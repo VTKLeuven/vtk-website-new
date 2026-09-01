@@ -71,8 +71,11 @@ const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
  * week alsnog niet, dan schuift ze horizontaal; op een telefoon is dat precies
  * het gedrag dat je wil, want dan veeg je van dag naar dag in plaats van zeven
  * onleesbare kolommen te zien.
+ *
+ * Als variabele zodat `app/globals.css` ze op een smal scherm kan bijstellen
+ * zonder dat dit bestand van de schermbreedte moet weten.
  */
-const DAY_MIN_WIDTH = '7rem';
+const DAY_MIN_WIDTH = 'var(--tg-day-min, 7rem)';
 
 /**
  * Het kolommenraster van de kalender: de urenkolom plus één kolom per dag.
@@ -502,7 +505,7 @@ export function TimeGrid({
                   columns_.current[dayIndex] = node;
                 }}
                 onPointerDown={(event) => beginCreate(event, dayIndex)}
-                className={`relative rounded-[10px] ${isToday ? 'bg-vtk-yellow/10' : 'bg-vtk-paper/70'} ${
+                className={`tg-day relative rounded-[10px] ${isToday ? 'bg-vtk-yellow/10' : 'bg-vtk-paper/70'} ${
                   onCreateRange ? 'cursor-copy' : ''
                 }`}
                 style={{ height }}

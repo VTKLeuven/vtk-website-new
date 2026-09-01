@@ -153,9 +153,56 @@ body {
 
 /* De dagkop is `position: sticky` binnen de scroller. Die scroller mag daarom
    geen `overflow: hidden` op een tussenliggende laag hebben; alles wat hier
-   scrollt, scrollt in .tg-scroller zelf. */
+   scrollt, scrollt in .tg-scroller zelf.
+
+   `touch-action: pan-x pan-y` houdt vegen native (en dus vloeiend) maar geeft
+   het knijpgebaar aan ons: op een telefoon zoomt twee vingers de kalender in
+   plaats van de hele pagina. Wie de pagina zelf wil vergroten, knijpt ernaast.
+   Tijdens het knijpen zet de component dit even op `none`, anders scrolt de
+   pane mee met het gebaar. */
 .tg-scroller {
   scrollbar-gutter: stable;
+  touch-action: pan-x pan-y;
+}
+
+/* Op een telefoon past een week niet, dus schuift ze horizontaal. Zonder
+   vastklikken sta je dan altijd half op twee dagen. Met `proximity` klikt ze
+   enkel vast wanneer je toch al dicht bij een dagrand stopt, dus een bewuste
+   veeg over anderhalve dag blijft mogelijk. `scroll-padding` houdt daarbij
+   rekening met de urenkolom, die links vastgeplakt staat: zonder die marge
+   schuift de dag waar je op mikt eronder. */
+@media (max-width: 700px) {
+  .tg-pane {
+    height: var(--tg-height, clamp(24rem, 78dvh, 60rem));
+  }
+
+  .tg-scroller {
+    scroll-snap-type: x proximity;
+    scroll-padding-inline-start: 3.25rem;
+  }
+
+  .tg-day {
+    scroll-snap-align: start;
+  }
+
+  /* Wat hier bewust niet staat:
+
+     - **De knoppen kleiner maken.** Dat scheelde zeventien pixels werkbalk en
+       bracht de raakvlakken terug tot 27px; daar mik je met een duim naast.
+       Minder lucht ertussen mag wel, en een ondergrens houdt ze aantikbaar.
+     - **De werkbalk vastplakken.** Sticky op `top: 0` legt ze over de bovenste
+       138px van de kalender, dus je verliest precies het stuk dat je wil zien.
+       Wil je de kalender schermvullend, dan is de knop "volledig scherm" de weg;
+       die geeft op een telefoon een vast paneel mét werkbalk erboven, en dat is
+       wat sticky hier had moeten doen. */
+  .transport-calendar-toolbar {
+    gap: 0.375rem;
+  }
+
+  .transport-calendar-toolbar a,
+  .transport-calendar-toolbar button {
+    min-height: 2.25rem;
+  }
 }
 
 /* Volledig scherm.

@@ -93,6 +93,51 @@ export function hourPxFor(fitHourPx: number, zoom: number): number {
   return Math.min(MAX_HOUR_PX, Math.max(MIN_HOUR_PX, fitHourPx * zoom));
 }
 
+/**
+ * Hoeveel het wiel zoomt, per pixel gescrolde afstand.
+ *
+ * Niet een vaste factor per gebeurtenis, en dat is het verschil met de eerste
+ * versie. Die deed 1,25x per `wheel`-event, en een trackpad vuurt er dertig per
+ * gebaar: één veeg sloeg dan meteen tegen het maximum aan. Dat is wat er
+ * "glitchte". Nu telt de afstand, dus een muiswiel met grote stappen en een
+ * trackpad met kleine stapjes komen op ongeveer hetzelfde uit, en een gebaar
+ * loopt vloeiend in plaats van in sprongen.
+ */
+export const ZOOM_WHEEL_PER_PX = 0.0015;
+
+/**
+ * Bovengrens op wat één gebeurtenis mag doen.
+ *
+ * Een muiswiel meldt soms 100 of zelfs 240 pixels per klik, en op een
+ * versnelde trackpadveeg lopen ze op tot in de honderden. Zonder deze grens
+ * springt de kalender bij zo'n enkele gebeurtenis alsnog een heel bereik door.
+ */
+export const ZOOM_WHEEL_MAX_PX = 60;
+
+/** Eén regel en één pagina in pixels, om `deltaMode` 1 en 2 om te rekenen. */
+const WHEEL_LINE_PX = 16;
+const WHEEL_PAGE_PX = 400;
+
+/**
+ * De scrollafstand van een `wheel`-gebeurtenis in pixels.
+ *
+ * Firefox en sommige muizen melden regels (`deltaMode` 1) of pagina's (2) in
+ * plaats van pixels; zonder omrekening zoomt dezelfde muis daar honderd keer
+ * trager dan in Chrome.
+ */
+export function wheelPixels(event: { deltaY: number; deltaMode: number }): number {
+  if (event.deltaMode === 1) return event.deltaY * WHEEL_LINE_PX;
+  if (event.deltaMode === 2) return event.deltaY * WHEEL_PAGE_PX;
+  return event.deltaY;
+}
+
+/** De nieuwe zoom na een wiel-gebeurtenis van `deltaPx` pixels. */
+export function zoomByWheel(zoom: number, deltaPx: number): number {
+  const capped = Math.max(-ZOOM_WHEEL_MAX_PX, Math.min(ZOOM_WHEEL_MAX_PX, deltaPx));
+  // Omhoog scrollen (negatieve delta) zoomt in, zoals overal elders.
+  return clampZoom(zoom * Math.exp(-capped * ZOOM_WHEEL_PER_PX));
+}
+
 export const ZOOM_STORAGE_KEY = 'logistiek.transportplanning.zoom';
 
 /**

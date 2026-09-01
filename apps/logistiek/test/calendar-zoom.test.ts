@@ -5,8 +5,11 @@ import {
   ZOOM_MAX,
   ZOOM_MIN,
   ZOOM_STEP,
+  ZOOM_WHEEL_MAX_PX,
   clampZoom,
   hourPxFor,
+  wheelPixels,
+  zoomByWheel,
 } from '../components/transport-calendar/types';
 
 /** Wat een pane van 24 uur hoog per uur overhoudt. */
@@ -63,5 +66,52 @@ describe('hourPxFor', () => {
 
   it('loopt niet weg bij een absurde hoogte', () => {
     expect(hourPxFor(fitFor(100_000), ZOOM_MAX)).toBe(MAX_HOUR_PX);
+  });
+});
+
+describe('wheelPixels', () => {
+  it('neemt pixels over zoals ze binnenkomen', () => {
+    expect(wheelPixels({ deltaY: 120, deltaMode: 0 })).toBe(120);
+  });
+
+  it('rekent regels en pagina\'s om naar pixels', () => {
+    // Firefox en sommige muizen melden regels of pagina's. Zonder omrekening
+    // zoomt dezelfde muis daar honderd keer trager dan in Chrome.
+    expect(wheelPixels({ deltaY: 3, deltaMode: 1 })).toBeGreaterThan(30);
+    expect(wheelPixels({ deltaY: 1, deltaMode: 2 })).toBeGreaterThan(300);
+  });
+});
+
+describe('zoomByWheel', () => {
+  it('zoomt in bij omhoog scrollen en uit bij omlaag', () => {
+    expect(zoomByWheel(2, -20)).toBeGreaterThan(2);
+    expect(zoomByWheel(2, 20)).toBeLessThan(2);
+  });
+
+  it('houdt één trackpadgebeurtenis klein', () => {
+    // Dit is waar het over ging: de eerste versie deed 1,25x per gebeurtenis, en
+    // een trackpad vuurt er dertig per gebaar. Eén stapje mag dus maar een paar
+    // procent zijn, anders slaat één veeg tegen het maximum aan.
+    expect(zoomByWheel(1, -8)).toBeLessThan(1.03);
+  });
+
+  it('blijft vloeiend over een heel gebaar', () => {
+    // Dertig kleine stapjes samen horen een merkbare maar beheersbare zoom te
+    // geven, niet het hele bereik.
+    let zoom = ZOOM_MIN;
+    for (let step = 0; step < 30; step += 1) zoom = zoomByWheel(zoom, -8);
+    expect(zoom).toBeGreaterThan(1.2);
+    expect(zoom).toBeLessThan(2.5);
+  });
+
+  it('vlakt één enorme gebeurtenis af', () => {
+    // Een versnelde trackpadveeg meldt soms honderden pixels in één keer; zonder
+    // grens springt de kalender dan alsnog een heel bereik door.
+    expect(zoomByWheel(1, -5000)).toBe(zoomByWheel(1, -ZOOM_WHEEL_MAX_PX));
+  });
+
+  it('blijft binnen de grenzen', () => {
+    expect(zoomByWheel(ZOOM_MIN, 500)).toBe(ZOOM_MIN);
+    expect(zoomByWheel(ZOOM_MAX, -500)).toBe(ZOOM_MAX);
   });
 });

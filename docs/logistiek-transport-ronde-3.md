@@ -162,9 +162,11 @@ en van de mobiele weergave.
   gekozen, loopt het rooster altijd van 00:00 tot 24:00, en zoomt scrollen rond
   de muis. Zie `docs/design-decisions.md` § Zoom is "hoeveel dag past er in
   beeld".
-- **Geen pinch-zoom.** Dat is op een telefoon de gebaar voor de paginazoom van de
-  browser; die overnemen breekt iets dat mensen al kennen. De knoppen werken daar
-  even goed. Google Agenda doet het op het web ook niet.
+- **~~Geen pinch-zoom.~~ Teruggedraaid.** De redenering was dat knijpen op een
+  telefoon het gebaar van de paginazoom is. Klopt, maar daardoor waren de twee
+  knopjes op het scherm waar zoom het hardst nodig is de enige weg, en dat is
+  het eerste wat iedereen probeert. `touch-action: pan-x pan-y` claimt enkel het
+  knijpgebaar op de kalender zelf; ernaast werkt de paginazoom gewoon.
 - **Klaar wanneer:** een drukke week op één scherm past, en een rustige week
   leesbaar groot staat.
 

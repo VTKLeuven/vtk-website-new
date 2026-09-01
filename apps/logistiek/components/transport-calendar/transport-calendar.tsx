@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { DriverColorOverrides } from '@/lib/driver-colors';
@@ -22,6 +22,8 @@ import {
   ZOOM_STORAGE_KEY,
   clampZoom,
   hourPxFor,
+  wheelPixels,
+  zoomByWheel,
   type AvailabilityBand,
   type CalendarVehicle,
   type TripBlock,
@@ -130,9 +132,22 @@ export function TransportCalendar({
   const [zoom, setZoom] = useState(ZOOM_MIN);
   const scroller = useRef<HTMLDivElement>(null);
   const metrics = useRef({ fitHourPx: 0, headHeight: 0 });
-  // De actuele zoom voor de luisteraars hieronder, die maar één keer opgehangen
-  // worden en anders de waarde van hun eerste render zouden vasthouden.
-  const zoomRef = useRef(zoom);
+  /**
+   * Twee zoomwaarden, en dat verschil is de reden dat het zoomen niet meer
+   * schokt.
+   *
+   * `zoomTarget` is waar we naartoe gaan en loopt meteen mee met elke
+   * gebeurtenis, zodat een tweede wieltik verder telt vanaf de eerste.
+   * `zoomApplied` is wat er op dat moment écht getekend staat, en enkel daarmee
+   * mag je de scrollpositie omrekenen: `scrollTop` hoort bij de hoogtes die nu
+   * in het scherm staan. Met één ref rekende een tweede gebeurtenis vóór de
+   * render de uren om met een uurhoogte die nog niet bestond, en dan sprong de
+   * dag weg.
+   */
+  const zoomTarget = useRef(zoom);
+  const zoomApplied = useRef(zoom);
+  /** Het uur dat na deze render weer op zijn plek moet komen. */
+  const pendingAnchor = useRef<{ hours: number; anchor: number } | null>(null);
 
   useEffect(() => {
     try {
@@ -164,18 +179,11 @@ export function TransportCalendar({
       // Het anker gemeten vanaf 00:00, dus vanaf ónder de vastgeplakte dagkop.
       // Zonder die aftrek schuift de dag bij elke zoomstap een kophoogte weg.
       const anchor = (anchorY ?? node.clientHeight / 2) - headHeight;
-      const before = hourPxFor(fit, zoomRef.current);
-      const after = hourPxFor(fit, value);
-      const hoursAtAnchor = (node.scrollTop + anchor) / before;
-      // Ná de render, want de nieuwe hoogte bestaat pas dan; anders klemt de
-      // browser de scrollpositie op de oude, kleinere inhoud.
-      requestAnimationFrame(() => {
-        const target = hoursAtAnchor * after - anchor;
-        node.scrollTop = Math.max(0, Math.min(target, node.scrollHeight - node.clientHeight));
-      });
+      const shown = hourPxFor(fit, zoomApplied.current);
+      pendingAnchor.current = { hours: (node.scrollTop + anchor) / shown, anchor };
     }
 
-    zoomRef.current = value;
+    zoomTarget.current = value;
     setZoom(value);
     try {
       window.localStorage.setItem(ZOOM_STORAGE_KEY, String(value));
@@ -184,8 +192,26 @@ export function TransportCalendar({
     }
   }, []);
 
-  useEffect(() => {
-    zoomRef.current = zoom;
+  /**
+   * De scrollpositie terugzetten zodat het vastgehouden uur weer op zijn plek
+   * ligt.
+   *
+   * In een layout-effect en niet in een `requestAnimationFrame`: dat laatste
+   * loopt niet gegarandeerd ná de commit, dus de browser klemde de nieuwe
+   * scrollpositie soms nog op de oude, kleinere inhoud. Dat gaf precies de
+   * sprongetjes bij het inzoomen. Een layout-effect draait ná de DOM en vóór
+   * het schilderen, dus de nieuwe hoogtes staan er en niemand ziet de tussenstap.
+   */
+  useLayoutEffect(() => {
+    zoomApplied.current = zoom;
+    zoomTarget.current = zoom;
+    const pending = pendingAnchor.current;
+    pendingAnchor.current = null;
+    const node = scroller.current;
+    const { fitHourPx: fit } = metrics.current;
+    if (!pending || !node || fit <= 0) return;
+    const target = pending.hours * hourPxFor(fit, zoom) - pending.anchor;
+    node.scrollTop = Math.max(0, Math.min(target, node.scrollHeight - node.clientHeight));
   }, [zoom]);
 
   /**
@@ -206,13 +232,82 @@ export function TransportCalendar({
       event.preventDefault();
       const pane = scroller.current;
       const anchor = pane ? event.clientY - pane.getBoundingClientRect().top : undefined;
-      // Vermenigvuldigen en niet optellen: één "klik" van het wiel voelt dan
-      // even groot boven- als onderaan het bereik.
-      const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
-      zoomAround(zoomRef.current * factor, anchor);
+      // De afstand telt, niet het aantal gebeurtenissen: zie `zoomByWheel`.
+      zoomAround(zoomByWheel(zoomTarget.current, wheelPixels(event)), anchor);
     }
     node.addEventListener('wheel', onWheel, { passive: false });
     return () => node.removeEventListener('wheel', onWheel);
+  }, [zoomAround]);
+
+  /**
+   * Knijpen met twee vingers zoomt, op het midden tussen je vingers.
+   *
+   * Op een telefoon bestaat ctrl+scrollen niet, en dan waren de twee knopjes in
+   * de werkbalk de enige manier om te zoomen. Dat is op het scherm waar zoom het
+   * meest nodig is precies het gebaar dat iedereen als eerste probeert.
+   *
+   * Het gebaar is **absoluut** en niet optellend: de verhouding wordt tegen de
+   * zoom bij het neerzetten van de tweede vinger gerekend. Bij optellen stapelen
+   * de afrondingen zich per beweging op en kruipt de kalender weg terwijl je
+   * stilhoudt.
+   *
+   * Zolang er geknepen wordt staat `touch-action` op `none`, zodat de pane niet
+   * tegelijk meescrolt met het gebaar. Daarbuiten blijft ze `pan-x pan-y`, dus
+   * gewoon vegen scrollt zoals altijd.
+   */
+  useEffect(() => {
+    const node = scroller.current;
+    if (!node) return;
+
+    const points = new Map<number, { x: number; y: number }>();
+    let pinch: { distance: number; zoom: number } | null = null;
+
+    function spread(): { distance: number; midY: number } | null {
+      const [a, b] = [...points.values()];
+      if (!a || !b) return null;
+      return { distance: Math.hypot(a.x - b.x, a.y - b.y), midY: (a.y + b.y) / 2 };
+    }
+
+    function onDown(event: PointerEvent) {
+      if (event.pointerType === 'mouse') return;
+      points.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      const now = spread();
+      if (points.size === 2 && now && now.distance > 0) {
+        pinch = { distance: now.distance, zoom: zoomTarget.current };
+        if (node) node.style.touchAction = 'none';
+      }
+    }
+
+    function onMove(event: PointerEvent) {
+      if (!points.has(event.pointerId)) return;
+      points.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (!pinch || points.size !== 2) return;
+      const now = spread();
+      if (!now || now.distance <= 0) return;
+      event.preventDefault();
+      const top = node ? node.getBoundingClientRect().top : 0;
+      zoomAround((pinch.zoom * now.distance) / pinch.distance, now.midY - top);
+    }
+
+    function onUp(event: PointerEvent) {
+      points.delete(event.pointerId);
+      if (points.size < 2 && pinch) {
+        pinch = null;
+        if (node) node.style.touchAction = '';
+      }
+    }
+
+    node.addEventListener('pointerdown', onDown);
+    // Op window, want een vinger mag tijdens het knijpen buiten de pane komen.
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', onUp);
+    window.addEventListener('pointercancel', onUp);
+    return () => {
+      node.removeEventListener('pointerdown', onDown);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onUp);
+    };
   }, [zoomAround]);
 
   /**

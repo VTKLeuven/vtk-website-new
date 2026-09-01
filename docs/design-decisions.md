@@ -2170,6 +2170,30 @@ Wat daarbij vastligt:
   moment dat je inzoomt om iets van dichtbij te bekijken. De kop wordt daarbij
   van de ankerpositie afgetrokken; die staat `sticky` boven de uren en hoort niet
   mee te schuiven.
+- **De afstand telt, niet het aantal gebeurtenissen.** Eerst deed het wiel een
+  vaste factor per `wheel`-event, en een trackpad vuurt er dertig per gebaar: één
+  veeg sloeg meteen tegen het maximum aan. Nu schaalt de zoom met de gescrolde
+  pixels (`zoomByWheel`), met een grens per gebeurtenis omdat een muis er soms
+  240 in één keer meldt. `deltaMode` wordt omgerekend, anders zoomt Firefox
+  honderd keer trager dan Chrome.
+- **De scrollcorrectie staat in een layout-effect, niet in een
+  `requestAnimationFrame`.** Dat laatste loopt niet gegarandeerd ná de commit,
+  dus klemde de browser de nieuwe scrollpositie soms nog op de oude, kleinere
+  inhoud; dat waren de sprongetjes bij het inzoomen. Daarvoor zijn er twee
+  zoomwaarden nodig: waar we naartoe gaan (telt meteen mee, zodat een tweede tik
+  verder telt) en wat er getekend staat (waarmee je `scrollTop` omrekent).
+- **Knijpen met twee vingers zoomt op een telefoon**, op het midden tussen je
+  vingers. Ronde 3 had dat bewust weggelaten omdat knijpen op een telefoon het
+  gebaar van de paginazoom is, maar op het scherm waar zoom het hardst nodig is
+  waren de twee knopjes daardoor de enige weg. `touch-action: pan-x pan-y` houdt
+  vegen native en geeft enkel het knijpgebaar aan ons; wie de pagina zelf wil
+  vergroten, knijpt naast de kalender. Het gebaar is absoluut (tegen de zoom bij
+  het neerzetten van de tweede vinger) en niet optellend, anders kruipt de
+  kalender weg terwijl je stilhoudt.
+- **Op een telefoon klikt de week per dag vast** (`scroll-snap-type: x
+  proximity`), met `scroll-padding` voor de vastgeplakte urenkolom. Zonder dat
+  sta je na elke veeg half op twee dagen. `proximity` en niet `mandatory`, zodat
+  een bewuste veeg over anderhalve dag mogelijk blijft.
 - **Bij het openen scrolt de kalender naar de vroegste rit**, minus een uur, of
   naar 08:00 als er niets staat. Bovenaan beginnen betekent vier uur nacht in
   beeld.
