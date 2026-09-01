@@ -153,3 +153,14 @@ describe("weergave", () => {
     expect(formatBytes(1024 * 1024 * 312)).toBe("312 MB");
   });
 });
+
+describe("filter parsing", () => {
+  it("valt netjes terug op het huidige werkingsjaar wanneer ?jaar= ontbreekt of leeg is", async () => {
+    const { readFilters } = await import("@/app/[locale]/admin/rekeningen/filters");
+    expect(readFilters({}, 2026).year).toBe(2026);
+    expect(readFilters({ jaar: "" }, 2026).year).toBe(2026);
+    expect(readFilters({ jaar: "   " }, 2026).year).toBe(2026);
+    expect(readFilters({ jaar: "alles" }, 2026).year).toBe("all");
+    expect(readFilters({ jaar: "2025" }, 2026).year).toBe(2025);
+  });
+});

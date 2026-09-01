@@ -117,6 +117,7 @@ export default async function RekeningenOverzicht({
       orderBy: [{ spentOn: "desc" }, { createdAt: "desc" }],
       take: PAGE_SIZE,
       skip: (filters.page - 1) * PAGE_SIZE,
+      include: expenseInclude,
     }),
     prisma.expense.aggregate({
       where: { AND: [yearScope, statusWhere("TO_REIMBURSE")] },
@@ -401,11 +402,12 @@ export default async function RekeningenOverzicht({
 
       <ExpenseWorkbench
         locale={locale}
-        rows={rowsRaw.map((expense) => toRow(expense, locale))}
+        rows={rowsRaw.map((expense) => toRow(expense, locale, access))}
         total={listCount}
         totalCents={listSum._sum.amountCents ?? 0}
         selected={selected ? toDetail(selected, locale, access) : null}
         hrefForRow={(id) => hrefWith({ sel: id })}
+        hrefWithoutSel={hrefWith({ sel: "" })}
         pagination={{
           page: filters.page,
           pages,

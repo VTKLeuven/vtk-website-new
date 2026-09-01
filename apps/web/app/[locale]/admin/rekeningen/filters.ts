@@ -56,11 +56,19 @@ export function readFilters(
   fallbackYear: number,
 ): ExpenseFilters {
   const rawYear = one(params, "jaar");
-  const parsedYear = Number(rawYear);
+  let year: number | "all" = fallbackYear;
+  if (rawYear === "alles") {
+    year = "all";
+  } else if (rawYear) {
+    const parsedYear = Number(rawYear);
+    if (Number.isInteger(parsedYear) && parsedYear > 0) {
+      year = parsedYear;
+    }
+  }
   const status = STATUS_BY_SLUG[one(params, "status")] ?? "all";
 
   return {
-    year: rawYear === "alles" ? "all" : Number.isInteger(parsedYear) ? parsedYear : fallbackYear,
+    year,
     status,
     q: one(params, "q").slice(0, 120),
     groupId: one(params, "post").slice(0, 40),

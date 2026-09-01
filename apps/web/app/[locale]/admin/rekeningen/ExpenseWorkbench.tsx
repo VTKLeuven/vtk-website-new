@@ -1,7 +1,14 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
+import { useState, type ReactNode } from "react";
 import type { Locale } from "@vtk/i18n";
+import { Modal } from "@/app/[locale]/admin/admin-table";
+import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
+import { IconButton, IconLink, RowActions } from "@/components/ui/IconButton";
+import { InfoIcon, PencilIcon } from "@/components/ui/icons";
 import {
   deleteExpenseAction,
   sendExpenseAction,
@@ -14,19 +21,10 @@ import {
   formatIban,
   type ExpenseStatus,
 } from "@/lib/rekeningen/expenses";
+import { BladModal } from "./BladModal";
 import { ExpenseActionBar } from "./ExpenseActionBar";
 import { ExpenseStateToggles } from "./ExpenseStateToggles";
 import { expenseErrorMessages } from "./messages";
-
-/**
- * De werkbank: de lijst links, de rekening die je bekeek rechts.
- *
- * Beide kanten worden serverkant gerenderd; de selectie zit in `?sel=` in de
- * URL. Zo is een geopende rekening een deelbare link, blijft de lijst een gewone
- * server-tabel die met tienduizend rijen overweg kan, en is er geen clientstate
- * die uit de pas kan lopen met de database. Enkel de vinkjes, het
- * voorbeeldvenster en verwijderen zijn client.
- */
 
 export type ExpenseRow = {
   id: string;
@@ -38,15 +36,6 @@ export type ExpenseRow = {
   amountCents: number;
   status: ExpenseStatus;
   paymentMethod: "VTK_CARD" | "PERSONAL";
-};
-
-export type ExpenseDetail = ExpenseRow & {
-  iban: string | null;
-  submittedByName: string | null;
-  submittedAtLabel: string;
-  receiptName: string;
-  receiptMime: string;
-  receiptSize: number;
   paidAtLabel: string | null;
   paidByName: string | null;
   bookedAtLabel: string | null;
@@ -54,8 +43,17 @@ export type ExpenseDetail = ExpenseRow & {
   sentAtLabel: string | null;
   sentTo: string | null;
   canEdit: boolean;
-  /** De mail naar de boekhouding, klaar om als voorbeeld te tonen. */
-  mail: { subject: string; body: string; attachmentName: string };
+  canDelete: boolean;
+  receiptName: string;
+  receiptMime: string;
+  mail: { from?: string; subject: string; body: string; attachmentName: string };
+};
+
+export type ExpenseDetail = ExpenseRow & {
+  iban: string | null;
+  submittedByName: string | null;
+  submittedAtLabel: string;
+  receiptSize: number;
 };
 
 export function ExpenseWorkbench({
@@ -65,6 +63,7 @@ export function ExpenseWorkbench({
   totalCents,
   selected,
   hrefForRow,
+  hrefWithoutSel,
   pagination,
   emptyMessage,
   canManageState,
@@ -77,8 +76,8 @@ export function ExpenseWorkbench({
   total: number;
   totalCents: number;
   selected: ExpenseDetail | null;
-  /** Link naar dezelfde pagina met deze rekening geopend. */
   hrefForRow: (id: string) => string;
+  hrefWithoutSel: string;
   pagination: { page: number; pages: number; hrefFor: (page: number) => string };
   emptyMessage: string;
   canManageState: boolean;
@@ -87,9 +86,19 @@ export function ExpenseWorkbench({
   editHrefFor: (id: string) => string;
 }) {
   const nl = locale === "nl";
+  const router = useRouter();
+
+  // Snelle actie direct vanuit de tabel zonder eerst het detailpaneel te moeten openen
+  const [activeBlad, setActiveBlad] = useState<{
+    expenseId: string;
+    mode: "download" | "send";
+    mail: { from: string; subject: string; body: string; attachmentName: string };
+  } | null>(null);
+
+  const errorMessages = expenseErrorMessages(locale);
 
   return (
-    <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(320px,1fr)]">
+    <div className="w-full space-y-4">
       <div className="overflow-hidden rounded-2xl border border-vtk-blue/12 bg-white">
         {rows.length === 0 ? (
           <p className="px-5 py-12 text-center text-sm text-[#5c667f]">{emptyMessage}</p>
@@ -97,48 +106,177 @@ export function ExpenseWorkbench({
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr>
-                  <th scope="col">{nl ? "Datum" : "Date"}</th>
-                  <th scope="col">{nl ? "Omschrijving" : "Description"}</th>
-                  <th scope="col">{nl ? "Post" : "Post"}</th>
-                  <th scope="col" className="text-right">
-                    {nl ? "Bedrag" : "Amount"}
-                  </th>
-                  <th scope="col">{nl ? "Status" : "Status"}</th>
+                <tr className="border-b border-vtk-blue/10 text-left text-xs font-semibold text-[#5c667f]">
+                  <th scope="col" className="px-4 py-3">{nl ? "Datum" : "Date"}</th>
+                  <th scope="col" className="px-4 py-3">{nl ? "Omschrijving" : "Description"}</th>
+                  <th scope="col" className="px-4 py-3">{nl ? "Post" : "Post"}</th>
+                  <th scope="col" className="px-4 py-3 text-right">{nl ? "Bedrag" : "Amount"}</th>
+                  <th scope="col" className="px-4 py-3">{nl ? "Betaald met" : "Payment"}</th>
+                  <th scope="col" className="px-4 py-3">{nl ? "Terugbetaald" : "Reimbursed"}</th>
+                  <th scope="col" className="px-4 py-3">{nl ? "Ingeboekt" : "Booked"}</th>
+                  <th scope="col" className="px-4 py-3">{nl ? "Doorgestuurd" : "Forwarded"}</th>
+                  <th scope="col" className="px-4 py-3">{nl ? "Status" : "Status"}</th>
+                  <th scope="col" className="px-4 py-3 text-right">{nl ? "Acties" : "Actions"}</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-vtk-blue/5">
                 {rows.map((row) => {
                   const isSelected = selected?.id === row.id;
                   return (
                     <tr
                       key={row.id}
-                      // `relative` draagt de uitgerekte link hieronder: zo is de
-                      // hele rij klikbaar terwijl er maar één echte link staat,
-                      // met de omschrijving als toegankelijke naam.
-                      className={`relative ${isSelected ? "bg-vtk-yellow/12" : ""}`}
+                      className={`group transition-colors hover:bg-vtk-blue-soft/30 ${
+                        isSelected ? "bg-vtk-yellow/12" : ""
+                      }`}
                     >
-                      <td className="whitespace-nowrap tabular-nums text-[#34405e]">
+                      <td className="whitespace-nowrap px-4 py-3 tabular-nums text-[#34405e]">
                         {row.spentOnLabel}
                       </td>
-                      <td>
-                        <Link
-                          href={hrefForRow(row.id)}
-                          scroll={false}
-                          className="font-semibold text-vtk-ink after:absolute after:inset-0 after:content-['']"
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => router.push(hrefForRow(row.id), { scroll: false })}
+                          className="text-left font-semibold text-vtk-ink hover:underline"
                         >
                           {row.description}
-                        </Link>
+                        </button>
                         <span className="block text-xs font-normal text-[#5c667f]">
                           {row.activity} · {row.payerName}
                         </span>
                       </td>
-                      <td className="text-[#34405e]">{row.postLabel}</td>
-                      <td className="whitespace-nowrap text-right font-semibold tabular-nums text-vtk-ink">
+                      <td className="whitespace-nowrap px-4 py-3 text-[#34405e]">{row.postLabel}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-vtk-ink">
                         {formatEuro(row.amountCents, locale)}
                       </td>
-                      <td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {row.paymentMethod === "VTK_CARD" ? (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
+                            💳 {nl ? "VTK-kaart" : "VTK card"}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                            👤 {nl ? "Eigen kaart" : "Personal"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {row.paymentMethod === "VTK_CARD" ? (
+                          <span
+                            className="text-xs text-zinc-400"
+                            title={nl ? "N.v.t. (met VTK-kaart betaald)" : "N/A (paid with VTK card)"}
+                          >
+                            —
+                          </span>
+                        ) : row.paidAtLabel ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
+                            title={row.paidByName ? `${nl ? "Door" : "By"} ${row.paidByName}` : undefined}
+                          >
+                            ✓ {nl ? "Terugbetaald" : "Reimbursed"}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
+                            ⏱ {nl ? "Nog terugbetalen" : "To reimburse"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {row.bookedAtLabel ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
+                            title={row.bookedByName ? `${nl ? "Door" : "By"} ${row.bookedByName}` : undefined}
+                          >
+                            ✓ {nl ? "Ingeboekt" : "Booked"}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-500">
+                            ⏱ {nl ? "Nog niet" : "Not yet"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        {row.sentAtLabel ? (
+                          <span
+                            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
+                            title={row.sentTo ? `${nl ? "Naar" : "To"} ${row.sentTo}` : undefined}
+                          >
+                            ✓ {nl ? "Doorgestuurd" : "Forwarded"}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-500">
+                            ⏱ {nl ? "Nog niet" : "Not yet"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
                         <StatusPill status={row.status} locale={locale} />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        <RowActions>
+                          <IconButton
+                            label={nl ? "Blad bekijken" : "View sheet"}
+                            srLabel={`${nl ? "Blad bekijken" : "View sheet"}: ${row.description}`}
+                            onClick={() =>
+                              setActiveBlad({
+                                expenseId: row.id,
+                                mode: "download",
+                                mail: { ...row.mail, from: senderEmail },
+                              })
+                            }
+                          >
+                            <DocumentIcon />
+                          </IconButton>
+                          {canManageState && (
+                            <IconButton
+                              label={nl ? "Doorsturen naar boekhouder" : "Forward to accountant"}
+                              srLabel={`${nl ? "Doorsturen" : "Forward"}: ${row.description}`}
+                              onClick={() =>
+                                setActiveBlad({
+                                  expenseId: row.id,
+                                  mode: "send",
+                                  mail: { ...row.mail, from: senderEmail },
+                                })
+                              }
+                            >
+                              <SendIcon />
+                            </IconButton>
+                          )}
+                          <IconButton
+                            label={nl ? "Details openen" : "Open details"}
+                            srLabel={`${nl ? "Details openen" : "Open details"}: ${row.description}`}
+                            onClick={() => router.push(hrefForRow(row.id), { scroll: false })}
+                          >
+                            <InfoIcon />
+                          </IconButton>
+                          {row.canEdit && (
+                            <IconLink
+                              href={editHrefFor(row.id)}
+                              label={nl ? "Bewerken" : "Edit"}
+                              srLabel={`${nl ? "Bewerken" : "Edit"}: ${row.description}`}
+                            >
+                              <PencilIcon />
+                            </IconLink>
+                          )}
+                          {row.canDelete && (
+                            <DeleteIconButton
+                              action={deleteExpenseAction}
+                              fields={{ id: row.id }}
+                              title={nl ? "Rekening verwijderen?" : "Delete expense?"}
+                              description={
+                                nl
+                                  ? `"${row.description}" (${formatEuro(row.amountCents, locale)}, ${row.postLabel}) verdwijnt samen met het bonnetje uit de opslag.`
+                                  : `"${row.description}" (${formatEuro(row.amountCents, locale)}, ${row.postLabel}) disappears together with the receipt in storage.`
+                              }
+                              confirmLabel={nl ? "Verwijderen" : "Delete"}
+                              cancelLabel={nl ? "Annuleren" : "Cancel"}
+                              label={nl ? "Verwijderen" : "Delete"}
+                              srLabel={`${nl ? "Verwijderen" : "Delete"}: ${row.description}`}
+                              successMessage={
+                                nl ? "Rekening en bonnetje verwijderd." : "Expense and receipt deleted."
+                              }
+                            />
+                          )}
+                        </RowActions>
                       </td>
                     </tr>
                   );
@@ -157,7 +295,10 @@ export function ExpenseWorkbench({
           {pagination.pages > 1 && (
             <nav className="flex items-center gap-1" aria-label={nl ? "Paginering" : "Pagination"}>
               {pagination.page > 1 && (
-                <Link href={pagination.hrefFor(pagination.page - 1)} className="rounded-lg border border-vtk-blue/15 px-2 py-1">
+                <Link
+                  href={pagination.hrefFor(pagination.page - 1)}
+                  className="rounded-lg border border-vtk-blue/15 px-2 py-1 hover:bg-vtk-blue-soft/50"
+                >
                   {nl ? "Vorige" : "Previous"}
                 </Link>
               )}
@@ -165,7 +306,10 @@ export function ExpenseWorkbench({
                 {pagination.page} / {pagination.pages}
               </span>
               {pagination.page < pagination.pages && (
-                <Link href={pagination.hrefFor(pagination.page + 1)} className="rounded-lg border border-vtk-blue/15 px-2 py-1">
+                <Link
+                  href={pagination.hrefFor(pagination.page + 1)}
+                  className="rounded-lg border border-vtk-blue/15 px-2 py-1 hover:bg-vtk-blue-soft/50"
+                >
                   {nl ? "Volgende" : "Next"}
                 </Link>
               )}
@@ -174,35 +318,48 @@ export function ExpenseWorkbench({
         </div>
       </div>
 
-      <aside className="xl:sticky xl:top-4">
-        {selected ? (
-          <Inspector
-            locale={locale}
-            expense={selected}
-            canManageState={canManageState}
-            accountantEmail={accountantEmail}
-            senderEmail={senderEmail}
-            editHref={editHrefFor(selected.id)}
-          />
-        ) : (
-          <div className="rounded-2xl border border-dashed border-vtk-blue/20 bg-white/60 px-5 py-10 text-center text-sm text-[#5c667f]">
-            {nl
-              ? "Klik op een rekening om het bonnetje en de gegevens ernaast te zien."
-              : "Click an expense to see its receipt and details alongside."}
-          </div>
-        )}
-      </aside>
+      {/* Modal voor geopende rekening */}
+      {selected && (
+        <ExpenseDetailModal
+          locale={locale}
+          expense={selected}
+          canManageState={canManageState}
+          accountantEmail={accountantEmail}
+          senderEmail={senderEmail}
+          editHref={editHrefFor(selected.id)}
+          onClose={() => router.push(hrefWithoutSel, { scroll: false })}
+        />
+      )}
+
+      {/* Direct blad downloaden of versturen vanuit tabelrij */}
+      {activeBlad && (
+        <BladModal
+          expenseId={activeBlad.expenseId}
+          locale={nl ? "nl" : "en"}
+          mode={activeBlad.mode}
+          defaultRecipient={activeBlad.mode === "send" ? accountantEmail : undefined}
+          mail={activeBlad.mail}
+          sendAction={sendExpenseAction}
+          labels={{
+            savedMessage: nl ? "Blad verstuurd naar de boekhouding." : "Sheet sent to the accountant.",
+            fallbackErrorMessage: nl ? "Er ging iets mis." : "Something went wrong.",
+            errorMessages,
+          }}
+          onClose={() => setActiveBlad(null)}
+        />
+      )}
     </div>
   );
 }
 
-function Inspector({
+function ExpenseDetailModal({
   locale,
   expense,
   canManageState,
   accountantEmail,
   senderEmail,
   editHref,
+  onClose,
 }: {
   locale: Locale;
   expense: ExpenseDetail;
@@ -210,6 +367,7 @@ function Inspector({
   accountantEmail: string;
   senderEmail: string;
   editHref: string;
+  onClose: () => void;
 }) {
   const nl = locale === "nl";
   const errorMessages = expenseErrorMessages(locale);
@@ -217,18 +375,20 @@ function Inspector({
   const receiptUrl = `/api/admin/rekeningen/${expense.id}/bon`;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-vtk-blue/12 bg-white">
-      <div className="flex items-start justify-between gap-3 border-b border-vtk-blue/10 px-4 py-3">
-        <div className="min-w-0">
-          <h2 className="truncate text-base font-semibold text-vtk-ink">{expense.description}</h2>
-          <p className="mt-0.5 text-xs text-[#5c667f]">
+    <Modal
+      title={expense.description}
+      size="lg"
+      onClose={onClose}
+    >
+      <div className="space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-vtk-blue/10 pb-3">
+          <div className="text-xs text-[#5c667f]">
             {expense.postLabel} · {expense.activity} · {expense.spentOnLabel}
-          </p>
+          </div>
+          <StatusPill status={expense.status} locale={locale} />
         </div>
-        <StatusPill status={expense.status} locale={locale} />
-      </div>
 
-      <div className="space-y-4 px-4 py-4">
+        {/* Bonnetjeskaart */}
         <a
           href={receiptUrl}
           target="_blank"
@@ -237,8 +397,6 @@ function Inspector({
         >
           <span className="relative grid h-20 w-16 shrink-0 place-items-center overflow-hidden rounded-lg border border-vtk-blue/12 bg-white">
             {isImage ? (
-              // Onbewerkt: het bonnetje zit achter een login en de beeldoptimizer
-              // stuurt geen sessiecookie mee, dus die zou een 403 binnenhalen.
               <Image
                 src={receiptUrl}
                 alt=""
@@ -268,9 +426,10 @@ function Inspector({
           </span>
         </a>
 
+        {/* Gegevenslijst */}
         <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
           <Row label={nl ? "Bedrag" : "Amount"}>
-            <span className="font-semibold tabular-nums">
+            <span className="font-semibold tabular-nums text-vtk-ink">
               {formatEuro(expense.amountCents, locale)}
             </span>
           </Row>
@@ -294,6 +453,7 @@ function Inspector({
           </Row>
         </dl>
 
+        {/* Toggles voor statussen */}
         <ExpenseStateToggles
           expenseId={expense.id}
           locale={nl ? "nl" : "en"}
@@ -311,31 +471,35 @@ function Inspector({
             errorMessages,
           }}
         />
-      </div>
 
-      <ExpenseActionBar
-        expenseId={expense.id}
-        locale={nl ? "nl" : "en"}
-        editHref={editHref}
-        canEdit={expense.canEdit}
-        canSend={canManageState}
-        defaultRecipient={accountantEmail}
-        mail={{ ...expense.mail, from: senderEmail }}
-        sendAction={sendExpenseAction}
-        deleteAction={deleteExpenseAction}
-        deleteDescription={
-          nl
-            ? `"${expense.description}" (${formatEuro(expense.amountCents, locale)}, ${expense.postLabel}) verdwijnt samen met het bonnetje uit de opslag. Al doorgestuurde bladen bij de boekhouder blijven uiteraard staan.`
-            : `"${expense.description}" (${formatEuro(expense.amountCents, locale)}, ${expense.postLabel}) disappears together with the receipt in storage. Sheets already forwarded to the accountant of course stay put.`
-        }
-        labels={{
-          savedMessage: nl ? "Opgeslagen." : "Saved.",
-          sentMessage: nl ? "Blad verstuurd naar de boekhouding." : "Sheet sent to the accountant.",
-          fallbackErrorMessage: nl ? "Er ging iets mis." : "Something went wrong.",
-          errorMessages,
-        }}
-      />
-    </div>
+        {/* Actiebalk */}
+        <div className="-mx-5 -mb-4 mt-4">
+          <ExpenseActionBar
+            expenseId={expense.id}
+            locale={nl ? "nl" : "en"}
+            editHref={editHref}
+            canEdit={expense.canEdit}
+            canDelete={expense.canDelete}
+            canSend={canManageState}
+            defaultRecipient={accountantEmail}
+            mail={{ ...expense.mail, from: senderEmail }}
+            sendAction={sendExpenseAction}
+            deleteAction={deleteExpenseAction}
+            deleteDescription={
+              nl
+                ? `"${expense.description}" (${formatEuro(expense.amountCents, locale)}, ${expense.postLabel}) verdwijnt samen met het bonnetje uit de opslag.`
+                : `"${expense.description}" (${formatEuro(expense.amountCents, locale)}, ${expense.postLabel}) disappears together with the receipt in storage.`
+            }
+            labels={{
+              savedMessage: nl ? "Opgeslagen." : "Saved.",
+              sentMessage: nl ? "Blad verstuurd naar de boekhouding." : "Sheet sent to the accountant.",
+              fallbackErrorMessage: nl ? "Er ging iets mis." : "Something went wrong.",
+              errorMessages,
+            }}
+          />
+        </div>
+      </div>
+    </Modal>
   );
 }
 
@@ -364,5 +528,45 @@ export function StatusPill({ status, locale }: { status: ExpenseStatus; locale: 
     >
       {expenseStatusLabel(status, locale === "nl")}
     </span>
+  );
+}
+
+function DocumentIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+    </svg>
+  );
+}
+
+function SendIcon() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <line x1="22" y1="2" x2="11" y2="13" />
+      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+    </svg>
   );
 }

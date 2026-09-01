@@ -96,31 +96,48 @@ export function visibilityWhere(access: ExpenseAccess) {
   return { submittedById: access.session.user.id };
 }
 
-type ExpenseGate = Pick<Expense, "groupId" | "submittedById" | "paidAt" | "sentAt" | "bookedAt">;
+type ExpenseGate = Pick<
+  Expense,
+  "groupId" | "submittedById" | "paidAt" | "sentAt" | "bookedAt" | "paymentMethod"
+>;
 
 /** Mag deze gebruiker deze rekening openen (bonnetje, blad, detail)? */
-export function canView(access: ExpenseAccess, expense: ExpenseGate): boolean {
+export function canView(
+  access: ExpenseAccess,
+  expense: Pick<Expense, "groupId" | "submittedById">,
+): boolean {
   if (access.canManageAll) return true;
   if (expense.submittedById === access.session.user.id) return true;
   return access.canManagePost && expense.groupId !== null && access.postScope.includes(expense.groupId);
 }
 
 /**
- * Mag deze gebruiker deze rekening nog wijzigen of wissen?
+ * Mag deze gebruiker deze rekening nog wijzigen?
  *
- * Billsheet blokkeerde bewerken zodra `paid` aan stond ("Paid bills cannot be
- * edited"): het bedrag op het blad moet overeenkomen met wat er uitbetaald is.
- * Diezelfde grens geldt hier, en ze loopt door tot na het doorsturen en
- * inboeken; een indiener mag daarnaast zijn eigen rekening corrigeren zolang er
- * niets van dat alles gebeurd is.
+ * Ingeboekte rekeningen kunnen niet gewijzigd worden. Rekeningen die met eigen
+ * kaart betaald zijn en al terugbetaald werden, kunnen niet gewijzigd worden
+ * om discrepanties met de overschrijving te voorkomen.
  */
 export function canEdit(access: ExpenseAccess, expense: ExpenseGate): boolean {
-  if (expense.paidAt || expense.sentAt || expense.bookedAt) {
-    // Enkel wie alles beheert kan een verwerkte rekening nog rechtzetten, en dan
-    // nog: eerst het vinkje weghalen. Zie `canManageState`.
-    return false;
-  }
+  if (expense.bookedAt) return false;
+  if (expense.paymentMethod === "PERSONAL" && expense.paidAt) return false;
   if (access.canManageAll) return true;
+  if (expense.sentAt) return false;
+  if (expense.submittedById === access.session.user.id) return true;
+  return access.canManagePost && expense.groupId !== null && access.postScope.includes(expense.groupId);
+}
+
+/**
+ * Mag deze gebruiker deze rekening verwijderen?
+ *
+ * Beheerders met volledig beheer (expenses.manage) kunnen altijd verwijderen.
+ * Indieners en post-beheerders kunnen verwijderen zolang de rekening niet
+ * doorgestuurd, ingeboekt of terugbetaald is.
+ */
+export function canDelete(access: ExpenseAccess, expense: ExpenseGate): boolean {
+  if (access.canManageAll) return true;
+  if (expense.bookedAt || expense.sentAt) return false;
+  if (expense.paymentMethod === "PERSONAL" && expense.paidAt) return false;
   if (expense.submittedById === access.session.user.id) return true;
   return access.canManagePost && expense.groupId !== null && access.postScope.includes(expense.groupId);
 }

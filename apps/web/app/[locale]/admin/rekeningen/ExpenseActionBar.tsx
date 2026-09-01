@@ -17,6 +17,7 @@ export function ExpenseActionBar({
   locale,
   editHref,
   canEdit,
+  canDelete = false,
   canSend,
   defaultRecipient,
   mail,
@@ -29,6 +30,7 @@ export function ExpenseActionBar({
   locale: "nl" | "en";
   editHref: string;
   canEdit: boolean;
+  canDelete?: boolean;
   canSend: boolean;
   defaultRecipient: string;
   /** De mail die straks vertrekt; het venster toont ze als voorbeeld. */
@@ -66,7 +68,7 @@ export function ExpenseActionBar({
             {nl ? "Bewerken" : "Edit"}
           </Link>
         )}
-        {canEdit && (
+        {canDelete && (
           <DeleteButton
             action={deleteAction}
             fields={{ id: expenseId }}

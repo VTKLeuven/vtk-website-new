@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/session";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import {
+  canDelete,
   canEdit,
   canManageState,
   canView,
@@ -248,7 +249,7 @@ export async function deleteExpenseAction(formData: FormData): Promise<void> {
   const id = text(formData, "id", 40);
   const existing = await prisma.expense.findUnique({ where: { id } });
   if (!existing) return;
-  if (!canEdit(access, existing)) throw new Error("FORBIDDEN");
+  if (!canDelete(access, existing)) throw new Error("FORBIDDEN");
 
   await prisma.expense.delete({ where: { id } });
   await deleteObject(existing.receiptKey).catch((error) =>
