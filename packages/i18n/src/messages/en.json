@@ -250,7 +250,7 @@
     "loginRequiredTitle": "Please log in to view this page",
     "loginRequiredBody": "You must be logged in before you can view the content on this page.",
     "goHome": "Go home",
-    "signInWithKulLong": "Sign in with the KU Leuven Authenticator",
+    "signInWithKulLong": "Sign in with KU Leuven Account",
     "signInWithKulHint": "The normal route for students: you sign in at KU Leuven itself.",
     "noKulLead": "Not a KU Leuven student (any more):",
     "noKulLink": "click here",
