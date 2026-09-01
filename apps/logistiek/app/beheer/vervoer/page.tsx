@@ -11,6 +11,7 @@ import {
 import { AuditTimeline } from '@/components/audit-timeline';
 import { PhoneLink } from '@/components/phone-link';
 import { EventLink } from '@/components/event-link';
+import { LogisticsIcon } from '@/components/logistics-icon';
 import {
   adminVanBookings,
   adminVehicles,
@@ -409,10 +410,24 @@ export default async function BeheerVervoerPage({
           </Link>
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          {/* T6: twee losse links, elk met een eigen bestemming en een titel
-              die zegt waar ze heen gaan, zodat ze niet door elkaar lopen met
-              de "Transportplanning"-tab in de navigatie (N1, zelfde bestemming
-              als hieronder). */}
+          {/* T6: losse links, elk met een eigen bestemming en een titel die zegt
+              waar ze heen gaan, zodat ze niet door elkaar lopen met de
+              "Transportplanning"-tab in de navigatie (N1, zelfde bestemming als
+              hieronder).
+
+              "Mijn ritten" staat vooraan en is de enige gevulde knop van de
+              drie: het is het scherm waar je als chauffeur zelf iets invult (je
+              kilometers, je beschikbaarheid), en dat is iets anders dan de twee
+              overzichten ernaast. Het stond nergens op deze pagina, terwijl dit
+              precies het scherm is waar een chauffeur op belandt. */}
+          <Link
+            href="/ritten"
+            title="Je eigen ritten: kilometers invullen, afronden, en doorgeven wanneer je kan rijden"
+            className="inline-flex items-center gap-2 rounded-full bg-vtk-navy px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-vtk-navy/90"
+          >
+            <LogisticsIcon name="driver" className="h-4 w-4" />
+            Mijn ritten
+          </Link>
           <Link
             href="/beheer/vervoer/week"
             title="Weekraster per voertuig, met beheeracties (zelfde als Transportplanning in de navigatie)"

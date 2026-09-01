@@ -131,8 +131,11 @@ export default async function VervoerWeekPage({
     activeGroups(),
     // De evenementen die dit venster raken, voor de strook erboven (P5).
     filters.showEvents ? eventsInRange(from, to) : Promise.resolve([]),
-    // Enkel ophalen wanneer de band ook getoond wordt (V1).
-    filters.showAvailability ? availabilityInRange(from, to) : Promise.resolve([]),
+    // Altijd ophalen, ook wanneer de band in het rooster uitstaat: de strook
+    // "Wie kan er rijden" onder de planning toont dezelfde gegevens en heeft ze
+    // dus altijd nodig. De filter bepaalt enkel of ze óók achter de ritten
+    // liggen.
+    availabilityInRange(from, to),
   ]);
 
   const conflicts = conflictingIds(bookings);

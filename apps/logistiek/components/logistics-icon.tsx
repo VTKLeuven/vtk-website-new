@@ -18,7 +18,13 @@ type IconName =
   | 'external'
   | 'expand'
   | 'collapse'
-  | 'chevron';
+  | 'chevron'
+  | 'template'
+  | 'text'
+  | 'settings'
+  | 'planning'
+  | 'basket'
+  | 'bottle';
 
 export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {
   const paths = {
@@ -130,6 +136,57 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
         <path d="M14 4h6v6" />
         <path d="M20 4 11 13" />
         <path d="M18 14v4.5a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 4 18.5v-11A1.5 1.5 0 0 1 5.5 6H10" />
+      </>
+    ),
+    /** Sjablonen: twee blaadjes over elkaar, want een sjabloon maak je na. */
+    template: (
+      <>
+        <path d="M9 4h7l3 3v9a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Z" />
+        <path d="M16 4v3.5H19" />
+        <path d="M15.5 17v2a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V8a1 1 0 0 1 1-1h2" />
+      </>
+    ),
+    /** Teksten: regels tekst, zoals in een alinea. */
+    text: (
+      <>
+        <path d="M4.5 6h15" />
+        <path d="M4.5 10.5h15" />
+        <path d="M4.5 15h11" />
+        <path d="M4.5 19.5h7" />
+      </>
+    ),
+    /** Instellingen: schuifregelaars. Bij 16 pixels leest een tandwiel als vlek. */
+    settings: (
+      <>
+        <path d="M4 7h16M4 12h16M4 17h16" />
+        <path d="M9 7v0M15 12v0M7.5 17v0" />
+        <circle cx="9" cy="7" r="2" />
+        <circle cx="15" cy="12" r="2" />
+        <circle cx="7.5" cy="17" r="2" />
+      </>
+    ),
+    /** Transportplanning: een week als raster, het beeld van de planning zelf. */
+    planning: (
+      <>
+        <rect x="3.5" y="5" width="17" height="15" rx="2" />
+        <path d="M3.5 9.5h17" />
+        <path d="M9 9.5V20M15 9.5V20" />
+        <path d="M8 3.5v3M16 3.5v3" />
+      </>
+    ),
+    /** Collect&Go: een winkelmandje; het is een bestelling en geen rit. */
+    basket: (
+      <>
+        <path d="M4 9.5h16l-1.4 8.1a2 2 0 0 1-2 1.65H7.4a2 2 0 0 1-2-1.65Z" />
+        <path d="m8.5 9.5 2.2-5M15.5 9.5l-2.2-5" />
+        <path d="M10 13v3M14 13v3" />
+      </>
+    ),
+    /** Flesserke: een fles. Stond op hetzelfde doosje als de inventaris. */
+    bottle: (
+      <>
+        <path d="M10 3h4v3.2c0 .6.2 1.1.6 1.6l1.2 1.4c.4.5.7 1.1.7 1.8v8a2 2 0 0 1-2 2H9.5a2 2 0 0 1-2-2v-8c0-.7.2-1.3.7-1.8l1.2-1.4c.4-.5.6-1 .6-1.6Z" />
+        <path d="M7.5 13.5h9" />
       </>
     ),
   } satisfies Record<IconName, ReactNode>;

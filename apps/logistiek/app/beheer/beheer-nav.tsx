@@ -57,21 +57,26 @@ const nodes: AdminNavNode[] = [
 // Een icoon per onderdeel, en niet vier keer de kalender: Overzicht,
 // Evenementen, Aanvragen, Chauffeurs en Kalender droegen alle vijf hetzelfde
 // blaadje, waardoor de zijbalk enkel nog op het woord te lezen was.
+//
+// Tweede ronde, om dezelfde reden. Sjablonen, Teksten en Instellingen droegen
+// alle drie het potlood van de groep "Overig" waarin ze staan, en Ritten,
+// Transportplanning en Collect&Go alle drie dezelfde bestelwagen. Een icoon dat
+// naast zijn buur hetzelfde is, is geen icoon meer maar een opvulling.
 const icons = {
   overview: <LogisticsIcon name="dashboard" className="h-4 w-4 shrink-0" />,
   requests: <LogisticsIcon name="request" className="h-4 w-4 shrink-0" />,
   events: <LogisticsIcon name="event" className="h-4 w-4 shrink-0" />,
   inventory: <LogisticsIcon name="material" className="h-4 w-4 shrink-0" />,
-  templates: <LogisticsIcon name="edit" className="h-4 w-4 shrink-0" />,
-  drinks: <LogisticsIcon name="material" className="h-4 w-4 shrink-0" />,
-  collectengo: <LogisticsIcon name="van" className="h-4 w-4 shrink-0" />,
+  templates: <LogisticsIcon name="template" className="h-4 w-4 shrink-0" />,
+  drinks: <LogisticsIcon name="bottle" className="h-4 w-4 shrink-0" />,
+  collectengo: <LogisticsIcon name="basket" className="h-4 w-4 shrink-0" />,
   trips: <LogisticsIcon name="van" className="h-4 w-4 shrink-0" />,
-  transportplanning: <LogisticsIcon name="van" className="h-4 w-4 shrink-0" />,
+  transportplanning: <LogisticsIcon name="planning" className="h-4 w-4 shrink-0" />,
   drivers: <LogisticsIcon name="driver" className="h-4 w-4 shrink-0" />,
   other: <LogisticsIcon name="edit" className="h-4 w-4 shrink-0" />,
   calendar: <LogisticsIcon name="reservation" className="h-4 w-4 shrink-0" />,
-  texts: <LogisticsIcon name="edit" className="h-4 w-4 shrink-0" />,
-  settings: <LogisticsIcon name="edit" className="h-4 w-4 shrink-0" />,
+  texts: <LogisticsIcon name="text" className="h-4 w-4 shrink-0" />,
+  settings: <LogisticsIcon name="settings" className="h-4 w-4 shrink-0" />,
 };
 
 export function BeheerNav() {

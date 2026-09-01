@@ -2298,6 +2298,57 @@ zijn en in beeld staan is de bevestiging al. De markering bleef daarna staan tot
 je herlaadde, en de gele tint in die lijst betekent al iets anders, namelijk dat
 er nog geen chauffeur is.
 
+### "Wie kan er rijden" staat als eigen strook onder de planning
+
+De beschikbaarheid van de chauffeurs ligt in het rooster als lichte band achter
+de ritten, en dat blijft zo: daar is ze de achtergrond waarbinnen je plant. Maar
+als achtergrond beantwoordt ze de vraag "wie kan er donderdagavond?" niet: alle
+banden liggen door elkaar in dezelfde dagkolom, en van vier mensen die kunnen zie
+je één gearceerd blok.
+
+Onder de planning staat daarom een strook met **één rij per chauffeur**, in
+dezelfde kleur als in het rooster erboven, met een filter per persoon.
+
+- **Iedereen uit de chauffeurslijst krijgt een rij**, ook wie niets doorgaf. Wie
+  niets doorgaf staat onderaan in één grijze zin: dat je het niet weet, is iets
+  anders dan dat hij niet kan, en dat verschil hoort op het scherm te staan.
+- **Niets aangevinkt betekent iedereen**, en de knop "Iedereen" zegt dat ook. Een
+  filter waarin niets aanstaat en die daarom niets toont, is de klassieke manier
+  om een scherm leeg te laten lijken.
+- **De tijd is een positie, geen tekst.** Het uur staat in de balk zodra het
+  past, en anders in de tooltip: op een week is een werkdag een balkje van
+  vijfendertig pixels, en "09:0…" erin is minder leesbaar dan niets. Hoe verder
+  je uitzoomt, hoe meer de kleur het werk doet.
+- **De vensters worden altijd opgehaald**, ook wanneer de band in het rooster
+  uitstaat. Die filter bepaalt enkel of ze ook áchter de ritten liggen.
+
+### Chauffeur en voertuig staan bovenaan in het paneel van een rit
+
+Ze stonden onderaan, onder de feiten en het bewerkformulier, en dat is omgekeerd
+aan waarvoor je een rit openklikt: de eerste vraag bij het plannen is wie hem
+doet. Bij een aanvraag die nog beslist moet worden staat op die plek de
+beslissing zelf, want dat is dan de eerste vraag.
+
+### Elk onderdeel in de beheernavigatie heeft zijn eigen icoon
+
+Twee keer moeten rechtzetten, om dezelfde reden. Eerst droegen Overzicht,
+Evenementen, Aanvragen, Chauffeurs en Kalender alle vijf hetzelfde blaadje;
+daarna droegen Sjablonen, Teksten en Instellingen alle drie het potlood van de
+groep "Overig" waarin ze staan, en Ritten, Transportplanning en Collect&Go alle
+drie dezelfde bestelwagen. Een icoon dat naast zijn buur hetzelfde is, is geen
+icoon meer maar een opvulling: je leest de zijbalk dan enkel nog op het woord, en
+dan kan het icoon net zo goed weg.
+
+Instellingen kreeg schuifregelaars en geen tandwiel: op zestien pixels met een
+lijndikte van 1,7 leest een tandwiel als een vlek.
+
+### "Mijn ritten" staat op de rittenpagina
+
+De knop stond nergens in het beheer, terwijl `/beheer/vervoer` precies het scherm
+is waar een chauffeur op belandt. Ze staat vooraan en is de enige gevulde knop
+van de drie ernaast: het is het scherm waar je zélf iets invult (je kilometers,
+je beschikbaarheid), en dat is iets anders dan de twee overzichten ernaast.
+
 ### Op een telefoon is volledig scherm een eigen weergave, geen kleinere week
 
 Klik je op een telefoon op "volledig scherm", dan verschijnt er niet de

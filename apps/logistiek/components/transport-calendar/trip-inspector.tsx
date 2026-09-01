@@ -82,6 +82,16 @@ export function TripInspector({
    * uit beeld zou lopen, en het krijgt een maximumhoogte zodat het binnen het
    * scherm blijft in plaats van eronder door te lopen.
    */
+  /**
+   * De gemeten hoogte van het kaartje. In een ref en niet in de berekening zelf,
+   * en dat is met opzet: `place()` las eerst `offsetHeight` en zette daarmee de
+   * positie, terwijl die positie de hoogte weer kon veranderen (een scrollbalk
+   * die binnenin verschijnt of verdwijnt). Dat is een lus die zichzelf voedt en
+   * de pagina laat vastlopen. De hoogte wordt nu enkel bijgewerkt wanneer ze
+   * écht verandert, door een `ResizeObserver`.
+   */
+  const height = useRef(0);
+
   const place = useCallback(() => {
     const node = panel.current;
     if (!node) return;
@@ -93,13 +103,26 @@ export function TripInspector({
       ? document.querySelector<HTMLElement>(`[data-trip="${CSS.escape(anchorId)}"]`)
       : null;
     const rect = block?.getBoundingClientRect();
-    const height = node.offsetHeight;
     const maxHeight = Math.min(520, window.innerHeight - EDGE * 2);
+    const wanted = Math.min(height.current || maxHeight, maxHeight);
+
+    // Alleen zetten wat echt verandert. Zonder deze vergelijking geeft elke
+    // scrollgebeurtenis een nieuw object en dus een nieuwe render, ook wanneer
+    // het kaartje op precies dezelfde plek blijft staan.
+    const apply = (next: Position) =>
+      setPosition((current) =>
+        current &&
+        current.left === next.left &&
+        current.top === next.top &&
+        current.maxHeight === next.maxHeight
+          ? current
+          : next
+      );
 
     if (!rect || rect.width === 0) {
-      setPosition({
+      apply({
         left: window.innerWidth - POPOVER_WIDTH - EDGE,
-        top: Math.max(EDGE, (window.innerHeight - Math.min(height, maxHeight)) / 2),
+        top: Math.max(EDGE, Math.round((window.innerHeight - wanted) / 2)),
         maxHeight,
       });
       return;
@@ -114,24 +137,36 @@ export function TripInspector({
           ? left
           : window.innerWidth - POPOVER_WIDTH - EDGE;
 
-    const wanted = Math.min(height, maxHeight);
     const y = Math.min(Math.max(EDGE, rect.top), window.innerHeight - wanted - EDGE);
-    setPosition({ left: x, top: y, maxHeight });
+    apply({ left: Math.round(x), top: Math.round(y), maxHeight });
   }, [anchorId]);
 
   // In een layout-effect: het kaartje mag niet één frame linksboven verschijnen
-  // en dan naar zijn plek springen.
+  // en dan naar zijn plek springen. `children` staat bewust niet in de
+  // afhankelijkheden: dat is bij elke render van de ouder een nieuw object, en
+  // dan zou dit effect eindeloos blijven lopen. Verandert de inhoud van hoogte,
+  // dan meldt de `ResizeObserver` hieronder dat.
   useLayoutEffect(() => {
+    const node = panel.current;
+    if (node) height.current = node.offsetHeight;
     place();
-  }, [place, children]);
+  }, [place]);
 
   useEffect(() => {
+    const node = panel.current;
+    if (!node) return;
+    const observer = new ResizeObserver(() => {
+      height.current = node.offsetHeight;
+      place();
+    });
+    observer.observe(node);
     // De kalender scrolt binnen zijn eigen doos, dus `scroll` in de capture-fase:
     // anders horen we de scroll van die doos niet en blijft het kaartje achter
     // terwijl zijn blok wegschuift.
     window.addEventListener('resize', place);
     window.addEventListener('scroll', place, true);
     return () => {
+      observer.disconnect();
       window.removeEventListener('resize', place);
       window.removeEventListener('scroll', place, true);
     };

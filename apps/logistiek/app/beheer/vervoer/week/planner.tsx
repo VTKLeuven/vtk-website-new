@@ -27,6 +27,7 @@ import { TransportDecisionForms, type DecisionLeg } from '../transport-decision-
 import { TripEditForm, type TripEditValues } from './trip-edit-form';
 import { NewTripForm, type NewTripValues } from './new-trip-form';
 import { EventEditForm, type PlannerEvent } from './event-edit-form';
+import { AvailabilityBoard } from '@/components/transport-calendar/availability-board';
 import type { CalendarEventBar } from '@/components/transport-calendar/event-bars';
 import { adminEditTransportAction } from '@/app/actions/beheer';
 import { useToast } from '@/components/ui/toast';
@@ -370,6 +371,39 @@ export function TransportPlanner({
                 ) : null}
               </div>
 
+              {/* Wie rijdt en waarmee, bovenaan. Dit stond onderaan, onder de
+                  feiten en het bewerkformulier, en dat is precies omgekeerd aan
+                  waarvoor je een rit openklikt: de eerste vraag bij het plannen
+                  is wie hem doet. Bij een aanvraag die nog beslist moet worden
+                  staat hier de beslissing zelf, want dat is dan de eerste vraag. */}
+              <section>
+                {trip.status === 'REQUESTED' ? (
+                  <TransportDecisionForms
+                    bookingId={trip.id}
+                    legs={trip.legs}
+                    drivers={drivers}
+                    pricingIsPerKm={trip.pricingMode === 'PER_KM'}
+                    requesterType={trip.requesterType}
+                    needsDriver={trip.needsDriver}
+                    needsVanDriver={trip.needsVanDriver}
+                    sameDayBookings={trip.sameDayBookings}
+                  />
+                ) : (
+                  <TransportControls
+                    bookingId={trip.id}
+                    vehicleId={trip.vehicleId}
+                    driverId={trip.driverId}
+                    driver={trip.driver}
+                    pricingMode={trip.pricingMode}
+                    paid={trip.paid}
+                    requesterType={trip.requesterType}
+                    drivers={drivers}
+                    vehicles={vehicleOptions}
+                    showComplete={false}
+                  />
+                )}
+              </section>
+
               {/* De feiten die niet in het formulier staan omdat het lid ze
                   invulde en het team ze niet hoort te overschrijven. */}
               <dl className="logistics-fact-grid">
@@ -451,39 +485,22 @@ export function TransportPlanner({
                 </div>
               </section>
 
-              <section>
-                {trip.status === 'REQUESTED' ? (
-                  <TransportDecisionForms
-                    bookingId={trip.id}
-                    legs={trip.legs}
-                    drivers={drivers}
-                    pricingIsPerKm={trip.pricingMode === 'PER_KM'}
-                    requesterType={trip.requesterType}
-                    needsDriver={trip.needsDriver}
-                    needsVanDriver={trip.needsVanDriver}
-                    sameDayBookings={trip.sameDayBookings}
-                  />
-                ) : (
-                  <TransportControls
-                    bookingId={trip.id}
-                    vehicleId={trip.vehicleId}
-                    driverId={trip.driverId}
-                    driver={trip.driver}
-                    pricingMode={trip.pricingMode}
-                    paid={trip.paid}
-                    requesterType={trip.requesterType}
-                    drivers={drivers}
-                    vehicles={vehicleOptions}
-                    showComplete={false}
-                  />
-                )}
-              </section>
 
               {trip.history.length > 0 ? <AuditTimeline entries={trip.history} /> : null}
             </div>
           </TripInspector>
         ) : null}
       </TransportCalendar>
+
+      {/* Onder de planning, niet erin: dit is een tweede vraag ("wie kan er
+          wanneer") naast de eerste ("wat rijdt er wanneer"), en die twee door
+          elkaar in hetzelfde rooster leggen was precies wat onduidelijk was. */}
+      <AvailabilityBoard
+        days={days}
+        windows={availability}
+        drivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
+        driverColors={driverColors}
+      />
     </>
   );
 }
