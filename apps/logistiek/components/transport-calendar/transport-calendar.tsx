@@ -61,6 +61,7 @@ export function TransportCalendar({
   onSelectEvent,
   selectedEventId,
   bands,
+  draft,
   nav,
   children,
 }: {
@@ -91,6 +92,8 @@ export function TransportCalendar({
   selectedEventId?: string | null;
   /** Beschikbaarheid van de chauffeurs als lichte band achter het rooster (V1). */
   bands?: AvailabilityBand[];
+  /** De rit die je aan het aanmaken bent, als grijs blok op het rooster. */
+  draft?: { startAt: string; endAt: string } | null;
   /**
    * Waar vorige, volgende en vandaag naartoe gaan. De pagina zet dezelfde
    * knoppen naast de titel (`CalendarNav`); de telefoonweergave in volledig
@@ -563,6 +566,7 @@ export function TransportCalendar({
           now={now}
           onMoveBlock={onMoveBlock}
           onCreateRange={onCreateRange}
+          draft={draft}
           bands={bands}
           above={
             events && events.length > 0 ? (

@@ -150,6 +150,7 @@ export function TimeGrid({
   above,
   bands,
   bandsProminent = false,
+  draft,
 }: {
   /** De dagen, als ISO-strings van UTC-middernacht (date-only). */
   days: string[];
@@ -190,6 +191,14 @@ export function TimeGrid({
   /** Beschikbaarheidsvensters als band achter het rooster (V1). */
   bands?: AvailabilityBand[];
   /**
+   * De rit die je aan het aanmaken bent, zolang het formulier openstaat.
+   *
+   * Blijft als grijs blok op het rooster staan. Zonder dit verdween je selectie
+   * op het moment dat je ze ging invullen: het sleepblok is er enkel tijdens het
+   * slepen, en daarna stond je in een formulier zonder te zien waar de rit komt.
+   */
+  draft?: { startAt: string; endAt: string } | null;
+  /**
    * De banden op de voorgrond in plaats van als context erachter.
    *
    * In de planning zijn ze bewust vaag: het is de achtergrond waarbinnen je
@@ -213,6 +222,23 @@ export function TimeGrid({
 
   // Dezelfde dagknip als de ritten, zodat een venster van 22:00 tot 02:00 ook op
   // twee dagen staat en niet op één met een negatieve hoogte.
+  /**
+   * Het ontwerp op zijn plek, per dag. Via dezelfde `placeForDay` als de ritten,
+   * zodat een selectie over middernacht ook op twee dagen klopt in plaats van
+   * een blok met negatieve hoogte te geven.
+   */
+  const draftPerDay = useMemo(
+    () =>
+      draft
+        ? parsedDays.map(
+            (day) =>
+              placeForDay([{ id: 'draft', startAt: draft.startAt, endAt: draft.endAt }], day)[0] ??
+              null
+          )
+        : parsedDays.map(() => null),
+    [draft, parsedDays]
+  );
+
   const bandsPerDay = useMemo(
     () => parsedDays.map((day) => (bands ? placeForDay(bands, day) : [])),
     [bands, parsedDays]
@@ -617,6 +643,29 @@ export function TimeGrid({
                     {formatTime(momentOn(day, Math.min(drag.from, drag.to)))}
                     {'-'}
                     {formatTime(momentOn(day, Math.max(drag.from, drag.to)))}
+                  </div>
+                ) : null}
+
+                {/* De rit in wording. Onder de echte blokken (`z-10` tegen
+                    hun eigen stapel) zodat ze niets afdekt, maar boven de
+                    uurlijnen zodat ze als blok leest en niet als arcering. */}
+                {draftPerDay[dayIndex] ? (
+                  <div
+                    aria-hidden
+                    className="trip-draft pointer-events-none absolute inset-x-0 z-10 rounded-[8px] px-1.5 py-1 text-[11px] font-semibold tabular-nums"
+                    style={{
+                      top:
+                        ((draftPerDay[dayIndex]!.from - firstHour * 60) / 60) * hourPx,
+                      height: Math.max(
+                        18,
+                        ((draftPerDay[dayIndex]!.to - draftPerDay[dayIndex]!.from) / 60) * hourPx -
+                          2
+                      ),
+                    }}
+                  >
+                    {formatTime(momentOn(day, draftPerDay[dayIndex]!.from))}
+                    {'-'}
+                    {formatTime(momentOn(day, draftPerDay[dayIndex]!.to))}
                   </div>
                 ) : null}
 

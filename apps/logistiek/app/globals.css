@@ -61,8 +61,13 @@ body {
      eroverheen. Daarom is dit een palet en geen vrije kleurkiezer; zie
      docs/design-decisions.md.
 
-     `--driver-none` is voor een rit zonder chauffeur: die moet juist opvallen
-     als onafgewerkt, vandaar de gele accentkleur van het huis. */
+     `--driver-none` is voor een rit zonder chauffeur: neutraal grijs, want dat
+     is een rit die nog niemand toegewezen kreeg en niet een fout. Het was de
+     gele accentkleur met een rode streepjesrand, en op een week waarin de helft
+     nog niet verdeeld is schreeuwt dat scherm zichzelf stuk. Grijs zegt
+     "hier moet nog iets gebeuren" zonder alarm; de tekst "geen chauffeur" in het
+     blok zegt wát er moet gebeuren. Dezelfde kleur draagt de rit die je aan het
+     aanmaken bent: die heeft per definitie nog geen chauffeur. */
   --driver-1: #cfe0ff;
   --driver-2: #bdd4f7;
   --driver-3: #c3e2f2;
@@ -87,7 +92,7 @@ body {
   --driver-22: #ded9cd;
   --driver-23: #d8dde6;
   --driver-24: #d6dcd8;
-  --driver-none: #fff0bf;
+  --driver-none: #e2e6ee;
 }
 
 /* Nog te beslissen rit in de transportplanning: gestreept, zodat je ziet dat
@@ -237,10 +242,14 @@ body {
    kolommen in 340 pixels werd tweeënhalve dag naast elkaar, met ritten van 112px
    waarin een naam drie letters is. Dit is één dag over de volle breedte, met de
    week als knoppenstrip erboven; zie components/transport-calendar/mobile-calendar.tsx. */
+/* De schil eromheen is in volledig scherm al `position: fixed` met een eigen
+   z-index; deze laag hoeft er enkel binnen te vullen. Ze stond op 70 en dat is
+   hoger dan het detailpaneel (60/61) dat in diezelfde schil zit: het formulier
+   voor een nieuwe rit ging dan achter de kalender staan en was onbereikbaar. */
 .mob-cal {
   position: fixed;
   inset: 0;
-  z-index: 70;
+  z-index: 1;
   display: flex;
   flex-direction: column;
   /* `dvh` en niet `vh`: met de adresbalk van een telefoon erbij is `vh` te hoog
@@ -463,6 +472,13 @@ body {
   padding: 1rem;
 }
 
+/* De telefoonweergave brengt haar eigen indeling mee (werkbalk, dagstrip,
+   rooster) en wil de padding en de flexkolom van het brede scherm niet. */
+.transport-calendar[data-phone='true'] {
+  display: block;
+  padding: 0;
+}
+
 .transport-calendar:fullscreen {
   width: 100%;
   height: 100%;
@@ -519,14 +535,25 @@ body {
   background: var(--paper);
 }
 
-/* Een rit zonder chauffeur is het enige wat op deze kalender nog werk is, dus ze
-   mag luider zijn dan de rest: de gele accentkleur van het huis plus een rode
-   streepjesrand. De rand is gestreept en niet vol, zodat ze niet verward wordt
-   met de volle rode rand van een conflict (twee goedgekeurde ritten met
-   hetzelfde voertuig op hetzelfde moment). */
+/* Een rit zonder chauffeur: grijs met een streepjesrand. De rand is gestreept en
+   niet vol, zodat "nog niet af" te onderscheiden blijft van de volle rode rand
+   van een conflict (twee goedgekeurde ritten met hetzelfde voertuig op hetzelfde
+   moment). Ze was rood en de vulling geel; dat las als een fout terwijl het
+   gewoon werk is dat nog moet gebeuren, en op een halfverdeelde week stond het
+   hele scherm in alarmkleuren. */
 .trip-no-driver {
   border-style: dashed;
-  border-color: #dc2626;
+  border-color: rgb(14 26 54 / 0.45);
+}
+
+/* De rit die je aan het aanmaken bent, terwijl het formulier openstaat. Dezelfde
+   grijze taal als "nog geen chauffeur", want dat is ze ook. Ze blijft staan tot
+   je opslaat of annuleert: zonder dat verdween je selectie op het moment dat je
+   ze ging invullen, en dan stond je te typen zonder te zien waar de rit komt. */
+.trip-draft {
+  border: 2px dashed rgb(14 26 54 / 0.5);
+  background: var(--driver-none);
+  color: var(--ink);
 }
 
 /* De uitleendienst gebruikt dezelfde vaste headerstructuur als vtk.be. Enkel

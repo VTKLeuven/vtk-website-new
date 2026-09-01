@@ -2113,11 +2113,21 @@ ze staan naast elkaar op twee assen die je tegelijk kan lezen.
   patroon herken je over een hele week heen. De patronen zijn licht gehouden
   (alfa rond 0.13): het is een tweede laag informatie, geen tweede kleur, en de
   tekst in het blok moet leesbaar blijven.
-- **Geen chauffeur schreeuwt het luidst.** Dat is de enige toestand op deze
-  kalender die nog werk is, dus ze krijgt de gele accentkleur plus een rode
-  **streepjes**rand. Streepjes en niet vol, want een volle rode rand betekent al
-  iets anders: twee goedgekeurde ritten met hetzelfde voertuig op hetzelfde
-  moment.
+- **Geen chauffeur is grijs, niet geel met rood.** Het was de gele accentkleur
+  met een rode streepjesrand, omdat het de enige toestand op deze kalender is die
+  nog werk is. In gebruik bleek dat verkeerd: bij het inplannen heeft de helft
+  van de week nog geen chauffeur, en dan staat het hele scherm in alarmkleuren
+  voor iets dat gewoon nog moet gebeuren. Rood betekent nu enkel nog een echte
+  fout. Grijs met een **streepjes**rand zegt "nog niet af"; de tekst "geen
+  chauffeur" in het blok zegt wat er moet gebeuren. Streepjes en niet vol, want
+  een volle rode rand betekent al iets anders: twee goedgekeurde ritten met
+  hetzelfde voertuig op hetzelfde moment.
+- **De rit die je aan het aanmaken bent, draagt diezelfde grijze taal.** Ze heeft
+  per definitie nog geen chauffeur, en het is dezelfde soort toestand: nog niet
+  af. Ze blijft op het rooster staan zolang het formulier openstaat en volgt de
+  uren die je erin aanpast. Voordien verdween je selectie op het moment dat je ze
+  ging invullen (het sleepblok bestaat enkel tijdens het slepen), en dan stond je
+  te typen zonder te zien waar de rit terechtkomt.
 - **Behalve waar de aanvrager zelf rijdt.** Een bakfiets zonder chauffeur is geen
   openstaande taak (`needsDriver`, T13); daar staat "rijdt zelf" in grijs in
   plaats van "geen chauffeur" in het rood. Anders staat er elke week een taak op
@@ -2143,6 +2153,12 @@ ze staan naast elkaar op twee assen die je tegelijk kan lezen.
   blijven. Met een kleurenwiel staat er binnen de maand een donkerblauw tussen
   waarop niemand het uur nog leest. Alle vierentwintig tinten in
   `apps/logistiek/app/globals.css` zijn daarop gekozen.
+
+  **Ingeklapt tot één knop.** Vierentwintig bolletjes bij elke chauffeur maakten
+  van een lijst van tien mensen een muur van tweehonderdveertig stippen, en je
+  kijkt naar hoogstens één ervan. De knop toont de kleur die deze chauffeur nu
+  heeft, met haar naam; het palet klapt eronder open en sluit met Escape of door
+  ernaast te klikken.
 - **Een postlid krijgt pas een `UitleenDriver`-rij zodra iemand er iets aan
   instelt**, net zoals bij `canDriveVan`. De rij is de plek voor wat het team
   handmatig bijhoudt; het lidmaatschap zelf blijft uit de post komen.

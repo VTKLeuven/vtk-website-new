@@ -138,6 +138,29 @@ export function MobileCalendar({
 
   const [hourPx, setHourPx] = useState(DEFAULT_HOUR_PX);
   const scroller = useRef<HTMLDivElement>(null);
+  /** De uurhoogte die nu getekend staat; waarmee je `scrollTop` mag omrekenen. */
+  const applied = useRef(hourPx);
+  /** Het uur dat na deze render weer onder je vingers moet liggen. */
+  const pendingAnchor = useRef<{ hours: number; offset: number } | null>(null);
+
+  /**
+   * Het knijpen afronden ná de render.
+   *
+   * Zonder dit schuift de dag onder je vingers weg terwijl je knijpt: de
+   * scrollpositie is een pixelafstand, en die betekent bij een andere uurhoogte
+   * een ander uur. In een layout-effect en niet in een `requestAnimationFrame`,
+   * want dat laatste loopt niet gegarandeerd ná de commit en klemt de nieuwe
+   * scrollpositie dan op de oude, kleinere inhoud.
+   */
+  useLayoutEffect(() => {
+    applied.current = hourPx;
+    const pending = pendingAnchor.current;
+    pendingAnchor.current = null;
+    const node = scroller.current;
+    if (!pending || !node) return;
+    const target = pending.hours * hourPx - pending.offset;
+    node.scrollTop = Math.max(0, Math.min(target, node.scrollHeight - node.clientHeight));
+  }, [hourPx]);
 
   const placed = useMemo(() => (day ? placeForDay(blocks, day) : []), [blocks, day]);
   const dayBands = useMemo(() => (day && bands ? placeForDay(bands, day) : []), [bands, day]);
@@ -205,8 +228,21 @@ export function MobileCalendar({
 
     const points = new Map<number, { x: number; y: number }>();
     let swipe: { x: number; y: number; done: boolean } | null = null;
-    let pinch: { distance: number; hourPx: number; anchorHours: number; offset: number } | null =
-      null;
+    let pinch: { distance: number; hourPx: number } | null = null;
+    let frame = 0;
+
+    /**
+     * Het scrollen weer vrijgeven.
+     *
+     * Tijdens het knijpen staat `touch-action` op `none`, anders scrolt de doos
+     * mee met het gebaar. Bleef die staan, dan kon je na een knijp niet meer
+     * scrollen; dat gebeurde zodra één `pointerup` verloren ging (de browser
+     * slikt er een bij zijn eigen gebaarherkenning). Daarom wordt dit ook bij
+     * elke nieuwe eerste vinger opnieuw vrijgegeven: dan geneest het zichzelf.
+     */
+    function release() {
+      if (node) node.style.touchAction = '';
+    }
 
     function spread(): { distance: number; midY: number } | null {
       const [a, b] = [...points.values()];
@@ -219,19 +255,14 @@ export function MobileCalendar({
       points.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (points.size === 1) {
         swipe = { x: event.clientX, y: event.clientY, done: false };
+        pinch = null;
+        release();
         return;
       }
-      const now_ = spread();
-      if (points.size === 2 && now_ && now_.distance > 0 && node) {
+      const spread_ = spread();
+      if (points.size === 2 && spread_ && spread_.distance > 0 && node) {
         swipe = null;
-        const top = node.getBoundingClientRect().top;
-        const offset = now_.midY - top;
-        pinch = {
-          distance: now_.distance,
-          hourPx,
-          anchorHours: (node.scrollTop + offset) / hourPx,
-          offset,
-        };
+        pinch = { distance: spread_.distance, hourPx: applied.current };
         node.style.touchAction = 'none';
       }
     }
@@ -241,10 +272,25 @@ export function MobileCalendar({
       points.set(event.pointerId, { x: event.clientX, y: event.clientY });
 
       if (pinch && points.size === 2) {
-        const now_ = spread();
-        if (!now_ || now_.distance <= 0) return;
+        const spread_ = spread();
+        if (!spread_ || spread_.distance <= 0) return;
         event.preventDefault();
-        setHourPx(clampHourPx((pinch.hourPx * now_.distance) / pinch.distance));
+        const next = clampHourPx((pinch.hourPx * spread_.distance) / pinch.distance);
+        // Hoogstens één keer per beeld. Een telefoon vuurt meer
+        // `pointermove`-gebeurtenissen af dan er beelden zijn, en elk daarvan
+        // een render geven maakte het knijpen schokkerig in plaats van vloeiend.
+        if (frame) return;
+        frame = window.requestAnimationFrame(() => {
+          frame = 0;
+          const current = spread();
+          if (!node || !current) return;
+          const offset = current.midY - node.getBoundingClientRect().top;
+          pendingAnchor.current = {
+            hours: (node.scrollTop + offset) / applied.current,
+            offset,
+          };
+          setHourPx(next);
+        });
         return;
       }
 
@@ -262,9 +308,9 @@ export function MobileCalendar({
     function onUp(event: PointerEvent) {
       points.delete(event.pointerId);
       if (points.size === 0) swipe = null;
-      if (points.size < 2 && pinch) {
+      if (points.size < 2) {
         pinch = null;
-        if (node) node.style.touchAction = '';
+        release();
       }
     }
 
@@ -273,12 +319,18 @@ export function MobileCalendar({
     window.addEventListener('pointerup', onUp);
     window.addEventListener('pointercancel', onUp);
     return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      release();
       node.removeEventListener('pointerdown', onDown);
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
       window.removeEventListener('pointercancel', onUp);
     };
-  }, [goto, hourPx, index]);
+    // `hourPx` staat er bewust niet bij: het knijpen leest de actuele waarde uit
+    // `applied`, en opnieuw ophangen bij elke zoomstap zou de luisteraars midden
+    // in een gebaar vervangen.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [goto, index]);
 
   if (!day) return null;
 

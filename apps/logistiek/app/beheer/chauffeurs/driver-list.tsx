@@ -1,6 +1,6 @@
 'use client';
 
-import { useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import Link from 'next/link';
 import {
   removeDriverAction,
@@ -58,17 +58,26 @@ function removeDescription(entry: DriverPoolEntry): string {
  * maand een donkerblauw tussen waarop niemand het uur nog leest. Alle
  * vierentwintig tinten hier zijn daarop gekozen.
  *
- * De knop onderaan zet hem terug op de kleur die uit zijn id volgt. Die
- * standaardkleur staat er als bolletje bij, want "standaard" is hier een kleur
- * en geen leegte.
+ * **Ingeklapt tot één knop.** Vierentwintig bolletjes bij elke chauffeur maakten
+ * van een lijst van tien mensen een muur van tweehonderdveertig stippen, en je
+ * kijkt naar hoogstens één ervan. De knop toont de kleur die deze chauffeur nu
+ * heeft, met haar naam; het palet klapt eronder open.
+ *
+ * De knop onderaan in het palet zet hem terug op de kleur die uit zijn id volgt.
+ * Die standaardkleur staat er als bolletje bij, want "standaard" is hier een
+ * kleur en geen leegte.
  */
 function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
   const showToast = useToast();
   const [pending, startTransition] = useTransition();
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
   const active = entry.colorIndex;
   const fallback = driverColorIndex(entry.id);
+  const shown = active ?? fallback;
 
   function choose(colorIndex: number | null) {
+    setOpen(false);
     startTransition(async () => {
       const result = await setDriverColorAction(entry.id, colorIndex);
       if (result.ok) {
@@ -79,63 +88,115 @@ function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
     });
   }
 
+  // Sluiten met Escape en door ernaast te klikken, zoals elk ander uitklapmenu.
+  // Op `pointerdown` en niet op `click`: anders sluit een klik op een swatch van
+  // een andere chauffeur dit menu pas ná die klik, en dan ving het lege scherm
+  // hem op.
+  useEffect(() => {
+    if (!open) return;
+    function onKey(event: KeyboardEvent) {
+      if (event.key === 'Escape') setOpen(false);
+    }
+    function onDown(event: PointerEvent) {
+      if (!wrap.current?.contains(event.target as Node)) setOpen(false);
+    }
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('pointerdown', onDown);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('pointerdown', onDown);
+    };
+  }, [open]);
+
   return (
-    <div className="mt-2">
+    <div className="relative mt-2" ref={wrap}>
       <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">
         Kleur in de planning
       </p>
-      {/* Zes op een rij: dan valt het palet in vier rijen uiteen die elk bij een
-          stuk van het spectrum horen, en herken je "ergens in het groen" zonder
-          de namen te lezen. */}
-      <div
-        className="mt-1.5 grid w-fit gap-1.5"
-        style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}
-        role="group"
-        aria-label={`Kleur voor ${entry.name}`}
+
+      {/* Ingeklapt is dit één knop met de kleur die deze chauffeur nu heeft.
+          Vierentwintig bolletjes bij elke chauffeur maakten van een lijst van
+          tien mensen een muur van tweehonderdveertig stippen, en je kijkt naar
+          hoogstens één ervan. */}
+      <button
+        type="button"
+        disabled={pending}
+        onClick={() => setOpen((value) => !value)}
+        aria-expanded={open}
+        aria-haspopup="true"
+        className="mt-1.5 inline-flex items-center gap-2 rounded-full border border-vtk-navy/20 px-2.5 py-1 text-xs font-medium text-vtk-ink transition hover:border-vtk-navy/50 disabled:opacity-50"
       >
-        {Array.from({ length: DRIVER_COLOR_COUNT }, (_, index) => index + 1).map((index) => (
-          <button
-            key={index}
-            type="button"
-            disabled={pending}
-            onClick={() => choose(index)}
-            aria-pressed={active === index}
-            title={driverColorName(index)}
-            className={`h-6 w-6 rounded-full border transition disabled:opacity-50 ${
-              active === index
-                ? 'border-vtk-navy ring-2 ring-vtk-navy/40'
-                : 'border-vtk-navy/20 hover:border-vtk-navy/50'
-            }`}
-            style={{ backgroundColor: `var(--driver-${index})` }}
-          >
-            <span className="sr-only">
-              {driverColorName(index)} voor {entry.name}
-            </span>
-          </button>
-        ))}
-      </div>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          disabled={pending || active === null}
-          onClick={() => choose(null)}
-          aria-pressed={active === null}
-          title="Terug op de standaardkleur"
-          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 ${
-            active === null
-              ? 'border-vtk-navy bg-vtk-navy/5 text-vtk-ink'
-              : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
-          }`}
+        <span
+          aria-hidden
+          className="h-4 w-4 rounded-full border border-vtk-navy/20"
+          style={{ backgroundColor: `var(--driver-${shown})` }}
+        />
+        {driverColorName(shown)}
+        {active === null ? <span className="text-vtk-muted">(standaard)</span> : null}
+        <LogisticsIcon
+          name="chevron"
+          className={`h-3 w-3 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
+        <span className="sr-only">Kleur kiezen voor {entry.name}</span>
+      </button>
+
+      {open ? (
+        <div
+          className="absolute left-0 top-full z-30 mt-1.5 w-fit rounded-[14px] border border-vtk-navy/15 bg-vtk-surface p-2.5 shadow-lg"
+          role="group"
+          aria-label={`Kleur voor ${entry.name}`}
         >
-          <span
-            aria-hidden
-            className="h-3 w-3 rounded-full border border-vtk-navy/20"
-            style={{ backgroundColor: driverColorVar(entry.id) }}
-          />
-          Standaard
-          <span className="sr-only">kleur voor {entry.name}</span>
-        </button>
-      </div>
+          {/* Zes op een rij: dan valt het palet in vier rijen uiteen die elk bij
+              een stuk van het spectrum horen, en herken je "ergens in het groen"
+              zonder de namen te lezen. */}
+          <div
+            className="grid gap-1.5"
+            style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}
+          >
+            {Array.from({ length: DRIVER_COLOR_COUNT }, (_, index) => index + 1).map((index) => (
+              <button
+                key={index}
+                type="button"
+                disabled={pending}
+                onClick={() => choose(index)}
+                aria-pressed={active === index}
+                title={driverColorName(index)}
+                className={`h-6 w-6 rounded-full border transition disabled:opacity-50 ${
+                  active === index
+                    ? 'border-vtk-navy ring-2 ring-vtk-navy/40'
+                    : 'border-vtk-navy/20 hover:border-vtk-navy/50'
+                }`}
+                style={{ backgroundColor: `var(--driver-${index})` }}
+              >
+                <span className="sr-only">
+                  {driverColorName(index)} voor {entry.name}
+                </span>
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            disabled={pending || active === null}
+            onClick={() => choose(null)}
+            aria-pressed={active === null}
+            title="Terug op de standaardkleur"
+            className={`mt-2 inline-flex w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium transition disabled:opacity-50 ${
+              active === null
+                ? 'border-vtk-navy bg-vtk-navy/5 text-vtk-ink'
+                : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
+            }`}
+          >
+            <span
+              aria-hidden
+              className="h-3 w-3 rounded-full border border-vtk-navy/20"
+              style={{ backgroundColor: driverColorVar(entry.id) }}
+            />
+            Standaard
+            <span className="sr-only">kleur voor {entry.name}</span>
+          </button>
+        </div>
+      ) : null}
+
       {active !== null && active === fallback ? (
         <p className="mt-1 text-xs text-vtk-muted">
           Dit is toevallig ook de standaardkleur van {entry.name}.

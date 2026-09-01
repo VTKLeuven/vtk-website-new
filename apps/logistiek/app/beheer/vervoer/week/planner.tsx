@@ -213,6 +213,11 @@ export function TransportPlanner({
         anchor={anchor}
         days={days}
         nav={nav}
+        // De selectie blijft op het rooster staan zolang het formulier
+        // openstaat, en volgt de uren die je erin aanpast. Het zijn
+        // datetime-local-waarden in Belgische tijd, wat `new Date(...)` in de
+        // browser van iemand hier ook zo leest.
+        draft={draft ? { startAt: draft.startAt, endAt: draft.endAt } : null}
         vehicles={vehicles}
         blocks={blocks}
         driverColors={driverColors}
@@ -315,6 +320,9 @@ export function TransportPlanner({
           >
             <NewTripForm
               initial={draft}
+              onRangeChange={(startAt, endAt) =>
+                setDraft((current) => (current ? { ...current, startAt, endAt } : current))
+              }
               vehicles={vehicleOptions}
               groups={groups}
               drivers={drivers}

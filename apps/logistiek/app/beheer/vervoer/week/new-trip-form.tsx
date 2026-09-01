@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useEffect, useRef, useState, useTransition } from 'react';
 import { Button } from '@vtk/ui';
 import { adminCreateTransportAction } from '@/app/actions/beheer';
 import { QuarterDateTime } from '@/components/quarter-datetime';
@@ -43,6 +43,7 @@ export function NewTripForm({
   drivers,
   onDone,
   onCancel,
+  onRangeChange,
 }: {
   initial: NewTripValues;
   vehicles: Array<{ id: string; name: string; needsVanDriver: boolean }>;
@@ -51,6 +52,12 @@ export function NewTripForm({
   drivers: DriverOption[];
   onDone: () => void;
   onCancel: () => void;
+  /**
+   * De gekozen uren, telkens ze veranderen. De planning tekent er het grijze
+   * blok mee op het rooster; zonder dit blijft dat blok staan op wat je
+   * oorspronkelijk sleepte terwijl je hier al iets anders koos.
+   */
+  onRangeChange?: (startAt: string, endAt: string) => void;
 }) {
   const showToast = useToast();
   const [pending, startTransition] = useTransition();
@@ -60,6 +67,16 @@ export function NewTripForm({
   function set<K extends keyof NewTripValues>(key: K, value: NewTripValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
   }
+
+  // De uren terugmelden in een effect en niet in de setter: een `setState` van
+  // de ouder oproepen binnen een updater draait tijdens de render van dit
+  // formulier, en React klaagt daar terecht over ("Cannot update a component
+  // while rendering a different component").
+  const report = useRef(onRangeChange);
+  report.current = onRangeChange;
+  useEffect(() => {
+    report.current?.(values.startAt, values.endAt);
+  }, [values.startAt, values.endAt]);
 
   function save() {
     setError(null);
