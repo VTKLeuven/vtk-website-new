@@ -2487,6 +2487,27 @@ handelingen voor één venster, en de nota bleef in de praktijk leeg.
   wat er te zien is; vaag betekende daar "ik zie niet goed wat ik net aangeduid
   heb".
 
+### Formulieren in een smalle kolom kijken niet naar de schermbreedte
+
+Het bewerkformulier van een rit en het bijrijdersformulier stonden in twee of
+drie kolommen "zodra het scherm breed genoeg is" (`sm:grid-cols-...`). Ze leven
+allebei in een zijbalk van 340px en in een detailkaartje van 352px, en daar
+werden dat stroken van honderdvijftig en van honderd pixels: de knop viel over
+het telefoonveld, en van het datumveld bleef een strookje van dertig pixels over
+waarin de browser niets meer kon tekenen.
+
+De regel: een `sm:`-breekpunt gaat over de breedte van het **scherm**, en dat is
+zelden waar het over gaat. Staat een formulier in een kolom, dan is de breedte
+van die kolom de vraag. Ze staan nu onder elkaar; dat is in een smalle kolom
+sowieso de betere indeling en het kan niet stukgaan.
+
+`QuarterDateTime` breekt daarbij af in plaats van te pletten: het datumveld
+krijgt een minimumbreedte (de browser tekent er `dd/mm/jjjj` in) en de urenlijst
+zakt eronder wanneer het niet past. De maten staan op omhulsels en niet op de
+velden zelf, want de `className` van de aanroeper draagt vaak al `w-full`, en
+welke van twee breedtes dan wint hangt af van de volgorde in de stylesheet. Dat
+gebeurde ook echt: de urenlijst werd 256px in plaats van 104px.
+
 ### Karchauffeurs: één vlag, geen aparte soort
 
 Een voertuig kan aangeduid staan als "vraagt een chauffeur die de kar mag

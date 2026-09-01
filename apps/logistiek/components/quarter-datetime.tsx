@@ -79,35 +79,53 @@ export function QuarterDateTime({
   }
 
   return (
-    // De breedte van de urenlijst zit in de kolom en niet in een klasse op de
-    // `<select>`: `className` draagt vaak al `w-full`, en welke van twee
-    // breedtes dan wint, hangt af van de volgorde in de stylesheet.
-    <span className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-2">
-      <input
-        type="date"
-        value={parts.date}
-        min={minParts?.date || undefined}
-        onChange={(event) => update({ ...parts, date: event.target.value })}
-        data-field={dataField}
-        aria-invalid={invalid}
-        disabled={disabled}
-        className={`${className} w-full`}
-      />
-      <select
-        value={parts.time}
-        onChange={(event) => update({ ...parts, time: event.target.value })}
-        aria-label={timeLabel}
-        aria-invalid={invalid}
-        disabled={disabled}
-        className={`${className} w-full`}
-      >
-        <option value="">--:--</option>
-        {options.map((option) => (
-          <option key={option} value={option} disabled={Boolean(earliestTime) && option < earliestTime}>
-            {option}
-          </option>
-        ))}
-      </select>
+    // Naast elkaar wanneer het past, onder elkaar wanneer niet.
+    //
+    // Dit was een raster van twee vaste kolommen, en in een zijbalk van 340px
+    // bleef er voor de datum een strookje van dertig pixels over: het veld stond
+    // er wel, maar je zag er niets meer van. Een datumveld heeft een
+    // minimumbreedte nodig (de browser tekent er dd/mm/jjjj in), dus krijgt het
+    // die, en dan zakt de urenlijst eronder in plaats van de datum plat te
+    // duwen.
+    //
+    // De maten staan op de omhulsels en niet op de velden zelf: `className`
+    // komt van de aanroeper en draagt vaak al `w-full`, en welke van twee
+    // breedtes dan wint hangt af van de volgorde in de stylesheet. Zo hoeft dat
+    // niet uitgevochten te worden.
+    <span className="flex flex-wrap gap-2">
+      <span className="min-w-[8.5rem] flex-1">
+        <input
+          type="date"
+          value={parts.date}
+          min={minParts?.date || undefined}
+          onChange={(event) => update({ ...parts, date: event.target.value })}
+          data-field={dataField}
+          aria-invalid={invalid}
+          disabled={disabled}
+          className={`${className} w-full`}
+        />
+      </span>
+      <span className="w-[6.5rem] shrink-0">
+        <select
+          value={parts.time}
+          onChange={(event) => update({ ...parts, time: event.target.value })}
+          aria-label={timeLabel}
+          aria-invalid={invalid}
+          disabled={disabled}
+          className={`${className} w-full`}
+        >
+          <option value="">--:--</option>
+          {options.map((option) => (
+            <option
+              key={option}
+              value={option}
+              disabled={Boolean(earliestTime) && option < earliestTime}
+            >
+              {option}
+            </option>
+          ))}
+        </select>
+      </span>
       {name ? <input type="hidden" name={name} value={joinMoment(parts.date, parts.time)} /> : null}
     </span>
   );

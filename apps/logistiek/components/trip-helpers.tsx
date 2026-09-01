@@ -113,9 +113,13 @@ export function TripHelpers({
         </ul>
       )}
 
+      {/* Het formulier staat onder elkaar. Het stond in drie kolommen zodra het
+          scherm breed was, maar het leeft in een zijbalk van 340px en in een
+          kaartje van 352px: daar werden het drie stroken van honderd pixels
+          waarin de knop over het telefoonveld viel. */}
       {canEdit ? (
         open ? (
-          <div className="grid gap-2 rounded-[12px] border border-dashed border-vtk-navy/25 p-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
+          <div className="grid gap-2 rounded-[12px] border border-dashed border-vtk-navy/25 p-3">
             <label className="grid gap-1 text-xs font-medium text-vtk-muted">
               {en ? 'Name' : 'Naam'}
               <input

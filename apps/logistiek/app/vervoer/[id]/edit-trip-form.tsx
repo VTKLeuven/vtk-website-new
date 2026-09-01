@@ -74,7 +74,10 @@ export function EditTripForm({
         </p>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      {/* Eén kolom. `sm:grid-cols-2` keek naar de breedte van het scherm, terwijl
+          dit formulier in een zijbalk van 340px staat: twee kolommen zijn daar
+          honderdvijftig pixels elk, en dan past er geen datumveld meer in. */}
+      <div className="grid gap-3">
         <label className="grid gap-1 text-sm">
           <span className="font-medium text-vtk-ink">{en ? 'From' : 'Van'}</span>
           <QuarterDateTime
@@ -94,7 +97,7 @@ export function EditTripForm({
             className={inputClass}
           />
         </label>
-        <label className="grid gap-1 text-sm sm:col-span-2">
+        <label className="grid gap-1 text-sm">
           <span className="font-medium text-vtk-ink">
             {en ? 'What is the trip for?' : 'Waarvoor dient de rit?'}
           </span>
