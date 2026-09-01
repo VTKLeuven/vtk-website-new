@@ -57,6 +57,15 @@ export const DEFAULT_FRONTPAGE_ID = "default";
 export const HOME_AGENDA_WEEK = "week";
 export const HOME_AGENDA_LIST = "list";
 
+/**
+ * Standaarddonkerte van de waas achter het weekoverzicht, in procent.
+ *
+ * De hero-foto is rechts net het lichtst (lucht en bomen), dus de waas draagt de
+ * leesbaarheid van de hele agenda. Wat hier goed staat, hangt af van de foto die
+ * op dat moment ingesteld is; vandaar de schuifregelaar ernaast.
+ */
+export const HOME_AGENDA_DIM_DEFAULT = 88;
+
 export const HOME_AGENDA_OPTIONS = [
   { value: HOME_AGENDA_WEEK, labelNl: "Weekoverzicht", labelEn: "Week overview" },
   { value: HOME_AGENDA_LIST, labelNl: "Lijst met eerstvolgende events", labelEn: "List of upcoming events" },
@@ -89,6 +98,20 @@ export const FRONTPAGE_MODULES: FrontpageModule[] = [
         helpEn:
           "Week overview: the next six days (Saturday is skipped), with a star to mark that you are coming. List: the next four events below one another.",
         options: HOME_AGENDA_OPTIONS,
+      },
+      agendaDim: {
+        type: "range",
+        labelNl: "Donkerte achter het weekoverzicht",
+        labelEn: "Darkness behind the week overview",
+        helpNl:
+          "Hoe donker de waas achter de agenda staat. Hoger bij een lichte of drukke herofoto; te hoog en de foto verdwijnt eronder. Geldt niet voor de lijst.",
+        helpEn:
+          "How dark the haze behind the agenda is. Raise it for a light or busy hero photo; too high and the photo disappears under it. Does not apply to the list.",
+        min: 40,
+        max: 100,
+        step: 2,
+        fallback: HOME_AGENDA_DIM_DEFAULT,
+        unit: "%",
       },
       eyebrowNl: { type: "text", labelNl: "Bovenschrift (NL)", labelEn: "Eyebrow (NL)" },
       eyebrowEn: { type: "text", labelNl: "Bovenschrift (EN)", labelEn: "Eyebrow (EN)" },

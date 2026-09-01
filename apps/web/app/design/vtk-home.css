@@ -10,6 +10,14 @@
   align-items: start;
 }
 
+/* Het weekoverzicht draagt zes dagen met plaats, uur en ster naast elkaar en
+   heeft daar meer breedte voor nodig dan de lijst met vier events. Enkel die
+   variant krijgt ze, zodat de oude hero exact blijft staan zoals ze stond. */
+.vtk-design .home-hero:has(.hero-week) {
+  grid-template-columns: minmax(0, 1.06fr) minmax(400px, 1fr);
+  gap: clamp(32px, 4vw, 52px);
+}
+
 /* Full-bleed Arenberg photo under a navy scrim (heaviest top-left, behind the
    headline) with light copy on top. The zone stretches the photo through the
    quick-links row, so the hero does not end on a hard edge; the quick links sit
@@ -397,18 +405,29 @@
   position: relative;
 }
 
+/* Een ruime, vervaagde vlek: dat is de wash uit het ontwerp, en niet een kaart
+   met zachte hoeken.
+
+   Twee keer eerder misgegaan, dus voor wie hier komt sleutelen. Een radiaal
+   verloop met een straal groter dan de helft van zijn eigen box (105% breed)
+   dooft niet uit binnen die box: het wordt aan de rand afgekapt en je ziet een
+   rechthoek beginnen boven het bovenschrift. Een strakke vulling met een
+   schaduw eromheen dooft wel uit, maar dan leest de kern als een paneel, wat
+   het net niet mag zijn.
+
+   Een vervaagde vorm heeft geen van beide problemen: de kern dekt de hele
+   inhoud gelijkmatig en de blur lost aan alle kanten volledig op, hoe groot de
+   vorm ook is. Hou de blur daarom in verhouding tot de marges; maak je ze
+   kleiner zonder de blur mee te verkleinen, dan krijg je opnieuw een kaart. */
 .vtk-design .home-hero .hero-week-wash {
   position: absolute;
   z-index: -1;
-  inset: -52px -64px -44px -52px;
-  border-radius: 44px;
-  background: radial-gradient(
-    102% 78% at 58% 50%,
-    rgba(5, 9, 22, 0.9) 0%,
-    rgba(5, 9, 22, 0.76) 40%,
-    rgba(5, 9, 22, 0.36) 70%,
-    rgba(5, 9, 22, 0) 100%
-  );
+  inset: -34px -56px -48px -52px;
+  border-radius: 56px;
+  /* De donkerte is instelbaar in /admin/frontpage; de waarde hier geldt zolang
+     er niets ingesteld is en moet gelijk lopen met HOME_AGENDA_DIM_DEFAULT. */
+  background: rgba(6, 10, 24, var(--hero-week-dim, 0.88));
+  filter: blur(34px);
   pointer-events: none;
 }
 
@@ -1754,8 +1773,8 @@
      schermrand door en toont dus nergens een rand. `html` klipt de overflow, dus
      een paar pixels ernaast geeft nooit een horizontale scrollbalk. */
   .vtk-design .home-hero .hero-week-wash {
-    inset: -30px calc(-1 * clamp(20px, 3vw, 36px)) -34px;
-    border-radius: 34px;
+    inset: -22px calc(-1 * clamp(24px, 4vw, 44px)) -30px;
+    border-radius: 44px;
   }
 
   .vtk-design .aanbod,

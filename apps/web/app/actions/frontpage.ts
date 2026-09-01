@@ -93,6 +93,16 @@ export async function saveFrontpageAction(
       values[name] = trimmed;
       continue;
     }
+    // Een getal buiten de grenzen komt niet uit de schuifregelaar, dus het is
+    // ofwel een oude waarde ofwel geknoei; klemmen in plaats van weigeren.
+    if (def.type === "range") {
+      const parsed = Number(trimmed);
+      if (!Number.isFinite(parsed)) return saveError("INVALID_INPUT");
+      const min = def.min ?? 0;
+      const max = def.max ?? 100;
+      values[name] = String(Math.min(max, Math.max(min, Math.round(parsed))));
+      continue;
+    }
     if (def.type === "datetime") {
       const moment = parseMoment(trimmed);
       if (!moment) return saveError("INVALID_INPUT");

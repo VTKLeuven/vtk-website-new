@@ -1,8 +1,9 @@
 import Link from "next/link";
 import { pick } from "@vtk/i18n";
-import { choiceValue, pickField } from "@/lib/frontpage/fields";
+import { choiceValue, pickField, rangeValue } from "@/lib/frontpage/fields";
 import {
   DEFAULT_FRONTPAGE_ID,
+  HOME_AGENDA_DIM_DEFAULT,
   HOME_AGENDA_WEEK,
   getFrontpageModule,
 } from "@/lib/frontpage/registry";
@@ -39,8 +40,13 @@ export function DefaultFrontpage({
   const nl = locale === "nl";
   // De registry is de bron van de opties; zo blijft "wat staat er als er nog
   // niets gekozen is" op één plaats staan.
-  const agendaField = getFrontpageModule(DEFAULT_FRONTPAGE_ID)?.fields.agenda;
+  const fields = getFrontpageModule(DEFAULT_FRONTPAGE_ID)?.fields;
+  const agendaField = fields?.agenda;
   const agenda = agendaField ? choiceValue(values, "agenda", agendaField) : HOME_AGENDA_WEEK;
+  const dimField = fields?.agendaDim;
+  const agendaDim = dimField
+    ? rangeValue(values, "agendaDim", dimField)
+    : HOME_AGENDA_DIM_DEFAULT;
 
   const eyebrow = pickField(values, "eyebrow", locale) ?? "Vlaamse Technische Kring · KU Leuven";
   const title = pickField(values, "title", locale) ?? (nl ? "De thuis voor" : "The home for");
@@ -84,13 +90,12 @@ export function DefaultFrontpage({
 
   const heroEvents = upcomingEvents.slice(0, 4);
 
-  // "Binnenkort", en in het Engels letterlijk "This week": dus de zeven dagen na
-  // nu en niet alles wat de homepage inlas. Dat laatste stond er ooit wel, maar
-  // enkel omdat de lezing op acht rijen stopte; nu leest ze er veertig en zou er
-  // "37 events" staan bij een teller die "binnenkort" belooft.
-  const weekAhead = now.getTime() + 7 * 24 * 60 * 60 * 1000;
-  const eventsThisWeek = upcomingEvents.filter(
-    (event) => event.start.getTime() < weekAhead,
+  // "Binnenkort" telt de maand vooruit. Niet alles wat de homepage inlas, want
+  // dat zijn er veertig en "37 events" is geen "binnenkort"; en niet één week,
+  // want dan staat er in september "0 events" naast een agenda die er vier toont.
+  const monthAhead = now.getTime() + 30 * 24 * 60 * 60 * 1000;
+  const eventsSoon = upcomingEvents.filter(
+    (event) => event.start.getTime() < monthAhead,
   ).length;
 
   const eventGroups = heroEvents.reduce<
@@ -135,9 +140,9 @@ export function DefaultFrontpage({
             <div className="v">{workingYear}</div>
           </div>
           <div className="meta">
-            <div className="k">{nl ? "Binnenkort" : "This week"}</div>
+            <div className="k">{nl ? "Binnenkort" : "Coming up"}</div>
             <div className="v">
-              {eventsThisWeek} {nl ? "events" : "events"}
+              {eventsSoon} {nl ? "events" : "events"}
             </div>
           </div>
           <div className="meta">
@@ -154,6 +159,7 @@ export function DefaultFrontpage({
           locale={locale}
           base={base}
           signedIn={signedIn}
+          dim={agendaDim}
         />
       ) : (
       <aside className="hero-cal">

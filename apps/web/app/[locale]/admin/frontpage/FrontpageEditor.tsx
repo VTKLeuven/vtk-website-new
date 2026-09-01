@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Card, Input, Label, Select, Textarea } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -131,6 +132,14 @@ function Field({
     );
   }
 
+  // Een schuifregelaar zonder getal ernaast is een gok: je ziet pas na opslaan
+  // wat je gekozen hebt. De waarde loopt daarom live mee.
+  if (def.type === "range") {
+    return (
+      <RangeField id={id} name={inputName} def={def} value={value} label={label} help={help} />
+    );
+  }
+
   if (def.type === "choice") {
     const options = def.options ?? [];
     return (
@@ -168,6 +177,53 @@ function Field({
           placeholder={def.placeholder}
         />
       )}
+      {help ? <p className="mt-1 text-xs text-[#5c667f]">{help}</p> : null}
+    </div>
+  );
+}
+
+function RangeField({
+  id,
+  name,
+  def,
+  value,
+  label,
+  help,
+}: {
+  id: string;
+  name: string;
+  def: FieldDef;
+  value: string;
+  label: string;
+  help?: string;
+}) {
+  const min = def.min ?? 0;
+  const max = def.max ?? 100;
+  const start = Number(value);
+  const [current, setCurrent] = useState(
+    Number.isFinite(start) ? Math.min(max, Math.max(min, start)) : (def.fallback ?? min),
+  );
+
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3">
+        <Label htmlFor={id}>{label}</Label>
+        <span className="text-sm tabular-nums text-vtk-ink">
+          {current}
+          {def.unit ?? ""}
+        </span>
+      </div>
+      <input
+        id={id}
+        name={name}
+        type="range"
+        min={min}
+        max={max}
+        step={def.step ?? 1}
+        value={current}
+        onChange={(event) => setCurrent(Number(event.target.value))}
+        className="mt-2 w-full accent-[#0e1a36]"
+      />
       {help ? <p className="mt-1 text-xs text-[#5c667f]">{help}</p> : null}
     </div>
   );

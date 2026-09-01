@@ -16,7 +16,7 @@
  * field creeping into the schema.
  */
 
-export type FieldType = "text" | "textarea" | "image" | "datetime" | "url" | "choice";
+export type FieldType = "text" | "textarea" | "image" | "datetime" | "url" | "choice" | "range";
 
 /** Eén optie van een keuzeveld. De waarde is wat er in de database komt. */
 export type FieldOption = {
@@ -48,6 +48,17 @@ export type FieldDef = {
    * gevolgen in plaats van een lege hero.
    */
   options?: readonly FieldOption[];
+  /**
+   * Schuifregelaars: grenzen, stap en de waarde die geldt zolang er niets
+   * ingesteld is. Alles in hele getallen, want de waarde gaat als tekst naar de
+   * database en een percentage leest nu eenmaal makkelijker dan 0,86.
+   */
+  min?: number;
+  max?: number;
+  step?: number;
+  fallback?: number;
+  /** Achter het getal in het beheer, bijvoorbeeld "%". */
+  unit?: string;
 };
 
 export type FieldSchema = Record<string, FieldDef>;
@@ -86,6 +97,22 @@ export function choiceValue(values: FieldValues, name: string, def: FieldDef): s
   const stored = values[name];
   if (!stored) return fallback;
   return options.some((option) => option.value === stored) ? stored : fallback;
+}
+
+/**
+ * De waarde van een schuifregelaar als getal, altijd binnen zijn grenzen.
+ *
+ * Een waarde buiten de grenzen komt niet uit het formulier maar kan wel in de
+ * database staan nadat iemand de grenzen hier verschoof; klemmen is dan beter
+ * dan een hero die daardoor pikzwart wordt.
+ */
+export function rangeValue(values: FieldValues, name: string, def: FieldDef): number {
+  const min = def.min ?? 0;
+  const max = def.max ?? 100;
+  const fallback = def.fallback ?? min;
+  const stored = Number(values[name]);
+  if (!Number.isFinite(stored)) return fallback;
+  return Math.min(max, Math.max(min, Math.round(stored)));
 }
 
 /** Picks the field for the current language from an `<name>Nl` / `<name>En` pair. */

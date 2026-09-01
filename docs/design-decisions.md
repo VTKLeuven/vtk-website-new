@@ -4855,9 +4855,21 @@ volledig oplost: dezelfde techniek als de scrim linksboven, alleen nu ook rechts
 Drie alternatieven zijn bekeken en afgevallen: een zachte glasplaat onder de hele
 week (het veiligst bij eender welke foto, maar het is weer een paneel), een blok
 per dag (het dichtst bij kaartjes) en een tijdlijn met bolletjes (het mooist,
-maar het verst van de rest van de site). De wash veronderstelt wel dat de
-herofoto donker genoeg is; wordt er ooit een felle zomerfoto ingesteld, dan is de
-glasplaat de terugval.
+maar het verst van de rest van de site).
+
+De waas veronderstelt wel dat de herofoto donker genoeg is, en die foto is
+instelbaar. Daarom staat de **donkerte als schuifregelaar** naast de agendakeuze
+in Admin → Website → Frontpage, van 40 tot 100 procent, standaard 88. Wie later
+een felle zomerfoto instelt, schuift ze op zonder dat er een deploy aan te pas
+komt; te ver opschuiven laat de foto onder de agenda verdwijnen, en dan is de
+lijst de betere keuze.
+
+De vorm zelf is een **vervaagde vlek** (`filter: blur`) en geen verloop of
+schaduw. Dat is twee keer misgelopen en staat daarom ook in de CSS: een radiaal
+verloop dat breder is dan zijn eigen kader wordt aan de rand afgekapt in plaats
+van uitgedoofd, zodat er een rechthoek boven de agenda verschijnt; en een
+strakke vulling met een schaduw eromheen dooft wel uit, maar leest als een
+paneel. Een vervaagde vorm heeft geen van beide problemen.
 
 ## De ster op een evenement is geen inschrijving
 

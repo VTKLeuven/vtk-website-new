@@ -54,12 +54,15 @@ export function HeroWeek({
   locale,
   base,
   signedIn,
+  dim,
 }: {
   events: FrontpageEvent[];
   now: Date;
   locale: Locale;
   base: string;
   signedIn: boolean;
+  /** Donkerte van de waas in procent; in te stellen in /admin/frontpage. */
+  dim: number;
 }) {
   const nl = locale === "nl";
   const { mode, days } = selectHeroWeek(events, now);
@@ -92,7 +95,10 @@ export function HeroWeek({
   const loginHref = `${base}/inloggen?next=${encodeURIComponent(base === "" ? "/" : base)}`;
 
   return (
-    <aside className="hero-week">
+    <aside
+      className="hero-week"
+      style={{ "--hero-week-dim": dim / 100 } as React.CSSProperties}
+    >
       {/* Het verloop dat de tekst draagt. Puur decoratief: het staat achter de
           rijen en heeft zelf geen rand, zodat de foto blijft doorlopen. */}
       <div className="hero-week-wash" aria-hidden="true" />
@@ -109,7 +115,8 @@ export function HeroWeek({
         </h3>
         {range ? <span className="range">{range}</span> : null}
         <Link href={`${base}/kalender`} className="all">
-          {nl ? "Volledige kalender" : "Full calendar"}
+          {nl ? "Volledige kalender" : "Full calendar"}{" "}
+          <span aria-hidden="true">&#8594;</span>
         </Link>
       </div>
 
