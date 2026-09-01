@@ -21,7 +21,7 @@ import {
   getRentalTemplates,
   rentalSenderLabel,
 } from "@/lib/theokotVerhuur-server";
-import { rentalMailVars } from "@/lib/theokotVerhuurMail";
+import { rentalMailVars, rentalReplyTo } from "@/lib/theokotVerhuurMail";
 import {
   currentWorkingYear,
   formatWorkingYear,
@@ -349,7 +349,7 @@ export default async function AdminTheokotVerhuurPage({
             templates={templates}
             senderLabel={rentalSenderLabel()}
             signature={config.signature}
-            replyTo={config.replyTo}
+            replyTo={rentalReplyTo(config)}
           />
           <RentalContractsCard nl={nl} contracts={contracts} />
           <RentalGuideCard nl={nl} guide={guide} />

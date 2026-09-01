@@ -20,6 +20,7 @@ import {
   parseRentalConfig,
   parseRentalGuide,
   parseRentalTemplates,
+  rentalReplyTo,
   type RentalConfig,
   type RentalGuide,
   type RentalTemplate,
@@ -144,9 +145,9 @@ export type RentalAttachment = { filename: string; content: Buffer; contentType?
 /**
  * Verstuurt één verhuurmail.
  *
- * `replyTo` staat op het adres uit de instellingen: een aanvrager die op de
- * goedkeuring antwoordt, moet bij de mensen terechtkomen die de verhuur doen en
- * niet bij een afzender die niemand leest.
+ * `replyTo` staat op de mensen die de aanvragen behandelen: een huurder die op
+ * de goedkeuring antwoordt, moet bij hen terechtkomen en niet bij een afzender
+ * die niemand leest.
  */
 export async function sendRentalMail(input: {
   to: string;
@@ -161,7 +162,7 @@ export async function sendRentalMail(input: {
     to: input.to,
     cc: input.cc,
     from: RENTAL_FROM,
-    replyTo: input.replyTo ?? config.replyTo,
+    replyTo: input.replyTo ?? rentalReplyTo(config),
     subject: input.subject,
     text: input.text,
     attachments: input.attachments,

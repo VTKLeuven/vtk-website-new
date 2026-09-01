@@ -247,6 +247,14 @@
     grid-template-columns: minmax(320px, 2fr) minmax(360px, 3fr);
   }
 
+  /* Zonder geselecteerde aanvraag staat er niets naast de kalender, en dan krijgt
+     ze de hele breedte. Een weekraster in een halve kolom zijn zeven kolommen van
+     een centimeter; de knoppenbalk erboven wipt er dan ook nog eens op twee
+     regels. Zie RentalBoard voor waarom de lijsten dit niet doen. */
+  .tv-board[data-single="true"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .tv-board > aside {
     position: sticky;
     top: 16px;
@@ -512,6 +520,24 @@
   height: 14px;
   border-radius: 4px;
   display: inline-block;
+}
+
+/* De derde legenderegel is tegelijk de knop die haar aanzet. Ze leest daarom
+   als de twee andere, met het vakje ervoor. */
+.tv-legend-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.tv-legend-toggle input {
+  accent-color: var(--navy);
+  cursor: pointer;
+}
+
+.tv-legend-toggle:hover {
+  color: var(--ink);
 }
 
 /* -------------------------------------------------------------------------- */

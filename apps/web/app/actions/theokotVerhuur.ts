@@ -797,14 +797,12 @@ export async function saveRentalConfigAction(
   const notifyEmails = splitEmails(toMessageText(formData.get("notifyEmails")));
   if (notifyEmails.length === 0) return saveError("NO_NOTIFY_EMAIL");
 
-  const replyTo = toSingleLine(formData.get("replyTo")) || notifyEmails[0]!;
   const signature = toMessageText(formData.get("signature"));
   const minLeadDays = clampLeadDays(formData.get("minLeadDays"));
   const formOpen = formData.get("formOpen") === "on";
 
   await writeSetting(RENTAL_CONFIG_KEY, {
     notifyEmails,
-    replyTo,
     signature,
     minLeadDays,
     formOpen,

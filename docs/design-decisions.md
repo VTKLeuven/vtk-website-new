@@ -5396,6 +5396,20 @@ exact hetzelfde uur wordt geweigerd. De kalender rekent in minuten sinds
 middernacht van de startdag en kapt het blokje op 24:00 af, zodat het raster niet
 verschuift; het echte einduur staat in de tekst ernaast.
 
+### De kalender toont wat de zaal bezet houdt
+
+Een goedgekeurde verhuur staat er vol op, een aanvraag die nog wacht dof met een
+streepjesrand. Wat **geweigerd of geannuleerd** is, staat er standaard níét op:
+die zeggen niets over of de zaal vrij is, en op een drukke week duwen ze net de
+aanvragen weg waar het over gaat. Een vinkje in de legende zet ze terug,
+doorstreept, voor wie wil nagaan of er al eens geweigerd werd.
+
+Zolang er niets aangeklikt is, krijgt de kalender de hele paginabreedte. Het
+paneel ernaast toont dan enkel de zin "klik op een aanvraag", en daarvoor een
+weekraster tot zeven kolommen van een centimeter knijpen is een slechte ruil. Bij
+de lijsten blijft dat paneel wel staan: daar is elke rij één regel tekst, en die
+over de volle breedte uitrekken leest slechter dan de hint ernaast.
+
 ### Vier opvolgvelden die los van elkaar staan
 
 Status, waarborg, contract en sleutel zijn vier aparte kolommen, precies zoals de
@@ -5405,6 +5419,16 @@ draagt de termen van Theokot zelf ("OS Binnen", "C Terug"): OS is een
 overschrijving, C is cash, binnen is ontvangen en terug is teruggegeven. Ze start
 op wat de aanvrager in het formulier koos, want "overschrijving" zonder meer
 betekent daar gekozen maar nog niet betaald.
+
+### Eén adres voor wie behandelt, mailt en antwoordt
+
+De instellingen hadden even een apart antwoordadres naast "wie de aanvragen
+behandelt". Dat is dezelfde groep: een huurder die op onze goedkeuring antwoordt,
+moet bij wie zijn aanvraag behandelt terechtkomen. Twee velden die hetzelfde
+horen te zijn, lopen na een jaar uiteen, dus het antwoordadres wordt afgeleid.
+Een antwoord komt bij alle behandelaars toe; het eerste adres uit die lijst staat
+op de publieke pagina onder "Een vraag?", want een `mailto:` met drie adressen
+erin is voor een bezoeker geen adres meer maar een lijst.
 
 ### Status zetten en mailen zijn twee knoppen, overal
 

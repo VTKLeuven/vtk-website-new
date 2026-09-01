@@ -76,18 +76,8 @@ export function RentalConfigCard({ nl, config }: { nl: boolean; config: RentalCo
           />
           <p className="mt-1 text-xs text-[#5c667f]">
             {nl
-              ? "Eén adres per regel (komma's mogen ook). Zij krijgen bij elke nieuwe aanvraag een mail met de knoppen om goed te keuren of te weigeren."
-              : "One address per line (commas are fine too). They get an email on every new request, with the buttons to approve or deny."}
-          </p>
-        </div>
-
-        <div>
-          <Label htmlFor="tv-replyto">{nl ? "Antwoordadres" : "Reply-to address"}</Label>
-          <Input id="tv-replyto" name="replyTo" type="email" defaultValue={config.replyTo} />
-          <p className="mt-1 text-xs text-[#5c667f]">
-            {nl
-              ? "Hier komt het antwoord van een huurder toe. Staat ook op de publieke pagina onder “Een vraag?”."
-              : "This is where a renter's reply arrives. It is also shown on the public page under “A question?”."}
+              ? "Eén adres per regel (komma's mogen ook). Zij krijgen bij elke nieuwe aanvraag een mail met de knoppen om goed te keuren of te weigeren, en zij zijn ook het antwoordadres van elke mail die hier vertrekt. Het eerste adres staat op de publieke pagina onder “Een vraag?”."
+              : "One address per line (commas are fine too). They get an email on every new request, with the buttons to approve or deny, and they are also the reply-to on every email sent from here. The first address is shown on the public page under “A question?”."}
           </p>
         </div>
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { RENTAL_STATUS_META } from "@/lib/theokotVerhuur";
+import { RENTAL_STATUS_META, isDeclinedRental } from "@/lib/theokotVerhuur";
 import type { RentalView } from "./types";
 
 /**
@@ -9,10 +9,13 @@ import type { RentalView } from "./types";
  *
  * Waar deze kalender voor bestaat: zien of de zaal die dag al bezet is. Daarom
  * staat een goedgekeurde verhuur er vol op en een aanvraag die nog wacht dof met
- * een streepjesrand; wat geweigerd of geannuleerd is, staat doorstreept en telt
- * niet mee. Dat onderscheid zit in de CSS (`.tv-chip[data-status]`), niet in de
- * kleur alleen, zodat het ook leesbaar is voor wie kleuren moeilijk uit elkaar
- * houdt.
+ * een streepjesrand. Dat onderscheid zit in de CSS (`.tv-chip[data-status]`),
+ * niet in de kleur alleen, zodat het ook leesbaar is voor wie kleuren moeilijk
+ * uit elkaar houdt.
+ *
+ * Wat geweigerd of geannuleerd is, staat er standaard **niet** op: die zeggen
+ * niets over of de zaal vrij is. Een vinkje zet ze terug, doorstreept, voor wie
+ * wil nagaan of er al eens geweigerd werd.
  *
  * Alle aanvragen van het werkingsjaar zitten al in `rentals`, dus bladeren
  * tussen maanden haalt niets op. De datumrekenkunde gebeurt op jaar/maand/dag en
@@ -81,22 +84,29 @@ export function RentalCalendar({
   onSelect: (rental: RentalView) => void;
 }) {
   const [view, setView] = useState<View>("month");
+  const [showDeclined, setShowDeclined] = useState(false);
   const [cursor, setCursor] = useState<Date>(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth(), now.getDate());
   });
   const bodyRef = useRef<HTMLDivElement>(null);
 
+  const visible = useMemo(
+    () => (showDeclined ? rentals : rentals.filter((rental) => !isDeclinedRental(rental.status))),
+    [rentals, showDeclined],
+  );
+  const declinedCount = rentals.filter((rental) => isDeclinedRental(rental.status)).length;
+
   const byDay = useMemo(() => {
     const map = new Map<string, RentalView[]>();
-    for (const rental of rentals) {
+    for (const rental of visible) {
       const bucket = map.get(rental.day);
       if (bucket) bucket.push(rental);
       else map.set(rental.day, [rental]);
     }
     for (const bucket of map.values()) bucket.sort((a, b) => a.minutes - b.minutes);
     return map;
-  }, [rentals]);
+  }, [visible]);
 
   // Bij het openen van week of dag meteen naar de avond scrollen; anders staat
   // het raster op middernacht en lijkt de dag leeg.
@@ -192,10 +202,18 @@ export function RentalCalendar({
           />
           {nl ? "Aangevraagd, nog niet beslist" : "Requested, not decided yet"}
         </span>
-        <span>
+        {/* De legende beschrijft wat er staat, dus de derde toestand hoort bij
+            het vinkje dat haar aan- en uitzet in plaats van er los boven. */}
+        <label className="tv-legend-toggle">
+          <input
+            type="checkbox"
+            checked={showDeclined}
+            onChange={(event) => setShowDeclined(event.target.checked)}
+          />
           <i style={{ background: TONE_COLOUR.no, opacity: 0.5 }} />
-          {nl ? "Geweigerd of geannuleerd" : "Denied or cancelled"}
-        </span>
+          {nl ? "Geweigerd of geannuleerd tonen" : "Show denied or cancelled"}
+          {declinedCount > 0 ? ` (${declinedCount})` : ""}
+        </label>
       </p>
 
       {view === "month" ? (

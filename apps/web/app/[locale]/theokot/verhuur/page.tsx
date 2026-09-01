@@ -5,6 +5,7 @@ import { hasLocale } from "@/lib/locale";
 import { staticMetadata } from "@/lib/pageMetadata";
 import { Markdown } from "@/components/ui/Markdown";
 import { getRentalConfig, getRentalGuide, getRentalQuestions } from "@/lib/theokotVerhuur-server";
+import { rentalContactEmail } from "@/lib/theokotVerhuurMail";
 import { RentalRequestForm } from "./RentalRequestForm";
 
 import "@/app/design/vtk-base.css";
@@ -46,6 +47,7 @@ export default async function TheokotVerhuurPage({ params }: { params: Params })
     getRentalGuide(),
   ]);
 
+  const contactEmail = rentalContactEmail(config);
   const guidelines = nl ? guide.guidelinesNl : guide.guidelinesEn || guide.guidelinesNl;
   const closedNotice = nl ? config.closedNoticeNl : config.closedNoticeEn;
 
@@ -108,8 +110,8 @@ export default async function TheokotVerhuurPage({ params }: { params: Params })
               <h2>{t.contactTitle}</h2>
               <p>
                 {t.contactBody}{" "}
-                <a className="vtk-link" href={`mailto:${config.replyTo}`}>
-                  {config.replyTo}
+                <a className="vtk-link" href={`mailto:${contactEmail}`}>
+                  {contactEmail}
                 </a>
                 .
               </p>

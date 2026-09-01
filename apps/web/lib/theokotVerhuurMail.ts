@@ -21,13 +21,14 @@ import type { DepositChoice, RenterType } from "@/lib/theokotVerhuur";
  * Instellingen van de verhuur, beheerd in /admin/theokot/verhuur.
  *
  * `notifyEmails` zijn de mensen die de aanvragen behandelen: zij krijgen de
- * melding met de knoppen "Goedkeuren" en "Weigeren" erin. `replyTo` is het adres
- * waar een antwoord van de aanvrager toekomt; zonder dat zou "Beantwoorden" bij
- * de afzender van de server belanden.
+ * melding met de knoppen "Goedkeuren" en "Weigeren" erin, en zij zijn ook het
+ * antwoordadres van elke mail die hier vertrekt. Dat was even een apart veld,
+ * maar het is per definitie dezelfde groep: een huurder die op onze goedkeuring
+ * antwoordt, moet bij wie zijn aanvraag behandelt terechtkomen. Twee velden die
+ * hetzelfde horen te zijn, lopen alleen maar uiteen.
  */
 export type RentalConfig = {
   notifyEmails: string[];
-  replyTo: string;
   signature: string;
   /**
    * Hoeveel dagen op voorhand een aanvraag minstens binnen moet zijn. Nul laat
@@ -44,7 +45,6 @@ export type RentalConfig = {
 
 export const DEFAULT_RENTAL_CONFIG: RentalConfig = {
   notifyEmails: ["theokot@vtk.be"],
-  replyTo: "theokot@vtk.be",
   signature: "Theokot\ntheokot@vtk.be",
   minLeadDays: 0,
   formOpen: true,
@@ -62,10 +62,6 @@ export function parseRentalConfig(value: unknown): RentalConfig {
 
   return {
     notifyEmails: notify.length > 0 ? notify : DEFAULT_RENTAL_CONFIG.notifyEmails,
-    replyTo:
-      typeof stored.replyTo === "string" && stored.replyTo.trim()
-        ? stored.replyTo.trim()
-        : (notify[0] ?? DEFAULT_RENTAL_CONFIG.replyTo),
     signature:
       typeof stored.signature === "string" && stored.signature.trim()
         ? stored.signature
@@ -75,6 +71,24 @@ export function parseRentalConfig(value: unknown): RentalConfig {
     closedNoticeNl: typeof stored.closedNoticeNl === "string" ? stored.closedNoticeNl : "",
     closedNoticeEn: typeof stored.closedNoticeEn === "string" ? stored.closedNoticeEn : "",
   };
+}
+
+/**
+ * Het antwoordadres van elke uitgaande verhuurmail: iedereen die de aanvragen
+ * behandelt. Een antwoord van een huurder komt zo bij de hele groep toe en niet
+ * bij één iemand die net op reis is.
+ */
+export function rentalReplyTo(config: RentalConfig): string {
+  return config.notifyEmails.join(", ");
+}
+
+/**
+ * Het adres dat op de publieke pagina onder "Een vraag?" staat. Eén adres, want
+ * een `mailto:` met drie adressen erin is voor een bezoeker geen adres meer maar
+ * een lijst.
+ */
+export function rentalContactEmail(config: RentalConfig): string {
+  return config.notifyEmails[0] ?? DEFAULT_RENTAL_CONFIG.notifyEmails[0]!;
 }
 
 /** Adressen uit één veld: komma's, puntkomma's, spaties en regels mogen allemaal. */

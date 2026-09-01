@@ -23,6 +23,8 @@ import {
   defaultTemplateFor,
   parseRentalConfig,
   parseRentalTemplates,
+  rentalContactEmail,
+  rentalReplyTo,
   previewRentalVars,
   renderRentalMail,
   renderRentalTemplate,
@@ -319,10 +321,18 @@ describe("de instellingen", () => {
     expect(clampLeadDays("geen getal")).toBe(0);
   });
 
-  it("neemt het eerste meldingsadres als antwoordadres wanneer er geen ingesteld is", () => {
+  it("laat het antwoord bij iedereen toekomen die de aanvragen behandelt", () => {
+    // Er was even een apart antwoordadres; dat hoort per definitie dezelfde groep
+    // te zijn, dus het wordt afgeleid in plaats van los bewaard.
     const config = parseRentalConfig({ notifyEmails: ["verhuur@vtk.be", "theokot@vtk.be"] });
-    expect(config.replyTo).toBe("verhuur@vtk.be");
+    expect(rentalReplyTo(config)).toBe("verhuur@vtk.be, theokot@vtk.be");
+    expect(rentalContactEmail(config)).toBe("verhuur@vtk.be");
     expect(config.formOpen).toBe(true);
+  });
+
+  it("negeert een antwoordadres dat nog in de opslag staat", () => {
+    const config = parseRentalConfig({ notifyEmails: ["verhuur@vtk.be"], replyTo: "iemand@elders.be" });
+    expect(rentalReplyTo(config)).toBe("verhuur@vtk.be");
   });
 });
 

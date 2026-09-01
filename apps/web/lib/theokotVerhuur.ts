@@ -137,6 +137,18 @@ export function isOpenRental(status: RentalStatus): boolean {
   return (OPEN_RENTAL_STATUSES as readonly string[]).includes(status);
 }
 
+/**
+ * Gaat deze aanvraag niet door?
+ *
+ * De kalender verbergt deze standaard: ze zeggen niets over of de zaal vrij is,
+ * en op een drukke week staan ze de aanvragen die er wél toe doen in de weg. Wie
+ * ze toch wil zien (om na te gaan of iemand al eens geweigerd werd), zet ze met
+ * een vinkje terug.
+ */
+export function isDeclinedRental(status: RentalStatus): boolean {
+  return status === "REJECTED" || status === "CANCELLED";
+}
+
 /** Blokkeert deze aanvraag de zaal? Enkel wat nog kan of zal doorgaan. */
 export function blocksRoom(status: RentalStatus): boolean {
   return status === "APPROVED" || status === "UNANSWERED" || status === "ENDED" || status === "COMPLETED";

@@ -61,8 +61,15 @@ export function RentalBoard({
     [rentals, selectedId],
   );
 
+  // Zolang er niets geselecteerd is, krijgt de kalender de hele breedte. Een
+  // weekraster in een halve kolom zijn zeven kolommen van een centimeter, en het
+  // paneel ernaast toont dan enkel de zin "klik op een aanvraag". Bij de lijsten
+  // blijft het paneel wel staan: daar is elke rij één regel tekst, en die over
+  // twaalfhonderd pixels uitrekken leest slechter dan de hint ernaast.
+  const fullWidth = mode === "calendar" && !selected;
+
   return (
-    <div className="tv-board">
+    <div className="tv-board" data-single={fullWidth || undefined}>
       <div>
         {mode === "calendar" ? (
           <RentalCalendar
@@ -126,31 +133,33 @@ export function RentalBoard({
         )}
       </div>
 
-      <aside>
-        {selected ? (
-          <Card className="p-5">
-            <RentalInspector
-              // Een andere aanvraag is een ander paneel: door de sleutel begint
-              // het opstelvak leeg in plaats van met de half getypte mail van de
-              // vorige aanvraag erin.
-              key={selected.id}
-              nl={nl}
-              rental={selected}
-              templates={templates}
-              senderLabel={senderLabel}
-              signature={signature}
-              contractAvailable={contractAvailable}
-              canManage={canManage}
-            />
-          </Card>
-        ) : (
-          <div className="rounded-2xl border border-dashed border-vtk-blue/20 bg-white/60 px-5 py-10 text-center text-sm text-[#5c667f]">
-            {nl
-              ? "Klik op een aanvraag om ze te bekijken, op te volgen en te beantwoorden."
-              : "Click a request to view it, follow it up and reply."}
-          </div>
-        )}
-      </aside>
+      {!fullWidth && (
+        <aside>
+          {selected ? (
+            <Card className="p-5">
+              <RentalInspector
+                // Een andere aanvraag is een ander paneel: door de sleutel begint
+                // het opstelvak leeg in plaats van met de half getypte mail van
+                // de vorige aanvraag erin.
+                key={selected.id}
+                nl={nl}
+                rental={selected}
+                templates={templates}
+                senderLabel={senderLabel}
+                signature={signature}
+                contractAvailable={contractAvailable}
+                canManage={canManage}
+              />
+            </Card>
+          ) : (
+            <div className="rounded-2xl border border-dashed border-vtk-blue/20 bg-white/60 px-5 py-10 text-center text-sm text-[#5c667f]">
+              {nl
+                ? "Klik op een aanvraag om ze te bekijken, op te volgen en te beantwoorden."
+                : "Click a request to view it, follow it up and reply."}
+            </div>
+          )}
+        </aside>
+      )}
     </div>
   );
 }
