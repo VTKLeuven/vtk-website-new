@@ -60,13 +60,19 @@ const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
 /**
  * Minimale breedte van een dagkolom.
  *
- * Ruim gekozen omdat een dagkolom bij overlap in twee of drie deelt: bij een
- * smallere kalender bleef van "Career Fair, Kar, Arthur" niets over dan drie
- * afgekapte letters. Past de week niet, dan schuift ze horizontaal; op een
- * telefoon is dat precies het gedrag dat je wil, want dan veeg je van dag naar
- * dag in plaats van zeven onleesbare kolommen te zien.
+ * Zo gekozen dat een hele week nog net in de beheerkolom past op een laptop:
+ * zeven maal deze breedte plus de urenkolom blijft onder de ~900px die daar
+ * overblijft naast de zijbalk. Op 9,5rem viel zondag standaard buiten beeld, en
+ * een weekweergave waarin je het weekend moet gaan zoeken is geen weekweergave.
+ *
+ * Breder zou beter zijn voor een blok dat bij overlap in tweeën of drieën
+ * deelt, maar dat blok toont dan toch enkel zijn beginuur (zie
+ * `docs/design-decisions.md`); wie de rest wil lezen, klikt hem open. Past de
+ * week alsnog niet, dan schuift ze horizontaal; op een telefoon is dat precies
+ * het gedrag dat je wil, want dan veeg je van dag naar dag in plaats van zeven
+ * onleesbare kolommen te zien.
  */
-const DAY_MIN_WIDTH = '9.5rem';
+const DAY_MIN_WIDTH = '7rem';
 
 /**
  * Het kolommenraster van de kalender: de urenkolom plus één kolom per dag.
