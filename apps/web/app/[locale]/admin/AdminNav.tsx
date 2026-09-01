@@ -425,6 +425,24 @@ const icons: Record<string, ReactNode> = {
       <path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1" />
     </Svg>
   ),
+  // theokotBroodjes: hetzelfde huis als de groep, dus dezelfde beker
+  theokotBroodjes: (
+    <Svg>
+      <path d="M10 2v2" />
+      <path d="M14 2v2" />
+      <path d="M6 2v2" />
+      <path d="M16 8a1 1 0 0 1 1 1v8a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V9a1 1 0 0 1 1-1h14a4 4 0 1 1 0 8h-1" />
+    </Svg>
+  ),
+  // theokotVerhuur: de zaal uitlenen -> een sleutel
+  theokotVerhuur: (
+    <Svg>
+      <circle cx="7.5" cy="15.5" r="3.5" />
+      <path d="m10 13 8.5-8.5" />
+      <path d="m16 7 2 2" />
+      <path d="m19 4 2 2" />
+    </Svg>
+  ),
   // grocomeet: vergaderen -> mensen rond een tafel
   grocomeet: (
     <Svg>

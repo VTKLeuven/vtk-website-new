@@ -10,6 +10,7 @@ import {
   expenseAccess,
   getExpenseConfig,
   visibilityWhere,
+  expenseSenderLabel,
 } from "@/lib/rekeningen/server";
 import {
   EXPENSE_STATUSES,
@@ -417,6 +418,7 @@ export default async function RekeningenOverzicht({
         }
         canManageState={access.canManageAll}
         accountantEmail={config.accountantEmail}
+        senderEmail={expenseSenderLabel(config)}
         editHrefFor={(id) => `${base}/admin/rekeningen/bewerken/${id}`}
       />
     </div>

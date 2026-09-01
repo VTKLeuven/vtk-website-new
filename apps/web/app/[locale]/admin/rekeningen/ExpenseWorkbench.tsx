@@ -54,6 +54,8 @@ export type ExpenseDetail = ExpenseRow & {
   sentAtLabel: string | null;
   sentTo: string | null;
   canEdit: boolean;
+  /** De mail naar de boekhouding, klaar om als voorbeeld te tonen. */
+  mail: { subject: string; body: string; attachmentName: string };
 };
 
 export function ExpenseWorkbench({
@@ -67,6 +69,7 @@ export function ExpenseWorkbench({
   emptyMessage,
   canManageState,
   accountantEmail,
+  senderEmail,
   editHrefFor,
 }: {
   locale: Locale;
@@ -80,6 +83,7 @@ export function ExpenseWorkbench({
   emptyMessage: string;
   canManageState: boolean;
   accountantEmail: string;
+  senderEmail: string;
   editHrefFor: (id: string) => string;
 }) {
   const nl = locale === "nl";
@@ -177,6 +181,7 @@ export function ExpenseWorkbench({
             expense={selected}
             canManageState={canManageState}
             accountantEmail={accountantEmail}
+            senderEmail={senderEmail}
             editHref={editHrefFor(selected.id)}
           />
         ) : (
@@ -196,12 +201,14 @@ function Inspector({
   expense,
   canManageState,
   accountantEmail,
+  senderEmail,
   editHref,
 }: {
   locale: Locale;
   expense: ExpenseDetail;
   canManageState: boolean;
   accountantEmail: string;
+  senderEmail: string;
   editHref: string;
 }) {
   const nl = locale === "nl";
@@ -313,6 +320,7 @@ function Inspector({
         canEdit={expense.canEdit}
         canSend={canManageState}
         defaultRecipient={accountantEmail}
+        mail={{ ...expense.mail, from: senderEmail }}
         sendAction={sendExpenseAction}
         deleteAction={deleteExpenseAction}
         deleteDescription={

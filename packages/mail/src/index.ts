@@ -55,6 +55,17 @@ export type MailInput = {
 const FROM = process.env.MAIL_FROM || 'Theokot VTK <theokot@vtk.be>';
 
 /**
+ * De afzender die een mail zonder eigen `from` krijgt.
+ *
+ * Bestaat omdat de beheerschermen een voorbeeld van de uitgaande mail tonen: die
+ * moet dezelfde afzender noemen als wat er echt in de inbox verschijnt, en dat
+ * kan het scherm niet raden.
+ */
+export function defaultMailFrom(): string {
+  return FROM;
+}
+
+/**
  * Is er een mailserver? Voor het onderscheid tussen "verstuurd" en "gelogd omdat
  * er niets ingesteld is". Wie een verzending maar één keer probeert, moet dit
  * eerst vragen; anders vinkt hij in productie iets af dat nooit vertrokken is.

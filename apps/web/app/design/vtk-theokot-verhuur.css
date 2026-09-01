@@ -1,0 +1,765 @@
+/* Theokot-verhuur: het publieke aanvraagformulier (/theokot/verhuur), het
+   beslisscherm uit de meldingsmail en de kalender in het beheer.
+
+   Eén bestand voor alle drie, want een verhuur moet er overal hetzelfde
+   uitzien: goedgekeurd is vol, aangevraagd is dof, geweigerd is doorstreept.
+   Kleuren komen uit de tokens in vtk-base.css.
+
+   De opbouw lijkt op vtk-lesbezoeken.css, en dat is geen toeval: het is
+   dezelfde soort werklijst met dezelfde soort kalender ernaast. Ze zijn bewust
+   niet samengevoegd, want de statussen verschillen en `lb-`-klassen in een
+   Theokot-scherm zouden bij de eerste aanpassing aan de lesbezoeken meeschuiven
+   zonder dat iemand hier keek. Wie ze ooit samenvoegt, doet dat best in één
+   beweging voor beide. */
+
+/* -------------------------------------------------------------------------- */
+/* Publiek: het aanvraagformulier                                              */
+/* -------------------------------------------------------------------------- */
+
+.tv-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(18px, 2.5vw, 28px);
+  align-items: start;
+}
+
+/* Het formulier links, de richtlijnen rechts. Die richtlijnen zijn geen bijzaak:
+   wie de verantwoordelijke mag zijn, wat er niet mag en wanneer de zaal vrij is,
+   stond vroeger verspreid over de vraagteksten van een Google Form. */
+@media (min-width: 960px) {
+  .tv-grid {
+    grid-template-columns: minmax(0, 1.9fr) minmax(280px, 1fr);
+  }
+}
+
+.tv-panel {
+  padding: clamp(22px, 3vw, 32px);
+}
+
+.tv-panel > h2 {
+  margin: 0;
+  font-size: 22px;
+  line-height: 1.25;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.tv-lead {
+  margin: 10px 0 0;
+  color: var(--body);
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.tv-form {
+  /* Positioneerd, zodat het weggeschoven honeypot-veld hieronder aan het
+     formulier hangt en niet aan de pagina. */
+  position: relative;
+  margin-top: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.tv-fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* Een `legend` in een flex-fieldset valt buiten de flexstroom en plakt dan tegen
+   het eerste veld; `float: left` zet hem terug in de gewone stroom. */
+.tv-fieldset > legend {
+  float: left;
+  width: 100%;
+  padding: 0 0 8px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tv-fieldset > legend + * {
+  clear: both;
+}
+
+.tv-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+@media (min-width: 640px) {
+  .tv-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .tv-row-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.tv-field {
+  min-width: 0;
+}
+
+.tv-help {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-line;
+}
+
+.tv-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.tv-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--body);
+}
+
+.tv-check input {
+  margin-top: 3px;
+  accent-color: var(--navy);
+}
+
+/* Uit beeld, maar niet `display: none`: sommige bots slaan een verborgen veld
+   over en vullen alleen wat ze zien. */
+.tv-honeypot {
+  position: absolute;
+  left: -9999px;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+}
+
+.tv-aside {
+  display: flex;
+  flex-direction: column;
+  gap: clamp(14px, 2vw, 18px);
+}
+
+.tv-side {
+  padding: clamp(18px, 2.4vw, 24px);
+}
+
+.tv-side h2 {
+  margin: 0 0 8px;
+  font-size: 16px;
+  line-height: 1.3;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tv-notice {
+  display: flex;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #f5d98a;
+  background: #fff8e1;
+  color: #6b4a00;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.tv-notice[data-tone="ok"] {
+  border-color: #a9dcbe;
+  background: #e9f7ef;
+  color: #12633b;
+}
+
+.tv-notice[data-tone="no"] {
+  border-color: #f3b8b8;
+  background: #fdecec;
+  color: #97231f;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Statusbadges                                                                */
+/* -------------------------------------------------------------------------- */
+
+.tv-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border-radius: 999px;
+  border: 1px solid;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tv-badge[data-tone="waiting"] {
+  background: #fff8e1;
+  border-color: #f5d98a;
+  color: #7a5300;
+}
+
+.tv-badge[data-tone="ok"] {
+  background: #e9f7ef;
+  border-color: #a9dcbe;
+  color: #12633b;
+}
+
+.tv-badge[data-tone="no"] {
+  background: #fdecec;
+  border-color: #f3b8b8;
+  color: #97231f;
+}
+
+.tv-badge[data-tone="done"] {
+  background: var(--paper-2);
+  border-color: var(--line);
+  color: var(--muted);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Beheer: werklijst                                                           */
+/* -------------------------------------------------------------------------- */
+
+.tv-board {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (min-width: 1100px) {
+  .tv-board {
+    grid-template-columns: minmax(320px, 2fr) minmax(360px, 3fr);
+  }
+
+  .tv-board > aside {
+    position: sticky;
+    top: 16px;
+  }
+}
+
+.tv-queue {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tv-item {
+  display: grid;
+  grid-template-columns: 4px minmax(0, 1fr);
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  overflow: hidden;
+  text-align: left;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  appearance: none;
+  width: 100%;
+}
+
+.tv-item:hover {
+  border-color: color-mix(in srgb, var(--navy) 30%, var(--line));
+}
+
+.tv-item[aria-current="true"] {
+  border-color: var(--navy);
+  box-shadow: 0 0 0 1px var(--navy);
+}
+
+.tv-item-rail {
+  background: var(--tone, var(--navy));
+}
+
+.tv-item-body {
+  padding: 12px 14px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tv-item-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.tv-item-title {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tv-item-meta {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.tv-flags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.tv-flag {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 11px;
+  color: var(--muted);
+  background: var(--paper);
+}
+
+.tv-flag[data-open="true"] {
+  border-color: #f5d98a;
+  background: #fff8e1;
+  color: #7a5300;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Beheer: detailpaneel                                                        */
+/* -------------------------------------------------------------------------- */
+
+.tv-def {
+  display: grid;
+  grid-template-columns: minmax(9rem, auto) minmax(0, 1fr);
+  gap: 4px 14px;
+  margin: 0;
+  font-size: 14px;
+}
+
+.tv-def dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding-top: 2px;
+}
+
+.tv-def dd {
+  margin: 0;
+  color: var(--ink);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.tv-quote {
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--line);
+  background: var(--paper);
+  border-radius: 0 10px 10px 0;
+  white-space: pre-wrap;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--body);
+}
+
+/* De streep tussen "dit verandert enkel de status" en "dit stuurt een mail". Dat
+   onderscheid is het hele punt van dit scherm, dus het krijgt een rand en een
+   kop en staat niet als nog een knop tussen de rest. */
+.tv-section {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--surface);
+}
+
+.tv-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tv-section-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.tv-section-note {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* Waarschuwt dat de knop eronder een mail verstuurt. Geel, want dat is in dit
+   ontwerp de kleur die zegt "kijk hier". */
+.tv-sends-mail {
+  border-left: 3px solid var(--yellow);
+  padding: 6px 0 6px 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--body);
+}
+
+.tv-sends-mail strong {
+  color: var(--ink);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Beheer: de balk boven de kalender                                           */
+/* -------------------------------------------------------------------------- */
+
+.tv-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.tv-toolbar-title {
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  min-width: 12ch;
+}
+
+.tv-spacer {
+  margin-left: auto;
+}
+
+.tv-segment {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+
+.tv-segment button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 5px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.tv-segment button[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(14 26 54 / 0.12);
+}
+
+.tv-step {
+  appearance: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.tv-step:hover {
+  background: var(--paper-2);
+}
+
+.tv-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tv-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tv-legend i {
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Beheer: maandraster                                                         */
+/* -------------------------------------------------------------------------- */
+
+.tv-month {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.tv-month-head,
+.tv-month-body {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.tv-month-head > div {
+  padding: 8px 6px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.tv-day {
+  min-height: 108px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.tv-day:nth-child(7n) {
+  border-right: 0;
+}
+
+.tv-day[data-outside="true"] {
+  background: var(--paper);
+}
+
+.tv-day[data-today="true"] {
+  background: #fffdf2;
+}
+
+.tv-daynum {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.tv-day[data-today="true"] .tv-daynum {
+  background: var(--navy);
+  color: var(--paper);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Beheer: een verhuur als blokje                                              */
+/*                                                                             */
+/* Hier zit de vraag waar de kalender voor bestaat: is de zaal die dag bezet?   */
+/* Een goedgekeurde verhuur staat er vol op, een aanvraag die nog wacht dof met */
+/* een streepjesrand, en wat niet doorgaat is doorstreept. Zo lees je in één    */
+/* blik het verschil tussen "vastgelegd" en "iemand vroeg het".                */
+/* -------------------------------------------------------------------------- */
+
+.tv-chip {
+  appearance: none;
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 0;
+  border-left: 3px solid var(--tone, var(--navy));
+  border-radius: 6px;
+  padding: 2px 6px;
+  background: color-mix(in srgb, var(--tone, var(--navy)) 16%, white);
+  color: var(--ink);
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1.35;
+  cursor: pointer;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tv-chip:hover {
+  background: color-mix(in srgb, var(--tone, var(--navy)) 26%, white);
+}
+
+.tv-chip strong {
+  font-weight: 700;
+  margin-right: 4px;
+}
+
+.tv-chip span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tv-chip[data-status="UNANSWERED"] {
+  background: color-mix(in srgb, var(--tone) 8%, white);
+  border-left-style: dashed;
+  outline: 1px dashed color-mix(in srgb, var(--tone) 55%, white);
+  outline-offset: -1px;
+  color: var(--body);
+}
+
+.tv-chip[data-status="REJECTED"],
+.tv-chip[data-status="CANCELLED"] {
+  opacity: 0.5;
+}
+
+.tv-chip[data-status="REJECTED"] span,
+.tv-chip[data-status="CANCELLED"] span {
+  text-decoration: line-through;
+}
+
+.tv-chip[aria-current="true"] {
+  box-shadow: 0 0 0 2px var(--yellow);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Beheer: week- en dagraster                                                  */
+/* -------------------------------------------------------------------------- */
+
+.tv-time {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  /* Hoogte van één uur; de blokjes rekenen hiermee, dus verander dit hier en
+     nergens anders. */
+  --hour: 46px;
+}
+
+.tv-time-head {
+  display: grid;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+.tv-time-head > div {
+  padding: 7px 4px;
+  text-align: center;
+  border-left: 1px solid var(--line);
+}
+
+.tv-time-head > div:first-child {
+  border-left: 0;
+}
+
+.tv-time-head .tv-dow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tv-time-head .tv-dom {
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tv-time-head > div[data-today="true"] .tv-dom {
+  color: var(--navy);
+}
+
+.tv-time-body {
+  display: grid;
+  overflow-y: auto;
+  max-height: 62vh;
+}
+
+.tv-hours {
+  border-right: 1px solid var(--line);
+  user-select: none;
+}
+
+/* Het uurlabel staat op de lijn en niet eronder, dus het schuift een halve regel
+   omhoog. Het eerste niet: dat zou boven de rand van het raster uitsteken. */
+.tv-hours > div {
+  height: var(--hour);
+  padding-right: 8px;
+  text-align: right;
+  font-size: 11px;
+  color: var(--muted);
+  transform: translateY(-6px);
+}
+
+.tv-hours > div:first-child {
+  transform: none;
+  padding-top: 3px;
+}
+
+.tv-col {
+  position: relative;
+  border-left: 1px solid var(--line);
+  min-width: 0;
+}
+
+.tv-col:first-of-type {
+  border-left: 0;
+}
+
+.tv-hourline {
+  position: absolute;
+  inset-inline: 0;
+  border-top: 1px solid var(--line);
+  opacity: 0.6;
+}
+
+.tv-event {
+  position: absolute;
+  inset-inline: 2px;
+  min-height: 26px;
+  z-index: 1;
+}
+
+@media (max-width: 640px) {
+  .tv-def {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2px;
+  }
+
+  .tv-def dd {
+    margin-bottom: 8px;
+  }
+
+  .tv-day {
+    min-height: 76px;
+  }
+}

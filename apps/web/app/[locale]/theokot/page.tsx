@@ -105,6 +105,16 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
       <header className="vtk-page-head">
         <div>
           <h1 className="vtk-page-title">{nl ? "Broodjes reserveren" : "Reserve sandwiches"}</h1>
+          {/* De zaal huren is iets anders dan een broodje bestellen, maar het is
+              wel hetzelfde Theokot; wie hier belandt op zoek naar de zaal, moet
+              niet terug naar het menu. */}
+          <p className="vtk-page-subtitle">
+            {nl ? "Wil je de zaal zelf huren? " : "Looking to rent the room itself? "}
+            <a className="vtk-link" href={`${base}/theokot/verhuur`}>
+              {nl ? "Dien hier een verhuuraanvraag in" : "Submit a rental request here"}
+            </a>
+            .
+          </p>
         </div>
       </header>
 

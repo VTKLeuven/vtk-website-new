@@ -2,7 +2,13 @@ import "server-only";
 
 import type { Expense } from "@prisma/client";
 import type { Locale } from "@vtk/i18n";
-import { expenseStatus, formatMoment, formatSpentOn } from "@/lib/rekeningen/expenses";
+import {
+  expenseMailDraft,
+  expenseReportFilename,
+  expenseStatus,
+  formatMoment,
+  formatSpentOn,
+} from "@/lib/rekeningen/expenses";
 import { canEdit, type ExpenseAccess } from "@/lib/rekeningen/server";
 import type { ExpenseDetail, ExpenseRow } from "./ExpenseWorkbench";
 
@@ -53,5 +59,12 @@ export function toDetail(
     sentAtLabel: expense.sentAt ? formatMoment(expense.sentAt, locale) : null,
     sentTo: expense.sentTo,
     canEdit: canEdit(access, expense),
+    // De mail naar de boekhouding wordt hier al opgesteld, met dezelfde functie
+    // als de action die ze verstuurt, zodat het voorbeeldvenster geen tweede
+    // versie van die tekst hoeft te verzinnen.
+    mail: {
+      ...expenseMailDraft(expense),
+      attachmentName: expenseReportFilename(expense),
+    },
   };
 }

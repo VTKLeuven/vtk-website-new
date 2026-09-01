@@ -73,6 +73,11 @@ export const MCP_PERMISSION_POLICY = {
   "shift.ranking": { reads: ["shift_ranking"], creates: [], blocked: [] },
   "theokot.manage": { reads: ["theokot"], creates: ["app_create:theokot_product", "app_create:theokot_session"], blocked: ["open sessions, ban users or alter orders"] },
   "theokot.pickup": { reads: ["theokot"], creates: [], blocked: ["mark orders picked up or redeem vouchers"] },
+  // Een verhuuraanvraag is één student met zijn naam, telefoonnummer en adres,
+  // plus wat hij van plan is. Daar gaat niets van door dit endpoint, ook niet
+  // lezend; aanmaken zou bovendien een mail naar de behandelaars sturen.
+  "theokot.rentals.view": { reads: [], creates: [], blocked: ["read rental requests"] },
+  "theokot.rentals.manage": { reads: [], creates: [], blocked: ["read, decide on or answer rental requests"] },
   "grocomeet.reserve": { reads: ["meeting_schedule"], creates: [], blocked: ["reserve products or incur a payment"] },
   "grocomeet.manage": { reads: ["meetings"], creates: ["app_create:meeting(GROCOMEET)"], blocked: ["reserve products, mark payments or alter stock"] },
   "bureau.manage": { reads: ["meetings"], creates: ["app_create:meeting(BUREAU)"], blocked: ["reserve products or alter stock"] },

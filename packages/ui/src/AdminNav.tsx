@@ -49,9 +49,31 @@ const TOP_GAP = 96;
 const BOTTOM_GAP = 24;
 const TWO_COLUMN = '(min-width: 860px)';
 
-function isActive(pathname: string, item: AdminNavItem): boolean {
+function matches(pathname: string, item: AdminNavItem): boolean {
   if (item.exact) return pathname === item.href;
   return pathname === item.href || pathname.startsWith(`${item.href}/`);
+}
+
+/**
+ * Het href van de tab die bij dit pad hoort: de **langste** die matcht.
+ *
+ * Zonder die regel lichtten twee tabs samen op zodra de ene onder de andere
+ * hangt: /admin/theokot/verhuur zette ook Broodjes (/admin/theokot) aan, en
+ * /admin/wachtwoorden/beheer ook Wachtwoorden. `exact` erop zetten is geen
+ * oplossing, want die bovenliggende tab heeft zelf onderliggende schermen die
+ * hem wél moeten laten oplichten (/admin/theokot/afhalen).
+ */
+function activeHrefFor(nodes: AdminNavNode[], pathname: string): string | null {
+  let best: string | null = null;
+  for (const item of flatten(nodes)) {
+    if (!matches(pathname, item)) continue;
+    if (best === null || item.href.length > best.length) best = item.href;
+  }
+  return best;
+}
+
+function isActive(activeHref: string | null, item: AdminNavItem): boolean {
+  return activeHref !== null && item.href === activeHref;
 }
 
 function useSmartSticky<T extends HTMLElement>() {
@@ -120,12 +142,12 @@ function useSmartSticky<T extends HTMLElement>() {
   return ref;
 }
 
-function activeLabel(nodes: AdminNavNode[], pathname: string, fallback: string): string {
+function activeLabel(nodes: AdminNavNode[], activeHref: string | null, fallback: string): string {
   for (const node of nodes) {
     if (node.type === 'item') {
-      if (isActive(pathname, node.item)) return node.item.label;
+      if (isActive(activeHref, node.item)) return node.item.label;
     } else {
-      const hit = node.items.find((item) => isActive(pathname, item));
+      const hit = node.items.find((item) => isActive(activeHref, item));
       if (hit) return hit.label;
     }
   }
@@ -142,7 +164,8 @@ export function AdminNav({ title, nodes, icons = {}, pins }: AdminNavProps) {
   const stickyRef = useSmartSticky<HTMLDivElement>();
   const panelId = useId();
   const [open, setOpen] = useState(false);
-  const current = activeLabel(nodes, pathname, title);
+  const activeHref = activeHrefFor(nodes, pathname);
+  const current = activeLabel(nodes, activeHref, title);
 
   const [previousPath, setPreviousPath] = useState(pathname);
   if (pathname !== previousPath) {
@@ -170,14 +193,14 @@ export function AdminNav({ title, nodes, icons = {}, pins }: AdminNavProps) {
       </button>
       <nav id={panelId} className={`vtk-admin-nav${open ? ' is-open' : ''}`} aria-label={title}>
         {pinCtx && (
-          <PinnedSection nodes={nodes} pathname={pathname} icons={icons} pins={pinCtx.pins} state={pinCtx.state} />
+          <PinnedSection nodes={nodes} activeHref={activeHref} icons={icons} pins={pinCtx.pins} state={pinCtx.state} />
         )}
         {nodes.map((node) =>
           node.type === 'item' ? (
             <NavLink
               key={node.item.key}
               item={node.item}
-              active={isActive(pathname, node.item)}
+              active={isActive(activeHref, node.item)}
               icons={icons}
               pin={pinCtx}
             />
@@ -185,7 +208,7 @@ export function AdminNav({ title, nodes, icons = {}, pins }: AdminNavProps) {
             <NavGroup
               key={node.key}
               group={node}
-              pathname={pathname}
+              activeHref={activeHref}
               icons={icons}
               pin={pinCtx}
             />
@@ -243,13 +266,13 @@ function usePins(pins: AdminNavPins | undefined): PinState | null {
 
 function PinnedSection({
   nodes,
-  pathname,
+  activeHref,
   icons,
   pins,
   state,
 }: {
   nodes: AdminNavNode[];
-  pathname: string;
+  activeHref: string | null;
   icons: Record<string, ReactNode>;
   pins: AdminNavPins;
   state: PinState;
@@ -267,7 +290,7 @@ function PinnedSection({
         <NavLink
           key={item.key}
           item={item}
-          active={isActive(pathname, item)}
+          active={isActive(activeHref, item)}
           icons={icons}
           pin={{ pins, state }}
         />
@@ -335,16 +358,16 @@ function NavLink({
 
 function NavGroup({
   group,
-  pathname,
+  activeHref,
   icons,
   pin,
 }: {
   group: Extract<AdminNavNode, { type: 'group' }>;
-  pathname: string;
+  activeHref: string | null;
   icons: Record<string, ReactNode>;
   pin?: PinCtx | null;
 }) {
-  const containsActive = group.items.some((item) => isActive(pathname, item));
+  const containsActive = group.items.some((item) => isActive(activeHref, item));
   const [open, setOpen] = useState(containsActive);
   const [previousContainsActive, setPreviousContainsActive] = useState(containsActive);
 
@@ -370,7 +393,7 @@ function NavGroup({
           <NavLink
             key={item.key}
             item={item}
-            active={isActive(pathname, item)}
+            active={isActive(activeHref, item)}
             icons={icons}
             sub
             pin={pin}

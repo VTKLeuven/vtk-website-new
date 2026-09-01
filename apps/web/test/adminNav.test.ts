@@ -53,17 +53,27 @@ describe("admin nav structure", () => {
     const normalNav = getAdminNav({ isItOrG5: false });
     const normalLoose = normalNav.filter((entry): entry is NavLeaf => !("group" in entry)).map((leaf) => leaf.key);
     expect(normalLoose).toContain("fakscanner");
-    expect(normalLoose).toContain("theokot");
     expect(normalLoose).toContain("grocomeet");
+
+    // Theokot is er twee (broodjes en verhuur) en staat daarom als eigen groep,
+    // ook voor een gewone post.
+    const theokotGroup = normalNav.find(
+      (e): e is Extract<NavEntry, { group: string }> => "group" in e && e.group === "theokot",
+    );
+    expect(theokotGroup?.items.map((i) => i.key)).toEqual(["theokotBroodjes", "theokotVerhuur"]);
 
     const itG5Nav = getAdminNav({ isItOrG5: true });
     const itG5Loose = itG5Nav.filter((entry): entry is NavLeaf => !("group" in entry)).map((leaf) => leaf.key);
     expect(itG5Loose).not.toContain("fakscanner");
-    expect(itG5Loose).not.toContain("theokot");
+    expect(itG5Loose).not.toContain("theokotBroodjes");
     expect(itG5Loose).toContain("grocomeet");
 
     const overigGroup = itG5Nav.find((e): e is Extract<NavEntry, { group: string }> => "group" in e && e.group === "overig");
-    expect(overigGroup?.items.map((i) => i.key)).toEqual(["fakscanner", "theokot"]);
+    expect(overigGroup?.items.map((i) => i.key)).toEqual([
+      "fakscanner",
+      "theokotBroodjes",
+      "theokotVerhuur",
+    ]);
   });
 
   it("routes every internal tab to a path below /admin", () => {

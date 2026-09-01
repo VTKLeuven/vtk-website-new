@@ -498,45 +498,45 @@ model User {
 
   // Onboarding-profiel (ingevuld bij de eerste KUL SSO-login). Zolang
   // onboardedAt null is, wordt het lid naar de onboarding-flow gestuurd.
-  onboardedAt            DateTime?
+  onboardedAt             DateTime?
   // Kotadres. `noKot` is expliciet: lege velden alleen kunnen niet onderscheiden
   // of iemand geen kot heeft of het adres nog niet invulde.
-  noKot                  Boolean   @default(false)
-  street                 String?
-  houseNumber            String?
-  bus                    String? // busnummer, optioneel
-  postalCode             String?
-  city                   String?
+  noKot                   Boolean             @default(false)
+  street                  String?
+  houseNumber             String?
+  bus                     String? // busnummer, optioneel
+  postalCode              String?
+  city                    String?
   // Thuisadres is functioneel verplicht in onboarding en studiebevestiging.
   // De kolommen blijven nullable zodat bestaande leden pas bij hun volgende
   // bevestiging een echt adres moeten opgeven, zonder verzonnen migratiedata.
-  homeStreet             String?
-  homeHouseNumber        String?
-  homeBus                String? // busnummer, optioneel
-  homePostalCode         String?
-  homeCity               String?
-  birthDate              DateTime?
+  homeStreet              String?
+  homeHouseNumber         String?
+  homeBus                 String? // busnummer, optioneel
+  homePostalCode          String?
+  homeCity                String?
+  birthDate               DateTime?
   // Contact: `email` is de login-/universiteitsmail (via SSO). Persoonlijke
   // mail en de voorkeur voor communicatie komen erbij.
-  personalEmail          String?
-  emailPreference        EmailPreference     @default(UNIVERSITY)
+  personalEmail           String?
+  emailPreference         EmailPreference     @default(UNIVERSITY)
   // Het `@vtk.be`-account in Google Workspace. `googleUserId` is het immutable
   // id van Google: dat blijft kloppen wanneer iemand van naam of adres wisselt.
   // Op naam matchen doen we bewust nooit (naamgenoten, tussenvoegsels), dus dit
   // veld is de enige koppeling. Zie docs/design-decisions.md, "Google Workspace".
-  googleUserId           String?             @unique
-  googleEmail            String?             @unique
-  googleLinkedAt         DateTime?
+  googleUserId            String?             @unique
+  googleEmail             String?             @unique
+  googleLinkedAt          DateTime?
   // Wanneer het lid de verplichte koppeling uitstelde omdat het nog geen
   // @vtk.be-account heeft. Zonder deze ontsnapping sluit de gate iemand buiten
   // die niets kan doen aan wat de gate vraagt; de gate komt gewoon terug.
-  googleLinkDeferredAt   DateTime?
+  googleLinkDeferredAt    DateTime?
   // Laatst toegepaste staat van het Google-account, zodat de sync niet elke
   // ronde dezelfde OU-verhuizing opnieuw doet. Afgeleid uit de posten en de
   // kiesploeg; zie lib/google/accountState.ts.
-  googleAccountState     GoogleAccountState?
+  googleAccountState      GoogleAccountState?
   // Opt-in mailinglijsten: enkel de aangeduide categorieën zitten in de array.
-  mailCategories         MailCategory[]      @default([])
+  mailCategories          MailCategory[]      @default([])
   // Wanneer het lid zich via een mail zelf uitschreef (de uitschrijflink in
   // Brevo). Bewust een datum en geen boolean: het beheer wil kunnen zien wanneer
   // die keuze viel, en het is een keuze van het lid die we niet stil mogen
@@ -548,31 +548,31 @@ model User {
   // dit terug, via de opt-in op /account; een import of een profielopslag mag
   // het nooit wissen. `mailCategories` blijft bewust staan, zodat een lid dat
   // zich opnieuw inschrijft zijn oude voorkeuren terugkrijgt.
-  mailUnsubscribedAt     DateTime?           @db.Timestamptz(3)
+  mailUnsubscribedAt      DateTime?           @db.Timestamptz(3)
   // Herinneringen voor een shift waarvoor je jezelf inschreef. Bewust geen
   // `MailCategory`: dat zijn opt-in nieuwsbrieven, dit is transactioneel. Wel
   // uitzetbaar, want niet iedereen wil twee mails per shift.
-  shiftReminderDayBefore Boolean             @default(true)
-  shiftReminderSoon      Boolean             @default(true)
+  shiftReminderDayBefore  Boolean             @default(true)
+  shiftReminderSoon       Boolean             @default(true)
   // Studie: meerdere studiejaren en richtingen mogelijk (iemand kan bv. deels in
   // 2de en deels in 3de bachelor zitten).
   // Expliciete studentstatus. Vroeger betekende "niet notStudying" impliciet
   // student, waardoor alumni en personeel elk academiejaar onterecht door de
   // studiebevestigingsgate gingen. Staat los van `alumni`: iemand kan beide zijn.
-  isStudent              Boolean             @default(true)
-  studyYears             StudyYear[]         @default([])
-  studyProgrammes        StudyProgramme[]    @default([])
+  isStudent               Boolean             @default(true)
+  studyYears              StudyYear[]         @default([])
+  studyProgrammes         StudyProgramme[]    @default([])
   // Lid dat niet aan de faculteit Ingenieurswetenschappen studeert. Bewust geen
   // `StudyProgramme`-waarde: het is geen richting, en als enum-waarde zou het
   // overal opduiken waar richtingen opgelijst worden (o.a. de career-export).
-  notAtFaculty           Boolean             @default(false)
+  notAtFaculty            Boolean             @default(false)
   // Expliciete status "ik studeer niet" voor wie geen student, alumnus of
   // academisch personeelslid is. Bewust los van `notAtFaculty` (dat is
   // "studeert wél, maar elders").
-  notStudying            Boolean             @default(false)
+  notStudying             Boolean             @default(false)
   // Subtype voor wie "academisch personeel" aanvinkt. De status zelf wordt uit
   // een niet-null waarde afgeleid, zodat checkbox en subtype niet uiteenlopen.
-  academicStaffRole      AcademicStaffRole?
+  academicStaffRole       AcademicStaffRole?
   // Verbergt doelgroepevents die niet bij het profiel passen.
   //
   // Standaard **uit**: alles is publiek en een eerstejaars mag gerust zien dat er
@@ -580,34 +580,34 @@ model User {
   // doopactiviteiten wil zien) zet dit aan op /account; dan gelden de doelgroepen
   // uit `audiencesForStudyProfile` als filter op de homepage, de kalender, de
   // zoekresultaten, de app en de persoonlijke agendafeed.
-  calendarOnlyMyAudiences Boolean            @default(false)
+  calendarOnlyMyAudiences Boolean             @default(false)
   // Internationale of uitwisselingsstudent. Bewust een eigen veld en geen
   // afleiding uit `locale`: de sitetaal zegt welke taal je leest, niet of je een
   // exchange-student bent. Stuurt welke evenementen vanzelf in de kalender
   // opduiken (zie CalendarAudience).
-  internationalStudent   Boolean             @default(false)
+  internationalStudent    Boolean             @default(false)
   // Afgestudeerde van de faculteit. Bewust los van `notStudying`: die laatste
   // omvat ook wie stopte zonder af te studeren en is dus geen betrouwbare
   // alumni-indicator. Stuurt de expliciete alumni-doelgroep in de kalender.
-  alumni                 Boolean             @default(false)
+  alumni                  Boolean             @default(false)
   // Het jaar waarin het lid afstudeerde. Enkel zinvol bij `alumni`, maar bewust
   // geen aparte tabel: het is één getal dat bij de persoon hoort. Wordt getoond
   // in de aanwezigheidslijst van een alumni-evenement wanneer het lid dat zelf
   // aanvinkt, en groepeert de alumni-mailinglijsten per lichting.
-  graduationYear         Int?
+  graduationYear          Int?
   // "Ik heb ooit in VTK gezeten" (praesidium, werkgroep, medewerker). Bewust
   // zelf verklaard en niet afgeleid uit `GroupMembership`: de historiek in de
   // database begint pas bij de website, terwijl een alumnus van 2004 evengoed
   // in VTK zat.
-  wasInVtk               Boolean             @default(false)
+  wasInVtk                Boolean             @default(false)
   // Wil per mail op de hoogte blijven van alumni-evenementen. Bewust geen
   // `MailCategory`: die lijsten zijn studiegericht en vallen weg zodra iemand
   // zijn studie niet meer bevestigt, wat voor een alumnus altijd het geval is.
-  alumniMailOptIn        Boolean             @default(false)
+  alumniMailOptIn         Boolean             @default(false)
   // Erelid. Enkel door een beheerder te zetten (zie `users.edit`), nooit door
   // het lid zelf. Geeft toegang tot ticketsoorten met `TicketAudience.HONORARY`,
   // die voor iedereen anders onzichtbaar blijven.
-  honoraryMember         Boolean             @default(false)
+  honoraryMember          Boolean             @default(false)
   // Wanneer dit account zichzelf met e-mail en wachtwoord aanmaakte (de weg voor
   // wie geen KU Leuven-login (meer) heeft). Bewust een datum en geen boolean:
   // het beheer wil kunnen zien wanneer zo'n account binnenkwam.
@@ -616,7 +616,7 @@ model User {
   // account dat een beheerder aanmaakte of dat via SSO binnenkwam is per
   // definitie vertrouwd; enkel bij een zelfgemaakt account houdt een
   // onbevestigd adres de login tegen (zie `loginAction`).
-  selfRegisteredAt       DateTime?           @db.Timestamptz(3)
+  selfRegisteredAt        DateTime?           @db.Timestamptz(3)
   // Academiejaar waarin een lid met `isStudent` zijn studieprofiel laatst
   // bevestigde (2026 = "26-27"). Loopt dat achter op het huidige academiejaar,
   // dan is het profiel verlopen: de bevestigingsgate vraagt het opnieuw en het
@@ -626,7 +626,7 @@ model User {
   // academiejaar tot eind september loopt. De bevestiging vervalt daarom op
   // 27 september (`currentStudyYear()` in @vtk/auth), anders duidt iedereen in
   // juli nog het jaar aan dat net gedaan is.
-  studyConfirmedYear     Int?
+  studyConfirmedYear      Int?
 
   sessions  Session[]
   accounts  Account[]
@@ -658,6 +658,10 @@ model User {
   theokotVoucherRedemptions TheokotVoucherRedemption[] @relation("TheokotVoucherUser")
   theokotVouchersProcessed  TheokotVoucherRedemption[] @relation("TheokotVoucherProcessedBy")
   theokotBans               TheokotBan[]
+  theokotRentalsDecided     TheokotRental[]            @relation("TheokotRentalDecidedBy")
+  theokotRentalsCreated     TheokotRental[]            @relation("TheokotRentalCreatedBy")
+  theokotRentalMessages     TheokotRentalMessage[]     @relation("TheokotRentalMessageSentBy")
+  theokotRentalContracts    TheokotRentalContractDoc[] @relation("TheokotRentalContractUploadedBy")
 
   appPushDevices          AppPushDevice[]             @relation("AppPushDeviceUser")
   appNotificationPrefs    AppNotificationPreference[] @relation("AppNotificationPrefUser")
@@ -670,8 +674,8 @@ model User {
   studyGroupMemberships   StudyGroupMember[]          @relation("StudyGroupMemberUser")
   studyProfile            StudyProfile?               @relation("StudyProfileUser")
 
-  fakbarEvenings          FakbarEvening[]             @relation("FakbarHoofdtapper")
-  photoTakedownsHandled   PhotoTakedownRequest[]     @relation("PhotoTakedownHandler")
+  fakbarEvenings        FakbarEvening[]        @relation("FakbarHoofdtapper")
+  photoTakedownsHandled PhotoTakedownRequest[] @relation("PhotoTakedownHandler")
 
   pianoReservations PianoReservation[]
 
@@ -739,8 +743,8 @@ model User {
   expensesPaid      Expense[] @relation("ExpensePaidBy")
   expensesBooked    Expense[] @relation("ExpenseBookedBy")
 
-  createdLesbezoeken  Lesbezoek[] @relation("LesbezoekCreatedBy")
-  reviewedLesbezoeken Lesbezoek[] @relation("LesbezoekReviewedBy")
+  createdLesbezoeken             Lesbezoek[]              @relation("LesbezoekCreatedBy")
+  reviewedLesbezoeken            Lesbezoek[]              @relation("LesbezoekReviewedBy")
   createdLesbezoekScheduledMails LesbezoekScheduledMail[] @relation("LesbezoekScheduledMailCreatedBy")
 
   @@index([deletedAt])
@@ -1183,12 +1187,12 @@ model HeaderTab {
  * naartoe moeten (jobfair, boeken bestellen, ...).
  */
 model HeaderTabLink {
-  id      String @id @default(cuid())
-  tabId   String
-  labelNl String
-  labelEn String
-  url     String
-  order   Int    @default(0)
+  id       String  @id @default(cuid())
+  tabId    String
+  labelNl  String
+  labelEn  String
+  url      String
+  order    Int     @default(0)
   // Foto op de kaart van dit item op de categoriepagina. Geldt zowel voor een
   // vaste route (/praesidium) als voor een externe link. Beheer via
   // /admin/header, net als Page.imageKey.
@@ -1309,35 +1313,35 @@ model Page {
   // Legacy tiptap-documenten. Markdown (contentMdNl/En) is de bron van waarheid;
   // deze JSON wordt enkel nog gerenderd zolang de pagina niet één keer in de
   // markdown-editor opgeslagen is.
-  contentJsonNl   Json
-  contentJsonEn   Json?
-  contentMdNl     String?
-  contentMdEn     String?
-  excerptNl       String?
-  excerptEn       String?
+  contentJsonNl         Json
+  contentJsonEn         Json?
+  contentMdNl           String?
+  contentMdEn           String?
+  excerptNl             String?
+  excerptEn             String?
   // Foto op de kaart van deze pagina op de categoriepagina (`/info`, ...),
   // uploadbaar in /admin/header en /admin/paginas. Zelfde soort veld als
   // `HeaderTabLink.imageKey`: een storage-key, geen URL. Zonder foto toont de
   // kaart het technische patroon uit de huisstijl.
-  imageKey        String?
+  imageKey              String?
   // Optionele knop naast de titel, dezelfde velden als op HeaderTab. Voor een
   // pagina die een aparte app beschrijft (Uitleendienst -> logistiek, Shiften ->
   // de shiftenlijst) hoort die app één klik ver te staan en niet ergens
   // halverwege de tekst.
-  ctaLabelNl      String?
-  ctaLabelEn      String?
-  ctaUrl          String?
+  ctaLabelNl            String?
+  ctaLabelEn            String?
+  ctaUrl                String?
   // Jaarlijks na te kijken pagina (namen, telefoonnummers, ...): komt bovenaan
   // het paginabeheer te staan zolang ze dit werkingsjaar niet bewerkt is.
-  needsYearlyEdit Boolean   @default(false)
+  needsYearlyEdit       Boolean   @default(false)
   // Laatste keer dat de INHOUD via de editor opgeslagen is. updatedAt telt niet:
   // die verschuift ook bij structuurwijzigingen (verslepen, hernoemen, ...).
-  contentEditedAt DateTime?
-  publishedAt     DateTime?
-  order           Int       @default(0)
-  createdById     String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  contentEditedAt       DateTime?
+  publishedAt           DateTime?
+  order                 Int       @default(0)
+  createdById           String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   // Zoekvectoren voor /zoeken, één per taalconfiguratie. Een trigger houdt ze
   // bij (zie de migratie `search_vectors`); Prisma schrijft ze nooit zelf en
@@ -1394,7 +1398,7 @@ model PageAsset {
 // -----------------------------------------------------------------------------
 
 model CalendarEvent {
-  id            String          @id @default(cuid())
+  id            String    @id @default(cuid())
   titleNl       String
   titleEn       String?
   descriptionNl String?
@@ -1402,16 +1406,16 @@ model CalendarEvent {
   location      String?
   start         DateTime
   end           DateTime
-  allDay        Boolean         @default(false)
+  allDay        Boolean   @default(false)
   url           String?
   imageKey      String?
   groupId       String
   createdById   String?
   // NULL = concept. Een concept blijft wel zichtbaar en bewerkbaar in de admin,
   // maar verschijnt nergens op de publieke site of in een agenda-feed.
-  publishedAt   DateTime?       @db.Timestamptz(3)
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  publishedAt   DateTime? @db.Timestamptz(3)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   // Zie de gelijknamige velden op `Page`: door een trigger onderhouden
   // zoekvectoren, enkel via ruwe SQL bevraagd.
@@ -2607,6 +2611,227 @@ model TheokotBan {
 
   @@index([userId])
   @@index([active])
+}
+
+// -----------------------------------------------------------------------------
+// Theokot-verhuur: de zaal zelf uitlenen aan een post, een werkgroep of iemand
+// van buiten de kring.
+//
+// Dit verving een Google Form met een Sheet ernaast. De vragen staan daarom niet
+// hier maar in `Setting` onder `theokot.rental.questions`: Theokot moet ze kunnen
+// herschrijven zonder deploy. Wat wél kolommen zijn, is alles waar het systeem
+// zelf op rekent (wanneer, wie, en de vier opvolgvelden), want daar hangen de
+// kalender, de dubbelboeking-waarschuwing en de mails aan.
+//
+// Zie docs/design-decisions.md ("Theokot-verhuur").
+// -----------------------------------------------------------------------------
+
+/// Waar een aanvraag in haar leven staat. De namen volgen de kolom uit de Sheet;
+/// `ENDED` is "het moment is voorbij", `COMPLETED` is "sleutel terug, waarborg
+/// geregeld, dossier dicht".
+enum TheokotRentalStatus {
+  UNANSWERED
+  REJECTED
+  APPROVED
+  CANCELLED
+  ENDED
+  COMPLETED
+}
+
+/// Wat de aanvrager in het formulier koos als betaalwijze voor de waarborg.
+/// Blijft staan zoals hij het antwoordde; het opvolgen gebeurt in `deposit`.
+enum TheokotRentalDepositChoice {
+  TRANSFER
+  CASH
+  NVT
+}
+
+/// Waar de waarborg staat. "OS" is een overschrijving, "C" is cash; binnen is
+/// ontvangen, terug is teruggestort of teruggegeven.
+enum TheokotDepositState {
+  NVT
+  TRANSFER
+  CASH
+  TRANSFER_IN
+  CASH_IN
+  TRANSFER_BACK
+  CASH_BACK
+  PROBLEM
+}
+
+enum TheokotContractState {
+  PENDING
+  SIGNED
+  NVT
+}
+
+enum TheokotKeyState {
+  PENDING
+  GIVEN
+  RETURNED
+  NVT
+}
+
+/// Intern (een post of werkgroep van VTK) of extern. Bepaalt welk huurcontract
+/// er als bijlage meegaat; die twee documenten zijn niet hetzelfde.
+enum TheokotRenterType {
+  INTERNAL
+  EXTERNAL
+}
+
+enum TheokotRentalDecision {
+  APPROVE
+  REJECT
+}
+
+/// Eén verhuuraanvraag.
+model TheokotRental {
+  id String @id @default(cuid())
+
+  /// De taal waarin de aanvrager verder aangeschreven wil worden ("nl"/"en").
+  /// Kwam als eerste vraag in het formulier en stuurt de keuze van het sjabloon.
+  locale String @default("nl")
+
+  /// De verantwoordelijke. Die moet student aan de faculteit zijn, tekent het
+  /// contract en is tijdens het hele evenement aanwezig; het formulier zegt dat,
+  /// wij bewaren enkel wie het is.
+  responsibleName String
+  phone           String
+  email           String
+
+  /// Instants; de weergave rekent naar Brussel-wandklok (lib/brussels.ts).
+  /// `endsAt` is het einde inclusief kuisen, zoals het formulier vraagt.
+  startsAt DateTime @db.Timestamptz(3)
+  endsAt   DateTime @db.Timestamptz(3)
+
+  /// Aard van de activiteit, letterlijk zoals ingevuld. Een post begint die tekst
+  /// met haar naam tussen vierkante haakjes ("[Theokot] Kaas- en wijnavond");
+  /// daar leidt `renterType` zijn eerste gok uit af.
+  purpose   String
+  attendees Int?
+  remarks   String?
+
+  depositChoice TheokotRentalDepositChoice @default(NVT)
+
+  /// De antwoorden op de vragen die Theokot zelf toevoegde, als
+  /// `{ vraagId: antwoord }`. Vrije vorm omdat de vragenlijst dat ook is; alles
+  /// waar code op rekent staat hierboven als kolom.
+  extraAnswers Json @default("{}")
+
+  renterType TheokotRenterType @default(EXTERNAL)
+
+  /// De vier opvolgvelden uit de Sheet. Ze staan los van elkaar met opzet: een
+  /// aanvraag kan goedgekeurd zijn terwijl het contract nog niet getekend is en
+  /// de sleutel nog binnen ligt.
+  status    TheokotRentalStatus  @default(UNANSWERED)
+  deposit   TheokotDepositState  @default(NVT)
+  contract  TheokotContractState @default(PENDING)
+  keyStatus TheokotKeyState      @default(PENDING)
+
+  /// Interne notitie, enkel in het beheer zichtbaar.
+  internalNote String?
+  /// De reden bij een weigering of een goedkeuring, zoals ze in de mail naar de
+  /// aanvrager terechtkomt. Schrijf hier een zin en geen code.
+  decisionNote String?
+
+  decidedAt      DateTime? @db.Timestamptz(3)
+  decidedById    String?
+  /// Beslist via de knop in de meldingsmail: dan is er geen ingelogde gebruiker
+  /// en weten we enkel dát het via die weg gebeurde.
+  decidedViaMail Boolean   @default(false)
+
+  /// Wanneer de aanvrager de uitkomst hoorde. Zonder dit is "heb ik al
+  /// geantwoord?" niet te beantwoorden.
+  requesterNotifiedAt DateTime? @db.Timestamptz(3)
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  decidedBy User? @relation("TheokotRentalDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  createdBy User? @relation("TheokotRentalCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  messages     TheokotRentalMessage[]
+  actionTokens TheokotRentalActionToken[]
+
+  @@index([startsAt])
+  @@index([status, startsAt])
+  @@index([email])
+}
+
+/// Elke mail die over een aanvraag vertrok, met de tekst zoals ze verstuurd werd.
+///
+/// Bewust de verstuurde tekst en niet enkel het sjabloon-id: een sjabloon wordt
+/// bijgeschaafd, en dan zou de historiek achteraf iets anders beweren dan wat de
+/// aanvrager in zijn inbox heeft.
+model TheokotRentalMessage {
+  id       String @id @default(cuid())
+  rentalId String
+
+  /// "confirmation" (ontvangstbevestiging), "notify" (naar de behandelaars) of
+  /// "reply" (een sjabloonantwoord naar de aanvrager).
+  kind       String
+  templateId String?
+
+  to             String
+  cc             String?
+  subject        String
+  body           String
+  /// Naam van het meegestuurde huurcontract, als er een meeging.
+  attachmentName String?
+
+  sentAt      DateTime @default(now()) @db.Timestamptz(3)
+  sentById    String?
+  /// Verstuurd door de knop in de meldingsmail in plaats van door een ingelogd lid.
+  sentViaMail Boolean  @default(false)
+
+  rental TheokotRental @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+  sentBy User?         @relation("TheokotRentalMessageSentBy", fields: [sentById], references: [id], onDelete: SetNull)
+
+  @@index([rentalId, sentAt])
+}
+
+/// De eenmalige sleutel achter "Goedkeuren" en "Weigeren" in de meldingsmail.
+///
+/// Enkel de hash staat hier: het token zelf bestaat alleen in die mail. Het is
+/// eenmalig en verloopt, want een mail blijft jaren in een mailbox staan en een
+/// doorgestuurde melding mag geen tweede beslissing kunnen nemen.
+model TheokotRentalActionToken {
+  id       String @id @default(cuid())
+  rentalId String
+
+  action    TheokotRentalDecision
+  tokenHash String                @unique
+
+  expiresAt DateTime  @db.Timestamptz(3)
+  usedAt    DateTime? @db.Timestamptz(3)
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+
+  rental TheokotRental @relation(fields: [rentalId], references: [id], onDelete: Cascade)
+
+  @@index([rentalId])
+  @@index([expiresAt])
+}
+
+/// Het huurcontract als pdf, per doelgroep en per taal. Eén rij per combinatie;
+/// een nieuwe upload vervangt de vorige.
+model TheokotRentalContractDoc {
+  id       String            @id @default(cuid())
+  audience TheokotRenterType
+  /// "nl" of "en".
+  locale   String
+
+  storageKey String
+  fileName   String
+  sizeBytes  Int
+
+  uploadedById String?
+  uploadedAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  uploadedBy User? @relation("TheokotRentalContractUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+
+  @@unique([audience, locale])
 }
 
 // -----------------------------------------------------------------------------
@@ -4920,7 +5145,7 @@ model Lesbezoek {
 /// Een ingeplande mail rond een lesbezoek (bv. vraag naar een docent die pas
 /// de volgende ochtend tijdens kantooruren verstuurd mag worden).
 model LesbezoekScheduledMail {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   lesbezoekId String
   kind        String
   to          String
@@ -5347,7 +5572,7 @@ model Expense {
 
   /// De post die de kost draagt. `SetNull` en niet `Cascade`: een gedeactiveerde
   /// of verwijderde post mag de boekhouding niet meenemen.
-  groupId String?
+  groupId   String?
   /// Naam van de post op het moment van indienen. Staat zo op het blad dat naar
   /// de boekhouder gaat, en blijft dus staan ook als de post later hernoemt.
   postLabel String
@@ -5380,14 +5605,14 @@ model Expense {
   /// Terugbetaald aan het lid. Bij VTK_CARD staat dit meteen gevuld: er valt
   /// niets terug te betalen, en zo blijft "openstaand" precies de lijst waar
   /// nog geld naartoe moet.
-  paidAt   DateTime? @db.Timestamptz(3)
-  paidById String?
+  paidAt     DateTime? @db.Timestamptz(3)
+  paidById   String?
   /// Bevestigd door de boekhouder dat ze in de boeken staat.
   bookedAt   DateTime? @db.Timestamptz(3)
   bookedById String?
   /// Wanneer het blad naar de boekhouding vertrok, en naar welk adres.
-  sentAt DateTime? @db.Timestamptz(3)
-  sentTo String?
+  sentAt     DateTime? @db.Timestamptz(3)
+  sentTo     String?
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -5420,7 +5645,7 @@ model FakbarItem {
   id         String             @id @default(cuid())
   name       String
   category   FakbarItemCategory
-  salesPrice Int                // In cents (theoretical income per unit)
+  salesPrice Int // In cents (theoretical income per unit)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -5456,7 +5681,7 @@ model FakbarEvening {
   id                 String   @id @default(cuid())
   weekId             String
   date               DateTime @db.Date
-  dayOfWeek          String   // Zondag, Maandag, etc.
+  dayOfWeek          String // Zondag, Maandag, etc.
   hoofdtapperId      String?
   specialeActiviteit String?
   bancontactRevenue  Int      @default(0) // In cents
@@ -5479,21 +5704,21 @@ model FakbarCashRegisterCount {
   eveningId String @id
 
   // All amounts are counts (how many pieces)
-  cnt_0_05          Int @default(0)
-  cnt_0_10          Int @default(0)
-  cnt_0_20          Int @default(0)
-  cnt_0_50          Int @default(0)
-  cnt_1_00          Int @default(0)
-  cnt_2_00          Int @default(0)
-  cnt_5_00          Int @default(0)
-  cnt_10_00         Int @default(0)
-  cnt_20_00         Int @default(0)
-  cnt_50_00         Int @default(0)
-  cnt_100_00        Int @default(0)
-  
-  cnt_elixirbon         Int @default(0)
-  cnt_guidogids         Int @default(0)
-  cnt_medewerkersbon    Int @default(0)
+  cnt_0_05   Int @default(0)
+  cnt_0_10   Int @default(0)
+  cnt_0_20   Int @default(0)
+  cnt_0_50   Int @default(0)
+  cnt_1_00   Int @default(0)
+  cnt_2_00   Int @default(0)
+  cnt_5_00   Int @default(0)
+  cnt_10_00  Int @default(0)
+  cnt_20_00  Int @default(0)
+  cnt_50_00  Int @default(0)
+  cnt_100_00 Int @default(0)
+
+  cnt_elixirbon      Int @default(0)
+  cnt_guidogids      Int @default(0)
+  cnt_medewerkersbon Int @default(0)
 
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
@@ -5566,21 +5791,21 @@ model FakbarEveningSpecial {
   kind      FakbarSpecialKind
 
   /// Wat er op het bord komt: "2+1 gratis Stella", "Cocktail van de maand".
-  title     String
+  title String
   /// Optionele toelichting, bv. de voorwaarden van de actie.
-  note      String?
+  note  String?
 
   /// Het artikel waar de actie over gaat, wanneer het er één is. Null voor een
   /// actie over de hele toog of een drank die niet op de kaart staat. Bewust
   /// `SetNull` en geen `Cascade`: gaat het artikel van de kaart, dan blijft de
   /// actie in de historiek staan met haar eigen titel.
-  itemId    String?
+  itemId String?
   /// De prijs die die avond geldt, in cent. Null betekent: de gewone prijs, of
   /// niet van toepassing (bij een actie zoals 2+1).
-  price     Int?
+  price  Int?
 
   /// Volgorde op het bord en op de site.
-  sortOrder Int               @default(0)
+  sortOrder Int @default(0)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
@@ -5596,7 +5821,7 @@ model FakbarRental {
   rentalFee       Int    @default(25000) // Default 250 EUR in cents
   expectedRevenue Int    @default(0) // In cents
   effectiveProfit Int    @default(0) // In cents
-  
+
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   evening FakbarEvening @relation(fields: [eveningId], references: [id], onDelete: Cascade)
@@ -5657,11 +5882,11 @@ model PhotoTakedownRequest {
   /// Vrije toelichting van de melder.
   message       String?
 
-  status        PhotoTakedownStatus @default(NEW)
-  handledById   String?
-  handledAt     DateTime?           @db.Timestamptz(3)
+  status       PhotoTakedownStatus @default(NEW)
+  handledById  String?
+  handledAt    DateTime?           @db.Timestamptz(3)
   /// Waarom het verzoek zo afgehandeld is. Verplicht wanneer de foto blijft.
-  handlingNote  String?
+  handlingNote String?
 
   /// Is de meldingsmail naar de post vertrokken? Onwaar betekent dat het
   /// verzoek enkel hier staat en dat niemand er een seintje van kreeg.

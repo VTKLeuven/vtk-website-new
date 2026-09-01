@@ -280,16 +280,24 @@ async function main() {
     "Role for collaborators helping a work group. Set permissions in the roles admin.",
   );
 
-  // theokot: het broodjes-reservatiesysteem beheren en de afhaalbalie bedienen.
+  // theokot: het broodjes-reservatiesysteem beheren, de afhaalbalie bedienen en
+  // de verhuur van de zaal opvolgen. Die drie zitten in één rol omdat het in de
+  // praktijk dezelfde post is; wie enkel de verhuur doet, krijgt in /admin/roles
+  // een eigen rol met alleen de `theokot.rentals.*`-rechten.
   const theokotRole = await upsertRole(
     "theokot",
     "Theokot",
     "Theokot",
     4,
-    "Theokot beheren (sessies, aanbod, bans, instellingen) en de afhaalbalie bedienen.",
-    "Manage Theokot (sessions, offering, bans, settings) and operate the pickup counter.",
+    "Theokot beheren (sessies, aanbod, bans, instellingen), de afhaalbalie bedienen en de verhuur opvolgen.",
+    "Manage Theokot (sessions, offering, bans, settings), operate the pickup counter and follow up rentals.",
   );
-  await setRolePermissions(theokotRole.id, ["theokot.manage", "theokot.pickup"]);
+  await setRolePermissions(theokotRole.id, [
+    "theokot.manage",
+    "theokot.pickup",
+    "theokot.rentals.view",
+    "theokot.rentals.manage",
+  ]);
   await grantRoleToGroup("THEOKOT", theokotRole.id, "DEFAULT");
 
   // grocomeet-deelnemer: wie een broodje mag reserveren voor de GM. Dat zijn de

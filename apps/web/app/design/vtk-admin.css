@@ -859,3 +859,132 @@ a.vtk-shortcut-tile:hover {
   gap: 6px;
   flex-shrink: 0;
 }
+
+/* ---------------------------------------------------------------------------
+ * Mailvoorbeeld (components/admin/MailPreview.tsx)
+ *
+ * Eén weergave voor elk beheerscherm dat mails verstuurt. Het paneel moet er
+ * als een bericht in een mailbox uitzien en niet als nog een formulierveld:
+ * daarom een eigen kop met van/aan/onderwerp op een lichte band, en daaronder
+ * de tekst met haar witregels bewaard. De mails gaan als platte tekst de deur
+ * uit, dus dit is letterlijk wat de ontvanger ziet.
+ * ------------------------------------------------------------------------- */
+
+.vtk-mail-preview {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.vtk-mail-preview-caption {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vtk-mail-preview-source {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.vtk-mail-preview-frame {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+.vtk-mail-preview-head {
+  margin: 0;
+  padding: 12px 16px;
+  background: var(--paper-2);
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.vtk-mail-preview-head > div {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+}
+
+.vtk-mail-preview-head dt {
+  color: var(--muted);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 700;
+}
+
+.vtk-mail-preview-head dd {
+  margin: 0;
+  color: var(--body);
+  /* Een lang adres of onderwerp mag afbreken; wegvallen achter een afkapping
+     is hier precies het verschil dat je wil zien. */
+  overflow-wrap: anywhere;
+}
+
+.vtk-mail-preview-subject {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vtk-mail-preview-body {
+  padding: 16px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  line-height: 1.65;
+  color: var(--body);
+}
+
+.vtk-mail-preview-attachments {
+  margin: 0;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  list-style: none;
+  font-size: 12px;
+}
+
+.vtk-mail-preview-attachments li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 10px;
+  color: var(--body);
+  background: var(--paper);
+}
+
+.vtk-mail-preview-warning {
+  margin: 0;
+  font-size: 12px;
+  color: var(--body);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  border-left: 3px solid var(--yellow);
+  padding-left: 10px;
+}
+
+.vtk-mail-preview-warning code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  background: var(--paper-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 1px 5px;
+}

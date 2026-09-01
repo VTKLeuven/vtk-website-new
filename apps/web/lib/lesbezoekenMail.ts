@@ -122,6 +122,37 @@ export function renderTemplate(text: string, vars: TemplateVars): string {
   });
 }
 
+/**
+ * Voorbeeldwaarden voor het mailvoorbeeld in het beheer.
+ *
+ * Een sjabloon bewerk je met `{placeholders}` in beeld, en dat is precies niet
+ * wat de professor krijgt. Deze waarden vullen het voorbeeld zodat je de echte
+ * zin leest; ze zijn herkenbaar verzonnen, want een voorbeeld met een bestaande
+ * professor erin leest als een verstuurde mail.
+ */
+export function previewTemplateVars(locale: "nl" | "en", signature: string): TemplateVars {
+  const nl = locale === "nl";
+  return {
+    prof: "Peeters",
+    organisatie: nl ? "Voorbeeldvereniging" : "Example Society",
+    contactpersoon: nl ? "Jonas Voorbeeld" : "Jonas Example",
+    onderwerp: nl ? "Lesbezoek Revue" : "Class visit Revue",
+    vak: nl ? "H01A0a Analyse" : "H01A0a Calculus",
+    doelgroep: nl ? "2e Bach, Algemene richting, Groep A" : "2nd Bachelor, general, group A",
+    datum: nl ? "maandag 6 oktober 2025" : "Monday 6 October 2025",
+    uur: "11:30",
+    toelichting: nl
+      ? "We komen kort onze Revue aankondigen; de inschrijvingen sluiten binnen twee weken."
+      : "We will briefly announce our Revue; registrations close in two weeks.",
+    reden: nl ? "de professor gaf al een ander lesbezoek door op die dag" : "the lecturer already accepted another visit that day",
+    overzicht: nl
+      ? ["Goedgekeurd:", "- H01A0a Analyse (2e Bach) op maandag 6 oktober om 11:30"].join("\n")
+      : ["Approved:", "- H01A0a Calculus (2nd Bach) on Monday 6 October at 11:30"].join("\n"),
+    aantal: "3",
+    ondertekening: signature,
+  };
+}
+
 export function renderMailTemplate(template: MailTemplate, vars: TemplateVars): MailTemplate {
   return {
     name: template.name,

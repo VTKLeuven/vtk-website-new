@@ -418,6 +418,8 @@
     "shift": "Shiften",
     "expenses": "Rekeningen",
     "theokot": "Theokot",
+    "theokotBroodjes": "Broodjes",
+    "theokotVerhuur": "Verhuur",
     "grocomeet": "Grocomeet",
     "bureau": "VTK Bureau",
     "piano": "Piano",
@@ -886,6 +888,10 @@
       "title": "Lesbezoek aanvragen",
       "description": "Vraag een lesbezoek aan bij VTK Onderwijs: wij coördineren de aanvragen met de faculteit Ingenieurswetenschappen."
     },
+    "theokotVerhuur": {
+      "title": "Theokot huren",
+      "description": "Vraag het Theokot aan voor je activiteit: de zaal van VTK aan het kasteel van Arenberg."
+    },
     "register": {
       "title": "Account aanmaken",
       "description": "Maak een VTK-account met je eigen e-mailadres, ook zonder KU Leuven-login."
@@ -985,6 +991,31 @@
     "errors": {
       "fallback": "Er ging iets mis. Probeer het opnieuw."
     }
+  },
+  "theokotVerhuur": {
+    "title": "Theokot huren",
+    "subtitle": "Het Theokot is de zaal van VTK aan het kasteel van Arenberg. Vraag ze hier aan; we laten je weten of je aanvraag goedgekeurd is.",
+    "formTitle": "Je aanvraag",
+    "formIntro": "Alles met een sterretje is verplicht. Je krijgt meteen een bevestiging per mail.",
+    "sectionContact": "De verantwoordelijke",
+    "sectionWhen": "Wanneer",
+    "sectionEvent": "Het evenement",
+    "sectionExtra": "Nog meer",
+    "honeypotLabel": "Laat dit veld leeg",
+    "submit": "Aanvraag versturen",
+    "submitting": "Versturen…",
+    "sent": "Je aanvraag is binnen. Je krijgt een bevestiging per mail; we laten je zo snel mogelijk weten of ze goedgekeurd is.",
+    "guidelinesTitle": "Goed om te weten",
+    "contactTitle": "Een vraag?",
+    "contactBody": "Staat je vraag hier niet bij? Mail ons op",
+    "closedTitle": "Aanvragen staan even dicht",
+    "closedBody": "Op dit moment nemen we geen nieuwe verhuuraanvragen aan. Mail ons gerust; we laten weten wanneer het weer kan.",
+    "depositTransfer": "Overschrijving",
+    "depositCash": "Cash",
+    "depositNvt": "NVT (post of werkgroep van VTK)",
+    "languageNl": "Nederlands",
+    "languageEn": "Engels",
+    "errorFallback": "Je aanvraag is niet verstuurd. Probeer het opnieuw."
   },
   "register": {
     "kicker": "Alumni & externen",

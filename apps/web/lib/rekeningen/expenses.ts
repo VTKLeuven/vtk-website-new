@@ -244,6 +244,33 @@ export function expenseReportFilename(expense: {
   );
 }
 
+/**
+ * De mail die het blad naar de boekhouding brengt.
+ *
+ * Staat hier en niet in de action omdat het voorbeeldvenster dezelfde tekst moet
+ * tonen als wat er straks vertrekt. Twee plekken die "ongeveer hetzelfde"
+ * opstellen, lopen na één bewerking uiteen, en dan liegt het voorbeeld.
+ */
+export function expenseMailDraft(expense: {
+  postLabel: string;
+  payerName: string;
+  description: string;
+  amountCents: number;
+}): { subject: string; body: string } {
+  return {
+    subject: `[REKENING] ${expense.postLabel} - ${expense.payerName}`,
+    body: [
+      "Dag,",
+      "",
+      `In bijlage de rekening "${expense.description}" van ${expense.payerName} (post ${expense.postLabel}), ` +
+        `voor ${formatEuro(expense.amountCents)}.`,
+      "",
+      "Met vriendelijke groeten,",
+      "VTK",
+    ].join("\n"),
+  };
+}
+
 /** Bytes naar "1,8 MB" / "312 MB". */
 export function formatBytes(bytes: number, locale: "nl" | "en" = "nl"): string {
   const format = (value: number, digits: number) =>

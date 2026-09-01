@@ -17,6 +17,7 @@ import {
 } from "@/lib/rekeningen/server";
 import { buildExpenseReportPdf } from "@/lib/rekeningen/report";
 import {
+  expenseMailDraft,
   formatEuro,
   isValidIban,
   normaliseIban,
@@ -346,16 +347,9 @@ export async function sendExpenseAction(
   const rotate = Number(text(formData, "rotate", 10)) || 0;
   const { bytes, filename } = await buildExpenseReportPdf(expense, rotate);
 
-  const subject = `[REKENING] ${expense.postLabel} - ${expense.payerName}`;
-  const body = [
-    "Dag,",
-    "",
-    `In bijlage de rekening "${expense.description}" van ${expense.payerName} (post ${expense.postLabel}), ` +
-      `voor ${formatEuro(expense.amountCents)}.`,
-    "",
-    "Met vriendelijke groeten,",
-    "VTK",
-  ].join("\n");
+  // Dezelfde opsteller als het voorbeeldvenster in het beheer; zie
+  // `expenseMailDraft` in lib/rekeningen/expenses.ts.
+  const { subject, body } = expenseMailDraft(expense);
 
   const sent = await sendMail({
     to,

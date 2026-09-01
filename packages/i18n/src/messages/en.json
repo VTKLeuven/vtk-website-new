@@ -418,6 +418,8 @@
     "shift": "Shifts",
     "expenses": "Expenses",
     "theokot": "Theokot",
+    "theokotBroodjes": "Sandwiches",
+    "theokotVerhuur": "Rentals",
     "grocomeet": "Grocomeet",
     "bureau": "VTK Bureau",
     "piano": "Piano",
@@ -886,6 +888,10 @@
       "title": "Request a class visit",
       "description": "Request a class visit through VTK Education: we coordinate every request with the Faculty of Engineering Science."
     },
+    "theokotVerhuur": {
+      "title": "Rent Theokot",
+      "description": "Request Theokot for your activity: VTK's own room at the Arenberg castle."
+    },
     "register": {
       "title": "Create an account",
       "description": "Create a VTK account with your own email address, also without a KU Leuven login."
@@ -985,6 +991,31 @@
     "errors": {
       "fallback": "Something went wrong. Please try again."
     }
+  },
+  "theokotVerhuur": {
+    "title": "Rent Theokot",
+    "subtitle": "Theokot is VTK's own room at the Arenberg castle. Request it here; we will let you know whether your request is approved.",
+    "formTitle": "Your request",
+    "formIntro": "Everything with an asterisk is required. You get a confirmation by email straight away.",
+    "sectionContact": "The person in charge",
+    "sectionWhen": "When",
+    "sectionEvent": "The event",
+    "sectionExtra": "Anything else",
+    "honeypotLabel": "Leave this field empty",
+    "submit": "Send request",
+    "submitting": "Sending…",
+    "sent": "Your request arrived. You will get a confirmation by email; we will let you know as soon as possible whether it is approved.",
+    "guidelinesTitle": "Good to know",
+    "contactTitle": "A question?",
+    "contactBody": "Is your question not answered here? Email us at",
+    "closedTitle": "Requests are closed for now",
+    "closedBody": "We are not taking new rental requests at the moment. Feel free to email us; we will let you know when it reopens.",
+    "depositTransfer": "Wire transfer",
+    "depositCash": "Cash",
+    "depositNvt": "N/A (post or work group of VTK)",
+    "languageNl": "Dutch",
+    "languageEn": "English",
+    "errorFallback": "Your request was not sent. Please try again."
   },
   "register": {
     "kicker": "Alumni & externals",

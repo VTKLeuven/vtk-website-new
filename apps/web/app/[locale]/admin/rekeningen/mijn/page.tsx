@@ -3,7 +3,12 @@ import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
 import type { Locale } from "@vtk/i18n";
-import { canView, expenseAccess, getExpenseConfig } from "@/lib/rekeningen/server";
+import {
+  canView,
+  expenseAccess,
+  expenseSenderLabel,
+  getExpenseConfig,
+} from "@/lib/rekeningen/server";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import { RekeningenNav } from "../RekeningenNav";
 import { ExpenseWorkbench } from "../ExpenseWorkbench";
@@ -137,6 +142,7 @@ export default async function MijnRekeningen({
         }
         canManageState={access.canManageAll}
         accountantEmail={config.accountantEmail}
+        senderEmail={expenseSenderLabel(config)}
         editHrefFor={(id) => `${base}/admin/rekeningen/bewerken/${id}`}
       />
     </div>

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { prisma } from "@vtk/db";
+import { defaultMailFrom } from "@vtk/mail";
 import type { Expense } from "@prisma/client";
 import type { SessionPayload } from "@vtk/auth";
 import { getCurrentSession, requireSession } from "@/lib/session";
@@ -165,6 +166,15 @@ export function parseExpenseConfig(raw: unknown): ExpenseConfig {
     guidelinesNl: str(value.guidelinesNl, DEFAULT_EXPENSE_CONFIG.guidelinesNl),
     guidelinesEn: str(value.guidelinesEn, DEFAULT_EXPENSE_CONFIG.guidelinesEn),
   };
+}
+
+/**
+ * De afzender waarmee het blad vertrekt, zoals ze in de inbox van de boekhouder
+ * staat. Leeg gelaten in de instellingen betekent: de standaardafzender van de
+ * site. Het voorbeeldvenster toont deze tekst, dus ze moet kloppen.
+ */
+export function expenseSenderLabel(config: ExpenseConfig): string {
+  return config.fromEmail.trim() || defaultMailFrom();
 }
 
 export async function getExpenseConfig(): Promise<ExpenseConfig> {

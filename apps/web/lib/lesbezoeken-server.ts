@@ -32,6 +32,15 @@ export const LESBEZOEK_CONFIG_KEY = "lesbezoeken.config";
 const LESBEZOEK_FROM =
   process.env.MAIL_FROM_LESBEZOEKEN?.trim() || "VTK Onderwijs <lesbezoeken@vtk.be>";
 
+/**
+ * De afzender zoals ze in de inbox van de docent staat. Het beheerscherm toont
+ * ze in het mailvoorbeeld; die tekst mag geen tweede waarheid worden, dus komt
+ * ze uit dezelfde constante als het versturen zelf.
+ */
+export function lesbezoekSenderLabel(): string {
+  return LESBEZOEK_FROM;
+}
+
 export async function getLesbezoekTemplates(): Promise<LesbezoekTemplates> {
   try {
     const row = await prisma.setting.findUnique({ where: { key: LESBEZOEK_MAIL_KEY } });

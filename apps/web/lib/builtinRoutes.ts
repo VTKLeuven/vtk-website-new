@@ -80,6 +80,13 @@ export const BUILTIN_ROUTES: BuiltinRoute[] = [
     descriptionEn: "Contact information, locations and contact form.",
   },
   {
+    path: "/theokot/verhuur",
+    labelNl: "Theokot huren",
+    labelEn: "Rent Theokot",
+    descriptionNl: "Vraag de zaal van VTK aan voor je activiteit.",
+    descriptionEn: "Request VTK's own room for your activity.",
+  },
+  {
     path: "/lesbezoeken",
     labelNl: "Lesbezoeken",
     labelEn: "Class visits",

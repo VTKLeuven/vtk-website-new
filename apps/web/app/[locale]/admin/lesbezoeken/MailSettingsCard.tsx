@@ -7,9 +7,12 @@ import {
   saveLesbezoekSettingsAction,
   saveLesbezoekTemplatesAction,
 } from "@/app/actions/lesbezoeken";
+import { MailPreview } from "@/components/admin/MailPreview";
 import {
   DEFAULT_LESBEZOEK_TEMPLATE_ITEMS,
   LESBEZOEK_PLACEHOLDERS,
+  previewTemplateVars,
+  renderTemplate,
   type LesbezoekConfig,
   type LesbezoekTemplateCategory,
   type LesbezoekTemplateItem,
@@ -26,13 +29,19 @@ export function MailSettingsCard({
   canManage,
   config,
   templates,
+  senderLabel,
 }: {
   nl: boolean;
   canManage: boolean;
   config: LesbezoekConfig;
   templates: LesbezoekTemplates;
+  /** De afzender zoals ze in de inbox van de docent staat; voor het voorbeeld. */
+  senderLabel: string;
 }) {
   const errors = lesbezoekAdminErrors(nl);
+  // De ondertekening staat los van het sjabloon maar hoort wel in het voorbeeld:
+  // zonder haar eindigt elke voorbeeldmail op een lege regel.
+  const [signature, setSignature] = useState(config.signature);
   const [items, setItems] = useState<LesbezoekTemplateItem[]>(() => {
     return templates.items && templates.items.length > 0
       ? templates.items
@@ -118,7 +127,13 @@ export function MailSettingsCard({
         >
           <div>
             <Label htmlFor="lb-signature">{nl ? "Ondertekening" : "Signature"}</Label>
-            <Textarea id="lb-signature" name="signature" rows={3} defaultValue={config.signature} />
+            <Textarea
+              id="lb-signature"
+              name="signature"
+              rows={3}
+              value={signature}
+              onChange={(event) => setSignature(event.target.value)}
+            />
           </div>
           <div>
             <Label htmlFor="lb-notify">{nl ? "Mailbox lesbezoeken" : "Classroom-visit mailbox"}</Label>
@@ -350,6 +365,14 @@ export function MailSettingsCard({
                       required
                     />
                   </div>
+
+                  <TemplatePreview
+                    nl={nl}
+                    item={item}
+                    signature={signature}
+                    senderLabel={senderLabel}
+                    replyTo={config.notifyEmail}
+                  />
                 </div>
               </details>
             ))}
@@ -363,5 +386,47 @@ export function MailSettingsCard({
         </SaveForm>
       </Card>
     </>
+  );
+}
+
+/**
+ * Het sjabloon zoals het aankomt, met voorbeeldgegevens ingevuld.
+ *
+ * Staat naast het tekstvak en niet erin: het tekstvak is waar je `{vak}` typt,
+ * dit is waar je leest wat de docent krijgt. De taal van het sjabloon bepaalt de
+ * voorbeeldwaarden, want een Engels sjabloon met Nederlandse voorbeelddata leest
+ * als een fout die er niet is.
+ */
+function TemplatePreview({
+  nl,
+  item,
+  signature,
+  senderLabel,
+  replyTo,
+}: {
+  nl: boolean;
+  item: LesbezoekTemplateItem;
+  signature: string;
+  senderLabel: string;
+  replyTo: string;
+}) {
+  const vars = previewTemplateVars(item.lang === "en" ? "en" : "nl", signature);
+  const isRequester = item.category === "requester";
+  return (
+    <MailPreview
+      nl={nl}
+      from={senderLabel}
+      to={
+        isRequester
+          ? nl
+            ? "jonas@voorbeeldvereniging.be"
+            : "jonas@example-society.org"
+          : "an.peeters@kuleuven.be"
+      }
+      replyTo={replyTo}
+      subject={renderTemplate(item.subject, vars).replace(/\s+/g, " ").trim()}
+      body={renderTemplate(item.body, vars)}
+      source={nl ? "met voorbeeldgegevens" : "with example data"}
+    />
   );
 }

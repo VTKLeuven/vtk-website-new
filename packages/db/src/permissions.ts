@@ -79,6 +79,12 @@ export const PERMISSIONS = [
   // Theokot (cafetaria / broodjesbar)
   { code: "theokot.manage", labelNl: "Theokot beheren (sessies, aanbod, bans, instellingen)", labelEn: "Manage Theokot (sessions, offering, bans, settings)", category: "theokot" },
   { code: "theokot.pickup", labelNl: "Theokot afhaalbalie bedienen", labelEn: "Operate Theokot pickup counter", category: "theokot" },
+  // De zaal verhuren. Los van `theokot.manage`: wie de broodjes doet, hoeft de
+  // verhuuraanvragen niet te zien, en wie de verhuur doet, hoeft niet aan de
+  // sessies te kunnen. Bekijken en beslissen staan apart omdat een goedkeuring
+  // een mail naar een huurder stuurt.
+  { code: "theokot.rentals.view", labelNl: "Verhuuraanvragen en verhuurkalender bekijken", labelEn: "View rental requests and the rental calendar", category: "theokot" },
+  { code: "theokot.rentals.manage", labelNl: "Verhuur beheren (beslissen, mailen, contracten en sjablonen)", labelEn: "Manage rentals (decide, email, contracts and templates)", category: "theokot" },
 
   // Broodjesmomenten (grocomeet en VTK Bureau)
   { code: "grocomeet.reserve", labelNl: "Broodje reserveren voor de grocomeet", labelEn: "Reserve a sandwich for the grocomeet", category: "meetings" },

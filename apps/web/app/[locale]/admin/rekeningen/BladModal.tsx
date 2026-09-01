@@ -4,6 +4,7 @@ import { startTransition, useActionState, useEffect, useRef, useState } from "re
 import { useRouter } from "next/navigation";
 import { Button, Input, Label } from "@vtk/ui";
 import { Modal } from "@/app/[locale]/admin/admin-table";
+import { MailPreview } from "@/components/admin/MailPreview";
 import { useToast } from "@/components/ui/toast";
 import { SAVE_IDLE, type SaveAction } from "@/lib/saveState";
 
@@ -26,6 +27,7 @@ export function BladModal({
   locale,
   mode,
   defaultRecipient,
+  mail,
   sendAction,
   labels,
   onClose,
@@ -34,6 +36,8 @@ export function BladModal({
   locale: "nl" | "en";
   mode: "download" | "send";
   defaultRecipient?: string;
+  /** De mail die straks vertrekt; enkel getoond in de verstuurstand. */
+  mail: { from: string; subject: string; body: string; attachmentName: string };
   sendAction?: SaveAction;
   labels: {
     savedMessage: string;
@@ -119,6 +123,22 @@ export function BladModal({
               </p>
             )}
           </div>
+        )}
+
+        {mode === "send" && (
+          <MailPreview
+            nl={nl}
+            from={mail.from}
+            to={recipient}
+            subject={mail.subject}
+            body={mail.body}
+            attachments={[mail.attachmentName]}
+            source={
+              nl
+                ? "met de gegevens van deze rekening"
+                : "with the details of this expense"
+            }
+          />
         )}
 
         <div className="flex flex-wrap items-center gap-2">

@@ -16,10 +16,11 @@
 // label gesorteerd). De regel is nu: eerst de domeinen, dan de modules die één
 // post beheert, en IT achteraan.
 //
-// Een module die één post dagelijks gebruikt (Theokot, Fakscanner, Grocomeet)
-// blijft voor die post bewust een los item. Voor IT en Groep 5 (die alle rechten
-// hebben en anders een overvolle balk zien) worden Fakscanner en Theokot
-// gebundeld onder "Overig".
+// Een module die één post dagelijks gebruikt (Fakscanner, Grocomeet) blijft voor
+// die post bewust een los item. Theokot is er twee (broodjes en verhuur, later
+// ook de uitleendienst) en staat daarom als eigen groep. Voor IT en Groep 5 (die
+// alle rechten hebben en anders een overvolle balk zien) worden Fakscanner en de
+// Theokot-tabs gebundeld onder "Overig".
 // -----------------------------------------------------------------------------
 
 export type NavGuard = {
@@ -60,7 +61,16 @@ export type AdminNavOptions = {
 
 export function getAdminNav({ isItOrG5 = false }: AdminNavOptions = {}): NavEntry[] {
   const fakscannerItem = item('fakscanner', '/fakscanner', { perm: 'fakscanner.manage' });
-  const theokotItem = item('theokot', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] });
+  // Theokot doet twee dingen die weinig met elkaar te maken hebben: broodjes
+  // verkopen en de zaal verhuren. Later komt de uitleendienst erbij. Daarom een
+  // groep en geen los item; wie maar één van de twee mag zien, krijgt dat ene
+  // item vanzelf terug als losse tab (zie de layout).
+  const theokotItems = [
+    item('theokotBroodjes', '/theokot', { anyPerm: ['theokot.manage', 'theokot.pickup'] }),
+    item('theokotVerhuur', '/theokot/verhuur', {
+      anyPerm: ['theokot.rentals.view', 'theokot.rentals.manage'],
+    }),
+  ];
 
   const looseOrOverig: NavEntry[] = isItOrG5
     ? [
@@ -70,7 +80,7 @@ export function getAdminNav({ isItOrG5 = false }: AdminNavOptions = {}): NavEntr
           anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.manage'],
         }),
         item('vault', '/wachtwoorden', { anyPerm: ['vault.editOwn', 'vault.manage'] }),
-        group('overig', [fakscannerItem, theokotItem]),
+        group('overig', [fakscannerItem, ...theokotItems]),
       ]
     : [
         fakscannerItem,
@@ -79,7 +89,7 @@ export function getAdminNav({ isItOrG5 = false }: AdminNavOptions = {}): NavEntr
         item('expenses', '/rekeningen', {
           anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.manage'],
         }),
-        theokotItem,
+        group('theokot', theokotItems),
         item('vault', '/wachtwoorden', { anyPerm: ['vault.editOwn', 'vault.manage'] }),
       ];
 

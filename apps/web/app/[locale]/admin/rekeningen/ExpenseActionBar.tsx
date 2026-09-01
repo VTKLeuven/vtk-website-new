@@ -19,6 +19,7 @@ export function ExpenseActionBar({
   canEdit,
   canSend,
   defaultRecipient,
+  mail,
   sendAction,
   deleteAction,
   deleteDescription,
@@ -30,6 +31,8 @@ export function ExpenseActionBar({
   canEdit: boolean;
   canSend: boolean;
   defaultRecipient: string;
+  /** De mail die straks vertrekt; het venster toont ze als voorbeeld. */
+  mail: { from: string; subject: string; body: string; attachmentName: string };
   sendAction: SaveAction;
   deleteAction: (formData: FormData) => Promise<void>;
   /** Wat er precies weg is; staat in de bevestigingsdialoog. */
@@ -86,6 +89,7 @@ export function ExpenseActionBar({
           locale={locale}
           mode={modal}
           defaultRecipient={modal === "send" ? defaultRecipient : undefined}
+          mail={mail}
           sendAction={sendAction}
           labels={{
             savedMessage: labels.sentMessage,

@@ -5283,3 +5283,125 @@ avond die iemand ooit gepost heeft, en dat is een ander gesprek dan een galerij.
 
 De implementatie staat in `packages/gallery` (gedeeld), `apps/fakbar/lib/gallery.ts`
 en `apps/web/lib/fakbar-gallery.ts`.
+
+## Theokot verhuren: het Google Form, de Sheet en de mailmerge in één scherm
+
+Naast de broodjes verhuurt Theokot ook de zaal zelf: aan een post of werkgroep
+van VTK, of aan een student die er een verjaardag geeft. Dat liep tot nu via een
+Google Form, een Sheet met vier opvolgkolommen ernaast, en mails die iemand elke
+keer uit een oud bericht kopieerde. Dit vervangt die drie.
+
+### Theokot is een groep in het beheer, geen tab
+
+Broodjes verkopen en de zaal verhuren delen niets behalve de post die het doet:
+andere mensen, andere schermen, andere week. Ze zaten wel onder één tab, en dan
+staat het ene altijd in de weg van het andere. In `lib/admin-nav.ts` is Theokot
+daarom een groep met **Broodjes** en **Verhuur**; de uitleendienst komt daar later
+bij. Wie maar één van de twee mag zien, krijgt dat ene item vanzelf als losse tab
+(de layout klapt een groep met één zichtbaar item plat).
+
+Dat legde meteen een oud probleem bloot: de zijbalk markeerde elke tab waarvan
+het pad een prefix was van de huidige URL, dus `/admin/theokot/verhuur` lichtte
+ook Broodjes op. Sinds `AdminNav` de **langste** match kiest, geldt dat ook voor
+Wachtwoorden en Media, waar hetzelfde stil misging.
+
+### De vragen staan in de database, de kalender hangt aan drie ervan
+
+De vraagteksten van het formulier zijn bewerkbaar in `/admin/theokot/verhuur`
+(`Setting: theokot.rental.questions`), want ze zijn elk jaar bijgeschaafd en dat
+mag geen deploy kosten. Elf kernvragen zijn wel **te herschrijven maar niet te
+schrappen**: op de dag en de twee uren hangt de kalender en de
+dubbelboeking-waarschuwing, en zonder e-mailadres gaat er geen antwoord ergens
+naartoe. Wat Theokot er zelf bij zet, landt als `extraAnswers` in een JSON-kolom.
+
+Het oude formulier toonde elke vraag twee keer, met
+`############## English version ##############` ertussen, omdat een Google Form
+maar één taal kent. Hier staat per vraag een NL- en een EN-tekst en kiest de site
+zelf. De taalvraag zelf blijft wel bestaan: iemand vult het formulier in het
+Nederlands in en wil toch een Engels antwoord, en die keuze stuurt het sjabloon.
+
+### Een einduur voor het startuur is de volgende ochtend
+
+Een verhuur die om 02:00 stopt, is de regel en niet de uitzondering. `endsAt`
+schuift daarom een dag op wanneer het einduur kleiner is dan het startuur; enkel
+exact hetzelfde uur wordt geweigerd. De kalender rekent in minuten sinds
+middernacht van de startdag en kapt het blokje op 24:00 af, zodat het raster niet
+verschuift; het echte einduur staat in de tekst ernaast.
+
+### Vier opvolgvelden die los van elkaar staan
+
+Status, waarborg, contract en sleutel zijn vier aparte kolommen, precies zoals de
+Sheet ze had. Ze staan bewust los: een aanvraag kan goedgekeurd zijn terwijl het
+contract nog niet getekend is en de sleutel nog binnen ligt. De waarborgkolom
+draagt de termen van Theokot zelf ("OS Binnen", "C Terug"): OS is een
+overschrijving, C is cash, binnen is ontvangen en terug is teruggegeven. Ze start
+op wat de aanvrager in het formulier koos, want "overschrijving" zonder meer
+betekent daar gekozen maar nog niet betaald.
+
+### Status zetten en mailen zijn twee knoppen, overal
+
+Dit is de kern van het scherm en van de meldingsmail. Een status wijzigen mag
+nooit stilzwijgend een mail losmaken, en een mail mag nooit vertrekken zonder dat
+iemand ze gezien heeft. In het beheer staan ze daarom in twee kaders met elk hun
+eigen kop: **Opvolging** ("opslaan verstuurt geen enkele mail") en **Antwoorden**
+("dit verstuurt wél een mail", met de tekst en een voorbeeld erboven).
+
+Dat tweede geval is echt en geen theorie: een verhuur die aan de toog al
+afgesproken werd, een aanvraag waar iemand liever zelf een mail over schrijft, of
+een annulering die de aanvrager zelf doorbelde.
+
+### Beslissen vanuit de meldingsmail, met een scherm ertussen
+
+Wie de melding van een nieuwe aanvraag krijgt, wil ze vanaf zijn telefoon kunnen
+goedkeuren. De twee links in die mail **doen daarom niets**: ze openen een
+bevestigingsscherm met de aanvraag, de mail die klaarstaat (bewerkbaar, met
+voorbeeld) en twee knoppen, waarvan de tweede enkel de status zet. Een link die
+meteen zou goedkeuren, wordt vroeg of laat afgevuurd door een mailclient die
+links vooruitlaadt, of door een virusscanner.
+
+De sleutel in die link is eenmalig, wordt enkel als hash bewaard
+(`TheokotRentalActionToken`) en vervalt na dertig dagen. Zodra er beslist is —
+ook in het beheer — worden de resterende sleutels van die aanvraag ingetrokken:
+een doorgestuurde melding mag een beslissing niet kunnen omkeren zonder te tonen
+dat er al geantwoord was.
+
+### Twee huurcontracten, want intern tekent iets anders dan extern
+
+Een post of werkgroep van VTK tekent een ander contract dan een externe huurder.
+Welk van de twee meegaat, volgt uit de aanvraag (`renterType`) en niet uit het
+sjabloon; anders zou er een sjabloon per combinatie nodig zijn. De eerste gok komt
+uit het formulier zelf: een post schrijft haar naam tussen vierkante haakjes
+vooraan de activiteit ("[Theokot] Kaas- en wijnavond"). Die gok is achteraf te
+overschrijven, want daar hangt aan welk contract er in de bijlage zit.
+
+Per doelgroep mag er een Nederlandse en een Engelse pdf staan. Ontbreekt de
+Engelse, dan gaat de Nederlandse mee; ontbreken ze allebei, dan zegt het scherm
+dat op voorhand in plaats van een mail zonder bijlage te laten vertrekken.
+
+### Een mailvoorbeeld bij elk sjabloon
+
+Een sjabloon bewerk je met `{plaatshouders}` in beeld, en dat is precies niet wat
+de ontvanger krijgt. Bij elk sjabloon staat daarom een voorbeeld van de mail zoals
+ze aankomt: afzender, ontvanger, onderwerp, tekst en bijlage, met
+voorbeeldgegevens ingevuld. Plaatshouders die blijven staan worden apart opgesomd,
+want dat is bijna altijd een tikfout die anders pas bij de ontvanger opvalt.
+
+Dat voorbeeld (`components/admin/MailPreview.tsx`) is bewust één component voor
+alle beheerschermen die mails versturen: lesbezoeken, rekeningen en de
+Theokot-verhuur. Anders krijgt elk scherm zijn eigen idee van hoe een voorbeeld
+eruitziet, en dan verschilt het voorbeeld meer van de andere schermen dan van de
+echte mail.
+
+### Wat er níét in zit
+
+- **Geen betaling.** De waarborg wordt met de hand opgevolgd, zoals nu. Er zit
+  geen Mollie aan vast, want het bedrag komt cash of per overschrijving binnen en
+  gaat er meestal ook zo weer uit.
+- **Geen automatische weigering bij een dubbele aanvraag.** Het formulier
+  belooft dat een tweede aanvraag voor een bezette dag geweigerd wordt, maar de
+  uitzondering ("tenzij het een post is") is precies het geval waarin een mens
+  moet kijken. De botsing staat daarom in de melding en bij de aanvraag, en het
+  weigeren blijft een klik.
+- **Geen aanvraag aanmaken in het beheer.** Alles komt via het formulier binnen;
+  wil Theokot de zaal zelf blokkeren, dan dient ze een aanvraag in en keurt ze
+  die goed. Eén weg naar binnen betekent één plaats waar de gegevens compleet zijn.

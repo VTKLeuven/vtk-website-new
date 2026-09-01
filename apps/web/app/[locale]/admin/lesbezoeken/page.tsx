@@ -20,6 +20,7 @@ import {
   formatMailMoment,
   getLesbezoekConfig,
   getLesbezoekTemplates,
+  lesbezoekSenderLabel,
   processDueLesbezoekScheduledMails,
 } from "@/lib/lesbezoeken-server";
 import {
@@ -383,7 +384,13 @@ export default async function AdminLesbezoekenPage({
         <>
           <OrganisationsCard nl={nl} canManage={canManage} organisations={organisations} />
           <PeculiaritiesCard nl={nl} canManage={canManage} peculiarities={peculiarities} />
-          <MailSettingsCard nl={nl} canManage={canManage} config={config} templates={templates} />
+          <MailSettingsCard
+            nl={nl}
+            canManage={canManage}
+            config={config}
+            templates={templates}
+            senderLabel={lesbezoekSenderLabel()}
+          />
         </>
       ) : (
         <Card className="p-5">
