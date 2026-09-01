@@ -2298,6 +2298,52 @@ zijn en in beeld staan is de bevestiging al. De markering bleef daarna staan tot
 je herlaadde, en de gele tint in die lijst betekent al iets anders, namelijk dat
 er nog geen chauffeur is.
 
+### Beschikbaarheid intekenen op een telefoon is een raster van uurvakjes
+
+Op een breed scherm sleep je een venster in het tijdrooster. Dat werkt op een
+touchscreen niet en kan daar ook niet werken: verticaal vegen ís scrollen. Op een
+telefoon kon je dus enkel de twee velden invullen, één venster tegelijk, en dat
+is het omgekeerde van "even snel je week doorgeven".
+
+Onder 700px komt daarom een eigen weergave
+(`app/ritten/beschikbaarheid/availability-paint.tsx`): de week als raster van
+vakjes van een uur, zeven kolommen breed. Je legt je vinger op een vakje en
+veegt; alles waar je over gaat krijgt de toestand van het eerste vakje. Begon je
+op iets dat aanstond, dan wis je.
+
+- **Per uur en niet per kwartier.** Met een vinger mik je geen kwartier. Gevolg
+  om te kennen: een dag die je op een telefoon aanraakt, wordt op hele uren
+  afgerond, dus een venster van 08:30 dat je daar herschrijft wordt 08:00. Wie
+  het precies wil, gebruikt de velden eronder of een computer.
+- **`touch-action: none` op het raster.** Anders scrolt de pagina mee met je veeg
+  en wordt er niets aangeduid. Daarom staat de nacht (00:00-06:00) standaard
+  ingeklapt: die zes rijen zijn precies wat het raster van het scherm duwt, en
+  binnen het raster kan je niet scrollen.
+- **De toestand van het eerste vakje bepaalt de hele veeg.** Zonder dat wissel je
+  bij het terugvegen over je eigen selectie af tussen aanduiden en wissen, en
+  flikkert de week onder je vinger.
+- **Opslaan gebeurt per aangeraakte dag bij het loslaten**, met één actie die die
+  dag herschrijft (`setAvailabilityDayAction`). Niet per vakje, want dan stuur je
+  twintig verzoeken voor één veeg; en niet achter een opslaanknop, want dan staat
+  er op het scherm iets anders dan in de databank.
+- **Vensters die over middernacht lopen worden gesplitst.** Eén dag herschrijven
+  mag de dagen ernaast niet stil wegvegen; dat rekenwerk staat puur en getest in
+  `lib/availability-day.ts`.
+- **Het vakje onder je vinger komt van `elementFromPoint`**, niet van de
+  gebeurtenis: bij een veeg vangt de browser de pointer, dus `event.target`
+  blijft de hele veeg lang het vakje waar je begon.
+
+### De knop naar de beschikbaarheid staat in de donkere paginakop
+
+Op "Mijn ritten" stond ze als paneeltje tussen de ritten, en zo leest ze als een
+mededeling die je wegscrolt terwijl het de enige actie op dat scherm is. Ze staat
+nu rechts in de donkere kop, geel zoals de primaire knop op een donkere band
+elders op de site. `PageShell` heeft daarvoor een `action`-plek gekregen.
+
+Vanuit het beheer gaat de knop op `/beheer/vervoer` rechtstreeks naar dat
+invulscherm en niet naar "Mijn ritten" met een stap ertussen: wie daar klikt,
+wil zijn uren doorgeven.
+
 ### "Wie kan er rijden" staat als eigen strook onder de planning
 
 De beschikbaarheid van de chauffeurs ligt in het rooster als lichte band achter

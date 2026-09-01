@@ -160,7 +160,10 @@ de same-origin `publicUrl`.
   detailpagina `[id]` met set-inhoud + "vaak samen aangevraagd"), `app/vervoer/`
   (voertuigkeuze), `app/reservaties/` (overzicht + detail + edit), `app/ritten/`
   ("Mijn ritten" voor een chauffeur; link in de header en een banner op de hub,
-  enkel voor wie chauffeur is of nog een rit heeft staan).
+  enkel voor wie chauffeur is of nog een rit heeft staan). `ritten/beschikbaarheid`
+  is het intekenscherm: op een breed scherm het tijdrooster, op een telefoon een
+  raster van uurvakjes waar je met je vinger over veegt
+  (`availability-paint.tsx`, met het rekenwerk in `lib/availability-day.ts`).
 - **Transportplanning** (`/beheer/vervoer/week`, ronde 3): een agenda-app met
   dag-, week- en maandweergave, zoom, volledig scherm, filters, en een paneel
   waarin je een rit opent, aanpast of aanmaakt; dat paneel is op een breed

@@ -415,18 +415,19 @@ export default async function BeheerVervoerPage({
               "Transportplanning"-tab in de navigatie (N1, zelfde bestemming als
               hieronder).
 
-              "Mijn ritten" staat vooraan en is de enige gevulde knop van de
-              drie: het is het scherm waar je als chauffeur zelf iets invult (je
-              kilometers, je beschikbaarheid), en dat is iets anders dan de twee
-              overzichten ernaast. Het stond nergens op deze pagina, terwijl dit
-              precies het scherm is waar een chauffeur op belandt. */}
+              "Mijn beschikbaarheid" staat vooraan en is de enige gevulde knop
+              van de drie: het is het enige scherm hier waar je zelf iets
+              invult, en dat is iets anders dan de twee overzichten ernaast. Ze
+              gaat rechtstreeks naar het invulscherm en niet naar "Mijn ritten"
+              met een stap ertussen; wie zijn eigen ritten zoekt, vindt ze via de
+              knop in de kop daar. */}
           <Link
-            href="/ritten"
-            title="Je eigen ritten: kilometers invullen, afronden, en doorgeven wanneer je kan rijden"
+            href="/ritten/beschikbaarheid"
+            title="Doorgeven wanneer je zelf kan rijden; vandaar kan je ook naar je eigen ritten"
             className="inline-flex items-center gap-2 rounded-full bg-vtk-navy px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-vtk-navy/90"
           >
             <LogisticsIcon name="driver" className="h-4 w-4" />
-            Mijn ritten
+            Mijn beschikbaarheid
           </Link>
           <Link
             href="/beheer/vervoer/week"

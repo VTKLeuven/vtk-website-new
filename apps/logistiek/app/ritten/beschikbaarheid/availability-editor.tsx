@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useOptimistic, useState, useTransition } from 'react';
+import { useCallback, useEffect, useOptimistic, useState, useTransition } from 'react';
 import { Button } from '@vtk/ui';
 import { addAvailabilityAction, removeAvailabilityAction } from '@/app/actions/uitleen';
 import { QuarterDateTime } from '@/components/quarter-datetime';
@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/toast';
 import { TimeGrid } from '@/components/transport-calendar/time-grid';
 import type { AvailabilityBand } from '@/components/transport-calendar/types';
 import { formatDateTime, toDatetimeLocalValue } from '@/lib/uitleen';
+import { AvailabilityPaint } from './availability-paint';
 
 /**
  * Wanneer kan je rijden (V1).
@@ -58,6 +59,21 @@ export function AvailabilityEditor({
   const showToast = useToast();
   const [pending, startTransition] = useTransition();
   const [draft, setDraft] = useState({ startAt: '', endAt: '', note: '' });
+
+  /**
+   * Smal scherm? Dan het intekenraster van uurvakjes in plaats van het
+   * tijdrooster. Via `matchMedia` en niet via CSS: het gaat niet om hoe iets
+   * eruitziet maar om welke component er rendert, en om welk gebaar erbij hoort.
+   * In een effect, want op de server bestaat `window` niet.
+   */
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 700px)');
+    const apply = () => setNarrow(query.matches);
+    apply();
+    query.addEventListener('change', apply);
+    return () => query.removeEventListener('change', apply);
+  }, []);
 
   /**
    * De vensters zoals ze er nú uitzien, inclusief wat nog aan het opslaan is.
@@ -136,6 +152,99 @@ export function AvailabilityEditor({
     [add, remove, shown]
   );
 
+  const fields = (
+    <section className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-5">
+      <h2 className="text-sm font-semibold text-vtk-ink">Venster intikken</h2>
+      <p className="mt-1 text-xs text-vtk-muted">
+        Voor wie een uur precies wil zetten; het raster hierboven gaat per uur.
+      </p>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+          Van
+          <QuarterDateTime
+            value={draft.startAt}
+            onChange={(value) => setDraft((current) => ({ ...current, startAt: value }))}
+          />
+        </label>
+        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+          Tot
+          <QuarterDateTime
+            value={draft.endAt}
+            onChange={(value) => setDraft((current) => ({ ...current, endAt: value }))}
+            min={draft.startAt}
+          />
+        </label>
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        className="mt-3"
+        disabled={pending || !draft.startAt || !draft.endAt}
+        onClick={() => add({ startAt: draft.startAt, endAt: draft.endAt })}
+      >
+        {pending ? 'Opslaan...' : 'Toevoegen'}
+      </Button>
+    </section>
+  );
+
+  const list = (
+    <section>
+      <h2 className="text-sm font-semibold text-vtk-ink">Wanneer je kan rijden ({shown.length})</h2>
+      {shown.length === 0 ? (
+        <p className="mt-2 text-sm text-vtk-muted">
+          Nog niets ingegeven. Zolang je niets ingeeft, gaat Logistiek er niet van uit dat je niet
+          kan; ze weten het gewoon niet, en bellen je dan.
+        </p>
+      ) : (
+        <ul className="mt-3 grid gap-2">
+          {shown.map((window) => (
+            <li
+              key={window.id}
+              className={`flex flex-wrap items-center justify-between gap-3 rounded-[12px] bg-vtk-surface px-4 py-2.5 text-sm ${
+                window.id === OPTIMISTIC_ID ? 'opacity-60' : ''
+              }`}
+            >
+              <div className="min-w-0">
+                <p className="font-medium text-vtk-ink">
+                  {formatDateTime(new Date(window.startAt))} tot{' '}
+                  {formatDateTime(new Date(window.endAt))}
+                </p>
+                {window.note ? <p className="text-xs text-vtk-muted">{window.note}</p> : null}
+              </div>
+              {window.id === OPTIMISTIC_ID ? (
+                <span className="text-xs text-vtk-muted">Opslaan...</span>
+              ) : (
+                <ConfirmActionButton
+                  label={`Weghalen: ${formatDateTime(new Date(window.startAt))}`}
+                  confirmLabel="Venster weghalen"
+                  icon={<LogisticsIcon name="close" className="h-4 w-4" />}
+                  action={removeAvailabilityAction.bind(null, window.id)}
+                  successMessage="Venster weggehaald."
+                  destructive
+                  dialogTitle="Venster weghalen?"
+                  dialogDescription="Logistiek weet dan niet meer dat je op dat moment kan rijden. Ritten die al aan jou toegewezen zijn, blijven staan."
+                />
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+
+  if (narrow) {
+    // Op een telefoon een eigen intekenraster van uurvakjes. Slepen in het
+    // tijdrooster hieronder is muis-only, en dat kan ook niet anders: verticaal
+    // vegen is daar scrollen. Zie `availability-paint.tsx`.
+    return (
+      <div className="grid gap-5">
+        <AvailabilityPaint days={days} windows={shown} />
+        {fields}
+        {list}
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-5">
       <TimeGrid
@@ -156,81 +265,9 @@ export function AvailabilityEditor({
         }
       />
 
-      <section className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-5">
-        <h2 className="text-sm font-semibold text-vtk-ink">Venster intikken</h2>
-        <p className="mt-1 text-xs text-vtk-muted">
-          Voor op een telefoon, waar verticaal vegen scrollen is en je dus niets kan intekenen.
-        </p>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-            Van
-            <QuarterDateTime
-              value={draft.startAt}
-              onChange={(value) => setDraft((current) => ({ ...current, startAt: value }))}
-            />
-          </label>
-          <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-            Tot
-            <QuarterDateTime
-              value={draft.endAt}
-              onChange={(value) => setDraft((current) => ({ ...current, endAt: value }))}
-              min={draft.startAt}
-            />
-          </label>
-        </div>
-        <Button
-          type="button"
-          size="sm"
-          className="mt-3"
-          disabled={pending || !draft.startAt || !draft.endAt}
-          onClick={() => add({ startAt: draft.startAt, endAt: draft.endAt })}
-        >
-          {pending ? 'Opslaan...' : 'Toevoegen'}
-        </Button>
-      </section>
+      {fields}
 
-      <section>
-        <h2 className="text-sm font-semibold text-vtk-ink">Wanneer je kan rijden ({shown.length})</h2>
-        {shown.length === 0 ? (
-          <p className="mt-2 text-sm text-vtk-muted">
-            Nog niets ingegeven. Zolang je niets ingeeft, gaat Logistiek er niet van uit dat je niet
-            kan; ze weten het gewoon niet, en bellen je dan.
-          </p>
-        ) : (
-          <ul className="mt-3 grid gap-2">
-            {shown.map((window) => (
-              <li
-                key={window.id}
-                className={`flex flex-wrap items-center justify-between gap-3 rounded-[12px] bg-vtk-surface px-4 py-2.5 text-sm ${
-                  window.id === OPTIMISTIC_ID ? 'opacity-60' : ''
-                }`}
-              >
-                <div className="min-w-0">
-                  <p className="font-medium text-vtk-ink">
-                    {formatDateTime(new Date(window.startAt))} tot{' '}
-                    {formatDateTime(new Date(window.endAt))}
-                  </p>
-                  {window.note ? <p className="text-xs text-vtk-muted">{window.note}</p> : null}
-                </div>
-                {window.id === OPTIMISTIC_ID ? (
-                  <span className="text-xs text-vtk-muted">Opslaan...</span>
-                ) : (
-                  <ConfirmActionButton
-                    label={`Weghalen: ${formatDateTime(new Date(window.startAt))}`}
-                    confirmLabel="Venster weghalen"
-                    icon={<LogisticsIcon name="close" className="h-4 w-4" />}
-                    action={removeAvailabilityAction.bind(null, window.id)}
-                    successMessage="Venster weggehaald."
-                    destructive
-                    dialogTitle="Venster weghalen?"
-                    dialogDescription="Logistiek weet dan niet meer dat je op dat moment kan rijden. Ritten die al aan jou toegewezen zijn, blijven staan."
-                  />
-                )}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {list}
     </div>
   );
 }

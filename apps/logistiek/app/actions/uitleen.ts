@@ -20,6 +20,8 @@ import {
 import { buildTransportBookings, type TransportFormInput } from '@/lib/transport-form';
 import { expireOpenPayments, logistiekBaseUrl, paymentGateway } from '@/lib/payments';
 import { runSerializable } from '@/lib/tx';
+import { clipOutsideDay, hoursToRanges, mergeRanges } from '@/lib/availability-day';
+import { startOfBrusselsDay } from '@/lib/week-lanes';
 import { writeAudit } from '@/lib/audit';
 import { notifyReservation, notifyTeamNewRequest, notifyTransport } from '@/lib/uitleen-mail';
 
@@ -1033,6 +1035,71 @@ export async function addAvailabilityAction(input: {
     await tx.uitleenDriverAvailability.create({
       data: { userId: session.user.id, startAt: from, endAt: to, note: keptNote },
     });
+  });
+
+  revalidatePath('/ritten/beschikbaarheid');
+  revalidatePath('/beheer/vervoer/week');
+  return { ok: true, message: 'Beschikbaarheid opgeslagen.' };
+}
+
+/**
+ * De beschikbaarheid van één dag in één keer herschrijven (V1, mobiel).
+ *
+ * Het intekenrooster op een telefoon werkt per uurvakje: je veegt over de uren
+ * dat je kan, en veegt er nog eens over om ze weg te halen. Dat is geen "voeg
+ * toe" en geen "haal weg" maar "zo ziet die dag er nu uit", en daar hoort één
+ * actie bij. Met alleen `add` en `remove` erbovenop zou een halve dag wissen
+ * neerkomen op een venster weghalen en er twee terugzetten, met drie
+ * roundtrips en een half opgeslagen dag als er eentje faalt.
+ *
+ * De dagranden zijn Belgisch, en vensters die over middernacht lopen worden
+ * gesplitst: één dag herschrijven mag de dagen ernaast niet stil wegvegen. Zie
+ * `lib/availability-day.ts`, waar dat rekenwerk puur en getest staat.
+ */
+export async function setAvailabilityDayAction(input: {
+  /** De dag, als `YYYY-MM-DD` in Belgische tijd. */
+  day: string;
+  /** De uren die aan staan (0 tot en met 23). */
+  hours: number[];
+}): Promise<ActionResult> {
+  const session = await requireSession();
+  if (!(await isDriver(session.user.id))) {
+    return { ok: false, error: 'Je staat niet in de chauffeurslijst.' };
+  }
+
+  const day = parseDateOnly(input.day);
+  if (!day) return { ok: false, error: 'Die dag begrijp ik niet.' };
+  const dayStart = new Date(startOfBrusselsDay(day));
+  const dayEnd = new Date(startOfBrusselsDay(new Date(day.getTime() + 24 * 60 * 60 * 1000)));
+
+  const hours = Array.isArray(input.hours) ? input.hours.filter((hour) => Number.isInteger(hour)) : [];
+
+  await runSerializable(async (tx) => {
+    const touching = await tx.uitleenDriverAvailability.findMany({
+      where: { userId: session.user.id, startAt: { lt: dayEnd }, endAt: { gt: dayStart } },
+      select: { id: true, startAt: true, endAt: true },
+    });
+
+    if (touching.length > 0) {
+      await tx.uitleenDriverAvailability.deleteMany({
+        where: { id: { in: touching.map((row) => row.id) } },
+      });
+    }
+
+    // Wat er buiten deze dag lag, komt terug; wat erbinnen lag, wordt vervangen
+    // door wat er nu aangeduid staat.
+    const keep = touching.flatMap((row) => clipOutsideDay(row, dayStart, dayEnd));
+    const ranges = mergeRanges([...keep, ...hoursToRanges(hours, dayStart)]);
+
+    if (ranges.length > 0) {
+      await tx.uitleenDriverAvailability.createMany({
+        data: ranges.map((range) => ({
+          userId: session.user.id,
+          startAt: range.startAt,
+          endAt: range.endAt,
+        })),
+      });
+    }
   });
 
   revalidatePath('/ritten/beschikbaarheid');

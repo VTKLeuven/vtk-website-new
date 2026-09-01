@@ -127,6 +127,29 @@ export function AvailabilityBoard({
  */
 const LABEL_MIN_SHARE = 12;
 
+/**
+ * Om de hoeveel uur er een streepje in de strook komt, per lengte van het
+ * venster.
+ *
+ * Zonder streepjes is een balk enkel een kleur op een lijn: je ziet dát iemand
+ * kan, niet wanneer. En het uur in de balk zelf helpt daar niet, want dat past
+ * precies niet bij de korte vensters waar je het nodig hebt.
+ *
+ * Op één dag om de drie uur, tot een week om de zes. Op een week is een dag
+ * ongeveer honderd pixels breed, dus vier streepjes per dag staan zo'n
+ * vijfentwintig pixels uit elkaar en de cijfers 00, 06, 12 en 18 passen er nog
+ * naast elkaar. Op een maand blijven enkel de dagranden over; daar zou elk
+ * streepje smaller zijn dan het cijfer erboven.
+ */
+function tickHours(dayCount: number): number {
+  if (dayCount <= 1) return 3;
+  if (dayCount <= HOUR_LABEL_MAX_DAYS) return 6;
+  return 24;
+}
+
+/** Tot hoeveel dagen de streepjes een uur dragen in plaats van enkel een lijn. */
+const HOUR_LABEL_MAX_DAYS = 7;
+
 /** Wie iets doorgaf eerst; wie niets doorgaf onderaan, in de eigen volgorde. */
   const rows = useMemo(() => {
     const chosen = only.length === 0 ? drivers : drivers.filter((driver) => only.includes(driver.id));
@@ -135,10 +158,37 @@ const LABEL_MIN_SHARE = 12;
     return { withWindows, without };
   }, [drivers, only, perDriver]);
 
+  /**
+   * De streepjes: één per `tickHours` uur, met de dagranden apart (die zijn
+   * sterker en dragen de dagnaam).
+   */
+  const ticks = useMemo(() => {
+    const step = tickHours(parsedDays.length);
+    const perDay = 24 / step;
+    const out: Array<{ left: number; hour: number; isDay: boolean }> = [];
+    for (let day = 0; day < parsedDays.length; day += 1) {
+      for (let slot = 0; slot < perDay; slot += 1) {
+        const hour = slot * step;
+        out.push({
+          left: ((day + hour / 24) / parsedDays.length) * 100,
+          hour,
+          isDay: hour === 0,
+        });
+      }
+    }
+    return out;
+  }, [parsedDays.length]);
+
+  const showHourLabels = parsedDays.length <= HOUR_LABEL_MAX_DAYS;
+
   if (!range || drivers.length === 0) return null;
 
   return (
-    <section className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-4">
+    // `min-w-0`: deze strook staat in een raster, en een rasteritem heeft
+    // `min-width: auto`, oftewel "krimp niet onder je inhoud". De `min-w-[30rem]`
+    // hieronder duwde daardoor de hele pagina open in plaats van in zijn eigen
+    // doos te scrollen, en dan schuift een telefoon de planning ernaast mee.
+    <section className="min-w-0 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-sm font-semibold text-vtk-ink">Wie kan er rijden</h2>
         <p className="text-xs text-vtk-muted">
@@ -194,23 +244,41 @@ const LABEL_MIN_SHARE = 12;
         })}
       </div>
 
-      <div className="mt-3 overflow-x-auto">
-        <div className="min-w-[36rem]">
+      <div className="mt-3 min-w-0 overflow-x-auto">
+        <div className="min-w-[30rem]">
           {/* De dagkop, uitgelijnd op de stroken eronder. */}
           <div className="flex items-end gap-2 pb-1">
             <span className="w-32 shrink-0" />
-            <div
-              className="grid flex-1 gap-px"
-              style={{ gridTemplateColumns: `repeat(${parsedDays.length}, minmax(0, 1fr))` }}
-            >
-              {parsedDays.map((day) => (
-                <span
-                  key={day.toISOString()}
-                  className="truncate px-1 text-[11px] font-semibold capitalize text-vtk-muted"
-                >
-                  {weekdayFormatter.format(day)} {dayNumberFormatter.format(day)}
-                </span>
-              ))}
+            <div className="relative flex-1">
+              <div
+                className="grid gap-px"
+                style={{ gridTemplateColumns: `repeat(${parsedDays.length}, minmax(0, 1fr))` }}
+              >
+                {parsedDays.map((day) => (
+                  <span
+                    key={day.toISOString()}
+                    className="truncate px-1 text-[11px] font-semibold capitalize text-vtk-muted"
+                  >
+                    {weekdayFormatter.format(day)} {dayNumberFormatter.format(day)}
+                  </span>
+                ))}
+              </div>
+              {/* De uren onder de dagnamen, op dezelfde plek als hun streepje.
+                  Enkel wanneer er dagen genoeg breed zijn; op een week zouden
+                  het veertien cijfers over elkaar worden. */}
+              {showHourLabels ? (
+                <div className="relative mt-0.5 h-3">
+                  {ticks.map((tick) => (
+                    <span
+                      key={`${tick.left}`}
+                      className="absolute top-0 -translate-x-1/2 text-[9px] tabular-nums text-vtk-muted"
+                      style={{ left: `${tick.left}%` }}
+                    >
+                      {String(tick.hour).padStart(2, '0')}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
             </div>
           </div>
 
@@ -221,15 +289,21 @@ const LABEL_MIN_SHARE = 12;
                   {driver.name}
                 </span>
                 <div className="relative h-8 flex-1 overflow-hidden rounded-[8px] bg-vtk-paper/70">
-                  {/* De daglijnen, zodat een balk af te lezen valt op een dag. */}
-                  {parsedDays.slice(1).map((day, index) => (
-                    <span
-                      key={day.toISOString()}
-                      aria-hidden
-                      className="absolute inset-y-0 w-px bg-vtk-navy/10"
-                      style={{ left: `${((index + 1) / parsedDays.length) * 100}%` }}
-                    />
-                  ))}
+                  {/* De uurstreepjes, zodat een balk af te lezen valt tegen een
+                      tijdstip in plaats van tegen een hele dag. De dagranden zijn
+                      donkerder: dat is de grens die je het eerst zoekt. */}
+                  {ticks.map((tick) =>
+                    tick.left === 0 ? null : (
+                      <span
+                        key={`${tick.left}`}
+                        aria-hidden
+                        className={`absolute inset-y-0 w-px ${
+                          tick.isDay ? 'bg-vtk-navy/15' : 'bg-vtk-navy/[0.06]'
+                        }`}
+                        style={{ left: `${tick.left}%` }}
+                      />
+                    )
+                  )}
                   {(perDriver.get(driver.id) ?? []).map((bar) => (
                     <span
                       key={bar.id}
@@ -254,6 +328,13 @@ const LABEL_MIN_SHARE = 12;
           {rows.withWindows.length === 0 ? (
             <p className="py-3 text-xs text-vtk-muted">
               Niemand gaf voor deze periode iets door.
+            </p>
+          ) : null}
+
+          {!showHourLabels && rows.withWindows.length > 0 ? (
+            <p className="mt-1 text-[11px] text-vtk-muted">
+              Elk fijn streepje is {tickHours(parsedDays.length)} uur, de donkere lijnen zijn de
+              dagranden. Wijs een balk aan voor het precieze uur, of ga naar de dagweergave.
             </p>
           ) : null}
 

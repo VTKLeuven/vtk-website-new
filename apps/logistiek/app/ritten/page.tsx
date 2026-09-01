@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { LogisticsIcon } from '@/components/logistics-icon';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { PhoneLink } from '@/components/phone-link';
@@ -158,23 +159,18 @@ export default async function RittenPage() {
         </>
       }
       intro={t.pageTripsLead}
+      /* V1: laten weten wanneer je kan rijden. In de kop en niet als paneel
+         tussen de ritten: het is de enige actie op dit scherm en de rest is
+         lezen, en als paneel las het als een mededeling die je wegscrolt. */
+      action={
+        driver ? (
+          <Link href="/ritten/beschikbaarheid" className="logistics-head-button">
+            <LogisticsIcon name="reservation" className="h-4 w-4" />
+            {en ? 'My availability' : 'Beschikbaarheid'}
+          </Link>
+        ) : null
+      }
     >
-      {/* V1: laten weten wanneer je kan rijden. Bovenaan en niet onderaan: het
-          is de enige actie op dit scherm, de rest is lezen. */}
-      {driver ? (
-        <p className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 text-sm leading-7 text-vtk-body">
-          <Link
-            href="/ritten/beschikbaarheid"
-            className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
-          >
-            {en ? 'When can I drive?' : 'Wanneer kan ik rijden?'}
-          </Link>{' '}
-          {en
-            ? 'Let Logistics know your free hours; they see them while planning.'
-            : 'Laat weten wanneer je vrij bent; Logistiek ziet dat bij het plannen.'}
-        </p>
-      ) : null}
-
       {!driver && trips.length === 0 ? (
         <p className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 text-sm leading-7 text-vtk-body">
           {en ? 'You are not a driver for Logistics. Would you like to drive? Mail ' : 'Je bent geen chauffeur bij Logistiek. Wil je rijden? Mail '}

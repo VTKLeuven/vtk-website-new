@@ -815,6 +815,53 @@ body {
   padding-bottom: clamp(64px, 8vw, 96px);
 }
 
+/* De titel links, de knop rechts. Op een smal scherm onder elkaar: naast een
+   titel van 32px past er niets meer, en een knop die tot een pictogram krimpt is
+   geen knop meer. */
+.logistics-page-head-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.logistics-page-head-action {
+  flex: 0 0 auto;
+  padding-bottom: 6px;
+}
+
+@media (max-width: 720px) {
+  .logistics-page-head-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .logistics-page-head-action {
+    padding-bottom: 0;
+  }
+}
+
+/* De knop zelf: geel op het donker, zoals de primaire knop op een donkere band
+   elders op de site. */
+.logistics-head-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  transition: filter 0.15s ease;
+}
+
+.logistics-head-button:hover {
+  filter: brightness(0.94);
+}
+
 .logistics-eyebrow {
   display: flex;
   align-items: center;
