@@ -271,7 +271,10 @@ export function TransportPlanner({
           <p className="text-xs font-medium text-vtk-navy">Gefilterd: {hiddenNote.join('; ')}.</p>
         ) : null}
 
-        <p className="text-xs text-vtk-muted">
+        {/* `tg-hint`: in volledig scherm valt deze uitleg weg. Daar wil je zoveel
+            mogelijk kalender, en wie fullscreen aanzet, heeft de legende al
+            gelezen. */}
+        <p className="tg-hint text-xs text-vtk-muted">
           De vulkleur is de chauffeur, de arcering is het voertuig; een rit zonder chauffeur is geel
           met een rode streepjesrand. Kleuren stel je in bij Chauffeurs, arceringen bij
           Instellingen. Gestreept = nog te beslissen, doorzichtig = afgerond, volle rode rand = twee

@@ -96,13 +96,19 @@ export function MonthGrid({
 
   const todayKey = now ? dayKeyFormatter.format(now) : null;
 
-  if (blocks.length === 0) {
-    return <p className="text-sm text-vtk-muted">{emptyLabel}</p>;
-  }
-
   return (
-    <div className="relative overflow-x-auto">
-      <div className="min-w-[42rem] rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-2">
+    // `tg-pane` zodat de maand in volledig scherm meegroeit in plaats van klein
+    // bovenaan te blijven staan; buiten fullscreen groeit ze met haar rijen mee
+    // (`tg-pane-auto` laat de vaste hoogte los), want een maand is al compact.
+    <div className="tg-pane tg-pane-auto relative overflow-auto">
+      {/* `min-h-full` en `flex-1` hieronder zijn wat de maand in volledig scherm
+          laat meegroeien: de weekrijen delen de hoogte in plaats van bovenaan
+          samen te klitten met een half leeg scherm eronder. Buiten fullscreen
+          heeft de pane geen vaste hoogte, en dan doen ze niets. */}
+      <div className="flex min-h-full min-w-[42rem] flex-col rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-2">
+        {blocks.length === 0 ? (
+          <p className="pb-1.5 text-xs text-vtk-muted">{emptyLabel}</p>
+        ) : null}
         <div className="grid grid-cols-7 gap-1 pb-1.5">
           {rows[0]?.map((day) => (
             <span
@@ -114,7 +120,10 @@ export function MonthGrid({
           ))}
         </div>
 
-        <div className="grid gap-1">
+        <div
+          className="grid flex-1 gap-1"
+          style={{ gridAutoRows: `minmax(${28 + lanes * BAR_PX}px, 1fr)` }}
+        >
           {rows.map((row, rowIndex) => {
             const bars = placedPerRow[rowIndex];
             /** Wat er per dag niet meer paste, om als "+n meer" te tonen. */
@@ -128,7 +137,7 @@ export function MonthGrid({
             return (
               <div key={row[0].toISOString()} className="relative">
                 {/* De dagcellen: het raster waar de balken overheen liggen. */}
-                <div className="grid grid-cols-7 gap-1">
+                <div className="grid h-full grid-cols-7 gap-1">
                   {row.map((day) => {
                     const iso = day.toISOString();
                     const inMonth = isInMonth(day, parsedAnchor);
@@ -136,14 +145,14 @@ export function MonthGrid({
                     return (
                       <div
                         key={iso}
-                        className={`rounded-[10px] px-1 pt-1 ${
+                        className={`h-full rounded-[10px] px-1 pt-1 ${
                           isToday
                             ? 'bg-vtk-yellow/15'
                             : inMonth
                               ? 'bg-vtk-paper/70'
                               : 'bg-vtk-paper/30'
                         }`}
-                        style={{ minHeight: 28 + lanes * BAR_PX }}
+
                       >
                         {onOpenDay ? (
                           <button

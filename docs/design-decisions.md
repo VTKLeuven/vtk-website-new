@@ -2139,6 +2139,54 @@ ze staan naast elkaar op twee assen die je tegelijk kan lezen.
   instelt**, net zoals bij `canDriveVan`. De rij is de plek voor wat het team
   handmatig bijhoudt; het lidmaatschap zelf blijft uit de post komen.
 
+### Zoom is "hoeveel dag past er in beeld", geen pixels per uur
+
+De kalender heeft één maat: **zoom 1 betekent dat de hele dag, 00:00 tot 24:00,
+precies in het venster past.** Er is dan geen verticale scrollbalk. Boven 1 wordt
+een uur hoger en scrolt de dag; onder 1 bestaat niet.
+
+Dat is de tweede vorm. Eerst was zoom een vaste hoogte per uur (24 tot 96 pixels,
+standaard 42), en dat was de reden dat "volledig scherm" niets leek te doen: het
+venster werd twee keer zo groot, de uren bleven even hoog, en de kalender stond
+nog altijd even klein in het scherm; enkel het wit eromheen groeide. Dezelfde
+42px vulde bovendien een laptop half en een extern scherm voor een derde, dus
+"ingezoomd" betekende iets anders naargelang waar je zat.
+
+Wat daarbij vastligt:
+
+- **De hoogte van een uur wordt gemeten, niet gekozen.** Een `ResizeObserver` op
+  de scroller en op de dagkop geeft de bruikbare hoogte; die gedeeld door 24 is
+  een uur op zoom 1. Daarom vult volledig scherm zich vanzelf: hetzelfde
+  zoomniveau geeft in een groter venster een hoger uur.
+- **Er is een ondergrens van 22 pixels per uur.** Op een korte pagina zou "de
+  hele dag past" op tien pixels per uur uitkomen, en dan liggen de uurlijnen op
+  elkaar. Daaronder scrolt de kalender dus toch, ook op zoom 1.
+- **Het rooster loopt altijd van 00:00 tot 24:00**, en niet van de vroegste tot
+  de laatste rit. Een venster dat met de data meebeweegt, verspringt zodra iemand
+  een rit om 6:00 toevoegt, en dan staat de week er de volgende ochtend anders
+  bij zonder dat je iets veranderd hebt.
+- **Scrollen zoomt rond de muis**, zoals in een kaart: het uur onder de cursor
+  blijft onder de cursor staan. Zonder dat anker springt de week weg op het
+  moment dat je inzoomt om iets van dichtbij te bekijken. De kop wordt daarbij
+  van de ankerpositie afgetrokken; die staat `sticky` boven de uren en hoort niet
+  mee te schuiven.
+- **Bij het openen scrolt de kalender naar de vroegste rit**, minus een uur, of
+  naar 08:00 als er niets staat. Bovenaan beginnen betekent vier uur nacht in
+  beeld.
+- **Het rooster verdwijnt niet op een lege dag.** Vroeger kwam er één zin in de
+  plaats; dat was een kalender die weg was op precies de dag waarop je er een rit
+  op wil tekenen. De zin staat nu in de kop, boven een leeg maar bruikbaar
+  raster.
+- **De maandweergave rekt haar weekrijen uit in volledig scherm**, in plaats van
+  bovenaan samen te klitten met een half leeg scherm eronder.
+
+Volledig scherm heeft twee vormen, want `requestFullscreen()` bestaat niet op een
+`div` in Safari op iOS: lukt de echte API, dan zorgt `:fullscreen` voor de
+achtergrond (zonder dat tekent de browser zwart); lukt ze niet, dan wordt het een
+vast paneel over de pagina (`data-fullscreen="fallback"`). De filters en de
+inspector staan bewust **binnen** die container: alles wat erbuiten gerenderd
+wordt, is in echte fullscreen onzichtbaar.
+
 ### Karchauffeurs: één vlag, geen aparte soort
 
 Een voertuig kan aangeduid staan als "vraagt een chauffeur die de kar mag

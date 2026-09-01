@@ -5,7 +5,9 @@ import { driverColorVar, type DriverColorOverrides } from '@/lib/driver-colors';
 import { minutesOfDay, placeForDay, startOfBrusselsDay, type Placed } from '@/lib/week-lanes';
 import { BlockContent, blockLabel, blockLook, formatTime } from './trip-block';
 import {
-  HOUR_PX_DEFAULT,
+  DAY_HOURS,
+  ZOOM_MIN,
+  hourPxFor,
   type AvailabilityBand,
   type CalendarVehicle,
   type TripBlock,
@@ -23,10 +25,20 @@ import {
  * verschillende voertuigen gaat: anders verbergt de auto de kar op precies het
  * moment waarop je wil zien dat er twee dingen tegelijk rijden.
  *
- * **De uurhoogte is een prop en geen constante** (P2): de zoom van de kalender
- * gaat hierdoorheen. Onder de 30 pixels per uur past er nog één regel in een blok
- * van een uur, dus dan valt alles behalve het uur en de titel weg; dat is bewust,
- * want vier afgekapte regels zijn onleesbaarder dan twee volledige.
+ * **Het is een echte agenda-pane en geen stuk pagina.** Drie dingen maken dat
+ * verschil, en alle drie ontbraken in de eerste versie:
+ *
+ * 1. **Een eigen scroller met een echte hoogte.** De uren scrollen bínnen de
+ *    kalender; de dagkop plakt bovenaan en de urenkolom links, zodat je nooit
+ *    kwijt bent welke dag of welk uur je bekijkt. Voordien scrolde de hele
+ *    pagina en verdween de dagkop naar boven.
+ * 2. **De hele dag, 00:00 tot 24:00.** Het venster hing vroeger aan de data
+ *    (07:00-23:00, opgerekt door de ritten), en dan verspringt de kalender van
+ *    week tot week en valt er niets te vullen. Nu staat de dag er altijd
+ *    volledig, en scrollt hij bij het openen naar het eerste dat er staat.
+ * 3. **Zoom 1 = de hele dag past exact.** De uurhoogte volgt uit de hoogte van
+ *    de pane (`fitHourPx`), dus in volledig scherm wordt een uur vanzelf hoger
+ *    en vúlt de kalender het scherm. Zie `types.ts` voor het waarom.
  */
 
 const weekdayFormatter = new Intl.DateTimeFormat('nl-BE', {
@@ -48,13 +60,19 @@ const dayKeyFormatter = new Intl.DateTimeFormat('en-CA', {
 /**
  * Minimale breedte van een dagkolom.
  *
- * Ruim gekozen omdat een dagkolom bij overlap in twee of drie deelt: bij een
- * smallere kalender bleef van "Career Fair, Kar, Arthur" niets over dan drie
- * afgekapte letters. Past de week niet, dan schuift ze horizontaal; op een
- * telefoon is dat precies het gedrag dat je wil, want dan veeg je van dag naar
- * dag in plaats van zeven onleesbare kolommen te zien.
+ * Zo gekozen dat een hele week nog net in de beheerkolom past op een laptop:
+ * zeven maal deze breedte plus de urenkolom blijft onder de ~900px die daar
+ * overblijft naast de zijbalk. Op 9,5rem viel zondag standaard buiten beeld, en
+ * een weekweergave waarin je het weekend moet gaan zoeken is geen weekweergave.
+ *
+ * Breder zou beter zijn voor een blok dat bij overlap in tweeën of drieën
+ * deelt, maar dat blok toont dan toch enkel zijn beginuur (zie
+ * `docs/design-decisions.md`); wie de rest wil lezen, klikt hem open. Past de
+ * week alsnog niet, dan schuift ze horizontaal; op een telefoon is dat precies
+ * het gedrag dat je wil, want dan veeg je van dag naar dag in plaats van zeven
+ * onleesbare kolommen te zien.
  */
-const DAY_MIN_WIDTH = '9.5rem';
+const DAY_MIN_WIDTH = '7rem';
 
 /**
  * Het kolommenraster van de kalender: de urenkolom plus één kolom per dag.
@@ -93,6 +111,12 @@ function snap(minutes: number): number {
   return Math.round(minutes / SNAP_MINUTES) * SNAP_MINUTES;
 }
 
+/** De verticale padding van een element; gaat van de bruikbare hoogte af. */
+function paddingOf(node: HTMLElement): number {
+  const style = getComputedStyle(node);
+  return parseFloat(style.paddingTop) + parseFloat(style.paddingBottom);
+}
+
 type DragState =
   | { kind: 'move'; blockId: string; dayIndex: number; from: number; to: number; grabOffset: number }
   | { kind: 'resize'; blockId: string; dayIndex: number; from: number; to: number }
@@ -107,7 +131,9 @@ export function TimeGrid({
   emptyLabel,
   showDriver = true,
   driverColors,
-  hourPx = HOUR_PX_DEFAULT,
+  zoom = ZOOM_MIN,
+  onMetrics,
+  scrollerRef,
   now,
   onMoveBlock,
   onCreateRange,
@@ -126,7 +152,16 @@ export function TimeGrid({
   showDriver?: boolean;
   /** Kleuren die het team zelf zette (K1); de rest volgt uit de id. */
   driverColors?: DriverColorOverrides;
-  hourPx?: number;
+  /** Zoomfactor; 1 = de hele dag past exact in de pane. Zie `types.ts`. */
+  zoom?: number;
+  /**
+   * De gemeten maten van de pane. De werkbalk heeft ze nodig om bij het zoomen
+   * het uur onder de muis vast te houden: `fitHourPx` om uren in pixels om te
+   * rekenen, `headHeight` omdat de dag pas ónder de vastgeplakte kop begint.
+   */
+  onMetrics?: (metrics: { fitHourPx: number; headHeight: number }) => void;
+  /** De scroller, zodat de werkbalk er ankerend in kan zoomen. */
+  scrollerRef?: React.RefObject<HTMLDivElement | null>;
   /** Nu-lijn; weglaten laat ze weg (bv. in een test of een afdruk). */
   now?: Date;
   /**
@@ -162,22 +197,83 @@ export function TimeGrid({
     [bands, parsedDays]
   );
 
-  // Enkel de uren tonen waarin er iets gebeurt, met 07:00-23:00 als bodem: een
-  // kalender die altijd om middernacht begint, is voor de helft leeg.
-  const { firstHour, lastHour } = useMemo(() => {
-    let earliest = 7;
-    let latest = 23;
-    for (const day of placedPerDay) {
-      for (const block of day) {
-        earliest = Math.min(earliest, Math.floor(block.from / 60));
-        latest = Math.max(latest, Math.ceil(block.to / 60));
-      }
-    }
-    return {
-      firstHour: Math.max(0, earliest),
-      lastHour: Math.min(24, Math.max(latest, earliest + 1)),
+  // De kalender toont altijd de hele dag; het eerste uur is dus 0. Een variabele
+  // die overal in de berekeningen meeloopt, is er niet meer, maar de naam blijft
+  // omdat de blokken hem als nulpunt gebruiken.
+  const firstHour = 0;
+  const lastHour = DAY_HOURS;
+
+  /**
+   * De uurhoogte waarbij de hele dag precies in de pane past, gemeten aan de
+   * scroller zelf. Een `ResizeObserver` en geen `window.resize`: de pane
+   * verandert ook van hoogte wanneer de evenementenstrook groeit of wanneer je
+   * in volledig scherm gaat, en daar komt geen vensterwijziging aan te pas.
+   */
+  const innerScroller = useRef<HTMLDivElement | null>(null);
+  const scroller = scrollerRef ?? innerScroller;
+  const head = useRef<HTMLDivElement | null>(null);
+  const [paneHeight, setPaneHeight] = useState(0);
+  const [headHeight, setHeadHeight] = useState(0);
+
+  useEffect(() => {
+    const node = scroller.current;
+    const headNode = head.current;
+    if (!node || !headNode) return;
+    // Twee dozen in één observer: de pane bepaalt hoeveel er is, de kop hoeveel
+    // daarvan al bezet is. De kop verandert van hoogte wanneer de
+    // evenementenstrook groeit, en dan hoort de dag mee te krimpen.
+    // `contentRect` en niet `clientHeight`: die eerste is de contentbox en laat
+    // de padding van de scroller buiten beschouwing. Met `clientHeight` bleef er
+    // precies die padding aan scrollhoogte over, en dus een scrollbalk van 16
+    // pixels bij "hele dag".
+    const measure = () => {
+      setPaneHeight(node.getBoundingClientRect().height - paddingOf(node));
+      setHeadHeight(headNode.offsetHeight);
     };
-  }, [placedPerDay]);
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    observer.observe(headNode);
+    measure();
+    return () => observer.disconnect();
+  }, [scroller]);
+
+  /**
+   * De uurhoogte waarbij de hele dag precies past.
+   *
+   * De kop gaat eraf: die plakt bovenaan de scroller en bedekt dus het eerste
+   * stuk van de dag. Zonder die aftrek bleef er bij "hele dag" altijd net een
+   * scrollbalk over ter grootte van de dagkop, en dat is precies het soort
+   * bijna-goed waar je naar blijft kijken.
+   */
+  const usable = Math.max(0, (paneHeight || 640) - headHeight);
+  const fitHourPx = usable / DAY_HOURS;
+  const hourPx = hourPxFor(fitHourPx, zoom);
+
+  useEffect(() => {
+    if (paneHeight > 0) onMetrics?.({ fitHourPx, headHeight });
+  }, [fitHourPx, headHeight, onMetrics, paneHeight]);
+
+  /**
+   * Bij het openen naar het eerste dat er staat, met een uur marge; anders kijk
+   * je elke keer eerst naar een lege nacht. Enkel wanneer er iets te scrollen
+   * valt, en enkel bij een nieuwe dagenreeks: tijdens het zoomen houdt de
+   * werkbalk het anker vast, en dan mag dit er niet overheen springen.
+   */
+  const scrolledFor = useRef<string | null>(null);
+  useEffect(() => {
+    const node = scroller.current;
+    if (!node || paneHeight === 0) return;
+    const key = days.join('|');
+    if (scrolledFor.current === key) return;
+    scrolledFor.current = key;
+
+    let earliest = 8 * 60;
+    for (const day of placedPerDay) {
+      for (const block of day) earliest = Math.min(earliest, block.from);
+    }
+    const target = Math.max(0, (earliest / 60 - 1) * hourPx);
+    node.scrollTop = Math.min(target, Math.max(0, node.scrollHeight - node.clientHeight));
+  }, [days, hourPx, paneHeight, placedPerDay, scroller]);
 
   /**
    * Wat er op dit moment versleept wordt.
@@ -330,46 +426,49 @@ export function TimeGrid({
   const todayKey = now ? dayKeyFormatter.format(now) : null;
   const nowMinutes = now ? minutesOfDay(now) : 0;
 
-  // Helemaal leeg is één zin genoeg. Staan er wel evenementen (de strook
-  // erboven), dan blijft het rooster staan: dan zie je dat er die week iets
-  // gepland is waarvoor nog geen rit bestaat, en dat is precies het gat dat je
-  // wil zien.
-  if (blocks.length === 0 && !above) {
-    return <p className="text-sm text-vtk-muted">{emptyLabel}</p>;
-  }
+  // Het rooster blijft staan wanneer er niets is. Vroeger kwam er één zin in de
+  // plaats, en dat was een kalender die verdween precies op de dag waarop je er
+  // een rit op wil tekenen. De zin staat nu in de kop, boven een leeg maar
+  // bruikbaar raster.
 
   return (
-    // `relative` op de scroller: een `sr-only` binnenin is absoluut gepositioneerd
-    // en ankert zonder dit op de pagina in plaats van op het raster, waardoor een
-    // telefoon het hele scherm uitzoomt om dat ene onzichtbare pixel te tonen.
-    <div className="relative overflow-x-auto">
-      <div className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-2">
-        {above}
+    // De pane: één doos met een echte hoogte waarin verticaal én horizontaal
+    // gescrold wordt. `relative` omdat een `sr-only` binnenin absoluut
+    // gepositioneerd is en zonder dit op de pagina ankert in plaats van op het
+    // raster; dat liet een telefoon het hele scherm uitzoomen om dat ene
+    // onzichtbare pixel te tonen.
+    <div className="tg-pane relative rounded-[16px] border border-vtk-navy/10 bg-vtk-surface">
+      <div ref={scroller} className="tg-scroller relative h-full overflow-auto p-2">
+        {/* De kop plakt bovenaan de scroller: de dagen en de evenementenstrook
+            blijven staan terwijl je door de uren scrolt. Eén `sticky` blok en
+            niet twee, want twee sticky elementen met een eigen `top` schuiven
+            over elkaar zodra de strook van hoogte verandert. */}
+        <div ref={head} className="tg-head sticky top-0 z-30 bg-vtk-surface pb-1.5">
+          {above}
 
-        {blocks.length === 0 ? (
-          <p className="px-1 pb-1 text-sm text-vtk-muted">{emptyLabel}</p>
-        ) : null}
+          {blocks.length === 0 ? (
+            <p className="px-1 pb-1 text-sm text-vtk-muted">{emptyLabel}</p>
+          ) : null}
 
-        {/* Kop: de dagen. Meescrollend met de kolommen eronder, want ze staan in
-            dezelfde scroller. */}
-        <div className="grid gap-1 pb-1.5" style={{ gridTemplateColumns: columns }}>
-          <span className="sticky left-0 z-20 bg-vtk-surface" />
-          {parsedDays.map((day, index) => {
-            const isToday = todayKey !== null && dayKeyFormatter.format(day) === todayKey;
-            return (
-              <span
-                key={days[index]}
-                className={`truncate px-1 text-xs ${isToday ? 'text-vtk-navy' : 'text-vtk-muted'}`}
-              >
+          <div className="grid gap-1" style={{ gridTemplateColumns: columns }}>
+            <span className="sticky left-0 z-20 bg-vtk-surface" />
+            {parsedDays.map((day, index) => {
+              const isToday = todayKey !== null && dayKeyFormatter.format(day) === todayKey;
+              return (
                 <span
-                  className={`font-semibold capitalize ${isToday ? 'text-vtk-navy' : 'text-vtk-ink'}`}
+                  key={days[index]}
+                  className={`truncate px-1 text-xs ${isToday ? 'text-vtk-navy' : 'text-vtk-muted'}`}
                 >
-                  {weekdayFormatter.format(day)}
-                </span>{' '}
-                {dayNumberFormatter.format(day)}
-              </span>
-            );
-          })}
+                  <span
+                    className={`font-semibold capitalize ${isToday ? 'text-vtk-navy' : 'text-vtk-ink'}`}
+                  >
+                    {weekdayFormatter.format(day)}
+                  </span>{' '}
+                  {dayNumberFormatter.format(day)}
+                </span>
+              );
+            })}
+          </div>
         </div>
 
         <div className="grid gap-1" style={{ gridTemplateColumns: columns }}>
@@ -380,7 +479,12 @@ export function TimeGrid({
               {hours.map((hour, index) => (
                 <span
                   key={hour}
-                  className="absolute right-1 -translate-y-1/2 text-[11px] tabular-nums text-vtk-muted"
+                  className={`absolute right-1 text-[11px] tabular-nums text-vtk-muted ${
+                    // 00:00 staat op de bovenrand; die half omhoog schuiven zou
+                    // hem onder de dagkop duwen. De rest hangt wél gecentreerd
+                    // op zijn lijn.
+                    index === 0 ? '' : '-translate-y-1/2'
+                  }`}
                   style={{ top: index * hourPx }}
                 >
                   {String(hour).padStart(2, '0')}:00

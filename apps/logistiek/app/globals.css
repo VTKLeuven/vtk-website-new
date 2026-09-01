@@ -113,30 +113,115 @@ body {
     repeating-linear-gradient(90deg, rgba(14, 26, 54, 0.11) 0 1px, transparent 1px 8px);
 }
 
-/* Volledig scherm voor de transportplanning (P2).
+/* De transportplanning is een agenda-pane, geen stuk pagina.
+
+   De uren scrollen bínnen de kalender in plaats van met de pagina mee; daardoor
+   kan de dagkop bovenaan blijven plakken en de urenkolom links. Dat vraagt één
+   ding: de pane moet een échte hoogte hebben, want een `overflow: auto` op een
+   doos die met haar inhoud meegroeit, scrolt nooit.
+
+   Buiten volledig scherm is dat een stuk van het scherm (`dvh` en niet `vh`: op
+   een telefoon telt `vh` de adresbalk mee, en dan valt de onderrand eronder). In
+   volledig scherm neemt ze wat er overblijft onder de werkbalk. */
+/* De hoogte staat op de pane zelf en niet enkel op de planning: het publieke
+   bezettingsoverzicht en het beschikbaarheidsscherm gebruiken hetzelfde rooster
+   zonder die shell eromheen, en zonder hoogte scrolt een `overflow: auto`-doos
+   nooit. Wie ze wil bijstellen, zet `--tg-height` op een ouder. */
+.tg-pane {
+  height: var(--tg-height, clamp(22rem, 68dvh, 60rem));
+  min-width: 0;
+}
+
+/* De maandweergave groeit met haar rijen mee; die is al compact en heeft geen
+   vaste hoogte nodig. In volledig scherm neemt ze wél de volle rest. */
+.tg-pane-auto {
+  height: auto;
+}
+
+/* Zonder deze twee rekt de kalender de pagina op in plaats van in zichzelf te
+   scrollen. Een grid- of flexitem heeft `min-width: auto`, en dat betekent "niet
+   krimpen onder je inhoud": een week van zeven kolommen van 9,5rem duwde de
+   werkbalk en de laatste dag buiten beeld. `min-width: 0` geeft `overflow: auto`
+   pas iets om te doen. */
+.transport-calendar {
+  min-width: 0;
+}
+
+.transport-calendar > * {
+  min-width: 0;
+}
+
+/* De dagkop is `position: sticky` binnen de scroller. Die scroller mag daarom
+   geen `overflow: hidden` op een tussenliggende laag hebben; alles wat hier
+   scrollt, scrollt in .tg-scroller zelf. */
+.tg-scroller {
+  scrollbar-gutter: stable;
+}
+
+/* Volledig scherm.
 
    Twee vormen, want `requestFullscreen()` bestaat niet op een `div` in Safari op
    iOS: lukt de echte fullscreen-API, dan zorgt `:fullscreen` voor de achtergrond
    (zonder dat is het zwart, want de browser tekent niets achter het element);
    lukt ze niet, dan zet de component `data-fullscreen="fallback"` en wordt het
-   een vast paneel over de pagina. In beide gevallen scrollt de kalender zelf,
-   anders valt een lange dag onder de schermrand.
+   een vast paneel over de pagina.
+
+   In beide gevallen is de container een **flexkolom over de volle hoogte**: de
+   werkbalk en de legende nemen wat ze nodig hebben, en de pane krijgt de rest.
+   Zonder `min-height: 0` op die pane weigert een flexitem te krimpen onder zijn
+   inhoud en steekt de kalender onderaan het scherm uit; dat is de klassieke
+   valkuil van een scrollende doos in een flexkolom.
 
    De inspector en de filters horen bínnen deze container te staan; alles wat
    erbuiten gerenderd wordt, is in echte fullscreen onzichtbaar. */
-.transport-calendar:fullscreen {
-  overflow: auto;
+.transport-calendar:fullscreen,
+.transport-calendar[data-fullscreen='fallback'] {
+  display: flex;
+  flex-direction: column;
   background: var(--paper);
   padding: 1rem;
+}
+
+.transport-calendar:fullscreen {
+  width: 100%;
+  height: 100%;
 }
 
 .transport-calendar[data-fullscreen='fallback'] {
   position: fixed;
   inset: 0;
   z-index: 70;
-  overflow: auto;
-  background: var(--paper);
-  padding: 1rem;
+}
+
+/* De pane vult wat er overblijft in plaats van haar vaste hoogte aan te houden;
+   dát is wat "volledig scherm" betekent.
+
+   `flex-basis: 0` en niet `height: 100%`: met een basis van 100% moet de
+   flexbox de pane weer laten krimpen om de werkbalk en de legende te laten
+   passen, en die berekening liep er een tiental pixels naast, waardoor de
+   legende net onder de schermrand viel. Met basis 0 krijgt de pane precies de
+   vrije ruimte, en klopt het per definitie. `height: auto` overschrijft zowel de
+   vaste hoogte van .tg-pane als de `auto` van de maandweergave. */
+.transport-calendar:fullscreen .tg-pane,
+.transport-calendar[data-fullscreen='fallback'] .tg-pane {
+  height: auto;
+  min-height: 0;
+  flex: 1 1 0%;
+}
+
+/* Uitleg die je in volledig scherm niet nodig hebt: daar wil je kalender zien.
+   De legende blijft wel staan, want die verklaart de kleuren die je op dat
+   moment bekijkt. */
+.transport-calendar:fullscreen .tg-hint,
+.transport-calendar[data-fullscreen='fallback'] .tg-hint {
+  display: none;
+}
+
+/* De legende en de uitleg onder de kalender mogen in volledig scherm niet
+   meegroeien; ze krijgen wat ze nodig hebben en de kalender de rest. */
+.transport-calendar:fullscreen > *,
+.transport-calendar[data-fullscreen='fallback'] > * {
+  flex: 0 0 auto;
 }
 
 /* In volledig scherm scrollt de kalender binnen de container, en dan zou de
@@ -147,7 +232,7 @@ body {
 .transport-calendar[data-fullscreen='fallback'] .transport-calendar-toolbar {
   position: sticky;
   top: -1rem;
-  z-index: 30;
+  z-index: 40;
   margin: -1rem -1rem 0;
   padding: 1rem;
   background: var(--paper);
