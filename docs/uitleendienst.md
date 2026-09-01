@@ -168,7 +168,10 @@ de same-origin `publicUrl`.
   `trip-block`, `trip-inspector`, `filters`, `transport-calendar`); de
   berekeningen zijn puur en getest (`lib/week-lanes.ts`, `lib/month-lanes.ts`,
   `lib/calendar-range.ts`, `lib/transport-filters.ts`, `lib/driver-colors.ts`).
-  Het tijdrooster is gedeeld met het publieke `/vervoer/bezetting`.
+  Het tijdrooster is gedeeld met het publieke `/vervoer/bezetting`. De zoom is
+  een factor op "de hele dag past in beeld" en geen pixelmaat
+  (`components/transport-calendar/types.ts`, getest in `test/calendar-zoom.test.ts`);
+  waarom, staat in `docs/design-decisions.md`.
   **"Rit afronden" staat hier bewust niet**; dat blijft op `/beheer/vervoer`.
 - **Beheer** (`app/beheer/`): `aanvragen/` (tabs, last-minute, decision/edit/
   return-forms, klaarzetlijst per lijn + printblad `[id]/print` en dag-afdruk

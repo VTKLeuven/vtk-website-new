@@ -16,12 +16,12 @@ import { MonthGrid } from './month-grid';
 import { TimeGrid, timeGridColumns } from './time-grid';
 import { vehicleIcon } from './trip-block';
 import {
-  HOUR_PX_DEFAULT,
-  HOUR_PX_MAX,
-  HOUR_PX_MIN,
-  HOUR_PX_STEP,
+  ZOOM_MAX,
+  ZOOM_MIN,
+  ZOOM_STEP,
   ZOOM_STORAGE_KEY,
-  clampHourPx,
+  clampZoom,
+  hourPxFor,
   type AvailabilityBand,
   type CalendarVehicle,
   type TripBlock,
@@ -120,26 +120,63 @@ export function TransportCalendar({
   );
 
   /**
-   * Zoom: hoe hoog één uur is.
+   * Zoom, als factor op "de hele dag past in beeld" (zie `types.ts`).
    *
    * In een effect en niet als beginwaarde, om dezelfde reden als de nu-lijn: op
    * de server bestaat `localStorage` niet, en een andere eerste render dan de
    * server geeft een hydratiefout. Lezen én schrijven in een try/catch, want in
    * een privévenster gooit de accessor zelf.
    */
-  const [hourPx, setHourPx] = useState(HOUR_PX_DEFAULT);
+  const [zoom, setZoom] = useState(ZOOM_MIN);
+  const scroller = useRef<HTMLDivElement>(null);
+  const metrics = useRef({ fitHourPx: 0, headHeight: 0 });
+  // De actuele zoom voor de luisteraars hieronder, die maar één keer opgehangen
+  // worden en anders de waarde van hun eerste render zouden vasthouden.
+  const zoomRef = useRef(zoom);
+
   useEffect(() => {
     try {
       const saved = window.localStorage.getItem(ZOOM_STORAGE_KEY);
-      if (saved !== null) setHourPx(clampHourPx(Number(saved)));
+      if (saved !== null) setZoom(clampZoom(Number(saved)));
     } catch {
-      /* privévenster: dan gewoon de standaardhoogte */
+      /* privévenster: dan gewoon op passend */
     }
   }, []);
 
-  const zoomTo = useCallback((next: number) => {
-    const value = clampHourPx(next);
-    setHourPx(value);
+  /**
+   * Zoomen mét anker: het uur dat je vasthoudt, blijft staan waar het staat.
+   *
+   * Zonder dit springt de dag weg onder je muis, want de scrollpositie is een
+   * pixelafstand en die betekent na het zoomen een ander uur. Dat is precies wat
+   * "de zoom werkt niet deftig" betekende: technisch werd alles hoger, maar je
+   * keek daarna naar een ander stuk van de dag.
+   *
+   * `anchorY` is de plek in de pane die vast moet blijven (de muis bij scrollen,
+   * het midden bij de knoppen). We rekenen om naar het uur op dat punt, zoomen,
+   * en zetten de scroll terug zodat datzelfde uur weer op dat punt ligt.
+   */
+  const zoomAround = useCallback((next: number, anchorY?: number) => {
+    const value = clampZoom(next);
+    const node = scroller.current;
+    const { fitHourPx: fit, headHeight } = metrics.current;
+
+    if (node && fit > 0) {
+      // Het anker gemeten vanaf 00:00, dus vanaf ónder de vastgeplakte dagkop.
+      // Zonder die aftrek schuift de dag bij elke zoomstap een kophoogte weg.
+      const anchor = (anchorY ?? node.clientHeight / 2) - headHeight;
+      const before = hourPxFor(fit, zoomRef.current);
+      const after = hourPxFor(fit, value);
+      const hoursAtAnchor = (node.scrollTop + anchor) / before;
+      // Ná de render, want de nieuwe hoogte bestaat pas dan; anders klemt de
+      // browser de scrollpositie op de oude, kleinere inhoud.
+      requestAnimationFrame(() => {
+        const target = hoursAtAnchor * after - anchor;
+        node.scrollTop = Math.max(0, Math.min(target, node.scrollHeight - node.clientHeight));
+      });
+    }
+
+    zoomRef.current = value;
+    setZoom(value);
     try {
       window.localStorage.setItem(ZOOM_STORAGE_KEY, String(value));
     } catch {
@@ -147,32 +184,36 @@ export function TransportCalendar({
     }
   }, []);
 
-  // Ctrl/⌘ + scrollen zoomt, zoals in een tekenprogramma. Zonder die modifier
-  // blijft scrollen gewoon scrollen: de kalender is hoger dan het scherm, en een
-  // pagina die onder je muis wegspringt is erger dan geen zoom.
-  //
-  // Niet via `onWheel` op het element: React hangt dat passief op, en een
-  // passieve listener mag `preventDefault()` niet doen, waardoor de browser
-  // eroverheen zijn eigen paginazoom doet.
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  /**
+   * Ctrl/⌘ + scrollen zoomt op de muis, zoals in een tekenprogramma en zoals de
+   * browser dat zelf met de pagina doet. Zonder die modifier blijft scrollen
+   * gewoon scrollen: de dag is hoger dan de pane, en een kalender die onder je
+   * muis wegspringt is erger dan geen zoom.
+   *
+   * Niet via `onWheel` op het element: React hangt dat passief op, en een
+   * passieve luisteraar mag `preventDefault()` niet doen, waardoor de browser
+   * eroverheen zijn eigen paginazoom doet.
+   */
   useEffect(() => {
     const node = shell.current;
     if (!node) return;
     function onWheel(event: WheelEvent) {
       if (!event.ctrlKey && !event.metaKey) return;
       event.preventDefault();
-      setHourPx((current) => {
-        const value = clampHourPx(current - Math.sign(event.deltaY) * HOUR_PX_STEP);
-        try {
-          window.localStorage.setItem(ZOOM_STORAGE_KEY, String(value));
-        } catch {
-          /* zie zoomTo */
-        }
-        return value;
-      });
+      const pane = scroller.current;
+      const anchor = pane ? event.clientY - pane.getBoundingClientRect().top : undefined;
+      // Vermenigvuldigen en niet optellen: één "klik" van het wiel voelt dan
+      // even groot boven- als onderaan het bereik.
+      const factor = event.deltaY < 0 ? ZOOM_STEP : 1 / ZOOM_STEP;
+      zoomAround(zoomRef.current * factor, anchor);
     }
     node.addEventListener('wheel', onWheel, { passive: false });
     return () => node.removeEventListener('wheel', onWheel);
-  }, []);
+  }, [zoomAround]);
 
   /**
    * Volledig scherm.
@@ -217,7 +258,12 @@ export function TransportCalendar({
     try {
       await node.requestFullscreen();
       setFullscreen('native');
-    } catch {
+    } catch (error) {
+      // Safari op iOS heeft geen fullscreen-API op een `div`, en sommige
+      // browsers weigeren ze in een iframe of zonder gebruikersactie. Dan het
+      // vaste paneel; de reden gaat naar de console, want "hij doet het niet"
+      // is anders niet na te trekken.
+      console.info('[planning] volledig scherm valt terug op een vast paneel:', error);
       setFullscreen('fallback');
     }
   }, [fullscreen]);
@@ -268,18 +314,30 @@ export function TransportCalendar({
             <>
               <button
                 type="button"
-                onClick={() => zoomTo(hourPx - HOUR_PX_STEP)}
-                disabled={hourPx <= HOUR_PX_MIN}
+                onClick={() => zoomAround(zoom / ZOOM_STEP)}
+                disabled={zoom <= ZOOM_MIN}
                 title="Uitzoomen (of Ctrl/⌘ + scrollen)"
                 className={iconButton}
               >
                 <span aria-hidden className="text-base leading-none">−</span>
                 <span className="sr-only">Uitzoomen</span>
               </button>
+              {/* Het zoomniveau in woorden, want een knop die uitgrijst zonder
+                  te zeggen waarom, leest als kapot. "Hele dag" is zoom 1: dan
+                  past de dag exact en valt er niets meer uit te zoomen. */}
               <button
                 type="button"
-                onClick={() => zoomTo(hourPx + HOUR_PX_STEP)}
-                disabled={hourPx >= HOUR_PX_MAX}
+                onClick={() => zoomAround(ZOOM_MIN)}
+                disabled={zoom <= ZOOM_MIN}
+                title="Terug naar de hele dag"
+                className="rounded-full border border-vtk-navy/15 px-2.5 py-1 text-xs font-medium tabular-nums text-vtk-ink transition hover:border-vtk-navy/40 disabled:opacity-40"
+              >
+                {zoom <= ZOOM_MIN ? 'Hele dag' : `${Math.round(zoom * 100)}%`}
+              </button>
+              <button
+                type="button"
+                onClick={() => zoomAround(zoom * ZOOM_STEP)}
+                disabled={zoom >= ZOOM_MAX}
                 title="Inzoomen (of Ctrl/⌘ + scrollen)"
                 className={iconButton}
               >
@@ -334,7 +392,11 @@ export function TransportCalendar({
           emptyLabel={emptyLabel}
           showDriver={showDriver}
           driverColors={driverColors}
-          hourPx={hourPx}
+          zoom={zoom}
+          scrollerRef={scroller}
+          onMetrics={(value) => {
+            metrics.current = value;
+          }}
           now={now}
           onMoveBlock={onMoveBlock}
           onCreateRange={onCreateRange}

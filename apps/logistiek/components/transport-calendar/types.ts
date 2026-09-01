@@ -41,23 +41,58 @@ export type CalendarVehicle = {
 };
 
 /**
- * Hoe hoog één uur is, in pixels.
+ * De zoom van de kalender, als **factor op "de hele dag past in beeld"**.
  *
- * `MIN` toont een hele dag zonder scrollen; `MAX` maakt een kwartierrit
- * aanklikbaar op een telefoon. De standaard is de hoogte waarmee de planning tot
- * nu toe getekend werd: genoeg voor de vier regels van een rit van een uur.
+ * Niet in pixels per uur, en dat is het verschil met de eerste versie. Een vaste
+ * pixelmaat weet niet hoe groot het scherm is: dezelfde 42px per uur vulde een
+ * laptop half en een volledig scherm voor een derde, en "inzoomen" betekende dan
+ * iets anders naargelang waar je zat.
+ *
+ * Zo werkt het nu, zoals een agenda-app het doet:
+ *
+ * - **Zoom 1 = de hele dag past exact in het venster.** Geen verticale
+ *   scrollbalk, van 00:00 tot 24:00 in beeld. In volledig scherm is dat venster
+ *   groter, dus wordt een uur vanzelf hoger; de kalender vúlt het scherm in
+ *   plaats van er klein in te blijven staan.
+ * - **Boven 1 wordt een uur hoger en scrolt de dag.** Dat is wat je wil zodra
+ *   er iets te lezen valt in een blok van een kwartier.
+ * - **Onder 1 bestaat niet.** Bij 1 zie je de dag al helemaal; verder uitzoomen
+ *   voegt enkel wit toe.
  */
-export const HOUR_PX_DEFAULT = 42;
-export const HOUR_PX_MIN = 24;
-export const HOUR_PX_MAX = 108;
-export const HOUR_PX_STEP = 12;
+export const ZOOM_MIN = 1;
+export const ZOOM_MAX = 8;
+/** Eén klik op + of -. Vermenigvuldigen en niet optellen: dat voelt gelijkmatig. */
+export const ZOOM_STEP = 1.25;
 
-export function clampHourPx(value: number): number {
-  if (!Number.isFinite(value)) return HOUR_PX_DEFAULT;
-  return Math.min(HOUR_PX_MAX, Math.max(HOUR_PX_MIN, Math.round(value)));
+export function clampZoom(value: number): number {
+  if (!Number.isFinite(value)) return ZOOM_MIN;
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, value));
 }
 
-/** Waar de zoom van deze persoon blijft staan. Per browser, zoals de catalogusweergave. */
+/**
+ * Ondergrens in pixels per uur. Op een korte pagina zou "de hele dag past" op
+ * 14px per uur uitkomen, en dan is een uurlijn niet meer van de volgende te
+ * onderscheiden. Onder deze grens scrolt de kalender dus toch, ook op zoom 1.
+ */
+export const MIN_HOUR_PX = 22;
+/** Bovengrens, zodat een misgelopen berekening geen kalender van 40 schermen maakt. */
+export const MAX_HOUR_PX = 320;
+
+/** Uren op een dag. De kalender toont ze allemaal en scrolt naar het interessante deel. */
+export const DAY_HOURS = 24;
+
+/**
+ * De uurhoogte die bij deze pane-hoogte en deze zoom hoort.
+ *
+ * Eén functie voor beide kanten: het rooster tekent ermee, en de werkbalk rekent
+ * er de scrollpositie mee om bij het zoomen. Twee keer dezelfde klemming
+ * schrijven betekent dat het anker na de eerste wijziging een halve schermhoogte
+ * verkeerd zit.
+ */
+export function hourPxFor(fitHourPx: number, zoom: number): number {
+  return Math.min(MAX_HOUR_PX, Math.max(MIN_HOUR_PX, fitHourPx * zoom));
+}
+
 export const ZOOM_STORAGE_KEY = 'logistiek.transportplanning.zoom';
 
 /**

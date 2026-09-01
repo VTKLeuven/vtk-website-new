@@ -151,10 +151,17 @@ en van de mobiele weergave.
 ### ✅ P2. Zoom en volledig scherm
 **P2 · code**
 
-- **Doen:** de vaste `HOUR_PX = 42` wordt een prop van 24 tot 108 pixels per uur,
-  met knoppen en met ctrl/⌘+scroll; onthouden in `localStorage` (in een try/catch,
-  want privémodus gooit). Volledig scherm via `requestFullscreen()` met een
-  `position: fixed`-fallback voor iOS Safari.
+- **Doen:** de vaste `HOUR_PX = 42` wordt een zoomfactor op "de hele dag past in
+  beeld", met knoppen en met ctrl/⌘+scroll; onthouden in `localStorage` (in een
+  try/catch, want privémodus gooit). Volledig scherm via `requestFullscreen()`
+  met een `position: fixed`-fallback voor iOS Safari.
+- **Bijgesteld na het eerste gebruik.** De eerste versie zette de zoom in pixels
+  per uur, en dan doet volledig scherm niets: het venster wordt groter, de uren
+  blijven even hoog, en enkel het wit eromheen groeit. Nu wordt de hoogte van een
+  uur gemeten (`ResizeObserver` op de scroller en de dagkop) in plaats van
+  gekozen, loopt het rooster altijd van 00:00 tot 24:00, en zoomt scrollen rond
+  de muis. Zie `docs/design-decisions.md` § Zoom is "hoeveel dag past er in
+  beeld".
 - **Geen pinch-zoom.** Dat is op een telefoon de gebaar voor de paginazoom van de
   browser; die overnemen breekt iets dat mensen al kennen. De knoppen werken daar
   even goed. Google Agenda doet het op het web ook niet.
