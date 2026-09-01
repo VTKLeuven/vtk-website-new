@@ -55,6 +55,7 @@ export function HeroWeek({
   base,
   signedIn,
   dim,
+  nextEventsLimit,
 }: {
   events: FrontpageEvent[];
   now: Date;
@@ -63,9 +64,11 @@ export function HeroWeek({
   signedIn: boolean;
   /** Donkerte van de waas in procent; in te stellen in /admin/frontpage. */
   dim: number;
+  /** Maximum aantal rijen in de rustige-weeklijst; in te stellen in de admin. */
+  nextEventsLimit: number;
 }) {
   const nl = locale === "nl";
-  const { mode, days } = selectHeroWeek(events, now);
+  const { mode, days } = selectHeroWeek(events, now, { nextLimit: nextEventsLimit });
   const todayKey = new Intl.DateTimeFormat("en-CA", {
     timeZone: HERO_WEEK_TIME_ZONE,
     year: "numeric",
@@ -96,7 +99,7 @@ export function HeroWeek({
 
   return (
     <aside
-      className="hero-week"
+      className={`hero-week hero-week-${mode}`}
       style={{ "--hero-week-dim": dim / 100 } as React.CSSProperties}
     >
       {/* Het verloop dat de tekst draagt. Puur decoratief: het staat achter de

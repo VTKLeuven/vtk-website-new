@@ -4807,8 +4807,11 @@ Het zijn altijd zes dagen, zodat de hoogte van het blok niet per dag verspringt.
 
 Zes dagen met twee dingen erin leest als een kring waar niets gebeurt. Zitten er
 minder dan vier evenementen in het venster, dan toont de hero in de plaats de
-**vier eerstvolgende evenementen**, ook al zijn die pas over drie weken. Precies
-vier telt als genoeg om het venster te vullen.
+**eerstvolgende evenementen**, ook al zijn die pas over drie weken. Precies vier
+telt als genoeg om het venster te vullen. De lijst toont er standaard maximaal
+acht: met compactere rijen vult dat de ruimte naast de herotekst tot aan de
+feitenlijn, zonder eronder te zakken. Het maximum is instelbaar van vier tot acht
+in Admin → Website → Frontpage.
 
 De terugval kijkt niet terug: gisteren hoort bij "deze week", niet bij "wat er
 nog komt".

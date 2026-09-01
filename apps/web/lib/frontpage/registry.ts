@@ -1,4 +1,9 @@
 import type { FieldSchema } from "./fields";
+import {
+  HERO_WEEK_NEXT_LIMIT_DEFAULT,
+  HERO_WEEK_NEXT_LIMIT_MAX,
+  HERO_WEEK_NEXT_LIMIT_MIN,
+} from "@/lib/calendar/heroWeek";
 
 /**
  * The front pages that exist.
@@ -94,10 +99,23 @@ export const FRONTPAGE_MODULES: FrontpageModule[] = [
         labelNl: "Agenda naast de titel",
         labelEn: "Agenda beside the headline",
         helpNl:
-          "Weekoverzicht: de komende zes dagen (zaterdag valt weg), met een ster om aan te duiden dat je komt. Lijst: de vier eerstvolgende evenementen onder elkaar.",
+          "Weekoverzicht: de komende zes dagen (zaterdag valt weg), met een ster om aan te duiden dat je komt. Bij minder dan vier evenementen schakelt het vanzelf over op de eerstvolgende evenementen. Lijst: altijd de vier eerstvolgende evenementen in een kaart.",
         helpEn:
-          "Week overview: the next six days (Saturday is skipped), with a star to mark that you are coming. List: the next four events below one another.",
+          "Week overview: the next six days (Saturday is skipped), with a star to mark that you are coming. With fewer than four events it automatically switches to the next events. List: always the next four events in a card.",
         options: HOME_AGENDA_OPTIONS,
+      },
+      nextEventsLimit: {
+        type: "range",
+        labelNl: "Maximum bij een rustige week",
+        labelEn: "Maximum in a quiet week",
+        helpNl:
+          "Hoeveel eerstvolgende evenementen er maximaal verschijnen wanneer het weekoverzicht minder dan vier evenementen bevat. Acht vult de beschikbare ruimte tot aan de feitenlijn.",
+        helpEn:
+          "The maximum number of upcoming events shown when the week overview contains fewer than four events. Eight fills the available space down to the facts divider.",
+        min: HERO_WEEK_NEXT_LIMIT_MIN,
+        max: HERO_WEEK_NEXT_LIMIT_MAX,
+        step: 1,
+        fallback: HERO_WEEK_NEXT_LIMIT_DEFAULT,
       },
       agendaDim: {
         type: "range",

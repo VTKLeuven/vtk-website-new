@@ -158,13 +158,17 @@ describe("selectHeroWeek", () => {
     expect(selectHeroWeek(withoutSunday, monday14).days[0]?.key).toBe("2026-09-14");
   });
 
-  it("falls back to the next four events when the window is nearly empty", () => {
+  it("fills the quiet-week list up to its default maximum", () => {
     const quiet: HeroWeekInput[] = [
       event("een", "2026-09-14T20:00:00+02:00"),
       event("twee", "2026-09-17T19:00:00+02:00"),
       event("drie", "2026-10-06T19:00:00+02:00"),
       event("vier", "2026-10-13T19:00:00+02:00"),
       event("vijf", "2026-10-20T19:00:00+02:00"),
+      event("zes", "2026-10-21T19:00:00+02:00"),
+      event("zeven", "2026-10-22T19:00:00+02:00"),
+      event("acht", "2026-10-23T19:00:00+02:00"),
+      event("negen", "2026-10-24T19:00:00+02:00"),
     ];
     const result = selectHeroWeek(quiet, sunday13);
     expect(result.mode).toBe("next");
@@ -173,7 +177,32 @@ describe("selectHeroWeek", () => {
       "twee",
       "drie",
       "vier",
+      "vijf",
+      "zes",
+      "zeven",
+      "acht",
     ]);
+  });
+
+  it("honours the configured quiet-week maximum", () => {
+    const quiet = [
+      event("een", "2026-09-14T20:00:00+02:00"),
+      event("twee", "2026-09-17T19:00:00+02:00"),
+      event("drie", "2026-10-06T19:00:00+02:00"),
+      event("vier", "2026-10-13T19:00:00+02:00"),
+      event("vijf", "2026-10-20T19:00:00+02:00"),
+      event("zes", "2026-10-21T19:00:00+02:00"),
+    ];
+
+    const result = selectHeroWeek(quiet, sunday13, { nextLimit: 5 });
+    expect(result.days.flatMap((day) => day.events.map((e) => e.id))).toEqual([
+      "een",
+      "twee",
+      "drie",
+      "vier",
+      "vijf",
+    ]);
+    expect(result.total).toBe(5);
   });
 
   it("keeps the window at exactly four events", () => {

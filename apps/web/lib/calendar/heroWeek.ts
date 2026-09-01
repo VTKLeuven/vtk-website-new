@@ -18,7 +18,8 @@
  *   kijkt het een dag verder vooruit.
  * - **Bij een rustige week toont het de eerstvolgende evenementen.** Zes dagen
  *   met twee dingen erin leest als een lege kring; dan is een korte lijst met wat
- *   er wél aankomt eerlijker, ook al is dat pas over drie weken.
+ *   er wél aankomt eerlijker, ook al is dat pas over drie weken. Hoeveel die
+ *   lijst maximaal toont, komt uit de Frontpage-instelling.
  * - **Hoogstens drie per dag en tien in totaal.** De hero staat naast de titel en
  *   mag niet met de drukte meegroeien tot een scherm vol.
  */
@@ -40,6 +41,15 @@ export const HERO_WEEK_MAX_TOTAL = 10;
  * er ook precies zoveel.
  */
 export const HERO_WEEK_MIN_FOR_WINDOW = 4;
+
+/**
+ * De rustige-weeklijst vult de ruimte naast de herotekst tot aan de feitenlijn.
+ * Acht compacte rijen passen daar op desktop; meer zou de lijn voorbij lopen.
+ * Een redacteur kan het aantal verlagen in Admin → Website → Frontpage.
+ */
+export const HERO_WEEK_NEXT_LIMIT_DEFAULT = 8;
+export const HERO_WEEK_NEXT_LIMIT_MIN = HERO_WEEK_MIN_FOR_WINDOW;
+export const HERO_WEEK_NEXT_LIMIT_MAX = 8;
 
 /** Zie de gelijknamige enum in schema.prisma. */
 export type HeroWeekPlacement = "AUTO" | "PINNED" | "HIDDEN";
@@ -154,8 +164,18 @@ function byPlacementThenStart<T extends HeroWeekInput>(a: T, b: T): number {
 export function selectHeroWeek<T extends HeroWeekInput>(
   events: readonly T[],
   now: Date,
-  timeZone = HERO_WEEK_TIME_ZONE,
+  options: { timeZone?: string; nextLimit?: number } = {},
 ): HeroWeekSelection<T> {
+  const timeZone = options.timeZone ?? HERO_WEEK_TIME_ZONE;
+  const requestedNextLimit = Math.floor(
+    options.nextLimit ?? HERO_WEEK_NEXT_LIMIT_DEFAULT,
+  );
+  const nextLimit = Number.isFinite(requestedNextLimit)
+    ? Math.min(
+        HERO_WEEK_NEXT_LIMIT_MAX,
+        Math.max(HERO_WEEK_NEXT_LIMIT_MIN, requestedNextLimit),
+      )
+    : HERO_WEEK_NEXT_LIMIT_DEFAULT;
   const visible = events.filter((event) => event.heroWeek !== "HIDDEN");
   const today = heroWeekDayKey(now, timeZone);
   const yesterday = shiftDayKey(today, -1);
@@ -176,14 +196,14 @@ export function selectHeroWeek<T extends HeroWeekInput>(
   const inWindow = keys.reduce((sum, key) => sum + (byDay.get(key)?.length ?? 0), 0);
 
   // Precies vier is genoeg om het venster te vullen; pas daaronder wordt het de
-  // lijst. Zonder deze grens zou "meer dan vier" bij exact vier tot een lege
-  // beslissing leiden.
+  // lijst. Het aantal rijen in die lijst is apart instelbaar: de drempel beslist
+  // over de vorm, de limiet enkel over hoeveel komende evenementen erin passen.
   if (inWindow < HERO_WEEK_MIN_FOR_WINDOW) {
     const next = visible
       .filter((event) => heroWeekDayKey(event.start, timeZone) >= today)
       .slice()
       .sort((a, b) => a.start.getTime() - b.start.getTime())
-      .slice(0, HERO_WEEK_MIN_FOR_WINDOW);
+      .slice(0, nextLimit);
 
     const days: Array<HeroWeekDay<T>> = [];
     for (const event of next) {

@@ -7,6 +7,7 @@ import {
   HOME_AGENDA_WEEK,
   getFrontpageModule,
 } from "@/lib/frontpage/registry";
+import { HERO_WEEK_NEXT_LIMIT_DEFAULT } from "@/lib/calendar/heroWeek";
 import { HeroWeek } from "./HeroWeek";
 import { Cta, ctaFrom, type FrontpageProps } from "./context";
 
@@ -47,6 +48,10 @@ export function DefaultFrontpage({
   const agendaDim = dimField
     ? rangeValue(values, "agendaDim", dimField)
     : HOME_AGENDA_DIM_DEFAULT;
+  const nextEventsLimitField = fields?.nextEventsLimit;
+  const nextEventsLimit = nextEventsLimitField
+    ? rangeValue(values, "nextEventsLimit", nextEventsLimitField)
+    : HERO_WEEK_NEXT_LIMIT_DEFAULT;
 
   const eyebrow = pickField(values, "eyebrow", locale) ?? "Vlaamse Technische Kring · KU Leuven";
   const title = pickField(values, "title", locale) ?? (nl ? "De thuis voor" : "The home for");
@@ -160,6 +165,7 @@ export function DefaultFrontpage({
           base={base}
           signedIn={signedIn}
           dim={agendaDim}
+          nextEventsLimit={nextEventsLimit}
         />
       ) : (
       <aside className="hero-cal">
