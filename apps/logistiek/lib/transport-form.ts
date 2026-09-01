@@ -3,7 +3,7 @@ import 'server-only';
 import { prisma } from '@vtk/db';
 import type { Prisma, UitleenRequesterType } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
-import { isOnQuarterHour, parseNotifyEmails, transportPriceCents } from './uitleen';
+import { isOnQuarterHour, MAX_HELPERS, parseNotifyEmails, transportPriceCents } from './uitleen';
 import { parseBrusselsDateTime } from './reservation-form';
 
 /**
@@ -25,6 +25,8 @@ export type TransportFormInput = {
   startAt: string; // datetime-local, Belgische wall-clock
   endAt: string;
   purpose: string;
+  /** Wat er mee moet ("20 bierbakken en 4 tafels"). */
+  cargoNote?: string;
   pickupAddress: string;
   destination: string;
   note: string;
@@ -32,6 +34,11 @@ export type TransportFormInput = {
   vehicleIds?: string[];
   vehicleId?: string;
   eventName?: string;
+  /**
+   * Bijrijders met naam en nummer (V2). Vervangt `helpersNote`/`helpersPhone`;
+   * die twee blijven aanvaard voor wie ze nog meestuurt.
+   */
+  helpers?: Array<{ name: string; phone?: string }>;
   helpersNote?: string;
   helpersPhone?: string;
   contactPhone?: string;
@@ -58,6 +65,11 @@ export type BuiltTransport =
   | {
       ok: true;
       bookings: Prisma.UitleenTransportBookingCreateManyInput[];
+      /**
+       * De bijrijders, opgeschoond. Apart van `bookings` omdat `createMany` geen
+       * geneste rijen kan schrijven: de aanroeper maakt ze aan per boeking.
+       */
+      helpers: Array<{ name: string; phone: string | null }>;
       vehicleCount: number;
       roundTrip: boolean;
     }
@@ -153,6 +165,7 @@ export async function buildTransportBookings(
     ...(owner.groupId !== undefined ? { groupId: owner.groupId } : {}),
     ...(owner.requesterName !== undefined ? { requesterName: owner.requesterName } : {}),
     purpose: purpose.slice(0, MAX_NOTE_LENGTH),
+    cargoNote: input.cargoNote?.trim().slice(0, MAX_NOTE_LENGTH) || null,
     eventName: input.eventName?.trim().slice(0, 300) || null,
     pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
     destination: input.destination.trim().slice(0, 300) || null,
@@ -199,11 +212,22 @@ export async function buildTransportBookings(
   const grouped = vehicles.length > 1 || legs.length > 1;
   const tripGroupId = grouped ? randomUUID() : null;
 
+  // Een rij zonder naam is geen bijrijder maar een leeg veld dat iemand liet
+  // staan; die valt weg in plaats van als "Bijrijder" in de lijst te komen.
+  const helpers = (input.helpers ?? [])
+    .map((helper) => ({
+      name: helper.name.trim().slice(0, 120),
+      phone: helper.phone?.trim().slice(0, 60) || null,
+    }))
+    .filter((helper) => helper.name.length > 0)
+    .slice(0, MAX_HELPERS);
+
   return {
     ok: true,
     bookings: vehicles.flatMap((vehicle) =>
       legs.map((leg) => bookingFor(vehicle, leg.from, leg.to, leg.leg, tripGroupId))
     ),
+    helpers,
     vehicleCount: vehicles.length,
     roundTrip: Boolean(inbound),
   };

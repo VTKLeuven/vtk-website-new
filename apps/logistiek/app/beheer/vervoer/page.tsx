@@ -20,6 +20,8 @@ import {
   transportAuditLogsByBooking,
   type AdminTransportBooking,
 } from '@/lib/uitleen-server';
+import { ScrollToRit } from '@/components/scroll-to-rit';
+import { TripHelpers } from '@/components/trip-helpers';
 import { BookingRow } from './booking-row';
 import { TransportControls } from './transport-controls';
 import { TransportDecisionForms } from './transport-decision-forms';
@@ -66,8 +68,15 @@ function awaitsDriver(booking: {
   return booking.vehicle.needsDriver && booking.driverId === null;
 }
 
-export default async function BeheerVervoerPage() {
+export default async function BeheerVervoerPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ rit?: string }>;
+}) {
   await requireManage();
+  // S3: vanuit de kalender klik je op één rit, en die hoort hier opengeklapt en
+  // gemarkeerd te staan in plaats van ergens in een lijst van twintig.
+  const { rit } = await searchParams;
 
   const [bookings, drivers, vehicles, events] = await Promise.all([
     adminVanBookings(),
@@ -171,9 +180,20 @@ export default async function BeheerVervoerPage() {
     if (booking.contactPhone) {
       lines.push(['Aanvrager bellen', <PhoneLink key="contact" number={booking.contactPhone} />]);
     }
-    if (booking.helpersNote) lines.push(['Bijrijders', booking.helpersNote]);
+    // V2: bijrijders staan als eigen rijen, met een nummer per persoon. De oude
+    // vrije tekst blijft leesbaar zolang ze op een rit staat.
+    lines.push([
+      'Bijrijders',
+      <TripHelpers
+        key="helpers"
+        bookingId={booking.id}
+        helpers={booking.helpers}
+        legacyNote={booking.helpersNote}
+        canEdit={booking.status === 'REQUESTED' || booking.status === 'APPROVED'}
+      />,
+    ]);
     if (booking.helpersPhone) {
-      lines.push(['Bijrijder bellen', <PhoneLink key="helpers" number={booking.helpersPhone} />]);
+      lines.push(['Bijrijder bellen', <PhoneLink key="helpersphone" number={booking.helpersPhone} />]);
     }
     if (booking.memberNote) lines.push(['Nota van het lid', booking.memberNote]);
     if (booking.adminNote) lines.push(['Nota van Logistiek', booking.adminNote]);
@@ -293,7 +313,12 @@ export default async function BeheerVervoerPage() {
           {list.map((booking) => (
             <li
               key={booking.id}
-              className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-4"
+              data-rit={booking.id}
+              className={`rounded-[16px] border bg-vtk-surface p-4 ${
+                booking.id === rit
+                  ? 'border-vtk-yellow bg-vtk-yellow/15 outline outline-2 outline-vtk-yellow'
+                  : 'border-vtk-navy/10'
+              }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -337,6 +362,8 @@ export default async function BeheerVervoerPage() {
               <BookingRow
                 key={booking.id}
                 columns={7}
+                ritId={booking.id}
+                defaultOpen={booking.id === rit}
                 label={`${booking.vehicle.nameNl}, ${requesterLabel(booking)}, ${dateFormatter.format(booking.startAt)}`}
                 summary={
                   <>
@@ -365,6 +392,10 @@ export default async function BeheerVervoerPage() {
 
   return (
     <div className="grid gap-8">
+      {/* Vanuit de kalender kom je met ?rit=<id> binnen; die rit staat dan
+          opengeklapt en gemarkeerd, en dit brengt hem in beeld (S3). */}
+      <ScrollToRit id={rit} />
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-vtk-muted">
           {drivers.length === 0
@@ -414,7 +445,15 @@ export default async function BeheerVervoerPage() {
               {openGroups.map((group) => {
                 const [first] = group;
                 return (
-                  <li key={first.id} className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-4">
+                  <li
+                    key={first.id}
+                    data-rit={first.id}
+                    className={`rounded-[16px] border bg-vtk-surface p-4 ${
+                      group.some((leg) => leg.id === rit)
+                        ? 'border-vtk-yellow bg-vtk-yellow/15 outline outline-2 outline-vtk-yellow'
+                        : 'border-vtk-navy/10'
+                    }`}
+                  >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <p className="flex flex-wrap items-center gap-2">
@@ -486,6 +525,10 @@ export default async function BeheerVervoerPage() {
                     <BookingRow
                       key={first.id}
                       columns={5}
+                      ritId={first.id}
+                      // Heen en terug staan onder één kaart: de rit waarop je
+                      // klikte kan de tweede helft zijn.
+                      defaultOpen={group.some((leg) => leg.id === rit)}
                       label={`${first.vehicle.nameNl}, ${requesterLabel(first)}, ${dateFormatter.format(first.startAt)}`}
                       summary={
                         <>
@@ -533,8 +576,13 @@ export default async function BeheerVervoerPage() {
                 return (
                   <li
                     key={booking.id}
+                    data-rit={booking.id}
                     className={`rounded-[16px] border bg-vtk-surface p-4 ${
-                      awaitsDriver(booking) ? 'border-amber-300 bg-amber-50/30' : 'border-vtk-navy/10'
+                      booking.id === rit
+                        ? 'border-vtk-yellow bg-vtk-yellow/15 outline outline-2 outline-vtk-yellow'
+                        : awaitsDriver(booking)
+                          ? 'border-amber-300 bg-amber-50/30'
+                          : 'border-vtk-navy/10'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -593,6 +641,8 @@ export default async function BeheerVervoerPage() {
                     <BookingRow
                       key={booking.id}
                       columns={6}
+                      ritId={booking.id}
+                      defaultOpen={booking.id === rit}
                       label={`${booking.vehicle.nameNl}, ${requesterLabel(booking)}, ${dateFormatter.format(booking.startAt)}`}
                       highlight={awaitsDriver(booking)}
                       summary={
@@ -656,7 +706,9 @@ export default async function BeheerVervoerPage() {
               // R2: ritten waarvan de rit al voorbij is (endAt < vandaag), standaard
               // ingeklapt achter een teller. Zelfde patroon als PastGroup in
               // app/reservaties/page.tsx.
-              <details className="group mt-4">
+              // Staat de gezochte rit hierin, dan gaat de uitklapper open: anders
+              // landt ?rit=<id> op een teller waarachter niets te zien is (S3).
+              <details className="group mt-4" open={restPast.some((booking) => booking.id === rit)}>
                 <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-medium text-vtk-muted [&::-webkit-details-marker]:hidden">
                   <span
                     aria-hidden="true"

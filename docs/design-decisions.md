@@ -2082,7 +2082,8 @@ Wat daarbij vastligt:
   kalender. Zo blijft de kolombreedte voor de dag, en niet voor drie voertuigen
   waarvan er meestal twee leegstaan.
 - **De kleur blijft van de chauffeur** (zie B4), niet van het voertuig. Wie rijdt
-  is de vraag bij het plannen; wat er rijdt lees je aan het icoon.
+  is de vraag bij het plannen; wat er rijdt lees je aan het icoon **en sinds K1
+  aan de arcering** (hieronder).
 - **Overlappende ritten komen naast elkaar, ook over voertuigen heen.** Anders
   verbergt de auto de kar op precies het moment waarop je wil zien dat er twee
   dingen tegelijk rijden. De breedte wordt per groep elkaar rakende ritten
@@ -2097,6 +2098,46 @@ Wat daarbij vastligt:
   kreeg dan een einduur vóór zijn beginuur (een blok met negatieve hoogte) en een
   rit van 00:30 belandde op de dag ervoor. `lib/week-lanes.ts` rekent de dagrand
   daarom om, en `test/week-lanes.test.ts` houdt dat vast.
+
+### Een rit leest op twee assen: kleur is wie, arcering is wat
+
+Ronde 3 vroeg om "kleurcodering of arcering om voertuigen te onderscheiden",
+terwijl de kleur al van de chauffeur was. Beide op de kleur zetten kan niet, dus
+ze staan naast elkaar op twee assen die je tegelijk kan lezen.
+
+- **De vulkleur is de chauffeur.** Dat blijft de eerste vraag bij het plannen, en
+  het is de as die het langst bestaat (B4).
+- **De arcering is het voertuig** (`UitleenVehicle.pattern`: schuine strepen,
+  verticale strepen, stippen, ruitjes, of niets). Het icoon in het blok zegt
+  hetzelfde, maar een icoon van twaalf pixels lees je pas van dichtbij; een
+  patroon herken je over een hele week heen. De patronen zijn licht gehouden
+  (alfa rond 0.13): het is een tweede laag informatie, geen tweede kleur, en de
+  tekst in het blok moet leesbaar blijven.
+- **Geen chauffeur schreeuwt het luidst.** Dat is de enige toestand op deze
+  kalender die nog werk is, dus ze krijgt de gele accentkleur plus een rode
+  **streepjes**rand. Streepjes en niet vol, want een volle rode rand betekent al
+  iets anders: twee goedgekeurde ritten met hetzelfde voertuig op hetzelfde
+  moment.
+- **Behalve waar de aanvrager zelf rijdt.** Een bakfiets zonder chauffeur is geen
+  openstaande taak (`needsDriver`, T13); daar staat "rijdt zelf" in grijs in
+  plaats van "geen chauffeur" in het rood. Anders staat er elke week een taak op
+  het scherm die niemand ooit kan afvinken.
+- **Instelbaar, met de hash als standaard.** `driverColorIndex` leidt de kleur af
+  uit de id van de chauffeur, en dat blijft de standaard: het doel is
+  onderscheiden wie welke rit doet, niet dat Jonas geel wil. Maar twee chauffeurs
+  die toevallig op bijna dezelfde tint uitkomen, moet het team kunnen
+  rechtzetten, en dat hoort geen deploy te vragen. `UitleenDriver.colorIndex`
+  overschrijft de hash; `null` is de hash. Een waarde die buiten het palet valt
+  (een handmatige update, een ooit verkleind palet) valt terug op de hash in
+  plaats van een token te vragen dat niet bestaat, want een blok zonder vulling
+  ziet eruit als een blok zonder chauffeur.
+- **Acht bolletjes, geen kleurkiezer.** De tinten staan als tokens in
+  `apps/logistiek/app/globals.css` en zijn gekozen om naast elkaar te
+  onderscheiden én donkere tekst leesbaar te houden. Een vrije kleurkiezer zet
+  daar binnen de maand een donkerblauw en een knalgeel tussen.
+- **Een postlid krijgt pas een `UitleenDriver`-rij zodra iemand er iets aan
+  instelt**, net zoals bij `canDriveVan`. De rij is de plek voor wat het team
+  handmatig bijhoudt; het lidmaatschap zelf blijft uit de post komen.
 
 ### Karchauffeurs: één vlag, geen aparte soort
 
@@ -2254,6 +2295,21 @@ was: "is voor dit evenement alles aangevraagd?".
   naam, en dat is vervelender dan geen groepering.
 - **De losse overzichten blijven.** `/beheer/aanvragen` en `/beheer/vervoer` zijn
   waar je beslist; het evenementscherm komt erbij en vervangt niets.
+- **Eén uitzondering: een aangevinkt kalenderevenement** (E1, ronde 3). Op
+  `/admin/kalender` staat een vinkje "Logistiek nodig", standaard aan bij een
+  nieuw evenement. Dat botst niet met de regel hierboven: die gaat over
+  aanvragen, en een kalenderevenement is geen aanvraag maar een gecureerde
+  activiteit van de kring. Het vinkje houdt de beslissing bovendien bij een mens;
+  wie het uitlaat, krijgt aan de logistiekkant niets.
+  - **Naam, locatie en uren volgen mee** bij elke wijziging op vtk.be, precies
+    zoals het gekoppelde ticketevent dat al deed. Zonder die duw blijft hier de
+    oude datum staan tot iemand er toevallig ook eens opslaat, en dat verschil
+    merkt niemand tot het materiaal op de verkeerde dag klaarstaat.
+  - **Het vinkje weghalen koppelt niets los.** Er kunnen al aanvragen aan hangen,
+    en die losmaken zou werk weggooien dat op dat scherm niet zichtbaar is; het
+    formulier zegt dat erbij.
+  - **Mislukt de koppeling, dan mislukt het opslaan niet.** Het kalenderevenement
+    is het echte werk; de koppeling is een gemak.
 
 ### Sjablonen maakt Logistiek, niet de posten
 
@@ -2679,6 +2735,147 @@ enkel `EXTERN` betaalt.
 - **Los van `showRentPrices`.** Die instelling gaat over de dagprijzen in de
   catalogus (mag een lid zien wat een beamer kost?) en niet over een concrete
   aanvraag. De twee combineren, de ene vervangt de andere niet.
+- **Ook al vóór het indienen** (S2, ronde 3). De regel gold aanvankelijk enkel op
+  een bestaande aanvraag; het aanvraagformulier zelf toonde de waarborg per item,
+  in het totaal en in de betaalnota eronder, aan iedereen. Een post zag dus een
+  bedrag terwijl hij koos, en pas erna nooit meer. Het formulier kent zijn
+  aanvragertype (het leidt het af uit de gekozen groep, zoals de server dat bij
+  het indienen opnieuw doet), dus het volgt nu dezelfde regel. Op de
+  itemdetailpagina, waar er nog geen aanvraag is, geldt de regel van het
+  formulier: wie bij geen enkele groep hoort, vraagt extern aan en ziet de
+  waarborg wel.
+
+### Bijrijders zijn rijen met een nummer, en mogen achteraf
+
+Een rit droeg `helpersNote` (vrije tekst) plus één `helpersPhone`. Twee bijrijders
+met elk hun gsm pasten daar niet in, en de chauffeur belde dan de aanvrager om het
+tweede nummer te vragen. Sinds V2 is het een tabel: één rij per persoon, met een
+naam en een optioneel nummer.
+
+- **Achteraf toevoegen mag, en niet alleen door de aanvrager.** Dat is de hele
+  reden dat dit bestaat: iemand van Sport vraagt de rit aan, en wie er effectief
+  meerijdt is pas de dag voordien bekend, vaak bij iemand anders van dezelfde
+  post. Wie de rit mag zien (`vanBookingForMember`: de aanvrager of een collega
+  van dezelfde post of werkgroep), mag de bijrijders wijzigen. Het team ook,
+  want de chauffeur belt hén wanneer er onderweg iets verandert.
+- **Het nummer mag leeg.** Soms weet je wel wie meegaat en nog niet zijn gsm.
+  Half ingevuld is beter dan niets ingevuld: de chauffeur weet dan tenminste op
+  wie hij staat te wachten.
+- **Ze hangen aan de boeking en niet aan de tripgroep.** Heen en terug kunnen
+  andere bijrijders hebben, en dat is net het geval waarin je het wil weten. Bij
+  het aanvragen krijgen beide helften dezelfde rijen; daarna leiden ze hun eigen
+  leven.
+- **De oude velden blijven staan.** De migratie maakt van wat er stond één
+  bijrijder, ook wanneer die tekst "twee helpers van onze werkgroep" is: dat is
+  informatie die de chauffeur onderweg gebruikt, en ze weggooien zou ze
+  verliezen. De kolommen blijven leesbaar voor bestaande ritten; nieuwe
+  bijrijders komen enkel nog in de tabel.
+- **Een gereden of afgewezen rit staat op slot.** Wie er toen meereed, verandert
+  achteraf niet meer.
+
+### Beschikbaarheid is een hint, geen belofte en geen rooster
+
+Chauffeurs geven op `/ritten/beschikbaarheid` in wanneer ze kunnen rijden; het
+team ziet dat als lichte band achter de transportplanning.
+
+- **Vensters en geen herhalend rooster.** Een chauffeur weet "die zaterdag kan
+  ik" en niet "elke tweede week van 9 tot 12". Een rooster zou hem dwingen iets
+  vast te leggen dat elke week anders is, en het team zou erop plannen.
+- **Iemand toewijzen buiten zijn venster mag**, met een waarschuwing in de
+  bevestiging. De app kent zijn agenda niet, hij wel, en een blokkade zou de
+  planning stilleggen op het moment dat er nog snel iemand gebeld moet worden.
+- **Niets ingeven betekent "niet gekend" en niet "kan niet".** Wie dit scherm
+  nooit opende, krijgt geen waarschuwing; anders zou elke chauffeur er een
+  krijgen en zou niemand ze nog lezen.
+- **Aansluitende vensters vloeien samen.** 12:00-14:00 plus 14:00-18:00 wordt
+  één band van 12 tot 18: twee banden naast elkaar zien eruit als een gaatje dat
+  er niet is.
+- **De band staat standaard uit** in de planning. Ze is nuttig op het moment dat
+  je chauffeurs toewijst, en de rest van de tijd een extra laag kleur over de
+  week.
+- **De chauffeur beheert ze zelf**, ook het team niet voor hem: de acties staan
+  in `app/actions/uitleen.ts` en niet in `beheer.ts`, want een chauffeur heeft
+  geen `logistiek.manage`.
+- **Vensters in het verleden blijven staan.** Die zeggen achteraf wie er die dag
+  kon, en dat is precies de vraag bij "waarom deed altijd dezelfde persoon de
+  nachtritten".
+
+### De transportplanning is abonneerbaar, en die link is een geheim
+
+Het team plant in deze app, maar leeft in zijn eigen agenda. Zonder feed staat een
+rit op twee plekken, of op één plek die niemand open heeft. `/api/kalender/<token>`
+geeft de planning als `.ics`.
+
+- **Het geheim zit in de URL**, want een agenda-client stuurt geen cookies mee.
+  Dat is dezelfde afweging als bij de persoonlijke feed op vtk.be, met één
+  verschil: die is een lijst publieke evenementen, en deze draagt namen, adressen
+  en telefoonnummers. Vandaar 256 bits, `Cache-Control: private, no-store`,
+  `X-Robots-Tag: noindex`, en een scherm dat zegt dat je de link niet doorgeeft.
+- **De URL bestaat één keer.** Enkel de sha256 gaat de databank in; ook het team
+  kan een bestaande link niet meer opvragen. Wie ze kwijt is, maakt een nieuwe en
+  trekt de oude in.
+- **Twee soorten**: `TEAM` (de hele planning, vraagt `logistiek.manage`) en
+  `DRIVER` (enkel je eigen ritten, vraagt dat je in de chauffeurslijst staat).
+  Die tweede is een eigen query en geen filter op de eerste: een filter achteraf
+  laat vroeg of laat een rit door zodra iemand aan de select boven raakt.
+- **Intrekken, niet verwijderen.** Zo blijft zichtbaar dat er een abonnement was,
+  en wordt een token nooit hergebruikt. Een ingetrokken of onbekend token geeft
+  **404 en geen 403**: wie een token probeert, hoort niet te leren dat het ooit
+  bestaan heeft.
+- **Een eigen tabel naast `CalendarFeedToken`.** Twee soorten geheim in één tabel
+  betekent dat één fout in één query beide lekt.
+- **De ics-generator is een kopie**, geen gedeeld pakket. Hoisten is netter, maar
+  een nieuw workspace-pakket dwingt een volledige lockfile-regeneratie af
+  (AGENTS.md) en die laat `better-auth` doorfloaten naar een versie waarop
+  `packages/auth` niet meer typecheckt. De generator is klein,
+  afhankelijkheidsvrij en getest; de kopie kost minder dan die val.
+
+### Een nieuwe aanvraag mailt het team, per soort een ander adres
+
+Tot ronde 3 gingen alle mails van de uitleendienst naar de **aanvrager**, en enkel
+bij een beslissing. Dat er iets binnengekomen was, moest het team zelf gaan
+kijken; in de praktijk deed het dat om de paar dagen, en een last-minute aanvraag
+lag dan al twee dagen stil.
+
+- **Per soort een eigen lijst adressen** (materiaal, flesserke, transport), in te
+  vullen op /beheer/instellingen. Materiaal, flesserke en transport hebben elk een
+  andere verantwoordelijke; één gedeelde mailbox betekent dat iedereen alles
+  leest tot niemand nog iets leest.
+- **Enkel bij het indienen.** Elke wijziging melden zou dezelfde mailbox vullen
+  tot ze even hard genegeerd wordt als voordien. De aanvrager krijgt wél bericht
+  bij elke beslissing; dat is de andere richting en die regels staan hierboven.
+- **Een lege lijst betekent geen mail, en het scherm zegt dat.** Dat is een
+  legitieme keuze (niet elke soort hoeft een melding), maar stil niets versturen
+  is precies de bug die deze instelling oplost, dus staat er een rode zin bij een
+  soort waarvan het adres leeg is.
+- **Dezelfde drie regels als de andere mails**: ná de write, nooit erin; falen
+  mag de aanvraag niet doen falen (een lid dat "er ging iets mis" ziet omdat de
+  mailserver plat ligt, dient opnieuw in en dan staan er twee); en één mail per
+  aanvraag, ook wanneer die uit twee boekingen bestaat (heen en terug).
+- **Naar één adres met de rest in kopie**, niet drie losse berichten: drie mails
+  naar dezelfde mailbox lezen als drie aanvragen.
+
+### De uitleendienst gaat in fases open, en externen zijn de laatste
+
+Vanaf het semester 2026-2027 werkt Logistiek écht met de app, maar niet met
+iedereen tegelijk. De transportkant is het scherpst (het team plant er zijn week
+mee); materiaal, flesserke en evenementen lopen bij de posten en de werkgroepen
+naast hun bestaande Excels. Een externe student kan voorlopig niets indienen.
+
+- **Eén schakelaar, geen deploy** (`externalRequestsOpen` in
+  `logistiek.settings`, op /beheer/instellingen). Het team beslist wanneer het
+  opengaat, en dat moment valt niet samen met een release.
+- **Kijken mag, indienen niet.** De catalogus, de tarieven en het
+  bezettingsoverzicht blijven zichtbaar; in de plaats van de indienknop staat het
+  mailadres van Logistiek. Een externe die een leeg scherm krijgt, mailt niet en
+  komt ook niet terug wanneer het wél opengaat.
+- **De poort staat in de server action** (`externalGate` in
+  `app/actions/uitleen.ts`), niet enkel in het formulier. De knop verbergen houdt
+  niemand tegen die de actie rechtstreeks aanroept, en het is precies deze poort
+  die bepaalt of er een aanvraag binnenkomt waar niemand naar kijkt.
+- **Posten en werkgroepen merken er niets van.** De regel hangt aan "hoort dit
+  werkingsjaar bij geen enkele groep", dezelfde regel die het aanvragertype
+  bepaalt (`requestsAsExternal`). Eén begrip, niet twee die uit elkaar groeien.
 
 ### Feedbackronde 2 (augustus 2026): vier keuzes vooraf
 

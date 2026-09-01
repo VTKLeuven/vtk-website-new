@@ -689,6 +689,9 @@ model User {
   uitleenTransportDone    UitleenTransportBooking[] @relation("UitleenTransportCompletedBy")
   collectEnGoImported     CollectEnGoOrder[]        @relation("CollectEnGoImportedBy")
   uitleenDriver           UitleenDriver?            @relation("UitleenDriverUser")
+  uitleenFeedTokens       UitleenFeedToken[]        @relation("UitleenFeedTokenUser")
+  uitleenAvailability     UitleenDriverAvailability[] @relation("UitleenDriverAvailabilityUser")
+  uitleenHelpersAdded     UitleenTransportHelper[]  @relation("UitleenTransportHelperAddedBy")
   uitleenDriversAdded     UitleenDriver[]           @relation("UitleenDriverAddedBy")
   uitleenAuditLogs        UitleenAuditLog[]         @relation("UitleenAuditActor")
 
@@ -1424,6 +1427,9 @@ model CalendarEvent {
   createdBy      User?                        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   ticketEvent    TicketEvent?
   form           Form?
+  /// Het logistiek-evenement dat bij dit kalenderevenement hoort (E1). Ontstaat
+  /// enkel wanneer iemand in de admin "Logistiek nodig" aanvinkt.
+  uitleenEvent   UitleenEvent?
   categories     CalendarEventCategory[]
   interests      CalendarEventInterest[]
   guestInterests CalendarEventGuestInterest[]
@@ -2839,6 +2845,15 @@ model UitleenEvent {
   location String?
   startAt  DateTime? @db.Timestamptz(3)
 
+  /// Het kalenderevenement op vtk.be waar dit uit ontstaan is (E1).
+  ///
+  /// Bewust nullable en uniek: de meeste logistiek-evenementen ontstaan hier, en
+  /// eentje dat uit de site komt hoort er precies één te hebben. Naam, locatie en
+  /// uren volgen dat evenement zolang iemand ze daar aanpast; verdwijnt het
+  /// evenement, dan blijft dit staan (`SetNull`), want de aanvragen eronder zijn
+  /// het echte werk.
+  calendarEventId String? @unique
+
   /// Is het uur van `startAt` echt ingevuld, of staat er enkel een dag?
   ///
   /// Bij het aanmaken is het uur vaak nog niet gekend ("ergens die zaterdag"),
@@ -2869,8 +2884,9 @@ model UitleenEvent {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  group     Group? @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  createdBy User?  @relation("UitleenEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  group         Group?         @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  createdBy     User?          @relation("UitleenEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  calendarEvent CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
 
   reservations  UitleenReservation[]
   transport     UitleenTransportBooking[]
@@ -3147,6 +3163,16 @@ model UitleenVehicle {
   /// `code == "bakfiets"`, om dezelfde reden als bij `needsVanDriver`.
   needsDriver    Boolean            @default(true)
 
+  /// Arcering van dit voertuig in de transportplanning: `diagonal`, `vertical`,
+  /// `dots`, `grid` of `none`. Een streeppatroon en geen kleur, want de kleur is
+  /// al bezet door de chauffeur (zie `UitleenDriver.colorIndex`): zo lees je in
+  /// één blok wie rijdt én waarmee, in plaats van te moeten kiezen.
+  ///
+  /// Een vrije string en geen enum: de patronen zijn CSS-klassen, en er eentje
+  /// bij zetten hoort geen migratie te vragen. `null` = geen arcering, wat de
+  /// toestand is van elk voertuig tot iemand er een kiest.
+  pattern        String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3174,11 +3200,58 @@ model UitleenDriver {
   // vlag zet; tot dan gelden ze als autochauffeur.
   canDriveVan Boolean @default(false)
 
+  /// De kleur van deze chauffeur in de transportplanning, 1 tot 8
+  /// (`--driver-1` .. `--driver-8` in app/globals.css).
+  ///
+  /// `null` = de kleur die uit zijn id volgt (`driverColorIndex` in
+  /// lib/driver-colors.ts). Die hash blijft de standaard: het doel is
+  /// onderscheiden wie welke rit doet, niet dat Jonas geel wil. Maar twee
+  /// chauffeurs die toevallig op bijna dezelfde tint uitkomen, of iemand die
+  /// altijd al "de blauwe" was, moet het team kunnen rechtzetten zonder dat
+  /// daar een deploy aan te pas komt.
+  ///
+  /// Een lid van de post Logistiek zonder rij in deze tabel krijgt er een zodra
+  /// iemand zijn kleur zet, net zoals `canDriveVan` dat al doet.
+  colorIndex  Int?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   user    User  @relation("UitleenDriverUser", fields: [userId], references: [id], onDelete: Cascade)
   addedBy User? @relation("UitleenDriverAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+}
+
+/// Wanneer een chauffeur kan rijden.
+///
+/// Vensters en geen rooster: een chauffeur weet "zaterdagvoormiddag kan ik" en
+/// niet "elke tweede week van 9 tot 12". Een herhalend rooster zou hem dwingen
+/// iets vast te leggen dat elke week anders is, en het team zou erop plannen.
+///
+/// Het is een **hulpmiddel en geen belofte**: iemand toewijzen buiten zijn
+/// venster geeft een waarschuwing en geen blokkade. De app kent zijn agenda niet,
+/// hij wel, en een blokkade zou de planning stilleggen op het moment dat er nog
+/// snel iemand gebeld moet worden.
+///
+/// Niet werkingsjaar-gescoped en niet opgekuist: een venster in het verleden
+/// zegt achteraf wie er die dag kon, en dat is precies de vraag bij "waarom deed
+/// altijd dezelfde persoon de nachtritten".
+model UitleenDriverAvailability {
+  id     String @id @default(cuid())
+  userId String
+
+  startAt DateTime @db.Timestamptz(3)
+  endAt   DateTime @db.Timestamptz(3)
+
+  /// Vrije nota van de chauffeur zelf ("enkel met de auto", "tot 16u zeker").
+  note String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation("UitleenDriverAvailabilityUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, startAt])
+  @@index([startAt, endAt])
 }
 
 /// Heen of terug binnen één heen-en-terugaanvraag (`tripGroupId`).
@@ -3210,10 +3283,20 @@ model UitleenTransportBooking {
   /// zelf aanvraagt heeft geen aanvraag om aan te hangen.
   reservationId String?
   purpose       String // waarvoor de rit dient
+  /// Wat er mee moet: "20 bierbakken en 4 tafels", "de geluidsinstallatie".
+  ///
+  /// Los van `purpose` (waarvóór de rit dient) en van de materiaalaanvraag: een
+  /// rit die geen levering is, heeft geen aanvraag met een inhoudslijst, en de
+  /// chauffeur wil weten of hij de kar of de auto moet nemen. Stond tot ronde 3
+  /// nergens; het team schreef het in de vrije nota of belde erover.
+  cargoNote     String?
   pickupAddress String?
   destination   String?
-  helpersNote   String? // bijrijders die de aanvrager zelf voorziet
-  helpersPhone  String? // nummer van de bijrijder, voor de chauffeur onderweg
+  /// Vrije tekst over de bijrijders, van vóór V2. Blijft staan voor de historiek
+  /// van bestaande ritten; nieuwe bijrijders komen in `UitleenTransportHelper`,
+  /// waar er meer dan één met elk zijn eigen nummer in past.
+  helpersNote   String?
+  helpersPhone  String?
   contactPhone  String? // nummer van de aanvrager zelf, zoals UitleenReservation dat heeft
 
   // Heen- en terugrit horen bij elkaar maar zijn twee boekingen: de kar is
@@ -3265,6 +3348,7 @@ model UitleenTransportBooking {
 
   payments  UitleenPayment[]
   auditLogs UitleenAuditLog[]
+  helpers   UitleenTransportHelper[]
 
   @@index([userId])
   @@index([status, startAt])
@@ -3277,6 +3361,77 @@ model UitleenTransportBooking {
   // "Mijn ritten" voor een chauffeur, en de rittentelling per chauffeur in het
   // chauffeursbeheer.
   @@index([driverId, startAt])
+}
+
+/// Waar een agendafeed van de uitleendienst over gaat.
+enum UitleenFeedScope {
+  /// De hele transportplanning: elke rit, met chauffeur, aanvrager en adressen.
+  /// Enkel voor wie `logistiek.manage` heeft op het moment van aanmaken.
+  TEAM
+  /// Enkel de ritten die aan deze persoon toegewezen zijn ("Mijn ritten").
+  DRIVER
+}
+
+/// Een abonneerbare agendafeed op de transportplanning.
+///
+/// Gemodelleerd op `CalendarFeedToken` van de hoofdsite, met dezelfde reden: een
+/// agenda-client stuurt geen cookies mee, dus het geheim zit in de URL zelf. Die
+/// URL komt in agenda-instellingen, back-ups en soms in server-logs terecht;
+/// daarom een token van 256 bits, een `no-store`-antwoord en een `noindex`.
+///
+/// Een eigen tabel en niet die van de hoofdsite: die feed gaat over de publieke
+/// kalender van de kring en heeft geen scope, terwijl deze de adressen en
+/// telefoonnummers van ritten draagt. Twee soorten geheim in één tabel betekent
+/// dat één fout in een query beide lekt.
+model UitleenFeedToken {
+  id     String           @id @default(cuid())
+  userId String
+  /// Waar de eigenaar deze feed voor gebruikt ("mijn gsm", "de logikot-agenda").
+  label  String
+  scope  UitleenFeedScope @default(TEAM)
+
+  /// sha256 van het token; het token zelf staat nergens. Een random token van
+  /// 256 bits heeft geen salt nodig.
+  tokenHash  String    @unique
+  lastUsedAt DateTime? @db.Timestamptz(3)
+  revokedAt  DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  user User @relation("UitleenFeedTokenUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+}
+
+/// Iemand die meerijdt op een rit: een naam en een nummer.
+///
+/// Verving `helpersNote` + `helpersPhone` op de rit zelf (V2). Die twee velden
+/// droegen één vrije tekst en één nummer, en twee bijrijders met elk hun eigen
+/// gsm pasten daar niet in; de chauffeur belde dan de aanvrager om het nummer
+/// van de tweede te vragen.
+///
+/// Hangt aan de **boeking** en niet aan de tripgroep: heen en terug kunnen
+/// andere bijrijders hebben, en dat is precies het geval waarin je het wil weten.
+/// Bij het aanvragen van een heen-en-terugrit krijgen beide helften dezelfde
+/// rijen; daarna leiden ze hun eigen leven.
+model UitleenTransportHelper {
+  id                 String @id @default(cuid())
+  transportBookingId String
+
+  name  String
+  /// Optioneel: soms weet de aanvrager enkel wie er meegaat, nog niet zijn nummer.
+  phone String?
+
+  /// Wie deze bijrijder toevoegde. Kan de aanvrager zijn, een collega van
+  /// dezelfde post, of iemand van het team.
+  addedById String?
+  createdAt DateTime @default(now())
+
+  booking UitleenTransportBooking @relation(fields: [transportBookingId], references: [id], onDelete: Cascade)
+  addedBy User?                   @relation("UitleenTransportHelperAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
+
+  @@index([transportBookingId])
 }
 
 /// Spiegel van TicketPayment (zonder refunds): provider is een vrije string

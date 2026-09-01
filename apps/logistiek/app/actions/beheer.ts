@@ -2,16 +2,25 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, UitleenFeedScope, UitleenRequesterType } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
-import { requireManage } from '@/lib/session';
+import { canManage, requireManage, requireSession } from '@/lib/session';
+import {
+  createFeedToken,
+  hashFeedToken,
+  MAX_ACTIVE_FEED_TOKENS,
+} from '@/lib/calendar/feed-token';
+import { logistiekBaseUrl } from '@/lib/payments';
 import { writeAudit } from '@/lib/audit';
+import { isDriverColorIndex, isVehiclePattern } from '@/lib/driver-colors';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 import {
   describeReservationChanges,
   formatDateTime,
   isOnQuarterHour,
+  NOTIFY_KINDS,
   parseDateOnly,
+  parseNotifyEmails,
   rangesOverlap,
   transportPriceCents,
 } from '@/lib/uitleen';
@@ -19,6 +28,7 @@ import { notifyReservation, notifyTransport } from '@/lib/uitleen-mail';
 import {
   consumeFlesserkeStock,
   flesserkeReserved,
+  driverIsAvailable,
   isDriver,
   reservedQuantities,
   reservationConflicts,
@@ -2022,6 +2032,228 @@ export async function rejectTransportAction(_prev: SaveState, formData: FormData
   return saveOk();
 }
 
+/**
+ * Een rit aanmaken vanuit de planning (P4).
+ *
+ * Meteen `APPROVED` en niet `REQUESTED`: het team vraagt niets aan zichzelf. Een
+ * rit die de transportverantwoordelijke zelf inplant, is beslist op het moment
+ * dat hij ze intekent; ze daarna nog eens laten goedkeuren zou een lege stap
+ * zijn die vroeg of laat blijft openstaan.
+ *
+ * Daarom loopt de botsingscontrole hier wél meteen (een goedgekeurde rit houdt
+ * het voertuig bezet), terwijl een aanvraag van een lid nog mag botsen; zie
+ * "Conflicten: aanvragen mag, goedkeuren niet".
+ *
+ * De rit komt op naam van de aanvrager die het team kiest, of op die van het
+ * teamlid zelf wanneer er geen gekozen wordt. Wie eronder staat, bepaalt wie ze
+ * bij "Mijn aanvragen" ziet.
+ */
+export async function adminCreateTransportAction(
+  input: TransportFormInput & {
+    groupId?: string | null;
+    requesterType?: UitleenRequesterType;
+    requesterName?: string | null;
+    userId?: string | null;
+    eventId?: string | null;
+    driverId?: string | null;
+  }
+): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const ownerId = input.userId?.trim() || session.user.id;
+  const built = await buildTransportBookings(input, {
+    userId: ownerId,
+    eventId: input.eventId?.trim() || null,
+    requesterType: input.requesterType ?? 'INTERN',
+    groupId: input.groupId?.trim() || null,
+    requesterName: input.requesterName?.trim() || null,
+  });
+  if (!built.ok) return { ok: false, error: built.error };
+
+  // Een chauffeur toewijzen mag enkel aan iemand uit de chauffeurslijst; dat is
+  // meteen leestoegang tot die rit, dus dezelfde hercheck als bij het goedkeuren.
+  const driverId = input.driverId?.trim() || null;
+  if (driverId && !(await isDriver(driverId))) {
+    return { ok: false, error: 'Deze persoon staat niet in de chauffeurslijst.' };
+  }
+
+  const outcome = await runSerializable(async (tx) => {
+    for (const booking of built.bookings) {
+      const clash = await overlappingBooking(
+        tx,
+        booking.vehicleId,
+        booking.startAt as Date,
+        booking.endAt as Date,
+        []
+      );
+      if (clash) return { error: 'OVERLAP' as const, detail: bookingLabel(clash) };
+    }
+    const created = await tx.uitleenTransportBooking.createManyAndReturn({
+      data: built.bookings.map((booking) => ({
+        ...booking,
+        status: 'APPROVED' as const,
+        driverId,
+        decidedAt: new Date(),
+        decidedById: session.user.id,
+      })),
+      select: { id: true },
+    });
+    for (const row of created) {
+      await writeAudit(tx, { transportBookingId: row.id }, {
+        kind: 'STATUS_CHANGED',
+        toStatus: 'APPROVED',
+        note: 'ingepland door Logistiek',
+        actorId: session.user.id,
+      });
+    }
+    return { error: null, ids: created.map((row) => row.id) };
+  });
+
+  if (outcome.error === 'OVERLAP') {
+    return { ok: false, error: `Botst met ${outcome.detail}. Kies een ander moment.` };
+  }
+
+  revalidateBeheer();
+  return {
+    ok: true,
+    message: built.roundTrip || built.vehicleCount > 1 ? 'Ritten ingepland.' : 'Rit ingepland.',
+  };
+}
+
+/**
+ * Een rit aanpassen vanuit de planning (P4).
+ *
+ * Dit is de tegenhanger van `editVanBookingAction` (het lid past zijn eigen rit
+ * aan) voor het team: die van het lid haalt een goedgekeurde rit terug naar
+ * REQUESTED omdat er dan opnieuw beslist moet worden, terwijl het team het hier
+ * juist zélf beslist. De status blijft dus staan, en de overlapcontrole gebeurt
+ * meteen, in dezelfde Serializable-transactie als bij het goedkeuren.
+ *
+ * Wat je hier niet doet: goedkeuren, afwijzen, afronden of een chauffeur
+ * toewijzen. Die hebben elk hun eigen actie met hun eigen regels; dit gaat over
+ * de feiten van de rit.
+ */
+export async function adminEditTransportAction(
+  bookingId: string,
+  input: {
+    startAt: string;
+    endAt: string;
+    purpose: string;
+    cargoNote: string;
+    pickupAddress: string;
+    destination: string;
+    adminNote: string;
+  }
+): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const purpose = input.purpose.trim();
+  if (!purpose) return { ok: false, error: 'Beschrijf waarvoor de rit dient.' };
+
+  const startAt = parseBrusselsDateTime(input.startAt);
+  const endAt = parseBrusselsDateTime(input.endAt);
+  if (!startAt || !endAt) return { ok: false, error: 'Vul een geldig begin- en einduur in.' };
+  if (endAt <= startAt) return { ok: false, error: 'Het einduur ligt voor het beginuur.' };
+  if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
+    return { ok: false, error: 'Kies uren op het kwartier (bv. 14:00, 14:15).' };
+  }
+
+  const outcome = await runSerializable(async (tx) => {
+    const existing = await tx.uitleenTransportBooking.findUnique({
+      where: { id: bookingId },
+      select: {
+        id: true,
+        status: true,
+        vehicleId: true,
+        startAt: true,
+        endAt: true,
+        purpose: true,
+        cargoNote: true,
+        pickupAddress: true,
+        destination: true,
+        adminNote: true,
+        pricingMode: true,
+        rateCents: true,
+      },
+    });
+    if (!existing) return { error: 'NOT_FOUND' as const };
+    // Een gereden rit is geschiedenis; die uren aanpassen zou de historiek en de
+    // afgerekende kilometers laten liegen.
+    if (existing.status !== 'REQUESTED' && existing.status !== 'APPROVED') {
+      return { error: 'LOCKED' as const };
+    }
+
+    // Enkel een goedgekeurde rit houdt een voertuig bezet; een aanvraag mag nog
+    // botsen (zie "Conflicten: aanvragen mag, goedkeuren niet").
+    if (existing.status === 'APPROVED') {
+      const clash = await overlappingBooking(tx, existing.vehicleId, startAt, endAt, [bookingId]);
+      if (clash) return { error: 'OVERLAP' as const, detail: bookingLabel(clash) };
+    }
+
+    const changes: string[] = [];
+    const moved =
+      startAt.getTime() !== existing.startAt.getTime() || endAt.getTime() !== existing.endAt.getTime();
+    if (moved) {
+      changes.push(
+        `Uren: ${formatDateTime(existing.startAt)} tot ${formatDateTime(existing.endAt)} werd ${formatDateTime(startAt)} tot ${formatDateTime(endAt)}`
+      );
+    }
+    const field = (label: string, before: string | null, after: string | null) => {
+      if ((before ?? '') === (after ?? '')) return;
+      changes.push(`${label}: ${before?.trim() || 'leeg'} → ${after?.trim() || 'leeg'}`);
+    };
+    field('Waarvoor', existing.purpose, purpose);
+    field('Lading', existing.cargoNote, input.cargoNote.trim() || null);
+    field('Laadadres', existing.pickupAddress, input.pickupAddress.trim() || null);
+    field('Bestemming', existing.destination, input.destination.trim() || null);
+    field('Nota van Logistiek', existing.adminNote, input.adminNote.trim() || null);
+    if (changes.length === 0) return { error: 'NO_CHANGES' as const };
+
+    await tx.uitleenTransportBooking.update({
+      where: { id: bookingId },
+      data: {
+        startAt,
+        endAt,
+        purpose: purpose.slice(0, 1000),
+        cargoNote: input.cargoNote.trim().slice(0, 1000) || null,
+        pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
+        destination: input.destination.trim().slice(0, 300) || null,
+        adminNote: input.adminNote.trim().slice(0, 1000) || null,
+        // De prijs volgt de uren bij een per-uur-tarief; bij per km blijft ze
+        // null tot het afronden.
+        priceCents: transportPriceCents({
+          pricingMode: existing.pricingMode,
+          rateCents: existing.rateCents,
+          startAt,
+          endAt,
+        }),
+      },
+    });
+    await writeAudit(tx, { transportBookingId: bookingId }, {
+      kind: 'EDITED',
+      note: changes.join('; '),
+      actorId: session.user.id,
+    });
+    return { error: null, changes };
+  });
+
+  if (outcome.error === 'NOT_FOUND') return { ok: false, error: 'Deze rit bestaat niet meer.' };
+  if (outcome.error === 'LOCKED') {
+    return { ok: false, error: 'Deze rit is afgerond of geannuleerd; daar kan niets meer aan.' };
+  }
+  if (outcome.error === 'OVERLAP') {
+    return { ok: false, error: `Botst met ${outcome.detail}. Kies een ander moment.` };
+  }
+  if (outcome.error === 'NO_CHANGES') return { ok: true, message: 'Niets gewijzigd.' };
+
+  // Ná de transactie, zoals elke mail hier: anders vertrekt er bericht over een
+  // wijziging die door een rollback nooit gebeurd is.
+  await notifyTransport([bookingId], 'EDITED', outcome.changes?.join('\n'));
+
+  revalidateBeheer();
+  return { ok: true, message: 'Rit aangepast.' };
+}
+
 /** Chauffeur toewijzen of wijzigen; kan op elk moment voor de rit afgerond is. */
 export async function assignDriverAction(bookingId: string, driverId: string): Promise<ActionResult> {
   const session = await requireManage();
@@ -2050,7 +2282,19 @@ export async function assignDriverAction(bookingId: string, driverId: string): P
   });
 
   revalidateBeheer();
-  return { ok: true, message: driverId ? 'Chauffeur toegewezen.' : 'Chauffeur verwijderd.' };
+  if (!driverId) return { ok: true, message: 'Chauffeur verwijderd.' };
+
+  // Een waarschuwing en geen blokkade (V1): de app kent de agenda van deze
+  // chauffeur niet, hij wel. Wie niets ingaf, krijgt er ook geen; `null` betekent
+  // "niet gekend" en niet "kan niet".
+  const available = await driverIsAvailable(driverId, booking.startAt, booking.endAt);
+  return {
+    ok: true,
+    message:
+      available === false
+        ? `Chauffeur toegewezen. Let op: ${driver?.name ?? 'deze chauffeur'} gaf niet op dat hij op dat moment kan rijden.`
+        : 'Chauffeur toegewezen.',
+  };
 }
 
 /** Voertuig wisselen: tarief opnieuw snapshotten en de prijs herberekenen. */
@@ -2412,6 +2656,44 @@ export async function setDriverVanAction(
 }
 
 /**
+ * De kleur van een chauffeur in de transportplanning (K1).
+ *
+ * `null` zet hem terug op de kleur die uit zijn id volgt; dat is de standaard en
+ * niet "geen kleur", want een blok zonder vulling is niet te onderscheiden van
+ * een blok zonder chauffeur.
+ *
+ * Upsert, zoals `setDriverVanAction`: een lid van de post Logistiek heeft pas een
+ * rij zodra iemand er iets aan instelt.
+ */
+export async function setDriverColorAction(
+  userId: string,
+  colorIndex: number | null
+): Promise<ActionResult> {
+  await requireManage();
+
+  if (colorIndex !== null && !isDriverColorIndex(colorIndex)) {
+    return { ok: false, error: 'Die kleur bestaat niet.' };
+  }
+
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null },
+    select: { id: true },
+  });
+  if (!user) return { ok: false, error: 'Dit lid bestaat niet (meer) op vtk.be.' };
+
+  await prisma.uitleenDriver.upsert({
+    where: { userId },
+    update: { colorIndex },
+    create: { userId, colorIndex },
+  });
+
+  revalidateBeheer();
+  // Ook het publieke bezettingsoverzicht draagt deze kleuren.
+  revalidatePath('/vervoer/bezetting');
+  return { ok: true, message: colorIndex === null ? 'Terug op de standaardkleur.' : 'Kleur opgeslagen.' };
+}
+
+/**
  * Chauffeur uit de pool halen. Ritten die al aan deze persoon toegewezen zijn
  * blijven bewust staan: de rit is gereden of gepland, en de naam wissen zou de
  * historiek en de planning stukmaken. Wel verdwijnt de keuze voor nieuwe ritten,
@@ -2446,6 +2728,7 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
     ? (modeRaw as PricingMode)
     : 'FREE';
   const rateCents = parseEuroToCents(formData.get('rate'));
+  const patternRaw = String(formData.get('pattern') ?? '').trim();
   if (!nameNl) return saveError('NAME_REQUIRED');
   if (rateCents === null) return saveError('AMOUNT_INVALID');
 
@@ -2457,6 +2740,10 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
     rateCents: pricingMode === 'FREE' ? 0 : rateCents,
     needsVanDriver: String(formData.get('needsVanDriver') ?? '') === 'on',
     needsDriver: String(formData.get('needsDriver') ?? '') === 'on',
+    // "Geen arcering" bewaren we als null en niet als de string 'none': in de
+    // databank is dat dezelfde toestand, en twee schrijfwijzen voor hetzelfde
+    // lopen vroeg of laat uiteen in een query.
+    pattern: isVehiclePattern(patternRaw) && patternRaw !== 'none' ? patternRaw : null,
   };
   if (id) {
     await prisma.uitleenVehicle.update({ where: { id }, data });
@@ -2472,6 +2759,8 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
   }
 
   revalidateBeheer();
+  // De arcering staat ook op het publieke bezettingsoverzicht.
+  revalidatePath('/vervoer/bezetting');
   return saveOk();
 }
 
@@ -2487,22 +2776,119 @@ const LOGISTIEK_SETTINGS_KEY = 'logistiek.settings';
 export async function saveLogistiekSettingsAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requireManage();
   const showRentPrices = String(formData.get('showRentPrices') ?? '') === 'on';
+  const externalRequestsOpen = String(formData.get('externalRequestsOpen') ?? '') === 'on';
   const lastMinuteDays = Number.parseInt(String(formData.get('lastMinuteDays') ?? ''), 10);
   // Een bovengrens omdat "last minute" anders alles wordt en de badge niets meer zegt.
   if (!Number.isFinite(lastMinuteDays) || lastMinuteDays < 1 || lastMinuteDays > 90) {
     return saveError('LAST_MINUTE_INVALID');
   }
-  const value = { showRentPrices, lastMinuteDays };
+  // Per soort een lijst adressen (M1). Komma-gescheiden in het formulier, want
+  // dat is hoe het meelezende adres op een aanvraag er ook uitziet; dezelfde
+  // parser, dus dezelfde regels over wat een adres is.
+  const notifyEmails: Record<string, string[]> = {};
+  for (const kind of NOTIFY_KINDS) {
+    const raw = String(formData.get(`notify-${kind}`) ?? '');
+    const parsed = parseNotifyEmails(raw);
+    if (parsed === null) return saveError('NOTIFY_EMAIL_INVALID');
+    notifyEmails[kind] = parsed;
+  }
+
+  const value = { showRentPrices, lastMinuteDays, externalRequestsOpen, notifyEmails };
   await prisma.setting.upsert({
     where: { key: LOGISTIEK_SETTINGS_KEY },
     update: { value },
     create: { key: LOGISTIEK_SETTINGS_KEY, value },
   });
   revalidateBeheer();
-  // Ook de ledenkant: de waarschuwing bij het aanvragen komt uit dezelfde instelling.
+  // Ook de ledenkant: de waarschuwing bij het aanvragen komt uit dezelfde
+  // instelling, en `externalRequestsOpen` bepaalt of daar überhaupt een formulier
+  // staat. De hub hoort erbij, want die zegt het als eerste.
+  revalidatePath('/');
   revalidatePath('/materiaal');
   revalidatePath('/flesserke');
+  revalidatePath('/vervoer');
   return saveOk();
+}
+
+// ---------------------------------------------------------------------------
+// Agendafeed (A1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Een abonneerbare agendafeed aanmaken.
+ *
+ * Het token komt **één keer** terug en wordt daarna nergens meer bewaard: enkel
+ * de sha256 staat in de databank. Dat is de prijs van een geheim in een URL, en
+ * het is de reden dat het scherm zegt dat je hem nu moet kopiëren.
+ *
+ * `TEAM` (de hele planning) vraagt `logistiek.manage`; `DRIVER` (enkel je eigen
+ * ritten) vraagt dat je in de chauffeurslijst staat. Die check gebeurt bij het
+ * aanmaken én bij elke poll (de route kijkt of het account nog actief is), maar
+ * niet elk uur opnieuw tegen de post: wie uit de post valt, trekt zijn eigen
+ * abonnement in of het team doet het voor hem.
+ */
+export async function createFeedTokenAction(input: {
+  label: string;
+  scope: 'TEAM' | 'DRIVER';
+}): Promise<{ ok: true; url: string } | { ok: false; error: string }> {
+  const session = await requireSession();
+
+  const label = input.label.trim();
+  if (!label) return { ok: false, error: 'Geef het abonnement een naam, bv. "mijn gsm".' };
+
+  const scope: UitleenFeedScope = input.scope === 'TEAM' ? 'TEAM' : 'DRIVER';
+  if (scope === 'TEAM' && !canManage(session)) {
+    return { ok: false, error: 'De volledige planning is voorbehouden voor het team.' };
+  }
+  if (scope === 'DRIVER' && !(await isDriver(session.user.id))) {
+    return { ok: false, error: 'Je staat niet in de chauffeurslijst.' };
+  }
+
+  const active = await prisma.uitleenFeedToken.count({
+    where: { userId: session.user.id, revokedAt: null },
+  });
+  if (active >= MAX_ACTIVE_FEED_TOKENS) {
+    return {
+      ok: false,
+      error: `Je hebt al ${MAX_ACTIVE_FEED_TOKENS} abonnementen. Trek er eerst een in.`,
+    };
+  }
+
+  const token = createFeedToken();
+  await prisma.uitleenFeedToken.create({
+    data: {
+      userId: session.user.id,
+      label: label.slice(0, 100),
+      scope,
+      tokenHash: hashFeedToken(token),
+    },
+  });
+
+  revalidatePath('/beheer/instellingen');
+  revalidatePath('/ritten');
+  // De URL komt hier één keer terug en wordt daarna nergens meer bewaard; enkel
+  // de sha256 staat in de databank.
+  return { ok: true, url: `${logistiekBaseUrl()}/api/kalender/${token}` };
+}
+
+/**
+ * Een abonnement intrekken. Intrekken en niet verwijderen: zo blijft in de lijst
+ * staan dat er ooit een was, en wordt het token nooit hergebruikt.
+ */
+export async function revokeFeedTokenAction(tokenId: string): Promise<ActionResult> {
+  const session = await requireSession();
+
+  const updated = await prisma.uitleenFeedToken.updateMany({
+    // Op `userId` mee: je trekt je eigen abonnementen in, niet die van een
+    // collega. Ook een teamlid niet; die weet niet welk toestel eraan hangt.
+    where: { id: tokenId, userId: session.user.id, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  if (updated.count === 0) return { ok: false, error: 'Dit abonnement bestaat niet (meer).' };
+
+  revalidatePath('/beheer/instellingen');
+  revalidatePath('/ritten');
+  return { ok: true, message: 'Abonnement ingetrokken.' };
 }
 
 // ---------------------------------------------------------------------------

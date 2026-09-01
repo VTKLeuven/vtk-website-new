@@ -7,6 +7,30 @@ import type {
 } from '@prisma/client';
 import type { LogistiekLocale } from './i18n-shared';
 
+/**
+ * De soorten aanvragen die elk hun eigen meldingsadres(sen) hebben (M1).
+ *
+ * Hier en niet in `lib/uitleen-server.ts`: het instellingenscherm is een
+ * client-component, en dat bestand draagt `import 'server-only'`. Een constante
+ * daaruit importeren laat de hele pagina omvallen met "You're importing a module
+ * that depends on server-only". Zie dezelfde comment bij `kalender-kinds.ts`.
+ */
+export const NOTIFY_KINDS = ['materiaal', 'flesserke', 'transport'] as const;
+
+export type NotifyKind = (typeof NOTIFY_KINDS)[number];
+
+export type LogistiekNotifyEmails = Record<NotifyKind, string[]>;
+
+/**
+ * Hoeveel bijrijders er op een rit passen (V2). Een grens tegen tikfouten en
+ * tegen een formulier dat oneindig groeit, geen beleid: in de kar passen er twee
+ * naast de chauffeur, en wie er meer meeneemt, schrijft dat in de nota.
+ *
+ * Hier en niet in `lib/transport-form.ts`: dat bestand is `server-only`, en het
+ * aanvraagformulier is een client-component. Zie de comment bij `NOTIFY_KINDS`.
+ */
+export const MAX_HELPERS = 4;
+
 export function formatEuro(cents: number): string {
   const euros = Math.floor(Math.abs(cents) / 100);
   const rest = Math.abs(cents) % 100;

@@ -313,49 +313,52 @@ modules".
 
 ### Binnen in het gebouw
 
-**Dit gaat met deze bron niet lukken, en dat is gemeten.**
+**Er bestaat geen publieke plattegrond van binnen. Gezocht en gemeten, niet
+aangenomen.**
 
-Alle 20 gebouwen op Celestijnenlaan 200 hebben een "Toegankelijkheidsplan" op
-KULag; 18 ervan hebben er precies één (Akoestiek en NanoCentre hebben er geen,
-en het eerste plan van 200D is een stuk bij dat geen enkele lezer opent). Het
-zijn vector-PDF's uit AutoCAD, één pagina van 842 x 1701 punten, gedraaid, elk
-met zijn eigen gebouwnummer als titel. Ze zijn dus wel degelijk per gebouw
-getekend.
+De "Toegankelijkheidsplannen" van KULag zijn geen gebouwplattegronden maar
+**campusplannen van buiten**. Alle 20 zijn dezelfde kaart van Celestijnenlaan
+200, telkens met de looproute naar de ingang van één gebouw in het groen en de
+inkomhallen aangeduid. KULag zegt dat zelf ook: de sectie op de gebouwpagina heet
+`#terrein-plannen`, en het titelblok is van de Technische Diensten. Wie ze naast
+elkaar legt ziet één tekening met twintig verschillende accenten.
 
-Maar het zijn **geen verdiepingsplattegronden, het zijn toegankelijkheidsroutes**.
-Onze 154 lokalen tegen de tekst op hun eigen plan gelegd:
+Dat verklaart ook waarom onze 154 lokalen er nauwelijks in terugkomen: 19
+inkomhallen wel, **nul aula's en nul leslokalen**.
 
-| rubriek | staat op het plan | staat er niet op |
-| --- | --- | --- |
-| Inkom en balie | 19 | 7 |
-| Aula (auditorium) | **0** | 17 |
-| Les- en vergaderlokaal | **0** | 77 |
-| Sanitair, lift, overige | 0 | 8 |
+De andere bronnen leverden niets:
 
-Enkel de inkomhallen staan erop. Geen enkele aula, geen enkel leslokaal. Dat past
-ook bij wat KULag is: een gids die toont hoe je van de straat tot aan een
-toegankelijke ingang geraakt, niet een lokalenregister.
+| bron | wat er is |
+| --- | --- |
+| KULag terreinplannen | campusplan, enkel inkomhallen |
+| KULag lokaalpagina's | toegankelijkheidskenmerken, geen ligging of plan |
+| OpenStreetMap indoor | **niets**; de enige `indoor`-tags zijn `indoor=no` op een glasbak en een pingpongtafel |
+| Faculteitspagina's (wet, set) | enkel bereikbaarheid van buitenaf |
 
-**Corrigeert een eerdere lezing in dit document.** Er stond hier dat
+Wel bruikbaar uit OSM: `building:levels` op 23 gebouwen, dus we weten hoeveel
+verdiepingen een gebouw heeft. Dat is metadata, geen plattegrond.
+
+**Twee correcties op eerdere versies van dit document.** Er stond eerst dat
 `pdftotext -bbox` de lokaalnummers met coördinaten oplevert, met `100`, `110` en
-`180` op het plan van Quadrivium als bewijs. Dat klopte niet: die reeks loopt van
-`088` tot `119`, staat op 19 van de 20 plannen en is de legende van het
-tekeningblad. Wie daarop verder bouwt, pint honderd lokalen op de plek van een
-symbolenlijst.
+`180` op het plan van Quadrivium als bewijs; die reeks loopt van `088` tot `119`,
+staat op 19 van de 20 plannen en is de legende van het tekeningblad. Daarna stond
+er dat het gebouwplannen zijn die enkel de inkomhallen labelen; het zijn
+campusplannen. Beide keren kwam de fout uit tekstanalyse zonder de tekening ooit
+te bekijken.
 
-Wat er dus nodig is voor een plattegrond binnen:
+Wat er dus nodig is:
 
-- **Een andere bron.** De technische dienst van KU Leuven heeft de echte
-  verdiepingsplannen; die staan niet publiek. Dat is een vraag aan een mens, geen
-  scrape.
-- **Of zelf tekenen.** Voor de handvol lokalen die er echt toe doen (de aula's van
-  200K/L/M/N, Aula A tot D in 200C, het kringlokaal) is een eigen schets per
-  verdieping haalbaar en meteen beter dan een CAD-plan met tweehonderd
-  symbolen erop.
+- **De Technische Diensten vragen.** Zij tekenden deze plannen in AutoCAD (hun
+  adres staat in het titelblok) en hebben de verdiepingsplannen dus zeker. Die
+  staan niet publiek. Dat is een vraag aan een mens, geen scrape.
+- **Of zelf tekenen** voor de handvol lokalen die er echt toe doen: de aula's van
+  200K/L/M/N, Aula A tot D in 200C, de seminarielokalen van Quadrivium, het
+  kringlokaal. Een eigen schets per verdieping is meteen leesbaarder dan een
+  CAD-plan met tweehonderd symbolen.
 
-Tot dan is het eerlijke alternatief klein: toon de verdieping en het
-lokaalnummer, en link naar het plan op KULag voor wie de ingang zoekt. Dat is de
-enige vraag die dat plan wél beantwoordt.
+Tot dan is het eerlijke alternatief klein en staat het er al: het lokaalnummer
+zegt de verdieping (`01.05` is de eerste), en de route brengt je tot aan de juiste
+deur van het juiste gebouw. Vanaf de deur is het zoeken, en dat verzwijgen we niet.
 
 Een echte binnennavigatie ("links, dan de trap op") bouwen we sowieso niet. Daar
 is een looproutegraaf per verdieping voor nodig die niemand onderhoudt, en die
@@ -443,10 +446,9 @@ update dus ook aangeboden en loopt dan tegen `requireNativeModule` aan. Zie
   terug op de halte en er staat wat er aan de hand is. Geen van beide is iets dat
   opnieuw proberen oplost, dus staat er geen "probeer opnieuw".
 
-**Fase 4, binnen. Vervalt in deze vorm.** De toegankelijkheidsplannen van KULag
-labelen enkel de inkomhallen en geen enkele aula of leslokaal; zie hierboven. Wat
-overblijft is de verdieping en het lokaalnummer tonen, en de echte plannen bij de
-technische dienst gaan vragen.
+**Fase 4, binnen. Vervalt.** Er bestaat geen publieke plattegrond van binnen; de
+KULag-plannen zijn campusplannen en OSM heeft hier geen indoor-mapping. Zie
+hierboven. Zonder een bron van de Technische Diensten valt er niets te bouwen.
 
 Uitbreiden naar heel Arenberg is geen fase maar een vlag: `--campus 30 --all`
 geeft 109 gebouwen. Doe dat pas wanneer fase 2 staat, anders debug je een kaart

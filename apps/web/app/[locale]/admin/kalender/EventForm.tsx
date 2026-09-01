@@ -22,6 +22,8 @@ type Event = {
   imageKey?: string | null;
   publishedAt?: Date | null;
   categoryIds?: string[];
+  /** Hangt er al een logistiek-evenement aan? Zie `UitleenEvent.calendarEventId`. */
+  hasUitleenEvent?: boolean;
 };
 
 type Group = { id: string; nameNl: string; nameEn: string };
@@ -233,6 +235,33 @@ export function EventForm({
             <label className="inline-flex items-center gap-2 text-sm">
               <input type="checkbox" name="allDay" defaultChecked={event.allDay ?? false} />
               {locale === "nl" ? "Hele dag" : "All day"}
+            </label>
+          </div>
+          {/* E1: hiermee verschijnt dit evenement ook op logistiek.vtk.be, zodat
+              materiaal, flesserke en transport eronder gegroepeerd kunnen worden.
+              Standaard aan bij een nieuw evenement; wie het uitlaat, krijgt daar
+              niets. Uitzetten koppelt niets los, want er kunnen al aanvragen aan
+              hangen. */}
+          <div className="md:col-span-2">
+            <label className="inline-flex items-start gap-2 text-sm">
+              <input
+                type="checkbox"
+                name="needsLogistics"
+                defaultChecked={event.id ? (event.hasUitleenEvent ?? false) : true}
+                className="mt-1"
+              />
+              <span>
+                {nl ? "Logistiek nodig" : "Needs logistics"}
+                <span className="mt-0.5 block text-vtk-blue-muted">
+                  {nl
+                    ? event.hasUitleenEvent
+                      ? "Dit evenement staat op logistiek.vtk.be; naam, locatie en uren volgen hier mee. Het vinkje weghalen laat het daar staan, want er kunnen al aanvragen aan hangen."
+                      : "Zet dit evenement ook op logistiek.vtk.be, zodat materiaal, flesserke en transport eronder samen komen te staan."
+                    : event.hasUitleenEvent
+                      ? "This event exists on logistiek.vtk.be; its name, location and times follow this one. Unticking leaves it there, since requests may already be attached."
+                      : "Also put this event on logistiek.vtk.be, so equipment, drinks and transport end up together."}
+                </span>
+              </span>
             </label>
           </div>
           <div>

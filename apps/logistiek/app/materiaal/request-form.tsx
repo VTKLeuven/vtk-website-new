@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { createReservationAction } from '@/app/actions/uitleen';
 import type { CatalogCategory, RequestTemplate } from '@/lib/uitleen-server';
@@ -17,6 +18,7 @@ export function MaterialRequestForm({
   userId,
   templates,
   events,
+  blocked,
 }: {
   catalog: CatalogCategory[];
   groups: RequesterOption[];
@@ -30,6 +32,8 @@ export function MaterialRequestForm({
   templates: RequestTemplate[];
   /** Weggelaten voor een externe aanvrager; zie `requestsAsExternal` (E3). */
   events?: SelectableEvent[];
+  /** Uitleg in de plaats van de indienknop zolang externen niets mogen (S1). */
+  blocked?: ReactNode;
 }) {
   const en = locale === 'en';
   const router = useRouter();
@@ -45,6 +49,7 @@ export function MaterialRequestForm({
       draftKey={`materiaal:${userId}`}
       templates={templates}
       events={events}
+      blocked={blocked}
       initial={{
         event: emptyEventValues(groups),
         pickupDate: '',

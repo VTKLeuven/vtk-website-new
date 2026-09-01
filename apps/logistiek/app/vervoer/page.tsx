@@ -1,10 +1,11 @@
 import Link from 'next/link';
+import { ExternClosed } from '@/components/extern-closed';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
-import { getSession, requestsAsExternal } from '@/lib/session';
+import { externalRequestsBlocked, getSession, requestsAsExternal } from '@/lib/session';
 import { copy, getLocale } from '@/lib/i18n';
 import { eventOptions, pricingModeLabel, formatEuro } from '@/lib/uitleen';
-import { activeVehicles, selectableEvents } from '@/lib/uitleen-server';
+import { activeVehicles, getLogistiekSettings, selectableEvents } from '@/lib/uitleen-server';
 import { getPublicCopy } from '@/lib/public-copy';
 import { requesterOptions } from '@/app/materiaal/event-values';
 import { VanRequestForm } from './request-form';
@@ -20,11 +21,15 @@ export default async function VervoerPage() {
   // Zelfde regel als bij materiaal (B3/E3): een externe krijgt de evenementen
   // niet te zien, en ze worden hier dus ook niet opgehaald.
   const external = requestsAsExternal(session);
-  const [vehicles, content, events] = await Promise.all([
+  const [vehicles, content, events, settings] = await Promise.all([
     activeVehicles(),
     getPublicCopy(locale),
     external ? Promise.resolve([]) : selectableEvents(session.groups.map((g) => g.id)),
+    getLogistiekSettings(),
   ]);
+  // S1: de tarieven en de bezetting blijven staan, het formulier niet. Zonder
+  // die twee zou "mail logistiek@vtk.be" komen zonder dat je weet wat er rijdt.
+  const blocked = externalRequestsBlocked(session, settings);
 
   return (
     <PageShell
@@ -36,18 +41,22 @@ export default async function VervoerPage() {
       intro={content.pageVanLead}
     >
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
-        <VanRequestForm
-          locale={locale}
-          groups={requesterOptions(session.groups, locale)}
-          vehicles={vehicles.map((v) => ({
-            id: v.id,
-            name: en ? v.nameEn : v.nameNl,
-            pricingMode: v.pricingMode,
-            rateCents: v.rateCents,
-          }))}
-          draftKey={`vervoer:${session.user.id}`}
-          events={external ? undefined : eventOptions(events, locale)}
-        />
+        {blocked ? (
+          <ExternClosed locale={locale} />
+        ) : (
+          <VanRequestForm
+            locale={locale}
+            groups={requesterOptions(session.groups, locale)}
+            vehicles={vehicles.map((v) => ({
+              id: v.id,
+              name: en ? v.nameEn : v.nameNl,
+              pricingMode: v.pricingMode,
+              rateCents: v.rateCents,
+            }))}
+            draftKey={`vervoer:${session.user.id}`}
+            events={external ? undefined : eventOptions(events, locale)}
+          />
+        )}
 
         <aside className="h-fit rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
           <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">

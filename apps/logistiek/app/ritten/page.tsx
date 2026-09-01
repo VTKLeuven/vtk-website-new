@@ -1,10 +1,13 @@
+import Link from 'next/link';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
 import { PhoneLink } from '@/components/phone-link';
 import { copy, getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
 import { formatDateTime } from '@/lib/uitleen';
-import { isDriver, tripsForDriver, type DriverTrip } from '@/lib/uitleen-server';
+import { feedTokensForUser, isDriver, tripsForDriver, type DriverTrip } from '@/lib/uitleen-server';
+import { FeedTokens } from '@/components/feed-tokens';
+import { ToastProvider } from '@/components/ui/toast';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
 
 function TripCard({ trip, locale, past }: { trip: DriverTrip; locale: LogistiekLocale; past: boolean }) {
@@ -73,6 +76,19 @@ function TripCard({ trip, locale, past }: { trip: DriverTrip; locale: LogistiekL
             <dd className="font-medium text-vtk-ink">{trip.eventName}</dd>
           </div>
         ) : null}
+        {trip.helpers.length > 0 ? (
+          <div className="sm:col-span-2">
+            <dt className="text-vtk-muted">{en ? 'Passengers' : 'Bijrijders'}</dt>
+            <dd className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-medium text-vtk-ink">
+              {trip.helpers.map((helper) => (
+                <span key={helper.id} className="inline-flex items-center gap-1.5">
+                  {helper.name}
+                  {helper.phone ? <PhoneLink number={helper.phone} /> : null}
+                </span>
+              ))}
+            </dd>
+          </div>
+        ) : null}
         {trip.helpersNote || trip.helpersPhone ? (
           <div className="sm:col-span-2">
             <dt className="text-vtk-muted">{en ? 'Helpers' : 'Bijrijders'}</dt>
@@ -121,7 +137,11 @@ export default async function RittenPage() {
   }
   const en = locale === 'en';
 
-  const [trips, driver] = await Promise.all([tripsForDriver(session.user.id), isDriver(session.user.id)]);
+  const [trips, driver, feedTokens] = await Promise.all([
+    tripsForDriver(session.user.id),
+    isDriver(session.user.id),
+    feedTokensForUser(session.user.id),
+  ]);
 
   // Grens tussen komend en voorbij: het einde van de rit, niet de start. Een rit
   // die vandaag bezig is, hoort nog bovenaan te staan.
@@ -139,6 +159,22 @@ export default async function RittenPage() {
       }
       intro={t.pageTripsLead}
     >
+      {/* V1: laten weten wanneer je kan rijden. Bovenaan en niet onderaan: het
+          is de enige actie op dit scherm, de rest is lezen. */}
+      {driver ? (
+        <p className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 text-sm leading-7 text-vtk-body">
+          <Link
+            href="/ritten/beschikbaarheid"
+            className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+          >
+            {en ? 'When can I drive?' : 'Wanneer kan ik rijden?'}
+          </Link>{' '}
+          {en
+            ? 'Let Logistics know your free hours; they see them while planning.'
+            : 'Laat weten wanneer je vrij bent; Logistiek ziet dat bij het plannen.'}
+        </p>
+      ) : null}
+
       {!driver && trips.length === 0 ? (
         <p className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 text-sm leading-7 text-vtk-body">
           {en ? 'You are not a driver for Logistics. Would you like to drive? Mail ' : 'Je bent geen chauffeur bij Logistiek. Wil je rijden? Mail '}
@@ -184,6 +220,27 @@ export default async function RittenPage() {
               ))}
             </ul>
           </section>
+        ) : null}
+
+        {/* Je ritten in je eigen agenda (A1). Enkel voor wie chauffeur is; de
+            ledenkant heeft geen ToastProvider (die staat enkel rond /beheer),
+            dus die komt hier rond dit ene blok. */}
+        {driver ? (
+          <ToastProvider>
+            <FeedTokens
+              canTeam={false}
+              canDriver
+              tokens={feedTokens
+                .filter((token) => token.scope === 'DRIVER')
+                .map((token) => ({
+                  id: token.id,
+                  label: token.label,
+                  scope: token.scope,
+                  createdAt: token.createdAt.toISOString(),
+                  lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
+                }))}
+            />
+          </ToastProvider>
         ) : null}
       </div>
     </PageShell>

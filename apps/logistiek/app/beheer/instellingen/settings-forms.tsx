@@ -1,7 +1,14 @@
 'use client';
 
+import { useState } from 'react';
 import type { UitleenVehicle } from '@prisma/client';
+import { NOTIFY_KINDS, type LogistiekNotifyEmails, type NotifyKind } from '@/lib/uitleen';
 import { saveLogistiekSettingsAction, saveVehicleAction, setVehicleActiveAction } from '@/app/actions/beheer';
+import {
+  VEHICLE_PATTERNS,
+  VEHICLE_PATTERN_LABELS,
+  vehiclePatternClass,
+} from '@/lib/driver-colors';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { SaveForm } from '@/components/ui/save-form';
 
@@ -21,6 +28,47 @@ const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text
 
 function euroInput(cents: number): string {
   return cents === 0 ? '' : (cents / 100).toFixed(2).replace('.', ',');
+}
+
+/**
+ * De arcering van dit voertuig in de transportplanning (K1), met het patroon
+ * ernaast getekend.
+ *
+ * Een keuzelijst zonder voorbeeld zou "Ruitjes" tegenover "Stippen" zetten
+ * zonder dat je ziet welke van de twee straks naast de kar staat, en dat is
+ * precies waarvoor je hier bent.
+ */
+function VehiclePatternField({ pattern }: { pattern: string }) {
+  const [chosen, setChosen] = useState(pattern);
+  return (
+    <label className="grid gap-1 text-xs font-medium text-vtk-muted sm:col-span-2">
+      Arcering in de transportplanning
+      <span className="flex items-center gap-3">
+        <select
+          name="pattern"
+          value={chosen}
+          onChange={(event) => setChosen(event.target.value)}
+          className={`${inputClass} flex-1`}
+        >
+          {VEHICLE_PATTERNS.map((value) => (
+            <option key={value} value={value}>
+              {VEHICLE_PATTERN_LABELS[value]}
+            </option>
+          ))}
+        </select>
+        <span
+          aria-hidden
+          className={`h-10 w-16 shrink-0 rounded-lg border border-vtk-navy/15 bg-vtk-paper ${vehiclePatternClass(
+            chosen
+          )}`}
+        />
+      </span>
+      <span className="font-normal text-vtk-muted">
+        De vulkleur van een rit is de chauffeur; dit patroon zegt met welk voertuig hij rijdt.
+        Geef elk voertuig een ander patroon, anders zegt het niets.
+      </span>
+    </label>
+  );
 }
 
 function VehicleFields({ vehicle }: { vehicle?: UitleenVehicle }) {
@@ -60,6 +108,7 @@ function VehicleFields({ vehicle }: { vehicle?: UitleenVehicle }) {
         Omschrijving (optioneel)
         <input type="text" name="description" defaultValue={vehicle?.description ?? ''} className={inputClass} />
       </label>
+      <VehiclePatternField pattern={vehicle?.pattern ?? 'none'} />
       <label className="flex items-start gap-2 text-sm text-vtk-ink sm:col-span-2">
         <input
           type="checkbox"
@@ -177,14 +226,36 @@ export function VehicleSettings({ vehicles }: { vehicles: UitleenVehicle[] }) {
 
 const GENERAL_ERRORS = {
   LAST_MINUTE_INVALID: 'De last-minute-termijn moet een aantal dagen tussen 1 en 90 zijn.',
+  NOTIFY_EMAIL_INVALID:
+    'Een van de meldingsadressen ziet er niet uit als een adres. Splits meerdere adressen met een komma.',
+};
+
+/** Wat er per soort in de melding staat, zodat je weet wie je waarvoor aanschrijft. */
+const NOTIFY_LABELS: Record<NotifyKind, { title: string; hint: string }> = {
+  materiaal: {
+    title: 'Materiaal',
+    hint: 'Krijgt een mail zodra iemand materiaal aanvraagt.',
+  },
+  flesserke: {
+    title: 'Flesserke',
+    hint: 'Krijgt een mail zodra iemand flesserke aanvraagt.',
+  },
+  transport: {
+    title: 'Transport',
+    hint: 'Krijgt een mail zodra iemand een rit aanvraagt.',
+  },
 };
 
 export function GeneralSettings({
   showRentPrices,
   lastMinuteDays,
+  externalRequestsOpen,
+  notifyEmails,
 }: {
   showRentPrices: boolean;
   lastMinuteDays: number;
+  externalRequestsOpen: boolean;
+  notifyEmails: LogistiekNotifyEmails;
 }) {
   return (
     <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
@@ -222,6 +293,54 @@ export function GeneralSettings({
           aanvragenlijst. Het lid ziet de waarschuwing al bij het invullen, dus dit is ook wat je belooft:
           korter dan dit mag je weigeren.
         </p>
+
+        <label className="mt-2 flex items-center gap-2 text-sm text-vtk-ink">
+          <input
+            type="checkbox"
+            name="externalRequestsOpen"
+            defaultChecked={externalRequestsOpen}
+            className="h-4 w-4"
+          />
+          Externen mogen aanvragen indienen
+        </label>
+        <p className="text-xs text-vtk-muted">
+          Staat dit uit, dan kan iemand die dit werkingsjaar bij geen enkele post of werkgroep hoort
+          de catalogus en de voertuigen wel bekijken, maar niets indienen; hij krijgt in de plaats van
+          het formulier het mailadres van Logistiek te zien. Posten en werkgroepen merken er niets van.
+        </p>
+
+        {/* M1: wie er gewaarschuwd wordt bij een nieuwe aanvraag. Per soort, want
+            materiaal, flesserke en transport hebben elk een andere
+            verantwoordelijke; één gedeelde mailbox betekent dat iedereen alles
+            leest tot niemand nog iets leest. */}
+        <div className="mt-4 grid gap-3 border-t border-vtk-navy/10 pt-4">
+          <p className="text-sm font-semibold text-vtk-ink">Melding bij een nieuwe aanvraag</p>
+          {NOTIFY_KINDS.map((kind) => (
+            <label key={kind} className="grid gap-1 text-xs font-medium text-vtk-muted">
+              {NOTIFY_LABELS[kind].title}
+              <input
+                type="text"
+                name={`notify-${kind}`}
+                defaultValue={notifyEmails[kind].join(', ')}
+                placeholder="logistiek@vtk.be, iemand@vtk.be"
+                className={inputClass}
+              />
+              <span className="font-normal">
+                {NOTIFY_LABELS[kind].hint}{' '}
+                {notifyEmails[kind].length === 0 ? (
+                  <span className="font-semibold text-red-700">
+                    Nu leeg: er vertrekt geen enkele melding voor deze soort.
+                  </span>
+                ) : null}
+              </span>
+            </label>
+          ))}
+          <p className="text-xs text-vtk-muted">
+            Meerdere adressen mogen, gescheiden door een komma. De mail draagt een samenvatting van
+            de aanvraag plus de link ernaartoe; hij vertrekt pas nádat de aanvraag opgeslagen is, en
+            een mailserver die er niet is, houdt de aanvraag nooit tegen.
+          </p>
+        </div>
       </SaveForm>
     </section>
   );

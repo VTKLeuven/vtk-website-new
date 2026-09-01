@@ -19,6 +19,7 @@ export const copy = {
     pageReservationsTitle: 'Mijn', pageReservationsAccent: 'reservaties',
     pageTripsTitle: 'Mijn', pageTripsAccent: 'ritten', pageTripsLead: 'De ritten die Logistiek aan jou toegewezen heeft, met het laadadres, de bestemming en wie je ter plaatse aanspreekt.',
     manageKicker: 'VTK Logistiek', manageTitle: 'Beheer uitleendienst', noAccess: 'Geen toegang', appTitle: 'VTK Uitleendienst', appDescription: 'Materiaal lenen en transport reserveren bij VTK Logistiek.',
+    externClosedTitle: 'Nog niet open voor externen', externClosedLead: 'De uitleendienst loopt dit semester eerst bij de posten en de werkgroepen van VTK. Hoor je bij geen van beide, dan kan je hier al rondkijken, maar nog niets indienen.', externClosedAction: 'Mail logistiek@vtk.be met wat je nodig hebt en wanneer; dan regelt het team het verder.',
     loginDefault: 'Log in met je VTK-account om materiaal of transport te reserveren.', loginMaterial: 'Log in met je VTK-account om materiaal te reserveren.', loginItem: 'Log in om het materiaal te bekijken.', loginReservations: 'Log in om je reservaties te bekijken.', loginReservation: 'Log in om je reservatie te bekijken.', loginVan: 'Log in met je VTK-account om transport te reserveren.', loginTrip: 'Log in om je rit te bekijken.', loginTrips: 'Log in om de ritten te zien die aan jou toegewezen zijn.', loginFlesserke: 'Log in met je VTK-account om flesserke te reserveren.', loginManage: 'Log in om het beheer van de uitleendienst te openen.',
   },
   en: {
@@ -31,6 +32,7 @@ export const copy = {
     pageReservationsTitle: 'My', pageReservationsAccent: 'reservations',
     pageTripsTitle: 'My', pageTripsAccent: 'trips', pageTripsLead: 'The trips Logistics assigned to you, with the loading address, the destination and who to contact on site.',
     manageKicker: 'VTK Logistics', manageTitle: 'Equipment service management', noAccess: 'Access denied', appTitle: 'VTK Equipment Service', appDescription: 'Borrow equipment and book the VTK van with Logistics.',
+    externClosedTitle: 'Not open to external requests yet', externClosedLead: 'This semester the equipment service runs with the VTK posts and work groups first. If you belong to neither, you can look around here, but not submit anything yet.', externClosedAction: 'Mail logistiek@vtk.be with what you need and when, and the team will take it from there.',
     loginDefault: 'Sign in with your VTK account to reserve equipment or transport.', loginMaterial: 'Sign in with your VTK account to reserve equipment.', loginItem: 'Sign in to view this item.', loginReservations: 'Sign in to view your reservations.', loginReservation: 'Sign in to view your reservation.', loginVan: 'Sign in with your VTK account to reserve transport.', loginTrip: 'Sign in to view your trip.', loginTrips: 'Sign in to see the trips assigned to you.', loginFlesserke: 'Sign in with your VTK account to reserve flesserke.', loginManage: 'Sign in to open the equipment service management.',
   },
 } as const;

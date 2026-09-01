@@ -2,9 +2,15 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
-import { requireSession } from '@/lib/session';
-import { isEmailish, isOnQuarterHour, parseDateOnly, todayDateOnly } from '@/lib/uitleen';
-import { availabilityForRange } from '@/lib/uitleen-server';
+import { canManage, externalRequestsBlocked, requireSession } from '@/lib/session';
+import { getLocale } from '@/lib/i18n';
+import { isEmailish, isOnQuarterHour, MAX_HELPERS, parseDateOnly, todayDateOnly } from '@/lib/uitleen';
+import {
+  availabilityForRange,
+  getLogistiekSettings,
+  isDriver,
+  vanBookingForMember,
+} from '@/lib/uitleen-server';
 import {
   buildReservationData,
   parseBrusselsDateTime,
@@ -15,7 +21,7 @@ import { buildTransportBookings, type TransportFormInput } from '@/lib/transport
 import { expireOpenPayments, logistiekBaseUrl, paymentGateway } from '@/lib/payments';
 import { runSerializable } from '@/lib/tx';
 import { writeAudit } from '@/lib/audit';
-import { notifyReservation, notifyTransport } from '@/lib/uitleen-mail';
+import { notifyReservation, notifyTeamNewRequest, notifyTransport } from '@/lib/uitleen-mail';
 
 export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
 // `ReservationFormInput` NIET her-exporteren vanuit dit `'use server'`-bestand:
@@ -31,6 +37,31 @@ function revalidateMember() {
 }
 
 type SessionLike = { user: { id: string; name: string }; groups: Array<{ id: string }> };
+
+/**
+ * De poort voor externen (S1): zolang `externalRequestsOpen` uitstaat, kan wie
+ * bij geen enkele groep hoort niets indienen of wijzigen.
+ *
+ * Server-side en niet enkel in het formulier: de knop verbergen houdt niemand
+ * tegen die de actie rechtstreeks aanroept, en het is precies deze poort die
+ * bepaalt of Logistiek een aanvraag mist.
+ *
+ * Geeft de fout terug in plaats van te gooien: dit is een verwachte toestand,
+ * geen serverfout, en de formulieren tonen `error` letterlijk aan het lid.
+ * `createFlesserkeReservationAction` heeft dit niet nodig: die weigert een lid
+ * zonder groep sowieso al.
+ */
+async function externalGate(session: SessionLike): Promise<ActionResult | null> {
+  const settings = await getLogistiekSettings();
+  if (!externalRequestsBlocked(session, settings)) return null;
+  const en = (await getLocale()) === 'en';
+  return {
+    ok: false,
+    error: en
+      ? 'Requests from outside VTK are not open yet. Mail logistiek@vtk.be and Logistics will help you.'
+      : 'Aanvragen van buiten VTK staan nog niet open. Mail logistiek@vtk.be, dan helpt Logistiek je verder.',
+  };
+}
 
 /**
  * Leidt het aanvragertype automatisch af uit de gekozen groep in de login. Een
@@ -111,6 +142,8 @@ async function resolveEventId(
 
 export async function createReservationAction(input: ReservationFormInput): Promise<ActionResult> {
   const session = await requireSession();
+  const blocked = await externalGate(session);
+  if (blocked) return blocked;
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
     { ...input, ...requester, flesserkeLines: [] },
@@ -119,14 +152,19 @@ export async function createReservationAction(input: ReservationFormInput): Prom
   if (!built.ok) return built;
 
   const eventId = await resolveEventId(session, input, built.scalars.groupId);
-  await prisma.uitleenReservation.create({
+  const created = await prisma.uitleenReservation.create({
     data: {
       userId: session.user.id,
       ...built.scalars,
       eventId,
       lines: { create: built.lineCreates },
     },
+    select: { id: true },
   });
+
+  // Ná de write en zonder de aanvraag te kunnen doen falen (M1); wie een fout
+  // ziet omdat de mailserver plat ligt, dient opnieuw in en dan staan er twee.
+  await notifyTeamNewRequest('materiaal', created.id);
 
   revalidateMember();
   return { ok: true, message: 'Aanvraag ingediend. Je vindt de status bij Mijn aanvragen.' };
@@ -138,6 +176,8 @@ export async function editReservationAction(
   input: ReservationFormInput
 ): Promise<ActionResult> {
   const session = await requireSession();
+  const blocked = await externalGate(session);
+  if (blocked) return blocked;
 
   const requester = await deriveMemberRequester(session, input.groupId ?? undefined);
   const built = await buildReservationData(
@@ -240,14 +280,17 @@ export async function createFlesserkeReservationAction(input: ReservationFormInp
   if (!built.ok) return built;
 
   const eventId = await resolveEventId(session, input, built.scalars.groupId);
-  await prisma.uitleenReservation.create({
+  const created = await prisma.uitleenReservation.create({
     data: {
       userId: session.user.id,
       ...built.scalars,
       eventId,
       flesserkeLines: { create: built.flesserkeLineCreates },
     },
+    select: { id: true },
   });
+
+  await notifyTeamNewRequest('flesserke', created.id);
 
   revalidateFlesserke();
   return { ok: true, message: 'Flesserke-aanvraag ingediend. Je krijgt bericht zodra Logistiek beslist.' };
@@ -610,6 +653,8 @@ export async function createVanBookingAction(input: TransportFormInput & {
   groupId?: string | null;
 }): Promise<ActionResult> {
   const session = await requireSession();
+  const blocked = await externalGate(session);
+  if (blocked) return blocked;
 
   // Zoals bij een materiaalaanvraag: de rit hangt aan de post waarvoor ze dient.
   // Dat stond hier niet, waardoor elke rit van een lid als "Interne post" zonder
@@ -625,7 +670,30 @@ export async function createVanBookingAction(input: TransportFormInput & {
   });
   if (!built.ok) return { ok: false, error: built.error };
 
-  await prisma.uitleenTransportBooking.createMany({ data: built.bookings });
+  const created = await prisma.uitleenTransportBooking.createManyAndReturn({
+    data: built.bookings,
+    select: { id: true },
+  });
+
+  // Bijrijders per boeking (V2). `createMany` kan geen geneste rijen schrijven,
+  // en heen en terug krijgen dezelfde rijen: daarna leiden ze hun eigen leven,
+  // want op de terugrit kan iemand anders meerijden.
+  if (built.helpers.length > 0) {
+    await prisma.uitleenTransportHelper.createMany({
+      data: created.flatMap((booking) =>
+        built.helpers.map((helper) => ({
+          transportBookingId: booking.id,
+          name: helper.name,
+          phone: helper.phone,
+          addedById: session.user.id,
+        }))
+      ),
+    });
+  }
+
+  // Eén melding per aanvraag en niet per boeking: heen en terug (of twee
+  // voertuigen) zijn samen één vraag, en de mail toont ze allebei.
+  if (created[0]) await notifyTeamNewRequest('transport', created[0].id);
 
   revalidateMember();
   const what =
@@ -660,6 +728,8 @@ export async function editVanBookingAction(
   }
 ): Promise<ActionResult> {
   const session = await requireSession();
+  const blocked = await externalGate(session);
+  if (blocked) return blocked;
 
   const purpose = input.purpose.trim();
   if (!purpose) return { ok: false, error: 'Beschrijf waarvoor je het voertuig nodig hebt.' };
@@ -903,4 +973,176 @@ export async function startPaymentAction(
     });
     return { ok: false, error: 'De betaalprovider is niet bereikbaar. Probeer straks opnieuw.' };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Beschikbaarheid van chauffeurs (V1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Een venster waarin je kan rijden toevoegen.
+ *
+ * Hier en niet in `app/actions/beheer.ts`: een chauffeur heeft geen
+ * `logistiek.manage` (zie `UitleenDriver` in de schema-comment), en zijn eigen
+ * beschikbaarheid ingeven is precies wat hij zonder beheerrechten moet kunnen.
+ * Dezelfde `isDriver()`-hercheck als `approveTransportAction` gebruikt.
+ *
+ * Overlappende vensters worden samengevoegd: twee keer "zaterdagvoormiddag"
+ * intekenen hoort geen twee banden op te leveren die je apart moet weghalen.
+ */
+export async function addAvailabilityAction(input: {
+  startAt: string;
+  endAt: string;
+  note?: string;
+}): Promise<ActionResult> {
+  const session = await requireSession();
+  if (!(await isDriver(session.user.id))) {
+    return { ok: false, error: 'Je staat niet in de chauffeurslijst.' };
+  }
+
+  const startAt = parseBrusselsDateTime(input.startAt);
+  const endAt = parseBrusselsDateTime(input.endAt);
+  if (!startAt || !endAt) return { ok: false, error: 'Kies een begin- en eindmoment.' };
+  if (endAt <= startAt) return { ok: false, error: 'Het einde ligt voor het begin.' };
+  if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
+    return { ok: false, error: 'Kies uren op het kwartier (bv. 14:00, 14:15).' };
+  }
+
+  const note = (input.note ?? '').trim().slice(0, 300) || null;
+
+  await runSerializable(async (tx) => {
+    // Alles wat dit venster raakt, gaat erin op. `lte`/`gte` en niet `lt`/`gt`:
+    // twee vensters die op elkaar aansluiten (12:00-14:00 en 14:00-18:00) zijn
+    // één blok van 12 tot 18, en als twee banden naast elkaar zien ze eruit als
+    // een gaatje dat er niet is.
+    const touching = await tx.uitleenDriverAvailability.findMany({
+      where: { userId: session.user.id, startAt: { lte: endAt }, endAt: { gte: startAt } },
+      select: { id: true, startAt: true, endAt: true, note: true },
+    });
+    const from = touching.reduce((earliest, row) => (row.startAt < earliest ? row.startAt : earliest), startAt);
+    const to = touching.reduce((latest, row) => (row.endAt > latest ? row.endAt : latest), endAt);
+    // De nota van het nieuwe venster wint; die van de oude blijft staan wanneer
+    // het nieuwe er geen heeft, zodat "enkel met de auto" niet stil verdwijnt.
+    const keptNote = note ?? touching.find((row) => row.note)?.note ?? null;
+
+    if (touching.length > 0) {
+      await tx.uitleenDriverAvailability.deleteMany({
+        where: { id: { in: touching.map((row) => row.id) } },
+      });
+    }
+    await tx.uitleenDriverAvailability.create({
+      data: { userId: session.user.id, startAt: from, endAt: to, note: keptNote },
+    });
+  });
+
+  revalidatePath('/ritten/beschikbaarheid');
+  revalidatePath('/beheer/vervoer/week');
+  return { ok: true, message: 'Beschikbaarheid opgeslagen.' };
+}
+
+/** Een venster weghalen. Enkel je eigen; het team beheert dit niet voor je. */
+export async function removeAvailabilityAction(id: string): Promise<ActionResult> {
+  const session = await requireSession();
+  const deleted = await prisma.uitleenDriverAvailability.deleteMany({
+    where: { id, userId: session.user.id },
+  });
+  if (deleted.count === 0) return { ok: false, error: 'Dit venster bestaat niet (meer).' };
+
+  revalidatePath('/ritten/beschikbaarheid');
+  revalidatePath('/beheer/vervoer/week');
+  return { ok: true, message: 'Venster weggehaald.' };
+}
+
+// ---------------------------------------------------------------------------
+// Bijrijders (V2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Wie er mag rommelen aan de bijrijders van een rit.
+ *
+ * De aanvrager, én een collega van dezelfde post of werkgroep. Dat tweede is de
+ * hele reden dat dit bestaat: iemand van Sport vraagt de rit aan, en de twee die
+ * effectief meerijden zijn pas de dag voordien bekend, vaak bij iemand anders.
+ * `vanBookingForMember` bepaalt al wie de rit mag zíén; dit is dezelfde regel,
+ * maar dan om te schrijven.
+ *
+ * Het team kan het ook, via `logistiek.manage`: de chauffeur belt hen wanneer er
+ * onderweg iets verandert.
+ */
+async function canEditHelpers(
+  session: SessionLike & { user: { id: string } },
+  bookingId: string,
+  isTeam: boolean
+): Promise<boolean> {
+  if (isTeam) return true;
+  const booking = await vanBookingForMember(
+    bookingId,
+    session.user.id,
+    session.groups.map((group) => group.id)
+  );
+  return booking !== null;
+}
+
+export async function addTripHelperAction(
+  bookingId: string,
+  input: { name: string; phone?: string }
+): Promise<ActionResult> {
+  const session = await requireSession();
+
+  const name = input.name.trim();
+  if (!name) return { ok: false, error: 'Vul de naam van de bijrijder in.' };
+
+  if (!(await canEditHelpers(session, bookingId, canManage(session)))) {
+    return { ok: false, error: 'Je kan deze rit niet aanpassen.' };
+  }
+
+  const booking = await prisma.uitleenTransportBooking.findUnique({
+    where: { id: bookingId },
+    select: { status: true, _count: { select: { helpers: true } } },
+  });
+  if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
+  // Een gereden of afgewezen rit is geschiedenis; wie er toen meereed, verandert
+  // achteraf niet meer.
+  if (booking.status !== 'REQUESTED' && booking.status !== 'APPROVED') {
+    return { ok: false, error: 'Deze rit is afgerond of geannuleerd.' };
+  }
+  if (booking._count.helpers >= MAX_HELPERS) {
+    return { ok: false, error: `Er passen er maximaal ${MAX_HELPERS} op een rit.` };
+  }
+
+  await prisma.uitleenTransportHelper.create({
+    data: {
+      transportBookingId: bookingId,
+      name: name.slice(0, 120),
+      phone: input.phone?.trim().slice(0, 60) || null,
+      addedById: session.user.id,
+    },
+  });
+
+  revalidateMember();
+  revalidatePath('/ritten');
+  revalidatePath('/beheer/vervoer');
+  revalidatePath('/beheer/vervoer/week');
+  return { ok: true, message: 'Bijrijder toegevoegd.' };
+}
+
+export async function removeTripHelperAction(helperId: string): Promise<ActionResult> {
+  const session = await requireSession();
+
+  const helper = await prisma.uitleenTransportHelper.findUnique({
+    where: { id: helperId },
+    select: { transportBookingId: true },
+  });
+  if (!helper) return { ok: false, error: 'Deze bijrijder staat er niet (meer).' };
+  if (!(await canEditHelpers(session, helper.transportBookingId, canManage(session)))) {
+    return { ok: false, error: 'Je kan deze rit niet aanpassen.' };
+  }
+
+  await prisma.uitleenTransportHelper.delete({ where: { id: helperId } });
+
+  revalidateMember();
+  revalidatePath('/ritten');
+  revalidatePath('/beheer/vervoer');
+  revalidatePath('/beheer/vervoer/week');
+  return { ok: true, message: 'Bijrijder weggehaald.' };
 }

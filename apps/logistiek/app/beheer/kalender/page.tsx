@@ -152,7 +152,9 @@ export default async function BeheerKalenderPage({
         booking.driver ? `chauffeur: ${booking.driver.name}` : 'nog geen chauffeur'
       }`,
       content: null,
-      href: '/beheer/vervoer',
+      // Naar de rit zelf en niet naar de kale lijst (S3): die lijst kan twintig
+      // ritten lang zijn, en dan begint het zoeken pas na de klik.
+      href: `/beheer/vervoer?rit=${booking.id}#rit-${booking.id}`,
     });
   }
 

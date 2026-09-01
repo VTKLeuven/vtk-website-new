@@ -44,13 +44,16 @@ zelf doet staat in `docs/logistiek-ingebruikname.md`.
 | Model | Wat |
 | --- | --- |
 | `UitleenCategory` / `UitleenItem` | Catalogus. `isSet` + `UitleenSetContent` (vrije-tekst inhoud, telt niet apart mee), `photoKey`, locatie (`locationShelf`/`Rack`), `condition` (informatief zolang het item geen exemplaren heeft). Soft-delete via `active`. |
-| `UitleenEvent` | Optionele koepel boven materiaal-, flesserke- en vervoeraanvragen van hetzelfde evenement (A8). `onDelete: SetNull`: verwijderen is loskoppelen. |
+| `UitleenEvent` | Optionele koepel boven materiaal-, flesserke- en vervoeraanvragen van hetzelfde evenement (A8). `onDelete: SetNull`: verwijderen is loskoppelen. `calendarEventId` koppelt aan een kalenderevenement op vtk.be: aangevinkt bij "Logistiek nodig", en naam/locatie/uren volgen dat evenement. |
 | `UitleenRequestTemplate` / `...Line` | Vaste set materiaal die het aanvraagformulier invult (M17). Beheerd door Logistiek; aanmaken gebeurt vanaf een bestaande aanvraag. |
 | `UitleenItemUnit` | Eén fysiek exemplaar met een eigen staat, optioneel per item. Bestaan er exemplaren, dan is `item.quantity` de telling van de bruikbare (actief en niet KAPOT), bijgehouden door `syncItemQuantityFromUnits`. |
 | `UitleenReservation` + `UitleenReservationLine` | Aanvraag met event-context + `requesterType` (+ `groupId`/`requesterName`), dagbereik, snapshots. Statusmachine `REQUESTED -> APPROVED/REJECTED/CANCELLED -> PICKED_UP -> RETURNED`. Per lijn: `note` (M15) en `preparedAt`/`preparedById` (klaarzetten, A7). `pickupPart`/`returnPart` zijn een afspraak tussen mensen: de voorraad rekent op hele dagen. |
-| `UitleenVehicle` | Voertuig (kar/auto/bakfiets); `pricingMode` (FREE/PER_HOUR/PER_KM/FLAT) + `rateCents`, team-configureerbaar. |
-| `UitleenTransportBooking` | Rit met voertuig, tijdvenster, chauffeur, tarief-snapshot, `kilometers`/`priceCents` (nullable). |
-| `UitleenDriver` | Chauffeur die het team zelf toevoegt (uniek per `userId`, met notitie en `addedById`). Niet werkingsjaar-gescoped; verwijderen laat toegewezen ritten staan. |
+| `UitleenVehicle` | Voertuig (kar/auto/bakfiets); `pricingMode` (FREE/PER_HOUR/PER_KM/FLAT) + `rateCents`, team-configureerbaar. `pattern` = de arcering in de transportplanning. |
+| `UitleenTransportBooking` | Rit met voertuig, tijdvenster, chauffeur, tarief-snapshot, `kilometers`/`priceCents` (nullable). `cargoNote` = wat er mee moet (ronde 3). |
+| `UitleenTransportHelper` | Bijrijder op een rit: naam + optioneel nummer, `addedById`. Vervangt `helpersNote`/`helpersPhone`, die voor bestaande ritten blijven staan. Ook achteraf te wijzigen door de aanvrager, een collega van dezelfde post, of het team. |
+| `UitleenDriver` | Chauffeur die het team zelf toevoegt (uniek per `userId`, met notitie en `addedById`). Niet werkingsjaar-gescoped; verwijderen laat toegewezen ritten staan. `colorIndex` overschrijft de kleur die uit zijn id volgt. |
+| `UitleenDriverAvailability` | Wanneer een chauffeur kan rijden: vensters, geen rooster. Een hint voor de planning, geen blokkade. |
+| `UitleenFeedToken` | Abonneerbare `.ics`-feed op de planning (`TEAM` of `DRIVER`). Enkel de sha256 staat opgeslagen; `revokedAt` in plaats van verwijderen. |
 | `UitleenFlesserkeCategory` / `UitleenFlesserkeItem` / `UitleenFlesserkeLine` | Verbruiksstock (vervaldatum, merk, Colruyt-link). Lijnen hangen aan `UitleenReservation`. Beschikbaar wordt berekend, nooit opgeslagen; `returnedQuantity` legt het verbruik vast. |
 | `CollectEnGoOrder` / `...Line` / `CollectEnGoProductMatch` | Een uitgelezen Collect&Go-bevestigingsmail, klaar om als ladingen in de flesserke-voorraad te zetten. Lijnen bewaren aantal, prijs, leeggoed en de notitie van de besteller ("Acti - livecantus"); `...ProductMatch` onthoudt naar welk item een Colruyt-product ging. Zie "Collect&Go-import" hieronder. |
 | `UitleenPayment` / `UitleenPaymentWebhook` | Spiegel van `TicketPayment`; `provider` vrije string; precies één van `reservationId`/`transportBookingId`. |
@@ -77,6 +80,14 @@ zelf doet staat in `docs/logistiek-ingebruikname.md`.
    `driverId = session.user.id` (`tripsForDriver`). `approveTransportAction` en
    `assignDriverAction` herchecken `isDriver()`, want een toewijzing is meteen
    leestoegang tot die rit.
+- **Externen** (wie dit werkingsjaar bij geen enkele groep hoort) kunnen sinds
+   ronde 3 kijken maar niets indienen, zolang `externalRequestsOpen` in
+   `logistiek.settings` uitstaat. De poort zit in `externalGate` in
+   `app/actions/uitleen.ts`, niet enkel in het formulier.
+- **Beschikbaarheid en bijrijders horen bij de ledenkant**
+   (`app/actions/uitleen.ts`): een chauffeur heeft geen `logistiek.manage`, en
+   bijrijders mag ook een collega van dezelfde post wijzigen
+   (`vanBookingForMember` bepaalt wie dat is).
 - Server actions herchecken altijd; verwachte fouten komen terug (SaveState/
    ActionResult), nooit als throw.
 
@@ -108,10 +119,31 @@ met een reden (zie `docs/design-decisions.md`):
 `notifyEmail` op `UitleenReservation`/`UitleenTransportBooking` gaat in kopie; het
 lid zelf krijgt de mail op zijn voorkeursadres (`emailPreference`).
 
+Sinds ronde 3 gaat er ook een mail de **andere kant** op: `notifyTeamNewRequest`
+waarschuwt het team zodra er iets ingediend wordt, met per soort (materiaal,
+flesserke, transport) een eigen lijst adressen in `logistiek.settings`. Een lege
+lijst betekent geen mail, en `/beheer/instellingen` zegt dat in het rood. Dezelfde
+drie regels gelden: ná de write, faalt nooit de actie, en enkel bij het indienen.
+
 Zonder `SMTP_HOST` wordt de mail gelogd in plaats van verstuurd. Draait er lokaal
 een mailcatcher zonder STARTTLS (bv. op `127.0.0.1:1025`), dan mislukt de
 verzending met `502 Command not implemented`: `requireTLS` staat bewust aan.
 Zet `SMTP_HOST` leeg om de mails in de dev-log te lezen.
+
+## Agendafeed: `/api/kalender/<token>`
+
+De transportplanning als `.ics`, met het geheim in de URL omdat een agenda-client
+geen cookies meestuurt. `Cache-Control: private, no-store`, `X-Robots-Tag:
+noindex`, 404 (niet 403) bij een onbekend of ingetrokken token. Twee scopes:
+`TEAM` (de hele planning, vraagt `logistiek.manage`) en `DRIVER` (enkel de eigen
+ritten, vraagt dat je chauffeur bent). De URL komt één keer terug, bij het
+aanmaken; enkel de sha256 staat in de databank.
+
+`lib/calendar/ics.ts` is een **kopie** van `apps/web/lib/calendar/ics.ts`. Hoisten
+naar een gedeeld pakket is netter, maar dat dwingt een volledige
+lockfile-regeneratie af (AGENTS.md) en die laat `better-auth` doorfloaten naar een
+versie waarop `packages/auth` niet meer typecheckt. Wijzig je hier iets aan de
+RFC-kant (vouwen, escapen, `DTSTAMP`), kijk dan of het daar ook moet.
 
 ## Foto's: @vtk/storage
 
@@ -129,6 +161,15 @@ de same-origin `publicUrl`.
   (voertuigkeuze), `app/reservaties/` (overzicht + detail + edit), `app/ritten/`
   ("Mijn ritten" voor een chauffeur; link in de header en een banner op de hub,
   enkel voor wie chauffeur is of nog een rit heeft staan).
+- **Transportplanning** (`/beheer/vervoer/week`, ronde 3): een agenda-app met
+  dag-, week- en maandweergave, zoom, volledig scherm, filters, en een paneel
+  waarin je een rit opent, aanpast of aanmaakt. De kalendercomponenten staan in
+  `components/transport-calendar/` (`time-grid`, `month-grid`, `event-bars`,
+  `trip-block`, `trip-inspector`, `filters`, `transport-calendar`); de
+  berekeningen zijn puur en getest (`lib/week-lanes.ts`, `lib/month-lanes.ts`,
+  `lib/calendar-range.ts`, `lib/transport-filters.ts`, `lib/driver-colors.ts`).
+  Het tijdrooster is gedeeld met het publieke `/vervoer/bezetting`.
+  **"Rit afronden" staat hier bewust niet**; dat blijft op `/beheer/vervoer`.
 - **Beheer** (`app/beheer/`): `aanvragen/` (tabs, last-minute, decision/edit/
   return-forms, klaarzetlijst per lijn + printblad `[id]/print` en dag-afdruk
   `print?datum=`), `vervoer/` (decision + controls: chauffeur, voertuigwissel, km;
@@ -145,7 +186,9 @@ de same-origin `publicUrl`.
   `lib/uitleen-mail.ts` (mails naar de aanvrager), `lib/payments.ts`,
   `lib/runtime-config.ts`, `lib/storage.ts`, `lib/session.ts`,
   `lib/collectengo/` (`parse.ts` + `match.ts` zijn puur en getest; `imap.ts`,
-  `store.ts`, `server.ts` en `eml.ts` doen de rest).
+  `store.ts`, `server.ts` en `eml.ts` doen de rest),
+  `lib/calendar/` (`ics.ts` is een **kopie** van `apps/web/lib/calendar/ics.ts`;
+  `feed-token.ts` en `transport-feed.ts` bouwen de privéfeed).
 - **Scripts**: `scripts/import-inventaris.ts` (materiaal + flesserke uit de xlsx),
   `scripts/group-events.ts` (historische aanvragen onder een evenement groeperen;
   dry-run tenzij `--apply`, via `npm run group:events -w @vtk/logistiek`),

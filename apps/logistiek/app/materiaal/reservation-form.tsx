@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useState, useTransition, type ReactNode } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@vtk/ui';
@@ -11,7 +11,7 @@ import {
 } from '@/app/actions/uitleen';
 import type { ReservationFormInput } from '@/lib/reservation-form';
 import type { RequestTemplate } from '@/lib/uitleen-server';
-import { formatDateTime, formatEuro } from '@/lib/uitleen';
+import { chargesRequester, formatDateTime, formatEuro } from '@/lib/uitleen';
 import type { CatalogCategory } from '@/lib/uitleen-server';
 import { CategoryThumb } from '@/components/category-thumb';
 import { DayPartSelect } from '@/components/day-part-select';
@@ -70,6 +70,7 @@ export function ReservationForm({
   draftKey,
   templates = [],
   events,
+  blocked,
 }: {
   catalog: CatalogCategory[];
   groups: RequesterOption[];
@@ -99,6 +100,15 @@ export function ReservationForm({
   templates?: RequestTemplate[];
   /** Evenementen om deze aanvraag onder te hangen (A8). */
   events?: SelectableEvent[];
+  /**
+   * Staat indienen dicht (S1: externen kunnen nog niets aanvragen), dan komt
+   * deze uitleg in de plaats van de indienknop en verdwijnt die knop.
+   *
+   * De catalogus zelf blijft staan: die is het halve antwoord op "wat heeft
+   * Logistiek?", en die wegnemen laat iemand met een lege pagina achter in
+   * plaats van met een mailadres.
+   */
+  blocked?: ReactNode;
 }) {
   const en = locale === 'en';
   const [event, setEvent] = useState<EventReservationValues>(initial.event);
@@ -119,6 +129,15 @@ export function ReservationForm({
    * aangepast wordt. Loskoppelen geeft het veld weer vrij, met de naam die er
    * stond als vertrekpunt.
    */
+  /**
+   * Rekent de uitleendienst deze aanvrager iets aan? Enkel een externe (R4).
+   *
+   * Het formulier leidt het aanvragertype af uit de gekozen groep, net zoals de
+   * server dat bij het indienen opnieuw doet (`deriveMemberRequester`). Wisselt
+   * iemand van post naar "extern", dan verschijnt de waarborg mee.
+   */
+  const charged = chargesRequester(event.requesterType);
+
   const linkedEvent = events?.find((entry) => entry.id === eventLink.eventId) ?? null;
   function chooseEvent(next: { eventId: string; createEvent: boolean }) {
     setEventLink(next);
@@ -796,19 +815,29 @@ export function ReservationForm({
                           <p className="mt-1 line-clamp-2 text-sm text-vtk-muted">{item.description}</p>
                         ) : null}
                         <SetContents contents={item.setContents} locale={locale} />
-                        <dl className="mt-3 grid grid-cols-2 gap-3 border-t border-vtk-navy/10 pt-3 text-xs">
-                          <div>
-                            <dt className="font-semibold text-vtk-muted">
-                              {en ? 'Deposit' : 'Waarborg'}
-                            </dt>
-                            <dd className="mt-0.5 text-vtk-ink">
-                              {item.depositCents > 0
-                                ? formatEuro(item.depositCents)
-                                : en
-                                  ? 'None'
-                                  : 'Geen'}
-                            </dd>
-                          </div>
+                        <dl
+                          className={`mt-3 grid gap-3 border-t border-vtk-navy/10 pt-3 text-xs ${
+                            charged ? 'grid-cols-2' : 'grid-cols-1'
+                          }`}
+                        >
+                          {/* R4/S2: enkel een externe betaalt waarborg. Bij een post
+                              of werkgroep staat er dus geen bedrag, ook niet hier bij
+                              het kiezen: het zou geld beloven dat nooit van hand
+                              wisselt. Zie `chargesRequester` in lib/uitleen.ts. */}
+                          {charged ? (
+                            <div>
+                              <dt className="font-semibold text-vtk-muted">
+                                {en ? 'Deposit' : 'Waarborg'}
+                              </dt>
+                              <dd className="mt-0.5 text-vtk-ink">
+                                {item.depositCents > 0
+                                  ? formatEuro(item.depositCents)
+                                  : en
+                                    ? 'None'
+                                    : 'Geen'}
+                              </dd>
+                            </div>
+                          ) : null}
                           <div>
                             <dt className="font-semibold text-vtk-muted">
                               {available !== undefined
@@ -1042,17 +1071,23 @@ export function ReservationForm({
                   <dd className="font-medium text-vtk-ink">{formatEuro(totals.rent)}</dd>
                 </div>
               ) : null}
-              <div className="flex justify-between">
-                <dt className="text-vtk-muted">{en ? 'Deposit' : 'Waarborg'}</dt>
-                <dd className="font-medium text-vtk-ink">{formatEuro(totals.deposit)}</dd>
-              </div>
+              {charged ? (
+                <div className="flex justify-between">
+                  <dt className="text-vtk-muted">{en ? 'Deposit' : 'Waarborg'}</dt>
+                  <dd className="font-medium text-vtk-ink">{formatEuro(totals.deposit)}</dd>
+                </div>
+              ) : null}
             </dl>
-            <p className="mt-2 text-xs leading-5 text-vtk-muted">
-              {paymentNote ??
-                (en
-                  ? 'Your deposit is returned when everything comes back in good condition.'
-                  : 'De waarborg krijg je terug wanneer alles in orde terugkomt.')}
-            </p>
+            {/* De betaalnota gaat over waarborg en betalen; zonder allebei zegt
+                ze niets meer tegen een post of werkgroep. */}
+            {charged ? (
+              <p className="mt-2 text-xs leading-5 text-vtk-muted">
+                {paymentNote ??
+                  (en
+                    ? 'Your deposit is returned when everything comes back in good condition.'
+                    : 'De waarborg krijg je terug wanneer alles in orde terugkomt.')}
+              </p>
+            ) : null}
             {/* Indienen mag, maar niet per ongeluk: wie meer vraagt dan er vrij is,
                 zegt hier expliciet dat hij dat weet. Zonder die stap belandt het
                 conflict bij Logistiek zonder dat de aanvrager het doorhad. */}
@@ -1092,15 +1127,22 @@ export function ReservationForm({
               </p>
             ) : null}
 
-            <Button
-              type="button"
-              size="lg"
-              className="mt-5 w-full"
-              onClick={submit}
-              disabled={pending}
-            >
-              {pending ? submittingLabel : submitLabel}
-            </Button>
+            {/* Indienen staat dicht (S1). De knop verdwijnt in plaats van
+                uitgeschakeld te staan: een grijze knop laat je zoeken naar wat
+                je nog moet invullen, terwijl er niets in te vullen valt. */}
+            {blocked ? (
+              <div className="mt-5">{blocked}</div>
+            ) : (
+              <Button
+                type="button"
+                size="lg"
+                className="mt-5 w-full"
+                onClick={submit}
+                disabled={pending}
+              >
+                {pending ? submittingLabel : submitLabel}
+              </Button>
+            )}
             {onCancel ? (
               <Button
                 type="button"

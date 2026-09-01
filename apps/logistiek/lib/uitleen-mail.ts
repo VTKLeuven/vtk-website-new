@@ -2,7 +2,14 @@ import 'server-only';
 
 import { prisma } from '@vtk/db';
 import { sendMail } from '@vtk/mail';
-import { formatDateOnly, formatDateTime, parseNotifyEmails } from './uitleen';
+import {
+  formatDateOnly,
+  formatDateTime,
+  parseNotifyEmails,
+  requesterLabel,
+  type NotifyKind,
+} from './uitleen';
+import { getLogistiekSettings } from './uitleen-server';
 import type { LogistiekLocale } from './i18n-shared';
 import { logistiekBaseUrl } from './payments';
 
@@ -322,4 +329,141 @@ export async function notifyTransport(
   } catch (err) {
     console.error('[uitleen-mail] ritmail mislukt:', err);
   }
+}
+
+/**
+ * Melding naar het team zodra er een nieuwe aanvraag binnenkomt (M1).
+ *
+ * De andere mails in dit bestand gaan naar de **aanvrager** en enkel bij een
+ * beslissing. Deze gaat de andere kant op, en is de reden dat het team tot nu toe
+ * elke dag zelf ging kijken of er iets binnengekomen was.
+ *
+ * Dezelfde drie regels als hierboven gelden onverkort:
+ *
+ * 1. **Aanroepen ná de write**, nooit erin.
+ * 2. **Falen mag de aanvraag niet doen falen.** Een lid dat "er ging iets mis"
+ *    te zien krijgt omdat de mailserver plat ligt, dient opnieuw in, en dan staan
+ *    er twee.
+ * 3. **Enkel bij het indienen.** Elke wijziging melden zou dezelfde mailbox
+ *    vullen tot niemand ze nog leest.
+ *
+ * Naar welk adres staat per soort op /beheer/instellingen. Is dat leeg, dan
+ * vertrekt er niets; dat scherm zegt dat er dan niets vertrekt.
+ */
+export async function notifyTeamNewRequest(kind: NotifyKind, id: string): Promise<void> {
+  try {
+    const settings = await getLogistiekSettings();
+    const to = settings.notifyEmails[kind] ?? [];
+    if (to.length === 0) return;
+
+    const body = kind === 'transport' ? await transportSummary(id) : await reservationSummary(id);
+    if (!body) return;
+
+    // Allemaal in één bericht met de rest in kopie: drie losse mails naar
+    // dezelfde mailbox lezen als drie aanvragen.
+    await deliver(
+      { to: to[0], cc: to.slice(1), name: '', locale: 'nl' },
+      `${SUBJECT_PREFIX}: nieuwe ${kind}aanvraag, ${body.title}`,
+      body.text
+    );
+  } catch (err) {
+    console.error('[uitleen-mail] teammelding mislukt:', err);
+  }
+}
+
+/** De samenvatting van een materiaal- of flesserke-aanvraag voor de teammelding. */
+async function reservationSummary(id: string): Promise<{ title: string; text: string } | null> {
+  const reservation = await prisma.uitleenReservation.findUnique({
+    where: { id },
+    select: {
+      eventName: true,
+      pickupDate: true,
+      returnDate: true,
+      memberNote: true,
+      delivery: true,
+      requesterType: true,
+      requesterName: true,
+      user: { select: { name: true } },
+      group: { select: { nameNl: true } },
+      lines: { select: { itemName: true, quantity: true } },
+      flesserkeLines: { select: { itemName: true, quantity: true } },
+    },
+  });
+  if (!reservation) return null;
+
+  const items = [...reservation.lines, ...reservation.flesserkeLines]
+    .map((line) => `- ${line.quantity} x ${line.itemName}`)
+    .join('\n');
+
+  return {
+    title: reservation.eventName,
+    text: joinBlocks([
+      `Er is een nieuwe aanvraag binnengekomen op ${logistiekBaseUrl()}.`,
+      `Aanvraag: ${reservation.eventName}\nVan: ${requesterLabel(reservation)} (${reservation.user.name})\nPeriode: ${formatDateOnly(reservation.pickupDate)} - ${formatDateOnly(reservation.returnDate)}`,
+      items ? `Gevraagd:\n${items}` : null,
+      reservation.delivery ? 'Er is levering gevraagd.' : null,
+      reservation.memberNote ? `Nota van het lid:\n${reservation.memberNote}` : null,
+      `Beslissen: ${logistiekBaseUrl()}/beheer/aanvragen/${id}`,
+    ]),
+  };
+}
+
+/** Idem voor een rit; bij een heen-en-terugaanvraag staan beide ritten erin. */
+async function transportSummary(id: string): Promise<{ title: string; text: string } | null> {
+  const booking = await prisma.uitleenTransportBooking.findUnique({
+    where: { id },
+    select: {
+      purpose: true,
+      cargoNote: true,
+      eventName: true,
+      startAt: true,
+      endAt: true,
+      tripGroupId: true,
+      pickupAddress: true,
+      destination: true,
+      memberNote: true,
+      requesterType: true,
+      requesterName: true,
+      user: { select: { name: true } },
+      group: { select: { nameNl: true } },
+      vehicle: { select: { nameNl: true } },
+      helpers: { orderBy: { createdAt: 'asc' }, select: { name: true, phone: true } },
+    },
+  });
+  if (!booking) return null;
+
+  // Heen en terug zijn twee boekingen maar één aanvraag; het team beslist er in
+  // één keer over, dus staan ze in één mail.
+  const legs = booking.tripGroupId
+    ? await prisma.uitleenTransportBooking.findMany({
+        where: { tripGroupId: booking.tripGroupId },
+        orderBy: { startAt: 'asc' },
+        select: { startAt: true, endAt: true, vehicle: { select: { nameNl: true } } },
+      })
+    : [{ startAt: booking.startAt, endAt: booking.endAt, vehicle: booking.vehicle }];
+
+  return {
+    title: booking.eventName?.trim() || booking.purpose,
+    text: joinBlocks([
+      `Er is een nieuwe ritaanvraag binnengekomen op ${logistiekBaseUrl()}.`,
+      `Waarvoor: ${booking.purpose}\nVan: ${requesterLabel(booking)} (${booking.user.name})`,
+      legs
+        .map(
+          (leg) =>
+            `- ${formatDateTime(leg.startAt)} tot ${formatDateTime(leg.endAt)} (${leg.vehicle.nameNl})`
+        )
+        .join('\n'),
+      booking.cargoNote ? `Lading: ${booking.cargoNote}` : null,
+      booking.helpers.length > 0
+        ? `Bijrijders: ${booking.helpers
+            .map((helper) => `${helper.name}${helper.phone ? ` (${helper.phone})` : ''}`)
+            .join(', ')}`
+        : null,
+      [booking.pickupAddress, booking.destination].some(Boolean)
+        ? `Van: ${booking.pickupAddress ?? 'niet ingevuld'}\nNaar: ${booking.destination ?? 'niet ingevuld'}`
+        : null,
+      booking.memberNote ? `Nota van het lid:\n${booking.memberNote}` : null,
+      `Beslissen: ${logistiekBaseUrl()}/beheer/vervoer?rit=${id}`,
+    ]),
+  };
 }

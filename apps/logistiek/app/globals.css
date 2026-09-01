@@ -75,6 +75,94 @@ body {
   );
 }
 
+/* Arcering per voertuig (K1). De vulkleur blijft van de chauffeur, dus het
+   voertuig krijgt het patroon: zo lees je in één blok wie rijdt én waarmee.
+
+   Alle vier zijn `background-image` op een `backgroundColor` die de chauffeur
+   zet. Gebruik daar nooit de `background`-shorthand voor: die wist dit patroon
+   weer uit. Ze zijn bewust licht (alfa rond 0.13): het is een tweede laag
+   informatie, geen tweede kleur, en de tekst in het blok moet leesbaar blijven.
+
+   Een blok kan tegelijk `week-block-requested` dragen. Twee schuine patronen
+   over elkaar worden soep, daarom staat `diagonal` op 45 graden en de
+   te-beslissen-arcering op 135: samen lezen ze als een ruit en niet als ruis. */
+.trip-pattern-diagonal {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(14, 26, 54, 0.13) 0 4px,
+    transparent 4px 10px
+  );
+}
+
+.trip-pattern-vertical {
+  background-image: repeating-linear-gradient(
+    90deg,
+    rgba(14, 26, 54, 0.13) 0 3px,
+    transparent 3px 9px
+  );
+}
+
+.trip-pattern-dots {
+  background-image: radial-gradient(rgba(14, 26, 54, 0.2) 1.2px, transparent 1.3px);
+  background-size: 7px 7px;
+}
+
+.trip-pattern-grid {
+  background-image:
+    repeating-linear-gradient(0deg, rgba(14, 26, 54, 0.11) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(90deg, rgba(14, 26, 54, 0.11) 0 1px, transparent 1px 8px);
+}
+
+/* Volledig scherm voor de transportplanning (P2).
+
+   Twee vormen, want `requestFullscreen()` bestaat niet op een `div` in Safari op
+   iOS: lukt de echte fullscreen-API, dan zorgt `:fullscreen` voor de achtergrond
+   (zonder dat is het zwart, want de browser tekent niets achter het element);
+   lukt ze niet, dan zet de component `data-fullscreen="fallback"` en wordt het
+   een vast paneel over de pagina. In beide gevallen scrollt de kalender zelf,
+   anders valt een lange dag onder de schermrand.
+
+   De inspector en de filters horen bínnen deze container te staan; alles wat
+   erbuiten gerenderd wordt, is in echte fullscreen onzichtbaar. */
+.transport-calendar:fullscreen {
+  overflow: auto;
+  background: var(--paper);
+  padding: 1rem;
+}
+
+.transport-calendar[data-fullscreen='fallback'] {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  overflow: auto;
+  background: var(--paper);
+  padding: 1rem;
+}
+
+/* In volledig scherm scrollt de kalender binnen de container, en dan zou de
+   werkbalk (weergave, navigatie, zoom, sluiten) mee naar boven verdwijnen. Die
+   blijft dus staan; de knop waarmee je er weer uit komt, hoort altijd zichtbaar
+   te zijn. */
+.transport-calendar:fullscreen .transport-calendar-toolbar,
+.transport-calendar[data-fullscreen='fallback'] .transport-calendar-toolbar {
+  position: sticky;
+  top: -1rem;
+  z-index: 30;
+  margin: -1rem -1rem 0;
+  padding: 1rem;
+  background: var(--paper);
+}
+
+/* Een rit zonder chauffeur is het enige wat op deze kalender nog werk is, dus ze
+   mag luider zijn dan de rest: de gele accentkleur van het huis plus een rode
+   streepjesrand. De rand is gestreept en niet vol, zodat ze niet verward wordt
+   met de volle rode rand van een conflict (twee goedgekeurde ritten met
+   hetzelfde voertuig op hetzelfde moment). */
+.trip-no-driver {
+  border-style: dashed;
+  border-color: #dc2626;
+}
+
 /* De uitleendienst gebruikt dezelfde vaste headerstructuur als vtk.be. Enkel
    de navigatie-inhoud verschilt per applicatie. */
 .vtk-site-header {

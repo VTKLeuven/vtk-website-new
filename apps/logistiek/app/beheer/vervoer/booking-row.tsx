@@ -20,6 +20,8 @@ export function BookingRow({
   columns,
   label,
   highlight = false,
+  ritId,
+  defaultOpen = false,
 }: {
   /** De `td`-cellen van de samenvattingsrij. */
   summary: ReactNode;
@@ -29,11 +31,29 @@ export function BookingRow({
   /** Waarover deze rij gaat, voor de screenreader: "Details: kar, Feest". */
   label: string;
   highlight?: boolean;
+  /**
+   * Het id van deze rit, als `data-rit`. Waar `ScrollToRit` naartoe scrollt bij
+   * `/beheer/vervoer?rit=<id>` (S3). Een data-attribuut en geen `id`: dezelfde
+   * rit staat twee keer op de pagina (kaarten op mobiel, een tabel op desktop),
+   * en twee elementen met hetzelfde `id` is ongeldige HTML.
+   */
+  ritId?: string;
+  /** Meteen opengeklapt, voor de rit waar je vanuit de kalender op klikte. */
+  defaultOpen?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <tbody className={highlight ? 'bg-vtk-yellow/10' : undefined}>
+    <tbody
+      data-rit={ritId}
+      className={
+        defaultOpen
+          ? 'bg-vtk-yellow/25 outline outline-2 outline-vtk-yellow'
+          : highlight
+            ? 'bg-vtk-yellow/10'
+            : undefined
+      }
+    >
       <tr className="border-b border-vtk-navy/5 align-top">
         {summary}
         <td className="py-2 pl-2 text-right">

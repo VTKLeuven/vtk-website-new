@@ -1,9 +1,16 @@
 import 'server-only';
 
 import { prisma } from '@vtk/db';
-import type { Prisma } from '@prisma/client';
+import type { Prisma, UitleenTransportBookingStatus } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
-import { DEFAULT_LAST_MINUTE_DAYS, STOCK_CONSUMING_STATUSES } from './uitleen';
+import {
+  DEFAULT_LAST_MINUTE_DAYS,
+  NOTIFY_KINDS,
+  STOCK_CONSUMING_STATUSES,
+  type LogistiekNotifyEmails,
+  type NotifyKind,
+} from './uitleen';
+import { NO_DRIVER, type TransportFilters } from './transport-filters';
 
 export type CatalogItem = {
   id: string;
@@ -566,24 +573,60 @@ export async function adminVehicles() {
 
 const LOGISTIEK_SETTINGS_KEY = 'logistiek.settings';
 
-export type LogistiekSettings = { showRentPrices: boolean; lastMinuteDays: number };
+export type LogistiekSettings = {
+  showRentPrices: boolean;
+  lastMinuteDays: number;
+  /**
+   * Naar welke adressen er een melding gaat bij een nieuwe aanvraag, per soort.
+   *
+   * Per soort en niet één adres voor alles: materiaal, flesserke en transport
+   * hebben elk een andere verantwoordelijke, en één gedeelde mailbox betekent dat
+   * iedereen alles leest tot niemand nog iets leest.
+   *
+   * Een lege lijst betekent **geen mail**. Dat is een echte keuze (niet elke
+   * soort hoeft een melding), maar wel eentje die het instellingenscherm hardop
+   * zegt: stil niets versturen is precies de bug die deze instelling oplost.
+   */
+  notifyEmails: LogistiekNotifyEmails;
+  /**
+   * Mag iemand die bij geen enkele groep hoort een aanvraag indienen?
+   *
+   * Standaard **uit**. De app is in het semester 2026-2027 in gebruik genomen bij
+   * de posten en de werkgroepen, terwijl de externe aanvragen nog per mail lopen;
+   * zonder deze schakelaar zou een externe student intussen wel kunnen indienen
+   * in een systeem waar niemand naar kijkt. Een instelling en geen env-variabele,
+   * want het is het team dat beslist wanneer het opengaat, niet een deploy.
+   */
+  externalRequestsOpen: boolean;
+};
 
 /**
  * Kringinstellingen, als één JSON-blob in `Setting`. Defaults: huurprijzen
- * verbergen en zeven dagen last minute. Een ontbrekende of onzinnige waarde valt
- * terug op de default in plaats van de pagina te doen falen; dit is een
- * instelling, geen invoer.
+ * verbergen, zeven dagen last minute, en externen nog niet open. Een ontbrekende
+ * of onzinnige waarde valt terug op de default in plaats van de pagina te doen
+ * falen; dit is een instelling, geen invoer.
  */
 export async function getLogistiekSettings(): Promise<LogistiekSettings> {
   const row = await prisma.setting.findUnique({ where: { key: LOGISTIEK_SETTINGS_KEY } });
   const value = (row?.value ?? null) as {
     showRentPrices?: boolean;
     lastMinuteDays?: number;
+    externalRequestsOpen?: boolean;
+    notifyEmails?: Partial<Record<NotifyKind, unknown>>;
   } | null;
   const days = Number(value?.lastMinuteDays);
   return {
     showRentPrices: Boolean(value?.showRentPrices),
     lastMinuteDays: Number.isFinite(days) && days > 0 ? Math.floor(days) : DEFAULT_LAST_MINUTE_DAYS,
+    externalRequestsOpen: Boolean(value?.externalRequestsOpen),
+    notifyEmails: Object.fromEntries(
+      NOTIFY_KINDS.map((kind) => {
+        const stored = value?.notifyEmails?.[kind];
+        // Een instelling, geen invoer: wat er onzin in staat, wordt een lege
+        // lijst in plaats van de pagina te doen falen.
+        return [kind, Array.isArray(stored) ? stored.filter((entry) => typeof entry === 'string') : []];
+      })
+    ) as LogistiekNotifyEmails,
   };
 }
 
@@ -645,6 +688,7 @@ export async function vanBookingForMember(id: string, userId: string, groupIds: 
       driver: { select: { name: true } },
       vehicle: { select: { nameNl: true, nameEn: true } },
       user: { select: { id: true, name: true } },
+      helpers: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true, phone: true } },
     },
   });
 }
@@ -966,6 +1010,7 @@ export async function adminVanBookings() {
       // De materiaalaanvraag waarvan dit de levering is, zodat de chauffeur ziet
       // wat er mee moet en het team van hieruit naar die aanvraag kan.
       reservation: { select: { id: true, eventName: true } },
+      helpers: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true, phone: true } },
     },
     take: 200,
   });
@@ -981,11 +1026,96 @@ export type AdminTransportBooking = Awaited<ReturnType<typeof adminVanBookings>>
  * `REQUESTED` komt mee, want het weekraster dient net om te zien waar een
  * nieuwe aanvraag nog past; het beheer toont ze in een lichtere stijl.
  */
+/**
+ * Statussen die op een bezettingsoverzicht horen: wat het voertuig bezet houdt.
+ * Afgewezen en geannuleerd vallen weg, want die ritten gaan niet door.
+ */
+const OCCUPYING_STATUSES: UitleenTransportBookingStatus[] = ['REQUESTED', 'APPROVED'];
+
+/**
+ * Wat de transportplanning toont: hetzelfde, plus de afgeronde ritten.
+ *
+ * Die laatste horen erbij omdat de planning ook naar gisteren kijkt ("wie heeft
+ * die rit gedaan?"), en omdat de kalender ze al lichter tekende terwijl de query
+ * ze nooit meebracht: de legende beloofde "doorzichtig = afgerond" en er stond
+ * nooit iets doorzichtigs. Op het publieke overzicht blijven ze weg: daar is de
+ * vraag "wanneer is de kar vrij", en een gereden rit maakt niets bezet.
+ */
+const PLANNING_STATUSES: UitleenTransportBookingStatus[] = [...OCCUPYING_STATUSES, 'COMPLETED'];
+
+/**
+ * De evenementen die dit venster raken, voor de balken boven de transportplanning
+ * (P5).
+ *
+ * Enkel evenementen met een startmoment: een evenement zonder datum heeft geen
+ * plek op een kalender, en het bovenaan of onderaan plakken zou beweren dat het
+ * ergens valt.
+ *
+ * Een evenement zonder einde duurt tot het einde van zijn startdag; anders werd
+ * het een balk van nul breed, en dat is precies het evenement waarvan het team
+ * het uur nog niet ingevuld heeft.
+ */
+export async function eventsInRange(from: Date, to: Date) {
+  const events = await prisma.uitleenEvent.findMany({
+    where: {
+      startAt: { not: null, lt: to },
+      OR: [{ endAt: null }, { endAt: { gt: from } }],
+    },
+    select: {
+      id: true,
+      name: true,
+      location: true,
+      startAt: true,
+      startTimeKnown: true,
+      endAt: true,
+      note: true,
+      group: { select: { nameNl: true } },
+      _count: { select: { reservations: true, transport: true } },
+    },
+    orderBy: { startAt: 'asc' },
+  });
+  // Het einde per evenement afronden gebeurt hier en niet in de query: Prisma
+  // kan geen `endAt ?? einde van de startdag` in een `where` zetten, dus een
+  // meerdaags evenement dat vóór dit venster begon en geen einde heeft, filteren
+  // we er alsnog uit.
+  return events.filter((event) => (event.endAt ?? event.startAt!) >= from || event.startAt! >= from);
+}
+
+export type PlanningEvent = Awaited<ReturnType<typeof eventsInRange>>[number];
+
+/**
+ * De filters van de planning als `where` (P3).
+ *
+ * De chauffeursfilter kan "nog geen chauffeur" bevatten; die en de gekozen
+ * personen samen zijn een OF en geen EN, want "de ritten van Arthur plus wat nog
+ * niemand heeft" is precies de vraag waarmee je een weekend indeelt.
+ */
+function transportFilterWhere(
+  filters: TransportFilters | undefined
+): Prisma.UitleenTransportBookingWhereInput {
+  if (!filters) return {};
+  const named = filters.driverIds.filter((id) => id !== NO_DRIVER);
+  const wantsNone = filters.driverIds.includes(NO_DRIVER);
+  return {
+    ...(filters.vehicleIds.length > 0 ? { vehicleId: { in: filters.vehicleIds } } : {}),
+    ...(filters.requesterTypes.length > 0 ? { requesterType: { in: filters.requesterTypes } } : {}),
+    ...(filters.driverIds.length > 0
+      ? {
+          OR: [
+            ...(named.length > 0 ? [{ driverId: { in: named } }] : []),
+            ...(wantsNone ? [{ driverId: null }] : []),
+          ],
+        }
+      : {}),
+  };
+}
+
 const transportWindowWhere = (
   from: Date,
-  to: Date
+  to: Date,
+  statuses: UitleenTransportBookingStatus[] = OCCUPYING_STATUSES
 ): Prisma.UitleenTransportBookingWhereInput => ({
-  status: { in: ['REQUESTED', 'APPROVED'] },
+  status: { in: statuses },
   startAt: { lt: to },
   endAt: { gt: from },
 });
@@ -996,9 +1126,19 @@ const transportWindowWhere = (
  * Meer velden dan het oude raster nodig had: sinds er vanuit dit scherm beslist
  * en aangepast wordt, moet het venster dezelfde gegevens hebben als de lijst.
  */
-export async function transportWeek(from: Date, to: Date) {
+export async function transportRange(from: Date, to: Date, filters?: TransportFilters) {
   return prisma.uitleenTransportBooking.findMany({
-    where: transportWindowWhere(from, to),
+    where: {
+      ...transportWindowWhere(
+        from,
+        to,
+        // Een statusfilter vervangt de standaardlijst, maar mag er niets aan
+        // toevoegen: afgewezen en geannuleerde ritten horen niet op een planning,
+        // en die uitzondering hoort niet via de URL te openen.
+        filters && filters.statuses.length > 0 ? filters.statuses : PLANNING_STATUSES
+      ),
+      ...transportFilterWhere(filters),
+    },
     select: {
       id: true,
       vehicleId: true,
@@ -1008,13 +1148,23 @@ export async function transportWeek(from: Date, to: Date) {
       endAt: true,
       status: true,
       purpose: true,
+      cargoNote: true,
+      eventId: true,
       eventName: true,
+      reservationId: true,
       requesterType: true,
       requesterName: true,
       contactPhone: true,
       pickupAddress: true,
       destination: true,
+      helpersNote: true,
+      helpersPhone: true,
+      helpers: { orderBy: { createdAt: 'asc' as const }, select: { id: true, name: true, phone: true } },
+      memberNote: true,
+      adminNote: true,
+      notifyEmail: true,
       pricingMode: true,
+      priceCents: true,
       paidOfflineAt: true,
       driverId: true,
       vehicle: { select: { nameNl: true } },
@@ -1026,12 +1176,12 @@ export async function transportWeek(from: Date, to: Date) {
   });
 }
 
-export type TransportWeekBooking = Awaited<ReturnType<typeof transportWeek>>[number];
+export type TransportBooking = Awaited<ReturnType<typeof transportRange>>[number];
 
 /**
  * Zelfde venster, maar enkel wanneer welk voertuig bezet is: geen namen, doelen,
  * adressen of chauffeurs. Bewust een eigen `select` en geen filter over
- * `transportWeek`: een projectie achteraf laat vroeg of laat een veld door
+ * `transportRange`: een projectie achteraf laat vroeg of laat een veld door
  * wanneer iemand hierboven een relatie toevoegt. Voor het publieke overzicht
  * (zie docs/logistiek-feedback-plan.md, V13).
  */
@@ -1112,6 +1262,11 @@ export type DriverOption = {
   source: DriverSource;
   /** Mag met de kar rijden, de bestelwagen; zie `UitleenDriver.canDriveVan`. */
   canDriveVan: boolean;
+  /**
+   * Kleur die het team zelf koos, of `null` voor de kleur uit zijn id
+   * (`driverColorIndex` in lib/driver-colors.ts).
+   */
+  colorIndex: number | null;
 };
 
 /** Leden van de post Logistiek dit werkingsjaar. */
@@ -1128,6 +1283,88 @@ async function logistiekTeamMembers() {
 }
 
 /**
+ * De beschikbaarheidsvensters die dit tijdvenster raken (V1), met de naam van de
+ * chauffeur erbij voor de band in de planning.
+ */
+export async function availabilityInRange(from: Date, to: Date) {
+  return prisma.uitleenDriverAvailability.findMany({
+    where: { startAt: { lt: to }, endAt: { gt: from } },
+    select: {
+      id: true,
+      userId: true,
+      startAt: true,
+      endAt: true,
+      note: true,
+      user: { select: { name: true } },
+    },
+    orderBy: { startAt: 'asc' },
+  });
+}
+
+/** De vensters van één chauffeur, vanaf vandaag: wat hij zelf beheert. */
+export async function availabilityForDriver(userId: string, now = new Date()) {
+  // Vensters die al voorbij zijn, blijven in de databank staan (ze zeggen
+  // achteraf wie er die dag kon), maar horen niet in de lijst waar je dingen
+  // weghaalt: die gaat over wat je nog belooft.
+  return prisma.uitleenDriverAvailability.findMany({
+    where: { userId, endAt: { gte: now } },
+    select: { id: true, startAt: true, endAt: true, note: true },
+    orderBy: { startAt: 'asc' },
+  });
+}
+
+/**
+ * Kan deze chauffeur op dit moment rijden, volgens wat hij zelf ingaf?
+ *
+ * `null` wanneer hij helemaal geen vensters ingaf: dan weet de app het niet, en
+ * "niet beschikbaar" beweren zou een waarschuwing geven bij elke chauffeur die
+ * dit scherm nog nooit geopend heeft.
+ */
+export async function driverIsAvailable(
+  userId: string,
+  startAt: Date,
+  endAt: Date
+): Promise<boolean | null> {
+  const any = await prisma.uitleenDriverAvailability.findFirst({
+    where: { userId },
+    select: { id: true },
+  });
+  if (!any) return null;
+  const covering = await prisma.uitleenDriverAvailability.findFirst({
+    where: { userId, startAt: { lte: startAt }, endAt: { gte: endAt } },
+    select: { id: true },
+  });
+  return covering !== null;
+}
+
+/**
+ * De agenda-abonnementen van deze persoon (A1). Ingetrokken abonnementen vallen
+ * weg: die staan er enkel nog om te beletten dat een token hergebruikt wordt.
+ */
+export async function feedTokensForUser(userId: string) {
+  return prisma.uitleenFeedToken.findMany({
+    where: { userId, revokedAt: null },
+    select: { id: true, label: true, scope: true, createdAt: true, lastUsedAt: true },
+    orderBy: { createdAt: 'asc' },
+  });
+}
+
+/**
+ * De kleuren die het team zelf zette, op gebruikers-id (K1).
+ *
+ * Apart van {@link driverOptions}, want het publieke bezettingsoverzicht toont
+ * wel de kleuren maar mag de chauffeurslijst zelf niet ophalen: dat zou namen
+ * meebrengen die daar niet horen.
+ */
+export async function driverColorOverrides(): Promise<Record<string, number>> {
+  const rows = await prisma.uitleenDriver.findMany({
+    where: { colorIndex: { not: null } },
+    select: { userId: true, colorIndex: true },
+  });
+  return Object.fromEntries(rows.map((row) => [row.userId, row.colorIndex as number]));
+}
+
+/**
  * Iedereen die als chauffeur gekozen kan worden: de post Logistiek van dit
  * werkingsjaar plus de handmatig toegevoegde chauffeurs. Zit iemand in allebei,
  * dan telt de post (die kost geen beheerwerk en verdwijnt vanzelf op 15 juli).
@@ -1137,22 +1374,24 @@ export async function driverOptions(): Promise<DriverOption[]> {
     logistiekTeamMembers(),
     prisma.uitleenDriver.findMany({
       where: { user: { active: true, deletedAt: null } },
-      select: { canDriveVan: true, user: { select: { id: true, name: true } } },
+      select: { canDriveVan: true, colorIndex: true, user: { select: { id: true, name: true } } },
     }),
   ]);
 
   // Een postlid kan óók een rij hier hebben: die wordt aangemaakt zodra iemand de
-  // karvlag zet. De bron blijft dan POST (die verdwijnt vanzelf op 15 juli), maar
-  // de vlag komt uit de rij.
-  const vanFlag = new Map(extra.map((row) => [row.user.id, row.canDriveVan]));
+  // karvlag of de kleur zet. De bron blijft dan POST (die verdwijnt vanzelf op
+  // 15 juli), maar de vlag en de kleur komen uit de rij.
+  const rowByUser = new Map(extra.map((row) => [row.user.id, row]));
 
   const byId = new Map<string, DriverOption>();
   for (const member of team) {
+    const row = rowByUser.get(member.id);
     byId.set(member.id, {
       id: member.id,
       name: member.name,
       source: 'POST',
-      canDriveVan: vanFlag.get(member.id) ?? false,
+      canDriveVan: row?.canDriveVan ?? false,
+      colorIndex: row?.colorIndex ?? null,
     });
   }
   for (const row of extra) {
@@ -1162,6 +1401,7 @@ export async function driverOptions(): Promise<DriverOption[]> {
       name: row.user.name,
       source: 'EXTRA',
       canDriveVan: row.canDriveVan,
+      colorIndex: row.colorIndex,
     });
   }
 
@@ -1194,6 +1434,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
         id: true,
         note: true,
         canDriveVan: true,
+        colorIndex: true,
         user: { select: { id: true, name: true, email: true, active: true } },
       },
     }),
@@ -1237,6 +1478,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       driverRowId: null,
       note: row?.note ?? null,
       canDriveVan: row?.canDriveVan ?? false,
+      colorIndex: row?.colorIndex ?? null,
       inactive: false,
     });
   }
@@ -1249,6 +1491,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       driverRowId: row.id,
       note: row.note,
       canDriveVan: row.canDriveVan,
+      colorIndex: row.colorIndex,
       inactive: !row.user.active,
     });
   }
@@ -1331,6 +1574,9 @@ export async function tripsForDriver(driverId: string) {
       user: { select: { name: true, email: true } },
       vehicle: { select: { nameNl: true, nameEn: true } },
       group: { select: { nameNl: true, nameEn: true } },
+      // V2: wie er meerijdt en op welk nummer. Dat is precies wat een chauffeur
+      // onderweg nodig heeft.
+      helpers: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true, phone: true } },
     },
   });
 }
