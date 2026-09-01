@@ -42,12 +42,67 @@ export const CAREER_YEAR_GROUPS: CareerYearGroup[] = [
   { slug: "alle-masters", label: "Alle masters", years: MASTER_YEARS },
 ];
 
-/** Binnen één richting bestaan enkel deze drie groepen. */
-export const CAREER_PROGRAMME_GROUPS: CareerYearGroup[] = [
-  { slug: "2de-bachelor", label: "2de bachelor", years: ["BACHELOR_2"] },
-  { slug: "3de-bachelor", label: "3de bachelor", years: ["BACHELOR_3"] },
-  { slug: "masters", label: "Masters", years: MASTER_YEARS },
+const BACHELOR_1_GROUP: CareerYearGroup = {
+  slug: "1ste-bachelor",
+  label: "1ste bachelor",
+  years: ["BACHELOR_1"],
+};
+const BACHELOR_2_GROUP: CareerYearGroup = {
+  slug: "2de-bachelor",
+  label: "2de bachelor",
+  years: ["BACHELOR_2"],
+};
+const BACHELOR_3_GROUP: CareerYearGroup = {
+  slug: "3de-bachelor",
+  label: "3de bachelor",
+  years: ["BACHELOR_3"],
+};
+const MASTERS_GROUP: CareerYearGroup = {
+  slug: "masters",
+  label: "Masters",
+  years: MASTER_YEARS,
+};
+
+const STANDARD_PROGRAMME_GROUPS: CareerYearGroup[] = [
+  BACHELOR_2_GROUP,
+  BACHELOR_3_GROUP,
+  MASTERS_GROUP,
 ];
+const ARCHITECTURE_PROGRAMME_GROUPS: CareerYearGroup[] = [
+  BACHELOR_1_GROUP,
+  BACHELOR_2_GROUP,
+  BACHELOR_3_GROUP,
+  MASTERS_GROUP,
+];
+const MASTERS_ONLY_PROGRAMME_GROUPS: CareerYearGroup[] = [MASTERS_GROUP];
+
+/**
+ * De deellijsten per richting.
+ *
+ * Niet elke richting heeft dezelfde deellijsten:
+ * - Architectuur heeft een eigen 1ste bachelor (en dus 4 deellijsten);
+ * - Algemene Bachelor heeft geen eigen deellijsten (0);
+ * - De 7 masters-only richtingen (bv. Cybersecurity, Energie) hebben enkel een masters-deel (1);
+ * - De overige 7 ingenieursrichtingen hebben 2de bachelor, 3de bachelor en masters (3).
+ */
+export const CAREER_PROGRAMME_GROUPS: Record<StudyProgramme, CareerYearGroup[]> = {
+  ARCHITECTURE: ARCHITECTURE_PROGRAMME_GROUPS,
+  BIOMEDICAL: STANDARD_PROGRAMME_GROUPS,
+  COMMON_BACHELOR: [],
+  CIVIL: STANDARD_PROGRAMME_GROUPS,
+  CHEMICAL: STANDARD_PROGRAMME_GROUPS,
+  COMPUTER_SCIENCE: STANDARD_PROGRAMME_GROUPS,
+  CYBERSECURITY: MASTERS_ONLY_PROGRAMME_GROUPS,
+  DIGITAL_HUMANITIES: MASTERS_ONLY_PROGRAMME_GROUPS,
+  ELECTRICAL: STANDARD_PROGRAMME_GROUPS,
+  ENERGY: MASTERS_ONLY_PROGRAMME_GROUPS,
+  ARTIFICIAL_INTELLIGENCE: MASTERS_ONLY_PROGRAMME_GROUPS,
+  MATERIALS: STANDARD_PROGRAMME_GROUPS,
+  NANO: MASTERS_ONLY_PROGRAMME_GROUPS,
+  URBANISM: MASTERS_ONLY_PROGRAMME_GROUPS,
+  MATHEMATICAL: MASTERS_ONLY_PROGRAMME_GROUPS,
+  MECHANICAL: STANDARD_PROGRAMME_GROUPS,
+};
 
 /**
  * Eén deel van de Career-lijst.
@@ -93,7 +148,7 @@ export const CAREER_SEGMENTS: CareerSegment[] = [
     }),
   ),
   ...STUDY_PROGRAMMES.flatMap((programme) =>
-    CAREER_PROGRAMME_GROUPS.map(
+    (CAREER_PROGRAMME_GROUPS[programme] ?? []).map(
       (group): CareerSegment => ({
         key: `richting:${programmeSlug(programme)}:${group.slug}`,
         label: `${programmeLabel(programme)} - ${group.label}`,

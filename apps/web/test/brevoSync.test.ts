@@ -174,9 +174,10 @@ describe("Career-deellijsten", () => {
     user({ mailCategories: ["CAREER"], ...overrides });
 
   it("beheert één Brevo-lijst per deel, naast de algemene Career-lijst", () => {
-    // Zes jaargroepen plus drie groepen per richting; de algemene lijst is de
+    // Zes jaargroepen plus 32 richting-delen (Architectuur 4, 7 bachelor+master-richtingen 3,
+    // 7 masters-only richtingen 1, Algemene Bachelor 0); de algemene lijst is de
     // categorie `CAREER` zelf en telt hier dus niet mee.
-    expect(CAREER_SEGMENTS).toHaveLength(6 + STUDY_PROGRAMMES.length * 3);
+    expect(CAREER_SEGMENTS).toHaveLength(6 + 32);
 
     const keys = CAREER_LIST_SEGMENTS.map((s) => s.key);
     expect(new Set(keys).size).toBe(keys.length);
@@ -228,7 +229,113 @@ describe("Career-deellijsten", () => {
     expect(keys).not.toContain("CAREER:richting:civil:2de-bachelor");
   });
 
-  it("telt een 1ste bachelor enkel via 'alle bachelors' mee", () => {
+  it("geeft Architectuur als enige richting een 1ste-bachelor-deel, plus de overige 3 delen", () => {
+    const ba1 = desiredListKeys(
+      career({ studyYears: ["BACHELOR_1"], studyProgrammes: ["ARCHITECTURE"] }),
+      YEAR,
+    );
+    expect(ba1.filter(isCareerListKey)).toEqual([
+      "CAREER:jaar:alle-bachelors",
+      "CAREER:richting:architecture:1ste-bachelor",
+    ]);
+
+    const ba2 = desiredListKeys(
+      career({ studyYears: ["BACHELOR_2"], studyProgrammes: ["ARCHITECTURE"] }),
+      YEAR,
+    );
+    expect(ba2).toContain("CAREER:richting:architecture:2de-bachelor");
+
+    const ba3 = desiredListKeys(
+      career({ studyYears: ["BACHELOR_3"], studyProgrammes: ["ARCHITECTURE"] }),
+      YEAR,
+    );
+    expect(ba3).toContain("CAREER:richting:architecture:3de-bachelor");
+
+    const ma = desiredListKeys(
+      career({ studyYears: ["MASTER_1"], studyProgrammes: ["ARCHITECTURE"] }),
+      YEAR,
+    );
+    expect(ma).toContain("CAREER:richting:architecture:masters");
+  });
+
+  it("plaatst de 7 masters-only richtingen uitsluitend in masters en niet in bachelor-delen", () => {
+    const mastersOnly = [
+      "CYBERSECURITY",
+      "DIGITAL_HUMANITIES",
+      "ENERGY",
+      "ARTIFICIAL_INTELLIGENCE",
+      "NANO",
+      "URBANISM",
+      "MATHEMATICAL",
+    ] as const;
+
+    for (const programme of mastersOnly) {
+      const progSlug = programme.toLowerCase().replace(/_/g, "-");
+      const segments = CAREER_SEGMENTS.filter((s) => s.programme === programme);
+      expect(segments).toHaveLength(1);
+      expect(segments[0].key).toBe(`richting:${progSlug}:masters`);
+
+      // Bachelor-student in deze richting krijgt geen enkel richtingsdeel
+      const baKeys = desiredListKeys(
+        career({ studyYears: ["BACHELOR_2"], studyProgrammes: [programme] }),
+        YEAR,
+      );
+      expect(baKeys.filter((k) => k.startsWith(`CAREER:richting:${progSlug}`))).toEqual([]);
+
+      // Master-student krijgt wél het masters-deel
+      const maKeys = desiredListKeys(
+        career({ studyYears: ["MASTER_1"], studyProgrammes: [programme] }),
+        YEAR,
+      );
+      expect(maKeys).toContain(`CAREER:richting:${progSlug}:masters`);
+    }
+  });
+
+  it("kent Algemene Bachelor geen richtingsdelen toe, enkel de algemene lijst en jaargroepen", () => {
+    expect(CAREER_SEGMENTS.filter((s) => s.programme === "COMMON_BACHELOR")).toEqual([]);
+
+    const ba1 = desiredListKeys(
+      career({ studyYears: ["BACHELOR_1"], studyProgrammes: ["COMMON_BACHELOR"] }),
+      YEAR,
+    );
+    expect(ba1).toContain("CAREER");
+    expect(ba1.filter(isCareerListKey)).toEqual(["CAREER:jaar:alle-bachelors"]);
+
+    const ba2 = desiredListKeys(
+      career({ studyYears: ["BACHELOR_2"], studyProgrammes: ["COMMON_BACHELOR"] }),
+      YEAR,
+    );
+    expect(ba2).toContain("CAREER");
+    expect(ba2.filter(isCareerListKey)).toEqual([
+      "CAREER:jaar:2de-bachelor",
+      "CAREER:jaar:alle-bachelors",
+    ]);
+  });
+
+  it("kent een lid met zowel Architectuur 1ste bachelor als een andere richting de juiste combinatie toe", () => {
+    const keys = desiredListKeys(
+      career({
+        studyYears: ["BACHELOR_1", "BACHELOR_2"],
+        studyProgrammes: ["ARCHITECTURE", "CIVIL"],
+      }),
+      YEAR,
+    );
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        "CAREER",
+        "CAREER:jaar:2de-bachelor",
+        "CAREER:jaar:alle-bachelors",
+        "CAREER:richting:architecture:1ste-bachelor",
+        "CAREER:richting:architecture:2de-bachelor",
+        "CAREER:richting:civil:2de-bachelor",
+      ]),
+    );
+    expect(keys).not.toContain("CAREER:richting:civil:1ste-bachelor");
+    expect(keys).not.toContain("CAREER:richting:architecture:3de-bachelor");
+    expect(keys).not.toContain("CAREER:richting:civil:masters");
+  });
+
+  it("telt een 1ste bachelor in een gewone ingenieursrichting enkel via 'alle bachelors' mee", () => {
     const keys = desiredListKeys(
       career({ studyYears: ["BACHELOR_1"], studyProgrammes: ["CIVIL"] }),
       YEAR,
@@ -265,6 +372,9 @@ describe("Career-deellijsten", () => {
 
   it("splitst exact zoals de ZIP-export", () => {
     const members = [
+      career({ email: "arch1@vtk.be", studyYears: ["BACHELOR_1"], studyProgrammes: ["ARCHITECTURE"] }),
+      career({ email: "common1@vtk.be", studyYears: ["BACHELOR_1"], studyProgrammes: ["COMMON_BACHELOR"] }),
+      career({ email: "cyber1@vtk.be", studyYears: ["MASTER_1"], studyProgrammes: ["CYBERSECURITY"] }),
       career({ email: "ba2@vtk.be", studyYears: ["BACHELOR_2"], studyProgrammes: ["CIVIL"] }),
       career({
         email: "mix@vtk.be",

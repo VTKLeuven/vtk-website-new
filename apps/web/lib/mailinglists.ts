@@ -181,12 +181,14 @@ export function careerZipEntries(recipients: Recipient[], locale: Locale): ZipEn
     });
   }
 
-  // Per richting: enkel 2de bachelor, 3de bachelor en de masters samen. De
+  // Per richting: de actuele deellijsten per richting. De
   // mapnaam is het vertaalde label, want deze mappen worden door mensen bekeken;
   // de Brevo-sync gebruikt voor dezelfde delen een stabiele enum-sleutel.
   for (const programme of STUDY_PROGRAMMES) {
+    const groups = CAREER_PROGRAMME_GROUPS[programme];
+    if (!groups || groups.length === 0) continue;
     const inProgramme = recipients.filter((r) => r.studyProgrammes.includes(programme));
-    for (const group of CAREER_PROGRAMME_GROUPS) {
+    for (const group of groups) {
       entries.push({
         name: `richtingen/${slug(t.programmes[programme])}/${group.slug}.csv`,
         content: toCsv(inProgramme.filter((r) => inYears(r, group.years))),
