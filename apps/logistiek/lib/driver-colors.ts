@@ -19,9 +19,48 @@
  * `UitleenDriver.colorIndex` de hash overschrijven.
  *
  * De kleuren zelf staan als tokens in `app/globals.css` (`--driver-1` tot
- * `--driver-8`), zodat ze op één plek bijgesteld kunnen worden.
+ * `--driver-24`), zodat ze op één plek bijgesteld kunnen worden.
  */
-export const DRIVER_COLOR_COUNT = 8;
+export const DRIVER_COLOR_COUNT = 24;
+
+/**
+ * De namen van het palet, in dezelfde volgorde als de tokens.
+ *
+ * Nodig omdat "Kleur 17" niets zegt: het kiesscherm toont ze als tooltip en als
+ * screenreader-tekst, zodat je een kleur ook kan kiezen en benoemen zonder ze
+ * te zien. De volgorde is de huisvolgorde van het spectrum, niet alfabetisch.
+ */
+export const DRIVER_COLOR_NAMES: readonly string[] = [
+  'Hemelblauw',
+  'Korenbloem',
+  'Staalblauw',
+  'Aqua',
+  'Turkoois',
+  'Mint',
+  'Lichtgroen',
+  'Grasgroen',
+  'Olijf',
+  'Limoen',
+  'Boter',
+  'Amber',
+  'Perzik',
+  'Zalm',
+  'Koraal',
+  'Roze',
+  'Framboos',
+  'Orchidee',
+  'Lavendel',
+  'Iris',
+  'Zand',
+  'Klei',
+  'Leisteen',
+  'Salie',
+];
+
+/** De naam van kleur `index` (1-gebaseerd), of een nummer als terugval. */
+export function driverColorName(index: number): string {
+  return DRIVER_COLOR_NAMES[index - 1] ?? `Kleur ${index}`;
+}
 
 /**
  * Stabiele, kleine hash (djb2). Niet cryptografisch: hij moet enkel dezelfde

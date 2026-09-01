@@ -393,7 +393,7 @@ export default async function BeheerVervoerPage({
   return (
     <div className="grid gap-8">
       {/* Vanuit de kalender kom je met ?rit=<id> binnen; die rit staat dan
-          opengeklapt en gemarkeerd, en dit brengt hem in beeld (S3). */}
+          opengeklapt, en dit brengt hem in beeld (S3). */}
       <ScrollToRit id={rit} />
 
       <div className="flex flex-wrap items-center justify-between gap-3">

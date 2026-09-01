@@ -232,6 +232,7 @@ export function MonthGrid({
                         <button
                           key={bar.id}
                           type="button"
+                          data-trip={bar.id}
                           onClick={() => onSelect(bar.id)}
                           title={label}
                           aria-label={label}

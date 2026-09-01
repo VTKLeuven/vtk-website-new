@@ -98,6 +98,7 @@ export function EventBars({
             return onSelect ? (
               <button
                 key={bar.id}
+                data-trip={bar.id}
                 type="button"
                 onClick={() => onSelect(bar.id)}
                 title={label}

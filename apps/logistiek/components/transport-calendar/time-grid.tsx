@@ -683,6 +683,8 @@ function TimeBlock({
   return (
     <button
       type="button"
+      // Waar het detailpaneel zich aan vastknoopt; zie `TripInspector`.
+      data-trip={block.id}
       // `onSelect` en niet openen wanneer je net gesleept hebt: het loslaten van
       // een sleep is óók een klik, en dan sprong het paneel open bovenop de week
       // waarin je aan het schuiven was.

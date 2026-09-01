@@ -8,7 +8,12 @@ import {
   setDriverColorAction,
   setDriverVanAction,
 } from '@/app/actions/beheer';
-import { DRIVER_COLOR_COUNT, driverColorIndex, driverColorVar } from '@/lib/driver-colors';
+import {
+  DRIVER_COLOR_COUNT,
+  driverColorIndex,
+  driverColorName,
+  driverColorVar,
+} from '@/lib/driver-colors';
 import { useToast } from '@/components/ui/toast';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
@@ -42,12 +47,18 @@ function removeDescription(entry: DriverPoolEntry): string {
 /**
  * De kleur van deze chauffeur in de transportplanning (K1).
  *
- * Acht bolletjes en geen kleurkiezer: de tinten komen uit `app/globals.css` en
- * zijn gekozen om naast elkaar te onderscheiden en donkere tekst leesbaar te
- * houden. Een vrije kleurkiezer zou daar binnen een maand een donkerblauw en een
- * knalgeel tussen zetten.
+ * Een palet van vierentwintig tinten in een raster, in de huisvolgorde van het
+ * spectrum: blauw, groen, geel, oranje, rood, roze, paars, neutraal. Het waren
+ * er acht in een rijtje, en dat was te weinig zodra er meer dan acht mensen
+ * rijden; dan deelden twee chauffeurs een kleur op precies de week waarin het
+ * druk was.
  *
- * De negende knop zet hem terug op de kleur die uit zijn id volgt. Die
+ * **Een palet en geen vrije kleurkiezer.** De tekst in een blok is donker, dus
+ * een vulling moet licht blijven; met een vrij kleurenwiel staat er binnen de
+ * maand een donkerblauw tussen waarop niemand het uur nog leest. Alle
+ * vierentwintig tinten hier zijn daarop gekozen.
+ *
+ * De knop onderaan zet hem terug op de kleur die uit zijn id volgt. Die
  * standaardkleur staat er als bolletje bij, want "standaard" is hier een kleur
  * en geen leegte.
  */
@@ -73,7 +84,15 @@ function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
       <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">
         Kleur in de planning
       </p>
-      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+      {/* Zes op een rij: dan valt het palet in vier rijen uiteen die elk bij een
+          stuk van het spectrum horen, en herken je "ergens in het groen" zonder
+          de namen te lezen. */}
+      <div
+        className="mt-1.5 grid w-fit gap-1.5"
+        style={{ gridTemplateColumns: 'repeat(6, minmax(0, 1fr))' }}
+        role="group"
+        aria-label={`Kleur voor ${entry.name}`}
+      >
         {Array.from({ length: DRIVER_COLOR_COUNT }, (_, index) => index + 1).map((index) => (
           <button
             key={index}
@@ -81,7 +100,7 @@ function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
             disabled={pending}
             onClick={() => choose(index)}
             aria-pressed={active === index}
-            title={`Kleur ${index}`}
+            title={driverColorName(index)}
             className={`h-6 w-6 rounded-full border transition disabled:opacity-50 ${
               active === index
                 ? 'border-vtk-navy ring-2 ring-vtk-navy/40'
@@ -90,10 +109,12 @@ function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
             style={{ backgroundColor: `var(--driver-${index})` }}
           >
             <span className="sr-only">
-              Kleur {index} voor {entry.name}
+              {driverColorName(index)} voor {entry.name}
             </span>
           </button>
         ))}
+      </div>
+      <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
         <button
           type="button"
           disabled={pending || active === null}

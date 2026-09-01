@@ -289,6 +289,7 @@ export function TransportPlanner({
               openEvent.groupName ? `Evenement · ${openEvent.groupName}` : 'Evenement'
             }
             onClose={() => setOpenEventId(null)}
+            anchorId={openEvent.id}
             footer={
               <>
                 <Link
@@ -334,6 +335,7 @@ export function TransportPlanner({
               </>
             }
             onClose={() => setOpenId(null)}
+            anchorId={trip.id}
             footer={
               <>
                 <Link

@@ -2131,10 +2131,18 @@ ze staan naast elkaar op twee assen die je tegelijk kan lezen.
   (een handmatige update, een ooit verkleind palet) valt terug op de hash in
   plaats van een token te vragen dat niet bestaat, want een blok zonder vulling
   ziet eruit als een blok zonder chauffeur.
-- **Acht bolletjes, geen kleurkiezer.** De tinten staan als tokens in
-  `apps/logistiek/app/globals.css` en zijn gekozen om naast elkaar te
-  onderscheiden én donkere tekst leesbaar te houden. Een vrije kleurkiezer zet
-  daar binnen de maand een donkerblauw en een knalgeel tussen.
+- **Een palet van vierentwintig, geen vrij kleurenwiel.** Het waren er acht in
+  een rijtje, en dat was te weinig zodra er meer dan acht mensen rijden: dan
+  deelden twee chauffeurs een kleur op precies de week waarin het druk was. Nu
+  staan ze als raster van zes bij vier in het kiesscherm, in de volgorde van het
+  spectrum (blauw, groen, geel, oranje, rood, roze, paars, neutraal), elk met een
+  naam als tooltip; "Kleur 17" zegt niets.
+
+  Een **vrije** kleurkiezer blijft er bewust niet: de tekst in een blok is donker
+  en de arcering van het voertuig ligt eroverheen, dus een vulling moet licht
+  blijven. Met een kleurenwiel staat er binnen de maand een donkerblauw tussen
+  waarop niemand het uur nog leest. Alle vierentwintig tinten in
+  `apps/logistiek/app/globals.css` zijn daarop gekozen.
 - **Een postlid krijgt pas een `UitleenDriver`-rij zodra iemand er iets aan
   instelt**, net zoals bij `canDriveVan`. De rij is de plek voor wat het team
   handmatig bijhoudt; het lidmaatschap zelf blijft uit de post komen.
@@ -2210,6 +2218,48 @@ achtergrond (zonder dat tekent de browser zwart); lukt ze niet, dan wordt het ee
 vast paneel over de pagina (`data-fullscreen="fallback"`). De filters en de
 inspector staan bewust **binnen** die container: alles wat erbuiten gerenderd
 wordt, is in echte fullscreen onzichtbaar.
+
+### Een rit opent als kaartje naast zijn blok
+
+Klik je een rit aan in de planning, dan verschijnt de detail als een kaartje van
+352px tegen dat blok: rechts ernaast wanneer dat past, anders links, en tegen de
+rand wanneer geen van beide past. Op een smal scherm blijft het een bottom
+sheet; een kaartje naast een blok van 112px is daar geen kaartje meer maar een
+scherm.
+
+Twee vormen die het hiervóór was:
+
+- **Een modal midden op het scherm.** Die dekte precies de week af waarin je aan
+  het schuiven was, terwijl de vraag "past dit ergens anders?" juist die week
+  nodig heeft.
+- **Een volle zijbalk rechts.** Beter, maar hij stond even ver van de rit als van
+  alle andere: je klikte links op dinsdag en het antwoord verscheen rechts, over
+  zaterdag heen.
+
+Wat daarbij vastligt:
+
+- **Het kaartje zoekt zijn blok op via `data-trip`**, niet via een positie die de
+  aanroeper meegeeft. Zo werkt het in dag-, week- én maandweergave zonder dat
+  drie plaatsen dezelfde meetcode dragen. Loopt een rit over middernacht, dan
+  staan er twee blokken met dezelfde id en wint het eerste; dat is de dag waarop
+  de rit begint.
+- **Het volgt mee bij scrollen**, met een luisteraar in de capture-fase: de
+  kalender scrolt binnen zijn eigen doos, en zonder capture horen we die scroll
+  niet en blijft het kaartje achter terwijl zijn blok wegschuift.
+- **Het plaatsen gebeurt in een layout-effect**, zodat het niet één frame
+  linksboven verschijnt en dan naar zijn plek springt.
+- **De feitenrijen gaan van vier naar twee kolommen in het kaartje**
+  (`.tg-popover .logistics-fact-grid`). Vier kolommen zijn daar zeventig pixels
+  breed, en dan breekt een telefoonnummer middenin. Een media query helpt niet:
+  het scherm is breed, het kaartje niet.
+
+### De rit waar je vanuit de planning op klikt, wordt niet gemarkeerd
+
+`/beheer/vervoer?rit=<id>` klapt die rij open en scrolt ernaartoe. Ze kreeg
+daarbij ook een gele vulling met een omranding, en dat is weggehaald: opengeklapt
+zijn en in beeld staan is de bevestiging al. De markering bleef daarna staan tot
+je herlaadde, en de gele tint in die lijst betekent al iets anders, namelijk dat
+er nog geen chauffeur is.
 
 ### Karchauffeurs: één vlag, geen aparte soort
 

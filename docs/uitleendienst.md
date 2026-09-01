@@ -163,7 +163,8 @@ de same-origin `publicUrl`.
   enkel voor wie chauffeur is of nog een rit heeft staan).
 - **Transportplanning** (`/beheer/vervoer/week`, ronde 3): een agenda-app met
   dag-, week- en maandweergave, zoom, volledig scherm, filters, en een paneel
-  waarin je een rit opent, aanpast of aanmaakt. De kalendercomponenten staan in
+  waarin je een rit opent, aanpast of aanmaakt; dat paneel is op een breed
+  scherm een kaartje naast het blok waar je op klikte. De kalendercomponenten staan in
   `components/transport-calendar/` (`time-grid`, `month-grid`, `event-bars`,
   `trip-block`, `trip-inspector`, `filters`, `transport-calendar`); de
   berekeningen zijn puur en getest (`lib/week-lanes.ts`, `lib/month-lanes.ts`,

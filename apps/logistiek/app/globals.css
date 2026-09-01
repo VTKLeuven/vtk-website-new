@@ -48,19 +48,45 @@ body {
   --success: #2f6f33;
   --success-soft: #eef8ea;
 
-  /* Chauffeurskleuren voor de transportplanning (B4, T7). Acht tinten die
-     naast elkaar te onderscheiden zijn en waarop donkere tekst leesbaar
-     blijft; de kleur volgt uit de id van de chauffeur, zie lib/driver-colors.ts.
+  /* Chauffeurskleuren voor de transportplanning (B4, T7, K1).
+
+     Vierentwintig tinten in plaats van acht, want acht was op een drukke week
+     te weinig: dan deelden twee chauffeurs een kleur en was het onderscheid
+     precies weg waar je het nodig had. Ze staan hier in huisvolgorde (blauw,
+     groen, geel, oranje, rood, roze, paars, neutraal), zodat het palet in het
+     kiesscherm als een spectrum leest en niet als een zak snoep.
+
+     Alle vierentwintig zijn licht gehouden: de tekst in een blok is donker
+     (`--ink`) en moet leesbaar blijven, ook met een arcering van het voertuig
+     eroverheen. Daarom is dit een palet en geen vrije kleurkiezer; zie
+     docs/design-decisions.md.
+
      `--driver-none` is voor een rit zonder chauffeur: die moet juist opvallen
      als onafgewerkt, vandaar de gele accentkleur van het huis. */
   --driver-1: #cfe0ff;
-  --driver-2: #d7f0d8;
-  --driver-3: #ffe0cc;
-  --driver-4: #e8dcff;
-  --driver-5: #cdefee;
-  --driver-6: #ffd9e6;
-  --driver-7: #e8ecc4;
-  --driver-8: #dcdfe8;
+  --driver-2: #bdd4f7;
+  --driver-3: #c3e2f2;
+  --driver-4: #c2e8ee;
+  --driver-5: #c6eee6;
+  --driver-6: #c9edd7;
+  --driver-7: #d7f0d8;
+  --driver-8: #dff0c4;
+  --driver-9: #e8ecc4;
+  --driver-10: #f2eec0;
+  --driver-11: #ffeeb8;
+  --driver-12: #ffe4b3;
+  --driver-13: #ffdcc2;
+  --driver-14: #ffd3c0;
+  --driver-15: #ffcccc;
+  --driver-16: #ffcedd;
+  --driver-17: #f9d2ea;
+  --driver-18: #eed4f4;
+  --driver-19: #e2d9f8;
+  --driver-20: #d3d6f6;
+  --driver-21: #e6ded2;
+  --driver-22: #ded9cd;
+  --driver-23: #d8dde6;
+  --driver-24: #d6dcd8;
   --driver-none: #fff0bf;
 }
 
@@ -1003,6 +1029,15 @@ body {
 
 .logistics-fact-grid > div {
   min-width: 0;
+}
+
+/* In het kaartje naast een rit is er 324px, geen paginabreedte. Vier kolommen
+   zijn daar 70px elk, en dan breekt een telefoonnummer middenin ("0470 12 /
+   34 56"). Een media query helpt hier niet: het scherm is breed, het kaartje
+   niet. */
+.tg-popover .logistics-fact-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .logistics-fact-grid > div[data-span='2'] {

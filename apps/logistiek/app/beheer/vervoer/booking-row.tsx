@@ -46,13 +46,12 @@ export function BookingRow({
   return (
     <tbody
       data-rit={ritId}
-      className={
-        defaultOpen
-          ? 'bg-vtk-yellow/25 outline outline-2 outline-vtk-yellow'
-          : highlight
-            ? 'bg-vtk-yellow/10'
-            : undefined
-      }
+      // Bewust géén markering voor de rit waar je vanuit de planning op klikte.
+      // Die stond er eerst (gele vulling plus een omranding), maar hij is al
+      // opengeklapt en de pagina scrolt er al naartoe: dan is de markering enkel
+      // ruis die blijft staan tot je herlaadt. De gele tint hieronder betekent
+      // wél iets, namelijk dat er nog geen chauffeur is.
+      className={highlight ? 'bg-vtk-yellow/10' : undefined}
     >
       <tr className="border-b border-vtk-navy/5 align-top">
         {summary}
