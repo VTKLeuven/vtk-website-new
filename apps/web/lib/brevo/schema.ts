@@ -1,14 +1,16 @@
 import "server-only";
 
-import { Prisma } from "@prisma/client";
+import { Prisma, type MailCategory } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { STUDY_PROGRAMMES, STUDY_YEARS } from "@/lib/profile";
 import {
   ALL_STUDENTS_KEY,
   BREVO_LIST_KEYS,
+  CAREER_LIST_SEGMENTS,
   programmeAttr,
   yearAttr,
   type BrevoListKey,
+  type CareerListKey,
 } from "./contacts";
 import {
   createContactAttribute,
@@ -21,19 +23,21 @@ import {
 
 /**
  * Zorgt dat de door de site beheerde Brevo-structuur bestaat (één folder, één
- * lijst per categorie, en de studie-attributen) en onthoudt de aangemaakte
- * lijst-ID's in de `Setting`-tabel. Zo hoeven `sync.ts` en de reconciliatie de
- * lijsten niet elke keer op naam op te zoeken.
+ * lijst per categorie, één per Career-deel, en de studie-attributen) en onthoudt
+ * de aangemaakte lijst-ID's in de `Setting`-tabel. Zo hoeven `sync.ts` en de
+ * reconciliatie de lijsten niet elke keer op naam op te zoeken.
  *
  * Alles is idempotent en op naam gematcht: bestaat de folder of lijst al (ook als
  * ze ooit handmatig is aangemaakt), dan hergebruiken we die i.p.v. te dupliceren.
+ * Komt er een lijst bij (zoals de Career-delen), dan valt `isComplete` en worden
+ * enkel de ontbrekende lijsten aangemaakt; de bestaande ID's blijven staan.
  */
 
 const SETTING_KEY = "brevo.lists";
 const FOLDER_NAME = "VTK Website";
 
 /** Interne Brevo-lijstnamen. Vast (niet vertaald): dit is admin-plumbing in Brevo. */
-const LIST_LABELS: Record<BrevoListKey, string> = {
+const LIST_LABELS: Record<MailCategory | typeof ALL_STUDENTS_KEY, string> = {
   [ALL_STUDENTS_KEY]: "VTK - Alle studenten",
   FEEST: "VTK - Feest",
   CAREER: "VTK - Career",
@@ -44,6 +48,21 @@ const LIST_LABELS: Record<BrevoListKey, string> = {
   EERSTEJAARS: "VTK - Eerstejaars",
   BAKSKE: "VTK - Bakske",
 };
+
+/**
+ * De Career-deellijsten hangen onder dezelfde naam als de algemene lijst:
+ * "VTK - Career - 2de bachelor", "VTK - Career - Bouwkunde - masters", ...
+ * Zo staan ze in Brevo alfabetisch bij elkaar en is meteen duidelijk welk deel
+ * van de ZIP-export je voor je hebt.
+ */
+const CAREER_LIST_LABELS = new Map<CareerListKey, string>(
+  CAREER_LIST_SEGMENTS.map(({ key, segment }) => [key, `${LIST_LABELS.CAREER} - ${segment.label}`]),
+);
+
+/** De Brevo-naam van een beheerde lijst. Namen zijn de identiteit: ze matchen idempotent. */
+function listLabel(key: BrevoListKey): string {
+  return CAREER_LIST_LABELS.get(key as CareerListKey) ?? LIST_LABELS[key as MailCategory];
+}
 
 export type BrevoListMap = { folderId: number; lists: Record<BrevoListKey, number> };
 
@@ -79,7 +98,7 @@ export async function ensureBrevoSchema(force = false): Promise<BrevoListMap> {
   const lists: Partial<Record<BrevoListKey, number>> = { ...(stored?.lists ?? {}) };
   for (const key of BREVO_LIST_KEYS) {
     if (typeof lists[key] === "number") continue;
-    const name = LIST_LABELS[key];
+    const name = listLabel(key);
     lists[key] = (await findListByName(folderId, name)) ?? (await createList(name, folderId));
   }
 

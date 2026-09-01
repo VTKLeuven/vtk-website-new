@@ -1,19 +1,32 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+
+// `lib/mailinglists.ts` is server-only en praat met prisma; de ZIP-opbouw zelf is
+// pure functie-werk, dus de client volstaat als lege huls.
+vi.mock("@vtk/db", () => ({ prisma: { user: { findMany: vi.fn() } } }));
+
+import { getDictionary } from "@vtk/i18n";
 import {
   ALL_STUDENTS_KEY,
+  BREVO_LIST_KEYS,
+  CAREER_LIST_SEGMENTS,
   alternateEmail,
+  careerListKey,
   contactAttributes,
   desiredListKeys,
   emailsToRemove,
+  isCareerListKey,
   isEligible,
   preferredEmail,
   programmeAttr,
   readUnsubscribe,
+  unsubscribedEmails,
   yearAttr,
   type BrevoListKey,
   type SyncUserData,
 } from "@/lib/brevo/contacts";
-import { STUDY_PROGRAMMES, STUDY_YEARS } from "@/lib/profile";
+import { CAREER_SEGMENTS, type CareerSegment } from "@/lib/careerLists";
+import { careerZipEntries, type Recipient } from "@/lib/mailinglists";
+import { MAIL_CATEGORIES, STUDY_PROGRAMMES, STUDY_YEARS } from "@/lib/profile";
 
 const YEAR = 2026;
 
@@ -135,6 +148,206 @@ describe("desiredListKeys", () => {
   it("includes CAREER for faculty members who opted in", () => {
     const keys = desiredListKeys(user({ mailCategories: ["CAREER"], notAtFaculty: false }), YEAR);
     expect(keys).toContain("CAREER");
+  });
+});
+
+/** Bestandsnaam-veilige slug, los herbouwd zodat de test de export niet napraat. */
+function slugify(label: string): string {
+  return label
+    .normalize("NFD")
+    .replace(/\p{Diacritic}/gu, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+/** Het pad dat dit deel in de ZIP-export heeft. */
+function zipEntryName(segment: CareerSegment): string {
+  const group = segment.key.slice(segment.key.lastIndexOf(":") + 1);
+  if (segment.programme === null) return `jaren/${group}.csv`;
+  const label = getDictionary("nl").onboarding.programmes[segment.programme];
+  return `richtingen/${slugify(label)}/${group}.csv`;
+}
+
+describe("Career-deellijsten", () => {
+  const career = (overrides: Partial<SyncUserData>) =>
+    user({ mailCategories: ["CAREER"], ...overrides });
+
+  it("beheert één Brevo-lijst per deel, naast de algemene Career-lijst", () => {
+    // Zes jaargroepen plus drie groepen per richting; de algemene lijst is de
+    // categorie `CAREER` zelf en telt hier dus niet mee.
+    expect(CAREER_SEGMENTS).toHaveLength(6 + STUDY_PROGRAMMES.length * 3);
+
+    const keys = CAREER_LIST_SEGMENTS.map((s) => s.key);
+    expect(new Set(keys).size).toBe(keys.length);
+    expect(keys.every(isCareerListKey)).toBe(true);
+    expect(keys).not.toContain("CAREER");
+    expect(BREVO_LIST_KEYS).toHaveLength(1 + MAIL_CATEGORIES.length + CAREER_SEGMENTS.length);
+  });
+
+  it("zet een lid in elk deel dat bij zijn jaar en richting past", () => {
+    const keys = desiredListKeys(
+      career({ studyYears: ["BACHELOR_2"], studyProgrammes: ["CIVIL"] }),
+      YEAR,
+    );
+    expect(keys).toContain("CAREER");
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        "CAREER:jaar:2de-bachelor",
+        "CAREER:jaar:alle-bachelors",
+        "CAREER:richting:civil:2de-bachelor",
+      ]),
+    );
+    expect(keys).not.toContain("CAREER:jaar:3de-bachelor");
+    expect(keys).not.toContain("CAREER:jaar:alle-masters");
+    expect(keys).not.toContain("CAREER:richting:civil:masters");
+    expect(keys).not.toContain("CAREER:richting:chemical:2de-bachelor");
+  });
+
+  it("combineert meerdere studiejaren en richtingen", () => {
+    const keys = desiredListKeys(
+      career({
+        studyYears: ["BACHELOR_3", "MASTER_1"],
+        studyProgrammes: ["CIVIL", "CHEMICAL"],
+      }),
+      YEAR,
+    );
+    expect(keys).toEqual(
+      expect.arrayContaining([
+        "CAREER:jaar:3de-bachelor",
+        "CAREER:jaar:alle-bachelors",
+        "CAREER:jaar:1ste-master",
+        "CAREER:jaar:alle-masters",
+        "CAREER:richting:civil:3de-bachelor",
+        "CAREER:richting:civil:masters",
+        "CAREER:richting:chemical:3de-bachelor",
+        "CAREER:richting:chemical:masters",
+      ]),
+    );
+    expect(keys).not.toContain("CAREER:jaar:2de-master");
+    expect(keys).not.toContain("CAREER:richting:civil:2de-bachelor");
+  });
+
+  it("telt een 1ste bachelor enkel via 'alle bachelors' mee", () => {
+    const keys = desiredListKeys(
+      career({ studyYears: ["BACHELOR_1"], studyProgrammes: ["CIVIL"] }),
+      YEAR,
+    );
+    expect(keys.filter(isCareerListKey)).toEqual(["CAREER:jaar:alle-bachelors"]);
+  });
+
+  it("houdt wie niet aan de faculteit studeert uit élk deel", () => {
+    const keys = desiredListKeys(
+      career({
+        notAtFaculty: true,
+        mailCategories: ["CAREER", "FEEST"],
+        studyYears: ["BACHELOR_2", "MASTER_1"],
+        studyProgrammes: ["CIVIL"],
+      }),
+      YEAR,
+    );
+    expect(keys).not.toContain("CAREER");
+    expect(keys.filter(isCareerListKey)).toEqual([]);
+    expect(keys).toContain("FEEST");
+  });
+
+  it("geeft geen delen aan wie Career niet aanvinkte", () => {
+    const keys = desiredListKeys(
+      user({
+        mailCategories: ["FEEST"],
+        studyYears: ["BACHELOR_2"],
+        studyProgrammes: ["CIVIL"],
+      }),
+      YEAR,
+    );
+    expect(keys.filter(isCareerListKey)).toEqual([]);
+  });
+
+  it("splitst exact zoals de ZIP-export", () => {
+    const members = [
+      career({ email: "ba2@vtk.be", studyYears: ["BACHELOR_2"], studyProgrammes: ["CIVIL"] }),
+      career({
+        email: "mix@vtk.be",
+        studyYears: ["BACHELOR_3", "MASTER_1"],
+        studyProgrammes: ["CIVIL", "CHEMICAL"],
+      }),
+      career({
+        email: "ma2@vtk.be",
+        studyYears: ["MASTER_2"],
+        studyProgrammes: ["COMPUTER_SCIENCE"],
+      }),
+      career({ email: "ba1@vtk.be", studyYears: ["BACHELOR_1"], studyProgrammes: [] }),
+    ];
+    const recipients: Recipient[] = members.map((m) => ({
+      firstname: "Jan",
+      lastname: "Peeters",
+      email: m.email,
+      studyYears: m.studyYears,
+      studyProgrammes: m.studyProgrammes,
+    }));
+
+    const entries = careerZipEntries(recipients, "nl");
+    // Eén CSV voor de algemene lijst, daarna één per Brevo-deellijst, in dezelfde volgorde.
+    expect(entries.map((e) => e.name)).toEqual([
+      "career-algemeen.csv",
+      ...CAREER_SEGMENTS.map(zipEntryName),
+    ]);
+
+    const inCsv = (name: string) =>
+      members.filter((m) => entries.find((e) => e.name === name)!.content.includes(m.email));
+    expect(inCsv("career-algemeen.csv").map((m) => m.email)).toEqual(
+      members.filter((m) => desiredListKeys(m, YEAR).includes("CAREER")).map((m) => m.email),
+    );
+    for (const segment of CAREER_SEGMENTS) {
+      const key = careerListKey(segment);
+      expect(
+        members.filter((m) => desiredListKeys(m, YEAR).includes(key)).map((m) => m.email),
+      ).toEqual(inCsv(zipEntryName(segment)).map((m) => m.email));
+    }
+  });
+});
+
+describe("uitschrijven per Career-deel", () => {
+  const part = careerListKey(CAREER_SEGMENTS[0]);
+  const keyByListId = new Map<number, BrevoListKey>([
+    [181, ALL_STUDENTS_KEY],
+    [183, "CAREER"],
+    [184, part],
+  ]);
+
+  it("vinkt bij de algemene Career-lijst de opt-in af, zoals vroeger", () => {
+    expect(
+      readUnsubscribe({ emailBlacklisted: false, listUnsubscribed: [183] }, keyByListId),
+    ).toEqual({ global: false, categories: ["CAREER"] });
+  });
+
+  it("laat een uitschrijving voor één deel de opt-in ongemoeid", () => {
+    // Er is op de site geen vinkje per deel, dus er valt niets af te vinken: het
+    // lid wil de andere career-mails nog. De uitschrijving blijft een feit in
+    // Brevo en de sync duwt dat adres niet terug in dat ene deel.
+    expect(
+      readUnsubscribe({ emailBlacklisted: false, listUnsubscribed: [184] }, keyByListId),
+    ).toEqual({ global: false, categories: [] });
+  });
+
+  it("blijft globaal bij een blacklist of 'alle studenten', ook met een deel erbij", () => {
+    expect(
+      readUnsubscribe({ emailBlacklisted: true, listUnsubscribed: [184] }, keyByListId),
+    ).toEqual({ global: true, categories: [] });
+    expect(
+      readUnsubscribe({ emailBlacklisted: false, listUnsubscribed: [181, 184] }, keyByListId),
+    ).toEqual({ global: true, categories: [] });
+  });
+
+  it("geeft per lijst de adressen die zich er apart voor uitschreven", () => {
+    const contacts = [
+      { email: "Weg@vtk.be", listUnsubscribed: [184] },
+      { email: "blijft@vtk.be", listUnsubscribed: [183] },
+      { email: "niets@vtk.be", listUnsubscribed: [] },
+    ];
+    expect(unsubscribedEmails(contacts, 184)).toEqual(new Set(["weg@vtk.be"]));
+    expect(unsubscribedEmails(contacts, 183)).toEqual(new Set(["blijft@vtk.be"]));
+    expect(unsubscribedEmails(contacts, 999)).toEqual(new Set());
   });
 });
 

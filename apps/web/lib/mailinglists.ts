@@ -4,6 +4,11 @@ import type { MailCategory, Prisma, StudyProgramme, StudyYear } from "@prisma/cl
 import { prisma } from "@vtk/db";
 import { nameParts } from "@vtk/auth";
 import { getDictionary, type Locale } from "@vtk/i18n";
+import {
+  CAREER_PROGRAMME_GROUPS,
+  CAREER_YEAR_GROUPS,
+  inYears,
+} from "@/lib/careerLists";
 import { MAIL_CATEGORIES, STUDY_PROGRAMMES } from "@/lib/profile";
 import { currentStudyYear } from "@/lib/workingYear";
 
@@ -141,13 +146,6 @@ export function toCsv(recipients: Recipient[]): string {
   return `﻿${lines.join("\r\n")}\r\n`;
 }
 
-const MASTER_YEARS: StudyYear[] = ["MASTER_1", "MASTER_2"];
-const BACHELOR_YEARS: StudyYear[] = ["BACHELOR_1", "BACHELOR_2", "BACHELOR_3"];
-
-function inYears(r: Recipient, years: StudyYear[]): boolean {
-  return r.studyYears.some((y) => years.includes(y));
-}
-
 /** Bestandsnaam-veilige slug van een label ("Chemische Ingenieurstechnieken" -> "chemische-ingenieurstechnieken"). */
 function slug(label: string): string {
   return label
@@ -161,10 +159,10 @@ function slug(label: string): string {
 export type ZipEntry = { name: string; content: string };
 
 /**
- * De Career-ZIP: een algemene lijst van alle Career-opt-ins, dezelfde groep
- * opgesplitst per studiejaar, en per richting nog eens 2de bachelor / 3de
- * bachelor / masters. Eerste bachelors krijgen geen eigen lijst (enkel via
- * "alle bachelors"), want daar zijn de career-activiteiten niet op gericht.
+ * De Career-ZIP: een algemene lijst van alle Career-opt-ins, plus één CSV per
+ * deel uit `CAREER_SEGMENTS`. De opsplitsing zelf staat in `lib/careerLists.ts`,
+ * want de Brevo-sync maakt exact dezelfde delen als aparte lijsten aan; zou ze
+ * hier apart beschreven staan, dan lopen download en sync uiteen.
  *
  * Een lid met meerdere studiejaren of richtingen komt in elke lijst waar het bij
  * hoort; lege lijsten blijven in de ZIP zitten zodat de structuur voorspelbaar is.
@@ -176,33 +174,22 @@ export function careerZipEntries(recipients: Recipient[], locale: Locale): ZipEn
   ];
 
   // Per studiejaar over alle richtingen heen.
-  const yearLists: { name: string; years: StudyYear[] }[] = [
-    { name: "2de-bachelor", years: ["BACHELOR_2"] },
-    { name: "3de-bachelor", years: ["BACHELOR_3"] },
-    { name: "alle-bachelors", years: BACHELOR_YEARS },
-    { name: "1ste-master", years: ["MASTER_1"] },
-    { name: "2de-master", years: ["MASTER_2"] },
-    { name: "alle-masters", years: MASTER_YEARS },
-  ];
-  for (const list of yearLists) {
+  for (const group of CAREER_YEAR_GROUPS) {
     entries.push({
-      name: `jaren/${list.name}.csv`,
-      content: toCsv(recipients.filter((r) => inYears(r, list.years))),
+      name: `jaren/${group.slug}.csv`,
+      content: toCsv(recipients.filter((r) => inYears(r, group.years))),
     });
   }
 
-  // Per richting: enkel 2de bachelor, 3de bachelor en de masters samen.
-  const programmeLists: { name: string; years: StudyYear[] }[] = [
-    { name: "2de-bachelor", years: ["BACHELOR_2"] },
-    { name: "3de-bachelor", years: ["BACHELOR_3"] },
-    { name: "masters", years: MASTER_YEARS },
-  ];
+  // Per richting: enkel 2de bachelor, 3de bachelor en de masters samen. De
+  // mapnaam is het vertaalde label, want deze mappen worden door mensen bekeken;
+  // de Brevo-sync gebruikt voor dezelfde delen een stabiele enum-sleutel.
   for (const programme of STUDY_PROGRAMMES) {
     const inProgramme = recipients.filter((r) => r.studyProgrammes.includes(programme));
-    for (const list of programmeLists) {
+    for (const group of CAREER_PROGRAMME_GROUPS) {
       entries.push({
-        name: `richtingen/${slug(t.programmes[programme])}/${list.name}.csv`,
-        content: toCsv(inProgramme.filter((r) => inYears(r, list.years))),
+        name: `richtingen/${slug(t.programmes[programme])}/${group.slug}.csv`,
+        content: toCsv(inProgramme.filter((r) => inYears(r, group.years))),
       });
     }
   }

@@ -978,13 +978,32 @@ bijgewerkt. De Brevo-sync (`apps/web/lib/brevo/`) haalt de tussenpersoon weg.
   `desiredListKeys()` in `lib/brevo/contacts.ts` is de JS-tegenhanger van
   `listWhere()` in `lib/mailinglists.ts`; `test/brevoSync.test.ts` bewaakt dat ze
   gelijk blijven. Lopen ze uiteen, dan verschilt de sync van de download.
-- **Career splitst niet in tientallen lijsten, maar via attributen + segmenten.**
-  Er is één `VTK - Career`-lijst; studiejaar en richting gaan als **boolean
-  contactattributen** mee (`YEAR_BACHELOR_2`, `PROG_CIVIL`, ...). De Career-ploeg
-  bouwt de opsplitsing (bv. Burgerlijk + 2de bach) in Brevo als **segment**. Dat
-  vervangt de ~50 CSV's uit de ZIP door één lijst plus segmenten; veel minder te
-  synchroniseren en te laten driften. De ZIP-download blijft wel bestaan voor wie
-  liever de kant-en-klare opsplitsing heeft.
+- **Career splitst in Brevo in exact dezelfde lijsten als de ZIP.** Eerst stond
+  hier het omgekeerde: één `VTK - Career`-lijst plus **boolean contactattributen**
+  (`YEAR_BACHELOR_2`, `PROG_CIVIL`, ...), waarmee de Career-ploeg de opsplitsing
+  zelf als **segment** in Brevo zou bouwen. Dat is minder te synchroniseren, maar
+  het legt het werk elke keer opnieuw bij de ploeg, en een segment dat iemand
+  verkeerd samenklikt lijkt op een lijst zonder er een te zijn. Sinds september
+  2026 maakt de sync de delen zelf aan: naast `VTK - Career` (de algemene lijst,
+  gelijk aan `career-algemeen.csv`) staat er één lijst per deel uit de ZIP,
+  `VTK - Career - 2de bachelor` tot `VTK - Career - Bouwkunde - masters`. Dat zijn
+  6 jaargroepen + 3 groepen × 16 richtingen = 54 deellijsten. De booleans blijven
+  wel bestaan: ze zijn handig voor een ad-hoc segment.
+  - **Eén definitie, twee afnemers.** `lib/careerLists.ts` beschrijft de
+    opsplitsing; de ZIP-export en de Brevo-sync leiden er allebei uit af. Zou elke
+    kant haar eigen lijstje hebben, dan zou de download vroeg of laat iets anders
+    zeggen dan de sync.
+  - **De sleutel van een deellijst is de enum-waarde, de ZIP-mapnaam het label.**
+    `CAREER:richting:civil:2de-bachelor` blijft dezelfde wanneer iemand het label
+    "Bouwkunde" ooit hernoemt; de mappen in de ZIP heten wél naar het (vertaalde)
+    label, want die worden door mensen bekeken.
+  - **Een uitschrijving voor één deel telt enkel voor dat deel.** De site heeft
+    per deel geen vinkje, dus er valt in de DB niets af te vinken (dat gebeurt
+    enkel voor de categorie `CAREER` zelf, en dan vallen alle delen mee weg). Die
+    uitschrijving blijft dus een feit in Brevo: de sync voegt dat adres niet
+    opnieuw aan die ene lijst toe, en verwijdert het er evenmin uit, want
+    loskoppelen zou de uitschrijving net wissen. De andere delen en de algemene
+    lijst blijven ongemoeid.
 - **Consent blijft de website.** De site is de opt-in-plek; we importeren als
   reeds-opted-in (single opt-in via de API), geen dubbele-opt-in-mail vanuit Brevo.
 - **Identiteit via het voorkeursadres, met `ext_id = user.id`.** Wisselt een lid

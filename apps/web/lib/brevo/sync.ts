@@ -11,6 +11,7 @@ import {
   emailsToRemove,
   normalizeEmail,
   preferredEmail,
+  unsubscribedEmails,
   type BrevoListKey,
 } from "./contacts";
 import {
@@ -131,6 +132,18 @@ export async function syncUserToBrevo(
 
     const desired = new Set(desiredListKeys(effective, currentStudyYear()));
 
+    // De lijsten waarvoor dit contact zich apart uitschreef. Zo'n uitschrijving
+    // hangt bij Brevo aan het lidmaatschap: opnieuw toevoegen wist ze niet, maar
+    // we laten die lijst toch met rust zolang het lid er nog in hoort. Dat is de
+    // enige plek waar een uitschrijving voor één Career-deel ("Career -
+    // Bouwkunde - 2de bachelor") kan blijven bestaan: de site heeft er geen
+    // vinkje voor, dus er valt in de DB niets af te vinken. De algemene
+    // Career-lijst en de andere delen raken we niet aan.
+    //
+    // Bij `resubscribe` is de lijst leeg: die uitschrijvingen zijn hierboven net
+    // losgekoppeld, want het lid vroeg expliciet om weer mails te krijgen.
+    const optedOut = new Set(options.resubscribe ? [] : (contact?.listUnsubscribed ?? []));
+
     // Enkel wie in minstens één lijst hoort, houden we als contact bij; voor de
     // rest volstaat het ze uit elke lijst te verwijderen.
     if (desired.size > 0) {
@@ -142,7 +155,11 @@ export async function syncUserToBrevo(
       // Per lijst afgeschermd: Brevo geeft een 400 wanneer je een adres
       // verwijdert dat niet in de lijst zit (voor ons een no-op). Dat mag de
       // overige lijsten niet tegenhouden.
-      await guard(desired.has(key) ? addContactsToList(listId, [email]) : removeContactsFromList(listId, [email]));
+      if (desired.has(key)) {
+        if (!optedOut.has(listId)) await guard(addContactsToList(listId, [email]));
+      } else {
+        await guard(removeContactsFromList(listId, [email]));
+      }
       if (alt) await guard(removeContactsFromList(listId, [alt]));
     }
 
@@ -228,10 +245,16 @@ export async function reconcileMailingLists(): Promise<ReconcileOutcome> {
     const listId = lists[key];
     const desired = desiredByList.get(key)!;
     const snapshot = snapshots.get(key);
+    // Wie zich voor precies deze lijst uitschreef, importeren we niet opnieuw;
+    // prunen doen we hem evenmin, want loskoppelen zou die uitschrijving wissen.
+    // Voor de categorieën is dat een dubbele bodem (stap 2 vinkte ze al af in de
+    // DB), voor een Career-deel is het de enige plek waar ze standhoudt.
+    const optedOut = snapshot ? unsubscribedEmails(snapshot, listId) : new Set<string>();
     try {
-      if (desired.size > 0) {
-        await importContactsToList(listId, [...desired.values()]);
-        assignments += desired.size;
+      const toImport = [...desired.values()].filter((c) => !optedOut.has(c.email));
+      if (toImport.length > 0) {
+        await importContactsToList(listId, toImport);
+        assignments += toImport.length;
       }
       if (snapshot) {
         const toRemove = emailsToRemove(

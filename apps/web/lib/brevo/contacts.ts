@@ -8,6 +8,7 @@
  */
 import type { MailCategory, StudyProgramme, StudyYear } from "@prisma/client";
 import { nameParts } from "@vtk/auth";
+import { CAREER_SEGMENTS, inCareerSegment, type CareerSegment } from "@/lib/careerLists";
 import { MAIL_CATEGORIES, STUDY_PROGRAMMES, STUDY_YEARS } from "@/lib/profile";
 
 /**
@@ -17,11 +18,49 @@ import { MAIL_CATEGORIES, STUDY_PROGRAMMES, STUDY_YEARS } from "@/lib/profile";
  */
 export const ALL_STUDENTS_KEY = "ALLE_STUDENTEN" as const;
 
-/** Een door de site beheerde Brevo-lijst: een opt-in-categorie of "alle studenten". */
-export type BrevoListKey = MailCategory | typeof ALL_STUDENTS_KEY;
+/**
+ * De sleutel van een Career-deellijst, bv. `CAREER:jaar:2de-bachelor` of
+ * `CAREER:richting:civil:masters`. Het deel na de dubbele punt is de `key` van
+ * een {@link CareerSegment}.
+ *
+ * De **algemene** Career-lijst heeft geen zo'n sleutel: dat is de gewone
+ * categoriesleutel `CAREER` (de bestaande `VTK - Career`-lijst), net zoals
+ * `career-algemeen.csv` in de ZIP de volledige groep is. Zo blijven de bestaande
+ * lijst, haar ID en haar uitschrijvingen ongemoeid, en komen de delen ernaast.
+ */
+export type CareerListKey = `CAREER:${string}`;
 
-/** Alle lijsten die de site in Brevo beheert, in vaste volgorde. */
-export const BREVO_LIST_KEYS: BrevoListKey[] = [ALL_STUDENTS_KEY, ...MAIL_CATEGORIES];
+/** Een door de site beheerde Brevo-lijst: "alle studenten", een opt-in-categorie of een Career-deel. */
+export type BrevoListKey = MailCategory | typeof ALL_STUDENTS_KEY | CareerListKey;
+
+/** De Brevo-sleutel van één Career-deel. */
+export function careerListKey(segment: CareerSegment): CareerListKey {
+  return `CAREER:${segment.key}`;
+}
+
+/** Elk Career-deel met zijn Brevo-sleutel, in de volgorde van {@link CAREER_SEGMENTS}. */
+export const CAREER_LIST_SEGMENTS: { key: CareerListKey; segment: CareerSegment }[] =
+  CAREER_SEGMENTS.map((segment) => ({ key: careerListKey(segment), segment }));
+
+/**
+ * Alle lijsten die de site in Brevo beheert, in vaste volgorde: "alle
+ * studenten", de acht categorieën, en daarna de Career-deellijsten.
+ */
+export const BREVO_LIST_KEYS: BrevoListKey[] = [
+  ALL_STUDENTS_KEY,
+  ...MAIL_CATEGORIES,
+  ...CAREER_LIST_SEGMENTS.map((s) => s.key),
+];
+
+/** Is dit een Career-deellijst (en dus niet de algemene `CAREER`-lijst)? */
+export function isCareerListKey(key: BrevoListKey): key is CareerListKey {
+  return key.startsWith("CAREER:");
+}
+
+/** Is dit een opt-in-categorie waar het lid op /account een vinkje voor heeft? */
+function isMailCategory(key: BrevoListKey): key is MailCategory {
+  return (MAIL_CATEGORIES as readonly string[]).includes(key);
+}
 
 /** Attribuutnaam voor een studiejaar-boolean (`YEAR_BACHELOR_2`). */
 export function yearAttr(year: StudyYear): string {
@@ -70,6 +109,11 @@ export function isEligible(user: SyncUserData, studyYear: number): boolean {
  * De lijsten waar een lid in hoort. "Alle studenten" krijgt elk geschikt lid; de
  * categorieën enkel wie ze aanvinkte; Career bovendien enkel faculteitsstudenten
  * (`notAtFaculty === false`), net als in `listWhere("CAREER")`.
+ *
+ * Wie in de algemene Career-lijst hoort, komt daarnaast in elk Career-deel dat
+ * bij zijn studiejaren en richtingen past; dat zijn dezelfde delen als de CSV's
+ * in de ZIP-export. Valt Career weg (niet aangevinkt, of `notAtFaculty`), dan
+ * vallen de delen mee weg: ze zijn per definitie deelverzamelingen.
  */
 export function desiredListKeys(user: SyncUserData, studyYear: number): BrevoListKey[] {
   if (!isEligible(user, studyYear)) return [];
@@ -77,6 +121,11 @@ export function desiredListKeys(user: SyncUserData, studyYear: number): BrevoLis
   for (const category of user.mailCategories) {
     if (category === "CAREER" && user.notAtFaculty) continue;
     keys.push(category);
+  }
+  if (keys.includes("CAREER")) {
+    for (const { key, segment } of CAREER_LIST_SEGMENTS) {
+      if (inCareerSegment(segment, user)) keys.push(key);
+    }
   }
   return keys;
 }
@@ -114,7 +163,33 @@ export function readUnsubscribe(
     .filter((key): key is BrevoListKey => key !== undefined);
 
   if (keys.includes(ALL_STUDENTS_KEY)) return { global: true, categories: [] };
-  return { global: false, categories: keys.filter((k) => k !== ALL_STUDENTS_KEY) as MailCategory[] };
+
+  // Enkel de categorieën komen hier door. Een uitschrijving voor één
+  // Career-deellijst ("Career - Bouwkunde - 2de bachelor") is géén uitschrijving
+  // voor Career: het lid wil de andere career-mails nog. De site heeft voor zo'n
+  // deel geen vinkje, dus er valt in de DB niets af te vinken; die uitschrijving
+  // blijft een feit in Brevo, en de sync respecteert ze per deel door dat adres
+  // niet opnieuw aan die ene lijst toe te voegen (zie `sync.ts`).
+  return { global: false, categories: keys.filter(isMailCategory) };
+}
+
+/**
+ * De adressen die zich voor precies deze lijst uitschreven, genormaliseerd.
+ *
+ * Zo'n uitschrijving hangt bij Brevo aan het lidmaatschap, niet aan het contact:
+ * loskoppelen wist ze (dat is precies wat `clearUnsubscribe` doet). De sync mag
+ * er dus niet overheen walsen; ze laat het adres met rust in die ene lijst en
+ * raakt de andere delen en de algemene lijst niet aan.
+ */
+export function unsubscribedEmails(
+  contacts: readonly { email: string; listUnsubscribed: number[] }[],
+  listId: number,
+): Set<string> {
+  const emails = new Set<string>();
+  for (const contact of contacts) {
+    if (contact.listUnsubscribed.includes(listId)) emails.add(normalizeEmail(contact.email));
+  }
+  return emails;
 }
 
 type EmailFields = Pick<SyncUserData, "email" | "personalEmail" | "emailPreference">;
