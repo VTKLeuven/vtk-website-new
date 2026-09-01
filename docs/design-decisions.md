@@ -2239,6 +2239,11 @@ Wat daarbij vastligt:
   proximity`), met `scroll-padding` voor de vastgeplakte urenkolom. Zonder dat
   sta je na elke veeg half op twee dagen. `proximity` en niet `mandatory`, zodat
   een bewuste veeg over anderhalve dag mogelijk blijft.
+- **De dagnamen plakken op een telefoon niet vast.** Ze schuiven mee met de
+  inhoud. De pane is daar maar iets hoger dan de dag zelf, dus je zag een rij
+  dagnamen boven een rooster hangen dat er nauwelijks onder wegschoof, en dat
+  las als een fout. In volledig scherm is er op een telefoon toch de
+  dagweergave, en die heeft haar eigen kop.
 - **Bij het openen scrolt de kalender naar de vroegste rit**, minus een uur, of
   naar 08:00 als er niets staat. Bovenaan beginnen betekent vier uur nacht in
   beeld.
@@ -2332,6 +2337,15 @@ op iets dat aanstond, dan wis je.
 - **Het vakje onder je vinger komt van `elementFromPoint`**, niet van de
   gebeurtenis: bij een veeg vangt de browser de pointer, dus `event.target`
   blijft de hele veeg lang het vakje waar je begon.
+- **Op een telefoon staat er niets anders op dat scherm.** De velden om een uur
+  in te tikken en de lijst om een venster weg te halen stonden er eerst onder,
+  maar allebei doen ze wat het raster al doet, en samen duwden ze het raster van
+  het scherm. Ze blijven wel op een breed scherm staan.
+- **Het raster meet zijn hoogte tot de onderrand van het venster** en de uren
+  delen wat er is. Daarvoor krijgt de paginakop een `compact`-stand: kleinere
+  titel, geen inleiding, minder ruimte onderaan, en de weeknavigatie op één rij.
+  Die zestig pixels waren precies het verschil tussen "past op één scherm" en
+  "je moet toch scrollen", en scrollen is hier wat niet kan: je vinger tekent.
 
 ### De knop naar de beschikbaarheid staat in de donkere paginakop
 

@@ -58,6 +58,7 @@ export default async function BeschikbaarheidPage({
           ? 'Let Logistics know when you are free. It is a hint, not a promise: they can still ask you outside these windows.'
           : 'Laat Logistiek weten wanneer je vrij bent. Het is een hint en geen belofte: ze mogen je nog altijd vragen buiten deze vensters.'
       }
+      compact
     >
       {!driver ? (
         <p className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 text-sm leading-7 text-vtk-body">
@@ -72,22 +73,34 @@ export default async function BeschikbaarheidPage({
         </p>
       ) : (
         <div className="grid gap-4">
-          <nav className="flex flex-wrap items-center gap-2 text-sm" aria-label="Week kiezen">
+          {/* Op een telefoon één rij: het raster eronder moet op hetzelfde
+              scherm passen, en drie rijen navigatie duwen het weg. Het
+              datumbereik verdwijnt daar; het weeknummer en de dagnummers in het
+              raster zeggen genoeg. */}
+          <nav
+            className="flex items-center justify-between gap-2 text-sm"
+            aria-label="Week kiezen"
+          >
             <Link
               href={hrefFor(new Date(monday.getTime() - 7 * DAY_MS))}
-              className="rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+              className="shrink-0 rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40"
             >
-              ← {en ? 'Previous' : 'Vorige'}
+              ←<span className="sr-only sm:not-sr-only sm:ml-1">
+                {en ? 'Previous' : 'Vorige'}
+              </span>
             </Link>
-            <span className="text-vtk-muted">
-              {en ? 'Week' : 'Week'} {isoWeekNumber(monday)} ·{' '}
-              {formatDateRange(monday, new Date(monday.getTime() + 6 * DAY_MS), locale)}
+            <span className="min-w-0 truncate text-center text-vtk-muted">
+              {en ? 'Week' : 'Week'} {isoWeekNumber(monday)}
+              <span className="hidden sm:inline">
+                {' '}
+                · {formatDateRange(monday, new Date(monday.getTime() + 6 * DAY_MS), locale)}
+              </span>
             </span>
             <Link
               href={hrefFor(new Date(monday.getTime() + 7 * DAY_MS))}
-              className="rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40"
+              className="shrink-0 rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40"
             >
-              {en ? 'Next' : 'Volgende'} →
+              <span className="sr-only sm:not-sr-only sm:mr-1">{en ? 'Next' : 'Volgende'}</span>→
             </Link>
           </nav>
 

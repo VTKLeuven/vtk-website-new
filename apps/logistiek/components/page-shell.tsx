@@ -7,6 +7,7 @@ export function PageShell({
   title,
   intro,
   action,
+  compact = false,
   children,
 }: {
   kicker?: ReactNode;
@@ -21,11 +22,20 @@ export function PageShell({
    * de kop staat ze naast de titel, waar je ze verwacht.
    */
   action?: ReactNode;
+  /**
+   * Op een telefoon een kleinere kop, zonder de inleiding.
+   *
+   * Voor een scherm dat op één scherm moet passen (het intekenraster van de
+   * beschikbaarheid). Daar is de inleiding drie regels die het raster naar
+   * beneden duwen tot je moet scrollen, en scrollen is precies wat daar niet
+   * kan: je vinger tekent er.
+   */
+  compact?: boolean;
   children: ReactNode;
 }) {
   return (
     <main className="flex-1">
-      <header className="logistics-page-head">
+      <header className={`logistics-page-head${compact ? ' is-compact' : ''}`}>
         <div className="logistics-page-head-inner">
           <div className="logistics-page-head-row">
             <div className="min-w-0">
@@ -42,7 +52,7 @@ export function PageShell({
           </div>
         </div>
       </header>
-      <div className="logistics-page-content">{children}</div>
+      <div className={`logistics-page-content${compact ? ' is-compact' : ''}`}>{children}</div>
     </main>
   );
 }

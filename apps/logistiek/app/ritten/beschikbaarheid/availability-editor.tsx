@@ -233,16 +233,13 @@ export function AvailabilityEditor({
   );
 
   if (narrow) {
-    // Op een telefoon een eigen intekenraster van uurvakjes. Slepen in het
-    // tijdrooster hieronder is muis-only, en dat kan ook niet anders: verticaal
-    // vegen is daar scrollen. Zie `availability-paint.tsx`.
-    return (
-      <div className="grid gap-5">
-        <AvailabilityPaint days={days} windows={shown} />
-        {fields}
-        {list}
-      </div>
-    );
+    // Op een telefoon enkel het intekenraster, op één scherm dat niet scrolt.
+    // De velden om een uur in te tikken en de lijst om een venster weg te halen
+    // stonden er eerst onder, maar allebei doen ze wat het raster al doet, en
+    // samen duwden ze het raster van het scherm. Slepen in het tijdrooster van
+    // het brede scherm is muis-only en kan daar ook niet anders: verticaal vegen
+    // is scrollen. Zie `availability-paint.tsx`.
+    return <AvailabilityPaint days={days} windows={shown} />;
   }
 
   return (

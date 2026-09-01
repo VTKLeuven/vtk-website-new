@@ -216,6 +216,15 @@ body {
     scroll-snap-align: start;
   }
 
+  /* De dagnamen plakken op een telefoon niet vast. Ze schuiven mee met de
+     inhoud in plaats van boven het rooster te blijven hangen: de pane is daar
+     maar iets hoger dan de dag zelf, en dan zag je een rij dagnamen zweven over
+     een rooster dat er nauwelijks onder wegschoof. In volledig scherm is er op
+     een telefoon toch de dagweergave, en die heeft haar eigen kop. */
+  .tg-head {
+    position: static;
+  }
+
   /* Wat hier bewust niet staat:
 
      - **De knoppen kleiner maken.** Dat scheelde zeventien pixels werkbalk en
@@ -813,6 +822,32 @@ body {
 .logistics-page-content {
   padding-top: clamp(28px, 4vw, 40px);
   padding-bottom: clamp(64px, 8vw, 96px);
+}
+
+/* Een kop die op een telefoon plaats maakt: minder lucht en geen inleiding.
+   Zie de `compact`-prop van PageShell voor het waarom. */
+@media (max-width: 700px) {
+  .logistics-page-head.is-compact .logistics-page-head-inner {
+    padding-top: 20px;
+    padding-bottom: 18px;
+  }
+
+  .logistics-page-head.is-compact h1 {
+    margin-top: 8px;
+    font-size: 26px;
+  }
+
+  .logistics-page-head.is-compact .logistics-page-intro {
+    display: none;
+  }
+
+  /* De ruimte onderaan de pagina is hier de laatste zestig pixels tussen "past
+     op één scherm" en "je moet toch scrollen". Het raster meet zijn hoogte tot
+     de onderrand van het venster; die padding kwam daar nog onder. */
+  .logistics-page-content.is-compact {
+    padding-top: 16px;
+    padding-bottom: 12px;
+  }
 }
 
 /* De titel links, de knop rechts. Op een smal scherm onder elkaar: naast een

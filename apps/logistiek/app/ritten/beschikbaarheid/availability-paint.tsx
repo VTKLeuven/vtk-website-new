@@ -34,6 +34,12 @@ import type { AvailabilityWindow } from './availability-editor';
  * - **De nacht staat ingeklapt.** Van 00:00 tot 06:00 rijdt er zelden iemand, en
  *   die zes rijen zijn precies wat het raster van het scherm duwt. Eén knop zet
  *   ze erbij.
+ * - **Het raster vult de rest van het scherm.** De hoogte wordt gemeten vanaf
+ *   waar het staat tot de onderrand, en de uren delen wat er is. Vaste
+ *   rijhoogtes gaven een scherm dat net iets te hoog was, en scrollen is hier
+ *   precies wat niet kan: je vinger tekent. Klap je de nacht open, dan passen
+ *   vierentwintig rijen niet meer en scrolt de pagina alsnog; dat is de
+ *   uitzondering waarvoor die knop bestaat.
  * - **Opslaan gebeurt per dag, bij het loslaten.** Niet per vakje: dan stuur je
  *   twintig verzoeken voor één veeg. En niet met een aparte opslaanknop: dan
  *   staat er op het scherm iets anders dan in de databank, en dat is precies wat
@@ -126,6 +132,30 @@ export function AvailabilityPaint({
   }, [saved, savedKey]);
 
   const grid = useRef<HTMLDivElement>(null);
+  const shell = useRef<HTMLElement>(null);
+
+  /**
+   * De hoogte die er onder dit blok nog over is, zodat het raster het scherm
+   * vult zonder dat de pagina moet scrollen. Gemeten en niet in CSS: de plek
+   * waar dit blok begint hangt af van de paginakop erboven, en die weet CSS niet.
+   */
+  const [height, setHeight] = useState<number | null>(null);
+  useEffect(() => {
+    const node = shell.current;
+    if (!node) return;
+    const measure = () => {
+      const top = node.getBoundingClientRect().top + window.scrollY;
+      setHeight(Math.max(320, window.innerHeight - top - 12));
+    };
+    measure();
+    window.addEventListener('resize', measure);
+    const observer = new ResizeObserver(measure);
+    observer.observe(document.body);
+    return () => {
+      window.removeEventListener('resize', measure);
+      observer.disconnect();
+    };
+  }, []);
   /** De veeg die bezig is: aanduiden of wissen, en welke dagen er geraakt zijn. */
   const stroke = useRef<{ turnOn: boolean; touched: Set<string> } | null>(null);
 
@@ -232,16 +262,20 @@ export function AvailabilityPaint({
   const total = cells.size;
 
   return (
-    <section className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-3">
-      <p className="text-sm font-semibold text-vtk-ink">Duid aan wanneer je kan</p>
-      <p className="mt-0.5 text-xs text-vtk-muted">
-        Leg je vinger op een uur en veeg. Veeg er nog eens over om het weg te halen.
+    <section
+      ref={shell}
+      className="flex flex-col rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-3"
+      style={height ? { height } : undefined}
+    >
+      {/* Eén regel, want elke regel hier is een rij vakjes minder. */}
+      <p className="truncate text-xs text-vtk-muted">
+        Vinger op een uur en vegen; nog eens vegen wist.
       </p>
 
-      <div className="mt-3">
+      <div className="mt-2 flex min-h-0 flex-1 flex-col">
         {/* De dagkoppen, op dezelfde kolommen als het raster eronder. */}
         <div
-          className="grid gap-1 pb-1"
+          className="grid gap-[2px] pb-1"
           style={{ gridTemplateColumns: `2.25rem repeat(${parsedDays.length}, minmax(0, 1fr))` }}
         >
           <span />
@@ -265,16 +299,22 @@ export function AvailabilityPaint({
 
         {/* `touch-action: none`: anders scrolt de pagina mee met je veeg en wordt
             er niets aangeduid. De pagina scrolt nog gewoon buiten dit raster. */}
-        <div ref={grid} className="grid gap-1 touch-none select-none">
+        {/* De rijen delen de hoogte (`1fr`) met een ondergrens, zodat het raster
+            het scherm vult in plaats van een vaste maat aan te houden. */}
+        <div
+          ref={grid}
+          className="grid min-h-0 flex-1 touch-none select-none gap-[2px]"
+          style={{ gridTemplateRows: `repeat(${hours.length}, minmax(22px, 1fr))` }}
+        >
           {hours.map((hour) => (
             <div
               key={hour}
-              className="grid items-center gap-1"
+              className="grid min-h-0 items-stretch gap-[2px]"
               style={{
                 gridTemplateColumns: `2.25rem repeat(${parsedDays.length}, minmax(0, 1fr))`,
               }}
             >
-              <span className="text-right text-[10px] tabular-nums text-vtk-muted">
+              <span className="self-center text-right text-[10px] tabular-nums text-vtk-muted">
                 {String(hour).padStart(2, '0')}
               </span>
               {parsedDays.map((day) => {
@@ -287,9 +327,7 @@ export function AvailabilityPaint({
                     data-day={iso}
                     data-hour={hour}
                     aria-pressed={on}
-                    // 30px hoog: hoger dan dit past de dag niet meer op één
-                    // scherm, lager mik je met een duim naast.
-                    className={`h-[30px] rounded-[6px] border transition-colors ${
+                    className={`h-full rounded-[6px] border transition-colors ${
                       on
                         ? 'border-vtk-navy/25 bg-vtk-yellow'
                         : 'border-vtk-navy/10 bg-vtk-paper/70'
@@ -308,7 +346,7 @@ export function AvailabilityPaint({
         </div>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => setShowNight((value) => !value)}
