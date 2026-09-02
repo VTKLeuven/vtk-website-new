@@ -56,34 +56,38 @@ export type ExpenseDetail = ExpenseRow & {
   receiptSize: number;
 };
 
+type LinkedExpenseRow = ExpenseRow & { detailHref: string; editHref: string };
+type LinkedExpenseDetail = ExpenseDetail & { editHref: string };
+
 export function ExpenseWorkbench({
   locale,
   rows,
   total,
   totalCents,
   selected,
-  hrefForRow,
   hrefWithoutSel,
   pagination,
   emptyMessage,
   canManageState,
   accountantEmail,
   senderEmail,
-  editHrefFor,
 }: {
   locale: Locale;
-  rows: ExpenseRow[];
+  rows: LinkedExpenseRow[];
   total: number;
   totalCents: number;
-  selected: ExpenseDetail | null;
-  hrefForRow: (id: string) => string;
+  selected: LinkedExpenseDetail | null;
   hrefWithoutSel: string;
-  pagination: { page: number; pages: number; hrefFor: (page: number) => string };
+  pagination: {
+    page: number;
+    pages: number;
+    previousHref: string | null;
+    nextHref: string | null;
+  };
   emptyMessage: string;
   canManageState: boolean;
   accountantEmail: string;
   senderEmail: string;
-  editHrefFor: (id: string) => string;
 }) {
   const nl = locale === "nl";
   const router = useRouter();
@@ -135,7 +139,7 @@ export function ExpenseWorkbench({
                       <td className="px-4 py-3">
                         <button
                           type="button"
-                          onClick={() => router.push(hrefForRow(row.id), { scroll: false })}
+                          onClick={() => router.push(row.detailHref, { scroll: false })}
                           className="text-left font-semibold text-vtk-ink hover:underline"
                         >
                           {row.description}
@@ -244,13 +248,13 @@ export function ExpenseWorkbench({
                           <IconButton
                             label={nl ? "Details openen" : "Open details"}
                             srLabel={`${nl ? "Details openen" : "Open details"}: ${row.description}`}
-                            onClick={() => router.push(hrefForRow(row.id), { scroll: false })}
+                            onClick={() => router.push(row.detailHref, { scroll: false })}
                           >
                             <InfoIcon />
                           </IconButton>
                           {row.canEdit && (
                             <IconLink
-                              href={editHrefFor(row.id)}
+                              href={row.editHref}
                               label={nl ? "Bewerken" : "Edit"}
                               srLabel={`${nl ? "Bewerken" : "Edit"}: ${row.description}`}
                             >
@@ -294,9 +298,9 @@ export function ExpenseWorkbench({
           </span>
           {pagination.pages > 1 && (
             <nav className="flex items-center gap-1" aria-label={nl ? "Paginering" : "Pagination"}>
-              {pagination.page > 1 && (
+              {pagination.previousHref && (
                 <Link
-                  href={pagination.hrefFor(pagination.page - 1)}
+                  href={pagination.previousHref}
                   className="rounded-lg border border-vtk-blue/15 px-2 py-1 hover:bg-vtk-blue-soft/50"
                 >
                   {nl ? "Vorige" : "Previous"}
@@ -305,9 +309,9 @@ export function ExpenseWorkbench({
               <span className="px-2 tabular-nums">
                 {pagination.page} / {pagination.pages}
               </span>
-              {pagination.page < pagination.pages && (
+              {pagination.nextHref && (
                 <Link
-                  href={pagination.hrefFor(pagination.page + 1)}
+                  href={pagination.nextHref}
                   className="rounded-lg border border-vtk-blue/15 px-2 py-1 hover:bg-vtk-blue-soft/50"
                 >
                   {nl ? "Volgende" : "Next"}
@@ -326,7 +330,7 @@ export function ExpenseWorkbench({
           canManageState={canManageState}
           accountantEmail={accountantEmail}
           senderEmail={senderEmail}
-          editHref={editHrefFor(selected.id)}
+          editHref={selected.editHref}
           onClose={() => router.push(hrefWithoutSel, { scroll: false })}
         />
       )}

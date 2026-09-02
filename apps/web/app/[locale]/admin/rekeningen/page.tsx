@@ -402,16 +402,33 @@ export default async function RekeningenOverzicht({
 
       <ExpenseWorkbench
         locale={locale}
-        rows={rowsRaw.map((expense) => toRow(expense, locale, access))}
+        rows={rowsRaw.map((expense) => ({
+          ...toRow(expense, locale, access),
+          detailHref: hrefWith({ sel: expense.id }),
+          editHref: `${base}/admin/rekeningen/bewerken/${expense.id}`,
+        }))}
         total={listCount}
         totalCents={listSum._sum.amountCents ?? 0}
-        selected={selected ? toDetail(selected, locale, access) : null}
-        hrefForRow={(id) => hrefWith({ sel: id })}
+        selected={
+          selected
+            ? {
+                ...toDetail(selected, locale, access),
+                editHref: `${base}/admin/rekeningen/bewerken/${selected.id}`,
+              }
+            : null
+        }
         hrefWithoutSel={hrefWith({ sel: "" })}
         pagination={{
           page: filters.page,
           pages,
-          hrefFor: (page) => hrefWith({ p: page > 1 ? String(page) : "", sel: "" }),
+          previousHref:
+            filters.page > 1
+              ? hrefWith({ p: filters.page > 2 ? String(filters.page - 1) : "", sel: "" })
+              : null,
+          nextHref:
+            filters.page < pages
+              ? hrefWith({ p: String(filters.page + 1), sel: "" })
+              : null,
         }}
         emptyMessage={
           nl
@@ -421,7 +438,6 @@ export default async function RekeningenOverzicht({
         canManageState={access.canManageAll}
         accountantEmail={config.accountantEmail}
         senderEmail={expenseSenderLabel(config)}
-        editHrefFor={(id) => `${base}/admin/rekeningen/bewerken/${id}`}
       />
     </div>
   );

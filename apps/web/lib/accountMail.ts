@@ -1,6 +1,6 @@
 import "server-only";
 
-import { sendMail } from "@vtk/mail";
+import { sendMail } from "@/lib/email";
 import type { Locale } from "@vtk/i18n";
 import { siteBaseUrl } from "@/lib/calendar/feeds";
 
@@ -29,33 +29,36 @@ export async function sendVerificationMail(input: {
   const nl = input.locale === "nl";
   const firstName = input.name.split(" ")[0] || input.name;
 
-  return sendMail({
-    to: input.to,
-    subject: nl ? "Bevestig je VTK-account" : "Confirm your VTK account",
-    text: nl
-      ? [
-          `Dag ${firstName}`,
-          "",
-          "Je maakte een VTK-account aan met dit e-mailadres. Klik op de link hieronder om het te bevestigen; daarna kan je inloggen.",
-          "",
-          url,
-          "",
-          "De link blijft zeven dagen geldig. Maakte jij dit account niet aan, dan hoef je niets te doen: zonder bevestiging gebeurt er niets met dit adres.",
-          "",
-          "VTK",
-        ].join("\n")
-      : [
-          `Hi ${firstName}`,
-          "",
-          "You created a VTK account with this email address. Use the link below to confirm it; after that you can sign in.",
-          "",
-          url,
-          "",
-          "The link stays valid for seven days. If you did not create this account, you do not have to do anything: without confirmation nothing happens with this address.",
-          "",
-          "VTK",
-        ].join("\n"),
-  });
+  return sendMail(
+    {
+      to: input.to,
+      subject: nl ? "Bevestig je VTK-account" : "Confirm your VTK account",
+      text: nl
+        ? [
+            `Dag ${firstName}`,
+            "",
+            "Je maakte een VTK-account aan met dit e-mailadres. Klik op de link hieronder om het te bevestigen; daarna kan je inloggen.",
+            "",
+            url,
+            "",
+            "De link blijft zeven dagen geldig. Maakte jij dit account niet aan, dan hoef je niets te doen: zonder bevestiging gebeurt er niets met dit adres.",
+            "",
+            "VTK",
+          ].join("\n")
+        : [
+            `Hi ${firstName}`,
+            "",
+            "You created a VTK account with this email address. Use the link below to confirm it; after that you can sign in.",
+            "",
+            url,
+            "",
+            "The link stays valid for seven days. If you did not create this account, you do not have to do anything: without confirmation nothing happens with this address.",
+            "",
+            "VTK",
+          ].join("\n"),
+    },
+    { source: "account" },
+  );
 }
 
 export async function sendPasswordResetMail(input: {
@@ -68,33 +71,36 @@ export async function sendPasswordResetMail(input: {
   const nl = input.locale === "nl";
   const firstName = input.name.split(" ")[0] || input.name;
 
-  return sendMail({
-    to: input.to,
-    subject: nl ? "Nieuw wachtwoord voor je VTK-account" : "New password for your VTK account",
-    text: nl
-      ? [
-          `Dag ${firstName}`,
-          "",
-          "Je vroeg een nieuw wachtwoord aan voor je VTK-account. Klik op de link hieronder om er een in te stellen.",
-          "",
-          url,
-          "",
-          "De link blijft één uur geldig en werkt maar één keer. Vroeg jij dit niet aan, dan verandert er niets: je huidige wachtwoord blijft gewoon werken.",
-          "",
-          "VTK",
-        ].join("\n")
-      : [
-          `Hi ${firstName}`,
-          "",
-          "You asked for a new password for your VTK account. Use the link below to set one.",
-          "",
-          url,
-          "",
-          "The link stays valid for one hour and works only once. If you did not ask for this, nothing changes: your current password keeps working.",
-          "",
-          "VTK",
-        ].join("\n"),
-  });
+  return sendMail(
+    {
+      to: input.to,
+      subject: nl ? "Nieuw wachtwoord voor je VTK-account" : "New password for your VTK account",
+      text: nl
+        ? [
+            `Dag ${firstName}`,
+            "",
+            "Je vroeg een nieuw wachtwoord aan voor je VTK-account. Klik op de link hieronder om er een in te stellen.",
+            "",
+            url,
+            "",
+            "De link blijft één uur geldig en werkt maar één keer. Vroeg jij dit niet aan, dan verandert er niets: je huidige wachtwoord blijft gewoon werken.",
+            "",
+            "VTK",
+          ].join("\n")
+        : [
+            `Hi ${firstName}`,
+            "",
+            "You asked for a new password for your VTK account. Use the link below to set one.",
+            "",
+            url,
+            "",
+            "The link stays valid for one hour and works only once. If you did not ask for this, nothing changes: your current password keeps working.",
+            "",
+            "VTK",
+          ].join("\n"),
+    },
+    { source: "account" },
+  );
 }
 
 /**
@@ -111,31 +117,34 @@ export async function sendManagedPasswordSetupMail(input: {
   const nl = input.locale === "nl";
   const firstName = input.name.split(" ")[0] || input.name;
 
-  return sendMail({
-    to: input.to,
-    subject: nl ? "Blijf toegang houden tot je VTK-account" : "Keep access to your VTK account",
-    text: nl
-      ? [
-          `Dag ${firstName}`,
-          "",
-          "Je VTK-account was gekoppeld aan je KU Leuven-login. Via de link hieronder kan je een wachtwoord instellen, zodat je ook na je afstuderen toegang houdt met je persoonlijke e-mailadres.",
-          "",
-          url,
-          "",
-          "De link blijft één uur geldig en werkt maar één keer. Verwachtte je deze mail niet, dan hoef je niets te doen.",
-          "",
-          "VTK",
-        ].join("\n")
-      : [
-          `Hi ${firstName}`,
-          "",
-          "Your VTK account was linked to your KU Leuven sign-in. Use the link below to set a password, so you can keep access after graduating with your personal email address.",
-          "",
-          url,
-          "",
-          "The link stays valid for one hour and works only once. If you did not expect this email, you do not need to do anything.",
-          "",
-          "VTK",
-        ].join("\n"),
-  });
+  return sendMail(
+    {
+      to: input.to,
+      subject: nl ? "Blijf toegang houden tot je VTK-account" : "Keep access to your VTK account",
+      text: nl
+        ? [
+            `Dag ${firstName}`,
+            "",
+            "Je VTK-account was gekoppeld aan je KU Leuven-login. Via de link hieronder kan je een wachtwoord instellen, zodat je ook na je afstuderen toegang houdt met je persoonlijke e-mailadres.",
+            "",
+            url,
+            "",
+            "De link blijft één uur geldig en werkt maar één keer. Verwachtte je deze mail niet, dan hoef je niets te doen.",
+            "",
+            "VTK",
+          ].join("\n")
+        : [
+            `Hi ${firstName}`,
+            "",
+            "Your VTK account was linked to your KU Leuven sign-in. Use the link below to set a password, so you can keep access after graduating with your personal email address.",
+            "",
+            url,
+            "",
+            "The link stays valid for one hour and works only once. If you did not expect this email, you do not need to do anything.",
+            "",
+            "VTK",
+          ].join("\n"),
+    },
+    { source: "account" },
+  );
 }

@@ -1,8 +1,6 @@
 import "server-only";
 
-import nodemailer from "nodemailer";
-
-import { smtpEhloName } from "@vtk/mail";
+import { deliverWebsiteMail } from "@/lib/email";
 
 export type MailAttachment = {
   filename: string;
@@ -19,59 +17,24 @@ export type MailMessage = {
   attachments?: MailAttachment[];
 };
 
-let transport: nodemailer.Transporter | null = null;
-
-function smtpTransport(): nodemailer.Transporter | null {
-  const host = process.env.SMTP_HOST?.trim();
-  if (!host) return null;
-  const secure = process.env.SMTP_SECURE === "true";
-  transport ??= nodemailer.createTransport({
-    host,
-    port: Number.parseInt(process.env.SMTP_PORT ?? "587", 10),
-    secure,
-    // Zonder een expliciete naam stelt nodemailer zich in een container voor als
-    // `EHLO [127.0.0.1]`, en dan verbreekt de relay van Google de verbinding met
-    // een 421. Zie `smtpEhloName()`.
-    name: smtpEhloName(),
-    // Op poort 587 mag de verbinding nooit onversleuteld doorgaan: daar reizen
-    // een wachtwoord en de tickets van een koper over. Zonder dit valt
-    // nodemailer terug op plain wanneer STARTTLS niet aangekondigd wordt.
-    requireTLS: !secure,
-    auth: process.env.SMTP_USER
-      ? { user: process.env.SMTP_USER, pass: process.env.SMTP_PASSWORD }
-      : undefined,
-    connectionTimeout: 15_000,
-    greetingTimeout: 15_000,
-    socketTimeout: 30_000,
-  });
-  return transport;
-}
-
 export async function sendMail(message: MailMessage): Promise<string> {
   const sender = process.env.MAIL_FROM?.trim();
-  const smtp = smtpTransport();
+  const result = await deliverWebsiteMail(
+    {
+      from: sender,
+      to: message.to,
+      subject: message.subject,
+      text: message.text,
+      html: message.html,
+      replyTo: message.replyTo || process.env.MAIL_REPLY_TO || undefined,
+      attachments: message.attachments,
+    },
+    { source: "ticketing", requireProductionConfig: true },
+  );
 
-  if (!sender || !smtp) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("SMTP_HOST and MAIL_FROM must be configured");
-    }
-    const files = message.attachments?.map((attachment) => attachment.filename).join(", ");
-    console.info(
-      `[ticket-mail:dev] ${message.subject} -> ${message.to}${files ? ` (bijlagen: ${files})` : ""}`
-    );
-    return `dev-${Date.now()}`;
-  }
-
-  const result = await smtp.sendMail({
-    from: sender,
-    to: message.to,
-    subject: message.subject,
-    text: message.text,
-    html: message.html,
-    replyTo: message.replyTo || process.env.MAIL_REPLY_TO || undefined,
-    attachments: message.attachments,
-  });
-  return result.messageId;
+  if (result.status === "failed") throw result.error;
+  if (result.status === "simulated") return result.messageId ?? `dev-${Date.now()}`;
+  return result.messageId ?? `smtp-${Date.now()}`;
 }
 
 /**

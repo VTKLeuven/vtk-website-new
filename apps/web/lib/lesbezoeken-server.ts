@@ -2,7 +2,7 @@ import "server-only";
 
 import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@vtk/db";
-import { sendMail } from "@vtk/mail";
+import { sendMail } from "@/lib/email";
 import { clampNudgeLeadDays } from "@/lib/lesbezoeken";
 import {
   DEFAULT_LESBEZOEK_CONFIG,
@@ -107,14 +107,17 @@ export async function sendLesbezoekMail(input: {
   cc?: string;
 }): Promise<boolean> {
   const config = await getLesbezoekConfig();
-  const delivered = await sendMail({
-    to: input.to,
-    cc: input.cc,
-    from: LESBEZOEK_FROM,
-    replyTo: config.notifyEmail,
-    subject: input.subject,
-    text: input.text,
-  });
+  const delivered = await sendMail(
+    {
+      to: input.to,
+      cc: input.cc,
+      from: LESBEZOEK_FROM,
+      replyTo: config.notifyEmail,
+      subject: input.subject,
+      text: input.text,
+    },
+    { source: "lesbezoeken" },
+  );
 
   if (!delivered) {
     // Enkel dát het misging: de inhoud is post van en naar een professor en hoort
@@ -142,23 +145,26 @@ export async function notifyNewLesbezoek(visit: {
   try {
     const config = await getLesbezoekConfig();
     const { date, time } = formatMailMoment(visit.startsAt, "nl");
-    await sendMail({
-      to: config.notifyEmail,
-      from: LESBEZOEK_FROM,
-      replyTo: visit.requesterEmail ?? undefined,
-      subject: `[Lesbezoek] ${visit.organisation.name} — ${visit.course} op ${date}`,
-      text: [
-        `Organisatie: ${visit.organisation.name}`,
-        `Onderwerp: ${visit.subject}`,
-        `Doelgroep: ${visit.audience}`,
-        `Vak: ${visit.course}`,
-        `Wanneer: ${date} om ${time}`,
-        `Professor: ${visit.teacherEmail}`,
-        `Aanvrager: ${visit.requesterEmail ?? "—"}`,
-        "",
-        "Beoordelen doe je in het beheer onder Lesbezoeken.",
-      ].join("\n"),
-    });
+    await sendMail(
+      {
+        to: config.notifyEmail,
+        from: LESBEZOEK_FROM,
+        replyTo: visit.requesterEmail ?? undefined,
+        subject: `[Lesbezoek] ${visit.organisation.name} — ${visit.course} op ${date}`,
+        text: [
+          `Organisatie: ${visit.organisation.name}`,
+          `Onderwerp: ${visit.subject}`,
+          `Doelgroep: ${visit.audience}`,
+          `Vak: ${visit.course}`,
+          `Wanneer: ${date} om ${time}`,
+          `Professor: ${visit.teacherEmail}`,
+          `Aanvrager: ${visit.requesterEmail ?? "—"}`,
+          "",
+          "Beoordelen doe je in het beheer onder Lesbezoeken.",
+        ].join("\n"),
+      },
+      { source: "lesbezoeken" },
+    );
   } catch (err) {
     console.error("[lesbezoeken] kon melding van nieuwe aanvraag niet versturen", err);
     Sentry.captureException(err);

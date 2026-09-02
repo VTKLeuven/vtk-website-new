@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Card } from "@vtk/ui";
+import { Modal } from "@/app/[locale]/admin/admin-table";
+import { IconButton, RowActions } from "@/components/ui/IconButton";
+import { InfoIcon } from "@/components/ui/icons";
 import {
   CONTRACT_STATE_META,
   DEPOSIT_STATE_META,
@@ -14,19 +16,14 @@ import { RentalInspector } from "./RentalInspector";
 import type { RentalView } from "./types";
 
 /**
- * De werkbank van de verhuur: links de aanvragen (of de kalender), rechts de
- * aanvraag die je bekeek.
+ * De werkbank van de verhuur: de aanvragen of kalender over de volle breedte,
+ * met de gekozen aanvraag in een modal. Dit volgt hetzelfde patroon als het
+ * rekeningenbeheer: eerst de volledige werklijst kunnen scannen, daarna pas het
+ * uitgebreide formulier ervoor leggen.
  *
- * De selectie zit in clientstate en niet in de URL, want het paneel bevat een
+ * De selectie zit in clientstate en niet in de URL, want de modal bevat een
  * half opgestelde mail; een herlaadbeurt bij elke klik zou die weggooien.
  */
-
-const TONE_COLOUR: Record<string, string> = {
-  waiting: "#B45309",
-  ok: "#0E9F6E",
-  no: "#BE123C",
-  done: "#5C667F",
-};
 
 export function RentalBoard({
   nl,
@@ -54,112 +51,173 @@ export function RentalBoard({
 
   // Na een verwijdering of een verversing kan de selectie naar iets wijzen dat er
   // niet meer is. Dat hoeft niet opgeruimd te worden: `selected` is dan vanzelf
-  // null en het paneel valt terug op de lege toestand. Een cuid komt nooit een
+  // null en de modal blijft dicht. Een cuid komt nooit een
   // tweede keer voor, dus een oude id kan later niets anders aanwijzen.
   const selected = useMemo(
     () => rentals.find((rental) => rental.id === selectedId) ?? null,
     [rentals, selectedId],
   );
 
-  // Zolang er niets geselecteerd is, krijgt de kalender de hele breedte. Een
-  // weekraster in een halve kolom zijn zeven kolommen van een centimeter, en het
-  // paneel ernaast toont dan enkel de zin "klik op een aanvraag". Bij de lijsten
-  // blijft het paneel wel staan: daar is elke rij één regel tekst, en die over
-  // twaalfhonderd pixels uitrekken leest slechter dan de hint ernaast.
-  const fullWidth = mode === "calendar" && !selected;
-
   return (
-    <div className="tv-board" data-single={fullWidth || undefined}>
-      <div>
-        {mode === "calendar" ? (
-          <RentalCalendar
-            nl={nl}
-            rentals={rentals}
-            selectedId={selectedId}
-            onSelect={(rental) => setSelectedId(rental.id)}
-          />
-        ) : rentals.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-vtk-blue/20 bg-white/60 px-5 py-10 text-center text-sm text-[#5c667f]">
-            {emptyMessage}
-          </p>
-        ) : (
-          <div className="tv-queue">
-            {rentals.map((rental) => {
-              const meta = RENTAL_STATUS_META[rental.status];
-              return (
-                <button
-                  key={rental.id}
-                  type="button"
-                  className="tv-item"
-                  aria-current={rental.id === selectedId}
-                  style={{ ["--tone" as string]: TONE_COLOUR[meta.tone] }}
-                  onClick={() => setSelectedId(rental.id)}
-                >
-                  <span className="tv-item-rail" aria-hidden="true" />
-                  <span className="tv-item-body">
-                    <span className="tv-item-top">
-                      <span className="tv-item-title">{rental.responsibleName}</span>
-                      <span className="tv-badge" data-tone={meta.tone}>
-                        {meta[lang]}
-                      </span>
-                    </span>
-                    <span className="tv-item-meta">
-                      {rental.dayLabel} · {rental.timeLabel} · {rental.purpose}
-                    </span>
-                    <span className="tv-flags">
-                      <span
-                        className="tv-flag"
-                        data-open={rental.deposit === "TRANSFER" || rental.deposit === "CASH"}
-                      >
-                        {nl ? "Waarborg" : "Deposit"}: {DEPOSIT_STATE_META[rental.deposit][lang]}
-                      </span>
-                      <span className="tv-flag" data-open={rental.contract === "PENDING"}>
-                        {nl ? "Contract" : "Contract"}: {CONTRACT_STATE_META[rental.contract][lang]}
-                      </span>
-                      <span className="tv-flag" data-open={rental.keyStatus === "PENDING"}>
-                        {nl ? "Sleutel" : "Key"}: {KEY_STATE_META[rental.keyStatus][lang]}
-                      </span>
-                      {rental.clashes.length > 0 && (
-                        <span className="tv-flag" data-open="true">
-                          {nl ? "Botst met een andere aanvraag" : "Clashes with another request"}
+    <div className="w-full">
+      {mode === "calendar" ? (
+        <RentalCalendar
+          nl={nl}
+          rentals={rentals}
+          selectedId={selectedId}
+          onSelect={(rental) => setSelectedId(rental.id)}
+        />
+      ) : rentals.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-vtk-blue/20 bg-white/60 px-5 py-12 text-center text-sm text-[#5c667f]">
+          {emptyMessage}
+        </p>
+      ) : (
+        <div className="overflow-hidden rounded-2xl border border-vtk-blue/12 bg-white">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[64rem] text-sm">
+              <thead>
+                <tr className="border-b border-vtk-blue/10 text-left text-xs font-semibold text-[#5c667f]">
+                  <th scope="col" className="px-4 py-3">{nl ? "Datum" : "Date"}</th>
+                  <th scope="col" className="px-4 py-3">{nl ? "Aanvrager" : "Requester"}</th>
+                  <th scope="col" className="px-4 py-3">{nl ? "Activiteit" : "Activity"}</th>
+                  <th scope="col" className="px-4 py-3">{nl ? "Waarborg" : "Deposit"}</th>
+                  <th scope="col" className="px-4 py-3">Contract</th>
+                  <th scope="col" className="px-4 py-3">{nl ? "Sleutel" : "Key"}</th>
+                  <th scope="col" className="px-4 py-3">Status</th>
+                  <th scope="col" className="px-4 py-3 text-right">{nl ? "Acties" : "Actions"}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-vtk-blue/5">
+                {rentals.map((rental) => {
+                  const meta = RENTAL_STATUS_META[rental.status];
+                  return (
+                    <tr
+                      key={rental.id}
+                      className="group transition-colors hover:bg-vtk-blue-soft/30"
+                    >
+                      <td className="whitespace-nowrap px-4 py-3 tabular-nums text-[#34405e]">
+                        <span className="font-medium text-vtk-ink">{rental.dayLabel}</span>
+                        <span className="block text-xs text-[#5c667f]">{rental.timeLabel}</span>
+                      </td>
+                      <td className="max-w-56 px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => setSelectedId(rental.id)}
+                          className="text-left font-semibold text-vtk-ink underline-offset-2 hover:underline focus-visible:rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-vtk-blue"
+                        >
+                          {rental.responsibleName}
+                        </button>
+                        <span className="block break-all text-xs text-[#5c667f]">{rental.email}</span>
+                      </td>
+                      <td className="max-w-80 px-4 py-3 text-[#34405e]">
+                        <span className="font-medium text-vtk-ink">{rental.purpose}</span>
+                        <span className="block text-xs text-[#5c667f]">
+                          {rental.attendees === null
+                            ? nl
+                              ? "Aantal aanwezigen onbekend"
+                              : "Number of attendees unknown"
+                            : `${rental.attendees} ${nl ? "aanwezigen" : "attendees"}`}
                         </span>
-                      )}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
+                        {rental.clashes.length > 0 && (
+                          <span className="mt-1 block text-xs font-medium text-amber-800">
+                            {nl ? "Botst met een andere aanvraag" : "Clashes with another request"}
+                          </span>
+                        )}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <FollowUpState
+                          label={DEPOSIT_STATE_META[rental.deposit][lang]}
+                          open={rental.deposit === "TRANSFER" || rental.deposit === "CASH"}
+                          problem={rental.deposit === "PROBLEM"}
+                        />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <FollowUpState
+                          label={CONTRACT_STATE_META[rental.contract][lang]}
+                          open={rental.contract === "PENDING"}
+                        />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <FollowUpState
+                          label={KEY_STATE_META[rental.keyStatus][lang]}
+                          open={rental.keyStatus === "PENDING"}
+                        />
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3">
+                        <span className="tv-badge" data-tone={meta.tone}>
+                          {meta[lang]}
+                        </span>
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                        <RowActions>
+                          <IconButton
+                            label={nl ? "Details openen" : "Open details"}
+                            srLabel={`${nl ? "Details openen" : "Open details"}: ${rental.responsibleName}`}
+                            onClick={() => setSelectedId(rental.id)}
+                          >
+                            <InfoIcon />
+                          </IconButton>
+                        </RowActions>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
-        )}
-      </div>
+          <div className="border-t border-vtk-blue/10 px-4 py-2.5 text-xs text-[#5c667f]">
+            {rentals.length} {rentals.length === 1
+              ? nl ? "aanvraag" : "request"
+              : nl ? "aanvragen" : "requests"}
+          </div>
+        </div>
+      )}
 
-      {!fullWidth && (
-        <aside>
-          {selected ? (
-            <Card className="p-5">
-              <RentalInspector
-                // Een andere aanvraag is een ander paneel: door de sleutel begint
-                // het opstelvak leeg in plaats van met de half getypte mail van
-                // de vorige aanvraag erin.
-                key={selected.id}
-                nl={nl}
-                rental={selected}
-                templates={templates}
-                senderLabel={senderLabel}
-                signature={signature}
-                contractAvailable={contractAvailable}
-                canManage={canManage}
-              />
-            </Card>
-          ) : (
-            <div className="rounded-2xl border border-dashed border-vtk-blue/20 bg-white/60 px-5 py-10 text-center text-sm text-[#5c667f]">
-              {nl
-                ? "Klik op een aanvraag om ze te bekijken, op te volgen en te beantwoorden."
-                : "Click a request to view it, follow it up and reply."}
-            </div>
-          )}
-        </aside>
+      {selected && (
+        <Modal
+          title={`${selected.responsibleName} · ${selected.dayLabel}`}
+          size="lg"
+          onClose={() => setSelectedId(null)}
+        >
+          <RentalInspector
+            // Een andere aanvraag is een nieuwe detailweergave: door de sleutel begint
+            // het opstelvak leeg in plaats van met de half getypte mail van de
+            // vorige aanvraag erin.
+            key={selected.id}
+            nl={nl}
+            rental={selected}
+            templates={templates}
+            senderLabel={senderLabel}
+            signature={signature}
+            contractAvailable={contractAvailable}
+            canManage={canManage}
+          />
+        </Modal>
       )}
     </div>
+  );
+}
+
+function FollowUpState({
+  label,
+  open,
+  problem = false,
+}: {
+  label: string;
+  open: boolean;
+  problem?: boolean;
+}) {
+  const tone = problem
+    ? "border-red-200 bg-red-50 text-red-700"
+    : open
+      ? "border-amber-200 bg-amber-50 text-amber-800"
+      : "border-zinc-200 bg-zinc-50 text-zinc-600";
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${tone}`}
+    >
+      {problem ? "!" : open ? "⏱" : "✓"} {label}
+    </span>
   );
 }

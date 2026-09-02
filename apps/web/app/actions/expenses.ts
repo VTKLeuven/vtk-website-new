@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
 import { deleteObject } from "@vtk/storage";
-import { sendMail, smtpConfigured } from "@vtk/mail";
+import { sendMail, smtpConfigured } from "@/lib/email";
 import { requirePermission } from "@/lib/session";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
@@ -352,15 +352,18 @@ export async function sendExpenseAction(
   // `expenseMailDraft` in lib/rekeningen/expenses.ts.
   const { subject, body } = expenseMailDraft(expense);
 
-  const sent = await sendMail({
-    to,
-    from: config.fromEmail || undefined,
-    subject,
-    text: body,
-    attachments: [
-      { filename, content: Buffer.from(bytes), contentType: "application/pdf" },
-    ],
-  });
+  const sent = await sendMail(
+    {
+      to,
+      from: config.fromEmail || undefined,
+      subject,
+      text: body,
+      attachments: [
+        { filename, content: Buffer.from(bytes), contentType: "application/pdf" },
+      ],
+    },
+    { source: "expenses" },
+  );
   if (!sent) return saveError("SEND_FAILED");
 
   await prisma.expense.update({

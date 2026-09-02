@@ -1,5 +1,5 @@
 import { prisma } from '@vtk/db';
-import { sendMail, smtpConfigured } from '@vtk/mail';
+import { sendMail, smtpConfigured } from '@/lib/email';
 import { preferredEmail } from '@/lib/brevo/contacts';
 import { sendShiftReminderPush } from '@/lib/app-api/notifications';
 
@@ -261,13 +261,16 @@ export async function processDueShiftReminders(now: Date = new Date()): Promise<
       if (count === 0) continue;
 
       const mail = shiftReminderMail(lead.key, candidate.user, candidate.shift);
-      const ok = await sendMail({
-        to: preferredEmail(candidate.user),
-        from: FROM,
-        subject: mail.subject,
-        text: mail.text,
-        messageId: `<shift-reminder-${lead.key}-${candidate.shiftId}-${candidate.userId}@vtk.be>`,
-      });
+      const ok = await sendMail(
+        {
+          to: preferredEmail(candidate.user),
+          from: FROM,
+          subject: mail.subject,
+          text: mail.text,
+          messageId: `<shift-reminder-${lead.key}-${candidate.shiftId}-${candidate.userId}@vtk.be>`,
+        },
+        { source: 'shifts' },
+      );
       if (ok) sent += 1;
       else failed += 1;
 

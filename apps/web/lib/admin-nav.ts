@@ -159,6 +159,7 @@ export function getAdminNav(): NavEntry[] {
       item('itConfig', '/it', { superAdminOnly: true, exact: true }),
       item('vaultAdmin', '/wachtwoorden/beheer', { perm: 'vault.manage' }),
       item('auditLog', '/it/logboek', { perm: 'audit.view' }),
+      item('emailLog', '/it/email-logboek', { superAdminOnly: true }),
       item('door', '/deur', { perm: 'door.manage' }),
       item('sso', '/sso', { perm: 'oauth.client.edit' }),
       item('kulSso', '/it/kul-sso', { superAdminOnly: true }),

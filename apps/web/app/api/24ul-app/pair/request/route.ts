@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { prisma } from "@vtk/db";
-import { sendMail } from "@vtk/mail";
+import { sendMail } from "@/lib/email";
 import { issueCode, pruneExpiredCodes } from "@/lib/urenloopApp/codes";
 import { CODE_TTL_MINUTES } from "@/lib/urenloopApp/config";
 
@@ -31,22 +31,25 @@ export async function POST(request: Request) {
   if (allowed) {
     const issued = await issueCode(email);
     if (issued.ok) {
-      await sendMail({
-        to: email,
-        subject: `Je code om de 24urenloop-app te koppelen: ${issued.code}`,
-        text: [
-          "Hallo,",
-          "",
-          `Je code om deze computer aan de 24urenloop-app te koppelen is: ${issued.code}`,
-          "",
-          `De code blijft ${CODE_TTL_MINUTES} minuten geldig en werkt één keer.`,
-          "Koppelen zorgt dat de app zelf nieuwe versies vindt; de app werkt ook zonder.",
-          "",
-          "Vroeg je zelf geen code aan? Dan hoef je niets te doen.",
-          "",
-          "VTK Leuven",
-        ].join("\n"),
-      });
+      await sendMail(
+        {
+          to: email,
+          subject: `Je code om de 24urenloop-app te koppelen: ${issued.code}`,
+          text: [
+            "Hallo,",
+            "",
+            `Je code om deze computer aan de 24urenloop-app te koppelen is: ${issued.code}`,
+            "",
+            `De code blijft ${CODE_TTL_MINUTES} minuten geldig en werkt één keer.`,
+            "Koppelen zorgt dat de app zelf nieuwe versies vindt; de app werkt ook zonder.",
+            "",
+            "Vroeg je zelf geen code aan? Dan hoef je niets te doen.",
+            "",
+            "VTK Leuven",
+          ].join("\n"),
+        },
+        { source: "urenloopApp" },
+      );
     }
   }
 

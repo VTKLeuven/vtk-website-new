@@ -18,7 +18,7 @@ import { extensionOf } from "@/lib/forms/uploadToken";
 import { logFormAudit } from "@/lib/forms/audit";
 import { answerLines } from "@/lib/forms/outbox";
 import { fillPlaceholders } from "@/lib/forms/mail";
-import { sendMail, smtpConfigured } from "@vtk/mail";
+import { sendMail, smtpConfigured } from "@/lib/email";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
 
@@ -275,11 +275,14 @@ export async function sendFormMailingAction(rawInput: unknown): Promise<SaveStat
           .map((line) => `${line.label}: ${line.value}`)
           .join("\n"),
       };
-      const ok = await sendMail({
-        to: target.submitterEmail as string,
-        subject: fillPlaceholders(input.subject, values),
-        text: fillPlaceholders(input.body, values),
-      });
+      const ok = await sendMail(
+        {
+          to: target.submitterEmail as string,
+          subject: fillPlaceholders(input.subject, values),
+          text: fillPlaceholders(input.body, values),
+        },
+        { source: "forms" },
+      );
       if (ok) sent += 1;
     }
 

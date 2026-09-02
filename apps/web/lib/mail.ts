@@ -2,11 +2,11 @@
  * Theokot-specifieke mails.
  *
  * De transportlaag zelf (SMTP, EHLO, STARTTLS) staat sinds augustus 2026 in
- * `@vtk/mail`, omdat `apps/logistiek` ze ook nodig heeft. Importeer `sendMail`,
- * `smtpConfigured` en `smtpEhloName` daar rechtstreeks; dit bestand houdt enkel
- * de berichten over die over broodjes gaan.
+ * `@vtk/mail`, omdat `apps/logistiek` ze ook nodig heeft. De website gaat via
+ * `@/lib/email`, dat boven op die transportlaag het centrale logboek vult; dit
+ * bestand houdt enkel de berichten over die over broodjes gaan.
  */
-import { sendMail } from '@vtk/mail';
+import { sendMail } from '@/lib/email';
 
 type MailUser = { name: string; email: string; locale: 'NL' | 'EN' };
 
@@ -33,7 +33,10 @@ export async function sendMeetingReservationInvalidated(
   const text = nl
     ? `Dag ${user.name},\n\nJe reserveerde een broodje voor de ${meeting.meetingLabel} van ${meeting.dateLabel}, maar dat kan niet meer: ${meeting.reason}\n\nKies een ander broodje (of enkel een drankje) op ${url}\n\nGroeten,\nVTK`
     : `Hi ${user.name},\n\nYou reserved a sandwich for the ${meeting.meetingLabel} of ${meeting.dateLabel}, but it is no longer possible: ${meeting.reason}\n\nPick another sandwich (or just a drink) at ${url}\n\nRegards,\nVTK`;
-  await sendMail({ to: user.email, subject, text }, { throwOnError: true });
+  await sendMail(
+    { to: user.email, subject, text },
+    { throwOnError: true, source: 'theokot' },
+  );
 }
 
 type NoShowMailUser = MailUser;
@@ -53,6 +56,6 @@ export async function sendNoShowWarning(
     : `Hi ${user.name},\n\nYou reserved sandwiches at Theokot for ${sessionDateLabel}, but they were not picked up.\n\nReserved sandwiches that are not collected go to waste. Repeatedly not showing up can lead to a temporary suspension from the reservation system.\n\nRegards,\nTheokot VTK`;
   await sendMail(
     { to: user.email, subject, text, messageId: `<theokot-no-show-${orderId}@vtk.be>` },
-    { throwOnError: true },
+    { throwOnError: true, source: 'theokot' },
   );
 }

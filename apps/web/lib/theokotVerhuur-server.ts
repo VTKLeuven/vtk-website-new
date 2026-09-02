@@ -3,7 +3,7 @@ import "server-only";
 import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@vtk/db";
-import { sendMail } from "@vtk/mail";
+import { sendMail } from "@/lib/email";
 import { getObjectBuffer } from "@vtk/storage";
 import { siteUrl } from "@/lib/seo";
 import {
@@ -158,15 +158,18 @@ export async function sendRentalMail(input: {
   attachments?: RentalAttachment[];
 }): Promise<boolean> {
   const config = await getRentalConfig();
-  const delivered = await sendMail({
-    to: input.to,
-    cc: input.cc,
-    from: RENTAL_FROM,
-    replyTo: input.replyTo ?? rentalReplyTo(config),
-    subject: input.subject,
-    text: input.text,
-    attachments: input.attachments,
-  });
+  const delivered = await sendMail(
+    {
+      to: input.to,
+      cc: input.cc,
+      from: RENTAL_FROM,
+      replyTo: input.replyTo ?? rentalReplyTo(config),
+      subject: input.subject,
+      text: input.text,
+      attachments: input.attachments,
+    },
+    { source: "theokotRental" },
+  );
 
   if (!delivered) {
     // Enkel dát het misging: de inhoud is post naar een huurder en hoort niet in
@@ -403,13 +406,16 @@ export async function notifyNewRental(rental: NotifyRentalInput): Promise<void> 
       `In het beheer: ${base}/admin/theokot/verhuur`,
     );
 
-    await sendMail({
-      to: config.notifyEmails.join(", "),
-      from: RENTAL_FROM,
-      replyTo: rental.email,
-      subject: `[Theokot verhuur] ${rental.responsibleName} — ${start.date}`,
-      text: lines.join("\n"),
-    });
+    await sendMail(
+      {
+        to: config.notifyEmails.join(", "),
+        from: RENTAL_FROM,
+        replyTo: rental.email,
+        subject: `[Theokot verhuur] ${rental.responsibleName} — ${start.date}`,
+        text: lines.join("\n"),
+      },
+      { source: "theokotRental" },
+    );
   } catch (err) {
     console.error("[theokot-verhuur] kon melding van nieuwe aanvraag niet versturen", err);
     Sentry.captureException(err);

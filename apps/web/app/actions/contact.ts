@@ -2,7 +2,7 @@
 
 import * as Sentry from "@sentry/nextjs";
 import { headers } from "next/headers";
-import { sendMail } from "@vtk/mail";
+import { sendMail } from "@/lib/email";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import {
   CONTACT_RATE_LIMIT,
@@ -62,15 +62,18 @@ export async function sendContactMessageAction(
   if (!limiter.take(key)) return saveError("RATE_LIMITED");
 
   const body = contactMailBody(parsed.message);
-  const delivered = await sendMail({
-    to: CONTACT_TO,
-    from: CONTACT_FROM,
-    // Antwoorden gaat rechtstreeks naar de bezoeker; zonder dit kan niemand
-    // reageren zonder het adres uit de tekst over te typen.
-    replyTo: `${parsed.message.name} <${parsed.message.email}>`,
-    subject: body.subject,
-    text: body.text,
-  });
+  const delivered = await sendMail(
+    {
+      to: CONTACT_TO,
+      from: CONTACT_FROM,
+      // Antwoorden gaat rechtstreeks naar de bezoeker; zonder dit kan niemand
+      // reageren zonder het adres uit de tekst over te typen.
+      replyTo: `${parsed.message.name} <${parsed.message.email}>`,
+      subject: body.subject,
+      text: body.text,
+    },
+    { source: "contact" },
+  );
 
   if (!delivered) {
     // Enkel dat het misging, nooit wat er in het bericht stond: dat is de post

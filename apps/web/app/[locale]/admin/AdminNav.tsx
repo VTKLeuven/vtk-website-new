@@ -513,6 +513,15 @@ const icons: Record<string, ReactNode> = {
       <path d="M16.5 13.5v2l1.5 1" />
     </Svg>
   ),
+  // emailLog: uitgaande envelop met verzendstatus/tijdstip
+  emailLog: (
+    <Svg>
+      <rect x="2" y="4" width="20" height="15" rx="2" />
+      <path d="m2 7 10 6 10-6" />
+      <circle cx="18" cy="18" r="4" fill="white" />
+      <path d="M18 16v2l1.5 1" />
+    </Svg>
+  ),
   // sso: sleutel, externe apps die met een VTK-account inloggen
   sso: (
     <Svg>

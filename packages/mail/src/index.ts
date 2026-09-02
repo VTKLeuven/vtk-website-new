@@ -52,6 +52,22 @@ export type MailInput = {
   attachments?: Array<{ filename: string; content: Buffer; contentType?: string }>;
 };
 
+/**
+ * Technisch resultaat van de SMTP-poging. De gewone {@link sendMail} houdt haar
+ * oude boolean-contract; de website gebruikt dit rijkere resultaat om het
+ * e-maillogboek te vullen zonder de transportlogica te dupliceren.
+ */
+export type MailDeliveryResult =
+  | {
+      status: 'sent' | 'partial';
+      messageId: string | null;
+      response: string | null;
+      accepted: string[];
+      rejected: string[];
+    }
+  | { status: 'simulated'; messageId: string | null }
+  | { status: 'failed'; error: unknown };
+
 const FROM = process.env.MAIL_FROM || 'Theokot VTK <theokot@vtk.be>';
 
 /**
@@ -95,18 +111,11 @@ export function smtpEhloName(): string {
 /**
  * Verstuurt een mail, of logt ze wanneer SMTP niet geconfigureerd is.
  *
- * Geeft terug of de mail de deur uit is. Bestaande aanroepers mogen dat negeren
- * (een mislukte no-show-waarschuwing mag de verwerking niet doen falen), maar
- * een formulier dat de gebruiker "verstuurd" meldt, moet het verschil weten.
- *
- * `throwOnError` is het zwaardere alternatief: dan gooit een mislukking door naar
- * de aanroeper. Gebruik het waar de mail zelf de opdracht is en stil falen dus
- * niet mag, zoals bij de no-show-waarschuwing van Theokot.
+ * Geeft het technische resultaat terug voor aanroepers die message-id,
+ * aanvaarde/geweigerde adressen of de fout nodig hebben. De compatibele
+ * boolean-helper staat onderaan.
  */
-export async function sendMail(
-  input: MailInput,
-  options: { throwOnError?: boolean } = {},
-): Promise<boolean> {
+export async function deliverMail(input: MailInput): Promise<MailDeliveryResult> {
   const from = input.from?.trim() || FROM;
   const cc = Array.isArray(input.cc) ? input.cc.filter(Boolean) : input.cc;
   const ccLabel = Array.isArray(cc) ? cc.join(', ') : cc;
@@ -116,7 +125,7 @@ export async function sendMail(
       `[mail] SMTP niet geconfigureerd; mail niet verstuurd.\n  from: ${from}\n  to: ${input.to}${ccLabel ? `\n  cc: ${ccLabel}` : ''}${input.replyTo ? `\n  reply-to: ${input.replyTo}` : ''}\n  subject: ${input.subject}${input.attachments?.length ? `\n  bijlagen: ${input.attachments.map((a) => a.filename).join(', ')}` : ''}\n  ${input.text.replace(/\n/g, '\n  ')}`,
     );
     // Lokaal is loggen de bedoeling; dat mag niet als mislukking tellen.
-    return true;
+    return { status: 'simulated', messageId: input.messageId ?? null };
   }
 
   try {
@@ -151,7 +160,7 @@ export async function sendMail(
           }
         : undefined,
     });
-    await transport.sendMail({
+    const result = await transport.sendMail({
       from,
       to: input.to,
       cc,
@@ -162,10 +171,34 @@ export async function sendMail(
       messageId: input.messageId,
       attachments: input.attachments,
     });
-    return true;
+
+    const accepted = addressList(result.accepted);
+    const rejected = addressList(result.rejected);
+    return {
+      status: rejected.length > 0 ? 'partial' : 'sent',
+      messageId: typeof result.messageId === 'string' ? result.messageId : null,
+      response: typeof result.response === 'string' ? result.response : null,
+      accepted,
+      rejected,
+    };
   } catch (err) {
     console.error('[mail] versturen mislukt:', err);
-    if (options.throwOnError) throw err;
-    return false;
+    return { status: 'failed', error: err };
   }
+}
+
+/** Zet de uiteenlopende nodemailer-vormen om naar waarden voor logging. */
+function addressList(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.map((address) => String(address));
+}
+
+export async function sendMail(
+  input: MailInput,
+  options: { throwOnError?: boolean } = {},
+): Promise<boolean> {
+  const result = await deliverMail(input);
+  if (result.status !== 'failed') return true;
+  if (options.throwOnError) throw result.error;
+  return false;
 }

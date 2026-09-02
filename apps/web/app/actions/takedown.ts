@@ -4,7 +4,7 @@ import * as Sentry from "@sentry/nextjs";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
-import { sendMail } from "@vtk/mail";
+import { sendMail } from "@/lib/email";
 import {
   TAKEDOWN_LIMITS,
   TAKEDOWN_RATE_LIMIT,
@@ -115,13 +115,16 @@ export async function submitTakedownAction(
     albumUrl: `${siteUrl()}/nl/media/${encodeURIComponent(album.slug)}`,
   });
 
-  const delivered = await sendMail({
-    to: TAKEDOWN_TO,
-    from: TAKEDOWN_FROM,
-    replyTo: `${submission.name} <${submission.email}>`,
-    subject: body.subject,
-    text: body.text,
-  });
+  const delivered = await sendMail(
+    {
+      to: TAKEDOWN_TO,
+      from: TAKEDOWN_FROM,
+      replyTo: `${submission.name} <${submission.email}>`,
+      subject: body.subject,
+      text: body.text,
+    },
+    { source: "takedowns" },
+  );
 
   // Mislukt de mail, dan staat het verzoek er nog steeds. Dat is geen fout voor
   // de melder; het beheer ziet aan `mailDelivered` dat er geen seintje uitging.

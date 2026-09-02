@@ -4176,6 +4176,51 @@ model AdminAuditLog {
 }
 
 // -----------------------------------------------------------------------------
+// Uitgaande e-mail: technisch verzendlogboek
+// -----------------------------------------------------------------------------
+// Eén rij per verzendpoging vanuit apps/web. De inhoud staat erbij omdat dit
+// logboek net bedoeld is om foute templates, ontvangers en links te kunnen
+// reconstrueren. Daarom is het scherm superadmin-only en worden de rijen na een
+// korte bewaartermijn verwijderd; dit is geen mailbox of blijvend archief.
+enum EmailLogStatus {
+  SENT
+  PARTIAL
+  FAILED
+  SIMULATED
+}
+
+model EmailLog {
+  id          String         @id @default(cuid())
+  createdAt   DateTime       @default(now()) @db.Timestamptz(3)
+  completedAt DateTime       @db.Timestamptz(3)
+  durationMs  Int
+  status      EmailLogStatus
+
+  source  String
+  from    String
+  to      String
+  cc      String?
+  replyTo String?
+  subject String
+  text    String
+  html    String?
+
+  /// Enkel metadata (naam, MIME-type en grootte), nooit de bytes zelf.
+  attachments Json @default("[]")
+
+  /// Wat de SMTP-server teruggaf. "SENT" betekent dat de server de mail
+  /// aanvaardde, niet dat de inbox van de ontvanger ze gegarandeerd afleverde.
+  providerMessageId String?
+  providerResponse  String?
+  accepted          String[] @default([])
+  rejected          String[] @default([])
+  error             String?
+
+  @@index([createdAt])
+  @@index([status, createdAt])
+}
+
+// -----------------------------------------------------------------------------
 // better-auth specific tables
 // -----------------------------------------------------------------------------
 

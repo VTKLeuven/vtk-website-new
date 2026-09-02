@@ -33,8 +33,8 @@ import { rentalAdminErrors } from "@/lib/theokotVerhuurMessages";
 import type { RentalView } from "./types";
 
 /**
- * Het paneel naast de lijst: alles over één aanvraag, en de twee dingen die je
- * ermee kan doen.
+ * De detailweergave in de modal: alles over één aanvraag, en de twee dingen die
+ * je ermee kan doen.
  *
  * Die twee staan bewust in aparte kaders met elk hun eigen kop. Bovenaan de vier
  * opvolgvelden, die **niets** versturen; daaronder het antwoord, dat **wel**

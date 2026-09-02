@@ -3,7 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@vtk/db";
 import type { Prisma } from "@prisma/client";
-import { sendMail, smtpConfigured } from "@vtk/mail";
+import { sendMail, smtpConfigured } from "@/lib/email";
 import {
   confirmationMail,
   digestMail,
@@ -219,7 +219,7 @@ async function deliver(message: ClaimedMessage): Promise<void> {
             }
           : null,
     });
-    const sent = await sendMail(mail, { throwOnError: true });
+    const sent = await sendMail(mail, { throwOnError: true, source: "forms" });
     if (!sent) throw new Error("Versturen mislukt");
     return;
   }
@@ -244,7 +244,7 @@ async function deliver(message: ClaimedMessage): Promise<void> {
       answers: await answerLines(message.entryId, "nl"),
       entryCount,
     });
-    const sent = await sendMail(mail, { throwOnError: true });
+    const sent = await sendMail(mail, { throwOnError: true, source: "forms" });
     if (!sent) throw new Error("Versturen mislukt");
     return;
   }
@@ -262,7 +262,7 @@ async function deliver(message: ClaimedMessage): Promise<void> {
         count: payload.count ?? 0,
         total,
       }),
-      { throwOnError: true }
+      { throwOnError: true, source: "forms" }
     );
     if (!sent) throw new Error("Versturen mislukt");
     return;
@@ -287,7 +287,7 @@ async function deliver(message: ClaimedMessage): Promise<void> {
         recipientName: entry.submitterName,
         closesAt: form.closesAt,
       }),
-      { throwOnError: true }
+      { throwOnError: true, source: "forms" }
     );
     if (!sent) throw new Error("Versturen mislukt");
     return;
