@@ -157,6 +157,7 @@ export function getAdminNav(): NavEntry[] {
       // `exact`, anders licht Configuratie (/admin/it) ook op wanneer je op de
       // onderliggende /admin/it/preview staat.
       item('itConfig', '/it', { superAdminOnly: true, exact: true }),
+      item('storage', '/it/storage', { superAdminOnly: true }),
       item('vaultAdmin', '/wachtwoorden/beheer', { perm: 'vault.manage' }),
       item('auditLog', '/it/logboek', { perm: 'audit.view' }),
       item('emailLog', '/it/email-logboek', { superAdminOnly: true }),

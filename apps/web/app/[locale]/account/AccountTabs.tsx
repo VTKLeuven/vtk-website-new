@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 
 type AccountTab = 'vtk' | 'details';
 
@@ -21,6 +21,23 @@ export function AccountTabs({
     { id: 'vtk', label: nl ? 'Mijn VTK' : 'My VTK' },
     { id: 'details', label: nl ? 'Mijn gegevens' : 'My details' },
   ];
+
+  useEffect(() => {
+    const selectLinkedTab = () => {
+      if (window.location.hash === '#default-iban') setActiveTab('details');
+    };
+    selectLinkedTab();
+    window.addEventListener('hashchange', selectLinkedTab);
+    return () => window.removeEventListener('hashchange', selectLinkedTab);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'details' || window.location.hash !== '#default-iban') return;
+    const frame = window.requestAnimationFrame(() => {
+      document.getElementById('default-iban')?.scrollIntoView({ block: 'start' });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab]);
 
   function activateTab(index: number) {
     const tab = tabs[index];

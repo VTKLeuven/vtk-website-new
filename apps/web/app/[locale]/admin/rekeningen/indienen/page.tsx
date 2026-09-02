@@ -6,7 +6,7 @@ import { pick } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
 import { submitExpenseAction } from "@/app/actions/expenses";
 import { expenseAccess, getExpenseConfig } from "@/lib/rekeningen/server";
-import { toDateInputValue } from "@/lib/rekeningen/expenses";
+import { formatIban, toDateInputValue } from "@/lib/rekeningen/expenses";
 import { RekeningenNav } from "../RekeningenNav";
 import { ExpenseForm } from "../ExpenseForm";
 import { expenseErrorMessages } from "../messages";
@@ -35,19 +35,20 @@ export default async function RekeningIndienen({
 
   const ownGroupIds = access.session.groups.map((group) => group.id);
 
-  const [groups, previous, config] = await Promise.all([
+  const [groups, previous, profile, config] = await Promise.all([
     prisma.group.findMany({
       where: { OR: [{ active: true }, { id: { in: ownGroupIds } }] },
       orderBy: [{ type: "asc" }, { orderInPraesidium: "asc" }, { nameNl: "asc" }],
       select: { id: true, nameNl: true, nameEn: true },
     }),
-    // Het IBAN uit je vorige rekening als voorinvulling. Bewust hier en niet op
-    // je profiel: dan draagt de ledentabel geen permanent rekeningnummer van
-    // iedereen die ooit iets voorschoot.
     prisma.expense.findFirst({
       where: { submittedById: access.session.user.id, paymentMethod: "PERSONAL" },
       orderBy: { createdAt: "desc" },
-      select: { iban: true, groupId: true },
+      select: { groupId: true },
+    }),
+    prisma.user.findUniqueOrThrow({
+      where: { id: access.session.user.id },
+      select: { defaultIban: true },
     }),
     getExpenseConfig(),
   ]);
@@ -62,10 +63,10 @@ export default async function RekeningIndienen({
     <div className="space-y-5">
       <header>
         <h1 className="text-2xl font-semibold">{nl ? "Rekening indienen" : "Submit an expense"}</h1>
-        <p className="mt-1 max-w-[70ch] text-sm text-[#5c667f]">
+        <p className="mt-1 max-w-5xl text-sm text-[#5c667f]">
           {nl
-            ? "Kocht je iets voor VTK? Vul het blad in en voeg het bonnetje toe. Betaalde je met je eigen kaart, dan stort Groep 5 het terug op het rekeningnummer dat je hier invult."
-            : "Bought something for VTK? Fill in the sheet and add the receipt. If you paid with your own card, Group 5 refunds it to the account number you enter here."}
+            ? "Kocht je iets voor VTK? Vul het blad in en voeg het bonnetje toe. Betaalde je met je eigen kaart, dan stort Beheer het terug op het rekeningnummer dat je hier invult."
+            : "Bought something for VTK? Fill in the sheet and add the receipt. If you paid with your own card, Administration refunds it to the account number you enter here."}
         </p>
       </header>
 
@@ -90,6 +91,7 @@ export default async function RekeningIndienen({
         <ExpenseForm
           locale={nl ? "nl" : "en"}
           action={submitExpenseAction}
+          defaultIbanHref={`${base}/account#default-iban`}
           posts={[
             ...own.map((group) => ({ id: group.id, name: `${name(group)} ${nl ? "(jouw post)" : "(your post)"}` })),
             ...others.map((group) => ({ id: group.id, name: name(group) })),
@@ -102,7 +104,7 @@ export default async function RekeningIndienen({
             spentOn: toDateInputValue(new Date()),
             amount: "",
             paymentMethod: "VTK_CARD",
-            iban: previous?.iban ?? "",
+            iban: formatIban(profile.defaultIban),
           }}
           labels={{
             submitLabel: nl ? "Rekening indienen" : "Submit expense",

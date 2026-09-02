@@ -520,6 +520,10 @@ model User {
   // mail en de voorkeur voor communicatie komen erbij.
   personalEmail           String?
   emailPreference         EmailPreference     @default(UNIVERSITY)
+  // Optionele standaard voor persoonlijke terugbetalingen. Elke rekening
+  // bewaart nog steeds haar eigen IBAN, zodat een afwijking of latere
+  // profielwijziging historische rekeningen niet verandert.
+  defaultIban             String?
   // Het `@vtk.be`-account in Google Workspace. `googleUserId` is het immutable
   // id van Google: dat blijft kloppen wanneer iemand van naam of adres wisselt.
   // Op naam matchen doen we bewust nooit (naamgenoten, tussenvoegsels), dus dit
@@ -5665,9 +5669,9 @@ model Expense {
   amountCents Int
 
   paymentMethod ExpensePaymentMethod
-  /// Enkel bij PERSONAL. Nergens anders bewaard: het staat niet op de User, want
-  /// dan draagt de ledentabel een permanent rekeningnummer van iedereen die ooit
-  /// iets voorschoot. Het formulier vult het in vanuit je vorige rekening.
+  /// Enkel bij PERSONAL. Dit blijft een momentopname per rekening: het formulier
+  /// vult `User.defaultIban` vooraf in, maar de indiener kan hier afwijken en een
+  /// latere wijziging aan de profielstandaard verandert deze rij nooit.
   iban          String?
 
   /// Het bonnetje in object storage. Onder `bonnetjes/`, en enkel te lezen via

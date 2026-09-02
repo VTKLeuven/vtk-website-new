@@ -63,3 +63,16 @@ export {
 } from './takedown';
 
 export { createGalleryClient, type GalleryClient } from './client';
+
+export {
+  classifyImmichAlbum,
+  getImmichStorageReport,
+  type ImmichAlbumKind,
+  type ImmichAlbumUsage,
+  type ImmichDiskUsage,
+  type ImmichGalleryUsage,
+  type ImmichLibraryUsage,
+  type ImmichSource,
+  type ImmichSourceFailure,
+  type ImmichStorageReport,
+} from './storage';

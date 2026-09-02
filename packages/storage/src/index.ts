@@ -2,6 +2,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadBucketCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
@@ -182,6 +183,69 @@ export async function checkS3Connection(cfg: S3Config): Promise<void> {
     forcePathStyle: cfg.forcePathStyle,
   });
   await client.send(new HeadBucketCommand({ Bucket: cfg.bucket }));
+}
+
+export type StoredObjectMetadata = {
+  key: string;
+  sizeBytes: number;
+  lastModified: Date | null;
+};
+
+export type ObjectStorageInventory = {
+  bucket: string;
+  objects: StoredObjectMetadata[];
+  totalBytes: number;
+};
+
+/**
+ * Inventariseer de volledige bucket zonder objectinhoud op te halen.
+ *
+ * De keys blijven server-side: het storage-dashboard aggregeert ze onmiddellijk
+ * per feature en toont nooit individuele bestandsnamen. `ListObjectsV2` levert
+ * maximaal 1.000 objecten per antwoord, dus de continuation token moet gevolgd
+ * worden om grote buckets niet stil te onderschatten.
+ */
+export async function getObjectStorageInventory(): Promise<ObjectStorageInventory> {
+  const { client, bucket } = await getClient();
+  const objects: StoredObjectMetadata[] = [];
+  const seenTokens = new Set<string>();
+  let continuationToken: string | undefined;
+
+  do {
+    if (continuationToken) {
+      if (seenTokens.has(continuationToken)) {
+        throw new Error("S3 object listing returned a repeated continuation token");
+      }
+      seenTokens.add(continuationToken);
+    }
+
+    const response = await client.send(
+      new ListObjectsV2Command({
+        Bucket: bucket,
+        ContinuationToken: continuationToken,
+      })
+    );
+
+    for (const object of response.Contents ?? []) {
+      if (!object.Key) continue;
+      objects.push({
+        key: object.Key,
+        sizeBytes: Math.max(0, Number(object.Size) || 0),
+        lastModified: object.LastModified ?? null,
+      });
+    }
+
+    continuationToken = response.IsTruncated ? response.NextContinuationToken : undefined;
+    if (response.IsTruncated && !continuationToken) {
+      throw new Error("S3 object listing was truncated without a continuation token");
+    }
+  } while (continuationToken);
+
+  return {
+    bucket,
+    objects,
+    totalBytes: objects.reduce((total, object) => total + object.sizeBytes, 0),
+  };
 }
 
 export type ZipEntry = { key: string; name: string };

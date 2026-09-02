@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { Input, Label, Select } from "@vtk/ui";
@@ -44,6 +45,7 @@ export function ExpenseForm({
   values,
   existingReceipt,
   redirectAfter,
+  defaultIbanHref,
 }: {
   locale: "nl" | "en";
   action: SaveAction;
@@ -59,6 +61,8 @@ export function ExpenseForm({
   };
   /** Waar we heen gaan na een geslaagde opslag. Leeg = op de pagina blijven. */
   redirectAfter?: string;
+  /** Profielpagina waar de indiener zijn eigen standaard-IBAN kan aanpassen. */
+  defaultIbanHref?: string;
 }) {
   const nl = locale === "nl";
   const router = useRouter();
@@ -208,8 +212,13 @@ export function ExpenseForm({
           />
           <p className="mt-1 text-xs text-[#5c667f]">
             {nl
-              ? "Hier komt de terugbetaling op. Het nummer hoort bij deze rekening en wordt niet bij je profiel bewaard."
-              : "This is where the reimbursement goes. The number belongs to this expense and is not stored on your profile."}
+              ? "Hier komt de terugbetaling op. Je kan voor deze rekening afwijken zonder je standaard-IBAN te wijzigen."
+              : "This is where the reimbursement goes. You can override it for this expense without changing your default IBAN."}{" "}
+            {defaultIbanHref ? (
+              <Link href={defaultIbanHref} className="font-medium text-vtk-ink underline">
+                {nl ? "Standaard-IBAN wijzigen" : "Change default IBAN"}
+              </Link>
+            ) : null}
           </p>
         </div>
       )}

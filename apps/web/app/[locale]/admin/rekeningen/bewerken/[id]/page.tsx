@@ -42,11 +42,11 @@ export default async function RekeningBewerken({
     return (
       <div className="space-y-4">
         <h1 className="text-2xl font-semibold">{nl ? "Rekening bewerken" : "Edit expense"}</h1>
-        <p className="max-w-[70ch] rounded-2xl border border-vtk-blue/12 bg-white p-5 text-sm text-[#34405e]">
+        <p className="max-w-5xl rounded-2xl border border-vtk-blue/12 bg-white p-5 text-sm text-[#34405e]">
           {(expense.paymentMethod === "PERSONAL" && expense.paidAt) || expense.sentAt || expense.bookedAt
             ? nl
-              ? `"${expense.description}" (${formatEuro(expense.amountCents, locale)}) is al terugbetaald, doorgestuurd of ingeboekt en kan niet meer aangepast worden. Het bedrag op het blad moet gelijk blijven aan wat er uitbetaald en geboekt is. Vraag Groep 5 om het vinkje eerst weg te halen.`
-              : `"${expense.description}" (${formatEuro(expense.amountCents, locale)}) has already been reimbursed, forwarded or booked and can no longer be changed. The amount on the sheet has to match what was paid out and booked. Ask Group 5 to clear that first.`
+              ? `"${expense.description}" (${formatEuro(expense.amountCents, locale)}) is al terugbetaald, doorgestuurd of ingeboekt en kan niet meer aangepast worden. Het bedrag op het blad moet gelijk blijven aan wat er uitbetaald en geboekt is. Vraag Beheer om het vinkje eerst weg te halen.`
+              : `"${expense.description}" (${formatEuro(expense.amountCents, locale)}) has already been reimbursed, forwarded or booked and can no longer be changed. The amount on the sheet has to match what was paid out and booked. Ask Administration to clear that first.`
             : nl
               ? "Je hebt geen recht om deze rekening te bewerken."
               : "You do not have the right to edit this expense."}
@@ -80,7 +80,7 @@ export default async function RekeningBewerken({
           {nl ? "← Terug naar de lijst" : "← Back to the list"}
         </Link>
         <h1 className="mt-2 text-2xl font-semibold">{nl ? "Rekening bewerken" : "Edit expense"}</h1>
-        <p className="mt-1 max-w-[70ch] text-sm text-[#5c667f]">
+        <p className="mt-1 max-w-5xl text-sm text-[#5c667f]">
           {nl
             ? "Laat je het bonnetje ongemoeid, dan blijft het huidige staan. Kies je een nieuw bestand, dan vervangt het het oude en wordt dat uit de opslag gewist."
             : "Leave the receipt alone and the current one stays. Pick a new file and it replaces the old one, which is then removed from storage."}

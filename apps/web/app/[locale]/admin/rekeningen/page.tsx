@@ -177,14 +177,14 @@ export default async function RekeningenOverzicht({
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{nl ? "Rekeningen" : "Expenses"}</h1>
-          <p className="mt-1 max-w-[70ch] text-sm text-[#5c667f]">
+          <p className="mt-1 max-w-5xl text-sm text-[#5c667f]">
             {access.canManageAll
               ? nl
                 ? "Alles wat er voor VTK betaald werd, met het bonnetje erbij. Vink af wat terugbetaald is en stuur het blad door naar de boekhouding."
                 : "Everything paid for VTK, receipt included. Tick off what has been reimbursed and forward the sheet to the accountant."
               : nl
-                ? "De rekeningen van je eigen post. Terugbetalen en inboeken gebeurt door Groep 5."
-                : "Your own post's expenses. Reimbursing and booking is done by Group 5."}
+                ? "De rekeningen van je eigen post. Terugbetalen en inboeken gebeurt door Beheer."
+                : "Your own post's expenses. Reimbursing and booking is done by Administration."}
           </p>
         </div>
         <Link

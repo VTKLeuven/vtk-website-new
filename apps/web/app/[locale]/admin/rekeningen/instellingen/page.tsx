@@ -38,7 +38,7 @@ export default async function RekeningenInstellingen({
     <div className="space-y-5">
       <header>
         <h1 className="text-2xl font-semibold">{nl ? "Instellingen" : "Settings"}</h1>
-        <p className="mt-1 max-w-[70ch] text-sm text-[#5c667f]">
+        <p className="mt-1 max-w-5xl text-sm text-[#5c667f]">
           {nl
             ? "Waar de bladen naartoe gaan, en wat een indiener te lezen krijgt voor hij het formulier invult."
             : "Where the sheets go, and what a submitter reads before filling in the form."}

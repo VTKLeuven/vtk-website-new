@@ -95,11 +95,11 @@ export default async function MijnRekeningen({
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold">{nl ? "Mijn rekeningen" : "My expenses"}</h1>
-          <p className="mt-1 max-w-[70ch] text-sm text-[#5c667f]">
+          <p className="mt-1 max-w-5xl text-sm text-[#5c667f]">
             {openCount > 0
               ? nl
-                ? `Er staat nog ${formatEuro(openCents._sum.amountCents ?? 0, locale)} open op je naam, verdeeld over ${openCount} ${openCount === 1 ? "rekening" : "rekeningen"}. Groep 5 betaalt terug.`
-                : `${formatEuro(openCents._sum.amountCents ?? 0, locale)} is still outstanding in your name, across ${openCount} ${openCount === 1 ? "expense" : "expenses"}. Group 5 handles reimbursements.`
+                ? `Er staat nog ${formatEuro(openCents._sum.amountCents ?? 0, locale)} open op je naam, verdeeld over ${openCount} ${openCount === 1 ? "rekening" : "rekeningen"}. Beheer betaalt terug.`
+                : `${formatEuro(openCents._sum.amountCents ?? 0, locale)} is still outstanding in your name, across ${openCount} ${openCount === 1 ? "expense" : "expenses"}. Administration handles reimbursements.`
               : nl
                 ? "Alles wat je indiende, met de stand van zaken erbij."
                 : "Everything you submitted, with its current state."}

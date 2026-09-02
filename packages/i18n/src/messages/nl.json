@@ -268,8 +268,8 @@
     "kicker": "Welkom bij VTK",
     "title": "Vervolledig je profiel",
     "intro": "Nog even dit invullen en je bent helemaal geregistreerd. Je kan deze gegevens later altijd aanpassen bij je account.",
-    "privacyNotice": "We gebruiken je naam, universiteitsmail en adresgegevens voor je lidmaatschap en administratie. Studentennummer, geboortedatum, persoonlijke mail, studiegegevens en foto worden enkel gebruikt voor de functies die je kiest.",
-    "privacyNoticeSelfRegistered": "We gebruiken je naam, login-e-mailadres en adresgegevens voor je lidmaatschap en administratie. Studentennummer, geboortedatum, studiegegevens en foto worden enkel gebruikt voor de functies die je kiest.",
+    "privacyNotice": "We gebruiken je naam, universiteitsmail en adresgegevens voor je lidmaatschap en administratie. Studentennummer, geboortedatum, persoonlijke mail, standaard-IBAN, studiegegevens en foto worden enkel gebruikt voor de functies die je kiest.",
+    "privacyNoticeSelfRegistered": "We gebruiken je naam, login-e-mailadres en adresgegevens voor je lidmaatschap en administratie. Studentennummer, geboortedatum, standaard-IBAN, studiegegevens en foto worden enkel gebruikt voor de functies die je kiest.",
     "privacyLink": "Lees hoe VTK je gegevens gebruikt.",
     "identityHeading": "Naam & studentennummer",
     "firstName": "Voornaam",
@@ -296,6 +296,9 @@
     "accountEmail": "E-mailadres",
     "accountEmailHint": "Dit is het persoonlijke e-mailadres waarmee je inlogt.",
     "personalEmail": "Persoonlijke mail",
+    "paymentsHeading": "Terugbetalingen",
+    "defaultIban": "Standaard-IBAN",
+    "defaultIbanHint": "Optioneel. We vullen dit nummer voor je in bij een persoonlijke uitgave. Je kan het voor elke rekening afzonderlijk aanpassen zonder je standaard te wijzigen.",
     "preferenceHeading": "Voorkeur voor communicatie",
     "preferenceHint": "Welk adres gebruiken we om je te contacteren?",
     "preferenceUniversity": "Universiteitsmail",
@@ -312,6 +315,7 @@
     "photoHeading": "Profielfoto",
     "photoHint": "Optioneel. Als je op het praesidium of bij een POC zit, verschijnt deze foto op de betreffende pagina.",
     "photoChoose": "Kies een foto",
+    "errorIban": "Vul een geldig IBAN in, of laat het veld leeg.",
     "studyHeading": "Studie",
     "statusLabel": "Ik ben:",
     "statusHint": "Duid alles aan wat op jou van toepassing is.",
@@ -432,6 +436,7 @@
     "vaultAdmin": "Kluisbeheer",
     "it": "IT",
     "itConfig": "Configuratie",
+    "storage": "Storage",
     "authorizationPreview": "Autorisatievoorbeeld",
     "kulSso": "KU Leuven SSO",
     "auditLog": "Adminlogboek",
@@ -537,7 +542,7 @@
     "kicker": "VTK · KU Leuven",
     "title": "Privacyverklaring",
     "lead": "Deze verklaring legt uit welke persoonsgegevens VTK verwerkt op de publieke website, in het ledenportaal, bij tickets en reservaties, in de logistieke tools en bij optionele gezichtsherkenning.",
-    "updated": "Laatst bijgewerkt op 31 augustus 2026.",
+    "updated": "Laatst bijgewerkt op 2 september 2026.",
     "sections": [
       {
         "heading": "Wie is verantwoordelijk?",
@@ -545,7 +550,7 @@
       },
       {
         "heading": "Welke gegevens verwerken we?",
-        "body": "Afhankelijk van de functies die je gebruikt verwerken we:\n• account- en lidmaatschapsgegevens: naam, KU Leuven-mail, taal, r-nummer, rollen en sessiegegevens\n• profielgegevens: kot- en thuisadres, geboortedatum, persoonlijke mail, mailvoorkeuren, studieprofiel en profielfoto\n• bestellingen en activiteiten: ticketkoper en deelnemers, antwoorden, betalingen en terugbetalingen, broodjes, shiften, materiaal- en camionettereservaties en bijbehorende nota's\n• toegangs- en beveiligingsgegevens: kaartnummer/naam, deurgebeurtenissen, IP-adres, browser en technische logs\n• fotoalbums: een selfie en biometrische gezichtstemplate, maar alleen als je daarvoor uitdrukkelijk toestemming geeft"
+        "body": "Afhankelijk van de functies die je gebruikt verwerken we:\n• account- en lidmaatschapsgegevens: naam, KU Leuven-mail, taal, r-nummer, rollen en sessiegegevens\n• profielgegevens: kot- en thuisadres, geboortedatum, persoonlijke mail, mailvoorkeuren, optionele standaard-IBAN, studieprofiel en profielfoto\n• bestellingen en activiteiten: ticketkoper en deelnemers, antwoorden, betalingen en terugbetalingen, broodjes, shiften, materiaal- en camionettereservaties en bijbehorende nota's\n• toegangs- en beveiligingsgegevens: kaartnummer/naam, deurgebeurtenissen, IP-adres, browser en technische logs\n• fotoalbums: een selfie en biometrische gezichtstemplate, maar alleen als je daarvoor uitdrukkelijk toestemming geeft"
       },
       {
         "heading": "Doelen en rechtsgronden",

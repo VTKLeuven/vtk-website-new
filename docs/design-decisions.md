@@ -5405,11 +5405,14 @@ versturen, niet door te beweren dat je dat deed. Zonder mailserver weigert de
 actie dus in plaats van een blad af te vinken dat nooit vertrok (zie de
 waarschuwing bovenaan `@vtk/mail`); je kan het blad dan downloaden en zelf mailen.
 
-**Het IBAN staat bij de rekening, niet bij het lid.** Billsheet bewaarde het op
-het profiel. Dat betekent een permanent rekeningnummer in de ledentabel van
-iedereen die ooit iets voorschoot, terwijl het maar voor één ding dient. Het
-formulier vult het in vanuit je vorige rekening, dus je merkt het verschil niet;
-verdwijnt die rekening ooit, dan verdwijnt het nummer mee.
+**Een standaard-IBAN is optioneel; de rekening blijft een momentopname.** Een lid
+kan in zijn eigen profiel een standaard instellen of wijzigen. Bij een
+persoonlijke betaling vult het formulier die vooraf in, maar het veld blijft per
+rekening aanpasbaar en opslaan verandert de profielstandaard niet. `Expense.iban`
+houdt dus het nummer waarmee precies die uitgave terugbetaald moet worden; een
+latere wijziging aan `User.defaultIban` herschrijft geen bestaande rekeningen.
+De standaard zit ook in de eigen gegevensexport en wordt bij accountwissing
+verwijderd.
 
 **De postnaam wordt vastgeklikt bij het indienen.** `Expense.postLabel` is een
 kopie van de naam zoals de post op dat moment heette, naast de gewone

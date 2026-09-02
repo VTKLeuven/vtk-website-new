@@ -10,6 +10,7 @@ import { saveProfileAction, type ProfileErrorCode } from "@/app/actions/onboardi
 import type { SaveAction } from "@/lib/saveState";
 import { AvatarCropField } from "./AvatarCropField";
 import { AddressFields } from "./AddressFields";
+import { formatIban } from "@/lib/rekeningen/expenses";
 
 function dateInputValue(date: Date | null): string {
   if (!date) return "";
@@ -64,6 +65,7 @@ export function ProfileForm({
     | "homeCity"
     | "birthDate"
     | "personalEmail"
+    | "defaultIban"
     | "emailPreference"
     | "mailCategories"
     | "mailUnsubscribedAt"
@@ -106,6 +108,7 @@ export function ProfileForm({
   const common = getDictionary(locale).common;
   const errorMessages: Record<ProfileErrorCode, string> = {
     INVALID_PROFILE: t.errorInvalid,
+    INVALID_IBAN: t.errorIban,
     RNUMBER_TAKEN: t.errorRnumberTaken,
     AVATAR_TOO_LARGE: t.errorAvatarTooLarge,
     AVATAR_FAILED: t.errorAvatarFailed,
@@ -330,6 +333,24 @@ export function ProfileForm({
             />
           </div>
         )}
+      </fieldset>
+
+      {/* Terugbetalingen: dit is enkel een voorinvulling. Een rekening bewaart
+          altijd haar eigen IBAN en kan dus veilig van deze standaard afwijken. */}
+      <fieldset id="default-iban" className="scroll-mt-28 space-y-4">
+        <legend className="text-lg font-semibold text-vtk-ink">{t.paymentsHeading}</legend>
+        <div className="sm:max-w-md">
+          <Label htmlFor="defaultIban">{t.defaultIban}</Label>
+          <Input
+            id="defaultIban"
+            name="defaultIban"
+            defaultValue={formatIban(user.defaultIban)}
+            placeholder="BE68 5390 0754 7034"
+            maxLength={40}
+            autoComplete="off"
+          />
+          <p className="mt-1 text-xs text-[#5c667f]">{t.defaultIbanHint}</p>
+        </div>
       </fieldset>
 
       {/* Studie: studiejaren + richtingen */}

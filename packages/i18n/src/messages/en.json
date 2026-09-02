@@ -268,8 +268,8 @@
     "kicker": "Welcome to VTK",
     "title": "Complete your profile",
     "intro": "Just a few things to fill in and your registration is done. You can always change these later in your account.",
-    "privacyNotice": "We use your name, university email and address details for your membership and administration. Student number, date of birth, personal email, study details and photo are only used for features you choose.",
-    "privacyNoticeSelfRegistered": "We use your name, login email address and address details for your membership and administration. Student number, date of birth, study details and photo are only used for features you choose.",
+    "privacyNotice": "We use your name, university email and address details for your membership and administration. Student number, date of birth, personal email, default IBAN, study details and photo are only used for features you choose.",
+    "privacyNoticeSelfRegistered": "We use your name, login email address and address details for your membership and administration. Student number, date of birth, default IBAN, study details and photo are only used for features you choose.",
     "privacyLink": "Read how VTK uses your data.",
     "identityHeading": "Name & student number",
     "firstName": "First name",
@@ -296,6 +296,9 @@
     "accountEmail": "Email address",
     "accountEmailHint": "This is the personal email address you use to sign in.",
     "personalEmail": "Personal email",
+    "paymentsHeading": "Reimbursements",
+    "defaultIban": "Default IBAN",
+    "defaultIbanHint": "Optional. We prefill this number for personal expenses. You can change it for each expense without changing your default.",
     "preferenceHeading": "Communication preference",
     "preferenceHint": "Which address should we use to contact you?",
     "preferenceUniversity": "University email",
@@ -312,6 +315,7 @@
     "photoHeading": "Profile picture",
     "photoHint": "Optional. If you are on the praesidium or a POC, this picture appears on the relevant page.",
     "photoChoose": "Choose a picture",
+    "errorIban": "Enter a valid IBAN, or leave the field empty.",
     "studyHeading": "Studies",
     "statusLabel": "I am:",
     "statusHint": "Select everything that applies to you.",
@@ -432,6 +436,7 @@
     "vaultAdmin": "Vault management",
     "it": "IT",
     "itConfig": "Configuration",
+    "storage": "Storage",
     "authorizationPreview": "Authorization preview",
     "kulSso": "KU Leuven SSO",
     "auditLog": "Admin log",
@@ -537,7 +542,7 @@
     "kicker": "VTK · KU Leuven",
     "title": "Privacy statement",
     "lead": "This statement explains which personal data VTK processes on the public website, in the member portal, for tickets and reservations, in logistics tools and for optional face recognition.",
-    "updated": "Last updated on 31 August 2026.",
+    "updated": "Last updated on 2 September 2026.",
     "sections": [
       {
         "heading": "Who is responsible?",
@@ -545,7 +550,7 @@
       },
       {
         "heading": "Which data do we process?",
-        "body": "Depending on the features you use, we process:\n• account and membership data: name, KU Leuven email, language, r-number, roles and session data\n• profile data: student room and home address, date of birth, personal email, email preferences, study profile and profile picture\n• orders and activities: ticket buyer and attendees, answers, payments and refunds, sandwiches, shifts, equipment and van reservations and related notes\n• access and security data: card number/name, door events, IP address, browser and technical logs\n• photo albums: a selfie and biometric face template, but only when you explicitly consent"
+        "body": "Depending on the features you use, we process:\n• account and membership data: name, KU Leuven email, language, r-number, roles and session data\n• profile data: student room and home address, date of birth, personal email, email preferences, optional default IBAN, study profile and profile picture\n• orders and activities: ticket buyer and attendees, answers, payments and refunds, sandwiches, shifts, equipment and van reservations and related notes\n• access and security data: card number/name, door events, IP address, browser and technical logs\n• photo albums: a selfie and biometric face template, but only when you explicitly consent"
       },
       {
         "heading": "Purposes and legal bases",

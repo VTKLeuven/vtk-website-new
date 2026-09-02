@@ -54,6 +54,7 @@ export type ImmichAsset = {
     dateTimeOriginal?: string | null;
     exifImageWidth?: number | string | null;
     exifImageHeight?: number | string | null;
+    fileSizeInByte?: number | string | null;
     description?: string | null;
   } | null;
 };

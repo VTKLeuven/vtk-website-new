@@ -488,6 +488,14 @@ const icons: Record<string, ReactNode> = {
       <circle cx="8" cy="18" r="2" />
     </Svg>
   ),
+  // storage: schijfgebruik van S3, Immich en de lokale server
+  storage: (
+    <Svg>
+      <ellipse cx="12" cy="5" rx="8" ry="3" />
+      <path d="M4 5v7c0 1.7 3.6 3 8 3s8-1.3 8-3V5" />
+      <path d="M4 12v7c0 1.7 3.6 3 8 3s8-1.3 8-3v-7" />
+    </Svg>
+  ),
   // authorizationPreview: oog, je bekijkt de site door andermans rechten
   authorizationPreview: (
     <Svg>
