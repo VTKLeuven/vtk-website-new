@@ -624,6 +624,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               const photo = eventPhoto ?? defaultEventImage;
               const title = pick(event.titleNl, event.titleEn ?? event.titleNl, locale);
               const going = interestLabel(interested.get(event.id), locale);
+              const location = event.location?.trim() || null;
+              const group = pick(event.group.nameNl, event.group.nameEn, locale)?.trim() || null;
               return (
                 // Een kaart met knoppen erin kan geen link zijn: een knop in een
                 // anker is ongeldige HTML en op een telefoon opent de ster dan de
@@ -667,13 +669,18 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                         {title}
                       </Link>
                     </h3>
-                    <p>
-                      {[event.location, pick(event.group.nameNl, event.group.nameEn, locale)]
-                        .filter(Boolean)
-                        .join(" · ")}
-                    </p>
+                    {going ? <span className="evcard-going">{going}</span> : null}
                     <div className="evcard-foot">
-                      {going ? <span className="evcard-going">{going}</span> : null}
+                      <div className="evcard-meta">
+                        {location ? (
+                          <>
+                            <span className="evcard-loc">{location}</span>
+                            {group ? <span className="evcard-group">{group}</span> : null}
+                          </>
+                        ) : group ? (
+                          <span className="evcard-loc">{group}</span>
+                        ) : null}
+                      </div>
                       <div className="evcard-actions">
                         <EventStar
                           eventId={event.id}

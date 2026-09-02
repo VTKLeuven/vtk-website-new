@@ -1378,7 +1378,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  padding: 20px 22px 22px;
+  padding: 20px 22px 18px;
 }
 
 .vtk-design .evcard-when {
@@ -1452,8 +1452,10 @@
   outline-offset: 3px;
 }
 
-/* Onderaan de kaart: links de teller, rechts de acties. Blijft onderaan plakken,
-   ook wanneer de ene kaart een langere titel heeft dan de andere. */
+/* Onderaan de kaart op één lijn: links de locatie en groep (waarbij de groep
+   wegvalt wanneer ze samen niet passen, en de locatie afkapt met ellipsis als ook
+   die alleen te lang is), rechts de twee acties. Blijft onderaan plakken, ook
+   wanneer de ene kaart een langere titel heeft dan de andere. */
 .vtk-design .evcard-foot {
   position: relative;
   z-index: 1;
@@ -1462,12 +1464,40 @@
   justify-content: space-between;
   gap: 10px;
   margin-top: auto;
-  padding-top: 14px;
+  padding-top: 10px;
+  pointer-events: none;
 }
 
-.vtk-design .evcard-foot .evcard-going {
-  align-self: center;
-  margin-top: 0;
+.vtk-design .evcard-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  height: 1.5em;
+  line-height: 1.5;
+  overflow: hidden;
+  font-size: 13.5px;
+  color: var(--body);
+  min-width: 0;
+  flex: 1;
+  margin: 0;
+}
+
+.vtk-design .evcard-loc {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vtk-design .evcard-group {
+  white-space: nowrap;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.vtk-design .evcard-group::before {
+  content: " · ";
+  white-space: pre;
 }
 
 .vtk-design .evcard-actions {
@@ -1476,6 +1506,8 @@
   gap: 2px;
   margin-left: auto;
   margin-right: -6px;
+  flex-shrink: 0;
+  pointer-events: auto;
 }
 
 /* Ster en agenda-icoon. Groot genoeg om op een telefoon te raken (Apple en

@@ -4956,12 +4956,15 @@ de eventpagina zelf.
 
 ### De ster en het agenda-icoon op de homepagekaarten
 
-Sinds september 2026 draagt elke kaart onder "Aankomende evenementen" rechtsonder
-twee icoonknoppen: dezelfde ster als in het weekoverzicht van de hero, en een
-agenda-icoon dat het evenement in je agenda zet. Het zijn de twee dingen die
-iemand met een evenement wil doen zonder eerst de detailpagina te openen, en ze
-staan er samen omdat "ik kom" en "in mijn agenda" dezelfde beslissing zijn op twee
-manieren opgeschreven.
+Sinds september 2026 draagt elke kaart onder "Aankomende evenementen" op dezelfde
+lijn als de locatie en groep twee icoonknoppen: dezelfde ster als in het
+weekoverzicht van de hero, en een agenda-icoon dat het evenement in je agenda
+zet. Ze staan op één regel met de locatie en groep om de kaarten compacter te
+houden; past de combinatie niet, dan valt de werkgroep weg en kapt een te lange
+locatie af met ellipsis (`...`). Het zijn de twee dingen die iemand met een
+evenement wil doen zonder eerst de detailpagina te openen, en ze staan er samen
+omdat "ik kom" en "in mijn agenda" dezelfde beslissing zijn op twee manieren
+opgeschreven.
 
 De kaart is daardoor geen link meer maar een `article` met de titel als link. Een
 knop in een anker is ongeldige HTML en gedraagt zich op een telefoon ook zo: de
