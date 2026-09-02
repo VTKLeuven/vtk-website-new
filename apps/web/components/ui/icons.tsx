@@ -112,6 +112,19 @@ export function UserIcon() {
   );
 }
 
+/**
+ * Bankkaart. Staat naast `UserIcon` in de rekeningentabel: het verschil tussen
+ * "met de kaart van VTK betaald" en "iemand schoot het voor".
+ */
+export function CardIcon() {
+  return (
+    <Icon>
+      <rect x="2" y="5" width="20" height="14" rx="2.5" />
+      <path d="M2 10h20" />
+    </Icon>
+  );
+}
+
 export function KeyIcon() {
   return (
     <Icon>

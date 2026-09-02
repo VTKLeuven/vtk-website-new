@@ -393,6 +393,21 @@ the design language into the application instead of copying mockup content.
     `.vtk-admin-main .overflow-x-auto` and `.ticket-admin-table-wrap` carry
     `position: relative`. It cost an afternoon on /admin/tickets and the
     bonnetjes tab.
+  - **De inhoudskolom van de admin is 900 px en wordt nooit breder** (`--max`
+    1240, min 2x36 padding, min 220 zijbalk, min 48 gap). Een beheertabel die
+    daar niet in past, verstopt haar rij-acties achter een scrollbalk. Op
+    /admin/rekeningen stonden terugbetaald, doorgestuurd en ingeboekt elk in een
+    eigen kolom met een pil erin, samen 460 px, terwijl de statuskolom ernaast
+    uit precies die drie datums wordt afgeleid (`expenseStatus()`): vier
+    kolommen voor drie bits. Ze zijn nu één `.vtk-expense-track` van drie
+    segmenten met het statuswoord erachter. Zoek bij een te brede tabel dus
+    eerst naar kolommen die hetzelfde zeggen, voor je kolommen versmalt.
+  - **Een rij in een beheertabel opent zijn detail met een klik op de rij zelf**,
+    niet enkel via een `i`-knop ernaast. De cel met de rij-acties stopt de
+    propagatie, en de titelknop in de rij blijft bestaan omdat een toetsenbord
+    en een screenreader een echt focusbaar element nodig hebben. Verwijderen
+    hoort dan in de detailmodal en niet meer in de rij: het is de enige
+    onomkeerbare actie en het scheelt een icoon per rij.
   - Below `sm` the admin CSS puts every field of a `flex flex-wrap items-end`
     filter row on its own full-width line: the fixed widths (`w-44`, `w-56`) and
     the `ml-auto` button are meant for a wide column. Rows of unlabelled inputs

@@ -988,3 +988,110 @@ a.vtk-shortcut-tile:hover {
   border-radius: 6px;
   padding: 1px 5px;
 }
+
+/* -----------------------------------------------------------------------
+   Voortgangsspoor in de rekeningentabel
+   -----------------------------------------------------------------------
+   Terugbetaald, doorgestuurd en ingeboekt stonden elk in een eigen kolom met
+   een pil erin ("Nog niet", "Nog niet", "Door te sturen"), samen goed voor 460
+   van de 900 pixels die de inhoudskolom breed is. Ze zeggen bovendien
+   hetzelfde als de statuskolom ernaast, want `expenseStatus()` leidt die status
+   uit precies die drie datums af. Vandaar één spoor van drie segmenten met het
+   statuswoord erachter.
+
+   Groen is hier een toestandskleur, geen accent: het zegt "deze stap is gezet".
+   Ze staat daarom als eigen custom property in dit blok en niet in het palet
+   van vtk-base.css.
+   ----------------------------------------------------------------------- */
+.vtk-expense-track,
+.vtk-expense-status {
+  --track-done: #2e9b76;
+  --track-done-ink: #14603f;
+  --track-open-ink: #7a5b12;
+}
+
+.vtk-expense-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  vertical-align: middle;
+}
+
+.vtk-expense-track > i {
+  display: block;
+  width: 15px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--paper-2);
+  box-shadow: inset 0 0 0 1px var(--line);
+}
+
+.vtk-expense-track > i[data-step='done'] {
+  background: var(--track-done);
+  box-shadow: none;
+}
+
+/* Terugbetalen is niet van toepassing wanneer met de kaart van VTK betaald is.
+   Een dun streepje in plaats van een blokje, want "niet nodig" is iets anders
+   dan "nog niet gebeurd". Arcering was hier de eerste poging, maar op vijf
+   pixels hoogte zie je het verschil met een leeg segment niet. */
+.vtk-expense-track > i[data-step='na'] {
+  height: 2px;
+  background: var(--line);
+  box-shadow: none;
+}
+
+.vtk-expense-status {
+  margin-left: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--body);
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+.vtk-expense-status[data-status='DONE'] {
+  color: var(--track-done-ink);
+}
+
+.vtk-expense-status[data-status='TO_REIMBURSE'] {
+  color: var(--track-open-ink);
+}
+
+/* De legende onder de kolomkoppen: drie segmenten zijn compact maar niet
+   vanzelfsprekend, en een tooltip vindt je pas als je hem zoekt. */
+.vtk-expense-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 16px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.vtk-expense-legend > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vtk-expense-legend b {
+  font-weight: 600;
+  color: var(--body);
+}
+
+/* Kaart of eigen portemonnee: een icoon met een tooltip in plaats van een pil
+   met een woord erin. Geen tint, want de twee iconen verschillen al genoeg. */
+.vtk-expense-method {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--body);
+}

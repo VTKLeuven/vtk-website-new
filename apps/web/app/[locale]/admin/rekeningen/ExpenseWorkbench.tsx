@@ -6,9 +6,8 @@ import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import type { Locale } from "@vtk/i18n";
 import { Modal } from "@/app/[locale]/admin/admin-table";
-import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { IconButton, IconLink, RowActions } from "@/components/ui/IconButton";
-import { InfoIcon, PencilIcon } from "@/components/ui/icons";
+import { CardIcon, PencilIcon, UserIcon } from "@/components/ui/icons";
 import {
   deleteExpenseAction,
   sendExpenseAction,
@@ -107,20 +106,40 @@ export function ExpenseWorkbench({
         {rows.length === 0 ? (
           <p className="px-5 py-12 text-center text-sm text-[#5c667f]">{emptyMessage}</p>
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <p className="vtk-expense-legend">
+              <span>{nl ? "Voortgang:" : "Progress:"}</span>
+              <span>
+                <TrackSample state="done" />
+                <b>{nl ? "1 terugbetaald" : "1 reimbursed"}</b>
+              </span>
+              <span>
+                <TrackSample state="done" />
+                <b>{nl ? "2 doorgestuurd" : "2 forwarded"}</b>
+              </span>
+              <span>
+                <TrackSample state="done" />
+                <b>{nl ? "3 ingeboekt" : "3 booked"}</b>
+              </span>
+              <span>
+                <TrackSample state="open" />
+                {nl ? "nog niet" : "not yet"}
+              </span>
+              <span>
+                <TrackSample state="na" />
+                {nl ? "n.v.t. bij de VTK-kaart" : "n/a with the VTK card"}
+              </span>
+            </p>
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-vtk-blue/10 text-left text-xs font-semibold text-[#5c667f]">
-                  <th scope="col" className="px-4 py-3">{nl ? "Datum" : "Date"}</th>
+                  <th scope="col" className="w-[96px] px-4 py-3">{nl ? "Datum" : "Date"}</th>
                   <th scope="col" className="px-4 py-3">{nl ? "Omschrijving" : "Description"}</th>
-                  <th scope="col" className="px-4 py-3">{nl ? "Post" : "Post"}</th>
-                  <th scope="col" className="px-4 py-3 text-right">{nl ? "Bedrag" : "Amount"}</th>
-                  <th scope="col" className="px-4 py-3">{nl ? "Betaald met" : "Payment"}</th>
-                  <th scope="col" className="px-4 py-3">{nl ? "Terugbetaald" : "Reimbursed"}</th>
-                  <th scope="col" className="px-4 py-3">{nl ? "Ingeboekt" : "Booked"}</th>
-                  <th scope="col" className="px-4 py-3">{nl ? "Doorgestuurd" : "Forwarded"}</th>
-                  <th scope="col" className="px-4 py-3">{nl ? "Status" : "Status"}</th>
-                  <th scope="col" className="px-4 py-3 text-right">{nl ? "Acties" : "Actions"}</th>
+                  <th scope="col" className="w-[104px] px-4 py-3 text-right">{nl ? "Bedrag" : "Amount"}</th>
+                  <th scope="col" className="w-[64px] px-4 py-3">{nl ? "Kaart" : "Card"}</th>
+                  <th scope="col" className="w-[190px] px-4 py-3">{nl ? "Voortgang" : "Progress"}</th>
+                  <th scope="col" className="w-[124px] px-4 py-3 text-right">{nl ? "Acties" : "Actions"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-vtk-blue/5">
@@ -129,7 +148,8 @@ export function ExpenseWorkbench({
                   return (
                     <tr
                       key={row.id}
-                      className={`group transition-colors hover:bg-vtk-blue-soft/30 ${
+                      onClick={() => router.push(row.detailHref, { scroll: false })}
+                      className={`group cursor-pointer transition-colors hover:bg-vtk-blue-soft/30 ${
                         isSelected ? "bg-vtk-yellow/12" : ""
                       }`}
                     >
@@ -137,85 +157,74 @@ export function ExpenseWorkbench({
                         {row.spentOnLabel}
                       </td>
                       <td className="px-4 py-3">
+                        {/* De hele rij opent de rekening; deze knop is wat een
+                            toetsenbord vindt en wat een screenreader voorleest. */}
                         <button
                           type="button"
-                          onClick={() => router.push(row.detailHref, { scroll: false })}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            router.push(row.detailHref, { scroll: false });
+                          }}
                           className="text-left font-semibold text-vtk-ink hover:underline"
                         >
                           {row.description}
                         </button>
                         <span className="block text-xs font-normal text-[#5c667f]">
-                          {row.activity} · {row.payerName}
+                          {row.postLabel} · {row.activity} · {row.payerName}
                         </span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-[#34405e]">{row.postLabel}</td>
                       <td className="whitespace-nowrap px-4 py-3 text-right font-semibold tabular-nums text-vtk-ink">
                         {formatEuro(row.amountCents, locale)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        {row.paymentMethod === "VTK_CARD" ? (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs font-medium text-purple-700">
-                            💳 {nl ? "VTK-kaart" : "VTK card"}
+                        <span
+                          className="vtk-expense-method"
+                          title={
+                            row.paymentMethod === "VTK_CARD"
+                              ? nl
+                                ? "Betaald met de kaart van VTK"
+                                : "Paid with the VTK card"
+                              : nl
+                                ? "Met eigen kaart voorgeschoten"
+                                : "Paid out of own pocket"
+                          }
+                        >
+                          {row.paymentMethod === "VTK_CARD" ? <CardIcon /> : <UserIcon />}
+                          <span className="sr-only">
+                            {row.paymentMethod === "VTK_CARD"
+                              ? nl
+                                ? "VTK-kaart"
+                                : "VTK card"
+                              : nl
+                                ? "Eigen kaart"
+                                : "Own card"}
                           </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-700">
-                            👤 {nl ? "Eigen kaart" : "Personal"}
-                          </span>
-                        )}
+                        </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        {row.paymentMethod === "VTK_CARD" ? (
-                          <span
-                            className="text-xs text-zinc-400"
-                            title={nl ? "N.v.t. (met VTK-kaart betaald)" : "N/A (paid with VTK card)"}
-                          >
-                            —
-                          </span>
-                        ) : row.paidAtLabel ? (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
-                            title={row.paidByName ? `${nl ? "Door" : "By"} ${row.paidByName}` : undefined}
-                          >
-                            ✓ {nl ? "Terugbetaald" : "Reimbursed"}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">
-                            ⏱ {nl ? "Nog terugbetalen" : "To reimburse"}
-                          </span>
-                        )}
+                        <ExpenseTrack
+                          card={row.paymentMethod === "VTK_CARD"}
+                          paid={Boolean(row.paidAtLabel)}
+                          sent={Boolean(row.sentAtLabel)}
+                          booked={Boolean(row.bookedAtLabel)}
+                          locale={locale}
+                          hints={{
+                            paidAt: row.paidAtLabel,
+                            paidBy: row.paidByName,
+                            bookedAt: row.bookedAtLabel,
+                            bookedBy: row.bookedByName,
+                            sentAt: row.sentAtLabel,
+                            sentTo: row.sentTo,
+                          }}
+                        />
+                        <span className="vtk-expense-status" data-status={row.status}>
+                          {expenseStatusLabel(row.status, nl)}
+                        </span>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        {row.bookedAtLabel ? (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
-                            title={row.bookedByName ? `${nl ? "Door" : "By"} ${row.bookedByName}` : undefined}
-                          >
-                            ✓ {nl ? "Ingeboekt" : "Booked"}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-500">
-                            ⏱ {nl ? "Nog niet" : "Not yet"}
-                          </span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        {row.sentAtLabel ? (
-                          <span
-                            className="inline-flex items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700"
-                            title={row.sentTo ? `${nl ? "Naar" : "To"} ${row.sentTo}` : undefined}
-                          >
-                            ✓ {nl ? "Doorgestuurd" : "Forwarded"}
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-zinc-200 bg-zinc-50 px-2 py-0.5 text-xs font-medium text-zinc-500">
-                            ⏱ {nl ? "Nog niet" : "Not yet"}
-                          </span>
-                        )}
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3">
-                        <StatusPill status={row.status} locale={locale} />
-                      </td>
-                      <td className="whitespace-nowrap px-4 py-3 text-right">
+                      <td
+                        className="whitespace-nowrap px-4 py-3 text-right"
+                        onClick={(event) => event.stopPropagation()}
+                      >
                         <RowActions>
                           <IconButton
                             label={nl ? "Blad bekijken" : "View sheet"}
@@ -245,13 +254,6 @@ export function ExpenseWorkbench({
                               <SendIcon />
                             </IconButton>
                           )}
-                          <IconButton
-                            label={nl ? "Details openen" : "Open details"}
-                            srLabel={`${nl ? "Details openen" : "Open details"}: ${row.description}`}
-                            onClick={() => router.push(row.detailHref, { scroll: false })}
-                          >
-                            <InfoIcon />
-                          </IconButton>
                           {row.canEdit && (
                             <IconLink
                               href={row.editHref}
@@ -261,25 +263,6 @@ export function ExpenseWorkbench({
                               <PencilIcon />
                             </IconLink>
                           )}
-                          {row.canDelete && (
-                            <DeleteIconButton
-                              action={deleteExpenseAction}
-                              fields={{ id: row.id }}
-                              title={nl ? "Rekening verwijderen?" : "Delete expense?"}
-                              description={
-                                nl
-                                  ? `"${row.description}" (${formatEuro(row.amountCents, locale)}, ${row.postLabel}) verdwijnt samen met het bonnetje uit de opslag.`
-                                  : `"${row.description}" (${formatEuro(row.amountCents, locale)}, ${row.postLabel}) disappears together with the receipt in storage.`
-                              }
-                              confirmLabel={nl ? "Verwijderen" : "Delete"}
-                              cancelLabel={nl ? "Annuleren" : "Cancel"}
-                              label={nl ? "Verwijderen" : "Delete"}
-                              srLabel={`${nl ? "Verwijderen" : "Delete"}: ${row.description}`}
-                              successMessage={
-                                nl ? "Rekening en bonnetje verwijderd." : "Expense and receipt deleted."
-                              }
-                            />
-                          )}
                         </RowActions>
                       </td>
                     </tr>
@@ -288,6 +271,7 @@ export function ExpenseWorkbench({
               </tbody>
             </table>
           </div>
+          </>
         )}
 
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-vtk-blue/10 px-4 py-2.5 text-xs text-[#5c667f]">
@@ -504,6 +488,86 @@ function ExpenseDetailModal({
         </div>
       </div>
     </Modal>
+  );
+}
+
+type TrackStep = "done" | "open" | "na";
+
+/**
+ * Drie segmenten naast elkaar: terugbetaald, doorgestuurd, ingeboekt. Ze
+ * vervangen de drie kolommen met pillen die daar stonden, en houden dezelfde
+ * volgorde aan als de werkstroom zelf.
+ *
+ * `aria-hidden`, want het statuswoord ernaast zegt hetzelfde in woorden; de
+ * tooltips zijn er voor wie met de muis wil weten wanneer en door wie.
+ */
+function ExpenseTrack({
+  card,
+  paid,
+  sent,
+  booked,
+  locale,
+  hints,
+}: {
+  card: boolean;
+  paid: boolean;
+  sent: boolean;
+  booked: boolean;
+  locale: Locale;
+  hints: { paidAt: string | null; paidBy: string | null; bookedAt: string | null; bookedBy: string | null; sentAt: string | null; sentTo: string | null };
+}) {
+  const nl = locale === "nl";
+  const by = (who: string | null) => (who ? ` · ${nl ? "door" : "by"} ${who}` : "");
+
+  const steps: { key: string; state: TrackStep; title: string }[] = [
+    {
+      key: "paid",
+      state: card ? "na" : paid ? "done" : "open",
+      title: card
+        ? nl
+          ? "Terugbetalen: niet nodig, met de kaart van VTK betaald"
+          : "Reimbursement: not needed, paid with the VTK card"
+        : paid
+          ? `${nl ? "Terugbetaald" : "Reimbursed"}: ${hints.paidAt}${by(hints.paidBy)}`
+          : nl
+            ? "Terugbetaald: nog niet"
+            : "Reimbursed: not yet",
+    },
+    {
+      key: "sent",
+      state: sent ? "done" : "open",
+      title: sent
+        ? `${nl ? "Doorgestuurd" : "Forwarded"}: ${hints.sentAt}${hints.sentTo ? ` · ${nl ? "naar" : "to"} ${hints.sentTo}` : ""}`
+        : nl
+          ? "Doorgestuurd: nog niet"
+          : "Forwarded: not yet",
+    },
+    {
+      key: "booked",
+      state: booked ? "done" : "open",
+      title: booked
+        ? `${nl ? "Ingeboekt" : "Booked"}: ${hints.bookedAt}${by(hints.bookedBy)}`
+        : nl
+          ? "Ingeboekt: nog niet"
+          : "Booked: not yet",
+    },
+  ];
+
+  return (
+    <span className="vtk-expense-track" aria-hidden>
+      {steps.map((step) => (
+        <i key={step.key} data-step={step.state} title={step.title} />
+      ))}
+    </span>
+  );
+}
+
+/** Eén segment, voor de legende boven de tabel. */
+function TrackSample({ state }: { state: TrackStep }) {
+  return (
+    <span className="vtk-expense-track" aria-hidden>
+      <i data-step={state} />
+    </span>
   );
 }
 
