@@ -193,12 +193,19 @@ export function describeChanges(
   after: Record<string, unknown>,
   labels: Record<string, string>,
 ): string | null {
-  const changed = Object.entries(labels)
-    // `undefined` in `after` betekent "niet meegeschreven" (zo leest Prisma het
-    // ook), niet "leeggemaakt". Zonder deze regel zou een gedeeltelijke update
-    // elk veld dat ze niet aanraakt als gewijzigd melden.
-    .filter(([key]) => after[key] !== undefined && !sameValue(before[key], after[key]))
-    .map(([, label]) => label);
+  const changed = [
+    ...new Set(
+      Object.entries(labels)
+        // `undefined` in `after` betekent "niet meegeschreven" (zo leest Prisma het
+        // ook), niet "leeggemaakt". Zonder deze regel zou een gedeeltelijke update
+        // elk veld dat ze niet aanraakt als gewijzigd melden.
+        .filter(([key]) => after[key] !== undefined && !sameValue(before[key], after[key]))
+        .map(([, label]) => label),
+    ),
+    // Ontdubbeld, want twee kolommen kunnen samen één ding zijn: `imageFocusX` en
+    // `imageFocusY` zijn allebei "uitsnede van de afbeelding", en die twee keer
+    // opsommen leest als een fout in het logboek.
+  ];
 
   if (changed.length === 0) return null;
   if (changed.length === 1) return `${changed[0]} gewijzigd`;

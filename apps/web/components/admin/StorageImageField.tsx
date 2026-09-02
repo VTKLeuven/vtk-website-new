@@ -34,6 +34,7 @@ export function StorageImageField({
   label,
   fallbackUrl,
   fallbackPosition = "center",
+  previewPosition,
   emptyHint,
   helpText,
   srContext,
@@ -48,6 +49,13 @@ export function StorageImageField({
   fallbackUrl?: string;
   /** Uitsnede van de standaardfoto in de preview. */
   fallbackPosition?: "center" | "left";
+  /**
+   * `object-position` voor de geüploade foto in deze preview. Geef dit mee zodra
+   * er elders een uitsnede gekozen wordt (`ImageFocusField`), anders toont deze
+   * duimnagel de middenuitsnede terwijl de voorbeelden ernaast iets anders
+   * tonen: twee kadertjes van dezelfde foto die elkaar tegenspreken.
+   */
+  previewPosition?: string;
   emptyHint?: string;
   helpText?: string;
   /** Waarover dit veld gaat ("Cursusdienst"), voor de screenreader-labels. */
@@ -134,6 +142,11 @@ export function StorageImageField({
                     ? `${fallbackPosition === "left" ? "object-left" : "object-center"} opacity-60`
                     : ""
                 }`}
+                style={
+                  !showingFallback && previewPosition
+                    ? { objectPosition: previewPosition }
+                    : undefined
+                }
               />
               {showingFallback && (
                 <span className="absolute bottom-1 left-1 rounded-md bg-white/85 px-1.5 py-0.5 text-[11px] font-medium text-[#5c667f]">

@@ -8,6 +8,7 @@ import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
 import { eventMetadata } from "@/lib/pageMetadata";
 import { loadCalendarCategory, loadCalendarEvent, loadDefaultEventImage } from "@/lib/pageQueries";
+import { focusPosition } from "@/lib/imageFocus";
 import { buildMetadata } from "@/lib/seo";
 import { getCurrentSession } from "@/lib/session";
 import {
@@ -117,7 +118,13 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
   const title = pick(event.titleNl, event.titleEn, locale);
   const description = pick(event.descriptionNl ?? "", event.descriptionEn ?? "", locale);
   const groupName = pick(event.group.nameNl, event.group.nameEn, locale);
-  const imageSrc = publicUrl(event.imageKey) ?? (await loadDefaultEventImage());
+  const eventPhoto = publicUrl(event.imageKey);
+  const imageSrc = eventPhoto ?? (await loadDefaultEventImage());
+  // De uitsnede hoort bij de foto die de redactie zelf koos; de standaardfoto
+  // valt terug op het midden, want dat punt is voor elk evenement hetzelfde.
+  const imagePosition = eventPhoto
+    ? focusPosition({ x: event.imageFocusX, y: event.imageFocusY })
+    : undefined;
   // Doelgroepen krijgen een eigen, opvallend label: wie hier toevallig belandt
   // moet meteen zien dat het evenement voor eerstejaars of internationals is.
   const audiences = event.categories.map((c) => c.category).filter((c) => c.audience !== null);
@@ -192,6 +199,7 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
               fill
               sizes="(max-width: 960px) 100vw, 58vw"
               className="vtk-event-photo-img"
+              style={imagePosition ? { objectPosition: imagePosition } : undefined}
               priority
             />
           </figure>

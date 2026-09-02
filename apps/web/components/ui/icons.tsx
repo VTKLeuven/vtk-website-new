@@ -89,6 +89,24 @@ export function StarIcon({ filled = false }: { filled?: boolean } = {}) {
   );
 }
 
+/**
+ * Agenda met een plus: "zet dit in mijn agenda". Bewust niet enkel een blad met
+ * datum, want die staat elders op dezelfde kaart al als datumblok; de plus zegt
+ * dat er iets gebeurt in plaats van dat er iets staat.
+ */
+export function CalendarPlusIcon() {
+  return (
+    <Icon>
+      <rect x="3" y="5" width="18" height="16" rx="2.5" />
+      <path d="M3 10h18" />
+      <path d="M8 3v4" />
+      <path d="M16 3v4" />
+      <path d="M12 13v5" />
+      <path d="M9.5 15.5h5" />
+    </Icon>
+  );
+}
+
 export function UploadIcon() {
   return (
     <Icon>

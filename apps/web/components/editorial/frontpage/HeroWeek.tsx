@@ -5,7 +5,7 @@ import {
   selectHeroWeek,
   type HeroWeekDay,
 } from "@/lib/calendar/heroWeek";
-import { HeroWeekStar, type HeroWeekStarLabels } from "./HeroWeekStar";
+import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar";
 import type { FrontpageEvent } from "./context";
 
 /**
@@ -87,7 +87,7 @@ export function HeroWeek({
         )} ${dayNumber(last.key)} ${monthLabel(last.date, locale)}`
       : null;
 
-  const starLabels: HeroWeekStarLabels = {
+  const starLabels: EventStarLabels = {
     mark: nl ? "Ik kom naar dit evenement" : "I am coming to this event",
     marked: nl ? "Je komt naar dit evenement" : "You are coming to this event",
     signIn: nl ? "Meld je aan om aan te duiden dat je komt" : "Sign in to mark that you are coming",
@@ -170,13 +170,14 @@ export function HeroWeek({
                         {meta ? <small>{meta}</small> : null}
                       </Link>
                       <span className="time">{timeLabel(event, locale, nl)}</span>
-                      <HeroWeekStar
+                      <EventStar
                         eventId={event.id}
                         title={title}
                         interested={event.viewerInterested}
                         signedIn={signedIn}
                         loginHref={loginHref}
                         labels={starLabels}
+                        className="hero-week-star"
                       />
                     </div>
                   );

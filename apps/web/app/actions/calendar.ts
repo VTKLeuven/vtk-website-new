@@ -8,6 +8,7 @@ import { hasPermission } from "@vtk/auth";
 import { deleteObject } from "@vtk/storage";
 import { requireSession } from "@/lib/session";
 import { readImageField, resolveImageKey } from "@/lib/imageField";
+import { readImageFocus } from "@/lib/imageFocus";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
@@ -51,6 +52,8 @@ const EVENT_FIELD_LABELS: Record<string, string> = {
   allDay: "hele dag",
   url: "link",
   imageKey: "afbeelding",
+  imageFocusX: "uitsnede van de afbeelding",
+  imageFocusY: "uitsnede van de afbeelding",
   publishedAt: "publicatiestatus",
   heroWeek: "weekoverzicht op de homepage",
 };
@@ -80,6 +83,9 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     heroWeek: formData.get("heroWeek") || "AUTO",
   });
   const image = readImageField(formData);
+  // Waar de uitsnede rond draait. Geen validatiepad: het veld stuurt altijd een
+  // punt mee en alles wat geen bruikbaar getal is, wordt het midden.
+  const focus = readImageFocus(formData);
   if (!parsed.success || image.kind === "invalid") return saveError("INVALID_INPUT");
   const input = parsed.data;
   const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
@@ -124,6 +130,8 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     end,
     allDay: input.allDay,
     url: input.url,
+    imageFocusX: focus.x,
+    imageFocusY: focus.y,
     createdById: session.user.id,
     ...(canHeroWeek ? { heroWeek: input.heroWeek } : {}),
   };

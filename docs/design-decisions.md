@@ -4954,6 +4954,29 @@ De teller staat op vier plekken en overal met dezelfde drempel: de heroagenda en
 de kaarten op de homepage, het kalenderraster, de voorvertoning bij een klik, en
 de eventpagina zelf.
 
+### De ster en het agenda-icoon op de homepagekaarten
+
+Sinds september 2026 draagt elke kaart onder "Aankomende evenementen" rechtsonder
+twee icoonknoppen: dezelfde ster als in het weekoverzicht van de hero, en een
+agenda-icoon dat het evenement in je agenda zet. Het zijn de twee dingen die
+iemand met een evenement wil doen zonder eerst de detailpagina te openen, en ze
+staan er samen omdat "ik kom" en "in mijn agenda" dezelfde beslissing zijn op twee
+manieren opgeschreven.
+
+De kaart is daardoor geen link meer maar een `article` met de titel als link. Een
+knop in een anker is ongeldige HTML en gedraagt zich op een telefoon ook zo: de
+ster opende dan de eventpagina. De titel spant zich nu over de kaart
+(`.evcard-link::after`), en de twee acties liggen erboven.
+
+**Het agenda-icoon downloadt niet, het opent.** De .ics wordt `inline` geserveerd
+in plaats van als `attachment`. Op een desktopbrowser is dat hetzelfde: geen van
+beide kan `text/calendar` tonen, dus het bestand belandt in de downloads en de
+agenda-app opent het. Op iOS is het verschil groot: een `attachment` verdwijnt
+naar de Bestanden-app en moet daar teruggevonden worden, terwijl Safari een
+inline `text/calendar` meteen als evenement toont met een knop om het toe te
+voegen. Daarom draagt de link ook geen `download`-attribuut; dat zou hetzelfde
+effect hebben als `attachment`.
+
 ---
 
 ## Alumniwerking
@@ -5727,3 +5750,40 @@ echte mail.
 - **Geen aanvraag aanmaken in het beheer.** Alles komt via het formulier binnen;
   wil Theokot de zaal zelf blokkeren, dan dient ze een aanvraag in en keurt ze
   die goed. Eén weg naar binnen betekent één plaats waar de gegevens compleet zijn.
+
+---
+
+## De uitsnede van een eventfoto: een punt, geen bijgesneden bestand
+
+Een affiche voor een evenement is meestal staand en draagt haar tekst bovenaan.
+De site toont diezelfde foto in drie verhoudingen: 16/9 op een homepagekaart,
+16/10 op de eventpagina en 4/3 op een telefoon. Met een automatische uitsnede
+rond het midden valt de tekst er in alle drie precies af, en dat is wat het
+probleem was.
+
+**Wat een redacteur nu kiest is een punt op de foto, niet een uitsnede.** Dat punt
+(`CalendarEvent.imageFocusX` / `imageFocusY`, 0..1 met linksboven (0, 0)) reist
+als `object-position` mee naar elk formaat. Drie gevolgen, en alle drie zijn de
+reden:
+
+- **Eén keuze werkt in alle formaten.** Een echte uitsnede zou voor één
+  verhouding kloppen en in de twee andere opnieuw gesneden worden.
+- **De upload blijft ongeschonden**, dus het punt is achteraf nog te verleggen.
+  Dat was uitdrukkelijk gevraagd: de evenementen die er al stonden moesten recht
+  te zetten zijn zonder de foto opnieuw te uploaden. Het uitsnedeveld staat er
+  daarom ook bij het openen van een bestaand evenement, niet enkel na een upload.
+- **Het midden is de standaard**, en dat is precies wat de browser zonder deze
+  waarde al deed. Een bestaand evenement verandert dus niet van uitzicht tot
+  iemand er iets aan doet.
+
+Dit is bewust iets anders dan de profielfoto op /account. Die wordt wél echt
+bijgesneden (`AvatarCropField`), want daar is er één vorm (een vierkant), is de
+uitsnede zelf het onderwerp, en scheelt het bijsnijden in de browser een
+volledige upload van een telefoonfoto. Hier is de foto redactionele inhoud die in
+meerdere kaders hergebruikt wordt.
+
+Naast het aanduidvlak staan de drie echte uitsneden van de site
+(`ImageFocusField`). Zonder die voorbeelden is een punt verslepen giswerk: je ziet
+pas na het opslaan wat de homepage ervan maakt. Om dezelfde reden volgt de
+duimnagel van de upload erboven hetzelfde punt; twee kadertjes van dezelfde foto
+die elkaar tegenspreken zijn erger dan één.

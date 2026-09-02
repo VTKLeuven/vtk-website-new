@@ -4,6 +4,7 @@ import { saveEventAction } from "@/app/actions/calendar";
 import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { saveErrorMessages } from "@/lib/saveMessages";
+import { toImageFocus } from "@/lib/imageFocus";
 import { EventImageField } from "./EventImageField";
 import { utcToLocalDateTime } from "@/lib/ticketing/time";
 
@@ -22,6 +23,9 @@ type Event = {
   allDay?: boolean;
   url?: string | null;
   imageKey?: string | null;
+  /** Waar de uitsnede van die foto rond draait; zie lib/imageFocus.ts. */
+  imageFocusX?: number | null;
+  imageFocusY?: number | null;
   publishedAt?: Date | null;
   categoryIds?: string[];
   /** Hangt er al een logistiek-evenement aan? Zie `UitleenEvent.calendarEventId`. */
@@ -324,7 +328,11 @@ export function EventForm({
             </div>
           ) : null}
           <div className="md:col-span-2">
-            <EventImageField defaultKey={event.imageKey} locale={locale} />
+            <EventImageField
+              defaultKey={event.imageKey}
+              defaultFocus={toImageFocus(event.imageFocusX, event.imageFocusY)}
+              locale={locale}
+            />
           </div>
           {/* Twee assen, bewust apart gezet. De doelgroep bepaalt wie het event
               vanzelf in zijn kalender krijgt; het thema is enkel een filter en

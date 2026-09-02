@@ -14,6 +14,9 @@ import { readBarStatus } from "@/lib/elixir/status";
 import { publicUrl } from "@/lib/storage";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
+import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar";
+import { CalendarPlusIcon } from "@/components/ui/icons";
+import { focusPosition } from "@/lib/imageFocus";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
 import { interestLabel, publicInterestCounts, viewerInterests } from "@/lib/calendar/interest";
 import {
@@ -181,6 +184,19 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     viewerInterests(eventIds, session?.user.id ?? null),
   ]);
   const viewerInterestIds = new Set(viewerInterestMap.keys());
+
+  // Dezelfde ster als in het weekoverzicht van de hero, met dezelfde teksten:
+  // het is dezelfde handeling op dezelfde pagina, dus ze hoort niet twee namen
+  // te hebben.
+  const starLabels: EventStarLabels = {
+    mark: nl ? "Ik kom naar dit evenement" : "I am coming to this event",
+    marked: nl ? "Je komt naar dit evenement" : "You are coming to this event",
+    signIn: nl ? "Meld je aan om aan te duiden dat je komt" : "Sign in to mark that you are coming",
+    failed: nl
+      ? "Aanduiden lukte niet. Probeer het straks opnieuw."
+      : "Marking this did not work. Try again in a moment.",
+  };
+  const eventLoginHref = `${base}/inloggen?next=${encodeURIComponent(base === "" ? "/" : base)}`;
 
   // POC's van jouw richtingen. Zonder sessie of zonder richtingen valt de hele
   // sectie weg: een lijst van alle POC's is hier niet wat gevraagd wordt.
@@ -604,15 +620,34 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           <div className="ev-grid">
             {eventCards.map((event) => {
               const start = new Date(event.start);
-              const photo = publicUrl(event.imageKey) ?? defaultEventImage;
+              const eventPhoto = publicUrl(event.imageKey);
+              const photo = eventPhoto ?? defaultEventImage;
+              const title = pick(event.titleNl, event.titleEn ?? event.titleNl, locale);
+              const going = interestLabel(interested.get(event.id), locale);
               return (
-                <Link key={event.id} href={`${base}/kalender/${event.slug}`} className="evcard">
+                // Een kaart met knoppen erin kan geen link zijn: een knop in een
+                // anker is ongeldige HTML en op een telefoon opent de ster dan de
+                // eventpagina. De titel is de link en spant zich over de kaart
+                // (`.evcard-link::after`), de acties liggen erboven.
+                <article key={event.id} className="evcard">
                   <span className="evcard-media" aria-hidden="true">
                     <Image
                       src={photo}
                       alt=""
                       fill
                       sizes="(max-width: 640px) 100vw, (max-width: 980px) 50vw, 33vw"
+                      // Enkel de eigen foto draagt een gekozen uitsnede; de
+                      // standaardfoto blijft gecentreerd.
+                      style={
+                        eventPhoto
+                          ? {
+                              objectPosition: focusPosition({
+                                x: event.imageFocusX,
+                                y: event.imageFocusY,
+                              }),
+                            }
+                          : undefined
+                      }
                     />
                   </span>
                   <div className="evcard-body">
@@ -627,19 +662,43 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                         ? nl ? "Hele dag" : "All day"
                         : formatTime(start, locale)}</span>
                     </div>
-                    <h3>{pick(event.titleNl, event.titleEn ?? event.titleNl, locale)}</h3>
+                    <h3>
+                      <Link href={`${base}/kalender/${event.slug}`} className="evcard-link">
+                        {title}
+                      </Link>
+                    </h3>
                     <p>
                       {[event.location, pick(event.group.nameNl, event.group.nameEn, locale)]
                         .filter(Boolean)
                         .join(" · ")}
                     </p>
-                    {interestLabel(interested.get(event.id), locale) ? (
-                      <span className="evcard-going">
-                        {interestLabel(interested.get(event.id), locale)}
-                      </span>
-                    ) : null}
+                    <div className="evcard-foot">
+                      {going ? <span className="evcard-going">{going}</span> : null}
+                      <div className="evcard-actions">
+                        <EventStar
+                          eventId={event.id}
+                          title={title}
+                          interested={viewerInterestIds.has(event.id)}
+                          signedIn={Boolean(session)}
+                          loginHref={eventLoginHref}
+                          labels={starLabels}
+                          className="evcard-action"
+                        />
+                        {/* Gewone link naar de .ics, zonder `download`: iOS zet
+                            een gedownload bestand in de Bestanden-app, terwijl
+                            het zo meteen als evenement opent. Zie de route. */}
+                        <a
+                          href={`/api/calendar/event/${event.id}${locale === "en" ? "?lang=en" : ""}`}
+                          className="evcard-action"
+                          title={nl ? "Zet in mijn agenda" : "Add to my calendar"}
+                          aria-label={`${nl ? "Zet in mijn agenda" : "Add to my calendar"}: ${title}`}
+                        >
+                          <CalendarPlusIcon />
+                        </a>
+                      </div>
+                    </div>
                   </div>
-                </Link>
+                </article>
               );
             })}
           </div>

@@ -1421,6 +1421,17 @@ model CalendarEvent {
   allDay        Boolean   @default(false)
   url           String?
   imageKey      String?
+  /// Welk punt van de foto in beeld moet blijven wanneer ze bijgesneden wordt:
+  /// 0..1, met (0, 0) linksboven. De site toont dezelfde foto in drie
+  /// verhoudingen (16/9 op de homepage, 16/10 op de eventpagina, 4/3 op een
+  /// telefoon), dus een vaste uitsnede bestaat niet; dit punt is wat elk formaat
+  /// centraal houdt en gaat als `object-position` mee.
+  ///
+  /// Bewust niet-destructief: de upload blijft ongewijzigd, zodat de uitsnede
+  /// achteraf nog te verleggen is. Een affiche waar de tekst bovenaan staat is
+  /// zo te redden zonder de foto opnieuw te uploaden.
+  imageFocusX   Float     @default(0.5)
+  imageFocusY   Float     @default(0.5)
   groupId       String
   createdById   String?
   // NULL = concept. Een concept blijft wel zichtbaar en bewerkbaar in de admin,

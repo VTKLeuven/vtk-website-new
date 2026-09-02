@@ -27,6 +27,16 @@ describe("describeChanges", () => {
     );
   });
 
+  // `imageFocusX` en `imageFocusY` dragen samen één label: dat twee keer
+  // opsommen leest als een fout in het logboek.
+  it("noemt twee kolommen met hetzelfde label maar één keer", () => {
+    const pair = { imageFocusX: "uitsnede van de afbeelding", imageFocusY: "uitsnede van de afbeelding" };
+
+    expect(describeChanges({ imageFocusX: 0.5, imageFocusY: 0.5 }, { imageFocusX: 0.2, imageFocusY: 0.1 }, pair)).toBe(
+      "uitsnede van de afbeelding gewijzigd",
+    );
+  });
+
   it("geeft null terug wanneer er niets veranderde", () => {
     const row = { titleNl: "Galabal", location: "Aula", start: new Date("2026-03-01T19:00:00Z") };
 

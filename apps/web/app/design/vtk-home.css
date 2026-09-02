@@ -1332,6 +1332,7 @@
 }
 
 .vtk-design .evcard {
+  position: relative;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1374,6 +1375,9 @@
 }
 
 .vtk-design .evcard-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   padding: 20px 22px 22px;
 }
 
@@ -1420,6 +1424,108 @@
   color: var(--body);
   font-size: 13.5px;
   line-height: 1.5;
+}
+
+/* De titel is de link van de kaart en spant zich over het geheel, zodat de hele
+   kaart klikbaar blijft zonder dat de kaart zelf een anker is; de acties
+   hieronder liggen erboven. Het pseudo-element draagt geen tekst, dus een
+   schermlezer leest gewoon de titel. */
+.vtk-design .evcard-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.vtk-design .evcard-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+
+.vtk-design .evcard:hover .evcard-link {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.vtk-design .evcard-link:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+
+/* Onderaan de kaart: links de teller, rechts de acties. Blijft onderaan plakken,
+   ook wanneer de ene kaart een langere titel heeft dan de andere. */
+.vtk-design .evcard-foot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.vtk-design .evcard-foot .evcard-going {
+  align-self: center;
+  margin-top: 0;
+}
+
+.vtk-design .evcard-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  margin-right: -6px;
+}
+
+/* Ster en agenda-icoon. Groot genoeg om op een telefoon te raken (Apple en
+   Google vragen allebei minstens 44 px) zonder als knop op te vallen: de kaart
+   is het onderwerp, dit zijn twee handelingen ernaast. */
+.vtk-design .evcard-action {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  color: var(--muted);
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+/* Het raakvlak tot 44 px, zonder de knop zelf groter te tekenen. Relatief
+   genest, anders hangt dit blok aan `.evcard` en ligt het onzichtbaar over de
+   foto. */
+.vtk-design .evcard-action::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+.vtk-design .evcard-action:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+/* Aangeduid: geel, de kleur die op deze site "actief" betekent. De gevulde ster
+   zegt het al, maar niet hard genoeg naast een lege ster van dezelfde grootte. */
+.vtk-design .evcard-action[aria-pressed="true"] {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.vtk-design .evcard-action[data-pending] {
+  opacity: 0.6;
+}
+
+.vtk-design .evcard-action:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
 }
 
 /* "Richtingsvertegenwoordigers" is één woord van 27 letters: op de gewone

@@ -8,13 +8,13 @@ import { useToast } from "@/components/ui/toast";
 import { SAVE_IDLE } from "@/lib/saveState";
 
 /**
- * "Ik kom", rechtstreeks vanuit het weekoverzicht in de hero.
+ * "Ik kom", als kale ster naast een evenement in een lijst.
  *
  * Schrijft in dezelfde tabel als de knop op de eventpagina en de ster in de app
  * (`app/actions/eventInterest.ts`), zodat een lid overal hetzelfde antwoord
- * krijgt. Hier staat bewust de kale ster: de hero heeft geen plaats voor de
- * alumnivelden, en die zijn ook nergens verplicht om te kunnen aanduiden dat je
- * komt.
+ * krijgt. Hier staat bewust enkel de ster: in het weekoverzicht en op de
+ * homepagekaarten is geen plaats voor de alumnivelden, en die zijn ook nergens
+ * verplicht om te kunnen aanduiden dat je komt.
  *
  * De ster wisselt meteen en corrigeert zichzelf wanneer de server weigert. Een
  * knop die pas na een ronde naar de server reageert, voelt in een lijst van tien
@@ -22,9 +22,12 @@ import { SAVE_IDLE } from "@/lib/saveState";
  *
  * Zonder aanmelding is het een link naar het aanmeldscherm en geen knop: dat is
  * eerlijker dan een ster die pas na het klikken vertelt dat het niet gaat.
+ *
+ * `className` bepaalt het uitzicht per plek (`hero-week-star` op de donkere
+ * hero, `evcard-action` op een witte kaart); het gedrag is overal hetzelfde.
  */
 
-export type HeroWeekStarLabels = {
+export type EventStarLabels = {
   /** "Ik kom naar dit evenement" */
   mark: string;
   /** "Je komt naar dit evenement" */
@@ -35,13 +38,14 @@ export type HeroWeekStarLabels = {
   failed: string;
 };
 
-export function HeroWeekStar({
+export function EventStar({
   eventId,
   title,
   interested: initialInterested,
   signedIn,
   loginHref,
   labels,
+  className,
 }: {
   eventId: string;
   /** De naam van het evenement, enkel voor de schermlezer. */
@@ -49,7 +53,8 @@ export function HeroWeekStar({
   interested: boolean;
   signedIn: boolean;
   loginHref: string;
-  labels: HeroWeekStarLabels;
+  labels: EventStarLabels;
+  className: string;
 }) {
   const [interested, setInterested] = useState(initialInterested);
   const [pending, startTransition] = useTransition();
@@ -59,7 +64,7 @@ export function HeroWeekStar({
     return (
       <Link
         href={loginHref}
-        className="hero-week-star"
+        className={className}
         title={labels.signIn}
         aria-label={`${labels.signIn}: ${title}`}
       >
@@ -73,7 +78,7 @@ export function HeroWeekStar({
   return (
     <button
       type="button"
-      className="hero-week-star"
+      className={className}
       aria-pressed={interested}
       aria-label={`${label}: ${title}`}
       title={label}
