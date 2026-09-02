@@ -21,6 +21,7 @@ import type { FrontpageEvent } from "@/components/editorial/frontpage/context";
 /** Wat deze module minimaal nodig heeft van een `CalendarEvent`-rij. */
 export type FrontpageEventRow = {
   id: string;
+  slug: string;
   start: Date;
   allDay: boolean;
   titleNl: string;
@@ -68,6 +69,7 @@ export function toFrontpageEvent(
 ): FrontpageEvent {
   return {
     id: row.id,
+    slug: row.slug,
     start: row.start,
     allDay: row.allDay,
     titleNl: row.titleNl,

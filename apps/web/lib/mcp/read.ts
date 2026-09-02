@@ -285,7 +285,7 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
         where: { ...idWhere(input.id), ...(scopedGroup ? { group: scopedGroup } : {}), ...(contains ? { OR: [{ titleNl: contains }, { titleEn: contains }, { location: contains }] } : {}) },
         take, skip, orderBy: { start: "desc" },
         select: {
-          id: true, titleNl: true, titleEn: true, descriptionNl: true, descriptionEn: true,
+          id: true, slug: true, titleNl: true, titleEn: true, descriptionNl: true, descriptionEn: true,
           location: true, start: true, end: true, allDay: true, url: true,
           publishedAt: true, createdAt: true, updatedAt: true,
           group: { select: { code: true, nameNl: true } },

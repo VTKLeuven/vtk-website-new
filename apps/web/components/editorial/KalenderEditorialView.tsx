@@ -16,6 +16,7 @@ import {
 
 type ApiEvent = {
   id: string;
+  slug: string;
   title: string;
   titleEn: string;
   start: string;
@@ -370,7 +371,7 @@ export function KalenderEditorialView({
   }
 
   function eventHref(e: ApiEvent) {
-    return `${base}/kalender/${e.id}`;
+    return `${base}/kalender/${e.slug}`;
   }
 
   function filterHref(slug: string | null): string {

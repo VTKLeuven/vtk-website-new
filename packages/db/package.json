@@ -7,7 +7,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./groups": "./src/groups.ts",
-    "./permissions": "./src/permissions.ts"
+    "./permissions": "./src/permissions.ts",
+    "./slug": "./src/slug.ts"
   },
   "scripts": {
     "generate": "dotenv -e ../../.env -- prisma generate",

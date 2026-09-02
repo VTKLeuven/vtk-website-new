@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
 import { z } from "zod";
 import { logSystemAudit } from "@/lib/audit";
+import { eventSlugBase, uniqueEventSlug } from "@/lib/calendar/slug";
 
 const MAX_LIST_RESULTS = 200;
 
@@ -546,8 +547,14 @@ export async function createCalendarEvent(raw: CreateCalendarEventInput) {
     );
   }
 
+  // De URL-naam wordt hier afgeleid en is niet op te geven: een agent hoort geen
+  // publieke adressen te kiezen, en de teller vangt een tweede editie in hetzelfde
+  // jaar op zonder dat de create op een unieke sleutel botst.
+  const slug = await uniqueEventSlug(eventSlugBase(input.titleNl, start));
+
   const row = await prisma.calendarEvent.create({
     data: {
+      slug,
       titleNl: input.titleNl,
       titleEn: nullIfEmpty(input.titleEn),
       descriptionNl: nullIfEmpty(input.descriptionNl),
@@ -566,6 +573,7 @@ export async function createCalendarEvent(raw: CreateCalendarEventInput) {
     },
     select: {
       id: true,
+      slug: true,
       titleNl: true,
       start: true,
       end: true,

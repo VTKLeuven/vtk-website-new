@@ -15,6 +15,8 @@ import type { HeroWeekPlacement } from "@/lib/calendar/heroWeek";
  */
 export type FrontpageEvent = {
   id: string;
+  /** De URL-naam voor `/kalender/<slug>`; de id blijft de sleutel voor de ster. */
+  slug: string;
   start: Date;
   /** Een heledagevenement toont "hele dag" in plaats van een uur. */
   allDay: boolean;

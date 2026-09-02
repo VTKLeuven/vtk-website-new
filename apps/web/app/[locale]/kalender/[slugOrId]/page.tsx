@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Image from "next/image";
-import { notFound } from "next/navigation";
+import { notFound, permanentRedirect } from "next/navigation";
 import { pick, type Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
 import { hasLocale } from "@/lib/locale";
@@ -83,15 +83,18 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   if (!event) return {};
 
   const image = publicUrl(event.imageKey) ?? (await loadDefaultEventImage());
-  return eventMetadata(event, locale, `/kalender/${event.id}`, image);
+  return eventMetadata(event, locale, `/kalender/${event.slug}`, image);
 }
 
 /**
- * Eén dynamisch segment onder /kalender voor twee dingen: een categorieslug
- * ("eerstejaars") en een event-id (een cuid). De categorie krijgt voorrang,
- * omdat haar slug beheerd wordt en dus nooit per ongeluk een cuid is. Zo houden
- * we `vtk.be/kalender/eerstejaars` als URL zonder de bestaande links naar
- * `/kalender/<id>` (vanaf de homepage) te breken.
+ * Eén dynamisch segment onder /kalender voor drie dingen: een categorieslug
+ * ("eerstejaars"), een event-slug ("galabal-2026") en een event-id (een cuid).
+ *
+ * De categorie krijgt voorrang; de save-actions bewaken dat een categorie en een
+ * evenement nooit dezelfde slug innemen, want anders zou het evenement hier
+ * onbereikbaar zijn. Het derde geval is de oude vorm van de URL: die blijft
+ * werken en stuurt permanent door naar de slug, zodat een link die ooit in een
+ * groepsgesprek of in een agenda-uitnodiging beland is niet op een 404 uitkomt.
  */
 export default async function CalendarSegmentPage({ params }: { params: Params }) {
   const { locale: localeParam, slugOrId } = await params;
@@ -105,6 +108,11 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
   const event = await loadCalendarEvent(slugOrId);
 
   if (!event) notFound();
+
+  // Eén evenement, één adres: wie via de oude cuid binnenkomt, gaat door naar de
+  // leesbare URL. 308, dus zoekmachines schrijven de link over en de oude vorm
+  // concurreert niet met de nieuwe. Loopt via een throw, dus buiten try/catch.
+  if (slugOrId !== event.slug) permanentRedirect(`${base}/kalender/${event.slug}`);
 
   const title = pick(event.titleNl, event.titleEn, locale);
   const description = pick(event.descriptionNl ?? "", event.descriptionEn ?? "", locale);
@@ -228,7 +236,7 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
               isAlumniEvent={isAlumniEvent}
               signedIn={Boolean(session)}
               viewer={viewer}
-              loginHref={`${base}/inloggen?next=${encodeURIComponent(`${base}/kalender/${event.id}`)}`}
+              loginHref={`${base}/inloggen?next=${encodeURIComponent(`${base}/kalender/${event.slug}`)}`}
               labels={{
                 interested: nl ? "Geïnteresseerd" : "Interested",
                 removeInterest: nl ? "Niet meer geïnteresseerd" : "Remove interest",

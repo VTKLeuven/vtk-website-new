@@ -48,13 +48,20 @@ export function siteBaseUrl(): string {
   return (process.env.BETTER_AUTH_URL ?? "http://localhost:3000").replace(/\/+$/, "");
 }
 
-/** Publieke URL van een evenement, in de taal van de feed. */
-export function eventUrl(id: string, locale: Locale): string {
-  return `${siteBaseUrl()}${locale === "en" ? "/en" : ""}/kalender/${id}`;
+/**
+ * Publieke URL van een evenement, in de taal van de feed.
+ *
+ * De URL-naam en niet de id: dit adres komt in de agenda van een lid terecht en
+ * blijft daar staan. De UID hieronder blijft wel de id, want die is de sleutel
+ * waarop een agenda-client een bestaande afspraak herkent.
+ */
+export function eventUrl(slug: string, locale: Locale): string {
+  return `${siteBaseUrl()}${locale === "en" ? "/en" : ""}/kalender/${slug}`;
 }
 
 type EventRow = {
   id: string;
+  slug: string;
   titleNl: string;
   titleEn: string | null;
   descriptionNl: string | null;
@@ -69,6 +76,7 @@ type EventRow = {
 
 const eventSelect = {
   id: true,
+  slug: true,
   titleNl: true,
   titleEn: true,
   descriptionNl: true,
@@ -91,7 +99,7 @@ function toIcsEvent(event: EventRow, locale: Locale): IcsEvent {
     summary: pick(event.titleNl, event.titleEn, locale),
     description: description ? markdownToPlainText(description) : null,
     location: event.location,
-    url: eventUrl(event.id, locale),
+    url: eventUrl(event.slug, locale),
     categories: event.categories.map((c) => pick(c.category.nameNl, c.category.nameEn, locale)),
     updatedAt: event.updatedAt,
   };
@@ -315,24 +323,32 @@ export async function buildFeed(
 
 /**
  * Eén evenement als los .ics-bestand, voor de downloadknop op de eventpagina.
- * Alleen publieke events, net als die pagina zelf: `/kalender/<id>` toont een
+ * Alleen publieke events, net als die pagina zelf: `/kalender/<slug>` toont een
  * MEMBERS-event aan niemand.
+ *
+ * Neemt een URL-naam of een id, net als de pagina. `filename` is de naam van het
+ * gedownloade bestand en staat los van de URL-naam: hij komt uit de titel in de
+ * taal van de bezoeker, zodat een Engelstalige de Engelse titel op zijn schijf
+ * ziet staan.
  */
 export async function buildEventIcs(
-  id: string,
+  slugOrId: string,
   locale: Locale,
   now = new Date(),
-): Promise<{ body: string; slug: string } | null> {
+): Promise<{ body: string; filename: string } | null> {
   const event = await prisma.calendarEvent.findFirst({
-    where: { id, publishedAt: { not: null } },
+    where: { publishedAt: { not: null }, OR: [{ slug: slugOrId }, { id: slugOrId }] },
     select: eventSelect,
   });
   if (!event) return null;
 
   const title = pick(event.titleNl, event.titleEn, locale);
   return {
-    body: buildIcs({ name: title, url: eventUrl(event.id, locale), events: [toIcsEvent(event, locale)] }, now),
-    slug: slugifyForFilename(title) || "vtk-event",
+    body: buildIcs(
+      { name: title, url: eventUrl(event.slug, locale), events: [toIcsEvent(event, locale)] },
+      now,
+    ),
+    filename: slugifyForFilename(title) || "vtk-event",
   };
 }
 

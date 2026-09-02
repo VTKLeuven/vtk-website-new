@@ -165,7 +165,7 @@ export function HeroWeek({
                       }
                     >
                       <span className="dot" aria-hidden="true" />
-                      <Link href={`${base}/kalender/${event.id}`} className="body">
+                      <Link href={`${base}/kalender/${event.slug}`} className="body">
                         <span className="title">{title}</span>
                         {meta ? <small>{meta}</small> : null}
                       </Link>

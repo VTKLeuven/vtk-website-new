@@ -210,7 +210,7 @@ export function DefaultFrontpage({
                 {group.events.map((event, eventIndex) => (
                   <Link
                     key={event.id}
-                    href={`${base}/kalender/${event.id}`}
+                    href={`${base}/kalender/${event.slug}`}
                     className={`hero-ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}
                   >
                     <div className="t">{formatTime(new Date(event.start))}</div>

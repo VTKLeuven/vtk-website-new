@@ -1399,6 +1399,14 @@ model PageAsset {
 
 model CalendarEvent {
   id            String    @id @default(cuid())
+  /// De publieke URL-naam: `/kalender/galabal-2026`. Titel plus jaartal, want
+  /// Galabal en Beiaardcantus komen elk jaar terug en het jaartal is precies wat
+  /// iemand intikt. Zie packages/db/src/slug.ts.
+  ///
+  /// Deelt het routesegment `[slugOrId]` met de categorieslugs, dus uniek over
+  /// beide tabellen; de action bewaakt dat. Het jaartal maakt een botsing daar in
+  /// de praktijk al onmogelijk, want een categorieslug eindigt nooit op een jaar.
+  slug          String    @unique
   titleNl       String
   titleEn       String?
   descriptionNl String?

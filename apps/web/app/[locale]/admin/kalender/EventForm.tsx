@@ -9,6 +9,8 @@ import { utcToLocalDateTime } from "@/lib/ticketing/time";
 
 type Event = {
   id?: string;
+  /** De publieke URL-naam. Leeg bij een nieuw evenement: die leidt de action af. */
+  slug?: string;
   titleNl?: string;
   titleEn?: string | null;
   descriptionNl?: string | null;
@@ -187,6 +189,9 @@ export function EventForm({
       savedMessage={nl ? "Evenement opgeslagen" : "Event saved"}
       errorMessages={{
         ...saveErrorMessages(locale),
+        SLUG_TAKEN: nl
+          ? "Niet opgeslagen: die URL-naam is al van een ander evenement of van een kalendercategorie. Kies een andere, bijvoorbeeld met het jaartal erachter."
+          : "Not saved: that URL name already belongs to another event or to a calendar category. Pick a different one, for instance with the year after it.",
         END_BEFORE_START: nl
           ? "Niet opgeslagen: het einde ligt voor de start. Kies een einde na de startdatum."
           : "Not saved: the end is before the start. Pick an end after the start date.",
@@ -215,6 +220,31 @@ export function EventForm({
           <div>
             <Label>Title (EN)</Label>
             <Input name="titleEn" defaultValue={event.titleEn ?? ""} />
+          </div>
+          <div className="md:col-span-2">
+            <Label htmlFor="event-slug">{nl ? "URL-naam" : "URL name"}</Label>
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 text-sm text-vtk-blue-muted">/kalender/</span>
+              <Input
+                id="event-slug"
+                name="slug"
+                defaultValue={event.slug ?? ""}
+                maxLength={80}
+                pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                placeholder={
+                  nl ? "galabal-2026 (leeg = uit de titel)" : "galabal-2026 (empty = from the title)"
+                }
+              />
+            </div>
+            <p className="mt-1 text-xs text-vtk-muted">
+              {event.slug
+                ? nl
+                  ? "Dit staat in de link die leden delen en in hun agenda. Wijzig je hem, dan werkt de oude naam niet meer; het oude adres met de lange code blijft wel doorsturen."
+                  : "This is in the link members share and in their calendar. Changing it breaks the old name; the old address with the long code keeps redirecting."
+                : nl
+                  ? "Laat leeg om hem uit de titel en het jaartal te maken, bijvoorbeeld galabal-2026."
+                  : "Leave empty to build it from the title and the year, for example galabal-2026."}
+            </p>
           </div>
           <div>
             <Label>{locale === "nl" ? "Groep" : "Group"}</Label>

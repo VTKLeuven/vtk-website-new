@@ -64,10 +64,17 @@ export const loadCalendarCategory = cache(
     }),
 );
 
-/** Eén kalenderevenement, met alles wat de detailpagina toont. */
-export const loadCalendarEvent = cache(async (id: string) =>
+/**
+ * Eén kalenderevenement, met alles wat de detailpagina toont.
+ *
+ * Zoekt op URL-naam en op id. De id is de oude vorm van de URL
+ * (`/kalender/<cuid>`) en blijft bereikbaar, want hij staat in gedeelde berichten
+ * en in agenda's die al een uitnodiging binnenkregen; de pagina stuurt zo'n
+ * adres permanent door naar de slug.
+ */
+export const loadCalendarEvent = cache(async (slugOrId: string) =>
   prisma.calendarEvent.findFirst({
-    where: { id, publishedAt: { not: null } },
+    where: { publishedAt: { not: null }, OR: [{ slug: slugOrId }, { id: slugOrId }] },
     include: {
       group: true,
       ticketEvent: { select: { slug: true, status: true } },

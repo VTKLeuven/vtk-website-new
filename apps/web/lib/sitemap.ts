@@ -48,7 +48,7 @@ export type SitemapHeaderTab = {
 };
 
 export type SitemapEvent = {
-  id: string;
+  slug: string;
   publishedAt: Date | null;
   updatedAt: Date;
 };
@@ -98,7 +98,7 @@ export function buildSitemapEntries(input: SitemapInput): MetadataRoute.Sitemap 
   // een login. Geen van beide hoort een publiek adres in de sitemap te krijgen.
   const eventEntries = input.events
     .filter((event) => event.publishedAt !== null)
-    .map((event) => entry(`/kalender/${event.id}`, event.updatedAt, 0.5));
+    .map((event) => entry(`/kalender/${event.slug}`, event.updatedAt, 0.5));
 
   // Ontdubbelen, want de lijsten overlappen elkaar echt: `/theokot`, `/shift` en
   // `/media` staan zowel in STATIC_ROUTES (het zijn eigen routes met eigen

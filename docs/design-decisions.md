@@ -1568,14 +1568,53 @@ gefilterd is.
 
 ### Eén dynamisch segment onder `/kalender`
 
-`/kalender/<slug>` (categorie) en `/kalender/<id>` (evenement) delen hetzelfde
+`/kalender/<slug>` (categorie) en `/kalender/<slug>` (evenement) delen hetzelfde
 routesegment `[slugOrId]`, dat eerst een categorieslug probeert en anders een
-event-id. Twee dynamische segmenten naast elkaar kan Next.js niet, en de
+evenement. Twee dynamische segmenten naast elkaar kan Next.js niet, en de
 alternatieven waren slechter: `/kalender/c/<slug>` geeft een lelijke URL voor iets
 wat je aan een eerstejaars wil kunnen doorgeven, en de events verhuizen naar
-`/kalender/event/<id>` zou de bestaande links vanaf de homepage breken. Een
-botsing is uitgesloten omdat een slug beheerd wordt en alleen kleine letters,
-cijfers en koppeltekens mag bevatten, terwijl event-ids cuids zijn.
+`/kalender/event/<slug>` zou de bestaande links vanaf de homepage breken.
+
+De categorie krijgt voorrang. Een botsing kan dus niet stil blijven bestaan, want
+het evenement zou onbereikbaar zijn; `saveEventAction` en
+`saveCalendarCategoryAction` controleren daarom allebei **beide** tabellen
+(`lib/calendar/slug.ts`) en geven `SLUG_TAKEN` terug.
+
+### Een evenement heeft een URL-naam, geen cuid
+
+`/kalender/galabal-2026`, niet `/kalender/cmrmfoulf0001og07vs14m1x1`.
+
+De cuid was nooit een keuze: `CalendarEvent` had gewoon geen slug, en de
+routebeslissing hierboven leunde er daarna op om categorie van evenement te
+onderscheiden. Het kostte twee dingen die er wel toe doen. Een adres zonder
+trefwoorden zegt een zoekmachine niets over waar de pagina over gaat, en een lid
+dat een link in een groepsgesprek plakt, deelt een reeks tekens waar niemand aan
+ziet of het over het galabal of over een vergadering gaat.
+
+Het **jaartal staat er altijd achter**, ook bij een eenmalig evenement. Galabal,
+Beiaardcantus en Kick-off komen elk jaar terug; zonder jaartal zou de eerste
+editie `galabal` voorgoed bezetten en zou net de volgende editie, die iemand
+zoekt, de lelijke naam krijgen. Het scheelt meteen een botsing met een
+categorieslug, want die eindigt nooit op een jaar. Twee evenementen met dezelfde
+titel binnen één jaar krijgen een teller (`galabal-2026-2`).
+
+Alternatieven die het niet werden: een kale titel (inconsistent zodra iets
+terugkomt), een datum vooraan (`2026-03-12-galabal` liegt zodra het evenement
+verschuift) en titel plus een stuk van de cuid (dan staat de ruis er nog steeds).
+
+- De slug wordt bij het aanmaken uit de titel afgeleid en blijft in het formulier
+  aanpasbaar; hij volgt de titel daarna **niet** vanzelf meer, want dan zou elke
+  correctie aan een titel elke gedeelde link breken.
+- **`/kalender/<cuid>` blijft werken** en stuurt permanent (308) door naar de
+  URL-naam. Die oude vorm staat in gedeelde berichten en in de agenda's van
+  iedereen die ooit een uitnodiging binnenkreeg; een 404 daarop is geen
+  opruiming maar dataverlies. De pagina resolvet daarom op slug én id.
+- De **UID in de ICS-feed blijft de cuid**. Dat is de sleutel waarop een
+  agenda-client een bestaande afspraak herkent; hem vervangen zou bij iedereen
+  een tweede kopie van elk evenement in de agenda zetten. Enkel het `URL`-veld
+  van de afspraak wijst naar de nieuwe vorm.
+- De **app** blijft intern op `/evenement/<id>` werken. Dat is geen publiek
+  adres maar een route in de app zelf, met een eigen API erachter.
 
 ### Twee weergaven: Agenda en Lijst
 

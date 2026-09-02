@@ -110,6 +110,7 @@ describe.sequential("kalender-doelgroepen", () => {
       await prisma.calendarEvent.create({
         data: {
           id,
+          slug: id,
           titleNl: id,
           start,
           end,

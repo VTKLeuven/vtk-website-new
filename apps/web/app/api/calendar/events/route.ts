@@ -78,6 +78,7 @@ export async function GET(request: Request) {
 
   const payload = events.map((e) => ({
     id: e.id,
+    slug: e.slug,
     title: e.titleNl,
     titleEn: e.titleEn,
     start: e.start.toISOString(),

@@ -606,7 +606,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               const start = new Date(event.start);
               const photo = publicUrl(event.imageKey) ?? defaultEventImage;
               return (
-                <Link key={event.id} href={`${base}/kalender/${event.id}`} className="evcard">
+                <Link key={event.id} href={`${base}/kalender/${event.slug}`} className="evcard">
                   <span className="evcard-media" aria-hidden="true">
                     <Image
                       src={photo}

@@ -5,13 +5,9 @@
  * enkel async functies mag exporteren; de nieuw-pagina wil deze functie ook, om
  * de URL-naam alvast in te vullen wanneer de titel van een gekoppeld
  * kalenderevent komt en er dus geen titelveld meer op het scherm staat.
+ *
+ * De implementatie staat in `@vtk/db/slug`, samen met die van de
+ * kalenderevents: de seed maakt dezelfde slugs en kan niets uit `apps/web`
+ * importeren.
  */
-export function slugify(input: string): string {
-  return input
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-}
+export { slugify } from "@vtk/db/slug";

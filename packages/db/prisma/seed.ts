@@ -4,6 +4,7 @@ import { GROUP_SEEDS, WERKGROEP_SEEDS, HEADER_TABS } from "../src/groups";
 import { SHIFTEN_PAGE, UITLEENDIENST_PAGE } from "../src/infoPages";
 import { PERMISSIONS } from "../src/permissions";
 import { loadFixtures } from "../src/fixtures";
+import { eventSlugBase } from "../src/slug";
 
 const prisma = new PrismaClient();
 
@@ -1389,6 +1390,10 @@ async function main() {
     if (existing) continue;
     await prisma.calendarEvent.create({
       data: {
+        // Dezelfde URL-naam als de admin zou maken; zie packages/db/src/slug.ts.
+        // De seed is create-only en de fixtures bevatten geen dubbele titels
+        // binnen een jaar, dus een teller is hier niet nodig.
+        slug: eventSlugBase(e.titleNl, start),
         titleNl: e.titleNl,
         titleEn: e.titleEn,
         location: e.location,

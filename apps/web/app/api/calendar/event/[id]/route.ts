@@ -12,5 +12,5 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const result = await buildEventIcs(stripIcsSuffix(id), locale);
   if (!result) return new Response("Not found", { status: 404 });
 
-  return icsResponse(result.body, `${result.slug}.ics`, { download: true });
+  return icsResponse(result.body, `${result.filename}.ics`, { download: true });
 }

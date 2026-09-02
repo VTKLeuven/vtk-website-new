@@ -11,9 +11,19 @@ import { readImageField, resolveImageKey } from "@/lib/imageField";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
+import {
+  categorySlugTaken,
+  eventSlugBase,
+  eventSlugTaken,
+  SLUG_PATTERN,
+  uniqueEventSlug,
+} from "@/lib/calendar/slug";
 
 const eventSchema = z.object({
   id: z.string().optional(),
+  // Leeg = afleiden uit de titel. Wie hem wel intikt, krijgt dezelfde regels als
+  // een categorieslug: dit staat in een publieke URL.
+  slug: z.string().trim().max(80).regex(SLUG_PATTERN).optional(),
   titleNl: z.string().min(1),
   titleEn: z.string().optional().nullable(),
   descriptionNl: z.string().optional().nullable(),
@@ -29,6 +39,7 @@ const eventSchema = z.object({
 
 /** Velden die in het logboek bij naam genoemd worden bij een bewerking. */
 const EVENT_FIELD_LABELS: Record<string, string> = {
+  slug: "URL-naam",
   titleNl: "titel",
   titleEn: "Engelse titel",
   descriptionNl: "beschrijving",
@@ -55,6 +66,7 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   const session = await requireSession();
   const parsed = eventSchema.safeParse({
     id: (formData.get("id") as string) || undefined,
+    slug: (formData.get("slug") as string)?.trim() || undefined,
     titleNl: formData.get("titleNl"),
     titleEn: formData.get("titleEn") || null,
     descriptionNl: formData.get("descriptionNl") || null,
@@ -131,13 +143,21 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     if (!existing) return saveError("INVALID_INPUT");
     await assertCanManageEvent(userGroupIds, existing.groupId, superOrAll);
     const imageKey = resolveImageKey(image, existing.imageKey);
+    // De URL-naam volgt de titel **niet** vanzelf bij een bewerking: elke
+    // correctie aan de titel zou dan elke gedeelde link breken. Het formulier
+    // toont de huidige slug, dus komt hij hier gewoon weer binnen; leeg betekent
+    // "laat staan".
+    const slug = input.slug ?? existing.slug;
+    if (slug !== existing.slug && (await eventSlugTaken(slug, input.id))) {
+      return saveError("SLUG_TAKEN");
+    }
     // De gewone knop publiceert een bestaand concept en bewaart de status van
     // een al gepubliceerd evenement. Alleen de expliciete conceptknop haalt het
     // evenement offline.
     const publishedAt = saveAsDraft ? null : (existing.publishedAt ?? new Date());
     await prisma.calendarEvent.update({
       where: { id: input.id },
-      data: { ...data, imageKey, publishedAt, categories: setCategories },
+      data: { ...data, slug, imageKey, publishedAt, categories: setCategories },
     });
     // Een gekoppeld ticketevent erft deze velden. Zonder deze duw blijft de
     // ticketshop de oude datum of locatie tonen tot iemand daar toevallig ook
@@ -173,7 +193,11 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
       entity: "calendarEvent",
       entityId: input.id,
       target: input.titleNl,
-      summary: describeChanges(existing, { ...data, imageKey, publishedAt }, EVENT_FIELD_LABELS),
+      summary: describeChanges(
+        existing,
+        { ...data, slug, imageKey, publishedAt },
+        EVENT_FIELD_LABELS,
+      ),
     });
     // De vervangen (of gewiste) afbeelding opruimen, zodat losse objecten niet
     // in de bucket blijven staan. Mislukt dat, dan is dat geen opslaanfout.
@@ -185,9 +209,20 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
       }
     }
   } else {
+    // Niets ingetikt betekent "leid af uit de titel"; dan mag de teller stil
+    // bijspringen bij een tweede editie in hetzelfde jaar. Wel zelf ingetikt en
+    // al bezet is een gewone invoerfout, en hoort als rode toast terug te komen.
+    let slug: string;
+    if (input.slug) {
+      if (await eventSlugTaken(input.slug)) return saveError("SLUG_TAKEN");
+      slug = input.slug;
+    } else {
+      slug = await uniqueEventSlug(eventSlugBase(input.titleNl, start));
+    }
     created = await prisma.calendarEvent.create({
       data: {
         ...data,
+        slug,
         imageKey: resolveImageKey(image, null),
         publishedAt: saveAsDraft ? null : new Date(),
         categories: { create: categoryIds.map((categoryId) => ({ categoryId })) },
@@ -385,9 +420,11 @@ export async function saveCalendarCategoryAction(
   };
 
   // Een dubbele slug is gewone invoerfout, geen serverfout: hij hoort als rode
-  // toast terug te komen in plaats van in de error boundary te belanden.
-  const clash = await prisma.calendarCategory.findUnique({ where: { slug: data.slug } });
-  if (clash && clash.id !== id) return saveError("SLUG_TAKEN");
+  // toast terug te komen in plaats van in de error boundary te belanden. De
+  // controle kijkt ook naar de evenementen, want die delen sinds de URL-namen
+  // hetzelfde routesegment: een categorie "galabal-2026" zou het evenement met
+  // die naam onbereikbaar maken.
+  if (await categorySlugTaken(data.slug, id)) return saveError("SLUG_TAKEN");
 
   if (id) {
     const existing = await prisma.calendarCategory.findUnique({ where: { id } });

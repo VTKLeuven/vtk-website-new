@@ -264,6 +264,7 @@ async function eventResults(
     },
     select: {
       id: true,
+      slug: true,
       titleNl: true,
       titleEn: true,
       descriptionNl: true,
@@ -280,7 +281,7 @@ async function eventResults(
     return {
       kind: "event" as const,
       id: event.id,
-      href: eventResultHref(event.id, locale),
+      href: eventResultHref(event.slug, locale),
       title: pick(event.titleNl, event.titleEn, locale),
       // De datum en niet de categorie: bij een activiteit is "wanneer" het eerste
       // wat iemand wil weten. Zelfde regel als in de deelvoorbeelden.

@@ -113,7 +113,7 @@ describe('evenementen', () => {
   it('laat een ledenexclusief evenement weg', () => {
     const entries = build({
       events: [
-        { id: 'evt-publiek', ...base },
+        { slug: 'evt-publiek', ...base },
       ],
     });
     expect(urls(entries)).toContain(`${BASE}/kalender/evt-publiek`);
@@ -122,7 +122,7 @@ describe('evenementen', () => {
 
   it('laat een concept-evenement weg', () => {
     const entries = build({
-      events: [{ id: 'evt-concept', ...base, publishedAt: null }],
+      events: [{ slug: 'evt-concept', ...base, publishedAt: null }],
     });
     expect(urls(entries)).not.toContain(`${BASE}/kalender/evt-concept`);
   });
@@ -142,7 +142,7 @@ describe('de sitemap als geheel', () => {
           },
         ],
         headerTabs: [{ slug: 'info', visible: true, externalUrl: null }],
-        events: [{ id: 'evt', publishedAt: NOW, updatedAt: NOW }],
+        events: [{ slug: 'evt', publishedAt: NOW, updatedAt: NOW }],
       }),
     );
     expect(new Set(list).size).toBe(list.length);

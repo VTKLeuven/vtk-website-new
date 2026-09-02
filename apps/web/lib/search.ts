@@ -306,6 +306,6 @@ export function pageResultHref(
   return localizedPath(pagePath(page), locale);
 }
 
-export function eventResultHref(id: string, locale: Locale): string {
-  return localizedPath(`/kalender/${id}`, locale);
+export function eventResultHref(slug: string, locale: Locale): string {
+  return localizedPath(`/kalender/${slug}`, locale);
 }

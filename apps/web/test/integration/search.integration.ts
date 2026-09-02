@@ -98,6 +98,7 @@ describe.sequential("zoeken", () => {
     await prisma.calendarEvent.create({
       data: {
         id,
+        slug: id,
         titleNl,
         descriptionNl: `Een avond rond de ${TERM}.`,
         start,

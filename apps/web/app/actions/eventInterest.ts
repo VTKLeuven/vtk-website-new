@@ -79,6 +79,18 @@ function parseAttendance(formData: FormData) {
  * de FormData zodat dezelfde action beide kanten dekt; twee keer aanduiden hoort
  * niets te doen, niet te falen.
  */
+/**
+ * De eventpagina verversen na een wijziging aan de aanwezigheidslijst.
+ *
+ * Het routepatroon en niet `/kalender/<id>`: de publieke URL is sinds de
+ * URL-namen de slug, dus een pad met de id erin ververst een adres waar niemand
+ * staat. De teller en de lijst zouden dan pas bijwerken als de cache vanzelf
+ * verloopt.
+ */
+function revalidateEventPage() {
+  revalidatePath("/kalender/[slugOrId]", "page");
+}
+
 export async function setEventInterestAction(
   _prev: SaveState,
   formData: FormData,
@@ -96,7 +108,7 @@ export async function setEventInterestAction(
     await prisma.calendarEventInterest.deleteMany({
       where: { userId: session.user.id, eventId },
     });
-    revalidatePath(`/kalender/${eventId}`);
+    revalidateEventPage();
     return saveOk();
   }
 
@@ -128,7 +140,7 @@ export async function setEventInterestAction(
     create: { userId: session.user.id, eventId, ...data },
   });
 
-  revalidatePath(`/kalender/${eventId}`);
+  revalidateEventPage();
   return saveOk();
 }
 
@@ -161,7 +173,7 @@ export async function setGuestInterestAction(
     create: { eventId, deviceHash, ...data },
   });
 
-  revalidatePath(`/kalender/${eventId}`);
+  revalidateEventPage();
   return saveOk();
 }
 
@@ -177,6 +189,6 @@ export async function removeGuestInterestAction(
   if (deviceHash) {
     await prisma.calendarEventGuestInterest.deleteMany({ where: { eventId, deviceHash } });
   }
-  revalidatePath(`/kalender/${eventId}`);
+  revalidateEventPage();
   return saveOk();
 }

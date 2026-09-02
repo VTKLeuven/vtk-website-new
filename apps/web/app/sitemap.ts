@@ -28,7 +28,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     }),
     prisma.calendarEvent.findMany({
       where: { publishedAt: { not: null } },
-      select: { id: true, publishedAt: true, updatedAt: true },
+      select: { slug: true, publishedAt: true, updatedAt: true },
     }),
   ]);
 

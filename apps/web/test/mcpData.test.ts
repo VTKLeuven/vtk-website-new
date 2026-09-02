@@ -82,6 +82,9 @@ describe("MCP create-only datalaag", () => {
 
     expect(mocks.eventCreate).toHaveBeenCalledOnce();
     expect(mocks.eventCreate.mock.calls[0][0].data).toMatchObject({
+      // Titel plus het jaartal in Brusselse tijd; een agent kiest de publieke
+      // URL-naam niet zelf.
+      slug: "testevent-2026",
       groupId: "group-1",
       publishedAt: null,
       createdById: null,
