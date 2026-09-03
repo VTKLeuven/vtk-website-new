@@ -21,7 +21,7 @@ import {
   NOTIFY_KINDS,
   parseDateOnly,
   parseNotifyEmails,
-  rangesOverlap,
+  momentsOverlap,
   transportPriceCents,
 } from '@/lib/uitleen';
 import { notifyReservation, notifyTransport } from '@/lib/uitleen-mail';
@@ -1807,7 +1807,7 @@ export async function createTransportForReservationAction(
 
 /**
  * De goedgekeurde rit van hetzelfde voertuig waarmee dit tijdvenster botst, of
- * null. Geeft de rit zelf terug en niet enkel een boolean: "voertuig bezet"
+ * null. Aansluiten mag: een rit die om 12:00 eindigt, laat de kar om 12:00 vrij. Geeft de rit zelf terug en niet enkel een boolean: "voertuig bezet"
  * zegt niet waarheen je moet schuiven, en dat is precies wat het team wil weten.
  */
 async function overlappingBooking(
@@ -1821,7 +1821,7 @@ async function overlappingBooking(
     where: { vehicleId, status: 'APPROVED', id: { notIn: excludeIds } },
     select: { id: true, startAt: true, endAt: true, eventName: true, purpose: true },
   });
-  return others.find((other) => rangesOverlap(startAt, endAt, other.startAt, other.endAt)) ?? null;
+  return others.find((other) => momentsOverlap(startAt, endAt, other.startAt, other.endAt)) ?? null;
 }
 
 /** "de rit van Feest op za 12 sep 14:00-18:00", voor in een foutmelding. */
@@ -1916,7 +1916,7 @@ export async function approveTransportAction(
           (other, otherIndex) =>
             otherIndex !== index &&
             other.leg.vehicleId === entry.leg.vehicleId &&
-            rangesOverlap(entry.startAt, entry.endAt, other.startAt, other.endAt)
+            momentsOverlap(entry.startAt, entry.endAt, other.startAt, other.endAt)
         );
         if (sibling) return { error: 'SELF_OVERLAP' as const };
       }

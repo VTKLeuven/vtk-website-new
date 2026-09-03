@@ -432,9 +432,21 @@ export function isNightTrip(startAt: Date, endAt: Date): boolean {
   return hour(endAt) >= 22 || hour(startAt) >= 22;
 }
 
-/** Twee gesloten datumbereiken overlappen. */
-export function rangesOverlap(aFrom: Date, aTo: Date, bFrom: Date, bTo: Date): boolean {
-  return aFrom <= bTo && aTo >= bFrom;
+/**
+ * Twee tijdvensters overlappen echt, en raken elkaar niet enkel aan.
+ *
+ * Het einde is **open**: een rit die om 12:00 eindigt, laat de kar om 12:00 vrij,
+ * dus een rit van 12:00 tot 14:00 botst daar niet mee. Dit stond op `<=` en
+ * `>=`, en dan weigerde het beheer precies de rit die je erachter wil plakken:
+ * "voertuig bezet" op een moment dat het net vrijkwam.
+ *
+ * Let op bij hergebruik: voor een reservatie die per **dag** loopt, is het einde
+ * wél gesloten (materiaal dat tot en met woensdag uit is, is woensdag niet
+ * beschikbaar). Die kant rekent met date-only velden en heeft haar eigen query;
+ * deze functie is voor momenten. Vandaar de naam.
+ */
+export function momentsOverlap(aFrom: Date, aTo: Date, bFrom: Date, bTo: Date): boolean {
+  return aFrom < bTo && aTo > bFrom;
 }
 
 /**

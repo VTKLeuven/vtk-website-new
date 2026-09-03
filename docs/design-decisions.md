@@ -2547,6 +2547,22 @@ velden zelf, want de `className` van de aanroeper draagt vaak al `w-full`, en
 welke van twee breedtes dan wint hangt af van de volgorde in de stylesheet. Dat
 gebeurde ook echt: de urenlijst werd 256px in plaats van 104px.
 
+### Een rit mag aansluiten op het einde van de vorige
+
+Het einde van een rit is **open**: eindigt een rit om 12:00, dan is de kar om
+12:00 weer vrij, en een rit van 12:00 tot 14:00 botst daar niet mee. De controle
+bij goedkeuren, aanmaken, aanpassen en bij een voertuigwissel rekende met een
+gesloten einde en weigerde dus precies de rit die je erachter wil plakken, met
+"voertuig bezet" op een moment dat het net vrijkwam. Het rode conflictmerkje in
+de kalender rekende al wél met een open einde; dat verschil was het bewijs dat de
+validatie de vreemde eend was.
+
+**Bij materiaal ligt het omgekeerd.** Dat loopt per dag: wat tot en met woensdag
+uit is, is woensdag niet beschikbaar, dus daar is het einde gesloten. Die kant
+rekent met date-only velden en heeft haar eigen query. De functie voor momenten
+heet daarom `momentsOverlap` en niet `rangesOverlap`: bij de oude naam is het een
+kwestie van tijd voor iemand ze aan de verkeerde kant hergebruikt.
+
 ### Karchauffeurs: één vlag, geen aparte soort
 
 Een voertuig kan aangeduid staan als "vraagt een chauffeur die de kar mag

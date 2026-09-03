@@ -19,7 +19,7 @@ import {
   parseNotifyEmails,
   startOfWeek,
   pricingModeLabel,
-  rangesOverlap,
+  momentsOverlap,
   requesterTypeLabel,
   reservationStatusLabel,
   toDateInputValue,
@@ -146,30 +146,49 @@ describe('todayDateOnly', () => {
   });
 });
 
-describe('rangesOverlap', () => {
+describe('momentsOverlap', () => {
   const d = (s: string) => new Date(s);
 
   it('detects overlapping ranges', () => {
     expect(
-      rangesOverlap(d('2026-07-01'), d('2026-07-10'), d('2026-07-05'), d('2026-07-15'))
+      momentsOverlap(d('2026-07-01'), d('2026-07-10'), d('2026-07-05'), d('2026-07-15'))
     ).toBe(true);
   });
 
-  it('treats touching endpoints as overlapping (closed ranges)', () => {
+  it('laat een rit aansluiten op het einde van de vorige', () => {
+    // Waar het om begonnen was: een rit die om 12:00 eindigt, laat de kar om
+    // 12:00 vrij. Dit stond op `<=` en dan weigerde het beheer precies de rit
+    // die je erachter wil plakken.
     expect(
-      rangesOverlap(d('2026-07-01'), d('2026-07-10'), d('2026-07-10'), d('2026-07-20'))
+      momentsOverlap(
+        d('2026-07-10T10:00:00Z'),
+        d('2026-07-10T12:00:00Z'),
+        d('2026-07-10T12:00:00Z'),
+        d('2026-07-10T14:00:00Z')
+      )
+    ).toBe(false);
+  });
+
+  it('herkent één minuut echte overlap wel', () => {
+    expect(
+      momentsOverlap(
+        d('2026-07-10T10:00:00Z'),
+        d('2026-07-10T12:00:00Z'),
+        d('2026-07-10T11:59:00Z'),
+        d('2026-07-10T14:00:00Z')
+      )
     ).toBe(true);
   });
 
   it('returns false for disjoint ranges', () => {
     expect(
-      rangesOverlap(d('2026-07-01'), d('2026-07-05'), d('2026-07-06'), d('2026-07-10'))
+      momentsOverlap(d('2026-07-01'), d('2026-07-05'), d('2026-07-06'), d('2026-07-10'))
     ).toBe(false);
   });
 
   it('detects a fully-contained range', () => {
     expect(
-      rangesOverlap(d('2026-07-01'), d('2026-07-31'), d('2026-07-10'), d('2026-07-12'))
+      momentsOverlap(d('2026-07-01'), d('2026-07-31'), d('2026-07-10'), d('2026-07-12'))
     ).toBe(true);
   });
 });
