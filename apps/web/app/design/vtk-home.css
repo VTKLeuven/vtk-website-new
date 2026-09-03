@@ -550,10 +550,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  /* De felle kalenderkleuren worden op de donkere herofoto snel neon. Meng ze
-     hier met het blauwgrijs van de secundaire tekst: de categorie blijft
-     herkenbaar, maar de stippen lezen rustiger en minder speels. */
-  background: color-mix(in srgb, var(--cat, var(--yellow)) 48%, #9da7ba);
+  background: var(--cat, var(--yellow));
   transform: translateY(4px);
 }
 
