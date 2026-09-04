@@ -1020,6 +1020,7 @@
     "depositNvt": "N/A (post or work group of VTK)",
     "languageNl": "Dutch",
     "languageEn": "English",
+    "newRequest": "Submit another request",
     "errorFallback": "Your request was not sent. Please try again."
   },
   "register": {

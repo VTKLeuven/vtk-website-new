@@ -16,12 +16,15 @@ import {
   depositChoiceLabel,
   formatRentalMoment,
   getRentalConfig,
+  getRentalFeedToken,
   getRentalGuide,
   getRentalQuestions,
   getRentalTemplates,
   rentalSenderLabel,
 } from "@/lib/theokotVerhuur-server";
 import { rentalMailVars, rentalReplyTo } from "@/lib/theokotVerhuurMail";
+import { siteBaseUrl } from "@/lib/calendar/feeds";
+import { RentalCalendarSubscribe } from "@/components/theokot/RentalCalendarSubscribe";
 import {
   currentWorkingYear,
   formatWorkingYear,
@@ -33,6 +36,7 @@ import { RentalBoard } from "./RentalBoard";
 import {
   RentalConfigCard,
   RentalContractsCard,
+  RentalFeedCard,
   RentalGuideCard,
   RentalQuestionsCard,
 } from "./RentalSettingsCards";
@@ -90,7 +94,7 @@ export default async function AdminTheokotVerhuurPage({
   const from = workingYearStart(year);
   const to = workingYearStart(year + 1);
 
-  const [rows, contractRows, config, templates, questions, guide, yearRows] = await Promise.all([
+  const [rows, contractRows, config, templates, questions, guide, yearRows, feedToken] = await Promise.all([
     prisma.theokotRental.findMany({
       where: { startsAt: { gte: from, lt: to } },
       orderBy: { startsAt: "asc" },
@@ -125,7 +129,10 @@ export default async function AdminTheokotVerhuurPage({
       select: { startsAt: true },
       orderBy: { startsAt: "asc" },
     }),
+    getRentalFeedToken(),
   ]);
+
+  const feedBaseUrl = `${siteBaseUrl()}/api/theokot/verhuur/feed/${feedToken}.ics`;
 
   const dateFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     timeZone: "Europe/Brussels",
@@ -294,12 +301,18 @@ export default async function AdminTheokotVerhuurPage({
         <h1 className="text-2xl font-semibold">
           {nl ? "Theokot verhuren" : "Theokot rentals"} · {formatWorkingYear(year)}
         </h1>
-        <Link
-          href={`${base}/theokot/verhuur`}
-          className="text-sm font-semibold text-vtk-ink underline underline-offset-4"
-        >
-          {nl ? "Het publieke formulier bekijken" : "View the public form"}
-        </Link>
+        <div className="flex flex-wrap items-center gap-3">
+          <RentalCalendarSubscribe
+            feedBaseUrl={feedBaseUrl}
+            locale={locale}
+          />
+          <Link
+            href={`${base}/theokot/verhuur`}
+            className="text-sm font-semibold text-vtk-ink underline underline-offset-4"
+          >
+            {nl ? "Het publieke formulier bekijken" : "View the public form"}
+          </Link>
+        </div>
       </div>
 
       <nav className="flex flex-wrap gap-2" aria-label={nl ? "Onderdelen" : "Sections"}>
@@ -343,6 +356,7 @@ export default async function AdminTheokotVerhuurPage({
       {tab === "instellingen" ? (
         <>
           <RentalConfigCard nl={nl} config={config} />
+          <RentalFeedCard nl={nl} feedBaseUrl={feedBaseUrl} />
           <RentalQuestionsCard nl={nl} questions={questions} />
           <RentalTemplatesCard
             nl={nl}
@@ -385,6 +399,7 @@ export default async function AdminTheokotVerhuurPage({
             signature={config.signature}
             contractAvailable={contractAvailable}
             canManage={canManage}
+            feedBaseUrl={feedBaseUrl}
             emptyMessage={
               tab === "verwerkt"
                 ? nl

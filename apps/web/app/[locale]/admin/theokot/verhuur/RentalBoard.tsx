@@ -33,6 +33,7 @@ export function RentalBoard({
   contractAvailable,
   canManage,
   emptyMessage,
+  feedBaseUrl,
 }: {
   nl: boolean;
   mode: "queue" | "processed" | "calendar";
@@ -43,6 +44,7 @@ export function RentalBoard({
   contractAvailable: Record<string, boolean>;
   canManage: boolean;
   emptyMessage: string;
+  feedBaseUrl?: string;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const lang = nl ? "nl" : "en";
@@ -64,6 +66,7 @@ export function RentalBoard({
           rentals={rentals}
           selectedId={selectedId}
           onSelect={(rental) => setSelectedId(rental.id)}
+          feedBaseUrl={feedBaseUrl}
         />
       ) : rentals.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-vtk-blue/20 bg-white/60 px-5 py-12 text-center text-sm text-[#5c667f]">

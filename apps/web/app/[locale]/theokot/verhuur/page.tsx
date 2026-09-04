@@ -65,30 +65,29 @@ export default async function TheokotVerhuurPage({ params }: { params: Params })
           <section className="vtk-panel tv-panel" aria-labelledby="tv-form-title">
             <h2 id="tv-form-title">{config.formOpen ? t.formTitle : t.closedTitle}</h2>
             {config.formOpen ? (
-              <>
-                <p className="tv-lead">{t.formIntro}</p>
-                <RentalRequestForm
-                  nl={nl}
-                  questions={questions}
-                  minLeadDays={config.minLeadDays}
-                  copy={{
-                    sectionContact: t.sectionContact,
-                    sectionWhen: t.sectionWhen,
-                    sectionEvent: t.sectionEvent,
-                    sectionExtra: t.sectionExtra,
-                    honeypotLabel: t.honeypotLabel,
-                    submit: t.submit,
-                    submitting: t.submitting,
-                    sent: t.sent,
-                    depositTransfer: t.depositTransfer,
-                    depositCash: t.depositCash,
-                    depositNvt: t.depositNvt,
-                    languageNl: t.languageNl,
-                    languageEn: t.languageEn,
-                    errorFallback: t.errorFallback,
-                  }}
-                />
-              </>
+              <RentalRequestForm
+                nl={nl}
+                questions={questions}
+                minLeadDays={config.minLeadDays}
+                copy={{
+                  formIntro: t.formIntro,
+                  sectionContact: t.sectionContact,
+                  sectionWhen: t.sectionWhen,
+                  sectionEvent: t.sectionEvent,
+                  sectionExtra: t.sectionExtra,
+                  honeypotLabel: t.honeypotLabel,
+                  submit: t.submit,
+                  submitting: t.submitting,
+                  sent: t.sent,
+                  newRequest: t.newRequest,
+                  depositTransfer: t.depositTransfer,
+                  depositCash: t.depositCash,
+                  depositNvt: t.depositNvt,
+                  languageNl: t.languageNl,
+                  languageEn: t.languageEn,
+                  errorFallback: t.errorFallback,
+                }}
+              />
             ) : (
               // Dicht is een echte toestand en geen fout: dan staat er wat er aan
               // de hand is, met het adres eronder, in plaats van een formulier dat

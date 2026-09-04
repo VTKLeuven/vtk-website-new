@@ -334,6 +334,11 @@ describe("de instellingen", () => {
     const config = parseRentalConfig({ notifyEmails: ["verhuur@vtk.be"], replyTo: "iemand@elders.be" });
     expect(rentalReplyTo(config)).toBe("verhuur@vtk.be");
   });
+
+  it("leest het feedToken en valt terug op leeg", () => {
+    expect(parseRentalConfig({ feedToken: "tok123" }).feedToken).toBe("tok123");
+    expect(parseRentalConfig({}).feedToken).toBe("");
+  });
 });
 
 describe("het mailvoorbeeld", () => {

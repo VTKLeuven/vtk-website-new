@@ -38,6 +38,8 @@ export type IcsCalendar = {
   description?: string;
   /** Absolute URL van de pagina waar deze kalender bij hoort. */
   url?: string;
+  /** Verversingsinterval voor geabonneerde agenda-apps (standaard PT6H). */
+  refreshInterval?: string;
   events: IcsEvent[];
 };
 
@@ -178,8 +180,8 @@ export function buildIcs(calendar: IcsCalendar, now = new Date()): string {
     `NAME:${escapeText(calendar.name)}`,
     `X-WR-CALNAME:${escapeText(calendar.name)}`,
     `X-WR-TIMEZONE:${TIME_ZONE}`,
-    "REFRESH-INTERVAL;VALUE=DURATION:PT6H",
-    "X-PUBLISHED-TTL:PT6H",
+    `REFRESH-INTERVAL;VALUE=DURATION:${calendar.refreshInterval ?? "PT6H"}`,
+    `X-PUBLISHED-TTL:${calendar.refreshInterval ?? "PT6H"}`,
   ];
 
   if (calendar.description) {

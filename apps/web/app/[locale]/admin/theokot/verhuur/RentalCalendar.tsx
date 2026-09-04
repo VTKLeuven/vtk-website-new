@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RENTAL_STATUS_META, isDeclinedRental } from "@/lib/theokotVerhuur";
+import { RentalCalendarSubscribe } from "@/components/theokot/RentalCalendarSubscribe";
 import type { RentalView } from "./types";
 
 /**
@@ -77,11 +78,13 @@ export function RentalCalendar({
   rentals,
   selectedId,
   onSelect,
+  feedBaseUrl,
 }: {
   nl: boolean;
   rentals: RentalView[];
   selectedId: string | null;
   onSelect: (rental: RentalView) => void;
+  feedBaseUrl?: string;
 }) {
   const [view, setView] = useState<View>("month");
   const [showDeclined, setShowDeclined] = useState(false);
@@ -173,6 +176,14 @@ export function RentalCalendar({
         >
           {nl ? "Vandaag" : "Today"}
         </button>
+
+        {feedBaseUrl && (
+          <RentalCalendarSubscribe
+            compact
+            feedBaseUrl={feedBaseUrl}
+            locale={nl ? "nl" : "en"}
+          />
+        )}
 
         <div className="tv-spacer tv-segment" role="group" aria-label={nl ? "Weergave" : "View"}>
           {VIEWS.map((value) => (

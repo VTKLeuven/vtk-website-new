@@ -8,6 +8,7 @@ import { FileField } from "@/components/ui/FileField";
 import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
 import {
   deleteRentalContractAction,
+  rotateRentalFeedTokenAction,
   saveRentalConfigAction,
   saveRentalGuideAction,
   saveRentalQuestionsAction,
@@ -644,3 +645,56 @@ export function RentalGuideCard({ nl, guide }: { nl: boolean; guide: RentalGuide
     </Card>
   );
 }
+
+// -----------------------------------------------------------------------------
+// Agenda-feed
+// -----------------------------------------------------------------------------
+
+export function RentalFeedCard({
+  nl,
+  feedBaseUrl,
+}: {
+  nl: boolean;
+  feedBaseUrl: string;
+}) {
+  return (
+    <Card className="p-5">
+      <h2 className="mb-1 text-lg font-semibold">
+        {nl ? "Agenda-feed (iCalendar)" : "Calendar feed (iCalendar)"}
+      </h2>
+      <p className="mb-4 text-sm text-[#5c667f]">
+        {nl
+          ? "De Theokot-verhuurkalender kan gesynchroniseerd worden met kalender-apps zoals Apple Calendar, Google Calendar en Outlook. Nieuwe aanvragen en wijzigingen komen automatisch binnen via de live feed."
+          : "The Theokot rental calendar can be synced with calendar apps like Apple Calendar, Google Calendar, and Outlook. New requests and updates appear automatically via the live feed."}
+      </p>
+
+      <div className="space-y-4">
+        <div>
+          <Label htmlFor="tv-feed-url">{nl ? "Abonnementslink" : "Subscription link"}</Label>
+          <Input
+            id="tv-feed-url"
+            type="text"
+            readOnly
+            value={feedBaseUrl}
+            className="font-mono text-xs"
+          />
+        </div>
+
+        <SaveForm
+          action={rotateRentalFeedTokenAction}
+          submitLabel={nl ? "Nieuwe feed-link genereren" : "Generate new feed link"}
+          savingLabel={nl ? "Genereren…" : "Generating…"}
+          savedMessage={nl ? "Nieuwe feed-link gegenereerd." : "New feed link generated."}
+          fallbackErrorMessage={nl ? "Kon feed-link niet vernieuwen." : "Could not rotate feed link."}
+        >
+          <p className="text-xs text-[#5c667f]">
+            {nl
+              ? "Als je een nieuwe link genereert, stoppen bestaande agenda-abonnementen met synchroniseren totdat de nieuwe link wordt ingesteld."
+              : "If you generate a new link, existing calendar subscriptions will stop syncing until the new link is configured."}
+          </p>
+        </SaveForm>
+      </div>
+    </Card>
+  );
+}
+

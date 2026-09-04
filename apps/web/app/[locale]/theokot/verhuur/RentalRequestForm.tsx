@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { Input, Label, Select, Textarea } from "@vtk/ui";
+import { Button, Input, Label, Select, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { requestRentalAction } from "@/app/actions/theokotVerhuur";
 import {
@@ -28,6 +28,7 @@ import { rentalRequestErrors } from "@/lib/theokotVerhuurMessages";
  */
 
 export type RentalCopy = {
+  formIntro?: string;
   sectionContact: string;
   sectionWhen: string;
   sectionEvent: string;
@@ -36,6 +37,7 @@ export type RentalCopy = {
   submit: string;
   submitting: string;
   sent: string;
+  newRequest: string;
   depositTransfer: string;
   depositCash: string;
   depositNvt: string;
@@ -67,22 +69,33 @@ export function RentalRequestForm({
   const [sent, setSent] = useState(false);
   const core = questions.core;
 
-  // Niet leegmaken na een geslaagde aanvraag: wie zich vergist in één veld wil
-  // niet alles opnieuw tikken, en het bevestigingsbericht hierboven zegt al dat
-  // ze binnen is.
   const onSuccess = useCallback(() => setSent(true), []);
 
   const label = (key: keyof typeof core) => questionLabel(core[key], nl);
   const help = (key: keyof typeof core) => questionHelp(core[key], nl);
   const star = (key: keyof typeof core) => (core[key].required ? " *" : "");
 
-  return (
-    <>
-      {sent && (
+  if (sent) {
+    return (
+      <div className="space-y-4 pt-2">
         <p className="tv-notice" data-tone="ok" role="status">
           <span>{copy.sent}</span>
         </p>
-      )}
+        <Button
+          type="button"
+          variant="secondary"
+          size="sm"
+          onClick={() => setSent(false)}
+        >
+          {copy.newRequest}
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {copy.formIntro && <p className="tv-lead">{copy.formIntro}</p>}
       <SaveForm
         action={requestRentalAction}
         submitLabel={copy.submit}
@@ -90,7 +103,7 @@ export function RentalRequestForm({
         savedMessage={copy.sent}
         errorMessages={rentalRequestErrors(nl)}
         fallbackErrorMessage={copy.errorFallback}
-        resetOnSuccess={false}
+        resetOnSuccess={true}
         onSuccess={onSuccess}
         className="tv-form"
       >

@@ -1020,6 +1020,7 @@
     "depositNvt": "NVT (post of werkgroep van VTK)",
     "languageNl": "Nederlands",
     "languageEn": "Engels",
+    "newRequest": "Nog een aanvraag indienen",
     "errorFallback": "Je aanvraag is niet verstuurd. Probeer het opnieuw."
   },
   "register": {

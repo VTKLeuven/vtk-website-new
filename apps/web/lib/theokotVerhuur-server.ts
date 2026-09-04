@@ -476,3 +476,46 @@ export function describeRentalWindow(
 export function depositStateLabel(state: keyof typeof DEPOSIT_STATE_META, locale: "nl" | "en"): string {
   return DEPOSIT_STATE_META[state][locale];
 }
+
+// -----------------------------------------------------------------------------
+// Agenda-feed token
+// -----------------------------------------------------------------------------
+
+/**
+ * Haalt het geheim token op achter de abonneerbare iCalendar-feed van de
+ * Theokot-verhuur. Bestaat het nog niet, dan wordt er direct een cryptografisch
+ * willekeurig token aangemaakt en bewaard.
+ */
+export async function getRentalFeedToken(): Promise<string> {
+  const config = await getRentalConfig();
+  if (config.feedToken) return config.feedToken;
+
+  const token = randomBytes(24).toString("base64url");
+  const nextConfig: RentalConfig = { ...config, feedToken: token };
+  try {
+    await prisma.setting.upsert({
+      where: { key: RENTAL_CONFIG_KEY },
+      create: { key: RENTAL_CONFIG_KEY, value: nextConfig },
+      update: { value: nextConfig },
+    });
+  } catch (err) {
+    console.error("[theokot-verhuur] kon nieuw feedToken niet bewaren", err);
+  }
+  return token;
+}
+
+/**
+ * Controleert of het meegegeven token overeenkomt met het geconfigureerde
+ * feedToken van de Theokot-verhuur. Tijdsaanval-bestendig (timingSafeEqual).
+ */
+export async function verifyRentalFeedToken(token: string): Promise<boolean> {
+  if (!token || typeof token !== "string") return false;
+  const config = await getRentalConfig();
+  if (!config.feedToken) return false;
+
+  const a = Buffer.from(token);
+  const b = Buffer.from(config.feedToken);
+  if (a.length !== b.length) return false;
+  return timingSafeEqual(a, b);
+}
+

@@ -41,6 +41,8 @@ export type RentalConfig = {
   /** Wat er op de gesloten pagina staat. Leeg = de standaardzin. */
   closedNoticeNl: string;
   closedNoticeEn: string;
+  /** Geheim token achter de abonneerbare iCalendar-feed van de verhuur. */
+  feedToken: string;
 };
 
 export const DEFAULT_RENTAL_CONFIG: RentalConfig = {
@@ -50,10 +52,14 @@ export const DEFAULT_RENTAL_CONFIG: RentalConfig = {
   formOpen: true,
   closedNoticeNl: "",
   closedNoticeEn: "",
+  feedToken: "",
 };
 
 export function parseRentalConfig(value: unknown): RentalConfig {
-  const stored = (value ?? {}) as Partial<RentalConfig> & { notifyEmail?: unknown };
+  const stored = (value ?? {}) as Partial<RentalConfig> & {
+    notifyEmail?: unknown;
+    feedToken?: unknown;
+  };
   const notify = Array.isArray(stored.notifyEmails)
     ? stored.notifyEmails.map((entry) => String(entry).trim()).filter(Boolean)
     : typeof stored.notifyEmail === "string"
@@ -70,6 +76,10 @@ export function parseRentalConfig(value: unknown): RentalConfig {
     formOpen: stored.formOpen !== false,
     closedNoticeNl: typeof stored.closedNoticeNl === "string" ? stored.closedNoticeNl : "",
     closedNoticeEn: typeof stored.closedNoticeEn === "string" ? stored.closedNoticeEn : "",
+    feedToken:
+      typeof stored.feedToken === "string" && stored.feedToken.trim()
+        ? stored.feedToken.trim()
+        : "",
   };
 }
 

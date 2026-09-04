@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
+import { randomBytes } from "node:crypto";
 import { prisma } from "@vtk/db";
 import { deleteObject, newStorageKey, putObject } from "@vtk/storage";
 import { requirePermission } from "@/lib/session";
@@ -801,6 +802,7 @@ export async function saveRentalConfigAction(
   const minLeadDays = clampLeadDays(formData.get("minLeadDays"));
   const formOpen = formData.get("formOpen") === "on";
 
+  const current = await getRentalConfig();
   await writeSetting(RENTAL_CONFIG_KEY, {
     notifyEmails,
     signature,
@@ -808,6 +810,7 @@ export async function saveRentalConfigAction(
     formOpen,
     closedNoticeNl: toMessageText(formData.get("closedNoticeNl")),
     closedNoticeEn: toMessageText(formData.get("closedNoticeEn")),
+    feedToken: current.feedToken,
   });
 
   await logAudit({
@@ -819,6 +822,31 @@ export async function saveRentalConfigAction(
   revalidateRentals();
   revalidatePath("/theokot/verhuur");
   revalidatePath("/en/theokot/verhuur");
+  return saveOk();
+}
+
+/**
+ * Vernieuwt het geheime token achter de abonneerbare iCalendar-feed van de
+ * Theokot-verhuurkalender.
+ */
+export async function rotateRentalFeedTokenAction(): Promise<SaveState> {
+  await requireRentalManager();
+
+  const config = await getRentalConfig();
+  const token = randomBytes(24).toString("base64url");
+  await writeSetting(RENTAL_CONFIG_KEY, {
+    ...config,
+    feedToken: token,
+  });
+
+  await logAudit({
+    action: "update",
+    entity: "theokotRentalSettings",
+    target: "Agenda-feed token",
+    summary: "token vernieuwd",
+  });
+
+  revalidateRentals();
   return saveOk();
 }
 
