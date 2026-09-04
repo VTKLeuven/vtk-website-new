@@ -1358,18 +1358,6 @@
   object-fit: cover;
 }
 
-/* Zelfde lichte navy scrim als de fotokop op de aanbod-kaarten. */
-.vtk-design .evcard-media::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    115deg,
-    rgba(10, 15, 31, 0.5) 0%,
-    rgba(14, 26, 54, 0.16) 55%,
-    rgba(14, 26, 54, 0) 100%
-  );
-}
 
 .vtk-design .evcard-body {
   display: flex;
