@@ -16,12 +16,14 @@ import { isDriverColorIndex, isVehiclePattern } from '@/lib/driver-colors';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 import {
   describeReservationChanges,
+  formatBrusselsTime,
   formatDateTime,
   isOnQuarterHour,
   NOTIFY_KINDS,
   parseDateOnly,
   parseNotifyEmails,
   momentsOverlap,
+  toBrusselsDateValue,
   transportPriceCents,
 } from '@/lib/uitleen';
 import { notifyReservation, notifyTransport } from '@/lib/uitleen-mail';
@@ -1829,7 +1831,13 @@ async function overlappingBookings(
   return others.filter((other) => momentsOverlap(startAt, endAt, other.startAt, other.endAt));
 }
 
-/** "de rit van Feest op za 12 sep 14:00-18:00", voor in een foutmelding. */
+/**
+ * "de rit van Feest op za 12 september 2026, 14:00-18:00", voor in een melding.
+ *
+ * Het einde als enkel een uur zolang de rit binnen één dag blijft: de datum twee
+ * keer voluit maakte er een zin van drie regels van, en dat is precies wat je in
+ * een toast niet leest.
+ */
 function bookingLabel(booking: {
   eventName: string | null;
   purpose: string;
@@ -1837,7 +1845,11 @@ function bookingLabel(booking: {
   endAt: Date;
 }): string {
   const what = booking.eventName?.trim() || booking.purpose;
-  return `de rit van ${what} op ${formatDateTime(booking.startAt)} tot ${formatDateTime(booking.endAt)}`;
+  const sameDay = toBrusselsDateValue(booking.startAt) === toBrusselsDateValue(booking.endAt);
+  const end = sameDay
+    ? formatBrusselsTime(booking.endAt)
+    : `tot ${formatDateTime(booking.endAt)}`;
+  return `de rit van ${what} op ${formatDateTime(booking.startAt)}${sameDay ? `-${end}` : ` ${end}`}`;
 }
 
 /** "de rit van A ... en de rit van B ...", voor een melding over meerdere. */

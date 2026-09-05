@@ -345,11 +345,7 @@ export function formatEventMoment(
   if (!event.endAt) return start;
   const sameDay = toBrusselsDateValue(event.startAt) === toBrusselsDateValue(event.endAt);
   const end = sameDay
-    ? new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'nl-BE', {
-        timeZone: 'Europe/Brussels',
-        hour: '2-digit',
-        minute: '2-digit',
-      }).format(event.endAt)
+    ? formatBrusselsTime(event.endAt, locale)
     : formatBrusselsDay(event.endAt, locale);
   return `${start} ${locale === 'en' ? 'to' : 'tot'} ${end}`;
 }
@@ -369,6 +365,15 @@ export function formatBrusselsDay(date: Date, locale: LogistiekLocale = 'nl'): s
     day: 'numeric',
     month: 'long',
     year: 'numeric',
+  }).format(date);
+}
+
+/** Enkel het uur, in Belgische tijd: "14:00". */
+export function formatBrusselsTime(date: Date, locale: LogistiekLocale = 'nl'): string {
+  return new Intl.DateTimeFormat(locale === 'en' ? 'en-GB' : 'nl-BE', {
+    timeZone: 'Europe/Brussels',
+    hour: '2-digit',
+    minute: '2-digit',
   }).format(date);
 }
 
