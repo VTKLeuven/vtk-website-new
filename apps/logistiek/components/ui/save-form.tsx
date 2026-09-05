@@ -4,7 +4,7 @@ import { useActionState, useCallback, useEffect, useRef, type ReactNode } from '
 import { Button } from '@vtk/ui';
 import { useToast } from '@/components/ui/toast';
 import { restoreFormValues } from '@/lib/form-values';
-import { SAVE_IDLE, type SaveAction } from '@/lib/saveState';
+import { SAVE_IDLE, type SaveAction, type SaveState } from '@/lib/saveState';
 
 /**
  * Vereenvoudigde kopie van apps/web/components/ui/SaveForm.tsx (zonder de
@@ -40,7 +40,15 @@ export function SaveForm({
   submitDisabled?: boolean;
   submitVariant?: 'primary' | 'secondary' | 'ghost' | 'danger';
   className?: string;
-  children?: ReactNode;
+  /**
+   * Een functie in plaats van vaste inhoud wanneer het formulier zelf op de
+   * uitkomst moet reageren. Dat is er voor het geval waarin een fout een extra
+   * keuze opent en niet enkel een melding is: bij een botsend voertuig verschijnt
+   * zo pas ná de weigering het vinkje om ze toch door te duwen. Altijd tonen zou
+   * dat vinkje tot standaarduitrusting maken, en dan is de weigering geen rem
+   * meer.
+   */
+  children?: ReactNode | ((state: SaveState) => ReactNode);
 }) {
   const formRef = useRef<HTMLFormElement>(null);
   // De FormData van de laatste submit, om terug te zetten na een fout (zie
@@ -97,7 +105,7 @@ export function SaveForm({
 
   return (
     <form ref={formRef} action={formAction} className={className}>
-      {children}
+      {typeof children === 'function' ? children(state) : children}
       <Button type="submit" variant={submitVariant} disabled={pending || submitDisabled}>
         {pending ? savingLabel : submitLabel}
       </Button>

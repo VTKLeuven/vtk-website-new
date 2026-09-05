@@ -1806,11 +1806,16 @@ export async function createTransportForReservationAction(
 }
 
 /**
- * De goedgekeurde rit van hetzelfde voertuig waarmee dit tijdvenster botst, of
- * null. Aansluiten mag: een rit die om 12:00 eindigt, laat de kar om 12:00 vrij. Geeft de rit zelf terug en niet enkel een boolean: "voertuig bezet"
- * zegt niet waarheen je moet schuiven, en dat is precies wat het team wil weten.
+ * De goedgekeurde ritten van hetzelfde voertuig waarmee dit tijdvenster botst.
+ *
+ * Aansluiten mag: een rit die om 12:00 eindigt, laat de kar om 12:00 vrij. Geeft
+ * de ritten zelf terug en niet enkel een boolean: "voertuig bezet" zegt niet
+ * waarheen je moet schuiven, en dat is precies wat het team wil weten.
+ *
+ * Alle botsende ritten en niet enkel de eerste: forceer je een overlap, dan hoort
+ * de melding te zeggen met hoeveel dingen je nu botst, niet met eentje ervan.
  */
-async function overlappingBooking(
+async function overlappingBookings(
   tx: Prisma.TransactionClient,
   vehicleId: string,
   startAt: Date,
@@ -1821,7 +1826,7 @@ async function overlappingBooking(
     where: { vehicleId, status: 'APPROVED', id: { notIn: excludeIds } },
     select: { id: true, startAt: true, endAt: true, eventName: true, purpose: true },
   });
-  return others.find((other) => momentsOverlap(startAt, endAt, other.startAt, other.endAt)) ?? null;
+  return others.filter((other) => momentsOverlap(startAt, endAt, other.startAt, other.endAt));
 }
 
 /** "de rit van Feest op za 12 sep 14:00-18:00", voor in een foutmelding. */
@@ -1833,6 +1838,25 @@ function bookingLabel(booking: {
 }): string {
   const what = booking.eventName?.trim() || booking.purpose;
   return `de rit van ${what} op ${formatDateTime(booking.startAt)} tot ${formatDateTime(booking.endAt)}`;
+}
+
+/** "de rit van A ... en de rit van B ...", voor een melding over meerdere. */
+function overlapLabel(clashes: Parameters<typeof bookingLabel>[0][]): string {
+  return clashes.map(bookingLabel).join(' en ');
+}
+
+/**
+ * Botsen mag tijdelijk, stil botsen niet.
+ *
+ * Het team tekent eerst in wat mensen vragen en schuift het daarna passend; die
+ * volgorde was onmogelijk zolang een botsing hard geweigerd werd. Twee ritten met
+ * hetzelfde voertuig op hetzelfde moment mogen dus bestaan, maar enkel wanneer
+ * iemand daar expliciet voor tekent (`allowOverlap`), en dan met een regel in de
+ * historiek, een waarschuwing in de melding en twee rode blokken in de planning
+ * tot het opgelost is. Zie docs/design-decisions.md.
+ */
+function overlapAuditNote(clashes: Parameters<typeof bookingLabel>[0][]): string {
+  return `bewust ingepland over ${overlapLabel(clashes)}`;
 }
 
 /**
@@ -1862,10 +1886,20 @@ export async function approveTransportAction(
   // een toegewezen rit is meteen ook leestoegang tot die rit ("Mijn ritten").
   if (driverId && !(await isDriver(driverId))) return saveError('NOT_A_DRIVER');
 
+  // Botsen mag, maar enkel bewust: zonder dit vinkje weigert het goedkeuren nog
+  // altijd en zegt het waarmee. Zie `overlapAuditNote`.
+  const allowOverlap = String(formData.get('allowOverlap') ?? '') === 'on';
+
   const outcome = await runSerializable(
     async (
       tx
-    ): Promise<{ error: string | null; detail?: string; legIds?: string[]; shifts?: string[] }> => {
+    ): Promise<{
+      error: string | null;
+      detail?: string;
+      legIds?: string[];
+      shifts?: string[];
+      overlaps?: string[];
+    }> => {
       const booking = await tx.uitleenTransportBooking.findUnique({ where: { id: bookingId } });
       if (!booking) return { error: 'NOT_FOUND' as const };
 
@@ -1900,18 +1934,25 @@ export async function approveTransportAction(
         planned.push({ leg, startAt, endAt });
       }
 
-      // Per voertuig: geen twee goedgekeurde ritten op hetzelfde moment. De
-      // andere helft van dezelfde aanvraag telt niet mee als conflict met
-      // zichzelf, maar mag wel niet over de eigen heenrit vallen.
+      // Per voertuig: twee goedgekeurde ritten op hetzelfde moment mogen enkel
+      // met het vinkje. De andere helft van dezelfde aanvraag telt niet mee als
+      // conflict met zichzelf, maar mag wel niet over de eigen heenrit vallen.
+      const overlapsPerLeg = new Map<string, string>();
       for (const [index, entry] of planned.entries()) {
-        const clash = await overlappingBooking(
+        const clashes = await overlappingBookings(
           tx,
           entry.leg.vehicleId,
           entry.startAt,
           entry.endAt,
           groupIds
         );
-        if (clash) return { error: 'OVERLAP' as const, detail: bookingLabel(clash) };
+        if (clashes.length > 0) {
+          if (!allowOverlap) return { error: 'OVERLAP' as const, detail: overlapLabel(clashes) };
+          overlapsPerLeg.set(entry.leg.id, overlapAuditNote(clashes));
+        }
+        // Blijft wel hard: dat de heen- en terugrit van één aanvraag hetzelfde
+        // voertuig op hetzelfde moment claimen, is geen planningskeuze maar een
+        // fout in de aanvraag. Daar helpt schuiven, niet doorduwen.
         const sibling = planned.find(
           (other, otherIndex) =>
             otherIndex !== index &&
@@ -1963,8 +2004,18 @@ export async function approveTransportAction(
             actorId: session.user.id,
           });
         }
+        // Een geforceerde botsing hoort in de historiek: over een week weet
+        // niemand nog of dat rode blok een keuze was of een ongeluk.
+        const overlapNote = overlapsPerLeg.get(leg.id);
+        if (overlapNote) {
+          await writeAudit(tx, { transportBookingId: leg.id }, {
+            kind: 'NOTE',
+            note: overlapNote,
+            actorId: session.user.id,
+          });
+        }
       }
-      return { error: null, legIds: groupIds, shifts };
+      return { error: null, legIds: groupIds, shifts, overlaps: [...overlapsPerLeg.values()] };
     }
   );
 
@@ -1975,7 +2026,10 @@ export async function approveTransportAction(
   if (outcome.error === 'TIME_QUARTER') return saveError('TIME_QUARTER');
   if (outcome.error === 'SELF_OVERLAP') return saveError('SELF_OVERLAP');
   if (outcome.error === 'OVERLAP') {
-    return saveError('OVERLAP', `Botst met ${outcome.detail}. Verschuif de uren of wijs af.`);
+    return saveError(
+      'OVERLAP',
+      `Botst met ${outcome.detail}. Verschuif de uren, wijs af, of vink "toch goedkeuren" aan.`
+    );
   }
 
   // Zijn de uren verschoven, dan is dat het nieuws; anders volstaat de betaalwijze.
@@ -1990,7 +2044,14 @@ export async function approveTransportAction(
   );
 
   revalidateBeheer();
-  return saveOk();
+  // De waarschuwing hoort in de bevestiging: wie forceert, moet daarna nog
+  // kunnen zien waarmee, zonder de historiek open te slaan.
+  const overlaps = outcome.overlaps ?? [];
+  return saveOk(
+    overlaps.length > 0
+      ? `Goedgekeurd, maar het voertuig staat nu dubbel geboekt: ${overlaps.join('; ')}. Verschuif een van beide in de planning.`
+      : undefined
+  );
 }
 
 export async function rejectTransportAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
@@ -2056,6 +2117,8 @@ export async function adminCreateTransportAction(
     userId?: string | null;
     eventId?: string | null;
     driverId?: string | null;
+    /** Bewust over een bestaande rit inplannen; zie `overlapAuditNote`. */
+    allowOverlap?: boolean;
   }
 ): Promise<ActionResult> {
   const session = await requireManage();
@@ -2078,15 +2141,21 @@ export async function adminCreateTransportAction(
   }
 
   const outcome = await runSerializable(async (tx) => {
-    for (const booking of built.bookings) {
-      const clash = await overlappingBooking(
+    // Per rit apart, zodat de historiekregel bij de rit staat die effectief
+    // over een andere valt.
+    const overlapsPerIndex = new Map<number, string>();
+    for (const [index, booking] of built.bookings.entries()) {
+      const clashes = await overlappingBookings(
         tx,
         booking.vehicleId,
         booking.startAt as Date,
         booking.endAt as Date,
         []
       );
-      if (clash) return { error: 'OVERLAP' as const, detail: bookingLabel(clash) };
+      if (clashes.length > 0) {
+        if (!input.allowOverlap) return { error: 'OVERLAP' as const, detail: overlapLabel(clashes) };
+        overlapsPerIndex.set(index, overlapAuditNote(clashes));
+      }
     }
     const created = await tx.uitleenTransportBooking.createManyAndReturn({
       data: built.bookings.map((booking) => ({
@@ -2098,25 +2167,48 @@ export async function adminCreateTransportAction(
       })),
       select: { id: true },
     });
-    for (const row of created) {
+    for (const [index, row] of created.entries()) {
       await writeAudit(tx, { transportBookingId: row.id }, {
         kind: 'STATUS_CHANGED',
         toStatus: 'APPROVED',
         note: 'ingepland door Logistiek',
         actorId: session.user.id,
       });
+      const overlapNote = overlapsPerIndex.get(index);
+      if (overlapNote) {
+        await writeAudit(tx, { transportBookingId: row.id }, {
+          kind: 'NOTE',
+          note: overlapNote,
+          actorId: session.user.id,
+        });
+      }
     }
-    return { error: null, ids: created.map((row) => row.id) };
+    return {
+      error: null,
+      ids: created.map((row) => row.id),
+      overlaps: [...overlapsPerIndex.values()],
+    };
   });
 
   if (outcome.error === 'OVERLAP') {
-    return { ok: false, error: `Botst met ${outcome.detail}. Kies een ander moment.` };
+    return {
+      ok: false,
+      error: `Botst met ${outcome.detail}. Kies een ander moment, of plan de rit toch in.`,
+      code: 'OVERLAP',
+    };
   }
 
   revalidateBeheer();
+  const overlaps = outcome.overlaps ?? [];
   return {
     ok: true,
-    message: built.roundTrip || built.vehicleCount > 1 ? 'Ritten ingepland.' : 'Rit ingepland.',
+    warning: overlaps.length > 0,
+    message:
+      overlaps.length > 0
+        ? `Ingepland, maar het voertuig staat nu dubbel geboekt: ${overlaps.join('; ')}. Verschuif een van beide.`
+        : built.roundTrip || built.vehicleCount > 1
+          ? 'Ritten ingepland.'
+          : 'Rit ingepland.',
   };
 }
 
@@ -2143,6 +2235,8 @@ export async function adminEditTransportAction(
     pickupAddress: string;
     destination: string;
     adminNote: string;
+    /** Bewust over een bestaande rit schuiven; zie `overlapAuditNote`. */
+    allowOverlap?: boolean;
   }
 ): Promise<ActionResult> {
   const session = await requireManage();
@@ -2185,9 +2279,13 @@ export async function adminEditTransportAction(
 
     // Enkel een goedgekeurde rit houdt een voertuig bezet; een aanvraag mag nog
     // botsen (zie "Conflicten: aanvragen mag, goedkeuren niet").
+    let overlapNote: string | null = null;
     if (existing.status === 'APPROVED') {
-      const clash = await overlappingBooking(tx, existing.vehicleId, startAt, endAt, [bookingId]);
-      if (clash) return { error: 'OVERLAP' as const, detail: bookingLabel(clash) };
+      const clashes = await overlappingBookings(tx, existing.vehicleId, startAt, endAt, [bookingId]);
+      if (clashes.length > 0) {
+        if (!input.allowOverlap) return { error: 'OVERLAP' as const, detail: overlapLabel(clashes) };
+        overlapNote = overlapAuditNote(clashes);
+      }
     }
 
     const changes: string[] = [];
@@ -2234,7 +2332,14 @@ export async function adminEditTransportAction(
       note: changes.join('; '),
       actorId: session.user.id,
     });
-    return { error: null, changes };
+    if (overlapNote) {
+      await writeAudit(tx, { transportBookingId: bookingId }, {
+        kind: 'NOTE',
+        note: overlapNote,
+        actorId: session.user.id,
+      });
+    }
+    return { error: null, changes, overlapNote };
   });
 
   if (outcome.error === 'NOT_FOUND') return { ok: false, error: 'Deze rit bestaat niet meer.' };
@@ -2242,7 +2347,11 @@ export async function adminEditTransportAction(
     return { ok: false, error: 'Deze rit is afgerond of geannuleerd; daar kan niets meer aan.' };
   }
   if (outcome.error === 'OVERLAP') {
-    return { ok: false, error: `Botst met ${outcome.detail}. Kies een ander moment.` };
+    return {
+      ok: false,
+      error: `Botst met ${outcome.detail}. Kies een ander moment, of schuif de rit er toch over.`,
+      code: 'OVERLAP',
+    };
   }
   if (outcome.error === 'NO_CHANGES') return { ok: true, message: 'Niets gewijzigd.' };
 
@@ -2251,7 +2360,13 @@ export async function adminEditTransportAction(
   await notifyTransport([bookingId], 'EDITED', outcome.changes?.join('\n'));
 
   revalidateBeheer();
-  return { ok: true, message: 'Rit aangepast.' };
+  return {
+    ok: true,
+    warning: Boolean(outcome.overlapNote),
+    message: outcome.overlapNote
+      ? `Aangepast, maar het voertuig staat nu dubbel geboekt (${outcome.overlapNote.replace('bewust ingepland over ', '')}). Verschuif een van beide.`
+      : 'Rit aangepast.',
+  };
 }
 
 /** Chauffeur toewijzen of wijzigen; kan op elk moment voor de rit afgerond is. */
@@ -2298,11 +2413,18 @@ export async function assignDriverAction(bookingId: string, driverId: string): P
 }
 
 /** Voertuig wisselen: tarief opnieuw snapshotten en de prijs herberekenen. */
-export async function changeVehicleAction(bookingId: string, vehicleId: string): Promise<ActionResult> {
+export async function changeVehicleAction(
+  bookingId: string,
+  vehicleId: string,
+  /** Bewust naar een voertuig wisselen dat op dat moment al bezet is. */
+  allowOverlap = false
+): Promise<ActionResult> {
   const session = await requireManage();
 
   const outcome = await runSerializable(
-    async (tx): Promise<{ error: string | null; vehicleName?: string }> => {
+    async (
+      tx
+    ): Promise<{ error: string | null; vehicleName?: string; detail?: string; overlapNote?: string }> => {
       const booking = await tx.uitleenTransportBooking.findUnique({
         where: { id: bookingId },
         include: { payments: { select: { status: true } } },
@@ -2322,11 +2444,15 @@ export async function changeVehicleAction(bookingId: string, vehicleId: string):
       const vehicle = await tx.uitleenVehicle.findFirst({ where: { id: vehicleId, active: true } });
       if (!vehicle) return { error: 'NO_VEHICLE' as const };
 
-      if (
-        booking.status === 'APPROVED' &&
-        (await overlappingBooking(tx, vehicle.id, booking.startAt, booking.endAt, [booking.id]))
-      ) {
-        return { error: 'OVERLAP' as const };
+      let overlapNote: string | undefined;
+      if (booking.status === 'APPROVED') {
+        const clashes = await overlappingBookings(tx, vehicle.id, booking.startAt, booking.endAt, [
+          booking.id,
+        ]);
+        if (clashes.length > 0) {
+          if (!allowOverlap) return { error: 'OVERLAP' as const, detail: overlapLabel(clashes) };
+          overlapNote = overlapAuditNote(clashes);
+        }
       }
 
       const priceCents =
@@ -2348,21 +2474,40 @@ export async function changeVehicleAction(bookingId: string, vehicleId: string):
         note: `voertuig: ${vehicle.nameNl}`,
         actorId: session.user.id,
       });
-      return { error: null, vehicleName: vehicle.nameNl };
+      if (overlapNote) {
+        await writeAudit(tx, { transportBookingId: booking.id }, {
+          kind: 'NOTE',
+          note: overlapNote,
+          actorId: session.user.id,
+        });
+      }
+      return { error: null, vehicleName: vehicle.nameNl, overlapNote };
     }
   );
 
   if (outcome.error === 'NOT_FOUND') return { ok: false, error: 'Rit niet gevonden.' };
   if (outcome.error === 'LOCKED') return { ok: false, error: 'Voor deze rit kan je het voertuig niet meer wisselen.' };
   if (outcome.error === 'NO_VEHICLE') return { ok: false, error: 'Voertuig niet gevonden.' };
-  if (outcome.error === 'OVERLAP') return { ok: false, error: 'Dat voertuig is al geboekt op dat moment.' };
+  if (outcome.error === 'OVERLAP') {
+    return {
+      ok: false,
+      error: `Dat voertuig staat op dat moment al vast: ${outcome.detail}.`,
+      code: 'OVERLAP',
+    };
+  }
   if (outcome.error === 'PAYMENT_LOCKED') {
     return { ok: false, error: 'Deze rit heeft een actieve of voltooide betaling en kan niet meer gewijzigd worden.' };
   }
 
   await notifyTransport([bookingId], 'EDITED', `Voertuig gewijzigd naar ${outcome.vehicleName}.`);
   revalidateBeheer();
-  return { ok: true, message: 'Voertuig gewijzigd.' };
+  return {
+    ok: true,
+    warning: Boolean(outcome.overlapNote),
+    message: outcome.overlapNote
+      ? `Voertuig gewijzigd, maar het staat nu dubbel geboekt (${outcome.overlapNote.replace('bewust ingepland over ', '')}).`
+      : 'Voertuig gewijzigd.',
+  };
 }
 
 /** Rit afronden; voor per-km-voertuigen voer je de kilometers in en wordt de prijs berekend. */

@@ -67,6 +67,8 @@ export function blockLook({
 
   const className = [
     'overflow-hidden rounded-[8px] px-1.5 py-1 text-left text-[11px] leading-tight text-vtk-ink',
+    // Rood en niet subtiel: een botsing mag bestaan (het team plant eerst in en
+    // schuift daarna), maar enkel zolang ze niet te missen valt.
     block.conflict
       ? 'border-2 border-red-500 bg-red-50 text-red-900'
       : awaitsDriver

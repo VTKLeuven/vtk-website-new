@@ -63,6 +63,12 @@ export function NewTripForm({
   const [pending, startTransition] = useTransition();
   const [values, setValues] = useState(initial);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Botste de vorige poging? Dan verschijnt er een tweede knop om ze toch door
+   * te duwen. Pas dán, en niet meteen: een knop "toch inplannen" die er altijd
+   * staat, wordt de knop waarop je klikt.
+   */
+  const [clashed, setClashed] = useState(false);
 
   function set<K extends keyof NewTripValues>(key: K, value: NewTripValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -78,10 +84,11 @@ export function NewTripForm({
     report.current?.(values.startAt, values.endAt);
   }, [values.startAt, values.endAt]);
 
-  function save() {
+  function save(allowOverlap = false) {
     setError(null);
     startTransition(async () => {
       const result = await adminCreateTransportAction({
+        allowOverlap,
         startAt: values.startAt,
         endAt: values.endAt,
         vehicleIds: values.vehicleId ? [values.vehicleId] : [],
@@ -96,10 +103,17 @@ export function NewTripForm({
         driverId: values.driverId || null,
       });
       if (result.ok) {
-        showToast({ message: result.message ?? 'Rit ingepland.', variant: 'success' });
+        // De actie meldt zelf wanneer de rit bewust over een andere ligt; dat is
+        // een waarschuwing en geen fout, dus blijft ze staan tot je ze wegklikt.
+        showToast({
+          message: result.message ?? 'Rit ingepland.',
+          variant: 'success',
+          duration: result.warning ? 0 : undefined,
+        });
         onDone();
       } else {
         setError(result.error);
+        setClashed(result.code === 'OVERLAP');
         showToast({ message: result.error, variant: 'error', duration: 0 });
       }
     });
@@ -219,10 +233,15 @@ export function NewTripForm({
         </p>
       ) : null}
 
-      <div className="flex items-center gap-2">
-        <Button type="button" size="sm" onClick={save} disabled={pending}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" onClick={() => save()} disabled={pending}>
           {pending ? 'Inplannen...' : 'Rit inplannen'}
         </Button>
+        {clashed ? (
+          <Button type="button" size="sm" variant="danger" onClick={() => save(true)} disabled={pending}>
+            Toch inplannen
+          </Button>
+        ) : null}
         <button
           type="button"
           onClick={onCancel}

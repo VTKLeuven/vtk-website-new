@@ -33,6 +33,7 @@ import {
   type TransportBooking,
 } from '@/lib/uitleen-server';
 import { describeFilters, filtersToQuery, parseTransportFilters } from '@/lib/transport-filters';
+import { conflictPartners } from '@/lib/transport-conflicts';
 import { startOfBrusselsDay } from '@/lib/week-lanes';
 import { TransportPlanner, type PlannerTrip } from './planner';
 import type { TripBlock } from '@/components/transport-calendar/types';
@@ -50,28 +51,6 @@ const monthFormatter = new Intl.DateTimeFormat('nl-BE', {
   month: 'long',
   year: 'numeric',
 });
-
-/**
- * Goedgekeurde ritten van hetzelfde voertuig die elkaar overlappen. Dat hoort
- * niet te kunnen (de goedkeuring checkt het), maar een voertuigwissel of een
- * handmatige ingreep kan het alsnog veroorzaken, en dan wil je het zien.
- */
-function conflictingIds(bookings: TransportBooking[]): Set<string> {
-  const conflicts = new Set<string>();
-  const approved = bookings.filter((booking) => booking.status === 'APPROVED');
-  for (let i = 0; i < approved.length; i++) {
-    for (let j = i + 1; j < approved.length; j++) {
-      const a = approved[i];
-      const b = approved[j];
-      if (a.vehicleId !== b.vehicleId) continue;
-      if (a.startAt < b.endAt && b.startAt < a.endAt) {
-        conflicts.add(a.id);
-        conflicts.add(b.id);
-      }
-    }
-  }
-  return conflicts;
-}
 
 /**
  * 23:59 van dezelfde Belgische dag, voor een evenement zonder eindmoment.
@@ -138,7 +117,7 @@ export default async function VervoerWeekPage({
     availabilityInRange(from, to),
   ]);
 
-  const conflicts = conflictingIds(bookings);
+  const conflicts = conflictPartners(bookings);
   // De historiek van de getoonde ritten in één query; ze staat ingeklapt in het
   // paneel, maar wordt hier server-side gerenderd, zoals op /beheer/vervoer.
   const history = await transportAuditLogsByBooking(bookings.map((booking) => booking.id));
@@ -165,6 +144,11 @@ export default async function VervoerWeekPage({
         : null,
     conflict: conflicts.has(booking.id),
   }));
+
+  /** "de rit van Feest (14:00-18:00)", om de botsende rit mee te benoemen. */
+  const tripLabel = (booking: TransportBooking) =>
+    `${booking.eventName?.trim() || booking.purpose} (${timeFormatter.format(booking.startAt)}-${timeFormatter.format(booking.endAt)})`;
+  const bookingById = new Map(bookings.map((booking) => [booking.id, booking]));
 
   const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
 
@@ -253,6 +237,12 @@ export default async function VervoerWeekPage({
               other.eventName?.trim() || other.purpose
             }`
         ),
+      // Met welke ritten deze botst: het paneel zet ze één klik weg, zodat
+      // schuiven het antwoord blijft op een botsing die je bewust maakte.
+      conflictsWith: (conflicts.get(booking.id) ?? []).flatMap((id) => {
+        const other = bookingById.get(id);
+        return other ? [{ id, label: tripLabel(other) }] : [];
+      }),
     };
   });
 

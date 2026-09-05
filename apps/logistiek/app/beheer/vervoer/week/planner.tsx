@@ -90,6 +90,8 @@ export type PlannerTrip = {
   /** De ritten van dezelfde aanvraag, voor het goedkeurformulier. */
   legs: DecisionLeg[];
   sameDayBookings: string[];
+  /** Goedgekeurde ritten met hetzelfde voertuig die deze overlappen. */
+  conflictsWith: Array<{ id: string; label: string }>;
   history: UitleenAuditEntry[];
 };
 
@@ -163,10 +165,11 @@ export function TransportPlanner({
   /**
    * Een rit verslepen of rekken in de kalender.
    *
-   * Dezelfde actie als het formulier in het paneel, met dezelfde
-   * overlapcontrole: slepen is een snellere manier om uren te wijzigen, geen
-   * tweede manier met andere regels. Botst het, dan zegt de melding waarmee, en
-   * zet het herladen de rit terug waar ze stond.
+   * Dezelfde actie als het formulier in het paneel, met één verschil: **slepen
+   * mag meteen over een andere rit vallen**, zonder tussenstap. Slepen ís het
+   * schuiven waarvoor de botsing toegelaten werd; een bevestigingsvraag per sleep
+   * zou precies het gebaar breken dat het probleem oplost. Stil gebeurt het niet:
+   * de melding blijft staan tot je ze wegklikt en beide blokken worden rood.
    */
   const moveBlock = useCallback(
     (blockId: string, startAt: Date, endAt: Date) => {
@@ -177,9 +180,14 @@ export function TransportPlanner({
           ...target.edit,
           startAt: toDatetimeLocalValue(startAt),
           endAt: toDatetimeLocalValue(endAt),
+          allowOverlap: true,
         });
         if (result.ok) {
-          showToast({ message: result.message ?? 'Rit verplaatst.', variant: 'success' });
+          showToast({
+            message: result.message ?? 'Rit verplaatst.',
+            variant: 'success',
+            duration: result.warning ? 0 : undefined,
+          });
         } else {
           showToast({ message: result.error, variant: 'error', duration: 0 });
         }
@@ -188,6 +196,29 @@ export function TransportPlanner({
     },
     [router, showToast, trips]
   );
+
+  /**
+   * De ritten die op dit moment botsen, en een knop om ze af te gaan.
+   *
+   * Botsen mag sinds kort tijdelijk, en dat is enkel verantwoord zolang je het
+   * niet kan vergeten: een rood blok in een week waar je niet naar kijkt, ziet
+   * niemand. Deze teller staat naast de navigatie en loopt bij elke klik naar de
+   * volgende botsende rit, zodat "twee dingen nog rechtzetten" een lijstje is dat
+   * je afwerkt in plaats van een kleur die je moet opmerken.
+   *
+   * Enkel wat in deze weergave zichtbaar is: verder kijken dan het venster zou
+   * een teller opleveren die naar iets wijst wat niet op het scherm staat.
+   */
+  const clashing = trips.filter((entry) => entry.conflictsWith.length > 0);
+  const [clashCursor, setClashCursor] = useState(0);
+  const nextClash = useCallback(() => {
+    if (clashing.length === 0) return;
+    const index = clashCursor % clashing.length;
+    setClashCursor(index + 1);
+    setDraft(null);
+    setOpenEventId(null);
+    setOpenId(clashing[index].id);
+  }, [clashCursor, clashing]);
 
   const createRange = useCallback(
     (startAt: Date, endAt: Date) => {
@@ -255,6 +286,16 @@ export function TransportPlanner({
               drivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
               driverColors={driverColors}
             />
+            {clashing.length > 0 ? (
+              <button
+                type="button"
+                onClick={nextClash}
+                className="rounded-full border border-red-400 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+              >
+                {clashing.length} {clashing.length === 1 ? 'botsing' : 'botsingen'}
+              </button>
+            ) : null}
+
             {/* Ook als knop en niet enkel als sleep: op een touchscreen is
                 verticaal vegen scrollen, dus daar valt er niets in te tekenen. */}
             <button
@@ -285,8 +326,9 @@ export function TransportPlanner({
           De vulkleur is de chauffeur, de arcering is het voertuig; een rit zonder chauffeur is geel
           met een rode streepjesrand. Kleuren stel je in bij Chauffeurs, arceringen bij
           Instellingen. Gestreept = nog te beslissen, doorzichtig = afgerond, volle rode rand = twee
-          goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. Klik een rit aan om ze te
-          beslissen of aan te passen.
+          goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. Dat laatste mag tijdelijk:
+          plan gerust in wat mensen vragen en schuif het daarna passend; de teller boven de kalender
+          houdt bij wat er nog dubbel staat. Klik een rit aan om ze te beslissen of aan te passen.
         </p>
 
         {openEvent ? (
@@ -370,6 +412,33 @@ export function TransportPlanner({
                   </span>
                 ) : null}
               </div>
+
+              {/* Botst deze rit, dan is dat het eerste wat je moet weten, en is
+                  de andere rit wat je nodig hebt om het op te lossen: een klik
+                  brengt je erheen om er een van beide te verschuiven. */}
+              {trip.conflictsWith.length > 0 ? (
+                <div className="rounded-[12px] border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+                  <p className="font-semibold">
+                    Dubbel geboekt met {trip.vehicleName}
+                  </p>
+                  <ul className="mt-1 grid gap-1">
+                    {trip.conflictsWith.map((other) => (
+                      <li key={other.id}>
+                        <button
+                          type="button"
+                          onClick={() => setOpenId(other.id)}
+                          className="text-left underline underline-offset-4"
+                        >
+                          {other.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="mt-1 text-xs">
+                    Verschuif er een van beide; slepen in de kalender volstaat.
+                  </p>
+                </div>
+              ) : null}
 
               {/* Wie rijdt en waarmee, bovenaan. Dit stond onderaan, onder de
                   feiten en het bewerkformulier, en dat is precies omgekeerd aan

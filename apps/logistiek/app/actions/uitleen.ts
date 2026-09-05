@@ -25,7 +25,23 @@ import { startOfBrusselsDay } from '@/lib/week-lanes';
 import { writeAudit } from '@/lib/audit';
 import { notifyReservation, notifyTeamNewRequest, notifyTransport } from '@/lib/uitleen-mail';
 
-export type ActionResult = { ok: true; message?: string } | { ok: false; error: string };
+/**
+ * `code` is optioneel en enkel voor een fout waar de client iets méér mee doet
+ * dan ze tonen: bij `OVERLAP` biedt het formulier een tweede knop aan om de
+ * botsing toch door te duwen. De zin in `error` blijft de melding.
+ */
+export type ActionResult =
+  | {
+      ok: true;
+      message?: string;
+      /**
+       * Gelukt, maar met een gevolg dat je niet mag missen (het voertuig staat nu
+       * dubbel geboekt). De client laat zo'n melding staan tot ze weggeklikt
+       * wordt, zoals een fout.
+       */
+      warning?: boolean;
+    }
+  | { ok: false; error: string; code?: string };
 // `ReservationFormInput` NIET her-exporteren vanuit dit `'use server'`-bestand:
 // Turbopack behandelt elke export van een use-server-module als een server action,
 // en een her-geëxporteerde type-binding laat de build falen ("export doesn't exist

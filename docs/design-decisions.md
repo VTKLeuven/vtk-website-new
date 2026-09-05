@@ -2852,6 +2852,39 @@ een tweede gegadigde was, en die tweede wist niet dat schuiven een optie was.
   verplaats je het probleem naar een derde aanvraag. Een aanvraag die nog beslist
   moet worden, mag wel in een conflict blijven staan.
 
+### Een voertuig mag tijdelijk dubbel staan
+
+De regel hierboven ("goedkeuren blijft hard geblokkeerd") geldt voor materiaal,
+niet voor een voertuig. Bij transport werkt Logistiek omgekeerd: eerst intekenen
+wat mensen vragen, dan schuiven tot het past. Zolang een botsing hard geweigerd
+werd, moest het probleem al opgelost zijn voor je het mocht invoeren, en dat is
+precies de verkeerde volgorde.
+
+- **Botsen mag, maar enkel bewust.** Goedkeuren, inplannen, aanpassen en een
+  voertuig wisselen weigeren nog altijd, mét de naam van de rit waarmee het
+  botst. Pas dan verschijnt de tweede knop ("Toch inplannen", "Toch goedkeuren").
+  Dat vinkje staat er niet standaard: een knop die er altijd staat, wordt de knop
+  waarop je klikt.
+- **Slepen forceert wel meteen.** Slepen ís het schuiven waarvoor dit bestaat; een
+  bevestigingsvraag per sleep zou het gebaar breken dat het probleem oplost. De
+  melding blijft wel staan tot je ze wegklikt.
+- **Waarom hier wel en bij materiaal niet.** Twee ritten op dezelfde kar zijn een
+  agendaprobleem: er ís een oplossing, en die is een halfuur schuiven. Twee
+  aanvragen voor dertig stoelen waarvan er twintig bestaan, zijn dat niet; daar
+  zou doorduwen de voorraad in de min zetten en dus liegen over wat er is.
+- **Stil botsen mag niet.** Beide blokken worden rood, de geforceerde botsing
+  komt in de historiek ("bewust ingepland over ..."), het paneel noemt de andere
+  rit met een klik erheen, en boven de kalender staat een teller die je van
+  botsing naar botsing brengt. Toestaan is enkel verantwoord zolang je het niet
+  kan vergeten; zonder die teller is een rood blok in een week waar je niet naar
+  kijkt, onzichtbaar.
+- **De eigen heen- en terugrit blijven hard uit elkaar.** Dat één aanvraag
+  hetzelfde voertuig twee keer tegelijk claimt, is geen planningskeuze maar een
+  fout in de aanvraag.
+- **Het conflict wordt altijd opnieuw berekend, nooit opgeslagen**
+  (`lib/transport-conflicts.ts`), zoals bij materiaal. Verschuif je er een, dan is
+  het rood weg zonder dat iemand iets moet aanvinken.
+
 ### Staat per exemplaar: kapot telt niet meer mee
 
 `UitleenItem.condition` geldt voor de hele rij: van vier frigo's kon er geen

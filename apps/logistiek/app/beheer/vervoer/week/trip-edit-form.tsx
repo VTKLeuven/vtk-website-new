@@ -49,6 +49,8 @@ export function TripEditForm({
   const [pending, startTransition] = useTransition();
   const [values, setValues] = useState(initial);
   const [error, setError] = useState<string | null>(null);
+  /** Botste de vorige poging? Dan pas verschijnt "toch verschuiven". */
+  const [clashed, setClashed] = useState(false);
 
   // Klik je in de kalender een andere rit aan, dan blijft dit formulier bestaan
   // en moet het de nieuwe waarden overnemen; anders bewerk je rit B met de velden
@@ -56,6 +58,7 @@ export function TripEditForm({
   useEffect(() => {
     setValues(initial);
     setError(null);
+    setClashed(false);
   }, [initial]);
 
   function set<K extends keyof TripEditValues>(key: K, value: TripEditValues[K]) {
@@ -66,17 +69,24 @@ export function TripEditForm({
     (key) => values[key] !== initial[key]
   );
 
-  function save() {
+  function save(allowOverlap = false) {
     setError(null);
     startTransition(async () => {
-      const result = await adminEditTransportAction(bookingId, values);
+      const result = await adminEditTransportAction(bookingId, { ...values, allowOverlap });
       if (result.ok) {
-        showToast({ message: result.message ?? 'Opgeslagen.', variant: 'success' });
+        // Een bewust geforceerde botsing is goed nieuws met een staartje: die
+        // melding blijft staan tot je ze wegklikt.
+        showToast({
+          message: result.message ?? 'Opgeslagen.',
+          variant: 'success',
+          duration: result.warning ? 0 : undefined,
+        });
         onSaved?.();
       } else {
         // In het paneel zelf én als toast: het paneel scrollt, en een melding die
         // boven de vouw hangt terwijl je onderaan op opslaan drukte, lees je niet.
         setError(result.error);
+        setClashed(result.code === 'OVERLAP');
         showToast({ message: result.error, variant: 'error', duration: 0 });
       }
     });
@@ -167,10 +177,21 @@ export function TripEditForm({
         </p>
       ) : null}
 
-      <div className="flex items-center gap-2">
-        <Button type="button" size="sm" onClick={save} disabled={pending || !dirty}>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" onClick={() => save()} disabled={pending || !dirty}>
           {pending ? 'Opslaan...' : 'Opslaan'}
         </Button>
+        {clashed ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="danger"
+            onClick={() => save(true)}
+            disabled={pending || !dirty}
+          >
+            Toch verschuiven
+          </Button>
+        ) : null}
         {dirty ? (
           <button
             type="button"
