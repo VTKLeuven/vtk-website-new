@@ -8,6 +8,8 @@
  * pagina omgegooid met "CALENDAR_KINDS is not iterable".
  */
 
+import type { AvailabilityKind } from '@/lib/availability-day';
+
 /** Eén rit als blok op de kalender. */
 export type TripBlock = {
   id: string;
@@ -160,5 +162,7 @@ export type AvailabilityBand = {
   /** ISO-strings, zoals alles wat naar een client-component reist. */
   startAt: string;
   endAt: string;
+  /** Beschikbaar, liever niet, of enkel in noodgeval. */
+  kind: AvailabilityKind;
   note: string | null;
 };

@@ -10,6 +10,8 @@ import { useToast } from '@/components/ui/toast';
 import { TimeGrid } from '@/components/transport-calendar/time-grid';
 import type { AvailabilityBand } from '@/components/transport-calendar/types';
 import { formatDateTime, toDatetimeLocalValue } from '@/lib/uitleen';
+import { AVAILABILITY_KINDS, type AvailabilityKind } from '@/lib/availability-day';
+import { AVAILABILITY_KIND_HINT, AVAILABILITY_KIND_LABEL, availabilityFillClass } from '@/lib/availability-kinds';
 import { AvailabilityPaint } from './availability-paint';
 
 /**
@@ -34,6 +36,7 @@ export type AvailabilityWindow = {
   id: string;
   startAt: string;
   endAt: string;
+  kind: AvailabilityKind;
   note: string | null;
 };
 
@@ -41,8 +44,10 @@ export type AvailabilityWindow = {
 const OPTIMISTIC_ID = 'optimistisch';
 
 type Optimistic =
-  | { kind: 'add'; startAt: string; endAt: string }
-  | { kind: 'remove'; id: string };
+  // `what` en niet `kind`: dat woord is hier al bezet door de soort
+  // beschikbaarheid, en twee betekenissen in één object is één te veel.
+  | { what: 'add'; startAt: string; endAt: string; kind: AvailabilityKind }
+  | { what: 'remove'; id: string };
 
 export function AvailabilityEditor({
   days,
@@ -68,6 +73,11 @@ export function AvailabilityEditor({
   const showToast = useToast();
   const [pending, startTransition] = useTransition();
   const [draft, setDraft] = useState({ startAt: '', endAt: '', note: '' });
+  /**
+   * Wat je met een sleep neerzet. Hetzelfde penseel als op een telefoon, zodat
+   * de twee schermen hetzelfde gebaar houden.
+   */
+  const [brush, setBrush] = useState<AvailabilityKind>('JA');
 
   /**
    * Smal scherm? Dan het intekenraster van uurvakjes in plaats van het
@@ -93,9 +103,18 @@ export function AvailabilityEditor({
    * en dan blijft er bij een fout een venster staan dat niet bestaat.
    */
   const [shown, applyOptimistic] = useOptimistic(windows, (state, action: Optimistic) =>
-    action.kind === 'remove'
+    action.what === 'remove'
       ? state.filter((window) => window.id !== action.id)
-      : [...state, { id: OPTIMISTIC_ID, startAt: action.startAt, endAt: action.endAt, note: null }]
+      : [
+          ...state,
+          {
+            id: OPTIMISTIC_ID,
+            startAt: action.startAt,
+            endAt: action.endAt,
+            kind: action.kind,
+            note: null,
+          },
+        ]
   );
 
   const bands: AvailabilityBand[] = shown.map((window) => ({
@@ -104,13 +123,19 @@ export function AvailabilityEditor({
     driverName,
     startAt: window.startAt,
     endAt: window.endAt,
+    kind: window.kind,
     note: window.note,
   }));
 
   const add = useCallback(
-    (values: { startAt: string; endAt: string; note?: string }) => {
+    (values: { startAt: string; endAt: string; note?: string; kind: AvailabilityKind }) => {
       startTransition(async () => {
-        applyOptimistic({ kind: 'add', startAt: values.startAt, endAt: values.endAt });
+        applyOptimistic({
+          what: 'add',
+          startAt: values.startAt,
+          endAt: values.endAt,
+          kind: values.kind,
+        });
         const result = await addAvailabilityAction(values);
         if (result.ok) {
           setDraft({ startAt: '', endAt: '', note: '' });
@@ -125,7 +150,7 @@ export function AvailabilityEditor({
   const remove = useCallback(
     (id: string) => {
       startTransition(async () => {
-        applyOptimistic({ kind: 'remove', id });
+        applyOptimistic({ what: 'remove', id });
         const result = await removeAvailabilityAction(id);
         if (!result.ok) {
           showToast({ message: result.error, variant: 'error', duration: 0 });
@@ -150,24 +175,45 @@ export function AvailabilityEditor({
       const existing = shown.find(
         (window) => new Date(window.startAt).getTime() <= at && new Date(window.endAt).getTime() > at
       );
-      if (existing) {
+      // Enkel wanneer er al hetzelfde antwoord stond, wist dit; stond er iets
+      // anders, dan verander je het van soort. Anders moest je eerst wissen en
+      // dan opnieuw tekenen om van "liever niet" naar "beschikbaar" te gaan.
+      if (existing && existing.kind === brush) {
         // Een venster dat nog aan het opslaan is, heeft nog geen echt id; dat kan
         // je niet weghalen. Even wachten is dan het juiste antwoord.
         if (existing.id !== OPTIMISTIC_ID) remove(existing.id);
         return;
       }
-      add({ startAt: toDatetimeLocalValue(startAt), endAt: toDatetimeLocalValue(endAt) });
+      add({
+        startAt: toDatetimeLocalValue(startAt),
+        endAt: toDatetimeLocalValue(endAt),
+        kind: brush,
+      });
     },
-    [add, remove, shown]
+    [add, brush, remove, shown]
   );
 
   const fields = (
     <section className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-5">
       <h2 className="text-sm font-semibold text-vtk-ink">Venster intikken</h2>
       <p className="mt-1 text-xs text-vtk-muted">
-        Voor wie een uur precies wil zetten; het raster hierboven gaat per uur.
+        Voor wie een uur precies wil zetten; het rooster hierboven gaat per uur.
       </p>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <label className="grid gap-1 text-xs font-medium text-vtk-muted sm:col-span-2">
+          Hoe graag
+          <select
+            value={brush}
+            onChange={(event) => setBrush(event.target.value as AvailabilityKind)}
+            className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+          >
+            {AVAILABILITY_KINDS.map((kind) => (
+              <option key={kind} value={kind}>
+                {AVAILABILITY_KIND_LABEL[kind]} — {AVAILABILITY_KIND_HINT[kind]}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
           Van
           <QuarterDateTime
@@ -189,7 +235,7 @@ export function AvailabilityEditor({
         size="sm"
         className="mt-3"
         disabled={pending || !draft.startAt || !draft.endAt}
-        onClick={() => add({ startAt: draft.startAt, endAt: draft.endAt })}
+        onClick={() => add({ startAt: draft.startAt, endAt: draft.endAt, kind: brush })}
       >
         {pending ? 'Opslaan...' : 'Toevoegen'}
       </Button>
@@ -217,6 +263,13 @@ export function AvailabilityEditor({
                 <p className="font-medium text-vtk-ink">
                   {formatDateTime(new Date(window.startAt))} tot{' '}
                   {formatDateTime(new Date(window.endAt))}
+                </p>
+                <p className="flex items-center gap-1.5 text-xs text-vtk-muted">
+                  <span
+                    aria-hidden
+                    className={`h-2.5 w-2.5 rounded-[3px] border border-vtk-navy/25 bg-vtk-yellow ${availabilityFillClass(window.kind)}`}
+                  />
+                  {AVAILABILITY_KIND_LABEL[window.kind]}
                 </p>
                 {window.note ? <p className="text-xs text-vtk-muted">{window.note}</p> : null}
               </div>
@@ -268,15 +321,43 @@ export function AvailabilityEditor({
         blocks={[]}
         bands={bands}
         bandsProminent
-        emptyLabel="Sleep hieronder in de week wanneer je kan rijden."
+        // De uitleg staat al in `above`; hier hoort enkel te staan dat er niets
+        // is, anders zeggen twee regels onder elkaar hetzelfde.
+        emptyLabel="Nog niets ingetekend deze week."
         showDriver={false}
         onCreateRange={onCreateRange}
         now={undefined}
         above={
-          <p className="px-1 pb-2 text-xs text-vtk-muted">
-            Sleep met de muis over een dag: het venster staat er meteen. Sleep er nog eens over om
-            het weg te halen.
-          </p>
+          <div className="grid gap-2 px-1 pb-2">
+            {/* Eerst kiezen wát je neerzet, dan slepen. Dezelfde volgorde als op
+                een telefoon, met dezelfde staaltjes, zodat het één gebaar blijft. */}
+            <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="Wat duid je aan">
+              {AVAILABILITY_KINDS.map((kind) => (
+                <button
+                  key={kind}
+                  type="button"
+                  aria-pressed={brush === kind}
+                  title={AVAILABILITY_KIND_HINT[kind]}
+                  onClick={() => setBrush(kind)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
+                    brush === kind
+                      ? 'border-vtk-navy bg-vtk-navy text-white'
+                      : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
+                  }`}
+                >
+                  <span
+                    aria-hidden
+                    className={`h-3 w-3 rounded-[3px] border border-vtk-navy/25 bg-vtk-yellow ${availabilityFillClass(kind)}`}
+                  />
+                  {AVAILABILITY_KIND_LABEL[kind]}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-vtk-muted">
+              Sleep met de muis over een dag: het venster staat er meteen, in de gekozen soort.
+              Sleep er nog eens over met dezelfde soort om het weg te halen.
+            </p>
+          </div>
         }
       />
 

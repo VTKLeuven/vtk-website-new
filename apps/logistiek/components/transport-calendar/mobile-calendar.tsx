@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DriverColorOverrides } from '@/lib/driver-colors';
+import { availabilityFillClass } from '@/lib/availability-kinds';
 import { driverColorVar } from '@/lib/driver-colors';
 import { minutesOfDay, placeForDay, startOfBrusselsDay } from '@/lib/week-lanes';
 import { LogisticsIcon } from '@/components/logistics-icon';
@@ -446,7 +447,7 @@ export function MobileCalendar({
               <span
                 key={band.id}
                 aria-hidden
-                className="mob-cal-band"
+                className={`mob-cal-band ${availabilityFillClass(band.kind)}`}
                 style={{
                   top: (band.from / 60) * hourPx,
                   height: Math.max(4, ((band.to - band.from) / 60) * hourPx),

@@ -20,7 +20,14 @@ import {
 import { buildTransportBookings, type TransportFormInput } from '@/lib/transport-form';
 import { expireOpenPayments, logistiekBaseUrl, paymentGateway } from '@/lib/payments';
 import { runSerializable } from '@/lib/tx';
-import { clipOutsideDay, hoursToRanges, mergeRanges } from '@/lib/availability-day';
+import {
+  clipOutsideDay,
+  hoursToRanges,
+  isAvailabilityKind,
+  mergeRanges,
+  subtractRange,
+  type AvailabilityKind,
+} from '@/lib/availability-day';
 import { startOfBrusselsDay } from '@/lib/week-lanes';
 import { writeAudit } from '@/lib/audit';
 import { notifyReservation, notifyTeamNewRequest, notifyTransport } from '@/lib/uitleen-mail';
@@ -1012,6 +1019,8 @@ export async function addAvailabilityAction(input: {
   startAt: string;
   endAt: string;
   note?: string;
+  /** Beschikbaar, liever niet of enkel in noodgeval; standaard beschikbaar. */
+  kind?: AvailabilityKind;
 }): Promise<ActionResult> {
   const session = await requireSession();
   if (!(await isDriver(session.user.id))) {
@@ -1025,23 +1034,30 @@ export async function addAvailabilityAction(input: {
   if (!isOnQuarterHour(startAt) || !isOnQuarterHour(endAt)) {
     return { ok: false, error: 'Kies uren op het kwartier (bv. 14:00, 14:15).' };
   }
+  const kind: AvailabilityKind = isAvailabilityKind(input.kind) ? input.kind : 'JA';
 
   const note = (input.note ?? '').trim().slice(0, 300) || null;
 
   await runSerializable(async (tx) => {
-    // Alles wat dit venster raakt, gaat erin op. `lte`/`gte` en niet `lt`/`gt`:
-    // twee vensters die op elkaar aansluiten (12:00-14:00 en 14:00-18:00) zijn
-    // één blok van 12 tot 18, en als twee banden naast elkaar zien ze eruit als
-    // een gaatje dat er niet is.
+    // Alles wat dit venster raakt. `lte`/`gte` en niet `lt`/`gt`: twee vensters
+    // die op elkaar aansluiten (12:00-14:00 en 14:00-18:00) zijn één blok van 12
+    // tot 18, en als twee banden naast elkaar zien ze eruit als een gaatje dat
+    // er niet is.
     const touching = await tx.uitleenDriverAvailability.findMany({
       where: { userId: session.user.id, startAt: { lte: endAt }, endAt: { gte: startAt } },
-      select: { id: true, startAt: true, endAt: true, note: true },
+      select: { id: true, startAt: true, endAt: true, note: true, kind: true },
     });
-    const from = touching.reduce((earliest, row) => (row.startAt < earliest ? row.startAt : earliest), startAt);
-    const to = touching.reduce((latest, row) => (row.endAt > latest ? row.endAt : latest), endAt);
+    // Dezelfde soort gaat erin op; een andere soort maakt plaats. Zonder dat
+    // tweede zou hetzelfde uur tegelijk "beschikbaar" en "enkel in noodgeval"
+    // zeggen, en dan is er geen antwoord meer.
+    const same = touching.filter((row) => row.kind === kind);
+    const others = touching.filter((row) => row.kind !== kind);
+
+    const from = same.reduce((earliest, row) => (row.startAt < earliest ? row.startAt : earliest), startAt);
+    const to = same.reduce((latest, row) => (row.endAt > latest ? row.endAt : latest), endAt);
     // De nota van het nieuwe venster wint; die van de oude blijft staan wanneer
     // het nieuwe er geen heeft, zodat "enkel met de auto" niet stil verdwijnt.
-    const keptNote = note ?? touching.find((row) => row.note)?.note ?? null;
+    const keptNote = note ?? same.find((row) => row.note)?.note ?? null;
 
     if (touching.length > 0) {
       await tx.uitleenDriverAvailability.deleteMany({
@@ -1049,8 +1065,22 @@ export async function addAvailabilityAction(input: {
       });
     }
     await tx.uitleenDriverAvailability.create({
-      data: { userId: session.user.id, startAt: from, endAt: to, note: keptNote },
+      data: { userId: session.user.id, startAt: from, endAt: to, kind, note: keptNote },
     });
+    // Wat er van de andere soorten buiten dit venster lag, komt terug.
+    const remainder = others.flatMap((row) =>
+      subtractRange({ startAt: row.startAt, endAt: row.endAt, kind: row.kind }, from, to)
+    );
+    if (remainder.length > 0) {
+      await tx.uitleenDriverAvailability.createMany({
+        data: remainder.map((range) => ({
+          userId: session.user.id,
+          startAt: range.startAt,
+          endAt: range.endAt,
+          kind: range.kind,
+        })),
+      });
+    }
   });
 
   revalidatePath('/ritten/beschikbaarheid');
@@ -1075,8 +1105,8 @@ export async function addAvailabilityAction(input: {
 export async function setAvailabilityDayAction(input: {
   /** De dag, als `YYYY-MM-DD` in Belgische tijd. */
   day: string;
-  /** De uren die aan staan (0 tot en met 23). */
-  hours: number[];
+  /** De uren die aan staan (0 tot en met 23), met hun soort. */
+  hours: Array<{ hour: number; kind: AvailabilityKind }>;
 }): Promise<ActionResult> {
   const session = await requireSession();
   if (!(await isDriver(session.user.id))) {
@@ -1088,12 +1118,16 @@ export async function setAvailabilityDayAction(input: {
   const dayStart = new Date(startOfBrusselsDay(day));
   const dayEnd = new Date(startOfBrusselsDay(new Date(day.getTime() + 24 * 60 * 60 * 1000)));
 
-  const hours = Array.isArray(input.hours) ? input.hours.filter((hour) => Number.isInteger(hour)) : [];
+  // Rommel eruit filteren en niet weigeren: dit komt van een raster waarop je
+  // veegt, niet van een formulier waarin je typt.
+  const hours = Array.isArray(input.hours)
+    ? input.hours.filter((cell) => Number.isInteger(cell?.hour) && isAvailabilityKind(cell?.kind))
+    : [];
 
   await runSerializable(async (tx) => {
     const touching = await tx.uitleenDriverAvailability.findMany({
       where: { userId: session.user.id, startAt: { lt: dayEnd }, endAt: { gt: dayStart } },
-      select: { id: true, startAt: true, endAt: true },
+      select: { id: true, startAt: true, endAt: true, kind: true },
     });
 
     if (touching.length > 0) {
@@ -1113,6 +1147,7 @@ export async function setAvailabilityDayAction(input: {
           userId: session.user.id,
           startAt: range.startAt,
           endAt: range.endAt,
+          kind: range.kind,
         })),
       });
     }

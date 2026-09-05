@@ -2352,9 +2352,13 @@ is het omgekeerde van "even snel je week doorgeven".
 Onder 700px komt daarom een eigen weergave
 (`app/ritten/beschikbaarheid/availability-paint.tsx`): de week als raster van
 vakjes van een uur, zeven kolommen breed. Je legt je vinger op een vakje en
-veegt; alles waar je over gaat krijgt de toestand van het eerste vakje. Begon je
-op iets dat aanstond, dan wis je.
+veegt; alles waar je over gaat krijgt wat je penseel draagt. Begon je op een
+vakje dat je penseel al droeg, dan wis je.
 
+- **Vier pillen boven het raster** (beschikbaar, liever niet, noodgeval, wissen),
+  die wrappen naar een tweede regel in plaats van zijwaarts te scrollen: op 390px
+  viel de vierde net buiten beeld, en een keuze die je enkel vindt door opzij te
+  vegen, bestaat niet.
 - **Per uur en niet per kwartier.** Met een vinger mik je geen kwartier. Gevolg
   om te kennen: een dag die je op een telefoon aanraakt, wordt op hele uren
   afgerond, dus een venster van 08:30 dat je daar herschrijft wordt 08:00. Wie
@@ -2513,6 +2517,10 @@ handelingen voor één venster, en de nota bleef in de praktijk leeg.
   Sleep je van halverwege je zaterdagvenster naar de avond, dan is dat "dit stuk
   mag weg" en niet "voeg er nog een uur aan toe". Het beginpunt is waar je de
   knop indrukte.
+- **Wissen enkel bij dezelfde soort.** Stond er iets anders dan wat je penseel
+  draagt, dan verander je het van soort in plaats van het weg te halen; anders
+  moest je eerst wissen en dan opnieuw tekenen om van "liever niet" naar
+  "beschikbaar" te gaan.
 - **Optimistisch, via `useOptimistic`.** De acties doen `revalidatePath`, dus de
   echte lijst komt vanzelf terug en React draait de optimistische versie precies
   dan terug. Met eigen state moet je die twee zelf uit elkaar houden, en dan
@@ -3244,9 +3252,9 @@ team ziet dat als lichte band achter de transportplanning.
 - **Niets ingeven betekent "niet gekend" en niet "kan niet".** Wie dit scherm
   nooit opende, krijgt geen waarschuwing; anders zou elke chauffeur er een
   krijgen en zou niemand ze nog lezen.
-- **Aansluitende vensters vloeien samen.** 12:00-14:00 plus 14:00-18:00 wordt
-  één band van 12 tot 18: twee banden naast elkaar zien eruit als een gaatje dat
-  er niet is.
+- **Aansluitende vensters van dezelfde soort vloeien samen.** 12:00-14:00 plus
+  14:00-18:00 wordt één band van 12 tot 18: twee banden naast elkaar zien eruit
+  als een gaatje dat er niet is. Van een andere soort niet; zie hieronder.
 - **De band staat standaard uit** in de planning. Ze is nuttig op het moment dat
   je chauffeurs toewijst, en de rest van de tijd een extra laag kleur over de
   week.
@@ -3256,6 +3264,42 @@ team ziet dat als lichte band achter de transportplanning.
 - **Vensters in het verleden blijven staan.** Die zeggen achteraf wie er die dag
   kon, en dat is precies de vraag bij "waarom deed altijd dezelfde persoon de
   nachtritten".
+
+### Drie antwoorden op "kan je rijden", niet twee
+
+Het enige antwoord was "ik kan", en daarmee kruisten mensen ofwel te veel aan (en
+werden ze gebeld voor ritten die slecht uitkwamen) ofwel te weinig (en stond de
+kalender leeg terwijl er wel iemand kon). Er zijn nu drie: **beschikbaar**,
+**liever niet** en **enkel in noodgeval** (`UitleenAvailabilityKind`).
+
+- **Drie en niet vijf.** Elke extra tint is een keuze die de chauffeur moet maken
+  en die het team moet interpreteren; dan wordt het een schaal in plaats van een
+  antwoord. Deze drie zijn wat mensen al zeiden als je hen belde.
+- **Geen vierde waarde voor "kan niet".** Niets aanduiden betekent al "we weten
+  het niet", en dat is iets anders dan "kan niet". Wie het scherm nooit opende,
+  krijgt nog altijd geen waarschuwing.
+- **Kleur én patroon, nooit kleur alleen.** De vulkleur is al bezet: ze zegt wie
+  het is (de chauffeurskleur uit de planning) of dát het aanstaat (geel op je
+  eigen raster). Het verschil tussen de drie zit dus in het patroon: vol,
+  schuine strepen, stippen. Drie tinten van dezelfde kleur houd je op een
+  telefoon in de zon of bij kleurenblindheid niet uit elkaar. Eén plek voor de
+  woorden en de patronen: `lib/availability-kinds.ts`.
+- **Een penseel, geen doorklikvakje.** Je kiest eerst wát je aanduidt en veegt
+  dan. Per vakje laten doorklikken naar de volgende soort was het alternatief,
+  maar dan is een week doorgeven vier keer over hetzelfde vakje tikken; met een
+  penseel blijft het één veeg per soort. Beginnen op een vakje dat je penseel al
+  draagt, wist; dat is meteen de weg terug zonder naar de wisknop te gaan.
+- **Twee soorten kunnen hetzelfde uur niet claimen.** Een nieuw venster snijdt
+  het overlappende stuk uit de andere soorten (`subtractRange`). Anders zegt
+  hetzelfde uur twee dingen tegelijk en is er geen antwoord meer. Bij oude rijen
+  van voor deze kolom wint het gulste antwoord.
+- **In de strook onder de planning staat wie het meest kan, boven.** De vraag
+  daar is "wie vraag ik?", en dan hoort het antwoord niet alfabetisch onderaan te
+  staan. Gesorteerd op de uren "beschikbaar" en pas daarna op de rest, zodat wie
+  enkel "in noodgeval" aankruiste niet boven iemand komt die gewoon kan.
+- **De waarschuwing bij het toewijzen noemt de soort.** "Gaf liever niet op voor
+  dat moment" is iets anders dan "gaf niets op", en het verschil bepaalt of je
+  die persoon nog belt.
 
 ### De transportplanning is abonneerbaar, en die link is een geheim
 

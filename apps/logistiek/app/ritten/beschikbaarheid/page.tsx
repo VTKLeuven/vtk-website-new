@@ -55,8 +55,8 @@ export default async function BeschikbaarheidPage({
       title={en ? 'When can I drive?' : 'Wanneer kan ik rijden?'}
       intro={
         en
-          ? 'Let Logistics know when you are free. It is a hint, not a promise: they can still ask you outside these windows.'
-          : 'Laat Logistiek weten wanneer je vrij bent. Het is een hint en geen belofte: ze mogen je nog altijd vragen buiten deze vensters.'
+          ? 'Let Logistics know when you can drive: available, rather not, or only in an emergency. It is a hint, not a promise: they can still ask you outside these windows.'
+          : 'Laat Logistiek weten wanneer je kan rijden: beschikbaar, liever niet, of enkel in noodgeval. Het is een hint en geen belofte: ze mogen je nog altijd vragen buiten deze vensters.'
       }
       compact
     >
@@ -119,6 +119,7 @@ export default async function BeschikbaarheidPage({
                 id: window.id,
                 startAt: window.startAt.toISOString(),
                 endAt: window.endAt.toISOString(),
+                kind: window.kind,
                 note: window.note,
               }))}
             />

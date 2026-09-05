@@ -5,7 +5,16 @@ import Link from 'next/link';
 import { setAvailabilityDayAction } from '@/app/actions/uitleen';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { useToast } from '@/components/ui/toast';
-import { rangeToHours } from '@/lib/availability-day';
+import {
+  AVAILABILITY_KINDS,
+  cellsForDay,
+  type AvailabilityKind,
+} from '@/lib/availability-day';
+import {
+  AVAILABILITY_KIND_LABEL,
+  AVAILABILITY_KIND_SHORT,
+  availabilityFillClass,
+} from '@/lib/availability-kinds';
 import { startOfBrusselsDay } from '@/lib/week-lanes';
 import type { AvailabilityWindow } from './availability-editor';
 
@@ -27,6 +36,11 @@ import type { AvailabilityWindow } from './availability-editor';
  *
  * Wat daarbij vastligt:
  *
+ * - **Een penseel boven het raster.** Je kiest eerst wát je aanduidt
+ *   (beschikbaar, liever niet, in noodgeval, of wissen) en veegt dan. De soort
+ *   per vakje laten doorklikken was het alternatief, maar dan is een week
+ *   doorgeven vier keer over hetzelfde vakje tikken; met een penseel blijft het
+ *   één veeg per soort.
  * - **Per uur en niet per kwartier.** Met een vinger mik je geen kwartier. Wie
  *   het precies wil, gebruikt de twee velden eronder of een computer.
  * - **`touch-action: none` op het raster.** Anders scrolt de pagina mee met je
@@ -98,26 +112,33 @@ export function AvailabilityPaint({
   const showToast = useToast();
   const [, startTransition] = useTransition();
   const [showNight, setShowNight] = useState(false);
+  /**
+   * Wat een veeg neerzet. `null` wist.
+   *
+   * Standaard "beschikbaar": dat is het antwoord dat het vaakst gegeven wordt,
+   * en wie enkel dat doet, hoeft van dit penseel niets te weten.
+   */
+  const [brush, setBrush] = useState<AvailabilityKind | null>('JA');
 
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
 
-  /** De vakjes zoals ze uit de opgeslagen vensters volgen. */
+  /** De vakjes zoals ze uit de opgeslagen vensters volgen, met hun soort. */
   const saved = useMemo(() => {
-    const set = new Set<string>();
+    const map = new Map<string, AvailabilityKind>();
+    const parsed = windows.map((window) => ({
+      startAt: new Date(window.startAt),
+      endAt: new Date(window.endAt),
+      kind: window.kind,
+    }));
     for (const day of parsedDays) {
       const dayStart = new Date(startOfBrusselsDay(day));
       const dayEnd = new Date(startOfBrusselsDay(new Date(day.getTime() + DAY_MS)));
       const iso = day.toISOString();
-      for (const window of windows) {
-        const hours = rangeToHours(
-          { startAt: new Date(window.startAt), endAt: new Date(window.endAt) },
-          dayStart,
-          dayEnd
-        );
-        for (const hour of hours) set.add(cellKey(iso, hour));
+      for (const [hour, kind] of cellsForDay(parsed, dayStart, dayEnd)) {
+        map.set(cellKey(iso, hour), kind);
       }
     }
-    return set;
+    return map;
   }, [parsedDays, windows]);
 
   /**
@@ -127,7 +148,7 @@ export function AvailabilityPaint({
    * elkaar, en die mogen niet één voor één terugspringen terwijl de server nog
    * bezig is. Bij nieuwe gegevens van de server nemen we die over.
    */
-  const [cells, setCells] = useState<Set<string>>(saved);
+  const [cells, setCells] = useState<Map<string, AvailabilityKind>>(saved);
   /**
    * Dezelfde vakjes, maar leesbaar vanuit de aanraakluisteraars.
    *
@@ -137,7 +158,10 @@ export function AvailabilityPaint({
    * de gebaren, de state is er voor het tekenen.
    */
   const cellsRef = useRef(cells);
-  const savedKey = useMemo(() => [...saved].sort().join('|'), [saved]);
+  const savedKey = useMemo(
+    () => [...saved].map(([key, kind]) => `${key}=${kind}`).sort().join('|'),
+    [saved]
+  );
   const lastSavedKey = useRef(savedKey);
   useEffect(() => {
     if (lastSavedKey.current === savedKey) return;
@@ -146,11 +170,19 @@ export function AvailabilityPaint({
     setCells(saved);
   }, [saved, savedKey]);
 
+  /**
+   * Het penseel, leesbaar vanuit de aanraakluisteraars. Om dezelfde reden als
+   * `cellsRef`: die luisteraars hangen er één keer aan en mogen niet bij elke
+   * pilklik vervangen worden.
+   */
+  const brushRef = useRef(brush);
+  brushRef.current = brush;
+
   const grid = useRef<HTMLDivElement>(null);
   const shell = useRef<HTMLElement>(null);
   const footer = useRef<HTMLDivElement>(null);
-  /** De veeg die bezig is: aanduiden of wissen, en welke dagen er geraakt zijn. */
-  const stroke = useRef<{ turnOn: boolean; touched: Set<string> } | null>(null);
+  /** De veeg die bezig is: wat ze neerzet (`null` = wissen), en welke dagen ze raakte. */
+  const stroke = useRef<{ paint: AvailabilityKind | null; touched: Set<string> } | null>(null);
 
   const hours = useMemo(() => {
     const first = showNight ? 0 : DEFAULT_FIRST_HOUR;
@@ -159,11 +191,12 @@ export function AvailabilityPaint({
 
 
   const save = useCallback(
-    (dayIso: string, next: Set<string>) => {
+    (dayIso: string, next: Map<string, AvailabilityKind>) => {
       const day = new Date(dayIso);
-      const hoursOn: number[] = [];
+      const hoursOn: Array<{ hour: number; kind: AvailabilityKind }> = [];
       for (let hour = 0; hour < 24; hour += 1) {
-        if (next.has(cellKey(dayIso, hour))) hoursOn.push(hour);
+        const kind = next.get(cellKey(dayIso, hour));
+        if (kind) hoursOn.push({ hour, kind });
       }
       startTransition(async () => {
         const result = await setAvailabilityDayAction({
@@ -202,9 +235,9 @@ export function AvailabilityPaint({
       if (!at || !current) return;
       const key = cellKey(at.dayIso, at.hour);
       current.touched.add(at.dayIso);
-      if (cellsRef.current.has(key) === current.turnOn) return;
-      const next = new Set(cellsRef.current);
-      if (current.turnOn) next.add(key);
+      if ((cellsRef.current.get(key) ?? null) === current.paint) return;
+      const next = new Map(cellsRef.current);
+      if (current.paint) next.set(key, current.paint);
       else next.delete(key);
       cellsRef.current = next;
       setCells(next);
@@ -215,10 +248,15 @@ export function AvailabilityPaint({
       if (!at) return;
       event.preventDefault();
       const key = cellKey(at.dayIso, at.hour);
-      // De toestand van het eerste vakje bepaalt wat de hele veeg doet. Zonder
-      // dat zou je bij het terugvegen over je eigen selectie afwisselend
-      // aanduiden en wissen, en dan flikkert de week onder je vinger.
-      stroke.current = { turnOn: !cellsRef.current.has(key), touched: new Set() };
+      // Het eerste vakje bepaalt wat de hele veeg doet: droeg het je penseel al,
+      // dan wist deze veeg. Zonder die regel zou je bij het terugvegen over je
+      // eigen selectie afwisselend aanduiden en wissen, en dan flikkert de week
+      // onder je vinger. Het is meteen ook hoe je iets weghaalt zonder eerst
+      // naar de wisknop te gaan.
+      const paint = brushRef.current !== null && cellsRef.current.get(key) === brushRef.current
+        ? null
+        : brushRef.current;
+      stroke.current = { paint, touched: new Set() };
       apply(event.clientX, event.clientY);
     }
 
@@ -253,7 +291,11 @@ export function AvailabilityPaint({
   }, [save]);
 
   const todayKey = dayKeyFormatter.format(new Date());
-  const total = cells.size;
+  /** Hoeveel uur je van elke soort aanduidde; nul soorten laten we weg. */
+  const totals = AVAILABILITY_KINDS.map((kind) => ({
+    kind,
+    count: [...cells.values()].filter((value) => value === kind).length,
+  })).filter((entry) => entry.count > 0);
 
   return (
     <section ref={shell} className="paint-screen">
@@ -266,10 +308,9 @@ export function AvailabilityPaint({
         </Link>
         <div className="min-w-0 flex-1 text-center">
           <p className="truncate text-sm font-semibold text-vtk-ink">{weekLabel}</p>
-          {/* Kort genoeg om niet af te kappen in de smalle middenkolom. */}
-          <p className="truncate text-[11px] text-vtk-muted">
-            Veeg om aan te duiden of te wissen.
-          </p>
+          {/* Kort genoeg om niet af te kappen in de smalle middenkolom; wát je
+              neerzet staat in de penseelrij eronder. */}
+          <p className="truncate text-[11px] text-vtk-muted">Veeg over de uren.</p>
         </div>
         <Link href={previousHref} className="paint-icon-button" aria-label="Vorige week">
           <span aria-hidden>←</span>
@@ -278,6 +319,32 @@ export function AvailabilityPaint({
           <span aria-hidden>→</span>
         </Link>
       </header>
+
+      {/* Kiezen wát je neerzet. De volgorde is die van het antwoord: eerst het
+          gulste, dan het karigste, en wissen apart achteraan. */}
+      <div className="paint-brush" role="group" aria-label="Wat duid je aan">
+        {AVAILABILITY_KINDS.map((kind) => (
+          <button
+            key={kind}
+            type="button"
+            aria-pressed={brush === kind}
+            onClick={() => setBrush(kind)}
+            className="paint-brush-option"
+          >
+            <span aria-hidden className={`paint-brush-swatch ${availabilityFillClass(kind)}`} />
+            {AVAILABILITY_KIND_SHORT[kind]}
+          </button>
+        ))}
+        <button
+          type="button"
+          aria-pressed={brush === null}
+          onClick={() => setBrush(null)}
+          className="paint-brush-option"
+        >
+          <span aria-hidden className="paint-brush-swatch paint-brush-swatch-off" />
+          Wissen
+        </button>
+      </div>
 
       <div className="paint-body">
         {/* De dagkoppen, op dezelfde kolommen als het raster eronder. */}
@@ -334,24 +401,24 @@ export function AvailabilityPaint({
               </span>
               {parsedDays.map((day) => {
                 const iso = day.toISOString();
-                const on = cells.has(cellKey(iso, hour));
+                const kind = cells.get(cellKey(iso, hour));
                 return (
                   <button
                     key={iso}
                     type="button"
                     data-day={iso}
                     data-hour={hour}
-                    aria-pressed={on}
+                    aria-pressed={Boolean(kind)}
                     className={`h-full rounded-[6px] border transition-colors ${
-                      on
-                        ? 'border-vtk-navy/25 bg-vtk-yellow'
+                      kind
+                        ? `border-vtk-navy/25 bg-vtk-yellow ${availabilityFillClass(kind)}`
                         : 'border-vtk-navy/10 bg-vtk-paper/70'
                     }`}
                   >
                     <span className="sr-only">
                       {weekdayFormatter.format(day)} {dayNumberFormatter.format(day)} om{' '}
                       {String(hour).padStart(2, '0')}:00
-                      {on ? ', aangeduid' : ''}
+                      {kind ? `, ${AVAILABILITY_KIND_LABEL[kind].toLowerCase()}` : ''}
                     </span>
                   </button>
                 );
@@ -369,9 +436,26 @@ export function AvailabilityPaint({
         >
           {showNight ? 'Nacht verbergen' : 'Ook 00:00 tot 06:00 tonen'}
         </button>
-        <p className="text-xs text-vtk-muted">
-          {total === 0 ? 'Nog niets aangeduid' : `${total} uur aangeduid deze week`}
-        </p>
+        {/* De telling per soort als staaltje plus uren, en niet uitgeschreven:
+            "1u beschikbaar · 1u liever niet · 1u in noodgeval" nam twee regels
+            en duwde de nachtknop weg. De pillen erboven zeggen al welk staaltje
+            welke soort is. */}
+        {totals.length === 0 ? (
+          <p className="text-xs text-vtk-muted">Nog niets aangeduid</p>
+        ) : (
+          <p className="flex items-center gap-2.5 text-xs tabular-nums text-vtk-muted">
+            {totals.map((entry) => (
+              <span key={entry.kind} className="inline-flex items-center gap-1">
+                <span
+                  aria-hidden
+                  className={`h-3 w-3 rounded-[3px] border border-vtk-navy/25 bg-vtk-yellow ${availabilityFillClass(entry.kind)}`}
+                />
+                {entry.count}u
+                <span className="sr-only"> {AVAILABILITY_KIND_LABEL[entry.kind].toLowerCase()}</span>
+              </span>
+            ))}
+          </p>
+        )}
       </div>
     </section>
   );

@@ -1,7 +1,11 @@
 import 'server-only';
 
 import { prisma } from '@vtk/db';
-import type { Prisma, UitleenTransportBookingStatus } from '@prisma/client';
+import type {
+  Prisma,
+  UitleenAvailabilityKind,
+  UitleenTransportBookingStatus,
+} from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
 import {
   DEFAULT_LAST_MINUTE_DAYS,
@@ -1294,6 +1298,7 @@ export async function availabilityInRange(from: Date, to: Date) {
       userId: true,
       startAt: true,
       endAt: true,
+      kind: true,
       note: true,
       user: { select: { name: true } },
     },
@@ -1308,33 +1313,44 @@ export async function availabilityForDriver(userId: string, now = new Date()) {
   // weghaalt: die gaat over wat je nog belooft.
   return prisma.uitleenDriverAvailability.findMany({
     where: { userId, endAt: { gte: now } },
-    select: { id: true, startAt: true, endAt: true, note: true },
+    select: { id: true, startAt: true, endAt: true, kind: true, note: true },
     orderBy: { startAt: 'asc' },
   });
 }
 
 /**
- * Kan deze chauffeur op dit moment rijden, volgens wat hij zelf ingaf?
+ * Wat deze chauffeur zelf zei over dit moment.
  *
- * `null` wanneer hij helemaal geen vensters ingaf: dan weet de app het niet, en
- * "niet beschikbaar" beweren zou een waarschuwing geven bij elke chauffeur die
- * dit scherm nog nooit geopend heeft.
+ * - `null`: hij gaf nog nooit iets door. Dan weet de app het niet, en "kan niet"
+ *   beweren zou een waarschuwing geven bij elke chauffeur die dit scherm nog
+ *   nooit opende.
+ * - `'NIETS'`: hij vult dit wel in, maar duidde dit moment niet aan. Dat is een
+ *   stille "waarschijnlijk niet", en iets anders dan het vorige geval.
+ * - `'JA'` / `'LIEVER_NIET'` / `'NOOD'`: wat hij aanduidde. Het venster moet het
+ *   hele ritmoment dekken; half beschikbaar is niet beschikbaar.
+ *
+ * Blijft een hulpmiddel en geen slot: iemand toewijzen buiten zijn venster geeft
+ * een waarschuwing, geen blokkade.
  */
-export async function driverIsAvailable(
+export async function driverAvailability(
   userId: string,
   startAt: Date,
   endAt: Date
-): Promise<boolean | null> {
+): Promise<UitleenAvailabilityKind | 'NIETS' | null> {
   const any = await prisma.uitleenDriverAvailability.findFirst({
     where: { userId },
     select: { id: true },
   });
   if (!any) return null;
-  const covering = await prisma.uitleenDriverAvailability.findFirst({
+  const covering = await prisma.uitleenDriverAvailability.findMany({
     where: { userId, startAt: { lte: startAt }, endAt: { gte: endAt } },
-    select: { id: true },
+    select: { kind: true },
   });
-  return covering !== null;
+  if (covering.length === 0) return 'NIETS';
+  // Dekt meer dan één venster het moment (kan bij oude rijen van voor de
+  // soorten bestonden), dan wint het gulste antwoord.
+  const order: UitleenAvailabilityKind[] = ['JA', 'LIEVER_NIET', 'NOOD'];
+  return order.find((kind) => covering.some((row) => row.kind === kind)) ?? 'NIETS';
 }
 
 /**

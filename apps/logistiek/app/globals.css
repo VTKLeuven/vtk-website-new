@@ -251,6 +251,29 @@ body {
    donkere paginakop en de weeknavigatie samen ruim driehonderd pixels; dan
    blijft er voor achttien rijen te weinig over. Zie
    app/ritten/beschikbaarheid/availability-paint.tsx. */
+/* De drie beschikbaarheden: het patroon over de vulkleur.
+
+   De vulkleur zegt wíé het is (de chauffeur) of dát het aanstaat (geel op je
+   eigen raster); het patroon zegt hoe graag. Kleur alleen kan dat niet dragen:
+   ze is al bezet, en drie tinten van dezelfde kleur houd je op een telefoon in
+   de zon niet uit elkaar.
+
+   `background-image` en niet de `background`-shorthand: de vulkleur komt als
+   `backgroundColor` uit de stijl en zou er anders mee weggeveegd worden.
+   Dezelfde val als bij de arcering van de voertuigen. */
+.avail-fill-liever-niet {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.62) 0 3px,
+    transparent 3px 7px
+  );
+}
+
+.avail-fill-nood {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.85) 1.4px, transparent 1.5px);
+  background-size: 7px 7px;
+}
+
 .paint-screen {
   position: fixed;
   inset: 0;
@@ -282,6 +305,60 @@ body {
   border-radius: 999px;
   color: var(--ink);
   font-size: 15px;
+}
+
+/* De penseelkeuze: welke soort je met een veeg neerzet.
+
+   Een eigen rij en niet in de balk erboven: die draagt al de week en de
+   navigatie, en vier pillen erbij maken er een puzzel van. Deze rij is het
+   antwoord op "hoe duid ik 'liever niet' aan"; zonder haar bestaan de twee
+   andere soorten alleen in de databank. */
+.paint-brush {
+  display: flex;
+  /* Wrappen en niet zijwaarts scrollen: op 390px viel de vierde pil ("Wissen")
+     net buiten beeld, en een keuze die je enkel vindt door opzij te vegen,
+     bestaat niet. Een tweede regel kost één rij vakjes; die rijen delen toch
+     wat er overblijft. */
+  flex-wrap: wrap;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 8px 12px 0;
+}
+
+.paint-brush-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 5px 11px;
+  border: 1px solid rgb(14 26 54 / 0.18);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.paint-brush-option[aria-pressed='true'] {
+  border-color: var(--navy);
+  background: var(--navy);
+  color: var(--paper);
+}
+
+/* Het staaltje van de soort in de pil: hetzelfde geel met hetzelfde patroon als
+   de vakjes eronder, zodat je de pil aan het vakje herkent en niet aan het
+   woord alleen. */
+.paint-brush-swatch {
+  width: 14px;
+  height: 14px;
+  border: 1px solid rgb(14 26 54 / 0.25);
+  border-radius: 4px;
+  background-color: var(--yellow);
+}
+
+.paint-brush-swatch-off {
+  background-color: var(--paper-2);
 }
 
 .paint-body {

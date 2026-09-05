@@ -28,7 +28,7 @@ import { notifyReservation, notifyTransport } from '@/lib/uitleen-mail';
 import {
   consumeFlesserkeStock,
   flesserkeReserved,
-  driverIsAvailable,
+  driverAvailability,
   isDriver,
   reservedQuantities,
   reservationConflicts,
@@ -2400,15 +2400,26 @@ export async function assignDriverAction(bookingId: string, driverId: string): P
   if (!driverId) return { ok: true, message: 'Chauffeur verwijderd.' };
 
   // Een waarschuwing en geen blokkade (V1): de app kent de agenda van deze
-  // chauffeur niet, hij wel. Wie niets ingaf, krijgt er ook geen; `null` betekent
-  // "niet gekend" en niet "kan niet".
-  const available = await driverIsAvailable(driverId, booking.startAt, booking.endAt);
+  // chauffeur niet, hij wel. Wie nog nooit iets ingaf, krijgt er ook geen; `null`
+  // betekent "niet gekend" en niet "kan niet".
+  //
+  // De soort staat in de melding en niet enkel "wel of niet": iemand die "enkel
+  // in noodgeval" aanduidde, mag je toewijzen, maar dan wil je weten dat je hem
+  // straks nog moet bellen.
+  const said = await driverAvailability(driverId, booking.startAt, booking.endAt);
+  const who = driver?.name ?? 'deze chauffeur';
+  const warning =
+    said === 'NIETS'
+      ? `Let op: ${who} gaf niet op dat hij op dat moment kan rijden.`
+      : said === 'LIEVER_NIET'
+        ? `Let op: ${who} gaf "liever niet" op voor dat moment.`
+        : said === 'NOOD'
+          ? `Let op: ${who} gaf op dat hij dan enkel in noodgeval rijdt.`
+          : null;
   return {
     ok: true,
-    message:
-      available === false
-        ? `Chauffeur toegewezen. Let op: ${driver?.name ?? 'deze chauffeur'} gaf niet op dat hij op dat moment kan rijden.`
-        : 'Chauffeur toegewezen.',
+    warning: warning !== null,
+    message: warning ? `Chauffeur toegewezen. ${warning}` : 'Chauffeur toegewezen.',
   };
 }
 

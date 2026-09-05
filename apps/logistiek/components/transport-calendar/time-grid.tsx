@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { AVAILABILITY_KIND_LABEL, availabilityFillClass } from '@/lib/availability-kinds';
 import { driverColorVar, type DriverColorOverrides } from '@/lib/driver-colors';
 import { minutesOfDay, placeForDay, startOfBrusselsDay, type Placed } from '@/lib/week-lanes';
 import { BlockContent, blockLabel, blockLook, formatTime } from './trip-block';
@@ -592,8 +593,10 @@ export function TimeGrid({
                     <span
                       key={`${band.id}-${days[dayIndex]}`}
                       aria-hidden
-                      title={`${band.driverName} kan rijden${band.note ? `: ${band.note}` : ''}`}
-                      className={`pointer-events-none absolute inset-x-0 overflow-hidden rounded-[6px] ${
+                      title={`${band.driverName}: ${AVAILABILITY_KIND_LABEL[band.kind].toLowerCase()}${band.note ? ` (${band.note})` : ''}`}
+                      // Het patroon zegt hoe graag, de kleur zegt wie. Zie
+                      // lib/availability-kinds.ts.
+                      className={`pointer-events-none absolute inset-x-0 overflow-hidden rounded-[6px] ${availabilityFillClass(band.kind)} ${
                         bandsProminent
                           ? 'border border-vtk-navy/30 px-1.5 py-0.5 text-[11px] font-semibold text-vtk-ink shadow-sm'
                           : 'opacity-30'
@@ -606,10 +609,19 @@ export function TimeGrid({
                     >
                       {/* Het uur in de band zelf, zodra ze hoog genoeg is: op je
                           eigen scherm wil je zien wát je aangeduid hebt, niet
-                          enkel dát er iets staat. */}
-                      {bandsProminent && height >= 26
-                        ? `${minutesLabel(band.from)} - ${minutesLabel(band.to)}`
-                        : null}
+                          enkel dát er iets staat. Is ze hoog genoeg voor twee
+                          regels, dan staat de soort erbij; het patroon alleen
+                          leer je pas na een keer of drie herkennen. */}
+                      {bandsProminent && height >= 26 ? (
+                        <>
+                          {`${minutesLabel(band.from)} - ${minutesLabel(band.to)}`}
+                          {height >= 44 && band.kind !== 'JA' ? (
+                            <span className="block text-[10px] font-medium">
+                              {AVAILABILITY_KIND_LABEL[band.kind]}
+                            </span>
+                          ) : null}
+                        </>
+                      ) : null}
                     </span>
                   );
                 })}

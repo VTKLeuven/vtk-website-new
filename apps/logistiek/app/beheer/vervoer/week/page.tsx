@@ -312,6 +312,7 @@ export default async function VervoerWeekPage({
             driverName: window.user.name,
             startAt: window.startAt.toISOString(),
             endAt: window.endAt.toISOString(),
+            kind: window.kind,
             note: window.note,
           }))}
           events={events.map((event) => {

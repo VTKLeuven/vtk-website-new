@@ -1,6 +1,12 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { AVAILABILITY_KINDS, type AvailabilityKind } from '@/lib/availability-day';
+import {
+  AVAILABILITY_KIND_HINT,
+  AVAILABILITY_KIND_LABEL,
+  availabilityFillClass,
+} from '@/lib/availability-kinds';
 import type { DriverColorOverrides } from '@/lib/driver-colors';
 import { driverColorVar } from '@/lib/driver-colors';
 import { startOfBrusselsDay } from '@/lib/week-lanes';
@@ -27,6 +33,15 @@ import type { AvailabilityBand } from './types';
  *   in plaats van een lege lijn.
  * - **De kleur is dezelfde als in de planning.** Zie je hier dat de blauwe kan,
  *   dan herken je hem boven meteen terug.
+ * - **Het patroon zegt hoe graag.** Vol is "beschikbaar", schuine strepen zijn
+ *   "liever niet", stippen zijn "enkel in noodgeval". De kleur is hier al bezet
+ *   om te zeggen wie het is, dus kan ze het verschil tussen de drie niet
+ *   dragen; zie lib/availability-kinds.ts.
+ * - **Wie het meest kan, staat boven.** De vraag hier is "wie vraag ik?", en dan
+ *   hoort het antwoord niet alfabetisch onderaan te staan. Gesorteerd op de uren
+ *   die iemand in dit venster als "beschikbaar" opgaf, en pas daarna op de rest;
+ *   wie enkel "in noodgeval" aankruiste, komt dus niet boven iemand die gewoon
+ *   kan.
  * - **De tijd is een positie, geen tekst.** De hele strook is het venster van de
  *   weergave; een blok van vier uur is een blokje van vier uur breed. Het uur
  *   staat erin zodra het past en anders in de tooltip: op een week is een
@@ -60,6 +75,25 @@ const timeFormatter = new Intl.DateTimeFormat('nl-BE', {
 
 export type BoardDriver = { id: string; name: string };
 
+/** Eén venster als balkje op de strook. */
+type Bar = {
+  id: string;
+  kind: AvailabilityKind;
+  /** Hoelang dit venster binnen de weergave duurt, voor de volgorde en de telling. */
+  minutes: number;
+  left: number;
+  width: number;
+  label: string;
+  title: string;
+};
+
+/** "8u" of "1u30", kort genoeg voor naast een naam van dertig tekens. */
+function hoursLabel(hours: number): string {
+  const whole = Math.floor(hours);
+  const minutes = Math.round((hours - whole) * 60);
+  return minutes === 0 ? `${whole}u` : `${whole}u${String(minutes).padStart(2, '0')}`;
+}
+
 export function AvailabilityBoard({
   days,
   windows,
@@ -74,6 +108,8 @@ export function AvailabilityBoard({
   driverColors?: DriverColorOverrides;
 }) {
   const [only, setOnly] = useState<string[]>([]);
+  /** Welke soorten getoond worden; leeg betekent alle drie. */
+  const [kinds, setKinds] = useState<AvailabilityKind[]>([]);
 
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
 
@@ -94,12 +130,10 @@ export function AvailabilityBoard({
    * de rand.
    */
   const perDriver = useMemo(() => {
-    if (!range) return new Map<string, Array<{ id: string; left: number; width: number; label: string; title: string }>>();
-    const map = new Map<
-      string,
-      Array<{ id: string; left: number; width: number; label: string; title: string }>
-    >();
+    const map = new Map<string, Bar[]>();
+    if (!range) return map;
     for (const window of windows) {
+      if (kinds.length > 0 && !kinds.includes(window.kind)) continue;
       const start = new Date(window.startAt).getTime();
       const end = new Date(window.endAt).getTime();
       if (end <= range.from || start >= range.to) continue;
@@ -108,15 +142,34 @@ export function AvailabilityBoard({
       const bars = map.get(window.driverId) ?? [];
       bars.push({
         id: window.id,
+        kind: window.kind,
+        minutes: (to - from) / 60000,
         left: ((from - range.from) / range.span) * 100,
         width: Math.max(0.4, ((to - from) / range.span) * 100),
         label: `${timeFormatter.format(new Date(from))}-${timeFormatter.format(new Date(to))}`,
-        title: `${window.driverName}: ${momentFormatter.format(new Date(start))} tot ${momentFormatter.format(new Date(end))}${window.note ? ` (${window.note})` : ''}`,
+        title: `${window.driverName}, ${AVAILABILITY_KIND_LABEL[window.kind].toLowerCase()}: ${momentFormatter.format(new Date(start))} tot ${momentFormatter.format(new Date(end))}${window.note ? ` (${window.note})` : ''}`,
       });
       map.set(window.driverId, bars);
     }
     return map;
-  }, [range, windows]);
+  }, [kinds, range, windows]);
+
+  /**
+   * Hoeveel uur iemand van elke soort opgaf binnen dit venster.
+   *
+   * Waarvoor: de volgorde van de rijen, en de regel naast de naam. Een balk
+   * aflezen zegt wanneer, niet hoeveel, en "wie kan er het meest deze week" is
+   * precies de vraag waarmee je aan een kalender begint.
+   */
+  const hoursPerDriver = useMemo(() => {
+    const map = new Map<string, Record<AvailabilityKind, number>>();
+    for (const [driverId, bars] of perDriver) {
+      const totals: Record<AvailabilityKind, number> = { JA: 0, LIEVER_NIET: 0, NOOD: 0 };
+      for (const bar of bars) totals[bar.kind] += bar.minutes / 60;
+      map.set(driverId, totals);
+    }
+    return map;
+  }, [perDriver]);
 
   /**
  * Vanaf welk aandeel van de strook er tekst in een balk past.
@@ -150,13 +203,30 @@ function tickHours(dayCount: number): number {
 /** Tot hoeveel dagen de streepjes een uur dragen in plaats van enkel een lijn. */
 const HOUR_LABEL_MAX_DAYS = 7;
 
-/** Wie iets doorgaf eerst; wie niets doorgaf onderaan, in de eigen volgorde. */
+/**
+ * Wie iets doorgaf eerst en op volgorde van bruikbaarheid; wie niets doorgaf
+ * onderaan, in de eigen volgorde.
+ */
   const rows = useMemo(() => {
     const chosen = only.length === 0 ? drivers : drivers.filter((driver) => only.includes(driver.id));
-    const withWindows = chosen.filter((driver) => (perDriver.get(driver.id)?.length ?? 0) > 0);
+    const withWindows = chosen
+      .filter((driver) => (perDriver.get(driver.id)?.length ?? 0) > 0)
+      .sort((a, b) => {
+        const left = hoursPerDriver.get(a.id) ?? { JA: 0, LIEVER_NIET: 0, NOOD: 0 };
+        const right = hoursPerDriver.get(b.id) ?? { JA: 0, LIEVER_NIET: 0, NOOD: 0 };
+        // Eerst wie het meest gewoon kan, dan wie het meest "liever niet" zei, en
+        // pas als laatste "in noodgeval": anders zou iemand die de hele week op
+        // noodgeval zette, boven iemand staan die zaterdag gewoon kan.
+        return (
+          right.JA - left.JA ||
+          right.LIEVER_NIET - left.LIEVER_NIET ||
+          right.NOOD - left.NOOD ||
+          a.name.localeCompare(b.name)
+        );
+      });
     const without = chosen.filter((driver) => (perDriver.get(driver.id)?.length ?? 0) === 0);
     return { withWindows, without };
-  }, [drivers, only, perDriver]);
+  }, [drivers, hoursPerDriver, only, perDriver]);
 
   /**
    * De streepjes: één per `tickHours` uur, met de dagranden apart (die zijn
@@ -195,6 +265,67 @@ const HOUR_LABEL_MAX_DAYS = 7;
           Wat de chauffeurs zelf doorgaven. Het is een hint, geen belofte: je mag ze ook daarbuiten
           vragen.
         </p>
+      </div>
+
+      {/* De legende meteen onder de titel: zonder haar is "liever niet" een
+          patroon dat je moet raden, en dan lezen alle balken als "kan". */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+        {AVAILABILITY_KINDS.map((kind) => (
+          <span key={kind} className="inline-flex items-center gap-1.5 text-[11px] text-vtk-muted">
+            <span
+              aria-hidden
+              className={`h-3 w-4 rounded-[3px] border border-vtk-navy/25 ${availabilityFillClass(kind)}`}
+              style={{ backgroundColor: 'var(--driver-1)' }}
+            />
+            <span className="font-medium text-vtk-ink">{AVAILABILITY_KIND_LABEL[kind]}</span>
+            {AVAILABILITY_KIND_HINT[kind]}
+          </span>
+        ))}
+      </div>
+
+      {/* Filteren op soort. Waarvoor: "wie kan er donderdagavond echt" is een
+          andere vraag dan "wie kan er desnoods", en met alle drie door elkaar
+          lijkt een week voller dan ze is. */}
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] font-semibold uppercase tracking-wide text-vtk-muted">
+          Toon
+        </span>
+        <button
+          type="button"
+          onClick={() => setKinds([])}
+          aria-pressed={kinds.length === 0}
+          className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+            kinds.length === 0
+              ? 'border-vtk-navy bg-vtk-navy text-white'
+              : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
+          }`}
+        >
+          Alles
+        </button>
+        {AVAILABILITY_KINDS.map((kind) => {
+          const active = kinds.includes(kind);
+          return (
+            <button
+              key={kind}
+              type="button"
+              aria-pressed={active}
+              onClick={() =>
+                setKinds((current) =>
+                  current.includes(kind)
+                    ? current.filter((value) => value !== kind)
+                    : [...current, kind]
+                )
+              }
+              className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                active
+                  ? 'border-vtk-navy bg-vtk-navy/5 text-vtk-ink'
+                  : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
+              }`}
+            >
+              {AVAILABILITY_KIND_LABEL[kind]}
+            </button>
+          );
+        })}
       </div>
 
       {/* De filter. Niets aangevinkt betekent iedereen, en dat staat er ook:
@@ -283,10 +414,30 @@ const HOUR_LABEL_MAX_DAYS = 7;
           </div>
 
           <ul className="grid gap-1">
-            {rows.withWindows.map((driver) => (
+            {rows.withWindows.map((driver) => {
+              const totals = hoursPerDriver.get(driver.id);
+              // De uren naast de naam: de balken zeggen wanneer, dit zegt
+              // hoeveel, en dat is wat de volgorde van de rijen verklaart.
+              const summary = totals
+                ? AVAILABILITY_KINDS.filter((kind) => totals[kind] >= 0.25)
+                    .map((kind) =>
+                      kind === 'JA'
+                        ? hoursLabel(totals[kind])
+                        : `${hoursLabel(totals[kind])} ${kind === 'NOOD' ? 'nood' : 'liever niet'}`
+                    )
+                    .join(' · ')
+                : '';
+              return (
               <li key={driver.id} className="flex items-center gap-2">
-                <span className="w-32 shrink-0 truncate text-xs font-medium text-vtk-ink">
-                  {driver.name}
+                <span className="w-32 shrink-0">
+                  <span className="block truncate text-xs font-medium text-vtk-ink">
+                    {driver.name}
+                  </span>
+                  {summary ? (
+                    <span className="block truncate text-[10px] tabular-nums text-vtk-muted">
+                      {summary}
+                    </span>
+                  ) : null}
                 </span>
                 <div className="relative h-8 flex-1 overflow-hidden rounded-[8px] bg-vtk-paper/70">
                   {/* De uurstreepjes, zodat een balk af te lezen valt tegen een
@@ -308,10 +459,12 @@ const HOUR_LABEL_MAX_DAYS = 7;
                     <span
                       key={bar.id}
                       title={bar.title}
-                      className="absolute inset-y-1 flex items-center overflow-hidden rounded-[6px] border border-vtk-navy/20 px-1.5 text-[10px] font-semibold tabular-nums text-vtk-ink"
+                      className={`absolute inset-y-1 flex items-center overflow-hidden rounded-[6px] border border-vtk-navy/20 px-1.5 text-[10px] font-semibold tabular-nums text-vtk-ink ${availabilityFillClass(bar.kind)}`}
                       style={{
                         left: `${bar.left}%`,
                         width: `${bar.width}%`,
+                        // `backgroundColor` en niet de shorthand: die zou het
+                        // patroon van de soort weer wegvegen.
                         backgroundColor: driverColorVar(driver.id, driverColors),
                       }}
                     >
@@ -322,12 +475,15 @@ const HOUR_LABEL_MAX_DAYS = 7;
                   ))}
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
 
           {rows.withWindows.length === 0 ? (
             <p className="py-3 text-xs text-vtk-muted">
-              Niemand gaf voor deze periode iets door.
+              {kinds.length > 0
+                ? `Niemand gaf voor deze periode "${kinds.map((kind) => AVAILABILITY_KIND_LABEL[kind].toLowerCase()).join('" of "')}" door.`
+                : 'Niemand gaf voor deze periode iets door.'}
             </p>
           ) : null}
 

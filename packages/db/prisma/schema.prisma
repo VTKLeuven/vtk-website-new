@@ -3513,6 +3513,12 @@ model UitleenDriverAvailability {
   startAt DateTime @db.Timestamptz(3)
   endAt   DateTime @db.Timestamptz(3)
 
+  /// Hoe graag deze chauffeur op dit moment rijdt.
+  ///
+  /// `JA` voor alles wat er stond voor deze kolom bestond, en dat is ook wat het
+  /// betekende: het enige antwoord was toen "ik kan".
+  kind UitleenAvailabilityKind @default(JA)
+
   /// Vrije nota van de chauffeur zelf ("enkel met de auto", "tot 16u zeker").
   note String?
 
@@ -3523,6 +3529,30 @@ model UitleenDriverAvailability {
 
   @@index([userId, startAt])
   @@index([startAt, endAt])
+}
+
+/// Hoe graag een chauffeur op een moment rijdt.
+///
+/// Drie antwoorden en niet twee: in de praktijk zegt niemand enkel ja of niets.
+/// "Ik kan wel, maar vraag eerst iemand anders" en "enkel als er echt niemand
+/// anders is" zijn allebei een ja waarop je anders plant, en zonder dat verschil
+/// kruisten mensen ofwel te veel aan (en werden ze gebeld voor ritten die
+/// slecht uitkwamen) ofwel te weinig (en stond de kalender leeg terwijl er wel
+/// iemand kon).
+///
+/// Niet meer dan drie: elke extra tint is een keuze die de chauffeur moet maken
+/// en die het team moet interpreteren, en dan wordt het een schaal in plaats van
+/// een antwoord.
+///
+/// Géén vierde waarde voor "kan niet": niets aanduiden betekent al "we weten het
+/// niet", en dat is iets anders dan "kan niet". Zie `driverAvailability`.
+enum UitleenAvailabilityKind {
+  /// Ik kan rijden.
+  JA
+  /// Ik kan, maar vraag eerst iemand anders.
+  LIEVER_NIET
+  /// Enkel als er echt niemand anders is.
+  NOOD
 }
 
 /// Heen of terug binnen één heen-en-terugaanvraag (`tripGroupId`).

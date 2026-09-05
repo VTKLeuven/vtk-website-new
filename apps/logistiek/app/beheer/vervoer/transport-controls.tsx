@@ -53,11 +53,20 @@ export function TransportControls({
   const [pending, startTransition] = useTransition();
   const [kilometers, setKilometers] = useState('');
 
-  function run(action: () => Promise<{ ok: boolean; message?: string; error?: string }>) {
+  function run(
+    action: () => Promise<{ ok: boolean; message?: string; error?: string; warning?: boolean }>
+  ) {
     startTransition(async () => {
       const result = await action();
       if (result.ok) {
-        showToast({ message: result.message ?? 'Opgeslagen.', variant: 'success' });
+        // Gelukt met een staartje ("die chauffeur gaf 'liever niet' op", "het
+        // voertuig staat nu dubbel"): dan blijft de melding staan tot je ze
+        // wegklikt, want ze vraagt nog iets van je.
+        showToast({
+          message: result.message ?? 'Opgeslagen.',
+          variant: 'success',
+          duration: result.warning ? 0 : undefined,
+        });
         router.refresh();
       } else {
         showToast({ message: result.error ?? 'Er ging iets mis.', variant: 'error', duration: 0 });
