@@ -1,19 +1,84 @@
+import { cache } from 'react';
 import { cookies, headers } from 'next/headers';
 import { hasPermission, type SessionPayload } from '@vtk/auth';
 import { fetchSession } from '@vtk/auth/remote';
-import { TEST_USER_COOKIE, buildTestSession, isTestUserKey, testLoginEnabled } from './test-users';
+import { mayUseTestLogin, testLoginMode } from './test-login-gate';
+import {
+  TEST_USER_COOKIE,
+  buildTestSession,
+  isTestUserKey,
+  testPersonaName,
+  type TestUserKey,
+} from './test-users';
+
+/**
+ * Wie je écht bent, los van welk test-profiel je speelt.
+ *
+ * In `cache()`: de poort hieronder heeft deze sessie nodig bij elke
+ * `getSession()`, en zonder dit belde één pagina er meerdere keren voor naar de
+ * hoofdsite.
+ */
+export const getRealSession = cache(
+  async (): Promise<SessionPayload | null> => fetchSession(await headers())
+);
+
+/**
+ * Het test-profiel dat deze aanvraag mag spelen, of null.
+ *
+ * De controle staat hier en niet enkel op de picker: `/test-login` verbergen
+ * belet niemand om de server action rechtstreeks aan te roepen, en die zet de
+ * cookie. De cookie wordt daarom bij élke aanvraag opnieuw getoetst aan de
+ * échte sessie. Wie zijn beheerrechten verliest, valt zo vanzelf terug op
+ * zichzelf in plaats van vast te blijven zitten in een profiel.
+ */
+async function activeTestUser(): Promise<TestUserKey | null> {
+  const mode = testLoginMode();
+  if (mode === 'off') return null;
+  const key = (await cookies()).get(TEST_USER_COOKIE)?.value;
+  if (!isTestUserKey(key)) return null;
+  const real = await getRealSession();
+  if (!mayUseTestLogin(mode, real ? { canManage: canManage(real) } : null)) return null;
+  return key;
+}
 
 /** Sessie of null; voor pagina's die zelf een login-uitnodiging tonen. */
 export async function getSession(): Promise<SessionPayload | null> {
-  // Test-login (enkel als de env-toggle aan staat): als er een geldige
-  // test-gebruiker-cookie is, doen we alsof die persoon is ingelogd. Zonder
-  // cookie vallen we terug op de echte sessie, zodat de gewone website-login
-  // naast de test-login blijft werken. Zie lib/test-users.ts.
-  if (testLoginEnabled()) {
-    const key = (await cookies()).get(TEST_USER_COOKIE)?.value;
-    if (isTestUserKey(key)) return buildTestSession(key);
-  }
-  return fetchSession(await headers());
+  // Speel je een test-profiel, dan doet de hele app alsof je die persoon bent.
+  // Zonder (geldige) cookie is dat gewoon je echte sessie, zodat de normale
+  // website-login ernaast blijft werken. Zie lib/test-users.ts.
+  const key = await activeTestUser();
+  if (key) return buildTestSession(key);
+  return getRealSession();
+}
+
+/**
+ * Mag je hier van test-gebruiker wisselen?
+ *
+ * Voor de picker en voor de plekken die ernaar linken: een menu-item dat 404
+ * geeft, is erger dan geen menu-item.
+ */
+export async function canUseTestLogin(): Promise<boolean> {
+  const mode = testLoginMode();
+  if (mode === 'off') return false;
+  const real = await getRealSession();
+  return mayUseTestLogin(mode, real ? { canManage: canManage(real) } : null);
+}
+
+/**
+ * Speel je iemand anders? Dan wie, en wie ben je zelf.
+ *
+ * Waarvoor dit bestaat: zonder dit stond nergens op het scherm dát je iemand
+ * anders bent, en was terugkeren naar jezelf eerst `/test-login` terugvinden.
+ * `real` mag null zijn in de ongegrendelde stand, waar er geen echte login is.
+ */
+export async function getImpersonation(): Promise<{
+  real: SessionPayload | null;
+  personaKey: TestUserKey;
+  personaName: string;
+} | null> {
+  const key = await activeTestUser();
+  if (!key) return null;
+  return { real: await getRealSession(), personaKey: key, personaName: testPersonaName(key) };
 }
 
 /**

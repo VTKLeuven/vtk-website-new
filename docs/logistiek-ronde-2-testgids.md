@@ -19,8 +19,11 @@ npm run dev -w @vtk/logistiek        # http://localhost:3100
 Prisma-client in het geheugen; je krijgt anders "Unknown argument" op precies de
 nieuwe velden. Dat kost je een kwartier zoeken naar een bug die er niet is.
 
-Inloggen doe je op `/test-login` (werkt omdat `LOGISTIEK_TEST_LOGIN=true` in
-`.env` staat). De personas die je nodig hebt:
+Inloggen doe je op `/test-login`. Zet daarvoor lokaal `LOGISTIEK_TEST_LOGIN=open`
+in je `.env`: met `true` moet je eerst een echte sessie hebben die logistiek mag
+beheren, en die is er op een laptop zonder draaiende hoofdsite niet. Speel je een
+profiel, dan staat er bovenaan elke pagina een gele balk die zegt als wie je
+kijkt, met de knop om terug te keren. De personas die je nodig hebt:
 
 | Persona | Wat het is | Waarvoor je hem nodig hebt |
 | --- | --- | --- |

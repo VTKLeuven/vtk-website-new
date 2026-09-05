@@ -1,9 +1,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
-import { canManage, getSession } from '@/lib/session';
+import { canManage, canUseTestLogin, getSession } from '@/lib/session';
 import { copy, getLocale } from '@/lib/i18n';
 import { driverStatus, showsMyTrips } from '@/lib/uitleen-server';
-import { testLoginEnabled } from '@/lib/test-users';
 import { LanguageSwitcher } from './language-switcher';
 import { ProfileMenu } from './profile-menu';
 
@@ -35,8 +34,9 @@ export async function SiteHeader() {
   // "Mijn ritten" is er enkel voor chauffeurs; voor de rest bestaat de link niet.
   const showTrips = session ? showsMyTrips(await driverStatus(session.user.id)) : false;
   // Op een testomgeving verwijst de login naar de test-picker in plaats van naar
-  // de KU Leuven-login op de hoofdsite. Zie lib/test-users.ts.
-  const testMode = testLoginEnabled();
+  // de KU Leuven-login op de hoofdsite; enkel voor wie er iets mee kan, anders is
+  // het een menu-item dat 404 geeft. Zie lib/session.ts.
+  const testMode = await canUseTestLogin();
 
   return (
     <header className="vtk-site-header">

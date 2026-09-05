@@ -410,19 +410,32 @@ Belangrijk: een remote app importeert **`@vtk/auth/remote`**, nooit
 ### Test-login (enkel testomgeving)
 
 Op een testomgeving (lokaal, `logistiek.dev.vtk.be`) is inloggen via de echte KU
-Leuven-SSO lastig, en logistiek heeft zelf geen auth. De toggle
-`LOGISTIEK_TEST_LOGIN=true` schakelt daarom een **test-login** in: via
-`/test-login` kies je een vast profiel en `getSession` fabriceert een
-`SessionPayload` voor die persoon (cookie `logistiek-test-user`). Zonder geldige
-cookie valt hij terug op de echte `fetchSession`, dus de gewone website-login
-blijft ernaast werken.
+Leuven-SSO lastig, en logistiek heeft zelf geen auth. `LOGISTIEK_TEST_LOGIN`
+schakelt daarom een **test-login** in: via `/test-login` kies je een vast profiel
+en `getSession` fabriceert een `SessionPayload` voor die persoon (cookie
+`logistiek-test-user`). Zonder geldige cookie valt hij terug op de echte
+`fetchSession`, dus de gewone website-login blijft ernaast werken.
 
 - De profielen (`apps/logistiek/lib/test-users.ts`) dekken elk toegangsniveau:
   `logistiek` (post Logistiek, `logistiek.manage` -> beheer), `it` (superadmin),
   `post` (gewoon praesidiumlid), `mechanix` (werkgrooplid), `student` (extern).
-- **Nooit aanzetten in productie:** de profielen geven echte permissies (incl.
-  superadmin) zonder wachtwoord. Staat de toggle uit, dan geeft `/test-login`
-  404 en wordt de cookie volledig genegeerd; enkel de gewone website-login werkt.
+- **Drie standen** (`testLoginMode` in `lib/test-login-gate.ts`):
+  - `""` -> `off`: `/test-login` geeft 404 en de cookie wordt genegeerd.
+  - `"true"` -> `gated`: enkel wie logistiek mag beheren (`canManage`, dus
+    Logistiek of superadmin/IT) kan wisselen. Dit hoort op dev.vtk.be te staan.
+  - `"open"` -> `open`: iedereen, **enkel voor een laptop** waar de hoofdsite
+    niet draait en er dus geen echte sessie bestaat om op te gaten.
+- **In productie staat het hoe dan ook uit.** `testLoginMode` geeft `off` zodra
+  `NODE_ENV === 'production'`, ongeacht de env-variabele. Dat is nieuw: die
+  grendel stond eerder enkel in de documentatie beschreven en niet in de code.
+- **De poort zit in `getSession` en in de server action**, niet enkel op de
+  picker. `activeTestUser` (`lib/session.ts`) toetst de cookie bij élke aanvraag
+  aan de **echte** sessie (`getRealSession`, buiten de cookie om), en
+  `loginAsTestUser` doet dezelfde controle. Een server action is een endpoint:
+  het scherm verbergen belet niemand om ze rechtstreeks aan te roepen.
+- **Je ziet altijd dat je iemand anders bent.** `ImpersonationBanner`
+  (`components/impersonation-banner.tsx`) staat boven de sitekop op elke pagina
+  en zet "terug naar mijn account" op één klik.
 - Bekabeling: `LOGISTIEK_TEST_LOGIN` in `.env` -> de logistiek-service in
   `infra/docker-compose.yml` geeft ze door aan de container.
 

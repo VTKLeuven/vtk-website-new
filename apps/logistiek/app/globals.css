@@ -624,6 +624,59 @@ body {
 
 /* De uitleendienst gebruikt dezelfde vaste headerstructuur als vtk.be. Enkel
    de navigatie-inhoud verschilt per applicatie. */
+/* De strook die zegt als wie je kijkt (test-login).
+   Boven de sticky kop en zelf niet sticky: ze mag meescrollen, want het is een
+   toestand en geen bediening. Geel op navy, omdat dit het enige gele vlak op de
+   pagina is en dus niet te verwarren met de gewone chrome. */
+.impersonation-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 14px;
+  padding: 7px clamp(12px, 3vw, 24px);
+  background: var(--yellow);
+  color: var(--ink);
+  font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.impersonation-bar-text {
+  min-width: 0;
+}
+
+/* Wie je zelf bent, staat er kleiner bij: het antwoord op "als wie kijk ik" is
+   de naam ervoor. Op een telefoon valt deze helft weg; daar is de balk anders
+   twee regels voor iets wat je al weet. */
+.impersonation-bar-real {
+  color: rgba(10, 15, 31, 0.65);
+}
+
+@media (max-width: 520px) {
+  .impersonation-bar-real {
+    display: none;
+  }
+}
+
+.impersonation-bar-button {
+  border: 1px solid rgba(10, 15, 31, 0.35);
+  border-radius: 999px;
+  padding: 3px 12px;
+  background: rgba(255, 255, 255, 0.55);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.impersonation-bar-button:hover {
+  border-color: var(--ink);
+  background: #fff;
+}
+
 .vtk-site-header {
   position: sticky;
   top: 0;

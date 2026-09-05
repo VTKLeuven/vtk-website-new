@@ -1,6 +1,7 @@
 import 'server-only';
 import { prisma } from '@vtk/db';
 import { currentStudyYear, type SessionPayload } from '@vtk/auth';
+import { testLoginMode } from './test-login-gate';
 
 /**
  * Test-login voor de uitleendienst. Op een testomgeving (dev.vtk.be, lokaal) is
@@ -10,14 +11,19 @@ import { currentStudyYear, type SessionPayload } from '@vtk/auth';
  * test-gebruiker inloggen via /test-login, om de verschillende toegangsprofielen
  * (beheer, gewone post, werkgroep, extern) los van de hoofdsite te testen.
  *
- * STAAT DEZE TOGGLE NOOIT AAN IN PRODUCTIE: de personas geven echte permissies
- * (inclusief superadmin) zonder wachtwoord. Standaard (toggle uit) verandert er
- * niets en werkt enkel de gewone website-login.
+ * De personas geven echte permissies (inclusief superadmin) zonder wachtwoord.
+ * Daarom staat de toggle in productie hoe dan ook uit (zie `testLoginMode`), en
+ * mag op een gedeelde testomgeving enkel wie logistiek beheert nog wisselen (zie
+ * `mayUseTestLogin`). Standaard verandert er niets en werkt enkel de gewone
+ * website-login.
  */
 
-/** Aan als de env-toggle expliciet op "true" staat; anders uit. */
+/**
+ * Aan in gelijk welke stand behalve `off`. Wie mag wisselen is een tweede vraag;
+ * die staat in `mayUseTestLogin` en wordt beantwoord in `lib/session.ts`.
+ */
 export function testLoginEnabled(): boolean {
-  return process.env.LOGISTIEK_TEST_LOGIN === 'true';
+  return testLoginMode() !== 'off';
 }
 
 /** Cookie die onthoudt als welke test-gebruiker je bent ingelogd. */
@@ -134,6 +140,11 @@ export function listTestPersonas() {
     const p = PERSONAS[key];
     return { key: p.key, name: p.name, descriptionNl: p.descriptionNl, descriptionEn: p.descriptionEn };
   });
+}
+
+/** De naam van één profiel, voor de balk die zegt als wie je kijkt. */
+export function testPersonaName(key: TestUserKey): string {
+  return PERSONAS[key].name;
 }
 
 export function isTestUserKey(value: string | undefined | null): value is TestUserKey {

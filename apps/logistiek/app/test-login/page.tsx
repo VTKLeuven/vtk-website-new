@@ -1,27 +1,23 @@
-import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { getLocale } from '@/lib/i18n';
-import {
-  TEST_USER_COOKIE,
-  isTestUserKey,
-  listTestPersonas,
-  testLoginEnabled,
-} from '@/lib/test-users';
+import { canUseTestLogin, getImpersonation, getRealSession } from '@/lib/session';
+import { listTestPersonas } from '@/lib/test-users';
 import { loginAsTestUser, logoutTestUser } from './actions';
 
 /**
- * Test-login picker. Enkel bereikbaar als de env-toggle `LOGISTIEK_TEST_LOGIN`
- * aan staat (anders 404). Kies een vast test-profiel om als die persoon in te
- * loggen; zie lib/test-users.ts. NOOIT aanzetten in productie.
+ * Test-login picker. Enkel bereikbaar voor wie mag wisselen: in productie
+ * niemand, op een gedeelde testomgeving enkel IT en Logistiek, en op een laptop
+ * (`LOGISTIEK_TEST_LOGIN=open`) iedereen omdat daar geen echte login bestaat.
+ * Anders 404: een 403 zou het bestaan van dit scherm nog altijd verklappen.
  */
 export default async function TestLoginPage() {
-  if (!testLoginEnabled()) notFound();
+  if (!(await canUseTestLogin())) notFound();
 
   const locale = await getLocale();
   const nl = locale === 'nl';
   const personas = listTestPersonas();
-  const active = (await cookies()).get(TEST_USER_COOKIE)?.value;
-  const activeKey = isTestUserKey(active) ? active : null;
+  const [impersonation, real] = await Promise.all([getImpersonation(), getRealSession()]);
+  const activeKey = impersonation?.personaKey ?? null;
 
   return (
     <main
@@ -38,9 +34,31 @@ export default async function TestLoginPage() {
         </h1>
         <p className="mt-4 leading-7 text-vtk-body">
           {nl
-            ? 'Dit scherm is enkel actief op een testomgeving (LOGISTIEK_TEST_LOGIN=true). Elk profiel dekt een ander toegangsniveau.'
-            : 'This screen is only active on a test environment (LOGISTIEK_TEST_LOGIN=true). Each profile covers a different access level.'}
+            ? 'Dit scherm is enkel actief op een testomgeving, en enkel voor IT en Logistiek. Elk profiel dekt een ander toegangsniveau.'
+            : 'This screen is only active on a test environment, and only for IT and Logistics. Each profile covers a different access level.'}
         </p>
+
+        {/* Wie je zelf bent, met de weg terug. Zonder dit was de enige uitgang
+            een linkje onderaan de lijst, en dat vind je pas als je al weet dat
+            het bestaat. */}
+        {real ? (
+          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-vtk-navy/15 bg-vtk-blue-soft px-4 py-3">
+            <p className="min-w-0 text-sm text-vtk-body">
+              {nl ? 'Je eigen account: ' : 'Your own account: '}
+              <span className="font-semibold text-vtk-ink">{real.user.name}</span>
+            </p>
+            {activeKey ? (
+              <form action={logoutTestUser}>
+                <button
+                  type="submit"
+                  className="rounded-full border border-vtk-navy/25 px-3 py-1.5 text-sm font-semibold text-vtk-ink transition hover:border-vtk-navy/60"
+                >
+                  {nl ? 'Terug naar mijn account' : 'Back to my account'}
+                </button>
+              </form>
+            ) : null}
+          </div>
+        ) : null}
 
         <ul className="mt-7 flex flex-col gap-3">
           {personas.map((p) => {
@@ -72,7 +90,9 @@ export default async function TestLoginPage() {
           })}
         </ul>
 
-        {activeKey ? (
+        {/* Zonder echte sessie staat de weg terug niet in het blok hierboven, en
+            is dit de enige uitgang. */}
+        {activeKey && !real ? (
           <form action={logoutTestUser} className="mt-6">
             <button type="submit" className="text-sm font-semibold text-vtk-muted underline">
               {nl ? 'Uitloggen (test-gebruiker wissen)' : 'Log out (clear test user)'}

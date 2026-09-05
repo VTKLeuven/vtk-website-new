@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import Script from "next/script";
+import { ImpersonationBanner } from "@/components/impersonation-banner";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { copy, getLocale } from "@/lib/i18n";
@@ -30,6 +31,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             data-exclude-hash="true"
           />
         )}
+        <ImpersonationBanner />
         <SiteHeader />
         {children}
         <SiteFooter />

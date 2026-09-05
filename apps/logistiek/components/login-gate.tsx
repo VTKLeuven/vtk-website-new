@@ -2,7 +2,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { copy, getLocale } from '@/lib/i18n';
 import { getPublicCopy } from '@/lib/public-copy';
-import { testLoginEnabled } from '@/lib/test-users';
+import { canUseTestLogin } from '@/lib/session';
 
 const MAIN_URL = process.env.VTK_MAIN_URL || 'https://vtk.be';
 
@@ -41,8 +41,10 @@ export async function LoginGate({ variant = 'default' }: { variant?: LoginVarian
   const content = await getPublicCopy(locale);
   const message = variant === 'default' ? content.loginLead : t[VARIANT_KEY[variant]];
   // Op een testomgeving stuurt de login-knop naar de test-picker; anders naar de
-  // KU Leuven-login op de hoofdsite.
-  const loginHref = testLoginEnabled() ? '/test-login' : `${MAIN_URL}/inloggen`;
+  // KU Leuven-login op de hoofdsite. In de gegrendelde stand is er hier nog geen
+  // sessie om rechten op te toetsen, dus valt hij vanzelf terug op de echte
+  // login: precies wat je wil op dev.vtk.be.
+  const loginHref = (await canUseTestLogin()) ? '/test-login' : `${MAIN_URL}/inloggen`;
   return (
     <main className="logistics-auth mx-auto grid w-full flex-1 place-items-center px-5 py-12">
       <section className="logistics-auth-panel w-full max-w-xl">
