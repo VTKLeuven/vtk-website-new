@@ -374,14 +374,23 @@
    vaak en hoe groot dat accent terugkomt. Bij het scrollen tekenen deze
    elementen zichzelf (vtk-motion.css). */
 
-/* Sectiekopje: een lijn over de hele kolom die vooraan geel is en daarna een
-   haarlijn wordt, zodat elke sectie ook echt als scheiding leest. */
+/* Sectiekopje: een gele lijn onder de titel, precies zo breed als de titel
+   zelf. Vandaar `width: fit-content` op het kopje: de lijn is `width: 100%` van
+   een blok dat om de tekst sluit. Een lijn over de hele kolom is bekeken en
+   las als een scheidingslijn tussen twee stukken pagina in plaats van als een
+   streep onder een titel. */
+.vtk-page-content .prose-vtk h2 {
+  width: fit-content;
+  max-width: 100%;
+}
+
 .vtk-page-content .prose-vtk h2::after {
   content: "";
   display: block;
-  height: 2px;
-  margin-top: 0.55rem;
-  background: linear-gradient(to right, var(--yellow) 0 2.75rem, var(--line) 2.75rem 100%);
+  height: 4px;
+  margin-top: 0.5rem;
+  border-radius: 2px;
+  background: var(--yellow);
   transform-origin: 0 50%;
 }
 
@@ -420,13 +429,18 @@
   font-weight: 700;
 }
 
-/* Vetgedrukt krijgt een markeerstift-streep. Een inset box-shadow en geen
-   gradient, en `box-decoration-break: clone` zodat een stuk tekst dat over twee
-   regels breekt twee streepjes krijgt in plaats van één blok over beide. */
+/* Vetgedrukt staat in navy met een gele lijn eronder, die bij het scrollen
+   aangroeit (vtk-motion.css). De lijn is een achtergrond op de tekst zelf en
+   geen los laagje erover: met `box-decoration-break: clone` krijgt een stuk
+   tekst dat over twee regels breekt twee streepjes in plaats van één streep
+   onder de hele blokhoogte. */
 .vtk-page-content .prose-vtk :is(p, li) > strong {
-  padding: 0 0.12em;
-  border-radius: 2px;
-  box-shadow: inset 0 -0.5em 0 rgba(255, 210, 63, 0.5);
+  color: var(--navy);
+  background-image: linear-gradient(var(--yellow), var(--yellow));
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 3px;
+  padding-bottom: 2px;
   -webkit-box-decoration-break: clone;
   box-decoration-break: clone;
 }
