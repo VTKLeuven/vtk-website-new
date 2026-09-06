@@ -72,3 +72,45 @@
     }
   }
 }
+
+/* De foto komt van opzij binnen. Geanimeerd wordt de `img`, niet het figuur:
+   het figuur knipt (`overflow-x: clip` in globals.css), zodat de foto binnen
+   haar eigen kader schuift en niets buiten de tekstkolom steekt. Om en om van
+   links en van rechts, zodat een pagina met meerdere foto's ritme krijgt. */
+@keyframes vtk-fly-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-7%) scale(0.985);
+  }
+}
+
+@keyframes vtk-fly-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(7%) scale(0.985);
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .vtk-motion .vtk-figure img {
+      animation: vtk-fly-in-left linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry 6% cover 34%;
+    }
+
+    /* `nth-of-type` telt enkel figuren tussen hun broers en zussen, dus dit is
+       de tweede foto van de tekst en niet het tweede element. */
+    .vtk-motion .vtk-figure:nth-of-type(even) img {
+      animation-name: vtk-fly-in-right;
+    }
+
+    /* Het bijschrift volgt de foto met een korte vertraging: eerst het beeld,
+       dan het onderschrift. */
+    .vtk-motion .vtk-figure figcaption {
+      animation: vtk-rise linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry 14% cover 40%;
+    }
+  }
+}

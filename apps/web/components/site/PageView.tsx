@@ -182,7 +182,11 @@ export async function PageView({
       </header>
 
       <div className={`vtk-page-shell vtk-page-body${showRail ? " has-rail" : ""}`}>
-        <div className="vtk-page-content">
+        {/* `vtk-motion` zet de scroll-animaties aan. Bewust op deze container en
+            niet op elke `.prose-vtk`: in het voorbeeldvenster van de editor zit
+            de tekst in een eigen scrollcontainer, waar een `view()`-tijdlijn een
+            kopje halverwege zijn animatie kan laten staan. */}
+        <div className="vtk-page-content vtk-motion">
           {content.kind === "markdown" ? (
             <>
               <article className="prose-vtk">
