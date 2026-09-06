@@ -186,6 +186,21 @@ export async function proxy(request: NextRequest) {
     return NextResponse.rewrite(url);
   }
 
+  // TIJDELIJK, weg te halen rond 20 september 2026: dit ene formulier draait nog
+  // op de oude site (old.vtk.be) en moet nog even blijven werken. Staat hier
+  // vóór de locale-rewrite en vóór de gate, anders belandt een ingelogd lid dat
+  // nog moet onboarden op /onboarding in plaats van op het formulier. Een 307 en
+  // geen 308: een permanente redirect blijft in de browser hangen ook nadat dit
+  // eruit is.
+  if (
+    pathname === '/form/index/13424' ||
+    pathname === '/nl/form/index/13424' ||
+    pathname === '/en/form/index/13424'
+  ) {
+    const locale = pathname.startsWith('/en/') ? 'en' : 'nl';
+    return NextResponse.redirect(`https://old.vtk.be/${locale}/form/index/13424${search}`, 307);
+  }
+
   // RFC 8414-vorm van de discovery-metadata (zie RFC8414_METADATA_PATH).
   if (pathname === `${RFC8414_METADATA_PATH}${AUTH_BASE_PATH}`) {
     const url = request.nextUrl.clone();
