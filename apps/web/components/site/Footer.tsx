@@ -63,13 +63,7 @@ export async function Footer({ locale }: { locale: Locale }) {
               <li>
                 <Link href={`${base}/shift`}>{f.linkShifts}</Link>
               </li>
-              <li>
-                {/* Eigen app op een eigen host (apps/logistiek), net als de cudi-links
-                    hierboven. Ze staat ook in het menu onder Info. */}
-                <a href="https://logistiek.vtk.be" rel="noopener noreferrer" target="_blank">
-                  {f.linkRental}
-                </a>
-              </li>
+              {/* Uitleendienst (https://logistiek.vtk.be) tijdelijk verborgen. */}
             </ul>
           </div>
           <div>
