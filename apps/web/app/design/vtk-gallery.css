@@ -1,0 +1,245 @@
+/* Een reeks foto's in de lopende tekst: twee of meer afbeeldingen die in de
+   markdown tegen elkaar aan staan (zie lib/gallery.ts en
+   docs/design-decisions.md). Dit bestand hoort bij de galerij zelf en wordt
+   geladen door de component, zodat ze er ook goed uitziet buiten een
+   contentpagina: in de beschrijving van een evenement, in de infotekst van een
+   werkgroep of in het voorbeeld van de markdown-editor. Hoe breed ze mag worden
+   op een contentpagina, staat in vtk-page.css: dat is de geometrie van die
+   pagina, niet van de galerij. */
+
+.vtk-gal {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 26px 0 28px;
+}
+
+.vtk-gal-row {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+
+.vtk-gal-item {
+  display: block;
+  position: relative;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  /* Hetzelfde gestreepte vlak als een tegel zonder foto: zolang de foto laadt,
+     staat er iets in plaats van een gat. */
+  background: repeating-linear-gradient(-45deg, var(--paper-2) 0 8px, var(--paper) 8px 16px);
+  cursor: zoom-in;
+}
+
+/* De opmaak van `.prose-vtk img` (ronding, marge, rand, schaduw) hoort bij een
+   losse foto in de tekst. In de strook draagt de tegel eromheen die rand al, en
+   een marge per foto zou de rijen uit elkaar duwen. Deze selector is bewust een
+   klasse specifieker, want de volgorde van de bundels ligt niet vast. */
+.vtk-gal .vtk-gal-item img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  object-fit: cover;
+  transition: transform 0.35s ease;
+}
+
+.vtk-gal .vtk-gal-item:hover img {
+  transform: scale(1.03);
+}
+
+.vtk-gal-item:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+/* ---------------------------------------------------------------------------
+   Uitgevulde strook (alle maten bekend)
+   --------------------------------------------------------------------------- */
+
+/* Groeien naar verhouding van de beeldverhouding, vanaf een basisbreedte van
+   nul: de breedtes op een rij verhouden zich dan exact als de foto's zelf, de
+   rij vult de kolom precies, en alle foto's erop komen op dezelfde hoogte uit.
+   Welke foto's samen op een rij staan, bepaalt de component (zie PageGallery).
+
+   De bovengrens is een vangnet voor een reeks die niet te verdelen valt, zoals
+   twee staande foto's: die zouden samen de volle breedte vullen en daarmee een
+   halve schermhoogte innemen. De rij is dan smaller dan de kolom; dat is het
+   betere van de twee. */
+.vtk-gal.is-strip .vtk-gal-item {
+  flex: var(--ar) 1 0;
+  max-width: calc(var(--ar) * 340px);
+  aspect-ratio: var(--ar);
+}
+
+/* ---------------------------------------------------------------------------
+   Raster (maten onbekend)
+   --------------------------------------------------------------------------- */
+
+/* Zonder de maten in de URL is de verhouding pas na het laden bekend. Een vaste
+   uitsnede in gelijke cellen staat dan meteen goed; het alternatief zou zijn dat
+   de hele reeks verspringt terwijl je leest. */
+.vtk-gal.is-grid .vtk-gal-row {
+  display: grid;
+  grid-template-columns: repeat(var(--cols, 3), minmax(0, 1fr));
+}
+
+.vtk-gal.is-grid .vtk-gal-item {
+  aspect-ratio: 3 / 2;
+}
+
+@media (max-width: 620px) {
+  .vtk-gal.is-grid .vtk-gal-row {
+    grid-template-columns: repeat(var(--cols-narrow, 2), minmax(0, 1fr));
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Telefoon: veegstrook
+   --------------------------------------------------------------------------- */
+
+/* Vier foto's naast elkaar op een telefoon zijn postzegels. De rij blijft dus
+   één regel en wordt veegbaar, op een hoogte waarop een foto nog iets toont. */
+@media (max-width: 640px) {
+  .vtk-gal.is-strip {
+    flex-direction: row;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: thin;
+    overscroll-behavior-x: contain;
+  }
+
+  /* De rijen verdwijnen als doos: alle foto's worden kinderen van de strook, dus
+     de reeks blijft één veegbeweging in plaats van drie strookjes onder elkaar. */
+  .vtk-gal.is-strip .vtk-gal-row {
+    display: contents;
+  }
+
+  .vtk-gal.is-strip .vtk-gal-item {
+    flex: 0 0 auto;
+    width: calc(var(--ar) * 200px);
+    max-width: none;
+    scroll-snap-align: start;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Vergrootglas
+   --------------------------------------------------------------------------- */
+
+.vtk-gal-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 76px clamp(16px, 5vw, 84px) 64px;
+  background: rgba(6, 8, 16, 0.94);
+}
+
+.vtk-gal-lightbox-bar {
+  position: absolute;
+  top: 18px;
+  left: clamp(16px, 4vw, 40px);
+  right: clamp(16px, 4vw, 40px);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  color: var(--on-dark-muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-gal-lightbox-bar button {
+  padding: 6px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--paper);
+  font: inherit;
+  cursor: pointer;
+}
+
+.vtk-gal-lightbox-bar button:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.vtk-gal-lightbox-image {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 10px;
+  box-shadow: 0 22px 70px rgba(0, 0, 0, 0.44);
+}
+
+/* Het bijschrift is de alt-tekst uit de markdown. Staat er geen, dan staat hier
+   niets: een lege regel onder een foto is geen bijschrift. */
+.vtk-gal-lightbox-caption {
+  position: absolute;
+  left: clamp(16px, 4vw, 40px);
+  right: clamp(16px, 4vw, 40px);
+  bottom: 22px;
+  margin: 0;
+  color: var(--on-dark-muted);
+  font-size: 13.5px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.vtk-gal-lightbox-nav {
+  position: absolute;
+  top: 50%;
+  width: 48px;
+  height: 64px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: 42px;
+  line-height: 1;
+  cursor: pointer;
+  transform: translateY(-50%);
+}
+
+.vtk-gal-lightbox-nav:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
+.vtk-gal-lightbox-nav.prev {
+  left: clamp(10px, 2vw, 28px);
+}
+
+.vtk-gal-lightbox-nav.next {
+  right: clamp(10px, 2vw, 28px);
+}
+
+@media (max-width: 760px) {
+  .vtk-gal-lightbox {
+    padding: 72px 12px 56px;
+  }
+
+  .vtk-gal-lightbox-nav {
+    width: 42px;
+    height: 54px;
+    font-size: 34px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vtk-gal .vtk-gal-item img,
+  .vtk-gal .vtk-gal-item:hover img {
+    transition: none;
+    transform: none;
+  }
+}

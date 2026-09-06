@@ -101,7 +101,7 @@ export default async function TheokotVerhuurPage({ params }: { params: Params })
               <div className="vtk-panel tv-side">
                 <h2>{t.guidelinesTitle}</h2>
                 <div className="prose-vtk">
-                  <Markdown>{guidelines}</Markdown>
+                  <Markdown locale={locale}>{guidelines}</Markdown>
                 </div>
               </div>
             )}

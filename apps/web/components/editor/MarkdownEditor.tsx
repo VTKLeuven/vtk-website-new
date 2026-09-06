@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import type { Locale } from "@vtk/i18n";
+import { withImageSize } from "@/lib/gallery";
 import { Markdown } from "@/components/ui/Markdown";
 import { useReportFormBusy } from "@/components/ui/formBusy";
 
@@ -14,6 +15,10 @@ import { useReportFormBusy } from "@/components/ui/formBusy";
  * Afbeeldingen en bestanden gaan via POST /api/admin/upload en worden als
  * markdown-syntax op de cursorpositie ingevoegd; zet `allowImages` of `allowFiles`
  * uit voor plekken waar uploads niet thuishoren.
+ *
+ * De galerijknop uploadt meerdere foto's tegelijk en zet ze onder elkaar. Dat is
+ * geen aparte syntax: de renderkant maakt van afbeeldingen die tegen elkaar aan
+ * staan één uitgevulde strook (zie lib/gallery.ts).
  */
 export function MarkdownEditor({
   value,
@@ -41,10 +46,12 @@ export function MarkdownEditor({
   const nl = locale === "nl";
   const uid = useId();
   const [mode, setMode] = useState<"edit" | "preview">("edit");
-  const [uploadingKind, setUploadingKind] = useState<"image" | "file" | null>(null);
+  const [uploadingKind, setUploadingKind] = useState<"image" | "file" | "gallery" | null>(null);
+  const [galleryProgress, setGalleryProgress] = useState<{ done: number; total: number } | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageFileRef = useRef<HTMLInputElement>(null);
+  const galleryFileRef = useRef<HTMLInputElement>(null);
   const docFileRef = useRef<HTMLInputElement>(null);
   const savedSelectionRef = useRef<{ start: number; end: number } | null>(null);
   const valueRef = useRef(value);
@@ -160,37 +167,94 @@ export function MarkdownEditor({
     replaceRange(start, end, text, { start: cursor, end: cursor });
   }
 
+  /**
+   * Uploadt één afbeelding en geeft de URL terug, met de maten eraan. Die maten
+   * laten een fotostrook haar rijen uitvullen voor de foto's geladen zijn.
+   */
+  async function postImage(file: File): Promise<string> {
+    const body = new FormData();
+    body.append("file", file);
+    body.append("kind", "image");
+    const res = await fetch("/api/admin/upload", { method: "POST", body });
+    if (!res.ok) {
+      if (res.status === 413) {
+        throw new Error(nl ? "Afbeelding is te groot (max. 45 MB)." : "Image is too large (max. 45 MB).");
+      }
+      if (res.status === 415) {
+        throw new Error(nl ? "Ongeldige afbeelding." : "Invalid image.");
+      }
+      if (res.status === 403) {
+        throw new Error(nl ? "Geen rechten om afbeeldingen te uploaden." : "No permission to upload images.");
+      }
+      throw new Error(nl ? "Upload mislukt, probeer opnieuw." : "Upload failed, try again.");
+    }
+    const data = (await res.json()) as {
+      url: string | null;
+      width: number | null;
+      height: number | null;
+    };
+    if (!data.url) throw new Error("upload returned no url");
+    return data.width && data.height ? withImageSize(data.url, data.width, data.height) : data.url;
+  }
+
   async function uploadImage(file: File) {
     setUploadingKind("image");
     setUploadError(null);
     try {
-      const body = new FormData();
-      body.append("file", file);
-      body.append("kind", "image");
-      const res = await fetch("/api/admin/upload", { method: "POST", body });
-      if (!res.ok) {
-        if (res.status === 413) {
-          throw new Error(nl ? "Afbeelding is te groot (max. 45 MB)." : "Image is too large (max. 45 MB).");
-        }
-        if (res.status === 415) {
-          throw new Error(nl ? "Ongeldige afbeelding." : "Invalid image.");
-        }
-        if (res.status === 403) {
-          throw new Error(nl ? "Geen rechten om afbeeldingen te uploaden." : "No permission to upload images.");
-        }
-        throw new Error(nl ? "Upload mislukt, probeer opnieuw." : "Upload failed, try again.");
-      }
-      const data = (await res.json()) as { url: string | null };
-      if (!data.url) throw new Error("upload returned no url");
+      const url = await postImage(file);
       const ta = textareaRef.current;
       const pos = ta ? ta.selectionStart : valueRef.current.length;
       const altEnd = pos + 2;
-      replaceRange(pos, pos, `![](${data.url})`, { start: altEnd, end: altEnd });
+      replaceRange(pos, pos, `![](${url})`, { start: altEnd, end: altEnd });
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : nl ? "Upload mislukt." : "Upload failed.");
     } finally {
       setUploadingKind(null);
     }
+  }
+
+  /** Zet een blok op `at` neer, met een lege regel ervoor en erna. */
+  function insertBlock(at: number, text: string) {
+    const current = valueRef.current;
+    const head = current.slice(0, at);
+    const tail = current.slice(at);
+    const before = head === "" || head.endsWith("\n\n") ? "" : head.endsWith("\n") ? "\n" : "\n\n";
+    const after = tail === "" || tail.startsWith("\n\n") ? "" : tail.startsWith("\n") ? "\n" : "\n\n";
+    const cursor = at + before.length + text.length;
+    replaceRange(at, at, `${before}${text}${after}`, { start: cursor, end: cursor });
+  }
+
+  /**
+   * Meerdere foto's tegelijk. Ze komen als gewone afbeeldingen onder elkaar in
+   * de markdown te staan, want dat is precies wat de renderkant als één strook
+   * toont; een lege regel ertussen splitst ze weer in losse foto's.
+   */
+  async function uploadGallery(files: File[]) {
+    if (files.length === 0) return;
+    const ta = textareaRef.current;
+    const at = ta ? ta.selectionStart : valueRef.current.length;
+
+    setUploadingKind("gallery");
+    setUploadError(null);
+    setGalleryProgress({ done: 0, total: files.length });
+
+    const urls: string[] = [];
+    let failure: string | null = null;
+    try {
+      for (const file of files) {
+        urls.push(await postImage(file));
+        setGalleryProgress({ done: urls.length, total: files.length });
+      }
+    } catch (err) {
+      failure = err instanceof Error ? err.message : nl ? "Upload mislukt." : "Upload failed.";
+    }
+
+    // Wat wél geüpload is, gaat alsnog in de tekst: opnieuw beginnen met vijf
+    // foto's omdat de zesde faalde, helpt niemand.
+    if (urls.length > 0) insertBlock(at, urls.map((url) => `![](${url})`).join("\n"));
+    setUploadError(failure);
+    setGalleryProgress(null);
+    setUploadingKind(null);
   }
 
   function handleDocumentUploadClick() {
@@ -339,6 +403,19 @@ export function MarkdownEditor({
                 <ImageGlyph />
               </ToolbarButton>
             )}
+            {allowImages && (
+              <ToolbarButton
+                label={
+                  nl
+                    ? "Fotogalerij: meerdere foto's naast elkaar"
+                    : "Photo gallery: several photos side by side"
+                }
+                onClick={() => galleryFileRef.current?.click()}
+                disabled={uploadingKind !== null}
+              >
+                <GalleryGlyph />
+              </ToolbarButton>
+            )}
             {canUploadFiles && (
               <ToolbarButton
                 label={nl ? "Document of bestand uploaden (bv. PDF)" : "Upload document or file (e.g. PDF)"}
@@ -390,6 +467,13 @@ export function MarkdownEditor({
                 {nl ? "Bestand uploaden..." : "Uploading file..."}
               </span>
             )}
+            {uploadingKind === "gallery" && galleryProgress && (
+              <span className="ml-2 text-xs text-[#5c667f]">
+                {nl
+                  ? `Foto ${Math.min(galleryProgress.done + 1, galleryProgress.total)} van ${galleryProgress.total} uploaden...`
+                  : `Uploading photo ${Math.min(galleryProgress.done + 1, galleryProgress.total)} of ${galleryProgress.total}...`}
+              </span>
+            )}
             {uploadError && !uploadingKind && (
               <span className="ml-2 text-xs text-red-600">
                 {uploadError}
@@ -409,6 +493,21 @@ export function MarkdownEditor({
             const file = e.target.files?.[0];
             e.target.value = "";
             if (file) void uploadImage(file);
+          }}
+        />
+      )}
+
+      {allowImages && (
+        <input
+          ref={galleryFileRef}
+          type="file"
+          accept="image/*"
+          multiple
+          className="hidden"
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            e.target.value = "";
+            if (files.length > 0) void uploadGallery(files);
           }}
         />
       )}
@@ -461,6 +560,16 @@ export function MarkdownEditor({
           }}
           onDrop={(e) => {
             const files = e.dataTransfer?.files;
+            if (files && files.length > 1 && allowImages) {
+              // Meerdere foto's in één keer laten vallen is een galerij; dat is
+              // wat je bedoelt als je er vier tegelijk op de tekst gooit.
+              const images = Array.from(files).filter((f) => f.type.startsWith("image/"));
+              if (images.length === files.length) {
+                e.preventDefault();
+                void uploadGallery(images);
+                return;
+              }
+            }
             if (files && files.length > 0) {
               const file = files[0];
               if (file.type.startsWith("image/") && allowImages) {
@@ -500,7 +609,7 @@ export function MarkdownEditor({
       ) : (
         <div className="prose-vtk min-h-32 p-4" style={{ minHeight: `${rows * 1.4}em` }}>
           {value.trim() ? (
-            <Markdown>{value}</Markdown>
+            <Markdown locale={locale}>{value}</Markdown>
           ) : (
             <p className="text-sm text-[#5c667f]">{nl ? "Nog geen inhoud." : "No content yet."}</p>
           )}
@@ -636,6 +745,16 @@ function ImageGlyph() {
       <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
       <circle cx="9" cy="9" r="2" />
       <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+    </Glyph>
+  );
+}
+
+function GalleryGlyph() {
+  return (
+    <Glyph>
+      <rect x="2" y="6" width="6" height="12" rx="1.5" />
+      <rect x="9" y="6" width="6" height="12" rx="1.5" />
+      <rect x="16" y="6" width="6" height="12" rx="1.5" />
     </Glyph>
   );
 }

@@ -50,7 +50,7 @@ export default async function TicketTermsPage({
       </header>
       <main className="vtk-page-shell vtk-page-narrow">
         <article className="vtk-card prose-vtk max-w-none p-6 sm:p-8">
-          <Markdown>{locale === "nl" ? terms.bodyNl : terms.bodyEn}</Markdown>
+          <Markdown locale={locale}>{locale === "nl" ? terms.bodyNl : terms.bodyEn}</Markdown>
           <p className="mt-8 border-t border-vtk-blue/10 pt-4 text-xs text-vtk-muted">
             {locale === "nl" ? "Versie" : "Version"}: {terms.version}
           </p>

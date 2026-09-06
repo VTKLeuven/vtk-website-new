@@ -70,6 +70,35 @@
 }
 
 /* ---------------------------------------------------------------------------
+   Fotostrook in de tekst
+   --------------------------------------------------------------------------- */
+
+/* De galerij zelf staat in vtk-gallery.css; hier staat enkel hoe breed ze op een
+   contentpagina mag worden. De tekst houdt haar leesbreedte van 74ch, de foto's
+   lopen door tot waar de rail begint: een strook die stopt waar de tekst stopt,
+   leest als een plaatje bij de vorige alinea in plaats van als een pauze.
+   Dezelfde redenering als bij de plaat boven de tekst.
+
+   De maat komt van de containerquery op `.vtk-page-body` (zie vtk-base.css),
+   want `100%` is hier de tekstkolom en niet de kolom van het rooster. */
+.vtk-page-content .vtk-gal {
+  width: 100cqi;
+}
+
+@media (min-width: 980px) {
+  .vtk-page-body.has-rail .vtk-page-content .vtk-gal {
+    width: calc(100cqi - 244px - clamp(28px, 4vw, 48px));
+  }
+
+  /* De brede zijkolom van een werkingspagina verdeelt de ruimte al met
+     `space-between`: daar is de tekstkolom precies 700px breed en blijft er
+     niets over om in door te lopen. */
+  .vtk-page-body.has-rail.has-side .vtk-page-content .vtk-gal {
+    width: 100%;
+  }
+}
+
+/* ---------------------------------------------------------------------------
    Kop
    --------------------------------------------------------------------------- */
 

@@ -1,7 +1,10 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { DEFAULT_LOCALE, type Locale } from "@vtk/i18n";
+import { galleryPhotos } from "@/lib/gallery";
 import { headingId, headingText } from "@/lib/pageOutline";
 import { isVideoUrl } from "@/lib/videoEmbed";
+import { PageGallery } from "@/components/site/PageGallery";
 import { InlineVideoPlayer } from "./InlineVideoPlayer";
 
 /**
@@ -35,8 +38,18 @@ export function preprocessMarkdownVideos(markdown: string): string {
  *
  * Ruwe HTML in de markdown wordt bewust NIET gerenderd (geen rehype-raw):
  * pagina's worden door leden bewerkt, dus de uitvoer moet veilig blijven.
+ *
+ * De taal is enkel nodig voor de knoplabels van een fotogalerij. Ze is
+ * optioneel, zodat een oproep zonder taal blijft werken; geef ze mee waar de
+ * locale toch al in de hand is.
  */
-export function Markdown({ children }: { children: string }) {
+export function Markdown({
+  children,
+  locale = DEFAULT_LOCALE,
+}: {
+  children: string;
+  locale?: Locale;
+}) {
   const content = preprocessMarkdownVideos(children);
 
   return (
@@ -56,6 +69,14 @@ export function Markdown({ children }: { children: string }) {
         h3: ({ children: headingChildren }) => (
           <h3 id={headingId(headingText(headingChildren))}>{headingChildren}</h3>
         ),
+        // Twee of meer afbeeldingen die in de markdown tegen elkaar aan staan,
+        // vormen samen een galerij. Alles wat daar niet aan voldoet (tekst
+        // ertussen, een enkele foto, een video) blijft een gewone alinea.
+        p: ({ node, children: paragraphChildren }) => {
+          const photos = galleryPhotos(node);
+          if (photos) return <PageGallery photos={photos} locale={locale} />;
+          return <p>{paragraphChildren}</p>;
+        },
         // Zelfde gedrag als de oude tiptap-renderer: links openen in een nieuw
         // tabblad. Interne ankers (#...) blijven in dezelfde pagina.
         a: ({ href, children: linkChildren }) => {

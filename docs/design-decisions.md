@@ -5983,3 +5983,54 @@ een telefoon 16/10 en de kaart op de categoriepagina bijna vierkant: één vaste
 uitsnede bestaat hier niet. Het midden is de standaard, precies wat de browser
 zonder die waarde al doet, dus bestaande pagina's veranderen niet van uitsnede
 tot iemand het punt verlegt. Zie ook "De uitsnede van een eventfoto".
+
+## Foto's tussen de tekst: een uitgevulde strook, geen nieuwe syntax
+
+Een contentpagina is vaak een lap tekst. Er moest een manier komen om er een
+reeks foto's tussen te zetten, en er zijn vier richtingen naast elkaar bekeken:
+een uitgevulde strook, een veegbare filmstrook, een raster van vier gelijke
+foto's op een rij, en een volle navy band zoals onderaan de pagina.
+
+**Het is de strook geworden.** Een rij foto's op gelijke hoogte, elk in haar
+eigen verhouding, samen precies zo breed als de kolom. De redenen, op volgorde:
+
+- **Er wordt niets bijgesneden.** Een staande foto blijft staand en neemt gewoon
+  minder breedte in. Het raster van gelijke cellen was de tweede keuze en leest
+  het rustigst, maar het kost elke staande foto haar boven- en onderkant en elke
+  groepsfoto de mensen aan de zijkant. Wie de foto's kiest, kan dat niet zien
+  voor ze publiceert.
+- **De filmstrook verstopt de helft.** Twintig foto's kosten er evenveel hoogte
+  als drie, wat de enige reden is om ze te kiezen; maar wat rechts hangt, ziet
+  lang niet iedereen. Ze blijft wel het gedrag op een telefoon: daar zijn vier
+  foto's naast elkaar postzegels, dus onder 640px wordt de strook één veegbare
+  rij van 200px hoog.
+- **De volle band kan niet middenin.** Ze is de sterkste onderbreking, maar de
+  rail loopt naast de tekst en zou over de band schuiven. Een band hoort dus
+  onderaan de pagina, waar de banden van een werking al staan, en niet tussen
+  twee alinea's.
+
+**De strook loopt door tot waar de rail begint**, niet tot waar de tekst stopt.
+Dezelfde redenering als bij de plaat boven de tekst: een reeks die precies zo
+breed is als de alinea erboven, leest als een illustratie bij die alinea in
+plaats van als een pauze in het lezen. De tekst houdt haar leesbreedte van 74ch.
+
+**Een redacteur zet er een neer zonder iets nieuws te leren: twee of meer
+afbeeldingen die in de markdown tegen elkaar aan staan, zijn samen een galerij.**
+Een lege regel ertussen splitst ze weer, en een enkele foto blijft de foto die ze
+altijd was. Een markering in de trant van `[[galerij]]` (zoals `[[formulier]]`)
+is overwogen en afgevoerd: die moet je uitleggen en onthouden, terwijl "de
+foto's staan onder elkaar" precies is wat je al doet als je er vier na elkaar
+uploadt. De werkbalkknop kiest er dan ook meerdere tegelijk, en bestaande
+pagina's met twee foto's onder elkaar worden er zonder werk beter van.
+
+**De alt-tekst is het bijschrift.** Ze verschijnt in het vergrootglas en blijft
+wat een schermlezer voorleest. Er staat bewust geen bijschrift onder elke foto in
+de rij zelf: bij vier foto's naast elkaar worden dat vier regeltjes van een paar
+woorden onder een rij van 190 pixels hoog, en dat leest als ruis.
+
+**De maten van elke foto staan in de URL** (`?w=1600&h=1067`, geschreven door de
+uploadroute). Zonder die maten is de verhouding pas bekend nadat de foto geladen
+is, en dan zou de hele strook verspringen terwijl je leest. Een reeks waarvan één
+foto haar maten mist, valt daarom terug op een raster met een vaste uitsnede: dat
+staat meteen goed. Oudere pagina's zitten in dat geval; ze komen in de strook
+zodra de foto's opnieuw geüpload worden.

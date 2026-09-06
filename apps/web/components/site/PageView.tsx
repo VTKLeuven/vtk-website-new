@@ -264,12 +264,12 @@ export async function PageView({
           {content.kind === "markdown" ? (
             <>
               <article className="prose-vtk">
-                <Markdown>{split.before}</Markdown>
+                <Markdown locale={locale}>{split.before}</Markdown>
               </article>
               {split.after !== null ? panel : null}
               {split.after ? (
                 <article className="prose-vtk">
-                  <Markdown>{split.after}</Markdown>
+                  <Markdown locale={locale}>{split.after}</Markdown>
                 </article>
               ) : null}
             </>

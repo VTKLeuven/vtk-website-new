@@ -106,6 +106,10 @@ export async function POST(request: Request) {
   let body: Buffer = bytes;
   let contentType = file.type || "application/octet-stream";
   let prefix = "uploads";
+  // De maten van de opgeslagen afbeelding. De editor hangt ze aan de URL, zodat
+  // een fotostrook in de tekst haar rijen kan uitvullen voor de foto's geladen
+  // zijn (zie lib/gallery.ts). Enkel voor afbeeldingen; een PDF heeft er geen.
+  let dimensions: { width: number; height: number } | null = null;
   // Wanneer we het bestand hercoderen, moet de key-extensie het resultaat volgen
   // en niet de originele naam. null = originele naam/extensie behouden.
   let outputName: string | null = null;
@@ -113,10 +117,14 @@ export async function POST(request: Request) {
   if (kind === "image") {
     prefix = "images";
     try {
-      body = await sharp(bytes, { failOn: "error", limitInputPixels: 40_000_000 })
+      // Met `resolveWithObject` komen de maten van het resultaat mee: die van na
+      // het draaien volgens de EXIF-oriëntatie, dus wat de browser straks toont.
+      const output = await sharp(bytes, { failOn: "error", limitInputPixels: 40_000_000 })
         .rotate()
         .jpeg({ quality: 86, mozjpeg: true })
-        .toBuffer();
+        .toBuffer({ resolveWithObject: true });
+      body = output.data;
+      dimensions = { width: output.info.width, height: output.info.height };
       contentType = "image/jpeg";
       outputName = "image.jpg";
     } catch {
@@ -175,5 +183,7 @@ export async function POST(request: Request) {
     size: body.length,
     mime: contentType,
     name: file.name,
+    width: dimensions?.width ?? null,
+    height: dimensions?.height ?? null,
   });
 }

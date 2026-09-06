@@ -149,7 +149,7 @@ export default async function PianoPage({
           <div className="vtk-piano-intro">
             <section className="vtk-basic-panel">
               <div className="prose-vtk">
-                <Markdown>{pick(info.bodyNl, info.bodyEn, locale)}</Markdown>
+                <Markdown locale={locale}>{pick(info.bodyNl, info.bodyEn, locale)}</Markdown>
               </div>
             </section>
 

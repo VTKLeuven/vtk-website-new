@@ -384,7 +384,7 @@ export default async function AdminTheokotVerhuurPage({
                   )}
                 </summary>
                 <div className="prose-vtk mt-3 border-t border-vtk-blue/10 pt-3">
-                  <Markdown>{guide.handbook}</Markdown>
+                  <Markdown locale={locale}>{guide.handbook}</Markdown>
                 </div>
               </details>
             </Card>

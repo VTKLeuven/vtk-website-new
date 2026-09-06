@@ -211,7 +211,7 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
           <h2>{locale === "nl" ? "Over dit event" : "About this event"}</h2>
           {description ? (
             <div className="prose-vtk vtk-event-description">
-              <Markdown>{description}</Markdown>
+              <Markdown locale={locale}>{description}</Markdown>
             </div>
           ) : (
             <p>

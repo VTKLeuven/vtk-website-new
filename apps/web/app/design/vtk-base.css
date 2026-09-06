@@ -340,6 +340,15 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: clamp(28px, 4vw, 48px);
+  /* Containerquery-container voor de fotostrook in de tekst. Die strook loopt
+     door tot waar de rail begint, en dat is de breedte van deze kolom; vanuit de
+     tekstkolom (die op 74ch afgekapt is) valt die breedte niet te kennen. Zie
+     `.vtk-page-content .vtk-gal` in vtk-page.css.
+
+     Let op: dit maakt deze grid ook het referentiekader voor alles wat
+     `position: fixed` is. Het vergrootglas van de galerij staat daarom in een
+     portal op `document.body`. */
+  container-type: inline-size;
 }
 
 .vtk-page-body > article,
@@ -354,6 +363,11 @@
    geven een gat dat groeit naarmate het toevallig een kopje of een alinea is. */
 .vtk-page-content {
   display: grid;
+  /* `minmax(0, 1fr)` en niet de standaard `auto`: een fotostrook is breder dan
+     de tekstkolom (ze loopt door tot aan de rail) en zou als max-content-kind de
+     kolom meetrekken. De tekst leest dan ineens 876 pixels breed in plaats van
+     74ch. Nu steekt enkel de strook uit, en blijft de leesbreedte staan. */
+  grid-template-columns: minmax(0, 1fr);
   gap: clamp(24px, 3vw, 34px);
 }
 

@@ -117,7 +117,7 @@ export default async function WerkgroepenPage({
                   </div>
                   {description && (
                     <div className="prose-vtk mb-6 max-w-[70ch] text-sm">
-                      <Markdown>{description}</Markdown>
+                      <Markdown locale={locale}>{description}</Markdown>
                     </div>
                   )}
                   {sorted.length === 0 ? (
