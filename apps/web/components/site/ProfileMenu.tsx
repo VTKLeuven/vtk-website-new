@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { logoutAction } from "@/app/actions/auth";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
@@ -39,30 +40,30 @@ export function ProfileMenu({
   locale: Locale;
   variant?: "default" | "editorial";
 }) {
+  const pathname = usePathname() ?? "/";
   const [open, setOpen] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [menuPath, setMenuPath] = useState(pathname);
   const ref = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
-    function onDocClick(e: MouseEvent) {
-      if (!ref.current?.contains(e.target as Node)) setOpen(false);
-    }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, [open]);
-
-  // Clean up a pending hover-close timer on unmount.
-  useEffect(() => () => {
-    if (closeTimer.current) clearTimeout(closeTimer.current);
-  }, []);
+  // Navigeren sluit het menu: anders blijft het paneel over de nieuwe pagina
+  // hangen (bv. klikken op Admin).
+  if (menuPath !== pathname) {
+    setMenuPath(pathname);
+    setOpen(false);
+  }
 
   function cancelClose() {
     if (closeTimer.current) {
       clearTimeout(closeTimer.current);
       closeTimer.current = null;
     }
+  }
+
+  function closeMenu() {
+    cancelClose();
+    setOpen(false);
   }
 
   function hoverOpen() {
@@ -75,6 +76,27 @@ export function ProfileMenu({
     cancelClose();
     closeTimer.current = setTimeout(() => setOpen(false), 120);
   }
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocPointer(e: PointerEvent) {
+      if (!ref.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("pointerdown", onDocPointer);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onDocPointer);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  // Clean up a pending hover-close timer on unmount.
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  }, []);
 
   const editorial = variant === "editorial";
 
@@ -121,11 +143,11 @@ export function ProfileMenu({
       </button>
       {(editorial || open) && (
         <div role="menu" className={menuClass} data-open={openAttr}>
-          <Link href={`${base}/account`} className={itemClass} role="menuitem">
+          <Link href={`${base}/account`} className={itemClass} role="menuitem" onClick={closeMenu}>
             {labels.myAccount}
           </Link>
           {canReserveGrocomeet && (
-            <Link href={`${base}/grocomeet`} className={itemClass} role="menuitem">
+            <Link href={`${base}/grocomeet`} className={itemClass} role="menuitem" onClick={closeMenu}>
               {labels.grocomeet}
               {grocomeetNeedsAttention && (
                 <>
@@ -140,7 +162,7 @@ export function ProfileMenu({
             </Link>
           )}
           {isAdmin && (
-            <Link href={`${base}/admin`} className={itemClass} role="menuitem">
+            <Link href={`${base}/admin`} className={itemClass} role="menuitem" onClick={closeMenu}>
               {labels.admin}
             </Link>
           )}
@@ -155,6 +177,7 @@ export function ProfileMenu({
               rel="noreferrer noopener"
               className={itemClass}
               role="menuitem"
+              onClick={closeMenu}
               {...umamiEvent(OUTBOUND_EVENT, {
                 bestemming: outboundHost(tool.href),
                 vanaf: "account",

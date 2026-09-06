@@ -395,6 +395,18 @@
   padding: 0;
 }
 
+@media (max-width: 900px) {
+  .vtk-page-evgrid {
+    grid-template-columns: repeat(auto-fit, minmax(0, calc((100% - 18px) / 2)));
+  }
+}
+
+@media (max-width: 640px) {
+  .vtk-page-evgrid {
+    grid-template-columns: 1fr;
+  }
+}
+
 .vtk-page-ev {
   display: flex;
   flex-direction: column;
@@ -446,6 +458,7 @@
   font-size: 12px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
 }
 
 .vtk-page-ev h3 {

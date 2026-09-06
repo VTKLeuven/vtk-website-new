@@ -121,6 +121,7 @@ export function EditorialNavLinks({
   function renderChildLink(child: NavChild) {
     const href = childHref(child);
     const label = pick(child.labelNl, child.labelEn, locale);
+    const active = pathname === href || (href !== "/" && pathname.startsWith(`${href}/`));
     if (child.external) {
       return (
         <a
@@ -133,7 +134,11 @@ export function EditorialNavLinks({
         </a>
       );
     }
-    return <Link href={href}>{label}</Link>;
+    return (
+      <Link href={href} className={isClient && active ? "active" : undefined}>
+        {label}
+      </Link>
+    );
   }
 
   function renderTabLink(tab: NavTab, active: boolean, withCaret = false) {

@@ -309,6 +309,7 @@
 
 .vtk-site-header .nav-menu a:hover,
 .vtk-site-header .nav-menu a:focus-visible,
+.vtk-site-header .nav-menu a.active,
 .vtk-site-header .profile-menu-item:hover,
 .vtk-site-header .profile-menu-item:focus-visible {
   background: rgba(255, 255, 255, 0.07);
@@ -317,6 +318,7 @@
 
 .vtk-site-header .nav-menu a:hover::before,
 .vtk-site-header .nav-menu a:focus-visible::before,
+.vtk-site-header .nav-menu a.active::before,
 .vtk-site-header .profile-menu-item:hover::before,
 .vtk-site-header .profile-menu-item:focus-visible::before {
   opacity: 1;
@@ -650,14 +652,32 @@
   }
 
   .vtk-site-header .nav-mobile-sub a {
-    display: block;
-    padding: 9px 0;
+    position: relative;
+    display: flex;
+    align-items: center;
+    padding: 9px 0 9px 14px;
     color: var(--on-dark-muted);
     font-size: 14.5px;
     text-decoration: none;
+    transition: color 140ms ease;
   }
 
-  .vtk-site-header .nav-mobile-sub a:hover {
+  /* Los verticaal geel streepje voor elke suboptie: geeft structuur
+     zonder een doorlopende rail te tekenen. */
+  .vtk-site-header .nav-mobile-sub a::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 2px;
+    height: 14px;
+    border-radius: 2px;
+    background: var(--yellow);
+  }
+
+  .vtk-site-header .nav-mobile-sub a:hover,
+  .vtk-site-header .nav-mobile-sub a.active {
     color: #fff;
   }
 }
