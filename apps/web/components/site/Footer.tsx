@@ -100,7 +100,7 @@ export async function Footer({ locale }: { locale: Locale }) {
                 <a href="mailto:info@vtk.be">info@vtk.be</a>
               </li>
               <li>
-                <a href="https://www.instagram.com/vtk_leuven/" rel="noopener noreferrer" target="_blank">
+                <a href="https://www.instagram.com/vtkleuven/" rel="noopener noreferrer" target="_blank">
                   {f.linkInstagram}
                 </a>
               </li>
