@@ -1719,12 +1719,20 @@ kaart van de categoriepagina te zien.
   het verschil met de server-uitvoer struikelt.
 - **Wat er beweegt, en wat niet.** De paginatitel (woord na woord bij het
   laden), de kopfoto (trager dan de pagina), kopjes (woord na woord, met een
-  lichte kanteling), tussentitels (als blok), foto's (van links of van rechts,
-  om en om, en ondertussen langzaam uitzoomend), hun bijschrift, regels van een
-  opsomming, de rail van een citaat, het gele streepje onder een sectiekopje en
-  de leesvoortgangsbalk. Niet: knoppen, tabellen, de rail naast de tekst en
-  alles in de admin. Beweging hoort bij het lezen van een tekst, niet bij het
-  bedienen van een scherm.
+  lichte kanteling), tussentitels (als blok), foto's (van buiten het scherm, om
+  en om van links en van rechts), hun bijschrift, regels van een opsomming, de
+  rail van een citaat, de gele lijn onder een sectiekopje en die onder
+  vetgedrukte tekst. Niet: knoppen, tabellen, de rail naast de tekst en alles in
+  de admin. Beweging hoort bij het lezen van een tekst, niet bij het bedienen
+  van een scherm.
+- **Een foto vertrekt echt naast het scherm** (`translate: -100vw`), niet binnen
+  haar eigen kader. Het figuur knipt daarom niet; de horizontale scrollbalk
+  wordt op `html` opgevangen, met dezelfde `overflow-x: clip` die de
+  volle-breedtebanden al nodig hadden. De rail naast de tekst staat op
+  `z-index: 1`, zodat een foto er onderdoor veegt in plaats van eroverheen.
+- **Geen leesvoortgangsbalk.** Er heeft er een gestaan, bovenaan onder de
+  sitekop. Een balk die bij elke scroll meebeweegt, trekt de aandacht naar de
+  rand van het scherm terwijl de beweging in de tekst zelf hoort te zitten.
 - **Twee animaties op één element vragen de losse `translate`/`scale`/`rotate`
   in plaats van `transform`.** De foto schuift binnen én zoomt uit; als beide
   animaties `transform` schrijven, wint de laatste en verdwijnt de andere
@@ -1732,18 +1740,22 @@ kaart van de categoriepagina te zien.
   animatie weggooit.
 - **De accentkleur wordt meer gebruikt, geen nieuwe kleuren.** Het palet is drie
   neutralen en één accent; levendigheid komt van verhouding en beweging. Het
-  geel komt terug als de lijn onder een sectiekopje (geel vooraan, daarna een
-  haarlijn over de kolom), als ruit in een opsomming, als markeerstift onder
-  vetgedrukte tekst, als rail van een citaat, bij een bijschrift en als
-  leesvoortgang. De eerste alinea is groter en in navy: een pagina begint met
+  geel komt terug als een dikke lijn onder een sectiekopje (zo breed als de
+  titel, niet als de kolom: over de hele kolom las het als een scheiding tussen
+  twee stukken pagina), als ruit in een opsomming, als lijn onder vetgedrukte
+  tekst, als rail van een citaat en bij een bijschrift. Vetgedrukte tekst zelf
+  staat in navy. De eerste alinea is groter en in navy: een pagina begint met
   een stem in plaats van met een muur. Banden die tussen de alinea's van kleur
   wisselen zijn niet gebouwd, om dezelfde reden als bij het formulierpaneel: een
   band van rand tot rand kan niet tussen twee alinea's staan en overheerst een
   korte pagina.
-- **De markeerstift is een inset box-shadow met `box-decoration-break: clone`**,
-  geen gradient en geen absoluut gepositioneerd laagje. Een pseudo-element over
-  de bounding box van vetgedrukte tekst die over twee regels breekt, legt één
-  blok over allebei de regels; `clone` geeft elk stuk zijn eigen streep.
+- **De lijn onder vetgedrukte tekst is een achtergrond op de tekst zelf**, met
+  `box-decoration-break: clone`, en geen absoluut gepositioneerd laagje. Een
+  pseudo-element pakt de omhullende doos van tekst die over twee regels breekt
+  en zet er één streep onder; `clone` geeft elk stuk zijn eigen lijn. Ze groeit
+  aan met `background-size`: dat is de ene uitzondering op "enkel opacity en
+  transform" hieronder, want een transform kan hier niet kloppen. Het gaat om
+  een paar woorden, dus het is verf en geen layout.
 
 ### Vallen waar we in gelopen zijn
 
@@ -1763,9 +1775,11 @@ kaart van de categoriepagina te zien.
   (`view(block var(--motion-inset) auto)`) is een kopje klaar met animeren
   terwijl het nog achter de header zit. Zelfde hoogte als de `scroll-margin-top`
   van de ankers.
-- **Enkel `opacity` en `transform`.** Die twee draaien op de compositor, naast de
-  hoofdthread. `width`, `filter` of `top` animeren zet de layout elke frame
-  opnieuw op.
+- **Enkel `opacity` en `transform`** (of de losse `translate`/`scale`/`rotate`).
+  Die draaien op de compositor, naast de hoofdthread. `width`, `filter` of `top`
+  animeren zet de layout elke frame opnieuw op. De enige uitzondering is de lijn
+  onder vetgedrukte tekst hierboven: daar wint kloppen bij een regelovergang van
+  de compositor, en het is verf op een paar woorden.
 - **Een bereik eindigt binnen `entry`, niet binnen `cover`.** `cover 34%` ligt
   voorbij het punt waarop een element volledig in beeld staat. Kan de pagina
   niet verder scrollen (een korte pagina, het laatste blok onderaan), dan komt

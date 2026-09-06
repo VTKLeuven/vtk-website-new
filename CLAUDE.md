@@ -291,16 +291,19 @@ the design language into the application instead of copying mockup content.
   `.vtk-page-head` do they invert.
 - Motion: content pages animate on scroll, in pure CSS (`animation-timeline`,
   `apps/web/app/design/vtk-motion.css`), never with a scroll listener. Headings
-  arrive word by word, figures slide in from alternating sides, the yellow
-  section rule draws itself, and a yellow progress bar tracks reading. Four
-  rules hold without exception: any hiding start state lives **inside** the
+  arrive word by word, figures fly in from off screen on alternating sides, and
+  the yellow rules under a section heading and under bold text draw themselves.
+  A reading-progress bar was tried and removed. Four rules hold: any hiding
+  start state lives **inside** the
   `@supports (animation-timeline: view())` guard (otherwise a browser without
   support shows a blank page), animate only `opacity` and `transform`, use
   `overflow-x: clip` and never `hidden` around sideways motion (`hidden` makes a
   scroll container and breaks the sticky rail), and nest everything in
   `@media (prefers-reduced-motion: no-preference)`. End every `animation-range`
   inside `entry`, never inside `cover`: a page that cannot scroll further leaves
-  anything ranged past full visibility half-faded forever. Motion belongs to reading a
+  anything ranged past full visibility half-faded forever. The one documented
+  exception to transform-only is the underline under bold text, which grows with
+  `background-size` because a transform cannot follow a line break. Motion belongs to reading a
   text: not on buttons, tables, the rail, or anywhere in admin. See
   `docs/design-decisions.md` for what was rejected.
 - Content pages (`PageView`): dark head with a breadcrumb to the category, then
