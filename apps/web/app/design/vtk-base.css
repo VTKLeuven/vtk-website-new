@@ -484,6 +484,11 @@
   flex-direction: column;
   gap: 12px;
   min-width: 0;
+  /* Een foto komt van buiten het scherm binnengevlogen en veegt daarbij over
+     deze kolom. De rail blijft leesbaar doordat ze erboven staat; de foto gaat
+     eronder door. */
+  position: relative;
+  z-index: 1;
 }
 
 /* Smal scherm: de rail staat boven de tekst. Een inhoudsopgave onderaan, na de

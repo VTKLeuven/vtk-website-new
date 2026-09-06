@@ -113,13 +113,13 @@ body {
   @apply rounded-2xl my-4 max-w-full h-auto shadow-sm border border-vtk-blue/10;
 }
 
-/* Een foto met een bijschrift. `overflow-x: clip` hoort bij de zijwaartse
-   animatie uit vtk-motion.css: de foto schuift binnen haar eigen kader in
-   plaats van naast de tekstkolom. `clip` en niet `hidden`, want `hidden` maakt
+/* Een foto met een bijschrift. Bewust NIET knippen: de foto komt van buiten het
+   scherm binnengevlogen (vtk-motion.css) en moet dus buiten haar eigen kader
+   kunnen staan. De horizontale scrollbalk wordt op `html` opgevangen met
+   `overflow-x: clip` (zie boven); `clip` en niet `hidden`, want `hidden` maakt
    een scrollcontainer en dat breekt de sticky rail naast de tekst. */
 .prose-vtk .vtk-figure {
   margin: 1.5rem 0;
-  overflow-x: clip;
 }
 
 .prose-vtk .vtk-figure img {

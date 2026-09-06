@@ -65,14 +65,6 @@
   }
 }
 
-/* Continu, over de hele doorloop: de foto zoomt langzaam uit terwijl ze
-   voorbijkomt. Staat los van de binnenkomst hierboven. */
-@keyframes vtk-settle {
-  from {
-    scale: 1.06;
-  }
-}
-
 /* De kopfoto beweegt trager dan de pagina. */
 @keyframes vtk-parallax {
   from {
@@ -104,44 +96,36 @@
   }
 }
 
-/* De foto komt van opzij binnen. Geanimeerd wordt de `img`, niet het figuur:
-   het figuur knipt (`overflow-x: clip` in globals.css), zodat de foto binnen
-   haar eigen kader schuift en niets buiten de tekstkolom steekt. Om en om van
-   links en van rechts, zodat een pagina met meerdere foto's ritme krijgt. */
+/* De foto komt van buiten het scherm binnengevlogen, om en om van links en van
+   rechts. Een volle viewportbreedte, dus ze vertrekt echt naast het scherm en
+   niet binnen haar eigen kader. Geen horizontale scrollbalk: `html` staat in
+   globals.css op `overflow-x: clip` (dezelfde regel die de volle-breedtebanden
+   opvangt). Geen `opacity` erbij; buiten het scherm is ze toch niet te zien, en
+   zo zie je haar echt binnenkomen in plaats van verschijnen. */
 @keyframes vtk-fly-in-left {
   from {
-    opacity: 0;
-    translate: -9% 0;
+    translate: -100vw 0;
   }
 }
 
 @keyframes vtk-fly-in-right {
   from {
-    opacity: 0;
-    translate: 9% 0;
+    translate: 100vw 0;
   }
 }
 
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
     .vtk-motion .vtk-figure img {
-      animation:
-        vtk-fly-in-left linear both,
-        vtk-settle linear both;
-      animation-timeline:
-        view(block var(--motion-inset) auto),
-        view(block var(--motion-inset) auto);
-      animation-range:
-        entry 5% entry 70%,
-        cover 0% cover 100%;
+      animation: vtk-fly-in-left linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry 0% entry 75%;
     }
 
     /* `nth-of-type` telt enkel figuren tussen hun broers en zussen, dus dit is
        de tweede foto van de tekst en niet het tweede element. */
     .vtk-motion .vtk-figure:nth-of-type(even) img {
-      /* Allebei de namen: één waarde zou de tweede animatie hierboven
-         (het uitzoomen) stilzwijgend weglaten. */
-      animation-name: vtk-fly-in-right, vtk-settle;
+      animation-name: vtk-fly-in-right;
     }
 
     /* Het bijschrift volgt de foto met een korte vertraging: eerst het beeld,
