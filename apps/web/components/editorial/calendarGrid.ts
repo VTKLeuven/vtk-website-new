@@ -59,9 +59,56 @@ function mondayFirstWeekdayIndex(d: Date): number {
 }
 
 export function isSameCalendarDay(a: Date, b: Date): boolean {
-  return (
-    a.getFullYear() === b.getFullYear() &&
-    a.getMonth() === b.getMonth() &&
-    a.getDate() === b.getDate()
-  );
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+}
+
+export type CalendarInterval = { start: string; end: string; allDay: boolean };
+
+/** All-day end dates are inclusive in our CMS; timed events end exclusively. */
+export function eventDayRange(event: CalendarInterval): { first: Date; last: Date } {
+  const start = new Date(event.start);
+  const end = new Date(event.end);
+  const lastInstant = !event.allDay && end > start ? new Date(+end - 1) : end;
+  return {
+    first: new Date(start.getFullYear(), start.getMonth(), start.getDate()),
+    last: new Date(lastInstant.getFullYear(), lastInstant.getMonth(), lastInstant.getDate()),
+  };
+}
+
+export function eventOccursOnDay(event: CalendarInterval, day: Date): boolean {
+  const { first, last } = eventDayRange(event);
+  return day >= first && day <= last;
+}
+
+export function isMultiDayEvent(event: CalendarInterval): boolean {
+  const { first, last } = eventDayRange(event);
+  return last > first;
+}
+
+/** Clip bars to a week and pack overlapping spans into separate rows. */
+export function weekEventSpans<T extends CalendarInterval>(events: T[], days: Date[]) {
+  const spans = events
+    .filter(isMultiDayEvent)
+    .flatMap((event) => {
+      const columns = days.flatMap((day, index) => (eventOccursOnDay(event, day) ? [index] : []));
+      if (!columns.length) return [];
+      const { first, last } = eventDayRange(event);
+      return [
+        {
+          event,
+          start: columns[0]!,
+          end: columns.at(-1)!,
+          continuesBefore: first < days[0]!,
+          continuesAfter: last > days.at(-1)!,
+        },
+      ];
+    })
+    .sort((a, b) => a.start - b.start || b.end - a.end || +new Date(a.event.start) - +new Date(b.event.start));
+  const occupied: number[] = [];
+  return spans.map((span) => {
+    let lane = occupied.findIndex((end) => end < span.start);
+    if (lane < 0) lane = occupied.length;
+    occupied[lane] = span.end;
+    return { ...span, lane };
+  });
 }

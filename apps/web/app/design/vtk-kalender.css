@@ -1667,12 +1667,7 @@
   /* De strepen van een ontbrekende foto; ze komen hier in de praktijk niet voor
      omdat de server terugvalt op de standaardfoto, maar een leeg vak terwijl de
      foto laadt hoort geen wit gat te zijn. */
-  background:
-    repeating-linear-gradient(
-      135deg,
-      var(--paper-2) 0 10px,
-      var(--paper) 10px 20px
-    );
+  background: repeating-linear-gradient(135deg, var(--paper-2) 0 10px, var(--paper) 10px 20px);
 }
 
 .vtk-design .ag-media img {
@@ -1687,7 +1682,7 @@
 /* Het klikvlak van de hele rij. Ligt onder de ster (die staat op z-index 1), dus
    een tik op de ster duidt aan dat je komt en opent het evenement niet. */
 .vtk-design .ag-link::after {
-  content: "";
+  content: '';
   position: absolute;
   inset: 0;
   border-radius: 18px;
@@ -1720,7 +1715,7 @@
 }
 
 .vtk-design .ag-star::before {
-  content: "";
+  content: '';
   position: absolute;
   top: 50%;
   left: 50%;
@@ -1735,7 +1730,7 @@
 }
 
 /* Aangeduid: geel, de kleur die op deze site "actief" betekent. */
-.vtk-design .ag-star[aria-pressed="true"] {
+.vtk-design .ag-star[aria-pressed='true'] {
   background: var(--yellow);
   color: var(--ink);
 }
@@ -1753,9 +1748,9 @@
   .vtk-design .ag-row {
     grid-template-columns: 68px minmax(0, 1fr) auto;
     grid-template-areas:
-      "media media media"
-      "date title star"
-      "tag tag tag";
+      'media media media'
+      'date title star'
+      'tag tag tag';
     gap: 14px;
     padding: 16px;
   }
@@ -1790,5 +1785,77 @@
      op een telefoon is die ruimte de titel meer waard. */
   .vtk-design .ag-go {
     display: none;
+  }
+}
+
+/* Multi-day events share a row across the seven day columns. */
+.vtk-design .cal-week {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  position: relative;
+}
+.vtk-design .cal-span-space {
+  height: calc(var(--span-lanes) * 29px);
+  flex-shrink: 0;
+}
+.vtk-design .cal-spans {
+  position: absolute;
+  top: 42px;
+  left: 0;
+  right: 0;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  grid-auto-rows: 25px;
+  row-gap: 4px;
+  pointer-events: none;
+}
+.vtk-design .cal-span {
+  min-width: 0;
+  margin: 0 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border-left: 3px solid var(--cat, var(--navy));
+  background: color-mix(in oklab, var(--cat, var(--navy)) 18%, var(--paper));
+  color: var(--ink);
+  font-size: 12px;
+  line-height: 17px;
+  font-weight: 600;
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: auto;
+}
+.vtk-design .cal-span:hover {
+  background: color-mix(in oklab, var(--cat, var(--navy)) 30%, var(--paper));
+}
+.vtk-design .cal-span:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+.vtk-design .cal-span.continues-before {
+  margin-left: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+.vtk-design .cal-span.continues-after {
+  margin-right: 0;
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+@media (max-width: 720px) {
+  .vtk-design .cal-week .cal-cell {
+    aspect-ratio: auto;
+    min-height: calc(52px + var(--span-lanes) * 29px);
+    justify-content: flex-start;
+    padding-top: 6px;
+  }
+  .vtk-design .cal-spans {
+    top: 48px;
+  }
+  .vtk-design .cal-span {
+    font-size: 10px;
+    padding-inline: 4px;
   }
 }

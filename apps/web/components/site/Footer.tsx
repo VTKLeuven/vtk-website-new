@@ -1,11 +1,11 @@
-import Image from "next/image";
-import Link from "next/link";
-import { getDictionary, type Locale } from "@vtk/i18n";
-import { CookieSettingsButton } from "./CookieConsent";
+import Image from 'next/image';
+import Link from 'next/link';
+import { getDictionary, type Locale } from '@vtk/i18n';
+import { CookieSettingsButton } from './CookieConsent';
 
 export async function Footer({ locale }: { locale: Locale }) {
   const dict = getDictionary(locale);
-  const base = locale === "nl" ? "" : "/en";
+  const base = locale === 'nl' ? '' : '/en';
   const f = dict.footer;
 
   return (
@@ -41,7 +41,7 @@ export async function Footer({ locale }: { locale: Locale }) {
                 <Link href={`${base}/cursusdienst`}>{f.linkCourse}</Link>
               </li>
               <li>
-                <Link href={`${base}/internationaal`}>{f.linkIntl}</Link>
+                <Link href="/en/internationals">{f.linkIntl}</Link>
               </li>
             </ul>
           </div>

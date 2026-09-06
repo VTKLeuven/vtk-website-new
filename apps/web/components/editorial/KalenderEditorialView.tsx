@@ -1,20 +1,23 @@
-"use client";
+'use client';
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import Image from "next/image";
-import { usePathname } from "next/navigation";
-import { markdownToPlainText } from "@/lib/markdown";
-import { CalendarSubscribe } from "@/components/site/CalendarSubscribe";
-import { Markdown } from "@/components/ui/Markdown";
-import { EventInterest } from "@/components/calendar/EventInterest";
-import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar";
-import type { ViewerInterest } from "@/lib/calendar/interest";
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
+import { usePathname } from 'next/navigation';
+import { markdownToPlainText } from '@/lib/markdown';
+import { CalendarSubscribe } from '@/components/site/CalendarSubscribe';
+import { Markdown } from '@/components/ui/Markdown';
+import { EventInterest } from '@/components/calendar/EventInterest';
+import { EventStar, type EventStarLabels } from '@/components/calendar/EventStar';
+import type { ViewerInterest } from '@/lib/calendar/interest';
 import {
+  eventOccursOnDay,
+  isMultiDayEvent,
+  weekEventSpans,
   monthGridCells,
   rollingSixWeeksGridCells,
   weekGridDays,
   isSameCalendarDay,
-} from "./calendarGrid";
+} from './calendarGrid';
 
 type ApiEvent = {
   id: string;
@@ -66,7 +69,7 @@ type ApiEvent = {
 function previewSummary(text: string, max = 260): string {
   if (text.length <= max) return text;
   const cut = text.slice(0, max);
-  const lastSpace = cut.lastIndexOf(" ");
+  const lastSpace = cut.lastIndexOf(' ');
   return `${(lastSpace > max * 0.6 ? cut.slice(0, lastSpace) : cut).trimEnd()}…`;
 }
 
@@ -95,7 +98,7 @@ export function KalenderEditorialView({
   defaultOnlyMyAudiences = false,
   signedIn = false,
 }: {
-  locale: "nl" | "en";
+  locale: 'nl' | 'en';
   labels: {
     crumbsHome: string;
     crumbsHere: string;
@@ -125,12 +128,10 @@ export function KalenderEditorialView({
   /** Bepaalt of de voorvertoning een knop toont of een verwijzing naar inloggen. */
   signedIn?: boolean;
 }) {
-  const base = locale === "nl" ? "" : "/en";
+  const base = locale === 'nl' ? '' : '/en';
   const pathname = usePathname();
   const now = new Date();
-  const [cursor, setCursor] = useState(
-    () => new Date(now.getFullYear(), now.getMonth(), now.getDate()),
-  );
+  const [cursor, setCursor] = useState(() => new Date(now.getFullYear(), now.getMonth(), now.getDate()));
   // Bij het openen van de kalender toont het raster de komende 6 weken (1 week
   // terug, huidige week, 4 weken vooruit). Zodra de gebruiker begint te bladeren
   // of van weergave wisselt, schakelt het raster over naar de klassieke maandweergave.
@@ -140,10 +141,10 @@ export function KalenderEditorialView({
   // Server Component-render op te halen; Next.js 16 houdt `usePathname` daarbij
   // zelf synchroon. Zo blijven terug/vooruit en een gekopieerde slug werken.
   const filter = useMemo(() => {
-    const slug = pathname.split("/").filter(Boolean).at(-1);
-    return categories.some((category) => category.slug === slug) ? slug! : "all";
+    const slug = pathname.split('/').filter(Boolean).at(-1);
+    return categories.some((category) => category.slug === slug) ? slug! : 'all';
   }, [categories, pathname]);
-  const [view, setView] = useState<"agenda" | "week" | "list">("agenda");
+  const [view, setView] = useState<'agenda' | 'week' | 'list'>('agenda');
   // Alles is standaard zichtbaar. Personalisatie is een bewuste keuze en houdt
   // algemene events plus de doelgroepevents die bij het profiel horen over; de
   // beginstand komt uit de accountvoorkeur van het lid.
@@ -164,17 +165,17 @@ export function KalenderEditorialView({
   const month = cursor.getMonth();
   const cells = useMemo(
     () => (isRolling ? rollingSixWeeksGridCells(cursor) : monthGridCells(year, month)),
-    [isRolling, cursor, year, month],
+    [isRolling, cursor, year, month]
   );
   const weekDays = useMemo(() => weekGridDays(cursor), [cursor]);
 
   const categoryName = useCallback(
-    (c: { nameNl: string; nameEn: string }) => (locale === "nl" ? c.nameNl : c.nameEn),
-    [locale],
+    (c: { nameNl: string; nameEn: string }) => (locale === 'nl' ? c.nameNl : c.nameEn),
+    [locale]
   );
   const selectedCategory = categories.find((category) => category.slug === filter) ?? null;
   const selectedDescription = selectedCategory
-    ? locale === "nl"
+    ? locale === 'nl'
       ? selectedCategory.descriptionNl
       : selectedCategory.descriptionEn
     : null;
@@ -183,16 +184,16 @@ export function KalenderEditorialView({
 
   const fetchForRange = useCallback(
     async (start: Date, end: Date) => {
-      const url = new URL("/api/calendar/events", window.location.origin);
-      url.searchParams.set("start", start.toISOString());
-      url.searchParams.set("end", end.toISOString());
-      if (filter !== "all") url.searchParams.set("category", filter);
-      if (onlyMyAudiences) url.searchParams.set("audience", "mine");
+      const url = new URL('/api/calendar/events', window.location.origin);
+      url.searchParams.set('start', start.toISOString());
+      url.searchParams.set('end', end.toISOString());
+      if (filter !== 'all') url.searchParams.set('category', filter);
+      if (onlyMyAudiences) url.searchParams.set('audience', 'mine');
       const res = await fetch(url.toString());
       if (!res.ok) return [];
       return (await res.json()) as ApiEvent[];
     },
-    [filter, onlyMyAudiences],
+    [filter, onlyMyAudiences]
   );
 
   useEffect(() => {
@@ -229,30 +230,29 @@ export function KalenderEditorialView({
   useEffect(() => {
     if (!preview) return;
     function onKey(event: KeyboardEvent) {
-      if (event.key === "Escape") setPreview(null);
+      if (event.key === 'Escape') setPreview(null);
     }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
   }, [preview]);
 
   const eventsByDay = useMemo(() => {
     const m = new Map<string, ApiEvent[]>();
-    for (const e of monthEvents) {
-      const d = new Date(e.start);
-      const key = dayKey(d);
-      const arr = m.get(key) ?? [];
-      arr.push(e);
-      m.set(key, arr);
+    for (const { date } of cells) {
+      m.set(
+        dayKey(date),
+        monthEvents.filter((event) => eventOccursOnDay(event, date))
+      );
     }
     for (const arr of m.values()) {
       arr.sort((a, b) => +new Date(a.start) - +new Date(b.start));
     }
     return m;
-  }, [monthEvents]);
+  }, [monthEvents, cells]);
 
   const weekEvents = useMemo(
-    () => weekDays.flatMap((day) => eventsByDay.get(dayKey(day)) ?? []),
-    [eventsByDay, weekDays],
+    () => monthEvents.filter((event) => weekDays.some((day) => eventOccursOnDay(event, day))),
+    [monthEvents, weekDays]
   );
 
   /**
@@ -264,11 +264,10 @@ export function KalenderEditorialView({
     () =>
       monthEvents
         .filter((e) => {
-          const d = new Date(e.start);
-          return d.getFullYear() === year && d.getMonth() === month;
+          return cells.some(({ date, inMonth }) => inMonth && eventOccursOnDay(e, date));
         })
         .sort((a, b) => +new Date(a.start) - +new Date(b.start)),
-    [monthEvents, year, month],
+    [monthEvents, cells]
   );
 
   /**
@@ -284,9 +283,7 @@ export function KalenderEditorialView({
     const todayKey = dayKey(new Date());
     if (cells.some((c) => c.inMonth && dayKey(c.date) === todayKey)) return todayKey;
 
-    const firstWithEvents = cells.find(
-      (c) => c.inMonth && (eventsByDay.get(dayKey(c.date))?.length ?? 0) > 0,
-    );
+    const firstWithEvents = cells.find((c) => c.inMonth && (eventsByDay.get(dayKey(c.date))?.length ?? 0) > 0);
     if (firstWithEvents) return dayKey(firstWithEvents.date);
 
     const firstOfMonth = cells.find((c) => c.inMonth);
@@ -295,48 +292,48 @@ export function KalenderEditorialView({
 
   const selectedDate = useMemo(
     () => cells.find((c) => dayKey(c.date) === selectedDayKey)?.date ?? null,
-    [cells, selectedDayKey],
+    [cells, selectedDayKey]
   );
   const selectedEvents = selectedDayKey ? (eventsByDay.get(selectedDayKey) ?? []) : [];
 
-  const monthLabel = cursor.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-    month: "long",
-    year: "numeric",
+  const monthLabel = cursor.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+    month: 'long',
+    year: 'numeric',
   });
   const gridFrom = cells[0]!.date;
   const gridTo = cells[41]!.date;
   const gridRange =
-    gridFrom.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-      day: "2-digit",
-      month: "short",
+    gridFrom.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+      day: '2-digit',
+      month: 'short',
     }) +
-    " - " +
-    gridTo.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-      day: "2-digit",
-      month: "short",
+    ' - ' +
+    gridTo.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+      day: '2-digit',
+      month: 'short',
     });
   const weekFrom = weekDays[0]!;
   const weekTo = weekDays[6]!;
-  const weekLabel = `${weekFrom.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-    day: "numeric",
-    month: "short",
-  })} - ${weekTo.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
+  const weekLabel = `${weekFrom.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+    day: 'numeric',
+    month: 'short',
+  })} - ${weekTo.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
   })}`;
 
   function pickTitle(e: ApiEvent) {
-    return locale === "nl" ? e.title : e.titleEn || e.title;
+    return locale === 'nl' ? e.title : e.titleEn || e.title;
   }
 
   function pickDesc(e: ApiEvent) {
-    const d = locale === "nl" ? e.extendedProps.descriptionNl : e.extendedProps.descriptionEn;
-    return markdownToPlainText(d ?? "");
+    const d = locale === 'nl' ? e.extendedProps.descriptionNl : e.extendedProps.descriptionEn;
+    return markdownToPlainText(d ?? '');
   }
 
   function pickGroup(e: ApiEvent) {
-    return locale === "nl" ? e.extendedProps.groupNameNl : e.extendedProps.groupNameEn;
+    return locale === 'nl' ? e.extendedProps.groupNameNl : e.extendedProps.groupNameEn;
   }
 
   /** De eerste categorie bepaalt de kleur van de pil en het label in de agendalijst. */
@@ -354,10 +351,10 @@ export function KalenderEditorialView({
   }
 
   function eventTime(e: ApiEvent) {
-    if (e.allDay) return locale === "nl" ? "Hele dag" : "All day";
-    return new Date(e.start).toLocaleTimeString(locale === "nl" ? "nl-BE" : "en-GB", {
-      hour: "2-digit",
-      minute: "2-digit",
+    if (e.allDay) return locale === 'nl' ? 'Hele dag' : 'All day';
+    return new Date(e.start).toLocaleTimeString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+      hour: '2-digit',
+      minute: '2-digit',
     });
   }
 
@@ -365,7 +362,7 @@ export function KalenderEditorialView({
     if (isRolling) {
       setIsRolling(false);
     }
-    if (view === "week") {
+    if (view === 'week') {
       const next = new Date(cursor);
       next.setDate(next.getDate() + delta * 7);
       setCursor(next);
@@ -394,7 +391,7 @@ export function KalenderEditorialView({
     }
     event.preventDefault();
     const href = filterHref(slug);
-    if (href !== pathname) window.history.pushState(null, "", href);
+    if (href !== pathname) window.history.pushState(null, '', href);
   }
 
   /**
@@ -420,7 +417,7 @@ export function KalenderEditorialView({
    * de drempel is een serverbeslissing, en die mogen we hier niet nabootsen.
    */
   function markInterest(eventId: string, nextViewer: ViewerInterest) {
-    const next = nextViewer.kind !== "none";
+    const next = nextViewer.kind !== 'none';
     const apply = (list: ApiEvent[]) =>
       list.map((item) =>
         item.id === eventId
@@ -431,13 +428,12 @@ export function KalenderEditorialView({
                 interested: next,
                 viewerInterest: nextViewer,
                 interestedCount:
-                  item.extendedProps.interestedCount === null ||
-                  item.extendedProps.interested === next
+                  item.extendedProps.interestedCount === null || item.extendedProps.interested === next
                     ? item.extendedProps.interestedCount
                     : Math.max(0, item.extendedProps.interestedCount + (next ? 1 : -1)),
               },
             }
-          : item,
+          : item
       );
     setMonthEvents(apply);
     setAgendaEvents(apply);
@@ -450,13 +446,12 @@ export function KalenderEditorialView({
               interested: next,
               viewerInterest: nextViewer,
               interestedCount:
-                current.extendedProps.interestedCount === null ||
-                current.extendedProps.interested === next
+                current.extendedProps.interestedCount === null || current.extendedProps.interested === next
                   ? current.extendedProps.interestedCount
                   : Math.max(0, current.extendedProps.interestedCount + (next ? 1 : -1)),
             },
           }
-        : current,
+        : current
     );
   }
 
@@ -464,28 +459,20 @@ export function KalenderEditorialView({
   function interestLine(e: ApiEvent): string | null {
     const count = e.extendedProps.interestedCount;
     if (!count) return null;
-    return locale === "nl" ? `${count} komen` : `${count} going`;
+    return locale === 'nl' ? `${count} komen` : `${count} going`;
   }
 
-  const showMonthGrid = view === "agenda";
-  const periodCount =
-    view === "week"
-      ? weekEvents.length
-      : isRolling
-        ? monthEvents.length
-        : monthOnlyEvents.length;
+  const showMonthGrid = view === 'agenda';
+  const periodCount = view === 'week' ? weekEvents.length : isRolling ? monthEvents.length : monthOnlyEvents.length;
 
   const starLabels: EventStarLabels = {
-    mark: locale === "nl" ? "Ik kom naar dit evenement" : "I am coming to this event",
-    marked: locale === "nl" ? "Je komt naar dit evenement" : "You are coming to this event",
-    signIn:
-      locale === "nl"
-        ? "Meld je aan om aan te duiden dat je komt"
-        : "Sign in to mark that you are coming",
+    mark: locale === 'nl' ? 'Ik kom naar dit evenement' : 'I am coming to this event',
+    marked: locale === 'nl' ? 'Je komt naar dit evenement' : 'You are coming to this event',
+    signIn: locale === 'nl' ? 'Meld je aan om aan te duiden dat je komt' : 'Sign in to mark that you are coming',
     failed:
-      locale === "nl"
-        ? "Aanduiden lukte niet. Probeer het straks opnieuw."
-        : "Marking this did not work. Try again in a moment.",
+      locale === 'nl'
+        ? 'Aanduiden lukte niet. Probeer het straks opnieuw.'
+        : 'Marking this did not work. Try again in a moment.',
   };
 
   /**
@@ -499,10 +486,10 @@ export function KalenderEditorialView({
     markInterest(
       e.id,
       interested
-        ? previous.kind !== "none"
+        ? previous.kind !== 'none'
           ? previous
           : {
-              kind: "member",
+              kind: 'member',
               displayName: null,
               graduationYear: null,
               wasInVtk: false,
@@ -510,7 +497,7 @@ export function KalenderEditorialView({
               showGraduationYear: false,
               showWasInVtk: false,
             }
-        : { kind: "none" },
+        : { kind: 'none' }
     );
   }
 
@@ -537,15 +524,15 @@ export function KalenderEditorialView({
     // die hier herhalen zou twee keer "Eerstejaars" geven.
     const cat = e.extendedProps.categories.find((c) => c.audience === null) ?? null;
     const d = new Date(e.start);
-    const dateLocale = locale === "nl" ? "nl-BE" : "en-GB";
+    const dateLocale = locale === 'nl' ? 'nl-BE' : 'en-GB';
     const going = interestLine(e);
     const title = pickTitle(e);
     return (
       <article key={e.id} className="ag-row">
         <div className="ag-date">
-          <b>{String(d.getDate()).padStart(2, "0")}</b>
-          {d.toLocaleDateString(dateLocale, { month: "short" })} ·{" "}
-          {d.toLocaleDateString(dateLocale, { weekday: "short" })}
+          <b>{String(d.getDate()).padStart(2, '0')}</b>
+          {d.toLocaleDateString(dateLocale, { month: 'short' })} ·{' '}
+          {d.toLocaleDateString(dateLocale, { weekday: 'short' })}
         </div>
         <span className="ag-media" aria-hidden="true">
           <Image
@@ -553,11 +540,7 @@ export function KalenderEditorialView({
             alt=""
             fill
             sizes="(max-width: 960px) 100vw, 220px"
-            style={
-              e.extendedProps.imagePosition
-                ? { objectPosition: e.extendedProps.imagePosition }
-                : undefined
-            }
+            style={e.extendedProps.imagePosition ? { objectPosition: e.extendedProps.imagePosition } : undefined}
           />
         </span>
         <div className="ag-title">
@@ -565,17 +548,13 @@ export function KalenderEditorialView({
             {title}
           </a>
           {audienceCategories(e).map((a) => (
-            <span
-              key={a.slug}
-              className="ag-audience"
-              style={{ "--cat": a.colour } as React.CSSProperties}
-            >
+            <span key={a.slug} className="ag-audience" style={{ '--cat': a.colour } as React.CSSProperties}>
               {categoryName(a)}
             </span>
           ))}
           <small>
             {eventTime(e)}
-            {e.location ? ` · ${e.location}` : ""}
+            {e.location ? ` · ${e.location}` : ''}
           </small>
           {going ? <span className="ev-going">{going}</span> : null}
         </div>
@@ -586,7 +565,7 @@ export function KalenderEditorialView({
               ? ({
                   background: cat.colour,
                   borderColor: cat.colour,
-                  color: "#fff",
+                  color: '#fff',
                 } as React.CSSProperties)
               : undefined
           }
@@ -635,10 +614,10 @@ export function KalenderEditorialView({
     >
       <div
         className={`ev-preview${
-          preview.extendedProps.viewerInterest.kind !== "none" &&
-          preview.extendedProps.categories.some((category) => category.audience === "ALUMNI")
-            ? " has-interest"
-            : ""
+          preview.extendedProps.viewerInterest.kind !== 'none' &&
+          preview.extendedProps.categories.some((category) => category.audience === 'ALUMNI')
+            ? ' has-interest'
+            : ''
         }`}
         onClick={(event) => event.stopPropagation()}
       >
@@ -646,7 +625,7 @@ export function KalenderEditorialView({
           type="button"
           className="ev-preview-close"
           onClick={() => setPreview(null)}
-          aria-label={locale === "nl" ? "Sluiten" : "Close"}
+          aria-label={locale === 'nl' ? 'Sluiten' : 'Close'}
         >
           ×
         </button>
@@ -655,8 +634,8 @@ export function KalenderEditorialView({
           {preview.extendedProps.categories.map((c) => (
             <span
               key={c.slug}
-              className={`ev-preview-tag${c.audience ? " audience" : ""}`}
-              style={{ "--cat": c.colour } as React.CSSProperties}
+              className={`ev-preview-tag${c.audience ? ' audience' : ''}`}
+              style={{ '--cat': c.colour } as React.CSSProperties}
             >
               {categoryName(c)}
             </span>
@@ -667,32 +646,30 @@ export function KalenderEditorialView({
 
         <dl className="ev-preview-meta">
           <div>
-            <dt>{locale === "nl" ? "Wanneer" : "When"}</dt>
+            <dt>{locale === 'nl' ? 'Wanneer' : 'When'}</dt>
             <dd>
-              {new Date(preview.start).toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-                weekday: "long",
-                day: "numeric",
-                month: "long",
+              {new Date(preview.start).toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
               })}
-              {" · "}
+              {' · '}
               {eventTime(preview)}
             </dd>
           </div>
           {preview.location ? (
             <div>
-              <dt>{locale === "nl" ? "Waar" : "Where"}</dt>
+              <dt>{locale === 'nl' ? 'Waar' : 'Where'}</dt>
               <dd>{preview.location}</dd>
             </div>
           ) : null}
           <div>
-            <dt>{locale === "nl" ? "Door" : "By"}</dt>
+            <dt>{locale === 'nl' ? 'Door' : 'By'}</dt>
             <dd>{pickGroup(preview)}</dd>
           </div>
         </dl>
 
-        {pickDesc(preview) ? (
-          <p className="ev-preview-desc">{previewSummary(pickDesc(preview))}</p>
-        ) : null}
+        {pickDesc(preview) ? <p className="ev-preview-desc">{previewSummary(pickDesc(preview))}</p> : null}
 
         {interestLine(preview) ? <p className="ev-preview-going">{interestLine(preview)}</p> : null}
 
@@ -703,58 +680,49 @@ export function KalenderEditorialView({
         <div className="ev-preview-actions">
           <EventInterest
             eventId={preview.id}
-            isAlumniEvent={preview.extendedProps.categories.some(
-              (category) => category.audience === "ALUMNI",
-            )}
+            isAlumniEvent={preview.extendedProps.categories.some((category) => category.audience === 'ALUMNI')}
             signedIn={signedIn}
             viewer={preview.extendedProps.viewerInterest}
             loginHref={`${base}/inloggen?next=${encodeURIComponent(eventHref(preview))}`}
             labels={{
-              interested: locale === "nl" ? "Geïnteresseerd" : "Interested",
-              removeInterest: locale === "nl" ? "Niet meer geïnteresseerd" : "Remove interest",
-              saving: locale === "nl" ? "Bezig..." : "Working...",
+              interested: locale === 'nl' ? 'Geïnteresseerd' : 'Interested',
+              removeInterest: locale === 'nl' ? 'Niet meer geïnteresseerd' : 'Remove interest',
+              saving: locale === 'nl' ? 'Bezig...' : 'Working...',
               countLine: null,
-              loginCta: locale === "nl" ? "Log in" : "Sign in",
+              loginCta: locale === 'nl' ? 'Log in' : 'Sign in',
               detailsHeading:
-                locale === "nl"
-                  ? "Wat mogen anderen zien bij ‘Wie er komt’?"
-                  : "What may others see under ‘Who is coming’?",
+                locale === 'nl'
+                  ? 'Wat mogen anderen zien bij ‘Wie er komt’?'
+                  : 'What may others see under ‘Who is coming’?',
               detailsHint:
-                locale === "nl"
-                  ? "Zo zien anderen wie er komt, en help je dus mede alumni te overtuigen om te komen door ze te laten weten dat ze mensen zullen herkennen!"
-                  : "This shows others who is coming and helps convince fellow alumni by letting them know they will recognise people there.",
-              name: locale === "nl" ? "Naam (optioneel)" : "Name (optional)",
-              namePlaceholder: locale === "nl" ? "Jouw naam" : "Your name",
-              showName: locale === "nl" ? "Toon mijn naam" : "Show my name",
-              graduationYear:
-                locale === "nl" ? "Afstudeerjaar (optioneel)" : "Graduation year (optional)",
-              showGraduationYear:
-                locale === "nl" ? "Toon mijn afstudeerjaar" : "Show my graduation year",
-              wasInVtk:
-                locale === "nl" ? "Ik zat in VTK Praesidium" : "I was in the VTK Praesidium",
+                locale === 'nl'
+                  ? 'Zo zien anderen wie er komt, en help je dus mede alumni te overtuigen om te komen door ze te laten weten dat ze mensen zullen herkennen!'
+                  : 'This shows others who is coming and helps convince fellow alumni by letting them know they will recognise people there.',
+              name: locale === 'nl' ? 'Naam (optioneel)' : 'Name (optional)',
+              namePlaceholder: locale === 'nl' ? 'Jouw naam' : 'Your name',
+              showName: locale === 'nl' ? 'Toon mijn naam' : 'Show my name',
+              graduationYear: locale === 'nl' ? 'Afstudeerjaar (optioneel)' : 'Graduation year (optional)',
+              showGraduationYear: locale === 'nl' ? 'Toon mijn afstudeerjaar' : 'Show my graduation year',
+              wasInVtk: locale === 'nl' ? 'Ik zat in VTK Praesidium' : 'I was in the VTK Praesidium',
               showWasInVtk:
-                locale === "nl"
-                  ? "Toon mijn antwoord over VTK Praesidium"
-                  : "Show my answer about the VTK Praesidium",
+                locale === 'nl' ? 'Toon mijn antwoord over VTK Praesidium' : 'Show my answer about the VTK Praesidium',
               perEventHint:
-                locale === "nl"
-                  ? "Deze gegevens gelden alleen voor dit evenement en komen niet uit je profiel. Alleen aangevinkte informatie wordt publiek getoond."
-                  : "These details apply only to this event and do not come from your profile. Only selected information is shown publicly.",
-              saveDetails: locale === "nl" ? "Bewaren" : "Save",
-              detailsSaved: locale === "nl" ? "Opgeslagen." : "Saved.",
+                locale === 'nl'
+                  ? 'Deze gegevens gelden alleen voor dit evenement en komen niet uit je profiel. Alleen aangevinkte informatie wordt publiek getoond.'
+                  : 'These details apply only to this event and do not come from your profile. Only selected information is shown publicly.',
+              saveDetails: locale === 'nl' ? 'Bewaren' : 'Save',
+              detailsSaved: locale === 'nl' ? 'Opgeslagen.' : 'Saved.',
               errorVisibleValue:
-                locale === "nl"
-                  ? "Vul eerst de naam of het afstudeerjaar in dat je zichtbaar wilt maken."
-                  : "First enter the name or graduation year you want to make visible.",
+                locale === 'nl'
+                  ? 'Vul eerst de naam of het afstudeerjaar in dat je zichtbaar wilt maken.'
+                  : 'First enter the name or graduation year you want to make visible.',
               errorGeneric:
-                locale === "nl"
-                  ? "Dat lukte niet. Probeer het opnieuw."
-                  : "That did not work. Please try again.",
+                locale === 'nl' ? 'Dat lukte niet. Probeer het opnieuw.' : 'That did not work. Please try again.',
             }}
             onChanged={(viewer) => markInterest(preview.id, viewer)}
           />
           <a href={eventHref(preview)} className="btn btn-ghost arrow ev-preview-go">
-            {locale === "nl" ? "Evenementpagina" : "Event page"}
+            {locale === 'nl' ? 'Evenementpagina' : 'Event page'}
           </a>
         </div>
       </div>
@@ -767,16 +735,16 @@ export function KalenderEditorialView({
       <header className="page-head">
         <div>
           <div className="crumbs">
-            {labels.crumbsHome} ·{" "}
+            {labels.crumbsHome} ·{' '}
             {selectedCategory ? (
               <>
                 <a href={`${base}/kalender`} onClick={(event) => switchFilter(event, null)}>
-                  {locale === "nl" ? "Kalender" : "Calendar"}
-                </a>{" "}
-                ·{" "}
+                  {locale === 'nl' ? 'Kalender' : 'Calendar'}
+                </a>{' '}
+                ·{' '}
               </>
             ) : null}
-            <span style={{ color: "var(--ink)" }}>
+            <span style={{ color: 'var(--ink)' }}>
               {selectedCategory ? categoryName(selectedCategory) : labels.crumbsHere}
             </span>
           </div>
@@ -785,7 +753,7 @@ export function KalenderEditorialView({
               categoryName(selectedCategory)
             ) : (
               <>
-                {locale === "nl" ? "Kalender " : "Calendar "}
+                {locale === 'nl' ? 'Kalender ' : 'Calendar '}
                 <em>{year}.</em>
               </>
             )}
@@ -797,15 +765,15 @@ export function KalenderEditorialView({
           ) : null}
         </div>
         <div className="page-head-meta">
-          <b>{periodCount}</b>{" "}
-          {view === "week"
-            ? locale === "nl"
-              ? "Evenementen (deze week)"
-              : "Events (this week)"
+          <b>{periodCount}</b>{' '}
+          {view === 'week'
+            ? locale === 'nl'
+              ? 'Evenementen (deze week)'
+              : 'Events (this week)'
             : isRolling
-              ? locale === "nl"
-                ? "Evenementen (komende weken)"
-                : "Events (upcoming weeks)"
+              ? locale === 'nl'
+                ? 'Evenementen (komende weken)'
+                : 'Events (upcoming weeks)'
               : labels.metaEvents}
         </div>
       </header>
@@ -819,69 +787,63 @@ export function KalenderEditorialView({
               <button
                 type="button"
                 onClick={() => shiftPeriod(-1)}
-                aria-label={view === "week" ? "Previous week" : "Previous month"}
+                aria-label={view === 'week' ? 'Previous week' : 'Previous month'}
               >
                 ←
               </button>
               <button
                 type="button"
                 onClick={() => shiftPeriod(1)}
-                aria-label={view === "week" ? "Next week" : "Next month"}
+                aria-label={view === 'week' ? 'Next week' : 'Next month'}
               >
                 →
               </button>
             </div>
             <div className="mo-label">
-              {view === "week"
-                ? weekLabel
-                : monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
+              {view === 'week' ? weekLabel : monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
               <small>
-                {view === "week"
-                  ? locale === "nl"
-                    ? "Weekoverzicht"
-                    : "Week overview"
-                  : `${labels.weekLine} ${gridRange}`}{" "}
-                · {periodCount}{" "}
+                {view === 'week'
+                  ? locale === 'nl'
+                    ? 'Weekoverzicht'
+                    : 'Week overview'
+                  : `${labels.weekLine} ${gridRange}`}{' '}
+                · {periodCount}{' '}
                 {periodCount === 1
-                  ? locale === "nl"
-                    ? "evenement"
-                    : "event"
-                  : locale === "nl"
-                    ? "evenementen"
-                    : "events"}
+                  ? locale === 'nl'
+                    ? 'evenement'
+                    : 'event'
+                  : locale === 'nl'
+                    ? 'evenementen'
+                    : 'events'}
               </small>
             </div>
-            <div
-              className="view-switch"
-              role="group"
-              aria-label={locale === "nl" ? "Weergave" : "View"}
-            >
+            <div className="view-switch" role="group" aria-label={locale === 'nl' ? 'Weergave' : 'View'}>
               <button
                 type="button"
-                className={view === "agenda" ? "on" : ""}
-                aria-pressed={view === "agenda"}
-                onClick={() => setView("agenda")}
+                className={view === 'agenda' ? 'on' : ''}
+                aria-pressed={view === 'agenda'}
+                onClick={() => setView('agenda')}
               >
                 {labels.views.agenda}
               </button>
               <button
                 type="button"
-                className={view === "week" ? "on" : ""}
-                aria-pressed={view === "week"}
+                className={view === 'week' ? 'on' : ''}
+                aria-pressed={view === 'week'}
                 onClick={() => {
                   setIsRolling(false);
-                  setView("week");
+                  setView('week');
                 }}
               >
                 {labels.views.week}
               </button>
               <button
                 type="button"
-                className={view === "list" ? "on" : ""}
-                aria-pressed={view === "list"}
+                className={view === 'list' ? 'on' : ''}
+                aria-pressed={view === 'list'}
                 onClick={() => {
                   setIsRolling(false);
-                  setView("list");
+                  setView('list');
                 }}
               >
                 {labels.views.list}
@@ -891,7 +853,7 @@ export function KalenderEditorialView({
               compact
               feedBaseUrl={feedBaseUrl}
               categories={categories}
-              selectedSlug={filter === "all" ? null : filter}
+              selectedSlug={filter === 'all' ? null : filter}
               locale={locale}
               labels={{ title: labels.subscribeTitle, sub: labels.subscribeSub }}
             />
@@ -906,8 +868,8 @@ export function KalenderEditorialView({
             <div className="filters">
               <a
                 href={`${base}/kalender`}
-                className={`filter${filter === "all" ? " on" : ""}`}
-                aria-current={filter === "all" ? "page" : undefined}
+                className={`filter${filter === 'all' ? ' on' : ''}`}
+                aria-current={filter === 'all' ? 'page' : undefined}
                 onClick={(event) => switchFilter(event, null)}
               >
                 {labels.all}
@@ -916,9 +878,9 @@ export function KalenderEditorialView({
                 <a
                   key={c.slug}
                   href={filter === c.slug ? `${base}/kalender` : `${base}/kalender/${c.slug}`}
-                  className={`filter category-filter${filter === c.slug ? " on" : ""}`}
-                  aria-current={filter === c.slug ? "page" : undefined}
-                  style={{ "--cat": c.colour } as React.CSSProperties}
+                  className={`filter category-filter${filter === c.slug ? ' on' : ''}`}
+                  aria-current={filter === c.slug ? 'page' : undefined}
+                  style={{ '--cat': c.colour } as React.CSSProperties}
                   onClick={(event) => switchFilter(event, c.slug)}
                 >
                   {categoryName(c)}
@@ -932,9 +894,9 @@ export function KalenderEditorialView({
                   <a
                     key={c.slug}
                     href={filter === c.slug ? `${base}/kalender` : `${base}/kalender/${c.slug}`}
-                    className={`filter audience-filter${filter === c.slug ? " on" : ""}`}
-                    aria-current={filter === c.slug ? "page" : undefined}
-                    style={{ "--cat": c.colour } as React.CSSProperties}
+                    className={`filter audience-filter${filter === c.slug ? ' on' : ''}`}
+                    aria-current={filter === c.slug ? 'page' : undefined}
+                    style={{ '--cat': c.colour } as React.CSSProperties}
                     onClick={(event) => switchFilter(event, c.slug)}
                   >
                     {categoryName(c)}
@@ -942,7 +904,7 @@ export function KalenderEditorialView({
                 ))}
                 {/* Enkel op /kalender: op een categoriepagina is de doelgroep al
                     gekozen, en dan zou dit vinkje twee dingen tegelijk zeggen. */}
-                {filter === "all" ? (
+                {filter === 'all' ? (
                   <label className="audience-toggle" title={labels.onlyMyAudiencesHint}>
                     <input
                       type="checkbox"
@@ -961,103 +923,142 @@ export function KalenderEditorialView({
           <div className="kal-main">
             <div className="cal">
               <div className="cal-header">
-                {(locale === "nl"
-                  ? ["Ma", "Di", "Wo", "Do", "Vr", "Za", "Zo"]
-                  : ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"]
+                {(locale === 'nl'
+                  ? ['Ma', 'Di', 'Wo', 'Do', 'Vr', 'Za', 'Zo']
+                  : ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su']
                 ).map((d) => (
                   <div key={d}>{d}</div>
                 ))}
               </div>
-              {cells.map(({ date, inMonth }) => {
-                const key = dayKey(date);
-                const list = eventsByDay.get(key) ?? [];
-                const isToday = isSameCalendarDay(date, new Date());
-                const more = list.length > 2 ? list.length - 2 : 0;
-                const show = list.slice(0, 2);
-                const isSelected = key === selectedDayKey;
+              {Array.from({ length: 6 }, (_, weekIndex) => {
+                const weekCells = cells.slice(weekIndex * 7, weekIndex * 7 + 7);
+                const spans = weekEventSpans(
+                  monthEvents,
+                  weekCells.map((cell) => cell.date)
+                );
+                const lanes = Math.max(0, ...spans.map((span) => span.lane + 1));
                 return (
                   <div
-                    key={key}
-                    className={`cal-cell${!inMonth ? " out" : ""}${isToday ? " today" : ""}${isSelected ? " selected" : ""}`}
+                    className="cal-week"
+                    key={dayKey(weekCells[0]!.date)}
+                    style={{ '--span-lanes': lanes } as React.CSSProperties}
                   >
-                    <div className="num">{String(date.getDate()).padStart(2, "0")}</div>
-                    {/* Enkel zichtbaar op smal scherm: één stip per evenement in de
+                    {weekCells.map(({ date, inMonth }) => {
+                      const key = dayKey(date);
+                      const list = eventsByDay.get(key) ?? [];
+                      const isToday = isSameCalendarDay(date, new Date());
+                      const singleDayEvents = list.filter((event) => !isMultiDayEvent(event));
+                      const more = Math.max(0, singleDayEvents.length - 2);
+                      const show = singleDayEvents.slice(0, 2);
+                      const isSelected = key === selectedDayKey;
+                      return (
+                        <div
+                          key={key}
+                          className={`cal-cell${!inMonth ? ' out' : ''}${isToday ? ' today' : ''}${isSelected ? ' selected' : ''}`}
+                        >
+                          <div className="num">{String(date.getDate()).padStart(2, '0')}</div>
+                          {/* Enkel zichtbaar op smal scherm: één stip per evenement in de
                         kleur van zijn categorie, plus een knop over de hele cel.
                         De eventpillen hieronder passen daar niet in. */}
-                    {list.length > 0 ? (
-                      <span className="cal-dots" aria-hidden>
-                        {list.slice(0, 3).map((e) => {
-                          const cat = primaryCategory(e);
-                          return (
-                            <span
-                              key={e.id}
-                              className="cal-dot"
-                              style={
-                                cat ? ({ "--cat": cat.colour } as React.CSSProperties) : undefined
-                              }
-                            />
-                          );
-                        })}
-                      </span>
-                    ) : null}
-                    <button
-                      type="button"
-                      className="cal-cell-tap"
-                      aria-label={`${date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-                        weekday: "long",
-                        day: "numeric",
-                        month: "long",
-                      })}, ${list.length} ${
-                        list.length === 1
-                          ? locale === "nl"
-                            ? "evenement"
-                            : "event"
-                          : locale === "nl"
-                            ? "evenementen"
-                            : "events"
-                      }`}
-                      aria-pressed={isSelected}
-                      onClick={() => setSelectedKey(key)}
-                    />
-                    {show.map((e) => {
-                      const cat = primaryCategory(e);
-                      const audiences = audienceCategories(e);
-                      return (
-                        <a
-                          key={e.id}
-                          href={eventHref(e)}
-                          className={`ev-pill${cat ? " tinted" : ""}`}
-                          style={cat ? ({ "--cat": cat.colour } as React.CSSProperties) : undefined}
-                          onClick={(event) => openPreview(event, e)}
-                        >
-                          {audiences.map((a) => (
-                            <span
-                              key={a.slug}
-                              className="ev-audience"
-                              style={{ "--cat": a.colour } as React.CSSProperties}
-                            >
-                              {categoryName(a)}
+                          {list.length > 0 ? (
+                            <span className="cal-dots" aria-hidden>
+                              {list.slice(0, 3).map((e) => {
+                                const cat = primaryCategory(e);
+                                return (
+                                  <span
+                                    key={e.id}
+                                    className="cal-dot"
+                                    style={cat ? ({ '--cat': cat.colour } as React.CSSProperties) : undefined}
+                                  />
+                                );
+                              })}
                             </span>
-                          ))}
-                          <b>{pickTitle(e)}</b>
-                          <span>
-                            {eventTime(e)}
-                            {e.location ? ` · ${e.location}` : ""}
-                          </span>
-                          {interestLine(e) ? (
-                            <span className="ev-going">{interestLine(e)}</span>
                           ) : null}
-                        </a>
+                          <button
+                            type="button"
+                            className="cal-cell-tap"
+                            aria-label={`${date.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+                              weekday: 'long',
+                              day: 'numeric',
+                              month: 'long',
+                            })}, ${list.length} ${
+                              list.length === 1
+                                ? locale === 'nl'
+                                  ? 'evenement'
+                                  : 'event'
+                                : locale === 'nl'
+                                  ? 'evenementen'
+                                  : 'events'
+                            }`}
+                            aria-pressed={isSelected}
+                            onClick={() => setSelectedKey(key)}
+                          />
+                          <div className="cal-span-space" aria-hidden="true" />
+                          {show.map((e) => {
+                            const cat = primaryCategory(e);
+                            const audiences = audienceCategories(e);
+                            return (
+                              <a
+                                key={e.id}
+                                href={eventHref(e)}
+                                className={`ev-pill${cat ? ' tinted' : ''}`}
+                                style={cat ? ({ '--cat': cat.colour } as React.CSSProperties) : undefined}
+                                onClick={(event) => openPreview(event, e)}
+                              >
+                                {audiences.map((a) => (
+                                  <span
+                                    key={a.slug}
+                                    className="ev-audience"
+                                    style={{ '--cat': a.colour } as React.CSSProperties}
+                                  >
+                                    {categoryName(a)}
+                                  </span>
+                                ))}
+                                <b>{pickTitle(e)}</b>
+                                <span>
+                                  {eventTime(e)}
+                                  {e.location ? ` · ${e.location}` : ''}
+                                </span>
+                                {interestLine(e) ? <span className="ev-going">{interestLine(e)}</span> : null}
+                              </a>
+                            );
+                          })}
+                          {more > 0 ? (
+                            <div className="ev-pill more" title={list.map((e) => pickTitle(e)).join(', ')}>
+                              +{more}
+                            </div>
+                          ) : null}
+                        </div>
                       );
                     })}
-                    {more > 0 ? (
-                      <div
-                        className="ev-pill more"
-                        title={list.map((e) => pickTitle(e)).join(", ")}
-                      >
-                        +{more}
-                      </div>
-                    ) : null}
+                    <div className="cal-spans">
+                      {spans.map(({ event, start, end, lane, continuesBefore, continuesAfter }) => {
+                        const cat = primaryCategory(event);
+                        const dateLocale = locale === 'nl' ? 'nl-BE' : 'en-GB';
+                        const range = `${new Date(event.start).toLocaleDateString(dateLocale)} – ${new Date(event.end).toLocaleDateString(dateLocale)}`;
+                        return (
+                          <a
+                            key={event.id}
+                            href={eventHref(event)}
+                            className={`cal-span${continuesBefore ? ' continues-before' : ''}${continuesAfter ? ' continues-after' : ''}`}
+                            style={
+                              {
+                                gridColumn: `${start + 1} / ${end + 2}`,
+                                gridRow: lane + 1,
+                                '--cat': cat?.colour,
+                              } as React.CSSProperties
+                            }
+                            title={`${pickTitle(event)} · ${range}`}
+                            aria-label={`${pickTitle(event)} · ${range}`}
+                            onClick={(clicked) => openPreview(clicked, event)}
+                          >
+                            {continuesBefore ? '‹ ' : ''}
+                            {pickTitle(event)}
+                            {continuesAfter ? ' ›' : ''}
+                          </a>
+                        );
+                      })}
+                    </div>
                   </div>
                 );
               })}
@@ -1069,21 +1070,18 @@ export function KalenderEditorialView({
               <h3>
                 {selectedDate
                   ? (() => {
-                      const text = selectedDate.toLocaleDateString(
-                        locale === "nl" ? "nl-BE" : "en-GB",
-                        {
-                          weekday: "long",
-                          day: "numeric",
-                          month: "long",
-                        },
-                      );
+                      const text = selectedDate.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+                        weekday: 'long',
+                        day: 'numeric',
+                        month: 'long',
+                      });
                       return text.charAt(0).toUpperCase() + text.slice(1);
                     })()
-                  : ""}
+                  : ''}
               </h3>
               {selectedEvents.length === 0 ? (
                 <p className="cal-day-empty">
-                  {locale === "nl" ? "Niets gepland op deze dag." : "Nothing planned on this day."}
+                  {locale === 'nl' ? 'Niets gepland op deze dag.' : 'Nothing planned on this day.'}
                 </p>
               ) : (
                 <ul className="cal-day-list">
@@ -1093,26 +1091,24 @@ export function KalenderEditorialView({
                       <li key={e.id}>
                         <a
                           href={eventHref(e)}
-                          style={cat ? ({ "--cat": cat.colour } as React.CSSProperties) : undefined}
+                          style={cat ? ({ '--cat': cat.colour } as React.CSSProperties) : undefined}
                           onClick={(event) => openPreview(event, e)}
                         >
                           <b>{pickTitle(e)}</b>
                           <span>
                             {eventTime(e)}
-                            {e.location ? ` · ${e.location}` : ""}
+                            {e.location ? ` · ${e.location}` : ''}
                           </span>
                           {audienceCategories(e).map((a) => (
                             <span
                               key={a.slug}
                               className="cal-day-audience"
-                              style={{ "--cat": a.colour } as React.CSSProperties}
+                              style={{ '--cat': a.colour } as React.CSSProperties}
                             >
                               {categoryName(a)}
                             </span>
                           ))}
-                          {interestLine(e) ? (
-                            <span className="ev-going">{interestLine(e)}</span>
-                          ) : null}
+                          {interestLine(e) ? <span className="ev-going">{interestLine(e)}</span> : null}
                         </a>
                       </li>
                     );
@@ -1123,36 +1119,31 @@ export function KalenderEditorialView({
           </div>
         )}
 
-        {view === "week" && (
+        {view === 'week' && (
           <div className="kal-main week-main">
             <div>
-              <section
-                className="week-cal"
-                aria-label={locale === "nl" ? "Weekkalender" : "Week calendar"}
-              >
+              <section className="week-cal" aria-label={locale === 'nl' ? 'Weekkalender' : 'Week calendar'}>
                 {weekDays.map((date) => {
                   const events = eventsByDay.get(dayKey(date)) ?? [];
                   const today = isSameCalendarDay(date, new Date());
                   return (
-                    <div key={dayKey(date)} className={`week-day${today ? " today" : ""}`}>
+                    <div key={dayKey(date)} className={`week-day${today ? ' today' : ''}`}>
                       <header>
                         <span>
-                          {date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-                            weekday: "short",
+                          {date.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+                            weekday: 'short',
                           })}
                         </span>
                         <b>{date.getDate()}</b>
                         <small>
-                          {date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-                            month: "short",
+                          {date.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+                            month: 'short',
                           })}
                         </small>
                       </header>
                       <div className="week-events">
                         {events.length === 0 ? (
-                          <span className="week-empty">
-                            {locale === "nl" ? "Geen evenementen" : "No events"}
-                          </span>
+                          <span className="week-empty">{locale === 'nl' ? 'Geen evenementen' : 'No events'}</span>
                         ) : (
                           events.map((event) => {
                             const cat = primaryCategory(event);
@@ -1161,9 +1152,7 @@ export function KalenderEditorialView({
                                 key={event.id}
                                 href={eventHref(event)}
                                 className="week-event"
-                                style={
-                                  cat ? ({ "--cat": cat.colour } as React.CSSProperties) : undefined
-                                }
+                                style={cat ? ({ '--cat': cat.colour } as React.CSSProperties) : undefined}
                                 onClick={(clicked) => openPreview(clicked, event)}
                               >
                                 <span className="week-event-time">{eventTime(event)}</span>
@@ -1173,14 +1162,12 @@ export function KalenderEditorialView({
                                   <span
                                     key={audience.slug}
                                     className="week-audience"
-                                    style={{ "--cat": audience.colour } as React.CSSProperties}
+                                    style={{ '--cat': audience.colour } as React.CSSProperties}
                                   >
                                     {categoryName(audience)}
                                   </span>
                                 ))}
-                                {interestLine(event) ? (
-                                  <span className="ev-going">{interestLine(event)}</span>
-                                ) : null}
+                                {interestLine(event) ? <span className="ev-going">{interestLine(event)}</span> : null}
                               </a>
                             );
                           })
@@ -1196,8 +1183,8 @@ export function KalenderEditorialView({
 
         {/* Agenda: onder het raster staat wat er de komende twee weken op je
             afkomt. Dat is het enige blok dat bewust niet met de pijlen meegaat. */}
-        {view === "agenda" && (
-          <section className="agenda" style={{ marginTop: 48, gridTemplateColumns: "1fr" }}>
+        {view === 'agenda' && (
+          <section className="agenda" style={{ marginTop: 48, gridTemplateColumns: '1fr' }}>
             <div>
               <div className="agenda-head">
                 <h2>{labels.agendaNext}</h2>
@@ -1213,20 +1200,20 @@ export function KalenderEditorialView({
         )}
 
         {/* Lijst: dezelfde maand als het raster, chronologisch. */}
-        {view === "list" && (
+        {view === 'list' && (
           <section className="agenda agenda-full" style={{ marginTop: 0 }}>
             <div>
               <div className="agenda-head">
                 <h2>{monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</h2>
                 <div>
-                  {monthOnlyEvents.length}{" "}
+                  {monthOnlyEvents.length}{' '}
                   {monthOnlyEvents.length === 1
-                    ? locale === "nl"
-                      ? "evenement"
-                      : "event"
-                    : locale === "nl"
-                      ? "evenementen"
-                      : "events"}
+                    ? locale === 'nl'
+                      ? 'evenement'
+                      : 'event'
+                    : locale === 'nl'
+                      ? 'evenementen'
+                      : 'events'}
                 </div>
               </div>
               {monthOnlyEvents.length === 0 ? (
