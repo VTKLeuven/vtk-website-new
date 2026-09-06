@@ -114,3 +114,39 @@
     }
   }
 }
+
+/* Kopjes komen woord na woord binnen. Elk woord draagt zijn volgnummer (`--i`,
+   gezet door de markdown-renderer) en schuift daarmee zijn eigen bereik op; het
+   plafond van 7 houdt een lange titel bij elkaar in plaats van het laatste
+   woord ver na de rest te laten komen. Een kopje met opmaak erin valt niet te
+   splitsen en komt als blok binnen (`data-reveal="block"`). */
+@keyframes vtk-draw {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .vtk-motion .vtk-word {
+      display: inline-block;
+      animation: vtk-rise linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry calc(10% + min(var(--i), 7) * 3%) cover
+        calc(38% + min(var(--i), 7) * 3%);
+    }
+
+    .vtk-motion [data-reveal="block"] {
+      animation: vtk-rise linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry 10% cover 40%;
+    }
+
+    /* Het gele streepje tekent zichzelf onder het kopje. */
+    .vtk-motion .prose-vtk h2::after {
+      animation: vtk-draw linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry 16% cover 42%;
+    }
+  }
+}

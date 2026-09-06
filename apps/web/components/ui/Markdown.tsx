@@ -1,4 +1,11 @@
-import { Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
+import {
+  Children,
+  cloneElement,
+  isValidElement,
+  type CSSProperties,
+  type ReactElement,
+  type ReactNode,
+} from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { headingId, headingText } from "@/lib/pageOutline";
@@ -31,7 +38,55 @@ function soleImage(children: ReactNode): ReactElement<ImageProps> | null {
   return only as ReactElement<ImageProps>;
 }
 
-export function Markdown({ children }: { children: string }) {
+/**
+ * Een kopje in losse woorden, elk met hun volgnummer, zodat ze bij het scrollen
+ * na elkaar kunnen binnenkomen (`--i` in vtk-motion.css). De spaties blijven
+ * gewone tekst tussen de spans: zo breekt de regel normaal af en kopieer je nog
+ * steeds "Kanweek 2026" en niet "Kanweek2026".
+ *
+ * Enkel voor een kopje dat uit platte tekst bestaat. Staat er een link of een
+ * vetgedrukt woord in, dan is er niets te splitsen zonder die opmaak te
+ * verliezen; zo'n kopje animeert als één blok.
+ */
+function splitWords(children: ReactNode): ReactNode[] | null {
+  const items = Children.toArray(children);
+  const text = items.every((child) => typeof child === "string") ? items.join("") : null;
+  if (text === null || !text.trim()) return null;
+  let index = 0;
+  return text.split(/(\s+)/).map((part, i) => {
+    if (!part || /^\s+$/.test(part)) return part;
+    const style = { "--i": index++ } as CSSProperties;
+    return (
+      <span key={i} className="vtk-word" style={style}>
+        {part}
+      </span>
+    );
+  });
+}
+
+export function Markdown({
+  children,
+  /**
+   * Kopjes bij het scrollen laten binnenkomen. Enkel de contentpagina's zetten
+   * dit aan; elders (aankondiging, hulptekst bij een formulier, voorbeeld in de
+   * editor) staat de tekst in een eigen scrollcontainer of in een dialoog, waar
+   * een `view()`-tijdlijn niet klopt.
+   */
+  revealHeadings = false,
+}: {
+  children: string;
+  revealHeadings?: boolean;
+}) {
+  // `data-reveal` zegt wat er animeert: de losse woorden, of het kopje als
+  // geheel wanneer er opmaak in staat. vtk-motion.css hangt daaraan.
+  const reveal = (headingChildren: ReactNode) => {
+    if (!revealHeadings) return { "data-reveal": undefined, content: headingChildren };
+    const words = splitWords(headingChildren);
+    return {
+      "data-reveal": words ? "words" : "block",
+      content: words ?? headingChildren,
+    };
+  };
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -54,11 +109,23 @@ export function Markdown({ children }: { children: string }) {
         },
         // Kopjes krijgen een anker, zodat de "Op deze pagina"-rail ernaartoe kan
         // linken. De id komt uit dezelfde helper als die rail (pageOutline).
-        h2: ({ children: headingChildren }) => (
-          <h2 id={headingId(headingText(headingChildren))}>{headingChildren}</h2>
-        ),
+        h2: ({ children: headingChildren }) => {
+          const { content, ...reveals } = reveal(headingChildren);
+          return (
+            <h2 id={headingId(headingText(headingChildren))} {...reveals}>
+              {content}
+            </h2>
+          );
+        },
+        // H3 komt als blok binnen en niet woord per woord: tussentitels staan
+        // dicht bij elkaar en woord-voor-woord wordt dan onrustig.
         h3: ({ children: headingChildren }) => (
-          <h3 id={headingId(headingText(headingChildren))}>{headingChildren}</h3>
+          <h3
+            id={headingId(headingText(headingChildren))}
+            data-reveal={revealHeadings ? "block" : undefined}
+          >
+            {headingChildren}
+          </h3>
         ),
         // Zelfde gedrag als de oude tiptap-renderer: links openen in een nieuw
         // tabblad. Interne ankers (#...) blijven in dezelfde pagina.
