@@ -13,7 +13,7 @@ import { saveErrorMessages } from "@/lib/saveMessages";
 import { AssetList } from "../../inhoud/AssetList";
 import { FileUploader } from "../../inhoud/FileUploader";
 import type { AssetNode } from "../../inhoud/ContentManager";
-import { PageCategoryImageCard } from "./PageCategoryImageCard";
+import { PageImageCard } from "./PageImageCard";
 import { PageSettingsCard, type SettingsRole } from "./PageSettingsCard";
 import {
   PageFormCard,
@@ -196,7 +196,7 @@ export function PageContentEditor({
         </SaveForm>
       </Card>
 
-      <PageCategoryImageCard
+      <PageImageCard
         locale={locale}
         pageId={page.id}
         pageTitle={page.titleNl}

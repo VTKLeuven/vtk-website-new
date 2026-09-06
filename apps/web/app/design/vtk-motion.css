@@ -150,3 +150,23 @@
     }
   }
 }
+
+/* De paginakop staat bij het laden al in beeld. Een `view()`-tijdlijn is daar
+   meteen voorbij haar bereik, dus die kop zou als enige stil blijven; hij komt
+   daarom binnen op een gewone animatie bij het laden. Geen `@supports` nodig:
+   keyframe-animaties werken overal. */
+@media (prefers-reduced-motion: no-preference) {
+  .vtk-page-head .vtk-page-kicker,
+  .vtk-page-head .vtk-page-title,
+  .vtk-page-head .vtk-page-subtitle {
+    animation: vtk-rise 620ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  .vtk-page-head .vtk-page-title {
+    animation-delay: 60ms;
+  }
+
+  .vtk-page-head .vtk-page-subtitle {
+    animation-delay: 120ms;
+  }
+}

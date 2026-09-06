@@ -751,6 +751,43 @@
   );
 }
 
+/* Een contentpagina met een eigen foto toont ze in dezelfde band, achter het
+   scrim. Dit is géén tweede soort paginakop: de hoogte, de gele onderlijn en de
+   typografie blijven identiek, en zonder foto verandert er niets. De volle
+   fotohero blijft voorbehouden aan de homepage. */
+.vtk-page-head-photo {
+  position: absolute;
+  z-index: -3;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  overflow: hidden;
+}
+
+.vtk-page-head-photo img {
+  object-fit: cover;
+  object-position: center 42%;
+}
+
+/* Het scrim vervangt de vlakke navy vulling: het zwaarst links, waar de titel
+   staat, en lichter naar rechts, zodat de foto zichtbaar blijft. */
+.vtk-page-head.has-photo::before {
+  background:
+    linear-gradient(
+      100deg,
+      rgba(14, 26, 54, 0.95) 0%,
+      rgba(14, 26, 54, 0.88) 42%,
+      rgba(14, 26, 54, 0.6) 100%
+    ),
+    linear-gradient(to top, rgba(10, 15, 31, 0.72), rgba(10, 15, 31, 0) 62%);
+}
+
+/* Het technische patroon zou over de foto een tweede laag ruis leggen. */
+.vtk-page-head.has-photo::after {
+  opacity: 0.16;
+}
+
 /* Deze drie klassen worden ook buiten de donkere band gebruikt (bv. de titel
    van een contentpagina in PageView). Ze houden daarom hun donkere tekstkleur;
    de lichte variant hangt aan `.vtk-page-head` hieronder. */

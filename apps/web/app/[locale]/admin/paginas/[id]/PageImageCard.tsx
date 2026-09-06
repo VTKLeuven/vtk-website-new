@@ -7,8 +7,12 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { savePageImageAction } from "@/app/actions/pages";
 import { saveErrorMessages } from "@/lib/saveMessages";
 
-/** Dezelfde categoriekaartfoto als in Website → Header, vanuit de pagina-editor. */
-export function PageCategoryImageCard({
+/**
+ * De foto van de pagina, vanuit de pagina-editor (dezelfde als in Website →
+ * Header). Ze komt op twee plaatsen terecht: in de donkere kop van de pagina
+ * zelf en op de kaart van deze pagina op de categoriepagina.
+ */
+export function PageImageCard({
   locale,
   pageId,
   pageTitle,
@@ -24,12 +28,12 @@ export function PageCategoryImageCard({
   return (
     <Card className="p-5">
       <h2 className="text-sm font-semibold text-vtk-ink">
-        {nl ? "Foto op de categoriepagina" : "Photo on the category page"}
+        {nl ? "Foto van de pagina" : "Photo for this page"}
       </h2>
       <p className="mt-1 text-xs text-[#5c667f]">
         {nl
-          ? "Deze foto verschijnt op de kaart van deze pagina zodra ze aan een categorie gekoppeld is."
-          : "This photo appears on this page's card once the page is linked to a category."}
+          ? "Deze foto staat achter de donkere kop van de pagina, en op de kaart van deze pagina zodra ze aan een categorie gekoppeld is."
+          : "This photo sits behind the page's dark header, and on this page's card once the page is linked to a category."}
       </p>
 
       <SaveForm
@@ -52,8 +56,8 @@ export function PageCategoryImageCard({
           emptyHint={nl ? "Technisch patroon" : "Technical pattern"}
           helpText={
             nl
-              ? "Zonder foto gebruikt de kaart het technische patroon uit de huisstijl."
-              : "Without a photo, the card uses the technical brand pattern."
+              ? "Zonder foto houden de kop en de kaart het technische patroon uit de huisstijl."
+              : "Without a photo, the header and the card keep the technical brand pattern."
           }
           srContext={pageTitle}
         />

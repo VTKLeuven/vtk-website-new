@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import {
   DOWNLOAD_EVENT,
@@ -76,6 +77,10 @@ export async function PageView({
   const title = pick(page.titleNl, page.titleEn, locale);
   const excerpt = pick(page.excerptNl ?? "", page.excerptEn ?? "", locale);
   const tab = page.headerTab ?? null;
+  // Dezelfde foto als op de kaart van de categoriepagina. De donkere band blijft
+  // de kop van de site; ze krijgt hier enkel een beeld achter het scrim, zodat
+  // een pagina herkenbaar is zonder een tweede soort paginakop te worden.
+  const headPhoto = publicUrl(page.imageKey);
   // Knop naast de titel, net als op de categoriepagina. Zonder label of zonder
   // adres is er geen knop: een knop zonder bestemming is een dode klik.
   const ctaLabel = pick(page.ctaLabelNl ?? "", page.ctaLabelEn ?? "", locale);
@@ -149,7 +154,14 @@ export async function PageView({
       {/* Leesvoortgang in de accentkleur, strak onder de sitekop. Decoratief:
           de scrollbalk zegt hetzelfde, dus een screenreader hoeft dit niet. */}
       <div className="vtk-read-progress" aria-hidden="true" />
-      <header className="vtk-page-head">
+      <header className={`vtk-page-head${headPhoto ? " has-photo" : ""}`}>
+        {headPhoto ? (
+          // Decoratief: de titel ernaast zegt al waar je bent, dus een alt-tekst
+          // zou de kop enkel twee keer voorlezen.
+          <div className="vtk-page-head-photo" aria-hidden="true">
+            <Image src={headPhoto} alt="" fill priority sizes="100vw" />
+          </div>
+        ) : null}
         <div>
           {tab ? (
             <div className="vtk-page-kicker">
