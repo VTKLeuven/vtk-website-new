@@ -289,6 +289,18 @@ the design language into the application instead of copying mockup content.
   `.vtk-page-title`/`.vtk-page-subtitle`/`.vtk-page-kicker` keep dark text
   outside that band (they are also used on light backgrounds); only inside
   `.vtk-page-head` do they invert.
+- Motion: content pages animate on scroll, in pure CSS (`animation-timeline`,
+  `apps/web/app/design/vtk-motion.css`), never with a scroll listener. Headings
+  arrive word by word, figures slide in from alternating sides, the yellow
+  section rule draws itself, and a yellow progress bar tracks reading. Four
+  rules hold without exception: any hiding start state lives **inside** the
+  `@supports (animation-timeline: view())` guard (otherwise a browser without
+  support shows a blank page), animate only `opacity` and `transform`, use
+  `overflow-x: clip` and never `hidden` around sideways motion (`hidden` makes a
+  scroll container and breaks the sticky rail), and nest everything in
+  `@media (prefers-reduced-motion: no-preference)`. Motion belongs to reading a
+  text: not on buttons, tables, the rail, or anywhere in admin. See
+  `docs/design-decisions.md` for what was rejected.
 - Content pages (`PageView`): dark head with a breadcrumb to the category, then
   the text column with an optional rail beside it holding the page outline (H2
   and H3, anchors from `lib/pageOutline.ts`) and the downloads. The rail only

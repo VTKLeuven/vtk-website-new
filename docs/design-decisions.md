@@ -1694,6 +1694,69 @@ nodig heeft.
   `canEditPageContent`, dus wie de tekst van een pagina schrijft, kiest ook de
   foto erbij; daar is geen `pages.manage` voor nodig.
 
+## Contentpagina: een foto in de kop en beweging bij het scrollen
+
+Een contentpagina was tekst en niets anders: dezelfde donkere band bovenaan als
+elke andere pagina, daaronder markdown in een kolom. Drieënveertig pagina's die
+er identiek uitzien, en de foto die de redacteur al uploadde was enkel op de
+kaart van de categoriepagina te zien.
+
+- **De foto staat in de bestaande donkere band, niet in een nieuwe hero.**
+  Dezelfde `Page.imageKey` als de kaart op de categoriepagina, achter het scrim
+  van `.vtk-page-head`. Hoogte, gele onderlijn en typografie blijven identiek;
+  zonder foto verandert er niets. Een eigen fotohero per pagina is bewust niet
+  gebouwd: de volle fotohero hoort bij de homepage, en een tweede soort
+  paginakop maakt van elke rubriek een eigen site.
+- **De markdown verandert niet.** De redacteur schrijft `## Kanweek` en de
+  renderer splitst dat kopje in woorden die bij het scrollen na elkaar
+  binnenkomen. Geen nieuwe markering, geen instelling per pagina, niets om te
+  vergeten. Een kopje met opmaak erin (een link, een vetgedrukt woord) valt niet
+  te splitsen zonder die opmaak te verliezen en komt als één blok binnen.
+- **Een alinea met enkel een foto wordt een `<figure>`**, en de markdown-titel
+  (`![alt](url "Cantus 2025")`) wordt het bijschrift. Dat gebeurt in de
+  `p`-override en niet in een `img`-override: een `<figure>` binnen een `<p>` is
+  ongeldige HTML en de browser breekt de alinea dan zelf open, waarna React over
+  het verschil met de server-uitvoer struikelt.
+- **Wat er beweegt, en wat niet.** Kopjes (woord na woord), tussentitels (als
+  blok), foto's (van links of van rechts, om en om), hun bijschrift, het gele
+  streepje onder een sectiekopje dat zichzelf tekent, en een gele
+  leesvoortgangsbalk onder de sitekop. Niet: knoppen, tabellen, lijsten, de rail
+  en alles in de admin. Beweging hoort bij het lezen van een tekst, niet bij het
+  bedienen van een scherm.
+- **De accentkleur wordt meer gebruikt, geen nieuwe kleuren.** Het palet is drie
+  neutralen en één accent; levendigheid komt van verhouding en beweging. Vandaar
+  het gele streepje per sectie, het streepje bij een bijschrift en de
+  voortgangsbalk. Banden die tussen de alinea's van kleur wisselen zijn niet
+  gebouwd, om dezelfde reden als bij het formulierpaneel: een band van rand tot
+  rand kan niet tussen twee alinea's staan en overheerst een korte pagina.
+
+### Vallen waar we in gelopen zijn
+
+- **Een begintoestand die iets verbergt, staat altijd binnen de
+  `@supports (animation-timeline: view())`-guard.** Lekt `opacity: 0` daarbuiten,
+  dan toont een browser zonder scroll-driven animations lege kopjes en
+  onzichtbare foto's; de pagina is dan stuk zonder één foutmelding.
+- **`overflow-x: clip` en niet `hidden`** rond een foto die van opzij binnenkomt.
+  `hidden` maakt een scrollcontainer en dat breekt stil de `position: sticky` van
+  de rail naast de tekst. Dezelfde reden staat al bij de `html`-regel in
+  globals.css, voor de volle-breedtebanden.
+- **De paginakop staat bij het laden al in beeld, dus een `view()`-tijdlijn is
+  daar meteen voorbij haar bereik.** De titel zou als enige stil blijven staan.
+  Die komt daarom binnen op een gewone keyframe-animatie bij het laden, niet op
+  een tijdlijn.
+- **De sticky sitekop bedekt de bovenkant van het scherm.** Zonder inset
+  (`view(block var(--motion-inset) auto)`) is een kopje klaar met animeren
+  terwijl het nog achter de header zit. Zelfde hoogte als de `scroll-margin-top`
+  van de ankers.
+- **Enkel `opacity` en `transform`.** Die twee draaien op de compositor, naast de
+  hoofdthread. `width`, `filter` of `top` animeren zet de layout elke frame
+  opnieuw op.
+- **De animaties hangen aan `.vtk-motion` (PageView) en niet aan elke
+  `.prose-vtk`.** Die klasse staat ook op een aankondiging, op de hulptekst bij
+  een formulierveld en op het voorbeeldvenster van de editor. Dat laatste is een
+  eigen scrollcontainer, waar een `view()`-tijdlijn een kopje halverwege zijn
+  animatie kan laten staan.
+
 ## Homepage-secties & bandenritme
 
 De homepage is opgebouwd uit volle-breedte banden die bewust van kleur
