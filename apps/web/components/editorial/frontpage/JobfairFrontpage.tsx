@@ -75,7 +75,18 @@ export function JobfairFrontpage({ values, locale, base, partners }: FrontpagePr
 
       {wall.length > 0 ? (
         <aside className="fp-wall" aria-label={nl ? "Deelnemende bedrijven" : "Participating companies"}>
-          {wall.map((partner) => (
+          {wall.map((partner) => partner.url ? (
+            <a
+              className="fp-wall-cell"
+              key={partner.id}
+              href={partner.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`${partner.name} (${nl ? "opent in een nieuw tabblad" : "opens in a new tab"})`}
+            >
+              <PartnerLogo src={publicUrl(partner.logoKey)} name={partner.name} />
+            </a>
+          ) : (
             <div className="fp-wall-cell" key={partner.id}>
               <PartnerLogo src={publicUrl(partner.logoKey)} name={partner.name} />
             </div>

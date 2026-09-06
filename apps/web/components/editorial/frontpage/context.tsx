@@ -46,6 +46,7 @@ export type FrontpageEvent = {
 };
 
 export type FrontpagePartner = {
+  url?: string | null;
   id: string;
   name: string;
   logoKey: string | null;

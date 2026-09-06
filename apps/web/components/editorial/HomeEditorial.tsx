@@ -863,7 +863,18 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           ) : (
             partners.map((partner) => {
               const logo = publicUrl(partner.logoKey);
-              return (
+              return partner.url ? (
+                <a
+                  className="partner"
+                  key={partner.id}
+                  href={partner.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`${partner.name} (${nl ? "opent in een nieuw tabblad" : "opens in a new tab"})`}
+                >
+                  <PartnerLogo src={logo} name={partner.name} />
+                </a>
+              ) : (
                 <div className="partner" key={partner.id}>
                   <PartnerLogo src={logo} name={partner.name} />
                 </div>
