@@ -1750,6 +1750,87 @@ H2, dus één item, en de rail verschijnt pas vanaf twee. De paginatitel is al d
 echte H1 van het document, dus een `#` in de tekst is gewoon een sectiekop. H1
 en H2 delen daarom hun niveau in de lijst; enkel H3 springt in.
 
+## Beweging in de tekst van een contentpagina
+
+Een contentpagina was tekst en verder niets: markdown in een kolom, op elke
+pagina dezelfde. De blokken eromheen (de fotoplaat, de galerij, de werking) geven
+haar een gezicht; dit gaat over de tekst zelf.
+
+- **De markdown verandert niet.** De redacteur schrijft `## Kanweek` en de
+  renderer splitst dat kopje in woorden die bij het scrollen na elkaar
+  binnenkomen. Geen nieuwe markering, geen instelling per pagina, niets om te
+  vergeten. Een kopje met opmaak erin (een link, een vetgedrukt woord) valt niet
+  te splitsen zonder die opmaak te verliezen en komt als één blok binnen.
+- **Eén foto in een alinea wordt een figuur met een bijschrift**, waar twee of
+  meer foto's een galerij worden. Het bijschrift is de markdown-titel:
+  `![alt](url "Cantus 2025")`. Beide lezen dezelfde alinea, dus `solePhoto` en
+  `galleryPhotos` staan naast elkaar in `lib/gallery.ts` en horen samen te
+  blijven. Een foto midden in een zin blijft een gewone inline afbeelding.
+- **Wat er beweegt, en wat niet.** De paginatitel (woord na woord bij het
+  laden), kopjes (woord na woord, met een lichte kanteling), tussentitels (als
+  blok), een losstaande foto (van links of van rechts, om en om, en ondertussen
+  langzaam uitzoomend), haar bijschrift, regels van een opsomming, de rail van
+  een citaat, de gele lijn onder een sectiekopje en een golfje door de letters
+  van vetgedrukte tekst. Niet: knoppen, tabellen, de rail naast de tekst, de
+  fotoplaat, de galerij en alles in de admin. Beweging hoort bij het lezen van
+  een tekst, niet bij het bedienen van een scherm.
+- **De accentkleur wordt meer gebruikt, geen nieuwe kleuren.** Het palet is drie
+  neutralen en één accent; levendigheid komt van verhouding en beweging. Het geel
+  komt terug als een dikke lijn onder een sectiekopje (zo breed als de titel,
+  niet als de kolom: over de hele kolom las het als een scheiding tussen twee
+  stukken pagina), als ruit in een opsomming, als rail van een citaat en bij een
+  bijschrift. De eerste alinea is groter en in navy: een pagina begint met een
+  stem in plaats van met een muur.
+- **Vetgedrukte tekst krijgt geen gele lijn eronder.** Dat is precies de opmaak
+  van een link op deze site (`.prose-vtk a` is navy plus een gele onderlijn), en
+  het las dan ook als een link die niet klikte. Een gele markeerstift erachter en
+  een ruitje ervoor zijn ook bekeken; het is een golfje door de letters geworden,
+  zodat het verschil met de lopende tekst van de kleur en van de beweging komt en
+  niet van een tweede streep.
+- **Geen leesvoortgangsbalk.** Er heeft er een gestaan, bovenaan onder de
+  sitekop. Een balk die bij elke scroll meebeweegt, trekt de aandacht naar de
+  rand van het scherm terwijl de beweging in de tekst zelf hoort te zitten.
+
+### Vallen waar we in gelopen zijn
+
+- **Een begintoestand die iets verbergt, staat altijd binnen de
+  `@supports (animation-timeline: view())`-guard.** Lekt `opacity: 0` daarbuiten,
+  dan toont een browser zonder scroll-driven animations lege kopjes en
+  onzichtbare foto's; de pagina is dan stuk zonder één foutmelding.
+- **Een bereik eindigt binnen `entry`, niet binnen `cover`.** `cover 34%` ligt
+  voorbij het punt waarop een element volledig in beeld staat. Kan de pagina niet
+  verder scrollen (een korte pagina, het laatste blok onderaan), dan komt de
+  tijdlijn daar nooit en blijft dat blok halfdoorzichtig staan.
+- **De paginatitel staat bij het laden al in beeld, dus een `view()`-tijdlijn is
+  daar meteen voorbij haar bereik.** Hij komt daarom binnen op een gewone
+  keyframe-animatie bij het laden, niet op een tijdlijn.
+- **De sticky sitekop bedekt de bovenkant van het scherm.** Zonder inset
+  (`view(block var(--motion-inset) auto)`) is een kopje klaar met animeren
+  terwijl het nog achter de header zit.
+- **Enkel `opacity` en `transform`** (of de losse `translate`/`scale`/`rotate`).
+  Die draaien op de compositor, naast de hoofdthread. Twee animaties op één
+  element vragen die losse eigenschappen: schrijven ze allebei `transform`, dan
+  wint de laatste en verdwijnt de andere stilzwijgend. Let ook op dat een
+  `animation-name` met één waarde de tweede animatie weggooit.
+- **Tekst per letter animeren vraagt twee dingen extra.** Een lengtegrens, want
+  een hele vetgedrukte zin wordt anders honderden spans met evenveel animaties.
+  En de letters gaan verborgen voor een screenreader met de volledige tekst
+  ernaast in een `sr-only`-kopie: elementgrenzen midden in een woord laten sommige
+  screenreaders de letters los uitspreken. Die kopie staat op `user-select: none`,
+  anders staat het vetgedrukte stuk twee keer in een selectie die je kopieert. Ze
+  staat ook in een `position: relative`-ouder, want `sr-only` is absoluut
+  gepositioneerd (zie de val op /admin/tickets).
+- **De ronding van een foto hoort op het kader, niet op de foto.** De foto zoomt
+  binnen dat kader; stond de ronding op de foto zelf, dan viel ze tijdens het
+  bewegen buiten het vierkante kader en zag je rechte hoeken. Het kader knipt met
+  `clip` en niet met `hidden`: `hidden` maakt een scrollcontainer en dat breekt de
+  sticky rail naast de tekst.
+- **De animaties hangen aan `.vtk-motion` (PageView) en niet aan elke
+  `.prose-vtk`.** Die klasse staat ook op een aankondiging, op de hulptekst bij
+  een formulierveld en op het voorbeeldvenster van de editor. Dat laatste is een
+  eigen scrollcontainer, waar een `view()`-tijdlijn een kopje halverwege zijn
+  animatie kan laten staan.
+
 ## Homepage-secties & bandenritme
 
 De homepage is opgebouwd uit volle-breedte banden die bewust van kleur
