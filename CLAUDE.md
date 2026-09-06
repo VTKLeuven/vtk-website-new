@@ -293,8 +293,9 @@ the design language into the application instead of copying mockup content.
   `apps/web/app/design/vtk-motion.css`), never with a scroll listener. Headings
   arrive word by word, figures slide in from alternating sides inside their own
   clipped frame, and
-  the yellow rules under a section heading and under bold text draw themselves.
-  A reading-progress bar was tried and removed. Four rules hold: any hiding
+  the yellow rule under a section heading draws itself, and bold text (navy, no
+  underline: that is the link style) ripples letter by letter. A
+  reading-progress bar was tried and removed. Four rules hold: any hiding
   start state lives **inside** the
   `@supports (animation-timeline: view())` guard (otherwise a browser without
   support shows a blank page), animate only `opacity` and `transform`, use
@@ -302,9 +303,9 @@ the design language into the application instead of copying mockup content.
   scroll container and breaks the sticky rail), and nest everything in
   `@media (prefers-reduced-motion: no-preference)`. End every `animation-range`
   inside `entry`, never inside `cover`: a page that cannot scroll further leaves
-  anything ranged past full visibility half-faded forever. The one documented
-  exception to transform-only is the underline under bold text, which grows with
-  `background-size` because a transform cannot follow a line break. Motion belongs to reading a
+  anything ranged past full visibility half-faded forever. Text split per letter needs a length
+  limit and an `sr-only` copy of the full text (on `user-select: none`), because
+  element boundaries inside a word make some screen readers spell it out. Motion belongs to reading a
   text: not on buttons, tables, the rail, or anywhere in admin. See
   `docs/design-decisions.md` for what was rejected.
 - Content pages (`PageView`): dark head with a breadcrumb to the category, then

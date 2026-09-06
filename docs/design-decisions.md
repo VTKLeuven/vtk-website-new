@@ -1721,8 +1721,8 @@ kaart van de categoriepagina te zien.
   laden), de kopfoto (trager dan de pagina), kopjes (woord na woord, met een
   lichte kanteling), tussentitels (als blok), foto's (van links of van rechts,
   om en om, en ondertussen langzaam uitzoomend), hun bijschrift, regels van een
-  opsomming, de rail van een citaat, de gele lijn onder een sectiekopje en die
-  onder vetgedrukte tekst. Niet: knoppen, tabellen, de rail naast de tekst en alles in
+  opsomming, de rail van een citaat, de gele lijn onder een sectiekopje en een
+  golfje door de letters van vetgedrukte tekst. Niet: knoppen, tabellen, de rail naast de tekst en alles in
   de admin. Beweging hoort bij het lezen van een tekst, niet bij het bedienen
   van een scherm.
 - **Een foto schuift binnen haar eigen kader en niet over de pagina.** Ze van
@@ -1743,20 +1743,18 @@ kaart van de categoriepagina te zien.
   neutralen en één accent; levendigheid komt van verhouding en beweging. Het
   geel komt terug als een dikke lijn onder een sectiekopje (zo breed als de
   titel, niet als de kolom: over de hele kolom las het als een scheiding tussen
-  twee stukken pagina), als ruit in een opsomming, als lijn onder vetgedrukte
-  tekst, als rail van een citaat en bij een bijschrift. Vetgedrukte tekst zelf
-  staat in navy. De eerste alinea is groter en in navy: een pagina begint met
+  twee stukken pagina), als ruit in een opsomming, als rail van een citaat en
+  bij een bijschrift. Vetgedrukte tekst staat in navy, zonder geel. De eerste alinea is groter en in navy: een pagina begint met
   een stem in plaats van met een muur. Banden die tussen de alinea's van kleur
   wisselen zijn niet gebouwd, om dezelfde reden als bij het formulierpaneel: een
   band van rand tot rand kan niet tussen twee alinea's staan en overheerst een
   korte pagina.
-- **De lijn onder vetgedrukte tekst is een achtergrond op de tekst zelf**, met
-  `box-decoration-break: clone`, en geen absoluut gepositioneerd laagje. Een
-  pseudo-element pakt de omhullende doos van tekst die over twee regels breekt
-  en zet er één streep onder; `clone` geeft elk stuk zijn eigen lijn. Ze groeit
-  aan met `background-size`: dat is de ene uitzondering op "enkel opacity en
-  transform" hieronder, want een transform kan hier niet kloppen. Het gaat om
-  een paar woorden, dus het is verf en geen layout.
+- **Vetgedrukte tekst krijgt geen gele lijn eronder.** Dat is precies de opmaak
+  van een link op deze site (`.prose-vtk a` is navy plus een gele onderlijn), en
+  het las dan ook als een link die niet klikte. Een gele markeerstift erachter
+  en een ruitje ervoor zijn ook bekeken; het is een golfje door de letters
+  geworden, zodat het verschil met de lopende tekst van de kleur en van de
+  beweging komt en niet van een tweede streep.
 
 ### Vallen waar we in gelopen zijn
 
@@ -1778,9 +1776,15 @@ kaart van de categoriepagina te zien.
   van de ankers.
 - **Enkel `opacity` en `transform`** (of de losse `translate`/`scale`/`rotate`).
   Die draaien op de compositor, naast de hoofdthread. `width`, `filter` of `top`
-  animeren zet de layout elke frame opnieuw op. De enige uitzondering is de lijn
-  onder vetgedrukte tekst hierboven: daar wint kloppen bij een regelovergang van
-  de compositor, en het is verf op een paar woorden.
+  animeren zet de layout elke frame opnieuw op.
+- **Tekst per letter animeren vraagt twee dingen extra.** Een lengtegrens, want
+  een hele vetgedrukte zin wordt anders honderden spans met evenveel animaties.
+  En de letters gaan verborgen voor een screenreader met de volledige tekst
+  ernaast in een `sr-only`-kopie: elementgrenzen midden in een woord laten
+  sommige screenreaders de letters los uitspreken. Die kopie staat op
+  `user-select: none`, anders staat het vetgedrukte stuk twee keer in een
+  selectie die je kopieert. Ze staat ook in een `position: relative`-ouder, want
+  `sr-only` is absoluut gepositioneerd (zie de val op /admin/tickets).
 - **Een bereik eindigt binnen `entry`, niet binnen `cover`.** `cover 34%` ligt
   voorbij het punt waarop een element volledig in beeld staat. Kan de pagina
   niet verder scrollen (een korte pagina, het laatste blok onderaan), dan komt
