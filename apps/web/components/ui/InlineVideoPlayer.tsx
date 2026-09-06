@@ -4,15 +4,6 @@ import { useState } from "react";
 import { Play } from "lucide-react";
 import { safeUrl, vimeoVideoId, youtubeThumbnailUrl, youtubeVideoId } from "@/lib/videoEmbed";
 
-export function isVideoUrl(url: string | null | undefined): boolean {
-  if (!url) return false;
-  const parsed = safeUrl(url);
-  if (!parsed) return false;
-  if (youtubeVideoId(parsed.parsed) || vimeoVideoId(parsed.parsed)) return true;
-  const clean = parsed.parsed.pathname.toLowerCase();
-  return clean.endsWith(".mp4") || clean.endsWith(".webm") || clean.endsWith(".ogg");
-}
-
 function withAutoplay(embedUrl: string): string {
   try {
     const url = new URL(embedUrl);

@@ -35,7 +35,7 @@ describe("markdownToPlainText", () => {
 });
 
 import { preprocessMarkdownVideos } from "@/components/ui/Markdown";
-import { isVideoUrl } from "@/components/ui/InlineVideoPlayer";
+import { isVideoUrl } from "@/lib/videoEmbed";
 
 describe("preprocessMarkdownVideos", () => {
   it("converts pasted YouTube iframe tags to markdown video syntax", () => {

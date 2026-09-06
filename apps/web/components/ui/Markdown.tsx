@@ -1,7 +1,8 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { headingId, headingText } from "@/lib/pageOutline";
-import { InlineVideoPlayer, isVideoUrl } from "./InlineVideoPlayer";
+import { isVideoUrl } from "@/lib/videoEmbed";
+import { InlineVideoPlayer } from "./InlineVideoPlayer";
 
 /**
  * Zet ingesloten video-iframes of losstaande video-links om naar de markdown-media-syntax `![Titel](url)`.
