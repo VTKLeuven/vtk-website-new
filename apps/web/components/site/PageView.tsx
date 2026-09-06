@@ -21,6 +21,7 @@ import { pick, type Locale } from "@vtk/i18n";
 import type { HeaderTab, Page, PageAsset } from "@prisma/client";
 
 import "@/app/design/vtk-forms.css";
+import "@/app/design/vtk-motion.css";
 
 /**
  * De inhoud voor de gevraagde taal, als bron in plaats van als gerenderde boom.
@@ -145,6 +146,9 @@ export async function PageView({
 
   return (
     <div className="vtk-page">
+      {/* Leesvoortgang in de accentkleur, strak onder de sitekop. Decoratief:
+          de scrollbalk zegt hetzelfde, dus een screenreader hoeft dit niet. */}
+      <div className="vtk-read-progress" aria-hidden="true" />
       <header className="vtk-page-head">
         <div>
           {tab ? (

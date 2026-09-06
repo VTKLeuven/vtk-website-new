@@ -1,0 +1,74 @@
+/* Scroll-gestuurde beweging op de contentpagina's.
+ *
+ * Alles hier is pure CSS (`animation-timeline`), geen JavaScript en geen
+ * scroll-listener: de animaties lopen naast de hoofdthread en de pagina blijft
+ * een servercomponent. Josh Comeau's uitleg over scroll-driven animations is de
+ * bron van het patroon.
+ *
+ * Drie regels die je niet mag breken:
+ *
+ * 1. **Een begintoestand die iets verbergt, staat ALTIJD binnen de
+ *    `@supports`-guard.** Lekt `opacity: 0` eruit, dan toont een browser zonder
+ *    scroll-driven animations lege kopjes en onzichtbare foto's. Alles wat
+ *    hieronder verbergt, staat dus in het geneste blok; daarbuiten is de pagina
+ *    gewoon zichtbaar en stil.
+ * 2. **Enkel `opacity` en `transform`.** Die twee draaien op de compositor.
+ *    `width`, `filter` of `top` animeren zet de layout elke frame opnieuw op.
+ * 3. **Zijwaartse beweging vraagt `overflow-x: clip`, nooit `hidden`.** `hidden`
+ *    maakt een scrollcontainer en dat breekt stil de `position: sticky` van de
+ *    rail naast de tekst. Zie ook de `html`-regel in globals.css, die om
+ *    dezelfde reden `clip` gebruikt.
+ *
+ * De animaties gelden enkel binnen `.vtk-motion` (gezet door PageView), niet
+ * overal waar `.prose-vtk` staat: in het voorbeeldvenster van de editor zit de
+ * tekst in een eigen scrollcontainer, waar een `view()`-tijdlijn een kopje
+ * halverwege zijn animatie kan laten staan.
+ */
+
+:root {
+  /* De sticky sitekop bedekt de bovenkant van het scherm. Een kopje dat op
+     `entry` animeert, is daar anders al mee klaar terwijl het nog achter de
+     header zit. Zelfde hoogte als `scroll-margin-top` voor de ankers. */
+  --motion-inset: var(--vtk-header-height, 73px);
+}
+
+@keyframes vtk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.6em);
+  }
+}
+
+@keyframes vtk-progress {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+/* Leesvoortgang: de accentkleur op volle sterkte, strak onder de sitekop. Geen
+   `hidden`-fallback nodig; zonder animatie blijft de balk op `scaleX(0)` staan
+   en is ze dus onzichtbaar in plaats van vol. */
+.vtk-read-progress {
+  position: fixed;
+  top: var(--vtk-header-height, 73px);
+  left: 0;
+  right: 0;
+  z-index: 49;
+  height: 3px;
+  background: var(--yellow);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .vtk-read-progress {
+      animation: vtk-progress linear both;
+      animation-timeline: scroll(root block);
+    }
+  }
+}
