@@ -1,6 +1,31 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { headingId, headingText } from "@/lib/pageOutline";
+import { InlineVideoPlayer, isVideoUrl } from "./InlineVideoPlayer";
+
+/**
+ * Zet ingesloten video-iframes of losstaande video-links om naar de markdown-media-syntax `![Titel](url)`.
+ */
+export function preprocessMarkdownVideos(markdown: string): string {
+  if (!markdown) return "";
+
+  // 1. Converteer legacy/geplakte YouTube- of Vimeo-iframes:
+  let result = markdown.replace(
+    /<iframe[^>]*\bsrc=["'](?:https?:)?\/\/([^"']+)["'][^>]*>(?:<\/iframe>)?/gi,
+    (_match, src) => {
+      const fullUrl = src.startsWith("//") ? `https:${src}` : src.startsWith("http") ? src : `https://${src}`;
+      return `\n\n![Video](${fullUrl})\n\n`;
+    }
+  );
+
+  // 2. Converteer losstaande video-links op een eigen regel:
+  result = result.replace(
+    /(?:^|\n\n)([ \t]*)(https?:\/\/(?:www\.)?(?:youtube\.com\/(?:watch\?v=[a-zA-Z0-9_-]+|embed\/[a-zA-Z0-9_-]+|shorts\/[a-zA-Z0-9_-]+)|youtu\.be\/[a-zA-Z0-9_-]+|vimeo\.com\/\d+)[^\s]*)([ \t]*)(?=\n\n|$)/g,
+    "\n\n![Video]($2)\n\n"
+  );
+
+  return result;
+}
 
 /**
  * Gedeelde markdown-renderer: dezelfde uitvoer op de publieke pagina's (server
@@ -11,6 +36,8 @@ import { headingId, headingText } from "@/lib/pageOutline";
  * pagina's worden door leden bewerkt, dus de uitvoer moet veilig blijven.
  */
 export function Markdown({ children }: { children: string }) {
+  const content = preprocessMarkdownVideos(children);
+
   return (
     <ReactMarkdown
       remarkPlugins={[remarkGfm]}
@@ -42,9 +69,17 @@ export function Markdown({ children }: { children: string }) {
             </a>
           );
         },
+        img: ({ src, alt }) => {
+          const srcString = typeof src === "string" ? src : undefined;
+          if (srcString && isVideoUrl(srcString)) {
+            return <InlineVideoPlayer src={srcString} title={alt || undefined} />;
+          }
+          // eslint-disable-next-line @next/next/no-img-element
+          return <img src={src} alt={alt} />;
+        },
       }}
     >
-      {children}
+      {content}
     </ReactMarkdown>
   );
 }

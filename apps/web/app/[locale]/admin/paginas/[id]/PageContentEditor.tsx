@@ -229,8 +229,8 @@ export function PageContentEditor({
         </h2>
         <p className="mb-3 text-xs text-[#5c667f]">
           {nl
-            ? "PDF's horen hier thuis, niet in de inhoud zelf. Downloads verschijnen onderaan de pagina."
-            : "PDFs belong here, not in the content itself. Downloads appear at the bottom of the page."}
+            ? "Downloads die automatisch onderaan de pagina verschijnen. Bestanden of PDF's kunnen ook rechtstreeks in de tekst gelinkt worden via de editor hierboven."
+            : "Downloads that automatically appear at the bottom of the page. Files or PDFs can also be linked directly in the text via the editor above."}
         </p>
         <AssetList locale={locale} pageId={page.id} assets={page.assets} />
         <FileUploader pageId={page.id} locale={locale} />

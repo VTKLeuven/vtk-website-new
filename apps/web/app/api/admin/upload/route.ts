@@ -154,7 +154,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "invalid_image" }, { status: 415 });
     }
   } else if (kind === "pdf") {
-    if (!bytes.subarray(0, 5).equals(Buffer.from("%PDF-"))) {
+    if (bytes.subarray(0, 1024).indexOf(Buffer.from("%PDF-")) === -1) {
       return NextResponse.json({ error: "invalid_pdf" }, { status: 415 });
     }
     prefix = "pdfs";

@@ -5,6 +5,8 @@
  */
 export function markdownToPlainText(markdown: string): string {
   return markdown
+    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, "")
+    .replace(/<iframe[^>]*\/?>/gi, "")
     .replace(/```[^\n]*\n?([\s\S]*?)```/g, "$1")
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")

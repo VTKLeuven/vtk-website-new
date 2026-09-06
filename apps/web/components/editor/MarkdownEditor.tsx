@@ -7,13 +7,13 @@ import { useReportFormBusy } from "@/components/ui/formBusy";
 
 /**
  * Herbruikbare markdown-editor met werkbalk en visueel voorbeeld. De werkbalk
- * ondersteunt H1, H2, H3, links, afbeeldingen, vet, cursief, code, lijsten,
- * citaten en horizontale lijnen. Het voorbeeld gebruikt exact dezelfde
- * Markdown-component als de publieke pagina's.
+ * ondersteunt H1, H2, H3, links, afbeeldingen, bestanden/documenten (zoals PDF),
+ * vet, cursief, code, lijsten, citaten en horizontale lijnen. Het voorbeeld
+ * gebruikt exact dezelfde Markdown-component als de publieke pagina's.
  *
- * Afbeeldingen gaan via POST /api/admin/upload (kind=image) en worden als
- * markdown-syntax op de cursorpositie ingevoegd; zet `allowImages` uit voor
- * plekken waar afbeeldingen niet thuishoren.
+ * Afbeeldingen en bestanden gaan via POST /api/admin/upload en worden als
+ * markdown-syntax op de cursorpositie ingevoegd; zet `allowImages` of `allowFiles`
+ * uit voor plekken waar uploads niet thuishoren.
  */
 export function MarkdownEditor({
   value,
@@ -21,6 +21,8 @@ export function MarkdownEditor({
   locale,
   rows = 18,
   allowImages = true,
+  allowFiles,
+  acceptFiles = ".pdf,application/pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.txt,.csv,.zip",
   textareaId,
   maxLength,
 }: {
@@ -29,19 +31,24 @@ export function MarkdownEditor({
   locale: Locale;
   rows?: number;
   allowImages?: boolean;
+  allowFiles?: boolean;
+  acceptFiles?: string;
   /** Optioneel id voor het textarea, zodat een <Label htmlFor> eraan kan hangen. */
   textareaId?: string;
   maxLength?: number;
 }) {
+  const canUploadFiles = allowFiles ?? allowImages;
   const nl = locale === "nl";
   const uid = useId();
   const [mode, setMode] = useState<"edit" | "preview">("edit");
-  const [uploading, setUploading] = useState(false);
-  const [uploadFailed, setUploadFailed] = useState(false);
+  const [uploadingKind, setUploadingKind] = useState<"image" | "file" | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
+  const imageFileRef = useRef<HTMLInputElement>(null);
+  const docFileRef = useRef<HTMLInputElement>(null);
+  const savedSelectionRef = useRef<{ start: number; end: number } | null>(null);
   const valueRef = useRef(value);
-  useReportFormBusy(uploading);
+  useReportFormBusy(uploadingKind !== null);
 
   useEffect(() => {
     valueRef.current = value;
@@ -101,6 +108,28 @@ export function MarkdownEditor({
     replaceRange(start, end, text, { start: urlStart, end: urlStart + 8 });
   }
 
+  function insertVideo() {
+    const ta = textareaRef.current;
+    if (!ta) return;
+    const { selectionStart: start, selectionEnd: end } = ta;
+    const selected = value.slice(start, end).trim() || (nl ? "Video" : "Video");
+    const inputUrl = window.prompt(
+      nl
+        ? "Voer de YouTube- of Vimeo-URL in (bv. https://www.youtube.com/watch?v=...):"
+        : "Enter YouTube or Vimeo URL (e.g. https://www.youtube.com/watch?v=...):",
+      "https://www.youtube.com/watch?v="
+    );
+    if (inputUrl === null) return;
+    const targetUrl = inputUrl.trim() || "https://www.youtube.com/watch?v=";
+    const text = `![${selected}](${targetUrl})`;
+    if (!inputUrl.trim() || targetUrl === "https://www.youtube.com/watch?v=") {
+      const urlStart = start + selected.length + 4;
+      replaceRange(start, end, text, { start: urlStart, end: urlStart + targetUrl.length });
+    } else {
+      replaceRange(start, end, text, { start: start + text.length, end: start + text.length });
+    }
+  }
+
   function insertCode() {
     const ta = textareaRef.current;
     if (!ta) return;
@@ -132,26 +161,114 @@ export function MarkdownEditor({
   }
 
   async function uploadImage(file: File) {
-    setUploading(true);
-    setUploadFailed(false);
+    setUploadingKind("image");
+    setUploadError(null);
     try {
       const body = new FormData();
       body.append("file", file);
       body.append("kind", "image");
       const res = await fetch("/api/admin/upload", { method: "POST", body });
-      if (!res.ok) throw new Error(`upload failed: ${res.status}`);
+      if (!res.ok) {
+        if (res.status === 413) {
+          throw new Error(nl ? "Afbeelding is te groot (max. 45 MB)." : "Image is too large (max. 45 MB).");
+        }
+        if (res.status === 415) {
+          throw new Error(nl ? "Ongeldige afbeelding." : "Invalid image.");
+        }
+        if (res.status === 403) {
+          throw new Error(nl ? "Geen rechten om afbeeldingen te uploaden." : "No permission to upload images.");
+        }
+        throw new Error(nl ? "Upload mislukt, probeer opnieuw." : "Upload failed, try again.");
+      }
       const data = (await res.json()) as { url: string | null };
       if (!data.url) throw new Error("upload returned no url");
       const ta = textareaRef.current;
-      const pos = ta ? ta.selectionStart : value.length;
+      const pos = ta ? ta.selectionStart : valueRef.current.length;
       const altEnd = pos + 2;
       replaceRange(pos, pos, `![](${data.url})`, { start: altEnd, end: altEnd });
-    } catch {
-      // Verwachte fout (offline, te groot, geen rechten): melding onder de
-      // werkbalk, geen error boundary.
-      setUploadFailed(true);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : nl ? "Upload mislukt." : "Upload failed.");
     } finally {
-      setUploading(false);
+      setUploadingKind(null);
+    }
+  }
+
+  function handleDocumentUploadClick() {
+    const ta = textareaRef.current;
+    if (ta) {
+      savedSelectionRef.current = {
+        start: ta.selectionStart,
+        end: ta.selectionEnd,
+      };
+    }
+    docFileRef.current?.click();
+  }
+
+  async function uploadFile(file: File) {
+    setUploadingKind("file");
+    setUploadError(null);
+    try {
+      const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+      const kind = isPdf ? "pdf" : "file";
+      const body = new FormData();
+      body.append("file", file);
+      body.append("kind", kind);
+      const res = await fetch("/api/admin/upload", { method: "POST", body });
+      if (!res.ok) {
+        if (res.status === 413) {
+          throw new Error(nl ? "Bestand is te groot (max. 40 MB)." : "File is too large (max. 40 MB).");
+        }
+        if (res.status === 415) {
+          throw new Error(nl ? "Ongeldig bestandstype." : "Invalid file type.");
+        }
+        if (res.status === 403) {
+          throw new Error(nl ? "Geen rechten om bestanden te uploaden." : "No permission to upload files.");
+        }
+        throw new Error(nl ? "Upload mislukt, probeer opnieuw." : "Upload failed, try again.");
+      }
+      const data = (await res.json()) as { url: string | null };
+      if (!data.url) throw new Error("upload returned no url");
+
+      const ta = textareaRef.current;
+      const currentVal = valueRef.current;
+      const saved = savedSelectionRef.current;
+      const pos = ta ? ta.selectionStart : currentVal.length;
+      const start = saved ? saved.start : pos;
+      const end = saved ? saved.end : pos;
+
+      const rawSelected = currentVal.slice(start, end);
+      const leadingSpace = rawSelected.match(/^\s*/)?.[0] ?? "";
+      const trailingSpace = rawSelected.match(/\s*$/)?.[0] ?? "";
+      let trimmed = rawSelected.trim();
+
+      // Als de selectie al een link was, bv [tekst](https://), haal dan de tekst eruit
+      const linkMatch = trimmed.match(/^\[(.*?)\](?:\(.*?\))?$/);
+      if (linkMatch) {
+        trimmed = linkMatch[1];
+      }
+
+      const fileUrl = `${data.url}?filename=${encodeURIComponent(file.name)}`;
+
+      if (trimmed.length > 0) {
+        // Er was tekst geselecteerd: maak van die tekst een link naar het geüploade bestand.
+        const inserted = `${leadingSpace}[${trimmed}](${fileUrl})${trailingSpace}`;
+        const newCursor = start + inserted.length;
+        replaceRange(start, end, inserted, { start: newCursor, end: newCursor });
+      } else {
+        // Geen selectie: voeg [bestandsnaam](url) in en selecteer de naam zodat
+        // de beheerder die desgewenst meteen kan overtypen.
+        const label = file.name;
+        const inserted = `[${label}](${fileUrl})`;
+        replaceRange(start, start, inserted, {
+          start: start + 1,
+          end: start + 1 + label.length,
+        });
+      }
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : nl ? "Upload mislukt." : "Upload failed.");
+    } finally {
+      setUploadingKind(null);
+      savedSelectionRef.current = null;
     }
   }
 
@@ -216,12 +333,28 @@ export function MarkdownEditor({
             {allowImages && (
               <ToolbarButton
                 label={nl ? "Afbeelding uploaden" : "Upload image"}
-                onClick={() => fileRef.current?.click()}
-                disabled={uploading}
+                onClick={() => imageFileRef.current?.click()}
+                disabled={uploadingKind !== null}
               >
                 <ImageGlyph />
               </ToolbarButton>
             )}
+            {canUploadFiles && (
+              <ToolbarButton
+                label={nl ? "Document of bestand uploaden (bv. PDF)" : "Upload document or file (e.g. PDF)"}
+                onClick={handleDocumentUploadClick}
+                disabled={uploadingKind !== null}
+              >
+                <FileGlyph />
+              </ToolbarButton>
+            )}
+            <ToolbarButton
+              label={nl ? "Video invoegen (YouTube / Vimeo)" : "Insert video (YouTube / Vimeo)"}
+              onClick={insertVideo}
+              disabled={uploadingKind !== null}
+            >
+              <VideoGlyph />
+            </ToolbarButton>
             <ToolbarDivider />
             <ToolbarButton
               label={nl ? "Opsomming" : "Bullet list"}
@@ -247,14 +380,19 @@ export function MarkdownEditor({
             >
               <HorizontalRuleGlyph />
             </ToolbarButton>
-            {uploading && (
+            {uploadingKind === "image" && (
               <span className="ml-2 text-xs text-[#5c667f]">
                 {nl ? "Afbeelding uploaden..." : "Uploading image..."}
               </span>
             )}
-            {uploadFailed && !uploading && (
+            {uploadingKind === "file" && (
+              <span className="ml-2 text-xs text-[#5c667f]">
+                {nl ? "Bestand uploaden..." : "Uploading file..."}
+              </span>
+            )}
+            {uploadError && !uploadingKind && (
               <span className="ml-2 text-xs text-red-600">
-                {nl ? "Upload mislukt, probeer opnieuw." : "Upload failed, try again."}
+                {uploadError}
               </span>
             )}
           </>
@@ -263,7 +401,7 @@ export function MarkdownEditor({
 
       {allowImages && (
         <input
-          ref={fileRef}
+          ref={imageFileRef}
           type="file"
           accept="image/*"
           className="hidden"
@@ -275,24 +413,88 @@ export function MarkdownEditor({
         />
       )}
 
+      {canUploadFiles && (
+        <input
+          ref={docFileRef}
+          type="file"
+          accept={acceptFiles}
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            if (file) void uploadFile(file);
+          }}
+        />
+      )}
+
       {mode === "edit" ? (
         <textarea
           ref={textareaRef}
           id={textareaId ?? `${uid}-md`}
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onDragOver={(e) => {
+            if (e.dataTransfer?.types?.includes("Files")) {
+              e.preventDefault();
+            }
+          }}
+          onPaste={(e) => {
+            const items = e.clipboardData?.items;
+            if (!items) return;
+            for (let i = 0; i < items.length; i++) {
+              const item = items[i];
+              if (item.kind === "file") {
+                const file = item.getAsFile();
+                if (!file) continue;
+                if (file.type.startsWith("image/") && allowImages) {
+                  e.preventDefault();
+                  void uploadImage(file);
+                  return;
+                }
+                if (canUploadFiles) {
+                  e.preventDefault();
+                  void uploadFile(file);
+                  return;
+                }
+              }
+            }
+          }}
+          onDrop={(e) => {
+            const files = e.dataTransfer?.files;
+            if (files && files.length > 0) {
+              const file = files[0];
+              if (file.type.startsWith("image/") && allowImages) {
+                e.preventDefault();
+                void uploadImage(file);
+                return;
+              }
+              if (canUploadFiles) {
+                e.preventDefault();
+                void uploadFile(file);
+                return;
+              }
+            }
+          }}
           rows={rows}
           maxLength={maxLength}
           spellCheck={false}
           className="block w-full resize-y bg-white p-4 font-mono text-sm leading-relaxed text-vtk-ink outline-none"
           placeholder={
-            allowImages
+            allowImages && canUploadFiles
               ? nl
-                ? "Schrijf hier in markdown. Gebruik de knoppen hierboven voor koppen, vet, links en afbeeldingen."
-                : "Write markdown here. Use the buttons above for headings, bold, links and images."
-              : nl
-                ? "Schrijf hier in markdown. Gebruik de knoppen hierboven voor koppen, vet en links."
-                : "Write markdown here. Use the buttons above for headings, bold and links."
+                ? "Schrijf hier in markdown. Gebruik de knoppen hierboven voor koppen, vet, links, afbeeldingen en documenten."
+                : "Write markdown here. Use the buttons above for headings, bold, links, images and documents."
+              : allowImages
+                ? nl
+                  ? "Schrijf hier in markdown. Gebruik de knoppen hierboven voor koppen, vet, links en afbeeldingen."
+                  : "Write markdown here. Use the buttons above for headings, bold, links and images."
+                : canUploadFiles
+                  ? nl
+                    ? "Schrijf hier in markdown. Gebruik de knoppen hierboven voor koppen, vet, links en documenten."
+                    : "Write markdown here. Use the buttons above for headings, bold, links and documents."
+                  : nl
+                    ? "Schrijf hier in markdown. Gebruik de knoppen hierboven voor koppen, vet en links."
+                    : "Write markdown here. Use the buttons above for headings, bold and links."
           }
         />
       ) : (
@@ -322,6 +524,8 @@ export function MarkdownEditorField({
   locale: Locale;
   rows?: number;
   allowImages?: boolean;
+  allowFiles?: boolean;
+  acceptFiles?: string;
   textareaId?: string;
   maxLength?: number;
 }) {
@@ -432,6 +636,27 @@ function ImageGlyph() {
       <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
       <circle cx="9" cy="9" r="2" />
       <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" />
+    </Glyph>
+  );
+}
+
+function FileGlyph() {
+  return (
+    <Glyph>
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+      <line x1="16" y1="13" x2="8" y2="13" />
+      <line x1="16" y1="17" x2="8" y2="17" />
+      <polyline points="10 9 9 9 8 9" />
+    </Glyph>
+  );
+}
+
+function VideoGlyph() {
+  return (
+    <Glyph>
+      <polygon points="23 7 16 12 23 17 23 7" />
+      <rect x="1" y="5" width="15" height="14" rx="2" ry="2" />
     </Glyph>
   );
 }

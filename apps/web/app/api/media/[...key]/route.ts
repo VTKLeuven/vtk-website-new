@@ -46,9 +46,23 @@ export async function GET(
       // cannot execute in the vtk.be origin when opened directly.
       headers.set("content-security-policy", "sandbox; default-src 'none'; style-src 'unsafe-inline'");
     }
-    if (key.startsWith("files/") || unsafeInlineType) {
-      const filename = key.split("/").at(-1)?.replace(/["\\\r\n]/g, "_") || "download";
-      headers.set("content-disposition", `attachment; filename="${filename}"`);
+    const url = new URL(request.url);
+    const requestedFilename = url.searchParams.get("filename")?.trim();
+    const forceDownload = url.searchParams.has("download");
+    const fallbackFilename = key.split("/").at(-1)?.replace(/["\\\r\n]/g, "_") || "download";
+    const filename = (requestedFilename || fallbackFilename).replace(/["\\\r\n]/g, "_");
+    const encodedFilename = encodeURIComponent(requestedFilename || fallbackFilename);
+
+    if (key.startsWith("files/") || unsafeInlineType || forceDownload) {
+      headers.set(
+        "content-disposition",
+        `attachment; filename="${filename}"; filename*=UTF-8''${encodedFilename}`
+      );
+    } else if (requestedFilename) {
+      headers.set(
+        "content-disposition",
+        `inline; filename="${filename}"; filename*=UTF-8''${encodedFilename}`
+      );
     }
     // Keys zijn content-adres-achtig (random hex) en dus onveranderlijk: hard cachen.
     headers.set("cache-control", "public, max-age=31536000, immutable");
