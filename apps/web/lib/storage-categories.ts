@@ -97,6 +97,12 @@ export const STORAGE_FEATURES: readonly StorageFeatureDefinition[] = [
     description: 'Photos and downloadable documents for loanable materials.',
   },
   {
+    id: 'feedback',
+    prefix: 'feedback/',
+    label: 'Website feedback screenshots',
+    description: 'Screenshots members attach to feedback about the website itself.',
+  },
+  {
     id: 'dashboard',
     prefix: 'tiles/',
     label: 'Dashboard tile logos',

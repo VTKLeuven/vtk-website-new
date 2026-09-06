@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Element, ElementContent } from 'hast';
-import { galleryPhotos, imageSize, withImageSize } from '@/lib/gallery';
+import { galleryPhotos, imageSize, solePhoto, withImageSize } from '@/lib/gallery';
 
 function img(src: string, alt = ''): ElementContent {
   return { type: 'element', tagName: 'img', properties: { src, alt }, children: [] };
@@ -49,8 +49,8 @@ describe('foto’s die tegen elkaar aan staan', () => {
     );
 
     expect(photos).toEqual([
-      { src: '/a.jpg?w=600&h=400', alt: 'Eerste', width: 600, height: 400 },
-      { src: '/b.jpg?w=400&h=600', alt: '', width: 400, height: 600 },
+      { src: '/a.jpg?w=600&h=400', alt: 'Eerste', title: null, width: 600, height: 400 },
+      { src: '/b.jpg?w=400&h=600', alt: '', title: null, width: 400, height: 600 },
     ]);
   });
 
@@ -80,8 +80,8 @@ describe('foto’s die tegen elkaar aan staan', () => {
     const photos = galleryPhotos(paragraph(img('/oud-1.jpg'), text('\n'), img('/oud-2.jpg')));
 
     expect(photos).toEqual([
-      { src: '/oud-1.jpg', alt: '', width: null, height: null },
-      { src: '/oud-2.jpg', alt: '', width: null, height: null },
+      { src: '/oud-1.jpg', alt: '', title: null, width: null, height: null },
+      { src: '/oud-2.jpg', alt: '', title: null, width: null, height: null },
     ]);
   });
 
@@ -95,5 +95,31 @@ describe('foto’s die tegen elkaar aan staan', () => {
 
     expect(galleryPhotos(paragraph(img('/a.jpg'), link, img('/b.jpg')))).toBeNull();
     expect(galleryPhotos(undefined)).toBeNull();
+  });
+});
+
+describe('een losstaande foto', () => {
+  it('geeft de ene foto van een alinea terug, met haar bijschrift', () => {
+    const captioned: ElementContent = {
+      type: 'element',
+      tagName: 'img',
+      properties: { src: '/een.jpg?w=800&h=600', alt: 'Alt', title: 'Het bijschrift' },
+      children: [],
+    };
+    expect(solePhoto(paragraph(captioned))).toEqual({
+      src: '/een.jpg?w=800&h=600',
+      alt: 'Alt',
+      title: 'Het bijschrift',
+      width: 800,
+      height: 600,
+    });
+  });
+
+  it('geeft null zodra er twee foto’s staan; dat is een galerij', () => {
+    expect(solePhoto(paragraph(img('/een.jpg'), img('/twee.jpg')))).toBeNull();
+  });
+
+  it('geeft null voor een foto met tekst ernaast', () => {
+    expect(solePhoto(paragraph(img('/een.jpg'), text('kijk')))).toBeNull();
   });
 });

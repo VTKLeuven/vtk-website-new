@@ -5,6 +5,8 @@ import { useState, useRef, useEffect } from "react";
 import { logoutAction } from "@/app/actions/auth";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
 import type { PostAdminLink } from "@/lib/postAdminLinks";
+import type { Locale } from "@vtk/i18n";
+import { FeedbackDialog } from "./FeedbackDialog";
 
 export function ProfileMenu({
   name,
@@ -14,6 +16,7 @@ export function ProfileMenu({
   grocomeetNeedsAttention = false,
   labels,
   base,
+  locale,
   variant = "default",
 }: {
   name: string;
@@ -29,12 +32,15 @@ export function ProfileMenu({
     admin: string;
     grocomeet: string;
     grocomeetAttention: string;
+    feedback: string;
     logout: string;
   };
   base: string;
+  locale: Locale;
   variant?: "default" | "editorial";
 }) {
   const [open, setOpen] = useState(false);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -157,6 +163,21 @@ export function ProfileMenu({
               {tool.label}
             </a>
           ))}
+          {/* Feedback over de site zelf hangt hier en niet in de navigatie: het
+              gaat over jouw ervaring op de pagina waar je nét stond, en dat is
+              hetzelfde menu waar je je eigen account beheert. Het paneel zelf
+              staat buiten dit menu (zie onder). */}
+          <button
+            type="button"
+            className={`${itemClass} text-left`}
+            role="menuitem"
+            onClick={() => {
+              setFeedbackOpen(true);
+              setOpen(false);
+            }}
+          >
+            {labels.feedback}
+          </button>
           <form action={logoutAction}>
             <button type="submit" className={`${itemClass} text-left`} role="menuitem">
               {labels.logout}
@@ -164,6 +185,11 @@ export function ProfileMenu({
           </form>
         </div>
       )}
+      {/* Buiten het menu: de modal moet blijven staan wanneer het menu sluit,
+          en bij de niet-editorial variant verdwijnt dat menu uit de DOM. */}
+      {feedbackOpen ? (
+        <FeedbackDialog locale={locale} onClose={() => setFeedbackOpen(false)} />
+      ) : null}
     </div>
   );
 }

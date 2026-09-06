@@ -681,6 +681,9 @@ model User {
   fakbarEvenings        FakbarEvening[]        @relation("FakbarHoofdtapper")
   photoTakedownsHandled PhotoTakedownRequest[] @relation("PhotoTakedownHandler")
 
+  websiteFeedback        WebsiteFeedback[] @relation("WebsiteFeedbackAuthor")
+  websiteFeedbackHandled WebsiteFeedback[] @relation("WebsiteFeedbackHandler")
+
   pianoReservations PianoReservation[]
 
   uitleenReservations     UitleenReservation[]      @relation("UitleenReservationUser")
@@ -6043,6 +6046,83 @@ model PhotoTakedownRequest {
 
   @@index([gallery, status])
   @@index([assetId])
+}
+
+/// Waarover de feedback gaat. Vier categorieën plus een restcategorie: meer
+/// keuzes maken de lijst voor de melder trager zonder de triage sneller te
+/// maken.
+enum WebsiteFeedbackKind {
+  /// Iets werkt niet.
+  BUG
+  /// De tekst of de gegevens op een pagina kloppen niet (meer).
+  CONTENT
+  /// Iets ziet er verkeerd uit of leest slecht.
+  DESIGN
+  /// Een voorstel voor iets dat er nog niet is.
+  FEATURE
+  OTHER
+}
+
+/// Waar een melding in de triage staat.
+enum WebsiteFeedbackStatus {
+  /// Nog niet bekeken.
+  NEW
+  /// Bekeken en op de lijst gezet; er is nog niets aan gedaan.
+  PLANNED
+  /// Aangepakt.
+  DONE
+  /// Bewust niets mee gedaan, met een notitie waarom.
+  DISMISSED
+}
+
+/// Feedback van een lid over de website zelf: een bug, een fout in de inhoud,
+/// iets aan het ontwerp of een voorstel.
+///
+/// Het formulier hangt in het accountmenu, dus enkel wie ingelogd is kan iets
+/// melden. **Anoniem betekent hier echt anoniem**: bij `anonymous` blijft
+/// `authorId` leeg, zodat er geen kolom is die iemand alsnog kan uitlezen. Wie
+/// wel zijn naam geeft, is te bereiken voor een vervolgvraag; dat is precies
+/// het verschil tussen de twee.
+///
+/// `path` en `userAgent` worden altijd bewaard, ook anoniem: zonder de pagina
+/// en de browser is een bugmelding meestal niet te reproduceren. Het
+/// toestemmingszinnetje in het formulier zegt dat er ook zo.
+model WebsiteFeedback {
+  id      String              @id @default(cuid())
+  kind    WebsiteFeedbackKind
+  message String
+
+  /// De screenshot, in de objectopslag onder `feedback/`. Optioneel.
+  imageKey String?
+
+  /// Het pad waar de melder stond toen hij het formulier opende, bv.
+  /// `/nl/kalender`. Zonder domein: dat is altijd deze site.
+  path      String?
+  userAgent String?
+
+  /// Waar of `authorId` leeg is; twee losse velden zodat "anoniem gemeld" ook
+  /// zichtbaar blijft nadat een account verwijderd werd.
+  anonymous Boolean @default(false)
+  authorId  String?
+
+  status       WebsiteFeedbackStatus @default(NEW)
+  handledById  String?
+  handledAt    DateTime?             @db.Timestamptz(3)
+  /// Wat het beheer ermee deed. Verplicht wanneer een melding afgewezen wordt.
+  handlingNote String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  /// `SetNull` aan beide kanten: verlaat de melder of de behandelaar de kring,
+  /// dan blijft de melding zelf bestaan.
+  author    User? @relation("WebsiteFeedbackAuthor", fields: [authorId], references: [id], onDelete: SetNull)
+  handledBy User? @relation("WebsiteFeedbackHandler", fields: [handledById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([kind])
+  @@index([authorId])
+  @@index([handledById])
 }
 
 /// Een gebouw van de KU Leuven, voor de lokalenzoeker in de app.

@@ -22,6 +22,9 @@ export type GalleryPhoto = {
   src: string;
   /** De alt-tekst uit de markdown; ook het bijschrift in het vergrootglas. */
   alt: string;
+  /** De titel uit de markdown (`![alt](url "titel")`); het bijschrift onder een
+   *  losstaande foto. Null wanneer de redacteur er geen gaf. */
+  title: string | null;
   /** De maten uit de URL, of null wanneer die er niet in staan. */
   width: number | null;
   height: number | null;
@@ -69,6 +72,24 @@ export function withImageSize(url: string, width: number, height: number): strin
  * `![Titel](url)` en zou anders als foto in de strook belanden.
  */
 export function galleryPhotos(node: Element | undefined): GalleryPhoto[] | null {
+  const photos = paragraphPhotos(node);
+  return photos && photos.length >= 2 ? photos : null;
+}
+
+/**
+ * De ene foto van een alinea die verder niets bevat, of null.
+ *
+ * De tegenhanger van {@link galleryPhotos}: twee of meer foto's worden een
+ * galerij, eentje wordt een figuur met een bijschrift. Beide lezen dezelfde
+ * alinea, dus ze horen bij elkaar te blijven staan.
+ */
+export function solePhoto(node: Element | undefined): GalleryPhoto | null {
+  const photos = paragraphPhotos(node);
+  return photos && photos.length === 1 ? photos[0] : null;
+}
+
+/** De foto's van een alinea die niets anders bevat, of null. */
+function paragraphPhotos(node: Element | undefined): GalleryPhoto[] | null {
   if (!node || !Array.isArray(node.children)) return null;
 
   const photos: GalleryPhoto[] = [];
@@ -82,15 +103,17 @@ export function galleryPhotos(node: Element | undefined): GalleryPhoto[] | null 
     const src = typeof child.properties?.src === "string" ? child.properties.src : "";
     if (!src || isVideoUrl(src)) return null;
     const alt = typeof child.properties?.alt === "string" ? child.properties.alt : "";
+    const title = typeof child.properties?.title === "string" ? child.properties.title : null;
     const size = imageSize(src);
 
     photos.push({
       src,
       alt,
+      title: title && title.trim() ? title : null,
       width: size?.width ?? null,
       height: size?.height ?? null,
     });
   }
 
-  return photos.length >= 2 ? photos : null;
+  return photos.length > 0 ? photos : null;
 }

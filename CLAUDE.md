@@ -293,6 +293,19 @@ the design language into the application instead of copying mockup content.
     the navy scrim here and was invisible, and it now opens the text as
     `.vtk-page-plate` instead (see below). Every page therefore gets the same
     opener, pattern included.
+- Motion: the text of a content page animates on scroll, in pure CSS
+  (`animation-timeline`, `apps/web/app/design/vtk-motion.css`), never with a
+  scroll listener. Headings arrive word by word, a single photo slides in from
+  alternating sides inside its own clipped frame, the yellow rule under a
+  section heading draws itself, and bold text (navy, no underline: that is the
+  link style) ripples letter by letter. Rules that hold without exception: any
+  hiding start state lives **inside** the `@supports (animation-timeline:
+  view())` guard, animate only `opacity` and `transform`, end every
+  `animation-range` inside `entry` and never inside `cover` (a page that cannot
+  scroll further leaves anything ranged past full visibility half-faded), and
+  nest everything in `@media (prefers-reduced-motion: no-preference)`. Motion
+  belongs to reading a text: not on buttons, tables, the rail, the photo plate,
+  the gallery, or anywhere in admin. See `docs/design-decisions.md`.
 - Content pages (`PageView`): dark head with a breadcrumb to the category, then
   the page's own photo as a wide unscrimmed plate (`.vtk-page-plate`, 2.45:1, the
   full content width so it runs over the rail too, 16/10 below 760px), then the

@@ -109,6 +109,38 @@ body {
 .prose-vtk hr {
   @apply my-6 border-0 border-t border-vtk-blue/20;
 }
+/* Een losstaande foto met een bijschrift. Het kader draagt de ronding, de rand
+   en de schaduw, en het knipt; de foto beweegt en zoomt daarbinnen
+   (vtk-motion.css). Stond de ronding op de foto zelf, dan viel ze bij het
+   bewegen buiten het vierkante kader en zag je rechte hoeken.
+
+   `clip` en niet `hidden`: `hidden` maakt een scrollcontainer en dat breekt de
+   sticky rail naast de tekst. */
+.prose-vtk .vtk-figure {
+  margin: 1.5rem 0;
+}
+
+.prose-vtk .vtk-figure-media {
+  @apply rounded-2xl shadow-sm border border-vtk-blue/10;
+  display: block;
+  overflow: clip;
+}
+
+.prose-vtk .vtk-figure img {
+  @apply my-0 rounded-none border-0 shadow-none;
+  display: block;
+  width: 100%;
+}
+
+.prose-vtk .vtk-figure figcaption {
+  margin-top: 0.6rem;
+  padding-left: 0.7rem;
+  border-left: 2px solid var(--yellow);
+  color: var(--muted);
+  font-size: 0.85rem;
+  line-height: 1.5;
+}
+
 .prose-vtk img {
   @apply rounded-2xl my-4 max-w-full h-auto shadow-sm border border-vtk-blue/10;
 }

@@ -1,0 +1,245 @@
+/* Scroll-gestuurde beweging op de contentpagina's.
+ *
+ * Alles hier is pure CSS (`animation-timeline`), geen JavaScript en geen
+ * scroll-listener: de animaties lopen naast de hoofdthread en de pagina blijft
+ * een servercomponent. Josh Comeau's uitleg over scroll-driven animations is de
+ * bron van het patroon.
+ *
+ * Drie regels die je niet mag breken:
+ *
+ * 1. **Een begintoestand die iets verbergt, staat ALTIJD binnen de
+ *    `@supports`-guard.** Lekt `opacity: 0` eruit, dan toont een browser zonder
+ *    scroll-driven animations lege kopjes en onzichtbare foto's. Alles wat
+ *    hieronder verbergt, staat dus in het geneste blok; daarbuiten is de pagina
+ *    gewoon zichtbaar en stil.
+ * 2. **Enkel `opacity` en `transform`.** Die twee draaien op de compositor.
+ *    `width`, `filter` of `top` animeren zet de layout elke frame opnieuw op.
+ * 3. **Zijwaartse beweging vraagt `overflow-x: clip`, nooit `hidden`.** `hidden`
+ *    maakt een scrollcontainer en dat breekt stil de `position: sticky` van de
+ *    rail naast de tekst. Zie ook de `html`-regel in globals.css, die om
+ *    dezelfde reden `clip` gebruikt.
+ *
+ * 4. **Een bereik eindigt binnen `entry`, niet binnen `cover`.** `cover 34%`
+ *    ligt voorbij het punt waarop een element volledig in beeld staat. Kan de
+ *    pagina niet verder scrollen (een korte pagina, het laatste blok), dan komt
+ *    de tijdlijn daar nooit en blijft dat blok halfdoorzichtig staan. `entry
+ *    100%` is per definitie bereikt zodra het element volledig binnen is.
+ *
+ * De animaties gelden enkel binnen `.vtk-motion` (gezet door PageView), niet
+ * overal waar `.prose-vtk` staat: in het voorbeeldvenster van de editor zit de
+ * tekst in een eigen scrollcontainer, waar een `view()`-tijdlijn een kopje
+ * halverwege zijn animatie kan laten staan.
+ */
+
+:root {
+  /* De sticky sitekop bedekt de bovenkant van het scherm. Een kopje dat op
+     `entry` animeert, is daar anders al mee klaar terwijl het nog achter de
+     header zit. Zelfde hoogte als `scroll-margin-top` voor de ankers. */
+  --motion-inset: var(--vtk-header-height, 73px);
+}
+
+/* `translate`/`rotate`/`scale` als losse eigenschappen en niet als één
+   `transform`: zo kunnen twee animaties tegelijk op hetzelfde element lopen
+   (een foto schuift binnen én zoomt uit) zonder elkaar te overschrijven. */
+@keyframes vtk-rise {
+  from {
+    opacity: 0;
+    translate: 0 0.6em;
+  }
+}
+
+/* Woorden komen met een lichte kanteling binnen; dat leest speelser dan recht
+   omhoog schuiven. */
+@keyframes vtk-rise-tilt {
+  from {
+    opacity: 0;
+    translate: 0 0.7em;
+    rotate: -3deg;
+  }
+}
+
+@keyframes vtk-slide-in {
+  from {
+    opacity: 0;
+    translate: -0.9rem 0;
+  }
+}
+
+/* Continu, over de hele doorloop: de foto zoomt langzaam uit terwijl ze
+   voorbijkomt. Staat los van de binnenkomst hierboven. */
+@keyframes vtk-settle {
+  from {
+    scale: 1.06;
+  }
+}
+
+/* De kopfoto beweegt trager dan de pagina. */
+/* Een golfje door de letters van vetgedrukte tekst: elke letter gaat omhoog en
+   komt weer terug, en doordat elke letter haar bereik iets opschuift, loopt er
+   één golf door het woord. Begin- en eindtoestand zijn allebei rust, dus er
+   blijft nooit een letter scheef of verschoven staan. */
+@keyframes vtk-letter-wave {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+
+  50% {
+    translate: 0 -0.22em;
+  }
+}
+
+/* De gele rail van een citaat tekent zichzelf van boven naar beneden. */
+@keyframes vtk-draw-down {
+  from {
+    scale: 1 0;
+  }
+}
+
+/* De foto komt van opzij binnen. Geanimeerd wordt de `img`, niet het figuur:
+   het figuur knipt (`overflow-x: clip` in globals.css), zodat de foto binnen
+   haar eigen kader schuift en niets buiten de tekstkolom steekt. Om en om van
+   links en van rechts, zodat een pagina met meerdere foto's ritme krijgt. */
+@keyframes vtk-fly-in-left {
+  from {
+    opacity: 0;
+    translate: -9% 0;
+  }
+}
+
+@keyframes vtk-fly-in-right {
+  from {
+    opacity: 0;
+    translate: 9% 0;
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .vtk-motion .vtk-figure img {
+      animation:
+        vtk-fly-in-left linear both,
+        vtk-settle linear both;
+      animation-timeline:
+        view(block var(--motion-inset) auto),
+        view(block var(--motion-inset) auto);
+      animation-range:
+        entry 5% entry 70%,
+        cover 0% cover 100%;
+    }
+
+    /* `nth-of-type` telt enkel figuren tussen hun broers en zussen, dus dit is
+       de tweede foto van de tekst en niet het tweede element. */
+    .vtk-motion .vtk-figure:nth-of-type(even) img {
+      /* Allebei de namen: één waarde zou de tweede animatie hierboven
+         (het uitzoomen) stilzwijgend weglaten. */
+      animation-name: vtk-fly-in-right, vtk-settle;
+    }
+
+    /* Het bijschrift volgt de foto met een korte vertraging: eerst het beeld,
+       dan het onderschrift. */
+    .vtk-motion .vtk-figure figcaption {
+      animation: vtk-rise linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry 20% entry 80%;
+    }
+  }
+}
+
+/* Kopjes komen woord na woord binnen. Elk woord draagt zijn volgnummer (`--i`,
+   gezet door de markdown-renderer) en schuift daarmee zijn eigen bereik op; het
+   plafond van 7 houdt een lange titel bij elkaar in plaats van het laatste
+   woord ver na de rest te laten komen. Een kopje met opmaak erin valt niet te
+   splitsen en komt als blok binnen (`data-reveal="block"`). */
+@keyframes vtk-draw {
+  from {
+    transform: scaleX(0);
+  }
+}
+
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .vtk-motion .vtk-word {
+      display: inline-block;
+      transform-origin: 0 85%;
+      animation: vtk-rise-tilt linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry calc(12% + min(var(--i), 7) * 4%) entry
+        calc(55% + min(var(--i), 7) * 4%);
+    }
+
+    .vtk-motion [data-reveal="block"] {
+      animation: vtk-rise linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry 12% entry 75%;
+    }
+
+    /* Opsommingen komen regel na regel van links binnen. Geen volgnummer
+       nodig: elk item staat op zijn eigen hoogte, dus de tijdlijn van het item
+       zelf zorgt al voor het na-elkaar. */
+    .vtk-motion .prose-vtk :is(ul, ol) > li {
+      animation: vtk-slide-in linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry 10% entry 70%;
+    }
+
+    /* De gele rail van een citaat tekent zichzelf naar beneden. */
+    .vtk-motion .prose-vtk blockquote::before {
+      animation: vtk-draw-down linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry 15% entry 75%;
+    }
+
+    .vtk-motion .prose-vtk .vtk-letter {
+      display: inline-block;
+      animation: vtk-letter-wave linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry calc(25% + min(var(--i), 14) * 1.6%) entry
+        calc(58% + min(var(--i), 14) * 1.6%);
+    }
+
+    /* De gele lijn tekent zichzelf onder het kopje. */
+    .vtk-motion .prose-vtk h2::after {
+      animation: vtk-draw linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry 25% entry 85%;
+    }
+  }
+}
+
+/* De paginakop staat bij het laden al in beeld. Een `view()`-tijdlijn is daar
+   meteen voorbij haar bereik, dus die kop zou als enige stil blijven; hij komt
+   daarom binnen op een gewone animatie bij het laden. Geen `@supports` nodig:
+   keyframe-animaties werken overal. */
+@media (prefers-reduced-motion: no-preference) {
+  .vtk-page-head .vtk-page-kicker,
+  .vtk-page-head .vtk-page-title,
+  .vtk-page-head .vtk-page-subtitle {
+    animation: vtk-rise 620ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  .vtk-page-head .vtk-page-title {
+    animation-delay: 60ms;
+  }
+
+  .vtk-page-head .vtk-page-subtitle {
+    animation-delay: 120ms;
+  }
+}
+
+/* De paginatitel komt woord na woord binnen bij het laden. Bij het laden en
+   niet op een tijdlijn: de kop staat al in beeld, dus een `view()`-tijdlijn is
+   daar meteen voorbij haar bereik. */
+@media (prefers-reduced-motion: no-preference) {
+  .vtk-page-head .vtk-word {
+    display: inline-block;
+    transform-origin: 0 85%;
+    animation: vtk-rise-tilt 620ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: calc(70ms + var(--i) * 55ms);
+  }
+
+  /* Anders zou de titel als geheel én per woord binnenkomen. */
+  .vtk-page-head .vtk-page-title:has(.vtk-word) {
+    animation: none;
+  }
+}

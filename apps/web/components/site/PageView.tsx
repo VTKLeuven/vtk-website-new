@@ -28,11 +28,13 @@ import {
 import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
 import { FORM_ANCHOR, splitOnFormMarker, stripFormMarker } from "@/lib/pageForm";
 import { outlineFromMarkdown, outlineFromTiptap, type OutlineItem } from "@/lib/pageOutline";
+import { revealWords } from "@/lib/revealWords";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import type { HeaderTab, Page, PageAsset } from "@prisma/client";
 
 import "@/app/design/vtk-forms.css";
 import "@/app/design/vtk-page.css";
+import "@/app/design/vtk-motion.css";
 
 /**
  * De inhoud voor de gevraagde taal, als bron in plaats van als gerenderde boom.
@@ -208,7 +210,7 @@ export async function PageView({
               <span>{title}</span>
             </div>
           ) : null}
-          <h1 className="vtk-page-title">{title}</h1>
+          <h1 className="vtk-page-title">{revealWords(title)}</h1>
           {excerpt ? <p className="vtk-page-subtitle">{excerpt}</p> : null}
           {group ? (
             <div className="vtk-page-headline">
@@ -260,16 +262,20 @@ export async function PageView({
           showRail ? (hasWerkingRail ? " has-rail has-side" : " has-rail") : ""
         }${platePhoto ? " has-plate" : ""}${hasBands ? " has-bands" : ""}`}
       >
-        <div className="vtk-page-content">
+        {/* `vtk-motion` zet de scroll-animaties aan. Bewust op deze container en
+            niet op elke `.prose-vtk`: in het voorbeeldvenster van de editor zit
+            de tekst in een eigen scrollcontainer, waar een `view()`-tijdlijn een
+            kopje halverwege zijn animatie kan laten staan. */}
+        <div className="vtk-page-content vtk-motion">
           {content.kind === "markdown" ? (
             <>
               <article className="prose-vtk">
-                <Markdown locale={locale}>{split.before}</Markdown>
+                <Markdown locale={locale} reveal>{split.before}</Markdown>
               </article>
               {split.after !== null ? panel : null}
               {split.after ? (
                 <article className="prose-vtk">
-                  <Markdown locale={locale}>{split.after}</Markdown>
+                  <Markdown locale={locale} reveal>{split.after}</Markdown>
                 </article>
               ) : null}
             </>

@@ -170,9 +170,11 @@ export async function Header({ locale }: { locale: Locale }) {
                 admin: dict.header.admin,
                 grocomeet: dict.header.grocomeet,
                 grocomeetAttention: dict.header.grocomeetAttention,
+                feedback: dict.header.feedback,
                 logout: dict.header.logout,
               }}
               base={base}
+              locale={locale}
               variant="editorial"
             />
           ) : (
