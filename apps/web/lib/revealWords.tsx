@@ -21,3 +21,37 @@ export function revealWords(text: string): ReactNode[] {
     );
   });
 }
+
+/**
+ * Zelfde idee per letter, voor een kort stuk tekst dat bij het scrollen een
+ * golfje door zijn letters krijgt.
+ *
+ * Twee dingen zitten hier bewust in:
+ *
+ * - **Een lengtegrens.** Een hele vetgedrukte zin zou honderden spans en
+ *   evenveel animaties opleveren, terwijl het effect enkel leesbaar is op een
+ *   paar woorden. Langer dan dit blijft gewoon tekst.
+ * - **De letters gaan verborgen voor een screenreader, met de hele tekst
+ *   ernaast.** Elementgrenzen midden in een woord laten sommige screenreaders
+ *   de letters los uitspreken; de `sr-only`-kopie houdt "praesidium" één woord.
+ */
+export const LETTER_LIMIT = 60;
+
+export function revealLetters(text: string): ReactNode {
+  let index = 0;
+  const letters = [...text].map((char, i) => {
+    if (char === " ") return char;
+    const style = { "--i": index++ } as CSSProperties;
+    return (
+      <span key={i} className="vtk-letter" style={style}>
+        {char}
+      </span>
+    );
+  });
+  return (
+    <>
+      <span aria-hidden="true">{letters}</span>
+      <span className="sr-only">{text}</span>
+    </>
+  );
+}

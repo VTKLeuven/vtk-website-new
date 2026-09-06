@@ -200,12 +200,12 @@ export async function PageView({
           {content.kind === "markdown" ? (
             <>
               <article className="prose-vtk">
-                <Markdown revealHeadings>{split.before}</Markdown>
+                <Markdown reveal>{split.before}</Markdown>
               </article>
               {split.after !== null ? panel : null}
               {split.after ? (
                 <article className="prose-vtk">
-                  <Markdown revealHeadings>{split.after}</Markdown>
+                  <Markdown reveal>{split.after}</Markdown>
                 </article>
               ) : null}
             </>

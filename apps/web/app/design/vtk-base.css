@@ -429,20 +429,26 @@
   font-weight: 700;
 }
 
-/* Vetgedrukt staat in navy met een gele lijn eronder, die bij het scrollen
-   aangroeit (vtk-motion.css). De lijn is een achtergrond op de tekst zelf en
-   geen los laagje erover: met `box-decoration-break: clone` krijgt een stuk
-   tekst dat over twee regels breekt twee streepjes in plaats van één streep
-   onder de hele blokhoogte. */
+/* Vetgedrukt staat in navy, en verder niets: navy tekst met een gele lijn
+   eronder is op deze site de opmaak van een LINK (`.prose-vtk a`), dus dat las
+   als een link die niet klikte. Het onderscheid komt nu van de kleur plus een
+   golfje door de letters bij het scrollen (vtk-motion.css).
+
+   `position: relative` hoort bij die animatie: de letters staan in spans en de
+   volledige tekst staat ernaast in een `sr-only`-kopie voor screenreaders. Die
+   kopie is absoluut gepositioneerd en moet in dit stukje tekst blijven hangen
+   in plaats van in de eerste de beste gepositioneerde voorouder. */
 .vtk-page-content .prose-vtk :is(p, li) > strong {
+  position: relative;
   color: var(--navy);
-  background-image: linear-gradient(var(--yellow), var(--yellow));
-  background-repeat: no-repeat;
-  background-position: 0 100%;
-  background-size: 100% 3px;
-  padding-bottom: 2px;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
+}
+
+/* De screenreader-kopie mag niet mee gekopieerd worden: zonder dit levert een
+   selectie over deze alinea het vetgedrukte stuk twee keer op. De letters zelf
+   staan wel gewoon in de selectie, dus wie kopieert krijgt de juiste tekst. */
+.vtk-page-content .prose-vtk .vtk-letters .sr-only {
+  -webkit-user-select: none;
+  user-select: none;
 }
 
 /* Een citaat is een pull quote: lichtblauw vlak, dikke gele rail, donkerder en

@@ -85,15 +85,18 @@
   }
 }
 
-/* De gele lijn onder vetgedrukte tekst groeit aan. Dit is de ene uitzondering
-   op "enkel opacity en transform": een `transform` op een inline stuk tekst dat
-   over twee regels breekt, pakt de omhullende doos van beide regels en zet er
-   één streep onder. `background-size` klopt in elk geval, en het gaat om een
-   paar woorden, dus het is verf en geen layout. De easing schiet licht door,
-   wat de lijn speels maakt in plaats van strak. */
-@keyframes vtk-underline {
-  from {
-    background-size: 0% 3px;
+/* Een golfje door de letters van vetgedrukte tekst: elke letter gaat omhoog en
+   komt weer terug, en doordat elke letter haar bereik iets opschuift, loopt er
+   één golf door het woord. Begin- en eindtoestand zijn allebei rust, dus er
+   blijft nooit een letter scheef of verschoven staan. */
+@keyframes vtk-letter-wave {
+  0%,
+  100% {
+    translate: 0 0;
+  }
+
+  50% {
+    translate: 0 -0.22em;
   }
 }
 
@@ -198,10 +201,12 @@
       animation-range: entry 15% entry 75%;
     }
 
-    .vtk-motion .prose-vtk :is(p, li) > strong {
-      animation: vtk-underline cubic-bezier(0.34, 1.32, 0.64, 1) both;
+    .vtk-motion .prose-vtk .vtk-letter {
+      display: inline-block;
+      animation: vtk-letter-wave linear both;
       animation-timeline: view(block var(--motion-inset) auto);
-      animation-range: entry 25% entry 80%;
+      animation-range: entry calc(25% + min(var(--i), 14) * 1.6%) entry
+        calc(58% + min(var(--i), 14) * 1.6%);
     }
 
     /* De gele lijn tekent zichzelf onder het kopje. */

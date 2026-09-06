@@ -2,7 +2,7 @@ import { Children, cloneElement, isValidElement, type ReactElement, type ReactNo
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { headingId, headingText } from "@/lib/pageOutline";
-import { revealWords } from "@/lib/revealWords";
+import { LETTER_LIMIT, revealLetters, revealWords } from "@/lib/revealWords";
 
 /**
  * Gedeelde markdown-renderer: dezelfde uitvoer op de publieke pagina's (server
@@ -49,20 +49,21 @@ function splitWords(children: ReactNode): ReactNode[] | null {
 export function Markdown({
   children,
   /**
-   * Kopjes bij het scrollen laten binnenkomen. Enkel de contentpagina's zetten
-   * dit aan; elders (aankondiging, hulptekst bij een formulier, voorbeeld in de
-   * editor) staat de tekst in een eigen scrollcontainer of in een dialoog, waar
-   * een `view()`-tijdlijn niet klopt.
+   * De tekst bij het scrollen laten binnenkomen: kopjes woord na woord,
+   * vetgedrukte tekst met een golfje door de letters. Enkel de contentpagina's
+   * zetten dit aan; elders (aankondiging, hulptekst bij een formulier,
+   * voorbeeld in de editor) staat de tekst in een eigen scrollcontainer of in
+   * een dialoog, waar een `view()`-tijdlijn niet klopt.
    */
-  revealHeadings = false,
+  reveal = false,
 }: {
   children: string;
-  revealHeadings?: boolean;
+  reveal?: boolean;
 }) {
   // `data-reveal` zegt wat er animeert: de losse woorden, of het kopje als
   // geheel wanneer er opmaak in staat. vtk-motion.css hangt daaraan.
-  const reveal = (headingChildren: ReactNode) => {
-    if (!revealHeadings) return { "data-reveal": undefined, content: headingChildren };
+  const revealHeading = (headingChildren: ReactNode) => {
+    if (!reveal) return { "data-reveal": undefined, content: headingChildren };
     const words = splitWords(headingChildren);
     return {
       "data-reveal": words ? "words" : "block",
@@ -89,10 +90,20 @@ export function Markdown({
             </figure>
           );
         },
+        // Vetgedrukt krijgt een golfje door de letters. Enkel platte tekst van
+        // beperkte lengte; zie revealLetters voor het waarom.
+        strong: ({ children: strongChildren }) => {
+          const items = Children.toArray(strongChildren);
+          const text = items.every((child) => typeof child === "string") ? items.join("") : null;
+          if (!reveal || text === null || !text.trim() || text.length > LETTER_LIMIT) {
+            return <strong>{strongChildren}</strong>;
+          }
+          return <strong className="vtk-letters">{revealLetters(text)}</strong>;
+        },
         // Kopjes krijgen een anker, zodat de "Op deze pagina"-rail ernaartoe kan
         // linken. De id komt uit dezelfde helper als die rail (pageOutline).
         h2: ({ children: headingChildren }) => {
-          const { content, ...reveals } = reveal(headingChildren);
+          const { content, ...reveals } = revealHeading(headingChildren);
           return (
             <h2 id={headingId(headingText(headingChildren))} {...reveals}>
               {content}
@@ -104,7 +115,7 @@ export function Markdown({
         h3: ({ children: headingChildren }) => (
           <h3
             id={headingId(headingText(headingChildren))}
-            data-reveal={revealHeadings ? "block" : undefined}
+            data-reveal={reveal ? "block" : undefined}
           >
             {headingChildren}
           </h3>
