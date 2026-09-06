@@ -2,21 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { mayUseTestLogin, testLoginMode } from '../lib/test-login-gate';
 
 describe('testLoginMode', () => {
-  it('staat in productie hoe dan ook uit', () => {
-    // De grendel die tot nu enkel in de documentatie stond, terwijl de vlag op
-    // de productieserver op "true" bleek te staan.
-    expect(testLoginMode({ NODE_ENV: 'production', LOGISTIEK_TEST_LOGIN: 'true' })).toBe('off');
-    expect(testLoginMode({ NODE_ENV: 'production', LOGISTIEK_TEST_LOGIN: 'open' })).toBe('off');
-  });
-
   it('kent de twee standen en valt anders terug op uit', () => {
-    expect(testLoginMode({ NODE_ENV: 'development', LOGISTIEK_TEST_LOGIN: 'true' })).toBe('gated');
-    expect(testLoginMode({ NODE_ENV: 'development', LOGISTIEK_TEST_LOGIN: 'open' })).toBe('open');
-    expect(testLoginMode({ NODE_ENV: 'development', LOGISTIEK_TEST_LOGIN: '' })).toBe('off');
-    expect(testLoginMode({ NODE_ENV: 'development' })).toBe('off');
+    expect(testLoginMode({ LOGISTIEK_TEST_LOGIN: 'true' })).toBe('gated');
+    expect(testLoginMode({ LOGISTIEK_TEST_LOGIN: 'open' })).toBe('open');
+    expect(testLoginMode({ LOGISTIEK_TEST_LOGIN: '' })).toBe('off');
+    expect(testLoginMode({})).toBe('off');
     // Geen "yes"/"1"/"TRUE"-vriendelijkheid: bij een vlag die superadmin uitdeelt
     // is een tikfout beter uit dan aan.
-    expect(testLoginMode({ NODE_ENV: 'development', LOGISTIEK_TEST_LOGIN: 'TRUE' })).toBe('off');
+    expect(testLoginMode({ LOGISTIEK_TEST_LOGIN: 'TRUE' })).toBe('off');
   });
 });
 

@@ -425,9 +425,15 @@ en `getSession` fabriceert een `SessionPayload` voor die persoon (cookie
     Logistiek of superadmin/IT) kan wisselen. Dit hoort op dev.vtk.be te staan.
   - `"open"` -> `open`: iedereen, **enkel voor een laptop** waar de hoofdsite
     niet draait en er dus geen echte sessie bestaat om op te gaten.
-- **In productie staat het hoe dan ook uit.** `testLoginMode` geeft `off` zodra
-  `NODE_ENV === 'production'`, ongeacht de env-variabele. Dat is nieuw: die
-  grendel stond eerder enkel in de documentatie beschreven en niet in de code.
+- **De `.env` van de host is de schakelaar, en er is bewust geen
+  `NODE_ENV`-grendel.** Die heeft hier ooit één deploy lang bestaan en zette de
+  test-login uit op de testomgeving zelf: `infra/docker-compose.yml` zet
+  `NODE_ENV: production` op de logistiek-container, want het is een
+  productie-build. `logistiek.dev.vtk.be` en `logistiek.vtk.be` draaien dezelfde
+  build op verschillende hosts, dus `NODE_ENV` kan die twee onmogelijk uit
+  elkaar houden. Op productie hoort `LOGISTIEK_TEST_LOGIN` leeg te staan; de
+  echte bescherming is de rechtencontrole hieronder, die ook een vergeten `true`
+  beperkt tot IT en Logistiek.
 - **De poort zit in `getSession` en in de server action**, niet enkel op de
   picker. `activeTestUser` (`lib/session.ts`) toetst de cookie bij élke aanvraag
   aan de **echte** sessie (`getRealSession`, buiten de cookie om), en

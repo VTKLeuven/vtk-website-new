@@ -42,14 +42,17 @@ de mail:
   zichzelf uit ("Logistiek worker disabled") en staat daarom op `unhealthy`. Die
   worker is het vangnet voor de betalingen: hij verzoent openstaande Mollie-betalingen
   en ruimt verlopen checkouts op. Genereer er een met `openssl rand -base64 48`.
-- **`LOGISTIEK_TEST_LOGIN` staat op `true`.** Dit document beweerde eerder dat
-  dat ongevaarlijk was omdat `testLoginEnabled()` óók `NODE_ENV !== 'production'`
-  zou eisen. **Dat stond niet in de code**; de vlag alleen zette de picker open,
-  en daarmee superadmin zonder wachtwoord. Sinds `testLoginMode`
-  (`lib/test-login-gate.ts`) klopt de bewering wél: in productie staat de
-  test-login hoe dan ook uit, en op een testomgeving mag enkel wie logistiek
-  beheert nog wisselen. Zet de vlag op de productieserver toch leeg: een grendel
-  waar je niet op moet vertrouwen, is er één minder om te vergeten.
+- **`LOGISTIEK_TEST_LOGIN` staat op `true`.** Op liv (de testomgeving) hoort dat
+  ook zo. Dit document beweerde eerder dat het sowieso ongevaarlijk was omdat
+  `testLoginEnabled()` óók `NODE_ENV !== 'production'` zou eisen; **dat stond
+  niet in de code**, en toen die grendel er wél kwam, viel de test-login uit op
+  liv zelf: de container draait een productie-build, dus `NODE_ENV` staat daar
+  even hard op `production` als op de echte productieserver. Die grendel is
+  daarom weer weg. Wat er in de plaats staat: enkel wie logistiek mag beheren
+  (IT of Logistiek) kan nog van test-gebruiker wisselen, en de controle zit ook
+  in de server action zelf. **Op de productieserver hoort de vlag leeg te
+  staan**; dat blijft een `.env`-per-host-afspraak en niets in de code kan ze
+  afdwingen.
 
 ### In de Google Workspace-admin
 
