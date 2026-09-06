@@ -291,7 +291,8 @@ the design language into the application instead of copying mockup content.
   `.vtk-page-head` do they invert.
 - Motion: content pages animate on scroll, in pure CSS (`animation-timeline`,
   `apps/web/app/design/vtk-motion.css`), never with a scroll listener. Headings
-  arrive word by word, figures fly in from off screen on alternating sides, and
+  arrive word by word, figures slide in from alternating sides inside their own
+  clipped frame, and
   the yellow rules under a section heading and under bold text draw themselves.
   A reading-progress bar was tried and removed. Four rules hold: any hiding
   start state lives **inside** the

@@ -1719,17 +1719,18 @@ kaart van de categoriepagina te zien.
   het verschil met de server-uitvoer struikelt.
 - **Wat er beweegt, en wat niet.** De paginatitel (woord na woord bij het
   laden), de kopfoto (trager dan de pagina), kopjes (woord na woord, met een
-  lichte kanteling), tussentitels (als blok), foto's (van buiten het scherm, om
-  en om van links en van rechts), hun bijschrift, regels van een opsomming, de
-  rail van een citaat, de gele lijn onder een sectiekopje en die onder
-  vetgedrukte tekst. Niet: knoppen, tabellen, de rail naast de tekst en alles in
+  lichte kanteling), tussentitels (als blok), foto's (van links of van rechts,
+  om en om, en ondertussen langzaam uitzoomend), hun bijschrift, regels van een
+  opsomming, de rail van een citaat, de gele lijn onder een sectiekopje en die
+  onder vetgedrukte tekst. Niet: knoppen, tabellen, de rail naast de tekst en alles in
   de admin. Beweging hoort bij het lezen van een tekst, niet bij het bedienen
   van een scherm.
-- **Een foto vertrekt echt naast het scherm** (`translate: -100vw`), niet binnen
-  haar eigen kader. Het figuur knipt daarom niet; de horizontale scrollbalk
-  wordt op `html` opgevangen, met dezelfde `overflow-x: clip` die de
-  volle-breedtebanden al nodig hadden. De rail naast de tekst staat op
-  `z-index: 1`, zodat een foto er onderdoor veegt in plaats van eroverheen.
+- **Een foto schuift binnen haar eigen kader en niet over de pagina.** Ze van
+  buiten het scherm laten binnenvliegen (`translate: -100vw`, met het figuur dat
+  niet knipt) is geprobeerd: dat veegt een foto over de hele breedte, ook over
+  de rail naast de tekst, en dat trok meer aandacht dan de tekst zelf. Het
+  figuur knipt daarom weer (`overflow-x: clip`), zodat de beweging binnen het
+  kader blijft.
 - **Geen leesvoortgangsbalk.** Er heeft er een gestaan, bovenaan onder de
   sitekop. Een balk die bij elke scroll meebeweegt, trekt de aandacht naar de
   rand van het scherm terwijl de beweging in de tekst zelf hoort te zitten.
