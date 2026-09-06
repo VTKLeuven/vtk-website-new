@@ -8,7 +8,8 @@
     "grocomeet": "Grocomeet sandwich",
     "grocomeetAttention": "pick again",
     "logout": "Sign out",
-    "language": "Language"
+    "language": "Language",
+    "feedback": "Website feedback"
   },
   "footer": {
     "partners": "Partners",
@@ -478,7 +479,8 @@
     "pinTab": "Pin",
     "unpinTab": "Unpin",
     "pinError": "Could not pin this tab. Please try again.",
-    "takedowns": "Takedown requests"
+    "takedowns": "Takedown requests",
+    "feedback": "Website feedback"
   },
   "confirmStudy": {
     "title": "Are your studies still up to date?",
@@ -1086,5 +1088,34 @@
     "errorInvalid": "Failed: please check the address you entered.",
     "errorPasswordShort": "Not saved: your password must be at least 10 characters long.",
     "errorPasswordMismatch": "Not saved: the two passwords do not match."
+  },
+  "feedback": {
+    "title": "Feedback about the website",
+    "intro": "Something broken, a text that is wrong, something that looks off, or an idea? Leave it here; it lands with IT.",
+    "kindLabel": "What is it about?",
+    "messageLabel": "What would you like to say?",
+    "messagePlaceholder": "Describe as concretely as you can what you saw and what you expected.",
+    "screenshotLabel": "Screenshot",
+    "screenshotHint": "Paste one (Ctrl+V or Cmd+V), drop a file here, or choose one. Optional.",
+    "screenshotChoose": "Choose a file",
+    "screenshotRemove": "Remove screenshot",
+    "screenshotUploading": "Uploading screenshot…",
+    "pageLabel": "Page",
+    "pageHint": "We send along which page you were on and which browser you use; without that a bug is usually impossible to reproduce.",
+    "anonymous": "Report anonymously",
+    "anonymousHint": "We then do not keep who sent the report, so we cannot ask you anything afterwards either.",
+    "submit": "Send",
+    "sending": "Sending…",
+    "sent": "Thanks, your feedback has been sent.",
+    "doneTitle": "Thank you.",
+    "doneText": "Your report is on the IT list. If you did not report anonymously, you may get a follow-up question.",
+    "another": "Report something else",
+    "close": "Close",
+    "failed": "Sending failed. Please try again.",
+    "messageRequired": "Write down what is wrong first.",
+    "messageTooLong": "Your message is too long. Please summarise it a bit.",
+    "kindInvalid": "Choose what it is about first.",
+    "imageInvalid": "The screenshot was not saved. Try adding it again.",
+    "saveFailed": "Something went wrong while saving. Please try again."
   }
 }

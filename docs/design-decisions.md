@@ -6115,3 +6115,50 @@ is, en dan zou de hele strook verspringen terwijl je leest. Een reeks waarvan é
 foto haar maten mist, valt daarom terug op een raster met een vaste uitsnede: dat
 staat meteen goed. Oudere pagina's zitten in dat geval; ze komen in de strook
 zodra de foto's opnieuw geüpload worden.
+
+## Feedback over de website ("Feedback Website")
+
+Elk ingelogd lid kan via het accountmenu iets over de site zelf melden: een bug,
+een fout in de inhoud, iets aan het ontwerp of een idee. Het beheer leest dat in
+`/admin/it/feedback` (`feedback.manage`).
+
+**Het staat in het accountmenu en niet in de navigatie.** Feedback over de site
+is geen dienst van de kring waar je naartoe navigeert; het is iets wat je doet
+op het moment dat je tegen iets aanloopt. Dat menu is bovendien al waar je je
+eigen zaken beheert, en het hangt op elke pagina in dezelfde hoek.
+
+**Het formulier is een modal en geen pagina.** De melding gaat bijna altijd over
+de pagina waar je nét stond. Wegnavigeren naar `/feedback` zou precies dat stuk
+context weggooien dat je anders zelf moet typen; nu gaat het pad automatisch
+mee.
+
+**Anoniem betekent anoniem.** Bij een aangevinkte melding wordt `authorId` niet
+weggeschreven; er is dus geen kolom die iemand achteraf alsnog kan uitlezen. Dat
+is het verschil dat het vinkje belooft, en de reden dat het vinkje er staat: een
+eerstejaars die vindt dat een pagina niet klopt, hoort dat te kunnen zeggen
+zonder zich af te vragen wie het leest. De keerzijde staat er ook bij: bij een
+anonieme melding kan niemand een vervolgvraag stellen.
+
+**Het pad en de browserstring gaan altijd mee, ook anoniem.** "Werkt niet" zonder
+te weten wáár en waarmee is geen bugmelding. Een browserstring zegt niet wie je
+bent, en het zinnetje onder het formulier zegt dat we ze meesturen. Bij een
+afgehandelde melding worden allebei na een jaar losgekoppeld
+(`PRIVACY_FEEDBACK_DAYS`): wat er gemeld werd en wat ermee gebeurde is de waarde
+van die lijst, wie het meldde niet meer.
+
+**De screenshot is de reden dat dit geen mailtje naar IT is.** Plakken werkt
+overal in het paneel, niet enkel in een uploadveld: wie een schermafdruk maakt,
+heeft ze in het klembord staan en niet als bestand op zijn bureaublad. Slepen en
+een bestand kiezen kunnen ook. De upload gaat naar een eigen prefix
+(`feedback/`) met een klein plafond, zodat dit geen algemene bestandsdropzone
+wordt.
+
+**Er vertrekt geen mail en geen pushbericht.** Dit is een werklijst die IT
+naleest, geen incident. Een verwijderverzoek voor een foto mailt wél, want daar
+loopt een wettelijke termijn; hier niet.
+
+**De triage is één keuzelijst en geen vier knoppen.** Nieuw → op de lijst →
+opgelost, of niets mee gedaan met een verplichte notitie. Vier knoppen per kaart
+maken van dertig meldingen een muur, terwijl het één beslissing is. Verwijderen
+staat apart en met een bevestiging: dat is voor spam en dubbels, niet voor het
+afsluiten van een echte melding.

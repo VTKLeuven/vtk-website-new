@@ -169,6 +169,9 @@ export function getAdminNav(): NavEntry[] {
       // deze pagina is er geen manier om te controleren of ze nog kloppen.
       item('flowPreview', '/it/flows', { superAdminOnly: true }),
       item('urenloopApp', '/it/24ul-app', { perm: 'urenloopApp.manage' }),
+      // Wat leden over de site zelf melden. Onder IT en niet onder Website: het
+      // is een werklijst voor wie de site onderhoudt, geen redactiescherm.
+      item('feedback', '/it/feedback', { perm: 'feedback.manage' }),
     ]),
   ];
 }

@@ -10,6 +10,9 @@ import "@/app/design/vtk-base.css";
 import "@/app/design/vtk-site-header.css";
 import "@/app/design/vtk-site-chrome.css";
 import "@/app/design/vtk-immich-gallery.css";
+// Het feedbackformulier hangt in de sitekop, dus op elke pagina; het
+// beheerscherm eronder valt in dezelfde bundel.
+import "@/app/design/vtk-feedback.css";
 
 export default async function LocaleLayout({
   children,

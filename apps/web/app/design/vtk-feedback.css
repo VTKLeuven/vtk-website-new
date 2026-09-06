@@ -1,0 +1,515 @@
+/* Websitefeedback: het formulier uit het accountmenu en het beheerscherm eronder.
+   Alle kleuren komen uit vtk-base.css; hier staan geen eigen hexes behalve de
+   dekkende lagen (backdrop, schaduw) die nergens anders voorkomen. */
+
+/* ── Het formulier in het accountmenu ────────────────────────────────────── */
+
+/* Boven de sitekop (z-index 50) en boven de uitklappanelen (60): het paneel
+   wordt vanuit dat menu geopend en mag er niet onder verdwijnen. */
+.vtk-feedback-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(10, 15, 31, 0.55);
+  overflow-y: auto;
+}
+
+.vtk-feedback-panel {
+  width: 100%;
+  max-width: 540px;
+  max-height: min(90vh, 820px);
+  overflow-y: auto;
+  padding: clamp(18px, 3vw, 26px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 22px 50px rgba(10, 15, 31, 0.22);
+}
+
+.vtk-feedback-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.vtk-feedback-head h2 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vtk-feedback-close {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--body);
+  cursor: pointer;
+}
+
+.vtk-feedback-close svg {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+}
+
+.vtk-feedback-close:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.vtk-feedback-form {
+  display: grid;
+  gap: 14px;
+}
+
+.vtk-feedback-form > label {
+  display: grid;
+  gap: 6px;
+}
+
+/* Enkel de veldlabels; het anoniem-vinkje is een keuze met uitleg en geen veld,
+   en zou hier anders in hoofdletters staan. */
+.vtk-feedback-form > label:not(.vtk-feedback-check) > span,
+.vtk-feedback-kinds legend,
+.vtk-feedback-shot-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.vtk-feedback-form textarea {
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--paper);
+  font: inherit;
+  font-size: 0.9rem;
+  line-height: 1.55;
+  color: var(--ink);
+  resize: vertical;
+}
+
+.vtk-feedback-form textarea:focus-visible,
+.vtk-feedback-chip:focus-visible,
+.vtk-feedback-close:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 1px;
+}
+
+.vtk-feedback-intro {
+  font-size: 0.84rem;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* De categorie is een keuze uit vijf korte woorden; pillen lezen sneller dan een
+   uitklaplijst en tonen meteen het hele bereik. Geel markeert de actieve keuze,
+   zoals overal op de site. */
+.vtk-feedback-kinds {
+  display: grid;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+}
+
+.vtk-feedback-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.vtk-feedback-chip {
+  min-height: 34px;
+  padding: 7px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--body);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.vtk-feedback-chip:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.vtk-feedback-chip[aria-pressed='true'] {
+  border-color: var(--yellow);
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.vtk-feedback-kind-hint {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+/* ── De screenshot ───────────────────────────────────────────────────────── */
+
+.vtk-feedback-shot {
+  display: grid;
+  gap: 6px;
+}
+
+.vtk-feedback-drop {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  padding: 14px;
+  border: 1px dashed var(--line-2);
+  border-radius: 14px;
+  background: var(--paper);
+}
+
+.vtk-feedback-drop[data-dragging] {
+  border-color: var(--ink);
+  border-style: solid;
+}
+
+.vtk-feedback-drop > p {
+  font-size: 0.84rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.vtk-feedback-preview {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+  width: 100%;
+}
+
+.vtk-feedback-preview img {
+  width: 100%;
+  max-width: 320px;
+  height: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.vtk-feedback-error {
+  font-size: 0.82rem;
+  color: #9b1c1c;
+}
+
+/* ── Anoniem, en wat er sowieso meegaat ──────────────────────────────────── */
+
+.vtk-feedback-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+  cursor: pointer;
+}
+
+.vtk-feedback-check input {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  accent-color: var(--ink);
+}
+
+.vtk-feedback-check span {
+  display: grid;
+  gap: 3px;
+}
+
+.vtk-feedback-check strong {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vtk-feedback-check em {
+  font-style: normal;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.vtk-feedback-privacy {
+  display: grid;
+  gap: 4px;
+  font-size: 0.8rem;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+.vtk-feedback-path code {
+  font-size: 0.78rem;
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+
+.vtk-feedback-done {
+  display: grid;
+  gap: 10px;
+  justify-items: start;
+}
+
+.vtk-feedback-done-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vtk-feedback-done p {
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--body);
+}
+
+.vtk-feedback-done-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* ── Het beheerscherm (/admin/it/feedback) ───────────────────────────────── */
+
+.vtk-feedback-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 18px 0 4px;
+}
+
+.vtk-feedback-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 5px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.84rem;
+  color: var(--body);
+  text-decoration: none;
+}
+
+.vtk-feedback-filter:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.vtk-feedback-filter[aria-current='true'] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.vtk-feedback-filter span {
+  font-variant-numeric: tabular-nums;
+  opacity: 0.75;
+}
+
+.vtk-feedback-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.vtk-feedback-card {
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+/* Een openstaande melding is het werk; die krijgt de gele rail die op deze site
+   "dit is de uitgelichte kaart" betekent. */
+.vtk-feedback-card[data-status='NEW'] {
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-feedback-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.vtk-feedback-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.vtk-feedback-tag {
+  padding: 3px 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+}
+
+.vtk-feedback-tag[data-tone='kind'] {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.vtk-feedback-tag[data-tone='open'] {
+  border-color: var(--yellow);
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.vtk-feedback-meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 18px;
+  margin-top: 12px;
+}
+
+.vtk-feedback-meta dt {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.vtk-feedback-meta dd {
+  margin-top: 2px;
+  font-size: 0.86rem;
+  line-height: 1.5;
+  color: var(--body);
+  overflow-wrap: anywhere;
+}
+
+.vtk-feedback-message {
+  margin-top: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--paper);
+  font-size: 0.9rem;
+  line-height: 1.65;
+  color: var(--ink);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.vtk-feedback-note {
+  margin-top: 10px;
+  font-size: 0.86rem;
+  line-height: 1.6;
+  color: var(--body);
+}
+
+.vtk-feedback-shot-block {
+  display: grid;
+  gap: 6px;
+  justify-items: start;
+  margin-top: 12px;
+}
+
+.vtk-feedback-shot-caption {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.vtk-feedback-shot-link {
+  display: inline-block;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow: hidden;
+  line-height: 0;
+}
+
+/* `width: auto` en niet 100%: de houder is shrink-to-fit, dus een breedte in
+   procenten heeft niets om zich op te baseren en de duimnagel klapt dicht tot
+   een stip. */
+.vtk-feedback-shot-link img {
+  width: auto;
+  max-width: 260px;
+  height: auto;
+}
+
+.vtk-feedback-triage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-feedback-triage label {
+  display: grid;
+  gap: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.vtk-feedback-triage select,
+.vtk-feedback-triage input {
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: normal;
+  color: var(--ink);
+}
+
+.vtk-feedback-triage .vtk-feedback-note-field {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.vtk-feedback-triage .vtk-feedback-note-field input {
+  width: 100%;
+}
+
+/* De rij is bedoeld voor een brede kolom; op een telefoon staat elk veld
+   daaronder op zijn eigen regel, met zijn eigen label erboven. */
+@media (max-width: 640px) {
+  .vtk-feedback-triage {
+    display: grid;
+  }
+}

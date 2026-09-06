@@ -549,6 +549,14 @@ const icons: Record<string, ReactNode> = {
       <path d="M12 13v4" />
     </Svg>
   ),
+  // feedback: tekstballon met een uitroepteken; wat leden over de site melden
+  feedback: (
+    <Svg>
+      <path d="M21 14a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2Z" />
+      <path d="M12 7v4" />
+      <path d="M12 13.5h.01" />
+    </Svg>
+  ),
   // door: deur met klink
   door: (
     <Svg>

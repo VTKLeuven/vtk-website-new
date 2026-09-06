@@ -67,6 +67,7 @@ export async function runPrivacyRetention(now = new Date()) {
     now,
   );
   const takedownCutoff = before(positiveDays("PRIVACY_TAKEDOWN_DAYS", 365), now);
+  const feedbackCutoff = before(positiveDays("PRIVACY_FEEDBACK_DAYS", 365), now);
 
   const results = await prisma.$transaction([
     prisma.session.deleteMany({ where: { expiresAt: { lt: now } } }),
@@ -128,6 +129,19 @@ export async function runPrivacyRetention(now = new Date()) {
       },
       data: { reporterName: "", reporterEmail: "", message: null },
     }),
+    // Websitefeedback wordt losgekoppeld van haar melder, niet gewist: wat er
+    // ooit gemeld werd en wat ermee gebeurde is de waarde van die lijst, wie
+    // het meldde niet meer. Enkel afgehandelde meldingen; bij een openstaande
+    // wil je nog een vraag kunnen stellen. De browserstring gaat mee weg: die
+    // hielp de bug reproduceren en dat is dan al gebeurd.
+    prisma.websiteFeedback.updateMany({
+      where: {
+        handledAt: { lt: feedbackCutoff },
+        status: { in: ["DONE", "DISMISSED"] },
+        OR: [{ authorId: { not: null } }, { userAgent: { not: null } }],
+      },
+      data: { authorId: null, userAgent: null },
+    }),
   ]);
 
   const formEntries = await purgeExpiredFormEntries(now);
@@ -139,6 +153,7 @@ export async function runPrivacyRetention(now = new Date()) {
       rawPayloadDays: positiveDays("PRIVACY_RAW_PAYLOAD_DAYS", 90),
       fingerprintDays: positiveDays("PRIVACY_FINGERPRINT_DAYS", 30),
       takedownDays: positiveDays("PRIVACY_TAKEDOWN_DAYS", 365),
+      feedbackDays: positiveDays("PRIVACY_FEEDBACK_DAYS", 365),
     },
     affected: {
       formEntries,
@@ -154,6 +169,7 @@ export async function runPrivacyRetention(now = new Date()) {
       formEntryFingerprints: results[9].count,
       orderFingerprints: results[10].count,
       takedownRequests: results[11].count,
+      websiteFeedback: results[12].count,
     },
   };
 }

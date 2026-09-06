@@ -151,6 +151,10 @@ export const PERMISSIONS = [
   // Adminlogboek (wie deed wat in de admin)
   { code: "audit.view", labelNl: "Adminlogboek bekijken", labelEn: "View the admin audit log", category: "it" },
   { code: "urenloopApp.manage", labelNl: "24UL-app: downloadlijst beheren", labelEn: "24UL app: manage the download list", category: "it" },
+  // Feedback over de website zelf, gemeld door leden via het accountmenu. Een
+  // eigen recht en niet `audit.view`: dit is een werklijst voor wie de site
+  // onderhoudt, geen logboek, en er staan vrije teksten van leden in.
+  { code: "feedback.manage", labelNl: "Websitefeedback bekijken en afhandelen", labelEn: "View and handle website feedback", category: "it" },
 
 ] as const;
 

@@ -129,6 +129,7 @@ export const AUDIT_ENTITIES = {
   itConfig: { nl: "IT-configuratie", en: "IT configuration", group: "it" },
   urenloopDownload: { nl: "24UL-app downloadlijst", en: "24UL app download list", group: "it" },
   appPush: { nl: "Pushbericht", en: "Push notification", group: "it" },
+  websiteFeedback: { nl: "Websitefeedback", en: "Website feedback", group: "it" },
 } as const;
 
 export type AuditEntity = keyof typeof AUDIT_ENTITIES;

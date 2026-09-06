@@ -16,6 +16,7 @@ const MAX_BYTES_BY_KIND = {
   image: 45 * 1024 * 1024,
   logo: 10 * 1024 * 1024,
   tile: 2 * 1024 * 1024,
+  feedback: 12 * 1024 * 1024,
   pdf: 40 * 1024 * 1024,
   file: 40 * 1024 * 1024,
 } as const;
@@ -88,7 +89,14 @@ export async function POST(request: Request) {
   // prefix kunnen weigeren.
   const tileUpload = kind === "tile";
 
-  if (!canUpload && !formManager && !werkgroepMember && !tileUpload) {
+  // Zelfde redenering als bij de tegel: het feedbackformulier hangt in het
+  // accountmenu en staat dus voor élk lid open, ook voor wie nergens iets mag
+  // beheren. Een screenshot bij een bugmelding is het halve verhaal, dus die
+  // upload mag niet achter een beheerrecht zitten. Eigen prefix en een klein
+  // plafond, zodat dit geen algemene bestandsdropzone wordt.
+  const feedbackUpload = kind === "feedback";
+
+  if (!canUpload && !formManager && !werkgroepMember && !tileUpload && !feedbackUpload) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 
@@ -158,6 +166,22 @@ export async function POST(request: Request) {
         .toBuffer();
       contentType = "image/png";
       outputName = "tile.png";
+    } catch {
+      return NextResponse.json({ error: "invalid_image" }, { status: 415 });
+    }
+  } else if (kind === "feedback") {
+    // PNG en geen JPEG: een screenshot is grotendeels tekst, en die wordt
+    // pappig van de JPEG-blokjes precies waar je de foutmelding moet lezen.
+    // 2000px breed is genoeg voor een retina-schermafdruk.
+    prefix = "feedback";
+    try {
+      body = await sharp(bytes, { failOn: "error", limitInputPixels: 40_000_000 })
+        .rotate()
+        .resize({ width: 2000, height: 2000, fit: "inside", withoutEnlargement: true })
+        .png({ compressionLevel: 9 })
+        .toBuffer();
+      contentType = "image/png";
+      outputName = "screenshot.png";
     } catch {
       return NextResponse.json({ error: "invalid_image" }, { status: 415 });
     }

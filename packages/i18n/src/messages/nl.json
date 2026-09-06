@@ -8,7 +8,8 @@
     "grocomeet": "Broodje grocomeet",
     "grocomeetAttention": "kies opnieuw",
     "logout": "Uitloggen",
-    "language": "Taal"
+    "language": "Taal",
+    "feedback": "Feedback Website"
   },
   "footer": {
     "partners": "Partners",
@@ -478,7 +479,8 @@
     "pinTab": "Vastpinnen",
     "unpinTab": "Losmaken",
     "pinError": "Vastpinnen is niet gelukt. Probeer het opnieuw.",
-    "takedowns": "Verwijderverzoeken"
+    "takedowns": "Verwijderverzoeken",
+    "feedback": "Feedback Website"
   },
   "confirmStudy": {
     "title": "Klopt je studie nog?",
@@ -1086,5 +1088,34 @@
     "errorInvalid": "Niet gelukt: kijk het ingevulde adres na.",
     "errorPasswordShort": "Niet opgeslagen: je wachtwoord moet minstens 10 tekens lang zijn.",
     "errorPasswordMismatch": "Niet opgeslagen: de twee wachtwoorden zijn niet gelijk."
+  },
+  "feedback": {
+    "title": "Feedback over de website",
+    "intro": "Iets kapot, een tekst die niet klopt, iets dat lelijk staat of een idee? Laat het hier achter; het komt bij IT terecht.",
+    "kindLabel": "Waarover gaat het?",
+    "messageLabel": "Wat wil je kwijt?",
+    "messagePlaceholder": "Beschrijf zo concreet mogelijk wat je zag en wat je verwachtte.",
+    "screenshotLabel": "Screenshot",
+    "screenshotHint": "Plak er een (Ctrl+V of Cmd+V), sleep een bestand hierheen, of kies er een. Optioneel.",
+    "screenshotChoose": "Bestand kiezen",
+    "screenshotRemove": "Screenshot verwijderen",
+    "screenshotUploading": "Screenshot uploaden…",
+    "pageLabel": "Pagina",
+    "pageHint": "We sturen mee waar je stond en met welke browser; zonder dat is een bug meestal niet na te doen.",
+    "anonymous": "Anoniem melden",
+    "anonymousHint": "Dan bewaren we niet van wie de melding komt, en kunnen we je dus ook niets meer vragen.",
+    "submit": "Versturen",
+    "sending": "Versturen…",
+    "sent": "Bedankt, je feedback is verstuurd.",
+    "doneTitle": "Bedankt.",
+    "doneText": "Je melding staat op de lijst van IT. Wie niet anoniem meldde, kan een vervolgvraag krijgen.",
+    "another": "Nog iets melden",
+    "close": "Sluiten",
+    "failed": "Versturen lukte niet. Probeer het opnieuw.",
+    "messageRequired": "Schrijf eerst even op wat er scheelt.",
+    "messageTooLong": "Je bericht is te lang. Vat het wat korter samen.",
+    "kindInvalid": "Kies eerst waarover het gaat.",
+    "imageInvalid": "De screenshot is niet bewaard. Probeer hem opnieuw toe te voegen.",
+    "saveFailed": "Er ging iets mis bij het opslaan. Probeer het opnieuw."
   }
 }

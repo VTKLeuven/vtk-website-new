@@ -1,5 +1,5 @@
 /** Limits mirror /api/admin/upload; checked before sending the file. */
-export const IMAGE_UPLOAD_MAX_MB = { image: 45, logo: 10 } as const;
+export const IMAGE_UPLOAD_MAX_MB = { image: 45, logo: 10, feedback: 12 } as const;
 type ImageKind = keyof typeof IMAGE_UPLOAD_MAX_MB;
 
 export function imageUploadError(locale: "nl" | "en", status?: number, kind: ImageKind = "image") {
