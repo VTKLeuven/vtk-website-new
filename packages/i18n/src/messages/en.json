@@ -229,7 +229,20 @@
     "empty": "No pages yet",
     "overview": "Overview",
     "downloads": "Downloads",
-    "onThisPage": "On this page"
+    "onThisPage": "On this page",
+    "upcomingTitle": "What {group} is up to next",
+    "upcomingAll": "Everything in the calendar",
+    "upcomingCount": "{count} upcoming activities",
+    "upcomingCountOne": "1 upcoming activity",
+    "allDay": "All day",
+    "teamTitle": "The {group} team",
+    "teamYear": "Working year {year}",
+    "moreIn": "More in {category}",
+    "allIn": "Everything in {category}",
+    "werking": "This team",
+    "werkingMembers": "Who is in {group}?",
+    "werkingWebsite": "Own website",
+    "updated": "Last updated"
   },
   "auth": {
     "signInLead": "Member sign-in",

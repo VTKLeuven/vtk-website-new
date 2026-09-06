@@ -57,23 +57,27 @@ export default async function AdminPageEditor({
   // en die nog nergens anders staan, plus de posten waarvoor hij er een mag
   // aanmaken. Beide leeg? Dan zegt de kaart dat, in plaats van twee lege
   // keuzelijsten te tonen.
+  // Alle actieve posten: voor de werking-koppeling hieronder, en (gefilterd op
+  // wie er een formulier voor mag maken) voor de formulierkaart.
   const [forms, fieldCount, groupRows] = await Promise.all([
     page.form ? Promise.resolve([]) : linkableForms(locale, null),
     page.form
       ? prisma.formField.count({ where: { formId: page.form.id, archivedAt: null } })
       : Promise.resolve(0),
-    page.form
-      ? Promise.resolve([])
-      : prisma.group.findMany({
-          where: { active: true },
-          select: { id: true, nameNl: true, nameEn: true },
-          orderBy: { orderInPraesidium: "asc" },
-        }),
+    prisma.group.findMany({
+      where: { active: true },
+      select: { id: true, nameNl: true, nameEn: true },
+      orderBy: { orderInPraesidium: "asc" },
+    }),
   ]);
 
-  const formGroups = groupRows
-    .filter((group) => canSessionCreateFormForGroup(session, group.id))
-    .map((group) => ({ id: group.id, name: locale === "en" ? group.nameEn : group.nameNl }));
+  const groupOptions = groupRows.map((group) => ({
+    id: group.id,
+    name: locale === "en" ? group.nameEn : group.nameNl,
+  }));
+  const formGroups = page.form
+    ? []
+    : groupOptions.filter((group) => canSessionCreateFormForGroup(session, group.id));
 
   // Markdown is de bron van waarheid. Bestaat die nog niet, dan vullen we de
   // editor met een automatische conversie van het legacy tiptap-JSON; wie
@@ -93,6 +97,7 @@ export default async function AdminPageEditor({
         titleNl: page.titleNl,
         titleEn: page.titleEn,
         imageKey: page.imageKey,
+        groupId: page.groupId,
         category: page.headerTab
           ? { slug: page.headerTab.slug, label: locale === "nl" ? page.headerTab.labelNl : page.headerTab.labelEn }
           : null,
@@ -129,6 +134,7 @@ export default async function AdminPageEditor({
       canPublish={canPublishPages(session)}
       linkableForms={forms.map((form) => ({ id: form.id, label: form.label }))}
       formGroups={formGroups}
+      werkingGroups={groupOptions}
     />
   );
 }

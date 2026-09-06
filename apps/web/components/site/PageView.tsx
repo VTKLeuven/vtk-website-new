@@ -1,3 +1,5 @@
+import type { CSSProperties } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import {
   DOWNLOAD_EVENT,
@@ -8,6 +10,7 @@ import {
 } from "@/lib/analytics";
 import { isExternalUrl, withLocaleBase } from "@/lib/href";
 import { publicUrl } from "@/lib/storage";
+import { focusPosition } from "@/lib/imageFocus";
 import { renderTiptap } from "@/lib/tiptap-render";
 import { Markdown } from "@/components/ui/Markdown";
 import { PageOutline } from "@/components/site/PageOutline";
@@ -15,12 +18,21 @@ import { PageFormPanel } from "@/components/forms/public/PageFormPanel";
 import { formRailMeta } from "@/components/forms/public/FormBody";
 import { loadPublicForm } from "@/lib/forms/publicForm";
 import { buildFormSurface } from "@/lib/forms/surface";
+import { loadDefaultEventImage } from "@/lib/pageQueries";
+import {
+  loadSiblingPages,
+  loadWerkingEvents,
+  loadWerkingGroup,
+  type WerkingEvent,
+} from "@/lib/pageWerking";
+import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
 import { FORM_ANCHOR, splitOnFormMarker, stripFormMarker } from "@/lib/pageForm";
 import { outlineFromMarkdown, outlineFromTiptap, type OutlineItem } from "@/lib/pageOutline";
-import { pick, type Locale } from "@vtk/i18n";
+import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import type { HeaderTab, Page, PageAsset } from "@prisma/client";
 
 import "@/app/design/vtk-forms.css";
+import "@/app/design/vtk-page.css";
 
 /**
  * De inhoud voor de gevraagde taal, als bron in plaats van als gerenderde boom.
@@ -71,6 +83,9 @@ export async function PageView({
   pagePath: string;
 }) {
   const base = locale === "nl" ? "" : "/en";
+  const dict = getDictionary(locale);
+  const t = dict.pages;
+  const readMore = dict.home.readMore;
   const downloads = page.assets.filter((a) => a.kind === "DOWNLOAD");
   const title = pick(page.titleNl, page.titleEn, locale);
   const excerpt = pick(page.excerptNl ?? "", page.excerptEn ?? "", locale);
@@ -81,6 +96,19 @@ export async function PageView({
   const showCta = Boolean(ctaLabel && page.ctaUrl);
   // Wijst de knop naar deze site, dan moet ze in dezelfde taal blijven.
   const ctaHref = page.ctaUrl ? withLocaleBase(page.ctaUrl, base) : "";
+
+  // De werking achter deze pagina, de andere pagina's uit haar categorie en de
+  // standaardfoto voor evenementen zonder eigen cover. Alle drie optioneel: een
+  // pagina zonder post en zonder categorie haalt niets extra op en blijft de
+  // pagina die ze vandaag is.
+  const [group, events, siblings, defaultEventImage] = await Promise.all([
+    page.groupId ? loadWerkingGroup(page.groupId) : null,
+    page.groupId ? loadWerkingEvents(page.groupId) : [],
+    page.headerTabId ? loadSiblingPages(page.headerTabId, page.id) : [],
+    page.groupId ? loadDefaultEventImage() : null,
+  ]);
+  const groupName = group ? pick(group.nameNl, group.nameEn, locale) : "";
+  const tabLabel = tab ? pick(tab.labelNl, tab.labelEn, locale) : "";
 
   // Een concept of een gearchiveerd formulier laat het paneel weg in plaats van
   // de hele pagina te weigeren: de tekst eromheen hoort er gewoon te staan. Wie
@@ -120,7 +148,14 @@ export async function PageView({
   // wordt de rail nuttig. Een formulier zet ze altijd aan: dat er iets in te
   // vullen valt, is het eerste wat de bezoeker mag weten.
   const showOutline = headings.length >= 2;
-  const showRail = showOutline || downloads.length > 0 || formPanel !== null;
+  const editedAt = page.contentEditedAt;
+  // Hangt de pagina aan een post, dan draagt de kolom naast de tekst meer dan
+  // een register en krijgt ze de volle breedte tot aan de rand. Zonder post
+  // blijft ze de smalle rail die ze altijd was.
+  const hasWerkingRail = group !== null;
+  // De datum zet de kolom niet zelf aan: een rail met enkel "laatst bijgewerkt"
+  // erin is een kolom om niets. Ze rijdt mee zodra er al iets anders staat.
+  const showRail = showOutline || downloads.length > 0 || formPanel !== null || hasWerkingRail;
 
   const railForm = formPanel
     ? {
@@ -143,14 +178,32 @@ export async function PageView({
     />
   ) : null;
 
+  // De foto van de pagina draagt de kop; zonder foto blijft het technische
+  // patroon uit de huisstijl staan. `encodeURI` omdat de sleutel uit de admin
+  // komt en hier in een `url()` belandt.
+  const headPhoto = publicUrl(page.imageKey);
+  const headStyle = headPhoto
+    ? ({ "--page-head-photo": `url("${encodeURI(headPhoto)}")` } as CSSProperties)
+    : undefined;
+
+  // Staat er onder de tekst nog iets, dan mag de staartpadding van de tekstkolom
+  // krimpen: de band sluit de pagina af in plaats van de lege ruimte.
+  const hasBands =
+    events.length > 0 || (group !== null && group.members.length > 0) || siblings.length > 0;
+
+  const upcomingLabel =
+    events.length === 1
+      ? t.upcomingCountOne
+      : t.upcomingCount.replace("{count}", String(events.length));
+
   return (
     <div className="vtk-page">
-      <header className="vtk-page-head">
+      <header className={`vtk-page-head${headPhoto ? " has-photo" : ""}`} style={headStyle}>
         <div>
           {tab ? (
             <div className="vtk-page-kicker">
               <Link href={`${base}/${tab.slug}`} className="vtk-crumb">
-                {pick(tab.labelNl, tab.labelEn, locale)}
+                {tabLabel}
               </Link>
               <span aria-hidden="true"> › </span>
               <span>{title}</span>
@@ -158,6 +211,14 @@ export async function PageView({
           ) : null}
           <h1 className="vtk-page-title">{title}</h1>
           {excerpt ? <p className="vtk-page-subtitle">{excerpt}</p> : null}
+          {group ? (
+            <div className="vtk-page-headline">
+              <span>
+                <Link href={`${base}/praesidium#post-${group.slug}`}>{groupName}</Link>
+              </span>
+              {events.length > 0 ? <span>{upcomingLabel}</span> : null}
+            </div>
+          ) : null}
         </div>
         {showCta ? (
           <div>
@@ -177,7 +238,11 @@ export async function PageView({
         ) : null}
       </header>
 
-      <div className={`vtk-page-shell vtk-page-body${showRail ? " has-rail" : ""}`}>
+      <div
+        className={`vtk-page-shell vtk-page-body${
+          showRail ? (hasWerkingRail ? " has-rail has-side" : " has-rail") : ""
+        }${hasBands ? " has-bands" : ""}`}
+      >
         <div className="vtk-page-content">
           {content.kind === "markdown" ? (
             <>
@@ -198,7 +263,7 @@ export async function PageView({
         </div>
 
         {showRail ? (
-          <aside className="vtk-page-rail">
+          <aside className={hasWerkingRail ? "vtk-page-side" : "vtk-page-rail"}>
             {showOutline || railForm ? (
               <PageOutline
                 items={headings}
@@ -208,8 +273,45 @@ export async function PageView({
               />
             ) : null}
 
+            {group ? (
+              <section className="vtk-page-side-box">
+                <h2>{t.werking}</h2>
+                <ul>
+                  <li>
+                    <Link href={`${base}/praesidium#post-${group.slug}`}>
+                      {t.werkingMembers.replace("{group}", groupName)}
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href={`${base}/kalender`}>{t.upcomingAll}</Link>
+                  </li>
+                  {group.website ? (
+                    <li>
+                      <a
+                        href={group.website}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        {...umamiEvent(OUTBOUND_EVENT, {
+                          bestemming: outboundHost(group.website),
+                          vanaf: `pagina:${page.slug}`,
+                        })}
+                      >
+                        {t.werkingWebsite}
+                      </a>
+                    </li>
+                  ) : null}
+                </ul>
+              </section>
+            ) : null}
+
             {downloads.length > 0 ? (
-              <section className="vtk-rail-box vtk-rail-downloads">
+              <section
+                className={
+                  hasWerkingRail
+                    ? "vtk-page-side-box vtk-rail-downloads"
+                    : "vtk-rail-box vtk-rail-downloads"
+                }
+              >
                 <h2>{downloadsLabel}</h2>
                 <ul>
                   {downloads.map((a) => {
@@ -239,9 +341,194 @@ export async function PageView({
                 </ul>
               </section>
             ) : null}
+
+            {/* Wanneer de inhoud voor het laatst is nagekeken. Zegt op een pagina
+                met jaarcijfers of namen meer dan welke tekst ook, en het is het
+                enige dat elke pagina over zichzelf weet. */}
+            {editedAt ? (
+              <section className={hasWerkingRail ? "vtk-page-side-box" : "vtk-rail-box"}>
+                <p className="vtk-page-side-stamp">
+                  {t.updated}
+                  <b>
+                    {editedAt.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}
+                  </b>
+                </p>
+              </section>
+            ) : null}
           </aside>
         ) : null}
       </div>
+
+      {/* Banden onder de tekst, in het ritme van de homepage: eerst wat de
+          werking binnenkort doet, dan wie ze is, dan waar je verder kan kijken.
+          Elke band verschijnt enkel wanneer ze iets te tonen heeft. */}
+      {events.length > 0 && group ? (
+        <section className="vtk-page-band vtk-page-band-dark">
+          <div className="vtk-page-band-inner">
+            <div className="vtk-page-band-head">
+              <h2>{t.upcomingTitle.replace("{group}", groupName)}</h2>
+              <Link href={`${base}/kalender`}>{t.upcomingAll} →</Link>
+            </div>
+            <ul className="vtk-page-evgrid">
+              {events.map((event) => (
+                <li key={event.id}>
+                  <EventCard
+                    event={event}
+                    locale={locale}
+                    base={base}
+                    allDayLabel={t.allDay}
+                    defaultImage={defaultEventImage ?? ""}
+                  />
+                </li>
+              ))}
+            </ul>
+          </div>
+        </section>
+      ) : null}
+
+      {group && group.members.length > 0 ? (
+        <section className="vtk-page-band vtk-page-band-tint">
+          <div className="vtk-page-band-inner">
+            <div className="vtk-page-band-head">
+              <h2>{t.teamTitle.replace("{group}", groupName)}</h2>
+              <span className="vtk-page-side-stamp">
+                {t.teamYear.replace("{year}", formatWorkingYear(currentWorkingYear()))}
+              </span>
+            </div>
+            <ul
+              className="vtk-page-faces"
+              style={{ "--face-cols": Math.min(group.members.length, 6) } as CSSProperties}
+            >
+              {group.members.map((member) => {
+                const src = publicUrl(member.avatarKey);
+                const memberTitle = pick(member.titleNl ?? "", member.titleEn ?? "", locale);
+                return (
+                  <li key={member.id} className="vtk-roster-cell">
+                    <div className={"vtk-roster-photo" + (src ? "" : " is-blank")}>
+                      {src ? (
+                        <Image src={src} alt={member.name} width={192} height={192} />
+                      ) : (
+                        <div className="vtk-roster-initial" aria-hidden>
+                          {member.name.slice(0, 1).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div className="vtk-roster-name">{member.name}</div>
+                    {memberTitle ? <div className="vtk-roster-title">{memberTitle}</div> : null}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </section>
+      ) : null}
+
+      {siblings.length > 0 && tab ? (
+        <section className="vtk-page-band vtk-page-band-plain">
+          <div className="vtk-page-band-inner">
+            <div className="vtk-page-band-head">
+              <h2>{t.moreIn.replace("{category}", tabLabel)}</h2>
+              <Link href={`${base}/${tab.slug}`}>
+                {t.allIn.replace("{category}", tabLabel)} →
+              </Link>
+            </div>
+            <ul className="vtk-tile-grid">
+              {siblings.map((sibling) => {
+                const photo = publicUrl(sibling.imageKey);
+                const siblingExcerpt = pick(
+                  sibling.excerptNl ?? "",
+                  sibling.excerptEn ?? "",
+                  locale,
+                );
+                return (
+                  <li key={sibling.id}>
+                    <Link href={`${base}/${tab.slug}/${sibling.slug}`}>
+                      <article className="vtk-tile">
+                        {/* Decoratief: de titel ernaast zegt al waar de kaart heen
+                            gaat. Zelfde tegel als op de categoriepagina zelf. */}
+                        <span
+                          className={`vtk-tile-media${photo ? " has-photo" : ""}`}
+                          aria-hidden="true"
+                        >
+                          {photo && (
+                            <Image src={photo} alt="" fill sizes="(max-width: 520px) 104px, 120px" />
+                          )}
+                        </span>
+                        <div className="vtk-tile-body">
+                          <h2>{pick(sibling.titleNl, sibling.titleEn, locale)}</h2>
+                          {siblingExcerpt ? <p className="line-clamp-3">{siblingExcerpt}</p> : null}
+                          <span className="vtk-tile-cta">{readMore} →</span>
+                        </div>
+                      </article>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </section>
+      ) : null}
     </div>
+  );
+}
+
+/**
+ * Eén evenement op de navy band. Bewust een eigen, kleine kaart en niet de
+ * `.evcard` van de homepage: die is wit, draagt de ster en de agendaknop, en
+ * hoort bij `.vtk-design`. Hier telt enkel wanneer, wat en waar.
+ */
+function EventCard({
+  event,
+  locale,
+  base,
+  allDayLabel,
+  defaultImage,
+}: {
+  event: WerkingEvent;
+  locale: Locale;
+  base: string;
+  allDayLabel: string;
+  defaultImage: string;
+}) {
+  const tag = locale === "nl" ? "nl-BE" : "en-GB";
+  const photo = publicUrl(event.imageKey) ?? defaultImage;
+  const when = event.start.toLocaleDateString(tag, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const time = event.allDay
+    ? allDayLabel
+    : event.start.toLocaleTimeString(tag, { hour: "2-digit", minute: "2-digit" });
+
+  return (
+    <Link href={`${base}/kalender/${event.slug}`} className="vtk-page-ev">
+      {photo ? (
+        <div className="vtk-page-ev-media" aria-hidden="true">
+          <Image
+            src={photo}
+            alt=""
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 980px) 50vw, 33vw"
+            style={
+              event.imageKey
+                ? { objectPosition: focusPosition({ x: event.imageFocusX, y: event.imageFocusY }) }
+                : undefined
+            }
+          />
+        </div>
+      ) : null}
+      <div className="vtk-page-ev-body">
+        <span className="vtk-page-ev-when">
+          {when} · {time}
+        </span>
+        <h3>{pick(event.titleNl, event.titleEn, locale)}</h3>
+        {event.location ? <p>{event.location}</p> : null}
+      </div>
+    </Link>
   );
 }

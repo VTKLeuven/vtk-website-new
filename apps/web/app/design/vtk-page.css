@@ -1,0 +1,413 @@
+/* De werkingsblokken van een contentpagina: de bredere zijkolom, de agenda van
+   de post, haar ploeg en de andere pagina's uit de categorie.
+ *
+ * Alles hier is optioneel. Een pagina zonder post, zonder categorie en zonder
+ * downloads valt terug op de smalle inhoudsopgave (`.vtk-page-rail` in
+ * vtk-base.css) en blijft de pagina die ze vandaag is; deze regels raken haar
+ * dan niet. Zie docs/design-decisions.md, "De contentpagina van een werking".
+ */
+
+/* ---------------------------------------------------------------------------
+   Kop
+   --------------------------------------------------------------------------- */
+
+/* Eén regel onder de titel: van wie deze pagina is en wat er op stapel staat.
+   Geen tegels met grote cijfers; dit is een onderschrift, geen dashboard. */
+.vtk-page-headline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+  margin-top: 16px;
+  color: var(--on-dark-muted);
+  font-size: 14px;
+}
+
+.vtk-page-headline b {
+  color: var(--paper);
+  font-weight: 600;
+}
+
+.vtk-page-headline a {
+  color: var(--paper);
+  font-weight: 600;
+  text-decoration: none;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.35);
+}
+
+.vtk-page-headline a:hover {
+  color: var(--yellow);
+  border-color: var(--yellow);
+}
+
+/* De scheiding tussen de stukjes; een bolletje leest rustiger dan een streepje
+   en botst niet met de kruimelpad-chevron erboven. */
+.vtk-page-headline span + span::before {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  margin-right: 14px;
+  border-radius: 999px;
+  background: currentColor;
+  vertical-align: middle;
+  opacity: 0.6;
+}
+
+/* ---------------------------------------------------------------------------
+   Zijkolom
+   --------------------------------------------------------------------------- */
+
+/* De brede variant van de rail. Ze loopt tot aan de rechterrand van de schil, en
+   de tekstkolom houdt haar leesbreedte: de ruimte die overblijft valt tussen de
+   twee in plaats van rechts van allebei. */
+/* `.has-rail` staat er ook op (zodat de body-grid blijft kloppen), en die regel
+   in vtk-base.css is even specifiek. Deze selector telt er daarom een klasse
+   bij: anders beslist de volgorde in de bundel welke kolombreedte wint. */
+@media (min-width: 980px) {
+  .vtk-page-body.has-rail.has-side {
+    grid-template-columns: minmax(0, 700px) 320px;
+    justify-content: space-between;
+    gap: clamp(40px, 5vw, 64px);
+    align-items: start;
+  }
+
+  .vtk-page-body.has-rail.has-side > .vtk-page-content {
+    max-width: 700px;
+  }
+
+  .vtk-page-side {
+    position: sticky;
+    top: 96px;
+  }
+}
+
+.vtk-page-side {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+}
+
+/* Elke blok in de kolom is een register en geen kaart: een kopje, een lijn
+   erboven en lucht ertussen. Dezelfde taal als de inhoudsopgave, alleen breder.
+   Zie de styling-sectie in CLAUDE.md: hier hoort geen witte kaart. */
+.vtk-page-side-box {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-page-side > .vtk-page-side-box:first-child,
+.vtk-page-side > .vtk-rail-box:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.vtk-page-side-box > h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.vtk-page-side-box ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vtk-page-side-box a {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.35;
+  text-decoration: none;
+}
+
+.vtk-page-side-box a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--yellow);
+}
+
+.vtk-page-side-stamp {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.vtk-page-side-stamp b {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Smal scherm: de kolom valt uit elkaar in de body-grid, zodat de
+   inhoudsopgave boven de tekst blijft staan en de rest eronder komt. Een agenda
+   boven de tekst zou de pagina beginnen met iets anders dan waarvoor ze
+   geopend is. */
+@media (max-width: 979px) {
+  .vtk-page-side {
+    display: contents;
+  }
+
+  .vtk-page-side > * {
+    order: 1;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+  }
+
+  .vtk-page-side > .vtk-rail-box:first-child {
+    order: -1;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .vtk-page-body.has-rail.has-side {
+    gap: 24px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Banden onder de tekst
+   --------------------------------------------------------------------------- */
+
+/* Volgt er een band, dan hoeft de tekstkolom haar volle staartpadding niet meer:
+   die 112px was er om de pagina niet op de footer te laten eindigen, en dat doet
+   de band nu. */
+.vtk-page-body.has-bands {
+  padding-bottom: clamp(44px, 5vw, 68px);
+}
+
+/* Volle-breedte banden, hetzelfde stramien als op de homepage: de vulling loopt
+   van rand tot rand, de inhoud blijft binnen --max. Twee banden na elkaar
+   sluiten aan op een strakke naad in plaats van met papier ertussen. */
+.vtk-page-band {
+  position: relative;
+  z-index: 0;
+  padding: clamp(38px, 4.5vw, 56px) 0 clamp(42px, 5vw, 62px);
+}
+
+.vtk-page-band::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+}
+
+.vtk-page-band-inner {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 0 clamp(20px, 3vw, 36px);
+}
+
+.vtk-page-band-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 16px;
+  margin-bottom: 20px;
+}
+
+.vtk-page-band-head h2 {
+  margin: 0;
+  font-size: clamp(20px, 2.2vw, 26px);
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vtk-page-band-head a {
+  color: var(--body);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.vtk-page-band-head a:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: var(--yellow);
+}
+
+/* Navy band (de agenda): de vulling plus het technische patroon, met een eigen
+   uitsnede zodat ze niet hetzelfde behang toont als de paginakop erboven. */
+.vtk-page-band-dark::before {
+  background: var(--navy);
+}
+
+.vtk-page-band-dark::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  pointer-events: none;
+  background-image: url("/technisch-pattern.svg");
+  background-size: 760px 760px;
+  background-repeat: repeat;
+  background-position: calc(50% - 420px) -90px;
+  opacity: 0.26;
+}
+
+.vtk-page-band-dark .vtk-page-band-head h2 {
+  color: var(--paper);
+}
+
+.vtk-page-band-dark .vtk-page-band-head a {
+  color: var(--on-dark-muted);
+}
+
+.vtk-page-band-dark .vtk-page-band-head a:hover {
+  color: var(--yellow);
+}
+
+/* Lichtblauwe band (de ploeg). */
+.vtk-page-band-tint::before {
+  background: var(--paper-2);
+}
+
+/* Papieren band (de andere pagina's). Ze staat op dezelfde grond als de tekst,
+   dus een haarlijn maakt de naad; zonder die lijn zweeft de rij los. */
+.vtk-page-band-plain {
+  border-top: 1px solid var(--line);
+}
+
+.vtk-page-band + .vtk-page-band {
+  border-top: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Evenementkaarten op de navy band
+   --------------------------------------------------------------------------- */
+
+.vtk-page-evgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, calc((100% - 36px) / 3)));
+  justify-content: start;
+  gap: 18px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.vtk-page-ev {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--paper);
+  text-decoration: none;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease;
+}
+
+.vtk-page-ev:hover {
+  transform: translateY(-3px);
+  border-color: rgba(255, 255, 255, 0.28);
+}
+
+.vtk-page-ev-media {
+  position: relative;
+  display: block;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.vtk-page-ev-media img {
+  object-fit: cover;
+}
+
+.vtk-page-ev-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px 18px;
+}
+
+/* De datum is een pil in het geel: op donker is dat het enige element dat van
+   ver leesbaar moet zijn. Donkere tekst erin, want geel draagt geen licht. */
+.vtk-page-ev-when {
+  align-self: flex-start;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-page-ev h3 {
+  margin: 0;
+  color: var(--paper);
+  font-size: 18px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+.vtk-page-ev p {
+  margin: 0;
+  color: var(--on-dark-muted);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+
+/* ---------------------------------------------------------------------------
+   De ploeg
+   --------------------------------------------------------------------------- */
+
+/* Dezelfde tegels als op /praesidium (`.vtk-roster-*` in vtk-base.css): de
+   portretten dragen zichzelf op de band, zonder kaart eromheen. */
+/* Evenveel kolommen als er leden zijn, tot zes. Met de auto-fill van de
+   gezichtenmuur (`.vtk-wall-faces`) zou een ploeg van vier in acht kolommen van
+   132px vallen en de halve band leeg laten; daar staat de postnaam in de
+   linkermarge en klopt dat wel. `--face-cols` komt uit PageView. */
+.vtk-page-faces {
+  display: grid;
+  grid-template-columns: repeat(var(--face-cols, 4), minmax(0, 1fr));
+  gap: clamp(16px, 2vw, 24px);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+/* Een ploeg van drie zou anders drie portretten van 380px opleveren: de kolommen
+   verdelen de band, de tegel zelf blijft op maat. */
+.vtk-page-faces > li {
+  max-width: 210px;
+}
+
+@media (max-width: 900px) {
+  .vtk-page-faces {
+    grid-template-columns: repeat(auto-fill, minmax(min(120px, 100%), 1fr));
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   De andere pagina's uit de categorie
+   --------------------------------------------------------------------------- */
+
+/* Exact dezelfde tegels als op de categoriepagina zelf (`.vtk-tile-grid` in
+   vtk-base.css): een pagina en haar buren horen er overal hetzelfde uit te zien,
+   dus hier staat bewust geen enkele afwijking. */

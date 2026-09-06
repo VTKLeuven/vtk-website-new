@@ -3,10 +3,17 @@ import { markdownToPlainText } from "@/lib/markdown";
 /**
  * Kopjes van een contentpagina, voor de "Op deze pagina"-rail naast de tekst.
  *
- * Enkel H2 en H3: dieper wordt de rail een tweede inhoudsopgave in plaats van
- * een houvast. De id's die hier berekend worden moeten exact overeenkomen met
- * wat de renderers zetten (`Markdown` voor markdown, `renderTiptap` voor de
- * oude JSON-documenten), anders springt een link nergens naartoe. Daarom leidt
+ * H1 tot en met H3; dieper wordt de rail een tweede inhoudsopgave in plaats van
+ * een houvast. H1 telt mee omdat de paginatitel al de echte H1 van het document
+ * is: wie in de editor `#` kiest, bedoelt gewoon een sectiekop. Dat H1 hier ooit
+ * niet meetelde, kostte pagina's stil hun hele rail (International Team had
+ * `# Wat we voor jou doen` en één `## Contact`, dus één item, en de rail
+ * verschijnt pas vanaf twee). H1 en H2 zijn daarom hetzelfde niveau in de lijst;
+ * enkel H3 springt in.
+ *
+ * De id's die hier berekend worden moeten exact overeenkomen met wat de
+ * renderers zetten (`Markdown` voor markdown, `renderTiptap` voor de oude
+ * JSON-documenten), anders springt een link nergens naartoe. Daarom leidt
  * iedereen zijn id af via {@link headingId}.
  */
 export type OutlineItem = { id: string; text: string; level: 2 | 3 };
@@ -49,12 +56,12 @@ export function outlineFromMarkdown(markdown: string): OutlineItem[] {
       continue;
     }
     if (inFence) continue;
-    const match = /^(#{2,3})\s+(.+?)\s*#*\s*$/.exec(line);
+    const match = /^(#{1,3})\s+(.+?)\s*#*\s*$/.exec(line);
     if (!match) continue;
     const text = markdownToPlainText(match[2]);
     const id = headingId(text);
     if (!text || !id) continue;
-    items.push({ id, text, level: match[1].length === 2 ? 2 : 3 });
+    items.push({ id, text, level: match[1].length === 3 ? 3 : 2 });
   }
   return items;
 }
@@ -71,10 +78,11 @@ export function outlineFromTiptap(doc: unknown): OutlineItem[] {
     if (!node || typeof node !== "object") return;
     if (node.type === "heading") {
       const level = Number(node.attrs?.level ?? 2);
-      if (level === 2 || level === 3) {
+      if (level >= 1 && level <= 3) {
         const text = headingText(node.content).trim();
         const id = headingId(text);
-        if (text && id) items.push({ id, text, level });
+        // H1 en H2 delen hun niveau in de rail; zie de opmerking hierboven.
+        if (text && id) items.push({ id, text, level: level === 3 ? 3 : 2 });
       }
     }
     for (const child of node.content ?? []) walk(child);

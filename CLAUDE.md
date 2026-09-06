@@ -289,11 +289,28 @@ the design language into the application instead of copying mockup content.
   `.vtk-page-title`/`.vtk-page-subtitle`/`.vtk-page-kicker` keep dark text
   outside that band (they are also used on light backgrounds); only inside
   `.vtk-page-head` do they invert.
+  - One exception, on content pages only: with `.has-photo` the band carries the
+    page's own photo under the navy scrim instead of the pattern. The pattern is
+    then off, never both: two drawings over each other read as noise. `/tickets`,
+    the category pages and `/praesidium` keep the pattern.
 - Content pages (`PageView`): dark head with a breadcrumb to the category, then
-  the text column with an optional rail beside it holding the page outline (H2
-  and H3, anchors from `lib/pageOutline.ts`) and the downloads. The rail only
-  appears when there are at least two headings, a download, or a linked form; it
-  sticks on desktop and moves above the text on narrow screens.
+  the text column with an optional rail beside it holding the page outline (H1,
+  H2 and H3, anchors from `lib/pageOutline.ts`) and the downloads. The rail only
+  appears when there are at least two headings, a download, a linked form, or a
+  linked post; it sticks on desktop and moves above the text on narrow screens.
+  - **A page can hang on a post** (`Page.groupId`, set in the page editor). Then
+    the head carries the page's own photo under the navy scrim (no technical
+    pattern over a photo), a line naming the post and its upcoming activities,
+    and the page closes with full-width bands: the post's next events (navy,
+    each with its own photo), its members this working year (light blue, the
+    same portrait tiles as `/praesidium`), and the other pages in the category
+    (paper, the same tiles as the category page). The rail widens to 320px and
+    carries a small block about the post. Everything here is optional and falls
+    away per block: a page without a post, without a category and without a
+    photo is exactly the page it was. See `docs/design-decisions.md`.
+  - The rail stays a register in the margin at both widths: hairlines, a small
+    uppercase heading, no white cards. `vtk-page.css` holds these blocks; do not
+    move them into `vtk-base.css`, which carries the shared page chrome.
   - A page can carry one form (`Form.pageId`), rendered as a `.vtk-page-form`
     panel in the text column: a `--surface` card with the yellow accent rail,
     the same treatment as any featured card. It sits where the editor put the

@@ -443,6 +443,60 @@ export async function savePageContentAction(
 }
 
 /**
+ * De post achter deze pagina koppelen of loskoppelen.
+ *
+ * Een aparte actie naast de inhoud, om dezelfde reden als de foto hierboven: de
+ * koppeling verandert wat de pagina toont (agenda, ploeg, werkingsblok) en dat
+ * hoort niet te wachten tot iemand toevallig ook de tekst opslaat. Leeg is een
+ * geldige keuze: een FAQ of een woordenlijst hoort bij geen enkele post.
+ */
+export async function savePageGroupAction(
+  _prev: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const session = await requireSession();
+  const id = formData.get('id');
+  const raw = formData.get('groupId');
+  if (typeof id !== 'string' || !id || (raw !== null && typeof raw !== 'string')) {
+    return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  }
+  const groupId = typeof raw === 'string' && raw.trim() !== '' ? raw.trim() : null;
+
+  const page = await prisma.page.findUnique({
+    where: { id },
+    select: {
+      titleNl: true,
+      groupId: true,
+      editorRoles: { select: { roleId: true } },
+    },
+  });
+  if (!page) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+  if (!canEditPageContent(session, page)) throw new Error('FORBIDDEN');
+  if (groupId === page.groupId) return saveOk();
+
+  // Een verzonnen of opgeheven id is invoer en geen serverfout: rode toast, geen
+  // error boundary.
+  const group = groupId
+    ? await prisma.group.findUnique({ where: { id: groupId }, select: { nameNl: true } })
+    : null;
+  if (groupId && !group) return saveError('INVALID_INPUT' satisfies ContentErrorCode);
+
+  await prisma.page.update({ where: { id }, data: { groupId } });
+
+  await logAudit({
+    action: 'update',
+    entity: 'page',
+    entityId: id,
+    target: page.titleNl,
+    summary: group ? `gekoppeld aan de post ${group.nameNl}` : 'losgekoppeld van haar post',
+  });
+
+  revalidatePath('/', 'layout');
+  revalidatePath(`/admin/paginas/${id}`);
+  return saveOk();
+}
+
+/**
  * De foto op de categoriekaart opslaan vanuit de gewone pagina-editor.
  *
  * Dit is bewust een aparte actie naast de markdown-save: een upload mag niet

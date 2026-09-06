@@ -229,7 +229,20 @@
     "empty": "Nog geen pagina's",
     "overview": "Overzicht",
     "downloads": "Downloads",
-    "onThisPage": "Op deze pagina"
+    "onThisPage": "Op deze pagina",
+    "upcomingTitle": "Wat {group} binnenkort doet",
+    "upcomingAll": "Alles in de kalender",
+    "upcomingCount": "{count} komende activiteiten",
+    "upcomingCountOne": "1 komende activiteit",
+    "allDay": "Hele dag",
+    "teamTitle": "De ploeg van {group}",
+    "teamYear": "Werkingsjaar {year}",
+    "moreIn": "Verder in {category}",
+    "allIn": "Alles in {category}",
+    "werking": "Deze werking",
+    "werkingMembers": "Wie zit er in {group}?",
+    "werkingWebsite": "Eigen website",
+    "updated": "Laatst bijgewerkt"
   },
   "auth": {
     "signInLead": "Ledenportaal",

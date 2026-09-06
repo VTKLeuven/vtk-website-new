@@ -1694,6 +1694,62 @@ nodig heeft.
   `canEditPageContent`, dus wie de tekst van een pagina schrijft, kiest ook de
   foto erbij; daar is geen `pages.manage` voor nodig.
 
+## De contentpagina van een werking
+
+Een contentpagina toonde alleen haar eigen tekst. Op een pagina van 210 woorden
+(International Team) is dat een tekstkolom van 660px links in een doek van
+1168px, met niets ernaast, niets erboven op de donkere kop na, en niets eronder
+tot de footer. Dat leest niet als rust maar als vergetelheid, terwijl de site
+over diezelfde pagina meer weet dan ze toont: de post die erachter zit, wat die
+post binnenkort doet, wie erin zit, en welke pagina's ernaast staan.
+
+- **De pagina kan aan een post hangen** (`Page.groupId`, keuzelijst in de
+  pagina-editor). Dat is de sleutel: uit die ene koppeling volgen de agenda, de
+  ploeg en het blok in de kolom. Een pagina zonder post blijft geldig en
+  verandert niet; een FAQ, een woordenlijst of een losse tekstpagina hoort bij
+  niemand in het bijzonder. Elk blok verschijnt apart en alleen wanneer het iets
+  te tonen heeft, dus er bestaat geen half ingevulde toestand.
+- **De foto van de pagina draagt de kop.** `Page.imageKey` bestond al voor de
+  kaart op de categoriepagina en stond op de meeste pagina's al ingevuld; ze was
+  alleen nergens groter te zien dan 148px. De kop blijft dezelfde band met
+  dezelfde hoogte en dezelfde gele onderlijn: enkel het technische patroon maakt
+  plaats voor de foto onder de navy waas. Zonder foto verandert er niets.
+  - **Het patroon gaat niet over de foto.** Twee tekeningen over elkaar maakten
+    het beeld rommelig in plaats van herkenbaar; de waas alleen doet het werk,
+    net als in de hero op de homepage.
+  - Dit wijkt af van de regel in `CLAUDE.md` dat alleen de homepage beeld in
+    haar kop heeft. Bewust, en beperkt tot contentpagina's: `/tickets`, de
+    categoriepagina's en `/praesidium` houden het patroon, want daar hoort geen
+    foto bij één pagina maar bij een lijst.
+- **Onder de tekst komen banden, in het ritme van de homepage**: wat de werking
+  binnenkort doet (navy, met de foto van elk evenement), haar ploeg van dit
+  werkingsjaar (lichtblauw, dezelfde portrettegels als `/praesidium`), en de
+  andere pagina's uit dezelfde categorie (papier, exact de tegels van de
+  categoriepagina). Zo eindigt de pagina ergens in plaats van op te houden.
+  - **Verwante pagina's staan onderaan en niet in de kolom.** Twee lijsten met
+    dezelfde vier links op één scherm lezen als een fout; de tegels met foto
+    zeggen bovendien meer dan een rij tekstlinks.
+- **De kolom naast de tekst wordt breder zodra er een post hangt** (320px in
+  plaats van 244px, tot aan de rechterrand). Ze blijft een register in de marge
+  en wordt geen kolom kaarten: haarlijnen, een klein bovenkopje, geen witte
+  vlakken. Zonder post blijft het exact de smalle rail die er stond.
+- **De datum van de laatste inhoudswijziging staat in die kolom**, maar zet ze
+  nooit zelf aan: een kolom met enkel "laatst bijgewerkt" erin is een kolom om
+  niets. Op een pagina met namen of jaarcijfers zegt die datum meer dan welke
+  zin ook, en het is het enige dat elke pagina over zichzelf weet.
+- **Contactgegevens blijven in de tekst.** Een contactblok in de kolom vraagt een
+  adres per post, en dat bestaat niet als veld (de groepsadressen in Google zijn
+  een ander systeem, zie `docs/google-workspace.md`). De knop naast de titel
+  (`Page.ctaUrl`) dekt de belangrijkste actie al.
+
+### H1 in de tekst telt mee voor de inhoudsopgave
+
+De rail telde alleen H2 en H3. Een redacteur die `#` koos in plaats van `##`
+verloor daarmee stil de hele rechterkolom: International Team had één H1 en één
+H2, dus één item, en de rail verschijnt pas vanaf twee. De paginatitel is al de
+echte H1 van het document, dus een `#` in de tekst is gewoon een sectiekop. H1
+en H2 delen daarom hun niveau in de lijst; enkel H3 springt in.
+
 ## Homepage-secties & bandenritme
 
 De homepage is opgebouwd uit volle-breedte banden die bewust van kleur

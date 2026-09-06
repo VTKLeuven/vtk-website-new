@@ -777,6 +777,8 @@ model Group {
   active            Boolean   @default(true)
 
   memberships       GroupMembership[]
+  /// Contentpagina's die deze post als werking tonen (agenda, ploeg, website).
+  pages             Page[]
   vaultPost         VaultPost?
   // Rollen die deze post toekent aan haar leden (DEFAULT) en verantwoordelijke (LEADER).
   roleGrants        GroupRole[]
@@ -1335,6 +1337,11 @@ model Page {
   ctaLabelNl            String?
   ctaLabelEn            String?
   ctaUrl                String?
+  // De post of werkgroep achter deze pagina. Ingevuld = de pagina toont wat die
+  // groep doet: haar eerstvolgende evenementen, haar ploeg van dit werkingsjaar
+  // en haar website. Leeg blijft geldig: een FAQ of een woordenlijst hoort bij
+  // geen enkele post en toont die blokken gewoon niet.
+  groupId               String?
   // Jaarlijks na te kijken pagina (namen, telefoonnummers, ...): komt bovenaan
   // het paginabeheer te staan zolang ze dit werkingsjaar niet bewerkt is.
   needsYearlyEdit       Boolean   @default(false)
@@ -1355,6 +1362,9 @@ model Page {
   searchEn Unsupported("tsvector")?
 
   headerTab   HeaderTab?       @relation(fields: [headerTabId], references: [id], onDelete: SetNull)
+  /// De post achter deze pagina. SetNull en niet Cascade: een post die opgeheven
+  /// wordt, mag de pagina niet meenemen; die verliest enkel haar werkingsblokken.
+  group       Group?           @relation(fields: [groupId], references: [id], onDelete: SetNull)
   createdBy   User?            @relation("PageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   assets      PageAsset[]
   editorRoles PageEditorRole[]
@@ -1362,6 +1372,7 @@ model Page {
   form        Form?
 
   @@index([headerTabId])
+  @@index([groupId])
   @@index([searchNl], type: Gin)
   @@index([searchEn], type: Gin)
 }

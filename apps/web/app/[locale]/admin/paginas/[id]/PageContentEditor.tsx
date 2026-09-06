@@ -14,6 +14,7 @@ import { AssetList } from "../../inhoud/AssetList";
 import { FileUploader } from "../../inhoud/FileUploader";
 import type { AssetNode } from "../../inhoud/ContentManager";
 import { PageCategoryImageCard } from "./PageCategoryImageCard";
+import { PageWerkingCard, type WerkingOption } from "./PageWerkingCard";
 import { PageSettingsCard, type SettingsRole } from "./PageSettingsCard";
 import {
   PageFormCard,
@@ -29,6 +30,8 @@ type EditorPage = {
   titleNl: string;
   titleEn: string | null;
   imageKey: string | null;
+  /** De post achter deze pagina, of null wanneer ze bij geen enkele hoort. */
+  groupId: string | null;
   category: { slug: string; label: string } | null;
   published: boolean;
   needsYearlyEdit: boolean;
@@ -58,6 +61,7 @@ export function PageContentEditor({
   canPublish,
   linkableForms,
   formGroups,
+  werkingGroups,
 }: {
   host: string;
   locale: Locale;
@@ -74,6 +78,8 @@ export function PageContentEditor({
   linkableForms: PageFormOption[];
   /** Posten waarvoor deze gebruiker een formulier mag aanmaken. */
   formGroups: PageFormGroup[];
+  /** Alle actieve posten, om deze pagina aan een werking te hangen. */
+  werkingGroups: WerkingOption[];
 }) {
   const nl = locale === "nl";
   const dict = getDictionary(locale);
@@ -201,6 +207,13 @@ export function PageContentEditor({
         pageId={page.id}
         pageTitle={page.titleNl}
         imageKey={page.imageKey}
+      />
+
+      <PageWerkingCard
+        locale={locale}
+        pageId={page.id}
+        groupId={page.groupId}
+        groups={werkingGroups}
       />
 
       <Card className="p-5">

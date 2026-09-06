@@ -669,7 +669,7 @@
 }
 
 /* Ankers uit de rail mogen niet onder de sticky sitekop landen. */
-.prose-vtk :is(h2, h3) {
+.prose-vtk :is(h1, h2, h3) {
   scroll-margin-top: 96px;
 }
 
@@ -734,6 +734,38 @@
     #000 calc(100% - 40px),
     transparent 100%
   );
+}
+
+/* Fotokop: dezelfde band, dezelfde hoogte, dezelfde gele onderlijn, maar met de
+   eigen foto van de pagina onder de navy waas (het zwaarst linksboven, achter de
+   titel). Zonder foto blijft de kop hierboven exact zoals ze was.
+
+   Het technische patroon gaat er bewust NIET overheen: twee tekeningen over
+   elkaar maakten de foto rommelig in plaats van herkenbaar. De waas alleen doet
+   het werk, zoals in de hero op de homepage. */
+.vtk-page-head.has-photo::before {
+  background:
+    linear-gradient(
+      100deg,
+      rgba(9, 12, 24, 0.94) 0%,
+      rgba(10, 15, 31, 0.86) 42%,
+      rgba(12, 20, 42, 0.62) 100%
+    ),
+    var(--page-head-photo) center 42% / cover no-repeat;
+}
+
+.vtk-page-head.has-photo::after {
+  content: none;
+}
+
+/* Op een smal scherm loopt de horizontale waas te snel uit: de titel valt dan op
+   het lichtste deel van de foto. Daar telt een verticale laag mee. */
+@media (max-width: 640px) {
+  .vtk-page-head.has-photo::before {
+    background:
+      linear-gradient(to top, rgba(9, 12, 24, 0.92) 20%, rgba(10, 15, 31, 0.55) 100%),
+      var(--page-head-photo) center 42% / cover no-repeat;
+  }
 }
 
 /* Deze drie klassen worden ook buiten de donkere band gebruikt (bv. de titel

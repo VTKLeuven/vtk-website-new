@@ -17,6 +17,11 @@ export function Markdown({ children }: { children: string }) {
       components={{
         // Kopjes krijgen een anker, zodat de "Op deze pagina"-rail ernaartoe kan
         // linken. De id komt uit dezelfde helper als die rail (pageOutline).
+        // Ook H1: de paginatitel is de echte H1, dus een `#` in de tekst is een
+        // sectiekop zoals elke andere.
+        h1: ({ children: headingChildren }) => (
+          <h1 id={headingId(headingText(headingChildren))}>{headingChildren}</h1>
+        ),
         h2: ({ children: headingChildren }) => (
           <h2 id={headingId(headingText(headingChildren))}>{headingChildren}</h2>
         ),

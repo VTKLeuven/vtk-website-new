@@ -8,11 +8,14 @@ import {
 } from '@/lib/pageOutline';
 
 describe('kopjes van een contentpagina', () => {
-  it('neemt H2 en H3 op, maar niet H1 of dieper', () => {
+  it('neemt H1 tot en met H3 op, maar niet dieper', () => {
     const outline = outlineFromMarkdown(
       ['# Titel', '## Inschrijven', 'tekst', '### Ruilen', '#### Detail'].join('\n')
     );
+    // H1 en H2 zijn hetzelfde niveau: de echte H1 van de pagina is de titel, dus
+    // een `#` in de tekst is gewoon een sectiekop.
     expect(outline).toEqual([
+      { id: 'sectie-titel', text: 'Titel', level: 2 },
       { id: 'sectie-inschrijven', text: 'Inschrijven', level: 2 },
       { id: 'sectie-ruilen', text: 'Ruilen', level: 3 },
     ]);
@@ -53,6 +56,7 @@ describe('kopjes van een contentpagina', () => {
       ],
     };
     expect(outlineFromTiptap(doc)).toEqual([
+      { id: 'sectie-titel', text: 'Titel', level: 2 },
       { id: 'sectie-hoe-schrijf-je-in', text: 'Hoe schrijf je in', level: 2 },
     ]);
   });

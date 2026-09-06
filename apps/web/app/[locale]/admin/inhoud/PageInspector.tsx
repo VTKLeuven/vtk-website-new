@@ -179,14 +179,14 @@ export function PageInspector({
           <StorageImageField
             defaultKey={page.imageKey}
             locale={locale}
-            label={nl ? "Foto op de categoriepagina" : "Photo on the category page"}
+            label={nl ? "Foto van de pagina" : "Page photo"}
             fallbackUrl="/technisch-pattern-light.png"
             fallbackPosition="left"
             emptyHint={nl ? "Technisch patroon" : "Technical pattern"}
             helpText={
               nl
-                ? "Deze foto verschijnt op de kaart van deze pagina. Zonder foto toont de kaart het technische patroon uit de huisstijl."
-                : "This photo appears on this page's card. Without one, the card shows the technical brand pattern."
+                ? "Deze foto draagt de kop bovenaan de pagina en staat op haar kaart op de categoriepagina. Zonder foto blijft het technische patroon uit de huisstijl."
+                : "This photo carries the header at the top of the page and appears on its card on the category page. Without one, the technical brand pattern stays."
             }
             srContext={page.titleNl}
           />

@@ -7,7 +7,11 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { savePageImageAction } from "@/app/actions/pages";
 import { saveErrorMessages } from "@/lib/saveMessages";
 
-/** Dezelfde categoriekaartfoto als in Website → Header, vanuit de pagina-editor. */
+/**
+ * De foto van deze pagina, vanuit de pagina-editor (hetzelfde veld als in
+ * Website → Header). Ze doet twee dingen: ze staat op de kaart van deze pagina
+ * op de categoriepagina, en ze draagt de donkere kop bovenaan de pagina zelf.
+ */
 export function PageCategoryImageCard({
   locale,
   pageId,
@@ -24,12 +28,12 @@ export function PageCategoryImageCard({
   return (
     <Card className="p-5">
       <h2 className="text-sm font-semibold text-vtk-ink">
-        {nl ? "Foto op de categoriepagina" : "Photo on the category page"}
+        {nl ? "Foto van de pagina" : "Page photo"}
       </h2>
       <p className="mt-1 text-xs text-[#5c667f]">
         {nl
-          ? "Deze foto verschijnt op de kaart van deze pagina zodra ze aan een categorie gekoppeld is."
-          : "This photo appears on this page's card once the page is linked to a category."}
+          ? "Deze foto draagt de donkere kop bovenaan de pagina, en staat op de kaart van deze pagina op de categoriepagina. Zonder foto blijft de kop het technische patroon tonen."
+          : "This photo carries the dark header at the top of the page, and appears on this page's card on the category page. Without a photo the header keeps the technical pattern."}
       </p>
 
       <SaveForm
