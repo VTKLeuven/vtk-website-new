@@ -83,9 +83,15 @@ export function Markdown({
           const caption = image.props.title;
           return (
             <figure className="vtk-figure">
-              {/* De titel is hier het bijschrift; ze ook als tooltip laten staan
-                  zou dezelfde tekst twee keer tonen. */}
-              {caption ? cloneElement(image, { title: undefined }) : image}
+              {/* De foto zit in een eigen kader dat de ronding en de rand draagt
+                  en dat knipt. De foto beweegt en zoomt binnen dat kader; stond
+                  de ronding op de foto zelf, dan viel ze tijdens het uitzoomen
+                  buiten het vierkante kader en zag je rechte hoeken. */}
+              <span className="vtk-figure-media">
+                {/* De titel is hier het bijschrift; ze ook als tooltip laten
+                    staan zou dezelfde tekst twee keer tonen. */}
+                {caption ? cloneElement(image, { title: undefined }) : image}
+              </span>
               {caption ? <figcaption>{caption}</figcaption> : null}
             </figure>
           );

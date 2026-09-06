@@ -113,17 +113,25 @@ body {
   @apply rounded-2xl my-4 max-w-full h-auto shadow-sm border border-vtk-blue/10;
 }
 
-/* Een foto met een bijschrift. `overflow-x: clip` hoort bij de zijwaartse
-   animatie uit vtk-motion.css: de foto schuift binnen haar eigen kader in
-   plaats van naast de tekstkolom. `clip` en niet `hidden`, want `hidden` maakt
-   een scrollcontainer en dat breekt de sticky rail naast de tekst. */
+/* Een foto met een bijschrift. Het kader draagt de ronding, de rand en de
+   schaduw, en het knipt; de foto beweegt en zoomt daarbinnen. Stond de ronding
+   op de foto zelf, dan viel ze bij het uitzoomen buiten het vierkante kader en
+   zag je rechte hoeken.
+
+   `clip` en niet `hidden`: `hidden` maakt een scrollcontainer en dat breekt de
+   sticky rail naast de tekst. */
 .prose-vtk .vtk-figure {
   margin: 1.5rem 0;
-  overflow-x: clip;
+}
+
+.prose-vtk .vtk-figure-media {
+  @apply rounded-2xl shadow-sm border border-vtk-blue/10;
+  display: block;
+  overflow: clip;
 }
 
 .prose-vtk .vtk-figure img {
-  @apply my-0;
+  @apply my-0 rounded-none border-0 shadow-none;
   display: block;
   width: 100%;
 }
