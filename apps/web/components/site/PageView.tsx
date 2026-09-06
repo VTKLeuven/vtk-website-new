@@ -152,9 +152,6 @@ export async function PageView({
 
   return (
     <div className="vtk-page">
-      {/* Leesvoortgang in de accentkleur, strak onder de sitekop. Decoratief:
-          de scrollbalk zegt hetzelfde, dus een screenreader hoeft dit niet. */}
-      <div className="vtk-read-progress" aria-hidden="true" />
       <header className={`vtk-page-head${headPhoto ? " has-photo" : ""}`}>
         {headPhoto ? (
           // Decoratief: de titel ernaast zegt al waar je bent, dus een alt-tekst

@@ -92,40 +92,6 @@
   }
 }
 
-@keyframes vtk-progress {
-  from {
-    transform: scaleX(0);
-  }
-  to {
-    transform: scaleX(1);
-  }
-}
-
-/* Leesvoortgang: de accentkleur op volle sterkte, strak onder de sitekop. Geen
-   `hidden`-fallback nodig; zonder animatie blijft de balk op `scaleX(0)` staan
-   en is ze dus onzichtbaar in plaats van vol. */
-.vtk-read-progress {
-  position: fixed;
-  top: var(--vtk-header-height, 73px);
-  left: 0;
-  right: 0;
-  z-index: 49;
-  height: 3px;
-  background: var(--yellow);
-  transform: scaleX(0);
-  transform-origin: 0 50%;
-  pointer-events: none;
-}
-
-@supports (animation-timeline: scroll()) {
-  @media (prefers-reduced-motion: no-preference) {
-    .vtk-read-progress {
-      animation: vtk-progress linear both;
-      animation-timeline: scroll(root block);
-    }
-  }
-}
-
 /* De foto komt van opzij binnen. Geanimeerd wordt de `img`, niet het figuur:
    het figuur knipt (`overflow-x: clip` in globals.css), zodat de foto binnen
    haar eigen kader schuift en niets buiten de tekstkolom steekt. Om en om van
