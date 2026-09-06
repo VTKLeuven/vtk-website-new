@@ -324,7 +324,7 @@
 }
 .vtk-design .ag-row {
   display: grid;
-  grid-template-columns: 80px 1fr 2fr auto auto;
+  grid-template-columns: 80px 200px minmax(0, 1fr) auto auto auto;
   gap: 24px;
   padding: 24px 0;
   border-bottom: 1px solid var(--rule);
@@ -369,11 +369,6 @@
   text-transform: uppercase;
   font-weight: 400;
 }
-.vtk-design .ag-desc {
-  font-size: 14px;
-  color: var(--ink-2);
-  line-height: 1.5;
-}
 .vtk-design .ag-tag {
   font-family: var(--mono);
   font-size: 10px;
@@ -401,13 +396,6 @@
   }
   .vtk-design .agenda {
     grid-template-columns: 1fr;
-  }
-  .vtk-design .ag-row {
-    grid-template-columns: 72px 1fr;
-    grid-template-rows: auto auto auto;
-  }
-  .vtk-design .ag-desc {
-    grid-column: 1 / -1;
   }
 }
 
@@ -882,7 +870,8 @@
 }
 
 .vtk-design .ag-row {
-  grid-template-columns: 96px minmax(180px, 1.1fr) minmax(160px, 1fr) auto auto;
+  position: relative;
+  grid-template-columns: 96px 200px minmax(0, 1fr) auto auto auto;
   gap: 22px;
   align-items: center;
   margin-bottom: 14px;
@@ -937,8 +926,7 @@
 
 @media (max-width: 960px) {
   .vtk-design .toolbar,
-  .vtk-design .agenda,
-  .vtk-design .ag-row {
+  .vtk-design .agenda {
     grid-template-columns: 1fr;
   }
 
@@ -1655,5 +1643,152 @@
   .vtk-design .ev-preview-actions .btn {
     padding-inline: 10px;
     font-size: 12px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   De rij in "Eerstvolgend" en in de lijstweergave.
+
+   De volledige beschrijving stond hier ooit uitgeschreven; ze liep over vijf
+   regels, zei zelden wat het evenement is en duwde de rijen zo ver uit elkaar
+   dat er nog drie op een scherm pasten. In haar plaats staat nu de affiche.
+
+   De rij is daarom geen anker meer maar een `article`: de ster is een knop, en
+   een knop in een anker is ongeldige HTML. De titel is de link en spant zich
+   over de kaart; de ster ligt erboven.
+   --------------------------------------------------------------------------- */
+
+.vtk-design .ag-media {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  border-radius: 14px;
+  aspect-ratio: 16 / 10;
+  /* De strepen van een ontbrekende foto; ze komen hier in de praktijk niet voor
+     omdat de server terugvalt op de standaardfoto, maar een leeg vak terwijl de
+     foto laadt hoort geen wit gat te zijn. */
+  background:
+    repeating-linear-gradient(
+      135deg,
+      var(--paper-2) 0 10px,
+      var(--paper) 10px 20px
+    );
+}
+
+.vtk-design .ag-media img {
+  object-fit: cover;
+}
+
+.vtk-design .ag-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Het klikvlak van de hele rij. Ligt onder de ster (die staat op z-index 1), dus
+   een tik op de ster duidt aan dat je komt en opent het evenement niet. */
+.vtk-design .ag-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 18px;
+}
+
+.vtk-design .ag-row:focus-within {
+  border-color: var(--line-2);
+}
+
+.vtk-design .ag-link:focus-visible::after {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* Dezelfde ster als op de homepagekaarten: groot genoeg om op een telefoon te
+   raken (Apple en Google vragen allebei minstens 44 px) zonder als knop op te
+   vallen. Het evenement is het onderwerp, dit is een handeling ernaast. */
+.vtk-design .ag-star {
+  position: relative;
+  z-index: 1;
+  display: inline-grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  color: var(--muted);
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.vtk-design .ag-star::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+.vtk-design .ag-star:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+/* Aangeduid: geel, de kleur die op deze site "actief" betekent. */
+.vtk-design .ag-star[aria-pressed="true"] {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.vtk-design .ag-star[data-pending] {
+  opacity: 0.6;
+}
+
+.vtk-design .ag-star:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (max-width: 960px) {
+  .vtk-design .ag-row {
+    grid-template-columns: 68px minmax(0, 1fr) auto;
+    grid-template-areas:
+      "media media media"
+      "date title star"
+      "tag tag tag";
+    gap: 14px;
+    padding: 16px;
+  }
+
+  .vtk-design .ag-row:hover {
+    padding: 16px;
+  }
+
+  .vtk-design .ag-media {
+    grid-area: media;
+    aspect-ratio: 16 / 9;
+  }
+
+  .vtk-design .ag-date {
+    grid-area: date;
+  }
+
+  .vtk-design .ag-title {
+    grid-area: title;
+  }
+
+  .vtk-design .ag-tag {
+    grid-area: tag;
+    justify-self: start;
+  }
+
+  .vtk-design .ag-star {
+    grid-area: star;
+  }
+
+  /* Het pijltje is decoratie naast een kaart die in haar geheel aanklikbaar is;
+     op een telefoon is die ruimte de titel meer waard. */
+  .vtk-design .ag-go {
+    display: none;
   }
 }

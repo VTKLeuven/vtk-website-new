@@ -46,6 +46,7 @@ export function EventStar({
   loginHref,
   labels,
   className,
+  onChanged,
 }: {
   eventId: string;
   /** De naam van het evenement, enkel voor de schermlezer. */
@@ -55,6 +56,12 @@ export function EventStar({
   loginHref: string;
   labels: EventStarLabels;
   className: string;
+  /**
+   * Laat een lijst die dezelfde evenementen zelf in de hand houdt meeschuiven,
+   * bijvoorbeeld de kalender: daar staat naast de ster ook een teller en een
+   * voorvertoning van hetzelfde evenement.
+   */
+  onChanged?: (interested: boolean) => void;
 }) {
   const [interested, setInterested] = useState(initialInterested);
   const [pending, startTransition] = useTransition();
@@ -86,6 +93,7 @@ export function EventStar({
       onClick={() => {
         const next = !interested;
         setInterested(next);
+        onChanged?.(next);
         startTransition(async () => {
           const data = new FormData();
           data.set("eventId", eventId);
@@ -94,6 +102,7 @@ export function EventStar({
           const result = await setEventInterestAction(SAVE_IDLE, data);
           if (result.status === "error") {
             setInterested(!next);
+            onChanged?.(!next);
             showToast({ message: labels.failed, variant: "error", duration: 0 });
           }
         });

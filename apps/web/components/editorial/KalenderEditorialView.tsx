@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { markdownToPlainText } from "@/lib/markdown";
 import { CalendarSubscribe } from "@/components/site/CalendarSubscribe";
 import { Markdown } from "@/components/ui/Markdown";
 import { EventInterest } from "@/components/calendar/EventInterest";
+import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar";
 import type { ViewerInterest } from "@/lib/calendar/interest";
 import {
   monthGridCells,
@@ -37,6 +39,10 @@ type ApiEvent = {
       colour: string;
       audience: string | null;
     }>;
+    /** De cover van het evenement; de server koos de standaardfoto al als er geen eigen foto is. */
+    image: string;
+    /** `object-position` van de gekozen uitsnede, of `null` bij de standaardfoto. */
+    imagePosition: string | null;
     /**
      * Hoeveel mensen aanduidden dat ze komen, of `null` zolang het er te weinig
      * zijn. De drempel zit aan de serverkant (zie lib/calendar/interest.ts), dus
@@ -99,8 +105,6 @@ export function KalenderEditorialView({
     agendaSub: string;
     subscribeTitle: string;
     subscribeSub: string;
-    prevEvents: string;
-    nextMonth: string;
     all: string;
     audienceFilters: string;
     onlyMyAudiences: string;
@@ -471,10 +475,62 @@ export function KalenderEditorialView({
         ? monthEvents.length
         : monthOnlyEvents.length;
 
+  const starLabels: EventStarLabels = {
+    mark: locale === "nl" ? "Ik kom naar dit evenement" : "I am coming to this event",
+    marked: locale === "nl" ? "Je komt naar dit evenement" : "You are coming to this event",
+    signIn:
+      locale === "nl"
+        ? "Meld je aan om aan te duiden dat je komt"
+        : "Sign in to mark that you are coming",
+    failed:
+      locale === "nl"
+        ? "Aanduiden lukte niet. Probeer het straks opnieuw."
+        : "Marking this did not work. Try again in a moment.",
+  };
+
+  /**
+   * De ster in een lijstrij houdt zijn eigen stand bij; dit trekt de rest van de
+   * pagina mee, zodat de teller en een openstaande voorvertoning van hetzelfde
+   * evenement niet achterblijven. Bestaande alumnigegevens blijven staan: de ster
+   * zet enkel de markering aan of uit.
+   */
+  function starChanged(e: ApiEvent, interested: boolean) {
+    const previous = e.extendedProps.viewerInterest;
+    markInterest(
+      e.id,
+      interested
+        ? previous.kind !== "none"
+          ? previous
+          : {
+              kind: "member",
+              displayName: null,
+              graduationYear: null,
+              wasInVtk: false,
+              showName: false,
+              showGraduationYear: false,
+              showWasInVtk: false,
+            }
+        : { kind: "none" },
+    );
+  }
+
   /**
    * Eén rij in een evenementenlijst. Gedeeld door de "eerstvolgend"-lijst onder
    * het raster en de maandlijst, zodat beide dezelfde labels en dezelfde
    * kleurlogica houden.
+   *
+   * De rij toont de affiche van het evenement en niet meer de eerste alinea van
+   * de beschrijving: die liep over vijf regels, zei zelden wat het evenement is,
+   * en duwde de rijen zo ver uit elkaar dat er nog drie op een scherm pasten.
+   *
+   * Een klik gaat rechtstreeks naar de eventpagina. De voorvertoning blijft waar
+   * ze wél iets toevoegt: in het raster en de weekweergave staat hoogstens een
+   * afgekapte titel in een cel, hier staat alles al.
+   *
+   * Daarom is de rij een `article` en geen `a`: een knop in een anker is
+   * ongeldige HTML en op een telefoon opent de ster dan de eventpagina. De titel
+   * is de link en spant zich over de kaart (`.ag-link::after`); de ster ligt
+   * erboven.
    */
   function renderRow(e: ApiEvent) {
     // Het label rechts toont het thema. De doelgroep staat al bij de titel, dus
@@ -483,20 +539,31 @@ export function KalenderEditorialView({
     const d = new Date(e.start);
     const dateLocale = locale === "nl" ? "nl-BE" : "en-GB";
     const going = interestLine(e);
+    const title = pickTitle(e);
     return (
-      <a
-        key={e.id}
-        href={eventHref(e)}
-        className="ag-row"
-        onClick={(event) => openPreview(event, e)}
-      >
+      <article key={e.id} className="ag-row">
         <div className="ag-date">
           <b>{String(d.getDate()).padStart(2, "0")}</b>
           {d.toLocaleDateString(dateLocale, { month: "short" })} ·{" "}
           {d.toLocaleDateString(dateLocale, { weekday: "short" })}
         </div>
+        <span className="ag-media" aria-hidden="true">
+          <Image
+            src={e.extendedProps.image}
+            alt=""
+            fill
+            sizes="(max-width: 960px) 100vw, 220px"
+            style={
+              e.extendedProps.imagePosition
+                ? { objectPosition: e.extendedProps.imagePosition }
+                : undefined
+            }
+          />
+        </span>
         <div className="ag-title">
-          {pickTitle(e)}
+          <a href={eventHref(e)} className="ag-link">
+            {title}
+          </a>
           {audienceCategories(e).map((a) => (
             <span
               key={a.slug}
@@ -512,7 +579,6 @@ export function KalenderEditorialView({
           </small>
           {going ? <span className="ev-going">{going}</span> : null}
         </div>
-        <div className="ag-desc">{pickDesc(e) || pickGroup(e)}</div>
         <div
           className="ag-tag"
           style={
@@ -527,29 +593,31 @@ export function KalenderEditorialView({
         >
           {cat ? categoryName(cat) : pickGroup(e)}
         </div>
-        <div className="ag-go">→</div>
-      </a>
+        {/* De ster houdt zijn eigen stand bij; de sleutel laat hem opnieuw
+            beginnen wanneer dit evenement elders van stand wisselt, bijvoorbeeld
+            in de voorvertoning of na een verse fetch. Zonder dat blijft de ster
+            in de lijst achter op wat de gebruiker net in de modal aanduidde. */}
+        <EventStar
+          key={`${e.id}:${e.extendedProps.interested}`}
+          eventId={e.id}
+          title={title}
+          interested={e.extendedProps.interested}
+          signedIn={signedIn}
+          loginHref={`${base}/inloggen?next=${encodeURIComponent(eventHref(e))}`}
+          labels={starLabels}
+          className="ag-star"
+          onChanged={(interested) => starChanged(e, interested)}
+        />
+        <div className="ag-go" aria-hidden>
+          →
+        </div>
+      </article>
     );
   }
 
-  const periodNav = (
-    <div
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        marginTop: 32,
-        flexWrap: "wrap",
-        gap: 12,
-      }}
-    >
-      <button type="button" className="btn btn-ghost arrow" onClick={() => shiftPeriod(-1)}>
-        {view === "week" ? (locale === "nl" ? "Vorige week" : "Previous week") : labels.prevEvents}
-      </button>
-      <button type="button" className="btn btn-primary arrow" onClick={() => shiftPeriod(1)}>
-        {view === "week" ? (locale === "nl" ? "Volgende week" : "Next week") : labels.nextMonth}
-      </button>
-    </div>
-  );
+  // De knoppen "vorige/volgende maand" onder elke lijst zijn weg: bovenaan
+  // staan dezelfde pijlen, en die blijven bij het bladeren in beeld terwijl deze
+  // pas onder de laatste rij verschenen.
 
   /**
    * De voorvertoning. Toont wat een cel niet kwijt kan: de volledige titel, een
@@ -1122,7 +1190,6 @@ export function KalenderEditorialView({
                   );
                 })}
               </section>
-              {periodNav}
             </div>
           </div>
         )}
@@ -1141,7 +1208,6 @@ export function KalenderEditorialView({
               ) : (
                 <div className="agenda-list">{agendaEvents.slice(0, 8).map(renderRow)}</div>
               )}
-              {periodNav}
             </div>
           </section>
         )}
@@ -1168,7 +1234,6 @@ export function KalenderEditorialView({
               ) : (
                 <div className="agenda-list">{monthOnlyEvents.map(renderRow)}</div>
               )}
-              {periodNav}
             </div>
           </section>
         )}

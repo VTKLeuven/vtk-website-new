@@ -2,6 +2,9 @@ import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@vtk/db";
 import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
+import { getDefaultEventImage } from "@/lib/defaultEventImage";
+import { focusPosition } from "@/lib/imageFocus";
+import { publicUrl } from "@/lib/storage";
 import { publicInterestCounts, viewerInterests } from "@/lib/calendar/interest";
 import { getCurrentSession } from "@/lib/session";
 
@@ -68,12 +71,17 @@ export async function GET(request: Request) {
   // `viewerInterests` geeft uitsluitend de rij van de huidige sessie of het
   // huidige gastcookie terug.
   const session = await getCurrentSession();
-  const [counts, mine] = await Promise.all([
+  const [counts, mine, defaultImage] = await Promise.all([
     publicInterestCounts(events.map((e) => e.id)),
     viewerInterests(
       events.map((e) => e.id),
       session?.user.id ?? null,
     ),
+    // De lijst onder de kalender toont de cover van het evenement in plaats van
+    // een afgekapte beschrijving. Welke foto een evenement zonder eigen cover
+    // krijgt, is een instelling (/admin/home); de browser kan dat niet weten en
+    // daarom kiest de server de fallback al.
+    getDefaultEventImage(),
   ]);
 
   const payload = events.map((e) => ({
@@ -94,6 +102,12 @@ export async function GET(request: Request) {
       descriptionNl: e.descriptionNl,
       descriptionEn: e.descriptionEn,
       categories: e.categories.map((c) => c.category),
+      image: publicUrl(e.imageKey) ?? defaultImage,
+      // Enkel de eigen foto draagt een gekozen uitsnede; de standaardfoto blijft
+      // gecentreerd.
+      imagePosition: e.imageKey
+        ? focusPosition({ x: e.imageFocusX, y: e.imageFocusY })
+        : null,
       interestedCount: counts.get(e.id) ?? null,
       viewerInterest: mine.get(e.id) ?? { kind: "none" },
       interested: mine.has(e.id),

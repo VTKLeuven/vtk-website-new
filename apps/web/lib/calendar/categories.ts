@@ -55,8 +55,6 @@ export function calendarLabels(locale: Locale) {
     subscribeSub: nl
       ? "Blijft vanzelf up-to-date in je agenda"
       : "Stays up to date in your calendar automatically",
-    prevEvents: nl ? "Vorige maand" : "Previous month",
-    nextMonth: nl ? "Volgende maand" : "Next month",
     all: nl ? "Alle" : "All",
     audienceFilters: nl ? "Doelgroepen" : "Target audiences",
     onlyMyAudiences: nl ? "Afstemmen op mijn profiel" : "Tailor to my profile",
