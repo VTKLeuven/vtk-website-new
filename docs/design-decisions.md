@@ -1717,18 +1717,33 @@ kaart van de categoriepagina te zien.
   `p`-override en niet in een `img`-override: een `<figure>` binnen een `<p>` is
   ongeldige HTML en de browser breekt de alinea dan zelf open, waarna React over
   het verschil met de server-uitvoer struikelt.
-- **Wat er beweegt, en wat niet.** Kopjes (woord na woord), tussentitels (als
-  blok), foto's (van links of van rechts, om en om), hun bijschrift, het gele
-  streepje onder een sectiekopje dat zichzelf tekent, en een gele
-  leesvoortgangsbalk onder de sitekop. Niet: knoppen, tabellen, lijsten, de rail
-  en alles in de admin. Beweging hoort bij het lezen van een tekst, niet bij het
+- **Wat er beweegt, en wat niet.** De paginatitel (woord na woord bij het
+  laden), de kopfoto (trager dan de pagina), kopjes (woord na woord, met een
+  lichte kanteling), tussentitels (als blok), foto's (van links of van rechts,
+  om en om, en ondertussen langzaam uitzoomend), hun bijschrift, regels van een
+  opsomming, de rail van een citaat, het gele streepje onder een sectiekopje en
+  de leesvoortgangsbalk. Niet: knoppen, tabellen, de rail naast de tekst en
+  alles in de admin. Beweging hoort bij het lezen van een tekst, niet bij het
   bedienen van een scherm.
+- **Twee animaties op één element vragen de losse `translate`/`scale`/`rotate`
+  in plaats van `transform`.** De foto schuift binnen én zoomt uit; als beide
+  animaties `transform` schrijven, wint de laatste en verdwijnt de andere
+  stilzwijgend. Let er ook op dat een `animation-name` met één waarde de tweede
+  animatie weggooit.
 - **De accentkleur wordt meer gebruikt, geen nieuwe kleuren.** Het palet is drie
-  neutralen en één accent; levendigheid komt van verhouding en beweging. Vandaar
-  het gele streepje per sectie, het streepje bij een bijschrift en de
-  voortgangsbalk. Banden die tussen de alinea's van kleur wisselen zijn niet
-  gebouwd, om dezelfde reden als bij het formulierpaneel: een band van rand tot
-  rand kan niet tussen twee alinea's staan en overheerst een korte pagina.
+  neutralen en één accent; levendigheid komt van verhouding en beweging. Het
+  geel komt terug als de lijn onder een sectiekopje (geel vooraan, daarna een
+  haarlijn over de kolom), als ruit in een opsomming, als markeerstift onder
+  vetgedrukte tekst, als rail van een citaat, bij een bijschrift en als
+  leesvoortgang. De eerste alinea is groter en in navy: een pagina begint met
+  een stem in plaats van met een muur. Banden die tussen de alinea's van kleur
+  wisselen zijn niet gebouwd, om dezelfde reden als bij het formulierpaneel: een
+  band van rand tot rand kan niet tussen twee alinea's staan en overheerst een
+  korte pagina.
+- **De markeerstift is een inset box-shadow met `box-decoration-break: clone`**,
+  geen gradient en geen absoluut gepositioneerd laagje. Een pseudo-element over
+  de bounding box van vetgedrukte tekst die over twee regels breekt, legt één
+  blok over allebei de regels; `clone` geeft elk stuk zijn eigen streep.
 
 ### Vallen waar we in gelopen zijn
 
@@ -1751,6 +1766,11 @@ kaart van de categoriepagina te zien.
 - **Enkel `opacity` en `transform`.** Die twee draaien op de compositor, naast de
   hoofdthread. `width`, `filter` of `top` animeren zet de layout elke frame
   opnieuw op.
+- **Een bereik eindigt binnen `entry`, niet binnen `cover`.** `cover 34%` ligt
+  voorbij het punt waarop een element volledig in beeld staat. Kan de pagina
+  niet verder scrollen (een korte pagina, het laatste blok onderaan), dan komt
+  de tijdlijn daar nooit en blijft dat blok halfdoorzichtig staan. Dit stond er
+  eerst wél zo in en viel pas op bij het uittesten op een korte pagina.
 - **De animaties hangen aan `.vtk-motion` (PageView) en niet aan elke
   `.prose-vtk`.** Die klasse staat ook op een aankondiging, op de hulptekst bij
   een formulierveld en op het voorbeeldvenster van de editor. Dat laatste is een

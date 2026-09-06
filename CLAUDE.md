@@ -298,7 +298,9 @@ the design language into the application instead of copying mockup content.
   support shows a blank page), animate only `opacity` and `transform`, use
   `overflow-x: clip` and never `hidden` around sideways motion (`hidden` makes a
   scroll container and breaks the sticky rail), and nest everything in
-  `@media (prefers-reduced-motion: no-preference)`. Motion belongs to reading a
+  `@media (prefers-reduced-motion: no-preference)`. End every `animation-range`
+  inside `entry`, never inside `cover`: a page that cannot scroll further leaves
+  anything ranged past full visibility half-faded forever. Motion belongs to reading a
   text: not on buttons, tables, the rail, or anywhere in admin. See
   `docs/design-decisions.md` for what was rejected.
 - Content pages (`PageView`): dark head with a breadcrumb to the category, then
