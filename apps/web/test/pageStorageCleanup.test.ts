@@ -229,7 +229,7 @@ describe("kaartfoto beheren vanuit Header", () => {
   });
 });
 
-describe("kaartfoto beheren vanuit Pagina's", () => {
+describe("de foto van een pagina beheren vanuit Pagina's", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.requireSession.mockResolvedValue({
@@ -241,21 +241,84 @@ describe("kaartfoto beheren vanuit Pagina's", () => {
     mocks.pageFindUnique.mockResolvedValue({
       titleNl: "Sportdag",
       imageKey: "images/oud.jpg",
+      imageCaptionNl: "De vorige foto",
+      imageCaptionEn: null,
+      imageFocusX: 0.5,
+      imageFocusY: 0.5,
       editorRoles: [],
     });
   });
 
-  it("bewaart dezelfde categoriekaartfoto en ruimt de vorige upload op", async () => {
+  it("bewaart de foto van de pagina en ruimt de vorige upload op", async () => {
     const form = new FormData();
     form.set("id", "page_1");
     form.set("imageKey", "images/nieuw.jpg");
+    form.set("captionNl", "Sportdag 2026");
+    form.set("imageFocusX", "0.2");
+    form.set("imageFocusY", "0.8");
 
     const result = await savePageImageAction(SAVE_IDLE, form);
 
     expect(result.status).toBe("success");
     expect(mocks.pageUpdate).toHaveBeenCalledWith({
       where: { id: "page_1" },
-      data: { imageKey: "images/nieuw.jpg" },
+      data: {
+        imageKey: "images/nieuw.jpg",
+        imageCaptionNl: "Sportdag 2026",
+        imageCaptionEn: null,
+        imageFocusX: 0.2,
+        imageFocusY: 0.8,
+      },
+    });
+    expect(mocks.deleteObject).toHaveBeenCalledWith("images/oud.jpg");
+  });
+
+  it("bewaart een nieuw bijschrift zonder de foto opnieuw te uploaden", async () => {
+    // De actie sloeg vroeger niets op zodra de key gelijk bleef. Met een
+    // bijschrift en een uitsnede ernaast zou een verlegd punt dan stil verloren
+    // gaan, en de foto mag daarbij zeker niet uit de opslag verdwijnen.
+    const form = new FormData();
+    form.set("id", "page_1");
+    form.set("imageKey", "images/oud.jpg");
+    form.set("captionNl", "Sportdag 2026");
+
+    const result = await savePageImageAction(SAVE_IDLE, form);
+
+    expect(result.status).toBe("success");
+    expect(mocks.pageUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          imageKey: "images/oud.jpg",
+          imageCaptionNl: "Sportdag 2026",
+        }),
+      }),
+    );
+    expect(mocks.deleteObject).not.toHaveBeenCalled();
+  });
+
+  it("wist het bijschrift en de uitsnede wanneer de foto weggaat", async () => {
+    // Anders bleef het bijschrift van de verwijderde foto staan en kwam het
+    // terug zodra iemand een nieuwe uploadde.
+    const form = new FormData();
+    form.set("id", "page_1");
+    form.set("imageKey", "");
+    form.set("imageKey__cleared", "1");
+    form.set("captionNl", "Sportdag 2026");
+    form.set("imageFocusX", "0.2");
+    form.set("imageFocusY", "0.8");
+
+    const result = await savePageImageAction(SAVE_IDLE, form);
+
+    expect(result.status).toBe("success");
+    expect(mocks.pageUpdate).toHaveBeenCalledWith({
+      where: { id: "page_1" },
+      data: {
+        imageKey: null,
+        imageCaptionNl: null,
+        imageCaptionEn: null,
+        imageFocusX: 0.5,
+        imageFocusY: 0.5,
+      },
     });
     expect(mocks.deleteObject).toHaveBeenCalledWith("images/oud.jpg");
   });

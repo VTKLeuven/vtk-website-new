@@ -4,7 +4,12 @@ import { categoryTiles } from '@/lib/categoryTiles';
 const page = (
   id: string,
   slug: string,
-  extra: Partial<{ excerptNl: string | null; imageKey: string | null }> = {}
+  extra: Partial<{
+    excerptNl: string | null;
+    imageKey: string | null;
+    imageFocusX: number;
+    imageFocusY: number;
+  }> = {}
 ) => ({
   id,
   slug,
@@ -13,6 +18,8 @@ const page = (
   excerptNl: null,
   excerptEn: null,
   imageKey: null,
+  imageFocusX: 0.5,
+  imageFocusY: 0.5,
   ...extra,
 });
 
@@ -82,6 +89,21 @@ describe('categoryTiles', () => {
 
     expect(tiles[0].imageKey).toBe('pages/shiften.jpg');
     expect(tiles[1].imageKey).toBe('images/piano.jpg');
+  });
+
+  it('geeft het uitsnedepunt van een pagina mee en laat een menu-item op het midden', () => {
+    // De kaart is bijna vierkant en de plaat boven de pagina is 2,45:1, dus het
+    // punt moet mee tot in de tegel. Een menu-item heeft geen kolom om er een te
+    // bewaren: `null` betekent hier het midden, precies wat de browser zonder
+    // `object-position` doet.
+    const tiles = categoryTiles({
+      slug: 'info',
+      pages: [page('p1', 'shiften', { imageFocusX: 0.2, imageFocusY: 0.8 })],
+      links: [link('l1', '/piano', 'images/piano.jpg')],
+    });
+
+    expect(tiles[0].focus).toEqual({ x: 0.2, y: 0.8 });
+    expect(tiles[1].focus).toBeNull();
   });
 
   it('valt terug op de Nederlandse titel wanneer een pagina geen Engelse heeft', () => {

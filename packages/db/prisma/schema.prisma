@@ -1325,11 +1325,21 @@ model Page {
   contentMdEn           String?
   excerptNl             String?
   excerptEn             String?
-  // Foto op de kaart van deze pagina op de categoriepagina (`/info`, ...),
-  // uploadbaar in /admin/header en /admin/paginas. Zelfde soort veld als
-  // `HeaderTabLink.imageKey`: een storage-key, geen URL. Zonder foto toont de
-  // kaart het technische patroon uit de huisstijl.
+  // Foto van deze pagina, uploadbaar in /admin/header en /admin/paginas.
+  // Zelfde soort veld als `HeaderTabLink.imageKey`: een storage-key, geen URL.
+  // Ze verschijnt twee keer: als plaat boven de tekst van de pagina zelf, en op
+  // de kaart van deze pagina op de categoriepagina. Zonder foto tonen allebei
+  // het technische patroon uit de huisstijl.
   imageKey              String?
+  // Bijschrift onder de plaat. Leeg blijft geldig: dan staat er enkel de foto.
+  // Zonder foto wordt het niet getoond, want er is dan niets om bij te schrijven.
+  imageCaptionNl        String?
+  imageCaptionEn        String?
+  // Het punt waar elke uitsnede van die foto rond draait, zie `lib/imageFocus`.
+  // De plaat is 2,45:1 en de categoriekaart bijna vierkant, dus één vaste
+  // uitsnede bestaat niet.
+  imageFocusX           Float     @default(0.5)
+  imageFocusY           Float     @default(0.5)
   // Optionele knop naast de titel, dezelfde velden als op HeaderTab. Voor een
   // pagina die een aparte app beschrijft (Uitleendienst -> logistiek, Shiften ->
   // de shiftenlijst) hoort die app één klik ver te staan en niet ergens

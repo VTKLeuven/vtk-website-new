@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
 import { categoryTiles } from "@/lib/categoryTiles";
+import { focusPosition } from "@/lib/imageFocus";
 import { hasLocale } from "@/lib/locale";
 import { loadHeaderTabWithPages } from "@/lib/pageQueries";
 import { buildMetadata } from "@/lib/seo";
@@ -80,7 +81,13 @@ export default async function HeaderOverviewPage({ params }: { params: Params })
                     aria-hidden="true"
                   >
                     {photo && (
-                      <Image src={photo} alt="" fill sizes="(max-width: 520px) 104px, 148px" />
+                      <Image
+                        src={photo}
+                        alt=""
+                        fill
+                        sizes="(max-width: 520px) 104px, 148px"
+                        style={tile.focus ? { objectPosition: focusPosition(tile.focus) } : undefined}
+                      />
                     )}
                   </span>
                   <div className="vtk-tile-body">

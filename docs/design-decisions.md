@@ -5939,3 +5939,47 @@ Naast het aanduidvlak staan de drie echte uitsneden van de site
 pas na het opslaan wat de homepage ervan maakt. Om dezelfde reden volgt de
 duimnagel van de upload erboven hetzelfde punt; twee kadertjes van dezelfde foto
 die elkaar tegenspreken zijn erger dan één.
+
+## De foto van een contentpagina: een plaat boven de tekst, geen behang onder de kop
+
+Een contentpagina kan haar eigen foto hebben (`Page.imageKey`, uploadbaar in de
+pagina-editor). Die foto lag onder de donkere paginakop, onder een navy waas die
+aan de titelkant op 94% stond en pas rechts opklaarde. In een band van zo'n 260
+pixels hoog bleef daar een donkere streep van over waar met moeite iets in te
+herkennen viel. De foto stond er, maar niemand zag ze.
+
+**De foto staat nu onbewerkt boven de tekst, als brede plaat van 2,45:1.** De
+paginakop toont weer op élke pagina het technische patroon, zonder uitzondering,
+dus `/tickets`, de categoriepagina's en de contentpagina's hebben opnieuw exact
+dezelfde aanhef. Wat daarmee wegvalt is de vraag "welke van de twee koppen krijgt
+deze pagina", en die vraag hoefde niemand te beantwoorden.
+
+Waarom dit en niet de drie andere richtingen die naast elkaar bekeken zijn:
+
+- **De waas alleen hoger of anders leggen** (een hogere band met de waas onderaan
+  verankerd, zoals de hero op de homepage) toont de foto wel, maar zet de titel
+  nog altijd óp de foto. Bij een drukke of lichte foto blijft dat elke keer
+  spannend, en dat is niet iets wat een redacteur kan zien voor ze publiceert.
+- **De band splitsen** (links navy met de titel, rechts de foto tot aan de rand)
+  lost dat op en was de tweede keuze, maar het is wél een tweede soort
+  paginakop naast de bestaande.
+- **De foto als kaart in de band, over de onderrand hangend**, geeft de kleinste
+  foto van de vier en vraagt marge onder de band, dus de kop kan dan niet meer
+  strak tegen de tekst staan.
+
+De plaat loopt over de volle inhoudsbreedte, dus ook over de rail heen. Een foto
+die stopt waar de tekstkolom stopt, leest als een illustratie bij de eerste
+alinea in plaats van als de foto van de pagina.
+
+**Er hoort een bijschrift bij** (`Page.imageCaptionNl` / `imageCaptionEn`,
+optioneel). Een foto zonder woorden boven een artikel is decoratie; met een regel
+erbij is het inhoud, en het zegt wie of wat er op staat. Het bijschrift is meteen
+de alt-tekst: zonder bijschrift is de plaat een decoratieve foto met een lege
+alt, want de titel erboven zegt al waar de pagina over gaat.
+
+**En er hoort een uitsnedepunt bij** (`Page.imageFocusX` / `imageFocusY`,
+dezelfde `lib/imageFocus` als bij een eventfoto). De plaat is 2,45:1, de plaat op
+een telefoon 16/10 en de kaart op de categoriepagina bijna vierkant: één vaste
+uitsnede bestaat hier niet. Het midden is de standaard, precies wat de browser
+zonder die waarde al doet, dus bestaande pagina's veranderen niet van uitsnede
+tot iemand het punt verlegt. Zie ook "De uitsnede van een eventfoto".

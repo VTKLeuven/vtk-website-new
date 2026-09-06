@@ -1,11 +1,73 @@
-/* De werkingsblokken van een contentpagina: de bredere zijkolom, de agenda van
-   de post, haar ploeg en de andere pagina's uit de categorie.
+/* De blokken van een contentpagina die niet op elke pagina staan: de fotoplaat
+   boven de tekst, en de werkingsblokken (de bredere zijkolom, de agenda van de
+   post, haar ploeg en de andere pagina's uit de categorie).
  *
  * Alles hier is optioneel. Een pagina zonder post, zonder categorie en zonder
  * downloads valt terug op de smalle inhoudsopgave (`.vtk-page-rail` in
  * vtk-base.css) en blijft de pagina die ze vandaag is; deze regels raken haar
  * dan niet. Zie docs/design-decisions.md, "De contentpagina van een werking".
  */
+
+/* ---------------------------------------------------------------------------
+   Fotoplaat
+   --------------------------------------------------------------------------- */
+
+/* De eigen foto van de pagina, tussen de donkere kop en de tekst. Ze lag ooit
+   onder de kop zelf, onder een waas die aan de titelkant op 94% stond: de foto
+   was er wel, maar er viel niets van te zien. Hier draagt ze geen tekst en heeft
+   ze dus geen waas nodig; ze loopt over de volle inhoudsbreedte, dus ook over de
+   rail, want een foto die stopt waar de tekstkolom stopt leest als een
+   illustratie bij de eerste alinea in plaats van als de foto van de pagina.
+   Zie docs/design-decisions.md, "De foto van een contentpagina". */
+.vtk-page-plate {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: clamp(24px, 3vw, 40px) clamp(20px, 3vw, 36px) 0;
+}
+
+/* 2,45:1: breed genoeg om als plaat te lezen in plaats van als kaart, en laag
+   genoeg om de tekst niet onder de vouw te duwen. Het gestreepte patroon eronder
+   vult de plaat zolang de foto laadt, dezelfde terugval als een tegel zonder
+   foto (`.vtk-tile-media`). */
+.vtk-page-plate-frame {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 2.45 / 1;
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  background: repeating-linear-gradient(-45deg, var(--paper-2) 0 8px, var(--paper) 8px 16px);
+}
+
+.vtk-page-plate-frame img {
+  object-fit: cover;
+}
+
+/* Het bijschrift is een onderschrift en geen tussentitel: klein, gedempt, en op
+   de rand van de plaat uitgelijnd. */
+.vtk-page-plate figcaption {
+  margin-top: 10px;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* Onder een plaat begint de tekst dichter: de plaat heeft haar eigen lucht al
+   meegebracht, en samen met de volle staartpadding van de schil zou er een gat
+   van bijna tachtig pixels tussen de foto en de eerste regel vallen. */
+.vtk-page-body.has-plate {
+  padding-top: clamp(20px, 2.4vw, 30px);
+}
+
+/* Op een telefoon is 2,45:1 een streep van honderd pixels hoog. Daar wordt de
+   plaat een gewone liggende foto; het uitsnedepunt uit de admin houdt in beide
+   verhoudingen hetzelfde in beeld. */
+@media (max-width: 760px) {
+  .vtk-page-plate-frame {
+    aspect-ratio: 16 / 10;
+    border-radius: 18px;
+  }
+}
 
 /* ---------------------------------------------------------------------------
    Kop

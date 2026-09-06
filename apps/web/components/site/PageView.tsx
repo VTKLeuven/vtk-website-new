@@ -178,13 +178,12 @@ export async function PageView({
     />
   ) : null;
 
-  // De foto van de pagina draagt de kop; zonder foto blijft het technische
-  // patroon uit de huisstijl staan. `encodeURI` omdat de sleutel uit de admin
-  // komt en hier in een `url()` belandt.
-  const headPhoto = publicUrl(page.imageKey);
-  const headStyle = headPhoto
-    ? ({ "--page-head-photo": `url("${encodeURI(headPhoto)}")` } as CSSProperties)
-    : undefined;
+  // De foto van de pagina staat als plaat tussen de kop en de tekst. Ze lag ooit
+  // onder de kop zelf, onder een waas die aan de titelkant op 94% stond; daar
+  // was er niets van te zien. De kop toont nu op elke pagina het technische
+  // patroon, zonder uitzondering.
+  const platePhoto = publicUrl(page.imageKey);
+  const plateCaption = pick(page.imageCaptionNl ?? "", page.imageCaptionEn ?? "", locale);
 
   // Staat er onder de tekst nog iets, dan mag de staartpadding van de tekstkolom
   // krimpen: de band sluit de pagina af in plaats van de lege ruimte.
@@ -198,7 +197,7 @@ export async function PageView({
 
   return (
     <div className="vtk-page">
-      <header className={`vtk-page-head${headPhoto ? " has-photo" : ""}`} style={headStyle}>
+      <header className="vtk-page-head">
         <div>
           {tab ? (
             <div className="vtk-page-kicker">
@@ -238,10 +237,28 @@ export async function PageView({
         ) : null}
       </header>
 
+      {platePhoto ? (
+        <figure className="vtk-page-plate">
+          <div className="vtk-page-plate-frame">
+            <Image
+              src={platePhoto}
+              alt={plateCaption}
+              fill
+              sizes="(min-width: 1240px) 1168px, 100vw"
+              style={{
+                objectPosition: focusPosition({ x: page.imageFocusX, y: page.imageFocusY }),
+              }}
+              priority
+            />
+          </div>
+          {plateCaption ? <figcaption>{plateCaption}</figcaption> : null}
+        </figure>
+      ) : null}
+
       <div
         className={`vtk-page-shell vtk-page-body${
           showRail ? (hasWerkingRail ? " has-rail has-side" : " has-rail") : ""
-        }${hasBands ? " has-bands" : ""}`}
+        }${platePhoto ? " has-plate" : ""}${hasBands ? " has-bands" : ""}`}
       >
         <div className="vtk-page-content">
           {content.kind === "markdown" ? (
@@ -455,7 +472,18 @@ export async function PageView({
                           aria-hidden="true"
                         >
                           {photo && (
-                            <Image src={photo} alt="" fill sizes="(max-width: 520px) 104px, 120px" />
+                            <Image
+                              src={photo}
+                              alt=""
+                              fill
+                              sizes="(max-width: 520px) 104px, 120px"
+                              style={{
+                                objectPosition: focusPosition({
+                                  x: sibling.imageFocusX,
+                                  y: sibling.imageFocusY,
+                                }),
+                              }}
+                            />
                           )}
                         </span>
                         <div className="vtk-tile-body">

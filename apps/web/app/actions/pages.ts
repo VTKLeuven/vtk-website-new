@@ -10,6 +10,7 @@ import { canEditPageContent, canPublishPages } from '@/lib/pageAccess';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 import { isEditableDestination } from '@/lib/href';
 import { readImageField, resolveImageKey } from '@/lib/imageField';
+import { CENTER_FOCUS, readImageFocus } from '@/lib/imageFocus';
 import { describeChanges, logAudit } from '@/lib/audit';
 import { deleteObject } from '@vtk/storage';
 
@@ -47,6 +48,17 @@ function parseErrorCode(error: z.ZodError): ContentErrorCode {
     : 'INVALID_INPUT';
 }
 
+/**
+ * Een optioneel tekstveld uit een formulier: leeg of enkel spaties is `null` en
+ * niet de lege string, zodat "geen bijschrift" in de database één vorm heeft.
+ */
+function readCaption(formData: FormData, name: string): string | null {
+  const value = formData.get(name);
+  if (typeof value !== 'string') return null;
+  const trimmed = value.trim();
+  return trimmed === '' ? null : trimmed.slice(0, 200);
+}
+
 /** `P2002` op een bepaald veld: de unieke constraint die Prisma noemt. */
 function isUniqueViolation(err: unknown, field: string): boolean {
   return (
@@ -66,7 +78,7 @@ const PAGE_FIELD_LABELS: Record<string, string> = {
   titleEn: 'Engelse titel',
   excerptNl: 'samenvatting',
   excerptEn: 'Engelse samenvatting',
-  imageKey: 'foto op de categoriepagina',
+  imageKey: 'foto van de pagina',
   ctaLabelNl: 'knoptekst',
   ctaLabelEn: 'Engelse knoptekst',
   ctaUrl: 'knoplink',
@@ -497,12 +509,13 @@ export async function savePageGroupAction(
 }
 
 /**
- * De foto op de categoriekaart opslaan vanuit de gewone pagina-editor.
+ * De foto van de pagina opslaan vanuit de gewone pagina-editor: de upload zelf,
+ * haar bijschrift en het punt waar elke uitsnede rond draait.
  *
  * Dit is bewust een aparte actie naast de markdown-save: een upload mag niet
  * pas bewaard worden wanneer iemand daarna toevallig ook de volledige inhoud
  * opslaat. Dezelfde paginatoegang geldt als voor de inhoud; /admin/header kan
- * hetzelfde veld daarnaast blijven beheren met `pages.manage`.
+ * de foto daarnaast blijven beheren met `pages.manage`.
  */
 export async function savePageImageAction(
   _prev: SaveState,
@@ -524,6 +537,10 @@ export async function savePageImageAction(
     select: {
       titleNl: true,
       imageKey: true,
+      imageCaptionNl: true,
+      imageCaptionEn: true,
+      imageFocusX: true,
+      imageFocusY: true,
       editorRoles: { select: { roleId: true } },
     },
   });
@@ -531,26 +548,50 @@ export async function savePageImageAction(
   if (!canEditPageContent(session, page)) throw new Error('FORBIDDEN');
 
   const imageKey = resolveImageKey(image, page.imageKey);
-  if (imageKey === page.imageKey) return saveOk();
+  // Zonder foto is er niets om bij te schrijven of rond te snijden; anders bleef
+  // het bijschrift van een verwijderde foto in de database achter en kwam het
+  // terug zodra iemand een nieuwe uploadt.
+  const captionNl = imageKey ? readCaption(formData, 'captionNl') : null;
+  const captionEn = imageKey ? readCaption(formData, 'captionEn') : null;
+  const focus = imageKey ? readImageFocus(formData) : CENTER_FOCUS;
+
+  const changed =
+    imageKey !== page.imageKey ||
+    captionNl !== page.imageCaptionNl ||
+    captionEn !== page.imageCaptionEn ||
+    focus.x !== page.imageFocusX ||
+    focus.y !== page.imageFocusY;
+  if (!changed) return saveOk();
 
   await prisma.page.update({
     where: { id },
-    data: { imageKey },
+    data: {
+      imageKey,
+      imageCaptionNl: captionNl,
+      imageCaptionEn: captionEn,
+      imageFocusX: focus.x,
+      imageFocusY: focus.y,
+    },
   });
 
+  // Het logboek noemt de foto enkel wanneer die zelf veranderde: een verlegd
+  // punt of een aangepast bijschrift is een verfijning, geen nieuwe foto.
   await logAudit({
     action: 'update',
     entity: 'page',
     entityId: id,
     target: page.titleNl,
-    summary: imageKey
-      ? page.imageKey
-        ? 'foto op de categoriepagina vervangen'
-        : 'foto op de categoriepagina toegevoegd'
-      : 'foto op de categoriepagina verwijderd',
+    summary:
+      imageKey === page.imageKey
+        ? 'bijschrift of uitsnede van de foto aangepast'
+        : imageKey
+          ? page.imageKey
+            ? 'foto van de pagina vervangen'
+            : 'foto van de pagina toegevoegd'
+          : 'foto van de pagina verwijderd',
   });
 
-  if (page.imageKey) await deleteStoredObjects([page.imageKey]);
+  if (page.imageKey && page.imageKey !== imageKey) await deleteStoredObjects([page.imageKey]);
   revalidatePath('/', 'layout');
   return saveOk();
 }

@@ -151,6 +151,8 @@ export type SiblingPage = {
   excerptNl: string | null;
   excerptEn: string | null;
   imageKey: string | null;
+  imageFocusX: number;
+  imageFocusY: number;
 };
 
 /**
@@ -177,6 +179,8 @@ export const loadSiblingPages = cache(
         excerptNl: true,
         excerptEn: true,
         imageKey: true,
+        imageFocusX: true,
+        imageFocusY: true,
       },
     }),
 );

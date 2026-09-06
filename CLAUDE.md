@@ -289,13 +289,20 @@ the design language into the application instead of copying mockup content.
   `.vtk-page-title`/`.vtk-page-subtitle`/`.vtk-page-kicker` keep dark text
   outside that band (they are also used on light backgrounds); only inside
   `.vtk-page-head` do they invert.
-  - One exception, on content pages only: with `.has-photo` the band carries the
-    page's own photo under the navy scrim instead of the pattern. The pattern is
-    then off, never both: two drawings over each other read as noise. `/tickets`,
-    the category pages and `/praesidium` keep the pattern.
+    There is no photo variant of this band: a content page's own photo sat under
+    the navy scrim here and was invisible, and it now opens the text as
+    `.vtk-page-plate` instead (see below). Every page therefore gets the same
+    opener, pattern included.
 - Content pages (`PageView`): dark head with a breadcrumb to the category, then
-  the text column with an optional rail beside it holding the page outline (H1,
-  H2 and H3, anchors from `lib/pageOutline.ts`) and the downloads. The rail only
+  the page's own photo as a wide unscrimmed plate (`.vtk-page-plate`, 2.45:1, the
+  full content width so it runs over the rail too, 16/10 below 760px), then the
+  text column with an optional rail beside it holding the page outline (H1, H2
+  and H3, anchors from `lib/pageOutline.ts`) and the downloads.
+  - The plate carries an optional caption (`Page.imageCaptionNl/En`) that doubles
+    as the alt text, and crops around `Page.imageFocusX/Y` (`lib/imageFocus.ts`),
+    the same point the category card uses. Do not put the photo back under the
+    page head, and do not give the plate a scrim: it carries no text, so it needs
+    none. See `docs/design-decisions.md`. The rail only
   appears when there are at least two headings, a download, a linked form, or a
   linked post; it sticks on desktop and moves above the text on narrow screens.
   - **A page can hang on a post** (`Page.groupId`, set in the page editor). Then

@@ -30,6 +30,10 @@ type EditorPage = {
   titleNl: string;
   titleEn: string | null;
   imageKey: string | null;
+  imageCaptionNl: string | null;
+  imageCaptionEn: string | null;
+  imageFocusX: number;
+  imageFocusY: number;
   /** De post achter deze pagina, of null wanneer ze bij geen enkele hoort. */
   groupId: string | null;
   category: { slug: string; label: string } | null;
@@ -207,6 +211,9 @@ export function PageContentEditor({
         pageId={page.id}
         pageTitle={page.titleNl}
         imageKey={page.imageKey}
+        captionNl={page.imageCaptionNl}
+        captionEn={page.imageCaptionEn}
+        focus={{ x: page.imageFocusX, y: page.imageFocusY }}
       />
 
       <PageWerkingCard

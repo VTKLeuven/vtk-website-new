@@ -97,6 +97,10 @@ export default async function AdminPageEditor({
         titleNl: page.titleNl,
         titleEn: page.titleEn,
         imageKey: page.imageKey,
+        imageCaptionNl: page.imageCaptionNl,
+        imageCaptionEn: page.imageCaptionEn,
+        imageFocusX: page.imageFocusX,
+        imageFocusY: page.imageFocusY,
         groupId: page.groupId,
         category: page.headerTab
           ? { slug: page.headerTab.slug, label: locale === "nl" ? page.headerTab.labelNl : page.headerTab.labelEn }

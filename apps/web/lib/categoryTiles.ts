@@ -13,6 +13,7 @@
  */
 
 import { isExternalUrl } from "./href";
+import { toImageFocus, type ImageFocus } from "./imageFocus";
 
 /** Een item dat als kaart op de categoriepagina komt. */
 export type CategoryTile = {
@@ -32,6 +33,12 @@ export type CategoryTile = {
    * patroon uit de huisstijl.
    */
   imageKey: string | null;
+  /**
+   * Het punt waar de uitsnede van die foto rond draait. Enkel pagina's kennen
+   * het: een menu-item heeft geen kolom om het in te bewaren, en valt dus terug
+   * op het midden, precies wat de browser zonder deze waarde doet.
+   */
+  focus: ImageFocus | null;
 };
 
 type TilePage = {
@@ -42,6 +49,8 @@ type TilePage = {
   excerptNl: string | null;
   excerptEn: string | null;
   imageKey: string | null;
+  imageFocusX: number;
+  imageFocusY: number;
   order?: number;
 };
 
@@ -69,6 +78,7 @@ export function categoryTiles(tab: {
       excerptNl: page.excerptNl,
       excerptEn: page.excerptEn,
       imageKey: page.imageKey,
+      focus: toImageFocus(page.imageFocusX, page.imageFocusY),
       order: page.order ?? 0,
     })),
     ...tab.links.map((link) => ({
@@ -80,13 +90,14 @@ export function categoryTiles(tab: {
       excerptNl: null,
       excerptEn: null,
       imageKey: link.imageKey,
+      focus: null,
       order: link.order ?? 0,
     })),
   ];
 
   return tiles
     .sort((a, b) => a.order - b.order)
-    .map(({ key, labelNl, labelEn, href, external, excerptNl, excerptEn, imageKey }) => ({
+    .map(({ key, labelNl, labelEn, href, external, excerptNl, excerptEn, imageKey, focus }) => ({
       key,
       labelNl,
       labelEn,
@@ -95,5 +106,6 @@ export function categoryTiles(tab: {
       excerptNl,
       excerptEn,
       imageKey,
+      focus,
     }));
 }
