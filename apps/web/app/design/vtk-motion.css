@@ -19,6 +19,12 @@
  *    rail naast de tekst. Zie ook de `html`-regel in globals.css, die om
  *    dezelfde reden `clip` gebruikt.
  *
+ * 4. **Een bereik eindigt binnen `entry`, niet binnen `cover`.** `cover 34%`
+ *    ligt voorbij het punt waarop een element volledig in beeld staat. Kan de
+ *    pagina niet verder scrollen (een korte pagina, het laatste blok), dan komt
+ *    de tijdlijn daar nooit en blijft dat blok halfdoorzichtig staan. `entry
+ *    100%` is per definitie bereikt zodra het element volledig binnen is.
+ *
  * De animaties gelden enkel binnen `.vtk-motion` (gezet door PageView), niet
  * overal waar `.prose-vtk` staat: in het voorbeeldvenster van de editor zit de
  * tekst in een eigen scrollcontainer, waar een `view()`-tijdlijn een kopje
@@ -32,10 +38,57 @@
   --motion-inset: var(--vtk-header-height, 73px);
 }
 
+/* `translate`/`rotate`/`scale` als losse eigenschappen en niet als één
+   `transform`: zo kunnen twee animaties tegelijk op hetzelfde element lopen
+   (een foto schuift binnen én zoomt uit) zonder elkaar te overschrijven. */
 @keyframes vtk-rise {
   from {
     opacity: 0;
-    transform: translateY(0.6em);
+    translate: 0 0.6em;
+  }
+}
+
+/* Woorden komen met een lichte kanteling binnen; dat leest speelser dan recht
+   omhoog schuiven. */
+@keyframes vtk-rise-tilt {
+  from {
+    opacity: 0;
+    translate: 0 0.7em;
+    rotate: -3deg;
+  }
+}
+
+@keyframes vtk-slide-in {
+  from {
+    opacity: 0;
+    translate: -0.9rem 0;
+  }
+}
+
+/* Continu, over de hele doorloop: de foto zoomt langzaam uit terwijl ze
+   voorbijkomt. Staat los van de binnenkomst hierboven. */
+@keyframes vtk-settle {
+  from {
+    scale: 1.06;
+  }
+}
+
+/* De kopfoto beweegt trager dan de pagina. */
+@keyframes vtk-parallax {
+  from {
+    translate: 0 -3.5%;
+    scale: 1.1;
+  }
+  to {
+    translate: 0 3.5%;
+    scale: 1.1;
+  }
+}
+
+/* De gele rail van een citaat tekent zichzelf van boven naar beneden. */
+@keyframes vtk-draw-down {
+  from {
+    scale: 1 0;
   }
 }
 
@@ -80,29 +133,37 @@
 @keyframes vtk-fly-in-left {
   from {
     opacity: 0;
-    transform: translateX(-7%) scale(0.985);
+    translate: -9% 0;
   }
 }
 
 @keyframes vtk-fly-in-right {
   from {
     opacity: 0;
-    transform: translateX(7%) scale(0.985);
+    translate: 9% 0;
   }
 }
 
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
     .vtk-motion .vtk-figure img {
-      animation: vtk-fly-in-left linear both;
-      animation-timeline: view(block var(--motion-inset) auto);
-      animation-range: entry 6% cover 34%;
+      animation:
+        vtk-fly-in-left linear both,
+        vtk-settle linear both;
+      animation-timeline:
+        view(block var(--motion-inset) auto),
+        view(block var(--motion-inset) auto);
+      animation-range:
+        entry 5% entry 70%,
+        cover 0% cover 100%;
     }
 
     /* `nth-of-type` telt enkel figuren tussen hun broers en zussen, dus dit is
        de tweede foto van de tekst en niet het tweede element. */
     .vtk-motion .vtk-figure:nth-of-type(even) img {
-      animation-name: vtk-fly-in-right;
+      /* Allebei de namen: één waarde zou de tweede animatie hierboven
+         (het uitzoomen) stilzwijgend weglaten. */
+      animation-name: vtk-fly-in-right, vtk-settle;
     }
 
     /* Het bijschrift volgt de foto met een korte vertraging: eerst het beeld,
@@ -110,7 +171,7 @@
     .vtk-motion .vtk-figure figcaption {
       animation: vtk-rise linear both;
       animation-timeline: view(block var(--motion-inset) auto);
-      animation-range: entry 14% cover 40%;
+      animation-range: entry 20% entry 80%;
     }
   }
 }
@@ -130,23 +191,40 @@
   @media (prefers-reduced-motion: no-preference) {
     .vtk-motion .vtk-word {
       display: inline-block;
-      animation: vtk-rise linear both;
+      transform-origin: 0 85%;
+      animation: vtk-rise-tilt linear both;
       animation-timeline: view(block var(--motion-inset) auto);
-      animation-range: entry calc(10% + min(var(--i), 7) * 3%) cover
-        calc(38% + min(var(--i), 7) * 3%);
+      animation-range: entry calc(12% + min(var(--i), 7) * 4%) entry
+        calc(55% + min(var(--i), 7) * 4%);
     }
 
     .vtk-motion [data-reveal="block"] {
       animation: vtk-rise linear both;
       animation-timeline: view(block var(--motion-inset) auto);
-      animation-range: entry 10% cover 40%;
+      animation-range: entry 12% entry 75%;
+    }
+
+    /* Opsommingen komen regel na regel van links binnen. Geen volgnummer
+       nodig: elk item staat op zijn eigen hoogte, dus de tijdlijn van het item
+       zelf zorgt al voor het na-elkaar. */
+    .vtk-motion .prose-vtk :is(ul, ol) > li {
+      animation: vtk-slide-in linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry 10% entry 70%;
+    }
+
+    /* De gele rail van een citaat tekent zichzelf naar beneden. */
+    .vtk-motion .prose-vtk blockquote::before {
+      animation: vtk-draw-down linear both;
+      animation-timeline: view(block var(--motion-inset) auto);
+      animation-range: entry 15% entry 75%;
     }
 
     /* Het gele streepje tekent zichzelf onder het kopje. */
     .vtk-motion .prose-vtk h2::after {
       animation: vtk-draw linear both;
       animation-timeline: view(block var(--motion-inset) auto);
-      animation-range: entry 16% cover 42%;
+      animation-range: entry 25% entry 85%;
     }
   }
 }
@@ -168,5 +246,35 @@
 
   .vtk-page-head .vtk-page-subtitle {
     animation-delay: 120ms;
+  }
+}
+
+/* De foto in de paginakop beweegt trager dan de pagina zelf. De schaal zit in
+   de keyframes en niet als vaste `scale`: zonder scroll-driven animations blijft
+   de foto dan gewoon onvergroot staan in plaats van bijgesneden. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .vtk-page-head-photo img {
+      animation: vtk-parallax linear both;
+      animation-timeline: view(block auto);
+      animation-range: cover 0% cover 100%;
+    }
+  }
+}
+
+/* De paginatitel komt woord na woord binnen bij het laden. Bij het laden en
+   niet op een tijdlijn: de kop staat al in beeld, dus een `view()`-tijdlijn is
+   daar meteen voorbij haar bereik. */
+@media (prefers-reduced-motion: no-preference) {
+  .vtk-page-head .vtk-word {
+    display: inline-block;
+    transform-origin: 0 85%;
+    animation: vtk-rise-tilt 620ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: calc(70ms + var(--i) * 55ms);
+  }
+
+  /* Anders zou de titel als geheel én per woord binnenkomen. */
+  .vtk-page-head .vtk-page-title:has(.vtk-word) {
+    animation: none;
   }
 }

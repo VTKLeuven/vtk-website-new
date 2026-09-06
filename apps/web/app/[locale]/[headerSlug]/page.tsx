@@ -9,6 +9,7 @@ import { hasLocale } from "@/lib/locale";
 import { loadHeaderTabWithPages } from "@/lib/pageQueries";
 import { buildMetadata } from "@/lib/seo";
 import { publicUrl } from "@/lib/storage";
+import { revealWords } from "@/lib/revealWords";
 
 type Params = Promise<{ locale: string; headerSlug: string }>;
 
@@ -51,7 +52,7 @@ export default async function HeaderOverviewPage({ params }: { params: Params })
     <div className="vtk-page">
       <header className="vtk-page-head">
         <div>
-          <h1 className="vtk-page-title">{pick(tab.labelNl, tab.labelEn, locale)}</h1>
+          <h1 className="vtk-page-title">{revealWords(pick(tab.labelNl, tab.labelEn, locale))}</h1>
           {intro && <p className="vtk-page-subtitle">{intro}</p>}
         </div>
         {showCta && (

@@ -9,6 +9,7 @@ import {
 } from "@/lib/analytics";
 import { isExternalUrl, withLocaleBase } from "@/lib/href";
 import { publicUrl } from "@/lib/storage";
+import { revealWords } from "@/lib/revealWords";
 import { renderTiptap } from "@/lib/tiptap-render";
 import { Markdown } from "@/components/ui/Markdown";
 import { PageOutline } from "@/components/site/PageOutline";
@@ -172,7 +173,7 @@ export async function PageView({
               <span>{title}</span>
             </div>
           ) : null}
-          <h1 className="vtk-page-title">{title}</h1>
+          <h1 className="vtk-page-title">{revealWords(title)}</h1>
           {excerpt ? <p className="vtk-page-subtitle">{excerpt}</p> : null}
         </div>
         {showCta ? (

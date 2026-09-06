@@ -1,14 +1,8 @@
-import {
-  Children,
-  cloneElement,
-  isValidElement,
-  type CSSProperties,
-  type ReactElement,
-  type ReactNode,
-} from "react";
+import { Children, cloneElement, isValidElement, type ReactElement, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { headingId, headingText } from "@/lib/pageOutline";
+import { revealWords } from "@/lib/revealWords";
 
 /**
  * Gedeelde markdown-renderer: dezelfde uitvoer op de publieke pagina's (server
@@ -39,10 +33,7 @@ function soleImage(children: ReactNode): ReactElement<ImageProps> | null {
 }
 
 /**
- * Een kopje in losse woorden, elk met hun volgnummer, zodat ze bij het scrollen
- * na elkaar kunnen binnenkomen (`--i` in vtk-motion.css). De spaties blijven
- * gewone tekst tussen de spans: zo breekt de regel normaal af en kopieer je nog
- * steeds "Kanweek 2026" en niet "Kanweek2026".
+ * Een kopje in losse woorden, of null wanneer er niets te splitsen valt.
  *
  * Enkel voor een kopje dat uit platte tekst bestaat. Staat er een link of een
  * vetgedrukt woord in, dan is er niets te splitsen zonder die opmaak te
@@ -52,16 +43,7 @@ function splitWords(children: ReactNode): ReactNode[] | null {
   const items = Children.toArray(children);
   const text = items.every((child) => typeof child === "string") ? items.join("") : null;
   if (text === null || !text.trim()) return null;
-  let index = 0;
-  return text.split(/(\s+)/).map((part, i) => {
-    if (!part || /^\s+$/.test(part)) return part;
-    const style = { "--i": index++ } as CSSProperties;
-    return (
-      <span key={i} className="vtk-word" style={style}>
-        {part}
-      </span>
-    );
-  });
+  return revealWords(text);
 }
 
 export function Markdown({
