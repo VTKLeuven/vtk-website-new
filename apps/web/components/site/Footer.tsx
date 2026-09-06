@@ -110,7 +110,7 @@ export async function Footer({ locale }: { locale: Locale }) {
                 </a>
               </li>
               <li>
-                <a href="https://www.linkedin.com/company/vtk-leuven" rel="noopener noreferrer" target="_blank">
+                <a href="https://www.linkedin.com/company/vtk" rel="noopener noreferrer" target="_blank">
                   {f.linkLinkedIn}
                 </a>
               </li>
