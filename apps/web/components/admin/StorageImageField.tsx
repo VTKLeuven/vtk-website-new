@@ -1,5 +1,7 @@
 "use client";
 
+import { imageUploadError, imageUploadSizeError } from "@/lib/imageUpload";
+
 import Image from "next/image";
 import { useRef, useState } from "react";
 import { Label } from "@vtk/ui";
@@ -80,7 +82,9 @@ export function StorageImageField({
   useReportFormBusy(uploading);
 
   async function onFile(file: File) {
-    setErr(null);
+    const sizeError = imageUploadSizeError(file, locale, "image");
+    setErr(sizeError);
+    if (sizeError) return;
     setUploading(true);
     try {
       const form = new FormData();
@@ -89,7 +93,7 @@ export function StorageImageField({
       if (formId) form.append("formId", formId);
       const res = await fetch("/api/admin/upload", { method: "POST", body: form });
       if (!res.ok) {
-        setErr(nl ? "Upload mislukt; de foto is niet bewaard." : "Upload failed; the photo was not saved.");
+        setErr(imageUploadError(locale, res.status, "image"));
         return;
       }
       const data = (await res.json()) as { key: string; url: string | null };
@@ -98,7 +102,7 @@ export function StorageImageField({
       setCleared(false);
       onChange?.(data.key);
     } catch {
-      setErr(nl ? "Upload mislukt; de foto is niet bewaard." : "Upload failed; the photo was not saved.");
+      setErr(imageUploadError(locale));
     } finally {
       setUploading(false);
     }
@@ -192,7 +196,8 @@ export function StorageImageField({
                 disabled={uploading}
                 onChange={(e) => {
                   const f = e.target.files?.[0];
-                  if (f) onFile(f);
+                  if (f) void onFile(f);
+                  e.target.value = "";
                 }}
                 className="sr-only"
               />
@@ -209,7 +214,7 @@ export function StorageImageField({
             )}
           </div>
           {helpText && <p className="text-xs text-[#5c667f]">{helpText}</p>}
-          {err && <p className="text-xs text-red-600">{err}</p>}
+          {err && <p role="alert" className="text-xs text-red-600">{err}</p>}
         </div>
       </div>
     </div>

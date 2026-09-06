@@ -50,6 +50,9 @@ const nextConfig: NextConfig = {
     root: monorepoRoot,
   },
   experimental: {
+    // Proxy otherwise truncates uploads at 10 MB, before our upload routes can
+    // validate them. Match the action limit, above the 46 MB multipart limit.
+    proxyClientMaxBodySize: "50mb",
     // Allow uploads bigger than the default 1 MiB body limit for server actions.
     serverActions: {
       bodySizeLimit: "50mb",

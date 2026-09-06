@@ -82,3 +82,14 @@ describe("uploads mogen groter zijn dan de standaard van 1 MiB", () => {
     expect(Number(promised![1]) * 1024 * 1024).toBeLessThanOrEqual(action!);
   });
 });
+
+
+it("buffers complete photo uploads through Next proxy, including multipart overhead", () => {
+  const config = read("apps/web/next.config.ts");
+  const proxy = config.match(/proxyClientMaxBodySize:\s*["'](\d+)mb["']/);
+  const route = read("apps/web/app/api/admin/upload/route.ts");
+  const requestLimit = route.match(/MAX_REQUEST_BYTES\s*=\s*(\d+) \* 1024 \* 1024/);
+  expect(proxy).not.toBeNull();
+  expect(requestLimit).not.toBeNull();
+  expect(Number(proxy![1])).toBeGreaterThan(Number(requestLimit![1]));
+});

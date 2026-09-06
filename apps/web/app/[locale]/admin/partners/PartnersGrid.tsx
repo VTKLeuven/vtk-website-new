@@ -1,5 +1,7 @@
 "use client";
 
+import { imageUploadError, imageUploadSizeError } from "@/lib/imageUpload";
+
 import { useRef, useState, useTransition } from "react";
 import { Input, Label } from "@vtk/ui";
 import { getDictionary } from "@vtk/i18n";
@@ -144,7 +146,9 @@ function EditPartnerModal({
   const [err, setErr] = useState<string | null>(null);
 
   async function onFile(file: File) {
-    setErr(null);
+    const sizeError = imageUploadSizeError(file, locale, "logo");
+    setErr(sizeError);
+    if (sizeError) return;
     setUploading(true);
     try {
       const form = new FormData();
@@ -152,12 +156,14 @@ function EditPartnerModal({
       form.append("kind", "logo");
       const res = await fetch("/api/admin/upload", { method: "POST", body: form });
       if (!res.ok) {
-        setErr(nl ? "Upload mislukt" : "Upload failed");
+        setErr(imageUploadError(locale, res.status, "logo"));
         return;
       }
       const data = (await res.json()) as { key: string; url: string | null };
       setLogoKey(data.key);
       setPreviewUrl(data.url);
+    } catch {
+      setErr(imageUploadError(locale));
     } finally {
       setUploading(false);
     }
@@ -223,7 +229,7 @@ function EditPartnerModal({
                 className="text-xs"
               />
               {uploading && <p className="mt-1 text-xs text-zinc-500">{nl ? "Bezig..." : "Uploading..."}</p>}
-              {err && <p className="mt-1 text-xs text-red-600">{err}</p>}
+              {err && <p role="alert" className="mt-1 text-xs text-red-600">{err}</p>}
             </div>
           </div>
 

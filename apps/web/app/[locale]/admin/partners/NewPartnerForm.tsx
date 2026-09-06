@@ -1,5 +1,7 @@
 "use client";
 
+import { imageUploadError, imageUploadSizeError } from "@/lib/imageUpload";
+
 import { useState } from "react";
 import { Input, Label } from "@vtk/ui";
 import { getDictionary } from "@vtk/i18n";
@@ -13,17 +15,23 @@ export function NewPartnerForm({ locale }: { locale: "nl" | "en" }) {
   const dict = getDictionary(locale);
 
   async function onFile(file: File) {
-    setErr(null);
-    const form = new FormData();
-    form.append("file", file);
-    form.append("kind", "logo");
-    const res = await fetch("/api/admin/upload", { method: "POST", body: form });
-    if (!res.ok) {
-      setErr("Upload failed");
-      return;
+    const sizeError = imageUploadSizeError(file, locale, "logo");
+    setErr(sizeError);
+    if (sizeError) return;
+    try {
+      const form = new FormData();
+      form.append("file", file);
+      form.append("kind", "logo");
+      const res = await fetch("/api/admin/upload", { method: "POST", body: form });
+      if (!res.ok) {
+        setErr(imageUploadError(locale, res.status, "logo"));
+        return;
+      }
+      const data = (await res.json()) as { key: string };
+      setLogoKey(data.key);
+    } catch {
+      setErr(imageUploadError(locale));
     }
-    const data = (await res.json()) as { key: string };
-    setLogoKey(data.key);
   }
 
   return (
@@ -51,7 +59,7 @@ export function NewPartnerForm({ locale }: { locale: "nl" | "en" }) {
           className="text-sm"
         />
         {logoKey && <p className="text-xs text-green-600 mt-1">✓ uploaded</p>}
-        {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
+        {err && <p role="alert" className="text-xs text-red-600 mt-1">{err}</p>}
       </div>
       <div><Label>Name</Label><Input name="name" required /></div>
       <div><Label>URL</Label><Input name="url" placeholder="https://..." /></div>
