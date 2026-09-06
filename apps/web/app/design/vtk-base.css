@@ -365,19 +365,97 @@
   margin-bottom: 0;
 }
 
-/* Een kort geel streepje onder elk sectiekopje: de accentkleur op de plaats
-   waar de tekst uit elkaar valt. Bewust hier en niet bij `.prose-vtk` in
-   globals.css, want die klasse staat ook op een aankondiging, op de hulptekst
-   bij een formulierveld en in een dialoog; daar is dit ruis. Bij het scrollen
-   tekent het streepje zichzelf (vtk-motion.css). */
+/* De redactionele opmaak van een contentpagina. Alles hieronder staat bewust
+   op `.vtk-page-content` en niet op `.prose-vtk` in globals.css: die klasse
+   staat ook op een aankondiging, op de hulptekst bij een formulierveld en in
+   een dialoog, en daar is dit ruis.
+
+   Het palet blijft drie neutralen en één accent; de levendigheid komt van hoe
+   vaak en hoe groot dat accent terugkomt. Bij het scrollen tekenen deze
+   elementen zichzelf (vtk-motion.css). */
+
+/* Sectiekopje: een lijn over de hele kolom die vooraan geel is en daarna een
+   haarlijn wordt, zodat elke sectie ook echt als scheiding leest. */
 .vtk-page-content .prose-vtk h2::after {
   content: "";
   display: block;
-  width: 2.75rem;
   height: 2px;
   margin-top: 0.55rem;
-  background: var(--yellow);
+  background: linear-gradient(to right, var(--yellow) 0 2.75rem, var(--line) 2.75rem 100%);
   transform-origin: 0 50%;
+}
+
+/* De eerste alinea is de aanhef: groter en in het donkerder navy, zodat een
+   pagina met een stem begint in plaats van met een muur. */
+.vtk-page-content > .prose-vtk > p:first-child {
+  color: var(--navy);
+  font-size: 1.15rem;
+  line-height: 1.62;
+}
+
+/* Gele ruit in plaats van een grijze bolletjeslijst. */
+.vtk-page-content .prose-vtk ul {
+  list-style: none;
+  padding-left: 1.35rem;
+}
+
+.vtk-page-content .prose-vtk ul > li {
+  position: relative;
+}
+
+.vtk-page-content .prose-vtk ul > li::before {
+  content: "";
+  position: absolute;
+  left: -1rem;
+  top: 0.62em;
+  width: 7px;
+  height: 7px;
+  background: var(--yellow);
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.vtk-page-content .prose-vtk ol > li::marker {
+  color: var(--navy);
+  font-weight: 700;
+}
+
+/* Vetgedrukt krijgt een markeerstift-streep. Een inset box-shadow en geen
+   gradient, en `box-decoration-break: clone` zodat een stuk tekst dat over twee
+   regels breekt twee streepjes krijgt in plaats van één blok over beide. */
+.vtk-page-content .prose-vtk :is(p, li) > strong {
+  padding: 0 0.12em;
+  border-radius: 2px;
+  box-shadow: inset 0 -0.5em 0 rgba(255, 210, 63, 0.5);
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+}
+
+/* Een citaat is een pull quote: lichtblauw vlak, dikke gele rail, donkerder en
+   groter dan de lopende tekst. */
+.vtk-page-content .prose-vtk blockquote {
+  position: relative;
+  margin: 1.7rem 0;
+  padding: 1.05rem 1.2rem 1.05rem 1.45rem;
+  border: 0;
+  border-radius: 14px;
+  background: var(--paper-2);
+  color: var(--navy);
+  font-size: 1.1rem;
+  font-style: normal;
+  line-height: 1.55;
+}
+
+.vtk-page-content .prose-vtk blockquote::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background: var(--yellow);
+  border-radius: 4px 0 0 4px;
+  transform-origin: 50% 0;
 }
 
 @media (min-width: 980px) {
