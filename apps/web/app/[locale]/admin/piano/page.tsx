@@ -178,8 +178,8 @@ export default async function AdminPianoPage({ params }: { params: Promise<{ loc
         <h2 className="mb-1 text-lg font-semibold">{nl ? "Tekst op de pianopagina" : "Text on the piano page"}</h2>
         <p className="mb-4 text-sm text-[#5c667f]">
           {nl
-            ? "Staat boven de agenda. Hier hoort onder meer de afspraak over de begeleidende brief."
-            : "Shown above the agenda. This is where the accompanying-letter arrangement belongs."}
+            ? "Staat boven de agenda. Hier hoort onder meer de afspraak over de bevestigingsmail."
+            : "Shown above the agenda. This is where the confirmation email arrangement belongs."}
         </p>
         <SaveForm
           action={savePianoInfoAction}

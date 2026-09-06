@@ -64,15 +64,31 @@ export function isSameCalendarDay(a: Date, b: Date): boolean {
 
 export type CalendarInterval = { start: string; end: string; allDay: boolean };
 
-/** All-day end dates are inclusive in our CMS; timed events end exclusively. */
+const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+
+/**
+ * All-day end dates are inclusive in our CMS; timed events end exclusively.
+ *
+ * Evenementen die voor middernacht beginnen en erna eindigen (zoals een cantus
+ * of fakparty) worden enkel over meerdere dagen weergegeven als ze langer dan
+ * 12 uur duren en over meerdere dagen verspreid zijn. Kortere nachtactiviteiten
+ * horen alleen bij hun startdag thuis in het raster.
+ */
 export function eventDayRange(event: CalendarInterval): { first: Date; last: Date } {
   const start = new Date(event.start);
   const end = new Date(event.end);
   const lastInstant = !event.allDay && end > start ? new Date(+end - 1) : end;
-  return {
-    first: new Date(start.getFullYear(), start.getMonth(), start.getDate()),
-    last: new Date(lastInstant.getFullYear(), lastInstant.getMonth(), lastInstant.getDate()),
-  };
+  const first = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const last = new Date(lastInstant.getFullYear(), lastInstant.getMonth(), lastInstant.getDate());
+
+  if (!event.allDay && last > first) {
+    const durationMs = end.getTime() - start.getTime();
+    if (durationMs <= TWELVE_HOURS_MS) {
+      return { first, last: first };
+    }
+  }
+
+  return { first, last };
 }
 
 export function eventOccursOnDay(event: CalendarInterval, day: Date): boolean {

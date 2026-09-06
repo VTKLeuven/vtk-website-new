@@ -548,7 +548,7 @@ feed: de URL draagt geen geheim, en er staan namen van professoren in.
 VTK heeft een eigen piano in lokaal 01.52 van het kasteel, naast de promotiezaal.
 Studenten mogen er gratis op spelen en reserveren daarvoor zelf een tijdslot op
 `/piano`. Op de oude site stond dit op `/reservations/piano`; de afspraken
-(gratis, wekelijks, begeleidende brief) zijn overgenomen, de manier waarop ze
+(gratis, wekelijks, bevestigingsmail als bewijs) zijn overgenomen, de manier waarop ze
 afgedwongen worden niet helemaal. Zie hieronder.
 
 ### Slots bestaan niet als rijen
@@ -587,12 +587,12 @@ in dezelfde week wordt geweigerd met de uitleg dat je eerst moet annuleren.
 - Er is ook een **horizon** (`horizonDays`, standaard 28 dagen): zonder die grens
   zou één iemand het hele jaar kunnen volboeken.
 
-### De begeleidende brief blijft mensenwerk
+### De bevestigingsmail als bewijs
 
-De brief die je bij de vice in Blok 6 haalt en aan de bewaking moet kunnen tonen,
-staat in de tekst boven de agenda (`Setting` `piano.info`, Markdown, beheerd via
-`/admin/piano`) en niet in de flow. We controleren niet of iemand ze heeft: dat
-is een afspraak tussen het lid en de vice, geen toestand die de site kent.
+De bevestigingsmail die je na reservatie ontvangt en aan de bewaking moet kunnen tonen,
+staat vermeld in de tekst boven de agenda (`Setting` `piano.info`, Markdown, beheerd via
+`/admin/piano`) en in het praktische luik. Bij elke reservatie wordt een bevestigingsmail
+verstuurd naar het lid.
 
 ### Uren zichtbaar zonder account, reserveren niet
 

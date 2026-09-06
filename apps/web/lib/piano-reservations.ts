@@ -11,6 +11,7 @@ import {
 } from "@/lib/piano";
 import { getPianoConfig, getPianoRules } from "@/lib/piano-server";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
+import { sendMail } from "@/lib/email";
 
 /**
  * Reserveren en annuleren van een pianoslot, los van het scherm.
@@ -101,6 +102,71 @@ export async function reservePianoSlot(
   }
 
   revalidatePiano();
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { email: true, firstName: true, name: true, locale: true },
+    });
+    if (user?.email) {
+      const isNl = user.locale !== "EN";
+      const dateLocale = isNl ? "nl-BE" : "en-GB";
+      const dayFmt = new Intl.DateTimeFormat(dateLocale, {
+        timeZone: "Europe/Brussels",
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      });
+      const timeFmt = new Intl.DateTimeFormat(dateLocale, {
+        timeZone: "Europe/Brussels",
+        hour: "2-digit",
+        minute: "2-digit",
+      });
+      const dateStr = dayFmt.format(slot.startsAt);
+      const timeStr = `${timeFmt.format(slot.startsAt)} - ${timeFmt.format(slot.endsAt)}`;
+      const name = user.firstName || user.name || "student";
+      const subject = isNl
+        ? `Bevestiging reservatie piano: ${dateStr}`
+        : `Piano booking confirmation: ${dateStr}`;
+      const text = isNl
+        ? [
+            `Dag ${name},`,
+            "",
+            `Je reservatie voor de piano in lokaal 01.52 van het kasteel Arenberg is bevestigd:`,
+            "",
+            `• Datum: ${dateStr}`,
+            `• Tijdstip: ${timeStr}`,
+            `• Locatie: Lokaal 01.52, kasteel Arenberg`,
+            "",
+            `Hou deze bevestigingsmail bij tijdens het spelen: de bewaking kan ernaar vragen als bewijs.`,
+            "",
+            `Groeten,`,
+            `VTK`,
+          ].join("\n")
+        : [
+            `Hi ${name},`,
+            "",
+            `Your reservation for the piano in room 01.52 of Arenberg castle has been confirmed:`,
+            "",
+            `• Date: ${dateStr}`,
+            `• Time: ${timeStr}`,
+            `• Location: Room 01.52, Arenberg castle`,
+            "",
+            `Please keep this confirmation email with you while playing: security may ask for it as proof.`,
+            "",
+            `Best regards,`,
+            `VTK`,
+          ].join("\n");
+
+      await sendMail(
+        { to: user.email, subject, text },
+        { source: "website", throwOnError: false },
+      );
+    }
+  } catch {
+    // Een mislukte mail mag de reservatie zelf nooit blokkeren.
+  }
+
   return slot;
 }
 

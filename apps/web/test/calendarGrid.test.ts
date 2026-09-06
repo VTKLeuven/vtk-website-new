@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   eventOccursOnDay,
+  isMultiDayEvent,
   weekEventSpans,
   rollingSixWeeksGridCells,
   weekGridDays,
@@ -109,5 +110,42 @@ describe('multi-day calendar events', () => {
       { start: 1, end: 3, lane: 1 },
       { start: 3, end: 4, lane: 0 },
     ]);
+  });
+
+  it('treats evening events crossing midnight as single-day if duration is at most 12 hours', () => {
+    // Evening cantus/party from 21:00 to 03:00 (6 hours)
+    const cantus = event('2026-09-07T21:00:00', '2026-09-08T03:00:00', false);
+    expect(isMultiDayEvent(cantus)).toBe(false);
+    expect(eventOccursOnDay(cantus, days[0]!)).toBe(true);
+    expect(eventOccursOnDay(cantus, days[1]!)).toBe(false);
+    expect(weekEventSpans([cantus], days)).toEqual([]);
+  });
+
+  it('treats events crossing midnight lasting exactly 12 hours as single-day', () => {
+    // Overnight event from 20:00 to 08:00 (exactly 12 hours)
+    const twelveHours = event('2026-09-07T20:00:00', '2026-09-08T08:00:00', false);
+    expect(isMultiDayEvent(twelveHours)).toBe(false);
+    expect(eventOccursOnDay(twelveHours, days[0]!)).toBe(true);
+    expect(eventOccursOnDay(twelveHours, days[1]!)).toBe(false);
+    expect(weekEventSpans([twelveHours], days)).toEqual([]);
+  });
+
+  it('treats events crossing midnight as multi-day only if longer than 12 hours', () => {
+    // Overnight marathon from 20:00 to 09:00 (13 hours)
+    const thirteenHours = event('2026-09-07T20:00:00', '2026-09-08T09:00:00', false);
+    expect(isMultiDayEvent(thirteenHours)).toBe(true);
+    expect(eventOccursOnDay(thirteenHours, days[0]!)).toBe(true);
+    expect(eventOccursOnDay(thirteenHours, days[1]!)).toBe(true);
+    expect(weekEventSpans([thirteenHours], days)).toMatchObject([
+      { start: 0, end: 1, lane: 0 },
+    ]);
+  });
+
+  it('treats long events on the same calendar day as single-day', () => {
+    // 14-hour daytime event: 08:00 to 22:00
+    const allDayLong = event('2026-09-07T08:00:00', '2026-09-07T22:00:00', false);
+    expect(isMultiDayEvent(allDayLong)).toBe(false);
+    expect(eventOccursOnDay(allDayLong, days[0]!)).toBe(true);
+    expect(eventOccursOnDay(allDayLong, days[1]!)).toBe(false);
   });
 });

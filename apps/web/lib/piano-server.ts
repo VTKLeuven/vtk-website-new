@@ -31,15 +31,15 @@ export const DEFAULT_PIANO_INFO: PianoInfo = {
     'VTK heeft een eigen piano: je vindt hem in lokaal 01.52 van het kasteel, naast de',
     'promotiezaal. Studenten mogen er gratis gebruik van maken.',
     '',
-    'Vraag vooraf je begeleidende brief bij de vice in Blok 6 (Studentenwijk Arenberg).',
-    'Hou die altijd bij wanneer je gaat spelen: de bewaking kan ernaar vragen.',
+    'Zorg dat je altijd de bevestigingsmail bij hebt die je ontvangt na reservatie.',
+    'Hou die altijd bij wanneer je gaat spelen: de bewaking kan ernaar vragen als bewijs.',
   ].join('\n'),
   bodyEn: [
     "VTK has its own piano: you'll find it in room 01.52 of the castle, next to the",
     'proclamation hall. Students can use it for free.',
     '',
-    'Ask the vice for your accompanying letter in Blok 6 (Studentenwijk Arenberg) first.',
-    'Always carry it with you when you go and play: security may ask for it.',
+    'Make sure you always have the confirmation email you receive after booking.',
+    'Always carry it with you when you go and play: security may ask for it as proof.',
   ].join('\n'),
 };
 
