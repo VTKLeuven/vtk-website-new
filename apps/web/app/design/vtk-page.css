@@ -502,3 +502,119 @@
 /* Exact dezelfde tegels als op de categoriepagina zelf (`.vtk-tile-grid` in
    vtk-base.css): een pagina en haar buren horen er overal hetzelfde uit te zien,
    dus hier staat bewust geen enkele afwijking. */
+
+/* ---------------------------------------------------------------------------
+   Redactionele opmaak van de tekst
+   --------------------------------------------------------------------------- */
+
+/* Alles hieronder staat bewust op `.vtk-page-content` en niet op `.prose-vtk`
+   in globals.css: die klasse staat ook op een aankondiging, op de hulptekst bij
+   een formulierveld en in een dialoog, en daar is dit ruis.
+
+   Het palet blijft drie neutralen en één accent; de levendigheid komt van hoe
+   vaak en hoe groot dat accent terugkomt. Bij het scrollen tekenen deze
+   elementen zichzelf (vtk-motion.css). */
+
+/* Sectiekopje: een gele lijn onder de titel, precies zo breed als de titel
+   zelf. Vandaar `width: fit-content` op het kopje: de lijn is `width: 100%` van
+   een blok dat om de tekst sluit. Een lijn over de hele kolom is bekeken en las
+   als een scheiding tussen twee stukken pagina in plaats van als een streep
+   onder een titel. */
+.vtk-page-content .prose-vtk h2 {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.vtk-page-content .prose-vtk h2::after {
+  content: "";
+  display: block;
+  height: 4px;
+  margin-top: 0.5rem;
+  border-radius: 2px;
+  background: var(--yellow);
+  transform-origin: 0 50%;
+}
+
+/* De eerste alinea is de aanhef: groter en in het donkerder navy, zodat een
+   pagina met een stem begint in plaats van met een muur. */
+.vtk-page-content > .prose-vtk > p:first-child {
+  color: var(--navy);
+  font-size: 1.15rem;
+  line-height: 1.62;
+}
+
+/* Gele ruit in plaats van een grijze bolletjeslijst. */
+.vtk-page-content .prose-vtk ul {
+  list-style: none;
+  padding-left: 1.35rem;
+}
+
+.vtk-page-content .prose-vtk ul > li {
+  position: relative;
+}
+
+.vtk-page-content .prose-vtk ul > li::before {
+  content: "";
+  position: absolute;
+  left: -1rem;
+  top: 0.62em;
+  width: 7px;
+  height: 7px;
+  background: var(--yellow);
+  border-radius: 2px;
+  transform: rotate(45deg);
+}
+
+.vtk-page-content .prose-vtk ol > li::marker {
+  color: var(--navy);
+  font-weight: 700;
+}
+
+/* Vetgedrukt staat in navy, en verder niets: navy tekst met een gele lijn
+   eronder is op deze site de opmaak van een LINK (`.prose-vtk a`), dus dat las
+   als een link die niet klikte. Het onderscheid komt van de kleur plus een
+   golfje door de letters bij het scrollen (vtk-motion.css).
+
+   `position: relative` hoort bij die animatie: de letters staan in spans en de
+   volledige tekst staat ernaast in een `sr-only`-kopie voor screenreaders. Die
+   kopie is absoluut gepositioneerd en moet in dit stukje tekst blijven hangen
+   in plaats van in de eerste de beste gepositioneerde voorouder. */
+.vtk-page-content .prose-vtk :is(p, li) > strong {
+  position: relative;
+  color: var(--navy);
+}
+
+/* De screenreader-kopie mag niet mee gekopieerd worden: zonder dit levert een
+   selectie over deze alinea het vetgedrukte stuk twee keer op. De letters zelf
+   staan wel gewoon in de selectie, dus wie kopieert krijgt de juiste tekst. */
+.vtk-page-content .prose-vtk .vtk-letters .sr-only {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Een citaat is een pull quote: lichtblauw vlak, dikke gele rail, donkerder en
+   groter dan de lopende tekst. */
+.vtk-page-content .prose-vtk blockquote {
+  position: relative;
+  margin: 1.7rem 0;
+  padding: 1.05rem 1.2rem 1.05rem 1.45rem;
+  border: 0;
+  border-radius: 14px;
+  background: var(--paper-2);
+  color: var(--navy);
+  font-size: 1.1rem;
+  font-style: normal;
+  line-height: 1.55;
+}
+
+.vtk-page-content .prose-vtk blockquote::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 4px;
+  background: var(--yellow);
+  border-radius: 4px 0 0 4px;
+  transform-origin: 50% 0;
+}
