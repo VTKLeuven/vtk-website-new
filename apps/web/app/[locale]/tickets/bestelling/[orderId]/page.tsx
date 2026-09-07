@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getOrderForViewer } from "@/lib/ticketing/queries";
+import { paymentMethodChoice } from "@/lib/ticketing/paymentMethods";
 import { hasLocale } from "@/lib/locale";
 import { staticMetadata } from "@/lib/pageMetadata";
 import { OrderStatus } from "@/components/ticketing/public/OrderStatus";
@@ -28,7 +29,11 @@ export default async function TicketOrderPage({ params }: { params: Params }) {
 
   return (
     <main className="vtk-page ticket-order-page">
-      <OrderStatus initialOrder={order} locale={localeParam} />
+      <OrderStatus
+        initialOrder={order}
+        locale={localeParam}
+        paymentChoice={paymentMethodChoice(localeParam)}
+      />
     </main>
   );
 }

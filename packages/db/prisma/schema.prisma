@@ -1896,6 +1896,13 @@ model TicketPayment {
   amountCents        Int
   currency           String              @default("EUR")
   checkoutUrl        String?
+  /// Sprong naar de betaalapp, voor een provider zonder gehoste checkoutpagina
+  /// (Bancontact). `checkoutUrl` wijst dan naar onze eigen pagina, en die toont
+  /// deze deeplink plus de QR eronder.
+  providerDeeplink   String?
+  /// Door de provider gehoste QR-afbeelding. Optioneel: valt die weg, dan
+  /// tekenen we de QR zelf uit de deeplink.
+  providerQrCodeUrl  String?
   providerStatus     String?
   expiresAt          DateTime?           @db.Timestamptz(3)
   succeededAt        DateTime?           @db.Timestamptz(3)

@@ -470,25 +470,26 @@
   margin-bottom: 0;
 }
 
+/* De sectiekop van de ticketshop volgt de kop van een gewone inhoudspagina:
+   titel met de gele regel eronder (`.prose-vtk h2::after` in vtk-page.css).
+   De genummerde bolletjes die hier stonden waren een decoratief stapnummer, en
+   die horen volgens de stijlregels van de site niet als sierraad bij een sectie. */
 .ticket-section-heading {
-  display: grid;
-  grid-template-columns: 35px minmax(0, 1fr);
-  gap: 14px;
   margin-bottom: 21px;
 }
 
-.ticket-section-heading > span {
-  display: flex;
-  width: 30px;
-  height: 30px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
+.ticket-section-heading h2 {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.ticket-section-heading h2::after {
+  content: "";
+  display: block;
+  height: 4px;
+  margin-top: 0.5rem;
+  border-radius: 2px;
   background: var(--yellow);
-  color: var(--ink);
-  font-family: var(--mono);
-  font-size: 10px;
-  font-weight: 700;
 }
 
 .ticket-section-heading h2 {
@@ -498,7 +499,9 @@
 }
 
 .ticket-section-heading p {
-  margin: 6px 0 0;
+  /* Ruimer dan de 6px van voordien: de gele regel staat nu tussen de titel en
+     deze zin, en die heeft aan weerszijden lucht nodig. */
+  margin: 10px 0 0;
   color: var(--muted);
   font-size: 13px;
 }
@@ -843,7 +846,6 @@
   display: flex;
   min-height: 50px;
   align-items: center;
-  justify-content: space-between;
   border-bottom: 1px solid var(--line);
   padding: 0 18px;
   background: var(--paper-2);
@@ -852,18 +854,6 @@
   text-transform: uppercase;
 }
 
-.ticket-order-summary-head strong {
-  display: flex;
-  width: 26px;
-  height: 26px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  background: var(--yellow);
-  color: var(--ink);
-  font-family: var(--mono);
-  font-size: 11px;
-}
 
 .ticket-order-event,
 .ticket-order-lines,
@@ -1175,10 +1165,13 @@
 }
 
 .ticket-terms-check {
-  margin: 16px 0 2px;
-  padding: 12px;
+  /* Zelfde inspringing als de rest van de kaart (18px): zonder dat liep dit
+     vlak tot tegen de rand terwijl de knop eronder wel insprong, en dan botst
+     de rand van dit vlak op de rand van de kaart. */
+  margin: 16px 18px 12px;
+  padding: 13px;
   border: 1px solid var(--line);
-  border-radius: 6px;
+  border-radius: 8px;
   background: var(--paper);
 }
 
@@ -3076,3 +3069,229 @@
   background: #ffd23f;
   color: #111318;
 }
+
+/* Betaalwijzekeuze op de bestelpagina.
+
+   De volgorde en het gewicht komen uit `lib/ticketing/paymentMethods.ts`; hier
+   staat enkel hoe `primary`, `secondary` en `equal` eruitzien. Op de
+   Nederlandse pagina staat Bancontact groot voorop met Mollie als regel
+   eronder; op de Engelse staan ze even zwaar onder elkaar. */
+
+.ticket-pay-choice {
+  margin-top: 24px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.ticket-pay-choice h2 {
+  margin: 0 0 14px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.ticket-pay-error {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin: 0 0 14px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: var(--ticket-red-soft);
+  color: var(--ticket-red);
+  font-size: 14px;
+}
+
+.ticket-pay-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* "Meer betaalmethodes" is bewust een bescheiden regel en geen tweede knop met
+   hetzelfde gewicht: de voorkeur zit in wat je meteen ziet, niet in kleur. */
+.ticket-pay-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 6px 2px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ticket-pay-more:hover {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ticket-pay-option {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  width: 100%;
+  padding: 15px 17px;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 150ms ease, border-color 150ms ease, transform 150ms ease;
+}
+
+.ticket-pay-option:hover:not(:disabled) {
+  border-color: var(--ink);
+  background: var(--paper-2);
+  transform: translateY(-1px);
+}
+
+.ticket-pay-option:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+
+.ticket-pay-option-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.ticket-pay-option-text strong {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ticket-pay-option-text small {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+
+/* De Bancontact-betaalpagina die we zelf hosten.
+
+   QR en app-knop staan naast elkaar en niet achter een schermbreedte-check:
+   betalen op een laptop met de app op je telefoon is hier het normale geval. */
+
+.ticket-bancontact-head {
+  margin-bottom: 20px;
+}
+
+.ticket-bancontact-head span {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.ticket-bancontact-head h1 {
+  margin: 0 0 8px;
+  font-size: 26px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.ticket-bancontact-head strong {
+  font-size: 20px;
+  color: var(--ink);
+}
+
+.ticket-bancontact-panel {
+  display: grid;
+  /* Twee kolommen die samen niet breder worden dan wat ze te zeggen hebben: de
+     paginabreedte hier volledig uitvullen laat een QR met een knop ernaast in
+     een half leeg vlak liggen. */
+  grid-template-columns: auto minmax(0, 1fr);
+  max-width: 680px;
+  gap: 26px;
+  align-items: center;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.ticket-bancontact-qr {
+  text-align: center;
+}
+
+.ticket-bancontact-qr img {
+  display: block;
+  width: 210px;
+  height: auto;
+  border-radius: 12px;
+}
+
+.ticket-bancontact-qr p,
+.ticket-bancontact-direct p {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.ticket-bancontact-direct p {
+  max-width: 34ch;
+}
+
+.ticket-bancontact-waiting {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  margin-top: 18px;
+  padding: 13px 15px;
+  border-radius: 12px;
+  background: var(--ticket-amber-soft);
+  color: var(--ticket-amber);
+  font-size: 14px;
+}
+
+@media (max-width: 640px) {
+  .ticket-bancontact-panel {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    justify-items: center;
+    text-align: center;
+  }
+
+  /* Op een telefoon is de app-knop de weg, en de QR het alternatief eronder. */
+  .ticket-bancontact-qr {
+    order: 2;
+  }
+
+  .ticket-bancontact-direct {
+    order: 1;
+  }
+
+  .ticket-bancontact-direct p {
+    max-width: none;
+  }
+}
+
+/* Het merkteken links in een betaalwijzeknop.
+
+   Vaste tegelbreedte met `object-fit: contain`: het ene merk levert een breed
+   woordmerk en het andere een vierkant, en zonder vaste breedte springt de
+   tekst ernaast per rij op een andere plaats.
+
+   Elke knop staat op wit, dus het logo heeft geen eigen ondergrond nodig. */
+.ticket-pay-logo {
+  box-sizing: border-box;
+  width: 88px;
+  height: 34px;
+  flex: none;
+  object-fit: contain;
+}
+

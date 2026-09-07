@@ -15,6 +15,7 @@ import {
   XCircle,
 } from "lucide-react";
 import { TicketPass } from "./TicketPass";
+import { PaymentMethodChooser, type PaymentMethodChoice } from "./PaymentMethodChooser";
 import {
   formatTicketDate,
   formatTicketOrderStatus,
@@ -39,9 +40,12 @@ function isOrder(value: StatusPayload): value is PublicOrder {
 export function OrderStatus({
   initialOrder,
   locale,
+  paymentChoice,
 }: {
   initialOrder: PublicOrder;
   locale: "nl" | "en";
+  /** Ontbreekt of `single`: er valt niets te kiezen en er komt geen keuzeblok. */
+  paymentChoice?: PaymentMethodChoice;
 }) {
   const base = locale === "nl" ? "" : "/en";
   const [order, setOrder] = useState(initialOrder);
@@ -87,6 +91,13 @@ export function OrderStatus({
 
   const paid = order.status === "PAID" || order.status === "PARTIALLY_REFUNDED";
   const failed = ["PAYMENT_FAILED", "CANCELLED", "EXPIRED", "REFUNDED"].includes(order.status);
+  // Zolang de bestelling op betaling wacht, mag de koper (opnieuw) kiezen: een
+  // afgebroken betaling laat de bestelling staan, en dan is dit de weg terug.
+  const canChoosePayment =
+    order.status === "PENDING_PAYMENT" &&
+    paymentChoice != null &&
+    paymentChoice.variant !== "single" &&
+    paymentChoice.options.length > 0;
   const trackedRef = useRef(false);
 
   useEffect(() => {
@@ -107,7 +118,17 @@ export function OrderStatus({
         aria-atomic="true"
       >
         <div className="ticket-status-icon">
-          {paid ? <CheckCircle2 aria-hidden="true" /> : failed ? <XCircle aria-hidden="true" /> : <CircleDashed className="is-spinning" aria-hidden="true" />}
+          {paid ? (
+            <CheckCircle2 aria-hidden="true" />
+          ) : failed ? (
+            <XCircle aria-hidden="true" />
+          ) : canChoosePayment ? (
+            // Wie nog moet kiezen, wacht nergens op: een draaiend icoon zou hier
+            // beweging tonen zonder dat er iets gebeurt.
+            <Clock3 aria-hidden="true" />
+          ) : (
+            <CircleDashed className="is-spinning" aria-hidden="true" />
+          )}
         </div>
         <div>
           <span>{locale === "nl" ? "Bestelling" : "Order"} {order.orderNumber}</span>
@@ -116,14 +137,18 @@ export function OrderStatus({
               ? locale === "nl" ? "Je tickets zijn klaar" : "Your tickets are ready"
               : failed
                 ? locale === "nl" ? "De bestelling is niet voltooid" : "The order was not completed"
-                : locale === "nl" ? "We verwerken je betaling" : "We are processing your payment"}
+                : canChoosePayment
+                  ? locale === "nl" ? "Je tickets staan klaar" : "Your tickets are reserved"
+                  : locale === "nl" ? "We verwerken je betaling" : "We are processing your payment"}
           </h1>
           <p>
             {paid
               ? locale === "nl" ? `Een bevestiging is verstuurd naar ${order.buyerEmail}.` : `A confirmation was sent to ${order.buyerEmail}.`
               : failed
                 ? locale === "nl" ? "Er werden geen geldige tickets uitgegeven voor deze bestelling." : "No valid tickets were issued for this order."
-                : locale === "nl" ? "Dit wordt automatisch bijgewerkt. Je mag deze pagina openlaten." : "This page updates automatically. You can leave it open."}
+                : canChoosePayment
+                  ? locale === "nl" ? "Ze blijven gereserveerd tot je betaling rond is." : "They stay reserved until your payment goes through."
+                  : locale === "nl" ? "Dit wordt automatisch bijgewerkt. Je mag deze pagina openlaten." : "This page updates automatically. You can leave it open."}
           </p>
         </div>
       </section>
@@ -167,7 +192,11 @@ export function OrderStatus({
         </section>
       ) : null}
 
-      {!paid && !failed ? (
+      {canChoosePayment ? (
+        <PaymentMethodChooser orderId={order.id} locale={locale} choice={paymentChoice} />
+      ) : null}
+
+      {!paid && !failed && !canChoosePayment ? (
         <div className="ticket-processing-row"><Clock3 size={18} aria-hidden="true" /> {locale === "nl" ? "Wachten op bevestiging van de betaalprovider" : "Waiting for payment confirmation"}</div>
       ) : null}
 

@@ -1,7 +1,8 @@
 # Integrated ticketing: architecture & file map
 
 Event-scoped ticket sales for the main web app (`apps/web`): create a ticketed
-event, sell tickets to the public, take payment via **Mollie**, issue signed
+event, sell tickets to the public, take payment via **Mollie** or **directly via
+Bancontact**, issue signed
 PDF/QR tickets, refund, and scan at the entrance. This doc is the "where is
 everything" map; the README's *Integrated ticketing* section covers operational
 setup (env, webhook, SMTP).
@@ -14,13 +15,19 @@ setup (env, webhook, SMTP).
    `OWNER` grant + the owner group's leads a `MANAGER` grant, and seeds a default
    inventory pool (`GENERAL`) and gate (`MAIN`).
 2. **Buy**: a buyer picks tickets at `/tickets/<slug>` -> `POST /api/tickets/checkout`
-   reserves inventory, creates a `TicketOrder` (`PENDING_PAYMENT`) + `TicketPayment`,
-   asks the payment gateway for a checkout URL, and redirects there.
+   reserves inventory and creates a `TicketOrder` (`PENDING_PAYMENT`).
    Zero-cost tickets skip the gateway (provider `free`) but require a logged-in
    account.
-3. **Pay**: Mollie hosted checkout. On completion Mollie calls the webhook,
-   which re-fetches the payment and calls `fulfillPaidOrder` -> tickets issued,
-   confirmation mail enqueued in the same transaction.
+   - With **one** enabled payment method, checkout also creates the
+     `TicketPayment`, asks the gateway for a checkout URL and redirects there
+     (unchanged behaviour).
+   - With **more than one**, checkout redirects to the order page instead, which
+     renders the method chooser; picking one calls
+     `POST /api/tickets/orders/<orderId>/pay` -> `startOrderPayment`.
+3. **Pay**: Mollie hosted checkout, or our own Bancontact page. On completion the
+   provider calls its webhook, which re-fetches the payment and calls
+   `fulfillPaidOrder` -> tickets issued, confirmation mail enqueued in the same
+   transaction.
 4. **Mail**: the confirmation carries the tickets themselves: one PDF with every
    valid ticket of the order, one Apple Wallet pass per ticket, and a Google
    Wallet save button per ticket (Google passes can only be links). The link to
@@ -43,15 +50,34 @@ which is a plain `String`, so adding/switching a provider needs **no DB migratio
 
 | Concern | Location |
 | --- | --- |
-| Gateway interface (`PaymentGateway`) + DTOs | `apps/web/lib/ticketing/payments/types.ts` |
+| Gateway interface (`PaymentGateway`) + DTOs | `packages/payments/src/types.ts` |
 | Provider factory (`paymentGateway`, `paymentGatewayFor`) | `apps/web/lib/ticketing/payments/index.ts` |
-| **Mollie** gateway (raw REST via `fetch`, no SDK) | `apps/web/lib/ticketing/payments/mollie.ts` |
-| Mock gateway (local dev only, instant "paid") | `apps/web/lib/ticketing/payments/mock.ts` |
-| Which provider is active | `configuredPaymentProvider()` in `apps/web/lib/ticketing/config.ts` |
+| **Mollie** gateway (raw REST via `fetch`, no SDK) | `packages/payments/src/mollie.ts` |
+| **Bancontact** gateway (Bancontact Pro) | `packages/payments/src/bancontact.ts` |
+| Mock gateway (local dev only, instant "paid") | `packages/payments/src/mock.ts` |
+| Which providers are enabled, and in what order | `enabledPaymentMethods()` in `apps/web/lib/ticketing/config.ts` |
+| Which method leads per locale | `apps/web/lib/ticketing/paymentMethods.ts` |
+| Starting a payment on an existing order | `startOrderPayment()` in `apps/web/lib/ticketing/orders.ts` |
 
-`configuredPaymentProvider()` returns `mollie` when `TICKETING_PAYMENT_PROVIDER=mollie`,
-`mock` when unset/`mock` outside production, and throws in production unless
-`mollie` is set.
+`configuredPaymentProvider()` returns `mollie`/`bancontact` when
+`TICKETING_PAYMENT_PROVIDER` names it, `mock` when unset/`mock` outside
+production, and throws in production otherwise. `enabledPaymentMethods()` reads
+the comma-separated `TICKETING_PAYMENT_METHODS` and falls back to that single
+provider, so leaving it empty keeps the old single-provider behaviour exactly.
+
+### Only one live checkout per order
+
+`startOrderPayment` closes every still-open checkout of the order before it
+creates a new one, asking the provider rather than trusting our own row. If that
+close reveals the order was just paid, it fulfils and refuses to start a second
+payment; if the provider still reports `PENDING` after a cancel attempt, it gives
+up rather than guessing. Without this, a buyer who opens Bancontact, returns, and
+then picks Mollie can pay twice.
+
+Each attempt gets its own number (`TicketPayment` count + 1), which feeds both the
+idempotency key (`<orderId>:<attempt>`) and the gateway's `attempt`. A fixed key
+would collide on `@@unique([provider, idempotencyKey])` and make the provider
+silently hand back the first checkout.
 
 ### Mollie specifics
 
@@ -69,6 +95,41 @@ which is a plain `String`, so adding/switching a provider needs **no DB migratio
 - Refunds are nested under a payment, so `getRefundStatus` takes
   `{ refundId, paymentId }` (not just a refund id like a top-level refund).
 - Definitive (non-retryable) errors = any Mollie 4xx except 429.
+
+### Bancontact specifics
+
+This is **Bancontact Pro**, a direct merchant contract, not Bancontact through a
+PSP. Bancontact Company is a scheme rather than an acquirer, so the card flow
+still needs a PSP; what this gateway offers is the app payment.
+
+**Names changed in 2026 and the old ones are still everywhere.** What used to be
+"Payconiq by Bancontact" is now **Bancontact Pay** (the buyer's app) and
+**Bancontact Pro** (the merchant solution we integrate with); the company is
+**Bancontact Company** as of spring 2026, and the Payconiq brand disappears
+during 2026. The API still runs on the payconiq host, so do not read the
+endpoint as the current brand name.
+
+- **No hosted checkout page.** The provider returns a deeplink plus a QR, so we
+  host the page: `CheckoutResult.url` points at
+  `/tickets/bestelling/<orderId>/bancontact` and the deeplink is stored in
+  `TicketPayment.providerDeeplink`. The QR is drawn from that deeplink by
+  `/api/tickets/orders/<orderId>/bancontact/qr`, using the same generator as the
+  ticket QR, so the page does not depend on an external image host.
+- Amounts are **integer cents**, unlike Mollie's decimal strings. `description`
+  and `reference` are capped at 35 characters and truncated locally.
+- **Webhook** `apps/web/app/api/tickets/bancontact/webhook/route.ts`: same
+  posture as Mollie, the callback body is never trusted and the payment is
+  re-fetched. Two differences: the provider does **not** carry our order id (only
+  a reference), so the order is resolved through our own `TicketPayment` row by
+  `providerCheckoutId`, and amount plus currency are checked against that row
+  before anything is issued. A failure only expires the order when no other
+  payment attempt is still open.
+- **Refunds are off by default.** `BANCONTACT_REFUNDS_ENABLED=true` enables the
+  API path; otherwise `refund()` throws `BancontactRefundUnsupportedError` without
+  sending a request, and the refund is handled manually by bank transfer.
+- **Verify against your own contract before going live**: endpoint version, field
+  names and status values depend on the product in the merchant contract.
+  Everything provider-specific sits in `packages/payments/src/bancontact.ts`.
 
 ## File map
 
@@ -258,6 +319,9 @@ webscanner blijft staan als webweg en als vangnet.
 ### API (`apps/web/app/api/tickets/...`)
 - `checkout/route.ts`: start an order + checkout
 - `mollie/webhook/route.ts`: Mollie payment/refund callback
+- `bancontact/webhook/route.ts`: Bancontact payment callback
+- `orders/[orderId]/pay/route.ts`: start a payment with a chosen method
+- `orders/[orderId]/bancontact/qr/route.ts`: QR for a live Bancontact payment
 - `mock/complete/route.ts`: dev-only instant "payment complete"
 - `maintenance/route.ts`: reconciliation + outbox flush (Bearer `TICKETING_MAINTENANCE_SECRET`)
 - `scanner/events/route.ts`: de evenementen waarvoor je scanrechten hebt, voor de native app

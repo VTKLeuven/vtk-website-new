@@ -31,7 +31,9 @@ export class MockPaymentGateway implements PaymentGateway {
     return {
       provider: this.name,
       checkoutId: `mock_${input.orderId}_${input.attempt}`,
-      paymentId: `mock_payment_${input.orderId}`,
+      // Het volgnummer hoort er ook hier in: twee pogingen op dezelfde
+      // bestelling botsen anders op de unieke index per provider.
+      paymentId: `mock_payment_${input.orderId}_${input.attempt}`,
       url: url.toString(),
       status: "PENDING",
     };

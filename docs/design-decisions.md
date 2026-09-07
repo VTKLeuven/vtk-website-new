@@ -2042,7 +2042,7 @@ een eigen account-overzicht. Technische kaart: `docs/uitleendienst.md`.
 ### Betalen: online of aan de balie, per reservatie
 
 - Bij goedkeuring kiest het **team** de betaalwijze: `ONLINE` (Mollie-checkout
-  via de gedeelde `@vtk/payments`-gateways) of `OFFLINE` (cash/Payconiq bij
+  via de gedeelde `@vtk/payments`-gateways) of `OFFLINE` (cash/Bancontact bij
   afhaling, team drukt "betaald"). Niet het lid: het team weet wanneer online
   betalen zinvol is.
 - **Enkel de huurprijs gaat online; de waarborg blijft cash bij afhaling.**
@@ -3907,6 +3907,45 @@ Vastgelegde keuzes:
   persoonlijke tegel mag maken, moet ze ook kunnen afwerken. De upload is daarom
   apart gehouden (`kind=tile`): maximaal 2 MB, herschaald naar 128px, en onder een
   eigen `tiles/`-prefix zodat de tegel-actions een key van elders weigeren.
+
+## Twee betaalwijzen, en welke bovenaan staat hangt aan de taal
+
+Naast Mollie kan een koper rechtstreeks met Bancontact betalen (Bancontact Pro,
+een eigen merchantcontract; dat heette tot 2026 Payconiq by Bancontact). Dat is
+voor de kring goedkoper per transactie, dus we willen het zoveel mogelijk
+gebruikt zien; het werkt alleen niet voor wie geen Belgische bankapp heeft.
+
+- **De taal bepaalt de volgorde, niet de keuze.** Op de Nederlandse
+  bestelpagina staat Bancontact groot bovenaan met Mollie als kleine regel
+  eronder. Op de Engelse staat Mollie eerst, met Bancontact er even groot onder.
+  De reden voor dat verschil: een internationale student kan niet met Bancontact
+  betalen en moet niet eerst langs een knop die voor hem niet werkt, maar een
+  Belgische student die de site in het Engels leest, moet Bancontact nog altijd
+  even goed zien staan. Vandaar dat Bancontact daar zakt maar niet krimpt.
+- **De taal is een aanwijzing, geen vaststelling.** We weten niet wie Belg is en
+  vragen het ook niet. Elke betaalwijze blijft in beide talen volledig
+  bruikbaar; de volgorde is het enige verschil.
+- **Bij één geconfigureerde betaalwijze is er geen keuzescherm.** Dan gaat de
+  koper meteen door naar de provider, precies zoals voordien. Een scherm met één
+  knop is een klik zonder keuze.
+- **Er staat nooit meer dan één betaling tegelijk open.** Kiest een koper na een
+  afgebroken poging de andere betaalwijze, dan wordt de eerste checkout eerst bij
+  de provider afgesloten en pas daarna een nieuwe gemaakt. Blijkt bij dat
+  afsluiten dat er net betaald is, dan worden de tickets alsnog uitgegeven en
+  start er geen tweede betaling. Zonder die regel kan iemand twee keer betalen
+  voor dezelfde bestelling.
+- **Een mislukte betaalwijze laat de bestelling staan.** De reservatie blijft
+  lopen zodat de koper de andere kan proberen; enkel bij de allereerste aankoop
+  valt de bestelling weg wanneer de provider ze definitief weigert.
+- **De Bancontact-betaalpagina is van ons.** De provider levert geen gehoste
+  checkout maar een deeplink, dus tonen we zelf een QR en een app-knop op
+  `/tickets/bestelling/<id>/bancontact`. QR en knop staan er allebei, altijd:
+  betalen op een laptop met de app op je telefoon is hier het normale geval.
+- **Terugbetalen kan er (nog) niet automatisch bij.** Het refund-product zit niet
+  standaard in het merchantcontract. Staat `BANCONTACT_REFUNDS_ENABLED` niet aan,
+  dan weigert een terugbetaling met een duidelijke fout in plaats van stil te
+  mislukken, en gebeurt ze met de hand via overschrijving. Dit is bewust luidruchtig:
+  een half werkende terugbetaling is erger dan een die zegt dat ze niet kan.
 
 ## Eén centrale pagina met ticketvoorwaarden
 

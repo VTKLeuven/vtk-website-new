@@ -375,7 +375,6 @@ export function TicketShop({
       <div className="ticket-shop-main">
         <section className="ticket-shop-section" aria-labelledby="ticket-types-heading">
           <div className="ticket-section-heading">
-            <span>01</span>
             <div>
               <h2 id="ticket-types-heading">{locale === "nl" ? "Kies je tickets" : "Choose your tickets"}</h2>
               <p>
@@ -547,7 +546,6 @@ export function TicketShop({
         {selectedCount > 0 ? (
           <section className="ticket-shop-section" aria-labelledby="attendees-heading">
             <div className="ticket-section-heading">
-              <span>02</span>
               <div>
                 <h2 id="attendees-heading">{locale === "nl" ? "Gegevens aanwezigen" : "Attendee details"}</h2>
                 <p>{locale === "nl" ? "Elk ticket wordt op naam gezet." : "Each ticket is issued to one attendee."}</p>
@@ -613,7 +611,6 @@ export function TicketShop({
         {selectedCount > 0 ? (
           <section className="ticket-shop-section" aria-labelledby="buyer-heading">
             <div className="ticket-section-heading">
-              <span>03</span>
               <div>
                 <h2 id="buyer-heading">{locale === "nl" ? "Gegevens koper" : "Buyer details"}</h2>
                 <p>{locale === "nl" ? "Hier sturen we de bestelling naartoe." : "We will send the order here."}</p>
@@ -654,7 +651,6 @@ export function TicketShop({
         <aside className="ticket-order-summary">
           <div className="ticket-order-summary-head">
             <span>{locale === "nl" ? "Bestelling" : "Order"}</span>
-            <strong>{selectedCount}</strong>
           </div>
           <div className="ticket-order-event">
             <h2>{event.title}</h2>

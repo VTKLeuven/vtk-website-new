@@ -8,6 +8,14 @@ export {
   type MolliePayment,
   type MollieRefund,
 } from "./mollie";
+export {
+  BancontactApiError,
+  BancontactPaymentGateway,
+  BancontactRefundUnsupportedError,
+  mapBancontactStatus,
+  type BancontactGatewayConfig,
+  type BancontactPayment,
+} from "./bancontact";
 export { MockPaymentGateway, type MockGatewayConfig } from "./mock";
 export type {
   CheckoutLine,

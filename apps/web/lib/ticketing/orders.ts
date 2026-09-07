@@ -6,7 +6,12 @@ import { headers } from "next/headers";
 import { getSession } from "@vtk/auth/server";
 import { prisma } from "@vtk/db";
 import { z } from "zod";
-import { reservationMinutes, ticketingBaseUrl } from "./config";
+import {
+  enabledPaymentMethods,
+  reservationMinutes,
+  ticketingBaseUrl,
+  type PaymentProviderName,
+} from "./config";
 import {
   createOrderAccessToken,
   createOrderNumber,
@@ -20,7 +25,11 @@ import {
   releaseReservedInventory,
   reserveInventory,
 } from "./inventory";
-import { paymentGateway, paymentGatewayFor, type CheckoutResult } from "./payments";
+import {
+  paymentGatewayFor,
+  type CheckoutLine,
+  type CheckoutResult,
+} from "./payments";
 import { orderAccessExpiry } from "./access";
 import { withSerializableTransaction } from "./transactions";
 import { publishedTicketDesign } from "./design";
@@ -394,105 +403,51 @@ export async function createTicketCheckout(
     };
   }
 
-  const provider = paymentGateway().name;
-  await prisma.ticketPayment.create({
-    data: {
-      id: paymentId,
-      orderId,
-      provider,
-      idempotencyKey: `${orderId}:1`,
-      status: "CREATED",
-      amountCents: totalCents,
-      currency: event.currency,
-      expiresAt,
-    },
-  });
-
-  const returnUrl = localOrderUrl(input.locale, orderId);
-  const gateway = paymentGateway();
-  const checkoutInput = {
+  // Is er maar één betaalwijze, dan is een keuzescherm een scherm met één knop:
+  // we sturen de koper meteen door, precies zoals voordien. Zijn er meerdere,
+  // dan kiest hij op de bestelpagina en start `startOrderPayment` de betaling.
+  const methods = enabledPaymentMethods();
+  if (methods.length > 1) {
+    return {
       orderId,
       orderNumber,
-      buyerEmail: input.buyerEmail,
-      eventName: input.locale === "en" && event.titleEn ? event.titleEn : event.titleNl,
-      currency: event.currency,
-      lines: [...countByType].map(([typeId, quantity]) => {
-        const type = typeById.get(typeId)!;
-        return {
-          name: input.locale === "en" && type.nameEn ? type.nameEn : type.nameNl,
-          description: input.locale === "en" ? type.descriptionEn : type.descriptionNl,
-          quantity,
-          unitAmountCents: type.unitPriceCents,
-        };
-      }),
-      expiresAt,
-      successUrl: `${returnUrl}?payment=return`,
-      cancelUrl: `${returnUrl}?payment=cancelled`,
-      attempt: 1,
+      access,
+      accessExpiresAt,
+      checkoutUrl: localOrderUrl(input.locale, orderId),
     };
-  let checkout: CheckoutResult | null = null;
-  let checkoutError: unknown;
-  for (let attempt = 0; attempt < 3 && !checkout; attempt += 1) {
-    try {
-      checkout = await gateway.createCheckout(checkoutInput);
-    } catch (error) {
-      checkoutError = error;
-      if (gateway.isDefinitiveCheckoutError(error)) {
-        await failPendingOrder(orderId, paymentId);
-        throw new TicketCheckoutError("PAYMENT_UNAVAILABLE");
-      }
-      if (attempt < 2) {
-        await new Promise((resolve) => setTimeout(resolve, 200 * 2 ** attempt));
-      }
-    }
-  }
-  if (!checkout) {
-    await prisma.ticketPayment.updateMany({
-      where: { id: paymentId, status: "CREATED" },
-      data: { providerStatus: "checkout_creation_uncertain" },
-    });
-    console.error("Ticket checkout creation remained uncertain after retries", {
-      orderId,
-      error: checkoutError,
-    });
-    throw new TicketCheckoutError("PAYMENT_UNAVAILABLE");
   }
 
-  let checkoutPersisted = false;
-  let checkoutPersistenceError: unknown;
-  for (let attempt = 1; attempt <= 3 && !checkoutPersisted; attempt += 1) {
-    try {
-      await prisma.ticketPayment.update({
-        where: { id: paymentId },
-        data: {
-          status: "PENDING",
-          providerCheckoutId: checkout.checkoutId,
-          providerPaymentId: checkout.paymentId,
-          checkoutUrl: checkout.url,
-        },
-      });
-      checkoutPersisted = true;
-    } catch (error) {
-      checkoutPersistenceError = error;
-      if (attempt < 3) {
-        await new Promise((resolve) => setTimeout(resolve, 100 * attempt));
-      }
+  const context: CheckoutContext = {
+    orderId,
+    orderNumber,
+    buyerEmail: input.buyerEmail,
+    eventName: input.locale === "en" && event.titleEn ? event.titleEn : event.titleNl,
+    currency: event.currency,
+    lines: [...countByType].map(([typeId, quantity]) => {
+      const type = typeById.get(typeId)!;
+      return {
+        name: input.locale === "en" && type.nameEn ? type.nameEn : type.nameNl,
+        description: input.locale === "en" ? type.descriptionEn : type.descriptionNl,
+        quantity,
+        unitAmountCents: type.unitPriceCents,
+      };
+    }),
+    expiresAt,
+    locale: input.locale,
+    totalCents,
+  };
+
+  let checkout: CheckoutResult;
+  try {
+    checkout = await createAndPersistCheckout(context, methods[0]!, 1, paymentId);
+  } catch (error) {
+    if (error instanceof CheckoutCreationError) {
+      if (error.definitive) await failPendingOrder(orderId, paymentId);
+      throw new TicketCheckoutError("PAYMENT_UNAVAILABLE");
     }
+    throw error;
   }
-  if (!checkoutPersisted) {
-    // Never expose a provider URL that cannot be reconciled locally. Keep the
-    // reservation pending so a concurrent provider webhook can still fulfill it.
-    try {
-      await gateway.expireCheckout(checkout.checkoutId);
-    } catch (expiryError) {
-      console.error("Unable to expire unpersisted ticket checkout", { orderId, expiryError });
-    }
-    console.error("Ticket checkout created but local payment update failed", {
-      orderId,
-      error: checkoutPersistenceError,
-    });
-    throw new TicketCheckoutError("PAYMENT_UNAVAILABLE");
-  }
+
   if (checkout.status === "SUCCEEDED") {
     try {
       await fulfillPaidOrder({
@@ -508,6 +463,147 @@ export async function createTicketCheckout(
     }
   }
   return { orderId, orderNumber, access, accessExpiresAt, checkoutUrl: checkout.url };
+}
+
+/** Wat een gateway nodig heeft om een checkout te maken voor een bestaande bestelling. */
+type CheckoutContext = {
+  orderId: string;
+  orderNumber: string;
+  buyerEmail: string;
+  eventName: string;
+  currency: string;
+  lines: CheckoutLine[];
+  expiresAt: Date;
+  locale: "nl" | "en";
+  totalCents: number;
+};
+
+/**
+ * Een mislukte checkoutaanmaak. `definitive` betekent: opnieuw proberen met
+ * dezelfde gegevens heeft geen zin. Wat er dan met de bestelling moet gebeuren,
+ * verschilt per aanroeper, en staat daarom niet hier: bij een eerste aankoop
+ * valt de bestelling af, bij een tweede poging blijft ze staan zodat de koper
+ * de andere betaalwijze nog kan kiezen.
+ */
+class CheckoutCreationError extends Error {
+  constructor(
+    readonly definitive: boolean,
+    readonly paymentId: string,
+    readonly cause?: unknown
+  ) {
+    super("CHECKOUT_CREATION_FAILED");
+    this.name = "CheckoutCreationError";
+  }
+}
+
+/**
+ * Maakt de payment-rij, vraagt de provider een checkout en legt het resultaat
+ * vast. Gedeeld door de eerste aankoop en door elke volgende poging met een
+ * andere betaalwijze.
+ */
+async function createAndPersistCheckout(
+  context: CheckoutContext,
+  provider: PaymentProviderName,
+  attempt: number,
+  paymentId: string = randomUUID()
+): Promise<CheckoutResult> {
+  await prisma.ticketPayment.create({
+    data: {
+      id: paymentId,
+      orderId: context.orderId,
+      provider,
+      idempotencyKey: `${context.orderId}:${attempt}`,
+      status: "CREATED",
+      amountCents: context.totalCents,
+      currency: context.currency,
+      expiresAt: context.expiresAt,
+    },
+  });
+
+  const returnUrl = localOrderUrl(context.locale, context.orderId);
+  const gateway = paymentGatewayFor(provider);
+  const checkoutInput = {
+    orderId: context.orderId,
+    orderNumber: context.orderNumber,
+    buyerEmail: context.buyerEmail,
+    eventName: context.eventName,
+    currency: context.currency,
+    lines: context.lines,
+    expiresAt: context.expiresAt,
+    successUrl: `${returnUrl}?payment=return`,
+    cancelUrl: `${returnUrl}?payment=cancelled`,
+    attempt,
+  };
+
+  let checkout: CheckoutResult | null = null;
+  let checkoutError: unknown;
+  for (let retry = 0; retry < 3 && !checkout; retry += 1) {
+    try {
+      checkout = await gateway.createCheckout(checkoutInput);
+    } catch (error) {
+      checkoutError = error;
+      if (gateway.isDefinitiveCheckoutError(error)) {
+        throw new CheckoutCreationError(true, paymentId, error);
+      }
+      if (retry < 2) {
+        await new Promise((resolve) => setTimeout(resolve, 200 * 2 ** retry));
+      }
+    }
+  }
+  if (!checkout) {
+    await prisma.ticketPayment.updateMany({
+      where: { id: paymentId, status: "CREATED" },
+      data: { providerStatus: "checkout_creation_uncertain" },
+    });
+    console.error("Ticket checkout creation remained uncertain after retries", {
+      orderId: context.orderId,
+      provider,
+      error: checkoutError,
+    });
+    throw new CheckoutCreationError(false, paymentId, checkoutError);
+  }
+
+  let checkoutPersisted = false;
+  let checkoutPersistenceError: unknown;
+  for (let retry = 1; retry <= 3 && !checkoutPersisted; retry += 1) {
+    try {
+      await prisma.ticketPayment.update({
+        where: { id: paymentId },
+        data: {
+          status: "PENDING",
+          providerCheckoutId: checkout.checkoutId,
+          providerPaymentId: checkout.paymentId,
+          checkoutUrl: checkout.url,
+          providerDeeplink: checkout.deeplinkUrl ?? null,
+          providerQrCodeUrl: checkout.qrCodeUrl ?? null,
+        },
+      });
+      checkoutPersisted = true;
+    } catch (error) {
+      checkoutPersistenceError = error;
+      if (retry < 3) {
+        await new Promise((resolve) => setTimeout(resolve, 100 * retry));
+      }
+    }
+  }
+  if (!checkoutPersisted) {
+    // Never expose a provider URL that cannot be reconciled locally. Keep the
+    // reservation pending so a concurrent provider webhook can still fulfill it.
+    try {
+      await gateway.expireCheckout(checkout.checkoutId);
+    } catch (expiryError) {
+      console.error("Unable to expire unpersisted ticket checkout", {
+        orderId: context.orderId,
+        expiryError,
+      });
+    }
+    console.error("Ticket checkout created but local payment update failed", {
+      orderId: context.orderId,
+      error: checkoutPersistenceError,
+    });
+    throw new CheckoutCreationError(false, paymentId, checkoutPersistenceError);
+  }
+  return checkout;
 }
 
 type FulfillPaidOrderInput = {
@@ -719,4 +815,209 @@ export async function releaseExpiredOrders(limit = 100): Promise<number> {
     if (await expirePendingOrder(order.id)) released += 1;
   }
   return released;
+}
+
+export type StartPaymentCode =
+  | "ORDER_NOT_FOUND"
+  | "ORDER_NOT_PAYABLE"
+  | "ALREADY_PAID"
+  | "RESERVATION_EXPIRED"
+  | "METHOD_UNAVAILABLE"
+  | "PAYMENT_PENDING_ELSEWHERE"
+  | "PAYMENT_UNAVAILABLE";
+
+export type StartPaymentResult =
+  | { ok: true; provider: PaymentProviderName; checkoutUrl: string }
+  | { ok: false; code: StartPaymentCode };
+
+/**
+ * Sluit elke nog levende checkout van deze bestelling af.
+ *
+ * Dit is de kern van "kiezen tussen twee betaalwijzen": zonder dit kan een
+ * koper Bancontact openen, terugkeren, Mollie kiezen, en twee keer betalen. Er
+ * mag er dus altijd hoogstens één openstaan.
+ *
+ * De provider heeft hier het laatste woord, niet onze eigen rij: blijkt er net
+ * betaald te zijn, dan wordt de bestelling alsnog vervuld en start er geen
+ * tweede betaling. Blijft ze na een annuleerpoging toch "pending", dan geven we
+ * op in plaats van te gokken; een tweede checkout ernaast is precies wat we
+ * proberen te vermijden.
+ */
+async function closeLivePayments(order: {
+  id: string;
+  totalCents: number;
+  currency: string;
+  payments: { id: string; provider: string; providerCheckoutId: string | null; status: string }[];
+}): Promise<"CLOSED" | "PAID" | "UNSAFE"> {
+  for (const payment of order.payments) {
+    if (payment.status !== "CREATED" && payment.status !== "PENDING") continue;
+
+    if (!payment.providerCheckoutId) {
+      await prisma.ticketPayment.updateMany({
+        where: { id: payment.id, status: { in: ["CREATED", "PENDING"] } },
+        data: { status: "CANCELLED", failedAt: new Date() },
+      });
+      continue;
+    }
+
+    try {
+      const gateway = paymentGatewayFor(payment.provider);
+      let status = await gateway.getCheckoutStatus(payment.providerCheckoutId);
+      if (status.status === "PENDING") {
+        await gateway.expireCheckout(payment.providerCheckoutId);
+        status = await gateway.getCheckoutStatus(payment.providerCheckoutId);
+      }
+
+      if (status.status === "SUCCEEDED") {
+        // Bedrag en munt moeten kloppen voor we tickets uitgeven. `orderId` komt
+        // niet bij elke provider terug (Bancontact draagt enkel een referentie),
+        // dus die controleren we enkel wanneer hij er is.
+        if (
+          (status.orderId != null && status.orderId !== order.id) ||
+          (status.amountCents != null && status.amountCents !== order.totalCents) ||
+          (status.currency != null && status.currency.toUpperCase() !== order.currency.toUpperCase())
+        ) {
+          console.error("Live checkout succeeded but did not match the order", {
+            orderId: order.id,
+            paymentId: payment.id,
+          });
+          return "UNSAFE";
+        }
+        await fulfillPaidOrder({
+          orderId: order.id,
+          provider: payment.provider,
+          providerPaymentId: status.paymentId ?? status.checkoutId,
+          providerCheckoutId: status.checkoutId,
+          amountCents: order.totalCents,
+          currency: order.currency,
+        });
+        return "PAID";
+      }
+
+      if (status.status === "PENDING") return "UNSAFE";
+
+      await prisma.ticketPayment.updateMany({
+        where: { id: payment.id, status: { in: ["CREATED", "PENDING"] } },
+        data: {
+          status: status.status === "EXPIRED" ? "EXPIRED" : "CANCELLED",
+          failedAt: new Date(),
+        },
+      });
+    } catch (error) {
+      console.error("Unable to safely close a live checkout", {
+        orderId: order.id,
+        paymentId: payment.id,
+        error,
+      });
+      return "UNSAFE";
+    }
+  }
+  return "CLOSED";
+}
+
+/**
+ * Start een betaling voor een bestelling die al bestaat, met de betaalwijze die
+ * de koper koos. Elke poging krijgt een eigen volgnummer, en dus een eigen
+ * idempotency-sleutel: zonder dat botst een tweede poging op de unieke index en
+ * zou de provider stilzwijgend de eerste checkout teruggeven.
+ */
+export async function startOrderPayment(input: {
+  orderId: string;
+  provider: PaymentProviderName;
+  locale: "nl" | "en";
+}): Promise<StartPaymentResult> {
+  if (!enabledPaymentMethods().includes(input.provider)) {
+    return { ok: false, code: "METHOD_UNAVAILABLE" };
+  }
+
+  const order = await prisma.ticketOrder.findUnique({
+    where: { id: input.orderId },
+    include: {
+      event: { select: { titleNl: true, titleEn: true } },
+      items: { select: { ticketTypeName: true, unitPriceCents: true } },
+      payments: {
+        select: { id: true, provider: true, providerCheckoutId: true, status: true },
+        orderBy: { createdAt: "asc" },
+      },
+    },
+  });
+  if (!order) return { ok: false, code: "ORDER_NOT_FOUND" };
+  if (order.status === "PAID" || order.status === "PARTIALLY_REFUNDED") {
+    return { ok: false, code: "ALREADY_PAID" };
+  }
+  if (order.status !== "PENDING_PAYMENT") return { ok: false, code: "ORDER_NOT_PAYABLE" };
+  if (order.totalCents <= 0) return { ok: false, code: "ORDER_NOT_PAYABLE" };
+  if (!order.reservationExpiresAt || order.reservationExpiresAt <= new Date()) {
+    return { ok: false, code: "RESERVATION_EXPIRED" };
+  }
+
+  const closed = await closeLivePayments(order);
+  if (closed === "PAID") return { ok: false, code: "ALREADY_PAID" };
+  if (closed === "UNSAFE") return { ok: false, code: "PAYMENT_PENDING_ELSEWHERE" };
+
+  // De regels van de checkout komen uit de bestelling zelf, niet uit het
+  // tickettype: de naam en de prijs staan daar vastgelegd zoals ze golden op het
+  // moment van bestellen, en een latere prijswijziging mag dit bedrag niet meer
+  // veranderen.
+  const lineByKey = new Map<string, CheckoutLine>();
+  for (const item of order.items) {
+    const key = `${item.ticketTypeName}:${item.unitPriceCents}`;
+    const existing = lineByKey.get(key);
+    if (existing) existing.quantity += 1;
+    else {
+      lineByKey.set(key, {
+        name: item.ticketTypeName,
+        quantity: 1,
+        unitAmountCents: item.unitPriceCents,
+      });
+    }
+  }
+
+  const context: CheckoutContext = {
+    orderId: order.id,
+    orderNumber: order.reference,
+    buyerEmail: order.buyerEmail,
+    eventName:
+      input.locale === "en" && order.event.titleEn ? order.event.titleEn : order.event.titleNl,
+    currency: order.currency,
+    lines: [...lineByKey.values()],
+    expiresAt: order.reservationExpiresAt,
+    locale: input.locale,
+    totalCents: order.totalCents,
+  };
+
+  let checkout: CheckoutResult;
+  try {
+    checkout = await createAndPersistCheckout(context, input.provider, order.payments.length + 1);
+  } catch (error) {
+    if (error instanceof CheckoutCreationError) {
+      // De bestelling blijft staan: de koper mag de andere betaalwijze proberen.
+      await prisma.ticketPayment.updateMany({
+        where: { id: error.paymentId, status: { in: ["CREATED", "PENDING"] } },
+        data: { status: "FAILED", failedAt: new Date() },
+      });
+      return { ok: false, code: "PAYMENT_UNAVAILABLE" };
+    }
+    throw error;
+  }
+
+  if (checkout.status === "SUCCEEDED") {
+    try {
+      await fulfillPaidOrder({
+        orderId: order.id,
+        provider: checkout.provider,
+        providerPaymentId: checkout.paymentId ?? checkout.checkoutId,
+        providerCheckoutId: checkout.checkoutId,
+        amountCents: order.totalCents,
+        currency: order.currency,
+      });
+    } catch (error) {
+      console.error("Immediate ticket fulfillment failed; webhook will retry", {
+        orderId: order.id,
+        error,
+      });
+    }
+  }
+
+  return { ok: true, provider: input.provider, checkoutUrl: checkout.url };
 }

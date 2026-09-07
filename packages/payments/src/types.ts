@@ -22,7 +22,17 @@ export type CheckoutResult = {
   provider: string;
   checkoutId: string;
   paymentId?: string | null;
+  /**
+   * Waar de koper naartoe gestuurd wordt. Bij een gehoste checkout (Mollie) is
+   * dat de pagina van de provider; bij een app-betaling zonder gehoste pagina
+   * (Bancontact) is het onze eigen pagina, en staat de sprong naar de app in
+   * `deeplinkUrl`.
+   */
   url: string;
+  /** Deeplink naar de betaalapp, voor providers zonder gehoste checkoutpagina. */
+  deeplinkUrl?: string | null;
+  /** Door de provider gehoste QR-afbeelding, wanneer die er is. */
+  qrCodeUrl?: string | null;
   status: "PENDING" | "SUCCEEDED";
 };
 
