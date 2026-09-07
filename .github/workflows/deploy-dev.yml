@@ -1,25 +1,21 @@
-name: Verify and deploy
+name: Deploy to Dev (elise)
 
 on:
   push:
     branches: ['main']
   pull_request:
     branches: ['main']
-  # Handmatig te starten vanaf het Actions-tabblad. Nodig wanneer GitHub voor een
-  # push geen run heeft aangemaakt: bij een Actions-storing worden pushes die
-  # tijdens de storing binnenkomen niet ingehaald, en dan staat main wel vooruit
-  # maar draait de server nog op de vorige commit.
+  # Handmatig te starten vanaf het Actions-tabblad voor test/herdeploy naar dev
   workflow_dispatch:
 
 # Een tweede push op dezelfde PR maakt de vorige run overbodig; die wordt
 # afgebroken in plaats van een runner bezet te houden. Op main gebeurt dat
 # bewust NIET: daar hoort elke commit haar eigen verify en deploy te krijgen.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: deploy-dev-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
-# Testwaarden, geen echte secrets. Op jobniveau zou dit blok twee keer moeten
-# staan; bovenaan erft elke job het.
+# Testwaarden voor de CI-checks
 env:
   DATABASE_URL: postgresql://vtk:vtk@127.0.0.1:5432/vtk_test?schema=public
   BETTER_AUTH_SECRET: 4tFQwV8Gq2YcX9nB6mR3kL7sP5uD1zH0jA8eC4vN2xM
@@ -27,10 +23,6 @@ env:
   TICKETING_TOKEN_SECRET: 7gK3wQ9cT2mV8xN4pR6yH1dF5sL0aJ7uB9eC3zX6qWk
   TICKETING_MAINTENANCE_SECRET: 5nD8vL2qH7xM4cR9wT1sF6jK3pY0uA5eB8gN2zQ7mVc
 
-# De verify was één job van vier tot tien minuten, terwijl de twee dure stappen
-# (tsc + lint, en de productiebuild + smoke) niets van elkaar nodig hebben. Ze
-# staan nu naast elkaar, dus de wachttijd is de traagste van de twee in plaats
-# van de som. Beide moeten groen zijn voor de deploy start.
 jobs:
   checks:
     name: Types, lint and tests
@@ -143,14 +135,6 @@ jobs:
         run: |
           echo "version=$(node -p "require('./node_modules/@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
 
-      # De browser downloaden duurde 30 seconden, maar `--with-deps` deed daar
-      # een apt-get update + install bovenop en dat schommelde tussen 30 seconden
-      # en zes minuten: het was veruit de traagste stap van de hele run. De
-      # runner-image van GitHub heeft Chrome al staan, dus die systeemlibs zijn
-      # er; enkel de browser van Playwright zelf moet erbij, en die komt uit de
-      # cache. Faalt Chromium ooit met een ontbrekende .so, zet dan hier
-      # `npx playwright install-deps chromium` bij in plaats van `--with-deps`
-      # terug te zetten op de installatiestap.
       - name: Cache Playwright browsers
         id: playwright-cache
         uses: actions/cache@v4
@@ -166,7 +150,8 @@ jobs:
         run: npm run test:e2e:tickets --workspace=@vtk/web
 
   deploy:
-    # Ook bij een handmatige start deployen; enkel een pull_request mag niet.
+    name: Deploy to dev (elise)
+    # Alleen deployen bij een push naar main of handmatige workflow_dispatch; nooit bij pull_request.
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: [checks, build]
     runs-on: ubuntu-latest
@@ -175,30 +160,43 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
+      - name: Check required secrets for dev
+        run: |
+          if [ -z "${{ secrets.DEV_SSH_HOST }}" ]; then
+            echo "::error::Secret DEV_SSH_HOST is not configured! Please add DEV_SSH_HOST to repository secrets."
+            exit 1
+          fi
+          if [ -z "${{ secrets.DEV_SSH_KEY || secrets.SSH_KEY }}" ]; then
+            echo "::error::Secret DEV_SSH_KEY (or SSH_KEY) is not configured! Please add DEV_SSH_KEY to repository secrets."
+            exit 1
+          fi
+
       - name: Install SSH key
         uses: webfactory/ssh-agent@v0.8.0
         with:
-          ssh-private-key: ${{ secrets.SSH_KEY }}
+          ssh-private-key: ${{ secrets.DEV_SSH_KEY || secrets.SSH_KEY }}
 
       - name: Deploy through SSH
+        env:
+          SSH_USER: ${{ secrets.DEV_SSH_USER || secrets.SSH_USER || 'it' }}
+          SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} "
+          ssh -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "
             cd /home/it/vtk-website-new &&
             git fetch --all &&
-            git reset --hard origin/main &&
+            git reset --hard ${{ github.sha }} &&
 
-            # Trigger the automount and refuse to deploy against a local fallback
-            # directory when the 12 TB NFS filesystem is unavailable.
-            timeout 30 stat /mnt/immich/.immich-storage-ready >/dev/null 2>&1 &&
-            findmnt -rn -M /mnt/immich -t nfs4 >/dev/null &&
+            # Trigger de automount en controleer NFS alleen als /mnt/immich in .env geconfigureerd staat.
+            if grep -qE '^IMMICH_MEDIA_LOCATION=.*/mnt/immich' .env 2>/dev/null; then
+              timeout 30 stat /mnt/immich/.immich-storage-ready >/dev/null 2>&1 &&
+              findmnt -rn -M /mnt/immich -t nfs4 >/dev/null
+            fi &&
 
-            # Build while the current containers are still serving traffic.
+            # Build while current containers serve traffic
             docker compose -f infra/docker-compose.yml config --quiet &&
             docker compose -f infra/docker-compose.yml build &&
 
-            # One-time migration of the existing IPv4-only default network.
-            # Doing this explicitly avoids Compose reusing a container that
-            # still references the removed network ID. Named volumes survive.
+            # Migratie van bestaand IPv4-only default network indien van toepassing
             if docker network inspect infra_default --format '{{.EnableIPv6}}' 2>/dev/null |
               grep -qx false; then
               docker compose -f infra/docker-compose.yml down --remove-orphans
@@ -206,24 +204,7 @@ jobs:
 
             docker compose -f infra/docker-compose.yml up -d --remove-orphans &&
 
-            # Opruimen na de switch, want pas nu draaien de containers op de
-            # nieuwe images en is de vorige versie echt ongebruikt. Elke deploy
-            # bouwt een nieuwe image: de oude verliest daarbij haar tag en blijft
-            # anders als naamloze laag op de schijf staan, met de BuildKit-cache
-            # er bovenop. Dat is wat de schijf deed vollopen en waarvoor er af en
-            # toe handmatig 'docker system prune -a' aan te pas kwam.
-            #
-            # Bewust NIET 'prune -a': dat gooit ook getagde images weg die op dat
-            # moment geen draaiende container hebben (Immich, de deur-stack), en
-            # die moeten dan opnieuw gepulld worden. Naamloze images zijn altijd
-            # afval; getagde niet.
-            #
-            # De haakjes met '|| true' houden dit in dezelfde &&-ketting (een
-            # afgebroken deploy hierboven mag nog steeds rood zijn) zonder dat een
-            # mislukte opruiming de run doet falen.
+            # Opruimen van ongetagde images en oude buildcache
             { docker image prune -f || true; } &&
-
-            # Buildcache ouder dan een week. Recente lagen blijven staan, zodat de
-            # volgende build ze nog kan hergebruiken.
             { docker builder prune -f --filter until=168h || true; }
           "

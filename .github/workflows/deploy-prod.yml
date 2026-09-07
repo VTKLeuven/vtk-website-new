@@ -1,0 +1,127 @@
+name: Deploy to Production (liv)
+
+on:
+  # Alleen handmatig te starten vanaf het Actions-tabblad
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  checks: read
+
+jobs:
+  verify:
+    name: Verify tests passed on main
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Check CI test status on main for this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMMIT_SHA: ${{ github.sha }}
+        run: |
+          echo "Controleer teststatus voor commit $COMMIT_SHA..."
+
+          # Vraag alle check-runs op via de GitHub API voor deze commit
+          CHECKS_JSON=$(gh api "repos/${{ github.repository }}/commits/$COMMIT_SHA/check-runs")
+
+          # We vereisen dat 'Types, lint and tests' en 'Production build and browser smoke' beide geslaagd zijn.
+          # Bij eventuele retries nemen we per job de meest recente run (max_by(.id)).
+          CHECK_RESULT=$(echo "$CHECKS_JSON" | jq -r '
+            [ .check_runs[]? | select(.name == "Types, lint and tests" or .name == "Production build and browser smoke") ]
+            | group_by(.name)
+            | map(max_by(.id)) as $latest
+            | {
+                types_lint_tests: ($latest[]? | select(.name == "Types, lint and tests") | {status, conclusion}),
+                build_smoke: ($latest[]? | select(.name == "Production build and browser smoke") | {status, conclusion})
+              }
+          ')
+
+          TYPES_STATUS=$(echo "$CHECK_RESULT" | jq -r '.types_lint_tests.status // empty')
+          TYPES_CONCLUSION=$(echo "$CHECK_RESULT" | jq -r '.types_lint_tests.conclusion // empty')
+          BUILD_STATUS=$(echo "$CHECK_RESULT" | jq -r '.build_smoke.status // empty')
+          BUILD_CONCLUSION=$(echo "$CHECK_RESULT" | jq -r '.build_smoke.conclusion // empty')
+
+          echo "Status 'Types, lint and tests': status='$TYPES_STATUS', conclusion='$TYPES_CONCLUSION'"
+          echo "Status 'Production build and browser smoke': status='$BUILD_STATUS', conclusion='$BUILD_CONCLUSION'"
+
+          if [ "$TYPES_STATUS" = "completed" ] && [ "$TYPES_CONCLUSION" = "success" ] && \
+             [ "$BUILD_STATUS" = "completed" ] && [ "$BUILD_CONCLUSION" = "success" ]; then
+            echo "✅ Alle vereiste tests ('Types, lint and tests' en 'Production build and browser smoke') zijn geslaagd voor commit $COMMIT_SHA."
+          else
+            echo "::error::Productie-deployment geblokkeerd! Commit $COMMIT_SHA is nog niet geslaagd voor alle vereiste checks op main."
+            echo " - 'Types, lint and tests': status='$TYPES_STATUS', conclusion='$TYPES_CONCLUSION'"
+            echo " - 'Production build and browser smoke': status='$BUILD_STATUS', conclusion='$BUILD_CONCLUSION'"
+            echo ""
+            echo "Zorg ervoor dat de checks op main groen zijn voordat je naar productie deployt."
+            exit 1
+          fi
+
+  deploy:
+    name: Deploy through SSH to Liv
+    needs: [verify]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Check required secrets for prod
+        run: |
+          if [ -z "${{ secrets.PROD_SSH_HOST || secrets.SSH_HOST }}" ]; then
+            echo "::error::Secret PROD_SSH_HOST (of SSH_HOST) is niet geconfigureerd in GitHub repository secrets!"
+            exit 1
+          fi
+          if [ -z "${{ secrets.PROD_SSH_KEY || secrets.SSH_KEY }}" ]; then
+            echo "::error::Secret PROD_SSH_KEY (of SSH_KEY) is niet geconfigureerd in GitHub repository secrets!"
+            exit 1
+          fi
+
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.PROD_SSH_KEY || secrets.SSH_KEY }}
+
+      - name: Deploy through SSH
+        env:
+          SSH_USER: ${{ secrets.PROD_SSH_USER || secrets.SSH_USER || 'it' }}
+          SSH_HOST: ${{ secrets.PROD_SSH_HOST || secrets.SSH_HOST }}
+        run: |
+          ssh -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "
+            cd /home/it/vtk-website-new &&
+            git fetch --all &&
+            git reset --hard ${{ github.sha }} &&
+
+            # Trigger the automount and refuse to deploy against a local fallback
+            # directory when the 12 TB NFS filesystem is unavailable.
+            timeout 30 stat /mnt/immich/.immich-storage-ready >/dev/null 2>&1 &&
+            findmnt -rn -M /mnt/immich -t nfs4 >/dev/null &&
+
+            # Build while the current containers are still serving traffic.
+            docker compose -f infra/docker-compose.yml config --quiet &&
+            docker compose -f infra/docker-compose.yml build &&
+
+            # One-time migration of the existing IPv4-only default network.
+            # Doing this explicitly avoids Compose reusing a container that
+            # still references the removed network ID. Named volumes survive.
+            if docker network inspect infra_default --format '{{.EnableIPv6}}' 2>/dev/null |
+              grep -qx false; then
+              docker compose -f infra/docker-compose.yml down --remove-orphans
+            fi &&
+
+            docker compose -f infra/docker-compose.yml up -d --remove-orphans &&
+
+            # Opruimen na de switch, want pas nu draaien de containers op de
+            # nieuwe images en is de vorige versie echt ongebruikt.
+            { docker image prune -f || true; } &&
+
+            # Buildcache ouder dan een week. Recente lagen blijven staan, zodat de
+            # volgende build ze nog kan hergebruiken.
+            { docker builder prune -f --filter until=168h || true; }
+          "

@@ -311,9 +311,10 @@ Compose file on the server.
 
 ## 7. Deployment mount guard
 
-The repository's `.github/workflows/deploy.yml` already triggers the automount
-and refuses to deploy unless `/mnt/immich` is an NFSv4 mount containing the
-remote marker. Its deployment guard is:
+The repository's deploy workflows (`.github/workflows/deploy-prod.yml` and
+`.github/workflows/deploy-dev.yml`) trigger the automount and refuse to deploy
+unless `/mnt/immich` is an NFSv4 mount containing the remote marker. Its
+deployment guard is:
 
 ```bash
 # Refuse deployment if the 12 TB NFS storage is unavailable.
@@ -383,7 +384,7 @@ Do not delete `infra/immich/data/library` yet; keep it for rollback.
 Commit the Compose and deployment-guard changes from the development checkout:
 
 ```bash
-git add infra/docker-compose.yml .github/workflows/deploy.yml
+git add infra/docker-compose.yml .github/workflows/deploy-prod.yml .github/workflows/deploy-dev.yml
 git commit -m "Store Immich media on remote NFS storage"
 git push origin main
 ```

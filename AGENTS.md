@@ -136,7 +136,7 @@ if you need them.
 
 `.githooks/pre-push` draait `npm run verify` (lockfile-check, `next typegen` +
 `tsc --noEmit`, eslint en de unit tests van `@vtk/web`). Dat zijn dezelfde
-checks als de `verify`-job in `.github/workflows/deploy.yml`, minus wat een
+checks als de `checks`-job in `.github/workflows/deploy-dev.yml`, minus wat een
 database, een browser of een volledige build nodig heeft. Een mislukte verify op
 main blokkeert de deploy, dus je wil dat lokaal weten en niet uit de pipeline.
 
