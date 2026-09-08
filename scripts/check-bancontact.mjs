@@ -1,23 +1,25 @@
 /**
  * Kijkt na of BANCONTACT_API_KEY aanvaard wordt, en op welke host.
  *
- * Dit bestaat omdat het antwoord op een verkeerde sleutel niets verraadt: de
- * provider stuurt `401 UNAUTHORIZED` met exact dezelfde body als wanneer je
- * helemaal geen sleutel meestuurt, en de koper ziet enkel "de betaalpagina is
- * tijdelijk niet bereikbaar". Dat verschil zelf uitvlooien kost een avond; dit
- * script legt de twee naast elkaar.
+ * Dit bestaat omdat het antwoord op de verkeerde host niets verraadt. De oude
+ * payconiq-host leeft nog en antwoordt `401 UNAUTHORIZED` met exact dezelfde
+ * body als wanneer je helemaal geen sleutel meestuurt, en de koper ziet enkel
+ * "de betaalpagina is tijdelijk niet bereikbaar". Een geldige sleutel op het
+ * verkeerde adres ziet er dus uit als een ongeldige sleutel. Dat heeft hier een
+ * avond gekost; dit script legt de kandidaten naast elkaar.
  *
  *   node --env-file=.env scripts/check-bancontact.mjs
  *
  * Er wordt niets aangemaakt: het script vraagt een betaling op die niet bestaat.
- * Wat je wil zien is 404 (of 400) op één van de twee hosts, want dat betekent
- * dat de sleutel herkend is en enkel die betaling niet bestaat. Blijft het op
- * allebei 401, dan is de sleutel geen betaalsleutel van dit product.
+ * Wat je wil zien is 404 op één van de hosts, want dat betekent dat de sleutel
+ * herkend is en enkel die ene betaling niet bestaat. Blijft het overal 401, dan
+ * draagt de sleutel de authority MERCHANT_PAYMENT niet.
  */
 
 const HOSTS = {
-  productie: "https://api.payconiq.com",
-  sandbox: "https://api.ext.payconiq.com",
+  productie: "https://merchant.api.bancontact.net",
+  preprod: "https://merchant.api.preprod.bancontact.net",
+  "payconiq (oud, hoort niet meer te werken)": "https://api.payconiq.com",
 };
 
 const key = process.env.BANCONTACT_API_KEY?.trim();
@@ -63,9 +65,9 @@ for (const [name, base] of Object.entries(HOSTS)) {
 }
 
 if (!accepted) {
-  console.log("Geen van beide hosts herkent deze sleutel.");
-  console.log("Haal in de Bancontact Pro-portal de API-sleutel van het online/e-commerce");
-  console.log("product op (elk product heeft een eigen sleutel) en kijk na of ze geactiveerd is.");
+  console.log("Geen enkele host herkent deze sleutel.");
+  console.log("Haal in de Bancontact Pro-portal de API-sleutel van het betaalprofiel op:");
+  console.log("die moet de authority MERCHANT_PAYMENT dragen voor dit PAYMENTPROFILE.");
   process.exit(1);
 }
 
@@ -73,9 +75,9 @@ console.log(`Deze sleutel hoort bij: ${accepted.name} (${accepted.base}).`);
 if (accepted.base !== configured) {
   console.log(`Maar de configuratie wijst naar ${configured}.`);
   console.log(
-    accepted.name === "sandbox"
-      ? 'Zet BANCONTACT_API_BASE="https://api.ext.payconiq.com".'
-      : "Laat BANCONTACT_API_BASE leeg."
+    accepted.base === HOSTS.productie
+      ? "Laat BANCONTACT_API_BASE leeg."
+      : `Zet BANCONTACT_API_BASE="${accepted.base}".`
   );
   process.exit(1);
 }

@@ -122,9 +122,18 @@ still needs a PSP; what this gateway offers is the app payment.
 **Names changed in 2026 and the old ones are still everywhere.** What used to be
 "Payconiq by Bancontact" is now **Bancontact Pay** (the buyer's app) and
 **Bancontact Pro** (the merchant solution we integrate with); the company is
-**Bancontact Company** as of spring 2026, and the Payconiq brand disappears
-during 2026. The API still runs on the payconiq host, so do not read the
-endpoint as the current brand name.
+**Bancontact Company** as of spring 2026.
+
+**The API moved with the rebrand, and that is a trap.** It is
+`https://merchant.api.bancontact.net` (preprod:
+`https://merchant.api.preprod.bancontact.net`), documented on
+docs.bancontactpro.com. The old `api.payconiq.com` is still up and still
+answers, but it does not know Bancontact Pro keys: it returns `401 UNAUTHORIZED`
+with **the same body as a request carrying no key at all**, so a perfectly good
+key on the old host is indistinguishable from an invalid key. developer.payconiq.com
+still documents that old host and an older version of the schema; do not use it as
+the reference. `npm run check:bancontact` tries every candidate host with and
+without the key and says which one accepts it.
 
 - **No hosted checkout page.** The provider returns a deeplink plus a QR, so we
   host the page: `CheckoutResult.url` points at
@@ -132,20 +141,24 @@ endpoint as the current brand name.
   `TicketPayment.providerDeeplink`. The QR is drawn from that deeplink by
   `/api/tickets/orders/<orderId>/bancontact/qr`, using the same generator as the
   ticket QR, so the page does not depend on an external image host.
-- **`POST /v3/payments` takes exactly six fields**: `amount`, `currency`,
-  `description`, `reference`, `bulkId` and `callbackUrl`; only `amount` is
-  mandatory. There is **no `returnUrl`** and no way to send one, which is why our
-  own page polls the order status instead of waiting for a return from the app.
-  A `returnUrl` was in the create request for a while and does not belong there.
-- Amounts are **integer cents**, unlike Mollie's decimal strings, and must be
-  1..999999 (so no order above EUR 9999,99). `description` is capped at 140
-  characters, `reference` at 35; both are truncated locally. Only the first 35
-  characters of the description reach the bank statement, which is where the
+- **`POST /v3/payments`** takes `amount` (the only mandatory one), `currency`,
+  `description`, `reference`, `bulkId`, `callbackUrl`, `identifyCallbackUrl` and
+  `returnUrl`. We send the first six. `returnUrl` exists but only matters for the
+  provider's own checkout page (`_links.checkout`); a buyer paying in the app
+  never passes it, which is why our page polls the order status.
+- Amounts are **integer cents**, unlike Mollie's decimal strings. There is
+  deliberately **no ceiling** in the gateway: the old payconiq schema said 999999
+  cents, but this API accepts more (measured with a EUR 10 000 payment, then
+  cancelled), and a hard-coded cap would block an order the provider would take.
+  `description` is capped at 140 characters and `reference` at 35; only the first
+  35 of the description reach the bank statement, which is where the mistaken
   single 35 for both came from.
-- **The callback must be `https`.** An `http` URL is not a callback that half
-  works but a 400 on the payment itself, so the gateway leaves it out and warns;
-  reconciliation is then the only way the payment comes back. Localhost is
-  dropped the same way Mollie's is.
+- **Every URL in the request must be `https`.** An `http` address is not a
+  half-working callback but a 400 on the whole payment
+  (`FIELD_IS_INVALID: Field returnUrl is invalid`), so the gateway drops both
+  `returnUrl` and `callbackUrl` when they are not https. Without that, Bancontact
+  cannot be tried out on a laptop at all, since everything there is
+  `http://localhost`. Reconciliation is then the only way a payment comes back.
 - Provider errors carry `code` (`FIELD_IS_INVALID`, `ACCESS_DENIED`,
   `MERCHANT_PROFILE_NOT_FOUND`, ...) and a `traceId`, and `BancontactApiError`
   puts both in its message: that is what their support asks for. A non-JSON body
@@ -170,13 +183,14 @@ endpoint as the current brand name.
   page uses it: once it passes, the dead QR is replaced by a "new QR code" button
   that starts a fresh attempt through `startOrderPayment`. See
   `docs/design-decisions.md` for why that is a button and not automatic.
-- **A 401 is configuration, not a failing payment.** A test key authenticates
-  only on `https://api.ext.payconiq.com` and a live key only on
-  `https://api.payconiq.com`, so `BANCONTACT_API_KEY` and `BANCONTACT_API_BASE`
-  have to belong together; a mismatch gives `401 UNAUTHORIZED` on every payment.
-  The gateway logs that case explicitly. `BANCONTACT_API_BASE` takes the host
-  only: a pasted `.../v3/payments` is stripped (with a warning) because the double
-  version prefix also comes back as a 401.
+- **A 401 is configuration, not a failing payment.** In practice it is the host
+  (see above) or a key without the `MERCHANT_PAYMENT` authority for this payment
+  profile; the docs spell out that the key must carry
+  `authority: MERCHANT_PAYMENT` and `resource: PAYMENTPROFILE:{profileId}`. The
+  gateway logs that case explicitly instead of letting it read as a payment
+  problem. `BANCONTACT_API_BASE` takes the host only: a pasted `.../v3/payments`
+  is stripped (with a warning), because that double version prefix also comes
+  back as a 401.
 - **Verify against your own contract before going live**: endpoint version, field
   names and status values depend on the product in the merchant contract.
   Everything provider-specific sits in `packages/payments/src/bancontact.ts`.

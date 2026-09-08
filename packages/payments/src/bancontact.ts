@@ -17,9 +17,16 @@ import type {
  * vroeger **Payconiq by Bancontact** heette, is nu **Bancontact Pay** (de app
  * van de koper) en **Bancontact Pro** (de betaaloplossing voor handelaars, wat
  * wij hier aanspreken). Het bedrijf heet sinds het voorjaar van 2026
- * Bancontact Company. De merknaam Payconiq verdwijnt in de loop van 2026, maar
- * de API draait nog op de payconiq-host; verwar de merknaam dus niet met het
- * endpoint hieronder.
+ * Bancontact Company.
+ *
+ * **De API is mee verhuisd, en dat is een val.** De oude payconiq-host leeft
+ * nog en antwoordt netjes, maar hij kent de sleutels van een Bancontact
+ * Pro-contract niet: je krijgt er `401 UNAUTHORIZED` op, met exact dezelfde
+ * body als wanneer je helemaal geen sleutel meestuurt. Dat leest als een
+ * ongeldige sleutel terwijl er niets mis is met de sleutel. De documentatie op
+ * developer.payconiq.com beschrijft nog die oude host; docs.bancontactpro.com
+ * is de huidige. Wij stonden hier een tijd op `https://api.payconiq.com`, en
+ * daar is een avond in gekropen.
  *
  * Dit is bewust een **andere** betaalwijze dan Bancontact-via-Mollie, en niet
  * dezelfde betaling langs een andere weg. Bancontact Company is een scheme en
@@ -35,11 +42,12 @@ import type {
  *    de deeplink terug in `deeplinkUrl` en laat de aanroeper bepalen welke
  *    lokale URL de koper te zien krijgt.
  * 2. Bedragen zijn hier gehele centen, niet Mollie's decimale string.
- * 3. Het aanmaakverzoek kent **geen `returnUrl`**. Het contract kent enkel
- *    `amount`, `currency`, `description`, `reference`, `bulkId` en
- *    `callbackUrl`. Er is dus geen terugkeer uit de app waarop we kunnen
- *    rekenen, en onze eigen pagina pollt de bestelstatus. Dat veld heeft hier
- *    wel in gestaan; zet het er niet terug.
+ * 3. `returnUrl` bestaat, maar is niet de weg terug waarop we rekenen. Hij
+ *    geldt voor de betaalpagina van de provider zelf (`_links.checkout`), en
+ *    wij tonen onze eigen pagina met de QR. Wie in zijn app betaalt, komt daar
+ *    sowieso niet langs, dus de pagina pollt de bestelstatus. We sturen hem wel
+ *    mee: wie via de checkout-link binnenkomt, hoort na het betalen bij zijn
+ *    bestelling uit te komen en niet nergens.
  *
  * De grenzen hieronder staan in dat contract en worden hier lokaal afgedwongen.
  * Een verzoek dat de provider toch zou weigeren, weigeren we liever zelf met
@@ -49,20 +57,30 @@ import type {
  * merchantcontract, dan is dit de enige plaats die verandert.
  */
 
-const DEFAULT_API_BASE = "https://api.payconiq.com";
+/**
+ * Productie. De preprod-omgeving draait op
+ * `https://merchant.api.preprod.bancontact.net` en zet je via
+ * `BANCONTACT_API_BASE`. Niet te verwarren met `api.payconiq.com`: zie de kop.
+ */
+const DEFAULT_API_BASE = "https://merchant.api.bancontact.net";
 
 /**
- * De grenzen van het aanmaakverzoek, zoals het contract ze stelt.
+ * De grenzen van het aanmaakverzoek, nagemeten tegen de echte API.
  *
  * `description` mag 140 tekens; enkel de eerste 35 daarvan belanden in de
  * mededeling op het rekeninguittreksel. `reference` is wel hard 35. Die twee
  * stonden hier ooit allebei op 35, waardoor de omschrijving die de koper in
  * zijn app ziet nodeloos afgekapt werd.
+ *
+ * Er staat bewust **geen bovengrens op het bedrag**. De oude payconiq-spec
+ * noemde 999999 cent, maar deze API aanvaardt meer (nagegaan met een betaling
+ * van 10.000 euro, daarna geannuleerd). Zo'n grens hier hardcoderen zou een
+ * grote bestelling tegenhouden die de provider wel aanvaardt, en dat is erger
+ * dan een 400 die nu netjes gelogd wordt.
  */
 const MAX_DESCRIPTION = 140;
 const MAX_REFERENCE = 35;
 const MIN_AMOUNT_CENTS = 1;
-const MAX_AMOUNT_CENTS = 999_999;
 
 export class BancontactApiError extends Error {
   readonly status: number;
@@ -281,13 +299,9 @@ export class BancontactPaymentGateway implements PaymentGateway {
       (sum, line) => sum + line.unitAmountCents * line.quantity,
       0
     );
-    if (
-      !Number.isInteger(totalCents) ||
-      totalCents < MIN_AMOUNT_CENTS ||
-      totalCents > MAX_AMOUNT_CENTS
-    ) {
+    if (!Number.isInteger(totalCents) || totalCents < MIN_AMOUNT_CENTS) {
       throw new BancontactRequestError(
-        `Bancontact accepts ${MIN_AMOUNT_CENTS} to ${MAX_AMOUNT_CENTS} cents, not ${totalCents}`
+        `Bancontact needs a whole amount of at least ${MIN_AMOUNT_CENTS} cent, not ${totalCents}`
       );
     }
     const currency = input.currency.toUpperCase();
@@ -295,19 +309,24 @@ export class BancontactPaymentGateway implements PaymentGateway {
       throw new BancontactRequestError(`Bancontact only settles in EUR, not ${currency}`);
     }
 
-    // De callback moet https zijn. Een http-adres is geen half werkende
-    // callback maar een 400 op de betaling zelf, en dan kan er niets meer
-    // betaald worden; liever geen callback dan geen betaling. De verzoening
-    // (`lib/ticketing/reconciliation.ts`) haalt de betaling dan alsnog op.
+    // Adressen moeten https zijn, en de provider weigert de hele betaling als
+    // er een http-adres in staat ("FIELD_IS_INVALID: Field returnUrl is
+    // invalid"). Dat is geen half werkende terugkeer maar geen betaling, dus
+    // laten we ze liever weg. Op een laptop draait alles op http://localhost,
+    // en zonder deze regel is Bancontact daar dus helemaal niet uit te
+    // proberen. De verzoening (`lib/ticketing/reconciliation.ts`) is het
+    // vangnet voor de callback die dan ontbreekt.
+    const httpsOnly = (url: string | null): string | null =>
+      url && url.startsWith("https://") ? url : null;
+
     const configuredCallbackUrl = this.config.callbackUrl();
-    const callbackUrl = configuredCallbackUrl?.startsWith("https://")
-      ? configuredCallbackUrl
-      : null;
+    const callbackUrl = httpsOnly(configuredCallbackUrl);
     if (configuredCallbackUrl && !callbackUrl) {
       console.warn("Bancontact callback URL is not https and was left out", {
         callbackUrl: configuredCallbackUrl,
       });
     }
+    const returnUrl = httpsOnly(input.successUrl);
 
     let payment: BancontactPayment;
     try {
@@ -318,6 +337,7 @@ export class BancontactPaymentGateway implements PaymentGateway {
           currency,
           description: truncate(input.eventName, MAX_DESCRIPTION),
           reference: truncate(input.orderNumber, MAX_REFERENCE),
+          ...(returnUrl ? { returnUrl } : {}),
           ...(callbackUrl ? { callbackUrl } : {}),
         },
       });
@@ -328,11 +348,12 @@ export class BancontactPaymentGateway implements PaymentGateway {
       // betaalpagina is tijdelijk niet bereikbaar") suggereert het tegendeel.
       if (error instanceof BancontactApiError && (error.status === 401 || error.status === 403)) {
         console.error(
-          "Bancontact refuses the API key. This is configuration, not a failing payment: " +
-            "a test key only authenticates on https://api.ext.payconiq.com and a live key only " +
-            "on https://api.payconiq.com, so check BANCONTACT_API_KEY against " +
-            "BANCONTACT_API_BASE, and check that the key belongs to the online product of the " +
-            "merchant contract.",
+          "Bancontact refuses the API key. This is configuration, not a failing payment. " +
+            "Check the host first: a Bancontact Pro key authenticates on " +
+            "https://merchant.api.bancontact.net (preprod: " +
+            "https://merchant.api.preprod.bancontact.net) and NOT on the older " +
+            "api.payconiq.com, which answers 401 for these keys. Then check that the key " +
+            "carries the MERCHANT_PAYMENT authority for this payment profile.",
           {
             status: error.status,
             code: error.code,

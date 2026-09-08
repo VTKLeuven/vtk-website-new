@@ -83,8 +83,7 @@ describe("BancontactPaymentGateway.createCheckout", () => {
     expect(body.amount).toBe(3500);
     expect(body.currency).toBe("EUR");
     expect(body.reference).toBe("VTK-0001");
-    // Het aanmaakverzoek kent geen returnUrl; zie de kop van bancontact.ts.
-    expect(body).not.toHaveProperty("returnUrl");
+    expect(body.returnUrl).toBe("https://vtk.be/tickets/bestelling/order-1?payment=return");
     expect(body.callbackUrl).toBe("https://vtk.be/api/tickets/bancontact/webhook");
 
     expect(result.url).toBe("https://vtk.be/tickets/bestelling/order-1/bancontact");
@@ -112,38 +111,58 @@ describe("BancontactPaymentGateway.createCheckout", () => {
     expect(body.reference).toHaveLength(35);
   });
 
-  it("leaves out a callback URL that is not https, instead of failing the payment", async () => {
+  it("leaves out the http addresses instead of failing the whole payment", async () => {
     const spy = mockFetch(201, {
       paymentId: "pay_4",
       status: "PENDING",
-      _links: { deeplink: { href: "https://payconiq.com/pay/2/ghi" } },
+      _links: { deeplink: { href: "https://pay.bancontact.net/pay/2/ghi" } },
     });
 
     const bancontact = new BancontactPaymentGateway({
       callbackUrl: () => "http://dev.vtk.be/api/tickets/bancontact/webhook",
-      hostedPageUrl: (input) => `https://vtk.be/tickets/bestelling/${input.orderId}/bancontact`,
+      hostedPageUrl: (input) => `http://localhost:3000/tickets/bestelling/${input.orderId}/bancontact`,
       apiKey: () => "test-key",
       apiBase: () => "https://api.test.local",
     });
-    await bancontact.createCheckout(CHECKOUT_INPUT);
+    // De provider weigert de hele betaling op een http-adres
+    // ("FIELD_IS_INVALID: Field returnUrl is invalid"), dus zonder dit is
+    // Bancontact op een laptop helemaal niet uit te proberen.
+    await bancontact.createCheckout({
+      ...CHECKOUT_INPUT,
+      successUrl: "http://localhost:3000/tickets/bestelling/order-1?payment=return",
+    });
 
     const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
     expect(body).not.toHaveProperty("callbackUrl");
+    expect(body).not.toHaveProperty("returnUrl");
   });
 
-  it("refuses an amount outside the contract before sending anything", async () => {
+  it("refuses an amount below one cent before sending anything", async () => {
     const bancontact = gateway();
     const spy = mockFetch(201, {});
     const error = await bancontact
-      .createCheckout({
-        ...CHECKOUT_INPUT,
-        lines: [{ name: "Weekendpas", quantity: 1, unitAmountCents: 1_000_000 }],
-      })
+      .createCheckout({ ...CHECKOUT_INPUT, lines: [{ name: "Gratis", quantity: 1, unitAmountCents: 0 }] })
       .catch((thrown) => thrown);
 
     expect(spy).not.toHaveBeenCalled();
     // Definitief: dezelfde bestelling nog twee keer sturen verandert niets.
     expect(bancontact.isDefinitiveCheckoutError(error)).toBe(true);
+  });
+
+  it("does not cap the amount, because the API accepts more than the old spec said", async () => {
+    const spy = mockFetch(201, {
+      paymentId: "pay_8",
+      status: "PENDING",
+      _links: { deeplink: { href: "https://pay.bancontact.net/pay/2/stu" } },
+    });
+
+    // 10.000 euro: nagemeten tegen de echte API, die dit aanvaardt.
+    await gateway().createCheckout({
+      ...CHECKOUT_INPUT,
+      lines: [{ name: "Weekendpas", quantity: 1, unitAmountCents: 1_000_000 }],
+    });
+
+    expect(JSON.parse(String(spy.mock.calls[0]?.[1]?.body)).amount).toBe(1_000_000);
   });
 
   it("takes the expiry from the provider, because it is shorter than our reservation", async () => {
@@ -185,11 +204,11 @@ describe("BancontactPaymentGateway.createCheckout", () => {
       apiKey: () => "test-key",
       // Wat iemand uit de documentatie plakt. Zonder normaliseren wordt dit
       // /v3/v3/payments, en dat antwoordt de gateway met een 401.
-      apiBase: () => "https://api.ext.payconiq.com/v3/payments/",
+      apiBase: () => "https://merchant.api.bancontact.net/v3/payments/",
     });
     await bancontact.createCheckout(CHECKOUT_INPUT);
 
-    expect(spy.mock.calls[0]?.[0]).toBe("https://api.ext.payconiq.com/v3/payments");
+    expect(spy.mock.calls[0]?.[0]).toBe("https://merchant.api.bancontact.net/v3/payments");
   });
 
   it("refuses a response without a deeplink instead of returning a dead page", async () => {
