@@ -365,7 +365,10 @@ async function main() {
     // Communicatie beheert de publieke mediapagina (magazines, promovideo's, albums).
     COMMUNICATIE: ["media.manage"],
     CURSUSDIENST: ["openingHours.manageOwn"],
-    FAKBAR: ["openingHours.manageOwn"],
+    // De fakbar-site ('t ElixIr) heeft haar eigen app met eigen beheer; wie in de
+    // post zit, beheert die. Eén permissie voor het hele beheer, net als
+    // `logistiek.manage` voor de uitleendienst.
+    FAKBAR: ["openingHours.manageOwn", "fakbar.manage"],
     THEOKOT: ["openingHours.manageOwn"],
   };
   for (const g of GROUP_SEEDS) {

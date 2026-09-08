@@ -259,7 +259,7 @@ every member of the post gets the role):
 | `grocomeet-deelnemer` | `grocomeet.reserve` | **LEADER** of every post, plus Groep 5 (DEFAULT) |
 | `grocomeet-beheer` | `grocomeet.manage`, `grocomeet.reserve` | Groep 5 |
 | `bureau` | `bureau.manage` | Onderwijs |
-| `post-<code>` (one per post) | none (container to fill in the GUI) | its own post |
+| `post-<code>` (one per post) | none, except: `post-fakbar` also carries `openingHours.manageOwn`, `fakbar.manage` | its own post |
 
 `grocomeet-deelnemer` is the one seeded role granted with **`LEADER`** instead of `DEFAULT`: the
 grocomeet is a meeting of the people responsible for a post, not of every post member. Group 5 gets
