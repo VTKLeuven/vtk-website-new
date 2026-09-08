@@ -129,7 +129,7 @@ export function TicketTypeManager({
                     {pool.reservedCount} {locale === "nl" ? "tijdelijk gereserveerd" : "temporarily reserved"}
                   </p>
                   <details className="ticket-admin-details">
-                    <summary>{locale === "nl" ? "Capaciteit aanpassen" : "Edit capacity"}</summary>
+                    <summary className="ticket-admin-pill-summary">{locale === "nl" ? "Capaciteit aanpassen" : "Edit capacity"}</summary>
                     <div className="ticket-admin-details-body">
                       <form action={updateInventoryPoolAction} className="ticket-admin-form">
                         <input type="hidden" name="locale" value={locale} />
@@ -262,12 +262,14 @@ export function TicketTypeManager({
                     </span>
                   )}
                 </div>
-                <details className="ticket-admin-details">
-                  <summary>
-                    {locale === "nl" ? "Kleur aanpassen" : "Change colour"}
-                    <span className="ticket-admin-row-meta">
-                      {ticketColorLabel(ticketType.color, locale)}
-                    </span>
+                <details className="ticket-admin-details ticket-admin-color-details">
+                  <summary className="ticket-admin-pill-summary">
+                    <span
+                      className="ticket-admin-color-dot"
+                      style={{ background: `var(--ticket-color-${ticketColorKey(ticketType.color)})` }}
+                      aria-hidden="true"
+                    />
+                    {locale === "nl" ? "Kleur aanpassen" : "Change colour"} ({ticketColorLabel(ticketType.color, locale)})
                   </summary>
                   <div className="ticket-admin-details-body">
                     <SaveForm
@@ -303,9 +305,12 @@ export function TicketTypeManager({
           </ul>
         ) : null}
 
-        <hr className="ticket-admin-divider" />
-        <details className="ticket-admin-details" open={!hasActiveTicketType}>
-          <summary>{locale === "nl" ? "Tickettype toevoegen" : "Add ticket type"}</summary>
+        <div className="ticket-admin-add-type-wrap">
+          <details className="ticket-admin-details" open={!hasActiveTicketType}>
+            <summary className="ticket-admin-pill-summary">
+              <Plus aria-hidden="true" size={15} />
+              {locale === "nl" ? "Tickettype toevoegen" : "Add ticket type"}
+            </summary>
           <div className="ticket-admin-details-body">
             {activePools.length === 0 ? (
               <div className="ticket-admin-alert">
@@ -396,6 +401,7 @@ export function TicketTypeManager({
             )}
           </div>
         </details>
+        </div>
       </section>
     </>
   );

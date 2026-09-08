@@ -242,6 +242,9 @@ function orderDto(order: OrderRecord, authenticatedOwner: boolean) {
       title: order.locale === "EN" && order.event.titleEn ? order.event.titleEn : order.event.titleNl,
       startsAt: order.event.startsAt,
       location: order.event.location,
+      confirmationMessage: order.locale === "EN"
+        ? order.event.confirmationMessageEn || order.event.confirmationMessageNl
+        : order.event.confirmationMessageNl,
     },
     tickets: order.items.filter(isIssued).map((item) => ({
       id: item.ticket.id,

@@ -1,24 +1,20 @@
+import { InteractiveRow } from "@/components/ticketing/admin/InteractiveRow";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { currentWorkingYear, hasPermission } from "@vtk/auth";
 import {
   ArrowRight,
-  CalendarClock,
-  CalendarDays,
   FileText,
   Filter,
   Plus,
-  Radio,
   Search,
-  TicketCheck,
   Tickets,
 } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { getAuthorizationPreview, requireSession } from "@/lib/session";
 import { hasLiveTicketManageAll } from "@/lib/ticketing/authorization";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
-import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { StatusBadge } from "@/components/ticketing/admin/StatusBadge";
 import {
   formatDateTime,
@@ -144,9 +140,6 @@ export default async function TicketAdminOverview({
     return true;
   });
 
-  const upcoming = events.filter((event) => event.startsAt >= now).length;
-  const published = events.filter((event) => event.status === "PUBLISHED").length;
-  const tickets = events.reduce((sum, event) => sum + event._count.tickets, 0);
   const base = ticketBase(locale);
 
   return (
@@ -174,13 +167,6 @@ export default async function TicketAdminOverview({
             </Link>
           ) : null}
         </div>
-      </div>
-
-      <div className="ticket-admin-metrics" aria-label={locale === "nl" ? "Samenvatting" : "Summary"}>
-        <AdminMetric icon={CalendarDays} label={locale === "nl" ? "Evenementen" : "Events"} value={formatNumber(events.length, locale)} />
-        <AdminMetric icon={CalendarClock} label={locale === "nl" ? "Aankomend" : "Upcoming"} value={formatNumber(upcoming, locale)} />
-        <AdminMetric icon={Radio} label={locale === "nl" ? "Online" : "Online"} value={formatNumber(published, locale)} tone={published > 0 ? "success" : "default"} />
-        <AdminMetric icon={TicketCheck} label={locale === "nl" ? "Tickets uitgegeven" : "Tickets issued"} value={formatNumber(tickets, locale)} />
       </div>
 
       <section className="ticket-admin-section" aria-labelledby="ticket-events-heading">
@@ -272,7 +258,7 @@ export default async function TicketAdminOverview({
                   const capacity = event.inventoryPools.reduce((sum, pool) => sum + pool.capacity, 0);
                   const sold = event.inventoryPools.reduce((sum, pool) => sum + pool.soldCount, 0);
                   return (
-                    <tr key={event.id}>
+                    <InteractiveRow key={event.id}>
                       <td data-wrap="true">
                         <strong>{locale === "en" && event.titleEn ? event.titleEn : event.titleNl}</strong>
                         <div className="ticket-admin-row-meta ticket-admin-code">/{event.slug}</div>
@@ -296,7 +282,7 @@ export default async function TicketAdminOverview({
                           <ArrowRight aria-hidden="true" size={17} />
                         </Link>
                       </td>
-                    </tr>
+                    </InteractiveRow>
                   );
                 })}
               </tbody>

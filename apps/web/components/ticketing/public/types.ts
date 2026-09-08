@@ -82,6 +82,7 @@ export type PublicOrder = {
     title: string;
     startsAt: string | Date;
     location?: string | null;
+    confirmationMessage?: string | null;
   };
   tickets: PublicTicket[];
 };

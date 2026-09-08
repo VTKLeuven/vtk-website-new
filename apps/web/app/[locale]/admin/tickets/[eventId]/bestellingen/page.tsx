@@ -1,3 +1,4 @@
+import { InteractiveRow } from "@/components/ticketing/admin/InteractiveRow";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
@@ -143,7 +144,7 @@ export default async function TicketOrdersPage({
         />
       </div>
 
-      <section className="ticket-admin-section ticket-admin-section-compact" aria-label={locale === "nl" ? "Bestellingen filteren" : "Filter orders"}>
+      <section className="ticket-admin-section" aria-labelledby="orders-heading">
         <form className="ticket-admin-filterbar" method="get">
           <div className="ticket-admin-field ticket-admin-filter-search">
             <label htmlFor="order-search">{locale === "nl" ? "Zoeken" : "Search"}</label>
@@ -172,9 +173,6 @@ export default async function TicketOrdersPage({
             {locale === "nl" ? "Filter" : "Filter"}
           </button>
         </form>
-      </section>
-
-      <section className="ticket-admin-section" aria-labelledby="orders-heading">
         <div className="ticket-admin-section-head">
           <div>
             <h2 id="orders-heading">{locale === "nl" ? "Resultaten" : "Results"}</h2>
@@ -208,7 +206,7 @@ export default async function TicketOrdersPage({
                     canManageOrders &&
                     ["PAID", "PARTIALLY_REFUNDED", "REFUNDED"].includes(order.status);
                   return (
-                    <tr key={order.id}>
+                    <InteractiveRow key={order.id}>
                       <td className="ticket-admin-code">{order.reference}</td>
                       <td data-wrap="true">
                         <strong>{order.buyerName}</strong>
@@ -320,7 +318,7 @@ export default async function TicketOrdersPage({
                           </div>
                         </details>
                       </td>
-                    </tr>
+                    </InteractiveRow>
                   );
                 })}
               </tbody>

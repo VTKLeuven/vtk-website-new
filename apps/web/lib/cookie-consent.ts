@@ -19,7 +19,7 @@ export type CookieConsentChoice = "essential" | "analytics";
  * komt. Zet hier dus nooit een pagina bij die zelf niet-noodzakelijke cookies
  * plaatst.
  */
-export const COOKIE_BANNER_HIDDEN_PATHS = ["/links"] as const;
+export const COOKIE_BANNER_HIDDEN_PATHS = ["/links", "/scan"] as const;
 
 /**
  * De locales staan hier letterlijk en niet via `@vtk/i18n`: dit bestand wordt
@@ -32,7 +32,7 @@ export function hidesCookieBanner(pathname: string | null | undefined): boolean 
   const withSlash = raw.startsWith("/") ? raw : `/${raw}`;
   const normalized = withSlash.length > 1 ? withSlash.replace(/\/+$/, "") : withSlash;
   const withoutLocale = normalized.replace(/^\/(?:nl|en)(?=\/|$)/, "") || "/";
-  return COOKIE_BANNER_HIDDEN_PATHS.some((hidden) => withoutLocale === hidden);
+  return COOKIE_BANNER_HIDDEN_PATHS.some((hidden) => withoutLocale === hidden || withoutLocale.startsWith(`${hidden}/`));
 }
 
 export function parseCookieConsent(value: string | null | undefined): CookieConsentChoice | null {

@@ -176,6 +176,10 @@ export function OrderStatus({
         </dl>
       </section>
 
+      {paid && order.event.confirmationMessage ? (
+        <p className="ticket-confirmation-message">{order.event.confirmationMessage}</p>
+      ) : null}
+
       {paid && order.tickets.length > 0 ? (
         <section className="ticket-issued-section" aria-labelledby="issued-tickets-title">
           <div className="ticket-section-title-row">

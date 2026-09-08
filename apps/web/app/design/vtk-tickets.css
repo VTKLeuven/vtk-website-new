@@ -1,3 +1,5 @@
+@import "./vtk-ticket-colors.css";
+
 /* Public ticketing and the operational scanner share brand tokens, but keep
    separate layout rules so the camera route never inherits site chrome. */
 
@@ -6,15 +8,7 @@
    volgen. De keys zelf staan in `lib/ticketing/ticketColors.ts`. Elke kleur is
    donker genoeg om er witte tekst op te zetten, want het scannerscherm vult er
    een vlak mee dat op armlengte in het donker leesbaar moet zijn. */
-:root {
-  --ticket-color-navy: #0e1a36;
-  --ticket-color-blue: #17558f;
-  --ticket-color-amber: #96590a;
-  --ticket-color-violet: #5b3699;
-  --ticket-color-green: #16663f;
-  --ticket-color-rose: #a32259;
-  --ticket-color-slate: #4a5468;
-}
+
 
 .vtk-tickets-page,
 .ticket-order-page {
@@ -157,7 +151,7 @@
 .ticket-catalog-shell {
   width: min(100%, var(--max));
   margin: 0 auto;
-  padding: 48px clamp(20px, 3vw, 36px) 96px;
+  padding: 32px clamp(20px, 3vw, 36px) 64px;
 }
 
 .ticket-catalog-title-row,
@@ -376,7 +370,7 @@
 .ticket-shop-head-inner {
   width: min(100%, var(--max));
   margin: 0 auto;
-  padding: 42px clamp(20px, 3vw, 36px) 40px;
+  padding: 20px clamp(20px, 3vw, 36px) 24px;
 }
 
 /* De terugknop en de eyebrow zijn elk een eigen regel; inline naast elkaar
@@ -396,7 +390,7 @@
 }
 
 .ticket-shop-head .ticket-back-link {
-  margin-bottom: 30px;
+  margin-bottom: 12px;
 }
 
 .ticket-shop-head .ticket-eyebrow {
@@ -406,9 +400,9 @@
 
 .ticket-shop-head h1 {
   max-width: 920px;
-  margin: 12px 0 0;
+  margin: 6px 0 0;
   color: var(--paper);
-  font-size: clamp(36px, 4.4vw, 58px);
+  font-size: clamp(30px, 3.5vw, 44px);
   font-weight: 600;
   letter-spacing: -0.035em;
   line-height: 1.03;
@@ -417,9 +411,9 @@
 
 .ticket-shop-description {
   max-width: 760px;
-  margin: 16px 0 0;
+  margin: 10px 0 0;
   color: var(--on-dark-muted);
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1.6;
   white-space: pre-line;
 }
@@ -428,10 +422,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: 10px 24px;
-  margin-top: 27px;
+  margin-top: 14px;
   color: rgba(255, 255, 255, 0.86);
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 /* Gele iconen als kleuraccent op de donkere band. */
@@ -442,13 +436,13 @@
 .ticket-shop-shell {
   width: min(100%, var(--max));
   margin: 0 auto;
-  padding: 42px clamp(20px, 3vw, 36px) 96px;
+  padding: 24px clamp(20px, 3vw, 36px) 56px;
 }
 
 .ticket-shop-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 345px;
-  gap: 46px;
+  grid-template-columns: minmax(0, 1fr) 330px;
+  gap: 24px;
   align-items: start;
 }
 
@@ -458,53 +452,27 @@
 
 .ticket-shop-main {
   min-width: 0;
+  display: grid;
+  gap: 16px;
 }
 
 .ticket-shop-section {
-  padding: 0 0 40px;
+  padding: 18px;
   border-bottom: 1px solid var(--line);
-  margin-bottom: 40px;
+  margin-bottom: 0;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
 }
 
 .ticket-shop-section:last-child {
   margin-bottom: 0;
 }
 
-/* De sectiekop van de ticketshop volgt de kop van een gewone inhoudspagina:
-   titel met de gele regel eronder (`.prose-vtk h2::after` in vtk-page.css).
-   De genummerde bolletjes die hier stonden waren een decoratief stapnummer, en
-   die horen volgens de stijlregels van de site niet als sierraad bij een sectie. */
-.ticket-section-heading {
-  margin-bottom: 21px;
-}
-
-.ticket-section-heading h2 {
-  width: fit-content;
-  max-width: 100%;
-}
-
-.ticket-section-heading h2::after {
-  content: "";
-  display: block;
-  height: 4px;
-  margin-top: 0.5rem;
-  border-radius: 2px;
-  background: var(--yellow);
-}
-
-.ticket-section-heading h2 {
-  margin: 0;
-  font-size: 22px;
-  line-height: 1.2;
-}
-
-.ticket-section-heading p {
-  /* Ruimer dan de 6px van voordien: de gele regel staat nu tussen de titel en
-     deze zin, en die heeft aan weerszijden lucht nodig. */
-  margin: 10px 0 0;
-  color: var(--muted);
-  font-size: 13px;
-}
+/* Compact section headings use the site's sans-serif hierarchy. */
+.ticket-section-heading { margin-bottom: 12px; }
+.ticket-section-heading h2 { margin: 0; font-size: 18px; font-weight: 600; line-height: 1.2; }
+.ticket-section-heading p { margin: 5px 0 0; color: var(--muted); font-size: 13px; }
 
 .ticket-type-list,
 .ticket-attendee-list,
@@ -516,12 +484,12 @@
 .ticket-type-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto 126px;
-  min-height: 112px;
+  min-height: 76px;
   align-items: center;
-  gap: 24px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 20px;
+  gap: 16px;
+  border: 0;
+  border-radius: 0;
+  padding: 12px 0;
   background: white;
 }
 
@@ -636,19 +604,21 @@
 
 .ticket-attendee {
   min-width: 0;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  padding: 20px;
+  border: 0;
+  border-radius: 0;
+  padding: 12px 0 0;
   background: white;
+  border-top: 1px solid var(--line);
+  margin: 0;
 }
 
 .ticket-attendee legend {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  padding: 0 8px;
+  padding: 0 8px 0 0;
   font-size: 13px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .ticket-fields-grid {
@@ -835,10 +805,10 @@
 
 .ticket-order-summary {
   position: sticky;
-  top: 20px;
+  top: 100px;
   overflow: hidden;
-  border: 1px solid var(--line-2);
-  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
   background: white;
 }
 
@@ -867,13 +837,14 @@
 
 .ticket-order-event {
   border-bottom: 1px solid var(--line);
-  padding: 20px 0 17px;
+  padding: 14px 0 10px;
 }
 
 .ticket-order-event h2 {
-  margin: 0 0 12px;
+  margin: 0 0 8px;
   font-size: 17px;
   line-height: 1.3;
+  font-weight: 600;
 }
 
 .ticket-order-event p {
@@ -884,9 +855,9 @@
 }
 
 .ticket-order-lines {
-  min-height: 70px;
+  min-height: 0;
   border-bottom: 1px solid var(--line);
-  padding: 15px 0;
+  padding: 10px 0;
 }
 
 .ticket-order-lines div,
@@ -895,6 +866,7 @@
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+  padding: 14px 0;
 }
 
 .ticket-order-lines div {
@@ -947,7 +919,7 @@
 }
 
 .ticket-checkout-button svg:last-child {
-  margin-left: auto;
+  margin-left: 0;
 }
 
 .ticket-checkout-button:hover:not(:disabled) {
@@ -1043,10 +1015,10 @@
 
 .ticket-status-hero h1 {
   margin: 5px 0 8px;
-  font-family: var(--serif);
-  font-size: 42px;
-  font-style: italic;
-  font-weight: 400;
+  font-family: var(--sans);
+  font-size: clamp(26px, 3vw, 36px);
+  font-style: normal;
+  font-weight: 600;
   line-height: 1.1;
 }
 
@@ -1168,7 +1140,7 @@
   /* Zelfde inspringing als de rest van de kaart (18px): zonder dat liep dit
      vlak tot tegen de rand terwijl de knop eronder wel insprong, en dan botst
      de rand van dit vlak op de rand van de kaart. */
-  margin: 16px 18px 12px;
+  margin: 0 18px 12px;
   padding: 13px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -1311,8 +1283,8 @@
 
 .scanner-route-shell {
   min-height: 100dvh;
-  background: #111318;
-  color: #f7f7f4;
+  background: var(--paper);
+  color: var(--ink);
   font-family: var(--sans);
 }
 
@@ -1326,18 +1298,26 @@
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
   min-height: 100dvh;
-  background: #111318;
+  background: var(--paper);
 }
 
 .scanner-header {
-  display: grid;
-  grid-template-columns: minmax(180px, 1fr) minmax(180px, 260px) auto 42px;
-  min-height: 68px;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  min-height: 68px;
   gap: 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
-  padding: 9px 16px;
-  background: #171a20;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 10px 20px;
+  background: var(--navy);
+  color: #ffffff;
+}
+
+.scanner-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .scanner-event-title {
@@ -1367,10 +1347,10 @@
   height: 42px;
   align-items: center;
   gap: 7px;
-  border: 1px solid rgba(255, 255, 255, 0.16);
+  border: 1px solid var(--line-2);
   border-radius: 6px;
   padding: 0 10px;
-  background: #20242b;
+  background: var(--paper-2);
   color: white;
 }
 
@@ -1417,7 +1397,7 @@
   height: 40px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--line);
   border-radius: 6px;
   color: white;
 }
@@ -1475,7 +1455,7 @@
 }
 
 .scanner-queue-banner button:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--line);
 }
 
 .scanner-queue-banner button:disabled {
@@ -1533,7 +1513,7 @@
   min-height: 360px;
   flex: 1;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--line);
   border-radius: 8px;
   background: #090a0d;
 }
@@ -1611,7 +1591,7 @@
   border-radius: 6px;
   padding: 10px 15px;
   background: #ffd23f;
-  color: #111318;
+  color: var(--paper);
   font-weight: 800;
   cursor: pointer;
 }
@@ -1749,10 +1729,10 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
-  border-radius: 6px;
-  background: #1d2026;
-  color: #d8dae0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -1773,11 +1753,11 @@
    invoer ernaast: het is dezelfde soort actie, en twee verschillende panelen
    onder elkaar zouden suggereren dat er iets anders gebeurt. */
 .scanner-card-reader {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--line);
   border-radius: 8px;
   margin-top: 10px;
   padding: 13px;
-  background: #1a1d22;
+  background: var(--surface);
 }
 
 .scanner-card-reader label {
@@ -1785,7 +1765,7 @@
   align-items: center;
   gap: 6px;
   margin-bottom: 7px;
-  color: #aeb3bd;
+  color: var(--muted);
   font-size: 11px;
   font-weight: 700;
 }
@@ -1794,12 +1774,12 @@
   width: 100%;
   min-width: 0;
   min-height: 42px;
-  border: 1px solid rgba(255, 255, 255, 0.17);
-  border-radius: 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
   padding: 9px 11px;
   outline: 0;
-  background: #101216;
-  color: white;
+  background: var(--surface);
+  color: var(--ink);
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
@@ -1818,17 +1798,17 @@
 }
 
 .scanner-manual-form {
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--line);
   border-radius: 8px;
   margin-top: 10px;
   padding: 13px;
-  background: #1a1d22;
+  background: var(--surface);
 }
 
 .scanner-manual-form label {
   display: block;
   margin-bottom: 7px;
-  color: #aeb3bd;
+  color: var(--muted);
   font-size: 11px;
   font-weight: 700;
 }
@@ -1842,12 +1822,12 @@
 .scanner-manual-form input {
   min-width: 0;
   min-height: 42px;
-  border: 1px solid rgba(255, 255, 255, 0.17);
-  border-radius: 6px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
   padding: 9px 11px;
   outline: 0;
-  background: #101216;
-  color: white;
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .scanner-manual-form input:focus {
@@ -1861,10 +1841,10 @@
   align-items: center;
   gap: 7px;
   border: 0;
-  border-radius: 6px;
+  border-radius: 999px;
   padding: 9px 13px;
   background: #ffd23f;
-  color: #111318;
+  color: var(--ink);
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
@@ -1890,16 +1870,16 @@
 
 .scanner-session-panel {
   min-width: 0;
-  border-left: 1px solid rgba(255, 255, 255, 0.11);
+  border-left: 1px solid var(--line);
   padding: 16px;
-  background: #171a20;
+  background: var(--paper);
 }
 
 .scanner-attendance {
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
   padding: 16px;
-  background: #20242a;
+  background: var(--surface);
 }
 
 .scanner-attendance > span {
@@ -1953,10 +1933,10 @@
   min-width: 0;
   grid-template-columns: 18px 1fr;
   gap: 2px 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
   padding: 10px;
-  background: #20242a;
+  background: var(--surface);
 }
 
 .scanner-counters > div:nth-child(1) svg { color: #63d59c; }
@@ -2027,10 +2007,10 @@
   min-height: 54px;
   align-items: center;
   gap: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.09);
-  border-radius: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
   padding: 7px 9px;
-  background: #1d2026;
+  background: var(--surface);
 }
 
 .scanner-history-state {
@@ -2088,10 +2068,10 @@
   height: 30px;
   align-items: center;
   justify-content: center;
-  border: 1px solid rgba(255, 255, 255, 0.13);
-  border-radius: 5px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
   background: transparent;
-  color: #d7dae0;
+  color: var(--ink);
   cursor: pointer;
 }
 
@@ -2118,7 +2098,7 @@
   align-items: center;
   justify-content: center;
   gap: 10px;
-  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border: 1px dashed var(--line);
   border-radius: 8px;
   margin-top: 9px;
   color: #767c87;
@@ -2133,8 +2113,8 @@
   justify-content: center;
   gap: 12px;
   padding: 25px;
-  background: #111318;
-  color: #c6cad1;
+  background: var(--paper);
+  color: var(--muted);
 }
 
 .scanner-loading > svg {
@@ -2145,7 +2125,7 @@
 
 .scanner-load-error h1 {
   margin: 8px 0 0;
-  color: white;
+  color: var(--ink);
   font-size: 22px;
 }
 
@@ -2313,9 +2293,11 @@
     position: sticky;
     z-index: 20;
     top: 0;
-    grid-template-columns: minmax(0, 1fr) auto 40px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
     min-height: 64px;
     gap: 8px;
+    padding: 10px 14px;
   }
 
   .scanner-gate-select {
@@ -2530,9 +2512,9 @@
 .scanner-name-list {
   margin-top: 10px;
   padding: 13px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--line);
   border-radius: 8px;
-  background: #1a1d22;
+  background: var(--surface);
 }
 
 .scanner-name-search {
@@ -2540,10 +2522,10 @@
   align-items: center;
   gap: 8px;
   padding: 0 11px;
-  border: 1px solid rgba(255, 255, 255, 0.17);
+  border: 1px solid var(--line-2);
   border-radius: 6px;
-  background: #101216;
-  color: #aeb3bd;
+  background: var(--surface);
+  color: var(--muted);
 }
 
 .scanner-name-search input {
@@ -2569,14 +2551,14 @@
 
 .scanner-name-count {
   margin: 9px 0 0;
-  color: #aeb3bd;
+  color: var(--muted);
   font-size: 11px;
   font-weight: 700;
 }
 
 .scanner-name-empty {
   margin: 14px 0 4px;
-  color: #aeb3bd;
+  color: var(--muted);
   font-size: 13px;
   text-align: center;
 }
@@ -2623,7 +2605,7 @@
   place-items: center;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.09);
-  color: #aeb3bd;
+  color: var(--muted);
 }
 
 .scanner-name-list li.is-in .scanner-name-state {
@@ -2647,7 +2629,7 @@
 }
 
 .scanner-name-who small {
-  color: #aeb3bd;
+  color: var(--muted);
   font-size: 12px;
 }
 
@@ -2675,7 +2657,7 @@
   align-items: center;
   gap: 10px;
   padding: 10px 15px;
-  background: #1a1d22;
+  background: var(--surface);
   color: #dfe3ea;
   font-size: 13px;
 }
@@ -2710,7 +2692,7 @@
 .scanner-install-close {
   border-color: transparent !important;
   padding: 6px !important;
-  color: #aeb3bd;
+  color: var(--muted);
 }
 
 /* Keuzescherm van de scanner (/scan): waar het icoon op het beginscherm landt. */
@@ -2726,7 +2708,7 @@
   display: grid;
   gap: 5px;
   padding: 15px 16px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--line);
   border-radius: 14px;
   background: #16191f;
   color: #e7eaf0;
@@ -2787,8 +2769,8 @@
   gap: 12px;
   padding: 16px;
   overflow-y: auto;
-  background: #111318;
-  color: #f7f7f4;
+  background: var(--paper);
+  color: var(--ink);
 }
 
 .scanner-sheet header {
@@ -2809,7 +2791,7 @@
   font-weight: 700;
   letter-spacing: 0.09em;
   text-transform: uppercase;
-  color: #a7adba;
+  color: var(--muted);
 }
 
 .scanner-sheet header button {
@@ -2820,8 +2802,8 @@
   height: 40px;
   border: 0;
   border-radius: 999px;
-  background: #20242b;
-  color: #f7f7f4;
+  background: var(--paper-2);
+  color: var(--ink);
   cursor: pointer;
 }
 
@@ -2829,7 +2811,7 @@
   margin: 0;
   font-size: 0.85rem;
   line-height: 1.45;
-  color: #a7adba;
+  color: var(--muted);
 }
 
 .scanner-sheet-error {
@@ -2847,8 +2829,8 @@
   gap: 10px;
   padding: 0 14px;
   border-radius: 14px;
-  background: #20242b;
-  color: #a7adba;
+  background: var(--paper-2);
+  color: var(--muted);
 }
 
 .scanner-sheet-search input {
@@ -2856,7 +2838,7 @@
   height: 50px;
   border: 0;
   background: none;
-  color: #f7f7f4;
+  color: var(--ink);
   font: inherit;
   font-size: 1rem;
 }
@@ -2900,7 +2882,7 @@
 .scanner-sheet-results span,
 .scanner-sheet-list span {
   font-size: 0.78rem;
-  color: #a7adba;
+  color: var(--muted);
 }
 
 .scanner-sheet-results button {
@@ -2912,7 +2894,7 @@
   border: 0;
   border-radius: 999px;
   background: #ffd23f;
-  color: #111318;
+  color: var(--ink);
   font: inherit;
   font-size: 0.85rem;
   font-weight: 600;
@@ -2920,8 +2902,8 @@
 }
 
 .scanner-sheet-results button:disabled {
-  background: #20242b;
-  color: #a7adba;
+  background: var(--paper-2);
+  color: var(--muted);
   cursor: default;
 }
 
@@ -2933,7 +2915,7 @@
   height: 40px;
   border: 0;
   border-radius: 999px;
-  background: #20242b;
+  background: var(--paper-2);
   color: #ff8493;
   cursor: pointer;
 }
@@ -2945,7 +2927,7 @@
   margin: 0;
   padding: 10px 2px;
   font-size: 0.85rem;
-  color: #a7adba;
+  color: var(--muted);
 }
 
 /* ── Landingspagina van een uitnodigings-QR ─────────────────────────────────
@@ -2959,8 +2941,8 @@
   justify-content: center;
   gap: 10px;
   padding: 32px 24px;
-  background: #111318;
-  color: #f7f7f4;
+  background: var(--paper);
+  color: var(--ink);
   text-align: center;
 }
 
@@ -2972,7 +2954,7 @@
   height: 58px;
   border-radius: 999px;
   background: #0d784c;
-  color: #f7f7f4;
+  color: var(--ink);
 }
 
 .scanner-invite-eyebrow {
@@ -2992,7 +2974,7 @@
 .scanner-invite p {
   max-width: 34ch;
   margin: 0;
-  color: #a7adba;
+  color: var(--muted);
   font-size: 0.92rem;
   line-height: 1.5;
 }
@@ -3014,12 +2996,12 @@
 .scanner-invite-primary {
   margin-top: 14px;
   background: #ffd23f;
-  color: #111318;
+  color: var(--ink);
 }
 
 .scanner-invite-secondary {
-  background: #20242b;
-  color: #f7f7f4;
+  background: var(--paper-2);
+  color: var(--ink);
 }
 
 /* ── De uitnodigings-QR in het scannerspaneel ───────────────────────────────── */
@@ -3041,7 +3023,7 @@
 .scanner-sheet-qr p {
   max-width: 34ch;
   margin: 0;
-  color: #a7adba;
+  color: var(--muted);
   font-size: 0.8rem;
   line-height: 1.45;
   text-align: center;
@@ -3054,10 +3036,10 @@
   justify-content: center;
   gap: 8px;
   padding: 0 16px;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--line);
   border-radius: 999px;
   background: none;
-  color: #f7f7f4;
+  color: var(--ink);
   font: inherit;
   font-size: 0.88rem;
   font-weight: 600;
@@ -3067,7 +3049,7 @@
 .scanner-sheet-toggle[aria-pressed="true"] {
   border-color: #ffd23f;
   background: #ffd23f;
-  color: #111318;
+  color: var(--ink);
 }
 
 /* Betaalwijzekeuze op de bestelpagina.
@@ -3295,3 +3277,69 @@
   object-fit: contain;
 }
 
+
+/* Compact shop: the summary owns payment, while the form owns attendee details. */
+.ticket-order-summary .ticket-order-event p { display: flex; gap: 7px; }
+.ticket-order-summary .ticket-pay-choice { margin: 0 18px; padding: 0; border: 0; border-radius: 0; }
+.ticket-order-summary .ticket-pay-choice h2 { margin: 0 0 10px; font-size: 14px; }
+.ticket-order-summary .ticket-pay-option { min-height: 62px; padding: 10px; gap: 12px; border-radius: 12px; }
+.ticket-order-summary .ticket-pay-logo { width: 60px; }
+.ticket-order-summary .ticket-pay-option-text strong { font-size: 14px; }
+.ticket-order-summary .ticket-pay-option-text small { font-size: 11px; line-height: 1.4; }
+.ticket-order-summary .ticket-pay-more { margin-top: 8px; font-size: 12px; }
+.ticket-same-buyer { margin: 0; font-size: 13px; }
+.ticket-privacy-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
+.ticket-confirmation-message { padding: 18px; margin-top: 20px; border-radius: 12px; background: var(--surface); white-space: pre-wrap; }
+.ticket-checkout-button { text-align: center; }
+.scanner-header { color: #ffffff; }
+.scanner-header .scanner-close { color: #ffffff; }
+.scanner-gate-select { color: var(--ink); background: var(--surface); border-radius: 12px; }
+.scanner-gate-select select { color: var(--ink); }
+.scanner-gate-select > svg { color: var(--muted); }
+.scanner-name-search input, .scanner-sheet-search input { color: var(--ink); }
+.scanner-sheet, .scanner-name-list { background: var(--surface); color: var(--ink); border-radius: 18px; }
+.scanner-sheet-toggle { color: var(--ink); }
+.scanner-sheet-toggle[aria-pressed="true"], .scanner-invite-primary { color: var(--ink); }
+.scanner-sheet-results button { color: var(--ink); }
+.scanner-picker-list a { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 18px; }
+.scanner-picker-list span, .scanner-picker-empty p { color: var(--muted); }
+.scanner-picker-list { width: min(100%, 900px); margin: 0 auto; }
+.scanner-route-shell :is(button, a, input, select):focus-visible { outline: 3px solid var(--yellow); outline-offset: 3px; }
+@media (max-width: 900px) {
+  .ticket-shop-layout { grid-template-columns: minmax(0, 1fr); }
+  .ticket-order-summary { position: static; }
+}
+@media (max-width: 600px) {
+  .ticket-shop-section { padding: 14px; }
+  .ticket-shop-head-inner { padding-top: 16px; padding-bottom: 18px; }
+  .ticket-shop-facts { gap: 8px 14px; }
+}
+
+.scanner-camera-empty button, .scanner-load-error button { color: var(--ink); border-radius: 999px; }
+.scanner-camera-tools button:hover:not(:disabled), .scanner-camera-tools button.is-active { background: var(--yellow); color: var(--ink); }
+.scanner-history-undo:hover:not(:disabled), .scanner-history-undo:focus-visible { background: var(--yellow); color: var(--ink); }
+.scanner-attendance > span, .scanner-attendance > strong small, .scanner-counters span,
+.scanner-history li span, .scanner-history li time, .scanner-history-empty,
+.scanner-card-reader p { color: var(--muted); }
+.scanner-history-head > span { background: var(--paper-2); color: var(--ink); }
+.scanner-history li.is-accepted .scanner-history-state, .scanner-counters > div:nth-child(1) svg { color: #176b4d; }
+.scanner-history li.is-duplicate .scanner-history-state, .scanner-counters > div:nth-child(2) svg { color: #74520d; }
+.scanner-history li.is-reversed .scanner-history-state { color: #304c8c; }
+.scanner-history li.is-rejected .scanner-history-state, .scanner-history li.is-error .scanner-history-state,
+.scanner-counters > div:nth-child(3) svg, .scanner-camera-error { color: #9d2f36; }
+
+.ticket-event-card { border-radius: 18px; }
+.ticket-event-card-link { padding: 20px 24px; }
+.ticket-event-date { border-radius: 12px; }
+.ticket-catalog-title-row { margin-bottom: 20px; }
+.ticket-order-summary-head { text-transform: none; font-size: 14px; font-weight: 600; }
+.ticket-same-buyer { border: 0; padding: 0; min-height: 24px; background: transparent; }
+.ticket-shop-layout .ticket-shop-section:last-child { padding-bottom: 18px; }
+@media (min-width: 901px) and (max-height: 850px) {
+  .ticket-shop-head-inner { padding-top: 14px; padding-bottom: 18px; }
+  .ticket-shop-head h1 { font-size: 32px; }
+  .ticket-shop-head .ticket-eyebrow { display: none; }
+  .ticket-shop-head .ticket-back-link { margin-bottom: 2px; }
+  .ticket-shop-facts { margin-top: 10px; }
+  .ticket-shop-shell { padding-top: 20px; }
+}

@@ -11,13 +11,17 @@ describe("Cookiekeuze", () => {
 });
 
 describe("Paden zonder cookiebanner", () => {
-  it("verbergt de banner op de linkpagina", () => {
+  it("verbergt de banner op de linkpagina en scanner", () => {
     expect(hidesCookieBanner("/links")).toBe(true);
     expect(hidesCookieBanner("/links/")).toBe(true);
     expect(hidesCookieBanner("/links?utm_source=instagram")).toBe(true);
+    expect(hidesCookieBanner("/scan")).toBe(true);
+    expect(hidesCookieBanner("/scan/")).toBe(true);
+    expect(hidesCookieBanner("/scan/event-123")).toBe(true);
     // Verdediging tegen later: mocht de pagina ooit onder een taalvoorvoegsel
     // komen te staan, dan blijft de banner ook daar weg.
     expect(hidesCookieBanner("/en/links")).toBe(true);
+    expect(hidesCookieBanner("/en/scan/event-123")).toBe(true);
   });
 
   it("toont de banner overal anders, ook op paden die ermee beginnen", () => {

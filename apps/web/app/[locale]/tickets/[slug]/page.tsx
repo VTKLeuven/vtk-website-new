@@ -7,6 +7,7 @@ import type { Locale } from "@vtk/i18n";
 import { getPublishedTicketEventBySlug } from "@/lib/ticketing/queries";
 import { hasLocale } from "@/lib/locale";
 import { buildMetadata } from "@/lib/seo";
+import { paymentMethodChoice } from "@/lib/ticketing/paymentMethods";
 import { TicketShop } from "@/components/ticketing/public/TicketShop";
 import {
   formatTicketDate,
@@ -68,7 +69,7 @@ export default async function TicketEventPage({ params }: { params: Params }) {
         </div>
       </header>
       <main className="ticket-shop-shell">
-        <TicketShop event={serializeTicketEvent(event)} locale={locale} />
+        <TicketShop event={serializeTicketEvent(event)} locale={locale} paymentChoice={paymentMethodChoice(locale)} />
       </main>
     </div>
   );

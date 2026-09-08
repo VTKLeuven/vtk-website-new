@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
+import "@/app/design/vtk-base.css";
 import "@/app/design/vtk-tickets.css";
 
 export const viewport: Viewport = {

@@ -1,3 +1,5 @@
+@import "./vtk-ticket-colors.css";
+
 .ticket-admin,
 .ticket-admin * {
   box-sizing: border-box;
@@ -1987,3 +1989,85 @@
   font-size: 12px;
   line-height: 1.5;
 }
+
+/* Ticket pages follow the same heading, card and field system as the other admin pages. */
+.ticket-admin-page-head { align-items: center; padding-bottom: 0; border-bottom: 0; }
+.ticket-admin-page-head h1,
+.ticket-admin-event-title h1 { font-size: clamp(1.8rem, 4vw, 2.6rem); letter-spacing: -0.03em; font-weight: 600; }
+.ticket-admin-page, .ticket-admin-event { gap: 20px; }
+.ticket-admin-section { padding: 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: 0 12px 40px rgba(10, 15, 31, 0.04); }
+.ticket-admin-page > .ticket-admin-section:first-child,
+.ticket-admin-page-head + .ticket-admin-section,
+.ticket-admin-page > .ticket-admin-grid:first-child > .ticket-admin-section:first-child { padding: 20px; border: 1px solid var(--line); }
+.ticket-admin-section-head { margin-bottom: 14px; }
+.ticket-admin-section-icon { width: 22px; height: 22px; border: 0; background: transparent; border-radius: 0; }
+.ticket-admin-section-head h2, .ticket-admin-section-head h3 { font-size: 17px; }
+.ticket-admin-form { gap: 16px; }
+.ticket-admin-form-grid { gap: 12px 16px; }
+.ticket-admin-field :is(input:not([type="checkbox"]):not([type="radio"]), select, textarea) { background: var(--paper) !important; border-radius: 12px !important; }
+.ticket-admin-field > small { color: var(--muted); font-size: 12px; }
+.ticket-admin-filterbar { gap: 10px; margin-bottom: 14px; }
+.ticket-admin-filterbar select { min-height: 40px; }
+.ticket-admin-interactive-row { cursor: pointer; transition: background 120ms ease; }
+.ticket-admin-interactive-row:hover { background: rgba(255, 210, 63, 0.08); }
+.ticket-admin-interactive-row:focus-within { background: var(--paper-2); }
+.ticket-admin-metric { min-height: 76px; padding: 12px 16px; }
+.ticket-admin-metric strong { font-size: 22px; margin-top: 7px; font-variant-numeric: tabular-nums; }
+.ticket-admin-metrics { box-shadow: none; }
+.ticket-admin-details { border: 0; margin-top: 10px; }
+.ticket-admin-details > summary { margin: 0; padding: 8px 0; border: 0; border-radius: 0; background: transparent; line-height: 1.4; }
+.ticket-admin-details[open] > summary { margin-bottom: 10px; }
+.ticket-admin-details-body { padding: 14px; border-radius: 12px; background: var(--paper); }
+.ticket-admin-pill-summary {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 7px;
+  min-height: 34px !important;
+  padding: 6px 14px !important;
+  border: 1px solid var(--line) !important;
+  border-radius: 999px !important;
+  background: var(--surface) !important;
+  color: var(--ink) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  cursor: pointer;
+  list-style: none !important;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+.ticket-admin-pill-summary::-webkit-details-marker { display: none !important; }
+.ticket-admin-pill-summary::marker { display: none !important; }
+.ticket-admin-pill-summary:hover { background: var(--paper-2) !important; border-color: var(--line-2) !important; }
+.ticket-admin-pill-summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.ticket-admin-add-type-wrap { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.ticket-admin-list > li { padding: 16px 0; }
+.ticket-admin-list > li:first-child { padding-top: 0; }
+.ticket-admin-list > li:has(.ticket-admin-access-entry) { padding: 0; border-top: 0; }
+.ticket-admin-list .ticket-admin-row-head { align-items: flex-start; }
+.ticket-admin-settings-disclosure { min-width: 0; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); }
+.ticket-admin-settings-disclosure > summary { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 16px 20px; font-weight: 600; cursor: pointer; list-style: none; }
+.ticket-admin-settings-disclosure > summary::-webkit-details-marker { display: none; }
+.ticket-admin-settings-disclosure > summary::after { content: "+"; margin-left: auto; font-size: 20px; }
+.ticket-admin-settings-disclosure[open] > summary::after { content: "−"; }
+.ticket-admin-settings-disclosure > summary small { color: var(--muted); font-size: 12px; font-weight: 400; }
+.ticket-admin-settings-disclosure > summary:hover { background: var(--paper-2); border-radius: 18px; }
+.ticket-admin-settings-disclosure > summary:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+.ticket-admin-settings-content { padding: 0 20px 20px; }
+.ticket-admin-settings-content > .ticket-admin-help { margin: 0 0 16px; }
+.ticket-admin-settings-content > .ticket-admin-section { border: 0; padding: 0; box-shadow: none; }
+.ticket-admin-access-entry { border-bottom: 1px solid var(--line); }
+.ticket-admin-access-entry > summary { display: flex; align-items: center; gap: 10px; padding: 14px 4px; cursor: pointer; list-style: none; }
+.ticket-admin-access-entry > summary::-webkit-details-marker { display: none; }
+.ticket-admin-access-entry > summary::after { content: "+"; margin-left: auto; }
+.ticket-admin-access-entry[open] > summary::after { content: "−"; }
+.ticket-admin-access-entry > summary:hover { background: var(--paper); }
+.ticket-admin-access-entry > div { padding: 0 4px 14px; }
+@media (max-width: 600px) {
+  .ticket-admin-section, .ticket-admin-page > .ticket-admin-section:first-child, .ticket-admin-page-head + .ticket-admin-section { padding: 14px; }
+  .ticket-admin-settings-disclosure > summary { padding: 14px; }
+  .ticket-admin-settings-disclosure > summary small { flex-basis: 100%; }
+  .ticket-admin-settings-content { padding: 0 14px 14px; }
+}
+
+.ticket-admin-anchor-section { display: grid; gap: 16px; }
+.ticket-admin .ticket-admin-row-title { color: var(--ink) !important; }
+.ticket-admin-access-entry > summary:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }

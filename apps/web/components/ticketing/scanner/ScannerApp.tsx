@@ -806,19 +806,21 @@ export function ScannerApp({ eventId }: { eventId: string }) {
           {online ? <Signal size={16} aria-hidden="true" /> : <SignalZero size={16} aria-hidden="true" />}
           {online ? "Online" : "Offline"}
         </div>
-        {bootstrap.canManageScanners ? (
-          <button
-            type="button"
-            className="scanner-close"
-            onClick={() => setAccessOpen(true)}
-            aria-label="Scanners beheren"
-            title="Scanners beheren"
-            disabled={!online}
-          >
-            <UserRoundCog aria-hidden="true" />
-          </button>
-        ) : null}
-        <Link href="/tickets" className="scanner-close" aria-label="Scanner sluiten" title="Scanner sluiten"><X aria-hidden="true" /></Link>
+        <div className="scanner-header-actions">
+          {bootstrap.canManageScanners ? (
+            <button
+              type="button"
+              className="scanner-close"
+              onClick={() => setAccessOpen(true)}
+              aria-label="Scanners beheren"
+              title="Scanners beheren"
+              disabled={!online}
+            >
+              <UserRoundCog aria-hidden="true" />
+            </button>
+          ) : null}
+          <Link href="/tickets" className="scanner-close" aria-label="Scanner sluiten" title="Scanner sluiten"><X aria-hidden="true" /></Link>
+        </div>
       </header>
 
       {accessOpen ? (

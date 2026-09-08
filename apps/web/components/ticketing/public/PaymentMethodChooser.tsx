@@ -71,15 +71,18 @@ export function PaymentMethodChooser({
   orderId,
   locale,
   choice,
+  checkout,
 }: {
-  orderId: string;
+  orderId?: string;
   locale: "nl" | "en";
   choice: PaymentMethodChoice;
+  checkout?: { busy: boolean; busyProvider?: string | null; disabled: boolean };
 }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function start(provider: PaymentMethodOption["provider"]) {
+    if (!orderId || busy) return;
     setBusy(provider);
     setError(null);
     try {
@@ -134,12 +137,22 @@ export function PaymentMethodChooser({
           return (
             <button
               key={option.provider}
-              type="button"
+              type={checkout ? "submit" : "button"}
+              name={checkout ? "paymentProvider" : undefined}
+              value={option.provider}
               className="ticket-pay-option"
-              onClick={() => void start(option.provider)}
-              disabled={busy !== null}
+              onClick={checkout ? undefined : () => void start(option.provider)}
+              disabled={checkout ? checkout.disabled || checkout.busy : busy !== null}
             >
-              <PaymentMethodMark option={option} busy={busy === option.provider} title={label.title} />
+              <PaymentMethodMark
+                option={option}
+                busy={
+                  checkout
+                    ? checkout.busy && (checkout.busyProvider ? checkout.busyProvider === option.provider : true)
+                    : busy === option.provider
+                }
+                title={label.title}
+              />
               <span className="ticket-pay-option-text">
                 <strong>{label.title}</strong>
                 <small>{label.hint}</small>

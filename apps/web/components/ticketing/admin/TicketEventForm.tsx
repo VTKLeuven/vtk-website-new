@@ -9,7 +9,6 @@ import {
   AlertTriangle,
   CalendarRange,
   CheckCircle2,
-  FileText,
   Info,
   LoaderCircle,
   Plus,
@@ -265,39 +264,15 @@ export function TicketEventForm({
               </small>
             </div>
           )}
-          {/* Het adres hoort bij het ticketevent, niet bij het kalenderevent:
-              het bestaat enkel om de geofence op de walletpas te voeden. Het
-              blijft dus ook staan wanneer titel, locatie en beschrijving van de
-              kalender overgenomen worden; anders was het veld onbereikbaar voor
-              precies de events die aan de kalender hangen. */}
-          <AddressPicker
-            defaultAddress={event.locationAddress}
-            defaultLatitude={event.locationLatitude}
-            defaultLongitude={event.locationLongitude}
-            locale={locale}
-          />
-          {linkedCalendarEvent ? null : (
-            <>
-              <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="ticket-description-nl">Beschrijving (NL)</label>
-                <textarea
-                  id="ticket-description-nl"
-                  name="descriptionNl"
-                  defaultValue={event.descriptionNl ?? ""}
-                  rows={4}
-                />
-              </div>
-              <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="ticket-description-en">Beschrijving (EN)</label>
-                <textarea
-                  id="ticket-description-en"
-                  name="descriptionEn"
-                  defaultValue={event.descriptionEn ?? ""}
-                  rows={4}
-                />
-              </div>
-            </>
-          )}
+          <div className="ticket-admin-field">
+            <label htmlFor="ticket-contact-email">{locale === "nl" ? "Contact e-mail" : "Contact email"}</label>
+            <input
+              id="ticket-contact-email"
+              name="contactEmail"
+              type="email"
+              defaultValue={event.contactEmail ?? ""}
+            />
+          </div>
         </div>
       </section>
 
@@ -433,6 +408,45 @@ export function TicketEventForm({
         </div>
       </section>
 
+      <details className="ticket-admin-settings-disclosure">
+        <summary>{locale === "nl" ? "Beschrijving en adres" : "Description and address"}<small>{locale === "nl" ? "Optioneel · extra informatie voor bezoekers" : "Optional · extra visitor information"}</small></summary>
+        <div className="ticket-admin-settings-content ticket-admin-form-grid">
+          {/* Het adres hoort bij het ticketevent, niet bij het kalenderevent:
+              het bestaat enkel om de geofence op de walletpas te voeden. Het
+              blijft dus ook staan wanneer titel, locatie en beschrijving van de
+              kalender overgenomen worden; anders was het veld onbereikbaar voor
+              precies de events die aan de kalender hangen. */}
+          <AddressPicker
+            defaultAddress={event.locationAddress}
+            defaultLatitude={event.locationLatitude}
+            defaultLongitude={event.locationLongitude}
+            locale={locale}
+          />
+          {linkedCalendarEvent ? null : (
+            <>
+              <div className="ticket-admin-field" data-span="2">
+                <label htmlFor="ticket-description-nl">Beschrijving (NL)</label>
+                <textarea
+                  id="ticket-description-nl"
+                  name="descriptionNl"
+                  defaultValue={event.descriptionNl ?? ""}
+                  rows={4}
+                />
+              </div>
+              <div className="ticket-admin-field" data-span="2">
+                <label htmlFor="ticket-description-en">Beschrijving (EN)</label>
+                <textarea
+                  id="ticket-description-en"
+                  name="descriptionEn"
+                  defaultValue={event.descriptionEn ?? ""}
+                  rows={4}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </details>
+
       {/* Alleen bij aanmaken. Voorheen vroeg dit formulier enkel een capaciteit,
           waarmee je een voorraadpot kreeg maar nog geen verkoopbaar ticket; je
           moest daarna alsnog naar de instellingen om een tickettype met een prijs
@@ -498,30 +512,11 @@ export function TicketEventForm({
         </section>
       ) : null}
 
-      <section className="ticket-admin-section">
-        <div className="ticket-admin-section-head">
-          <div className="ticket-admin-section-heading">
-            <span className="ticket-admin-section-icon"><FileText aria-hidden="true" size={17} /></span>
-            <div>
-            <h2>{locale === "nl" ? "Communicatie" : "Communication"}</h2>
-            <p>
-              {locale === "nl"
-                ? "De algemene voorwaarden worden centraal beheerd voor alle ticketevents."
-                : "The general terms are managed centrally for all ticket events."}
-            </p>
-            </div>
-          </div>
-        </div>
+      <details className="ticket-admin-settings-disclosure">
+        <summary>{locale === "nl" ? "Bevestigingsbericht en voorwaarden" : "Confirmation message and terms"}<small>{locale === "nl" ? "Optioneel · tekst voor kopers na aankoop" : "Optional · text for buyers after purchase"}</small></summary>
+        <div className="ticket-admin-settings-content">
+        <p className="ticket-admin-help">{locale === "nl" ? "Het bevestigingsbericht is een extra mededeling die kopers te zien krijgen op het scherm zodra hun bestelling betaald is, én die meegestuurd wordt in de bevestigingsmail met hun tickets (bijv. praktische afspraken, wat mee te brengen of richtlijnen voor de ingang). Laat leeg als je niets wilt toevoegen." : "The confirmation message is an additional note shown to buyers on the order screen once paid, and included in the ticket confirmation email (e.g. practical instructions or what to bring). Leave empty if you have nothing to add."}</p>
         <div className="ticket-admin-form-grid">
-          <div className="ticket-admin-field">
-            <label htmlFor="ticket-contact-email">{locale === "nl" ? "Contact e-mail" : "Contact email"}</label>
-            <input
-              id="ticket-contact-email"
-              name="contactEmail"
-              type="email"
-              defaultValue={event.contactEmail ?? ""}
-            />
-          </div>
           <div className="ticket-admin-field">
             <span className="ticket-admin-help">
               <Link
@@ -536,27 +531,30 @@ export function TicketEventForm({
           {isEdit ? (
             <>
               <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="ticket-confirmation-nl">Bevestigingsbericht (NL)</label>
+                <label htmlFor="ticket-confirmation-nl">{locale === "nl" ? "Bevestigingsbericht na betaling en in e-mail (NL)" : "Confirmation message after payment and in email (NL)"}</label>
                 <textarea
                   id="ticket-confirmation-nl"
                   name="confirmationMessageNl"
                   defaultValue={event.confirmationMessageNl ?? ""}
+                  placeholder={locale === "nl" ? "Bijv. 'Vergeet je studentenkaart en identiteitskaart niet mee te nemen naar de ingang.'" : "E.g. 'Please bring your student card and ID to the entrance.'"}
                   rows={3}
                 />
               </div>
               <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="ticket-confirmation-en">Bevestigingsbericht (EN)</label>
+                <label htmlFor="ticket-confirmation-en">{locale === "nl" ? "Bevestigingsbericht na betaling en in e-mail (EN)" : "Confirmation message after payment and in email (EN)"}</label>
                 <textarea
                   id="ticket-confirmation-en"
                   name="confirmationMessageEn"
                   defaultValue={event.confirmationMessageEn ?? ""}
+                  placeholder={locale === "nl" ? "Bijv. 'Please bring your student ID and identity card to the entrance.'" : "E.g. 'Please bring your student ID and identity card to the entrance.'"}
                   rows={3}
                 />
               </div>
             </>
           ) : null}
         </div>
-      </section>
+        </div>
+      </details>
 
       {state.status === "error" ? (
         <div className="ticket-admin-alert" data-tone="danger" role="alert">

@@ -245,6 +245,11 @@ export default async function TicketAccessPage({
                   const isLastOwner = grant.role === "OWNER" && ownerCount <= 1;
                   return (
                     <li key={grant.id}>
+                      <details className="ticket-admin-access-entry">
+                        <summary>
+                          <strong>{grant.user.name}</strong>
+                          <span className="ticket-admin-row-meta">{roleLabel(grant.role, locale)}</span>
+                        </summary>
                       <div className="ticket-admin-row-head">
                         <div className="ticket-admin-person">
                           <span className="ticket-admin-avatar" aria-hidden="true">{grant.user.name.slice(0, 1).toUpperCase()}</span>
@@ -273,6 +278,7 @@ export default async function TicketAccessPage({
                           </form>
                         </div>
                       </div>
+                      </details>
                     </li>
                   );
                 })}
@@ -283,6 +289,11 @@ export default async function TicketAccessPage({
               <ul className="ticket-admin-list">
                 {groupGrants.map((grant) => (
                   <li key={grant.id}>
+                    <details className="ticket-admin-access-entry">
+                      <summary>
+                        <strong>{locale === "en" ? grant.group.nameEn : grant.group.nameNl}</strong>
+                        <span className="ticket-admin-row-meta">{roleLabel(grant.role, locale)}</span>
+                      </summary>
                     <div className="ticket-admin-row-head">
                       <div>
                         <p className="ticket-admin-row-title">{locale === "en" ? grant.group.nameEn : grant.group.nameNl}</p>
@@ -299,6 +310,7 @@ export default async function TicketAccessPage({
                         </button>
                       </form>
                     </div>
+                    </details>
                   </li>
                 ))}
               </ul>

@@ -1,3 +1,4 @@
+import { InteractiveRow } from "@/components/ticketing/admin/InteractiveRow";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
@@ -149,7 +150,7 @@ export default async function TicketAttendeesPage({
         <AdminMetric icon={RotateCcw} label={locale === "nl" ? "Terugbetaald" : "Refunded"} value={formatNumber(refundedCount, locale)} />
       </div>
 
-      <section className="ticket-admin-section ticket-admin-section-compact" aria-label={locale === "nl" ? "Deelnemers filteren" : "Filter attendees"}>
+      <section className="ticket-admin-section" aria-labelledby="attendees-heading">
         <form className="ticket-admin-filterbar" method="get">
           <div className="ticket-admin-field ticket-admin-filter-search">
             <label htmlFor="attendee-search">{locale === "nl" ? "Zoeken" : "Search"}</label>
@@ -199,9 +200,6 @@ export default async function TicketAttendeesPage({
             {locale === "nl" ? "Filter" : "Filter"}
           </button>
         </form>
-      </section>
-
-      <section className="ticket-admin-section" aria-labelledby="attendees-heading">
         <div className="ticket-admin-section-head">
           <div>
             <h2 id="attendees-heading">{locale === "nl" ? "Deelnemerslijst" : "Attendee list"}</h2>
@@ -233,7 +231,7 @@ export default async function TicketAttendeesPage({
                   if (!ticket) return null;
                   const latestScan = ticket.scanLogs[0];
                   return (
-                    <tr key={item.id}>
+                    <InteractiveRow key={item.id}>
                       <td data-wrap="true">
                         <strong>{item.attendeeName}</strong>
                         <div className="ticket-admin-row-meta ticket-admin-inline-meta">
@@ -365,7 +363,7 @@ export default async function TicketAttendeesPage({
                           </div>
                         </details>
                       </td>
-                    </tr>
+                    </InteractiveRow>
                   );
                 })}
               </tbody>

@@ -47,6 +47,7 @@ export const checkoutRequestSchema = z.object({
   buyerEmail: z.string().trim().email().max(320).transform((value) => value.toLowerCase()),
   locale: z.enum(["nl", "en"]).default("nl"),
   termsAccepted: z.literal(true),
+  paymentProvider: z.enum(["bancontact", "mollie", "mock"]).optional(),
   items: z
     .array(
       z.object({
@@ -149,6 +150,10 @@ export async function createTicketCheckout(
   checkoutUrl: string;
 }> {
   const input = checkoutRequestSchema.parse(rawInput);
+  const methods = enabledPaymentMethods();
+  if (input.paymentProvider && !methods.includes(input.paymentProvider)) {
+    throw new TicketCheckoutError("PAYMENT_UNAVAILABLE");
+  }
   const now = new Date();
   const [session, terms] = await Promise.all([getSession(await headers()), getTicketTerms()]);
   // Erelidtickets staan bij niemand anders in de lijst (zie ticketing/queries.ts);
@@ -403,11 +408,9 @@ export async function createTicketCheckout(
     };
   }
 
-  // Is er maar één betaalwijze, dan is een keuzescherm een scherm met één knop:
-  // we sturen de koper meteen door, precies zoals voordien. Zijn er meerdere,
-  // dan kiest hij op de bestelpagina en start `startOrderPayment` de betaling.
-  const methods = enabledPaymentMethods();
-  if (methods.length > 1) {
+  // The shop sends its selected provider. Older clients without a choice can
+  // still select one on the order page when multiple providers are enabled.
+  if (!input.paymentProvider && methods.length > 1) {
     return {
       orderId,
       orderNumber,
@@ -439,7 +442,7 @@ export async function createTicketCheckout(
 
   let checkout: CheckoutResult;
   try {
-    checkout = await createAndPersistCheckout(context, methods[0]!, 1, paymentId);
+    checkout = await createAndPersistCheckout(context, input.paymentProvider ?? methods[0]!, 1, paymentId);
   } catch (error) {
     if (error instanceof CheckoutCreationError) {
       if (error.definitive) await failPendingOrder(orderId, paymentId);

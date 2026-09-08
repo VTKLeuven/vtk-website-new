@@ -186,6 +186,51 @@ describe.sequential("ticketing database invariants", () => {
     });
   });
 
+  it("starts the selected provider directly when multiple payment methods are enabled", async () => {
+    const previous = process.env.TICKETING_PAYMENT_METHODS;
+    vi.stubEnv("TICKETING_PAYMENT_METHODS", "mollie,mock");
+    try {
+      const checkout = await createTicketCheckout({
+        eventId: ids.rateEvent,
+        buyerName: "Direct Checkout Buyer",
+        buyerEmail: "direct-checkout@example.test",
+        locale: "nl",
+        termsAccepted: true,
+        paymentProvider: "mock",
+        items: [{ ticketTypeId: ids.rateType, attendeeName: "Direct Attendee", attendeeEmail: "" }],
+      }, "direct-checkout-fingerprint");
+      expect(new URL(checkout.checkoutUrl).pathname).toBe("/api/tickets/mock/complete");
+      const payments = await prisma.ticketPayment.findMany({ where: { orderId: checkout.orderId } });
+      expect(payments).toHaveLength(1);
+      expect(payments[0]).toMatchObject({ provider: "mock", amountCents: 100 });
+    } finally {
+      if (previous === undefined) delete process.env.TICKETING_PAYMENT_METHODS;
+      else process.env.TICKETING_PAYMENT_METHODS = previous;
+    }
+  });
+
+  it("rejects a disabled payment provider before reserving inventory or creating an order", async () => {
+    const previous = process.env.TICKETING_PAYMENT_METHODS;
+    vi.stubEnv("TICKETING_PAYMENT_METHODS", "mock");
+    try {
+      const before = await prisma.ticketInventoryPool.findUniqueOrThrow({ where: { id: ids.ratePool } });
+      await expect(createTicketCheckout({
+        eventId: ids.rateEvent,
+        buyerName: "Unavailable Provider",
+        buyerEmail: "disabled-provider@example.test",
+        termsAccepted: true,
+        paymentProvider: "bancontact",
+        items: [{ ticketTypeId: ids.rateType, attendeeName: "Test Attendee", attendeeEmail: "" }],
+      }, "disabled-provider-fingerprint")).rejects.toMatchObject({ code: "PAYMENT_UNAVAILABLE" });
+      expect(await prisma.ticketOrder.count({ where: { eventId: ids.rateEvent, buyerEmail: "disabled-provider@example.test" } })).toBe(0);
+      const after = await prisma.ticketInventoryPool.findUniqueOrThrow({ where: { id: ids.ratePool } });
+      expect(after.reservedCount).toBe(before.reservedCount);
+    } finally {
+      if (previous === undefined) delete process.env.TICKETING_PAYMENT_METHODS;
+      else process.env.TICKETING_PAYMENT_METHODS = previous;
+    }
+  });
+
   it("requires an account for a fully free public order", async () => {
     await expect(
       createTicketCheckout(

@@ -51,6 +51,7 @@ test("public purchase, admin dashboard and scanner", async ({ page }) => {
   await page.getByRole("button", { name: /Meer Studententicket/ }).click();
   await page.getByLabel("Naam aanwezige *").fill("E2E Deelnemer");
   await page.getByLabel("E-mail aanwezige *").fill("attendee-e2e@example.test");
+  await page.getByLabel("Stuur de bestelling naar de eerste aanwezige").uncheck();
   await page.getByLabel("Volledige naam *").fill("E2E Koper");
   await page.getByLabel("E-mailadres *").fill("buyer-e2e@example.test");
   await page.locator(".ticket-terms-check input[type=checkbox]").check();
@@ -63,7 +64,7 @@ test("public purchase, admin dashboard and scanner", async ({ page }) => {
   expect(orderSummary).not.toBeNull();
   expect(orderSummary!.y).toBeGreaterThan(buyerSection!.y);
   await page.setViewportSize({ width: 1440, height: 1000 });
-  await page.getByRole("button", { name: /Veilig betalen/ }).click();
+  await page.getByRole("button", { name: /Testbetaling/ }).click();
   await page.waitForURL(/\/tickets\/bestelling\//);
   await expect(page.getByRole("heading", { name: "Je tickets zijn klaar" })).toBeVisible();
   await expect(page.getByAltText("QR-code van ticket")).toBeVisible();

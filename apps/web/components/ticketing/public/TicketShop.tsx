@@ -2,12 +2,12 @@
 
 import { useMemo, useState, type FormEvent } from "react";
 import Link from "next/link";
+import { PaymentMethodChooser, type PaymentMethodChoice } from "./PaymentMethodChooser";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   CalendarDays,
   Check,
-  ChevronRight,
   LoaderCircle,
   LockKeyhole,
   LogIn,
@@ -244,7 +244,9 @@ function QuestionField({
 export function TicketShop({
   event,
   locale,
+  paymentChoice,
 }: {
+  paymentChoice: PaymentMethodChoice;
   event: SerializedTicketEvent;
   locale: "nl" | "en";
 }) {
@@ -255,7 +257,9 @@ export function TicketShop({
   const [attendees, setAttendees] = useState<Record<string, Attendee[]>>({});
   const [buyerName, setBuyerName] = useState(event.viewer?.name ?? "");
   const [buyerEmail, setBuyerEmail] = useState(event.viewer?.email ?? "");
+  const [sameBuyer, setSameBuyer] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [submittingProvider, setSubmittingProvider] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const selectedCount = useMemo(
@@ -314,7 +318,12 @@ export function TicketShop({
       return;
     }
 
+    const submitter = (event_.nativeEvent as SubmitEvent).submitter;
+    const provider = submitter instanceof HTMLButtonElement && submitter.value
+      ? submitter.value
+      : paymentChoice.options[0]?.provider;
     setSubmitting(true);
+    setSubmittingProvider(provider ?? null);
     setError(null);
     // Hoeveel mensen die een evenement openen ook effectief beginnen af te
     // rekenen. Zonder bestelnummer: dat hoort bij een persoon, en de
@@ -336,8 +345,9 @@ export function TicketShop({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           eventId: event.id,
-          buyerName: buyerName.trim(),
-          buyerEmail: buyerEmail.trim(),
+          paymentProvider: provider,
+          buyerName: sameBuyer ? items[0].attendeeName : buyerName.trim(),
+          buyerEmail: sameBuyer ? items[0].attendeeEmail : buyerEmail.trim(),
           locale,
           termsAccepted: true,
           items,
@@ -367,6 +377,7 @@ export function TicketShop({
             : "Checkout failed. Please try again.",
       );
       setSubmitting(false);
+      setSubmittingProvider(null);
     }
   }
 
@@ -609,6 +620,12 @@ export function TicketShop({
         ) : null}
 
         {selectedCount > 0 ? (
+          <label className="ticket-checkbox ticket-same-buyer">
+            <input type="checkbox" checked={sameBuyer} onChange={(event_) => setSameBuyer(event_.target.checked)} />
+            <span>{locale === "nl" ? "Stuur de bestelling naar de eerste aanwezige" : "Send the order to the first attendee"}</span>
+          </label>
+        ) : null}
+        {selectedCount > 0 && !sameBuyer ? (
           <section className="ticket-shop-section" aria-labelledby="buyer-heading">
             <div className="ticket-section-heading">
               <div>
@@ -632,7 +649,11 @@ export function TicketShop({
                 </div>
               </label>
             </div>
-            <p className="mt-3 text-sm text-[#5c667f]">
+
+          </section>
+        ) : null}
+        {selectedCount > 0 ? (
+            <p className="ticket-privacy-note">
               {locale === "nl"
                 ? "VTK gebruikt deze gegevens om je bestelling uit te voeren, tickets te leveren, fraude te voorkomen en de boekhouding bij te houden. "
                 : "VTK uses these details to fulfil your order, deliver tickets, prevent fraud and maintain accounting records. "}
@@ -643,7 +664,6 @@ export function TicketShop({
                 {locale === "nl" ? "Lees de privacyverklaring." : "Read the privacy statement."}
               </a>
             </p>
-          </section>
         ) : null}
       </div>
 
@@ -695,13 +715,22 @@ export function TicketShop({
             </label>
           ) : null}
           {error ? <div className="ticket-error" role="alert"><AlertCircle size={17} aria-hidden="true" /> {error}</div> : null}
-          <button className="ticket-checkout-button" type="submit" disabled={!salesOpen || selectedCount === 0 || submitting}>
-            {submitting ? <LoaderCircle className="is-spinning" size={19} aria-hidden="true" /> : <LockKeyhole size={18} aria-hidden="true" />}
-            {submitting
-              ? locale === "nl" ? "Betaalpagina openen…" : "Opening checkout…"
-              : locale === "nl" ? "Veilig betalen" : "Secure checkout"}
-            {!submitting ? <ChevronRight size={18} aria-hidden="true" /> : null}
-          </button>
+          {selectedCount > 0 && totalCents > 0 ? (
+            <PaymentMethodChooser
+              locale={locale}
+              choice={paymentChoice}
+              checkout={{ busy: submitting, busyProvider: submittingProvider, disabled: !salesOpen }}
+            />
+          ) : (
+            <button className="ticket-checkout-button" type="submit" disabled={!salesOpen || selectedCount === 0 || submitting}>
+              {submitting ? <LoaderCircle className="is-spinning" size={19} aria-hidden="true" /> : <LockKeyhole size={18} aria-hidden="true" />}
+              <span>{submitting
+                ? locale === "nl" ? "Bestelling verwerken…" : "Processing order…"
+                : selectedCount === 0
+                  ? locale === "nl" ? "Kies eerst tickets" : "Select tickets first"
+                  : locale === "nl" ? "Gratis tickets bevestigen" : "Confirm free tickets"}</span>
+            </button>
+          )}
           <div className="ticket-order-trust">
             <span><ShieldCheck size={15} aria-hidden="true" /> {locale === "nl" ? "Beveiligde betaling" : "Secure payment"}</span>
             <span><Check size={15} aria-hidden="true" /> {locale === "nl" ? "Ticket per e-mail" : "Ticket by email"}</span>
