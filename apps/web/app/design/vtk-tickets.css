@@ -3240,7 +3240,60 @@
   font-size: 14px;
 }
 
+/* De vervallen QR. Dezelfde kaart als het paneel dat ze vervangt, met de gele
+   accentregel van een uitgelichte kaart: dit is het enige op het scherm dat nog
+   iets van de koper vraagt. Geen rood, want er is niets misgegaan; zijn tickets
+   staan gewoon nog klaar. */
+.ticket-bancontact-expired {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  max-width: 680px;
+  gap: 16px;
+  align-items: center;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.ticket-bancontact-expired > svg {
+  color: var(--muted);
+}
+
+.ticket-bancontact-expired strong {
+  display: block;
+  font-size: 16px;
+}
+
+.ticket-bancontact-expired p {
+  margin: 6px 0 0;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.ticket-bancontact-expired-error {
+  color: var(--ticket-red);
+}
+
+.ticket-bancontact-expired button {
+  white-space: nowrap;
+}
+
 @media (max-width: 640px) {
+  .ticket-bancontact-expired {
+    grid-template-columns: auto minmax(0, 1fr);
+    justify-items: start;
+  }
+
+  /* De knop onder de tekst en over de volle breedte: naast een zin van twee
+     regels wordt hij anders een streepje in de hoek. */
+  .ticket-bancontact-expired button {
+    grid-column: 1 / -1;
+    justify-content: center;
+    width: 100%;
+  }
+
   .ticket-bancontact-panel {
     grid-template-columns: 1fr;
     gap: 20px;

@@ -176,6 +176,26 @@ function defaultApiBase(): string {
   return process.env.BANCONTACT_API_BASE?.trim() || DEFAULT_API_BASE;
 }
 
+/**
+ * De basis-URL zoals de paden hieronder ze verwachten: enkel het adres, zonder
+ * afsluitende slash en zonder versie.
+ *
+ * `BANCONTACT_API_BASE` wordt met de hand ingevuld, en wat er in de
+ * documentatie staat is de volledige URL van het endpoint
+ * (`https://api.ext.payconiq.com/v3/payments`). Wie die plakt, krijgt
+ * `/v3/v3/payments` of een dubbele slash, en de gateway antwoordt daarop met een
+ * 401 voordat er ooit naar de betaling gekeken wordt. Dat leest als een
+ * verkeerde sleutel terwijl er niets mis is met de sleutel.
+ */
+function normalizeApiBase(base: string): string {
+  const trimmed = base.trim().replace(/\/+$/, "");
+  const normalized = trimmed.replace(/\/v3(\/payments)?$/, "");
+  if (normalized !== base.trim()) {
+    console.warn("Bancontact API base was normalised", { configured: base, used: normalized });
+  }
+  return normalized;
+}
+
 function defaultRefundsEnabled(): boolean {
   return process.env.BANCONTACT_REFUNDS_ENABLED?.trim().toLowerCase() === "true";
 }
@@ -216,7 +236,7 @@ export class BancontactPaymentGateway implements PaymentGateway {
     path: string,
     init: { method: string; body?: unknown } = { method: "GET" }
   ): Promise<T> {
-    const base = (this.config.apiBase ?? defaultApiBase)();
+    const base = normalizeApiBase((this.config.apiBase ?? defaultApiBase)());
     const response = await fetch(`${base}${path}`, {
       method: init.method,
       headers: {
@@ -289,19 +309,48 @@ export class BancontactPaymentGateway implements PaymentGateway {
       });
     }
 
-    const payment = await this.request<BancontactPayment>("/v3/payments", {
-      method: "POST",
-      body: {
-        amount: totalCents,
-        currency,
-        description: truncate(input.eventName, MAX_DESCRIPTION),
-        reference: truncate(input.orderNumber, MAX_REFERENCE),
-        ...(callbackUrl ? { callbackUrl } : {}),
-      },
-    });
+    let payment: BancontactPayment;
+    try {
+      payment = await this.request<BancontactPayment>("/v3/payments", {
+        method: "POST",
+        body: {
+          amount: totalCents,
+          currency,
+          description: truncate(input.eventName, MAX_DESCRIPTION),
+          reference: truncate(input.orderNumber, MAX_REFERENCE),
+          ...(callbackUrl ? { callbackUrl } : {}),
+        },
+      });
+    } catch (error) {
+      // Een 401 of 403 is niet één mislukte betaling maar een stuk configuratie:
+      // elke koper loopt erop vast, en aan de bestelling is niets mis. Dat hoort
+      // in de logs te staan als zoiets, want de melding bij de koper ("de
+      // betaalpagina is tijdelijk niet bereikbaar") suggereert het tegendeel.
+      if (error instanceof BancontactApiError && (error.status === 401 || error.status === 403)) {
+        console.error(
+          "Bancontact refuses the API key. This is configuration, not a failing payment: " +
+            "a test key only authenticates on https://api.ext.payconiq.com and a live key only " +
+            "on https://api.payconiq.com, so check BANCONTACT_API_KEY against " +
+            "BANCONTACT_API_BASE, and check that the key belongs to the online product of the " +
+            "merchant contract.",
+          {
+            status: error.status,
+            code: error.code,
+            apiBase: normalizeApiBase((this.config.apiBase ?? defaultApiBase)()),
+          }
+        );
+      }
+      throw error;
+    }
 
     const deeplinkUrl = payment._links?.deeplink?.href ?? payment._links?.checkout?.href ?? null;
     if (!deeplinkUrl) throw new Error("Bancontact did not return a deeplink");
+
+    // Wanneer deze betaling vervalt, zegt de provider zelf; dat is korter dan
+    // onze reservatie en het hangt aan het merchantcontract, dus we nemen het
+    // over in plaats van een eigen getal te kiezen. Zie de betaalpagina, die
+    // erop terugvalt om geen dode QR te blijven tonen.
+    const providerExpiresAt = payment.expiresAt ? new Date(payment.expiresAt) : null;
 
     return {
       provider: this.name,
@@ -311,6 +360,8 @@ export class BancontactPaymentGateway implements PaymentGateway {
       url: this.config.hostedPageUrl(input),
       deeplinkUrl,
       qrCodeUrl: payment._links?.qrcode?.href ?? null,
+      expiresAt:
+        providerExpiresAt && !Number.isNaN(providerExpiresAt.getTime()) ? providerExpiresAt : null,
       // Een net aangemaakte betaling staat open of is al rond; alles daartussen
       // bestaat hier nog niet.
       status: mapBancontactStatus(payment.status) === "SUCCEEDED" ? "SUCCEEDED" : "PENDING",

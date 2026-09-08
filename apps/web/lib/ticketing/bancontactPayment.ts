@@ -21,6 +21,9 @@ export async function liveBancontactPayment(orderId: string) {
       status: { in: ["CREATED", "PENDING"] },
     },
     orderBy: { createdAt: "desc" },
+    // `expiresAt` is hier de vervaldatum van de checkout bij de provider, niet
+    // die van de reservatie: zie `createAndPersistCheckout`. De pagina heeft ze
+    // nodig om geen dode QR te blijven tonen.
     select: { id: true, providerDeeplink: true, expiresAt: true },
   });
 }

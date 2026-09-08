@@ -3946,6 +3946,22 @@ gebruikt zien; het werkt alleen niet voor wie geen Belgische bankapp heeft.
   dan weigert een terugbetaling met een duidelijke fout in plaats van stil te
   mislukken, en gebeurt ze met de hand via overschrijving. Dit is bewust luidruchtig:
   een half werkende terugbetaling is erger dan een die zegt dat ze niet kan.
+- **Een vervallen QR wordt vervangen op een klik, niet vanzelf.** De betaling bij
+  de provider leeft twee minuten, de reservatie een half uur. Wie intussen zijn
+  telefoon zoekt, komt dus terug bij een QR die niets meer doet. De pagina telt af
+  op de vervaldatum die de provider zelf meegeeft (niet op een eigen getal, want
+  die termijn hangt aan het contract) en zet er dan "deze QR-code is vervallen"
+  met een knop voor een nieuwe.
+  - **Waarom niet automatisch verversen?** Een nieuwe betaling annuleert de
+    vorige. Wie op dat moment net aan het bevestigen is in zijn app, zou dat onder
+    zijn handen zien wegvallen. `startOrderPayment` vraagt de vorige eerst op bij
+    de provider, dus een betaling die toch doorging levert alsnog tickets; maar
+    dat is een vangnet, geen reden om het risico elke twee minuten te nemen.
+  - **Waarom geen tikkende klok?** Een aftelling van twee minuten naast een QR
+    jaagt vooral op. De koper heeft aan "vervallen" genoeg om te weten wat hij
+    moet doen, en de melding komt pas wanneer er echt iets te doen is.
+  - De tekst zegt er expliciet bij dat de tickets nog klaarstaan. Zonder die zin
+    leest een vervallen QR als een mislukte bestelling, en dat is ze niet.
 
 ## Eén centrale pagina met ticketvoorwaarden
 

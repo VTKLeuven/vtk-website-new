@@ -598,6 +598,10 @@ async function createAndPersistCheckout(
           checkoutUrl: checkout.url,
           providerDeeplink: checkout.deeplinkUrl ?? null,
           providerQrCodeUrl: checkout.qrCodeUrl ?? null,
+          // Zegt de provider wanneer zijn checkout vervalt, dan wint dat van de
+          // reservatie: dit veld gaat over deze betaalpoging en niet over hoe
+          // lang de tickets vasthangen. De betaalpagina leest het.
+          ...(checkout.expiresAt ? { expiresAt: checkout.expiresAt } : {}),
         },
       });
       checkoutPersisted = true;

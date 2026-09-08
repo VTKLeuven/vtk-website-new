@@ -38,6 +38,8 @@ export default async function BancontactPaymentPage({ params }: { params: Params
         orderId={orderId}
         locale={localeParam}
         deeplink={payment.providerDeeplink}
+        paymentId={payment.id}
+        expiresAt={payment.expiresAt?.toISOString() ?? null}
         orderNumber={order.orderNumber}
         amountLabel={formatTicketPrice(order.totalCents, order.currency, localeParam)}
       />

@@ -33,6 +33,14 @@ export type CheckoutResult = {
   deeplinkUrl?: string | null;
   /** Door de provider gehoste QR-afbeelding, wanneer die er is. */
   qrCodeUrl?: string | null;
+  /**
+   * Wanneer deze checkout bij de provider vervalt, wanneer die dat zegt. Dat is
+   * niet hetzelfde als het einde van onze reservatie en het is meestal veel
+   * korter: een Bancontact-betaling leeft maar kort, terwijl de tickets een half
+   * uur vastgehouden worden. Null betekent: de provider zegt er niets over, en
+   * dan blijft de reservatie de enige klok.
+   */
+  expiresAt?: Date | null;
   status: "PENDING" | "SUCCEEDED";
 };
 

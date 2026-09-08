@@ -163,6 +163,20 @@ endpoint as the current brand name.
   API path; otherwise `refund()` throws `BancontactRefundUnsupportedError` without
   sending a request, and the refund is handled manually by bank transfer. Refund
   reconciliation therefore stays Mollie-only; payment reconciliation covers both.
+- **A payment expires long before the reservation does** (two minutes on our
+  contract, against 31 minutes of held tickets). `createCheckout` returns the
+  provider's own `expiresAt` and it is stored on `TicketPayment.expiresAt`, which
+  for Bancontact therefore means *this attempt*, not the reservation. The payment
+  page uses it: once it passes, the dead QR is replaced by a "new QR code" button
+  that starts a fresh attempt through `startOrderPayment`. See
+  `docs/design-decisions.md` for why that is a button and not automatic.
+- **A 401 is configuration, not a failing payment.** A test key authenticates
+  only on `https://api.ext.payconiq.com` and a live key only on
+  `https://api.payconiq.com`, so `BANCONTACT_API_KEY` and `BANCONTACT_API_BASE`
+  have to belong together; a mismatch gives `401 UNAUTHORIZED` on every payment.
+  The gateway logs that case explicitly. `BANCONTACT_API_BASE` takes the host
+  only: a pasted `.../v3/payments` is stripped (with a warning) because the double
+  version prefix also comes back as a 401.
 - **Verify against your own contract before going live**: endpoint version, field
   names and status values depend on the product in the merchant contract.
   Everything provider-specific sits in `packages/payments/src/bancontact.ts`.

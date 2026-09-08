@@ -146,6 +146,52 @@ describe("BancontactPaymentGateway.createCheckout", () => {
     expect(bancontact.isDefinitiveCheckoutError(error)).toBe(true);
   });
 
+  it("takes the expiry from the provider, because it is shorter than our reservation", async () => {
+    mockFetch(201, {
+      paymentId: "pay_5",
+      status: "PENDING",
+      // Twee minuten, terwijl de reservatie in CHECKOUT_INPUT tot 20:00 loopt.
+      expiresAt: "2026-09-07T19:32:00.000Z",
+      _links: { deeplink: { href: "https://payconiq.com/pay/2/jkl" } },
+    });
+
+    const result = await gateway().createCheckout(CHECKOUT_INPUT);
+
+    expect(result.expiresAt?.toISOString()).toBe("2026-09-07T19:32:00.000Z");
+  });
+
+  it("leaves the expiry empty when the provider does not give one", async () => {
+    mockFetch(201, {
+      paymentId: "pay_6",
+      status: "PENDING",
+      _links: { deeplink: { href: "https://payconiq.com/pay/2/mno" } },
+    });
+
+    const result = await gateway().createCheckout(CHECKOUT_INPUT);
+
+    expect(result.expiresAt).toBeNull();
+  });
+
+  it("strips a pasted endpoint path from the API base", async () => {
+    const spy = mockFetch(201, {
+      paymentId: "pay_7",
+      status: "PENDING",
+      _links: { deeplink: { href: "https://payconiq.com/pay/2/pqr" } },
+    });
+
+    const bancontact = new BancontactPaymentGateway({
+      callbackUrl: () => null,
+      hostedPageUrl: (input) => `https://vtk.be/tickets/bestelling/${input.orderId}/bancontact`,
+      apiKey: () => "test-key",
+      // Wat iemand uit de documentatie plakt. Zonder normaliseren wordt dit
+      // /v3/v3/payments, en dat antwoordt de gateway met een 401.
+      apiBase: () => "https://api.ext.payconiq.com/v3/payments/",
+    });
+    await bancontact.createCheckout(CHECKOUT_INPUT);
+
+    expect(spy.mock.calls[0]?.[0]).toBe("https://api.ext.payconiq.com/v3/payments");
+  });
+
   it("refuses a response without a deeplink instead of returning a dead page", async () => {
     mockFetch(201, { paymentId: "pay_3", status: "PENDING", _links: {} });
     await expect(gateway().createCheckout(CHECKOUT_INPUT)).rejects.toThrow(/deeplink/);
