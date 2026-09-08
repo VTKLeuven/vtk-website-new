@@ -48,11 +48,11 @@ describe("admin nav structure", () => {
   it("gives everyone the same bar: loose modules loose, Theokot as its own category", () => {
     // Er was ooit een groep "Overig" die Fakscanner en Theokot enkel voor IT en
     // Groep 5 samennam. Dat is weg: welke tabs je ziet hangt van je rechten af,
-    // niet van je post.
+    // niet van je post. (De fakscanner zelf staat intussen in de fakbar-app.)
     const nav = getAdminNav();
     const loose = nav.filter((entry): entry is NavLeaf => !("group" in entry)).map((leaf) => leaf.key);
-    expect(loose).toContain("fakscanner");
     expect(loose).toContain("grocomeet");
+    expect(loose).toContain("vault");
 
     expect(nav.some((entry) => "group" in entry && entry.group === "overig")).toBe(false);
 

@@ -3,6 +3,7 @@ import { timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import type { FakScanResult } from "@prisma/client";
 import { prisma } from "@vtk/db";
+import { FAKSCANNER_SETTING_KEY } from "@vtk/db/fakscanner";
 import { currentWorkingYear } from "@vtk/auth";
 import {
   DEFAULT_FAKSCANNER_CONFIG,
@@ -16,12 +17,14 @@ import {
 
 /**
  * Server-only kant van de fakscanner: de instellingen uit `Setting`, het
- * device-token uit de omgeving, het bijwerken van de stand en de ranglijst voor
- * /admin/fakscanner. De rekenregels zelf (bardag, dubbeltelvenster, gratis pint)
- * staan in {@link ./fakscanner}.
+ * device-token uit de omgeving, het bijwerken van de stand en de ranglijst. De
+ * rekenregels zelf (bardag, dubbeltelvenster, gratis pint) staan in
+ * {@link ./fakscanner}.
+ *
+ * Het beheerscherm staat niet meer hier maar in de fakbar-app
+ * (`apps/fakbar/app/admin/fakscanner`); die leest dezelfde `Setting`-rij en
+ * dezelfde tabellen.
  */
-
-export const FAKSCANNER_SETTING_KEY = "fakscanner.config";
 
 /** Live instellingen; ontbreken ze, dan gelden de defaults. */
 export async function getFakscannerConfig(): Promise<FakscannerConfig> {

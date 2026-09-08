@@ -59,7 +59,6 @@ export function logisticsModuleUrl(): string {
 
 export function getAdminNav(): NavEntry[] {
   const loose: NavEntry[] = [
-    item('fakscanner', '/fakscanner', { perm: 'fakscanner.manage' }),
     item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
     item('logistics', logisticsModuleUrl()),
     item('expenses', '/rekeningen', {

@@ -38,7 +38,9 @@ type IconName =
   | 'upload'
   | 'close'
   | 'retry'
-  | 'flag';
+  | 'flag'
+  | 'copy'
+  | 'print';
 
 export function ElixirIcon({ name, className, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {
   const paths: Record<IconName, ReactNode> = {
@@ -187,6 +189,19 @@ export function ElixirIcon({ name, className, ...props }: SVGProps<SVGSVGElement
       <>
         <path d="M20 12a8 8 0 1 1-2.34-5.66" />
         <path d="M20 4v5h-5" />
+      </>
+    ),
+    copy: (
+      <>
+        <rect x="9" y="9" width="11" height="11" rx="2" />
+        <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+      </>
+    ),
+    print: (
+      <>
+        <path d="M7 8V4h10v4" />
+        <path d="M7 17H5a2 2 0 0 1-2-2v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4a2 2 0 0 1-2 2h-2" />
+        <rect x="7" y="14" width="10" height="6" rx="1" />
       </>
     ),
   };

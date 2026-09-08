@@ -16,6 +16,7 @@ const nodes: AdminNavNode[] = [
   { type: 'item', item: { key: 'specials', href: '/admin/specials', label: 'Specials' } },
   { type: 'item', item: { key: 'weeks', href: '/admin/weekoverzicht', label: 'Weekoverzicht' } },
   { type: 'item', item: { key: 'stats', href: '/admin/statistieken', label: 'Statistieken' } },
+  { type: 'item', item: { key: 'scanner', href: '/admin/fakscanner', label: 'Fakscanner' } },
   { type: 'item', item: { key: 'photos', href: '/admin/fotos', label: "Foto's" } },
   { type: 'item', item: { key: 'takedowns', href: '/admin/verwijderverzoeken', label: 'Verwijderverzoeken' } },
   {
@@ -37,6 +38,7 @@ const icons = {
   specials: <ElixirIcon name="beer" className="h-4 w-4 shrink-0" />,
   weeks: <ElixirIcon name="calendar" className="h-4 w-4 shrink-0" />,
   stats: <ElixirIcon name="dashboard" className="h-4 w-4 shrink-0" />,
+  scanner: <ElixirIcon name="beer" className="h-4 w-4 shrink-0" />,
   photos: <ElixirIcon name="photo" className="h-4 w-4 shrink-0" />,
   config: <ElixirIcon name="settings" className="h-4 w-4 shrink-0" />,
   menu: <ElixirIcon name="menu" className="h-4 w-4 shrink-0" />,
