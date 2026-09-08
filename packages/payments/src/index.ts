@@ -12,6 +12,7 @@ export {
   BancontactApiError,
   BancontactPaymentGateway,
   BancontactRefundUnsupportedError,
+  BancontactRequestError,
   mapBancontactStatus,
   type BancontactGatewayConfig,
   type BancontactPayment,

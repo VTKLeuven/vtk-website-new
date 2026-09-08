@@ -152,6 +152,14 @@ export async function createTicketCheckout(
   const input = checkoutRequestSchema.parse(rawInput);
   const methods = enabledPaymentMethods();
   if (input.paymentProvider && !methods.includes(input.paymentProvider)) {
+    // De knop komt van dezelfde `enabledPaymentMethods()`, dus dit betekent dat
+    // de browser een oudere pagina toont dan de server draait. Zonder deze
+    // regel is dat niet te onderscheiden van een provider die weigert: de koper
+    // ziet in beide gevallen dezelfde melding.
+    console.error("Ticket checkout asked for a payment method that is not enabled", {
+      requested: input.paymentProvider,
+      enabled: methods,
+    });
     throw new TicketCheckoutError("PAYMENT_UNAVAILABLE");
   }
   const now = new Date();
@@ -546,6 +554,17 @@ async function createAndPersistCheckout(
     } catch (error) {
       checkoutError = error;
       if (gateway.isDefinitiveCheckoutError(error)) {
+        // Dit is de enige weg waarlangs een koper "de betaalpagina is tijdelijk
+        // niet bereikbaar" te zien kreeg zonder dat er iets in de logs stond:
+        // een definitieve fout wordt niet opnieuw geprobeerd, en werd dus ook
+        // niet gelogd zoals de onzekere fout hieronder wel. Wat de provider
+        // precies weigert (foutcode, veld, traceId) staat in `error`.
+        console.error("Ticket checkout refused by the payment provider", {
+          orderId: context.orderId,
+          provider,
+          attempt,
+          error,
+        });
         throw new CheckoutCreationError(true, paymentId, error);
       }
       if (retry < 2) {
@@ -929,7 +948,13 @@ export async function startOrderPayment(input: {
   provider: PaymentProviderName;
   locale: "nl" | "en";
 }): Promise<StartPaymentResult> {
-  if (!enabledPaymentMethods().includes(input.provider)) {
+  const methods = enabledPaymentMethods();
+  if (!methods.includes(input.provider)) {
+    console.error("Ticket payment asked for a payment method that is not enabled", {
+      orderId: input.orderId,
+      requested: input.provider,
+      enabled: methods,
+    });
     return { ok: false, code: "METHOD_UNAVAILABLE" };
   }
 

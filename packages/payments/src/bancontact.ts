@@ -28,35 +28,93 @@ import type {
  * API-sleutel. Wat de koper hier krijgt is dus een QR of een sprong naar de
  * Bancontact-app, nooit een kaartformulier.
  *
- * Twee gevolgen die de rest van de code voelt:
+ * Drie gevolgen die de rest van de code voelt:
  *
  * 1. Er is **geen gehoste checkoutpagina**. De provider geeft een deeplink en
  *    een QR terug; de pagina eromheen is van ons. `createCheckout` geeft daarom
  *    de deeplink terug in `deeplinkUrl` en laat de aanroeper bepalen welke
  *    lokale URL de koper te zien krijgt.
  * 2. Bedragen zijn hier gehele centen, niet Mollie's decimale string.
+ * 3. Het aanmaakverzoek kent **geen `returnUrl`**. Het contract kent enkel
+ *    `amount`, `currency`, `description`, `reference`, `bulkId` en
+ *    `callbackUrl`. Er is dus geen terugkeer uit de app waarop we kunnen
+ *    rekenen, en onze eigen pagina pollt de bestelstatus. Dat veld heeft hier
+ *    wel in gestaan; zet het er niet terug.
  *
- * VERIFIEER VOOR PRODUCTIE: endpoint-versie, veldnamen en de exacte
- * statuswaarden hangen aan het producttype in je merchantcontract, en de
- * merkwissel van 2026 kan ze verschoven hebben. Alles wat provider-specifiek
- * is, staat bewust in dit ene bestand; klopt er iets niet, dan is dit de enige
- * plaats die verandert.
+ * De grenzen hieronder staan in dat contract en worden hier lokaal afgedwongen.
+ * Een verzoek dat de provider toch zou weigeren, weigeren we liever zelf met
+ * een leesbare fout: aan hun kant wordt het een 400 die bij de koper als een
+ * algemene "betaalpagina niet bereikbaar" eindigt. Alles wat provider-specifiek
+ * is, staat bewust in dit ene bestand; klopt er iets niet aan je eigen
+ * merchantcontract, dan is dit de enige plaats die verandert.
  */
 
 const DEFAULT_API_BASE = "https://api.payconiq.com";
 
+/**
+ * De grenzen van het aanmaakverzoek, zoals het contract ze stelt.
+ *
+ * `description` mag 140 tekens; enkel de eerste 35 daarvan belanden in de
+ * mededeling op het rekeninguittreksel. `reference` is wel hard 35. Die twee
+ * stonden hier ooit allebei op 35, waardoor de omschrijving die de koper in
+ * zijn app ziet nodeloos afgekapt werd.
+ */
+const MAX_DESCRIPTION = 140;
+const MAX_REFERENCE = 35;
+const MIN_AMOUNT_CENTS = 1;
+const MAX_AMOUNT_CENTS = 999_999;
+
 export class BancontactApiError extends Error {
   readonly status: number;
   readonly detail: unknown;
+  /** Foutcode van de provider (`FIELD_IS_INVALID`, `ACCESS_DENIED`, ...), of null. */
+  readonly code: string | null;
+  /** Het spoor dat de support van de provider vraagt, of null. */
+  readonly traceId: string | null;
+
   constructor(status: number, detail: unknown) {
+    const body =
+      detail && typeof detail === "object" ? (detail as Record<string, unknown>) : {};
+    const code = typeof body.code === "string" ? body.code : null;
+    const traceId = typeof body.traceId === "string" ? body.traceId : null;
     const message =
-      detail && typeof detail === "object" && "message" in detail
-        ? String((detail as { message: unknown }).message)
-        : `HTTP ${status}`;
-    super(`Bancontact API error (${status}): ${message}`);
+      typeof body.message === "string"
+        ? body.message
+        : typeof detail === "string" && detail.trim()
+          ? detail.trim().slice(0, 300)
+          : `HTTP ${status}`;
+    // Alles wat de provider zegt in één regel. Enkel `message` overnemen liet
+    // net de twee dingen vallen waarmee je verder kan: de code zegt wát er mis
+    // is, en de traceId is wat hun support als eerste vraagt.
+    super(
+      [
+        `Bancontact API error (${status})`,
+        code ? `[${code}]` : null,
+        message,
+        traceId ? `(traceId ${traceId})` : null,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    );
     this.name = "BancontactApiError";
     this.status = status;
     this.detail = detail;
+    this.code = code;
+    this.traceId = traceId;
+  }
+}
+
+/**
+ * Een verzoek dat wij zelf al afkeuren, voor het vertrekt.
+ *
+ * Apart van `BancontactApiError`, want dit is geen antwoord van de provider maar
+ * onze eigen vaststelling dat het er geen zin heeft heen te sturen. Het telt wel
+ * als definitief: dezelfde gegevens nog twee keer sturen verandert niets.
+ */
+export class BancontactRequestError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "BancontactRequestError";
   }
 }
 
@@ -79,7 +137,7 @@ export type BancontactPayment = {
   currency?: string;
   reference?: string | null;
   description?: string | null;
-  expireAt?: string | null;
+  expiresAt?: string | null;
   _links?: {
     deeplink?: BancontactLink;
     qrcode?: BancontactLink;
@@ -123,10 +181,10 @@ function defaultRefundsEnabled(): boolean {
 }
 
 /**
- * De provider knipt `description` en `reference` hard af op 35 tekens. Zelf
- * inkorten is beter dan een 400 op een veld dat de koper toch niet leest.
+ * Zelf inkorten is beter dan een 400 op een veld dat de koper toch niet leest.
+ * De grenzen staan bij `MAX_DESCRIPTION` en `MAX_REFERENCE`.
  */
-function truncate(value: string, max = 35): string {
+function truncate(value: string, max: number): string {
   return value.length <= max ? value : value.slice(0, max);
 }
 
@@ -164,15 +222,33 @@ export class BancontactPaymentGateway implements PaymentGateway {
       headers: {
         Authorization: `Bearer ${(this.config.apiKey ?? defaultApiKey)()}`,
         "Content-Type": "application/json",
+        "Cache-Control": "no-cache",
       },
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
       // Externe dienst: een blijven hangen socket mag nooit een request vastzetten.
       signal: AbortSignal.timeout(15_000),
     });
 
+    // Niet elk antwoord is JSON: een proxy, een WAF of een verkeerde
+    // BANCONTACT_API_BASE geeft HTML of niets terug. Blind parsen gooide dan een
+    // `SyntaxError`, en de routes hierboven lezen die als een stukke JSON-body
+    // van de koper (`INVALID_JSON`, 400). Een providerfout mag nooit als een
+    // fout van de koper eindigen, dus parsen we pas na de statuscontrole.
     const text = await response.text();
-    const payload: unknown = text ? JSON.parse(text) : {};
+    let payload: unknown = {};
+    let parsed = true;
+    try {
+      if (text) payload = JSON.parse(text);
+    } catch {
+      parsed = false;
+      payload = text;
+    }
     if (!response.ok) throw new BancontactApiError(response.status, payload);
+    if (!parsed) {
+      throw new Error(
+        `Bancontact returned a non-JSON body for ${init.method} ${path}: ${text.slice(0, 300)}`
+      );
+    }
     return payload as T;
   }
 
@@ -185,16 +261,41 @@ export class BancontactPaymentGateway implements PaymentGateway {
       (sum, line) => sum + line.unitAmountCents * line.quantity,
       0
     );
-    const callbackUrl = this.config.callbackUrl();
+    if (
+      !Number.isInteger(totalCents) ||
+      totalCents < MIN_AMOUNT_CENTS ||
+      totalCents > MAX_AMOUNT_CENTS
+    ) {
+      throw new BancontactRequestError(
+        `Bancontact accepts ${MIN_AMOUNT_CENTS} to ${MAX_AMOUNT_CENTS} cents, not ${totalCents}`
+      );
+    }
+    const currency = input.currency.toUpperCase();
+    if (currency !== "EUR") {
+      throw new BancontactRequestError(`Bancontact only settles in EUR, not ${currency}`);
+    }
+
+    // De callback moet https zijn. Een http-adres is geen half werkende
+    // callback maar een 400 op de betaling zelf, en dan kan er niets meer
+    // betaald worden; liever geen callback dan geen betaling. De verzoening
+    // (`lib/ticketing/reconciliation.ts`) haalt de betaling dan alsnog op.
+    const configuredCallbackUrl = this.config.callbackUrl();
+    const callbackUrl = configuredCallbackUrl?.startsWith("https://")
+      ? configuredCallbackUrl
+      : null;
+    if (configuredCallbackUrl && !callbackUrl) {
+      console.warn("Bancontact callback URL is not https and was left out", {
+        callbackUrl: configuredCallbackUrl,
+      });
+    }
 
     const payment = await this.request<BancontactPayment>("/v3/payments", {
       method: "POST",
       body: {
         amount: totalCents,
-        currency: input.currency.toUpperCase(),
-        description: truncate(input.eventName),
-        reference: truncate(input.orderNumber),
-        returnUrl: input.successUrl,
+        currency,
+        description: truncate(input.eventName, MAX_DESCRIPTION),
+        reference: truncate(input.orderNumber, MAX_REFERENCE),
         ...(callbackUrl ? { callbackUrl } : {}),
       },
     });
@@ -252,7 +353,7 @@ export class BancontactPaymentGateway implements PaymentGateway {
         body: {
           amount: input.amountCents,
           currency: input.currency.toUpperCase(),
-          description: truncate(input.reason || `VTK refund ${input.refundId}`),
+          description: truncate(input.reason || `VTK refund ${input.refundId}`, MAX_DESCRIPTION),
         },
       }
     );
@@ -279,6 +380,8 @@ export class BancontactPaymentGateway implements PaymentGateway {
   }
 
   isDefinitiveCheckoutError(error: unknown): boolean {
+    // Wat wij zelf afkeuren, wordt niet beter van een tweede poging.
+    if (error instanceof BancontactRequestError) return true;
     return (
       error instanceof BancontactApiError &&
       error.status >= 400 &&

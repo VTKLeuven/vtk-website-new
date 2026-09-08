@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  BancontactApiError,
   BancontactPaymentGateway,
   BancontactRefundUnsupportedError,
   mapBancontactStatus,
@@ -82,6 +83,9 @@ describe("BancontactPaymentGateway.createCheckout", () => {
     expect(body.amount).toBe(3500);
     expect(body.currency).toBe("EUR");
     expect(body.reference).toBe("VTK-0001");
+    // Het aanmaakverzoek kent geen returnUrl; zie de kop van bancontact.ts.
+    expect(body).not.toHaveProperty("returnUrl");
+    expect(body.callbackUrl).toBe("https://vtk.be/api/tickets/bancontact/webhook");
 
     expect(result.url).toBe("https://vtk.be/tickets/bestelling/order-1/bancontact");
     expect(result.deeplinkUrl).toBe("https://payconiq.com/pay/2/abc");
@@ -89,7 +93,7 @@ describe("BancontactPaymentGateway.createCheckout", () => {
     expect(result.status).toBe("PENDING");
   });
 
-  it("truncates the description to what the provider accepts", async () => {
+  it("truncates the description and the reference to their own limits", async () => {
     const spy = mockFetch(201, {
       paymentId: "pay_2",
       status: "PENDING",
@@ -98,11 +102,48 @@ describe("BancontactPaymentGateway.createCheckout", () => {
 
     await gateway().createCheckout({
       ...CHECKOUT_INPUT,
-      eventName: "Een evenement met een bijzonder lange naam die niet past",
+      eventName: "E".repeat(200),
+      orderNumber: "R".repeat(50),
     });
 
     const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
-    expect(body.description).toHaveLength(35);
+    // Twee verschillende grenzen: de omschrijving mag 140, de referentie 35.
+    expect(body.description).toHaveLength(140);
+    expect(body.reference).toHaveLength(35);
+  });
+
+  it("leaves out a callback URL that is not https, instead of failing the payment", async () => {
+    const spy = mockFetch(201, {
+      paymentId: "pay_4",
+      status: "PENDING",
+      _links: { deeplink: { href: "https://payconiq.com/pay/2/ghi" } },
+    });
+
+    const bancontact = new BancontactPaymentGateway({
+      callbackUrl: () => "http://dev.vtk.be/api/tickets/bancontact/webhook",
+      hostedPageUrl: (input) => `https://vtk.be/tickets/bestelling/${input.orderId}/bancontact`,
+      apiKey: () => "test-key",
+      apiBase: () => "https://api.test.local",
+    });
+    await bancontact.createCheckout(CHECKOUT_INPUT);
+
+    const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
+    expect(body).not.toHaveProperty("callbackUrl");
+  });
+
+  it("refuses an amount outside the contract before sending anything", async () => {
+    const bancontact = gateway();
+    const spy = mockFetch(201, {});
+    const error = await bancontact
+      .createCheckout({
+        ...CHECKOUT_INPUT,
+        lines: [{ name: "Weekendpas", quantity: 1, unitAmountCents: 1_000_000 }],
+      })
+      .catch((thrown) => thrown);
+
+    expect(spy).not.toHaveBeenCalled();
+    // Definitief: dezelfde bestelling nog twee keer sturen verandert niets.
+    expect(bancontact.isDefinitiveCheckoutError(error)).toBe(true);
   });
 
   it("refuses a response without a deeplink instead of returning a dead page", async () => {
@@ -121,6 +162,46 @@ describe("BancontactPaymentGateway error handling", () => {
     mockFetch(429, { message: "Too many requests" });
     const throttled = await bancontact.createCheckout(CHECKOUT_INPUT).catch((error) => error);
     expect(bancontact.isDefinitiveCheckoutError(throttled)).toBe(false);
+  });
+
+  it("keeps the provider's code and traceId in the error, not just its message", async () => {
+    mockFetch(400, {
+      traceId: "b2586833395d4750",
+      spanId: "c235e54376fab4b9",
+      code: "FIELD_IS_INVALID",
+      message: "Field 'callbackUrl' is invalid",
+    });
+
+    const error = await gateway().createCheckout(CHECKOUT_INPUT).catch((thrown) => thrown);
+
+    expect(error).toBeInstanceOf(BancontactApiError);
+    expect(error.code).toBe("FIELD_IS_INVALID");
+    expect(error.traceId).toBe("b2586833395d4750");
+    // De logregel moet op zichzelf bruikbaar zijn voor hun support.
+    expect(error.message).toContain("FIELD_IS_INVALID");
+    expect(error.message).toContain("b2586833395d4750");
+    expect(error.message).toContain("callbackUrl");
+  });
+
+  it("reports a non-JSON error body as a provider error, not as broken JSON", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response("<html><body>404 Not Found</body></html>", {
+            status: 404,
+            headers: { "Content-Type": "text/html" },
+          })
+      )
+    );
+
+    const error = await gateway().createCheckout(CHECKOUT_INPUT).catch((thrown) => thrown);
+
+    // Blind parsen gaf hier een SyntaxError, en die leest de checkout-route als
+    // een stukke JSON-body van de koper (INVALID_JSON, 400).
+    expect(error).toBeInstanceOf(BancontactApiError);
+    expect(error).not.toBeInstanceOf(SyntaxError);
+    expect(error.status).toBe(404);
   });
 
   it("swallows a 4xx on expiry, because an already-settled payment is a no-op", async () => {

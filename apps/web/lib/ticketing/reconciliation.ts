@@ -5,10 +5,25 @@ import { expirePendingOrder, fulfillPaidOrder } from "./orders";
 import { paymentGatewayFor, type RefundStatusResult } from "./payments";
 import { completeTicketRefund, failTicketRefund } from "./refunds";
 
+/**
+ * De providers waarvan een lopende betaling opnieuw opgevraagd kan worden.
+ *
+ * Expliciet en niet uit `enabledPaymentMethods()`: een betaling die vorige week
+ * gestart is, moet ook verzoend worden wanneer die betaalwijze intussen uit de
+ * configuratie is gehaald. `free` en `mock` staan er niet in; die hebben geen
+ * provider om iets aan te vragen.
+ *
+ * Dit stond op enkel `"mollie"`, en daarmee had een Bancontact-betaling geen
+ * vangnet: bleef de callback weg (een mislukte aflevering, of een callback-URL
+ * die de provider niet aanvaardt), dan bleef een betaalde bestelling voorgoed op
+ * `PENDING_PAYMENT` staan en kreeg de koper nooit tickets.
+ */
+const RECONCILABLE_PROVIDERS = ["mollie", "bancontact"];
+
 export async function reconcileTicketPayments(limit = 50) {
   const payments = await prisma.ticketPayment.findMany({
     where: {
-      provider: "mollie",
+      provider: { in: RECONCILABLE_PROVIDERS },
       status: { in: ["CREATED", "PENDING"] },
       providerCheckoutId: { not: null },
     },
@@ -25,10 +40,18 @@ export async function reconcileTicketPayments(limit = 50) {
         payment.providerCheckoutId!
       );
       if (status.status === "SUCCEEDED") {
+        // Niet elke provider draagt onze order-id mee: Bancontact geeft enkel
+        // een referentie terug. We controleren dus wat er wél terugkomt tegen
+        // onze eigen payment-rij, die per provider uniek is op
+        // `providerCheckoutId`. Bedrag en munt horen daar altijd bij, ook als de
+        // order-id ontbreekt; anders zou een betaling van het verkeerde bedrag
+        // hier tickets uitgeven.
         if (
-          status.orderId !== payment.orderId ||
+          (status.orderId != null && status.orderId !== payment.orderId) ||
           status.amountCents == null ||
+          status.amountCents !== payment.amountCents ||
           !status.currency ||
+          status.currency.toUpperCase() !== payment.currency.toUpperCase() ||
           !status.paymentId
         ) {
           throw new Error("RECONCILIATION_DATA_MISMATCH");
@@ -38,12 +61,32 @@ export async function reconcileTicketPayments(limit = 50) {
           provider: payment.provider,
           providerPaymentId: status.paymentId,
           providerCheckoutId: status.checkoutId,
-          amountCents: status.amountCents,
-          currency: status.currency,
+          amountCents: payment.amountCents,
+          currency: payment.currency,
         });
         succeeded += 1;
       } else if (status.status === "EXPIRED" || status.status === "FAILED") {
-        await expirePendingOrder(payment.orderId);
+        // Dezelfde voorzichtigheid als in de Bancontact-webhook: deze poging
+        // valt af, maar de bestelling enkel wanneer er geen andere betaling meer
+        // openstaat. Sinds een koper tussen twee betaalwijzen kan kiezen, is een
+        // mislukte poging niet meer hetzelfde als een mislukte bestelling, en
+        // `expirePendingOrder` sluit élke openstaande betaling van de bestelling.
+        await prisma.ticketPayment.updateMany({
+          where: { id: payment.id, status: { in: ["CREATED", "PENDING"] } },
+          data: {
+            status: status.status === "EXPIRED" ? "EXPIRED" : "FAILED",
+            failedAt: new Date(),
+          },
+        });
+        const stillOpen = await prisma.ticketPayment.findFirst({
+          where: {
+            orderId: payment.orderId,
+            status: { in: ["CREATED", "PENDING"] },
+            NOT: { id: payment.id },
+          },
+          select: { id: true },
+        });
+        if (!stillOpen) await expirePendingOrder(payment.orderId);
         expired += 1;
       }
     } catch (error) {
@@ -52,6 +95,12 @@ export async function reconcileTicketPayments(limit = 50) {
     }
   }
 
+  // Enkel Mollie, en niet `RECONCILABLE_PROVIDERS`: een Bancontact-terugbetaling
+  // gaat standaard met de hand via overschrijving en `refund()` weigert dan
+  // meteen (`BancontactRefundUnsupportedError`). Die hier laten meedraaien
+  // betekent bij elke ronde dezelfde fout in de logs voor iets wat buiten de
+  // site afgehandeld wordt. Dekt je contract terugbetalingen wel, zet dan
+  // BANCONTACT_REFUNDS_ENABLED aan en voeg de provider hier toe.
   const refunds = await prisma.ticketRefund.findMany({
     where: { provider: "mollie", status: "PENDING" },
     include: { payment: { select: { providerPaymentId: true } } },

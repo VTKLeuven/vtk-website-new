@@ -65,6 +65,23 @@ production, and throws in production otherwise. `enabledPaymentMethods()` reads
 the comma-separated `TICKETING_PAYMENT_METHODS` and falls back to that single
 provider, so leaving it empty keeps the old single-provider behaviour exactly.
 
+### A failed payment is not a failed order
+
+Since a buyer can pick between two methods, one attempt failing no longer means
+the order failed. The webhook and `reconcileTicketPayments` both mark **that
+attempt** failed and only call `expirePendingOrder` when no other attempt is
+still open; `expirePendingOrder` expires every open payment of the order, so
+without that check a stale Bancontact attempt would close a live Mollie checkout.
+
+### Nothing fails silently
+
+A checkout the provider refuses definitively (any 4xx except 429) used to reach
+the buyer as "de betaalpagina is tijdelijk niet bereikbaar" with **nothing** in
+the logs: only the retryable branch logged. `createAndPersistCheckout` now logs
+the refusal with provider, attempt and the provider's own error, and a checkout
+asking for a method the server does not have enabled logs that too. If a buyer
+reports a failing payment, there is a log line.
+
 ### Only one live checkout per order
 
 `startOrderPayment` closes every still-open checkout of the order before it
@@ -115,8 +132,26 @@ endpoint as the current brand name.
   `TicketPayment.providerDeeplink`. The QR is drawn from that deeplink by
   `/api/tickets/orders/<orderId>/bancontact/qr`, using the same generator as the
   ticket QR, so the page does not depend on an external image host.
-- Amounts are **integer cents**, unlike Mollie's decimal strings. `description`
-  and `reference` are capped at 35 characters and truncated locally.
+- **`POST /v3/payments` takes exactly six fields**: `amount`, `currency`,
+  `description`, `reference`, `bulkId` and `callbackUrl`; only `amount` is
+  mandatory. There is **no `returnUrl`** and no way to send one, which is why our
+  own page polls the order status instead of waiting for a return from the app.
+  A `returnUrl` was in the create request for a while and does not belong there.
+- Amounts are **integer cents**, unlike Mollie's decimal strings, and must be
+  1..999999 (so no order above EUR 9999,99). `description` is capped at 140
+  characters, `reference` at 35; both are truncated locally. Only the first 35
+  characters of the description reach the bank statement, which is where the
+  single 35 for both came from.
+- **The callback must be `https`.** An `http` URL is not a callback that half
+  works but a 400 on the payment itself, so the gateway leaves it out and warns;
+  reconciliation is then the only way the payment comes back. Localhost is
+  dropped the same way Mollie's is.
+- Provider errors carry `code` (`FIELD_IS_INVALID`, `ACCESS_DENIED`,
+  `MERCHANT_PROFILE_NOT_FOUND`, ...) and a `traceId`, and `BancontactApiError`
+  puts both in its message: that is what their support asks for. A non-JSON body
+  (a proxy, a WAF, a wrong `BANCONTACT_API_BASE`) becomes the same error and not
+  a `SyntaxError`, which the routes above would report to the buyer as
+  `INVALID_JSON`.
 - **Webhook** `apps/web/app/api/tickets/bancontact/webhook/route.ts`: same
   posture as Mollie, the callback body is never trusted and the payment is
   re-fetched. Two differences: the provider does **not** carry our order id (only
@@ -126,7 +161,8 @@ endpoint as the current brand name.
   payment attempt is still open.
 - **Refunds are off by default.** `BANCONTACT_REFUNDS_ENABLED=true` enables the
   API path; otherwise `refund()` throws `BancontactRefundUnsupportedError` without
-  sending a request, and the refund is handled manually by bank transfer.
+  sending a request, and the refund is handled manually by bank transfer. Refund
+  reconciliation therefore stays Mollie-only; payment reconciliation covers both.
 - **Verify against your own contract before going live**: endpoint version, field
   names and status values depend on the product in the merchant contract.
   Everything provider-specific sits in `packages/payments/src/bancontact.ts`.
