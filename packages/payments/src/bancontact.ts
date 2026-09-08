@@ -226,6 +226,40 @@ function truncate(value: string, max: number): string {
   return value.length <= max ? value : value.slice(0, max);
 }
 
+/**
+ * Wat er van een tekst overblijft binnen de SEPA-tekenset.
+ *
+ * Een eventnaam wordt door een lid ingetikt en kan alles bevatten. Een emoji of
+ * een ampersand in de omschrijving laat de provider de hele betaling weigeren
+ * (`FIELD_IS_INVALID`), en dan kan er voor dat evenement niets meer betaald
+ * worden. Liever een mededeling zonder dat teken dan geen verkoop.
+ */
+function sepaSafe(value: string): string {
+  return value
+    .replace(/[^A-Za-z0-9\u00C0-\u00FF /?:().,'+-]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * De mededeling die de koper in zijn betaalapp ziet, en die daarna op zijn
+ * rekeninguittreksel belandt.
+ *
+ * De app zet er zelf al een betaalcode en onze bestelreferentie voor
+ * (`PQ DqWk7u VTK-26-327079785D ...`), dus wat hier staat moet zeggen **wat** er
+ * gekocht wordt. Enkel de eerste 35 tekens halen de mededeling op het
+ * uittreksel, en daarom staat het aantal vooraan: "2 tickets Galabal van de
+ * Ingenieur" past daar nog net volledig in en zegt maanden later nog iets, waar
+ * de kale eventnaam dat niet doet.
+ *
+ * Het woord "tickets" werkt in beide talen, dus deze tekst heeft de taal van de
+ * koper niet nodig; de eventnaam is al vertaald door de aanroeper.
+ */
+function paymentDescription(eventName: string, ticketCount: number): string {
+  const count = ticketCount === 1 ? "1 ticket" : `${ticketCount} tickets`;
+  return truncate(sepaSafe(`${count} ${eventName}`), MAX_DESCRIPTION);
+}
+
 export function mapBancontactStatus(status: string): CheckoutStatusResult["status"] {
   switch (status.toUpperCase()) {
     case "SUCCEEDED":
@@ -299,6 +333,7 @@ export class BancontactPaymentGateway implements PaymentGateway {
       (sum, line) => sum + line.unitAmountCents * line.quantity,
       0
     );
+    const ticketCount = input.lines.reduce((count, line) => count + line.quantity, 0);
     if (!Number.isInteger(totalCents) || totalCents < MIN_AMOUNT_CENTS) {
       throw new BancontactRequestError(
         `Bancontact needs a whole amount of at least ${MIN_AMOUNT_CENTS} cent, not ${totalCents}`
@@ -335,7 +370,7 @@ export class BancontactPaymentGateway implements PaymentGateway {
         body: {
           amount: totalCents,
           currency,
-          description: truncate(input.eventName, MAX_DESCRIPTION),
+          description: paymentDescription(input.eventName, ticketCount),
           reference: truncate(input.orderNumber, MAX_REFERENCE),
           ...(returnUrl ? { returnUrl } : {}),
           ...(callbackUrl ? { callbackUrl } : {}),

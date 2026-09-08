@@ -92,6 +92,51 @@ describe("BancontactPaymentGateway.createCheckout", () => {
     expect(result.status).toBe("PENDING");
   });
 
+  it("puts the ticket count and the event in the description the buyer sees", async () => {
+    const spy = mockFetch(201, {
+      paymentId: "pay_9",
+      status: "PENDING",
+      _links: { deeplink: { href: "https://pay.bancontact.net/pay/2/vwx" } },
+    });
+
+    await gateway().createCheckout(CHECKOUT_INPUT);
+
+    // 2 + 1 uit CHECKOUT_INPUT. Het aantal staat vooraan omdat enkel de eerste
+    // 35 tekens de mededeling op het rekeninguittreksel halen.
+    const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
+    expect(body.description).toBe("3 tickets Galabal");
+  });
+
+  it("says ticket in the singular for one ticket", async () => {
+    const spy = mockFetch(201, {
+      paymentId: "pay_10",
+      status: "PENDING",
+      _links: { deeplink: { href: "https://pay.bancontact.net/pay/2/yz" } },
+    });
+
+    await gateway().createCheckout({
+      ...CHECKOUT_INPUT,
+      lines: [{ name: "Standaard", quantity: 1, unitAmountCents: 1500 }],
+    });
+
+    expect(JSON.parse(String(spy.mock.calls[0]?.[1]?.body)).description).toBe("1 ticket Galabal");
+  });
+
+  it("drops characters the SEPA character set does not carry", async () => {
+    const spy = mockFetch(201, {
+      paymentId: "pay_11",
+      status: "PENDING",
+      _links: { deeplink: { href: "https://pay.bancontact.net/pay/2/abc" } },
+    });
+
+    // Een eventnaam wordt ingetikt door een lid; een emoji of een ampersand
+    // laat de provider anders de hele betaling weigeren.
+    await gateway().createCheckout({ ...CHECKOUT_INPUT, eventName: "Cantus \u{1F37A} & vrienden" });
+
+    const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
+    expect(body.description).toBe("3 tickets Cantus vrienden");
+  });
+
   it("truncates the description and the reference to their own limits", async () => {
     const spy = mockFetch(201, {
       paymentId: "pay_2",
@@ -108,6 +153,7 @@ describe("BancontactPaymentGateway.createCheckout", () => {
     const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
     // Twee verschillende grenzen: de omschrijving mag 140, de referentie 35.
     expect(body.description).toHaveLength(140);
+    expect(body.description.startsWith("3 tickets EEE")).toBe(true);
     expect(body.reference).toHaveLength(35);
   });
 

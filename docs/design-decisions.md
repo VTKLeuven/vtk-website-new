@@ -3946,6 +3946,22 @@ gebruikt zien; het werkt alleen niet voor wie geen Belgische bankapp heeft.
   dan weigert een terugbetaling met een duidelijke fout in plaats van stil te
   mislukken, en gebeurt ze met de hand via overschrijving. Dit is bewust luidruchtig:
   een half werkende terugbetaling is erger dan een die zegt dat ze niet kan.
+- **De mededeling zegt hoeveel tickets, en dan waarvoor.** Wat de koper in zijn
+  app leest, is `PQ <betaalcode> <onze bestelreferentie> <onze omschrijving>`.
+  De code en de referentie zijn ruis voor hem, dus de omschrijving is de enige
+  plek waar staat wát hij koopt; die was de kale eventnaam en dus in de praktijk
+  een los woord. Nu is het "2 tickets Galabal van de Ingenieur".
+  - **Het aantal staat vooraan** omdat enkel de eerste 35 tekens de mededeling op
+    het rekeninguittreksel halen. "2 tickets Galabal van de Ingenieur" past daar
+    net volledig in en zegt maanden later nog iets; zet je de eventnaam eerst,
+    dan valt bij een lange naam net het woord "tickets" weg, en dat is het enige
+    dat een VTK-afschrijving van een andere onderscheidt.
+  - Er staat bewust geen "VTK" in: de naam van de kring staat er al als
+    begunstigde boven, en die tekens gaan af van de 35.
+  - Tekens buiten de SEPA-set worden vervangen door een spatie. Een eventnaam
+    wordt door een lid ingetikt, en een emoji of ampersand erin laat de provider
+    de hele betaling weigeren. Liever een mededeling zonder dat teken dan een
+    evenement waarvoor niemand kan betalen.
 - **Een vervallen QR wordt vervangen op een klik, niet vanzelf.** De betaling bij
   de provider leeft twee minuten, de reservatie een half uur. Wie intussen zijn
   telefoon zoekt, komt dus terug bij een QR die niets meer doet. De pagina telt af

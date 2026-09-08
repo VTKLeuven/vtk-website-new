@@ -3165,6 +3165,16 @@
    QR en app-knop staan naast elkaar en niet achter een schermbreedte-check:
    betalen op een laptop met de app op je telefoon is hier het normale geval. */
 
+/* Dezelfde kolom als de bestelpagina waar deze pagina bij hoort. Zonder dit
+   vult de betaalpagina de volle breedte en staat alles links tegen de rand,
+   terwijl de header en de voettekst eromheen wel uitgelijnd zijn. Dat viel
+   vooral op aan de wachtbalk en de knop eronder, die niets hebben om hun
+   breedte tegen te houden. */
+.ticket-bancontact {
+  width: min(100%, 860px);
+  margin: 0 auto;
+}
+
 .ticket-bancontact-head {
   margin-bottom: 20px;
 }
