@@ -297,6 +297,12 @@ the design language into the application instead of copying mockup content.
     the navy scrim here and was invisible, and it now opens the text as
     `.vtk-page-plate` instead (see below). Every page therefore gets the same
     opener, pattern included.
+- The yellow rule under a heading is one treatment with three homes: a section
+  heading on a content page (`.vtk-page-content .prose-vtk h2::after`), the title
+  of an event tile, and "Over dit event" on an event page. It is always exactly
+  as wide as the heading itself, which is why those headings carry
+  `width: fit-content`; a rule that spans the whole column reads as a divider
+  between two parts of the page instead of a line under a title.
 - Motion: the text of a content page animates on scroll, in pure CSS
   (`animation-timeline`, `apps/web/app/design/vtk-motion.css`), never with a
   scroll listener. Headings arrive word by word, a single photo slides in from
