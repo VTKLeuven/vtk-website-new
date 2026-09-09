@@ -27,6 +27,8 @@ export async function Footer({ locale }: { locale: Locale }) {
               {f.tagline}
             </div>
             <div className="vtk-site-footer-address">{f.address}</div>
+            <div className="vtk-site-footer-address">{f.phone}</div>
+            <div className="vtk-site-footer-address">{f.btw}</div>
           </div>
           <div>
             <h2>{f.colStudy}</h2>
