@@ -14,10 +14,18 @@ import {
   isMultiDayEvent,
   weekEventSpans,
   monthGridCells,
-  rollingSixWeeksGridCells,
+  rollingWeeksGridCells,
   weekGridDays,
   isSameCalendarDay,
+  startOfWeek,
+  type GridDay,
 } from './calendarGrid';
+
+/**
+ * Hoeveel weken de agenda vooruit toont. Zes rijen van 132 pixels waren hoger
+ * dan het scherm van een 13-inch laptop; vier passen er samen met de kop op.
+ */
+const AGENDA_WEEKS = 4;
 
 type ApiEvent = {
   id: string;
@@ -102,8 +110,6 @@ export function KalenderEditorialView({
   labels: {
     crumbsHome: string;
     crumbsHere: string;
-    metaEvents: string;
-    weekLine: string;
     agendaNext: string;
     agendaSub: string;
     subscribeTitle: string;
@@ -114,7 +120,9 @@ export function KalenderEditorialView({
     onlyMyAudiencesHint: string;
     emptyMonth: string;
     emptyUpcoming: string;
-    views: { agenda: string; week: string; list: string };
+    views: { grid: string; agenda: string; week: string };
+    gridWeek: string;
+    showPast: string;
   };
   categories: CalendarCategoryOption[];
   /** Absolute URL van de hoofdfeed; de abonneerdialoog stelt de selectie samen. */
@@ -132,10 +140,6 @@ export function KalenderEditorialView({
   const pathname = usePathname();
   const now = new Date();
   const [cursor, setCursor] = useState(() => new Date(now.getFullYear(), now.getMonth(), now.getDate()));
-  // Bij het openen van de kalender toont het raster de komende 6 weken (1 week
-  // terug, huidige week, 4 weken vooruit). Zodra de gebruiker begint te bladeren
-  // of van weergave wisselt, schakelt het raster over naar de klassieke maandweergave.
-  const [isRolling, setIsRolling] = useState(true);
   // De gekozen categorie blijft een deelbare route, maar wordt uit de huidige
   // client-URL afgeleid. `history.pushState` wijzigt die URL zonder een nieuwe
   // Server Component-render op te halen; Next.js 16 houdt `usePathname` daarbij
@@ -144,7 +148,14 @@ export function KalenderEditorialView({
     const slug = pathname.split('/').filter(Boolean).at(-1);
     return categories.some((category) => category.slug === slug) ? slug! : 'all';
   }, [categories, pathname]);
-  const [view, setView] = useState<'agenda' | 'week' | 'list'>('agenda');
+  // Het raster met affiches is de standaard. Wie de kalender opendoet wil eerst
+  // weten wát er is, en een kaart met de affiche erop zegt dat sneller dan een
+  // dagcel waarin hoogstens een afgekapte titel past. Het maandraster en de
+  // weekweergave blijven ernaast staan voor wie op een datum zoekt.
+  const [view, setView] = useState<'grid' | 'agenda' | 'week'>('grid');
+  // Binnen de huidige maand begint het raster bij deze week. Deze knop zet de
+  // weken die al voorbij zijn er alsnog bij.
+  const [showPast, setShowPast] = useState(false);
   // Alles is standaard zichtbaar. Personalisatie is een bewuste keuze en houdt
   // algemene events plus de doelgroepevents die bij het profiel horen over; de
   // beginstand komt uit de accountvoorkeur van het lid.
@@ -163,10 +174,12 @@ export function KalenderEditorialView({
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
-  const cells = useMemo(
-    () => (isRolling ? rollingSixWeeksGridCells(cursor) : monthGridCells(year, month)),
-    [isRolling, cursor, year, month]
-  );
+  // Het raster is een rollend venster van vier weken en blijft dat ook bij het
+  // bladeren: de pijlen schuiven het venster op, ze springen niet naar een
+  // maandraster van zes rijen dat weer buiten het scherm valt.
+  const cells = useMemo(() => rollingWeeksGridCells(cursor, AGENDA_WEEKS), [cursor]);
+  // De lijstweergave blijft wel per maand werken; die heeft geen rasterhoogte.
+  const monthCells = useMemo(() => monthGridCells(year, month), [year, month]);
   const weekDays = useMemo(() => weekGridDays(cursor), [cursor]);
 
   const categoryName = useCallback(
@@ -196,10 +209,20 @@ export function KalenderEditorialView({
     [filter, onlyMyAudiences]
   );
 
+  /**
+   * De dagen die de actieve weergave nodig heeft. Dat is meteen het bereik dat
+   * we ophalen: de lijst werkt per maand, het raster per venster van vier weken.
+   */
+  const rangeDays = useMemo(() => {
+    if (view === 'week') return weekDays;
+    if (view === 'agenda') return cells.map((cell) => cell.date);
+    return monthCells.map((cell) => cell.date);
+  }, [view, weekDays, monthCells, cells]);
+
   useEffect(() => {
-    const start = new Date(cells[0]!.date);
+    const start = new Date(rangeDays[0]!);
     start.setHours(0, 0, 0, 0);
-    const end = new Date(cells[41]!.date);
+    const end = new Date(rangeDays.at(-1)!);
     end.setHours(23, 59, 59, 999);
     let cancelled = false;
     void (async () => {
@@ -209,7 +232,7 @@ export function KalenderEditorialView({
     return () => {
       cancelled = true;
     };
-  }, [cells, fetchForRange]);
+  }, [rangeDays, fetchForRange]);
 
   useEffect(() => {
     const start = new Date();
@@ -250,25 +273,87 @@ export function KalenderEditorialView({
     return m;
   }, [monthEvents, cells]);
 
+  /**
+   * Het raster in weekrijen, zonder de lege weken aan het begin en het einde.
+   * Een venster dat opent op een stille week toonde anders een rij van zeven
+   * lege cellen die de weken met iets erin naar beneden duwde.
+   *
+   * Er blijft altijd minstens één rij staan, en er wordt pas ingekort zodra de
+   * evenementen binnen zijn: anders knipt de eerste render, waarin nog niets
+   * geladen is, het hele raster weg.
+   */
+  const weekRows = useMemo(() => {
+    const rows: GridDay[][] = [];
+    for (let index = 0; index < cells.length; index += 7) rows.push(cells.slice(index, index + 7));
+    if (monthEvents.length === 0) return rows;
+    const today = new Date();
+    // De week van vandaag blijft staan, ook als er niets in gepland is: dat is
+    // het punt waar iemand zich op oriënteert.
+    const keep = (row: GridDay[]) =>
+      row.some(
+        (cell) => (eventsByDay.get(dayKey(cell.date))?.length ?? 0) > 0 || isSameCalendarDay(cell.date, today)
+      );
+    while (rows.length > 1 && !keep(rows[0]!)) rows.shift();
+    while (rows.length > 1 && !keep(rows.at(-1)!)) rows.pop();
+    return rows;
+  }, [cells, eventsByDay, monthEvents.length]);
+
+  const visibleCells = useMemo(() => weekRows.flat(), [weekRows]);
+
   const weekEvents = useMemo(
     () => monthEvents.filter((event) => weekDays.some((day) => eventOccursOnDay(event, day))),
     [monthEvents, weekDays]
   );
 
   /**
-   * De evenementen van de maand zelf, chronologisch. `monthEvents` dekt het hele
-   * raster van 42 cellen en bevat dus ook de uitlopers van de vorige en volgende
-   * maand; die horen niet in een lijst met "Augustus 2026" erboven.
+   * De evenementen van de maand zelf, chronologisch. Het maandraster loopt door
+   * in de vorige en de volgende maand; die uitlopers horen niet in een lijst met
+   * "Augustus 2026" erboven.
    */
   const monthOnlyEvents = useMemo(
     () =>
       monthEvents
         .filter((e) => {
-          return cells.some(({ date, inMonth }) => inMonth && eventOccursOnDay(e, date));
+          return monthCells.some(({ date, inMonth }) => inMonth && eventOccursOnDay(e, date));
         })
         .sort((a, b) => +new Date(a.start) - +new Date(b.start)),
-    [monthEvents, cells]
+    [monthEvents, monthCells]
   );
+
+  /**
+   * De evenementen van het raster, gebundeld per week.
+   *
+   * Gegroepeerd op de maandag van de **startdag**, en niet op elke dag waarop
+   * een evenement valt: een meerdaags evenement zou anders in twee weekblokken
+   * staan en twee keer geteld worden.
+   *
+   * Binnen de huidige maand vallen de weken weg die al voorbij zijn. Het raster
+   * is de eerste weergave die iemand ziet, en dan is "wat komt er" de vraag, niet
+   * "wat heb ik gemist"; de knop eronder haalt ze alsnog terug. In een maand die
+   * volledig achter ons ligt gebeurt dat niet, want dan blijft er niets over.
+   */
+  const gridWeeks = useMemo(() => {
+    const groups = new Map<string, { monday: Date; events: ApiEvent[] }>();
+    for (const event of monthOnlyEvents) {
+      const monday = startOfWeek(new Date(event.start));
+      const key = dayKey(monday);
+      const group = groups.get(key);
+      if (group) group.events.push(event);
+      else groups.set(key, { monday, events: [event] });
+    }
+    return [...groups.values()].sort((a, b) => +a.monday - +b.monday);
+  }, [monthOnlyEvents]);
+
+  const pastWeekCount = useMemo(() => {
+    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+    if (monthEnd < new Date()) return 0;
+    const thisMonday = startOfWeek(new Date());
+    return gridWeeks.filter((group) => group.monday < thisMonday).length;
+  }, [gridWeeks, year, month]);
+
+  const shownGridWeeks = showPast || pastWeekCount === 0 ? gridWeeks : gridWeeks.slice(pastWeekCount);
+  const shownGridCount = shownGridWeeks.reduce((total, group) => total + group.events.length, 0);
+  const hiddenGridCount = monthOnlyEvents.length - shownGridCount;
 
   /**
    * De dag die op smal scherm opengeklapt staat. Bewust afgeleid in plaats van in
@@ -277,22 +362,22 @@ export function KalenderEditorialView({
    * (vandaag, anders de eerste dag met iets erop, anders de eerste van de maand).
    */
   const selectedDayKey = useMemo(() => {
-    const inGrid = (key: string) => cells.some((c) => dayKey(c.date) === key);
+    const inGrid = (key: string) => visibleCells.some((c) => dayKey(c.date) === key);
     if (selectedKey && inGrid(selectedKey)) return selectedKey;
 
     const todayKey = dayKey(new Date());
-    if (cells.some((c) => c.inMonth && dayKey(c.date) === todayKey)) return todayKey;
+    if (visibleCells.some((c) => c.inMonth && dayKey(c.date) === todayKey)) return todayKey;
 
-    const firstWithEvents = cells.find((c) => c.inMonth && (eventsByDay.get(dayKey(c.date))?.length ?? 0) > 0);
+    const firstWithEvents = visibleCells.find((c) => c.inMonth && (eventsByDay.get(dayKey(c.date))?.length ?? 0) > 0);
     if (firstWithEvents) return dayKey(firstWithEvents.date);
 
-    const firstOfMonth = cells.find((c) => c.inMonth);
+    const firstOfMonth = visibleCells.find((c) => c.inMonth);
     return firstOfMonth ? dayKey(firstOfMonth.date) : null;
-  }, [selectedKey, cells, eventsByDay]);
+  }, [selectedKey, visibleCells, eventsByDay]);
 
   const selectedDate = useMemo(
-    () => cells.find((c) => dayKey(c.date) === selectedDayKey)?.date ?? null,
-    [cells, selectedDayKey]
+    () => visibleCells.find((c) => dayKey(c.date) === selectedDayKey)?.date ?? null,
+    [visibleCells, selectedDayKey]
   );
   const selectedEvents = selectedDayKey ? (eventsByDay.get(selectedDayKey) ?? []) : [];
 
@@ -300,18 +385,14 @@ export function KalenderEditorialView({
     month: 'long',
     year: 'numeric',
   });
-  const gridFrom = cells[0]!.date;
-  const gridTo = cells[41]!.date;
-  const gridRange =
-    gridFrom.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
-      day: '2-digit',
-      month: 'short',
-    }) +
+  const dateLocale = locale === 'nl' ? 'nl-BE' : 'en-GB';
+  const gridFrom = visibleCells[0]!.date;
+  const gridTo = visibleCells.at(-1)!.date;
+  /** "14 sep - 11 okt 2026": het venster dat het raster nu toont. */
+  const windowLabel =
+    gridFrom.toLocaleDateString(dateLocale, { day: 'numeric', month: 'short' }) +
     ' - ' +
-    gridTo.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
-      day: '2-digit',
-      month: 'short',
-    });
+    gridTo.toLocaleDateString(dateLocale, { day: 'numeric', month: 'short', year: 'numeric' });
   const weekFrom = weekDays[0]!;
   const weekTo = weekDays[6]!;
   const weekLabel = `${weekFrom.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
@@ -358,17 +439,20 @@ export function KalenderEditorialView({
     });
   }
 
+  /**
+   * Bladeren doet wat de weergave toont: de lijst gaat per maand, de week per
+   * week, en het raster schuift zijn venster van vier weken op. Dat laatste
+   * verving een sprong naar het maandraster: die maakte het raster meteen weer
+   * zes rijen hoog, precies wat het venster moest oplossen.
+   */
   function shiftPeriod(delta: number) {
-    if (isRolling) {
-      setIsRolling(false);
-    }
-    if (view === 'week') {
-      const next = new Date(cursor);
-      next.setDate(next.getDate() + delta * 7);
-      setCursor(next);
+    if (view === 'grid') {
+      setCursor(new Date(year, month + delta, 1));
       return;
     }
-    setCursor(new Date(year, month + delta, 1));
+    const next = new Date(cursor);
+    next.setDate(next.getDate() + delta * (view === 'week' ? 7 : AGENDA_WEEKS * 7));
+    setCursor(next);
   }
 
   function eventHref(e: ApiEvent) {
@@ -462,8 +546,23 @@ export function KalenderEditorialView({
     return locale === 'nl' ? `${count} komen` : `${count} going`;
   }
 
+  const periodNoun =
+    view === 'week'
+      ? locale === 'nl'
+        ? 'week'
+        : 'week'
+      : view === 'grid'
+        ? locale === 'nl'
+          ? 'maand'
+          : 'month'
+        : locale === 'nl'
+          ? 'vier weken'
+          : 'four weeks';
+  const previousLabel = locale === 'nl' ? `Vorige ${periodNoun}` : `Previous ${periodNoun}`;
+  const nextLabel = locale === 'nl' ? `Volgende ${periodNoun}` : `Next ${periodNoun}`;
+
   const showMonthGrid = view === 'agenda';
-  const periodCount = view === 'week' ? weekEvents.length : isRolling ? monthEvents.length : monthOnlyEvents.length;
+  const periodCount = view === 'week' ? weekEvents.length : view === 'grid' ? shownGridCount : monthEvents.length;
 
   const starLabels: EventStarLabels = {
     mark: locale === 'nl' ? 'Ik kom naar dit evenement' : 'I am coming to this event',
@@ -589,6 +688,77 @@ export function KalenderEditorialView({
         />
         <div className="ag-go" aria-hidden>
           →
+        </div>
+      </article>
+    );
+  }
+
+  /**
+   * Eén evenement als kaart in het raster: de affiche bovenaan, daaronder de
+   * datum, de titel en de plaats.
+   *
+   * Net als bij de lijstrij is dit een `article` en geen `a`: de ster is een
+   * knop, en een knop in een anker is ongeldige HTML. De titel is de link en
+   * spant zich over de hele kaart (`.ev-card-link::after`); de ster ligt erboven.
+   *
+   * De ster staat rechtsboven in het tekstblok, met de teller ernaast op
+   * dezelfde regel als de datum. Onderaan stond hij op een eigen regel die de
+   * kaart alleen maar hoger maakte, en die regel viel weg zodra niemand nog had
+   * aangeduid dat hij kwam; de kaarten in een rij stonden dan ongelijk.
+   */
+  function renderCard(e: ApiEvent) {
+    const cat = e.extendedProps.categories.find((c) => c.audience === null) ?? null;
+    const going = interestLine(e);
+    const title = pickTitle(e);
+    const start = new Date(e.start);
+    return (
+      <article key={e.id} className="ev-card">
+        <div className="ev-card-shot">
+          <Image
+            src={e.extendedProps.image}
+            alt=""
+            fill
+            sizes="(max-width: 620px) 100vw, (max-width: 1000px) 50vw, 380px"
+            style={e.extendedProps.imagePosition ? { objectPosition: e.extendedProps.imagePosition } : undefined}
+          />
+          {cat ? (
+            <span className="ev-card-cat" style={{ '--cat': cat.colour } as React.CSSProperties}>
+              {categoryName(cat)}
+            </span>
+          ) : null}
+          {audienceCategories(e).map((a) => (
+            <span key={a.slug} className="ev-card-aud" style={{ '--cat': a.colour } as React.CSSProperties}>
+              {categoryName(a)}
+            </span>
+          ))}
+        </div>
+        <div className="ev-card-body">
+          <div className="ev-card-meta">
+            <span className="ev-card-when">
+              {start.toLocaleDateString(dateLocale, { weekday: 'short', day: 'numeric', month: 'short' })} ·{' '}
+              {eventTime(e)}
+            </span>
+            <span className="ev-card-right">
+              {going ? <span className="ev-going">{going}</span> : null}
+              <EventStar
+                key={`${e.id}:${e.extendedProps.interested}`}
+                eventId={e.id}
+                title={title}
+                interested={e.extendedProps.interested}
+                signedIn={signedIn}
+                loginHref={`${base}/inloggen?next=${encodeURIComponent(eventHref(e))}`}
+                labels={starLabels}
+                className="ev-card-star"
+                onChanged={(interested) => starChanged(e, interested)}
+              />
+            </span>
+          </div>
+          <h3 className="ev-card-title">
+            <a href={eventHref(e)} className="ev-card-link">
+              {title}
+            </a>
+          </h3>
+          {e.location ? <div className="ev-card-where">{e.location}</div> : null}
         </div>
       </article>
     );
@@ -732,7 +902,7 @@ export function KalenderEditorialView({
   return (
     <>
       {previewCard}
-      <header className="page-head">
+      <header className="page-head has-tools">
         <div>
           <div className="crumbs">
             {labels.crumbsHome} ·{' '}
@@ -764,101 +934,86 @@ export function KalenderEditorialView({
             </div>
           ) : null}
         </div>
-        <div className="page-head-meta">
-          <b>{periodCount}</b>{' '}
-          {view === 'week'
-            ? locale === 'nl'
-              ? 'Evenementen (deze week)'
-              : 'Events (this week)'
-            : isRolling
-              ? locale === 'nl'
-                ? 'Evenementen (komende weken)'
-                : 'Events (upcoming weeks)'
-              : labels.metaEvents}
+        {/* Bladeren, weergave en abonneren staan in de donkere band zelf. Ze
+            stonden eronder in een kaart op papier, en die kaart plus de kop
+            samen duwden het raster zo ver naar beneden dat je bij het openen van
+            de kalender nog geen anderhalve week zag. De filterchips blijven wel
+            op papier: dat zijn er elf en die horen bij het raster, niet bij de
+            titel. */}
+        <div className="page-head-tools">
+          <div className="nav-mo">
+            <button type="button" onClick={() => shiftPeriod(-1)} aria-label={previousLabel}>
+              ←
+            </button>
+            <button type="button" onClick={() => shiftPeriod(1)} aria-label={nextLabel}>
+              →
+            </button>
+          </div>
+          <div className="mo-label">
+            {view === 'week'
+              ? weekLabel
+              : view === 'grid'
+                ? monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
+                : windowLabel}
+            <small>
+              {view === 'week'
+                ? locale === 'nl'
+                  ? 'Weekoverzicht · '
+                  : 'Week overview · '
+                : view === 'grid'
+                  ? ''
+                  : locale === 'nl'
+                    ? 'Vier weken · '
+                    : 'Four weeks · '}
+              {periodCount}{' '}
+              {periodCount === 1
+                ? locale === 'nl'
+                  ? 'evenement'
+                  : 'event'
+                : locale === 'nl'
+                  ? 'evenementen'
+                  : 'events'}
+            </small>
+          </div>
+          <div className="view-switch" role="group" aria-label={locale === 'nl' ? 'Weergave' : 'View'}>
+            <button
+              type="button"
+              className={view === 'grid' ? 'on' : ''}
+              aria-pressed={view === 'grid'}
+              onClick={() => setView('grid')}
+            >
+              {labels.views.grid}
+            </button>
+            <button
+              type="button"
+              className={view === 'agenda' ? 'on' : ''}
+              aria-pressed={view === 'agenda'}
+              onClick={() => setView('agenda')}
+            >
+              {labels.views.agenda}
+            </button>
+            <button
+              type="button"
+              className={view === 'week' ? 'on' : ''}
+              aria-pressed={view === 'week'}
+              onClick={() => setView('week')}
+            >
+              {labels.views.week}
+            </button>
+          </div>
+          <CalendarSubscribe
+            compact
+            feedBaseUrl={feedBaseUrl}
+            categories={categories}
+            selectedSlug={filter === 'all' ? null : filter}
+            locale={locale}
+            labels={{ title: labels.subscribeTitle, sub: labels.subscribeSub }}
+          />
         </div>
       </header>
 
       <div className="kal-wrap">
-        {/* De weergavekeuze staat bovenaan bij de maandnavigatie, niet naast de
-            filterchips: daar leek ze een categorie in plaats van "hoe kijk ik". */}
         <div className="toolbar">
-          <div className="toolbar-top">
-            <div className="nav-mo">
-              <button
-                type="button"
-                onClick={() => shiftPeriod(-1)}
-                aria-label={view === 'week' ? 'Previous week' : 'Previous month'}
-              >
-                ←
-              </button>
-              <button
-                type="button"
-                onClick={() => shiftPeriod(1)}
-                aria-label={view === 'week' ? 'Next week' : 'Next month'}
-              >
-                →
-              </button>
-            </div>
-            <div className="mo-label">
-              {view === 'week' ? weekLabel : monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}
-              <small>
-                {view === 'week'
-                  ? locale === 'nl'
-                    ? 'Weekoverzicht'
-                    : 'Week overview'
-                  : `${labels.weekLine} ${gridRange}`}{' '}
-                · {periodCount}{' '}
-                {periodCount === 1
-                  ? locale === 'nl'
-                    ? 'evenement'
-                    : 'event'
-                  : locale === 'nl'
-                    ? 'evenementen'
-                    : 'events'}
-              </small>
-            </div>
-            <div className="view-switch" role="group" aria-label={locale === 'nl' ? 'Weergave' : 'View'}>
-              <button
-                type="button"
-                className={view === 'agenda' ? 'on' : ''}
-                aria-pressed={view === 'agenda'}
-                onClick={() => setView('agenda')}
-              >
-                {labels.views.agenda}
-              </button>
-              <button
-                type="button"
-                className={view === 'week' ? 'on' : ''}
-                aria-pressed={view === 'week'}
-                onClick={() => {
-                  setIsRolling(false);
-                  setView('week');
-                }}
-              >
-                {labels.views.week}
-              </button>
-              <button
-                type="button"
-                className={view === 'list' ? 'on' : ''}
-                aria-pressed={view === 'list'}
-                onClick={() => {
-                  setIsRolling(false);
-                  setView('list');
-                }}
-              >
-                {labels.views.list}
-              </button>
-            </div>
-            <CalendarSubscribe
-              compact
-              feedBaseUrl={feedBaseUrl}
-              categories={categories}
-              selectedSlug={filter === 'all' ? null : filter}
-              locale={locale}
-              labels={{ title: labels.subscribeTitle, sub: labels.subscribeSub }}
-            />
-          </div>
-
           {/* De chips zijn links, geen knoppen: een categorie heeft een eigen
               pagina (/kalender/alumni) en die hoort in de adresbalk te staan.
               Zo is ze deelbaar, staat ze in de geschiedenis, en ziet iemand die
@@ -930,8 +1085,7 @@ export function KalenderEditorialView({
                   <div key={d}>{d}</div>
                 ))}
               </div>
-              {Array.from({ length: 6 }, (_, weekIndex) => {
-                const weekCells = cells.slice(weekIndex * 7, weekIndex * 7 + 7);
+              {weekRows.map((weekCells) => {
                 const spans = weekEventSpans(
                   monthEvents,
                   weekCells.map((cell) => cell.date)
@@ -1199,31 +1353,31 @@ export function KalenderEditorialView({
           </section>
         )}
 
-        {/* Lijst: dezelfde maand als het raster, chronologisch. */}
-        {view === 'list' && (
-          <section className="agenda agenda-full" style={{ marginTop: 0 }}>
-            <div>
-              <div className="agenda-head">
-                <h2>{monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)}</h2>
-                <div>
-                  {monthOnlyEvents.length}{' '}
-                  {monthOnlyEvents.length === 1
-                    ? locale === 'nl'
-                      ? 'evenement'
-                      : 'event'
-                    : locale === 'nl'
-                      ? 'evenementen'
-                      : 'events'}
+        {/* Raster: de maand als kaarten met de affiche erop, per week gebundeld. */}
+        {view === 'grid' && (
+          <section className="ev-grid-wrap">
+            {shownGridWeeks.length === 0 ? (
+              <p className="agenda-empty">{labels.emptyMonth}</p>
+            ) : (
+              shownGridWeeks.map((group) => (
+                <div key={dayKey(group.monday)}>
+                  <h2 className="ev-grid-week">
+                    {labels.gridWeek}{' '}
+                    {group.monday.toLocaleDateString(dateLocale, { day: 'numeric', month: 'long' })}
+                  </h2>
+                  <div className="ev-grid">{group.events.map(renderCard)}</div>
                 </div>
-              </div>
-              {monthOnlyEvents.length === 0 ? (
-                <p className="agenda-empty">{labels.emptyMonth}</p>
-              ) : (
-                <div className="agenda-list">{monthOnlyEvents.map(renderRow)}</div>
-              )}
-            </div>
+              ))
+            )}
+            {pastWeekCount > 0 && !showPast ? (
+              <button type="button" className="ev-grid-past" onClick={() => setShowPast(true)}>
+                {labels.showPast}
+                <span>{hiddenGridCount}</span>
+              </button>
+            ) : null}
           </section>
         )}
+
       </div>
     </>
   );

@@ -43,8 +43,6 @@ export function calendarLabels(locale: Locale) {
   return {
     crumbsHome: "Home",
     crumbsHere: nl ? "Kalender" : "Calendar",
-    metaEvents: nl ? "Evenementen (deze maand)" : "Events (this month)",
-    weekLine: nl ? "Raster" : "Grid",
     agendaNext: nl ? "Eerstvolgend" : "Up next",
     agendaSub: nl ? "Komende 14 dagen" : "Next 14 days",
     emptyMonth: nl ? "Geen evenementen deze maand." : "No events this month.",
@@ -62,9 +60,12 @@ export function calendarLabels(locale: Locale) {
       ? "Toon algemene evenementen en enkel doelgroepactiviteiten die passen bij je profiel."
       : "Show general events and only target-audience events that match your profile.",
     views: {
+      grid: nl ? "Raster" : "Grid",
       agenda: nl ? "Agenda" : "Agenda",
       week: nl ? "Week" : "Week",
-      list: nl ? "Lijst" : "List",
     },
+    /** Boven een blok kaarten in de rasterweergave: "Week van 14 september". */
+    gridWeek: nl ? "Week van" : "Week of",
+    showPast: nl ? "Ook tonen wat al voorbij is" : "Also show what has already passed",
   };
 }

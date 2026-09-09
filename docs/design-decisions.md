@@ -6233,3 +6233,118 @@ opgelost, of niets mee gedaan met een verplichte notitie. Vier knoppen per kaart
 maken van dertig meldingen een muur, terwijl het één beslissing is. Verwijderen
 staat apart en met een bevestiging: dat is voor spam en dubbels, niet voor het
 afsluiten van een echte melding.
+
+## De kalender opent op vier weken, niet op een maandraster
+
+`/kalender` toont een rollend venster van **vier weken** vanaf de maandag van
+deze week, en de pijlen schuiven dat venster met vier weken op. Er is geen
+maandraster meer in de agendaweergave; de lijstweergave werkt wel nog per maand.
+
+**Waarom.** Het was zes weken (één terug, deze, vier vooruit) en de pijlen
+sprongen daarna naar een klassiek maandraster van zes rijen. Zes rijen van 132
+pixels zijn 792 pixels, en daarboven stonden de siteheader (88), de donkere
+paginakop (230) en een witte kaart met de maandregel, de weergaveknoppen en
+vijftien filterchips (250). De eerste rasterrij begon dus op 610 pixels: op het
+scherm van een 13-inch laptop (790 pixels bruikbaar) zag je bij het openen van
+de kalender anderhalve week, en het raster liep tot ver voorbij 1400.
+
+Drie ingrepen samen brengen dat terug naar 385:
+
+- **De balk staat in de donkere kop, naast de titel.** Bladeren, de weergave en
+  Abonneren zijn de bediening van de kalender, dus horen ze bij de titel en niet
+  in een tweede kaart eronder. De filterchips blijven wel op papier: dat zijn er
+  vijftien en ze horen bij het raster.
+- **De filters staan los op het papier**, zonder witte kaart eromheen. De chips
+  zijn zelf al omlijnde pillen; de kaart voegde een tweede rand en 28 pixels
+  padding toe.
+- **Vier weken in plaats van zes**, en de pijlen houden dat venster vast. Sprong
+  je vroeger naar een maandraster, dan was het raster meteen weer zes rijen hoog.
+
+**De week die net voorbij is, valt weg.** Het oude venster begon een week terug.
+Een venster dat vooruitkijkt heeft daar niets aan, en die rij kostte evenveel
+hoogte als een week met iets erin. Wie terug wil, bladert terug.
+
+**Lege weken aan de randen vallen weg**, tot er nog één rij over is. Een venster
+dat opent op een stille week toonde anders zeven lege cellen die de weken met
+iets erin naar beneden duwden. Twee uitzonderingen: de week van vandaag blijft
+altijd staan, ook leeg, want dat is het punt waarop iemand zich oriënteert; en
+er wordt pas ingekort zodra de evenementen binnen zijn, anders knipt de eerste
+render (waarin nog niets geladen is) het hele raster weg.
+
+## Een evenement in een dagcel is een kleurstreep op wit
+
+De pil in een dagcel is een witte kaart met een streep van 3 pixels in de kleur
+van zijn eerste categorie. Geen getinte vulling.
+
+**Waarom.** Ze codeerde diezelfde categorie drie keer: een streep links, een
+vulling van 10% dezelfde kleur, én een gevuld doelgroeplabel erboven in een
+tweede kleur. De categoriekleuren komen los uit de admin en zijn dus nooit op
+elkaar afgestemd; zeven getinte vullingen onder elkaar in een kolom van 167
+pixels vloekten met elkaar. Roze op roze met een turkooizen badge erop is het
+scherpste voorbeeld.
+
+De streep blijft, want die leest snel en botst met niets. Het doelgroeplabel
+blijft ook gevuld: op een witte kaart is dat het enige gekleurde vlak, en "voor
+wie is dit" moet je in één oogopslag zien.
+
+**De weekweergave gebruikt dezelfde kaart.** Die stond nog op de oude vierkante
+variant met monospace tijden, en dat las als een tweede kalender op dezelfde
+pagina.
+
+## Het raster met affiches is de standaardweergave van /kalender
+
+De weergavekeuze is **Raster · Agenda · Week**, en Raster staat aan wanneer je de
+pagina opendoet. Het verving de lijstweergave; de agenda (het maandraster met de
+cellen) en de week blijven ernaast staan.
+
+**Waarom.** Wie de kalender opendoet wil eerst weten *wát* er is. In een dagcel
+past hoogstens een afgekapte titel; een kaart met de affiche erop zegt het in één
+blik. De andere kringen doen dit ook: Ekonomika, VRG en Wina hebben alle drie een
+raster van affiches als evenementenpagina en geen kalenderraster. De agenda blijft
+wel staan, want wie op een datum zoekt heeft er meer aan dan aan een raster.
+
+**Per week gebundeld,** met een dunne regel "Week van 14 september" erboven. Een
+raster leest van links naar rechts en raakt daarmee de tijdlijn kwijt die een
+kalender juist wel heeft; de kopjes brengen die terug. Wina doet hetzelfde.
+
+Gegroepeerd op de maandag van de **startdag**, en niet op elke dag waarop een
+evenement valt: een meerdaags evenement zou anders in twee weekblokken staan en
+twee keer geteld worden. Een evenement dat in de vorige maand begint en in deze
+doorloopt, krijgt dus een kopje uit die vorige maand. Dat klopt ook.
+
+**Binnen de huidige maand begint het raster bij deze week.** Het is de eerste
+weergave die iemand ziet, en dan is "wat komt er" de vraag, niet "wat heb ik
+gemist". De knop "Ook tonen wat al voorbij is" haalt ze alsnog terug, met het
+aantal erbij. In een maand die volledig achter ons ligt gebeurt dat niet, want
+dan blijft er niets over.
+
+### De kaart
+
+Affiche bovenaan in 3:2, daaronder een wit blok met de datum, de titel en de
+plaats. De titel blijft donker op wit; dat leest het makkelijkst bij lange
+Nederlandse evenementnamen. Op de affiche staan het thema linksboven en de
+doelgroep rechtsboven.
+
+**De ster staat rechtsboven in het tekstblok, met de teller ernaast op dezelfde
+regel als de datum.** Onderaan stond hij op een eigen regel die de kaart alleen
+maar hoger maakte, en die regel viel weg zodra niemand had aangeduid dat hij
+kwam, waardoor de kaarten in een rij ongelijk stonden.
+
+De teller is daar gewone grijze tekst en geen gele pil zoals in de lijst: hij
+staat vlak naast de ster, en die wordt geel zodra jij aanduidt dat je komt. Twee
+gele vlakken naast elkaar lopen in elkaar over, en dan zegt het geel niets meer.
+
+**Een kaart is een `article`, geen `a`.** De ster is een knop, en een knop in een
+anker is ongeldige HTML; op een telefoon opent de ster dan de eventpagina. De
+titel is de link en spant zich over de hele kaart (`.ev-card-link::after`), de
+ster ligt erboven. Dezelfde constructie als in de lijstrij.
+
+**Een kaart gaat rechtstreeks naar de eventpagina,** zonder voorvertoning. Die
+blijft waar ze iets toevoegt: in een dagcel van het maandraster staat hoogstens
+een afgekapte titel, op deze kaart staat alles al.
+
+**Een evenement zonder eigen affiche houdt de standaardfoto.** Dat is bewust
+gekozen boven een gegenereerde plaat met de titel op de categoriekleur: de
+standaardfoto is een echte VTK-foto en blijft herkenbaar. De keerzijde is dat een
+maand met weinig eigen affiches dezelfde foto meermaals naast elkaar zet; dat is
+een reden om affiches te uploaden, niet om de weergave aan te passen.

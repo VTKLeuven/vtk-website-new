@@ -1859,3 +1859,511 @@
     padding-inline: 4px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Bladeren, weergave en abonneren staan in de donkere paginakop, naast de titel.
+
+   Ze stonden eronder in een witte kaart op papier. Die kaart was met de
+   maandregel, de weergaveknoppen, elf categoriechips en vier doelgroepchips zo'n
+   250 pixels hoog, en samen met de kop van 230 begon het raster pas op 610
+   pixels: op een 13-inch scherm zag je bij het openen van de kalender anderhalve
+   weekrij. Naast de titel in plaats van eronder scheelt nog eens de hoogte van
+   een hele rij. De chips blijven wel op papier staan; die horen bij het raster
+   en niet bij de titel.
+
+   `.has-tools` is een modifier, want dezelfde `.page-head` draagt ook /aanbod,
+   en dat scherm heeft deze rij niet.
+   --------------------------------------------------------------------------- */
+
+.vtk-design .page-head.has-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px 32px;
+  padding-top: clamp(22px, 2.6vw, 34px);
+  padding-bottom: clamp(18px, 2vw, 26px);
+}
+
+.vtk-design .page-head.has-tools > div:first-child {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.vtk-design .page-head.has-tools .crumbs {
+  margin-bottom: 10px;
+}
+
+.vtk-design .page-head.has-tools h1 {
+  font-size: clamp(28px, 3vw, 40px);
+}
+
+.vtk-design .page-head-tools {
+  flex: 1 1 560px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px 14px;
+}
+
+/* De pijlen en de maandregel zaten in `.toolbar`; die selectors gelden hier
+   niet meer, dus hun maat en typografie staan hieronder opnieuw. */
+.vtk-design .page-head-tools .nav-mo {
+  display: flex;
+  flex: none;
+  gap: 8px;
+}
+
+.vtk-design .page-head-tools .nav-mo button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(183, 192, 220, 0.34);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--paper);
+  font-size: 14px;
+}
+
+.vtk-design .page-head-tools .nav-mo button:hover {
+  border-color: var(--paper);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.vtk-design .page-head-tools .mo-label {
+  flex: 0 1 auto;
+  min-width: 0;
+  color: var(--paper);
+  font-size: clamp(18px, 1.9vw, 24px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+.vtk-design .page-head-tools .mo-label small {
+  display: block;
+  margin-top: 3px;
+  color: var(--on-dark-muted);
+  font-family: var(--sans);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.vtk-design .page-head-tools .view-switch {
+  flex: none;
+  display: flex;
+  border: 0;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.vtk-design .page-head-tools .view-switch button {
+  padding: 8px 14px;
+  border: 1px solid rgba(183, 192, 220, 0.34);
+  border-radius: 0;
+  border-right-width: 0;
+  background: transparent;
+  color: var(--on-dark-muted);
+  font-family: var(--sans);
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.vtk-design .page-head-tools .view-switch button:first-child {
+  border-radius: 999px 0 0 999px;
+}
+
+.vtk-design .page-head-tools .view-switch button:last-child {
+  border-right-width: 1px;
+  border-radius: 0 999px 999px 0;
+}
+
+.vtk-design .page-head-tools .view-switch button:hover {
+  color: var(--paper);
+}
+
+.vtk-design .page-head-tools .view-switch button.on {
+  border-color: var(--paper);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+/* Op de donkere band keert de primaire knop om, net als op de hero. */
+.vtk-design .page-head-tools .subscribe-compact {
+  flex: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.vtk-design .page-head-tools .subscribe-compact .btn-primary,
+.vtk-design .page-head-tools .subscribe-compact button.btn-primary {
+  border-color: var(--surface);
+  background: var(--surface);
+  color: var(--ink) !important;
+}
+
+.vtk-design .page-head-tools .subscribe-compact .btn-primary:hover,
+.vtk-design .page-head-tools .subscribe-compact button.btn-primary:hover {
+  background: var(--paper-2);
+}
+
+/* De filters staan los op het papier in plaats van in een witte kaart: de chips
+   zijn zelf al omlijnd, dus de kaart eromheen voegde vooral 28 pixels padding
+   en een tweede rand toe aan een strook die het raster niet mag wegduwen. */
+.vtk-design .kal-wrap {
+  padding-top: 22px;
+}
+
+.vtk-design .toolbar {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  margin-bottom: 20px;
+}
+
+.vtk-design .toolbar-filters {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.vtk-design .audience-filters {
+  padding-top: 10px;
+}
+
+@media (max-width: 900px) {
+  .vtk-design .page-head-tools {
+    justify-content: flex-start;
+  }
+  .vtk-design .page-head-tools .mo-label {
+    flex: 1 1 200px;
+  }
+}
+
+/* ---------------------------------------------------------------------------
+   Het evenement in een dagcel: een kleurstreep op wit.
+
+   De pil codeerde zijn categorie drie keer: een streep links, een vulling van
+   10% dezelfde kleur, en een gevuld doelgroeplabel in een tweede kleur erboven.
+   Zeven getinte vullingen onder elkaar in een kolom van 167 pixels vloekten
+   met elkaar; de kleur zit nu alleen nog in de streep, op een witte kaart.
+   --------------------------------------------------------------------------- */
+
+.vtk-design .ev-pill {
+  padding: 6px 9px;
+  border-left-width: 3px;
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.vtk-design .ev-pill.tinted {
+  border-left-color: var(--cat);
+  background: var(--surface);
+}
+
+/* `border-color` in de hover-regel hierboven trok ook de linkerstreep grijs;
+   die houdt zijn categoriekleur vast. */
+.vtk-design .ev-pill:hover {
+  border-color: var(--line-2);
+  border-left-color: var(--navy);
+  background: var(--paper);
+}
+
+.vtk-design .ev-pill.tinted:hover {
+  border-left-color: var(--cat);
+}
+
+/* De weekweergave gebruikt dezelfde kaart als een dagcel: wit met een streep in
+   de categoriekleur. Ze stond nog op de oude vierkante variant met monospace
+   tijden, en dat las als een tweede kalender op dezelfde pagina. */
+.vtk-design .week-event {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--cat, var(--navy));
+  border-radius: 9px;
+  background: var(--surface);
+}
+
+.vtk-design .week-event:hover {
+  border-color: var(--line-2);
+  border-left-color: var(--cat, var(--navy));
+  background: var(--paper);
+}
+
+.vtk-design .week-event-time,
+.vtk-design .week-event small {
+  font-family: var(--sans);
+  font-size: 11.5px;
+  letter-spacing: 0;
+}
+
+/* ---------------------------------------------------------------------------
+   Rasterweergave: de maand als kaarten met de affiche erop.
+
+   Dit verving de lijstweergave en is meteen de eerste weergave die iemand
+   ziet. Een dagcel in het maandraster kan hoogstens een afgekapte titel kwijt;
+   een kaart met de affiche erop zegt in één blik wát er is, en dat is wat je
+   wil weten wanneer je de kalender opendoet. De agenda en de week blijven
+   ernaast staan voor wie op een datum zoekt.
+
+   Per week gebundeld: een raster leest van links naar rechts en raakt daarmee
+   de tijdlijn kwijt die een kalender juist wel heeft.
+   --------------------------------------------------------------------------- */
+
+.vtk-design .ev-grid-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 34px;
+}
+
+.vtk-design .ev-grid-week {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0 0 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* De streep loopt door tot de rand: zo is het kopje een scheiding en niet nog
+   een titel in de kolom. */
+.vtk-design .ev-grid-week::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+
+.vtk-design .ev-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.vtk-design .ev-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.vtk-design .ev-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-2);
+  box-shadow: 0 12px 26px -18px rgba(14, 26, 54, 0.6);
+}
+
+.vtk-design .ev-card:focus-within {
+  border-color: var(--line-2);
+}
+
+.vtk-design .ev-card-shot {
+  position: relative;
+  aspect-ratio: 3 / 2;
+  background: var(--paper-2);
+}
+
+.vtk-design .ev-card-shot img {
+  object-fit: cover;
+}
+
+.vtk-design .ev-card-cat,
+.vtk-design .ev-card-aud {
+  position: absolute;
+  top: 12px;
+  z-index: 1;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--cat);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+.vtk-design .ev-card-cat {
+  left: 12px;
+}
+
+.vtk-design .ev-card-aud {
+  right: 12px;
+}
+
+.vtk-design .ev-card-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  padding: 12px 16px 16px;
+}
+
+/* Datum links, teller en ster rechts, alles op één regel. Onderaan stond de
+   ster op een eigen regel die alleen maar hoogte kostte en wegviel zodra
+   niemand had aangeduid dat hij kwam; de kaarten in een rij stonden dan
+   ongelijk. */
+.vtk-design .ev-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 34px;
+}
+
+.vtk-design .ev-card-when {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-design .ev-card-right {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* De teller is hier gewone grijze tekst en geen gele pil: hij staat vlak naast
+   de ster, en die wordt geel zodra jij aanduidt dat je komt. Twee gele vlakken
+   naast elkaar lopen in elkaar over, en dan zegt het geel niets meer. */
+.vtk-design .ev-card-right .ev-going {
+  margin-top: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-design .ev-card-star {
+  position: relative;
+  z-index: 2;
+  display: inline-grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin-right: -6px;
+  border-radius: 999px;
+  color: var(--muted);
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.vtk-design .ev-card-star:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.vtk-design .ev-card-star[aria-pressed='true'] {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.vtk-design .ev-card-star[data-pending] {
+  opacity: 0.6;
+}
+
+.vtk-design .ev-card-star:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.vtk-design .ev-card-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.22;
+}
+
+.vtk-design .ev-card-title a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* De titel is de link en spant zich over de hele kaart; de ster ligt erboven.
+   Een knop in een anker is ongeldige HTML, dus de kaart zelf is geen link. */
+.vtk-design .ev-card-link::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+}
+
+.vtk-design .ev-card-link:focus-visible::after {
+  outline: 2px solid var(--ink);
+  outline-offset: -3px;
+  border-radius: 18px;
+}
+
+.vtk-design .ev-card-where {
+  margin-top: auto;
+  padding-top: 4px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* Binnen de huidige maand begint het raster bij deze week; dit haalt de weken
+   terug die al voorbij zijn. */
+.vtk-design .ev-grid-past {
+  align-self: flex-start;
+  padding: 9px 16px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.vtk-design .ev-grid-past:hover {
+  border-color: var(--ink);
+}
+
+@media (max-width: 1000px) {
+  .vtk-design .ev-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .vtk-design .ev-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.vtk-design .ev-grid-past {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.vtk-design .ev-grid-past span {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}

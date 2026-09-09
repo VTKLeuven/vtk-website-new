@@ -22,16 +22,19 @@ export function monthGridCells(year: number, monthIndex: number): GridDay[] {
 }
 
 /**
- * 6-weekse weergave (42 dagen) rond `anchor`: 1 week terug, huidige week, 4 weken vooruit.
+ * Rollend venster van `weeks` weken vanaf de maandag van de week rond `anchor`.
  * Alle dagen in dit venster zijn actief (inMonth: true).
+ *
+ * De agenda toont er vier. Zes weken van 132 pixels zijn hoger dan het scherm
+ * van een 13-inch laptop, dus wie de kalender opendeed zag hoogstens anderhalve
+ * week zonder te scrollen. Vier weken passen wel, en de week die net voorbij is
+ * hoort niet in een venster dat vooruitkijkt.
  */
-export function rollingSixWeeksGridCells(anchor: Date = new Date()): GridDay[] {
-  const currentWeekMonday = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
-  currentWeekMonday.setDate(currentWeekMonday.getDate() - mondayFirstWeekdayIndex(currentWeekMonday));
-  const start = new Date(currentWeekMonday);
-  start.setDate(start.getDate() - 7);
+export function rollingWeeksGridCells(anchor: Date = new Date(), weeks = 4): GridDay[] {
+  const start = new Date(anchor.getFullYear(), anchor.getMonth(), anchor.getDate());
+  start.setDate(start.getDate() - mondayFirstWeekdayIndex(start));
   const cells: GridDay[] = [];
-  for (let i = 0; i < 42; i++) {
+  for (let i = 0; i < weeks * 7; i++) {
     const d = new Date(start);
     d.setDate(start.getDate() + i);
     cells.push({
@@ -51,6 +54,13 @@ export function weekGridDays(anchor: Date): Date[] {
     day.setDate(start.getDate() + index);
     return day;
   });
+}
+
+/** De maandag van de week waarin `date` valt, op middernacht. */
+export function startOfWeek(date: Date): Date {
+  const monday = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  monday.setDate(monday.getDate() - mondayFirstWeekdayIndex(monday));
+  return monday;
 }
 
 function mondayFirstWeekdayIndex(d: Date): number {

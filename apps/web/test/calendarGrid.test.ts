@@ -3,7 +3,7 @@ import {
   eventOccursOnDay,
   isMultiDayEvent,
   weekEventSpans,
-  rollingSixWeeksGridCells,
+  rollingWeeksGridCells,
   weekGridDays,
 } from '@/components/editorial/calendarGrid';
 
@@ -22,40 +22,40 @@ describe('calendar week grid', () => {
   });
 });
 
-describe('rolling six weeks grid', () => {
-  it('generates 42 days covering 1 week back, current week, and 4 weeks ahead', () => {
+describe('rolling weeks grid', () => {
+  it('generates four weeks starting at the current week', () => {
     // Wednesday 26 August 2026
     const anchor = new Date(2026, 7, 26);
-    const cells = rollingSixWeeksGridCells(anchor);
+    const cells = rollingWeeksGridCells(anchor);
 
-    expect(cells).toHaveLength(42);
+    expect(cells).toHaveLength(28);
     expect(cells.every((c) => c.inMonth)).toBe(true);
 
-    // Week 1 (previous week): Monday 17 Aug - Sunday 23 Aug
-    expect(cells[0].date).toEqual(new Date(2026, 7, 17));
-    expect(cells[6].date).toEqual(new Date(2026, 7, 23));
+    // Week 1 (current week containing anchor): Monday 24 Aug - Sunday 30 Aug
+    expect(cells[0].date).toEqual(new Date(2026, 7, 24));
+    expect(cells[6].date).toEqual(new Date(2026, 7, 30));
 
-    // Week 2 (current week containing anchor): Monday 24 Aug - Sunday 30 Aug
-    expect(cells[7].date).toEqual(new Date(2026, 7, 24));
-    expect(cells[13].date).toEqual(new Date(2026, 7, 30));
+    // Week 4 (3rd upcoming week): Monday 14 Sep - Sunday 20 Sep
+    expect(cells[21].date).toEqual(new Date(2026, 8, 14));
+    expect(cells[27].date).toEqual(new Date(2026, 8, 20));
+  });
 
-    // Week 6 (4th upcoming week): Monday 21 Sep - Sunday 27 Sep
-    expect(cells[35].date).toEqual(new Date(2026, 8, 21));
-    expect(cells[41].date).toEqual(new Date(2026, 8, 27));
+  it('takes the number of weeks as an argument', () => {
+    const cells = rollingWeeksGridCells(new Date(2026, 7, 26), 6);
+    expect(cells).toHaveLength(42);
+    expect(cells[41].date).toEqual(new Date(2026, 9, 4));
   });
 
   it('works across year transitions', () => {
     // Friday 1 January 2027
     const anchor = new Date(2027, 0, 1);
-    const cells = rollingSixWeeksGridCells(anchor);
+    const cells = rollingWeeksGridCells(anchor);
 
-    expect(cells).toHaveLength(42);
-    // Week 1 (previous week): Mon 21 Dec 2026
-    expect(cells[0].date).toEqual(new Date(2026, 11, 21));
-    // Week 2 (current week): Mon 28 Dec 2026
-    expect(cells[7].date).toEqual(new Date(2026, 11, 28));
-    // Week 6 (+4 weeks): Sun 31 Jan 2027
-    expect(cells[41].date).toEqual(new Date(2027, 0, 31));
+    expect(cells).toHaveLength(28);
+    // Week 1 (current week): Mon 28 Dec 2026
+    expect(cells[0].date).toEqual(new Date(2026, 11, 28));
+    // Week 4 (+3 weeks): Sun 24 Jan 2027
+    expect(cells[27].date).toEqual(new Date(2027, 0, 24));
   });
 });
 
