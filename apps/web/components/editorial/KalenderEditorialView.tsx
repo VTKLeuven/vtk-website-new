@@ -973,39 +973,41 @@ export function KalenderEditorialView({
             op papier: dat zijn er elf en die horen bij het raster, niet bij de
             titel. */}
         <div className="page-head-tools">
-          <div className="nav-mo">
-            <button type="button" onClick={() => shiftPeriod(-1)} aria-label={previousLabel}>
-              ←
-            </button>
-            <button type="button" onClick={() => shiftPeriod(1)} aria-label={nextLabel}>
-              →
-            </button>
-          </div>
-          <div className="mo-label">
-            {view === 'week'
-              ? weekLabel
-              : view === 'grid'
-                ? monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
-                : windowLabel}
-            <small>
+          <div className="mo-nav-group">
+            <div className="nav-mo">
+              <button type="button" onClick={() => shiftPeriod(-1)} aria-label={previousLabel}>
+                ←
+              </button>
+              <button type="button" onClick={() => shiftPeriod(1)} aria-label={nextLabel}>
+                →
+              </button>
+            </div>
+            <div className="mo-label">
               {view === 'week'
-                ? locale === 'nl'
-                  ? 'Weekoverzicht · '
-                  : 'Week overview · '
+                ? weekLabel
                 : view === 'grid'
-                  ? ''
+                  ? monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
+                  : windowLabel}
+              <small>
+                {view === 'week'
+                  ? locale === 'nl'
+                    ? 'Weekoverzicht · '
+                    : 'Week overview · '
+                  : view === 'grid'
+                    ? ''
+                    : locale === 'nl'
+                      ? 'Vier weken · '
+                      : 'Four weeks · '}
+                {periodCount}{' '}
+                {periodCount === 1
+                  ? locale === 'nl'
+                    ? 'evenement'
+                    : 'event'
                   : locale === 'nl'
-                    ? 'Vier weken · '
-                    : 'Four weeks · '}
-              {periodCount}{' '}
-              {periodCount === 1
-                ? locale === 'nl'
-                  ? 'evenement'
-                  : 'event'
-                : locale === 'nl'
-                  ? 'evenementen'
-                  : 'events'}
-            </small>
+                    ? 'evenementen'
+                    : 'events'}
+              </small>
+            </div>
           </div>
           <div className="view-switch" role="group" aria-label={locale === 'nl' ? 'Weergave' : 'View'}>
             <button

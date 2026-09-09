@@ -1907,8 +1907,17 @@
   gap: 10px 14px;
 }
 
-/* De pijlen en de maandregel zaten in `.toolbar`; die selectors gelden hier
-   niet meer, dus hun maat en typografie staan hieronder opnieuw. */
+/* De pijlen en de maandregel zitten samen in een groep zodat ze niet
+   afzonderlijk kunnen wrappen. De maandregel heeft een stabiele minimumbreedte
+   zodat de vorige/volgende-knoppen niet verspringen wanneer de maandnaam van
+   lengte verandert (bv. "Mei" vs "September"). */
+.vtk-design .page-head-tools .mo-nav-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+
 .vtk-design .page-head-tools .nav-mo {
   display: flex;
   flex: none;
@@ -1933,12 +1942,13 @@
 
 .vtk-design .page-head-tools .mo-label {
   flex: 0 1 auto;
-  min-width: 0;
+  min-width: 11em;
   color: var(--paper);
   font-size: clamp(18px, 1.9vw, 24px);
   font-weight: 600;
   letter-spacing: -0.02em;
   line-height: 1.15;
+  font-variant-numeric: tabular-nums;
 }
 
 .vtk-design .page-head-tools .mo-label small {
@@ -2040,8 +2050,12 @@
   .vtk-design .page-head-tools {
     justify-content: flex-start;
   }
+  .vtk-design .page-head-tools .mo-nav-group {
+    flex: 1 1 auto;
+  }
   .vtk-design .page-head-tools .mo-label {
     flex: 1 1 200px;
+    min-width: 0;
   }
 }
 
