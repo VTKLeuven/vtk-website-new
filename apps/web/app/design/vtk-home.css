@@ -1780,10 +1780,8 @@
   text-align: right;
 }
 
-.vtk-design .hours-col.section-hours-bg .hours-list dt {
-  color: var(--on-dark-muted);
-}
-
+.vtk-design .hours-list dt.today,
+.vtk-design .hours-list dd.today,
 .vtk-design .hours-list .today {
   color: var(--yellow);
   font-weight: 600;

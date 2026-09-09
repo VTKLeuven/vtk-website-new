@@ -85,7 +85,8 @@ export default async function HeaderOverviewPage({ params }: { params: Params })
                         src={photo}
                         alt=""
                         fill
-                        sizes="(max-width: 520px) 104px, 148px"
+                        sizes="(max-width: 640px) 240px, 400px"
+                        quality={90}
                         style={tile.focus ? { objectPosition: focusPosition(tile.focus) } : undefined}
                       />
                     )}

@@ -1,3 +1,5 @@
+import type { Locale } from "@vtk/i18n";
+
 /** Map weekday (Mon = 0 … Sun = 6) to Dutch day name prefix for matching CMS rows. */
 export const DUTCH_FULL_DAYS = [
   "Maandag",
@@ -91,4 +93,21 @@ export function isOpenAt(hours: string, d: Date): boolean {
 export function shortWeekdayNl(d: Date): string {
   const abb = ["MA", "DI", "WO", "DO", "VR", "ZA", "ZO"];
   return abb[mondayFirstWeekdayIndex(d)] ?? "—";
+}
+
+export function shortWeekday(d: Date, locale: Locale): string {
+  const abbNl = ["MA", "DI", "WO", "DO", "VR", "ZA", "ZO"];
+  const abbEn = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+  const idx = mondayFirstWeekdayIndex(d);
+  return (locale === "nl" ? abbNl[idx] : abbEn[idx]) ?? "—";
+}
+
+export function shortDayLabel(
+  row: { dayNl: string; dayEn?: string },
+  locale: Locale,
+): string {
+  if (locale === "nl") {
+    return row.dayNl.slice(0, 2).toUpperCase();
+  }
+  return (row.dayEn ? row.dayEn.slice(0, 3) : row.dayNl.slice(0, 3)).toUpperCase();
 }

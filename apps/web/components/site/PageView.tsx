@@ -482,7 +482,8 @@ export async function PageView({
                               src={photo}
                               alt=""
                               fill
-                              sizes="(max-width: 520px) 104px, 120px"
+                              sizes="(max-width: 640px) 240px, 400px"
+                              quality={90}
                               style={{
                                 objectPosition: focusPosition({
                                   x: sibling.imageFocusX,

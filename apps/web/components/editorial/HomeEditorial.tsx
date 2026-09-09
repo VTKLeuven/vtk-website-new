@@ -34,6 +34,7 @@ import {
   entryForDate,
   isClosedHours,
   isOpenAt,
+  shortDayLabel,
 } from "./hoursUtils";
 import {
   entriesForService,
@@ -446,7 +447,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                   const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
                   return (
                     <div key={i} style={{ display: "contents" }}>
-                      <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
+                      <dt className={todayCls}>{shortDayLabel(row, locale)}</dt>
                       <dd className={todayCls}>{row.hours}</dd>
                     </div>
                   );
@@ -468,7 +469,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                       const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
                       return (
                         <div key={i} style={{ display: "contents" }}>
-                          <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
+                          <dt className={todayCls}>{shortDayLabel(row, locale)}</dt>
                           <dd className={todayCls}>{row.hours}</dd>
                         </div>
                       );
@@ -536,7 +537,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                   const todayCls = row.dayNl === dutchDayNameForDate(now) ? "today" : "";
                   return (
                     <div key={i} style={{ display: "contents" }}>
-                      <dt className={todayCls}>{row.dayNl.slice(0, 2).toUpperCase()}</dt>
+                      <dt className={todayCls}>{shortDayLabel(row, locale)}</dt>
                       <dd className={todayCls}>{row.hours}</dd>
                     </div>
                   );

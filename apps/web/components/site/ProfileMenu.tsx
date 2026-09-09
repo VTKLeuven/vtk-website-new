@@ -146,21 +146,6 @@ export function ProfileMenu({
           <Link href={`${base}/account`} className={itemClass} role="menuitem" onClick={closeMenu}>
             {labels.myAccount}
           </Link>
-          {canReserveGrocomeet && (
-            <Link href={`${base}/grocomeet`} className={itemClass} role="menuitem" onClick={closeMenu}>
-              {labels.grocomeet}
-              {grocomeetNeedsAttention && (
-                <>
-                  {/* Een stip alleen zegt niets tegen een screenreader. */}
-                  <span
-                    aria-hidden="true"
-                    className="ml-2 inline-block h-2 w-2 rounded-full bg-vtk-yellow align-middle"
-                  />
-                  <span className="sr-only">({labels.grocomeetAttention})</span>
-                </>
-              )}
-            </Link>
-          )}
           {isAdmin && (
             <Link href={`${base}/admin`} className={itemClass} role="menuitem" onClick={closeMenu}>
               {labels.admin}
@@ -186,6 +171,21 @@ export function ProfileMenu({
               {tool.label}
             </a>
           ))}
+          {canReserveGrocomeet && (
+            <Link href={`${base}/grocomeet`} className={itemClass} role="menuitem" onClick={closeMenu}>
+              {labels.grocomeet}
+              {grocomeetNeedsAttention && (
+                <>
+                  {/* Een stip alleen zegt niets tegen een screenreader. */}
+                  <span
+                    aria-hidden="true"
+                    className="ml-2 inline-block h-2 w-2 rounded-full bg-vtk-yellow align-middle"
+                  />
+                  <span className="sr-only">({labels.grocomeetAttention})</span>
+                </>
+              )}
+            </Link>
+          )}
           {/* Feedback over de site zelf hangt hier en niet in de navigatie: het
               gaat over jouw ervaring op de pagina waar je nét stond, en dat is
               hetzelfde menu waar je je eigen account beheert. Het paneel zelf

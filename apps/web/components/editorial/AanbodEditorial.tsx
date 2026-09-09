@@ -10,7 +10,7 @@ import {
   findEntryForFullDay,
   isClosedHours,
   isOpenAt,
-  shortWeekdayNl,
+  shortWeekday,
 } from "./hoursUtils";
 
 import "@/app/design/vtk-base.css";
@@ -43,7 +43,7 @@ function HoursViz({
         const closed = isClosedHours(hours);
         const pct = barPercentForHours(hours);
         const isToday = full === todayNl;
-        const abb = shortWeekdayNl(new Date(2020, 0, 6 + dayIndex));
+        const abb = shortWeekday(new Date(2020, 0, 6 + dayIndex), locale);
         return (
           <div key={entry.dayNl} style={{ display: "contents" }}>
             <div className={`day-lbl${isToday ? " today" : ""}`}>{abb}</div>
