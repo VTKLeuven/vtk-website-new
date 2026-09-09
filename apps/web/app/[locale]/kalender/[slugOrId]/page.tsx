@@ -4,6 +4,7 @@ import Image from "next/image";
 import { notFound, permanentRedirect } from "next/navigation";
 import { pick, type Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
+import { MapPinIcon, UsersIcon } from "@/components/ui/icons";
 import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
 import { eventMetadata } from "@/lib/pageMetadata";
@@ -178,14 +179,24 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
             </div>
           ) : null}
         </div>
+        {/* Het icoon staat naast de waarde en niet naast het opschrift: het
+            zegt hetzelfde als "Groep" en "Locatie" erboven, en helpt vooral om
+            de twee kaartjes uit elkaar te houden in een oogopslag. Decoratief
+            dus, en `Icon` zet er al `aria-hidden` op. */}
         <div className="vtk-event-meta">
           <div>
             <span>{locale === "nl" ? "Groep" : "Group"}</span>
-            <b>{groupName}</b>
+            <b>
+              <UsersIcon />
+              {groupName}
+            </b>
           </div>
           <div>
             <span>{locale === "nl" ? "Locatie" : "Location"}</span>
-            <b>{event.location ?? (locale === "nl" ? "Nog te bevestigen" : "To be confirmed")}</b>
+            <b>
+              <MapPinIcon />
+              {event.location ?? (locale === "nl" ? "Nog te bevestigen" : "To be confirmed")}
+            </b>
           </div>
         </div>
       </header>

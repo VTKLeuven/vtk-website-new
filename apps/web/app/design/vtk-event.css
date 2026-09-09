@@ -38,11 +38,20 @@
 }
 
 .vtk-event-meta b {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin-top: 3px;
   color: var(--ink);
   font-size: 15px;
   font-weight: 600;
+}
+
+/* Het icoon is grijs en de tekst niet: het is een merkteken, geen tweede woord.
+   `flex: none` houdt het op maat wanneer een lange locatie de regel vult. */
+.vtk-event-meta b svg {
+  flex: none;
+  color: var(--muted);
 }
 
 .vtk-event-layout {
