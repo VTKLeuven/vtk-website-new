@@ -447,28 +447,37 @@ export default async function SamplePage({
 
           <div className="aanbod">
             <a className="acard feat" href="#calendar">
-              <div>
+              <span className="acard-media acard-media-ph" aria-hidden="true" />
+              <div className="acard-body">
                 <div className="tag">Featured card</div>
-                <h3>Highlighted surface</h3>
-                <p>Dark feature card with yellow accents and the standard card spacing.</p>
+                <div className="acard-head">
+                  <h3>Highlighted surface</h3>
+                  <span className="cta">Read more</span>
+                </div>
+                <p>Light card marked by a yellow accent rail, with the standard card spacing.</p>
               </div>
-              <span className="cta">Read more</span>
             </a>
             <a className="acard" href="#calendar">
-              <div>
+              <span className="acard-media acard-media-ph" aria-hidden="true" />
+              <div className="acard-body">
                 <div className="tag">Default card</div>
-                <h3>Editorial content</h3>
+                <div className="acard-head">
+                  <h3>Editorial content</h3>
+                  <span className="cta">Open section</span>
+                </div>
                 <p>White card, quiet border, compact copy and hover lift for repeated items.</p>
               </div>
-              <span className="cta">Open section</span>
             </a>
             <a className="acard" href="#calendar">
-              <div>
+              <span className="acard-media acard-media-ph" aria-hidden="true" />
+              <div className="acard-body">
                 <div className="tag">Service card</div>
-                <h3>Student services</h3>
+                <div className="acard-head">
+                  <h3>Student services</h3>
+                  <span className="cta">Inspect</span>
+                </div>
                 <p>A practical card style for pages, tiles, services and dashboards.</p>
               </div>
-              <span className="cta">Inspect</span>
             </a>
           </div>
 

@@ -513,8 +513,8 @@ export async function PageView({
 
 /**
  * Eén evenement op de navy band. Bewust een eigen, kleine kaart en niet de
- * `.evcard` van de homepage: die is wit, draagt de ster en de agendaknop, en
- * hoort bij `.vtk-design`. Hier telt enkel wanneer, wat en waar.
+ * `.ev-card` van de homepage en /kalender: die is wit, draagt de ster en de
+ * agendaknop, en hoort bij `.vtk-design`. Hier telt enkel wanneer, wat en waar.
  */
 function EventCard({
   event,

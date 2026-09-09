@@ -212,10 +212,14 @@ the design language into the application instead of copying mockup content.
   navy bands: were it between them, the two navy bands would collide the moment it
   disappears. See `docs/design-decisions.md` for the section ordering rationale.
 - Photography: content cards open with a real photo under a navy scrim, never a
-  decorative illustration. Aanbod cards carry a photo header (light 115deg
-  scrim) and are uniform: every card in the grid gets the same photo-header +
-  white-body treatment, no card is singled out as a featured/mini-hero (that was
-  reviewed and removed). Werkingen without a photo fall back
+  decorative illustration. Aanbod cards ("Wat we doen") carry a photo header
+  (16:9, light 115deg scrim) and are uniform: every card in the grid gets the
+  same photo-header + white-body treatment, no card is singled out as a
+  featured/mini-hero (that was reviewed and removed). Below that header they
+  follow the event card deliberately: same 16:9 crop, same title size with the
+  yellow rule under it, "Ontdek" right of the title on the same baseline (where
+  the event card's date pin sits), same border, radius and hover. The two grids sit on the same page, so a different photo height or
+  title size there reads as two websites. Werkingen without a photo fall back
   to the striped placeholder pattern (`repeating-linear-gradient` of
   `--paper-2`/`--paper`) so missing images stay visible. Admins upload the photo
   per werking via /admin/home (`HeaderTab.imageKey`); the `AANBOD_PHOTOS` map
@@ -376,6 +380,20 @@ the design language into the application instead of copying mockup content.
   photo gets an outline, or the initial floats loose on the band.
 - Lists and calendars: favor agenda/list layouts, tabular times, compact day
   labels, and small yellow status pins.
+  - **The event tile lives in `apps/web/app/design/vtk-eventcard.css` and is
+    shared** by the `/kalender` grid and the homepage band "Aankomende
+    evenementen"; both import that file, and `.ev-grid` belongs to it too. Do not
+    build a second event card beside it: it existed twice (`.evcard` on the
+    homepage) and drifted, while both stylesheets stay loaded after a
+    client-side navigation.
+  - That tile carries the date as a square yellow pin hanging top-right over the
+    bottom edge of the poster (out of the text flow, so the white block starts at
+    the top and stays compact; navy was tried first and vanished into every dark
+    poster), theme and audience in the body (never as pills over the photo, where
+    a poster carries its own title), the yellow heading rule under the title (the
+    same one as `.prose-vtk h2::after`), and one bottom row with the time, the
+    place, the counter, the star and "Zet in mijn agenda". The poster is 16:9,
+    like the event banner it usually already is. See `docs/design-decisions.md`.
 - Functional pages and modules, including Media and Logistiek, use the same
   visual system as the main website. A separate subdomain or operational flow
   is not a reason to invent another hero, type treatment, palette, container

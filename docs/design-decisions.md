@@ -5255,22 +5255,62 @@ De teller staat op vier plekken en overal met dezelfde drempel: de heroagenda en
 de kaarten op de homepage, het kalenderraster, de voorvertoning bij een klik, en
 de eventpagina zelf.
 
-### De ster en het agenda-icoon op de homepagekaarten
+### De aanbod-kaart volgt de eventkaart
 
-Sinds september 2026 draagt elke kaart onder "Aankomende evenementen" op dezelfde
-lijn als de locatie en groep twee icoonknoppen: dezelfde ster als in het
-weekoverzicht van de hero, en een agenda-icoon dat het evenement in je agenda
-zet. Ze staan op één regel met de locatie en groep om de kaarten compacter te
-houden; past de combinatie niet, dan valt de werkgroep weg en kapt een te lange
-locatie af met ellipsis (`...`). Het zijn de twee dingen die iemand met een
+De kaarten onder "Wat we doen" dragen dezelfde vormtaal als de eventkaart: een
+fotokop in 16:9, een witte body, en de titel op dezelfde grootte met de gele
+streep eronder. Ze staan op dezelfde pagina, en met een fotokop van 118 pixels,
+een titel van 24 en een andere voetregel lazen de twee roosters onder elkaar als
+twee websites.
+
+**"Ontdek" staat rechts op de titelregel**, op de plek waar een eventkaart haar
+datumpin heeft. Onderaan was het een losse regel die de kaart hoger maakte
+zonder iets toe te voegen; naast de titel sluit de kaart af met haar eigen tekst.
+De gele streep hangt onder de titel alleen (`width: fit-content`), dus staat de
+knoptekst ernaast en niet erin.
+
+Het label boven de titel valt weg wanneer het de titel zelf is. Bij een
+headertab is `titleNl` letterlijk `labelNl`, dus stond er "→ Info" boven "Info".
+Enkel de terugvalkaarten (een lege database) hebben een label dat iets toevoegt,
+en daar blijft het staan.
+
+Wat de aanbod-kaart wél apart houdt, is de lichte navy scrim over de foto
+(115 graden): een werking is een plek om te verkennen, een evenement is iets op
+een datum. Dat verschil mag klein blijven.
+
+### De homepagekaart en de kalenderkaart zijn dezelfde kaart
+
+"Aankomende evenementen" op de homepage en het raster op `/kalender` tonen
+dezelfde evenementen, dus tonen ze die ook in dezelfde kaart: de datumpin, de
+themaregel, de titel met de gele streep, en onderaan het uur, de plaats, de
+teller, de ster en "Zet in mijn agenda". Ze staat in `vtk-eventcard.css`, dat
+allebei de pagina's importeren.
+
+Daarvoor bestond ze twee keer: `.evcard` in `vtk-home.css` met een eigen
+datumblok en een eigen voetregel, en `.ev-card` in `vtk-kalender.css`. Dat liep
+uiteen zodra er aan één van de twee iets veranderde. Erger: `.ev-grid` stond in
+allebei de stylesheets met een andere kolomregel, terwijl ze na een client-side
+navigatie allebei in het document blijven staan; welke won hing dus af van de
+volgorde in het document en niet van de pagina.
+
+**Wat de homepage daarbij verloor:** de werkgroep achter de locatie. Het thema
+staat nu bovenaan de kaart en zegt in de praktijk hetzelfde ("Career" in plaats
+van "Bedrijvenrelaties"), en twee labels voor bijna dezelfde vraag maakten de
+voetregel te vol.
+
+### De ster en het agenda-icoon op de eventkaart
+
+Sinds september 2026 draagt elke eventkaart twee icoonknoppen op de onderste
+regel: dezelfde ster als in het weekoverzicht van de hero, en een agenda-icoon
+dat het evenement in je agenda zet. Het zijn de twee dingen die iemand met een
 evenement wil doen zonder eerst de detailpagina te openen, en ze staan er samen
 omdat "ik kom" en "in mijn agenda" dezelfde beslissing zijn op twee manieren
-opgeschreven.
+opgeschreven. Past de regel niet, dan kapt de plaats af met ellipsis (`...`).
 
-De kaart is daardoor geen link meer maar een `article` met de titel als link. Een
+De kaart is daardoor geen link maar een `article` met de titel als link. Een
 knop in een anker is ongeldige HTML en gedraagt zich op een telefoon ook zo: de
-ster opende dan de eventpagina. De titel spant zich nu over de kaart
-(`.evcard-link::after`), en de twee acties liggen erboven.
+ster opende dan de eventpagina. De titel spant zich over de kaart
+(`.ev-card-link::after`), en de twee acties liggen erboven.
 
 **Het agenda-icoon downloadt niet, het opent.** De .ics wordt `inline` geserveerd
 in plaats van als `attachment`. Op een desktopbrowser is dat hetzelfde: geen van
@@ -6320,19 +6360,55 @@ dan blijft er niets over.
 
 ### De kaart
 
-Affiche bovenaan in 3:2, daaronder een wit blok met de datum, de titel en de
-plaats. De titel blijft donker op wit; dat leest het makkelijkst bij lange
-Nederlandse evenementnamen. Op de affiche staan het thema linksboven en de
-doelgroep rechtsboven.
+Affiche bovenaan in 16:9, daaronder een wit blok. De titel blijft donker op wit;
+dat leest het makkelijkst bij lange Nederlandse evenementnamen.
 
-**De ster staat rechtsboven in het tekstblok, met de teller ernaast op dezelfde
-regel als de datum.** Onderaan stond hij op een eigen regel die de kaart alleen
-maar hoger maakte, en die regel viel weg zodra niemand had aangeduid dat hij
-kwam, waardoor de kaarten in een rij ongelijk stonden.
+16:9 en niet 3:2: dat is de verhouding waarin een evenementenbanner toch al
+gemaakt wordt (Facebook, Instagram), en de kaart wordt er veertig pixels korter
+van. Een staande of vierkante affiche verliest hier wel meer aan de snede; het
+brandpunt per evenement (`imageFocusX/Y`) bepaalt wat er blijft staan.
+
+**De datum is een vierkant geel plaatje dat rechtsboven over de onderrand van de
+affiche hangt.** Ze stond eerst als grijze regel boven de titel, in dezelfde
+grootte en kleur als de plaats eronder, terwijl de datum net is waarop je een
+kalender afscant. Vierkant en niet liggend, want zo staat een datum op een
+kalenderblad: weekdag boven, het getal groot, de maand onder.
+
+Geel en niet navy. Navy was de eerste versie, en die verdween in elke donkere
+affiche: een aula in het donker, een fuifzaal, een nachtfoto. Precies daar moet
+de datum blijven staan. Geel is de enige kleur op deze site die niet uit een foto
+kan komen. De kaart heeft er verder maar één plek voor (de streep onder de
+titel), dus botsen doet het niet.
+
+Rechts en uit de tekststroom, niet links erin: als blok links duwde de pin het
+hele tekstblok naar beneden en werd de witte balk onder elke affiche even hoog
+als de pin zelf. Nu begint de tekst bovenaan en is die balk 26 pixels korter;
+enkel de themaregel houdt plaats vrij naast de pin.
+
+**Thema en doelgroep staan in het tekstblok en niet meer op de affiche.** Als
+pillen stonden ze in de twee bovenhoeken van de foto, en dat is precies waar een
+affiche haar eigen titel draagt. Het thema is nu een gekleurde stip met het woord
+ernaast; de doelgroep blijft een gevulde pil in de kleur van haar categorie,
+want die moet luid blijven (zie "Doelgroepen filteren vanzelf" hierboven).
+
+**Onder de titel loopt dezelfde gele streep als onder een sectiekop op een
+inhoudspagina** (`.prose-vtk h2::after`), even breed als de titel zelf. Het
+accent van de kaart is daarmee hetzelfde accent als elders op de site, en de
+kaart heeft één gele plek in plaats van geen.
+
+**Onderaan staan het uur, de plaats, de teller en twee handelingen op één regel:
+de ster en "Zet in mijn agenda".** Dat is hetzelfde paar als op de homepagekaart,
+inclusief de `.ics`-link zonder `download` (iOS zet een gedownload bestand in de
+Bestanden-app in plaats van het als evenement te openen).
 
 De teller is daar gewone grijze tekst en geen gele pil zoals in de lijst: hij
 staat vlak naast de ster, en die wordt geel zodra jij aanduidt dat je komt. Twee
 gele vlakken naast elkaar lopen in elkaar over, en dan zegt het geel niets meer.
+
+Die onderste regel valt nooit weg, want de twee knoppen staan er altijd; de
+kaarten in een rij blijven dus even hoog. Dat was eerder de reden om de ster
+bovenaan naast de datum te zetten: een regel met enkel de teller verdween zodra
+niemand had aangeduid dat hij kwam.
 
 **Een kaart is een `article`, geen `a`.** De ster is een knop, en een knop in een
 anker is ongeldige HTML; op een telefoon opent de ster dan de eventpagina. De

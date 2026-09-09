@@ -1,0 +1,315 @@
+/* ---------------------------------------------------------------------------
+   De evenementkaart, gedeeld door /kalender en de band "Aankomende
+   evenementen" op de homepage.
+
+   Ze stond in twee stylesheets als `.ev-card` (kalender) en `.evcard`
+   (homepage), met twee keer een eigen datum, een eigen voetregel en een eigen
+   ster. Dat liep uiteen zodra er aan één van de twee iets veranderde, en het
+   zijn dezelfde evenementen. Eén kaart, één bestand, en de twee pagina's
+   importeren het allebei.
+
+   Alles hier hangt aan `.vtk-design`, net als de rest van het ontwerp. Wie deze
+   kaart ergens anders wil, importeert dit bestand en zet ze in een raster; het
+   raster (`.ev-grid`) hoort erbij, want de maten van de kaart zijn erop
+   afgestemd.
+   --------------------------------------------------------------------------- */
+
+.vtk-design .ev-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.vtk-design .ev-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.vtk-design .ev-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-2);
+  box-shadow: 0 12px 26px -18px rgba(14, 26, 54, 0.6);
+}
+
+.vtk-design .ev-card:focus-within {
+  border-color: var(--line-2);
+}
+
+/* 16:9 en niet 3:2: dat is de verhouding waarin een evenementenbanner sowieso al
+   gemaakt wordt (Facebook, Instagram), en de kaart wordt er 40 pixels korter
+   van, dus er past een rij meer op het scherm. Een affiche die staand of
+   vierkant is, verliest hier wel meer aan de snede; het brandpunt
+   (`imageFocusX/Y`, in te stellen per evenement) bepaalt wat er blijft staan. */
+.vtk-design .ev-card-shot {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--paper-2);
+}
+
+.vtk-design .ev-card-shot img {
+  object-fit: cover;
+}
+
+.vtk-design .ev-card-body {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 10px 16px 10px;
+}
+
+/* De datum als vierkant geel plaatje dat rechtsboven over de onderrand van de
+   foto hangt: op een kalender scan je op datum, en die stond hiervoor als grijze
+   regel in dezelfde grootte en kleur als de plaats eronder. Vierkant en niet
+   liggend, want zo staat een datum op een kalenderblad: weekdag boven, getal
+   groot, maand onder.
+
+   Geel en niet navy: navy verdween in elke donkere affiche, en juist daar moet
+   de datum blijven staan. Geel is de enige kleur op deze site die niet uit de
+   foto kan komen, en de kaart heeft er verder maar één plek voor (de streep
+   onder de titel), dus botsen doet het niet.
+
+   Rechts en uit de tekststroom (`absolute`), niet links in de stroom: als blok
+   links duwde de pin het hele tekstblok 38 pixels naar beneden en werd de witte
+   balk onder elke affiche even hoog als de pin. Nu begint de tekst bovenaan en
+   schuift alles daaronder mee omhoog; enkel de themaregel houdt plaats vrij
+   naast de pin. */
+.vtk-design .ev-card-pin {
+  position: absolute;
+  top: -30px;
+  right: 16px;
+  z-index: 1;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 15px;
+  background: var(--yellow);
+  color: var(--ink);
+  text-align: center;
+  box-shadow: 0 10px 22px -10px rgba(8, 13, 28, 0.75);
+}
+
+.vtk-design .ev-card-pin b {
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-design .ev-card-pin i {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-style: normal;
+  line-height: 1.3;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(10, 15, 31, 0.62);
+}
+
+/* Thema en doelgroep staan in het tekstblok en niet meer op de foto: een
+   affiche draagt vaak precies in die twee hoeken haar eigen titel. Het thema is
+   een stip met een woord (het zegt waarover het gaat), de doelgroep blijft een
+   gevulde pil in de kleur van haar categorie (die moet luid zijn, zie
+   docs/design-decisions.md). */
+/* De 66 px rechts is de pin (58) plus lucht: deze regel is de enige die naast de
+   pin loopt, de titel begint eronder. */
+.vtk-design .ev-card-tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 20px;
+  margin-bottom: 4px;
+  padding-right: 66px;
+}
+
+.vtk-design .ev-card-cat {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.vtk-design .ev-card-cat::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--cat);
+}
+
+.vtk-design .ev-card-aud {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--cat);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.45;
+  white-space: nowrap;
+}
+
+/* Uur, plaats, teller en de twee handelingen op één regel onderaan. De teller
+   is gewone grijze tekst en geen gele pil: hij staat vlak naast de ster, en die
+   wordt geel zodra jij aanduidt dat je komt. Twee gele vlakken naast elkaar
+   lopen in elkaar over, en dan zegt het geel niets meer. */
+.vtk-design .ev-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 6px;
+}
+
+.vtk-design .ev-card-when {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-design .ev-card-actions {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+  margin-right: -6px;
+}
+
+.vtk-design .ev-card-actions .ev-going {
+  margin-top: 0;
+  margin-right: 4px;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Ster en agenda-icoon, hetzelfde paar als op de homepagekaart. Groot genoeg om
+   op een telefoon te raken (44 px raakvlak) zonder als knop op te vallen: de
+   kaart is het onderwerp, dit zijn twee handelingen ernaast. */
+.vtk-design .ev-card-action {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 999px;
+  color: var(--muted);
+  transition:
+    color 140ms ease,
+    background-color 140ms ease;
+}
+
+.vtk-design .ev-card-action::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+.vtk-design .ev-card-action:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.vtk-design .ev-card-action[aria-pressed='true'] {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.vtk-design .ev-card-action[data-pending] {
+  opacity: 0.6;
+}
+
+.vtk-design .ev-card-action:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* De gele streep onder de titel is dezelfde als onder een sectiekop op een
+   inhoudspagina (`.prose-vtk h2::after`), en daarom staat hier ook
+   `width: fit-content`: de streep is 100% van een blok dat om de tekst sluit.
+   Een titel over twee regels vult de kolom en krijgt dus een volle streep, een
+   korte titel een korte. */
+.vtk-design .ev-card-title {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.22;
+}
+
+.vtk-design .ev-card-title::after {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin-top: 7px;
+  border-radius: 2px;
+  background: var(--yellow);
+}
+
+.vtk-design .ev-card-title a {
+  color: var(--ink);
+  text-decoration: none;
+}
+
+/* De titel is de link en spant zich over de hele kaart; de ster ligt erboven.
+   Een knop in een anker is ongeldige HTML, dus de kaart zelf is geen link. */
+.vtk-design .ev-card-link::after {
+  content: '';
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+}
+
+.vtk-design .ev-card-link:focus-visible::after {
+  outline: 2px solid var(--ink);
+  outline-offset: -3px;
+  border-radius: 18px;
+}
+
+@media (max-width: 1000px) {
+  .vtk-design .ev-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .vtk-design .ev-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

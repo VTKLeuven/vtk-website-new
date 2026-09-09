@@ -24,7 +24,7 @@ import { SAVE_IDLE } from "@/lib/saveState";
  * eerlijker dan een ster die pas na het klikken vertelt dat het niet gaat.
  *
  * `className` bepaalt het uitzicht per plek (`hero-week-star` op de donkere
- * hero, `evcard-action` op een witte kaart); het gedrag is overal hetzelfde.
+ * hero, `ev-card-action` op de witte eventkaart); het gedrag is overal hetzelfde.
  */
 
 export type EventStarLabels = {

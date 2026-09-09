@@ -11,6 +11,7 @@ import { notFound } from "next/navigation";
 import "@/app/design/vtk-base.css";
 import "@/app/design/vtk-event.css";
 import "@/app/design/vtk-kalender.css";
+import "@/app/design/vtk-eventcard.css";
 
 export async function generateMetadata({
   params,

@@ -8,6 +8,7 @@ import { CalendarSubscribe } from '@/components/site/CalendarSubscribe';
 import { Markdown } from '@/components/ui/Markdown';
 import { EventInterest } from '@/components/calendar/EventInterest';
 import { EventStar, type EventStarLabels } from '@/components/calendar/EventStar';
+import { CalendarPlusIcon } from '@/components/ui/icons';
 import type { ViewerInterest } from '@/lib/calendar/interest';
 import {
   eventOccursOnDay,
@@ -694,23 +695,33 @@ export function KalenderEditorialView({
   }
 
   /**
-   * Eén evenement als kaart in het raster: de affiche bovenaan, daaronder de
-   * datum, de titel en de plaats.
+   * Eén evenement als kaart in het raster: de affiche bovenaan, de datum als
+   * vierkante pin die rechtsboven over de onderrand van de foto hangt, links
+   * daarvan het thema, daaronder de titel met de gele streep, en onderaan het
+   * uur, de plaats en de twee handelingen.
+   *
+   * De datum stond eerst als grijze regel boven de titel, in dezelfde grootte
+   * en kleur als de plaats eronder, terwijl de datum net is waarop je een
+   * kalender afscant. Als pin is ze het eerste wat je ziet. Daardoor kunnen ook
+   * het thema en de doelgroep van de foto af: die stonden als pillen over een
+   * affiche waar vaak precies daar de titel van het evenement staat.
    *
    * Net als bij de lijstrij is dit een `article` en geen `a`: de ster is een
    * knop, en een knop in een anker is ongeldige HTML. De titel is de link en
-   * spant zich over de hele kaart (`.ev-card-link::after`); de ster ligt erboven.
+   * spant zich over de hele kaart (`.ev-card-link::after`); de handelingen
+   * liggen erboven.
    *
-   * De ster staat rechtsboven in het tekstblok, met de teller ernaast op
-   * dezelfde regel als de datum. Onderaan stond hij op een eigen regel die de
-   * kaart alleen maar hoger maakte, en die regel viel weg zodra niemand nog had
-   * aangeduid dat hij kwam; de kaarten in een rij stonden dan ongelijk.
+   * De teller staat naast de ster onderaan, en niet op een eigen regel: die
+   * regel viel weg zodra niemand had aangeduid dat hij kwam, en de kaarten in
+   * een rij stonden dan ongelijk. De ster en de agendaknop staan er altijd, dus
+   * de rij houdt haar hoogte.
    */
   function renderCard(e: ApiEvent) {
     const cat = e.extendedProps.categories.find((c) => c.audience === null) ?? null;
     const going = interestLine(e);
     const title = pickTitle(e);
     const start = new Date(e.start);
+    const addToCalendar = locale === 'nl' ? 'Zet in mijn agenda' : 'Add to my calendar';
     return (
       <article key={e.id} className="ev-card">
         <div className="ev-card-shot">
@@ -721,24 +732,39 @@ export function KalenderEditorialView({
             sizes="(max-width: 620px) 100vw, (max-width: 1000px) 50vw, 380px"
             style={e.extendedProps.imagePosition ? { objectPosition: e.extendedProps.imagePosition } : undefined}
           />
-          {cat ? (
-            <span className="ev-card-cat" style={{ '--cat': cat.colour } as React.CSSProperties}>
-              {categoryName(cat)}
-            </span>
-          ) : null}
-          {audienceCategories(e).map((a) => (
-            <span key={a.slug} className="ev-card-aud" style={{ '--cat': a.colour } as React.CSSProperties}>
-              {categoryName(a)}
-            </span>
-          ))}
         </div>
         <div className="ev-card-body">
-          <div className="ev-card-meta">
+          {/* Weekdag boven het getal, maand eronder: zo staat een datum op een
+              kalenderblad, en zo blijft de pin vierkant. Ze ligt rechtsboven en
+              uit de stroom, zodat het tekstblok bovenaan begint. */}
+          <span className="ev-card-pin">
+            <i>{start.toLocaleDateString(dateLocale, { weekday: 'short' })}</i>
+            <b>{start.getDate()}</b>
+            <i>{start.toLocaleDateString(dateLocale, { month: 'short' })}</i>
+          </span>
+          <div className="ev-card-tags">
+            {cat ? (
+              <span className="ev-card-cat" style={{ '--cat': cat.colour } as React.CSSProperties}>
+                {categoryName(cat)}
+              </span>
+            ) : null}
+            {audienceCategories(e).map((a) => (
+              <span key={a.slug} className="ev-card-aud" style={{ '--cat': a.colour } as React.CSSProperties}>
+                {categoryName(a)}
+              </span>
+            ))}
+          </div>
+          <h3 className="ev-card-title">
+            <a href={eventHref(e)} className="ev-card-link">
+              {title}
+            </a>
+          </h3>
+          <div className="ev-card-foot">
             <span className="ev-card-when">
-              {start.toLocaleDateString(dateLocale, { weekday: 'short', day: 'numeric', month: 'short' })} ·{' '}
               {eventTime(e)}
+              {e.location ? ` · ${e.location}` : ''}
             </span>
-            <span className="ev-card-right">
+            <span className="ev-card-actions">
               {going ? <span className="ev-going">{going}</span> : null}
               <EventStar
                 key={`${e.id}:${e.extendedProps.interested}`}
@@ -748,17 +774,22 @@ export function KalenderEditorialView({
                 signedIn={signedIn}
                 loginHref={`${base}/inloggen?next=${encodeURIComponent(eventHref(e))}`}
                 labels={starLabels}
-                className="ev-card-star"
+                className="ev-card-action"
                 onChanged={(interested) => starChanged(e, interested)}
               />
+              {/* Gewone link naar de .ics, zonder `download`: iOS zet een
+                  gedownload bestand in de Bestanden-app, terwijl het zo meteen
+                  als evenement opent. Zie de route. */}
+              <a
+                href={`/api/calendar/event/${e.id}${locale === 'en' ? '?lang=en' : ''}`}
+                className="ev-card-action"
+                title={addToCalendar}
+                aria-label={`${addToCalendar}: ${title}`}
+              >
+                <CalendarPlusIcon />
+              </a>
             </span>
           </div>
-          <h3 className="ev-card-title">
-            <a href={eventHref(e)} className="ev-card-link">
-              {title}
-            </a>
-          </h3>
-          {e.location ? <div className="ev-card-where">{e.location}</div> : null}
         </div>
       </article>
     );

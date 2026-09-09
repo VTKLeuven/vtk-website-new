@@ -44,6 +44,7 @@ import {
 } from "@/lib/openingHoursSettings";
 
 import "@/app/design/vtk-home.css";
+import "@/app/design/vtk-eventcard.css";
 import "@/app/design/vtk-frontpage.css";
 import {
   HOME_LINK_EVENT,
@@ -80,6 +81,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const base = locale === "nl" ? "" : "/en";
   const now = new Date();
   const nl = locale === "nl";
+  /** De taal waarin datums op deze pagina geschreven worden. */
+  const dateTag = nl ? "nl-BE" : "en-GB";
 
   const [
     settings,
@@ -559,8 +562,11 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         <div className="aanbod">
           {aanbodCards.slice(0, 6).map((card) => {
             const photo = card.photo;
-            // Alle aanbod-kaarten zijn identiek: een fotokop onder navy scrim met
-            // witte body. Geen enkele kaart krijgt een aparte featured-stijl.
+            const label = pick(card.labelNl, card.labelEn, locale);
+            const cardTitle = pick(card.titleNl, card.titleEn, locale);
+            // Alle aanbod-kaarten zijn identiek: dezelfde fotokop in 16:9 en
+            // dezelfde witte body als een eventkaart. Geen enkele kaart krijgt
+            // een aparte featured-stijl.
             return (
               <Link
                 key={card.href}
@@ -568,25 +574,29 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                 className="acard"
                 {...umamiEvent(HOME_LINK_EVENT, { soort: "aanbodkaart", naar: card.href })}
               >
+                <span
+                  className={`acard-media${photo ? "" : " acard-media-ph"}`}
+                  aria-hidden="true"
+                >
+                  {photo ? (
+                    <Image
+                      src={photo}
+                      alt=""
+                      fill
+                      sizes="(max-width: 620px) 100vw, (max-width: 1000px) 50vw, 380px"
+                    />
+                  ) : null}
+                </span>
                 <div className="acard-body">
-                  <span
-                    className={`acard-media${photo ? "" : " acard-media-ph"}`}
-                    aria-hidden="true"
-                  >
-                    {photo ? (
-                      <Image
-                        src={photo}
-                        alt=""
-                        fill
-                        sizes="(max-width: 640px) 100vw, (max-width: 980px) 50vw, 33vw"
-                      />
-                    ) : null}
-                  </span>
-                  <div className="tag">→ {pick(card.labelNl, card.labelEn, locale)}</div>
-                  <h3>{pick(card.titleNl, card.titleEn, locale)}</h3>
+                  {/* Bij een headertab is het label de titel; dan stond hier
+                      hetzelfde woord twee keer onder elkaar. */}
+                  {label && label !== cardTitle ? <div className="tag">{label}</div> : null}
+                  <div className="acard-head">
+                    <h3>{cardTitle}</h3>
+                    <span className="cta">{nl ? "Ontdek" : "Explore"}</span>
+                  </div>
                   <p>{pick(card.bodyNl, card.bodyEn, locale)}</p>
                 </div>
-                <div className="cta">{nl ? "Ontdek" : "Explore"}</div>
               </Link>
             );
           })}
@@ -626,19 +636,25 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               const title = pick(event.titleNl, event.titleEn ?? event.titleNl, locale);
               const going = interestLabel(interested.get(event.id), locale);
               const location = event.location?.trim() || null;
-              const group = pick(event.group.nameNl, event.group.nameEn, locale)?.trim() || null;
+              const categories = event.categories.map((link) => link.category);
+              const theme = categories.find((category) => category.audience === null) ?? null;
+              const audiences = categories.filter((category) => category.audience !== null);
               return (
-                // Een kaart met knoppen erin kan geen link zijn: een knop in een
-                // anker is ongeldige HTML en op een telefoon opent de ster dan de
-                // eventpagina. De titel is de link en spant zich over de kaart
-                // (`.evcard-link::after`), de acties liggen erboven.
-                <article key={event.id} className="evcard">
-                  <span className="evcard-media" aria-hidden="true">
+                // Dezelfde kaart als in het raster van /kalender, uit
+                // `vtk-eventcard.css`. Een kaart met knoppen erin kan geen link
+                // zijn: een knop in een anker is ongeldige HTML en op een
+                // telefoon opent de ster dan de eventpagina. De titel is de link
+                // en spant zich over de kaart (`.ev-card-link::after`), de
+                // acties liggen erboven.
+                <article key={event.id} className="ev-card">
+                  <div className="ev-card-shot">
                     <Image
                       src={photo}
                       alt=""
                       fill
-                      sizes="(max-width: 640px) 100vw, (max-width: 980px) 50vw, 33vw"
+                      // Dezelfde maten als het raster op /kalender: de kaart en
+                      // haar breekpunten komen uit hetzelfde stylesheet.
+                      sizes="(max-width: 620px) 100vw, (max-width: 1000px) 50vw, 380px"
                       // Enkel de eigen foto draagt een gekozen uitsnede; de
                       // standaardfoto blijft gecentreerd.
                       style={
@@ -652,37 +668,48 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                           : undefined
                       }
                     />
-                  </span>
-                  <div className="evcard-body">
-                    <div className="evcard-when">
-                      <span className="num">{String(start.getDate()).padStart(2, "0")}</span>
-                      <span className="mon">
-                        {start.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
-                          month: "short",
-                        })}
-                      </span>
-                      <span className="time">{event.allDay
-                        ? nl ? "Hele dag" : "All day"
-                        : formatTime(start, locale)}</span>
+                  </div>
+                  <div className="ev-card-body">
+                    {/* Weekdag boven het getal, maand eronder: zo staat een
+                        datum op een kalenderblad, en zo blijft de pin vierkant.
+                        Ze ligt rechtsboven en uit de stroom, zodat het tekstblok
+                        bovenaan begint. */}
+                    <span className="ev-card-pin">
+                      <i>{start.toLocaleDateString(dateTag, { weekday: "short" })}</i>
+                      <b>{start.getDate()}</b>
+                      <i>{start.toLocaleDateString(dateTag, { month: "short" })}</i>
+                    </span>
+                    <div className="ev-card-tags">
+                      {theme ? (
+                        <span
+                          className="ev-card-cat"
+                          style={{ "--cat": theme.colour } as CSSProperties}
+                        >
+                          {pick(theme.nameNl, theme.nameEn, locale)}
+                        </span>
+                      ) : null}
+                      {audiences.map((audience) => (
+                        <span
+                          key={audience.id}
+                          className="ev-card-aud"
+                          style={{ "--cat": audience.colour } as CSSProperties}
+                        >
+                          {pick(audience.nameNl, audience.nameEn, locale)}
+                        </span>
+                      ))}
                     </div>
-                    <h3>
-                      <Link href={`${base}/kalender/${event.slug}`} className="evcard-link">
+                    <h3 className="ev-card-title">
+                      <Link href={`${base}/kalender/${event.slug}`} className="ev-card-link">
                         {title}
                       </Link>
                     </h3>
-                    {going ? <span className="evcard-going">{going}</span> : null}
-                    <div className="evcard-foot">
-                      <div className="evcard-meta">
-                        {location ? (
-                          <>
-                            <span className="evcard-loc">{location}</span>
-                            {group ? <span className="evcard-group">{group}</span> : null}
-                          </>
-                        ) : group ? (
-                          <span className="evcard-loc">{group}</span>
-                        ) : null}
-                      </div>
-                      <div className="evcard-actions">
+                    <div className="ev-card-foot">
+                      <span className="ev-card-when">
+                        {event.allDay ? (nl ? "Hele dag" : "All day") : formatTime(start, locale)}
+                        {location ? ` · ${location}` : ""}
+                      </span>
+                      <span className="ev-card-actions">
+                        {going ? <span className="ev-going">{going}</span> : null}
                         <EventStar
                           eventId={event.id}
                           title={title}
@@ -690,20 +717,20 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                           signedIn={Boolean(session)}
                           loginHref={eventLoginHref}
                           labels={starLabels}
-                          className="evcard-action"
+                          className="ev-card-action"
                         />
                         {/* Gewone link naar de .ics, zonder `download`: iOS zet
                             een gedownload bestand in de Bestanden-app, terwijl
                             het zo meteen als evenement opent. Zie de route. */}
                         <a
                           href={`/api/calendar/event/${event.id}${locale === "en" ? "?lang=en" : ""}`}
-                          className="evcard-action"
+                          className="ev-card-action"
                           title={nl ? "Zet in mijn agenda" : "Add to my calendar"}
                           aria-label={`${nl ? "Zet in mijn agenda" : "Add to my calendar"}: ${title}`}
                         >
                           <CalendarPlusIcon />
                         </a>
-                      </div>
+                      </span>
                     </div>
                   </div>
                 </article>

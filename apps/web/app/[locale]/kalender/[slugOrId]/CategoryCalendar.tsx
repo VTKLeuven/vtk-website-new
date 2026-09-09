@@ -7,6 +7,7 @@ import { getCurrentSession } from "@/lib/session";
 import "@/app/design/vtk-base.css";
 import "@/app/design/vtk-event.css";
 import "@/app/design/vtk-kalender.css";
+import "@/app/design/vtk-eventcard.css";
 
 /**
  * Een categoriepagina is dezelfde kalender als /kalender, vastgezet op één

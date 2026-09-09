@@ -767,61 +767,110 @@
 .vtk-design .aanbod {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  gap: 20px;
 }
 
+/* De aanbod-kaart is de eventkaart met andere inhoud: dezelfde fotokop in 16:9,
+   dezelfde witte body en dezelfde titel met de gele streep eronder. Ze stonden
+   ooit naast elkaar op de homepage met twee verschillende fotohoogtes, twee
+   titelgroottes en twee soorten voetregel, en dan lezen twee roosters onder
+   elkaar als twee websites. Zie `vtk-eventcard.css`; wat hier staat is bewust
+   hetzelfde. */
 .vtk-design .acard {
   position: relative;
-  overflow: hidden;
-  min-height: 240px;
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--surface);
-  padding: 28px;
   color: var(--ink);
-  transition: transform 180ms ease, border-color 180ms ease;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
 }
 
 .vtk-design .acard:hover {
-  transform: translateY(-3px);
+  transform: translateY(-2px);
   border-color: var(--line-2);
+  box-shadow: 0 12px 26px -18px rgba(14, 26, 54, 0.6);
 }
 
+.vtk-design .acard-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  padding: 12px 16px 12px;
+}
+
+/* Enkel wanneer een kaart iets anders te zeggen heeft dan haar titel; bij een
+   headertab is het label de titel, en dan stond hier hetzelfde woord twee keer
+   onder elkaar. */
 .vtk-design .acard .tag {
+  margin-bottom: 4px;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
   color: var(--muted);
-  font-size: 12px;
+}
+
+/* Titel links, "Ontdek" rechts op dezelfde regel: de gele streep hangt onder de
+   titel alleen (`fit-content`), dus staat de knoptekst ernaast en niet erin. Op
+   dezelfde plek als de datumpin op een eventkaart. */
+.vtk-design .acard-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
 }
 
 .vtk-design .acard h3 {
-  margin: 14px 0 0;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  margin: 0;
   color: var(--ink);
-  font-size: 24px;
-  line-height: 1.1;
-  letter-spacing: -0.02em;
+  font-size: 19px;
+  line-height: 1.2;
+  letter-spacing: -0.018em;
   font-weight: 600;
 }
 
+/* Dezelfde gele streep als onder een sectiekop en onder de titel van een
+   eventkaart, even breed als de titel zelf. */
+.vtk-design .acard h3::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin-top: 7px;
+  border-radius: 2px;
+  background: var(--yellow);
+}
+
 .vtk-design .acard p {
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   color: var(--body);
-  font-size: 14px;
-  line-height: 1.55;
+  font-size: 13.5px;
+  line-height: 1.5;
 }
 
 .vtk-design .acard .cta {
-  margin-top: 18px;
   display: inline-flex;
+  flex: none;
+  align-items: baseline;
   gap: 6px;
   color: var(--ink);
   font-size: 13px;
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .vtk-design .acard .cta::after {
-  content: "→";
+  content: "\2192";
   transition: transform 160ms ease;
 }
 
@@ -837,38 +886,26 @@
   box-shadow: inset 3px 0 0 0 var(--yellow);
 }
 
-.vtk-design .acard.feat h3 {
-  color: var(--ink);
-}
-
-.vtk-design .acard.feat p {
-  color: var(--body);
-}
-
 .vtk-design .acard.feat .tag {
   display: inline-flex;
+  align-self: flex-start;
   padding: 3px 10px;
   border-radius: 999px;
   background: var(--yellow);
   color: var(--ink);
-  font-weight: 700;
-}
-
-.vtk-design .acard.feat .cta {
-  color: var(--navy);
+  letter-spacing: 0.08em;
 }
 
 /* Fotokop op de aanbod-kaarten: elke werking opent met beeld onder een lichte
-   navy scrim (fotografie-richting). De kop bloedt tot de kaartranden; werkingen
-   zonder foto vallen terug op het gestreepte placeholder-patroon, zodat het
-   ritme blijft kloppen en meteen zichtbaar is waar nog beeld ontbreekt. */
+   navy scrim (fotografie-richting), in dezelfde 16:9 als de affiche op een
+   eventkaart. Werkingen zonder foto vallen terug op het gestreepte
+   placeholder-patroon, zodat het ritme blijft kloppen en meteen zichtbaar is
+   waar nog beeld ontbreekt. */
 .vtk-design .acard-media {
   position: relative;
   display: block;
-  height: 118px;
-  margin: -28px -28px 20px;
-  overflow: hidden;
-  border-bottom: 1px solid var(--line);
+  aspect-ratio: 16 / 9;
+  background: var(--paper-2);
 }
 
 .vtk-design .acard-media img {
@@ -1319,231 +1356,12 @@
   background: var(--paper-2);
 }
 
-/* Minder dan drie evenementen mag geen lege plaatsen opvullen: auto-fit met een
-   max van 3 kolommen laat het rooster meekrimpen naar 1 of 2 kaarten. */
-.vtk-design .ev-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(0, calc((100% - 36px) / 3)));
-  justify-content: start;
-  gap: 18px;
-}
-
-.vtk-design .evcard {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
-  color: var(--ink);
-  text-decoration: none;
-  transition: transform 180ms ease, border-color 180ms ease;
-}
-
-.vtk-design .evcard:hover {
-  transform: translateY(-3px);
-  border-color: var(--line-2);
-}
-
-.vtk-design .evcard-media {
-  position: relative;
-  display: block;
-  aspect-ratio: 16 / 9;
-  overflow: hidden;
-  border-bottom: 1px solid var(--line);
-}
-
-.vtk-design .evcard-media img {
-  object-fit: cover;
-}
-
-
-.vtk-design .evcard-body {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  padding: 20px 22px 18px;
-}
-
-.vtk-design .evcard-when {
-  display: flex;
-  align-items: baseline;
-  gap: 7px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.vtk-design .evcard-when .num {
-  color: var(--ink);
-  font-size: 19px;
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  font-variant-numeric: tabular-nums;
-}
-
-.vtk-design .evcard-when .mon {
-  color: var(--ink);
-  font-size: 12px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.vtk-design .evcard-when .time {
-  margin-left: auto;
-  font-variant-numeric: tabular-nums;
-}
-
-.vtk-design .evcard h3 {
-  margin: 8px 0 0;
-  color: var(--ink);
-  font-size: 19px;
-  line-height: 1.2;
-  letter-spacing: -0.02em;
-  font-weight: 600;
-}
-
-.vtk-design .evcard p {
-  margin: 6px 0 0;
-  color: var(--body);
-  font-size: 13.5px;
-  line-height: 1.5;
-}
-
-/* De titel is de link van de kaart en spant zich over het geheel, zodat de hele
-   kaart klikbaar blijft zonder dat de kaart zelf een anker is; de acties
-   hieronder liggen erboven. Het pseudo-element draagt geen tekst, dus een
-   schermlezer leest gewoon de titel. */
-.vtk-design .evcard-link {
-  color: inherit;
-  text-decoration: none;
-}
-
-.vtk-design .evcard-link::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-}
-
-.vtk-design .evcard:hover .evcard-link {
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.vtk-design .evcard-link:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 3px;
-}
-
-/* Onderaan de kaart op één lijn: links de locatie en groep (waarbij de groep
-   wegvalt wanneer ze samen niet passen, en de locatie afkapt met ellipsis als ook
-   die alleen te lang is), rechts de twee acties. Blijft onderaan plakken, ook
-   wanneer de ene kaart een langere titel heeft dan de andere. */
-.vtk-design .evcard-foot {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: auto;
-  padding-top: 10px;
-  pointer-events: none;
-}
-
-.vtk-design .evcard-meta {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  height: 1.5em;
-  line-height: 1.5;
-  overflow: hidden;
-  font-size: 13.5px;
-  color: var(--body);
-  min-width: 0;
-  flex: 1;
-  margin: 0;
-}
-
-.vtk-design .evcard-loc {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vtk-design .evcard-group {
-  white-space: nowrap;
-  overflow: hidden;
-  flex-shrink: 0;
-}
-
-.vtk-design .evcard-group::before {
-  content: " · ";
-  white-space: pre;
-}
-
-.vtk-design .evcard-actions {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  margin-left: auto;
-  margin-right: -6px;
-  flex-shrink: 0;
-  pointer-events: auto;
-}
-
-/* Ster en agenda-icoon. Groot genoeg om op een telefoon te raken (Apple en
-   Google vragen allebei minstens 44 px) zonder als knop op te vallen: de kaart
-   is het onderwerp, dit zijn twee handelingen ernaast. */
-.vtk-design .evcard-action {
-  position: relative;
-  display: inline-grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 999px;
-  color: var(--muted);
-  transition:
-    color 140ms ease,
-    background-color 140ms ease;
-}
-
-/* Het raakvlak tot 44 px, zonder de knop zelf groter te tekenen. Relatief
-   genest, anders hangt dit blok aan `.evcard` en ligt het onzichtbaar over de
-   foto. */
-.vtk-design .evcard-action::before {
-  content: "";
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 44px;
-  height: 44px;
-  transform: translate(-50%, -50%);
-}
-
-.vtk-design .evcard-action:hover {
-  background: var(--paper-2);
-  color: var(--ink);
-}
-
-/* Aangeduid: geel, de kleur die op deze site "actief" betekent. De gevulde ster
-   zegt het al, maar niet hard genoeg naast een lege ster van dezelfde grootte. */
-.vtk-design .evcard-action[aria-pressed="true"] {
-  background: var(--yellow);
-  color: var(--ink);
-}
-
-.vtk-design .evcard-action[data-pending] {
-  opacity: 0.6;
-}
-
-.vtk-design .evcard-action:focus-visible {
-  outline: 2px solid var(--ink);
-  outline-offset: 2px;
-}
+/* Het raster en de kaart van deze band staan in `vtk-eventcard.css`: het zijn
+   dezelfde kaarten als in het raster van /kalender. Ze stonden hier als
+   `.evcard` met een eigen datumblok, een eigen voetregel en een eigen ster, en
+   dat liep uiteen zodra er aan één van de twee iets veranderde. `.ev-grid` stond
+   bovendien in beide stylesheets met een andere kolomregel, terwijl ze allebei
+   globaal geladen worden; welke won hing af van de volgorde in het document. */
 
 /* "Richtingsvertegenwoordigers" is één woord van 27 letters: op de gewone
    sectiegrootte breekt de kop van deze band altijd over twee regels. */
@@ -1906,10 +1724,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .vtk-design .ev-grid {
-    grid-template-columns: repeat(auto-fit, minmax(0, calc((100% - 18px) / 2)));
-  }
-
   /* Te smal voor kolommen naast elkaar, ook voor de gecentreerde enkele kaart. */
   .vtk-design .poc-grid,
   .vtk-design .poc-grid[data-groups="1"],
@@ -1921,8 +1735,7 @@
 
 @media (max-width: 640px) {
   .vtk-design .aanbod,
-  .vtk-design .am-grid,
-  .vtk-design .ev-grid {
+  .vtk-design .am-grid {
     grid-template-columns: 1fr;
   }
 
