@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { layoutDayEvents } from "@/lib/calendarLayout";
 import type { VisitView } from "./types";
 
 /**
@@ -205,27 +206,38 @@ export function LesbezoekCalendar({
             </div>
             {dates.map((date) => {
               const key = dayKey(date);
-              const dayVisits = byDay.get(key) ?? [];
+              const dayVisits = layoutDayEvents(
+                byDay.get(key) ?? [],
+                Math.ceil((30 / HOUR_PX) * 60),
+              );
               return (
                 <div key={key} className="lb-col" style={{ height: HOURS.length * HOUR_PX }}>
                   {HOURS.map((hour, index) => (
                     <div key={hour} className="lb-hourline" style={{ top: index * HOUR_PX }} />
                   ))}
-                  {dayVisits.map((visit) => (
-                    <div
-                      key={visit.id}
-                      className="lb-event"
-                      style={{
-                        top: Math.max(0, ((visit.minutes - FIRST_HOUR * 60) / 60) * HOUR_PX),
-                        height: Math.max(
-                          30,
-                          ((visit.endMinutes - visit.minutes) / 60) * HOUR_PX,
-                        ),
-                      }}
-                    >
-                      <Chip visit={visit} selected={visit.id === selectedId} onSelect={onSelect} />
-                    </div>
-                  ))}
+                  {dayVisits.map((visit) => {
+                    const widthPct = 100 / visit.lanes;
+                    const leftPct = visit.lane * widthPct;
+                    return (
+                      <div
+                        key={visit.id}
+                        className="lb-event"
+                        style={{
+                          top: Math.max(0, ((visit.minutes - FIRST_HOUR * 60) / 60) * HOUR_PX),
+                          height: Math.max(
+                            30,
+                            ((visit.endMinutes - visit.minutes) / 60) * HOUR_PX,
+                          ),
+                          left: `calc(${leftPct}% + 2px)`,
+                          width: `calc(${widthPct}% - 4px)`,
+                          right: "auto",
+                          zIndex: visit.id === selectedId ? 3 : 1,
+                        }}
+                      >
+                        <Chip visit={visit} selected={visit.id === selectedId} onSelect={onSelect} />
+                      </div>
+                    );
+                  })}
                 </div>
               );
             })}

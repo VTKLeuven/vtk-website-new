@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RENTAL_STATUS_META, isDeclinedRental } from "@/lib/theokotVerhuur";
 import { RentalCalendarSubscribe } from "@/components/theokot/RentalCalendarSubscribe";
+import { layoutDayEvents } from "@/lib/calendarLayout";
+import { shiftYMD, ymdKey } from "@/lib/brussels";
 import type { RentalView } from "./types";
 
 /**
@@ -73,6 +75,57 @@ function addDays(date: Date, days: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 }
 
+export type TimeGridSegment = {
+  key: string;
+  day: string;
+  minutes: number;
+  endMinutes: number;
+  isContinuation: boolean;
+  rental: RentalView;
+};
+
+/**
+ * Splitst verhuren die na middernacht doorlopen op in twee blokken voor het
+ * tijdrooster: avonddeel (start tot 24:00) en ochtenddeel (00:00 tot einde).
+ */
+export function buildRentalTimeSegments(rentals: RentalView[]): Map<string, TimeGridSegment[]> {
+  const map = new Map<string, TimeGridSegment[]>();
+  for (const rental of rentals) {
+    const day1End = Math.min(rental.endMinutes, 24 * 60);
+    const seg1: TimeGridSegment = {
+      key: `${rental.id}-start`,
+      day: rental.day,
+      minutes: rental.minutes,
+      endMinutes: day1End,
+      isContinuation: false,
+      rental,
+    };
+    const b1 = map.get(rental.day);
+    if (b1) b1.push(seg1);
+    else map.set(rental.day, [seg1]);
+
+    if (rental.endMinutes > 24 * 60) {
+      const [y, m, d] = rental.day.split("-").map(Number);
+      const nextDay = ymdKey(shiftYMD({ year: y!, month: m!, day: d! }, 1));
+      const seg2: TimeGridSegment = {
+        key: `${rental.id}-cont`,
+        day: nextDay,
+        minutes: 0,
+        endMinutes: Math.min(rental.endMinutes - 24 * 60, 24 * 60),
+        isContinuation: true,
+        rental,
+      };
+      const b2 = map.get(nextDay);
+      if (b2) b2.push(seg2);
+      else map.set(nextDay, [seg2]);
+    }
+  }
+  for (const bucket of map.values()) {
+    bucket.sort((a, b) => a.minutes - b.minutes || a.endMinutes - b.endMinutes);
+  }
+  return map;
+}
+
 export function RentalCalendar({
   nl,
   rentals,
@@ -110,6 +163,8 @@ export function RentalCalendar({
     for (const bucket of map.values()) bucket.sort((a, b) => a.minutes - b.minutes);
     return map;
   }, [visible]);
+
+  const timeSegmentsByDay = useMemo(() => buildRentalTimeSegments(visible), [visible]);
 
   // Bij het openen van week of dag meteen naar de avond scrollen; anders staat
   // het raster op middernacht en lijkt de dag leeg.
@@ -286,24 +341,31 @@ export function RentalCalendar({
             </div>
             {dates.map((date) => {
               const key = dayKey(date);
-              const dayRentals = byDay.get(key) ?? [];
+              const daySegments = timeSegmentsByDay.get(key) ?? [];
+              const layout = layoutDayEvents(
+                daySegments,
+                Math.ceil((26 / HOUR_PX) * 60),
+              );
               return (
                 <div key={key} className="tv-col" style={{ height: HOURS.length * HOUR_PX }}>
                   {HOURS.map((hour, index) => (
                     <div key={hour} className="tv-hourline" style={{ top: index * HOUR_PX }} />
                   ))}
-                  {dayRentals.map((rental) => {
-                    // Een verhuur die over middernacht loopt, kappen we op het
-                    // einde van de dag af: hem over de rand laten steken zou het
-                    // raster verschuiven, en het echte einduur staat in de tekst.
-                    const end = Math.min(rental.endMinutes, 24 * 60);
+                  {layout.map((segment) => {
+                    const rental = segment.rental;
+                    const widthPct = 100 / segment.lanes;
+                    const leftPct = segment.lane * widthPct;
                     return (
                       <div
-                        key={rental.id}
+                        key={segment.key}
                         className="tv-event"
                         style={{
-                          top: (rental.minutes / 60) * HOUR_PX,
-                          height: Math.max(26, ((end - rental.minutes) / 60) * HOUR_PX),
+                          top: (segment.minutes / 60) * HOUR_PX,
+                          height: Math.max(26, ((segment.endMinutes - segment.minutes) / 60) * HOUR_PX),
+                          left: `calc(${leftPct}% + 2px)`,
+                          width: `calc(${widthPct}% - 4px)`,
+                          right: "auto",
+                          zIndex: rental.id === selectedId ? 3 : 1,
                         }}
                       >
                         <Chip
@@ -311,6 +373,7 @@ export function RentalCalendar({
                           rental={rental}
                           selected={rental.id === selectedId}
                           onSelect={onSelect}
+                          isContinuation={segment.isContinuation}
                         />
                       </div>
                     );
@@ -331,13 +394,18 @@ function Chip({
   rental,
   selected,
   onSelect,
+  isContinuation,
 }: {
   nl: boolean;
   rental: RentalView;
   selected: boolean;
   onSelect: (rental: RentalView) => void;
+  isContinuation?: boolean;
 }) {
   const meta = RENTAL_STATUS_META[rental.status];
+  const timeText = isContinuation
+    ? `${nl ? "tot" : "until"} ${rental.endInput}`
+    : rental.timeLabel;
   return (
     <button
       type="button"
@@ -349,7 +417,7 @@ function Chip({
       title={`${rental.timeLabel} · ${rental.responsibleName} — ${rental.purpose} (${meta[nl ? "nl" : "en"]})`}
     >
       <span>
-        <strong>{rental.startInput}</strong>
+        <strong>{timeText}</strong>
         {rental.responsibleName}
       </span>
       <span className="opacity-70">{rental.purpose}</span>

@@ -167,30 +167,37 @@ export default async function AdminTheokotVerhuurPage({
     const endYmd = brusselsYMD(row.endsAt);
     const startDay = ymdKey(startYmd);
     const minutes = brusselsMinutesOfDay(row.startsAt);
-    // Een verhuur die na middernacht stopt, valt op een andere kalenderdag. Het
-    // raster rekent in minuten sinds middernacht van de startdag, dus die
-    // volgende dag telt als +1440.
-    const endMinutes =
-      brusselsMinutesOfDay(row.endsAt) + (ymdKey(endYmd) === startDay ? 0 : 24 * 60);
+    const rawEndMinutes = brusselsMinutesOfDay(row.endsAt);
+    const isNextDay =
+      ymdKey(endYmd) !== startDay ||
+      rawEndMinutes <= minutes ||
+      row.endsAt.getTime() <= row.startsAt.getTime();
+    const endMinutes = rawEndMinutes + (isNextDay ? 24 * 60 : 0);
+
+    const effectiveEndsAt =
+      isNextDay && row.endsAt.getTime() <= row.startsAt.getTime()
+        ? new Date(row.endsAt.getTime() + 86_400_000)
+        : row.endsAt;
 
     const mailLocale = row.locale === "en" ? "en" : "nl";
     const answers = (row.extraAnswers ?? {}) as Record<string, string>;
 
     const clashes = rows
-      .filter(
-        (other) =>
-          other.id !== row.id &&
-          blocksRoom(other.status) &&
-          other.startsAt < row.endsAt &&
-          row.startsAt < other.endsAt,
-      )
+      .filter((other) => {
+        if (other.id === row.id || !blocksRoom(other.status)) return false;
+        const otherEffectiveEndsAt =
+          other.endsAt.getTime() <= other.startsAt.getTime()
+            ? new Date(other.endsAt.getTime() + 86_400_000)
+            : other.endsAt;
+        return other.startsAt < effectiveEndsAt && row.startsAt < otherEffectiveEndsAt;
+      })
       .map((other) => ({
         id: other.id,
         label: `${other.responsibleName} (${RENTAL_STATUS_META[other.status][nl ? "nl" : "en"]}, ${timeFmt.format(other.startsAt)}–${timeFmt.format(other.endsAt)})`,
       }));
 
     const mailStart = formatRentalMoment(row.startsAt, mailLocale);
-    const mailEnd = formatRentalMoment(row.endsAt, mailLocale);
+    const mailEnd = formatRentalMoment(effectiveEndsAt, mailLocale);
 
     return {
       id: row.id,

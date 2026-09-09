@@ -518,10 +518,9 @@
 
 .lb-event {
   position: absolute;
+  /* Breedte en positie worden per baan (lane) berekend wanneer bezoeken
+     overlappen; inset-inline geldt als terugval wanneer er geen banen zijn. */
   inset-inline: 2px;
-  /* Een lesbezoek duurt vijf minuten; op ware schaal is dat vier pixels. De
-     blokjes krijgen dus een leesbare minimumhoogte en mogen elkaar overlappen,
-     want overlap is hier informatie: twee organisaties in dezelfde les. */
   min-height: 30px;
   z-index: 1;
 }

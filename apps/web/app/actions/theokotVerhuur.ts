@@ -7,7 +7,7 @@ import { prisma } from "@vtk/db";
 import { deleteObject, newStorageKey, putObject } from "@vtk/storage";
 import { requirePermission } from "@/lib/session";
 import { RateLimiter, clientKeyFromHeaders, toMessageText, toSingleLine } from "@/lib/contactForm";
-import { brusselsWallClockMinutes } from "@/lib/brussels";
+import { brusselsWallClockMinutes, shiftYMD } from "@/lib/brussels";
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import {
@@ -93,10 +93,12 @@ function toInstant(date: string, time: string): Date | null {
  * ochtend; ligt het einduur voor het startuur, dan telt het als de dag erna.
  */
 function endInstant(date: string, startTime: string, endTime: string): Date | null {
-  const start = toInstant(date, startTime);
-  const end = toInstant(date, endTime);
-  if (!start || !end) return null;
-  return end.getTime() <= start.getTime() ? new Date(end.getTime() + 86_400_000) : end;
+  const ymd = parseDateField(date);
+  const startMinutes = parseTimeField(startTime);
+  const endMinutes = parseTimeField(endTime);
+  if (!ymd || startMinutes === null || endMinutes === null) return null;
+  const endYmd = endMinutes <= startMinutes ? shiftYMD(ymd, 1) : ymd;
+  return brusselsWallClockMinutes(endYmd, endMinutes);
 }
 
 // -----------------------------------------------------------------------------

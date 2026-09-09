@@ -657,9 +657,15 @@
 
 .tv-event {
   position: absolute;
+  /* `left` en `width` worden door `layoutDayEvents` berekend per laan. `inset-inline`
+     dient als veilige fallback wanneer er geen rijstroken zijn. */
   inset-inline: 2px;
   min-height: 26px;
   z-index: 1;
+}
+
+.tv-event .tv-chip {
+  height: 100%;
 }
 
 @media (max-width: 640px) {
