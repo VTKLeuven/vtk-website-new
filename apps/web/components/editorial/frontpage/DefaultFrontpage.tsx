@@ -69,10 +69,16 @@ export function DefaultFrontpage({
       values.primaryUrl ?? "/info",
       base,
     );
+  // De tweede knop wijst elke taal naar haar eigen publiek: een Nederlandstalige
+  // bezoeker is hier een eerstejaars, wie de site op Engels leest een
+  // uitwisselingsstudent. Daarom heeft ze per taal een eigen adres in
+  // /admin/frontpage, net zoals ze al een eigen tekst had. De Engelse knop erft
+  // het Nederlandse adres bewust niet: dan stuurde ze een uitwisselingsstudent
+  // alsnog naar de eerstejaarswerking.
   const secondary = ctaFrom(
     pickField(values, "secondaryLabel", locale) ??
-      (nl ? "Eerstejaars? Start hier" : "First-year? Start here"),
-    values.secondaryUrl ?? "/eerstejaars",
+      (nl ? "Eerstejaars? Start hier" : "International? Start here"),
+    nl ? (values.secondaryUrl ?? "/eerstejaars") : (values.secondaryUrlEn ?? "/internationaal"),
     base,
   );
 

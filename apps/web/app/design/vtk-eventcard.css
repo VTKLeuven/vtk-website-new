@@ -59,8 +59,12 @@
   object-fit: cover;
 }
 
+/* Bewust géén `position: relative`: de titel spant met `.ev-card-link::after`
+   een klikvlak over de hele kaart, en dat vlak zoekt zijn kader bij de dichtste
+   geplaatste voorouder. Stond dat kader hier, dan hield het klikvlak op bij de
+   foto en opende een klik op de affiche niets. Daarom hangt de datumpin aan de
+   foto en niet aan dit blok. */
 .vtk-design .ev-card-body {
-  position: relative;
   display: flex;
   flex: 1;
   flex-direction: column;
@@ -82,10 +86,13 @@
    links duwde de pin het hele tekstblok 38 pixels naar beneden en werd de witte
    balk onder elke affiche even hoog als de pin. Nu begint de tekst bovenaan en
    schuift alles daaronder mee omhoog; enkel de themaregel houdt plaats vrij
-   naast de pin. */
+   naast de pin.
+
+   Ze hangt aan de foto en steekt er onderuit, want het klikvlak van de titel
+   heeft de kaart als kader nodig (zie `.ev-card-body`). */
 .vtk-design .ev-card-pin {
   position: absolute;
-  top: -30px;
+  bottom: -28px;
   right: 16px;
   z-index: 1;
   display: grid;
@@ -131,20 +138,20 @@
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
-  min-height: 20px;
+  min-height: 21px;
   margin-bottom: 4px;
   padding-right: 66px;
 }
 
+/* Gewoon geschreven, niet in gespatieerde kapitalen: "O N T S P A N N I N G"
+   leest trager dan het woord zelf en de categorienamen komen uit de admin, dus
+   ze staan er zoals iemand ze intikte. */
 .vtk-design .ev-card-cat {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-family: var(--mono);
-  font-size: 10.5px;
+  font-size: 12.5px;
   font-weight: 500;
-  letter-spacing: 0.11em;
-  text-transform: uppercase;
   color: var(--muted);
 }
 

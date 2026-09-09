@@ -167,11 +167,20 @@ export const FRONTPAGE_MODULES: FrontpageModule[] = [
       },
       secondaryLabelNl: { type: "text", labelNl: "Knop 2 (NL)", labelEn: "Button 2 (NL)" },
       secondaryLabelEn: { type: "text", labelNl: "Knop 2 (EN)", labelEn: "Button 2 (EN)" },
+      // Twee adressen, want de twee talen sturen naar een ander publiek: een
+      // Nederlandstalige bezoeker is hier een eerstejaars, wie de site op Engels
+      // leest een uitwisselingsstudent. De labels stonden al per taal.
       secondaryUrl: {
         type: "url",
-        labelNl: "Knop 2 link",
-        labelEn: "Button 2 link",
+        labelNl: "Knop 2 link (NL)",
+        labelEn: "Button 2 link (NL)",
         placeholder: "/eerstejaars",
+      },
+      secondaryUrlEn: {
+        type: "url",
+        labelNl: "Knop 2 link (EN)",
+        labelEn: "Button 2 link (EN)",
+        placeholder: "/internationaal",
       },
     },
   },

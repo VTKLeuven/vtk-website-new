@@ -4,6 +4,7 @@ import { cache } from "react";
 import { prisma } from "@vtk/db";
 import { currentWorkingYear } from "@/lib/workingYear";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
+import { categoryTiles, type CategoryTile } from "@/lib/categoryTiles";
 
 /**
  * Wat een contentpagina over zichzelf kan tonen naast haar eigen tekst.
@@ -143,44 +144,51 @@ export const loadWerkingEvents = cache(async (groupId: string): Promise<WerkingE
   });
 });
 
-export type SiblingPage = {
-  id: string;
-  slug: string;
-  titleNl: string;
-  titleEn: string | null;
-  excerptNl: string | null;
-  excerptEn: string | null;
-  imageKey: string | null;
-  imageFocusX: number;
-  imageFocusY: number;
-};
-
 /**
- * De andere pagina's onder dezelfde categorie, in de volgorde van de
- * categoriepagina. Dezelfde selectie als daar (`visibleOnCategoryPage`), zodat
- * een pagina die daar bewust niet staat hier ook niet opduikt.
+ * De rest van de categorie, onderaan een pagina.
+ *
+ * Letterlijk dezelfde tegels als op de categoriepagina zelf (`categoryTiles`),
+ * dus inclusief de vaste menu-items die geen `Page` zijn: Kalender en Tickets
+ * onder Evenementen, de piano-reservatie, de webshop van de cursusdienst. Dit
+ * las eerst enkel `Page`, waardoor /evenementen vier kaarten toonde en de
+ * "Verder in"-band onderaan Cantussen er nog één overhield. Wie doorklikte zag
+ * de categorie dus kleiner worden dan ze is.
  */
-export const loadSiblingPages = cache(
-  async (headerTabId: string, exceptPageId: string): Promise<SiblingPage[]> =>
-    prisma.page.findMany({
-      where: {
-        headerTabId,
-        id: { not: exceptPageId },
-        visibleOnCategoryPage: true,
-        publishedAt: { not: null },
-      },
-      orderBy: [{ order: "asc" }, { titleNl: "asc" }],
-      take: MAX_SIBLINGS,
+export const loadSiblingTiles = cache(
+  async (headerTabId: string, exceptPageId: string): Promise<CategoryTile[]> => {
+    const tab = await prisma.headerTab.findUnique({
+      where: { id: headerTabId },
       select: {
-        id: true,
         slug: true,
-        titleNl: true,
-        titleEn: true,
-        excerptNl: true,
-        excerptEn: true,
-        imageKey: true,
-        imageFocusX: true,
-        imageFocusY: true,
+        pages: {
+          where: {
+            id: { not: exceptPageId },
+            visibleOnCategoryPage: true,
+            publishedAt: { not: null },
+          },
+          orderBy: [{ order: "asc" }, { titleNl: "asc" }],
+          select: {
+            id: true,
+            slug: true,
+            titleNl: true,
+            titleEn: true,
+            excerptNl: true,
+            excerptEn: true,
+            imageKey: true,
+            imageFocusX: true,
+            imageFocusY: true,
+            order: true,
+          },
+        },
+        links: {
+          orderBy: { order: "asc" },
+          select: { id: true, labelNl: true, labelEn: true, url: true, imageKey: true, order: true },
+        },
       },
-    }),
+    });
+    if (!tab) return [];
+    // Afkappen na het samenvoegen, niet per soort: anders duwen vier pagina's
+    // de menu-items er weer uit.
+    return categoryTiles(tab).slice(0, MAX_SIBLINGS);
+  },
 );

@@ -668,17 +668,18 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                           : undefined
                       }
                     />
-                  </div>
-                  <div className="ev-card-body">
                     {/* Weekdag boven het getal, maand eronder: zo staat een
                         datum op een kalenderblad, en zo blijft de pin vierkant.
-                        Ze ligt rechtsboven en uit de stroom, zodat het tekstblok
-                        bovenaan begint. */}
+                        Ze hangt rechtsonder aan de foto en steekt er onderuit,
+                        zodat het tekstblok bovenaan begint en het klikvlak van
+                        de titel de hele kaart houdt. */}
                     <span className="ev-card-pin">
                       <i>{start.toLocaleDateString(dateTag, { weekday: "short" })}</i>
                       <b>{start.getDate()}</b>
                       <i>{start.toLocaleDateString(dateTag, { month: "short" })}</i>
                     </span>
+                  </div>
+                  <div className="ev-card-body">
                     <div className="ev-card-tags">
                       {theme ? (
                         <span

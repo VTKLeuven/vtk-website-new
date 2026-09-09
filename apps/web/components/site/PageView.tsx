@@ -20,7 +20,7 @@ import { loadPublicForm } from "@/lib/forms/publicForm";
 import { buildFormSurface } from "@/lib/forms/surface";
 import { loadDefaultEventImage } from "@/lib/pageQueries";
 import {
-  loadSiblingPages,
+  loadSiblingTiles,
   loadWerkingEvents,
   loadWerkingGroup,
   type WerkingEvent,
@@ -106,7 +106,7 @@ export async function PageView({
   const [group, events, siblings, defaultEventImage] = await Promise.all([
     page.groupId ? loadWerkingGroup(page.groupId) : null,
     page.groupId ? loadWerkingEvents(page.groupId) : [],
-    page.headerTabId ? loadSiblingPages(page.headerTabId, page.id) : [],
+    page.headerTabId ? loadSiblingTiles(page.headerTabId, page.id) : [],
     page.groupId ? loadDefaultEventImage() : null,
   ]);
   const groupName = group ? pick(group.nameNl, group.nameEn, locale) : "";
@@ -467,39 +467,55 @@ export async function PageView({
                   sibling.excerptEn ?? "",
                   locale,
                 );
+                const card = (
+                  <article className="vtk-tile">
+                    {/* Decoratief: de titel ernaast zegt al waar de kaart heen
+                        gaat. Zelfde tegel als op de categoriepagina zelf. */}
+                    <span
+                      className={`vtk-tile-media${photo ? " has-photo" : ""}`}
+                      aria-hidden="true"
+                    >
+                      {photo && (
+                        <Image
+                          src={photo}
+                          alt=""
+                          fill
+                          sizes="(max-width: 640px) 240px, 400px"
+                          quality={90}
+                          style={
+                            sibling.focus
+                              ? { objectPosition: focusPosition(sibling.focus) }
+                              : undefined
+                          }
+                        />
+                      )}
+                    </span>
+                    <div className="vtk-tile-body">
+                      <h2>{pick(sibling.labelNl, sibling.labelEn, locale)}</h2>
+                      {siblingExcerpt ? <p className="line-clamp-3">{siblingExcerpt}</p> : null}
+                      <span className="vtk-tile-cta">{readMore} →</span>
+                    </div>
+                  </article>
+                );
                 return (
-                  <li key={sibling.id}>
-                    <Link href={`${base}/${tab.slug}/${sibling.slug}`}>
-                      <article className="vtk-tile">
-                        {/* Decoratief: de titel ernaast zegt al waar de kaart heen
-                            gaat. Zelfde tegel als op de categoriepagina zelf. */}
-                        <span
-                          className={`vtk-tile-media${photo ? " has-photo" : ""}`}
-                          aria-hidden="true"
-                        >
-                          {photo && (
-                            <Image
-                              src={photo}
-                              alt=""
-                              fill
-                              sizes="(max-width: 640px) 240px, 400px"
-                              quality={90}
-                              style={{
-                                objectPosition: focusPosition({
-                                  x: sibling.imageFocusX,
-                                  y: sibling.imageFocusY,
-                                }),
-                              }}
-                            />
-                          )}
-                        </span>
-                        <div className="vtk-tile-body">
-                          <h2>{pick(sibling.titleNl, sibling.titleEn, locale)}</h2>
-                          {siblingExcerpt ? <p className="line-clamp-3">{siblingExcerpt}</p> : null}
-                          <span className="vtk-tile-cta">{readMore} →</span>
-                        </div>
-                      </article>
-                    </Link>
+                  <li key={sibling.key}>
+                    {sibling.external ? (
+                      // Een andere site opent in een nieuw tabblad, net als op de
+                      // categoriepagina en in het uitklapmenu van de header.
+                      <a
+                        href={sibling.href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        {...umamiEvent(OUTBOUND_EVENT, {
+                          bestemming: outboundHost(sibling.href),
+                          vanaf: `pagina:${page.slug}`,
+                        })}
+                      >
+                        {card}
+                      </a>
+                    ) : (
+                      <Link href={`${base}${sibling.href}`}>{card}</Link>
+                    )}
                   </li>
                 );
               })}

@@ -1724,8 +1724,16 @@ post binnenkort doet, wie erin zit, en welke pagina's ernaast staan.
 - **Onder de tekst komen banden, in het ritme van de homepage**: wat de werking
   binnenkort doet (navy, met de foto van elk evenement), haar ploeg van dit
   werkingsjaar (lichtblauw, dezelfde portrettegels als `/praesidium`), en de
-  andere pagina's uit dezelfde categorie (papier, exact de tegels van de
-  categoriepagina). Zo eindigt de pagina ergens in plaats van op te houden.
+  rest van dezelfde categorie (papier, exact de tegels van de categoriepagina).
+  Zo eindigt de pagina ergens in plaats van op te houden.
+  - **"Verder in <categorie>" is letterlijk dezelfde lijst als de
+    categoriepagina** (`categoryTiles`), dus inclusief de vaste menu-items die
+    geen `Page` zijn: Kalender en Tickets onder Evenementen, de piano-reservatie
+    onder Info, de webshop onder Cursusdienst. Dit las eerst enkel `Page`,
+    waardoor /evenementen vier kaarten toonde en de band onderaan Cantussen er
+    nog één overhield: wie doorklikte zag de categorie kleiner worden dan ze is.
+    Het afkappen op vier gebeurt daarom ná het samenvoegen, anders duwen vier
+    pagina's de menu-items er weer uit.
   - **Verwante pagina's staan onderaan en niet in de kolom.** Twee lijsten met
     dezelfde vier links op één scherm lezen als een fout; de tegels met foto
     zeggen bovendien meer dan een rij tekstlinks.
@@ -1882,6 +1890,15 @@ opnieuw een gedeeld schema ontstaat.
 soort velden, zodat "de frontpage wijzigen" overal hetzelfde betekent. Ze heeft
 geen venster en kan niet uitgezet worden: ze is wat er staat zodra geen enkele
 andere frontpage actief is.
+
+**De tweede knop van de standaard heeft per taal een eigen adres.** In het
+Nederlands is dat "Eerstejaars? Start hier" naar `/eerstejaars`, in het Engels
+"International? Start here" naar `/internationaal`: wie de site op Engels leest,
+is hier zelden een eerstejaars en meestal een uitwisselingsstudent. De labels
+stonden al per taal in het register; het adres nu ook (`secondaryUrl` en
+`secondaryUrlEn`). De Engelse knop erft het Nederlandse adres bewust **niet**,
+want dan stuurt een ingevuld NL-veld de uitwisselingsstudent alsnog naar de
+eerstejaarswerking.
 
 **Vensters, geen schakelaar.** Dezelfde reden als bij de aankondigingen: je zet
 de jobfair weken vooraf klaar, ze gaat vanzelf live en verdwijnt vanzelf. Staan
@@ -6385,11 +6402,21 @@ hele tekstblok naar beneden en werd de witte balk onder elke affiche even hoog
 als de pin zelf. Nu begint de tekst bovenaan en is die balk 26 pixels korter;
 enkel de themaregel houdt plaats vrij naast de pin.
 
+**De pin hangt aan de foto en niet aan het tekstblok.** Dat is geen detail: de
+titel spant met `.ev-card-link::after` een klikvlak over de hele kaart, en dat
+vlak zoekt zijn kader bij de dichtste geplaatste voorouder. Zolang dat kader het
+tekstblok was, hield het klikvlak op bij de foto en opende een klik op de
+affiche niets.
+
 **Thema en doelgroep staan in het tekstblok en niet meer op de affiche.** Als
 pillen stonden ze in de twee bovenhoeken van de foto, en dat is precies waar een
 affiche haar eigen titel draagt. Het thema is nu een gekleurde stip met het woord
 ernaast; de doelgroep blijft een gevulde pil in de kleur van haar categorie,
 want die moet luid blijven (zie "Doelgroepen filteren vanzelf" hierboven).
+
+De naam van het thema staat er **gewoon geschreven**, niet in gespatieerde
+kapitalen: "O N T S P A N N I N G" leest trager dan het woord zelf, en die namen
+komen uit de admin, dus ze horen er te staan zoals iemand ze intikte.
 
 **Onder de titel loopt dezelfde gele streep als onder een sectiekop op een
 inhoudspagina** (`.prose-vtk h2::after`), even breed als de titel zelf. Het

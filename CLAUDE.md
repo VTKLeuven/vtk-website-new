@@ -387,13 +387,18 @@ the design language into the application instead of copying mockup content.
     homepage) and drifted, while both stylesheets stay loaded after a
     client-side navigation.
   - That tile carries the date as a square yellow pin hanging top-right over the
-    bottom edge of the poster (out of the text flow, so the white block starts at
-    the top and stays compact; navy was tried first and vanished into every dark
+    bottom edge of the poster (navy was tried first and vanished into every dark
     poster), theme and audience in the body (never as pills over the photo, where
-    a poster carries its own title), the yellow heading rule under the title (the
-    same one as `.prose-vtk h2::after`), and one bottom row with the time, the
-    place, the counter, the star and "Zet in mijn agenda". The poster is 16:9,
-    like the event banner it usually already is. See `docs/design-decisions.md`.
+    a poster carries its own title; the theme name is written normally, not in
+    spaced caps), the yellow heading rule under the title (the same one as
+    `.prose-vtk h2::after`), and one bottom row with the time, the place, the
+    counter, the star and "Zet in mijn agenda". The poster is 16:9, like the
+    event banner it usually already is. See `docs/design-decisions.md`.
+  - **The pin hangs on the photo, not on the body, and `.ev-card-body` must stay
+    unpositioned.** The title spans a click area over the whole card with
+    `.ev-card-link::after`, and that area resolves against the nearest positioned
+    ancestor; with the body positioned it stopped at the photo and clicking the
+    poster did nothing.
 - Functional pages and modules, including Media and Logistiek, use the same
   visual system as the main website. A separate subdomain or operational flow
   is not a reason to invent another hero, type treatment, palette, container
