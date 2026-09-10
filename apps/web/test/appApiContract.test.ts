@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { APP_API_VERSION, appLocaleFrom, isAppPushToken } from '@/lib/app-api/contract';
 import { appPushRegisterSchema, appPushUnregisterSchema } from '@/lib/app-api/schemas';
@@ -55,8 +56,11 @@ describe('app-api contract', () => {
    * (en dus altijd in CI).
    */
   it('is byte-voor-byte gelijk aan de kopie in de app', () => {
-    const original = new URL('../lib/app-api/contract.ts', import.meta.url).pathname;
-    const copy = new URL('../../../mobile/src/api/contract.ts', import.meta.url).pathname;
+    // `fileURLToPath` en niet `.pathname`: op Windows geeft dat laatste
+    // "/C:/Users/..." terug, wat `readFileSync` als pad vanaf de schijfwortel
+    // leest en dus "C:\C:\Users\..." zoekt.
+    const original = fileURLToPath(new URL('../lib/app-api/contract.ts', import.meta.url));
+    const copy = fileURLToPath(new URL('../../../mobile/src/api/contract.ts', import.meta.url));
 
     expect(readFileSync(copy, 'utf8')).toBe(readFileSync(original, 'utf8'));
   });
