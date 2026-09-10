@@ -256,8 +256,11 @@ export function EventForm({
               name="organiserName"
               defaultValue={event.organiserName ?? ''}
               maxLength={120}
-              placeholder={nl ? 'bv. Industria' : 'e.g. Industria'}
+              placeholder={nl ? 'bv. Development x GHC' : 'e.g. Development x GHC'}
             />
+            <p className="mt-1 text-xs text-vtk-muted">
+              {nl ? 'Laat leeg wanneer de post zelf organiseert.' : 'Leave empty when the post organises it.'}
+            </p>
           </div>
           <div>
             <Label>{locale === 'nl' ? 'Locatie' : 'Location'}</Label>
