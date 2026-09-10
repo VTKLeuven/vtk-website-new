@@ -415,8 +415,12 @@ export async function deletePermissionAction(formData: FormData): Promise<void> 
 }
 
 /**
- * Toekennen kan enkel via een rol of een post; rechtstreeks aan één lid bestaat
- * bewust niet meer (zie GrantTarget in de auth-laag).
+ * Toekennen kan enkel via een VTK-rol; rechtstreeks aan één lid of aan een post
+ * bestaat bewust niet meer (zie GrantTarget in de auth-laag en docs/sso.md).
+ *
+ * Het formulierveld `kind` blijft staan en moet `role` zijn: een oud tabblad of
+ * een nagebouwd formulier dat nog `group` meestuurt, hoort een invoerfout te
+ * krijgen en niet stilletjes een rol-toekenning te maken.
  *
  * Geeft `SaveState` terug zodat het scherm de uitkomst kan tonen: een
  * toekenning die stil mislukt, laat de beheerder denken dat iemand toegang
@@ -426,25 +430,11 @@ export async function grantPermissionAction(_prev: SaveState, formData: FormData
   const clientId = String(formData.get('clientId') || '');
   const permissionId = String(formData.get('permissionId') || '');
   const kind = String(formData.get('kind') || '');
-  if (!clientId || !permissionId) return saveError('INVALID_INPUT');
+  const roleId = String(formData.get('roleId') || '');
+  if (!clientId || !permissionId || kind !== 'role' || !roleId) return saveError('INVALID_INPUT');
 
-  const requestHeaders = await headers();
   try {
-    if (kind === 'role') {
-      const roleId = String(formData.get('roleId') || '');
-      if (!roleId) return saveError('INVALID_INPUT');
-      await grantClientPermission(requestHeaders, permissionId, { kind: 'role', roleId });
-    } else if (kind === 'group') {
-      const groupId = String(formData.get('groupId') || '');
-      if (!groupId) return saveError('INVALID_INPUT');
-      await grantClientPermission(requestHeaders, permissionId, {
-        kind: 'group',
-        groupId,
-        grantKind: formData.get('grantKind') === 'LEADER' ? 'LEADER' : 'DEFAULT',
-      });
-    } else {
-      return saveError('INVALID_INPUT');
-    }
+    await grantClientPermission(await headers(), permissionId, { kind: 'role', roleId });
   } catch (error) {
     console.error('[sso] permissie toekennen mislukt:', error);
     return saveError(permissionErrorCode(error));
@@ -455,13 +445,17 @@ export async function grantPermissionAction(_prev: SaveState, formData: FormData
     entity: 'ssoPermission',
     entityId: clientId,
     target: `${await ssoClientName(clientId)}: ${await ssoPermissionCode(permissionId)}`,
-    summary: kind === 'role' ? 'toegekend aan een rol' : 'toegekend aan een post',
+    summary: 'toegekend aan een rol',
   });
 
   revalidateClient(clientId);
   return saveOk();
 }
 
+/**
+ * Intrekken kan nog wel voor beide soorten: post-toekenningen van voor september
+ * 2026 bestaan nog, en die moeten weg kunnen zonder dat er een pad terug is.
+ */
 export async function revokePermissionAction(formData: FormData): Promise<void> {
   const clientId = String(formData.get('clientId') || '');
   const grantId = String(formData.get('grantId') || '');

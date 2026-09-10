@@ -124,6 +124,9 @@ describe.sequential('client permissions', () => {
     expect(await effectiveClientPermissions(ids.user, clientId)).toContain(`${namespace}.edit`);
   });
 
+  // Toekennen via een post kan sinds september 2026 niet meer vanuit het beheer;
+  // rijen die er al stonden blijven wel gelden, en dat is wat deze test bewaakt.
+  // De rij wordt daarom rechtstreeks geschreven en niet via grantClientPermission.
   it('applies LEADER grants only to the lead of a post', async () => {
     await prisma.ssoGroupClientPermission.create({
       data: { permissionId: permissionIds[`${namespace}.lead`], clientId, groupId: ids.group, kind: 'LEADER' },

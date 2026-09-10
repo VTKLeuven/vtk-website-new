@@ -56,8 +56,8 @@ Permissies, en let op dat het er **twee soorten** zijn:
 RESTRICTED client leest `SsoClientPermission`, een andere tabel en een ander
 systeem (zie `docs/sso.md`). Ze in de registry zetten geeft twee codes met
 dezelfde naam die niets met elkaar te maken hebben, en dan lijkt de toegang
-geregeld terwijl er niemand binnen raakt. Toekennen doe je per post of per rol in
-`/admin/sso/[clientId]`.
+geregeld terwijl er niemand binnen raakt. Toekennen doe je aan een rol in
+`/admin/sso/[clientId]`; per post kan niet meer, zie `docs/sso.md`.
 
 ---
 

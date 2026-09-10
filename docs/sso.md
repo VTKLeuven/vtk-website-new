@@ -150,22 +150,42 @@ Elke client definieert zijn eigen vocabulaire (`wiki.read`, `cudi.admin`) onder
 een namespace. Leden krijgen die codes toegekend en de applicatie leest ze uit de
 `permissions`-claim op `/oauth2/userinfo`.
 
-### Toekennen gaat via een rol of een post
+### Toekennen gaat via een rol, en enkel via een rol
 
-Nooit rechtstreeks aan één lid: zo'n toekenning werkt vandaag en verdwijnt
-geruisloos zodra die persoon vertrekt. De tabel `SsoUserClientPermission` bestaat
-nog voor bestaande rijen en voor de flow-tester, maar geen beheerpad maakt er
-nieuwe aan.
+Niet rechtstreeks aan één lid: zo'n toekenning werkt vandaag en verdwijnt
+geruisloos zodra die persoon vertrekt. En sinds september 2026 ook **niet meer
+aan een post**. Een post heeft dat vervalprobleem niet, maar:
+
+- Een post zegt wáár iemand zit, niet wélk recht hij hoort te hebben. Een rol
+  noemt het recht bij naam, en dat is wat een beheerder achteraf leest.
+- Twee wegen naar dezelfde code betekenen twee schermen om de vraag "wie raakt
+  er in de wiki?" te beantwoorden, en dus een antwoord dat op één van de twee
+  onvolledig is.
+- De weg via een post bestaat al: hang de code aan een rol en geef die rol aan de
+  post (`GroupRole`, met dezelfde `DEFAULT`/`LEADER`-keuze). Er ging dus geen
+  mogelijkheid verloren, enkel een tweede pad ernaartoe.
+
+De tabel `SsoUserClientPermission` bestaat nog voor bestaande rijen en voor de
+flow-tester; `SsoGroupClientPermission` bestaat nog voor rijen die er al stonden.
+Geen beheerpad maakt er nog nieuwe aan: `GrantTarget` in
+`packages/auth/src/server/clientPermissionsAdmin.ts` kent enkel nog `role`, en
+`grantPermissionAction` weigert alles wat geen rol is.
+
+**Intrekken kan wel nog voor allebei.** Een oude post-toekenning blijft als chip
+op het clientscherm staan, met een regel eronder die zegt dat ze naar een rol
+moet verhuizen. Ze verbergen zou een werkend recht achterlaten dat nergens meer
+te zien of in te trekken is.
 
 ### Wat op 15 juli reset
 
-- Toekenningen **via een rol of post** volgen het werkingsjaar en resetten mee.
-  Dat is het punt van via een rol toekennen: wie de post verlaat, verliest de
-  toegang vanzelf.
+- Toekenningen **via een rol** volgen het werkingsjaar en resetten mee. Dat is
+  het punt van via een rol toekennen: wie de post verlaat, verliest de toegang
+  vanzelf.
 - **Directe** toekenningen (legacy) blijven tot ze ingetrokken worden of hun
   `expiresAt` bereiken.
-- `LEADER`-toekenningen gelden enkel voor de verantwoordelijke van de post,
-  exact zoals `GroupRole` dat voor rollen doet.
+- Oude **post**-toekenningen (legacy) volgen het werkingsjaar net als een rol;
+  `LEADER` geldt daar enkel voor de verantwoordelijke van de post, exact zoals
+  `GroupRole` dat voor rollen doet.
 
 ### Intrekken logt enkel de getroffen leden uit
 
@@ -333,6 +353,7 @@ in overleg geschrapt; bouw ze niet alsnog zonder te vragen.
 | Apart tokens-scherm en discovery viewer | Intrekken op de clientdetail; `curl` voor discovery |
 | `impliesCodes` / `replacedByCode` op permissies | Versioneringsmachinerie zonder gebruiker |
 | `permissions` in het access token | Enkel UserInfo: daar is de client bekend (`jwt.azp`) en is de lijst live |
+| Toekennen aan een post (weggehaald in september 2026) | Toekennen aan een rol, en die rol aan de post hangen (`GroupRole`) |
 
 ---
 

@@ -30,23 +30,31 @@ export default async function SsoClientDetail({ params }: { params: Promise<{ lo
 
   const audit = await listSsoAuditLog(requestHeaders, { clientId, take: 25 });
 
-  // Rollen en posten worden hier geladen en als naam meegegeven: het
+  // De rollen worden hier geladen en als naam meegegeven: het
   // toekenningsformulier toont namen, terwijl de grants enkel id's bevatten.
   // Twee verschillende vragen, dus twee tellingen. Het formulier waarschuwt of
   // er überhaupt iemand binnen raakt (elk pad telt); "Aandacht vereist" kijkt of
   // toegang via een rol geregeld is (zie attention.ts).
-  const [permissions, grants, roles, groups, accessGrantCount, accessRoleGrants] = await Promise.all([
+  const [permissions, grants, roles, accessGrantCount, accessRoleGrants] = await Promise.all([
     listClientPermissions(requestHeaders, clientId),
     listClientGrants(requestHeaders, clientId),
     prisma.role.findMany({ orderBy: { order: 'asc' }, select: { id: true, nameNl: true, nameEn: true } }),
-    prisma.group.findMany({
-      where: { active: true },
-      orderBy: { orderInPraesidium: 'asc' },
-      select: { id: true, nameNl: true, nameEn: true },
-    }),
     countMembersWithAccess(clientId),
     accessRoleGrantCount(requestHeaders, clientId),
   ]);
+
+  // Enkel de posten waar nog een oude toekenning aan hangt, en dus zonder het
+  // `active`-filter dat de keuzelijst had: die lijst is weg, deze namen dienen
+  // om zo'n toekenning te herkennen voor ze ingetrokken wordt. Een opgeheven
+  // post die nog een recht opent, is precies het geval dat je wil zien staan.
+  const grantedGroupIds = [...new Set(grants.groups.map((grant) => grant.groupId))];
+  const groups = grantedGroupIds.length
+    ? await prisma.group.findMany({
+        where: { id: { in: grantedGroupIds } },
+        orderBy: { orderInPraesidium: 'asc' },
+        select: { id: true, nameNl: true, nameEn: true },
+      })
+    : [];
 
   const warnings = attentionFor(client, accessRoleGrants);
   const nl = locale === 'nl';

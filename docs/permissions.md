@@ -322,7 +322,7 @@ De kluis (`docs/wachtwoorden.md`) voegt twee permissies toe aan deze registry:
 
 Wie de kluis mag **binnenlogen** staat hier bewust niet. Dat is `vault.access`,
 een **SSO-clientpermissie** uit het andere systeem (`SsoClientPermission`, zie
-`docs/sso.md`), toegekend per post of per rol in `/admin/sso/[clientId]`. Beide
+`docs/sso.md`), toegekend aan een rol in `/admin/sso/[clientId]`. Beide
 in de registry zetten zou twee dingen met dezelfde naam geven die elkaar niets
 aangaan; dan lijkt de toegang geregeld terwijl niemand binnen raakt.
 

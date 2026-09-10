@@ -7,6 +7,9 @@
  * de **toegangsmodus** bepaalt of een lid überhaupt kan inloggen, de
  * **permissies** bepalen wat het er mag. Bij een beperkte client doet
  * `<namespace>.access` het eerste; alle andere codes doen het tweede.
+ *
+ * Toekennen gebeurt **enkel via een VTK-rol**. Wat er ooit aan een post is
+ * toegekend, blijft zichtbaar tot iemand het intrekt; zie docs/sso.md.
  */
 import { useState } from 'react';
 import { Input } from '@vtk/ui';
@@ -32,6 +35,10 @@ type Permission = {
 
 type Grants = {
   roles: { id: string; permissionId: string; roleId: string }[];
+  /**
+   * Toekenningen via een post, van voor september 2026. Er is geen formulier
+   * meer dat er nieuwe maakt; ze staan hier nog om ingetrokken te kunnen worden.
+   */
   groups: { id: string; permissionId: string; groupId: string; kind: 'DEFAULT' | 'LEADER' }[];
 };
 
@@ -196,8 +203,8 @@ export function ClientPermissions({
         <h2 className="text-sm font-semibold">{nl ? 'Rechten' : 'Permissions'}</h2>
         <p className="mt-1 text-sm text-zinc-500">
           {nl
-            ? 'Het vocabulaire dat deze applicatie zelf gebruikt. Leden krijgen deze codes via een VTK-rol, een post, of rechtstreeks; de applicatie leest ze uit de permissions-claim.'
-            : 'The vocabulary this application uses. Members receive these codes through a VTK role, a post, or directly; the application reads them from the permissions claim.'}
+            ? 'Het vocabulaire dat deze applicatie zelf gebruikt. Leden krijgen deze codes via een VTK-rol; de applicatie leest ze uit de permissions-claim.'
+            : 'The vocabulary this application uses. Members receive these codes through a VTK role; the application reads them from the permissions claim.'}
         </p>
         <p className="mt-1 text-sm text-zinc-500">
           {nl
@@ -334,6 +341,9 @@ function PermissionRow({
             label={`${nl ? 'rol' : 'role'}: ${nameOf(roles, grant.roleId)}`}
           />
         ))}
+        {/* Toekennen via een post kan niet meer; wat er ooit zo is toegekend,
+            blijft hier wel staan. Onzichtbaar maken zou een werkend recht
+            achterlaten dat nergens meer te zien of in te trekken is. */}
         {groupGrants.map((grant) => (
           <GrantChip
             key={grant.id}
@@ -351,13 +361,21 @@ function PermissionRow({
         )}
       </div>
 
+      {groupGrants.length > 0 && (
+        <p className="mt-2 text-xs text-amber-900">
+          {nl
+            ? 'Deze code hangt nog aan een post. Dat kan niet meer toegekend worden: hang ze aan een rol en trek de post-toekenning hierboven in.'
+            : 'This code still hangs on a post. That can no longer be granted: hang it on a role and revoke the post grant above.'}
+        </p>
+      )}
+
       <details className="mt-2">
         <summary className="cursor-pointer text-xs text-zinc-500">{nl ? 'Toekennen' : 'Grant'}</summary>
         <div className="mt-2 space-y-3">
           <p className="text-xs text-zinc-500">
             {nl
-              ? 'Toekennen kan enkel via een rol of een post. Rechtstreeks aan één lid bestaat niet: zo n toekenning valt stil zodra die persoon vertrekt, zonder dat iemand het merkt.'
-              : 'Granting goes through a role or a post only. Directly to one member does not exist: such a grant quietly dies the moment that person leaves.'}
+              ? 'Toekennen kan enkel via een VTK-rol. Rechtstreeks aan één lid of aan een post bestaat niet: zo n toekenning zegt niet wélk recht iemand krijgt, enkel waar hij zit, en er is geen enkel scherm waar je ziet wat een post allemaal opent.'
+              : 'Granting goes through a VTK role only. Directly to one member or to a post does not exist: such a grant says where someone sits instead of what they may do, and no screen shows everything a post opens.'}
           </p>
 
           <SaveForm
@@ -380,37 +398,6 @@ function PermissionRow({
                     {role.name}
                   </option>
                 ))}
-              </select>
-            </label>
-          </SaveForm>
-
-          <SaveForm
-            action={grantPermissionAction}
-            submitLabel={nl ? 'Toekennen' : 'Grant'}
-            savingLabel={nl ? 'Toekennen…' : 'Granting…'}
-            savedMessage={nl ? 'Toegekend' : 'Granted'}
-            fallbackErrorMessage={nl ? 'Toekennen mislukt' : 'Could not grant'}
-            errorMessages={errorMessages}
-            className="flex flex-wrap items-end gap-2"
-          >
-            <input type="hidden" name="clientId" value={clientId} />
-            <input type="hidden" name="permissionId" value={permission.id} />
-            <input type="hidden" name="kind" value="group" />
-            <label className="text-xs text-[#5c667f]">
-              {nl ? 'Via post' : 'Through post'}
-              <select name="groupId" className="mt-1 block rounded-lg border border-zinc-300 px-2 py-1 text-sm">
-                {groups.map((group) => (
-                  <option key={group.id} value={group.id}>
-                    {group.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="text-xs text-[#5c667f]">
-              {nl ? 'Wie' : 'Who'}
-              <select name="grantKind" className="mt-1 block rounded-lg border border-zinc-300 px-2 py-1 text-sm">
-                <option value="DEFAULT">{nl ? 'elk lid van de post' : 'every member of the post'}</option>
-                <option value="LEADER">{nl ? 'enkel de verantwoordelijke' : 'only the lead'}</option>
               </select>
             </label>
           </SaveForm>

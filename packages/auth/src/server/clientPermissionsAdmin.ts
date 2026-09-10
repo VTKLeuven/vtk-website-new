@@ -427,18 +427,23 @@ export async function deleteClientPermission(headers: Headers, permissionId: str
 // ── Toekennen en intrekken ───────────────────────────────────────────────────
 
 /**
- * Toekennen kan enkel via een rol of een post, nooit rechtstreeks aan een lid.
+ * Toekennen kan **enkel via een rol**, nooit rechtstreeks aan een lid en niet
+ * meer aan een post.
  *
  * Een losse toekenning aan één persoon werkt vandaag en valt stil zodra die
- * persoon vertrekt, zonder dat iemand het merkt. Rollen en posten zijn
- * werkingsjaar-gebonden en worden op het rollenscherm beheerd; dat is waar
- * toegang thuishoort. De tabel `SsoUserClientPermission` blijft bestaan voor
- * bestaande rijen en voor de flow-tester, maar er is geen beheerpad meer dat
- * er nieuwe aanmaakt.
+ * persoon vertrekt, zonder dat iemand het merkt. Een post is werkingsjaar-gebonden
+ * en heeft dat probleem niet, maar zegt enkel wáár iemand zit en niet wélk recht
+ * hij krijgt: twee wegen naar dezelfde code betekent ook dat de vraag "wie raakt
+ * er in de wiki?" op twee schermen beantwoord moet worden. Een rol is het enige
+ * ding dat een recht bij naam noemt, en een post krijgt zijn rechten daar al via
+ * `GroupRole`. Dus: hang de code aan een rol en geef die rol aan de post.
+ *
+ * De tabellen `SsoUserClientPermission` en `SsoGroupClientPermission` blijven
+ * bestaan voor rijen die er al staan (en de eerste voor de flow-tester), maar er
+ * is geen beheerpad meer dat er nieuwe aanmaakt. Intrekken kan wel nog voor
+ * allebei; zie `revokeClientPermission`.
  */
-export type GrantTarget =
-  | { kind: 'role'; roleId: string }
-  | { kind: 'group'; groupId: string; grantKind: RoleGrantKind };
+export type GrantTarget = { kind: 'role'; roleId: string };
 
 export async function grantClientPermission(
   headers: Headers,
@@ -449,29 +454,27 @@ export async function grantClientPermission(
   const permission = await prisma.ssoClientPermission.findUnique({ where: { id: permissionId } });
   if (!permission) fail('PERMISSION_NOT_FOUND');
   const client = await loadClient(permission.clientId);
-  const common = { permissionId, clientId: permission.clientId, grantedByUserId: actor.user.id };
 
-  if (target.kind === 'role') {
-    await prisma.ssoRoleClientPermission.upsert({
-      where: { permissionId_roleId: { permissionId, roleId: target.roleId } },
-      update: {},
-      create: { ...common, roleId: target.roleId },
-    });
-  } else {
-    await prisma.ssoGroupClientPermission.upsert({
-      where: {
-        permissionId_groupId_kind: { permissionId, groupId: target.groupId, kind: target.grantKind },
-      },
-      update: {},
-      create: { ...common, groupId: target.groupId, kind: target.grantKind },
-    });
-  }
+  await prisma.ssoRoleClientPermission.upsert({
+    where: { permissionId_roleId: { permissionId, roleId: target.roleId } },
+    update: {},
+    create: {
+      permissionId,
+      clientId: permission.clientId,
+      grantedByUserId: actor.user.id,
+      roleId: target.roleId,
+    },
+  });
 
   // Toekennen neemt niemand iets af, dus hier hoeft geen token weg.
   await writeAudit(actor, client, 'grant', `${permission.code} via ${target.kind}`);
 }
 
-export async function revokeClientPermission(headers: Headers, grantId: string, kind: GrantTarget['kind']) {
+/**
+ * Intrekken kent nog wel beide soorten: post-toekenningen van voor september 2026
+ * bestaan nog en moeten weg kunnen, ook al is er geen weg terug meer.
+ */
+export async function revokeClientPermission(headers: Headers, grantId: string, kind: 'role' | 'group') {
   const actor = await requireSsoAdmin(headers);
 
   const grant =
