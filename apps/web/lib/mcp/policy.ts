@@ -90,6 +90,9 @@ export const MCP_PERMISSION_POLICY = {
   "door.remoteOpen": { reads: [], creates: [], blocked: ["open doors remotely"] },
   "door.manage": { reads: ["door"], creates: [], blocked: ["grant access, create shortcut tokens or open doors"] },
   "fakscanner.manage": { reads: ["fakscanner"], creates: [], blocked: ["record scans, award drinks or overwrite configuration"] },
+  // Het beheer van de fakbar-site draait op haar eigen app (apps/fakbar), niet op
+  // dit endpoint; de tellingen, drankkaart en uren staan in geen MCP-catalogus.
+  "fakbar.manage": { reads: [], creates: [], blocked: ["read or change fakbar counts, menu, hours, rentals or photos"] },
   "modules.logistiek.access": { reads: ["logistiek_catalog"], creates: [], blocked: ["change module access"] },
   "modules.cursusdienst.access": { reads: ["module_access"], creates: [], blocked: ["change module access"] },
   "oauth.client.edit": { reads: ["oauth_clients"], creates: ["app_create:oauth_client"], blocked: ["enable clients, reveal or rotate secrets, grant access or revoke tokens"] },

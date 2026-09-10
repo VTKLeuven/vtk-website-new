@@ -114,6 +114,15 @@ export const PERMISSIONS = [
   // Fakscanner (kaartlezer aan de bar: check-ins en gratis pinten)
   { code: "fakscanner.manage", labelNl: "Fakscanner beheren (ranglijst, log, instellingen)", labelEn: "Manage the fakscanner (ranking, log, settings)", category: "fakbar" },
 
+  // De fakbar-site zelf ('t ElixIr op haar eigen domein). Eén permissie voor het
+  // hele beheer, net als `logistiek.manage` voor de uitleendienst: de
+  // avondtelling, stocktelling, drankkaart, openingsuren, verhuur en foto's
+  // horen bij één ploeg. Vroeger was dit een groepslidmaatschap van de post
+  // FAKBAR (niet beheerbaar op de rollenpagina); met deze code hang je het aan
+  // elke rol. De publieke kant van de site (drankkaart lezen, openingsuren,
+  // foto's bekijken, verhuur aanvragen) vraagt geen permissie.
+  { code: "fakbar.manage", labelNl: "Fakbar beheren (tellingen, kaart, uren, verhuur, foto's)", labelEn: "Manage the fakbar (counts, menu, hours, rentals, photos)", category: "fakbar" },
+
   // Module access flags (gate submodules via group permissions)
   { code: "modules.logistiek.access", labelNl: "Toegang tot Logistiek module", labelEn: "Access to Logistics module", category: "modules" },
   { code: "modules.cursusdienst.access", labelNl: "Toegang tot Cursusdienst module", labelEn: "Access to Course Shop module", category: "modules" },

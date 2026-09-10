@@ -389,20 +389,24 @@ Eén catch-all route (`apps/web/app/api/auth/[...all]/route.ts`) delegeert naar
   terug voor remote apps, of `401 null`. Antwoorden zijn `Cache-Control: no-store`.
 - Al de rest -> 404; verkeerde methodes -> 405.
 
-## Remote apps (logistiek)
+## Remote apps (logistiek, fakbar)
 
 De submodule-apps draaien geen better-auth. Ze hergebruiken de gedeelde
 `.vtk.be`-cookie:
 
-- `apps/logistiek/lib/session.ts` roept `fetchSession(headers)` uit
-  `@vtk/auth/remote` aan.
+- `apps/logistiek/lib/session.ts` (en `apps/fakbar/lib/session.ts`) roept
+  `fetchSession(headers)` uit `@vtk/auth/remote` aan.
 - `fetchSession` (`src/remote.ts`) stuurt de `cookie`-header door naar
   `${VTK_MAIN_URL}/api/auth/remote/session` en krijgt de `SessionPayload` terug.
   In Compose praat dat over het interne Docker-netwerk (`VTK_MAIN_URL` ->
   `http://web:3000`); daarbuiten over het internet.
 - De permissie-checks (`hasPermission`) draaien lokaal op de teruggekregen
   payload. Logistiek: elk ingelogd lid mag aanvragen; beheer vraagt
-  `logistiek.manage`.
+  `logistiek.manage`. Fakbar: de publieke site staat voor iedereen open; het
+  beheer vraagt `fakbar.manage` (vroeger was dat een groepslidmaatschap van de
+  post FAKBAR, sinds de centrale permissie `fakbar.manage` is het een rolrecht
+  dat op de rollenpagina van vtk.be beheerd wordt —zelfde patroon als
+  `logistiek.manage`).
 
 Belangrijk: een remote app importeert **`@vtk/auth/remote`**, nooit
 `@vtk/auth/server` (dat zou better-auth + Prisma mee de submodule in trekken).

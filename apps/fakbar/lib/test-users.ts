@@ -51,7 +51,7 @@ const PERSONAS: Record<TestUserKey, TestPersona> = {
     description: 'Lid van de post Fakbar. Mag alles beheren.',
     isSuperAdmin: false,
     groups: [{ code: 'FAKBAR', role: 'LEAD' }],
-    permissions: [],
+    permissions: ['fakbar.manage'],
   },
   it: {
     key: 'it',
@@ -77,7 +77,7 @@ export function testPersonas(): { key: TestUserKey; name: string; description: s
  */
 export function testPersonaLanding(key: TestUserKey): string {
   const persona = PERSONAS[key];
-  const manages = persona.isSuperAdmin || persona.groups.some((group) => group.code === 'FAKBAR');
+  const manages = persona.isSuperAdmin || persona.permissions.includes('fakbar.manage');
   return manages ? '/admin' : '/';
 }
 
