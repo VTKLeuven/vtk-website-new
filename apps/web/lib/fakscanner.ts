@@ -3,13 +3,22 @@
  * één keer per avond incheckt en om de zoveel punten een gratis pint krijgt.
  *
  * Dit bestand bevat GEEN server-only imports (geen prisma, geen env), zodat de
- * admin-UI dezelfde regels kan tonen als de API-route ze toepast. De DB- en
- * env-afhankelijke kant staat in `lib/fakscanner-server.ts`.
+ * scan-API en haar tests dezelfde regels lezen. De DB- en env-afhankelijke kant
+ * staat in `lib/fakscanner-server.ts`.
+ *
+ * De **instellingen** zelf (type, defaults, parser, sleutel in `Setting`) staan in
+ * `@vtk/db/fakscanner`: het beheerscherm zit in de fakbar-app en leest dezelfde
+ * rij. Wat hieronder staat, heeft een klok nodig en hoort dus bij de scan.
  *
  * Zie docs/design-decisions.md ("Fakscanner") voor het waarom achter de bardag en
  * het dubbeltelvenster.
  */
 
+import {
+  DEFAULT_FAKSCANNER_CONFIG,
+  parseFakscannerConfig,
+  type FakscannerConfig,
+} from '@vtk/db/fakscanner';
 import {
   brusselsMinutesOfDay,
   brusselsWallClockMinutes,
@@ -17,56 +26,8 @@ import {
   shiftYMD,
 } from './brussels';
 
-export type FakscannerConfig = {
-  /** Aantal punten per gratis pint. */
-  rewardEvery: number;
-  /** Staat het dubbeltelvenster aan? */
-  doubleEnabled: boolean;
-  /** Begin van het dubbeltelvenster, "HH:mm" Brusselse wandklok. */
-  doubleStart: string;
-  /** Einde van het dubbeltelvenster (exclusief), "HH:mm". Mag over middernacht. */
-  doubleEnd: string;
-  /**
-   * Tijdstip waarop een nieuwe bardag begint, "HH:mm" Brusselse wandklok. Een
-   * fakavond loopt over middernacht, dus de kalenderdag deugt niet als "één keer
-   * per dag"-grens.
-   */
-  dayRolloverTime: string;
-};
-
-export const DEFAULT_FAKSCANNER_CONFIG: FakscannerConfig = {
-  rewardEvery: 10,
-  doubleEnabled: true,
-  doubleStart: '22:00',
-  doubleEnd: '23:00',
-  dayRolloverTime: '06:00',
-};
-
-const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
-
-function coerceInt(value: unknown, fallback: number, min: number, max: number): number {
-  const n = typeof value === 'number' ? value : Number(value);
-  return Number.isInteger(n) && n >= min && n <= max ? n : fallback;
-}
-
-function coerceTime(value: unknown, fallback: string): string {
-  return typeof value === 'string' && HHMM.test(value) ? value : fallback;
-}
-
-/** Leest de opgeslagen JSON uit `Setting`; onbekende of kapotte velden vallen terug. */
-export function parseFakscannerConfig(value: unknown): FakscannerConfig {
-  const v = (value ?? {}) as Partial<Record<keyof FakscannerConfig, unknown>>;
-  return {
-    rewardEvery: coerceInt(v.rewardEvery, DEFAULT_FAKSCANNER_CONFIG.rewardEvery, 1, 1000),
-    doubleEnabled:
-      typeof v.doubleEnabled === 'boolean'
-        ? v.doubleEnabled
-        : DEFAULT_FAKSCANNER_CONFIG.doubleEnabled,
-    doubleStart: coerceTime(v.doubleStart, DEFAULT_FAKSCANNER_CONFIG.doubleStart),
-    doubleEnd: coerceTime(v.doubleEnd, DEFAULT_FAKSCANNER_CONFIG.doubleEnd),
-    dayRolloverTime: coerceTime(v.dayRolloverTime, DEFAULT_FAKSCANNER_CONFIG.dayRolloverTime),
-  };
-}
+export { DEFAULT_FAKSCANNER_CONFIG, parseFakscannerConfig };
+export type { FakscannerConfig };
 
 function minutesOf(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number);
