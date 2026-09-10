@@ -287,6 +287,7 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
         select: {
           id: true, slug: true, titleNl: true, titleEn: true, descriptionNl: true, descriptionEn: true,
           location: true, start: true, end: true, allDay: true, url: true,
+          organiserName: true,
           publishedAt: true, createdAt: true, updatedAt: true,
           group: { select: { code: true, nameNl: true } },
           categories: { select: { category: { select: { slug: true, nameNl: true, colour: true } } } },

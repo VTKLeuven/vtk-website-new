@@ -1222,6 +1222,12 @@ async function main() {
     end: string;
     url: string;
     groupCode: string;
+    /**
+     * Wie het organiseert, wanneer dat niet de beherende groep is. Bij een
+     * crossover beheert één van de twee kringen het evenement, maar staat die
+     * kring alleen als organisator er verkeerd.
+     */
+    organiserName?: string;
     descriptionNl?: string;
     descriptionEn?: string;
   }> = [
@@ -1244,6 +1250,7 @@ async function main() {
       end: "2026-05-20T03:00:00+02:00",
       url: "https://vtk.be/nl/kalender",
       groupCode: "ACTIVITEITEN",
+      organiserName: "VTK × Industria",
       descriptionNl: "Een gezamenlijke TD van VTK en Industria. Verwacht stevige muziek, een late avond en praktische updates via de organiserende kring.",
       descriptionEn: "A joint TD by VTK and Industria. Expect a loud night, a late finish and practical updates through the organising association.",
     },
@@ -1405,6 +1412,7 @@ async function main() {
         url: e.url,
         descriptionNl: e.descriptionNl,
         descriptionEn: e.descriptionEn,
+        organiserName: e.organiserName ?? null,
         publishedAt: new Date(),
         groupId: group.id,
       },

@@ -42,6 +42,8 @@ type ApiEvent = {
     groupCode: string;
     groupNameNl: string;
     groupNameEn: string;
+    /** Ingevuld = die naam organiseert, niet de groep hierboven. */
+    organiserName: string | null;
     descriptionNl: string | null;
     descriptionEn: string | null;
     categories: Array<{
@@ -414,7 +416,15 @@ export function KalenderEditorialView({
     return markdownToPlainText(d ?? '');
   }
 
+  /**
+   * Van wie het evenement is, zoals de bezoeker het te zien krijgt: de
+   * organisator wanneer die ingevuld is, anders de beherende groep. Zie
+   * lib/calendar/organiser.ts; hier in de browser zonder die helper, want die
+   * leest een Prisma-rij.
+   */
   function pickGroup(e: ApiEvent) {
+    const organiser = e.extendedProps.organiserName?.trim();
+    if (organiser) return organiser;
     return locale === 'nl' ? e.extendedProps.groupNameNl : e.extendedProps.groupNameEn;
   }
 

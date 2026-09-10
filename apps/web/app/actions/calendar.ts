@@ -31,6 +31,9 @@ const eventSchema = z.object({
   descriptionEn: z.string().optional().nullable(),
   location: z.string().optional().nullable(),
   groupId: z.string().min(1),
+  // De organisator zoals bezoekers hem zien, wanneer dat niet de beherende groep
+  // is. Leeg = de groep; zie lib/calendar/organiser.ts.
+  organiserName: z.string().trim().max(120).optional().nullable(),
   start: z.string().min(1),
   end: z.string().min(1),
   allDay: z.coerce.boolean().default(false),
@@ -47,6 +50,7 @@ const EVENT_FIELD_LABELS: Record<string, string> = {
   descriptionEn: "Engelse beschrijving",
   location: "locatie",
   groupId: "groep",
+  organiserName: "organisator",
   start: "startmoment",
   end: "eindmoment",
   allDay: "hele dag",
@@ -76,6 +80,7 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     descriptionEn: formData.get("descriptionEn") || null,
     location: formData.get("location") || null,
     groupId: formData.get("groupId"),
+    organiserName: formData.get("organiserName") || null,
     start: formData.get("start"),
     end: formData.get("end"),
     allDay: formData.get("allDay") === "on",
@@ -126,6 +131,9 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     descriptionEn: input.descriptionEn,
     location: input.location,
     groupId: input.groupId,
+    // Een naam van enkel spaties is hetzelfde als niets ingevuld: dan blijft de
+    // groep de organisator, in plaats van dat de site een lege naam toont.
+    organiserName: input.organiserName || null,
     start,
     end,
     allDay: input.allDay,

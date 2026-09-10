@@ -6,6 +6,7 @@ import { pick, type Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
 import { MapPinIcon, UsersIcon } from "@/components/ui/icons";
 import { hasLocale } from "@/lib/locale";
+import { organiserName } from "@/lib/calendar/organiser";
 import { publicUrl } from "@/lib/storage";
 import { eventMetadata } from "@/lib/pageMetadata";
 import { loadCalendarCategory, loadCalendarEvent, loadDefaultEventImage } from "@/lib/pageQueries";
@@ -118,7 +119,9 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
 
   const title = pick(event.titleNl, event.titleEn, locale);
   const description = pick(event.descriptionNl ?? "", event.descriptionEn ?? "", locale);
-  const groupName = pick(event.group.nameNl, event.group.nameEn, locale);
+  // Wie het organiseert, en dat is niet altijd de groep die het beheert; zie
+  // lib/calendar/organiser.ts.
+  const organiser = organiserName(event.organiserName, event.group, locale);
   const eventPhoto = publicUrl(event.imageKey);
   const imageSrc = eventPhoto ?? (await loadDefaultEventImage());
   // De uitsnede hoort bij de foto die de redactie zelf koos; de standaardfoto
@@ -153,7 +156,7 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
             <Link href={`${base}/kalender`} className="vtk-link">
               {locale === "nl" ? "Kalender" : "Calendar"}
             </Link>{" "}
-            · {groupName}
+            · {organiser}
           </div>
           <h1 className="vtk-page-title">{title}</h1>
           <p className="vtk-page-subtitle">
@@ -180,15 +183,15 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
           ) : null}
         </div>
         {/* Het icoon staat naast de waarde en niet naast het opschrift: het
-            zegt hetzelfde als "Groep" en "Locatie" erboven, en helpt vooral om
+            zegt hetzelfde als "Organisator" en "Locatie" erboven, en helpt vooral om
             de twee kaartjes uit elkaar te houden in een oogopslag. Decoratief
             dus, en `Icon` zet er al `aria-hidden` op. */}
         <div className="vtk-event-meta">
           <div>
-            <span>{locale === "nl" ? "Groep" : "Group"}</span>
+            <span>{locale === "nl" ? "Organisator" : "Organiser"}</span>
             <b>
               <UsersIcon />
-              {groupName}
+              {organiser}
             </b>
           </div>
           <div>

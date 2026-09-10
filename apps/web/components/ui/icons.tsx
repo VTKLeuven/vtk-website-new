@@ -132,7 +132,7 @@ export function UserIcon() {
 
 /**
  * Twee personen: een post of werkgroep, niet één lid. Staat in de kop van een
- * eventpagina naast de naam van de organiserende post.
+ * eventpagina naast de naam van de organisator.
  */
 export function UsersIcon() {
   return (

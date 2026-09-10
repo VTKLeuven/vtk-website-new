@@ -8,6 +8,7 @@ import {
   getFrontpageModule,
 } from "@/lib/frontpage/registry";
 import { HERO_WEEK_NEXT_LIMIT_DEFAULT } from "@/lib/calendar/heroWeek";
+import { organiserName } from "@/lib/calendar/organiser";
 import { HeroWeek } from "./HeroWeek";
 import { Cta, ctaFrom, type FrontpageProps } from "./context";
 
@@ -224,7 +225,7 @@ export function DefaultFrontpage({
                       {groupIndex === 0 && eventIndex === 0 ? <span className="pin" /> : null}
                       {pick(event.titleNl, event.titleEn ?? event.titleNl, locale)}
                       <small>
-                        {[event.location, pick(event.group.nameNl, event.group.nameEn, locale)]
+                        {[event.location, organiserName(event.organiserName, event.group, locale)]
                           .filter(Boolean)
                           .join(" · ")}
                       </small>

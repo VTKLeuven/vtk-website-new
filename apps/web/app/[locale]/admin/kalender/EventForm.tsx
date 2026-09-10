@@ -18,6 +18,8 @@ type Event = {
   descriptionEn?: string | null;
   location?: string | null;
   groupId?: string;
+  /** Vervangt de groepsnaam als organisator op de site; zie lib/calendar/organiser.ts. */
+  organiserName?: string | null;
   start?: Date | null;
   end?: Date | null;
   allDay?: boolean;
@@ -260,6 +262,27 @@ export function EventForm({
                 </option>
               ))}
             </Select>
+          </div>
+          {/* De groep hierboven bepaalt wie mag bewerken; deze naam bepaalt wie
+              er als organisator getoond wordt. Twee verschillende vragen, dus
+              twee velden: bij een crossover of een gekocht evenement beheert de
+              groep het wel, maar organiseert ze het niet. */}
+          <div>
+            <Label htmlFor="event-organiser">
+              {locale === "nl" ? "Organisator (optioneel)" : "Organiser (optional)"}
+            </Label>
+            <Input
+              id="event-organiser"
+              name="organiserName"
+              defaultValue={event.organiserName ?? ""}
+              maxLength={120}
+              placeholder={nl ? "bv. Industria" : "e.g. Industria"}
+            />
+            <p className="mt-1 text-xs text-vtk-muted">
+              {nl
+                ? "Laat leeg wanneer de groep hierboven zelf organiseert. Vul een naam in bij een crossover of een evenement van een partner: die naam komt dan overal op de site, in de app en in de agenda in plaats van de groep. De groep blijft wel beheren en bewerken."
+                : "Leave empty when the group above organises it. Fill in a name for a crossover or a partner's event: that name then appears across the site, the app and the calendar instead of the group. The group keeps managing and editing it."}
+            </p>
           </div>
           <div>
             <Label>{locale === "nl" ? "Locatie" : "Location"}</Label>

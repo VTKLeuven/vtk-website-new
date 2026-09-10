@@ -14,6 +14,7 @@ import {
 } from "@/lib/calendar/interest";
 import { absoluteMediaUrl, absoluteUrl } from "@/lib/app-api/media";
 import { appErrorResponse, appJson, appNotFound } from "@/lib/app-api/respond";
+import { organiserName } from "@/lib/calendar/organiser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -81,7 +82,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       allDay: event.allDay,
       location: event.location,
       imageUrl,
-      groupName: pick(event.group.nameNl, event.group.nameEn, locale) ?? event.group.nameNl,
+      groupName: organiserName(event.organiserName, event.group, locale),
       groupSlug: event.group.slug,
       categories: event.categories.map(({ category }) => ({
         slug: category.slug,

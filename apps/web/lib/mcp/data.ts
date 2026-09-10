@@ -99,6 +99,9 @@ export async function listCalendarEvents(raw: ListEventsInput) {
       allDay: true,
       url: true,
       imageKey: true,
+      // Ingevuld = die naam wordt als organisator getoond in plaats van de
+      // groep hieronder; zie lib/calendar/organiser.ts.
+      organiserName: true,
       publishedAt: true,
       createdAt: true,
       updatedAt: true,
@@ -156,6 +159,9 @@ export async function getCalendarEvent(raw: { id: string }) {
       allDay: true,
       url: true,
       imageKey: true,
+      // Ingevuld = die naam wordt als organisator getoond in plaats van de
+      // groep hieronder; zie lib/calendar/organiser.ts.
+      organiserName: true,
       publishedAt: true,
       createdAt: true,
       updatedAt: true,

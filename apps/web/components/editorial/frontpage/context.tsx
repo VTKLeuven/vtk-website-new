@@ -23,7 +23,13 @@ export type FrontpageEvent = {
   titleNl: string;
   titleEn: string | null;
   location: string | null;
+  /**
+   * De groep die het evenement beheert, en de naam die in haar plaats getoond
+   * wordt wanneer iemand anders het organiseert. Zie lib/calendar/organiser.ts:
+   * `organiserName` gaat voor, en enkel de terugval op de groep is vertaald.
+   */
   group: { nameNl: string; nameEn: string };
+  organiserName: string | null;
   /**
    * Hoeveel mensen aanduidden dat ze komen, of `null` zolang het er te weinig
    * zijn. De drempel zit in `lib/calendar/interest.ts`: onder een bepaald aantal

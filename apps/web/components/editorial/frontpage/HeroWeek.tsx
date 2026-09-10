@@ -6,6 +6,7 @@ import {
   type HeroWeekDay,
 } from "@/lib/calendar/heroWeek";
 import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar";
+import { organiserName } from "@/lib/calendar/organiser";
 import type { FrontpageEvent } from "./context";
 
 /**
@@ -146,7 +147,7 @@ export function HeroWeek({
                   const title = pick(event.titleNl, event.titleEn ?? event.titleNl, locale);
                   const meta = [
                     event.location,
-                    pick(event.group.nameNl, event.group.nameEn, locale),
+                    organiserName(event.organiserName, event.group, locale),
                     // Enkel boven de publieke drempel; zie lib/calendar/interest.ts.
                     event.interestedCount
                       ? `${event.interestedCount} ${nl ? "komen" : "going"}`

@@ -99,6 +99,10 @@ export async function GET(request: Request) {
       groupSlug: e.group.slug,
       groupNameNl: e.group.nameNl,
       groupNameEn: e.group.nameEn,
+      // De organisator wanneer dat niet de beherende groep is. Eén taalloze
+      // naam, dus naast de twee groepsnamen en niet in plaats ervan; de
+      // kalender kiest zelf welke van de twee hij toont.
+      organiserName: e.organiserName,
       descriptionNl: e.descriptionNl,
       descriptionEn: e.descriptionEn,
       categories: e.categories.map((c) => c.category),

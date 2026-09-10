@@ -1457,6 +1457,18 @@ model CalendarEvent {
   imageFocusX   Float     @default(0.5)
   imageFocusY   Float     @default(0.5)
   groupId       String
+  /// Wie het evenement organiseert, wanneer dat niet de groep is die het beheert.
+  ///
+  /// `groupId` bepaalt wie het evenement mag bewerken en blijft dus altijd een
+  /// echte VTK-groep. Maar een TD samen met Industria, of een activiteit die een
+  /// partner bij ons in de kalender koopt, wordt niet door die groep
+  /// georganiseerd; hem als organisator tonen is dan gewoon onjuist. Ingevuld
+  /// vervangt deze naam de groepsnaam overal waar de site, de feeds en de app
+  /// zeggen van wie het evenement is; leeg blijft alles zoals het was.
+  ///
+  /// Eén taalloze naam: een organisator is een eigennaam ("Industria", "Bosch")
+  /// en die vertaalt niet. Zie lib/calendar/organiser.ts.
+  organiserName String?
   createdById   String?
   // NULL = concept. Een concept blijft wel zichtbaar en bewerkbaar in de admin,
   // maar verschijnt nergens op de publieke site of in een agenda-feed.

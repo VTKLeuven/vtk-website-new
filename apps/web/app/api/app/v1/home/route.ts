@@ -31,6 +31,7 @@ import {
 import { interestedEventIds } from "@/lib/app-api/interest";
 import { absoluteMediaUrl, absoluteUrl } from "@/lib/app-api/media";
 import { appErrorResponse, appJson } from "@/lib/app-api/respond";
+import { organiserName } from "@/lib/calendar/organiser";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -194,7 +195,7 @@ export async function GET(request: Request) {
         location: event.location,
         imageUrl:
           absoluteMediaUrl(request, event.imageKey) ?? absoluteUrl(request, defaultEventImage),
-        groupName: pick(event.group.nameNl, event.group.nameEn, locale) ?? event.group.nameNl,
+        groupName: organiserName(event.organiserName, event.group, locale),
         groupSlug: event.group.slug,
         categories: event.categories.map(({ category }) => ({
           slug: category.slug,

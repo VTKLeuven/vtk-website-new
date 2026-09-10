@@ -288,7 +288,13 @@ export type AppCalendarEvent = {
   allDay: boolean;
   location: string | null;
   imageUrl: string | null;
+  /**
+   * Wie het evenement organiseert, zoals het getoond hoort te worden: de
+   * `organiserName` van het evenement wanneer die ingevuld is (een crossover of
+   * een evenement van een partner), anders de naam van de beherende groep.
+   */
   groupName: string;
+  /** De groep die het evenement beheert. Blijft de groep, ook bij een externe organisator. */
   groupSlug: string;
   categories: AppCalendarCategory[];
   /**

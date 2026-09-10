@@ -5509,6 +5509,52 @@ export blijven staan.
 
 ---
 
+## Wie een evenement organiseert, is niet altijd wie het beheert
+
+Een `CalendarEvent` hangt aan één `Group`, en die groep bepaalt wie het evenement
+mag bewerken (`calendar.create` binnen de eigen groep, `calendar.manageAll`
+erboven). Tot september 2026 was diezelfde groep ook overal de organisator: op de
+eventpagina, in de kalender, op de homepage en in de app stond gewoon haar naam.
+
+Dat klopt niet altijd:
+
+- **Crossovers.** Een TD samen met Industria of een cantus met Wina wordt door
+  één van de twee kringen in onze kalender gezet. "Activiteiten" er dan alleen
+  boven zetten, wist de andere kring uit.
+- **Evenementen die een partner koopt.** Een bedrijf betaalt om zijn eigen
+  activiteit in onze kalender te krijgen. Iemand van VTK beheert die rij, maar
+  VTK organiseert niets: de bezoeker moet de partner zien staan.
+
+Daarom is er `CalendarEvent.organiserName`: **één optioneel vrij tekstveld naast
+de groep, niet in plaats ervan.** Staat het leeg, dan verandert er niets en blijft
+de groepsnaam de organisator. Staat het ingevuld, dan vervangt die naam de
+groepsnaam overal waar een bezoeker leest van wie het evenement is: de kop en het
+infokaartje van de eventpagina, het label in de agendalijst en de voorvertoning op
+/kalender, de regel in het weekoverzicht en de agenda in de hero, en `groupName`
+in de app-API. `lib/calendar/organiser.ts` is de enige plaats waar die keuze
+gemaakt wordt; roep die helper aan in plaats van de groepsnaam opnieuw te picken.
+
+Drie keuzes die daarbij horen:
+
+- **De beherende groep blijft de beherende groep.** Er verandert niets aan de
+  rechten, aan wie het evenement in /admin/kalender ziet staan, of aan het
+  logistiek- en ticketevent eronder. Het veld is een label voor bezoekers, geen
+  tweede eigenaar. Daarom blijft `groupSlug` in de app-API ook de echte groep,
+  ook al draagt `groupName` er de organisator.
+- **Eén taalloze naam, geen NL/EN-paar.** Een organisator is een eigennaam
+  ("Industria", "Bosch", "VTK × Wina") en die vertaalt niet. De taalkeuze geldt
+  enkel nog voor de terugval op de groepsnaam.
+- **Geen koppeling naar een externe organisatie.** Geen tabel met partners, geen
+  logo, geen link: dat zou een tweede partnerbeheer worden naast de
+  hoofdpartners op de homepage, voor een naam die één keer per evenement
+  ingetikt wordt. Wie de bezoeker naar de partner wil sturen, heeft daar al
+  `CalendarEvent.url` voor.
+
+Het label op de eventpagina heet daarom "Organisator" en niet meer "Groep": dat
+opschrift klopt in beide gevallen.
+
+---
+
 ## Doelgroepen zijn een label, geen slot
 
 Een `CalendarCategory` met een `audience` (eerstejaars, internationaal,

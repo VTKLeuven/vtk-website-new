@@ -29,6 +29,7 @@ export type FrontpageEventRow = {
   location: string | null;
   heroWeek: HeroWeekPlacement;
   group: { nameNl: string; nameEn: string };
+  organiserName: string | null;
   categories: Array<{ category: { colour: string; audience: string | null } }>;
 };
 
@@ -76,6 +77,7 @@ export function toFrontpageEvent(
     titleEn: row.titleEn,
     location: row.location,
     group: { nameNl: row.group.nameNl, nameEn: row.group.nameEn },
+    organiserName: row.organiserName,
     interestedCount: extras.interestedCount,
     categoryColour: categoryColour(row),
     heroWeek: row.heroWeek,
