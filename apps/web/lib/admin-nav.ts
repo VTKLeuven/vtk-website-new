@@ -51,16 +51,28 @@ const item = (key: string, href: string, guard: NavGuard = {}): NavLeaf => ({
 });
 const group = (key: string, items: NavLeaf[]): NavEntry => ({ group: key, items });
 
-export function logisticsModuleUrl(): string {
+/**
+ * Zelfde variabele en zelfde regel als de zoekresultaten
+ * (`lib/search-server.ts`) en de postbeheerlinks (`lib/postAdminLinks.ts`):
+ * kennen we het adres niet, dan tonen we de tab niet. Een link naar een adres
+ * dat we niet kennen is erger dan geen link.
+ *
+ * Hier stond `https://logistiek.dev.vtk.be` als standaard buiten development,
+ * dus zonder LOGISTIEK_PUBLIC_URL stuurde de beheeromgeving van productie je
+ * naar de uitleendienst van dev; met de sessiecookie van `.vtk.be` erbij viel
+ * dat niet eens op aan de login.
+ */
+export function logisticsModuleUrl(): string | null {
   const configured = process.env.LOGISTIEK_PUBLIC_URL?.trim();
   if (configured) return configured.replace(/\/+$/, '');
-  return process.env.NODE_ENV === 'development' ? 'http://localhost:3100' : 'https://logistiek.dev.vtk.be';
+  return process.env.NODE_ENV === 'development' ? 'http://localhost:3100' : null;
 }
 
 export function getAdminNav(): NavEntry[] {
+  const logistics = logisticsModuleUrl();
   const loose: NavEntry[] = [
     item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
-    item('logistics', logisticsModuleUrl()),
+    ...(logistics ? [item('logistics', logistics)] : []),
     item('expenses', '/rekeningen', {
       anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.manage'],
     }),

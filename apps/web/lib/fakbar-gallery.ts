@@ -21,14 +21,33 @@ import { createGalleryClient } from "@vtk/gallery";
 
 export const FAKBAR_UPLOAD_SETTING_KEY = "media.fakbarUpload";
 
-const FAKBAR_APP_URL = (process.env.FAKBAR_APP_URL || "https://fakbar.vtk.be").replace(/\/+$/, "");
+/**
+ * Waar de fakbar-app draait, uit de root-`.env` (`FAKBAR_APP_URL`). Zelfde
+ * regel als `logisticsModuleUrl()` in `lib/admin-nav.ts` en `lib/search-server.ts`:
+ * kennen we de host niet, dan geven we liever geen link dan een kapotte.
+ *
+ * Hier stond `https://fakbar.vtk.be` als standaard en die host bestaat niet; de
+ * app draait op elixir.vtk.be, op dev op elixir.dev.vtk.be. Zonder
+ * FAKBAR_APP_URL kreeg elke foto dus een downloadlink die nergens uitkwam, en
+ * dat viel niet op omdat de link hier vandaag nergens getoond wordt.
+ */
+function fakbarAppUrl(): string | null {
+  const configured = process.env.FAKBAR_APP_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, "");
+  return process.env.NODE_ENV === "development" ? "http://localhost:3300" : null;
+}
 
 export const fakbarGallery = createGalleryClient({
   id: "fakbar",
   // Deze app serveert de fakbar-downloads niet; de route staat in de fakbar-app.
-  // Absolute URL dus, anders wijst een gekopieerde link naar vtk.be.
-  downloadPath: (slug, assetId) =>
-    `${FAKBAR_APP_URL}/api/gallery/albums/${encodeURIComponent(slug)}/photos/${encodeURIComponent(assetId)}/download`,
+  // Absolute URL dus, anders wijst een gekopieerde link naar vtk.be. Een leeg
+  // pad zou net dat doen, dus bij een onbekende host geven we een lege string
+  // terug en geen relatieve route.
+  downloadPath: (slug, assetId) => {
+    const base = fakbarAppUrl();
+    if (!base) return "";
+    return `${base}/api/gallery/albums/${encodeURIComponent(slug)}/photos/${encodeURIComponent(assetId)}/download`;
+  },
 });
 
 /** Of het uploaden naar de fakbargalerij hier aanstaat. Standaard: nee. */
