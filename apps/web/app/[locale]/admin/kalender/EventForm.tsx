@@ -1,12 +1,12 @@
-import Link from "next/link";
-import { Card, Input, Label, Select } from "@vtk/ui";
-import { saveEventAction } from "@/app/actions/calendar";
-import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
-import { SaveForm } from "@/components/ui/SaveForm";
-import { saveErrorMessages } from "@/lib/saveMessages";
-import { toImageFocus } from "@/lib/imageFocus";
-import { EventImageField } from "./EventImageField";
-import { utcToLocalDateTime } from "@/lib/ticketing/time";
+import Link from 'next/link';
+import { Card, Input, Label, Select } from '@vtk/ui';
+import { saveEventAction } from '@/app/actions/calendar';
+import { MarkdownEditorField } from '@/components/editor/MarkdownEditor';
+import { SaveForm } from '@/components/ui/SaveForm';
+import { saveErrorMessages } from '@/lib/saveMessages';
+import { toImageFocus } from '@/lib/imageFocus';
+import { EventImageField } from './EventImageField';
+import { utcToLocalDateTime } from '@/lib/ticketing/time';
 
 type Event = {
   id?: string;
@@ -33,7 +33,7 @@ type Event = {
   /** Hangt er al een logistiek-evenement aan? Zie `UitleenEvent.calendarEventId`. */
   hasUitleenEvent?: boolean;
   /** Voorrang of uitsluiting in het weekoverzicht op de homepage. */
-  heroWeek?: "AUTO" | "PINNED" | "HIDDEN";
+  heroWeek?: 'AUTO' | 'PINNED' | 'HIDDEN';
 };
 
 type Group = { id: string; nameNl: string; nameEn: string };
@@ -46,29 +46,17 @@ type Category = {
 };
 
 function toLocalDatetime(d?: Date | null | string) {
-  if (!d) return "";
-  const date = typeof d === "string" ? new Date(d) : d;
+  if (!d) return '';
+  const date = typeof d === 'string' ? new Date(d) : d;
   return utcToLocalDateTime(date);
 }
 
 /** Eén aanvinkbare categorie; doelgroep en thema gebruiken dezelfde `name`. */
-function CategoryCheckbox({
-  category,
-  checked,
-  nl,
-}: {
-  category: Category;
-  checked: boolean;
-  nl: boolean;
-}) {
+function CategoryCheckbox({ category, checked, nl }: { category: Category; checked: boolean; nl: boolean }) {
   return (
     <label className="inline-flex items-center gap-2 text-sm">
       <input type="checkbox" name="categoryIds" value={category.id} defaultChecked={checked} />
-      <span
-        aria-hidden
-        className="inline-block size-2.5 rounded-full"
-        style={{ background: category.colour }}
-      />
+      <span aria-hidden className="inline-block size-2.5 rounded-full" style={{ background: category.colour }} />
       {nl ? category.nameNl : category.nameEn}
     </label>
   );
@@ -89,14 +77,14 @@ function EmptyCategoryMessage({
     <p className="rounded-xl border border-vtk-blue/15 bg-vtk-blue-soft/50 px-3 py-2 text-sm text-vtk-blue-muted">
       {audience
         ? nl
-          ? "Er zijn nog geen doelgroepen ingesteld. Dit evenement is voorlopig voor iedereen."
-          : "No audiences have been configured yet. This event is for everyone for now."
+          ? 'Er zijn nog geen doelgroepen ingesteld. Dit evenement is voorlopig voor iedereen.'
+          : 'No audiences have been configured yet. This event is for everyone for now.'
         : nl
-          ? "Er zijn nog geen categorieën ingesteld. Dit evenement wordt zonder categorie opgeslagen."
-          : "No categories have been configured yet. This event will be saved without a category."}{" "}
+          ? 'Er zijn nog geen categorieën ingesteld. Dit evenement wordt zonder categorie opgeslagen.'
+          : 'No categories have been configured yet. This event will be saved without a category.'}{' '}
       {canManageCategories ? (
         <Link href={`${base}/admin/kalender/categorieen`} className="font-medium text-vtk-ink hover:underline">
-          {nl ? "Categorieën instellen" : "Configure categories"}
+          {nl ? 'Categorieën instellen' : 'Configure categories'}
         </Link>
       ) : null}
     </p>
@@ -115,7 +103,7 @@ export function EventForm({
   event: Event;
   groups: Group[];
   categories: Category[];
-  locale: "nl" | "en";
+  locale: 'nl' | 'en';
   /**
    * Toont "Opslaan en tickets toevoegen" bij een nieuw evenement. Ticketevents
    * aanmaken is een aparte permissie, dus wie enkel mag inplannen ziet die knop
@@ -130,8 +118,8 @@ export function EventForm({
    */
   canHeroWeek?: boolean;
 }) {
-  const nl = locale === "nl";
-  const base = nl ? "" : "/en";
+  const nl = locale === 'nl';
+  const base = nl ? '' : '/en';
   const selected = new Set(event.categoryIds ?? []);
   const audienceCategories = categories.filter((c) => c.audience !== null);
   const themeCategories = categories.filter((c) => c.audience === null);
@@ -141,9 +129,9 @@ export function EventForm({
     ...(!event.id || isDraft
       ? [
           {
-            name: "publication",
-            value: "draft",
-            label: nl ? "Opslaan als concept" : "Save as draft",
+            name: 'publication',
+            value: 'draft',
+            label: nl ? 'Opslaan als concept' : 'Save as draft',
           },
         ]
       : []),
@@ -153,16 +141,16 @@ export function EventForm({
     ...(isPublished
       ? [
           {
-            name: "publication",
-            value: "draft",
-            label: nl ? "Terug naar concept" : "Back to draft",
+            name: 'publication',
+            value: 'draft',
+            label: nl ? 'Terug naar concept' : 'Back to draft',
             confirm: {
-              title: nl ? "Terug naar concept?" : "Back to draft?",
+              title: nl ? 'Terug naar concept?' : 'Back to draft?',
               description: nl
-                ? "Het evenement verdwijnt meteen van de kalender, de homepage, de agenda-feeds en de app. De inhoud, categorieën, tickets en het formulier blijven bewaard; publiceren zet alles in één klik terug online."
-                : "The event disappears at once from the calendar, the home page, the calendar feeds and the app. Its content, categories, tickets and form are kept; publishing puts everything back online in one click.",
-              confirmLabel: nl ? "Terug naar concept" : "Back to draft",
-              cancelLabel: nl ? "Annuleren" : "Cancel",
+                ? 'Het evenement verdwijnt meteen van de kalender, de homepage, de agenda-feeds en de app. De inhoud, categorieën, tickets en het formulier blijven bewaard; publiceren zet alles in één klik terug online.'
+                : 'The event disappears at once from the calendar, the home page, the calendar feeds and the app. Its content, categories, tickets and form are kept; publishing puts everything back online in one click.',
+              confirmLabel: nl ? 'Terug naar concept' : 'Back to draft',
+              cancelLabel: nl ? 'Annuleren' : 'Cancel',
             },
           },
         ]
@@ -170,9 +158,9 @@ export function EventForm({
     ...(canCreateTickets && !event.id
       ? [
           {
-            name: "andThen",
-            value: "tickets",
-            label: nl ? "Publiceren en tickets toevoegen" : "Publish and add tickets",
+            name: 'andThen',
+            value: 'tickets',
+            label: nl ? 'Publiceren en tickets toevoegen' : 'Publish and add tickets',
           },
         ]
       : []),
@@ -182,27 +170,19 @@ export function EventForm({
     <SaveForm
       action={saveEventAction}
       className="space-y-4"
-      submitLabel={
-        !event.id || isDraft
-          ? nl
-            ? "Publiceren"
-            : "Publish"
-          : nl
-            ? "Wijzigingen opslaan"
-            : "Save changes"
-      }
-      savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
-      savedMessage={nl ? "Evenement opgeslagen" : "Event saved"}
+      submitLabel={!event.id || isDraft ? (nl ? 'Publiceren' : 'Publish') : nl ? 'Wijzigingen opslaan' : 'Save changes'}
+      savingLabel={nl ? 'Bezig met opslaan...' : 'Saving...'}
+      savedMessage={nl ? 'Evenement opgeslagen' : 'Event saved'}
       errorMessages={{
         ...saveErrorMessages(locale),
         SLUG_TAKEN: nl
-          ? "Niet opgeslagen: die URL-naam is al van een ander evenement of van een kalendercategorie. Kies een andere, bijvoorbeeld met het jaartal erachter."
-          : "Not saved: that URL name already belongs to another event or to a calendar category. Pick a different one, for instance with the year after it.",
+          ? 'Niet opgeslagen: die URL-naam is al van een ander evenement of van een kalendercategorie. Kies een andere, bijvoorbeeld met het jaartal erachter.'
+          : 'Not saved: that URL name already belongs to another event or to a calendar category. Pick a different one, for instance with the year after it.',
         END_BEFORE_START: nl
-          ? "Niet opgeslagen: het einde ligt voor de start. Kies een einde na de startdatum."
-          : "Not saved: the end is before the start. Pick an end after the start date.",
+          ? 'Niet opgeslagen: het einde ligt voor de start. Kies een einde na de startdatum.'
+          : 'Not saved: the end is before the start. Pick an end after the start date.',
       }}
-      fallbackErrorMessage={nl ? "Er ging iets mis bij het opslaan." : "Something went wrong while saving."}
+      fallbackErrorMessage={nl ? 'Er ging iets mis bij het opslaan.' : 'Something went wrong while saving.'}
       secondarySubmit={secondarySubmits.length > 0 ? secondarySubmits : undefined}
     >
       {event.id && <input type="hidden" name="id" value={event.id} />}
@@ -211,54 +191,54 @@ export function EventForm({
           className="rounded-xl border border-vtk-blue/15 bg-vtk-blue-soft/60 px-4 py-3 text-sm text-vtk-ink"
           role="status"
         >
-          <strong>{nl ? "Dit evenement is een concept." : "This event is a draft."}</strong>{" "}
+          <strong>{nl ? 'Dit evenement is een concept.' : 'This event is a draft.'}</strong>{' '}
           {nl
-            ? "Het staat nog nergens online. Klik op Publiceren wanneer het klaar is."
-            : "It is not visible anywhere online yet. Click Publish when it is ready."}
+            ? 'Het staat nog nergens online. Klik op Publiceren wanneer het klaar is.'
+            : 'It is not visible anywhere online yet. Click Publish when it is ready.'}
         </div>
       ) : null}
       <Card className="p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <Label>Title (NL)</Label>
-            <Input name="titleNl" defaultValue={event.titleNl ?? ""} required />
+            <Input name="titleNl" defaultValue={event.titleNl ?? ''} required />
           </div>
           <div>
             <Label>Title (EN)</Label>
-            <Input name="titleEn" defaultValue={event.titleEn ?? ""} />
+            <Input name="titleEn" defaultValue={event.titleEn ?? ''} />
           </div>
           <div className="md:col-span-2">
-            <Label htmlFor="event-slug">{nl ? "URL-naam" : "URL name"}</Label>
+            <Label htmlFor="event-slug">{nl ? 'URL-naam' : 'URL name'}</Label>
             <div className="flex items-center gap-2">
               <span className="shrink-0 text-sm text-vtk-blue-muted">/kalender/</span>
               <Input
                 id="event-slug"
                 name="slug"
-                defaultValue={event.slug ?? ""}
+                defaultValue={event.slug ?? ''}
                 maxLength={80}
                 pattern="[a-z0-9]+(-[a-z0-9]+)*"
-                placeholder={
-                  nl ? "galabal-2026 (leeg = uit de titel)" : "galabal-2026 (empty = from the title)"
-                }
+                placeholder={nl ? 'galabal-2026 (leeg = uit de titel)' : 'galabal-2026 (empty = from the title)'}
               />
             </div>
             <p className="mt-1 text-xs text-vtk-muted">
               {event.slug
                 ? nl
-                  ? "Dit staat in de link die leden delen en in hun agenda. Wijzig je hem, dan werkt de oude naam niet meer; het oude adres met de lange code blijft wel doorsturen."
-                  : "This is in the link members share and in their calendar. Changing it breaks the old name; the old address with the long code keeps redirecting."
+                  ? 'Dit staat in de link die leden delen en in hun agenda. Wijzig je hem, dan werkt de oude naam niet meer; het oude adres met de lange code blijft wel doorsturen.'
+                  : 'This is in the link members share and in their calendar. Changing it breaks the old name; the old address with the long code keeps redirecting.'
                 : nl
-                  ? "Laat leeg om hem uit de titel en het jaartal te maken, bijvoorbeeld galabal-2026."
-                  : "Leave empty to build it from the title and the year, for example galabal-2026."}
+                  ? 'Laat leeg om hem uit de titel en het jaartal te maken, bijvoorbeeld galabal-2026.'
+                  : 'Leave empty to build it from the title and the year, for example galabal-2026.'}
             </p>
           </div>
           <div>
-            <Label>{locale === "nl" ? "Groep" : "Group"}</Label>
-            <Select name="groupId" defaultValue={event.groupId ?? ""} required>
-              <option value="" disabled>{nl ? "Kies een groep" : "Choose a group"}</option>
+            <Label>{locale === 'nl' ? 'Groep' : 'Group'}</Label>
+            <Select name="groupId" defaultValue={event.groupId ?? ''} required>
+              <option value="" disabled>
+                {nl ? 'Kies een groep' : 'Choose a group'}
+              </option>
               {groups.map((g) => (
                 <option key={g.id} value={g.id}>
-                  {locale === "nl" ? g.nameNl : g.nameEn}
+                  {locale === 'nl' ? g.nameNl : g.nameEn}
                 </option>
               ))}
             </Select>
@@ -269,37 +249,32 @@ export function EventForm({
               groep het wel, maar organiseert ze het niet. */}
           <div>
             <Label htmlFor="event-organiser">
-              {locale === "nl" ? "Organisator (optioneel)" : "Organiser (optional)"}
+              {locale === 'nl' ? 'Organisator (optioneel)' : 'Organiser (optional)'}
             </Label>
             <Input
               id="event-organiser"
               name="organiserName"
-              defaultValue={event.organiserName ?? ""}
+              defaultValue={event.organiserName ?? ''}
               maxLength={120}
-              placeholder={nl ? "bv. Industria" : "e.g. Industria"}
+              placeholder={nl ? 'bv. Industria' : 'e.g. Industria'}
             />
-            <p className="mt-1 text-xs text-vtk-muted">
-              {nl
-                ? "Laat leeg wanneer de groep hierboven zelf organiseert. Vul een naam in bij een crossover of een evenement van een partner: die naam komt dan overal op de site, in de app en in de agenda in plaats van de groep. De groep blijft wel beheren en bewerken."
-                : "Leave empty when the group above organises it. Fill in a name for a crossover or a partner's event: that name then appears across the site, the app and the calendar instead of the group. The group keeps managing and editing it."}
-            </p>
           </div>
           <div>
-            <Label>{locale === "nl" ? "Locatie" : "Location"}</Label>
-            <Input name="location" defaultValue={event.location ?? ""} />
+            <Label>{locale === 'nl' ? 'Locatie' : 'Location'}</Label>
+            <Input name="location" defaultValue={event.location ?? ''} />
           </div>
           <div>
             <Label>Start</Label>
             <Input name="start" type="datetime-local" defaultValue={toLocalDatetime(event.start)} required />
           </div>
           <div>
-            <Label>{locale === "nl" ? "Einde" : "End"}</Label>
+            <Label>{locale === 'nl' ? 'Einde' : 'End'}</Label>
             <Input name="end" type="datetime-local" defaultValue={toLocalDatetime(event.end)} required />
           </div>
           <div className="flex items-end gap-3">
             <label className="inline-flex items-center gap-2 text-sm">
               <input type="checkbox" name="allDay" defaultChecked={event.allDay ?? false} />
-              {locale === "nl" ? "Hele dag" : "All day"}
+              {locale === 'nl' ? 'Hele dag' : 'All day'}
             </label>
           </div>
           {/* E1: hiermee verschijnt dit evenement ook op logistiek.vtk.be, zodat
@@ -316,37 +291,35 @@ export function EventForm({
                 className="mt-1"
               />
               <span>
-                {nl ? "Logistiek nodig" : "Needs logistics"}
+                {nl ? 'Logistiek nodig' : 'Needs logistics'}
                 <span className="mt-0.5 block text-vtk-blue-muted">
                   {nl
                     ? event.hasUitleenEvent
-                      ? "Dit evenement staat op logistiek.vtk.be; naam, locatie en uren volgen hier mee. Het vinkje weghalen laat het daar staan, want er kunnen al aanvragen aan hangen."
-                      : "Zet dit evenement ook op logistiek.vtk.be, zodat materiaal, flesserke en transport eronder samen komen te staan."
+                      ? 'Dit evenement staat op logistiek.vtk.be; naam, locatie en uren volgen hier mee. Het vinkje weghalen laat het daar staan, want er kunnen al aanvragen aan hangen.'
+                      : 'Zet dit evenement ook op logistiek.vtk.be, zodat materiaal, flesserke en transport eronder samen komen te staan.'
                     : event.hasUitleenEvent
-                      ? "This event exists on logistiek.vtk.be; its name, location and times follow this one. Unticking leaves it there, since requests may already be attached."
-                      : "Also put this event on logistiek.vtk.be, so equipment, drinks and transport end up together."}
+                      ? 'This event exists on logistiek.vtk.be; its name, location and times follow this one. Unticking leaves it there, since requests may already be attached.'
+                      : 'Also put this event on logistiek.vtk.be, so equipment, drinks and transport end up together.'}
                 </span>
               </span>
             </label>
           </div>
           <div>
             <Label>URL</Label>
-            <Input name="url" defaultValue={event.url ?? ""} placeholder="https://..." />
+            <Input name="url" defaultValue={event.url ?? ''} placeholder="https://..." />
           </div>
           {canHeroWeek ? (
             <div>
-              <Label htmlFor="heroWeek">
-                {nl ? "Weekoverzicht op de homepage" : "Week overview on the home page"}
-              </Label>
-              <Select id="heroWeek" name="heroWeek" defaultValue={event.heroWeek ?? "AUTO"}>
-                <option value="AUTO">{nl ? "Automatisch" : "Automatic"}</option>
-                <option value="PINNED">{nl ? "Voorrang geven" : "Give priority"}</option>
-                <option value="HIDDEN">{nl ? "Niet tonen" : "Do not show"}</option>
+              <Label htmlFor="heroWeek">{nl ? 'Weekoverzicht op de homepage' : 'Week overview on the home page'}</Label>
+              <Select id="heroWeek" name="heroWeek" defaultValue={event.heroWeek ?? 'AUTO'}>
+                <option value="AUTO">{nl ? 'Automatisch' : 'Automatic'}</option>
+                <option value="PINNED">{nl ? 'Voorrang geven' : 'Give priority'}</option>
+                <option value="HIDDEN">{nl ? 'Niet tonen' : 'Do not show'}</option>
               </Select>
               <p className="mt-1 text-xs text-vtk-muted">
                 {nl
-                  ? "Het overzicht toont hoogstens drie evenementen per dag en tien in totaal. Voorrang zet dit evenement vooraan op zijn dag; niet tonen houdt het van de homepage zonder het uit de kalender te halen."
-                  : "The overview shows at most three events per day and ten in total. Priority puts this event first on its day; do not show keeps it off the home page without removing it from the calendar."}
+                  ? 'Het overzicht toont hoogstens drie evenementen per dag en tien in totaal. Voorrang zet dit evenement vooraan op zijn dag; niet tonen houdt het van de homepage zonder het uit de kalender te halen.'
+                  : 'The overview shows at most three events per day and ten in total. Priority puts this event first on its day; do not show keeps it off the home page without removing it from the calendar.'}
               </p>
             </div>
           ) : null}
@@ -362,11 +335,11 @@ export function EventForm({
               een kleur. Ze staan in dezelfde koppeltabel, vandaar dezelfde
               `name`. */}
           <div className="md:col-span-2">
-            <Label>{nl ? "Doelgroep" : "Audience"}</Label>
+            <Label>{nl ? 'Doelgroep' : 'Audience'}</Label>
             <p className="mb-2 text-sm text-vtk-blue-muted">
               {nl
-                ? "Laat leeg voor een algemeen event. Met een doelgroep blijft het event voor iedereen zichtbaar, maar bezoekers kunnen erop filteren of hun kalender op hun profiel afstemmen."
-                : "Leave empty for a general event. With a target audience it remains visible to everyone, while visitors can filter by it or tailor the calendar to their profile."}
+                ? 'Laat leeg voor een algemeen event. Met een doelgroep blijft het event voor iedereen zichtbaar, maar bezoekers kunnen erop filteren of hun kalender op hun profiel afstemmen.'
+                : 'Leave empty for a general event. With a target audience it remains visible to everyone, while visitors can filter by it or tailor the calendar to their profile.'}
             </p>
             <div className="flex flex-wrap gap-x-5 gap-y-2">
               {audienceCategories.length > 0 ? (
@@ -374,20 +347,15 @@ export function EventForm({
                   <CategoryCheckbox key={c.id} category={c} checked={selected.has(c.id)} nl={nl} />
                 ))
               ) : (
-                <EmptyCategoryMessage
-                  audience
-                  nl={nl}
-                  canManageCategories={canManageCategories}
-                  base={base}
-                />
+                <EmptyCategoryMessage audience nl={nl} canManageCategories={canManageCategories} base={base} />
               )}
             </div>
           </div>
           <div className="md:col-span-2">
-            <Label>{nl ? "Categorieën" : "Categories"}</Label>
+            <Label>{nl ? 'Categorieën' : 'Categories'}</Label>
             <p className="mb-2 text-sm text-vtk-blue-muted">
               {nl
-                ? "Het thema van het event. Bepaalt de kleur in de kalender, de filterknop en de agenda-feed per categorie."
+                ? 'Het thema van het event. Bepaalt de kleur in de kalender, de filterknop en de agenda-feed per categorie.'
                 : "The event's theme. Determines its colour in the calendar, the filter button and the per-category calendar feed."}
             </p>
             <div className="flex flex-wrap gap-x-5 gap-y-2">
@@ -396,12 +364,7 @@ export function EventForm({
                   <CategoryCheckbox key={c.id} category={c} checked={selected.has(c.id)} nl={nl} />
                 ))
               ) : (
-                <EmptyCategoryMessage
-                  audience={false}
-                  nl={nl}
-                  canManageCategories={canManageCategories}
-                  base={base}
-                />
+                <EmptyCategoryMessage audience={false} nl={nl} canManageCategories={canManageCategories} base={base} />
               )}
             </div>
           </div>
