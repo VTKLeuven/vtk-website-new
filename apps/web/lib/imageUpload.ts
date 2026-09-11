@@ -23,3 +23,27 @@ export function imageUploadSizeError(file: { size: number }, locale: "nl" | "en"
     ? imageUploadError(locale, 413, kind)
     : null;
 }
+
+/**
+ * Een foto die smaller is dan de plek waar ze terechtkomt, wordt door de browser
+ * uitvergroot en ziet er wazig uit. Dat gebeurde in de praktijk voortdurend:
+ * de coverfoto's van de events op de homepagina waren 596 tot 600 px breed, het
+ * formaat van een Facebook-linkvoorbeeld, terwijl de eventpagina ze op een
+ * scherm met dubbele pixeldichtheid tot ongeveer 1300 px opblaast. Niets zei dat
+ * tegen de redacteur, en `next/image` vergroot nooit boven de bron, dus de
+ * uitvergroting gebeurt pas in de browser van de bezoeker.
+ *
+ * Dit is een waarschuwing en geen weigering: soms bestaat er van een affiche
+ * niets beters dan wat iemand doorgestuurd kreeg, en een wazige foto is nog
+ * altijd beter dan het gestreepte patroon.
+ */
+export function imageTooSmallWarning(
+  width: number | null | undefined,
+  minWidth: number,
+  locale: "nl" | "en",
+): string | null {
+  if (!width || width >= minWidth) return null;
+  return locale === "nl"
+    ? `Deze foto is maar ${width} px breed. Ze wordt op de site uitvergroot en zal wazig zijn; gebruik de originele affiche of foto van minstens ${minWidth} px breed.`
+    : `This photo is only ${width} px wide. It gets enlarged on the site and will look blurry; use the original poster or photo, at least ${minWidth} px wide.`;
+}

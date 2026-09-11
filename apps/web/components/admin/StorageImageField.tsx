@@ -1,6 +1,6 @@
 "use client";
 
-import { imageUploadError, imageUploadSizeError } from "@/lib/imageUpload";
+import { imageTooSmallWarning, imageUploadError, imageUploadSizeError } from "@/lib/imageUpload";
 
 import Image from "next/image";
 import { useRef, useState } from "react";
@@ -41,6 +41,7 @@ export function StorageImageField({
   helpText,
   srContext,
   formId,
+  minWidth,
   onChange,
 }: {
   defaultKey?: string | null;
@@ -64,6 +65,12 @@ export function StorageImageField({
   srContext?: string;
   /** Formulier waarvoor de upload gebeurt, voor de capability-check van de route. */
   formId?: string;
+  /**
+   * Breedte die deze foto minstens nodig heeft om scherp te blijven op de plek
+   * waar ze terechtkomt. Zonder deze waarde waarschuwt het veld niet; met een
+   * waarde meldt het een te kleine upload zonder ze te weigeren.
+   */
+  minWidth?: number;
   /** Voor gecontroleerde editors die de key in hun eigen state bewaren. */
   onChange?: (key: string) => void;
 }) {
@@ -74,6 +81,9 @@ export function StorageImageField({
   );
   const [uploading, setUploading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Een te kleine foto is geen fout: ze wordt bewaard en getoond, maar ziet er
+  // wazig uit. Vandaar een aparte, oranje melding naast de rode van `err`.
+  const [warning, setWarning] = useState<string | null>(null);
   // Enkel een klik op de prullenbak betekent "wis de bestaande foto". Bij een
   // nieuw item is er niets te wissen en blijft dit false.
   const [cleared, setCleared] = useState(false);
@@ -84,6 +94,7 @@ export function StorageImageField({
   async function onFile(file: File) {
     const sizeError = imageUploadSizeError(file, locale, "image");
     setErr(sizeError);
+    setWarning(null);
     if (sizeError) return;
     setUploading(true);
     try {
@@ -96,10 +107,15 @@ export function StorageImageField({
         setErr(imageUploadError(locale, res.status, "image"));
         return;
       }
-      const data = (await res.json()) as { key: string; url: string | null };
+      const data = (await res.json()) as {
+        key: string;
+        url: string | null;
+        width: number | null;
+      };
       setKey(data.key);
       setPreviewUrl(data.url ?? mediaUrl(data.key));
       setCleared(false);
+      if (minWidth) setWarning(imageTooSmallWarning(data.width, minWidth, locale));
       onChange?.(data.key);
     } catch {
       setErr(imageUploadError(locale));
@@ -112,6 +128,7 @@ export function StorageImageField({
     setKey("");
     setPreviewUrl(null);
     setErr(null);
+    setWarning(null);
     setCleared(true);
     onChange?.("");
     // Anders weigert de browser hetzelfde bestand opnieuw te accepteren: de
@@ -215,6 +232,14 @@ export function StorageImageField({
           </div>
           {helpText && <p className="text-xs text-[#5c667f]">{helpText}</p>}
           {err && <p role="alert" className="text-xs text-red-600">{err}</p>}
+          {!err && warning && (
+            <p
+              role="status"
+              className="rounded-lg border border-amber-300 bg-amber-50 px-2 py-1.5 text-xs text-amber-900"
+            >
+              {warning}
+            </p>
+          )}
         </div>
       </div>
     </div>

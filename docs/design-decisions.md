@@ -6339,6 +6339,41 @@ pas na het opslaan wat de homepage ervan maakt. Om dezelfde reden volgt de
 duimnagel van de upload erboven hetzelfde punt; twee kadertjes van dezelfde foto
 die elkaar tegenspreken zijn erger dan één.
 
+## Een te kleine eventfoto: waarschuwen, niet weigeren
+
+De klacht was "de foto van een event is soms potato kwaliteit", met als
+vermoeden dat de uploadlimiet te laag stond. Dat vermoeden klopte niet: de
+limiet is 45 MB. De gemeten oorzaak was de andere kant op. Van de vijf events
+die op dat moment op de homepagina stonden, waren er vier bewaard op ongeveer
+600 px breed (596x335, 600x400, 600x314, 447x447); één was 6960x4640. Zeshonderd
+pixels breed is het formaat van een Facebook-linkvoorbeeld, dus die affiches zijn
+uit een preview geplukt in plaats van bij de ontwerper gehaald.
+
+Het kader op de eventpagina is ongeveer 650 px breed, wat op een telefoon of een
+retina-scherm ruim 1300 echte pixels is. `next/image` vergroot nooit boven de
+bron (nagegaan: `w=640`, `w=1200` en `w=2048` gaven voor zo'n foto alle drie
+596x335 terug), dus de uitvergroting gebeurt in de browser van de bezoeker. Onze
+eigen hercodering is niet de boosdoener: de JPEG-tussenstap op q86 kost op een
+affiche met veel tekst RMSE 3,19 tegenover 2,70 zonder tussenstap, merkbaar voor
+wie erop let en verwaarloosbaar naast een uitvergroting van 2,2x.
+
+**Het veld waarschuwt dus zodra een upload smaller is dan 1600 px, en weigert
+niet.** Drie keuzes zitten daarin:
+
+- **Waarschuwen en niet weigeren.** Van een affiche bestaat er soms niets beters
+  dan wat iemand doorstuurde, en een wazige affiche is nog altijd beter dan het
+  gestreepte patroon. Een weigering zou het evenement zonder foto laten.
+- **De gemeten breedte staat in de melding**, niet enkel "deze foto is klein".
+  "Deze foto is maar 596 px breed" is na te trekken; het zegt meteen dat de
+  bron het probleem is en niet de upload.
+- **1600 px en niet 1300.** De streefmaat ligt boven wat het grootste kader
+  vandaag vraagt, zodat een foto niet net-aan is en bij de eerste layoutwijziging
+  opnieuw tekortschiet.
+
+De waarschuwing zit in `StorageImageField` achter een `minWidth`-prop, dus ze
+verschijnt enkel waar iemand een streefmaat opgeeft. Het eventveld doet dat; de
+andere uploadvelden zwijgen tot iemand er dezelfde afweging voor maakt.
+
 ## De foto van een contentpagina: een plaat boven de tekst, geen behang onder de kop
 
 Een contentpagina kan haar eigen foto hebben (`Page.imageKey`, uploadbaar in de

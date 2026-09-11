@@ -10,6 +10,13 @@ import { CENTER_FOCUS, focusPosition, type ImageFocus } from "@/lib/imageFocus";
  * Optionele cover-afbeelding voor een evenement; zonder afbeelding valt de
  * eventpagina terug op de standaardfoto.
  *
+ * De streefbreedte van 1600 px komt van de plek waar de foto terechtkomt: het
+ * kader op de eventpagina is ongeveer 650 px breed, en op een telefoon of een
+ * retina-scherm zijn dat ruim 1300 echte pixels. Een affiche die van een
+ * Facebook-linkvoorbeeld geplukt is, is 600 px breed en wordt daar dus meer dan
+ * verdubbeld; `next/image` vergroot niet, dus dat doet de browser van de
+ * bezoeker, met een wazige affiche tot gevolg.
+ *
  * Onder de upload staat het uitsnedeveld. Dat hangt aan de key in deze state en
  * niet aan de opgeslagen waarde, zodat het meteen de zopas gekozen foto toont;
  * bij een evenement dat al een foto heeft, staat het er van bij het openen en is
@@ -40,9 +47,10 @@ export function EventImageField({
         emptyHint={nl ? "Standaardfoto" : "Default photo"}
         helpText={
           nl
-            ? "Optioneel. Zonder afbeelding toont de eventpagina de standaardfoto uit de preview."
-            : "Optional. Without an image the event page shows the default photo shown here."
+            ? "Optioneel, maar neem de originele affiche van minstens 1600 px breed: een kleine foto wordt op de eventpagina uitvergroot en oogt wazig. Zonder afbeelding toont de eventpagina de standaardfoto uit de preview."
+            : "Optional, but use the original poster, at least 1600 px wide: a small photo gets enlarged on the event page and looks blurry. Without an image the event page shows the default photo shown here."
         }
+        minWidth={1600}
         onChange={setKey}
         previewPosition={focusPosition(focus)}
       />
