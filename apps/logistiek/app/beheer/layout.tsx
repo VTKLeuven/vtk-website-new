@@ -10,7 +10,7 @@ export default async function BeheerLayout({ children }: { children: React.React
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   const t = copy[locale];
   if (!session) {
-    return <LoginGate variant="manage" />;
+    return <LoginGate variant="manage" returnTo="/beheer" />;
   }
   if (!canManage(session)) {
     return (

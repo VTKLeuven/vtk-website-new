@@ -134,7 +134,7 @@ export default async function RittenPage() {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   const t = copy[locale];
   if (!session) {
-    return <LoginGate variant="trips" />;
+    return <LoginGate variant="trips" returnTo="/ritten" />;
   }
   const en = locale === 'en';
 

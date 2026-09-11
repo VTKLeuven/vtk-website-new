@@ -33,7 +33,13 @@ const VARIANT_KEY = {
   manage: 'loginManage',
 } as const;
 
-export async function LoginGate({ variant = 'default' }: { variant?: LoginVariant }) {
+export async function LoginGate({
+  variant = 'default',
+  returnTo,
+}: {
+  variant?: LoginVariant;
+  returnTo?: string;
+}) {
   const locale = await getLocale();
   const t = copy[locale];
   // Specifieke context-boodschap per variant; de generieke 'default' komt uit de
@@ -44,7 +50,13 @@ export async function LoginGate({ variant = 'default' }: { variant?: LoginVarian
   // KU Leuven-login op de hoofdsite. In de gegrendelde stand is er hier nog geen
   // sessie om rechten op te toetsen, dus valt hij vanzelf terug op de echte
   // login: precies wat je wil op dev.vtk.be.
-  const loginHref = (await canUseTestLogin()) ? '/test-login' : `${MAIN_URL}/inloggen`;
+  const publicUrl = process.env.LOGISTIEK_PUBLIC_URL || 'https://logistiek.vtk.be';
+  const destination = returnTo
+    ? `${publicUrl}${returnTo.startsWith('/') ? returnTo : `/${returnTo}`}`
+    : publicUrl;
+  const loginHref = (await canUseTestLogin())
+    ? '/test-login'
+    : `${MAIN_URL}/inloggen?next=${encodeURIComponent(destination)}`;
   return (
     <main className="logistics-auth mx-auto grid w-full flex-1 place-items-center px-5 py-12">
       <section className="logistics-auth-panel w-full max-w-xl">

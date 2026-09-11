@@ -44,7 +44,11 @@ export async function SiteHeader() {
       }
       user={session ? { name: session.user.name, canManage: isFakbar } : null}
       mainUrl={MAIN_URL}
-      loginHref={testMode ? '/test-login' : `${MAIN_URL}/inloggen`}
+      loginHref={
+        testMode
+          ? '/test-login'
+          : `${MAIN_URL}/inloggen?next=${encodeURIComponent(process.env.FAKBAR_APP_URL ?? 'https://elixir.vtk.be')}`
+      }
       testLoginHref={testMode ? '/test-login' : undefined}
     />
   );

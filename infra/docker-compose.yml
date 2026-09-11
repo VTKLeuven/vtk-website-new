@@ -37,7 +37,6 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public
-      SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-.vtk.be}
       # VTK_MAIN_URL en LOGISTIEK_PUBLIC_URL stonden hier met een
       # productiestandaard (`https://vtk.be`, `https://logistiek.vtk.be`) en dat
       # was dezelfde val als bij de lege standaarden in de logistiek-service
@@ -73,7 +72,6 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public
-      SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-.vtk.be}
       LOGISTIEK_PAYMENT_PROVIDER: ${LOGISTIEK_PAYMENT_PROVIDER:-mollie}
     ports:
       - '127.0.0.1:3100:3000'
@@ -96,7 +94,6 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public
-      SESSION_COOKIE_DOMAIN: ${SESSION_COOKIE_DOMAIN:-.vtk.be}
       GALLERY_IMMICH_API_URL: http://immich-server:2283/api
       GALLERY_DATABASE_HOST: immich-database
       GALLERY_FAKBAR_FACE_SEARCH_ENABLED: ${GALLERY_FAKBAR_FACE_SEARCH_ENABLED:-false}

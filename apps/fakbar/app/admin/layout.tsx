@@ -12,10 +12,13 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const session = await getSession();
 
   if (!session) {
+    const mainUrl = process.env.VTK_MAIN_URL ?? 'https://vtk.be';
+    const publicUrl = process.env.FAKBAR_APP_URL ?? 'https://elixir.vtk.be';
+    const destination = `${publicUrl}/admin`;
     const loginUrl =
       process.env.FAKBAR_TEST_LOGIN === 'true'
         ? '/test-login'
-        : `${process.env.VTK_MAIN_URL ?? 'https://vtk.be'}/inloggen`;
+        : `${mainUrl}/inloggen?next=${encodeURIComponent(destination)}`;
     redirect(loginUrl);
   }
 

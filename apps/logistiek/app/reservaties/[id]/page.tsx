@@ -39,13 +39,13 @@ export default async function ReservatieDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ betaling?: string }>;
 }) {
+  const { id } = await params;
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   if (!session) {
-    return <LoginGate variant="reservation" />;
+    return <LoginGate variant="reservation" returnTo={`/reservaties/${id}`} />;
   }
   const en = locale === 'en';
 
-  const { id } = await params;
   const { betaling } = await searchParams;
   // Ook de aanvragen van je eigen post, zodat je ziet wat er al geregeld is.
   // Alleen lezen: aanpassen en annuleren blijft aan de aanvrager zelf.

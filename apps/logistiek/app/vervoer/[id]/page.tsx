@@ -23,13 +23,13 @@ export default async function VanBookingDetailPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ betaling?: string }>;
 }) {
+  const { id } = await params;
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   if (!session) {
-    return <LoginGate variant="trip" />;
+    return <LoginGate variant="trip" returnTo={`/vervoer/${id}`} />;
   }
   const en = locale === 'en';
 
-  const { id } = await params;
   const { betaling } = await searchParams;
   // Ook de ritten van je eigen post, leesalleen; zie reservaties/[id].
   const postIds = session.groups.filter((group) => group.type === 'PRAESIDIUM').map((g) => g.id);

@@ -8,6 +8,7 @@
 
 import { createAuthClient } from 'better-auth/react';
 import { genericOAuthClient } from 'better-auth/client/plugins';
+import { sanitizeNextUrl } from './redirect';
 
 export const authClient = createAuthClient({
   baseURL: process.env.BETTER_AUTH_URL,
@@ -27,7 +28,7 @@ export const KUL_PROVIDER_ID = 'kuleuven';
  * this from an email/password error without masking that parameter.
  */
 export async function signInKul(next = '/'): Promise<void> {
-  const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/';
+  const safeNext = sanitizeNextUrl(next);
   await authClient.signIn.oauth2({
     providerId: KUL_PROVIDER_ID,
     callbackURL: safeNext,

@@ -32,7 +32,7 @@ export default async function BeschikbaarheidPage({
   searchParams: Promise<{ week?: string }>;
 }) {
   const [{ week }, session, locale] = await Promise.all([searchParams, getSession(), getLocale()]);
-  if (!session) return <LoginGate variant="trips" />;
+  if (!session) return <LoginGate variant="trips" returnTo="/ritten/beschikbaarheid" />;
   const en = locale === 'en';
 
   const [driver, vanDriver, windows] = await Promise.all([

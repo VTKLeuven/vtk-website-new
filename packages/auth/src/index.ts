@@ -9,6 +9,7 @@ import type { NextRequest } from 'next/server';
 import type { Permission } from './lib/permissions';
 
 export { splitFullName, fullName, nameParts, type NameParts } from './lib/names';
+export { isSafeRedirectUrl, sanitizeNextUrl } from './redirect';
 export { PERMISSIONS, isPermission, permissionCodes, type Permission } from './lib/permissions';
 export {
   currentWorkingYear,

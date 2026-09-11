@@ -37,6 +37,10 @@ export async function SiteHeader() {
   // de KU Leuven-login op de hoofdsite; enkel voor wie er iets mee kan, anders is
   // het een menu-item dat 404 geeft. Zie lib/session.ts.
   const testMode = await canUseTestLogin();
+  const publicUrl = process.env.LOGISTIEK_PUBLIC_URL || 'https://logistiek.vtk.be';
+  const loginHref = testMode
+    ? '/test-login'
+    : `${MAIN_URL}/inloggen?next=${encodeURIComponent(publicUrl)}`;
 
   return (
     <header className="vtk-site-header">
@@ -101,7 +105,7 @@ export async function SiteHeader() {
             />
           ) : (
             <a
-              href={testMode ? '/test-login' : `${MAIN_URL}/inloggen`}
+              href={loginHref}
               aria-label={t.signIn}
               title={t.signIn}
               className="nav-login"

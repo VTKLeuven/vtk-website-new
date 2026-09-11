@@ -14,7 +14,7 @@ export default async function VervoerPage() {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   const t = copy[locale];
   if (!session) {
-    return <LoginGate variant="van" />;
+    return <LoginGate variant="van" returnTo="/vervoer" />;
   }
   const en = locale === 'en';
 

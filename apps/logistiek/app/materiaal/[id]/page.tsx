@@ -9,13 +9,13 @@ import { frequentlyRequestedWith, itemDetail, itemTeamDetails } from '@/lib/uitl
 import { ItemGallery } from './item-gallery';
 
 export default async function ItemDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   if (!session) {
-    return <LoginGate variant="item" />;
+    return <LoginGate variant="item" returnTo={`/materiaal/${id}`} />;
   }
   const en = locale === 'en';
 
-  const { id } = await params;
   const item = await itemDetail(id);
   if (!item) notFound();
 

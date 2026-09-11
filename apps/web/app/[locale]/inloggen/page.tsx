@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import { notFound } from 'next/navigation';
 import { hasLocale } from '@/lib/locale';
 import { getDictionary } from '@vtk/i18n';
+import { sanitizeNextUrl } from '@vtk/auth';
 import { getSession, isKulEnabled } from '@vtk/auth/server';
 import { hasPrompt, isOAuthRequest, resumeAuthorizeUrl, type RawSearchParams } from '@/lib/oauthFlow';
 import { PasswordSignIn } from './PasswordSignIn';
@@ -54,7 +55,7 @@ export default async function LoginPage({
 
   const session = await getSession(await headers());
   if (session && !mustReauthenticate) {
-    const safeNext = nextRaw?.startsWith('/') && !nextRaw.startsWith('//') ? nextRaw : '/';
+    const safeNext = sanitizeNextUrl(nextRaw);
     redirect(oauth ? next : safeNext);
   }
 

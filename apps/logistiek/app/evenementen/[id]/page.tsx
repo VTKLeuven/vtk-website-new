@@ -29,11 +29,10 @@ export default async function EvenementDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const [session, locale] = await Promise.all([getSession(), getLocale()]);
-  if (!session) return <LoginGate variant="reservations" />;
-  const en = locale === 'en';
-
   const { id } = await params;
+  const [session, locale] = await Promise.all([getSession(), getLocale()]);
+  if (!session) return <LoginGate variant="reservations" returnTo={`/evenementen/${id}`} />;
+  const en = locale === 'en';
   const event = await memberEvent(
     id,
     session.user.id,

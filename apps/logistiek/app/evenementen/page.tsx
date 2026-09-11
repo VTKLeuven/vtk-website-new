@@ -23,7 +23,7 @@ function countByKind(event: AdminEvent) {
 
 export default async function EvenementenPage() {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
-  if (!session) return <LoginGate variant="reservations" />;
+  if (!session) return <LoginGate variant="reservations" returnTo="/evenementen" />;
   const en = locale === 'en';
 
   const events = await memberEvents(

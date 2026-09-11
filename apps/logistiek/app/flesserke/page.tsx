@@ -14,7 +14,7 @@ import { FlesserkeForm } from './request-form';
 export default async function FlesserkePage() {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   if (!session) {
-    return <LoginGate variant="flesserke" />;
+    return <LoginGate variant="flesserke" returnTo="/flesserke" />;
   }
   const en = locale === 'en';
 

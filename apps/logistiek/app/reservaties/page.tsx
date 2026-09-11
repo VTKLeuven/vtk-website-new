@@ -200,7 +200,7 @@ export default async function ReservatiesPage({
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   const t = copy[locale];
   if (!session) {
-    return <LoginGate variant="reservations" />;
+    return <LoginGate variant="reservations" returnTo="/reservaties" />;
   }
 
   const en = locale === 'en';

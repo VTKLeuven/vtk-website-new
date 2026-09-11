@@ -28,7 +28,9 @@ export const auth = betterAuth({
   baseURL: process.env.BETTER_AUTH_URL,
   basePath: AUTH_BASE_PATH,
   secret: process.env.BETTER_AUTH_SECRET,
-  trustedOrigins: isProduction ? ['https://*.vtk.be'] : ['http://localhost:3000', 'http://localhost:3001'],
+  trustedOrigins: isProduction
+    ? ['https://*.vtk.be', 'https://vtk.be']
+    : ['http://localhost:3000', 'http://localhost:3001'],
 
   database: prismaAdapter(prisma, {
     provider: 'postgresql',
@@ -236,7 +238,7 @@ export const auth = betterAuth({
   },
 
   advanced: {
-    cookiePrefix: 'vtk',
+    cookiePrefix: process.env.BETTER_AUTH_COOKIE_PREFIX || 'vtk',
     useSecureCookies: isProduction,
     crossSubDomainCookies: {
       enabled: isProduction,

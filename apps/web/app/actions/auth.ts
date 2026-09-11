@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { headers } from 'next/headers';
 import { z } from 'zod';
+import { sanitizeNextUrl } from '@vtk/auth';
 import { prisma } from '@vtk/db';
 import { checkLoginBlocked, resolveLoginEmail, signInEmail, signOut } from '@vtk/auth/server';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
@@ -56,13 +57,14 @@ export async function loginAction(_prev: LoginState, formData: FormData): Promis
     return { error: 'INVALID' };
   }
 
-  const next =
-    parsed.data.next && parsed.data.next.startsWith('/') && !parsed.data.next.startsWith('//') ? parsed.data.next : '/';
+  const next = sanitizeNextUrl(parsed.data.next);
 
   // Het authorize-endpoint is een route handler, geen pagina: daar kan de App
-  // Router niet client-side naartoe navigeren. Geef de URL terug en laat de
-  // browser hem echt volgen, zodat de OAuth-redirectketen intact blijft.
-  if (parsed.data.hardRedirect) return { redirectTo: next };
+  // Router niet client-side naartoe navigeren. Hetzelfde geldt voor externe
+  // domeinen (zoals logistiek of fakbar). Geef de URL terug en laat de
+  // browser hem echt volgen, zodat de navigatie intact blijft.
+  const isExternal = next.startsWith('http://') || next.startsWith('https://');
+  if (parsed.data.hardRedirect || isExternal) return { redirectTo: next };
 
   redirect(next);
 }

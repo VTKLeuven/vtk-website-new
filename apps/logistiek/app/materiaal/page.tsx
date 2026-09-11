@@ -18,7 +18,7 @@ export default async function MateriaalPage() {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   const t = copy[locale];
   if (!session) {
-    return <LoginGate variant="material" />;
+    return <LoginGate variant="material" returnTo="/materiaal" />;
   }
 
   // Een externe (geen enkele groep) ziet geen evenementen en geen sjablonen
