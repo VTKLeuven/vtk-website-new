@@ -482,6 +482,52 @@ async function main() {
         ] as Array<{ type: "video" | "image"; url: string; titleNl?: string; titleEn?: string }>,
       },
     },
+    {
+      key: "home.slogans",
+      value: {
+        items: [
+          {
+            id: "slogan-1",
+            titleNl: "Ingenieurs zijn",
+            accentNl: "superieur.",
+            tailNl: "",
+            titleEn: "Engineers are",
+            accentEn: "superior.",
+            tailEn: "",
+          },
+          {
+            id: "slogan-2",
+            titleNl: "Al meer dan 100 jaar",
+            accentNl: "thuis",
+            tailNl: "in Leuven.",
+            titleEn: "For over 100 years",
+            accentEn: "at home",
+            tailEn: "in Leuven.",
+          },
+          {
+            id: "slogan-3",
+            titleNl: "Van aula tot fakbar,",
+            accentNl: "jouw kring.",
+            tailNl: "",
+            titleEn: "From lecture hall to fakbar,",
+            accentEn: "your society.",
+            tailEn: "",
+          },
+        ],
+        personal: {
+          enabled: true,
+          titleNl: "Welkom terug,",
+          accentNl: "{firstName}!",
+          tailNl: "",
+          titleEn: "Welcome back,",
+          accentEn: "{firstName}!",
+          tailEn: "",
+          chancePercent: 50,
+        },
+        intervalSeconds: 8,
+        randomizeOnReload: true,
+      },
+    },
     // Theokot-configuratie: waarden die niet elke week wijzigen. maxItemsPerOrder = X,
     // maxWeeklySpecialPerOrder = Y (X > Y). Tijden zijn "HH:mm" in Brussel-tijd.
     {

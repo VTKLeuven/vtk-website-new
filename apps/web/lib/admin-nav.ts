@@ -102,6 +102,7 @@ export function getAdminNav(): NavEntry[] {
     group('website', [
       item('home', '/home', { perm: 'home.edit' }),
       item('frontpage', '/frontpage', { perm: 'home.edit' }),
+      item('slogans', '/slogans', { perm: 'home.edit' }),
       item('openingHours', '/openingsuren', { perm: 'openingHours.manageOwn' }),
       item('announcements', '/aankondigingen', { perm: 'home.edit' }),
       item('linkPage', '/linkpagina', { perm: 'home.edit' }),

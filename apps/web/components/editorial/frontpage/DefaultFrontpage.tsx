@@ -9,7 +9,9 @@ import {
 } from "@/lib/frontpage/registry";
 import { HERO_WEEK_NEXT_LIMIT_DEFAULT } from "@/lib/calendar/heroWeek";
 import { organiserName } from "@/lib/calendar/organiser";
+import { pickInitialSloganIndex, resolveDisplaySlogans } from "@/lib/slogans";
 import { HeroWeek } from "./HeroWeek";
+import { HeroSlogan } from "./HeroSlogan";
 import { Cta, ctaFrom, type FrontpageProps } from "./context";
 
 /**
@@ -38,6 +40,8 @@ export function DefaultFrontpage({
   upcomingEvents,
   weekEvents,
   signedIn,
+  slogansConfig,
+  user,
 }: FrontpageProps) {
   const nl = locale === "nl";
   // De registry is de bron van de opties; zo blijft "wat staat er als er nog
@@ -55,9 +59,26 @@ export function DefaultFrontpage({
     : HERO_WEEK_NEXT_LIMIT_DEFAULT;
 
   const eyebrow = pickField(values, "eyebrow", locale) ?? "Vlaamse Technische Kring · KU Leuven";
-  const title = pickField(values, "title", locale) ?? (nl ? "De thuis voor" : "The home for");
-  const accent = pickField(values, "accent", locale) ?? (nl ? "ingenieurs" : "engineers");
-  const tail = pickField(values, "tail", locale) ?? (nl ? "in Leuven." : "in Leuven.");
+  const fallbackTitle = pickField(values, "title", locale) ?? (nl ? "De thuis voor" : "The home for");
+  const fallbackAccent = pickField(values, "accent", locale) ?? (nl ? "ingenieurs" : "engineers");
+  const fallbackTail = pickField(values, "tail", locale) ?? (nl ? "in Leuven." : "in Leuven.");
+
+  const displaySlogans = resolveDisplaySlogans({
+    config: slogansConfig,
+    locale,
+    user,
+    fallback: {
+      title: fallbackTitle,
+      accent: fallbackAccent,
+      tail: fallbackTail,
+    },
+  });
+
+  const initialIndex = pickInitialSloganIndex({
+    displaySlogans,
+    slogansConfig,
+    now,
+  });
   const subtitle =
     pickField(values, "subtitle", locale) ??
     (nl
@@ -136,11 +157,11 @@ export function DefaultFrontpage({
           <span className="dot" />
           {eyebrow}
         </div>
-        <h1>
-          {title} <span className="serif">{accent}</span>
-          <br />
-          {tail}
-        </h1>
+        <HeroSlogan
+          slogans={displaySlogans}
+          intervalSeconds={slogansConfig?.intervalSeconds ?? 8}
+          initialIndex={initialIndex}
+        />
         <p className="hero-sub">{subtitle}</p>
         <div className="hero-cta">
           <Cta cta={primary} className="btn btn-primary arrow" />

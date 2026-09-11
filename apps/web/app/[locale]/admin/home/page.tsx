@@ -113,6 +113,25 @@ export default async function AdminHome({
     <div className="space-y-6">
       <h1 className="text-2xl font-semibold">{locale === "nl" ? "Homepagina" : "Homepage"}</h1>
 
+      <Card className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h2 className="mb-1 font-semibold">
+            {locale === "nl" ? "Landing page slogans" : "Landing page slogans"}
+          </h2>
+          <p className="text-sm text-[#5c667f]">
+            {locale === "nl"
+              ? "Beheer de roterende slogans, het gele accentwoord en de persoonlijke slogan voor ingelogde leden op de startpagina."
+              : "Manage the rotating slogans, the yellow accent word, and personalized member slogans on the landing page."}
+          </p>
+        </div>
+        <Link
+          href={`${base}/admin/slogans`}
+          className="inline-flex items-center justify-center rounded-lg bg-vtk-blue px-4 py-2 text-sm font-medium text-white hover:bg-vtk-blue/90 self-start sm:self-auto shrink-0"
+        >
+          {locale === "nl" ? "Slogans beheren" : "Manage slogans"} →
+        </Link>
+      </Card>
+
       <Card className="p-5">
         <h2 className="mb-1 font-semibold">{locale === "nl" ? "Wat we doen" : "What we do"}</h2>
         <p className="mb-5 text-sm text-[#5c667f]">

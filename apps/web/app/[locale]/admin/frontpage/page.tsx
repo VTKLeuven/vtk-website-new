@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
@@ -105,6 +106,20 @@ export default async function AdminFrontpage({
             : "The dark block at the top of the homepage. Each front page below is its own design with its own fields; you schedule one around an event and afterwards the default returns by itself. Building a new front page is a job for IT."}
         </p>
       </header>
+
+      <div className="rounded-xl border border-vtk-blue/15 bg-vtk-blue-soft/50 p-4 text-sm text-vtk-blue flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <span>
+          {nl
+            ? "Tip: De slogans op de standaard landing page (inclusief roterende en persoonlijke slogans voor leden) beheer je centraal onder Slogans."
+            : "Tip: The slogans on the default landing page (including rotating and personalized member slogans) are managed under Slogans."}
+        </span>
+        <Link
+          href={`${locale === "nl" ? "" : "/en"}/admin/slogans`}
+          className="font-medium underline shrink-0 hover:text-vtk-blue/80"
+        >
+          {nl ? "Naar Slogans" : "Go to Slogans"} →
+        </Link>
+      </div>
 
       {orphans.length > 0 ? (
         <p className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">

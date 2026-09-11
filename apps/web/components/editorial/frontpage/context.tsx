@@ -80,6 +80,8 @@ export type FrontpageProps = {
   /** Of er iemand aangemeld is. De ster van het weekoverzicht hangt eraan. */
   signedIn: boolean;
   partners: FrontpagePartner[];
+  slogansConfig?: import("@/lib/slogans").SlogansConfig | null;
+  user?: { name: string; firstName: string | null } | null;
 };
 
 /**
