@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { Locale } from "@vtk/i18n";
 import type { FieldValues } from "@/lib/frontpage/fields";
 import type { HeroWeekPlacement } from "@/lib/calendar/heroWeek";
+import type { ResolvedSlogans } from "@/lib/slogans";
 
 /**
  * What every front page component receives.
@@ -80,8 +81,12 @@ export type FrontpageProps = {
   /** Of er iemand aangemeld is. De ster van het weekoverzicht hangt eraan. */
   signedIn: boolean;
   partners: FrontpagePartner[];
-  slogansConfig?: import("@/lib/slogans").SlogansConfig | null;
-  user?: { name: string; firstName: string | null } | null;
+  /**
+   * De slogans voor deze bezoeker, al opgelost op de server: welke bij haar
+   * publiek en bij dit dagdeel passen, in de volgorde waarin de hero ze toont.
+   * Enkel de standaardpagina roteert; een campagne heeft haar eigen titel.
+   */
+  slogans: ResolvedSlogans;
 };
 
 /**

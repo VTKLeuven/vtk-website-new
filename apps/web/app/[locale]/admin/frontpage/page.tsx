@@ -110,8 +110,8 @@ export default async function AdminFrontpage({
       <div className="rounded-xl border border-vtk-blue/15 bg-vtk-blue-soft/50 p-4 text-sm text-vtk-blue flex flex-col sm:flex-row sm:items-center justify-between gap-2">
         <span>
           {nl
-            ? "Tip: De slogans op de standaard landing page (inclusief roterende en persoonlijke slogans voor leden) beheer je centraal onder Slogans."
-            : "Tip: The slogans on the default landing page (including rotating and personalized member slogans) are managed under Slogans."}
+            ? "De titel van de standaardpagina staat hier niet: dat is een lijst roterende slogans, met de begroeting voor leden erbij, en die beheer je onder Slogans."
+            : "The headline of the default front page is not here: it is a list of rotating slogans, greeting for members included, managed under Slogans."}
         </span>
         <Link
           href={`${locale === "nl" ? "" : "/en"}/admin/slogans`}

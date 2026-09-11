@@ -24,13 +24,11 @@ export default async function AdminSlogans({
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold">
-          {locale === "nl" ? "Landing page slogans" : "Landing page slogans"}
-        </h1>
+        <h1 className="text-2xl font-semibold">{locale === "nl" ? "Slogans" : "Slogans"}</h1>
         <p className="mt-1 text-sm text-zinc-500">
           {locale === "nl"
-            ? "Beheer de slogan en de roterende ('rolling') slogans op de startpagina. Geef telkens het gele accentwoord op en stel eventueel een persoonlijke slogan in voor ingelogde leden."
-            : "Manage the headline and rotating ('rolling') slogans on the homepage. Configure the yellow accent word for each slogan and optionally set a personalized greeting for logged-in members."}
+            ? "De titel in de hero van de homepage. Eén lijst: een begroeting voor aangemelde leden opent de reeks, daarna roteren de slogans. Het gele accent zet je tussen sterretjes."
+            : "The headline in the homepage hero. One list: a greeting for signed-in members opens the sequence, then the slogans rotate. Put the yellow accent between asterisks."}
         </p>
       </header>
 

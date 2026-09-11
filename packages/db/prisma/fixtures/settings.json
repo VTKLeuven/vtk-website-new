@@ -25,45 +25,127 @@
     "value": {
       "items": [
         {
-          "id": "slogan-1",
-          "titleNl": "Ingenieurs zijn",
-          "accentNl": "superieur.",
-          "tailNl": "",
-          "titleEn": "Engineers are",
-          "accentEn": "superior.",
-          "tailEn": ""
+          "id": "opener-ochtend",
+          "nl": "Goeiemorgen, *{firstName}*.",
+          "en": "Good morning, *{firstName}*.",
+          "audience": "members",
+          "opener": true,
+          "window": "morning"
         },
         {
-          "id": "slogan-2",
-          "titleNl": "Al meer dan 100 jaar",
-          "accentNl": "thuis",
-          "tailNl": "in Leuven.",
-          "titleEn": "For over 100 years",
-          "accentEn": "at home",
-          "tailEn": "in Leuven."
+          "id": "opener-middag",
+          "nl": "Welkom terug, *{firstName}*.",
+          "en": "Welcome back, *{firstName}*.",
+          "audience": "members",
+          "opener": true,
+          "window": "afternoon"
         },
         {
-          "id": "slogan-3",
-          "titleNl": "Van aula tot fakbar,",
-          "accentNl": "jouw kring.",
-          "tailNl": "",
-          "titleEn": "From lecture hall to fakbar,",
-          "accentEn": "your society.",
-          "tailEn": ""
+          "id": "opener-avond",
+          "nl": "Goeieavond, *{firstName}*.",
+          "en": "Good evening, *{firstName}*.",
+          "audience": "members",
+          "opener": true,
+          "window": "evening"
+        },
+        {
+          "id": "opener-nacht",
+          "nl": "Nog laat bezig, *{firstName}*?",
+          "en": "Still up, *{firstName}*?",
+          "audience": "members",
+          "opener": true,
+          "window": "night"
+        },
+        {
+          "id": "slogan-thuis",
+          "nl": "De thuis voor *ingenieurs* in Leuven.",
+          "en": "The home for *engineers* in Leuven.",
+          "audience": "all",
+          "opener": false,
+          "window": "any"
+        },
+        {
+          "id": "slogan-glory",
+          "nl": "Glory, glory, *wij zijn VTK!*",
+          "en": "Glory, glory, *we are VTK!*",
+          "audience": "all",
+          "opener": false,
+          "window": "any"
+        },
+        {
+          "id": "slogan-superieur",
+          "nl": "Ingenieurs zijn *superieur*.",
+          "en": "Engineers are *superior*.",
+          "audience": "all",
+          "opener": false,
+          "window": "any"
+        },
+        {
+          "id": "slogan-verstand",
+          "nl": "Het verstand zit aan *deze kant*.",
+          "en": "The brains are on *this side*.",
+          "audience": "all",
+          "opener": false,
+          "window": "any"
+        },
+        {
+          "id": "slogan-staal",
+          "nl": "Wij zijn machines, *wij zijn van staal*.",
+          "en": "We are machines, *we are made of steel*.",
+          "audience": "all",
+          "opener": false,
+          "window": "any"
+        },
+        {
+          "id": "slogan-100jaar",
+          "nl": "Al meer dan 100 jaar *thuis* in Leuven.",
+          "en": "For over 100 years *at home* in Leuven.",
+          "audience": "all",
+          "opener": false,
+          "window": "any"
+        },
+        {
+          "id": "slogan-aula-fakbar",
+          "nl": "Van aula tot fakbar, *jouw kring*.",
+          "en": "From lecture hall to fakbar, *your society*.",
+          "audience": "all",
+          "opener": false,
+          "window": "any"
+        },
+        {
+          "id": "slogan-hoofden-benen",
+          "nl": "Met slimme hoofden en *snelle benen*.",
+          "en": "With sharp minds and *fast legs*.",
+          "audience": "all",
+          "opener": false,
+          "window": "any"
+        },
+        {
+          "id": "slogan-sfeer",
+          "nl": "Waar is de beste sfeer?\n*V-T-K!*",
+          "en": "Where is the best vibe?\n*V-T-K!*",
+          "audience": "all",
+          "opener": false,
+          "window": "any"
+        },
+        {
+          "id": "slogan-studeren-fuiven",
+          "nl": "Studeren, fuiven, lopen: *zonder ons hard te forceren*.",
+          "en": "Study, party, run: *without breaking a sweat*.",
+          "audience": "all",
+          "opener": false,
+          "window": "any"
+        },
+        {
+          "id": "slogan-winnen-feesten",
+          "nl": "Winnen doen we gauw, *feesten doen we trouw*.",
+          "en": "Quick to win, *loyal to the party*.",
+          "audience": "all",
+          "opener": false,
+          "window": "any"
         }
       ],
-      "personal": {
-        "enabled": true,
-        "titleNl": "Welkom terug,",
-        "accentNl": "{firstName}!",
-        "tailNl": "",
-        "titleEn": "Welcome back,",
-        "accentEn": "{firstName}!",
-        "tailEn": "",
-        "chancePercent": 50
-      },
-      "intervalSeconds": 8,
-      "randomizeOnReload": true
+      "intervalSeconds": 8
     }
   },
   {

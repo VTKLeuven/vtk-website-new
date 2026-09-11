@@ -1906,6 +1906,52 @@ er meerdere tegelijk klaar, dan wint de laatst gestarte; er is maar één
 frontpage. Een rij die naar een verwijderde module wijst, wordt genegeerd (de
 homepage valt terug op de standaard) en in het beheer als onbekend gemeld.
 
+### De titel van de standaard frontpage: een lijst slogans
+
+De titel in de hero is geen veld maar een **lijst** die roteert, te beheren via
+**/admin/slogans** (`Setting["home.slogans"]`). Wat er in die lijst staat, is
+kringcultuur: naast "De thuis voor ingenieurs in Leuven" ook de kreten uit het
+liedjesboek ("Glory, glory, wij zijn VTK!", "Het verstand zit aan deze kant").
+
+- **Eén tekstveld per taal, met het accent in de zin.** Het gele schuine accent
+  zet je tussen sterretjes (`Ingenieurs zijn *superieur*.`) en een enter in het
+  veld is een echte regelafbreking. Daarvoor stonden er drie velden per taal
+  (titel, accent, staart) met het accent altijd in het midden; een accent
+  vooraan, twee accenten of een kreet van één regel waren niet te schrijven,
+  terwijl de kreten die we echt gebruiken precies dat vragen.
+- **De begroeting is een gewone slogan, geen apart systeem.** Elke slogan heeft
+  een publiek (iedereen / enkel aangemelde leden / enkel bezoekers) en mag de
+  reeks *openen*. "Goeiemorgen, Jan." is dus: publiek = leden, opener = aan. Ze
+  verschijnt één keer, bij aankomst, en valt daarna uit de rotatie, want een
+  begroeting is waar wanneer je toekomt en niet elke acht seconden opnieuw.
+- **Geen kanspercentage.** De eerste versie gooide een dobbelsteen (standaard
+  50% kans op de begroeting), gevoed door de seconden van de serverklok. Dat was
+  niet te testen in het beheer, niet uit te leggen aan een redacteur, niet
+  per bezoeker (twee mensen in dezelfde seconde kregen hetzelfde) en het zou
+  bevriezen zodra de anonieme homepage ooit gecachet wordt. De regel is nu één
+  zin: **de eerste opener in de lijst die past bij het publiek en het dagdeel
+  opent de reeks.**
+- **Dagdeel in plaats van kans.** Een slogan kan beperkt worden tot ochtend,
+  middag, avond of nacht (Brusselse klok). Zo variëren de begroetingen op iets
+  dat waar is in plaats van op toeval: "Goeiemorgen", "Welkom terug",
+  "Goeieavond", "Nog laat bezig?". Het geldt voor elke slogan, niet enkel voor
+  begroetingen; zo blijft het één begrip in het beheer.
+- **De lijst kan niet leeg.** De hero heeft een titel nodig, dus de laatste
+  slogan is niet te verwijderen en opslaan met een lege lijst wordt geweigerd.
+  Anders zette de code stilletjes haar eigen zaailijst terug.
+- **De reeks staat even groot, op maat van de langste slogan.** De hero is
+  getekend voor een handvol woorden op 80px; "Studeren, fuiven, lopen: zonder
+  ons hard te forceren" loopt daar over vijf regels. Omdat de hoogte vastligt op
+  de langste slogan (anders springt de halve hero bij elke wissel), zou de hele
+  hero daarnaar groeien. Daarom zakt de tekengrootte mee met de langste regel,
+  in drie stappen, voor de hele reeks tegelijk: een titel die per slogan van
+  grootte verspringt, leest als een fout. Het beheerscherm zegt welke stap
+  actief is, zodat "korter schrijven" een zichtbare beloning heeft.
+- **De rotatie is te stoppen.** Ze pauzeert bij hover, bij focus in de hero, in
+  een verborgen tabblad en bij `prefers-reduced-motion`, en er staat een
+  pauzeknop naast het bovenschrift (WCAG 2.2.2). De `h1` draagt altijd één
+  slogan; de andere staan onzichtbaar in een stapel die enkel de hoogte bepaalt.
+
 ### Aftermovies op de homepage
 
 - Dezelfde `media.aftermovies`-instelling als de /media-pagina, te beheren via

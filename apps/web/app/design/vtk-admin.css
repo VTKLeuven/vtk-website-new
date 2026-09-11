@@ -1095,3 +1095,45 @@ a.vtk-shortcut-tile:hover {
   background: var(--paper);
   color: var(--body);
 }
+
+/* Het voorbeeld van de hero-slogans in /admin/slogans.
+
+   Dezelfde donkere grond, hetzelfde gele schuine accent en dezelfde
+   regelafbrekingen als de echte hero, zodat een redacteur ziet wat er op de
+   site komt te staan. Kleiner en zonder foto: het gaat om de tekst, en de type
+   van de hero (tot 80px) zou hier het scherm opvreten. De hoogte ligt vast,
+   dus het paneel springt niet bij een slogan van twee regels. */
+.vtk-slogan-preview {
+  display: grid;
+  align-content: center;
+  min-height: 132px;
+  padding: 20px 22px;
+  border-radius: 16px;
+  background: var(--navy);
+  color: var(--paper);
+  font-size: clamp(22px, 3.2vw, 30px);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+.vtk-slogan-preview .vtk-slogan-line {
+  display: block;
+}
+
+.vtk-slogan-preview .vtk-slogan-accent {
+  color: var(--yellow);
+  font-family: var(--serif);
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* Dezelfde maatvoering als de hero (zie `sloganSizeTier`), zodat het voorbeeld
+   ook toont dat een lange slogan de hele reeks kleiner zet. */
+.vtk-slogan-preview[data-size="m"] {
+  font-size: clamp(20px, 2.6vw, 25px);
+}
+
+.vtk-slogan-preview[data-size="s"] {
+  font-size: clamp(17px, 2.1vw, 20px);
+}

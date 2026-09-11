@@ -1,56 +1,81 @@
 "use client";
 
-import { useId, useState } from "react";
-import { Button, Card, Input, Label } from "@vtk/ui";
+import { useEffect, useId, useMemo, useState, useSyncExternalStore } from "react";
+import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
+import { Button, Card, ConfirmDialog, Input, Label, Select, Textarea } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
+import { IconButton } from "@/components/ui/IconButton";
 import { SaveForm } from "@/components/ui/SaveForm";
+import { saveErrorMessages } from "@/lib/saveMessages";
 import { saveSlogansAction } from "@/app/actions/slogans";
 import {
-  interpolateName,
-  type PersonalSlogan,
-  type SloganItem,
+  SLOGAN_INTERVAL_MAX,
+  nextSloganIndex,
+  parseSlogan,
+  resolveSlogans,
+  sloganWindowAt,
+  type Slogan,
+  type SloganAudience,
+  type SloganLine,
   type SlogansConfig,
+  type SloganWindow,
 } from "@/lib/slogans";
 
-function SloganPreviewChip({
-  title,
-  accent,
-  tail,
-}: {
-  title?: string;
-  accent?: string;
-  tail?: string;
-}) {
+/**
+ * De klok van de browser, elke minuut ververst.
+ *
+ * Via een externe store en niet via `new Date()` tijdens het renderen: de server
+ * rendert dit scherm mee, en een dagdeel dat tussen server en browser kantelt,
+ * geeft anders een hydratiefout. Vóór de hydratie is het dus `null` en toont het
+ * voorbeeld nog geen dagdeel.
+ */
+let clockStamp: number | null = null;
+
+function subscribeClock(onChange: () => void) {
+  clockStamp = Date.now();
+  onChange();
+  const timer = setInterval(() => {
+    clockStamp = Date.now();
+    onChange();
+  }, 60_000);
+  return () => clearInterval(timer);
+}
+
+const getClock = () => clockStamp;
+const getServerClock = () => null;
+
+const AUDIENCE_LABELS: Record<SloganAudience, { nl: string; en: string }> = {
+  all: { nl: "Iedereen", en: "Everyone" },
+  members: { nl: "Enkel aangemelde leden", en: "Signed-in members only" },
+  guests: { nl: "Enkel niet-aangemelde bezoekers", en: "Signed-out visitors only" },
+};
+
+const WINDOW_LABELS: Record<SloganWindow, { nl: string; en: string }> = {
+  any: { nl: "Altijd", en: "Always" },
+  morning: { nl: "Ochtend (6u-12u)", en: "Morning (6am-12pm)" },
+  afternoon: { nl: "Middag (12u-18u)", en: "Afternoon (12pm-6pm)" },
+  evening: { nl: "Avond (18u-24u)", en: "Evening (6pm-12am)" },
+  night: { nl: "Nacht (0u-6u)", en: "Night (12am-6am)" },
+};
+
+/** De slogan zoals de hero ze zet: geel schuin accent, echte regelafbrekingen. */
+function SloganLines({ lines }: { lines: SloganLine[] }) {
   return (
-    <div className="rounded-lg bg-[#0a0f1f] p-4 text-white shadow-inner font-sans">
-      <div className="text-xs uppercase tracking-wider text-white/50 mb-1">
-        Voorbeeldweergave
-      </div>
-      <div className="text-lg font-semibold leading-tight">
-        {tail ? (
-          <>
-            {title ? `${title} ` : null}
-            {accent ? (
-              <span className="serif italic text-[#FCD34D] font-normal">{accent}</span>
-            ) : null}
-            <br />
-            {tail}
-          </>
-        ) : (
-          <>
-            {title ? (
-              <>
-                {title}
-                {accent ? <br /> : null}
-              </>
-            ) : null}
-            {accent ? (
-              <span className="serif italic text-[#FCD34D] font-normal">{accent}</span>
-            ) : null}
-          </>
-        )}
-      </div>
-    </div>
+    <>
+      {lines.map((line, lineIdx) => (
+        <span className="vtk-slogan-line" key={lineIdx}>
+          {line.map((segment, idx) =>
+            segment.accent ? (
+              <span className="vtk-slogan-accent" key={idx}>
+                {segment.text}
+              </span>
+            ) : (
+              <span key={idx}>{segment.text}</span>
+            ),
+          )}
+        </span>
+      ))}
+    </>
   );
 }
 
@@ -64,74 +89,119 @@ export function SlogansEditor({
   const dict = getDictionary(locale);
   const isNl = locale === "nl";
   const baseId = useId();
+  const t = (nl: string, en: string) => (isNl ? nl : en);
 
-  const [items, setItems] = useState<SloganItem[]>(() => initialConfig.items);
-  const [personal, setPersonal] = useState<PersonalSlogan>(
+  const [items, setItems] = useState<Slogan[]>(() => initialConfig.items);
+  const [intervalSeconds, setIntervalSeconds] = useState(initialConfig.intervalSeconds);
+
+  // Voorbeeldinstellingen: welke bezoeker, welke taal, welke naam.
+  const [previewLocale, setPreviewLocale] = useState<Locale>(locale);
+  const [asMember, setAsMember] = useState(true);
+  const [previewName, setPreviewName] = useState("Jan Peeters");
+  const [focused, setFocused] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Slogan | null>(null);
+
+  const stamp = useSyncExternalStore(subscribeClock, getClock, getServerClock);
+  const now = useMemo(() => (stamp === null ? null : new Date(stamp)), [stamp]);
+
+  const previewUser = asMember
+    ? {
+        name: previewName.trim() || "Jan Peeters",
+        firstName: (previewName.trim() || "Jan Peeters").split(" ")[0] || null,
+      }
+    : null;
+
+  const resolved = useMemo(
     () =>
-      initialConfig.personal ?? {
-        enabled: true,
-        titleNl: "Welkom terug,",
-        accentNl: "{firstName}!",
-        tailNl: "",
-        titleEn: "Welcome back,",
-        accentEn: "{firstName}!",
-        tailEn: "",
-      },
-  );
-  const [intervalSeconds, setIntervalSeconds] = useState(
-    initialConfig.intervalSeconds,
-  );
-  const [randomizeOnReload, setRandomizeOnReload] = useState(
-    initialConfig.randomizeOnReload,
+      resolveSlogans({
+        config: { items, intervalSeconds },
+        locale: previewLocale,
+        user: previewUser,
+        now: now ?? new Date(0),
+      }),
+    // previewUser is elke render een nieuw object; de naam erin is wat telt.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, intervalSeconds, previewLocale, asMember, previewName, now],
   );
 
-  const [previewMemberName, setPreviewMemberName] = useState("Jan Peeters");
+  // Geen effect dat de teller terugzet wanneer de lijst korter wordt: clampen
+  // volstaat, en een effect dat enkel `setState` doet, is een extra render.
+  const [previewIndex, setPreviewIndex] = useState(0);
+  useEffect(() => {
+    if (focused || intervalSeconds <= 0 || resolved.items.length <= 1) return;
+    const timer = setTimeout(
+      () =>
+        setPreviewIndex((prev) =>
+          nextSloganIndex(prev, resolved.items.length, resolved.openerCount),
+        ),
+      Math.max(3000, intervalSeconds * 1000),
+    );
+    return () => clearTimeout(timer);
+  }, [focused, previewIndex, intervalSeconds, resolved.items.length, resolved.openerCount]);
+
+  // Wie een rij aan het bewerken is, ziet díé slogan; anders draait het voorbeeld.
+  const focusedIndex = focused ? resolved.items.findIndex((item) => item.id === focused) : -1;
+  const shown =
+    focusedIndex >= 0
+      ? resolved.items[focusedIndex]
+      : resolved.items[Math.min(previewIndex, Math.max(0, resolved.items.length - 1))];
+  const focusedHidden = Boolean(focused) && focusedIndex < 0;
 
   const addItem = () => {
-    const newItem: SloganItem = {
+    const item: Slogan = {
       id: `slogan-${Date.now()}`,
-      titleNl: "",
-      accentNl: "",
-      tailNl: "",
-      titleEn: "",
-      accentEn: "",
-      tailEn: "",
+      nl: "",
+      en: "",
+      audience: "all",
+      opener: false,
+      window: "any",
     };
-    setItems((prev) => [...prev, newItem]);
+    setItems((prev) => [...prev, item]);
   };
 
-  const removeItem = (index: number) => {
-    setItems((prev) => prev.filter((_, i) => i !== index));
-  };
+  const removeItem = (id: string) => setItems((prev) => prev.filter((item) => item.id !== id));
 
   const moveItem = (index: number, direction: -1 | 1) => {
     const target = index + direction;
     if (target < 0 || target >= items.length) return;
     setItems((prev) => {
       const copy = [...prev];
-      const temp = copy[index]!;
+      const moved = copy[index]!;
       copy[index] = copy[target]!;
-      copy[target] = temp;
+      copy[target] = moved;
       return copy;
     });
   };
 
-  const updateItem = (index: number, patch: Partial<SloganItem>) => {
+  const updateItem = (index: number, patch: Partial<Slogan>) =>
     setItems((prev) => {
       const copy = [...prev];
       copy[index] = { ...copy[index]!, ...patch };
       return copy;
     });
-  };
 
-  const serializedData = JSON.stringify({
-    items,
-    personal,
-    intervalSeconds,
-    randomizeOnReload,
-  });
+  // De hero zet de hele reeks even groot, op maat van de langste slogan; dat is
+  // het enige wat een redacteur van de lengte moet weten.
+  const size = resolved.size;
+  const sizeHint =
+    size === "l"
+      ? t(
+          "De titel staat op volle grootte. Blijft elke slogan kort, dan blijft dat zo.",
+          "The headline is at full size. As long as every slogan stays short, it stays that way.",
+        )
+      : size === "m"
+        ? t(
+            "De langste slogan is aan de lange kant, dus de hele reeks staat een maat kleiner in de hero.",
+            "The longest slogan is on the long side, so the whole sequence sits one size smaller in the hero.",
+          )
+        : t(
+            "De langste slogan is lang, dus de hele reeks staat twee maten kleiner in de hero. Kort ze in om de titel groot te houden.",
+            "The longest slogan is long, so the whole sequence sits two sizes smaller in the hero. Shorten it to keep the headline large.",
+          );
 
-  const previewFirstName = previewMemberName.trim().split(" ")[0] || "Jan";
+  const serialized = JSON.stringify({ items, intervalSeconds });
+  const empty = items.filter((item) => !item.nl.trim() && !item.en?.trim()).length;
+  const windowNow = now ? WINDOW_LABELS[sloganWindowAt(now)][isNl ? "nl" : "en"] : null;
 
   return (
     <SaveForm
@@ -139,464 +209,353 @@ export function SlogansEditor({
       className="space-y-6"
       submitLabel={dict.admin.save}
       savingLabel={dict.common.saving}
-      savedMessage={
-        isNl ? "Slogans succesvol opgeslagen" : "Slogans saved successfully"
-      }
+      savedMessage={t("Slogans opgeslagen", "Slogans saved")}
+      errorMessages={{
+        ...saveErrorMessages(locale),
+        NO_SLOGANS: t(
+          "Niet opgeslagen: er moet minstens één slogan overblijven, anders heeft de hero geen titel.",
+          "Not saved: at least one slogan must remain, otherwise the hero has no headline.",
+        ),
+        EMPTY_SLOGAN: t(
+          "Niet opgeslagen: er staat een slogan zonder tekst in de lijst.",
+          "Not saved: one of the slogans has no text.",
+        ),
+      }}
       fallbackErrorMessage={dict.common.saveError}
+      submitDisabled={items.length === 0 || empty > 0}
       resetOnSuccess={false}
     >
-      <input type="hidden" name="slogansData" value={serializedData} />
+      <input type="hidden" name="slogansData" value={serialized} />
 
-      {/* Roterende Slogans */}
+      {/* Voorbeeld */}
       <Card className="p-5 space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-vtk-blue/10 pb-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="font-semibold text-lg">
-              {isNl ? "Roterende slogans" : "Rotating slogans"}
-            </h2>
+            <h2 className="text-lg font-semibold">{t("Voorbeeld", "Preview")}</h2>
             <p className="text-sm text-[#5c667f]">
-              {isNl
-                ? "Slogans die afwisselend getoond worden op de landing page. Het accentwoord staat in geel."
-                : "Slogans displayed alternately on the landing page hero. The accent word is highlighted in yellow."}
+              {t(
+                "Zoals de hero het toont: de begroeting opent, daarna roteren de slogans.",
+                "The way the hero shows it: the greeting opens, then the slogans rotate.",
+              )}
             </p>
           </div>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={addItem}
-            className="self-start sm:self-auto text-sm"
-          >
-            + {isNl ? "Slogan toevoegen" : "Add slogan"}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex overflow-hidden rounded-full border border-vtk-blue/15 text-xs">
+              {(["nl", "en"] as const).map((code) => (
+                <button
+                  key={code}
+                  type="button"
+                  onClick={() => setPreviewLocale(code)}
+                  aria-pressed={previewLocale === code}
+                  className={`px-3 py-1 font-medium ${
+                    previewLocale === code ? "bg-vtk-ink text-white" : "text-[#5c667f]"
+                  }`}
+                >
+                  {code.toUpperCase()}
+                </button>
+              ))}
+            </div>
+            <div className="flex overflow-hidden rounded-full border border-vtk-blue/15 text-xs">
+              <button
+                type="button"
+                onClick={() => setAsMember(false)}
+                aria-pressed={!asMember}
+                className={`px-3 py-1 font-medium ${
+                  !asMember ? "bg-vtk-ink text-white" : "text-[#5c667f]"
+                }`}
+              >
+                {t("Als bezoeker", "As visitor")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setAsMember(true)}
+                aria-pressed={asMember}
+                className={`px-3 py-1 font-medium ${
+                  asMember ? "bg-vtk-ink text-white" : "text-[#5c667f]"
+                }`}
+              >
+                {t("Als lid", "As member")}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="vtk-slogan-preview" data-size={resolved.size}>
+          {shown ? <SloganLines lines={shown.lines} /> : null}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 text-xs text-[#5c667f]">
+          <span>
+            {focusedHidden
+              ? t(
+                  "Deze slogan staat nu niet op de site: ze past niet bij dit publiek of dit dagdeel.",
+                  "This slogan is not on the site right now: it does not match this audience or time of day.",
+                )
+              : focusedIndex >= 0
+                ? t("Je bewerkt deze slogan.", "You are editing this slogan.")
+                : t(
+                    `${resolved.items.length} slogan(s) in de reeks${windowNow ? `, dagdeel nu: ${windowNow.toLowerCase()}` : ""}`,
+                    `${resolved.items.length} slogan(s) in the sequence${windowNow ? `, current time of day: ${windowNow.toLowerCase()}` : ""}`,
+                  )}
+          </span>
+          {asMember ? (
+            <label className="flex items-center gap-2">
+              <span>{t("Naam van het lid", "Member name")}</span>
+              <Input
+                value={previewName}
+                onChange={(event) => setPreviewName(event.target.value)}
+                className="h-8 w-40 py-1 text-xs"
+              />
+            </label>
+          ) : null}
+        </div>
+      </Card>
+
+      {/* De lijst */}
+      <Card className="p-5 space-y-4">
+        <div className="flex flex-col gap-2 border-b border-vtk-blue/10 pb-4 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">{t("Slogans", "Slogans")}</h2>
+            <p className="text-sm text-[#5c667f]">
+              {t(
+                "Zet het gele accent tussen sterretjes: Ingenieurs zijn *superieur*. Een enter in het veld is een echte regelafbreking in de hero.",
+                "Put the yellow accent between asterisks: Engineers are *superior*. A newline in the field is a real line break in the hero.",
+              )}
+            </p>
+          </div>
+          <Button type="button" variant="ghost" onClick={addItem} className="shrink-0 text-sm">
+            <Plus size={14} aria-hidden="true" className="mr-1 inline" />
+            {t("Slogan toevoegen", "Add slogan")}
           </Button>
         </div>
 
-        {items.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-zinc-300 p-8 text-center text-sm text-zinc-500">
-            {isNl
-              ? "Nog geen slogans toegevoegd. Klik hierboven op '+ Slogan toevoegen'."
-              : "No slogans added yet. Click '+ Add slogan' above."}
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {items.map((item, idx) => (
+        <div className="space-y-3">
+          {items.map((item, idx) => {
+            const preview = parseSlogan(item.nl || item.en || "");
+            return (
               <div
                 key={item.id}
-                className="rounded-xl border border-vtk-blue/15 p-4 bg-white space-y-3"
+                className="rounded-xl border border-vtk-blue/15 bg-white p-4"
+                onFocus={() => setFocused(item.id)}
+                onBlur={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    setFocused((prev) => (prev === item.id ? null : prev));
+                  }
+                }}
               >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-vtk-blue-soft text-xs font-semibold text-vtk-blue">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex min-w-0 flex-wrap items-center gap-2">
+                    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-vtk-blue-soft text-xs font-semibold text-vtk-blue">
                       {idx + 1}
                     </span>
-                    <span className="text-xs font-medium text-zinc-500 uppercase tracking-wide">
-                      {isNl ? `Slogan ${idx + 1}` : `Slogan ${idx + 1}`}
-                    </span>
+                    {item.opener ? (
+                      <span className="rounded-md bg-vtk-ink px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                        {t("Begroeting", "Greeting")}
+                      </span>
+                    ) : null}
+                    {item.audience !== "all" ? (
+                      <span className="rounded-md bg-vtk-blue-soft px-1.5 py-0.5 text-[10px] font-semibold text-vtk-blue">
+                        {AUDIENCE_LABELS[item.audience][isNl ? "nl" : "en"]}
+                      </span>
+                    ) : null}
+                    {item.window !== "any" ? (
+                      <span className="rounded-md bg-vtk-blue-soft px-1.5 py-0.5 text-[10px] font-semibold text-vtk-blue">
+                        {WINDOW_LABELS[item.window][isNl ? "nl" : "en"]}
+                      </span>
+                    ) : null}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
+                  <div className="flex shrink-0 items-center gap-1">
+                    <IconButton
+                      label={t("Omhoog", "Move up")}
+                      srLabel={`${t("Omhoog", "Move up")}: ${item.nl || item.en || idx + 1}`}
                       onClick={() => moveItem(idx, -1)}
                       disabled={idx === 0}
-                      className="rounded p-1 text-zinc-500 hover:bg-zinc-100 disabled:opacity-30"
-                      title={isNl ? "Naar boven" : "Move up"}
-                      aria-label={isNl ? "Naar boven" : "Move up"}
                     >
-                      ▲
-                    </button>
-                    <button
-                      type="button"
+                      <ChevronUp size={16} aria-hidden="true" />
+                    </IconButton>
+                    <IconButton
+                      label={t("Omlaag", "Move down")}
+                      srLabel={`${t("Omlaag", "Move down")}: ${item.nl || item.en || idx + 1}`}
                       onClick={() => moveItem(idx, 1)}
                       disabled={idx === items.length - 1}
-                      className="rounded p-1 text-zinc-500 hover:bg-zinc-100 disabled:opacity-30"
-                      title={isNl ? "Naar beneden" : "Move down"}
-                      aria-label={isNl ? "Naar beneden" : "Move down"}
                     >
-                      ▼
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => removeItem(idx)}
-                      className="rounded p-1 text-rose-600 hover:bg-rose-50 ml-2 text-sm font-medium"
-                      title={isNl ? "Verwijderen" : "Delete"}
-                      aria-label={isNl ? "Verwijderen" : "Delete"}
+                      <ChevronDown size={16} aria-hidden="true" />
+                    </IconButton>
+                    <IconButton
+                      label={t("Verwijderen", "Delete")}
+                      srLabel={`${t("Verwijderen", "Delete")}: ${item.nl || item.en || idx + 1}`}
+                      tone="danger"
+                      onClick={() => setConfirmDelete(item)}
+                      disabled={items.length <= 1}
                     >
-                      ✕
-                    </button>
+                      <Trash2 size={16} aria-hidden="true" />
+                    </IconButton>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
                   <div className="space-y-1">
-                    <Label htmlFor={`${baseId}-t-nl-${item.id}`}>
-                      {isNl ? "Tekst vóór accent (NL)" : "Text before accent (NL)"}
-                    </Label>
-                    <Input
-                      id={`${baseId}-t-nl-${item.id}`}
-                      value={item.titleNl}
-                      onChange={(e) =>
-                        updateItem(idx, { titleNl: e.target.value })
-                      }
-                      placeholder={isNl ? "bv. Ingenieurs zijn" : "e.g. Engineers are"}
+                    <Label htmlFor={`${baseId}-nl-${item.id}`}>{t("Nederlands", "Dutch")}</Label>
+                    <Textarea
+                      id={`${baseId}-nl-${item.id}`}
+                      rows={2}
+                      value={item.nl}
+                      onChange={(event) => updateItem(idx, { nl: event.target.value })}
+                      placeholder={t("Ingenieurs zijn *superieur*.", "Ingenieurs zijn *superieur*.")}
+                      className="min-h-0"
                     />
                   </div>
-
                   <div className="space-y-1">
-                    <Label
-                      htmlFor={`${baseId}-a-nl-${item.id}`}
-                      className="flex items-center gap-1.5"
+                    <Label htmlFor={`${baseId}-en-${item.id}`} className="text-[#5c667f]">
+                      {t("Engels (leeg = Nederlands)", "English (empty = Dutch)")}
+                    </Label>
+                    <Textarea
+                      id={`${baseId}-en-${item.id}`}
+                      rows={2}
+                      value={item.en ?? ""}
+                      onChange={(event) => updateItem(idx, { en: event.target.value })}
+                      placeholder={item.nl}
+                      className="min-h-0"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 grid gap-3 border-t border-vtk-blue/10 pt-3 sm:grid-cols-3">
+                  <div className="space-y-1">
+                    <Label htmlFor={`${baseId}-aud-${item.id}`}>{t("Publiek", "Audience")}</Label>
+                    <Select
+                      id={`${baseId}-aud-${item.id}`}
+                      value={item.audience}
+                      onChange={(event) =>
+                        updateItem(idx, { audience: event.target.value as SloganAudience })
+                      }
                     >
-                      <span>{isNl ? "Accentwoord (NL)" : "Accent word (NL)"}</span>
-                      <span className="inline-flex items-center rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900">
-                        {isNl ? "In 't geel" : "In yellow"}
+                      {(Object.keys(AUDIENCE_LABELS) as SloganAudience[]).map((value) => (
+                        <option key={value} value={value}>
+                          {AUDIENCE_LABELS[value][isNl ? "nl" : "en"]}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor={`${baseId}-win-${item.id}`}>
+                      {t("Wanneer op de dag", "Time of day")}
+                    </Label>
+                    <Select
+                      id={`${baseId}-win-${item.id}`}
+                      value={item.window}
+                      onChange={(event) =>
+                        updateItem(idx, { window: event.target.value as SloganWindow })
+                      }
+                    >
+                      {(Object.keys(WINDOW_LABELS) as SloganWindow[]).map((value) => (
+                        <option key={value} value={value}>
+                          {WINDOW_LABELS[value][isNl ? "nl" : "en"]}
+                        </option>
+                      ))}
+                    </Select>
+                  </div>
+                  <label className="flex items-start gap-2 pt-6 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={item.opener}
+                      onChange={(event) => updateItem(idx, { opener: event.target.checked })}
+                      className="mt-0.5 size-4 rounded border-zinc-300 text-vtk-blue focus:ring-vtk-blue"
+                    />
+                    <span>
+                      {t("Opent de reeks", "Opens the sequence")}
+                      <span className="block text-xs text-[#5c667f]">
+                        {t("en komt daarna niet terug", "and does not come back")}
                       </span>
-                    </Label>
-                    <Input
-                      id={`${baseId}-a-nl-${item.id}`}
-                      value={item.accentNl}
-                      onChange={(e) =>
-                        updateItem(idx, { accentNl: e.target.value })
-                      }
-                      placeholder={isNl ? "bv. superieur." : "e.g. superior."}
-                      className="border-amber-400 focus:border-amber-500"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor={`${baseId}-tail-nl-${item.id}`}>
-                      {isNl ? "Tekst na accent (NL, optioneel)" : "Text after accent (NL, optional)"}
-                    </Label>
-                    <Input
-                      id={`${baseId}-tail-nl-${item.id}`}
-                      value={item.tailNl ?? ""}
-                      onChange={(e) =>
-                        updateItem(idx, { tailNl: e.target.value })
-                      }
-                      placeholder={isNl ? "bv. in Leuven." : "e.g. in Leuven."}
-                    />
-                  </div>
+                    </span>
+                  </label>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-zinc-100">
-                  <div className="space-y-1">
-                    <Label htmlFor={`${baseId}-t-en-${item.id}`} className="text-zinc-500">
-                      {isNl ? "Tekst vóór accent (EN)" : "Text before accent (EN)"}
-                    </Label>
-                    <Input
-                      id={`${baseId}-t-en-${item.id}`}
-                      value={item.titleEn ?? ""}
-                      onChange={(e) =>
-                        updateItem(idx, { titleEn: e.target.value })
-                      }
-                      placeholder={item.titleNl || (isNl ? "Laat leeg voor NL" : "Leave empty for default")}
-                    />
-                  </div>
+                {item.opener || item.audience === "members" ? (
+                  <p className="mt-2 text-xs text-[#5c667f]">
+                    {t(
+                      "Gebruik {firstName} voor de voornaam of {name} voor de volledige naam.",
+                      "Use {firstName} for the first name or {name} for the full name.",
+                    )}
+                  </p>
+                ) : null}
 
-                  <div className="space-y-1">
-                    <Label htmlFor={`${baseId}-a-en-${item.id}`} className="text-zinc-500">
-                      {isNl ? "Accentwoord (EN)" : "Accent word (EN)"}
-                    </Label>
-                    <Input
-                      id={`${baseId}-a-en-${item.id}`}
-                      value={item.accentEn ?? ""}
-                      onChange={(e) =>
-                        updateItem(idx, { accentEn: e.target.value })
-                      }
-                      placeholder={item.accentNl || (isNl ? "Laat leeg voor NL" : "Leave empty for default")}
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor={`${baseId}-tail-en-${item.id}`} className="text-zinc-500">
-                      {isNl ? "Tekst na accent (EN)" : "Text after accent (EN)"}
-                    </Label>
-                    <Input
-                      id={`${baseId}-tail-en-${item.id}`}
-                      value={item.tailEn ?? ""}
-                      onChange={(e) =>
-                        updateItem(idx, { tailEn: e.target.value })
-                      }
-                      placeholder={item.tailNl || ""}
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-2">
-                  <SloganPreviewChip
-                    title={item.titleNl}
-                    accent={item.accentNl}
-                    tail={item.tailNl}
-                  />
-                </div>
+                {preview.length === 0 ? (
+                  <p className="mt-2 text-xs text-red-600">
+                    {t("Deze slogan heeft nog geen tekst.", "This slogan has no text yet.")}
+                  </p>
+                ) : null}
               </div>
-            ))}
-          </div>
-        )}
-      </Card>
-
-      {/* Persoonlijke slogan voor ingelogde leden */}
-      <Card className="p-5 space-y-4">
-        <div className="border-b border-vtk-blue/10 pb-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="font-semibold text-lg">
-                {isNl
-                  ? "Persoonlijke slogan voor ingelogde leden"
-                  : "Personalized slogan for logged-in members"}
-              </h2>
-              <p className="text-sm text-[#5c667f]">
-                {isNl
-                  ? "Toon een begroeting op maat met de naam of voornaam van het ingelogde lid."
-                  : "Show a customized welcome message with the member's name or first name."}
-              </p>
-            </div>
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={personal.enabled}
-                onChange={(e) =>
-                  setPersonal((prev) => ({ ...prev, enabled: e.target.checked }))
-                }
-                className="h-4 w-4 rounded border-zinc-300 text-vtk-blue focus:ring-vtk-blue"
-              />
-              <span className="text-sm font-medium">
-                {isNl ? "Ingeschakeld" : "Enabled"}
-              </span>
-            </label>
-          </div>
+            );
+          })}
         </div>
-
-        {personal.enabled ? (
-          <div className="space-y-4">
-            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-              <p className="font-semibold">
-                {isNl ? "Ondersteunde placeholders:" : "Supported placeholders:"}
-              </p>
-              <ul className="list-disc pl-5 mt-1 space-y-0.5 text-xs">
-                <li>
-                  <code className="font-bold">{`{firstName}`}</code>:{" "}
-                  {isNl
-                    ? "Voornaam van het lid (bv. Jan)"
-                    : "First name of the member (e.g. Jan)"}
-                </li>
-                <li>
-                  <code className="font-bold">{`{name}`}</code>:{" "}
-                  {isNl
-                    ? "Volledige naam van het lid (bv. Jan Peeters)"
-                    : "Full name of the member (e.g. Jan Peeters)"}
-                </li>
-              </ul>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor={`${baseId}-p-t-nl`}>
-                  {isNl ? "Tekst vóór accent (NL)" : "Text before accent (NL)"}
-                </Label>
-                <Input
-                  id={`${baseId}-p-t-nl`}
-                  value={personal.titleNl}
-                  onChange={(e) =>
-                    setPersonal((prev) => ({ ...prev, titleNl: e.target.value }))
-                  }
-                  placeholder={isNl ? "bv. Welkom terug," : "e.g. Welcome back,"}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor={`${baseId}-p-a-nl`} className="flex items-center gap-1.5">
-                  <span>{isNl ? "Accentwoord (NL)" : "Accent word (NL)"}</span>
-                  <span className="inline-flex items-center rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-900">
-                    {isNl ? "In 't geel" : "In yellow"}
-                  </span>
-                </Label>
-                <Input
-                  id={`${baseId}-p-a-nl`}
-                  value={personal.accentNl}
-                  onChange={(e) =>
-                    setPersonal((prev) => ({ ...prev, accentNl: e.target.value }))
-                  }
-                  placeholder={isNl ? "bv. {firstName}!" : "e.g. {firstName}!"}
-                  className="border-amber-400 focus:border-amber-500 font-mono"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor={`${baseId}-p-tail-nl`}>
-                  {isNl ? "Tekst na accent (NL, optioneel)" : "Text after accent (NL, optional)"}
-                </Label>
-                <Input
-                  id={`${baseId}-p-tail-nl`}
-                  value={personal.tailNl ?? ""}
-                  onChange={(e) =>
-                    setPersonal((prev) => ({ ...prev, tailNl: e.target.value }))
-                  }
-                  placeholder={isNl ? "bv. bij VTK." : "e.g. at VTK."}
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-zinc-100">
-              <div className="space-y-1">
-                <Label htmlFor={`${baseId}-p-t-en`} className="text-zinc-500">
-                  {isNl ? "Tekst vóór accent (EN)" : "Text before accent (EN)"}
-                </Label>
-                <Input
-                  id={`${baseId}-p-t-en`}
-                  value={personal.titleEn ?? ""}
-                  onChange={(e) =>
-                    setPersonal((prev) => ({ ...prev, titleEn: e.target.value }))
-                  }
-                  placeholder={personal.titleNl}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor={`${baseId}-p-a-en`} className="text-zinc-500">
-                  {isNl ? "Accentwoord (EN)" : "Accent word (EN)"}
-                </Label>
-                <Input
-                  id={`${baseId}-p-a-en`}
-                  value={personal.accentEn ?? ""}
-                  onChange={(e) =>
-                    setPersonal((prev) => ({ ...prev, accentEn: e.target.value }))
-                  }
-                  placeholder={personal.accentNl}
-                  className="font-mono"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor={`${baseId}-p-tail-en`} className="text-zinc-500">
-                  {isNl ? "Tekst na accent (EN)" : "Text after accent (EN)"}
-                </Label>
-                <Input
-                  id={`${baseId}-p-tail-en`}
-                  value={personal.tailEn ?? ""}
-                  onChange={(e) =>
-                    setPersonal((prev) => ({ ...prev, tailEn: e.target.value }))
-                  }
-                  placeholder={personal.tailNl ?? ""}
-                />
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-zinc-100 space-y-1">
-              <Label htmlFor={`${baseId}-p-chance`} className="font-medium text-sm">
-                {isNl
-                  ? "Weergavekans persoonlijke slogan bij bezoek / herladen"
-                  : "Personal slogan chance on page visit / reload"}
-              </Label>
-              <div className="flex items-center gap-3">
-                <Input
-                  id={`${baseId}-p-chance`}
-                  type="number"
-                  min={0}
-                  max={100}
-                  value={personal.chancePercent ?? 50}
-                  onChange={(e) => {
-                    const val = Number(e.target.value);
-                    setPersonal((prev) => ({
-                      ...prev,
-                      chancePercent: Number.isFinite(val)
-                        ? Math.max(0, Math.min(100, val))
-                        : 50,
-                    }));
-                  }}
-                  className="w-24"
-                />
-                <span className="text-xs text-zinc-500">
-                  {isNl
-                    ? `% kans (standaard 50% = 50% kans op persoonlijke begroeting, 50% op een roterende slogan).`
-                    : `% chance (default 50% = 50% chance for personal greeting, 50% for rotating slogans).`}
-                </span>
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <div className="flex items-center gap-2 mb-2 text-xs text-zinc-500">
-                <span>{isNl ? "Voorbeeld-lid naam:" : "Preview member name:"}</span>
-                <input
-                  type="text"
-                  value={previewMemberName}
-                  onChange={(e) => setPreviewMemberName(e.target.value)}
-                  className="rounded border border-zinc-200 px-2 py-0.5 text-xs text-zinc-800"
-                />
-              </div>
-              <SloganPreviewChip
-                title={interpolateName(personal.titleNl, previewMemberName, previewFirstName)}
-                accent={interpolateName(personal.accentNl, previewMemberName, previewFirstName)}
-                tail={interpolateName(personal.tailNl, previewMemberName, previewFirstName)}
-              />
-            </div>
-          </div>
-        ) : (
-          <p className="text-sm text-zinc-500 italic">
-            {isNl
-              ? "Persoonlijke slogan is uitgeschakeld. Ingelogde leden zien dezelfde roterende slogans als gewone bezoekers."
-              : "Personalized slogan is disabled. Logged-in members see the same slogans as regular visitors."}
-          </p>
-        )}
       </Card>
 
-      {/* Rotatie instellingen */}
-      <Card className="p-5 space-y-4">
+      {/* Rotatie */}
+      <Card className="space-y-3 p-5">
         <div>
-          <h2 className="font-semibold text-lg">
-            {isNl ? "Rotatie-instellingen" : "Rotation settings"}
-          </h2>
+          <h2 className="text-lg font-semibold">{t("Rotatie", "Rotation")}</h2>
           <p className="text-sm text-[#5c667f]">
-            {isNl
-              ? "Kies hoe vaak de slogan automatisch wisselt en of de volgorde willekeurig is bij herladen."
-              : "Choose how often the slogan rotates and whether the start order is randomized on page reload."}
+            {t(
+              "Hoe lang elke slogan blijft staan. De reeks begint altijd bij het begin, dus wat je bovenaan zet, ziet iedereen het eerst.",
+              "How long each slogan stays. The sequence always starts at the top, so whatever you put first is what everyone sees first.",
+            )}
           </p>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-vtk-blue/10">
-          <div className="space-y-1">
-            <Label htmlFor={`${baseId}-interval`}>
-              {isNl
-                ? "Wisseltijd in seconden (automatische rotatie)"
-                : "Rotation interval in seconds"}
-            </Label>
-            <div className="flex items-center gap-3">
-              <Input
-                id={`${baseId}-interval`}
-                type="number"
-                min={0}
-                max={60}
-                value={intervalSeconds}
-                onChange={(e) => setIntervalSeconds(Number(e.target.value) || 0)}
-                className="w-28"
-              />
-              <span className="text-xs text-zinc-500">
-                {intervalSeconds === 0
-                  ? isNl
-                    ? "0 = alleen bij herladen van de pagina wisselen"
-                    : "0 = only rotate upon page reload"
-                  : isNl
-                    ? `Wisselt elke ${intervalSeconds} seconden`
-                    : `Rotates every ${intervalSeconds} seconds`}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center">
-            <label className="flex items-center gap-2 cursor-pointer mt-4 sm:mt-0">
-              <input
-                type="checkbox"
-                checked={randomizeOnReload}
-                onChange={(e) => setRandomizeOnReload(e.target.checked)}
-                className="h-4 w-4 rounded border-zinc-300 text-vtk-blue focus:ring-vtk-blue"
-              />
-              <span className="text-sm">
-                {isNl
-                  ? "Willekeurige start-slogan bij het herladen van de pagina"
-                  : "Random initial slogan on page reload"}
-              </span>
-            </label>
-          </div>
+        <p className="text-sm text-[#5c667f]">
+          {sizeHint}
+        </p>
+        <div className="flex flex-wrap items-center gap-3 border-t border-vtk-blue/10 pt-3">
+          <Label htmlFor={`${baseId}-interval`} className="sr-only">
+            {t("Wisseltijd in seconden", "Rotation interval in seconds")}
+          </Label>
+          <Input
+            id={`${baseId}-interval`}
+            type="number"
+            min={0}
+            max={SLOGAN_INTERVAL_MAX}
+            value={intervalSeconds}
+            onChange={(event) => setIntervalSeconds(Number(event.target.value) || 0)}
+            className="w-24"
+          />
+          <span className="text-xs text-[#5c667f]">
+            {intervalSeconds === 0
+              ? t(
+                  "0 = niet roteren; enkel de eerste slogan blijft staan.",
+                  "0 = no rotation; only the first slogan stays.",
+                )
+              : t(
+                  `Wisselt elke ${intervalSeconds} seconden (minimum 3).`,
+                  `Rotates every ${intervalSeconds} seconds (minimum 3).`,
+                )}
+          </span>
         </div>
       </Card>
+
+      <ConfirmDialog
+        open={confirmDelete !== null}
+        title={t("Slogan verwijderen?", "Delete slogan?")}
+        description={
+          <>
+            <span className="block font-medium text-vtk-ink">
+              {confirmDelete?.nl || confirmDelete?.en}
+            </span>
+            <span className="mt-1 block">
+              {t(
+                "Ze verdwijnt uit de rotatie zodra je opslaat. De andere slogans blijven staan.",
+                "It leaves the rotation as soon as you save. The other slogans stay.",
+              )}
+            </span>
+          </>
+        }
+        confirmLabel={t("Verwijderen", "Delete")}
+        cancelLabel={t("Annuleren", "Cancel")}
+        onConfirm={() => {
+          if (confirmDelete) removeItem(confirmDelete.id);
+          setConfirmDelete(null);
+        }}
+        onCancel={() => setConfirmDelete(null)}
+      />
     </SaveForm>
   );
 }

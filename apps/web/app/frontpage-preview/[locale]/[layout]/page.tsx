@@ -7,6 +7,9 @@ import type { Locale } from "@vtk/i18n";
 import { publicUrl } from "@/lib/storage";
 import { readFieldValues } from "@/lib/frontpage/fields";
 import { frontpagePhoto, getFrontpageModule } from "@/lib/frontpage/registry";
+import { legacyHeroFrom } from "@/lib/frontpage/resolve";
+import { readSlogansSetting, resolveSlogans } from "@/lib/slogans";
+import { splitFullName } from "@vtk/auth";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
 import { publicInterestCounts, viewerInterests } from "@/lib/calendar/interest";
 import {
@@ -60,7 +63,7 @@ export default async function FrontpagePreview({
   // Dezelfde lezing als de homepage, tot en met het venster dat een dag
   // terugkijkt: een voorbeeld dat andere evenementen toont dan de echte pagina,
   // is geen voorbeeld. Zie lib/frontpage/events.ts.
-  const [row, calendarEvents, partners] = await Promise.all([
+  const [row, calendarEvents, partners, sloganSetting] = await Promise.all([
     prisma.frontpage.findUnique({ where: { layout } }),
     viewerAudienceFilter().then((audiences) =>
       prisma.calendarEvent.findMany({
@@ -79,6 +82,7 @@ export default async function FrontpagePreview({
       orderBy: [{ order: "asc" }, { name: "asc" }],
       take: 12,
     }),
+    prisma.setting.findUnique({ where: { key: "home.slogans" } }),
   ]);
 
   const eventIds = calendarEvents.map((event) => event.id);
@@ -90,6 +94,19 @@ export default async function FrontpagePreview({
   const upcomingEvents = calendarEvents.filter((event) => event.start >= now);
 
   const values = readFieldValues(row?.values, layoutModule.fields);
+  // Dezelfde oplossing als de homepage, met de beheerder als het aangemelde lid:
+  // een voorbeeld dat de begroeting wegliet, verzweeg precies wat er als eerste
+  // op het scherm komt.
+  const slogans = resolveSlogans({
+    config: readSlogansSetting(sloganSetting?.value),
+    locale,
+    user: {
+      name: session.user.name,
+      firstName: splitFullName(session.user.name).firstName || null,
+    },
+    now,
+    fallback: legacyHeroFrom(row?.values),
+  });
   const heroPhoto = frontpagePhoto(layoutModule, publicUrl(values.photo));
   const style = { "--home-hero-photo": `url("${heroPhoto}")` } as CSSProperties;
 
@@ -113,6 +130,7 @@ export default async function FrontpagePreview({
             weekEvents={toFrontpageEvents(calendarEvents, interested, viewerInterestIds)}
             signedIn
             partners={partners}
+            slogans={slogans}
           />
         </div>
       </ToastProvider>

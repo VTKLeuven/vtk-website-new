@@ -10,7 +10,35 @@ import {
 export type ResolvedFrontpage = {
   module: FrontpageModule;
   values: FieldValues;
+  /**
+   * De hero-titel zoals die vóór de slogans in `Frontpage.values` stond.
+   *
+   * Die velden zijn uit de registry gehaald, dus `values` bevat ze niet meer,
+   * maar een site die er ooit een eigen titel in typte mag die niet zomaar zien
+   * verdwijnen. `resolveSlogans` gebruikt dit enkel wanneer er geen enkele
+   * slogan overblijft, wat in de praktijk betekent: zolang de instelling
+   * `home.slogans` niet bestaat. Vanaf de eerste keer opslaan in
+   * /admin/slogans wordt hier niet meer naar gekeken.
+   */
+  legacyHero: { nl: string; en?: string } | null;
 };
+
+/** Dezelfde samenstelling als de migratie in lib/slogans.ts, op de ruwe JSON. */
+export function legacyHeroFrom(values: unknown): { nl: string; en?: string } | null {
+  if (!values || typeof values !== "object" || Array.isArray(values)) return null;
+  const obj = values as Record<string, unknown>;
+  const text = (key: string) => (typeof obj[key] === "string" ? (obj[key] as string).trim() : "");
+  const compose = (title: string, accent: string, tail: string) => {
+    const head = accent ? `${title ? `${title} ` : ""}*${accent}*` : title;
+    if (!head) return tail;
+    if (!tail) return title && accent ? `${title}\n*${accent}*` : head;
+    return `${head}\n${tail}`;
+  };
+  const nl = compose(text("titleNl"), text("accentNl"), text("tailNl"));
+  const en = compose(text("titleEn"), text("accentEn"), text("tailEn"));
+  if (!nl && !en) return null;
+  return { nl: nl || en, en: en || undefined };
+}
 
 export type FrontpageStatus = "live" | "scheduled" | "expired" | "off";
 
@@ -91,8 +119,13 @@ export async function resolveFrontpage(now = new Date()): Promise<ResolvedFrontp
   const layoutModule =
     (chosen && getFrontpageModule(chosen.layout)) ?? getFrontpageModule(DEFAULT_FRONTPAGE_ID)!;
 
+  // De oude hero-tekst hoort bij de standaardpagina, ook wanneer een campagne de
+  // hero overneemt: die heeft haar eigen titelvelden en roteert niet.
+  const defaultRow = rows.find((row) => row.layout === DEFAULT_FRONTPAGE_ID);
+
   return {
     module: layoutModule,
     values: chosen ? readFieldValues(chosen.values, layoutModule.fields) : {},
+    legacyHero: legacyHeroFrom(defaultRow?.values),
   };
 }

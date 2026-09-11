@@ -14,7 +14,7 @@ import { readBarStatus } from "@/lib/elixir/status";
 import { publicUrl } from "@/lib/storage";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { splitFullName } from "@vtk/auth";
-import { readSlogansSetting } from "@/lib/slogans";
+import { readSlogansSetting, resolveSlogans } from "@/lib/slogans";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
 import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar";
 import { CalendarPlusIcon } from "@/components/ui/icons";
@@ -253,13 +253,22 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const defaultEventImage =
     publicUrl((map.get(DEFAULT_EVENT_IMAGE_SETTING) as { imageKey?: string | null } | undefined)?.imageKey) ??
     BUILTIN_DEFAULT_EVENT_IMAGE;
-  const slogansConfig = readSlogansSetting(map.get("home.slogans"));
   const user = session?.user
     ? {
         name: session.user.name,
         firstName: splitFullName(session.user.name).firstName || null,
       }
     : null;
+  // Op de server opgelost, met dezelfde `now` als de rest van de pagina: welke
+  // slogans bij dit publiek en dit dagdeel horen, ligt dan vast voor de HTML
+  // vertrekt en is in de browser exact hetzelfde. Zie lib/slogans.ts.
+  const slogans = resolveSlogans({
+    config: readSlogansSetting(map.get("home.slogans")),
+    locale,
+    user,
+    now,
+    fallback: frontpage.legacyHero,
+  });
 
   // The front page carries its own background photo as a field. It goes into a
   // custom property instead of the stylesheet so swapping it is an upload rather
@@ -399,8 +408,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           weekEvents={toFrontpageEvents(calendarEvents, interested, viewerInterestIds)}
           signedIn={session !== null}
           partners={partners}
-          slogansConfig={slogansConfig}
-          user={user}
+          slogans={slogans}
         />
 
         <section className="quick">

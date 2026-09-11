@@ -174,7 +174,13 @@ the design language into the application instead of copying mockup content.
   gradients, decorative blobs, nested cards, or oversized explanatory text.
 - Hero (homepage): a full-bleed photo under a navy scrim (heaviest top-left,
   behind the headline) carries light copy, a yellow italic-serif accent, and the
-  agenda beside it. That agenda is either the week overview (`.hero-week`, the
+  agenda beside it. The headline is not a field but a rotating list of slogans
+  from /admin/slogans (`lib/slogans.ts`); the accent sits inside the sentence as
+  `*sterretjes*`. All slogans sit in an invisible stack behind the `h1` so the
+  block keeps the height of the longest and nothing below it moves on a switch,
+  and the whole sequence shares one type size derived from that longest line. Do
+  not put the headline back in the front page fields, and do not let it rotate
+  without a pause control. See `docs/design-decisions.md`. That agenda is either the week overview (`.hero-week`, the
   default) or the older list of upcoming events (`.hero-cal`); an editor picks
   which in /admin/frontpage. The week overview deliberately has **no panel**: it
   reads on a wide, borderless gradient in the scrim (`.hero-week-wash`) that

@@ -1,312 +1,257 @@
 import { describe, expect, it } from "vitest";
 import {
-  interpolateName,
-  pickInitialSloganIndex,
-  readSlogansSetting,
-  resolveDisplaySlogans,
   DEFAULT_SLOGANS_CONFIG,
-  DEFAULT_PERSONAL_SLOGAN,
+  interpolateName,
+  nextSloganIndex,
+  parseSlogan,
+  readSlogansSetting,
+  resolveSlogans,
+  sloganPlainText,
+  sloganWindowAt,
   type SlogansConfig,
 } from "@/lib/slogans";
 
+const member = { name: "Jan Peeters", firstName: "Jan" };
+
+/** Een instant op de Brusselse wandklok, zodat de dagdelen testbaar zijn. */
+function at(hour: number): Date {
+  // Januari: winteruur, dus Brussel = UTC+1.
+  return new Date(Date.UTC(2026, 0, 15, hour - 1, 30));
+}
+
+function config(items: SlogansConfig["items"], intervalSeconds = 8): SlogansConfig {
+  return { items, intervalSeconds };
+}
+
+const plain = (nl: string, overrides: Partial<SlogansConfig["items"][number]> = {}) => ({
+  id: nl.slice(0, 12),
+  nl,
+  audience: "all" as const,
+  opener: false,
+  window: "any" as const,
+  ...overrides,
+});
+
 describe("slogans", () => {
-  describe("interpolateName", () => {
-    it("replaces {firstName} and {name} correctly", () => {
-      expect(
-        interpolateName("Welkom terug, {firstName}!", "Jan Peeters", "Jan"),
-      ).toBe("Welkom terug, Jan!");
-      expect(
-        interpolateName("Hallo {name}, jij bent top", "Jan Peeters", "Jan"),
-      ).toBe("Hallo Jan Peeters, jij bent top");
-      expect(
-        interpolateName("{firstName} ({name})", "Marie Dupont", "Marie"),
-      ).toBe("Marie (Marie Dupont)");
+  describe("parseSlogan", () => {
+    it("maakt van sterretjes een accent", () => {
+      expect(parseSlogan("Ingenieurs zijn *superieur*.")).toEqual([
+        [
+          { text: "Ingenieurs zijn ", accent: false },
+          { text: "superieur", accent: true },
+          { text: ".", accent: false },
+        ],
+      ]);
     });
 
-    it("handles null or empty templates", () => {
-      expect(interpolateName("", "Jan", "Jan")).toBe("");
+    it("laat het accent vooraan, achteraan en twee keer toe", () => {
+      expect(parseSlogan("*Glory*, glory, *wij zijn VTK!*")).toEqual([
+        [
+          { text: "Glory", accent: true },
+          { text: ", glory, ", accent: false },
+          { text: "wij zijn VTK!", accent: true },
+        ],
+      ]);
+    });
+
+    it("maakt van een enter een tweede regel", () => {
+      expect(parseSlogan("Waar is de beste sfeer?\n*V-T-K!*")).toHaveLength(2);
+    });
+
+    it("laat een los sterretje staan in plaats van stuk te gaan", () => {
+      expect(parseSlogan("Halve *slogan")).toEqual([[{ text: "Halve *slogan", accent: false }]]);
+    });
+
+    it("negeert lege regels", () => {
+      expect(parseSlogan("\n\nVTK\n\n")).toEqual([[{ text: "VTK", accent: false }]]);
+    });
+
+    it("sloganPlainText geeft de zin zonder opmaak terug", () => {
+      expect(sloganPlainText(parseSlogan("Ingenieurs zijn *superieur*."))).toBe(
+        "Ingenieurs zijn superieur.",
+      );
+    });
+  });
+
+  describe("interpolateName", () => {
+    it("vervangt {firstName} en {name}", () => {
+      expect(interpolateName("Welkom terug, {firstName}!", "Jan Peeters", "Jan")).toBe(
+        "Welkom terug, Jan!",
+      );
+      expect(interpolateName("Hallo {name}", "Jan Peeters", "Jan")).toBe("Hallo Jan Peeters");
+    });
+
+    it("valt terug op de andere naam als er maar één is", () => {
+      expect(interpolateName("{firstName}", "Jan Peeters", null)).toBe("Jan Peeters");
+      expect(interpolateName("{name}", null, "Jan")).toBe("Jan");
+    });
+
+    it("geeft een lege tekst terug voor een leeg sjabloon", () => {
       expect(interpolateName(null, "Jan", "Jan")).toBe("");
       expect(interpolateName(undefined, "Jan", "Jan")).toBe("");
     });
+  });
 
-    it("falls back gracefully when user name is missing", () => {
-      expect(interpolateName("Welkom, {firstName}!", null, null)).toBe(
-        "Welkom, {firstName}!",
-      );
-      expect(interpolateName("Welkom, {name}!", null, "Jan")).toBe(
-        "Welkom, Jan!",
-      );
+  describe("sloganWindowAt", () => {
+    it("verdeelt de dag in vier", () => {
+      expect(sloganWindowAt(at(3))).toBe("night");
+      expect(sloganWindowAt(at(9))).toBe("morning");
+      expect(sloganWindowAt(at(14))).toBe("afternoon");
+      expect(sloganWindowAt(at(21))).toBe("evening");
     });
   });
 
   describe("readSlogansSetting", () => {
-    it("falls back to default config on null or non-object", () => {
+    it("valt terug op de zaailijst zonder instelling", () => {
       expect(readSlogansSetting(null)).toEqual(DEFAULT_SLOGANS_CONFIG);
-      expect(readSlogansSetting(undefined)).toEqual(DEFAULT_SLOGANS_CONFIG);
-      expect(readSlogansSetting("invalid")).toEqual(DEFAULT_SLOGANS_CONFIG);
-      expect(readSlogansSetting([])).toEqual(DEFAULT_SLOGANS_CONFIG);
+      expect(readSlogansSetting("nope")).toEqual(DEFAULT_SLOGANS_CONFIG);
+      expect(readSlogansSetting({ items: [] }).items).toEqual(DEFAULT_SLOGANS_CONFIG.items);
     });
 
-    it("parses valid config correctly", () => {
-      const input = {
+    it("leest de nieuwe vorm en vult ontbrekende keuzes aan", () => {
+      const cfg = readSlogansSetting({
+        items: [{ id: "a", nl: "VTK", audience: "wat?", window: "nooit" }],
+        intervalSeconds: 12,
+      });
+      expect(cfg.items).toEqual([
+        { id: "a", nl: "VTK", en: undefined, audience: "all", opener: false, window: "any" },
+      ]);
+      expect(cfg.intervalSeconds).toBe(12);
+    });
+
+    it("houdt de wisseltijd binnen de grenzen", () => {
+      expect(readSlogansSetting({ items: [{ nl: "x" }], intervalSeconds: -5 }).intervalSeconds).toBe(0);
+      expect(readSlogansSetting({ items: [{ nl: "x" }], intervalSeconds: 999 }).intervalSeconds).toBe(60);
+      expect(readSlogansSetting({ items: [{ nl: "x" }] }).intervalSeconds).toBe(8);
+    });
+
+    it("migreert de oude titel/accent/staart naar één zin", () => {
+      const cfg = readSlogansSetting({
         items: [
+          { id: "a", titleNl: "Ingenieurs zijn", accentNl: "superieur.", tailNl: "" },
           {
-            id: "s1",
-            titleNl: "Ingenieurs zijn",
-            accentNl: "superieur.",
-            tailNl: "Altijd.",
-            titleEn: "Engineers are",
-            accentEn: "superior.",
-            tailEn: "Always.",
+            id: "b",
+            titleNl: "Al meer dan 100 jaar",
+            accentNl: "thuis",
+            tailNl: "in Leuven.",
+            titleEn: "For over 100 years",
+            accentEn: "at home",
+            tailEn: "in Leuven.",
           },
         ],
-        personal: {
-          enabled: true,
-          titleNl: "Dag,",
-          accentNl: "{firstName}!",
-        },
-        intervalSeconds: 12,
-        randomizeOnReload: false,
-      };
-
-      const result = readSlogansSetting(input);
-      expect(result.items).toHaveLength(1);
-      expect(result.items[0].id).toBe("s1");
-      expect(result.items[0].titleNl).toBe("Ingenieurs zijn");
-      expect(result.items[0].accentNl).toBe("superieur.");
-      expect(result.items[0].tailNl).toBe("Altijd.");
-      expect(result.personal?.enabled).toBe(true);
-      expect(result.personal?.accentNl).toBe("{firstName}!");
-      expect(result.intervalSeconds).toBe(12);
-      expect(result.randomizeOnReload).toBe(false);
-    });
-
-    it("clamps intervalSeconds between 0 and 60", () => {
-      expect(readSlogansSetting({ intervalSeconds: 999 }).intervalSeconds).toBe(
-        60,
-      );
-      expect(readSlogansSetting({ intervalSeconds: -5 }).intervalSeconds).toBe(
-        0,
-      );
-    });
-
-    it("filters out completely empty slogan items", () => {
-      const input = {
-        items: [
-          { id: "empty", titleNl: "   ", accentNl: "" },
-          { id: "valid", titleNl: "Geldig", accentNl: "accent" },
-        ],
-      };
-      const result = readSlogansSetting(input);
-      expect(result.items).toHaveLength(1);
-      expect(result.items[0].id).toBe("valid");
-    });
-  });
-
-  describe("resolveDisplaySlogans", () => {
-    const sampleConfig: SlogansConfig = {
-      items: [
-        {
-          id: "item-1",
-          titleNl: "Titel NL",
-          accentNl: "Accent NL",
-          tailNl: "Tail NL",
-          titleEn: "Title EN",
-          accentEn: "Accent EN",
-          tailEn: "Tail EN",
-        },
-        {
-          id: "item-2",
-          titleNl: "Alleen NL",
-          accentNl: "Accent 2",
-        },
-      ],
-      personal: {
-        enabled: true,
-        titleNl: "Hey,",
-        accentNl: "{firstName}!",
-        tailNl: "welkom",
-        titleEn: "Hey,",
-        accentEn: "{firstName}!",
-        tailEn: "welcome",
-      },
-      intervalSeconds: 8,
-      randomizeOnReload: true,
-    };
-
-    it("resolves slogans for anonymous visitors (no personal slogan)", () => {
-      const slogans = resolveDisplaySlogans({
-        config: sampleConfig,
-        locale: "nl",
-        user: null,
-      });
-
-      expect(slogans).toHaveLength(2);
-      expect(slogans.some((s) => s.isPersonal)).toBe(false);
-      expect(slogans[0]).toEqual({
-        id: "item-1",
-        title: "Titel NL",
-        accent: "Accent NL",
-        tail: "Tail NL",
-      });
-    });
-
-    it("prepends personal slogan for logged-in users when enabled", () => {
-      const slogans = resolveDisplaySlogans({
-        config: sampleConfig,
-        locale: "nl",
-        user: { name: "Maxime Van Insberghe", firstName: "Maxime" },
-      });
-
-      expect(slogans).toHaveLength(3);
-      expect(slogans[0].isPersonal).toBe(true);
-      expect(slogans[0]).toEqual({
-        id: "personal",
-        title: "Hey,",
-        accent: "Maxime!",
-        tail: "welkom",
-        isPersonal: true,
-      });
-    });
-
-    it("does not include personal slogan if personal.enabled is false", () => {
-      const disabledConfig: SlogansConfig = {
-        ...sampleConfig,
-        personal: { ...sampleConfig.personal!, enabled: false },
-      };
-
-      const slogans = resolveDisplaySlogans({
-        config: disabledConfig,
-        locale: "nl",
-        user: { name: "Maxime Van Insberghe", firstName: "Maxime" },
-      });
-
-      expect(slogans).toHaveLength(2);
-      expect(slogans.some((s) => s.isPersonal)).toBe(false);
-    });
-
-    it("falls back to Dutch if English fields are omitted", () => {
-      const slogans = resolveDisplaySlogans({
-        config: sampleConfig,
-        locale: "en",
-        user: null,
-      });
-
-      expect(slogans[0]).toEqual({
-        id: "item-1",
-        title: "Title EN",
-        accent: "Accent EN",
-        tail: "Tail EN",
-      });
-      // item-2 has no English fields, so falls back to Dutch
-      expect(slogans[1]).toEqual({
-        id: "item-2",
-        title: "Alleen NL",
-        accent: "Accent 2",
-        tail: "",
-      });
-    });
-
-    it("uses fallback when config has empty items", () => {
-      const emptyConfig: SlogansConfig = {
-        items: [],
-        personal: null,
         intervalSeconds: 8,
-        randomizeOnReload: false,
-      };
-
-      const slogans = resolveDisplaySlogans({
-        config: emptyConfig,
-        locale: "nl",
-        user: null,
-        fallback: {
-          title: "Aangepaste titel",
-          accent: "Aangepast accent",
-          tail: "Aangepaste tail",
-        },
       });
+      // Zonder staart brak de oude component af tussen titel en accent.
+      expect(cfg.items[0]!.nl).toBe("Ingenieurs zijn\n*superieur.*");
+      // Met staart brak ze af na het accent.
+      expect(cfg.items[1]!.nl).toBe("Al meer dan 100 jaar *thuis*\nin Leuven.");
+      expect(cfg.items[1]!.en).toBe("For over 100 years *at home*\nin Leuven.");
+    });
 
-      expect(slogans).toHaveLength(1);
-      expect(slogans[0]).toEqual({
-        id: "fallback",
-        title: "Aangepaste titel",
-        accent: "Aangepast accent",
-        tail: "Aangepaste tail",
+    it("migreert de oude persoonlijke slogan naar een begroeting vooraan", () => {
+      const cfg = readSlogansSetting({
+        items: [{ id: "a", nl: "VTK" }],
+        personal: { enabled: true, titleNl: "Welkom terug,", accentNl: "{firstName}!", chancePercent: 35 },
+        intervalSeconds: 8,
       });
+      expect(cfg.items[0]).toMatchObject({
+        audience: "members",
+        opener: true,
+        window: "any",
+        nl: "Welkom terug,\n*{firstName}!*",
+      });
+      expect(cfg.items).toHaveLength(2);
+    });
+
+    it("laat een uitgeschakelde persoonlijke slogan vallen", () => {
+      const cfg = readSlogansSetting({
+        items: [{ id: "a", nl: "VTK" }],
+        personal: { enabled: false, titleNl: "Welkom terug,", accentNl: "{firstName}!" },
+      });
+      expect(cfg.items).toHaveLength(1);
     });
   });
 
-  describe("pickInitialSloganIndex", () => {
-    const slogansWithPersonal = [
-      { id: "personal", title: "Hey", accent: "Jan!", tail: "", isPersonal: true },
-      { id: "s1", title: "Ingenieurs zijn", accent: "superieur.", tail: "" },
-      { id: "s2", title: "Al 100 jaar", accent: "thuis", tail: "in Leuven" },
+  describe("resolveSlogans", () => {
+    const items = [
+      plain("Goeiemorgen, *{firstName}*.", {
+        id: "ochtend",
+        audience: "members",
+        opener: true,
+        window: "morning",
+      }),
+      plain("Goeieavond, *{firstName}*.", {
+        id: "avond",
+        audience: "members",
+        opener: true,
+        window: "evening",
+      }),
+      plain("Word lid.", { id: "gast", audience: "guests" }),
+      plain("Ingenieurs zijn *superieur*.", { id: "een" }),
+      plain("Glory, glory, *wij zijn VTK!*", { id: "twee" }),
     ];
 
-    it("always returns 0 when there is only 1 slogan", () => {
-      const index = pickInitialSloganIndex({
-        displaySlogans: [slogansWithPersonal[0]],
-        slogansConfig: DEFAULT_SLOGANS_CONFIG,
-        now: new Date(),
+    it("opent bij een lid met de begroeting van dit dagdeel", () => {
+      const out = resolveSlogans({ config: config(items), locale: "nl", user: member, now: at(9) });
+      expect(out.openerCount).toBe(1);
+      expect(out.items.map((item) => item.id)).toEqual(["ochtend", "een", "twee"]);
+      expect(out.items[0]!.text).toBe("Goeiemorgen, Jan.");
+    });
+
+    it("neemt de begroeting van het juiste dagdeel", () => {
+      const out = resolveSlogans({ config: config(items), locale: "nl", user: member, now: at(21) });
+      expect(out.items[0]!.id).toBe("avond");
+    });
+
+    it("toont een bezoeker geen begroeting en wel de bezoekersslogan", () => {
+      const out = resolveSlogans({ config: config(items), locale: "nl", user: null, now: at(9) });
+      expect(out.openerCount).toBe(0);
+      expect(out.items.map((item) => item.id)).toEqual(["gast", "een", "twee"]);
+    });
+
+    it("valt in het Engels terug op de Nederlandse zin", () => {
+      const out = resolveSlogans({
+        config: config([plain("Enkel Nederlands", { id: "x" }), { ...plain("NL", { id: "y" }), en: "EN" }]),
+        locale: "en",
+        user: null,
+        now: at(14),
       });
-      expect(index).toBe(0);
+      expect(out.items.map((item) => item.text)).toEqual(["Enkel Nederlands", "EN"]);
     });
 
-    it("always returns 0 when personal chance is 100%", () => {
-      const cfg: SlogansConfig = {
-        ...DEFAULT_SLOGANS_CONFIG,
-        personal: { ...DEFAULT_PERSONAL_SLOGAN, chancePercent: 100 },
-      };
-      for (let s = 0; s < 10; s++) {
-        const now = new Date(2026, 8, 12, 12, 0, s, s * 50);
-        expect(
-          pickInitialSloganIndex({
-            displaySlogans: slogansWithPersonal,
-            slogansConfig: cfg,
-            now,
-          }),
-        ).toBe(0);
-      }
+    it("gebruikt de oude hero-tekst enkel wanneer er niets overblijft", () => {
+      const out = resolveSlogans({
+        config: config([plain("Enkel voor leden", { id: "m", audience: "members" })]),
+        locale: "nl",
+        user: null,
+        now: at(14),
+        fallback: { nl: "De thuis voor *ingenieurs* in Leuven." },
+      });
+      expect(out.items).toHaveLength(1);
+      expect(out.items[0]!.text).toBe("De thuis voor ingenieurs in Leuven.");
     });
 
-    it("always returns a rolling slogan (> 0) when personal chance is 0%", () => {
-      const cfg: SlogansConfig = {
-        ...DEFAULT_SLOGANS_CONFIG,
-        personal: { ...DEFAULT_PERSONAL_SLOGAN, chancePercent: 0 },
-      };
-      for (let s = 0; s < 10; s++) {
-        const now = new Date(2026, 8, 12, 12, 0, s, s * 50);
-        const index = pickInitialSloganIndex({
-          displaySlogans: slogansWithPersonal,
-          slogansConfig: cfg,
-          now,
-        });
-        expect(index).toBeGreaterThan(0);
-        expect(index).toBeLessThan(slogansWithPersonal.length);
-      }
+    it("laat de hero nooit zonder titel achter", () => {
+      const out = resolveSlogans({ config: config([]), locale: "nl", user: null, now: at(14) });
+      expect(out.items).toHaveLength(1);
+      expect(out.items[0]!.text.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe("nextSloganIndex", () => {
+    it("rondt terug naar het begin zonder begroeting", () => {
+      expect(nextSloganIndex(0, 3, 0)).toBe(1);
+      expect(nextSloganIndex(2, 3, 0)).toBe(0);
     });
 
-    it("distributes between personal and rolling slogans with 50% chance", () => {
-      const cfg: SlogansConfig = {
-        ...DEFAULT_SLOGANS_CONFIG,
-        personal: { ...DEFAULT_PERSONAL_SLOGAN, chancePercent: 50 },
-      };
+    it("laat de begroeting na haar beurt vallen", () => {
+      expect(nextSloganIndex(0, 3, 1)).toBe(1);
+      expect(nextSloganIndex(2, 3, 1)).toBe(1);
+    });
 
-      const results = new Set<number>();
-      for (let ms = 0; ms < 100; ms++) {
-        const now = new Date(2026, 8, 12, 12, 0, 0, ms);
-        results.add(
-          pickInitialSloganIndex({
-            displaySlogans: slogansWithPersonal,
-            slogansConfig: cfg,
-            now,
-          }),
-        );
-      }
-
-      // Moet zowel index 0 (persoonlijk) als minstens één rolling index (> 0) opleveren
-      expect(results.has(0)).toBe(true);
-      expect(Array.from(results).some((idx) => idx > 0)).toBe(true);
+    it("blijft staan wanneer er niets anders is", () => {
+      expect(nextSloganIndex(0, 1, 1)).toBe(0);
+      expect(nextSloganIndex(0, 1, 0)).toBe(0);
     });
   });
 });

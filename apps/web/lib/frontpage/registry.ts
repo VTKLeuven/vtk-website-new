@@ -133,28 +133,11 @@ export const FRONTPAGE_MODULES: FrontpageModule[] = [
       },
       eyebrowNl: { type: "text", labelNl: "Bovenschrift (NL)", labelEn: "Eyebrow (NL)" },
       eyebrowEn: { type: "text", labelNl: "Bovenschrift (EN)", labelEn: "Eyebrow (EN)" },
-      titleNl: { type: "text", labelNl: "Titel (NL)", labelEn: "Title (NL)" },
-      titleEn: { type: "text", labelNl: "Titel (EN)", labelEn: "Title (EN)" },
-      accentNl: {
-        type: "text",
-        labelNl: "Geel accent (NL)",
-        labelEn: "Yellow accent (NL)",
-        helpNl: "Schuin en geel, midden in de titel. Leeg = geen accent.",
-        helpEn: "Italic and yellow, inside the headline. Empty = no accent.",
-      },
-      accentEn: { type: "text", labelNl: "Geel accent (EN)", labelEn: "Yellow accent (EN)" },
-      tailNl: {
-        type: "text",
-        labelNl: "Titel na het accent (NL)",
-        labelEn: "Title after the accent (NL)",
-        helpNl: 'Bij "De thuis voor ingenieurs in Leuven" is dit "in Leuven.".',
-        helpEn: 'In "The home for engineers in Leuven" this is "in Leuven.".',
-      },
-      tailEn: {
-        type: "text",
-        labelNl: "Titel na het accent (EN)",
-        labelEn: "Title after the accent (EN)",
-      },
+      // De titel staat hier bewust niet meer. Ze is een lijst slogans geworden
+      // die in /admin/slogans beheerd wordt; deze velden bleven achter als
+      // invulvakken die opsloegen zonder iets te veranderen, want de slogans
+      // wonnen altijd. Wat er nog in de database staat, geldt enkel zolang de
+      // instelling `home.slogans` niet bestaat; zie `legacyHero` in resolve.ts.
       subtitleNl: { type: "textarea", labelNl: "Subtekst (NL)", labelEn: "Subtitle (NL)" },
       subtitleEn: { type: "textarea", labelNl: "Subtekst (EN)", labelEn: "Subtitle (EN)" },
       primaryLabelNl: { type: "text", labelNl: "Knop 1 (NL)", labelEn: "Button 1 (NL)" },

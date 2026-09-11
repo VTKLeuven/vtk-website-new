@@ -115,13 +115,11 @@ export default async function AdminHome({
 
       <Card className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="mb-1 font-semibold">
-            {locale === "nl" ? "Landing page slogans" : "Landing page slogans"}
-          </h2>
+          <h2 className="mb-1 font-semibold">{locale === "nl" ? "Slogans" : "Slogans"}</h2>
           <p className="text-sm text-[#5c667f]">
             {locale === "nl"
-              ? "Beheer de roterende slogans, het gele accentwoord en de persoonlijke slogan voor ingelogde leden op de startpagina."
-              : "Manage the rotating slogans, the yellow accent word, and personalized member slogans on the landing page."}
+              ? "De roterende titel in de hero, en de begroeting waarmee een aangemeld lid de reeks ziet openen."
+              : "The rotating headline in the hero, and the greeting a signed-in member sees it open with."}
           </p>
         </div>
         <Link
