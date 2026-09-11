@@ -108,8 +108,16 @@ export async function buildTransportFeed(
     url: `${base}/beheer/vervoer?rit=${booking.id}`,
     categories: ['Transport'],
     updatedAt: booking.updatedAt,
-    // Deze feed hangt aan een geheim in een URL; alles erin is privé.
-    private: true,
+    // **Bewust géén `private: true`.** Dat zet `CLASS:PRIVATE` op elk VEVENT, en
+    // Google Calendar verbergt in een geabonneerde agenda de titel en de details
+    // van zo'n event: je zag enkel "Bezet" staan waar de rit hoorde te staan
+    // (Outlook doet hetzelfde). De gegevens hierboven stonden er dus wel, maar
+    // met de instructie aan de agenda om ze niet te tonen; dat is precies de
+    // leesbaarheid waarvoor deze feed bestaat.
+    //
+    // De vertrouwelijkheid hangt aan het geheim in de URL, `no-store` en
+    // `noindex` (zie de route). `CLASS` voegt daar niets aan toe: wie de link
+    // heeft, kan de feed toch ophalen.
   }));
 
   return buildIcs(

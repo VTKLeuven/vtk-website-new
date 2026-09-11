@@ -1,12 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   EMPTY_FILTERS,
+  FILTER_QUERY_KEYS,
   NO_DRIVER,
   countActiveFilters,
   describeFilters,
   filtersToQuery,
   hasActiveFilters,
   parseTransportFilters,
+  type TransportFilters,
 } from '../lib/transport-filters';
 
 describe('parseTransportFilters', () => {
@@ -131,5 +133,62 @@ describe('describeFilters', () => {
     expect(describeFilters(parseTransportFilters({ voertuig: 'weg' }), names)).toEqual([
       'enkel onbekend voertuig',
     ]);
+  });
+});
+
+/**
+ * De filterbalk legt de nieuwe query bovenop de bestaande URL; deze helper is
+ * precies wat `apply()` in `components/transport-calendar/filters.tsx` doet. Hij
+ * staat hier omdat de bug niet in `filtersToQuery` zat maar in het wissen vooraf:
+ * een filter op haar standaard schrijft geen sleutel, dus wie enkel schrijft,
+ * laat de oude waarde staan.
+ */
+function applyOver(current: string, next: TransportFilters): Record<string, string> {
+  const query = new URLSearchParams(current);
+  for (const key of FILTER_QUERY_KEYS) query.delete(key);
+  for (const [key, value] of Object.entries(filtersToQuery(next))) query.set(key, value);
+  return Object.fromEntries(query.entries());
+}
+
+describe('de filters over een bestaande URL leggen', () => {
+  it('zet de beschikbaarheidsband weer uit', () => {
+    // `beschikbaar=1` bleef in de URL staan omdat het uitzetten niets schrijft,
+    // en dan sprong het vinkje meteen terug: niet uit te zetten.
+    expect(applyOver('beschikbaar=1', EMPTY_FILTERS)).toEqual({});
+  });
+
+  it('zet de evenementenstrook weer aan', () => {
+    // De spiegel daarvan: `evenementen=0` overleefde het opnieuw aanvinken.
+    expect(applyOver('evenementen=0', EMPTY_FILTERS)).toEqual({});
+  });
+
+  it('wist met "Alles tonen" ook die twee', () => {
+    expect(applyOver('voertuig=kar&beschikbaar=1&evenementen=0&status=APPROVED', EMPTY_FILTERS)).toEqual(
+      {}
+    );
+  });
+
+  it('laat een parameter van buiten deze module staan', () => {
+    // De weergave en de datum horen bij dezelfde URL en zijn niet van de filters.
+    expect(
+      applyOver('weergave=week&datum=2026-09-14&voertuig=kar', {
+        ...EMPTY_FILTERS,
+        showAvailability: true,
+      })
+    ).toEqual({ weergave: 'week', datum: '2026-09-14', beschikbaar: '1' });
+  });
+
+  it('dekt elke sleutel die filtersToQuery kan schrijven', () => {
+    // De lijst en de schrijver mogen niet uit elkaar lopen: een zevende filter
+    // zonder sleutel in FILTER_QUERY_KEYS is precies deze bug opnieuw.
+    const all = filtersToQuery({
+      vehicleIds: ['v1'],
+      driverIds: ['d1'],
+      statuses: ['APPROVED'],
+      requesterTypes: ['EXTERN'],
+      showEvents: false,
+      showAvailability: true,
+    });
+    expect(Object.keys(all).sort()).toEqual([...FILTER_QUERY_KEYS].sort());
   });
 });

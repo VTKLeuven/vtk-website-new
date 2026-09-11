@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { driverColorVar, type DriverColorOverrides } from '@/lib/driver-colors';
 import {
   EMPTY_FILTERS,
+  FILTER_QUERY_KEYS,
   NO_DRIVER,
   REQUESTER_TYPES,
   REQUESTER_TYPE_FILTER_LABELS,
@@ -95,7 +96,11 @@ export function TransportFilterBar({
 
   function apply(next: TransportFilters) {
     const query = new URLSearchParams(params.toString());
-    for (const key of ['voertuig', 'chauffeur', 'status', 'aanvrager']) query.delete(key);
+    // Élke sleutel die deze module bezit, ook de twee die een vinkje zijn. Een
+    // filter op haar standaard schrijft géén sleutel, dus wie enkel schrijft,
+    // laat de oude waarde staan: zo was de beschikbaarheidsband niet meer uit te
+    // zetten en de evenementenstrook niet meer aan. Zie `FILTER_QUERY_KEYS`.
+    for (const key of FILTER_QUERY_KEYS) query.delete(key);
     const added = filtersToQuery(next);
     for (const [key, value] of Object.entries(added)) query.set(key, value);
     try {

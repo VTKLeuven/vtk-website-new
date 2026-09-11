@@ -37,7 +37,20 @@ export type IcsEvent = {
   categories?: string[];
   /** Voedt `DTSTAMP`, `LAST-MODIFIED` en `SEQUENCE`. */
   updatedAt: Date;
-  /** Zet `CLASS:PRIVATE`; enkel voor events uit een persoonlijke feed. */
+  /**
+   * Zet `CLASS:PRIVATE`.
+   *
+   * **Niet zomaar aanzetten omdat een feed geheim is.** Een agenda-client
+   * behandelt dit als "verberg dit voor wie meekijkt": Google en Outlook tonen
+   * een geabonneerd privé-event als "Bezet", zonder titel en zonder
+   * beschrijving. Dat is bruikbaar voor een feed die je in een gedeelde agenda
+   * naast die van collega's hangt, en het is precies verkeerd voor een feed die
+   * je abonneert om er iets in te kunnen lezen (zie `transport-feed.ts`, waar
+   * dit ooit elke rit "Bezet" maakte).
+   *
+   * Geheimhouding regel je met de URL, `no-store` en `noindex`; `CLASS` is een
+   * weergavehint aan de client en geen slot.
+   */
   private?: boolean;
 };
 

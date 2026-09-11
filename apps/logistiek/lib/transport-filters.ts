@@ -103,6 +103,32 @@ export function parseTransportFilters(query: {
   };
 }
 
+/**
+ * Elke sleutel die {@link filtersToQuery} *kan* schrijven.
+ *
+ * Bestaat omdat een filter die op haar standaard staat, géén sleutel schrijft
+ * ("leeg betekent alles"). Wie de nieuwe query bovenop de oude legt, moet dus
+ * eerst alles wissen wat deze module bezit; anders overleeft een oude waarde het
+ * uitzetten van haar eigen filter.
+ *
+ * Dat is precies wat er misging: de filterbalk wiste met de hand vier van de zes
+ * sleutels, en `evenementen` en `beschikbaar` stonden er niet bij. De
+ * beschikbaarheidsband was daardoor niet meer uit te zetten (`beschikbaar=1`
+ * bleef staan) en de evenementenstrook niet meer aan (`evenementen=0` bleef
+ * staan). Om dezelfde reden deed "Alles tonen" aan die twee niets.
+ *
+ * Als constante hier en niet als lijstje in de balk: een zevende filter hoort
+ * dit niet opnieuw stuk te kunnen maken.
+ */
+export const FILTER_QUERY_KEYS = [
+  'voertuig',
+  'chauffeur',
+  'status',
+  'aanvrager',
+  'evenementen',
+  'beschikbaar',
+] as const;
+
 /** Wat er in de URL komt te staan; wat leeg is, komt er niet in. */
 export function filtersToQuery(filters: TransportFilters): Record<string, string> {
   const query: Record<string, string> = {};
