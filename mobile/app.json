@@ -3,7 +3,6 @@
     "name": "VTK",
     "slug": "vtk-app",
     "owner": "vtk-it",
-    "privacy": "unlisted",
     "scheme": "vtk",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -26,8 +25,7 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundColor": "#0E1A36"
       },
-      "package": "be.vtk.app",
-      "edgeToEdgeEnabled": true
+      "package": "be.vtk.app"
     },
     "plugins": [
       "expo-router",
@@ -69,7 +67,9 @@
           "isAndroidBackgroundLocationEnabled": false,
           "isAndroidForegroundServiceEnabled": false
         }
-      ]
+      ],
+      "expo-image",
+      "expo-sharing"
     ],
     "extra": {
       "router": {},
