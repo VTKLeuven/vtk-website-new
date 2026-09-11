@@ -255,10 +255,10 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.paper },
   content: { paddingBottom: SPACING.xxl },
   hero: { backgroundColor: COLORS.navy, minHeight: 220, justifyContent: 'flex-end' },
-  photo: { ...StyleSheet.absoluteFillObject },
+  photo: { ...StyleSheet.absoluteFill },
   // De scrim is zwaarst linksonder, waar de tekst staat; zonder dat verdwijnt een
   // titel in een lichte foto.
-  scrim: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(14, 26, 54, 0.55)' },
+  scrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(14, 26, 54, 0.55)' },
   heroText: { padding: SPACING.lg, gap: SPACING.xs },
   group: { ...TYPE.kicker, color: COLORS.yellow },
   title: { ...TYPE.pageTitle, color: COLORS.onDark },

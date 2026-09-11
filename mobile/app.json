@@ -8,11 +8,6 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#0E1A36"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "be.vtk.app",
@@ -28,6 +23,14 @@
       "package": "be.vtk.app"
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#0E1A36"
+        }
+      ],
       "expo-router",
       "expo-font",
       "expo-sqlite",
@@ -69,7 +72,9 @@
         }
       ],
       "expo-image",
-      "expo-sharing"
+      "expo-sharing",
+      "expo-splash-screen",
+      "expo-status-bar"
     ],
     "extra": {
       "router": {},

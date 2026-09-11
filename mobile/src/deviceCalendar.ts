@@ -29,7 +29,18 @@ export type AddResult =
  * mogen schrijven en die bij een echt account hoort. Een lokale agenda aanmaken
  * zou betekenen dat de afspraak niet synchroniseert met de rest van je toestellen.
  */
-async function targetCalendar(): Promise<Calendar.Calendar | null> {
+/**
+ * De vorm van één agenda op het toestel.
+ *
+ * Sinds SDK 56 heeft `expo-calendar` een herziene API en exporteert het hoofdpad
+ * het type `Calendar` niet meer; de functies die we hier gebruiken bestaan nog
+ * wel, met een deprecatiewaarschuwing. We leiden het type daarom af uit de
+ * functie zelf, in plaats van `expo-calendar/legacy` binnen te halen. Gaat deze
+ * module ooit naar de nieuwe API, dan vervalt deze regel.
+ */
+type DeviceCalendar = Awaited<ReturnType<typeof Calendar.getDefaultCalendarAsync>>;
+
+async function targetCalendar(): Promise<DeviceCalendar | null> {
   if (Platform.OS === 'ios') {
     const defaultCalendar = await Calendar.getDefaultCalendarAsync().catch(() => null);
     if (defaultCalendar?.allowsModifications) return defaultCalendar;

@@ -93,7 +93,7 @@ const styles = StyleSheet.create({
   title: { ...TYPE.cardTitle, color: COLORS.onDark },
   web: { flex: 1, backgroundColor: COLORS.paper },
   loading: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     alignItems: 'center',
     justifyContent: 'center',
   },
