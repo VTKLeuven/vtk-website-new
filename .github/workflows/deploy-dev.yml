@@ -204,7 +204,8 @@ jobs:
 
             docker compose -f infra/docker-compose.yml up -d --remove-orphans &&
 
-            # Opruimen van ongetagde images en oude buildcache
-            { docker image prune -f || true; } &&
-            { docker builder prune -f --filter until=168h || true; }
+            # Opruimen na de switch: alle ongebruikte containers, images en buildcache verwijderen.
+            # Bewust zonder --volumes zodat database- en applicatiedata behouden blijft.
+            { docker system prune -a -f || true; } &&
+            { docker builder prune -a -f || true; }
           "

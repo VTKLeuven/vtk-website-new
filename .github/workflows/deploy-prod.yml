@@ -117,11 +117,8 @@ jobs:
 
             docker compose -f infra/docker-compose.yml up -d --remove-orphans &&
 
-            # Opruimen na de switch, want pas nu draaien de containers op de
-            # nieuwe images en is de vorige versie echt ongebruikt.
-            { docker image prune -f || true; } &&
-
-            # Buildcache ouder dan een week. Recente lagen blijven staan, zodat de
-            # volgende build ze nog kan hergebruiken.
-            { docker builder prune -f --filter until=168h || true; }
+            # Opruimen na de switch: alle ongebruikte containers, images en buildcache verwijderen.
+            # Bewust zonder --volumes zodat database- en applicatiedata behouden blijft.
+            { docker system prune -a -f || true; } &&
+            { docker builder prune -a -f || true; }
           "
