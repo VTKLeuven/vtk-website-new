@@ -37,12 +37,9 @@ const BASE_URL_KEY = 'base-url';
 /**
  * De site waar de app mee praat.
  *
- * **`dev.vtk.be` en niet `vtk.be`**, en dat is geen vergissing: op `vtk.be` draait
- * nog de oude site, die deze API niet heeft en op elk app-adres een 404 geeft.
- * Deze codebase deployt naar `dev.vtk.be`. Neemt de nieuwe site ooit `vtk.be`
- * over, dan hoort deze regel mee te verhuizen.
+ * **`vtk.be`**, de live productiewebsite.
  */
-const DEFAULT_BASE_URL = process.env.EXPO_PUBLIC_VTK_URL?.trim() || 'https://dev.vtk.be';
+const DEFAULT_BASE_URL = process.env.EXPO_PUBLIC_VTK_URL?.trim() || 'https://vtk.be';
 
 export function baseUrl(): string {
   return (getPref(BASE_URL_KEY) ?? DEFAULT_BASE_URL).replace(/\/+$/, '');

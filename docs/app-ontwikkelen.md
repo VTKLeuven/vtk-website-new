@@ -69,7 +69,7 @@ Developer-account, en dat is er nog niet.
 ### 4. De server instellen
 
 Open in de app **Meer → je naam → Server** en vul je cloudflared-adres in. Zonder dat
-praat de app met `https://dev.vtk.be`, en dan test je de productiegegevens in
+praat de app met `https://vtk.be`, en dan test je de productiegegevens in
 plaats van je eigen werk.
 
 Het wisselen gooit de leescache weg. Dat is met opzet: inhoud van de ene server
