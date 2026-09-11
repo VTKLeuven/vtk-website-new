@@ -466,10 +466,21 @@
   text-decoration-color: #fff;
 }
 
+/* Eén raster voor alle dagen: de dag links, de evenementen rechts. Elke dag
+   neemt die kolommen over via subgrid, dus de dagkolom is voor elke rij even
+   breed: de breedste dag beslist, ook een Engelse "Wed", en de evenementen
+   beginnen overal op dezelfde plaats. Een vaste kolom van 52px liet een langere
+   dagnaam overlopen in de tussenruimte. */
+.vtk-design .home-hero .hero-week-days {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 16px;
+}
+
 .vtk-design .home-hero .hero-week-day {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
-  gap: 16px;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
   padding: 12px 0;
   align-items: start;
 }
@@ -503,12 +514,19 @@
   padding-top: 1px;
 }
 
+/* Het nummer staat rechts in een vaste breedte, met cijfers van gelijke
+   breedte. Zo begint de dagnaam overal op dezelfde plaats: in Inter is een 11
+   smaller dan een 16, en een lege dag heeft een kleiner cijfer. 26px is ruim
+   voor twee cijfers op 19px, ook in een terugvalfont. */
 .vtk-design .home-hero .hero-week-label .num {
+  min-width: 26px;
   color: #fff;
   font-size: 19px;
   font-weight: 600;
+  font-variant-numeric: tabular-nums;
   letter-spacing: -0.02em;
   line-height: 1.15;
+  text-align: right;
 }
 
 .vtk-design .home-hero .hero-week-label .dow {
@@ -516,20 +534,27 @@
   font-size: 12.5px;
 }
 
-/* Vandaag als geel pilletje. Rond en niet vierkant: de kalender gebruikt daar
-   een blokje, maar in de hero staat het naast ronde stippen en ronde knoppen. */
-.vtk-design .home-hero .hero-week-day.today .num {
-  padding: 1px 8px;
-  border-radius: 999px;
-  background: var(--yellow);
-  color: var(--ink);
-  font-size: 17px;
-}
-
 .vtk-design .home-hero .hero-week-day.empty .num {
   color: rgba(255, 255, 255, 0.55);
   font-size: 16px;
   font-weight: 500;
+}
+
+/* Vandaag is een gewone dag, in het geel: zelfde grootte, zelfde plaats, geen
+   vlak en geen extra woord. Ook op een lege dag staat het cijfer op volle
+   grootte, anders dimt het geel mee.
+
+   Bewust een klasse specifieker dan de lege dag hierboven. Het gele pilletje
+   dat hier stond, was even specifiek en stond ervoor, en verloor dus op een
+   lege dag: doorschijnend wit op geel. Zie docs/design-decisions.md. */
+.vtk-design .home-hero .hero-week-day.today .hero-week-label .num {
+  color: var(--yellow);
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.vtk-design .home-hero .hero-week-day.today .hero-week-label .dow {
+  color: var(--yellow);
 }
 
 .vtk-design .home-hero .hero-week-evs {
@@ -552,6 +577,14 @@
   border-radius: 50%;
   background: var(--cat, var(--yellow));
   transform: translateY(4px);
+}
+
+/* De tweede en volgende dag van een evenement over meerdere dagen: een open
+   stip in dezelfde kleur. Samen met "dag 2 van 3" in de uurkolom leest het als
+   één evenement dat doorloopt, niet als drie aparte. */
+.vtk-design .home-hero .hero-week-ev.repeat .dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.6px var(--cat, var(--yellow));
 }
 
 .vtk-design .home-hero .hero-week-ev .body {
@@ -619,6 +652,14 @@
 .vtk-design .home-hero .hero-week-star:focus-visible {
   outline: 2px solid var(--yellow);
   outline-offset: 2px;
+}
+
+/* Een herhaalde rij draagt geen ster: één evenement, één ster. Deze lege plaats
+   houdt het uur op dezelfde lijn als bij de rijen erboven en eronder. */
+.vtk-design .home-hero .hero-week-star-spacer {
+  width: 26px;
+  height: 26px;
+  margin: -4px -4px 0 0;
 }
 
 .vtk-design .home-hero .hero-week-none {

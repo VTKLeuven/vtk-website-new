@@ -18,6 +18,11 @@ export type FrontpageEvent = {
   /** De URL-naam voor `/kalender/<slug>`; de id blijft de sleutel voor de ster. */
   slug: string;
   start: Date;
+  /**
+   * Het einde. Bij een heledagevenement is de einddag inclusief, zoals overal in
+   * de kalender; het weekoverzicht zet het op elke dag tot en met die dag.
+   */
+  end: Date;
   /** Een heledagevenement toont "hele dag" in plaats van een uur. */
   allDay: boolean;
   titleNl: string;

@@ -113,6 +113,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     //
     // Vanaf gisteren en niet vanaf nu: het weekoverzicht in de hero laat de dag
     // van gisteren staan zolang daar iets was (zie lib/calendar/heroWeek.ts).
+    // Op het einde en niet op de start: anders valt een evenement over meerdere
+    // dagen weg zodra het vóór gisteren begon, terwijl het vandaag nog loopt.
     // Alles wat de rest van deze pagina toont, filtert daar zelf weer uit. De
     // limiet ligt hoger dan de zes van het rooster hieronder, omdat het venster
     // van zes dagen er meer kan bevatten en de terugval de eerstvolgende vier
@@ -120,7 +122,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     viewerAudienceFilter().then((audiences) =>
       prisma.calendarEvent.findMany({
         where: {
-          start: { gte: frontpageEventsSince(now) },
+          end: { gte: frontpageEventsSince(now) },
           publishedAt: { not: null },
           ...audiences,
         },

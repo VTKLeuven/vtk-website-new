@@ -23,6 +23,7 @@ export type FrontpageEventRow = {
   id: string;
   slug: string;
   start: Date;
+  end: Date;
   allDay: boolean;
   titleNl: string;
   titleEn: string | null;
@@ -41,11 +42,12 @@ export const FRONTPAGE_EVENT_INCLUDE = {
 
 /**
  * Vanaf wanneer de homepage evenementen leest: middernacht gisteren, in
- * Brusselse tijd.
+ * Brusselse tijd, af te zetten tegen het **einde** van een evenement.
  *
  * Het weekoverzicht kan gisteren tonen wanneer daar iets stond, dus de lezing
- * moet een dag verder terug beginnen dan "nu". Alles wat daarvoor ligt, komt
- * nergens meer op de homepage.
+ * moet een dag verder terug beginnen dan "nu". Op het einde en niet op de start,
+ * want een evenement over meerdere dagen dat eerder begon, loopt vandaag nog.
+ * Wat vóór dit moment al afgelopen was, komt nergens meer op de homepage.
  */
 export function frontpageEventsSince(now: Date): Date {
   const yesterday = heroWeekDayDate(heroWeekDayKey(now, HERO_WEEK_TIME_ZONE));
@@ -72,6 +74,7 @@ export function toFrontpageEvent(
     id: row.id,
     slug: row.slug,
     start: row.start,
+    end: row.end,
     allDay: row.allDay,
     titleNl: row.titleNl,
     titleEn: row.titleEn,

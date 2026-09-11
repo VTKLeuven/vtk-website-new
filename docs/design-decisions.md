@@ -5299,7 +5299,10 @@ terwijl er dan net het meest te beleven valt. Daarom rolt het venster mee:
 
 - Stond er **gisteren** iets, dan begint het overzicht gisteren en loopt het nog
   vier dagen vooruit. Anders verdwijnt een cantus van gisteren om middernacht van
-  de homepage, terwijl de halve kring er de dag erna nog over praat.
+  de homepage, terwijl de halve kring er de dag erna nog over praat. Wat gisteren
+  begon en vandaag nog loopt, telt daar niet voor: het staat vandaag al in het
+  overzicht, en een tentoonstelling van een maand zou het venster anders elke dag
+  laten terugkijken.
 - Stond er gisteren niets, dan begint het vandaag en kijkt het een dag verder.
 
 Het zijn altijd zes dagen, zodat de hoogte van het blok niet per dag verspringt.
@@ -5323,6 +5326,38 @@ De hero staat naast de titel en mag niet met de drukte meegroeien tot een tweede
 scherm. Een dag met meer toont er drie plus "nog n die dag", met een link naar de
 kalender. Het totaal stopt op tien; de kap valt dan op de verste dagen, want die
 zijn het minst dringend.
+
+### Een evenement over meerdere dagen staat op elke dag
+
+De Onthaaldagen liepen van zondag tot dinsdag en stonden enkel op zondag: het
+overzicht deelde een evenement in op zijn startdag. Nu staat het op elke dag
+waarop het loopt, met dezelfde dagregels als het kalenderrooster, zodat de hero
+en /kalender nooit iets anders zeggen:
+
+- Bij een **heledagevenement** telt de einddag mee. Dat is overal in de kalender
+  zo; de ICS-feed telt er om dezelfde reden een dag bij.
+- Een **nachtactiviteit van hoogstens twaalf uur** (een cantus tot drie uur) hoort
+  enkel bij haar startdag. Anders staat ze de ochtend erna nog eens in het
+  overzicht.
+
+Vanaf de tweede rij staat er "dag 2 van 3" in plaats van het uur, een open stip
+in plaats van een volle, en geen ster. Drie gelijke rijen met drie sterren lazen
+als drie aparte evenementen. De ster staat op de eerste rij die het evenement
+echt krijgt: valt de eerste dag weg door de kap van drie, dan draagt de volgende
+dag ze. Begon het evenement al voor het venster, dan zegt ook die eerste rij welke
+dag het is.
+
+Het telt op twee manieren mee:
+
+- Voor de **drempel van vier** telt het één keer. Drie rijen Onthaaldagen maken
+  nog geen drukke week.
+- Voor de **kappen** (drie per dag, tien in totaal) telt elke rij, want die kappen
+  bewaken de hoogte van het blok.
+
+De homepage leest evenementen daarom op hun einde en niet op hun start: wie op
+dinsdag kijkt, moet de Onthaaldagen nog zien, ook al begonnen ze zondag. Ook de
+lijst met eerstvolgende evenementen neemt mee wat vandaag nog loopt, op de dag
+van vandaag.
 
 ### Uitlichten en weglaten is een eigen recht
 
@@ -5374,6 +5409,28 @@ verloop dat breder is dan zijn eigen kader wordt aan de rand afgekapt in plaats
 van uitgedoofd, zodat er een rechthoek boven de agenda verschijnt; en een
 strakke vulling met een schaduw eromheen dooft wel uit, maar leest als een
 paneel. Een vervaagde vorm heeft geen van beide problemen.
+
+### Vandaag is een gewone dag, in het geel
+
+Vandaag stond als een geel pilletje rond het dagnummer, en dat liep op twee
+manieren mis. Op een dag zonder evenementen won de regel voor een lege dag van
+die voor vandaag (even specifiek, later in de CSS), en stond er doorschijnend wit
+op geel. En de padding van het pilletje duwde de dagnaam opzij, zodat "vr" niet
+meer onder "zo" en "ma" stond.
+
+Nu ziet vandaag eruit als elke andere dag, met het nummer en de dagnaam in het
+geel: geen vlak, geen extra woord, en niets verschuift. Ook op een lege dag staat
+het cijfer op volle grootte; het kleinere, gedimde cijfer van een lege dag zou het
+geel mee dimmen. Drie alternatieven zijn bekeken en afgevallen: een pilletje rond
+nummer en dagnaam samen (leesbaar, maar op een lege dag het felste punt van het
+blok), "vandaag" in de plaats van de dagnaam (maakt die rij hoger) en een geel
+speldje in de marge (te makkelijk te missen).
+
+De dagnamen staan onder elkaar, hoe breed het nummer ook is. In Inter is een 11
+smaller dan een 16 en een lege dag heeft een kleiner cijfer; daarom staat het
+nummer rechts in een vaste breedte, met cijfers van gelijke breedte. De dagkolom
+zelf is via subgrid in elke rij even breed, zodat ook een Engelse "Wed" de
+evenementen niet opzij duwt.
 
 ## De ster op een evenement is geen inschrijving
 

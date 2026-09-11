@@ -4,6 +4,7 @@ import {
   HERO_WEEK_TIME_ZONE,
   selectHeroWeek,
   type HeroWeekDay,
+  type HeroWeekEntry,
 } from "@/lib/calendar/heroWeek";
 import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar";
 import { organiserName } from "@/lib/calendar/organiser";
@@ -17,6 +18,10 @@ import type { FrontpageEvent } from "./context";
  * leesbaarheid komt van een zacht verloop in de scrim (`.hero-week-wash`), zodat
  * de herofoto gewoon doorloopt. Zie docs/design-decisions.md voor waarom deze
  * vorm het haalde van een paneel.
+ *
+ * Een evenement over meerdere dagen staat op elke dag. Vanaf de tweede rij
+ * staat er "dag 2 van 3" in plaats van het uur, een open stip en geen ster: het
+ * blijft één evenement.
  *
  * Welke dagen en welke evenementen erin staan, beslist `selectHeroWeek`; die
  * regels staan los getest in lib/calendar/heroWeek.ts. Dit bestand tekent alleen.
@@ -47,6 +52,19 @@ function timeLabel(event: FrontpageEvent, locale: Locale, nl: boolean): string {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/**
+ * Wat er in de uurkolom staat. Een latere dag van een evenement over meerdere
+ * dagen zegt welke dag het is in plaats van het uur te herhalen. Ook de eerste
+ * rij doet dat wanneer het evenement al vóór het overzicht begon: daar zou het
+ * startuur van eergisteren staan.
+ */
+function entryTimeLabel(entry: HeroWeekEntry<FrontpageEvent>, locale: Locale, nl: boolean): string {
+  if (entry.days > 1 && (entry.repeat || entry.day > 1)) {
+    return nl ? `dag ${entry.day} van ${entry.days}` : `day ${entry.day} of ${entry.days}`;
+  }
+  return timeLabel(entry.event, locale, nl);
 }
 
 export function HeroWeek({
@@ -131,70 +149,79 @@ export function HeroWeek({
             : "Nothing is in the calendar yet. As soon as something is planned it shows up here."}
         </p>
       ) : (
-        days.map((day: HeroWeekDay<FrontpageEvent>) => {
-          const empty = day.events.length === 0 && day.more === 0;
-          return (
-            <div
-              className={`hero-week-day${day.key === todayKey ? " today" : ""}${empty ? " empty" : ""}`}
-              key={day.key}
-            >
-              <div className="hero-week-label">
-                <span className="num">{dayNumber(day.key)}</span>
-                <span className="dow">{weekdayLabel(day.date, locale, "short")}</span>
+        // Eén raster voor alle dagen, zodat de dagkolom in elke rij even breed is.
+        <div className="hero-week-days">
+          {days.map((day: HeroWeekDay<FrontpageEvent>) => {
+            const empty = day.events.length === 0 && day.more === 0;
+            return (
+              <div
+                className={`hero-week-day${day.key === todayKey ? " today" : ""}${empty ? " empty" : ""}`}
+                key={day.key}
+              >
+                <div className="hero-week-label">
+                  <span className="num">{dayNumber(day.key)}</span>
+                  <span className="dow">{weekdayLabel(day.date, locale, "short")}</span>
+                </div>
+                <div className="hero-week-evs">
+                  {day.events.map((entry) => {
+                    const { event, repeat } = entry;
+                    const title = pick(event.titleNl, event.titleEn ?? event.titleNl, locale);
+                    const meta = [
+                      event.location,
+                      organiserName(event.organiserName, event.group, locale),
+                      // Enkel boven de publieke drempel; zie lib/calendar/interest.ts.
+                      event.interestedCount
+                        ? `${event.interestedCount} ${nl ? "komen" : "going"}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ");
+                    return (
+                      <div
+                        className={`hero-week-ev${repeat ? " repeat" : ""}`}
+                        key={event.id}
+                        style={
+                          event.categoryColour
+                            ? ({ "--cat": event.categoryColour } as React.CSSProperties)
+                            : undefined
+                        }
+                      >
+                        <span className="dot" aria-hidden="true" />
+                        <Link href={`${base}/kalender/${event.slug}`} className="body">
+                          <span className="title">{title}</span>
+                          {meta ? <small>{meta}</small> : null}
+                        </Link>
+                        <span className="time">{entryTimeLabel(entry, locale, nl)}</span>
+                        {/* Eén evenement, één ster: enkel op de eerste rij die het krijgt. */}
+                        {repeat ? (
+                          <span className="hero-week-star-spacer" aria-hidden="true" />
+                        ) : (
+                          <EventStar
+                            eventId={event.id}
+                            title={title}
+                            interested={event.viewerInterested}
+                            signedIn={signedIn}
+                            loginHref={loginHref}
+                            labels={starLabels}
+                            className="hero-week-star"
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
+                  {day.more > 0 ? (
+                    <Link href={`${base}/kalender`} className="hero-week-more">
+                      {nl ? `Nog ${day.more} die dag` : `${day.more} more that day`}
+                    </Link>
+                  ) : null}
+                  {empty ? (
+                    <span className="hero-week-none">{nl ? "niets gepland" : "nothing planned"}</span>
+                  ) : null}
+                </div>
               </div>
-              <div className="hero-week-evs">
-                {day.events.map((event) => {
-                  const title = pick(event.titleNl, event.titleEn ?? event.titleNl, locale);
-                  const meta = [
-                    event.location,
-                    organiserName(event.organiserName, event.group, locale),
-                    // Enkel boven de publieke drempel; zie lib/calendar/interest.ts.
-                    event.interestedCount
-                      ? `${event.interestedCount} ${nl ? "komen" : "going"}`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ");
-                  return (
-                    <div
-                      className="hero-week-ev"
-                      key={event.id}
-                      style={
-                        event.categoryColour
-                          ? ({ "--cat": event.categoryColour } as React.CSSProperties)
-                          : undefined
-                      }
-                    >
-                      <span className="dot" aria-hidden="true" />
-                      <Link href={`${base}/kalender/${event.slug}`} className="body">
-                        <span className="title">{title}</span>
-                        {meta ? <small>{meta}</small> : null}
-                      </Link>
-                      <span className="time">{timeLabel(event, locale, nl)}</span>
-                      <EventStar
-                        eventId={event.id}
-                        title={title}
-                        interested={event.viewerInterested}
-                        signedIn={signedIn}
-                        loginHref={loginHref}
-                        labels={starLabels}
-                        className="hero-week-star"
-                      />
-                    </div>
-                  );
-                })}
-                {day.more > 0 ? (
-                  <Link href={`${base}/kalender`} className="hero-week-more">
-                    {nl ? `Nog ${day.more} die dag` : `${day.more} more that day`}
-                  </Link>
-                ) : null}
-                {empty ? (
-                  <span className="hero-week-none">{nl ? "niets gepland" : "nothing planned"}</span>
-                ) : null}
-              </div>
-            </div>
-          );
-        })
+            );
+          })}
+        </div>
       )}
     </aside>
   );

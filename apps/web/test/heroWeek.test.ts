@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   heroWeekDayKeys,
   selectHeroWeek,
+  type HeroWeekDay,
   type HeroWeekInput,
 } from "@/lib/calendar/heroWeek";
 
@@ -18,8 +19,25 @@ function at(iso: string): Date {
   return new Date(iso);
 }
 
-function event(id: string, iso: string, heroWeek: HeroWeekInput["heroWeek"] = "AUTO"): HeroWeekInput {
-  return { id, start: at(iso), heroWeek };
+function event(
+  id: string,
+  iso: string,
+  heroWeek: HeroWeekInput["heroWeek"] = "AUTO",
+  span: { end?: string; allDay?: boolean } = {},
+): HeroWeekInput {
+  const start = at(iso);
+  return {
+    id,
+    start,
+    // Zonder einde duurt een evenement een uur, zoals de meeste in de kalender.
+    end: span.end ? at(span.end) : new Date(start.getTime() + 60 * 60 * 1000),
+    allDay: span.allDay ?? false,
+    heroWeek,
+  };
+}
+
+function ids(day: HeroWeekDay<HeroWeekInput> | undefined): string[] {
+  return day?.events.map((entry) => entry.event.id) ?? [];
 }
 
 const sunday13 = at("2026-09-13T10:00:00+02:00");
@@ -132,15 +150,15 @@ describe("selectHeroWeek", () => {
       event("uitgelicht", "2026-09-17T23:30:00+02:00", "PINNED"),
     ];
     const thursday = selectHeroWeek(crowded, sunday13).days.find((d) => d.key === "2026-09-17");
-    expect(thursday?.events.map((e) => e.id)).toEqual(["uitgelicht", "lezing", "pasta"]);
+    expect(ids(thursday)).toEqual(["uitgelicht", "lezing", "pasta"]);
   });
 
   it("leaves hidden events out everywhere", () => {
     const withHidden = busyWeek.map((e) =>
       e.id === "pasta" ? { ...e, heroWeek: "HIDDEN" as const } : e,
     );
-    const ids = selectHeroWeek(withHidden, sunday13).days.flatMap((d) => d.events.map((e) => e.id));
-    expect(ids).not.toContain("pasta");
+    const shown = selectHeroWeek(withHidden, sunday13).days.flatMap((day) => ids(day));
+    expect(shown).not.toContain("pasta");
     const thursday = selectHeroWeek(withHidden, sunday13).days.find((d) => d.key === "2026-09-17");
     expect(thursday?.more).toBe(0);
   });
@@ -149,7 +167,7 @@ describe("selectHeroWeek", () => {
     const monday14 = at("2026-09-14T09:00:00+02:00");
     const result = selectHeroWeek(busyWeek, monday14);
     expect(result.days[0]?.key).toBe("2026-09-13");
-    expect(result.days[0]?.events.map((e) => e.id)).toEqual(["onthaal"]);
+    expect(ids(result.days[0])).toEqual(["onthaal"]);
   });
 
   it("starts today when yesterday was empty", () => {
@@ -172,7 +190,7 @@ describe("selectHeroWeek", () => {
     ];
     const result = selectHeroWeek(quiet, sunday13);
     expect(result.mode).toBe("next");
-    expect(result.days.flatMap((day) => day.events.map((e) => e.id))).toEqual([
+    expect(result.days.flatMap((day) => ids(day))).toEqual([
       "een",
       "twee",
       "drie",
@@ -194,7 +212,7 @@ describe("selectHeroWeek", () => {
     ];
 
     const result = selectHeroWeek(quiet, sunday13, { nextLimit: 5 });
-    expect(result.days.flatMap((day) => day.events.map((e) => e.id))).toEqual([
+    expect(result.days.flatMap((day) => ids(day))).toEqual([
       "een",
       "twee",
       "drie",
@@ -222,7 +240,7 @@ describe("selectHeroWeek", () => {
     const monday14 = at("2026-09-14T09:00:00+02:00");
     const result = selectHeroWeek(quiet, monday14);
     expect(result.mode).toBe("next");
-    expect(result.days.flatMap((day) => day.events.map((e) => e.id))).toEqual(["later"]);
+    expect(result.days.flatMap((day) => ids(day))).toEqual(["later"]);
   });
 
   it("returns an empty list when there is nothing left at all", () => {
@@ -230,5 +248,85 @@ describe("selectHeroWeek", () => {
     expect(result.mode).toBe("next");
     expect(result.days).toEqual([]);
     expect(result.total).toBe(0);
+  });
+});
+
+describe("selectHeroWeek with events over several days", () => {
+  // Onthaaldagen: een heledagevenement van zondag 13 tot en met dinsdag 15.
+  const onthaal = event("onthaaldagen", "2026-09-13T00:00:00+02:00", "AUTO", {
+    end: "2026-09-15T00:00:00+02:00",
+    allDay: true,
+  });
+  const rest: HeroWeekInput[] = [
+    event("orientation", "2026-09-16T16:00:00+02:00"),
+    event("receptie", "2026-09-16T19:00:00+02:00"),
+    event("croque", "2026-09-17T12:00:00+02:00"),
+    event("pasta", "2026-09-17T19:00:00+02:00"),
+  ];
+  const friday11 = at("2026-09-11T16:00:00+02:00");
+
+  it("puts an all-day event on every day up to and including its end day", () => {
+    const result = selectHeroWeek([onthaal, ...rest], friday11);
+    const onDays = result.days.filter((day) => ids(day).includes("onthaaldagen"));
+    expect(onDays.map((day) => day.key)).toEqual(["2026-09-13", "2026-09-14", "2026-09-15"]);
+    expect(onDays.map((day) => day.events[0])).toMatchObject([
+      { day: 1, days: 3, repeat: false },
+      { day: 2, days: 3, repeat: true },
+      { day: 3, days: 3, repeat: true },
+    ]);
+  });
+
+  it("counts it once for the window threshold but once per day for the caps", () => {
+    // Vijf rijen, maar drie evenementen: dat blijft een rustige week.
+    expect(selectHeroWeek([onthaal, ...rest.slice(0, 2)], friday11).mode).toBe("next");
+    expect(selectHeroWeek([onthaal, ...rest], friday11).total).toBe(7);
+  });
+
+  it("keeps a short night event on its start day only", () => {
+    const cantus = event("cantus", "2026-09-14T21:00:00+02:00", "AUTO", {
+      end: "2026-09-15T03:00:00+02:00",
+    });
+    const result = selectHeroWeek([cantus, ...rest], friday11);
+    const onDays = result.days.filter((day) => ids(day).includes("cantus"));
+    expect(onDays.map((day) => day.key)).toEqual(["2026-09-14"]);
+  });
+
+  it("spreads a long timed event over the days it runs, without Saturday", () => {
+    // Van vrijdag 18u tot zondag 14u: 44 uur, dus geen nachtactiviteit.
+    const weekend = event("weekend", "2026-09-18T18:00:00+02:00", "AUTO", {
+      end: "2026-09-20T14:00:00+02:00",
+    });
+    const wednesday16 = at("2026-09-16T08:00:00+02:00");
+    const result = selectHeroWeek([weekend, ...rest], wednesday16);
+    const onDays = result.days.filter((day) => ids(day).includes("weekend"));
+    expect(onDays.map((day) => [day.key, day.events[0]?.day])).toEqual([
+      ["2026-09-18", 1],
+      ["2026-09-20", 3],
+    ]);
+  });
+
+  it("does not look back to yesterday for an event that is still running", () => {
+    const monday14 = at("2026-09-14T09:00:00+02:00");
+    const result = selectHeroWeek([onthaal, ...rest], monday14);
+    expect(result.days[0]?.key).toBe("2026-09-14");
+    expect(result.days[0]?.events[0]).toMatchObject({ day: 2, days: 3, repeat: false });
+  });
+
+  it("keeps a running event in the fallback list, on today", () => {
+    const tuesday15 = at("2026-09-15T09:00:00+02:00");
+    const result = selectHeroWeek([onthaal, event("later", "2026-10-06T19:00:00+02:00")], tuesday15);
+    expect(result.mode).toBe("next");
+    expect(result.days[0]?.key).toBe("2026-09-15");
+    expect(result.days[0]?.events[0]).toMatchObject({ day: 3, days: 3, repeat: false });
+  });
+
+  it("treats the first row that is actually shown as the first", () => {
+    const busySunday = ["a", "b", "c"].map((id) => event(id, "2026-09-13T10:00:00+02:00", "PINNED"));
+    const result = selectHeroWeek([onthaal, ...busySunday, ...rest], friday11);
+    const sunday = result.days.find((day) => day.key === "2026-09-13");
+    expect(ids(sunday)).toEqual(["a", "b", "c"]);
+    expect(sunday?.more).toBe(1);
+    const monday = result.days.find((day) => day.key === "2026-09-14");
+    expect(monday?.events[0]).toMatchObject({ day: 2, repeat: false });
   });
 });
