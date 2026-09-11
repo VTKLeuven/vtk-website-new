@@ -1,17 +1,21 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
+import { Input, Label } from "@vtk/ui";
 import { hasLocale } from "@/lib/locale";
 import type { Locale } from "@vtk/i18n";
+import { SaveForm } from "@/components/ui/SaveForm";
+import { saveDefaultIbanAction } from "@/app/actions/expenses";
 import {
   canView,
   expenseAccess,
   expenseSenderLabel,
   getExpenseConfig,
 } from "@/lib/rekeningen/server";
-import { formatEuro } from "@/lib/rekeningen/expenses";
+import { formatEuro, formatIban } from "@/lib/rekeningen/expenses";
 import { RekeningenNav } from "../RekeningenNav";
 import { ExpenseWorkbench } from "../ExpenseWorkbench";
+import { expenseErrorMessages } from "../messages";
 import { expenseInclude, toDetail, toRow } from "../rows";
 import { statusWhere, type ExpenseSearchParams } from "../filters";
 
@@ -22,6 +26,10 @@ const PAGE_SIZE = 25;
  *
  * Bewust hetzelfde scherm als het beheeroverzicht, enkel zonder de filterbalk:
  * wie zijn eigen rekeningen zoekt heeft er hooguit tien, en die staan er al.
+ *
+ * Onderaan staat je standaard-rekeningnummer. Dat hoort hier en niet in je
+ * profiel of in de onboarding: enkel wie rekeningen indient heeft het nodig (zie
+ * docs/design-decisions.md). Het indienformulier linkt naar `#standaard-iban`.
  */
 export default async function MijnRekeningen({
   params,
@@ -53,7 +61,7 @@ export default async function MijnRekeningen({
 
   const where = { submittedById: access.session.user.id };
 
-  const [count, sum, rowsRaw, openCents, config] = await Promise.all([
+  const [count, sum, rowsRaw, openCents, config, profile] = await Promise.all([
     prisma.expense.count({ where }),
     prisma.expense.aggregate({ where, _sum: { amountCents: true } }),
     prisma.expense.findMany({
@@ -69,6 +77,10 @@ export default async function MijnRekeningen({
       _count: true,
     }),
     getExpenseConfig(),
+    prisma.user.findUniqueOrThrow({
+      where: { id: access.session.user.id },
+      select: { defaultIban: true },
+    }),
   ]);
 
   const selectedRaw = selectedId
@@ -161,6 +173,52 @@ export default async function MijnRekeningen({
         accountantEmail={config.accountantEmail}
         senderEmail={expenseSenderLabel(config)}
       />
+
+      {access.canSubmit && (
+        <section
+          id="standaard-iban"
+          aria-labelledby="standaard-iban-title"
+          className="scroll-mt-28 rounded-2xl border border-vtk-blue/12 bg-white p-5"
+        >
+          <h2 id="standaard-iban-title" className="text-base font-semibold">
+            {nl ? "Standaard-rekeningnummer" : "Default account number"}
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm text-[#5c667f]">
+            {nl
+              ? "Betaal je iets met je eigen kaart, dan vult het indienformulier dit nummer al in. Je kan het per rekening nog aanpassen, en een wijziging hier verandert niets aan rekeningen die je al indiende."
+              : "When you pay with your own card, the submit form prefills this number. You can still change it per expense, and changing it here does not affect expenses you already submitted."}
+          </p>
+          {/* Niet leegmaken na opslaan: dit is een instelling, geen nieuw item. Een
+              reset zou het veld even terugzetten op het oude nummer. */}
+          <SaveForm
+            action={saveDefaultIbanAction}
+            className="mt-4 space-y-3"
+            submitLabel={nl ? "Opslaan" : "Save"}
+            savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
+            savedMessage={nl ? "Standaard-rekeningnummer opgeslagen." : "Default account number saved."}
+            errorMessages={expenseErrorMessages(locale)}
+            fallbackErrorMessage={nl ? "Opslaan mislukt." : "Could not save."}
+            resetOnSuccess={false}
+          >
+            <div className="sm:max-w-sm">
+              <Label htmlFor="defaultIban">IBAN</Label>
+              <Input
+                id="defaultIban"
+                name="defaultIban"
+                defaultValue={formatIban(profile.defaultIban)}
+                placeholder="BE68 5390 0754 7034"
+                maxLength={40}
+                autoComplete="off"
+              />
+              <p className="mt-1 text-xs text-[#5c667f]">
+                {nl
+                  ? "Optioneel. Laat het leeg als je geen nummer wil bewaren."
+                  : "Optional. Leave it empty if you do not want to store a number."}
+              </p>
+            </div>
+          </SaveForm>
+        </section>
+      )}
     </div>
   );
 }

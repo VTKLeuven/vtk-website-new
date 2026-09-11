@@ -91,7 +91,7 @@ export default async function RekeningIndienen({
         <ExpenseForm
           locale={nl ? "nl" : "en"}
           action={submitExpenseAction}
-          defaultIbanHref={`${base}/account#default-iban`}
+          defaultIbanHref={`${base}/admin/rekeningen/mijn#standaard-iban`}
           posts={[
             ...own.map((group) => ({ id: group.id, name: `${name(group)} ${nl ? "(jouw post)" : "(your post)"}` })),
             ...others.map((group) => ({ id: group.id, name: name(group) })),

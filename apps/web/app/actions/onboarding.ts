@@ -27,7 +27,6 @@ import {
   addressSchema,
   addressUpdate,
 } from "@/lib/profile-address";
-import { isValidIban, normaliseIban } from "@/lib/rekeningen/expenses";
 
 /**
  * De studievelden, gedeeld door het volledige profielformulier en de jaarlijkse
@@ -162,11 +161,6 @@ const profileSchema = z
       .toLowerCase()
       .refine((value) => value === "" || z.string().email().safeParse(value).success)
       .default(""),
-    defaultIban: z
-      .string()
-      .trim()
-      .refine((value) => value === "" || isValidIban(value), { message: "INVALID_IBAN" })
-      .default(""),
     emailPreference: z.enum(EMAIL_PREFERENCES),
     mailCategories: z.array(z.enum(MAIL_CATEGORIES)).default([]),
     // Enkel zichtbaar voor wie zich via een mail uitschreef: het lid vraagt
@@ -206,7 +200,6 @@ async function storeAvatar(file: File | null): Promise<string | null> {
 /** Fouten die het lid zelf kan oplossen; `ProfileForm` vertaalt ze naar een toast. */
 export type ProfileErrorCode =
   | "INVALID_PROFILE"
-  | "INVALID_IBAN"
   | "RNUMBER_TAKEN"
   | "AVATAR_TOO_LARGE"
   | "AVATAR_FAILED";
@@ -220,6 +213,10 @@ export type ProfileErrorCode =
  * Verwachte invoerfouten komen als `status: "error"` terug in plaats van als
  * throw: een lid dat een r-nummer hergebruikt hoort een melding te zien, geen
  * error boundary. Onverwachte serverfouten blijven wel gooien.
+ *
+ * Het standaard-IBAN zit hier bewust niet in: dat stelt enkel wie rekeningen mag
+ * indienen in, onder Rekeningen (`saveDefaultIbanAction`). Dit formulier raakt
+ * het veld dus ook niet aan; anders zou elke profielopslag het wissen.
  */
 export async function saveProfileAction(
   _prevState: SaveState,
@@ -234,7 +231,6 @@ export async function saveProfileAction(
     ...addressFieldsFromForm(formData),
     birthDate: formData.get("birthDate") ?? "",
     personalEmail: formData.get("personalEmail") ?? "",
-    defaultIban: formData.get("defaultIban") ?? "",
     emailPreference: formData.get("emailPreference") ?? "UNIVERSITY",
     mailCategories: formData.getAll("mailCategories"),
     mailResubscribe: formData.get("mailResubscribe") === "on",
@@ -245,9 +241,6 @@ export async function saveProfileAction(
   });
 
   if (!parsed.success) {
-    if (parsed.error.issues.some((issue) => issue.path.includes("defaultIban"))) {
-      return saveError("INVALID_IBAN" satisfies ProfileErrorCode);
-    }
     return saveError("INVALID_PROFILE" satisfies ProfileErrorCode);
   }
   const data = parsed.data;
@@ -292,7 +285,6 @@ export async function saveProfileAction(
         ...addressUpdate(data),
         birthDate: data.birthDate ? new Date(data.birthDate) : null,
         personalEmail: data.personalEmail || null,
-        defaultIban: data.defaultIban ? normaliseIban(data.defaultIban) : null,
         emailPreference: data.emailPreference,
         mailCategories: { set: data.mailCategories },
         ...(resubscribe ? { mailUnsubscribedAt: null } : {}),

@@ -46,6 +46,37 @@ function text(formData: FormData, name: string, max = 200): string {
 }
 
 // -----------------------------------------------------------------------------
+// Standaard-rekeningnummer
+// -----------------------------------------------------------------------------
+
+/**
+ * Het rekeningnummer dat het indienformulier vooraf invult bij een persoonlijke
+ * betaling. Enkel voor wie rekeningen mag indienen: een IBAN hoort niet bij de
+ * gegevens die elk lid in de onboarding afgeeft (zie docs/design-decisions.md).
+ *
+ * Leeg opslaan wist de standaard. Rekeningen die al ingediend zijn, houden hun
+ * eigen nummer: `Expense.iban` is een momentopname.
+ */
+export async function saveDefaultIbanAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const access = await requireExpenseAccess();
+  if (!access.canSubmit) return saveError("FORBIDDEN");
+
+  const raw = text(formData, "defaultIban", 40);
+  if (raw && !isValidIban(raw)) return saveError("BAD_IBAN");
+
+  await prisma.user.update({
+    where: { id: access.session.user.id },
+    data: { defaultIban: raw ? normaliseIban(raw) : null },
+  });
+
+  revalidateExpenses();
+  return saveOk();
+}
+
+// -----------------------------------------------------------------------------
 // Indienen en bewerken
 // -----------------------------------------------------------------------------
 

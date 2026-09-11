@@ -70,7 +70,6 @@ export default async function AdminFlowPreview({
       homeCity: true,
       birthDate: true,
       personalEmail: true,
-      defaultIban: true,
       emailPreference: true,
       mailCategories: true,
       mailUnsubscribedAt: true,

@@ -61,7 +61,7 @@ export function ExpenseForm({
   };
   /** Waar we heen gaan na een geslaagde opslag. Leeg = op de pagina blijven. */
   redirectAfter?: string;
-  /** Profielpagina waar de indiener zijn eigen standaard-IBAN kan aanpassen. */
+  /** Waar de indiener zijn eigen standaard-IBAN aanpast: onder Mijn rekeningen. */
   defaultIbanHref?: string;
 }) {
   const nl = locale === "nl";

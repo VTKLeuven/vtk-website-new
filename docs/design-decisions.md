@@ -6036,14 +6036,22 @@ versturen, niet door te beweren dat je dat deed. Zonder mailserver weigert de
 actie dus in plaats van een blad af te vinken dat nooit vertrok (zie de
 waarschuwing bovenaan `@vtk/mail`); je kan het blad dan downloaden en zelf mailen.
 
-**Een standaard-IBAN is optioneel; de rekening blijft een momentopname.** Een lid
-kan in zijn eigen profiel een standaard instellen of wijzigen. Bij een
-persoonlijke betaling vult het formulier die vooraf in, maar het veld blijft per
-rekening aanpasbaar en opslaan verandert de profielstandaard niet. `Expense.iban`
-houdt dus het nummer waarmee precies die uitgave terugbetaald moet worden; een
-latere wijziging aan `User.defaultIban` herschrijft geen bestaande rekeningen.
-De standaard zit ook in de eigen gegevensexport en wordt bij accountwissing
-verwijderd.
+**Een standaard-IBAN is optioneel; de rekening blijft een momentopname.** Wie
+rekeningen mag indienen, stelt onder Rekeningen → Mijn rekeningen een standaard
+in of wijzigt die. Bij een persoonlijke betaling vult het formulier die vooraf in,
+maar het veld blijft per rekening aanpasbaar en opslaan verandert de standaard
+niet. `Expense.iban` houdt dus het nummer waarmee precies die uitgave
+terugbetaald moet worden; een latere wijziging aan `User.defaultIban` herschrijft
+geen bestaande rekeningen. De standaard zit ook in de eigen gegevensexport en
+wordt bij accountwissing verwijderd.
+
+**Het rekeningnummer zit niet in de onboarding en niet in het profiel.** Het
+stond eerst onder "Terugbetalingen" in het profielformulier, en dus ook in de
+onboarding van elk nieuw lid. De meeste leden dienen nooit een rekening in, en een
+rekeningnummer is geen gegeven dat de kring van iedereen hoeft te vragen. Het
+staat daarom enkel bij de rekeningen zelf, waar alleen komt wie
+`expenses.submit` of een beheerrecht heeft. Het profielformulier raakt het veld
+ook niet meer aan: anders zou elke gewone profielopslag het wissen.
 
 **De postnaam wordt vastgeklikt bij het indienen.** `Expense.postLabel` is een
 kopie van de naam zoals de post op dat moment heette, naast de gewone
