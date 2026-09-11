@@ -623,25 +623,29 @@ export function TransportCalendar({
 
       {/* Welk icoon en welke arcering horen bij welk voertuig (K1). Allebei staan
           ze in het blok, dus zonder deze regel moet je raden wat het karretje
-          voorstelt en waarom het gestreept is. */}
-      <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-vtk-muted">
-        {vehicles.map((vehicle) => (
-          <li key={vehicle.id} className="flex items-center gap-1.5">
-            {/* Enkel wanneer er een arcering ingesteld is: een leeg vierkantje
-                naast elk voertuig leest als een uitgevinkt selectievakje. */}
-            {vehiclePatternClass(vehicle.pattern) ? (
-              <span
-                aria-hidden
-                className={`h-3.5 w-3.5 shrink-0 rounded-[3px] border border-vtk-navy/20 bg-vtk-paper ${vehiclePatternClass(
-                  vehicle.pattern
-                )}`}
-              />
-            ) : null}
-            <LogisticsIcon name={vehicleIcon(vehicle.code)} className="h-3.5 w-3.5 shrink-0" />
-            {vehicle.name}
-          </li>
-        ))}
-      </ul>
+          voorstelt en waarom het gestreept is. Staat er nog geen voertuig klaar,
+          dan valt de regel weg: een lege `ul` met gap laat enkel een
+          onverklaarbaar gat tussen de kalender en wat eronder staat. */}
+      {vehicles.length > 0 ? (
+        <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-vtk-muted">
+          {vehicles.map((vehicle) => (
+            <li key={vehicle.id} className="flex items-center gap-1.5">
+              {/* Enkel wanneer er een arcering ingesteld is: een leeg vierkantje
+                  naast elk voertuig leest als een uitgevinkt selectievakje. */}
+              {vehiclePatternClass(vehicle.pattern) ? (
+                <span
+                  aria-hidden
+                  className={`h-3.5 w-3.5 shrink-0 rounded-[3px] border border-vtk-navy/20 bg-vtk-paper ${vehiclePatternClass(
+                    vehicle.pattern
+                  )}`}
+                />
+              ) : null}
+              <LogisticsIcon name={vehicleIcon(vehicle.code)} className="h-3.5 w-3.5 shrink-0" />
+              {vehicle.name}
+            </li>
+          ))}
+        </ul>
+      ) : null}
 
       {children}
     </div>

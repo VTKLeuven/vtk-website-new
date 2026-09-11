@@ -233,6 +233,17 @@ export function TransportPlanner({
 
   const createRange = useCallback(
     (startAt: Date, endAt: Date) => {
+      // Slepen op een leeg rooster kan ook zonder voertuig, en een formulier dat
+      // bij het opslaan "Kies een voertuig" antwoordt op een keuzelijst zonder
+      // keuzes, is een doodlopend straatje. Zeg het hier, waar het gebaar valt.
+      if (vehicleOptions.length === 0) {
+        showToast({
+          message: 'Voeg eerst een voertuig toe bij Instellingen; daarna kan je ritten inplannen.',
+          variant: 'error',
+          duration: 0,
+        });
+        return;
+      }
       setOpenId(null);
       setDraft({
         startAt: toDatetimeLocalValue(startAt),
@@ -247,11 +258,28 @@ export function TransportPlanner({
         destination: '',
       });
     },
-    [vehicleOptions]
+    [showToast, vehicleOptions]
   );
+
+  // Zonder voertuig valt er niets in te plannen, maar de kalender zelf zegt dat
+  // niet: die stond er vroeger helemaal niet, en dan leek de planning stuk in
+  // plaats van leeg. Ze staat er nu wel, met deze regel erboven die zegt wat er
+  // ontbreekt en waar je het zet.
+  const noVehicles = vehicleOptions.length === 0;
 
   return (
     <>
+      {noVehicles ? (
+        <p className="rounded-[14px] border border-vtk-yellow-dark/40 bg-vtk-yellow/20 px-4 py-3 text-sm font-medium text-vtk-ink">
+          Er staat nog geen voertuig klaar, dus een rit kan nog niet ingepland worden. Voeg er een
+          toe bij{' '}
+          <Link href="/beheer/instellingen" className="underline underline-offset-4">
+            Instellingen
+          </Link>
+          ; de kalender hieronder werkt daarna meteen.
+        </p>
+      ) : null}
+
       <TransportCalendar
         view={view}
         anchor={anchor}
@@ -312,13 +340,15 @@ export function TransportPlanner({
                 verticaal vegen scrollen, dus daar valt er niets in te tekenen. */}
             <button
               type="button"
+              disabled={noVehicles}
+              title={noVehicles ? 'Er staat nog geen voertuig klaar bij Instellingen.' : undefined}
               onClick={() => {
                 const start = new Date();
                 start.setMinutes(0, 0, 0);
                 start.setHours(start.getHours() + 1);
                 createRange(start, new Date(start.getTime() + 60 * 60 * 1000));
               }}
-              className="rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-vtk-ink"
+              className="rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-vtk-ink disabled:cursor-not-allowed disabled:border-vtk-navy/20 disabled:bg-vtk-navy/30"
             >
               Nieuwe rit
             </button>

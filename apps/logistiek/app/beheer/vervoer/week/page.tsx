@@ -286,80 +286,76 @@ export default async function VervoerWeekPage({
         </div>
       </div>
 
-      {vehicles.length === 0 ? (
-        <p className="text-sm text-vtk-muted">Er staan nog geen voertuigen in de instellingen.</p>
-      ) : (
-        <TransportPlanner
-          view={view}
-          anchor={anchor.toISOString()}
-          days={days.map((day) => day.toISOString())}
-          vehicles={vehicles.map((vehicle) => ({
+      <TransportPlanner
+        view={view}
+        anchor={anchor.toISOString()}
+        days={days.map((day) => day.toISOString())}
+        vehicles={vehicles.map((vehicle) => ({
+          id: vehicle.id,
+          name: vehicle.nameNl,
+          code: vehicle.code,
+          pattern: vehicle.pattern,
+          needsDriver: vehicle.needsDriver,
+        }))}
+        blocks={blocks}
+        trips={trips}
+        drivers={drivers}
+        driverColors={driverColors}
+        filters={filters}
+        hiddenNote={describeFilters(filters, {
+          vehicles: new Map(vehicles.map((vehicle) => [vehicle.id, vehicle.nameNl])),
+          drivers: new Map(drivers.map((driver) => [driver.id, driver.name])),
+        })}
+        vehicleOptions={vehicles
+          .filter((vehicle) => vehicle.active)
+          .map((vehicle) => ({
             id: vehicle.id,
             name: vehicle.nameNl,
-            code: vehicle.code,
-            pattern: vehicle.pattern,
-            needsDriver: vehicle.needsDriver,
+            needsVanDriver: vehicle.needsVanDriver,
           }))}
-          blocks={blocks}
-          trips={trips}
-          drivers={drivers}
-          driverColors={driverColors}
-          filters={filters}
-          hiddenNote={describeFilters(filters, {
-            vehicles: new Map(vehicles.map((vehicle) => [vehicle.id, vehicle.nameNl])),
-            drivers: new Map(drivers.map((driver) => [driver.id, driver.name])),
-          })}
-          vehicleOptions={vehicles
-            .filter((vehicle) => vehicle.active)
-            .map((vehicle) => ({
-              id: vehicle.id,
-              name: vehicle.nameNl,
-              needsVanDriver: vehicle.needsVanDriver,
-            }))}
-          groups={groups.map((group) => ({ id: group.id, name: group.nameNl }))}
-          availability={availability.map((window) => ({
-            id: window.id,
-            driverId: window.userId,
-            driverName: window.user.name,
-            startAt: window.startAt.toISOString(),
-            endAt: window.endAt.toISOString(),
-            kind: window.kind,
-            note: window.note,
-          }))}
-          events={events.map((event) => {
-            const startAt = event.startAt as Date;
-            // Een evenement zonder einde duurt tot het einde van zijn startdag;
-            // een balk van nul breed zou onzichtbaar zijn, en dat is net het
-            // evenement waarvan het uur nog niet ingevuld is.
-            const endAt = event.endAt ?? endOfDay(startAt);
-            return {
-              id: event.id,
-              name: event.name,
-              location: event.location,
-              startAt: startAt.toISOString(),
-              endAt: endAt.toISOString(),
-              timeKnown: event.startTimeKnown,
-              groupName: event.group?.nameNl ?? null,
-              requestCount: event._count.reservations,
-              tripCount: event._count.transport,
-              form: {
-                startDate: toBrusselsDateValue(startAt),
-                startTime: event.startTimeKnown ? toBrusselsTimeValue(startAt) : '',
-                endDate: event.endAt ? toBrusselsDateValue(event.endAt) : '',
-                endTime: event.endAt ? toBrusselsTimeValue(event.endAt) : '',
-                note: event.note ?? '',
-              },
-            };
-          })}
-          nav={{
-            previousHref: hrefFor(shiftAnchor(view, anchor, -1)),
-            nextHref: hrefFor(shiftAnchor(view, anchor, 1)),
-            todayHref: hrefFor(todayDateOnly()),
-            isToday: isCurrentPeriod(view, anchor),
-            label: view,
-          }}
-        />
-      )}
+        groups={groups.map((group) => ({ id: group.id, name: group.nameNl }))}
+        availability={availability.map((window) => ({
+          id: window.id,
+          driverId: window.userId,
+          driverName: window.user.name,
+          startAt: window.startAt.toISOString(),
+          endAt: window.endAt.toISOString(),
+          kind: window.kind,
+          note: window.note,
+        }))}
+        events={events.map((event) => {
+          const startAt = event.startAt as Date;
+          // Een evenement zonder einde duurt tot het einde van zijn startdag;
+          // een balk van nul breed zou onzichtbaar zijn, en dat is net het
+          // evenement waarvan het uur nog niet ingevuld is.
+          const endAt = event.endAt ?? endOfDay(startAt);
+          return {
+            id: event.id,
+            name: event.name,
+            location: event.location,
+            startAt: startAt.toISOString(),
+            endAt: endAt.toISOString(),
+            timeKnown: event.startTimeKnown,
+            groupName: event.group?.nameNl ?? null,
+            requestCount: event._count.reservations,
+            tripCount: event._count.transport,
+            form: {
+              startDate: toBrusselsDateValue(startAt),
+              startTime: event.startTimeKnown ? toBrusselsTimeValue(startAt) : '',
+              endDate: event.endAt ? toBrusselsDateValue(event.endAt) : '',
+              endTime: event.endAt ? toBrusselsTimeValue(event.endAt) : '',
+              note: event.note ?? '',
+            },
+          };
+        })}
+        nav={{
+          previousHref: hrefFor(shiftAnchor(view, anchor, -1)),
+          nextHref: hrefFor(shiftAnchor(view, anchor, 1)),
+          todayHref: hrefFor(todayDateOnly()),
+          isToday: isCurrentPeriod(view, anchor),
+          label: view,
+        }}
+      />
     </div>
   );
 }
