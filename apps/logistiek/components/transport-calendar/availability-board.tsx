@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AVAILABILITY_KINDS, type AvailabilityKind } from '@/lib/availability-day';
 import {
   AVAILABILITY_KIND_HINT,
@@ -16,37 +16,19 @@ import type { AvailabilityBand } from './types';
  * Wie kan er wanneer rijden, deze week (V1).
  *
  * Een eigen strook onder de planning, met **één rij per chauffeur**. In de
- * planning zelf liggen dezelfde vensters als lichte band achter de ritten, en
- * dat blijft zo: daar is beschikbaarheid de achtergrond waarbinnen je plant. Maar
- * als achtergrond beantwoordt ze de vraag "wie kan er donderdagavond?" niet: alle
- * banden liggen dan door elkaar in dezelfde kolom, en van vier mensen die kunnen
- * zie je één gearceerd blok.
- *
- * Hier staat elke chauffeur op zijn eigen lijn, in zijn eigen kleur uit de
- * planning, zodat "wie kan er wanneer" één blik is in plaats van een puzzel.
+ * planning zelf liggen dezelfde vensters als lichte band achter de ritten.
  *
  * Wat daarbij vastligt:
- *
- * - **Iedereen uit de chauffeurslijst krijgt een rij**, ook wie niets doorgaf.
- *   Een lege rij is informatie: die persoon weet je niet, en dat is iets anders
- *   dan dat hij niet kan. Wie niets doorgaf staat onderaan, met een grijze zin
- *   in plaats van een lege lijn.
- * - **De kleur is dezelfde als in de planning.** Zie je hier dat de blauwe kan,
- *   dan herken je hem boven meteen terug.
+ * - **Enkel karchauffeurs krijgen een rij**, ook wie niets doorgaf.
+ * - **De kleur is dezelfde als in de planning.**
  * - **Het patroon zegt hoe graag.** Vol is "beschikbaar", schuine strepen zijn
- *   "liever niet", stippen zijn "enkel in noodgeval". De kleur is hier al bezet
- *   om te zeggen wie het is, dus kan ze het verschil tussen de drie niet
- *   dragen; zie lib/availability-kinds.ts.
- * - **Wie het meest kan, staat boven.** De vraag hier is "wie vraag ik?", en dan
- *   hoort het antwoord niet alfabetisch onderaan te staan. Gesorteerd op de uren
- *   die iemand in dit venster als "beschikbaar" opgaf, en pas daarna op de rest;
- *   wie enkel "in noodgeval" aankruiste, komt dus niet boven iemand die gewoon
- *   kan.
- * - **De tijd is een positie, geen tekst.** De hele strook is het venster van de
- *   weergave; een blok van vier uur is een blokje van vier uur breed. Het uur
- *   staat erin zodra het past en anders in de tooltip: op een week is een
- *   werkdag een balkje van vijfendertig pixels, en "09:0…" erin is minder
- *   leesbaar dan niets. Op een dagweergave past het wel, en dan staat het er.
+ *   "liever niet", stippen zijn "enkel in noodgeval".
+ * - **Wie het meest kan, staat boven.**
+ * - **Interactieve zoom**: Zowel op desktop (knoppen, Ctrl+wiel, trackpad pinch)
+ *   als op mobiel (knoppen, touch pinch) kan worden ingezoomd om specifieke
+ *   tijden tot op het kwartier/halfuur nauwkeurig te bekijken.
+ * - **Vastgezette chauffeurskolom (sticky)**: Bij horizontaal scrollen blijven
+ *   de namen van de chauffeurs altijd links in beeld.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -58,6 +40,12 @@ const weekdayFormatter = new Intl.DateTimeFormat('nl-BE', {
 const dayNumberFormatter = new Intl.DateTimeFormat('nl-BE', {
   timeZone: 'Europe/Brussels',
   day: 'numeric',
+});
+const fullDateFormatter = new Intl.DateTimeFormat('nl-BE', {
+  timeZone: 'Europe/Brussels',
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
 });
 const momentFormatter = new Intl.DateTimeFormat('nl-BE', {
   timeZone: 'Europe/Brussels',
@@ -78,13 +66,20 @@ export type BoardDriver = { id: string; name: string };
 /** Eén venster als balkje op de strook. */
 type Bar = {
   id: string;
+  driverId: string;
+  driverName: string;
   kind: AvailabilityKind;
   /** Hoelang dit venster binnen de weergave duurt, voor de volgorde en de telling. */
   minutes: number;
   left: number;
   width: number;
   label: string;
+  shortLabel: string;
   title: string;
+  fullDate: string;
+  timeRange: string;
+  duration: string;
+  note: string | null;
 };
 
 /** "8u" of "1u30", kort genoeg voor naast een naam van dertig tekens. */
@@ -103,13 +98,20 @@ export function AvailabilityBoard({
   /** De dagen van de weergave, als ISO-strings van UTC-middernacht. */
   days: string[];
   windows: AvailabilityBand[];
-  /** Iedereen die kan rijden, ook wie niets doorgaf. */
+  /** Iedereen die kan rijden (gefilterd op karchauffeurs), ook wie niets doorgaf. */
   drivers: BoardDriver[];
   driverColors?: DriverColorOverrides;
 }) {
   const [only, setOnly] = useState<string[]>([]);
   /** Welke soorten getoond worden; leeg betekent alle drie. */
   const [kinds, setKinds] = useState<AvailabilityKind[]>([]);
+  /** Zoomniveau: 1 (100%) tot 5 (500%). */
+  const [zoom, setZoom] = useState(1);
+  /** Geselecteerde balk voor detailweergave (vooral op mobiel). */
+  const [selectedBar, setSelectedBar] = useState<Bar | null>(null);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const touchState = useRef<{ initialDist: number; initialZoom: number; midX: number } | null>(null);
 
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
 
@@ -123,11 +125,92 @@ export function AvailabilityBoard({
   }, [parsedDays]);
 
   /**
+   * Geankerd zoomen: het tijdstip dat nu gecentreerd is (of onder de muis ligt)
+   * blijft op dezelfde plek na de schaling.
+   */
+  const setZoomAnchored = useCallback(
+    (nextZoomOrUpdater: number | ((prev: number) => number), clientAnchorX?: number) => {
+      const container = containerRef.current;
+      setZoom((prev) => {
+        const target =
+          typeof nextZoomOrUpdater === 'function' ? nextZoomOrUpdater(prev) : nextZoomOrUpdater;
+        const next = Math.min(5, Math.max(1, Math.round(target * 10) / 10));
+        if (next === prev) return prev;
+
+        if (container) {
+          const rect = container.getBoundingClientRect();
+          const anchorX =
+            clientAnchorX !== undefined ? clientAnchorX - rect.left : container.clientWidth / 2;
+          const oldScroll = container.scrollLeft;
+          const oldContentWidth = container.scrollWidth;
+          const anchorRatio = (oldScroll + anchorX) / Math.max(1, oldContentWidth);
+
+          requestAnimationFrame(() => {
+            if (containerRef.current) {
+              const newContentWidth = containerRef.current.scrollWidth;
+              containerRef.current.scrollLeft = anchorRatio * newContentWidth - anchorX;
+            }
+          });
+        }
+
+        return next;
+      });
+    },
+    []
+  );
+
+  /**
+   * Desktop wheel / trackpad pinch zoom.
+   */
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY;
+        const zoomDelta = -delta * 0.005;
+        setZoomAnchored((current) => current * (1 + zoomDelta), e.clientX);
+      }
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [setZoomAnchored]);
+
+  /**
+   * Touch pinch-to-zoom voor mobiel.
+   */
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 2) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      const midX = (t1.clientX + t2.clientX) / 2;
+      touchState.current = { initialDist: dist, initialZoom: zoom, midX };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (e.touches.length === 2 && touchState.current) {
+      const t1 = e.touches[0];
+      const t2 = e.touches[1];
+      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY);
+      if (touchState.current.initialDist > 10) {
+        const factor = dist / touchState.current.initialDist;
+        const newZoom = touchState.current.initialZoom * factor;
+        setZoomAnchored(newZoom, touchState.current.midX);
+      }
+    }
+  };
+
+  const handleTouchEnd = () => {
+    touchState.current = null;
+  };
+
+  /**
    * De vensters per chauffeur, geknipt op het venster van de weergave.
-   *
-   * Knippen en niet weglaten: een venster van vrijdagavond tot zondagochtend
-   * hoort ook op een week te staan die op zaterdag eindigt, en dan als balk tot
-   * de rand.
    */
   const perDriver = useMemo(() => {
     const map = new Map<string, Bar[]>();
@@ -139,15 +222,29 @@ export function AvailabilityBoard({
       if (end <= range.from || start >= range.to) continue;
       const from = Math.max(start, range.from);
       const to = Math.min(end, range.to);
+      const minutes = (to - from) / 60000;
+      const durationHours = minutes / 60;
+      const fromDate = new Date(from);
+      const toDate = new Date(to);
+      const timeRange = `${timeFormatter.format(fromDate)} – ${timeFormatter.format(toDate)}`;
+      const duration = hoursLabel(durationHours);
+
       const bars = map.get(window.driverId) ?? [];
       bars.push({
         id: window.id,
+        driverId: window.driverId,
+        driverName: window.driverName,
         kind: window.kind,
-        minutes: (to - from) / 60000,
+        minutes,
         left: ((from - range.from) / range.span) * 100,
-        width: Math.max(0.4, ((to - from) / range.span) * 100),
-        label: `${timeFormatter.format(new Date(from))}-${timeFormatter.format(new Date(to))}`,
+        width: Math.max(0.3, ((to - from) / range.span) * 100),
+        label: `${timeRange} (${duration})`,
+        shortLabel: timeRange,
         title: `${window.driverName}, ${AVAILABILITY_KIND_LABEL[window.kind].toLowerCase()}: ${momentFormatter.format(new Date(start))} tot ${momentFormatter.format(new Date(end))}${window.note ? ` (${window.note})` : ''}`,
+        fullDate: fullDateFormatter.format(fromDate),
+        timeRange,
+        duration,
+        note: window.note,
       });
       map.set(window.driverId, bars);
     }
@@ -156,10 +253,6 @@ export function AvailabilityBoard({
 
   /**
    * Hoeveel uur iemand van elke soort opgaf binnen dit venster.
-   *
-   * Waarvoor: de volgorde van de rijen, en de regel naast de naam. Een balk
-   * aflezen zegt wanneer, niet hoeveel, en "wie kan er het meest deze week" is
-   * precies de vraag waarmee je aan een kalender begint.
    */
   const hoursPerDriver = useMemo(() => {
     const map = new Map<string, Record<AvailabilityKind, number>>();
@@ -172,41 +265,9 @@ export function AvailabilityBoard({
   }, [perDriver]);
 
   /**
- * Vanaf welk aandeel van de strook er tekst in een balk past.
- *
- * Twaalf procent is op een week ongeveer twintig uur (dus nooit) en op één dag
- * bijna drie uur (dus meestal wel), en dat is precies de bedoeling: hoe verder
- * je uitzoomt, hoe meer de kleur het werk doet.
- */
-const LABEL_MIN_SHARE = 12;
-
-/**
- * Om de hoeveel uur er een streepje in de strook komt, per lengte van het
- * venster.
- *
- * Zonder streepjes is een balk enkel een kleur op een lijn: je ziet dát iemand
- * kan, niet wanneer. En het uur in de balk zelf helpt daar niet, want dat past
- * precies niet bij de korte vensters waar je het nodig hebt.
- *
- * Op één dag om de drie uur, tot een week om de zes. Op een week is een dag
- * ongeveer honderd pixels breed, dus vier streepjes per dag staan zo'n
- * vijfentwintig pixels uit elkaar en de cijfers 00, 06, 12 en 18 passen er nog
- * naast elkaar. Op een maand blijven enkel de dagranden over; daar zou elk
- * streepje smaller zijn dan het cijfer erboven.
- */
-function tickHours(dayCount: number): number {
-  if (dayCount <= 1) return 3;
-  if (dayCount <= HOUR_LABEL_MAX_DAYS) return 6;
-  return 24;
-}
-
-/** Tot hoeveel dagen de streepjes een uur dragen in plaats van enkel een lijn. */
-const HOUR_LABEL_MAX_DAYS = 7;
-
-/**
- * Wie iets doorgaf eerst en op volgorde van bruikbaarheid; wie niets doorgaf
- * onderaan, in de eigen volgorde.
- */
+   * Wie iets doorgaf eerst en op volgorde van bruikbaarheid; wie niets doorgaf
+   * onderaan.
+   */
   const rows = useMemo(() => {
     const chosen = only.length === 0 ? drivers : drivers.filter((driver) => only.includes(driver.id));
     const withWindows = chosen
@@ -214,9 +275,6 @@ const HOUR_LABEL_MAX_DAYS = 7;
       .sort((a, b) => {
         const left = hoursPerDriver.get(a.id) ?? { JA: 0, LIEVER_NIET: 0, NOOD: 0 };
         const right = hoursPerDriver.get(b.id) ?? { JA: 0, LIEVER_NIET: 0, NOOD: 0 };
-        // Eerst wie het meest gewoon kan, dan wie het meest "liever niet" zei, en
-        // pas als laatste "in noodgeval": anders zou iemand die de hele week op
-        // noodgeval zette, boven iemand staan die zaterdag gewoon kan.
         return (
           right.JA - left.JA ||
           right.LIEVER_NIET - left.LIEVER_NIET ||
@@ -229,46 +287,73 @@ const HOUR_LABEL_MAX_DAYS = 7;
   }, [drivers, hoursPerDriver, only, perDriver]);
 
   /**
-   * De streepjes: één per `tickHours` uur, met de dagranden apart (die zijn
-   * sterker en dragen de dagnaam).
+   * Dynamische tijdsverdeling (ticks) afhankelijk van het zoomniveau en het
+   * aantal dagen.
    */
-  const ticks = useMemo(() => {
-    const step = tickHours(parsedDays.length);
-    const perDay = 24 / step;
-    const out: Array<{ left: number; hour: number; isDay: boolean }> = [];
-    for (let day = 0; day < parsedDays.length; day += 1) {
-      for (let slot = 0; slot < perDay; slot += 1) {
-        const hour = slot * step;
+  const { ticks, tickStepHours } = useMemo(() => {
+    const dayCount = parsedDays.length;
+    let step = 6;
+    if (dayCount <= 1) {
+      step = zoom >= 3 ? 0.5 : zoom >= 1.5 ? 1 : 2;
+    } else if (dayCount <= 7) {
+      if (zoom >= 4) step = 0.5;
+      else if (zoom >= 2.5) step = 1;
+      else if (zoom >= 1.5) step = 3;
+      else step = 6;
+    } else {
+      step = zoom >= 4 ? 3 : zoom >= 2 ? 6 : 24;
+    }
+
+    const out: Array<{
+      left: number;
+      hour: number;
+      isDay: boolean;
+      isHalfHour: boolean;
+      label?: string;
+    }> = [];
+
+    const slotsPerDay = 24 / step;
+    for (let day = 0; day < dayCount; day += 1) {
+      for (let slot = 0; slot < slotsPerDay; slot += 1) {
+        const hourDecimal = slot * step;
+        const hour = Math.floor(hourDecimal);
+        const isHalfHour = hourDecimal % 1 !== 0;
+        const left = ((day + hourDecimal / 24) / dayCount) * 100;
+        const isDay = hourDecimal === 0;
+
+        let label: string | undefined = undefined;
+        if (isDay) {
+          label = '00:00';
+        } else if (!isHalfHour) {
+          label = `${String(hour).padStart(2, '0')}:00`;
+        }
+
         out.push({
-          left: ((day + hour / 24) / parsedDays.length) * 100,
+          left,
           hour,
-          isDay: hour === 0,
+          isDay,
+          isHalfHour,
+          label,
         });
       }
     }
-    return out;
-  }, [parsedDays.length]);
 
-  const showHourLabels = parsedDays.length <= HOUR_LABEL_MAX_DAYS;
+    return { ticks: out, tickStepHours: step };
+  }, [parsedDays.length, zoom]);
 
   if (!range || drivers.length === 0) return null;
 
   return (
-    // `min-w-0`: deze strook staat in een raster, en een rasteritem heeft
-    // `min-width: auto`, oftewel "krimp niet onder je inhoud". De `min-w-[30rem]`
-    // hieronder duwde daardoor de hele pagina open in plaats van in zijn eigen
-    // doos te scrollen, en dan schuift een telefoon de planning ernaast mee.
     <section className="min-w-0 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-sm font-semibold text-vtk-ink">Wie kan er rijden</h2>
+        <h2 className="text-sm font-semibold text-vtk-ink">Wie kan er rijden (karchauffeurs)</h2>
         <p className="text-xs text-vtk-muted">
-          Wat de chauffeurs zelf doorgaven. Het is een hint, geen belofte: je mag ze ook daarbuiten
+          Wat de karchauffeurs zelf doorgaven. Het is een hint, geen belofte: je mag ze ook daarbuiten
           vragen.
         </p>
       </div>
 
-      {/* De legende meteen onder de titel: zonder haar is "liever niet" een
-          patroon dat je moet raden, en dan lezen alle balken als "kan". */}
+      {/* Legende */}
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
         {AVAILABILITY_KINDS.map((kind) => (
           <span key={kind} className="inline-flex items-center gap-1.5 text-[11px] text-vtk-muted">
@@ -283,54 +368,111 @@ const HOUR_LABEL_MAX_DAYS = 7;
         ))}
       </div>
 
-      {/* Filteren op soort. Waarvoor: "wie kan er donderdagavond echt" is een
-          andere vraag dan "wie kan er desnoods", en met alle drie door elkaar
-          lijkt een week voller dan ze is. */}
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-vtk-muted">
-          Toon
-        </span>
-        <button
-          type="button"
-          onClick={() => setKinds([])}
-          aria-pressed={kinds.length === 0}
-          className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
-            kinds.length === 0
-              ? 'border-vtk-navy bg-vtk-navy text-white'
-              : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
-          }`}
-        >
-          Alles
-        </button>
-        {AVAILABILITY_KINDS.map((kind) => {
-          const active = kinds.includes(kind);
-          return (
+      {/* Werkbalk: Soort filter + Zoom controls */}
+      <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-y border-vtk-navy/10 py-2.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-vtk-muted">
+            Toon
+          </span>
+          <button
+            type="button"
+            onClick={() => setKinds([])}
+            aria-pressed={kinds.length === 0}
+            className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+              kinds.length === 0
+                ? 'border-vtk-navy bg-vtk-navy text-white'
+                : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
+            }`}
+          >
+            Alles
+          </button>
+          {AVAILABILITY_KINDS.map((kind) => {
+            const active = kinds.includes(kind);
+            return (
+              <button
+                key={kind}
+                type="button"
+                aria-pressed={active}
+                onClick={() =>
+                  setKinds((current) =>
+                    current.includes(kind)
+                      ? current.filter((value) => value !== kind)
+                      : [...current, kind]
+                  )
+                }
+                className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
+                  active
+                    ? 'border-vtk-navy bg-vtk-navy/5 text-vtk-ink'
+                    : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
+                }`}
+              >
+                {AVAILABILITY_KIND_LABEL[kind]}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Zoombediening (desktop & mobiel) */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-vtk-muted hidden lg:inline">
+            Ctrl + scroll of knijp om in te zoomen
+          </span>
+          <div className="flex items-center gap-1 rounded-full border border-vtk-navy/15 bg-vtk-paper/60 p-0.5">
             <button
-              key={kind}
               type="button"
-              aria-pressed={active}
-              onClick={() =>
-                setKinds((current) =>
-                  current.includes(kind)
-                    ? current.filter((value) => value !== kind)
-                    : [...current, kind]
-                )
-              }
-              className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
-                active
-                  ? 'border-vtk-navy bg-vtk-navy/5 text-vtk-ink'
-                  : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
-              }`}
+              onClick={() => setZoomAnchored((z) => Math.max(1, z - 0.5))}
+              disabled={zoom <= 1}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-vtk-ink transition hover:bg-vtk-surface disabled:opacity-30"
+              title="Uitzoomen"
+              aria-label="Uitzoomen"
             >
-              {AVAILABILITY_KIND_LABEL[kind]}
+              −
             </button>
-          );
-        })}
+            <span className="min-w-[3rem] px-1 text-center text-xs font-semibold tabular-nums text-vtk-ink">
+              {Math.round(zoom * 100)}%
+            </span>
+            <button
+              type="button"
+              onClick={() => setZoomAnchored((z) => Math.min(5, z + 0.5))}
+              disabled={zoom >= 5}
+              className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold text-vtk-ink transition hover:bg-vtk-surface disabled:opacity-30"
+              title="Inzoomen"
+              aria-label="Inzoomen"
+            >
+              +
+            </button>
+            {zoom > 1 ? (
+              <button
+                type="button"
+                onClick={() => setZoomAnchored(1)}
+                className="rounded-full px-2 py-0.5 text-[11px] font-medium text-vtk-navy hover:bg-vtk-surface transition"
+                title="Herstel zoom naar 100%"
+              >
+                Reset
+              </button>
+            ) : null}
+          </div>
+
+          <div className="hidden sm:flex items-center gap-1">
+            {[1, 2, 4].map((level) => (
+              <button
+                key={level}
+                type="button"
+                onClick={() => setZoomAnchored(level)}
+                className={`rounded-full border px-2 py-0.5 text-xs font-medium transition ${
+                  Math.round(zoom) === level
+                    ? 'border-vtk-navy bg-vtk-navy/10 text-vtk-ink font-semibold'
+                    : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
+                }`}
+              >
+                {level}x
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {/* De filter. Niets aangevinkt betekent iedereen, en dat staat er ook:
-          een lege filter die alles verbergt is de klassieke manier om een scherm
-          leeg te laten lijken. */}
+      {/* Chauffeur filter chips */}
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         <button
           type="button"
@@ -342,7 +484,7 @@ const HOUR_LABEL_MAX_DAYS = 7;
               : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
           }`}
         >
-          Iedereen
+          Iedereen ({drivers.length})
         </button>
         {drivers.map((driver) => {
           const active = only.includes(driver.id);
@@ -375,11 +517,69 @@ const HOUR_LABEL_MAX_DAYS = 7;
         })}
       </div>
 
-      <div className="mt-3 min-w-0 overflow-x-auto">
-        <div className="min-w-[30rem]">
-          {/* De dagkop, uitgelijnd op de stroken eronder. */}
-          <div className="flex items-end gap-2 pb-1">
-            <span className="w-32 shrink-0" />
+      {/* Detail inspectiekaartje bij klik of tik op een balk */}
+      {selectedBar && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-vtk-navy/15 bg-vtk-paper/80 p-3 text-xs shadow-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              aria-hidden
+              className="h-3 w-3 shrink-0 rounded-full border border-vtk-navy/20"
+              style={{ backgroundColor: driverColorVar(selectedBar.driverId, driverColors) }}
+            />
+            <span className="font-semibold text-vtk-ink">{selectedBar.driverName}</span>
+            <span className="text-vtk-muted">·</span>
+            <span className="capitalize font-medium text-vtk-ink">{selectedBar.fullDate}</span>
+            <span className="text-vtk-muted">·</span>
+            <span className="font-semibold tabular-nums text-vtk-ink">{selectedBar.timeRange}</span>
+            <span className="text-vtk-muted">({selectedBar.duration})</span>
+            <span
+              className={`ml-2 inline-flex items-center rounded-full border border-vtk-navy/20 px-2 py-0.5 text-[11px] font-medium ${availabilityFillClass(
+                selectedBar.kind
+              )}`}
+            >
+              {AVAILABILITY_KIND_LABEL[selectedBar.kind]}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {selectedBar.note && (
+              <span className="rounded border border-vtk-navy/10 bg-vtk-surface px-2 py-0.5 text-[11px] italic text-vtk-body">
+                "{selectedBar.note}"
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setSelectedBar(null)}
+              className="rounded-full px-2 py-0.5 text-xs text-vtk-muted hover:bg-vtk-surface hover:text-vtk-ink transition"
+              title="Detail sluiten"
+              aria-label="Detail sluiten"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tijdrooster met zoom en sticky chauffeursnamen */}
+      <div
+        className="mt-3 min-w-0 overflow-x-auto select-none rounded-[12px] border border-vtk-navy/10 bg-vtk-surface"
+        ref={containerRef}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      >
+        <div
+          className="relative min-w-[32rem] p-3 transition-all duration-75"
+          style={{ width: `${Math.max(100, zoom * 100)}%` }}
+        >
+          {/* Dagkop met uurschaal */}
+          <div className="flex items-end gap-2 pb-2 border-b border-vtk-navy/10">
+            <div className="w-28 sm:w-36 shrink-0 sticky left-0 z-20 bg-vtk-surface pr-2 border-r border-vtk-navy/10">
+              <span className="text-[11px] font-semibold text-vtk-muted uppercase tracking-wider">
+                Chauffeur
+              </span>
+            </div>
+
             <div className="relative flex-1">
               <div
                 className="grid gap-px"
@@ -394,30 +594,28 @@ const HOUR_LABEL_MAX_DAYS = 7;
                   </span>
                 ))}
               </div>
-              {/* De uren onder de dagnamen, op dezelfde plek als hun streepje.
-                  Enkel wanneer er dagen genoeg breed zijn; op een week zouden
-                  het veertien cijfers over elkaar worden. */}
-              {showHourLabels ? (
-                <div className="relative mt-0.5 h-3">
-                  {ticks.map((tick) => (
+
+              {/* Uurlabels afhankelijk van zoom */}
+              <div className="relative mt-1 h-3.5">
+                {ticks.map((tick) =>
+                  tick.label ? (
                     <span
-                      key={`${tick.left}`}
-                      className="absolute top-0 -translate-x-1/2 text-[9px] tabular-nums text-vtk-muted"
+                      key={`${tick.left}-${tick.hour}`}
+                      className="absolute top-0 -translate-x-1/2 text-[9px] tabular-nums text-vtk-muted pointer-events-none"
                       style={{ left: `${tick.left}%` }}
                     >
-                      {String(tick.hour).padStart(2, '0')}
+                      {tick.label}
                     </span>
-                  ))}
-                </div>
-              ) : null}
+                  ) : null
+                )}
+              </div>
             </div>
           </div>
 
-          <ul className="grid gap-1">
+          {/* Chauffeur rijen */}
+          <ul className="grid gap-1.5 mt-2">
             {rows.withWindows.map((driver) => {
               const totals = hoursPerDriver.get(driver.id);
-              // De uren naast de naam: de balken zeggen wanneer, dit zegt
-              // hoeveel, en dat is wat de volgorde van de rijen verklaart.
               const summary = totals
                 ? AVAILABILITY_KINDS.filter((kind) => totals[kind] >= 0.25)
                     .map((kind) =>
@@ -427,54 +625,73 @@ const HOUR_LABEL_MAX_DAYS = 7;
                     )
                     .join(' · ')
                 : '';
+
               return (
-              <li key={driver.id} className="flex items-center gap-2">
-                <span className="w-32 shrink-0">
-                  <span className="block truncate text-xs font-medium text-vtk-ink">
-                    {driver.name}
-                  </span>
-                  {summary ? (
-                    <span className="block truncate text-[10px] tabular-nums text-vtk-muted">
-                      {summary}
+                <li key={driver.id} className="flex items-center gap-2 group">
+                  {/* Sticky Chauffeursnaam links */}
+                  <div className="w-28 sm:w-36 shrink-0 sticky left-0 z-20 bg-vtk-surface pr-2 border-r border-vtk-navy/10 py-0.5">
+                    <span className="block truncate text-xs font-semibold text-vtk-ink">
+                      {driver.name}
                     </span>
-                  ) : null}
-                </span>
-                <div className="relative h-8 flex-1 overflow-hidden rounded-[8px] bg-vtk-paper/70">
-                  {/* De uurstreepjes, zodat een balk af te lezen valt tegen een
-                      tijdstip in plaats van tegen een hele dag. De dagranden zijn
-                      donkerder: dat is de grens die je het eerst zoekt. */}
-                  {ticks.map((tick) =>
-                    tick.left === 0 ? null : (
-                      <span
-                        key={`${tick.left}`}
-                        aria-hidden
-                        className={`absolute inset-y-0 w-px ${
-                          tick.isDay ? 'bg-vtk-navy/15' : 'bg-vtk-navy/[0.06]'
-                        }`}
-                        style={{ left: `${tick.left}%` }}
-                      />
-                    )
-                  )}
-                  {(perDriver.get(driver.id) ?? []).map((bar) => (
-                    <span
-                      key={bar.id}
-                      title={bar.title}
-                      className={`absolute inset-y-1 flex items-center overflow-hidden rounded-[6px] border border-vtk-navy/20 px-1.5 text-[10px] font-semibold tabular-nums text-vtk-ink ${availabilityFillClass(bar.kind)}`}
-                      style={{
-                        left: `${bar.left}%`,
-                        width: `${bar.width}%`,
-                        // `backgroundColor` en niet de shorthand: die zou het
-                        // patroon van de soort weer wegvegen.
-                        backgroundColor: driverColorVar(driver.id, driverColors),
-                      }}
-                    >
-                      {bar.width >= LABEL_MIN_SHARE ? (
-                        <span className="truncate">{bar.label}</span>
-                      ) : null}
-                    </span>
-                  ))}
-                </div>
-              </li>
+                    {summary ? (
+                      <span className="block truncate text-[10px] tabular-nums text-vtk-muted">
+                        {summary}
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {/* Balken op de tijdslijn */}
+                  <div className="relative h-8 flex-1 overflow-hidden rounded-[8px] bg-vtk-paper/70">
+                    {/* Ticks */}
+                    {ticks.map((tick) =>
+                      tick.left === 0 ? null : (
+                        <span
+                          key={`${tick.left}-${tick.hour}`}
+                          aria-hidden
+                          className={`absolute inset-y-0 w-px ${
+                            tick.isDay
+                              ? 'bg-vtk-navy/25 z-1'
+                              : tick.isHalfHour
+                                ? 'bg-vtk-navy/[0.04]'
+                                : 'bg-vtk-navy/[0.08]'
+                          }`}
+                          style={{ left: `${tick.left}%` }}
+                        />
+                      )
+                    )}
+
+                    {/* Beschikbaarheidsbalken */}
+                    {(perDriver.get(driver.id) ?? []).map((bar) => {
+                      const isSelected = selectedBar?.id === bar.id;
+                      const showLabel = bar.width * zoom >= 3.5;
+
+                      return (
+                        <button
+                          type="button"
+                          key={bar.id}
+                          onClick={() => setSelectedBar((curr) => (curr?.id === bar.id ? null : bar))}
+                          title={bar.title}
+                          className={`absolute inset-y-1 flex items-center overflow-hidden rounded-[6px] border border-vtk-navy/20 px-1.5 text-[10px] font-semibold tabular-nums text-vtk-ink transition cursor-pointer text-left ${
+                            isSelected
+                              ? 'ring-2 ring-vtk-ink ring-offset-1 z-10 brightness-105'
+                              : 'hover:brightness-95 hover:z-10'
+                          } ${availabilityFillClass(bar.kind)}`}
+                          style={{
+                            left: `${bar.left}%`,
+                            width: `${bar.width}%`,
+                            backgroundColor: driverColorVar(driver.id, driverColors),
+                          }}
+                        >
+                          {showLabel ? (
+                            <span className="truncate drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">
+                              {bar.width * zoom >= 7 ? bar.label : bar.shortLabel}
+                            </span>
+                          ) : null}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </li>
               );
             })}
           </ul>
@@ -482,21 +699,21 @@ const HOUR_LABEL_MAX_DAYS = 7;
           {rows.withWindows.length === 0 ? (
             <p className="py-3 text-xs text-vtk-muted">
               {kinds.length > 0
-                ? `Niemand gaf voor deze periode "${kinds.map((kind) => AVAILABILITY_KIND_LABEL[kind].toLowerCase()).join('" of "')}" door.`
-                : 'Niemand gaf voor deze periode iets door.'}
+                ? `Geen karchauffeur gaf voor deze periode "${kinds.map((kind) => AVAILABILITY_KIND_LABEL[kind].toLowerCase()).join('" of "')}" door.`
+                : 'Geen karchauffeur gaf voor deze periode beschikbaarheid door.'}
             </p>
           ) : null}
 
-          {!showHourLabels && rows.withWindows.length > 0 ? (
-            <p className="mt-1 text-[11px] text-vtk-muted">
-              Elk fijn streepje is {tickHours(parsedDays.length)} uur, de donkere lijnen zijn de
-              dagranden. Wijs een balk aan voor het precieze uur, of ga naar de dagweergave.
+          {rows.withWindows.length > 0 && (
+            <p className="mt-2 text-[11px] text-vtk-muted">
+              Elk streepje is {tickStepHours} uur, de donkere lijnen zijn de dagranden. Klik of tik op een
+              balk voor het exacte uur en details.
             </p>
-          ) : null}
+          )}
 
           {rows.without.length > 0 ? (
             <p className="mt-2 border-t border-vtk-navy/10 pt-2 text-xs text-vtk-muted">
-              <span className="font-medium text-vtk-ink">Niets doorgegeven:</span>{' '}
+              <span className="font-medium text-vtk-ink">Niets doorgegeven (karchauffeurs):</span>{' '}
               {rows.without.map((driver) => driver.name).join(', ')}. Dat betekent niet dat ze niet
               kunnen; je weet het gewoon niet.
             </p>

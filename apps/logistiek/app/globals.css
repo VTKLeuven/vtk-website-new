@@ -1266,10 +1266,20 @@ body {
   .logistics-admin-layout {
     grid-template-columns: 220px minmax(0, 1fr);
     gap: 48px;
+    transition: grid-template-columns 200ms ease, gap 200ms ease;
+  }
+
+  .logistics-admin-layout.is-collapsed {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
   }
 
   .logistics-admin-layout > aside {
     align-self: stretch;
+  }
+
+  .logistics-admin-layout.is-collapsed > aside {
+    display: none;
   }
 }
 

@@ -1294,11 +1294,19 @@ async function logistiekTeamMembers() {
 
 /**
  * De beschikbaarheidsvensters die dit tijdvenster raken (V1), met de naam van de
- * chauffeur erbij voor de band in de planning.
+ * chauffeur erbij voor de band in de planning. Enkel karchauffeurs (canDriveVan).
  */
 export async function availabilityInRange(from: Date, to: Date) {
   return prisma.uitleenDriverAvailability.findMany({
-    where: { startAt: { lt: to }, endAt: { gt: from } },
+    where: {
+      startAt: { lt: to },
+      endAt: { gt: from },
+      user: {
+        uitleenDriver: { canDriveVan: true },
+        active: true,
+        deletedAt: null,
+      },
+    },
     select: {
       id: true,
       userId: true,
@@ -1560,6 +1568,24 @@ export async function isDriver(userId: string): Promise<boolean> {
     }),
   ]);
   return extra > 0 || membership > 0;
+}
+
+/**
+ * Mag dit lid met de kar rijden (karchauffeur)?
+ *
+ * Enkel karchauffeurs geven hun beschikbaarheid door en verschijnen op het
+ * beschikbaarheidsbord onder de transportplanning.
+ */
+export async function isVanDriver(userId: string): Promise<boolean> {
+  const driver = await prisma.uitleenDriver.findFirst({
+    where: {
+      userId,
+      canDriveVan: true,
+      user: { active: true, deletedAt: null },
+    },
+    select: { id: true },
+  });
+  return driver !== null;
 }
 
 /**

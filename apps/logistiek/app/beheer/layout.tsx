@@ -4,6 +4,8 @@ import { canManage, getSession } from '@/lib/session';
 import { BeheerNav } from './beheer-nav';
 import { copy, getLocale } from '@/lib/i18n';
 
+import { BeheerLayoutClient } from './beheer-layout-client';
+
 export default async function BeheerLayout({ children }: { children: React.ReactNode }) {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   const t = copy[locale];
@@ -26,23 +28,13 @@ export default async function BeheerLayout({ children }: { children: React.React
 
   return (
     <ToastProvider>
-      <main className="mx-auto w-full max-w-[1240px] flex-1 px-5 py-10 sm:px-9">
-        <div data-print="hide" className="border-b border-vtk-navy/10 pb-5">
-          <div>
-            <p className="flex items-center gap-2 text-sm text-vtk-muted">
-              <span className="h-1.5 w-1.5 rounded-full bg-vtk-yellow" aria-hidden />
-              {t.manageKicker}
-            </p>
-            <h1 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-vtk-ink">{t.manageTitle}</h1>
-          </div>
-        </div>
-        <div className="logistics-admin-layout mt-8">
-          <aside data-print="hide">
-            <BeheerNav />
-          </aside>
-          <div className="min-w-0">{children}</div>
-        </div>
-      </main>
+      <BeheerLayoutClient
+        kicker={t.manageKicker}
+        title={t.manageTitle}
+        nav={<BeheerNav />}
+      >
+        {children}
+      </BeheerLayoutClient>
     </ToastProvider>
   );
 }

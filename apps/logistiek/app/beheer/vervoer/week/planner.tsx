@@ -640,7 +640,9 @@ export function TransportPlanner({
       <AvailabilityBoard
         days={days}
         windows={availability}
-        drivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
+        drivers={drivers
+          .filter((driver) => driver.canDriveVan)
+          .map((driver) => ({ id: driver.id, name: driver.name }))}
         driverColors={driverColors}
       />
     </>

@@ -11,7 +11,7 @@ import {
   startOfWeek,
   toDateInputValue,
 } from '@/lib/uitleen';
-import { availabilityForDriver, isDriver } from '@/lib/uitleen-server';
+import { availabilityForDriver, isDriver, isVanDriver } from '@/lib/uitleen-server';
 import { AvailabilityEditor } from './availability-editor';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -22,6 +22,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
  * Bij `/ritten` en niet in het beheer: een chauffeur heeft geen
  * `logistiek.manage`, en dit is precies wat hij zonder beheerrechten moet kunnen.
  * Het team ziet het resultaat als lichte band in de transportplanning.
+ * Enkel karchauffeurs geven hun beschikbaarheid door.
  */
 export const metadata = { title: 'Wanneer kan ik rijden' };
 
@@ -34,8 +35,9 @@ export default async function BeschikbaarheidPage({
   if (!session) return <LoginGate variant="trips" />;
   const en = locale === 'en';
 
-  const [driver, windows] = await Promise.all([
+  const [driver, vanDriver, windows] = await Promise.all([
     isDriver(session.user.id),
+    isVanDriver(session.user.id),
     availabilityForDriver(session.user.id),
   ]);
 
@@ -70,6 +72,12 @@ export default async function BeschikbaarheidPage({
             logistiek@vtk.be
           </a>
           .
+        </p>
+      ) : !vanDriver ? (
+        <p className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 text-sm leading-7 text-vtk-body">
+          {en
+            ? 'Only van drivers submit their availability. If you drive a car, you do not need to submit availability and will be contacted directly by Logistics.'
+            : 'Enkel karchauffeurs geven hun beschikbaarheid door. Rijd je met de auto, dan hoef je niets door te geven en word je rechtstreeks gecontacteerd door Logistiek.'}
         </p>
       ) : (
         <div className="grid gap-4">

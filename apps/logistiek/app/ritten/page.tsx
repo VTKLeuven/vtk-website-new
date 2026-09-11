@@ -6,7 +6,7 @@ import { PhoneLink } from '@/components/phone-link';
 import { copy, getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
 import { formatDateTime } from '@/lib/uitleen';
-import { feedTokensForUser, isDriver, tripsForDriver, type DriverTrip } from '@/lib/uitleen-server';
+import { feedTokensForUser, isDriver, isVanDriver, tripsForDriver, type DriverTrip } from '@/lib/uitleen-server';
 import { FeedTokens } from '@/components/feed-tokens';
 import { ToastProvider } from '@/components/ui/toast';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
@@ -138,9 +138,10 @@ export default async function RittenPage() {
   }
   const en = locale === 'en';
 
-  const [trips, driver, feedTokens] = await Promise.all([
+  const [trips, driver, vanDriver, feedTokens] = await Promise.all([
     tripsForDriver(session.user.id),
     isDriver(session.user.id),
+    isVanDriver(session.user.id),
     feedTokensForUser(session.user.id),
   ]);
 
@@ -163,7 +164,7 @@ export default async function RittenPage() {
          tussen de ritten: het is de enige actie op dit scherm en de rest is
          lezen, en als paneel las het als een mededeling die je wegscrolt. */
       action={
-        driver ? (
+        vanDriver ? (
           <Link href="/ritten/beschikbaarheid" className="logistics-head-button">
             <LogisticsIcon name="reservation" className="h-4 w-4" />
             {en ? 'My availability' : 'Beschikbaarheid'}

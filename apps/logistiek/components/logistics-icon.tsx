@@ -18,6 +18,8 @@ type IconName =
   | 'external'
   | 'expand'
   | 'collapse'
+  | 'sidebarCollapse'
+  | 'sidebarExpand'
   | 'chevron'
   | 'template'
   | 'text'
@@ -130,6 +132,20 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
         <path d="M3 3l6 6" />
         <path d="M20 15h-5v5" />
         <path d="M21 21l-6-6" />
+      </>
+    ),
+    sidebarCollapse: (
+      <>
+        <rect width="18" height="18" x="3" y="3" rx="2" />
+        <path d="M9 3v18" />
+        <path d="m14 9-3 3 3 3" />
+      </>
+    ),
+    sidebarExpand: (
+      <>
+        <rect width="18" height="18" x="3" y="3" rx="2" />
+        <path d="M9 3v18" />
+        <path d="m13 15 3-3-3-3" />
       </>
     ),
     external: (

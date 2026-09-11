@@ -9,6 +9,7 @@ import {
   availabilityForRange,
   getLogistiekSettings,
   isDriver,
+  isVanDriver,
   vanBookingForMember,
 } from '@/lib/uitleen-server';
 import {
@@ -1028,8 +1029,8 @@ export async function addAvailabilityAction(input: {
   kind?: AvailabilityKind;
 }): Promise<ActionResult> {
   const session = await requireSession();
-  if (!(await isDriver(session.user.id))) {
-    return { ok: false, error: 'Je staat niet in de chauffeurslijst.' };
+  if (!(await isVanDriver(session.user.id))) {
+    return { ok: false, error: 'Enkel karchauffeurs kunnen beschikbaarheid doorgeven.' };
   }
 
   const startAt = parseBrusselsDateTime(input.startAt);
@@ -1114,8 +1115,8 @@ export async function setAvailabilityDayAction(input: {
   hours: Array<{ hour: number; kind: AvailabilityKind }>;
 }): Promise<ActionResult> {
   const session = await requireSession();
-  if (!(await isDriver(session.user.id))) {
-    return { ok: false, error: 'Je staat niet in de chauffeurslijst.' };
+  if (!(await isVanDriver(session.user.id))) {
+    return { ok: false, error: 'Enkel karchauffeurs kunnen beschikbaarheid doorgeven.' };
   }
 
   const day = parseDateOnly(input.day);
