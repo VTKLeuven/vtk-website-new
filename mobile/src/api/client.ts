@@ -1,4 +1,4 @@
-import { clearCache, getPref, setPref } from '../storage';
+import { clearCache, clearPref, getPref, setPref } from '../storage';
 import { APP_ERROR, type AppErrorBody } from './contract';
 
 /**
@@ -33,6 +33,30 @@ import { APP_ERROR, type AppErrorBody } from './contract';
  */
 
 const BASE_URL_KEY = 'base-url';
+const LIVE_MIGRATION_KEY = 'live-server-migration-v1';
+
+/**
+ * Eenmalige opschoning bij de overstap van dev.vtk.be naar live vtk.be:
+ * - Als 'base-url' expliciet op dev.vtk.be stond opgeslagen, wissen we die voorkeur.
+ * - We schonen de leescache op zodat verouderde dev-antwoorden (zoals een lege
+ *   albumlijst van toen dev nog geen Immich had) direct verdwijnen.
+ */
+function migrateLegacyDevServer(): void {
+  try {
+    if (getPref(LIVE_MIGRATION_KEY) !== '1') {
+      const saved = getPref(BASE_URL_KEY)?.trim().replace(/\/+$/, '');
+      if (saved === 'https://dev.vtk.be' || saved === 'http://dev.vtk.be') {
+        clearPref(BASE_URL_KEY);
+      }
+      clearCache();
+      setPref(LIVE_MIGRATION_KEY, '1');
+    }
+  } catch {
+    // SQLite fout mag de app-opstart niet blokkeren
+  }
+}
+
+migrateLegacyDevServer();
 
 /**
  * De site waar de app mee praat.
@@ -42,7 +66,13 @@ const BASE_URL_KEY = 'base-url';
 const DEFAULT_BASE_URL = process.env.EXPO_PUBLIC_VTK_URL?.trim() || 'https://vtk.be';
 
 export function baseUrl(): string {
-  return (getPref(BASE_URL_KEY) ?? DEFAULT_BASE_URL).replace(/\/+$/, '');
+  const saved = getPref(BASE_URL_KEY)?.trim().replace(/\/+$/, '');
+  if (saved === 'https://dev.vtk.be' || saved === 'http://dev.vtk.be') {
+    clearPref(BASE_URL_KEY);
+    clearCache();
+    return DEFAULT_BASE_URL;
+  }
+  return saved || DEFAULT_BASE_URL;
 }
 
 export function defaultBaseUrl(): string {
@@ -56,9 +86,14 @@ export function defaultBaseUrl(): string {
  * de andere tonen levert schermen op die iets beweren dat er niet is.
  */
 export function setBaseUrl(value: string): void {
-  const next = value.trim().replace(/\/+$/, '') || DEFAULT_BASE_URL;
+  const trimmed = value.trim().replace(/\/+$/, '');
+  const next = trimmed || DEFAULT_BASE_URL;
   if (next === baseUrl()) return;
-  setPref(BASE_URL_KEY, next);
+  if (next === DEFAULT_BASE_URL) {
+    clearPref(BASE_URL_KEY);
+  } else {
+    setPref(BASE_URL_KEY, next);
+  }
   clearCache();
 }
 
