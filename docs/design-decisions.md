@@ -5626,6 +5626,25 @@ waar de rest van de site zich vragen bij stelt; wie geen erelid is, ziet gewoon
 het gewone aanbod. `createTicketCheckout` weigert zo'n type ook serverside, met
 dezelfde fout als bij een onbestaand type.
 
+### Een tickettype kiest zijn kopers, en dat blijft aanpasbaar
+
+Elk tickettype draagt wie het mag kopen: **leden en niet-leden**, **alleen
+leden**, of **alleen ereleden**. "Lid" betekent daarbij: iemand met een
+VTK-account die ingelogd is. Er bestaat geen lidkaart- of lidgeldmodel in de
+database, dus een fijner onderscheid kan dit veld niet maken; het is een drempel
+("je hebt hier een account voor nodig"), geen ledencontrole.
+
+**De keuze blijft na het aanmaken aanpasbaar.** Dat is de hele reden dat er een
+bewerkpaneel per tickettype is. De voorverkoop gaat vaak eerst open voor leden en
+pas later voor iedereen, en dat mag geen archiveren-en-opnieuw-aanmaken vragen:
+dat breekt de verkoopcijfers per type en de bestellingen verwijzen naar het oude.
+
+**Een wijziging raakt nooit wat al verkocht is.** De doelgroep wordt enkel bij
+het afrekenen gelezen. Iemand die gisteren als niet-lid een ticket kocht, houdt
+dat ticket wanneer het type vandaag op "alleen leden" gaat; het alternatief zou
+betekenen dat de kring een geldige aankoop intrekt omdat ze zelf van gedacht
+veranderde.
+
 ### "Ik kom" zonder account, maar enkel bij een alumni-evenement
 
 Bij een evenement met de alumni-doelgroep kan iemand **zonder account** aanduiden

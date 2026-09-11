@@ -34,6 +34,7 @@ import { orderAccessExpiry } from "./access";
 import { withSerializableTransaction } from "./transactions";
 import { publishedTicketDesign } from "./design";
 import { getTicketTerms } from "./terms";
+import { ticketTypeIsHidden, ticketTypeRequiresLogin } from "./audience";
 
 const answerValueSchema = z.union([
   z.string().max(2_000),
@@ -203,15 +204,17 @@ export async function createTicketCheckout(
     if (!type || !type.active || !isWithinWindow(now, type.salesStartAt, type.salesEndAt)) {
       throw new TicketCheckoutError("INVALID_TICKET_TYPE", item.ticketTypeId);
     }
-    if (type.audience === "MEMBERS" && !session) {
-      throw new TicketCheckoutError("LOGIN_REQUIRED", item.ticketTypeId);
-    }
     // Een erelidticket staat bij niemand anders in de lijst; wie het toch
-    // meestuurt, krijgt hetzelfde antwoord als bij een onbestaand type.
-    if (type.audience === "HONORARY" && !isHonorary) {
+    // meestuurt, krijgt hetzelfde antwoord als bij een onbestaand type. Deze
+    // controle staat bewust voor die op de login: anders verraadt een
+    // LOGIN_REQUIRED aan een uitgelogde bezoeker dat het type bestaat.
+    if (ticketTypeIsHidden(type, isHonorary)) {
       throw new TicketCheckoutError("INVALID_TICKET_TYPE", item.ticketTypeId);
     }
-    if (type.unitPriceCents === 0 && !session) {
+    if (
+      !session &&
+      ticketTypeRequiresLogin({ audience: type.audience, priceCents: type.unitPriceCents })
+    ) {
       throw new TicketCheckoutError("LOGIN_REQUIRED", item.ticketTypeId);
     }
     countByType.set(type.id, (countByType.get(type.id) ?? 0) + 1);

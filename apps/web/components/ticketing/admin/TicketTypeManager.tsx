@@ -5,10 +5,10 @@ import {
   archiveTicketTypeAction,
   createTicketTypeAction,
   reorderTicketTypesAction,
-  saveTicketTypeColorAction,
+  saveTicketTypeAction,
   updateInventoryPoolAction,
 } from "@/app/actions/tickets";
-import { Archive, Package, Plus, Save, Ticket, UsersRound } from "lucide-react";
+import { Archive, Package, Plus, Save, Ticket, TriangleAlert, UsersRound } from "lucide-react";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { ticketColorKey, ticketColorLabel } from "@/lib/ticketing/ticketColors";
 import { TicketColorChoice } from "./TicketColorChoice";
@@ -40,6 +40,153 @@ type TicketType = {
   inventoryPool: InventoryPool;
   _count?: { orderItems: number };
 };
+
+type TicketAudience = "PUBLIC" | "MEMBERS" | "HONORARY";
+
+function audienceLabel(audience: string, locale: AdminLocale): string {
+  if (audience === "MEMBERS") return locale === "nl" ? "Alleen leden" : "Members only";
+  if (audience === "HONORARY") return locale === "nl" ? "Alleen ereleden" : "Honorary members only";
+  return locale === "nl" ? "Publiek" : "Public";
+}
+
+/**
+ * Kan een bezoeker zonder account dit tickettype kopen?
+ *
+ * Een gratis ticket vereist altijd een login, ook bij doelgroep "publiek"
+ * (`ticketTypeRequiresLogin` in lib/ticketing/audience.ts). Die regel staat hier
+ * mee in, want zonder haar zou het beheer een waarschuwing missen die de shop
+ * wel toont.
+ */
+function guestCanBuy(ticketType: TicketType): boolean {
+  return ticketType.active && ticketType.audience === "PUBLIC" && ticketType.unitPriceCents > 0;
+}
+
+/**
+ * Kleur en doelgroep van een bestaand tickettype.
+ *
+ * Dit is bewust het enige bewerkpaneel per rij: naam, prijs en verkoopvenster
+ * blijven staan zoals ze aangemaakt zijn. De hulpteksten reageren live op de
+ * gekozen doelgroep, want het gevolg (het type verdwijnt uit de shop van een
+ * uitgelogde bezoeker) is niet af te lezen aan de keuze zelf.
+ */
+function TicketTypeEditPanel({
+  eventId,
+  ticketType,
+  guestBuyableElsewhere,
+  locale,
+}: {
+  eventId: string;
+  ticketType: TicketType;
+  guestBuyableElsewhere: boolean;
+  locale: AdminLocale;
+}) {
+  const [audience, setAudience] = useState<TicketAudience>(
+    ticketType.audience === "MEMBERS" || ticketType.audience === "HONORARY"
+      ? ticketType.audience
+      : "PUBLIC"
+  );
+  const orderedTickets = ticketType._count?.orderItems ?? 0;
+  const closesShopForGuests = audience !== "PUBLIC" && !guestBuyableElsewhere;
+  const freeAndPublic = audience === "PUBLIC" && ticketType.unitPriceCents === 0;
+
+  return (
+    <details className="ticket-admin-details">
+      <summary className="ticket-admin-pill-summary">
+        <span
+          className="ticket-admin-color-dot"
+          style={{ background: `var(--ticket-color-${ticketColorKey(ticketType.color)})` }}
+          aria-hidden="true"
+        />
+        {locale === "nl" ? "Bewerken" : "Edit"} ({ticketColorLabel(ticketType.color, locale)} ·{" "}
+        {audienceLabel(ticketType.audience, locale)})
+      </summary>
+      <div className="ticket-admin-details-body">
+        <SaveForm
+          action={saveTicketTypeAction}
+          className="ticket-admin-form"
+          resetOnSuccess={false}
+          submitLabel={locale === "nl" ? "Opslaan" : "Save"}
+          savingLabel={locale === "nl" ? "Opslaan" : "Saving"}
+          savedMessage={locale === "nl" ? "Tickettype opgeslagen." : "Ticket type saved."}
+          errorMessages={{
+            TICKET_TYPE_NOT_FOUND:
+              locale === "nl"
+                ? "Niet opgeslagen: dit tickettype bestaat niet meer."
+                : "Not saved: this ticket type no longer exists.",
+          }}
+          fallbackErrorMessage={
+            locale === "nl" ? "Tickettype niet opgeslagen." : "Ticket type was not saved."
+          }
+        >
+          <input type="hidden" name="locale" value={locale} />
+          <input type="hidden" name="eventId" value={eventId} />
+          <input type="hidden" name="ticketTypeId" value={ticketType.id} />
+          <div className="ticket-admin-field">
+            <label htmlFor={`ticket-type-${ticketType.id}-audience`}>
+              {locale === "nl" ? "Wie mag dit ticket kopen?" : "Who may buy this ticket?"}
+            </label>
+            <select
+              id={`ticket-type-${ticketType.id}-audience`}
+              name="audience"
+              value={audience}
+              onChange={(event) => setAudience(event.target.value as TicketAudience)}
+            >
+              <option value="PUBLIC">
+                {locale === "nl" ? "Leden en niet-leden" : "Members and non-members"}
+              </option>
+              <option value="MEMBERS">{locale === "nl" ? "Alleen leden" : "Members only"}</option>
+              {/* Onzichtbaar voor iedereen behalve ereleden; niet uitgegrijsd
+                  maar echt weggefilterd, zodat de rest van de site die
+                  uitzondering niet ziet. */}
+              <option value="HONORARY">
+                {locale === "nl" ? "Alleen ereleden" : "Honorary members only"}
+              </option>
+            </select>
+            <span className="ticket-admin-help">
+              {audience === "PUBLIC"
+                ? locale === "nl"
+                  ? "Iedereen kan dit ticket kopen, ook zonder account."
+                  : "Anyone can buy this ticket, also without an account."
+                : audience === "MEMBERS"
+                  ? locale === "nl"
+                    ? "Enkel wie ingelogd is met een VTK-account ziet dit ticket en kan het kopen."
+                    : "Only visitors signed in with a VTK account see this ticket and can buy it."
+                  : locale === "nl"
+                    ? "Enkel ereleden zien dit ticket; voor alle anderen bestaat het niet."
+                    : "Only honorary members see this ticket; for everyone else it does not exist."}
+            </span>
+            {freeAndPublic || closesShopForGuests ? (
+              <div className="ticket-admin-alert">
+                <TriangleAlert aria-hidden="true" size={16} />
+                <span>
+                  {freeAndPublic
+                    ? locale === "nl"
+                      ? "Dit ticket is gratis, en een gratis ticket vraagt sowieso een login. Zonder account komt een bezoeker er dus niet aan, ook niet bij “leden en niet-leden”."
+                      : "This ticket is free, and a free ticket always requires a sign-in. Without an account a visitor cannot get it, not even with “members and non-members”."
+                    : locale === "nl"
+                      ? "Er blijft dan geen enkel ticket over voor een bezoeker zonder account: de shop toont hem een inlogscherm."
+                      : "No ticket then remains for a visitor without an account: the shop shows them a sign-in screen."}
+                </span>
+              </div>
+            ) : null}
+            {orderedTickets > 0 ? (
+              <span className="ticket-admin-help">
+                {locale === "nl"
+                  ? `De ${orderedTickets} al bestelde tickets blijven geldig; dit geldt enkel voor nieuwe bestellingen.`
+                  : `The ${orderedTickets} tickets already ordered stay valid; this only applies to new orders.`}
+              </span>
+            ) : null}
+          </div>
+          <TicketColorChoice
+            idPrefix={`ticket-type-${ticketType.id}`}
+            value={ticketType.color}
+            locale={locale}
+          />
+        </SaveForm>
+      </div>
+    </details>
+  );
+}
 
 export function TicketTypeManager({
   eventId,
@@ -237,7 +384,7 @@ export function TicketTypeManager({
                         {locale === "en" && ticketType.nameEn ? ticketType.nameEn : ticketType.nameNl}
                       </p>
                       <p className="ticket-admin-row-meta">
-                        {formatMoney(ticketType.unitPriceCents, ticketType.currency, locale)} · {ticketType.inventoryPool.nameNl} · {ticketType.audience === "MEMBERS" ? (locale === "nl" ? "Leden" : "Members") : ticketType.audience === "HONORARY" ? (locale === "nl" ? "Ereleden" : "Honorary members") : (locale === "nl" ? "Publiek" : "Public")}
+                        {formatMoney(ticketType.unitPriceCents, ticketType.currency, locale)} · {ticketType.inventoryPool.nameNl} · {audienceLabel(ticketType.audience, locale)}
                       </p>
                       <p className="ticket-admin-row-meta ticket-admin-inline-meta">
                         <UsersRound aria-hidden="true" size={13} />
@@ -262,44 +409,14 @@ export function TicketTypeManager({
                     </span>
                   )}
                 </div>
-                <details className="ticket-admin-details ticket-admin-color-details">
-                  <summary className="ticket-admin-pill-summary">
-                    <span
-                      className="ticket-admin-color-dot"
-                      style={{ background: `var(--ticket-color-${ticketColorKey(ticketType.color)})` }}
-                      aria-hidden="true"
-                    />
-                    {locale === "nl" ? "Kleur aanpassen" : "Change colour"} ({ticketColorLabel(ticketType.color, locale)})
-                  </summary>
-                  <div className="ticket-admin-details-body">
-                    <SaveForm
-                      action={saveTicketTypeColorAction}
-                      className="ticket-admin-form"
-                      resetOnSuccess={false}
-                      submitLabel={locale === "nl" ? "Kleur opslaan" : "Save colour"}
-                      savingLabel={locale === "nl" ? "Opslaan" : "Saving"}
-                      savedMessage={locale === "nl" ? "Kleur opgeslagen." : "Colour saved."}
-                      errorMessages={{
-                        TICKET_TYPE_NOT_FOUND:
-                          locale === "nl"
-                            ? "Niet opgeslagen: dit tickettype bestaat niet meer."
-                            : "Not saved: this ticket type no longer exists.",
-                      }}
-                      fallbackErrorMessage={
-                        locale === "nl" ? "Kleur niet opgeslagen." : "Colour was not saved."
-                      }
-                    >
-                      <input type="hidden" name="locale" value={locale} />
-                      <input type="hidden" name="eventId" value={eventId} />
-                      <input type="hidden" name="ticketTypeId" value={ticketType.id} />
-                      <TicketColorChoice
-                        idPrefix={`ticket-type-${ticketType.id}`}
-                        value={ticketType.color}
-                        locale={locale}
-                      />
-                    </SaveForm>
-                  </div>
-                </details>
+                <TicketTypeEditPanel
+                  eventId={eventId}
+                  ticketType={ticketType}
+                  guestBuyableElsewhere={items.some(
+                    (other) => other.id !== ticketType.id && guestCanBuy(other)
+                  )}
+                  locale={locale}
+                />
               </li>
             ))}
           </ul>
@@ -355,9 +472,9 @@ export function TicketTypeManager({
                     </span>
                   </div>
                   <div className="ticket-admin-field">
-                    <label htmlFor="ticket-type-audience">{locale === "nl" ? "Doelgroep" : "Audience"}</label>
+                    <label htmlFor="ticket-type-audience">{locale === "nl" ? "Wie mag dit ticket kopen?" : "Who may buy this ticket?"}</label>
                     <select id="ticket-type-audience" name="audience" defaultValue="PUBLIC">
-                      <option value="PUBLIC">{locale === "nl" ? "Publiek" : "Public"}</option>
+                      <option value="PUBLIC">{locale === "nl" ? "Leden en niet-leden" : "Members and non-members"}</option>
                       <option value="MEMBERS">{locale === "nl" ? "Alleen leden" : "Members only"}</option>
                       {/* Onzichtbaar voor iedereen behalve ereleden; niet
                           uitgegrijsd maar echt weggefilterd, zodat de rest van

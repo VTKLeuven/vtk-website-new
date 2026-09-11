@@ -248,6 +248,45 @@ communicatie tussen de toestellen nodig. Wil je dat live, zet dan een lokale
 router of hotspot aan de ingang; LoRa-mesh (Meshtastic) haalt de EU-duty-cycle
 niet bij de toeloop van een galabal, en Web Bluetooth bestaat niet op iOS.
 
+### Wie mag een tickettype kopen
+
+`TicketType.audience` bepaalt per tickettype wie het ziet en koopt. Drie waarden,
+en ze zijn **na het aanmaken aanpasbaar** in het bewerkpaneel per rij op
+`/admin/tickets/<id>/instellingen` (dezelfde `MANAGE_INVENTORY`-capability als de
+kleur):
+
+| waarde | in de admin | gedrag |
+| --- | --- | --- |
+| `PUBLIC` | "Leden en niet-leden" | iedereen, ook zonder account |
+| `MEMBERS` | "Alleen leden" | het type verdwijnt uit de lijst van een uitgelogde bezoeker; de shop toont hem een inlogscherm |
+| `HONORARY` | "Alleen ereleden" | enkel voor `User.honoraryMember`; voor alle anderen bestaat het type niet |
+
+"Lid" betekent hier **iemand met een VTK-account die ingelogd is**. Er is geen
+lidkaart- of lidgeldmodel in de database, dus een fijner onderscheid bestaat niet
+en kan dit veld ook niet maken.
+
+De drie regels staan als pure functies in `apps/web/lib/ticketing/audience.ts`:
+`ticketAudienceFrom` (onbekende invoer valt naar `PUBLIC`, nooit naar een
+strengere of ruimere groep), `ticketTypeRequiresLogin` en `ticketTypeIsHidden`.
+Ze zijn bewust puur en gedeeld, want de regel wordt op drie plaatsen gelezen
+(`queries.ts` voor de shop, `orders.ts` als slot bij het afrekenen, het
+beheerformulier) en stond er eerder twee keer in een eigen vorm;
+`apps/web/test/ticketAudience.test.ts` legt ze vast.
+
+**Drie dingen die makkelijk misgaan.**
+
+- **Een gratis ticket vereist altijd een login**, ook bij `PUBLIC`
+  (`ticketTypeRequiresLogin`). Zonder account is een gratis ticket niet aan één
+  persoon te binden en is de voorraad in een handomdraai leeg. Het beheerpaneel
+  zegt dat erbij, anders lijkt "leden en niet-leden" te liegen.
+- **De erelidcontrole staat in `createOrder` vóór de logincontrole.** Andersom
+  krijgt een uitgelogde bezoeker die zo'n type-id meestuurt een `LOGIN_REQUIRED`
+  in plaats van een `INVALID_TICKET_TYPE`, en dat verraadt dat het type bestaat.
+- **Een wijziging geldt enkel voor nieuwe bestellingen.** `audience` wordt
+  alleen bij het afrekenen gelezen, en de bestelregel draagt haar eigen naam- en
+  prijskopie; reeds verkochte tickets blijven dus gewoon geldig. Het paneel
+  vermeldt hoeveel tickets er al besteld zijn.
+
 ### Kleur per tickettype
 
 Een tickettype draagt een `color`: een key uit het palet in
@@ -419,6 +458,8 @@ webscanner blijft staan als webweg en als vangnet.
 - `config.ts`: env-driven config (provider, base URL, secrets, reservation window)
 - `crypto.ts`: signed ticket credentials + order access tokens
 - `ticketColors.ts`: het palet per tickettype (key, geen hex)
+- `audience.ts`: wie een tickettype ziet en koopt (`PUBLIC` / `MEMBERS` /
+  `HONORARY`); puur, gedeeld door de shop, de kassa en het beheer
 - `cardHash.ts`: het hashformaat van de studentenkaart in het offline-manifest;
   draait bewust aan beide kanten
 - `mail.ts`, `outbox.ts`: durable confirmation-mail queue

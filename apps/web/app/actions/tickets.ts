@@ -27,6 +27,7 @@ import {
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { TICKET_TERMS_SETTING_KEY } from "@/lib/ticketing/terms";
+import { ticketAudienceFrom, type TicketAudience } from "@/lib/ticketing/audience";
 
 const localeSchema = z.enum(["nl", "en"]);
 
@@ -72,15 +73,11 @@ function value(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
 }
 
-/**
- * De doelgroep van een ticketsoort. Alles wat we niet herkennen wordt `PUBLIC`:
- * een onbekende waarde mag nooit per ongeluk een strengere of net ruimere groep
- * opleveren dan wat de beheerder koos.
- */
-function ticketAudienceFrom(raw: string): "PUBLIC" | "MEMBERS" | "HONORARY" {
-  if (raw === "MEMBERS") return "MEMBERS";
-  if (raw === "HONORARY") return "HONORARY";
-  return "PUBLIC";
+/** Het woord dat in de auditlijn staat; de UI vertaalt zelf. */
+function ticketAudienceLabel(audience: TicketAudience): string {
+  if (audience === "MEMBERS") return "alleen leden";
+  if (audience === "HONORARY") return "alleen ereleden";
+  return "publiek";
 }
 
 function optionalValue(formData: FormData, key: string): string | null {
@@ -773,12 +770,18 @@ export async function reorderTicketTypesAction(formData: FormData): Promise<void
 }
 
 /**
- * De kleur van een bestaand tickettype. Apart van het aanmaken, want een
- * tickettype is verder niet bewerkbaar en de kleur is precies het veld dat je
- * pas wil kiezen wanneer de drie types naast elkaar staan (water, bier, eigen
- * drank aan een cantus).
+ * De kleur en de doelgroep van een bestaand tickettype. Apart van het aanmaken,
+ * want dit zijn de twee velden die je pas wil kiezen wanneer het event al loopt:
+ * de kleur wanneer de drie types naast elkaar staan (water, bier, eigen drank
+ * aan een cantus), de doelgroep wanneer de verkoop halverwege opengaat voor
+ * niet-leden of net dichtgaat.
+ *
+ * De doelgroep geldt enkel voor **nieuwe** bestellingen. Reeds verkochte
+ * tickets blijven geldig: `audience` wordt alleen bij het afrekenen gelezen
+ * (`lib/ticketing/orders.ts`), en de bestelregel draagt haar eigen naam- en
+ * prijskopie.
  */
-export async function saveTicketTypeColorAction(
+export async function saveTicketTypeAction(
   _previousState: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
@@ -790,10 +793,11 @@ export async function saveTicketTypeColorAction(
   if (!type) return saveError("TICKET_TYPE_NOT_FOUND");
 
   const color = ticketColorKey(formData.get("color"));
-  if (color === type.color) return saveOk();
+  const audience = ticketAudienceFrom(value(formData, "audience"));
+  if (color === type.color && audience === type.audience) return saveOk();
 
   await prisma.$transaction([
-    prisma.ticketType.update({ where: { id: type.id }, data: { color } }),
+    prisma.ticketType.update({ where: { id: type.id }, data: { color, audience } }),
     prisma.ticketAuditLog.create({
       data: {
         eventId,
@@ -801,16 +805,20 @@ export async function saveTicketTypeColorAction(
         action: "TICKET_TYPE_UPDATED",
         entityType: "TicketType",
         entityId: type.id,
-        metadata: { color },
+        metadata: { color, audience },
       },
     }),
   ]);
+  const changes = [
+    color === type.color ? null : `kleur op ${color}`,
+    audience === type.audience ? null : `doelgroep op ${ticketAudienceLabel(audience)}`,
+  ].filter((change): change is string => change !== null);
   await logAudit({
     action: "update",
     entity: "ticketType",
     entityId: eventId,
     target: `${await ticketEventTitle(eventId)}: ${type.nameNl}`,
-    summary: `kleur op ${color}`,
+    summary: changes.join(", "),
   });
   refreshTicketEvent(locale, eventId);
   return saveOk();

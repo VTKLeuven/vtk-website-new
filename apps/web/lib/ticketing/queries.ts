@@ -8,6 +8,7 @@ import { createTicketCredential, secureTokenHash, verifyOrderAccessToken } from 
 import { orderAccessCookieName } from "./access";
 import { isAppleWalletAvailable, isGoogleWalletAvailable } from "./wallet";
 import { ticketTermsPath } from "./terms";
+import { ticketTypeIsHidden, ticketTypeRequiresLogin } from "./audience";
 
 type PublicLocale = "nl" | "en";
 
@@ -40,22 +41,6 @@ function localized(nl: string, en: string | null | undefined, locale: PublicLoca
 
 function isIssued(item: OrderItemRecord): item is IssuedOrderItem {
   return item.ticket !== null;
-}
-
-function ticketTypeRequiresLogin(type: { audience: string; priceCents: number }): boolean {
-  return type.audience === "MEMBERS" || type.priceCents === 0;
-}
-
-/**
- * Een ticketsoort voor ereleden bestaat voor iedereen anders niet.
- *
- * Bewust wegfilteren en niet uitgrijzen: wat de kring aan haar ereleden geeft
- * (gratis naar een cantus, bijvoorbeeld) hoort geen zichtbare uitzondering te
- * zijn waar de rest van de site zich vragen bij stelt. Wie geen erelid is, ziet
- * gewoon het gewone aanbod, en `createOrder` weigert zo'n type ook serverside.
- */
-function ticketTypeIsHidden(type: { audience: string }, isHonorary: boolean): boolean {
-  return type.audience === "HONORARY" && !isHonorary;
 }
 
 /**

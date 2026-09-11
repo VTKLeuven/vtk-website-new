@@ -300,6 +300,67 @@ describe.sequential("ticketing database invariants", () => {
     }
   });
 
+  it("closes a ticket type to guests the moment its audience changes", async () => {
+    // De doelgroep is na het aanmaken aanpasbaar (het bewerkpaneel op
+    // /admin/tickets/<id>/instellingen). Dat mag geen momentopname zijn: de
+    // kassa moet de nieuwe waarde zien bij de volgende bestelling.
+    const guestOrder = (email: string) =>
+      createTicketCheckout(
+        {
+          eventId: ids.rateEvent,
+          buyerName: "Guest Buyer",
+          buyerEmail: email,
+          locale: "nl",
+          termsAccepted: true,
+          items: [
+            {
+              ticketTypeId: ids.rateType,
+              attendeeName: "Guest Attendee",
+              attendeeEmail: "",
+              answers: {},
+            },
+          ],
+        },
+        `audience-${email}`
+      );
+
+    try {
+      await prisma.ticketType.update({
+        where: { id: ids.rateType },
+        data: { audience: "MEMBERS" },
+      });
+      await expect(guestOrder("audience-members@example.test")).rejects.toMatchObject({
+        code: "LOGIN_REQUIRED",
+      });
+
+      await prisma.ticketType.update({
+        where: { id: ids.rateType },
+        data: { audience: "PUBLIC" },
+      });
+      const reopened = await guestOrder("audience-public@example.test");
+      const order = await prisma.ticketOrder.findUniqueOrThrow({
+        where: { id: reopened.orderId },
+      });
+      expect(order.status).toBe("PENDING_PAYMENT");
+      expect(order.buyerUserId).toBeNull();
+
+      // Erelidtickets verraden hun bestaan niet: wie het type toch meestuurt,
+      // krijgt hetzelfde antwoord als bij een onbestaand type.
+      await prisma.ticketType.update({
+        where: { id: ids.rateType },
+        data: { audience: "HONORARY" },
+      });
+      await expect(guestOrder("audience-honorary@example.test")).rejects.toMatchObject({
+        code: "INVALID_TICKET_TYPE",
+      });
+    } finally {
+      await prisma.ticketType.update({
+        where: { id: ids.rateType },
+        data: { audience: "PUBLIC" },
+      });
+    }
+  });
+
   it("fulfills a Mollie webhook once and deduplicates its retry", async () => {
     const accessExpiresAt = new Date("2027-06-20T00:00:00.000Z");
     const access = createOrderAccessToken(ids.mollieOrder, accessExpiresAt);
