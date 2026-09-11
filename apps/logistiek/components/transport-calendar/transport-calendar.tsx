@@ -12,22 +12,27 @@ import {
 } from '@/lib/calendar-range';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { EventBars, type CalendarEventBar } from './event-bars';
+import { TripFieldPicker } from './field-picker';
 import { MobileCalendar } from './mobile-calendar';
 import { MonthGrid } from './month-grid';
 import { TimeGrid, timeGridColumns } from './time-grid';
 import { vehicleIcon } from './trip-block';
 import {
+  DEFAULT_TRIP_FIELDS,
+  TRIP_FIELDS_STORAGE_KEY,
   ZOOM_MAX,
   ZOOM_MIN,
   ZOOM_STEP,
   ZOOM_STORAGE_KEY,
   clampZoom,
   hourPxFor,
+  parseTripFields,
   wheelPixels,
   zoomByWheel,
   type AvailabilityBand,
   type CalendarVehicle,
   type TripBlock,
+  type TripFields,
 } from './types';
 
 /**
@@ -141,6 +146,33 @@ export function TransportCalendar({
    * een privévenster gooit de accessor zelf.
    */
   const [zoom, setZoom] = useState(ZOOM_MIN);
+
+  /**
+   * Wat er in een rit-blok staat (R7).
+   *
+   * Naast de zoom en om precies dezelfde reden in een effect: op de server
+   * bestaat `localStorage` niet, en een andere eerste render dan de server is
+   * een hydratiefout. De standaard is de weergave zoals ze altijd was, dus wie
+   * niets instelt merkt niets.
+   */
+  const [fields, setFields] = useState<TripFields>(DEFAULT_TRIP_FIELDS);
+  useEffect(() => {
+    try {
+      setFields(parseTripFields(window.localStorage.getItem(TRIP_FIELDS_STORAGE_KEY)));
+    } catch {
+      /* privévenster: dan de standaard */
+    }
+  }, []);
+
+  const chooseFields = useCallback((next: TripFields) => {
+    setFields(next);
+    try {
+      window.localStorage.setItem(TRIP_FIELDS_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      /* niet kunnen onthouden is geen reden om niets te tonen */
+    }
+  }, []);
+
   const scroller = useRef<HTMLDivElement>(null);
   const metrics = useRef({ fitHourPx: 0, headHeight: 0 });
   /**
@@ -429,6 +461,7 @@ export function TransportCalendar({
           bands={bands}
           driverColors={driverColors}
           showDriver={showDriver}
+          fields={fields}
           selectedId={selectedId}
           onSelect={onSelect}
           onSelectEvent={onSelectEvent}
@@ -471,6 +504,11 @@ export function TransportCalendar({
         </div>
 
         {toolbarExtra}
+
+        {/* Wat er in een blok staat. Naast de filters, want het is dezelfde
+            soort vraag over hetzelfde scherm: die kiezen wélke ritten er staan,
+            deze wat je van elke rit ziet. */}
+        <TripFieldPicker fields={fields} onChange={chooseFields} canShowDriver={showDriver} />
 
         {/* Zoom en volledig scherm helemaal rechts: het zijn kijkinstellingen en
             geen acties op de planning. In de maandweergave is de uurhoogte
@@ -557,6 +595,7 @@ export function TransportCalendar({
           selectedId={selectedId}
           emptyLabel={emptyLabel}
           showDriver={showDriver}
+          fields={fields}
           driverColors={driverColors}
           zoom={zoom}
           scrollerRef={scroller}

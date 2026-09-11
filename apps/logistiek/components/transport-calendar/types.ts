@@ -23,9 +23,105 @@ export type TripBlock = {
   /** Tweede regel: de aanvrager, of niets op het publieke overzicht. */
   subtitle: string | null;
   driver: { id: string; name: string } | null;
+  /**
+   * Waar de rit heen gaat, en wat er mee moet. Allebei enkel gevuld op de
+   * planning van het team: ze staan standaard niet in het blok en verschijnen
+   * pas wanneer iemand ze in "Weergave" aanvinkt (zie {@link TRIP_BLOCK_FIELDS}).
+   */
+  destination?: string | null;
+  cargoNote?: string | null;
   /** Rood: twee goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. */
   conflict: boolean;
 };
+
+/**
+ * Wat er in een rit-blok mag staan, en wat er standaard staat.
+ *
+ * Waarom dit instelbaar is: wie chauffeurs indeelt, kijkt naar de naam in het
+ * blok; wie de week van zijn post nakijkt, wil de post zien; wie een verhuis
+ * plant, de bestemming. Alles tegelijk tonen kan niet, want een rit van een
+ * kwartier is 24 pixels hoog. Eén vaste keuze maakt dus telkens iemand anders
+ * ongelijk, en daarom kiest hij het zelf.
+ *
+ * De **post of werkgroep** was hier de aanleiding: die stond al in
+ * `TripBlock.subtitle`, maar kwam enkel in de tooltip terecht.
+ *
+ * Wat hier bewust **niet** in staat:
+ *
+ * - **De maandweergave.** Een balk daar is één regel van veertien pixels; die
+ *   toont beginuur, voertuig en titel en daar past niets bij. Velden aanvinken
+ *   die er toch niet in passen, is een instelling die liegt.
+ * - **De tooltip en de screenreader.** `blockLabel` blijft alles zeggen. Iets
+ *   weglaten omdat het blok smal is, is een weergavekeuze; een screenreader
+ *   heeft geen smal blok.
+ * - **De chauffeur op het publieke overzicht.** Dat is `showDriver`, en dat is
+ *   een serverbeslissing (daar staan geen namen) en geen voorkeur. De twee
+ *   staan naast elkaar: uitgevinkt óf niet toegestaan betekent allebei "niet
+ *   tonen", maar enkel het eerste mag de bezoeker zelf terugzetten.
+ */
+export const TRIP_BLOCK_FIELDS = [
+  { key: 'time', label: 'Uur' },
+  { key: 'title', label: 'Evenement of doel' },
+  { key: 'vehicle', label: 'Voertuig' },
+  { key: 'driver', label: 'Chauffeur' },
+  { key: 'requester', label: 'Post of werkgroep' },
+  { key: 'destination', label: 'Bestemming' },
+  { key: 'cargo', label: 'Lading' },
+] as const;
+
+export type TripBlockField = (typeof TRIP_BLOCK_FIELDS)[number]['key'];
+
+export type TripFields = Record<TripBlockField, boolean>;
+
+/**
+ * Wat er stond voor deze instelling bestond, plus de drie nieuwe velden uit.
+ *
+ * De standaard is met opzet de oude weergave: wie niets instelt, hoort niets te
+ * merken. Post, bestemming en lading staan uit omdat ze in een blok van een
+ * kwartier de vier regels eronder wegduwen die er altijd al stonden.
+ */
+export const DEFAULT_TRIP_FIELDS: TripFields = {
+  time: true,
+  title: true,
+  vehicle: true,
+  driver: true,
+  requester: false,
+  destination: false,
+  cargo: false,
+};
+
+export const TRIP_FIELDS_STORAGE_KEY = 'logistiek.transportplanning.velden';
+
+/**
+ * De bewaarde keuze inlezen.
+ *
+ * Alles wat niet klopt valt terug op de standaard, per veld: dit is een
+ * voorkeur uit `localStorage` en geen invoer, en een kalender hoort niet leeg te
+ * blijven omdat er ooit iets raars in die sleutel geschreven is. Een veld dat
+ * later bijkomt, krijgt zo vanzelf zijn eigen standaard in plaats van `false`.
+ */
+export function parseTripFields(raw: string | null): TripFields {
+  if (!raw) return DEFAULT_TRIP_FIELDS;
+  let stored: unknown;
+  try {
+    stored = JSON.parse(raw);
+  } catch {
+    return DEFAULT_TRIP_FIELDS;
+  }
+  if (typeof stored !== 'object' || stored === null) return DEFAULT_TRIP_FIELDS;
+  const values = stored as Record<string, unknown>;
+  return Object.fromEntries(
+    TRIP_BLOCK_FIELDS.map(({ key }) => [
+      key,
+      typeof values[key] === 'boolean' ? values[key] : DEFAULT_TRIP_FIELDS[key],
+    ])
+  ) as TripFields;
+}
+
+/** Hoeveel velden er afwijken van de standaard; voor de teller op de knop. */
+export function countChangedFields(fields: TripFields): number {
+  return TRIP_BLOCK_FIELDS.filter(({ key }) => fields[key] !== DEFAULT_TRIP_FIELDS[key]).length;
+}
 
 export type CalendarVehicle = {
   id: string;
@@ -82,6 +178,25 @@ export const MAX_HOUR_PX = 320;
 
 /** Uren op een dag. De kalender toont ze allemaal en scrolt naar het interessante deel. */
 export const DAY_HOURS = 24;
+
+/**
+ * De strook die rechts van een rit vrij blijft, in pixels.
+ *
+ * Een blok liep tot voor kort over de volle breedte van zijn baan, en bij één
+ * rit is dat de hele dagkolom. Slepen op lege ruimte start enkel op de kolom
+ * zelf (`event.target === event.currentTarget` in `beginCreate`), dus over de
+ * hele hoogte van die rit viel er niets meer in te tekenen: je klikte altijd het
+ * blok aan, en een tweede rit op dat uur moest via de knop in de werkbalk.
+ *
+ * Elke agenda-app houdt daarom die strook vrij. Ze doet meteen dubbel werk: bij
+ * overlap staat er ook lucht tussen de banen in plaats van twee blokken die
+ * tegen elkaar plakken.
+ *
+ * Gedeeld met de telefoonweergave, waar er niet in getekend wordt (verticaal
+ * vegen is daar scrollen): daar is het enkel zodat de twee weergaven er
+ * hetzelfde uitzien.
+ */
+export const BLOCK_GUTTER_PX = 14;
 
 /**
  * De uurhoogte die bij deze pane-hoogte en deze zoom hoort.

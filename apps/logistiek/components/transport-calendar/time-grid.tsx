@@ -6,12 +6,15 @@ import { driverColorVar, type DriverColorOverrides } from '@/lib/driver-colors';
 import { minutesOfDay, placeForDay, startOfBrusselsDay, type Placed } from '@/lib/week-lanes';
 import { BlockContent, blockLabel, blockLook, formatTime } from './trip-block';
 import {
+  BLOCK_GUTTER_PX,
   DAY_HOURS,
+  DEFAULT_TRIP_FIELDS,
   ZOOM_MIN,
   hourPxFor,
   type AvailabilityBand,
   type CalendarVehicle,
   type TripBlock,
+  type TripFields,
 } from './types';
 
 /**
@@ -141,6 +144,7 @@ export function TimeGrid({
   selectedId,
   emptyLabel,
   showDriver = true,
+  fields = DEFAULT_TRIP_FIELDS,
   driverColors,
   zoom = ZOOM_MIN,
   onMetrics,
@@ -163,6 +167,8 @@ export function TimeGrid({
   emptyLabel: string;
   /** Uit op het publieke overzicht zonder login: daar is er geen chauffeur om te tonen. */
   showDriver?: boolean;
+  /** Welke regels er in een blok staan (R7); weglaten geeft de standaardweergave. */
+  fields?: TripFields;
   /** Kleuren die het team zelf zette (K1); de rest volgt uit de id. */
   driverColors?: DriverColorOverrides;
   /** Zoomfactor; 1 = de hele dag past exact in de pane. Zie `types.ts`. */
@@ -574,11 +580,16 @@ export function TimeGrid({
                 }`}
                 style={{ height }}
               >
-                {/* Uurlijnen, zodat je een blok op de klok kan leggen. */}
+                {/* Uurlijnen, zodat je een blok op de klok kan leggen.
+                    `pointer-events-none` is hier niet cosmetisch: zonder dat is
+                    zo'n lijn het doelwit van een pointerdown die er toevallig op
+                    valt, en `beginCreate` slikt die (hij eist de kolom zelf als
+                    doelwit). Dat gaf één dode lijn per uur, midden in het vlak
+                    waarin je een rit moet kunnen tekenen. */}
                 {hours.map((hour, index) => (
                   <span
                     key={hour}
-                    className="absolute inset-x-0 border-t border-vtk-navy/10"
+                    className="pointer-events-none absolute inset-x-0 border-t border-vtk-navy/10"
                     style={{ top: index * hourPx }}
                     aria-hidden
                   />
@@ -632,7 +643,10 @@ export function TimeGrid({
                 {isToday && nowMinutes >= firstHour * 60 && nowMinutes <= lastHour * 60 ? (
                   <span
                     aria-hidden
-                    className="absolute inset-x-0 z-10 border-t-2 border-red-500"
+                    // Ook hier `pointer-events-none`, om dezelfde reden als bij
+                    // de uurlijnen: de nu-lijn ligt op het uur waarop je het
+                    // vaakst iets inplant.
+                    className="pointer-events-none absolute inset-x-0 z-10 border-t-2 border-red-500"
                     style={{ top: ((nowMinutes - firstHour * 60) / 60) * hourPx }}
                   />
                 ) : null}
@@ -691,6 +705,7 @@ export function TimeGrid({
                     onSelect={onSelect}
                     selected={selectedId === block.id}
                     showDriver={showDriver}
+                    fields={fields}
                     driverColors={driverColors}
                     draggable={Boolean(onMoveBlock)}
                     dimmed={drag?.kind !== 'create' && drag?.blockId === block.id && moved.current}
@@ -719,6 +734,7 @@ function TimeBlock({
   onSelect,
   selected,
   showDriver,
+  fields,
   driverColors,
   draggable,
   dimmed,
@@ -732,6 +748,7 @@ function TimeBlock({
   onSelect?: (blockId: string) => void;
   selected: boolean;
   showDriver: boolean;
+  fields: TripFields;
   driverColors?: DriverColorOverrides;
   draggable?: boolean;
   /** Dit blok wordt op dit moment versleept; de schaduw toont waar het heen gaat. */
@@ -751,7 +768,9 @@ function TimeBlock({
     // Minimaal 24px: een kwartierrit moet aanklikbaar blijven, ook uitgezoomd.
     height: Math.max(24, rawHeight - 2),
     left: `${block.lane * laneWidth}%`,
-    width: `${laneWidth}%`,
+    // Min de strook rechts: zie `BLOCK_GUTTER_PX`. Zonder die aftrek is er op
+    // het uur van een rit geen lege plek meer om een tweede rit op te tekenen.
+    width: `calc(${laneWidth}% - ${BLOCK_GUTTER_PX}px)`,
     opacity: dimmed ? 0.4 : look.style.opacity,
   };
 
@@ -771,6 +790,7 @@ function TimeBlock({
       block={block}
       vehicle={vehicle}
       showDriver={showDriver}
+      fields={fields}
       awaitsDriver={look.awaitsDriver}
       start={block.start}
       end={block.end}

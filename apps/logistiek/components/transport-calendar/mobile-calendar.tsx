@@ -8,7 +8,14 @@ import { minutesOfDay, placeForDay, startOfBrusselsDay } from '@/lib/week-lanes'
 import { LogisticsIcon } from '@/components/logistics-icon';
 import type { CalendarEventBar } from './event-bars';
 import { BlockContent, blockLabel, blockLook } from './trip-block';
-import type { AvailabilityBand, CalendarVehicle, TripBlock } from './types';
+import {
+  BLOCK_GUTTER_PX,
+  DEFAULT_TRIP_FIELDS,
+  type AvailabilityBand,
+  type CalendarVehicle,
+  type TripBlock,
+  type TripFields,
+} from './types';
 
 /**
  * De transportplanning op een telefoon, in volledig scherm.
@@ -83,6 +90,7 @@ export function MobileCalendar({
   bands,
   driverColors,
   showDriver = true,
+  fields = DEFAULT_TRIP_FIELDS,
   selectedId,
   onSelect,
   onSelectEvent,
@@ -101,6 +109,8 @@ export function MobileCalendar({
   bands?: AvailabilityBand[];
   driverColors?: DriverColorOverrides;
   showDriver?: boolean;
+  /** Welke regels er in een blok staan (R7); dezelfde keuze als op een breed scherm. */
+  fields?: TripFields;
   selectedId?: string | null;
   onSelect?: (blockId: string) => void;
   onSelectEvent?: (eventId: string) => void;
@@ -489,14 +499,21 @@ export function MobileCalendar({
                     // Overlappende ritten delen de breedte, net als op een breed
                     // scherm. Op één dag over de volle breedte blijft ook een
                     // half blok nog leesbaar.
+                    //
+                    // Dezelfde strook rechts als daar (`BLOCK_GUTTER_PX`), maar
+                    // om een andere reden: hier wordt er niet in getekend (op
+                    // een touchscreen is verticaal vegen scrollen, dus dat gaat
+                    // via de +-knop). Het is enkel zodat de twee weergaven er
+                    // hetzelfde uitzien en blokken niet tegen de rand plakken.
                     left: `${(block.lane / block.lanes) * 100}%`,
-                    width: `${(1 / block.lanes) * 100}%`,
+                    width: `calc(${(1 / block.lanes) * 100}% - ${BLOCK_GUTTER_PX}px)`,
                   }}
                 >
                   <BlockContent
                     block={block}
                     vehicle={vehicle}
                     showDriver={showDriver}
+                    fields={fields}
                     awaitsDriver={look.awaitsDriver}
                     start={block.start}
                     end={block.end}

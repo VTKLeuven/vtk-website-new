@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { requireManage } from '@/lib/session';
 import {
+  canDeleteTransport,
   chargesRequester,
   formatDateOnly,
   formatDateRange,
@@ -142,6 +143,11 @@ export default async function VervoerWeekPage({
       booking.driver && booking.driverId
         ? { id: booking.driverId, name: booking.driver.name }
         : null,
+    // Staan standaard niet in het blok; ze verschijnen pas wanneer iemand ze in
+    // "Weergave" aanvinkt (R7). Ze reizen wel altijd mee: het zijn twee korte
+    // strings per rit, en een tweede query per vinkje is dat niet waard.
+    destination: booking.destination,
+    cargoNote: booking.cargoNote,
     conflict: conflicts.has(booking.id),
   }));
 
@@ -205,6 +211,11 @@ export default async function VervoerWeekPage({
       needsDriver: vehicle?.needsDriver ?? true,
       needsVanDriver: vehicle?.needsVanDriver ?? false,
       paid: booking.paidOfflineAt !== null,
+      // Enkel een rit die het team zelf tekende, en enkel zolang er geen geld en
+      // geen gereden rit aan hangt (R1). Bij een heen-en-terugrit telt de hele
+      // groep: die gaat samen weg, dus als één helft niet mag, mag geen enkele.
+      canDelete: legs.every(canDeleteTransport),
+      deleteCount: legs.length,
       history: history.get(booking.id) ?? [],
       legs: legs
         .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())

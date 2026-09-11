@@ -3,7 +3,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { driverColorVar, vehiclePatternClass, type DriverColorOverrides } from '@/lib/driver-colors';
 import { LogisticsIcon } from '@/components/logistics-icon';
-import type { CalendarVehicle, TripBlock } from './types';
+import { DEFAULT_TRIP_FIELDS, type CalendarVehicle, type TripBlock, type TripFields } from './types';
 
 /**
  * Het uiterlijk van één rit, gedeeld door de dag-, week- en maandweergave.
@@ -100,7 +100,17 @@ export function blockLook({
   };
 }
 
-/** Alles wat er in een blok staat, van boven naar onder. */
+/**
+ * Alles wat er in een blok staat, van boven naar onder.
+ *
+ * Welke regels dat zijn, kiest de lezer zelf in "Weergave" (zie
+ * `TRIP_BLOCK_FIELDS`); `fields` weglaten geeft de standaardweergave, wat het
+ * publieke overzicht en de maandweergave gebruiken.
+ *
+ * De volgorde staat vast en is niet instelbaar: uur bovenaan, dan waarvoor, dan
+ * waarmee, dan wie. Een blok waarvan de regels per persoon in een andere
+ * volgorde staan, moet je elke keer opnieuw lezen in plaats van herkennen.
+ */
 export function BlockContent({
   block,
   vehicle,
@@ -110,6 +120,7 @@ export function BlockContent({
   end,
   continuesBefore,
   continuesAfter,
+  fields = DEFAULT_TRIP_FIELDS,
   /** Bij overlap is er geen plaats voor een heel bereik; dan enkel het beginuur. */
   compact = false,
 }: {
@@ -121,24 +132,38 @@ export function BlockContent({
   end: Date;
   continuesBefore: boolean;
   continuesAfter: boolean;
+  fields?: TripFields;
   compact?: boolean;
 }): ReactNode {
   return (
     <>
-      <span className="block truncate font-semibold tabular-nums">
-        {continuesBefore ? '↑ ' : ''}
-        {formatTime(start)}
-        {compact ? '' : `-${formatTime(end)}`}
-        {continuesAfter ? ' ↓' : ''}
-      </span>
-      <span className="block truncate">{block.title}</span>
-      {vehicle ? (
+      {/* Het uur blijft de regel die zegt dát dit blok ergens over gaat: staat
+          het uit én is er verder niets aangevinkt, dan is een blok een lege
+          rechthoek. De pijlen voor een rit over middernacht horen bij het uur en
+          verdwijnen dus mee; de hoogte van het blok zegt de rest. */}
+      {fields.time ? (
+        <span className="block truncate font-semibold tabular-nums">
+          {continuesBefore ? '↑ ' : ''}
+          {formatTime(start)}
+          {compact ? '' : `-${formatTime(end)}`}
+          {continuesAfter ? ' ↓' : ''}
+        </span>
+      ) : null}
+      {fields.title ? <span className="block truncate">{block.title}</span> : null}
+      {/* De post of werkgroep. Standaard uit, en enkel wanneer ze er is: op het
+          publieke overzicht staat er geen aanvrager in het blok. */}
+      {fields.requester && block.subtitle ? (
+        <span className="block truncate text-vtk-muted">{block.subtitle}</span>
+      ) : null}
+      {fields.vehicle && vehicle ? (
         <span className="flex items-center gap-1">
           <LogisticsIcon name={vehicleIcon(vehicle.code)} className="h-3 w-3 shrink-0" />
           <span className="truncate">{vehicle.name}</span>
         </span>
       ) : null}
-      {showDriver ? (
+      {/* `showDriver` én het vinkje: het eerste is een serverbeslissing (op het
+          publieke overzicht staan geen namen), het tweede een voorkeur. */}
+      {showDriver && fields.driver ? (
         block.driver ? (
           <span className="block truncate font-medium">{block.driver.name}</span>
         ) : awaitsDriver ? (
@@ -149,11 +174,28 @@ export function BlockContent({
           <span className="block truncate text-vtk-muted">rijdt zelf</span>
         )
       ) : null}
+      {/* Een pijl ervoor, want "Zaal Alma 3" op een eigen regel is niet van
+          "Doopcantus" te onderscheiden zodra de titel erboven wegvalt. */}
+      {fields.destination && block.destination ? (
+        <span className="block truncate text-vtk-muted">
+          <span aria-hidden>→ </span>
+          {block.destination}
+        </span>
+      ) : null}
+      {fields.cargo && block.cargoNote ? (
+        <span className="block truncate text-vtk-muted">{block.cargoNote}</span>
+      ) : null}
     </>
   );
 }
 
-/** De tekst voor tooltip en screenreader; hetzelfde als in het blok, maar voluit. */
+/**
+ * De tekst voor tooltip en screenreader.
+ *
+ * **Altijd alles**, ook wat er in het blok uitgevinkt staat. "Weergave" is een
+ * antwoord op "dit blok is 24 pixels hoog"; een tooltip heeft dat probleem niet
+ * en een screenreader al helemaal niet.
+ */
 export function blockLabel({
   block,
   vehicle,
@@ -181,6 +223,8 @@ export function blockLabel({
           ? 'nog geen chauffeur'
           : 'de aanvrager rijdt zelf'
       : null,
+    block.destination ? `naar ${block.destination}` : null,
+    block.cargoNote ? `lading: ${block.cargoNote}` : null,
   ]
     .filter(Boolean)
     .join(', ');
