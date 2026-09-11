@@ -466,7 +466,7 @@ met vijf keer te veel vormen erop.
 - **`AppNavTab` en Meer.** Het scherm in `src/screens/meer.tsx` zetten met een
   icoon uit `lucide-react-native` (`MapPin` of `Compass`), geen emoji.
 - **EAS Update.** Na elke app-wijziging op `main` meteen
-  `cd mobile && npx eas update --branch preview`.
+  `cd mobile && npx eas update --branch preview --environment preview`.
 - **Geen kaart in een kaart.** De campuskaart staat direct op het papier, niet in
   een witte kaart met een rand; anders krijg je het geneste-kaartprobleem dat de
   styleguide verbiedt.

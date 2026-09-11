@@ -108,9 +108,9 @@ lucht, native modules niet.
 
 ## `runtimeVersion`: `exposdk`, en waarom niet fingerprint
 
-`app.json` zet `runtimeVersion` op `"exposdk:54.0.0"`. Een update en een client
-horen bij elkaar wanneer die waarde gelijk is, en `exposdk:54.0.0` is de waarde
-van **Expo Go** voor SDK 54.
+`app.json` zet `runtimeVersion` op `"exposdk:57.0.0"`. Een update en een client
+horen bij elkaar wanneer die waarde gelijk is, en `exposdk:57.0.0` is de waarde
+van **Expo Go** voor SDK 57.
 
 Dat is geen detail maar de hele iOS-kant. Er is geen Apple Developer-account, dus
 er bestaat geen iOS-build en die is er ook nooit geweest. De enige manier waarop
@@ -126,7 +126,7 @@ Expo Go verstuurt sinds SDK 53 geen pushberichten meer. Voeg je een module toe d
 niet in Expo Go zit, dan valt die weg weg, en dan is dit hele stuk aan herziening
 toe.
 
-**De prijs is echt.** Deze waarde is dezelfde voor élke SDK 54-build, dus EAS kan
+**De prijs is echt.** Deze waarde is dezelfde voor élke SDK 57-build, dus EAS kan
 een oude APK niet van een nieuwe onderscheiden en biedt elke update aan iedereen
 aan. Krijgt een APK zonder `expo-camera` JavaScript dat `expo-camera` importeert,
 dan gooit `requireNativeModule` op het moment dat dat scherm laadt: een rood
@@ -136,6 +136,21 @@ en later `expo-calendar` erbij kwamen.
 Daarom hoort bij elke native wijziging een zin naar het bestuur: wie een oudere
 APK heeft, installeert de nieuwste. Dat werkt zolang de APK's intern verspreid
 worden en we iedereen kunnen bereiken.
+
+**De tweede prijs: Expo Go bepaalt wanneer we upgraden.** In de App Store staat
+maar één Expo Go, en die ondersteunt enkel de nieuwste SDK. Apple laat een oudere
+versie van een app niet installeren, en de uitweg die Expo daarvoor heeft
+(`eas go`, een eigen Expo Go op TestFlight) vraagt net het Apple
+Developer-account dat er niet is. Zet Expo een nieuwe SDK in de store, dan
+kunnen de iPhone-testers de app dus niet meer openen tot wij mee zijn. Dat is
+in september 2026 gebeurd met SDK 57, en het gebeurt opnieuw bij SDK 58.
+
+Een SDK-sprong **verlegt bovendien deze `runtimeVersion`**, en dat is precies het
+geval waarin de policy hierboven stil faalt in de andere richting: een APK van de
+vorige SDK krijgt geen enkele update meer aangeboden. Geen rood scherm, geen
+melding, de app blijft gewoon staan waar ze stond. De volgorde is daarom: eerst
+bouwen en de APK verspreiden, dan pas publiceren, en er expliciet bij zeggen dat
+iedereen herinstalleert.
 
 **Wanneer dit moet wijzigen.** Zodra er builds in de wereld staan die we niet meer
 kunnen vragen om te herinstalleren, dus bij TestFlight of de stores, is

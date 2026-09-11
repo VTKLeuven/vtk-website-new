@@ -19,7 +19,7 @@ in de wortel raakt hem niet aan; gebruik `npm run app:install`, `npm run app` en
 - **EAS Update na elke app-wijziging.** Pas je iets aan aan de mobiele app (`mobile/`)
   en push je naar `main`, publiceer dan ook altijd direct een EAS Update zodat
   testtoestellen en Expo Go de update direct ontvangen:
-  `cd mobile && npx eas update --branch preview --message "<korte beschrijving>"`.
+  `cd mobile && npx eas update --branch preview --environment preview --message "<korte beschrijving>"`.
 
 # Local setup: `make up && make db && make dev`
 

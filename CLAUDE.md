@@ -11,7 +11,7 @@
 - **EAS Update na elke app-wijziging.** Pas je iets aan aan de mobiele app (`mobile/`)
   en push je naar `main`, publiceer dan ook altijd direct een EAS Update zodat
   toestellen en Expo Go de wijzigingen ontvangen:
-  `cd mobile && npx eas update --branch preview --message "<korte beschrijving>"`.
+  `cd mobile && npx eas update --branch preview --environment preview --message "<korte beschrijving>"`.
 
 # UX-conventies
 

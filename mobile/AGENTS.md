@@ -92,7 +92,7 @@ bekijken. Push is de bestaande uitzondering: die werkt in Expo Go niet.
    want elke route controleert het daarna nog eens zelf.
 12. **Publiceer altijd een EAS Update na het pushen naar main.** De CI-pipeline
    van GitHub Actions deployt enkel de website; wijzigingen aan de mobiele app
-   moeten dus altijd via `npx eas update --branch preview --message "..."` naar het
+   moeten dus altijd via `npx eas update --branch preview --environment preview --message "..."` naar het
    preview-kanaal gepubliceerd worden zodat ze direct op toestellen en in Expo Go
    verschijnen.
 
@@ -208,10 +208,33 @@ vergelijkt de eerste rij byte voor byte wanneer beide repo's naast elkaar staan.
 | `src/theme/tokens.ts` | `apps/web/app/design/vtk-base.css` (`:root`) |
 | `src/api/client.ts` | `vtk-scanner-app/src/api/client.ts` |
 
-## Expo SDK 54, niet 57
+## Expo SDK 57, gelijk met de andere twee apps
 
-Bewust gelijk aan vtk-scanner-app: een toolchain voor beide VTK-apps, en die is
-daar al door de EAS-bouwproblemen heen (de `react-dom`-pin, het wegvallen van
-`@react-native-cookies/cookies`, `platforms: ["ios","android"]` voor
-`eas update`). Upgraden is prima, maar doe het dan voor allebei tegelijk en als
-een eigen taak, niet en passant.
+Bewust gelijk aan **vtk-scanner-app** en **vtk-floorplan-app**: één toolchain voor
+de drie VTK-apps, en die is al door de EAS-bouwproblemen heen (de `react-dom`-pin,
+het wegvallen van `@react-native-cookies/cookies`, `platforms: ["ios","android"]`
+voor `eas update`). Upgraden is prima, maar doe het dan voor alle drie tegelijk en
+als een eigen taak, niet en passant.
+
+**Die keuze is niet vrijblijvend.** Expo Go in de App Store draait enkel de
+nieuwste SDK, en zonder Apple Developer-account is Expo Go de enige weg naar een
+iPhone; blijven we achter, dan kan niemand de app op iOS nog openen. Zie
+`docs/architecture.md` onder `runtimeVersion`.
+
+Wat er bij de sprong van 54 naar 57 uit de weg moest, voor de volgende keer:
+
+- `privacy`, `splash` en `android.edgeToEdgeEnabled` bestaan niet meer in
+  `app.json`. De splash is nu een `expo-splash-screen`-plugin, edge-to-edge is
+  verplicht en dus geen instelling meer.
+- `expo-status-bar` heeft geen `backgroundColor` meer, om diezelfde reden. Wie
+  onder de statusbalk wil kleuren, doet dat zelf met de insets uit
+  `react-native-safe-area-context`; `SafeAreaView` uit `react-native` is op
+  Android geen echte safe area.
+- `StyleSheet.absoluteFillObject` is weg, `StyleSheet.absoluteFill` is nu zelf een
+  gewoon object en vervangt het één op één.
+- `expo-calendar` heeft een herziene API; de oude functies werken nog (met een
+  waarschuwing) maar het type `Calendar` wordt niet meer geëxporteerd.
+- `eas update` eist sinds SDK 55 `--environment`.
+- `eslint-config-expo` zet de React Compiler-regels aan. Zie `eslint.config.js`
+  voor welke aan staan en waarom `immutability` uit moet zolang we Reanimated
+  gebruiken.
