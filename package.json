@@ -29,7 +29,8 @@
     "import:praesidium": "dotenv -e .env -- tsx scripts/import-praesidium-history.ts",
     "import:pocs": "dotenv -e .env -- tsx scripts/import-poc-history.ts",
     "import:pages": "dotenv -e .env -- tsx scripts/import-pages.ts",
-    "probe:elixir": "dotenv -e .env -- tsx --conditions=react-server scripts/elixir-probe.ts"
+    "probe:elixir": "dotenv -e .env -- tsx --conditions=react-server scripts/elixir-probe.ts",
+    "explain:access": "dotenv -e .env -- tsx scripts/explain-access.ts"
   },
   "engines": {
     "node": ">=20.0.0"
