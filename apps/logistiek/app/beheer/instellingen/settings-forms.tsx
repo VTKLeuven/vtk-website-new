@@ -234,15 +234,15 @@ const GENERAL_ERRORS = {
 const NOTIFY_LABELS: Record<NotifyKind, { title: string; hint: string }> = {
   materiaal: {
     title: 'Materiaal',
-    hint: 'Krijgt een mail zodra iemand materiaal aanvraagt.',
+    hint: 'Krijgt een mail met de nieuwe materiaalaanvragen.',
   },
   flesserke: {
     title: 'Flesserke',
-    hint: 'Krijgt een mail zodra iemand flesserke aanvraagt.',
+    hint: 'Krijgt een mail met de nieuwe flesserke-aanvragen.',
   },
   transport: {
     title: 'Transport',
-    hint: 'Krijgt een mail zodra iemand een rit aanvraagt.',
+    hint: 'Krijgt een mail met de nieuwe ritaanvragen.',
   },
 };
 
@@ -314,7 +314,7 @@ export function GeneralSettings({
             verantwoordelijke; één gedeelde mailbox betekent dat iedereen alles
             leest tot niemand nog iets leest. */}
         <div className="mt-4 grid gap-3 border-t border-vtk-navy/10 pt-4">
-          <p className="text-sm font-semibold text-vtk-ink">Melding bij een nieuwe aanvraag</p>
+          <p className="text-sm font-semibold text-vtk-ink">Melding bij nieuwe aanvragen</p>
           {NOTIFY_KINDS.map((kind) => (
             <label key={kind} className="grid gap-1 text-xs font-medium text-vtk-muted">
               {NOTIFY_LABELS[kind].title}
@@ -336,9 +336,17 @@ export function GeneralSettings({
             </label>
           ))}
           <p className="text-xs text-vtk-muted">
-            Meerdere adressen mogen, gescheiden door een komma. De mail draagt een samenvatting van
-            de aanvraag plus de link ernaartoe; hij vertrekt pas nádat de aanvraag opgeslagen is, en
-            een mailserver die er niet is, houdt de aanvraag nooit tegen.
+            Meerdere adressen mogen, gescheiden door een komma. De mail draagt per aanvraag een
+            samenvatting plus de link ernaartoe, en een mailserver die er niet is, houdt een aanvraag
+            nooit tegen.
+          </p>
+          {/* R4: zeggen dát er gewacht wordt. Wie dit niet weet, denkt bij het
+              testen dat de melding stuk is omdat er na het indienen niets komt. */}
+          <p className="text-xs text-vtk-muted">
+            De meldingen worden <strong>gebundeld</strong>: hoogstens één mail per uur per soort, met
+            alles wat er sinds de vorige binnenkwam. Vijf aanvragen na elkaar gaven anders vijf mails
+            naar dezelfde mailbox. Een aanvraag die binnen 24 uur begint, wacht niet en vertrekt
+            meteen.
           </p>
         </div>
       </SaveForm>

@@ -18,7 +18,8 @@ import { useToast } from '@/components/ui/toast';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { SaveForm } from '@/components/ui/save-form';
-import { compareText, useSort, type SortDir } from '@/app/beheer/sortable-header';
+import { SortChips, useSort } from '@/app/beheer/sortable-header';
+import { compareText, type SortDir } from '@/app/beheer/sort';
 import type { DriverPoolEntry } from '@/lib/uitleen-server';
 
 const inputClass = 'h-9 w-full rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
@@ -315,6 +316,12 @@ function DriverRow({ entry }: { entry: DriverPoolEntry }) {
  */
 type DriverSortKey = 'name' | 'trips' | 'van';
 
+const DRIVER_SORTS = [
+  { key: 'name', label: 'Naam' },
+  { key: 'trips', label: 'Aantal ritten' },
+  { key: 'van', label: 'Rijdt met de kar' },
+] as const satisfies ReadonlyArray<{ key: DriverSortKey; label: string }>;
+
 /** Sorteert binnen een groep; de groepen zelf blijven staan waar ze staan. */
 function sortDrivers(
   drivers: DriverPoolEntry[],
@@ -353,31 +360,12 @@ export function DriverList({ drivers }: { drivers: DriverPoolEntry[] }) {
 
   return (
     <div className="grid gap-5">
-      <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-vtk-muted">Sorteren op</span>
-        {(
-          [
-            ['name', 'Naam'],
-            ['trips', 'Aantal ritten'],
-            ['van', 'Rijdt met de kar'],
-          ] as Array<[DriverSortKey, string]>
-        ).map(([sortKey, label]) => (
-          <button
-            key={sortKey}
-            type="button"
-            onClick={() => toggle(sortKey)}
-            aria-pressed={key === sortKey}
-            className={`rounded-full border px-3 py-1 font-medium transition ${
-              key === sortKey
-                ? 'border-vtk-navy bg-vtk-navy text-white'
-                : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
-            }`}
-          >
-            {label}
-            {key === sortKey ? <span aria-hidden="true"> {dir === 'asc' ? '↑' : '↓'}</span> : null}
-          </button>
-        ))}
-      </div>
+      <SortChips
+        options={DRIVER_SORTS}
+        activeKey={key}
+        dir={dir}
+        onSort={toggle}
+      />
       <section>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h3 className="text-sm font-semibold text-vtk-ink">Post Logistiek ({fromPost.length})</h3>

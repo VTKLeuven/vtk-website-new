@@ -2454,6 +2454,62 @@ vast paneel over de pagina (`data-fullscreen="fallback"`). De filters en de
 inspector staan bewust **binnen** die container: alles wat erbuiten gerenderd
 wordt, is in echte fullscreen onzichtbaar.
 
+### Wat er in een rit-blok staat, kiest de lezer zelf
+
+Een blok toonde vier vaste regels: uur, evenement of doel, voertuig, chauffeur.
+De **post of werkgroep** stond er niet in, terwijl de planning ze al kende; ze
+kwam enkel in de tooltip terecht. Dat was de aanleiding, maar één veld bijzetten
+loste het niet op: wie chauffeurs indeelt kijkt naar de naam, wie de week van
+zijn post nakijkt wil de post zien, en wie een verhuis plant de bestemming. Alles
+tegelijk kan niet, want een rit van een kwartier is 24 pixels hoog. Eén vaste
+keuze maakt dus telkens iemand anders ongelijk.
+
+- **Zeven vinkjes in een knop "Weergave"**, naast de filterknop en met dezelfde
+  vorm. De twee beantwoorden een andere vraag over hetzelfde scherm: de filters
+  bepalen wélke ritten er staan, dit bepaalt wat je van elke rit ziet. Dat
+  verschil zit in de labels en in de teller, die hier telt wat er afwijkt van de
+  standaard.
+- **De standaard is de oude weergave.** Post, bestemming en lading staan uit. Wie
+  niets instelt, hoort niets te merken.
+- **In `localStorage` en niet in de URL**, anders dan de filters. Die staan er
+  omdat een gefilterde week deelbaar hoort te zijn en de server enkel ophaalt wat
+  je ziet; dit verandert niets aan de query, het is een voorkeur van één persoon,
+  en zeven extra parameters maken een gedeelde link naar een bepaalde week
+  onleesbaar. Het volgt dus de zoom en niet de filters.
+- **Een voorkeur per browser en geen teaminstelling.** Twee mensen kijken op
+  hetzelfde moment naar dezelfde week met een andere vraag in hun hoofd; een
+  instelling in /beheer/instellingen zou de ene laten kiezen voor de andere. Het
+  is bovendien niets dat fout kan staan: er gaat geen data verloren, er wordt
+  niets anders beslist, en je zet het in één klik terug.
+- **De volgorde van de regels is vast.** Uur bovenaan, dan waarvoor, dan waarmee,
+  dan wie. Een blok waarvan de regels per persoon in een andere volgorde staan,
+  moet je elke keer opnieuw lezen in plaats van herkennen.
+- **De tooltip en de screenreader blijven alles zeggen.** "Weergave" is een
+  antwoord op "dit blok is 24 pixels hoog"; een tooltip heeft dat probleem niet
+  en een screenreader al helemaal niet. Iets weglaten omdat het niet past, is een
+  weergavekeuze en geen filter op de informatie.
+- **De maandweergave doet niet mee.** Een balk daar is één regel van veertien
+  pixels met beginuur, voertuig en titel; er past niets bij. Vinkjes aanbieden
+  voor velden die er toch niet in passen, is een instelling die liegt.
+- **De chauffeur op het publieke overzicht blijft een verbod en geen vinkje.**
+  `showDriver` is een serverbeslissing (daar staan geen namen). Het vinkje wordt
+  daar dus niet getoond in plaats van uitgevinkt: uitgevinkt zou betekenen dat je
+  het terug kan zetten.
+
+### Een rit-blok vult zijn dagkolom niet helemaal
+
+Rechts van een rit blijft veertien pixels vrij (`BLOCK_GUTTER_PX`). Dat is geen
+lucht om de lucht: een blok liep over de volle breedte van zijn baan, en bij één
+rit is dat de hele dagkolom. Slepen om een nieuwe rit te tekenen start enkel op
+de kolom zelf, dus over de hele hoogte van een bestaande rit viel er niets meer
+in te tekenen; een tweede rit op datzelfde uur moest via de knop in de werkbalk.
+Dezelfde strook geeft bij overlap meteen ook ruimte tussen de banen.
+
+Om dezelfde reden zijn de uurlijnen en de nu-lijn `pointer-events: none`. Het
+zijn absolute elementen met een rand van één pixel, en zonder die regel is zo'n
+lijn het doelwit van een pointerdown die er toevallig op valt: één dode lijn per
+uur, precies in het vlak waarin je moet kunnen tekenen.
+
 ### Een rit opent als kaartje naast zijn blok
 
 Klik je een rit aan in de planning, dan verschijnt de detail als een kaartje van
@@ -3536,6 +3592,15 @@ geeft de planning als `.ics`.
   bestaan heeft.
 - **Een eigen tabel naast `CalendarFeedToken`.** Twee soorten geheim in één tabel
   betekent dat één fout in één query beide lekt.
+- **Het geheim zit in de URL en niet in `CLASS`.** De VEVENTs dragen bewust
+  `CLASS:PUBLIC`. Een tijd lang stond er `PRIVATE` op, met de redenering "deze
+  feed is vertrouwelijk, dus ook elk event erin"; het gevolg was dat Google
+  Calendar in een geabonneerde agenda enkel **"Bezet"** toonde en Outlook de
+  details wegliet. De rit stond er dus wel in (titel, chauffeur, lading,
+  nummers), met de instructie aan de agenda om ze niet te tonen, en dat is
+  precies het omgekeerde van waarvoor de feed bestaat. `CLASS` is een
+  weergavehint aan de client en geen slot: wie de link heeft, haalt de feed toch
+  op. De afscherming is en blijft het token, `no-store` en `noindex`.
 - **De ics-generator is een kopie**, geen gedeeld pakket. Hoisten is netter, maar
   een nieuw workspace-pakket dwingt een volledige lockfile-regeneratie af
   (AGENTS.md) en die laat `better-auth` doorfloaten naar een versie waarop
@@ -3556,6 +3621,28 @@ lag dan al twee dagen stil.
 - **Enkel bij het indienen.** Elke wijziging melden zou dezelfde mailbox vullen
   tot ze even hard genegeerd wordt als voordien. De aanvrager krijgt wél bericht
   bij elke beslissing; dat is de andere richting en die regels staan hierboven.
+- **Gebundeld: hoogstens één mail per uur per soort.** Ze vertrok eerst meteen
+  bij het indienen, en wie vijf ritten na elkaar aanvroeg, stuurde vijf mails
+  naar dezelfde mailbox. Vijf mails lezen als vijf aanvragen, en dat is precies
+  de ruis waar deze melding tegen bedoeld was. Elke aanvraag houdt in de bundel
+  haar eigen blok met haar eigen beslis-link; enkel de kop erboven telt ze.
+  - **De wachtrij is een kolom op de aanvraag zelf** (`teamNotifiedAt`, `null` =
+    nog te melden) en geen outbox-tabel zoals bij ticketing. Er valt niets te
+    bewaren buiten "is dit al gemeld", en de wekker die het uitstuurt draait toch
+    al: de logistiek-worker post elke minuut naar `/api/uitleen/maintenance`. Een
+    tweede worker is een tweede ding dat stil kan uitvallen.
+  - **Een aanvraag die binnen 24 uur begint, wacht niet.** Een rit die vanavond
+    vertrekt een uur laten liggen is geen verbetering maar precies het probleem
+    dat deze melding kwam oplossen. Bewust 24 uur en niet de
+    "last minute"-instelling (standaard zeven dagen): met zeven dagen zou bijna
+    alles de bundel omzeilen en verandert er niets.
+  - **Een mislukte verzending stempelt niet.** Dan staat de aanvraag er bij de
+    volgende tick nog, in plaats van stil verdwenen te zijn. Is er géén adres
+    ingesteld, dan wordt er wél gestempeld: dat is een geldige keuze, en anders
+    groeit een wachtrij aan die nergens heen gaat.
+  - **Het instellingenscherm zegt dat er gewacht wordt.** Wie dat niet weet,
+    denkt bij het testen dat de melding stuk is omdat er na het indienen niets
+    komt.
 - **Een lege lijst betekent geen mail, en het scherm zegt dat.** Dat is een
   legitieme keuze (niet elke soort hoeft een melding), maar stil niets versturen
   is precies de bug die deze instelling oplost, dus staat er een rode zin bij een

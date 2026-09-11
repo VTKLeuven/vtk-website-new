@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { ReservationStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
+import { SortChipLinks, nextSortDir, type SortDir } from '@/app/beheer/sort';
 import {
   chargesRequester,
   formatDateOnly,
@@ -41,7 +42,6 @@ const SORTS = {
   requester: { label: 'Post', defaultDir: 'asc' as const },
 };
 type SortKey = keyof typeof SORTS;
-type SortDir = 'asc' | 'desc';
 
 function isSortKey(value: string | undefined): value is SortKey {
   return value !== undefined && value in SORTS;
@@ -132,12 +132,13 @@ export default async function BeheerAanvragenPage({
   const sortedDone = chosenSort ? sortReservations(done, activeSort, activeDir) : byLastTouched(done);
 
   function sortLink(key: SortKey): string {
-    // Klikken op de actieve sortering draait de richting om.
-    const nextDir: SortDir = activeSort === key && activeDir === 'asc' ? 'desc' : 'asc';
+    // Klikken op de actieve sortering draait de richting om; een andere sleutel
+    // begint bij haar eigen standaard (een aanvraagdatum leest van nieuw naar
+    // oud, een post van a naar z).
     const params = new URLSearchParams();
     if (activeTab !== 'all') params.set('type', activeTab);
     params.set('sort', key);
-    params.set('dir', nextDir);
+    params.set('dir', nextSortDir(key, chosenSort, activeDir, SORTS[key].defaultDir));
     return `/beheer/aanvragen?${params.toString()}`;
   }
 
@@ -323,32 +324,15 @@ export default async function BeheerAanvragenPage({
           ))}
         </nav>
 
-        <nav className="flex flex-wrap items-center gap-2 text-sm" aria-label="Sorteren">
-          <span className="text-vtk-muted">Sorteren op</span>
-          {(Object.keys(SORTS) as SortKey[]).map((key) => {
-            const isActive = chosenSort === key;
-            return (
-              <Link
-                key={key}
-                href={sortLink(key)}
-                aria-current={isActive ? 'true' : undefined}
-                className={
-                  isActive
-                    ? 'inline-flex items-center gap-1 rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1 font-semibold text-white'
-                    : 'inline-flex items-center gap-1 rounded-full border border-vtk-navy/15 px-3 py-1 font-medium text-vtk-ink transition hover:border-vtk-navy/40'
-                }
-              >
-                {SORTS[key].label}
-                {isActive ? <span aria-hidden="true">{activeDir === 'asc' ? '↑' : '↓'}</span> : null}
-                {isActive ? (
-                  <span className="sr-only">
-                    {activeDir === 'asc' ? '(oplopend)' : '(aflopend)'}
-                  </span>
-                ) : null}
-              </Link>
-            );
-          })}
-        </nav>
+        <SortChipLinks
+          activeKey={chosenSort}
+          dir={activeDir}
+          options={(Object.keys(SORTS) as SortKey[]).map((key) => ({
+            key,
+            label: SORTS[key].label,
+            href: sortLink(key),
+          }))}
+        />
       </div>
 
       {/* Wat nog moet gebeuren staat chronologisch vooruit: de eerstvolgende

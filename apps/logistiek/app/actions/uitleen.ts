@@ -30,7 +30,7 @@ import {
 } from '@/lib/availability-day';
 import { startOfBrusselsDay } from '@/lib/week-lanes';
 import { writeAudit } from '@/lib/audit';
-import { notifyReservation, notifyTeamNewRequest, notifyTransport } from '@/lib/uitleen-mail';
+import { notifyReservation, notifyTeamIfUrgent, notifyTransport } from '@/lib/uitleen-mail';
 
 /**
  * `code` is optioneel en enkel voor een fout waar de client iets méér mee doet
@@ -189,7 +189,10 @@ export async function createReservationAction(input: ReservationFormInput): Prom
 
   // Ná de write en zonder de aanvraag te kunnen doen falen (M1); wie een fout
   // ziet omdat de mailserver plat ligt, dient opnieuw in en dan staan er twee.
-  await notifyTeamNewRequest('materiaal', created.id);
+  // De teammelding vertrekt gebundeld, hoogstens één keer per uur (R4); enkel
+  // een aanvraag die binnen 24 uur begint, gaat meteen door. Zie
+  // `notifyTeamIfUrgent` en `sendTeamDigests`.
+  await notifyTeamIfUrgent('materiaal', created.id);
 
   revalidateMember();
   return { ok: true, message: 'Aanvraag ingediend. Je vindt de status bij Mijn aanvragen.' };
@@ -315,7 +318,8 @@ export async function createFlesserkeReservationAction(input: ReservationFormInp
     select: { id: true },
   });
 
-  await notifyTeamNewRequest('flesserke', created.id);
+  // Zie de materiaalaanvraag hierboven: gebundeld, tenzij het dringend is.
+  await notifyTeamIfUrgent('flesserke', created.id);
 
   revalidateFlesserke();
   return { ok: true, message: 'Flesserke-aanvraag ingediend. Je krijgt bericht zodra Logistiek beslist.' };
@@ -717,8 +721,9 @@ export async function createVanBookingAction(input: TransportFormInput & {
   }
 
   // Eén melding per aanvraag en niet per boeking: heen en terug (of twee
-  // voertuigen) zijn samen één vraag, en de mail toont ze allebei.
-  if (created[0]) await notifyTeamNewRequest('transport', created[0].id);
+  // voertuigen) zijn samen één vraag, en de mail toont ze allebei. Ze vertrekt
+  // gebundeld (R4); enkel een rit die binnen 24 uur begint, gaat meteen door.
+  if (created[0]) await notifyTeamIfUrgent('transport', created[0].id);
 
   revalidateMember();
   const what =

@@ -14,7 +14,8 @@ import {
 import { FlesserkeItemName } from '@/components/flesserke-item-name';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { SaveForm } from '@/components/ui/save-form';
-import { SortHeader, compareText, useSort } from '@/app/beheer/sortable-header';
+import { SortHeader, useSort } from '@/app/beheer/sortable-header';
+import { compareText } from '@/app/beheer/sort';
 import { CONTENT_UNITS, formatContentAmount } from '@/lib/uitleen';
 import type { AdminFlesserkeItem } from '@/lib/uitleen-server';
 

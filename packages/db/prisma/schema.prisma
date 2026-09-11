@@ -3383,6 +3383,11 @@ model UitleenReservation {
   /// lezer: het gaat om de aanvrager, en die is er maar één.
   requesterSeenAt DateTime?
 
+  /// Wanneer het team een melding kreeg dat deze aanvraag binnenkwam. Zie het
+  /// gelijknamige veld op `UitleenTransportBooking` voor het waarom; `null`
+  /// betekent "staat nog in de wachtrij van de uurlijkse bundel".
+  teamNotifiedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3407,6 +3412,8 @@ model UitleenReservation {
   @@index([pickupDate, returnDate])
   @@index([requesterType, status])
   @@index([eventId])
+  // De wachtrij van de teammelding wordt elke minuut afgetast.
+  @@index([teamNotifiedAt])
 }
 
 model UitleenReservationLine {
@@ -3690,6 +3697,23 @@ model UitleenTransportBooking {
   /// Zie `UitleenReservation.requesterSeenAt` (R5).
   requesterSeenAt DateTime?
 
+  /// Wanneer het team een melding kreeg dat deze aanvraag binnenkwam.
+  ///
+  /// `null` betekent "staat nog in de wachtrij", en dát is de wachtrij: de
+  /// meldingsmail vertrekt niet meer bij het indienen maar hoogstens één keer
+  /// per uur, gebundeld (zie `sendTeamDigests`). Vijf aanvragen na elkaar gaven
+  /// anders vijf mails naar dezelfde mailbox, en vijf mails lezen als vijf
+  /// aanvragen; precies de ruis waar deze melding tegen bedoeld was.
+  ///
+  /// Een kolom op de rij zelf en geen outbox-tabel: er is niets te bewaren
+  /// buiten "is dit al gemeld", en de wekker die het uitstuurt draait toch al
+  /// (de logistiek-worker).
+  ///
+  /// Wordt óók gestempeld wanneer er niets vertrekt (geen adres ingesteld) of
+  /// wanneer de aanvraag dringend is en meteen gemaild werd. Blijft het bij een
+  /// mislukte verzending bewust `null`, zodat de melding niet stil verdwijnt.
+  teamNotifiedAt DateTime?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3719,6 +3743,8 @@ model UitleenTransportBooking {
   // "Mijn ritten" voor een chauffeur, en de rittentelling per chauffeur in het
   // chauffeursbeheer.
   @@index([driverId, startAt])
+  // De wachtrij van de teammelding wordt elke minuut afgetast.
+  @@index([teamNotifiedAt])
 }
 
 /// Waar een agendafeed van de uitleendienst over gaat.

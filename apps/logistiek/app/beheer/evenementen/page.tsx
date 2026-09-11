@@ -5,6 +5,7 @@ import {
   VanStatusBadge,
 } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
+import { SortChipLinks, compareText, nextSortDir, type SortDir } from '@/app/beheer/sort';
 import {
   formatDateOnly,
   formatDateTime,
@@ -292,53 +293,86 @@ function EventCard({ event }: { event: AdminEvent }) {
   );
 }
 
-/** Sorteersleutels voor het evenementenoverzicht (E2). */
+/**
+ * Sorteersleutels voor het evenementenoverzicht (E2).
+ *
+ * `defaultDir` is de richting waarin je begint zodra je erop klikt; een tweede
+ * klik draait om (`nextSortDir`). Datum staat op oplopend omdat de lijst al in
+ * "komend" en "voorbij" gesplitst is en je bij komend het eerstvolgende wil zien.
+ */
 const EVENT_SORTS = {
-  datum: 'Datum',
-  naam: 'Naam',
-  post: 'Post of werkgroep',
-} as const;
+  datum: { label: 'Datum', defaultDir: 'asc' as const },
+  naam: { label: 'Naam', defaultDir: 'asc' as const },
+  post: { label: 'Post of werkgroep', defaultDir: 'asc' as const },
+};
 
 type EventSort = keyof typeof EVENT_SORTS;
 
-function sortEvents(events: AdminEvent[], sort: EventSort): AdminEvent[] {
-  const byName = (a: AdminEvent, b: AdminEvent) =>
-    a.name.localeCompare(b.name, 'nl', { sensitivity: 'base' });
-  if (sort === 'naam') return [...events].sort(byName);
+function isEventSort(value: string | undefined): value is EventSort {
+  return value !== undefined && value in EVENT_SORTS;
+}
+
+function sortEvents(events: AdminEvent[], sort: EventSort, dir: SortDir): AdminEvent[] {
+  const factor = dir === 'asc' ? 1 : -1;
+  // De naam is de tiebreak en draait **niet** mee: binnen dezelfde post hoort de
+  // lijst alfabetisch te blijven, ook wanneer je de posten van z naar a zet.
+  // Dezelfde regel als in `sortDrivers`.
+  const byName = (a: AdminEvent, b: AdminEvent) => compareText(a.name, b.name, 'asc');
+  if (sort === 'naam') return [...events].sort((a, b) => compareText(a.name, b.name, dir));
   if (sort === 'post') {
     // Zonder post achteraan: die vraag ("van wie is dit?") is precies waarom je
-    // hierop sorteert, en een leeg vak bovenaan helpt daar niet bij.
+    // hierop sorteert, en een leeg vak bovenaan helpt daar niet bij. Ook bij
+    // aflopend blijft het achteraan, want het is geen naam maar een gat.
     return [...events].sort((a, b) => {
-      const groupA = a.group?.nameNl ?? '\uffff';
-      const groupB = b.group?.nameNl ?? '\uffff';
-      const diff = groupA.localeCompare(groupB, 'nl', { sensitivity: 'base' });
+      const noGroupA = a.group === null;
+      const noGroupB = b.group === null;
+      if (noGroupA !== noGroupB) return noGroupA ? 1 : -1;
+      const diff = compareText(a.group?.nameNl ?? '', b.group?.nameNl ?? '', dir);
       return diff !== 0 ? diff : byName(a, b);
     });
   }
-  return events;
+  // Datum: de lijst komt al chronologisch binnen, dus aflopend is ze omkeren.
+  // Een evenement zonder datum houdt zijn plek in die volgorde.
+  return dir === 'asc' ? events : [...events].reverse();
 }
 
 export default async function BeheerEvenementenPage({
   searchParams,
 }: {
-  searchParams: Promise<{ sorteer?: string }>;
+  searchParams: Promise<{ sorteer?: string; richting?: string }>;
 }) {
   await requireManage();
-  const { sorteer } = await searchParams;
-  const sort: EventSort = sorteer === 'naam' || sorteer === 'post' ? sorteer : 'datum';
+  const { sorteer, richting } = await searchParams;
+  // Zonder parameter blijft het datum-oplopend, zoals het altijd was: bestaande
+  // links en bladwijzers komen op dezelfde lijst uit.
+  const chosenSort = isEventSort(sorteer) ? sorteer : null;
+  const sort: EventSort = chosenSort ?? 'datum';
+  const dir: SortDir =
+    richting === 'asc' || richting === 'desc' ? richting : EVENT_SORTS[sort].defaultDir;
   const events = await adminEvents();
+
+  /** Waar een sorteerknop heen gaat; een tweede klik op dezelfde draait om. */
+  function sortHref(key: EventSort): string {
+    const params = new URLSearchParams({
+      sorteer: key,
+      richting: nextSortDir(key, chosenSort, dir, EVENT_SORTS[key].defaultDir),
+    });
+    return `/beheer/evenementen?${params.toString()}`;
+  }
 
   const upcoming = sortEvents(
     events.filter(
       (event) => !event.startAt || event.startAt.getTime() >= Date.now() - 24 * 60 * 60 * 1000
     ),
-    sort
+    sort,
+    dir
   );
   const past = sortEvents(
     events.filter(
       (event) => event.startAt !== null && event.startAt.getTime() < Date.now() - 24 * 60 * 60 * 1000
     ),
-    sort
+    sort,
+    dir
   );
 
   return (
@@ -358,22 +392,16 @@ export default async function BeheerEvenementenPage({
             many="komende of zonder datum"
           />
         </div>
-        <div className="mt-4 flex flex-wrap items-center gap-2 text-xs">
-          <span className="text-vtk-muted">Sorteren op</span>
-          {(Object.keys(EVENT_SORTS) as EventSort[]).map((key) => (
-            <Link
-              key={key}
-              href={key === 'datum' ? '/beheer/evenementen' : `/beheer/evenementen?sorteer=${key}`}
-              aria-current={sort === key ? 'true' : undefined}
-              className={`rounded-full border px-3 py-1 font-medium transition ${
-                sort === key
-                  ? 'border-vtk-navy bg-vtk-navy text-white'
-                  : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
-              }`}
-            >
-              {EVENT_SORTS[key]}
-            </Link>
-          ))}
+        <div className="mt-4">
+          <SortChipLinks
+            activeKey={chosenSort}
+            dir={dir}
+            options={(Object.keys(EVENT_SORTS) as EventSort[]).map((key) => ({
+              key,
+              label: EVENT_SORTS[key].label,
+              href: sortHref(key),
+            }))}
+          />
         </div>
 
         <div className="mt-4">

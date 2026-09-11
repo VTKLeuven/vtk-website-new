@@ -1,7 +1,10 @@
 import Link from 'next/link';
 import { VanStatusBadge } from '@/components/status-badge';
 import { requireManage } from '@/lib/session';
+import { SortChipLinks, nextSortDir, type SortDir } from '@/app/beheer/sort';
+import { TRIP_SORTS, compareTrips, isTripSort, type TripSort } from '@/lib/transport-sort';
 import {
+  canDeleteTransport,
   chargesRequester,
   eventOptions,
   formatPriceCents,
@@ -27,6 +30,7 @@ import { BookingRow } from './booking-row';
 import { TransportControls } from './transport-controls';
 import { TransportDecisionForms } from './transport-decision-forms';
 import { TransportUndoButtons } from './transport-undo';
+import { TransportDeleteButton } from './transport-delete';
 
 const dateFormatter = new Intl.DateTimeFormat('nl-BE', {
   timeZone: 'Europe/Brussels',
@@ -72,12 +76,19 @@ function awaitsDriver(booking: {
 export default async function BeheerVervoerPage({
   searchParams,
 }: {
-  searchParams: Promise<{ rit?: string }>;
+  searchParams: Promise<{ rit?: string; sorteer?: string; richting?: string }>;
 }) {
   await requireManage();
   // S3: vanuit de kalender klik je op één rit, en die hoort hier opengeklapt en
   // gemarkeerd te staan in plaats van ergens in een lijst van twintig.
-  const { rit } = await searchParams;
+  const { rit, sorteer, richting } = await searchParams;
+
+  const chosenSort = isTripSort(sorteer) ? sorteer : null;
+  const sort: TripSort = chosenSort ?? 'datum';
+  const dir: SortDir =
+    richting === 'asc' || richting === 'desc' ? richting : TRIP_SORTS[sort].defaultDir;
+  const byChoice = (a: AdminTransportBooking, b: AdminTransportBooking) =>
+    compareTrips(a, b, sort, dir);
 
   const [bookings, drivers, vehicles, events] = await Promise.all([
     adminVanBookings(),
@@ -95,13 +106,16 @@ export default async function BeheerVervoerPage({
   // één keer over, dus staan ze onder één kaart met één beslisformulier.
   const openGroups: AdminTransportBooking[][] = [];
   const seenGroups = new Set<string>();
-  for (const booking of open) {
+  for (const booking of [...open].sort(byChoice)) {
     if (!booking.tripGroupId) {
       openGroups.push([booking]);
       continue;
     }
     if (seenGroups.has(booking.tripGroupId)) continue;
     seenGroups.add(booking.tripGroupId);
+    // De sortering bepaalt waar de **groep** staat; bínnen een aanvraag blijven
+    // heen en terug chronologisch, wat je ook kiest. Anders staat de terugrit
+    // boven de heenrit zodra je op voertuig sorteert.
     openGroups.push(
       open
         .filter((other) => other.tripGroupId === booking.tripGroupId)
@@ -126,10 +140,10 @@ export default async function BeheerVervoerPage({
       .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
       .map((other) => `${hoursLabel(other)} · ${other.eventName?.trim() || other.purpose}`);
   }
-  const approved = bookings
-    .filter((booking) => booking.status === 'APPROVED')
-    .sort((a, b) => a.startAt.getTime() - b.startAt.getTime());
-  const rest = bookings.filter((booking) => !['REQUESTED', 'APPROVED'].includes(booking.status));
+  const approved = bookings.filter((booking) => booking.status === 'APPROVED').sort(byChoice);
+  const rest = bookings
+    .filter((booking) => !['REQUESTED', 'APPROVED'].includes(booking.status))
+    .sort(byChoice);
   // R2: ritten waarvan de rit al voorbij is, staan standaard ingeklapt achter
   // een teller. Nog niet voorbije historiek (bv. een geannuleerde rit die nog
   // moest plaatsvinden) blijft gewoon zichtbaar.
@@ -143,6 +157,35 @@ export default async function BeheerVervoerPage({
 
   function paidOf(booking: AdminTransportBooking): boolean {
     return hasSucceededPayment(booking.payments) || booking.paidOfflineAt !== null;
+  }
+
+  /**
+   * Waar een sorteerknop heen gaat; een tweede klik op dezelfde draait om.
+   *
+   * `?rit=` blijft staan: je komt hier vaak vanuit de kalender met één rit
+   * opengeklapt, en die mag niet verdwijnen omdat je even anders sorteert.
+   */
+  function sortHref(key: TripSort): string {
+    const params = new URLSearchParams();
+    if (rit) params.set('rit', rit);
+    params.set('sorteer', key);
+    params.set('richting', nextSortDir(key, chosenSort, dir, TRIP_SORTS[key].defaultDir));
+    return `/beheer/vervoer?${params.toString()}`;
+  }
+
+  /**
+   * Hoeveel ritten er weggaan als je deze verwijdert, of `null` wanneer het niet
+   * mag (R1).
+   *
+   * Heen en terug zijn samen ingetekend en gaan samen weg, dus telt de hele
+   * tripgroep: mag één helft niet weg, dan geen enkele. Eén functie voor "mag
+   * het" en "hoeveel", want de bevestigingstekst moet dat tweede zeggen.
+   */
+  function deletableGroup(booking: AdminTransportBooking): number | null {
+    const legs = booking.tripGroupId
+      ? bookings.filter((other) => other.tripGroupId === booking.tripGroupId)
+      : [booking];
+    return legs.every(canDeleteTransport) ? legs.length : null;
   }
 
   /** Wat niet in de samenvattingsrij past, plus de beheeracties. */
@@ -233,6 +276,16 @@ export default async function BeheerVervoerPage({
           paidOffline={booking.paidOfflineAt !== null}
           paidOnline={hasSucceededPayment(booking.payments)}
         />
+        {/* Enkel bij een rit die het team zelf intekende (R1). Bij een
+            heen-en-terugrit gaan beide helften mee, dus telt de groep en niet
+            deze ene rij. */}
+        {deletableGroup(booking) !== null ? (
+          <TransportDeleteButton
+            bookingId={booking.id}
+            title={booking.eventName?.trim() || booking.purpose}
+            count={deletableGroup(booking)!}
+          />
+        ) : null}
         <div className="mt-3">
           <AuditTimeline entries={auditLogs.get(booking.id) ?? []} />
         </div>
@@ -445,6 +498,19 @@ export default async function BeheerVervoerPage({
           </Link>
         </div>
       </div>
+
+      {/* Sorteren geldt voor de drie lijsten tegelijk (R3). Eén rij en niet drie:
+          "waar staat de kar deze maand" is één vraag, en je wil ze niet per
+          sectie opnieuw stellen. */}
+      <SortChipLinks
+        activeKey={chosenSort}
+        dir={dir}
+        options={(Object.keys(TRIP_SORTS) as TripSort[]).map((key) => ({
+          key,
+          label: TRIP_SORTS[key].label,
+          href: sortHref(key),
+        }))}
+      />
 
       <section>
         <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">

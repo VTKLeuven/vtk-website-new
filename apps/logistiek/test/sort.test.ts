@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareText } from '@/app/beheer/sortable-header';
+import { compareText, nextSortDir } from '@/app/beheer/sort';
 
 describe('compareText', () => {
   it('orders ascending', () => {
@@ -30,5 +30,24 @@ describe('compareText', () => {
       'cola',
       'Gitaar',
     ]);
+  });
+});
+
+describe('nextSortDir', () => {
+  it('draait om bij een tweede klik op dezelfde sleutel', () => {
+    expect(nextSortDir('naam', 'naam', 'asc')).toBe('desc');
+    expect(nextSortDir('naam', 'naam', 'desc')).toBe('asc');
+  });
+
+  it('begint bij de standaard van een andere sleutel', () => {
+    // Een datumkolom leest van nieuw naar oud; zonder deze regel begin je op de
+    // oudste rij van 2019 zodra je erop klikt.
+    expect(nextSortDir('datum', 'naam', 'desc', 'desc')).toBe('desc');
+    expect(nextSortDir('naam', 'datum', 'desc')).toBe('asc');
+  });
+
+  it('behandelt "nog niets gekozen" als een andere sleutel', () => {
+    expect(nextSortDir('naam', null, 'asc')).toBe('asc');
+    expect(nextSortDir('datum', null, 'asc', 'desc')).toBe('desc');
   });
 });
