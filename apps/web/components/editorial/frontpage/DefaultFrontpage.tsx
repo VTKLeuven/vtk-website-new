@@ -79,7 +79,7 @@ export function DefaultFrontpage({
   const secondary = ctaFrom(
     pickField(values, "secondaryLabel", locale) ??
       (nl ? "Eerstejaars? Start hier" : "International? Start here"),
-    nl ? (values.secondaryUrl ?? "/eerstejaars") : (values.secondaryUrlEn ?? "/internationaal"),
+    nl ? (values.secondaryUrl ?? "/eerstejaars") : (values.secondaryUrlEn ?? "/internationals"),
     base,
   );
 

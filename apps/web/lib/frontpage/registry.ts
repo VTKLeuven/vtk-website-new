@@ -180,7 +180,7 @@ export const FRONTPAGE_MODULES: FrontpageModule[] = [
         type: "url",
         labelNl: "Knop 2 link (EN)",
         labelEn: "Button 2 link (EN)",
-        placeholder: "/internationaal",
+        placeholder: "/internationals",
       },
     },
   },
