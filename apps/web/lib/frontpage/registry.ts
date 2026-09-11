@@ -139,18 +139,16 @@ export const FRONTPAGE_MODULES: FrontpageModule[] = [
         type: "text",
         labelNl: "Geel accent (NL)",
         labelEn: "Yellow accent (NL)",
-        helpNl: "Schuin en geel accentwoord in de titel. Leeg = geen accent.",
-        helpEn: "Italic and yellow accent word in the headline. Empty = no accent.",
+        helpNl: "Schuin en geel, midden in de titel. Leeg = geen accent.",
+        helpEn: "Italic and yellow, inside the headline. Empty = no accent.",
       },
       accentEn: { type: "text", labelNl: "Geel accent (EN)", labelEn: "Yellow accent (EN)" },
       tailNl: {
         type: "text",
         labelNl: "Titel na het accent (NL)",
         labelEn: "Title after the accent (NL)",
-        helpNl:
-          'Tekst na het geel accent (bijv. "in Leuven."). Leeg laten als de titel eindigt op het accent.',
-        helpEn:
-          'Text after the yellow accent (e.g. "in Leuven."). Leave empty if the headline ends on the accent.',
+        helpNl: 'Bij "De thuis voor ingenieurs in Leuven" is dit "in Leuven.".',
+        helpEn: 'In "The home for engineers in Leuven" this is "in Leuven.".',
       },
       tailEn: {
         type: "text",

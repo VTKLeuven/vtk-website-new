@@ -26,9 +26,9 @@ import { Cta, ctaFrom, type FrontpageProps } from "./context";
  * rewrite the headline without a deploy.
  *
  * The headline is deliberately three fields (`title`, `accent`, `tail`) rather
- * than one: the yellow italic accent sits inside the sentence ("Ingenieurs zijn
- * **superieur.**"), which one text field cannot express without letting HTML
- * into the admin.
+ * than one: the yellow italic accent sits *inside* the sentence ("De thuis voor
+ * **ingenieurs** in Leuven"), which one text field cannot express without
+ * letting HTML into the admin.
  */
 export function DefaultFrontpage({
   values,
@@ -55,9 +55,9 @@ export function DefaultFrontpage({
     : HERO_WEEK_NEXT_LIMIT_DEFAULT;
 
   const eyebrow = pickField(values, "eyebrow", locale) ?? "Vlaamse Technische Kring · KU Leuven";
-  const title = pickField(values, "title", locale) ?? (nl ? "Ingenieurs zijn" : "Engineers are");
-  const accent = pickField(values, "accent", locale) ?? (nl ? "superieur." : "superior.");
-  const tail = pickField(values, "tail", locale) ?? "";
+  const title = pickField(values, "title", locale) ?? (nl ? "De thuis voor" : "The home for");
+  const accent = pickField(values, "accent", locale) ?? (nl ? "ingenieurs" : "engineers");
+  const tail = pickField(values, "tail", locale) ?? (nl ? "in Leuven." : "in Leuven.");
   const subtitle =
     pickField(values, "subtitle", locale) ??
     (nl
@@ -137,24 +137,9 @@ export function DefaultFrontpage({
           {eyebrow}
         </div>
         <h1>
-          {tail ? (
-            <>
-              {title ? `${title} ` : null}
-              {accent ? <span className="serif">{accent}</span> : null}
-              <br />
-              {tail}
-            </>
-          ) : (
-            <>
-              {title ? (
-                <>
-                  {title}
-                  {accent ? <br /> : null}
-                </>
-              ) : null}
-              {accent ? <span className="serif">{accent}</span> : null}
-            </>
-          )}
+          {title} <span className="serif">{accent}</span>
+          <br />
+          {tail}
         </h1>
         <p className="hero-sub">{subtitle}</p>
         <div className="hero-cta">
