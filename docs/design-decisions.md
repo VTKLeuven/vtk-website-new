@@ -2709,6 +2709,63 @@ velden zelf, want de `className` van de aanroeper draagt vaak al `w-full`, en
 welke van twee breedtes dan wint hangt af van de volgorde in de stylesheet. Dat
 gebeurde ook echt: de urenlijst werd 256px in plaats van 104px.
 
+### Verwijderen mag, maar enkel voor een rit die het team zelf tekende
+
+De planning zei lang: een rit gaat niet weg, ze wordt afgewezen of geannuleerd.
+Dat klopt voor een rit die uit een aanvraag komt en niet voor een rit die het
+team zelf intekent. Sinds de planning een agenda is, tekent de
+transportverantwoordelijke ritten zoals je in een agenda afspraken zet, en dan
+hoort een misklik van 03:00 niet als "geannuleerd" in de historiek te blijven
+staan.
+
+- **De grens is `UitleenTransportBooking.plannedByTeam`**, gezet door de twee
+  plekken waar het team zelf een rit aanmaakt (intekenen in de planning, en
+  "Levering nodig" bij een materiaalaanvraag). Een eigen kolom en geen afleiding
+  uit de historiek: zo'n rit is te herkennen aan de auditregel "ingepland door
+  Logistiek", en een verwijderknop die op een stringvergelijking staat, is één
+  hernoemde melding van stuk.
+- **Een rit uit een aanvraag blijft afwijzen of annuleren.** Daar hangt een lid
+  aan dat een reden hoort te zien in zijn overzicht; een rit die zonder woord
+  verdwijnt, levert een telefoontje op in plaats van een beslissing.
+- **De knop staat er niet wanneer het niet mag.** Een knop die altijd weigert,
+  leert mensen op knoppen te klikken die niets doen. De actie hercontroleert het
+  hoe dan ook.
+- **Twee andere weigeringen**: een gereden rit (COMPLETED) is geschiedenis, en
+  een rit met een betaling eraan kan niet weg. Dat tweede is geen beleid maar de
+  databank: `UitleenPayment.transportBooking` staat op `onDelete: Restrict`, dus
+  zonder die controle vooraf faalt het verwijderen met een Prisma-fout in plaats
+  van met een zin die zegt wat er in de weg staat.
+- **Heen en terug gaan samen weg.** Ze zijn samen ingetekend, en één helft
+  verwijderen laat een rit staan die niemand meer gaat rijden. Mag één helft niet
+  weg, dan geen enkele. De bevestiging zegt hoeveel ritten er verdwijnen.
+- **De historiek verdwijnt mee**, want `UitleenAuditLog` en
+  `UitleenTransportHelper` cascaderen. Dat staat in de bevestigingstekst: zeggen
+  wat er precies weg is, niet enkel "weet je het zeker".
+
+### "Andere" bij de postkeuze is een werkgroep, geen externe
+
+Logistiek rijdt niet enkel voor de posten in de lijst: soms voor de alumni, een
+bevriende kring of de faculteit. Bij het intekenen kon dat nergens, en dan werd
+het "Logistiek zelf" met de naam in het doel van de rit.
+
+- **"Andere..." opent een vrij naamveld** en slaat op als `requesterType =
+  WERKGROEP` met die naam in `requesterName`. `requesterLabel` toont bij elk
+  niet-intern type al de naam, dus de planning, de lijst, het paneel en de
+  agendafeed pikken het vanzelf op.
+- **Niet `EXTERN`**, ook al voelt "iemand van buiten de kring" zo. `EXTERN` is de
+  enige waarde waar `chargesRequester` true op geeft, en dan duiken prijs, tarief
+  en betaalstatus op bij die rit, aan beide kanten van het scherm. "Andere" gaat
+  over wie er in de planning staat en niet over wie er betaalt; wordt er echt
+  gefactureerd, dan is het een externe aanvraag en die loopt langs het gewone
+  aanvraagformulier.
+- **De naam is verplicht zodra het type niet intern is**, aan beide kanten. Een
+  interne rit wordt benoemd door haar post; zonder naam staat er bij elk ander
+  type een kale "Werkgroep" in de planning, en dan is "voor wie is dit" precies
+  de vraag die je niet meer beantwoord krijgt.
+- **Eén keuzelijst en geen tweede veld ernaast.** Het is één vraag ("voor wie
+  rijdt deze rit") met één antwoord; twee velden waarvan er altijd precies één
+  gevuld hoort te zijn, lopen vroeg of laat allebei ingevuld.
+
 ### Een rit mag aansluiten op het einde van de vorige
 
 Het einde van een rit is **open**: eindigt een rit om 12:00, dan is de kar om

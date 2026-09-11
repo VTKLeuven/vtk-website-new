@@ -575,6 +575,30 @@ export function chargesRequester(requesterType: UitleenRequesterType): boolean {
 }
 
 /**
+ * Mag deze rit verwijderd worden (R1)?
+ *
+ * Enkel een rit die Logistiek zelf intekende. Een rit die uit een aanvraag komt,
+ * blijft afwijzen of annuleren: daar hangt een lid aan dat een reden hoort te
+ * zien in plaats van een lege plek in zijn overzicht.
+ *
+ * Dezelfde drie regels als `deleteTransportAction` in `app/actions/beheer.ts`,
+ * maar dan voor de weergave: een knop die altijd weigert, leert mensen op
+ * knoppen te klikken die niets doen. De actie hercontroleert het toch; dit is
+ * enkel om de knop weg te laten. Daarom staat de regel hier en niet daar: een
+ * `'use server'`-module mag enkel async functies exporteren.
+ *
+ * De betalingscheck is geen beleidskeuze maar een databankregel:
+ * `UitleenPayment.transportBooking` staat op `onDelete: Restrict`.
+ */
+export function canDeleteTransport(booking: {
+  plannedByTeam: boolean;
+  status: UitleenTransportBookingStatus;
+  payments: Array<unknown>;
+}): boolean {
+  return booking.plannedByTeam && booking.status !== 'COMPLETED' && booking.payments.length === 0;
+}
+
+/**
  * Termijn waarbinnen een aanvraag "last minute" heet. Zeven dagen: met veertien
  * kreeg bijna elke aanvraag de badge, en een signaal dat overal staat is geen
  * signaal meer. Het team past dit zelf aan op /beheer/instellingen.

@@ -1788,7 +1788,11 @@ export async function createTransportForReservationAction(
   if (!built.ok) return { ok: false, error: built.error };
 
   await prisma.$transaction(async (tx) => {
-    await tx.uitleenTransportBooking.createMany({ data: built.bookings });
+    // Ook dit is een rit die het team zelf aanmaakt (vanaf "Levering nodig"), en
+    // dus een die het weer mag weghalen; het lid vroeg materiaal, geen rit.
+    await tx.uitleenTransportBooking.createMany({
+      data: built.bookings.map((booking) => ({ ...booking, plannedByTeam: true })),
+    });
     await writeAudit(tx, { reservationId: reservation.id }, {
       kind: 'NOTE',
       note: built.roundTrip
@@ -2106,6 +2110,75 @@ export async function rejectTransportAction(_prev: SaveState, formData: FormData
 }
 
 /**
+ * Een rit die het team zelf intekende, echt verwijderen (R1).
+ *
+ * **Enkel die.** Een rit die uit een aanvraag komt, blijft afwijzen of
+ * annuleren: daar hangt een lid aan dat een reden hoort te zien in zijn
+ * overzicht in plaats van een lege plek. Een rit die de transportverantwoordelijke
+ * zelf tekende, is een tekening en geen afspraak met iemand; die per ongeluk
+ * getekende rit van 03:00 hoort niet als "geannuleerd" in de historiek te blijven
+ * staan. `plannedByTeam` houdt de twee uit elkaar; zie schema.prisma.
+ *
+ * Wat er mee verdwijnt: de historiek (`UitleenAuditLog`) en de bijrijders staan
+ * allebei op `onDelete: Cascade`. Dat is de reden dat de bevestigingsdialoog het
+ * hardop zegt.
+ *
+ * De betalingscheck is géén beleidskeuze maar een databankregel:
+ * `UitleenPayment.transportBooking` staat op `onDelete: Restrict`, dus zonder
+ * deze controle faalt het verwijderen met een Prisma-fout in plaats van met een
+ * zin die zegt wat er in de weg staat.
+ */
+export async function deleteTransportAction(bookingId: string): Promise<ActionResult> {
+  await requireManage();
+
+  const booking = await prisma.uitleenTransportBooking.findUnique({
+    where: { id: bookingId },
+    select: { id: true, tripGroupId: true },
+  });
+  if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
+
+  // Heen en terug (of twee voertuigen) zijn samen ingetekend en gaan samen weg,
+  // net zoals annuleren en afwijzen de hele groep behandelen: één helft
+  // verwijderen laat een rit staan die niemand meer gaat rijden.
+  const legs = await prisma.uitleenTransportBooking.findMany({
+    where: booking.tripGroupId ? { tripGroupId: booking.tripGroupId } : { id: booking.id },
+    select: {
+      id: true,
+      status: true,
+      plannedByTeam: true,
+      _count: { select: { payments: true } },
+    },
+  });
+
+  if (legs.some((leg) => !leg.plannedByTeam)) {
+    return {
+      ok: false,
+      error:
+        'Deze rit komt van een aanvraag en kan niet verwijderd worden. Wijs ze af, of laat de aanvrager ze annuleren.',
+    };
+  }
+  if (legs.some((leg) => leg.status === 'COMPLETED')) {
+    return { ok: false, error: 'Deze rit is gereden; ze blijft in de historiek staan.' };
+  }
+  if (legs.some((leg) => leg._count.payments > 0)) {
+    return {
+      ok: false,
+      error: 'Aan deze rit hangt een betaling. Rond ze af of mail logistiek@vtk.be.',
+    };
+  }
+
+  const { count } = await prisma.uitleenTransportBooking.deleteMany({
+    where: { id: { in: legs.map((leg) => leg.id) } },
+  });
+
+  revalidateBeheer();
+  return {
+    ok: true,
+    message: count > 1 ? `${count} ritten verwijderd.` : 'Rit verwijderd.',
+  };
+}
+
+/**
  * Een rit aanmaken vanuit de planning (P4).
  *
  * Meteen `APPROVED` en niet `REQUESTED`: het team vraagt niets aan zichzelf. Een
@@ -2136,12 +2209,24 @@ export async function adminCreateTransportAction(
   const session = await requireManage();
 
   const ownerId = input.userId?.trim() || session.user.id;
+  const requesterType = input.requesterType ?? 'INTERN';
+  const requesterName = input.requesterName?.trim().slice(0, 200) || null;
+
+  // Een interne aanvraag wordt benoemd door haar post (`requesterLabel` valt
+  // daarop terug); elk ander type heeft enkel deze naam. Ontbreekt die, dan staat
+  // de rit als kale "Werkgroep" of "Extern" in de planning en is "voor wie is
+  // dit" precies de vraag die je niet meer beantwoord krijgt. De client checkt
+  // het ook, maar de client is de poort niet.
+  if (requesterType !== 'INTERN' && !requesterName) {
+    return { ok: false, error: 'Vul in voor wie deze rit rijdt, of kies een post.' };
+  }
+
   const built = await buildTransportBookings(input, {
     userId: ownerId,
     eventId: input.eventId?.trim() || null,
-    requesterType: input.requesterType ?? 'INTERN',
+    requesterType,
     groupId: input.groupId?.trim() || null,
-    requesterName: input.requesterName?.trim() || null,
+    requesterName,
   });
   if (!built.ok) return { ok: false, error: built.error };
 
@@ -2173,6 +2258,9 @@ export async function adminCreateTransportAction(
       data: built.bookings.map((booking) => ({
         ...booking,
         status: 'APPROVED' as const,
+        // Zelf ingetekend, dus later ook zelf weg te halen (R1). Zie de comment
+        // bij het veld in schema.prisma.
+        plannedByTeam: true,
         driverId,
         decidedAt: new Date(),
         decidedById: session.user.id,

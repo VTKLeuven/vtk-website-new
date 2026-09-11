@@ -3653,6 +3653,20 @@ model UitleenTransportBooking {
 
   driverId String? // pas het weekend ervoor toegewezen; blijft optioneel bij goedkeuring
 
+  /// Heeft Logistiek deze rit zelf ingetekend, of komt ze van een aanvraag?
+  ///
+  /// Bestaat om één reden: **enkel een zelf ingetekende rit mag verwijderd
+  /// worden.** Een rit die uit een aanvraag komt, hangt aan een lid dat een
+  /// reden hoort te zien (afgewezen, geannuleerd) in plaats van een lege plek in
+  /// zijn overzicht; een rit die de transportverantwoordelijke zelf tekende is
+  /// een tekening en geen afspraak met iemand.
+  ///
+  /// Een eigen kolom en geen afleiding uit de historiek: een rit die het team
+  /// inplant, is te herkennen aan de auditregel met de note "ingepland door
+  /// Logistiek", en een verwijderknop die op een stringvergelijking staat, is
+  /// één hernoemde melding van stuk. Zie docs/design-decisions.md.
+  plannedByTeam Boolean @default(false)
+
   // Tarief gesnapshot bij de aanvraag (en her-gesnapshot bij een voertuigwissel).
   pricingMode UitleenPricingMode
   rateCents   Int

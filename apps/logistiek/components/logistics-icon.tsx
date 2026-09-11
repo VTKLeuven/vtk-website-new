@@ -24,7 +24,8 @@ type IconName =
   | 'settings'
   | 'planning'
   | 'basket'
-  | 'bottle';
+  | 'bottle'
+  | 'trash';
 
 export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {
   const paths = {
@@ -180,6 +181,19 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
         <path d="M4 9.5h16l-1.4 8.1a2 2 0 0 1-2 1.65H7.4a2 2 0 0 1-2-1.65Z" />
         <path d="m8.5 9.5 2.2-5M15.5 9.5l-2.2-5" />
         <path d="M10 13v3M14 13v3" />
+      </>
+    ),
+    /**
+     * Verwijderen: een vuilbak. Bewust niet het kruisje van `close`, want dat
+     * betekent hier al "dit paneel toedoen"; twee betekenissen op één vorm is
+     * precies de knop waar iemand per ongeluk op drukt.
+     */
+    trash: (
+      <>
+        <path d="M4.5 7h15" />
+        <path d="M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7" />
+        <path d="M6.5 7l.8 11.1A2 2 0 0 0 9.3 20h5.4a2 2 0 0 0 2-1.9L17.5 7" />
+        <path d="M10.5 11v5M13.5 11v5" />
       </>
     ),
     /** Flesserke: een fles. Stond op hetzelfde doosje als de inventaris. */

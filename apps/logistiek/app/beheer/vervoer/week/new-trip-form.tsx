@@ -24,11 +24,24 @@ import type { DriverOption } from '@/lib/uitleen-server';
 const inputClass =
   'w-full rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-sm text-vtk-ink';
 
+/**
+ * De waarde van "Andere..." in de postkeuze.
+ *
+ * Een sentinel in `groupId` en geen tweede veld ernaast: het is één vraag ("voor
+ * wie rijdt deze rit") met één antwoord, en twee velden waarvan er altijd
+ * precies één gevuld hoort te zijn, lopen vroeg of laat allebei ingevuld.
+ * Botst niet met een echte id: die zijn cuids.
+ */
+const OTHER_GROUP = 'andere';
+
 export type NewTripValues = {
   startAt: string;
   endAt: string;
   vehicleId: string;
+  /** Een post- of werkgroep-id, leeg (Logistiek zelf) of {@link OTHER_GROUP}. */
   groupId: string;
+  /** Enkel bij {@link OTHER_GROUP}: voor wie de rit dan wél rijdt. */
+  requesterName: string;
   driverId: string;
   purpose: string;
   cargoNote: string;
@@ -84,8 +97,17 @@ export function NewTripForm({
     report.current?.(values.startAt, values.endAt);
   }, [values.startAt, values.endAt]);
 
+  /** "Andere" gekozen, dus er hoort een naam bij. */
+  const isOther = values.groupId === OTHER_GROUP;
+
   function save(allowOverlap = false) {
     setError(null);
+    if (isOther && values.requesterName.trim() === '') {
+      // Anders staat de rit als "Werkgroep" zonder naam in de planning, en dan
+      // is "voor wie is dit" precies de vraag die je niet meer beantwoord krijgt.
+      setError('Vul in voor wie deze rit rijdt, of kies een post uit de lijst.');
+      return;
+    }
     startTransition(async () => {
       const result = await adminCreateTransportAction({
         allowOverlap,
@@ -99,7 +121,12 @@ export function NewTripForm({
         // Er is geen ledennota bij een rit die het team zelf inplant: er is geen
         // lid dat er een schreef.
         note: '',
-        groupId: values.groupId || null,
+        // "Andere" wordt een werkgroep met een vrije naam en géén externe: enkel
+        // een externe krijgt prijs, tarief en betaalstatus (`chargesRequester`),
+        // en dat is niet wat "andere" hier betekent. Zie docs/design-decisions.md.
+        groupId: isOther ? null : values.groupId || null,
+        requesterType: isOther ? 'WERKGROEP' : 'INTERN',
+        requesterName: isOther ? values.requesterName.trim() : null,
         driverId: values.driverId || null,
       });
       if (result.ok) {
@@ -166,8 +193,25 @@ export function NewTripForm({
               {group.name}
             </option>
           ))}
+          {/* Onderaan en niet bovenaan: het is de uitzondering, en Logistiek
+              rijdt meestal voor een post die gewoon in de lijst staat. */}
+          <option value={OTHER_GROUP}>Andere...</option>
         </select>
       </label>
+
+      {isOther ? (
+        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+          Voor wie dan
+          <input
+            type="text"
+            value={values.requesterName}
+            onChange={(event) => set('requesterName', event.target.value)}
+            placeholder="bv. Alumni, een bevriende kring, de faculteit"
+            className={inputClass}
+            autoFocus
+          />
+        </label>
+      ) : null}
 
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
         Chauffeur
