@@ -14,6 +14,20 @@ import { APP_ERROR, type AppErrorBody } from './contract';
  * Dat is ook de reden dat de app KU Leuven-logins gewoon aankan: we bouwen geen
  * eigen loginformulier na, we tonen dat van de site.
  *
+ * **Sinds SDK 56 is `globalThis.fetch` niet meer die van React Native maar
+ * `expo/fetch`, en dat blijft kloppen.** Dat was de vraag bij de upgrade naar
+ * SDK 57, want als die eigen cookies zou bijhouden, viel de hele login stil.
+ * Nagekeken in de native kant: op iOS zet `ExpoFetchModule` zijn
+ * `URLSessionConfiguration` op `HTTPCookieStorage.shared`, op Android gebruikt
+ * het React Natives eigen `ForwardingCookieHandler`, en dat is de `CookieManager`
+ * die ook onder de WebView zit. Eén ding is wel anders: op Android stuurt
+ * `expo/fetch` cookies enkel mee bij `credentials: 'include'`. Die staat hier niet
+ * expliciet, maar de standaard ís `include` (en `same-origin` wordt erop
+ * afgebeeld), dus het komt op hetzelfde neer. Zet die dus niet op `omit`.
+ *
+ * Loopt het ooit tóch mis, dan zet `EXPO_PUBLIC_USE_RN_FETCH=1` de oude `fetch`
+ * terug.
+ *
  * Zelfde bestand als in vtk-scanner-app, op de app-API-paden na. Bewust een
  * kopie: twee losse repo's delen hier geen pakket voor.
  */
