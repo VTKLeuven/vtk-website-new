@@ -7,6 +7,7 @@ import { CUDI_SHIFT_SOURCE } from '@/lib/cudiShiftMirror';
 import { pushCudiRegistration } from '@/lib/cudiRegistrationSync';
 import { handledLeadFields } from '@/lib/shift/reminders';
 import { withSerializableTransaction } from '@/lib/ticketing/transactions';
+import { ROSTER_PARTICIPANT_SELECT, toRoster } from '@/lib/shift/roster';
 
 /** Binnen dit venster voor de start kan een user zichzelf niet meer uitschrijven. */
 const UNREGISTER_LOCK_MS = 24 * 60 * 60 * 1000;
@@ -52,17 +53,24 @@ export async function GET(request: Request) {
       participants: { some: { userId: targetUserId } },
     },
     orderBy: { startTime: 'asc' },
-    include: { participants: { select: { userId: true, payedOut: true, registeredAt: true } } },
+    include: { participants: { select: { ...ROSTER_PARTICIPANT_SELECT, payedOut: true } } },
   });
 
   // `registeredAt` van deze user apart meegeven: de tabel bepaalt daarmee of de
-  // bedenktijd nog loopt en of de uitschrijfknop dus actief mag zijn.
+  // bedenktijd nog loopt en of de uitschrijfknop dus actief mag zijn. De namen
+  // gaan enkel via `roster` mee, niet in `participants`.
   return NextResponse.json(
-    shifts.map((shift) => ({
+    shifts.map(({ participants, ...shift }) => ({
       ...shift,
+      participants: participants.map(({ userId, payedOut, registeredAt }) => ({
+        userId,
+        payedOut,
+        registeredAt,
+      })),
       registeredAt:
-        shift.participants.find((participant) => participant.userId === targetUserId)
-          ?.registeredAt ?? null,
+        participants.find((participant) => participant.userId === targetUserId)?.registeredAt ??
+        null,
+      roster: toRoster(participants, session.user.id),
     })),
   );
 }

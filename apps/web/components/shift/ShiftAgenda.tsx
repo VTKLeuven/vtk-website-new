@@ -1,7 +1,9 @@
 'use client';
 import { useMemo, useState } from 'react';
+import { addDays, isSameDay } from 'date-fns';
+import { AlertTriangle, MapPin, Ticket } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
-import { canUnregister } from '@/lib/shift';
+import { canUnregister, type ShiftResponse } from '@/lib/shift';
 import { useToast } from '@/components/ui/toast';
 import { InternationalsBadge } from './ShiftDialog';
 import {
@@ -16,170 +18,232 @@ import {
   type MergedShift,
 } from './shiftData';
 
-type DayGroup = { key: string; date: Date; items: MergedShift[] };
+const DOW_SHORT: Record<Locale, string[]> = {
+  nl: ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'],
+  en: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
+};
 
-/** `Date` → sleutel per kalenderdag (lokale tijd). */
-function dayKey(date: Date): string {
-  return `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
-}
+const MONTH_SHORT: Record<Locale, string[]> = {
+  nl: ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'],
+  en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+};
 
-/**
- * Groepeert de shiften van de week per kalenderdag. Een shift die vóór de week
- * begon maar erin doorloopt (nachtshift op de grens) hangt onder de eerste dag.
- */
-function groupByDay(shifts: MergedShift[], weekStart: Date): DayGroup[] {
-  const groups = new Map<string, DayGroup>();
-
-  for (const item of shifts) {
-    const start = item.shift.startTime < weekStart ? weekStart : item.shift.startTime;
-    const date = new Date(start.getFullYear(), start.getMonth(), start.getDate());
-    const key = dayKey(date);
-    const group = groups.get(key);
-    if (group) group.items.push(item);
-    else groups.set(key, { key, date, items: [item] });
-  }
-
-  const days = [...groups.values()].sort((a, b) => a.date.getTime() - b.date.getTime());
-  for (const day of days) {
-    day.items.sort((a, b) => a.shift.startTime.getTime() - b.shift.startTime.getTime());
-  }
-  return days;
-}
+type DayData = {
+  index: number;
+  date: Date;
+  isToday: boolean;
+  items: MergedShift[];
+};
 
 /**
- * De lijstweergave: de shiften van de getoonde week onder elkaar, gegroepeerd
- * per dag met de datum als kolom links. De rij zelf opent het detailvenster; de
- * knop ernaast is de snelle weg voor wie de shift al kent.
+ * Lijstweergave volgens Richting A (Kalenderblad):
+ * elke dag hangt aan de gele datumpin van de evenementenkaart, de haarlijn verbindt
+ * de pins over de week, en de shiften liggen per dag gebundeld in een kaart.
  */
 export function ShiftAgenda({
   locale,
   weekStart,
   shifts,
+  registeredShifts = [],
   emptyState,
   onOpen,
 }: {
   locale: Locale;
   weekStart: Date;
   shifts: MergedShift[];
+  registeredShifts?: ShiftResponse[];
   emptyState: React.ReactNode;
   onOpen: (entry: MergedShift) => void;
 }) {
   const t = getDictionary(locale).shift;
   const showToast = useToast();
-  // Klok één keer vastleggen bij mount: tijdens de render lezen is onzuiver, en
-  // een verouderde "binnen 24u"-vlag in een lang openstaande tab is onschuldig.
   const [now] = useState(() => Date.now());
 
-  const days = useMemo(() => groupByDay(shifts, weekStart), [shifts, weekStart]);
+  const days: DayData[] = useMemo(() => {
+    const nowDate = new Date(now);
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = addDays(weekStart, i);
+      const items = shifts
+        .filter((entry) => isSameDay(entry.shift.startTime, date))
+        .sort((a, b) => a.shift.startTime.getTime() - b.shift.startTime.getTime());
+      return {
+        index: i,
+        date,
+        isToday: isSameDay(date, nowDate),
+        items,
+      };
+    });
+  }, [shifts, weekStart, now]);
 
   const weekdayFmt = new Intl.DateTimeFormat(locale === 'nl' ? 'nl-BE' : 'en-GB', {
     weekday: 'long',
   });
-  const dayFmt = new Intl.DateTimeFormat(locale === 'nl' ? 'nl-BE' : 'en-GB', {
-    day: 'numeric',
-    month: 'short',
-  });
 
-  if (days.length === 0) return <>{emptyState}</>;
+  if (shifts.length === 0) return <>{emptyState}</>;
 
   return (
-    <div className="vtk-shift-agenda">
-      {days.map((day) => (
-        <div key={day.key} className="vtk-shift-day">
-          <div className="vtk-shift-day-label">
-            <span className="vtk-shift-dow">{weekdayFmt.format(day.date)}</span>
-            <span className="vtk-shift-date">{dayFmt.format(day.date)}</span>
-          </div>
+    <ol className="vtk-shift-days">
+      {days.map((day) => {
+        const n = day.items.length;
+        const dowStr = DOW_SHORT[locale][day.date.getDay()];
+        const monthStr = MONTH_SHORT[locale][day.date.getMonth()];
+        const weekdayName = weekdayFmt.format(day.date);
+        const capitalizedDay = weekdayName.charAt(0).toUpperCase() + weekdayName.slice(1);
 
-          <div className="vtk-shift-rows">
-            {day.items.map((entry) => {
-              const { shift, registered } = entry;
-              const isFull = !registered && freeSpots(shift) <= 0;
-              const locked = registered && !canUnregister(shift, now);
-
-              return (
-                <div
-                  key={shift.id}
-                  className="vtk-shift-row"
-                  data-state={registered ? 'registered' : isFull ? 'full' : 'open'}
-                >
-                  <button
-                    type="button"
-                    className="vtk-shift-row-main"
-                    title={t.dialog.open}
-                    onClick={() => onOpen(entry)}
-                  >
-                    <span className="vtk-shift-row-time">
-                      <span className="vtk-shift-row-start">{fmtTime(shift.startTime)}</span>
-                      <span className="vtk-shift-row-end">
-                        {fill(t.until, { time: fmtTime(shift.endTime) })}
-                      </span>
-                    </span>
-                    <span className="vtk-shift-row-body">
-                      <span className="vtk-shift-row-name">
-                        {shift.name}
-                        {shift.openToInternationals ? (
-                          <InternationalsBadge locale={locale} />
-                        ) : null}
-                      </span>
-                      <span className="vtk-shift-row-meta">
-                        <span>{shift.location}</span>
-                        {shift.post ? (
-                          <>
-                            <span className="vtk-shift-sep" aria-hidden="true" />
-                            <span>{shift.post}</span>
-                          </>
-                        ) : null}
-                        <span className="vtk-shift-sep" aria-hidden="true" />
-                        <span>{rewardLabel(shift.reward, t)}</span>
-                      </span>
-                    </span>
-                  </button>
-
-                  <div className="vtk-shift-row-actions">
-                    {registered ? (
-                      <>
-                        <span className="vtk-basic-badge vtk-basic-badge-accent">
-                          {t.isRegistered}
-                        </span>
-                        <button
-                          type="button"
-                          className="vtk-basic-action vtk-basic-action-danger"
-                          disabled={locked}
-                          title={locked ? t.error.tooLateToUnregister : undefined}
-                          onClick={() => unregisterShift(shift.id, showToast, t)}
-                        >
-                          {t.unregister}
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <span
-                          className={`vtk-basic-badge vtk-basic-badge-${spotsVariant(shift)}`}
-                          title={fill(t.spots.taken, {
-                            taken: shift.takenSpots ?? 0,
-                            max: shift.maxParticipants,
-                          })}
-                        >
-                          {spotsLabel(shift, t)}
-                        </span>
-                        <button
-                          type="button"
-                          className="vtk-basic-action"
-                          disabled={isFull}
-                          onClick={() => registerShift(shift.id, showToast, t)}
-                        >
-                          {t.register}
-                        </button>
-                      </>
-                    )}
-                  </div>
+        if (n === 0) {
+          return (
+            <li key={day.date.toISOString()} className="vtk-shift-day" data-empty="true">
+              <span className="vtk-shift-pin vtk-shift-pin-quiet" aria-hidden="true">
+                <i>{dowStr}</i>
+                <b>{day.date.getDate()}</b>
+                <i>{monthStr}</i>
+              </span>
+              <div className="vtk-shift-day-body">
+                <div className="vtk-shift-day-head">
+                  <h3 className="vtk-shift-day-name">
+                    {fill(t.day.emptyDay, { day: capitalizedDay })}
+                  </h3>
+                  {day.isToday ? (
+                    <span className="vtk-shift-today-tag">{t.week.today}</span>
+                  ) : null}
                 </div>
-              );
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
+              </div>
+            </li>
+          );
+        }
+
+        const countLabel =
+          n === 1 ? t.day.shiftsOne : fill(t.day.shifts, { n });
+
+        return (
+          <li key={day.date.toISOString()} className="vtk-shift-day">
+            <span className="vtk-shift-pin" aria-hidden="true">
+              <i>{dowStr}</i>
+              <b>{day.date.getDate()}</b>
+              <i>{monthStr}</i>
+            </span>
+
+            <div className="vtk-shift-day-body">
+              <div className="vtk-shift-day-head">
+                <h3 className="vtk-shift-day-name">{capitalizedDay}</h3>
+                <span className="vtk-shift-day-count">{countLabel}</span>
+                {day.isToday ? (
+                  <span className="vtk-shift-today-tag">{t.week.today}</span>
+                ) : null}
+              </div>
+
+              <ul className="vtk-shift-card">
+                {day.items.map((entry) => {
+                  const { shift, registered } = entry;
+                  const isFull = !registered && freeSpots(shift) <= 0;
+                  const locked = registered && !canUnregister(shift, now);
+
+                  // Detecteer clash met eigen inschrijving
+                  const conflict = !registered
+                    ? registeredShifts.find(
+                        (mine) =>
+                          mine.id !== shift.id &&
+                          mine.startTime < shift.endTime &&
+                          mine.endTime > shift.startTime
+                      )
+                    : null;
+
+                  return (
+                    <li
+                      key={shift.id}
+                      className="vtk-shift-row"
+                      data-state={registered ? 'mine' : isFull ? 'full' : 'open'}
+                    >
+                      <button
+                        type="button"
+                        className="vtk-shift-row-main"
+                        title={t.dialog.open}
+                        onClick={() => onOpen(entry)}
+                      >
+                        <span className="vtk-shift-time">
+                          <b>{fmtTime(shift.startTime)}</b>
+                          <span>{fill(t.until, { time: fmtTime(shift.endTime) })}</span>
+                        </span>
+
+                        <span className="vtk-shift-what">
+                          <span className="vtk-shift-title">
+                            <span className="vtk-shift-title-text">{shift.name}</span>
+                            {shift.openToInternationals ? (
+                              <InternationalsBadge locale={locale} compact />
+                            ) : null}
+                          </span>
+
+                          <span className="vtk-shift-meta">
+                            {shift.post ? (
+                              <span className="vtk-shift-post">{shift.post}</span>
+                            ) : null}
+                            <span className="vtk-shift-meta-i">
+                              <MapPin aria-hidden="true" />
+                              <span>{shift.location}</span>
+                            </span>
+                            <span className="vtk-shift-meta-i">
+                              <Ticket aria-hidden="true" />
+                              <span>{rewardLabel(shift.reward, t)}</span>
+                            </span>
+                            {conflict ? (
+                              <span
+                                className="vtk-shift-clash-warning"
+                                title={fill(t.clashWarning, { name: conflict.name })}
+                              >
+                                <AlertTriangle aria-hidden="true" />
+                                <span>{t.clash}</span>
+                              </span>
+                            ) : null}
+                          </span>
+                        </span>
+                      </button>
+
+                      <div className="vtk-shift-act">
+                        {registered ? (
+                          <>
+                            <span className="vtk-shift-spots vtk-shift-spots-mine">
+                              {t.isRegistered}
+                            </span>
+                            <button
+                              type="button"
+                              className="vtk-shift-btn vtk-shift-btn-ghost vtk-shift-btn-sm"
+                              disabled={locked}
+                              title={locked ? t.error.tooLateToUnregister : undefined}
+                              onClick={() => unregisterShift(shift.id, showToast, t)}
+                            >
+                              {t.unregister}
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <span
+                              className={`vtk-shift-spots vtk-shift-spots-${spotsVariant(shift)}`}
+                              title={fill(t.spots.taken, {
+                                taken: shift.takenSpots ?? 0,
+                                max: shift.maxParticipants,
+                              })}
+                            >
+                              {spotsLabel(shift, t)}
+                            </span>
+                            <button
+                              type="button"
+                              className="vtk-shift-btn vtk-shift-btn-sm"
+                              disabled={isFull}
+                              onClick={() => registerShift(shift.id, showToast, t)}
+                            >
+                              {t.register}
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </li>
+        );
+      })}
+    </ol>
   );
 }

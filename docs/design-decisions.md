@@ -3728,33 +3728,49 @@ naar diezelfde week en dezelfde postfilter kijken:
 
 - **Weekrooster (standaard).** Een shift is in de eerste plaats een blok in je
   agenda: je wil zien of ze botst met je les of met een andere shift, en dat leest
-  een raster meteen. Overlappende shiften komen naast elkaar in kolommen.
-- **Lijst.** Dezelfde week per dag onder elkaar, met de details uitklapbaar. Beter
-  wanneer de namen lang zijn of het scherm smal is, want daar wordt een raster
-  onleesbaar. De lijst blijft dus bestaan; ze is geen restant van de oude tabel.
+  een raster meteen. Het rooster gebruikt een 24-uurs verticale tijdgrid
+  (standaard gefocust op de daguren). Overlappende shiften worden per dag
+  geclusterd en naast elkaar in evenredige kolommen geplaatst (`left` en `width` op
+  basis van het aantal overlappende banen), zodat overlappingen onmiddellijk
+  visueel duidelijk zijn. Wanneer een shift overlapt met een shift waarvoor je al
+  bent ingeschreven, toont een waarschuwingsbadge ("Overlapt met je shift") de
+  botsing direct in het overzicht.
+- **Lijst (Kalenderblad).** Dezelfde week per dag onder elkaar, met 58px gele
+  datum-pins (`.vtk-shift-pin`), een doorlopende verticale haarlijn door de zeven
+  dagen van de week en de details uitklapbaar. Lege dagen krijgen een rustige
+  weergave (`.vtk-shift-pin-quiet`) zodat het weekritme voelbaar blijft zonder
+  lege ruis. Beter wanneer de namen lang zijn of het scherm smal is, want daar
+  wordt een raster onleesbaar.
 
 Verder vastgelegd:
 
-- **Je eigen shiften staan in een rail náást het overzicht**, niet als een tweede
-  tabel erboven. Ze blijven zo in beeld terwijl je door de week scrolt, en een
-  lege "Mijn shiften" kost geen halve pagina meer. Op smal scherm gaat de rail
-  bóven het overzicht staan: wat jij vandaag moet doen, hoort niet onder andermans
-  shiften te liggen.
+- **Paginakop met technische balk en weekgereedschap.** De donkerblauwe kop
+  draagt het technische ruitpatroon, de titel en direct rechts het
+  weekgereedschap: ronde weeknavigatieknoppen, het ISO-weeknummer met het aantal
+  shiften en resterende vrije plaatsen, een compacte weergaveschakelaar
+  (Week/Lijst) en een snelknop naar vandaag.
+- **Je eigen shiften staan in een rail náást het overzicht**, als een kantlijn-register.
+  Bovenaan toont een gele attentiekaart de eerstvolgende geplande shift (of een
+  rustige status wanneer er niets gepland staat). Een haarlijn met gele actieve
+  indicator verbindt de komende shiften. Ze blijven zo in beeld terwijl je door de
+  week scrolt, en een lege "Mijn shiften" kost geen halve pagina meer. Op smal
+  scherm gaat de rail bóven het overzicht staan: wat jij vandaag moet doen, hoort
+  niet onder andermans shiften te liggen.
 - **Je eigen shiften staan óók in het overzicht zelf** (geel randje,
   "Ingeschreven"). De rail is je persoonlijke lijstje, het overzicht is de
   volledige week; een week met een gat waar jouw shift hoort te staan, klopt niet.
-- **De rail toont de stand van het academiejaar** (voltooide shiften + bonnetjes,
-  zelfde telling als de admin-ranglijst: enkel shiften die al voorbij zijn). Dat
-  geeft de shiftranking eindelijk een plek op de publieke pagina en maakt van
-  `/shift/history` een logische doorklik i.p.v. een badge in de paginakop.
+- **De rail toont de stand van het academiejaar** (voltooide shiften + bonnetjes
+  als 28px Geist Mono cijfers, zelfde telling als de admin-ranglijst: enkel shiften
+  die al voorbij zijn). Dat geeft de shiftranking een prominente plek op de
+  publieke pagina en maakt van `/shift/history` een logische doorklik.
 - **Een lege week is een boodschap met een volgende stap**, niet een lege tabel:
   ze noemt de eerstvolgende geplande shift en heeft een knop die naar die week
   springt. In het rooster blijft het raster staan onder de boodschap, zodat een
   rustige week er niet uitziet als een stuk pagina.
 - **De postfilter zijn chips met tellers**, en enkel voor posten die deze week
-  effectief voorkomen. De oude `<select>` + datumveld + sorteerknop zijn weg: de
-  weeknavigatie vertelt al waar je zit, en chronologisch is de enige zinnige
-  volgorde voor een week.
+  effectief voorkomen. De actieve filter kleurt VTK-geel. De oude `<select>` +
+  datumveld + sorteerknop zijn weg: de weeknavigatie vertelt al waar je zit, en
+  chronologisch is de enige zinnige volgorde voor een week.
 - **Plaatsen lezen als "Nog 1 plaats" of "Vol"**, niet als `5/6`. De exacte
   verhouding blijft in de tooltip en in het detailvenster staan.
 
@@ -3796,6 +3812,28 @@ Cudi-shiften krijgen deze twee velden niet mee uit de spiegeling: cudi kent ze
 niet, en de mirror-update raakt enkel de velden die ze zelf stuurt. Een
 verantwoordelijke die de uitleg op de main site invult, ziet die dus niet
 overschreven worden bij de volgende sync.
+
+### Wie er al ingeschreven is
+
+Het detailvenster toont onder de gegevens **wie er al ingeschreven is**, in de
+volgorde waarin ze zich inschreven, met "(jij)" achter je eigen naam. Een shift
+doe je samen: wie een tapshift overweegt, wil weten met wie hij achter de toog
+staat. Dat is bewust anders dan de ster bij een evenement, waarvan de teller geen
+namen draagt: een ster belooft niets, een inschrijving voor een shift wel.
+
+- **Enkel de naam, geen profielfoto.** "Mijn account" zegt bij de foto dat ze
+  verschijnt als je op het praesidium of bij een POC zit; een lijst van shifters
+  valt daar niet onder. Wie hier foto's wil, past eerst die belofte aan. In de
+  plaats staat een cirkel met de initiaal, geel voor jezelf.
+- **De lijst draagt niets anders dan de naam.** Ze komt als `roster` mee met
+  `GET /api/shift` en `GET /api/shift/register` (`lib/shift/roster.ts`): geen
+  e-mail, geen r-nummer, en in `/api/shift` ook geen user-id's.
+- **Enkel in het venster, niet in de rij of het roosterblok.** Het overzicht dient
+  om een moment te kiezen; namen in elke rij maken een week onleesbaar. Wie meer
+  wil weten over één shift, opent ze.
+- **Elk ingelogd lid ziet de lijst**, net zoals iedereen de shiften zelf ziet.
+  Gewiste accounts staan er nooit in: `eraseUserData` verwijdert hun
+  inschrijvingen, dus de namen en de teller van bezette plaatsen lopen gelijk.
 
 ---
 

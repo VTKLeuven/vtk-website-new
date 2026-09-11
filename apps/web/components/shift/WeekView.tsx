@@ -1,23 +1,29 @@
 'use client';
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
-import { addDays, format } from 'date-fns';
-import { ChevronDown, ChevronUp, Globe } from 'lucide-react';
+import { addDays } from 'date-fns';
+import { AlertTriangle, ChevronDown, ChevronUp, Globe, MapPin } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
-import { fmtTime, freeSpots, spotsLabel, type MergedShift } from './shiftData';
+import { canUnregister, type ShiftResponse } from '@/lib/shift';
+import { fill, fmtTime, freeSpots, spotsLabel, type MergedShift } from './shiftData';
 
-const HOUR_PX = 44;
+const HOUR_PX = 48;
 const TOTAL_HOURS = 24;
 const DEFAULT_START_HOUR = 8;
 const DEFAULT_END_HOUR = 20;
 const MS_PER_HOUR = 3_600_000;
-const HEADER_HEIGHT = 38;
+const HEADER_HEIGHT = 44;
 
 const subscribeToClient = () => () => undefined;
-// Weekdag-afkortingen per locale, geïndexeerd via Date.getDay() (0 = zondag).
-const DOW = {
+
+const DOW_SHORT: Record<Locale, string[]> = {
   nl: ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'],
   en: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
-} as const;
+};
+
+const MONTH_SHORT: Record<Locale, string[]> = {
+  nl: ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'],
+  en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+};
 
 type Segment = {
   key: string;
@@ -30,21 +36,23 @@ type Segment = {
 };
 
 /**
- * Google-Calendar-achtige weekweergave: 7 dagkolommen vanaf `weekStart`, met de
- * shiften als blokken op hun uren over het volledige 24u-bereik. Standaard
- * gescrold naar 8h-20h, met scrollbare overige uren (0h-8h en 20h-24h) en
- * indicatorknoppen voor shiften buiten het zichtbare deel.
+ * Weekweergave volgens Richting A (Kalenderblad):
+ * 7 dagkolommen vanaf `weekStart` op een 24u-tijdsas, waarbij overlappende shiften
+ * expliciet naast elkaar in parallelle kolommen worden geplaatst en duidelijke
+ * overlap- en clash-indicatoren dragen.
  */
 export function ShiftWeekView({
   locale,
   weekStart,
   shifts,
+  registeredShifts = [],
   emptyState,
   onOpen,
 }: {
   locale: Locale;
   weekStart: Date;
   shifts: MergedShift[];
+  registeredShifts?: ShiftResponse[];
   emptyState: React.ReactNode;
   onOpen: (entry: MergedShift) => void;
 }) {
@@ -56,7 +64,6 @@ export function ShiftWeekView({
   );
   const hasScrolledInitially = useRef(false);
 
-  // De "nu"-lijn en de markering van vandaag horen bij de klok van de browser.
   const isClient = useSyncExternalStore(
     subscribeToClient,
     () => true,
@@ -91,8 +98,8 @@ export function ShiftWeekView({
     return () => observer.disconnect();
   }, []);
 
-  // Split shiften in dag-segmenten (voor shiften over middernacht) en leg
-  // overlappende shiften naast elkaar in kolommen.
+  // Split shiften in dag-segmenten en groepeer overlappende shiften
+  // in parallelle kolommen naast elkaar.
   const segments = useMemo(() => {
     const raw: Omit<Segment, 'col' | 'cols'>[] = [];
     for (const m of shifts) {
@@ -153,7 +160,7 @@ export function ShiftWeekView({
   const gridHeight = TOTAL_HOURS * HOUR_PX;
   const hours = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => i);
 
-  // Positie van de "nu"-lijn: enkel wanneer vandaag in de getoonde week valt.
+  // Positie van de "nu"-lijn
   const nowLine = useMemo(() => {
     if (now === null) return null;
     const today = new Date(now);
@@ -193,16 +200,20 @@ export function ShiftWeekView({
       >
         <div className="vtk-week-grid">
           <div className="vtk-week-corner" />
-          {days.map((day, d) => (
-            <div
-              key={day.toISOString()}
-              className="vtk-week-head"
-              data-today={nowLine?.index === d ? 'true' : undefined}
-            >
-              <span className="vtk-week-dow">{DOW[locale][day.getDay()]}</span>
-              <span className="vtk-week-date">{format(day, 'd/MM')}</span>
-            </div>
-          ))}
+          {days.map((day, d) => {
+            const isToday = nowLine?.index === d;
+            return (
+              <div
+                key={day.toISOString()}
+                className="vtk-week-head"
+                data-today={isToday ? 'true' : undefined}
+              >
+                <span className="vtk-week-dow">{DOW_SHORT[locale][day.getDay()]}</span>
+                <b className="vtk-week-date-num">{day.getDate()}</b>
+                <small className="vtk-week-month">{MONTH_SHORT[locale][day.getMonth()]}</small>
+              </div>
+            );
+          })}
 
           <div className="vtk-week-gutter" style={{ height: gridHeight }}>
             {hours.map((h) => (
@@ -237,13 +248,13 @@ export function ShiftWeekView({
                   <button
                     type="button"
                     className="vtk-week-indicator vtk-week-indicator-top"
-                    style={{ top: scrollTop + 4 }}
+                    style={{ top: scrollTop + 6 }}
                     onClick={(e) => {
                       e.stopPropagation();
                       scrollToHour(earliestAbove.startFrac, false);
                     }}
                     title={`${t.earlierShifts ?? 'Vroegere shiften'}: ${earliestAbove.merged.shift.name} (${fmtTime(earliestAbove.merged.shift.startTime)})`}
-                    aria-label={`${t.earlierShifts ?? 'Vroegere shiften op'} ${format(day, 'd/MM')}: ${earliestAbove.merged.shift.name}`}
+                    aria-label={`${t.earlierShifts ?? 'Vroegere shiften'}: ${earliestAbove.merged.shift.name}`}
                   >
                     <ChevronUp className="vtk-week-indicator-chevron" aria-hidden="true" />
                     <span className="vtk-week-indicator-label">
@@ -255,23 +266,42 @@ export function ShiftWeekView({
                 {daySegs.map((s) => {
                   const { shift, registered } = s.merged;
                   const isFull = !registered && freeSpots(shift) <= 0;
-                  const variant = registered
-                    ? 'vtk-week-block-registered'
+                  const height = Math.max(26, (s.endFrac - s.startFrac) * HOUR_PX - 3);
+                  const isOverlap = s.cols > 1;
+
+                  // Conflict met een shift waarvoor de user al is ingeschreven
+                  const conflict = !registered
+                    ? registeredShifts.find(
+                        (mine) =>
+                          mine.id !== shift.id &&
+                          mine.startTime < shift.endTime &&
+                          mine.endTime > shift.startTime
+                      )
+                    : null;
+
+                  const statusText = registered
+                    ? t.isRegistered
                     : isFull
-                      ? 'vtk-week-block-full'
-                      : 'vtk-week-block-available';
-                  const height = Math.max(18, (s.endFrac - s.startFrac) * HOUR_PX - 2);
-                  const status = registered ? t.isRegistered : spotsLabel(shift, t);
-                  const intl = shift.openToInternationals ? ` · ${t.intl.badge}` : '';
+                      ? t.spots.full
+                      : fill(t.spots.few, { n: freeSpots(shift) });
+
+                  const clashTooltip = conflict
+                    ? ` · ${fill(t.clashWarning, { name: conflict.name })}`
+                    : isOverlap
+                      ? ' · Overlapt in tijd met andere shiften'
+                      : '';
 
                   return (
                     <button
                       key={s.key}
                       type="button"
-                      className={`vtk-week-block ${variant}`}
-                      data-compact={height < 58 ? 'true' : undefined}
-                      title={`${shift.name} · ${fmtTime(shift.startTime)}-${fmtTime(shift.endTime)} · ${shift.location} · ${status}${intl}`}
-                      aria-label={`${t.dialog.open}: ${shift.name}, ${fmtTime(shift.startTime)}-${fmtTime(shift.endTime)}, ${shift.location}, ${status}${intl}`}
+                      className="vtk-week-block"
+                      data-state={registered ? 'mine' : isFull ? 'full' : 'open'}
+                      data-overlap={isOverlap ? 'true' : undefined}
+                      data-clash={conflict ? 'true' : undefined}
+                      data-compact={height < 60 ? 'true' : undefined}
+                      title={`${shift.name} (${fmtTime(shift.startTime)} - ${fmtTime(shift.endTime)}) · ${shift.location} · ${statusText}${clashTooltip}`}
+                      aria-label={`${t.dialog.open}: ${shift.name}, ${fmtTime(shift.startTime)} - ${fmtTime(shift.endTime)}, ${shift.location}`}
                       onClick={() => onOpen(s.merged)}
                       style={{
                         top: s.startFrac * HOUR_PX,
@@ -281,13 +311,39 @@ export function ShiftWeekView({
                       }}
                     >
                       <span className="vtk-week-block-time">
-                        {fmtTime(shift.startTime)}
+                        <b>{fmtTime(shift.startTime)}</b> - {fmtTime(shift.endTime)}
                         {shift.openToInternationals ? (
                           <Globe className="vtk-week-block-globe" aria-hidden="true" />
                         ) : null}
                       </span>
+
                       <span className="vtk-week-block-name">{shift.name}</span>
-                      <span className="vtk-week-block-status">{status}</span>
+
+                      {conflict ? (
+                        <span className="vtk-week-clash-badge" title={fill(t.clashWarning, { name: conflict.name })}>
+                          <AlertTriangle aria-hidden="true" />
+                          <span>{t.clash}</span>
+                        </span>
+                      ) : (
+                        <span className="vtk-week-block-status">
+                          {registered ? (
+                            <span className="vtk-week-pill-mine">{t.isRegistered}</span>
+                          ) : isFull ? (
+                            <span className="vtk-week-pill-full">{t.spots.full}</span>
+                          ) : (
+                            <span className="vtk-week-pill-open">
+                              {fill(t.spots.few, { n: freeSpots(shift) })}
+                            </span>
+                          )}
+                        </span>
+                      )}
+
+                      {height >= 80 && shift.location ? (
+                        <span className="vtk-week-block-loc">
+                          <MapPin aria-hidden="true" />
+                          <span>{shift.location}</span>
+                        </span>
+                      ) : null}
                     </button>
                   );
                 })}
@@ -296,13 +352,13 @@ export function ShiftWeekView({
                   <button
                     type="button"
                     className="vtk-week-indicator vtk-week-indicator-bottom"
-                    style={{ top: scrollTop + effectiveVisibleHeight - 28 }}
+                    style={{ top: scrollTop + effectiveVisibleHeight - 30 }}
                     onClick={(e) => {
                       e.stopPropagation();
                       scrollToHour(latestBelow.endFrac, true);
                     }}
                     title={`${t.laterShifts ?? 'Latere shiften'}: ${latestBelow.merged.shift.name} (${fmtTime(latestBelow.merged.shift.startTime)})`}
-                    aria-label={`${t.laterShifts ?? 'Latere shiften op'} ${format(day, 'd/MM')}: ${latestBelow.merged.shift.name}`}
+                    aria-label={`${t.laterShifts ?? 'Latere shiften'}: ${latestBelow.merged.shift.name}`}
                   >
                     <ChevronDown className="vtk-week-indicator-chevron" aria-hidden="true" />
                     <span className="vtk-week-indicator-label">

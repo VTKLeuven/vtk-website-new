@@ -71,16 +71,7 @@ export default async function ShiftPage({ params }: { params: Promise<{ locale: 
 
   return (
     <div className="vtk-page">
-      <header className="vtk-page-head">
-        <div>
-          <h1 className="vtk-page-title">{t.shifts}</h1>
-          <p className="vtk-page-subtitle">{t.subtitle}</p>
-        </div>
-      </header>
-
-      <div className="vtk-page-shell">
-        <ShiftBoard locale={locale} historyHref={`${base}/shift/history`} stats={stats} />
-      </div>
+      <ShiftBoard locale={locale} historyHref={`${base}/shift/history`} stats={stats} />
     </div>
   );
 }

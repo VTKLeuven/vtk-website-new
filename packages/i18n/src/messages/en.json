@@ -607,8 +607,18 @@
       "prev": "Previous week",
       "next": "Next week",
       "today": "Today",
-      "range": "{from} to {to}"
+      "range": "{from} to {to}",
+      "summary": "Week {week}: {total} shifts, {open} with spots",
+      "summaryEmpty": "Week {week}: no shifts"
     },
+    "day": {
+      "noShifts": "no shifts",
+      "shifts": "{n} shifts",
+      "shiftsOne": "1 shift",
+      "emptyDay": "{day}: no shifts"
+    },
+    "clash": "Overlaps with your shift",
+    "clashWarning": "Overlaps with {name}",
     "earlierShifts": "Earlier shifts",
     "laterShifts": "Later shifts",
     "filter": {
@@ -625,6 +635,11 @@
       "hint": "You do not need to speak Dutch for this shift."
     },
     "instructions": "What does this shift involve?",
+    "roster": {
+      "title": "Signed up so far",
+      "empty": "Nobody yet. You could be the first.",
+      "you": "you"
+    },
     "dialog": {
       "close": "Close",
       "cancel": "Cancel",
@@ -652,7 +667,10 @@
       "none": "No shifts are scheduled at the moment."
     },
     "rail": {
+      "nextShift": "Your next shift",
+      "nextShiftMeta": "{name}, {day} at {time}",
       "emptyTitle": "Nothing planned yet",
+      "emptySub": "Pick a shift; it will appear here right away.",
       "emptyText": "Pick a shift from the overview; your registration shows up here right away.",
       "year": "Academic year {year}",
       "shiftsDone": "shifts done",

@@ -172,6 +172,18 @@ export type ShiftResponse = Shift & {
   participants?: { userId: string; payedOut: boolean }[];
   /** ISO-tijdstip waarop de opvragende user zich inschreef (enkel op /register). */
   registeredAt?: string | null;
+  /** Wie er al ingeschreven is, voor het detailvenster op /shift. */
+  roster?: ShiftRosterEntry[];
+};
+
+/**
+ * Eén naam in de lijst "Al ingeschreven". Bewust niet meer dan dat: geen id,
+ * e-mail of foto (zie `lib/shift/roster.ts`).
+ */
+export type ShiftRosterEntry = {
+  name: string;
+  /** Dit is de user die de lijst opvraagt. */
+  isSelf: boolean;
 };
 
 /**

@@ -21,8 +21,8 @@ import {
 function Detail({ k, v }: { k: string; v: string }) {
   return (
     <div>
-      <span className="vtk-basic-shift-k">{k}</span>
-      <span className="vtk-basic-shift-v">{v}</span>
+      <dt>{k}</dt>
+      <dd>{v}</dd>
     </div>
   );
 }
@@ -31,17 +31,28 @@ function Detail({ k, v }: { k: string; v: string }) {
 export function InternationalsBadge({ locale, compact }: { locale: Locale; compact?: boolean }) {
   const t = getDictionary(locale).shift;
   return (
-    <span className="vtk-shift-intl" title={t.intl.hint}>
+    <span className={`vtk-shift-intl${compact ? ' vtk-shift-intl-compact' : ''}`} title={t.intl.hint}>
       <Globe aria-hidden="true" />
       <span className={compact ? 'vtk-sr-only' : undefined}>{t.intl.badge}</span>
     </span>
   );
 }
 
+const DOW_SHORT: Record<Locale, string[]> = {
+  nl: ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'],
+  en: ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'],
+};
+
+const MONTH_SHORT: Record<Locale, string[]> = {
+  nl: ['jan', 'feb', 'mrt', 'apr', 'mei', 'jun', 'jul', 'aug', 'sep', 'okt', 'nov', 'dec'],
+  en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+};
+
 /**
- * Het detailvenster van één shift: alles wat je moet weten voor je intekent
- * (tijden, plaats, beloning, plaatsen, de uitleg) plus de knop zelf. Wordt
- * geopend vanuit het weekrooster, de lijst en de rail.
+ * Het detailvenster van één shift volgens Richting A (Kalenderblad):
+ * donkere navy kop met het technisch patroon, gele datumpin die eronder hangt,
+ * gele onderstreping van de titel, facts-rooster, initialenlijst van ingeschrevenen
+ * en instructies met gele ruitjes.
  */
 export function ShiftDialog({
   locale,
@@ -62,7 +73,8 @@ export function ShiftDialog({
   const { shift, registered } = entry;
   const isFull = !registered && freeSpots(shift) <= 0;
   const locked = registered && !canUnregister(shift, now);
-  const taken = shift.takenSpots ?? shift.participants?.length;
+  const free = freeSpots(shift);
+  const taken = shift.takenSpots ?? shift.participants?.length ?? 0;
 
   useEffect(() => {
     panelRef.current?.focus();
@@ -80,10 +92,13 @@ export function ShiftDialog({
   });
   const sameDay = shift.startTime.toDateString() === shift.endTime.toDateString();
   const when = sameDay
-    ? `${dateFmt.format(shift.startTime)} · ${fmtTime(shift.startTime)} ${fill(t.until, {
+    ? `${dateFmt.format(shift.startTime)}, ${fmtTime(shift.startTime)} ${fill(t.until, {
         time: fmtTime(shift.endTime),
       })}`
     : `${fmtDateTime(shift.startTime)} ${fill(t.until, { time: fmtDateTime(shift.endTime) })}`;
+
+  const dowStr = DOW_SHORT[locale][shift.startTime.getDay()];
+  const monthStr = MONTH_SHORT[locale][shift.startTime.getMonth()];
 
   async function act() {
     setBusy(true);
@@ -91,10 +106,10 @@ export function ShiftDialog({
       ? await unregisterShift(shift.id, showToast, t)
       : await registerShift(shift.id, showToast, t);
     setBusy(false);
-    // Enkel sluiten wanneer het lukte; anders blijft de toast bij het venster
-    // staan waar de gebruiker net op klikte.
     if (ok) onClose();
   }
+
+  const freeLabel = free === 1 ? t.spots.one : fill(t.spots.few, { n: free });
 
   return (
     <div className="vtk-shift-overlay" onClick={onClose}>
@@ -107,13 +122,17 @@ export function ShiftDialog({
         ref={panelRef}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="vtk-shift-dialog-head">
-          <div>
-            <h2 className="vtk-shift-dialog-title" id="vtk-shift-dialog-title">
-              {shift.name}
-            </h2>
-            <p className="vtk-shift-dialog-when">{when}</p>
-          </div>
+        <div className="vtk-shift-dialog-top">
+          {shift.post ? <span className="vtk-shift-dialog-top-post">{shift.post}</span> : null}
+          <span className="vtk-shift-dialog-top-when">{when}</span>
+
+          {/* Hangende gele datumpin van Richting A */}
+          <span className="vtk-shift-pin vtk-shift-dialog-pin" aria-hidden="true">
+            <i>{dowStr}</i>
+            <b>{shift.startTime.getDate()}</b>
+            <i>{monthStr}</i>
+          </span>
+
           <button
             type="button"
             className="vtk-shift-dialog-close"
@@ -125,34 +144,78 @@ export function ShiftDialog({
           </button>
         </div>
 
-        <div className="vtk-shift-dialog-badges">
-          {registered ? (
-            <span className="vtk-basic-badge vtk-basic-badge-accent">{t.isRegistered}</span>
-          ) : (
-            <span className={`vtk-basic-badge vtk-basic-badge-${spotsVariant(shift)}`}>
-              {spotsLabel(shift, t)}
-            </span>
-          )}
-          {shift.openToInternationals ? <InternationalsBadge locale={locale} /> : null}
-        </div>
-
         <div className="vtk-shift-dialog-body">
+          <div className="vtk-shift-dialog-tags">
+            {registered ? (
+              <span className="vtk-shift-spots vtk-shift-spots-mine">
+                {t.isRegistered}
+              </span>
+            ) : (
+              <span className={`vtk-shift-spots vtk-shift-spots-${spotsVariant(shift)}`}>
+                {spotsLabel(shift, t)}
+              </span>
+            )}
+            {shift.openToInternationals ? <InternationalsBadge locale={locale} /> : null}
+          </div>
+
+          <h2 className="vtk-shift-dialog-title" id="vtk-shift-dialog-title">
+            {shift.name}
+          </h2>
+
           {shift.description ? (
             <p className="vtk-shift-dialog-lead">{shift.description}</p>
           ) : null}
 
-          <div className="vtk-basic-shift-details">
+          <dl className="vtk-shift-facts">
             <Detail k={t.detail.location} v={shift.location} />
             {shift.post ? <Detail k={t.detail.post} v={shift.post} /> : null}
             <Detail k={t.detail.reward} v={rewardLabel(shift.reward, t)} />
-            <Detail k={t.detail.spots} v={`${taken ?? '?'}/${shift.maxParticipants}`} />
-          </div>
+            <Detail
+              k={t.detail.spots}
+              v={fill(t.spots.taken, { taken, max: shift.maxParticipants })}
+            />
+          </dl>
 
-          {/* Niet ingevuld = geen leeg kopje tonen. */}
+          {/* Enkel namen, geen profielfoto: zie docs/design-decisions.md */}
+          {shift.roster ? (
+            <section className="vtk-shift-sec" aria-labelledby="vtk-shift-roster-title">
+              <h3 id="vtk-shift-roster-title">{t.roster.title}</h3>
+              {shift.roster.length === 0 ? (
+                <p className="vtk-shift-roster-empty">{t.roster.empty}</p>
+              ) : (
+                <ul className="vtk-shift-roster-list">
+                  {shift.roster.map((person, index) => (
+                    <li
+                      key={`${index}-${person.name}`}
+                      className="vtk-shift-person"
+                      data-self={person.isSelf ? 'true' : undefined}
+                    >
+                      <span className="vtk-shift-person-initial" aria-hidden="true">
+                        {person.name.trim().slice(0, 1).toUpperCase() || '?'}
+                      </span>
+                      <span>
+                        {person.name}
+                        {person.isSelf ? (
+                          <span className="vtk-shift-person-you"> ({t.roster.you})</span>
+                        ) : null}
+                      </span>
+                    </li>
+                  ))}
+                  {free > 0 && !registered ? (
+                    <li className="vtk-shift-person vtk-shift-person-open">
+                      {freeLabel}
+                    </li>
+                  ) : null}
+                </ul>
+              )}
+            </section>
+          ) : null}
+
+          {/* Instructies met gele ruitjes */}
           {shift.instructions?.trim() ? (
-            <section className="vtk-shift-instructions">
+            <section className="vtk-shift-sec">
               <h3>{t.instructions}</h3>
-              <div className="prose-vtk">
+              <div className="vtk-shift-instructions-prose prose-vtk">
                 <Markdown>{shift.instructions}</Markdown>
               </div>
             </section>
@@ -160,14 +223,22 @@ export function ShiftDialog({
         </div>
 
         <div className="vtk-shift-dialog-foot">
-          {locked ? <span className="vtk-shift-note">{t.error.tooLateToUnregister}</span> : null}
+          {locked ? (
+            <span className="vtk-shift-dialog-note">{t.error.tooLateToUnregister}</span>
+          ) : (
+            <span />
+          )}
           <div className="vtk-shift-dialog-actions">
-            <button type="button" className="vtk-basic-action vtk-shift-ghost" onClick={onClose}>
+            <button
+              type="button"
+              className="vtk-shift-btn vtk-shift-btn-ghost"
+              onClick={onClose}
+            >
               {t.dialog.cancel}
             </button>
             <button
               type="button"
-              className={`vtk-basic-action${registered ? ' vtk-basic-action-danger' : ''}`}
+              className={`vtk-shift-btn${registered ? ' vtk-shift-btn-danger' : ''}`}
               disabled={busy || isFull || locked}
               onClick={act}
             >

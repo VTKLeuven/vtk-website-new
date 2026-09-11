@@ -607,8 +607,18 @@
       "prev": "Vorige week",
       "next": "Volgende week",
       "today": "Vandaag",
-      "range": "{from} tot {to}"
+      "range": "{from} tot {to}",
+      "summary": "Week {week}: {total} shiften, {open} met plaats",
+      "summaryEmpty": "Week {week}: geen shiften"
     },
+    "day": {
+      "noShifts": "geen shiften",
+      "shifts": "{n} shiften",
+      "shiftsOne": "1 shift",
+      "emptyDay": "{day}: geen shiften"
+    },
+    "clash": "Overlapt met je shift",
+    "clashWarning": "Overlapt met {name}",
     "earlierShifts": "Vroegere shiften",
     "laterShifts": "Latere shiften",
     "filter": {
@@ -625,6 +635,11 @@
       "hint": "Je hoeft geen Nederlands te spreken voor deze shift."
     },
     "instructions": "Wat houdt deze shift in?",
+    "roster": {
+      "title": "Al ingeschreven",
+      "empty": "Nog niemand. Jij kan de eerste zijn.",
+      "you": "jij"
+    },
     "dialog": {
       "close": "Sluiten",
       "cancel": "Annuleren",
@@ -652,7 +667,10 @@
       "none": "Er staan voorlopig geen shiften gepland."
     },
     "rail": {
+      "nextShift": "Jouw volgende shift",
+      "nextShiftMeta": "{name}, {day} om {time}",
       "emptyTitle": "Nog niets ingepland",
+      "emptySub": "Kies een shift; hij verschijnt hier meteen.",
       "emptyText": "Kies een shift in het overzicht; je inschrijving verschijnt hier meteen.",
       "year": "Academiejaar {year}",
       "shiftsDone": "shiften gedaan",
