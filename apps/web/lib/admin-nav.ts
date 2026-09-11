@@ -174,7 +174,6 @@ export function getAdminNav(): NavEntry[] {
       item('emailLog', '/it/email-logboek', { superAdminOnly: true }),
       item('door', '/deur', { perm: 'door.manage' }),
       item('sso', '/sso', { perm: 'oauth.client.edit' }),
-      item('kulSso', '/it/kul-sso', { superAdminOnly: true }),
       item('authorizationPreview', '/it/preview', { superAdminOnly: true }),
       // De onboarding en de jaarlijkse bevestiging zie je maar één keer; zonder
       // deze pagina is er geen manier om te controleren of ze nog kloppen.

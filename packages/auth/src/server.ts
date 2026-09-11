@@ -15,16 +15,6 @@ import { AUTH_BASE_PATH } from './index';
 
 export { hashPassword } from './logins/password';
 export { isKulEnabled } from './logins/kul';
-export {
-  KUL_DEBUG_SETTING_KEY,
-  KUL_LOG_RETENTION_DAYS,
-  KUL_LOG_KEEP,
-  isKulDebugEnabled,
-  getKulAuthLogs,
-  clearKulAuthLogs,
-  pruneKulAuthLogs,
-  type KulAuthLogEntry,
-} from './logins/kul-debug';
 export { ApiHandler } from './apiHandlers/apiHandler';
 export { getSession } from './server/session';
 export { resolveClaims, type ResolveClaimsInput } from './server/claims';

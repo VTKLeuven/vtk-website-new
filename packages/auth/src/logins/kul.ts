@@ -29,7 +29,6 @@
 
 import { prisma } from "@vtk/db";
 
-import { recordKulProfile } from "./kul-debug";
 import { firwStudentFromProfile, syncFirwStudent } from "./kul-firw";
 import {
   getKulUserInfo,
@@ -195,7 +194,7 @@ export function kulOAuthConfig() {
     // The default generic-oauth implementation returns the ID-token claims
     // immediately when `sub` and `email` are present. Always fetch userinfo so
     // ICTS-released attributes (eduPersonOrgUnitDN, KULdipl, KULopl, ...) reach
-    // mapProfileToUser and the opt-in admin debug log.
+    // mapProfileToUser.
     getUserInfo: getKulUserInfo,
     pkce: true,
     // ICTS registered the client with token_endpoint_auth_method
@@ -234,10 +233,6 @@ export function kulOAuthConfig() {
       const linkEmail =
         email && rNumber ? await linkEmailForRNumber(rNumber, email) : undefined;
 
-      // Opt-in debuglog (Admin -> IT): bewaart de ruwe claims zodat een superadmin
-      // ziet welke attributen ICTS vrijgeeft. Doet niets als de toggle uit staat en
-      // gooit nooit, dus deze await kan de login niet breken.
-      await recordKulProfile(profile, { email, rNumber });
       return {
         email: linkEmail ?? email,
         name: profileName(profile),
