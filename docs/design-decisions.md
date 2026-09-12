@@ -5525,6 +5525,75 @@ nummer rechts in een vaste breedte, met cijfers van gelijke breedte. De dagkolom
 zelf is via subgrid in elke rij even breed, zodat ook een Engelse "Wed" de
 evenementen niet opzij duwt.
 
+## Openstaande shiften onder de herotekst
+
+Onder de herotekst staan de **shiften waar nog plaats is**, en daaronder pas de
+feitenlijn (werkingsjaar, binnenkort, sinds). Daarvoor stond daar niets: de
+tekstkolom eindigde ruim boven de agenda ernaast en de rest van de hoogte was
+lege foto.
+
+De regel die bepaalt wat daar wel en niet hoort: **de rij snelle links eronder
+zegt waar je naartoe kan, dit blok zegt waar er nu handen tekort zijn.** Bijna
+alles wat je in die hoek zou willen zetten (Theokot, Cursusdienst, Tijdsloten,
+Kalender) staat al als bestemming in die rij; dit blok verdient zijn plaats enkel
+doordat het iets toont wat een vaste link niet kan. Zet er dus geen tweede
+menu neer.
+
+De regels staan in `apps/web/lib/frontpage/heroShifts.ts` en zijn los getest
+(`apps/web/test/heroShifts.test.ts`).
+
+### Welke shiften
+
+- **Enkel waar nog plaats is.** Dit is een oproep, geen rooster. Een volle shift
+  zegt de bezoeker niets wat hij kan doen.
+- **Niet wat je zelf al doet.** Dezelfde regel als `GET /api/shift`: je eigen
+  shift is voor jou geen vacature, en ze staat op /shift al bij je eigen shiften.
+- **Wat bezig is, blijft staan.** Gefilterd op het einde en niet op de start:
+  bij een shift die een uur geleden begon en nog een plaats vrij heeft, kan
+  iemand vandaag nog iets doen.
+- **De eerstvolgende eerst**, ook wanneer een latere shift meer plaatsen vrij
+  heeft. Wat morgen is, is dringender dan wat over drie weken is.
+- **Geel betekent binnen een dag**, net als in het weekoverzicht ernaast: daar is
+  geel "vandaag", hier "dit gaat over nu".
+
+Per rij staat de naam, wanneer ze is, hoeveel plaatsen er vrij zijn en wat ze
+opbrengt in bonnetjes. Die bonnetjes staan er bewust bij: ze maken de ruil
+meteen duidelijk, en ze staan rechts, in dezelfde kolom waar het weekoverzicht
+het uur zet.
+
+### Ook voor wie niet aangemeld is
+
+/shift vraagt een login, dus voor een bezoeker zonder account loopt elke rij uit
+op een aanmeldscherm. Het blok staat er toch, om twee redenen: de naam en het uur
+van een shift zijn geen geheim, en het is net dat publiek dat nog niet weet dat
+het kan helpen. /shift vangt het aanmelden zelf op en stuurt daarna terug.
+
+Wil je dat ooit anders, dan is het één voorwaarde in `DefaultFrontpage`: het blok
+enkel tonen wanneer `signedIn` waar is. Hou er dan rekening mee dat de hoek voor
+een bezoeker weer leeg valt.
+
+### Hoeveel er staan, hangt af van hoe hoog de titel uitvalt
+
+De titel is geen blok van vaste hoogte: `hero-slogan-sizer` maakt hem zo hoog als
+de langste slogan uit /admin/slogans, en wie daar morgen een langere kreet
+neerzet, maakt hem in één keer honderd pixels hoger. Stond er dan een vast aantal
+shiften onder, dan schoof de kolom onder de agenda uit en werd de hero hoger dan
+het scherm.
+
+Daarom delen de titel en de shiften één hoogtebudget. Groeit de titel, dan valt
+er een shift weg; nul is een geldig antwoord, en dan verdwijnt het blok. De lucht
+die overblijft, komt bóven het blok te staan, waar ze leest als ademruimte onder
+de knoppen in plaats van als een gat onderaan.
+
+De server schat die titelhoogte, want hij weet niet waar de browser afbreekt. Dat
+hoeft niet exact: de schatting kiest enkel tussen nul en drie rijen, en het
+budget ligt bewust wat lager dan de ruimte die er is. Een rij te weinig oogt
+altijd beter dan een kolom die onder de agenda uitsteekt.
+
+Eén gevolg om te kennen: het budget rekent met de breedste hero. Op een telefoon
+concurreert niets om die hoogte en zou er meer passen, maar de server rekent één
+getal uit voor alle schermen. Een lange slogan kost daar dus ook een rij.
+
 ## De ster op een evenement is geen inschrijving
 
 In de app staat bij elk evenement een ster: "ik ga hier waarschijnlijk naartoe".

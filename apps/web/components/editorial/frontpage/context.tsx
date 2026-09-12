@@ -57,6 +57,26 @@ export type FrontpageEvent = {
   viewerInterested: boolean;
 };
 
+/**
+ * Eén shift zoals de hero ze nodig heeft. Bewust niet de hele `Shift`: de
+ * beschrijving, de uitleg en de deelnemers horen op /shift, niet op de
+ * voorpagina. Zie lib/frontpage/heroShifts.ts voor wat er met deze velden
+ * gebeurt.
+ */
+export type FrontpageShift = {
+  id: string;
+  name: string;
+  startTime: Date;
+  endTime: Date;
+  maxParticipants: number;
+  /** Hoeveel plaatsen er al bezet zijn. */
+  takenSpots: number;
+  /** Of de bezoeker zelf al ingeschreven is; die shift is voor hem geen vacature. */
+  viewerRegistered: boolean;
+  /** Het aantal bonnetjes dat de shift opbrengt. */
+  reward: number;
+};
+
 export type FrontpagePartner = {
   url?: string | null;
   id: string;
@@ -80,6 +100,12 @@ export type FrontpageProps = {
   weekEvents: FrontpageEvent[];
   /** Of er iemand aangemeld is. De ster van het weekoverzicht hangt eraan. */
   signedIn: boolean;
+  /**
+   * De shiften waar nog plaats is, al gefilterd en op tijd gesorteerd. De hero
+   * neemt er hoogstens de eerste paar van; hoeveel, hangt af van hoe hoog de
+   * titel uitvalt. Zie lib/frontpage/heroShifts.ts.
+   */
+  openShifts: FrontpageShift[];
   partners: FrontpagePartner[];
   /**
    * De slogans voor deze bezoeker, al opgelost op de server: welke bij haar

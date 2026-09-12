@@ -9,8 +9,10 @@ import {
 } from "@/lib/frontpage/registry";
 import { HERO_WEEK_NEXT_LIMIT_DEFAULT } from "@/lib/calendar/heroWeek";
 import { organiserName } from "@/lib/calendar/organiser";
+import { heroShiftRowCount, pickHeroShifts } from "@/lib/frontpage/heroShifts";
 import { HeroWeek } from "./HeroWeek";
 import { HeroSlogan } from "./HeroSlogan";
+import { HeroShifts } from "./HeroShifts";
 import { Cta, ctaFrom, type FrontpageProps } from "./context";
 
 /**
@@ -38,6 +40,7 @@ export function DefaultFrontpage({
   upcomingEvents,
   weekEvents,
   signedIn,
+  openShifts,
   slogans,
 }: FrontpageProps) {
   const nl = locale === "nl";
@@ -100,6 +103,15 @@ export function DefaultFrontpage({
 
   const heroEvents = upcomingEvents.slice(0, 4);
 
+  // Hoeveel shiften er onder de titel passen, hangt af van hoe hoog die titel
+  // uitvalt: de slogans bepalen dat, en die kunnen morgen twee keer zo lang
+  // zijn. Groeit de titel, dan valt hier een rij weg in plaats van dat de kolom
+  // onder de agenda uitschiet. Zie lib/frontpage/heroShifts.ts.
+  const heroShifts = pickHeroShifts(openShifts, {
+    now,
+    limit: heroShiftRowCount(slogans.items, slogans.size),
+  });
+
   // "Binnenkort" telt de maand vooruit. Niet alles wat de homepage inlas, want
   // dat zijn er veertig en "37 events" is geen "binnenkort"; en niet één week,
   // want dan staat er in september "0 events" naast een agenda die er vier toont.
@@ -149,20 +161,27 @@ export function DefaultFrontpage({
           <Cta cta={primary} className="btn btn-primary arrow" />
           <Cta cta={secondary} className="btn btn-ghost" />
         </div>
-        <div className="hero-meta">
-          <div className="meta">
-            <div className="k">{nl ? "Werkingsjaar" : "Working year"}</div>
-            <div className="v">{workingYear}</div>
-          </div>
-          <div className="meta">
-            <div className="k">{nl ? "Binnenkort" : "Coming up"}</div>
-            <div className="v">
-              {eventsSoon} {nl ? "events" : "events"}
+        {/* De shiften en de feitenlijn zijn samen de voet van de kolom en hangen
+            aan de onderkant (`margin-top: auto` in vtk-home.css), zodat ze
+            uitkomen op de onderlijn van de agenda ernaast. De lucht die de titel
+            overlaat, komt daardoor boven dit blok te staan en niet eronder. */}
+        <div className="hero-foot">
+          <HeroShifts shifts={heroShifts} now={now} locale={locale} base={base} />
+          <div className="hero-meta">
+            <div className="meta">
+              <div className="k">{nl ? "Werkingsjaar" : "Working year"}</div>
+              <div className="v">{workingYear}</div>
             </div>
-          </div>
-          <div className="meta">
-            <div className="k">{nl ? "Sinds" : "Since"}</div>
-            <div className="v">1920</div>
+            <div className="meta">
+              <div className="k">{nl ? "Binnenkort" : "Coming up"}</div>
+              <div className="v">
+                {eventsSoon} {nl ? "events" : "events"}
+              </div>
+            </div>
+            <div className="meta">
+              <div className="k">{nl ? "Sinds" : "Since"}</div>
+              <div className="v">1920</div>
+            </div>
           </div>
         </div>
       </div>

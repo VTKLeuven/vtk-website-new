@@ -186,7 +186,15 @@ the design language into the application instead of copying mockup content.
   reads on a wide, borderless gradient in the scrim (`.hero-week-wash`) that
   dissolves outward, because the photo is at its lightest exactly there. Do not
   put a card back around it, and see `docs/design-decisions.md` for the rules
-  behind the days it shows. The dark zone (`.home-dark-zone`) stretches the photo
+  behind the days it shows. The foot of the text column carries the shifts that
+  still have room (`.hero-shifts`) and, below them, the facts line; both hang on
+  the bottom so the column ends on the agenda's last line. That block is the one
+  place on the homepage for live state, never for another destination: the
+  quick-links row below already says where you can go. **How many rows it shows
+  is computed from how tall the title turns out** (`lib/frontpage/heroShifts.ts`),
+  because the slogan stack sizes itself to the longest slogan and an editor can
+  make it a hundred pixels taller without a deploy. Grow the title and a shift
+  drops; do not put a fixed number back. The dark zone (`.home-dark-zone`) stretches the photo
   through the quick-links row, which sits on it as a dark glass panel; the zone
   ends on a crisp seam: a short bottom-anchored vignette settles the photo edge
   and the openingsuren band starts right below it. Both a paper gap and a long

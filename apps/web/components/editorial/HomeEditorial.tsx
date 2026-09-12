@@ -29,6 +29,7 @@ import {
 import { resolveFrontpage } from "@/lib/frontpage/resolve";
 import { frontpagePhoto } from "@/lib/frontpage/registry";
 import { Frontpage } from "@/components/editorial/frontpage";
+import type { FrontpageShift } from "@/components/editorial/frontpage/context";
 import { currentWorkingYear } from "@/lib/workingYear";
 import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
 import {
@@ -186,12 +187,47 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   // drempel; zie lib/calendar/interest.ts voor waarom een laag getal averechts
   // werkt. Eén lezing voor de hero én de kaarten hieronder.
   const eventIds = calendarEvents.map((event) => event.id);
-  const [interested, viewerInterestMap] = await Promise.all([
+  const [interested, viewerInterestMap, shifts] = await Promise.all([
     publicInterestCounts(eventIds),
     // Wat de bezoeker zelf al aanduidde, voor de ster in het weekoverzicht.
     // Zonder sessie blijft dit leeg en is de ster een link naar het aanmelden.
     viewerInterests(eventIds, session?.user.id ?? null),
+    // De shiften onder de herotekst. Hier en niet in de ronde hierboven, omdat
+    // de sessie nodig is om je eigen shiften eruit te laten.
+    //
+    // Geen `participants` in de selectie: het aantal volstaat om te weten of er
+    // nog plaats is, en wie er ingeschreven staat hoeft de homepage niet te
+    // kennen. De enige naam die wél opgevraagd wordt, is die van de bezoeker
+    // zelf, om zijn eigen shiften weg te laten. Zonder sessie matcht die filter
+    // niets en blijft de rij leeg.
+    //
+    // Ruimer opgehaald dan de hoogstens drie rijen die de hero toont: er vallen
+    // er nog volle en eigen shiften weg, en dat filteren gebeurt in
+    // `pickHeroShifts`, waar het getest is.
+    prisma.shift.findMany({
+      where: { endTime: { gte: now } },
+      orderBy: { startTime: "asc" },
+      take: 24,
+      select: {
+        id: true,
+        name: true,
+        startTime: true,
+        endTime: true,
+        maxParticipants: true,
+        reward: true,
+        _count: { select: { participants: true } },
+        participants: {
+          where: { userId: session?.user.id ?? "" },
+          select: { userId: true },
+        },
+      },
+    }),
   ]);
+  const openShifts: FrontpageShift[] = shifts.map(({ _count, participants, ...shift }) => ({
+    ...shift,
+    takenSpots: _count.participants,
+    viewerRegistered: participants.length > 0,
+  }));
   const viewerInterestIds = new Set(viewerInterestMap.keys());
 
   // Dezelfde ster als in het weekoverzicht van de hero, met dezelfde teksten:
@@ -407,6 +443,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           upcomingEvents={toFrontpageEvents(upcomingEvents, interested, viewerInterestIds)}
           weekEvents={toFrontpageEvents(calendarEvents, interested, viewerInterestIds)}
           signedIn={session !== null}
+          openShifts={openShifts}
           partners={partners}
           slogans={slogans}
         />

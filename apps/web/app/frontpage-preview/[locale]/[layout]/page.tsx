@@ -19,6 +19,7 @@ import {
 } from "@/lib/frontpage/events";
 import { ToastProvider } from "@/components/ui/toast";
 import { Frontpage } from "@/components/editorial/frontpage";
+import type { FrontpageShift } from "@/components/editorial/frontpage/context";
 
 // Outside `app/[locale]/` on purpose, so the site header, the footer and the
 // admin navigation stay out of the frame; only the root layout wraps this. That
@@ -86,10 +87,33 @@ export default async function FrontpagePreview({
   ]);
 
   const eventIds = calendarEvents.map((event) => event.id);
-  const [interested, viewerInterestMap] = await Promise.all([
+  // Ook de shiften, en met dezelfde regels: ze staan in de voet van de
+  // tekstkolom en bepalen mee hoe hoog die uitvalt. Een voorbeeld zonder dat
+  // blok toont een andere hero dan de echte. Zie lib/frontpage/heroShifts.ts.
+  const [interested, viewerInterestMap, shifts] = await Promise.all([
     publicInterestCounts(eventIds),
     viewerInterests(eventIds, session.user.id),
+    prisma.shift.findMany({
+      where: { endTime: { gte: now } },
+      orderBy: { startTime: "asc" },
+      take: 24,
+      select: {
+        id: true,
+        name: true,
+        startTime: true,
+        endTime: true,
+        maxParticipants: true,
+        reward: true,
+        _count: { select: { participants: true } },
+        participants: { where: { userId: session.user.id }, select: { userId: true } },
+      },
+    }),
   ]);
+  const openShifts: FrontpageShift[] = shifts.map(({ _count, participants, ...shift }) => ({
+    ...shift,
+    takenSpots: _count.participants,
+    viewerRegistered: participants.length > 0,
+  }));
   const viewerInterestIds = new Set(viewerInterestMap.keys());
   const upcomingEvents = calendarEvents.filter((event) => event.start >= now);
 
@@ -129,6 +153,7 @@ export default async function FrontpagePreview({
             upcomingEvents={toFrontpageEvents(upcomingEvents, interested, viewerInterestIds)}
             weekEvents={toFrontpageEvents(calendarEvents, interested, viewerInterestIds)}
             signedIn
+            openShifts={openShifts}
             partners={partners}
             slogans={slogans}
           />

@@ -292,6 +292,162 @@
   letter-spacing: -0.02em;
 }
 
+/* ---------------------------------------------------------------------------
+   De voet van de tekstkolom: de openstaande shiften en daaronder de feitenlijn.
+
+   De kolom rekt mee met de rij, en de voet hangt aan de onderkant. Zo eindigt de
+   tekstkolom op dezelfde lijn als de agenda ernaast en komt de lucht die de
+   titel overlaat bóven de shiften te staan in plaats van eronder. De agenda zelf
+   krijgt die stretch bewust niet: `.hero-week-wash` is een vervaagde vlek die
+   zich aan de hoogte van haar aside meet, en een aside die tot onderaan uitrekt
+   trekt die vlek mee over een stuk lege foto.
+
+   Hoeveel shiftrijen er staan, rekent de server uit op de hoogte van de titel
+   (lib/frontpage/heroShifts.ts). Groeit de slogan, dan valt hier een rij weg;
+   deze CSS vangt enkel het restje op dat die schatting overhoudt.
+   --------------------------------------------------------------------------- */
+.vtk-design .home-hero > div {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+}
+
+/* De lucht die de titel overlaat, gaat naar de marge; de padding is het minimum
+   dat er altijd staat. Met enkel `margin: auto` plakte het blok tegen de
+   knoppen zodra er niets over was, bijvoorbeeld in een week zonder evenementen,
+   wanneer de agenda ernaast tot een paar regels krimpt. */
+.vtk-design .hero-foot {
+  margin-top: auto;
+  padding-top: 34px;
+}
+
+.vtk-design .hero-shifts {
+  display: flex;
+  flex-direction: column;
+}
+
+.vtk-design .hero-shifts-head {
+  display: flex;
+  align-items: baseline;
+  gap: 6px 12px;
+  margin-bottom: 6px;
+}
+
+.vtk-design .hero-shifts-head h2 {
+  margin: 0;
+  color: rgba(250, 250, 247, 0.62);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1.5;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.vtk-design .hero-shifts-head .all {
+  margin-left: auto;
+  color: #fff;
+  font-size: 12.5px;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: rgba(255, 255, 255, 0.4);
+}
+
+.vtk-design .hero-shifts-head .all:hover {
+  text-decoration-color: #fff;
+}
+
+/* De maten hier bepalen samen `HERO_SHIFT_ROW_PX` (62): 11 + 11 padding, een
+   naam van 15/1.35 en een detailregel van 12.5/1.4 met 2px ertussen. Verander je
+   er één, pas dan ook dat getal aan, anders rekent de server met een rijhoogte
+   die niet meer bestaat. `min-height` houdt de rijen gelijk; een lange naam mag
+   nog altijd afbreken en de rij hoger maken, want een afgekapte shiftnaam zegt
+   niet meer waarvoor je je inschrijft. */
+.vtk-design .hero-shift-row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: baseline;
+  min-height: 62px;
+  padding: 11px 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Een scheiding die naar rechts oplost, dezelfde als tussen twee dagen in het
+   weekoverzicht: het is dezelfde soort lijst, dus ze hoort er hetzelfde uit te
+   zien. */
+.vtk-design .hero-shift-row + .hero-shift-row {
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0.03) 78%,
+    transparent
+  );
+  background-size: 100% 1px;
+  background-repeat: no-repeat;
+  background-position: top left;
+}
+
+.vtk-design .hero-shift-row .dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: transparent;
+  box-shadow: inset 0 0 0 1.6px rgba(255, 255, 255, 0.45);
+  transform: translateY(4px);
+}
+
+/* Geel betekent hier hetzelfde als in het weekoverzicht: dit gaat over nu. */
+.vtk-design .hero-shift-row.urgent .dot {
+  background: var(--yellow);
+  box-shadow: none;
+}
+
+.vtk-design .hero-shift-row .body {
+  display: block;
+  min-width: 0;
+}
+
+.vtk-design .hero-shift-row .t {
+  display: block;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.vtk-design .hero-shift-row .d {
+  display: block;
+  margin-top: 2px;
+  color: var(--on-dark-muted);
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+
+.vtk-design .hero-shift-row .reward {
+  color: rgba(250, 250, 247, 0.86);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.vtk-design .hero-shift-row.urgent .reward {
+  color: var(--yellow);
+}
+
+.vtk-design .hero-shift-row:hover .t {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  text-decoration-color: rgba(255, 255, 255, 0.5);
+}
+
+/* De feitenlijn sluit de voet af; boven de shiften staat geen tweede lijn, want
+   de kop van het blok markeert die grens al. */
+.vtk-design .hero-shifts + .hero-meta {
+  margin-top: 24px;
+}
+
 /*
  * De eventkaart in de hero. De klassen hieronder heten bewust `hero-*` en niet
  * `cal` / `agenda` / `day-group` / `ev`: `vtk-kalender.css` gebruikt die korte
