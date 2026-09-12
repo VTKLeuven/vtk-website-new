@@ -29,10 +29,8 @@ export function legacyHeroFrom(values: unknown): { nl: string; en?: string } | n
   const obj = values as Record<string, unknown>;
   const text = (key: string) => (typeof obj[key] === "string" ? (obj[key] as string).trim() : "");
   const compose = (title: string, accent: string, tail: string) => {
-    const head = accent ? `${title ? `${title} ` : ""}*${accent}*` : title;
-    if (!head) return tail;
-    if (!tail) return title && accent ? `${title}\n*${accent}*` : head;
-    return `${head}\n${tail}`;
+    const parts = [title, accent ? `*${accent}*` : "", tail].filter(Boolean);
+    return parts.join("\n");
   };
   const nl = compose(text("titleNl"), text("accentNl"), text("tailNl"));
   const en = compose(text("titleEn"), text("accentEn"), text("tailEn"));

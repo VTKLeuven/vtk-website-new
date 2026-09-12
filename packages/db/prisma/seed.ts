@@ -485,6 +485,7 @@ async function main() {
     {
       key: "home.slogans",
       value: {
+        enabled: true,
         items: [
           {
             id: "opener-ochtend",
@@ -520,8 +521,8 @@ async function main() {
           },
           {
             id: "slogan-thuis",
-            nl: "De thuis voor *ingenieurs* in Leuven.",
-            en: "The home for *engineers* in Leuven.",
+            nl: "De thuis voor\n*ingenieurs*\nin Leuven.",
+            en: "The home for\n*engineers*\nin Leuven.",
             audience: "all",
             opener: false,
             window: "any"

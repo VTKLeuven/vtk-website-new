@@ -91,6 +91,7 @@ export function SlogansEditor({
   const baseId = useId();
   const t = (nl: string, en: string) => (isNl ? nl : en);
 
+  const [enabled, setEnabled] = useState<boolean>(initialConfig.enabled !== false);
   const [items, setItems] = useState<Slogan[]>(() => initialConfig.items);
   const [intervalSeconds, setIntervalSeconds] = useState(initialConfig.intervalSeconds);
 
@@ -114,14 +115,14 @@ export function SlogansEditor({
   const resolved = useMemo(
     () =>
       resolveSlogans({
-        config: { items, intervalSeconds },
+        config: { enabled, items, intervalSeconds },
         locale: previewLocale,
         user: previewUser,
         now: now ?? new Date(0),
       }),
     // previewUser is elke render een nieuw object; de naam erin is wat telt.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [items, intervalSeconds, previewLocale, asMember, previewName, now],
+    [enabled, items, intervalSeconds, previewLocale, asMember, previewName, now],
   );
 
   // Geen effect dat de teller terugzet wanneer de lijst korter wordt: clampen
@@ -199,7 +200,7 @@ export function SlogansEditor({
             "The longest slogan is long, so the whole sequence sits two sizes smaller in the hero. Shorten it to keep the headline large.",
           );
 
-  const serialized = JSON.stringify({ items, intervalSeconds });
+  const serialized = JSON.stringify({ enabled, items, intervalSeconds });
   const empty = items.filter((item) => !item.nl.trim() && !item.en?.trim()).length;
   const windowNow = now ? WINDOW_LABELS[sloganWindowAt(now)][isNl ? "nl" : "en"] : null;
 
@@ -226,6 +227,72 @@ export function SlogansEditor({
       resetOnSuccess={false}
     >
       <input type="hidden" name="slogansData" value={serialized} />
+
+      {/* Slogans aan/uit schakelaar */}
+      <Card className="p-5 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h2 className="font-semibold text-lg flex items-center gap-2">
+              <span>{t("Slogans op de startpagina", "Homepage slogans")}</span>
+              <span
+                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+                  enabled
+                    ? "bg-emerald-100 text-emerald-800"
+                    : "bg-zinc-100 text-zinc-700"
+                }`}
+              >
+                {enabled ? t("Actief", "Active") : t("Uitgeschakeld", "Disabled")}
+              </span>
+            </h2>
+            <p className="text-sm text-[#5c667f]">
+              {t(
+                "Schakel de slogans in of uit. Indien uitgeschakeld toont de homepage steeds de vaste titel 'De thuis voor ingenieurs in Leuven' op 3 lijnen.",
+                "Enable or disable slogans. When disabled, the homepage displays the static headline 'The home for engineers in Leuven' across 3 lines.",
+              )}
+            </p>
+          </div>
+          <label className="flex items-center gap-2 cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              checked={enabled}
+              onChange={(e) => setEnabled(e.target.checked)}
+              className="h-5 w-5 rounded border-zinc-300 text-vtk-blue focus:ring-vtk-blue"
+            />
+            <span className="text-sm font-semibold">
+              {enabled
+                ? t("Slogans ingeschakeld", "Slogans enabled")
+                : t("Slogans uitgeschakeld", "Slogans disabled")}
+            </span>
+          </label>
+        </div>
+
+        {!enabled && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-3.5 text-sm text-amber-900">
+            <p className="font-semibold mb-1">
+              {t("Slogans staan momenteel uit", "Slogans are currently disabled")}
+            </p>
+            <div className="text-xs sm:text-sm space-y-1">
+              <p>
+                {t(
+                  "Op de homepage verschijnt nu steeds de standaard titel op 3 lijnen:",
+                  "The homepage will display the static headline across 3 lines:",
+                )}
+              </p>
+              <div className="font-sans pl-3 border-l-2 border-amber-300 my-2 text-zinc-800 font-semibold leading-snug">
+                <div>De thuis voor</div>
+                <div className="serif italic text-[#c29304]">ingenieurs</div>
+                <div>in Leuven.</div>
+              </div>
+              <p className="text-xs text-amber-800/80">
+                {t(
+                  "De onderstaande lijst blijft bewaard voor wanneer je de slogans later weer inschakelt.",
+                  "The list below is preserved for when you re-enable slogans later.",
+                )}
+              </p>
+            </div>
+          </div>
+        )}
+      </Card>
 
       {/* Voorbeeld */}
       <Card className="p-5 space-y-4">

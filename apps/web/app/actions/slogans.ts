@@ -56,7 +56,7 @@ export async function saveSlogansAction(
     action: "update",
     entity: "home",
     target: "Slogans",
-    summary: `${config.items.length} slogan(s), waarvan ${openers} begroeting(en)`,
+    summary: `${config.enabled !== false ? "Actief" : "Uitgeschakeld"}, ${config.items.length} slogan(s), waarvan ${openers} begroeting(en)`,
   });
 
   revalidatePath("/", "layout");

@@ -48,6 +48,8 @@ export type Slogan = {
 };
 
 export type SlogansConfig = {
+  /** Of slogans actief zijn op de homepage. Indien uitgeschakeld toont de homepage de vaste titel 'De thuis voor ingenieurs in Leuven' op 3 lijnen. */
+  enabled?: boolean;
   items: Slogan[];
   /** Wisseltijd in seconden. 0 = niet roteren, enkel de eerste tonen. */
   intervalSeconds: number;
@@ -123,8 +125,8 @@ export const DEFAULT_SLOGAN_ITEMS: Slogan[] = [
   },
   {
     id: "slogan-thuis",
-    nl: "De thuis voor *ingenieurs* in Leuven.",
-    en: "The home for *engineers* in Leuven.",
+    nl: "De thuis voor\n*ingenieurs*\nin Leuven.",
+    en: "The home for\n*engineers*\nin Leuven.",
     audience: "all",
     opener: false,
     window: "any",
@@ -212,6 +214,7 @@ export const DEFAULT_SLOGAN_ITEMS: Slogan[] = [
 ];
 
 export const DEFAULT_SLOGANS_CONFIG: SlogansConfig = {
+  enabled: true,
   items: DEFAULT_SLOGAN_ITEMS,
   intervalSeconds: SLOGAN_INTERVAL_DEFAULT,
 };
@@ -312,10 +315,8 @@ function pickFrom<T extends readonly string[]>(
  * hero die al jaren zo staat er na deze migratie identiek uitziet.
  */
 function composeLegacy(title: string, accent: string, tail: string): string {
-  const head = accent ? `${title ? `${title} ` : ""}*${accent}*` : title;
-  if (!head) return tail;
-  if (!tail) return title && accent ? `${title}\n*${accent}*` : head;
-  return `${head}\n${tail}`;
+  const parts = [title, accent ? `*${accent}*` : "", tail].filter(Boolean);
+  return parts.join("\n");
 }
 
 function readLegacyItem(raw: Record<string, unknown>, idx: number): Slogan | null {
@@ -401,7 +402,10 @@ export function readSlogansSetting(raw: unknown): SlogansConfig {
     ? Math.max(0, Math.min(SLOGAN_INTERVAL_MAX, Math.round(rawInterval)))
     : SLOGAN_INTERVAL_DEFAULT;
 
+  const enabled = typeof obj.enabled === "boolean" ? obj.enabled : true;
+
   return {
+    enabled,
     items: all.length > 0 ? all : DEFAULT_SLOGAN_ITEMS,
     intervalSeconds,
   };
@@ -489,6 +493,28 @@ export function resolveSlogans({
   fallback?: { nl: string; en?: string } | null;
 }): ResolvedSlogans {
   const cfg = config ?? DEFAULT_SLOGANS_CONFIG;
+
+  if (cfg.enabled === false) {
+    const raw = fallback
+      ? locale === "nl"
+        ? fallback.nl
+        : fallback.en || fallback.nl
+      : "";
+    const lines = parseSlogan(
+      raw ||
+        (locale === "nl"
+          ? "De thuis voor\n*ingenieurs*\nin Leuven."
+          : "The home for\n*engineers*\nin Leuven."),
+    );
+    const only = [{ id: "fallback", lines, text: sloganPlainText(lines), opener: false }];
+    return {
+      items: only,
+      openerCount: 0,
+      intervalSeconds: 0,
+      size: sloganSizeTier(only),
+    };
+  }
+
   const window = sloganWindowAt(now);
 
   const eligible = cfg.items.filter(
@@ -513,8 +539,8 @@ export function resolveSlogans({
     const lines = parseSlogan(
       raw ||
         (locale === "nl"
-          ? "De thuis voor *ingenieurs* in Leuven."
-          : "The home for *engineers* in Leuven."),
+          ? "De thuis voor\n*ingenieurs*\nin Leuven."
+          : "The home for\n*engineers*\nin Leuven."),
     );
     const only = [{ id: "fallback", lines, text: sloganPlainText(lines), opener: false }];
     return {

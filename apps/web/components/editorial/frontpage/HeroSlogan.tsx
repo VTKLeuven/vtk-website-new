@@ -134,7 +134,11 @@ export function HeroSlogan({
       <h1>
         {/* De sleutel is de slogan: bij een wissel maakt React een nieuw element
             en speelt de CSS-animatie zichzelf af. Geen timers voor de fade. */}
-        <span className="hero-slogan" key={current.id} data-animate={reduced ? "false" : "true"}>
+        <span
+          className="hero-slogan"
+          key={current.id}
+          data-animate={reduced || slogans.length <= 1 ? "false" : "true"}
+        >
           <Lines slogan={current} />
         </span>
       </h1>

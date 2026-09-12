@@ -1951,6 +1951,15 @@ liedjesboek ("Glory, glory, wij zijn VTK!", "Het verstand zit aan deze kant").
   een verborgen tabblad en bij `prefers-reduced-motion`, en er staat een
   pauzeknop naast het bovenschrift (WCAG 2.2.2). De `h1` draagt altijd één
   slogan; de andere staan onzichtbaar in een stapel die enkel de hoogte bepaalt.
+- **Slogans kunnen volledig uitgeschakeld worden.** In `/admin/slogans` staat een
+  hoofdschakelaar om de slogans uit te zetten. Wanneer ze uitgeschakeld zijn,
+  toont de homepage steeds de klassieke titel over drie lijnen ("De thuis voor" /
+  *ingenieurs* / "in Leuven.") zonder rotatie of client-timers. De ingestelde
+  sloganlijst blijft bewaard voor wanneer ze later weer ingeschakeld wordt.
+- **"De thuis voor ingenieurs in Leuven" staat op 3 lijnen.** In plaats van 2
+  lijnen staat de titel nu op 3 lijnen ("De thuis voor" \n *ingenieurs* \n "in
+  Leuven."). Dit oogt voller en balanceert de hoogte van het weekoverzicht aan
+  de rechterkant van de hero.
 
 ### Aftermovies op de homepage
 

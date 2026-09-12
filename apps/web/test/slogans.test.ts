@@ -125,7 +125,13 @@ describe("slogans", () => {
       expect(readSlogansSetting({ items: [{ nl: "x" }] }).intervalSeconds).toBe(8);
     });
 
-    it("migreert de oude titel/accent/staart naar één zin", () => {
+    it("leest de enabled vlag in (standaard true)", () => {
+      expect(readSlogansSetting({ enabled: false }).enabled).toBe(false);
+      expect(readSlogansSetting({ enabled: true }).enabled).toBe(true);
+      expect(readSlogansSetting({}).enabled).toBe(true);
+    });
+
+    it("migreert de oude titel/accent/staart naar 3 regels", () => {
       const cfg = readSlogansSetting({
         items: [
           { id: "a", titleNl: "Ingenieurs zijn", accentNl: "superieur.", tailNl: "" },
@@ -141,11 +147,11 @@ describe("slogans", () => {
         ],
         intervalSeconds: 8,
       });
-      // Zonder staart brak de oude component af tussen titel en accent.
+      // Zonder staart: titel en accent op aparte regels.
       expect(cfg.items[0]!.nl).toBe("Ingenieurs zijn\n*superieur.*");
-      // Met staart brak ze af na het accent.
-      expect(cfg.items[1]!.nl).toBe("Al meer dan 100 jaar *thuis*\nin Leuven.");
-      expect(cfg.items[1]!.en).toBe("For over 100 years *at home*\nin Leuven.");
+      // Met staart: titel, accent en staart op 3 aparte regels.
+      expect(cfg.items[1]!.nl).toBe("Al meer dan 100 jaar\n*thuis*\nin Leuven.");
+      expect(cfg.items[1]!.en).toBe("For over 100 years\n*at home*\nin Leuven.");
     });
 
     it("migreert de oude persoonlijke slogan naar een begroeting vooraan", () => {
@@ -231,9 +237,23 @@ describe("slogans", () => {
       expect(out.items[0]!.text).toBe("De thuis voor ingenieurs in Leuven.");
     });
 
+    it("toont de vaste titel over 3 regels wanneer slogans uitgeschakeld zijn", () => {
+      const out = resolveSlogans({
+        config: { enabled: false, items, intervalSeconds: 8 },
+        locale: "nl",
+        user: member,
+        now: at(9),
+      });
+      expect(out.items).toHaveLength(1);
+      expect(out.items[0]!.lines).toHaveLength(3);
+      expect(out.items[0]!.text).toBe("De thuis voor ingenieurs in Leuven.");
+      expect(out.intervalSeconds).toBe(0);
+    });
+
     it("laat de hero nooit zonder titel achter", () => {
       const out = resolveSlogans({ config: config([]), locale: "nl", user: null, now: at(14) });
       expect(out.items).toHaveLength(1);
+      expect(out.items[0]!.lines).toHaveLength(3);
       expect(out.items[0]!.text.length).toBeGreaterThan(0);
     });
   });
