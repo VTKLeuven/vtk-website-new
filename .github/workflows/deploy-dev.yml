@@ -15,6 +15,9 @@ concurrency:
   group: deploy-dev-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
+permissions:
+  contents: read
+
 # Testwaarden voor de CI-checks
 env:
   DATABASE_URL: postgresql://vtk:vtk@127.0.0.1:5432/vtk_test?schema=public
@@ -22,6 +25,7 @@ env:
   BETTER_AUTH_URL: http://localhost:3000
   TICKETING_TOKEN_SECRET: 7gK3wQ9cT2mV8xN4pR6yH1dF5sL0aJ7uB9eC3zX6qWk
   TICKETING_MAINTENANCE_SECRET: 5nD8vL2qH7xM4cR9wT1sF6jK3pY0uA5eB8gN2zQ7mVc
+  NEXT_TELEMETRY_DISABLED: '1'
 
 jobs:
   checks:
@@ -44,10 +48,10 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -70,15 +74,35 @@ jobs:
           npm run test --workspace=@vtk/web
           npm run test --workspace=@vtk/logistiek
 
+      # tsc is single-threaded en de runner heeft vier kernen, dus de drie apps
+      # en eslint draaien naast elkaar: dat halveert deze stap. De typegen van
+      # een app moet wel vóór haar eigen tsc blijven, vandaar de subshells.
       - name: Validate types and lint
         run: |
-          npm exec --workspace=@vtk/web -- next typegen
-          npm exec --workspace=@vtk/logistiek -- next typegen
-          npm exec --workspace=@vtk/fakbar -- next typegen
-          npx tsc --noEmit -p apps/web/tsconfig.build.json
-          npx tsc --noEmit -p apps/logistiek/tsconfig.build.json
-          npx tsc --noEmit -p apps/fakbar/tsconfig.build.json
-          npm run lint --workspace=@vtk/web
+          jobs=()
+          for app in web logistiek fakbar; do
+            (
+              npm exec --workspace=@vtk/$app -- next typegen
+              npx tsc --noEmit -p apps/$app/tsconfig.build.json
+            ) > "/tmp/check-types-$app.log" 2>&1 &
+            jobs+=("$!:types-$app")
+          done
+          npm run lint --workspace=@vtk/web > /tmp/check-lint.log 2>&1 &
+          jobs+=("$!:lint")
+
+          failed=()
+          for job in "${jobs[@]}"; do
+            wait "${job%%:*}" || failed+=("${job##*:}")
+          done
+          for log in /tmp/check-*.log; do
+            echo "::group::$log"
+            cat "$log"
+            echo "::endgroup::"
+          done
+          if [ ${#failed[@]} -gt 0 ]; then
+            echo "::error::Mislukt: ${failed[*]}"
+            exit 1
+          fi
 
       - name: Apply migrations and run database integration tests
         run: |
@@ -105,10 +129,10 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: 20
           cache: npm
@@ -123,6 +147,21 @@ jobs:
 
       - name: Apply migrations
         run: npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
+
+      # De Turbopack-buildcache van de vorige run: die hercompileert enkel wat
+      # echt veranderd is. De sleutel bevat de sha zodat elke run haar eigen
+      # cache wegschrijft; restore-keys pakt de meest recente eerdere.
+      - name: Cache Next build cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            apps/web/.next/cache
+            apps/logistiek/.next/cache
+            apps/fakbar/.next/cache
+          key: next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-${{ github.sha }}
+          restore-keys: |
+            next-${{ runner.os }}-${{ hashFiles('package-lock.json') }}-
+            next-${{ runner.os }}-
 
       - name: Build production application
         run: |
@@ -157,8 +196,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      # Enkel nodig om infra/deploy.sh mee te hebben; de runner bouwt niets.
+      - name: Checkout deploy script
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: infra/deploy.sh
+          sparse-checkout-cone-mode: false
 
       - name: Check required secrets for dev
         run: |
@@ -172,40 +215,18 @@ jobs:
           fi
 
       - name: Install SSH key
-        uses: webfactory/ssh-agent@v0.8.0
+        uses: webfactory/ssh-agent@v0.9.1
         with:
           ssh-private-key: ${{ secrets.DEV_SSH_KEY || secrets.SSH_KEY }}
 
+      # De deploylogica staat in infra/deploy.sh en wordt daarheen gepipet, zodat
+      # ze in git leeft in plaats van als quoted string in deze workflow. `auto`
+      # betekent: controleer de NFS-opslag enkel wanneer .env ze gebruikt.
       - name: Deploy through SSH
         env:
           SSH_USER: ${{ secrets.DEV_SSH_USER || secrets.SSH_USER || 'it' }}
           SSH_HOST: ${{ secrets.DEV_SSH_HOST }}
+          GIT_SHA: ${{ github.sha }}
         run: |
-          ssh -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "
-            cd /home/it/vtk-website-new &&
-            git fetch --all &&
-            git reset --hard ${{ github.sha }} &&
-
-            # Trigger de automount en controleer NFS alleen als /mnt/immich in .env geconfigureerd staat.
-            if grep -qE '^IMMICH_MEDIA_LOCATION=.*/mnt/immich' .env 2>/dev/null; then
-              timeout 30 stat /mnt/immich/.immich-storage-ready >/dev/null 2>&1 &&
-              findmnt -rn -M /mnt/immich -t nfs4 >/dev/null
-            fi &&
-
-            # Build while current containers serve traffic
-            docker compose -f infra/docker-compose.yml config --quiet &&
-            docker compose -f infra/docker-compose.yml build &&
-
-            # Migratie van bestaand IPv4-only default network indien van toepassing
-            if docker network inspect infra_default --format '{{.EnableIPv6}}' 2>/dev/null |
-              grep -qx false; then
-              docker compose -f infra/docker-compose.yml down --remove-orphans
-            fi &&
-
-            docker compose -f infra/docker-compose.yml up -d --remove-orphans &&
-
-            # Opruimen na de switch: alle ongebruikte containers, images en buildcache verwijderen.
-            # Bewust zonder --volumes zodat database- en applicatiedata behouden blijft.
-            { docker system prune -a -f || true; } &&
-            { docker builder prune -a -f || true; }
-          "
+          ssh -o StrictHostKeyChecking=no -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            bash -s -- "$GIT_SHA" auto < infra/deploy.sh

@@ -311,19 +311,21 @@ Compose file on the server.
 
 ## 7. Deployment mount guard
 
-The repository's deploy workflows (`.github/workflows/deploy-prod.yml` and
-`.github/workflows/deploy-dev.yml`) trigger the automount and refuse to deploy
-unless `/mnt/immich` is an NFSv4 mount containing the remote marker. Its
-deployment guard is:
+Both deploy workflows (`.github/workflows/deploy-prod.yml` and
+`.github/workflows/deploy-dev.yml`) run the same script on the server,
+`infra/deploy.sh`; that is where the guard lives. It triggers the automount and
+refuses to deploy unless `/mnt/immich` is an NFSv4 mount containing the remote
+marker:
 
 ```bash
 # Refuse deployment if the 12 TB NFS storage is unavailable.
-timeout 30 stat /mnt/immich/.immich-storage-ready >/dev/null 2>&1 &&
-findmnt -rn -M /mnt/immich -t nfs4 >/dev/null &&
-
-docker compose -f infra/docker-compose.yml config --quiet &&
-docker compose -f infra/docker-compose.yml up -d --build --remove-orphans
+timeout 30 stat /mnt/immich/.immich-storage-ready >/dev/null
+findmnt -rn -M /mnt/immich -t nfs4 >/dev/null
 ```
+
+Production always runs the check (the workflow passes `required`). Dev runs it
+only when its own `.env` points `IMMICH_MEDIA_LOCATION` at `/mnt/immich`
+(`auto`), so a dev box with local media is not blocked by it.
 
 Do not remove this guard. Without the marker and filesystem-type checks, Docker
 could start Immich against an empty local `/mnt/immich` directory after an NFS
@@ -504,11 +506,23 @@ docker compose -f infra/docker-compose.yml up -d --force-recreate \
 
 A complete recovery requires both:
 
-- A backup or snapshot of `/vtk/immich` on the 12 TB server.
-- A PostgreSQL backup from `immich-database` on the cloud server.
+- An off-site copy of the original media (`/upload`, `/library`, `/profile`).
+- A PostgreSQL backup from `immich-database`.
 
 The media directory alone is not a complete Immich backup, and RAID is not an
-independent backup. Monitor at minimum:
+independent backup. The off-site backup to Google Drive is automated via:
+
+```bash
+# Automated off-site backup (rclone to Google Drive)
+scripts/immich-backup.sh
+# or:
+make backup-immich
+```
+
+For the complete recovery procedure from Google Drive or local mirrors, see
+[immich-disaster-recovery.md](./immich-disaster-recovery.md).
+
+Monitor at minimum:
 
 ```bash
 # Cloud server

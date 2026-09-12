@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Check CI test status on main for this commit
         env:
@@ -69,8 +69,12 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      # Enkel nodig om infra/deploy.sh mee te hebben; de runner bouwt niets.
+      - name: Checkout deploy script
+        uses: actions/checkout@v5
+        with:
+          sparse-checkout: infra/deploy.sh
+          sparse-checkout-cone-mode: false
 
       - name: Check required secrets for prod
         run: |
@@ -84,41 +88,18 @@ jobs:
           fi
 
       - name: Install SSH key
-        uses: webfactory/ssh-agent@v0.8.0
+        uses: webfactory/ssh-agent@v0.9.1
         with:
           ssh-private-key: ${{ secrets.PROD_SSH_KEY || secrets.SSH_KEY }}
 
+      # Dezelfde deploylogica als dev, uit infra/deploy.sh. `required` betekent:
+      # weiger te deployen wanneer het NFS-volume niet gemonteerd is, zodat we
+      # nooit tegen de lokale fallbackmap draaien.
       - name: Deploy through SSH
         env:
           SSH_USER: ${{ secrets.PROD_SSH_USER || secrets.SSH_USER || 'it' }}
           SSH_HOST: ${{ secrets.PROD_SSH_HOST || secrets.SSH_HOST }}
+          GIT_SHA: ${{ github.sha }}
         run: |
-          ssh -o StrictHostKeyChecking=no "$SSH_USER@$SSH_HOST" "
-            cd /home/it/vtk-website-new &&
-            git fetch --all &&
-            git reset --hard ${{ github.sha }} &&
-
-            # Trigger the automount and refuse to deploy against a local fallback
-            # directory when the 12 TB NFS filesystem is unavailable.
-            timeout 30 stat /mnt/immich/.immich-storage-ready >/dev/null 2>&1 &&
-            findmnt -rn -M /mnt/immich -t nfs4 >/dev/null &&
-
-            # Build while the current containers are still serving traffic.
-            docker compose -f infra/docker-compose.yml config --quiet &&
-            docker compose -f infra/docker-compose.yml build &&
-
-            # One-time migration of the existing IPv4-only default network.
-            # Doing this explicitly avoids Compose reusing a container that
-            # still references the removed network ID. Named volumes survive.
-            if docker network inspect infra_default --format '{{.EnableIPv6}}' 2>/dev/null |
-              grep -qx false; then
-              docker compose -f infra/docker-compose.yml down --remove-orphans
-            fi &&
-
-            docker compose -f infra/docker-compose.yml up -d --remove-orphans &&
-
-            # Opruimen na de switch: alle ongebruikte containers, images en buildcache verwijderen.
-            # Bewust zonder --volumes zodat database- en applicatiedata behouden blijft.
-            { docker system prune -a -f || true; } &&
-            { docker builder prune -a -f || true; }
-          "
+          ssh -o StrictHostKeyChecking=no -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+            bash -s -- "$GIT_SHA" required < infra/deploy.sh
