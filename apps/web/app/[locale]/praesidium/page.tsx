@@ -6,6 +6,7 @@ import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
+import { postAddress } from "@/lib/postAddress";
 import { publicUrl } from "@/lib/storage";
 import { currentWorkingYear, formatWorkingYear, splitYearBar } from "@/lib/workingYear";
 
@@ -170,6 +171,9 @@ export default async function PraesidiumPage({
                     <div className="vtk-wall-label-inner">
                       <h2>{pick(group.nameNl, group.nameEn, locale)}</h2>
                       <p>{memberCount(sorted.length)}</p>
+                      <a className="vtk-wall-email" href={`mailto:${postAddress(group.code)}`}>
+                        {postAddress(group.code)}
+                      </a>
                     </div>
                   </div>
                   <ul className="vtk-wall-faces">
