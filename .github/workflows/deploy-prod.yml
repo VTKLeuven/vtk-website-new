@@ -101,5 +101,14 @@ jobs:
           SSH_HOST: ${{ secrets.PROD_SSH_HOST || secrets.SSH_HOST }}
           GIT_SHA: ${{ github.sha }}
         run: |
-          ssh -o StrictHostKeyChecking=no -o BatchMode=yes "$SSH_USER@$SSH_HOST" \
+          # `ServerAliveInterval`: tijdens het bouwen staat deze sessie minutenlang
+          # stil (de drie builds schrijven naar een logbestand op de server), en
+          # een stille TCP-verbinding wordt onderweg afgeschoten. Dat is precies
+          # hoe run 34767614290 sneuvelde: "client_loop: send disconnect: Broken
+          # pipe", 4,5 minuten na de laatste regel. De client stuurt nu elke 30
+          # seconden een teken van leven en houdt het 20 keer vol, dus een echt
+          # dode verbinding valt na tien minuten alsnog op.
+          ssh -o StrictHostKeyChecking=no -o BatchMode=yes \
+            -o ServerAliveInterval=30 -o ServerAliveCountMax=20 \
+            "$SSH_USER@$SSH_HOST" \
             bash -s -- "$GIT_SHA" required < infra/deploy.sh

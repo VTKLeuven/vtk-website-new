@@ -63,6 +63,32 @@ for svc in "${BUILD_SERVICES[@]}"; do
   build_jobs+=("$!:$svc")
 done
 
+# Een teken van leven zolang er gebouwd wordt.
+#
+# Niet voor de sier: de builds schrijven naar een logbestand, dus tussen de
+# regel hierboven en het eerste "build ... ok" komt er minutenlang niets over de
+# ssh-sessie. Een stille verbinding wordt onderweg afgeschoten, en dan sterft de
+# deploy met "client_loop: send disconnect: Broken pipe" terwijl er niets mis is
+# (dev-run 34767614290). De workflow stuurt daarom keepalives en dit schrijft
+# elke halve minuut een regel; samen houdt dat de verbinding warm en zie je in
+# het log dat er nog iets gebeurt in plaats van een gat van vijf minuten.
+build_heartbeat() {
+  while :; do
+    sleep 30
+    printf 'nog aan het bouwen (%ss)\n' "$SECONDS"
+  done
+}
+build_heartbeat &
+heartbeat_pid=$!
+stop_heartbeat() {
+  kill "$heartbeat_pid" 2>/dev/null || true
+  wait "$heartbeat_pid" 2>/dev/null || true
+}
+# Ook wanneer een build faalt en `set -e` ons hier weghaalt: een achtergrondlus
+# die blijft draaien, houdt de ssh-sessie open en de workflow hangt dan tot haar
+# time-out in plaats van te falen.
+trap stop_heartbeat EXIT
+
 build_failed=()
 for job in "${build_jobs[@]}"; do
   if wait "${job%%:*}"; then
@@ -72,6 +98,9 @@ for job in "${build_jobs[@]}"; do
     build_failed+=("${job##*:}")
   fi
 done
+
+stop_heartbeat
+trap - EXIT
 
 for svc in "${BUILD_SERVICES[@]}"; do
   log "buildlog $svc"
