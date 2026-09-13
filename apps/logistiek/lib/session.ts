@@ -128,6 +128,28 @@ export function canManage(session: SessionPayload): boolean {
   return hasPermission(session, 'logistiek.manage');
 }
 
+/**
+ * Mag deze persoon zien wát een rit is, en niet enkel dát het voertuig bezet is?
+ *
+ * Het praesidium, plus Logistiek en IT via `canManage` (waar de
+ * superadmin-bypass in zit). Een post die zijn weekend plant, moet kunnen zien
+ * welke post de kar al vroeg en waarvoor; dat nu bij Logistiek moeten gaan
+ * vragen is precies de omweg die dit overzicht moest wegnemen.
+ *
+ * **Werkgroepen niet.** Niet omdat ze minder vertrouwd zijn, maar omdat dit de
+ * grens is die de kring elders ook trekt: een werkgroep is geen post (zie
+ * `AuthGroupType`), en de werking van de posten staat niet standaard open voor
+ * elk lid van elke werkgroep. Wie het toch nodig heeft, heeft een post of
+ * `logistiek.manage`.
+ *
+ * Wát ze dan zien, verschilt nog: `transportWeekForPraesidium` laat de
+ * telefoonnummers, het ophaaladres en de nota's weg, `transportRange` (het
+ * team) niet.
+ */
+export function canSeeTripDetails(session: SessionPayload): boolean {
+  return canManage(session) || session.groups.some((group) => group.type === 'PRAESIDIUM');
+}
+
 /** Beheer (inventaris, aanvragen, vervoer) vraagt logistiek.manage. */
 export async function requireManage(): Promise<SessionPayload> {
   const session = await requireSession();

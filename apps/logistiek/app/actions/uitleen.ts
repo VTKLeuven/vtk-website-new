@@ -1245,6 +1245,9 @@ export async function addTripHelperAction(
 
   revalidateMember();
   revalidatePath('/ritten');
+  // Ook het bezettingsoverzicht: daar werkt een post de bijrijders van zijn
+  // eigen rit bij, en `revalidatePath('/vervoer')` raakt die subroute niet.
+  revalidatePath('/vervoer/bezetting');
   revalidatePath('/beheer/vervoer');
   revalidatePath('/beheer/vervoer/week');
   return { ok: true, message: 'Bijrijder toegevoegd.' };
@@ -1266,6 +1269,7 @@ export async function removeTripHelperAction(helperId: string): Promise<ActionRe
 
   revalidateMember();
   revalidatePath('/ritten');
+  revalidatePath('/vervoer/bezetting');
   revalidatePath('/beheer/vervoer');
   revalidatePath('/beheer/vervoer/week');
   return { ok: true, message: 'Bijrijder weggehaald.' };

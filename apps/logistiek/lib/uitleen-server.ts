@@ -1215,6 +1215,62 @@ export async function transportWeekPublic(from: Date, to: Date) {
 }
 
 /**
+ * Het weekvenster voor een praesidiumlid: wat een post over een rit hoort te
+ * kunnen zien zonder bij Logistiek te moeten gaan vragen.
+ *
+ * Bovenop de ledenversie hieronder: welke post de rit aanvroeg en wie ze
+ * indiende, waarvoor ze dient, wat er mee moet en waar ze naartoe gaat. Dat is
+ * werking van de kring, en een post die zijn eigen weekend plant, heeft er meer
+ * aan dan aan een blok met enkel een uur.
+ *
+ * Wat hier bewust **niet** in zit, en wel in `transportRange` (het team):
+ * telefoonnummers, het ophaaladres, de nota van het lid en de nota van het
+ * team. Een nummer en een kotadres zijn van een persoon en niet van de kring,
+ * en de nota's zijn het werkblad van Logistiek. Opnieuw een eigen `select` en
+ * geen filter over de beheerquery: een projectie achteraf laat vroeg of laat
+ * een veld door wanneer iemand daar een relatie toevoegt.
+ *
+ * De statussen zijn die van de planning (`PLANNING_STATUSES`) en niet "alles
+ * behalve geannuleerd": een afgewezen rit gaat niet door en hoort dus niet als
+ * bezetting op deze kalender.
+ */
+export async function transportWeekForPraesidium(from: Date, to: Date) {
+  return prisma.uitleenTransportBooking.findMany({
+    where: transportWindowWhere(from, to, PLANNING_STATUSES),
+    select: {
+      id: true,
+      vehicleId: true,
+      tripLeg: true,
+      startAt: true,
+      endAt: true,
+      status: true,
+      purpose: true,
+      cargoNote: true,
+      eventName: true,
+      destination: true,
+      requesterType: true,
+      requesterName: true,
+      // Wie de rit aanvroeg en namens welke post: daarmee weet de pagina of dit
+      // een rit van de kijker zelf is, en dus of hij de bijrijders mag bijwerken
+      // (`ownsTransportBooking`). Het nummer van een bijrijder reist enkel mee
+      // bij zo'n eigen rit; zie de pagina.
+      userId: true,
+      groupId: true,
+      helpersNote: true,
+      driverId: true,
+      driver: { select: { name: true } },
+      user: { select: { name: true } },
+      group: { select: { nameNl: true } },
+      helpers: {
+        orderBy: { createdAt: 'asc' as const },
+        select: { id: true, name: true, phone: true },
+      },
+    },
+    orderBy: { startAt: 'asc' },
+  });
+}
+
+/**
  * Het weekvenster voor een ingelogd lid (T8): dezelfde planning als het team
  * ziet, met het evenement en de chauffeur erbij, maar zonder adressen,
  * telefoonnummers en bedragen.

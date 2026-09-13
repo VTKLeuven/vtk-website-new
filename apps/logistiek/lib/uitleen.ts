@@ -558,6 +558,29 @@ export function requesterLabel(request: {
 }
 
 /**
+ * Is deze rit van jou of van je post of werkgroep?
+ *
+ * Dezelfde regel als `vanBookingForMember` in lib/uitleen-server.ts, maar dan om
+ * er een scherm mee te tekenen in plaats van er één rit mee op te halen: het
+ * weekoverzicht moet ze per rij kennen, en zeventig keer een query per rij
+ * stellen om te weten of er een knop bij mag, is dat niet.
+ *
+ * De schrijfkant staat er los van: `canEditHelpers` in app/actions/uitleen.ts
+ * toetst dit nog eens op de server, want een knop verbergen is geen poort.
+ */
+export function ownsTransportBooking(
+  booking: { userId: string; requesterType: UitleenRequesterType; groupId: string | null },
+  viewer: { userId: string; groupIds: string[] }
+): boolean {
+  if (booking.userId === viewer.userId) return true;
+  return (
+    booking.requesterType === 'INTERN' &&
+    booking.groupId !== null &&
+    viewer.groupIds.includes(booking.groupId)
+  );
+}
+
+/**
  * Rekent de uitleendienst deze aanvrager iets aan?
  *
  * Enkel externen betalen. Een post of een werkgroep is de kring zelf: die
