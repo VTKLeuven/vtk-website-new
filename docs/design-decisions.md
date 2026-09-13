@@ -2820,32 +2820,39 @@ velden zelf, want de `className` van de aanroeper draagt vaak al `w-full`, en
 welke van twee breedtes dan wint hangt af van de volgorde in de stylesheet. Dat
 gebeurde ook echt: de urenlijst werd 256px in plaats van 104px.
 
-### Verwijderen mag, maar enkel voor een rit die het team zelf tekende
+### Verwijderen mag bij elke rit, zolang er geen betaling aan hangt
 
-De planning zei lang: een rit gaat niet weg, ze wordt afgewezen of geannuleerd.
-Dat klopt voor een rit die uit een aanvraag komt en niet voor een rit die het
-team zelf intekent. Sinds de planning een agenda is, tekent de
-transportverantwoordelijke ritten zoals je in een agenda afspraken zet, en dan
-hoort een misklik van 03:00 niet als "geannuleerd" in de historiek te blijven
-staan.
+De planning zei eerst: een rit gaat niet weg, ze wordt afgewezen of geannuleerd.
+Daarna mocht een rit die het team zelf intekende wél weg, want sinds de planning
+een agenda is, hoort een misklik van 03:00 niet als "geannuleerd" in de
+historiek te blijven staan. Sinds september 2026 mag elke rit weg: met enkel de
+eigen ritten van het team bleven gereden ritten en ritten uit een aanvraag die
+iemand anders inplande of goedkeurde op de planning staan, en geen beheerder kon
+er iets mee.
 
-- **De grens is `UitleenTransportBooking.plannedByTeam`**, gezet door de twee
-  plekken waar het team zelf een rit aanmaakt (intekenen in de planning, en
-  "Levering nodig" bij een materiaalaanvraag). Een eigen kolom en geen afleiding
-  uit de historiek: zo'n rit is te herkennen aan de auditregel "ingepland door
-  Logistiek", en een verwijderknop die op een stringvergelijking staat, is één
-  hernoemde melding van stuk.
-- **Een rit uit een aanvraag blijft afwijzen of annuleren.** Daar hangt een lid
-  aan dat een reden hoort te zien in zijn overzicht; een rit die zonder woord
-  verdwijnt, levert een telefoontje op in plaats van een beslissing.
+- **De enige weigering is een betaling.** Dat is geen beleid maar de databank:
+  `UitleenPayment.transportBooking` staat op `onDelete: Restrict`, en een
+  betaling wissen om een rit kwijt te raken maakt de boekhouding stuk. Zonder de
+  controle vooraf faalt het verwijderen met een Prisma-fout in plaats van met een
+  zin die zegt wat er in de weg staat. Enkel externen betalen, dus een interne
+  rit is altijd te verwijderen.
+- **Bij een rit uit een aanvraag waarschuwt de bevestiging, in plaats van dat de
+  knop ontbreekt.** Het oude bezwaar blijft waar: wie een rit zonder woord ziet
+  verdwijnen, belt in plaats van een beslissing te lezen, en verwijderen stuurt
+  geen bericht. Daarom noemt de dialoog bij een rit die nog moet plaatsvinden de
+  aanvrager en de toegewezen chauffeur bij naam, en wijst ze naar afwijzen
+  wanneer de aanvrager een reden moet zien (`transportDeleteDescription` in
+  `lib/uitleen.ts`). Bij een rit die voorbij, gereden, afgewezen of geannuleerd
+  is, valt die waarschuwing weg: daar rekent niemand nog op.
+- **`plannedByTeam` blijft bestaan**, gezet door de twee plekken waar het team
+  zelf een rit aanmaakt (intekenen in de planning, en "Levering nodig" bij een
+  materiaalaanvraag). Het veld beslist niet meer of de knop er staat, enkel of de
+  bevestiging voor een aanvrager moet waarschuwen. Een eigen kolom en geen
+  afleiding uit de historiek: een waarschuwing die op een stringvergelijking met
+  "ingepland door Logistiek" staat, is één hernoemde melding van stuk.
 - **De knop staat er niet wanneer het niet mag.** Een knop die altijd weigert,
   leert mensen op knoppen te klikken die niets doen. De actie hercontroleert het
   hoe dan ook.
-- **Twee andere weigeringen**: een gereden rit (COMPLETED) is geschiedenis, en
-  een rit met een betaling eraan kan niet weg. Dat tweede is geen beleid maar de
-  databank: `UitleenPayment.transportBooking` staat op `onDelete: Restrict`, dus
-  zonder die controle vooraf faalt het verwijderen met een Prisma-fout in plaats
-  van met een zin die zegt wat er in de weg staat.
 - **Heen en terug gaan samen weg.** Ze zijn samen ingetekend, en één helft
   verwijderen laat een rit staan die niemand meer gaat rijden. Mag één helft niet
   weg, dan geen enkele. De bevestiging zegt hoeveel ritten er verdwijnen.
@@ -3545,6 +3552,17 @@ naam en een optioneel nummer.
   post. Wie de rit mag zien (`vanBookingForMember`: de aanvrager of een collega
   van dezelfde post of werkgroep), mag de bijrijders wijzigen. Het team ook,
   want de chauffeur belt hén wanneer er onderweg iets verandert.
+- **Bijrijders regelen is een eigen recht (`logistiek.helpers`), los van het
+  beheer.** Soms regelt één persoon de bijrijders voor alle posten, en die hoort
+  daarvoor niet de inventaris, de aanvragen en de beslisknoppen te krijgen. Wie
+  het recht heeft, klikt op de transportplanning (`/vervoer/bezetting`) een rit
+  aan en past in het ritkaartje de bijrijders aan, bij elke rit en niet enkel
+  bij die van de eigen post. Het kaartje is dat van een post
+  (`transportWeekForPraesidium`, via `canSeeTripDetails`): geen ophaaladres,
+  geen nummer van de aanvrager en geen nota's van het team, want het recht gaat
+  over wie er meerijdt en niet over de rit zelf. Het nummer van de bijrijders
+  blijft wel staan, ook bij de rit van een andere post: wie ze regelt, belt ze.
+  De code levert enkel de permissie; de rol maak je in `/admin/roles`.
 - **Het nummer mag leeg.** Soms weet je wel wie meegaat en nog niet zijn gsm.
   Half ingevuld is beter dan niets ingevuld: de chauffeur weet dan tenminste op
   wie hij staat te wachten.

@@ -53,13 +53,14 @@ import type {
  * misklik van je verwijderd. Afronden hoort bij `/beheer/vervoer`, waar je er
  * bewust naartoe gaat.
  *
- * **Verwijderen staat er wél, maar niet bij elke rit** (R1). Enkel een rit die
- * het team zelf intekende, mag echt weg: die per ongeluk getekende rit van 03:00
- * hoort niet als "geannuleerd" in de historiek te blijven staan. Komt de rit uit
- * een aanvraag, dan blijft het afwijzen of annuleren, want daar hangt een lid aan
- * dat een reden hoort te zien in plaats van een lege plek. De knop staat er dan
- * niet: een knop die altijd weigert, leert mensen op knoppen te klikken die niets
- * doen. Zie `canDeleteTransport` en docs/design-decisions.md.
+ * **Verwijderen staat er wél, bij elke rit zonder betaling** (R1). Tot september
+ * 2026 enkel bij een rit die het team zelf intekende, maar dan bleven gereden
+ * ritten en ritten uit een aanvraag van iemand anders op de planning staan
+ * zonder dat een beheerder ze kwijt kon. Wat er bij een rit op het spel staat
+ * (een aanvrager die geen bericht krijgt, een chauffeur die ze kwijt is), zegt
+ * de bevestiging. Hangt er een betaling aan, dan staat de knop er niet: een knop
+ * die altijd weigert, leert mensen op knoppen te klikken die niets doen. Zie
+ * `canDeleteTransport`, `transportDeleteDescription` en docs/design-decisions.md.
  */
 export type PlannerTrip = {
   id: string;
@@ -94,10 +95,12 @@ export type PlannerTrip = {
   needsDriver: boolean;
   needsVanDriver: boolean;
   paid: boolean;
-  /** Mag deze rit echt weg? Enkel een rit die het team zelf tekende (R1). */
+  /** Mag deze rit echt weg? Elke rit zonder betaling (R1). */
   canDelete: boolean;
   /** Hoeveel ritten er dan weggaan: heen en terug verdwijnen samen. */
   deleteCount: number;
+  /** Wat de bevestiging zegt: wat er weggaat en wie het merkt. */
+  deleteDescription: string;
   /** De ritten van dezelfde aanvraag, voor het goedkeurformulier. */
   legs: DecisionLeg[];
   sameDayBookings: string[];
@@ -596,14 +599,15 @@ export function TransportPlanner({
                 </div>
               </section>
 
-              {/* Verwijderen, en enkel bij een rit die het team zelf tekende
-                  (R1). Onderaan en niet bij de statusknoppen bovenaan: het is de
-                  enige onomkeerbare actie op dit paneel, en je klikt hier de
-                  hele dag ritten aan om te schuiven.
+              {/* Verwijderen, bij elke rit zonder betaling (R1). Onderaan en niet
+                  bij de statusknoppen bovenaan: het is de enige onomkeerbare
+                  actie op dit paneel, en je klikt hier de hele dag ritten aan om
+                  te schuiven.
 
-                  De beschrijving zegt wát er weg is: bij een heen-en-terugrit
-                  gaan beide helften mee, en de historiek van de rit verdwijnt
-                  (`UitleenAuditLog` cascadeert). */}
+                  De beschrijving zegt wát er weg is en wie het merkt: bij een
+                  heen-en-terugrit gaan beide helften mee, de historiek van de rit
+                  verdwijnt (`UitleenAuditLog` cascadeert), en bij een rit uit een
+                  aanvraag krijgt de aanvrager geen bericht. */}
               {trip.canDelete ? (
                 <section className="border-t border-vtk-navy/10 pt-4">
                   <ConfirmActionButton
@@ -616,12 +620,7 @@ export function TransportPlanner({
                     dialogTitle={
                       trip.deleteCount > 1 ? 'Deze ritten verwijderen?' : 'Deze rit verwijderen?'
                     }
-                    dialogDescription={
-                      (trip.deleteCount > 1
-                        ? `Heen- en terugrit gaan samen weg (${trip.deleteCount} ritten). `
-                        : '') +
-                      'De rit en haar historiek verdwijnen helemaal; het voertuig komt op dat moment weer vrij. Dit kan niet ongedaan gemaakt worden.'
-                    }
+                    dialogDescription={trip.deleteDescription}
                     successMessage="Rit verwijderd."
                     action={() => deleteTransportAction(trip.id)}
                   />

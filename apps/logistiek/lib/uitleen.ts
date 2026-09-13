@@ -600,25 +600,86 @@ export function chargesRequester(requesterType: UitleenRequesterType): boolean {
 /**
  * Mag deze rit verwijderd worden (R1)?
  *
- * Enkel een rit die Logistiek zelf intekende. Een rit die uit een aanvraag komt,
- * blijft afwijzen of annuleren: daar hangt een lid aan dat een reden hoort te
- * zien in plaats van een lege plek in zijn overzicht.
+ * Elke rit, zolang er geen betaling aan hangt: ook een gereden rit, en ook een
+ * rit uit een aanvraag die iemand anders inplande of goedkeurde. Tot september
+ * 2026 mocht enkel een rit weg die het team zelf intekende, maar dan bleven
+ * zulke ritten op de planning staan zonder dat een beheerder er iets aan kon
+ * doen. Wat er bij een rit op het spel staat, zegt nu de bevestiging
+ * (`transportDeleteDescription`) in plaats van een ontbrekende knop.
  *
- * Dezelfde drie regels als `deleteTransportAction` in `app/actions/beheer.ts`,
- * maar dan voor de weergave: een knop die altijd weigert, leert mensen op
- * knoppen te klikken die niets doen. De actie hercontroleert het toch; dit is
- * enkel om de knop weg te laten. Daarom staat de regel hier en niet daar: een
+ * Dezelfde regel als `deleteTransportAction` in `app/actions/beheer.ts`, maar dan
+ * voor de weergave: een knop die altijd weigert, leert mensen op knoppen te
+ * klikken die niets doen. De actie hercontroleert het toch; dit is enkel om de
+ * knop weg te laten. Daarom staat de regel hier en niet daar: een
  * `'use server'`-module mag enkel async functies exporteren.
  *
  * De betalingscheck is geen beleidskeuze maar een databankregel:
  * `UitleenPayment.transportBooking` staat op `onDelete: Restrict`.
  */
-export function canDeleteTransport(booking: {
-  plannedByTeam: boolean;
-  status: UitleenTransportBookingStatus;
-  payments: Array<unknown>;
-}): boolean {
-  return booking.plannedByTeam && booking.status !== 'COMPLETED' && booking.payments.length === 0;
+export function canDeleteTransport(booking: { payments: Array<unknown> }): boolean {
+  return booking.payments.length === 0;
+}
+
+/**
+ * Wat de bevestiging zegt voor een rit verdwijnt (R1).
+ *
+ * Bij een rit die het team zelf tekende, volstaat "de rit en haar historiek
+ * verdwijnen". Bij een rit uit een aanvraag die nog moet plaatsvinden, hangt er
+ * iemand aan die geen bericht krijgt, en soms een chauffeur die de rit zomaar
+ * kwijt is. Dat hoort de beheerder te lezen vóór de klik, samen met de uitweg die
+ * de aanvrager wél een reden laat zien: afwijzen.
+ *
+ * Een rit die voorbij, gereden, afgewezen of geannuleerd is, krijgt die
+ * waarschuwingen niet: daar rekent niemand nog op.
+ *
+ * `legs` is de hele tripgroep, want heen en terug gaan samen weg.
+ */
+export function transportDeleteDescription(
+  legs: Array<{
+    plannedByTeam: boolean;
+    status: UitleenTransportBookingStatus;
+    endAt: Date;
+    user: { name: string };
+    driver: { name: string } | null;
+  }>,
+  now: Date = new Date()
+): string {
+  const upcoming = legs.filter(
+    (leg) => (leg.status === 'REQUESTED' || leg.status === 'APPROVED') && leg.endAt >= now
+  );
+  const sentences: string[] = [];
+
+  if (legs.length > 1) {
+    sentences.push(`Heen- en terugrit gaan samen weg (${legs.length} ritten).`);
+  }
+
+  const request = upcoming.find((leg) => !leg.plannedByTeam);
+  if (request) {
+    sentences.push(
+      `De rit komt uit een aanvraag van ${request.user.name}, die hier geen bericht over krijgt.`,
+      // Afwijzen kan enkel bij een rit die nog op "aangevraagd" staat.
+      request.status === 'APPROVED'
+        ? 'Moet de aanvrager een reden zien, draai dan de goedkeuring terug en wijs de aanvraag af in plaats van ze te verwijderen.'
+        : 'Moet de aanvrager een reden zien, wijs de aanvraag dan af in plaats van ze te verwijderen.'
+    );
+  }
+
+  // "Mijn ritten" toont enkel goedgekeurde ritten; een chauffeur bij een
+  // aanvraag ziet er nog niets van.
+  const driver = upcoming.find((leg) => leg.status === 'APPROVED' && leg.driver)?.driver;
+  if (driver) {
+    sentences.push(
+      `Chauffeur ${driver.name} krijgt geen bericht en ziet de rit niet meer bij "Mijn ritten".`
+    );
+  }
+
+  sentences.push(
+    upcoming.length > 0
+      ? 'De rit en haar historiek verdwijnen helemaal; het voertuig komt op dat moment weer vrij.'
+      : 'De rit en haar historiek verdwijnen helemaal.',
+    'Dit kan niet ongedaan gemaakt worden.'
+  );
+  return sentences.join(' ');
 }
 
 /**

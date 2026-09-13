@@ -139,15 +139,23 @@ export function canManage(session: SessionPayload): boolean {
  * **Werkgroepen niet.** Niet omdat ze minder vertrouwd zijn, maar omdat dit de
  * grens is die de kring elders ook trekt: een werkgroep is geen post (zie
  * `AuthGroupType`), en de werking van de posten staat niet standaard open voor
- * elk lid van elke werkgroep. Wie het toch nodig heeft, heeft een post of
- * `logistiek.manage`.
+ * elk lid van elke werkgroep. Wie het toch nodig heeft, heeft een post,
+ * `logistiek.manage` of `logistiek.helpers`.
+ *
+ * **`logistiek.helpers` hoort erbij**: wie de bijrijders van elke rit aanpast
+ * (`canEditAllHelpers`), moet kunnen zien over welke rit het gaat. Die persoon
+ * krijgt dezelfde laag als een post en niet die van het team.
  *
  * Wát ze dan zien, verschilt nog: `transportWeekForPraesidium` laat de
  * telefoonnummers, het ophaaladres en de nota's weg, `transportRange` (het
  * team) niet.
  */
 export function canSeeTripDetails(session: SessionPayload): boolean {
-  return canManage(session) || session.groups.some((group) => group.type === 'PRAESIDIUM');
+  return (
+    canManage(session) ||
+    hasPermission(session, 'logistiek.helpers') ||
+    session.groups.some((group) => group.type === 'PRAESIDIUM')
+  );
 }
 
 /** Beheer (inventaris, aanvragen, vervoer) vraagt logistiek.manage. */
@@ -157,4 +165,17 @@ export async function requireManage(): Promise<SessionPayload> {
     throw new Error('FORBIDDEN');
   }
   return session;
+}
+
+/**
+ * Mag deze persoon de bijrijders van élke rit aanpassen?
+ *
+ * Het team kan het via `logistiek.manage`. `logistiek.helpers` is hetzelfde
+ * recht zonder de rest van het beheer: voor wie de bijrijders over alle posten
+ * heen regelt en daarvoor de inventaris, de aanvragen en de beslisknoppen niet
+ * nodig heeft. Dat gebeurt in het ritkaartje op de transportplanning
+ * (/vervoer/bezetting), niet in /beheer. Zie docs/design-decisions.md.
+ */
+export function canEditAllHelpers(session: SessionPayload): boolean {
+  return canManage(session) || hasPermission(session, 'logistiek.helpers');
 }

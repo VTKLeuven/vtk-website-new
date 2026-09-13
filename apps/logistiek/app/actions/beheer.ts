@@ -2110,23 +2110,24 @@ export async function rejectTransportAction(_prev: SaveState, formData: FormData
 }
 
 /**
- * Een rit die het team zelf intekende, echt verwijderen (R1).
+ * Een rit echt verwijderen (R1).
  *
- * **Enkel die.** Een rit die uit een aanvraag komt, blijft afwijzen of
- * annuleren: daar hangt een lid aan dat een reden hoort te zien in zijn
- * overzicht in plaats van een lege plek. Een rit die de transportverantwoordelijke
- * zelf tekende, is een tekening en geen afspraak met iemand; die per ongeluk
- * getekende rit van 03:00 hoort niet als "geannuleerd" in de historiek te blijven
- * staan. `plannedByTeam` houdt de twee uit elkaar; zie schema.prisma.
+ * **Elke rit**, ook een gereden rit of een rit uit een aanvraag die iemand
+ * anders inplande of goedkeurde. Tot september 2026 mocht enkel een rit weg die
+ * het team zelf intekende, met als gedachte dat een lid een reden hoort te zien
+ * in plaats van een lege plek. In de praktijk bleven zo ritten op de planning
+ * staan die geen beheerder kwijt kon. Afwijzen blijft de weg wanneer de
+ * aanvrager moet horen waarom; bij zo'n rit zegt de bevestigingsdialoog dat
+ * (`transportDeleteDescription`), want verwijderen stuurt geen bericht.
  *
  * Wat er mee verdwijnt: de historiek (`UitleenAuditLog`) en de bijrijders staan
  * allebei op `onDelete: Cascade`. Dat is de reden dat de bevestigingsdialoog het
  * hardop zegt.
  *
- * De betalingscheck is géén beleidskeuze maar een databankregel:
- * `UitleenPayment.transportBooking` staat op `onDelete: Restrict`, dus zonder
- * deze controle faalt het verwijderen met een Prisma-fout in plaats van met een
- * zin die zegt wat er in de weg staat.
+ * De enige weigering is een betaling, en die is géén beleidskeuze maar een
+ * databankregel: `UitleenPayment.transportBooking` staat op `onDelete: Restrict`,
+ * dus zonder deze controle faalt het verwijderen met een Prisma-fout in plaats
+ * van met een zin die zegt wat er in de weg staat.
  */
 export async function deleteTransportAction(bookingId: string): Promise<ActionResult> {
   await requireManage();
@@ -2144,22 +2145,10 @@ export async function deleteTransportAction(bookingId: string): Promise<ActionRe
     where: booking.tripGroupId ? { tripGroupId: booking.tripGroupId } : { id: booking.id },
     select: {
       id: true,
-      status: true,
-      plannedByTeam: true,
       _count: { select: { payments: true } },
     },
   });
 
-  if (legs.some((leg) => !leg.plannedByTeam)) {
-    return {
-      ok: false,
-      error:
-        'Deze rit komt van een aanvraag en kan niet verwijderd worden. Wijs ze af, of laat de aanvrager ze annuleren.',
-    };
-  }
-  if (legs.some((leg) => leg.status === 'COMPLETED')) {
-    return { ok: false, error: 'Deze rit is gereden; ze blijft in de historiek staan.' };
-  }
   if (legs.some((leg) => leg._count.payments > 0)) {
     return {
       ok: false,

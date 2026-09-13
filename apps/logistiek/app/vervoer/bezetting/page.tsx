@@ -5,7 +5,7 @@ import { PageShell } from '@/components/page-shell';
 import { PublicWeek } from './public-week';
 import type { TripBlock } from '@/components/transport-calendar/types';
 import { getLocale } from '@/lib/i18n';
-import { canManage, canSeeTripDetails, getSession } from '@/lib/session';
+import { canEditAllHelpers, canManage, canSeeTripDetails, getSession } from '@/lib/session';
 import {
   formatBrusselsDay,
   formatDateRange,
@@ -47,6 +47,10 @@ import type { BezettingTrip } from './trip-card';
  *   te voorschijn wat die persoon op /beheer/vervoer niet al zag; het scheelt hem
  *   enkel de omweg langs dat scherm. Knoppen staan er niet: dit blijft een
  *   overzicht om naar te kijken, en beslissen gebeurt op één plek.
+ * - **Wie de bijrijders regelt** (`logistiek.helpers`) krijgt de leeskaart van
+ *   een post en mag bij elke rit de bijrijders aanpassen, met hun nummer erbij.
+ *   Niet de laag van het team: dat recht gaat over wie er meerijdt, niet over
+ *   adressen of nota's.
  *
  * Drie gezichten dus, maar nog altijd niet één query met een vlag: elke laag
  * haalt zijn eigen velden op, zodat een vergeten `if` geen namen aan de
@@ -102,12 +106,14 @@ export default async function VervoerBezettingPage({
    * Mogen de bijrijders van deze rit nog bijgewerkt worden, en door deze
    * persoon? (V2)
    *
-   * Het team altijd; een lid enkel bij een rit van hemzelf of van zijn post of
-   * werkgroep. Dat is precies de reden dat dit bestaat: wie meerijdt is vaak pas
-   * de dag voordien bekend, en dan staat de aanvrager niet naast je. Na het
-   * rijden of het afwijzen niet meer: dan is het geschiedenis, en de server
-   * weigert het ook (`addTripHelperAction`).
+   * Het team en wie `logistiek.helpers` heeft altijd (`canEditAllHelpers`); een
+   * lid enkel bij een eigen rit of een rit van de eigen post of werkgroep. Dat
+   * is precies de reden dat dit bestaat: wie meerijdt is vaak pas de dag
+   * voordien bekend, en dan staat de aanvrager niet naast je. Na het rijden of
+   * het afwijzen niet meer: dan is het geschiedenis, en de server weigert het
+   * ook (`addTripHelperAction`).
    */
+  const allHelpers = session ? canEditAllHelpers(session) : false;
   const viewer = session
     ? { userId: session.user.id, groupIds: session.groups.map((group) => group.id) }
     : null;
@@ -118,7 +124,7 @@ export default async function VervoerBezettingPage({
     groupId: string | null;
   }) =>
     (booking.status === 'REQUESTED' || booking.status === 'APPROVED') &&
-    (team || (viewer !== null && ownsTransportBooking(booking, viewer)));
+    (allHelpers || (viewer !== null && ownsTransportBooking(booking, viewer)));
 
   /** Dag plus tijdvenster, hier al tekst: dat formatteren hoort in Belgische tijd. */
   const whenLabel = (startAt: Date, endAt: Date) =>
@@ -177,10 +183,12 @@ export default async function VervoerBezettingPage({
       destination: booking.destination,
       // Het nummer van een bijrijder hoort bij de post die de rit aanvroeg en
       // niet bij de hele kring: bij de rit van iemand anders blijft de naam
-      // staan en valt het nummer weg.
-      helpers: own
-        ? booking.helpers
-        : booking.helpers.map((helper) => ({ ...helper, phone: null })),
+      // staan en valt het nummer weg. Wie de bijrijders van elke rit regelt
+      // (`logistiek.helpers`), houdt het nummer: die belt ze.
+      helpers:
+        own || allHelpers
+          ? booking.helpers
+          : booking.helpers.map((helper) => ({ ...helper, phone: null })),
       helpersNote: booking.helpersNote,
       canEditHelpers: helpersEditable(booking),
       // Van het team: een nummer en een kotadres zijn van een persoon, de nota's

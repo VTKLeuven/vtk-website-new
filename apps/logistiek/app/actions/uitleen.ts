@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
-import { canManage, externalRequestsBlocked, requireSession } from '@/lib/session';
+import { canEditAllHelpers, externalRequestsBlocked, requireSession } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
 import { isEmailish, isOnQuarterHour, MAX_HELPERS, parseDateOnly, todayDateOnly } from '@/lib/uitleen';
 import {
@@ -1190,15 +1190,16 @@ export async function removeAvailabilityAction(id: string): Promise<ActionResult
  * `vanBookingForMember` bepaalt al wie de rit mag zíén; dit is dezelfde regel,
  * maar dan om te schrijven.
  *
- * Het team kan het ook, via `logistiek.manage`: de chauffeur belt hen wanneer er
- * onderweg iets verandert.
+ * Voor élke rit kan het team het via `logistiek.manage` (de chauffeur belt hen
+ * wanneer er onderweg iets verandert), en wie `logistiek.helpers` heeft via de
+ * transportplanning; zie `canEditAllHelpers`.
  */
 async function canEditHelpers(
   session: SessionLike & { user: { id: string } },
   bookingId: string,
-  isTeam: boolean
+  mayEditAll: boolean
 ): Promise<boolean> {
-  if (isTeam) return true;
+  if (mayEditAll) return true;
   const booking = await vanBookingForMember(
     bookingId,
     session.user.id,
@@ -1216,7 +1217,7 @@ export async function addTripHelperAction(
   const name = input.name.trim();
   if (!name) return { ok: false, error: 'Vul de naam van de bijrijder in.' };
 
-  if (!(await canEditHelpers(session, bookingId, canManage(session)))) {
+  if (!(await canEditHelpers(session, bookingId, canEditAllHelpers(session)))) {
     return { ok: false, error: 'Je kan deze rit niet aanpassen.' };
   }
 
@@ -1261,7 +1262,9 @@ export async function removeTripHelperAction(helperId: string): Promise<ActionRe
     select: { transportBookingId: true },
   });
   if (!helper) return { ok: false, error: 'Deze bijrijder staat er niet (meer).' };
-  if (!(await canEditHelpers(session, helper.transportBookingId, canManage(session)))) {
+  if (
+    !(await canEditHelpers(session, helper.transportBookingId, canEditAllHelpers(session)))
+  ) {
     return { ok: false, error: 'Je kan deze rit niet aanpassen.' };
   }
 

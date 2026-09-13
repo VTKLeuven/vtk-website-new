@@ -86,6 +86,7 @@ export const MCP_PERMISSION_POLICY = {
   "lesbezoeken.manage": { reads: ["lesbezoeken"], creates: ["app_create:lesbezoek_organisation", "app_create:lesbezoek", "app_create:lesbezoek_peculiarity"], blocked: ["approve, reject or send email"] },
   "piano.manage": { reads: ["piano"], creates: ["app_create:piano_window"], blocked: ["create closures, reserve or cancel slots"] },
   "logistiek.manage": { reads: ["logistiek"], creates: ["app_create:uitleen_category", "app_create:uitleen_item", "app_create:uitleen_event"], blocked: ["reserve stock, approve requests, move money or plan transport"] },
+  "logistiek.helpers": { reads: [], creates: [], blocked: ["add or remove trip passengers"] },
   "door.open": { reads: [], creates: [], blocked: ["open doors"] },
   "door.remoteOpen": { reads: [], creates: [], blocked: ["open doors remotely"] },
   "door.manage": { reads: ["door"], creates: [], blocked: ["grant access, create shortcut tokens or open doors"] },

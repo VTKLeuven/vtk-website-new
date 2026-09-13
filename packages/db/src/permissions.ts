@@ -105,6 +105,10 @@ export const PERMISSIONS = [
 
   // Logistiek (uitleendienst op logistiek.vtk.be)
   { code: "logistiek.manage", labelNl: "Uitleendienst beheren (inventaris, aanvragen, camionette)", labelEn: "Manage equipment rental (inventory, requests, van)", category: "logistiek" },
+  // Bijrijders van elke rit aanpassen, zonder de rest van het beheer: wie de
+  // bijrijders over alle posten heen regelt, hoeft daarvoor de inventaris en de
+  // beslisknoppen niet te krijgen. Zie docs/design-decisions.md.
+  { code: "logistiek.helpers", labelNl: "Bijrijders van elke rit aanpassen in de transportplanning", labelEn: "Edit the passengers of any trip in the transport planning", category: "logistiek" },
 
   // Deurtoegang (KU Leuven-kaartscanner op de deur)
   { code: "door.open", labelNl: "Deur openen met studentenkaart", labelEn: "Open the door with a student card", category: "door" },

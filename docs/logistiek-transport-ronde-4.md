@@ -28,6 +28,9 @@ Alles wordt op **390px breed** nagekeken, niet alleen op desktop.
 - **D1. Verwijderen mag, maar enkel voor wat het team zelf tekende.** Een rit die
   uit een ledenaanvraag komt, blijft afwijzen of annuleren; de aanvrager mag zijn
   rit nooit zien verdwijnen zonder reden in zijn scherm. Zie R1.
+  **Bijgesteld in september 2026:** elke rit zonder betaling mag weg, ook een
+  gereden rit of een rit uit een aanvraag. De bevestiging waarschuwt nu voor de
+  aanvrager in plaats van dat de knop ontbreekt; zie docs/design-decisions.md.
 - **D2. "Andere" is niet factureerbaar.** De vrije naam wordt opgeslagen als
   `requesterType = WERKGROEP` + `requesterName`, dus `chargesRequester()` blijft
   false en er komt geen prijs of betaalstatus bij die rit. Zie R5.

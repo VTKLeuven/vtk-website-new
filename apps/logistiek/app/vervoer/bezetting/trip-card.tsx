@@ -19,7 +19,8 @@ import type { LogistiekLocale } from '@/lib/i18n-shared';
  * plannen. Dezelfde knoppen hier nog eens zetten zou van deze pagina een tweede
  * planning maken, en dan zijn er twee schermen die hetzelfde half doen.
  *
- * Het kaartje is voor het **praesidium, Logistiek en IT** (`canSeeTripDetails`).
+ * Het kaartje is voor het **praesidium, Logistiek en IT**, en voor wie met
+ * `logistiek.helpers` de bijrijders regelt (`canSeeTripDetails`).
  * Het is dus ledenoppervlak en geen beheerscherm, en het volgt daarom de taal
  * van de bezoeker zoals de rest van de ledenkant. Wat een post niet hoort te
  * zien, komt niet als lege regel maar helemaal niet mee uit de server (zie

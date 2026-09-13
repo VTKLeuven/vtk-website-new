@@ -5,25 +5,28 @@ import { LogisticsIcon } from '@/components/logistics-icon';
 import { deleteTransportAction } from '@/app/actions/beheer';
 
 /**
- * Een rit die het team zelf intekende, echt weghalen (R1).
+ * Een rit echt weghalen (R1).
  *
  * Apart van `TransportUndoButtons` ernaast, en dat is geen indeling maar een
  * betekenisverschil: die knoppen zetten één stap terug, deze laat niets achter.
  * Vandaar een eigen rij met een eigen opschrift.
  *
- * De knop verschijnt enkel wanneer het mag (`canDeleteTransport`): een rit uit
- * een aanvraag wordt afgewezen of geannuleerd, want daar hangt een lid aan dat
- * een reden hoort te zien in plaats van een lege plek in zijn overzicht.
+ * De knop staat bij elke rit zonder betaling (`canDeleteTransport`). Wat er bij
+ * deze rit op het spel staat, zoals een aanvrager die geen bericht krijgt,
+ * rekent de pagina uit met `transportDeleteDescription`.
  */
 export function TransportDeleteButton({
   bookingId,
   title,
-  /** Hoeveel ritten er meegaan: heen en terug verdwijnen samen. */
   count,
+  description,
 }: {
   bookingId: string;
   title: string;
+  /** Hoeveel ritten er meegaan: heen en terug verdwijnen samen. */
   count: number;
+  /** Wat er precies weggaat en wie het merkt; zie `transportDeleteDescription`. */
+  description: string;
 }) {
   return (
     <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed border-red-300 pt-3">
@@ -36,10 +39,7 @@ export function TransportDeleteButton({
         destructive
         icon={<LogisticsIcon name="trash" className="h-4 w-4" />}
         dialogTitle={count > 1 ? 'Deze ritten verwijderen?' : 'Deze rit verwijderen?'}
-        dialogDescription={
-          (count > 1 ? `Heen- en terugrit gaan samen weg (${count} ritten). ` : '') +
-          'De rit en haar historiek verdwijnen helemaal; het voertuig komt op dat moment weer vrij. Dit kan niet ongedaan gemaakt worden.'
-        }
+        dialogDescription={description}
         successMessage="Rit verwijderd."
         action={() => deleteTransportAction(bookingId)}
       />

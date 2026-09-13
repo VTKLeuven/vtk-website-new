@@ -14,6 +14,7 @@ import {
   toDateInputValue,
   toDatetimeLocalValue,
   todayDateOnly,
+  transportDeleteDescription,
 } from '@/lib/uitleen';
 import {
   calendarRange,
@@ -211,11 +212,12 @@ export default async function VervoerWeekPage({
       needsDriver: vehicle?.needsDriver ?? true,
       needsVanDriver: vehicle?.needsVanDriver ?? false,
       paid: booking.paidOfflineAt !== null,
-      // Enkel een rit die het team zelf tekende, en enkel zolang er geen geld en
-      // geen gereden rit aan hangt (R1). Bij een heen-en-terugrit telt de hele
-      // groep: die gaat samen weg, dus als één helft niet mag, mag geen enkele.
+      // Elke rit zolang er geen geld aan hangt (R1). Bij een heen-en-terugrit
+      // telt de hele groep: die gaat samen weg, dus als één helft niet mag, mag
+      // geen enkele. De bevestiging zegt wie het merkt, zoals een aanvrager.
       canDelete: legs.every(canDeleteTransport),
       deleteCount: legs.length,
+      deleteDescription: transportDeleteDescription(legs),
       history: history.get(booking.id) ?? [],
       legs: legs
         .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())

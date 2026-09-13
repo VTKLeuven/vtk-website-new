@@ -64,6 +64,11 @@ export async function SiteHeader() {
             <Link href="/vervoer">
               {t.navVan}
             </Link>
+            {/* Voor iedereen: zonder login toont de pagina enkel voertuig, dag en
+                uur, dus ook wie niet ingelogd is, ziet of de kar vrij is. */}
+            <Link href="/vervoer/bezetting">
+              {t.navPlanning}
+            </Link>
             {session && session.groups.length > 0 ? (
               <Link href="/flesserke">
                 {t.navFlesserke}

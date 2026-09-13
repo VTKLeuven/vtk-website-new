@@ -10,6 +10,7 @@ import {
   formatPriceCents,
   requesterLabel,
   toDatetimeLocalValue,
+  transportDeleteDescription,
 } from '@/lib/uitleen';
 import { AuditTimeline } from '@/components/audit-timeline';
 import { PhoneLink } from '@/components/phone-link';
@@ -174,18 +175,19 @@ export default async function BeheerVervoerPage({
   }
 
   /**
-   * Hoeveel ritten er weggaan als je deze verwijdert, of `null` wanneer het niet
-   * mag (R1).
+   * De ritten die weggaan als je deze verwijdert, of `null` wanneer het niet mag
+   * (R1).
    *
    * Heen en terug zijn samen ingetekend en gaan samen weg, dus telt de hele
    * tripgroep: mag één helft niet weg, dan geen enkele. Eén functie voor "mag
-   * het" en "hoeveel", want de bevestigingstekst moet dat tweede zeggen.
+   * het" en "welke", want de bevestigingstekst zegt hoeveel ritten er weggaan en
+   * wie het merkt.
    */
-  function deletableGroup(booking: AdminTransportBooking): number | null {
+  function deletableGroup(booking: AdminTransportBooking): AdminTransportBooking[] | null {
     const legs = booking.tripGroupId
       ? bookings.filter((other) => other.tripGroupId === booking.tripGroupId)
       : [booking];
-    return legs.every(canDeleteTransport) ? legs.length : null;
+    return legs.every(canDeleteTransport) ? legs : null;
   }
 
   /** Wat niet in de samenvattingsrij past, plus de beheeracties. */
@@ -255,6 +257,7 @@ export default async function BeheerVervoerPage({
         current={booking.event}
       />,
     ]);
+    const deleteLegs = deletableGroup(booking);
 
     return (
       <div className="rounded-[14px] bg-vtk-paper px-4 py-3">
@@ -276,14 +279,14 @@ export default async function BeheerVervoerPage({
           paidOffline={booking.paidOfflineAt !== null}
           paidOnline={hasSucceededPayment(booking.payments)}
         />
-        {/* Enkel bij een rit die het team zelf intekende (R1). Bij een
-            heen-en-terugrit gaan beide helften mee, dus telt de groep en niet
-            deze ene rij. */}
-        {deletableGroup(booking) !== null ? (
+        {/* Bij elke rit zonder betaling (R1). Bij een heen-en-terugrit gaan
+            beide helften mee, dus telt de groep en niet deze ene rij. */}
+        {deleteLegs ? (
           <TransportDeleteButton
             bookingId={booking.id}
             title={booking.eventName?.trim() || booking.purpose}
-            count={deletableGroup(booking)!}
+            count={deleteLegs.length}
+            description={transportDeleteDescription(deleteLegs)}
           />
         ) : null}
         <div className="mt-3">

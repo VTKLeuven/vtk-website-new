@@ -1171,10 +1171,12 @@ export async function transportRange(from: Date, to: Date, filters?: TransportFi
       priceCents: true,
       paidOfflineAt: true,
       driverId: true,
-      // Twee velden die enkel de verwijderknop nodig heeft (R1): of het team de
-      // rit zelf tekende, en of er al geld aan hangt. De betalingen als
-      // (lege) lijst en niet als teller, zodat `canDeleteTransport` dezelfde
-      // vorm krijgt als op /beheer/vervoer, waar de rijen ze toch al dragen.
+      // Twee velden voor de verwijderknop (R1): of er al geld aan hangt (dan
+      // mag de rit niet weg), en of het team ze zelf tekende (dan hoeft de
+      // bevestiging niet te waarschuwen voor een aanvrager zonder bericht). De
+      // betalingen als (lege) lijst en niet als teller, zodat
+      // `canDeleteTransport` dezelfde vorm krijgt als op /beheer/vervoer, waar
+      // de rijen ze toch al dragen.
       plannedByTeam: true,
       payments: { select: { id: true } },
       vehicle: { select: { nameNl: true } },
