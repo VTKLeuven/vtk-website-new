@@ -1275,15 +1275,25 @@ export async function transportWeekForPraesidium(from: Date, to: Date) {
  * ziet, met het evenement en de chauffeur erbij, maar zonder adressen,
  * telefoonnummers en bedragen.
  *
- * Waarom een derde projectie naast de publieke en de beheerversie: wie zonder
+ * Waarom een aparte projectie naast de publieke en de beheerversie: wie zonder
  * login kijkt, hoort de werking van de kring niet te zien (zie
- * `transportWeekPublic`), terwijl een praesidiumlid net wél moet kunnen zien wie
- * welk ritje doet. Die twee in één query met een vlag zou betekenen dat één
- * vergeten `if` de namen aan de straatkant zet.
+ * `transportWeekPublic`), terwijl een lid net wél moet kunnen zien wie welk
+ * ritje doet. Die twee in één query met een vlag zou betekenen dat één vergeten
+ * `if` de namen aan de straatkant zet.
+ *
+ * Dit is de laag voor een lid **zonder** post: werkgroepleden en studenten. Een
+ * post krijgt `transportWeekForPraesidium`, met dezelfde statussen en meer
+ * velden.
+ *
+ * De statussen komen van `transportWindowWhere` en worden hier niet meer
+ * overschreven. Er stond `status: { not: 'CANCELLED' }` achter de spread, en dat
+ * is één object: die sleutel won van de `status: { in: [...] }` ernaast, dus een
+ * **afgewezen** rit werd als blok getekend. De pagina zei dan "bezet" terwijl de
+ * kar vrij was, precies het omgekeerde van waarvoor ze bestaat.
  */
 export async function transportWeekForMembers(from: Date, to: Date) {
   return prisma.uitleenTransportBooking.findMany({
-    where: { ...transportWindowWhere(from, to), status: { not: 'CANCELLED' } },
+    where: transportWindowWhere(from, to, PLANNING_STATUSES),
     select: {
       id: true,
       vehicleId: true,
