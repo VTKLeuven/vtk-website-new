@@ -10,12 +10,14 @@ import {
   fmtDateTime,
   fmtTime,
   freeSpots,
+  postLabel,
   registerShift,
   rewardLabel,
   spotsLabel,
   spotsVariant,
   unregisterShift,
   type MergedShift,
+  type PostNames,
 } from './shiftData';
 
 function Detail({ k, v }: { k: string; v: string }) {
@@ -57,10 +59,12 @@ const MONTH_SHORT: Record<Locale, string[]> = {
 export function ShiftDialog({
   locale,
   entry,
+  postNames,
   onClose,
 }: {
   locale: Locale;
   entry: MergedShift;
+  postNames: PostNames;
   onClose: () => void;
 }) {
   const t = getDictionary(locale).shift;
@@ -123,7 +127,9 @@ export function ShiftDialog({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="vtk-shift-dialog-top">
-          {shift.post ? <span className="vtk-shift-dialog-top-post">{shift.post}</span> : null}
+          {shift.post ? (
+            <span className="vtk-shift-dialog-top-post">{postLabel(shift.post, postNames)}</span>
+          ) : null}
           <span className="vtk-shift-dialog-top-when">{when}</span>
 
           {/* Hangende gele datumpin van Richting A */}
@@ -168,7 +174,7 @@ export function ShiftDialog({
 
           <dl className="vtk-shift-facts">
             <Detail k={t.detail.location} v={shift.location} />
-            {shift.post ? <Detail k={t.detail.post} v={shift.post} /> : null}
+            {shift.post ? <Detail k={t.detail.post} v={postLabel(shift.post, postNames)} /> : null}
             <Detail k={t.detail.reward} v={rewardLabel(shift.reward, t)} />
             <Detail
               k={t.detail.spots}

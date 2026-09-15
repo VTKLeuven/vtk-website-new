@@ -55,11 +55,19 @@ export function spotsLabel(shift: ShiftResponse, t: ShiftDict): string {
   return fill(t.spots.few, { n: free });
 }
 
-/** Groen = ruim plaats, geel = bijna vol, rood = vol. */
-export function spotsVariant(shift: ShiftResponse): 'success' | 'accent' | 'danger' {
+/** Groen = ruim plaats, geel = bijna vol, grijs = vol. */
+export function spotsVariant(shift: ShiftResponse): 'ok' | 'low' | 'full' {
   const free = freeSpots(shift);
-  if (free <= 0) return 'danger';
-  return free <= 2 ? 'accent' : 'success';
+  if (free <= 0) return 'full';
+  return free <= 2 ? 'low' : 'ok';
+}
+
+/** Groepscode (`Shift.post`) naar postnaam, serverside geladen door de pagina. */
+export type PostNames = Record<string, string>;
+
+/** De naam van de post, of de code zelf wanneer die groep niet meer bestaat. */
+export function postLabel(code: string, names: PostNames): string {
+  return names[code] ?? code;
 }
 
 export function rewardLabel(reward: number, t: ShiftDict): string {

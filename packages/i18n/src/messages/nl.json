@@ -668,10 +668,7 @@
       "none": "Er staan voorlopig geen shiften gepland."
     },
     "rail": {
-      "nextShift": "Jouw volgende shift",
-      "nextShiftMeta": "{name}, {day} om {time}",
       "emptyTitle": "Nog niets ingepland",
-      "emptySub": "Kies een shift; hij verschijnt hier meteen.",
       "emptyText": "Kies een shift in het overzicht; je inschrijving verschijnt hier meteen.",
       "year": "Academiejaar {year}",
       "shiftsDone": "shiften gedaan",

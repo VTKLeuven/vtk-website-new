@@ -400,6 +400,15 @@ the design language into the application instead of copying mockup content.
   photo gets an outline, or the initial floats loose on the band.
 - Lists and calendars: favor agenda/list layouts, tabular times, compact day
   labels, and small yellow status pins.
+  - **The shift page (`/shift`, `components/shift`) sets every digit in Inter
+    with `tabular-nums`, never in `--mono`**: the slashed zero of Geist Mono read
+    as a different font next to the rest of the site. A post is shown by its
+    group name (`lib/shift/postNames.ts`), never as the raw `Shift.post` code in
+    capitals. Consecutive days without shifts share one line, a full shift gets
+    no disabled button, and below 640px the timeline and the pin column go away
+    so the day card gets the full width (the pin moves beside the day name).
+    Three directions were reviewed; this cleaned-up agenda won over a table and
+    over event-style tiles.
   - **The event tile lives in `apps/web/app/design/vtk-eventcard.css` and is
     shared** by the `/kalender` grid and the homepage band "Aankomende
     evenementen"; both import that file, and `.ev-grid` belongs to it too. Do not

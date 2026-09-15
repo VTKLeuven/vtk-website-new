@@ -2,7 +2,6 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { differenceInCalendarDays } from 'date-fns';
-import { Clock } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { canUnregister, type ShiftResponse } from '@/lib/shift';
 import {
@@ -37,10 +36,13 @@ function whenLabel(start: Date, now: number, locale: Locale, t: ShiftDict): stri
 }
 
 /**
- * De rail in de marge volgens Richting A (Kalenderblad):
- * bovenaan de gele CTA met je eerstvolgende shift (of ruststand),
- * daaronder het register "Mijn shiften" met de haarlijn en gele indicator,
- * en als afsluiter het academiejaarblok met stempelcijfers.
+ * De rail in de marge: het register "Mijn shiften" met de haarlijn en een gele
+ * markering op je eerstvolgende shift, en daaronder het academiejaarblok.
+ *
+ * Bovenaan stond ook een gele knop met je volgende shift. Die herhaalde de eerste
+ * regel van het register, en zonder inschrijving stonden er twee zinnen onder
+ * elkaar die hetzelfde zeiden, in een grijs vak dat las als een uitgeschakelde
+ * knop. Het register alleen volstaat.
  */
 export function MyShiftsRail({
   locale,
@@ -59,39 +61,15 @@ export function MyShiftsRail({
   const [now] = useState(() => Date.now());
 
   const upcoming = [...shifts].sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
-  const next = upcoming[0] ?? null;
 
   return (
     <>
-      {next ? (
-        <button
-          type="button"
-          className="vtk-shift-rail-cta"
-          onClick={() => onOpen({ shift: next, registered: true })}
-          title={t.dialog.open}
-        >
-          <Clock aria-hidden="true" />
-          <span className="vtk-shift-rail-cta-text">
-            <span className="vtk-shift-rail-cta-title">{t.rail.nextShift}</span>
-            <span className="vtk-shift-rail-cta-meta">
-              {next.name}, {whenLabel(next.startTime, now, locale, t).toLowerCase()} om {fmtTime(next.startTime)}
-            </span>
-          </span>
-        </button>
-      ) : (
-        <div className="vtk-shift-rail-cta" data-state="closed">
-          <Clock aria-hidden="true" />
-          <span className="vtk-shift-rail-cta-text">
-            <span className="vtk-shift-rail-cta-title">{t.rail.emptyTitle}</span>
-            <span className="vtk-shift-rail-cta-meta">{t.rail.emptySub}</span>
-          </span>
-        </div>
-      )}
-
       <div className="vtk-shift-rail-box" aria-labelledby="vtk-shift-mine-title">
         <h2 id="vtk-shift-mine-title">{t.registered}</h2>
         {upcoming.length === 0 ? (
-          <p className="vtk-shift-rail-empty">{t.rail.emptyText}</p>
+          <p className="vtk-shift-rail-empty">
+            {t.rail.emptyTitle}. {t.rail.emptyText}
+          </p>
         ) : (
           <ul className="vtk-shift-rail-list">
             {upcoming.map((shift, i) => {

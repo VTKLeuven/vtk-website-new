@@ -668,10 +668,7 @@
       "none": "No shifts are scheduled at the moment."
     },
     "rail": {
-      "nextShift": "Your next shift",
-      "nextShiftMeta": "{name}, {day} at {time}",
       "emptyTitle": "Nothing planned yet",
-      "emptySub": "Pick a shift; it will appear here right away.",
       "emptyText": "Pick a shift from the overview; your registration shows up here right away.",
       "year": "Academic year {year}",
       "shiftsDone": "shifts done",

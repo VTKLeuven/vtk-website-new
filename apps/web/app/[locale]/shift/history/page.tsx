@@ -7,6 +7,7 @@ import { notFound } from 'next/navigation';
 import { requireSession } from '@/lib/session';
 import { PleaseLogin } from '@/components/site/pleaseLogin';
 import { prisma } from '@vtk/db';
+import { loadPostNames } from '@/lib/shift/postNames';
 
 import '@/app/design/vtk-basic.css';
 
@@ -39,10 +40,13 @@ export default async function ShiftHistoryPage({
   }
 
   // Alle shiften waarvoor de user (ooit) ingeschreven was, per post geteld.
-  const participations = await prisma.shiftParticipant.findMany({
-    where: { userId: session.user.id },
-    select: { shift: { select: { post: true } } },
-  });
+  const [participations, postNames] = await Promise.all([
+    prisma.shiftParticipant.findMany({
+      where: { userId: session.user.id },
+      select: { shift: { select: { post: true } } },
+    }),
+    loadPostNames(locale),
+  ]);
 
   const perPost = new Map<string, number>();
   for (const p of participations) {
@@ -88,7 +92,9 @@ export default async function ShiftHistoryPage({
                 ) : (
                   rows.map(([post, count]) => (
                     <tr key={post}>
-                      <td data-label={t.history.post}>{post === 'GEEN' ? t.history.noPost : post}</td>
+                      <td data-label={t.history.post}>
+                        {post === 'GEEN' ? t.history.noPost : (postNames[post] ?? post)}
+                      </td>
                       <td data-label={t.history.count}>{count}</td>
                     </tr>
                   ))

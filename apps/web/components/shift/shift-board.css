@@ -78,17 +78,17 @@
   letter-spacing: 0;
 }
 
+/* Losse pillen, zoals de weergavekeuze op /kalender. */
 .vtk-shift-view-switch {
   display: inline-flex;
   flex: none;
-  border: 1px solid rgba(183, 192, 220, 0.34);
-  border-radius: 999px;
-  overflow: clip;
+  gap: 6px;
 }
 
 .vtk-shift-view-switch button {
   padding: 8px 16px;
-  border: 0;
+  border: 1px solid rgba(183, 192, 220, 0.34);
+  border-radius: 999px;
   background: transparent;
   color: var(--on-dark-muted);
   font-size: 13px;
@@ -101,6 +101,7 @@
 }
 
 .vtk-shift-view-switch button[aria-pressed='true'] {
+  border-color: var(--paper);
   background: var(--paper);
   color: var(--ink);
 }
@@ -160,6 +161,14 @@
   .vtk-shift-rail {
     position: static;
     order: -1;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr));
+    gap: 18px 32px;
+  }
+
+  .vtk-shift-rail .vtk-shift-rail-box + .vtk-shift-rail-box {
+    padding-top: 0;
+    border-top: 0;
   }
 }
 
@@ -177,7 +186,7 @@
   gap: 8px;
   min-height: 32px;
   padding: 6px 14px;
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-2);
   border-radius: 999px;
   background: var(--surface);
   color: var(--body);
@@ -195,21 +204,24 @@
   border-color: var(--line-2);
 }
 
+/* Actief is een inktpil, zoals de filters op /kalender. Geel is op deze site een
+   accent, geen selectie. */
 .vtk-shift-chip[aria-pressed='true'] {
-  border-color: var(--yellow);
-  background: var(--yellow);
-  color: var(--ink);
-  font-weight: 600;
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
 }
 
 .vtk-shift-chip-count {
   color: var(--muted);
-  font: 500 12px/1 var(--mono);
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
 .vtk-shift-chip[aria-pressed='true'] .vtk-shift-chip-count {
-  color: rgba(10, 15, 31, 0.65);
+  color: var(--on-dark-muted);
 }
 
 /* --- Datumpin (evenementkaart & dialoog) --- */
@@ -227,27 +239,23 @@
   text-align: center;
 }
 
+/* Cijfers in Inter met tabelcijfers, nergens op deze pagina in --mono: de
+   doorgestreepte nul van Geist Mono las als een ander lettertype dan de rest van
+   de site. */
 .vtk-shift-pin b {
-  font: 500 20px/1.1 var(--mono);
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.1;
   letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
 .vtk-shift-pin i {
   color: rgba(10, 15, 31, 0.62);
-  font: normal 9.5px/1.3 var(--mono);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.vtk-shift-pin-quiet {
-  border: 1px solid var(--line-2);
-  background: var(--surface);
-  color: var(--muted);
-}
-
-.vtk-shift-pin-quiet i {
-  color: var(--muted);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.2;
 }
 
 /* --- Lijstweergave (Richting A: aDays) --- */
@@ -283,7 +291,29 @@
 }
 
 .vtk-shift-day[data-empty='true'] {
-  padding-bottom: 14px;
+  padding-bottom: 16px;
+}
+
+.vtk-shift-day[data-empty='true']::before {
+  top: 22px;
+}
+
+/* Lege dagen: een open ringetje op de haarlijn in plaats van een datumpin. */
+.vtk-shift-ring {
+  justify-self: center;
+  width: 11px;
+  height: 11px;
+  margin-top: 5px;
+  border: 1.5px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--paper);
+}
+
+.vtk-shift-quiet {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .vtk-shift-day-body {
@@ -308,12 +338,6 @@
   color: var(--ink);
 }
 
-.vtk-shift-day[data-empty='true'] .vtk-shift-day-name {
-  color: var(--muted);
-  font-size: 15px;
-  font-weight: 500;
-}
-
 .vtk-shift-day-count {
   color: var(--muted);
   font-size: 13px;
@@ -322,8 +346,8 @@
 .vtk-shift-today-tag {
   padding: 2px 8px;
   border-radius: 999px;
-  background: var(--ink);
-  color: var(--yellow);
+  background: var(--yellow);
+  color: var(--ink);
   font-size: 11px;
   font-weight: 600;
   line-height: 1.5;
@@ -380,20 +404,19 @@
 .vtk-shift-time {
   display: grid;
   gap: 2px;
-  font-family: var(--mono);
   font-variant-numeric: tabular-nums;
 }
 
 .vtk-shift-time b {
   color: var(--ink);
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .vtk-shift-time span {
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 
 .vtk-shift-what {
@@ -501,19 +524,26 @@
   background: currentColor;
 }
 
-.vtk-shift-spots-success {
+/* De tokens staan in vtk-base.css. Ze werden hier al gebruikt maar bestonden
+   nergens, waardoor "Vol" en "Nog 3 plaatsen" er hetzelfde uitzagen. */
+.vtk-shift-spots-ok {
   background: var(--ok-bg);
   color: var(--ok-ink);
 }
 
-.vtk-shift-spots-accent {
+.vtk-shift-spots-low {
   background: var(--low-bg);
   color: var(--low-ink);
 }
 
-.vtk-shift-spots-danger {
+.vtk-shift-spots-full {
   background: var(--full-bg);
   color: var(--full-ink);
+}
+
+.vtk-shift-spots-full::before {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px currentColor;
 }
 
 .vtk-shift-spots-mine {
@@ -526,6 +556,7 @@
 }
 
 .vtk-shift-intl {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -547,6 +578,17 @@
 
 .vtk-shift-intl-compact {
   padding: 3px;
+}
+
+/* Het label van het compacte bolletje is enkel voor een screenreader. De klasse
+   bestond nergens, dus de tekst stond gewoon naast de wereldbol. */
+.vtk-shift-intl .vtk-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
 }
 
 /* --- Knoppen --- */
@@ -603,14 +645,14 @@
 }
 
 .vtk-shift-btn-danger {
-  border-color: var(--full-ink);
+  border-color: var(--danger-ink);
   background: var(--surface);
-  color: var(--full-ink);
+  color: var(--danger-ink);
 }
 
 .vtk-shift-btn-danger:hover:not(:disabled) {
-  border-color: var(--full-ink);
-  background: var(--full-bg);
+  border-color: var(--danger-ink);
+  background: var(--danger-bg);
 }
 
 .vtk-shift-btn-link {
@@ -627,68 +669,6 @@
 }
 
 /* --- Rail (Marge register) --- */
-
-.vtk-shift-rail-cta {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 12px 14px;
-  border: 0;
-  border-radius: 14px;
-  background: var(--yellow);
-  color: var(--ink);
-  font-size: 13px;
-  font-weight: 600;
-  text-align: left;
-  box-shadow: 0 2px 8px rgba(14, 26, 54, 0.12);
-  cursor: pointer;
-  transition:
-    transform 140ms ease,
-    box-shadow 140ms ease;
-}
-
-.vtk-shift-rail-cta:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(14, 26, 54, 0.18);
-}
-
-.vtk-shift-rail-cta[data-state='closed'] {
-  background: var(--paper-2);
-  color: var(--body);
-  box-shadow: inset 3px 0 0 var(--line-2);
-  cursor: default;
-  transform: none;
-}
-
-.vtk-shift-rail-cta svg {
-  flex: none;
-  width: 18px;
-  height: 18px;
-}
-
-.vtk-shift-rail-cta-text {
-  display: grid;
-  gap: 2px;
-  min-width: 0;
-}
-
-.vtk-shift-rail-cta-title {
-  font-size: 13.5px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-.vtk-shift-rail-cta-meta {
-  color: color-mix(in srgb, var(--ink) 65%, var(--yellow));
-  font-size: 12px;
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
-
-.vtk-shift-rail-cta[data-state='closed'] .vtk-shift-rail-cta-meta {
-  color: var(--muted);
-}
 
 .vtk-shift-rail-box {
   display: flex;
@@ -766,7 +746,7 @@
 }
 
 .vtk-shift-rail-lock {
-  color: var(--full-ink) !important;
+  color: var(--danger-ink) !important;
   font-weight: 500 !important;
 }
 
@@ -797,8 +777,10 @@
 .vtk-shift-stamps dd {
   margin: 0;
   color: var(--ink);
-  font: 500 28px/1 var(--mono);
-  letter-spacing: -0.03em;
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
   font-variant-numeric: tabular-nums;
 }
 
@@ -855,9 +837,9 @@
 
 .vtk-week-dow {
   color: var(--muted);
-  font: 600 11px/1 var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
 }
 
 .vtk-week-head[data-today='true'] .vtk-week-dow {
@@ -865,9 +847,12 @@
 }
 
 .vtk-week-date-num {
-  font: 500 18px/1 var(--mono);
+  font-size: 17px;
+  font-weight: 600;
+  line-height: 1;
   letter-spacing: -0.02em;
   color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 
 .vtk-week-head[data-today='true'] .vtk-week-date-num {
@@ -878,9 +863,8 @@
 
 .vtk-week-month {
   color: var(--muted);
-  font: 400 10px/1 var(--mono);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+  font-size: 11px;
+  line-height: 1;
 }
 
 .vtk-week-gutter {
@@ -896,7 +880,8 @@
   right: 7px;
   transform: translateY(-7px);
   color: var(--muted);
-  font: 10.5px/1 var(--mono);
+  font-size: 11px;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
@@ -987,7 +972,8 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  font: 10.5px/1.2 var(--mono);
+  font-size: 11px;
+  line-height: 1.2;
   font-variant-numeric: tabular-nums;
   color: var(--muted);
 }
@@ -1086,7 +1072,10 @@
   border-radius: 999px;
   background: var(--surface);
   color: var(--ink);
-  font: 600 10px/1 var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
   box-shadow: 0 2px 8px rgba(14, 26, 54, 0.12);
   cursor: pointer;
   transition:
@@ -1203,9 +1192,9 @@
 
 .vtk-shift-dialog-top-post {
   color: var(--on-dark-muted);
-  font: 500 11px/1.2 var(--mono);
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
 }
 
 .vtk-shift-dialog-top-when {
@@ -1473,9 +1462,29 @@
     justify-content: space-between;
   }
 
+  /* Geen haarlijn en geen pinkolom op een telefoon: die kolom kostte elke kaart
+     bijna 60 pixels breedte. De pin schuift naast de dagnaam en de kaart loopt
+     eronder over de hele breedte. */
   .vtk-shift-day {
-    grid-template-columns: 46px minmax(0, 1fr);
-    gap: 12px;
+    grid-template-columns: auto minmax(0, 1fr);
+    gap: 10px 12px;
+  }
+
+  .vtk-shift-day::before,
+  .vtk-shift-ring {
+    display: none;
+  }
+
+  .vtk-shift-day[data-empty='true'] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vtk-shift-day-body {
+    display: contents;
+  }
+
+  .vtk-shift-card {
+    grid-column: 1 / -1;
   }
 
   .vtk-shift-day .vtk-shift-pin {
@@ -1485,16 +1494,11 @@
   }
 
   .vtk-shift-day .vtk-shift-pin b {
-    font-size: 16px;
+    font-size: 17px;
   }
 
   .vtk-shift-day .vtk-shift-pin i {
-    font-size: 8.5px;
-  }
-
-  .vtk-shift-day::before {
-    left: 23px;
-    top: 46px;
+    font-size: 10px;
   }
 
   .vtk-shift-day-head {

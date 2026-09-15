@@ -1,5 +1,5 @@
 'use client';
-import { useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { addDays, isSameDay } from 'date-fns';
 import { AlertTriangle, MapPin, Ticket } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
@@ -10,12 +10,15 @@ import {
   fill,
   fmtTime,
   freeSpots,
+  postLabel,
   registerShift,
   rewardLabel,
   spotsLabel,
   spotsVariant,
   unregisterShift,
   type MergedShift,
+  type PostNames,
+  type ShiftDict,
 } from './shiftData';
 
 const DOW_SHORT: Record<Locale, string[]> = {
@@ -29,22 +32,82 @@ const MONTH_SHORT: Record<Locale, string[]> = {
 };
 
 type DayData = {
-  index: number;
   date: Date;
   isToday: boolean;
   items: MergedShift[];
 };
 
+/** Een dag met shiften, of een reeks opeenvolgende dagen zonder. */
+type Segment = { kind: 'day'; day: DayData } | { kind: 'quiet'; days: DayData[] };
+
 /**
- * Lijstweergave volgens Richting A (Kalenderblad):
- * elke dag hangt aan de gele datumpin van de evenementenkaart, de haarlijn verbindt
- * de pins over de week, en de shiften liggen per dag gebundeld in een kaart.
+ * Lege dagen die op elkaar volgen, worden samen één regel. Elk een eigen rij met
+ * datumpin kostte in een gewone week twee schermhoogtes aan "geen shiften"
+ * voor de eerste shift in beeld kwam.
+ */
+function segmentsOf(days: DayData[]): Segment[] {
+  const segments: Segment[] = [];
+  let quiet: DayData[] = [];
+  for (const day of days) {
+    if (day.items.length === 0) {
+      quiet.push(day);
+      continue;
+    }
+    if (quiet.length > 0) {
+      segments.push({ kind: 'quiet', days: quiet });
+      quiet = [];
+    }
+    segments.push({ kind: 'day', day });
+  }
+  if (quiet.length > 0) segments.push({ kind: 'quiet', days: quiet });
+  return segments;
+}
+
+/** "Maandag 14 en dinsdag 15: geen shiften", met het vandaag-label bij de juiste dag. */
+function QuietDays({ days, locale, t }: { days: DayData[]; locale: Locale; t: ShiftDict }) {
+  const intl = locale === 'nl' ? 'nl-BE' : 'en-GB';
+  const dayFmt = new Intl.DateTimeFormat(intl, { weekday: 'long', day: 'numeric' });
+  const parts = new Intl.ListFormat(intl, { type: 'conjunction' }).formatToParts(
+    days.map((_, index) => String(index))
+  );
+  const [before, after] = t.day.emptyDay.split('{day}');
+
+  return (
+    <p className="vtk-shift-quiet">
+      {before}
+      {parts.map((part, i) => {
+        if (part.type === 'literal') return <Fragment key={i}>{part.value}</Fragment>;
+        const day = days[Number(part.value)];
+        const label = dayFmt.format(day.date);
+        return (
+          <Fragment key={i}>
+            {i === 0 && !before ? label.charAt(0).toUpperCase() + label.slice(1) : label}
+            {day.isToday ? (
+              <>
+                {' '}
+                <span className="vtk-shift-today-tag">{t.week.today}</span>
+              </>
+            ) : null}
+          </Fragment>
+        );
+      })}
+      {after}
+    </p>
+  );
+}
+
+/**
+ * Lijstweergave: elke dag hangt aan de gele datumpin van de evenementenkaart, de
+ * haarlijn verbindt de pins over de week, en de shiften liggen per dag gebundeld
+ * in een kaart. Op een telefoon vallen de haarlijn en de pinkolom weg en schuift
+ * de pin naast de dagnaam, zodat de kaart de volle breedte krijgt.
  */
 export function ShiftAgenda({
   locale,
   weekStart,
   shifts,
   registeredShifts = [],
+  postNames,
   emptyState,
   onOpen,
 }: {
@@ -52,6 +115,7 @@ export function ShiftAgenda({
   weekStart: Date;
   shifts: MergedShift[];
   registeredShifts?: ShiftResponse[];
+  postNames: PostNames;
   emptyState: React.ReactNode;
   onOpen: (entry: MergedShift) => void;
 }) {
@@ -66,12 +130,7 @@ export function ShiftAgenda({
       const items = shifts
         .filter((entry) => isSameDay(entry.shift.startTime, date))
         .sort((a, b) => a.shift.startTime.getTime() - b.shift.startTime.getTime());
-      return {
-        index: i,
-        date,
-        isToday: isSameDay(date, nowDate),
-        items,
-      };
+      return { date, isToday: isSameDay(date, nowDate), items };
     });
   }, [shifts, weekStart, now]);
 
@@ -83,53 +142,39 @@ export function ShiftAgenda({
 
   return (
     <ol className="vtk-shift-days">
-      {days.map((day) => {
-        const n = day.items.length;
-        const dowStr = DOW_SHORT[locale][day.date.getDay()];
-        const monthStr = MONTH_SHORT[locale][day.date.getMonth()];
-        const weekdayName = weekdayFmt.format(day.date);
-        const capitalizedDay = weekdayName.charAt(0).toUpperCase() + weekdayName.slice(1);
-
-        if (n === 0) {
+      {segmentsOf(days).map((segment) => {
+        if (segment.kind === 'quiet') {
           return (
-            <li key={day.date.toISOString()} className="vtk-shift-day" data-empty="true">
-              <span className="vtk-shift-pin vtk-shift-pin-quiet" aria-hidden="true">
-                <i>{dowStr}</i>
-                <b>{day.date.getDate()}</b>
-                <i>{monthStr}</i>
-              </span>
-              <div className="vtk-shift-day-body">
-                <div className="vtk-shift-day-head">
-                  <h3 className="vtk-shift-day-name">
-                    {fill(t.day.emptyDay, { day: capitalizedDay })}
-                  </h3>
-                  {day.isToday ? (
-                    <span className="vtk-shift-today-tag">{t.week.today}</span>
-                  ) : null}
-                </div>
-              </div>
+            <li
+              key={segment.days[0].date.toISOString()}
+              className="vtk-shift-day"
+              data-empty="true"
+            >
+              <span className="vtk-shift-ring" aria-hidden="true" />
+              <QuietDays days={segment.days} locale={locale} t={t} />
             </li>
           );
         }
 
-        const countLabel =
-          n === 1 ? t.day.shiftsOne : fill(t.day.shifts, { n });
+        const { day } = segment;
+        const n = day.items.length;
+        const weekdayName = weekdayFmt.format(day.date);
+        const capitalizedDay = weekdayName.charAt(0).toUpperCase() + weekdayName.slice(1);
+        const countLabel = n === 1 ? t.day.shiftsOne : fill(t.day.shifts, { n });
 
         return (
           <li key={day.date.toISOString()} className="vtk-shift-day">
             <span className="vtk-shift-pin" aria-hidden="true">
-              <i>{dowStr}</i>
+              <i>{DOW_SHORT[locale][day.date.getDay()]}</i>
               <b>{day.date.getDate()}</b>
-              <i>{monthStr}</i>
+              <i>{MONTH_SHORT[locale][day.date.getMonth()]}</i>
             </span>
 
             <div className="vtk-shift-day-body">
               <div className="vtk-shift-day-head">
                 <h3 className="vtk-shift-day-name">{capitalizedDay}</h3>
                 <span className="vtk-shift-day-count">{countLabel}</span>
-                {day.isToday ? (
-                  <span className="vtk-shift-today-tag">{t.week.today}</span>
-                ) : null}
+                {day.isToday ? <span className="vtk-shift-today-tag">{t.week.today}</span> : null}
               </div>
 
               <ul className="vtk-shift-card">
@@ -175,7 +220,9 @@ export function ShiftAgenda({
 
                           <span className="vtk-shift-meta">
                             {shift.post ? (
-                              <span className="vtk-shift-post">{shift.post}</span>
+                              <span className="vtk-shift-post">
+                                {postLabel(shift.post, postNames)}
+                              </span>
                             ) : null}
                             <span className="vtk-shift-meta-i">
                               <MapPin aria-hidden="true" />
@@ -225,14 +272,16 @@ export function ShiftAgenda({
                             >
                               {spotsLabel(shift, t)}
                             </span>
-                            <button
-                              type="button"
-                              className="vtk-shift-btn vtk-shift-btn-sm"
-                              disabled={isFull}
-                              onClick={() => registerShift(shift.id, showToast, t)}
-                            >
-                              {t.register}
-                            </button>
+                            {/* Een volle shift krijgt geen uitgeschakelde knop: "Vol" zegt het al. */}
+                            {isFull ? null : (
+                              <button
+                                type="button"
+                                className="vtk-shift-btn vtk-shift-btn-sm"
+                                onClick={() => registerShift(shift.id, showToast, t)}
+                              >
+                                {t.register}
+                              </button>
+                            )}
                           </>
                         )}
                       </div>

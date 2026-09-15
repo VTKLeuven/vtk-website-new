@@ -7,6 +7,7 @@ import { requireSession } from '@/lib/session';
 import { PleaseLogin } from '@/components/site/pleaseLogin';
 import { prisma } from '@vtk/db';
 import { academicYearRange, currentAcademicYear } from '@/lib/shift';
+import { loadPostNames } from '@/lib/shift/postNames';
 import { ShiftBoard } from '@/components/shift/ShiftBoard';
 import type { ShiftYearStats } from '@/components/shift/MyShiftsRail';
 
@@ -67,11 +68,19 @@ export default async function ShiftPage({ params }: { params: Promise<{ locale: 
     return <PleaseLogin locale={locale} nextPath={`${base}/shift`} className="vtk-page-shell" />;
   }
 
-  const stats = await yearStats(session.user.id);
+  const [stats, postNames] = await Promise.all([
+    yearStats(session.user.id),
+    loadPostNames(locale),
+  ]);
 
   return (
     <div className="vtk-page">
-      <ShiftBoard locale={locale} historyHref={`${base}/shift/history`} stats={stats} />
+      <ShiftBoard
+        locale={locale}
+        historyHref={`${base}/shift/history`}
+        stats={stats}
+        postNames={postNames}
+      />
     </div>
   );
 }

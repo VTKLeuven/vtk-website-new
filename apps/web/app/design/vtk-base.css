@@ -18,6 +18,18 @@
   --body: #34405e;
   /* Muted text on a navy/ink ground (intentional dark bands only). */
   --on-dark-muted: #b7c0dc;
+  /* Beschikbaarheid van een plaats (shiften): ruim, bijna vol, vol. Vol is
+     bewust grijs en niet rood: het is geen fout maar een keuze die wegvalt, en
+     in een drukke week staat het tien keer op het scherm. */
+  --ok-bg: #e2f1e8;
+  --ok-ink: #16663f;
+  --low-bg: #fff2c7;
+  --low-ink: #7a4e05;
+  --full-bg: var(--paper-2);
+  --full-ink: var(--muted);
+  /* Een handeling die iets terugdraait, zoals uitschrijven. */
+  --danger-bg: #fdecea;
+  --danger-ink: #b42318;
   --ink-2: var(--body);
   --rule: var(--line);
   --rule-soft: rgba(14, 26, 54, 0.07);

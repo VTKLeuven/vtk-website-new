@@ -3,7 +3,14 @@ import { useMemo, useState } from 'react';
 import { addDays, getISOWeek, startOfWeek } from 'date-fns';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import type { ShiftResponse } from '@/lib/shift';
-import { fill, freeSpots, useShiftList, type MergedShift } from './shiftData';
+import {
+  fill,
+  freeSpots,
+  postLabel,
+  useShiftList,
+  type MergedShift,
+  type PostNames,
+} from './shiftData';
 import { ShiftAgenda } from './ShiftAgenda';
 import { ShiftWeekView } from './WeekView';
 import { ShiftDialog } from './ShiftDialog';
@@ -23,15 +30,20 @@ function mondayOf(date: Date): Date {
  * De shiftpagina volgens Richting A (Kalenderblad):
  * de donkere kop draagt weeknavigatie, weergavekeuze en vandaag-knop,
  * daaronder het raster met postfilter, weekrooster/lijst en rail.
+ *
+ * `postNames` zet de groepscode van een shift om naar de naam van de post: de
+ * pagina toonde `CURSUSDIENST` waar "Cursusdienst" hoort.
  */
 export function ShiftBoard({
   locale,
   historyHref,
   stats,
+  postNames,
 }: {
   locale: Locale;
   historyHref: string;
   stats: ShiftYearStats;
+  postNames: PostNames;
 }) {
   const t = getDictionary(locale).shift;
 
@@ -64,8 +76,10 @@ export function ShiftBoard({
       if (!shift.post) continue;
       counts.set(shift.post, (counts.get(shift.post) ?? 0) + 1);
     }
-    return [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]));
-  }, [weekShifts]);
+    return [...counts.entries()].sort((a, b) =>
+      postLabel(a[0], postNames).localeCompare(postLabel(b[0], postNames))
+    );
+  }, [weekShifts, postNames]);
 
   const visible = useMemo(
     () =>
@@ -215,7 +229,7 @@ export function ShiftBoard({
                     aria-pressed={postFilter === post}
                     onClick={() => setPostFilter(post)}
                   >
-                    {post}
+                    {postLabel(post, postNames)}
                     <span className="vtk-shift-chip-count">{count}</span>
                   </button>
                 ))}
@@ -237,6 +251,7 @@ export function ShiftBoard({
                 weekStart={weekStart}
                 shifts={visible}
                 registeredShifts={registered}
+                postNames={postNames}
                 emptyState={emptyState}
                 onOpen={setOpened}
               />
@@ -255,7 +270,12 @@ export function ShiftBoard({
         </div>
 
         {opened ? (
-          <ShiftDialog locale={locale} entry={opened} onClose={() => setOpened(null)} />
+          <ShiftDialog
+            locale={locale}
+            entry={opened}
+            postNames={postNames}
+            onClose={() => setOpened(null)}
+          />
         ) : null}
       </div>
     </>
