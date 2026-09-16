@@ -170,6 +170,28 @@ async function deliver(recipient: Recipient, subject: string, text: string): Pro
   }
 }
 
+export type NotifyOptions = {
+  /** Wie de actie uitvoerde. Is dit dezelfde persoon als de aanvrager, dan vertrekt er geen mail. */
+  actorId?: string;
+};
+
+export function shouldNotifyReservation(
+  reservation: { userId: string },
+  options?: NotifyOptions
+): boolean {
+  if (options?.actorId && options.actorId === reservation.userId) return false;
+  return true;
+}
+
+export function shouldNotifyTransport(
+  booking: { plannedByTeam: boolean; userId: string },
+  options?: NotifyOptions
+): boolean {
+  if (booking.plannedByTeam) return false;
+  if (options?.actorId && options.actorId === booking.userId) return false;
+  return true;
+}
+
 /**
  * Mail over een materiaal- of flesserke-aanvraag.
  *
@@ -179,12 +201,14 @@ async function deliver(recipient: Recipient, subject: string, text: string): Pro
 export async function notifyReservation(
   reservationId: string,
   event: UitleenMailEvent,
-  note?: string | null
+  note?: string | null,
+  options?: NotifyOptions
 ): Promise<void> {
   try {
     const reservation = await prisma.uitleenReservation.findUnique({
       where: { id: reservationId },
       select: {
+        userId: true,
         eventName: true,
         pickupDate: true,
         returnDate: true,
@@ -212,6 +236,7 @@ export async function notifyReservation(
       },
     });
     if (!reservation) return;
+    if (!shouldNotifyReservation(reservation, options)) return;
 
     const recipient = recipientOf(reservation.user, reservation.notifyEmail);
     const nl = recipient.locale !== 'en';
@@ -280,7 +305,8 @@ export async function notifyReservation(
 export async function notifyTransport(
   bookingIds: string[],
   event: UitleenMailEvent,
-  note?: string | null
+  note?: string | null,
+  options?: NotifyOptions
 ): Promise<void> {
   try {
     if (bookingIds.length === 0) return;
@@ -288,6 +314,8 @@ export async function notifyTransport(
       where: { id: { in: bookingIds } },
       orderBy: { startAt: 'asc' },
       select: {
+        userId: true,
+        plannedByTeam: true,
         purpose: true,
         startAt: true,
         endAt: true,
@@ -309,6 +337,8 @@ export async function notifyTransport(
     if (bookings.length === 0) return;
 
     const first = bookings[0];
+    if (!shouldNotifyTransport(first, options)) return;
+
     const recipient = recipientOf(first.user, first.notifyEmail);
     const nl = recipient.locale !== 'en';
     const words = eventWords(event, 'trip', recipient.locale);
@@ -415,7 +445,11 @@ async function writeDigestState(state: DigestState): Promise<void> {
 async function pendingFor(kind: NotifyKind): Promise<Array<{ id: string; startsAt: Date }>> {
   if (kind === 'transport') {
     const rows = await prisma.uitleenTransportBooking.findMany({
-      where: { teamNotifiedAt: null },
+      where: {
+        teamNotifiedAt: null,
+        plannedByTeam: false,
+        status: 'REQUESTED',
+      },
       orderBy: { createdAt: 'asc' },
       // Een bovengrens tegen een bundel van honderd aanvragen na een storing:
       // de rest volgt bij de volgende tick.
@@ -437,6 +471,7 @@ async function pendingFor(kind: NotifyKind): Promise<Array<{ id: string; startsA
   const rows = await prisma.uitleenReservation.findMany({
     where: {
       teamNotifiedAt: null,
+      status: 'REQUESTED',
       // Materiaal en flesserke zijn twee soorten melding op dezelfde tabel; welke
       // het is, volgt uit de lijnen die eraan hangen. Een aanvraag met allebei
       // hoort in allebei de bundels, want er kijken twee mensen naar.

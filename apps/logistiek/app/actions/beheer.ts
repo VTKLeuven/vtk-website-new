@@ -822,7 +822,8 @@ export async function approveReservationAction(
     'APPROVED',
     paymentMode === 'ONLINE'
       ? 'Betalen gebeurt online; je vindt de betaalknop bij je aanvraag.'
-      : 'Betalen gebeurt aan de balie bij het afhalen.'
+      : 'Betalen gebeurt aan de balie bij het afhalen.',
+    { actorId: session.user.id }
   );
 
   revalidateBeheer();
@@ -859,7 +860,7 @@ export async function rejectReservationAction(
     note: `reden: ${adminNote}`,
     actorId: session.user.id,
   });
-  await notifyReservation(reservationId, 'REJECTED', adminNote);
+  await notifyReservation(reservationId, 'REJECTED', adminNote, { actorId: session.user.id });
 
   revalidateBeheer();
   return saveOk();
@@ -1169,7 +1170,8 @@ export async function reopenReservationAction(reservationId: string): Promise<Ac
     'REOPENED',
     reservation.status === 'APPROVED'
       ? 'De goedkeuring is ingetrokken; je aanvraag wacht opnieuw op een beslissing.'
-      : 'De afwijzing is ingetrokken; je aanvraag wacht opnieuw op een beslissing.'
+      : 'De afwijzing is ingetrokken; je aanvraag wacht opnieuw op een beslissing.',
+    { actorId: session.user.id }
   );
 
   revalidateBeheer();
@@ -1471,7 +1473,7 @@ export async function adminEditFlesserkeReservationAction(
     return { ok: false, error: `Onvoldoende voorraad voor "${outcome.error.slice(6)}".` };
   }
 
-  await notifyReservation(reservationId, 'EDITED', outcome.changes?.join('\n'));
+  await notifyReservation(reservationId, 'EDITED', outcome.changes?.join('\n'), { actorId: session.user.id });
   revalidateBeheer();
   revalidatePath('/flesserke');
   return { ok: true, message: 'Flesserke-aanvraag bijgewerkt.' };
@@ -1595,7 +1597,7 @@ export async function shiftReservationDatesAction(
   // De aanvrager hoort dit te weten zonder in te loggen; bij een conflict tussen
   // twee aanvragen verschuif je ze allebei, en dan krijgt elke aanvrager de mail
   // over zijn eigen aanvraag.
-  await notifyReservation(reservationId, 'EDITED', outcome.note);
+  await notifyReservation(reservationId, 'EDITED', outcome.note, { actorId: session.user.id });
   revalidateBeheer();
   return saveOk();
 }
@@ -1729,7 +1731,7 @@ export async function adminEditReservationAction(
   if (outcome.error?.startsWith('STOCK:')) {
     return { ok: false, error: `Onvoldoende voorraad voor "${outcome.error.slice(6)}".` };
   }
-  await notifyReservation(reservationId, 'EDITED', outcome.changes?.join('\n'));
+  await notifyReservation(reservationId, 'EDITED', outcome.changes?.join('\n'), { actorId: session.user.id });
   revalidateBeheer();
   return { ok: true, message: 'Aanvraag bijgewerkt.' };
 }
@@ -2056,7 +2058,8 @@ export async function approveTransportAction(
       ? outcome.shifts.join('\n')
       : paymentMode === 'ONLINE'
         ? 'Betalen gebeurt online; je vindt de betaalknop bij je rit.'
-        : 'Betalen gebeurt aan de balie.'
+        : 'Betalen gebeurt aan de balie.',
+    { actorId: session.user.id }
   );
 
   revalidateBeheer();
@@ -2102,7 +2105,8 @@ export async function rejectTransportAction(_prev: SaveState, formData: FormData
   await notifyTransport(
     legs.map((leg) => leg.id),
     'REJECTED',
-    adminNote
+    adminNote,
+    { actorId: session.user.id }
   );
 
   revalidateBeheer();
@@ -2243,6 +2247,7 @@ export async function adminCreateTransportAction(
         overlapsPerIndex.set(index, overlapAuditNote(clashes));
       }
     }
+    const now = new Date();
     const created = await tx.uitleenTransportBooking.createManyAndReturn({
       data: built.bookings.map((booking) => ({
         ...booking,
@@ -2251,8 +2256,11 @@ export async function adminCreateTransportAction(
         // bij het veld in schema.prisma.
         plannedByTeam: true,
         driverId,
-        decidedAt: new Date(),
+        decidedAt: now,
         decidedById: session.user.id,
+        // Het team tekent dit zelf in en vraagt niets aan zichzelf; direct
+        // gemarkeerd zodat deze ritten nooit in de team-digest terechtkomen.
+        teamNotifiedAt: now,
       })),
       select: { id: true },
     });
@@ -2446,7 +2454,7 @@ export async function adminEditTransportAction(
 
   // Ná de transactie, zoals elke mail hier: anders vertrekt er bericht over een
   // wijziging die door een rollback nooit gebeurd is.
-  await notifyTransport([bookingId], 'EDITED', outcome.changes?.join('\n'));
+  await notifyTransport([bookingId], 'EDITED', outcome.changes?.join('\n'), { actorId: session.user.id });
 
   revalidateBeheer();
   return {
@@ -2599,7 +2607,7 @@ export async function changeVehicleAction(
     return { ok: false, error: 'Deze rit heeft een actieve of voltooide betaling en kan niet meer gewijzigd worden.' };
   }
 
-  await notifyTransport([bookingId], 'EDITED', `Voertuig gewijzigd naar ${outcome.vehicleName}.`);
+  await notifyTransport([bookingId], 'EDITED', `Voertuig gewijzigd naar ${outcome.vehicleName}.`, { actorId: session.user.id });
   revalidateBeheer();
   return {
     ok: true,
@@ -2720,7 +2728,8 @@ export async function reopenTransportAction(bookingId: string): Promise<ActionRe
     'REOPENED',
     booking.status === 'APPROVED'
       ? 'De goedkeuring is ingetrokken; je rit wacht opnieuw op een beslissing.'
-      : 'De afwijzing is ingetrokken; je rit wacht opnieuw op een beslissing.'
+      : 'De afwijzing is ingetrokken; je rit wacht opnieuw op een beslissing.',
+    { actorId: session.user.id }
   );
 
   revalidateBeheer();

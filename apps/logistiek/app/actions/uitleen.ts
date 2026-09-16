@@ -276,7 +276,8 @@ export async function editReservationAction(
     await notifyReservation(
       reservationId,
       'EDITED',
-      'De aanvraag is aangepast na de goedkeuring en moet opnieuw beslist worden.'
+      'De aanvraag is aangepast na de goedkeuring en moet opnieuw beslist worden.',
+      { actorId: session.user.id }
     );
     return {
       ok: true,
@@ -825,7 +826,8 @@ export async function editVanBookingAction(
     await notifyTransport(
       [bookingId],
       'EDITED',
-      'De rit is aangepast na de goedkeuring en moet opnieuw beslist worden.'
+      'De rit is aangepast na de goedkeuring en moet opnieuw beslist worden.',
+      { actorId: session.user.id }
     );
     return { ok: true, message: 'Rit bijgewerkt. Logistiek moet ze opnieuw goedkeuren.' };
   }
