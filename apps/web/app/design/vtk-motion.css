@@ -5,7 +5,7 @@
  * een servercomponent. Josh Comeau's uitleg over scroll-driven animations is de
  * bron van het patroon.
  *
- * Drie regels die je niet mag breken:
+ * Vier regels die je niet mag breken:
  *
  * 1. **Een begintoestand die iets verbergt, staat ALTIJD binnen de
  *    `@supports`-guard.** Lekt `opacity: 0` eruit, dan toont een browser zonder
@@ -29,6 +29,12 @@
  * overal waar `.prose-vtk` staat: in het voorbeeldvenster van de editor zit de
  * tekst in een eigen scrollcontainer, waar een `view()`-tijdlijn een kopje
  * halverwege zijn animatie kan laten staan.
+ *
+ * Alles hier hoort dus binnen `.vtk-motion` te staan. PageView importeert dit
+ * bestand, dus een regel die ook op een andere pagina mikt, loopt daar enkel na
+ * een client-side navigatie vanaf een contentpagina: de stylesheet blijft dan
+ * staan. Zulke regels horen in vtk-base.css, zoals de binnenkomst van de
+ * paginakop.
  */
 
 :root {
@@ -38,25 +44,10 @@
   --motion-inset: var(--vtk-header-height, 73px);
 }
 
-/* `translate`/`rotate`/`scale` als losse eigenschappen en niet als één
-   `transform`: zo kunnen twee animaties tegelijk op hetzelfde element lopen
-   (een foto schuift binnen én zoomt uit) zonder elkaar te overschrijven. */
-@keyframes vtk-rise {
-  from {
-    opacity: 0;
-    translate: 0 0.6em;
-  }
-}
-
-/* Woorden komen met een lichte kanteling binnen; dat leest speelser dan recht
-   omhoog schuiven. */
-@keyframes vtk-rise-tilt {
-  from {
-    opacity: 0;
-    translate: 0 0.7em;
-    rotate: -3deg;
-  }
-}
+/* `vtk-rise` en `vtk-rise-tilt` staan in vtk-base.css en niet hier: de
+   paginakop komt er ook mee binnen, en die kop staat op elke pagina terwijl dit
+   bestand enkel op een contentpagina geladen wordt. De keyframes hieronder zijn
+   wel van hier, want enkel de tekst gebruikt ze. */
 
 @keyframes vtk-slide-in {
   from {
@@ -65,8 +56,9 @@
   }
 }
 
-/* Continu, over de hele doorloop: de foto zoomt langzaam uit terwijl ze
-   voorbijkomt. Staat los van de binnenkomst hierboven. */
+/* De foto zoomt langzaam uit terwijl ze binnenschuift, en staat stil zodra ze
+   volledig in beeld is. Staat los van de binnenkomst hierboven; ze loopt trager
+   en over een ruimer bereik, zodat het beeld nog even nazakt. */
 @keyframes vtk-settle {
   from {
     scale: 1.06;
@@ -123,9 +115,13 @@
       animation-timeline:
         view(block var(--motion-inset) auto),
         view(block var(--motion-inset) auto);
+      /* Allebei de bereiken eindigen binnen `entry`, ook het uitzoomen. Dat
+         stond op `cover 0% cover 100%`, en `cover 100%` is pas bereikt wanneer
+         de foto er bovenaan weer uit geschoven is: een foto onderaan een pagina
+         komt daar nooit en bleef dus voorgoed lichtjes ingezoomd staan. */
       animation-range:
         entry 5% entry 70%,
-        cover 0% cover 100%;
+        entry 0% entry 100%;
     }
 
     /* `nth-of-type` telt enkel figuren tussen hun broers en zussen, dus dit is
@@ -207,39 +203,9 @@
   }
 }
 
-/* De paginakop staat bij het laden al in beeld. Een `view()`-tijdlijn is daar
-   meteen voorbij haar bereik, dus die kop zou als enige stil blijven; hij komt
-   daarom binnen op een gewone animatie bij het laden. Geen `@supports` nodig:
-   keyframe-animaties werken overal. */
-@media (prefers-reduced-motion: no-preference) {
-  .vtk-page-head .vtk-page-kicker,
-  .vtk-page-head .vtk-page-title,
-  .vtk-page-head .vtk-page-subtitle {
-    animation: vtk-rise 620ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
-  }
-
-  .vtk-page-head .vtk-page-title {
-    animation-delay: 60ms;
-  }
-
-  .vtk-page-head .vtk-page-subtitle {
-    animation-delay: 120ms;
-  }
-}
-
-/* De paginatitel komt woord na woord binnen bij het laden. Bij het laden en
-   niet op een tijdlijn: de kop staat al in beeld, dus een `view()`-tijdlijn is
-   daar meteen voorbij haar bereik. */
-@media (prefers-reduced-motion: no-preference) {
-  .vtk-page-head .vtk-word {
-    display: inline-block;
-    transform-origin: 0 85%;
-    animation: vtk-rise-tilt 620ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
-    animation-delay: calc(70ms + var(--i) * 55ms);
-  }
-
-  /* Anders zou de titel als geheel én per woord binnenkomen. */
-  .vtk-page-head .vtk-page-title:has(.vtk-word) {
-    animation: none;
-  }
-}
+/* De binnenkomst van de paginakop stond hier en staat nu in vtk-base.css, bij
+   de band zelf. Ze hangt niet aan het scrollen, en dit bestand wordt enkel door
+   PageView geladen terwijl `.vtk-page-head` op vierendertig pagina's staat: de
+   kop van /tickets of /praesidium animeerde daardoor wel na een klik vanaf een
+   contentpagina (de stylesheet blijft dan staan) en niet bij een directe
+   load. */

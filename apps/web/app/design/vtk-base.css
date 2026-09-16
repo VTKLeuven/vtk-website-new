@@ -831,6 +831,66 @@
   color: var(--on-dark-muted);
 }
 
+/* De kop komt binnen bij het laden, met een gewone keyframe-animatie en niet op
+   een `view()`-tijdlijn: hij staat bij het laden al in beeld, dus zo'n tijdlijn
+   is daar meteen voorbij haar bereik en zou de kop als enige stil laten staan.
+   Geen `@supports` nodig, want keyframe-animaties werken overal.
+
+   Dit hoort bij de band en dus in dit bestand, dat op elke pagina geladen wordt.
+   Het stond in vtk-motion.css, dat enkel door PageView geladen wordt; de kop van
+   een pagina zonder tekstkolom animeerde daardoor enkel wanneer je er via een
+   contentpagina belandde, want dan bleef die stylesheet staan.
+
+   `translate`/`rotate` als losse eigenschappen en niet als één `transform`: zo
+   kunnen twee animaties tegelijk op hetzelfde element lopen zonder elkaar te
+   overschrijven. vtk-motion.css laat de tekst met dezelfde twee binnenkomen. */
+@keyframes vtk-rise {
+  from {
+    opacity: 0;
+    translate: 0 0.6em;
+  }
+}
+
+/* Woorden komen met een lichte kanteling binnen; dat leest speelser dan recht
+   omhoog schuiven. */
+@keyframes vtk-rise-tilt {
+  from {
+    opacity: 0;
+    translate: 0 0.7em;
+    rotate: -3deg;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vtk-page-head .vtk-page-kicker,
+  .vtk-page-head .vtk-page-title,
+  .vtk-page-head .vtk-page-subtitle {
+    animation: vtk-rise 620ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+  }
+
+  .vtk-page-head .vtk-page-title {
+    animation-delay: 60ms;
+  }
+
+  .vtk-page-head .vtk-page-subtitle {
+    animation-delay: 120ms;
+  }
+
+  /* Een titel die in woorden gesplitst is (de contentpagina's), komt woord na
+     woord binnen. */
+  .vtk-page-head .vtk-word {
+    display: inline-block;
+    transform-origin: 0 85%;
+    animation: vtk-rise-tilt 620ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+    animation-delay: calc(70ms + var(--i) * 55ms);
+  }
+
+  /* Anders zou de titel als geheel én per woord binnenkomen. */
+  .vtk-page-head .vtk-page-title:has(.vtk-word) {
+    animation: none;
+  }
+}
+
 /* `.vtk-link` is navy, en dus onzichtbaar op de navy paginakop. Binnen de donkere
    band draait hij mee met de rest van de tekst; het gele onderstreepje blijft. */
 .vtk-page-head .vtk-link {

@@ -1808,10 +1808,25 @@ haar een gezicht; dit gaat over de tekst zelf.
 - **Een bereik eindigt binnen `entry`, niet binnen `cover`.** `cover 34%` ligt
   voorbij het punt waarop een element volledig in beeld staat. Kan de pagina niet
   verder scrollen (een korte pagina, het laatste blok onderaan), dan komt de
-  tijdlijn daar nooit en blijft dat blok halfdoorzichtig staan.
+  tijdlijn daar nooit en blijft dat blok halfdoorzichtig staan. Het uitzoomen van
+  een foto stond op `cover 0% cover 100%` en viel in dezelfde put: een foto die
+  een pagina afsluit, schuift er bovenaan nooit meer uit, dus ze bleef op een
+  hoog scherm voorgoed op `scale: 1.013` staan.
+- **Een foto in de tekst reserveert haar plaats.** De maten staan in de URL
+  (`?w=&h=`) en horen op de `img`. Zonder die maten is ze nul pixels hoog tot ze
+  geladen is, schuift de hele tekst eronder een fotohoogte naar beneden zodra ze
+  binnenkomt, en valt daarmee terug in haar `entry`-bereik: regels die er net nog
+  stonden, worden weer onzichtbaar. Na een refresh zit de foto in de cache en
+  klopt de layout wel, dus de bug ziet er willekeurig uit. Elke layoutverschuiving
+  is hier dus meer dan lelijk; ze draait de onthulling terug.
 - **De paginatitel staat bij het laden al in beeld, dus een `view()`-tijdlijn is
   daar meteen voorbij haar bereik.** Hij komt daarom binnen op een gewone
-  keyframe-animatie bij het laden, niet op een tijdlijn.
+  keyframe-animatie bij het laden, niet op een tijdlijn. Die animatie staat in
+  vtk-base.css en niet in vtk-motion.css: `.vtk-page-head` staat op elke pagina,
+  terwijl vtk-motion.css enkel door PageView geladen wordt. Stond ze daar, dan
+  animeerde de kop van /tickets of /praesidium enkel wanneer je er via een
+  contentpagina belandde, want een stylesheet blijft na een client-side
+  navigatie staan. Alles in vtk-motion.css hoort dus binnen `.vtk-motion`.
 - **De sticky sitekop bedekt de bovenkant van het scherm.** Zonder inset
   (`view(block var(--motion-inset) auto)`) is een kopje klaar met animeren
   terwijl het nog achter de header zit.
