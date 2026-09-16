@@ -252,7 +252,7 @@ every member of the post gets the role):
 | Role | Permissions | Granted to (post -> DEFAULT) |
 | --- | --- | --- |
 | `admin` (system) | all | IT, Groep 5 |
-| `praesidium` | `calendar.create`, `photos.upload`, `tickets.create`, `forms.create`, `users.search` | every post |
+| `praesidium` | `calendar.create`, `photos.upload`, `tickets.create`, `forms.create`, `users.search`, `shift.rewardRedeem`, `expenses.submit`, `signature.generate` | every post |
 | `werkgroep` | none (fill in the GUI) | - |
 | `medewerker` | none (fill in the GUI) | - |
 | `theokot` | `theokot.manage`, `theokot.pickup` | Theokot |
@@ -365,3 +365,18 @@ toe:
 Terugbetalen en inboeken zitten bewust **niet** in `expenses.managePost`: dat is
 geld en boekhouding, en een postverantwoordelijke die zijn eigen uitgaven op
 "betaald" kan zetten is precies het gat dat billsheet had.
+
+## E-mailhandtekening
+
+De handtekeninggenerator op `/account` hangt aan `signature.generate`. Daarvoor
+stond hij voor elk ingelogd lid open, en dat was te ruim: de handtekening draagt
+het VTK-schild én een functietitel, en wie geen post heeft hoort geen briefhoofd
+van de kring te kunnen plakken.
+
+Bewust een recht en geen harde check op "zit in een praesidiumpost" — hetzelfde
+patroon als `users.search`. De geseede rol `praesidium` draagt het, dus elk
+praesidiumlid houdt de generator zonder dat IT iets moet uitdelen; het beheer zet
+hem **per post** aan in `/admin/roles` door een rol met dit recht aan die post te
+hangen. Een werkgroep of losse post die hem nodig heeft, krijgt hem er dus
+expliciet bij. Zie `docs/design-decisions.md` ("De e-mailhandtekening is een
+recht, geen ledenfunctie").

@@ -7015,3 +7015,23 @@ staat, staat los in `Shift`, met zijn inschrijvingen. Een sjabloon verwijderen
 haalt dus enkel het sjabloon weg. Dat staat met zoveel woorden in de
 bevestigingsdialoog, want de omgekeerde vrees ("verlies ik de inschrijvingen van
 vorige maand?") is precies de reden waarom iemand van een opkuis afziet.
+
+## De e-mailhandtekening is een recht, geen ledenfunctie
+
+De handtekeninggenerator op `/account` bouwt een mailhandtekening met het
+VTK-schild, de naam van het lid en een functietitel. Hij stond voor elk ingelogd
+lid open, en dat is te ruim: een lid zonder post kon er "VTK <eender wat>" in
+zetten, en zo'n handtekening hangt aan mails die namens de kring de deur uitgaan.
+
+Daarom is het een permissie geworden: `signature.generate`, in de categorie
+`account`. Geen harde check op "zit in een praesidiumpost", om dezelfde reden als
+bij `grocomeet.reserve`: een recht kan je aan een rol hangen, een
+post-lidmaatschap niet. De geseede rol `praesidium` draagt het recht, dus elk
+praesidiumlid houdt de generator; het beheer zet hem **per post** aan in
+`/admin/roles` — een werkgroep, een losse post of één persoon die hem nodig heeft
+krijgt er een rol met dit recht bij.
+
+De generator zelf verandert niet: de HTML, de functiepresets uit de
+groepslidmaatschappen en het opslaan van de gegevens in de browser blijven zoals
+ze waren. Wie het recht niet heeft, ziet de kaart niet, en de lidmaatschappen
+worden voor die pagina dan ook niet meer opgehaald.

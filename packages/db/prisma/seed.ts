@@ -179,7 +179,8 @@ async function main() {
   //   - admin (alle rechten, systeemrol)                 -> IT + Groep 5
   //   - praesidium (calendar.create + photos.upload +    -> elke post
   //       tickets.create + forms.create + users.search +
-  //       shift.rewardRedeem + expenses.submit)
+  //       shift.rewardRedeem + expenses.submit +
+  //       signature.generate)
   //   - werkgroep, medewerker                            -> beschikbaar, nog niet toegekend
   //   - theokot (theokot.manage + theokot.pickup)        -> Theokot
   //   - één rol per post, met de postnaam                -> die post zelf
@@ -242,8 +243,8 @@ async function main() {
     "Praesidium",
     "Praesidium",
     1,
-    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) en formulieren voor de eigen groep aanmaken, foto's uploaden, gebruikers opzoeken en bonnetjes aanvaarden aan de toog.",
-    "Base role for every praesidium member: create events (incl. ticket events) and forms for the own group, upload photos, search users and accept vouchers at the bar.",
+    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) en formulieren voor de eigen groep aanmaken, foto's uploaden, gebruikers opzoeken, je e-mailhandtekening genereren en bonnetjes aanvaarden aan de toog.",
+    "Base role for every praesidium member: create events (incl. ticket events) and forms for the own group, upload photos, search users, generate your email signature and accept vouchers at the bar.",
   );
   await setRolePermissions(praesidiumRole.id, [
     "calendar.create",
@@ -259,6 +260,11 @@ async function main() {
     // voorschiet; beheren (terugbetalen, inboeken, doorsturen) blijft bij de rol
     // admin, dus bij IT en Groep 5.
     "expenses.submit",
+    // Je e-mailhandtekening genereren. De generator draagt het VTK-schild en een
+    // functietitel en stond vroeger voor elk ingelogd lid open; sinds deze
+    // permissie hangt hij aan een rol, zodat het beheer hem per post kan
+    // aanzetten (een werkgroep of losse post krijgt hem er in /admin/roles bij).
+    "signature.generate",
   ]);
   for (const g of GROUP_SEEDS) {
     await grantRoleToGroup(g.code, praesidiumRole.id, "DEFAULT");
