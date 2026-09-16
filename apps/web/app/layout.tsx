@@ -110,6 +110,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               data-before-send={analytics.beforeSend}
               data-exclude-search="true"
               data-exclude-hash="true"
+              data-performance="true"
             />
           </>
         )}

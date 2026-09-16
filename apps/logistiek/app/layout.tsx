@@ -29,6 +29,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             data-website-id={analytics.websiteId}
             data-exclude-search="true"
             data-exclude-hash="true"
+            data-performance="true"
           />
         )}
         <ImpersonationBanner />
