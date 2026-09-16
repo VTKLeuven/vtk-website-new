@@ -288,6 +288,25 @@ export const auth = betterAuth({
   // bijl; de echte bescherming tegen het raden van wachtwoorden zit per account
   // (`checkLoginBlocked` in server/selfSignup.ts), niet hier. Dit blijft staan
   // als vangnet tegen een bot die er in zijn eentje op los gaat.
+  //
+  // LET OP, dit is de val die ons een tweede keer klemzette: er zijn DRIE lagen,
+  // en `window`/`max` hieronder zijn enkel de onderste. `resolveRateLimitConfig`
+  // in better-auth kiest in deze volgorde, waarbij elke volgende de vorige
+  // overschrijft:
+  //
+  //   1. de globale `window`/`max` hieronder;
+  //   2. de ingebouwde regels van better-auth (`/sign-in*` op 3 per 10s);
+  //   3. de regels die een PLUGIN zelf meebrengt;
+  //   4. `customRules` hieronder, die als laatste komt en dus altijd wint.
+  //
+  // Laag 3 is het addertje. `@better-auth/oauth-provider` zet zijn eigen limiet
+  // op zijn eigen routes: `/oauth2/token` op 20 per minuut en
+  // `/oauth2/authorize` op 30 per minuut. Een globale `max` verhogen doet daar
+  // dus niets aan. En precies die token-route is server-naar-server: elke
+  // aanmelding op een SSO-client (de cursusdienst) komt van het ENE adres van
+  // die server, dus twintig aanmeldingen per minuut voor die hele site samen.
+  // Bij een lesuur dat uitgaat is dat in seconden op, en het lid ziet enkel de
+  // foutpagina van de client. Zie docs/sso.md.
   rateLimit: {
     window: 60,
     max: 2000,
@@ -298,6 +317,24 @@ export const auth = betterAuth({
       // Deze versturen mail; die blijven wél streng.
       '/request-password-reset': { window: 60, max: 10 },
       '/send-verification-email': { window: 60, max: 10 },
+
+      // De OAuth-routes, die de plugin anders op 20 tot 30 per minuut zet.
+      //
+      // Bewust een hoog plafond en niet `false` (waarmee je een route volledig
+      // vrijstelt): een client die op hol slaat, hoort nog steeds tegen een muur
+      // te lopen in plaats van ongelimiteerd onze database te mogen bevragen.
+      //
+      // `token`, `userinfo` en `introspect` praten server-naar-server en tellen
+      // dus per client-server, niet per lid. `authorize` komt wél uit de browser
+      // van het lid, maar dat lid deelt zijn adres met de halve campus.
+      '/oauth2/token': { window: 60, max: 2000 },
+      '/oauth2/authorize': { window: 60, max: 2000 },
+      '/oauth2/userinfo': { window: 60, max: 2000 },
+      '/oauth2/introspect': { window: 60, max: 2000 },
+      '/oauth2/revoke': { window: 60, max: 600 },
+      // `/oauth2/register` blijft op de strenge standaard van de plugin (5 per
+      // minuut): dat is dynamische clientregistratie en die hoort zeldzaam te
+      // zijn.
     },
   },
 

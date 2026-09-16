@@ -355,6 +355,32 @@ Elk punt hier heeft ooit tijd gekost.
     samen. Het echte slot op het raden van wachtwoorden is `checkLoginBlocked`,
     en dat werkt per account.
 
+16. **De plugin brengt haar eigen limieten mee, en die staan los van je globale
+    `max`.** Dit is dezelfde val als hierboven, maar een laag dieper, en ze heeft
+    ons een tweede ronde gekost: het verhogen van `rateLimit.max` loste de 429's
+    niet op. `resolveRateLimitConfig` kiest namelijk in vier stappen, waarbij
+    elke volgende de vorige overschrijft: de globale `window`/`max`, dan de
+    ingebouwde regels van better-auth, dan **de regels die een plugin zelf
+    meebrengt**, en pas als laatste `rateLimit.customRules`.
+
+    `@better-auth/oauth-provider` zet standaard `/oauth2/token` op **20 per
+    minuut** en `/oauth2/authorize` op **30 per minuut** (verder `/userinfo` 60,
+    `/introspect` 100, `/revoke` 30, `/register` 5). De token-route is
+    server-naar-server: élke aanmelding op een SSO-client komt van het ene adres
+    van die client-server, dus die twintig gelden voor die hele applicatie
+    samen. Eén lesuur dat uitgaat en de cursusdienst kan niemand meer aanmelden,
+    terwijl vtk.be zelf gewoon draait.
+
+    Overschrijven doe je in `rateLimit.customRules` (die wint van de plugin) of
+    via de eigen opties van de plugin. Zoek dus bij een 429 op een OAuth-route
+    niet naar je globale instelling maar naar deze laag.
+
+    Herkenbaar in de logs van de **client**, niet in die van ons:
+    `ERROR [Better Auth]:  { message: 'Too many requests...', status: 429 }`,
+    met twee spaties na de dubbele punt. Dat is `logger.error("", e)` in
+    `generic-oauth/routes.mjs`, waar de client de mislukte token-uitwisseling
+    opvangt.
+
 ---
 
 ## Bewust niet gebouwd
