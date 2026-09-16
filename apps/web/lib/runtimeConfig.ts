@@ -106,8 +106,34 @@ export async function getS3Status(): Promise<S3Status> {
   };
 }
 
+/**
+ * Hoe lang de gelezen DSN hergebruikt wordt.
+ *
+ * `app/layout.tsx` spuit de client-DSN in élk document, dus zonder deze memo
+ * deed elke paginaweergave van de hele site er een `Setting`-lezing voor. De
+ * server-side Sentry leest ze sowieso maar één keer, bij het opstarten (zie
+ * instrumentation.ts), dus een minuut naloop verandert niets aan wat er al
+ * gold. Zelfde patroon als `googleLinkGateEnabled` in lib/google/config.ts.
+ */
+const SENTRY_DSN_TTL_MS = 60_000;
+let sentryDsnCache: { dsn: string | undefined; until: number } | null = null;
+
 /** De Sentry-DSN (server + client delen dezelfde). DB wint; anders de omgeving. */
 export async function getSentryDsn(): Promise<string | undefined> {
+  const now = Date.now();
+  if (sentryDsnCache && sentryDsnCache.until > now) return sentryDsnCache.dsn;
+
+  const dsn = await readSentryDsn();
+  sentryDsnCache = { dsn, until: now + SENTRY_DSN_TTL_MS };
+  return dsn;
+}
+
+/** Gooit de memo weg; gebruikt nadat de DSN opgeslagen is. */
+export function forgetSentryDsn(): void {
+  sentryDsnCache = null;
+}
+
+async function readSentryDsn(): Promise<string | undefined> {
   try {
     const row = await prisma.setting.findUnique({ where: { key: SENTRY_SETTING_KEY } });
     const v = (row?.value ?? null) as unknown as StoredSentry | null;

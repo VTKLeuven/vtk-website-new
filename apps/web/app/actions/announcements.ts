@@ -1,9 +1,10 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { z } from "zod";
 import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
+import { ANNOUNCEMENT_TAG } from "@/lib/cachedContent";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
@@ -52,6 +53,17 @@ function revalidate() {
   // onzichtbaar tot ze vanzelf verloopt.
   revalidatePath("/", "layout");
   revalidatePath("/admin/aankondigingen");
+  // De publieke site leest de aankondiging uit een gedeelde cache
+  // (lib/cachedContent.ts) en `revalidatePath` raakt die niet: dat is een andere
+  // cache. Zonder deze regel staat een afgelasting pas een minuut later op de
+  // site, en dat is net het bericht dat niet mag wachten.
+  //
+  // `updateTag` en niet `revalidateTag(tag, 'max')`: die laatste is
+  // stale-while-revalidate, dus de eerstvolgende bezoeker krijgt nog steeds het
+  // oude bericht terwijl er op de achtergrond ververst wordt. Hier hoort de
+  // volgende bezoeker te wachten op de verse lezing. `updateTag` mag enkel
+  // vanuit een server action, en dat is precies waar deze helper vandaan komt.
+  updateTag(ANNOUNCEMENT_TAG);
 }
 
 export async function saveAnnouncementAction(

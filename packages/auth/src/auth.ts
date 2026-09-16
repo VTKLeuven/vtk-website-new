@@ -255,6 +255,22 @@ export const auth = betterAuth({
   session: {
     expiresIn: 60 * 60 * 24 * 30, // 30 day expiry
     updateAge: 60 * 60 * 24,
+    // De sessie komt uit een ondertekende cookie in plaats van uit de
+    // Session-tabel. Zonder dit deed élk verzoek van een ingelogd lid eerst een
+    // lezing op die tabel, nog voor onze eigen queries begonnen; bij een piek
+    // (ticketverkoop, 500 gelijktijdige bezoekers) is dat de duurste query die
+    // niets oplevert wat vijf minuten later niet nog waar is.
+    //
+    // Wat dit NIET uitstelt: een gedeactiveerd lid. Zowel `getSession` als
+    // `getGateUser` lezen `active` live uit de database, dus deactiveren werkt
+    // onmiddellijk. Wat wel tot `maxAge` kan nalopen, is het intrekken van een
+    // sessierij zelf ("overal afmelden"): op een ander toestel blijft de
+    // ondertekende cookie zolang geldig. Afmelden op het toestel zelf wist de
+    // cookie en werkt dus wel meteen.
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,
+    },
   },
 
   // ── Snelheidsbegrenzing ───────────────────────────────────────────────────

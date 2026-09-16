@@ -127,6 +127,64 @@ export async function getSession(headers: Headers): Promise<SessionPayload | nul
 }
 
 /**
+ * Het profiel dat de gate in `apps/web/proxy.ts` nodig heeft, en niets meer.
+ *
+ * Bewust een eigen query naast `getSession`: die lost ook posten, rollen en
+ * permissies op (`userGrantsInclude` hierboven), en dat is de zwaarste join van
+ * de site. De gate kijkt enkel of het profiel af is, of de studie nog bevestigd
+ * moet worden en of er een post is; permissies komen er niet aan te pas.
+ *
+ * Omdat de proxy op élk verzoek draait, betaalde een ingelogd lid die join
+ * voordien twee keer per paginaweergave: hier en nog eens tijdens de render. Die
+ * twee delen niets, want de React-`cache` van `getCurrentSession` geldt per
+ * render en de WeakMap van `getSessionCached` hangt aan het `Headers`-object,
+ * dat op de netwerkgrens een ander is dan in de render.
+ *
+ * `active` wordt wel degelijk gelezen: een gedeactiveerd lid hoort ook met een
+ * geldige cookie niets meer te zien, en die controle mag niet aan de
+ * cookie-cache van better-auth overgelaten worden.
+ */
+export type GateUser = {
+  onboarded: boolean;
+  isStudent: boolean;
+  studyConfirmedYear: number | null;
+  googleLinked: boolean;
+  googleLinkDeferredAt: string | null;
+  /** Zit dit lid dit werkingsjaar in een post of werkgroep? */
+  hasGroups: boolean;
+};
+
+export async function getGateUser(headers: Headers): Promise<GateUser | null> {
+  const betterSession = await auth.api.getSession({ headers });
+  if (!betterSession) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: betterSession.user.id },
+    select: {
+      active: true,
+      onboardedAt: true,
+      isStudent: true,
+      studyConfirmedYear: true,
+      googleUserId: true,
+      googleLinkDeferredAt: true,
+      // Enkel het aantal, niet de rijen: de gate wil weten óf er een post is.
+      _count: { select: { memberships: { where: { year: currentWorkingYear() } } } },
+    },
+  });
+
+  if (!user || !user.active) return null;
+
+  return {
+    onboarded: user.onboardedAt !== null,
+    isStudent: user.isStudent,
+    studyConfirmedYear: user.studyConfirmedYear,
+    googleLinked: user.googleUserId !== null,
+    googleLinkDeferredAt: user.googleLinkDeferredAt?.toISOString() ?? null,
+    hasGroups: user._count.memberships > 0,
+  };
+}
+
+/**
  * De sessie voor deze `Headers`, hoogstens één keer per object opgehaald.
  *
  * `getSession` doet een zware query (posten, rollen, permissies), dus elke

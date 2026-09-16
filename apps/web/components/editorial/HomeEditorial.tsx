@@ -3,9 +3,13 @@ import Link from "next/link";
 import type { CSSProperties } from "react";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
-import { getVisibleHeaderTabsForNav } from "@/lib/headerTabs";
 import { AANBOD_PHOTOS, aanbodCardBody } from "@/lib/aanbodCards";
-import { getMediaContent } from "@/lib/media-content";
+import {
+  getCachedHeaderTabs,
+  getCachedMediaContent,
+  getCachedPartners,
+  getCachedSettings,
+} from "@/lib/cachedContent";
 import { videoEmbed } from "@/lib/videoEmbed";
 import { getCurrentSession } from "@/lib/session";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
@@ -98,20 +102,17 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     barStatus,
     frontpage,
   ] = await Promise.all([
-    prisma.setting.findMany({
-      where: {
-        key: {
-          in: [
-            "home.openingHours.theokot",
-            "home.openingHours.cursusdienst",
-            "home.openingHours.elixir",
-            "home.career",
-            "home.slogans",
-            DEFAULT_EVENT_IMAGE_SETTING,
-          ],
-        },
-      },
-    }),
+    // Redactionele inhoud: voor elke bezoeker gelijk, dus uit de gedeelde cache
+    // (lib/cachedContent.ts). Wat hieronder persoonlijk is (de kalenderfilter,
+    // de sessie, de shiften, de POC's) blijft een lezing per verzoek.
+    getCachedSettings([
+      "home.openingHours.theokot",
+      "home.openingHours.cursusdienst",
+      "home.openingHours.elixir",
+      "home.career",
+      "home.slogans",
+      DEFAULT_EVENT_IMAGE_SETTING,
+    ]),
     // Dezelfde doelgroepregel als /kalender: standaard staat alles erop, en enkel
     // wie op /account koos zijn kalender toe te spitsen krijgt hier minder.
     //
@@ -135,13 +136,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         include: FRONTPAGE_EVENT_INCLUDE,
       }),
     ),
-    getVisibleHeaderTabsForNav(locale),
-    prisma.partner.findMany({
-      where: { active: true },
-      orderBy: [{ order: "asc" }, { name: "asc" }],
-      take: 12,
-    }),
-    getMediaContent(),
+    getCachedHeaderTabs(locale),
+    getCachedPartners(),
+    getCachedMediaContent(),
     // De POC-sectie is persoonlijk, dus de homepage leest de sessie. Dat maakt
     // de pagina dynamisch: ze wordt per bezoeker gerenderd in plaats van
     // gecachet. De rest van de pagina deed al een DB-lezing per render, dus dat

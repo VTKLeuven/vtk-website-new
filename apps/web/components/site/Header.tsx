@@ -1,10 +1,9 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { Search } from 'lucide-react';
-import { prisma } from '@vtk/db';
 import { getDictionary, pick, type Locale } from '@vtk/i18n';
 import { entryForDate, isClosedHours } from '@/components/editorial/hoursUtils';
-import { getVisibleHeaderTabsForNav } from '@/lib/headerTabs';
+import { getCachedHeaderTabs, getCachedSetting } from '@/lib/cachedContent';
 import { getCurrentSession } from '@/lib/session';
 import { hasPermission } from '@vtk/auth';
 import { hasPendingMeetingNotice } from '@/lib/meetings-server';
@@ -42,10 +41,13 @@ function AnonymousUserIcon({ className }: { className?: string }) {
 
 export async function Header({ locale }: { locale: Locale }) {
   const now = new Date();
-  const [tabs, session, theokotRow] = await Promise.all([
-    getVisibleHeaderTabsForNav(locale),
+  // De navigatie en de openingsuren zijn voor elke bezoeker gelijk en komen uit
+  // een gedeelde, kortlevende cache (lib/cachedContent.ts). Enkel de sessie is
+  // persoonlijk en wordt dus wel per verzoek gelezen.
+  const [tabs, session, theokotSetting] = await Promise.all([
+    getCachedHeaderTabs(locale),
     getCurrentSession(),
-    prisma.setting.findUnique({ where: { key: 'home.openingHours.theokot' } }),
+    getCachedSetting('home.openingHours.theokot'),
   ]);
   const dict = getDictionary(locale);
   const base = locale === 'nl' ? '' : '/en';
@@ -59,7 +61,7 @@ export async function Header({ locale }: { locale: Locale }) {
     ? await hasPendingMeetingNotice(session!.user.id, now)
     : false;
 
-  const theokot = theokotRow?.value as OpeningHoursSetting | undefined;
+  const theokot = theokotSetting as OpeningHoursSetting | undefined;
   const theoToday = theokot ? entryForDate(theokot.entries, now, locale) : undefined;
   const utilLeft =
     theoToday && !isClosedHours(theoToday.hours)

@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { AUTH_BASE_PATH, needsStudyConfirmation } from '@vtk/auth';
 import { googleLinkGateEnabled } from '@/lib/google/config';
-import { getSession } from '@vtk/auth/server';
+import { getGateUser, getSession } from '@vtk/auth/server';
 import {
   AUTHORIZATION_PREVIEW_COOKIE,
   blocksAuthorizationPreviewMutation,
@@ -83,10 +83,16 @@ async function gateRedirect(request: NextRequest, internalPath: string): Promise
 
   const [, locale, segment] = internalPath.split('/');
 
-  // Goedkope short-circuit: geen sessie -> anoniem -> geen gate. `getSession`
-  // geeft zonder geldige sessiecookie snel `null` terug (geen zware queries).
-  const session = await getSession(request.headers);
-  if (!session) return null;
+  // Goedkope short-circuit: geen sessie -> anoniem -> geen gate. `getGateUser`
+  // geeft zonder geldige sessiecookie snel `null` terug.
+  //
+  // Bewust `getGateUser` en niet `getSession`: de gate kijkt enkel naar het
+  // profiel, terwijl `getSession` daarbovenop posten, rollen en permissies
+  // oplost. Die join draaide hier op élk verzoek én nog eens tijdens de render,
+  // want de twee lagen delen hun cache niet (zie de toelichting bij
+  // `getGateUser` in packages/auth/src/server/session.ts).
+  const user = await getGateUser(request.headers);
+  if (!user) return null;
 
   const enPrefix = locale === 'en' ? '/en' : '';
 
@@ -97,7 +103,7 @@ async function gateRedirect(request: NextRequest, internalPath: string): Promise
   }
 
   // 1. Onboarding: profiel nog niet ingevuld -> eerst dat afwerken.
-  if (!session.user.onboarded) {
+  if (!user.onboarded) {
     if (segment !== 'onboarding') {
       return NextResponse.redirect(new URL(`${enPrefix}/onboarding`, request.url));
     }
@@ -109,7 +115,7 @@ async function gateRedirect(request: NextRequest, internalPath: string): Promise
   //    de mailinglijsten beperkt tot wie effectief nog studeert). Bewust het
   //    studiejaar (27 september) en niet het werkingsjaar (15 juli): in juli
   //    loopt het academiejaar nog en duidt iedereen zijn oude jaar aan.
-  if (needsStudyConfirmation(session.user)) {
+  if (needsStudyConfirmation(user)) {
     if (segment !== 'studie-bevestigen') {
       return NextResponse.redirect(new URL(`${enPrefix}/studie-bevestigen`, request.url));
     }
@@ -130,14 +136,14 @@ async function gateRedirect(request: NextRequest, internalPath: string): Promise
   //    doen aan wat de gate vraagt, en een gate die zo iemand van de hele site
   //    houdt is een storing. De gate komt na de uitsteltermijn gewoon terug.
   if (
-    !session.user.googleLinked &&
-    session.groups.length > 0 &&
+    !user.googleLinked &&
+    user.hasGroups &&
     segment !== 'koppel-vtk-account' &&
     // Als laatste gecheckt: dit leest de instellingen (een minuut gecachet), en
     // die moeite is nutteloos voor iemand die toch niet gegate wordt.
     (await googleLinkGateEnabled())
   ) {
-    const deferred = session.user.googleLinkDeferredAt;
+    const deferred = user.googleLinkDeferredAt;
     const stillDeferred =
       deferred !== null && Date.now() - Date.parse(deferred) < GOOGLE_LINK_DEFER_MS;
     if (!stillDeferred) {

@@ -2,23 +2,19 @@
  * Next.js instrumentation-hook. `register()` draait één keer wanneer de
  * server-instance start.
  *
- * Twee verantwoordelijkheden:
- *  1. Sentry initialiseren voor de juiste server-runtime (Node.js of edge).
- *  2. De Theokot no-show-verwerking periodiek draaien zonder externe cron: een
- *     `setInterval` roept `processDueNoShows` aan. Een globale flag voorkomt
- *     dubbele intervallen bij hot-reloads in dev. In deze single-container deploy
- *     draait er precies één instance; bij horizontaal schalen zou dit meervoudig
- *     draaien; de verwerking is echter idempotent via `session.processedAt`, dus
- *     dat levert hooguit dubbele mail-pogingen op (zie docs/design-decisions.md).
+ * Eén verantwoordelijkheid: Sentry initialiseren voor de juiste server-runtime
+ * (Node.js of edge), en de objectopslag laten resolven uit de live DB-config.
+ *
+ * Hier stond ook een `setInterval` die de Theokot-no-shows en de geplande
+ * lesbezoekmails verwerkte. Die is verhuisd naar `background-worker` in
+ * `infra/docker-compose.yml`, dat elke vijf minuten
+ * `POST /api/background/maintenance` klopt. Een timer in het renderproces draait
+ * mee in élke instance, dus zodra de website op meer dan één container draait
+ * verstuurt ze haar mail meervoudig; ze deelt bovendien het event loop met de
+ * paginaweergaven. Elke andere periodieke taak hier heeft allang haar eigen
+ * worker; dit was de laatste die dat niet had.
  */
 import * as Sentry from '@sentry/nextjs';
-
-const INTERVAL_MS = 5 * 60 * 1000; // elke 5 minuten
-
-declare global {
-  var __theokotNoShowTimer: NodeJS.Timeout | undefined;
-  var __theokotNoShowRunning: boolean | undefined;
-}
 
 export async function register(): Promise<void> {
   // Sentry per server-runtime laden (browser gebruikt instrumentation-client.ts).
@@ -39,40 +35,6 @@ export async function register(): Promise<void> {
     await import('./sentry.edge.config');
   }
 
-  // Theokot-timer enkel in de Node.js-runtime (niet edge/browser) en niet dubbel starten.
-  if (process.env.NEXT_RUNTIME == 'nodejs' && !globalThis.__theokotNoShowTimer) {
-    // niet gebruik maken van early return, want met npm run dev worden branches niet altijd correct gepruned en anders komen deze functies in de browser bundle terecht
-
-    const run = async () => {
-      if (globalThis.__theokotNoShowRunning) return;
-      globalThis.__theokotNoShowRunning = true;
-      try {
-        const { processDueNoShows } = await import('./lib/theokot-server');
-        const result = await processDueNoShows(new Date());
-        if (result.noShows > 0) {
-          console.info(
-            `[theokot] no-show-verwerking: ${result.noShows} bestelling(en) over ${result.sessions} sessie(s) gemarkeerd.`
-          );
-        }
-
-        const { processDueLesbezoekScheduledMails } = await import('./lib/lesbezoeken-server');
-        const lesbezoekResult = await processDueLesbezoekScheduledMails(new Date());
-        if (lesbezoekResult.sent > 0) {
-          console.info(
-            `[lesbezoeken] ${lesbezoekResult.sent} geplande mail(s) succesvol verzonden.`
-          );
-        }
-      } catch (err) {
-        console.error('[background-runner] periodieke verwerking mislukt:', err);
-      } finally {
-        globalThis.__theokotNoShowRunning = false;
-      }
-    };
-
-    // Kort na boot één keer draaien, daarna op interval.
-    globalThis.__theokotNoShowTimer = setInterval(run, INTERVAL_MS);
-    setTimeout(run, 15_000);
-  }
 }
 
 // Vangt automatisch alle onverwerkte server-side request-errors op (App Router

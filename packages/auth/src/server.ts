@@ -16,7 +16,7 @@ import { AUTH_BASE_PATH } from './index';
 export { hashPassword } from './logins/password';
 export { isKulEnabled } from './logins/kul';
 export { ApiHandler } from './apiHandlers/apiHandler';
-export { getSession } from './server/session';
+export { getSession, getGateUser, type GateUser } from './server/session';
 export { resolveClaims, type ResolveClaimsInput } from './server/claims';
 export { verifySignedOAuthQuery } from './server/oauthQuery';
 export { createUser, updateUser, setUserPassword, deleteUser } from './server/users';

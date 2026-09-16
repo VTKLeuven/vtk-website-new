@@ -254,6 +254,7 @@ Production runs on self-hosted Docker Compose with Caddy on the host as the publ
 - `forms-worker` (60s): form confirmation emails and daily digests.
 - `elixir-worker` (180s): Munisense sound meter polling for 't ElixIr bar status.
 - `shift-worker` (300s): automated shift reminder emails and push alerts.
+- `background-worker` (300s): Theokot no-show processing and scheduled lesbezoek emails.
 - `app-push-worker` (300s): automated mobile push notifications.
 - `vault-worker` (300s): Vaultwarden post membership synchronization.
 - `google-worker` (300s): Google Workspace group address synchronization.

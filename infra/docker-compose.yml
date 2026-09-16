@@ -54,6 +54,13 @@ services:
       GALLERY_DATABASE_HOST: immich-database
       # Object storage (Hetzner S3) is configured at runtime via Admin -> IT and
       # stored in the database. S3_* values from ../.env are only a fallback.
+    volumes:
+      # De geoptimaliseerde afbeeldingen van next/image (<distDir>/cache/images).
+      # Zonder dit volume sterft die cache met de container, en dan herencodeert
+      # sharp na élke deploy elke foto opnieuw, op hetzelfde event loop dat de
+      # pagina's rendert. Dat is precies op het moment dat er volk op de site zit,
+      # want een deploy valt zelden op een stil uur.
+      - web-image-cache:/app/apps/web/.next/cache/images
     ports:
       - '127.0.0.1:3011:3000'
 
@@ -356,6 +363,45 @@ services:
         - CMD-SHELL
         - >-
           test -n "$${APP_PUSH_MAINTENANCE_SECRET:-}" && test -f /tmp/app-push-worker-heartbeat && [ "$$(($$(date +%s) - $$(cat /tmp/app-push-worker-heartbeat)))" -lt 900 ]
+      interval: 60s
+      timeout: 5s
+      retries: 2
+      start_period: 90s
+
+  # De periodieke verwerking die geen eigen worker had: de Theokot-no-shows en de
+  # geplande lesbezoekmails. Die draaide als `setInterval` in het renderproces
+  # (`apps/web/instrumentation.ts`), en dat is de enige wekker die niet meeschaalt:
+  # een timer daar draait in elke instance mee, dus bij een tweede webcontainer
+  # vertrekt elke mail dubbel. Zelfde ritme als voorheen, vijf minuten.
+  background-worker:
+    image: curlimages/curl:8.10.1
+    restart: unless-stopped
+    depends_on:
+      web:
+        condition: service_started
+    env_file:
+      - ../.env
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        if [ -z "$${BACKGROUND_MAINTENANCE_SECRET:-}" ]; then
+          echo "Background worker disabled: BACKGROUND_MAINTENANCE_SECRET is empty"
+          while true; do sleep 3600; done
+        fi
+        while true; do
+          if curl --fail --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $${BACKGROUND_MAINTENANCE_SECRET}" \
+            http://web:3000/api/background/maintenance; then
+            date +%s > /tmp/background-worker-heartbeat
+          fi
+          sleep 300
+        done
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          test -n "$${BACKGROUND_MAINTENANCE_SECRET:-}" && test -f /tmp/background-worker-heartbeat && [ "$$(($$(date +%s) - $$(cat /tmp/background-worker-heartbeat)))" -lt 900 ]
       interval: 60s
       timeout: 5s
       retries: 2
@@ -676,3 +722,4 @@ volumes:
   postgres-data:
   immich-model-cache:
   vaultwarden-data:
+  web-image-cache:

@@ -2,7 +2,8 @@ import { headers } from "next/headers";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { AnnouncementModal } from "@/components/site/AnnouncementModal";
 import { Markdown } from "@/components/ui/Markdown";
-import { announcementFits, getCurrentAnnouncement } from "@/lib/announcements";
+import { announcementFits } from "@/lib/announcements";
+import { getCachedAnnouncement } from "@/lib/cachedContent";
 
 /**
  * Het aankondigingsvenster, voor elke pagina van de site.
@@ -13,13 +14,16 @@ import { announcementFits, getCurrentAnnouncement } from "@/lib/announcements";
  * beheer gekozen is; `announcementFits` beslist dat op basis van het pad.
  *
  * Het pad komt uit de `x-pathname`-header die `proxy.ts` zet, dezelfde bron als
- * de statistieken in `app/layout.tsx` gebruiken. Deze layout is toch al
- * dynamisch (de header leest de sessie), dus dit kost één query, geen
- * caching-omslag.
+ * de statistieken in `app/layout.tsx` gebruiken.
+ *
+ * De aankondiging zelf komt uit de gedeelde cache (lib/cachedContent.ts). Ze
+ * hangt in de layout en werd dus op élke pagina van de site opnieuw opgevraagd,
+ * terwijl het antwoord voor iedereen gelijk is. Publiceren of intrekken duwt de
+ * tag meteen om, zodat een afgelasting niet op de TTL moet wachten.
  */
 export async function SiteAnnouncement({ locale }: { locale: Locale }) {
   const pathname = (await headers()).get("x-pathname") ?? "";
-  const announcement = await getCurrentAnnouncement();
+  const announcement = await getCachedAnnouncement();
   if (!announcement || !announcementFits(announcement.scope, pathname)) return null;
 
   const dict = getDictionary(locale);

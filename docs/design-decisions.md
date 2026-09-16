@@ -228,9 +228,10 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 ### No-shows & bans
 
 - Een bestelling telt pas als **no-show** vanaf **15 min na sluitingstijd**
-  (`noShowGraceMinutes`). Verwerking gebeurt door een **ingebouwde scheduler**
-  (`apps/web/instrumentation.ts`) die periodiek `processDueNoShows` draait (geen
-  externe cron). Idempotent via `TheokotSession.processedAt`.
+  (`noShowGraceMinutes`). Verwerking gebeurt door de **`background-worker`** uit
+  `infra/docker-compose.yml`, die elke vijf minuten
+  `POST /api/background/maintenance` klopt en daar `processDueNoShows` draait.
+  Idempotent via `TheokotSession.processedAt`.
 - Bij een no-show krijgt de student een **waarschuwingsmail** (`lib/mail.ts`,
   nodemailer/SMTP; logt enkel wanneer SMTP niet geconfigureerd is).
 - Na **X** no-shows (`noShowThreshold`) volgt een **ban** van **Y** dagen
@@ -249,11 +250,16 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 
 ### Scheduler-caveat
 
-- De no-show-scheduler draait in-proces. In deze single-container deploy is er precies
-  één instance. Bij horizontaal schalen zou hij meervoudig draaien; de verwerking blijft
-  correct (idempotent via `processedAt`), maar mails zouden dan dubbel geprobeerd kunnen
-  worden. Verplaats de trigger in dat geval naar één externe cron die
-  `processDueNoShows` aanroept.
+- De trigger zat eerst **in het renderproces**: een `setInterval` in
+  `apps/web/instrumentation.ts`. Dat werkte zolang er precies één container was, maar het
+  is precies wat je tegenhoudt wanneer je er een tweede bij wil zetten: een timer in het
+  renderproces draait in élke instance, dus vanaf dat moment vertrekt elke no-show-mail
+  dubbel. Hij deelde bovendien het event loop met de paginaweergaven, terwijl de kring
+  daar tijdens een piek net alles van nodig heeft.
+- Hij staat nu in **`background-worker`** (`infra/docker-compose.yml`), hetzelfde
+  curl-patroon als elke andere periodieke taak hier. De verwerking blijft idempotent via
+  `processedAt`, dus een dubbele ronde is nog altijd onschadelijk; het verschil is dat er
+  nu maar één wekker is, los van hoeveel webcontainers er draaien.
 
 ### Permissies
 
