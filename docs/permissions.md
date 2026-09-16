@@ -252,7 +252,7 @@ every member of the post gets the role):
 | Role | Permissions | Granted to (post -> DEFAULT) |
 | --- | --- | --- |
 | `admin` (system) | all | IT, Groep 5 |
-| `praesidium` | `calendar.create`, `photos.upload`, `tickets.create`, `forms.create`, `users.search`, `shift.rewardRedeem`, `expenses.submit`, `signature.generate` | every post |
+| `praesidium` | `calendar.create`, `photos.upload`, `tickets.create`, `forms.create`, `users.search`, `shift.rewardRedeem`, `expenses.submit`, `signature.generate`, `shift.templates` | every post |
 | `werkgroep` | none (fill in the GUI) | - |
 | `medewerker` | none (fill in the GUI) | - |
 | `theokot` | `theokot.manage`, `theokot.pickup` | Theokot |
@@ -306,6 +306,14 @@ iederéén daarna neerzet, en aan het sjabloon `theokot` hangt code (elke
 verkoopdag van een nieuwe verkoopweek wordt ermee bemand). Meegeleverde
 sjablonen (`ShiftTemplate.builtIn`) zijn daarom wel bewerkbaar maar niet
 verwijderbaar. De keuzes erachter staan in `docs/design-decisions.md`.
+
+`shift.templates` zit in de geseede rol `praesidium`, en dus bij elk praesidiumlid.
+Dat is een bewuste, ruime keuze: elke post zet zijn eigen avonden op, en de reeks
+aan IT moeten vragen is precies waarom die sjablonen vroeger in de code stonden en
+niemand ze aanpaste. Het is een vertrekpunt, geen wet: afnemen doe je per rol in
+/admin/roles. **Let op:** een deploy draait de seed niet (enkel `migrate deploy` +
+`sync.ts`, en die raakt rol-grants bewust niet aan), dus op een bestaande databank
+moet je dit vinkje één keer zelf zetten.
 
 Geen van beide rechten is werkingsjaar- of postgebonden, maar de **keuzelijst met
 posten** is dat wel: wie geen superadmin is, ziet zijn eigen posten, plus de

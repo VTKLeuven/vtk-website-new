@@ -243,8 +243,8 @@ async function main() {
     "Praesidium",
     "Praesidium",
     1,
-    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) en formulieren voor de eigen groep aanmaken, foto's uploaden, gebruikers opzoeken, je e-mailhandtekening genereren en bonnetjes aanvaarden aan de toog.",
-    "Base role for every praesidium member: create events (incl. ticket events) and forms for the own group, upload photos, search users, generate your email signature and accept vouchers at the bar.",
+    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) en formulieren voor de eigen groep aanmaken, foto's uploaden, gebruikers opzoeken, je e-mailhandtekening genereren, bonnetjes aanvaarden aan de toog en shiftsjablonen beheren.",
+    "Base role for every praesidium member: create events (incl. ticket events) and forms for the own group, upload photos, search users, generate your email signature, accept vouchers at the bar and manage shift templates.",
   );
   await setRolePermissions(praesidiumRole.id, [
     "calendar.create",
@@ -265,6 +265,12 @@ async function main() {
     // permissie hangt hij aan een rol, zodat het beheer hem per post kan
     // aanzetten (een werkgroep of losse post krijgt hem er in /admin/roles bij).
     "signature.generate",
+    // De shiftsjablonen beheren. Bewust ruim gezet: elke post zet zijn eigen
+    // avonden op, en de reeks aan IT moeten vragen is precies waarom die
+    // sjablonen vroeger in de code stonden en niemand ze aanpaste. Het is wél
+    // een breed recht (je wijzigt de reeks die iederéén daarna neerzet), dus het
+    // is een vertrekpunt en geen wet: afnemen doe je per rol in /admin/roles.
+    "shift.templates",
   ]);
   for (const g of GROUP_SEEDS) {
     await grantRoleToGroup(g.code, praesidiumRole.id, "DEFAULT");
