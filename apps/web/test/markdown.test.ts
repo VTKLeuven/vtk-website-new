@@ -78,3 +78,38 @@ describe("isVideoUrl", () => {
     expect(isVideoUrl("")).toBe(false);
   });
 });
+
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { Markdown } from "@/components/ui/Markdown";
+
+function render(markdown: string): string {
+  return renderToStaticMarkup(createElement(Markdown, null, markdown));
+}
+
+/**
+ * Een foto zonder gereserveerde hoogte duwt bij het laden de hele tekst eronder
+ * naar beneden, en omdat de onthulling van die tekst aan een `view()`-tijdlijn
+ * hangt, wordt elke regel die meeschuift weer onzichtbaar. De maten staan al in
+ * de URL; ze moeten enkel op de `img` terechtkomen.
+ */
+describe("maten van een foto in de tekst", () => {
+  it("zet de maten uit de URL op een losstaande foto", () => {
+    const html = render('![Arenberg](/api/media/images/foto.jpg?w=1600&h=1067 "Bijschrift")');
+    expect(html).toContain('width="1600"');
+    expect(html).toContain('height="1067"');
+  });
+
+  it("zet ze ook op een foto midden in een alinea", () => {
+    const html = render("Kijk ![Arenberg](/api/media/images/foto.jpg?w=800&h=600) hier.");
+    expect(html).toContain('width="800"');
+    expect(html).toContain('height="600"');
+  });
+
+  it("verzint geen maten voor een foto zonder maten in haar URL", () => {
+    const html = render("![Arenberg](/api/media/images/foto.jpg)");
+    expect(html).toContain("<img");
+    expect(html).not.toContain("width=");
+    expect(html).not.toContain("height=");
+  });
+});

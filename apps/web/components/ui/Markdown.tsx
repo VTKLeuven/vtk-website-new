@@ -2,7 +2,7 @@ import { Children, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { DEFAULT_LOCALE, type Locale } from "@vtk/i18n";
-import { galleryPhotos, solePhoto } from "@/lib/gallery";
+import { galleryPhotos, imageSize, solePhoto } from "@/lib/gallery";
 import { headingId, headingText } from "@/lib/pageOutline";
 import { LETTER_LIMIT, revealLetters, revealWords } from "@/lib/revealWords";
 import { isVideoUrl } from "@/lib/videoEmbed";
@@ -165,8 +165,21 @@ export function Markdown({
           if (srcString && isVideoUrl(srcString)) {
             return <InlineVideoPlayer src={srcString} title={alt || undefined} />;
           }
+          // De maten uit de URL (`?w=&h=`, geschreven bij het uploaden) horen op
+          // de `img` zelf. De CSS geeft haar `width: 100%; height: auto`, dus
+          // zonder die maten is een foto nul pixels hoog tot ze geladen is en
+          // schuift de hele tekst eronder een fotohoogte naar beneden zodra ze
+          // binnenkomt. Dat verspringen is hier meer dan lelijk: de onthulling
+          // van de tekst hangt aan een `view()`-tijdlijn, dus elke regel die
+          // meeschuift valt terug in haar `entry`-bereik en wordt opnieuw
+          // onzichtbaar. Iemand die de pagina voor het eerst opent, ziet regels
+          // die er net nog stonden weer verdwijnen; na een refresh zit de foto
+          // in de cache en klopt de layout wel. `PageGallery` geeft ze om
+          // dezelfde reden mee. Een foto die van voor die uploadroute dateert,
+          // heeft geen maten in haar URL en blijft verspringen.
+          const size = srcString ? imageSize(srcString) : null;
           // eslint-disable-next-line @next/next/no-img-element
-          return <img src={src} alt={alt} />;
+          return <img src={src} alt={alt} width={size?.width} height={size?.height} />;
         },
       }}
     >
