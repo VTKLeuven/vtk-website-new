@@ -28,6 +28,7 @@ export type SearchableAlbum = {
   date: string | null;
   year: number | null;
   photoCount: number;
+  subAlbums?: Array<{ title: string; slug?: string }>;
 };
 
 /** De albums die bij de zoekterm passen, als gewone zoekresultaten. */
@@ -39,7 +40,9 @@ export function matchAlbums(
   const results: SearchResult[] = [];
 
   for (const album of albums) {
-    const rank = scoreTextMatch(album.title, album.description, query);
+    const subTitles = album.subAlbums?.map((s) => s.title).join(" ") || "";
+    const searchableTitle = subTitles ? `${album.title} ${subTitles}` : album.title;
+    const rank = scoreTextMatch(searchableTitle, album.description, query);
     if (rank === 0) continue;
 
     results.push({

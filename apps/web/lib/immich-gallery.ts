@@ -27,6 +27,8 @@ export type {
   GalleryAlbum,
   GalleryAlbumSummary,
   GalleryPhoto,
+  GallerySubAlbum,
+  GallerySubAlbumSummary,
 } from "@vtk/gallery";
 
 export {

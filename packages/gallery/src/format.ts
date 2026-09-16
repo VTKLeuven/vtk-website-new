@@ -81,12 +81,51 @@ export function fileTitle(filename: string): string {
     .trim();
 }
 
+export type ParsedAlbumMarkers = {
+  parent?: string;
+  group?: string;
+  tab?: string;
+  titlePrefix?: string;
+  titleSuffix?: string;
+};
+
+export function parseAlbumMarkers(description: string | null | undefined, title = ''): ParsedAlbumMarkers {
+  const desc = String(description || '');
+  const result: ParsedAlbumMarkers = {};
+
+  const parentMatch = desc.match(/\[parent:\s*([^\]]+)\]/i);
+  if (parentMatch?.[1]) {
+    result.parent = parentMatch[1].trim();
+  }
+
+  const groupMatch = desc.match(/\[group:\s*([^\]]+)\]/i);
+  if (groupMatch?.[1]) {
+    result.group = groupMatch[1].trim();
+  }
+
+  const tabMatch = desc.match(/\[tab:\s*([^\]]+)\]/i);
+  if (tabMatch?.[1]) {
+    result.tab = tabMatch[1].trim();
+  }
+
+  const trimmedTitle = title.trim();
+  const delimiterMatch = trimmedTitle.match(/^(.+?)\s*(?:::|:|\/\/)\s*(.+)$/);
+  if (delimiterMatch?.[1] && delimiterMatch?.[2]) {
+    result.titlePrefix = delimiterMatch[1].trim();
+    result.titleSuffix = delimiterMatch[2].trim();
+  }
+
+  return result;
+}
+
 export function stripMarkers(description: string | null | undefined, markers: string[]): string {
   let raw = String(description || '');
   for (const marker of markers) {
     if (!marker) continue;
     raw = raw.split(marker).join('');
   }
+  raw = raw.replace(/\[(parent|group|tab):\s*[^\]]+\]/gi, '');
+
   return raw
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')

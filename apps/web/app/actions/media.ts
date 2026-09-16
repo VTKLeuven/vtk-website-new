@@ -215,7 +215,19 @@ export async function createImmichAlbumAction(
 ): Promise<{ ok: boolean; albumId?: string; error?: string }> {
   await requirePermission("media.manage");
   const title = readField(formData, "title");
-  const description = readField(formData, "description", 1000);
+  let description = readField(formData, "description", 1000);
+  const parentSlug = readField(formData, "parentSlug", 100);
+  const tabName = readField(formData, "tabName", 100);
+
+  if (parentSlug) {
+    const parentMarker = `[parent: ${parentSlug}]`;
+    const tabMarker = tabName ? ` [tab: ${tabName}]` : "";
+    description = description ? `${description}\n\n${parentMarker}${tabMarker}` : `${parentMarker}${tabMarker}`;
+  } else if (tabName) {
+    const tabMarker = `[tab: ${tabName}]`;
+    description = description ? `${description}\n\n${tabMarker}` : tabMarker;
+  }
+
   if (!title) return { ok: false, error: "missing_title" };
   const target = await readGalleryTarget(formData);
   if (!target) return { ok: false, error: "fakbar_upload_disabled" };

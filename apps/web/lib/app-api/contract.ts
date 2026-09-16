@@ -698,8 +698,17 @@ export type AppPhoto = {
   filename: string;
 };
 
+export type AppSubAlbum = {
+  id: string;
+  slug: string;
+  title: string;
+  photoCount: number;
+  photos: AppPhoto[];
+};
+
 export type AppAlbumDetail = AppAlbum & {
   photos: AppPhoto[];
+  subAlbums?: AppSubAlbum[];
 };
 
 export type AppPublication = {

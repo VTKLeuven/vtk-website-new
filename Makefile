@@ -16,7 +16,7 @@ COMPOSE := docker compose -f infra/compose.dev.yml
 .DEFAULT_GOAL := help
 
 .PHONY: help up down db postgres admin dev logistiek seed migrate generate deps \
-        lint test verify psql logs status backup backups restore reset fixtures
+        lint test verify psql logs status backup backups backup-immich restore reset fixtures
 
 ## help: show this list
 help:
@@ -148,6 +148,10 @@ backup:
 ## backups: list the backups on disk
 backups:
 	@scripts/db-backup.sh --list
+
+## backup-immich: sync Immich media and DB dumps to Google Drive (rclone)
+backup-immich:
+	scripts/immich-backup.sh
 
 ## restore: load a dump back in; FILE=backups/<run>/vtk.sql.gz (DESTRUCTIVE)
 restore:

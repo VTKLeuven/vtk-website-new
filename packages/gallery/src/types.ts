@@ -13,6 +13,18 @@ export type GalleryPhoto = {
   downloadUrl: string;
 };
 
+export type GallerySubAlbum = {
+  id: string;
+  slug: string;
+  title: string;
+  photoCount: number;
+  coverPhoto: GalleryPhoto | null;
+  photos: GalleryPhoto[];
+  shareUrl: string;
+};
+
+export type GallerySubAlbumSummary = Omit<GallerySubAlbum, 'photos' | 'shareUrl'>;
+
 export type GalleryAlbum = {
   id: string;
   slug: string;
@@ -25,9 +37,12 @@ export type GalleryAlbum = {
   photos: GalleryPhoto[];
   shareUrl: string;
   updatedAt: string | null;
+  subAlbums?: GallerySubAlbum[];
 };
 
-export type GalleryAlbumSummary = Omit<GalleryAlbum, 'photos' | 'shareUrl'>;
+export type GalleryAlbumSummary = Omit<GalleryAlbum, 'photos' | 'shareUrl' | 'subAlbums'> & {
+  subAlbums?: GallerySubAlbumSummary[];
+};
 
 /**
  * Een album dat de merker van meer dan één galerij draagt. Het verschijnt

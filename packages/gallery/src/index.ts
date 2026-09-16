@@ -4,6 +4,8 @@ export type {
   GalleryAlbum,
   GalleryAlbumSummary,
   GalleryPhoto,
+  GallerySubAlbum,
+  GallerySubAlbumSummary,
 } from './types';
 
 export {
@@ -41,7 +43,15 @@ export {
   uploadImmichAsset,
 } from './immich';
 
-export { downloadFilenameFromResponse, sanitizeFilename, slugify } from './format';
+export {
+  downloadFilenameFromResponse,
+  parseAlbumMarkers,
+  sanitizeFilename,
+  slugify,
+  stripMarkers,
+  type ParsedAlbumMarkers,
+} from './format';
+export { groupAlbums, type MappedAlbumEntry } from './grouping';
 
 export {
   TAKEDOWN_LIMITS,

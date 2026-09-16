@@ -16,6 +16,7 @@ type Progress = { total: number; done: number; errors: number };
 export function ImmichAlbumUploader({
   locale,
   fakbarEnabled = false,
+  albums = [],
 }: {
   locale: "nl" | "en";
   /**
@@ -24,11 +25,15 @@ export function ImmichAlbumUploader({
    * lib/fakbar-gallery.ts).
    */
   fakbarEnabled?: boolean;
+  albums?: Array<{ slug: string; title: string }>;
 }) {
   const nl = locale === "nl";
   const [gallery, setGallery] = useState<"main" | "fakbar">("main");
   const [files, setFiles] = useState<File[]>([]);
   const [coverIndex, setCoverIndex] = useState(0);
+  const [isSubAlbum, setIsSubAlbum] = useState(false);
+  const [parentSlug, setParentSlug] = useState("");
+  const [tabName, setTabName] = useState("");
   const [progress, setProgress] = useState<Progress | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -54,6 +59,12 @@ export function ImmichAlbumUploader({
     // De bestemming komt uit de state, niet uit een veld dat ook zonder de
     // schakelaar meegestuurd zou kunnen worden.
     data.set("gallery", fakbarEnabled ? gallery : "main");
+    if (gallery === "main" && isSubAlbum && parentSlug) {
+      data.set("parentSlug", parentSlug);
+      if (tabName.trim()) {
+        data.set("tabName", tabName.trim());
+      }
+    }
     if (files.length === 0) {
       setError(nl ? "Kies eerst foto's om te uploaden." : "Pick photos to upload first.");
       return;
@@ -120,6 +131,9 @@ export function ImmichAlbumUploader({
     setProgress(null);
     setFiles([]);
     setCoverIndex(0);
+    setIsSubAlbum(false);
+    setParentSlug("");
+    setTabName("");
     form.reset();
     const base =
       errors === 0
@@ -147,6 +161,54 @@ export function ImmichAlbumUploader({
         <Label>{nl ? "Beschrijving (optioneel)" : "Description (optional)"}</Label>
         <Input name="description" maxLength={1000} />
       </div>
+      {albums && albums.length > 0 && gallery === "main" ? (
+        <div className="md:col-span-2 space-y-2 rounded-lg border border-zinc-200 p-3 bg-zinc-50/50">
+          <label className="flex items-center gap-2 text-sm font-medium">
+            <input
+              type="checkbox"
+              checked={isSubAlbum}
+              onChange={(e) => {
+                setIsSubAlbum(e.target.checked);
+                if (e.target.checked && !parentSlug && albums[0]) {
+                  setParentSlug(albums[0].slug);
+                }
+              }}
+            />
+            <span>
+              {nl
+                ? "Dit album is een subalbum van een bestaand evenement (tabs)"
+                : "This album is a sub-album of an existing event (tabs)"}
+            </span>
+          </label>
+          {isSubAlbum ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
+              <div>
+                <Label>{nl ? "Hoofdalbum (evenement)" : "Parent album (event)"}</Label>
+                <select
+                  className="w-full rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm"
+                  value={parentSlug}
+                  onChange={(e) => setParentSlug(e.target.value)}
+                >
+                  {albums.map((a) => (
+                    <option key={a.slug} value={a.slug}>
+                      {a.title} ({a.slug})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <Label>{nl ? "Tabnaam (bijv. Photobooth of Zaal)" : "Tab name (e.g. Photobooth or Zaal)"}</Label>
+                <Input
+                  value={tabName}
+                  onChange={(e) => setTabName(e.target.value)}
+                  placeholder={nl ? "Photobooth" : "Photobooth"}
+                  maxLength={50}
+                />
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       {fakbarEnabled ? (
         <div className="md:col-span-2">
           <Label>{nl ? "Naar welke galerij" : "Which gallery"}</Label>

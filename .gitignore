@@ -64,6 +64,11 @@ infra/immich/.env
 infra/immich/data
 infra/immich/seed/photos
 infra/immich/seed/state.json
+infra/comfyui/models
+infra/comfyui/input
+infra/comfyui/output
+infra/whishper/data
+infra/whishper/.env
 
 .vscode
 .agents

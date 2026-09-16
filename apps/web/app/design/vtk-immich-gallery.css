@@ -1003,3 +1003,69 @@
     flex: 1 1 100%;
   }
 }
+
+/* Sub-album tabs */
+.vtk-album-tab-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.vtk-album-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 28px;
+  padding: 4px 2px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.vtk-album-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.vtk-album-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 18px;
+  border-radius: 9999px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 180ms ease;
+}
+
+.vtk-album-tab:hover {
+  background: var(--paper-2);
+  border-color: var(--line-dark, #cbd5e1);
+}
+
+.vtk-album-tab.is-active {
+  background: var(--navy);
+  color: #fff;
+  border-color: var(--navy);
+  font-weight: 600;
+}
+
+.vtk-album-tab-count {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  background: var(--paper-2);
+  color: var(--muted);
+  transition: all 180ms ease;
+}
+
+.vtk-album-tab.is-active .vtk-album-tab-count {
+  background: rgba(255, 255, 255, 0.2);
+  color: #fff;
+}

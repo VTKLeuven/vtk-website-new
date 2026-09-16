@@ -38,6 +38,19 @@ export async function GET(request: Request, context: { params: Promise<{ slug: s
         downloadUrl: absoluteUrl(request, photo.downloadUrl) as string,
         filename: photo.filename,
       })),
+      subAlbums: album.subAlbums?.map((sub) => ({
+        id: sub.id,
+        slug: sub.slug,
+        title: sub.title,
+        photoCount: sub.photoCount,
+        photos: sub.photos.map((photo) => ({
+          id: photo.id,
+          url: absoluteUrl(request, photo.previewUrl) as string,
+          thumbUrl: absoluteUrl(request, photo.thumbnailUrl) as string,
+          downloadUrl: absoluteUrl(request, photo.downloadUrl) as string,
+          filename: photo.filename,
+        })),
+      })),
     };
 
     return appJson(request, payload);

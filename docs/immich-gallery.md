@@ -32,6 +32,25 @@ The old `/fotos` routes redirect to `/media`.
 
 Albums without the marker stay hidden.
 
+### Sub-albums (Tabs per evenement)
+
+Voor evenementen met meerdere fotoseries (bijvoorbeeld het Galabal met "Zaal" en "Photobooth") kunnen albums worden gegroepeerd tot één albumpagina met tabs (`/media/galabal-2026?sub=photobooth`).
+
+In Immich kan dit op drie manieren worden ingesteld:
+
+1. **Via `[parent: ...]` (Aanbevolen):**
+   - Hoofdalbum: Titel `Galabal 2026`, beschrijving: `[gallery] [tab: Zaal]`
+   - Deelalbum: Titel `Galabal 2026 - Photobooth`, beschrijving: `[gallery] [parent: galabal-2026] [tab: Photobooth]`
+2. **Via `[group: ...]`:**
+   - Album 1: `[gallery] [group: galabal-2026] [tab: Zaal]`
+   - Album 2: `[gallery] [group: galabal-2026] [tab: Photobooth]`
+3. **Via titelpatroon (`Event: Tab`):**
+   - Album 1: Titel `Galabal 2026: Zaal`, beschrijving `[gallery]`
+   - Album 2: Titel `Galabal 2026: Photobooth`, beschrijving `[gallery]`
+   (Zodra 2 of meer albums hetzelfde voorvoegsel delen, worden ze automatisch als tabs gegroepeerd).
+
+Op `/media` verschijnt slechts één overzichtskaart met het totaal aantal foto's. Gezichtsherkenning zoekt automatisch over alle sub-albums van het evenement.
+
 ## Environment
 
 Copy `.env.example` to `.env` and fill in the gallery values:

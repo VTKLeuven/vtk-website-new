@@ -9,10 +9,12 @@ import {
   createSlugAllocator,
   dateValue,
   fileTitle,
+  parseAlbumMarkers,
   photoDate,
   sanitizeFilename,
   stripMarkers,
 } from './format';
+import { groupAlbums, type MappedAlbumEntry } from './grouping';
 import type {
   AmbiguousAlbum,
   DownloadTarget,
@@ -268,7 +270,7 @@ export function createGalleryClient({
     mine.sort((left, right) => dateValue(right.startDate) - dateValue(left.startDate));
 
     const allocateSlug = createSlugAllocator();
-    const albums: GalleryAlbum[] = [];
+    const mappedEntries: MappedAlbumEntry[] = [];
 
     for (const album of mine) {
       const publicDescription = stripMarkers(album.description || '', allMarkers);
@@ -284,24 +286,49 @@ export function createGalleryClient({
       }
 
       const slug = allocateSlug(album.albumName || 'album');
-      albums.push(
-        mapAlbumDetail({
-          album,
-          slug,
-          shareKey: sharedLink.key,
-          markers: allMarkers,
-          publicProxyUrl: config.publicProxyUrl,
-        }),
-      );
+      const mapped = mapAlbumDetail({
+        album,
+        slug,
+        shareKey: sharedLink.key,
+        markers: allMarkers,
+        publicProxyUrl: config.publicProxyUrl,
+      });
+
+      mappedEntries.push({
+        album: mapped,
+        markers: parseAlbumMarkers(album.description, album.albumName || ''),
+        rawTitle: album.albumName || '',
+        rawDescription: album.description || '',
+      });
+    }
+
+    const albums = groupAlbums(mappedEntries, downloadPath);
+
+    const bySlug = new Map<string, GalleryAlbum>();
+    for (const album of albums) {
+      bySlug.set(album.slug, album);
+    }
+    for (const entry of mappedEntries) {
+      if (!bySlug.has(entry.album.slug)) {
+        const parent = albums.find((a) => a.subAlbums?.some((sub) => sub.id === entry.album.id));
+        if (parent) {
+          bySlug.set(entry.album.slug, parent);
+        }
+      }
     }
 
     return {
       generatedAt: new Date().toISOString(),
       albums,
       summaries: albums.map(
-        ({ photos: _photos, shareUrl: _shareUrl, ...summary }): GalleryAlbumSummary => summary,
+        ({ photos: _photos, shareUrl: _shareUrl, subAlbums, ...summary }): GalleryAlbumSummary => ({
+          ...summary,
+          subAlbums: subAlbums?.map(
+            ({ photos: _subPhotos, shareUrl: _subShareUrl, ...subSummary }) => subSummary,
+          ),
+        }),
       ),
-      bySlug: new Map(albums.map((album) => [album.slug, album])),
+      bySlug,
       ambiguous,
     };
   }
@@ -344,7 +371,9 @@ export function createGalleryClient({
       const album = snapshot.bySlug.get(slug);
       if (!album) throw new GalleryError(404, 'Album not found.', 'album_not_found');
 
-      const photo = album.photos.find((item) => item.id === assetId);
+      const photo =
+        album.photos.find((item) => item.id === assetId) ||
+        album.subAlbums?.flatMap((sub) => sub.photos).find((item) => item.id === assetId);
       if (!photo) throw new GalleryError(404, 'Photo not found in this gallery album.', 'photo_not_found');
 
       return { album, photo: { ...photo, filename: sanitizeFilename(photo.filename, `${album.slug}.jpg`) } };

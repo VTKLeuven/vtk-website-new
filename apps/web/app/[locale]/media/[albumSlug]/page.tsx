@@ -8,6 +8,7 @@ import { getImmichFaceSearchPublicConfig } from "@/lib/immich-face-search";
 import { getImmichGalleryAlbum } from "@/lib/immich-gallery";
 import { buildMetadata } from "@/lib/seo";
 import { AlbumViewer } from "./AlbumViewer";
+import { AlbumTabViewer } from "./AlbumTabViewer";
 import { FaceSearchPanel } from "./FaceSearchPanel";
 
 export const dynamic = "force-dynamic";
@@ -192,19 +193,41 @@ export default async function MediaAlbumPage({ params }: { params: Params }) {
                 }}
               />
             ) : null}
-            <AlbumViewer
-              albumSlug={album.slug}
-              photos={album.photos.map((photo) => ({
-                id: photo.id,
-                title: photo.title,
-                width: photo.width,
-                height: photo.height,
-                thumbnailUrl: photo.thumbnailUrl,
-                previewUrl: photo.previewUrl,
-                downloadUrl: photo.downloadUrl,
-              }))}
-              labels={viewerLabels}
-            />
+            {album.subAlbums && album.subAlbums.length > 1 ? (
+              <AlbumTabViewer
+                albumSlug={album.slug}
+                subAlbums={album.subAlbums.map((sub) => ({
+                  id: sub.id,
+                  slug: sub.slug,
+                  title: sub.title,
+                  photoCount: sub.photoCount,
+                  photos: sub.photos.map((photo) => ({
+                    id: photo.id,
+                    title: photo.title,
+                    width: photo.width,
+                    height: photo.height,
+                    thumbnailUrl: photo.thumbnailUrl,
+                    previewUrl: photo.previewUrl,
+                    downloadUrl: photo.downloadUrl,
+                  })),
+                }))}
+                labels={viewerLabels}
+              />
+            ) : (
+              <AlbumViewer
+                albumSlug={album.slug}
+                photos={album.photos.map((photo) => ({
+                  id: photo.id,
+                  title: photo.title,
+                  width: photo.width,
+                  height: photo.height,
+                  thumbnailUrl: photo.thumbnailUrl,
+                  previewUrl: photo.previewUrl,
+                  downloadUrl: photo.downloadUrl,
+                }))}
+                labels={viewerLabels}
+              />
+            )}
           </>
         )}
       </div>

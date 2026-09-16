@@ -200,7 +200,7 @@ export default async function AdminMedia({
           ) : null}
         </p>
         <FakbarUploadToggle locale={locale} enabled={fakbarEnabled} />
-        <ImmichAlbumUploader locale={locale} fakbarEnabled={fakbarEnabled} />
+        <ImmichAlbumUploader locale={locale} fakbarEnabled={fakbarEnabled} albums={galleryAlbums} />
 
         <h3 className="mt-6 mb-2 text-sm font-semibold">
           {nl ? "Staat nu op de mediapagina" : "Currently on the media page"} ({galleryAlbums.length})
@@ -217,6 +217,15 @@ export default async function AdminMedia({
               <li key={album.slug} className="flex items-center gap-3 py-2 text-sm">
                 <Link href={`${base}/media/${album.slug}`} className="flex-1 hover:underline">
                   {album.title}
+                  {album.subAlbums && album.subAlbums.length > 1 ? (
+                    <span className="ml-2 inline-flex flex-wrap gap-1">
+                      {album.subAlbums.map((sub) => (
+                        <span key={sub.slug} className="rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600">
+                          {sub.title} ({sub.photoCount})
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
                 </Link>
                 <span className="text-xs text-zinc-500">
                   {album.photoCount} {nl ? "foto's" : "photos"}

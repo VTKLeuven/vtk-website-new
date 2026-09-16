@@ -188,7 +188,7 @@ function assetFaceEmbeddings(config: FaceSearchConfig, assetId: string) {
   );
 }
 
-async function countAlbumIndexedFaces(config: FaceSearchConfig, albumId: string): Promise<number> {
+async function countAlbumIndexedFaces(config: FaceSearchConfig, albumIds: string[]): Promise<number> {
   const rows = await query<{ count: number }>(
     config,
     `
@@ -197,13 +197,13 @@ async function countAlbumIndexedFaces(config: FaceSearchConfig, albumId: string)
       join asset a on a.id = aa."assetId"
       join asset_face af on af."assetId" = a.id
       join face_search fs on fs."faceId" = af.id
-      where aa."albumId" = $1
+      where aa."albumId" = any($1::uuid[])
         and a."deletedAt" is null
         and a.status = 'active'
         and af."deletedAt" is null
         and af."isVisible" is true
     `,
-    [albumId],
+    [albumIds],
   );
 
   return rows[0]?.count || 0;
@@ -211,7 +211,7 @@ async function countAlbumIndexedFaces(config: FaceSearchConfig, albumId: string)
 
 function findAlbumFaceMatches(
   config: FaceSearchConfig,
-  { albumId, embedding, maxDistance, limit }: { albumId: string; embedding: string; maxDistance: number; limit: number },
+  { albumIds, embedding, maxDistance, limit }: { albumIds: string[]; embedding: string; maxDistance: number; limit: number },
 ) {
   return query<MatchRow>(
     config,
@@ -225,7 +225,7 @@ function findAlbumFaceMatches(
         join asset a on a.id = aa."assetId"
         join asset_face af on af."assetId" = a.id
         join face_search fs on fs."faceId" = af.id
-        where aa."albumId" = $1
+        where aa."albumId" = any($1::uuid[])
           and a."deletedAt" is null
           and a.status = 'active'
           and af."deletedAt" is null
@@ -241,7 +241,7 @@ function findAlbumFaceMatches(
       order by distance asc
       limit $4
     `,
-    [albumId, embedding, maxDistance, limit],
+    [albumIds, embedding, maxDistance, limit],
   );
 }
 
@@ -522,7 +522,9 @@ export function createFaceSearchClient({
 
       const albumResult = { id: album.id, slug: album.slug, title: album.title, photoCount: album.photoCount };
 
-      const indexedFaceCount = await countAlbumIndexedFaces(config, album.id);
+      const albumIds = Array.from(new Set([album.id, ...(album.subAlbums?.map((s) => s.id) || [])]));
+
+      const indexedFaceCount = await countAlbumIndexedFaces(config, albumIds);
       if (indexedFaceCount === 0) {
         finish(job, {
           status: 'no_indexed_faces',
@@ -573,7 +575,7 @@ export function createFaceSearchClient({
       }
 
       const matches = await findAlbumFaceMatches(config, {
-        albumId: album.id,
+        albumIds,
         embedding: selectedFace.embedding,
         maxDistance: config.maxDistance,
         limit: config.maxResults,
