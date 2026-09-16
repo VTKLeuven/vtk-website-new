@@ -1283,9 +1283,9 @@ export async function transportWeekForPraesidium(from: Date, to: Date) {
  * ritje doet. Die twee in één query met een vlag zou betekenen dat één vergeten
  * `if` de namen aan de straatkant zet.
  *
- * Dit is de laag voor een lid **zonder** post: werkgroepleden en studenten. Een
- * post krijgt `transportWeekForPraesidium`, met dezelfde statussen en meer
- * velden.
+ * Dit is de laag voor een lid **zonder** groep: gewone studenten. Het
+ * praesidium, werkgroepen en jaarwerkingen krijgen `transportWeekForPraesidium`,
+ * met dezelfde statussen en meer velden.
  *
  * De statussen komen van `transportWindowWhere` en worden hier niet meer
  * overschreven. Er stond `status: { not: 'CANCELLED' }` achter de spread, en dat

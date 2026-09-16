@@ -71,7 +71,7 @@ export default async function VervoerBezettingPage({
   const [{ week }, locale, session] = await Promise.all([searchParams, getLocale(), getSession()]);
   const en = locale === 'en';
   const team = session ? canManage(session) : false;
-  // Het praesidium krijgt de details ook, maar niet dezelfde: zie de projecties.
+  // Het praesidium, werkgroepen en jaarwerkingen krijgen de details ook, maar niet dezelfde: zie de projecties.
   const praesidium = session ? !team && canSeeTripDetails(session) : false;
 
   const monday = startOfWeek((week && parseDateOnly(week)) || new Date());

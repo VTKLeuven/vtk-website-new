@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import type { SessionPayload } from '@vtk/auth';
+import { canSeeTripDetails } from '../lib/session';
 import { ownsTransportBooking } from '../lib/uitleen';
 
 /**
@@ -49,5 +51,70 @@ describe('ownsTransportBooking', () => {
         viewer
       )
     ).toBe(false);
+  });
+});
+
+describe('canSeeTripDetails', () => {
+  const baseUser = {
+    id: 'u1',
+    email: 'test@vtk.be',
+    name: 'Test Lid',
+    avatarKey: null,
+    locale: 'NL' as const,
+    isSuperAdmin: false,
+    onboarded: true,
+    studyConfirmedYear: 2026,
+    isStudent: true,
+    googleLinked: true,
+    googleLinkDeferredAt: null,
+  };
+
+  const makeSession = (
+    groups: Array<{ type: 'PRAESIDIUM' | 'WERKGROEP'; code: string }>,
+    permissions: string[] = [],
+    isSuperAdmin = false
+  ): SessionPayload => ({
+    token: 'tok',
+    expiresAt: '2099-01-01T00:00:00.000Z',
+    user: { ...baseUser, isSuperAdmin },
+    groups: groups.map((g) => ({
+      id: g.code,
+      code: g.code,
+      slug: g.code.toLowerCase(),
+      nameNl: g.code,
+      nameEn: g.code,
+      role: 'MEMBER' as const,
+      type: g.type,
+    })),
+    permissions,
+    roleIds: [],
+  });
+
+  it('geeft een gewoon lid zonder groep geen toegang tot ritdetails', () => {
+    expect(canSeeTripDetails(makeSession([]))).toBe(false);
+  });
+
+  it('geeft een praesidiumlid toegang tot ritdetails', () => {
+    expect(
+      canSeeTripDetails(makeSession([{ type: 'PRAESIDIUM', code: 'SPORT' }]))
+    ).toBe(true);
+  });
+
+  it('geeft een werkgroep- of jaarwerkingslid toegang tot ritdetails', () => {
+    expect(
+      canSeeTripDetails(makeSession([{ type: 'WERKGROEP', code: 'REVUE' }]))
+    ).toBe(true);
+  });
+
+  it('geeft iemand met logistiek.helpers toegang tot ritdetails', () => {
+    expect(canSeeTripDetails(makeSession([], ['logistiek.helpers']))).toBe(true);
+  });
+
+  it('geeft wie logistiek.manage heeft toegang tot ritdetails', () => {
+    expect(canSeeTripDetails(makeSession([], ['logistiek.manage']))).toBe(true);
+  });
+
+  it('geeft een superadmin toegang tot ritdetails', () => {
+    expect(canSeeTripDetails(makeSession([], [], true))).toBe(true);
   });
 });
