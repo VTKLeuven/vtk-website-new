@@ -334,6 +334,27 @@ Elk punt hier heeft ooit tijd gekost.
     foutmelding dus eerst naar een verlopen token, niet naar een scope-probleem.
     Schrijf `'10m'`.
 
+15. **De snelheidsbegrenzing staat standaard aan in productie, en zonder
+    oplosbaar client-IP deelt de hele site één emmer.** `getIp` vertrouwt
+    `x-forwarded-for` alleen wanneer die header precies één waarde draagt. Caddy
+    hangt het echte adres achteraan, dus een bezoeker die zelf zo'n header
+    meestuurt maakt er twee, en dan valt de resolutie terug op `null`. Alles komt
+    daarna in dezelfde sleutel (`no-trusted-ip`) terecht, en de ingebouwde regel
+    op `/sign-in*` is **3 verzoeken per 10 seconden**: voor alle bezoekers samen.
+
+    Een SSO-client botst daar als eerste op, want `signInKul` post vanuit de
+    browser naar `/sign-in/oauth2`. Het lid ziet enkel de foutpagina van de
+    client, terwijl de oorzaak hier ligt; in onze logs staat het als
+    `ERROR [Better Auth]: Too many requests`. Zet daarom
+    `advanced.ipAddress.trustedProxies` (dan leest de resolver de keten van
+    rechts, wat precies de hop van Caddy is) én eigen `rateLimit.customRules`.
+    Zie `packages/auth/src/auth.ts`.
+
+    Ook mét een correct IP blijft dit bot gereedschap: honderden leden zitten op
+    hetzelfde campusnetwerk achter één adres, dus een limiet per IP raakt hen
+    samen. Het echte slot op het raden van wachtwoorden is `checkLoginBlocked`,
+    en dat werkt per account.
+
 ---
 
 ## Bewust niet gebouwd

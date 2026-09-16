@@ -21,6 +21,26 @@ import { AUTH_BASE_PATH, OAUTH_CLIENT_OWNER, SCOPE_CODES } from './index';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+/**
+ * De proxy's waarvan we een hop in `x-forwarded-for` mogen geloven.
+ *
+ * Caddy draait op de host en is de enige publieke ingang; de containers
+ * luisteren enkel op loopback. De standaard dekt loopback en de privéreeksen
+ * waarin Docker zijn bridge-netwerk aanmaakt. Komt er ooit nog een proxy vóór
+ * Caddy (Cloudflare), zet dan `BETTER_AUTH_TRUSTED_PROXIES` met komma's ertussen.
+ *
+ * Waarom dit überhaupt gezet moet worden, staat bij `advanced.ipAddress`
+ * hieronder: zonder lijst valt de snelheidsbegrenzing terug op één emmer voor de
+ * hele site.
+ */
+const TRUSTED_PROXIES = (
+  process.env.BETTER_AUTH_TRUSTED_PROXIES ??
+  '127.0.0.1/8,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16'
+)
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+
 const kulConfig = kulOAuthConfig();
 
 export const auth = betterAuth({
@@ -237,12 +257,54 @@ export const auth = betterAuth({
     updateAge: 60 * 60 * 24,
   },
 
+  // ── Snelheidsbegrenzing ───────────────────────────────────────────────────
+  //
+  // better-auth zet dit standaard AAN in productie, met 100 verzoeken per 10
+  // seconden en, via een ingebouwde regel, 3 per 10 seconden op `/sign-in*`.
+  // Zonder een oplosbaar client-IP valt dat allemaal in één gedeelde emmer voor
+  // de hele site (`no-trusted-ip`), en dan zijn dat drie aanmeldingen per tien
+  // seconden voor álle bezoekers samen. Bij een piek is iedereen daarna 429, ook
+  // de SSO-doorgangen van de cursusdienst, want die lopen over dezelfde routes.
+  //
+  // De getallen hieronder gaan uit van wat deze kring echt is: honderden leden
+  // die tegelijk binnenkomen, grotendeels via hetzelfde campusnetwerk en dus met
+  // hetzelfde publieke adres. Een limiet per IP is voor zulk verkeer een botte
+  // bijl; de echte bescherming tegen het raden van wachtwoorden zit per account
+  // (`checkLoginBlocked` in server/selfSignup.ts), niet hier. Dit blijft staan
+  // als vangnet tegen een bot die er in zijn eentje op los gaat.
+  rateLimit: {
+    window: 60,
+    max: 2000,
+    customRules: {
+      // Ruim boven wat een volle aula aan gelijktijdige aanmeldingen haalt, en
+      // nog altijd ver onder wat brute force nodig heeft.
+      '/sign-in/*': { window: 60, max: 120 },
+      // Deze versturen mail; die blijven wél streng.
+      '/request-password-reset': { window: 60, max: 10 },
+      '/send-verification-email': { window: 60, max: 10 },
+    },
+  },
+
   advanced: {
     cookiePrefix: process.env.BETTER_AUTH_COOKIE_PREFIX || 'vtk',
     useSecureCookies: isProduction,
     crossSubDomainCookies: {
       enabled: isProduction,
       domain: process.env.BETTER_AUTH_COOKIE_DOMAIN,
+    },
+    ipAddress: {
+      // Zonder dit vertrouwt better-auth `x-forwarded-for` enkel wanneer die
+      // header precies één waarde draagt, en geeft ze anders `null` terug: dan
+      // deelt de hele site één emmer. Caddy voegt het echte adres achteraan toe,
+      // dus een bezoeker die zelf een `x-forwarded-for` meestuurt maakt er twee.
+      //
+      // Met een (niet-lege) lijst loopt de resolver de keten van rechts naar
+      // links tot de eerste hop die hier niet in staat, en dat is precies de
+      // waarde die Caddy zelf aanhing. De inhoud van de lijst doet er daardoor
+      // weinig toe zolang Caddy de laatste schakel is; ze wordt pas belangrijk
+      // wanneer er nog een proxy voor komt (Cloudflare), en daarom is ze
+      // instelbaar. Zie docs/sso.md.
+      trustedProxies: TRUSTED_PROXIES,
     },
   },
 
