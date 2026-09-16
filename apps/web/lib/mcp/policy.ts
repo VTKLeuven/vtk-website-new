@@ -112,6 +112,9 @@ export const MCP_PERMISSION_POLICY = {
   // andere kant een terugbetaling. Niets ervan gaat door dit endpoint, ook niet
   // lezend, en er is geen create-kind: een rekening zonder bonnetje bestaat niet.
   "expenses.submit": { reads: [], creates: [], blocked: ["submit expenses or upload receipts"] },
+  // De handtekeninggenerator is een accountfunctie op de website zelf: geen
+  // catalogusresource, geen create-kind.
+  "signature.generate": { reads: [], creates: [], blocked: ["generate an email signature"] },
   "expenses.managePost": { reads: [], creates: [], blocked: ["read or edit expenses"] },
   "expenses.manage": { reads: [], creates: [], blocked: ["read or edit expenses, mark reimbursements or forward to the accountant"] },
   "audit.view": { reads: ["audit_log"], creates: [], blocked: [] },

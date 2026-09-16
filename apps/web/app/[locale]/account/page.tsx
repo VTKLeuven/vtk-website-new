@@ -46,6 +46,11 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
 
   const now = new Date();
   const canUseDoorShortcut = hasPermission(session, 'door.remoteOpen');
+  // De handtekeninggenerator draagt het VTK-schild en een functietitel: wie er
+  // een mag genereren, houdt daar een post voor. De geseede rol `praesidium`
+  // draagt dit recht, dus elk praesidiumlid ziet de kaart; het beheer zet het
+  // per post aan in /admin/roles.
+  const canGenerateSignature = hasPermission(session, 'signature.generate');
   const [
     profile,
     reservations,
@@ -156,12 +161,15 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       orderBy: { meeting: { startsAt: 'asc' } },
       include: { meeting: { select: { kind: true, slug: true, startsAt: true } } },
     }),
-    // Groepslidmaatschappen voor o.a. de handtekeninggenerator.
-    prisma.groupMembership.findMany({
-      where: { userId: session.user.id },
-      include: { group: { select: { nameNl: true, nameEn: true, code: true, type: true } } },
-      orderBy: [{ year: 'desc' }, { group: { orderInPraesidium: 'asc' } }],
-    }),
+    // Groepslidmaatschappen voor de functiepresets van de handtekeninggenerator.
+    // Enkel ophalen als het lid die mag genereren.
+    canGenerateSignature
+      ? prisma.groupMembership.findMany({
+          where: { userId: session.user.id },
+          include: { group: { select: { nameNl: true, nameEn: true, code: true, type: true } } },
+          orderBy: [{ year: 'desc' }, { group: { orderInPraesidium: 'asc' } }],
+        })
+      : Promise.resolve([]),
     // Heeft dit lid een wachtwoord, en waar zou een herstelmail heen gaan?
     passwordStatus(session.user.id),
   ]);
@@ -387,19 +395,21 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
               </Card>
             ) : null}
 
-            <Card className="p-6">
-              <AccountSignature
-                locale={locale}
-                user={{
-                  name: profile.name,
-                  firstName: profile.firstName,
-                  lastName: profile.lastName,
-                  email: profile.email,
-                }}
-                memberships={userMemberships}
-                currentYearCode={formatWorkingYear(workingYear)}
-              />
-            </Card>
+            {canGenerateSignature ? (
+              <Card className="p-6">
+                <AccountSignature
+                  locale={locale}
+                  user={{
+                    name: profile.name,
+                    firstName: profile.firstName,
+                    lastName: profile.lastName,
+                    email: profile.email,
+                  }}
+                  memberships={userMemberships}
+                  currentYearCode={formatWorkingYear(workingYear)}
+                />
+              </Card>
+            ) : null}
 
             <Card className="p-6">
               <h3 className="mb-2 text-lg font-semibold text-vtk-ink">{nl ? 'Verbonden apps' : 'Connected apps'}</h3>

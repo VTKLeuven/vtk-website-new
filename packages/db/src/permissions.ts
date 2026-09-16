@@ -71,6 +71,15 @@ export const PERMISSIONS = [
   // Short links
   { code: "shortlinks.manage", labelNl: "Verkorte links beheren", labelEn: "Manage short links", category: "general" },
 
+  // E-mailhandtekening (de generator op /account). Die stond vroeger voor elk
+  // ingelogd lid open, maar de handtekening draagt het VTK-schild én een
+  // functietitel: wie er een mag genereren, hoort een post te hebben. Bewust een
+  // recht en geen harde check op "zit in een praesidiumpost" (zoals ook
+  // `grocomeet.reserve` er een is): de geseede rol `praesidium` draagt het, dus
+  // elk praesidiumlid houdt het, en het beheer zet het per post aan in
+  // /admin/roles. Zelfde patroon als `users.search`.
+  { code: "signature.generate", labelNl: "E-mailhandtekening genereren", labelEn: "Generate email signature", category: "account" },
+
   // Shifts
   { code: "shift.edit", labelNl: "Shiften beheren", labelEn: "Manage shifts", category: "shift" },
   { code: "shift.reward", labelNl: "Shiftbonnetjes beheren", labelEn: "Manage shift vouchers", category: "shift" },

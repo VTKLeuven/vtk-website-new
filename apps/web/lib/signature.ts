@@ -1,9 +1,14 @@
 /**
- * E-mailhandtekening generator voor VTK-leden en praesidium.
+ * E-mailhandtekeninggenerator voor wie het recht `signature.generate` heeft.
  *
  * Genereert de officiële HTML-handtekening volgens de VTK-huisstijl
  * (blauw schild, gele scheidingsstreep, adres en contactgegevens)
  * voor gebruik in Gmail, Outlook, Apple Mail etc.
+ *
+ * De kaart op /account hangt aan dat recht: de geseede rol `praesidium` draagt
+ * het, dus elk praesidiumlid ziet ze; een werkgroep of losse post krijgt het er
+ * in /admin/roles bij. Zie docs/design-decisions.md ("De e-mailhandtekening is
+ * een recht, geen ledenfunctie").
  */
 
 export type SignatureData = {
