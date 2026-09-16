@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { GROUP_SEEDS, WERKGROEP_SEEDS, HEADER_TABS } from "../src/groups";
 import { SHIFTEN_PAGE, UITLEENDIENST_PAGE } from "../src/infoPages";
 import { PERMISSIONS } from "../src/permissions";
+import { BUILTIN_SHIFT_TEMPLATES } from "../src/shiftTemplates";
 import { loadFixtures } from "../src/fixtures";
 import { eventSlugBase } from "../src/slug";
 
@@ -1961,6 +1962,54 @@ async function main() {
       create: {
         name: lesbezoekOrganisations[i],
         colour: lesbezoekColours[i % lesbezoekColours.length],
+      },
+    });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Shiftsjablonen: de reeksen die een cantus en een Theokot-verkoopdag telkens
+  // nodig hebben.
+  //
+  // Create-only, zoals de rest van deze seed: de sjablonen zijn GUI-beheerd
+  // (/admin/shiften/sjablonen/beheer) en een herseed mag een aangepaste reeks
+  // niet terugzetten naar de code. `builtIn` markeert wat hiervandaan komt; die
+  // sjablonen zijn wel bewerkbaar maar niet verwijderbaar, want `theokot` bemant
+  // automatisch elke verkoopdag.
+  // ---------------------------------------------------------------------------
+  console.log("Seeding shift templates...");
+  for (let i = 0; i < BUILTIN_SHIFT_TEMPLATES.length; i += 1) {
+    const template = BUILTIN_SHIFT_TEMPLATES[i];
+    const existing = await prisma.shiftTemplate.findUnique({ where: { slug: template.slug } });
+    if (existing) continue;
+
+    await prisma.shiftTemplate.create({
+      data: {
+        slug: template.slug,
+        label: template.label,
+        note: template.note ?? null,
+        eventName: template.eventName ?? "",
+        location: template.location ?? "",
+        post: template.post ?? null,
+        timeOfDay: template.timeOfDay ?? null,
+        builtIn: true,
+        order: i,
+        shifts: {
+          create: template.shifts.map((entry, order) => ({
+            order,
+            name: entry.name,
+            startOffsetMinutes: entry.startOffsetMinutes,
+            durationMinutes: entry.durationMinutes,
+            maxParticipants: entry.maxParticipants,
+            reward: entry.reward,
+            description: entry.description,
+            instructions: entry.instructions ?? null,
+            location: entry.location ?? null,
+            ownPost: entry.ownPost ?? false,
+            post: entry.post ?? null,
+            openToInternationals: entry.openToInternationals ?? false,
+            enabled: entry.enabled ?? true,
+          })),
+        },
       },
     });
   }

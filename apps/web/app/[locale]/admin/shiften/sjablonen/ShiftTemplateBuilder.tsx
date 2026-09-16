@@ -7,7 +7,7 @@ import { Button, Card, ConfirmDialog, Input, Label, Select, Textarea } from '@vt
 import { useToast } from '@/components/ui/toast';
 import { IconButton } from '@/components/ui/IconButton';
 import { TrashIcon } from '@/components/ui/icons';
-import { composeName, type ShiftTemplate } from '@/lib/shift/templates';
+import { composeName, templateTimeOfDay, type ShiftTemplate } from '@/lib/shift/templates';
 
 // -----------------------------------------------------------------------------
 // Reken- en formatteerhulpjes.
@@ -79,10 +79,7 @@ function formatMoment(local: string, locale: Locale): string {
  * kunnen verschillen (andere tijdzone, of net over middernacht).
  */
 function defaultStart(template: ShiftTemplate, today: string): string {
-  const time = /^\d{2}:\d{2}$/.test(template.defaults.timeOfDay ?? '')
-    ? (template.defaults.timeOfDay as string)
-    : '20:00';
-  return `${today}T${time}`;
+  return `${today}T${templateTimeOfDay(template)}`;
 }
 
 // -----------------------------------------------------------------------------
@@ -167,42 +164,41 @@ async function describeFailure(resp: Response): Promise<string> {
 }
 
 function initialGlobals(template: ShiftTemplate, start: string, postOptions?: string[]): Globals {
-  let defaultPost = template.defaults.post ?? '';
+  let defaultPost = template.post ?? '';
   if (postOptions && postOptions.length > 0 && !postOptions.includes(defaultPost)) {
     defaultPost = postOptions[0];
   }
   return {
-    eventName: template.defaults.eventName,
+    eventName: template.eventName,
     start,
-    location: template.defaults.location,
+    location: template.location,
     post: defaultPost,
   };
 }
 
 function buildRows(template: ShiftTemplate, globals: Globals, postOptions?: string[]): Row[] {
   return template.shifts.map((entry, index) => {
-    let post = entry.post !== undefined ? (entry.post ?? '') : globals.post;
-    if (postOptions && postOptions.length > 0 && !postOptions.includes(post)) {
-      post = globals.post;
-    }
+    // Een eigen post die deze gebruiker niet mag kiezen, valt terug op de
+    // algemene post: hij zou hem anders wel versturen maar niet kunnen zien.
+    const ownPost = entry.ownPost && (entry.post === null || !postOptions?.length || postOptions.includes(entry.post));
     return {
-      uid: `${template.id}-${entry.key}-${index}`,
-      enabled: entry.enabled !== false,
+      uid: `${template.id}-${entry.id}-${index}`,
+      enabled: entry.enabled,
       name: composeName(globals.eventName, entry.name),
       start: addMinutes(globals.start, entry.startOffsetMinutes),
       end: addMinutes(globals.start, entry.startOffsetMinutes + entry.durationMinutes),
       maxParticipants: String(entry.maxParticipants),
       reward: String(entry.reward),
       location: entry.location ?? globals.location,
-      post,
+      post: ownPost ? (entry.post ?? '') : globals.post,
       description: entry.description,
       instructions: entry.instructions ?? '',
-      openToInternationals: entry.openToInternationals ?? false,
+      openToInternationals: entry.openToInternationals,
       offsetMinutes: entry.startOffsetMinutes,
       durationMinutes: entry.durationMinutes,
       baseName: entry.name,
-      ownLocation: entry.location !== undefined,
-      ownPost: entry.post !== undefined && (!postOptions || postOptions.includes(entry.post ?? '')),
+      ownLocation: entry.location !== null,
+      ownPost,
       touched: {},
     };
   });

@@ -293,6 +293,25 @@ available roles but not auto-assigned to any post. Your seeded admin account is 
 - Do **not** switch dev off `next dev --webpack`, and do **not** re-export Prisma client types from
   `@vtk/db` (import model types from `@prisma/client` at the call site). See `AGENTS.md`.
 
+## Shiften en shiftsjablonen
+
+`shift.edit` zet shiften neer, bewerkt en verwijdert ze, en mag daarmee ook het
+scherm /admin/shiften/sjablonen gebruiken: dat is een sneltoets op hetzelfde
+formulier, die per shift `POST /api/shift` aanroept.
+
+**De sjablonen zelf bewerken is een eigen recht: `shift.templates`**
+(/admin/shiften/sjablonen/beheer). Los van `shift.edit` omdat het een andere
+orde is: `shift.edit` gaat over één avond, `shift.templates` over de reeks die
+iederéén daarna neerzet, en aan het sjabloon `theokot` hangt code (elke
+verkoopdag van een nieuwe verkoopweek wordt ermee bemand). Meegeleverde
+sjablonen (`ShiftTemplate.builtIn`) zijn daarom wel bewerkbaar maar niet
+verwijderbaar. De keuzes erachter staan in `docs/design-decisions.md`.
+
+Geen van beide rechten is werkingsjaar- of postgebonden, maar de **keuzelijst met
+posten** is dat wel: wie geen superadmin is, ziet zijn eigen posten, plus de
+posten die de sjablonen nu al gebruiken. Dat laatste is nodig omdat wie de
+cantusreeks komt bijstellen anders de post ACTIVITEITEN stilletjes zou leegmaken.
+
 ## Groepsadressen (Google Workspace)
 
 De koppeling met Google Workspace (opzet in `docs/google-workspace.md`, keuzes

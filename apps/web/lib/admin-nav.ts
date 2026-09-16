@@ -111,7 +111,9 @@ export function getAdminNav(): NavEntry[] {
       item('partners', '/partners', { perm: 'partners.manage' }),
       item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
       item('forms', '/formulieren', { forms: true }),
-      item('shift', '/shiften', { anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking'] }),
+      item('shift', '/shiften', {
+        anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking', 'shift.templates'],
+      }),
       item('piano', '/piano', { perm: 'piano.manage' }),
     ]),
     // Eén evenement is één ding voor wie het organiseert: je plant het in en je

@@ -80,6 +80,11 @@ export const PERMISSIONS = [
   // kunnen worden zonder hem uit zijn post te zetten.
   { code: "shift.rewardRedeem", labelNl: "Bonnetjes aanvaarden als betaling (app)", labelEn: "Accept vouchers as payment (app)", category: "shift" },
   { code: "shift.ranking", labelNl: "Shiftranglijst bekijken", labelEn: "View shift rankings", category: "shift" },
+  // De sjablonen zelf aanpassen: welke shiften een cantus of een verkoopdag
+  // telkens nodig heeft. Bewust los van `shift.edit`: dat recht zet shiften neer
+  // voor één avond, dit verandert de reeks die iederéén daarna neerzet, en één
+  // sjabloon (theokot) hangt aan het automatisch bemannen van een verkoopweek.
+  { code: "shift.templates", labelNl: "Shiftsjablonen beheren", labelEn: "Manage shift templates", category: "shift" },
 
   // Theokot (cafetaria / broodjesbar)
   { code: "theokot.manage", labelNl: "Theokot beheren (sessies, aanbod, bans, instellingen)", labelEn: "Manage Theokot (sessions, offering, bans, settings)", category: "theokot" },

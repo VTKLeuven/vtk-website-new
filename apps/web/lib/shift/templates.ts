@@ -1,23 +1,18 @@
 /**
- * De shiftsjablonen: welke shiften een terugkerend evenement nodig heeft.
+ * De shiftsjablonen, kant van de webapp: types en het samenstellen van een naam.
  *
- * Dit bestand is de enige plek waar dat staat. Het scherm
- * /admin/shiften/sjablonen bouwt er een formulier mee, en het aanmaken van een
- * Theokot-verkoopweek zet er de shiften van een verkoopdag mee neer. Stonden ze
- * op twee plaatsen, dan zou een aangepaste Theokot-shift in het ene scherm wel
- * en in het andere niet meegaan.
- *
- * Alleen data en types: dit wordt zowel door een client component als door een
- * server action geïmporteerd. De rest van `lib/shift/` mag wél de databank en
- * server-only code aanraken; hou dat hier buiten.
+ * De sjablonen zelf staan in de databank (`ShiftTemplate`) en worden beheerd op
+ * /admin/shiften/sjablonen/beheer. Wat hier staat is bewust puur: dit bestand
+ * wordt zowel door een client component (het sjabloonscherm) als door server
+ * code geïmporteerd, dus geen Prisma en geen server-only. Het lezen en schrijven
+ * gebeurt in `lib/shift/templateStore.ts`.
  */
 
-import { brusselsTimeOnDay } from '@/lib/brussels';
-import type { ShiftInput } from '@/lib/shift';
+export { THEOKOT_TEMPLATE_SLUG } from '@vtk/db/shiftTemplates';
 
+/** Eén shift binnen een sjabloon, zoals het scherm ze leest. */
 export type ShiftTemplateEntry = {
-  /** Stabiele sleutel binnen het sjabloon; enkel voor React-keys en leesbaarheid. */
-  key: string;
+  id: string;
   /** Naam van de shift, zonder de evenementnaam erachter ("Bar 1"). */
   name: string;
   /** Minuten t.o.v. het gekozen startmoment; negatief = ervoor (opbouw). */
@@ -31,247 +26,39 @@ export type ShiftTemplateEntry = {
    */
   reward: number;
   description: string;
-  instructions?: string;
-  /** Enkel invullen wanneer deze shift van de globale locatie/post afwijkt. */
-  location?: string;
-  post?: string | null;
-  openToInternationals?: boolean;
+  instructions: string | null;
+  /** Eigen locatie; null = volgt de algemene locatie uit het scherm. */
+  location: string | null;
+  /**
+   * Volgt deze shift de algemene post niet? Dan telt `post`, ook wanneer die
+   * null is ("geen post"). Twee velden omdat er drie toestanden zijn en één
+   * nullable veld er maar twee kan zeggen.
+   */
+  ownPost: boolean;
+  post: string | null;
+  openToInternationals: boolean;
   /** `false` = staat standaard uitgevinkt. */
-  enabled?: boolean;
+  enabled: boolean;
 };
 
+/** Eén sjabloon met zijn shiften, chronologisch. */
 export type ShiftTemplate = {
   id: string;
+  /** Natuurlijke sleutel; `theokot` hangt aan het bemannen van een verkoopweek. */
+  slug: string;
   label: string;
-  /** Eén regel uitleg onder de keuzelijst. */
-  note?: string;
-  defaults: {
-    eventName: string;
-    location: string;
-    post?: string | null;
-    /** Suggestie voor het uur van de eerste shift, "HH:mm". */
-    timeOfDay?: string;
-  };
+  /** Eén regel uitleg onder de keuzelijst; null = geen uitleg. */
+  note: string | null;
+  /** Meegeleverd met de seed: bewerkbaar, maar niet verwijderbaar. */
+  builtIn: boolean;
+  /** Startwaarden waarmee het sjabloonscherm opent; daar allemaal aanpasbaar. */
+  eventName: string;
+  location: string;
+  post: string | null;
+  /** Suggestie voor het uur van de eerste shift, "HH:mm"; null = 20:00. */
+  timeOfDay: string | null;
   shifts: ShiftTemplateEntry[];
 };
-
-// -----------------------------------------------------------------------------
-// De sjablonen zelf.
-//
-// Evenementen die telkens terugkeren (een cantus, een bar-avond, een TD) hebben
-// elke keer dezelfde reeks shiften; enkel datum, uur en soms de locatie
-// verschillen. Zet zo'n reeks hier één keer neer en de rest van deze pagina doet
-// het rekenwerk.
-//
-// Een sjabloon toevoegen = een blok in deze lijst bijzetten. Er is bewust geen
-// beheerscherm voor: dit verandert hooguit een paar keer per werkingsjaar, en
-// een lijst in de code is dan makkelijker te lezen (en te reviewen) dan een
-// tabel in de databank.
-//
-//   startOffsetMinutes  minuten t.o.v. het startmoment dat je bovenaan invult;
-//                       negatief = ervoor (opbouw), 0 = de eerste shift.
-//   durationMinutes     lengte van de shift.
-//   maxParticipants     aantal plaatsen.
-//   reward              aantal bonnetjes per deelnemer, per shift te zetten: een
-//                       opbouw van een half uur is niet hetzelfde waard als vier
-//                       uur aan de tap.
-//   location / post     vaste locatie/post voor deze ene shift: ze volgt de
-//                       globale locatie/post bovenaan dan niet meer. Bv.
-//                       "Bijrijden" vertrekt altijd aan de loods, waar de cantus
-//                       zelf ook doorgaat. Weglaten = mee met het globale veld.
-//                       In het scherm blijft ze gewoon aanpasbaar.
-//   enabled: false      staat standaard uitgevinkt (bv. een shift die je enkel
-//                       bij een grote editie nodig hebt).
-// -----------------------------------------------------------------------------
-
-export const SHIFT_TEMPLATES: ShiftTemplate[] = [
-  {
-    id: 'cantus',
-    label: 'Cantus',
-    note: 'Klassieke cantus: opbouw, inkom, bar en tap, afbouw achteraf.',
-    defaults: {
-      eventName: 'Cantus',
-      location: 'Waaiberg',
-      post: 'ACTIVITEITEN',
-      timeOfDay: '20:30',
-    },
-    shifts: [
-      {
-        key: 'bijrijden-1',
-        name: 'Bijrijden',
-        startOffsetMinutes: -150,
-        durationMinutes: 60,
-        maxParticipants: 2,
-        reward: 1,
-        // Bijrijden vertrekt altijd aan de loods, waar de cantus ook doorgaat.
-        location: 'De Loods',
-        description: 'All het materiaal van de loods naar de cantus brengen \n Adress loods: tervuursevest 238',
-      },
-      {
-        key: 'opbouw',
-        name: 'Opbouw',
-        startOffsetMinutes: -90,
-        durationMinutes: 60,
-        maxParticipants: 6,
-        reward: 2,
-        description: 'Zaal klaarzetten: tafels, stoelen, podia,...',
-      },
-      {
-        key: 'inkom',
-        name: 'Inkom',
-        startOffsetMinutes: -30,
-        durationMinutes: 30,
-        maxParticipants: 2,
-        reward: 1,
-        description: 'Tickets scannen en Polsbandjes uitdelen',
-      },
-      {
-        key: 'tap-1',
-        name: 'Tappen en rondbrengen',
-        startOffsetMinutes: 0,
-        durationMinutes: 90,
-        maxParticipants: 4,
-        reward: 2,
-        description: 'Bier tappen en de kannen rondbrengen',
-      },
-      {
-        key: 'pis-1',
-        name: 'Pispolitie',
-        startOffsetMinutes: 0,
-        durationMinutes: 90,
-        maxParticipants: 2,
-        reward: 2,
-        description: 'Mensen die naar het toilet willen een strafje geven',
-      },
-      {
-        key: 'steward-1',
-        name: 'Stewarden',
-        startOffsetMinutes: 90,
-        durationMinutes: 15,
-        maxParticipants: 2,
-        reward: 0,
-        description: 'Zorgen dat er niemand luid is buiten en fiksen dat er geen drank buiten geraakt',
-      },
-      {
-        key: 'controle-1',
-        name: 'Bandjes controleren',
-        startOffsetMinutes: 90,
-        durationMinutes: 15,
-        maxParticipants: 2,
-        reward: 0,
-        description: 'Bandjes controleren tijdens de tempus',
-      },
-      {
-        key: 'tap-2',
-        name: 'Tappen en rondbrengen',
-        startOffsetMinutes: 105,
-        durationMinutes: 105,
-        maxParticipants: 4,
-        reward: 2,
-        description: 'Bier tappen en de kannen rondbrengen',
-      },
-      {
-        key: 'pis-2',
-        name: 'Pispolitie',
-        startOffsetMinutes: 105,
-        durationMinutes: 105,
-        maxParticipants: 2,
-        reward: 2,
-        description: 'Mensen die naar het toilet willen een strafje geven',
-      },
-      {
-        key: 'steward-2',
-        name: 'Stewarden',
-        startOffsetMinutes: 210,
-        durationMinutes: 15,
-        maxParticipants: 2,
-        reward: 0,
-        description: 'Zorgen dat er niemand luid is buiten en fiksen dat er geen drank buiten geraakt',
-      },
-      {
-        key: 'controle-2',
-        name: 'Bandjes controleren',
-        startOffsetMinutes: 210,
-        durationMinutes: 15,
-        maxParticipants: 2,
-        reward: 0,
-        description: 'Bandjes controleren tijdens de tempus',
-      },
-      {
-        key: 'stilhouden',
-        name: 'Corona stilhouden',
-        startOffsetMinutes: 225,
-        durationMinutes: 45,
-        maxParticipants: 2,
-        reward: 1,
-        description: 'De corona stilhouden voor het 3de deel',
-      },
-      {
-        key: 'afbouw',
-        name: 'Afbraak',
-        startOffsetMinutes: 270,
-        durationMinutes: 60,
-        maxParticipants: 5,
-        reward: 2,
-        description: 'Please help ons mee en zorg dat we na een half uurtje klaar kunnen zijn :))',
-      },
-      {
-        key: 'bijrijden-2',
-        name: 'Bijrijden',
-        startOffsetMinutes: 330,
-        durationMinutes: 60,
-        maxParticipants: 2,
-        reward: 2,
-        // Bijrijden vertrekt altijd aan de loods, waar de cantus ook doorgaat.
-        location: 'De Loods',
-        description: 'All het materiaal terug naar de loods brengen \n Adress loods: tervuursevest 238',
-      },
-    ],
-  },
-  {
-    id: 'theokot',
-    label: 'Theokot opening',
-    note: 'Standaard template voor 1 dag in Theokot (smeren, middag, namiddag)',
-    defaults: {
-      eventName: '',
-      location: 'Theokot',
-      post: 'THEOKOT',
-      timeOfDay: '10:30',
-    },
-    shifts: [
-      {
-        key: 'smeren',
-        name: 'Broodjes Smeren',
-        startOffsetMinutes: 0,
-        durationMinutes: 120,
-        maxParticipants: 4,
-        reward: 2,
-        description:
-          'Kom gezellig mee broodjes smeren in het Theokot ;)) Als reward mag je ook zelf je eigen broodje samenstellen en smeren!',
-        openToInternationals: true,
-      },
-      {
-        key: 'middag',
-        name: 'Broodjes verkopen',
-        startOffsetMinutes: 120,
-        durationMinutes: 90,
-        maxParticipants: 4,
-        reward: 2,
-        description: 'Broodjes en croques verkopen over de middag',
-        openToInternationals: false,
-      },
-      {
-        key: 'namiddag',
-        name: 'Namiddag verkoop',
-        startOffsetMinutes: 210,
-        durationMinutes: 120,
-        maxParticipants: 2,
-        reward: 2,
-        description: 'De namiddag verkoop voor theokot, kom gezellig wat chillen :))',
-      },
-    ],
-  },
-];
 
 /**
  * De shiftnaam komt eerst, het evenement erachter: "Inkom - Cantus". Wat je in een
@@ -280,50 +67,185 @@ export const SHIFT_TEMPLATES: ShiftTemplate[] = [
 export const composeName = (eventName: string, baseName: string) =>
   eventName.trim() === '' ? baseName : `${baseName} - ${eventName.trim()}`;
 
-/** Het sjabloon dat één Theokot-verkoopdag bemant. */
-export const THEOKOT_TEMPLATE_ID = 'theokot';
+/** Het uur waarop een sjabloon standaard opent, met de val terug op 20:00. */
+export const templateTimeOfDay = (template: Pick<ShiftTemplate, 'timeOfDay'>) =>
+  /^\d{2}:\d{2}$/.test(template.timeOfDay ?? '') ? (template.timeOfDay as string) : '20:00';
+
+// -----------------------------------------------------------------------------
+// Wat het beheerscherm verstuurt
+// -----------------------------------------------------------------------------
 
 /**
- * De shiften die bij één Theokot-verkoopdag horen, klaar om aangemaakt te worden.
- *
- * Het anker is het uur waarop die dag afgehaald kan worden (`pickupStart` van de
- * verkoopdag), niet het vaste uur uit het sjabloon: zet je een dag later open,
- * dan schuiven smeren, middag en namiddag mee. De offsets komen wél uit het
- * sjabloon, zodat het scherm /admin/shiften/sjablonen en een verkoopweek exact
- * dezelfde dag neerzetten.
- *
- * Het optellen gebeurt in echte minuten op één kalenderdag. Dat mag hier: de
- * zomertijd verspringt om 03:00 en geen enkele Theokot-shift raakt dat uur.
+ * De post van één shift binnen een sjabloon, zoals de keuzelijst ze verstuurt.
+ * Drie toestanden, dus drie waarden: `INHERIT_POST` volgt de post van het
+ * sjabloon, `NO_POST` is bewust geen post, en al de rest is een postcode.
  */
-export function theokotShiftsForDay(day: Date, pickupStart: string): ShiftInput[] {
-  const template = SHIFT_TEMPLATES.find((t) => t.id === THEOKOT_TEMPLATE_ID);
-  if (!template) return [];
+export const INHERIT_POST = 'inherit';
+export const NO_POST = 'none';
 
-  const anchor = brusselsTimeOnDay(day, pickupStart);
+/** Eén shiftrij zoals het beheerscherm ze verstuurt. */
+export type ShiftTemplateDraftEntry = {
+  name: string;
+  startOffsetMinutes: number;
+  durationMinutes: number;
+  maxParticipants: number;
+  reward: number;
+  description: string;
+  instructions: string;
+  /** Leeg = volgt de locatie van het sjabloon. */
+  location: string;
+  /** `INHERIT_POST`, `NO_POST` of een postcode. */
+  post: string;
+  openToInternationals: boolean;
+  enabled: boolean;
+};
 
-  return template.shifts
-    // Een shift die in het sjabloon standaard uitgevinkt staat, hoort ook hier
-    // niet bij de gewone dag: iemand moet ze bewust aanzetten.
-    .filter((entry) => entry.enabled !== false)
-    .map((entry) => {
-      const startTime = new Date(anchor.getTime() + entry.startOffsetMinutes * 60_000);
-      return {
-        name: composeName(template.defaults.eventName, entry.name),
-        startTime,
-        endTime: new Date(startTime.getTime() + entry.durationMinutes * 60_000),
-        location: entry.location ?? template.defaults.location,
-        description: entry.description,
-        maxParticipants: entry.maxParticipants,
-        reward: entry.reward,
-        post: entry.post ?? template.defaults.post ?? null,
-        openToInternationals: entry.openToInternationals ?? false,
-        instructions: entry.instructions ?? null,
-      };
-    });
+/** De shiftrij zoals ze uit een bestaand sjabloon in het formulier komt. */
+export function toDraftEntry(entry: ShiftTemplateEntry): ShiftTemplateDraftEntry {
+  return {
+    name: entry.name,
+    startOffsetMinutes: entry.startOffsetMinutes,
+    durationMinutes: entry.durationMinutes,
+    maxParticipants: entry.maxParticipants,
+    reward: entry.reward,
+    description: entry.description,
+    instructions: entry.instructions ?? '',
+    location: entry.location ?? '',
+    post: entry.ownPost ? (entry.post ?? NO_POST) : INHERIT_POST,
+    openToInternationals: entry.openToInternationals,
+    enabled: entry.enabled,
+  };
 }
 
-/** De post waaronder een Theokot-verkoopdag bemand wordt, of null. */
-export function theokotShiftPost(): string | null {
-  const template = SHIFT_TEMPLATES.find((t) => t.id === THEOKOT_TEMPLATE_ID);
-  return template?.defaults.post ?? null;
+// -----------------------------------------------------------------------------
+// De offsets leesbaar maken
+//
+// De tijden van een sjabloon staan als afstand tot het startmoment, want
+// hetzelfde sjabloon moet op elke datum en elk uur neergezet kunnen worden. Dat
+// leest niet: "-150" zegt niemand iets. Deze hulpjes rekenen die minuten om naar
+// het klokuur dat eruit volgt op het standaarduur van het sjabloon.
+// -----------------------------------------------------------------------------
+
+const pad = (n: number) => String(n).padStart(2, '0');
+
+/** "2 u 30" / "45 min". */
+export function formatTemplateDuration(minutes: number, nl: boolean): string {
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  if (hours === 0) return `${rest} min`;
+  if (rest === 0) return nl ? `${hours} u` : `${hours}h`;
+  return nl ? `${hours} u ${pad(rest)}` : `${hours}h${pad(rest)}`;
+}
+
+/** "op de start" / "1 u 30 ervoor" / "2 u erna". */
+export function formatTemplateOffset(minutes: number, nl: boolean): string {
+  if (minutes === 0) return nl ? 'op de start' : 'at the start';
+  const amount = formatTemplateDuration(Math.abs(minutes), nl);
+  if (minutes < 0) return nl ? `${amount} ervoor` : `${amount} before`;
+  return nl ? `${amount} erna` : `${amount} after`;
+}
+
+/**
+ * Het klokuur waarop een offset uitkomt, met de dag erbij wanneer het over
+ * middernacht gaat. Een cantus bouwt om 02:00 af; zonder dat "+1" lijkt dat
+ * 's ochtends voor de opbouw te vallen.
+ */
+export function templateClockAt(timeOfDay: string, offsetMinutes: number, nl: boolean): string {
+  const [h, m] = timeOfDay.split(':').map(Number);
+  const total = (Number.isFinite(h) ? h : 20) * 60 + (Number.isFinite(m) ? m : 0) + offsetMinutes;
+  const day = Math.floor(total / 1440);
+  const inDay = ((total % 1440) + 1440) % 1440;
+  const clock = `${pad(Math.floor(inDay / 60))}:${pad(inDay % 60)}`;
+  if (day === 0) return clock;
+  return `${clock} (${day > 0 ? `+${day}` : day} ${nl ? 'dag' : 'day'})`;
+}
+
+// -----------------------------------------------------------------------------
+// Wat het beheerscherm verstuurt, nakijken
+// -----------------------------------------------------------------------------
+
+/** Eén shiftrij zoals ze naar de databank gaat. */
+export type ParsedTemplateEntry = {
+  name: string;
+  startOffsetMinutes: number;
+  durationMinutes: number;
+  maxParticipants: number;
+  reward: number;
+  description: string;
+  instructions: string | null;
+  location: string | null;
+  ownPost: boolean;
+  post: string | null;
+  openToInternationals: boolean;
+  enabled: boolean;
+};
+
+/**
+ * Leest de shiftrijen uit het verborgen JSON-veld en kijkt ze na.
+ *
+ * Geeft een zin terug in plaats van een lijst wanneer er iets niet klopt; die
+ * zin gaat als `detail` mee met de rode toast, zodat er "Shift 3" in kan staan
+ * en de gebruiker niet zelf moet zoeken welke rij hij niet ingevuld heeft.
+ *
+ * `posts` is wat deze gebruiker mag kiezen: een postcode die er niet in staat,
+ * weigeren we hier en niet stilletjes in de databank.
+ */
+export function parseTemplateEntries(raw: unknown, posts: string[]): ParsedTemplateEntry[] | string {
+  if (!Array.isArray(raw)) return 'De shiften konden niet gelezen worden.';
+
+  const entries: ParsedTemplateEntry[] = [];
+  for (let i = 0; i < raw.length; i += 1) {
+    const row = raw[i] as Partial<ShiftTemplateDraftEntry> | null;
+    const at = `Shift ${i + 1}`;
+    if (typeof row !== 'object' || row === null) return `${at}: kon niet gelezen worden.`;
+
+    const name = typeof row.name === 'string' ? row.name.trim() : '';
+    if (name === '') return `${at}: geef de shift een naam.`;
+
+    const start = Number(row.startOffsetMinutes);
+    if (!Number.isInteger(start)) return `${at}: de starttijd is geen geheel aantal minuten.`;
+
+    const duration = Number(row.durationMinutes);
+    if (!Number.isInteger(duration) || duration < 5) return `${at}: de shift moet minstens vijf minuten duren.`;
+
+    const spots = Number(row.maxParticipants);
+    if (!Number.isInteger(spots) || spots < 1) return `${at}: er moet minstens één plaats zijn.`;
+
+    const reward = Number(row.reward);
+    if (!Number.isInteger(reward) || reward < 0) return `${at}: het aantal bonnetjes kan niet negatief zijn.`;
+
+    const description = typeof row.description === 'string' ? row.description.trim() : '';
+    if (description === '') return `${at}: geef een korte beschrijving; die staat op /shift bij de shift.`;
+
+    const postChoice = typeof row.post === 'string' ? row.post : INHERIT_POST;
+    if (postChoice !== INHERIT_POST && postChoice !== NO_POST && !posts.includes(postChoice)) {
+      return `${at}: je kan geen shift onder de post ${postChoice} zetten.`;
+    }
+
+    const instructions = typeof row.instructions === 'string' ? row.instructions.trim() : '';
+    const location = typeof row.location === 'string' ? row.location.trim() : '';
+
+    entries.push({
+      name,
+      startOffsetMinutes: start,
+      durationMinutes: duration,
+      maxParticipants: spots,
+      reward,
+      description,
+      instructions: instructions === '' ? null : instructions,
+      location: location === '' ? null : location,
+      ownPost: postChoice !== INHERIT_POST,
+      post: postChoice === INHERIT_POST || postChoice === NO_POST ? null : postChoice,
+      openToInternationals: row.openToInternationals === true,
+      enabled: row.enabled !== false,
+    });
+  }
+
+  // Chronologisch, zodat de lijst leest zoals de avond verloopt. Een stabiele
+  // sortering houdt twee shiften die tegelijk beginnen (tap en pispolitie) in de
+  // volgorde waarin ze ingetikt zijn.
+  return entries
+    .map((entry, index) => ({ entry, index }))
+    .sort((a, b) => a.entry.startOffsetMinutes - b.entry.startOffsetMinutes || a.index - b.index)
+    .map((row) => row.entry);
 }

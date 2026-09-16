@@ -9,6 +9,7 @@
     "./fakscanner": "./src/fakscanner.ts",
     "./groups": "./src/groups.ts",
     "./permissions": "./src/permissions.ts",
+    "./shiftTemplates": "./src/shiftTemplates.ts",
     "./slug": "./src/slug.ts"
   },
   "scripts": {

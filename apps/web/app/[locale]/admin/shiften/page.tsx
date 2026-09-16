@@ -1,6 +1,7 @@
 import { prisma } from "@vtk/db";
 import { format } from "date-fns";
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
@@ -32,8 +33,30 @@ export default async function AdminShifts({
   const canEdit = has("shift.edit");
   const canReward = has("shift.reward");
   const canRanking = has("shift.ranking");
+  const canTemplates = has("shift.templates");
 
   if (!canEdit && !canReward && !canRanking) {
+    // Wie enkel de sjablonen beheert, heeft hier geen tabblad maar hoort ook
+    // niet op "Geen toegang." te botsen: dit is de tab waarachter zijn scherm
+    // hangt, en zonder dit lijntje is het nergens te vinden.
+    if (canTemplates) {
+      return (
+        <div className="space-y-3">
+          <h1 className="text-2xl font-semibold">{locale === "nl" ? "Shiften" : "Shifts"}</h1>
+          <p className="text-sm text-[#5c667f]">
+            {locale === "nl"
+              ? "Je beheert de shiftsjablonen: de vaste reeks shiften van een evenement dat telkens terugkomt."
+              : "You manage the shift templates: the fixed series of shifts of a recurring event."}
+          </p>
+          <Link
+            href={`${locale === "nl" ? "" : "/en"}/admin/shiften/sjablonen/beheer`}
+            className="inline-flex h-10 items-center rounded-full bg-vtk-ink px-4 text-sm font-medium text-white"
+          >
+            {locale === "nl" ? "Naar de sjablonen" : "To the templates"}
+          </Link>
+        </div>
+      );
+    }
     return <p className="text-sm text-zinc-500">{locale === "nl" ? "Geen toegang." : "No access."}</p>;
   }
 

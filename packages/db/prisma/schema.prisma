@@ -2385,6 +2385,91 @@ model ShiftParticipant {
 }
 
 // -----------------------------------------------------------------------------
+// Shiftsjablonen: de vaste reeks shiften van een terugkerend evenement
+// -----------------------------------------------------------------------------
+
+/// Eén sjabloon: welke shiften een cantus, een TD of een Theokot-verkoopdag
+/// telkens nodig heeft. Het scherm /admin/shiften/sjablonen zet er in één klik
+/// een hele reeks mee neer; /admin/shiften/sjablonen/beheer bewerkt ze.
+///
+/// Dit stond ooit als constante in `apps/web/lib/shift/templates.ts`. Een
+/// sjabloon bijzetten was dan een commit en een deploy, dus in de praktijk deed
+/// enkel IT het en zetten de posten hun reeksen weer met de hand. Die constanten
+/// bestaan nog en zijn nu de seed van deze tabel; `builtIn` markeert wat eruit
+/// komt, zodat een herseed niets overschrijft wat iemand hier aanpaste.
+model ShiftTemplate {
+  id String @id @default(cuid())
+
+  /// Natuurlijke sleutel, stabiel over een herseed heen. De Theokot-verkoopweek
+  /// zoekt haar sjabloon hierop op (`theokot`), dus dit is geen los label.
+  slug  String  @unique
+  label String
+  /// Eén regel uitleg onder de keuzelijst; leeg = geen uitleg.
+  note  String?
+
+  /// Standaardwaarden waarmee het sjabloonscherm opent. Ze zijn daar allemaal
+  /// nog aanpasbaar: dit is het startpunt, niet de regel.
+  eventName String  @default("")
+  location  String  @default("")
+  post      String?
+  /// Suggestie voor het uur van de eerste shift, "HH:mm". Leeg = 20:00.
+  timeOfDay String?
+
+  /// Meegeleverd met de seed. Bewerken mag, verwijderen niet: `theokot` hangt
+  /// aan het aanmaken van een verkoopweek, en die zou stil zonder shiften vallen.
+  builtIn Boolean @default(false)
+
+  /// Volgorde in de keuzelijst.
+  order Int @default(0)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  shifts ShiftTemplateEntry[]
+}
+
+/// Eén shift binnen een sjabloon. De tijden staan als offset t.o.v. het
+/// startmoment dat je in het sjabloonscherm invult, niet als klokuur: hetzelfde
+/// sjabloon moet op elke datum en elk uur neergezet kunnen worden.
+model ShiftTemplateEntry {
+  id         String        @id @default(cuid())
+  templateId String
+  template   ShiftTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  /// Volgorde in het scherm. Wordt bij elke opslag opnieuw gezet op de
+  /// chronologische volgorde, zodat de lijst leest zoals de avond verloopt.
+  order Int
+
+  /// Naam zonder de evenementnaam erachter ("Bar 1"); die komt er in het scherm bij.
+  name String
+  /// Minuten t.o.v. het startmoment; negatief = ervoor (opbouw).
+  startOffsetMinutes Int
+  durationMinutes    Int
+  maxParticipants    Int
+  /// Bonnetjes per deelnemer, bewust per shift: een opbouw van een half uur is
+  /// niet hetzelfde waard als vier uur aan de tap.
+  reward             Int
+  description        String  @default("")
+  instructions       String?
+
+  /// Eigen locatie voor deze ene shift (bijrijden vertrekt aan de loods).
+  /// NULL = volgt de algemene locatie uit het scherm.
+  location String?
+  /// Eigen post voor deze ene shift. `ownPost` staat er los naast omdat er drie
+  /// toestanden zijn: de algemene post volgen (false), geen post (true + NULL)
+  /// en een vaste post (true + code). Eén nullable veld kan dat niet zeggen.
+  ownPost Boolean @default(false)
+  post    String?
+
+  openToInternationals Boolean @default(false)
+  /// `false` = staat standaard uitgevinkt in het scherm; iemand moet ze bewust
+  /// aanzetten. Een verkoopweek slaat zo'n shift ook over.
+  enabled              Boolean @default(true)
+
+  @@index([templateId, order])
+}
+
+// -----------------------------------------------------------------------------
 // Short links (on.vtk.be/<slug> -> target URL)
 // -----------------------------------------------------------------------------
 

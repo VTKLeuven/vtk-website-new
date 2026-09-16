@@ -6961,3 +6961,57 @@ gekozen boven een gegenereerde plaat met de titel op de categoriekleur: de
 standaardfoto is een echte VTK-foto en blijft herkenbaar. De keerzijde is dat een
 maand met weinig eigen affiches dezelfde foto meermaals naast elkaar zet; dat is
 een reden om affiches te uploaden, niet om de weergave aan te passen.
+
+## Shiftsjablonen zijn beheerbaar, en dat is een eigen recht
+
+Een sjabloon is de vaste reeks shiften van een evenement dat telkens terugkomt:
+een cantus (bijrijden, opbouw, inkom, twee tapblokken, pispolitie, stewarden,
+afbraak, bijrijden) of een Theokot-verkoopdag (smeren, middag, namiddag). Wie
+shiften mag aanmaken, zet met /admin/shiften/sjablonen zo'n hele reeks in twee
+klikken neer in plaats van ze veertien keer in te tikken.
+
+**Die sjablonen stonden als constante in de code.** Een reeks bijstellen was dan
+een commit en een deploy, dus in de praktijk deed enkel IT het en zetten de
+posten hun avonden weer met de hand neer, of vroegen ze het aan IT en gebeurde
+het niet. Ze staan nu in `ShiftTemplate` / `ShiftTemplateEntry` en worden beheerd
+op /admin/shiften/sjablonen/beheer. De constanten bestaan nog, in
+`packages/db/src/shiftTemplates.ts`, maar zijn nu enkel nog de **seed**: die is
+create-only zoals de rest, want een reeks die iemand in de admin bijstelde mag
+een herseed niet terugdraaien. Verwacht dus dat die lijst na de eerste dag
+afwijkt van de echte site, net als de fixtures.
+
+**Het beheer hangt aan een eigen recht (`shift.templates`), niet aan
+`shift.edit`.** Dat laatste zet shiften neer voor één avond en mag ruim gegeven
+worden; dit verandert de reeks die iederéén daarna neerzet, en is dus van een
+andere orde. Er hangt bovendien code aan één sjabloon: `theokot` bemant
+automatisch elke verkoopdag van een nieuwe verkoopweek
+(`apps/web/app/actions/theokot.ts`). Daarom is een **meegeleverd sjabloon
+(`builtIn`) wel bewerkbaar maar niet verwijderbaar**: wie het weghaalt, zou pas
+op de verkoopdag zelf merken dat er niemand achter de balie staat.
+
+**De tijden staan als offset, niet als klokuur.** `startOffsetMinutes` is het
+aantal minuten t.o.v. de start die je invult bij het neerzetten; negatief is
+ervoor. Anders zou hetzelfde sjabloon niet op een ander uur kunnen staan, en dat
+is precies waar een sjabloon voor dient. De prijs is dat "-150" niets zegt, dus
+rekent het beheerscherm elke offset om naar het klokuur dat eruit volgt op het
+standaarduur van het sjabloon, inclusief "(+1 dag)" voor de afbraak om 01:00.
+Dat standaarduur is dan ook enkel een voorstel: wie een reeks neerzet, kiest zelf
+datum en uur.
+
+**Een shift kan van de algemene locatie of post afwijken, en dat heeft drie
+toestanden, geen twee.** Bijrijden vertrekt altijd aan de loods, ook wanneer de
+cantus in de Waaiberg doorgaat. Voor de post is "volg het sjabloon", "bewust geen
+post" en "deze vaste post" alle drie iets anders, en één nullable veld kan dat
+niet zeggen; vandaar `ownPost` naast `post`.
+
+**Bij het opslaan worden de shiftregels vervangen, niet bijgewerkt,** en de
+volgorde wordt op de chronologie gezet. Rijen kunnen verdwenen, bijgekomen en van
+plaats gewisseld zijn, en niets buiten het sjabloon verwijst naar zo'n regel. Een
+gebruiker hoeft dus geen rijen te verslepen: een shift verplaatsen is haar
+starttijd aanpassen, en de lijst leest daarna zoals de avond verloopt.
+
+**Wat je hier wijzigt, raakt geen enkele bestaande shift.** Wat al op de kalender
+staat, staat los in `Shift`, met zijn inschrijvingen. Een sjabloon verwijderen
+haalt dus enkel het sjabloon weg. Dat staat met zoveel woorden in de
+bevestigingsdialoog, want de omgekeerde vrees ("verlies ik de inschrijvingen van
+vorige maand?") is precies de reden waarom iemand van een opkuis afziet.
