@@ -90,6 +90,8 @@ export type PlannerTrip = {
   vehicleName: string;
   driverId: string | null;
   driver: { id: string; name: string } | null;
+  /** De post die deze rit zelf mag invullen, of null. */
+  assignedGroupId: string | null;
   pricingMode: UitleenPricingMode;
   requesterType: UitleenRequesterType;
   priceLabel: string | null;
@@ -526,6 +528,8 @@ export function TransportPlanner({
                     requesterType={trip.requesterType}
                     drivers={drivers}
                     vehicles={vehicleOptions}
+                    groups={groups}
+                    assignedGroupId={trip.assignedGroupId}
                     showComplete={false}
                   />
                 )}

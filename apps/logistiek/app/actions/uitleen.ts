@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
+import { currentWorkingYear } from '@vtk/auth';
 import { canEditAllHelpers, externalRequestsBlocked, requireSession } from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
 import { isEmailish, isOnQuarterHour, MAX_HELPERS, parseDateOnly, todayDateOnly } from '@/lib/uitleen';
@@ -1278,4 +1279,95 @@ export async function removeTripHelperAction(helperId: string): Promise<ActionRe
   revalidatePath('/beheer/vervoer');
   revalidatePath('/beheer/vervoer/week');
   return { ok: true, message: 'Bijrijder weggehaald.' };
+}
+
+/**
+ * De chauffeur van een rit die aan jouw post doorgegeven is.
+ *
+ * De tegenhanger van `assignTripGroupAction` in het beheer: Logistiek geeft een
+ * autorit door aan een post, en dán mag die post er zelf iemand op zetten. Zonder
+ * deze actie zou de mail naar de verantwoordelijke eindigen in "antwoord even
+ * aan Logistiek wie er rijdt", en dan is er niets doorgegeven.
+ *
+ * Drie poorten, en alle drie nodig:
+ *
+ * 1. **De rit moet aan een van jouw posten doorgegeven zijn.** Niet "je bent
+ *    lid van de post die ze aanvroeg": aanvragen is iets anders dan ze mogen
+ *    invullen, en dat tweede is precies wat Logistiek expliciet doorgeeft.
+ * 2. **Niet bij de kar.** Die vraagt een goedgekeurde karchauffeur; een post
+ *    kan dat niet beoordelen. De rit hoort er niet eens te staan, maar een
+ *    voertuigwissel achteraf mag dit niet stil openzetten.
+ * 3. **De chauffeur is een lid van diezelfde post, of staat al in de
+ *    chauffeurslijst.** Anders is dit een manier om iedereen op de site
+ *    leestoegang tot een rit te geven.
+ */
+export async function setGroupTripDriverAction(
+  bookingId: string,
+  driverId: string
+): Promise<ActionResult> {
+  const session = await requireSession();
+  const myGroupIds = session.groups.map((group) => group.id);
+
+  const booking = await prisma.uitleenTransportBooking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      status: true,
+      assignedGroupId: true,
+      driverId: true,
+      vehicle: { select: { needsVanDriver: true, nameNl: true } },
+    },
+  });
+  if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
+  if (!booking.assignedGroupId || !myGroupIds.includes(booking.assignedGroupId)) {
+    return { ok: false, error: 'Deze rit is niet aan jouw post doorgegeven.' };
+  }
+  if (booking.status !== 'REQUESTED' && booking.status !== 'APPROVED') {
+    return { ok: false, error: 'Deze rit is afgerond of geannuleerd.' };
+  }
+  if (booking.vehicle.needsVanDriver) {
+    return {
+      ok: false,
+      error: `${booking.vehicle.nameNl} vraagt een goedgekeurde karchauffeur; vraag Logistiek om er een aan te duiden.`,
+    };
+  }
+
+  const wanted = driverId.trim();
+  let driverName: string | null = null;
+  if (wanted) {
+    const member = await prisma.user.findFirst({
+      where: {
+        id: wanted,
+        active: true,
+        deletedAt: null,
+        OR: [
+          { memberships: { some: { groupId: booking.assignedGroupId, year: currentWorkingYear() } } },
+          { uitleenDriver: { isNot: null } },
+        ],
+      },
+      select: { name: true },
+    });
+    if (!member) {
+      return { ok: false, error: 'Kies iemand van je eigen post, of iemand uit de chauffeurslijst.' };
+    }
+    driverName = member.name;
+  }
+
+  await prisma.uitleenTransportBooking.update({
+    where: { id: bookingId },
+    data: { driverId: wanted || null },
+  });
+  await writeAudit(prisma, { transportBookingId: bookingId }, {
+    kind: 'EDITED',
+    note: driverName ? `chauffeur door de post: ${driverName}` : 'chauffeur door de post verwijderd',
+    actorId: session.user.id,
+  });
+
+  revalidatePath('/ritten');
+  revalidatePath('/beheer/vervoer');
+  revalidatePath('/beheer/vervoer/week');
+  return {
+    ok: true,
+    message: driverName ? `${driverName} rijdt deze rit.` : 'Chauffeur verwijderd.',
+  };
 }

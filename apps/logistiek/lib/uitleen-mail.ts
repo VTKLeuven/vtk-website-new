@@ -10,7 +10,7 @@ import {
   requesterLabel,
   type NotifyKind,
 } from './uitleen';
-import { getLogistiekSettings } from './uitleen-server';
+import { getLogistiekSettings, groupLeads } from './uitleen-server';
 import type { LogistiekLocale } from './i18n-shared';
 import { logistiekBaseUrl } from './payments';
 
@@ -372,6 +372,81 @@ export async function notifyTransport(
     await deliver(recipient, `${SUBJECT_PREFIX}: ${first.purpose} ${words.subject}`, text);
   } catch (err) {
     console.error('[uitleen-mail] ritmail mislukt:', err);
+  }
+}
+
+/**
+ * "Jullie post mag deze autorit zelf invullen."
+ *
+ * Vertrekt zodra Logistiek een rit aan een post of werkgroep doorgeeft. Zonder
+ * deze mail is de toewijzing een vinkje in een beheerscherm dat niemand aan de
+ * andere kant ziet: de post weet niet dat er een rit op hen wacht, en de rit
+ * vertrekt zonder chauffeur.
+ *
+ * Naar de verantwoordelijken (`LEAD`) en niet naar de hele post: het is een
+ * taak die iemand moet verdelen, en veertien mensen mailen om er één te laten
+ * antwoorden, is precies hoe een mailbox onleesbaar wordt. Zij zien de rit
+ * daarna op /ritten, waar ze de chauffeur en de bijrijders invullen.
+ *
+ * Dezelfde regels als de rest van dit bestand: aanroepen ná de transactie, en
+ * falen mag de toewijzing niet ongedaan maken.
+ */
+export async function notifyGroupAssignedForTrip(bookingId: string): Promise<number> {
+  try {
+    const booking = await prisma.uitleenTransportBooking.findUnique({
+      where: { id: bookingId },
+      select: {
+        purpose: true,
+        eventName: true,
+        startAt: true,
+        endAt: true,
+        pickupAddress: true,
+        destination: true,
+        cargoNote: true,
+        adminNote: true,
+        vehicle: { select: { nameNl: true } },
+        assignedGroup: { select: { id: true, nameNl: true } },
+      },
+    });
+    if (!booking?.assignedGroup) return 0;
+
+    const leads = await groupLeads(booking.assignedGroup.id);
+    if (leads.length === 0) return 0;
+
+    const what = booking.eventName?.trim() || booking.purpose;
+    const url = `${logistiekBaseUrl()}/ritten`;
+
+    let sent = 0;
+    for (const lead of leads) {
+      const recipient = recipientOf(lead, null);
+      const nl = recipient.locale !== 'en';
+      const text = joinBlocks([
+        nl ? `Dag ${recipient.name},` : `Hi ${recipient.name},`,
+        nl
+          ? `Logistiek heeft een rit met ${booking.vehicle.nameNl} doorgegeven aan ${booking.assignedGroup.nameNl}. Jullie duiden zelf de chauffeur aan (en eventuele bijrijders).`
+          : `Logistics assigned a trip with ${booking.vehicle.nameNl} to ${booking.assignedGroup.nameNl}. Your post picks the driver (and any passengers).`,
+        [
+          `${nl ? 'Rit' : 'Trip'}: ${what}`,
+          `${nl ? 'Wanneer' : 'When'}: ${formatDateTime(booking.startAt, recipient.locale)} - ${formatDateTime(booking.endAt, recipient.locale)}`,
+          booking.pickupAddress ? `${nl ? 'Laadadres' : 'Loading address'}: ${booking.pickupAddress}` : null,
+          booking.destination ? `${nl ? 'Bestemming' : 'Destination'}: ${booking.destination}` : null,
+          booking.cargoNote ? `${nl ? 'Lading' : 'Cargo'}: ${booking.cargoNote}` : null,
+          booking.adminNote ? `${nl ? 'Van Logistiek' : 'From Logistics'}: ${booking.adminNote}` : null,
+        ]
+          .filter(Boolean)
+          .join('\n'),
+        nl ? `Chauffeur invullen: ${url}` : `Pick a driver: ${url}`,
+        nl ? 'Groeten,\nLogistiek VTK' : 'Regards,\nLogistics VTK',
+      ]);
+      const subject = nl
+        ? `${SUBJECT_PREFIX}: chauffeur gezocht voor ${what} (${formatDateOnly(booking.startAt)})`
+        : `${SUBJECT_PREFIX}: driver needed for ${what} (${formatDateOnly(booking.startAt)})`;
+      if (await deliver(recipient, subject, text)) sent += 1;
+    }
+    return sent;
+  } catch (err) {
+    console.error('[uitleen-mail] mail naar de postverantwoordelijke mislukt:', err);
+    return 0;
   }
 }
 

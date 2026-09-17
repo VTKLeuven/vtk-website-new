@@ -7,7 +7,17 @@ import { PhoneLink } from '@/components/phone-link';
 import { copy, getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
 import { formatDateTime } from '@/lib/uitleen';
-import { feedTokensForUser, isDriver, isVanDriver, tripsForDriver, type DriverTrip } from '@/lib/uitleen-server';
+import {
+  driverPhones,
+  feedTokensForUser,
+  groupMemberOptions,
+  isDriver,
+  isVanDriver,
+  tripsForDriver,
+  tripsForGroups,
+  type DriverTrip,
+} from '@/lib/uitleen-server';
+import { GroupDriverPicker } from './group-driver-picker';
 import { FeedTokens } from '@/components/feed-tokens';
 import { ToastProvider } from '@/components/ui/toast';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
@@ -37,7 +47,24 @@ function MapLink({ address, en }: { address: string; en: boolean }) {
   );
 }
 
-function TripCard({ trip, locale, past }: { trip: DriverTrip; locale: LogistiekLocale; past: boolean }) {
+function TripCard({
+  trip,
+  locale,
+  past,
+  driverPhone,
+  groupMembers,
+}: {
+  trip: DriverTrip;
+  locale: LogistiekLocale;
+  past: boolean;
+  /** Het nummer van wie rijdt; enkel op een rit van je post, niet op je eigen. */
+  driverPhone?: string | null;
+  /**
+   * De leden van de post waaraan deze rit doorgegeven is. Aanwezig betekent:
+   * jij mag hier de chauffeur kiezen.
+   */
+  groupMembers?: Array<{ id: string; name: string }>;
+}) {
   const en = locale === 'en';
   const vehicle = en ? trip.vehicle.nameEn : trip.vehicle.nameNl;
   const requesterGroup = trip.group ? (en ? trip.group.nameEn : trip.group.nameNl) : null;
@@ -118,6 +145,24 @@ function TripCard({ trip, locale, past }: { trip: DriverTrip; locale: LogistiekL
             <dd className="font-medium text-vtk-ink">{trip.eventName}</dd>
           </div>
         ) : null}
+        {/* Enkel op een rit van je post: op je eigen rit ben jij de chauffeur,
+            en je eigen nummer opzoeken op een scherm is geen hulp. */}
+        {trip.driver && driverPhone !== undefined ? (
+          <div>
+            <dt className="text-vtk-muted">{en ? 'Driver' : 'Chauffeur'}</dt>
+            <dd className="font-medium text-vtk-ink">
+              {trip.driver.name}
+              {driverPhone ? (
+                <>
+                  {' · '}
+                  <span className="font-normal">
+                    <PhoneLink number={driverPhone} />
+                  </span>
+                </>
+              ) : null}
+            </dd>
+          </div>
+        ) : null}
         {trip.helpers.length > 0 ? (
           <div className="sm:col-span-2">
             <dt className="text-vtk-muted">{en ? 'Passengers' : 'Bijrijders'}</dt>
@@ -165,6 +210,18 @@ function TripCard({ trip, locale, past }: { trip: DriverTrip; locale: LogistiekL
           <LinkedText text={trip.memberNote} />
         </p>
       ) : null}
+
+      {/* Doorgegeven aan jouw post: dan duid je hier zelf iemand aan. Onderaan
+          de kaart en niet bovenaan: eerst weten wat de rit is, dan pas kiezen
+          wie hem doet. */}
+      {groupMembers && !past && trip.assignedGroup ? (
+        <GroupDriverPicker
+          bookingId={trip.id}
+          driverId={trip.driverId}
+          members={groupMembers}
+          groupName={en ? trip.assignedGroup.nameEn : trip.assignedGroup.nameNl}
+        />
+      ) : null}
     </li>
   );
 }
@@ -183,11 +240,33 @@ export default async function RittenPage() {
   }
   const en = locale === 'en';
 
-  const [trips, driver, vanDriver, feedTokens] = await Promise.all([
+  const myGroupIds = session.groups.map((group) => group.id);
+
+  const [trips, groupTrips, driver, vanDriver, feedTokens] = await Promise.all([
     tripsForDriver(session.user.id),
+    // Wat je medepostleden rijden, en wat er nog een chauffeur mist omdat
+    // Logistiek de rit aan jouw post doorgaf.
+    tripsForGroups(session.user.id, myGroupIds),
     isDriver(session.user.id),
     isVanDriver(session.user.id),
     feedTokensForUser(session.user.id),
+  ]);
+
+  // Enkel voor de ritten van je post: het nummer van wie rijdt, en de leden van
+  // de post die de rit mag invullen. Twee queries op precies wat op het scherm
+  // komt, en niets wanneer er geen postritten zijn.
+  const assignedGroupIds = [
+    ...new Set(
+      groupTrips
+        .map((trip) => trip.assignedGroup?.id)
+        .filter((id): id is string => Boolean(id) && myGroupIds.includes(id as string))
+    ),
+  ];
+  const [groupDriverPhones, membersPerGroup] = await Promise.all([
+    driverPhones(groupTrips.map((trip) => trip.driverId).filter((id): id is string => Boolean(id))),
+    Promise.all(
+      assignedGroupIds.map(async (groupId) => [groupId, await groupMemberOptions(groupId)] as const)
+    ).then((entries) => new Map(entries)),
   ]);
 
   // Grens tussen komend en voorbij: het einde van de rit, niet de start. Een rit
@@ -195,6 +274,24 @@ export default async function RittenPage() {
   const now = new Date();
   const upcoming = trips.filter((trip) => trip.endAt >= now);
   const past = trips.filter((trip) => trip.endAt < now).reverse();
+  // Van je post tonen we enkel wat er nog aankomt: wie er vorige maand reed, is
+  // historiek van Logistiek en niet iets waar een post iets mee doet.
+  const groupUpcoming = groupTrips.filter((trip) => trip.endAt >= now);
+  const groupNames = [
+    ...new Set(
+      groupUpcoming.map((trip) =>
+        trip.assignedGroup
+          ? en
+            ? trip.assignedGroup.nameEn
+            : trip.assignedGroup.nameNl
+          : trip.group
+            ? en
+              ? trip.group.nameEn
+              : trip.group.nameNl
+            : ''
+      )
+    ),
+  ].filter(Boolean);
 
   return (
     <PageShell
@@ -217,7 +314,7 @@ export default async function RittenPage() {
         ) : null
       }
     >
-      {!driver && trips.length === 0 ? (
+      {!driver && trips.length === 0 && groupTrips.length === 0 ? (
         <p className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-5 py-4 text-sm leading-7 text-vtk-body">
           {en ? 'You are not a driver for Logistics. Would you like to drive? Mail ' : 'Je bent geen chauffeur bij Logistiek. Wil je rijden? Mail '}
           <a href="mailto:logistiek@vtk.be" className="font-medium text-vtk-navy underline underline-offset-4">
@@ -250,6 +347,43 @@ export default async function RittenPage() {
             </ul>
           )}
         </section>
+
+        {/* De ritten van je post. Een tweede sectie en geen tweede tabblad: het
+            zijn er meestal een handvol, en een tabblad verstopt precies de rit
+            die nog een chauffeur zoekt. Valt helemaal weg wanneer er niets is;
+            een lege sectie met een uitleg erbij zou op elk scherm staan van
+            iedereen die bij een post zit. */}
+        {groupUpcoming.length > 0 ? (
+          <ToastProvider>
+            <section>
+              <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
+                {en ? 'Trips of my post' : 'Ritten van mijn post'}
+                {groupNames.length > 0 ? ` (${groupNames.join(', ')})` : ''}
+              </h2>
+              <p className="mt-1 text-sm text-vtk-muted">
+                {en
+                  ? 'What your fellow members are driving, and the trips Logistics handed to your post to fill in yourselves.'
+                  : 'Wat je medeleden rijden, en de ritten die Logistiek aan je post doorgaf om zelf in te vullen.'}
+              </p>
+              <ul className="mt-4 grid gap-4">
+                {groupUpcoming.map((trip) => (
+                  <TripCard
+                    key={trip.id}
+                    trip={trip}
+                    locale={locale}
+                    past={false}
+                    driverPhone={trip.driverId ? (groupDriverPhones.get(trip.driverId) ?? null) : null}
+                    groupMembers={
+                      trip.assignedGroup && myGroupIds.includes(trip.assignedGroup.id)
+                        ? (membersPerGroup.get(trip.assignedGroup.id) ?? [])
+                        : undefined
+                    }
+                  />
+                ))}
+              </ul>
+            </section>
+          </ToastProvider>
+        ) : null}
 
         {past.length > 0 ? (
           <section>

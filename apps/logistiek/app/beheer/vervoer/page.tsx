@@ -20,6 +20,7 @@ import { LogisticsIcon } from '@/components/logistics-icon';
 import {
   adminVanBookings,
   adminVehicles,
+  activeGroups,
   driverOptions,
   selectableEvents,
   hasSucceededPayment,
@@ -92,12 +93,16 @@ export default async function BeheerVervoerPage({
   const byChoice = (a: AdminTransportBooking, b: AdminTransportBooking) =>
     compareTrips(a, b, sort, dir);
 
-  const [bookings, drivers, vehicles, events] = await Promise.all([
+  const [bookings, drivers, vehicles, events, groups] = await Promise.all([
     adminVanBookings(),
     driverOptions(),
     adminVehicles(),
     selectableEvents(),
+    // Aan wie een autorit doorgegeven kan worden; de post vult dan zelf de
+    // chauffeur in (zie `assignTripGroupAction`).
+    activeGroups(),
   ]);
+  const groupOptions = groups.map((group) => ({ id: group.id, name: group.nameNl }));
   const eventChoices = eventOptions(events);
   const activeVehicleOptions = vehicles
     .filter((v) => v.active)
@@ -714,6 +719,8 @@ export default async function BeheerVervoerPage({
                         requesterType={booking.requesterType}
                         drivers={drivers}
                         vehicles={activeVehicleOptions}
+                        groups={groupOptions}
+                        assignedGroupId={booking.assignedGroupId}
                       />
                     </BookingDetails>
                   </li>
@@ -778,6 +785,8 @@ export default async function BeheerVervoerPage({
                             requesterType={booking.requesterType}
                             drivers={drivers}
                             vehicles={activeVehicleOptions}
+                            groups={groupOptions}
+                            assignedGroupId={booking.assignedGroupId}
                           />
                         </BookingDetails>
                       }

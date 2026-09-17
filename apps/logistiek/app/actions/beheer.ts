@@ -26,7 +26,11 @@ import {
   toBrusselsDateValue,
   transportPriceCents,
 } from '@/lib/uitleen';
-import { notifyReservation, notifyTransport } from '@/lib/uitleen-mail';
+import {
+  notifyGroupAssignedForTrip,
+  notifyReservation,
+  notifyTransport,
+} from '@/lib/uitleen-mail';
 import {
   consumeFlesserkeStock,
   flesserkeReserved,
@@ -2554,6 +2558,84 @@ export async function assignDriverAction(bookingId: string, driverId: string): P
     ok: true,
     warning: warning !== null,
     message: warning ? `Chauffeur toegewezen. ${warning}` : 'Chauffeur toegewezen.',
+  };
+}
+
+/**
+ * Een rit doorgeven aan een post of werkgroep, die er zelf een chauffeur op zet.
+ *
+ * Bestaat omdat Logistiek niet voor elke rit een chauffeur heeft, en voor de
+ * auto ook niet hoeft: daar rijdt elk lid met een rijbewijs mee. De post die de
+ * rit vroeg, weet zelf wie er die avond kan; Logistiek weet dat niet en moet het
+ * anders gaan navragen.
+ *
+ * **Niet voor de kar.** Een voertuig met `needsVanDriver` vraagt een
+ * goedgekeurde karchauffeur uit de pool, en dat is een beslissing van Logistiek
+ * en niet van de post die iets te vervoeren heeft. De keuzelijst laat het al niet
+ * toe; deze controle staat er omdat een keuzelijst geen poort is.
+ *
+ * De toewijzing vervangt de chauffeur niet: staat er al iemand op, dan blijft
+ * die staan en is dit enkel "jullie mogen dit wijzigen".
+ */
+export async function assignTripGroupAction(
+  bookingId: string,
+  groupId: string
+): Promise<ActionResult> {
+  const session = await requireManage();
+
+  const booking = await prisma.uitleenTransportBooking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      status: true,
+      assignedGroupId: true,
+      vehicle: { select: { needsVanDriver: true, nameNl: true } },
+    },
+  });
+  if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
+  if (booking.status !== 'REQUESTED' && booking.status !== 'APPROVED') {
+    return { ok: false, error: 'Deze rit is afgerond of geannuleerd; die geef je niet meer door.' };
+  }
+
+  const wanted = groupId.trim();
+  if (wanted && booking.vehicle.needsVanDriver) {
+    return {
+      ok: false,
+      error: `${booking.vehicle.nameNl} vraagt een goedgekeurde karchauffeur en kan niet aan een post doorgegeven worden.`,
+    };
+  }
+
+  const group = wanted
+    ? await prisma.group.findFirst({ where: { id: wanted, active: true }, select: { id: true, nameNl: true } })
+    : null;
+  if (wanted && !group) return { ok: false, error: 'Die post of werkgroep bestaat niet meer.' };
+  if ((group?.id ?? null) === booking.assignedGroupId) return { ok: true, message: 'Niets gewijzigd.' };
+
+  await prisma.uitleenTransportBooking.update({
+    where: { id: bookingId },
+    data: { assignedGroupId: group?.id ?? null },
+  });
+  await writeAudit(prisma, { transportBookingId: bookingId }, {
+    kind: 'EDITED',
+    note: group ? `doorgegeven aan ${group.nameNl}` : 'niet meer doorgegeven aan een post',
+    actorId: session.user.id,
+  });
+
+  revalidateBeheer();
+  revalidatePath('/ritten');
+  if (!group) return { ok: true, message: 'De rit staat niet meer bij een post.' };
+
+  // Ná de write, zoals elke mail hier. Vertrekt er niets omdat de post geen
+  // verantwoordelijke heeft, dan zegt de melding dat: de toewijzing zelf is
+  // gelukt, maar ze bereikt zo niemand, en dat wil je weten voor je verder gaat.
+  const sent = await notifyGroupAssignedForTrip(bookingId);
+  return {
+    ok: true,
+    warning: sent === 0,
+    message:
+      sent === 0
+        ? `Doorgegeven aan ${group.nameNl}, maar die post heeft dit werkingsjaar geen verantwoordelijke; er vertrok geen mail. Verwittig hen zelf.`
+        : `Doorgegeven aan ${group.nameNl}; de verantwoordelijke${sent === 1 ? '' : 'n'} kreeg${sent === 1 ? '' : 'en'} een mail om een chauffeur aan te duiden.`,
   };
 }
 

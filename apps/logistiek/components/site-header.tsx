@@ -32,7 +32,7 @@ export async function SiteHeader() {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
   const t = copy[locale];
   // "Mijn ritten" is er enkel voor chauffeurs; voor de rest bestaat de link niet.
-  const showTrips = session ? showsMyTrips(await driverStatus(session.user.id)) : false;
+  const showTrips = session ? showsMyTrips(await driverStatus(session.user.id, session.groups.map((group) => group.id))) : false;
   // Op een testomgeving verwijst de login naar de test-picker in plaats van naar
   // de KU Leuven-login op de hoofdsite; enkel voor wie er iets mee kan, anders is
   // het een menu-item dat 404 geeft. Zie lib/session.ts.

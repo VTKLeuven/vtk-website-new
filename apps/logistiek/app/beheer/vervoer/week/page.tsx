@@ -222,6 +222,7 @@ export default async function VervoerWeekPage({
       vehicleId: booking.vehicleId,
       vehicleName: booking.vehicle.nameNl,
       driverId: booking.driverId,
+      assignedGroupId: booking.assignedGroupId,
       driver:
         booking.driver && booking.driverId
           ? { id: booking.driverId, name: booking.driver.name }

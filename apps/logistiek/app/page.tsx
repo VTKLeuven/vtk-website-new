@@ -50,7 +50,7 @@ export default async function LogistiekHome() {
   const en = locale === 'en';
   const [content, driver, settings] = await Promise.all([
     getPublicCopy(locale),
-    driverStatus(session.user.id),
+    driverStatus(session.user.id, session.groups.map((group) => group.id)),
     getLogistiekSettings(),
   ]);
   // S1: het zegt het hier al, zodat niemand eerst een formulier invult om pas

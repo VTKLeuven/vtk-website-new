@@ -6,6 +6,7 @@ import { Button } from '@vtk/ui';
 import type { UitleenPricingMode, UitleenRequesterType } from '@prisma/client';
 import {
   assignDriverAction,
+  assignTripGroupAction,
   changeVehicleAction,
   completeTransportAction,
   markTransportPaidOfflineAction,
@@ -28,6 +29,8 @@ export function TransportControls({
   requesterType,
   drivers,
   vehicles,
+  groups,
+  assignedGroupId,
   showComplete = true,
 }: {
   bookingId: string;
@@ -40,6 +43,10 @@ export function TransportControls({
   requesterType: UitleenRequesterType;
   drivers: DriverOption[];
   vehicles: Array<{ id: string; name: string; needsVanDriver: boolean }>;
+  /** Posten en werkgroepen waaraan een autorit doorgegeven kan worden. */
+  groups: Array<{ id: string; name: string }>;
+  /** De post die deze rit zelf mag invullen, of null. */
+  assignedGroupId: string | null;
   /**
    * Staat "Rit afronden" hier? Niet in de transportplanning (P4): daar klik je de
    * hele dag ritten aan om te schuiven en chauffeurs toe te wijzen, en dan is een
@@ -52,6 +59,8 @@ export function TransportControls({
   const showToast = useToast();
   const [pending, startTransition] = useTransition();
   const [kilometers, setKilometers] = useState('');
+
+  const needsVanDriver = vehicles.find((v) => v.id === vehicleId)?.needsVanDriver ?? false;
 
   function run(
     action: () => Promise<{ ok: boolean; message?: string; error?: string; warning?: boolean }>
@@ -104,12 +113,34 @@ export function TransportControls({
             <DriverOptions
               drivers={drivers}
               current={driver}
-              needsVanDriver={
-                vehicles.find((v) => v.id === vehicleId)?.needsVanDriver ?? false
-              }
+              needsVanDriver={needsVanDriver}
             />
           </select>
         </label>
+
+        {/* Doorgeven aan een post, die er zelf iemand op zet. Enkel bij de auto:
+            de kar vraagt een goedgekeurde karchauffeur, en die keuze is niet aan
+            de post die iets te vervoeren heeft. Staat er dus niet bij de kar in
+            plaats van er te staan en te weigeren; een keuzelijst die altijd nee
+            zegt, leert mensen keuzelijsten te negeren. */}
+        {!needsVanDriver ? (
+          <label className="flex items-center gap-2 text-sm">
+            <span className="text-vtk-muted">Post vult zelf in</span>
+            <select
+              value={assignedGroupId ?? ''}
+              disabled={pending}
+              onChange={(e) => run(() => assignTripGroupAction(bookingId, e.target.value))}
+              className={selectClass}
+            >
+              <option value="">Logistiek regelt het</option>
+              {groups.map((group) => (
+                <option key={group.id} value={group.id}>
+                  {group.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-end gap-3">
