@@ -113,7 +113,7 @@ async function gateRedirect(request: NextRequest, internalPath: string): Promise
   // 2. Studiebevestiging: bij elk nieuw academiejaar declareert het lid opnieuw
   //    wat het studeert (vervangt het jaarlijkse cursusdienst-signaal en houdt
   //    de mailinglijsten beperkt tot wie effectief nog studeert). Bewust het
-  //    studiejaar (27 september) en niet het werkingsjaar (15 juli): in juli
+  //    studiejaar (21 september) en niet het werkingsjaar (15 juli): in juli
   //    loopt het academiejaar nog en duidt iedereen zijn oude jaar aan.
   if (needsStudyConfirmation(user)) {
     if (segment !== 'studie-bevestigen') {

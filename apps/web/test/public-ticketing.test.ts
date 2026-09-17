@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   availableTicketCount,
   formatTicketOrderStatus,
+  maximumSelectableForLine,
   maximumSelectableForType,
   nextTicketQuantity,
+  ticketLinesForType,
   type PublicTicketType,
 } from '@/components/ticketing/public/types';
 
@@ -58,6 +60,30 @@ describe('public ticket inventory presentation', () => {
         maximum: 5,
       })
     ).toBe(0);
+  });
+});
+
+describe('member prices', () => {
+  it('splits a ticket type with a member price into two lines, member first', () => {
+    const beer = { ...ticketType('beer', 'beer', 10), memberPriceCents: 800 };
+    expect(ticketLinesForType(beer).map((line) => [line.key, line.priceCents])).toEqual([
+      ['beer:member', 800],
+      ['beer', 1_000],
+    ]);
+    expect(ticketLinesForType(ticketType('water', 'water', 10))).toHaveLength(1);
+  });
+
+  it('lets both prices of one type share its per-order maximum and stock', () => {
+    const beer = { ...ticketType('beer', 'beer', 3), memberPriceCents: 800, maxPerOrder: 4 };
+    const lines = ticketLinesForType(beer);
+    const [member, standard] = lines;
+    // Voorraad 3, waarvan 2 al aan de ledenprijs: er blijft er 1 over.
+    expect(
+      maximumSelectableForLine({ line: standard, lines, quantities: { 'beer:member': 2 }, maxTicketsPerOrder: 8 })
+    ).toBe(1);
+    expect(
+      maximumSelectableForLine({ line: member, lines, quantities: { 'beer:member': 2 }, maxTicketsPerOrder: 8 })
+    ).toBe(3);
   });
 });
 

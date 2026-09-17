@@ -10,7 +10,7 @@
  *   meteen ook de 15-juli-reset: na de cutover tellen enkel de toewijzingen van
  *   het nieuwe jaar mee. `User.isSuperAdmin` is de enige uitzondering die niet
  *   reset (het is een boolean op de user, geen jaartoewijzing).
- * - **Studiejaar** ({@link currentStudyYear}): begint op 27 september, en enkel
+ * - **Studiejaar** ({@link currentStudyYear}): begint op 21 september, en enkel
  *   de jaarlijkse studiebevestiging (`User.studyConfirmedYear`) hangt eraan. Het
  *   academiejaar loopt door tot eind september, dus wie op 15 juli zijn studie
  *   "voor het nieuwe jaar" bevestigt, duidt in de praktijk nog het jaar aan dat
@@ -29,9 +29,9 @@ export const FIRST_WORKING_YEAR = 2026;
 const CUTOVER_MONTH = 7; // juli
 const CUTOVER_DAY = 15;
 
-/** Dag/maand waarop de studiebevestiging vervalt (27 september). */
+/** Dag/maand waarop de studiebevestiging vervalt (21 september). */
 const STUDY_CUTOVER_MONTH = 9; // september
-const STUDY_CUTOVER_DAY = 27;
+const STUDY_CUTOVER_DAY = 21;
 
 /** Huidige datum uitgedrukt in Brussel-tijd (jaar/maand/dag). */
 function brusselsYmd(date: Date): { year: number; month: number; day: number } {
@@ -65,7 +65,7 @@ export function currentWorkingYear(date: Date = new Date()): number {
  *
  * Bewust **niet** geklemd op {@link FIRST_WORKING_YEAR}: die klem bestaat omdat
  * er geen roldata is van vóór "26-27", en hier zou ze net het tegenovergestelde
- * doen van waarvoor deze cutover gemaakt is. Tussen 15 juli en 27 september 2026
+ * doen van waarvoor deze cutover gemaakt is. Tussen 15 juli en 21 september 2026
  * zou ze 2026 teruggeven, en dan valt de bevestigingsgate toch in juli.
  */
 export function currentStudyYear(date: Date = new Date()): number {
@@ -88,7 +88,7 @@ export function needsStudyConfirmation(
 }
 
 /**
- * Startmoment van een studiejaar: 27 september van dat jaar (Brussel-tijd, hier
+ * Startmoment van een studiejaar: 21 september van dat jaar (Brussel-tijd, hier
  * benaderd als middernacht UTC; het uur doet er niet toe voor het tonen van "de
  * eerstvolgende omslag"). De tegenhanger voor het werkingsjaar staat in
  * `apps/web/lib/workingYear.ts`.

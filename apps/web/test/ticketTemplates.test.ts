@@ -130,6 +130,28 @@ describe("de tickettypes lezen die een scherm terugstuurt", () => {
     ).toBe("Tickettype 1: de verkoop moet sluiten na ze opent.");
   });
 
+  it("houdt een ledenprijs bij een ticket dat voor iedereen te koop staat", () => {
+    const parsed = parseTemplateTypes([
+      { nameNl: "Bier", unitPriceCents: 1700, memberPriceCents: 1400 },
+    ]);
+    if (typeof parsed === "string") throw new Error(parsed);
+    expect(parsed[0].memberPriceCents).toBe(1400);
+  });
+
+  it("weigert een ledenprijs die niet lager ligt", () => {
+    expect(
+      parseTemplateTypes([{ nameNl: "Bier", unitPriceCents: 1400, memberPriceCents: 1400 }])
+    ).toBe("Tickettype 1: de ledenprijs moet lager liggen dan de gewone prijs.");
+  });
+
+  it("laat de ledenprijs vallen bij een ticket voor leden alleen", () => {
+    const parsed = parseTemplateTypes([
+      { nameNl: "Bier (lid)", unitPriceCents: 1400, memberPriceCents: 1200, audience: "MEMBERS" },
+    ]);
+    if (typeof parsed === "string") throw new Error(parsed);
+    expect(parsed[0].memberPriceCents).toBeNull();
+  });
+
   it("overleeft de rondrit door het verborgen JSON-veld", () => {
     const original = [
       row({ code: "BIERLID", unitPriceCents: 1400, audience: "MEMBERS", maxPerOrder: 1 }),

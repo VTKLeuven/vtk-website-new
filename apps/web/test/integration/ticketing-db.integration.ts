@@ -361,6 +361,65 @@ describe.sequential("ticketing database invariants", () => {
     }
   });
 
+  it("sells the member price only to a member, beside the regular price", async () => {
+    const memberOrder = (email: string, memberPrice: boolean) =>
+      createTicketCheckout(
+        {
+          eventId: ids.rateEvent,
+          buyerName: "Member Price Buyer",
+          buyerEmail: email,
+          locale: "nl",
+          termsAccepted: true,
+          paymentProvider: "mock",
+          items: [
+            { ticketTypeId: ids.rateType, memberPrice, attendeeName: "Member Attendee", attendeeEmail: "" },
+            { ticketTypeId: ids.rateType, attendeeName: "Friend Attendee", attendeeEmail: "" },
+          ],
+        },
+        `member-price-${email}`
+      );
+
+    await prisma.ticketType.update({ where: { id: ids.rateType }, data: { memberPriceCents: 60 } });
+    try {
+      await expect(memberOrder("member-price-guest@example.test", true)).rejects.toMatchObject({
+        code: "LOGIN_REQUIRED",
+      });
+
+      vi.mocked(getSession).mockResolvedValue({
+        user: { id: ids.user, name: "Integration Admin", email: `${ids.user}@example.test`, isSuperAdmin: false },
+      } as never);
+      await expect(memberOrder("member-price-nonmember@example.test", true)).rejects.toMatchObject({
+        code: "MEMBERSHIP_REQUIRED",
+      });
+
+      // Een student van de faculteit is lid, zie lib/membership.
+      await prisma.user.update({ where: { id: ids.user }, data: { firwStudent: true } });
+      const checkout = await memberOrder("member-price-member@example.test", true);
+      const order = await prisma.ticketOrder.findUniqueOrThrow({
+        where: { id: checkout.orderId },
+        include: { items: { orderBy: { unitPriceCents: "asc" } } },
+      });
+      expect(order.totalCents).toBe(160);
+      expect(order.items.map((item) => [item.ticketTypeName, item.unitPriceCents, item.memberPrice])).toEqual([
+        ["Limiettest (lid)", 60, true],
+        ["Limiettest (niet-lid)", 100, false],
+      ]);
+
+      // Een ticket dat al enkel voor leden is, heeft geen ledenprijs naast zich.
+      await prisma.ticketType.update({ where: { id: ids.rateType }, data: { audience: "MEMBERS" } });
+      await expect(memberOrder("member-price-members-only@example.test", true)).rejects.toMatchObject({
+        code: "INVALID_TICKET_TYPE",
+      });
+    } finally {
+      vi.mocked(getSession).mockResolvedValue(null);
+      await prisma.user.update({ where: { id: ids.user }, data: { firwStudent: false } });
+      await prisma.ticketType.update({
+        where: { id: ids.rateType },
+        data: { audience: "PUBLIC", memberPriceCents: null },
+      });
+    }
+  });
+
   it("fulfills a Mollie webhook once and deduplicates its retry", async () => {
     const accessExpiresAt = new Date("2027-06-20T00:00:00.000Z");
     const access = createOrderAccessToken(ids.mollieOrder, accessExpiresAt);

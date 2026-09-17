@@ -2258,6 +2258,17 @@
   text-transform: uppercase;
 }
 
+/* Het label boven de ledenprijs, onder de gewone prijs in dezelfde cel. Klein
+   en gedempt: het hoort bij het veld erboven en is geen tweede kolomkop. */
+.ticket-admin-template-subfield-label {
+  display: block;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--muted);
+}
+
 .ticket-admin-template-rows-foot {
   display: flex;
   flex-wrap: wrap;

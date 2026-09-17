@@ -100,6 +100,21 @@ admin).
 **Server actions** must re-check (`await requirePermission(...)`): never trust the client. Expected
 input errors are *returned* as `saveError(code)`, not thrown (see `CLAUDE.md`).
 
+### "...for own group" permissions (permission + membership)
+
+`calendar.create`, `tickets.create` and `forms.create` all mean the same thing: **you hold the
+permission, and the post you are creating for is one you are a member of this working year.**
+Nothing more. The live check pairs `hasLivePermission` with a `GroupMembership` lookup
+(`canCreateFormForGroup`, `canCreateTicketEventForGroup`); the session variant that decides whether
+a button renders pairs `hasPermission(session, ...)` with `session.groups`.
+
+**Do not add a hard-coded "and you must be the LEAD of that post".** Whether a right belongs to the
+responsible only is what the role grant's `kind` says (`DEFAULT` vs `LEADER`); `hasLivePermission`
+already resolves that, and IT can change it per post in `/admin/groepen` without a deploy. Ticketing
+did carry that extra check and it made `tickets.create` unusable: the seed grants `praesidium` as
+`DEFAULT` to every post, so every praesidium member saw the Tickets tab, an empty list and no "New
+event" button, with no setting in the admin that could fix it.
+
 ### Page editing (permission + page role)
 
 Info pages are the one place where a plain permission is not enough: the **content** of a page may
@@ -212,6 +227,7 @@ table whose rows expand into per-category editors, with create/import in modals.
 | `/admin/groepen` (`PostsTable`) | `groups.manage` | Per working-year tabs. Row = post + member count. Expands to: members, roles this post grants (DEFAULT/LEADER), post settings (incl. `active`). Posts are deactivated, never hard-deleted. Filtered to `Group.type = PRAESIDIUM`. |
 | `/admin/werkgroepen` (`WerkgroepenTable`) | `werkgroepen.manage` **or** werkgroep member | Werkgroepen = `Group` with `type = WERKGROEP`. Managers see all and manage members/roles/settings like posts; a plain member sees only their own werkgroep(s) and may edit just the info text + website (`saveWerkgroepInfoAction`, scoped to their own membership). Public page: `/werkgroepen`. |
 | `/admin/gebruikers` | `users.view` (edit needs `users.edit`) | **Server-driven** table (URL `?q&sort&dir&page`, `count` + `findMany` with `take`/`skip`, no memberships join), built to scale to tens of thousands of users. Editing opens `/admin/gebruikers/[id]`. |
+| `/admin/leden` | `leden.manage` | Wie dit **academiejaar** lid is van de kring (`Membership`, cutover 21 september), niet te verwarren met `/admin/gebruikers` (elk account) of `/admin/groepen` (posten per werkingsjaar). Ledenaantal + omzet bovenaan, jaartabs, instellingen (prijs, welke wegen openstaan), iemand handmatig lid maken, en een xlsx-export (`/api/admin/leden/export`). Los van `users.view`: die tab toont elk account, deze toont persoonsgegevens mét betaalstatus. |
 | `/admin/pocs` (`PocsTable`) | `pocs.manage` | Row = POC + representative count. Expands to representatives (added via the `/api/users/search` typeahead) and POC settings. |
 | `/admin/paginas` (server-rendered table) | `pages.edit` or `pages.editAll` | Lists only the pages the user may edit (role match; editAll/superadmin sees all). Search + sort + pagination run in the DB (25/page); search spans every page the user may edit. Yearly-review pages not yet edited this working year float to the top with a yellow cue. Row -> full-page markdown editor (`/admin/paginas/[id]`). "Nieuwe pagina" (title + slug) creates a draft and redirects to its editor. |
 | `/admin/paginas/[id]` (`PageContentEditor`) | `canEditPageContent` | Markdown content (NL/EN) + attachments, plus a settings card for the page's slug, editor roles and yearly flag (same check, not `pages.manage`), and Delete (`pages.delete` **and** `canEditPageContent`). |

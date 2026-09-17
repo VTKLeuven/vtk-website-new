@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ticketAudienceFrom,
   ticketTypeIsHidden,
+  ticketTypeMemberPrice,
   ticketTypeRequiresLogin,
 } from '@/lib/ticketing/audience';
 
@@ -34,5 +35,12 @@ describe('ticket audience', () => {
     expect(ticketTypeIsHidden({ audience: 'HONORARY' }, true)).toBe(false);
     expect(ticketTypeIsHidden({ audience: 'MEMBERS' }, false)).toBe(false);
     expect(ticketTypeIsHidden({ audience: 'PUBLIC' }, false)).toBe(false);
+  });
+
+  it('only gives a member price to a ticket that is also sold to non-members', () => {
+    expect(ticketTypeMemberPrice({ audience: 'PUBLIC', memberPriceCents: 1_400 })).toBe(1_400);
+    expect(ticketTypeMemberPrice({ audience: 'PUBLIC', memberPriceCents: null })).toBeNull();
+    expect(ticketTypeMemberPrice({ audience: 'MEMBERS', memberPriceCents: 1_400 })).toBeNull();
+    expect(ticketTypeMemberPrice({ audience: 'HONORARY', memberPriceCents: 1_400 })).toBeNull();
   });
 });

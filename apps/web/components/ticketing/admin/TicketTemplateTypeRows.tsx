@@ -111,6 +111,39 @@ export function TicketTemplateTypeRows({
                       update(index, { unitPriceCents: amountToCents(changed.target.value) })
                     }
                   />
+                  {/* De ledenprijs onder de gewone prijs en niet in een eigen
+                      kolom: de tabel staat in een kolom van 900 px en telt er al
+                      zeven, en het gaat over hetzelfde ticket. Enkel bij een
+                      ticket dat voor iedereen te koop staat; bij "alleen leden"
+                      is er geen tweede prijs om naast te zetten. */}
+                  {row.audience === "PUBLIC" ? (
+                    <>
+                      <label
+                        className="ticket-admin-template-subfield-label"
+                        htmlFor={`${name}-memberprice-${index}`}
+                      >
+                        {nl ? "leden" : "members"}
+                      </label>
+                      <input
+                        id={`${name}-memberprice-${index}`}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder={nl ? "geen" : "none"}
+                        value={
+                          row.memberPriceCents === null ? "" : centsToAmount(row.memberPriceCents)
+                        }
+                        onChange={(changed) =>
+                          update(index, {
+                            memberPriceCents:
+                              changed.target.value.trim() === ""
+                                ? null
+                                : amountToCents(changed.target.value),
+                          })
+                        }
+                      />
+                    </>
+                  ) : null}
                 </td>
                 <td>
                   <label className="sr-only" htmlFor={`${name}-audience-${index}`}>
@@ -119,11 +152,17 @@ export function TicketTemplateTypeRows({
                   <select
                     id={`${name}-audience-${index}`}
                     value={row.audience}
-                    onChange={(changed) =>
+                    onChange={(changed) => {
+                      const audience = changed.target.value as TicketTemplateType["audience"];
+                      // De ledenprijs mee wissen: ze verdwijnt hierboven uit
+                      // beeld, en een waarde die je niet meer ziet maar wel nog
+                      // meereist, duikt later op als een korting die niemand
+                      // ingesteld heeft.
                       update(index, {
-                        audience: changed.target.value as TicketTemplateType["audience"],
-                      })
-                    }
+                        audience,
+                        memberPriceCents: audience === "PUBLIC" ? row.memberPriceCents : null,
+                      });
+                    }}
                   >
                     <option value="PUBLIC">{nl ? "Iedereen" : "Everyone"}</option>
                     <option value="MEMBERS">{nl ? "Alleen leden" : "Members only"}</option>

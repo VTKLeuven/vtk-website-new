@@ -29,6 +29,8 @@ export type BuiltinTicketTemplateType = {
   descriptionEn?: string;
   /** Prijs in cent; 0 is geldig (gratis ticket). */
   unitPriceCents: number;
+  /** Optionele ledenprijs; enkel zinvol bij doelgroep PUBLIC en lager dan de gewone prijs. */
+  memberPriceCents?: number | null;
   audience?: "PUBLIC" | "MEMBERS" | "HONORARY";
   /** Sleutel uit `lib/ticketing/ticketColors.ts`. */
   color?: string;
@@ -74,6 +76,7 @@ export type BuiltinTicketTemplate = {
   openScanning?: boolean;
   presaleLeadMinutes?: number | null;
   presalePraesidium?: boolean;
+  presaleHelpers?: boolean;
   confirmationMessageNl?: string;
   confirmationMessageEn?: string;
   capacity?: number;

@@ -66,6 +66,7 @@ type TicketEventFormValue = {
   salesEndAt?: Date | null;
   presaleLeadMinutes?: number | null;
   presalePraesidium?: boolean;
+  presaleHelpers?: boolean;
   presaleGroupIds?: readonly string[];
   status?: string;
   maxTicketsPerOrder?: number;
@@ -401,6 +402,7 @@ export function TicketEventForm({
               salesStartLocal={salesStart}
               leadMinutes={event.presaleLeadMinutes}
               praesidium={event.presalePraesidium ?? true}
+              helpers={event.presaleHelpers ?? true}
               groupIds={event.presaleGroupIds}
               groups={presaleGroups}
               locale={locale}

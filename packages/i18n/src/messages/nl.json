@@ -416,6 +416,7 @@
     "content": "Header",
     "calendar": "Kalender",
     "users": "Gebruikers",
+    "leden": "Leden",
     "groups": "Posten",
     "werkgroepen": "Werkgroepen",
     "roles": "Rollen",
@@ -931,6 +932,10 @@
     "passwordReset": {
       "title": "Wachtwoord vergeten",
       "description": "Stel een nieuw wachtwoord in voor je VTK-account."
+    },
+    "membership": {
+      "title": "Je lidmaatschap",
+      "description": "Je lidmaatschap van VTK voor dit academiejaar."
     }
   },
   "contact": {
@@ -1129,5 +1134,41 @@
     "kindInvalid": "Kies eerst waarover het gaat.",
     "imageInvalid": "De screenshot is niet bewaard. Probeer hem opnieuw toe te voegen.",
     "saveFailed": "Er ging iets mis bij het opslaan. Probeer het opnieuw."
+  },
+  "membership": {
+    "kicker": "Lidmaatschap",
+    "headingFaculty": "Word gratis lid van VTK",
+    "headingExternal": "Word lid van VTK",
+    "faculty": "Ik wil gratis lid worden van VTK voor academiejaar {year}",
+    "facultyHint": "KU Leuven bevestigt dat je aan de faculteit Ingenieurswetenschappen studeert, dus je lidmaatschap is gratis.",
+    "external": "Ik wil niet-facultair lid worden voor {price}",
+    "externalHint": "Je studeert niet aan de faculteit Ingenieurswetenschappen. Na het bevestigen ga je meteen naar de betaalpagina; je bent lid zodra de betaling binnen is.",
+    "closed": "Lid worden kan op dit moment niet.",
+    "already": "Je bent dit academiejaar al lid.",
+    "pageTitle": "Je lidmaatschap",
+    "pageSubtitle": "Lidmaatschap van VTK voor {year}.",
+    "statusActive": "Je bent lid voor {year}.",
+    "statusActiveFaculty": "Je bent lid voor {year}, gratis als student van de faculteit Ingenieurswetenschappen.",
+    "statusPending": "Je lidmaatschap voor {year} staat klaar zodra je {price} betaald hebt.",
+    "statusNone": "Je bent dit academiejaar nog geen lid.",
+    "statusFirw": "Je studeert aan de faculteit Ingenieurswetenschappen, dus je telt als lid van VTK.",
+    "pay": "Betaal {price}",
+    "payAgain": "Betaling opnieuw proberen",
+    "paymentReturned": "Bedankt. Zodra de betaling bevestigd is, staat je lidmaatschap hier. Dat duurt meestal een paar seconden.",
+    "paymentCancelled": "De betaling is afgebroken. Je kan ze hieronder opnieuw starten.",
+    "paymentFailed": "De betaalpagina kon niet geopend worden. Probeer het straks opnieuw.",
+    "since": "Lid sinds {date}",
+    "accountHeading": "Lidmaatschap",
+    "accountLink": "Bekijk je lidmaatschap",
+    "ticketMembersOnly": "Dit ticket is er voor leden van VTK.",
+    "ticketBecomeMember": "Word lid",
+    "joinHeading": "Word lid",
+    "joinFree": "Word gratis lid voor {year}",
+    "joinPaid": "Word lid voor {price}",
+    "joinSaving": "Bezig...",
+    "joined": "Je bent nu lid.",
+    "joinFailed": "Lid worden is niet gelukt. Probeer het opnieuw.",
+    "joinClosed": "Lid worden kan op dit moment niet.",
+    "accountJoin": "Word lid van VTK"
   }
 }

@@ -33,6 +33,25 @@ export function ticketTypeRequiresLogin(type: {
 }
 
 /**
+ * Een ticketsoort voor leden, bij iemand die geen lid is.
+ *
+ * "Lid" is sinds het lidmaatschap meer dan "heeft een account": het is een
+ * student van de faculteit Ingenieurswetenschappen (KU Leuven bevestigt dat) of
+ * wie een lidmaatschap van dit academiejaar op zak heeft, gratis of betaald.
+ * Zie `lib/membership`.
+ *
+ * Bewust **niet** verstoppen zoals een erelidticket: dit is een ticket dat je
+ * kan krijgen, dus de shop toont het met de reden erbij en een weg naar het
+ * lidmaatschap. Wie het toch meestuurt, wordt bij het afrekenen geweigerd.
+ */
+export function ticketTypeNeedsMembership(
+  type: { audience: string },
+  isMember: boolean,
+): boolean {
+  return type.audience === "MEMBERS" && !isMember;
+}
+
+/**
  * Een ticketsoort voor ereleden bestaat voor iedereen anders niet.
  *
  * Bewust wegfilteren en niet uitgrijzen: wat de kring aan haar ereleden geeft
@@ -42,4 +61,20 @@ export function ticketTypeRequiresLogin(type: {
  */
 export function ticketTypeIsHidden(type: { audience: string }, isHonorary: boolean): boolean {
   return type.audience === "HONORARY" && !isHonorary;
+}
+
+/**
+ * De ledenprijs van een ticketsoort, of null wanneer ze er geen heeft.
+ *
+ * Enkel bij doelgroep "publiek": een ledenprijs is een tweede prijs naast de
+ * gewone, en een ticket dat al alleen voor leden (of ereleden) is, heeft geen
+ * gewone prijs om naast te staan. Blijft er na een wijziging van de doelgroep
+ * een oude waarde in de database staan, dan telt ze hier niet.
+ */
+export function ticketTypeMemberPrice(type: {
+  audience: string;
+  memberPriceCents?: number | null;
+}): number | null {
+  if (type.audience !== "PUBLIC") return null;
+  return type.memberPriceCents ?? null;
 }

@@ -22,6 +22,8 @@ const T = {
     needsStart: "Vul eerst een start verkoop in; een voorverkoop is een duur daarvoor.",
     from: (moment: string) => `Loopt van ${moment} tot de verkoopstart.`,
     praesidium: "Alle praesidiumposten",
+    helpers: "Vaste medewerkers (15+ shiften dit werkingsjaar)",
+    helpersShort: "vaste medewerkers",
     nobody: "Niemand: kies het praesidium of een groep",
     edit: "Aanpassen",
     done: "Klaar",
@@ -38,6 +40,8 @@ const T = {
     needsStart: "Set a sales start first; a presale is a duration before it.",
     from: (moment: string) => `Runs from ${moment} until sales open.`,
     praesidium: "Every praesidium post",
+    helpers: "Regular helpers (15+ shifts this working year)",
+    helpersShort: "regular helpers",
     nobody: "Nobody: pick the praesidium or a group",
     edit: "Change",
     done: "Done",
@@ -70,6 +74,7 @@ export function PresaleFields({
   salesStartLocal,
   leadMinutes,
   praesidium = true,
+  helpers = true,
   groupIds = [],
   groups,
   locale,
@@ -78,6 +83,7 @@ export function PresaleFields({
   salesStartLocal: string;
   leadMinutes?: number | null;
   praesidium?: boolean;
+  helpers?: boolean;
   groupIds?: readonly string[];
   groups: PresaleGroupOption[];
   locale: AdminLocale;
@@ -87,6 +93,7 @@ export function PresaleFields({
   const [lead, setLead] = useState(initial.value);
   const [unit, setUnit] = useState<"hours" | "days">(initial.unit);
   const [withPraesidium, setWithPraesidium] = useState(praesidium);
+  const [withHelpers, setWithHelpers] = useState(helpers);
   const [selected, setSelected] = useState<string[]>([...groupIds]);
   const [open, setOpen] = useState(false);
 
@@ -114,13 +121,19 @@ export function PresaleFields({
     chosen.length <= 1
       ? chosen.join("")
       : `${chosen.slice(0, -1).join(", ")} ${t.and} ${chosen[chosen.length - 1]}`;
-  const audience = withPraesidium
-    ? chosen.length > 0
-      ? `${t.praesidium} + ${chosenLabel}`
-      : t.praesidium
-    : chosen.length > 0
-      ? chosenLabel
-      : t.nobody;
+  // De zin die de beheerder leest: wie er nu in de voorverkoop zit, in de
+  // volgorde waarin die groepen in de regel staan.
+  const parts = [
+    ...(withPraesidium ? [t.praesidium] : []),
+    ...(withHelpers ? [t.helpersShort] : []),
+    ...(chosen.length > 0 ? [chosenLabel] : []),
+  ];
+  const audience =
+    parts.length === 0
+      ? t.nobody
+      : parts.length === 1
+        ? parts[0]
+        : `${parts.slice(0, -1).join(", ")} ${t.and} ${parts[parts.length - 1]}`;
 
   function toggleGroup(id: string, checked: boolean) {
     setSelected((current) =>
@@ -169,13 +182,14 @@ export function PresaleFields({
       {/* De keuze reist altijd mee, ook wanneer het paneel dicht staat; de
           vakjes daarin sturen niets zelf, ze bewerken deze staat. */}
       <input type="hidden" name="presalePraesidium" value={withPraesidium ? "true" : "false"} />
+      <input type="hidden" name="presaleHelpers" value={withHelpers ? "true" : "false"} />
       {selected.map((id) => (
         <input key={id} type="hidden" name="presaleGroupIds" value={id} />
       ))}
 
       {active ? (
         <div className="ticket-admin-presale-who">
-          <span data-empty={!withPraesidium && chosen.length === 0 ? "" : undefined}>
+          <span data-empty={parts.length === 0 ? "" : undefined}>
             <Users aria-hidden="true" size={15} />
             {audience}
           </span>
@@ -199,6 +213,14 @@ export function PresaleFields({
               onChange={(event) => setWithPraesidium(event.target.checked)}
             />
             {t.praesidium}
+          </label>
+          <label className="ticket-admin-check">
+            <input
+              type="checkbox"
+              checked={withHelpers}
+              onChange={(event) => setWithHelpers(event.target.checked)}
+            />
+            {t.helpers}
           </label>
           <span className="ticket-admin-label">{t.extra}</span>
           <div className="ticket-admin-presale-groups">

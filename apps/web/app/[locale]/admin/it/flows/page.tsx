@@ -95,7 +95,7 @@ export default async function AdminFlowPreview({
   const dict = getDictionary(locale);
   const year = currentStudyYear();
 
-  // De eerstvolgende 27 september: dat is het moment waarop iedereen tegelijk de
+  // De eerstvolgende 21 september: dat is het moment waarop iedereen tegelijk de
   // bevestigingsgate voor zijn neus krijgt.
   const rollover = studyYearStart(year + 1).toLocaleDateString(nl ? "nl-BE" : "en-GB", {
     day: "numeric",
@@ -216,7 +216,7 @@ export default async function AdminFlowPreview({
               </li>
               <li>
                 {nl
-                  ? `Het academiejaar rolt om op 27 september, niet op 15 juli zoals het werkingsjaar: in juli loopt het academiejaar nog. De eerstvolgende omslag is ${rollover}; dan krijgen alle studenten dit scherm.`
+                  ? `Het academiejaar rolt om op 21 september, niet op 15 juli zoals het werkingsjaar: in juli loopt het academiejaar nog. De eerstvolgende omslag is ${rollover}; dan krijgen alle studenten dit scherm.`
                   : `The academic year rolls over on 27 September, not on 15 July like the working year: in July the academic year is still running. The next rollover is ${rollover}; all students then get this screen.`}
               </li>
               <li>

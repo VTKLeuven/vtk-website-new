@@ -24,8 +24,10 @@ import { AccountShifts } from './AccountShifts';
 import { DoorShortcutTokens } from './DoorShortcutTokens';
 import { CalendarFeedTokens } from './CalendarFeedTokens';
 import { AccountSignature } from './AccountSignature';
+import { AccountMembership } from './AccountMembership';
 import { siteBaseUrl } from '@/lib/calendar/feeds';
-import { currentWorkingYear, formatWorkingYear } from '@/lib/workingYear';
+import { currentWorkingYear, currentStudyYear, formatWorkingYear } from '@/lib/workingYear';
+import { getMembership, getMembershipConfig, membershipOffer } from '@/lib/membership';
 
 export async function generateMetadata({
   params,
@@ -61,6 +63,8 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
     meetingReservations,
     memberships,
     password,
+    membership,
+    membershipConfig,
   ] = await Promise.all([
     // Volledig profiel voor het bewerkbare gegevensformulier (kotadres, mails, ...).
     prisma.user.findUniqueOrThrow({
@@ -73,6 +77,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         lastName: true,
         rNumber: true,
         rNumberFromKul: true,
+        firwStudent: true,
         avatarKey: true,
         noKot: true,
         street: true,
@@ -172,6 +177,9 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
       : Promise.resolve([]),
     // Heeft dit lid een wachtwoord, en waar zou een herstelmail heen gaan?
     passwordStatus(session.user.id),
+    // Het lidmaatschap van dit academiejaar (betaald of nog niet).
+    getMembership(session.user.id, currentStudyYear(now)),
+    getMembershipConfig(),
   ]);
 
   const workingYear = currentWorkingYear(now);
@@ -228,6 +236,16 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                 ? 'Je tickets, reservaties, shiften en gekoppelde VTK-diensten.'
                 : 'Your tickets, reservations, shifts and connected VTK services.'}
             </p>
+
+            <AccountMembership
+              locale={locale}
+              year={currentStudyYear(now)}
+              firwStudent={profile.firwStudent}
+              membership={membership}
+              canJoin={
+                membershipOffer(profile, membership, membershipConfig).kind !== 'none'
+              }
+            />
 
             <AccountTickets locale={locale} orders={ticketOrders} />
 

@@ -36,6 +36,13 @@ export type TicketTemplateType = {
   descriptionNl: string;
   descriptionEn: string;
   unitPriceCents: number;
+  /**
+   * Optionele ledenprijs, enkel bij doelgroep PUBLIC en lager dan de gewone
+   * prijs. Eén ticket met twee prijzen, net als bij `TicketType` zelf; een
+   * sjabloon dat dat niet meedroeg, zette de ledenkorting bij elk nieuw event
+   * stil op nul.
+   */
+  memberPriceCents: number | null;
   audience: TicketTemplateAudience;
   color: string;
   minPerOrder: number;
@@ -87,6 +94,8 @@ export type TicketEventTemplate = {
   openScanning: boolean;
   presaleLeadMinutes: number | null;
   presalePraesidium: boolean;
+  /** Krijgen de vaste medewerkers de voorverkoop mee? Zie `presale.ts`. */
+  presaleHelpers: boolean;
   confirmationMessageNl: string;
   confirmationMessageEn: string;
   capacity: number;
@@ -249,6 +258,18 @@ export function parseTemplateTypes(raw: unknown): TicketTemplateType[] | string 
       ? (row.audience as TicketTemplateAudience)
       : "PUBLIC";
 
+    // Dezelfde twee regels als op het ticketformulier zelf: een ledenprijs
+    // hoort enkel bij een ticket dat voor iedereen te koop staat, en ze moet
+    // lager liggen dan de gewone prijs. Anders is het geen korting maar een
+    // tweede volle prijs die niemand als zodanig leest.
+    let memberPriceCents: number | null = null;
+    if (row.memberPriceCents !== null && row.memberPriceCents !== undefined && audience === "PUBLIC") {
+      const member = integer(row.memberPriceCents, Number.NaN, 0, 99_999_999);
+      if (!Number.isFinite(member)) return `${label}: de ledenprijs is geen geldig bedrag.`;
+      if (member >= price) return `${label}: de ledenprijs moet lager liggen dan de gewone prijs.`;
+      memberPriceCents = member;
+    }
+
     result.push({
       code,
       nameNl,
@@ -256,6 +277,7 @@ export function parseTemplateTypes(raw: unknown): TicketTemplateType[] | string 
       descriptionNl: text(row.descriptionNl, 2_000),
       descriptionEn: text(row.descriptionEn, 2_000),
       unitPriceCents: price,
+      memberPriceCents,
       audience,
       color: ticketColorKey(row.color),
       minPerOrder,
@@ -363,6 +385,7 @@ export function blankTicketTemplate(): TicketEventTemplate {
     openScanning: true,
     presaleLeadMinutes: null,
     presalePraesidium: true,
+    presaleHelpers: true,
     confirmationMessageNl: "",
     confirmationMessageEn: "",
     capacity: 100,
@@ -382,6 +405,7 @@ export function blankTicketTemplateType(index: number): TicketTemplateType {
     descriptionNl: "",
     descriptionEn: "",
     unitPriceCents: 0,
+    memberPriceCents: null,
     audience: "PUBLIC",
     color: "navy",
     minPerOrder: 1,

@@ -23,6 +23,11 @@ export type PublicTicketType = {
   name: string;
   description?: string | null;
   priceCents: number;
+  /**
+   * Een tweede, lagere prijs voor leden. Enkel gevuld voor wie lid is (en in het
+   * voorbeeld voor de beheerder); een niet-lid krijgt hier null.
+   */
+  memberPriceCents?: number | null;
   available: number;
   active: boolean;
   maxPerOrder?: number | null;
@@ -39,6 +44,9 @@ export type PublicTicketEvent = {
   title: string;
   description?: string | null;
   location?: string | null;
+  locationAddress?: string | null;
+  /** De foto van het gekoppelde kalender-event, met zijn uitsnede. */
+  poster?: { src: string; position: string } | null;
   startsAt: string | Date;
   endsAt: string | Date;
   currentTime: string;
@@ -59,6 +67,22 @@ export type PublicTicketEvent = {
   termsUrl?: string | null;
   viewer?: { id: string; name: string; email: string } | null;
   requiresLogin?: boolean;
+  /**
+   * Ingelogd, maar de enige tickets hier zijn voor leden. Bewust naast
+   * `requiresLogin` en niet in de plaats: inloggen en lid worden zijn twee
+   * verschillende dingen om te vragen.
+   */
+  requiresMembership?: boolean;
+  /**
+   * Er is een ledenprijs die deze bezoeker niet ziet: "login" wanneer hij niet
+   * ingelogd is (misschien is hij al lid), "join" wanneer hij het niet is.
+   */
+  memberPriceHint?: "login" | "join" | null;
+  /**
+   * Enkel in het overzicht: de verkoop opent pas op dit moment (voor deze
+   * bezoeker, dus na een eventuele voorverkoop).
+   */
+  salesOpensAt?: string | Date | null;
   ticketTypes: PublicTicketType[];
 };
 
@@ -135,6 +159,80 @@ export function formatTicketDate(value: string | Date, locale: "nl" | "en") {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+/**
+ * Eén regel in de shop: een tickettype aan één prijs. Een type met een
+ * ledenprijs geeft er twee, de ledenprijs eerst; elk ander type één.
+ */
+export type TicketLine = {
+  key: string;
+  type: PublicTicketType;
+  memberPrice: boolean;
+  priceCents: number;
+};
+
+export function ticketLineKey(ticketTypeId: string, memberPrice: boolean): string {
+  return memberPrice ? `${ticketTypeId}:member` : ticketTypeId;
+}
+
+export function ticketLinesForType(type: PublicTicketType): TicketLine[] {
+  const standard: TicketLine = {
+    key: ticketLineKey(type.id, false),
+    type,
+    memberPrice: false,
+    priceCents: type.priceCents,
+  };
+  if (type.memberPriceCents == null) return [standard];
+  return [
+    {
+      key: ticketLineKey(type.id, true),
+      type,
+      memberPrice: true,
+      priceCents: type.memberPriceCents,
+    },
+    standard,
+  ];
+}
+
+/** Aantallen per regel opgeteld per tickettype, zoals de voorraad en de limieten tellen. */
+export function quantitiesByTicketType(
+  lines: TicketLine[],
+  quantities: Record<string, number>,
+): Record<string, number> {
+  const byType: Record<string, number> = {};
+  for (const line of lines) {
+    byType[line.type.id] = (byType[line.type.id] ?? 0) + (quantities[line.key] ?? 0);
+  }
+  return byType;
+}
+
+/**
+ * Het maximum voor één regel. De ledenprijs en de gewone prijs van een type
+ * delen voorraad en "maximum per bestelling", dus wat de andere regel van
+ * hetzelfde type al vastheeft, gaat eraf.
+ */
+export function maximumSelectableForLine({
+  line,
+  lines,
+  quantities,
+  maxTicketsPerOrder,
+}: {
+  line: TicketLine;
+  lines: TicketLine[];
+  quantities: Record<string, number>;
+  maxTicketsPerOrder: number;
+}): number {
+  const byType = quantitiesByTicketType(lines, quantities);
+  const ticketTypes = [...new Map(lines.map((candidate) => [candidate.type.id, candidate.type])).values()];
+  const typeMaximum = maximumSelectableForType({
+    type: line.type,
+    ticketTypes,
+    quantities: byType,
+    maxTicketsPerOrder,
+  });
+  const onOtherLines = (byType[line.type.id] ?? 0) - (quantities[line.key] ?? 0);
+  return Math.max(0, typeMaximum - onOtherLines);
 }
 
 function inventoryKey(type: PublicTicketType): string {

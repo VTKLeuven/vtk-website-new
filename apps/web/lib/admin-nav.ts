@@ -124,6 +124,9 @@ export function getAdminNav(): NavEntry[] {
     ]),
     group('ledenbeheer', [
       item('users', '/gebruikers', { perm: 'users.view' }),
+      // Leden van de kring dit academiejaar. Boven Posten omdat het de bredere
+      // groep is: elk praesidiumlid is lid, lang niet elk lid heeft een post.
+      item('leden', '/leden', { perm: 'leden.manage' }),
       item('groups', '/groepen', { perm: 'groups.manage' }),
       item('werkgroepen', '/werkgroepen', { werkgroep: true }),
       item('roles', '/roles', { perm: 'roles.manage' }),

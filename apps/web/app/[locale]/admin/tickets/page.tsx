@@ -2,7 +2,7 @@ import { InteractiveRow } from "@/components/ticketing/admin/InteractiveRow";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
-import { currentWorkingYear, hasPermission } from "@vtk/auth";
+import { hasPermission } from "@vtk/auth";
 import {
   ArrowRight,
   FileText,
@@ -49,43 +49,18 @@ export default async function TicketAdminOverview({
   const canManageAll = preview
     ? hasPermission(session, "tickets.manageAll")
     : await hasLiveTicketManageAll(session.user.id, session.user.isSuperAdmin);
-  const memberships = preview
-    ? session.groups.map((group) => ({
-        groupId: group.id,
-        role: group.role,
-        grantsTicketCreation: hasPermission(session, "tickets.create"),
-      }))
-    : await prisma.groupMembership.findMany({
-        where: { userId: session.user.id, year: currentWorkingYear() },
-        select: {
-          groupId: true,
-          role: true,
-          group: {
-            select: {
-              roleGrants: {
-                select: {
-                  role: {
-                    select: {
-                      permissions: { select: { permission: { select: { code: true } } } },
-                    },
-                  },
-                },
-              },
-            },
-          },
-        },
-      }).then((rows) => rows.map((membership) => ({
-        groupId: membership.groupId,
-        role: membership.role,
-        grantsTicketCreation: membership.group.roleGrants.some((grant) =>
-          grant.role.permissions.some((entry) => entry.permission.code === "tickets.create")
-        ),
-      })));
-  const allGroupIds = memberships.map((membership) => membership.groupId);
-  const leadGroupIds = memberships.filter((membership) => membership.role === "LEAD").map((membership) => membership.groupId);
+  // De posten van dit werkingsjaar staan al in de sessie; een tweede query naar
+  // `GroupMembership` leverde hier enkel een kans op dat de twee uiteenlopen.
+  const allGroupIds = session.groups.map((group) => group.id);
+  const leadGroupIds = session.groups
+    .filter((group) => group.role === "LEAD")
+    .map((group) => group.id);
+  // Een knop tonen mag op de sessie-snapshot varen; de server action checkt het
+  // recht live opnieuw. Lid zijn van een post volstaat: of `tickets.create`
+  // enkel voor de verantwoordelijke geldt, bepaalt de post met de `kind` van
+  // haar rolgrant, niet deze pagina.
   const canCreate =
-    canManageAll ||
-    memberships.some((membership) => membership.role === "LEAD" && membership.grantsTicketCreation);
+    canManageAll || (hasPermission(session, "tickets.create") && allGroupIds.length > 0);
   const canManageTemplates = hasPermission(session, "tickets.templates");
 
   const events = await prisma.ticketEvent.findMany({

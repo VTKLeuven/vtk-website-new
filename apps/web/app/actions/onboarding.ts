@@ -27,6 +27,12 @@ import {
   addressSchema,
   addressUpdate,
 } from "@/lib/profile-address";
+import {
+  getMembership,
+  getMembershipConfig,
+  membershipOffer,
+  recordMembershipChoice,
+} from "@/lib/membership";
 
 /**
  * De studievelden, gedeeld door het volledige profielformulier en de jaarlijkse
@@ -330,9 +336,14 @@ export async function saveProfileAction(
   // opslaan niet); de dagelijkse reconciliatie is het vangnet als dit faalt.
   after(() => syncUserToBrevo(session.user.id, { resubscribe }));
 
+  // Enkel de onboarding toont de lidmaatschapsvraag; op /account staat het
+  // lidmaatschap als eigen kaart en stuurt dit formulier het veld niet mee.
+  const chosen = await recordMembershipFromForm(session.user.id, formData);
+
   // Buiten elke try/catch: redirect() werkt via een throw en mag niet als
   // "onverwachte fout" opgevangen worden.
   const next = safeNext(formData);
+  if (chosen === "external") redirect(`${next === "/en" ? "/en" : ""}/lidmaatschap/betalen`);
   if (next) redirect(next);
 
   return saveOk();
@@ -390,8 +401,52 @@ export async function confirmStudyAction(formData: FormData): Promise<void> {
     },
   });
 
+  const chosen = await recordMembershipFromForm(session.user.id, formData);
+
   revalidatePath("/account");
   // Studiejaar/richting/bevestiging kunnen net gewijzigd zijn: houd Brevo gelijk.
   after(() => syncUserToBrevo(session.user.id));
-  redirect(safeNext(formData) ?? "/");
+  // Buiten elke try/catch: redirect() werkt via een throw.
+  //
+  // Een betalend lidmaatschap gaat naar het betaalscherm in plaats van naar
+  // huis. De studie is dan al bevestigd, dus de poort staat open; wie de
+  // betaling laat vallen, is gewoon geen lid en wordt verder met rust gelaten.
+  const next = safeNext(formData);
+  if (chosen === "external") {
+    redirect(`${next === "/en" ? "/en" : ""}/lidmaatschap/betalen`);
+  }
+  redirect(next ?? "/");
+}
+
+/**
+ * Legt de lidmaatschapskeuze van het bevestigingsformulier vast.
+ *
+ * Het aanbod wordt serverside opnieuw bepaald in plaats van de gepostte waarde
+ * te geloven: anders koopt iemand een gratis lidmaatschap door "faculty" mee te
+ * sturen. Geeft terug wat er effectief vastgelegd is, of `null`.
+ */
+async function recordMembershipFromForm(
+  userId: string,
+  formData: FormData,
+): Promise<"faculty" | "external" | null> {
+  const choice = String(formData.get("membership") ?? "");
+  if (choice !== "faculty" && choice !== "external") return null;
+
+  const year = currentStudyYear();
+  const [user, existing, config] = await Promise.all([
+    prisma.user.findUniqueOrThrow({
+      where: { id: userId },
+      select: { firwStudent: true },
+    }),
+    getMembership(userId, year),
+    getMembershipConfig(),
+  ]);
+  const offer = membershipOffer(user, existing, config);
+  if (offer.kind === "none" || offer.kind !== choice) return null;
+
+  await recordMembershipChoice(userId, offer.kind === "faculty" ? "FACULTY" : "EXTERNAL", {
+    year,
+    priceCents: offer.priceCents,
+  });
+  return offer.kind;
 }

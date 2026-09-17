@@ -49,6 +49,10 @@ export const PERMISSIONS = [
   // alumniwerking zelf bijhoudt, mét persoonsgegevens van mensen zonder account.
   { code: "alumni.manage", labelNl: "Alumni-adresboek beheren", labelEn: "Manage the alumni address book", category: "users" },
 
+  // Ledenbeheer. Bewust los van `users.view`: die tab toont elk account van de
+  // site, dit toont wie dit academiejaar lid is, met betaalstatus en export.
+  { code: "leden.manage", labelNl: "Leden beheren", labelEn: "Manage members", category: "users" },
+
   // POCs
   { code: "pocs.manage", labelNl: "POC's beheren", labelEn: "Manage POCs", category: "general" },
 

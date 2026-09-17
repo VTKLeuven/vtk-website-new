@@ -15,7 +15,7 @@ Een ingelogd lid wordt omgeleid zolang een van deze twee gaten open staat:
    `studyConfirmedYear !== currentStudyYear()` -> omleiden naar
    `/studie-bevestigen`. Alumni, academisch personeel en andere niet-studenten
    krijgen deze jaarlijkse gate niet. Dit is het **academiejaar** (cutover
-   27 september), niet het werkingsjaar (15 juli). Zie
+   21 september), niet het werkingsjaar (15 juli). Zie
    `docs/design-decisions.md`.
 
 Op de doelpagina zelf grijpt de gate niet in (anders krijg je een lus). Anonieme
@@ -119,7 +119,7 @@ tegen de DB gecheckt te worden. Denkrichtingen voor een herwerking:
   op de better-auth-sessie zetten, zodat de proxy ze uit de cookie leest zonder
   DB-hit. Vergt invalidatie wanneer het lid onboardt/bevestigt.
 - **Event-driven i.p.v. per-request:** enkel (her)evalueren op de momenten die
-  ertoe doen (login, jaarwissel op 15 juli en 27 september, na het invullen van
+  ertoe doen (login, jaarwissel op 15 juli en 21 september, na het invullen van
   het formulier), en de rest van de tijd niets doen.
 
 Tot dan: de huidige proxy-gate werkt en is correct; dit is bewust "goed genoeg

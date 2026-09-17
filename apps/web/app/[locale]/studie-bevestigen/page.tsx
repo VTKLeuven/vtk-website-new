@@ -12,7 +12,14 @@ import { logoutAction } from "@/app/actions/auth";
 import { confirmStudyAction } from "@/app/actions/onboarding";
 import { StudyFieldset } from "@/components/profile/StudyFieldset";
 import { AddressConfirmation } from "@/components/profile/AddressConfirmation";
+import { MembershipChoice } from "@/components/profile/MembershipChoice";
 import { hasCompleteAddresses } from "@/lib/profile-address";
+import {
+  getMembership,
+  getMembershipConfig,
+  membershipChoiceLabels,
+  membershipOffer,
+} from "@/lib/membership";
 
 export async function generateMetadata({
   params,
@@ -27,7 +34,7 @@ export async function generateMetadata({
 /**
  * Jaarlijkse bevestiging van het studieprofiel. De gate in `proxy.ts` stuurt
  * hierheen zodra `studyConfirmedYear` achterloopt op het academiejaar (de
- * cutover ligt op 27 september, zie `lib/workingYear.ts`).
+ * cutover ligt op 21 september, zie `lib/workingYear.ts`).
  *
  * De vorige keuze staat voorgevuld, zodat bevestigen één klik is voor wie niets
  * wijzigt; dat is het verschil tussen een lid dat bevestigt en een lid dat
@@ -57,6 +64,7 @@ export default async function ConfirmStudyPage({
       studyYears: true,
       studyProgrammes: true,
       isStudent: true,
+      firwStudent: true,
       notAtFaculty: true,
       notStudying: true,
       academicStaffRole: true,
@@ -82,6 +90,14 @@ export default async function ConfirmStudyPage({
   const dict = getDictionary(locale);
   const t = dict.confirmStudy;
   const addressT = dict.onboarding;
+
+  // Het lidmaatschap hangt aan hetzelfde academiejaar als deze bevestiging, dus
+  // wordt het hier gevraagd en niet op een scherm dat niemand uit zichzelf opent.
+  const [membership, membershipConfig] = await Promise.all([
+    getMembership(session.user.id, year),
+    getMembershipConfig(),
+  ]);
+  const offer = membershipOffer(user, membership, membershipConfig);
 
   return (
     <div className="vtk-page vtk-page-shell vtk-page-narrow space-y-6">
@@ -134,6 +150,7 @@ export default async function ConfirmStudyPage({
               homeAddress: t.homeAddress,
             }}
           />
+          <MembershipChoice offer={offer} labels={membershipChoiceLabels(locale, offer, year)} />
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit">{t.submit}</Button>
             <span className="text-xs text-[#5c667f]">{t.unchangedHint}</span>

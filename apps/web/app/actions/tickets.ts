@@ -12,6 +12,7 @@ import {
   requireTicketEventCapability,
 } from "@/lib/ticketing/authorization";
 import { parseEuroAmount } from "@/lib/ticketing/money";
+import { newPresaleToken } from "@/lib/ticketing/presaleLink";
 import { requestTicketRefund } from "@/lib/ticketing/refunds";
 import { slugify } from "@/lib/ticketing/slug";
 import { ticketColorKey } from "@/lib/ticketing/ticketColors";
@@ -87,6 +88,29 @@ function ticketAudienceLabel(audience: TicketAudience): string {
   if (audience === "MEMBERS") return "alleen leden";
   if (audience === "HONORARY") return "alleen ereleden";
   return "publiek";
+}
+
+/**
+ * De ledenprijs uit het formulier: null wanneer het veld leeg is of het ticket
+ * niet voor iedereen is (dan is er geen gewone prijs om naast te staan, zie
+ * `ticketTypeMemberPrice`). Een ledenprijs die niet lager ligt dan de gewone,
+ * is geen ledenprijs.
+ */
+function memberPriceFromForm(
+  formData: FormData,
+  audience: TicketAudience,
+  unitPriceCents: number,
+): { ok: true; cents: number | null } | { ok: false; code: "INVALID_AMOUNT" | "MEMBER_PRICE_NOT_LOWER" } {
+  const raw = String(formData.get("memberPrice") ?? "").trim();
+  if (audience !== "PUBLIC" || raw === "") return { ok: true, cents: null };
+  let cents: number;
+  try {
+    cents = parseEuroAmount(raw);
+  } catch {
+    return { ok: false, code: "INVALID_AMOUNT" };
+  }
+  if (cents >= unitPriceCents) return { ok: false, code: "MEMBER_PRICE_NOT_LOWER" };
+  return { ok: true, cents };
 }
 
 function optionalValue(formData: FormData, key: string): string | null {
@@ -474,6 +498,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         confirmationMessageEn: template?.confirmationMessageEn || undefined,
         presaleLeadMinutes: template?.presaleLeadMinutes ?? undefined,
         presalePraesidium: template?.presalePraesidium ?? undefined,
+        presaleHelpers: template?.presaleHelpers ?? undefined,
         openScanning: template?.openScanning ?? undefined,
         ...(templateSettings ? { settings: templateSettings } : {}),
         createdById: session.user.id,
@@ -509,6 +534,16 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
             descriptionNl: type.descriptionNl || null,
             descriptionEn: type.descriptionEn || null,
             unitPriceCents: type.unitPriceCents,
+            // De ledenprijs enkel wanneer ze nog klopt tegen de prijs die in het
+            // aanmaakscherm kan zijn bijgesteld: een sjabloon van 17 euro met 14
+            // voor leden, hier verlaagd naar 12, zou anders een "korting" van 14
+            // op 12 opleveren. `parseTemplateTypes` bewaakt dezelfde regel.
+            memberPriceCents:
+              type.audience === "PUBLIC" &&
+              type.memberPriceCents !== null &&
+              type.memberPriceCents < type.unitPriceCents
+                ? type.memberPriceCents
+                : null,
             audience: type.audience,
             color: type.color,
             minPerOrder: type.minPerOrder,
@@ -655,6 +690,7 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
   }
   const presaleLeadMinutes = presaleLeadMinutesValue(formData);
   const presalePraesidium = checkboxValue(formData, "presalePraesidium");
+  const presaleHelpers = checkboxValue(formData, "presaleHelpers");
   const presaleGroupIds = [
     ...new Set(formData.getAll("presaleGroupIds").map((entry) => String(entry)).filter(Boolean)),
   ];
@@ -662,7 +698,7 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
     // Een voorverkoop is een duur vóór de verkoopstart; zonder die start staat
     // de verkoop al voor iedereen open en is er niets om vroeger te zetten.
     if (!salesStartAt) throw new Error("PRESALE_NEEDS_SALES_START");
-    if (!presalePraesidium && presaleGroupIds.length === 0) {
+    if (!presalePraesidium && !presaleHelpers && presaleGroupIds.length === 0) {
       throw new Error("PRESALE_NEEDS_AUDIENCE");
     }
   }
@@ -689,6 +725,7 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
         salesEndAt,
         presaleLeadMinutes,
         presalePraesidium,
+        presaleHelpers,
         status,
         maxTicketsPerOrder,
         cardCheckIn: checkboxValue(formData, "cardCheckIn"),
@@ -837,14 +874,22 @@ export async function updateInventoryPoolAction(formData: FormData): Promise<voi
   refreshTicketEvent(locale, eventId);
 }
 
-export async function createTicketTypeAction(formData: FormData): Promise<void> {
+export async function createTicketTypeAction(
+  _previousState: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   const eventId = value(formData, "eventId");
   const locale = localeSchema.parse(value(formData, "locale") || "nl");
   const { session, event } = await requireTicketEventCapability(eventId, "MANAGE_INVENTORY");
   const nameNl = limitedValue(formData, "nameNl", 160) || limitedValue(formData, "name", 160);
-  if (!nameNl) throw new Error("NAME_REQUIRED");
-  const unitPriceCents = parseEuroAmount(formData.get("unitPrice") ?? formData.get("price"));
-  if (unitPriceCents > 99_999_999) throw new Error("INVALID_AMOUNT");
+  if (!nameNl) return saveError("NAME_REQUIRED");
+  let unitPriceCents: number;
+  try {
+    unitPriceCents = parseEuroAmount(formData.get("unitPrice") ?? formData.get("price"));
+  } catch {
+    return saveError("INVALID_AMOUNT");
+  }
+  if (unitPriceCents > 99_999_999) return saveError("INVALID_AMOUNT");
   const minPerOrder = boundedIntegerValue(formData, "minPerOrder", 1, 1, 50);
   const maxPerOrder = boundedIntegerValue(
     formData,
@@ -853,12 +898,15 @@ export async function createTicketTypeAction(formData: FormData): Promise<void> 
     1,
     50
   );
-  if (maxPerOrder < minPerOrder) throw new Error("INVALID_ORDER_LIMITS");
+  if (maxPerOrder < minPerOrder) return saveError("INVALID_ORDER_LIMITS");
   const salesStartAt = dateValue(formData, "salesStartAt");
   const salesEndAt = dateValue(formData, "salesEndAt");
   if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
-    throw new Error("INVALID_SALES_DATES");
+    return saveError("INVALID_SALES_DATES");
   }
+  const audience = ticketAudienceFrom(value(formData, "audience"));
+  const memberPrice = memberPriceFromForm(formData, audience, unitPriceCents);
+  if (!memberPrice.ok) return saveError(memberPrice.code);
   let inventoryPoolId = value(formData, "inventoryPoolId") || value(formData, "poolId");
 
   await prisma.$transaction(async (tx) => {
@@ -887,8 +935,9 @@ export async function createTicketTypeAction(formData: FormData): Promise<void> 
         descriptionNl: limitedOptionalValue(formData, "descriptionNl", 5_000),
         descriptionEn: limitedOptionalValue(formData, "descriptionEn", 5_000),
         unitPriceCents,
+        memberPriceCents: memberPrice.cents,
         currency: event.currency,
-        audience: ticketAudienceFrom(value(formData, "audience")),
+        audience,
         color: ticketColorKey(formData.get("color")),
         salesStartAt,
         salesEndAt,
@@ -919,9 +968,13 @@ export async function createTicketTypeAction(formData: FormData): Promise<void> 
     entity: "ticketType",
     entityId: eventId,
     target: `${event.titleNl}: ${nameNl}`,
-    summary: `${(unitPriceCents / 100).toFixed(2)} euro per ticket`,
+    summary:
+      memberPrice.cents === null
+        ? `${(unitPriceCents / 100).toFixed(2)} euro per ticket`
+        : `${(unitPriceCents / 100).toFixed(2)} euro per ticket, ${(memberPrice.cents / 100).toFixed(2)} euro voor leden`,
   });
   refreshTicketEvent(locale, eventId);
+  return saveOk();
 }
 
 export async function reorderTicketTypesAction(formData: FormData): Promise<void> {
@@ -972,10 +1025,72 @@ export async function saveTicketTypeAction(
 
   const color = ticketColorKey(formData.get("color"));
   const audience = ticketAudienceFrom(value(formData, "audience"));
-  if (color === type.color && audience === type.audience) return saveOk();
+
+  // Naam, prijs, aantallen en verkoopvenster zijn hier ook te wijzigen, ook
+  // wanneer het event al gepubliceerd staat en er al besteld is. Wat verkocht
+  // is, verandert niet mee: `TicketOrderItem` bewaart zijn eigen naam en prijs,
+  // dus een correctie geldt enkel voor wat er daarna besteld wordt. Dit stond
+  // vroeger vast vanaf het aanmaken, en dan was een typfout in de prijs of in
+  // "maximum per bestelling" enkel op te lossen door het type te archiveren en
+  // opnieuw aan te maken.
+  const nameNl = limitedValue(formData, "nameNl", 160) || type.nameNl;
+  const nameEn = limitedOptionalValue(formData, "nameEn", 160) ?? null;
+  const descriptionNl = limitedOptionalValue(formData, "descriptionNl", 2_000) ?? null;
+  const descriptionEn = limitedOptionalValue(formData, "descriptionEn", 2_000) ?? null;
+  const unitPriceCents = formData.has("unitPrice")
+    ? parseEuroAmount(formData.get("unitPrice"))
+    : type.unitPriceCents;
+  if (unitPriceCents > 99_999_999) return saveError("INVALID_AMOUNT");
+  // Een formulier zonder het veld (bv. een oudere pagina) laat de ledenprijs staan.
+  const memberPrice = formData.has("memberPrice")
+    ? memberPriceFromForm(formData, audience, unitPriceCents)
+    : ({ ok: true, cents: audience === "PUBLIC" ? type.memberPriceCents : null } as const);
+  if (!memberPrice.ok) return saveError(memberPrice.code);
+  const memberPriceCents = memberPrice.cents;
+  const minPerOrder = boundedIntegerValue(formData, "minPerOrder", type.minPerOrder, 1, 50);
+  const maxPerOrder = boundedIntegerValue(formData, "maxPerOrder", type.maxPerOrder, 1, 50);
+  if (maxPerOrder < minPerOrder) return saveError("INVALID_ORDER_LIMITS");
+  const salesStartAt = formData.has("salesStartAt")
+    ? dateValue(formData, "salesStartAt")
+    : type.salesStartAt;
+  const salesEndAt = formData.has("salesEndAt")
+    ? dateValue(formData, "salesEndAt")
+    : type.salesEndAt;
+  if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
+    return saveError("INVALID_SALES_DATES");
+  }
+
+  const data = {
+    color,
+    audience,
+    nameNl,
+    nameEn,
+    descriptionNl,
+    descriptionEn,
+    unitPriceCents,
+    memberPriceCents,
+    minPerOrder,
+    maxPerOrder,
+    salesStartAt,
+    salesEndAt,
+  };
+  const unchanged =
+    color === type.color &&
+    audience === type.audience &&
+    nameNl === type.nameNl &&
+    nameEn === type.nameEn &&
+    descriptionNl === type.descriptionNl &&
+    descriptionEn === type.descriptionEn &&
+    unitPriceCents === type.unitPriceCents &&
+    memberPriceCents === type.memberPriceCents &&
+    minPerOrder === type.minPerOrder &&
+    maxPerOrder === type.maxPerOrder &&
+    salesStartAt?.getTime() === type.salesStartAt?.getTime() &&
+    salesEndAt?.getTime() === type.salesEndAt?.getTime();
+  if (unchanged) return saveOk();
 
   await prisma.$transaction([
-    prisma.ticketType.update({ where: { id: type.id }, data: { color, audience } }),
+    prisma.ticketType.update({ where: { id: type.id }, data }),
     prisma.ticketAuditLog.create({
       data: {
         eventId,
@@ -983,13 +1098,26 @@ export async function saveTicketTypeAction(
         action: "TICKET_TYPE_UPDATED",
         entityType: "TicketType",
         entityId: type.id,
-        metadata: { color, audience },
+        metadata: { color, audience, unitPriceCents, memberPriceCents, minPerOrder, maxPerOrder },
       },
     }),
   ]);
   const changes = [
     color === type.color ? null : `kleur op ${color}`,
     audience === type.audience ? null : `doelgroep op ${ticketAudienceLabel(audience)}`,
+    nameNl === type.nameNl ? null : `naam op ${nameNl}`,
+    unitPriceCents === type.unitPriceCents
+      ? null
+      : `prijs op ${(unitPriceCents / 100).toFixed(2)} euro`,
+    memberPriceCents === type.memberPriceCents
+      ? null
+      : memberPriceCents === null
+        ? "ledenprijs verwijderd"
+        : `ledenprijs op ${(memberPriceCents / 100).toFixed(2)} euro`,
+    minPerOrder === type.minPerOrder ? null : `minimum per bestelling op ${minPerOrder}`,
+    maxPerOrder === type.maxPerOrder ? null : `maximum per bestelling op ${maxPerOrder}`,
+    salesStartAt?.getTime() === type.salesStartAt?.getTime() ? null : "verkoopstart gewijzigd",
+    salesEndAt?.getTime() === type.salesEndAt?.getTime() ? null : "verkoopeinde gewijzigd",
   ].filter((change): change is string => change !== null);
   await logAudit({
     action: "update",
@@ -1525,4 +1653,70 @@ export async function refundTicketsAction(formData: FormData): Promise<void> {
   });
   refreshTicketEvent(locale, eventId);
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}/bestellingen`));
+}
+
+/**
+ * Maakt (of vernieuwt) de private voorverkooplink van een event.
+ *
+ * Vernieuwen maakt de vorige link meteen waardeloos; dat is de bedoeling, want
+ * het is de enige manier om een link terug te nemen die te breed gedeeld werd.
+ * De cookies die met de oude link gezet werden, vallen daardoor ook door de
+ * mand: de vergelijking gebeurt telkens opnieuw tegen wat hier staat.
+ */
+export async function createPresaleLinkAction(formData: FormData): Promise<void> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const { session } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+
+  const presaleToken = newPresaleToken();
+  await prisma.$transaction([
+    prisma.ticketEvent.update({ where: { id: eventId }, data: { presaleToken } }),
+    prisma.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "EVENT_UPDATED",
+        entityType: "TicketEvent",
+        entityId: eventId,
+        metadata: { presaleLink: "regenerated" },
+      },
+    }),
+  ]);
+  await logAudit({
+    action: "update",
+    entity: "ticketEvent",
+    entityId: eventId,
+    target: await ticketEventTitle(eventId),
+    summary: "private voorverkooplink aangemaakt of vernieuwd",
+  });
+  refreshTicketEvent(locale, eventId);
+}
+
+/** Trekt de private voorverkooplink in; bestaande links werken meteen niet meer. */
+export async function revokePresaleLinkAction(formData: FormData): Promise<void> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const { session } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+
+  await prisma.$transaction([
+    prisma.ticketEvent.update({ where: { id: eventId }, data: { presaleToken: null } }),
+    prisma.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "EVENT_UPDATED",
+        entityType: "TicketEvent",
+        entityId: eventId,
+        metadata: { presaleLink: "revoked" },
+      },
+    }),
+  ]);
+  await logAudit({
+    action: "update",
+    entity: "ticketEvent",
+    entityId: eventId,
+    target: await ticketEventTitle(eventId),
+    summary: "private voorverkooplink ingetrokken",
+  });
+  refreshTicketEvent(locale, eventId);
 }

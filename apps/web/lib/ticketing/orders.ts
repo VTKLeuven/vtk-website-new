@@ -34,8 +34,15 @@ import { orderAccessExpiry } from "./access";
 import { withSerializableTransaction } from "./transactions";
 import { publishedTicketDesign } from "./design";
 import { getTicketTerms } from "./terms";
-import { ticketTypeIsHidden, ticketTypeRequiresLogin } from "./audience";
-import { viewerSalesStart } from "./presale";
+import {
+  ticketTypeIsHidden,
+  ticketTypeMemberPrice,
+  ticketTypeNeedsMembership,
+  ticketTypeRequiresLogin,
+} from "./audience";
+import { viewerSalesStart, viewerTypeSalesStart } from "./presale";
+import { presaleViewerFor } from "./presaleViewer";
+import { userIsMember } from "@/lib/membership";
 
 const answerValueSchema = z.union([
   z.string().max(2_000),
@@ -54,6 +61,8 @@ export const checkoutRequestSchema = z.object({
     .array(
       z.object({
         ticketTypeId: z.string().min(1),
+        // Aan de ledenprijs van dit type. Enkel voor een lid; zie hieronder.
+        memberPrice: z.boolean().default(false),
         attendeeName: z.string().trim().min(2).max(160),
         attendeeEmail: z
           .union([z.string().trim().email().max(320), z.literal("")])
@@ -74,6 +83,7 @@ export class TicketCheckoutError extends Error {
       | "EVENT_NOT_ON_SALE"
       | "INVALID_TICKET_TYPE"
       | "LOGIN_REQUIRED"
+      | "MEMBERSHIP_REQUIRED"
       | "INVALID_QUANTITY"
       | "INVALID_ANSWER"
       | "TOO_MANY_RESERVATIONS"
@@ -141,6 +151,23 @@ async function buyerRNumberForCheckout(
   return taken > 0 ? null : rNumber;
 }
 
+/**
+ * De naam van een bestelregel bij een soort met ledenprijs: met "lid" of
+ * "niet-lid" erbij. Die regel draagt haar naam zelf mee naar de mail, de pdf,
+ * de wallet en de scanner, dus zo staat het overal zonder dat elk van die
+ * plaatsen de vlag moet kennen. Een soort zonder ledenprijs houdt haar naam.
+ */
+function ticketLineName(
+  name: string,
+  hasMemberPrice: boolean,
+  memberPrice: boolean,
+  locale: "nl" | "en",
+): string {
+  if (!hasMemberPrice) return name;
+  if (memberPrice) return `${name} (${locale === "en" ? "member" : "lid"})`;
+  return `${name} (${locale === "en" ? "non-member" : "niet-lid"})`;
+}
+
 export async function createTicketCheckout(
   rawInput: unknown,
   requestFingerprint: string | null
@@ -176,6 +203,9 @@ export async function createTicketCheckout(
         })
       )?.honoraryMember ?? false)
     : false;
+  // Een ledenticket staat bij een niet-lid niet in de lijst; dit is het slot
+  // erachter. "Lid" is meer dan "heeft een account", zie lib/membership.
+  const isMember = await userIsMember(session?.user.id);
 
   const event = await prisma.ticketEvent.findUnique({
     where: { id: input.eventId },
@@ -188,14 +218,17 @@ export async function createTicketCheckout(
     },
   });
 
-  if (
-    !event ||
-    event.status !== "PUBLISHED" ||
-    // De verkoopstart zoals deze koper ze heeft: wie in de voorverkoop mag,
-    // begint vroeger. Het tickettype houdt zijn eigen venster (zie
-    // `lib/ticketing/presale.ts`), dus dat wordt hieronder ongewijzigd getoetst.
-    !isWithinWindow(now, viewerSalesStart(event, session), event.salesEndAt)
-  ) {
+  if (!event || event.status !== "PUBLISHED") {
+    throw new TicketCheckoutError("EVENT_NOT_ON_SALE");
+  }
+  // Wie deze koper is voor de voorverkoop: zijn posten én zijn shiften. Dezelfde
+  // bron als de shop, zodat wat je daar mag kiezen hier niet alsnog afketst.
+  //
+  // De verkoopstart zoals deze koper ze heeft: wie in de voorverkoop mag, begint
+  // vroeger. Een tickettype met een eigen, latere start houdt die wel (zie
+  // `lib/ticketing/presale.ts`); dat wordt hieronder per type getoetst.
+  const presaleBuyer = await presaleViewerFor(session, [event]);
+  if (!isWithinWindow(now, viewerSalesStart(event, presaleBuyer), event.salesEndAt)) {
     throw new TicketCheckoutError("EVENT_NOT_ON_SALE");
   }
   if (input.items.length > event.maxTicketsPerOrder) {
@@ -206,7 +239,11 @@ export async function createTicketCheckout(
   const countByType = new Map<string, number>();
   const normalizedItems = input.items.map((item) => {
     const type = typeById.get(item.ticketTypeId);
-    if (!type || !type.active || !isWithinWindow(now, type.salesStartAt, type.salesEndAt)) {
+    if (
+      !type ||
+      !type.active ||
+      !isWithinWindow(now, viewerTypeSalesStart(event, type, presaleBuyer), type.salesEndAt)
+    ) {
       throw new TicketCheckoutError("INVALID_TICKET_TYPE", item.ticketTypeId);
     }
     // Een erelidticket staat bij niemand anders in de lijst; wie het toch
@@ -222,6 +259,23 @@ export async function createTicketCheckout(
     ) {
       throw new TicketCheckoutError("LOGIN_REQUIRED", item.ticketTypeId);
     }
+    if (ticketTypeNeedsMembership(type, isMember)) {
+      throw new TicketCheckoutError("MEMBERSHIP_REQUIRED", item.ticketTypeId);
+    }
+    // De ledenprijs staat bij een niet-lid niet in de shop; dit is het slot
+    // erachter. Een type zonder ledenprijs krijgt hetzelfde antwoord als een
+    // onbestaand type: dan is de pagina ouder dan de instellingen.
+    const memberPriceCents = ticketTypeMemberPrice(type);
+    if (item.memberPrice && memberPriceCents === null) {
+      throw new TicketCheckoutError("INVALID_TICKET_TYPE", item.ticketTypeId);
+    }
+    if (item.memberPrice && !session) {
+      throw new TicketCheckoutError("LOGIN_REQUIRED", item.ticketTypeId);
+    }
+    if (item.memberPrice && !isMember) {
+      throw new TicketCheckoutError("MEMBERSHIP_REQUIRED", item.ticketTypeId);
+    }
+    const unitPriceCents = item.memberPrice ? memberPriceCents! : type.unitPriceCents;
     countByType.set(type.id, (countByType.get(type.id) ?? 0) + 1);
 
     const questions = event.questions.filter(
@@ -248,10 +302,16 @@ export async function createTicketCheckout(
       ticketTypeId: type.id,
       inventoryPoolId: type.inventoryPoolId,
       ticketTypeCode: type.code,
-      ticketTypeName: input.locale === "en" && type.nameEn ? type.nameEn : type.nameNl,
-      unitPriceCents: type.unitPriceCents,
+      ticketTypeName: ticketLineName(
+        input.locale === "en" && type.nameEn ? type.nameEn : type.nameNl,
+        memberPriceCents !== null,
+        item.memberPrice,
+        input.locale,
+      ),
+      memberPrice: item.memberPrice,
+      unitPriceCents,
       discountCents: 0,
-      totalCents: type.unitPriceCents,
+      totalCents: unitPriceCents,
       attendeeName: item.attendeeName,
       attendeeEmail: item.attendeeEmail?.toLowerCase() ?? null,
       answers,
@@ -361,6 +421,7 @@ export async function createTicketCheckout(
                 ticketTypeCode: item.ticketTypeCode,
                 ticketTypeName: item.ticketTypeName,
                 unitPriceCents: item.unitPriceCents,
+                memberPrice: item.memberPrice,
                 discountCents: item.discountCents,
                 totalCents: item.totalCents,
                 attendeeName: item.attendeeName,
@@ -442,15 +503,27 @@ export async function createTicketCheckout(
     buyerEmail: input.buyerEmail,
     eventName: input.locale === "en" && event.titleEn ? event.titleEn : event.titleNl,
     currency: event.currency,
-    lines: [...countByType].map(([typeId, quantity]) => {
-      const type = typeById.get(typeId)!;
-      return {
-        name: input.locale === "en" && type.nameEn ? type.nameEn : type.nameNl,
-        description: input.locale === "en" ? type.descriptionEn : type.descriptionNl,
-        quantity,
-        unitAmountCents: type.unitPriceCents,
-      };
-    }),
+    // Per type én prijs: een lid dat een ledenticket en een gewoon ticket van
+    // hetzelfde type koopt, heeft twee regels met elk hun eigen bedrag.
+    lines: [
+      ...normalizedItems
+        .reduce((lines, item) => {
+          const key = `${item.ticketTypeId}:${item.memberPrice}`;
+          const existing = lines.get(key);
+          if (existing) existing.quantity += 1;
+          else {
+            const type = typeById.get(item.ticketTypeId)!;
+            lines.set(key, {
+              name: item.ticketTypeName,
+              description: input.locale === "en" ? type.descriptionEn : type.descriptionNl,
+              quantity: 1,
+              unitAmountCents: item.unitPriceCents,
+            });
+          }
+          return lines;
+        }, new Map<string, CheckoutLine>())
+        .values(),
+    ],
     expiresAt,
     locale: input.locale,
     totalCents,

@@ -74,26 +74,33 @@ export async function hasLiveTicketManageAll(
   return isSuperAdmin || hasLivePermission(userId, "tickets.manageAll");
 }
 
+/**
+ * Wie `tickets.create` heeft, mag ticketevents aanmaken voor elke post waar die
+ * persoon dit werkingsjaar lid van is. Live gecheckt, want dit staat een mutatie
+ * toe; dezelfde regel als bij formulieren en de kalender.
+ *
+ * Bewust **geen** extra "en je moet de lead van die post zijn". Of een recht
+ * enkel voor de verantwoordelijke geldt, zegt de post zelf al met de `kind` van
+ * haar rolgrant (`DEFAULT` voor elk lid, `LEADER` enkel voor de lead; zie
+ * `docs/permissions.md`), en `hasLivePermission` rekent dat mee. Die tweede,
+ * hardgecodeerde lead-regel maakte het recht in de praktijk onbruikbaar: de
+ * seed geeft de rol praesidium als `DEFAULT` aan elke post, dus elk
+ * praesidiumlid zag wel de Tickets-tab maar kreeg nergens een aanmaakknop, en
+ * IT kon dat in /admin/roles niet rechtzetten.
+ */
 export async function canCreateTicketEventForGroup(
   userId: string,
   groupId: string,
   isSuperAdmin = false
 ): Promise<boolean> {
   if (isSuperAdmin) return true;
-  // De lead van de post mag ticketevents aanmaken voor die post, mits de post een
-  // rol toekent die `tickets.create` bevat (praesidium in de seed).
-  const membership = await prisma.groupMembership.findFirst({
-    where: {
-      userId,
-      groupId,
-      role: "LEAD",
-      year: currentWorkingYear(),
-      group: {
-        roleGrants: {
-          some: { role: { permissions: { some: { permission: { code: "tickets.create" } } } } },
-        },
-      },
-    },
+  // Zonder deze tak kon wie álle ticketevents beheert er geen aanmaken voor een
+  // post waar hij zelf niet in zit, terwijl het formulier hem elke post toont.
+  if (await hasLivePermission(userId, "tickets.manageAll")) return true;
+  if (!(await hasLivePermission(userId, "tickets.create"))) return false;
+
+  const membership = await prisma.groupMembership.findUnique({
+    where: { userId_groupId_year: { userId, groupId, year: currentWorkingYear() } },
     select: { id: true },
   });
   return Boolean(membership);
@@ -107,7 +114,7 @@ export function canSessionCreateTicketEventForGroup(
   if (hasPermission(session, "tickets.manageAll")) return true;
   return (
     hasPermission(session, "tickets.create") &&
-    session.groups.some((group) => group.id === groupId && group.role === "LEAD")
+    session.groups.some((group) => group.id === groupId)
   );
 }
 

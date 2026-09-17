@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
-import { Palette } from "lucide-react";
+import { Link2, Palette } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
 import { TicketEventForm } from "@/components/ticketing/admin/TicketEventForm";
@@ -10,6 +10,8 @@ import { TicketQuestionManager } from "@/components/ticketing/admin/TicketQuesti
 import { TicketDesignManager } from "@/components/ticketing/admin/TicketDesignManager";
 import { SettingsPanel } from "@/components/ticketing/admin/SettingsPanel";
 import { SaveAsTemplateCard } from "@/components/ticketing/admin/SaveAsTemplateCard";
+import { PresaleLinkPanel } from "@/components/ticketing/admin/PresaleLinkPanel";
+import { hasPresale } from "@/lib/ticketing/presale";
 import type { AdminLocale } from "@/components/ticketing/admin/format";
 import { readTicketDesignSettings } from "@/lib/ticketing/design";
 
@@ -112,15 +114,6 @@ export default async function TicketEventSettingsPage({
           />
         </div>
       ) : null}
-      {canManageEvent && canManageTemplates ? (
-        <SaveAsTemplateCard
-          eventId={event.id}
-          eventTitle={event.titleNl}
-          ticketTypeCount={event.ticketTypes.filter((ticketType) => ticketType.active).length}
-          questionCount={event.questions.filter((question) => question.active).length}
-          locale={locale}
-        />
-      ) : null}
       {canManageInventory ? (
         <div id="ticket-aanbod" className="ticket-admin-anchor-section">
           <TicketTypeManager
@@ -131,6 +124,30 @@ export default async function TicketEventSettingsPage({
             locale={locale}
           />
         </div>
+      ) : null}
+      {canManageEvent ? (
+        <SettingsPanel
+          id="voorverkooplink"
+          title={locale === "nl" ? "Private voorverkooplink" : "Private presale link"}
+          status={
+            event.presaleToken
+              ? locale === "nl"
+                ? "Er staat een link klaar"
+                : "A link is ready"
+              : locale === "nl"
+                ? "Optioneel · nog geen link"
+                : "Optional · no link yet"
+          }
+          icon={<Link2 size={18} aria-hidden="true" />}
+        >
+          <PresaleLinkPanel
+            eventId={eventId}
+            slug={event.slug}
+            token={event.presaleToken}
+            hasPresale={hasPresale(event)}
+            locale={locale}
+          />
+        </SettingsPanel>
       ) : null}
       {canManageEvent ? (
         <SettingsPanel
@@ -160,6 +177,17 @@ export default async function TicketEventSettingsPage({
             locale={locale}
           />
         </SettingsPanel>
+      ) : null}
+      {/* Onderaan: dit gaat niet over de instellingen van dit event, maar over
+          het volgende. */}
+      {canManageEvent && canManageTemplates ? (
+        <SaveAsTemplateCard
+          eventId={event.id}
+          eventTitle={event.titleNl}
+          ticketTypeCount={event.ticketTypes.filter((ticketType) => ticketType.active).length}
+          questionCount={event.questions.filter((question) => question.active).length}
+          locale={locale}
+        />
       ) : null}
     </div>
   );

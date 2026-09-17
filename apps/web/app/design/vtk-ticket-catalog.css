@@ -1,0 +1,449 @@
+/* Het ticketoverzicht (/tickets): brede kaarten met de prijzen erbij.
+
+   Elke kaart heeft drie delen: de poster van het gekoppelde kalender-event met
+   de gele datum erop, wat het event is, en rechts de tickets met hun prijs
+   zoals deze bezoeker ze betaalt. Dezelfde taal als het ticketpaneel op de
+   eventpagina (vtk-ticket-shop.css): haarlijnen, geen kaart in een kaart. Zie
+   docs/design-decisions.md voor waarom het deze vorm werd. */
+
+.tcat-shell {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: clamp(28px, 4.5vw, 44px) clamp(20px, 3vw, 36px) clamp(64px, 8vw, 104px);
+}
+
+.tcat-mine {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 18px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background 150ms ease;
+}
+
+.tcat-mine:hover {
+  background: var(--paper-2);
+}
+
+/* ---------- Filters ---------- */
+
+.tcat-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.tcat-filters a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 15px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--body);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.tcat-filters a:hover {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.tcat-filters a[aria-current="page"] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.tcat-filters a span {
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  opacity: 0.7;
+}
+
+/* ---------- Kaart ---------- */
+
+.tcat-list {
+  display: grid;
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tcat-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) 300px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  transition: border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;
+}
+
+.tcat-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-2);
+  box-shadow: 0 12px 26px -18px rgba(14, 26, 54, 0.6);
+}
+
+.tcat-card:focus-within {
+  border-color: var(--ink);
+}
+
+/* Zonder poster het streepjesvlak, zoals overal waar een foto ontbreekt. */
+.tcat-shot {
+  position: relative;
+  min-height: 180px;
+  background: repeating-linear-gradient(135deg, var(--paper-2) 0 12px, var(--paper) 12px 24px);
+}
+
+.tcat-date {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  align-content: center;
+  border-radius: 12px;
+  background: var(--yellow);
+  color: var(--ink);
+  line-height: 1;
+  text-align: center;
+  box-shadow: 0 6px 14px -6px rgba(10, 15, 31, 0.35);
+}
+
+.tcat-date small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tcat-date b {
+  margin: 2px 0 1px;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.tcat-body {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 20px 22px;
+}
+
+.tcat-owner {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* De gele streep onder de titel, even breed als de titel, zoals op een eventtegel. */
+.tcat-title {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+}
+
+.tcat-title::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: var(--yellow);
+}
+
+.tcat-title a {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Het klikvlak over de hele kaart. `.tcat-card` is de geplaatste voorouder. */
+.tcat-title a::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+}
+
+.tcat-title a:focus-visible {
+  outline: none;
+}
+
+.tcat-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.tcat-facts span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tcat-facts svg {
+  flex: none;
+}
+
+.tcat-summary {
+  display: -webkit-box;
+  margin: 2px 0 0;
+  overflow: hidden;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* ---------- Tickets rechts ---------- */
+
+.tcat-side {
+  display: grid;
+  align-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-left: 1px solid var(--line);
+}
+
+.tcat-side h4 {
+  margin: 0 0 4px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.tcat-prices {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tcat-prices li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 12px;
+  padding: 7px 0;
+  font-size: 14px;
+}
+
+.tcat-prices li + li {
+  border-top: 1px solid var(--line);
+}
+
+.tcat-prices span {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.tcat-prices b {
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.tcat-prices small {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tcat-prices li[data-sold-out] span,
+.tcat-prices li[data-sold-out] b {
+  color: var(--muted);
+}
+
+.tcat-none,
+.tcat-more {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.tcat-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 10px;
+}
+
+.tcat-pill {
+  display: inline-flex;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.tcat-pill[data-tone="ok"] {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+.tcat-pill[data-tone="low"] {
+  background: var(--low-bg);
+  color: var(--low-ink);
+}
+
+.tcat-pill[data-tone="info"],
+.tcat-pill[data-tone="out"] {
+  background: var(--paper-2);
+  color: var(--body);
+}
+
+.tcat-go {
+  display: inline-flex;
+  margin-left: auto;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  transition: border-color 150ms ease;
+}
+
+.tcat-card:hover .tcat-go {
+  border-color: var(--ink);
+}
+
+/* Uitverkocht blijft staan, maar treedt terug. */
+.tcat-card[data-sold-out] .tcat-date {
+  background: var(--paper-2);
+}
+
+.tcat-card[data-sold-out] .tcat-title {
+  color: var(--muted);
+}
+
+.tcat-card[data-sold-out] .tcat-title::after {
+  background: var(--line-2);
+}
+
+/* ---------- Onder de lijst ---------- */
+
+.tcat-hint {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.tcat-hint a {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tcat-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 40px 24px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--muted);
+  text-align: center;
+}
+
+.tcat-empty h2 {
+  margin: 6px 0 0;
+  color: var(--ink);
+  font-size: 19px;
+}
+
+.tcat-empty p {
+  max-width: 480px;
+  margin: 0 0 10px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tcat-card {
+    transition: none;
+  }
+
+  .tcat-card:hover {
+    transform: none;
+  }
+}
+
+@media (max-width: 1000px) {
+  .tcat-card {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+
+  .tcat-side {
+    grid-column: 1 / -1;
+    border-top: 1px solid var(--line);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  .vtk-tickets-page .vtk-page-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tcat-mine {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 620px) {
+  .tcat-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .tcat-shot {
+    min-height: 0;
+    aspect-ratio: 16 / 9;
+  }
+
+  .tcat-body {
+    padding: 16px 16px 4px;
+  }
+
+  .tcat-side {
+    padding: 14px 16px 16px;
+  }
+}

@@ -45,6 +45,7 @@
     "remark-gfm": "^4.0.1",
     "server-only": "^0.0.1",
     "sharp": "^0.35.3",
+    "write-excel-file": "^4.1.1",
     "zod": "^3.24.2"
   },
   "devDependencies": {

@@ -478,6 +478,21 @@ function TemplateEditor({
               <span>{nl ? "Voorverkoop voor het praesidium" : "Presale for the praesidium"}</span>
             </label>
           </div>
+          <div className="ticket-admin-field" data-span="2">
+            <label className="ticket-admin-check" htmlFor={`presale-helpers-${id || "new"}`}>
+              <input type="hidden" name="presaleHelpers" value="false" />
+              <input
+                id={`presale-helpers-${id || "new"}`}
+                name="presaleHelpers"
+                type="checkbox"
+                value="true"
+                defaultChecked={template.presaleHelpers}
+              />
+              <span>
+                {nl ? "Voorverkoop voor de vaste medewerkers" : "Presale for the regular helpers"}
+              </span>
+            </label>
+          </div>
           <OffsetField
             id={`lead-${id || "new"}`}
             name="presaleLeadMinutes"

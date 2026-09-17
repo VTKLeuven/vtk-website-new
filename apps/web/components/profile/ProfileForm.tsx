@@ -10,6 +10,8 @@ import { saveProfileAction, type ProfileErrorCode } from "@/app/actions/onboardi
 import type { SaveAction } from "@/lib/saveState";
 import { AvatarCropField } from "./AvatarCropField";
 import { AddressFields } from "./AddressFields";
+import { MembershipChoice, type MembershipChoiceLabels } from "./MembershipChoice";
+import type { MembershipOffer } from "@/lib/membership/offer";
 
 function dateInputValue(date: Date | null): string {
   if (!date) return "";
@@ -40,6 +42,7 @@ export function ProfileForm({
   action = saveProfileAction,
   savedMessage,
   showCalendarPreference = true,
+  membership = null,
 }: {
   locale: Locale;
   user: Pick<
@@ -91,6 +94,12 @@ export function ProfileForm({
   savedMessage?: string;
   /** Toont de kalender-doelgroepvoorkeur. Standaard aan (op /account); uit tijdens onboarding. */
   showCalendarPreference?: boolean;
+  /**
+   * De lidmaatschapsvraag. Enkel tijdens de onboarding: op /account staat het
+   * lidmaatschap als eigen kaart met zijn status, en een tweede vinkje daarnaast
+   * zou twee bronnen zijn voor dezelfde keuze.
+   */
+  membership?: { offer: MembershipOffer; labels: MembershipChoiceLabels | null } | null;
 }) {
   const t = getDictionary(locale).onboarding;
   const currentAvatar = publicUrl(user.avatarKey);
@@ -349,6 +358,9 @@ export function ProfileForm({
           wasInVtk={user.wasInVtk}
           alumniMailOptIn={user.alumniMailOptIn}
         />
+        {membership ? (
+          <MembershipChoice offer={membership.offer} labels={membership.labels} />
+        ) : null}
       </fieldset>
 
       {/* Profielfoto */}
