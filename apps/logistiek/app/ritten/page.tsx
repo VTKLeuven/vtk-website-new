@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { LoginGate } from '@/components/login-gate';
 import { PageShell } from '@/components/page-shell';
+import { LinkedText } from '@/components/linked-text';
 import { PhoneLink } from '@/components/phone-link';
 import { copy, getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
@@ -10,6 +11,31 @@ import { feedTokensForUser, isDriver, isVanDriver, tripsForDriver, type DriverTr
 import { FeedTokens } from '@/components/feed-tokens';
 import { ToastProvider } from '@/components/ui/toast';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
+
+/**
+ * Een adres met een link naar de kaart erachter. Een chauffeur die vertrekt,
+ * wil navigeren en niet overtypen; het adres zelf blijft staan zoals het
+ * ingevuld is, want dat is wat je aan de telefoon voorleest.
+ *
+ * `geo:`-achtige diepe links bestaan wel maar werken per toestel anders; een
+ * gewone maps-zoekopdracht opent op elk toestel de kaart-app die daar de
+ * standaard is.
+ */
+function MapLink({ address, en }: { address: string; en: boolean }) {
+  return (
+    <>
+      {address}{' '}
+      <a
+        href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(address)}`}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="whitespace-nowrap text-xs font-normal text-vtk-navy underline decoration-vtk-yellow underline-offset-2"
+      >
+        {en ? 'map' : 'kaart'}
+      </a>
+    </>
+  );
+}
 
 function TripCard({ trip, locale, past }: { trip: DriverTrip; locale: LogistiekLocale; past: boolean }) {
   const en = locale === 'en';
@@ -43,13 +69,28 @@ function TripCard({ trip, locale, past }: { trip: DriverTrip; locale: LogistiekL
         {trip.pickupAddress ? (
           <div>
             <dt className="text-vtk-muted">{en ? 'Loading address' : 'Laadadres'}</dt>
-            <dd className="font-medium text-vtk-ink">{trip.pickupAddress}</dd>
+            <dd className="font-medium text-vtk-ink">
+              <MapLink address={trip.pickupAddress} en={en} />
+            </dd>
           </div>
         ) : null}
         {trip.destination ? (
           <div>
             <dt className="text-vtk-muted">{en ? 'Destination' : 'Bestemming'}</dt>
-            <dd className="font-medium text-vtk-ink">{trip.destination}</dd>
+            <dd className="font-medium text-vtk-ink">
+              <MapLink address={trip.destination} en={en} />
+            </dd>
+          </div>
+        ) : null}
+        {/* Wat er mee moet. Stond hier niet, terwijl het net het antwoord is op
+            "waarom sta ik hier met de auto in plaats van met de kar". De link
+            naar de materiaallijst die Logistiek erin plakt, is aanklikbaar. */}
+        {trip.cargoNote ? (
+          <div className="sm:col-span-2">
+            <dt className="text-vtk-muted">{en ? 'Cargo' : 'Lading'}</dt>
+            <dd className="font-medium text-vtk-ink">
+              <LinkedText text={trip.cargoNote} />
+            </dd>
           </div>
         ) : null}
         <div>
@@ -106,10 +147,14 @@ function TripCard({ trip, locale, past }: { trip: DriverTrip; locale: LogistiekL
         ) : null}
       </dl>
 
+      {/* De boodschap van Logistiek is geen voetnoot: daar staat de code van de
+          poort in, of bij wie de sleutel ligt. Ze krijgt daarom de gele
+          accentrand die op de site een uitgelicht paneel markeert, terwijl de
+          nota van de aanvrager gewoon een nota blijft. */}
       {trip.adminNote ? (
-        <p className="mt-4 rounded-lg bg-vtk-paper px-4 py-3 text-sm text-vtk-body">
+        <p className="mt-4 rounded-lg bg-vtk-paper px-4 py-3 text-sm text-vtk-body shadow-[inset_3px_0_0_var(--color-vtk-yellow)]">
           <span className="font-medium text-vtk-ink">{en ? 'Note from Logistics:' : 'Nota van Logistiek:'}</span>{' '}
-          {trip.adminNote}
+          <LinkedText text={trip.adminNote} />
         </p>
       ) : null}
       {trip.memberNote ? (
@@ -117,7 +162,7 @@ function TripCard({ trip, locale, past }: { trip: DriverTrip; locale: LogistiekL
           <span className="font-medium text-vtk-ink">
             {en ? 'Note from the requester:' : 'Nota van de aanvrager:'}
           </span>{' '}
-          {trip.memberNote}
+          <LinkedText text={trip.memberNote} />
         </p>
       ) : null}
     </li>

@@ -2332,6 +2332,13 @@ export async function adminEditTransportAction(
     pickupAddress: string;
     destination: string;
     adminNote: string;
+    /**
+     * Het evenement waar de rit onder hangt (A8). Weglaten laat de koppeling
+     * staan; een lege string haalt ze weg. De naam zoekt de actie zelf op, zodat
+     * een sleep in de kalender (die enkel de uren wijzigt) er geen bij de hand
+     * hoeft te hebben.
+     */
+    eventId?: string;
     /** Bewust over een bestaande rit schuiven; zie `overlapAuditNote`. */
     allowOverlap?: boolean;
   }
@@ -2349,6 +2356,19 @@ export async function adminEditTransportAction(
     return { ok: false, error: 'Kies uren op het kwartier (bv. 14:00, 14:15).' };
   }
 
+  // Buiten de transactie: het evenement bestaat los van deze rit, en een
+  // Serializable-transactie die er een tweede tabel bij leest, is er een die
+  // vaker opnieuw moet.
+  const chosenEventId = input.eventId?.trim() ?? null;
+  let chosenEvent: { id: string; name: string } | null = null;
+  if (chosenEventId) {
+    chosenEvent = await prisma.uitleenEvent.findUnique({
+      where: { id: chosenEventId },
+      select: { id: true, name: true },
+    });
+    if (!chosenEvent) return { ok: false, error: 'Dat evenement bestaat niet meer; herlaad de pagina.' };
+  }
+
   const outcome = await runSerializable(async (tx) => {
     const existing = await tx.uitleenTransportBooking.findUnique({
       where: { id: bookingId },
@@ -2363,6 +2383,8 @@ export async function adminEditTransportAction(
         pickupAddress: true,
         destination: true,
         adminNote: true,
+        eventId: true,
+        eventName: true,
         pricingMode: true,
         rateCents: true,
       },
@@ -2402,6 +2424,15 @@ export async function adminEditTransportAction(
     field('Laadadres', existing.pickupAddress, input.pickupAddress.trim() || null);
     field('Bestemming', existing.destination, input.destination.trim() || null);
     field('Nota van Logistiek', existing.adminNote, input.adminNote.trim() || null);
+    // De koppeling enkel aanraken wanneer het formulier ze meestuurde: een
+    // sleep in de kalender stuurt `eventId` niet mee, en die hoort een rit niet
+    // stil van haar evenement los te maken.
+    const eventChanged = input.eventId !== undefined && (chosenEventId ?? null) !== existing.eventId;
+    if (eventChanged) {
+      changes.push(
+        `Evenement: ${existing.eventName?.trim() || 'geen'} → ${chosenEvent?.name ?? 'geen'}`
+      );
+    }
     if (changes.length === 0) return { error: 'NO_CHANGES' as const };
 
     await tx.uitleenTransportBooking.update({
@@ -2414,6 +2445,12 @@ export async function adminEditTransportAction(
         pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
         destination: input.destination.trim().slice(0, 300) || null,
         adminNote: input.adminNote.trim().slice(0, 1000) || null,
+        // De naam van het evenement is een momentopname naast de koppeling, net
+        // als bij een aanvraag van een lid: verdwijnt het evenement, dan blijft
+        // in de planning staan waarvoor deze rit reed.
+        ...(eventChanged
+          ? { eventId: chosenEvent?.id ?? null, eventName: chosenEvent?.name.slice(0, 300) ?? null }
+          : {}),
         // De prijs volgt de uren bij een per-uur-tarief; bij per km blijft ze
         // null tot het afronden.
         priceCents: transportPriceCents({

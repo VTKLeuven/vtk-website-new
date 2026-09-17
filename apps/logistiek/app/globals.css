@@ -216,14 +216,11 @@ body {
     scroll-snap-align: start;
   }
 
-  /* De dagnamen plakken op een telefoon niet vast. Ze schuiven mee met de
-     inhoud in plaats van boven het rooster te blijven hangen: de pane is daar
-     maar iets hoger dan de dag zelf, en dan zag je een rij dagnamen zweven over
-     een rooster dat er nauwelijks onder wegschoof. In volledig scherm is er op
-     een telefoon toch de dagweergave, en die heeft haar eigen kop. */
-  .tg-head {
-    position: static;
-  }
+  /* Hier stond ooit `.tg-head { position: static }`, met als reden dat de pane
+     op een telefoon maar iets hoger was dan de dag zelf. Dat klopt niet meer:
+     de pane is hier 78dvh, dus je scrollt wel degelijk door een halve dag en
+     verloor dan meteen de dagnamen bovenaan. De kop plakt daarom overal,
+     precies zoals op een laptop. */
 
   /* Wat hier bewust niet staat:
 

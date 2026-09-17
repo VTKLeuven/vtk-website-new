@@ -93,6 +93,25 @@ export function timeGridColumns(dayCount: number): string {
 }
 
 /**
+ * De volle breedte van datzelfde raster: de urenkolom, de dagkolommen op hun
+ * minimum en de tussenruimtes ertussen.
+ *
+ * Dit staat hier omdat `position: sticky` plakt binnen zijn **ouder**, niet
+ * binnen de scroller. Een raster met `1fr`-kolommen is als doos precies zo breed
+ * als het scrollvenster terwijl zijn kolommen eroverheen lopen; scrolde je
+ * voorbij die rand, richting zondag, dan liep de urenkolom links tegen de grens
+ * van haar ouder en schoof ze alsnog uit beeld. De kop, de evenementenstrook en
+ * het rooster hangen daarom samen in één doos die wél zo breed is als de week.
+ *
+ * Waarom een uitgerekende breedte en geen `min-width: max-content`: dat laatste
+ * laat elke lange evenementnaam in de strook erboven de kolommen meerekken, en
+ * dan wordt de week breder naarmate er een event met een lange naam in staat.
+ */
+export function timeGridMinWidth(dayCount: number): string {
+  return `calc(3.25rem + ${dayCount} * ${DAY_MIN_WIDTH} + ${dayCount} * 0.25rem)`;
+}
+
+/**
  * De stap waarop slepen vastklikt. Hetzelfde kwartier als de server aanvaardt
  * (`isOnQuarterHour`): kon je fijner slepen, dan bouwde je een rit die bij het
  * opslaan geweigerd wordt.
@@ -497,7 +516,16 @@ export function TimeGrid({
           bleven dus onbedekt, en daar schoven de ritten doorheen boven de
           dagnamen. Dat is wat er "los" uitzag. De lucht bovenaan zit nu in de
           kop zelf, die meeschuift en alles eronder afdekt. */}
-      <div ref={scroller} className="tg-scroller relative h-full overflow-auto px-2 pb-2">
+      <div ref={scroller} className="tg-scroller relative h-full overflow-auto pb-2 pr-2">
+        {/* Eén doos rond de kop en het rooster, zo breed als de week (zie
+            `timeGridMinWidth`). Zonder deze doos plakt de urenkolom links maar
+            tot aan de rechterrand van het scherm en verdwijnt ze zodra je naar
+            zaterdag scrolt; de kop zou bij horizontaal scrollen op dezelfde
+            manier een onbeschilderde strook achterlaten waar de ritten
+            doorheen schoven. De kop blijft `sticky` binnen de scroller: een
+            tussenliggende doos zonder eigen `overflow` verandert daar niets
+            aan. */}
+        <div style={{ minWidth: timeGridMinWidth(parsedDays.length) }}>
         {/* De kop plakt bovenaan de scroller: de dagen en de evenementenstrook
             blijven staan terwijl je door de uren scrolt. Eén `sticky` blok en
             niet twee, want twee sticky elementen met een eigen `top` schuiven
@@ -521,7 +549,9 @@ export function TimeGrid({
           ) : null}
 
           <div className="grid gap-1" style={{ gridTemplateColumns: columns }}>
-            <span className="sticky left-0 z-20 bg-vtk-surface" />
+            {/* De hoek linksboven. Dezelfde rand als de urenkolom eronder,
+                anders breekt de scheidingslijn af ter hoogte van de kop. */}
+            <span className="sticky left-0 z-20 border-r border-vtk-navy/10 bg-vtk-surface" />
             {parsedDays.map((day, index) => {
               const isToday = todayKey !== null && dayKeyFormatter.format(day) === todayKey;
               return (
@@ -720,6 +750,7 @@ export function TimeGrid({
               </div>
             );
           })}
+        </div>
         </div>
       </div>
     </div>

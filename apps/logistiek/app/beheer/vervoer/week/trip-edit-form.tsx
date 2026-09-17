@@ -5,6 +5,8 @@ import { Button } from '@vtk/ui';
 import { adminEditTransportAction } from '@/app/actions/beheer';
 import { QuarterDateTime } from '@/components/quarter-datetime';
 import { useToast } from '@/components/ui/toast';
+import { TripEventSelect, type TripEventOption } from '@/components/trip-event-select';
+import { materialListHref } from '@/lib/material-list-link';
 
 /**
  * De feiten van een rit aanpassen, in de inspector naast de kalender (P4).
@@ -31,16 +33,24 @@ export type TripEditValues = {
   pickupAddress: string;
   destination: string;
   adminNote: string;
+  /** Het evenement waar de rit onder hangt (A8); leeg is geen evenement. */
+  eventId: string;
 };
 
 export function TripEditForm({
   bookingId,
   initial,
+  events,
+  reservationId,
   locked,
   onSaved,
 }: {
   bookingId: string;
   initial: TripEditValues;
+  /** De evenementen rond deze periode, om de rit aan te hangen (A8). */
+  events: TripEventOption[];
+  /** De materiaalaanvraag waarvan deze rit de levering is, als er een is. */
+  reservationId: string | null;
   /** Afgerond of geannuleerd: de rit is geschiedenis en staat enkel nog te lezen. */
   locked: boolean;
   onSaved?: () => void;
@@ -72,6 +82,10 @@ export function TripEditForm({
   function save(allowOverlap = false) {
     setError(null);
     startTransition(async () => {
+      // `eventName` staat hier niet bij: de actie zoekt de naam zelf op bij het
+      // gekozen evenement. Het slepen van een blok in de kalender roept dezelfde
+      // actie aan met deze waarden, en dat gebaar heeft geen lijst evenementen
+      // bij de hand om een naam uit te halen.
       const result = await adminEditTransportAction(bookingId, { ...values, allowOverlap });
       if (result.ok) {
         // Een bewust geforceerde botsing is goed nieuws met een staartje: die
@@ -139,6 +153,35 @@ export function TripEditForm({
           className={inputClass}
         />
       </label>
+
+      {/* De link naar de materiaallijst erbij zetten, in één klik. Hij hoort in
+          de lading omdat dat het veld is dat meereist naar "Mijn ritten": wie de
+          rit openslaat, ziet dan meteen waar de lijst staat in plaats van hem
+          terug te zoeken via de naam van de aanvrager. Enkel bij een rit die een
+          levering is; een rit zonder aanvraag heeft geen lijst. */}
+      {reservationId && !values.cargoNote.includes(materialListHref(reservationId)) ? (
+        <button
+          type="button"
+          onClick={() =>
+            set(
+              'cargoNote',
+              `${values.cargoNote.trim() ? `${values.cargoNote.trim()} · ` : ''}Materiaallijst: ${materialListHref(reservationId)}`
+            )
+          }
+          className="justify-self-start text-xs font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+        >
+          Link naar de materiaallijst invoegen
+        </button>
+      ) : null}
+
+      {events.length > 0 ? (
+        <TripEventSelect
+          events={events}
+          value={values.eventId}
+          onChange={(eventId) => set('eventId', eventId)}
+          className={inputClass}
+        />
+      ) : null}
 
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
         Laadadres

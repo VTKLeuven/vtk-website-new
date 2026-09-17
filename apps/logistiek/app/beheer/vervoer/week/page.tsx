@@ -42,6 +42,14 @@ import type { TripBlock } from '@/components/transport-calendar/types';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/**
+ * Hoe ver voorbij het venster de keuzelijst met evenementen kijkt.
+ *
+ * Twee weken aan elke kant: een rit hoort bij een evenement dat er nog aan komt
+ * of net geweest is, en die twee weken dekken het voorbereiden en het opruimen.
+ */
+const EVENT_MARGIN_MS = 14 * DAY_MS;
+
 const timeFormatter = new Intl.DateTimeFormat('nl-BE', {
   timeZone: 'Europe/Brussels',
   hour: '2-digit',
@@ -110,14 +118,28 @@ export default async function VervoerWeekPage({
     // Voor wie het team zelf een rit inplant. Alle posten en werkgroepen, niet
     // enkel die van het teamlid: Logistiek rijdt voor de hele kring.
     activeGroups(),
-    // De evenementen die dit venster raken, voor de strook erboven (P5).
-    filters.showEvents ? eventsInRange(from, to) : Promise.resolve([]),
+    // De evenementen rond dit venster. Ruimer dan het venster zelf, want ze
+    // dienen twee dingen: de strook boven het rooster (P5, enkel wat dit venster
+    // raakt) en de keuzelijst "hoort bij" in het ritformulier. Een rit op
+    // vrijdag hoort vaak bij een evenement dat maandag daarna begint, en dat
+    // moet je kunnen kiezen zonder eerst een week verder te bladeren.
+    eventsInRange(new Date(from.getTime() - EVENT_MARGIN_MS), new Date(to.getTime() + EVENT_MARGIN_MS)),
     // Altijd ophalen, ook wanneer de band in het rooster uitstaat: de strook
     // "Wie kan er rijden" onder de planning toont dezelfde gegevens en heeft ze
     // dus altijd nodig. De filter bepaalt enkel of ze óók achter de ritten
     // liggen.
     availabilityInRange(from, to),
   ]);
+
+  // De strook boven het rooster toont enkel wat dit venster raakt, en enkel
+  // wanneer de filter aanstaat; de keuzelijst in het formulier gebruikt de
+  // ruimere lijst.
+  const eventBarSource = filters.showEvents
+    ? events.filter((event) => {
+        const startAt = event.startAt as Date;
+        return startAt < to && (event.endAt ?? endOfDay(startAt)) > from;
+      })
+    : [];
 
   const conflicts = conflictPartners(bookings);
   // De historiek van de getoonde ritten in één query; ze staat ingeklapt in het
@@ -194,6 +216,7 @@ export default async function VervoerWeekPage({
         pickupAddress: booking.pickupAddress ?? '',
         destination: booking.destination ?? '',
         adminNote: booking.adminNote ?? '',
+        eventId: booking.eventId ?? '',
       },
       status: booking.status,
       vehicleId: booking.vehicleId,
@@ -325,7 +348,13 @@ export default async function VervoerWeekPage({
           kind: window.kind,
           note: window.note,
         }))}
-        events={events.map((event) => {
+        eventOptions={events.map((event) => ({
+          id: event.id,
+          name: event.name,
+          startAt: (event.startAt as Date).toISOString(),
+          groupName: event.group?.nameNl ?? null,
+        }))}
+        events={eventBarSource.map((event) => {
           const startAt = event.startAt as Date;
           // Een evenement zonder einde duurt tot het einde van zijn startdag;
           // een balk van nul breed zou onzichtbaar zijn, en dat is net het

@@ -6,6 +6,7 @@ import { adminCreateTransportAction } from '@/app/actions/beheer';
 import { QuarterDateTime } from '@/components/quarter-datetime';
 import { useToast } from '@/components/ui/toast';
 import { DriverOptions } from '../driver-select';
+import { TripEventSelect, type TripEventOption } from '@/components/trip-event-select';
 import type { DriverOption } from '@/lib/uitleen-server';
 
 /**
@@ -43,6 +44,8 @@ export type NewTripValues = {
   /** Enkel bij {@link OTHER_GROUP}: voor wie de rit dan wél rijdt. */
   requesterName: string;
   driverId: string;
+  /** Het evenement waar de rit onder hangt (A8); leeg is geen evenement. */
+  eventId: string;
   purpose: string;
   cargoNote: string;
   pickupAddress: string;
@@ -53,6 +56,7 @@ export function NewTripForm({
   initial,
   vehicles,
   groups,
+  events,
   drivers,
   onDone,
   onCancel,
@@ -62,6 +66,8 @@ export function NewTripForm({
   vehicles: Array<{ id: string; name: string; needsVanDriver: boolean }>;
   /** De posten en werkgroepen waarvoor de rit rijdt. */
   groups: Array<{ id: string; name: string }>;
+  /** De evenementen rond deze periode, om de rit aan te hangen (A8). */
+  events: TripEventOption[];
   drivers: DriverOption[];
   onDone: () => void;
   onCancel: () => void;
@@ -116,6 +122,11 @@ export function NewTripForm({
         vehicleIds: values.vehicleId ? [values.vehicleId] : [],
         purpose: values.purpose,
         cargoNote: values.cargoNote,
+        // De naam reist mee als momentopname, zoals bij een aanvraag van een
+        // lid: verdwijnt het evenement later, dan blijft in de planning staan
+        // waarvoor deze rit reed.
+        eventId: values.eventId || null,
+        eventName: events.find((event) => event.id === values.eventId)?.name ?? '',
         pickupAddress: values.pickupAddress,
         destination: values.destination,
         // Er is geen ledennota bij een rit die het team zelf inplant: er is geen
@@ -228,6 +239,19 @@ export function NewTripForm({
           />
         </select>
       </label>
+
+      {/* Tussen "voor wie" en "waarvoor": het evenement is de koepel waar die
+          twee onder hangen, en zo leest het formulier als één zin. Valt weg
+          wanneer er in deze periode geen evenementen zijn; een keuzelijst met
+          enkel "geen evenement" erin is een veld dat niets vraagt. */}
+      {events.length > 0 ? (
+        <TripEventSelect
+          events={events}
+          value={values.eventId}
+          onChange={(eventId) => set('eventId', eventId)}
+          className={inputClass}
+        />
+      ) : null}
 
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
         Waarvoor

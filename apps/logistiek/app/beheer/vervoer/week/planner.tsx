@@ -27,6 +27,7 @@ import { TransportDecisionForms, type DecisionLeg } from '../transport-decision-
 import { TripEditForm, type TripEditValues } from './trip-edit-form';
 import { NewTripForm, type NewTripValues } from './new-trip-form';
 import { EventEditForm, type PlannerEvent } from './event-edit-form';
+import type { TripEventOption } from '@/components/trip-event-select';
 import { AvailabilityBoard } from '@/components/transport-calendar/availability-board';
 import type { CalendarEventBar } from '@/components/transport-calendar/event-bars';
 import { adminEditTransportAction, deleteTransportAction } from '@/app/actions/beheer';
@@ -120,6 +121,7 @@ export function TransportPlanner({
   vehicleOptions,
   groups,
   events,
+  eventOptions,
   availability,
   driverColors,
   filters,
@@ -138,6 +140,12 @@ export function TransportPlanner({
   groups: Array<{ id: string; name: string }>;
   /** De evenementen boven het rooster, met wat het paneel nodig heeft (P5). */
   events: PlannerEvent[];
+  /**
+   * De evenementen waaraan een rit gehangen kan worden (A8). Ruimer dan de
+   * strook erboven: die toont enkel dit venster en valt weg wanneer de filter
+   * uitstaat, terwijl de keuzelijst altijd moet werken.
+   */
+  eventOptions: TripEventOption[];
   /** Wanneer de chauffeurs kunnen rijden (V1); leeg wanneer de filter uitstaat. */
   availability: AvailabilityBand[];
   driverColors?: DriverColorOverrides;
@@ -255,6 +263,7 @@ export function TransportPlanner({
         groupId: '',
         requesterName: '',
         driverId: '',
+        eventId: '',
         purpose: '',
         cargoNote: '',
         pickupAddress: '',
@@ -413,6 +422,7 @@ export function TransportPlanner({
               }
               vehicles={vehicleOptions}
               groups={groups}
+              events={eventOptions}
               drivers={drivers}
               onDone={() => {
                 setDraft(null);
@@ -593,6 +603,8 @@ export function TransportPlanner({
                   <TripEditForm
                     bookingId={trip.id}
                     initial={trip.edit}
+                    events={eventOptions}
+                    reservationId={trip.reservationId}
                     locked={trip.status !== 'REQUESTED' && trip.status !== 'APPROVED'}
                     onSaved={() => router.refresh()}
                   />

@@ -10,6 +10,7 @@ import { useToast } from '@/components/ui/toast';
 import { VanStatusBadge } from '@/components/status-badge';
 import { QuarterDateTime } from '@/components/quarter-datetime';
 import { formatDateTime } from '@/lib/uitleen';
+import { materialListNote } from '@/lib/material-list-link';
 
 /**
  * "Levering nodig" doorschuiven naar een echte rit.
@@ -73,6 +74,11 @@ export function DeliveryPanel({
   const [returnStartAt, setReturnStartAt] = useState(initial.returnStartAt);
   const [returnEndAt, setReturnEndAt] = useState(initial.returnEndAt);
   const [purpose, setPurpose] = useState(initial.purpose);
+  // De lading staat voorgevuld met de link naar deze aanvraag. Dat is waar de
+  // materiaallijst staat, en zonder die link zoekt wie de rit later openslaat
+  // (de transportverantwoordelijke, de chauffeur) hem terug via de naam van de
+  // aanvrager. Weghalen mag: het is een voorstel, geen vast veld.
+  const [cargoNote, setCargoNote] = useState(materialListNote(reservationId));
   const [pickupAddress, setPickupAddress] = useState('');
   const [destination, setDestination] = useState(initial.destination);
   const [contactPhone, setContactPhone] = useState(initial.contactPhone);
@@ -92,6 +98,7 @@ export function DeliveryPanel({
         returnStartAt: roundTrip ? returnStartAt : undefined,
         returnEndAt: roundTrip ? returnEndAt : undefined,
         purpose,
+        cargoNote,
         eventName: initial.eventName,
         pickupAddress,
         destination,
@@ -245,6 +252,16 @@ export function DeliveryPanel({
                 type="text"
                 value={purpose}
                 onChange={(event) => setPurpose(event.target.value)}
+                className={inputClass}
+              />
+            </label>
+            <label className="grid gap-1 text-sm sm:col-span-2">
+              <span className="font-medium text-vtk-ink">Lading</span>
+              <input
+                type="text"
+                value={cargoNote}
+                onChange={(event) => setCargoNote(event.target.value)}
+                placeholder="Wat moet er mee?"
                 className={inputClass}
               />
             </label>

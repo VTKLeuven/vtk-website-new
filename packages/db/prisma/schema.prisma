@@ -795,12 +795,16 @@ model Group {
   formGrants        FormGroupGrant[]
   ssoGrants         SsoGroupClientPermission[]
 
-  uitleenReservations UitleenReservation[]
-  uitleenTransport    UitleenTransportBooking[]
-  uitleenTemplates    UitleenRequestTemplate[]
-  uitleenEventsGroup  UitleenEvent[]
-  mailGroupSources    MailGroupSource[]
-  expenses            Expense[]
+  uitleenReservations      UitleenReservation[]
+  uitleenTransport         UitleenTransportBooking[]
+  /// Autoritten die Logistiek aan deze post doorgaf, zodat de post zelf een
+  /// chauffeur aanduidt. Los van `uitleenTransport`: dat is de post die de rit
+  /// aanvroeg, dit is de post die ze rijdt, en dat hoeft niet dezelfde te zijn.
+  uitleenTransportAssigned UitleenTransportBooking[] @relation("UitleenTransportAssignedGroup")
+  uitleenTemplates         UitleenRequestTemplate[]
+  uitleenEventsGroup       UitleenEvent[]
+  mailGroupSources         MailGroupSource[]
+  expenses                 Expense[]
 }
 
 model GroupMembership {
@@ -3650,6 +3654,15 @@ model UitleenDriver {
   /// iemand zijn kleur zet, net zoals `canDriveVan` dat al doet.
   colorIndex Int?
 
+  /// Het nummer waarop deze chauffeur bereikbaar is onderweg.
+  ///
+  /// Staat hier en niet op `User`: een telefoonnummer op het account is een
+  /// gegeven van de hele site (en van elk lid), terwijl dit er één is van de
+  /// uitleendienst, ingevuld door het team of overgenomen uit wat deze persoon
+  /// zelf al eens als contactnummer opgaf. Zie `driverPhones` in
+  /// apps/logistiek/lib/uitleen-server.ts voor die overname.
+  phone String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -3775,6 +3788,15 @@ model UitleenTransportBooking {
 
   driverId String? // pas het weekend ervoor toegewezen; blijft optioneel bij goedkeuring
 
+  /// De post of werkgroep die deze rit zelf mag invullen (Onthaal, Feest, ...).
+  ///
+  /// Logistiek heeft niet altijd een chauffeur, en voor de auto hoeft dat ook
+  /// niet: elk lid met een rijbewijs mag ermee rijden. Dan gaat de rit naar de
+  /// post die ze aanvroeg en duidt die zelf iemand aan. **Enkel voor voertuigen
+  /// zonder `needsVanDriver`**: de kar vraagt een goedgekeurde karchauffeur, en
+  /// die keuze is niet aan een post om te maken. Zie docs/design-decisions.md.
+  assignedGroupId String?
+
   /// Heeft Logistiek deze rit zelf ingetekend, of komt ze van een aanvraag?
   ///
   /// Bestaat om één reden: **enkel een zelf ingetekende rit mag verwijderd
@@ -3832,16 +3854,17 @@ model UitleenTransportBooking {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user        User                @relation("UitleenTransportUser", fields: [userId], references: [id], onDelete: Cascade)
-  vehicle     UitleenVehicle      @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
-  event       UitleenEvent?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  user          User                @relation("UitleenTransportUser", fields: [userId], references: [id], onDelete: Cascade)
+  vehicle       UitleenVehicle      @relation(fields: [vehicleId], references: [id], onDelete: Restrict)
+  event         UitleenEvent?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
   // Verdwijnt de aanvraag, dan blijft de rit bestaan: ze is dan gewoon een rit
   // zonder levering eraan, en het voertuig is die dag nog altijd bezet.
-  reservation UitleenReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
-  group       Group?              @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  driver      User?               @relation("UitleenTransportDriver", fields: [driverId], references: [id], onDelete: SetNull)
-  decidedBy   User?               @relation("UitleenTransportDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
-  completedBy User?               @relation("UitleenTransportCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
+  reservation   UitleenReservation? @relation(fields: [reservationId], references: [id], onDelete: SetNull)
+  group         Group?              @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  assignedGroup Group?              @relation("UitleenTransportAssignedGroup", fields: [assignedGroupId], references: [id], onDelete: SetNull)
+  driver        User?               @relation("UitleenTransportDriver", fields: [driverId], references: [id], onDelete: SetNull)
+  decidedBy     User?               @relation("UitleenTransportDecidedBy", fields: [decidedById], references: [id], onDelete: SetNull)
+  completedBy   User?               @relation("UitleenTransportCompletedBy", fields: [completedById], references: [id], onDelete: SetNull)
 
   payments  UitleenPayment[]
   auditLogs UitleenAuditLog[]
@@ -3860,6 +3883,8 @@ model UitleenTransportBooking {
   @@index([driverId, startAt])
   // De wachtrij van de teammelding wordt elke minuut afgetast.
   @@index([teamNotifiedAt])
+  // "Ritten van mijn post" op /ritten, en de openstaande ritten per post.
+  @@index([assignedGroupId, startAt])
 }
 
 /// Waar een agendafeed van de uitleendienst over gaat.

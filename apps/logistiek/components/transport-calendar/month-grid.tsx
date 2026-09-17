@@ -109,7 +109,10 @@ export function MonthGrid({
         {blocks.length === 0 ? (
           <p className="pb-1.5 text-xs text-vtk-muted">{emptyLabel}</p>
         ) : null}
-        <div className="grid grid-cols-7 gap-1 pb-1.5">
+        {/* De dagnamen plakken bovenaan, net als in de weekweergave: in
+            volledig scherm scrollt de maand wel degelijk, en dan hoor je niet
+            te moeten terugscrollen om te weten welke kolom zondag is. */}
+        <div className="sticky top-0 z-20 grid grid-cols-7 gap-1 bg-vtk-surface pb-1.5">
           {rows[0]?.map((day) => (
             <span
               key={day.toISOString()}
