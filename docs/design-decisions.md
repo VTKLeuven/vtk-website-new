@@ -7134,3 +7134,115 @@ de shoplijst, de eventpagina en het slot bij het afrekenen, net als
 `audience.ts`. De voorverkoop is dus **niet** enkel een kwestie van een knop
 uitgrijzen: `createOrder` rekent met dezelfde vervroegde start, dus een
 gekopieerde bestelling van iemand die er niet in mag, krijgt `EVENT_NOT_ON_SALE`.
+
+## Een autorit doorgeven aan een post
+
+Logistiek heeft niet voor elke rit een chauffeur, en voor de **auto** hoeft dat
+ook niet: daar rijdt elk lid met een geldig rijbewijs mee. De post die de rit
+vroeg, weet meestal zelf wie er die avond kan; Logistiek weet dat niet en moet
+het anders gaan navragen. Een rit kan daarom aan een post of werkgroep
+**doorgegeven** worden (`UitleenTransportBooking.assignedGroupId`). De
+verantwoordelijke van die post krijgt daar een mail over en duidt op `/ritten`
+zelf de chauffeur aan.
+
+**Enkel voor de auto, nooit voor de kar.** Een voertuig met `needsVanDriver`
+vraagt een goedgekeurde karchauffeur uit de pool, en of iemand die bestelwagen
+aankan, is een oordeel van Logistiek en niet van de post die iets te vervoeren
+heeft. De keuzelijst staat er niet bij zo'n voertuig, en de server weigert het
+ook: een keuzelijst is geen poort, en een voertuigwissel achteraf mag dit niet
+stil openzetten.
+
+**Doorgeven vervangt de chauffeur niet.** Staat er al iemand op de rit, dan
+blijft die staan; doorgeven betekent "jullie mogen dit wijzigen", niet "wij
+wissen wat er staat".
+
+**De mail gaat naar de verantwoordelijken (`LEAD`), niet naar de hele post.**
+Het is een taak die iemand moet verdelen, en veertien mensen mailen om er één te
+laten antwoorden is precies hoe een mailbox onleesbaar wordt. Heeft de post dit
+werkingsjaar geen verantwoordelijke, dan vertrekt er niets en zégt de melding
+dat: de toewijzing lukte, maar ze bereikt zo niemand, en dat wil je weten voor
+je verder gaat in plaats van een week later.
+
+**Wie de post aanduidt, hoeft geen chauffeur van Logistiek te zijn.** Dat is het
+hele punt. De server aanvaardt een lid van diezelfde post van dit werkingsjaar,
+of iemand die al in de chauffeurslijst staat; iemand anders niet, want een
+chauffeur toewijzen is meteen leestoegang tot die rit.
+
+## "Mijn ritten" toont ook de ritten van je post
+
+`/ritten` was strikt persoonlijk: enkel wat aan jou als chauffeur toegewezen
+was. Daar is een tweede lijst bijgekomen met de ritten van je eigen post, om
+twee redenen die allebei tot een telefoontje naar Logistiek leidden:
+
+- **Een rit die aan je post doorgegeven is** (zie hierboven) heeft nog geen
+  chauffeur, en zonder dit scherm is die ene mail naar de verantwoordelijke het
+  enige spoor ervan.
+- **Een rit die je post aanvroeg en die al toegewezen is**: dan weet je wie er
+  rijdt zonder het te moeten navragen, met zijn nummer erbij.
+
+Enkel wat er nog aankomt. Wie er vorige maand reed, is historiek van Logistiek
+en niet iets waar een post nog iets mee doet; dat staat wel in de statistieken.
+Je eigen ritten staan er niet nog eens bij: die hebben hun eigen lijst bovenaan,
+en dezelfde rit twee keer op één pagina leest als twee ritten.
+
+De link naar dit scherm verschijnt ook voor wie **geen** chauffeur is maar wel
+een rit op zijn post heeft staan. Anders raakt die persoon er enkel via de mail,
+en mist hij de tweede rit, waar geen mail meer voor vertrekt.
+
+## Het nummer van een chauffeur komt uit zijn eigen aanvragen
+
+Er staat geen telefoonnummer op een account: dat is een gegeven van de hele site
+en van elk lid, en de uitleendienst gaat daar niet over. Maar bijna iedereen die
+ooit zelf iets aanvroeg, tikte toen een contactnummer in. `driverPhones` neemt
+dat over: het meest recente nummer dat deze persoon zelf bij een rit of een
+materiaalaanvraag opgaf, zodat "bel de chauffeur" niet begint met "vraag eerst
+zijn nummer aan iemand".
+
+Het team kan er een vastleggen bij Chauffeurs (`UitleenDriver.phone`); dat wint
+altijd van wat uit de historiek komt, en het scherm zegt erbij welk van de twee
+je ziet. Wat gevonden wordt, wordt **niet** weggeschreven: dit draait op een
+leespad, en een pagina die stil rijen bijwerkt terwijl je ze bekijkt, is een
+pagina waarvan je de gegevens niet meer kan verklaren.
+
+Het nummer van een **bijrijder** telt hier niet mee. Dat is het nummer van die
+bijrijder en niet van wie de rij aanmaakte; `addedById` erop loslaten zou de
+helft van de chauffeurs het nummer van iemand anders geven, en een verkeerd
+nummer is erger dan geen nummer.
+
+## De materiaallijst hangt in de lading van de rit
+
+Wordt een levering aangemaakt vanaf een materiaalaanvraag, dan staat de link
+naar die aanvraag voorgevuld in het veld **Lading**, en in het ritformulier
+staat er een knop om hem er alsnog in te plakken. Er bestaat al een koppeling in
+de database (`reservationId`), maar dat is een relatie en geen zin die iemand
+leest. De lading is het veld dat meereist naar "Mijn ritten": wie de rit
+openslaat, ziet dan in één regel wat er mee moet en waar de lijst staat, in
+plaats van hem terug te zoeken via de naam van de aanvrager.
+
+Adressen in de lading en in de nota's zijn overal aanklikbaar
+(`lib/linkify.ts`). Bewust geen markdown en geen html: dit is een invoerveld
+waar iemand snel iets in tikt, en de enige structuur die er ooit in zit, is een
+adres. Een kale `www.iets.be` blijft tekst, want er is geen manier om te weten
+of "3 bakken vs.be" een adres bevat, en een verkeerd geraden link is erger dan
+geen link.
+
+## Statistieken over het vervoer: uren zijn het geboekte venster
+
+`/beheer/statistieken` beantwoordt wie er wanneer reed, hoelang en voor welke
+post. Drie keuzes die daaronder zitten:
+
+**"Gereden" is goedgekeurd of afgerond, niet enkel afgerond.** Afronden is de
+stap waarin de kilometers ingevuld worden, en dat hoeft enkel bij een tarief per
+km. In de praktijk blijft de helft van de ritten dus op "goedgekeurd" staan, en
+een jaaroverzicht dat die weglaat omdat niemand op een knop duwde, is geen
+jaaroverzicht. Afgewezen en geannuleerde ritten tellen apart, als eigen getal.
+
+**"Uren" is het geboekte venster, niet de tijd achter het stuur.** De app weet
+niet wanneer de motor startte. Dat venster is wél precies wat het voertuig bezet
+hield, en dat is de vraag die dit scherm beantwoordt; overal waar een getal uren
+toont, staat dat woord erbij.
+
+**Dit is geen afrekening.** Er staan geen bedragen op. Wie wat betaalt, hangt aan
+het type aanvrager (`chargesRequester`) en staat bij de rit zelf; een
+jaartotaal per post naast een bedrag zou gelezen worden als een factuur die
+niemand zo bedoeld heeft.
