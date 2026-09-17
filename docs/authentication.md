@@ -456,7 +456,7 @@ Admin-CRUD op accounts, allemaal achter de `users.edit`-permissie
 
 Een nieuw lid landt met `onboardedAt = null` en moet eerst zijn profiel
 invullen. Alleen wie daar de expliciete status Student heeft, moet daarna elk
-academiejaar zijn studie herbevestigen (die bevestiging vervalt op 27 september,
+academiejaar zijn studie herbevestigen (die bevestiging vervalt op 21 september,
 niet op 15 juli zoals het werkingsjaar). Beide zijn blokkerende gates op de
 **netwerkgrens** (`apps/web/proxy.ts`), niet in een layout. Het r-nummer-veld
 wordt bij SSO voorgevuld uit de KU Leuven-claim; bij een zelfgemaakt

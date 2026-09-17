@@ -102,7 +102,7 @@ waarschijnlijkheid:
    `User.isSuperAdmin` is het enige dat de cutover overleeft.
 2. **Een gate in `apps/web/proxy.ts`** stuurt je van élke pagina weg, en dan lijkt
    dat op "ik raak niet in /admin": onboarding niet af, de studiebevestiging
-   (`needsStudyConfirmation`, cutover 27 september) of de optionele
+   (`needsStudyConfirmation`, cutover 21 september) of de optionele
    `@vtk.be`-koppelgate. Kijk waar de browser naartoe redirect.
 3. Pas als 1 en 2 uitgesloten zijn: een rol die de permissie niet meer bevat.
 

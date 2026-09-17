@@ -1,6 +1,6 @@
 // Werkingsjaar-logica voor posten (groepen).
 //
-// De cutovers zelf (15 juli voor het werkingsjaar, 27 september voor de
+// De cutovers zelf (15 juli voor het werkingsjaar, 21 september voor de
 // studiebevestiging; beide Brussel-tijd) leven in @vtk/auth, zodat de apps én de
 // sessie-resolver exact dezelfde grenzen gebruiken. Dit bestand voegt enkel
 // app-specifieke helpers toe (tabs, parsing, formatting). Omdat memberships en

@@ -628,7 +628,7 @@ model User {
   //
   // Dit is bewust NIET het werkingsjaar: dat kantelt op 15 juli, terwijl het
   // academiejaar tot eind september loopt. De bevestiging vervalt daarom op
-  // 27 september (`currentStudyYear()` in @vtk/auth), anders duidt iedereen in
+  // 21 september (`currentStudyYear()` in @vtk/auth), anders duidt iedereen in
   // juli nog het jaar aan dat net gedaan is.
   studyConfirmedYear      Int?
 

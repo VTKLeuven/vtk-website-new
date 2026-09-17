@@ -3,12 +3,12 @@ import { needsStudyConfirmation } from "@vtk/auth";
 import { currentStudyYear, currentWorkingYear, splitYearBar, studyYearStart } from "@/lib/workingYear";
 
 describe("currentStudyYear", () => {
-  // De studiebevestiging kantelt op 27 september, het werkingsjaar op 15 juli.
+  // De studiebevestiging kantelt op 21 september, het werkingsjaar op 15 juli.
   // Precies dat gat is waarom deze functie bestaat: in juli loopt het
   // academiejaar nog, dus vraag je dan niemand naar het nieuwe studiejaar.
-  it("kantelt op 27 september, niet op 15 juli", () => {
-    expect(currentStudyYear(new Date("2027-09-26T12:00:00Z"))).toBe(2026);
-    expect(currentStudyYear(new Date("2027-09-27T12:00:00Z"))).toBe(2027);
+  it("kantelt op 21 september, niet op 15 juli", () => {
+    expect(currentStudyYear(new Date("2027-09-20T12:00:00Z"))).toBe(2026);
+    expect(currentStudyYear(new Date("2027-09-21T12:00:00Z"))).toBe(2027);
   });
 
   it("laat de zomer bij het aflopende academiejaar horen", () => {
@@ -19,8 +19,8 @@ describe("currentStudyYear", () => {
   });
 
   it("telt in Brussel-tijd, niet in UTC", () => {
-    // 26 september 23:30 UTC is in Brussel al 27 september (zomertijd, UTC+2).
-    expect(currentStudyYear(new Date("2027-09-26T23:30:00Z"))).toBe(2027);
+    // 20 september 23:30 UTC is in Brussel al 21 september (zomertijd, UTC+2).
+    expect(currentStudyYear(new Date("2027-09-20T23:30:00Z"))).toBe(2027);
   });
 
   it("klemt niet op het eerste werkingsjaar", () => {
@@ -32,8 +32,8 @@ describe("currentStudyYear", () => {
 });
 
 describe("studyYearStart", () => {
-  it("geeft 27 september van dat jaar", () => {
-    expect(studyYearStart(2026).toISOString()).toBe("2026-09-27T00:00:00.000Z");
+  it("geeft 21 september van dat jaar", () => {
+    expect(studyYearStart(2026).toISOString()).toBe("2026-09-21T00:00:00.000Z");
   });
 });
 
