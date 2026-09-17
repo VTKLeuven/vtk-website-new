@@ -670,8 +670,7 @@ async function main() {
             issueNl: "Week 6 / Semester 2, 2025-2026",
             issueEn: "Week 6 / Semester 2, 2025-2026",
             publishedAt: "2026-03-15",
-            pdfUrl:
-              "https://vtk.be/_publications/pdf/a88e502ea825c3395a47cbb28d3a3ee96f9b81ee.pdf",
+            storageKey: "publications/bakske-2025-2026-s2w6.pdf",
           },
           {
             id: "bakske-2025-2026-s2w4",
@@ -681,8 +680,7 @@ async function main() {
             issueNl: "Week 4 / Semester 2, 2025-2026",
             issueEn: "Week 4 / Semester 2, 2025-2026",
             publishedAt: "2026-03-01",
-            pdfUrl:
-              "https://vtk.be/_publications/pdf/9a4677aa5dea8e0f3a7bf2a0c1812a6eae49142c.pdf",
+            storageKey: "publications/bakske-2025-2026-s2w4.pdf",
           },
           {
             id: "bakske-2025-2026-s2w3",
@@ -692,8 +690,7 @@ async function main() {
             issueNl: "Week 3 / Semester 2, 2025-2026",
             issueEn: "Week 3 / Semester 2, 2025-2026",
             publishedAt: "2026-02-22",
-            pdfUrl:
-              "https://vtk.be/_publications/pdf/a7f09c8575986b9b010d7ce5348b6d76fd13b3de.pdf",
+            storageKey: "publications/bakske-2025-2026-s2w3.pdf",
           },
           {
             id: "bakske-2025-2026-s1w2",
@@ -703,8 +700,7 @@ async function main() {
             issueNl: "Week 2 / Semester 1, 2025-2026",
             issueEn: "Week 2 / Semester 1, 2025-2026",
             publishedAt: "2025-09-29",
-            pdfUrl:
-              "https://vtk.be/_publications/pdf/a5251f173ff84324bef666dabc03484b91b35f15.pdf",
+            storageKey: "publications/bakske-2025-2026-s1w2.pdf",
           },
           {
             id: "ir-reeel-2025-september",
@@ -714,8 +710,7 @@ async function main() {
             issueNl: "September 2025, 2025-2026",
             issueEn: "September 2025, 2025-2026",
             publishedAt: "2025-09-01",
-            pdfUrl:
-              "https://vtk.be/_publications/pdf/bea5a73905a541b43900d7529c0793a5e24a957a.pdf",
+            storageKey: "publications/ir-reeel-2025-september.pdf",
           },
           {
             id: "ir-reeel-2024-2025-2",
@@ -725,8 +720,7 @@ async function main() {
             issueNl: "Editie 2, 2024-2025",
             issueEn: "Issue 2, 2024-2025",
             publishedAt: "2024-12-03",
-            pdfUrl:
-              "https://vtk.be/_publications/pdf/fc365177942f2411e10340faf2613ba70d1221b8.pdf",
+            storageKey: "publications/ir-reeel-2024-2025-2.pdf",
           },
           {
             id: "ir-reeel-2023-2024-4",
@@ -736,8 +730,7 @@ async function main() {
             issueNl: "Editie 4, 2023-2024",
             issueEn: "Issue 4, 2023-2024",
             publishedAt: "2024-04-25",
-            pdfUrl:
-              "https://vtk.be/_publications/pdf/81d2550a98e49f4bd35962a62e3d2c992e415b6d.pdf",
+            storageKey: "publications/ir-reeel-2023-2024-4.pdf",
           },
         ],
       },

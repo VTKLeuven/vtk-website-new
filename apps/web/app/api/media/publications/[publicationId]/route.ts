@@ -1,5 +1,6 @@
+import { Readable } from "node:stream";
+import { getObjectStream } from "@vtk/storage";
 import { getMediaContent, type MediaPublication } from "@/lib/media-content";
-import { publicUrl } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 
@@ -34,22 +35,6 @@ function isAllowedExternalPdf(url: URL): boolean {
 }
 
 function publicationSource(publication: MediaPublication): PublicationSource | null {
-  if (publication.storageKey) {
-    const resolved = publicUrl(publication.storageKey);
-    const url = resolved ? parseHttpUrl(resolved) : null;
-    if (url) {
-      const origin = url.origin;
-      return {
-        url,
-        allowsRedirect: (candidate) =>
-          HTTP_PROTOCOLS.has(candidate.protocol) &&
-          !candidate.username &&
-          !candidate.password &&
-          candidate.origin === origin,
-      };
-    }
-  }
-
   if (publication.pdfUrl) {
     const url = parseHttpUrl(publication.pdfUrl);
     if (url && isAllowedExternalPdf(url)) {
@@ -140,6 +125,32 @@ export async function GET(
   const { publicationId } = await context.params;
   const publication = publications.find((item) => item.id === publicationId);
   if (!publication) return errorResponse(404);
+
+  if (publication.storageKey) {
+    try {
+      const range = request.headers.get("range");
+      const object = await getObjectStream(publication.storageKey, range);
+      const { stream, contentType, contentLength, contentRange, etag, lastModified } = object;
+      const headers = new Headers({
+        "content-type": contentType || "application/pdf",
+        "content-disposition": `inline; filename="${publication.id}.pdf"`,
+        "accept-ranges": "bytes",
+        "x-content-type-options": "nosniff",
+        "cache-control": "private, max-age=3600",
+      });
+      if (contentLength != null) headers.set("content-length", String(contentLength));
+      if (contentRange) headers.set("content-range", contentRange);
+      if (etag) headers.set("etag", etag);
+      if (lastModified) headers.set("last-modified", lastModified.toUTCString());
+
+      return new Response(Readable.toWeb(stream as Readable) as unknown as BodyInit, {
+        status: contentRange ? 206 : 200,
+        headers,
+      });
+    } catch {
+      return errorResponse(502);
+    }
+  }
 
   const source = publicationSource(publication);
   if (!source) return errorResponse(502);
