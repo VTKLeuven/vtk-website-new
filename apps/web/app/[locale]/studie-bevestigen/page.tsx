@@ -14,6 +14,7 @@ import { StudyFieldset } from "@/components/profile/StudyFieldset";
 import { AddressConfirmation } from "@/components/profile/AddressConfirmation";
 import { MembershipChoice } from "@/components/profile/MembershipChoice";
 import { CareerOptIn } from "@/components/profile/CareerOptIn";
+import { ConfirmStudySteps } from "@/components/profile/ConfirmStudySteps";
 import { hasCompleteAddresses } from "@/lib/profile-address";
 import { careerChoiceLabels, shouldAskCareerOptIn } from "@/lib/careerOptIn";
 import "@/app/design/vtk-career-optin.css";
@@ -117,58 +118,80 @@ export default async function ConfirmStudyPage({
       </div>
 
       <Card className="p-6">
-        <form action={confirmStudyAction} className="space-y-6">
-          <input type="hidden" name="next" value={home} />
-          <StudyFieldset
-            locale={locale}
-            studyYears={user.studyYears}
-            studyProgrammes={user.studyProgrammes}
-            isStudent={user.isStudent}
-            notAtFaculty={user.notAtFaculty}
-            notStudying={user.notStudying}
-            academicStaffRole={user.academicStaffRole}
-            internationalStudent={user.internationalStudent}
-            alumni={user.alumni}
-            graduationYear={user.graduationYear}
-            wasInVtk={user.wasInVtk}
-            alumniMailOptIn={user.alumniMailOptIn}
-          />
-          <AddressConfirmation
-            values={user}
-            complete={hasCompleteAddresses(user)}
-            addressLabels={{
-              noKot: addressT.noKot,
-              kotAddressHeading: addressT.kotAddressHeading,
-              homeAddressHeading: addressT.homeAddressHeading,
-              homeAddressHint: addressT.homeAddressHint,
-              street: addressT.street,
-              houseNumber: addressT.houseNumber,
-              bus: addressT.bus,
-              busHint: addressT.busHint,
-              postalCode: addressT.postalCode,
-              city: addressT.city,
-            }}
-            labels={{
-              heading: t.addressesHeading,
-              question: t.addressesQuestion,
-              yes: t.addressesYes,
-              no: t.addressesNo,
-              incomplete: t.addressesIncomplete,
-              noKot: t.noKot,
-              kotAddress: t.kotAddress,
-              homeAddress: t.homeAddress,
-            }}
-          />
-          <MembershipChoice offer={offer} labels={membershipChoiceLabels(locale, offer, year)} />
-          <CareerOptIn
-            labels={askCareer ? careerChoiceLabels(locale, user) : null}
-            photoAlt={t.careerPhotoAlt}
-          />
-          <div className="flex flex-wrap items-center gap-3">
-            <Button type="submit">{t.submit}</Button>
-            <span className="text-xs text-[#5c667f]">{t.unchangedHint}</span>
-          </div>
-        </form>
+        {/* Twee stappen: eerst studie en adressen, dan het lidmaatschap en
+            Career. Eén formulier, dus alles vertrekt in één POST; zie
+            ConfirmStudySteps. */}
+        <ConfirmStudySteps
+          action={confirmStudyAction}
+          next={home}
+          labels={{
+            stepOf: t.stepOf,
+            continueLabel: t.continueLabel,
+            backLabel: t.back,
+            submitLabel: t.submit,
+            unchangedHint: t.unchangedHint,
+          }}
+          first={
+            <>
+              <StudyFieldset
+                locale={locale}
+                studyYears={user.studyYears}
+                studyProgrammes={user.studyProgrammes}
+                isStudent={user.isStudent}
+                notAtFaculty={user.notAtFaculty}
+                notStudying={user.notStudying}
+                academicStaffRole={user.academicStaffRole}
+                internationalStudent={user.internationalStudent}
+                alumni={user.alumni}
+                graduationYear={user.graduationYear}
+                wasInVtk={user.wasInVtk}
+                alumniMailOptIn={user.alumniMailOptIn}
+              />
+              <AddressConfirmation
+                values={user}
+                complete={hasCompleteAddresses(user)}
+                addressLabels={{
+                  noKot: addressT.noKot,
+                  kotAddressHeading: addressT.kotAddressHeading,
+                  homeAddressHeading: addressT.homeAddressHeading,
+                  homeAddressHint: addressT.homeAddressHint,
+                  street: addressT.street,
+                  houseNumber: addressT.houseNumber,
+                  bus: addressT.bus,
+                  busHint: addressT.busHint,
+                  postalCode: addressT.postalCode,
+                  city: addressT.city,
+                }}
+                labels={{
+                  heading: t.addressesHeading,
+                  question: t.addressesQuestion,
+                  yes: t.addressesYes,
+                  no: t.addressesNo,
+                  incomplete: t.addressesIncomplete,
+                  noKot: t.noKot,
+                  kotAddress: t.kotAddress,
+                  homeAddress: t.homeAddress,
+                }}
+              />
+            </>
+          }
+          second={
+            // Een tweede stap zonder vraag erop is een extra klik voor niets:
+            // wie al lid is én Career al aanduidde, houdt één pagina.
+            offer.kind !== "none" || askCareer ? (
+              <>
+                <MembershipChoice
+                  offer={offer}
+                  labels={membershipChoiceLabels(locale, offer, year)}
+                />
+                <CareerOptIn
+                  labels={askCareer ? careerChoiceLabels(locale, user) : null}
+                  photoAlt={t.careerPhotoAlt}
+                />
+              </>
+            ) : null
+          }
+        />
       </Card>
 
       <form action={logoutAction}>

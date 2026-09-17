@@ -500,6 +500,9 @@
     "careerHint": "Career only; your other preferences stay as they are. You can unsubscribe at any time on your account page or at the bottom of every email.",
     "careerPhotoAlt": "Students and companies at the VTK Career Fair",
     "unchangedHint": "Nothing changed? Confirm your studies and addresses.",
+    "stepOf": "Step {step} of {total}",
+    "continueLabel": "Continue",
+    "back": "Back",
     "submit": "Confirm"
   },
   "mailinglists": {

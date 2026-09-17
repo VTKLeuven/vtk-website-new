@@ -7552,7 +7552,23 @@ bereik, dus hoe meer studenten erin zitten, hoe meer VTK kan doen. De jaarlijkse
 studiebevestiging is het enige scherm waar élke student langskomt, en dus de
 enige plek waar die vraag iedereen bereikt.
 
-**Eén categorie apart, de rest niet.** Onderaan de bevestiging staat één vinkje
+**De bevestiging loopt in twee stappen.** Eerst wie je bent en waar je woont
+("Ik ben", de studiejaren, de richtingen, de adressen), dan een tweede stap met
+het lidmaatschap en Career, en pas daar de knop "Bevestigen". De vragen die het
+meest opbrengen stonden onderaan een kolom van vier statussen, vijf
+studiejaren, zestien richtingen en twee adressen, bij een lid dat al tien keer
+geklikt had en enkel nog "bevestigen" zocht.
+
+Het blijft **één formulier met twee panelen**, geen twee POSTs: de verborgen
+stap blijft in de DOM, dus alles vertrekt in één keer. Zo kan niemand halverwege
+blijven hangen met een bevestigde studie maar een onbeantwoorde
+lidmaatschapsvraag, hoeft de action geen tussenstand te kennen, en verliest
+"Terug" niets. Valt de tweede stap leeg (al lid én Career al aangeduid), dan
+blijft het één pagina: een extra klik voor een leeg scherm is geen stap. Zonder
+JavaScript staan beide panelen open met één knop; een gate die op "Ga verder"
+blijft steken, laat niemand meer binnen. Zie `ConfirmStudySteps`.
+
+**Eén categorie apart, de rest niet.** Op die tweede stap staat één vinkje
 voor `MailCategory.CAREER`. De volledige lijst met acht categorieën blijft waar
 ze stond (de onboarding en `/account`): acht vinkjes op de gate zouden van een
 bevestiging een formulier maken, en dan haakt precies de student af die we nog

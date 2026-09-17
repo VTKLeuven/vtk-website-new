@@ -11,6 +11,7 @@ import { StudyFieldset } from "@/components/profile/StudyFieldset";
 import { AddressConfirmation } from "@/components/profile/AddressConfirmation";
 import { MembershipChoice } from "@/components/profile/MembershipChoice";
 import { CareerOptIn } from "@/components/profile/CareerOptIn";
+import { ConfirmStudySteps } from "@/components/profile/ConfirmStudySteps";
 import { hasCompleteAddresses } from "@/lib/profile-address";
 import { careerChoiceLabels, shouldAskCareerOptIn } from "@/lib/careerOptIn";
 import "@/app/design/vtk-career-optin.css";
@@ -304,6 +305,11 @@ export default async function AdminFlowPreview({
                   ? "Wie hier niet bevestigt, valt uit elke studiegerichte mailinglijst. Alumni, personeel en andere niet-studenten krijgen deze gate niet."
                   : "Anyone who does not confirm falls out of every study-related mailing list. Alumni, staff and other non-students do not get this gate."}
               </li>
+              <li>
+                {nl
+                  ? "Het lid ziet dit in twee stappen: eerst studie en adressen, dan het lidmaatschap en Career, met één keer versturen op het einde. Hieronder staan beide stappen onder elkaar."
+                  : "The member sees this in two steps: studies and addresses first, then membership and Career, submitted once at the end. Below, both steps are shown one after another."}
+              </li>
               <li>{membershipRule}</li>
               <li>
                 {nl
@@ -359,48 +365,69 @@ export default async function AdminFlowPreview({
           resetOnSuccess={false}
         >
           <p className="text-sm text-[#34405e]">{dict.confirmStudy.intro}</p>
-          <StudyFieldset
-            locale={locale}
-            studyYears={user.studyYears}
-            studyProgrammes={user.studyProgrammes}
-            isStudent={user.isStudent}
-            notAtFaculty={user.notAtFaculty}
-            notStudying={user.notStudying}
-            academicStaffRole={user.academicStaffRole}
-            internationalStudent={user.internationalStudent}
-            alumni={user.alumni}
-            graduationYear={user.graduationYear}
-            wasInVtk={user.wasInVtk}
-            alumniMailOptIn={user.alumniMailOptIn}
-          />
-          <AddressConfirmation
-            values={user}
-            complete={hasCompleteAddresses(user)}
-            addressLabels={{
-              noKot: dict.onboarding.noKot,
-              kotAddressHeading: dict.onboarding.kotAddressHeading,
-              homeAddressHeading: dict.onboarding.homeAddressHeading,
-              homeAddressHint: dict.onboarding.homeAddressHint,
-              street: dict.onboarding.street,
-              houseNumber: dict.onboarding.houseNumber,
-              bus: dict.onboarding.bus,
-              busHint: dict.onboarding.busHint,
-              postalCode: dict.onboarding.postalCode,
-              city: dict.onboarding.city,
-            }}
+          {/* Dezelfde twee stappen als op het echte scherm, maar onder elkaar:
+              `SaveForm` bezit hier het formulier en de submitknop, en een
+              beheerder wil de volledige inhoud zien zonder door te klikken. */}
+          <ConfirmStudySteps
+            preview
             labels={{
-              heading: dict.confirmStudy.addressesHeading,
-              question: dict.confirmStudy.addressesQuestion,
-              yes: dict.confirmStudy.addressesYes,
-              no: dict.confirmStudy.addressesNo,
-              incomplete: dict.confirmStudy.addressesIncomplete,
-              noKot: dict.confirmStudy.noKot,
-              kotAddress: dict.confirmStudy.kotAddress,
-              homeAddress: dict.confirmStudy.homeAddress,
+              stepOf: dict.confirmStudy.stepOf,
+              continueLabel: dict.confirmStudy.continueLabel,
+              backLabel: dict.confirmStudy.back,
+              submitLabel: dict.confirmStudy.submit,
+              unchangedHint: dict.confirmStudy.unchangedHint,
             }}
+            first={
+              <>
+                <StudyFieldset
+                  locale={locale}
+                  studyYears={user.studyYears}
+                  studyProgrammes={user.studyProgrammes}
+                  isStudent={user.isStudent}
+                  notAtFaculty={user.notAtFaculty}
+                  notStudying={user.notStudying}
+                  academicStaffRole={user.academicStaffRole}
+                  internationalStudent={user.internationalStudent}
+                  alumni={user.alumni}
+                  graduationYear={user.graduationYear}
+                  wasInVtk={user.wasInVtk}
+                  alumniMailOptIn={user.alumniMailOptIn}
+                />
+                <AddressConfirmation
+                  values={user}
+                  complete={hasCompleteAddresses(user)}
+                  addressLabels={{
+                    noKot: dict.onboarding.noKot,
+                    kotAddressHeading: dict.onboarding.kotAddressHeading,
+                    homeAddressHeading: dict.onboarding.homeAddressHeading,
+                    homeAddressHint: dict.onboarding.homeAddressHint,
+                    street: dict.onboarding.street,
+                    houseNumber: dict.onboarding.houseNumber,
+                    bus: dict.onboarding.bus,
+                    busHint: dict.onboarding.busHint,
+                    postalCode: dict.onboarding.postalCode,
+                    city: dict.onboarding.city,
+                  }}
+                  labels={{
+                    heading: dict.confirmStudy.addressesHeading,
+                    question: dict.confirmStudy.addressesQuestion,
+                    yes: dict.confirmStudy.addressesYes,
+                    no: dict.confirmStudy.addressesNo,
+                    incomplete: dict.confirmStudy.addressesIncomplete,
+                    noKot: dict.confirmStudy.noKot,
+                    kotAddress: dict.confirmStudy.kotAddress,
+                    homeAddress: dict.confirmStudy.homeAddress,
+                  }}
+                />
+              </>
+            }
+            second={
+              <>
+                <MembershipChoice offer={previewOffer} labels={previewLabels} />
+                <CareerOptIn labels={careerLabels} photoAlt={dict.confirmStudy.careerPhotoAlt} />
+              </>
+            }
           />
-          <MembershipChoice offer={previewOffer} labels={previewLabels} />
-          <CareerOptIn labels={careerLabels} photoAlt={dict.confirmStudy.careerPhotoAlt} />
           <span className="text-xs text-[#5c667f]">{dict.confirmStudy.unchangedHint}</span>
         </SaveForm>
       </FlowPreview>

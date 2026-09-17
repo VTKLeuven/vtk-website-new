@@ -500,6 +500,9 @@
     "careerHint": "Enkel Career; je andere voorkeuren blijven staan. Uitschrijven kan altijd op je accountpagina of onderaan elke mail.",
     "careerPhotoAlt": "Studenten en bedrijven op de VTK Career Fair",
     "unchangedHint": "Niets veranderd? Bevestig je studie en adressen.",
+    "stepOf": "Stap {step} van {total}",
+    "continueLabel": "Ga verder",
+    "back": "Terug",
     "submit": "Bevestigen"
   },
   "mailinglists": {
