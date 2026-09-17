@@ -9,6 +9,7 @@ import { orderAccessCookieName } from "./access";
 import { isAppleWalletAvailable, isGoogleWalletAvailable } from "./wallet";
 import { ticketTermsPath } from "./terms";
 import { ticketTypeIsHidden, ticketTypeRequiresLogin } from "./audience";
+import { getTicketEventAccess } from "./authorization";
 
 type PublicLocale = "nl" | "en";
 
@@ -185,6 +186,36 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
     viewer: session
       ? { id: session.user.id, name: session.user.name, email: session.user.email }
       : null,
+  };
+}
+
+/**
+ * Hetzelfde event als de publieke pagina, maar voor wie het beheert.
+ *
+ * Bestaat om een concept te kunnen nakijken voor je publiceert: de shop zelf
+ * kan niets verkopen zolang het event niet PUBLISHED is (`lib/ticketing/orders`
+ * bewaakt dat serverside), dus dit opent geen verkoopweg.
+ *
+ * Er wordt hier bewust niets weggefilterd: een tickettype dat enkel voor leden
+ * of ereleden zichtbaar is, hoort in een voorbeeld net wél te tonen, anders kan
+ * de organisator precies dat type niet nakijken. De voorbeeldbalk op de pagina
+ * zegt dat erbij.
+ */
+export async function getTicketEventPreviewBySlug(slug: string, locale: PublicLocale = "nl") {
+  const event = await prisma.ticketEvent.findUnique({
+    where: { slug },
+    include: publicEventInclude,
+  });
+  if (!event) return null;
+
+  const access = await getTicketEventAccess(event.id);
+  if (!access?.capabilities.includes("VIEW_EVENT")) return null;
+  const { session } = access;
+
+  return {
+    ...publicEventDto(event, locale),
+    requiresLogin: false,
+    viewer: { id: session.user.id, name: session.user.name, email: session.user.email },
   };
 }
 

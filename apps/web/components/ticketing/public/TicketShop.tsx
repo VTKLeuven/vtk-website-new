@@ -245,10 +245,18 @@ export function TicketShop({
   event,
   locale,
   paymentChoice,
+  preview = false,
 }: {
   paymentChoice: PaymentMethodChoice;
   event: SerializedTicketEvent;
   locale: "nl" | "en";
+  /**
+   * Voorbeeldmodus voor wie het event beheert: de verkoopvensters worden
+   * genegeerd, zodat je aantallen kan kiezen en de vragen aan de deelnemers te
+   * zien krijgt, maar afrekenen kan niet. Dat laatste is geen vertrouwen op deze
+   * vlag alleen: `lib/ticketing/orders` weigert elk event dat niet PUBLISHED is.
+   */
+  preview?: boolean;
 }) {
   const router = useRouter();
   const base = locale === "nl" ? "" : "/en";
@@ -278,7 +286,7 @@ export function TicketShop({
   const now = new Date(event.currentTime).getTime();
   const beforeSales = event.salesStart ? new Date(event.salesStart).getTime() > now : false;
   const afterSales = event.salesEnd ? new Date(event.salesEnd).getTime() <= now : false;
-  const salesOpen = event.status === "PUBLISHED" && !beforeSales && !afterSales;
+  const salesOpen = preview || (event.status === "PUBLISHED" && !beforeSales && !afterSales);
 
   function setQuantity(ticketTypeId: string, next: number) {
     const type = event.ticketTypes.find((candidate) => candidate.id === ticketTypeId);
@@ -313,6 +321,7 @@ export function TicketShop({
 
   async function submitCheckout(event_: FormEvent<HTMLFormElement>) {
     event_.preventDefault();
+    if (preview) return;
     if (selectedCount < 1 || submitting) {
       setError(locale === "nl" ? "Kies minstens één ticket." : "Choose at least one ticket.");
       return;
@@ -438,7 +447,7 @@ export function TicketShop({
                 const typeAfterSales = type.salesEnd
                   ? new Date(type.salesEnd).getTime() <= now
                   : false;
-                const typeSalesOpen = salesOpen && !typeBeforeSales && !typeAfterSales;
+                const typeSalesOpen = preview || (salesOpen && !typeBeforeSales && !typeAfterSales);
                 const unavailable = soldOut || !typeSalesOpen || belowMinimum;
                 let availabilityText: string;
 
@@ -538,10 +547,14 @@ export function TicketShop({
             </div>
           )}
 
-          {!salesOpen ? (
+          {/* In voorbeeldmodus staat de verkoop open zodat de beheerder door de
+              vragen kan klikken; wat een bezoeker nu te zien zou krijgen, staat
+              er dan als mededeling bij in plaats van als blokkade. */}
+          {!salesOpen || (preview && (beforeSales || afterSales)) ? (
             <div className="ticket-notice">
               <AlertCircle size={19} aria-hidden="true" />
               <span>
+                {preview ? (locale === "nl" ? "Bezoekers zien nu: " : "Visitors currently see: ") : null}
                 {beforeSales
                   ? locale === "nl"
                     ? `De verkoop start op ${formatTicketDate(event.salesStart!, locale)}.`
@@ -719,10 +732,14 @@ export function TicketShop({
             <PaymentMethodChooser
               locale={locale}
               choice={paymentChoice}
-              checkout={{ busy: submitting, busyProvider: submittingProvider, disabled: !salesOpen }}
+              checkout={{
+                busy: submitting,
+                busyProvider: submittingProvider,
+                disabled: preview || !salesOpen,
+              }}
             />
           ) : (
-            <button className="ticket-checkout-button" type="submit" disabled={!salesOpen || selectedCount === 0 || submitting}>
+            <button className="ticket-checkout-button" type="submit" disabled={preview || !salesOpen || selectedCount === 0 || submitting}>
               {submitting ? <LoaderCircle className="is-spinning" size={19} aria-hidden="true" /> : <LockKeyhole size={18} aria-hidden="true" />}
               <span>{submitting
                 ? locale === "nl" ? "Bestelling verwerken…" : "Processing order…"
@@ -731,6 +748,13 @@ export function TicketShop({
                   : locale === "nl" ? "Gratis tickets bevestigen" : "Confirm free tickets"}</span>
             </button>
           )}
+          {preview ? (
+            <p className="ticket-preview-note">
+              {locale === "nl"
+                ? "Voorbeeld: bestellen is uitgeschakeld."
+                : "Preview: ordering is disabled."}
+            </p>
+          ) : null}
           <div className="ticket-order-trust">
             <span><ShieldCheck size={15} aria-hidden="true" /> {locale === "nl" ? "Beveiligde betaling" : "Secure payment"}</span>
             <span><Check size={15} aria-hidden="true" /> {locale === "nl" ? "Ticket per e-mail" : "Ticket by email"}</span>

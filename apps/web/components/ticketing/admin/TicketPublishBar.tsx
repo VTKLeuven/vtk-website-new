@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertTriangle, CheckCircle2, LoaderCircle, Rocket } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Eye, LoaderCircle, Rocket } from "lucide-react";
 import { publishTicketEventAction } from "@/app/actions/tickets";
 import type { AdminLocale } from "./format";
 
@@ -12,6 +12,8 @@ const T = {
     publishing: "Publiceren...",
     published: "Dit event staat live in de ticketshop.",
     view: "Bekijk de ticketpagina",
+    preview: "Voorbeeld",
+    previewHint: "Bekijk de ticketpagina zoals een bezoeker ze krijgt, voor je publiceert.",
     needsType:
       "Voeg eerst een actief tickettype toe; zonder ticket valt er niets te verkopen.",
     forbidden: "Je hebt geen rechten om dit event te publiceren.",
@@ -24,6 +26,8 @@ const T = {
     publishing: "Publishing...",
     published: "This event is live in the ticket shop.",
     view: "View the ticket page",
+    preview: "Preview",
+    previewHint: "See the ticket page the way a visitor gets it, before you publish.",
     needsType: "Add an active ticket type first; without a ticket there is nothing to sell.",
     forbidden: "You do not have permission to publish this event.",
     failed: "Publishing failed. Please try again.",
@@ -91,7 +95,10 @@ export function TicketPublishBar({
     return (
       <div className="ticket-admin-alert" data-tone="info" role="status">
         <span>
-          {t.otherStatus} {status}
+          {t.otherStatus} {status}{" "}
+          <a className="ticket-admin-alert-link" href={`${base}/tickets/${slug}?preview=1`}>
+            {t.preview}
+          </a>
         </span>
       </div>
     );
@@ -110,21 +117,33 @@ export function TicketPublishBar({
           </span>
         ) : null}
       </div>
-      <button
-        type="button"
-        className="ticket-admin-button"
-        data-variant="primary"
-        onClick={publish}
-        disabled={pending || !hasActiveTicketType}
-        title={hasActiveTicketType ? undefined : t.needsType}
-      >
-        {pending ? (
-          <LoaderCircle className="is-spinning" aria-hidden="true" size={16} />
-        ) : (
-          <Rocket aria-hidden="true" size={16} />
-        )}
-        {pending ? t.publishing : t.publish}
-      </button>
+      <div className="ticket-admin-publish-actions">
+        {/* Nakijken voor je publiceert: de pagina zelf, niet nog een samenvatting
+            van de velden. De voorbeeldbalk daar linkt terug naar dit scherm. */}
+        <a
+          className="ticket-admin-button"
+          href={`${base}/tickets/${slug}?preview=1`}
+          title={t.previewHint}
+        >
+          <Eye aria-hidden="true" size={16} />
+          {t.preview}
+        </a>
+        <button
+          type="button"
+          className="ticket-admin-button"
+          data-variant="primary"
+          onClick={publish}
+          disabled={pending || !hasActiveTicketType}
+          title={hasActiveTicketType ? undefined : t.needsType}
+        >
+          {pending ? (
+            <LoaderCircle className="is-spinning" aria-hidden="true" size={16} />
+          ) : (
+            <Rocket aria-hidden="true" size={16} />
+          )}
+          {pending ? t.publishing : t.publish}
+        </button>
+      </div>
     </div>
   );
 }

@@ -3406,3 +3406,77 @@
   .ticket-shop-facts { margin-top: 10px; }
   .ticket-shop-shell { padding-top: 20px; }
 }
+
+/* ---------------------------------------------------------------------------
+   Voorbeeldbalk (`/tickets/<slug>?preview=1`).
+
+   De pagina zelf blijft exact wat een bezoeker krijgt; alleen hierboven staat
+   dat het een voorbeeld is, met de weg terug naar de instellingen. Bewust geen
+   sticky balk: die zou over de kop van de shop schuiven en net het stuk
+   verbergen dat je komt nakijken.
+   --------------------------------------------------------------------------- */
+
+.ticket-preview-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 18px;
+  padding: 12px clamp(16px, 5vw, 40px);
+  border-bottom: 1px solid rgba(14, 26, 54, 0.12);
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.ticket-preview-bar p {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.ticket-preview-bar p > span:last-child {
+  color: rgba(10, 15, 31, 0.72);
+}
+
+.ticket-preview-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ticket-preview-back {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ticket-preview-back:hover {
+  background: var(--navy);
+}
+
+.ticket-preview-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  text-align: center;
+}

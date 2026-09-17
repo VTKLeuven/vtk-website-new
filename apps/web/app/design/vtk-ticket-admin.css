@@ -2071,3 +2071,13 @@
 .ticket-admin-anchor-section { display: grid; gap: 16px; }
 .ticket-admin .ticket-admin-row-title { color: var(--ink) !important; }
 .ticket-admin-access-entry > summary:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
+
+/* Voorbeeld naast publiceren: één rij, zodat de knoppen bij smalle kolommen
+   samen onder de tekst vallen in plaats van elk apart te wikkelen. */
+.ticket-admin-publish-actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}

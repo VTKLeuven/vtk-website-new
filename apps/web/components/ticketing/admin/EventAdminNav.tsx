@@ -93,11 +93,25 @@ export function EventAdminNav({
         </div>
         <div className="ticket-admin-event-actions">
           <StatusBadge status={event.status} locale={locale} />
+          {/* Zolang het event niet live staat, bestaat de publieke pagina nog
+              niet en gaf dit icoon een 404; dan opent het het voorbeeld. */}
           <Link
             className="ticket-admin-icon-button"
-            href={`${ticketBase(locale)}/tickets/${event.slug}`}
-            aria-label={locale === "nl" ? "Ticketshop openen" : "Open ticket shop"}
-            title={locale === "nl" ? "Ticketshop openen" : "Open ticket shop"}
+            href={
+              event.status === "PUBLISHED"
+                ? `${ticketBase(locale)}/tickets/${event.slug}`
+                : `${ticketBase(locale)}/tickets/${event.slug}?preview=1`
+            }
+            aria-label={
+              event.status === "PUBLISHED"
+                ? locale === "nl" ? "Ticketshop openen" : "Open ticket shop"
+                : locale === "nl" ? "Voorbeeld van de ticketpagina openen" : "Open the ticket page preview"
+            }
+            title={
+              event.status === "PUBLISHED"
+                ? locale === "nl" ? "Ticketshop openen" : "Open ticket shop"
+                : locale === "nl" ? "Voorbeeld van de ticketpagina" : "Ticket page preview"
+            }
           >
             <ExternalLink aria-hidden="true" size={17} />
           </Link>
