@@ -55,6 +55,26 @@ export type AmbiguousAlbum = {
   markers: string[];
 };
 
+/**
+ * Een album zoals het beheerscherm het nodig heeft: recht uit Immich, zonder
+ * groepering, zonder gedeelde link en buiten de momentopname om. Dit is de
+ * enige manier om een album te zien dat van de site gehaald is, want dat valt
+ * per definitie uit de momentopname.
+ */
+export type ManageableAlbum = {
+  id: string;
+  title: string;
+  /** De ruwe beschrijving, merkers inbegrepen. */
+  description: string;
+  /** De beschrijving zonder merkers, zoals ze op de site zou staan. */
+  publicDescription: string;
+  photoCount: number;
+  /** Staat het album niet op de site (`[gallery-uit]`)? */
+  hidden: boolean;
+  parent?: string;
+  tab?: string;
+};
+
 export type ImmichAsset = {
   id: string;
   type?: string | null;

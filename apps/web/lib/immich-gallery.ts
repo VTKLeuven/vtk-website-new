@@ -29,14 +29,23 @@ export type {
   GalleryPhoto,
   GallerySubAlbum,
   GallerySubAlbumSummary,
+  ImmichBulkIdResult,
+  ManageableAlbum,
 } from "@vtk/gallery";
 
 export {
+  deleteImmichAlbum,
   deleteImmichAssets,
   downloadImmichOriginal,
+  getImmichAssetThumbnail,
   immichWebUrl,
+  removeImmichAssetsFromAlbum,
   runImmichAssetJob,
   setImmichAlbumCover,
+  setMarker,
+  succeededAssetIds,
+  swapMarker,
+  updateImmichAlbum,
   uploadImmichAsset,
 } from "@vtk/gallery";
 
@@ -51,3 +60,7 @@ export const refreshImmichGallerySnapshot = gallery.refreshSnapshot;
 export const createImmichGalleryAlbum = gallery.createAlbum;
 export const addImmichAssetsToAlbum = gallery.addAssets;
 export const listAmbiguousGalleryAlbums = gallery.listAmbiguousAlbums;
+export const listManageableGalleryAlbums = gallery.listManageableAlbums;
+export const getManageableGalleryAlbum = gallery.getManageableAlbum;
+export const galleryAlbumMarker = gallery.marker;
+export const galleryHiddenAlbumMarker = gallery.hiddenMarker;

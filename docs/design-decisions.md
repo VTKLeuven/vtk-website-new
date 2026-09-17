@@ -78,6 +78,57 @@ acties zijn daarom verwijderd.
   albums nergens. Wil je later toch uitgelichte albums op de homepage, bouw dan
   eerst de sectie en kies de albums met een keuzelijst uit Immich.
 
+### Een evenement met meerdere fotosets is één album met tabs
+
+Een galabal levert een map "Zaal" en een map "Photobooth" op. Die staan als twee
+Immich-albums naast elkaar, maar op de site horen ze één albumpagina met twee
+tabs te zijn: bezoekers zoeken het evenement, niet de fotograafsmap.
+
+- **De eerste tab is het album zelf**, de volgende hangen eraan met
+  `[parent: <slug>]`. Daardoor houdt het evenement één slug, één cover en één
+  overzichtskaart op `/media`, en blijft `album.photos` de foto's van alle tabs
+  samen bevatten; de mobiele app leest precies dat.
+- **Ook het hoofdalbum draagt een tabnaam** (`[tab: Zaal]`). Zonder die merker
+  heet zijn tab op de site "Algemeen", en dat was jarenlang niet in te vullen:
+  het veld stond enkel achter het vinkje "dit is een subalbum", dus het eerste
+  album kon per definitie geen naam krijgen. Een tab die "Algemeen" heet naast
+  een tab die "Photobooth" heet, ziet eruit als een fout, en dat was het ook.
+- **Een tab opheffen verwijdert niets**: `[parent:]` en `[tab:]` gaan weg en dat
+  album staat weer op zichzelf op `/media`. Er is geen aparte "tab verwijderen
+  met foto's": daarvoor bestaat het verwijderen van een album.
+
+### Archiveren bestaat hier niet; uit het album halen wel
+
+Immich kent een archief, maar onze uploads staan **al** op `visibility: archive`
+zodat ze niet in de tijdlijn van de API-sleutel hangen. Een foto archiveren zou
+op de site dus niets doen. De twee acties die wel iets betekenen:
+
+- **Uit het album halen.** De foto verdwijnt van de site en blijft in Immich
+  staan. Omkeerbaar, want een rij in `GalleryDetachedPhoto` onthoudt uit welk
+  album en welke tab ze kwam. Zonder die rij is ze nergens meer terug te vinden:
+  de publieke foto-URL's hangen aan de gedeelde link van een album, en die heeft
+  ze niet meer.
+- **Naar de prullenmand.** `deleteImmichAssets(force: false)`, dezelfde keuze als
+  bij de verwijderverzoeken: meteen van de site, en Immich ruimt na een maand
+  zelf op, zodat een tikfout in het beheer geen onherstelbaar verlies is.
+  Definitief verwijderen (`force: true`) zit bewust niet in het beheerscherm.
+
+### Een album verwijderen laat de foto's staan
+
+`DELETE /albums/{id}` haalt in Immich enkel de map weg; de assets blijven in de
+bibliotheek en in elk ander album waar ze in zitten. Een knop "verwijderen" die
+dat niet zegt, belooft iets anders dan ze doet, dus de bevestigingsdialoog heeft
+een apart vinkje "ook de foto's naar de prullenmand" en noemt beide gevolgen.
+Een hoofdalbum met tabs wordt altijd als geheel verwijderd: enkel het hoofdalbum
+weggooien laat losse tabalbums achter die naar een parent wijzen die niet meer
+bestaat, en die duiken dan één voor één als eigen album op `/media` op.
+
+### Van de site halen is omkeerbaar, verwijderen niet
+
+`[gallery]` wordt `[gallery-uit]`. De merker helemaal weghalen zou het album
+onvindbaar maken voor het beheer (dat leest enkel albums met een merker), en dan
+is "even offline halen" in de praktijk hetzelfde als kwijtspelen.
+
 ---
 
 ## Aankondigingen op de homepage

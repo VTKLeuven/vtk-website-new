@@ -62,6 +62,20 @@ export function galleryMarker(id: GalleryId): string {
   return definition.defaultMarker;
 }
 
+/**
+ * De merker van een album dat **wel** bij deze galerij hoort maar niet op de
+ * site staat: `[gallery]` wordt `[gallery-uit]`.
+ *
+ * Van de site halen wist de merker niet, want dan is het album in het beheer
+ * niet meer terug te vinden en kan je het er nooit meer op zetten. Er is geen
+ * botsing met de gewone merker: `'[gallery-uit]'.includes('[gallery]')` is
+ * `false`, dus een verborgen album komt niet door het filter in `client.ts`.
+ */
+export function hiddenMarker(id: GalleryId): string {
+  const marker = galleryMarker(id);
+  return marker.endsWith(']') ? `${marker.slice(0, -1)}-uit]` : `${marker}-uit`;
+}
+
 /** De merkers van alle andere galerijen, voor de uitsluiting hierboven. */
 export function foreignMarkers(id: GalleryId): string[] {
   return GALLERY_IDS.filter((other) => other !== id)

@@ -51,6 +51,35 @@ In Immich kan dit op drie manieren worden ingesteld:
 
 Op `/media` verschijnt slechts één overzichtskaart met het totaal aantal foto's. Gezichtsherkenning zoekt automatisch over alle sub-albums van het evenement.
 
+**In de praktijk hoef je dit niet met de hand in Immich te zetten.** In
+`/admin/media` maak je een album met tabs in één keer aan (een tabnaam en een
+fotoselectie per tab), of hang je later een tab aan een bestaand album; het
+beheerscherm per album (`/admin/media/albums/<slug>`) doet de rest. De uploader
+schrijft variant 1 hierboven.
+
+**Let op de tabnaam van het hoofdalbum.** Draagt het hoofdalbum zelf geen
+`[tab: ...]`, dan heet zijn tab op de site letterlijk "Algemeen"
+(`resolveTabTitle` in `packages/gallery/src/grouping.ts`). Het beheerscherm zegt
+dat met zoveel woorden en laat de naam invullen.
+
+### Een album van de site halen
+
+`[gallery]` wisselen voor **`[gallery-uit]`** haalt het album van de mediapagina
+zonder het uit Immich te gooien. De merker weghalen zou het album onvindbaar
+maken in het beheer; met `[gallery-uit]` staat het onderaan `/admin/media` onder
+"Niet op de site" en kan je het daar terugzetten. Voor de fakbargalerij is dat
+`[fakbar-uit]`. Er is geen botsing met de gewone merker: `"[gallery-uit]"`
+bevat `"[gallery]"` niet.
+
+### Foto's uit een album halen
+
+Een foto uit een album halen (`DELETE /albums/{id}/assets`) laat ze in Immich
+staan, maar dan heeft ze geen publieke URL meer: die hangt aan de gedeelde link
+van een *album*. De rij in `GalleryDetachedPhoto` houdt bij waar ze vandaan kwam,
+en het beheer toont haar duimnagel via
+`/api/admin/immich-gallery/assets/<assetId>/thumbnail`, met de API-sleutel. Die
+route is afgeschermd en is bewust geen algemene fotoproxy.
+
 ## Environment
 
 Copy `.env.example` to `.env` and fill in the gallery values:

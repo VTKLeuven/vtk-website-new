@@ -680,31 +680,32 @@ model User {
 
   fakbarEvenings        FakbarEvening[]        @relation("FakbarHoofdtapper")
   photoTakedownsHandled PhotoTakedownRequest[] @relation("PhotoTakedownHandler")
+  galleryPhotosDetached GalleryDetachedPhoto[] @relation("GalleryPhotoDetacher")
 
   websiteFeedback        WebsiteFeedback[] @relation("WebsiteFeedbackAuthor")
   websiteFeedbackHandled WebsiteFeedback[] @relation("WebsiteFeedbackHandler")
 
   pianoReservations PianoReservation[]
 
-  uitleenReservations     UitleenReservation[]      @relation("UitleenReservationUser")
-  uitleenDecided          UitleenReservation[]      @relation("UitleenDecidedBy")
-  uitleenPickedUp         UitleenReservation[]      @relation("UitleenPickedUpBy")
-  uitleenReturned         UitleenReservation[]      @relation("UitleenReturnedBy")
-  uitleenLinesPrepared    UitleenReservationLine[]  @relation("UitleenLinePreparedBy")
-  uitleenTemplates        UitleenRequestTemplate[]  @relation("UitleenTemplateCreatedBy")
-  uitleenEvents           UitleenEvent[]            @relation("UitleenEventCreatedBy")
-  uitleenEventExtraItems  UitleenEventExtraItem[]   @relation("UitleenEventExtraItemCreatedBy")
-  uitleenTransport        UitleenTransportBooking[] @relation("UitleenTransportUser")
-  uitleenTransportDriven  UitleenTransportBooking[] @relation("UitleenTransportDriver")
-  uitleenTransportDecided UitleenTransportBooking[] @relation("UitleenTransportDecidedBy")
-  uitleenTransportDone    UitleenTransportBooking[] @relation("UitleenTransportCompletedBy")
-  collectEnGoImported     CollectEnGoOrder[]        @relation("CollectEnGoImportedBy")
-  uitleenDriver           UitleenDriver?            @relation("UitleenDriverUser")
-  uitleenFeedTokens       UitleenFeedToken[]        @relation("UitleenFeedTokenUser")
+  uitleenReservations     UitleenReservation[]        @relation("UitleenReservationUser")
+  uitleenDecided          UitleenReservation[]        @relation("UitleenDecidedBy")
+  uitleenPickedUp         UitleenReservation[]        @relation("UitleenPickedUpBy")
+  uitleenReturned         UitleenReservation[]        @relation("UitleenReturnedBy")
+  uitleenLinesPrepared    UitleenReservationLine[]    @relation("UitleenLinePreparedBy")
+  uitleenTemplates        UitleenRequestTemplate[]    @relation("UitleenTemplateCreatedBy")
+  uitleenEvents           UitleenEvent[]              @relation("UitleenEventCreatedBy")
+  uitleenEventExtraItems  UitleenEventExtraItem[]     @relation("UitleenEventExtraItemCreatedBy")
+  uitleenTransport        UitleenTransportBooking[]   @relation("UitleenTransportUser")
+  uitleenTransportDriven  UitleenTransportBooking[]   @relation("UitleenTransportDriver")
+  uitleenTransportDecided UitleenTransportBooking[]   @relation("UitleenTransportDecidedBy")
+  uitleenTransportDone    UitleenTransportBooking[]   @relation("UitleenTransportCompletedBy")
+  collectEnGoImported     CollectEnGoOrder[]          @relation("CollectEnGoImportedBy")
+  uitleenDriver           UitleenDriver?              @relation("UitleenDriverUser")
+  uitleenFeedTokens       UitleenFeedToken[]          @relation("UitleenFeedTokenUser")
   uitleenAvailability     UitleenDriverAvailability[] @relation("UitleenDriverAvailabilityUser")
-  uitleenHelpersAdded     UitleenTransportHelper[]  @relation("UitleenTransportHelperAddedBy")
-  uitleenDriversAdded     UitleenDriver[]           @relation("UitleenDriverAddedBy")
-  uitleenAuditLogs        UitleenAuditLog[]         @relation("UitleenAuditActor")
+  uitleenHelpersAdded     UitleenTransportHelper[]    @relation("UitleenTransportHelperAddedBy")
+  uitleenDriversAdded     UitleenDriver[]             @relation("UitleenDriverAddedBy")
+  uitleenAuditLogs        UitleenAuditLog[]           @relation("UitleenAuditActor")
 
   doorGrants         DoorAccessGrant[]
   doorLogs           DoorAccessLog[]
@@ -1813,7 +1814,6 @@ model TicketEventGroupGrant {
 
 /**
  * Een groep die naast (of in plaats van) het praesidium in de voorverkoop mag.
- *
  * Staat los van `TicketEventGroupGrant`: die gaat over wie het event *beheert*,
  * dit over wie er vroeger mag *kopen*. Ze op één tabel leggen zou betekenen dat
  * elke werkgroep met een voorverkoop ook in het ticketbeheer terechtkomt.
@@ -2471,7 +2471,7 @@ model ShiftTemplateEntry {
   order Int
 
   /// Naam zonder de evenementnaam erachter ("Bar 1"); die komt er in het scherm bij.
-  name String
+  name               String
   /// Minuten t.o.v. het startmoment; negatief = ervoor (opbouw).
   startOffsetMinutes Int
   durationMinutes    Int
@@ -2488,8 +2488,8 @@ model ShiftTemplateEntry {
   /// Eigen post voor deze ene shift. `ownPost` staat er los naast omdat er drie
   /// toestanden zijn: de algemene post volgen (false), geen post (true + NULL)
   /// en een vaste post (true + code). Eén nullable veld kan dat niet zeggen.
-  ownPost Boolean @default(false)
-  post    String?
+  ownPost  Boolean @default(false)
+  post     String?
 
   openToInternationals Boolean @default(false)
   /// `false` = staat standaard uitgevinkt in het scherm; iemand moet ze bewust
@@ -3607,7 +3607,7 @@ model UitleenVehicle {
   /// Een vrije string en geen enum: de patronen zijn CSS-klassen, en er eentje
   /// bij zetten hoort geen migratie te vragen. `null` = geen arcering, wat de
   /// toestand is van elk voertuig tot iemand er een kiest.
-  pattern        String?
+  pattern String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -3648,7 +3648,7 @@ model UitleenDriver {
   ///
   /// Een lid van de post Logistiek zonder rij in deze tabel krijgt er een zodra
   /// iemand zijn kleur zet, net zoals `canDriveVan` dat al doet.
-  colorIndex  Int?
+  colorIndex Int?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -6202,6 +6202,37 @@ model PhotoTakedownRequest {
 
   @@index([gallery, status])
   @@index([assetId])
+}
+
+/// Een foto die uit haar album gehaald is maar in Immich blijft staan.
+///
+/// Zonder deze rij is zo'n foto nergens meer terug te vinden: de publieke
+/// foto-URL's hangen aan de gedeelde link van een *album*, en die heeft ze niet
+/// meer. Het beheer toont ze daarom uit deze tabel, met de thumbnail via de
+/// API-sleutel. De rij verdwijnt zodra de foto teruggezet of weggegooid wordt.
+model GalleryDetachedPhoto {
+  id      String               @id @default(cuid())
+  gallery PhotoTakedownGallery
+
+  /// Het Immich-asset. Uniek: een foto kan maar uit één album tegelijk los staan.
+  assetId String @unique
+
+  /// Waar ze uit kwam, om ze in één klik terug te kunnen zetten. Het album-id is
+  /// dat van Immich; titel en tabnaam zijn momentopnames, zodat de lijst leesbaar
+  /// blijft wanneer het album intussen hernoemd of verwijderd is.
+  albumId    String
+  albumTitle String
+  tabName    String?
+  /// De bestandsnaam, om iets te tonen als de thumbnail niet laadt.
+  filename   String?
+
+  detachedById String?
+  detachedAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  /// `SetNull`: wie de foto losmaakte mag de kring verlaten zonder de rij mee te nemen.
+  detachedBy User? @relation("GalleryPhotoDetacher", fields: [detachedById], references: [id], onDelete: SetNull)
+
+  @@index([gallery, albumId])
 }
 
 /// Waarover de feedback gaat. Vier categorieën plus een restcategorie: meer

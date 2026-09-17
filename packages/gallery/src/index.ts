@@ -6,12 +6,14 @@ export type {
   GalleryPhoto,
   GallerySubAlbum,
   GallerySubAlbumSummary,
+  ManageableAlbum,
 } from './types';
 
 export {
   GALLERY_IDS,
   galleryLabel,
   galleryMarker,
+  hiddenMarker,
   faceSearchConfig,
   foreignMarkers,
   immichConfig,
@@ -33,22 +35,31 @@ export {
 export {
   GalleryError,
   addImmichAssetsToAlbum,
+  deleteImmichAlbum,
   deleteImmichAssets,
   downloadImmichOriginal,
   galleryStatus,
+  getImmichAssetThumbnail,
   immichJson,
   immichRequest,
+  removeImmichAssetsFromAlbum,
   runImmichAssetJob,
+  succeededAssetIds,
   setImmichAlbumCover,
+  updateImmichAlbum,
   uploadImmichAsset,
+  type ImmichBulkIdResult,
 } from './immich';
 
 export {
   downloadFilenameFromResponse,
   parseAlbumMarkers,
   sanitizeFilename,
+  setMarker,
   slugify,
   stripMarkers,
+  swapMarker,
+  type AlbumMarkerName,
   type ParsedAlbumMarkers,
 } from './format';
 export { groupAlbums, type MappedAlbumEntry } from './grouping';

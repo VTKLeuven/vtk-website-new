@@ -118,6 +118,61 @@ export function parseAlbumMarkers(description: string | null | undefined, title 
   return result;
 }
 
+export type AlbumMarkerName = 'parent' | 'group' | 'tab';
+
+/**
+ * Zet, vervangt of verwijdert één merker in een albumbeschrijving.
+ *
+ * Bewerken moet een merker kunnen **herschrijven** zonder de rest van de
+ * beschrijving of de andere merkers aan te raken: een tab hernoemen mag de
+ * `[gallery]`-merker niet kwijtspelen, want dan verdwijnt het album van de site.
+ * `null` of een lege waarde haalt de merker weg. Een nieuwe merker komt achteraan,
+ * op een eigen regel, zoals de uploader ze al schreef.
+ */
+export function setMarker(
+  description: string | null | undefined,
+  name: AlbumMarkerName,
+  value: string | null,
+): string {
+  const raw = String(description || '');
+  const pattern = new RegExp(`\\[${name}:\\s*[^\\]]*\\]`, 'gi');
+  const trimmed = String(value || '').trim();
+  const marker = trimmed ? `[${name}: ${trimmed}]` : '';
+
+  let replaced = false;
+  let next = raw.replace(pattern, () => {
+    if (replaced || !marker) return '';
+    replaced = true;
+    return marker;
+  });
+
+  if (marker && !replaced) {
+    next = next.trim() ? `${next.trim()}\n\n${marker}` : marker;
+  }
+
+  return tidyDescription(next);
+}
+
+/** Dubbele spaties en lege regels die het weghalen van een merker achterlaat. */
+function tidyDescription(value: string): string {
+  return value
+    .replace(/[ \t]{2,}/g, ' ')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
+/**
+ * Wisselt de galerijmerker van een album, bijvoorbeeld `[gallery]` voor
+ * `[gallery-uit]`. Staat geen van beide erin, dan komt de nieuwe erbij.
+ */
+export function swapMarker(description: string | null | undefined, from: string, to: string): string {
+  const raw = String(description || '');
+  if (raw.includes(from)) return tidyDescription(raw.split(from).join(to));
+  if (raw.includes(to)) return tidyDescription(raw);
+  return tidyDescription(raw.trim() ? `${raw.trim()}\n\n${to}` : to);
+}
+
 export function stripMarkers(description: string | null | undefined, markers: string[]): string {
   let raw = String(description || '');
   for (const marker of markers) {

@@ -1,8 +1,9 @@
-import { foreignMarkers, galleryMarker, immichConfig, type GalleryId } from './config';
+import { foreignMarkers, galleryMarker, hiddenMarker, immichConfig, type GalleryId } from './config';
 import {
   GalleryError,
   addImmichAssetsToAlbum,
   immichJson,
+  type ImmichBulkIdResult,
 } from './immich';
 import {
   assetDimensions,
@@ -24,6 +25,7 @@ import type {
   ImmichAsset,
   ImmichSearchResponse,
   ImmichSharedLink,
+  ManageableAlbum,
 } from './types';
 
 type Snapshot = {
@@ -37,6 +39,14 @@ type Snapshot = {
 export type GalleryClient = {
   id: GalleryId;
   marker: () => string;
+  hiddenMarker: () => string;
+  /**
+   * Alle albums van deze galerij recht uit Immich, ook die van de site gehaald
+   * zijn. Loopt niet via de momentopname; zie `ManageableAlbum`.
+   */
+  listManageableAlbums: () => Promise<ManageableAlbum[]>;
+  /** Eén album uit die lijst, op Immich-id. */
+  getManageableAlbum: (albumId: string) => Promise<ManageableAlbum | null>;
   listAlbums: () => Promise<{ generatedAt: string; albums: GalleryAlbumSummary[] }>;
   getAlbum: (slug: string) => Promise<GalleryAlbum | null>;
   getDownloadTarget: (slug: string, assetId: string) => Promise<DownloadTarget>;
@@ -44,7 +54,7 @@ export type GalleryClient = {
   listAmbiguousAlbums: () => Promise<AmbiguousAlbum[]>;
   refreshSnapshot: () => Promise<void>;
   createAlbum: (input: { title: string; description?: string }) => Promise<{ id: string }>;
-  addAssets: (albumId: string, assetIds: string[]) => Promise<unknown>;
+  addAssets: (albumId: string, assetIds: string[]) => Promise<ImmichBulkIdResult[]>;
 };
 
 /**
@@ -362,9 +372,59 @@ export function createGalleryClient({
     return inflight;
   }
 
+  function toManageableAlbum(album: ImmichAlbumSummary, ownMarker: string, offMarker: string): ManageableAlbum {
+    const description = String(album.description || '');
+    const markers = parseAlbumMarkers(description, album.albumName || '');
+
+    return {
+      id: album.id,
+      title: album.albumName || 'Naamloos album',
+      description,
+      publicDescription: stripMarkers(description, [ownMarker, offMarker, ...foreignMarkers(id)]),
+      photoCount: Number(album.assetCount || 0),
+      hidden: description.includes(offMarker) && !description.includes(ownMarker),
+      parent: markers.parent,
+      tab: markers.tab,
+    };
+  }
+
   return {
     id,
     marker: () => galleryMarker(id),
+    hiddenMarker: () => hiddenMarker(id),
+
+    /**
+     * Eén `GET /albums`, geen assets en geen gedeelde links: dit voedt een
+     * beheerlijst, niet de site. De verborgen albums horen er wel in, want
+     * anders is een album dat van de site is, nergens meer terug te vinden.
+     */
+    async listManageableAlbums() {
+      const ownMarker = galleryMarker(id);
+      const offMarker = hiddenMarker(id);
+      if (!ownMarker) return [];
+
+      const summaries = await immichJson<ImmichAlbumSummary[]>('/albums');
+      const rows: ManageableAlbum[] = [];
+
+      for (const album of summaries || []) {
+        const description = String(album.description || '');
+        const own = description.includes(ownMarker);
+        const off = description.includes(offMarker);
+        if (!own && !off) continue;
+        // Een dubbelzinnig album (twee galerijmerkers) hoort nergens; het staat
+        // al apart in `listAmbiguousAlbums`.
+        if (own && foreignMarkers(id).some((marker) => description.includes(marker))) continue;
+        rows.push(toManageableAlbum(album, ownMarker, offMarker));
+      }
+
+      return rows;
+    },
+
+    async getManageableAlbum(albumId: string) {
+      const album = await immichJson<ImmichAlbumSummary>(`/albums/${encodeURIComponent(albumId)}`).catch(() => null);
+      if (!album?.id) return null;
+      return toManageableAlbum(album, galleryMarker(id), hiddenMarker(id));
+    },
 
     async listAlbums() {
       const snapshot = await getSnapshot();

@@ -1,8 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   groupAlbums,
+  hiddenMarker,
   parseAlbumMarkers,
+  setMarker,
   stripMarkers,
+  swapMarker,
   type MappedAlbumEntry,
   type GalleryAlbum,
 } from "@vtk/gallery";
@@ -89,7 +92,70 @@ describe("stripMarkers", () => {
   });
 });
 
+describe("setMarker", () => {
+  it("voegt een merker toe achter de bestaande beschrijving", () => {
+    expect(setMarker("Leuk feest!", "tab", "Zaal")).toBe("Leuk feest!\n\n[tab: Zaal]");
+  });
+
+  it("vervangt een bestaande merker zonder de rest aan te raken", () => {
+    const before = "Leuk feest!\n\n[gallery] [parent: galabal-2026] [tab: Zaal]";
+    const after = setMarker(before, "tab", "Photobooth");
+    expect(after).toContain("[tab: Photobooth]");
+    expect(after).not.toContain("[tab: Zaal]");
+    // Zonder [gallery] verdwijnt het album van de site; dat mag hier niet gebeuren.
+    expect(after).toContain("[gallery]");
+    expect(after).toContain("[parent: galabal-2026]");
+    expect(after).toContain("Leuk feest!");
+  });
+
+  it("verwijdert de merker bij een lege waarde, zonder dubbele spaties", () => {
+    const after = setMarker("[gallery] [parent: galabal-2026] [tab: Zaal]", "parent", null);
+    expect(after).toBe("[gallery] [tab: Zaal]");
+  });
+
+  it("laat een beschrijving zonder die merker ongemoeid bij verwijderen", () => {
+    expect(setMarker("Leuk feest!\n\n[gallery]", "tab", null)).toBe("Leuk feest!\n\n[gallery]");
+  });
+});
+
+describe("swapMarker", () => {
+  it("wisselt de galerijmerker voor de verborgen variant en terug", () => {
+    const hidden = hiddenMarker("main");
+    expect(hidden).toBe("[gallery-uit]");
+
+    const off = swapMarker("Leuk feest!\n\n[gallery]", "[gallery]", hidden);
+    expect(off).toBe("Leuk feest!\n\n[gallery-uit]");
+    // De verborgen merker mag niet als de gewone gelezen worden, anders staat
+    // het album gewoon terug op de site.
+    expect(off.includes("[gallery]")).toBe(false);
+
+    expect(swapMarker(off, hidden, "[gallery]")).toBe("Leuk feest!\n\n[gallery]");
+  });
+
+  it("voegt de merker toe wanneer er nog geen staat", () => {
+    expect(swapMarker("Leuk feest!", "[gallery]", "[gallery-uit]")).toBe("Leuk feest!\n\n[gallery-uit]");
+  });
+});
+
 describe("groupAlbums", () => {
+  it("gebruikt de tabnaam van het hoofdalbum in plaats van \"Algemeen\"", () => {
+    // Het hoofdalbum draagt zelf een [tab:]; enkel zonder die merker valt de tab
+    // terug op "Algemeen", en dat was jarenlang niet in te vullen.
+    const main = entry("a1", "Galabal 2026", "[gallery] [tab: Zaal]", 2);
+    const sub = entry("a2", "Galabal 2026: Photobooth", "[gallery] [parent: galabal-2026] [tab: Photobooth]", 1);
+
+    const grouped = groupAlbums([main, sub]);
+    expect(grouped[0].subAlbums?.map((s) => s.title)).toEqual(["Zaal", "Photobooth"]);
+  });
+
+  it("valt terug op \"Algemeen\" wanneer het hoofdalbum geen tabnaam draagt", () => {
+    const main = entry("a1", "Galabal 2026", "[gallery]", 2);
+    const sub = entry("a2", "Galabal 2026: Photobooth", "[gallery] [parent: galabal-2026] [tab: Photobooth]", 1);
+
+    const grouped = groupAlbums([main, sub]);
+    expect(grouped[0].subAlbums?.[0].title).toBe("Algemeen");
+  });
+
   it("groepeert een deelalbum onder zijn parentalbum via [parent:...]", () => {
     const main = entry("a1", "Galabal 2026", "Foto's van het bal.\n\n[gallery] [tab: Zaal]", 5);
     const sub = entry(

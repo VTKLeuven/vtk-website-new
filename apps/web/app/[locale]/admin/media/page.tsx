@@ -7,11 +7,15 @@ import type { Locale } from "@vtk/i18n";
 import { Card, Input, Label } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
+import { IconLink } from "@/components/ui/IconButton";
+import { PencilIcon } from "@/components/ui/icons";
 import { getMediaContent } from "@/lib/media-content";
 import {
   immichWebUrl,
   listImmichGalleryAlbums,
+  listManageableGalleryAlbums,
   type GalleryAlbumSummary,
+  type ManageableAlbum,
 } from "@/lib/immich-gallery";
 import { deleteMagazineAction, savePromoVideosAction } from "@/app/actions/media";
 import { fakbarUploadEnabled } from "@/lib/fakbar-gallery";
@@ -42,15 +46,29 @@ export default async function AdminMedia({
   const { publications, videos } = await getMediaContent();
 
   let galleryAlbums: GalleryAlbumSummary[] = [];
+  let manageableAlbums: ManageableAlbum[] = [];
   let galleryError = false;
   if (canManageAlbums) {
     try {
-      const gallery = await listImmichGalleryAlbums();
+      const [gallery, manageable] = await Promise.all([
+        listImmichGalleryAlbums(),
+        listManageableGalleryAlbums(),
+      ]);
       galleryAlbums = gallery.albums;
+      manageableAlbums = manageable;
     } catch {
       galleryError = true;
     }
   }
+  // Albums die van de site gehaald zijn, dragen `[gallery-uit]` en vallen dus
+  // uit de momentopname. Zonder deze lijst zijn ze nergens meer terug te vinden.
+  const hiddenAlbums = manageableAlbums.filter((album) => album.hidden);
+  // Welke albums al een tabnaam dragen; de uploader vraagt er anders naar.
+  const albumsForUploader = galleryAlbums.map((album) => ({
+    slug: album.slug,
+    title: album.title,
+    hasTabName: manageableAlbums.some((row) => row.id === album.id && Boolean(row.tab)),
+  }));
   const immichUrl = immichWebUrl();
   // Staat standaard uit; zie lib/fakbar-gallery.ts.
   const fakbarEnabled = await fakbarUploadEnabled();
@@ -203,7 +221,7 @@ export default async function AdminMedia({
         <ImmichAlbumUploader
           locale={locale}
           fakbarEnabled={fakbarEnabled}
-          albums={galleryAlbums}
+          albums={albumsForUploader}
           albumsError={galleryError}
         />
 
@@ -235,6 +253,13 @@ export default async function AdminMedia({
                 <span className="text-xs text-zinc-500">
                   {album.photoCount} {nl ? "foto's" : "photos"}
                 </span>
+                <IconLink
+                  href={`${base}/admin/media/albums/${album.slug}`}
+                  label={nl ? "Beheren" : "Manage"}
+                  srLabel={nl ? `Beheren: ${album.title}` : `Manage: ${album.title}`}
+                >
+                  <PencilIcon />
+                </IconLink>
               </li>
             ))}
             {galleryAlbums.length === 0 ? (
@@ -244,6 +269,36 @@ export default async function AdminMedia({
             ) : null}
           </ul>
         )}
+
+        {hiddenAlbums.length > 0 ? (
+          <>
+            <h3 className="mt-6 mb-1 text-sm font-semibold">
+              {nl ? "Niet op de site" : "Not on the site"} ({hiddenAlbums.length})
+            </h3>
+            <p className="mb-2 text-xs text-zinc-500">
+              {nl
+                ? "Deze albums bestaan nog in Immich maar staan niet op de mediapagina. Zet ze op hun beheerpagina terug."
+                : "These albums still exist in Immich but are not on the media page. Put them back from their admin page."}
+            </p>
+            <ul className="divide-y divide-zinc-200">
+              {hiddenAlbums.map((album) => (
+                <li key={album.id} className="flex items-center gap-3 py-2 text-sm">
+                  <span className="flex-1 text-zinc-600">{album.title}</span>
+                  <span className="text-xs text-zinc-500">
+                    {album.photoCount} {nl ? "foto's" : "photos"}
+                  </span>
+                  <IconLink
+                    href={`${base}/admin/media/albums/${album.id}`}
+                    label={nl ? "Beheren" : "Manage"}
+                    srLabel={nl ? `Beheren: ${album.title}` : `Manage: ${album.title}`}
+                  >
+                    <PencilIcon />
+                  </IconLink>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
       </Card>
       )}
     </div>

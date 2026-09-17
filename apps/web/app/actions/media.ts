@@ -4,7 +4,7 @@ import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
 import { newStorageKey, putObject } from "@vtk/storage";
-import { requirePermission } from "@/lib/session";
+import { requireAnyPermission, requirePermission } from "@/lib/session";
 import { saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
 import {
@@ -15,8 +15,13 @@ import {
 import {
   addImmichAssetsToAlbum,
   createImmichGalleryAlbum,
+  getImmichGalleryAlbum,
+  getManageableGalleryAlbum,
   refreshImmichGallerySnapshot,
   setImmichAlbumCover,
+  setMarker,
+  succeededAssetIds,
+  updateImmichAlbum,
   uploadImmichAsset,
 } from "@/lib/immich-gallery";
 import { fakbarGallery, fakbarUploadEnabled, setFakbarUploadEnabled } from "@/lib/fakbar-gallery";
@@ -210,14 +215,24 @@ export async function savePromoVideosAction(
   return saveOk();
 }
 
+/**
+ * Wie een fotoalbum mag aanmaken en vullen.
+ *
+ * De albumsectie van /admin/media staat open voor `photos.manageAlbums`, maar
+ * deze acties eisten enkel `media.manage`: wie het eerste recht had, zag de
+ * uploader en kreeg een throw bij het opslaan.
+ */
+const ALBUM_PERMISSIONS = ["media.manage", "photos.manageAlbums"] as const;
+
 export async function createImmichAlbumAction(
   formData: FormData
 ): Promise<{ ok: boolean; albumId?: string; error?: string }> {
-  await requirePermission("media.manage");
+  await requireAnyPermission([...ALBUM_PERMISSIONS]);
   const title = readField(formData, "title");
   let description = readField(formData, "description", 1000);
   const parentSlug = readField(formData, "parentSlug", 100);
   const tabName = readField(formData, "tabName", 100);
+  const parentTabName = readField(formData, "parentTabName", 50);
 
   if (parentSlug) {
     const parentMarker = `[parent: ${parentSlug}]`;
@@ -236,6 +251,20 @@ export async function createImmichAlbumAction(
       target === "fakbar"
         ? await fakbarGallery.createAlbum({ title, description })
         : await createImmichGalleryAlbum({ title, description });
+
+    // Het hoofdalbum draagt zelf ook een tabnaam. Zonder die merker heet zijn
+    // eigen tab op de site "Algemeen" (zie grouping.ts), en er was geen enkel
+    // scherm waar je dat nog kon invullen.
+    if (target === "main" && parentSlug && parentTabName) {
+      const parent = await getImmichGalleryAlbum(parentSlug).catch(() => null);
+      const parentRow = parent ? await getManageableGalleryAlbum(parent.id).catch(() => null) : null;
+      if (parentRow) {
+        await updateImmichAlbum(parent!.id, {
+          description: setMarker(parentRow.description, "tab", parentTabName),
+        }).catch((error) => console.error("Immich parent tab update failed", error));
+      }
+    }
+
     await logAudit({
       action: "create",
       entity: "photoAlbum",
@@ -256,7 +285,7 @@ export async function createImmichAlbumAction(
 export async function uploadImmichAlbumAssetAction(
   formData: FormData
 ): Promise<{ ok: boolean; assetId?: string; error?: string }> {
-  await requirePermission("media.manage");
+  await requireAnyPermission([...ALBUM_PERMISSIONS]);
   const albumId = readField(formData, "albumId", 100);
   const file = formData.get("file");
   if (!albumId || !(file instanceof File) || file.size === 0) {
@@ -277,7 +306,11 @@ export async function uploadImmichAlbumAssetAction(
       createdAt: file.lastModified ? new Date(file.lastModified).toISOString() : undefined,
     });
     if (!uploaded?.id) return { ok: false, error: "upload_failed" };
-    await addImmichAssetsToAlbum(albumId, [uploaded.id]);
+    // Immich antwoordt hier met HTTP 200 en een resultaat per foto: een asset
+    // die niet in het album raakt, zou anders stil als gelukt tellen en nergens
+    // op de site verschijnen.
+    const added = succeededAssetIds(await addImmichAssetsToAlbum(albumId, [uploaded.id]));
+    if (added.length === 0) return { ok: false, error: "album_add_failed" };
     return { ok: true, assetId: uploaded.id };
   } catch (error) {
     console.error("Immich asset upload failed", error);
@@ -288,7 +321,7 @@ export async function uploadImmichAlbumAssetAction(
 export async function setImmichAlbumCoverAction(
   formData: FormData
 ): Promise<{ ok: boolean; error?: string }> {
-  await requirePermission("media.manage");
+  await requireAnyPermission([...ALBUM_PERMISSIONS]);
   const albumId = readField(formData, "albumId", 100);
   const assetId = readField(formData, "assetId", 100);
   if (!albumId || !assetId) return { ok: false, error: "missing" };
@@ -309,7 +342,7 @@ export async function setImmichAlbumCoverAction(
 }
 
 export async function finalizeImmichAlbumAction(formData?: FormData): Promise<void> {
-  await requirePermission("media.manage");
+  await requireAnyPermission([...ALBUM_PERMISSIONS]);
   // Ververst de momentopname van de galerij waarin net geüpload is. De andere
   // met rust laten scheelt een volledige Immich-uitlezing per upload.
   if (formData?.get("gallery") === "fakbar") {

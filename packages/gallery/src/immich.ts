@@ -170,13 +170,59 @@ export async function runImmichAssetJob(assetIds: string[], name: string): Promi
   return immichJson<unknown>('/assets/jobs', { method: 'POST', body: { assetIds, name } });
 }
 
+/**
+ * Het antwoord van Immich op een bulkbewerking met assets.
+ *
+ * **Let op: dit is een HTTP 200 met een resultaat per asset.** Eén asset die
+ * niet toegevoegd of verwijderd raakt, gooit dus geen fout; wie dat niet
+ * nakijkt, denkt dat alles gelukt is. Bij verplaatsen is dat het verschil
+ * tussen een foto die in twee albums staat en een foto die nergens meer staat.
+ */
+export type ImmichBulkIdResult = {
+  id: string;
+  success: boolean;
+  /** 'duplicate' | 'no_permission' | 'not_found' | 'unknown' | 'validation' */
+  error?: string;
+};
+
+/**
+ * De assets die de bewerking overleefd hebben.
+ *
+ * `duplicate` telt als gelukt: bij toevoegen betekent het dat de foto al in het
+ * album zit, en dat is precies de gewenste eindtoestand.
+ */
+export function succeededAssetIds(results: ImmichBulkIdResult[] | null | undefined): string[] {
+  if (!Array.isArray(results)) return [];
+  return results.filter((row) => row.success || row.error === 'duplicate').map((row) => row.id);
+}
+
 /** Voegt eerder geüploade assets aan een album toe. */
-export async function addImmichAssetsToAlbum(albumId: string, assetIds: string[]): Promise<unknown> {
-  if (assetIds.length === 0) return null;
-  return immichJson<unknown>(`/albums/${encodeURIComponent(albumId)}/assets`, {
+export async function addImmichAssetsToAlbum(
+  albumId: string,
+  assetIds: string[],
+): Promise<ImmichBulkIdResult[]> {
+  if (assetIds.length === 0) return [];
+  const result = await immichJson<ImmichBulkIdResult[]>(`/albums/${encodeURIComponent(albumId)}/assets`, {
     method: 'PUT',
     body: { ids: assetIds },
   });
+  return Array.isArray(result) ? result : [];
+}
+
+/**
+ * Haalt assets uit een album zonder ze te verwijderen: ze blijven in Immich
+ * staan en in elk ander album waar ze in zitten.
+ */
+export async function removeImmichAssetsFromAlbum(
+  albumId: string,
+  assetIds: string[],
+): Promise<ImmichBulkIdResult[]> {
+  if (assetIds.length === 0) return [];
+  const result = await immichJson<ImmichBulkIdResult[]>(`/albums/${encodeURIComponent(albumId)}/assets`, {
+    method: 'DELETE',
+    body: { ids: assetIds },
+  });
+  return Array.isArray(result) ? result : [];
 }
 
 /**
@@ -188,4 +234,62 @@ export async function setImmichAlbumCover(albumId: string, assetId: string): Pro
     method: 'PATCH',
     body: { albumThumbnailAssetId: assetId },
   });
+}
+
+/**
+ * Titel en/of beschrijving van een album wijzigen.
+ *
+ * De beschrijving draagt de merkers (`[gallery]`, `[parent:]`, `[tab:]`), dus
+ * wie ze hier overschrijft moet ze eerst uitlezen en opnieuw meegeven; zie
+ * `setMarker` in `format.ts`.
+ */
+export async function updateImmichAlbum(
+  albumId: string,
+  patch: { albumName?: string; description?: string },
+): Promise<unknown> {
+  const body: Record<string, unknown> = {};
+  if (patch.albumName !== undefined) body.albumName = patch.albumName;
+  if (patch.description !== undefined) body.description = patch.description;
+  if (Object.keys(body).length === 0) return null;
+
+  return immichJson<unknown>(`/albums/${encodeURIComponent(albumId)}`, { method: 'PATCH', body });
+}
+
+/**
+ * Verwijdert het album zelf.
+ *
+ * **De foto's blijven bestaan.** Immich verwijdert enkel de map; de assets
+ * blijven in de bibliotheek staan en in elk ander album waar ze in zitten. Wie
+ * ze ook weg wil, roept daarnaast `deleteImmichAssets` aan.
+ */
+export async function deleteImmichAlbum(albumId: string): Promise<unknown> {
+  return immichJson<unknown>(`/albums/${encodeURIComponent(albumId)}`, { method: 'DELETE' });
+}
+
+/**
+ * De thumbnail van één asset, met de API-sleutel in plaats van via een gedeelde
+ * link. Nodig voor foto's die in geen enkel album meer zitten: de publieke
+ * foto-URL's hangen aan de gedeelde link van een álbum, en die hebben ze niet
+ * meer. Zie de beheerroute in `apps/web/app/api/admin/immich-gallery`.
+ */
+export async function getImmichAssetThumbnail(
+  assetId: string,
+  size: 'thumbnail' | 'preview' = 'thumbnail',
+): Promise<Response> {
+  const response = await immichRequest(
+    `/assets/${encodeURIComponent(assetId)}/thumbnail?size=${encodeURIComponent(size)}`,
+    { headers: { Accept: 'image/*' } },
+  );
+
+  if (!response.ok) {
+    const body = await readErrorBody(response);
+    throw new GalleryError(
+      response.status,
+      errorMessage(body, `Immich thumbnail failed with HTTP ${response.status}`),
+      'immich_thumbnail_failed',
+      body,
+    );
+  }
+
+  return response;
 }
