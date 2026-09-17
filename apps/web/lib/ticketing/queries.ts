@@ -10,11 +10,13 @@ import { isAppleWalletAvailable, isGoogleWalletAvailable } from "./wallet";
 import { ticketTermsPath } from "./terms";
 import { ticketTypeIsHidden, ticketTypeRequiresLogin } from "./audience";
 import { getTicketEventAccess } from "./authorization";
+import { isInPresaleNow, viewerSalesStart } from "./presale";
 
 type PublicLocale = "nl" | "en";
 
 const publicEventInclude = {
   ownerGroup: true,
+  presaleGroups: { select: { groupId: true } },
   questions: { where: { active: true }, orderBy: { sortOrder: "asc" } },
   ticketTypes: {
     where: { active: true },
@@ -69,7 +71,16 @@ function ticketTypeIsOnSale(
   );
 }
 
-function publicEventDto(event: PublicEventRecord, locale: PublicLocale) {
+/**
+ * @param viewer de sessie, om de verkoopstart te tonen zoals **deze** bezoeker
+ * ze ervaart: wie in de voorverkoop mag, ziet ze vroeger. De rest van de shop
+ * rekent gewoon met `salesStart` en hoeft van de voorverkoop niets te weten.
+ */
+function publicEventDto(
+  event: PublicEventRecord,
+  locale: PublicLocale,
+  viewer?: { groups: { id: string; type: string }[] } | null
+) {
   return {
     id: event.id,
     slug: event.slug,
@@ -79,8 +90,13 @@ function publicEventDto(event: PublicEventRecord, locale: PublicLocale) {
     startsAt: event.startsAt,
     endsAt: event.endsAt,
     currentTime: new Date().toISOString(),
-    salesStart: event.salesStartAt,
+    salesStart: viewerSalesStart(event, viewer),
     salesEnd: event.salesEndAt,
+    // Enkel om het te kunnen zeggen tegen wie nu vroeger mag kopen; voor de rest
+    // staat er niets over de voorverkoop op de pagina.
+    presale: isInPresaleNow(event, viewer)
+      ? { publicStart: event.salesStartAt as Date }
+      : null,
     status: event.status,
     maxTicketsPerOrder: event.maxTicketsPerOrder,
     currency: event.currency,
@@ -130,7 +146,17 @@ export async function listPublishedTicketEvents(locale: PublicLocale) {
         status: "PUBLISHED",
         endsAt: { gte: now },
         AND: [
-          { OR: [{ salesStartAt: null }, { salesStartAt: { lte: now } }] },
+          {
+            OR: [
+              { salesStartAt: null },
+              { salesStartAt: { lte: now } },
+              // Een event met voorverkoop kan al open staan voor wie erin mag,
+              // en hoe vroeg valt hier niet te vergelijken: `salesStartAt` min
+              // een duur is geen kolom. Daarom hier ruim ophalen en verderop
+              // per bezoeker filteren op `salesStart` uit de dto.
+              { presaleLeadMinutes: { not: null } },
+            ],
+          },
           { OR: [{ salesEndAt: null }, { salesEndAt: { gt: now } }] },
         ],
       },
@@ -140,8 +166,9 @@ export async function listPublishedTicketEvents(locale: PublicLocale) {
     getSession(await headers()),
   ]);
   const isHonorary = await viewerIsHonorary(session?.user.id);
-  return events.map((event) => {
-    const dto = publicEventDto(event, locale);
+  return events.flatMap((event) => {
+    const dto = publicEventDto(event, locale, session);
+    if (dto.salesStart && new Date(dto.salesStart) > now) return [];
     const selectableTypes = dto.ticketTypes.filter(
       (type) =>
         ticketTypeIsOnSale(type, now) &&
@@ -151,14 +178,14 @@ export async function listPublishedTicketEvents(locale: PublicLocale) {
     const ticketTypes = selectableTypes.filter(
       (type) => Boolean(session) || !ticketTypeRequiresLogin(type)
     );
-    return {
+    return [{
       ...dto,
       ticketTypes,
       requiresLogin:
         !session &&
         ticketTypes.length === 0 &&
         selectableTypes.some(ticketTypeRequiresLogin),
-    };
+    }];
   });
 }
 
@@ -171,7 +198,7 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
 
   const session = await getSession(await headers());
   const isHonorary = await viewerIsHonorary(session?.user.id);
-  const dto = publicEventDto(event, locale);
+  const dto = publicEventDto(event, locale, session);
   const visibleTypes = dto.ticketTypes.filter((type) => !ticketTypeIsHidden(type, isHonorary));
   const ticketTypes = visibleTypes.filter(
     (type) => Boolean(session) || !ticketTypeRequiresLogin(type)
@@ -213,7 +240,7 @@ export async function getTicketEventPreviewBySlug(slug: string, locale: PublicLo
   const { session } = access;
 
   return {
-    ...publicEventDto(event, locale),
+    ...publicEventDto(event, locale, session),
     requiresLogin: false,
     viewer: { id: session.user.id, name: session.user.name, email: session.user.email },
   };

@@ -16,6 +16,7 @@ import {
   Minus,
   Plus,
   ShieldCheck,
+  Sparkles,
   Ticket,
   TicketX,
   UserRound,
@@ -404,6 +405,19 @@ export function TicketShop({
               </p>
             </div>
           </div>
+
+          {/* Enkel voor wie nu in voorverkoop koopt. Wie er niet in mag, krijgt
+              hier niets te zien: dan is het gewoon een verkoop die later start. */}
+          {event.presale ? (
+            <div className="ticket-notice" data-tone="presale">
+              <Sparkles size={19} aria-hidden="true" />
+              <span>
+                {locale === "nl"
+                  ? `Voorverkoop: jij kan nu al bestellen. Voor iedereen start de verkoop op ${formatTicketDate(event.presale.publicStart, locale)}.`
+                  : `Presale: you can order already. Sales open for everyone on ${formatTicketDate(event.presale.publicStart, locale)}.`}
+              </span>
+            </div>
+          ) : null}
 
           {event.ticketTypes.length === 0 ? (
             <div className="ticket-shop-empty-state">

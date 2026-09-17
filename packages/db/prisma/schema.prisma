@@ -789,6 +789,7 @@ model Group {
   dashboardTiles    DashboardTile[]
   ownedTicketEvents TicketEvent[]              @relation("TicketEventOwnerGroup")
   ticketEventGrants TicketEventGroupGrant[]
+  ticketPresale     TicketEventPresaleGroup[]
   ownedForms        Form[]                     @relation("FormOwnerGroup")
   formGrants        FormGroupGrant[]
   ssoGrants         SsoGroupClientPermission[]
@@ -1631,6 +1632,16 @@ model TicketEvent {
   timeZone              String            @default("Europe/Brussels")
   salesStartAt          DateTime?         @db.Timestamptz(3)
   salesEndAt            DateTime?         @db.Timestamptz(3)
+  // Voorverkoop: hoeveel minuten voor `salesStartAt` de voorverkoopgroep al mag
+  // kopen. `null` of 0 is geen voorverkoop. Bewust een duur en geen tweede
+  // datum: verschuift de verkoopstart, dan schuift de voorverkoop mee, en twee
+  // datums die uit de pas lopen leveren een event op dat voor niemand klopt.
+  // Zonder `salesStartAt` bestaat er geen voorverkoop: de verkoop staat dan al
+  // voor iedereen open.
+  presaleLeadMinutes    Int?
+  // Wie er in de voorverkoop mag: standaard elke praesidiumpost, met optioneel
+  // extra groepen (`presaleGroups`) erbij, bv. de werkgroep die het organiseert.
+  presalePraesidium     Boolean           @default(true)
   status                TicketEventStatus @default(DRAFT)
   currency              String            @default("EUR")
   maxTicketsPerOrder    Int               @default(8)
@@ -1670,6 +1681,7 @@ model TicketEvent {
   tickets        Ticket[]
   gates          TicketGate[]
   scanDevices    TicketScanDevice[]
+  presaleGroups  TicketEventPresaleGroup[]
   scanLogs       TicketScanLog[]
   auditLogs      TicketAuditLog[]
   outboxMessages TicketOutboxMessage[]
@@ -1796,6 +1808,24 @@ model TicketEventGroupGrant {
   grantedBy User?       @relation("TicketEventGroupGrantGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
 
   @@unique([eventId, groupId])
+  @@index([groupId])
+}
+
+/**
+ * Een groep die naast (of in plaats van) het praesidium in de voorverkoop mag.
+ *
+ * Staat los van `TicketEventGroupGrant`: die gaat over wie het event *beheert*,
+ * dit over wie er vroeger mag *kopen*. Ze op één tabel leggen zou betekenen dat
+ * elke werkgroep met een voorverkoop ook in het ticketbeheer terechtkomt.
+ */
+model TicketEventPresaleGroup {
+  eventId String
+  groupId String
+
+  event TicketEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  group Group       @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, groupId])
   @@index([groupId])
 }
 

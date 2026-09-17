@@ -460,6 +460,11 @@ webscanner blijft staan als webweg en als vangnet.
 - `ticketColors.ts`: het palet per tickettype (key, geen hex)
 - `audience.ts`: wie een tickettype ziet en koopt (`PUBLIC` / `MEMBERS` /
   `HONORARY`); puur, gedeeld door de shop, de kassa en het beheer
+- `presale.ts`: de voorverkoop (`TicketEvent.presaleLeadMinutes`,
+  `presalePraesidium`, `TicketEventPresaleGroup`); puur, en net als `audience.ts`
+  gedeeld door de shoplijst, de eventpagina en `createOrder`. `viewerSalesStart`
+  geeft de verkoopstart zoals **deze** bezoeker ze heeft; al de rest rekent
+  gewoon met een venster. Zie `docs/design-decisions.md` voor de kringkeuzes
 - `cardHash.ts`: het hashformaat van de studentenkaart in het offline-manifest;
   draait bewust aan beide kanten
 - `mail.ts`, `outbox.ts`: durable confirmation-mail queue

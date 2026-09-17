@@ -44,6 +44,13 @@ export type PublicTicketEvent = {
   currentTime: string;
   salesStart?: string | Date | null;
   salesEnd?: string | Date | null;
+  /**
+   * Gevuld wanneer **deze** bezoeker nu in voorverkoop koopt: `salesStart` is
+   * dan al verschoven, en dit draagt enkel het moment waarop de verkoop voor
+   * iedereen opengaat. Voor wie niet in de voorverkoop mag, blijft dit null en
+   * staat er niets over de voorverkoop op de pagina.
+   */
+  presale?: { publicStart: string | Date } | null;
   status: string;
   maxTicketsPerOrder: number;
   currency: string;
@@ -89,12 +96,13 @@ export type PublicOrder = {
 
 export type SerializedTicketEvent = Omit<
   PublicTicketEvent,
-  "startsAt" | "endsAt" | "salesStart" | "salesEnd"
+  "startsAt" | "endsAt" | "salesStart" | "salesEnd" | "presale"
 > & {
   startsAt: string;
   endsAt: string;
   salesStart: string | null;
   salesEnd: string | null;
+  presale: { publicStart: string } | null;
 };
 
 export function serializeTicketEvent(event: PublicTicketEvent): SerializedTicketEvent {
@@ -104,6 +112,9 @@ export function serializeTicketEvent(event: PublicTicketEvent): SerializedTicket
     endsAt: new Date(event.endsAt).toISOString(),
     salesStart: event.salesStart ? new Date(event.salesStart).toISOString() : null,
     salesEnd: event.salesEnd ? new Date(event.salesEnd).toISOString() : null,
+    presale: event.presale
+      ? { publicStart: new Date(event.presale.publicStart).toISOString() }
+      : null,
   };
 }
 

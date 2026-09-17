@@ -35,6 +35,7 @@ import { withSerializableTransaction } from "./transactions";
 import { publishedTicketDesign } from "./design";
 import { getTicketTerms } from "./terms";
 import { ticketTypeIsHidden, ticketTypeRequiresLogin } from "./audience";
+import { viewerSalesStart } from "./presale";
 
 const answerValueSchema = z.union([
   z.string().max(2_000),
@@ -183,13 +184,17 @@ export async function createTicketCheckout(
         include: { inventoryPool: true },
       },
       questions: { where: { active: true }, orderBy: { sortOrder: "asc" } },
+      presaleGroups: { select: { groupId: true } },
     },
   });
 
   if (
     !event ||
     event.status !== "PUBLISHED" ||
-    !isWithinWindow(now, event.salesStartAt, event.salesEndAt)
+    // De verkoopstart zoals deze koper ze heeft: wie in de voorverkoop mag,
+    // begint vroeger. Het tickettype houdt zijn eigen venster (zie
+    // `lib/ticketing/presale.ts`), dus dat wordt hieronder ongewijzigd getoetst.
+    !isWithinWindow(now, viewerSalesStart(event, session), event.salesEndAt)
   ) {
     throw new TicketCheckoutError("EVENT_NOT_ON_SALE");
   }

@@ -602,6 +602,12 @@
   color: var(--ticket-amber);
 }
 
+/* De voorverkoop is geen waarschuwing maar een voorrecht: groen, niet amber. */
+.ticket-notice[data-tone="presale"] {
+  background: var(--ticket-green-soft);
+  color: var(--ticket-green);
+}
+
 .ticket-attendee {
   min-width: 0;
   border: 0;

@@ -7035,3 +7035,51 @@ De generator zelf verandert niet: de HTML, de functiepresets uit de
 groepslidmaatschappen en het opslaan van de gegevens in de browser blijven zoals
 ze waren. Wie het recht niet heeft, ziet de kaart niet, en de lidmaatschappen
 worden voor die pagina dan ook niet meer opgehaald.
+
+## Voorverkoop: een duur voor de verkoopstart, niet een tweede datum
+
+Een ticketevent kan een **voorverkoop** hebben: een periode waarin enkel het
+praesidium (en eventueel een paar extra groepen) al kan bestellen, terwijl de
+rest nog moet wachten. Dat is de gewone gang van zaken bij een galabal of een
+cantus met te weinig plaatsen: wie het event draait, hoort niet in de rij te
+staan voor zijn eigen feest.
+
+**Het is een duur, geen datum.** Je vult in "48 uur eerder" of "3 dagen eerder",
+en de voorverkoop begint zoveel voor de verkoopstart. Twee losse datums leken
+eerst voorspelbaarder, maar de verkoopstart verschuift vaak (een affiche die
+later klaar is, een examenrooster) en dan blijft de tweede datum staan. Zo krijg
+je een event waar de voorverkoop na de gewone verkoop begint, en dat merkt
+niemand tot het te laat is. Met een duur schuift alles mee.
+
+Zonder verkoopstart bestaat er geen voorverkoop: de verkoop staat dan al voor
+iedereen open en er valt niets vroeger te zetten. Het formulier weigert de
+combinatie in plaats van ze stil te negeren.
+
+**Wie erin mag, staat per event.** Standaard elke praesidiumpost; daarnaast kan
+je groepen aanvinken, bijvoorbeeld de werkgroep die het event organiseert. Je
+kan het praesidium ook uitvinken en enkel die ene werkgroep aanduiden, voor een
+event dat van hen is. Dat staat los van de beheerrechten op het event
+(`TicketEventGroupGrant`): vroeger mogen kopen is iets anders dan het event
+mogen beheren, en op één tabel leggen zou elke groep met een voorverkoop in het
+ticketbeheer zetten.
+
+**De voorverkoop verschuift enkel het eventvenster.** Een tickettype met een
+eigen verkoopstart ("late tickets vanaf 5 december") houdt die: dat venster is
+een aparte beslissing van de beheerder, en de voorverkoop hoort ze niet stiekem
+naar voren te halen. Wie in de voorverkoop mag, krijgt dus het laatste van de
+twee: de vervroegde eventstart of de eigen start van het type.
+
+**Een gewone bezoeker ziet niet dat er een voorverkoop loopt.** Hij krijgt de
+pagina die hij anders ook kreeg, met de tickets zichtbaar en de melding "de
+verkoop start op ...". Zeggen dat anderen al mogen kopen levert enkel de vraag
+op waarom hij daar niet bij hoort, en het antwoord daarop staat niet op een
+ticketpagina. Wie wél in de voorverkoop zit, krijgt het omgekeerde: een groene
+regel die zegt dat hij nu al kan bestellen en wanneer de verkoop voor iedereen
+opengaat; anders lijkt het alsof hij gewoon vroeg is en koopt hij misschien
+morgen pas, wanneer het uitverkocht is.
+
+De regel staat puur in `apps/web/lib/ticketing/presale.ts` en wordt gelezen door
+de shoplijst, de eventpagina en het slot bij het afrekenen, net als
+`audience.ts`. De voorverkoop is dus **niet** enkel een kwestie van een knop
+uitgrijzen: `createOrder` rekent met dezelfde vervroegde start, dus een
+gekopieerde bestelling van iemand die er niet in mag, krijgt `EVENT_NOT_ON_SALE`.

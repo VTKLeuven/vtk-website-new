@@ -67,6 +67,8 @@ const EXPECTED_EVENT_FORM_ERRORS = new Set([
   "INVALID_MAXTICKETSPERORDER",
   "INVALID_CAPACITY",
   "INVALID_CONTACTEMAIL",
+  "PRESALE_NEEDS_SALES_START",
+  "PRESALE_NEEDS_AUDIENCE",
 ]);
 
 function value(formData: FormData, key: string): string {
@@ -130,6 +132,27 @@ function boundedIntegerValue(
     throw new Error(`INVALID_${key.toUpperCase()}`);
   }
   return parsed;
+}
+
+/**
+ * De voorverkoop uit het formulier, in minuten.
+ *
+ * Het formulier vraagt een getal en een eenheid (uren of dagen); de database
+ * bewaart minuten, zodat er maar één grootheid is om mee te rekenen. Leeg of 0
+ * betekent geen voorverkoop.
+ */
+function presaleLeadMinutesValue(formData: FormData): number | null {
+  const raw = value(formData, "presaleLeadValue");
+  if (!raw) return null;
+  const parsed = Number(raw);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) throw new Error("INVALID_PRESALELEADVALUE");
+  if (parsed === 0) return null;
+  const perUnit = value(formData, "presaleLeadUnit") === "days" ? 1_440 : 60;
+  const minutes = parsed * perUnit;
+  // Een jaar is ruim genoeg voor elke voorverkoop en houdt een typfout
+  // ("100 dagen" i.p.v. "10") uit de database.
+  if (minutes > 365 * 1_440) throw new Error("INVALID_PRESALELEADVALUE");
+  return minutes;
 }
 
 function codeFrom(input: string): string {
@@ -503,6 +526,19 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
   if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
     throw new Error("INVALID_SALES_DATES");
   }
+  const presaleLeadMinutes = presaleLeadMinutesValue(formData);
+  const presalePraesidium = checkboxValue(formData, "presalePraesidium");
+  const presaleGroupIds = [
+    ...new Set(formData.getAll("presaleGroupIds").map((entry) => String(entry)).filter(Boolean)),
+  ];
+  if (presaleLeadMinutes !== null) {
+    // Een voorverkoop is een duur vóór de verkoopstart; zonder die start staat
+    // de verkoop al voor iedereen open en is er niets om vroeger te zetten.
+    if (!salesStartAt) throw new Error("PRESALE_NEEDS_SALES_START");
+    if (!presalePraesidium && presaleGroupIds.length === 0) {
+      throw new Error("PRESALE_NEEDS_AUDIENCE");
+    }
+  }
   const locationGeo = await resolveLocationGeo(formData, event);
 
   await prisma.$transaction(async (tx) => {
@@ -524,6 +560,8 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
         endsAt,
         salesStartAt,
         salesEndAt,
+        presaleLeadMinutes,
+        presalePraesidium,
         status,
         maxTicketsPerOrder,
         cardCheckIn: checkboxValue(formData, "cardCheckIn"),
@@ -534,6 +572,19 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
         archivedAt: status === "ARCHIVED" ? new Date() : null,
       },
     });
+    // De groepen die naast het praesidium in de voorverkoop mogen. Vervangen en
+    // niet bijwerken: het formulier stuurt de volledige keuze mee, en zonder
+    // voorverkoop hoort er niets te blijven staan.
+    await tx.ticketEventPresaleGroup.deleteMany({ where: { eventId } });
+    if (presaleLeadMinutes !== null && presaleGroupIds.length > 0) {
+      const existing = await tx.group.findMany({
+        where: { id: { in: presaleGroupIds } },
+        select: { id: true },
+      });
+      await tx.ticketEventPresaleGroup.createMany({
+        data: existing.map((group) => ({ eventId, groupId: group.id })),
+      });
+    }
     // Een gearchiveerd event heeft de r-nummers niet meer nodig: ze dienden enkel
     // om een gescande studentenkaart aan de deur tot een ticket te herleiden.
     // Zonder deze opkuis blijft de deelnemerslijst van elke cantus onbeperkt een

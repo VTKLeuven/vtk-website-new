@@ -15,9 +15,10 @@ import {
   Save,
   Ticket,
 } from "lucide-react";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { toDatetimeLocal, type AdminLocale } from "./format";
 import { AddressPicker } from "./AddressPicker";
+import { PresaleFields, type PresaleGroupOption } from "./PresaleFields";
 
 const initialState: TicketEventFormActionState = { status: "idle" };
 
@@ -28,6 +29,9 @@ const formErrorMessages: Record<string, { nl: string; en: string }> = {
   TITLE_REQUIRED: { nl: "Vul een Nederlandse titel in.", en: "Enter a Dutch title." },
   INVALID_EVENT_DATES: { nl: "De eindtijd moet na de starttijd liggen.", en: "The end time must be after the start time." },
   INVALID_SALES_DATES: { nl: "Het einde van de verkoop moet na de start liggen.", en: "Sales must end after they start." },
+  PRESALE_NEEDS_SALES_START: { nl: "Vul een start verkoop in: de voorverkoop is een duur daarvoor.", en: "Set a sales start: the presale is a duration before it." },
+  PRESALE_NEEDS_AUDIENCE: { nl: "Kies wie er in de voorverkoop mag: het praesidium of minstens één groep.", en: "Choose who may buy during the presale: the praesidium or at least one group." },
+  INVALID_PRESALELEADVALUE: { nl: "De voorverkoop moet een geheel aantal uren of dagen zijn, hoogstens een jaar.", en: "The presale must be a whole number of hours or days, at most a year." },
   INVALID_SLUG: { nl: "Vul een geldige URL-naam in.", en: "Enter a valid URL slug." },
   SLUG_ALREADY_EXISTS: { nl: "Deze URL-naam is al in gebruik.", en: "This URL slug is already in use." },
   TICKET_TYPE_REQUIRED_TO_PUBLISH: { nl: "Voeg een actief tickettype toe voordat je publiceert.", en: "Add an active ticket type before publishing." },
@@ -57,6 +61,9 @@ type TicketEventFormValue = {
   endsAt?: Date;
   salesStartAt?: Date | null;
   salesEndAt?: Date | null;
+  presaleLeadMinutes?: number | null;
+  presalePraesidium?: boolean;
+  presaleGroupIds?: readonly string[];
   status?: string;
   maxTicketsPerOrder?: number;
   cardCheckIn?: boolean;
@@ -138,6 +145,7 @@ function InheritedFromCalendar({
 export function TicketEventForm({
   event = {},
   groups,
+  presaleGroups = [],
   calendarEvents,
   hasActiveTicketType = false,
   linkedCalendarEvent,
@@ -145,6 +153,8 @@ export function TicketEventForm({
 }: {
   event?: TicketEventFormValue;
   groups: GroupOption[];
+  /** De groepen die naast het praesidium in de voorverkoop kunnen; leeg bij aanmaken. */
+  presaleGroups?: PresaleGroupOption[];
   calendarEvents: CalendarOption[];
   hasActiveTicketType?: boolean;
   /**
@@ -155,6 +165,9 @@ export function TicketEventForm({
   locale: AdminLocale;
 }) {
   const isEdit = Boolean(event.id);
+  // Gecontroleerd, omdat de voorverkoop eronder de uitkomst toont: "48 uur
+  // eerder" zegt pas iets samen met de datum waar het van afgetrokken wordt.
+  const [salesStart, setSalesStart] = useState(toDatetimeLocal(event.salesStartAt));
   const [state, formAction, pending] = useActionState(
     submitTicketEventFormAction,
     initialState
@@ -321,7 +334,8 @@ export function TicketEventForm({
               id="ticket-sales-start"
               name="salesStartAt"
               type="datetime-local"
-              defaultValue={toDatetimeLocal(event.salesStartAt)}
+              value={salesStart}
+              onChange={(changed) => setSalesStart(changed.target.value)}
             />
           </div>
           <div className="ticket-admin-field">
@@ -333,6 +347,16 @@ export function TicketEventForm({
               defaultValue={toDatetimeLocal(event.salesEndAt)}
             />
           </div>
+          {isEdit ? (
+            <PresaleFields
+              salesStartLocal={salesStart}
+              leadMinutes={event.presaleLeadMinutes}
+              praesidium={event.presalePraesidium ?? true}
+              groupIds={event.presaleGroupIds}
+              groups={presaleGroups}
+              locale={locale}
+            />
+          ) : null}
           {isEdit ? (
             <div className="ticket-admin-field">
               <label htmlFor="ticket-status">Status</label>

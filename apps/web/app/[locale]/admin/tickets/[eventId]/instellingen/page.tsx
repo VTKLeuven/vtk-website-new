@@ -38,6 +38,7 @@ export default async function TicketEventSettingsPage({
         include: { ticketType: true },
         orderBy: [{ active: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
       },
+      presaleGroups: { select: { groupId: true } },
     },
   });
   if (!event) notFound();
@@ -45,6 +46,16 @@ export default async function TicketEventSettingsPage({
     ? canManageAll
       ? await prisma.group.findMany({ orderBy: { orderInPraesidium: "asc" } })
       : await prisma.group.findMany({ where: { id: event.ownerGroupId } })
+    : [];
+  // Voor de voorverkoop mag elke actieve groep gekozen worden: dat geeft geen
+  // toegang tot het beheer, enkel het recht om vroeger te kopen. Daarom staat
+  // deze lijst los van `groups`, die de verantwoordelijke groep bepaalt.
+  const presaleGroups = canManageEvent
+    ? await prisma.group.findMany({
+        where: { active: true },
+        select: { id: true, nameNl: true, nameEn: true, type: true },
+        orderBy: [{ type: "asc" }, { orderInPraesidium: "asc" }, { nameNl: "asc" }],
+      })
     : [];
   const calendarEvents = canManageEvent
     ? await prisma.calendarEvent.findMany({
@@ -82,8 +93,12 @@ export default async function TicketEventSettingsPage({
             locale={locale}
           />
           <TicketEventForm
-            event={event}
+            event={{
+              ...event,
+              presaleGroupIds: event.presaleGroups.map((group) => group.groupId),
+            }}
             groups={groups}
+            presaleGroups={presaleGroups}
             calendarEvents={calendarEvents}
             linkedCalendarEvent={
               calendarEvents.find((candidate) => candidate.id === event.calendarEventId) ?? null

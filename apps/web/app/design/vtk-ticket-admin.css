@@ -2081,3 +2081,68 @@
   align-items: center;
   gap: 8px;
 }
+
+/* ---------------------------------------------------------------------------
+   Voorverkoop op het ticketevent.
+
+   Het getal en de eenheid staan op één regel, want ze zijn samen één waarde
+   ("48 uur eerder"). De doelgroep eronder verschijnt pas wanneer er een
+   voorverkoop is; anders staat er een lijst posten in het formulier die
+   nergens op slaat.
+   --------------------------------------------------------------------------- */
+
+.ticket-admin-presale-lead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.ticket-admin-presale-lead input[type="number"] {
+  width: 96px;
+  flex: none;
+}
+
+.ticket-admin-presale-lead select {
+  min-width: 0;
+  flex: 1 1 140px;
+}
+
+.ticket-admin-presale-audience {
+  margin: 4px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper-2);
+}
+
+.ticket-admin-presale-audience > legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  margin-bottom: 8px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ticket-admin-presale-groups {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.ticket-admin-presale-group-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px 14px;
+}
+
+/* De lijst staat al in een raster; de verticale marge tussen twee vakjes zou
+   de rijen ongelijk maken. */
+.ticket-admin-presale-group-list .ticket-admin-check + .ticket-admin-check {
+  margin-top: 0;
+}
