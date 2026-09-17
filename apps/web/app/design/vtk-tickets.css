@@ -481,6 +481,13 @@
   gap: 10px;
 }
 
+/* De lijst leest als een lijst: een haarlijn tussen twee rijen, geen vulling.
+   Zonder die lijn staan de rijen enkel op afstand van elkaar, en dat was de
+   reden dat een niet-verkrijgbare rij een grijs blok kreeg. */
+.ticket-type-list {
+  gap: 0;
+}
+
 .ticket-type-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto 126px;
@@ -489,13 +496,27 @@
   gap: 16px;
   border: 0;
   border-radius: 0;
-  padding: 12px 0;
-  background: white;
+  padding: 14px 0;
+  background: var(--surface);
 }
 
+.ticket-type-list .ticket-type-row + .ticket-type-row {
+  border-top: 1px solid var(--line);
+}
+
+/* Niet te koop: de rij blijft op het witte paneel staan en wordt getemperd.
+   Ze kreeg hier een `--paper-2`-vulling, en die liep over de volle breedte van
+   het paneel zonder rand of radius; met een dichte verkoop stond het hele
+   paneel dan vol grijsblauwe balken. Wat de rij niet-verkrijgbaar maakt, staat
+   er trouwens al in woorden ("Binnenkort", "Uitverkocht") en in de uitgezette
+   knoppen. */
 .ticket-type-row.is-disabled {
-  background: var(--paper-2);
   color: var(--muted);
+}
+
+.ticket-type-row.is-disabled .ticket-type-price {
+  color: var(--muted);
+  font-weight: 600;
 }
 
 .ticket-type-title {

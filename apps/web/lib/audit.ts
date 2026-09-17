@@ -49,6 +49,9 @@ export const AUDIT_ENTITIES = {
   // Ledenbeheer
   user: { nl: "Gebruiker", en: "User", group: "users" },
   membership: { nl: "Postlidmaatschap", en: "Post membership", group: "users" },
+  // Het lidmaatschap van de kring zelf, per academiejaar. Bewust een andere
+  // naam dan `membership` hierboven: dat is een post in een werkingsjaar.
+  vtkMembership: { nl: "Lidmaatschap", en: "Membership", group: "users" },
   post: { nl: "Post", en: "Post", group: "users" },
   werkgroep: { nl: "Werkgroep", en: "Werkgroep", group: "users" },
   poc: { nl: "POC", en: "POC", group: "users" },

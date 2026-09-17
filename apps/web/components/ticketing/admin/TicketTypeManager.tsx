@@ -12,7 +12,7 @@ import { Archive, Package, Plus, Save, Ticket, TriangleAlert, UsersRound } from 
 import { SaveForm } from "@/components/ui/SaveForm";
 import { ticketColorKey, ticketColorLabel } from "@/lib/ticketing/ticketColors";
 import { TicketColorChoice } from "./TicketColorChoice";
-import { formatMoney, type AdminLocale } from "./format";
+import { formatMoney, toDatetimeLocal, type AdminLocale } from "./format";
 import { SettingsPanel } from "./SettingsPanel";
 
 type InventoryPool = {
@@ -37,6 +37,8 @@ type TicketType = {
   color: string;
   minPerOrder: number;
   maxPerOrder: number;
+  salesStartAt: Date | null;
+  salesEndAt: Date | null;
   active: boolean;
   inventoryPool: InventoryPool;
   _count?: { orderItems: number };
@@ -65,10 +67,17 @@ function guestCanBuy(ticketType: TicketType): boolean {
 /**
  * Kleur en doelgroep van een bestaand tickettype.
  *
- * Dit is bewust het enige bewerkpaneel per rij: naam, prijs en verkoopvenster
- * blijven staan zoals ze aangemaakt zijn. De hulpteksten reageren live op de
- * gekozen doelgroep, want het gevolg (het type verdwijnt uit de shop van een
- * uitgelogde bezoeker) is niet af te lezen aan de keuze zelf.
+ * Alles van het tickettype is hier te wijzigen, ook nadat het event
+ * gepubliceerd is en er al besteld is. Wat verkocht is verandert niet mee (een
+ * bestelregel bewaart zijn eigen naam en prijs), dus een correctie geldt voor
+ * wat er daarna besteld wordt. Eerder stonden naam, prijs en verkoopvenster
+ * vast vanaf het aanmaken, en dan was een typfout in de prijs of in "maximum
+ * per bestelling" enkel recht te zetten door het type te archiveren en opnieuw
+ * aan te maken.
+ *
+ * De hulpteksten reageren live op de gekozen doelgroep, want het gevolg (het
+ * type verdwijnt uit de shop van een uitgelogde bezoeker) is niet af te lezen
+ * aan de keuze zelf.
  */
 function TicketTypeEditPanel({
   eventId,
@@ -114,6 +123,16 @@ function TicketTypeEditPanel({
               locale === "nl"
                 ? "Niet opgeslagen: dit tickettype bestaat niet meer."
                 : "Not saved: this ticket type no longer exists.",
+            INVALID_ORDER_LIMITS:
+              locale === "nl"
+                ? "Het maximum per bestelling mag niet onder het minimum liggen."
+                : "The maximum per order cannot be below the minimum.",
+            INVALID_SALES_DATES:
+              locale === "nl"
+                ? "Het einde van de verkoop moet na de start liggen."
+                : "Sales must end after they start.",
+            INVALID_AMOUNT:
+              locale === "nl" ? "Vul een geldige prijs in." : "Enter a valid price.",
           }}
           fallbackErrorMessage={
             locale === "nl" ? "Tickettype niet opgeslagen." : "Ticket type was not saved."
@@ -122,6 +141,103 @@ function TicketTypeEditPanel({
           <input type="hidden" name="locale" value={locale} />
           <input type="hidden" name="eventId" value={eventId} />
           <input type="hidden" name="ticketTypeId" value={ticketType.id} />
+          <div className="ticket-admin-form-grid">
+            <div className="ticket-admin-field">
+              <label htmlFor={`ticket-type-${ticketType.id}-name-nl`}>Naam (NL)</label>
+              <input
+                id={`ticket-type-${ticketType.id}-name-nl`}
+                name="nameNl"
+                defaultValue={ticketType.nameNl}
+                required
+              />
+            </div>
+            <div className="ticket-admin-field">
+              <label htmlFor={`ticket-type-${ticketType.id}-name-en`}>Naam (EN)</label>
+              <input
+                id={`ticket-type-${ticketType.id}-name-en`}
+                name="nameEn"
+                defaultValue={ticketType.nameEn ?? ""}
+              />
+            </div>
+            <div className="ticket-admin-field">
+              <label htmlFor={`ticket-type-${ticketType.id}-price`}>
+                {locale === "nl"
+                  ? `Prijs per ticket (${ticketType.currency})`
+                  : `Price per ticket (${ticketType.currency})`}
+              </label>
+              <input
+                id={`ticket-type-${ticketType.id}-price`}
+                name="unitPrice"
+                type="number"
+                min="0"
+                step="0.01"
+                defaultValue={(ticketType.unitPriceCents / 100).toFixed(2)}
+                required
+              />
+              {orderedTickets > 0 ? (
+                <span className="ticket-admin-help">
+                  {locale === "nl"
+                    ? "De al verkochte tickets houden de prijs van toen."
+                    : "Tickets already sold keep the price of that moment."}
+                </span>
+              ) : null}
+            </div>
+            <div className="ticket-admin-field">
+              <label htmlFor={`ticket-type-${ticketType.id}-min`}>
+                {locale === "nl" ? "Minimum per bestelling" : "Minimum per order"}
+              </label>
+              <input
+                id={`ticket-type-${ticketType.id}-min`}
+                name="minPerOrder"
+                type="number"
+                min="1"
+                max="50"
+                defaultValue={ticketType.minPerOrder}
+                required
+              />
+            </div>
+            <div className="ticket-admin-field">
+              <label htmlFor={`ticket-type-${ticketType.id}-max`}>
+                {locale === "nl" ? "Maximum per bestelling" : "Maximum per order"}
+              </label>
+              <input
+                id={`ticket-type-${ticketType.id}-max`}
+                name="maxPerOrder"
+                type="number"
+                min="1"
+                max="50"
+                defaultValue={ticketType.maxPerOrder}
+                required
+              />
+            </div>
+            <div className="ticket-admin-field">
+              <label htmlFor={`ticket-type-${ticketType.id}-sales-start`}>
+                {locale === "nl" ? "Verkoop start" : "Sales start"}
+              </label>
+              <input
+                id={`ticket-type-${ticketType.id}-sales-start`}
+                name="salesStartAt"
+                type="datetime-local"
+                defaultValue={toDatetimeLocal(ticketType.salesStartAt)}
+              />
+              <span className="ticket-admin-help">
+                {locale === "nl"
+                  ? "Leeg laten volgt het verkoopvenster van het event."
+                  : "Leave empty to follow the event's sales window."}
+              </span>
+            </div>
+            <div className="ticket-admin-field">
+              <label htmlFor={`ticket-type-${ticketType.id}-sales-end`}>
+                {locale === "nl" ? "Verkoop einde" : "Sales end"}
+              </label>
+              <input
+                id={`ticket-type-${ticketType.id}-sales-end`}
+                name="salesEndAt"
+                type="datetime-local"
+                defaultValue={toDatetimeLocal(ticketType.salesEndAt)}
+              />
+            </div>
+          </div>
           <div className="ticket-admin-field">
             <label htmlFor={`ticket-type-${ticketType.id}-audience`}>
               {locale === "nl" ? "Wie mag dit ticket kopen?" : "Who may buy this ticket?"}

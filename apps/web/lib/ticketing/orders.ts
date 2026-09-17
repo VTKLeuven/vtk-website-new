@@ -34,8 +34,14 @@ import { orderAccessExpiry } from "./access";
 import { withSerializableTransaction } from "./transactions";
 import { publishedTicketDesign } from "./design";
 import { getTicketTerms } from "./terms";
-import { ticketTypeIsHidden, ticketTypeRequiresLogin } from "./audience";
-import { viewerSalesStart } from "./presale";
+import {
+  ticketTypeIsHidden,
+  ticketTypeNeedsMembership,
+  ticketTypeRequiresLogin,
+} from "./audience";
+import { viewerSalesStart, viewerTypeSalesStart } from "./presale";
+import { presaleViewerFor } from "./presaleViewer";
+import { userIsMember } from "@/lib/membership";
 
 const answerValueSchema = z.union([
   z.string().max(2_000),
@@ -74,6 +80,7 @@ export class TicketCheckoutError extends Error {
       | "EVENT_NOT_ON_SALE"
       | "INVALID_TICKET_TYPE"
       | "LOGIN_REQUIRED"
+      | "MEMBERSHIP_REQUIRED"
       | "INVALID_QUANTITY"
       | "INVALID_ANSWER"
       | "TOO_MANY_RESERVATIONS"
@@ -176,6 +183,9 @@ export async function createTicketCheckout(
         })
       )?.honoraryMember ?? false)
     : false;
+  // Een ledenticket staat bij een niet-lid niet in de lijst; dit is het slot
+  // erachter. "Lid" is meer dan "heeft een account", zie lib/membership.
+  const isMember = await userIsMember(session?.user.id);
 
   const event = await prisma.ticketEvent.findUnique({
     where: { id: input.eventId },
@@ -188,14 +198,17 @@ export async function createTicketCheckout(
     },
   });
 
-  if (
-    !event ||
-    event.status !== "PUBLISHED" ||
-    // De verkoopstart zoals deze koper ze heeft: wie in de voorverkoop mag,
-    // begint vroeger. Het tickettype houdt zijn eigen venster (zie
-    // `lib/ticketing/presale.ts`), dus dat wordt hieronder ongewijzigd getoetst.
-    !isWithinWindow(now, viewerSalesStart(event, session), event.salesEndAt)
-  ) {
+  if (!event || event.status !== "PUBLISHED") {
+    throw new TicketCheckoutError("EVENT_NOT_ON_SALE");
+  }
+  // Wie deze koper is voor de voorverkoop: zijn posten én zijn shiften. Dezelfde
+  // bron als de shop, zodat wat je daar mag kiezen hier niet alsnog afketst.
+  //
+  // De verkoopstart zoals deze koper ze heeft: wie in de voorverkoop mag, begint
+  // vroeger. Een tickettype met een eigen, latere start houdt die wel (zie
+  // `lib/ticketing/presale.ts`); dat wordt hieronder per type getoetst.
+  const presaleBuyer = await presaleViewerFor(session, [event]);
+  if (!isWithinWindow(now, viewerSalesStart(event, presaleBuyer), event.salesEndAt)) {
     throw new TicketCheckoutError("EVENT_NOT_ON_SALE");
   }
   if (input.items.length > event.maxTicketsPerOrder) {
@@ -206,7 +219,11 @@ export async function createTicketCheckout(
   const countByType = new Map<string, number>();
   const normalizedItems = input.items.map((item) => {
     const type = typeById.get(item.ticketTypeId);
-    if (!type || !type.active || !isWithinWindow(now, type.salesStartAt, type.salesEndAt)) {
+    if (
+      !type ||
+      !type.active ||
+      !isWithinWindow(now, viewerTypeSalesStart(event, type, presaleBuyer), type.salesEndAt)
+    ) {
       throw new TicketCheckoutError("INVALID_TICKET_TYPE", item.ticketTypeId);
     }
     // Een erelidticket staat bij niemand anders in de lijst; wie het toch
@@ -221,6 +238,9 @@ export async function createTicketCheckout(
       ticketTypeRequiresLogin({ audience: type.audience, priceCents: type.unitPriceCents })
     ) {
       throw new TicketCheckoutError("LOGIN_REQUIRED", item.ticketTypeId);
+    }
+    if (ticketTypeNeedsMembership(type, isMember)) {
+      throw new TicketCheckoutError("MEMBERSHIP_REQUIRED", item.ticketTypeId);
     }
     countByType.set(type.id, (countByType.get(type.id) ?? 0) + 1);
 

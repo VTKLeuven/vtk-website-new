@@ -8,9 +8,20 @@ import { createTicketCredential, secureTokenHash, verifyOrderAccessToken } from 
 import { orderAccessCookieName } from "./access";
 import { isAppleWalletAvailable, isGoogleWalletAvailable } from "./wallet";
 import { ticketTermsPath } from "./terms";
-import { ticketTypeIsHidden, ticketTypeRequiresLogin } from "./audience";
+import {
+  ticketTypeIsHidden,
+  ticketTypeNeedsMembership,
+  ticketTypeRequiresLogin,
+} from "./audience";
 import { getTicketEventAccess } from "./authorization";
-import { isInPresaleNow, viewerSalesStart } from "./presale";
+import {
+  isInPresaleNow,
+  viewerSalesStart,
+  viewerTypeSalesStart,
+  type PresaleViewer,
+} from "./presale";
+import { presaleViewerFor } from "./presaleViewer";
+import { userIsMember } from "@/lib/membership";
 
 type PublicLocale = "nl" | "en";
 
@@ -79,7 +90,7 @@ function ticketTypeIsOnSale(
 function publicEventDto(
   event: PublicEventRecord,
   locale: PublicLocale,
-  viewer?: { groups: { id: string; type: string }[] } | null
+  viewer?: PresaleViewer
 ) {
   return {
     id: event.id,
@@ -119,7 +130,10 @@ function publicEventDto(
       audience: type.audience,
       minPerOrder: type.minPerOrder,
       maxPerOrder: type.maxPerOrder,
-      salesStart: type.salesStartAt,
+      // Presale-bewust, net als het eventvenster hierboven: een eigen start
+      // die samenvalt met de publieke verkoopstart houdt de voorverkoop niet
+      // tegen (zie `viewerTypeSalesStart`).
+      salesStart: viewerTypeSalesStart(event, type, viewer),
       salesEnd: type.salesEndAt,
       questions: event.questions
         .filter((question) => question.ticketTypeId == null || question.ticketTypeId === type.id)
@@ -165,9 +179,13 @@ export async function listPublishedTicketEvents(locale: PublicLocale) {
     }),
     getSession(await headers()),
   ]);
-  const isHonorary = await viewerIsHonorary(session?.user.id);
+  const [isHonorary, isMember, viewer] = await Promise.all([
+    viewerIsHonorary(session?.user.id),
+    userIsMember(session?.user.id),
+    presaleViewerFor(session, events),
+  ]);
   return events.flatMap((event) => {
-    const dto = publicEventDto(event, locale, session);
+    const dto = publicEventDto(event, locale, viewer);
     if (dto.salesStart && new Date(dto.salesStart) > now) return [];
     const selectableTypes = dto.ticketTypes.filter(
       (type) =>
@@ -176,7 +194,9 @@ export async function listPublishedTicketEvents(locale: PublicLocale) {
         !ticketTypeIsHidden(type, isHonorary)
     );
     const ticketTypes = selectableTypes.filter(
-      (type) => Boolean(session) || !ticketTypeRequiresLogin(type)
+      (type) =>
+        (Boolean(session) || !ticketTypeRequiresLogin(type)) &&
+        !ticketTypeNeedsMembership(type, isMember)
     );
     return [{
       ...dto,
@@ -185,6 +205,10 @@ export async function listPublishedTicketEvents(locale: PublicLocale) {
         !session &&
         ticketTypes.length === 0 &&
         selectableTypes.some(ticketTypeRequiresLogin),
+      requiresMembership:
+        Boolean(session) &&
+        ticketTypes.length === 0 &&
+        selectableTypes.some((type) => ticketTypeNeedsMembership(type, isMember)),
     }];
   });
 }
@@ -197,11 +221,17 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
   if (!event || event.status !== "PUBLISHED") return null;
 
   const session = await getSession(await headers());
-  const isHonorary = await viewerIsHonorary(session?.user.id);
-  const dto = publicEventDto(event, locale, session);
+  const [isHonorary, isMember, viewer] = await Promise.all([
+    viewerIsHonorary(session?.user.id),
+    userIsMember(session?.user.id),
+    presaleViewerFor(session, [event]),
+  ]);
+  const dto = publicEventDto(event, locale, viewer);
   const visibleTypes = dto.ticketTypes.filter((type) => !ticketTypeIsHidden(type, isHonorary));
   const ticketTypes = visibleTypes.filter(
-    (type) => Boolean(session) || !ticketTypeRequiresLogin(type)
+    (type) =>
+      (Boolean(session) || !ticketTypeRequiresLogin(type)) &&
+      !ticketTypeNeedsMembership(type, isMember)
   );
   return {
     ...dto,
@@ -210,6 +240,10 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
       !session &&
       ticketTypes.length === 0 &&
       visibleTypes.some(ticketTypeRequiresLogin),
+    requiresMembership:
+      Boolean(session) &&
+      ticketTypes.length === 0 &&
+      visibleTypes.some((type) => ticketTypeNeedsMembership(type, isMember)),
     viewer: session
       ? { id: session.user.id, name: session.user.name, email: session.user.email }
       : null,

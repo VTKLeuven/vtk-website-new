@@ -638,6 +638,10 @@ model User {
   updatedAt DateTime  @updatedAt
 
   memberships          GroupMembership[]
+  // Lidmaatschap van de kring per academiejaar. Bewust een andere as dan
+  // `memberships` hierboven: dat zijn posten per werkingsjaar.
+  vtkMemberships       Membership[]            @relation("MembershipUser")
+  membershipsGranted   Membership[]            @relation("MembershipGrantedBy")
   roles                UserRole[]
   vaultMember          VaultMember?
   pocRepresentative    PocRepresentative[]
@@ -822,6 +826,124 @@ model GroupMembership {
   @@unique([userId, groupId, year])
   @@index([groupId])
   @@index([year])
+}
+
+// -----------------------------------------------------------------------------
+// Lidmaatschap van de kring (per academiejaar)
+// -----------------------------------------------------------------------------
+// Dit is iets anders dan `GroupMembership` hierboven: dat is een post in een
+// werkingsjaar, dit is "student X is dit academiejaar lid van VTK". Gratis voor
+// wie aan de faculteit Ingenieurswetenschappen studeert (KU Leuven bevestigt
+// dat via `User.firwStudent`), betalend voor wie dat niet doet.
+// Zie docs/design-decisions.md, "Lidmaatschap".
+
+/// Waar een lidmaatschap vandaan komt. Bepaalt niet wat het lid mag: een lid is
+/// een lid. Het zegt enkel hoe het tot stand kwam, en dus ook of er geld aan te
+/// pas kwam.
+enum MembershipKind {
+  /// Gratis, voor een student van de faculteit Ingenieurswetenschappen.
+  FACULTY
+  /// Betalend niet-facultair lid.
+  EXTERNAL
+  /// Door een beheerder toegekend, zonder betaling.
+  MANUAL
+}
+
+enum MembershipPaymentStatus {
+  CREATED
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+  EXPIRED
+}
+
+/// Eén lidmaatschap, van één lid, voor één academiejaar (2026 = "26-27").
+///
+/// Bewust een tabel en geen boolean op `User`: het lidmaatschap loopt per jaar
+/// af, de historiek is wat het ledenaantal van vorig jaar is, en er kan een
+/// betaling aan hangen.
+model Membership {
+  id     String         @id @default(cuid())
+  userId String
+  /// Academiejaar, als startjaar (2026 = "26-27"). Dezelfde as als
+  /// `User.studyConfirmedYear`, want daar wordt het lidmaatschap gevraagd.
+  year   Int
+  kind   MembershipKind
+
+  /// Wanneer het lidmaatschap effectief geldig werd. Blijft null zolang een
+  /// betalend lidmaatschap niet betaald is, en dat is precies het verschil
+  /// tussen "heeft aangeduid lid te willen worden" en "is lid". Een gratis of
+  /// handmatig lidmaatschap staat meteen geactiveerd.
+  activatedAt DateTime? @db.Timestamptz(3)
+  /// Wat het lidmaatschap kostte, in cent. Bewust op de rij en niet enkel in de
+  /// instelling: de prijs van vorig jaar mag niet veranderen wanneer het bestuur
+  /// de prijs van dit jaar aanpast.
+  priceCents  Int       @default(0)
+
+  /// De beheerder die dit lidmaatschap toekende (`MANUAL`).
+  grantedById String?
+  note        String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  user      User                @relation("MembershipUser", fields: [userId], references: [id], onDelete: Cascade)
+  grantedBy User?               @relation("MembershipGrantedBy", fields: [grantedById], references: [id], onDelete: SetNull)
+  payments  MembershipPayment[]
+
+  @@unique([userId, year])
+  @@index([year, activatedAt])
+}
+
+/// Spiegel van `UitleenPayment`, zonder refunds: een lidmaatschap wordt niet
+/// terugbetaald via de site. `provider` is een vrije string zodat een
+/// providerwissel geen migratie vraagt.
+model MembershipPayment {
+  id                 String                  @id @default(cuid())
+  membershipId       String
+  provider           String
+  providerCheckoutId String?
+  providerPaymentId  String?
+  idempotencyKey     String
+  status             MembershipPaymentStatus @default(CREATED)
+  amountCents        Int
+  currency           String                  @default("EUR")
+  checkoutUrl        String?
+  providerStatus     String?
+  expiresAt          DateTime?               @db.Timestamptz(3)
+  succeededAt        DateTime?               @db.Timestamptz(3)
+  failedAt           DateTime?               @db.Timestamptz(3)
+  createdAt          DateTime                @default(now()) @db.Timestamptz(3)
+  updatedAt          DateTime                @updatedAt @db.Timestamptz(3)
+
+  membership Membership                 @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  webhooks   MembershipPaymentWebhook[]
+
+  @@unique([provider, providerCheckoutId])
+  @@unique([provider, providerPaymentId])
+  @@unique([provider, idempotencyKey])
+  @@index([membershipId, status])
+  @@index([status, expiresAt])
+}
+
+model MembershipPaymentWebhook {
+  id                 String    @id @default(cuid())
+  provider           String
+  externalEventId    String
+  paymentId          String?
+  signatureValid     Boolean
+  payload            Json
+  processingAttempts Int       @default(0)
+  receivedAt         DateTime  @default(now()) @db.Timestamptz(3)
+  processedAt        DateTime? @db.Timestamptz(3)
+  lastError          String?
+
+  payment MembershipPayment? @relation(fields: [paymentId], references: [id], onDelete: Restrict)
+
+  @@unique([provider, externalEventId])
+  @@index([paymentId])
+  @@index([processedAt, receivedAt])
 }
 
 // -----------------------------------------------------------------------------
@@ -1643,6 +1765,16 @@ model TicketEvent {
   // Wie er in de voorverkoop mag: standaard elke praesidiumpost, met optioneel
   // extra groepen (`presaleGroups`) erbij, bv. de werkgroep die het organiseert.
   presalePraesidium     Boolean           @default(true)
+  // En standaard ook de vaste medewerkers: wie dit werkingsjaar minstens
+  // `PRESALE_SHIFT_THRESHOLD` shiften deed (zie lib/ticketing/presale.ts). Die
+  // staan even vaak achter de toog als een praesidiumlid, maar zitten in geen
+  // enkele post en vielen dus buiten elke voorverkoop.
+  presaleHelpers        Boolean           @default(true)
+  // Geheime sleutel voor de private voorverkooplink: wie ze heeft, koopt al
+  // tijdens de voorverkoop, zonder post en zonder shiften. Bedoeld om te delen
+  // met een groep die de site niet kent (de band, de sponsors, de ouders van).
+  // `null` = geen link; regenereren maakt de oude meteen waardeloos.
+  presaleToken          String?           @unique
   status                TicketEventStatus @default(DRAFT)
   currency              String            @default("EUR")
   maxTicketsPerOrder    Int               @default(8)

@@ -59,6 +59,12 @@ export type PublicTicketEvent = {
   termsUrl?: string | null;
   viewer?: { id: string; name: string; email: string } | null;
   requiresLogin?: boolean;
+  /**
+   * Ingelogd, maar de enige tickets hier zijn voor leden. Bewust naast
+   * `requiresLogin` en niet in de plaats: inloggen en lid worden zijn twee
+   * verschillende dingen om te vragen.
+   */
+  requiresMembership?: boolean;
   ticketTypes: PublicTicketType[];
 };
 

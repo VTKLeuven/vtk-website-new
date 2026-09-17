@@ -8,6 +8,13 @@ import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { logoutAction } from "@/app/actions/auth";
 import { ProfileForm } from "@/components/profile/ProfileForm";
+import {
+  getMembership,
+  getMembershipConfig,
+  membershipChoiceLabels,
+  membershipOffer,
+} from "@/lib/membership";
+import { currentStudyYear } from "@/lib/workingYear";
 
 export async function generateMetadata({
   params,
@@ -45,6 +52,7 @@ export default async function OnboardingPage({
       lastName: true,
       rNumber: true,
       rNumberFromKul: true,
+      firwStudent: true,
       avatarKey: true,
       noKot: true,
       street: true,
@@ -79,6 +87,15 @@ export default async function OnboardingPage({
     },
   });
 
+  // Ook hier, en niet enkel op de jaarlijkse bevestiging: een eerstejaars
+  // doorloopt deze pagina en ziet die bevestiging pas een jaar later.
+  const year = currentStudyYear();
+  const [membership, membershipConfig] = await Promise.all([
+    getMembership(session.user.id, year),
+    getMembershipConfig(),
+  ]);
+  const offer = membershipOffer(user, membership, membershipConfig);
+
   const t = getDictionary(locale).onboarding;
 
   return (
@@ -96,6 +113,7 @@ export default async function OnboardingPage({
           next={home}
           submitLabel={t.submit}
           showCalendarPreference={false}
+          membership={{ offer, labels: membershipChoiceLabels(locale, offer, year) }}
         />
       </Card>
 

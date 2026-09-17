@@ -77,6 +77,7 @@ function checkoutErrorMessage(code: string | undefined, locale: "nl" | "en"): st
     EVENT_NOT_ON_SALE: { nl: "De ticketverkoop is niet geopend.", en: "Ticket sales are not open." },
     INVALID_TICKET_TYPE: { nl: "Een gekozen tickettype is niet meer beschikbaar.", en: "A selected ticket type is no longer available." },
     LOGIN_REQUIRED: { nl: "Log in om deze bestelling af te ronden.", en: "Sign in to complete this order." },
+    MEMBERSHIP_REQUIRED: { nl: "Dit ticket is er voor leden van VTK.", en: "This ticket is for members of VTK." },
     INVALID_QUANTITY: { nl: "Controleer het gekozen aantal tickets.", en: "Check the selected ticket quantity." },
     INVALID_ANSWER: { nl: "Controleer de antwoorden bij de aanwezigen.", en: "Check the attendee answers." },
     TOO_MANY_RESERVATIONS: { nl: "Er staan al meerdere reservaties open. Probeer later opnieuw.", en: "Several reservations are already pending. Try again later." },
@@ -425,21 +426,34 @@ export function TicketShop({
               <h3>
                 {event.requiresLogin
                   ? locale === "nl" ? "Log in om tickets te bestellen" : "Sign in to order tickets"
-                  : locale === "nl" ? "Geen tickets beschikbaar" : "No tickets available"}
+                  : event.requiresMembership
+                    ? locale === "nl" ? "Alleen voor leden" : "Members only"
+                    : locale === "nl" ? "Geen tickets beschikbaar" : "No tickets available"}
               </h3>
               <p>
                 {event.requiresLogin
                   ? locale === "nl"
                     ? "Voor de beschikbare tickets moet je ingelogd zijn."
                     : "You need to sign in for the available tickets."
-                  : locale === "nl"
-                    ? "Er zijn momenteel geen tickettypes beschikbaar voor dit event."
-                    : "There are currently no ticket types available for this event."}
+                  : event.requiresMembership
+                    ? locale === "nl"
+                      ? "De tickets voor dit event zijn er voor leden van VTK."
+                      : "The tickets for this event are for members of VTK."
+                    : locale === "nl"
+                      ? "Er zijn momenteel geen tickettypes beschikbaar voor dit event."
+                      : "There are currently no ticket types available for this event."}
               </p>
               {event.requiresLogin ? (
                 <Link className="ticket-primary-button" href={loginHref}>
                   <LogIn size={17} aria-hidden="true" />
                   {locale === "nl" ? "Inloggen" : "Sign in"}
+                </Link>
+              ) : event.requiresMembership ? (
+                <Link
+                  className="ticket-primary-button"
+                  href={locale === "en" ? "/en/lidmaatschap" : "/lidmaatschap"}
+                >
+                  {locale === "nl" ? "Word lid" : "Become a member"}
                 </Link>
               ) : null}
             </div>

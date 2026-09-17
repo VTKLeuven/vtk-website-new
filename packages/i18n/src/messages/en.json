@@ -416,6 +416,7 @@
     "content": "Header",
     "calendar": "Calendar",
     "users": "Users",
+    "leden": "Members",
     "groups": "Posts",
     "werkgroepen": "Werkgroepen",
     "roles": "Roles",
@@ -931,6 +932,10 @@
     "passwordReset": {
       "title": "Forgot your password",
       "description": "Set a new password for your VTK account."
+    },
+    "membership": {
+      "title": "Your membership",
+      "description": "Your VTK membership for this academic year."
     }
   },
   "contact": {
@@ -1129,5 +1134,41 @@
     "kindInvalid": "Choose what it is about first.",
     "imageInvalid": "The screenshot was not saved. Try adding it again.",
     "saveFailed": "Something went wrong while saving. Please try again."
+  },
+  "membership": {
+    "kicker": "Membership",
+    "headingFaculty": "Become a member of VTK for free",
+    "headingExternal": "Become a member of VTK",
+    "faculty": "I want to become a member of VTK for free for academic year {year}",
+    "facultyHint": "KU Leuven confirms that you study at the Faculty of Engineering Science, so your membership is free.",
+    "external": "I want to become a non-faculty member for {price}",
+    "externalHint": "You do not study at the Faculty of Engineering Science. After confirming you go straight to the payment page; you are a member as soon as the payment arrives.",
+    "closed": "Becoming a member is not possible right now.",
+    "already": "You are already a member this academic year.",
+    "pageTitle": "Your membership",
+    "pageSubtitle": "VTK membership for {year}.",
+    "statusActive": "You are a member for {year}.",
+    "statusActiveFaculty": "You are a member for {year}, free as a student of the Faculty of Engineering Science.",
+    "statusPending": "Your membership for {year} is ready once you have paid {price}.",
+    "statusNone": "You are not a member yet this academic year.",
+    "statusFirw": "You study at the Faculty of Engineering Science, so you count as a member of VTK.",
+    "pay": "Pay {price}",
+    "payAgain": "Try the payment again",
+    "paymentReturned": "Thank you. As soon as the payment is confirmed your membership shows up here. That usually takes a few seconds.",
+    "paymentCancelled": "The payment was cancelled. You can start it again below.",
+    "paymentFailed": "The payment page could not be opened. Please try again later.",
+    "since": "Member since {date}",
+    "accountHeading": "Membership",
+    "accountLink": "View your membership",
+    "ticketMembersOnly": "This ticket is for members of VTK.",
+    "ticketBecomeMember": "Become a member",
+    "joinHeading": "Become a member",
+    "joinFree": "Become a member for free for {year}",
+    "joinPaid": "Become a member for {price}",
+    "joinSaving": "Saving...",
+    "joined": "You are a member now.",
+    "joinFailed": "Becoming a member failed. Please try again.",
+    "joinClosed": "Becoming a member is not possible right now.",
+    "accountJoin": "Become a member of VTK"
   }
 }

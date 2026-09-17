@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
+import { PRESALE_SHIFT_THRESHOLD, presaleStart } from "@/lib/ticketing/presale";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { StatusBadge } from "@/components/ticketing/admin/StatusBadge";
@@ -41,6 +42,24 @@ export default async function TicketEventDashboard({
   const canViewAttendees = capabilities.includes("VIEW_ATTENDEES");
   const canViewOrders = capabilities.includes("MANAGE_ORDERS") || canViewFinance;
   const canManageSetup = capabilities.includes("MANAGE_EVENT") || capabilities.includes("MANAGE_INVENTORY");
+
+  // De voorverkoop in één regel, zodat je ze kan nakijken zonder het
+  // instellingenformulier te openen.
+  const presaleFrom = presaleStart(event);
+  const presaleAudience = [
+    event.presalePraesidium !== false
+      ? locale === "nl"
+        ? "praesidium"
+        : "praesidium"
+      : null,
+    event.presaleHelpers !== false
+      ? locale === "nl"
+        ? `vaste medewerkers (${PRESALE_SHIFT_THRESHOLD}+ shiften)`
+        : `regular helpers (${PRESALE_SHIFT_THRESHOLD}+ shifts)`
+      : null,
+  ]
+    .filter((part): part is string => part !== null)
+    .join(locale === "nl" ? " en " : " and ");
 
   const [pools, activeTypeCount, ticketCount, checkedInCount, completedOrderCount, financials, recentOrders] =
     await Promise.all([
@@ -125,6 +144,30 @@ export default async function TicketEventDashboard({
             <div><dt>{locale === "nl" ? "Verkoop einde" : "Sales end"}</dt><dd>{formatDateTime(event.salesEndAt, locale)}</dd></div>
             <div><dt>{locale === "nl" ? "Evenement" : "Event"}</dt><dd>{formatDateTime(event.startsAt, locale)}</dd></div>
             <div><dt>{locale === "nl" ? "Limiet per order" : "Limit per order"}</dt><dd>{formatNumber(event.maxTicketsPerOrder, locale)}</dd></div>
+            {/* Wanneer dit event online kwam, en of er een voorverkoop voor
+                liep. Allebei enkel na te kijken, niet aan te passen: precies
+                waar je naar zoekt als je wil controleren of de instellingen van
+                een lopende verkoop kloppen. */}
+            <div>
+              <dt>{locale === "nl" ? "Online sinds" : "Online since"}</dt>
+              <dd>
+                {event.publishedAt
+                  ? formatDateTime(event.publishedAt, locale)
+                  : locale === "nl"
+                    ? "Nog niet gepubliceerd"
+                    : "Not published yet"}
+              </dd>
+            </div>
+            <div>
+              <dt>{locale === "nl" ? "Voorverkoop" : "Presale"}</dt>
+              <dd>
+                {presaleFrom
+                  ? `${formatDateTime(presaleFrom, locale)} · ${presaleAudience}`
+                  : locale === "nl"
+                    ? "Geen"
+                    : "None"}
+              </dd>
+            </div>
           </dl>
           <div className="ticket-admin-inline-details">
             <span><CalendarDays aria-hidden="true" size={14} />{formatDateTime(event.startsAt, locale)}</span>

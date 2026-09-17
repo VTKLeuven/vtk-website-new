@@ -7134,3 +7134,95 @@ de shoplijst, de eventpagina en het slot bij het afrekenen, net als
 `audience.ts`. De voorverkoop is dus **niet** enkel een kwestie van een knop
 uitgrijzen: `createOrder` rekent met dezelfde vervroegde start, dus een
 gekopieerde bestelling van iemand die er niet in mag, krijgt `EVENT_NOT_ON_SALE`.
+
+**Ook de vaste medewerkers, standaard.** Wie dit werkingsjaar minstens vijftien
+shiften deed, zit in de voorverkoop, ook zonder post
+(`PRESALE_SHIFT_THRESHOLD`). Zonder die tak was de voorverkoop van "wie
+meewerkt" stilzwijgend "wie een postje heeft", terwijl de mensen die het
+vaakst achter de toog staan er dan net buiten vielen. De drempel telt enkel
+voltooide shiften van het lopende werkingsjaar, dezelfde definitie als de
+ranglijst, en reset dus mee op 15 juli. Per event uit te zetten naast het
+praesidium-vinkje (`presaleHelpers`).
+
+**Een tickettype volgt de voorverkoop, tenzij het echt later start.** Een eigen
+verkoopstart die op of vóór de publieke verkoopstart valt, zegt niets bovenop
+het eventvenster; ze staat er omdat het formulier ze mee overneemt. Enkel een
+**latere** eigen start ("late tickets vanaf 5 december") is een aparte
+beslissing en blijft staan, ook in voorverkoop. Dit is een keuze uit de
+praktijk: het eerste event met een voorverkoop toonde wie erin zat wel de
+melding "jij kan nu al bestellen", terwijl elk tickettype op "Binnenkort" stond
+en er niets te kopen viel. De regel staat in `viewerTypeSalesStart`.
+
+**Daarnaast is er één private link per event** (`TicketEvent.presaleToken`,
+`/tickets/<slug>/voorverkoop/<token>`). Wie hem opent, koopt mee in de
+voorverkoop, ook uitgelogd en zonder post of shiften. Die bestaat voor de groep
+die je niet in een post of werkgroep kan vatten: de band die komt spelen, de
+sponsors, de ouders van. Zonder die weg was het alternatief de verkoop vroeger
+openzetten voor iedereen.
+
+- De link zet een cookie voor dat ene event en stuurt door naar de gewone
+  ticketpagina, zodat het geheim niet in elke gedeelde link en in elke
+  browsergeschiedenis blijft staan, en de bezoeker kan herladen en afrekenen
+  zonder de link opnieuw nodig te hebben. De cookie vervalt wanneer de verkoop
+  voor iedereen opengaat.
+- Vernieuwen maakt de vorige link meteen waardeloos. Dat is de enige manier om
+  een link terug te nemen die te breed gedeeld werd, en dus ook het antwoord op
+  "hij staat op Facebook".
+- Een verkeerde of ingetrokken link leidt gewoon naar de ticketpagina in plaats
+  van naar een foutmelding: die zou enkel verklappen dat er een link bestaat.
+
+## Lidmaatschap van de kring
+
+VTK houdt per **academiejaar** bij wie lid is (`Membership`, uniek op lid +
+jaar). Dat is iets anders dan `GroupMembership`: dat is een post in een
+werkingsjaar, dit is "deze student is dit jaar lid van de kring". Het hangt aan
+dezelfde klok als de studiebevestiging (cutover 21 september), want het wordt op
+datzelfde scherm gevraagd.
+
+**Gratis voor de faculteit, betalend daarbuiten.** Een student van de faculteit
+Ingenieurswetenschappen wordt gratis lid; wie er niet studeert, betaalt (default
+€25, instelbaar in /admin/leden). De faculteit komt van KU Leuven zelf
+(`User.firwStudent`, uit `eduPersonOrgUnitDN`), niet uit een vinkje van het lid.
+
+**De vraag staat bij de studiebevestiging en bij de onboarding**, niet op een
+eigen scherm dat niemand uit zichzelf opent. Eén vinkje, nooit twee: je krijgt
+de gratis weg óf de betalende te zien, want welke van de twee het is, hangt van
+je faculteit af en niet van een voorkeur. Het vinkje staat niet voor,
+en is niet verplicht: het is een beslissing van het lid, bij de betalende weg
+zelfs een uitgave, en de studiebevestiging mag er niet op blijven hangen.
+
+**Betalen gebeurt na het bevestigen**, want een betaling kan de poort niet
+ophouden. Wie de betalende weg koos, gaat meteen door naar de betaalpagina; wie
+ze laat vallen, is gewoon geen lid en wordt verder met rust gelaten. Het
+lidmaatschap is pas geldig wanneer het geld er is (`activatedAt`), en dat is
+precies het verschil tussen "heeft aangeduid lid te willen worden" en "is lid".
+
+**Enkel Mollie**, terwijl ticketing ook een rechtstreekse Bancontact-koppeling
+kent. Bancontact host zelf geen betaalpagina; die moeten wij dan hosten, en bij
+ticketing is dat een heel scherm rond één bestelling. In de gehoste checkout van
+Mollie staat Bancontact gewoon tussen de betaalwijzen, dus het lid betaalt
+precies zoals gevraagd, zonder een tweede scherm om te onderhouden.
+
+**Wie telt als lid**, voor bijvoorbeeld een ticketsoort "alleen leden": een
+student van de faculteit (KU Leuven bevestigt dat, en die bevestiging is sterker
+dan een vinkje), of wie een geactiveerd lidmaatschap van dit academiejaar heeft,
+gratis, betaald of door een beheerder toegekend. Zonder die eerste tak zou het
+halve publiek van de kring buiten staan tot iedereen het formulier ooit eens
+invulde. Vroeger betekende `TicketAudience.MEMBERS` enkel "heeft een account".
+
+**Een beheerder kan iemand handmatig lid maken**, zonder betaling: iemand
+betaalt cash aan de toog, een uitwisselingsstudent valt buiten de
+faculteitscheck, of KU Leuven geeft een faculteit verkeerd door. Zo'n
+lidmaatschap krijgt altijd `MANUAL`, ook voor een student van de faculteit,
+zodat in de ledenlijst zichtbaar blijft dat een beheerder het deed en wie.
+
+**De prijs staat op de rij, niet enkel in de instelling.** Verandert het bestuur
+de prijs, dan verandert wat vorig jaar betaald is niet mee.
+
+**Nee zeggen is niet definitief.** Het vinkje bij de studiebevestiging mag je
+laten staan, en dan kan je later alsnog lid worden op `/lidmaatschap`, met een
+link daarnaartoe op `/account`. Zonder die weg was "ik bekijk het nog wel even"
+hetzelfde als "dit academiejaar niet", en dat is precies de beslissing die
+iemand op dat moment níét wilde nemen. Het blijft één plek om lid te worden: de
+accountpagina toont de status en linkt ernaartoe, ze bouwt geen tweede
+formulier.

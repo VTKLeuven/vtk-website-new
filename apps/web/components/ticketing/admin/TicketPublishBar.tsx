@@ -77,6 +77,16 @@ export function TicketPublishBar({
     });
   }
 
+  // Ook bij een live event: gepubliceerd is niet hetzelfde als zichtbaar. Staat
+  // de verkoopstart nog in de toekomst, dan toont de echte pagina een dichte
+  // shop, en is het voorbeeld de enige manier om na te kijken of de
+  // tickettypes, de prijzen en de vragen kloppen.
+  const previewLink = (
+    <a className="ticket-admin-alert-link" href={`${base}/tickets/${slug}?preview=1`}>
+      {t.preview}
+    </a>
+  );
+
   if (status === "PUBLISHED") {
     return (
       <div className="ticket-admin-alert" data-tone="success" role="status">
@@ -85,7 +95,8 @@ export function TicketPublishBar({
           {t.published}{" "}
           <a className="ticket-admin-alert-link" href={`${base}/tickets/${slug}`}>
             {t.view}
-          </a>
+          </a>{" "}
+          &middot; {previewLink}
         </span>
       </div>
     );
@@ -95,10 +106,7 @@ export function TicketPublishBar({
     return (
       <div className="ticket-admin-alert" data-tone="info" role="status">
         <span>
-          {t.otherStatus} {status}{" "}
-          <a className="ticket-admin-alert-link" href={`${base}/tickets/${slug}?preview=1`}>
-            {t.preview}
-          </a>
+          {t.otherStatus} {status} {previewLink}
         </span>
       </div>
     );

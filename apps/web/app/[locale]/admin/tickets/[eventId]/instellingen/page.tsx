@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
-import { Palette } from "lucide-react";
+import { Link2, Palette } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
 import { TicketEventForm } from "@/components/ticketing/admin/TicketEventForm";
@@ -9,6 +9,8 @@ import { TicketTypeManager } from "@/components/ticketing/admin/TicketTypeManage
 import { TicketQuestionManager } from "@/components/ticketing/admin/TicketQuestionManager";
 import { TicketDesignManager } from "@/components/ticketing/admin/TicketDesignManager";
 import { SettingsPanel } from "@/components/ticketing/admin/SettingsPanel";
+import { PresaleLinkPanel } from "@/components/ticketing/admin/PresaleLinkPanel";
+import { hasPresale } from "@/lib/ticketing/presale";
 import type { AdminLocale } from "@/components/ticketing/admin/format";
 import { readTicketDesignSettings } from "@/lib/ticketing/design";
 
@@ -119,6 +121,30 @@ export default async function TicketEventSettingsPage({
             locale={locale}
           />
         </div>
+      ) : null}
+      {canManageEvent ? (
+        <SettingsPanel
+          id="voorverkooplink"
+          title={locale === "nl" ? "Private voorverkooplink" : "Private presale link"}
+          status={
+            event.presaleToken
+              ? locale === "nl"
+                ? "Er staat een link klaar"
+                : "A link is ready"
+              : locale === "nl"
+                ? "Optioneel · nog geen link"
+                : "Optional · no link yet"
+          }
+          icon={<Link2 size={18} aria-hidden="true" />}
+        >
+          <PresaleLinkPanel
+            eventId={eventId}
+            slug={event.slug}
+            token={event.presaleToken}
+            hasPresale={hasPresale(event)}
+            locale={locale}
+          />
+        </SettingsPanel>
       ) : null}
       {canManageEvent ? (
         <SettingsPanel
