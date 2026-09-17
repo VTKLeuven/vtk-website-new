@@ -14,6 +14,7 @@ import {
 } from '@/lib/uitleen';
 import { AuditTimeline } from '@/components/audit-timeline';
 import { PhoneLink } from '@/components/phone-link';
+import { LinkedText } from '@/components/linked-text';
 import { EventLink } from '@/components/event-link';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import {
@@ -221,8 +222,22 @@ export default async function BeheerVervoerPage({
       ]);
     }
     if (booking.eventName) lines.push(['Evenement', booking.eventName]);
+    // Wat er mee moet, met de link naar de materiaallijst erin aanklikbaar.
+    if (booking.cargoNote) {
+      lines.push(['Lading', <LinkedText key="cargo" text={booking.cargoNote} />]);
+    }
     if (booking.pickupAddress) lines.push(['Laadadres', booking.pickupAddress]);
     if (booking.destination) lines.push(['Bestemming', booking.destination]);
+    // Het nummer van de chauffeur staat bij de andere nummers en niet bij zijn
+    // naam in de rij erboven: bellen is bellen, of het nu de aanvrager, de
+    // bijrijder of de chauffeur is. Zie `driverPhones` voor waar het vandaan
+    // komt; is er geen, dan staat de regel er niet.
+    const driverPhone = booking.driverId
+      ? (drivers.find((driver) => driver.id === booking.driverId)?.phone ?? null)
+      : null;
+    if (driverPhone) {
+      lines.push(['Chauffeur bellen', <PhoneLink key="driverphone" number={driverPhone} />]);
+    }
     if (booking.contactPhone) {
       lines.push(['Aanvrager bellen', <PhoneLink key="contact" number={booking.contactPhone} />]);
     }

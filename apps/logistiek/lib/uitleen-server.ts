@@ -1345,6 +1345,12 @@ export type DriverOption = {
    * (`driverColorIndex` in lib/driver-colors.ts).
    */
   colorIndex: number | null;
+  /**
+   * Het nummer waarop deze chauffeur bereikbaar is, of `null`. Zie
+   * {@link driverPhones}: vastgelegd door het team, anders het laatste nummer
+   * dat deze persoon zelf bij een aanvraag opgaf.
+   */
+  phone: string | null;
 };
 
 /** Leden van de post Logistiek dit werkingsjaar. */
@@ -1472,8 +1478,20 @@ export async function driverOptions(): Promise<DriverOption[]> {
     logistiekTeamMembers(),
     prisma.uitleenDriver.findMany({
       where: { user: { active: true, deletedAt: null } },
-      select: { canDriveVan: true, colorIndex: true, user: { select: { id: true, name: true } } },
+      select: {
+        canDriveVan: true,
+        colorIndex: true,
+        phone: true,
+        user: { select: { id: true, name: true } },
+      },
     }),
+  ]);
+
+  // Het nummer erbij, zodat "bel de chauffeur" overal waar deze lijst gebruikt
+  // wordt één tik is in plaats van een zoektocht.
+  const phones = await driverPhones([
+    ...team.map((member) => member.id),
+    ...extra.map((row) => row.user.id),
   ]);
 
   // Een postlid kan óók een rij hier hebben: die wordt aangemaakt zodra iemand de
@@ -1490,6 +1508,7 @@ export async function driverOptions(): Promise<DriverOption[]> {
       source: 'POST',
       canDriveVan: row?.canDriveVan ?? false,
       colorIndex: row?.colorIndex ?? null,
+      phone: row?.phone?.trim() || phones.get(member.id) || null,
     });
   }
   for (const row of extra) {
@@ -1500,10 +1519,71 @@ export async function driverOptions(): Promise<DriverOption[]> {
       source: 'EXTRA',
       canDriveVan: row.canDriveVan,
       colorIndex: row.colorIndex,
+      phone: row.phone?.trim() || phones.get(row.user.id) || null,
     });
   }
 
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'nl'));
+}
+
+/**
+ * Het nummer waarop je een chauffeur bereikt, per gebruikers-id.
+ *
+ * Het staat nergens als vast gegeven op een account, maar het staat wél al
+ * ergens: bijna iedereen die ooit zelf iets aanvroeg, tikte toen een
+ * contactnummer in. Deze functie neemt dat over, zodat "bel de chauffeur" niet
+ * begint met "vraag eerst zijn nummer aan iemand".
+ *
+ * De volgorde is die van betrouwbaarheid: wat het team zelf invulde
+ * (`UitleenDriver.phone`) gaat voor op wat deze persoon ooit ergens meegaf, en
+ * daarbinnen telt het meest recente.
+ *
+ * Wat hier bewust **niet** in zit: het nummer van een bijrijder
+ * (`UitleenTransportHelper.phone`). Dat is het nummer van de bijrijder zelf en
+ * niet van wie die rij aanmaakte; `addedById` erop loslaten zou de helft van de
+ * chauffeurs het nummer van iemand anders geven, en een verkeerd nummer is
+ * erger dan geen nummer.
+ *
+ * Het gevondene wordt niet weggeschreven: dit draait op een leespad, en een
+ * pagina die stil rijen bijwerkt terwijl je ze bekijkt, is een pagina waarvan
+ * je de gegevens niet meer kan verklaren. Het team legt een nummer vast bij
+ * Chauffeurs; tot dan is dit een voorstel uit de historiek.
+ */
+export async function driverPhones(userIds: string[]): Promise<Map<string, string>> {
+  const ids = [...new Set(userIds.filter(Boolean))];
+  if (ids.length === 0) return new Map();
+
+  const [saved, bookings, reservations] = await Promise.all([
+    prisma.uitleenDriver.findMany({
+      where: { userId: { in: ids }, phone: { not: null } },
+      select: { userId: true, phone: true },
+    }),
+    prisma.uitleenTransportBooking.findMany({
+      where: { userId: { in: ids }, contactPhone: { not: null } },
+      select: { userId: true, contactPhone: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.uitleenReservation.findMany({
+      where: { userId: { in: ids }, contactPhone: { not: null } },
+      select: { userId: true, contactPhone: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    }),
+  ]);
+
+  const phones = new Map<string, string>();
+  // Van oud naar nieuw zou hier ook kunnen, maar dan schrijf je elke rij over de
+  // vorige heen; zo stopt het bij de eerste (en dus meest recente) per persoon.
+  for (const row of [...bookings, ...reservations].sort(
+    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+  )) {
+    const phone = row.contactPhone?.trim();
+    if (phone && !phones.has(row.userId)) phones.set(row.userId, phone);
+  }
+  for (const row of saved) {
+    const phone = row.phone?.trim();
+    if (phone) phones.set(row.userId, phone);
+  }
+  return phones;
 }
 
 export type DriverPoolEntry = DriverOption & {
@@ -1513,6 +1593,10 @@ export type DriverPoolEntry = DriverOption & {
   note: string | null;
   /** Gedeactiveerd op vtk.be: staat nog in de lijst, maar valt uit de keuze weg. */
   inactive: boolean;
+  /** Het nummer waarop deze chauffeur bereikbaar is; zie {@link driverPhones}. */
+  phone: string | null;
+  /** Staat het nummer vast (door het team ingevuld) of komt het uit de historiek? */
+  phoneFromHistory: boolean;
   upcomingTrips: number;
   totalTrips: number;
 };
@@ -1533,6 +1617,7 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
         note: true,
         canDriveVan: true,
         colorIndex: true,
+        phone: true,
         user: { select: { id: true, name: true, email: true, active: true } },
       },
     }),
@@ -1550,6 +1635,12 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
 
   const total = new Map(tripCounts.map((row) => [row.driverId, row._count._all]));
   const upcoming = new Map(upcomingCounts.map((row) => [row.driverId, row._count._all]));
+
+  // Het nummer uit de historiek voor iedereen die er nog geen vast heeft staan.
+  const phones = await driverPhones([
+    ...team.map((member) => member.id),
+    ...extra.map((row) => row.user.id),
+  ]);
 
   const byId = new Map<string, DriverPoolEntry>();
   const put = (entry: Omit<DriverPoolEntry, 'upcomingTrips' | 'totalTrips'>) => {
@@ -1578,6 +1669,8 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       canDriveVan: row?.canDriveVan ?? false,
       colorIndex: row?.colorIndex ?? null,
       inactive: false,
+      phone: row?.phone?.trim() || phones.get(member.id) || null,
+      phoneFromHistory: !row?.phone?.trim() && Boolean(phones.get(member.id)),
     });
   }
   for (const row of extra) {
@@ -1591,6 +1684,8 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       canDriveVan: row.canDriveVan,
       colorIndex: row.colorIndex,
       inactive: !row.user.active,
+      phone: row.phone?.trim() || phones.get(row.user.id) || null,
+      phoneFromHistory: !row.phone?.trim() && Boolean(phones.get(row.user.id)),
     });
   }
 

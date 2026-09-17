@@ -168,6 +168,9 @@ export function TransportPlanner({
   const [draft, setDraft] = useState<NewTripValues | null>(null);
   const [openEventId, setOpenEventId] = useState<string | null>(null);
   const trip = trips.find((entry) => entry.id === openId) ?? null;
+  const tripDriverPhone = trip?.driverId
+    ? (drivers.find((driver) => driver.id === trip.driverId)?.phone ?? null)
+    : null;
   const openEvent = events.find((entry) => entry.id === openEventId) ?? null;
 
   const eventBars: CalendarEventBar[] | undefined = filters.showEvents
@@ -531,6 +534,19 @@ export function TransportPlanner({
               {/* De feiten die niet in het formulier staan omdat het lid ze
                   invulde en het team ze niet hoort te overschrijven. */}
               <dl className="logistics-fact-grid">
+                {/* Het nummer van de chauffeur, bovenaan bij de andere nummers
+                    en niet als extra regel bij zijn naam: wie hier belt, belt
+                    de aanvrager, de bijrijder of de chauffeur, en dat zijn drie
+                    regels van hetzelfde soort. Staat er geen nummer, dan valt de
+                    regel weg; zie `driverPhones`. */}
+                {tripDriverPhone ? (
+                  <div>
+                    <dt>Chauffeur bellen</dt>
+                    <dd>
+                      <PhoneLink number={tripDriverPhone} />
+                    </dd>
+                  </div>
+                ) : null}
                 {trip.contactPhone ? (
                   <div>
                     <dt>Aanvrager bellen</dt>

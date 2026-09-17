@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   removeDriverAction,
   saveDriverNoteAction,
+  saveDriverPhoneAction,
   setDriverColorAction,
   setDriverVanAction,
 } from '@/app/actions/beheer';
@@ -18,6 +19,7 @@ import { useToast } from '@/components/ui/toast';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { SaveForm } from '@/components/ui/save-form';
+import { PhoneLink } from '@/components/phone-link';
 import { SortChips, useSort } from '@/app/beheer/sortable-header';
 import { compareText, type SortDir } from '@/app/beheer/sort';
 import type { DriverPoolEntry } from '@/lib/uitleen-server';
@@ -225,6 +227,20 @@ function DriverRow({ entry }: { entry: DriverPoolEntry }) {
               <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">E-mail</dt>
               <dd className="mt-0.5 break-all text-vtk-body">{entry.email}</dd>
             </div>
+            {/* Het nummer waarop je deze chauffeur bereikt. Staat naast de
+                e-mail en niet in de notitie: een chauffeur die niet komt
+                opdagen, bel je, en dan wil je niet eerst een vrije tekst
+                moeten lezen. Komt het uit de historiek, dan zegt het label
+                dat: het is dan het laatste nummer dat deze persoon zelf
+                ergens opgaf en niet iets wat het team bevestigde. */}
+            <div>
+              <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">
+                Telefoon{entry.phoneFromHistory ? ' (uit een eerdere aanvraag)' : ''}
+              </dt>
+              <dd className="mt-0.5 text-vtk-body">
+                {entry.phone ? <PhoneLink number={entry.phone} /> : <span className="text-vtk-muted">niet gekend</span>}
+              </dd>
+            </div>
             <div>
               <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">Ritten</dt>
               <dd className="mt-0.5 text-vtk-body">
@@ -280,6 +296,32 @@ function DriverRow({ entry }: { entry: DriverPoolEntry }) {
           />
         ) : null}
       </div>
+
+      {/* Het nummer vastleggen kan bij iedereen, ook bij wie via de post
+          chauffeur is: de actie maakt de rij aan wanneer ze nog niet bestaat,
+          net als de karvlag en de kleur. */}
+      <details className="mt-2">
+        <summary className="cursor-pointer text-xs font-semibold text-vtk-navy">
+          {entry.phone && !entry.phoneFromHistory ? 'Telefoon bewerken' : 'Telefoon vastleggen'}
+        </summary>
+        <SaveForm
+          action={saveDriverPhoneAction}
+          submitLabel="Opslaan"
+          savingLabel="Opslaan..."
+          savedMessage="Telefoonnummer opgeslagen."
+          errorMessages={{ NOT_FOUND: 'Dit lid bestaat niet (meer) op vtk.be.' }}
+          className="mt-2 grid gap-2 sm:max-w-md"
+        >
+          <input type="hidden" name="userId" value={entry.id} />
+          <input
+            type="tel"
+            name="phone"
+            defaultValue={entry.phoneFromHistory ? '' : (entry.phone ?? '')}
+            placeholder={entry.phoneFromHistory && entry.phone ? entry.phone : '+32 4..'}
+            className={inputClass}
+          />
+        </SaveForm>
+      </details>
 
       {entry.driverRowId ? (
         <details className="mt-2">

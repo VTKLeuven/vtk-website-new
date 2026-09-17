@@ -2913,6 +2913,41 @@ export async function saveDriverNoteAction(_prev: SaveState, formData: FormData)
 }
 
 /**
+ * Het nummer waarop een chauffeur bereikbaar is, vastleggen.
+ *
+ * Op `userId` en met een upsert, net als de karvlag: een lid van de post
+ * Logistiek heeft pas een rij zodra iemand er iets aan instelt.
+ *
+ * Wat het scherm toont zolang dit leeg is, is het nummer dat deze persoon ooit
+ * zelf bij een aanvraag opgaf (`driverPhones`). Opslaan zet dat vast; leeg maken
+ * laat het weer aan de historiek over, en dat is iets anders dan "heeft geen
+ * nummer". Een nummer wissen dat nergens in de historiek staat, laat het veld
+ * gewoon leeg, zoals het hoort.
+ */
+export async function saveDriverPhoneAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requireManage();
+
+  const userId = String(formData.get('userId') ?? '').trim();
+  const phone = String(formData.get('phone') ?? '').trim().slice(0, 60);
+  if (!userId) return saveError('NOT_FOUND');
+
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null },
+    select: { id: true },
+  });
+  if (!user) return saveError('NOT_FOUND');
+
+  await prisma.uitleenDriver.upsert({
+    where: { userId },
+    update: { phone: phone || null },
+    create: { userId, phone: phone || null },
+  });
+
+  revalidateBeheer();
+  return saveOk();
+}
+
+/**
  * Zet of wist de karvlag van een chauffeur.
  *
  * Werkt op `userId` en niet op de rij, want iemand uit de post Logistiek heeft
