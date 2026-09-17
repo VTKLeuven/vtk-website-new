@@ -12,6 +12,18 @@
  *   make admin
  *   ADMIN_EMAIL=me@vtk.local ADMIN_PASSWORD=hunter2 make admin
  *
+ * ## Het account komt langs de twee poorten binnen
+ *
+ * `proxy.ts` stuurt een lid eerst door de onboarding ("Vervolledig je profiel")
+ * en daarna door de jaarlijkse studiebevestiging. Een vers account viel in
+ * beide, dus wie lokaal even iets in /admin wou nakijken, vulde eerst twee
+ * formulieren in die niets met zijn werk te maken hadden.
+ *
+ * Daarom zet dit script `onboardedAt` en `studyConfirmedYear` meteen goed, met
+ * een studieprofiel erbij. Dat laatste is niet enkel vulling: een lid zonder
+ * richting krijgt de POC-band op de homepage niet te zien, en dat is precies
+ * zo'n surface die je lokaal wil kunnen bekijken.
+ *
  * ## Refuses to run against anything but a local database
  *
  * This hands out full access, so it checks the host in `DATABASE_URL` and stops
@@ -22,6 +34,8 @@
 
 import { hash } from "@node-rs/argon2";
 import { PrismaClient } from "@prisma/client";
+import type { StudyProgramme, StudyYear } from "@prisma/client";
+import { currentStudyYear } from "@vtk/auth";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
@@ -64,12 +78,27 @@ async function main() {
   try {
     const passwordHash = await hash(password);
 
+    // Beide poorten van `proxy.ts` in een keer: `onboardedAt` voor de
+    // onboarding, `studyConfirmedYear` voor de studiebevestiging. Het jaar komt
+    // uit `currentStudyYear()` en niet uit een vast getal, anders valt het
+    // account na de volgende 27 september toch weer in de gate.
+    const profile = {
+      firstName: "Local",
+      lastName: "Admin",
+      onboardedAt: new Date(),
+      studyConfirmedYear: currentStudyYear(),
+      studyYears: ["MASTER_1"] as StudyYear[],
+      studyProgrammes: ["COMPUTER_SCIENCE"] as StudyProgramme[],
+    };
+
     const user = await prisma.user.upsert({
       where: { email },
       // An existing account is promoted rather than left alone: the whole point
-      // of running this is to end up with access.
-      update: { isSuperAdmin: true },
-      create: { email, name: "Local Admin", isSuperAdmin: true },
+      // of running this is to end up with access. Het profiel wordt hier bewust
+      // ook op een bestaand account gezet: draai je dit opnieuw, dan is dat
+      // meestal net omdat je ergens vastzit.
+      update: { isSuperAdmin: true, ...profile },
+      create: { email, name: "Local Admin", isSuperAdmin: true, ...profile },
     });
 
     // Same shape the seed uses for its admin, so better-auth recognises it as a
@@ -93,6 +122,8 @@ async function main() {
         "",
         `  email     ${email}`,
         `  password  ${password}`,
+        "",
+        "  Onboarding en studiebevestiging staan al ingevuld.",
         "",
         "  Log in at  http://localhost:3000/inloggen",
         "  Admin at   http://localhost:3000/admin",
