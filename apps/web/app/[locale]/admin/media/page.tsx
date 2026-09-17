@@ -200,7 +200,12 @@ export default async function AdminMedia({
           ) : null}
         </p>
         <FakbarUploadToggle locale={locale} enabled={fakbarEnabled} />
-        <ImmichAlbumUploader locale={locale} fakbarEnabled={fakbarEnabled} albums={galleryAlbums} />
+        <ImmichAlbumUploader
+          locale={locale}
+          fakbarEnabled={fakbarEnabled}
+          albums={galleryAlbums}
+          albumsError={galleryError}
+        />
 
         <h3 className="mt-6 mb-2 text-sm font-semibold">
           {nl ? "Staat nu op de mediapagina" : "Currently on the media page"} ({galleryAlbums.length})

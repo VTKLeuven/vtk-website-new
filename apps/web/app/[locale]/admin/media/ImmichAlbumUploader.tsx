@@ -17,6 +17,7 @@ export function ImmichAlbumUploader({
   locale,
   fakbarEnabled = false,
   albums = [],
+  albumsError = false,
 }: {
   locale: "nl" | "en";
   /**
@@ -26,8 +27,15 @@ export function ImmichAlbumUploader({
    */
   fakbarEnabled?: boolean;
   albums?: Array<{ slug: string; title: string }>;
+  /**
+   * Immich gaf de albumlijst niet terug. Zonder die lijst kan je geen
+   * hoofdalbum kiezen, maar de optie blijft zichtbaar met uitleg: een blok dat
+   * zichzelf verbergt ziet eruit als een feature die niet gedeployd is.
+   */
+  albumsError?: boolean;
 }) {
   const nl = locale === "nl";
+  const canPickParent = albums.length > 0;
   const [gallery, setGallery] = useState<"main" | "fakbar">("main");
   const [files, setFiles] = useState<File[]>([]);
   const [coverIndex, setCoverIndex] = useState(0);
@@ -161,12 +169,13 @@ export function ImmichAlbumUploader({
         <Label>{nl ? "Beschrijving (optioneel)" : "Description (optional)"}</Label>
         <Input name="description" maxLength={1000} />
       </div>
-      {albums && albums.length > 0 && gallery === "main" ? (
+      {gallery === "main" ? (
         <div className="md:col-span-2 space-y-2 rounded-lg border border-zinc-200 p-3 bg-zinc-50/50">
           <label className="flex items-center gap-2 text-sm font-medium">
             <input
               type="checkbox"
               checked={isSubAlbum}
+              disabled={!canPickParent}
               onChange={(e) => {
                 setIsSubAlbum(e.target.checked);
                 if (e.target.checked && !parentSlug && albums[0]) {
@@ -174,13 +183,24 @@ export function ImmichAlbumUploader({
                 }
               }}
             />
-            <span>
+            <span className={canPickParent ? "" : "text-zinc-400"}>
               {nl
                 ? "Dit album is een subalbum van een bestaand evenement (tabs)"
                 : "This album is a sub-album of an existing event (tabs)"}
             </span>
           </label>
-          {isSubAlbum ? (
+          {!canPickParent ? (
+            <p className="text-xs text-zinc-500">
+              {albumsError
+                ? nl
+                  ? "Immich is nu niet bereikbaar, dus de bestaande albums kunnen niet opgehaald worden. Je kan dit album wel aanmaken, maar het nog niet als tab aan een evenement hangen."
+                  : "Immich is unreachable right now, so the existing albums cannot be loaded. You can still create this album, but not yet attach it as a tab to an event."
+                : nl
+                  ? "Er staat nog geen album op de mediapagina. Maak eerst het album van het evenement zelf aan; daarna kan je hier extra tabs eraan hangen."
+                  : "There is no album on the media page yet. Create the event's own album first; after that you can attach extra tabs to it here."}
+            </p>
+          ) : null}
+          {canPickParent && isSubAlbum ? (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2">
               <div>
                 <Label>{nl ? "Hoofdalbum (evenement)" : "Parent album (event)"}</Label>
