@@ -43,6 +43,7 @@ const nodes: AdminNavNode[] = [
       { key: 'inventory', href: '/beheer/materiaal', label: 'Inventaris' },
       { key: 'templates', href: '/beheer/sjablonen', label: 'Sjablonen' },
       { key: 'drivers', href: '/beheer/chauffeurs', label: 'Chauffeurs' },
+      { key: 'stats', href: '/beheer/statistieken', label: 'Statistieken' },
       // Collect&Go stond onder "Uitleen" en verhuist mee naar Overig: het is
       // net als Sjablonen en Instellingen een incidenteel beheerschermpje
       // (een bestelling importeren, geen dagelijkse werklijst), niet iets dat
@@ -73,6 +74,7 @@ const icons = {
   trips: <LogisticsIcon name="van" className="h-4 w-4 shrink-0" />,
   transportplanning: <LogisticsIcon name="planning" className="h-4 w-4 shrink-0" />,
   drivers: <LogisticsIcon name="driver" className="h-4 w-4 shrink-0" />,
+  stats: <LogisticsIcon name="chart" className="h-4 w-4 shrink-0" />,
   other: <LogisticsIcon name="edit" className="h-4 w-4 shrink-0" />,
   calendar: <LogisticsIcon name="reservation" className="h-4 w-4 shrink-0" />,
   texts: <LogisticsIcon name="text" className="h-4 w-4 shrink-0" />,

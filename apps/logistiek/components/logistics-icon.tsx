@@ -27,7 +27,8 @@ type IconName =
   | 'planning'
   | 'basket'
   | 'bottle'
-  | 'trash';
+  | 'trash'
+  | 'chart';
 
 export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElement> & { name: IconName }) {
   const paths = {
@@ -213,6 +214,12 @@ export function LogisticsIcon({ name, className, ...props }: SVGProps<SVGSVGElem
       </>
     ),
     /** Flesserke: een fles. Stond op hetzelfde doosje als de inventaris. */
+    chart: (
+      <>
+        <path d="M4 20h16" />
+        <path d="M7 20v-6M12 20V6M17 20v-9" />
+      </>
+    ),
     bottle: (
       <>
         <path d="M10 3h4v3.2c0 .6.2 1.1.6 1.6l1.2 1.4c.4.5.7 1.1.7 1.8v8a2 2 0 0 1-2 2H9.5a2 2 0 0 1-2-2v-8c0-.7.2-1.3.7-1.8l1.2-1.4c.4-.5.6-1 .6-1.6Z" />
