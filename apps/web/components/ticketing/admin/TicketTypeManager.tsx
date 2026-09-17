@@ -13,6 +13,7 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { ticketColorKey, ticketColorLabel } from "@/lib/ticketing/ticketColors";
 import { TicketColorChoice } from "./TicketColorChoice";
 import { formatMoney, type AdminLocale } from "./format";
+import { SettingsPanel } from "./SettingsPanel";
 
 type InventoryPool = {
   id: string;
@@ -212,6 +213,20 @@ export function TicketTypeManager({
   }
 
   const hasActiveTicketType = items.some((ticketType) => ticketType.active);
+  const nl = locale === "nl";
+  const capacity = pools.reduce((sum, pool) => sum + pool.capacity, 0);
+  const taken = pools.reduce((sum, pool) => sum + pool.soldCount + pool.reservedCount, 0);
+  const places = nl
+    ? capacity === 1 ? "plaats" : "plaatsen"
+    : capacity === 1 ? "place" : "places";
+  const inventoryStatus =
+    pools.length === 0
+      ? nl ? "Geen voorraadpool" : "No inventory pool"
+      : `${capacity} ${places} · ${taken} ${nl ? "bezet" : "taken"}`;
+  const activeCount = items.filter((ticketType) => ticketType.active).length;
+  const typesStatus = nl
+    ? `${activeCount} actief${items.length > activeCount ? ` · ${items.length - activeCount} gearchiveerd` : ""}`
+    : `${activeCount} active${items.length > activeCount ? ` · ${items.length - activeCount} archived` : ""}`;
 
   const dragFrom = useRef<number | null>(null);
   const [overIndex, setOverIndex] = useState<number | null>(null);
@@ -236,15 +251,11 @@ export function TicketTypeManager({
 
   return (
     <>
-      <section className="ticket-admin-section">
-        <div className="ticket-admin-section-head">
-          <div className="ticket-admin-section-heading">
-            <span className="ticket-admin-section-icon"><Package aria-hidden="true" size={17} /></span>
-            <div>
-            <h2>{locale === "nl" ? "Voorraad" : "Inventory"}</h2>
-            </div>
-          </div>
-        </div>
+      <SettingsPanel
+        title={locale === "nl" ? "Voorraad" : "Inventory"}
+        status={inventoryStatus}
+        icon={<Package aria-hidden="true" size={17} />}
+      >
         {pools.length === 0 ? (
           <div className="ticket-admin-alert">
             {locale === "nl"
@@ -320,17 +331,15 @@ export function TicketTypeManager({
             })}
           </ul>
         )}
-      </section>
+      </SettingsPanel>
 
-      <section id="tickettype-aanmaken" className="ticket-admin-section ticket-admin-anchor-section">
-        <div className="ticket-admin-section-head">
-          <div className="ticket-admin-section-heading">
-            <span className="ticket-admin-section-icon"><Ticket aria-hidden="true" size={17} /></span>
-            <div>
-            <h2>{locale === "nl" ? "Tickettypes" : "Ticket types"}</h2>
-            </div>
-          </div>
-        </div>
+      <SettingsPanel
+        id="tickettype-aanmaken"
+        title={locale === "nl" ? "Tickettypes" : "Ticket types"}
+        status={typesStatus}
+        icon={<Ticket aria-hidden="true" size={17} />}
+        defaultOpen
+      >
         {!hasActiveTicketType ? (
           <div className="ticket-admin-alert" role="status">
             <span>
@@ -519,7 +528,7 @@ export function TicketTypeManager({
           </div>
         </details>
         </div>
-      </section>
+      </SettingsPanel>
     </>
   );
 }

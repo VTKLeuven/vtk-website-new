@@ -8,6 +8,7 @@ import { TicketPublishBar } from "@/components/ticketing/admin/TicketPublishBar"
 import { TicketTypeManager } from "@/components/ticketing/admin/TicketTypeManager";
 import { TicketQuestionManager } from "@/components/ticketing/admin/TicketQuestionManager";
 import { TicketDesignManager } from "@/components/ticketing/admin/TicketDesignManager";
+import { SettingsPanel } from "@/components/ticketing/admin/SettingsPanel";
 import type { AdminLocale } from "@/components/ticketing/admin/format";
 import { readTicketDesignSettings } from "@/lib/ticketing/design";
 
@@ -120,30 +121,33 @@ export default async function TicketEventSettingsPage({
         </div>
       ) : null}
       {canManageEvent ? (
-        <details id="deelnemersvragen" className="ticket-admin-settings-disclosure">
-          <summary>{locale === "nl" ? "Vragen aan deelnemers" : "Attendee questions"}<small>{event.questions.filter((question) => question.active).length} {locale === "nl" ? "vragen · optioneel" : "questions · optional"}</small></summary>
-          <div className="ticket-admin-settings-content">
+        <SettingsPanel
+          id="deelnemersvragen"
+          title={locale === "nl" ? "Vragen aan deelnemers" : "Attendee questions"}
+          status={`${event.questions.filter((question) => question.active).length} ${locale === "nl" ? "vragen · optioneel" : "questions · optional"}`}
+        >
           <TicketQuestionManager
             eventId={eventId}
             questions={event.questions}
             ticketTypes={event.ticketTypes}
             locale={locale}
           />
-          </div>
-        </details>
+        </SettingsPanel>
       ) : null}
       {canManageEvent ? (
-        <details id="ticketontwerp" className="ticket-admin-settings-disclosure">
-          <summary><Palette size={18} aria-hidden="true" />{locale === "nl" ? "Ticketontwerp" : "Ticket design"}<small>{locale === "nl" ? "Optioneel · het standaardontwerp staat klaar" : "Optional · the default design is ready"}</small></summary>
-          <div className="ticket-admin-settings-content">
+        <SettingsPanel
+          id="ticketontwerp"
+          title={locale === "nl" ? "Ticketontwerp" : "Ticket design"}
+          status={locale === "nl" ? "Optioneel · het standaardontwerp staat klaar" : "Optional · the default design is ready"}
+          icon={<Palette size={18} aria-hidden="true" />}
+        >
           <TicketDesignManager
             eventId={eventId}
             initialDraft={ticketDesign.draft ?? ticketDesign.published}
             publishedRevision={ticketDesign.published?.revision}
             locale={locale}
           />
-          </div>
-        </details>
+        </SettingsPanel>
       ) : null}
     </div>
   );

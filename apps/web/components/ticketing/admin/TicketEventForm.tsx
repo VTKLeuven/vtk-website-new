@@ -19,6 +19,7 @@ import { useActionState, useState } from "react";
 import { toDatetimeLocal, type AdminLocale } from "./format";
 import { AddressPicker } from "./AddressPicker";
 import { PresaleFields, type PresaleGroupOption } from "./PresaleFields";
+import { SettingsPanel } from "./SettingsPanel";
 
 const initialState: TicketEventFormActionState = { status: "idle" };
 
@@ -71,6 +72,26 @@ type TicketEventFormValue = {
   confirmationMessageNl?: string | null;
   confirmationMessageEn?: string | null;
 };
+
+/** Korte datum voor de statusregel in een dichte kop; leeg wordt een streepje. */
+function formatShortDate(value: Date | null | undefined, locale: AdminLocale): string {
+  if (!value) return "—";
+  return new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    day: "numeric",
+    month: "short",
+  }).format(new Date(value));
+}
+
+/** "2880" wordt "2 dagen": hele dagen als dat opgaat, anders uren. */
+function describeLead(minutes: number, locale: AdminLocale): string {
+  if (minutes % 1_440 === 0) {
+    const days = minutes / 1_440;
+    return `${days} ${locale === "nl" ? (days === 1 ? "dag" : "dagen") : days === 1 ? "day" : "days"}`;
+  }
+  const hours = Math.round(minutes / 60);
+  return `${hours} ${locale === "nl" ? "uur" : hours === 1 ? "hour" : "hours"}`;
+}
 
 type GroupOption = { id: string; nameNl: string; nameEn: string };
 type CalendarOption = {
@@ -173,25 +194,47 @@ export function TicketEventForm({
     initialState
   );
 
+  /**
+   * Een verplicht veld in een dichtgeklapt venster blokkeert het opslaan zonder
+   * dat de gebruiker iets ziet: de browser weigert te versturen omdat ze een
+   * ongeldig veld niet in beeld kan brengen. Daarom het venster eromheen openen
+   * voor de melding verschijnt. In de capture-fase, want `invalid` bubbelt niet.
+   */
+  function revealInvalidField(event_: React.InvalidEvent<HTMLFormElement>) {
+    const field = event_.target as HTMLElement | null;
+    const panel = field?.closest("details");
+    if (panel && !panel.open) panel.open = true;
+  }
+
+  const nl = locale === "nl";
+  const basicsStatus = [event.titleNl, event.slug ? `/${event.slug}` : null]
+    .filter(Boolean)
+    .join(" · ");
+  const salesStatus = event.salesStartAt || event.salesEndAt
+    ? `${nl ? "Verkoop" : "Sales"} ${formatShortDate(event.salesStartAt, locale)} – ${formatShortDate(event.salesEndAt, locale)}`
+    : nl
+      ? "Geen verkoopvenster ingesteld"
+      : "No sales window set";
+  const presaleStatus = event.presaleLeadMinutes
+    ? ` · ${nl ? "voorverkoop" : "presale"} ${describeLead(event.presaleLeadMinutes, locale)}`
+    : "";
+
   return (
-    <form action={formAction} className="ticket-admin-form">
+    <form action={formAction} className="ticket-admin-form" onInvalidCapture={revealInvalidField}>
       <input type="hidden" name="locale" value={locale} />
       {event.id ? <input type="hidden" name="eventId" value={event.id} /> : null}
 
-      <section className="ticket-admin-section">
-        <div className="ticket-admin-section-head">
-          <div className="ticket-admin-section-heading">
-            <span className="ticket-admin-section-icon"><Info aria-hidden="true" size={17} /></span>
-            <div>
-            <h2>{locale === "nl" ? "Basisinformatie" : "Basic information"}</h2>
-            <p>
-              {locale === "nl"
-                ? "De informatie die kopers in de ticketshop zien."
-                : "The information buyers see in the ticket shop."}
-            </p>
-            </div>
-          </div>
-        </div>
+      <SettingsPanel
+        title={locale === "nl" ? "Basisinformatie" : "Basic information"}
+        status={isEdit ? basicsStatus : undefined}
+        icon={<Info aria-hidden="true" size={17} />}
+        defaultOpen
+      >
+        <p className="ticket-admin-help">
+          {locale === "nl"
+            ? "De informatie die kopers in de ticketshop zien."
+            : "The information buyers see in the ticket shop."}
+        </p>
         {linkedCalendarEvent ? (
           <InheritedFromCalendar event={linkedCalendarEvent} locale={locale} />
         ) : null}
@@ -287,22 +330,18 @@ export function TicketEventForm({
             />
           </div>
         </div>
-      </section>
+      </SettingsPanel>
 
-      <section className="ticket-admin-section">
-        <div className="ticket-admin-section-head">
-          <div className="ticket-admin-section-heading">
-            <span className="ticket-admin-section-icon"><CalendarRange aria-hidden="true" size={17} /></span>
-            <div>
-            <h2>{locale === "nl" ? "Planning en verkoop" : "Schedule and sales"}</h2>
-            <p>
-              {locale === "nl"
-                ? "Datums worden geïnterpreteerd in Europe/Brussels."
-                : "Dates are interpreted in Europe/Brussels."}
-            </p>
-            </div>
-          </div>
-        </div>
+      <SettingsPanel
+        title={locale === "nl" ? "Planning en verkoop" : "Schedule and sales"}
+        status={isEdit ? `${salesStatus}${presaleStatus}` : undefined}
+        icon={<CalendarRange aria-hidden="true" size={17} />}
+      >
+        <p className="ticket-admin-help">
+          {locale === "nl"
+            ? "Datums worden geïnterpreteerd in Europe/Brussels."
+            : "Dates are interpreted in Europe/Brussels."}
+        </p>
         <div className="ticket-admin-form-grid">
           {linkedCalendarEvent ? null : (
             <>
@@ -430,11 +469,13 @@ export function TicketEventForm({
             </span>
           </div>
         </div>
-      </section>
+      </SettingsPanel>
 
-      <details className="ticket-admin-settings-disclosure">
-        <summary>{locale === "nl" ? "Beschrijving en adres" : "Description and address"}<small>{locale === "nl" ? "Optioneel · extra informatie voor bezoekers" : "Optional · extra visitor information"}</small></summary>
-        <div className="ticket-admin-settings-content ticket-admin-form-grid">
+      <SettingsPanel
+        title={locale === "nl" ? "Beschrijving en adres" : "Description and address"}
+        status={locale === "nl" ? "Optioneel · extra informatie voor bezoekers" : "Optional · extra visitor information"}
+      >
+        <div className="ticket-admin-form-grid">
           {/* Het adres hoort bij het ticketevent, niet bij het kalenderevent:
               het bestaat enkel om de geofence op de walletpas te voeden. Het
               blijft dus ook staan wanneer titel, locatie en beschrijving van de
@@ -469,7 +510,7 @@ export function TicketEventForm({
             </>
           )}
         </div>
-      </details>
+      </SettingsPanel>
 
       {/* Alleen bij aanmaken. Voorheen vroeg dit formulier enkel een capaciteit,
           waarmee je een voorraadpot kreeg maar nog geen verkoopbaar ticket; je
@@ -536,9 +577,10 @@ export function TicketEventForm({
         </section>
       ) : null}
 
-      <details className="ticket-admin-settings-disclosure">
-        <summary>{locale === "nl" ? "Bevestigingsbericht en voorwaarden" : "Confirmation message and terms"}<small>{locale === "nl" ? "Optioneel · tekst voor kopers na aankoop" : "Optional · text for buyers after purchase"}</small></summary>
-        <div className="ticket-admin-settings-content">
+      <SettingsPanel
+        title={locale === "nl" ? "Bevestigingsbericht en voorwaarden" : "Confirmation message and terms"}
+        status={locale === "nl" ? "Optioneel · tekst voor kopers na aankoop" : "Optional · text for buyers after purchase"}
+      >
         <p className="ticket-admin-help">{locale === "nl" ? "Het bevestigingsbericht is een extra mededeling die kopers te zien krijgen op het scherm zodra hun bestelling betaald is, én die meegestuurd wordt in de bevestigingsmail met hun tickets (bijv. praktische afspraken, wat mee te brengen of richtlijnen voor de ingang). Laat leeg als je niets wilt toevoegen." : "The confirmation message is an additional note shown to buyers on the order screen once paid, and included in the ticket confirmation email (e.g. practical instructions or what to bring). Leave empty if you have nothing to add."}</p>
         <div className="ticket-admin-form-grid">
           <div className="ticket-admin-field">
@@ -577,8 +619,7 @@ export function TicketEventForm({
             </>
           ) : null}
         </div>
-        </div>
-      </details>
+      </SettingsPanel>
 
       {state.status === "error" ? (
         <div className="ticket-admin-alert" data-tone="danger" role="alert">

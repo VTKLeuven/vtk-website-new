@@ -595,6 +595,11 @@
 
 .ticket-admin-field {
   display: grid;
+  /* Zonder dit rekken de rijen van een veld mee met de hoogste buur in dezelfde
+     rasterrij: staat er links een hulpzin onder het invoerveld en rechts niet,
+     dan zakt het rechtse invoerveld 12 tot 14 pixels lager dan het linkse. De
+     inhoud hoort bovenaan te beginnen; de resterende hoogte blijft gewoon leeg. */
+  align-content: start;
   min-width: 0;
   gap: 6px;
   padding: 0;
@@ -2048,7 +2053,11 @@
 .ticket-admin-settings-disclosure > summary::-webkit-details-marker { display: none; }
 .ticket-admin-settings-disclosure > summary::after { content: "+"; margin-left: auto; font-size: 20px; }
 .ticket-admin-settings-disclosure[open] > summary::after { content: "−"; }
-.ticket-admin-settings-disclosure > summary small { color: var(--muted); font-size: 12px; font-weight: 400; }
+/* De statusregel mag de kop niet uit elkaar duwen: een slug of een lange
+   verkoopperiode kapt af met puntjes in plaats van de titel weg te drukken. Op
+   een smal scherm valt ze op haar eigen regel (zie de media query onderaan) en
+   kapt ze daar af. */
+.ticket-admin-settings-disclosure > summary small { min-width: 0; overflow: hidden; color: var(--muted); font-size: 12px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
 .ticket-admin-settings-disclosure > summary:hover { background: var(--paper-2); border-radius: 18px; }
 .ticket-admin-settings-disclosure > summary:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
 .ticket-admin-settings-content { padding: 0 20px 20px; }

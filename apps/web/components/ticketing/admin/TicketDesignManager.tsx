@@ -5,7 +5,17 @@
 /* eslint-disable @next/next/no-img-element */
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { CheckCircle2, ExternalLink, ImagePlus, LoaderCircle, Palette, RefreshCw, RotateCcw, Save, Send, Upload } from "lucide-react";
+import {
+  CheckCircle2,
+  ExternalLink,
+  ImagePlus,
+  LoaderCircle,
+  RefreshCw,
+  RotateCcw,
+  Save,
+  Send,
+  Upload,
+} from "lucide-react";
 import {
   publishTicketDesignAction,
   saveTicketDesignDraftAction,
@@ -158,14 +168,10 @@ export function TicketDesignManager({
   const artworkUrl = assetUrl(design.artwork?.key);
   return (
     <section className="ticket-admin-section ticket-design-manager">
+      {/* De titel staat in de kop van het venster eromheen; hier blijft enkel de
+          uitleg en welke versie er live staat. */}
       <div className="ticket-admin-section-head">
-        <div className="ticket-admin-section-heading">
-          <span className="ticket-admin-section-icon"><Palette aria-hidden="true" size={17} /></span>
-          <div>
-            <h2>{message(locale, "Ticketontwerp", "Ticket design")}</h2>
-            <p>{message(locale, "Elke download is één A4-pagina. QR-code en ticketgegevens blijven steeds leesbaar en scanbaar.", "Every download is one A4 page. The QR code and ticket details always remain readable and scannable.")}</p>
-          </div>
-        </div>
+        <p className="ticket-admin-help">{message(locale, "Elke download is één A4-pagina. QR-code en ticketgegevens blijven steeds leesbaar en scanbaar.", "Every download is one A4 page. The QR code and ticket details always remain readable and scannable.")}</p>
         {liveRevision ? <span className="ticket-admin-status" data-tone="success">{message(locale, `Live: versie ${liveRevision}`, `Live: revision ${liveRevision}`)}</span> : null}
       </div>
 

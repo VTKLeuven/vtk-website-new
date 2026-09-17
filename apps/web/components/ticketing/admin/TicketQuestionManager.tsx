@@ -6,7 +6,10 @@ import {
   createTicketQuestionAction,
   reorderTicketQuestionsAction,
 } from "@/app/actions/tickets";
-import { Archive, ListChecks, Plus } from "lucide-react";
+import {
+  Archive,
+  Plus,
+} from "lucide-react";
 import type { AdminLocale } from "./format";
 
 type Question = {
@@ -109,15 +112,9 @@ export function TicketQuestionManager({
   }
 
   return (
+    // Geen eigen kop meer: het venster eromheen draagt de titel al, en twee keer
+    // "Vragen aan deelnemers" onder elkaar leest als een fout.
     <section className="ticket-admin-section">
-      <div className="ticket-admin-section-head">
-        <div className="ticket-admin-section-heading">
-          <span className="ticket-admin-section-icon"><ListChecks aria-hidden="true" size={17} /></span>
-          <div>
-          <h2>{nl ? "Vragen aan deelnemers" : "Attendee questions"}</h2>
-          </div>
-        </div>
-      </div>
       {items.length === 0 ? (
         <p className="ticket-admin-empty">{nl ? "Nog geen vragen." : "No questions yet."}</p>
       ) : (
