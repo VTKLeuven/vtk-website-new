@@ -47,7 +47,10 @@ export async function GET(request: Request) {
     },
     orderBy: { name: 'asc' },
     take: limit,
-    select: { id: true, name: true, email: true, rNumber: true },
+    // Het gsm-nummer staat erbij omdat de shiftpicker het meteen in zijn
+    // ingeschrevenenlijst toont; wie dit recht heeft, krijgt met e-mail en
+    // r-nummer al de contactgegevens van hetzelfde lid.
+    select: { id: true, name: true, email: true, rNumber: true, phone: true },
   });
 
   return NextResponse.json(users);

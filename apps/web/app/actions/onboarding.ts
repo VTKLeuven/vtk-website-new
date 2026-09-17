@@ -167,6 +167,9 @@ const profileSchema = z
       .toLowerCase()
       .refine((value) => value === "" || z.string().email().safeParse(value).success)
       .default(""),
+    // Vrije tekst, enkel begrensd op lengte: zie de kolomcomment in het schema.
+    // Een strenge regex weigert vroeg of laat een nummer dat gewoon werkt.
+    phone: z.string().trim().max(40).default(""),
     emailPreference: z.enum(EMAIL_PREFERENCES),
     mailCategories: z.array(z.enum(MAIL_CATEGORIES)).default([]),
     // Enkel zichtbaar voor wie zich via een mail uitschreef: het lid vraagt
@@ -237,6 +240,7 @@ export async function saveProfileAction(
     ...addressFieldsFromForm(formData),
     birthDate: formData.get("birthDate") ?? "",
     personalEmail: formData.get("personalEmail") ?? "",
+    phone: formData.get("phone") ?? "",
     emailPreference: formData.get("emailPreference") ?? "UNIVERSITY",
     mailCategories: formData.getAll("mailCategories"),
     mailResubscribe: formData.get("mailResubscribe") === "on",
@@ -291,6 +295,7 @@ export async function saveProfileAction(
         ...addressUpdate(data),
         birthDate: data.birthDate ? new Date(data.birthDate) : null,
         personalEmail: data.personalEmail || null,
+        phone: data.phone || null,
         emailPreference: data.emailPreference,
         mailCategories: { set: data.mailCategories },
         ...(resubscribe ? { mailUnsubscribedAt: null } : {}),

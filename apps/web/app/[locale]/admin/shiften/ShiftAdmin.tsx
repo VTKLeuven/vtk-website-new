@@ -5,7 +5,15 @@ import { ShiftManage } from "./ShiftManage";
 import { ShiftRanking } from "./ShiftRanking";
 import { ShiftRewards } from "./ShiftRewards";
 
-export type AdminParticipant = { userId: string; name: string; email: string; payedOut: boolean };
+export type AdminParticipant = {
+  userId: string;
+  name: string;
+  email: string;
+  rNumber: string | null;
+  /** Vrije tekst uit het profiel; leeg zolang het lid het niet invulde. */
+  phone: string | null;
+  payedOut: boolean;
+};
 export type AdminShift = {
   id: string;
   name: string;

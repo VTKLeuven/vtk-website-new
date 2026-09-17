@@ -92,6 +92,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         homeCity: true,
         birthDate: true,
         personalEmail: true,
+        phone: true,
         emailPreference: true,
         mailCategories: true,
         mailUnsubscribedAt: true,

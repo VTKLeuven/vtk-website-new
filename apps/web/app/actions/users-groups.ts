@@ -62,6 +62,11 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
   const rNumber = formData.has("rNumber")
     ? String(formData.get("rNumber") ?? "").trim() || null
     : undefined;
+  // Enkel het detailformulier stuurt dit veld mee; het snelle aanmaakformulier
+  // op de lijstpagina niet, en dan moet het nummer onaangeroerd blijven.
+  const phone = formData.has("phone")
+    ? String(formData.get("phone") ?? "").trim().slice(0, 40) || null
+    : undefined;
 
   const before = parsed.id
     ? await prisma.user.findUnique({
@@ -76,6 +81,7 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
           isSuperAdmin: true,
           honoraryMember: true,
           rNumber: true,
+          phone: true,
         },
       })
     : null;
@@ -92,6 +98,7 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
         isSuperAdmin: parsed.isSuperAdmin,
         honoraryMember: parsed.honoraryMember,
         rNumber,
+        phone,
         password: parsed.password,
       });
     } else {
@@ -122,7 +129,12 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
     summary: before
       ? describeChanges(
           before,
-          { ...parsed, name, rNumber: rNumber === undefined ? before.rNumber : rNumber },
+          {
+            ...parsed,
+            name,
+            rNumber: rNumber === undefined ? before.rNumber : rNumber,
+            phone: phone === undefined ? before.phone : phone,
+          },
           {
             email: "e-mail",
             name: "naam",
@@ -131,6 +143,7 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
             isSuperAdmin: "superadmin",
             honoraryMember: "erelid",
             rNumber: "r-nummer",
+            phone: "gsm-nummer",
           },
         )
       : parsed.email,

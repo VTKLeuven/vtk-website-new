@@ -6,8 +6,6 @@ import { format } from "date-fns";
 import type { Locale } from "@vtk/i18n";
 import { Button, Card, ConfirmDialog, Input, Label, Select } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
-import { IconButton, RowActions } from "@/components/ui/IconButton";
-import { PencilIcon, TrashIcon } from "@/components/ui/icons";
 import { ShiftEditModal } from "./ShiftEditModal";
 import type { AdminShift } from "./ShiftAdmin";
 
@@ -82,6 +80,14 @@ export function ShiftManage({
     });
   }, [shifts, postFilter, search, sort]);
 
+  /**
+   * Mag deze gebruiker deze shift beheren? Een shift van een andere post open je
+   * niet: het venster is een bewerkvenster, niet een leesvenster.
+   */
+  const canManage = (s: AdminShift) =>
+    isSuperAdmin ||
+    (s.post !== null && userPostCodes.some((code) => code.toLowerCase() === s.post?.toLowerCase()));
+
   const toggleSort = (key: SortKey) =>
     setSort((cur) =>
       cur.key === key ? { key, dir: cur.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" },
@@ -95,6 +101,9 @@ export function ShiftManage({
     setDeleting(null);
     if (resp.ok) {
       showToast({ variant: "success", message: nl ? "Shift verwijderd." : "Shift deleted." });
+      // Het venster van de zonet verwijderde shift moet mee dicht; anders blijft
+      // een formulier openstaan dat naar niets meer verwijst.
+      setEditing(null);
       router.refresh();
     } else {
       showToast({ variant: "error", message: nl ? "Verwijderen mislukt." : "Delete failed.", duration: 0 });
@@ -169,13 +178,36 @@ export function ShiftManage({
                 {nl ? "Beloning" : "Reward"}
                 {arrow("reward")}
               </th>
-              <th className="px-4 py-2"></th>
             </tr>
           </thead>
           <tbody>
             {rows.map((s) => (
-              <tr key={s.id} className="border-t border-zinc-200">
-                <td className="px-4 py-2 font-medium">{s.name}</td>
+              // De hele rij opent het venster; de titel blijft een echte knop,
+              // want een toetsenbord en een screenreader hebben iets nodig om op
+              // te landen. Zie CLAUDE.md > Admin.
+              <tr
+                key={s.id}
+                className={`border-t border-zinc-200 ${
+                  canManage(s) ? "cursor-pointer hover:bg-vtk-blue-soft/60" : ""
+                }`}
+                onClick={canManage(s) ? () => setEditing(s) : undefined}
+              >
+                <td className="px-4 py-2 font-medium">
+                  {canManage(s) ? (
+                    <button
+                      type="button"
+                      className="text-left hover:underline"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditing(s);
+                      }}
+                    >
+                      {s.name}
+                    </button>
+                  ) : (
+                    s.name
+                  )}
+                </td>
                 <td className="px-4 py-2 text-zinc-500">
                   {format(s.startTime, "dd/MM/yyyy HH:mm")}–{format(s.endTime, "HH:mm")}
                 </td>
@@ -184,37 +216,11 @@ export function ShiftManage({
                   {s.participants.length}/{s.maxParticipants}
                 </td>
                 <td className="px-4 py-2 text-zinc-500">{s.reward}</td>
-                <td className="px-4 py-2 text-right">
-                  {(isSuperAdmin ||
-                    (s.post !== null &&
-                      userPostCodes.some(
-                        (code) => code.toLowerCase() === s.post?.toLowerCase(),
-                      ))) && (
-                    <RowActions>
-                      <IconButton
-                        label={nl ? "Bewerken" : "Edit"}
-                        srLabel={`${nl ? "Bewerken" : "Edit"}: ${s.name}`}
-                        onClick={() => setEditing(s)}
-                      >
-                        <PencilIcon />
-                      </IconButton>
-                      <IconButton
-                        label={nl ? "Verwijderen" : "Delete"}
-                        srLabel={`${nl ? "Verwijderen" : "Delete"}: ${s.name}`}
-                        tone="danger"
-                        disabled={busyId === s.id}
-                        onClick={() => setDeleting(s)}
-                      >
-                        <TrashIcon />
-                      </IconButton>
-                    </RowActions>
-                  )}
-                </td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
                   {nl ? "Geen shiften." : "No shifts."}
                 </td>
               </tr>
@@ -230,6 +236,7 @@ export function ShiftManage({
           postOptions={postOptions}
           userPostCodes={userPostCodes}
           isSuperAdmin={isSuperAdmin}
+          onDelete={editing ? () => setDeleting(editing) : undefined}
           onClose={() => {
             setCreating(false);
             setEditing(null);

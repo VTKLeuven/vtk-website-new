@@ -520,6 +520,13 @@ model User {
   // mail en de voorkeur voor communicatie komen erbij.
   personalEmail           String?
   emailPreference         EmailPreference     @default(UNIVERSITY)
+  // Gsm-nummer, optioneel en vrije tekst: we bellen ermee, we valideren er niets
+  // mee. Buitenlandse nummers, een spatie hier en een streepje daar; een regex
+  // die daar streng op is, weigert vroeg of laat een nummer dat gewoon werkt.
+  // Bestaat voor de dagelijkse werking: wie een shift doet en niet komt opdagen,
+  // bel je. Daarom staat het in de ingeschrevenenlijst van een shift, en niet in
+  // een publieke lijst.
+  phone                   String?
   // Optionele standaard voor persoonlijke terugbetalingen. Elke rekening
   // bewaart nog steeds haar eigen IBAN, zodat een afwijking of latere
   // profielwijziging historische rekeningen niet verandert.

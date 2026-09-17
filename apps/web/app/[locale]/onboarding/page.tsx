@@ -67,6 +67,7 @@ export default async function OnboardingPage({
       homeCity: true,
       birthDate: true,
       personalEmail: true,
+      phone: true,
       emailPreference: true,
       mailCategories: true,
       mailUnsubscribedAt: true,

@@ -103,6 +103,15 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
             <Input name="rNumber" defaultValue={user.rNumber ?? ''} placeholder="r0123456" />
           </div>
           <div>
+            <Label>{locale === 'nl' ? 'Gsm-nummer' : 'Mobile number'}</Label>
+            <Input
+              name="phone"
+              type="tel"
+              defaultValue={user.phone ?? ''}
+              placeholder="+32 470 12 34 56"
+            />
+          </div>
+          <div>
             <Label>{locale === 'nl' ? 'Nieuw wachtwoord' : 'New password'}</Label>
             <Input
               name="password"

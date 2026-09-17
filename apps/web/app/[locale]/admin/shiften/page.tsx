@@ -86,7 +86,13 @@ export default async function AdminShifts({
           orderBy: { startTime: "asc" },
           include: {
             participants: {
-              select: { userId: true, payedOut: true, user: { select: { name: true, email: true } } },
+              select: {
+                userId: true,
+                payedOut: true,
+                // Het gsm-nummer staat in de ingeschrevenenlijst van het
+                // shiftvenster: wie niet komt opdagen, bel je.
+                user: { select: { name: true, email: true, rNumber: true, phone: true } },
+              },
             },
           },
         })
@@ -138,6 +144,8 @@ export default async function AdminShifts({
       userId: p.userId,
       name: p.user.name,
       email: p.user.email,
+      rNumber: p.user.rNumber,
+      phone: p.user.phone,
       payedOut: p.payedOut,
     })),
   }));

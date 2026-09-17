@@ -13,6 +13,36 @@ import { AddressFields } from "./AddressFields";
 import { MembershipChoice, type MembershipChoiceLabels } from "./MembershipChoice";
 import type { MembershipOffer } from "@/lib/membership/offer";
 
+/**
+ * Het gsm-nummer. `type="tel"` en verder geen patroon: een nummer uit het
+ * buitenland, met of zonder spaties, moet gewoon opgeslagen kunnen worden. Het
+ * staat in beide takken van het contactblok, vandaar een eigen component.
+ */
+function PhoneField({
+  defaultValue,
+  label,
+  hint,
+}: {
+  defaultValue: string | null;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <div>
+      <Label htmlFor="phone">{label}</Label>
+      <Input
+        id="phone"
+        name="phone"
+        type="tel"
+        autoComplete="tel"
+        defaultValue={defaultValue ?? ""}
+        placeholder="+32 470 12 34 56"
+      />
+      <p className="mt-1 text-xs text-[#5c667f]">{hint}</p>
+    </div>
+  );
+}
+
 function dateInputValue(date: Date | null): string {
   if (!date) return "";
   return date.toISOString().slice(0, 10);
@@ -67,6 +97,7 @@ export function ProfileForm({
     | "homeCity"
     | "birthDate"
     | "personalEmail"
+    | "phone"
     | "emailPreference"
     | "mailCategories"
     | "mailUnsubscribedAt"
@@ -225,6 +256,9 @@ export function ProfileForm({
                 data blijft wel behouden wanneer het profiel wordt opgeslagen. */}
             <input type="hidden" name="personalEmail" value={user.personalEmail ?? ""} />
             <input type="hidden" name="emailPreference" value="PERSONAL" />
+            <div className="mt-4">
+              <PhoneField defaultValue={user.phone} label={t.phone} hint={t.phoneHint} />
+            </div>
           </div>
         ) : (
           <>
@@ -243,6 +277,7 @@ export function ProfileForm({
                   defaultValue={user.personalEmail ?? ""}
                 />
               </div>
+              <PhoneField defaultValue={user.phone} label={t.phone} hint={t.phoneHint} />
             </div>
             <div>
               <span className="text-sm font-medium text-vtk-ink">{t.preferenceHeading}</span>

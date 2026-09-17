@@ -312,6 +312,8 @@
     "accountEmail": "Email address",
     "accountEmailHint": "This is the personal email address you use to sign in.",
     "personalEmail": "Personal email",
+    "phone": "Mobile number",
+    "phoneHint": "Optional. Only visible to the people who run the activities, e.g. the post organising your shift.",
     "preferenceHeading": "Communication preference",
     "preferenceHint": "Which address should we use to contact you?",
     "preferenceUniversity": "University email",

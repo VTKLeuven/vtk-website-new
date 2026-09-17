@@ -7526,3 +7526,21 @@ niet meer.
 - De regel in het adminlogboek overleeft het verwijderen: wie het deed en van
   welk event, blijft leesbaar in /admin/it/logboek.
 
+## Het gsm-nummer van een lid
+
+Een lid heeft één optioneel gsm-nummer in zijn profiel (`User.phone`), in te
+vullen tijdens de onboarding en op /account, en door een beheerder in het
+gebruikersbeheer.
+
+- **Waarvoor het bestaat**: de dagelijkse werking. Wie zich voor een shift
+  inschreef en niet komt opdagen, bel je; een mail helpt dan niet. Daarom staat
+  het in de ingeschrevenenlijst van een shift in het beheer, en nergens
+  publiek.
+- **Vrije tekst, geen validatie** buiten een lengtegrens. Buitenlandse nummers,
+  een spatie hier, een streepje daar: een strenge regex weigert vroeg of laat
+  een nummer dat gewoon werkt, en een nummer dat niet opgeslagen kan worden is
+  erger dan een nummer met een streepje te veel.
+- **Optioneel blijft optioneel.** Een lid dat niets invult, houdt een leeg veld
+  en de lijst toont een streepje. Het is geen voorwaarde om te shiften.
+- Het nummer hoort bij de persoonsgegevens: het gaat mee in de gegevensexport en
+  wordt gewist wanneer een account geanonimiseerd wordt.

@@ -38,6 +38,8 @@ type UpdateUserInput = {
    */
   honoraryMember?: boolean;
   rNumber?: string | null;
+  /** Gsm-nummer; vrije tekst, zie de kolomcomment op `User.phone`. */
+  phone?: string | null;
   password?: string;
 };
 
@@ -114,6 +116,7 @@ export async function updateUser(
     ...(input.isSuperAdmin !== undefined ? { isSuperAdmin: input.isSuperAdmin } : {}),
     ...(input.honoraryMember !== undefined ? { honoraryMember: input.honoraryMember } : {}),
     ...(input.rNumber !== undefined ? { rNumber: input.rNumber?.trim() || null } : {}),
+    ...(input.phone !== undefined ? { phone: input.phone?.trim() || null } : {}),
   };
   return prisma.$transaction(async (tx) => {
     const existing = await tx.user.findUnique({ where: { id: userId }, select: { isSuperAdmin: true } });

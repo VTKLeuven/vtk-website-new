@@ -312,6 +312,8 @@
     "accountEmail": "E-mailadres",
     "accountEmailHint": "Dit is het persoonlijke e-mailadres waarmee je inlogt.",
     "personalEmail": "Persoonlijke mail",
+    "phone": "Gsm-nummer",
+    "phoneHint": "Optioneel. Enkel zichtbaar voor wie de werking regelt, bv. de post die je shift organiseert.",
     "preferenceHeading": "Voorkeur voor communicatie",
     "preferenceHint": "Welk adres gebruiken we om je te contacteren?",
     "preferenceUniversity": "Universiteitsmail",

@@ -7,7 +7,13 @@ import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
 import { utcToLocalDateTime } from "@/lib/ticketing/time";
 import type { AdminParticipant, AdminShift } from "./ShiftAdmin";
 
-type SearchUser = { id: string; name: string; email: string; rNumber: string | null };
+type SearchUser = {
+  id: string;
+  name: string;
+  email: string;
+  rNumber: string | null;
+  phone?: string | null;
+};
 
 const toLocalInput = (date: Date) => utcToLocalDateTime(date);
 
@@ -19,6 +25,7 @@ export function ShiftEditModal({
   isSuperAdmin = false,
   onClose,
   onSaved,
+  onDelete,
 }: {
   locale: Locale;
   shift: AdminShift | null;
@@ -27,6 +34,8 @@ export function ShiftEditModal({
   isSuperAdmin?: boolean;
   onClose: () => void;
   onSaved: () => void;
+  /** Opent de bevestiging om deze shift te verwijderen; enkel bij bewerken. */
+  onDelete?: () => void;
 }) {
   const nl = locale === "nl";
   const showToast = useToast();
@@ -99,7 +108,17 @@ export function ShiftEditModal({
   }, [results, participants]);
 
   function addParticipant(u: SearchUser) {
-    setParticipants((cur) => [...cur, { userId: u.id, name: u.name, email: u.email, payedOut: false }]);
+    setParticipants((cur) => [
+      ...cur,
+      {
+        userId: u.id,
+        name: u.name,
+        email: u.email,
+        rNumber: u.rNumber,
+        phone: u.phone ?? null,
+        payedOut: false,
+      },
+    ]);
     setAddSearch("");
     setResults([]);
   }
@@ -275,29 +294,66 @@ export function ShiftEditModal({
         {isEdit ? (
           <div className="mt-5">
             <Label>
-              {nl ? "Deelnemers" : "Participants"} ({participants.length}/{maxParticipants})
+              {nl ? "Ingeschreven shifters" : "Registered shifters"} ({participants.length}/
+              {maxParticipants})
             </Label>
-            <div className="mb-2 flex flex-wrap gap-2">
-              {participants.length === 0 && (
-                <span className="text-sm text-zinc-400">{nl ? "Nog geen deelnemers." : "No participants yet."}</span>
-              )}
-              {participants.map((p) => (
-                <span
-                  key={p.userId}
-                  className="inline-flex items-center gap-1 rounded-full border border-vtk-blue/15 bg-vtk-blue-soft px-2 py-1 text-xs"
-                  title={p.email}
-                >
-                  {p.name}
-                  <button
-                    className="text-zinc-500 hover:text-red-600"
-                    onClick={() => removeParticipant(p.userId)}
-                    aria-label="Remove"
-                  >
-                    ✕
-                  </button>
-                </span>
-              ))}
-            </div>
+            {/* Een tabel en geen rij pillen: wie een shift bemant, wil je kunnen
+                bereiken, en dan moeten het r-nummer, de mail en het gsm-nummer
+                naast elkaar staan in plaats van in een tooltip. */}
+            {participants.length === 0 ? (
+              <p className="mb-2 text-sm text-zinc-400">
+                {nl ? "Nog niemand ingeschreven." : "Nobody registered yet."}
+              </p>
+            ) : (
+              <div className="mb-3 overflow-x-auto rounded-xl border border-zinc-200">
+                <table className="w-full text-sm">
+                  <thead className="bg-vtk-blue-soft text-left">
+                    <tr>
+                      <th className="px-3 py-2 font-medium">{nl ? "Naam" : "Name"}</th>
+                      <th className="px-3 py-2 font-medium">{nl ? "R-nummer" : "R-number"}</th>
+                      <th className="px-3 py-2 font-medium">{nl ? "E-mail" : "Email"}</th>
+                      <th className="px-3 py-2 font-medium">{nl ? "Gsm" : "Phone"}</th>
+                      <th className="px-3 py-2"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {participants.map((p) => (
+                      <tr key={p.userId} className="border-t border-zinc-200">
+                        <td className="px-3 py-2 font-medium">{p.name}</td>
+                        <td className="px-3 py-2 tabular-nums text-zinc-500">{p.rNumber ?? "—"}</td>
+                        <td className="px-3 py-2 text-zinc-500">
+                          <a className="hover:underline" href={`mailto:${p.email}`}>
+                            {p.email}
+                          </a>
+                        </td>
+                        <td className="px-3 py-2 tabular-nums text-zinc-500">
+                          {/* Leeg zolang het lid geen nummer invulde: het veld is
+                              optioneel, dus een streepje is hier de waarheid. */}
+                          {p.phone ? (
+                            <a className="hover:underline" href={`tel:${p.phone}`}>
+                              {p.phone}
+                            </a>
+                          ) : (
+                            "—"
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          <button
+                            type="button"
+                            className="text-zinc-500 hover:text-red-600"
+                            onClick={() => removeParticipant(p.userId)}
+                            title={nl ? "Uitschrijven" : "Remove"}
+                            aria-label={`${nl ? "Uitschrijven" : "Remove"}: ${p.name}`}
+                          >
+                            ✕
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
             <Input
               value={addSearch}
               onChange={(e) => setAddSearch(e.target.value)}
@@ -334,14 +390,25 @@ export function ShiftEditModal({
         ) : (
           <p className="mt-4 text-xs text-zinc-400">
             {nl
-              ? "Deelnemers kan je toevoegen na het aanmaken, via Bewerken."
-              : "You can add participants after creating, via Edit."}
+              ? "Shifters kan je inschrijven na het aanmaken, door de shift in de lijst te openen."
+              : "You can register shifters after creating, by opening the shift in the list."}
           </p>
         )}
 
         <FormError>{error}</FormError>
 
-        <div className="mt-5 flex justify-end gap-2">
+        <div className="mt-5 flex items-center justify-end gap-2">
+          {/* Verwijderen staat in het venster en niet meer per rij in de tabel:
+              het is de enige onomkeerbare actie. Zie CLAUDE.md > Admin. */}
+          {isEdit && onDelete ? (
+            <button
+              type="button"
+              className="mr-auto text-sm font-medium text-red-600 hover:underline"
+              onClick={onDelete}
+            >
+              {nl ? "Shift verwijderen" : "Delete shift"}
+            </button>
+          ) : null}
           <Button variant="ghost" onClick={onClose}>
             {nl ? "Annuleren" : "Cancel"}
           </Button>
