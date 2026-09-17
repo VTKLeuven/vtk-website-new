@@ -80,11 +80,22 @@ export default async function VervoerBezettingPage({
   const { week } = query;
   // Dezelfde filters als de planning van het team, uit dezelfde queryparameters:
   // een gefilterde week blijft zo een deelbare link, en de terugknop werkt.
-  const filters = parseTransportFilters(query);
+  const parsed = parseTransportFilters(query);
   const en = locale === 'en';
   const team = session ? canManage(session) : false;
   // Het praesidium, werkgroepen en jaarwerkingen krijgen de details ook, maar niet dezelfde: zie de projecties.
   const praesidium = session ? !team && canSeeTripDetails(session) : false;
+
+  // **Een filter mag niet meer prijsgeven dan het rooster zelf.** De filterbalk
+  // toont deze twee groepen enkel aan wie de namen en de aanvrager toch al
+  // ziet, maar een keuzelijst is geen poort: `?chauffeur=<id>` in de adresbalk
+  // zou anders een bezoeker zonder login laten uitvissen welke ritten één
+  // bepaalde persoon rijdt, op een pagina die bewust geen namen toont.
+  const filters = {
+    ...parsed,
+    driverIds: session ? parsed.driverIds : [],
+    requesterTypes: team || praesidium ? parsed.requesterTypes : [],
+  };
 
   const monday = startOfWeek((week && parseDateOnly(week)) || new Date());
   const nextMonday = new Date(monday.getTime() + 7 * DAY_MS);

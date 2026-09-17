@@ -94,18 +94,12 @@ export function timeGridColumns(dayCount: number): string {
 
 /**
  * De volle breedte van datzelfde raster: de urenkolom, de dagkolommen op hun
- * minimum en de tussenruimtes ertussen.
+ * minimum en de tussenruimtes ertussen. Zie `minWidth` in `TimeGrid` voor waar
+ * dit voor dient.
  *
- * Dit staat hier omdat `position: sticky` plakt binnen zijn **ouder**, niet
- * binnen de scroller. Een raster met `1fr`-kolommen is als doos precies zo breed
- * als het scrollvenster terwijl zijn kolommen eroverheen lopen; scrolde je
- * voorbij die rand, richting zondag, dan liep de urenkolom links tegen de grens
- * van haar ouder en schoof ze alsnog uit beeld. De kop, de evenementenstrook en
- * het rooster hangen daarom samen in één doos die wél zo breed is als de week.
- *
- * Waarom een uitgerekende breedte en geen `min-width: max-content`: dat laatste
- * laat elke lange evenementnaam in de strook erboven de kolommen meerekken, en
- * dan wordt de week breder naarmate er een event met een lange naam in staat.
+ * Een uitgerekende breedte en geen `min-width: max-content`: dat laatste laat
+ * elke lange evenementnaam in de strook erboven de kolommen meerekken, en dan
+ * wordt de week breder naarmate er een event met een lange naam in staat.
  */
 export function timeGridMinWidth(dayCount: number): string {
   return `calc(3.25rem + ${dayCount} * ${DAY_MIN_WIDTH} + ${dayCount} * 0.25rem)`;
@@ -495,6 +489,23 @@ export function TimeGrid({
   const hours = Array.from({ length: lastHour - firstHour }, (_, index) => firstHour + index);
   const height = hours.length * hourPx;
   const columns = timeGridColumns(parsedDays.length);
+  /**
+   * De kop en het rooster krijgen allebei deze breedte, en dat is wat de
+   * urenkolom links laat plakken tot en met zondag.
+   *
+   * `position: sticky` plakt binnen zijn **ouder** en niet binnen de scroller.
+   * Een raster met `1fr`-kolommen is als doos precies zo breed als het
+   * scrollvenster terwijl zijn kolommen eroverheen lopen; scrolde je voorbij die
+   * rand, dan liep de urenkolom tegen de grens van haar ouder en schoof ze
+   * alsnog uit beeld. Dezelfde breedte op de kop houdt daarbij de dagnamen
+   * doorlopend: anders bleef er rechts een onbeschilderde strook waar de ritten
+   * doorheen schoven.
+   *
+   * Eén uitgerekende waarde op twee zusters en geen doos eromheen: zo blijven
+   * ze exact even breed zonder dat er een laag bijkomt tussen de `sticky` kop en
+   * haar scroller.
+   */
+  const minWidth = timeGridMinWidth(parsedDays.length);
 
   const todayKey = now ? dayKeyFormatter.format(now) : null;
   const nowMinutes = now ? minutesOfDay(now) : 0;
@@ -517,15 +528,6 @@ export function TimeGrid({
           dagnamen. Dat is wat er "los" uitzag. De lucht bovenaan zit nu in de
           kop zelf, die meeschuift en alles eronder afdekt. */}
       <div ref={scroller} className="tg-scroller relative h-full overflow-auto pb-2 pr-2">
-        {/* Eén doos rond de kop en het rooster, zo breed als de week (zie
-            `timeGridMinWidth`). Zonder deze doos plakt de urenkolom links maar
-            tot aan de rechterrand van het scherm en verdwijnt ze zodra je naar
-            zaterdag scrolt; de kop zou bij horizontaal scrollen op dezelfde
-            manier een onbeschilderde strook achterlaten waar de ritten
-            doorheen schoven. De kop blijft `sticky` binnen de scroller: een
-            tussenliggende doos zonder eigen `overflow` verandert daar niets
-            aan. */}
-        <div style={{ minWidth: timeGridMinWidth(parsedDays.length) }}>
         {/* De kop plakt bovenaan de scroller: de dagen en de evenementenstrook
             blijven staan terwijl je door de uren scrolt. Eén `sticky` blok en
             niet twee, want twee sticky elementen met een eigen `top` schuiven
@@ -537,6 +539,7 @@ export function TimeGrid({
         <div
           ref={head}
           className="tg-head sticky top-0 z-30 border-b border-vtk-navy/10 bg-vtk-surface pb-1.5 pt-2"
+          style={{ minWidth }}
         >
           {above}
 
@@ -571,7 +574,7 @@ export function TimeGrid({
           </div>
         </div>
 
-        <div className="grid gap-1" style={{ gridTemplateColumns: columns }}>
+        <div className="grid gap-1" style={{ gridTemplateColumns: columns, minWidth }}>
           {/* De urenkolom, vastgeplakt links: scrol je horizontaal door de week,
               dan blijft de klok staan waar ze hoort. */}
           <div
@@ -750,7 +753,6 @@ export function TimeGrid({
               </div>
             );
           })}
-        </div>
         </div>
       </div>
     </div>
