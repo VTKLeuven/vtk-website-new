@@ -428,7 +428,6 @@ export default async function AdminFlowPreview({
               </>
             }
           />
-          <span className="text-xs text-[#5c667f]">{dict.confirmStudy.unchangedHint}</span>
         </SaveForm>
       </FlowPreview>
 

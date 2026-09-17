@@ -49,7 +49,7 @@ export function CareerOptIn({
           quality={90}
           sizes="(max-width: 860px) 100vw, 800px"
         />
-        <div>
+        <div className="vtk-career-text">
           <div className="vtk-career-kicker">{labels.kicker}</div>
           <p className="vtk-career-title">{labels.heading}</p>
         </div>

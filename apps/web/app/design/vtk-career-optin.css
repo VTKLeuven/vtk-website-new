@@ -22,29 +22,38 @@
   padding: 20px 22px;
 }
 
+/* De drie lagen liggen expliciet op elkaar: foto, wash, tekst. Zonder die
+   z-index schuift de <img> over het scrim heen; ze is zelf gepositioneerd en
+   staat ná het pseudo-element in de DOM, dus bij gelijke z-index wint zij. De
+   tekst stond dan op een felle zaalfoto en was onleesbaar. */
 .vtk-career-shot img {
   position: absolute;
   inset: 0;
+  z-index: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* 42% en niet 50%: de koppen van de standen staan in de bovenste helft, en
-     die maken de zaal herkenbaar. Horizontaal valt er bij deze verhouding niets
-     te kiezen; de foto is dan al breedte-gebonden. */
-  object-position: 50% 42%;
+  /* De middenband van de foto: daar staan de standen en de drukte, en niet de
+     lichte tapijtstrook waar de titel op wegvalt. Horizontaal valt er bij deze
+     verhouding niets te kiezen; de foto is dan al breedte-gebonden. */
+  object-position: 50% 50%;
 }
 
 .vtk-career-shot::before {
   content: "";
   position: absolute;
   inset: 0;
+  z-index: 1;
   background:
-    radial-gradient(120% 100% at 0% 0%, rgba(14, 26, 54, 0.32) 0%, rgba(14, 26, 54, 0) 70%),
+    /* De zachte hoek zit linksónder, waar de titel staat; in de voorstelling
+       hing ze linksboven omdat de proefuitsnede daar het felst was. */
+    radial-gradient(120% 110% at 0% 100%, rgba(14, 26, 54, 0.34) 0%, rgba(14, 26, 54, 0) 72%),
     linear-gradient(0deg, rgba(14, 26, 54, 0.45), rgba(14, 26, 54, 0.45));
 }
 
-.vtk-career-shot > * {
+.vtk-career-text {
   position: relative;
+  z-index: 2;
 }
 
 .vtk-career-kicker {
@@ -57,6 +66,9 @@
 
 .vtk-career-title {
   margin: 6px 0 0;
+  /* Een leesregel, niet de volle breedte: over een kaart van 900px leest de
+     titel als een balk over de foto in plaats van als een kop in de hoek. */
+  max-width: 19ch;
   font-size: clamp(20px, 2.6vw, 26px);
   line-height: 1.16;
   font-weight: 600;
