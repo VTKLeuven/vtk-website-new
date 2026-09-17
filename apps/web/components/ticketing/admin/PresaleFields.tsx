@@ -21,6 +21,7 @@ const T = {
     none: "Geen voorverkoop: iedereen begint op de verkoopstart.",
     needsStart: "Vul eerst een start verkoop in; een voorverkoop is een duur daarvoor.",
     from: (moment: string) => `Loopt van ${moment} tot de verkoopstart.`,
+    fromRelative: "Loopt tot de verkoop opent; de datum volgt uit de editie die je aanmaakt.",
     praesidium: "Alle praesidiumposten",
     helpers: "Vaste medewerkers (15+ shiften dit werkingsjaar)",
     helpersShort: "vaste medewerkers",
@@ -39,6 +40,7 @@ const T = {
     none: "No presale: everyone starts when sales open.",
     needsStart: "Set a sales start first; a presale is a duration before it.",
     from: (moment: string) => `Runs from ${moment} until sales open.`,
+    fromRelative: "Runs until sales open; the date follows from the edition you create.",
     praesidium: "Every praesidium post",
     helpers: "Regular helpers (15+ shifts this working year)",
     helpersShort: "regular helpers",
@@ -79,12 +81,19 @@ export function PresaleFields({
   groups,
   locale,
 }: {
-  /** De waarde van het veld "Start verkoop", zoals ze nu in het formulier staat. */
-  salesStartLocal: string;
+  /**
+   * De waarde van het veld "Start verkoop", zoals ze nu in het formulier staat.
+   * `null` betekent dat er er geen datum bestaat om van af te trekken: zo staat
+   * het in een sjabloon, waar de verkoopstart zelf nog een duur is. De regel
+   * leest dan zonder de uitkomst in klokuren, wat het enige is dat daar niet
+   * berekend kan worden.
+   */
+  salesStartLocal: string | null;
   leadMinutes?: number | null;
   praesidium?: boolean;
   helpers?: boolean;
   groupIds?: readonly string[];
+  /** Leeg: dan valt de keuze "extra groepen" weg in plaats van leeg te staan. */
   groups: PresaleGroupOption[];
   locale: AdminLocale;
 }) {
@@ -174,9 +183,11 @@ export function PresaleFields({
       <span className="ticket-admin-help">
         {!active
           ? t.none
-          : !salesStartLocal || !startLabel
-            ? t.needsStart
-            : t.from(startLabel)}
+          : salesStartLocal === null
+            ? t.fromRelative
+            : !salesStartLocal || !startLabel
+              ? t.needsStart
+              : t.from(startLabel)}
       </span>
 
       {/* De keuze reist altijd mee, ook wanneer het paneel dicht staat; de
@@ -222,19 +233,23 @@ export function PresaleFields({
             />
             {t.helpers}
           </label>
-          <span className="ticket-admin-label">{t.extra}</span>
-          <div className="ticket-admin-presale-groups">
-            {groups.map((group) => (
-              <label className="ticket-admin-check" key={group.id}>
-                <input
-                  type="checkbox"
-                  checked={selected.includes(group.id)}
-                  onChange={(event) => toggleGroup(group.id, event.target.checked)}
-                />
-                {groupName(group)}
-              </label>
-            ))}
-          </div>
+          {groups.length > 0 ? (
+            <>
+              <span className="ticket-admin-label">{t.extra}</span>
+              <div className="ticket-admin-presale-groups">
+                {groups.map((group) => (
+                  <label className="ticket-admin-check" key={group.id}>
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(group.id)}
+                      onChange={(event) => toggleGroup(group.id, event.target.checked)}
+                    />
+                    {groupName(group)}
+                  </label>
+                ))}
+              </div>
+            </>
+          ) : null}
         </div>
       ) : null}
     </div>

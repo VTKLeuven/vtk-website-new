@@ -2078,6 +2078,9 @@
 }
 
 .ticket-admin-anchor-section { display: grid; gap: 16px; }
+/* De kop van een ankersectie draagt haar eigen ondermarge niet: het raster zet
+   de ruimte al, en samen werd dat een gat van 30px onder de titel. */
+.ticket-admin-anchor-section > .ticket-admin-section-head { margin-bottom: 0; }
 .ticket-admin .ticket-admin-row-title { color: var(--ink) !important; }
 .ticket-admin-access-entry > summary:focus-visible { outline: 3px solid var(--yellow); outline-offset: 2px; }
 

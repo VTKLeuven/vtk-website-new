@@ -49,6 +49,7 @@ export function SaveAsTemplateCard({
           : `If this event comes back, you do not have to type it again. The tickets, prices, capacity, questions, texts and settings of "${eventTitle}" become a template; dates become durations, so a next edition only needs a day.`}
       </p>
       <SaveForm
+        className="ticket-admin-form"
         action={saveTicketTemplateFromEventAction}
         submitLabel={nl ? "Bewaar als sjabloon" : "Save as template"}
         savingLabel={nl ? "Bewaren..." : "Saving..."}
@@ -74,8 +75,11 @@ export function SaveAsTemplateCard({
           <div className="ticket-admin-field">
             <label htmlFor="template-label">{nl ? "Naam van het sjabloon" : "Template name"}</label>
             <input id="template-label" name="label" defaultValue={eventTitle} required />
+            <span className="ticket-admin-help">
+              {nl ? "Dit staat in de keuzelijst bij een nieuw event." : "This is what the list shows."}
+            </span>
           </div>
-          <div className="ticket-admin-field" data-span="2">
+          <div className="ticket-admin-field">
             <label htmlFor="template-note">{nl ? "Uitleg (optioneel)" : "Explanation (optional)"}</label>
             <input
               id="template-note"

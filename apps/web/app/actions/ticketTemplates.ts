@@ -58,6 +58,21 @@ function optionalOffset(value: FormDataEntryValue | null): number | null {
   return Math.min(366 * 1_440, Math.max(-366 * 1_440, parsed));
 }
 
+/**
+ * De voorverkoop als een getal plus een eenheid, precies zoals het
+ * ticketevent ze vraagt (`PresaleFields`). De databank bewaart minuten, zodat
+ * er maar één grootheid is om mee te rekenen; leeg of 0 betekent geen
+ * voorverkoop.
+ */
+function presaleLeadMinutes(formData: FormData): number | null {
+  const raw = text(formData.get("presaleLeadValue"));
+  if (raw === "") return null;
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return null;
+  const perUnit = text(formData.get("presaleLeadUnit")) === "days" ? 1_440 : 60;
+  return Math.min(365 * 1_440, parsed * perUnit);
+}
+
 /** Een vrije slug die nog niet bestaat: `cantus`, dan `cantus-2`, ... */
 async function freeSlug(label: string): Promise<string> {
   const base = slugify(label) || "sjabloon";
@@ -169,7 +184,7 @@ export async function saveTicketTemplateAction(
     contactEmail: text(formData.get("contactEmail")) || null,
     cardCheckIn: checkbox(formData.get("cardCheckIn")),
     openScanning: checkbox(formData.get("openScanning")),
-    presaleLeadMinutes: optionalOffset(formData.get("presaleLeadMinutes")),
+    presaleLeadMinutes: presaleLeadMinutes(formData),
     presalePraesidium: checkbox(formData.get("presalePraesidium")),
     presaleHelpers: checkbox(formData.get("presaleHelpers")),
     confirmationMessageNl: text(formData.get("confirmationMessageNl")).slice(0, 5_000),

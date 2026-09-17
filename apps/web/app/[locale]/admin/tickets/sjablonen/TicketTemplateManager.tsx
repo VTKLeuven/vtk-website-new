@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { LayoutTemplate, Plus } from "lucide-react";
+import { CalendarRange, Info, LayoutTemplate, Plus, Ticket } from "lucide-react";
 import {
   deleteTicketTemplateAction,
   saveTicketTemplateAction,
@@ -9,6 +9,8 @@ import {
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
+import { PresaleFields } from "@/components/ticketing/admin/PresaleFields";
+import { SettingsPanel } from "@/components/ticketing/admin/SettingsPanel";
 import { TicketTemplateTypeRows } from "@/components/ticketing/admin/TicketTemplateTypeRows";
 import { formatMoney, type AdminLocale } from "@/components/ticketing/admin/format";
 import {
@@ -272,9 +274,15 @@ function TemplateEditor({
   // Een meegeleverd sjabloon heeft nog geen rij in de databank zolang de seed
   // niet liep; dan maakt opslaan er een echte van.
   const id = template.id.startsWith("builtin:") ? "" : template.id;
+  const field = (key: string) => `${key}-${id || "new"}`;
+  const activeTypes = template.types.filter((type) => type.enabled);
 
   return (
-    <section className="ticket-admin-section">
+    // Geen `ticket-admin-section` eromheen: de vensters hieronder zijn zelf al
+    // witte kaarten, en die in nog een kaart zetten geeft precies het
+    // kaart-in-een-kaart dat op het event zelf niet gebeurt. Dit is de schil van
+    // een ankersectie: enkel een raster met ruimte ertussen.
+    <section className="ticket-admin-anchor-section">
       <div className="ticket-admin-section-head">
         <div className="ticket-admin-section-heading">
           <span className="ticket-admin-section-icon">
@@ -291,7 +299,13 @@ function TemplateEditor({
         </div>
       </div>
 
+      {/* Dezelfde schil als de instellingen van een ticketevent: `ticket-admin-form`
+          voor de ruimte tussen de blokken, en dezelfde uitklapvensters met
+          dezelfde titels. Dit scherm beschrijft hetzelfde ding als dat scherm,
+          alleen zonder datum, en het als één lange muur velden tonen terwijl het
+          echte event netjes in vensters staat, leest als twee producten. */}
       <SaveForm
+        className="ticket-admin-form"
         action={saveTicketTemplateAction}
         submitLabel={nl ? "Sjabloon opslaan" : "Save template"}
         savingLabel={nl ? "Opslaan..." : "Saving..."}
@@ -313,256 +327,309 @@ function TemplateEditor({
       >
         <input type="hidden" name="templateId" value={id} />
 
-        <div className="ticket-admin-form-grid">
-          <div className="ticket-admin-field">
-            <label htmlFor={`label-${id || "new"}`}>{nl ? "Naam van het sjabloon" : "Template name"}</label>
-            <input
-              id={`label-${id || "new"}`}
-              name="label"
-              defaultValue={template.label}
-              placeholder="Cantus"
-              required
-            />
-            <span className="ticket-admin-help">
-              {nl ? "Dit staat in de keuzelijst bij een nieuw event." : "This is what the list shows."}
-            </span>
-          </div>
-          <div className="ticket-admin-field" data-span="2">
-            <label htmlFor={`note-${id || "new"}`}>{nl ? "Uitleg (optioneel)" : "Explanation (optional)"}</label>
-            <input
-              id={`note-${id || "new"}`}
-              name="note"
-              defaultValue={template.note ?? ""}
-              placeholder={nl ? "Eén regel onder de keuzelijst." : "One line below the list."}
-            />
-          </div>
-          <div className="ticket-admin-field">
-            <label htmlFor={`group-${id || "new"}`}>{nl ? "Post" : "Post"}</label>
-            <select id={`group-${id || "new"}`} name="ownerGroupId" defaultValue={template.ownerGroupId ?? ""}>
-              <option value="">{nl ? "Geen" : "None"}</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {nl ? group.nameNl : group.nameEn}
-                </option>
-              ))}
-            </select>
-            <span className="ticket-admin-help">
-              {nl
-                ? "Enkel een toelichting in de lijst; het sjabloon blijft voor iedereen bruikbaar."
-                : "Only a hint in the list; the template stays usable by everyone."}
-            </span>
-          </div>
-        </div>
-
-        <h3 className="ticket-admin-subheading">{nl ? "Het event" : "The event"}</h3>
-        <div className="ticket-admin-form-grid">
-          <div className="ticket-admin-field">
-            <label htmlFor={`titleNl-${id || "new"}`}>{nl ? "Titel (NL)" : "Title (NL)"}</label>
-            <input id={`titleNl-${id || "new"}`} name="titleNl" defaultValue={template.titleNl} />
-          </div>
-          <div className="ticket-admin-field">
-            <label htmlFor={`titleEn-${id || "new"}`}>{nl ? "Titel (EN)" : "Title (EN)"}</label>
-            <input id={`titleEn-${id || "new"}`} name="titleEn" defaultValue={template.titleEn} />
-          </div>
-          <div className="ticket-admin-field">
-            <label htmlFor={`location-${id || "new"}`}>{nl ? "Locatie" : "Location"}</label>
-            <input id={`location-${id || "new"}`} name="location" defaultValue={template.location} />
-          </div>
-          <div className="ticket-admin-field">
-            <label htmlFor={`time-${id || "new"}`}>{nl ? "Startuur" : "Start time"}</label>
-            <input
-              id={`time-${id || "new"}`}
-              name="timeOfDay"
-              type="time"
-              defaultValue={templateTimeOfDay(template)}
-            />
-            <span className="ticket-admin-help">
-              {nl ? "De datum kies je bij het aanmaken." : "The date is picked when creating."}
-            </span>
-          </div>
-          <div className="ticket-admin-field">
-            <label htmlFor={`duration-${id || "new"}`}>{nl ? "Duur (minuten)" : "Duration (minutes)"}</label>
-            <input
-              id={`duration-${id || "new"}`}
-              name="durationMinutes"
-              type="number"
-              min="15"
-              step="15"
-              defaultValue={template.durationMinutes}
-            />
-          </div>
-          <div className="ticket-admin-field">
-            <label htmlFor={`capacity-${id || "new"}`}>{nl ? "Capaciteit" : "Capacity"}</label>
-            <input
-              id={`capacity-${id || "new"}`}
-              name="capacity"
-              type="number"
-              min="1"
-              defaultValue={template.capacity}
-            />
-          </div>
-          <OffsetField
-            id={`opens-${id || "new"}`}
-            name="salesOpensMinutesBefore"
-            label={nl ? "Verkoop opent" : "Sales open"}
-            help={nl ? "vóór de start van het event" : "before the event starts"}
-            value={template.salesOpensMinutesBefore}
-            locale={locale}
-          />
-          <OffsetField
-            id={`closes-${id || "new"}`}
-            name="salesClosesMinutesBefore"
-            label={nl ? "Verkoop sluit" : "Sales close"}
-            help={nl ? "0 = bij de start" : "0 = at the start"}
-            value={template.salesClosesMinutesBefore}
-            locale={locale}
-          />
-          <div className="ticket-admin-field">
-            <label htmlFor={`max-${id || "new"}`}>
-              {nl ? "Max. tickets per bestelling" : "Max. tickets per order"}
-            </label>
-            <input
-              id={`max-${id || "new"}`}
-              name="maxTicketsPerOrder"
-              type="number"
-              min="1"
-              max="50"
-              defaultValue={template.maxTicketsPerOrder}
-            />
-          </div>
-          <div className="ticket-admin-field">
-            <label htmlFor={`contact-${id || "new"}`}>{nl ? "Contact-e-mail" : "Contact email"}</label>
-            <input
-              id={`contact-${id || "new"}`}
-              name="contactEmail"
-              type="email"
-              defaultValue={template.contactEmail ?? ""}
-            />
-          </div>
-          <div className="ticket-admin-field" data-span="2">
-            <label className="ticket-admin-check" htmlFor={`card-${id || "new"}`}>
-              <input type="hidden" name="cardCheckIn" value="false" />
-              <input
-                id={`card-${id || "new"}`}
-                name="cardCheckIn"
-                type="checkbox"
-                value="true"
-                defaultChecked={template.cardCheckIn}
-              />
-              <span>{nl ? "Check-in met de studentenkaart" : "Check in with the student card"}</span>
-            </label>
-          </div>
-          <div className="ticket-admin-field" data-span="2">
-            <label className="ticket-admin-check" htmlFor={`scan-${id || "new"}`}>
-              <input type="hidden" name="openScanning" value="false" />
-              <input
-                id={`scan-${id || "new"}`}
-                name="openScanning"
-                type="checkbox"
-                value="true"
-                defaultChecked={template.openScanning}
-              />
-              <span>{nl ? "Elke praesidiumpost mag scannen" : "Every praesidium post may scan"}</span>
-            </label>
-          </div>
-          <div className="ticket-admin-field" data-span="2">
-            <label className="ticket-admin-check" htmlFor={`presale-${id || "new"}`}>
-              <input type="hidden" name="presalePraesidium" value="false" />
-              <input
-                id={`presale-${id || "new"}`}
-                name="presalePraesidium"
-                type="checkbox"
-                value="true"
-                defaultChecked={template.presalePraesidium}
-              />
-              <span>{nl ? "Voorverkoop voor het praesidium" : "Presale for the praesidium"}</span>
-            </label>
-          </div>
-          <div className="ticket-admin-field" data-span="2">
-            <label className="ticket-admin-check" htmlFor={`presale-helpers-${id || "new"}`}>
-              <input type="hidden" name="presaleHelpers" value="false" />
-              <input
-                id={`presale-helpers-${id || "new"}`}
-                name="presaleHelpers"
-                type="checkbox"
-                value="true"
-                defaultChecked={template.presaleHelpers}
-              />
-              <span>
-                {nl ? "Voorverkoop voor de vaste medewerkers" : "Presale for the regular helpers"}
-              </span>
-            </label>
-          </div>
-          <OffsetField
-            id={`lead-${id || "new"}`}
-            name="presaleLeadMinutes"
-            label={nl ? "Voorverkoop begint" : "Presale starts"}
-            help={nl ? "vóór de verkoopstart" : "before sales open"}
-            value={template.presaleLeadMinutes}
-            locale={locale}
-          />
-          <div className="ticket-admin-field" data-span="2">
-            <label htmlFor={`descNl-${id || "new"}`}>{nl ? "Beschrijving (NL)" : "Description (NL)"}</label>
-            <textarea
-              id={`descNl-${id || "new"}`}
-              name="descriptionNl"
-              rows={6}
-              defaultValue={template.descriptionNl}
-            />
-            <span className="ticket-admin-help">
-              {nl
-                ? "De vaste blokken (locatie, timing, prijzen). De datum vul je per editie in."
-                : "The fixed blocks (location, timing, prices). The date is filled in per edition."}
-            </span>
-          </div>
-          <div className="ticket-admin-field" data-span="2">
-            <label htmlFor={`descEn-${id || "new"}`}>{nl ? "Beschrijving (EN)" : "Description (EN)"}</label>
-            <textarea
-              id={`descEn-${id || "new"}`}
-              name="descriptionEn"
-              rows={4}
-              defaultValue={template.descriptionEn}
-            />
-          </div>
-          <div className="ticket-admin-field" data-span="2">
-            <label htmlFor={`confirmNl-${id || "new"}`}>
-              {nl ? "Bevestigingsbericht (NL)" : "Confirmation message (NL)"}
-            </label>
-            <textarea
-              id={`confirmNl-${id || "new"}`}
-              name="confirmationMessageNl"
-              rows={3}
-              defaultValue={template.confirmationMessageNl}
-            />
-          </div>
-          <div className="ticket-admin-field" data-span="2">
-            <label htmlFor={`confirmEn-${id || "new"}`}>
-              {nl ? "Bevestigingsbericht (EN)" : "Confirmation message (EN)"}
-            </label>
-            <textarea
-              id={`confirmEn-${id || "new"}`}
-              name="confirmationMessageEn"
-              rows={3}
-              defaultValue={template.confirmationMessageEn}
-            />
-          </div>
-        </div>
-
-        <h3 className="ticket-admin-subheading">{nl ? "De tickets" : "The tickets"}</h3>
-        <TicketTemplateTypeRows
-          name="typesData"
-          initial={template.types}
-          locale={locale}
-          showOffsets
-        />
-        <input type="hidden" name="questionsData" value={JSON.stringify(template.questions)} />
-        {template.questions.length > 0 ? (
+        <SettingsPanel
+          title={nl ? "Basisinformatie" : "Basic information"}
+          status={isNew ? undefined : [template.label, template.titleNl].filter(Boolean).join(" · ")}
+          icon={<Info aria-hidden="true" size={17} />}
+          defaultOpen
+        >
           <p className="ticket-admin-help">
             {nl
-              ? `Dit sjabloon draagt ${template.questions.length} deelnemersvra${template.questions.length === 1 ? "ag" : "gen"} mee. Die bewerk je op een event zelf; hier blijven ze bewaard.`
-              : `This template carries ${template.questions.length} attendee question(s). You edit those on an event itself; here they are kept.`}
+              ? "De naam van het sjabloon staat enkel in de keuzelijst; de titel eronder is wat kopers straks in de ticketshop zien."
+              : "The template name only appears in the list; the title below is what buyers will see in the ticket shop."}
           </p>
-        ) : null}
+          <div className="ticket-admin-form-grid">
+            <div className="ticket-admin-field">
+              <label htmlFor={field("label")}>{nl ? "Naam van het sjabloon" : "Template name"}</label>
+              <input
+                id={field("label")}
+                name="label"
+                defaultValue={template.label}
+                placeholder="Cantus"
+                required
+              />
+            </div>
+            <div className="ticket-admin-field">
+              <label htmlFor={field("group")}>{nl ? "Post" : "Post"}</label>
+              <select
+                id={field("group")}
+                name="ownerGroupId"
+                defaultValue={template.ownerGroupId ?? ""}
+              >
+                <option value="">{nl ? "Geen" : "None"}</option>
+                {groups.map((group) => (
+                  <option key={group.id} value={group.id}>
+                    {nl ? group.nameNl : group.nameEn}
+                  </option>
+                ))}
+              </select>
+              <span className="ticket-admin-help">
+                {nl
+                  ? "Enkel een toelichting in de lijst; het sjabloon blijft voor iedereen bruikbaar."
+                  : "Only a hint in the list; the template stays usable by everyone."}
+              </span>
+            </div>
+            <div className="ticket-admin-field" data-span="2">
+              <label htmlFor={field("note")}>{nl ? "Uitleg (optioneel)" : "Explanation (optional)"}</label>
+              <input
+                id={field("note")}
+                name="note"
+                defaultValue={template.note ?? ""}
+                placeholder={nl ? "Eén regel onder de keuzelijst." : "One line below the list."}
+              />
+            </div>
+            <div className="ticket-admin-field">
+              <label htmlFor={field("titleNl")}>Titel (NL)</label>
+              <input id={field("titleNl")} name="titleNl" defaultValue={template.titleNl} />
+            </div>
+            <div className="ticket-admin-field">
+              <label htmlFor={field("titleEn")}>Titel (EN)</label>
+              <input id={field("titleEn")} name="titleEn" defaultValue={template.titleEn} />
+            </div>
+            <div className="ticket-admin-field">
+              <label htmlFor={field("location")}>{nl ? "Locatie" : "Location"}</label>
+              <input id={field("location")} name="location" defaultValue={template.location} />
+              <small>
+                {nl
+                  ? 'De naam die bezoekers zien. Een vrije naam zoals "Theokot" mag.'
+                  : 'The name buyers see. A free-form name such as "Theokot" is fine.'}
+              </small>
+            </div>
+            <div className="ticket-admin-field">
+              <label htmlFor={field("contact")}>{nl ? "Contact e-mail" : "Contact email"}</label>
+              <input
+                id={field("contact")}
+                name="contactEmail"
+                type="email"
+                defaultValue={template.contactEmail ?? ""}
+              />
+            </div>
+          </div>
+        </SettingsPanel>
+
+        <SettingsPanel
+          title={nl ? "Planning en verkoop" : "Schedule and sales"}
+          status={
+            nl
+              ? `Start ${templateTimeOfDay(template)} · verkoop opent ${formatMinutesBefore(template.salesOpensMinutesBefore, locale)}`
+              : `Starts ${templateTimeOfDay(template)} · sales open ${formatMinutesBefore(template.salesOpensMinutesBefore, locale)}`
+          }
+          icon={<CalendarRange aria-hidden="true" size={17} />}
+        >
+          <p className="ticket-admin-help">
+            {nl
+              ? "Een sjabloon bewaart duurtijden, geen datums: de dag vul je per editie in, de rest staat hier al goed."
+              : "A template stores durations, not dates: you pick the day per edition, the rest is already set here."}
+          </p>
+          <div className="ticket-admin-form-grid">
+            <div className="ticket-admin-field">
+              <label htmlFor={field("time")}>{nl ? "Startuur" : "Start time"}</label>
+              <input
+                id={field("time")}
+                name="timeOfDay"
+                type="time"
+                defaultValue={templateTimeOfDay(template)}
+              />
+              <span className="ticket-admin-help">
+                {nl ? "De datum kies je bij het aanmaken." : "The date is picked when creating."}
+              </span>
+            </div>
+            <div className="ticket-admin-field">
+              <label htmlFor={field("duration")}>{nl ? "Duur (minuten)" : "Duration (minutes)"}</label>
+              <input
+                id={field("duration")}
+                name="durationMinutes"
+                type="number"
+                min="15"
+                step="15"
+                defaultValue={template.durationMinutes}
+              />
+            </div>
+            <OffsetField
+              id={field("opens")}
+              name="salesOpensMinutesBefore"
+              label={nl ? "Verkoop opent" : "Sales open"}
+              help={nl ? "vóór de start van het event" : "before the event starts"}
+              value={template.salesOpensMinutesBefore}
+              locale={locale}
+            />
+            <OffsetField
+              id={field("closes")}
+              name="salesClosesMinutesBefore"
+              label={nl ? "Verkoop sluit" : "Sales close"}
+              help={nl ? "0 = bij de start" : "0 = at the start"}
+              value={template.salesClosesMinutesBefore}
+              locale={locale}
+            />
+            <div className="ticket-admin-field">
+              <label htmlFor={field("capacity")}>{nl ? "Capaciteit" : "Capacity"}</label>
+              <input
+                id={field("capacity")}
+                name="capacity"
+                type="number"
+                min="1"
+                defaultValue={template.capacity}
+              />
+              <span className="ticket-admin-help">
+                {nl
+                  ? "De totale capaciteit; alle tickets hieronder delen ze."
+                  : "The total capacity; all tickets below share it."}
+              </span>
+            </div>
+            <div className="ticket-admin-field">
+              <label htmlFor={field("max")}>
+                {nl ? "Maximum tickets per bestelling" : "Maximum tickets per order"}
+              </label>
+              <input
+                id={field("max")}
+                name="maxTicketsPerOrder"
+                type="number"
+                min="1"
+                max="50"
+                defaultValue={template.maxTicketsPerOrder}
+              />
+            </div>
+            {/* Dezelfde regel als op het event zelf, met één verschil: daar
+                rekent ze de voorverkoop om naar een klokuur, en hier bestaat
+                de verkoopstart nog niet als datum. Vandaar `salesStartLocal`
+                op null. */}
+            <PresaleFields
+              salesStartLocal={null}
+              leadMinutes={template.presaleLeadMinutes}
+              praesidium={template.presalePraesidium}
+              helpers={template.presaleHelpers}
+              groups={[]}
+              locale={locale}
+            />
+            <div className="ticket-admin-field" data-span="2">
+              <label className="ticket-admin-check" htmlFor={field("card")}>
+                <input type="hidden" name="cardCheckIn" value="false" />
+                <input
+                  id={field("card")}
+                  name="cardCheckIn"
+                  type="checkbox"
+                  value="true"
+                  defaultChecked={template.cardCheckIn}
+                />
+                {nl
+                  ? "Aanmelden met de studentenkaart aan de deur"
+                  : "Check in with a student card at the door"}
+              </label>
+            </div>
+            <div className="ticket-admin-field" data-span="2">
+              <label className="ticket-admin-check" htmlFor={field("scan")}>
+                <input type="hidden" name="openScanning" value="false" />
+                <input
+                  id={field("scan")}
+                  name="openScanning"
+                  type="checkbox"
+                  value="true"
+                  defaultChecked={template.openScanning}
+                />
+                {nl ? "Elke praesidiumpost mag scannen" : "Every praesidium post may scan"}
+              </label>
+            </div>
+          </div>
+        </SettingsPanel>
+
+        <SettingsPanel
+          title={nl ? "Tickets" : "Tickets"}
+          status={`${activeTypes.length} ticket${activeTypes.length === 1 ? "" : "s"}`}
+          icon={<Ticket aria-hidden="true" size={17} />}
+          defaultOpen
+        >
+          <p className="ticket-admin-help">
+            {nl
+              ? "Deze rijen worden de tickettypes van een nieuw event; daar blijft alles aanpasbaar."
+              : "These rows become the ticket types of a new event, where everything stays editable."}
+          </p>
+          <TicketTemplateTypeRows
+            name="typesData"
+            initial={template.types}
+            locale={locale}
+            showOffsets
+          />
+          <input type="hidden" name="questionsData" value={JSON.stringify(template.questions)} />
+          {template.questions.length > 0 ? (
+            <p className="ticket-admin-help">
+              {nl
+                ? `Dit sjabloon draagt ${template.questions.length} deelnemersvra${template.questions.length === 1 ? "ag" : "gen"} mee. Die bewerk je op een event zelf; hier blijven ze bewaard.`
+                : `This template carries ${template.questions.length} attendee question(s). You edit those on an event itself; here they are kept.`}
+            </p>
+          ) : null}
+        </SettingsPanel>
+
+        <SettingsPanel
+          title={nl ? "Beschrijving" : "Description"}
+          status={
+            nl
+              ? "Optioneel · extra informatie voor bezoekers"
+              : "Optional · extra visitor information"
+          }
+        >
+          <div className="ticket-admin-form-grid">
+            <div className="ticket-admin-field" data-span="2">
+              <label htmlFor={field("descNl")}>{nl ? "Beschrijving (NL)" : "Description (NL)"}</label>
+              <textarea
+                id={field("descNl")}
+                name="descriptionNl"
+                rows={6}
+                defaultValue={template.descriptionNl}
+              />
+              <span className="ticket-admin-help">
+                {nl
+                  ? "De vaste blokken (locatie, timing, prijzen). De datum vul je per editie in."
+                  : "The fixed blocks (location, timing, prices). The date is filled in per edition."}
+              </span>
+            </div>
+            <div className="ticket-admin-field" data-span="2">
+              <label htmlFor={field("descEn")}>{nl ? "Beschrijving (EN)" : "Description (EN)"}</label>
+              <textarea
+                id={field("descEn")}
+                name="descriptionEn"
+                rows={4}
+                defaultValue={template.descriptionEn}
+              />
+            </div>
+          </div>
+        </SettingsPanel>
+
+        <SettingsPanel
+          title={nl ? "Bevestigingsbericht" : "Confirmation message"}
+          status={
+            nl ? "Optioneel · tekst voor kopers na aankoop" : "Optional · text for buyers after purchase"
+          }
+        >
+          <p className="ticket-admin-help">
+            {nl
+              ? "Staat op het scherm zodra de bestelling betaald is, en in de bevestigingsmail met de tickets."
+              : "Shown once the order is paid, and included in the confirmation email with the tickets."}
+          </p>
+          <div className="ticket-admin-form-grid">
+            <div className="ticket-admin-field" data-span="2">
+              <label htmlFor={field("confirmNl")}>
+                {nl ? "Bevestigingsbericht (NL)" : "Confirmation message (NL)"}
+              </label>
+              <textarea
+                id={field("confirmNl")}
+                name="confirmationMessageNl"
+                rows={3}
+                defaultValue={template.confirmationMessageNl}
+              />
+            </div>
+            <div className="ticket-admin-field" data-span="2">
+              <label htmlFor={field("confirmEn")}>
+                {nl ? "Bevestigingsbericht (EN)" : "Confirmation message (EN)"}
+              </label>
+              <textarea
+                id={field("confirmEn")}
+                name="confirmationMessageEn"
+                rows={3}
+                defaultValue={template.confirmationMessageEn}
+              />
+            </div>
+          </div>
+        </SettingsPanel>
       </SaveForm>
 
       {/* Verwijderen staat in het detail en niet in de rij: het is de enige
