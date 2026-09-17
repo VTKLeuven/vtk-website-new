@@ -269,21 +269,31 @@ export function createGalleryClient({
 
     mine.sort((left, right) => dateValue(right.startDate) - dateValue(left.startDate));
 
+    // De gedeelde links naast elkaar, net als de albums hierboven. Dit liep per
+    // album na elkaar, en met een GET plus soms een POST of PATCH per album was
+    // dat het grootste deel van de twee seconden die het opbouwen van de
+    // momentopname kostte. De volgorde van `mine` blijft leidend, zodat het
+    // toekennen van de slugs hieronder onveranderd deterministisch is.
+    const sharedLinks = await Promise.allSettled(
+      mine.map((album) => ensureAlbumSharedLink(album, stripMarkers(album.description || '', allMarkers))),
+    );
+
     const allocateSlug = createSlugAllocator();
     const mappedEntries: MappedAlbumEntry[] = [];
 
-    for (const album of mine) {
-      const publicDescription = stripMarkers(album.description || '', allMarkers);
+    for (const [index, album] of mine.entries()) {
+      const result = sharedLinks[index];
 
       // Om dezelfde reden als hierboven: een album zonder werkende gedeelde
       // link heeft geen foto-URL's en valt weg, maar neemt de rest niet mee.
-      let sharedLink: ImmichSharedLink;
-      try {
-        sharedLink = await ensureAlbumSharedLink(album, publicDescription);
-      } catch (error) {
-        console.warn(`[gallery:${id}] geen gedeelde link voor ${album.albumName || album.id}:`, error);
+      if (result.status === 'rejected') {
+        console.warn(
+          `[gallery:${id}] geen gedeelde link voor ${album.albumName || album.id}:`,
+          result.reason,
+        );
         continue;
       }
+      const sharedLink = result.value;
 
       const slug = allocateSlug(album.albumName || 'album');
       const mapped = mapAlbumDetail({

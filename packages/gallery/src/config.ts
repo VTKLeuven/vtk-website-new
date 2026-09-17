@@ -77,6 +77,23 @@ export type ImmichConfig = {
 };
 
 /**
+ * Hoe lang de momentopname van een galerij blijft staan.
+ *
+ * Dit stond op een minuut, en dat was duur: het opbouwen van de momentopname
+ * haalt de albumlijst, daarna per album de volledige assetlijst en per album
+ * een gedeelde link op. Op vtk.be duurt dat ongeveer twee seconden, en met een
+ * TTL van een minuut betaalt elk uur zestig bezoekers die twee seconden aan
+ * TTFB, terwijl de albums zelden wijzigen.
+ *
+ * Een kwartier kan omdat elke schrijfactie de momentopname zelf ververst:
+ * `refreshSnapshot()` loopt na een upload (`app/actions/media.ts`) en na een
+ * verwijderverzoek (`app/actions/takedown.ts`). De TTL is dus enkel nog het
+ * vangnet voor wijzigingen die rechtstreeks in Immich gebeuren, buiten het
+ * beheerscherm om. Wie daar vaak werkt, zet de variabele lager.
+ */
+const DEFAULT_CACHE_TTL_SECONDS = 900;
+
+/**
  * De Immich-verbinding zelf. Die is voor alle galerijen dezelfde: één server,
  * één sleutel, één publieke proxy. Enkel de merker verschilt.
  */
@@ -85,13 +102,13 @@ export function immichConfig(): ImmichConfig {
   const apiKey = process.env.GALLERY_IMMICH_API_KEY || process.env.IMMICH_API_KEY || '';
   const publicProxyUrl =
     process.env.GALLERY_PUBLIC_PROXY_URL || process.env.IMMICH_PUBLIC_PROXY_URL || 'http://localhost:3000';
-  const ttl = Number(process.env.GALLERY_CACHE_TTL_SECONDS || '60');
+  const ttl = Number(process.env.GALLERY_CACHE_TTL_SECONDS || String(DEFAULT_CACHE_TTL_SECONDS));
 
   return {
     apiUrl: apiUrl.replace(/\/+$/, ''),
     apiKey,
     publicProxyUrl: publicProxyUrl.replace(/\/+$/, ''),
-    cacheTtlSeconds: Number.isFinite(ttl) && ttl >= 0 ? ttl : 60,
+    cacheTtlSeconds: Number.isFinite(ttl) && ttl >= 0 ? ttl : DEFAULT_CACHE_TTL_SECONDS,
   };
 }
 

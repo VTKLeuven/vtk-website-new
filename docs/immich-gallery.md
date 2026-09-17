@@ -60,8 +60,16 @@ GALLERY_IMMICH_API_URL="http://localhost:2283/api"
 GALLERY_IMMICH_API_KEY="<immich-api-key>"
 GALLERY_PUBLIC_PROXY_URL="http://localhost:3014"
 GALLERY_ALBUM_MARKER="[gallery]"
-GALLERY_CACHE_TTL_SECONDS="60"
+GALLERY_CACHE_TTL_SECONDS="900"
 ```
+
+`GALLERY_CACHE_TTL_SECONDS` is de levensduur van de momentopname per galerij.
+Die opbouwen kost op vtk.be ongeveer twee seconden (albumlijst, per album de
+assets, per album een gedeelde link), en de bezoeker die de verlopen cache
+tegenkomt betaalt dat volledig aan wachttijd. Een kwartier kan omdat uploaden en
+een verwijderverzoek de momentopname zelf verversen; de TTL vangt enkel nog
+wijzigingen op die rechtstreeks in Immich gebeuren. Werk je een tijd lang in
+Immich zelf, zet hem dan tijdelijk lager.
 
 For face search:
 
