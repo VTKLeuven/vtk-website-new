@@ -58,7 +58,14 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "50mb",
     },
   },
-  // Er staat hier bewust géén `images`-sleutel. Alles wat via next/image gaat is
+  images: {
+    // Next 16 laat standaard enkel kwaliteit 75 toe. Een `quality={90}` op een
+    // <Image> werd daardoor stilzwijgend 75, en een URL met q=90 gaf een 400.
+    // Een grote foto (eventpagina, contentpagina) oogde op 75 zacht en vlekkerig
+    // in donkere delen; zie CLAUDE.md onder Implementation Constraints.
+    qualities: [75, 90],
+  },
+  // Er staan hier bewust géén `remotePatterns`. Alles wat via next/image gaat is
   // een pad op deze host (`/api/media/...` en de statische bestanden onder
   // `public/`), en daar heeft de optimizer geen `remotePatterns` voor nodig.
   //

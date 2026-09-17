@@ -509,5 +509,10 @@ the design language into the application instead of copying mockup content.
 - Keep `next dev --webpack` for both apps; do not re-enable Turbopack in dev.
 - Keep `turbopack.root` and `outputFileTracingRoot` pinned in both Next configs.
 - Do not re-export Prisma client types from `@vtk/db`.
+- A `quality` on `next/image` only works when that value is listed in
+  `images.qualities` in `apps/web/next.config.ts` (now `[75, 90]`). Next 16
+  allows only 75 by default: a `quality={90}` was silently served at 75 and a
+  URL with `q=90` returned a 400, so the large photos on event and content pages
+  looked soft. Add a value there before using it in a component.
 - Read relevant local Next.js 16 docs under `node_modules/next/dist/docs/`
   before changing app layout, fonts, CSS, or routing conventions.

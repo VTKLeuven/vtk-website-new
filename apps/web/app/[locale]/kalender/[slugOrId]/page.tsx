@@ -212,6 +212,7 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
               alt=""
               fill
               sizes="(max-width: 960px) 100vw, 58vw"
+              quality={90}
               className="vtk-event-photo-img"
               style={imagePosition ? { objectPosition: imagePosition } : undefined}
               priority
