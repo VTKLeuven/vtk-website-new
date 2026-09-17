@@ -834,6 +834,77 @@ export async function publishTicketEventAction(
   }
 }
 
+/**
+ * De uitkomst van een verwijderactie in het ticketbeheer.
+ *
+ * Bewust een teruggegeven code en geen gegooide fout: "er is intussen al
+ * besteld" is een verwachte uitkomst (de knop stond er op het moment dat de
+ * pagina geladen werd, de bestelling kwam daarna) en hoort een rode toast te
+ * geven, geen error boundary. Zelfde vorm als {@link PublishTicketEventResult}.
+ */
+export type TicketDeleteResult = { ok: true } | { ok: false; error: string };
+
+/**
+ * Een ticketevent waar nog geen enkele bestelling op staat, echt weggooien.
+ *
+ * Archiveren is er voor een event dat geweest is: de bestellingen, de betalingen
+ * en de tickets moeten blijven, dus het event dat ze dragen ook. Een event dat
+ * nooit iets verkocht heeft, draagt niets: een concept dat een dubbel bleek, een
+ * cantus die niet doorging. Dat als "gearchiveerd" in de lijst laten staan maakt
+ * het overzicht onleesbaar voor iedereen die er niets mee te maken had.
+ *
+ * De grens is één bestelling, niet één betaalde bestelling. Een vervallen of
+ * geannuleerde bestelling is een spoor van een echte bezoeker in de kassa, met
+ * een betaalpoging eraan; die gooien we niet weg om op te ruimen. Staat er zo
+ * één, dan blijft archiveren over.
+ *
+ * Wat mee weg moet, gaat er hier met de hand uit: het ticketlogboek, de
+ * uitgaande berichten en de scanlijnen wijzen met `Restrict` naar het event
+ * (ze horen een verwijderde bestelling te overleven, niet een verwijderd event).
+ * De rest (tickettypes, voorraadpotten, vragen, grants, poorten, toestellen)
+ * hangt met `Cascade` en verdwijnt vanzelf. De regel in het adminlogboek blijft:
+ * die staat los en vertelt wie dit deed.
+ */
+export async function deleteTicketEventAction(formData: FormData): Promise<TicketDeleteResult> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  try {
+    const { event } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+
+    const deleted = await prisma.$transaction(async (tx) => {
+      // Binnen de transactie opnieuw tellen: tussen het laden van de pagina en
+      // deze klik kan er besteld zijn. De databank weigert het daarna ook zelf
+      // (`onDelete: Restrict` op TicketOrder), maar dan als ruwe FK-fout.
+      const orders = await tx.ticketOrder.count({ where: { eventId } });
+      if (orders > 0) return false;
+      await tx.ticketScanLog.deleteMany({ where: { eventId } });
+      await tx.ticketOutboxMessage.deleteMany({ where: { eventId } });
+      await tx.ticketAuditLog.deleteMany({ where: { eventId } });
+      await tx.ticketEvent.delete({ where: { id: eventId } });
+      return true;
+    });
+    if (!deleted) return { ok: false, error: "TICKET_EVENT_HAS_ORDERS" };
+
+    await logAudit({
+      action: "delete",
+      entity: "ticketEvent",
+      entityId: eventId,
+      target: event.titleNl,
+      summary: "ticketevent verwijderd; er stond nog geen enkele bestelling op",
+    });
+    refreshTicketEvent(locale, eventId);
+  } catch (error) {
+    unstable_rethrow(error);
+    const code = error instanceof Error ? error.message : "";
+    if (code === "FORBIDDEN" || code === "TICKET_EVENT_NOT_FOUND") return { ok: false, error: code };
+    console.error("Deleting ticket event failed", error);
+    throw error;
+  }
+  // Het scherm waar deze knop op stond, bestaat niet meer; die navigatie is
+  // zelf de bevestiging. Buiten de try/catch, want `redirect` werkt via throw.
+  redirect(localePath(locale, "/admin/tickets"));
+}
+
 export async function updateInventoryPoolAction(formData: FormData): Promise<void> {
   const eventId = value(formData, "eventId");
   const poolId = value(formData, "poolId");
@@ -1160,6 +1231,74 @@ export async function archiveTicketTypeAction(formData: FormData): Promise<void>
 }
 
 /**
+ * Een tickettype dat nog nooit besteld is, echt weggooien.
+ *
+ * Archiveren bestaat omdat een verkocht ticket naar zijn type blijft wijzen: de
+ * bestelregel bewaart wel haar eigen naam en prijs, maar `TicketOrderItem`
+ * houdt een `Restrict`-verwijzing naar `TicketType`. Zodra er één besteld is, is
+ * verwijderen dus geen keuze meer. Vóór de eerste bestelling is het dat wel, en
+ * dan is een gearchiveerde regel die voor altijd in de lijst blijft staan enkel
+ * ruis: een typfout bij het aanmaken, een type dat toch niet doorging.
+ *
+ * De vragen die enkel aan dit type hingen, gaan mee: ze wijzen er met
+ * `Restrict` naar en hebben zonder hun type geen betekenis meer. Staat er toch
+ * een antwoord op zo'n vraag, dan stopt het hier; dat is een gegeven van een
+ * deelnemer en dat gooien we niet weg om een tickettype op te ruimen.
+ */
+export async function deleteTicketTypeAction(formData: FormData): Promise<TicketDeleteResult> {
+  const eventId = value(formData, "eventId");
+  const ticketTypeId = value(formData, "ticketTypeId") || value(formData, "id");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  try {
+    const { session } = await requireTicketEventCapability(eventId, "MANAGE_INVENTORY");
+    const type = await prisma.ticketType.findFirst({ where: { id: ticketTypeId, eventId } });
+    if (!type) return { ok: false, error: "TICKET_TYPE_NOT_FOUND" };
+
+    const deleted = await prisma.$transaction(async (tx) => {
+      // Opnieuw tellen binnen de transactie: tussen het tonen van de knop en
+      // deze klik kan er besteld zijn. De databank weigert het daarna ook zelf
+      // (`onDelete: Restrict`), maar dan als ruwe FK-fout.
+      const ordered = await tx.ticketOrderItem.count({ where: { eventId, ticketTypeId: type.id } });
+      if (ordered > 0) return false;
+      const answered = await tx.ticketOrderItemAnswer.count({
+        where: { eventId, question: { ticketTypeId: type.id } },
+      });
+      if (answered > 0) return false;
+      await tx.ticketQuestion.deleteMany({ where: { eventId, ticketTypeId: type.id } });
+      await tx.ticketType.delete({ where: { id: type.id } });
+      await tx.ticketAuditLog.create({
+        data: {
+          eventId,
+          actorUserId: session.user.id,
+          action: "TICKET_TYPE_DELETED",
+          entityType: "TicketType",
+          entityId: type.id,
+          metadata: { nameNl: type.nameNl, code: type.code },
+        },
+      });
+      return true;
+    });
+    if (!deleted) return { ok: false, error: "TICKET_TYPE_HAS_ORDERS" };
+
+    await logAudit({
+      action: "delete",
+      entity: "ticketType",
+      entityId: eventId,
+      target: `${await ticketEventTitle(eventId)}: ${type.nameNl}`,
+      summary: "tickettype verwijderd; er was nog niets van besteld",
+    });
+    refreshTicketEvent(locale, eventId);
+    return { ok: true };
+  } catch (error) {
+    unstable_rethrow(error);
+    const code = error instanceof Error ? error.message : "";
+    if (code === "FORBIDDEN" || code === "TICKET_EVENT_NOT_FOUND") return { ok: false, error: code };
+    console.error("Deleting ticket type failed", error);
+    throw error;
+  }
+}
+
+/**
  * Het r-nummer van één deelnemer, vanuit de deelnemerspagina.
  *
  * De kassa vult enkel het nummer van de **ingelogde koper** in; wie voor vier man
@@ -1324,6 +1463,53 @@ export async function archiveTicketQuestionAction(formData: FormData): Promise<v
     summary: "vraag gearchiveerd; gegeven antwoorden blijven bewaard",
   });
   refreshTicketEvent(locale, eventId);
+}
+
+/**
+ * Een vraag die nog niemand beantwoord heeft, echt weggooien.
+ *
+ * Archiveren houdt de vraag in leven omdat een antwoord ernaar wijst
+ * (`Restrict`) en de deelnemerslijst anders een kolom zonder kop overhoudt.
+ * Zonder antwoorden bestaat dat bezwaar niet, en dan is een vraag die je per
+ * ongeluk aanmaakte gewoon een vergissing die weg mag.
+ */
+export async function deleteTicketQuestionAction(
+  formData: FormData,
+): Promise<TicketDeleteResult> {
+  const eventId = value(formData, "eventId");
+  const questionId = value(formData, "questionId") || value(formData, "id");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  try {
+    await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+    const question = await prisma.ticketQuestion.findFirst({ where: { id: questionId, eventId } });
+    if (!question) return { ok: false, error: "QUESTION_NOT_FOUND" };
+
+    const deleted = await prisma.$transaction(async (tx) => {
+      const answered = await tx.ticketOrderItemAnswer.count({
+        where: { eventId, questionId: question.id },
+      });
+      if (answered > 0) return false;
+      await tx.ticketQuestion.delete({ where: { id: question.id } });
+      return true;
+    });
+    if (!deleted) return { ok: false, error: "QUESTION_HAS_ANSWERS" };
+
+    await logAudit({
+      action: "delete",
+      entity: "ticketQuestion",
+      entityId: eventId,
+      target: `${await ticketEventTitle(eventId)}: ${question.labelNl}`,
+      summary: "vraag verwijderd; ze was nog niet beantwoord",
+    });
+    refreshTicketEvent(locale, eventId);
+    return { ok: true };
+  } catch (error) {
+    unstable_rethrow(error);
+    const code = error instanceof Error ? error.message : "";
+    if (code === "FORBIDDEN" || code === "TICKET_EVENT_NOT_FOUND") return { ok: false, error: code };
+    console.error("Deleting ticket question failed", error);
+    throw error;
+  }
 }
 
 export async function addTicketUserGrantAction(formData: FormData): Promise<void> {

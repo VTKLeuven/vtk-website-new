@@ -4,12 +4,23 @@ import { useRef, useState, useTransition } from "react";
 import {
   archiveTicketTypeAction,
   createTicketTypeAction,
+  deleteTicketTypeAction,
   reorderTicketTypesAction,
   saveTicketTypeAction,
   updateInventoryPoolAction,
 } from "@/app/actions/tickets";
-import { Archive, Package, Plus, Save, Ticket, TriangleAlert, UsersRound } from "lucide-react";
+import {
+  Archive,
+  Package,
+  Plus,
+  Save,
+  Ticket,
+  Trash2,
+  TriangleAlert,
+  UsersRound,
+} from "lucide-react";
 import { SaveForm } from "@/components/ui/SaveForm";
+import { DangerActionButton } from "./DangerActionButton";
 import { ticketColorKey, ticketColorLabel } from "@/lib/ticketing/ticketColors";
 import { TicketColorChoice } from "./TicketColorChoice";
 import { formatMoney, toDatetimeLocal, type AdminLocale } from "./format";
@@ -42,7 +53,7 @@ type TicketType = {
   salesEndAt: Date | null;
   active: boolean;
   inventoryPool: InventoryPool;
-  _count?: { orderItems: number };
+  _count?: { orderItems: number; questions: number };
 };
 
 type TicketAudience = "PUBLIC" | "MEMBERS" | "HONORARY";
@@ -363,6 +374,27 @@ function TicketTypeEditPanel({
   );
 }
 
+/**
+ * Wat er weg is en wat blijft, in de bevestiging zelf. Enkel de vragen die aan
+ * dít type hangen verdwijnen mee; die gelden zonder hun type nergens meer voor.
+ */
+function deleteTypeDescription(ticketType: TicketType, locale: AdminLocale): string {
+  const questions = ticketType._count?.questions ?? 0;
+  const name = locale === "en" && ticketType.nameEn ? ticketType.nameEn : ticketType.nameNl;
+  if (locale === "nl") {
+    return `"${name}" verdwijnt definitief uit dit event. Er is nog niets van besteld, dus er gaan geen tickets of bestellingen verloren.${
+      questions === 0
+        ? ""
+        : ` ${questions === 1 ? "De vraag die enkel aan dit type hangt, verdwijnt" : `De ${questions} vragen die enkel aan dit type hangen, verdwijnen`} mee.`
+    } De rest van het event blijft staan.`;
+  }
+  return `"${name}" is permanently removed from this event. Nothing has been ordered yet, so no tickets or orders are lost.${
+    questions === 0
+      ? ""
+      : ` ${questions === 1 ? "The question that only belongs to this type goes" : `The ${questions} questions that only belong to this type go`} with it.`
+  } The rest of the event stays.`;
+}
+
 export function TicketTypeManager({
   eventId,
   pools,
@@ -581,21 +613,52 @@ export function TicketTypeManager({
                       </p>
                     </div>
                   </div>
-                  {ticketType.active ? (
-                    <form action={archiveTicketTypeAction}>
-                      <input type="hidden" name="locale" value={locale} />
-                      <input type="hidden" name="eventId" value={eventId} />
-                      <input type="hidden" name="ticketTypeId" value={ticketType.id} />
-                      <button className="ticket-admin-button" data-variant="danger" type="submit">
-                        <Archive aria-hidden="true" size={15} />
-                        {locale === "nl" ? "Archiveren" : "Archive"}
-                      </button>
-                    </form>
-                  ) : (
-                    <span className="ticket-admin-status" data-tone="neutral">
-                      {locale === "nl" ? "Gearchiveerd" : "Archived"}
-                    </span>
-                  )}
+                  {/* Twee verschillende dingen, allebei beschikbaar zolang ze
+                      kunnen: archiveren haalt het type uit de verkoop en laat
+                      het staan, verwijderen gooit het weg. Dat laatste kan enkel
+                      zolang er niets van besteld is, want een verkocht ticket
+                      blijft naar zijn type wijzen. */}
+                  <div className="ticket-admin-row-actions">
+                    {ticketType.active ? (
+                      <form action={archiveTicketTypeAction}>
+                        <input type="hidden" name="locale" value={locale} />
+                        <input type="hidden" name="eventId" value={eventId} />
+                        <input type="hidden" name="ticketTypeId" value={ticketType.id} />
+                        <button className="ticket-admin-button" data-variant="danger" type="submit">
+                          <Archive aria-hidden="true" size={15} />
+                          {nl ? "Archiveren" : "Archive"}
+                        </button>
+                      </form>
+                    ) : (
+                      <span className="ticket-admin-status" data-tone="neutral">
+                        {nl ? "Gearchiveerd" : "Archived"}
+                      </span>
+                    )}
+                    {(ticketType._count?.orderItems ?? 0) === 0 ? (
+                      <DangerActionButton
+                        action={deleteTicketTypeAction}
+                        fields={{ locale, eventId, ticketTypeId: ticketType.id }}
+                        label={nl ? "Verwijderen" : "Delete"}
+                        icon={<Trash2 aria-hidden="true" size={15} />}
+                        title={nl ? "Tickettype verwijderen?" : "Delete ticket type?"}
+                        description={deleteTypeDescription(ticketType, locale)}
+                        confirmLabel={nl ? "Verwijderen" : "Delete"}
+                        cancelLabel={nl ? "Annuleren" : "Cancel"}
+                        successMessage={nl ? "Tickettype verwijderd." : "Ticket type deleted."}
+                        errorMessages={{
+                          TICKET_TYPE_HAS_ORDERS: nl
+                            ? "Niet verwijderd: er is intussen een ticket van dit type besteld. Archiveer het in de plaats."
+                            : "Not deleted: a ticket of this type has been ordered in the meantime. Archive it instead.",
+                          TICKET_TYPE_NOT_FOUND: nl
+                            ? "Dit tickettype bestaat niet meer."
+                            : "This ticket type no longer exists.",
+                        }}
+                        fallbackErrorMessage={
+                          nl ? "Tickettype niet verwijderd." : "Ticket type was not deleted."
+                        }
+                      />
+                    ) : null}
+                  </div>
                 </div>
                 <TicketTypeEditPanel
                   eventId={eventId}

@@ -7499,3 +7499,30 @@ toont, staat dat woord erbij.
 het type aanvrager (`chargesRequester`) en staat bij de rit zelf; een
 jaartotaal per post naast een bedrag zou gelezen worden als een factuur die
 niemand zo bedoeld heeft.
+## Archiveren en verwijderen in het ticketbeheer
+
+Alles in het ticketbeheer kon enkel gearchiveerd worden: een tickettype, een
+deelnemersvraag en een event zelf. Dat klopt zodra er verkocht is (een verkocht
+ticket wijst naar zijn type, een antwoord naar zijn vraag, een bestelling naar
+haar event) maar niet daarvoor, en dan blijft een typfout of een event dat niet
+doorging voor altijd als "gearchiveerd" in de lijst staan.
+
+**De grens is dus niet de status maar de eerste bestelling.** Een concept, een
+gepubliceerd event zonder verkoop en een gearchiveerd tickettype waar nooit iets
+van besteld is, mogen alle drie echt weg; wat één spoor van een bezoeker draagt,
+niet meer.
+
+- **Tickettype**: weg zolang `_count.orderItems` nul is. De vragen die enkel aan
+  dat type hingen, gaan mee (ze gelden zonder hun type nergens meer voor); staat
+  er toch een antwoord op zo'n vraag, dan stopt het daar.
+- **Deelnemersvraag**: weg zolang niemand ze beantwoordde.
+- **Event**: weg zolang er **geen enkele** `TicketOrder` op staat, ook geen
+  vervallen of geannuleerde. Zo'n rij is een bezoeker die in de kassa stond, met
+  een betaalpoging eraan; die gooien we niet weg om op te ruimen. Dan blijft
+  archiveren over, en dat is ook wat het scherm zegt.
+- **Archiveren verdwijnt niet.** Het is iets anders dan verwijderen: een
+  tickettype uit de verkoop halen en laten staan. Beide knoppen staan naast
+  elkaar zolang ze allebei kunnen.
+- De regel in het adminlogboek overleeft het verwijderen: wie het deed en van
+  welk event, blijft leesbaar in /admin/it/logboek.
+

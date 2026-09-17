@@ -4,13 +4,16 @@ import { useRef, useState, useTransition } from "react";
 import {
   archiveTicketQuestionAction,
   createTicketQuestionAction,
+  deleteTicketQuestionAction,
   reorderTicketQuestionsAction,
 } from "@/app/actions/tickets";
 import {
   Archive,
   Plus,
+  Trash2,
 } from "lucide-react";
 import type { AdminLocale } from "./format";
+import { DangerActionButton } from "./DangerActionButton";
 
 type Question = {
   id: string;
@@ -22,6 +25,7 @@ type Question = {
   active: boolean;
   sortOrder?: number;
   ticketType: { id: string; nameNl: string; nameEn: string | null } | null;
+  _count?: { answers: number };
 };
 
 type TicketTypeOption = {
@@ -161,21 +165,51 @@ export function TicketQuestionManager({
                     <p className="ticket-admin-row-meta ticket-admin-code">{question.code}</p>
                   </div>
                 </div>
-                {question.active ? (
-                  <form action={archiveTicketQuestionAction}>
-                    <input type="hidden" name="locale" value={locale} />
-                    <input type="hidden" name="eventId" value={eventId} />
-                    <input type="hidden" name="questionId" value={question.id} />
-                    <button className="ticket-admin-button" data-variant="danger" type="submit">
-                      <Archive aria-hidden="true" size={15} />
-                      {nl ? "Archiveren" : "Archive"}
-                    </button>
-                  </form>
-                ) : (
-                  <span className="ticket-admin-status" data-tone="neutral">
-                    {nl ? "Gearchiveerd" : "Archived"}
-                  </span>
-                )}
+                {/* Zolang niemand geantwoord heeft, mag de vraag echt weg;
+                    daarna enkel archiveren, want de antwoorden wijzen ernaar. */}
+                <div className="ticket-admin-row-actions">
+                  {(question._count?.answers ?? 0) === 0 ? (
+                    <DangerActionButton
+                      action={deleteTicketQuestionAction}
+                      fields={{ locale, eventId, questionId: question.id }}
+                      label={nl ? "Verwijderen" : "Delete"}
+                      icon={<Trash2 aria-hidden="true" size={15} />}
+                      title={nl ? "Vraag verwijderen?" : "Delete question?"}
+                      description={
+                        nl
+                          ? `"${question.labelNl}" verdwijnt definitief. Niemand heeft ze beantwoord, dus er gaan geen antwoorden verloren. De rest van het event blijft staan.`
+                          : `"${question.labelNl}" is permanently removed. Nobody answered it, so no answers are lost. The rest of the event stays.`
+                      }
+                      confirmLabel={nl ? "Verwijderen" : "Delete"}
+                      cancelLabel={nl ? "Annuleren" : "Cancel"}
+                      successMessage={nl ? "Vraag verwijderd." : "Question deleted."}
+                      errorMessages={{
+                        QUESTION_HAS_ANSWERS: nl
+                          ? "Niet verwijderd: er is intussen een antwoord op deze vraag gegeven. Archiveer ze in de plaats."
+                          : "Not deleted: this question has been answered in the meantime. Archive it instead.",
+                        QUESTION_NOT_FOUND: nl
+                          ? "Deze vraag bestaat niet meer."
+                          : "This question no longer exists.",
+                      }}
+                      fallbackErrorMessage={nl ? "Vraag niet verwijderd." : "Question was not deleted."}
+                    />
+                  ) : question.active ? (
+                    <form action={archiveTicketQuestionAction}>
+                      <input type="hidden" name="locale" value={locale} />
+                      <input type="hidden" name="eventId" value={eventId} />
+                      <input type="hidden" name="questionId" value={question.id} />
+                      <button className="ticket-admin-button" data-variant="danger" type="submit">
+                        <Archive aria-hidden="true" size={15} />
+                        {nl ? "Archiveren" : "Archive"}
+                      </button>
+                    </form>
+                  ) : null}
+                  {question.active ? null : (
+                    <span className="ticket-admin-status" data-tone="neutral">
+                      {nl ? "Gearchiveerd" : "Archived"}
+                    </span>
+                  )}
+                </div>
               </div>
             </li>
           ))}
