@@ -2363,7 +2363,11 @@ export async function adminEditTransportAction(
   // Buiten de transactie: het evenement bestaat los van deze rit, en een
   // Serializable-transactie die er een tweede tabel bij leest, is er een die
   // vaker opnieuw moet.
-  const chosenEventId = input.eventId?.trim() ?? null;
+  // `|| null` en niet `?? null`: het formulier stuurt een lege string voor "geen
+  // evenement", en met `??` bleef dat een lege string. Die is niet gelijk aan de
+  // `null` in de database, dus elke sleep in de kalender schreef dan een regel
+  // "Evenement: geen → geen" in de historiek van een rit die niet veranderde.
+  const chosenEventId = input.eventId?.trim() || null;
   let chosenEvent: { id: string; name: string } | null = null;
   if (chosenEventId) {
     chosenEvent = await prisma.uitleenEvent.findUnique({
@@ -2431,7 +2435,7 @@ export async function adminEditTransportAction(
     // De koppeling enkel aanraken wanneer het formulier ze meestuurde: een
     // sleep in de kalender stuurt `eventId` niet mee, en die hoort een rit niet
     // stil van haar evenement los te maken.
-    const eventChanged = input.eventId !== undefined && (chosenEventId ?? null) !== existing.eventId;
+    const eventChanged = input.eventId !== undefined && chosenEventId !== existing.eventId;
     if (eventChanged) {
       changes.push(
         `Evenement: ${existing.eventName?.trim() || 'geen'} → ${chosenEvent?.name ?? 'geen'}`
