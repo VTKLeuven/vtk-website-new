@@ -1848,30 +1848,36 @@ model TicketInventoryPool {
 }
 
 model TicketType {
-  id              String         @id @default(cuid())
-  eventId         String
-  inventoryPoolId String
-  code            String
-  nameNl          String
-  nameEn          String?
-  descriptionNl   String?
-  descriptionEn   String?
-  unitPriceCents  Int
-  currency        String         @default("EUR")
-  audience        TicketAudience @default(PUBLIC)
+  id               String         @id @default(cuid())
+  eventId          String
+  inventoryPoolId  String
+  code             String
+  nameNl           String
+  nameEn           String?
+  descriptionNl    String?
+  descriptionEn    String?
+  unitPriceCents   Int
+  // Optionele ledenprijs, enkel bij doelgroep PUBLIC. Is ze gezet, dan is dit
+  // één ticket met twee prijzen: een lid ziet en koopt beide (de gewone prijs
+  // bv. voor een vriend), een niet-lid ziet enkel `unitPriceCents`. Bewust geen
+  // tweede tickettype: voorraad, verkoopvenster, vragen en scannerkleur zijn
+  // dezelfde, en twee types die dat elk apart dragen lopen uit de pas.
+  memberPriceCents Int?
+  currency         String         @default("EUR")
+  audience         TicketAudience @default(PUBLIC)
   // Key uit het palet in `apps/web/lib/ticketing/ticketColors.ts`, geen vrije
   // hexwaarde: de scanner kleurt hiermee een vlak van een halve telefoon groot
   // en een zelfgekozen kleur is daar vroeg of laat onleesbaar op. Aan een cantus
   // is dit het verschil tussen water, bier en eigen drank.
-  color           String         @default("navy")
-  salesStartAt    DateTime?      @db.Timestamptz(3)
-  salesEndAt      DateTime?      @db.Timestamptz(3)
-  minPerOrder     Int            @default(1)
-  maxPerOrder     Int            @default(8)
-  active          Boolean        @default(true)
-  sortOrder       Int            @default(0)
-  createdAt       DateTime       @default(now()) @db.Timestamptz(3)
-  updatedAt       DateTime       @updatedAt @db.Timestamptz(3)
+  color            String         @default("navy")
+  salesStartAt     DateTime?      @db.Timestamptz(3)
+  salesEndAt       DateTime?      @db.Timestamptz(3)
+  minPerOrder      Int            @default(1)
+  maxPerOrder      Int            @default(8)
+  active           Boolean        @default(true)
+  sortOrder        Int            @default(0)
+  createdAt        DateTime       @default(now()) @db.Timestamptz(3)
+  updatedAt        DateTime       @updatedAt @db.Timestamptz(3)
 
   event         TicketEvent         @relation(fields: [eventId], references: [id], onDelete: Cascade)
   inventoryPool TicketInventoryPool @relation(fields: [inventoryPoolId, eventId], references: [id, eventId], onDelete: Restrict)
@@ -2013,6 +2019,9 @@ model TicketOrderItem {
   ticketTypeCode  String
   ticketTypeName  String
   unitPriceCents  Int
+  // Gekocht aan de ledenprijs van het tickettype. De koper was toen lid; de
+  // deelnemer hoeft dat niet te zijn.
+  memberPrice     Boolean  @default(false)
   discountCents   Int      @default(0)
   totalCents      Int
   attendeeName    String

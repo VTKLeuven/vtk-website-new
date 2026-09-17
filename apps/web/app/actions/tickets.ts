@@ -83,6 +83,29 @@ function ticketAudienceLabel(audience: TicketAudience): string {
   return "publiek";
 }
 
+/**
+ * De ledenprijs uit het formulier: null wanneer het veld leeg is of het ticket
+ * niet voor iedereen is (dan is er geen gewone prijs om naast te staan, zie
+ * `ticketTypeMemberPrice`). Een ledenprijs die niet lager ligt dan de gewone,
+ * is geen ledenprijs.
+ */
+function memberPriceFromForm(
+  formData: FormData,
+  audience: TicketAudience,
+  unitPriceCents: number,
+): { ok: true; cents: number | null } | { ok: false; code: "INVALID_AMOUNT" | "MEMBER_PRICE_NOT_LOWER" } {
+  const raw = String(formData.get("memberPrice") ?? "").trim();
+  if (audience !== "PUBLIC" || raw === "") return { ok: true, cents: null };
+  let cents: number;
+  try {
+    cents = parseEuroAmount(raw);
+  } catch {
+    return { ok: false, code: "INVALID_AMOUNT" };
+  }
+  if (cents >= unitPriceCents) return { ok: false, code: "MEMBER_PRICE_NOT_LOWER" };
+  return { ok: true, cents };
+}
+
 function optionalValue(formData: FormData, key: string): string | null {
   return value(formData, key) || null;
 }
@@ -713,14 +736,22 @@ export async function updateInventoryPoolAction(formData: FormData): Promise<voi
   refreshTicketEvent(locale, eventId);
 }
 
-export async function createTicketTypeAction(formData: FormData): Promise<void> {
+export async function createTicketTypeAction(
+  _previousState: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   const eventId = value(formData, "eventId");
   const locale = localeSchema.parse(value(formData, "locale") || "nl");
   const { session, event } = await requireTicketEventCapability(eventId, "MANAGE_INVENTORY");
   const nameNl = limitedValue(formData, "nameNl", 160) || limitedValue(formData, "name", 160);
-  if (!nameNl) throw new Error("NAME_REQUIRED");
-  const unitPriceCents = parseEuroAmount(formData.get("unitPrice") ?? formData.get("price"));
-  if (unitPriceCents > 99_999_999) throw new Error("INVALID_AMOUNT");
+  if (!nameNl) return saveError("NAME_REQUIRED");
+  let unitPriceCents: number;
+  try {
+    unitPriceCents = parseEuroAmount(formData.get("unitPrice") ?? formData.get("price"));
+  } catch {
+    return saveError("INVALID_AMOUNT");
+  }
+  if (unitPriceCents > 99_999_999) return saveError("INVALID_AMOUNT");
   const minPerOrder = boundedIntegerValue(formData, "minPerOrder", 1, 1, 50);
   const maxPerOrder = boundedIntegerValue(
     formData,
@@ -729,12 +760,15 @@ export async function createTicketTypeAction(formData: FormData): Promise<void> 
     1,
     50
   );
-  if (maxPerOrder < minPerOrder) throw new Error("INVALID_ORDER_LIMITS");
+  if (maxPerOrder < minPerOrder) return saveError("INVALID_ORDER_LIMITS");
   const salesStartAt = dateValue(formData, "salesStartAt");
   const salesEndAt = dateValue(formData, "salesEndAt");
   if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
-    throw new Error("INVALID_SALES_DATES");
+    return saveError("INVALID_SALES_DATES");
   }
+  const audience = ticketAudienceFrom(value(formData, "audience"));
+  const memberPrice = memberPriceFromForm(formData, audience, unitPriceCents);
+  if (!memberPrice.ok) return saveError(memberPrice.code);
   let inventoryPoolId = value(formData, "inventoryPoolId") || value(formData, "poolId");
 
   await prisma.$transaction(async (tx) => {
@@ -763,8 +797,9 @@ export async function createTicketTypeAction(formData: FormData): Promise<void> 
         descriptionNl: limitedOptionalValue(formData, "descriptionNl", 5_000),
         descriptionEn: limitedOptionalValue(formData, "descriptionEn", 5_000),
         unitPriceCents,
+        memberPriceCents: memberPrice.cents,
         currency: event.currency,
-        audience: ticketAudienceFrom(value(formData, "audience")),
+        audience,
         color: ticketColorKey(formData.get("color")),
         salesStartAt,
         salesEndAt,
@@ -795,9 +830,13 @@ export async function createTicketTypeAction(formData: FormData): Promise<void> 
     entity: "ticketType",
     entityId: eventId,
     target: `${event.titleNl}: ${nameNl}`,
-    summary: `${(unitPriceCents / 100).toFixed(2)} euro per ticket`,
+    summary:
+      memberPrice.cents === null
+        ? `${(unitPriceCents / 100).toFixed(2)} euro per ticket`
+        : `${(unitPriceCents / 100).toFixed(2)} euro per ticket, ${(memberPrice.cents / 100).toFixed(2)} euro voor leden`,
   });
   refreshTicketEvent(locale, eventId);
+  return saveOk();
 }
 
 export async function reorderTicketTypesAction(formData: FormData): Promise<void> {
@@ -864,6 +903,12 @@ export async function saveTicketTypeAction(
     ? parseEuroAmount(formData.get("unitPrice"))
     : type.unitPriceCents;
   if (unitPriceCents > 99_999_999) return saveError("INVALID_AMOUNT");
+  // Een formulier zonder het veld (bv. een oudere pagina) laat de ledenprijs staan.
+  const memberPrice = formData.has("memberPrice")
+    ? memberPriceFromForm(formData, audience, unitPriceCents)
+    : ({ ok: true, cents: audience === "PUBLIC" ? type.memberPriceCents : null } as const);
+  if (!memberPrice.ok) return saveError(memberPrice.code);
+  const memberPriceCents = memberPrice.cents;
   const minPerOrder = boundedIntegerValue(formData, "minPerOrder", type.minPerOrder, 1, 50);
   const maxPerOrder = boundedIntegerValue(formData, "maxPerOrder", type.maxPerOrder, 1, 50);
   if (maxPerOrder < minPerOrder) return saveError("INVALID_ORDER_LIMITS");
@@ -885,6 +930,7 @@ export async function saveTicketTypeAction(
     descriptionNl,
     descriptionEn,
     unitPriceCents,
+    memberPriceCents,
     minPerOrder,
     maxPerOrder,
     salesStartAt,
@@ -898,6 +944,7 @@ export async function saveTicketTypeAction(
     descriptionNl === type.descriptionNl &&
     descriptionEn === type.descriptionEn &&
     unitPriceCents === type.unitPriceCents &&
+    memberPriceCents === type.memberPriceCents &&
     minPerOrder === type.minPerOrder &&
     maxPerOrder === type.maxPerOrder &&
     salesStartAt?.getTime() === type.salesStartAt?.getTime() &&
@@ -913,7 +960,7 @@ export async function saveTicketTypeAction(
         action: "TICKET_TYPE_UPDATED",
         entityType: "TicketType",
         entityId: type.id,
-        metadata: { color, audience, unitPriceCents, minPerOrder, maxPerOrder },
+        metadata: { color, audience, unitPriceCents, memberPriceCents, minPerOrder, maxPerOrder },
       },
     }),
   ]);
@@ -924,6 +971,11 @@ export async function saveTicketTypeAction(
     unitPriceCents === type.unitPriceCents
       ? null
       : `prijs op ${(unitPriceCents / 100).toFixed(2)} euro`,
+    memberPriceCents === type.memberPriceCents
+      ? null
+      : memberPriceCents === null
+        ? "ledenprijs verwijderd"
+        : `ledenprijs op ${(memberPriceCents / 100).toFixed(2)} euro`,
     minPerOrder === type.minPerOrder ? null : `minimum per bestelling op ${minPerOrder}`,
     maxPerOrder === type.maxPerOrder ? null : `maximum per bestelling op ${maxPerOrder}`,
     salesStartAt?.getTime() === type.salesStartAt?.getTime() ? null : "verkoopstart gewijzigd",

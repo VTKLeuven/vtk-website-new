@@ -62,3 +62,19 @@ export function ticketTypeNeedsMembership(
 export function ticketTypeIsHidden(type: { audience: string }, isHonorary: boolean): boolean {
   return type.audience === "HONORARY" && !isHonorary;
 }
+
+/**
+ * De ledenprijs van een ticketsoort, of null wanneer ze er geen heeft.
+ *
+ * Enkel bij doelgroep "publiek": een ledenprijs is een tweede prijs naast de
+ * gewone, en een ticket dat al alleen voor leden (of ereleden) is, heeft geen
+ * gewone prijs om naast te staan. Blijft er na een wijziging van de doelgroep
+ * een oude waarde in de database staan, dan telt ze hier niet.
+ */
+export function ticketTypeMemberPrice(type: {
+  audience: string;
+  memberPriceCents?: number | null;
+}): number | null {
+  if (type.audience !== "PUBLIC") return null;
+  return type.memberPriceCents ?? null;
+}

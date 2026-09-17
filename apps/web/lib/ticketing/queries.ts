@@ -10,9 +10,12 @@ import { isAppleWalletAvailable, isGoogleWalletAvailable } from "./wallet";
 import { ticketTermsPath } from "./terms";
 import {
   ticketTypeIsHidden,
+  ticketTypeMemberPrice,
   ticketTypeNeedsMembership,
   ticketTypeRequiresLogin,
 } from "./audience";
+import { publicUrl } from "@/lib/storage";
+import { focusPosition } from "@/lib/imageFocus";
 import { getTicketEventAccess } from "./authorization";
 import {
   isInPresaleNow,
@@ -27,6 +30,9 @@ type PublicLocale = "nl" | "en";
 
 const publicEventInclude = {
   ownerGroup: true,
+  // Enkel voor de poster: een ticketevent heeft geen eigen foto, het gekoppelde
+  // kalender-event wel.
+  calendarEvent: { select: { imageKey: true, imageFocusX: true, imageFocusY: true } },
   presaleGroups: { select: { groupId: true } },
   questions: { where: { active: true }, orderBy: { sortOrder: "asc" } },
   ticketTypes: {
@@ -98,6 +104,16 @@ function publicEventDto(
     title: localized(event.titleNl, event.titleEn, locale),
     description: localized(event.descriptionNl ?? "", event.descriptionEn, locale),
     location: event.location,
+    locationAddress: event.locationAddress,
+    poster: event.calendarEvent?.imageKey
+      ? {
+          src: publicUrl(event.calendarEvent.imageKey)!,
+          position: focusPosition({
+            x: event.calendarEvent.imageFocusX,
+            y: event.calendarEvent.imageFocusY,
+          }),
+        }
+      : null,
     startsAt: event.startsAt,
     endsAt: event.endsAt,
     currentTime: new Date().toISOString(),
@@ -120,6 +136,8 @@ function publicEventDto(
       name: localized(type.nameNl, type.nameEn, locale),
       description: localized(type.descriptionNl ?? "", type.descriptionEn, locale),
       priceCents: type.unitPriceCents,
+      // Ongefilterd: wie geen lid is, verliest deze prijs in `forViewer`.
+      memberPriceCents: ticketTypeMemberPrice(type),
       available: Math.max(
         0,
         type.inventoryPool.capacity -
@@ -152,25 +170,68 @@ function publicEventDto(
   };
 }
 
-export async function listPublishedTicketEvents(locale: PublicLocale) {
+type PublicTicketTypeDto = ReturnType<typeof publicEventDto>["ticketTypes"][number];
+
+/**
+ * De ledenprijs bestaat enkel voor een lid. Een niet-lid krijgt het ticket aan
+ * de gewone prijs, en hoort de lagere prijs ook niet in de paginabron terug te
+ * vinden.
+ */
+function withMemberPrices(types: PublicTicketTypeDto[], isMember: boolean): PublicTicketTypeDto[] {
+  return isMember ? types : types.map((type) => ({ ...type, memberPriceCents: null }));
+}
+
+/**
+ * Wat een bezoeker die de ledenprijs niet ziet, moet doen om ze wel te zien:
+ * inloggen (misschien is hij al lid) of lid worden. Null wanneer er niets te
+ * winnen valt.
+ */
+function memberPriceHint(
+  types: PublicTicketTypeDto[],
+  signedIn: boolean,
+  isMember: boolean,
+): "login" | "join" | null {
+  if (isMember || !types.some((type) => type.memberPriceCents !== null)) return null;
+  return signedIn ? "join" : "login";
+}
+
+/**
+ * De events die nu te koop staan, zoals de app ze toont: enkel wat je nu kan
+ * kiezen. Het overzicht op de website gebruikt `overview: true` (zie daar).
+ */
+export async function listPublishedTicketEvents(
+  locale: PublicLocale,
+  options: {
+    /**
+     * Voor /tickets: ook events waarvan de verkoop nog moet openen (met
+     * `salesOpensAt`), en per event alle tickettypes die nog verkocht worden,
+     * ook uitverkochte en die met een latere eigen start, zodat de kaart de
+     * prijzen kan tonen. Niet voor de app: die lijst belooft dat je nu kan kopen.
+     */
+    overview?: boolean;
+  } = {},
+) {
   const now = new Date();
+  const overview = options.overview ?? false;
   const [events, session] = await Promise.all([
     prisma.ticketEvent.findMany({
       where: {
         status: "PUBLISHED",
         endsAt: { gte: now },
         AND: [
-          {
-            OR: [
-              { salesStartAt: null },
-              { salesStartAt: { lte: now } },
-              // Een event met voorverkoop kan al open staan voor wie erin mag,
-              // en hoe vroeg valt hier niet te vergelijken: `salesStartAt` min
-              // een duur is geen kolom. Daarom hier ruim ophalen en verderop
-              // per bezoeker filteren op `salesStart` uit de dto.
-              { presaleLeadMinutes: { not: null } },
-            ],
-          },
+          overview
+            ? {}
+            : {
+                OR: [
+                  { salesStartAt: null },
+                  { salesStartAt: { lte: now } },
+                  // Een event met voorverkoop kan al open staan voor wie erin mag,
+                  // en hoe vroeg valt hier niet te vergelijken: `salesStartAt` min
+                  // een duur is geen kolom. Daarom hier ruim ophalen en verderop
+                  // per bezoeker filteren op `salesStart` uit de dto.
+                  { presaleLeadMinutes: { not: null } },
+                ],
+              },
           { OR: [{ salesEndAt: null }, { salesEndAt: { gt: now } }] },
         ],
       },
@@ -186,11 +247,13 @@ export async function listPublishedTicketEvents(locale: PublicLocale) {
   ]);
   return events.flatMap((event) => {
     const dto = publicEventDto(event, locale, viewer);
-    if (dto.salesStart && new Date(dto.salesStart) > now) return [];
+    const opensLater = Boolean(dto.salesStart && new Date(dto.salesStart) > now);
+    if (opensLater && !overview) return [];
     const selectableTypes = dto.ticketTypes.filter(
       (type) =>
-        ticketTypeIsOnSale(type, now) &&
-        type.available >= (type.minPerOrder ?? 1) &&
+        (overview
+          ? !type.salesEnd || new Date(type.salesEnd) > now
+          : ticketTypeIsOnSale(type, now) && type.available >= (type.minPerOrder ?? 1)) &&
         !ticketTypeIsHidden(type, isHonorary)
     );
     const ticketTypes = selectableTypes.filter(
@@ -200,7 +263,9 @@ export async function listPublishedTicketEvents(locale: PublicLocale) {
     );
     return [{
       ...dto,
-      ticketTypes,
+      ticketTypes: withMemberPrices(ticketTypes, isMember),
+      salesOpensAt: opensLater ? dto.salesStart : null,
+      memberPriceHint: memberPriceHint(ticketTypes, Boolean(session), isMember),
       requiresLogin:
         !session &&
         ticketTypes.length === 0 &&
@@ -235,7 +300,8 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
   );
   return {
     ...dto,
-    ticketTypes,
+    ticketTypes: withMemberPrices(ticketTypes, isMember),
+    memberPriceHint: memberPriceHint(ticketTypes, Boolean(session), isMember),
     requiresLogin:
       !session &&
       ticketTypes.length === 0 &&

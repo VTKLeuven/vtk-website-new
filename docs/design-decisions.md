@@ -7226,3 +7226,97 @@ hetzelfde als "dit academiejaar niet", en dat is precies de beslissing die
 iemand op dat moment níét wilde nemen. Het blijft één plek om lid te worden: de
 accountpagina toont de status en linkt ernaartoe, ze bouwt geen tweede
 formulier.
+
+## Ledenprijs: één ticket met twee prijzen
+
+Een cantus verkoopt hetzelfde bierticket aan €14 voor leden en €17 voor
+niet-leden. Dat stond als vier losse tickettypes in het beheer ("Bierticket
+(Lid)" met doelgroep "alleen leden", "Bierticket (Niet-lid)" publiek, en zo ook
+voor water), en op de pagina als vier gelijke rijen waarin je zelf moest zoeken
+welke prijs voor jou gold.
+
+**Een tickettype kan nu een optionele ledenprijs hebben** (`TicketType.memberPriceCents`).
+Het blijft één type: één voorraad, één verkoopvenster, één set vragen, één
+scannerkleur, één "maximum per bestelling" over beide prijzen samen. Twee
+gekoppelde types zouden elk hun eigen kopie van dat alles dragen, en die lopen
+vroeg of laat uit de pas (de ledenversie die een uur later opengaat omdat
+iemand maar één van de twee aanpaste).
+
+- **Een lid ziet beide prijzen en kan beide kopen.** Het gewone ticket is er
+  dan voor een vriend die geen lid is; een ticket staat op naam van de
+  aanwezige, niet van de koper.
+- **Een niet-lid ziet enkel de gewone prijs.** De ledenprijs staat voor hem ook
+  niet in de paginabron. Wie niet ingelogd is, krijgt één regel "Lid van VTK?
+  Log in voor de ledenprijs", en wie ingelogd is maar geen lid, "Leden betalen
+  minder. Word lid": wie gratis lid is via de faculteit, weet dat anders niet.
+- **Enkel bij doelgroep "leden en niet-leden".** Een ticket dat al alleen voor
+  leden of ereleden is, heeft geen gewone prijs om naast te staan; het veld
+  staat dan uit en de server wist een oude waarde.
+- **De ledenprijs moet lager zijn dan de gewone prijs**, anders is het geen
+  ledenprijs en koopt een lid per ongeluk duurder.
+- **De bestelregel draagt "(lid)" of "(niet-lid)" in haar naam** en
+  `TicketOrderItem.memberPrice`. De naam reist zo mee naar de mail, de pdf, de
+  wallet, de scanner en de betaalpagina zonder dat elk van die plaatsen de vlag
+  moet kennen. Een type zonder ledenprijs houdt gewoon zijn naam.
+- **"Lid" is hetzelfde lid als overal** (`userIsMember`, zie "Lidmaatschap van
+  de kring"), en de checkout toetst het opnieuw: een ledenprijs meesturen als
+  niet-lid geeft `MEMBERSHIP_REQUIRED`.
+
+De bestaande losse types ("Waterticket (Lid)") blijven werken zoals ze waren;
+omzetten doet de beheerder door één type een ledenprijs te geven en het andere
+te archiveren.
+
+## De ticketpagina van één event
+
+`/tickets/[slug]` opende met een navy band waarop de volledige beschrijving
+stond, met emoji-opsommingen en al, en daaronder een witte kaart met grijsblauwe
+rijen per tickettype en een tweede kaart die het event nog eens herhaalde. Uit
+vier richtingen (een kalenderachtige pagina, een kassa-eerst-tabel, tickets als
+afscheurstrookjes, gegroepeerd per soort) en vier uitwerkingen van de eerste
+werd **de kalenderpagina met tickets per soort** gekozen.
+
+- **De kop is die van een event in de kalender** (`vtk-event-head`): titel,
+  datum, organisator en locatie. De beschrijving staat eronder op papier, met
+  de gele streep onder "Over dit event", en naast de tekst een register
+  "Praktisch" in de marge zoals op een contentpagina.
+- **De poster komt van het gekoppelde kalender-event.** Een ticketevent heeft
+  geen eigen foto; zonder koppeling is er geen poster, geen streepjesvlak.
+- **De tickets staan in één wit paneel rechts dat meescrollt**, per soort:
+  naam en beschrijving, en bij een ledenprijs twee korte regels "Lid" en
+  "Niet-lid". Hoeveel er nog zijn, staat er enkel bij twintig of minder: pas dan
+  helpt het getal iemand beslissen.
+- **Een melding over de verkoop staat één keer bovenaan het paneel**, niet onder
+  elke rij.
+- **De gegevens komen pas na "Verder naar gegevens"**, bovenaan de linkerkolom,
+  met de voorwaarden en de betaalwijzen eronder. In een paneel van 400px passen
+  de vragen per aanwezige niet, en een formulier dat meegroeit terwijl je nog
+  aan het kiezen bent, duwt de beschrijving weg voor je ze gelezen hebt.
+- **Op een gsm staan de tickets eerst**, daarvoor kwam je.
+
+## Het ticketoverzicht: brede kaarten met de prijzen erbij
+
+`/tickets` toonde elk event als een smalle kaart met een grijze datum en één
+"vanaf"-prijs. Uit vier richtingen (een agenda per maand, postertegels zoals
+`/kalender`, één uitgelicht event met de rest eronder, brede kaarten met alle
+prijzen) werden **de brede kaarten** gekozen.
+
+- **Poster, wat het is, en de tickets rechts.** Links de poster van het
+  gekoppelde kalender-event met de gele datum erop (zonder koppeling het
+  streepjesvlak), in het midden organisator, titel met gele streep, datum,
+  plaats en de eerste alinea van de beschrijving, rechts de tickets met hun
+  prijs. Je ziet wat water en bier kosten zonder het event te openen.
+- **De prijs is die van de bezoeker.** Een lid ziet de ledenprijs met "Lid ·
+  niet-lid €17" eronder; een niet-lid ziet de gewone prijs, en onder de lijst
+  één regel om in te loggen of lid te worden. Meer dan vier soorten worden "+2
+  andere": de kaart is een overzicht, geen kassa.
+- **Filters in de URL**: "Nu te koop" (standaard), "Binnenkort" en "Alles", als
+  links met `?filter=`, zodat je "wat binnenkort komt" kan doorsturen en het
+  zonder JavaScript werkt.
+- **"Binnenkort" betekent dat een event al vóór de verkoopstart op /tickets
+  staat**, met de prijzen en "Te koop vanaf ...". Voorheen verscheen een event
+  pas zodra de verkoop opende, en dan wist niemand dat het galabal eraan kwam.
+  Wie in de voorverkoop zit, ziet het meteen onder "Nu te koop". Dit geldt enkel
+  voor de website (`listPublishedTicketEvents(..., { overview: true })`): de
+  lijst in de app belooft dat je nu kan kopen en blijft zoals ze was.
+- **Uitverkocht blijft in de lijst staan**, met een grijze datum en streep: dat
+  het event bestaat, is ook informatie.

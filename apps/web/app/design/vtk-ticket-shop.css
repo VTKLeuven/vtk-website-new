@@ -1,0 +1,540 @@
+/* De ticketpagina van één event (/tickets/[slug]).
+
+   Links wat je over het event wil weten (poster, beschrijving, het praktische),
+   rechts een wit paneel met de tickets dat meescrollt. De tickets staan per
+   soort; een soort met een ledenprijs krijgt twee korte regels "Lid" en
+   "Niet-lid" onder haar naam. Wie op "Verder" klikt, krijgt de gegevens bovenaan
+   de linkerkolom. Zie docs/design-decisions.md voor waarom het er zo uitziet.
+
+   De kop komt uit vtk-event.css, net als een event in de kalender. De velden in
+   het gegevensblok (ticket-field, ticket-attendee, ticket-pay-*) blijven in
+   vtk-tickets.css, want de bestelpagina gebruikt ze ook. */
+
+.tshop-shell {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: clamp(28px, 4.5vw, 48px) clamp(20px, 3vw, 36px) clamp(64px, 8vw, 104px);
+}
+
+.tshop {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: clamp(24px, 3.5vw, 44px);
+  align-items: start;
+}
+
+.tshop-main {
+  display: grid;
+  gap: clamp(24px, 3vw, 36px);
+  min-width: 0;
+}
+
+/* Dezelfde gele streep als "Over dit event" in de kalender, even breed als de kop. */
+.tshop-heading {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 0 16px;
+  color: var(--ink);
+  font-size: clamp(22px, 2.4vw, 28px);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
+
+.tshop-heading::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 4px;
+  margin-top: 0.5rem;
+  border-radius: 2px;
+  background: var(--yellow);
+}
+
+/* ---------- Over dit event ---------- */
+
+.tshop-poster {
+  min-height: 0;
+}
+
+.tshop-about {
+  display: grid;
+  gap: 36px;
+}
+
+.tshop-about[data-has-text] {
+  grid-template-columns: minmax(0, 1fr) 210px;
+}
+
+.tshop-description {
+  max-width: 66ch;
+  color: var(--body);
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.tshop-description p {
+  margin: 0 0 14px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.tshop-description p:last-child {
+  margin-bottom: 0;
+}
+
+/* Een register in de marge, zoals op een contentpagina: haarlijn, klein
+   opschrift, geen kaart. */
+.tshop-rail {
+  align-self: start;
+  border-left: 1px solid var(--line-2);
+  padding-left: 20px;
+}
+
+.tshop-rail h2 {
+  margin: 0 0 14px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.tshop-rail dl {
+  display: grid;
+  gap: 14px;
+  margin: 0;
+}
+
+.tshop-rail dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.tshop-rail dd {
+  margin: 2px 0 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.tshop-rail dd span {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.tshop-rail a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* ---------- Het ticketpaneel ---------- */
+
+.tshop-panel {
+  position: sticky;
+  top: 96px;
+  display: grid;
+  gap: 14px;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(14, 26, 54, 0.04), 0 12px 32px -18px rgba(14, 26, 54, 0.25);
+}
+
+.tshop-panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tshop-panel-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.tshop-panel-head small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.tshop-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: var(--low-bg);
+  color: var(--low-ink);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.tshop-notice svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.tshop-notice strong {
+  color: var(--ink);
+}
+
+.tshop-types {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.tshop-type {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.tshop-type h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.tshop-type-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* Eén regel: naam links, dan prijs en teller. Bij een soort met ledenprijs
+   staat de naam erboven en begint de regel met "Lid" of "Niet-lid". */
+.tshop-line {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 12px;
+}
+
+.tshop-type[data-split] .tshop-line {
+  grid-template-columns: 76px minmax(0, 1fr) auto;
+  min-height: 48px;
+  padding-top: 6px;
+}
+
+.tshop-type[data-split] .tshop-type-note + .tshop-line,
+.tshop-type[data-split] h3 + .tshop-line {
+  margin-top: 4px;
+}
+
+.tshop-line-name {
+  min-width: 0;
+}
+
+.tshop-audience {
+  color: var(--body);
+  font-size: 14px;
+}
+
+.tshop-price {
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tshop-type[data-split] .tshop-price {
+  justify-self: start;
+}
+
+.tshop-price[data-unavailable] {
+  color: var(--muted);
+}
+
+.tshop-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.tshop-pill[data-tone="low"] {
+  background: var(--low-bg);
+  color: var(--low-ink);
+}
+
+.tshop-pill[data-tone="out"] {
+  background: var(--paper-2);
+  color: var(--muted);
+}
+
+.tshop-stepper {
+  display: inline-grid;
+  grid-template-columns: 38px 32px 38px;
+  height: 40px;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.tshop-stepper[data-active="true"] {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+.tshop-stepper button {
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: none;
+  color: var(--navy);
+  cursor: pointer;
+}
+
+.tshop-stepper button:hover:not(:disabled) {
+  background: var(--paper-2);
+}
+
+.tshop-stepper button:disabled {
+  color: rgba(14, 26, 54, 0.25);
+  cursor: default;
+}
+
+.tshop-stepper button:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: -2px;
+}
+
+.tshop-stepper output {
+  display: grid;
+  place-items: center;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.tshop-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.tshop-hint a {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.tshop-summary {
+  display: grid;
+  gap: 12px;
+}
+
+.tshop-summary-lines {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--body);
+  font-size: 14px;
+}
+
+.tshop-summary-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tshop-summary-lines li span:last-child {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.tshop-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--ink);
+}
+
+.tshop-total span {
+  font-weight: 600;
+}
+
+.tshop-total strong {
+  font-size: 26px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.tshop-cta {
+  display: flex;
+  width: 100%;
+  min-height: 50px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--paper);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.tshop-cta:hover:not(:disabled) {
+  background: var(--navy);
+}
+
+.tshop-cta:disabled {
+  background: var(--paper-2);
+  color: var(--muted);
+  cursor: default;
+}
+
+.tshop-trust {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.tshop-trust span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.tshop-empty {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 18px 4px 4px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.tshop-empty h3 {
+  margin: 4px 0 0;
+  color: var(--ink);
+  font-size: 17px;
+}
+
+.tshop-empty p {
+  margin: 0 0 8px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ---------- Jouw gegevens ---------- */
+
+.tshop-details {
+  display: grid;
+  gap: 16px;
+  padding: clamp(20px, 3vw, 28px);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+  scroll-margin-top: 96px;
+}
+
+.tshop-details .tshop-heading {
+  margin-bottom: 0;
+}
+
+.tshop-lede {
+  margin: -6px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* In dit blok staan de betaalwijzen al op wit; een tweede kaart eromheen
+   zou een kaart in een kaart zijn. */
+.tshop-details .ticket-terms-check {
+  margin: 0;
+}
+
+.tshop-details .ticket-pay-choice {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+}
+
+.tshop-details .ticket-error {
+  margin: 0;
+}
+
+.tshop-pay {
+  display: grid;
+  gap: 10px;
+}
+
+.tshop-muted {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+@media (max-width: 960px) {
+  .tshop {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /* Op een smal scherm staan de tickets eerst: daarvoor kwam je. */
+  .tshop-panel {
+    position: static;
+    order: -1;
+  }
+}
+
+@media (max-width: 700px) {
+  .tshop-about[data-has-text] {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 24px;
+  }
+
+  .tshop-rail {
+    border-left: 0;
+    border-top: 1px solid var(--line-2);
+    padding: 16px 0 0;
+  }
+}
+
+@media (max-width: 420px) {
+  .tshop-panel {
+    padding: 18px 16px;
+  }
+
+  .tshop-type[data-split] .tshop-line {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+  }
+}
