@@ -1,4 +1,4 @@
-import { createSlugAllocator, slugify, type ParsedAlbumMarkers } from './format';
+import { createSlugAllocator, dateValue, slugify, type ParsedAlbumMarkers } from './format';
 import type { GalleryAlbum, GallerySubAlbum } from './types';
 
 export type MappedAlbumEntry = {
@@ -34,8 +34,10 @@ function resolveTabTitle(
  * Ondersteunt:
  * 1. [parent: galabal-2026] in de beschrijving van een deelalbum.
  * 2. [group: galabal-2026] in de beschrijving van meerdere albums.
- * 3. Titelpatronen met scheidingsteken (bijv. "Galabal 2026: Zaal" en "Galabal 2026: Photobooth")
- *    mits er 2 of meer albums zijn die hetzelfde voorvoegsel delen.
+ *
+ * Groeperen gebeurt uitsluitend via expliciete merkers, niet automatisch op
+ * basis van titelpatronen (zoals "Sport van de maand: ..."), zodat verschillende
+ * evenementen in dezelfde reeks netjes aparte albums blijven.
  */
 export function groupAlbums(
   entries: MappedAlbumEntry[],
@@ -43,27 +45,13 @@ export function groupAlbums(
 ): GalleryAlbum[] {
   if (entries.length === 0) return [];
 
-  // Tel voorvoegsels in titels ("Event: Tab" of "Event // Tab")
-  const prefixCounts = new Map<string, number>();
-  for (const entry of entries) {
-    if (entry.markers.titlePrefix) {
-      const key = slugify(entry.markers.titlePrefix);
-      prefixCounts.set(key, (prefixCounts.get(key) || 0) + 1);
-    }
-  }
-
-  // Wijs elk album toe aan een groepssleutel (indien van toepassing)
+  // Wijs elk album toe aan een groepssleutel op basis van expliciete merkers
   const entryGroupKey = new Map<MappedAlbumEntry, string>();
   for (const entry of entries) {
     if (entry.markers.parent) {
       entryGroupKey.set(entry, slugify(entry.markers.parent));
     } else if (entry.markers.group) {
       entryGroupKey.set(entry, slugify(entry.markers.group));
-    } else if (entry.markers.titlePrefix) {
-      const key = slugify(entry.markers.titlePrefix);
-      if ((prefixCounts.get(key) || 0) > 1) {
-        entryGroupKey.set(entry, key);
-      }
     }
   }
 
@@ -75,20 +63,23 @@ export function groupAlbums(
     const key = entryGroupKey.get(entry);
     if (!key) {
       // Controleer of dit album toevallig de parent is van een andere groep
-      const selfKey = slugify(entry.album.title);
-      let isTargeted = false;
+      const titleKey = slugify(entry.album.title);
+      const slugKey = entry.album.slug;
+      let targetKey: string | null = null;
+
       for (const other of entries) {
-        if (entryGroupKey.get(other) === selfKey && other !== entry) {
-          isTargeted = true;
+        const otherKey = entryGroupKey.get(other);
+        if (otherKey && (otherKey === titleKey || otherKey === slugKey) && other !== entry) {
+          targetKey = otherKey;
           break;
         }
       }
 
-      if (isTargeted) {
-        entryGroupKey.set(entry, selfKey);
-        const list = groups.get(selfKey) || [];
+      if (targetKey) {
+        entryGroupKey.set(entry, targetKey);
+        const list = groups.get(targetKey) || [];
         list.push(entry);
-        groups.set(selfKey, list);
+        groups.set(targetKey, list);
       } else {
         standalone.push(entry);
       }
@@ -115,23 +106,29 @@ export function groupAlbums(
 
     // Zoek het parent album, of neem het eerste album als basis
     const explicitParent = groupEntries.find(
-      (e) => slugify(e.album.title) === groupKey || !e.markers.parent,
+      (e) =>
+        slugify(e.album.title) === groupKey ||
+        e.album.slug === groupKey ||
+        !e.markers.parent,
     );
     const parentEntry = explicitParent || groupEntries[0];
 
     let compositeTitle = parentEntry.album.title;
-    if (parentEntry.markers.titlePrefix) {
-      compositeTitle = parentEntry.markers.titlePrefix;
-    } else if (parentEntry.markers.group) {
+    if (parentEntry.markers.group) {
       compositeTitle = parentEntry.markers.group;
     } else if (parentEntry.markers.parent && !explicitParent) {
       compositeTitle = parentEntry.markers.parent;
     }
 
+    // Zorg dat het ouder-album (hoofdtitel) voorop staat in de tabs
+    const orderedEntries = explicitParent
+      ? [explicitParent, ...groupEntries.filter((e) => e !== explicitParent)]
+      : groupEntries;
+
     const allocateTabSlug = createSlugAllocator();
-    const subAlbums: GallerySubAlbum[] = groupEntries.map((entry) => {
+    const subAlbums: GallerySubAlbum[] = orderedEntries.map((entry) => {
       const isParent = entry === parentEntry;
-      const tabTitle = resolveTabTitle(entry, isParent, groupEntries.length > 1);
+      const tabTitle = resolveTabTitle(entry, isParent, orderedEntries.length > 1);
       const tabSlug = allocateTabSlug(tabTitle);
 
       const photos = downloadPath
@@ -155,10 +152,26 @@ export function groupAlbums(
     const totalPhotos = subAlbums.flatMap((sub) => sub.photos);
     const totalPhotoCount = subAlbums.reduce((acc, sub) => acc + sub.photoCount, 0);
 
+    // Vroegste datum bepalen van de deelalbums
+    const validDates = groupEntries
+      .map((e) => e.album.date)
+      .filter((d): d is string => typeof d === 'string' && dateValue(d) > 0);
+
+    let compositeDate = parentEntry.album.date;
+    if (validDates.length > 0) {
+      validDates.sort((a, b) => dateValue(a) - dateValue(b));
+      compositeDate = validDates[0];
+    }
+
+
+    const compositeYear = compositeDate ? new Date(compositeDate).getUTCFullYear() : parentEntry.album.year;
+
     const compositeAlbum: GalleryAlbum = {
       ...parentEntry.album,
       slug: groupKey,
       title: compositeTitle,
+      date: compositeDate,
+      year: Number.isFinite(compositeYear) ? compositeYear : null,
       photoCount: totalPhotoCount,
       photos: totalPhotos,
       subAlbums,
@@ -167,5 +180,13 @@ export function groupAlbums(
     result.push(compositeAlbum);
   }
 
+  // Sorteer alle albums (zowel standalone als gegroepeerd) chronologisch op datum (aflopend)
+  result.sort((left, right) => {
+    const diff = dateValue(right.date) - dateValue(left.date);
+    if (diff !== 0) return diff;
+    return left.title.localeCompare(right.title);
+  });
+
   return result;
 }
+

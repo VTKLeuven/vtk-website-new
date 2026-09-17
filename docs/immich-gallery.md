@@ -36,7 +36,7 @@ Albums without the marker stay hidden.
 
 Voor evenementen met meerdere fotoseries (bijvoorbeeld het Galabal met "Zaal" en "Photobooth") kunnen albums worden gegroepeerd tot één albumpagina met tabs (`/media/galabal-2026?sub=photobooth`).
 
-In Immich kan dit op drie manieren worden ingesteld:
+In Immich kan dit op twee manieren worden ingesteld:
 
 1. **Via `[parent: ...]` (Aanbevolen):**
    - Hoofdalbum: Titel `Galabal 2026`, beschrijving: `[gallery] [tab: Zaal]`
@@ -44,12 +44,11 @@ In Immich kan dit op drie manieren worden ingesteld:
 2. **Via `[group: ...]`:**
    - Album 1: `[gallery] [group: galabal-2026] [tab: Zaal]`
    - Album 2: `[gallery] [group: galabal-2026] [tab: Photobooth]`
-3. **Via titelpatroon (`Event: Tab`):**
-   - Album 1: Titel `Galabal 2026: Zaal`, beschrijving `[gallery]`
-   - Album 2: Titel `Galabal 2026: Photobooth`, beschrijving `[gallery]`
-   (Zodra 2 of meer albums hetzelfde voorvoegsel delen, worden ze automatisch als tabs gegroepeerd).
 
-Op `/media` verschijnt slechts één overzichtskaart met het totaal aantal foto's. Gezichtsherkenning zoekt automatisch over alle sub-albums van het evenement.
+Groeperen gebeurt uitsluitend via deze expliciete merkers, niet automatisch op basis van titelpatronen (zoals `Sport van de maand: ...`), zodat losse evenementen in dezelfde reeks aparte albums blijven.
+
+Op `/media` verschijnt slechts één overzichtskaart met het totaal aantal foto's, chronologisch gesorteerd op de vroegste datum van de deelalbums. Gezichtsherkenning zoekt automatisch over alle sub-albums van het evenement.
+
 
 **In de praktijk hoef je dit niet met de hand in Immich te zetten.** In
 `/admin/media` maak je een album met tabs in één keer aan (een tabnaam en een

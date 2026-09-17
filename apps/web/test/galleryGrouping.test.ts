@@ -10,21 +10,22 @@ import {
   type GalleryAlbum,
 } from "@vtk/gallery";
 
-function mockAlbum(id: string, title: string, count = 2): GalleryAlbum {
+function mockAlbum(id: string, title: string, count = 2, date = "2026-03-14"): GalleryAlbum {
+  const year = date ? new Date(date).getUTCFullYear() : 2026;
   return {
     id,
     slug: title.toLowerCase().replace(/[^a-z0-9]+/g, "-"),
     title,
     description: "Beschrijving",
-    date: "2026-03-14",
-    year: 2026,
+    date,
+    year,
     photoCount: count,
     coverPhoto: null,
     photos: Array.from({ length: count }, (_, i) => ({
       id: `${id}-photo-${i + 1}`,
       title: `Foto ${i + 1}`,
       description: "",
-      date: "2026-03-14",
+      date,
       width: 1600,
       height: 1067,
       filename: `${id}-${i + 1}.jpg`,
@@ -44,8 +45,9 @@ function entry(
   title: string,
   description: string,
   count = 2,
+  date = "2026-03-14",
 ): MappedAlbumEntry {
-  const album = mockAlbum(id, title, count);
+  const album = mockAlbum(id, title, count, date);
   const markers = parseAlbumMarkers(description, title);
   return {
     album,
@@ -54,6 +56,7 @@ function entry(
     rawDescription: description,
   };
 }
+
 
 describe("parseAlbumMarkers", () => {
   it("extraheert parent, group en tab merkers", () => {
@@ -198,19 +201,43 @@ describe("groupAlbums", () => {
     expect(grouped[0].subAlbums).toHaveLength(2);
   });
 
-  it("groepeert albums met titelpatroon 'Event: Tab' wanneer er 2 of meer zijn", () => {
-    const e1 = entry("a1", "Galabal 2026: Zaal", "[gallery]", 3);
-    const e2 = entry("a2", "Galabal 2026: Photobooth", "[gallery]", 2);
+  it("groepeert albums NIET automatisch op basis van titelpatroon 'Event: Tab'", () => {
+    const e1 = entry("a1", "Sport van de maand: Klimmen", "[gallery]", 3, "2026-03-01");
+    const e2 = entry("a2", "Sport van de maand: IJshocky", "[gallery]", 2, "2026-03-02");
 
     const grouped = groupAlbums([e1, e2]);
 
-    expect(grouped).toHaveLength(1);
-    expect(grouped[0].slug).toBe("galabal-2026");
-    expect(grouped[0].title).toBe("Galabal 2026");
-    expect(grouped[0].photoCount).toBe(5);
-    expect(grouped[0].subAlbums?.[0].title).toBe("Zaal");
-    expect(grouped[0].subAlbums?.[1].title).toBe("Photobooth");
+    expect(grouped).toHaveLength(2);
+    expect(grouped.map((g) => g.title)).toEqual([
+      "Sport van de maand: IJshocky",
+      "Sport van de maand: Klimmen",
+    ]);
   });
+
+  it("sorteert standalone en gegroepeerde albums chronologisch op datum (aflopend)", () => {
+    const older = entry("a1", "Oud feestje", "[gallery]", 2, "2026-01-10");
+    const main = entry("a2", "Galabal 2026", "[gallery] [tab: Zaal]", 5, "2026-04-03");
+    const sub = entry("a3", "Galabal 2026: Photobooth", "[gallery] [parent: galabal-2026] [tab: Photobooth]", 3, "2026-04-03");
+    const newer = entry("a4", "Nieuw feestje", "[gallery]", 2, "2026-05-20");
+
+    const grouped = groupAlbums([older, main, sub, newer]);
+
+    expect(grouped).toHaveLength(3);
+    expect(grouped[0].title).toBe("Nieuw feestje");
+    expect(grouped[1].title).toBe("Galabal 2026");
+    expect(grouped[2].title).toBe("Oud feestje");
+  });
+
+  it("neemt de vroegste datum onder de deelalbums van een samengesteld album", () => {
+    const main = entry("a1", "Galabal 2026", "[gallery] [tab: Zaal]", 5, "2026-04-04");
+    const sub = entry("a2", "Galabal 2026: Photobooth", "[gallery] [parent: galabal-2026] [tab: Photobooth]", 3, "2026-04-03");
+
+    const grouped = groupAlbums([main, sub]);
+
+    expect(grouped).toHaveLength(1);
+    expect(grouped[0].date).toBe("2026-04-03");
+  });
+
 
   it("laat een enkel album met een dubbele punt in de titel met rust", () => {
     const single = entry("a1", "Workshop: AI", "[gallery]", 4);
