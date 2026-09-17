@@ -7,6 +7,13 @@ import { trackAlbumView } from '@/lib/analytics-client';
 
 const INITIAL_ALBUM_COUNT = 8;
 
+/**
+ * De bovenste rij covers laadt meteen; die staat boven de vouw en is het
+ * LCP-beeld van /media. De rest blijft lazy, ook de albums die pas na "meer
+ * albums" in beeld komen.
+ */
+const EAGER_ALBUM_COUNT = 4;
+
 type AlbumItem = {
   id: string;
   href: string;
@@ -34,7 +41,7 @@ export function AlbumGrid({ albums, labels }: { albums: AlbumItem[]; labels: Alb
   return (
     <>
       <ul id="media-photo-albums" className="vtk-immich-album-grid">
-        {visibleAlbums.map((album) => (
+        {visibleAlbums.map((album, index) => (
           <li key={album.id}>
             <Link
               href={album.href}
@@ -48,7 +55,13 @@ export function AlbumGrid({ albums, labels }: { albums: AlbumItem[]; labels: Alb
                   // die host past niet in remotePatterns en wordt lokaal door de
                   // optimizer geweigerd. Vandaar <img>.
                   // eslint-disable-next-line @next/next/no-img-element
-                  <img src={album.thumbnailUrl} alt="" loading="lazy" decoding="async" />
+                  <img
+                    src={album.thumbnailUrl}
+                    alt=""
+                    loading={index < EAGER_ALBUM_COUNT ? 'eager' : 'lazy'}
+                    fetchPriority={index === 0 ? 'high' : 'auto'}
+                    decoding="async"
+                  />
                 ) : (
                   <span className="ph-label">{labels.album}</span>
                 )}

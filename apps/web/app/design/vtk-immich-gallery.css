@@ -1069,3 +1069,39 @@
   background: rgba(255, 255, 255, 0.2);
   color: #fff;
 }
+
+/* ---------------------------------------------------------------------------
+   Skelet tijdens het laden van een album (`media/[albumSlug]/loading.tsx`).
+
+   Een album met vijftienhonderd foto's kost de server bijna een seconde, en
+   zonder deze grens bleef je na een klik op de albumlijst staan zonder dat er
+   iets bewoog. Het skelet heeft opzettelijk dezelfde maten als de echte pagina
+   (dezelfde hero, dezelfde kolommen), zodat de inhoud er niet naast springt.
+   --------------------------------------------------------------------------- */
+.vtk-immich-skeleton {
+  display: block;
+  border-radius: 10px;
+  background: var(--paper-2);
+}
+
+.vtk-album-hero .vtk-immich-skeleton {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.vtk-immich-photo-tile .vtk-immich-skeleton {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .vtk-immich-skeleton {
+    animation: vtk-immich-skeleton-pulse 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes vtk-immich-skeleton-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}

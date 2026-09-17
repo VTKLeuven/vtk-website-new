@@ -4,6 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { trackPhotoDownload } from "@/lib/analytics-client";
 import { TakedownDialog, type TakedownLabels } from "./TakedownDialog";
 
+/**
+ * Hoeveel duimnagels meteen laden in plaats van lazy. De bovenste rij is het
+ * LCP-beeld van de pagina, en die stond met `loading="lazy"` precies op de foto
+ * te wachten waarop gemeten wordt. Vier kolommen in de masonry, plus een rij
+ * marge voor bredere schermen.
+ */
+const EAGER_PHOTO_COUNT = 8;
+
 type Photo = {
   id: string;
   title: string;
@@ -109,7 +117,13 @@ export function AlbumViewer({
                   host uit GALLERY_PUBLIC_PROXY_URL. Zie next.config.ts: die host past
                   niet in remotePatterns en wordt lokaal door de optimizer geweigerd. */}
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={photo.thumbnailUrl} alt={photo.title} loading="lazy" />
+              <img
+                src={photo.thumbnailUrl}
+                alt={photo.title}
+                loading={index < EAGER_PHOTO_COUNT ? "eager" : "lazy"}
+                fetchPriority={index === 0 ? "high" : "auto"}
+                decoding="async"
+              />
             </button>
             <a
               className="vtk-immich-icon-button vtk-immich-photo-download"
