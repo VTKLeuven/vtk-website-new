@@ -44,7 +44,10 @@ services:
   # pages impossible to try out. `lib/storage.ts` already assumed something on
   # :9000 lived here; it just was never in a compose file.
   minio:
-    image: minio/minio:latest
+    # MinIO is van Docker Hub verdwenen (`minio/minio` bestaat daar niet meer);
+    # quay.io is sindsdien de bron. Vastgezet op een release in plaats van
+    # `latest`, zodat een nieuwe machine hetzelfde krijgt als de rest.
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     container_name: vtk-dev-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
@@ -68,7 +71,7 @@ services:
   # and an upload into a missing bucket fails with an error that says nothing
   # about the bucket.
   minio-init:
-    image: minio/mc:latest
+    image: quay.io/minio/mc:RELEASE.2025-08-13T08-35-41Z
     depends_on:
       minio:
         condition: service_healthy
