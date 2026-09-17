@@ -132,7 +132,7 @@ describe('authorization preview', () => {
     expect(blocksAuthorizationPreviewMutation(false, 'POST', '/nl/admin')).toBe(false);
   });
 
-  it('uses only effective preview permissions and post leadership for ticket creation', () => {
+  it('uses only effective preview permissions and post membership for ticket creation', () => {
     const session = previewSession({
       permissions: ['tickets.create'],
       groups: [
@@ -157,8 +157,15 @@ describe('authorization preview', () => {
       ],
     });
 
+    // Lid zijn volstaat, ook zonder LEAD: of het recht enkel voor de
+    // verantwoordelijke geldt, bepaalt de post met de `kind` van haar rolgrant,
+    // en dat zit al in `session.permissions`.
     expect(canSessionCreateTicketEventForGroup(session, 'group-a')).toBe(true);
-    expect(canSessionCreateTicketEventForGroup(session, 'group-b')).toBe(false);
+    expect(canSessionCreateTicketEventForGroup(session, 'group-b')).toBe(true);
+    // Een post waar deze sessie geen lid van is, blijft dicht.
     expect(canSessionCreateTicketEventForGroup(session, 'group-c')).toBe(false);
+    expect(
+      canSessionCreateTicketEventForGroup(previewSession({ groups: session.groups }), 'group-a'),
+    ).toBe(false);
   });
 });

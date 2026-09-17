@@ -36,15 +36,22 @@ export default async function NewTicketEventPage({
         where: { id: { in: session.groups.map((group) => group.id) } },
         orderBy: { orderInPraesidium: "asc" },
       });
-  const allowed = await Promise.all(allGroups.map(async (group) => ({
-    group,
-    allowed: preview
-      ? canSessionCreateTicketEventForGroup(session, group.id)
-      : await canCreateTicketEventForGroup(session.user.id, group.id, session.user.isSuperAdmin),
-  })));
+  // Enkel wanneer de keuze beperkt is: wie alles beheert, krijgt elke post, en
+  // dan hoefde die check per post niet gedaan (en weggegooid) te worden.
   const groups = canManageAll
     ? allGroups
-    : allowed.filter((entry) => entry.allowed).map((entry) => entry.group);
+    : (
+        await Promise.all(
+          allGroups.map(async (group) => ({
+            group,
+            allowed: preview
+              ? canSessionCreateTicketEventForGroup(session, group.id)
+              : await canCreateTicketEventForGroup(session.user.id, group.id, session.user.isSuperAdmin),
+          })),
+        )
+      )
+        .filter((entry) => entry.allowed)
+        .map((entry) => entry.group);
   const calendarEvents = groups.length
     ? await prisma.calendarEvent.findMany({
         where: {

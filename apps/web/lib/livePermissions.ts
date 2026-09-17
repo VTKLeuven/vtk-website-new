@@ -1,5 +1,6 @@
 import "server-only";
 
+import { cache } from "react";
 import { prisma } from "@vtk/db";
 import { currentWorkingYear } from "@vtk/auth";
 
@@ -14,8 +15,15 @@ import { currentWorkingYear } from "@vtk/auth";
  * Waarom niet gewoon `session.permissions`: een server action die iets aanmaakt
  * mag niet op een snapshot varen die minuten oud kan zijn. Voor het *tonen* van
  * knoppen is de snapshot prima; voor het *toestaan* van een mutatie niet.
+ *
+ * Gedeeld binnen één request (React `cache`): schermen die per post vragen of je
+ * er iets mag aanmaken, stelden dezelfde permissievraag anders vijftien keer.
+ * "Live" blijft kloppen: één request is één moment.
  */
-export async function hasLivePermission(userId: string, code: string): Promise<boolean> {
+export const hasLivePermission = cache(async function hasLivePermission(
+  userId: string,
+  code: string,
+): Promise<boolean> {
   const year = currentWorkingYear();
 
   const directRole = await prisma.userRole.findFirst({
@@ -54,4 +62,4 @@ export async function hasLivePermission(userId: string, code: string): Promise<b
   return memberships.some((m) =>
     m.group.roleGrants.some((grant) => grant.kind === "DEFAULT" || m.role === "LEAD")
   );
-}
+});
