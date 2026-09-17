@@ -33,6 +33,7 @@ import {
   membershipOffer,
   recordMembershipChoice,
 } from "@/lib/membership";
+import { CAREER_OPT_IN_FIELD, careerOptInUpdate, withCareerCategory } from "@/lib/careerOptIn";
 
 /**
  * De studievelden, gedeeld door het volledige profielformulier en de jaarlijkse
@@ -276,9 +277,16 @@ export async function saveProfileAction(
   // zelfs een gemanipuleerde submit laat het r-nummer dan ongemoeid.
   const existing = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { rNumberFromKul: true, mailUnsubscribedAt: true },
+    select: { rNumberFromKul: true, mailUnsubscribedAt: true, mailCategories: true },
   });
   const rNumberLocked = existing?.rNumberFromKul ?? false;
+  // Hetzelfde formulier draagt de onboarding en /account, dus de herkomst van
+  // een Career-opt-in hangt af van welke van de twee dit is.
+  const careerTracking = careerOptInUpdate(
+    existing?.mailCategories ?? [],
+    data.mailCategories,
+    session.user.onboarded ? "ACCOUNT" : "ONBOARDING",
+  );
   // Alleen een lid dat écht uitgeschreven stond, schrijft zich opnieuw in; zo
   // blijft een gewone profielopslag een gewone push naar Brevo.
   const resubscribe = existing?.mailUnsubscribedAt != null && data.mailResubscribe;
@@ -298,6 +306,7 @@ export async function saveProfileAction(
         phone: data.phone || null,
         emailPreference: data.emailPreference,
         mailCategories: { set: data.mailCategories },
+        ...(careerTracking ?? {}),
         ...(resubscribe ? { mailUnsubscribedAt: null } : {}),
         shiftReminderDayBefore: data.shiftReminderDayBefore,
         shiftReminderSoon: data.shiftReminderSoon,
@@ -407,9 +416,12 @@ export async function confirmStudyAction(formData: FormData): Promise<void> {
   });
 
   const chosen = await recordMembershipFromForm(session.user.id, formData);
+  await recordCareerOptIn(session.user.id, formData);
 
   revalidatePath("/account");
   // Studiejaar/richting/bevestiging kunnen net gewijzigd zijn: houd Brevo gelijk.
+  // Staat na de opt-in hierboven, zodat een net aangeduide Career-lijst in
+  // dezelfde ronde mee naar Brevo gaat.
   after(() => syncUserToBrevo(session.user.id));
   // Buiten elke try/catch: redirect() werkt via een throw.
   //
@@ -454,4 +466,32 @@ async function recordMembershipFromForm(
     priceCents: offer.priceCents,
   });
   return offer.kind;
+}
+
+/**
+ * Legt de Career-opt-in van het bevestigingsformulier vast.
+ *
+ * Voegt enkel toe en schrijft nooit uit: een leeg gelaten vakje is "nu niet",
+ * en de andere categorieën van het lid staan niet op dit scherm. Een blinde
+ * `set` met enkel Career zou ze dus allemaal wissen.
+ *
+ * `push` van Prisma zou hier een duplicaat in de array zetten wanneer dezelfde
+ * POST twee keer aankomt, vandaar de lezing plus {@link withCareerCategory}:
+ * die geeft `null` terug zodra Career er al in staat, en dan schrijven we niets.
+ */
+async function recordCareerOptIn(userId: string, formData: FormData): Promise<void> {
+  if (formData.get(CAREER_OPT_IN_FIELD) !== "on") return;
+  const user = await prisma.user.findUniqueOrThrow({
+    where: { id: userId },
+    select: { mailCategories: true },
+  });
+  const next = withCareerCategory(user.mailCategories);
+  if (!next) return;
+  await prisma.user.update({
+    where: { id: userId },
+    data: {
+      mailCategories: { set: next },
+      ...(careerOptInUpdate(user.mailCategories, next, "STUDY_CONFIRMATION") ?? {}),
+    },
+  });
 }

@@ -7544,3 +7544,80 @@ gebruikersbeheer.
   en de lijst toont een streepje. Het is geen voorwaarde om te shiften.
 - Het nummer hoort bij de persoonsgegevens: het gaat mee in de gegevensexport en
   wordt gewist wanneer een account geanonimiseerd wordt.
+
+## De Career-vraag op de studiebevestiging
+
+Career is voor de kring de lijst die geld opbrengt: bedrijven betalen voor dat
+bereik, dus hoe meer studenten erin zitten, hoe meer VTK kan doen. De jaarlijkse
+studiebevestiging is het enige scherm waar élke student langskomt, en dus de
+enige plek waar die vraag iedereen bereikt.
+
+**Eén categorie apart, de rest niet.** Onderaan de bevestiging staat één vinkje
+voor `MailCategory.CAREER`. De volledige lijst met acht categorieën blijft waar
+ze stond (de onboarding en `/account`): acht vinkjes op de gate zouden van een
+bevestiging een formulier maken, en dan haakt precies de student af die we nog
+niet in de lijst hebben.
+
+Het is dezelfde categorie en geen tweede soort toestemming: wie het hier
+aanduidt, ziet het op `/account` gewoon aangevinkt staan en zet het daar ook
+weer uit.
+
+**We vragen het maar één keer.** Wie Career ooit aanduidde, in welk jaar dan ook,
+krijgt het blok niet meer te zien. `mailCategories` is een voorkeur en geen
+jaarlijkse keuze, dus het staat er al; een leeg vinkje tonen aan iemand die al ja
+zei leest als "je stond er niet in", en een leeg gelaten vakje zou dan lijken uit
+te schrijven. Drie groepen krijgen het evenmin, telkens omdat hun aanduiding
+niets zou opleveren: wie zich via de uitschrijflink in een mail uitschreef
+(`mailUnsubscribedAt` blokkeert élke lijstmail), wie **geen richting van ons**
+aanduidde (de Career-lijst is opgesplitst per richting, dus zonder richting past
+het lid in geen enkel deel), en wie buiten de faculteit studeert (`notAtFaculty`
+valt sowieso uit de Career-lijst, want de bedrijven vragen studenten van deze
+faculteit). Zie `lib/careerOptIn.ts`.
+
+**De titel noemt zijn richting.** "Bedrijven zoeken 2de masters Energie" is
+moeilijker over te slaan dan "blijf op de hoogte", en het is waar: de lijst
+splitst echt per studiejaar en per richting (`lib/careerLists.ts`). Bij meer dan
+één richting, of zonder studiejaar, valt de titel terug op een algemenere zin in
+plaats van er één uit te kiezen; dat zou voor de helft van die leden fout staan.
+
+**De foto van de Career Fair draagt het blok.** Een zaal vol bedrijven zegt
+sneller waar die mails over gaan dan een zin. Drie ronden ontwerp gingen eraan
+vooraf; wat overbleef staat in `vtk-career-optin.css`:
+- een **gelijkmatige wash** van 45% navy (plus een lichte donkere hoek
+  linksboven) en geen diagonaal verloop zoals de homepage-hero. Die foto is één
+  drukke zaal zonder rustige hoek, dus elk verloop laat een fel stuk achter de
+  tekst staan.
+- **4:1** op een gewoon scherm, en 2.2:1 onder 700px: op een telefoon is 4:1 een
+  streep van tachtig pixels waarin de titel niet past.
+- de uitsnede zit **verticaal** op 42%, waar de koppen van de standen staan.
+  Horizontaal valt er bij deze verhouding niets te kiezen: de foto is dan al
+  breedte-gebonden en schuift niet.
+- het vinkje is **dezelfde chip** als "Student" of "Energie" hierboven op het
+  scherm. Een eigen vinkje-vorm voor deze ene vraag las minder als een keuze; wie
+  hier komt, heeft er dan al twintig van die chips aangeklikt.
+
+**Het mag opvallen, binnen de AVG.** Wat er niet mag, is precies wat het meeste
+zou opleveren: het vakje staat **niet** voorgevinkt (een voorgevinkt vakje is geen
+toestemming), bevestigen kan zonder het aan te duiden, de tekst zegt wat je
+krijgt (studentenjobs, stages en vacatures op maat van je richting) in plaats van
+enkel "blijf op de hoogte", en ze zegt erbij dat uitschrijven altijd kan.
+
+**Aanduiden voegt toe, leeg laten doet niets.** De action schrijft nooit uit: de
+andere categorieën van het lid staan niet op dit scherm, dus een `set` met enkel
+Career zou ze wissen. Een leeg gelaten vakje betekent "nu niet"; uitschrijven doe
+je op `/account`, waar alle categorieën staan en je ziet wat je uitzet.
+
+**We houden bij welk scherm de opt-in vastlegde**, want de vraag staat op drie
+plaatsen en zonder dat is niet te zien welke ervan werkt.
+`User.careerOptInSource` (`ONBOARDING`, `ACCOUNT`, `STUDY_CONFIRMATION`) plus
+`careerOptInAt` hangen aan de **lopende** opt-in: zet het lid Career weer uit,
+dan gaan ze mee op null. Anders telt /admin/mailinglijsten herkomsten van mensen
+die niet meer op de lijst staan. Wie al aangeduid stond voor we dit bijhielden,
+valt onder "Eerder". Bewust geen logtabel met alle aan- en uitzettingen: de vraag
+is "waar komt deze inschrijving vandaan", niet "hoe vaak twijfelde dit lid".
+
+**"Onze studenten" is de noemer van het percentage**, en die is nauwer dan
+"iedereen met een account": actief, status Student, een richting van de faculteit
+aangeduid en niet `notAtFaculty`. Dat is precies het publiek dat Career aan
+bedrijven belooft, en het is dezelfde grens als wie de vraag te zien krijgt, dus
+het percentage en het scherm gaan over dezelfde groep (`lib/careerStats.ts`).

@@ -397,6 +397,13 @@ enum EmailPreference {
 }
 
 // Mailinglijst-categorieën waarvoor een lid zich (opt-in) kan inschrijven.
+// Welk scherm de Career-opt-in van een lid vastlegde. Zie `User.careerOptInAt`.
+enum CareerOptInSource {
+  ONBOARDING
+  ACCOUNT
+  STUDY_CONFIRMATION
+}
+
 enum MailCategory {
   FEEST
   CAREER
@@ -560,6 +567,15 @@ model User {
   // het nooit wissen. `mailCategories` blijft bewust staan, zodat een lid dat
   // zich opnieuw inschrijft zijn oude voorkeuren terugkrijgt.
   mailUnsubscribedAt      DateTime?           @db.Timestamptz(3)
+  // Waar de lopende Career-opt-in vandaan komt, en wanneer ze gezet is. Bewust
+  // enkel voor Career: het beheer wil weten welk scherm die lijst vult, want de
+  // vraag staat op drie plaatsen (onboarding, /account, studiebevestiging) en
+  // Career is de lijst waar bedrijven voor betalen. Zet het lid Career weer uit,
+  // dan gaan beide velden mee op null; anders telt /admin/mailinglijsten
+  // herkomsten van mensen die niet meer op de lijst staan. Leeg bij wie al
+  // aangeduid stond voor dit bijgehouden werd: die tellen als "eerder".
+  careerOptInAt           DateTime?           @db.Timestamptz(3)
+  careerOptInSource       CareerOptInSource?
   // Herinneringen voor een shift waarvoor je jezelf inschreef. Bewust geen
   // `MailCategory`: dat zijn opt-in nieuwsbrieven, dit is transactioneel. Wel
   // uitzetbaar, want niet iedereen wil twee mails per shift.

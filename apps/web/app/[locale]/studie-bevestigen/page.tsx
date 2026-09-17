@@ -13,7 +13,10 @@ import { confirmStudyAction } from "@/app/actions/onboarding";
 import { StudyFieldset } from "@/components/profile/StudyFieldset";
 import { AddressConfirmation } from "@/components/profile/AddressConfirmation";
 import { MembershipChoice } from "@/components/profile/MembershipChoice";
+import { CareerOptIn } from "@/components/profile/CareerOptIn";
 import { hasCompleteAddresses } from "@/lib/profile-address";
+import { careerChoiceLabels, shouldAskCareerOptIn } from "@/lib/careerOptIn";
+import "@/app/design/vtk-career-optin.css";
 import {
   getMembership,
   getMembershipConfig,
@@ -73,6 +76,8 @@ export default async function ConfirmStudyPage({
       graduationYear: true,
       wasInVtk: true,
       alumniMailOptIn: true,
+      mailCategories: true,
+      mailUnsubscribedAt: true,
       noKot: true,
       street: true,
       houseNumber: true,
@@ -98,6 +103,10 @@ export default async function ConfirmStudyPage({
     getMembershipConfig(),
   ]);
   const offer = membershipOffer(user, membership, membershipConfig);
+
+  // De Career-vraag stellen we enkel aan wie ze nog niet beantwoordde; zie
+  // `lib/careerOptIn.ts` voor de drie gevallen waarin ze wegvalt.
+  const askCareer = shouldAskCareerOptIn(user);
 
   return (
     <div className="vtk-page vtk-page-shell vtk-page-narrow space-y-6">
@@ -151,6 +160,10 @@ export default async function ConfirmStudyPage({
             }}
           />
           <MembershipChoice offer={offer} labels={membershipChoiceLabels(locale, offer, year)} />
+          <CareerOptIn
+            labels={askCareer ? careerChoiceLabels(locale, user) : null}
+            photoAlt={t.careerPhotoAlt}
+          />
           <div className="flex flex-wrap items-center gap-3">
             <Button type="submit">{t.submit}</Button>
             <span className="text-xs text-[#5c667f]">{t.unchangedHint}</span>

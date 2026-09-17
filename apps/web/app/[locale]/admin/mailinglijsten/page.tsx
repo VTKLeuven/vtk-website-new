@@ -14,6 +14,7 @@ import {
   listWhere,
   type MailingListId,
 } from "@/lib/mailinglists";
+import { careerStats, formatShare } from "@/lib/careerStats";
 
 /**
  * Mailinglijst-tab: per categorie een download met de leden die ze aangevinkt
@@ -38,11 +39,12 @@ export default async function AdminMailingLists({
   const nl = locale === "nl";
   const syncOn = brevoEnabled();
 
-  const [counts, unsubscribed] = await Promise.all([
+  const [counts, unsubscribed, career] = await Promise.all([
     Promise.all(MAILING_LISTS.map((id) => prisma.user.count({ where: listWhere(id) }))),
     // Uitschrijvingen komen uit Brevo terug (lib/brevo/unsubscribe.ts). Ze zijn
     // hier zichtbaar omdat de aantallen hierboven anders onverklaard dalen.
     prisma.user.count({ where: { mailUnsubscribedAt: { not: null }, deletedAt: null } }),
+    careerStats(),
   ]);
 
   const label = (id: MailingListId) =>
@@ -119,6 +121,67 @@ export default async function AdminMailingLists({
             </li>
           ))}
         </ul>
+      </Card>
+
+      {/* Career apart, want het is de lijst waar bedrijven voor betalen en de
+          vraag staat op drie schermen. Zonder deze uitsplitsing is niet te zien
+          welk scherm de lijst vult. */}
+      <Card className="p-5">
+        <h2 className="font-medium text-vtk-ink">{t.careerStatsTitle}</h2>
+        <p className="mt-1 max-w-2xl text-sm text-[#5c667f]">{t.careerStatsIntro}</p>
+
+        <dl className="mt-4 divide-y divide-vtk-blue/10 border-y border-vtk-blue/10">
+          <div className="flex items-baseline justify-between gap-4 py-2">
+            <dt className="text-sm text-[#34405e]">{t.careerStudentAccounts}</dt>
+            <dd className="text-sm font-medium tabular-nums text-vtk-ink">
+              {career.studentAccounts}
+            </dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-4 py-2">
+            <dt className="text-sm text-[#34405e]">
+              {t.careerOurStudents}
+              <span className="block text-xs text-[#5c667f]">{t.careerOurStudentsHint}</span>
+            </dt>
+            <dd className="text-sm font-medium tabular-nums text-vtk-ink">{career.ourStudents}</dd>
+          </div>
+          <div className="flex items-baseline justify-between gap-4 py-2">
+            <dt className="text-sm text-[#34405e]">{t.careerWithCareer}</dt>
+            <dd className="text-sm font-medium tabular-nums text-vtk-ink">
+              {career.ourStudentsWithCareer}
+              <span className="ml-2 inline-flex items-center rounded-full bg-vtk-blue/10 px-2 py-0.5 text-xs font-medium text-vtk-ink">
+                {formatShare(career.ourStudentsShare, nl ? "nl" : "en")}
+              </span>
+            </dd>
+          </div>
+        </dl>
+
+        <p className="mt-4 text-xs font-medium uppercase tracking-wide text-[#5c667f]">
+          {t.careerBySource}
+        </p>
+        <dl className="mt-2 divide-y divide-vtk-blue/10 border-y border-vtk-blue/10">
+          {(
+            [
+              ["ONBOARDING", t.careerSourceOnboarding, null],
+              ["ACCOUNT", t.careerSourceAccount, null],
+              ["STUDY_CONFIRMATION", t.careerSourceConfirmation, null],
+              ["unknown", t.careerSourceUnknown, t.careerSourceUnknownHint],
+            ] as const
+          ).map(([key, label, hint]) => (
+            <div key={key} className="flex items-baseline justify-between gap-4 py-2">
+              <dt className="text-sm text-[#34405e]">
+                {label}
+                {hint ? <span className="block text-xs text-[#5c667f]">{hint}</span> : null}
+              </dt>
+              <dd className="text-sm font-medium tabular-nums text-vtk-ink">
+                {career.bySource[key]}
+              </dd>
+            </div>
+          ))}
+          <div className="flex items-baseline justify-between gap-4 py-2">
+            <dt className="text-sm font-medium text-vtk-ink">{t.careerTotalOptIns}</dt>
+            <dd className="text-sm font-medium tabular-nums text-vtk-ink">{career.totalOptIns}</dd>
+          </div>
+        </dl>
       </Card>
 
       <p className="text-xs text-[#5c667f]">

@@ -9,7 +9,18 @@ import { previewNoopAction } from "@/app/actions/flowPreview";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { StudyFieldset } from "@/components/profile/StudyFieldset";
 import { AddressConfirmation } from "@/components/profile/AddressConfirmation";
+import { MembershipChoice } from "@/components/profile/MembershipChoice";
+import { CareerOptIn } from "@/components/profile/CareerOptIn";
 import { hasCompleteAddresses } from "@/lib/profile-address";
+import { careerChoiceLabels, shouldAskCareerOptIn } from "@/lib/careerOptIn";
+import "@/app/design/vtk-career-optin.css";
+import {
+  getMembership,
+  getMembershipConfig,
+  membershipChoiceLabels,
+  membershipOffer,
+  type MembershipOffer,
+} from "@/lib/membership";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { FlowPreview } from "./FlowPreview";
 
@@ -80,6 +91,7 @@ export default async function AdminFlowPreview({
       studyYears: true,
       studyProgrammes: true,
       isStudent: true,
+      firwStudent: true,
       notAtFaculty: true,
       notStudying: true,
       academicStaffRole: true,
@@ -95,6 +107,65 @@ export default async function AdminFlowPreview({
 
   const dict = getDictionary(locale);
   const year = currentStudyYear();
+
+  // Beide schermen dragen ook de lidmaatschapsvraag, dus draagt de
+  // voorvertoning ze ook. Het echte aanbod hangt aan de eigen staat van de
+  // kijker: wie dit academiejaar al lid is, of wiens weg gesloten staat, krijgt
+  // van `membershipOffer` een `none` terug en dus geen vinkje. In een
+  // voorvertoning is dat het verkeerde antwoord, want dan lijkt de vraag niet
+  // te bestaan. We tonen daarom altijd de weg die bij deze kijker hoort (gratis
+  // voor een student van de faculteit, betalend voor de rest) en zeggen ernaast
+  // wanneer een lid ze werkelijk ziet.
+  const [membership, membershipConfig] = await Promise.all([
+    getMembership(session.user.id, year),
+    getMembershipConfig(),
+  ]);
+  const offer = membershipOffer(user, membership, membershipConfig);
+  const previewOffer: MembershipOffer = user.firwStudent
+    ? { kind: "faculty", priceCents: 0 }
+    : { kind: "external", priceCents: membershipConfig.externalPriceCents };
+  const previewLabels = membershipChoiceLabels(locale, previewOffer, year);
+  const membershipRule = nl
+    ? "Onderaan staat de lidmaatschapsvraag: gratis voor een student van de faculteit (User.firwStudent, uit de SSO), betalend voor wie dat niet is. Ze valt weg voor wie dit academiejaar al lid is en wanneer die weg gesloten staat in /admin/leden; hieronder staat ze altijd, anders lijkt ze niet te bestaan."
+    : "The membership question sits at the bottom: free for a faculty student (User.firwStudent, from SSO), paid for anyone else. It falls away for anyone who is already a member this academic year and when that route is closed in /admin/leden; below it is always shown, or it would look like it does not exist.";
+  const membershipState = (
+    <>
+      <div className="flex justify-between gap-4">
+        <dt>firwStudent</dt>
+        <dd className="text-right">{user.firwStudent ? (nl ? "ja" : "yes") : nl ? "nee" : "no"}</dd>
+      </div>
+      <div className="flex justify-between gap-4">
+        <dt>{nl ? `Lid voor ${formatWorkingYear(year)}` : `Member for ${formatWorkingYear(year)}`}</dt>
+        <dd className="text-right">{membership ? (nl ? "ja" : "yes") : nl ? "nee" : "no"}</dd>
+      </div>
+      <div className="flex justify-between gap-4">
+        <dt>{nl ? "Lidmaatschapsvraag" : "Membership question"}</dt>
+        <dd className="text-right">
+          {offer.kind === "none" ? (nl ? "nee" : "no") : nl ? "ja" : "yes"}
+        </dd>
+      </div>
+    </>
+  );
+
+  // Dezelfde redenering voor de Career-opt-in, die enkel op de bevestiging
+  // staat: wie ze ooit aanduidde krijgt ze niet meer te zien, dus zou ze uit de
+  // voorvertoning verdwijnen net wanneer je ze wil nakijken.
+  const askCareer = shouldAskCareerOptIn(user);
+  const careerLabels = careerChoiceLabels(locale, user);
+  const careerState = (
+    <>
+      <div className="flex justify-between gap-4">
+        <dt>{nl ? "Career aangeduid" : "Career opted in"}</dt>
+        <dd className="text-right">
+          {user.mailCategories.includes("CAREER") ? (nl ? "ja" : "yes") : nl ? "nee" : "no"}
+        </dd>
+      </div>
+      <div className="flex justify-between gap-4">
+        <dt>{nl ? "Career-vraag" : "Career question"}</dt>
+        <dd className="text-right">{askCareer ? (nl ? "ja" : "yes") : nl ? "nee" : "no"}</dd>
+      </div>
+    </>
+  );
 
   // De eerstvolgende 21 september: dat is het moment waarop iedereen tegelijk de
   // bevestigingsgate voor zijn neus krijgt.
@@ -166,6 +237,7 @@ export default async function AdminFlowPreview({
                   ? "Invullen stempelt onboardedAt en, enkel voor de status Student, studyConfirmedYear."
                   : "Submitting stamps onboardedAt and, only for the Student status, studyConfirmedYear."}
               </li>
+              <li>{membershipRule}</li>
             </ul>
           </>
         }
@@ -183,6 +255,7 @@ export default async function AdminFlowPreview({
                   {user.onboardedAt ? (nl ? "nee" : "no") : nl ? "ja" : "yes"}
                 </dd>
               </div>
+              {membershipState}
             </dl>
           </>
         }
@@ -194,6 +267,7 @@ export default async function AdminFlowPreview({
           action={previewNoopAction}
           savedMessage={previewSaved}
           showCalendarPreference={false}
+          membership={{ offer: previewOffer, labels: previewLabels }}
         />
       </FlowPreview>
 
@@ -230,6 +304,12 @@ export default async function AdminFlowPreview({
                   ? "Wie hier niet bevestigt, valt uit elke studiegerichte mailinglijst. Alumni, personeel en andere niet-studenten krijgen deze gate niet."
                   : "Anyone who does not confirm falls out of every study-related mailing list. Alumni, staff and other non-students do not get this gate."}
               </li>
+              <li>{membershipRule}</li>
+              <li>
+                {nl
+                  ? "Daaronder staat de Career-opt-in: één vinkje voor de mailinglijst Career, niet voor de andere categorieën. We vragen ze enkel aan wie ze nog nooit aanduidde; ook wie zich via een mail uitschreef of buiten de faculteit studeert krijgt ze niet, want hun aanduiding zou geen mail opleveren. Hieronder staat ze altijd."
+                  : "Below that sits the Career opt-in: one checkbox for the Career mailing list, not for the other categories. We only ask it of anyone who never ticked it; anyone who unsubscribed by email or studies outside the faculty does not get it either, as their tick would never produce a mail. Below it is always shown."}
+              </li>
             </ul>
           </>
         }
@@ -261,6 +341,8 @@ export default async function AdminFlowPreview({
                   {needsStudyConfirmation(user) ? (nl ? "ja" : "yes") : nl ? "nee" : "no"}
                 </dd>
               </div>
+              {membershipState}
+              {careerState}
             </dl>
           </>
         }
@@ -317,6 +399,8 @@ export default async function AdminFlowPreview({
               homeAddress: dict.confirmStudy.homeAddress,
             }}
           />
+          <MembershipChoice offer={previewOffer} labels={previewLabels} />
+          <CareerOptIn labels={careerLabels} photoAlt={dict.confirmStudy.careerPhotoAlt} />
           <span className="text-xs text-[#5c667f]">{dict.confirmStudy.unchangedHint}</span>
         </SaveForm>
       </FlowPreview>

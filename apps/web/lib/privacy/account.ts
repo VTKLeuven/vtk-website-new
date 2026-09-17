@@ -41,6 +41,10 @@ export async function exportUserData(userId: string) {
       defaultIban: true,
       emailPreference: true,
       mailCategories: true,
+      // Hoort in de inzage: het is een gegeven over dit lid (wanneer en waar het
+      // zijn toestemming voor Career gaf), niet enkel een teller voor ons.
+      careerOptInAt: true,
+      careerOptInSource: true,
       studyYears: true,
       studyProgrammes: true,
       isStudent: true,
@@ -436,6 +440,10 @@ export async function eraseUserData(userId: string) {
         defaultIban: null,
         emailPreference: "UNIVERSITY",
         mailCategories: { set: [] },
+        // De herkomst van de Career-opt-in hangt aan die opt-in; met de
+        // categorieën verdwijnt ze mee.
+        careerOptInAt: null,
+        careerOptInSource: null,
         studyYears: { set: [] },
         studyProgrammes: { set: [] },
         isStudent: false,

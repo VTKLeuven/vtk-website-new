@@ -3,6 +3,7 @@ import "server-only";
 import type { MailCategory, Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import type { BrevoContact } from "./client";
+import { careerOptInUpdate } from "@/lib/careerOptIn";
 import { normalizeEmail, readUnsubscribe, type BrevoListKey, type BrevoUnsubscribe } from "./contacts";
 
 /**
@@ -137,7 +138,12 @@ export async function pullUnsubscribes(
     if (unsub.global && user.mailUnsubscribedAt === null) data.mailUnsubscribedAt = new Date();
     if (unsub.categories.length > 0) {
       const kept = user.mailCategories.filter((c) => !unsub.categories.includes(c));
-      if (kept.length !== user.mailCategories.length) data.mailCategories = { set: kept };
+      if (kept.length !== user.mailCategories.length) {
+        data.mailCategories = { set: kept };
+        // Valt Career hier weg, dan vervalt ook de herkomst: anders blijft
+        // /admin/mailinglijsten iemand meetellen die net "stop" zei.
+        Object.assign(data, careerOptInUpdate(user.mailCategories, kept, "ACCOUNT") ?? {});
+      }
     }
     if (Object.keys(data).length === 0) continue;
 
