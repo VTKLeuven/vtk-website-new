@@ -113,10 +113,7 @@ export function TransportFilterBar({
       if (values.length > 0) stored.set(key, values.join(','));
       else stored.delete(key);
     };
-    keep(
-      'voertuig',
-      vehicles.map((vehicle) => vehicle.id)
-    );
+    keep('voertuig', vehicles.map((vehicle) => vehicle.id));
     keep('chauffeur', [NO_DRIVER, ...drivers.map((driver) => driver.id)]);
     const query = stored.toString();
     if (!query) return;
@@ -145,7 +142,9 @@ export function TransportFilterBar({
 
   function toggle<K extends keyof TransportFilters>(key: K, value: string) {
     const current = filters[key] as string[];
-    const next = current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value];
+    const next = current.includes(value)
+      ? current.filter((entry) => entry !== value)
+      : [...current, value];
     apply({ ...filters, [key]: next } as TransportFilters);
   }
 
@@ -240,8 +239,8 @@ export function TransportFilterBar({
           <span>
             Beschikbaarheid van de chauffeurs
             <span className="mt-0.5 block text-xs font-normal text-vtk-muted">
-              Als lichte band achter het rooster, in de kleur van de chauffeur. Wie niets ingaf, staat er niet: dat
-              betekent niet dat hij niet kan.
+              Als lichte band achter het rooster, in de kleur van de chauffeur. Wie niets ingaf,
+              staat er niet: dat betekent niet dat hij niet kan.
             </span>
           </span>
         </label>
@@ -264,7 +263,10 @@ export function TransportFilterBar({
         <LogisticsIcon name="request" className="h-4 w-4" />
         Filters
         {active > 0 ? <span className="tabular-nums">({active})</span> : null}
-        <LogisticsIcon name="chevron" className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
+        <LogisticsIcon
+          name="chevron"
+          className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
       </button>
 
       {open ? (
