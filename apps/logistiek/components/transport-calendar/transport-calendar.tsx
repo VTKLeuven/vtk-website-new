@@ -5,11 +5,7 @@ import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import type { DriverColorOverrides } from '@/lib/driver-colors';
 import { vehiclePatternClass } from '@/lib/driver-colors';
-import {
-  CALENDAR_VIEWS,
-  CALENDAR_VIEW_LABELS,
-  type CalendarView,
-} from '@/lib/calendar-range';
+import { CALENDAR_VIEWS, CALENDAR_VIEW_LABELS, type CalendarView } from '@/lib/calendar-range';
 import { LogisticsIcon } from '@/components/logistics-icon';
 import { EventBars, type CalendarEventBar } from './event-bars';
 import { TripFieldPicker } from './field-picker';
@@ -68,6 +64,7 @@ export function TransportCalendar({
   bands,
   draft,
   nav,
+  views = true,
   children,
 }: {
   view: CalendarView;
@@ -105,6 +102,12 @@ export function TransportCalendar({
    * scherm heeft ze nodig omdat daar geen paginakop meer staat.
    */
   nav?: { previousHref: string; nextHref: string; todayHref: string };
+  /**
+   * Staat de keuze dag/week/maand in de werkbalk? Uit op het publieke
+   * bezettingsoverzicht: die pagina kent enkel weken (`?week=`), en drie
+   * segmenten waarvan er twee nergens heen gaan, zijn erger dan geen keuze.
+   */
+  views?: boolean;
   /** Wat onder de kalender komt: de legende staat er al, dit komt erna. */
   children?: React.ReactNode;
 }) {
@@ -447,12 +450,7 @@ export function TransportCalendar({
 
   if (phoneFullscreen) {
     return (
-      <div
-        ref={shell}
-        className="transport-calendar"
-        data-fullscreen={fullscreen || undefined}
-        data-phone="true"
-      >
+      <div ref={shell} className="transport-calendar" data-fullscreen={fullscreen || undefined} data-phone="true">
         <MobileCalendar
           days={days}
           vehicles={vehicles}
@@ -482,26 +480,26 @@ export function TransportCalendar({
       <div className="transport-calendar-toolbar flex flex-wrap items-center gap-2">
         {/* Weergavekeuze. Segmenten en geen keuzelijst: het zijn er drie, en je
             wisselt er de hele tijd tussen. */}
-        <div
-          className="inline-flex overflow-hidden rounded-full border border-vtk-navy/15"
-          role="group"
-          aria-label="Weergave"
-        >
-          {CALENDAR_VIEWS.map((option) => (
-            <Link
-              key={option}
-              href={hrefFor({ weergave: option })}
-              aria-current={option === view ? 'true' : undefined}
-              className={`px-3.5 py-1.5 text-sm font-medium transition ${
-                option === view
-                  ? 'bg-vtk-navy text-white'
-                  : 'text-vtk-ink hover:bg-vtk-navy/5'
-              }`}
-            >
-              {CALENDAR_VIEW_LABELS[option]}
-            </Link>
-          ))}
-        </div>
+        {views ? (
+          <div
+            className="inline-flex overflow-hidden rounded-full border border-vtk-navy/15"
+            role="group"
+            aria-label="Weergave"
+          >
+            {CALENDAR_VIEWS.map((option) => (
+              <Link
+                key={option}
+                href={hrefFor({ weergave: option })}
+                aria-current={option === view ? 'true' : undefined}
+                className={`px-3.5 py-1.5 text-sm font-medium transition ${
+                  option === view ? 'bg-vtk-navy text-white' : 'text-vtk-ink hover:bg-vtk-navy/5'
+                }`}
+              >
+                {CALENDAR_VIEW_LABELS[option]}
+              </Link>
+            ))}
+          </div>
+        ) : null}
 
         {toolbarExtra}
 
@@ -523,7 +521,9 @@ export function TransportCalendar({
                 title="Uitzoomen (of Ctrl/⌘ + scrollen)"
                 className={iconButton}
               >
-                <span aria-hidden className="text-base leading-none">−</span>
+                <span aria-hidden className="text-base leading-none">
+                  −
+                </span>
                 <span className="sr-only">Uitzoomen</span>
               </button>
               {/* Het zoomniveau in woorden, want een knop die uitgrijst zonder
@@ -545,11 +545,20 @@ export function TransportCalendar({
                 title="Inzoomen (of Ctrl/⌘ + scrollen)"
                 className={iconButton}
               >
-                <span aria-hidden className="text-base leading-none">+</span>
+                <span aria-hidden className="text-base leading-none">
+                  +
+                </span>
                 <span className="sr-only">Inzoomen</span>
               </button>
             </>
           )}
+          {/* Op een telefoon is dit geen kijkinstelling maar de manier waarop
+              je deze kalender leest: volledig scherm geeft daar één dag over de
+              volle breedte, met vegen tussen de dagen en knijpen om de uren
+              groter te maken (zie `MobileCalendar`). Als naamloos icoontje
+              tussen twee andere icoontjes vond niemand dat, dus staat het er
+              met zijn naam. Op een laptop blijft het het icoontje rechts: daar
+              is de weekweergave zelf al leesbaar. */}
           <button
             type="button"
             onClick={toggleFullscreen}
@@ -558,15 +567,15 @@ export function TransportCalendar({
             className={
               fullscreen
                 ? 'grid h-8 w-8 place-items-center rounded-full border border-vtk-navy bg-vtk-navy text-white transition'
-                : iconButton
+                : narrow
+                  ? 'inline-flex h-8 items-center gap-1.5 rounded-full border border-vtk-navy bg-vtk-navy px-3 text-sm font-semibold text-white transition'
+                  : iconButton
             }
           >
-            <LogisticsIcon
-              name={fullscreen ? 'collapse' : 'expand'}
-              className="h-4 w-4"
-            />
+            <LogisticsIcon name={fullscreen ? 'collapse' : 'expand'} className="h-4 w-4" />
+            {narrow && !fullscreen ? <span aria-hidden>Dagweergave</span> : null}
             <span className="sr-only">
-              {fullscreen ? 'Volledig scherm sluiten' : 'Volledig scherm'}
+              {fullscreen ? 'Volledig scherm sluiten' : narrow ? 'Dagweergave op volledig scherm' : 'Volledig scherm'}
             </span>
           </button>
         </div>
@@ -684,9 +693,7 @@ export function CalendarNav({
         href={todayHref}
         aria-current={isToday ? 'true' : undefined}
         className={
-          isToday
-            ? 'rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1.5 font-semibold text-white'
-            : buttonClass
+          isToday ? 'rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1.5 font-semibold text-white' : buttonClass
         }
       >
         Vandaag

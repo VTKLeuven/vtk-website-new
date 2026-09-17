@@ -38,16 +38,44 @@ const STORAGE_KEY = 'logistiek.transportplanning.filters';
 
 export type FilterOption = { id: string; name: string };
 
+/**
+ * Welke groepen er in het paneel staan.
+ *
+ * Bestaat voor het publieke bezettingsoverzicht: daar hangt geen
+ * evenementenstrook en geen beschikbaarheidsband onder de kalender, en wie
+ * zonder login kijkt, krijgt geen chauffeursnamen te zien. Een groep verbergen
+ * is dan het enige eerlijke: een filter tonen die niets kan doen, of erger, die
+ * namen prijsgeeft die het rooster zelf niet toont, is geen filter.
+ */
+export type FilterGroups = {
+  vehicles?: boolean;
+  drivers?: boolean;
+  statuses?: boolean;
+  requesters?: boolean;
+  events?: boolean;
+  availability?: boolean;
+};
+
 export function TransportFilterBar({
   filters,
   vehicles,
   drivers,
   driverColors,
+  groups: shown,
+  storageKey = STORAGE_KEY,
 }: {
   filters: TransportFilters;
   vehicles: FilterOption[];
   drivers: FilterOption[];
   driverColors?: DriverColorOverrides;
+  /** Weglaten toont alles; zie {@link FilterGroups}. */
+  groups?: FilterGroups;
+  /**
+   * Waar de laatste keuze blijft staan. Een eigen sleutel per scherm: de
+   * planning en het publieke overzicht filteren op andere dingen, en wat je op
+   * het ene aanvinkte, hoort het andere niet leeg te maken.
+   */
+  storageKey?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -74,7 +102,7 @@ export function TransportFilterBar({
     if (window.location.search !== '') return;
     let saved: string | null = null;
     try {
-      saved = window.localStorage.getItem(STORAGE_KEY);
+      saved = window.localStorage.getItem(storageKey);
     } catch {
       return; /* privévenster */
     }
@@ -85,7 +113,10 @@ export function TransportFilterBar({
       if (values.length > 0) stored.set(key, values.join(','));
       else stored.delete(key);
     };
-    keep('voertuig', vehicles.map((vehicle) => vehicle.id));
+    keep(
+      'voertuig',
+      vehicles.map((vehicle) => vehicle.id)
+    );
     keep('chauffeur', [NO_DRIVER, ...drivers.map((driver) => driver.id)]);
     const query = stored.toString();
     if (!query) return;
@@ -104,7 +135,7 @@ export function TransportFilterBar({
     const added = filtersToQuery(next);
     for (const [key, value] of Object.entries(added)) query.set(key, value);
     try {
-      window.localStorage.setItem(STORAGE_KEY, new URLSearchParams(added).toString());
+      window.localStorage.setItem(storageKey, new URLSearchParams(added).toString());
     } catch {
       /* niet kunnen onthouden mag het filteren niet tegenhouden */
     }
@@ -114,9 +145,7 @@ export function TransportFilterBar({
 
   function toggle<K extends keyof TransportFilters>(key: K, value: string) {
     const current = filters[key] as string[];
-    const next = current.includes(value)
-      ? current.filter((entry) => entry !== value)
-      : [...current, value];
+    const next = current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value];
     apply({ ...filters, [key]: next } as TransportFilters);
   }
 
@@ -137,63 +166,86 @@ export function TransportFilterBar({
     };
   }, [open]);
 
+  const show = {
+    vehicles: shown?.vehicles ?? true,
+    drivers: shown?.drivers ?? true,
+    statuses: shown?.statuses ?? true,
+    requesters: shown?.requesters ?? true,
+    events: shown?.events ?? true,
+    availability: shown?.availability ?? true,
+  };
+
   const groups = (
     <>
-      <FilterGroup
-        label="Voertuig"
-        options={vehicles}
-        selected={filters.vehicleIds}
-        onToggle={(id) => toggle('vehicleIds', id)}
-      />
-      <FilterGroup
-        label="Chauffeur"
-        options={[{ id: NO_DRIVER, name: 'Nog geen' }, ...drivers]}
-        selected={filters.driverIds}
-        onToggle={(id) => toggle('driverIds', id)}
-        swatch={(id) => (id === NO_DRIVER ? 'var(--driver-none)' : driverColorVar(id, driverColors))}
-      />
-      <FilterGroup
-        label="Status"
-        options={TRIP_STATUSES.map((status) => ({ id: status, name: TRIP_STATUS_LABELS[status] }))}
-        selected={filters.statuses}
-        onToggle={(id) => toggle('statuses', id)}
-      />
-      <FilterGroup
-        label="Aanvrager"
-        options={REQUESTER_TYPES.map((type) => ({
-          id: type,
-          name: REQUESTER_TYPE_FILTER_LABELS[type],
-        }))}
-        selected={filters.requesterTypes}
-        onToggle={(id) => toggle('requesterTypes', id)}
-      />
-      {/* Geen groep pillen maar een vinkje: dit is aan of uit, en één pil
+      {show.vehicles ? (
+        <FilterGroup
+          label="Voertuig"
+          options={vehicles}
+          selected={filters.vehicleIds}
+          onToggle={(id) => toggle('vehicleIds', id)}
+        />
+      ) : null}
+      {show.drivers ? (
+        <FilterGroup
+          label="Chauffeur"
+          options={[{ id: NO_DRIVER, name: 'Nog geen' }, ...drivers]}
+          selected={filters.driverIds}
+          onToggle={(id) => toggle('driverIds', id)}
+          swatch={(id) => (id === NO_DRIVER ? 'var(--driver-none)' : driverColorVar(id, driverColors))}
+        />
+      ) : null}
+      {show.statuses ? (
+        <FilterGroup
+          label="Status"
+          options={TRIP_STATUSES.map((status) => ({ id: status, name: TRIP_STATUS_LABELS[status] }))}
+          selected={filters.statuses}
+          onToggle={(id) => toggle('statuses', id)}
+        />
+      ) : null}
+      {show.requesters ? (
+        <FilterGroup
+          label="Aanvrager"
+          options={REQUESTER_TYPES.map((type) => ({
+            id: type,
+            name: REQUESTER_TYPE_FILTER_LABELS[type],
+          }))}
+          selected={filters.requesterTypes}
+          onToggle={(id) => toggle('requesterTypes', id)}
+        />
+      ) : null}
+      {show.events ? (
+        <>
+          {/* Geen groep pillen maar een vinkje: dit is aan of uit, en één pil
           "Evenementen" die aanstaat betekent iets anders dan één pil in een
           groep waar er meer zijn. */}
-      <label className="flex items-center gap-2 text-sm text-vtk-ink">
-        <input
-          type="checkbox"
-          checked={filters.showEvents}
-          onChange={(event) => apply({ ...filters, showEvents: event.target.checked })}
-          className="h-4 w-4 accent-vtk-navy"
-        />
-        Evenementen boven de kalender
-      </label>
-      <label className="flex items-start gap-2 text-sm text-vtk-ink">
-        <input
-          type="checkbox"
-          checked={filters.showAvailability}
-          onChange={(event) => apply({ ...filters, showAvailability: event.target.checked })}
-          className="mt-0.5 h-4 w-4 accent-vtk-navy"
-        />
-        <span>
-          Beschikbaarheid van de chauffeurs
-          <span className="mt-0.5 block text-xs font-normal text-vtk-muted">
-            Als lichte band achter het rooster, in de kleur van de chauffeur. Wie niets ingaf,
-            staat er niet: dat betekent niet dat hij niet kan.
+          <label className="flex items-center gap-2 text-sm text-vtk-ink">
+            <input
+              type="checkbox"
+              checked={filters.showEvents}
+              onChange={(event) => apply({ ...filters, showEvents: event.target.checked })}
+              className="h-4 w-4 accent-vtk-navy"
+            />
+            Evenementen boven de kalender
+          </label>
+        </>
+      ) : null}
+      {show.availability ? (
+        <label className="flex items-start gap-2 text-sm text-vtk-ink">
+          <input
+            type="checkbox"
+            checked={filters.showAvailability}
+            onChange={(event) => apply({ ...filters, showAvailability: event.target.checked })}
+            className="mt-0.5 h-4 w-4 accent-vtk-navy"
+          />
+          <span>
+            Beschikbaarheid van de chauffeurs
+            <span className="mt-0.5 block text-xs font-normal text-vtk-muted">
+              Als lichte band achter het rooster, in de kleur van de chauffeur. Wie niets ingaf, staat er niet: dat
+              betekent niet dat hij niet kan.
+            </span>
           </span>
-        </span>
-      </label>
+        </label>
+      ) : null}
     </>
   );
 
@@ -212,10 +264,7 @@ export function TransportFilterBar({
         <LogisticsIcon name="request" className="h-4 w-4" />
         Filters
         {active > 0 ? <span className="tabular-nums">({active})</span> : null}
-        <LogisticsIcon
-          name="chevron"
-          className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`}
-        />
+        <LogisticsIcon name="chevron" className={`h-4 w-4 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open ? (

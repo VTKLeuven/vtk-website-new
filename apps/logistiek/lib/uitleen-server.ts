@@ -1114,6 +1114,25 @@ function transportFilterWhere(
   };
 }
 
+/**
+ * Welke statussen deze laag mag tonen, met de statusfilter erop toegepast.
+ *
+ * De doorsnede en niet de filter zelf: een filter mag beperken wat je ziet,
+ * nooit uitbreiden. Het publieke overzicht toont enkel wat een voertuig bezet
+ * houdt, en `?status=COMPLETED` in de adresbalk hoort daar geen afgeronde ritten
+ * te laten verschijnen die er zonder die parameter niet staan.
+ */
+function allowedStatuses(
+  allowed: UitleenTransportBookingStatus[],
+  filters: TransportFilters | undefined
+): UitleenTransportBookingStatus[] {
+  if (!filters || filters.statuses.length === 0) return allowed;
+  const wanted = allowed.filter((status) => (filters.statuses as string[]).includes(status));
+  // Filtert iemand alles weg, dan toont de kalender niets; terugvallen op
+  // "alles" zou de filter stil negeren.
+  return wanted;
+}
+
 const transportWindowWhere = (
   from: Date,
   to: Date,
@@ -1205,9 +1224,12 @@ export type TransportBooking = Awaited<ReturnType<typeof transportRange>>[number
  * tijdvenster. Een eigen projectie en geen filter over de beheerquery, want dat
  * laatste lekt vroeg of laat een veld mee.
  */
-export async function transportWeekPublic(from: Date, to: Date) {
+export async function transportWeekPublic(from: Date, to: Date, filters?: TransportFilters) {
   return prisma.uitleenTransportBooking.findMany({
-    where: transportWindowWhere(from, to),
+    where: {
+      ...transportWindowWhere(from, to, allowedStatuses(OCCUPYING_STATUSES, filters)),
+      ...transportFilterWhere(filters),
+    },
     select: {
       id: true,
       vehicleId: true,
@@ -1239,9 +1261,16 @@ export async function transportWeekPublic(from: Date, to: Date) {
  * behalve geannuleerd": een afgewezen rit gaat niet door en hoort dus niet als
  * bezetting op deze kalender.
  */
-export async function transportWeekForPraesidium(from: Date, to: Date) {
+export async function transportWeekForPraesidium(
+  from: Date,
+  to: Date,
+  filters?: TransportFilters
+) {
   return prisma.uitleenTransportBooking.findMany({
-    where: transportWindowWhere(from, to, PLANNING_STATUSES),
+    where: {
+      ...transportWindowWhere(from, to, allowedStatuses(PLANNING_STATUSES, filters)),
+      ...transportFilterWhere(filters),
+    },
     select: {
       id: true,
       vehicleId: true,
@@ -1296,9 +1325,16 @@ export async function transportWeekForPraesidium(from: Date, to: Date) {
  * **afgewezen** rit werd als blok getekend. De pagina zei dan "bezet" terwijl de
  * kar vrij was, precies het omgekeerde van waarvoor ze bestaat.
  */
-export async function transportWeekForMembers(from: Date, to: Date) {
+export async function transportWeekForMembers(
+  from: Date,
+  to: Date,
+  filters?: TransportFilters
+) {
   return prisma.uitleenTransportBooking.findMany({
-    where: transportWindowWhere(from, to, PLANNING_STATUSES),
+    where: {
+      ...transportWindowWhere(from, to, allowedStatuses(PLANNING_STATUSES, filters)),
+      ...transportFilterWhere(filters),
+    },
     select: {
       id: true,
       vehicleId: true,

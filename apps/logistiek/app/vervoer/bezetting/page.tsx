@@ -20,11 +20,13 @@ import {
 import {
   activeVehicles,
   driverColorOverrides,
+  driverOptions,
   transportRange,
   transportWeekForMembers,
   transportWeekForPraesidium,
   transportWeekPublic,
 } from '@/lib/uitleen-server';
+import { filtersToQuery, parseTransportFilters } from '@/lib/transport-filters';
 import type { BezettingTrip } from './trip-card';
 
 /**
@@ -66,9 +68,19 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 export default async function VervoerBezettingPage({
   searchParams,
 }: {
-  searchParams: Promise<{ week?: string }>;
+  searchParams: Promise<{
+    week?: string;
+    voertuig?: string;
+    chauffeur?: string;
+    status?: string;
+    aanvrager?: string;
+  }>;
 }) {
-  const [{ week }, locale, session] = await Promise.all([searchParams, getLocale(), getSession()]);
+  const [query, locale, session] = await Promise.all([searchParams, getLocale(), getSession()]);
+  const { week } = query;
+  // Dezelfde filters als de planning van het team, uit dezelfde queryparameters:
+  // een gefilterde week blijft zo een deelbare link, en de terugknop werkt.
+  const filters = parseTransportFilters(query);
   const en = locale === 'en';
   const team = session ? canManage(session) : false;
   // Het praesidium, werkgroepen en jaarwerkingen krijgen de details ook, maar niet dezelfde: zie de projecties.
@@ -82,23 +94,42 @@ export default async function VervoerBezettingPage({
 
   // Aparte projecties in plaats van één met een vlag: zo kan er geen veld uit
   // een hogere laag in een lagere belanden.
-  const [teamBookings, postBookings, memberBookings, publicBookings, vehicles, driverColors] =
-    await Promise.all([
-      team ? transportRange(monday, nextMonday) : Promise.resolve(null),
-      praesidium ? transportWeekForPraesidium(monday, nextMonday) : Promise.resolve(null),
-      session && !team && !praesidium
-        ? transportWeekForMembers(monday, nextMonday)
-        : Promise.resolve(null),
-      session ? Promise.resolve(null) : transportWeekPublic(monday, nextMonday),
-      activeVehicles(),
-      // Enkel zinvol voor wie de chauffeurs ook te zien krijgt; zonder login staat
-      // er geen naam en dus ook geen kleur per persoon.
-      session ? driverColorOverrides() : Promise.resolve({}),
-    ]);
+  const [
+    teamBookings,
+    postBookings,
+    memberBookings,
+    publicBookings,
+    vehicles,
+    driverColors,
+    drivers,
+  ] = await Promise.all([
+    team ? transportRange(monday, nextMonday, filters) : Promise.resolve(null),
+    praesidium
+      ? transportWeekForPraesidium(monday, nextMonday, filters)
+      : Promise.resolve(null),
+    session && !team && !praesidium
+      ? transportWeekForMembers(monday, nextMonday, filters)
+      : Promise.resolve(null),
+    session ? Promise.resolve(null) : transportWeekPublic(monday, nextMonday, filters),
+    activeVehicles(),
+    // Enkel zinvol voor wie de chauffeurs ook te zien krijgt; zonder login staat
+    // er geen naam en dus ook geen kleur per persoon.
+    session ? driverColorOverrides() : Promise.resolve({}),
+    // De namen om op te filteren, om diezelfde reden enkel met login: zonder
+    // login staat er geen chauffeur op het rooster, en dan hoort er ook geen
+    // lijst met namen in een filterpaneel te staan.
+    session ? driverOptions() : Promise.resolve([]),
+  ]);
 
   const thisWeek = startOfWeek(new Date());
-  const previousHref = `/vervoer/bezetting?week=${toDateInputValue(new Date(monday.getTime() - 7 * DAY_MS))}`;
-  const nextHref = `/vervoer/bezetting?week=${toDateInputValue(nextMonday)}`;
+  // De filters blijven staan wanneer je van week naar week bladert: ze horen bij
+  // waar je naar kijkt, niet bij wanneer. Zelfde regel als op /beheer/vervoer/week.
+  const filterQuery = new URLSearchParams(filtersToQuery(filters)).toString();
+  const weekHref = (monday: Date) =>
+    `/vervoer/bezetting?week=${toDateInputValue(monday)}${filterQuery ? `&${filterQuery}` : ''}`;
+  const previousHref = weekHref(new Date(monday.getTime() - 7 * DAY_MS));
+  const nextHref = weekHref(nextMonday);
+  const thisWeekHref = filterQuery ? `/vervoer/bezetting?${filterQuery}` : '/vervoer/bezetting';
 
   const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
 
@@ -218,6 +249,12 @@ export default async function VervoerBezettingPage({
         booking.driver && booking.driverId
           ? { id: booking.driverId, name: booking.driver.name }
           : null,
+      // Reizen mee zodat "Weergave" ze in het blok kan zetten. Enkel in de twee
+      // lagen die ze toch al mogen zien (het team en een post); een lid zonder
+      // groep en een bezoeker zonder login krijgen ze niet, en daar staan die
+      // twee vinkjes dan ook niet.
+      destination: booking.destination,
+      cargoNote: booking.cargoNote,
       conflict: false,
     })) ??
     postBookings?.map((booking) => ({
@@ -232,6 +269,8 @@ export default async function VervoerBezettingPage({
         booking.driver && booking.driverId
           ? { id: booking.driverId, name: booking.driver.name }
           : null,
+      destination: booking.destination,
+      cargoNote: booking.cargoNote,
       conflict: false,
     })) ??
     memberBookings?.map((booking) => ({
@@ -298,7 +337,7 @@ export default async function VervoerBezettingPage({
             ← {en ? 'Previous' : 'Vorige'}
           </Link>
           <Link
-            href="/vervoer/bezetting"
+            href={thisWeekHref}
             aria-current={monday.getTime() === thisWeek.getTime() ? 'true' : undefined}
             className={
               monday.getTime() === thisWeek.getTime()
@@ -345,6 +384,15 @@ export default async function VervoerBezettingPage({
             trips={trips}
             locale={locale}
             manage={team}
+            anchor={monday.toISOString()}
+            filters={filters}
+            filterVehicles={vehicles.map((vehicle) => ({
+              id: vehicle.id,
+              name: en ? vehicle.nameEn : vehicle.nameNl,
+            }))}
+            filterDrivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
+            canFilterRequester={team || praesidium}
+            nav={{ previousHref, nextHref, todayHref: thisWeekHref }}
           />
 
           <p className="text-xs text-vtk-muted">

@@ -1,13 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { vehiclePatternClass, type DriverColorOverrides } from '@/lib/driver-colors';
-import { LogisticsIcon } from '@/components/logistics-icon';
-import { TimeGrid } from '@/components/transport-calendar/time-grid';
-import { vehicleIcon } from '@/components/transport-calendar/trip-block';
+import { useState } from 'react';
+import { type DriverColorOverrides } from '@/lib/driver-colors';
+import { TransportCalendar } from '@/components/transport-calendar/transport-calendar';
+import { TransportFilterBar } from '@/components/transport-calendar/filters';
 import { TripInspector } from '@/components/transport-calendar/trip-inspector';
 import type { CalendarVehicle, TripBlock } from '@/components/transport-calendar/types';
+import type { TransportFilters } from '@/lib/transport-filters';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
 import { TripCard, type BezettingTrip } from './trip-card';
 
@@ -15,9 +15,16 @@ import { TripCard, type BezettingTrip } from './trip-card';
  * Het publieke bezettingsoverzicht (T8): dezelfde weekkalender als het team
  * ziet, zonder de knoppen.
  *
- * Een client-component omdat de nu-lijn het uur van de bezoeker nodig heeft. De
- * server kent dat niet, en het uit een server-render meegeven zou een lijn
- * opleveren die stilstaat op het moment van de laatste build.
+ * Draait op dezelfde shell als de planning (`TransportCalendar`) en niet meer op
+ * een kale `TimeGrid`. Dat is wat dit scherm de drie dingen geeft die het miste
+ * en die het team wel had: **volledig scherm** (op een telefoon de dagweergave
+ * met vegen en knijpen, en dat is precies het scherm waarop iemand "is de kar
+ * vrij?" opzoekt), **zoom**, en **"Weergave"** om te kiezen wat er in een blok
+ * staat. De filters komen ernaast in de werkbalk, met enkel de groepen die hier
+ * iets betekenen; zie `TransportFilterBar`.
+ *
+ * De weergavekeuze dag/week/maand staat er níét: deze pagina kent enkel weken
+ * (`?week=`), en de shell laat ze daarom weg.
  *
  * Met `trips` erbij (enkel voor Logistiek en IT, zie de pagina) worden de
  * blokken aanklikbaar en opent een rit een leeskaart naast zijn blok: post,
@@ -35,6 +42,12 @@ export function PublicWeek({
   trips,
   locale,
   manage,
+  anchor,
+  filters,
+  filterVehicles,
+  filterDrivers,
+  canFilterRequester,
+  nav,
 }: {
   days: string[];
   vehicles: CalendarVehicle[];
@@ -47,29 +60,58 @@ export function PublicWeek({
   locale: LogistiekLocale;
   /** Logistiek en IT: zij krijgen de link naar het beheer onder het kaartje. */
   manage: boolean;
+  /** De maandag van deze week, als ISO-string; de shell wil een ankerdag. */
+  anchor: string;
+  filters: TransportFilters;
+  filterVehicles: Array<{ id: string; name: string }>;
+  /**
+   * De chauffeurs om op te filteren. Leeg zonder login: dan staat er geen naam
+   * op het rooster, en een filterlijst met namen erin zou precies prijsgeven wat
+   * de kalender bewust weglaat.
+   */
+  filterDrivers: Array<{ id: string; name: string }>;
+  /** Filteren op post/werkgroep/extern; enkel voor wie de aanvrager al ziet. */
+  canFilterRequester: boolean;
+  nav: { previousHref: string; nextHref: string; todayHref: string };
 }) {
-  const [now, setNow] = useState<Date | undefined>(undefined);
   const [openId, setOpenId] = useState<string | null>(null);
   const openTrip = trips?.find((trip) => trip.id === openId) ?? null;
-  useEffect(() => {
-    setNow(new Date());
-    const timer = window.setInterval(() => setNow(new Date()), 60_000);
-    return () => window.clearInterval(timer);
-  }, []);
 
   return (
-    <div className="grid gap-3">
-      <TimeGrid
-        days={days}
-        vehicles={vehicles}
-        blocks={blocks}
-        emptyLabel={emptyLabel}
-        showDriver={showDriver}
-        driverColors={driverColors}
-        now={now}
-        onSelect={trips ? setOpenId : undefined}
-        selectedId={openId}
-      />
+    <TransportCalendar
+      view="week"
+      anchor={anchor}
+      days={days}
+      vehicles={vehicles}
+      blocks={blocks}
+      emptyLabel={emptyLabel}
+      showDriver={showDriver}
+      driverColors={driverColors}
+      onSelect={trips ? setOpenId : undefined}
+      selectedId={openId}
+      views={false}
+      nav={nav}
+      toolbarExtra={
+        <TransportFilterBar
+          filters={filters}
+          vehicles={filterVehicles}
+          drivers={filterDrivers}
+          driverColors={driverColors}
+          // Een eigen sleutel: wat je op de planning van het team aanvinkte,
+          // hoort dit scherm niet te filteren.
+          storageKey="logistiek.bezetting.filters"
+          groups={{
+            drivers: filterDrivers.length > 0,
+            requesters: canFilterRequester,
+            // Beide horen bij de planning van het team: hier hangt geen
+            // evenementenstrook boven het rooster en geen beschikbaarheidsband
+            // erachter.
+            events: false,
+            availability: false,
+          }}
+        />
+      }
+    >
       {openTrip ? (
         <TripInspector
           title={openTrip.title}
@@ -97,24 +139,6 @@ export function PublicWeek({
           <TripCard trip={openTrip} locale={locale} manage={manage} />
         </TripInspector>
       ) : null}
-      <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-vtk-muted">
-        {vehicles.map((vehicle) => (
-          <li key={vehicle.id} className="flex items-center gap-1.5">
-            {/* Enkel wanneer er een arcering ingesteld is: een leeg vierkantje
-                naast elk voertuig leest als een uitgevinkt selectievakje. */}
-            {vehiclePatternClass(vehicle.pattern) ? (
-              <span
-                aria-hidden
-                className={`h-3.5 w-3.5 shrink-0 rounded-[3px] border border-vtk-navy/20 bg-vtk-paper ${vehiclePatternClass(
-                  vehicle.pattern
-                )}`}
-              />
-            ) : null}
-            <LogisticsIcon name={vehicleIcon(vehicle.code)} className="h-3.5 w-3.5 shrink-0" />
-            {vehicle.name}
-          </li>
-        ))}
-      </ul>
-    </div>
+    </TransportCalendar>
   );
 }
