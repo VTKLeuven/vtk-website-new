@@ -693,6 +693,7 @@ model User {
   uitleenReturned         UitleenReservation[]        @relation("UitleenReturnedBy")
   uitleenLinesPrepared    UitleenReservationLine[]    @relation("UitleenLinePreparedBy")
   uitleenTemplates        UitleenRequestTemplate[]    @relation("UitleenTemplateCreatedBy")
+  ticketTemplates         TicketEventTemplate[]       @relation("TicketTemplateCreatedBy")
   uitleenEvents           UitleenEvent[]              @relation("UitleenEventCreatedBy")
   uitleenEventExtraItems  UitleenEventExtraItem[]     @relation("UitleenEventExtraItemCreatedBy")
   uitleenTransport        UitleenTransportBooking[]   @relation("UitleenTransportUser")
@@ -802,6 +803,7 @@ model Group {
   /// aanvroeg, dit is de post die ze rijdt, en dat hoeft niet dezelfde te zijn.
   uitleenTransportAssigned UitleenTransportBooking[] @relation("UitleenTransportAssignedGroup")
   uitleenTemplates         UitleenRequestTemplate[]
+  ticketTemplates          TicketEventTemplate[]
   uitleenEventsGroup       UitleenEvent[]
   mailGroupSources         MailGroupSource[]
   expenses                 Expense[]
@@ -2169,6 +2171,146 @@ model TicketOutboxMessage {
   @@index([status, availableAt])
   @@index([eventId])
   @@index([orderId])
+}
+
+// -----------------------------------------------------------------------------
+// Ticket templates (sjablonen)
+// -----------------------------------------------------------------------------
+
+/// Een sjabloon voor een ticketevent: wat een terugkerend evenement (een cantus,
+/// een galabal) telkens opnieuw nodig heeft.
+///
+/// Het sjabloon bewaart **geen datums maar offsets**, zoals `ShiftTemplateEntry`:
+/// hetzelfde sjabloon moet op elke dag en elk uur neergezet kunnen worden, en de
+/// verkoop opent "drie dagen vooraf", niet "op 19 september". De concrete datums
+/// vallen pas bij het aanmaken van het event, uit het startmoment dat je daar
+/// invult.
+///
+/// Wat hier staat is het vertrekpunt, niet de regel: elk veld is in het
+/// aanmaakscherm nog aanpasbaar.
+model TicketEventTemplate {
+  id String @id @default(cuid())
+
+  /// Natuurlijke sleutel, stabiel over een herseed heen.
+  slug  String  @unique
+  label String
+  /// Eén regel uitleg onder de keuzelijst; leeg = geen uitleg.
+  note  String?
+
+  /// Post waarvoor dit sjabloon typisch dient. Enkel toelichting in de lijst:
+  /// het filtert niet, want een cantussjabloon van Activiteiten past even goed
+  /// voor een andere post, en verbergen maakt het onvindbaar voor wie het nodig
+  /// heeft.
+  ownerGroupId String?
+
+  titleNl           String  @default("")
+  titleEn           String  @default("")
+  descriptionNl     String  @default("")
+  descriptionEn     String  @default("")
+  location          String  @default("")
+  locationAddress   String?
+  locationLatitude  Float?
+  locationLongitude Float?
+
+  /// Suggestie voor het startuur, "HH:mm". Leeg = 20:00.
+  timeOfDay       String?
+  /// Duur van het event; de eindtijd is de start plus deze duur.
+  durationMinutes Int     @default(300)
+
+  /// Verkoopvenster in minuten vóór de start van het event. NULL = geen venster.
+  /// Een cantus: opent 4320 (drie dagen) vooraf, sluit 0 (bij de start).
+  salesOpensMinutesBefore  Int?
+  salesClosesMinutesBefore Int?
+
+  maxTicketsPerOrder    Int     @default(8)
+  contactEmail          String?
+  cardCheckIn           Boolean @default(false)
+  openScanning          Boolean @default(true)
+  presaleLeadMinutes    Int?
+  presalePraesidium     Boolean @default(true)
+  confirmationMessageNl String  @default("")
+  confirmationMessageEn String  @default("")
+
+  /// Capaciteit van de voorraadpot `GENERAL`.
+  capacity Int   @default(100)
+  /// Ticketontwerp, dezelfde vorm als `TicketEvent.settings.ticketDesign.draft`.
+  design   Json?
+
+  /// Meegeleverd met de seed. Bewerken mag, verwijderen niet.
+  builtIn Boolean @default(false)
+  /// Volgorde in de keuzelijst.
+  order   Int     @default(0)
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  group     Group?                        @relation(fields: [ownerGroupId], references: [id], onDelete: SetNull)
+  createdBy User?                         @relation("TicketTemplateCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  types     TicketEventTemplateType[]
+  questions TicketEventTemplateQuestion[]
+
+  @@index([order])
+}
+
+/// Eén tickettype binnen een sjabloon. Prijzen staan hier wél absoluut: een
+/// cantusticket kost elk jaar hetzelfde tot iemand het aanpast, en een prijs
+/// "relatief" maken zegt niets.
+model TicketEventTemplateType {
+  id         String @id @default(cuid())
+  templateId String
+  order      Int
+
+  code          String
+  nameNl        String
+  nameEn        String @default("")
+  descriptionNl String @default("")
+  descriptionEn String @default("")
+
+  unitPriceCents Int
+  audience       TicketAudience @default(PUBLIC)
+  /// Sleutel uit `lib/ticketing/ticketColors.ts`, geen vrije hex.
+  color          String         @default("navy")
+  minPerOrder    Int            @default(1)
+  maxPerOrder    Int            @default(8)
+
+  /// Eigen verkoopvenster in minuten vóór de start; NULL = volgt het event.
+  salesOpensMinutesBefore  Int?
+  salesClosesMinutesBefore Int?
+
+  /// `false` = staat in het aanmaakscherm uitgevinkt; iemand moet het bewust
+  /// aanzetten (bv. een alumniticket dat je enkel bij een grote editie verkoopt).
+  enabled Boolean @default(true)
+
+  template TicketEventTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, code])
+  @@index([templateId, order])
+}
+
+/// Eén deelnemersvraag binnen een sjabloon.
+model TicketEventTemplateQuestion {
+  id         String @id @default(cuid())
+  templateId String
+  order      Int
+
+  code          String
+  labelNl       String
+  labelEn       String             @default("")
+  descriptionNl String             @default("")
+  descriptionEn String             @default("")
+  type          TicketQuestionType
+  required      Boolean            @default(false)
+  options       Json?
+
+  /// Vraag enkel bij één tickettype, op code en niet op id: het tickettype van
+  /// het event bestaat nog niet wanneer het sjabloon geschreven wordt.
+  ticketTypeCode String?
+
+  template TicketEventTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, code])
+  @@index([templateId, order])
 }
 
 // -----------------------------------------------------------------------------

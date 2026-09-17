@@ -7067,6 +7067,60 @@ haalt dus enkel het sjabloon weg. Dat staat met zoveel woorden in de
 bevestigingsdialoog, want de omgekeerde vrees ("verlies ik de inschrijvingen van
 vorige maand?") is precies de reden waarom iemand van een opkuis afziet.
 
+## Ticketsjablonen: een cantus is elke keer dezelfde verkoop op een andere dag
+
+Drie cantussen die binnen twee dagen na elkaar aangemaakt werden, verschilden op
+de productieserver bijna alleen in titel en datum: dezelfde vier tickets (bier en
+water, lid en niet-lid), dezelfde prijzen, dezelfde capaciteit, één ticket per
+bestelling, verkoop die enkele dagen vooraf om 18:00 opent en sluit bij de start.
+Dat werd elke keer opnieuw ingetikt, tickettype per tickettype, want het
+aanmaakscherm maakte precies één `STANDARD`-ticket. Nu staat dat als
+**ticketsjabloon** in de databank, met hetzelfde stramien als de shiftsjablonen.
+
+**Een sjabloon bewaart duurtijden, geen datums.** "Verkoop opent drie dagen
+vooraf" past op elke editie; "opent op 19 september" is één keer waar. Vandaar
+`salesOpensMinutesBefore` / `salesClosesMinutesBefore` en `durationMinutes`,
+t.o.v. de start die je bij het aanmaken invult, precies zoals
+`ShiftTemplateEntry.startOffsetMinutes`. De prijs is dat "4320" niets zegt, dus
+schrijft elk scherm de offset voluit ("3 dagen vooraf"). Het startuur is
+eveneens een voorstel: de dag kies je per editie.
+
+**Het sjabloon vult het gewone aanmaakformulier in; het vervangt het niet.** De
+datum verandert per definitie, en de prijs van een cantusticket verandert vaker
+dan iemand denkt. De tickets staan er dus als bewerkbare rijen, niet als een
+lijstje "dit wordt aangemaakt", en wat er bij het opslaan staat, is wat er
+verkocht wordt. Van sjabloon of dag wisselen bouwt het formulier volledig
+opnieuw op: half overschrijven levert een scherm op waar de titel van het ene
+sjabloon boven de prijzen van het andere staat. Zit er al werk in, dan gaat er
+eerst een bevestiging over.
+
+**Wat het scherm niet vraagt, komt toch mee: de deelnemersvragen, het
+bevestigingsbericht, de voorverkoop en het ticketontwerp.** Die vier stonden bij
+het aanmaken niet eens in beeld en werden dus in de praktijk nooit ingevuld. De
+status komt bewust *niet* mee: een nieuw event blijft DRAFT, want publiceren is
+de ene handeling waar je niet per ongeluk in wil rollen.
+
+**Het ontwerp reist zonder afbeeldingen.** Artwork en logo's staan per event in
+object storage onder `ticket-design/<eventId>/` en worden bij het uitlezen tegen
+dat ene event gecontroleerd. Een gekopieerde key hoort dus bij een ander event,
+en de controle laat het ontwerp dan stil terugvallen op de standaard: het
+sjabloon draagt enkel de sjabloonkeuze, de kleuren en de footer.
+
+**Het eerste sjabloon bestaat al: het is de cantus van vorige week.** Daarom kan
+een bestaand event met één knop een sjabloon worden ("Bewaar als sjabloon" op de
+instellingen), waarbij de datums teruggerekend worden naar duurtijden. Een leeg
+beheerscherm laten volschrijven is precies het werk dat deze functie moest
+wegnemen.
+
+**Beheren is een eigen recht (`tickets.templates`), toepassen niet.** Zelfde
+redenering als bij de shiftsjablonen: `tickets.create` gaat over één event, het
+sjabloon over het vertrekpunt van alles wat daarna aangemaakt wordt. Een
+meegeleverd sjabloon is bewerkbaar maar niet verwijderbaar, zodat er na een
+enthousiaste opkuis altijd één werkend vertrekpunt staat. En wat je aan een
+sjabloon wijzigt, raakt geen enkel bestaand ticketevent: die staan los, met hun
+bestellingen. Dat staat met zoveel woorden in de verwijderdialoog, want de
+omgekeerde vrees is precies waarom iemand van een opkuis afziet.
+
 ## De e-mailhandtekening is een recht, geen ledenfunctie
 
 De handtekeninggenerator op `/account` bouwt een mailhandtekening met het

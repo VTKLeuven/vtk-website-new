@@ -11,7 +11,9 @@ import {
   hasLiveTicketManageAll,
 } from "@/lib/ticketing/authorization";
 import { slugify } from "@/lib/ticketing/slug";
-import { TicketEventForm } from "@/components/ticketing/admin/TicketEventForm";
+import { TicketEventCreate } from "@/components/ticketing/admin/TicketEventCreate";
+import { listTicketEventTemplates } from "@/lib/ticketing/templateStore";
+import { utcToLocalDateTime } from "@/lib/ticketing/time";
 import { ticketBase, type AdminLocale } from "@/components/ticketing/admin/format";
 
 export default async function NewTicketEventPage({
@@ -19,7 +21,7 @@ export default async function NewTicketEventPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ calendarEvent?: string }>;
+  searchParams: Promise<{ calendarEvent?: string; sjabloon?: string }>;
 }) {
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
@@ -57,11 +59,14 @@ export default async function NewTicketEventPage({
     : [];
   // Kwam je hier via "Tickets verkopen voor dit evenement", dan is het
   // kalenderevent al gekozen en erft dit ticketevent er zijn gegevens van.
-  const requestedCalendarEventId = (await searchParams).calendarEvent;
+  const query = await searchParams;
+  const requestedCalendarEventId = query.calendarEvent;
   const linkedCalendarEvent = requestedCalendarEventId
     ? (calendarEvents.find((e) => e.id === requestedCalendarEventId) ?? null)
     : null;
   const base = ticketBase(locale);
+  const templates = await listTicketEventTemplates();
+  const canManageTemplates = hasPermission(session, "tickets.templates");
 
   return (
     <div className="ticket-admin-page">
@@ -74,8 +79,8 @@ export default async function NewTicketEventPage({
           <h1>{locale === "nl" ? "Nieuw ticketevent" : "New ticket event"}</h1>
           <p>
             {locale === "nl"
-              ? "Maak de verkoopomgeving aan. Tickettypes voeg je daarna toe."
-              : "Create the sales environment. Ticket types are added afterwards."}
+              ? "Maak de verkoopomgeving aan. Kies een sjabloon voor een evenement dat terugkomt, of begin met een leeg formulier."
+              : "Create the sales environment. Pick a template for a recurring event, or start from an empty form."}
           </p>
         </div>
       </div>
@@ -89,15 +94,23 @@ export default async function NewTicketEventPage({
           </span>
         </div>
       ) : (
-        <TicketEventForm
+        <TicketEventCreate
+          templates={templates}
+          initialTemplateSlug={
+            query.sjabloon && templates.some((template) => template.slug === query.sjabloon)
+              ? query.sjabloon
+              : null
+          }
+          today={utcToLocalDateTime(new Date()).slice(0, 10)}
           groups={groups}
           calendarEvents={calendarEvents}
           linkedCalendarEvent={linkedCalendarEvent}
-          event={
+          baseEvent={
             linkedCalendarEvent
               ? { ownerGroupId: linkedCalendarEvent.groupId, slug: slugify(linkedCalendarEvent.titleNl) }
               : undefined
           }
+          canManageTemplates={canManageTemplates}
           locale={locale}
         />
       )}

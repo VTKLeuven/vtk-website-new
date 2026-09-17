@@ -28,6 +28,12 @@ import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { TICKET_TERMS_SETTING_KEY } from "@/lib/ticketing/terms";
 import { ticketAudienceFrom, type TicketAudience } from "@/lib/ticketing/audience";
+import { getTicketEventTemplate } from "@/lib/ticketing/templateStore";
+import {
+  applyTicketTemplateType,
+  parseTemplateTypes,
+  type TicketTemplateType,
+} from "@/lib/ticketing/templates";
 
 const localeSchema = z.enum(["nl", "en"]);
 
@@ -55,6 +61,7 @@ export type TicketEventFormActionState = {
 };
 
 const EXPECTED_EVENT_FORM_ERRORS = new Set([
+  "NO_TICKET_TYPES",
   "GROUP_REQUIRED",
   "FORBIDDEN",
   "INVALID_CALENDAR_EVENT",
@@ -360,6 +367,24 @@ export async function submitTicketEventFormAction(
   }
 }
 
+/**
+ * Het ticketontwerp uit een sjabloon als `settings` voor een nieuw event.
+ *
+ * Een sjabloon draagt enkel de sjabloonkeuze, de kleuren en de footer; artwork
+ * en logo's staan per event in object storage en reizen bewust niet mee. De
+ * eventId is daarom leeg: er zijn geen assetkeys om tegen te controleren. Is de
+ * bewaarde vorm om een of andere reden stuk, dan start het event gewoon met het
+ * standaardontwerp in plaats van het aanmaken te laten falen.
+ */
+function templateDesignSettings(design: unknown): Prisma.InputJsonValue | undefined {
+  if (!design) return undefined;
+  try {
+    return ticketDesignSettingsWith({}, { draft: parseTicketDesignDraft(design, "") }) as Prisma.InputJsonValue;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function createTicketEventAction(formData: FormData): Promise<void> {
   const session = await requireSession();
   const locale = localeSchema.parse(value(formData, "locale") || "nl");
@@ -399,6 +424,30 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
   const slug = slugExists ? `${requestedSlug}-${randomBytes(3).toString("hex")}` : requestedSlug;
   const createdLocationGeo = await resolveLocationGeo(formData, { locationAddress: null, locationLatitude: null, locationLongitude: null });
 
+  // Het sjabloon waaruit dit event ontstaat. De tickettypes komen uit het
+  // formulier, niet rechtstreeks uit het sjabloon: in het aanmaakscherm zijn ze
+  // nog aanpasbaar, en wat daar staat is wat er verkocht wordt. Het sjabloon
+  // levert wat het scherm niet vraagt: de vragen, het ticketontwerp, het
+  // bevestigingsbericht en de voorverkoop.
+  const templateSlug = optionalValue(formData, "templateSlug");
+  const template = templateSlug ? await getTicketEventTemplate(templateSlug) : null;
+  let templateTypes: TicketTemplateType[] = [];
+  const rawTemplateTypes = optionalValue(formData, "templateTypesData");
+  if (rawTemplateTypes) {
+    let payload: unknown;
+    try {
+      payload = JSON.parse(rawTemplateTypes);
+    } catch {
+      throw new Error("INVALID_TICKET_TYPES");
+    }
+    const parsed = parseTemplateTypes(payload);
+    if (typeof parsed === "string") throw new Error("INVALID_TICKET_TYPES");
+    templateTypes = parsed.filter((type) => type.enabled);
+    if (templateTypes.length === 0) throw new Error("NO_TICKET_TYPES");
+  }
+  const templateQuestions = template?.questions ?? [];
+  const templateSettings = templateDesignSettings(template?.design);
+
   const event = await prisma.$transaction(async (tx) => {
     const created = await tx.ticketEvent.create({
       data: {
@@ -418,6 +467,15 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         maxTicketsPerOrder: boundedIntegerValue(formData, "maxTicketsPerOrder", 8, 1, 50),
         cardCheckIn: checkboxValue(formData, "cardCheckIn"),
         contactEmail: emailValue(formData, "contactEmail"),
+        // Uit het sjabloon, niet uit het formulier: het aanmaakscherm vraagt ze
+        // niet, en ze na het aanmaken opnieuw moeten intikken is precies wat een
+        // sjabloon moest wegnemen. Wat het scherm wél vraagt, wint.
+        confirmationMessageNl: template?.confirmationMessageNl || undefined,
+        confirmationMessageEn: template?.confirmationMessageEn || undefined,
+        presaleLeadMinutes: template?.presaleLeadMinutes ?? undefined,
+        presalePraesidium: template?.presalePraesidium ?? undefined,
+        openScanning: template?.openScanning ?? undefined,
+        ...(templateSettings ? { settings: templateSettings } : {}),
         createdById: session.user.id,
       },
     });
@@ -433,16 +491,74 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
     // Het eerste tickettype hoort bij het aanmaken, niet bij een tweede ronde in
     // de instellingen: een event met een voorraadpot maar zonder tickettype is
     // niet publiceerbaar en verkoopt niets, dus dat is geen zinvolle tussenstand.
-    await tx.ticketType.create({
-      data: {
-        eventId: created.id,
-        inventoryPoolId: pool.id,
-        code: "STANDARD",
-        nameNl: firstTicketName,
-        unitPriceCents: firstTicketPriceCents,
-        maxPerOrder: boundedIntegerValue(formData, "maxTicketsPerOrder", 8, 1, 50),
-      },
-    });
+    //
+    // Komt het event uit een sjabloon, dan zijn dat de (in het scherm nog
+    // aangepaste) tickets van dat sjabloon; anders het ene ticket uit het
+    // formulier.
+    if (templateTypes.length > 0) {
+      for (let index = 0; index < templateTypes.length; index += 1) {
+        const type = templateTypes[index];
+        const window = applyTicketTemplateType(type, startsAt);
+        await tx.ticketType.create({
+          data: {
+            eventId: created.id,
+            inventoryPoolId: pool.id,
+            code: type.code,
+            nameNl: type.nameNl,
+            nameEn: type.nameEn || null,
+            descriptionNl: type.descriptionNl || null,
+            descriptionEn: type.descriptionEn || null,
+            unitPriceCents: type.unitPriceCents,
+            audience: type.audience,
+            color: type.color,
+            minPerOrder: type.minPerOrder,
+            maxPerOrder: type.maxPerOrder,
+            salesStartAt: window.salesStartAt,
+            salesEndAt: window.salesEndAt,
+            sortOrder: index,
+          },
+        });
+      }
+    } else {
+      await tx.ticketType.create({
+        data: {
+          eventId: created.id,
+          inventoryPoolId: pool.id,
+          code: "STANDARD",
+          nameNl: firstTicketName,
+          unitPriceCents: firstTicketPriceCents,
+          maxPerOrder: boundedIntegerValue(formData, "maxTicketsPerOrder", 8, 1, 50),
+        },
+      });
+    }
+
+    // De deelnemersvragen van het sjabloon. Ze worden bij het aanmaken niet
+    // getoond: wie ze wil bijstellen doet dat in de instellingen, waar de
+    // vragenbeheerder al staat.
+    for (let index = 0; index < templateQuestions.length; index += 1) {
+      const question = templateQuestions[index];
+      const linkedType = question.ticketTypeCode
+        ? await tx.ticketType.findFirst({
+            where: { eventId: created.id, code: question.ticketTypeCode },
+            select: { id: true },
+          })
+        : null;
+      await tx.ticketQuestion.create({
+        data: {
+          eventId: created.id,
+          ticketTypeId: linkedType?.id ?? null,
+          code: question.code,
+          labelNl: question.labelNl,
+          labelEn: question.labelEn || null,
+          descriptionNl: question.descriptionNl || null,
+          descriptionEn: question.descriptionEn || null,
+          type: question.type,
+          required: question.required,
+          options: question.options.length > 0 ? question.options : undefined,
+          sortOrder: index,
+        },
+      });
+    }
     await tx.ticketEventUserGrant.create({
       data: {
         eventId: created.id,
@@ -480,11 +596,22 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
     entity: "ticketEvent",
     entityId: event.id,
     target: titleNl,
-    summary: `capaciteit ${capacity}, eerste tickettype "${firstTicketName}"`,
+    summary: template
+      ? `sjabloon "${template.label}", capaciteit ${capacity}, ${templateTypes.length} tickettype(s)`
+      : `capaciteit ${capacity}, eerste tickettype "${firstTicketName}"`,
   });
 
   refreshTicketEvent(locale, event.id);
-  redirect(localePath(locale, `/admin/tickets/${event.id}/instellingen#tickettype-aanmaken`));
+  // Kwam het event uit een sjabloon, dan staan de tickets er al en hoeft het
+  // scherm niet op "tickettype toevoegen" open te springen.
+  redirect(
+    localePath(
+      locale,
+      templateTypes.length > 0
+        ? `/admin/tickets/${event.id}/instellingen`
+        : `/admin/tickets/${event.id}/instellingen#tickettype-aanmaken`
+    )
+  );
 }
 
 export async function updateTicketEventAction(formData: FormData): Promise<void> {

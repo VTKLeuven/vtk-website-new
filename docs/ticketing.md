@@ -205,7 +205,8 @@ without the key and says which one accepts it.
 
 ### Routes: admin (`apps/web/app/[locale]/admin/tickets/...`)
 - `page.tsx`: event list / management
-- `new/page.tsx`: create event
+- `new/page.tsx`: create event (kies hier een sjabloon)
+- `sjablonen/page.tsx`: beheer van de ticketsjablonen (`tickets.templates`)
 - `[eventId]/{instellingen,toegang,deelnemers,bestellingen}`: settings (ticket
   types), access/grants, attendees, orders
 
@@ -484,6 +485,51 @@ webscanner blijft staan als webweg en als vangnet.
 ### Styling
 - `apps/web/app/design/vtk-tickets.css`
 
+## Sjablonen
+
+Een cantus is elke keer dezelfde verkoopomgeving op een andere dag: vier tickets
+(bier en water, lid en niet-lid), één per bestelling, verkoop die enkele dagen
+vooraf opent. Dat stond vroeger nergens, dus werd het per event opnieuw
+ingetikt. Nu staat het in een **ticketsjabloon**.
+
+**Een sjabloon bewaart offsets, geen datums.** `TicketEventTemplate` heeft
+`timeOfDay`, `durationMinutes`, `salesOpensMinutesBefore` en
+`salesClosesMinutesBefore`; hetzelfde sjabloon moet op elke dag neergezet kunnen
+worden, en de verkoop opent "drie dagen vooraf", niet "op 19 september". Zelfde
+keuze als `ShiftTemplateEntry.startOffsetMinutes`. `applyTicketTemplate()` zet
+die offsets om zodra er een dag gekozen is.
+
+- Datamodel: `TicketEventTemplate` + `TicketEventTemplateType` +
+  `TicketEventTemplateQuestion` (`packages/db/prisma/schema.prisma`). Het
+  meegeleverde cantussjabloon staat in
+  `packages/db/src/ticketEventTemplates.ts` en wordt create-only geseed op zijn
+  `slug`; `builtIn` maakt het bewerkbaar maar niet verwijderbaar.
+- Pure laag: `lib/ticketing/templates.ts` (types, offsets, `parseTemplateTypes`,
+  `parseTemplateQuestions`) — client én server. Lezen:
+  `lib/ticketing/templateStore.ts` (server-only, met terugval op de meegeleverde
+  sjablonen zolang de tabel leeg is).
+- Toepassen: `components/ticketing/admin/TicketEventCreate.tsx` op
+  /admin/tickets/new. Je kiest een sjabloon en een **dag**; het formulier
+  eronder wordt daarmee voorgevuld en blijft volledig aanpasbaar. De tickets
+  staan er als bewerkbare rijen (`TicketTemplateTypeRows`) en reizen als JSON in
+  één verborgen veld naar `createTicketEventAction`, zoals de shiftsjablonen.
+  Wisselen van sjabloon of dag herbouwt het formulier (remount op `key`), met
+  een bevestiging zodra er al iets ingevuld is.
+- Wat het scherm níét vraagt, komt rechtstreeks uit het sjabloon: de
+  deelnemersvragen, het bevestigingsbericht, de voorverkoop en het
+  ticketontwerp. `status` blijft DRAFT: publiceren blijft een bewuste tweede
+  handeling.
+- **Het ontwerp reist zonder afbeeldingen.** Artwork en logo's staan per event
+  onder `ticket-design/<eventId>/` en worden bij het uitlezen tegen dat ene
+  event gecontroleerd (`design.ts:assertEventAssetKeys`), dus een gekopieerde
+  key hoort bij een ander event en zou het ontwerp stil laten terugvallen.
+  `templateDesign()` houdt enkel de sjabloonkeuze, de kleuren en de footer over.
+- Beheren: /admin/tickets/sjablonen (`tickets.templates`), plus "Bewaar als
+  sjabloon" op de instellingen van een bestaand event
+  (`saveTicketTemplateFromEventAction`): dat neemt de tickettypes, capaciteit,
+  vragen, teksten en instellingen over en rekent de datums terug naar offsets.
+- Tests: `apps/web/test/ticketTemplates.test.ts`, puur op `lib/ticketing/templates.ts`.
+
 ## Permissions
 
 - Groups + per-group `MembershipRole` (`MEMBER` | `LEAD`) in
@@ -491,6 +537,8 @@ webscanner blijft staan als webweg en als vangnet.
   `packages/db/src/permissions.ts`.
 - `tickets.create`: create ticket events for own group (granted to `IT` and
   `GROEP5` by the seed). `tickets.manageAll`: global ticket admin (explicit).
+- `tickets.templates`: de sjablonen bewerken. Een sjabloon *kiezen* hoort bij
+  `tickets.create`; het *schrijven* stuurt elk event dat iemand daarna aanmaakt.
 - Per-event capabilities via grants: `OWNER`/`MANAGER` grants include `SCAN`.
   Superadmins bypass all checks.
 - `SCANNER` draagt **enkel `SCAN`**, bewust zonder `VIEW_EVENT`: die capability

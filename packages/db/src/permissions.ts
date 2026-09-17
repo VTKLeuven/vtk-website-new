@@ -23,6 +23,7 @@ export const PERMISSIONS = [
   // Tickets
   { code: "tickets.create", labelNl: "Ticketevents aanmaken voor eigen groep", labelEn: "Create ticket events for own group", category: "tickets" },
   { code: "tickets.manageAll", labelNl: "Alle ticketevents beheren", labelEn: "Manage all ticket events", category: "tickets" },
+  { code: "tickets.templates", labelNl: "Ticketsjablonen beheren", labelEn: "Manage ticket templates", category: "tickets" },
 
   // Formulieren
   { code: "forms.create", labelNl: "Formulieren aanmaken voor eigen groep", labelEn: "Create forms for own group", category: "forms" },

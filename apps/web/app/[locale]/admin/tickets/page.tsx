@@ -7,6 +7,7 @@ import {
   ArrowRight,
   FileText,
   Filter,
+  LayoutTemplate,
   Plus,
   Search,
   Tickets,
@@ -85,6 +86,7 @@ export default async function TicketAdminOverview({
   const canCreate =
     canManageAll ||
     memberships.some((membership) => membership.role === "LEAD" && membership.grantsTicketCreation);
+  const canManageTemplates = hasPermission(session, "tickets.templates");
 
   const events = await prisma.ticketEvent.findMany({
     where: canManageAll
@@ -154,6 +156,12 @@ export default async function TicketAdminOverview({
           </p>
         </div>
         <div className="ticket-admin-actions">
+          {canManageTemplates ? (
+            <Link className="ticket-admin-button" href={`${base}/admin/tickets/sjablonen`}>
+              <LayoutTemplate aria-hidden="true" size={16} />
+              {locale === "nl" ? "Sjablonen" : "Templates"}
+            </Link>
+          ) : null}
           {canManageAll ? (
             <Link className="ticket-admin-button" href={`${base}/admin/tickets/voorwaarden`}>
               <FileText aria-hidden="true" size={16} />

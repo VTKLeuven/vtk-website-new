@@ -252,7 +252,7 @@ every member of the post gets the role):
 | Role | Permissions | Granted to (post -> DEFAULT) |
 | --- | --- | --- |
 | `admin` (system) | all | IT, Groep 5 |
-| `praesidium` | `calendar.create`, `photos.upload`, `tickets.create`, `forms.create`, `users.search`, `shift.rewardRedeem`, `expenses.submit`, `signature.generate`, `shift.templates` | every post |
+| `praesidium` | `calendar.create`, `photos.upload`, `tickets.create`, `forms.create`, `users.search`, `shift.rewardRedeem`, `expenses.submit`, `signature.generate`, `shift.templates`, `tickets.templates` | every post |
 | `werkgroep` | none (fill in the GUI) | - |
 | `medewerker` | none (fill in the GUI) | - |
 | `theokot` | `theokot.manage`, `theokot.pickup` | Theokot |
@@ -292,6 +292,22 @@ available roles but not auto-assigned to any post. Your seeded admin account is 
   timeout.
 - Do **not** switch dev off `next dev --webpack`, and do **not** re-export Prisma client types from
   `@vtk/db` (import model types from `@prisma/client` at the call site). See `AGENTS.md`.
+
+## Ticketsjablonen
+
+**De sjablonen bewerken is een eigen recht: `tickets.templates`**
+(/admin/tickets/sjablonen). Los van `tickets.create` om dezelfde reden als bij de
+shiften: `tickets.create` gaat over één event, `tickets.templates` over het
+vertrekpunt van elk event dat iemand daarna aanmaakt (prijzen, doelgroepen,
+verkoopvenster). Een sjabloon **kiezen** bij het aanmaken kan iedereen met
+`tickets.create`; een bestaand event bewaren als sjabloon vraagt
+`tickets.templates` én `MANAGE_EVENT` op dat event.
+
+Het recht zit in de geseede rol `praesidium`, met dezelfde afweging als
+`shift.templates` hieronder: ruim gezet, per rol af te nemen. Meegeleverde
+sjablonen (`TicketEventTemplate.builtIn`) zijn bewerkbaar maar niet
+verwijderbaar. **Let op:** een deploy draait de seed niet, dus op een bestaande
+databank zet je dit vinkje één keer zelf.
 
 ## Shiften en shiftsjablonen
 

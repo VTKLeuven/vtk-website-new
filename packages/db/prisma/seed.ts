@@ -4,6 +4,7 @@ import { GROUP_SEEDS, WERKGROEP_SEEDS, HEADER_TABS } from "../src/groups";
 import { SHIFTEN_PAGE, UITLEENDIENST_PAGE } from "../src/infoPages";
 import { PERMISSIONS } from "../src/permissions";
 import { BUILTIN_SHIFT_TEMPLATES } from "../src/shiftTemplates";
+import { BUILTIN_TICKET_EVENT_TEMPLATES } from "../src/ticketEventTemplates";
 import { loadFixtures } from "../src/fixtures";
 import { eventSlugBase } from "../src/slug";
 
@@ -243,8 +244,8 @@ async function main() {
     "Praesidium",
     "Praesidium",
     1,
-    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) en formulieren voor de eigen groep aanmaken, foto's uploaden, gebruikers opzoeken, je e-mailhandtekening genereren, bonnetjes aanvaarden aan de toog en shiftsjablonen beheren.",
-    "Base role for every praesidium member: create events (incl. ticket events) and forms for the own group, upload photos, search users, generate your email signature, accept vouchers at the bar and manage shift templates.",
+    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) en formulieren voor de eigen groep aanmaken, foto's uploaden, gebruikers opzoeken, je e-mailhandtekening genereren, bonnetjes aanvaarden aan de toog en shift- en ticketsjablonen beheren.",
+    "Base role for every praesidium member: create events (incl. ticket events) and forms for the own group, upload photos, search users, generate your email signature, accept vouchers at the bar and manage shift and ticket templates.",
   );
   await setRolePermissions(praesidiumRole.id, [
     "calendar.create",
@@ -271,6 +272,12 @@ async function main() {
     // een breed recht (je wijzigt de reeks die iederéén daarna neerzet), dus het
     // is een vertrekpunt en geen wet: afnemen doe je per rol in /admin/roles.
     "shift.templates",
+    // De ticketsjablonen beheren. Zelfde redenering als de shiftsjablonen: de
+    // post die de cantus organiseert stelt zijn eigen reeks tickets samen, en
+    // daarvoor bij IT moeten aankloppen is precies waarom alles nu per event
+    // opnieuw ingetikt wordt. Breed recht (je wijzigt wat iedereen daarna
+    // aanmaakt), dus een vertrekpunt: afnemen doe je per rol in /admin/roles.
+    "tickets.templates",
   ]);
   for (const g of GROUP_SEEDS) {
     await grantRoleToGroup(g.code, praesidiumRole.id, "DEFAULT");
@@ -2013,6 +2020,80 @@ async function main() {
             post: entry.post ?? null,
             openToInternationals: entry.openToInternationals ?? false,
             enabled: entry.enabled ?? true,
+          })),
+        },
+      },
+    });
+  }
+
+  console.log("Seeding ticket templates...");
+  for (let i = 0; i < BUILTIN_TICKET_EVENT_TEMPLATES.length; i += 1) {
+    const template = BUILTIN_TICKET_EVENT_TEMPLATES[i];
+    const existing = await prisma.ticketEventTemplate.findUnique({ where: { slug: template.slug } });
+    if (existing) continue;
+
+    // De post is enkel een label in de lijst; staat ze er niet, dan blijft het
+    // sjabloon gewoon zonder post staan in plaats van de seed te laten vallen.
+    const group = template.groupCode
+      ? await prisma.group.findUnique({ where: { code: template.groupCode }, select: { id: true } })
+      : null;
+
+    await prisma.ticketEventTemplate.create({
+      data: {
+        slug: template.slug,
+        label: template.label,
+        note: template.note ?? null,
+        ownerGroupId: group?.id ?? null,
+        titleNl: template.titleNl ?? "",
+        titleEn: template.titleEn ?? "",
+        descriptionNl: template.descriptionNl ?? "",
+        descriptionEn: template.descriptionEn ?? "",
+        location: template.location ?? "",
+        timeOfDay: template.timeOfDay ?? null,
+        durationMinutes: template.durationMinutes ?? 300,
+        salesOpensMinutesBefore: template.salesOpensMinutesBefore ?? null,
+        salesClosesMinutesBefore: template.salesClosesMinutesBefore ?? null,
+        maxTicketsPerOrder: template.maxTicketsPerOrder ?? 8,
+        contactEmail: template.contactEmail ?? null,
+        cardCheckIn: template.cardCheckIn ?? false,
+        openScanning: template.openScanning ?? true,
+        presaleLeadMinutes: template.presaleLeadMinutes ?? null,
+        presalePraesidium: template.presalePraesidium ?? true,
+        confirmationMessageNl: template.confirmationMessageNl ?? "",
+        confirmationMessageEn: template.confirmationMessageEn ?? "",
+        capacity: template.capacity ?? 100,
+        builtIn: true,
+        order: i,
+        types: {
+          create: template.types.map((type, order) => ({
+            order,
+            code: type.code,
+            nameNl: type.nameNl,
+            nameEn: type.nameEn ?? "",
+            descriptionNl: type.descriptionNl ?? "",
+            descriptionEn: type.descriptionEn ?? "",
+            unitPriceCents: type.unitPriceCents,
+            audience: type.audience ?? "PUBLIC",
+            color: type.color ?? "navy",
+            minPerOrder: type.minPerOrder ?? 1,
+            maxPerOrder: type.maxPerOrder ?? 8,
+            salesOpensMinutesBefore: type.salesOpensMinutesBefore ?? null,
+            salesClosesMinutesBefore: type.salesClosesMinutesBefore ?? null,
+            enabled: type.enabled ?? true,
+          })),
+        },
+        questions: {
+          create: (template.questions ?? []).map((question, order) => ({
+            order,
+            code: question.code,
+            labelNl: question.labelNl,
+            labelEn: question.labelEn ?? "",
+            descriptionNl: question.descriptionNl ?? "",
+            descriptionEn: question.descriptionEn ?? "",
+            type: question.type,
+            required: question.required ?? false,
+            options: question.options ?? undefined,
+            ticketTypeCode: question.ticketTypeCode ?? null,
           })),
         },
       },

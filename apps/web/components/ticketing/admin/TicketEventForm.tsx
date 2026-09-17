@@ -20,6 +20,8 @@ import { toDatetimeLocal, type AdminLocale } from "./format";
 import { AddressPicker } from "./AddressPicker";
 import { PresaleFields, type PresaleGroupOption } from "./PresaleFields";
 import { SettingsPanel } from "./SettingsPanel";
+import { TicketTemplateTypeRows } from "./TicketTemplateTypeRows";
+import type { TicketEventTemplate } from "@/lib/ticketing/templates";
 
 const initialState: TicketEventFormActionState = { status: "idle" };
 
@@ -169,6 +171,7 @@ export function TicketEventForm({
   presaleGroups = [],
   calendarEvents,
   hasActiveTicketType = false,
+  template = null,
   linkedCalendarEvent,
   locale,
 }: {
@@ -178,6 +181,12 @@ export function TicketEventForm({
   presaleGroups?: PresaleGroupOption[];
   calendarEvents: CalendarOption[];
   hasActiveTicketType?: boolean;
+  /**
+   * Het sjabloon waaruit dit event ontstaat; enkel bij aanmaken. De velden zijn
+   * dan voorgevuld en het paneel "Eerste ticket" toont de tickets van het
+   * sjabloon, elk nog aanpasbaar.
+   */
+  template?: TicketEventTemplate | null;
   /**
    * Gezet wanneer dit ticketevent aan een kalenderevent hangt. Titel,
    * beschrijving, locatie en datums worden dan niet gevraagd maar overgenomen.
@@ -223,6 +232,7 @@ export function TicketEventForm({
     <form action={formAction} className="ticket-admin-form" onInvalidCapture={revealInvalidField}>
       <input type="hidden" name="locale" value={locale} />
       {event.id ? <input type="hidden" name="eventId" value={event.id} /> : null}
+      {template && !isEdit ? <input type="hidden" name="templateSlug" value={template.slug} /> : null}
 
       <SettingsPanel
         title={locale === "nl" ? "Basisinformatie" : "Basic information"}
@@ -524,56 +534,119 @@ export function TicketEventForm({
             <div className="ticket-admin-section-heading">
               <span className="ticket-admin-section-icon"><Ticket aria-hidden="true" size={17} /></span>
               <div>
-                <h2>{locale === "nl" ? "Eerste ticket" : "First ticket"}</h2>
+                <h2>
+                  {template
+                    ? locale === "nl"
+                      ? "Tickets uit het sjabloon"
+                      : "Tickets from the template"
+                    : locale === "nl"
+                      ? "Eerste ticket"
+                      : "First ticket"}
+                </h2>
                 <p>
-                  {locale === "nl"
-                    ? "Het ticket dat kopers meteen kunnen kiezen. Zonder dit valt er niets te verkopen."
-                    : "The ticket buyers can pick straight away. Without it there is nothing to sell."}
+                  {template
+                    ? locale === "nl"
+                      ? "Dit wordt aangemaakt. Pas gerust een naam, een prijs of het aantal aan; wat hier staat, wordt verkocht."
+                      : "This is what gets created. Adjust a name, a price or the number; what is here is what will be sold."
+                    : locale === "nl"
+                      ? "Het ticket dat kopers meteen kunnen kiezen. Zonder dit valt er niets te verkopen."
+                      : "The ticket buyers can pick straight away. Without it there is nothing to sell."}
                 </p>
               </div>
             </div>
           </div>
-          <div className="ticket-admin-form-grid">
-            <div className="ticket-admin-field">
-              <label htmlFor="ticket-first-name">{locale === "nl" ? "Naam" : "Name"}</label>
-              <input
-                id="ticket-first-name"
-                name="firstTicketName"
-                defaultValue={locale === "nl" ? "Standaardticket" : "Standard ticket"}
-                required
+          {template ? (
+            <>
+              <TicketTemplateTypeRows
+                name="templateTypesData"
+                initial={template.types}
+                locale={locale}
               />
+              <div className="ticket-admin-form-grid">
+                <div className="ticket-admin-field">
+                  <label htmlFor="ticket-capacity">
+                    {locale === "nl" ? "Aantal beschikbaar" : "Available quantity"}
+                  </label>
+                  <input
+                    id="ticket-capacity"
+                    name="capacity"
+                    type="number"
+                    min="1"
+                    defaultValue={template.capacity}
+                    required
+                  />
+                  <span className="ticket-admin-help">
+                    {locale === "nl"
+                      ? "De totale capaciteit; alle tickets hierboven delen ze."
+                      : "The total capacity; all tickets above share it."}
+                  </span>
+                </div>
+              </div>
+              {template.questions.length > 0 || template.design ? (
+                <p className="ticket-admin-help">
+                  {locale === "nl"
+                    ? `Het sjabloon brengt ook ${[
+                        template.questions.length > 0
+                          ? `${template.questions.length} deelnemersvra${template.questions.length === 1 ? "ag" : "gen"}`
+                          : null,
+                        template.design ? "het ticketontwerp" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" en ")} mee. Die pas je aan na het aanmaken, in de instellingen.`
+                    : `The template also brings ${[
+                        template.questions.length > 0
+                          ? `${template.questions.length} attendee question(s)`
+                          : null,
+                        template.design ? "the ticket design" : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" and ")}. You adjust those after creating, in the settings.`}
+                </p>
+              ) : null}
+            </>
+          ) : (
+            <div className="ticket-admin-form-grid">
+              <div className="ticket-admin-field">
+                <label htmlFor="ticket-first-name">{locale === "nl" ? "Naam" : "Name"}</label>
+                <input
+                  id="ticket-first-name"
+                  name="firstTicketName"
+                  defaultValue={locale === "nl" ? "Standaardticket" : "Standard ticket"}
+                  required
+                />
+              </div>
+              <div className="ticket-admin-field">
+                <label htmlFor="ticket-first-price">
+                  {locale === "nl" ? "Prijs (EUR)" : "Price (EUR)"}
+                </label>
+                <input
+                  id="ticket-first-price"
+                  name="firstTicketPrice"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  defaultValue="0"
+                  required
+                />
+                <span className="ticket-admin-help">
+                  {locale === "nl" ? "0 voor een gratis ticket." : "0 for a free ticket."}
+                </span>
+              </div>
+              <div className="ticket-admin-field">
+                <label htmlFor="ticket-capacity">
+                  {locale === "nl" ? "Aantal beschikbaar" : "Available quantity"}
+                </label>
+                <input
+                  id="ticket-capacity"
+                  name="capacity"
+                  type="number"
+                  min="1"
+                  defaultValue="100"
+                  required
+                />
+              </div>
             </div>
-            <div className="ticket-admin-field">
-              <label htmlFor="ticket-first-price">
-                {locale === "nl" ? "Prijs (EUR)" : "Price (EUR)"}
-              </label>
-              <input
-                id="ticket-first-price"
-                name="firstTicketPrice"
-                type="number"
-                min="0"
-                step="0.01"
-                defaultValue="0"
-                required
-              />
-              <span className="ticket-admin-help">
-                {locale === "nl" ? "0 voor een gratis ticket." : "0 for a free ticket."}
-              </span>
-            </div>
-            <div className="ticket-admin-field">
-              <label htmlFor="ticket-capacity">
-                {locale === "nl" ? "Aantal beschikbaar" : "Available quantity"}
-              </label>
-              <input
-                id="ticket-capacity"
-                name="capacity"
-                type="number"
-                min="1"
-                defaultValue="100"
-                required
-              />
-            </div>
-          </div>
+          )}
         </section>
       ) : null}
 

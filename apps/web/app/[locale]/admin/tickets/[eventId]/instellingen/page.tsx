@@ -9,6 +9,7 @@ import { TicketTypeManager } from "@/components/ticketing/admin/TicketTypeManage
 import { TicketQuestionManager } from "@/components/ticketing/admin/TicketQuestionManager";
 import { TicketDesignManager } from "@/components/ticketing/admin/TicketDesignManager";
 import { SettingsPanel } from "@/components/ticketing/admin/SettingsPanel";
+import { SaveAsTemplateCard } from "@/components/ticketing/admin/SaveAsTemplateCard";
 import type { AdminLocale } from "@/components/ticketing/admin/format";
 import { readTicketDesignSettings } from "@/lib/ticketing/design";
 
@@ -26,6 +27,8 @@ export default async function TicketEventSettingsPage({
   if (!canManageEvent && !canManageInventory) throw new Error("FORBIDDEN");
   const canManageAll =
     session.user.isSuperAdmin || session.permissions.includes("tickets.manageAll");
+  const canManageTemplates =
+    session.user.isSuperAdmin || session.permissions.includes("tickets.templates");
 
   const event = await prisma.ticketEvent.findUnique({
     where: { id: eventId },
@@ -108,6 +111,15 @@ export default async function TicketEventSettingsPage({
             locale={locale}
           />
         </div>
+      ) : null}
+      {canManageEvent && canManageTemplates ? (
+        <SaveAsTemplateCard
+          eventId={event.id}
+          eventTitle={event.titleNl}
+          ticketTypeCount={event.ticketTypes.filter((ticketType) => ticketType.active).length}
+          questionCount={event.questions.filter((question) => question.active).length}
+          locale={locale}
+        />
       ) : null}
       {canManageInventory ? (
         <div id="ticket-aanbod" className="ticket-admin-anchor-section">

@@ -36,6 +36,9 @@ export const MCP_PERMISSION_POLICY = {
   "calendar.heroWeek": { reads: ["calendar"], creates: [], blocked: ["pin or hide events in the homepage week overview"] },
   "tickets.create": { reads: ["tickets"], creates: ["app_create:ticket_event", "app_create:ticket_type", "app_create:ticket_question", "app_create:ticket_gate"], blocked: ["publish, sell, scan or refund tickets"] },
   "tickets.manageAll": { reads: ["tickets", "ticket_orders"], creates: ["app_create:ticket_event", "app_create:ticket_type", "app_create:ticket_question", "app_create:ticket_gate"], blocked: ["publish, sell, scan, resend or refund tickets"] },
+  // Een sjabloon stuurt elk ticketevent dat erna gemaakt wordt; dat is geen
+  // create-kind maar een regel, en die schrijft een agent niet.
+  "tickets.templates": { reads: [], creates: [], blocked: ["create or edit ticket templates"] },
   "forms.create": { reads: ["forms"], creates: ["app_create:form", "app_create:form_section", "app_create:form_field"], blocked: ["publish forms or submit entries"] },
   "forms.manageAll": { reads: ["forms", "form_entries"], creates: ["app_create:form", "app_create:form_section", "app_create:form_field"], blocked: ["publish forms, submit entries or send mail"] },
   "photos.upload": { reads: ["photos"], creates: ["app_create:photo_album"], blocked: ["upload assets or publish albums"] },

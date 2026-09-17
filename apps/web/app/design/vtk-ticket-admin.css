@@ -2187,3 +2187,147 @@
 .ticket-admin-presale-groups .ticket-admin-check + .ticket-admin-check {
   margin-top: 0;
 }
+
+/* -----------------------------------------------------------------------------
+   Sjablonen
+   -------------------------------------------------------------------------- */
+
+/* De tickets van een sjabloon, als bewerkbare rijen. Een tabel en geen reeks
+   kaarten: het gaat om vier varianten van hetzelfde ticket, en die vergelijk je
+   per kolom (prijs naast prijs), niet per blok. */
+.ticket-admin-template-rows {
+  display: grid;
+  gap: 10px;
+}
+
+/* De rijen zijn breder dan de 900px contentkolom van de admin; ze scrollen dus
+   horizontaal in hun eigen wrapper, met kolombreedtes die leesbaar blijven.
+   Zonder minimumbreedtes kruipt de code-input in de prijskolom. */
+.ticket-admin-template-rows .ticket-admin-table {
+  min-width: 840px;
+}
+
+.ticket-admin-template-rows td {
+  vertical-align: top;
+  white-space: normal;
+}
+
+.ticket-admin-template-rows td :is(input:not([type="checkbox"]), select) {
+  width: 100%;
+  min-width: 0;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid var(--line-2);
+  border-radius: 9px;
+  background: #fff;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+}
+
+.ticket-admin-template-rows td:nth-child(1) {
+  min-width: 190px;
+}
+
+.ticket-admin-template-rows td:nth-child(2),
+.ticket-admin-template-rows td:nth-child(4) {
+  min-width: 90px;
+}
+
+.ticket-admin-template-rows td:nth-child(3),
+.ticket-admin-template-rows td:nth-child(5) {
+  min-width: 120px;
+}
+
+.ticket-admin-template-rows td input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ink);
+}
+
+/* Een uitgevinkte rij wordt niet aangemaakt; dat hoort te zien te zijn zonder
+   dat je het vinkje zoekt. */
+.ticket-admin-template-rows tr[data-enabled="false"] :is(input, select) {
+  opacity: 0.55;
+}
+
+.ticket-admin-template-code {
+  margin-top: 4px;
+  font-family: var(--mono, ui-monospace, monospace);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.ticket-admin-template-rows-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+/* Een getal met zijn eenheid ernaast ("3 dagen"), als één regel. */
+.ticket-admin-inline-fields {
+  display: flex;
+  gap: 8px;
+}
+
+/* Het getal krijgt de ruimte, de eenheid net genoeg. Zonder deze breedtes wint
+   de `width: 100%` van het veldraster en blijft van het getal een sliver over. */
+.ticket-admin-field .ticket-admin-inline-fields input {
+  flex: 1 1 auto;
+  width: auto;
+  min-width: 80px;
+}
+
+.ticket-admin-field .ticket-admin-inline-fields select {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 96px;
+}
+
+.ticket-admin-subheading {
+  margin: 18px 0 -2px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.ticket-admin-section-foot {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+/* De titel in een beheerrij: de rij zelf opent het detail, maar een toetsenbord
+   heeft een echt focusbaar element nodig. */
+.ticket-admin-linkbutton {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ticket-admin-linkbutton:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ticket-admin-clickable-rows tbody tr {
+  cursor: pointer;
+}
+
+/* De uitleg onder de naam is een zin, geen label: laat ze wrappen in plaats van
+   de tabel breder te maken dan de contentkolom. */
+.ticket-admin-clickable-rows td:first-child {
+  min-width: 260px;
+  white-space: normal;
+}
+
+.ticket-admin-clickable-rows tbody tr:hover,
+.ticket-admin-table tbody tr[data-open="true"] {
+  background: var(--paper-2);
+}
