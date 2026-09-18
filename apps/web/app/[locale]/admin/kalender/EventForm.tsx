@@ -7,7 +7,7 @@ import { SaveForm } from '@/components/ui/SaveForm';
 import { saveErrorMessages } from '@/lib/saveMessages';
 import { toImageFocus } from '@/lib/imageFocus';
 import { EventImageField } from './EventImageField';
-import { utcToLocalDateTime } from '@/lib/ticketing/time';
+import { EventWhenField, type MomentValue } from './EventWhenField';
 
 type Event = {
   id?: string;
@@ -24,6 +24,11 @@ type Event = {
   start?: Date | null;
   end?: Date | null;
   allDay?: boolean;
+  /**
+   * De losse momenten, wanneer het evenement er meer dan één heeft. Leeg = het
+   * evenement loopt van start tot einde door; zie `CalendarEventMoment`.
+   */
+  moments?: MomentValue[];
   url?: string | null;
   /** De tekst op de knop naar `url`; leeg = "Externe eventlink". */
   urlLabelNl?: string | null;
@@ -48,12 +53,6 @@ type Category = {
   colour: string;
   audience: string | null;
 };
-
-function toLocalDatetime(d?: Date | null | string) {
-  if (!d) return '';
-  const date = typeof d === 'string' ? new Date(d) : d;
-  return utcToLocalDateTime(date);
-}
 
 /** Eén aanvinkbare categorie; doelgroep en thema gebruiken dezelfde `name`. */
 function CategoryCheckbox({ category, checked, nl }: { category: Category; checked: boolean; nl: boolean }) {
@@ -185,6 +184,12 @@ export function EventForm({
         END_BEFORE_START: nl
           ? 'Niet opgeslagen: het einde ligt voor de start. Kies een einde na de startdatum.'
           : 'Not saved: the end is before the start. Pick an end after the start date.',
+        NO_MOMENTS: nl
+          ? 'Niet opgeslagen: er staat geen enkel moment ingevuld. Voeg er één toe, of kies "Eén doorlopende periode".'
+          : 'Not saved: no moment has been filled in. Add one, or pick "One continuous period".',
+        INVALID_MOMENT: nl
+          ? 'Niet opgeslagen: een van de momenten heeft geen geldige dag of uren. Vul bij elk moment een dag, een beginuur en een einduur in.'
+          : 'Not saved: one of the moments has no valid day or times. Fill in a day, a start time and an end time for every moment.',
       }}
       fallbackErrorMessage={nl ? 'Er ging iets mis bij het opslaan.' : 'Something went wrong while saving.'}
       secondarySubmit={secondarySubmits.length > 0 ? secondarySubmits : undefined}
@@ -270,20 +275,15 @@ export function EventForm({
             <Label>{locale === 'nl' ? 'Locatie' : 'Location'}</Label>
             <Input name="location" defaultValue={event.location ?? ''} />
           </div>
-          <div>
-            <Label>Start</Label>
-            <Input name="start" type="datetime-local" defaultValue={toLocalDatetime(event.start)} required />
-          </div>
-          <div>
-            <Label>{locale === 'nl' ? 'Einde' : 'End'}</Label>
-            <Input name="end" type="datetime-local" defaultValue={toLocalDatetime(event.end)} required />
-          </div>
-          <div className="flex items-end gap-3">
-            <label className="inline-flex items-center gap-2 text-sm">
-              <input type="checkbox" name="allDay" defaultChecked={event.allDay ?? false} />
-              {locale === 'nl' ? 'Hele dag' : 'All day'}
-            </label>
-          </div>
+          {/* Eén doorlopende periode, of een reeks losse momenten (een loopweek
+              met elke dag een loopje). Zie EventWhenField. */}
+          <EventWhenField
+            start={event.start}
+            end={event.end}
+            allDay={event.allDay}
+            moments={event.moments ?? []}
+            locale={locale}
+          />
           {/* E1: hiermee verschijnt dit evenement ook op logistiek.vtk.be, zodat
               materiaal, flesserke en transport eronder gegroepeerd kunnen worden.
               Standaard aan bij een nieuw evenement; wie het uitlaat, krijgt daar

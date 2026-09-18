@@ -51,6 +51,11 @@ export async function GET(request: Request) {
     where,
     include: {
       group: true,
+      // De losse momenten van een evenement dat op meerdere dagen doorgaat
+      // zonder ertussen door te lopen; zie `CalendarEventMoment`. De kalender
+      // zet het daarmee op elk van die dagen met het juiste uur, in plaats van
+      // als één balk over de hele periode.
+      moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
       categories: {
         select: {
           category: {
@@ -94,6 +99,11 @@ export async function GET(request: Request) {
     allDay: e.allDay,
     url: e.url,
     location: e.location,
+    moments: e.moments.map((m) => ({
+      start: m.start.toISOString(),
+      end: m.end.toISOString(),
+      label: m.label,
+    })),
     extendedProps: {
       groupCode: e.group.code,
       groupSlug: e.group.slug,

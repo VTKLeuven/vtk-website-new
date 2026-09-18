@@ -28,6 +28,9 @@ export default async function EditEventPage({
     where: { id },
     include: {
       categories: { select: { categoryId: true } },
+      // De losse momenten, wanneer het evenement er meer dan één heeft; het
+      // formulier zet daarmee meteen de juiste modus. Zie `CalendarEventMoment`.
+      moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
       // E1: staat er een logistiek-evenement aan dit evenement? Dat bepaalt of
       // het vinkje "Logistiek nodig" aanstaat.
       uitleenEvent: { select: { id: true } },

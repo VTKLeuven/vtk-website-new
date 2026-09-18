@@ -4,7 +4,7 @@ import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { markdownToPlainText } from "@/lib/markdown";
 import { audienceFilter, audienceFilterForUser } from "./audience";
-import { buildIcs, type IcsCalendar, type IcsEvent } from "./ics";
+import { buildIcs, formatDate, type IcsCalendar, type IcsEvent } from "./ics";
 
 /**
  * Welke events een feed bevat. `personal` is de enige die ledenexclusieve
@@ -72,6 +72,8 @@ type EventRow = {
   allDay: boolean;
   updatedAt: Date;
   categories: { category: { nameNl: string; nameEn: string } }[];
+  /** Zie `CalendarEventMoment`; leeg voor een evenement dat gewoon doorloopt. */
+  moments: { start: Date; end: Date; label: string | null }[];
 };
 
 const eventSelect = {
@@ -87,22 +89,70 @@ const eventSelect = {
   allDay: true,
   updatedAt: true,
   categories: { select: { category: { select: { nameNl: true, nameEn: true } } } },
+  moments: {
+    select: { start: true, end: true, label: true },
+    orderBy: { start: "asc" },
+  },
 } as const;
 
-function toIcsEvent(event: EventRow, locale: Locale): IcsEvent {
+/**
+ * Eén evenement als VEVENT's: normaal precies één, en bij een evenement met
+ * losse momenten één per moment.
+ *
+ * Dat laatste is het hele punt van `CalendarEventMoment`. Een loopweek als één
+ * afspraak van maandag 18u tot zondag 19u zet in de agenda van elk lid een blok
+ * dat een week lang alle uren bezet houdt, terwijl er elke dag een uur gelopen
+ * wordt.
+ *
+ * De UID draagt de **dag** en niet de id van het moment: het formulier schrijft
+ * de momenten bij elk opslaan opnieuw weg, dus een id-gebaseerde UID zou bij elke
+ * kleine correctie elke afspraak in ieders agenda vervangen. Met de dag erin
+ * herkent een agenda-client dezelfde afspraak terug, ook nadat het uur verschoof.
+ */
+function toIcsEvents(event: EventRow, locale: Locale): IcsEvent[] {
   const description = pick(event.descriptionNl ?? "", event.descriptionEn ?? "", locale);
-  return {
-    uid: `${event.id}@vtk.be`,
-    start: event.start,
-    end: event.end,
-    allDay: event.allDay,
-    summary: pick(event.titleNl, event.titleEn, locale),
+  const title = pick(event.titleNl, event.titleEn, locale);
+  const shared = {
     description: description ? markdownToPlainText(description) : null,
     location: event.location,
     url: eventUrl(event.slug, locale),
     categories: event.categories.map((c) => pick(c.category.nameNl, c.category.nameEn, locale)),
     updatedAt: event.updatedAt,
   };
+
+  if (event.moments.length > 0) {
+    // Twee momenten op dezelfde dag (een namiddag- en een avondsessie) mogen niet
+    // dezelfde UID krijgen: een agenda-client zou de tweede dan als een wijziging
+    // van de eerste lezen en er één afspraak van overhouden.
+    const perDay = new Map<string, number>();
+    return event.moments.map((moment) => {
+      const day = formatDate(moment.start);
+      const nth = (perDay.get(day) ?? 0) + 1;
+      perDay.set(day, nth);
+      return {
+        ...shared,
+        uid: `${event.id}-${day}${nth > 1 ? `-${nth}` : ""}@vtk.be`,
+        start: moment.start,
+        end: moment.end,
+        allDay: false,
+        // De eigen naam van een moment staat achter de titel: in een agenda-app
+        // zie je enkel die regel, en zeven keer dezelfde titel zegt niets over
+        // welke dag je voor je hebt.
+        summary: moment.label ? `${title}: ${moment.label}` : title,
+      };
+    });
+  }
+
+  return [
+    {
+      ...shared,
+      uid: `${event.id}@vtk.be`,
+      start: event.start,
+      end: event.end,
+      allDay: event.allDay,
+      summary: title,
+    },
+  ];
 }
 
 /**
@@ -283,7 +333,7 @@ export async function buildFeed(
         }),
       ]);
 
-      const icsEvents = events.map((e) => toIcsEvent(e, locale));
+      const icsEvents = events.flatMap((e) => toIcsEvents(e, locale));
       for (const { shift } of shifts) {
         icsEvents.push({
           uid: `shift-${shift.id}@vtk.be`,
@@ -345,7 +395,7 @@ export async function buildEventIcs(
   const title = pick(event.titleNl, event.titleEn, locale);
   return {
     body: buildIcs(
-      { name: title, url: eventUrl(event.slug, locale), events: [toIcsEvent(event, locale)] },
+      { name: title, url: eventUrl(event.slug, locale), events: toIcsEvents(event, locale) },
       now,
     ),
     filename: slugifyForFilename(title) || "vtk-event",
@@ -374,7 +424,7 @@ function render(
   const calendar: IcsCalendar = {
     ...meta,
     url,
-    events: events.map((e) => toIcsEvent(e, locale)),
+    events: events.flatMap((e) => toIcsEvents(e, locale)),
   };
   return buildIcs(calendar, now);
 }

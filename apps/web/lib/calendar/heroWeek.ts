@@ -24,8 +24,18 @@
  *   mag niet met de drukte meegroeien tot een scherm vol.
  * - **Een evenement over meerdere dagen staat op elke dag.** Met dezelfde
  *   dagregels als het kalenderrooster (zie `heroWeekEventRange`). Voor de drempel
- *   van vier telt het één keer, voor de kappen telt elke rij.
+ *   van vier telt het één keer.
+ * - **Een evenement met losse momenten staat op de dagen van zijn momenten.** Een
+ *   loopweek met elke dag een loopje is één evenement, maar geen blok dat een week
+ *   lang doorloopt: het staat enkel op de dagen waarop er echt iets is, telkens
+ *   met het uur van dat moment. Zie `CalendarEventMoment`.
+ * - **Een eerste rij gaat voor op een herhaling.** De kappen bewaken de hoogte van
+ *   het blok, dus ze blijven gelden; maar een evenement dat zes dagen duurt, mag de
+ *   andere evenementen van de week niet van de homepage duwen. Daarom worden eerst
+ *   alle eerste rijen verdeeld en pas daarna de herhalingen.
  */
+
+import { NIGHT_EVENT_MAX_MS, type EventMoment } from "./moments";
 
 export const HERO_WEEK_TIME_ZONE = "Europe/Brussels";
 
@@ -55,14 +65,11 @@ export const HERO_WEEK_NEXT_LIMIT_DEFAULT = 7;
 export const HERO_WEEK_NEXT_LIMIT_MIN = HERO_WEEK_MIN_FOR_WINDOW;
 export const HERO_WEEK_NEXT_LIMIT_MAX = 7;
 
-/**
- * Hoe lang een nachtactiviteit mag duren om enkel bij haar startdag te horen.
- * Dezelfde grens als het kalenderrooster in components/editorial/calendarGrid.ts.
- */
-const NIGHT_EVENT_MAX_MS = 12 * 60 * 60 * 1000;
-
 /** Zie de gelijknamige enum in schema.prisma. */
 export type HeroWeekPlacement = "AUTO" | "PINNED" | "HIDDEN";
+
+/** Eén moment van een evenement; zie `CalendarEventMoment` in het schema. */
+export type HeroWeekMoment = EventMoment;
 
 /** Het minimum dat een evenement moet dragen om ingedeeld te kunnen worden. */
 export type HeroWeekInput = {
@@ -72,6 +79,11 @@ export type HeroWeekInput = {
   end: Date;
   allDay: boolean;
   heroWeek: HeroWeekPlacement;
+  /**
+   * De losse momenten, wanneer het evenement er meer dan één heeft. Leeg of
+   * afwezig = het evenement loopt van `start` tot `end` door, zoals altijd.
+   */
+  moments?: readonly HeroWeekMoment[];
 };
 
 /** Eén evenement op één dag van het overzicht. */
@@ -79,13 +91,19 @@ export type HeroWeekEntry<T> = {
   event: T;
   /** De hoeveelste dag van het evenement dit is, vanaf 1. */
   day: number;
-  /** Over hoeveel kalenderdagen het evenement loopt; 1 voor een gewoon evenement. */
+  /** Over hoeveel dagen het evenement loopt; 1 voor een gewoon evenement. */
   days: number;
   /**
    * Of hetzelfde evenement al op een eerdere rij van dit overzicht staat. Een
    * evenement over drie dagen blijft één evenement.
    */
   repeat: boolean;
+  /**
+   * Het moment dat op deze dag doorgaat, bij een evenement met losse momenten.
+   * `null` bij een gewoon evenement: dan staat het uur op het evenement zelf.
+   * Hiermee toont elke rij het uur van díé dag in plaats van "dag 3 van 7".
+   */
+  moment: HeroWeekMoment | null;
 };
 
 export type HeroWeekDay<T> = {
@@ -137,11 +155,6 @@ function shiftDayKey(key: string, days: number): string {
   const date = heroWeekDayDate(key);
   date.setUTCDate(date.getUTCDate() + days);
   return date.toISOString().slice(0, 10);
-}
-
-/** Het aantal kalenderdagen van de ene dagsleutel tot de andere. */
-function dayDistance(from: string, to: string): number {
-  return Math.round((heroWeekDayDate(to).getTime() - heroWeekDayDate(from).getTime()) / 86_400_000);
 }
 
 /** Zaterdag, in de zin van "de dag waarop de kring nooit iets doet". */
@@ -206,29 +219,91 @@ export function heroWeekDayKeys(
   return keys;
 }
 
-/** Een evenement met zijn eerste en laatste dag erbij. */
-type Ranged<T> = { event: T; first: string; last: string };
+/**
+ * Alle dagen waarop een evenement in het overzicht hoort, in volgorde.
+ *
+ * Zonder momenten is dat de reeks van `heroWeekEventRange`: elke dag van de
+ * eerste tot en met de laatste. Met momenten zijn het enkel de dagen waarop er
+ * echt iets is, en dat is precies het verschil tussen een loopweek en een
+ * evenement dat een week lang doorloopt. Elk moment volgt daarbij dezelfde
+ * dagregels als een evenement, dus een nachtloop van 22u tot 2u hoort bij de dag
+ * waarop hij vertrekt.
+ */
+export function heroWeekEventDays(
+  event: Pick<HeroWeekInput, "start" | "end" | "allDay" | "moments">,
+  timeZone = HERO_WEEK_TIME_ZONE,
+): string[] {
+  const ranges = event.moments?.length
+    ? event.moments.map((moment) =>
+        heroWeekEventRange({ start: moment.start, end: moment.end, allDay: false }, timeZone),
+      )
+    : [heroWeekEventRange(event, timeZone)];
 
-function occursOn<T>(item: Ranged<T>, key: string): boolean {
-  return item.first <= key && key <= item.last;
+  const keys = new Set<string>();
+  for (const { first, last } of ranges) {
+    for (let cursor = first; cursor <= last; cursor = shiftDayKey(cursor, 1)) keys.add(cursor);
+  }
+  return [...keys].sort();
 }
 
-function entryOn<T>(item: Ranged<T>, key: string, repeat: boolean): HeroWeekEntry<T> {
+/** Een evenement met de dagen waarop het staat erbij. */
+type Ranged<T> = { event: T; days: string[] };
+
+function occursOn<T>(item: Ranged<T>, key: string): boolean {
+  return item.days.includes(key);
+}
+
+/**
+ * Het moment dat op deze dag doorgaat. `null` bij een evenement zonder momenten,
+ * en ook wanneer een moment over middernacht loopt en deze dag dus enkel zijn
+ * staart is: het uur van gisteravond hoort niet als begin van vandaag te lezen.
+ */
+function momentOn<T extends HeroWeekInput>(
+  event: T,
+  key: string,
+  timeZone: string,
+): HeroWeekMoment | null {
+  if (!event.moments?.length) return null;
+  return (
+    event.moments.find((moment) => heroWeekDayKey(moment.start, timeZone) === key) ?? null
+  );
+}
+
+function entryOn<T extends HeroWeekInput>(
+  item: Ranged<T>,
+  key: string,
+  repeat: boolean,
+  timeZone: string,
+): HeroWeekEntry<T> {
   return {
     event: item.event,
-    day: dayDistance(item.first, key) + 1,
-    days: dayDistance(item.first, item.last) + 1,
+    day: item.days.indexOf(key) + 1,
+    days: item.days.length,
     repeat,
+    moment: momentOn(item.event, key, timeZone),
   };
 }
 
-/** Uitgelicht eerst, daarna gewoon op uur. Gelijke uren houden hun volgorde. */
-function byPlacementThenStart<T extends HeroWeekInput>(a: Ranged<T>, b: Ranged<T>): number {
-  if (a.event.heroWeek !== b.event.heroWeek) {
-    if (a.event.heroWeek === "PINNED") return -1;
-    if (b.event.heroWeek === "PINNED") return 1;
-  }
-  return a.event.start.getTime() - b.event.start.getTime();
+/**
+ * Uitgelicht eerst, daarna gewoon op uur. Gelijke uren houden hun volgorde.
+ *
+ * Bij een evenement met momenten telt het uur van het moment op díé dag: anders
+ * zou een loopweek die maandag begon, de hele week bovenaan elke dag staan omdat
+ * zijn eerste moment het vroegste is.
+ */
+function byPlacementThenStart<T extends HeroWeekInput>(
+  key: string,
+  timeZone: string,
+): (a: Ranged<T>, b: Ranged<T>) => number {
+  const startOn = (item: Ranged<T>) =>
+    (momentOn(item.event, key, timeZone) ?? item.event).start.getTime();
+  return (a, b) => {
+    if (a.event.heroWeek !== b.event.heroWeek) {
+      if (a.event.heroWeek === "PINNED") return -1;
+      if (b.event.heroWeek === "PINNED") return 1;
+    }
+    return startOn(a) - startOn(b);
+  };
 }
 
 /**
@@ -256,7 +331,7 @@ export function selectHeroWeek<T extends HeroWeekInput>(
     : HERO_WEEK_NEXT_LIMIT_DEFAULT;
   const visible: Array<Ranged<T>> = events
     .filter((event) => event.heroWeek !== "HIDDEN")
-    .map((event) => ({ event, ...heroWeekEventRange(event, timeZone) }));
+    .map((event) => ({ event, days: heroWeekEventDays(event, timeZone) }));
   const today = heroWeekDayKey(now, timeZone);
   const yesterday = shiftDayKey(today, -1);
 
@@ -264,7 +339,7 @@ export function selectHeroWeek<T extends HeroWeekInput>(
   // staat vandaag al in het overzicht; zonder die uitzondering zou een
   // tentoonstelling van een maand het venster elke dag laten terugkijken.
   const keys = heroWeekDayKeys(now, {
-    includeYesterday: visible.some((item) => item.last === yesterday),
+    includeYesterday: visible.some((item) => item.days.at(-1) === yesterday),
     timeZone,
   });
 
@@ -277,16 +352,23 @@ export function selectHeroWeek<T extends HeroWeekInput>(
   // over de vorm, de limiet enkel over hoeveel komende evenementen erin passen.
   if (inWindow < HERO_WEEK_MIN_FOR_WINDOW) {
     // Wat nog loopt, hoort erbij en staat op vandaag: een evenement dat zondag
-    // begon en tot dinsdag duurt, is op maandag geen verleden.
+    // begon en tot dinsdag duurt, is op maandag geen verleden. Bij een evenement
+    // met momenten is dat de dag van het eerstvolgende moment; de dagen ertussen
+    // zijn dan leeg en hebben hier niets te zoeken.
     const next = visible
-      .filter((item) => item.last >= today)
-      .sort((a, b) => a.event.start.getTime() - b.event.start.getTime())
+      .filter((item) => item.days.at(-1)! >= today)
+      .map((item) => ({ item, key: item.days.find((day) => day >= today) ?? item.days[0]! }))
+      .sort(
+        (a, b) =>
+          a.key.localeCompare(b.key) ||
+          (momentOn(a.item.event, a.key, timeZone) ?? a.item.event).start.getTime() -
+            (momentOn(b.item.event, b.key, timeZone) ?? b.item.event).start.getTime(),
+      )
       .slice(0, nextLimit);
 
     const days: Array<HeroWeekDay<T>> = [];
-    for (const item of next) {
-      const key = item.first < today ? today : item.first;
-      const entry = entryOn(item, key, false);
+    for (const { item, key } of next) {
+      const entry = entryOn(item, key, false, timeZone);
       const last = days[days.length - 1];
       if (last && last.key === key) last.events.push(entry);
       else days.push({ key, date: heroWeekDayDate(key), events: [entry], more: 0 });
@@ -294,22 +376,50 @@ export function selectHeroWeek<T extends HeroWeekInput>(
     return { mode: "next", days, total: next.length };
   }
 
+  // Wat er die dag te kiezen valt, in de volgorde waarin het getoond wordt.
+  const candidates = new Map<string, Array<Ranged<T>>>(
+    keys.map((key) => [
+      key,
+      visible.filter((item) => occursOn(item, key)).sort(byPlacementThenStart(key, timeZone)),
+    ]),
+  );
+  const chosen = new Map<string, Set<string>>(keys.map((key) => [key, new Set<string>()]));
+
+  // Twee rondes, en dat is de hele reden dat dit geen lus is: eerst krijgt elk
+  // evenement zijn eerste rij, daarna vullen de herhalingen aan met wat er
+  // overblijft. Anders neemt een evenement dat zes dagen duurt in één ronde zes
+  // van de tien rijen en verdwijnt de rest van de week van de homepage.
   let budget = HERO_WEEK_MAX_TOTAL;
+  const anchored = new Set<string>();
+  for (const pass of ["first", "repeat"] as const) {
+    for (const key of keys) {
+      if (budget <= 0) break;
+      const picked = chosen.get(key)!;
+      for (const item of candidates.get(key)!) {
+        if (budget <= 0) break;
+        if (picked.size >= HERO_WEEK_MAX_PER_DAY) break;
+        const id = item.event.id;
+        if (picked.has(id)) continue;
+        if (pass === "first" ? anchored.has(id) : !anchored.has(id)) continue;
+        picked.add(id);
+        anchored.add(id);
+        budget -= 1;
+      }
+    }
+  }
+
   const shownIds = new Set<string>();
   const days = keys.map((key) => {
-    const all = visible.filter((item) => occursOn(item, key)).sort(byPlacementThenStart);
-    // Eerst de kap per dag, dan pas het totaal: zo raakt een drukke maandag nooit
-    // de vrijdag kwijt, en houdt het totaal de dagen in volgorde.
-    const room = Math.min(HERO_WEEK_MAX_PER_DAY, budget);
-    const shown = all.slice(0, Math.max(room, 0));
-    budget -= shown.length;
+    const all = candidates.get(key)!;
+    const picked = chosen.get(key)!;
+    const shown = all.filter((item) => picked.has(item.event.id));
     return {
       key,
       date: heroWeekDayDate(key),
       // Een herhaling is pas een herhaling als de vorige rij ook echt getoond
       // werd; viel de eerste dag weg door de kap, dan is de volgende de eerste.
       events: shown.map((item) => {
-        const entry = entryOn(item, key, shownIds.has(item.event.id));
+        const entry = entryOn(item, key, shownIds.has(item.event.id), timeZone);
         shownIds.add(item.event.id);
         return entry;
       }),

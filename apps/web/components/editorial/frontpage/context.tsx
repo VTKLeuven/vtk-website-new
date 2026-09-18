@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { Locale } from "@vtk/i18n";
 import type { FieldValues } from "@/lib/frontpage/fields";
-import type { HeroWeekPlacement } from "@/lib/calendar/heroWeek";
+import type { HeroWeekMoment, HeroWeekPlacement } from "@/lib/calendar/heroWeek";
 import type { ResolvedSlogans } from "@/lib/slogans";
 
 /**
@@ -26,6 +26,12 @@ export type FrontpageEvent = {
   end: Date;
   /** Een heledagevenement toont "hele dag" in plaats van een uur. */
   allDay: boolean;
+  /**
+   * De losse momenten, wanneer het evenement er meer dan één heeft. Het
+   * weekoverzicht zet het dan enkel op de dagen waarop er echt iets is, met het
+   * uur van dat moment; zie `CalendarEventMoment` en lib/calendar/heroWeek.ts.
+   */
+  moments: HeroWeekMoment[];
   titleNl: string;
   titleEn: string | null;
   location: string | null;

@@ -127,6 +127,58 @@
   margin-top: 26px;
 }
 
+/*
+ * De losse momenten van een evenement (een loopweek met elke dag een loopje):
+ * een compacte agenda in de infokaart, met tabulaire uren zoals overal waar de
+ * site tijden onder elkaar zet. Bewust geen tweede kalender en geen kaartjes:
+ * dit is een opsomming van dagen binnen een paneel dat er al is.
+ */
+.vtk-event-moments {
+  margin-top: 26px;
+}
+
+.vtk-event-moments h3 {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+
+.vtk-event-moments ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-event-moment {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 16px;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.vtk-event-moment .day {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.vtk-event-moment .time {
+  color: var(--body);
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-event-moment .label {
+  grid-column: 1 / -1;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .vtk-event-actions {
   display: flex;
   flex-wrap: wrap;

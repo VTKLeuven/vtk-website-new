@@ -23,6 +23,10 @@ import type { FrontpageEvent } from "./context";
  * staat er "dag 2 van 3" in plaats van het uur, een open stip en geen ster: het
  * blijft één evenement.
  *
+ * Bij een evenement met losse momenten (een loopweek met elke dag een loopje)
+ * blijft het **uur** staan op elke rij, want dat is daar net wat elke dag iets
+ * zegt. Alleen de stip en de ster volgen dezelfde regel als hierboven.
+ *
  * Welke dagen en welke evenementen erin staan, beslist `selectHeroWeek`; die
  * regels staan los getest in lib/calendar/heroWeek.ts. Dit bestand tekent alleen.
  */
@@ -45,13 +49,17 @@ function monthLabel(date: Date, locale: Locale): string {
     .replace(".", "");
 }
 
-function timeLabel(event: FrontpageEvent, locale: Locale, nl: boolean): string {
-  if (event.allDay) return nl ? "hele dag" : "all day";
-  return event.start.toLocaleTimeString(locale === "nl" ? "nl-BE" : "en-GB", {
+function clockLabel(date: Date, locale: Locale): string {
+  return date.toLocaleTimeString(locale === "nl" ? "nl-BE" : "en-GB", {
     timeZone: HERO_WEEK_TIME_ZONE,
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+function timeLabel(event: FrontpageEvent, locale: Locale, nl: boolean): string {
+  if (event.allDay) return nl ? "hele dag" : "all day";
+  return clockLabel(event.start, locale);
 }
 
 /**
@@ -61,6 +69,10 @@ function timeLabel(event: FrontpageEvent, locale: Locale, nl: boolean): string {
  * startuur van eergisteren staan.
  */
 function entryTimeLabel(entry: HeroWeekEntry<FrontpageEvent>, locale: Locale, nl: boolean): string {
+  // Een evenement met losse momenten houdt zijn uur, ook op de vierde rij: bij
+  // een loopweek is dat uur net wat elke dag te zeggen heeft, en "dag 4 van 7"
+  // zou het verdringen.
+  if (entry.moment) return clockLabel(entry.moment.start, locale);
   if (entry.days > 1 && (entry.repeat || entry.day > 1)) {
     return nl ? `dag ${entry.day} van ${entry.days}` : `day ${entry.day} of ${entry.days}`;
   }
@@ -167,6 +179,8 @@ export function HeroWeek({
                     const { event, repeat } = entry;
                     const title = pick(event.titleNl, event.titleEn ?? event.titleNl, locale);
                     const meta = [
+                      // De eigen naam van dít moment ("Nachtloop"), als die er is.
+                      entry.moment?.label || null,
                       event.location,
                       organiserName(event.organiserName, event.group, locale),
                       // Enkel boven de publieke drempel; zie lib/calendar/interest.ts.

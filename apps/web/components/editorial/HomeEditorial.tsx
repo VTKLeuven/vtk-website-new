@@ -23,6 +23,7 @@ import { PartnerLogo } from "@/components/site/PartnerLogo";
 import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar";
 import { CalendarPlusIcon } from "@/components/ui/icons";
 import { focusPosition } from "@/lib/imageFocus";
+import { hasUpcomingMoment, momentsSummary, nextOccurrenceAt } from "@/lib/calendar/moments";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
 import { interestLabel, publicInterestCounts, viewerInterests } from "@/lib/calendar/interest";
 import {
@@ -174,7 +175,14 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
   // Wat er nog komt. De hero mag een dag terugkijken, de rest van de pagina niet:
   // een evenement van gisteren in "Aankomende evenementen" is gewoon fout.
-  const upcomingEvents = calendarEvents.filter((event) => event.start >= now);
+  //
+  // Bij een evenement met losse momenten telt niet de envelop maar het
+  // eerstvolgende moment: een loopweek die maandag begon, heeft op woensdag nog
+  // vier loopjes te gaan en is dus niet "voorbij". Om dezelfde reden staan de
+  // kaarten op de eerstvolgende keer gesorteerd en niet op de start.
+  const upcomingEvents = calendarEvents
+    .filter((event) => hasUpcomingMoment(event, now))
+    .sort((a, b) => +nextOccurrenceAt(a, now) - +nextOccurrenceAt(b, now));
 
   // Opkomende evenementen: 2 rijen van 3. Zijn er minder, dan krimpt het
   // rooster gewoon mee (zie `.ev-grid`), zonder lege plaatsen op te vullen.
@@ -686,7 +694,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           </div>
           <div className="ev-grid">
             {eventCards.map((event) => {
-              const start = new Date(event.start);
+              // De eerstvolgende keer dat er iets is; bij een gewoon evenement
+              // gewoon zijn start.
+              const start = nextOccurrenceAt(event, now);
               const eventPhoto = publicUrl(event.imageKey);
               const photo = eventPhoto ?? defaultEventImage;
               const title = pick(event.titleNl, event.titleEn ?? event.titleNl, locale);
@@ -762,7 +772,14 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                     </h3>
                     <div className="ev-card-foot">
                       <span className="ev-card-when">
-                        {event.allDay ? (nl ? "Hele dag" : "All day") : formatTime(start, locale)}
+                        {/* Zeven keer hetzelfde uur hoort niet zeven keer op een
+                            kaart: een reeks momenten wordt "telkens 18:00". */}
+                        {event.allDay
+                          ? nl
+                            ? "Hele dag"
+                            : "All day"
+                          : (momentsSummary(event.moments, locale, "Europe/Brussels") ??
+                            formatTime(start, locale))}
                         {location ? ` · ${location}` : ""}
                       </span>
                       <span className="ev-card-actions">

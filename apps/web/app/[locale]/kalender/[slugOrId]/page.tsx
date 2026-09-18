@@ -8,6 +8,7 @@ import { MapPinIcon, UsersIcon } from "@/components/ui/icons";
 import { hasLocale } from "@/lib/locale";
 import { organiserName } from "@/lib/calendar/organiser";
 import { eventLinkLabel } from "@/lib/calendar/eventLink";
+import { momentsSummary } from "@/lib/calendar/moments";
 import { publicUrl } from "@/lib/storage";
 import { eventMetadata } from "@/lib/pageMetadata";
 import { loadCalendarCategory, loadCalendarEvent, loadDefaultEventImage } from "@/lib/pageQueries";
@@ -40,6 +41,44 @@ function audienceLabel(audience: string | null, locale: Locale): string {
     return nl ? "Voor internationals" : "For international students";
   if (audience === "ALUMNI") return nl ? "Voor alumni" : "For alumni";
   return nl ? "Voor een specifieke doelgroep" : "For a specific audience";
+}
+
+/** Eén moment van het evenement; zie `CalendarEventMoment`. */
+type EventMomentRow = { start: Date; end: Date; label: string | null };
+
+function dayLabel(date: Date, locale: Locale, style: "long" | "short" = "long") {
+  return date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    weekday: style,
+    day: "2-digit",
+    month: style === "long" ? "long" : "short",
+    ...(style === "long" ? { year: "numeric" as const } : {}),
+  });
+}
+
+function clockLabel(date: Date, locale: Locale) {
+  return date.toLocaleTimeString(locale === "nl" ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/**
+ * De regel onder de titel bij een evenement met losse momenten: van de eerste
+ * tot en met de laatste dag, met het gedeelde uur erachter wanneer elk moment
+ * hetzelfde uur draagt. Welke dagen het precies zijn, staat in de lijst in de
+ * infokaart; die zin hier moet in één oogopslag te lezen zijn.
+ */
+function formatMomentsRange(moments: EventMomentRow[], locale: Locale) {
+  const first = moments[0]!.start;
+  const last = moments[moments.length - 1]!.start;
+  const span = `${dayLabel(first, locale)} ${locale === "nl" ? "t.e.m." : "to"} ${dayLabel(
+    last,
+    locale,
+  )}`;
+  const summary = momentsSummary(moments, locale, "Europe/Brussels");
+  return summary ? `${span} · ${summary}` : span;
 }
 
 function formatDateRange(start: Date, end: Date, locale: Locale, allDay: boolean) {
@@ -161,7 +200,9 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
           </div>
           <h1 className="vtk-page-title">{title}</h1>
           <p className="vtk-page-subtitle">
-            {formatDateRange(event.start, event.end, locale, event.allDay)}
+            {event.moments.length > 0
+              ? formatMomentsRange(event.moments, locale)
+              : formatDateRange(event.start, event.end, locale, event.allDay)}
           </p>
           {audiences.length > 0 || themes.length > 0 ? (
             <div className="vtk-event-tags">
@@ -236,20 +277,40 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
                 : "More details will be added later by the organising work group."}
             </p>
           )}
-          <dl className="spec">
-            <dt>{locale === "nl" ? "Start" : "Start"}</dt>
-            <dd>
-              {event.start.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", {
-                timeZone: "Europe/Brussels",
-              })}
-            </dd>
-            <dt>{locale === "nl" ? "Einde" : "End"}</dt>
-            <dd>
-              {event.end.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", {
-                timeZone: "Europe/Brussels",
-              })}
-            </dd>
-          </dl>
+          {/* Een evenement met losse momenten zegt hier wannéér het doorgaat, dag
+              per dag. Dat is precies wat één start en één einde niet kunnen
+              zeggen: die zouden er een blok van maken dat de hele week doorloopt. */}
+          {event.moments.length > 0 ? (
+            <section className="vtk-event-moments">
+              <h3>{nl ? "Wanneer" : "When"}</h3>
+              <ol>
+                {event.moments.map((moment) => (
+                  <li key={moment.start.toISOString()} className="vtk-event-moment">
+                    <span className="day">{dayLabel(moment.start, locale, "short")}</span>
+                    <span className="time">
+                      {clockLabel(moment.start, locale)} - {clockLabel(moment.end, locale)}
+                    </span>
+                    {moment.label ? <span className="label">{moment.label}</span> : null}
+                  </li>
+                ))}
+              </ol>
+            </section>
+          ) : (
+            <dl className="spec">
+              <dt>{locale === "nl" ? "Start" : "Start"}</dt>
+              <dd>
+                {event.start.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", {
+                  timeZone: "Europe/Brussels",
+                })}
+              </dd>
+              <dt>{locale === "nl" ? "Einde" : "End"}</dt>
+              <dd>
+                {event.end.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", {
+                  timeZone: "Europe/Brussels",
+                })}
+              </dd>
+            </dl>
+          )}
           <div className="vtk-event-actions">
             {/* "Ik kom" hoort bij "Tickets kopen" en "Zet in mijn agenda": het is
                 dezelfde soort beslissing over dit evenement. Wat er méér nodig is

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   eventOccursOnDay,
   isMultiDayEvent,
+  momentOnDay,
   weekEventSpans,
   rollingWeeksGridCells,
   weekGridDays,
@@ -147,5 +148,70 @@ describe('multi-day calendar events', () => {
     expect(isMultiDayEvent(allDayLong)).toBe(false);
     expect(eventOccursOnDay(allDayLong, days[0]!)).toBe(true);
     expect(eventOccursOnDay(allDayLong, days[1]!)).toBe(false);
+  });
+});
+
+describe('events made of separate moments', () => {
+  // Maandag 7 tot en met vrijdag 11 september 2026, elke dag een loopje.
+  const loopweek = {
+    start: '2026-09-07T18:00:00',
+    end: '2026-09-11T19:00:00',
+    allDay: false,
+    moments: ['07', '08', '09', '10', '11'].map((day) => ({
+      start: `2026-09-${day}T18:00:00`,
+      end: `2026-09-${day}T19:00:00`,
+      label: null,
+    })),
+  };
+  const days = weekGridDays(new Date(2026, 8, 9));
+
+  it('is not a bar across the grid but a pill on each of its days', () => {
+    expect(isMultiDayEvent(loopweek)).toBe(false);
+    expect(weekEventSpans([loopweek], days)).toEqual([]);
+    expect(days.map((day) => eventOccursOnDay(loopweek, day))).toEqual([
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      false,
+    ]);
+  });
+
+  it('leaves the days between two moments empty', () => {
+    const filmreeks = {
+      start: '2026-09-07T20:00:00',
+      end: '2026-09-10T22:30:00',
+      allDay: false,
+      moments: [
+        { start: '2026-09-07T20:00:00', end: '2026-09-07T22:30:00' },
+        { start: '2026-09-10T20:00:00', end: '2026-09-10T22:30:00' },
+      ],
+    };
+    expect(days.map((day) => eventOccursOnDay(filmreeks, day))).toEqual([
+      true,
+      false,
+      false,
+      true,
+      false,
+      false,
+      false,
+    ]);
+  });
+
+  it('gives back the moment of a day, and a night moment only on its own evening', () => {
+    expect(momentOnDay(loopweek, days[2]!)?.start).toEqual(new Date('2026-09-09T18:00:00'));
+    expect(momentOnDay(loopweek, days[5]!)).toBeNull();
+
+    const nacht = {
+      start: '2026-09-09T22:00:00',
+      end: '2026-09-10T02:00:00',
+      allDay: false,
+      moments: [{ start: '2026-09-09T22:00:00', end: '2026-09-10T02:00:00' }],
+    };
+    expect(momentOnDay(nacht, days[2]!)?.start).toEqual(new Date('2026-09-09T22:00:00'));
+    expect(momentOnDay(nacht, days[3]!)).toBeNull();
+    expect(eventOccursOnDay(nacht, days[3]!)).toBe(false);
   });
 });

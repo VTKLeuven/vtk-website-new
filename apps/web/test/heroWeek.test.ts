@@ -330,3 +330,118 @@ describe("selectHeroWeek with events over several days", () => {
     expect(monday?.events[0]).toMatchObject({ day: 2, repeat: false });
   });
 });
+
+describe("selectHeroWeek with events made of separate moments", () => {
+  /** Een loopweek: van zondag tot en met vrijdag elke dag een loopje van 18u tot 19u. */
+  const loopweek: HeroWeekInput = {
+    id: "loopweek",
+    start: at("2026-09-13T18:00:00+02:00"),
+    end: at("2026-09-18T19:00:00+02:00"),
+    allDay: false,
+    heroWeek: "AUTO",
+    moments: [
+      "2026-09-13",
+      "2026-09-14",
+      "2026-09-15",
+      "2026-09-16",
+      "2026-09-17",
+      "2026-09-18",
+    ].map((day) => ({
+      start: at(`${day}T18:00:00+02:00`),
+      end: at(`${day}T19:00:00+02:00`),
+      label: null,
+    })),
+  };
+  const rest: HeroWeekInput[] = [
+    event("orientation", "2026-09-16T16:00:00+02:00"),
+    event("receptie", "2026-09-16T19:00:00+02:00"),
+    event("croque", "2026-09-17T12:00:00+02:00"),
+    event("pasta", "2026-09-17T19:00:00+02:00"),
+  ];
+  const friday11 = at("2026-09-11T16:00:00+02:00");
+
+  it("stands on the days of its moments, with the time of that day", () => {
+    const result = selectHeroWeek([loopweek, ...rest], friday11);
+    const onDays = result.days.filter((day) => ids(day).includes("loopweek"));
+    // Het venster loopt van vrijdag 11 tot donderdag 17 (zaterdag valt weg), dus
+    // het loopje van vrijdag 18 valt erbuiten.
+    expect(onDays.map((day) => day.key)).toEqual([
+      "2026-09-13",
+      "2026-09-14",
+      "2026-09-15",
+      "2026-09-16",
+      "2026-09-17",
+    ]);
+    // Elke rij draagt het moment van díé dag, zodat het uur blijft staan.
+    expect(
+      onDays.map((day) => day.events.find((entry) => entry.event.id === "loopweek")?.moment?.start),
+    ).toEqual(loopweek.moments!.slice(0, 5).map((moment) => moment.start));
+  });
+
+  it("skips the days in between when the moments are not consecutive", () => {
+    const filmreeks: HeroWeekInput = {
+      ...loopweek,
+      id: "filmreeks",
+      moments: [
+        { start: at("2026-09-14T20:00:00+02:00"), end: at("2026-09-14T22:30:00+02:00") },
+        { start: at("2026-09-17T20:00:00+02:00"), end: at("2026-09-17T22:30:00+02:00") },
+      ],
+      start: at("2026-09-14T20:00:00+02:00"),
+      end: at("2026-09-17T22:30:00+02:00"),
+    };
+    const result = selectHeroWeek([filmreeks, ...rest], friday11);
+    const onDays = result.days.filter((day) => ids(day).includes("filmreeks"));
+    expect(onDays.map((day) => day.key)).toEqual(["2026-09-14", "2026-09-17"]);
+    // Woensdag ligt tussen de twee avonden in en blijft dus leeg voor dit event.
+    expect(ids(result.days.find((day) => day.key === "2026-09-16"))).not.toContain("filmreeks");
+  });
+
+  it("orders a moment by its own time on that day", () => {
+    const result = selectHeroWeek([loopweek, ...rest], friday11);
+    // Donderdag: croque om 12u, dan pasta en het loopje, allebei om 18-19u.
+    expect(ids(result.days.find((day) => day.key === "2026-09-17"))).toEqual([
+      "croque",
+      "loopweek",
+      "pasta",
+    ]);
+  });
+
+  it("keeps a night moment on the evening it starts", () => {
+    const nacht: HeroWeekInput = {
+      ...loopweek,
+      id: "nachtloop",
+      moments: [{ start: at("2026-09-14T22:00:00+02:00"), end: at("2026-09-15T02:00:00+02:00") }],
+      start: at("2026-09-14T22:00:00+02:00"),
+      end: at("2026-09-15T02:00:00+02:00"),
+    };
+    const result = selectHeroWeek([nacht, ...rest], friday11);
+    const onDays = result.days.filter((day) => ids(day).includes("nachtloop"));
+    expect(onDays.map((day) => day.key)).toEqual(["2026-09-14"]);
+  });
+
+  it("shows the next moment in the quiet-week list, not the day it began", () => {
+    const tuesday15 = at("2026-09-15T09:00:00+02:00");
+    const result = selectHeroWeek([loopweek, event("later", "2026-10-06T19:00:00+02:00")], tuesday15);
+    expect(result.mode).toBe("next");
+    expect(result.days[0]?.key).toBe("2026-09-15");
+    expect(result.days[0]?.events[0]).toMatchObject({ day: 3, days: 6, repeat: false });
+  });
+
+  it("does not let its repeats push the rest of the week off the home page", () => {
+    // Vijf loopjes in het venster plus zes andere evenementen is één rij te veel.
+    // Zonder de eerste ronde zou de loopweek zijn herhalingen opeisen en viel er
+    // een evenement weg; nu krijgt elk evenement eerst zijn eigen rij en is het
+    // een loopje van de laatste dag dat sneuvelt.
+    const busy = [
+      ...rest,
+      event("cantus", "2026-09-15T21:00:00+02:00"),
+      event("fakbar", "2026-09-13T22:00:00+02:00"),
+    ];
+    const result = selectHeroWeek([loopweek, ...busy], friday11);
+    for (const item of busy) {
+      expect(result.days.some((day) => ids(day).includes(item.id))).toBe(true);
+    }
+    expect(result.total).toBe(10);
+    expect(result.days.find((day) => day.key === "2026-09-17")?.more).toBe(1);
+  });
+});

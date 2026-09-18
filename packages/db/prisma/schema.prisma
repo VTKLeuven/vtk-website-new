@@ -1663,12 +1663,58 @@ model CalendarEvent {
   categories     CalendarEventCategory[]
   interests      CalendarEventInterest[]
   guestInterests CalendarEventGuestInterest[]
+  /// De losse momenten van dit evenement, wanneer het er meer dan één heeft. Leeg
+  /// = het evenement loopt gewoon van `start` tot `end` door. Zie
+  /// `CalendarEventMoment`.
+  moments        CalendarEventMoment[]
 
   @@index([start])
   @@index([publishedAt, announcedPushAt])
   @@index([groupId])
   @@index([searchNl], type: Gin)
   @@index([searchEn], type: Gin)
+}
+
+/// Eén moment van een evenement dat op meerdere dagen doorgaat zonder ertussen
+/// door te lopen: een loopweek met elke dag een loopje van 18u tot 19u, een
+/// filmreeks met drie avonden, een kerstmarkt die vier namiddagen openstaat.
+///
+/// **Waarom dit bestaat.** Zoiets had maar twee vormen, en geen van beide zei wat
+/// het was. Zeven losse evenementen zijn zeven URL's, zeven affiches, zeven
+/// interessetellers en zeven pushberichten voor één ding. Eén meerdaags evenement
+/// zegt dat het van maandag 18u tot zondag 19u *doorloopt*, en dat lekt verder dan
+/// de kalenderpagina: de ICS-feed maakt er één afspraak van die een week lang in
+/// ieders agenda staat, en het maandraster tekent er een balk over alle dagen van.
+///
+/// Het evenement blijft dus één record met één URL, één affiche, één beschrijving,
+/// één ster, één ticketshop en één formulier; de momenten zeggen enkel wannéér het
+/// doorgaat.
+///
+/// **`CalendarEvent.start` en `.end` blijven de envelop**: de start van het eerste
+/// moment en het einde van het laatste, door de save-action bijgehouden. Alles wat
+/// niets van momenten weet (zoek, tickets, logistiek, de vensters van de feeds, de
+/// app) blijft daardoor werken zoals voordien.
+///
+/// Een moment en een heledagevenement sluiten elkaar uit: iets dat een hele dag
+/// duurt, heeft geen uren om per dag te herhalen. De action zet `allDay` uit zodra
+/// er momenten zijn.
+model CalendarEventMoment {
+  id      String @id @default(cuid())
+  eventId String
+
+  start DateTime @db.Timestamptz(3)
+  /// Ligt na `start`. Een nachtmoment (22u tot 2u) eindigt dus op de dag erna;
+  /// het hoort nog bij zijn startdag, dezelfde regel als in de kalender zelf.
+  end   DateTime @db.Timestamptz(3)
+
+  /// Een korte eigen naam voor dit ene moment ("Ploegenloop", "Nachtloop").
+  /// Leeg = het moment draagt gewoon de titel van het evenement.
+  label String?
+
+  event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+
+  @@index([eventId, start])
+  @@index([start])
 }
 
 /// Wat dit evenement doet in het weekoverzicht van de hero op de homepage.

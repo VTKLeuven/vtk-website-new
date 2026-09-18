@@ -29,6 +29,8 @@ export type FrontpageEventRow = {
   titleEn: string | null;
   location: string | null;
   heroWeek: HeroWeekPlacement;
+  /** Zie `CalendarEventMoment`; leeg voor een evenement dat gewoon doorloopt. */
+  moments: Array<{ start: Date; end: Date; label: string | null }>;
   group: { nameNl: string; nameEn: string };
   organiserName: string | null;
   categories: Array<{ category: { colour: string; audience: string | null } }>;
@@ -38,6 +40,7 @@ export type FrontpageEventRow = {
 export const FRONTPAGE_EVENT_INCLUDE = {
   group: true,
   categories: { include: { category: true } },
+  moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
 } as const;
 
 /**
@@ -76,6 +79,11 @@ export function toFrontpageEvent(
     start: row.start,
     end: row.end,
     allDay: row.allDay,
+    moments: row.moments.map((moment) => ({
+      start: moment.start,
+      end: moment.end,
+      label: moment.label,
+    })),
     titleNl: row.titleNl,
     titleEn: row.titleEn,
     location: row.location,

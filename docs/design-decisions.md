@@ -1673,6 +1673,64 @@ verschuift) en titel plus een stuk van de cuid (dan staat de ruis er nog steeds)
 - De **app** blijft intern op `/evenement/<id>` werken. Dat is geen publiek
   adres maar een route in de app zelf, met een eigen API erachter.
 
+### Een evenement met losse momenten (een loopweek)
+
+Een loopweek met elke dag een loopje had maar twee vormen, en geen van beide zei
+wat het was:
+
+- **Zeven losse evenementen** zijn zeven URL's, zeven affiches, zeven
+  interessetellers, zeven sterrenlijsten en zeven pushberichten "er staat iets
+  nieuws in een categorie die je volgt" (`announcedPushAt` staat per evenement),
+  voor één ding. In het weekoverzicht van de hero vullen ze bovendien zes van de
+  tien rijen.
+- **Eén meerdaags evenement** zegt dat het van maandag 18u tot zondag 19u
+  *doorloopt*, en dat is feitelijk onjuist. Het lekt ook verder dan de
+  kalenderpagina: de ICS-feed maakte er één afspraak van die een week lang in
+  ieders agenda staat, en het maandraster tekende er een balk over alle dagen van
+  terwijl de kaartenweergave er één kaart van maakte met enkel het beginuur van
+  de eerste dag.
+
+Daarom is er een derde vorm: **één evenement met meerdere momenten**
+(`CalendarEventMoment`). Het evenement blijft één record met één URL, één
+affiche, één beschrijving, één ster, één ticketshop en één formulier; de momenten
+zeggen enkel wannéér het doorgaat.
+
+- **`CalendarEvent.start` en `.end` blijven de envelop** eromheen: de start van
+  het eerste moment en het einde van het laatste, door de save-action
+  bijgehouden. Alles wat niets van momenten weet (zoek, tickets, logistiek, de
+  vensters van de feeds, de app) blijft daardoor werken zoals voordien. Dat is
+  ook waarom dit geen ingrijpende wijziging was: enkel de plaatsen die een
+  evenement op dagen uitrekenen, kregen er weet van.
+- **Een moment en een heledagevenement sluiten elkaar uit.** Iets dat een hele
+  dag duurt, heeft geen uren om per dag te herhalen; de action zet `allDay` uit
+  zodra er momenten zijn. Het beheerscherm laat daarom kiezen tussen "één
+  doorlopende periode" en "meerdere momenten", en toont maar één van de twee: een
+  formulier waarin de helft van wat je intikt stil genegeerd wordt, is erger dan
+  een keuze.
+- **Waar het verschil zit.** Het weekoverzicht en het maandraster zetten het op
+  de dagen van zijn momenten (en dus niet op de dagen ertussen), telkens met het
+  uur van díé dag; de balk over het rooster blijft voor wat echt doorloopt. De
+  kaart en de lijstrij blijven één per evenement, met "telkens 18:00" in plaats
+  van één uur en met de eerstvolgende keer als datum. De ICS-feed schrijft **één
+  afspraak per moment**.
+- **Die afspraken dragen de dag in hun UID** (`<id>-20261013@vtk.be`), niet de id
+  van de momentrij. Het formulier schrijft de momenten bij elk opslaan opnieuw
+  weg, dus een id-gebaseerde UID zou bij elke kleine correctie elke afspraak in
+  ieders agenda vervangen. Twee momenten op dezelfde dag krijgen een teller
+  erachter, anders leest een agenda-client de tweede als een wijziging van de
+  eerste.
+- **Een einduur dat niet later is dan het beginuur is de nacht erna.** Zo blijft
+  een rij twee uurvelden breed in plaats van twee datums, en volgt een nachtloop
+  van 22u tot 2u dezelfde regel als elders in de kalender: hij hoort bij de avond
+  waarop hij vertrekt.
+
+**Wat hier bewust níét staat, is een herhalingsregel** (`RRULE`, "elke dinsdag
+tot eind december"). Een regel moet uitgerekend worden op elke plaats die een
+kalender leest, en levert momenten op zonder eigen rij, terwijl de ster, de
+tellers, de tickets en de formulieren allemaal aan een id hangen. Een opsomming
+van momenten is voor een kring die zoiets een paar keer per jaar doet het
+eerlijkere model, en een editor kan een reeks dagen in één klik klaarzetten.
+
 ### Twee weergaven: Agenda en Lijst
 
 `/kalender` had drie knoppen (Agenda, Maand, Lijst), maar Agenda en Lijst toonden
@@ -5535,7 +5593,18 @@ Het telt op twee manieren mee:
 - Voor de **drempel van vier** telt het één keer. Drie rijen Onthaaldagen maken
   nog geen drukke week.
 - Voor de **kappen** (drie per dag, tien in totaal) telt elke rij, want die kappen
-  bewaken de hoogte van het blok.
+  bewaken de hoogte van het blok. Maar ze worden **in twee rondes** verdeeld:
+  eerst krijgt elk evenement zijn eerste rij, en pas daarna vullen de herhalingen
+  aan met wat er overblijft. Anders neemt een evenement dat zes dagen duurt in
+  één keer zes van de tien rijen en verdwijnt de rest van de week van de
+  homepage. Sneuvelt er iets, dan is het dus een herhaling en nooit een evenement
+  dat nergens anders staat.
+
+**Een evenement met losse momenten staat op de dagen van zijn momenten**, niet op
+alles ertussen, en houdt op elke rij het **uur** van die dag in plaats van "dag 3
+van 7": bij een loopweek is dat uur net wat elke dag te zeggen heeft. De stip en
+de ster volgen wel dezelfde regel als hierboven, want het blijft één evenement.
+Zie "Een evenement met losse momenten (een loopweek)" bij de kalender.
 
 De homepage leest evenementen daarom op hun einde en niet op hun start: wie op
 dinsdag kijkt, moet de Onthaaldagen nog zien, ook al begonnen ze zondag. Ook de

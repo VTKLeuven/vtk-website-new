@@ -10,9 +10,12 @@ import { EventInterest } from '@/components/calendar/EventInterest';
 import { EventStar, type EventStarLabels } from '@/components/calendar/EventStar';
 import { CalendarPlusIcon } from '@/components/ui/icons';
 import type { ViewerInterest } from '@/lib/calendar/interest';
+import { leadMoment, momentsSummary } from '@/lib/calendar/moments';
 import {
   eventOccursOnDay,
   isMultiDayEvent,
+  momentOnDay,
+  toMoments,
   weekEventSpans,
   monthGridCells,
   rollingWeeksGridCells,
@@ -38,6 +41,12 @@ type ApiEvent = {
   allDay: boolean;
   url: string | null;
   location: string | null;
+  /**
+   * De losse momenten, wanneer het evenement er meer dan één heeft (een loopweek
+   * met elke dag een loopje). Leeg = het evenement loopt van `start` tot `end`
+   * door. `start` en `end` blijven in beide gevallen de envelop eromheen.
+   */
+  moments: Array<{ start: string; end: string; label: string | null }>;
   extendedProps: {
     groupCode: string;
     groupNameNl: string;
@@ -442,12 +451,55 @@ export function KalenderEditorialView({
     return e.extendedProps.categories.filter((c) => c.audience !== null);
   }
 
-  function eventTime(e: ApiEvent) {
-    if (e.allDay) return locale === 'nl' ? 'Hele dag' : 'All day';
-    return new Date(e.start).toLocaleTimeString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+  function clock(date: Date) {
+    return date.toLocaleTimeString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
       hour: '2-digit',
       minute: '2-digit',
     });
+  }
+
+  /**
+   * Het uur van een evenement, en bij een evenement met losse momenten het uur
+   * dat op déze dag telt.
+   *
+   * Zonder dag (een kaart, een lijstrij) wordt het de samenvatting van de
+   * momenten: zeven keer "18:00" op één kaart zegt minder dan "telkens 18:00".
+   */
+  function eventTime(e: ApiEvent, day?: Date | null) {
+    if (e.allDay) return locale === 'nl' ? 'Hele dag' : 'All day';
+    if (e.moments.length > 0) {
+      const moment = day ? momentOnDay(e, day) : null;
+      if (moment) return clock(moment.start);
+      return momentsSummary(toMoments(e), locale) ?? clock(new Date(e.start));
+    }
+    return clock(new Date(e.start));
+  }
+
+  /**
+   * De dag waarop een kaart of lijstrij staat: de eerstvolgende keer dat er iets
+   * is, en niet de dag waarop een reeks momenten ooit begon.
+   */
+  function leadDate(e: ApiEvent): Date {
+    return leadMoment(toMoments(e), now)?.start ?? new Date(e.start);
+  }
+
+  /**
+   * De regel "Wanneer" in het venster van één evenement. Een reeks momenten
+   * leest als een periode met het gedeelde uur erachter; de dagen ertussen
+   * waarop niets staat, zijn daarbij de kalender zelf die het toont.
+   */
+  function whenLine(e: ApiEvent): string {
+    const dateLocale = locale === 'nl' ? 'nl-BE' : 'en-GB';
+    const dayText = (date: Date) =>
+      date.toLocaleDateString(dateLocale, { weekday: 'long', day: 'numeric', month: 'long' });
+    const moments = toMoments(e);
+    if (moments.length > 1) {
+      const span = `${dayText(moments[0]!.start)} ${locale === 'nl' ? 't.e.m.' : 'to'} ${dayText(
+        moments[moments.length - 1]!.start
+      )}`;
+      return `${span} · ${eventTime(e)}`;
+    }
+    return `${dayText(new Date(e.start))} · ${eventTime(e)}`;
   }
 
   /**
@@ -633,7 +685,9 @@ export function KalenderEditorialView({
     // Het label rechts toont het thema. De doelgroep staat al bij de titel, dus
     // die hier herhalen zou twee keer "Eerstejaars" geven.
     const cat = e.extendedProps.categories.find((c) => c.audience === null) ?? null;
-    const d = new Date(e.start);
+    // Bij een reeks momenten de eerstvolgende keer dat er iets is, niet de dag
+    // waarop de reeks begon.
+    const d = leadDate(e);
     const dateLocale = locale === 'nl' ? 'nl-BE' : 'en-GB';
     const going = interestLine(e);
     const title = pickTitle(e);
@@ -730,7 +784,7 @@ export function KalenderEditorialView({
     const cat = e.extendedProps.categories.find((c) => c.audience === null) ?? null;
     const going = interestLine(e);
     const title = pickTitle(e);
-    const start = new Date(e.start);
+    const start = leadDate(e);
     const addToCalendar = locale === 'nl' ? 'Zet in mijn agenda' : 'Add to my calendar';
     return (
       <article key={e.id} className="ev-card">
@@ -859,15 +913,7 @@ export function KalenderEditorialView({
         <dl className="ev-preview-meta">
           <div>
             <dt>{locale === 'nl' ? 'Wanneer' : 'When'}</dt>
-            <dd>
-              {new Date(preview.start).toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-              })}
-              {' · '}
-              {eventTime(preview)}
-            </dd>
+            <dd>{whenLine(preview)}</dd>
           </div>
           {preview.location ? (
             <div>
@@ -1214,7 +1260,7 @@ export function KalenderEditorialView({
                                 ))}
                                 <b>{pickTitle(e)}</b>
                                 <span>
-                                  {eventTime(e)}
+                                  {eventTime(e, date)}
                                   {e.location ? ` · ${e.location}` : ''}
                                 </span>
                                 {interestLine(e) ? <span className="ev-going">{interestLine(e)}</span> : null}
@@ -1294,7 +1340,7 @@ export function KalenderEditorialView({
                         >
                           <b>{pickTitle(e)}</b>
                           <span>
-                            {eventTime(e)}
+                            {eventTime(e, selectedDate)}
                             {e.location ? ` · ${e.location}` : ''}
                           </span>
                           {audienceCategories(e).map((a) => (
@@ -1353,7 +1399,7 @@ export function KalenderEditorialView({
                                 style={cat ? ({ '--cat': cat.colour } as React.CSSProperties) : undefined}
                                 onClick={(clicked) => openPreview(clicked, event)}
                               >
-                                <span className="week-event-time">{eventTime(event)}</span>
+                                <span className="week-event-time">{eventTime(event, date)}</span>
                                 <b>{pickTitle(event)}</b>
                                 {event.location ? <small>{event.location}</small> : null}
                                 {audienceCategories(event).map((audience) => (

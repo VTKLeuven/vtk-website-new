@@ -77,6 +77,9 @@ export const loadCalendarEvent = cache(async (slugOrId: string) =>
     where: { publishedAt: { not: null }, OR: [{ slug: slugOrId }, { id: slugOrId }] },
     include: {
       group: true,
+      // De losse momenten van het evenement; leeg bij een evenement dat gewoon
+      // doorloopt. Zie `CalendarEventMoment`.
+      moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
       ticketEvent: { select: { slug: true, status: true } },
       form: { select: { slug: true, status: true, opensAt: true, closesAt: true } },
       categories: {

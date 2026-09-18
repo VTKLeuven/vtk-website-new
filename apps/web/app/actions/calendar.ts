@@ -35,8 +35,10 @@ const eventSchema = z.object({
   // De organisator zoals bezoekers hem zien, wanneer dat niet de beherende groep
   // is. Leeg = de groep; zie lib/calendar/organiser.ts.
   organiserName: z.string().trim().max(120).optional().nullable(),
-  start: z.string().min(1),
-  end: z.string().min(1),
+  // Leeg wanneer het evenement met losse momenten werkt: dan komen start en
+  // einde uit die momenten. Zie `readMoments` hieronder.
+  start: z.string().optional(),
+  end: z.string().optional(),
   allDay: z.coerce.boolean().default(false),
   url: z.string().optional().nullable(),
   // De tekst op de knop naar die link. Kort gehouden: het is een knop naast twee
@@ -45,6 +47,73 @@ const eventSchema = z.object({
   urlLabelEn: z.string().trim().max(EVENT_LINK_LABEL_MAX).optional().nullable(),
   heroWeek: z.enum(["AUTO", "PINNED", "HIDDEN"]).default("AUTO"),
 });
+
+/** Eén moment zoals het formulier het meestuurt: een dag en twee uren. */
+const momentSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  start: z.string().regex(/^\d{2}:\d{2}$/),
+  end: z.string().regex(/^\d{2}:\d{2}$/),
+  label: z.string().trim().max(80).optional().default(""),
+});
+
+/**
+ * Hoeveel momenten één evenement mag dragen. Een loopweek heeft er zeven en een
+ * kerstmarkt een stuk of tien; honderd is geen evenement meer maar een reeks die
+ * in de kalender zelf thuishoort.
+ */
+const MAX_MOMENTS = 60;
+
+/**
+ * De losse momenten uit het formulier, in volgorde.
+ *
+ * `null` = het formulier stuurde er geen mee, dus het evenement werkt met één
+ * doorlopende periode. Een lege lijst is wél een fout: dan stond het formulier in
+ * de momentenmodus zonder dat er iets ingevuld was, en stil terugvallen op de
+ * start en het einde van daarnet zou iets anders opslaan dan wat er op het scherm
+ * stond.
+ *
+ * Een einduur dat niet later is dan het beginuur betekent de nacht erna: een
+ * nachtloop van 22u tot 2u hoort bij de avond waarop hij vertrekt, en dat is ook
+ * hoe de kalender hem indeelt.
+ */
+function readMoments(
+  formData: FormData,
+): { start: Date; end: Date; label: string | null }[] | null | "invalid" {
+  const raw = formData.get("moments");
+  if (typeof raw !== "string") return null;
+
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(raw);
+  } catch {
+    return "invalid";
+  }
+  const parsed = z.array(momentSchema).max(MAX_MOMENTS).safeParse(parsedJson);
+  if (!parsed.success) return "invalid";
+
+  const moments: { start: Date; end: Date; label: string | null }[] = [];
+  for (const row of parsed.data) {
+    try {
+      const start = localDateTimeToUtc(`${row.date}T${row.start}`);
+      const endDay = row.end > row.start ? row.date : nextDay(row.date);
+      moments.push({
+        start,
+        end: localDateTimeToUtc(`${endDay}T${row.end}`),
+        label: row.label || null,
+      });
+    } catch {
+      return "invalid";
+    }
+  }
+  return moments.sort((a, b) => a.start.getTime() - b.start.getTime());
+}
+
+/** De dag na deze, als "YYYY-MM-DD". Kalenderdagen, dus via UTC gerekend. */
+function nextDay(date: string): string {
+  const next = new Date(`${date}T12:00:00Z`);
+  next.setUTCDate(next.getUTCDate() + 1);
+  return next.toISOString().slice(0, 10);
+}
 
 /** Velden die in het logboek bij naam genoemd worden bij een bewerking. */
 const EVENT_FIELD_LABELS: Record<string, string> = {
@@ -67,6 +136,7 @@ const EVENT_FIELD_LABELS: Record<string, string> = {
   imageFocusY: "uitsnede van de afbeelding",
   publishedAt: "publicatiestatus",
   heroWeek: "weekoverzicht op de homepage",
+  moments: "momenten",
 };
 
 async function assertCanManageEvent(userGroups: string[], groupId: string, superOrAll: boolean) {
@@ -88,8 +158,10 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     location: formData.get("location") || null,
     groupId: formData.get("groupId"),
     organiserName: formData.get("organiserName") || null,
-    start: formData.get("start"),
-    end: formData.get("end"),
+    // Afwezig in de momentenmodus; `undefined` en niet `null`, want het veld is
+    // optioneel en niet leeg.
+    start: formData.get("start") ?? undefined,
+    end: formData.get("end") ?? undefined,
     allDay: formData.get("allDay") === "on",
     url: formData.get("url") || null,
     urlLabelNl: formData.get("urlLabelNl") || null,
@@ -107,13 +179,26 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   // E1: hangt er een logistiek-evenement aan dit evenement?
   const needsLogistics = formData.get("needsLogistics") === "on";
 
+  const moments = readMoments(formData);
+  if (moments === "invalid") return saveError("INVALID_MOMENT");
+  if (moments !== null && moments.length === 0) return saveError("NO_MOMENTS");
+
+  // De envelop rond de momenten: de start van het eerste en het einde van het
+  // laatste. `CalendarEvent.start`/`.end` blijven daarmee kloppen voor alles wat
+  // niets van momenten weet (zoek, tickets, logistiek, de vensters van de feeds).
   let start: Date;
   let end: Date;
-  try {
-    start = localDateTimeToUtc(input.start);
-    end = localDateTimeToUtc(input.end);
-  } catch {
-    return saveError("INVALID_INPUT");
+  if (moments) {
+    start = moments[0]!.start;
+    end = moments.reduce((latest, moment) => (moment.end > latest ? moment.end : latest), moments[0]!.end);
+  } else {
+    if (!input.start || !input.end) return saveError("INVALID_INPUT");
+    try {
+      start = localDateTimeToUtc(input.start);
+      end = localDateTimeToUtc(input.end);
+    } catch {
+      return saveError("INVALID_INPUT");
+    }
   }
   // Het einde mag niet voor de start liggen. Anders is het evenement tegelijk
   // "aankomend" op de homepage (die op `start` filtert) en "verleden" in de
@@ -145,7 +230,9 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     organiserName: input.organiserName || null,
     start,
     end,
-    allDay: input.allDay,
+    // Een reeks momenten en een heledagevenement sluiten elkaar uit: iets dat een
+    // hele dag duurt, heeft geen uren om per dag te herhalen.
+    allDay: moments ? false : input.allDay,
     url: input.url,
     // Enkel spaties is hetzelfde als niets: dan staat de standaardtekst op de
     // knop in plaats van een lege knop.
@@ -164,6 +251,13 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     deleteMany: {},
     create: categoryIds.map((categoryId) => ({ categoryId })),
   };
+
+  // Dezelfde aanpak als bij de categorieën: alles wegdoen en opnieuw zetten houdt
+  // de rijen gelijk aan wat het formulier toont. De UID in de agenda-feed hangt
+  // daarom aan de dag en niet aan de id van de rij; zie lib/calendar/feeds.ts.
+  const setMoments = moments
+    ? { deleteMany: {}, create: moments }
+    : { deleteMany: {} };
 
   let created: { id: string } | null = null;
 
@@ -186,7 +280,7 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     const publishedAt = saveAsDraft ? null : (existing.publishedAt ?? new Date());
     await prisma.calendarEvent.update({
       where: { id: input.id },
-      data: { ...data, slug, imageKey, publishedAt, categories: setCategories },
+      data: { ...data, slug, imageKey, publishedAt, categories: setCategories, moments: setMoments },
     });
     // Een gekoppeld ticketevent erft deze velden. Zonder deze duw blijft de
     // ticketshop de oude datum of locatie tonen tot iemand daar toevallig ook
@@ -255,6 +349,7 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
         imageKey: resolveImageKey(image, null),
         publishedAt: saveAsDraft ? null : new Date(),
         categories: { create: categoryIds.map((categoryId) => ({ categoryId })) },
+        ...(moments ? { moments: { create: moments } } : {}),
       },
       select: { id: true },
     });

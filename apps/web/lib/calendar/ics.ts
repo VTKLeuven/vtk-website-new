@@ -1,9 +1,11 @@
 /**
  * iCalendar (RFC 5545) serialisatie voor de VTK-kalenderfeeds.
  *
- * Bewust zonder afhankelijkheden en zonder DB: `CalendarEvent` kent geen
- * herhaling, dus elk event is precies één VEVENT en de hele generator past in
- * dit bestand. Dat maakt hem ook volledig unit-testbaar (test/ics.test.ts).
+ * Bewust zonder afhankelijkheden en zonder DB: dit bestand serialiseert een
+ * lijst afspraken en beslist niets. `CalendarEvent` kent geen herhalingsregel
+ * (`RRULE`); een evenement met losse momenten wordt in lib/calendar/feeds.ts één
+ * VEVENT per moment. Dat maakt de generator ook volledig unit-testbaar
+ * (test/ics.test.ts).
  */
 
 /** Tijdzone van de kring. Enkel hele-dag-events rekenen ermee; de rest gaat in UTC. */

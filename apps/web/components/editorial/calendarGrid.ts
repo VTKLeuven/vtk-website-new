@@ -1,5 +1,7 @@
 /** Monday-first month grid cells (42 days) for editorial calendar. */
 
+import { NIGHT_EVENT_MAX_MS, type EventMoment } from '@/lib/calendar/moments';
+
 export type GridDay = {
   date: Date;
   inMonth: boolean;
@@ -72,9 +74,37 @@ export function isSameCalendarDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-export type CalendarInterval = { start: string; end: string; allDay: boolean };
+/**
+ * Een moment zoals de kalender-API hem doorgeeft: ISO-tekst, want hij komt door
+ * een JSON-antwoord. `toMoments` maakt er `Date`s van.
+ */
+export type CalendarMoment = { start: string; end: string; label?: string | null };
 
-const TWELVE_HOURS_MS = 12 * 60 * 60 * 1000;
+export type CalendarInterval = {
+  start: string;
+  end: string;
+  allDay: boolean;
+  /**
+   * De losse momenten, wanneer het evenement er meer dan één heeft. Leeg of
+   * afwezig = het evenement loopt van `start` tot `end` door.
+   *
+   * Dit maakt het verschil tussen een festival dat drie dagen doorloopt (één
+   * balk over het rooster) en een loopweek met elke dag een loopje (een pil op
+   * elke dag, met het uur van die dag).
+   */
+  moments?: CalendarMoment[] | null;
+};
+
+/** De momenten van een evenement als `Date`s, in volgorde. */
+export function toMoments(event: CalendarInterval): EventMoment[] {
+  return (event.moments ?? [])
+    .map((moment) => ({
+      start: new Date(moment.start),
+      end: new Date(moment.end),
+      label: moment.label ?? null,
+    }))
+    .sort((a, b) => +a.start - +b.start);
+}
 
 /**
  * All-day end dates are inclusive in our CMS; timed events end exclusively.
@@ -93,7 +123,7 @@ export function eventDayRange(event: CalendarInterval): { first: Date; last: Dat
 
   if (!event.allDay && last > first) {
     const durationMs = end.getTime() - start.getTime();
-    if (durationMs <= TWELVE_HOURS_MS) {
+    if (durationMs <= NIGHT_EVENT_MAX_MS) {
       return { first, last: first };
     }
   }
@@ -101,12 +131,51 @@ export function eventDayRange(event: CalendarInterval): { first: Date; last: Dat
   return { first, last };
 }
 
+/** De dag van een moment: dezelfde nachtregel als bij een evenement. */
+function momentDayRange(moment: EventMoment): { first: Date; last: Date } {
+  return eventDayRange({
+    start: moment.start.toISOString(),
+    end: moment.end.toISOString(),
+    allDay: false,
+  });
+}
+
+/**
+ * Het moment dat op deze dag doorgaat, of `null`.
+ *
+ * Enkel het moment dat op deze dag **begint**: een nachtloop tot twee uur hoort
+ * bij de avond waarop hij vertrok, niet als begin van de ochtend erna.
+ */
+export function momentOnDay(event: CalendarInterval, day: Date): EventMoment | null {
+  return (
+    toMoments(event).find((moment) => isSameCalendarDay(moment.start, day)) ?? null
+  );
+}
+
 export function eventOccursOnDay(event: CalendarInterval, day: Date): boolean {
+  const moments = toMoments(event);
+  if (moments.length > 0) {
+    // Enkel de dagen waarop er echt iets is. De dagen ertussen horen bij geen
+    // enkel moment en blijven dus leeg, ook al ligt de envelop eromheen.
+    return moments.some((moment) => {
+      const { first, last } = momentDayRange(moment);
+      return day >= first && day <= last;
+    });
+  }
   const { first, last } = eventDayRange(event);
   return day >= first && day <= last;
 }
 
+/**
+ * Loopt dit evenement over meerdere dagen **door**? Dat is wat een balk over het
+ * rooster rechtvaardigt.
+ *
+ * Een evenement met losse momenten is dat per definitie niet: het staat als
+ * gewone pil op elk van zijn dagen, met het uur van die dag erbij. Een balk van
+ * maandag tot zondag zou zeggen dat er ook 's nachts en tussendoor iets is.
+ */
 export function isMultiDayEvent(event: CalendarInterval): boolean {
+  if (event.moments?.length) return false;
   const { first, last } = eventDayRange(event);
   return last > first;
 }
