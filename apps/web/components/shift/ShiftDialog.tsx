@@ -19,6 +19,7 @@ import {
   type MergedShift,
   type PostNames,
 } from './shiftData';
+import './shift-board.css';
 
 function Detail({ k, v }: { k: string; v: string }) {
   return (
@@ -61,11 +62,15 @@ export function ShiftDialog({
   entry,
   postNames,
   onClose,
+  signInHref,
+  onSuccess,
 }: {
   locale: Locale;
   entry: MergedShift;
   postNames: PostNames;
   onClose: () => void;
+  signInHref?: string;
+  onSuccess?: (registered: boolean) => void;
 }) {
   const t = getDictionary(locale).shift;
   const showToast = useToast();
@@ -110,7 +115,10 @@ export function ShiftDialog({
       ? await unregisterShift(shift.id, showToast, t)
       : await registerShift(shift.id, showToast, t);
     setBusy(false);
-    if (ok) onClose();
+    if (ok) {
+      onSuccess?.(!registered);
+      onClose();
+    }
   }
 
   const freeLabel = free === 1 ? t.spots.one : fill(t.spots.few, { n: free });
@@ -242,14 +250,20 @@ export function ShiftDialog({
             >
               {t.dialog.cancel}
             </button>
-            <button
-              type="button"
-              className={`vtk-shift-btn${registered ? ' vtk-shift-btn-danger' : ''}`}
-              disabled={busy || isFull || locked}
-              onClick={act}
-            >
-              {registered ? t.unregister : t.register}
-            </button>
+            {signInHref && !registered ? (
+              <a href={signInHref} className="vtk-shift-btn">
+                {t.register}
+              </a>
+            ) : (
+              <button
+                type="button"
+                className={`vtk-shift-btn${registered ? ' vtk-shift-btn-danger' : ''}`}
+                disabled={busy || isFull || locked}
+                onClick={act}
+              >
+                {registered ? t.unregister : t.register}
+              </button>
+            )}
           </div>
         </div>
       </div>

@@ -7,6 +7,7 @@ import { getDictionary, type Locale } from "@vtk/i18n";
 import { useToast } from "@/components/ui/toast";
 import { registerShift, type MergedShift, type PostNames } from "@/components/shift/shiftData";
 import { ShiftDialog } from "@/components/shift/ShiftDialog";
+import "@/components/shift/shift-board.css";
 import type { ShiftResponse } from "@/lib/shift";
 
 export type FrontpageShiftItem = {
@@ -248,6 +249,27 @@ export function FrontpageShiftBand({
           locale={locale}
           entry={selectedEntry}
           postNames={postNames}
+          signInHref={
+            !signedIn
+              ? `${base}/inloggen?next=${encodeURIComponent(base || "/")}`
+              : undefined
+          }
+          onSuccess={(newRegistered) => {
+            setShifts((prev) =>
+              prev.map((s) =>
+                s.id === selectedEntry.shift.id
+                  ? {
+                      ...s,
+                      viewerRegistered: newRegistered,
+                      takenSpots: newRegistered ? s.takenSpots + 1 : Math.max(0, s.takenSpots - 1),
+                      availableSpots: newRegistered
+                        ? Math.max(0, s.availableSpots - 1)
+                        : s.availableSpots + 1,
+                    }
+                  : s
+              )
+            );
+          }}
           onClose={() => setSelectedEntry(null)}
         />
       )}
