@@ -1,24 +1,32 @@
 /**
- * De twee jaargrenzen van de site, gedeeld tussen de apps en de sessie-resolver.
+ * De jaargrenzen van de site, gedeeld tussen de apps en de sessie-resolver.
  *
- * Beide tellen in startjaren van het academiejaar (2026 = "26-27"), maar ze
- * kantelen op een andere dag, en dat verschil is het punt:
+ * Alle drie tellen in startjaren van het academiejaar (2026 = "26-27"), maar ze
+ * kantelen op een andere dag, en juist die verschillen zijn het punt:
  *
- * - **Werkingsjaar** ({@link currentWorkingYear}): begint op 15 juli. Dat is
+ * - **Werkingsjaar** ({@link currentWorkingYear}): begint op **15 juli**. Dat is
  *   wanneer het nieuwe praesidium aantreedt. Roltoewijzingen en
  *   postlidmaatschappen zijn per werkingsjaar opgeslagen, dus deze cutover is
  *   meteen ook de 15-juli-reset: na de cutover tellen enkel de toewijzingen van
  *   het nieuwe jaar mee. `User.isSuperAdmin` is de enige uitzondering die niet
  *   reset (het is een boolean op de user, geen jaartoewijzing).
- * - **Studiejaar** ({@link currentStudyYear}): begint op 21 september, en enkel
- *   de jaarlijkse studiebevestiging (`User.studyConfirmedYear`) hangt eraan. Het
- *   academiejaar loopt door tot eind september, dus wie op 15 juli zijn studie
- *   "voor het nieuwe jaar" bevestigt, duidt in de praktijk nog het jaar aan dat
- *   net gedaan is. De bevestiging hoort dus pas te vervallen wanneer het
- *   academiejaar effectief gedraaid is.
+ * - **Academiejaar** ({@link currentStudyYear}): begint op **14 september**. Dan
+ *   zijn de herexamens gedaan en ligt vast wie wat gaat studeren, dus vanaf dan
+ *   noemen we het nieuwe academiejaar bij naam. Dit is het jaar dat op het
+ *   scherm staat ("lid voor 26-27"), het jaar waaronder een lidmaatschap
+ *   bewaard wordt, en het jaar dat een bevestiging stempelt. In juli is dat nog
+ *   niet te zeggen: wie dan gevraagd wordt "wat studeer je?" antwoordt met het
+ *   jaar dat net gedaan is.
+ * - **Bevestigingsronde** ({@link studyConfirmationYear}): begint op
+ *   **21 september**, een week na het academiejaar. Dat is de dag waarop
+ *   iedereen tegelijk de bevestigingsgate voor zijn neus krijgt. Die week
+ *   ertussen is bewust: het nieuwe jaar heet al 26-27, maar niemand wordt
+ *   geblokkeerd terwijl de eerste lesweek nog moet beginnen, en de bevestiging
+ *   van vorig jaar blijft zolang geldig (ook voor de mailinglijsten). Wie in
+ *   die week uit zichzelf langskomt, bevestigt gewoon al voor 26-27.
  *
  * Deze logica leeft bewust in @vtk/auth zodat elke app (en de resolver) exact
- * dezelfde cutovers gebruikt. `apps/web/lib/workingYear.ts` her-exporteert dit en
+ * dezelfde grenzen gebruikt. `apps/web/lib/workingYear.ts` her-exporteert dit en
  * voegt app-specifieke helpers toe (tabs, parsing, formatting).
  */
 
@@ -29,9 +37,13 @@ export const FIRST_WORKING_YEAR = 2026;
 const CUTOVER_MONTH = 7; // juli
 const CUTOVER_DAY = 15;
 
-/** Dag/maand waarop de studiebevestiging vervalt (21 september). */
+/** Dag/maand waarop het nieuwe academiejaar begint (14 september). */
 const STUDY_CUTOVER_MONTH = 9; // september
-const STUDY_CUTOVER_DAY = 21;
+const STUDY_CUTOVER_DAY = 14;
+
+/** Dag/maand waarop de bevestigingsronde opengaat (21 september). */
+const CONFIRM_CUTOVER_MONTH = 9; // september
+const CONFIRM_CUTOVER_DAY = 21;
 
 /** Huidige datum uitgedrukt in Brussel-tijd (jaar/maand/dag). */
 function brusselsYmd(date: Date): { year: number; month: number; day: number } {
@@ -61,19 +73,38 @@ export function currentWorkingYear(date: Date = new Date()): number {
 }
 
 /**
- * Het academiejaar waarvoor een studiebevestiging moet gelden (default nu).
+ * Het lopende academiejaar (default nu): wat er op het scherm staat, waaronder
+ * een lidmaatschap bewaard wordt en wat een bevestiging stempelt.
  *
  * Bewust **niet** geklemd op {@link FIRST_WORKING_YEAR}: die klem bestaat omdat
- * er geen roldata is van vóór "26-27", en hier zou ze net het tegenovergestelde
- * doen van waarvoor deze cutover gemaakt is. Tussen 15 juli en 21 september 2026
- * zou ze 2026 teruggeven, en dan valt de bevestigingsgate toch in juli.
+ * er geen roldata is van vóór "26-27". Een lidmaatschap of een bevestiging van
+ * een ouder academiejaar bestaat wel degelijk, en die op 2026 klemmen zou ze op
+ * het verkeerde jaar zetten.
  */
 export function currentStudyYear(date: Date = new Date()): number {
   return yearAtCutover(date, STUDY_CUTOVER_MONTH, STUDY_CUTOVER_DAY);
 }
 
 /**
+ * Het academiejaar waarvoor er een bevestiging moet zijn (default nu).
+ *
+ * Loopt een week achter op {@link currentStudyYear}: tussen 14 en 21 september
+ * heet het nieuwe jaar al 26-27, maar telt de bevestiging van vorig jaar nog
+ * mee. Zowel de gate ({@link needsStudyConfirmation}) als de geschiktheid voor
+ * de mailinglijsten hangt hieraan; liepen die twee uiteen, dan viel iedereen
+ * die week uit elke lijst zonder dat er iets gebeurd was.
+ */
+export function studyConfirmationYear(date: Date = new Date()): number {
+  return yearAtCutover(date, CONFIRM_CUTOVER_MONTH, CONFIRM_CUTOVER_DAY);
+}
+
+/**
  * Of een account nu door de jaarlijkse studiebevestiging moet.
+ *
+ * Vergelijkt met de **bevestigingsronde** en niet met het academiejaar: anders
+ * stond iedereen op 14 september voor de gate terwijl de eerste lesweek nog
+ * moet beginnen. Een bevestiging die al voor het nieuwe jaar geldt (iemand die
+ * in die week uit zichzelf langskwam) telt daarbij ook, vandaar `<`.
  *
  * De expliciete studentstatus is essentieel: een oude of ontbrekende
  * `studyConfirmedYear` zegt niets over alumni, academisch personeel of andere
@@ -84,15 +115,16 @@ export function needsStudyConfirmation(
   user: { isStudent: boolean; studyConfirmedYear: number | null },
   date: Date = new Date(),
 ): boolean {
-  return user.isStudent && user.studyConfirmedYear !== currentStudyYear(date);
+  if (!user.isStudent) return false;
+  return (user.studyConfirmedYear ?? -1) < studyConfirmationYear(date);
 }
 
 /**
- * Startmoment van een studiejaar: 21 september van dat jaar (Brussel-tijd, hier
- * benaderd als middernacht UTC; het uur doet er niet toe voor het tonen van "de
- * eerstvolgende omslag"). De tegenhanger voor het werkingsjaar staat in
- * `apps/web/lib/workingYear.ts`.
+ * Startmoment van een bevestigingsronde: 21 september van dat jaar
+ * (Brussel-tijd, hier benaderd als middernacht UTC; het uur doet er niet toe
+ * voor het tonen van "de eerstvolgende omslag"). De tegenhanger voor het
+ * werkingsjaar staat in `apps/web/lib/workingYear.ts`.
  */
-export function studyYearStart(year: number): Date {
-  return new Date(Date.UTC(year, STUDY_CUTOVER_MONTH - 1, STUDY_CUTOVER_DAY));
+export function studyConfirmationStart(year: number): Date {
+  return new Date(Date.UTC(year, CONFIRM_CUTOVER_MONTH - 1, CONFIRM_CUTOVER_DAY));
 }

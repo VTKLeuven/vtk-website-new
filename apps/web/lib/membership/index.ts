@@ -16,7 +16,7 @@ import {
  * Lidmaatschap van de kring, per academiejaar.
  *
  * Het lidmaatschap loopt op dezelfde klok als de studiebevestiging
- * (`currentStudyYear()`, cutover 21 september) en niet op het werkingsjaar: het
+ * (`currentStudyYear()`, cutover 14 september) en niet op het werkingsjaar: het
  * wordt op datzelfde scherm gevraagd, en "lid voor 26-27" is een academiejaar.
  *
  * Wie aan de faculteit Ingenieurswetenschappen studeert wordt gratis lid;

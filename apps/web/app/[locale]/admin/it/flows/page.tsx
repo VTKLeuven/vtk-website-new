@@ -3,7 +3,12 @@ import { prisma } from "@vtk/db";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
-import { currentStudyYear, formatWorkingYear, studyYearStart } from "@/lib/workingYear";
+import {
+  currentStudyYear,
+  formatWorkingYear,
+  studyConfirmationStart,
+  studyConfirmationYear,
+} from "@/lib/workingYear";
 import { needsStudyConfirmation } from "@vtk/auth";
 import { previewNoopAction } from "@/app/actions/flowPreview";
 import { ProfileForm } from "@/components/profile/ProfileForm";
@@ -108,6 +113,8 @@ export default async function AdminFlowPreview({
 
   const dict = getDictionary(locale);
   const year = currentStudyYear();
+  // De ronde loopt een week achter op de jaarnaam; de gate hangt aan de ronde.
+  const confirmationYear = studyConfirmationYear();
 
   // Beide schermen dragen ook de lidmaatschapsvraag, dus draagt de
   // voorvertoning ze ook. Het echte aanbod hangt aan de eigen staat van de
@@ -168,9 +175,10 @@ export default async function AdminFlowPreview({
     </>
   );
 
-  // De eerstvolgende 21 september: dat is het moment waarop iedereen tegelijk de
-  // bevestigingsgate voor zijn neus krijgt.
-  const rollover = studyYearStart(year + 1).toLocaleDateString(nl ? "nl-BE" : "en-GB", {
+  // De eerstvolgende 21 september: dat is het moment waarop iedereen tegelijk
+  // de bevestigingsgate voor zijn neus krijgt. Op de bevestigingsronde en niet
+  // op het academiejaar: dat laatste is op 14 september al omgeslagen.
+  const rollover = studyConfirmationStart(confirmationYear + 1).toLocaleDateString(nl ? "nl-BE" : "en-GB", {
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -287,13 +295,13 @@ export default async function AdminFlowPreview({
             <ul className="mt-2 list-disc space-y-1 pl-4">
               <li>
                 {nl
-                  ? `Enkel met de status Student, zodra User.studyConfirmedYear achterloopt op het huidige academiejaar (${formatWorkingYear(year)}).`
-                  : `Only with the Student status, as soon as User.studyConfirmedYear lags behind the current academic year (${formatWorkingYear(year)}).`}
+                  ? `Enkel met de status Student, zodra User.studyConfirmedYear achterloopt op de lopende bevestigingsronde (${formatWorkingYear(confirmationYear)}). Het lopende academiejaar is ${formatWorkingYear(year)}.`
+                  : `Only with the Student status, as soon as User.studyConfirmedYear lags behind the running confirmation round (${formatWorkingYear(confirmationYear)}). The current academic year is ${formatWorkingYear(year)}.`}
               </li>
               <li>
                 {nl
-                  ? `Het academiejaar rolt om op 21 september, niet op 15 juli zoals het werkingsjaar: in juli loopt het academiejaar nog. De eerstvolgende omslag is ${rollover}; dan krijgen alle studenten dit scherm.`
-                  : `The academic year rolls over on 27 September, not on 15 July like the working year: in July the academic year is still running. The next rollover is ${rollover}; all students then get this screen.`}
+                  ? `Het academiejaar rolt om op 14 september, na de herexamens; de bevestigingsronde opent een week later op 21 september, zodat niemand geblokkeerd wordt voor de eerste lesweek. De eerstvolgende omslag is ${rollover}; dan krijgen alle studenten dit scherm.`
+                  : `The academic year rolls over on 14 September, after the resits; the confirmation round opens a week later on 21 September, so nobody is blocked before the first week of classes. The next rollover is ${rollover}; all students then get this screen.`}
               </li>
               <li>
                 {nl

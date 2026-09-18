@@ -12,7 +12,7 @@
  *    het account veranderd is. `User.isSuperAdmin` is het enige dat blijft.
  * 2. **Een gate in `apps/web/proxy.ts`** stuurt je van élke pagina weg, en dan
  *    lijkt dat op "ik raak niet in /admin": onboarding niet af, de jaarlijkse
- *    studiebevestiging (cutover 27 september), of de @vtk.be-koppelgate.
+ *    studiebevestiging (bevestigingsronde vanaf 21 september), of de @vtk.be-koppelgate.
  * 3. Pas als 1 en 2 uitgesloten zijn: een rol die de permissie niet (meer)
  *    bevat.
  *

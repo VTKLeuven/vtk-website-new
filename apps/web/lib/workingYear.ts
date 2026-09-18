@@ -1,18 +1,31 @@
 // Werkingsjaar-logica voor posten (groepen).
 //
-// De cutovers zelf (15 juli voor het werkingsjaar, 21 september voor de
-// studiebevestiging; beide Brussel-tijd) leven in @vtk/auth, zodat de apps én de
-// sessie-resolver exact dezelfde grenzen gebruiken. Dit bestand voegt enkel
+// De cutovers zelf (15 juli voor het werkingsjaar, 14 september voor het
+// academiejaar, 21 september voor de bevestigingsronde; alle drie Brussel-tijd)
+// leven in @vtk/auth, zodat de apps én de sessie-resolver exact dezelfde grenzen
+// gebruiken. Dit bestand voegt enkel
 // app-specifieke helpers toe (tabs, parsing, formatting). Omdat memberships en
 // roltoewijzingen per jaar worden bijgehouden, begint een nieuw werkingsjaar
 // automatisch met lege posten en blijft de historiek bewaard.
 
-import { currentWorkingYear, currentStudyYear, studyYearStart, FIRST_WORKING_YEAR } from "@vtk/auth";
+import {
+  currentWorkingYear,
+  currentStudyYear,
+  studyConfirmationYear,
+  studyConfirmationStart,
+  FIRST_WORKING_YEAR,
+} from "@vtk/auth";
 
-export { currentWorkingYear, currentStudyYear, studyYearStart, FIRST_WORKING_YEAR };
+export {
+  currentWorkingYear,
+  currentStudyYear,
+  studyConfirmationYear,
+  studyConfirmationStart,
+  FIRST_WORKING_YEAR,
+};
 
 /**
- * Formatteer een werkingsjaar als "26-27". Een studiejaar telt in dezelfde
+ * Formatteer een werkingsjaar als "26-27". Een academiejaar telt in dezelfde
  * startjaren en gebruikt dus dezelfde vorm.
  */
 export function formatWorkingYear(year: number): string {

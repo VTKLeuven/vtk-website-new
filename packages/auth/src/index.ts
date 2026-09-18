@@ -14,8 +14,9 @@ export { PERMISSIONS, isPermission, permissionCodes, type Permission } from './l
 export {
   currentWorkingYear,
   currentStudyYear,
+  studyConfirmationYear,
   needsStudyConfirmation,
-  studyYearStart,
+  studyConfirmationStart,
   FIRST_WORKING_YEAR,
 } from './lib/workingYear';
 export {

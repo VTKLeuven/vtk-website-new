@@ -37,8 +37,9 @@ export async function generateMetadata({
 
 /**
  * Jaarlijkse bevestiging van het studieprofiel. De gate in `proxy.ts` stuurt
- * hierheen zodra `studyConfirmedYear` achterloopt op het academiejaar (de
- * cutover ligt op 21 september, zie `lib/workingYear.ts`).
+ * hierheen zodra `studyConfirmedYear` achterloopt op de bevestigingsronde, die
+ * op 21 september opengaat. Het academiejaar zelf heet al een week eerder
+ * 26-27; zie `lib/workingYear.ts` voor de drie grenzen.
  *
  * De vorige keuze staat voorgevuld, zodat bevestigen één klik is voor wie niets
  * wijzigt; dat is het verschil tussen een lid dat bevestigt en een lid dat

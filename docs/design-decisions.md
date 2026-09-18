@@ -936,35 +936,42 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
 - **De oplossing:** niet de koppeling herbouwen, maar de _jaarlijkse herdeclaratie_.
   `User.isStudent` zegt expliciet wie student is; alleen voor die accounts houdt
   `User.studyConfirmedYear` bij in welk academiejaar het lid zijn studie laatst
-  bevestigde. Loopt dat achter op `currentStudyYear()` (rollover op 27 september,
-  zie `lib/workingYear.ts`), dan is het studentenprofiel verlopen. De gedeelde
-  helper `needsStudyConfirmation()` bewaakt die regel in web en mobiele app.
-- **De bevestiging vervalt op 27 september, niet op 15 juli.** Dat is bewust een
-  andere dag dan de rest van de site: het werkingsjaar kantelt op 15 juli, maar
-  het academiejaar loopt door tot eind september. Wie in juli gevraagd wordt "wat
-  studeer je?" antwoordt met het jaar dat net gedaan is (in juli 2026 dus 25-26),
-  en dan staat het hele werkingsjaar lang het verkeerde studiejaar in de
-  mailinglijsten en in de career-mappen. Op 27 september is het nieuwe
-  academiejaar effectief begonnen: de tweedezittijd is voorbij, wie heroriënteert
-  weet het, en de eerste lesweek is bezig. Dan pas is "wat studeer je?" een vraag
-  met een juist antwoord.
-- **Gevolg: twee jaargrenzen naast elkaar.** `currentWorkingYear()` (15 juli,
-  posten en rollen) en `currentStudyYear()` (27 september, enkel de
-  studiebevestiging) staan samen in `packages/auth/src/lib/workingYear.ts`, zodat
-  het verschil op één plek zichtbaar is. Alles wat aan `studyConfirmedYear` hangt
-  gebruikt het studiejaar; dat is de gate, het bevestigingsscherm, én de
-  geschiktheid voor de mailinglijsten. Zouden die uit elkaar lopen, dan valt
-  iedereen tussen 15 juli en 27 september uit elke lijst zonder dat er iets
-  gebeurd is.
-- Het studiejaar is bewust **niet geklemd** op `FIRST_WORKING_YEAR` zoals het
-  werkingsjaar (die klem bestaat omdat er geen roldata is van vóór 26-27). Met
-  die klem zou de gate in de zomer van 2026 alsnog in juli vallen.
+  bevestigde. Loopt dat achter op de lopende bevestigingsronde
+  (`studyConfirmationYear()`, zie `lib/workingYear.ts`), dan is het
+  studentenprofiel verlopen. De gedeelde helper `needsStudyConfirmation()`
+  bewaakt die regel in web en mobiele app.
+- **Drie grenzen, en ze vallen bewust niet samen.** Ze staan samen in
+  `packages/auth/src/lib/workingYear.ts`, zodat het verschil op één plek
+  zichtbaar is:
+  - **15 juli, het werkingsjaar** (`currentWorkingYear()`): het nieuwe
+    praesidium treedt aan. Posten en rollen, niets van dit alles.
+  - **14 september, het academiejaar** (`currentStudyYear()`): de herexamens
+    zijn gedaan en het ligt vast wie wat gaat studeren, dus vanaf dan noemen we
+    het nieuwe jaar bij naam. Dit is het jaar dat op het scherm staat ("lid voor
+    26-27"), het jaar waaronder een lidmaatschap bewaard wordt, en het jaar dat
+    een bevestiging stempelt. In juli kan dat niet: wie dan gevraagd wordt "wat
+    studeer je?" antwoordt met het jaar dat net gedaan is, en dan staat het hele
+    werkingsjaar lang het verkeerde studiejaar in de mailinglijsten en in de
+    career-mappen.
+  - **21 september, de bevestigingsronde** (`studyConfirmationYear()`): pas dan
+    krijgt iedereen tegelijk de gate voor zijn neus. Een week na de jaarnaam,
+    zodat niemand geblokkeerd wordt terwijl de eerste lesweek nog moet beginnen.
+- **Die week ertussen is het punt, niet een detail.** Tussen 14 en 21 september
+  heet het jaar al 26-27 en bevestigt wie uit zichzelf langskomt meteen voor
+  26-27 (en wordt dus lid voor 26-27), terwijl de bevestiging van vorig jaar
+  gewoon geldig blijft. Daarom hangt de geschiktheid voor de mailinglijsten aan
+  de **ronde** en niet aan de jaarnaam, en vergelijkt ze met `>=` en niet met
+  `=`: met een gelijkheid viel die week ofwel iedereen uit elke lijst, ofwel net
+  wie al bevestigd had.
+- Het academiejaar is bewust **niet geklemd** op `FIRST_WORKING_YEAR` zoals het
+  werkingsjaar (die klem bestaat omdat er geen roldata is van vóór 26-27). Een
+  lidmaatschap of een bevestiging van een ouder academiejaar bestaat wel
+  degelijk, en die op 2026 klemmen zou ze op het verkeerde jaar zetten.
 - **Eenmalige correctie bij de invoering (augustus 2026):** wie sinds 15 juli
   2026 al bevestigd had, stond op 2026 terwijl het antwoord in de praktijk over
-  25-26 ging. De migratie `20260827160000_studiebevestiging_27_september` zet die
-  stempels op 2025. Zo valt de eerste bevestiging onder de nieuwe regel op
-  27 september 2026; tot dan is niemand gegate en blijven de mailinglijsten
-  intact.
+  25-26 ging. De migratie `20260827160000_studiebevestiging_27_september` zet
+  die stempels op 2025. Zo valt de eerste bevestiging onder de nieuwe regel in
+  september 2026; tot dan is niemand gegate en blijven de mailinglijsten intact.
 - Een verlopen studentenprofiel wordt **blokkerend** afgedwongen door een tweede gate in
   `apps/web/proxy.ts`, na de onboarding-gate: het lid gaat naar
   `/studie-bevestigen` voor het de site verder kan gebruiken.
@@ -987,8 +994,8 @@ SSO. Concrete implementatie: hook in `packages/auth/src/auth.ts`, gate in
 - Enkel **actieve** leden komen in een export: een gedeactiveerd account hoort
   geen mails meer te krijgen.
 - Enkel leden met de status **Student** die hun studie **dit academiejaar bevestigd** hebben (zie de
-  jaarlijkse studiebevestiging hierboven; die vervalt op 27 september, niet op
-  15 juli) zitten in een lijst; dat geldt voor **alle** lijsten, ook "Alle
+  jaarlijkse studiebevestiging hierboven; de bevestigingsronde opent op
+  21 september) zitten in een lijst; dat geldt voor **alle** lijsten, ook "Alle
   studenten". Andere statussen vallen er meteen uit, zonder op een verlopen
   jaarstempel te moeten wachten.
 - **"Alle studenten"** is een synthetische lijst: iedereen, zonder opt-in. Ze is
@@ -5174,7 +5181,7 @@ wist.
 
 `/admin/it/flows` (superadmin) toont per gate wanneer hij afgaat, wat de eigen
 staat van de kijker is (`onboardedAt`, `isStudent`, `studyConfirmedYear`, het huidige
-academiejaar en de eerstvolgende omslag op 27 september), en het formulier zelf.
+academiejaar en de eerstvolgende omslag op 21 september), en het formulier zelf.
 
 Dat is bewust **het echte formulier**, met een opslaan-actie die niets bewaart
 (`previewNoopAction`). Een nagebouwde kopie zou vroeg of laat afwijken van wat een
@@ -7371,8 +7378,8 @@ openzetten voor iedereen.
 VTK houdt per **academiejaar** bij wie lid is (`Membership`, uniek op lid +
 jaar). Dat is iets anders dan `GroupMembership`: dat is een post in een
 werkingsjaar, dit is "deze student is dit jaar lid van de kring". Het hangt aan
-dezelfde klok als de studiebevestiging (cutover 21 september), want het wordt op
-datzelfde scherm gevraagd.
+dezelfde klok als de studiebevestiging (het academiejaar, cutover
+14 september), want het wordt op datzelfde scherm gevraagd.
 
 **Gratis voor de faculteit, betalend daarbuiten.** Een student van de faculteit
 Ingenieurswetenschappen wordt gratis lid; wie er niet studeert, betaalt (default

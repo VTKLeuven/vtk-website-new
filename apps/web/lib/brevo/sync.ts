@@ -2,7 +2,7 @@ import "server-only";
 
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
-import { currentStudyYear } from "@vtk/auth";
+import { studyConfirmationYear } from "@vtk/auth";
 import {
   BREVO_LIST_KEYS,
   alternateEmail,
@@ -130,7 +130,7 @@ export async function syncUserToBrevo(
       }
     }
 
-    const desired = new Set(desiredListKeys(effective, currentStudyYear()));
+    const desired = new Set(desiredListKeys(effective, studyConfirmationYear()));
 
     // De lijsten waarvoor dit contact zich apart uitschreef. Zo'n uitschrijving
     // hangt bij Brevo aan het lidmaatschap: opnieuw toevoegen wist ze niet, maar
@@ -196,7 +196,7 @@ export type ReconcileOutcome =
 export async function reconcileMailingLists(): Promise<ReconcileOutcome> {
   if (!brevoEnabled()) return { skipped: true };
   const { lists } = await getBrevoListMap();
-  const studyYear = currentStudyYear();
+  const studyYear = studyConfirmationYear();
 
   // 1. Momentopname van Brevo. Een lijst die we niet konden lezen, prunen we
   //    ook niet: zonder inhoud weten we niet wie eruit moet.

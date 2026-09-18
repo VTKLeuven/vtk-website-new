@@ -91,16 +91,21 @@ export type SyncUserData = {
 };
 
 /**
- * Basis-geschiktheid: enkel actieve leden die hun studie dit academiejaar
- * bevestigden, de status Student hebben en zich niet via een mail uitschreven. Faalt dit,
- * dan hoort het lid in géén enkele lijst en wordt het overal uit verwijderd.
- * Spiegelt de eerste vier filters van `listWhere()`.
+ * Basis-geschiktheid: enkel actieve leden die hun studie bevestigden voor de
+ * lopende bevestigingsronde, de status Student hebben en zich niet via een mail
+ * uitschreven. Faalt dit, dan hoort het lid in géén enkele lijst en wordt het
+ * overal uit verwijderd. Spiegelt de eerste vier filters van `listWhere()`.
+ *
+ * `studyYear` is de **bevestigingsronde** (`studyConfirmationYear()`), en de
+ * vergelijking is `>=`: tussen 14 en 21 september heet het academiejaar al
+ * 26-27 terwijl de bevestiging van vorig jaar nog geldt, en wie in die week uit
+ * zichzelf bevestigt, draagt al de nieuwe stempel.
  */
 export function isEligible(user: SyncUserData, studyYear: number): boolean {
   return (
     user.active &&
     user.isStudent &&
-    user.studyConfirmedYear === studyYear &&
+    (user.studyConfirmedYear ?? -1) >= studyYear &&
     user.mailUnsubscribedAt === null
   );
 }

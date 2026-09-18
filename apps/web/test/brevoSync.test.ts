@@ -63,6 +63,13 @@ describe("isEligible", () => {
     expect(isEligible(user({ studyConfirmedYear: null }), YEAR)).toBe(false);
   });
 
+  it("keeps a member who already confirmed for the next year", () => {
+    // Tussen 14 en 21 september bevestigt wie langskomt al voor het nieuwe
+    // academiejaar, terwijl de ronde nog op het oude staat. Die stempel loopt
+    // dus vóór, en mag het lid niet uit elke lijst duwen.
+    expect(isEligible(user({ studyConfirmedYear: YEAR + 1 }), YEAR)).toBe(true);
+  });
+
   it("rejects a member who unsubscribed through an email, like listWhere", () => {
     expect(isEligible(user({ mailUnsubscribedAt: new Date() }), YEAR)).toBe(false);
     // Ook met categorieën aangevinkt: de uitschrijving gaat voor.

@@ -10,7 +10,7 @@ import {
   inYears,
 } from "@/lib/careerLists";
 import { MAIL_CATEGORIES, STUDY_PROGRAMMES } from "@/lib/profile";
-import { currentStudyYear } from "@/lib/workingYear";
+import { studyConfirmationYear } from "@/lib/workingYear";
 
 /**
  * Mailinglijst-exports voor de admin.
@@ -82,7 +82,11 @@ export function listWhere(id: MailingListId): Prisma.UserWhereInput {
   return {
     active: true,
     isStudent: true,
-    studyConfirmedYear: currentStudyYear(),
+    // Op de bevestigingsronde en niet op het academiejaar, en `gte` en niet
+    // `equals`: tussen 14 en 21 september heet het jaar al 26-27 terwijl de
+    // bevestiging van vorig jaar nog geldt. Met een gelijkheid viel die week
+    // ofwel iedereen uit elke lijst, ofwel net wie al bevestigd had.
+    studyConfirmedYear: { gte: studyConfirmationYear() },
     mailUnsubscribedAt: null,
     ...(id === ALL_STUDENTS ? {} : { mailCategories: { has: id } }),
     // Career is op faculteitsstudenten gericht: wie aangaf niet aan de
