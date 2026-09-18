@@ -5557,20 +5557,22 @@ tot de volgende dag. Staat er tóch iets op een zaterdag, dan valt het uit het
 overzicht; het blijft wel in de kalender, in de feeds en in de app staan. Wie op
 een zaterdag langskomt, ziet het venster vanaf zondag.
 
-### Zes dagen, rollend, met gisteren erbij als daar iets was
+### Zes dagen, rollend, met gisteren erbij als er plaats is
 
 Een vaste week (maandag tot zondag) staat op vrijdagavond zo goed als leeg,
 terwijl er dan net het meest te beleven valt. Daarom rolt het venster mee:
 
-- Stond er **gisteren** iets, dan begint het overzicht gisteren en loopt het nog
-  vier dagen vooruit. Anders verdwijnt een cantus van gisteren om middernacht van
-  de homepage, terwijl de halve kring er de dag erna nog over praat. Wat gisteren
-  begon en vandaag nog loopt, telt daar niet voor: het staat vandaag al in het
-  overzicht, en een tentoonstelling van een maand zou het venster anders elke dag
-  laten terugkijken.
-- Stond er gisteren niets, dan begint het vandaag en kijkt het een dag verder.
-
-Het zijn altijd zes dagen, zodat de hoogte van het blok niet per dag verspringt.
+- Het begint **vandaag**. Wie op de homepage kijkt, kijkt in de eerste plaats
+  naar vandaag, en die dag hoort dus bovenaan te staan.
+- **Gisteren** komt er enkel bij wanneer hij niets verdringt: er moet nog een
+  rij vrij zijn in het totaal van tien én de laatste dag van het venster moet
+  leeg staan. Die lege dag staat hij dan af, zodat het altijd zes dagen blijven
+  en de hoogte van het blok niet per dag verspringt. Zo verdwijnt een cantus van
+  gisteren niet om middernacht van de homepage terwijl de halve kring er de dag
+  erna nog over praat, maar duwt hij ook nooit iets weg dat nog moet komen.
+- Wat gisteren begon en vandaag nog loopt, telt daar niet voor: het staat vandaag
+  al in het overzicht, en een tentoonstelling van een maand zou het venster anders
+  elke dag laten terugkijken.
 
 ### Onder de vier evenementen wordt het een lijst
 
@@ -5589,8 +5591,20 @@ nog komt".
 
 De hero staat naast de titel en mag niet met de drukte meegroeien tot een tweede
 scherm. Een dag met meer toont er drie plus "nog n die dag", met een link naar de
-kalender. Het totaal stopt op tien; de kap valt dan op de verste dagen, want die
-zijn het minst dringend.
+kalender. Het totaal stopt op tien.
+
+**Vandaag en morgen vallen buiten de dagkap.** Dat vandaag zijn derde evenement
+afkapt terwijl er volgende week nog rijen vrij zijn, is de omgekeerde wereld: het
+overzicht gaat in de eerste plaats over vanavond en morgen. Die twee dagen
+worden dus volledig getoond; enkel het totaal van tien houdt ze tegen, want dat
+is de hoogte van het blok.
+
+**De rijen worden verdeeld in volgorde van dringendheid**: vandaag, morgen,
+overmorgen, ... en gisteren als laatste. Loopt het totaal vol, dan is het dus de
+laatste dag van het venster die rijen inlevert en "nog n die dag" krijgt, en
+nooit vandaag of morgen. Dit kwam van een homepage waarop donderdag drie
+evenementen toonde, vrijdag er één plus "nog 1 die dag", en de woensdag erna wél
+twee rijen kreeg.
 
 ### Een evenement over meerdere dagen staat op elke dag
 

@@ -176,6 +176,45 @@ describe("selectHeroWeek", () => {
     expect(selectHeroWeek(withoutSunday, monday14).days[0]?.key).toBe("2026-09-14");
   });
 
+  it("leaves yesterday out when the days from today fill the overview", () => {
+    // Zelfde week als hierboven, maar nu staat er ook iets op de laatste dag van
+    // het venster. Gisteren is de minst belangrijke dag en verdringt die niet.
+    const monday14 = at("2026-09-14T09:00:00+02:00");
+    const full = [...busyWeek, event("slot", "2026-09-20T19:00:00+02:00")];
+    const result = selectHeroWeek(full, monday14);
+    expect(result.days[0]?.key).toBe("2026-09-14");
+    expect(result.days.some((day) => day.key === "2026-09-13")).toBe(false);
+  });
+
+  it("shows every event of today, also past the cap of three", () => {
+    const busyToday = [
+      ...busyWeek,
+      event("vandaag-4", "2026-09-13T14:00:00+02:00"),
+      event("vandaag-5", "2026-09-13T22:00:00+02:00"),
+    ];
+    const today = selectHeroWeek(busyToday, sunday13).days.find((d) => d.key === "2026-09-13");
+    expect(ids(today)).toEqual(["onthaal", "vandaag-4", "vandaag-5"]);
+    expect(today?.more).toBe(0);
+  });
+
+  it("keeps all of tomorrow and takes the rows from the last day of the window", () => {
+    // Vandaag één, morgen vier, en verderop meer dan er nog in het totaal past.
+    const crowdedTomorrow = [
+      ...busyWeek,
+      event("morgen-3", "2026-09-14T21:00:00+02:00"),
+      event("morgen-4", "2026-09-14T22:30:00+02:00"),
+    ];
+    const result = selectHeroWeek(crowdedTomorrow, sunday13);
+    const tomorrow = result.days.find((day) => day.key === "2026-09-14");
+    expect(ids(tomorrow)).toEqual(["info", "cantus", "morgen-3", "morgen-4"]);
+    expect(tomorrow?.more).toBe(0);
+    // Vrijdag 18 is de laatste dag van het venster en levert zijn rijen in.
+    const last = result.days.find((day) => day.key === "2026-09-18");
+    expect(last?.events).toHaveLength(0);
+    expect(last?.more).toBe(2);
+    expect(result.total).toBe(10);
+  });
+
   it("fills the quiet-week list up to its default maximum", () => {
     const quiet: HeroWeekInput[] = [
       event("een", "2026-09-14T20:00:00+02:00"),
@@ -321,8 +360,12 @@ describe("selectHeroWeek with events over several days", () => {
   });
 
   it("treats the first row that is actually shown as the first", () => {
+    // Woensdag 9 als referentiedag: zondag 13 is dan niet vandaag of morgen en
+    // valt dus wél onder de dagkap van drie, die de eerste rij van Onthaaldagen
+    // eruit duwt.
+    const wednesday9 = at("2026-09-09T16:00:00+02:00");
     const busySunday = ["a", "b", "c"].map((id) => event(id, "2026-09-13T10:00:00+02:00", "PINNED"));
-    const result = selectHeroWeek([onthaal, ...busySunday, ...rest], friday11);
+    const result = selectHeroWeek([onthaal, ...busySunday, ...rest], wednesday9);
     const sunday = result.days.find((day) => day.key === "2026-09-13");
     expect(ids(sunday)).toEqual(["a", "b", "c"]);
     expect(sunday?.more).toBe(1);

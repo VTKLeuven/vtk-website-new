@@ -12,16 +12,27 @@
  *   overzicht; het blijft wel gewoon in de kalender staan.
  * - **Het venster rolt mee.** Een vaste week (maandag tot zondag) staat op
  *   vrijdagavond zo goed als leeg, terwijl er dan net het meest te beleven valt.
- * - **Gisteren blijft staan zolang er iets was.** Anders verdwijnt een cantus van
- *   gisteren om middernacht van de homepage, terwijl de halve kring er de dag
- *   erna nog over praat. Was er gisteren niets, dan begint het venster vandaag en
- *   kijkt het een dag verder vooruit.
+ * - **Vandaag staat bovenaan en wordt volledig getoond.** Wie op de homepage
+ *   kijkt, kijkt in de eerste plaats naar vandaag: dat die dag onderaan zijn
+ *   derde evenement afkapt terwijl er volgende week nog rijen vrij zijn, is de
+ *   omgekeerde wereld. De rijen worden daarom verdeeld in de volgorde vandaag,
+ *   morgen, overmorgen, ... en gisteren als laatste. Vandaag en morgen kennen
+ *   geen dagkap; loopt het totaal vol, dan geeft de laatste dag van het venster
+ *   zijn rijen af.
+ * - **Gisteren blijft staan zolang er iets was en er plaats is.** Anders
+ *   verdwijnt een cantus van gisteren om middernacht van de homepage, terwijl de
+ *   halve kring er de dag erna nog over praat. Maar gisteren is wel het minst
+ *   belangrijke: hij komt er enkel bij wanneer de dagen vanaf vandaag het
+ *   overzicht niet vol krijgen én de laatste dag van het venster leeg is. Die
+ *   lege dag staat hij dan af, zodat het blok even hoog blijft.
  * - **Bij een rustige week toont het de eerstvolgende evenementen.** Zes dagen
  *   met twee dingen erin leest als een lege kring; dan is een korte lijst met wat
  *   er wél aankomt eerlijker, ook al is dat pas over drie weken. Hoeveel die
  *   lijst maximaal toont, komt uit de Frontpage-instelling.
  * - **Hoogstens drie per dag en tien in totaal.** De hero staat naast de titel en
- *   mag niet met de drukte meegroeien tot een scherm vol.
+ *   mag niet met de drukte meegroeien tot een scherm vol. Vandaag en morgen
+ *   vallen buiten die dagkap (zie hierboven); het totaal van tien geldt wel voor
+ *   iedereen, want dat is de hoogte van het blok.
  * - **Een evenement over meerdere dagen staat op elke dag.** Met dezelfde
  *   dagregels als het kalenderrooster (zie `heroWeekEventRange`). Voor de drempel
  *   van vier telt het één keer.
@@ -42,7 +53,12 @@ export const HERO_WEEK_TIME_ZONE = "Europe/Brussels";
 /** Aantal dagen in het venster, zaterdagen niet meegeteld. */
 export const HERO_WEEK_DAYS = 6;
 
-/** Hoogstens zoveel evenementen per dag; de rest wordt "+n meer". */
+/**
+ * Hoogstens zoveel evenementen per dag; de rest wordt "+n meer".
+ *
+ * Vandaag en morgen zijn hiervan uitgezonderd: die willen we volledig tonen, en
+ * enkel het totaal hieronder houdt ze tegen.
+ */
 export const HERO_WEEK_MAX_PER_DAY = 3;
 
 /** Hoogstens zoveel rijen in het hele overzicht. */
@@ -335,17 +351,22 @@ export function selectHeroWeek<T extends HeroWeekInput>(
   const today = heroWeekDayKey(now, timeZone);
   const yesterday = shiftDayKey(today, -1);
 
+  // Het venster begint vandaag; gisteren komt er pas achteraf bij, wanneer
+  // blijkt dat er plaats over is.
+  const futureKeys = heroWeekDayKeys(now, { includeYesterday: false, timeZone });
+
   // Gisteren telt enkel voor wat er gisteren ophield. Wat vandaag nog loopt,
   // staat vandaag al in het overzicht; zonder die uitzondering zou een
   // tentoonstelling van een maand het venster elke dag laten terugkijken.
-  const keys = heroWeekDayKeys(now, {
-    includeYesterday: visible.some((item) => item.days.at(-1) === yesterday),
-    timeZone,
-  });
+  const yesterdayFits =
+    !isHeroWeekSkippedDay(yesterday) && visible.some((item) => item.days.at(-1) === yesterday);
+  const windowKeys = yesterdayFits ? [yesterday, ...futureKeys] : futureKeys;
 
   // Per evenement en niet per rij: Onthaaldagen over drie dagen is één
   // evenement, en drie rijen ervan maken nog geen drukke week.
-  const inWindow = visible.filter((item) => keys.some((key) => occursOn(item, key))).length;
+  const inWindow = visible.filter((item) =>
+    windowKeys.some((key) => occursOn(item, key)),
+  ).length;
 
   // Precies vier is genoeg om het venster te vullen; pas daaronder wordt het de
   // lijst. Het aantal rijen in die lijst is apart instelbaar: de drempel beslist
@@ -378,34 +399,64 @@ export function selectHeroWeek<T extends HeroWeekInput>(
 
   // Wat er die dag te kiezen valt, in de volgorde waarin het getoond wordt.
   const candidates = new Map<string, Array<Ranged<T>>>(
-    keys.map((key) => [
+    windowKeys.map((key) => [
       key,
       visible.filter((item) => occursOn(item, key)).sort(byPlacementThenStart(key, timeZone)),
     ]),
   );
-  const chosen = new Map<string, Set<string>>(keys.map((key) => [key, new Set<string>()]));
+  const chosen = new Map<string, Set<string>>(windowKeys.map((key) => [key, new Set<string>()]));
 
-  // Twee rondes, en dat is de hele reden dat dit geen lus is: eerst krijgt elk
-  // evenement zijn eerste rij, daarna vullen de herhalingen aan met wat er
-  // overblijft. Anders neemt een evenement dat zes dagen duurt in één ronde zes
-  // van de tien rijen en verdwijnt de rest van de week van de homepage.
   let budget = HERO_WEEK_MAX_TOTAL;
   const anchored = new Set<string>();
-  for (const pass of ["first", "repeat"] as const) {
-    for (const key of keys) {
-      if (budget <= 0) break;
-      const picked = chosen.get(key)!;
-      for (const item of candidates.get(key)!) {
-        if (budget <= 0) break;
-        if (picked.size >= HERO_WEEK_MAX_PER_DAY) break;
-        const id = item.event.id;
-        if (picked.has(id)) continue;
-        if (pass === "first" ? anchored.has(id) : !anchored.has(id)) continue;
-        picked.add(id);
-        anchored.add(id);
-        budget -= 1;
-      }
+
+  /**
+   * Vult één dag met wat er nog in het budget past.
+   *
+   * Twee rondes, en dat is de hele reden dat dit geen lus is: eerst krijgt elk
+   * evenement zijn eerste rij, daarna vullen de herhalingen aan met wat er
+   * overblijft. Anders neemt een evenement dat zes dagen duurt in één ronde zes
+   * van de tien rijen en verdwijnt de rest van de week van de homepage.
+   */
+  const fill = (key: string, pass: "first" | "repeat", cap: number) => {
+    const picked = chosen.get(key)!;
+    for (const item of candidates.get(key)!) {
+      if (budget <= 0) return;
+      if (picked.size >= cap) return;
+      const id = item.event.id;
+      if (picked.has(id)) continue;
+      if (pass === "first" ? anchored.has(id) : !anchored.has(id)) continue;
+      picked.add(id);
+      anchored.add(id);
+      budget -= 1;
     }
+  };
+
+  // Vandaag en morgen eerst, en allebei in één keer volledig: zij zijn waarvoor
+  // iemand het overzicht leest. De dagkap geldt hier niet, het totaal wel.
+  const [todayKey, tomorrowKey, ...laterKeys] = futureKeys;
+  for (const key of [todayKey, tomorrowKey]) {
+    if (!key) continue;
+    fill(key, "first", Number.POSITIVE_INFINITY);
+    fill(key, "repeat", Number.POSITIVE_INFINITY);
+  }
+  // Wat overblijft gaat naar de dagen erna, van dichtbij naar veraf: loopt het
+  // totaal vol, dan is het de laatste dag van het venster die rijen mist.
+  for (const pass of ["first", "repeat"] as const) {
+    for (const key of laterKeys) {
+      if (budget <= 0) break;
+      fill(key, pass, HERO_WEEK_MAX_PER_DAY);
+    }
+  }
+
+  // En pas dan gisteren, en enkel wanneer hij niets verdringt: er moet nog een
+  // rij over zijn én de laatste dag van het venster moet leeg staan. Die dag
+  // geeft hij op, zodat het blok even hoog blijft als anders.
+  let keys = futureKeys;
+  const lastKey = futureKeys[futureKeys.length - 1];
+  if (yesterdayFits && budget > 0 && lastKey && chosen.get(lastKey)!.size === 0) {
+    fill(yesterday, "first", HERO_WEEK_MAX_PER_DAY);
+    fill(yesterday, "repeat", HERO_WEEK_MAX_PER_DAY);
+    if (chosen.get(yesterday)!.size > 0) keys = [yesterday, ...futureKeys.slice(0, -1)];
   }
 
   const shownIds = new Set<string>();
