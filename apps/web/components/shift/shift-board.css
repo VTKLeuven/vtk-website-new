@@ -1143,10 +1143,10 @@
   inset: 0;
   z-index: 80;
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   overflow-y: auto;
-  padding: clamp(16px, 5vh, 64px) 16px 48px;
+  padding: clamp(24px, 5vh, 48px) 16px;
   background: rgba(10, 15, 31, 0.55);
   backdrop-filter: blur(2px);
 }
@@ -1155,6 +1155,7 @@
   position: relative;
   width: 100%;
   max-width: 580px;
+  margin: auto;
   overflow: clip;
   border-radius: 20px;
   background: var(--surface);
