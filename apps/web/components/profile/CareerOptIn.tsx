@@ -10,13 +10,13 @@ export type CareerOptInLabels = {
 };
 
 /**
- * De Career-vraag onderaan de studiebevestiging: de Career Fair onder een navy
- * wash, met de vraag eronder.
+ * De Career-vraag onderaan de studiebevestiging: de Career Fair met de titel op
+ * de linkerhelft, en de vraag eronder.
  *
  * De foto doet het werk. Dit is waar die mails over gaan, en een zaal vol
- * bedrijven zegt dat sneller dan een zin. De vormkeuzes (gelijkmatige wash op
- * 75%, 4:1, tekst linksonder) staan in `vtk-career-optin.css` en in
- * docs/design-decisions.md.
+ * bedrijven zegt dat sneller dan een zin. De vormkeuzes (3.4:1, een verloop dat
+ * links draagt en rechts oplost, de titel achter een gele regel) staan in
+ * `vtk-career-optin.css` en in docs/design-decisions.md.
  *
  * Wat het bewust **niet** doet, en dat is een AVG-grens en geen stijlkeuze:
  * niet voorgevinkt (een voorgevinkt vakje is geen toestemming), niet verplicht
@@ -40,7 +40,7 @@ export function CareerOptIn({
       <div className="vtk-career-shot">
         {/* Dezelfde foto als de Career-band op de homepage. `fill` met een eigen
             hoogteverhouding: de uitsnede hoort bij het blok, niet bij het bestand. */}
-        {/* quality 90 en niet de standaard 75: onder de navy wash worden de
+        {/* quality 90 en niet de standaard 75: onder het verloop worden de
             donkere delen van een zaalfoto op 75 vlekkerig (zie CLAUDE.md). */}
         <Image
           src="/career-fair.jpg"

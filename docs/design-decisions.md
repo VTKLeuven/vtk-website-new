@@ -7779,32 +7779,55 @@ weer uit.
 krijgt het blok niet meer te zien. `mailCategories` is een voorkeur en geen
 jaarlijkse keuze, dus het staat er al; een leeg vinkje tonen aan iemand die al ja
 zei leest als "je stond er niet in", en een leeg gelaten vakje zou dan lijken uit
-te schrijven. Drie groepen krijgen het evenmin, telkens omdat hun aanduiding
+te schrijven. Vier groepen krijgen het evenmin, telkens omdat hun aanduiding
 niets zou opleveren: wie zich via de uitschrijflink in een mail uitschreef
 (`mailUnsubscribedAt` blokkeert élke lijstmail), wie **geen richting van ons**
 aanduidde (de Career-lijst is opgesplitst per richting, dus zonder richting past
-het lid in geen enkel deel), en wie buiten de faculteit studeert (`notAtFaculty`
+het lid in geen enkel deel), wie buiten de faculteit studeert (`notAtFaculty`
 valt sowieso uit de Career-lijst, want de bedrijven vragen studenten van deze
-faculteit). Zie `lib/careerOptIn.ts`.
+faculteit), en wie **enkel eerste bachelor** is. Zie `lib/careerOptIn.ts`.
+
+**Eerste bachelors krijgen de vraag niet.** De career-activiteiten zijn niet op
+hen gericht en de lijst heeft er ook geen deel voor: in `CAREER_YEAR_GROUPS`
+telt het eerste jaar enkel mee via "alle bachelors". Ze staan bovendien allemaal
+in de Algemene Bachelor, dus er valt niet eens een richting te noemen in de
+titel. Vanaf de tweede bachelor krijgt iedereen ze wel. Wie het als eerstejaars
+tóch wil, vindt het vinkje gewoon op `/account`.
 
 **De titel noemt zijn richting.** "Bedrijven zoeken 2de masters Energie" is
 moeilijker over te slaan dan "blijf op de hoogte", en het is waar: de lijst
-splitst echt per studiejaar en per richting (`lib/careerLists.ts`). Bij meer dan
-één richting, of zonder studiejaar, valt de titel terug op een algemenere zin in
-plaats van er één uit te kiezen; dat zou voor de helft van die leden fout staan.
+splitst echt per studiejaar en per richting (`lib/careerLists.ts`).
+
+Bij meer dan één richting noemen we er gewoon één, in plaats van terug te vallen
+op "studenten van jouw richtingen": dat is precies de vage zin die dit blok moest
+vervangen, en wie twee richtingen aanduidde herkent zich in allebei.
+**Algemene Bachelor valt daarbij af** zolang er een echte richting naast staat;
+daar zoekt geen enkel bedrijf op. Blijft er geen richting over, dan draagt het
+studiejaar de titel ("Bedrijven zoeken 2de bachelors"), en pas zonder allebei
+komt de algemene zin terug.
 
 **De foto van de Career Fair draagt het blok.** Een zaal vol bedrijven zegt
-sneller waar die mails over gaan dan een zin. Drie ronden ontwerp gingen eraan
-vooraf; wat overbleef staat in `vtk-career-optin.css`:
-- een **gelijkmatige wash** van 45% navy (plus een lichte donkere hoek
-  linksboven) en geen diagonaal verloop zoals de homepage-hero. Die foto is één
-  drukke zaal zonder rustige hoek, dus elk verloop laat een fel stuk achter de
-  tekst staan.
-- **4:1** op een gewoon scherm, en 2.2:1 onder 700px: op een telefoon is 4:1 een
-  streep van tachtig pixels waarin de titel niet past.
-- de uitsnede zit **verticaal** op 42%, waar de koppen van de standen staan.
-  Horizontaal valt er bij deze verhouding niets te kiezen: de foto is dan al
-  breedte-gebonden en schuift niet.
+sneller waar die mails over gaan dan een zin. De tekst stond eerst linksonder op
+een **gelijkmatige wash** van 45% navy over de hele foto. Dat werkte niet: de
+titel lag midden in de drukte, moest op negentien tekens breken, en bij een lange
+richting zakte ze over drie regels naar beneden. Bovendien werd de hele foto er
+grijs van om tekst leesbaar te houden die het tóch maar half was. Vier richtingen
+zijn naast elkaar gelegd (tekstpaneel naast de foto, titel onder de foto, een
+donkere balk tegen de onderrand, en dit); wat het haalde staat in
+`vtk-career-optin.css`:
+- een **verloop van links naar rechts**: 92% donker waar de tekst staat, opgelost
+  tot 12% aan de rechterrand. De standen en de drukte blijven zo in kleur, en de
+  tekst ligt op een vlak dat overal donker genoeg is. Niet op minder dan 92%
+  beginnen: een zaalfoto heeft felle plekken, en witte tekst op een
+  halfdoorzichtige wash over een lichte stand is onleesbaar.
+- de titel staat achter een **gele verticale regel** en vult hoogstens 56% van de
+  breedte. De regel geeft het blok een kant om tegen uit te lijnen op een foto
+  die geen rand of rustige hoek heeft, en herhaalt het accent van de kicker.
+- **3.4:1** op een gewoon scherm, en 2.2:1 onder 700px: op een telefoon is 3.4:1
+  een streep van honderd pixels waarin de titel niet past. Daar neemt de
+  tekstkolom de volle breedte, dus draagt het verloop ook over de volle breedte.
+- de uitsnede zit **horizontaal op 72%**: de linkerhelft gaat toch onder het
+  verloop, dus het onderwerp hoort aan de kant die zichtbaar blijft.
 - het vinkje is **dezelfde chip** als "Student" of "Energie" hierboven op het
   scherm. Een eigen vinkje-vorm voor deze ene vraag las minder als een keuze; wie
   hier komt, heeft er dan al twintig van die chips aangeklikt.
@@ -7832,8 +7855,9 @@ is "waar komt deze inschrijving vandaan", niet "hoe vaak twijfelde dit lid".
 **"Onze studenten" is de noemer van het percentage**, en die is nauwer dan
 "iedereen met een account": actief, status Student, een richting van de faculteit
 aangeduid en niet `notAtFaculty`. Dat is precies het publiek dat Career aan
-bedrijven belooft, en het is dezelfde grens als wie de vraag te zien krijgt, dus
-het percentage en het scherm gaan over dezelfde groep (`lib/careerStats.ts`).
+bedrijven belooft. Het scherm is nog een tikje nauwer (eerste bachelors krijgen
+de vraag niet), maar de noemer blijft de volledige groep: zij kunnen het vinkje
+op `/account` wel aanzetten en horen dus in het percentage (`lib/careerStats.ts`).
 
 ## De donkere modus van de uitleendienst
 

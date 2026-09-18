@@ -12,6 +12,7 @@ const base = {
   mailUnsubscribedAt: null as Date | null,
   notAtFaculty: false,
   studyProgrammes: ["ENERGY"] as string[],
+  studyYears: ["MASTER_1"] as string[],
 };
 
 describe("shouldAskCareerOptIn", () => {
@@ -34,6 +35,24 @@ describe("shouldAskCareerOptIn", () => {
     // Career is per richting opgesplitst; zonder richting past het lid in geen
     // enkel deel en levert de aanduiding niets op.
     expect(shouldAskCareerOptIn({ ...base, studyProgrammes: [] })).toBe(false);
+  });
+
+  it("vraagt het niet aan een eerste bachelor", () => {
+    // Daar zijn de career-activiteiten niet op gericht, de lijst heeft er geen
+    // deel voor, en ze staan allemaal in de Algemene Bachelor.
+    expect(
+      shouldAskCareerOptIn({
+        ...base,
+        studyYears: ["BACHELOR_1"],
+        studyProgrammes: ["COMMON_BACHELOR"],
+      }),
+    ).toBe(false);
+    // Vanaf de tweede bachelor wel, en ook wie naast zijn eerste jaar al een
+    // tweede aanduidde.
+    expect(shouldAskCareerOptIn({ ...base, studyYears: ["BACHELOR_2"] })).toBe(true);
+    expect(shouldAskCareerOptIn({ ...base, studyYears: ["BACHELOR_1", "BACHELOR_2"] })).toBe(true);
+    // Zonder jaar weten we het niet; de algemene Career-lijst past dan nog.
+    expect(shouldAskCareerOptIn({ ...base, studyYears: [] })).toBe(true);
   });
 
   it("vraagt het niet aan wie buiten de faculteit studeert", () => {
@@ -119,11 +138,36 @@ describe("careerChoiceLabels", () => {
     expect(labels.heading).toBe("Bedrijven zoeken studenten Bouwkunde");
   });
 
-  it("kiest bij meerdere richtingen geen richting uit", () => {
-    // Eén ervan noemen zou voor de helft van die leden fout staan.
+  it("kiest bij meerdere richtingen de eerste", () => {
+    // "Studenten van jouw richtingen" is precies de vage zin die dit blok moet
+    // vervangen; wie twee richtingen aanduidde, herkent zich in allebei.
     const labels = careerChoiceLabels("nl", {
       studyYears: ["MASTER_1"],
       studyProgrammes: ["ENERGY", "MECHANICAL"],
+    });
+    expect(labels.heading).toBe("Bedrijven zoeken 1ste masters Energie");
+  });
+
+  it("slaat de Algemene Bachelor over zolang er een echte richting naast staat", () => {
+    const labels = careerChoiceLabels("nl", {
+      studyYears: ["BACHELOR_3"],
+      studyProgrammes: ["COMMON_BACHELOR", "CIVIL"],
+    });
+    expect(labels.heading).toBe("Bedrijven zoeken 3de bachelors Bouwkunde");
+  });
+
+  it("valt terug op het studiejaar wanneer er geen richting overblijft", () => {
+    const labels = careerChoiceLabels("nl", {
+      studyYears: ["BACHELOR_2"],
+      studyProgrammes: ["COMMON_BACHELOR"],
+    });
+    expect(labels.heading).toBe("Bedrijven zoeken 2de bachelors");
+  });
+
+  it("valt pas zonder jaar én zonder richting terug op de algemene zin", () => {
+    const labels = careerChoiceLabels("nl", {
+      studyYears: ["BACHELOR_2", "BACHELOR_3"],
+      studyProgrammes: ["COMMON_BACHELOR"],
     });
     expect(labels.heading).toBe("Bedrijven zoeken studenten van jouw richtingen");
   });

@@ -15,9 +15,10 @@ import { CAREER_CATEGORY, type CareerOptInSourceValue } from "@/lib/careerOptIn"
  *
  * "Onze studenten" is hier bewust nauwer dan "iedereen met een account": het
  * zijn de leden met een **richting van deze faculteit** aangeduid, want dat is
- * precies het publiek dat Career belooft aan bedrijven. Dezelfde grens bepaalt
- * wie de vraag op de studiebevestiging krijgt (zie `shouldAskCareerOptIn`), dus
- * het percentage en het scherm gaan over dezelfde groep.
+ * precies het publiek dat Career belooft aan bedrijven. Het scherm op de
+ * studiebevestiging is nog een tikje nauwer (eerste bachelors krijgen de vraag
+ * niet, zie `shouldAskCareerOptIn`); de noemer blijft hier de volledige groep,
+ * want die kan het vinkje op /account wel aanzetten.
  */
 
 /** Actieve, niet-verwijderde accounts. De ondergrens van elke telling hier. */

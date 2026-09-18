@@ -1,12 +1,13 @@
 /* De Career-vraag onderaan de jaarlijkse studiebevestiging.
-   Eén fotokaart: de Career Fair onder een gelijkmatige navy wash, met de vraag
+   Eén fotokaart: de Career Fair met de titel op de linkerhelft, en de vraag
    eronder als dezelfde chip die de rest van dat formulier gebruikt.
 
-   De wash is bewust gelijkmatig en niet diagonaal zoals de homepage-hero: die
-   foto is één drukke zaal zonder rustige hoek, dus een verloop laat altijd
-   ergens een fel stuk achter de tekst staan. Sterkte, verhouding en uitsnede
-   zijn met de hand gekozen (75% donkerte, 4:1, midden); zie
-   docs/design-decisions.md. */
+   De wash was eerst gelijkmatig over de hele foto: de titel stond dan linksonder
+   midden in de drukte, brak op negentien tekens en zakte bij een lange richting
+   over drie regels weg. Het verloop trekt zich nu samen aan de linkerkant, waar
+   de tekst staat, en laat de rechterhelft met de standen bijna onaangeroerd.
+   Verhouding, uitsnede en de sterkte van het verloop zijn met de hand gekozen
+   (3.4:1, iets naar rechts uitgesneden); zie docs/design-decisions.md. */
 
 .vtk-career {
   border: 1px solid var(--line);
@@ -16,10 +17,10 @@
 
 .vtk-career-shot {
   position: relative;
-  aspect-ratio: 4 / 1;
+  aspect-ratio: 3.4 / 1;
   display: flex;
-  align-items: flex-end;
-  padding: 20px 22px;
+  align-items: center;
+  padding: 0 26px;
 }
 
 /* De drie lagen liggen expliciet op elkaar: foto, wash, tekst. Zonder die
@@ -33,10 +34,9 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  /* De middenband van de foto: daar staan de standen en de drukte, en niet de
-     lichte tapijtstrook waar de titel op wegvalt. Horizontaal valt er bij deze
-     verhouding niets te kiezen; de foto is dan al breedte-gebonden. */
-  object-position: 50% 50%;
+  /* Iets naar rechts uitgesneden: de tekst dekt de linkerhelft af, dus de
+     standen en de drukte horen aan de kant die zichtbaar blijft. */
+  object-position: 72% 50%;
 }
 
 .vtk-career-shot::before {
@@ -44,16 +44,26 @@
   position: absolute;
   inset: 0;
   z-index: 1;
-  background:
-    /* De zachte hoek zit linksónder, waar de titel staat; in de voorstelling
-       hing ze linksboven omdat de proefuitsnede daar het felst was. */
-    radial-gradient(120% 110% at 0% 100%, rgba(14, 26, 54, 0.34) 0%, rgba(14, 26, 54, 0) 72%),
-    linear-gradient(0deg, rgba(14, 26, 54, 0.45), rgba(14, 26, 54, 0.45));
+  /* Donker waar de tekst staat, en het lost op voor het de standen bereikt. Op
+     92% beginnen en niet lager: een zaalfoto heeft felle plekken, en witte
+     tekst op een halfdoorzichtige wash over een lichte stand is onleesbaar. */
+  background: linear-gradient(
+    90deg,
+    rgba(10, 15, 31, 0.92) 0%,
+    rgba(10, 15, 31, 0.84) 34%,
+    rgba(10, 15, 31, 0.38) 62%,
+    rgba(10, 15, 31, 0.12) 100%
+  );
 }
 
+/* De gele regel houdt het blok vast op een foto zonder rand of hoek om tegen
+   uit te lijnen, en herhaalt het accent van de kicker. */
 .vtk-career-text {
   position: relative;
   z-index: 2;
+  max-width: 56%;
+  border-left: 3px solid var(--yellow);
+  padding-left: 16px;
 }
 
 .vtk-career-kicker {
@@ -65,15 +75,14 @@
 }
 
 .vtk-career-title {
-  margin: 6px 0 0;
-  /* Een leesregel, niet de volle breedte: over een kaart van 900px leest de
-     titel als een balk over de foto in plaats van als een kop in de hoek. */
-  max-width: 19ch;
-  font-size: clamp(20px, 2.6vw, 26px);
+  margin: 7px 0 0;
+  /* Geen eigen maximum meer: de kolom hierboven is de leesregel. Een limiet in
+     ch brak "Bedrijven zoeken 2de masters Energie" al na twee woorden. */
+  font-size: clamp(19px, 2.4vw, 24px);
   line-height: 1.16;
   font-weight: 600;
   letter-spacing: -0.022em;
-  color: var(--paper);
+  color: #ffffff;
   text-wrap: balance;
 }
 
@@ -127,12 +136,26 @@
   color: var(--muted);
 }
 
-/* Op een telefoon is 4:1 een streep van tachtig pixels: dan past de titel er
-   niet meer in en verliest de foto zijn onderwerp. */
+/* Op een telefoon is 3.4:1 een streep van honderd pixels: dan past de titel er
+   niet meer in en verliest de foto zijn onderwerp. De tekstkolom neemt daar de
+   volle breedte, dus het verloop moet ook over de volle breedte dragen. */
 @media (max-width: 700px) {
   .vtk-career-shot {
     aspect-ratio: 2.2 / 1;
-    padding: 16px 18px;
+    padding: 0 18px;
+  }
+
+  .vtk-career-shot::before {
+    background: linear-gradient(
+      90deg,
+      rgba(10, 15, 31, 0.9) 0%,
+      rgba(10, 15, 31, 0.82) 55%,
+      rgba(10, 15, 31, 0.58) 100%
+    );
+  }
+
+  .vtk-career-text {
+    max-width: 100%;
   }
 
   .vtk-career-body {

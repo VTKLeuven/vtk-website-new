@@ -39,12 +39,23 @@ export type CareerOptInState = {
   notAtFaculty: boolean;
   /** De richtingen die het lid aanduidde. Leeg = niet één van de onze. */
   studyProgrammes: readonly string[];
+  /** De studiejaren die het lid aanduidde; enkel eerste bachelor = geen vraag. */
+  studyYears: readonly string[];
 };
+
+/** Het eerste bachelorjaar; zie `shouldAskCareerOptIn`. */
+const FIRST_BACHELOR = "BACHELOR_1";
+
+/**
+ * De "richting" van wie nog niet gekozen heeft. Geen richting waar een bedrijf
+ * naar zoekt, dus ze komt niet in de titel; zie `careerChoiceLabels`.
+ */
+const COMMON_BACHELOR = "COMMON_BACHELOR";
 
 /**
  * Of we het dit jaar nog vragen.
  *
- * Vier keer nee, en telkens om dezelfde reden: een vinkje dat niets toevoegt,
+ * Vijf keer nee, en telkens om dezelfde reden: een vinkje dat niets toevoegt,
  * hoort niet op een scherm dat je maar één keer ziet.
  *
  * - **Al aangeduid**, in welk jaar dan ook: `mailCategories` is een voorkeur en
@@ -58,12 +69,22 @@ export type CareerOptInState = {
  *   lid in geen enkel deel, dus levert de aanduiding niets op.
  * - **Niet aan de faculteit** (`notAtFaculty`): die leden vallen sowieso uit de
  *   Career-lijst (zie `desiredListKeys`), wat ze ook aanduidden.
+ * - **Enkel eerste bachelor**: daar zijn de career-activiteiten niet op gericht,
+ *   en de lijst heeft er ook geen deel voor (zie `CAREER_YEAR_GROUPS`, waar het
+ *   eerste jaar enkel via "alle bachelors" meetelt). Ze zitten bovendien
+ *   allemaal in de Algemene Bachelor, dus er valt niet eens een richting te
+ *   noemen. Vanaf de tweede bachelor krijgt iedereen de vraag wel.
  */
 export function shouldAskCareerOptIn(user: CareerOptInState): boolean {
   if (user.mailCategories.includes(CAREER_CATEGORY)) return false;
   if (user.mailUnsubscribedAt !== null) return false;
   if (user.studyProgrammes.length === 0) return false;
   if (user.notAtFaculty) return false;
+  // Een leeg jaar sluit niets uit: dan weten we het niet, en de algemene
+  // Career-lijst past nog altijd.
+  if (user.studyYears.length > 0 && user.studyYears.every((year) => year === FIRST_BACHELOR)) {
+    return false;
+  }
   return true;
 }
 
@@ -113,9 +134,15 @@ export function careerOptInUpdate(
  *
  * "Bedrijven zoeken 2de masters Energie" is moeilijker over te slaan dan
  * "blijf op de hoogte", en het is waar: de Career-lijst is echt opgesplitst per
- * studiejaar en per richting (zie `lib/careerLists.ts`). Bij meer dan één
- * richting of zonder studiejaar valt het terug op een algemenere zin in plaats
- * van er één uit te kiezen; dat zou voor de helft van die leden fout staan.
+ * studiejaar en per richting (zie `lib/careerLists.ts`).
+ *
+ * Bij meer dan één richting noemen we er gewoon één. "Studenten van jouw
+ * richtingen" is precies de vage zin die dit blok moest vervangen, en wie twee
+ * richtingen aanduidde, herkent zich in allebei. **Algemene Bachelor valt daarbij
+ * af** zolang er een echte richting naast staat: daar zoekt geen enkel bedrijf
+ * op. Blijft er geen richting over, dan draagt het studiejaar de titel
+ * ("Bedrijven zoeken 2de bachelors"), en pas zonder allebei valt het terug op
+ * de algemene zin.
  */
 export function careerChoiceLabels(
   locale: Locale,
@@ -127,10 +154,10 @@ export function careerChoiceLabels(
 
   const years = dict.onboarding.years as Record<string, string>;
   const programmes = dict.onboarding.programmes as Record<string, string>;
-  const programme =
-    user.studyProgrammes.length === 1
-      ? programmes[user.studyProgrammes[0] as StudyProgrammeValue]
-      : null;
+  // De eerste echte richting; Algemene Bachelor enkel wanneer er niets anders
+  // staat, en dan nog liever het studiejaar hieronder.
+  const named = user.studyProgrammes.filter((code) => code !== COMMON_BACHELOR);
+  const programme = named.length > 0 ? programmes[named[0] as StudyProgrammeValue] : null;
   const year =
     user.studyYears.length === 1 ? years[user.studyYears[0] as StudyYearValue] : null;
 
@@ -139,6 +166,8 @@ export function careerChoiceLabels(
     audience = nl ? `${year}s ${programme}` : `${year} students in ${programme}`;
   } else if (programme) {
     audience = nl ? `studenten ${programme}` : `students in ${programme}`;
+  } else if (year) {
+    audience = nl ? `${year}s` : `${year} students`;
   } else {
     audience = nl ? "studenten van jouw richtingen" : "students in your programmes";
   }
