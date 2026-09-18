@@ -1,6 +1,6 @@
 import 'server-only';
 import { prisma } from '@vtk/db';
-import { currentStudyYear, type SessionPayload } from '@vtk/auth';
+import { currentStudyYear, currentWorkingYear, type SessionPayload } from '@vtk/auth';
 import { testLoginMode } from './test-login-gate';
 
 /**
@@ -160,10 +160,11 @@ function testUserEmail(key: TestUserKey): string {
 }
 
 /**
- * Zorgt dat de test-gebruiker als een échte User-rij bestaat. Nodig omdat elke
- * uitleen-aanvraag een FK op `userId` legt: een verzonnen sessie-id geeft anders
- * een foreign key-fout. Idempotent; enkel bedoeld voor de test-login. Draai dit
- * in een mutatie-context (server action), niet tijdens het renderen.
+ * Zorgt dat de test-gebruiker als een échte User-rij bestaat, met de posten van
+ * zijn profiel erbij. Nodig omdat elke uitleen-aanvraag een FK op `userId` legt:
+ * een verzonnen sessie-id geeft anders een foreign key-fout. Idempotent; enkel
+ * bedoeld voor de test-login. Draai dit in een mutatie-context (server action),
+ * niet tijdens het renderen.
  */
 export async function ensureTestUser(key: TestUserKey): Promise<void> {
   const p = PERSONAS[key];
@@ -182,6 +183,65 @@ export async function ensureTestUser(key: TestUserKey): Promise<void> {
       studyConfirmedYear: currentStudyYear(),
     },
   });
+  await ensureTestMemberships(p, id);
+}
+
+/**
+ * Zet de posten van het profiel ook echt in `GroupMembership`.
+ *
+ * `buildTestSession` draagt ze enkel in de sessie, en dat volstaat voor elke
+ * check die naar `session.groups` kijkt. Maar een groot deel van de
+ * uitleendienst vraagt het lidmaatschap aan de databank, want het gaat daar over
+ * *andere* mensen dan wie er kijkt: de chauffeurslijst (`logistiekTeamMembers`),
+ * "ben ik chauffeur via mijn post" (`isDriver`), wie een doorgegeven rit mag
+ * invullen (`groupMemberOptions`) en naar wie de mail daarover vertrekt
+ * (`groupLeads`). Zonder deze rijen is een testprofiel voor al die schermen geen
+ * lid van de post die hij naar eigen zeggen is, en dat faalt stil: je ziet een
+ * lege keuzelijst, geen fout.
+ *
+ * Het werkingsjaar is dat van vandaag. De rijen lopen dus mee met de 15
+ * juli-wissel, net als bij een echt lid; wat na de wissel blijft staan is
+ * historiek van vorig jaar en hoort niet opgeruimd te worden.
+ *
+ * Neveneffect om te kennen: dit maakt de testgebruiker een gewoon postlid voor
+ * de hele site, dus hij verschijnt op /praesidium van de testomgeving. Dat is de
+ * prijs van een profiel dat overal hetzelfde betekent, en de test-login staat in
+ * productie hoe dan ook uit (zie `testLoginMode`).
+ */
+async function ensureTestMemberships(persona: TestPersona, userId: string): Promise<void> {
+  const year = currentWorkingYear();
+  const codes = persona.groups.map((group) => group.code);
+  const rows = codes.length
+    ? await prisma.group.findMany({ where: { code: { in: codes } }, select: { id: true, code: true } })
+    : [];
+  const idByCode = new Map(rows.map((row) => [row.code, row.id]));
+
+  // Een post die nog niet geseed is, valt stil weg; dat doet `buildTestSession`
+  // met dezelfde reden, en anders kan je op een halve databank niet inloggen.
+  const wanted = persona.groups.flatMap((group) => {
+    const groupId = idByCode.get(group.code);
+    return groupId ? [{ groupId, role: group.role }] : [];
+  });
+
+  // Eerst weg wat dit profiel niet (meer) is: de personas hierboven worden
+  // aangepast, en een post die uit de lijst verdween zou anders aan de
+  // testgebruiker blijven plakken tot iemand de rij met de hand weghaalt.
+  // Enkel dit jaar, en enkel voor dit vaste `test-user-*`-id.
+  await prisma.groupMembership.deleteMany({
+    where: {
+      userId,
+      year,
+      ...(wanted.length > 0 ? { groupId: { notIn: wanted.map((row) => row.groupId) } } : {}),
+    },
+  });
+
+  for (const row of wanted) {
+    await prisma.groupMembership.upsert({
+      where: { userId_groupId_year: { userId, groupId: row.groupId, year } },
+      update: { role: row.role },
+      create: { userId, groupId: row.groupId, year, role: row.role },
+    });
+  }
 }
 
 /**
