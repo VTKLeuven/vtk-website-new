@@ -112,6 +112,97 @@ export function hasUpcomingMoment(
 }
 
 /**
+ * Hoeveel dagvakjes een strip hoogstens toont voor ze afkapt op "+n".
+ *
+ * Zes en niet meer: de strip staat zowel op een kaart van 380 pixels als in de
+ * hero naast de titel, en zes vakjes van ongeveer vijftig pixels passen daar
+ * nog op één regel. Wat er niet op past, zegt het laatste vakje.
+ */
+export const MOMENT_STRIP_MAX = 6;
+
+/** Eén dagvakje in de strip. */
+export type MomentStripDay = {
+  /** De start van dat moment; de strip toont er de dag van. */
+  start: Date;
+  /** De eerstvolgende keer. Dat vakje staat in het geel; de rest is rustig. */
+  next: boolean;
+};
+
+export type MomentStrip = {
+  days: MomentStripDay[];
+  /** Hoeveel keren er niet op de strip passen. */
+  rest: number;
+  /** De laatste keer van de reeks; het "+n"-vakje zegt tot wanneer ze loopt. */
+  last: Date;
+};
+
+/**
+ * De dagen die een reeks nog te gaan heeft, als strip onder de titel.
+ *
+ * Dit is het antwoord op "telkens 18:00, maar op welke dagen dan?". Bewust
+ * enkel wat nog komt: een loopweek die woensdag halfweg is, moet zeggen dat er
+ * nog vier loopjes zijn en niet dat er twee voorbij zijn. Daardoor schuift de
+ * strip mee met de rij en met de datum op de kaart, die allebei al op het
+ * eerstvolgende moment staan (`leadMoment`).
+ *
+ * `null` bij hoogstens één moment: dan is er geen reeks en zegt een strip van
+ * één vakje niets wat de datum ernaast niet al zegt.
+ *
+ * Is alles voorbij (een kaart in een voorbije week, een archiefpagina), dan
+ * toont ze de laatste dagen in plaats van niets, en draagt geen enkel vakje de
+ * markering "eerstvolgend".
+ */
+export function momentStrip(
+  moments: readonly EventMoment[],
+  now: Date,
+  max = MOMENT_STRIP_MAX,
+): MomentStrip | null {
+  if (moments.length < 2) return null;
+  const upcoming = moments.filter((moment) => moment.end >= now);
+  const pool = upcoming.length > 0 ? upcoming : moments.slice(-max);
+  const days = pool.slice(0, max).map((moment, index) => ({
+    start: moment.start,
+    next: upcoming.length > 0 && index === 0,
+  }));
+  return {
+    days,
+    rest: pool.length - days.length,
+    last: pool[pool.length - 1]!.start,
+  };
+}
+
+/**
+ * De dag van een moment zoals een vakje hem draagt: "vr" boven "18", elk in
+ * hun eigen element zodat de cijfers uitlijnen.
+ */
+export function momentDayParts(
+  date: Date,
+  locale: "nl" | "en",
+  timeZone?: string,
+): { weekday: string; day: string } {
+  const tag = locale === "nl" ? "nl-BE" : "en-GB";
+  return {
+    weekday: date
+      .toLocaleDateString(tag, { timeZone, weekday: "short" })
+      .replace(".", ""),
+    day: date.toLocaleDateString(tag, { timeZone, day: "numeric" }),
+  };
+}
+
+/** "tot wo 23 sep": waar een reeks eindigt die niet op de strip past. */
+export function momentStripRest(
+  strip: MomentStrip,
+  locale: "nl" | "en",
+  timeZone?: string,
+): string {
+  const tag = locale === "nl" ? "nl-BE" : "en-GB";
+  const last = strip.last
+    .toLocaleDateString(tag, { timeZone, weekday: "short", day: "numeric", month: "short" })
+    .replace(/\./g, "");
+  return locale === "nl" ? `+${strip.rest} tot ${last}` : `+${strip.rest} until ${last}`;
+}
+
+/**
  * Wat er op de plaats van het uur komt te staan bij een evenement met momenten:
  * "telkens 18:00" wanneer ze hetzelfde uur delen, anders het aantal.
  *

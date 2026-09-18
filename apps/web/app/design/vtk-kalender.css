@@ -369,6 +369,14 @@
   text-transform: uppercase;
   font-weight: 400;
 }
+/* De dagenstrip van een reeks staat hier dichter op de regel erboven dan op een
+   kaart: in een lijstrij hoort ze bij het uur dat er vlak boven staat, terwijl
+   ze op een kaart een blok op zichzelf is. De vorm zelf komt uit
+   `.ev-days` in vtk-eventcard.css, dat deze pagina ook inlaadt. */
+.vtk-design .ag-row .ag-days {
+  margin-top: 6px;
+}
+
 .vtk-design .ag-tag {
   font-family: var(--mono);
   font-size: 10px;

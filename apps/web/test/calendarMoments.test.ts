@@ -2,6 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   hasUpcomingMoment,
   leadMoment,
+  momentDayParts,
+  momentStrip,
+  momentStripRest,
   momentsEnvelope,
   momentsSummary,
   nextOccurrenceAt,
@@ -113,6 +116,54 @@ describe("the next occurrence of an event", () => {
     const gala = { start: new Date("2026-10-21T20:00:00+02:00") };
     expect(nextOccurrenceAt(gala, now)).toEqual(gala.start);
     expect(hasUpcomingMoment(gala, now)).toBe(true);
+  });
+});
+
+describe("the day strip of a series", () => {
+  const zone = "Europe/Brussels";
+  const week = ["12", "13", "14", "15", "16", "17", "18"].map((day) =>
+    moment(day, "18:00", "19:00"),
+  );
+
+  it("only shows what is still to come, with the next day marked", () => {
+    // Woensdag, na het loopje van dinsdag: de eerste twee dagen zijn voorbij en
+    // horen niet meer op de strip. Zo schuift ze mee met de rij en met de datum
+    // op de kaart, die allebei al op het eerstvolgende moment staan.
+    const wednesday = new Date("2026-10-14T09:00:00+02:00");
+    const strip = momentStrip(week.slice(0, 4), wednesday);
+    expect(strip?.days.map((day) => day.start.getDate())).toEqual([14, 15]);
+    expect(strip?.days.map((day) => day.next)).toEqual([true, false]);
+    expect(strip?.rest).toBe(0);
+  });
+
+  it("caps the strip and says where the series ends", () => {
+    const monday = new Date("2026-10-12T09:00:00+02:00");
+    const strip = momentStrip(week, monday, 6);
+    expect(strip?.days).toHaveLength(6);
+    expect(strip?.rest).toBe(1);
+    expect(momentStripRest(strip!, "nl", zone)).toBe("+1 tot zo 18 okt");
+    expect(momentStripRest(strip!, "en", zone)).toBe("+1 until Sun 18 Oct");
+  });
+
+  it("shows the last days once everything is over, without a next", () => {
+    // Een kaart in een voorbije week toont nog altijd wanneer de reeks liep;
+    // niets tonen zou daar een gewoon evenement van maken.
+    const after = new Date("2026-10-20T09:00:00+02:00");
+    const strip = momentStrip(week, after, 3);
+    expect(strip?.days.map((day) => day.start.getDate())).toEqual([16, 17, 18]);
+    expect(strip?.days.some((day) => day.next)).toBe(false);
+    expect(strip?.rest).toBe(0);
+  });
+
+  it("has no strip for an event that happens once", () => {
+    const now = new Date("2026-10-10T09:00:00+02:00");
+    expect(momentStrip([], now)).toBeNull();
+    expect(momentStrip([moment("12", "18:00", "19:00")], now)).toBeNull();
+  });
+
+  it("writes a day as a weekday above its number", () => {
+    expect(momentDayParts(week[0]!.start, "nl", zone)).toEqual({ weekday: "ma", day: "12" });
+    expect(momentDayParts(week[0]!.start, "en", zone)).toEqual({ weekday: "Mon", day: "12" });
   });
 });
 

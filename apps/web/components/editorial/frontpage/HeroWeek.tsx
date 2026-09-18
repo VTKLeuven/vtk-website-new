@@ -8,6 +8,7 @@ import {
 } from "@/lib/calendar/heroWeek";
 import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar";
 import { organiserName } from "@/lib/calendar/organiser";
+import { momentDayParts, momentStrip, momentStripRest } from "@/lib/calendar/moments";
 import type { FrontpageEvent } from "./context";
 
 /**
@@ -26,6 +27,11 @@ import type { FrontpageEvent } from "./context";
  * Bij een evenement met losse momenten (een loopweek met elke dag een loopje)
  * blijft het **uur** staan op elke rij, want dat is daar net wat elke dag iets
  * zegt. Alleen de stip en de ster volgen dezelfde regel als hierboven.
+ *
+ * In de lijstvorm (een rustige week) staat zo'n evenement maar één keer, en dan
+ * zegt die ene rij niet dat er nog vier loopjes volgen. Daarom draagt ze daar een
+ * **dagenstrip**: de dagen die de reeks nog te gaan heeft, de eerstvolgende in
+ * het geel. In de vensterweergave niet: daar staan die dagen al als rijen.
  *
  * Welke dagen en welke evenementen erin staan, beslist `selectHeroWeek`; die
  * regels staan los getest in lib/calendar/heroWeek.ts. Dit bestand tekent alleen.
@@ -190,6 +196,9 @@ export function HeroWeek({
                     ]
                       .filter(Boolean)
                       .join(" · ");
+                    // De dagen die deze reeks nog te gaan heeft. Enkel in de
+                    // lijstvorm: in het venster staat elke dag al als eigen rij.
+                    const strip = mode === "next" ? momentStrip(event.moments, now) : null;
                     return (
                       <div
                         className={`hero-week-ev${repeat ? " repeat" : ""}`}
@@ -204,6 +213,31 @@ export function HeroWeek({
                         <Link href={`${base}/kalender/${event.slug}`} className="body">
                           <span className="title">{title}</span>
                           {meta ? <small>{meta}</small> : null}
+                          {strip ? (
+                            <span className="hero-week-strip">
+                              {strip.days.map((stripDay) => {
+                                const parts = momentDayParts(
+                                  stripDay.start,
+                                  locale,
+                                  HERO_WEEK_TIME_ZONE,
+                                );
+                                return (
+                                  <span
+                                    key={stripDay.start.toISOString()}
+                                    className={`day${stripDay.next ? " next" : ""}`}
+                                  >
+                                    <i>{parts.weekday}</i>
+                                    {parts.day}
+                                  </span>
+                                );
+                              })}
+                              {strip.rest > 0 ? (
+                                <span className="rest">
+                                  {momentStripRest(strip, locale, HERO_WEEK_TIME_ZONE)}
+                                </span>
+                              ) : null}
+                            </span>
+                          ) : null}
                         </Link>
                         <span className="time">{entryTimeLabel(entry, locale, nl)}</span>
                         {/* Eén evenement, één ster: enkel op de eerste rij die het krijgt. */}

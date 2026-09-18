@@ -21,6 +21,7 @@ import { splitFullName } from "@vtk/auth";
 import { readSlogansSetting, resolveSlogans } from "@/lib/slogans";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
 import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar";
+import { MomentDays } from "@/components/calendar/MomentDays";
 import { CalendarPlusIcon } from "@/components/ui/icons";
 import { focusPosition } from "@/lib/imageFocus";
 import { hasUpcomingMoment, momentsSummary, nextOccurrenceAt } from "@/lib/calendar/moments";
@@ -770,6 +771,15 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                         {title}
                       </Link>
                     </h3>
+                    {/* Dezelfde strip als op /kalender: de dagen die de reeks nog
+                        te gaan heeft. Het is dezelfde kaart, dus ook hetzelfde
+                        antwoord op "telkens 18:00, maar wanneer dan?". */}
+                    <MomentDays
+                      moments={event.moments}
+                      now={now}
+                      locale={locale}
+                      timeZone="Europe/Brussels"
+                    />
                     <div className="ev-card-foot">
                       <span className="ev-card-when">
                         {/* Zeven keer hetzelfde uur hoort niet zeven keer op een

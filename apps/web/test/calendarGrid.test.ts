@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  eventLeadDate,
   eventOccursOnDay,
   isMultiDayEvent,
   momentOnDay,
+  startOfWeek,
   weekEventSpans,
   rollingWeeksGridCells,
   weekGridDays,
@@ -213,5 +215,41 @@ describe('events made of separate moments', () => {
     expect(momentOnDay(nacht, days[2]!)?.start).toEqual(new Date('2026-09-09T22:00:00'));
     expect(momentOnDay(nacht, days[3]!)).toBeNull();
     expect(eventOccursOnDay(nacht, days[3]!)).toBe(false);
+  });
+});
+
+describe('the day a card sits on', () => {
+  /** Een loopweek van vrijdag 18 tot en met woensdag 23 september, telkens 20u. */
+  const loopweek = {
+    start: '2026-09-18T18:00:00.000Z',
+    end: '2026-09-23T20:00:00.000Z',
+    allDay: false,
+    moments: ['18', '19', '20', '21', '22', '23'].map((day) => ({
+      start: `2026-09-${day}T18:00:00.000Z`,
+      end: `2026-09-${day}T20:00:00.000Z`,
+    })),
+  };
+
+  it('moves along with the series instead of staying on its first day', () => {
+    // Zondag de 20ste, na het loopje van die avond nog niet: de kaart hoort op
+    // 20 september te staan en dus in de week van maandag 14 september.
+    const sunday = new Date('2026-09-20T09:00:00.000Z');
+    expect(eventLeadDate(loopweek, sunday)).toEqual(new Date('2026-09-20T18:00:00.000Z'));
+
+    // Maandag schuift ze mee naar de week erna, en verdwijnt ze dus niet achter
+    // "toon voorbije weken" terwijl er nog drie loopjes komen.
+    const monday = new Date('2026-09-21T09:00:00.000Z');
+    expect(startOfWeek(eventLeadDate(loopweek, monday))).toEqual(new Date(2026, 8, 21));
+  });
+
+  it('keeps the last day once the series is over', () => {
+    const after = new Date('2026-09-30T09:00:00.000Z');
+    expect(eventLeadDate(loopweek, after)).toEqual(new Date('2026-09-23T18:00:00.000Z'));
+  });
+
+  it('is simply the start for an event without moments', () => {
+    const gala = { start: '2026-10-21T18:00:00.000Z', end: '2026-10-22T02:00:00.000Z', allDay: false };
+    const now = new Date('2026-10-01T09:00:00.000Z');
+    expect(eventLeadDate(gala, now)).toEqual(new Date(gala.start));
   });
 });

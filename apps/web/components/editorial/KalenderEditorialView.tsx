@@ -10,8 +10,10 @@ import { EventInterest } from '@/components/calendar/EventInterest';
 import { EventStar, type EventStarLabels } from '@/components/calendar/EventStar';
 import { CalendarPlusIcon } from '@/components/ui/icons';
 import type { ViewerInterest } from '@/lib/calendar/interest';
-import { leadMoment, momentsSummary } from '@/lib/calendar/moments';
+import { momentsSummary } from '@/lib/calendar/moments';
+import { MomentDays } from '@/components/calendar/MomentDays';
 import {
+  eventLeadDate,
   eventOccursOnDay,
   isMultiDayEvent,
   momentOnDay,
@@ -150,7 +152,11 @@ export function KalenderEditorialView({
 }) {
   const base = locale === 'nl' ? '' : '/en';
   const pathname = usePathname();
-  const now = new Date();
+  // Eén vast "nu" zolang deze weergave openstaat. Het bepaalt welk moment van
+  // een reeks het eerstvolgende is, en dus waar een kaart staat en welke dagen
+  // haar strip toont; een nieuwe `Date` bij elke render zou die indeling telkens
+  // opnieuw laten berekenen zonder dat er iets veranderd is.
+  const now = useMemo(() => new Date(), []);
   const [cursor, setCursor] = useState(() => new Date(now.getFullYear(), now.getMonth(), now.getDate()));
   // De gekozen categorie blijft een deelbare route, maar wordt uit de huidige
   // client-URL afgeleid. `history.pushState` wijzigt die URL zonder een nieuwe
@@ -255,12 +261,16 @@ export function KalenderEditorialView({
     let cancelled = false;
     void (async () => {
       const data = await fetchForRange(start, end);
-      if (!cancelled) setAgendaEvents(data.sort((a, b) => +new Date(a.start) - +new Date(b.start)));
+      // Op de eerstvolgende keer en niet op de start: een reeks die vorige week
+      // begon, hoort niet bovenaan "wat komt er" te blijven staan.
+      if (!cancelled) {
+        setAgendaEvents(data.sort((a, b) => +eventLeadDate(a, now) - +eventLeadDate(b, now)));
+      }
     })();
     return () => {
       cancelled = true;
     };
-  }, [fetchForRange]);
+  }, [fetchForRange, now]);
 
   useEffect(() => {
     if (!preview) return;
@@ -328,16 +338,25 @@ export function KalenderEditorialView({
         .filter((e) => {
           return monthCells.some(({ date, inMonth }) => inMonth && eventOccursOnDay(e, date));
         })
-        .sort((a, b) => +new Date(a.start) - +new Date(b.start)),
-    [monthEvents, monthCells]
+        // Op de datum die de kaart ook draagt, en niet op de start van de
+        // envelop: een reeks die vorige week begon, hoort tussen de dagen die
+        // nog komen te staan. Zie `eventLeadDate`.
+        .sort((a, b) => +eventLeadDate(a, now) - +eventLeadDate(b, now)),
+    [monthEvents, monthCells, now]
   );
 
   /**
    * De evenementen van het raster, gebundeld per week.
    *
-   * Gegroepeerd op de maandag van de **startdag**, en niet op elke dag waarop
-   * een evenement valt: een meerdaags evenement zou anders in twee weekblokken
-   * staan en twee keer geteld worden.
+   * Gegroepeerd op de maandag van **de dag die op de kaart staat**, en niet op
+   * elke dag waarop een evenement valt: een meerdaags evenement zou anders in
+   * twee weekblokken staan en twee keer geteld worden.
+   *
+   * Die dag is bij een reeks losse momenten de eerstvolgende keer dat er iets
+   * is (`eventLeadDate`), niet de start van de envelop. Anders blijft een
+   * loopweek die vrijdag begon in de week van die vrijdag hangen, en verdwijnt
+   * ze op maandag achter "toon voorbije weken" terwijl er nog vier loopjes
+   * komen.
    *
    * Binnen de huidige maand vallen de weken weg die al voorbij zijn. Het raster
    * is de eerste weergave die iemand ziet, en dan is "wat komt er" de vraag, niet
@@ -347,14 +366,14 @@ export function KalenderEditorialView({
   const gridWeeks = useMemo(() => {
     const groups = new Map<string, { monday: Date; events: ApiEvent[] }>();
     for (const event of monthOnlyEvents) {
-      const monday = startOfWeek(new Date(event.start));
+      const monday = startOfWeek(eventLeadDate(event, now));
       const key = dayKey(monday);
       const group = groups.get(key);
       if (group) group.events.push(event);
       else groups.set(key, { monday, events: [event] });
     }
     return [...groups.values()].sort((a, b) => +a.monday - +b.monday);
-  }, [monthOnlyEvents]);
+  }, [monthOnlyEvents, now]);
 
   const pastWeekCount = useMemo(() => {
     const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
@@ -480,7 +499,7 @@ export function KalenderEditorialView({
    * is, en niet de dag waarop een reeks momenten ooit begon.
    */
   function leadDate(e: ApiEvent): Date {
-    return leadMoment(toMoments(e), now)?.start ?? new Date(e.start);
+    return eventLeadDate(e, now);
   }
 
   /**
@@ -720,6 +739,7 @@ export function KalenderEditorialView({
             {eventTime(e)}
             {e.location ? ` · ${e.location}` : ''}
           </small>
+          <MomentDays moments={toMoments(e)} now={now} locale={locale} className="ag-days" />
           {going ? <span className="ev-going">{going}</span> : null}
         </div>
         <div
@@ -824,6 +844,9 @@ export function KalenderEditorialView({
               {title}
             </a>
           </h3>
+          {/* De dagen die de reeks nog te gaan heeft. "telkens 20:00" hieronder
+              zegt hoe laat; dit zegt wanneer. Zie components/calendar/MomentDays. */}
+          <MomentDays moments={toMoments(e)} now={now} locale={locale} />
           <div className="ev-card-foot">
             <span className="ev-card-when">
               {eventTime(e)}

@@ -294,6 +294,63 @@
   text-decoration: none;
 }
 
+/* De dagenstrip van een evenement met losse momenten: de dagen die de reeks nog
+   te gaan heeft, de eerstvolgende in het geel.
+
+   Ze staat hier en niet in de voetregel: die regel is één regel breed en kapt
+   af met een ellips, dus daar zou de plaats als eerste sneuvelen. "telkens
+   20:00" blijft eronder staan en zegt hoe laat; deze strip zegt wanneer.
+
+   Ze ligt boven het klikvlak van de titel (`.ev-card-link::after`, z-index 1)
+   maar vangt zelf geen klikken: een vakje is geen knop, en een klik op de kaart
+   hoort gewoon het evenement te openen. Daarom geen eigen `z-index`.
+
+   Ook gebruikt in de lijstrij op /kalender (`.ag-row`) en op de homepageband, en
+   met dezelfde vorm in de hero (`.hero-week-strip` in vtk-home.css); wijzig ze
+   dus niet op één plaats. */
+.vtk-design .ev-days {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.vtk-design .ev-days .day {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 7px;
+  background: var(--paper-2);
+  color: var(--body);
+  font-size: 11px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vtk-design .ev-days .day i {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.vtk-design .ev-days .day.next {
+  background: var(--yellow);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.vtk-design .ev-days .day.next i {
+  color: rgba(10, 15, 31, 0.62);
+}
+
+.vtk-design .ev-days .rest {
+  color: var(--muted);
+  font-size: 11px;
+}
+
 /* De titel is de link en spant zich over de hele kaart; de ster ligt erboven.
    Een knop in een anker is ongeldige HTML, dus de kaart zelf is geen link. */
 .vtk-design .ev-card-link::after {

@@ -1713,6 +1713,30 @@ zeggen enkel wannéér het doorgaat.
   kaart en de lijstrij blijven één per evenement, met "telkens 18:00" in plaats
   van één uur en met de eerstvolgende keer als datum. De ICS-feed schrijft **één
   afspraak per moment**.
+- **Eén kaart, maar wel de juiste dagen: de dagenstrip.** "telkens 20:00" zegt
+  hoe laat en niet wanneer, en dat was precies de vraag die openbleef. Onder de
+  titel staat daarom een strip met de dagen die de reeks **nog te gaan heeft**,
+  de eerstvolgende in het geel: op de eventkaart (/kalender en de homepageband),
+  in de lijstrij op /kalender en in het weekoverzicht van de hero. Wat er niet op
+  past, wordt "+3 tot wo 23 sep"; is alles voorbij, dan toont ze de laatste
+  dagen zonder markering. De regels staan in `momentStrip`
+  (apps/web/lib/calendar/moments.ts), de vorm in `.ev-days` en
+  `.hero-week-strip`.
+  - **Enkel wat nog komt.** Een loopweek die woensdag halfweg is, moet zeggen dat
+    er nog vier loopjes zijn, niet dat er twee voorbij zijn. Zo schuift de strip
+    mee met de rij en met de datum op de kaart, die allebei al op het
+    eerstvolgende moment staan.
+  - **Niet in de vensterweergave van de hero.** Daar staat elke dag al als eigen
+    rij; de strip zou dezelfde dagen een tweede keer zeggen. Ze verschijnt enkel
+    in de lijstvorm (een rustige week), want dan staat de reeks er maar één keer.
+- **Een kaart staat in de week van de datum die op haar pin staat.** Het raster
+  op /kalender groepeerde per week op de start van de envelop, en dus bleef een
+  loopweek die vrijdag begon in die week hangen; zodra die week voorbij was,
+  verdween ze achter "toon voorbije weken" terwijl er nog vier loopjes kwamen.
+  Zowel de groepering als de volgorde gaan nu over `eventLeadDate`
+  (components/editorial/calendarGrid.ts), dezelfde datum als in de pin, zodat de
+  kop van het weekblok en de kaart erin niet uit elkaar kunnen lopen. Om dezelfde
+  reden sorteert de agendalijst op die datum en niet op de start.
 - **Die afspraken dragen de dag in hun UID** (`<id>-20261013@vtk.be`), niet de id
   van de momentrij. Het formulier schrijft de momenten bij elk opslaan opnieuw
   weg, dus een id-gebaseerde UID zou bij elke kleine correctie elke afspraak in

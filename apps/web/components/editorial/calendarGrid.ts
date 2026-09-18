@@ -1,6 +1,6 @@
 /** Monday-first month grid cells (42 days) for editorial calendar. */
 
-import { NIGHT_EVENT_MAX_MS, type EventMoment } from '@/lib/calendar/moments';
+import { leadMoment, NIGHT_EVENT_MAX_MS, type EventMoment } from '@/lib/calendar/moments';
 
 export type GridDay = {
   date: Date;
@@ -104,6 +104,23 @@ export function toMoments(event: CalendarInterval): EventMoment[] {
       label: moment.label ?? null,
     }))
     .sort((a, b) => +a.start - +b.start);
+}
+
+/**
+ * De dag waarop een kaart of een lijstrij van dit evenement hoort te staan: de
+ * eerstvolgende keer dat er iets is, en bij een gewoon evenement zijn start.
+ *
+ * Eén evenement blijft één kaart, dus die kaart moet **meeschuiven** met de
+ * reeks. Een loopweek die vrijdag begon, staat op maandag nog altijd in de
+ * kalender, maar dan op maandag: op de dag waarop de reeks ooit begon, zou ze in
+ * een week staan die al voorbij is en dus achter de knop "toon voorbije weken"
+ * verdwijnen terwijl er nog vier loopjes komen.
+ *
+ * Dit is dezelfde datum die in de pin van de kaart staat. Zo zeggen de kop van
+ * het weekblok en de pin erin altijd hetzelfde.
+ */
+export function eventLeadDate(event: CalendarInterval, now: Date): Date {
+  return leadMoment(toMoments(event), now)?.start ?? new Date(event.start);
 }
 
 /**

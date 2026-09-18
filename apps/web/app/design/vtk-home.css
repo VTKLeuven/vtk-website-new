@@ -877,6 +877,55 @@
   line-height: 1.35;
 }
 
+/* De dagenstrip van een reeks: de dagen die nog komen, de eerstvolgende in het
+   geel. Enkel in de lijstvorm, want in het venster staat elke dag al als rij.
+
+   Dezelfde vorm als op de eventkaart (`.ev-days` in vtk-eventcard.css), alleen
+   op een donkere grond. Ze wikkelt wanneer ze niet past: een tweede regel kost
+   hier minder dan een reeks die stilzwijgend afkapt. */
+.vtk-design .home-hero .hero-week-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 6px;
+}
+
+.vtk-design .home-hero .hero-week-strip .day {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 7px;
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--paper);
+  font-size: 11px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vtk-design .home-hero .hero-week-strip .day i {
+  font-style: normal;
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.vtk-design .home-hero .hero-week-strip .day.next {
+  background: var(--yellow);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.vtk-design .home-hero .hero-week-strip .day.next i {
+  opacity: 0.62;
+}
+
+.vtk-design .home-hero .hero-week-strip .rest {
+  color: var(--on-dark-muted);
+  font-size: 11px;
+}
+
 .vtk-design .home-hero .hero-week-ev .time {
   color: var(--on-dark-muted);
   font-size: 12px;
