@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { Card, Input, Label, Select } from '@vtk/ui';
 import { saveEventAction } from '@/app/actions/calendar';
@@ -57,6 +57,8 @@ type Category = {
   audience: string | null;
 };
 
+type Lang = 'nl' | 'en';
+
 /** Eén aanvinkbare categorie; doelgroep en thema gebruiken dezelfde `name`. */
 function CategoryCheckbox({ category, checked, nl }: { category: Category; checked: boolean; nl: boolean }) {
   return (
@@ -97,6 +99,53 @@ function EmptyCategoryMessage({
   );
 }
 
+/**
+ * Eén benoemde sectie van het formulier: een titel met de gele regel eronder,
+ * één regel uitleg, en de velden.
+ *
+ * De uitleg staat hier één keer per sectie in plaats van onder elk veld apart.
+ * Een scherm waarin onder elk invoervak twee regels grijze tekst hangen, leest
+ * niemand nog; bij de sectie blijft het bij het stuk waar het over gaat.
+ */
+function Section({ title, note, children }: { title: string; note?: ReactNode; children: ReactNode }) {
+  return (
+    <Card className="vtk-ef-section">
+      <h2 className="vtk-ef-section-title">{title}</h2>
+      {note ? <p className="vtk-ef-section-note">{note}</p> : null}
+      {children}
+    </Card>
+  );
+}
+
+/**
+ * De NL/EN-schakelaar naast het opschrift van een tweetalig veld.
+ *
+ * Eén schakelaar per veld, maar allemaal op dezelfde toestand: wie het Engels
+ * invult, doet dat meestal voor het hele formulier in één keer.
+ */
+function LangTabs({ value, onChange, nl }: { value: Lang; onChange: (lang: Lang) => void; nl: boolean }) {
+  return (
+    <span className="vtk-ef-langtabs" role="group" aria-label={nl ? 'Taal van dit veld' : 'Language of this field'}>
+      <button
+        type="button"
+        aria-pressed={value === 'nl'}
+        title={nl ? 'Nederlands' : 'Dutch'}
+        onClick={() => onChange('nl')}
+      >
+        NL
+      </button>
+      <button
+        type="button"
+        aria-pressed={value === 'en'}
+        title={nl ? 'Engels' : 'English'}
+        onClick={() => onChange('en')}
+      >
+        EN
+      </button>
+    </span>
+  );
+}
+
 export function EventForm({
   event,
   groups,
@@ -111,9 +160,9 @@ export function EventForm({
   categories: Category[];
   locale: 'nl' | 'en';
   /**
-   * Toont "Aanmaken en tickets toevoegen" bij een nieuw evenement. Ticketevents
-   * aanmaken is een aparte permissie, dus wie enkel mag inplannen ziet die knop
-   * niet.
+   * Toont "Publiceren en tickets toevoegen" bij een nieuw evenement.
+   * Ticketevents aanmaken is een aparte permissie, dus wie enkel mag inplannen
+   * ziet die knop niet.
    */
   canCreateTickets?: boolean;
   /** Geeft bij een lege keuzelijst een rechtstreekse link naar categoriebeheer. */
@@ -130,14 +179,19 @@ export function EventForm({
   const isDraft = Boolean(event.id) && !event.publishedAt;
   const isPublished = Boolean(event.id) && Boolean(event.publishedAt);
 
-  const [activeLang, setActiveLang] = useState<'nl' | 'en'>('nl');
+  /**
+   * Welke taal de tweetalige velden tonen. Beide talen blijven in het formulier
+   * staan (de verborgen taal in een `hidden` blok), zodat wat je in de andere
+   * taal tikte niet verdwijnt bij het wisselen en gewoon mee opgeslagen wordt.
+   */
+  const [activeLang, setActiveLang] = useState<Lang>('nl');
 
   const selected = new Set(event.categoryIds ?? []);
   const audienceCategories = categories.filter((c) => c.audience !== null);
   const themeCategories = categories.filter((c) => c.audience === null);
 
   const secondarySubmits = [
-    ...(isDraft
+    ...(isNew || isDraft
       ? [
           {
             name: 'publication',
@@ -146,9 +200,9 @@ export function EventForm({
           },
         ]
       : []),
-    // Een gepubliceerd evenement terug offline halen. Dezelfde knop en dezelfde
-    // waarde als hierboven, maar met een andere naam en een bevestiging: dit
-    // haalt iets weg dat bezoekers nu zien, en dat verdient een vraag.
+    // Een gepubliceerd evenement terug offline halen. Dezelfde waarde als
+    // hierboven, maar met een bevestiging: dit haalt iets weg dat bezoekers nu
+    // zien, en dat verdient een vraag.
     ...(isPublished
       ? [
           {
@@ -171,18 +225,30 @@ export function EventForm({
           {
             name: 'andThen',
             value: 'tickets',
-            label: nl ? 'Aanmaken en tickets toevoegen' : 'Create and add tickets',
+            label: nl ? 'Publiceren en tickets toevoegen' : 'Publish and add tickets',
           },
         ]
       : []),
   ];
 
-  // Checklist voor het bewerkscherm: wat is er al ingevuld en wat ontbreekt nog.
+  // Wat er nog ontbreekt aan een bestaand evenement. Bij een nieuw evenement
+  // staat er nog niets ingevuld en zou dit enkel een lijst rode kruisjes zijn.
   const hasDescriptionNl = Boolean(event.descriptionNl?.trim());
   const hasDescriptionEn = Boolean(event.descriptionEn?.trim());
   const hasLocation = Boolean(event.location?.trim());
   const hasImage = Boolean(event.imageKey);
   const hasCategories = (event.categoryIds?.length ?? 0) > 0;
+
+  // Staat er iets in "Meer instellingen" dat van de standaard afwijkt, dan gaat
+  // die sectie open: een externe link die dicht staat, is een link die niemand
+  // ziet staan tot hij verkeerd blijkt. De URL-naam telt niet mee; elk bestaand
+  // evenement heeft er een.
+  const hasMoreSettings = Boolean(
+    event.url ||
+      event.urlLabelNl ||
+      event.urlLabelEn ||
+      (canHeroWeek && event.heroWeek && event.heroWeek !== 'AUTO')
+  );
 
   const checklistItems = [
     {
@@ -245,29 +311,17 @@ export function EventForm({
   return (
     <SaveForm
       action={saveEventAction}
-      className="space-y-6"
+      className="vtk-ef"
       submitLabel={
-        isNew
+        isPublished
           ? nl
-            ? 'Aanmaken en verder'
-            : 'Create and continue'
-          : isDraft
-            ? nl
-              ? 'Publiceren'
-              : 'Publish'
-            : nl
-              ? 'Wijzigingen opslaan'
-              : 'Save changes'
-      }
-      savingLabel={
-        isNew
-          ? nl
-            ? 'Bezig met aanmaken...'
-            : 'Creating...'
+            ? 'Wijzigingen opslaan'
+            : 'Save changes'
           : nl
-            ? 'Bezig met opslaan...'
-            : 'Saving...'
+            ? 'Publiceren'
+            : 'Publish'
       }
+      savingLabel={nl ? 'Bezig met opslaan...' : 'Saving...'}
       savedMessage={nl ? 'Evenement opgeslagen' : 'Event saved'}
       errorMessages={{
         ...saveErrorMessages(locale),
@@ -286,611 +340,445 @@ export function EventForm({
       }}
       fallbackErrorMessage={nl ? 'Er ging iets mis bij het opslaan.' : 'Something went wrong while saving.'}
       secondarySubmit={secondarySubmits.length > 0 ? secondarySubmits : undefined}
-      footer={({ submitButton, secondaryButtons, confirmDialog }) => (
+      header={({ submitButton, secondaryButtons, confirmDialog }) => (
         <>
-          <div className="stickybar">
-            <span className="state">
-              {isNew ? (
-                <>
-                  <span className="pill draft">{nl ? 'Nieuw' : 'New'}</span>
-                  <span>
-                    {nl
-                      ? 'Dit maakt een concept. Niets staat online tot je publiceert.'
-                      : 'This creates a draft. Nothing is online until you publish.'}
-                  </span>
-                </>
-              ) : isDraft ? (
-                <>
-                  <span className="pill draft">{nl ? 'Concept' : 'Draft'}</span>
-                  <span>
-                    {nl
-                      ? 'Nog niet zichtbaar op de site. Klik op Publiceren wanneer het klaar is.'
-                      : 'Not visible online yet. Click Publish when ready.'}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="pill live">{nl ? 'Gepubliceerd' : 'Published'}</span>
-                  <span>
-                    {nl
-                      ? 'Zichtbaar op de kalender, de homepage en in de app.'
-                      : 'Visible on the calendar, home page and in the app.'}
-                  </span>
-                </>
-              )}
-            </span>
-            <div className="flex items-center gap-3">
+          <div className="vtk-ef-head">
+            <div className="vtk-ef-head-text">
+              <nav className="vtk-ef-crumbs" aria-label={nl ? 'Kruimelpad' : 'Breadcrumb'}>
+                <Link href={`${base}/admin/kalender`}>{nl ? 'Kalender' : 'Calendar'}</Link>
+                <span aria-hidden>›</span>
+                <span>
+                  {isNew
+                    ? nl
+                      ? 'Nieuw evenement'
+                      : 'New event'
+                    : nl
+                      ? 'Bewerken'
+                      : 'Edit'}
+                </span>
+              </nav>
+              <h1>
+                {isNew
+                  ? nl
+                    ? 'Nieuw evenement'
+                    : 'New event'
+                  : (event.titleNl ?? '')}
+              </h1>
+            </div>
+            <div className="vtk-ef-head-actions">
+              <span className={`vtk-ef-pill ${isPublished ? 'is-live' : 'is-draft'}`}>
+                {isPublished
+                  ? nl
+                    ? 'Gepubliceerd'
+                    : 'Published'
+                  : isDraft
+                    ? nl
+                      ? 'Concept'
+                      : 'Draft'
+                    : nl
+                      ? 'Nieuw'
+                      : 'New'}
+              </span>
               {submitButton}
               {secondaryButtons}
-              <Link
-                href={`${base}/admin/kalender`}
-                className="inline-flex h-9 items-center justify-center rounded-xl px-3 text-sm font-medium text-vtk-muted transition-colors hover:text-vtk-ink"
-              >
-                {isNew ? (nl ? 'Annuleren' : 'Cancel') : nl ? 'Terug naar overzicht' : 'Back to overview'}
-              </Link>
             </div>
           </div>
+          <p className="vtk-ef-state">
+            {isPublished
+              ? nl
+                ? 'Zichtbaar op de kalender, de homepage, de agenda-feeds en in de app.'
+                : 'Visible on the calendar, the home page, the calendar feeds and in the app.'
+              : isDraft
+                ? nl
+                  ? 'Dit evenement staat nog nergens online. Klik op Publiceren wanneer het klaar is.'
+                  : 'This event is not online anywhere yet. Click Publish when it is ready.'
+                : nl
+                  ? 'Nog niets staat online. Publiceren zet het meteen op de kalender; opslaan als concept houdt het voor jezelf.'
+                  : 'Nothing is online yet. Publishing puts it on the calendar at once; saving as a draft keeps it to yourself.'}
+          </p>
           {confirmDialog}
         </>
       )}
     >
-      {/* ----------------- NIEUW EVENEMENT (Optie C: stap 1) ----------------- */}
-      {isNew ? (
-        <>
-          <input type="hidden" name="publication" value="draft" />
+      {event.id ? <input type="hidden" name="id" value={event.id} /> : null}
 
-          <div className="step-head">
-            <b>{nl ? 'Stap 1 van 2' : 'Step 1 of 2'}</b> ·{' '}
-            {nl
-              ? 'het evenement bestaat, de rest vul je erna aan'
-              : 'the event exists, the rest you fill in afterwards'}
-            <span className="bar">
-              <i />
-            </span>
-          </div>
-
-          {/* 1. Titel */}
-          <Card className="p-5 space-y-4">
-            <div className="sec-title">
-              <h2>{nl ? 'Titel' : 'Title'}</h2>
-            </div>
-            <p className="sec-note">
-              {nl
-                ? 'De naam zoals hij op de kalender staat.'
-                : 'The name as it appears on the calendar.'}
-            </p>
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <Label htmlFor="new-event-title-nl">
-                  {activeLang === 'nl' ? 'Titel (NL)' : 'Title (EN)'}
-                  <span className="langtabs">
-                    <button
-                      type="button"
-                      aria-pressed={activeLang === 'nl'}
-                      onClick={() => setActiveLang('nl')}
-                    >
-                      NL
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={activeLang === 'en'}
-                      onClick={() => setActiveLang('en')}
-                    >
-                      EN
-                    </button>
-                  </span>
-                </Label>
-              </div>
-              <div className={activeLang === 'nl' ? 'block' : 'hidden'}>
-                <Input
-                  id="new-event-title-nl"
-                  name="titleNl"
-                  defaultValue=""
-                  placeholder={nl ? 'bv. Galabal 2026' : 'e.g. Gala 2026'}
-                  required
-                />
-              </div>
-              <div className={activeLang === 'en' ? 'block' : 'hidden'}>
-                <Input
-                  name="titleEn"
-                  defaultValue=""
-                  placeholder={nl ? 'bv. Gala 2026 (Engelse titel)' : 'e.g. Gala 2026 (English title)'}
-                />
-              </div>
-            </div>
-          </Card>
-
-          {/* 2. Wie en waar */}
-          <Card className="p-5 space-y-4">
-            <div className="sec-title">
-              <h2>{nl ? 'Wie en waar' : 'Who and where'}</h2>
-            </div>
-            <p className="sec-note">
-              {nl
-                ? 'De groep bepaalt wie het mag bewerken. De organisator is wie er op de site bij staat.'
-                : 'The group decides who can edit it. The organiser is what appears on the site.'}
-            </p>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <Label>{nl ? 'Groep' : 'Group'}</Label>
-                <Select name="groupId" defaultValue="" required>
-                  <option value="" disabled>
-                    {nl ? 'Kies een groep' : 'Choose a group'}
-                  </option>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {nl ? g.nameNl : g.nameEn}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="new-event-organiser">
-                  {nl ? 'Organisator (optioneel)' : 'Organiser (optional)'}
-                </Label>
-                <Input
-                  id="new-event-organiser"
-                  name="organiserName"
-                  defaultValue=""
-                  maxLength={120}
-                  placeholder={nl ? 'bv. Development x GHC' : 'e.g. Development x GHC'}
-                />
-                <p className="mt-1 text-xs text-vtk-muted">
-                  {nl ? 'Laat leeg wanneer de post zelf organiseert.' : 'Leave empty when the post organises it.'}
-                </p>
-              </div>
-              <div className="md:col-span-2">
-                <Label>{nl ? 'Locatie' : 'Location'}</Label>
-                <Input
-                  name="location"
-                  defaultValue=""
-                  placeholder={nl ? 'bv. Aula Pieter De Somer' : 'e.g. Pieter De Somer Auditorium'}
-                />
-              </div>
-            </div>
-          </Card>
-
-          {/* 3. Wanneer */}
-          <Card className="p-5 space-y-4">
-            <div className="sec-title">
-              <h2>{nl ? 'Wanneer' : 'When'}</h2>
-            </div>
-            <p className="sec-note">
-              {nl
-                ? 'Eén doorlopende periode, of een reeks losse momenten zoals een loopweek met elke dag een loopje.'
-                : 'One continuous period, or a series of separate moments such as a running week.'}
-            </p>
-            <EventWhenField moments={[]} locale={locale} />
-          </Card>
-
-          {/* 4. Logistiek */}
-          <Card className="p-5 space-y-4">
-            <div className="sec-title">
-              <h2>{nl ? 'Logistiek' : 'Logistics'}</h2>
-            </div>
-            <label className="inline-flex items-start gap-2 text-sm">
-              <input type="checkbox" name="needsLogistics" defaultChecked className="mt-1" />
-              <span>
-                {nl ? 'Logistiek nodig' : 'Needs logistics'}
-                <span className="mt-0.5 block text-xs text-vtk-muted">
-                  {nl
-                    ? 'Dit evenement staat op logistiek.vtk.be; naam, locatie en uren volgen hier mee.'
-                    : 'This event will appear on logistiek.vtk.be; its name, location and times follow this one.'}
+      {event.id ? (
+        <div className={`vtk-ef-todo ${allReady ? 'is-done' : ''}`}>
+          <h2>
+            {allReady
+              ? nl
+                ? 'Alles klaar om te publiceren'
+                : 'Ready to publish'
+              : nl
+                ? 'Klaar om te publiceren?'
+                : 'Ready to publish?'}
+          </h2>
+          <ul>
+            {checklistItems.map((item, index) => (
+              <li key={index} className={item.done ? 'is-ok' : 'is-missing'}>
+                <span className="mark" aria-hidden>
+                  {item.done ? '✓' : '!'}
                 </span>
-              </span>
-            </label>
-          </Card>
-        </>
-      ) : (
-        /* ----------------- EVENEMENT BEWERKEN (Optie A) ----------------- */
-        <>
-          <input type="hidden" name="id" value={event.id} />
+                <span>{item.label}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
-          {/* Checklist bovenaan */}
-          <div className={`todo-card ${allReady ? 'all-done' : ''}`}>
-            <h2>
-              {allReady
-                ? nl
-                  ? 'Alles klaar om te publiceren'
-                  : 'Ready to publish'
-                : nl
-                  ? 'Klaar om te publiceren?'
-                  : 'Ready to publish?'}
-            </h2>
-            <ul className="todo-list">
-              {checklistItems.map((item, idx) => (
-                <li key={idx} className={item.done ? 'done' : 'miss'}>
-                  <span className="mark" aria-hidden>
-                    {item.done ? '✓' : '!'}
-                  </span>
-                  <span>{item.label}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* 1. Titel en adres */}
-          <Card className="p-5 space-y-4">
-            <div className="sec-title">
-              <h2>{nl ? 'Titel en adres' : 'Title and address'}</h2>
+      <Section
+        title={nl ? 'Het evenement' : 'The event'}
+        note={
+          nl
+            ? 'De naam zoals bezoekers hem zien, en wie het beheert.'
+            : 'The name visitors see, and who manages it.'
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <div className="vtk-ef-field-head">
+              <Label htmlFor={`event-title-${activeLang}`}>
+                {activeLang === 'nl'
+                  ? nl
+                    ? 'Titel (NL)'
+                    : 'Title (NL)'
+                  : nl
+                    ? 'Titel (EN)'
+                    : 'Title (EN)'}
+              </Label>
+              <LangTabs value={activeLang} onChange={setActiveLang} nl={nl} />
             </div>
-            <p className="sec-note">
-              {nl
-                ? 'De naam zoals hij op de kalender staat, en het adres dat leden delen.'
-                : 'The name as it appears on the calendar, and the address members share.'}
-            </p>
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <Label htmlFor="event-title-nl">
-                    {activeLang === 'nl' ? 'Titel (NL)' : 'Title (EN)'}
-                    <span className="langtabs">
-                      <button
-                        type="button"
-                        aria-pressed={activeLang === 'nl'}
-                        onClick={() => setActiveLang('nl')}
-                      >
-                        NL
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={activeLang === 'en'}
-                        onClick={() => setActiveLang('en')}
-                      >
-                        EN
-                      </button>
-                    </span>
-                  </Label>
-                </div>
-                <div className={activeLang === 'nl' ? 'block' : 'hidden'}>
-                  <Input
-                    id="event-title-nl"
-                    name="titleNl"
-                    defaultValue={event.titleNl ?? ''}
-                    placeholder={nl ? 'Galabal 2026' : 'Gala 2026'}
-                    required
-                  />
-                </div>
-                <div className={activeLang === 'en' ? 'block' : 'hidden'}>
-                  <Input
-                    name="titleEn"
-                    defaultValue={event.titleEn ?? ''}
-                    placeholder={nl ? 'Gala 2026 (Engelse titel)' : 'Gala 2026 (English title)'}
-                  />
-                </div>
-              </div>
-
-              <div>
-                <Label htmlFor="event-slug">{nl ? 'URL-naam' : 'URL name'}</Label>
-                <div className="flex items-center gap-2">
-                  <span className="shrink-0 text-sm text-vtk-blue-muted">/kalender/</span>
-                  <Input
-                    id="event-slug"
-                    name="slug"
-                    defaultValue={event.slug ?? ''}
-                    maxLength={80}
-                    pattern="[a-z0-9]+(-[a-z0-9]+)*"
-                    placeholder={nl ? 'galabal-2026 (leeg = uit de titel)' : 'galabal-2026 (empty = from the title)'}
-                  />
-                </div>
-                <p className="mt-1 text-xs text-vtk-muted">
-                  {event.slug
-                    ? nl
-                      ? 'Dit staat in de link die leden delen en in hun agenda. Wijzig je hem, dan werkt de oude naam niet meer; het oude adres met de lange code blijft wel doorsturen.'
-                      : 'This is in the link members share and in their calendar. Changing it breaks the old name; the old address with the long code keeps redirecting.'
-                    : nl
-                      ? 'Laat leeg om hem uit de titel en het jaartal te maken, bijvoorbeeld galabal-2026.'
-                      : 'Leave empty to build it from the title and the year, for example galabal-2026.'}
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          {/* 2. Wie en waar */}
-          <Card className="p-5 space-y-4">
-            <div className="sec-title">
-              <h2>{nl ? 'Wie en waar' : 'Who and where'}</h2>
-            </div>
-            <p className="sec-note">
-              {nl
-                ? 'De groep bepaalt wie het mag bewerken. De organisator is wie er op de site bij staat.'
-                : 'The group decides who can edit it. The organiser is what appears on the site.'}
-            </p>
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div>
-                <Label>{nl ? 'Groep' : 'Group'}</Label>
-                <Select name="groupId" defaultValue={event.groupId ?? ''} required>
-                  <option value="" disabled>
-                    {nl ? 'Kies een groep' : 'Choose a group'}
-                  </option>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {nl ? g.nameNl : g.nameEn}
-                    </option>
-                  ))}
-                </Select>
-              </div>
-              <div>
-                <Label htmlFor="event-organiser">
-                  {nl ? 'Organisator (optioneel)' : 'Organiser (optional)'}
-                </Label>
-                <Input
-                  id="event-organiser"
-                  name="organiserName"
-                  defaultValue={event.organiserName ?? ''}
-                  maxLength={120}
-                  placeholder={nl ? 'bv. Development x GHC' : 'e.g. Development x GHC'}
-                />
-                <p className="mt-1 text-xs text-vtk-muted">
-                  {nl ? 'Laat leeg wanneer de post zelf organiseert.' : 'Leave empty when the post organises it.'}
-                </p>
-              </div>
-              <div className="md:col-span-2">
-                <Label>{nl ? 'Locatie' : 'Location'}</Label>
-                <Input
-                  name="location"
-                  defaultValue={event.location ?? ''}
-                  placeholder={nl ? 'bv. Aula Pieter De Somer' : 'e.g. Pieter De Somer Auditorium'}
-                />
-              </div>
-            </div>
-          </Card>
-
-          {/* 3. Wanneer */}
-          <Card className="p-5 space-y-4">
-            <div className="sec-title">
-              <h2>{nl ? 'Wanneer' : 'When'}</h2>
-            </div>
-            <p className="sec-note">
-              {nl
-                ? 'Eén doorlopende periode, of een reeks losse momenten zoals een loopweek met elke dag een loopje.'
-                : 'One continuous period, or a series of separate moments such as a running week.'}
-            </p>
-            <EventWhenField
-              start={event.start}
-              end={event.end}
-              allDay={event.allDay}
-              moments={event.moments ?? []}
-              locale={locale}
-            />
-          </Card>
-
-          {/* 4. Beschrijving */}
-          <Card className="p-5 space-y-4">
-            <div className="sec-title">
-              <h2>{nl ? 'Beschrijving' : 'Description'}</h2>
-            </div>
-            <p className="sec-note">
-              {nl
-                ? 'Wat er op de eventpagina komt te staan. Markdown; de Engelse tekst valt niet terug op de Nederlandse.'
-                : 'What appears on the event page. Markdown; English text does not fall back to Dutch.'}
-            </p>
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <Label htmlFor={activeLang === 'nl' ? 'calendar-description-nl' : 'calendar-description-en'}>
-                  {activeLang === 'nl' ? 'Beschrijving (NL)' : 'Description (EN)'}
-                  <span className="langtabs">
-                    <button
-                      type="button"
-                      aria-pressed={activeLang === 'nl'}
-                      onClick={() => setActiveLang('nl')}
-                    >
-                      NL
-                    </button>
-                    <button
-                      type="button"
-                      aria-pressed={activeLang === 'en'}
-                      onClick={() => setActiveLang('en')}
-                    >
-                      EN
-                    </button>
-                  </span>
-                </Label>
-              </div>
-              <div className={activeLang === 'nl' ? 'block' : 'hidden'}>
-                <MarkdownEditorField
-                  name="descriptionNl"
-                  defaultValue={event.descriptionNl}
-                  locale={locale}
-                  rows={8}
-                  textareaId="calendar-description-nl"
-                />
-              </div>
-              <div className={activeLang === 'en' ? 'block' : 'hidden'}>
-                <MarkdownEditorField
-                  name="descriptionEn"
-                  defaultValue={event.descriptionEn}
-                  locale={locale}
-                  rows={8}
-                  textareaId="calendar-description-en"
-                />
-              </div>
-            </div>
-          </Card>
-
-          {/* 5. Affiche */}
-          <Card className="p-5 space-y-4">
-            <div className="sec-title">
-              <h2>{nl ? 'Affiche' : 'Poster'}</h2>
-            </div>
-            <p className="sec-note">
-              {nl
-                ? 'De foto op de kaart, de eventpagina en de homepage. Neem de originele affiche van minstens 1600 px breed.'
-                : 'The photo on the card, event page and homepage. Use the original poster of at least 1600 px wide.'}
-            </p>
-            <EventImageField
-              defaultKey={event.imageKey}
-              defaultFocus={toImageFocus(event.imageFocusX, event.imageFocusY)}
-              locale={locale}
-            />
-          </Card>
-
-          {/* 6. Doelgroep en categorieën */}
-          <Card className="p-5 space-y-4">
-            <div className="sec-title">
-              <h2>{nl ? 'Doelgroep en categorieën' : 'Audience and categories'}</h2>
-            </div>
-            <p className="sec-note">
-              {nl
-                ? 'De doelgroep bepaalt wie het vanzelf in zijn kalender krijgt; het thema bepaalt de kleur en de filterknop.'
-                : 'The audience determines who sees it automatically in their calendar; the theme determines colour and filter button.'}
-            </p>
-
-            <div className="space-y-4">
-              <div>
-                <Label>{nl ? 'Doelgroep' : 'Audience'}</Label>
-                <p className="mb-2 text-xs text-vtk-muted">
-                  {nl
-                    ? 'Laat leeg voor een algemeen event. Met een doelgroep blijft het event voor iedereen zichtbaar, maar bezoekers kunnen erop filteren of hun kalender op hun profiel afstemmen.'
-                    : 'Leave empty for a general event. With a target audience it remains visible to everyone, while visitors can filter by it or tailor the calendar to their profile.'}
-                </p>
-                <div className="flex flex-wrap gap-x-5 gap-y-2">
-                  {audienceCategories.length > 0 ? (
-                    audienceCategories.map((c) => (
-                      <CategoryCheckbox key={c.id} category={c} checked={selected.has(c.id)} nl={nl} />
-                    ))
-                  ) : (
-                    <EmptyCategoryMessage audience nl={nl} canManageCategories={canManageCategories} base={base} />
-                  )}
-                </div>
-              </div>
-
-              <div>
-                <Label>{nl ? 'Categorieën' : 'Categories'}</Label>
-                <p className="mb-2 text-xs text-vtk-muted">
-                  {nl
-                    ? 'Het thema van het event. Bepaalt de kleur in de kalender, de filterknop en de agenda-feed per categorie.'
-                    : "The event's theme. Determines its colour in the calendar, the filter button and the per-category calendar feed."}
-                </p>
-                <div className="flex flex-wrap gap-x-5 gap-y-2">
-                  {themeCategories.length > 0 ? (
-                    themeCategories.map((c) => (
-                      <CategoryCheckbox key={c.id} category={c} checked={selected.has(c.id)} nl={nl} />
-                    ))
-                  ) : (
-                    <EmptyCategoryMessage audience={false} nl={nl} canManageCategories={canManageCategories} base={base} />
-                  )}
-                </div>
-              </div>
-            </div>
-          </Card>
-
-          {/* 7. Link en homepage */}
-          <Card className="p-5 space-y-4">
-            <div className="sec-title">
-              <h2>{nl ? 'Link en homepage' : 'Link and home page'}</h2>
-            </div>
-            <p className="sec-note">
-              {nl
-                ? 'Een externe inschrijflink, en wat dit evenement in het weekoverzicht van de homepage doet.'
-                : 'An external registration link, and what this event does in the home page week overview.'}
-            </p>
-
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="event-url">URL</Label>
-                <Input id="event-url" name="url" defaultValue={event.url ?? ''} placeholder="https://..." />
-              </div>
-
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <Label htmlFor={activeLang === 'nl' ? 'event-url-label-nl' : 'event-url-label-en'}>
-                    {activeLang === 'nl'
-                      ? nl
-                        ? 'Knoptekst (NL)'
-                        : 'Button text (NL)'
-                      : nl
-                        ? 'Knoptekst (EN)'
-                        : 'Button text (EN)'}
-                    <span className="langtabs">
-                      <button
-                        type="button"
-                        aria-pressed={activeLang === 'nl'}
-                        onClick={() => setActiveLang('nl')}
-                      >
-                        NL
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={activeLang === 'en'}
-                        onClick={() => setActiveLang('en')}
-                      >
-                        EN
-                      </button>
-                    </span>
-                  </Label>
-                </div>
-                <div className={activeLang === 'nl' ? 'block' : 'hidden'}>
-                  <Input
-                    id="event-url-label-nl"
-                    name="urlLabelNl"
-                    defaultValue={event.urlLabelNl ?? ''}
-                    maxLength={EVENT_LINK_LABEL_MAX}
-                    placeholder={DEFAULT_EVENT_LINK_LABEL.nl}
-                  />
-                </div>
-                <div className={activeLang === 'en' ? 'block' : 'hidden'}>
-                  <Input
-                    id="event-url-label-en"
-                    name="urlLabelEn"
-                    defaultValue={event.urlLabelEn ?? ''}
-                    maxLength={EVENT_LINK_LABEL_MAX}
-                    placeholder={DEFAULT_EVENT_LINK_LABEL.en}
-                  />
-                </div>
-                <p className="mt-1 text-xs text-vtk-muted">
-                  {nl
-                    ? 'Laat leeg voor "Externe eventlink". Gaat de link naar de inschrijvingen of de ticketverkoop van iemand anders, zet er dan bv. "Inschrijflink" of "Ticketverkoop": dat scheelt of iemand klikt.'
-                    : 'Leave empty for "External event link". If the link leads to someone else’s sign-up form or ticket sales, enter "Sign-up link" or "Tickets".'}
-                </p>
-              </div>
-
-              {canHeroWeek ? (
-                <div>
-                  <Label htmlFor="heroWeek">{nl ? 'Weekoverzicht op de homepage' : 'Week overview on the home page'}</Label>
-                  <Select id="heroWeek" name="heroWeek" defaultValue={event.heroWeek ?? 'AUTO'}>
-                    <option value="AUTO">{nl ? 'Automatisch' : 'Automatic'}</option>
-                    <option value="PINNED">{nl ? 'Voorrang geven' : 'Give priority'}</option>
-                    <option value="HIDDEN">{nl ? 'Niet tonen' : 'Do not show'}</option>
-                  </Select>
-                  <p className="mt-1 text-xs text-vtk-muted">
-                    {nl
-                      ? 'Sinds vandaag ook per rij te zetten in de lijst op /admin/kalender. Voorrang zet dit evenement vooraan op zijn dag; niet tonen houdt het van de homepage zonder het uit de kalender te halen.'
-                      : 'Can also be toggled per row in the table on /admin/kalender. Priority puts this event first on its day; do not show keeps it off the home page without removing it from the calendar.'}
-                  </p>
-                </div>
-              ) : null}
-            </div>
-          </Card>
-
-          {/* 8. Logistiek */}
-          <Card className="p-5 space-y-4">
-            <div className="sec-title">
-              <h2>{nl ? 'Logistiek' : 'Logistics'}</h2>
-            </div>
-            <label className="inline-flex items-start gap-2 text-sm">
-              <input
-                type="checkbox"
-                name="needsLogistics"
-                defaultChecked={event.hasUitleenEvent ?? false}
-                className="mt-1"
+            {/* Beide talen blijven staan; de verborgene stuurt zijn waarde mee.
+                `required` hangt aan de zichtbare taal: een verplicht veld in een
+                `display: none` blok kan de browser niet aanwijzen, en dan gebeurt
+                er bij het verzenden helemaal niets. */}
+            <div className={activeLang === 'nl' ? undefined : 'hidden'}>
+              <Input
+                id="event-title-nl"
+                name="titleNl"
+                defaultValue={event.titleNl ?? ''}
+                placeholder={nl ? 'bv. Galabal 2026' : 'e.g. Gala 2026'}
+                required={activeLang === 'nl'}
               />
-              <span>
-                {nl ? 'Logistiek nodig' : 'Needs logistics'}
-                <span className="mt-0.5 block text-xs text-vtk-muted">
-                  {nl
-                    ? event.hasUitleenEvent
-                      ? 'Dit evenement staat op logistiek.vtk.be; naam, locatie en uren volgen hier mee. Het vinkje weghalen laat het daar staan, want er kunnen al aanvragen aan hangen.'
-                      : 'Zet dit evenement ook op logistiek.vtk.be, zodat materiaal, flesserke en transport eronder samen komen te staan.'
-                    : event.hasUitleenEvent
-                      ? 'This event exists on logistiek.vtk.be; its name, location and times follow this one. Unticking leaves it there, since requests may already be attached.'
-                      : 'Also put this event on logistiek.vtk.be, so equipment, drinks and transport end up together.'}
-                </span>
-              </span>
-            </label>
-          </Card>
-        </>
-      )}
+            </div>
+            <div className={activeLang === 'en' ? undefined : 'hidden'}>
+              <Input
+                id="event-title-en"
+                name="titleEn"
+                defaultValue={event.titleEn ?? ''}
+                placeholder={nl ? 'Leeg = de Nederlandse titel' : 'Empty = the Dutch title'}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <div>
+              <Label htmlFor="event-group">{nl ? 'Groep' : 'Group'}</Label>
+              <Select id="event-group" name="groupId" defaultValue={event.groupId ?? ''} required>
+                <option value="" disabled>
+                  {nl ? 'Kies een groep' : 'Choose a group'}
+                </option>
+                {groups.map((g) => (
+                  <option key={g.id} value={g.id}>
+                    {nl ? g.nameNl : g.nameEn}
+                  </option>
+                ))}
+              </Select>
+              <p className="vtk-ef-hint">
+                {nl ? 'Bepaalt wie het mag bewerken.' : 'Decides who may edit it.'}
+              </p>
+            </div>
+            {/* De groep hierboven bepaalt wie mag bewerken; deze naam bepaalt wie
+                er als organisator getoond wordt. Twee verschillende vragen, dus
+                twee velden: bij een crossover of een gekocht evenement beheert de
+                groep het wel, maar organiseert ze het niet. */}
+            <div>
+              <Label htmlFor="event-organiser">
+                {nl ? 'Getoond als organisator' : 'Shown as organiser'}
+              </Label>
+              <Input
+                id="event-organiser"
+                name="organiserName"
+                defaultValue={event.organiserName ?? ''}
+                maxLength={120}
+                placeholder={nl ? 'bv. Development x GHC' : 'e.g. Development x GHC'}
+              />
+              <p className="vtk-ef-hint">
+                {nl
+                  ? 'Enkel bij een crossover; leeg = de groep zelf.'
+                  : 'Only for a crossover; empty = the group itself.'}
+              </p>
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      <Section
+        title={nl ? 'Wanneer en waar' : 'When and where'}
+        note={
+          nl
+            ? 'Loopt het door van begin tot einde, of zijn het losse momenten op meerdere dagen?'
+            : 'Does it run through from start to end, or are they separate moments on several days?'
+        }
+      >
+        <EventWhenField
+          start={event.start}
+          end={event.end}
+          allDay={event.allDay}
+          moments={event.moments ?? []}
+          locale={locale}
+        />
+
+        <hr className="vtk-ef-rule" />
+
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-start">
+          <div>
+            <Label htmlFor="event-location">{nl ? 'Locatie' : 'Location'}</Label>
+            <Input
+              id="event-location"
+              name="location"
+              defaultValue={event.location ?? ''}
+              placeholder={nl ? 'bv. Aula Pieter De Somer' : 'e.g. Pieter De Somer Auditorium'}
+            />
+          </div>
+          {/* E1: hiermee verschijnt dit evenement ook op logistiek.vtk.be, zodat
+              materiaal, flesserke en transport eronder gegroepeerd kunnen worden.
+              Standaard aan bij een nieuw evenement; wie het uitlaat, krijgt daar
+              niets. Uitzetten koppelt niets los, want er kunnen al aanvragen aan
+              hangen. */}
+          <label className="vtk-ef-check">
+            <input
+              type="checkbox"
+              name="needsLogistics"
+              defaultChecked={event.id ? (event.hasUitleenEvent ?? false) : true}
+            />
+            <span>
+              <b>{nl ? 'Logistiek nodig' : 'Needs logistics'}</b>
+              <small>
+                {nl
+                  ? event.hasUitleenEvent
+                    ? 'Dit evenement staat op logistiek.vtk.be; naam, locatie en uren volgen hier mee. Het vinkje weghalen laat het daar staan, want er kunnen al aanvragen aan hangen.'
+                    : 'Zet dit evenement ook op logistiek.vtk.be, zodat materiaal, flesserke en transport eronder samen komen te staan.'
+                  : event.hasUitleenEvent
+                    ? 'This event exists on logistiek.vtk.be; its name, location and times follow this one. Unticking leaves it there, since requests may already be attached.'
+                    : 'Also put this event on logistiek.vtk.be, so equipment, drinks and transport end up together.'}
+              </small>
+            </span>
+          </label>
+        </div>
+      </Section>
+
+      <Section
+        title={nl ? 'Beschrijving' : 'Description'}
+        note={
+          nl
+            ? 'Wat er op de eventpagina komt te staan. Laat je het Engels leeg, dan toont de site daar de Nederlandse tekst.'
+            : 'What appears on the event page. Leave the English text empty and the site shows the Dutch one there.'
+        }
+      >
+        <div className="vtk-ef-field-head">
+          <Label htmlFor={activeLang === 'nl' ? 'calendar-description-nl' : 'calendar-description-en'}>
+            {activeLang === 'nl'
+              ? nl
+                ? 'Tekst (NL)'
+                : 'Text (NL)'
+              : nl
+                ? 'Tekst (EN)'
+                : 'Text (EN)'}
+          </Label>
+          <LangTabs value={activeLang} onChange={setActiveLang} nl={nl} />
+        </div>
+        <div className={activeLang === 'nl' ? undefined : 'hidden'}>
+          <MarkdownEditorField
+            name="descriptionNl"
+            defaultValue={event.descriptionNl}
+            locale={locale}
+            rows={8}
+            textareaId="calendar-description-nl"
+          />
+        </div>
+        <div className={activeLang === 'en' ? undefined : 'hidden'}>
+          <MarkdownEditorField
+            name="descriptionEn"
+            defaultValue={event.descriptionEn}
+            locale={locale}
+            rows={8}
+            textareaId="calendar-description-en"
+          />
+        </div>
+      </Section>
+
+      <Section
+        title={nl ? 'Affiche' : 'Poster'}
+        note={
+          nl
+            ? 'De foto op de kalenderkaart, de eventpagina en de homepage.'
+            : 'The photo on the calendar card, the event page and the home page.'
+        }
+      >
+        <EventImageField
+          defaultKey={event.imageKey}
+          defaultFocus={toImageFocus(event.imageFocusX, event.imageFocusY)}
+          locale={locale}
+        />
+      </Section>
+
+      {/* Twee assen, bewust apart gezet. De doelgroep bepaalt wie het event
+          vanzelf in zijn kalender krijgt; het thema is enkel een filter en een
+          kleur. Ze staan in dezelfde koppeltabel, vandaar dezelfde `name`. */}
+      <Section
+        title={nl ? 'Doelgroep en thema' : 'Audience and theme'}
+        note={
+          nl
+            ? 'De doelgroep verbergt niets: ze laat leden filteren en hun kalender op hun profiel afstemmen. Het thema bepaalt de kleur in de kalender, de filterknop en de agenda-feed per categorie.'
+            : 'The audience hides nothing: it lets members filter and tailor the calendar to their profile. The theme sets the colour in the calendar, the filter button and the per-category calendar feed.'
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <Label>{nl ? 'Doelgroep' : 'Audience'}</Label>
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              {audienceCategories.length > 0 ? (
+                audienceCategories.map((c) => (
+                  <CategoryCheckbox key={c.id} category={c} checked={selected.has(c.id)} nl={nl} />
+                ))
+              ) : (
+                <EmptyCategoryMessage audience nl={nl} canManageCategories={canManageCategories} base={base} />
+              )}
+            </div>
+            <p className="vtk-ef-hint">
+              {nl ? 'Leeg = een algemeen event, voor iedereen.' : 'Empty = a general event, for everyone.'}
+            </p>
+          </div>
+
+          <div>
+            <Label>{nl ? 'Thema' : 'Theme'}</Label>
+            <div className="flex flex-wrap gap-x-5 gap-y-2">
+              {themeCategories.length > 0 ? (
+                themeCategories.map((c) => (
+                  <CategoryCheckbox key={c.id} category={c} checked={selected.has(c.id)} nl={nl} />
+                ))
+              ) : (
+                <EmptyCategoryMessage
+                  audience={false}
+                  nl={nl}
+                  canManageCategories={canManageCategories}
+                  base={base}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </Section>
+
+      {/* De rest is per evenement zelden nodig: de URL-naam ontstaat vanzelf uit
+          de titel, de meeste events hebben geen externe link, en het
+          weekoverzicht staat goed op automatisch. Dicht dus, maar wel op het
+          scherm zelf en niet op een tweede tabblad. */}
+      <details className="vtk-ef-more" open={hasMoreSettings}>
+        <summary>
+          <span>
+            <b>{nl ? 'Meer instellingen' : 'More settings'}</b>
+            <small>
+              {nl
+                ? `URL-naam, externe link en knoptekst${canHeroWeek ? ', weekoverzicht op de homepage' : ''}`
+                : `URL name, external link and button text${canHeroWeek ? ', week overview on the home page' : ''}`}
+            </small>
+          </span>
+          <span className="chev" aria-hidden>
+            ⌄
+          </span>
+        </summary>
+
+        <div className="vtk-ef-more-body">
+          <div>
+            <Label htmlFor="event-slug">{nl ? 'URL-naam' : 'URL name'}</Label>
+            <div className="flex items-center gap-2">
+              <span className="shrink-0 text-sm text-vtk-muted">/kalender/</span>
+              <Input
+                id="event-slug"
+                name="slug"
+                defaultValue={event.slug ?? ''}
+                maxLength={80}
+                pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                placeholder={nl ? 'galabal-2026 (leeg = uit de titel)' : 'galabal-2026 (empty = from the title)'}
+              />
+            </div>
+            <p className="vtk-ef-hint">
+              {event.slug
+                ? nl
+                  ? 'Dit staat in de link die leden delen en in hun agenda. Wijzig je hem, dan werkt de oude naam niet meer; het oude adres met de lange code blijft wel doorsturen.'
+                  : 'This is in the link members share and in their calendar. Changing it breaks the old name; the old address with the long code keeps redirecting.'
+                : nl
+                  ? 'Laat leeg om hem uit de titel en het jaartal te maken, bijvoorbeeld galabal-2026.'
+                  : 'Leave empty to build it from the title and the year, for example galabal-2026.'}
+            </p>
+          </div>
+
+          {/* De knoptekst hoort bij de link en staat er dus onder: leeg blijven
+              is de normale toestand, en wie de link invult, ziet meteen dat hij
+              ze een naam kan geven. */}
+          <div>
+            <Label htmlFor="event-url">{nl ? 'Externe link' : 'External link'}</Label>
+            <Input id="event-url" name="url" defaultValue={event.url ?? ''} placeholder="https://..." />
+            <div className="mt-3">
+              <div className="vtk-ef-field-head">
+                <Label htmlFor={activeLang === 'nl' ? 'event-url-label-nl' : 'event-url-label-en'}>
+                  {activeLang === 'nl'
+                    ? nl
+                      ? 'Knoptekst (NL)'
+                      : 'Button text (NL)'
+                    : nl
+                      ? 'Knoptekst (EN)'
+                      : 'Button text (EN)'}
+                </Label>
+                <LangTabs value={activeLang} onChange={setActiveLang} nl={nl} />
+              </div>
+              <div className={activeLang === 'nl' ? undefined : 'hidden'}>
+                <Input
+                  id="event-url-label-nl"
+                  name="urlLabelNl"
+                  defaultValue={event.urlLabelNl ?? ''}
+                  maxLength={EVENT_LINK_LABEL_MAX}
+                  placeholder={DEFAULT_EVENT_LINK_LABEL.nl}
+                />
+              </div>
+              <div className={activeLang === 'en' ? undefined : 'hidden'}>
+                <Input
+                  id="event-url-label-en"
+                  name="urlLabelEn"
+                  defaultValue={event.urlLabelEn ?? ''}
+                  maxLength={EVENT_LINK_LABEL_MAX}
+                  placeholder={DEFAULT_EVENT_LINK_LABEL.en}
+                />
+              </div>
+              <p className="vtk-ef-hint">
+                {nl
+                  ? 'Laat leeg voor "Externe eventlink". Gaat de link naar de inschrijvingen of de ticketverkoop van iemand anders, zet er dan "Inschrijflink" of "Ticketverkoop": dat scheelt of iemand klikt. De Engelse tekst valt terug op de Nederlandse.'
+                  : 'Leave empty for "External event link". If the link goes to someone else’s sign-up form or ticket sales, write "Sign-up link" or "Tickets": that decides whether people click. The English text falls back to the Dutch one.'}
+              </p>
+            </div>
+          </div>
+
+          {canHeroWeek ? (
+            <div>
+              <Label htmlFor="heroWeek">
+                {nl ? 'Weekoverzicht op de homepage' : 'Week overview on the home page'}
+              </Label>
+              <Select id="heroWeek" name="heroWeek" defaultValue={event.heroWeek ?? 'AUTO'}>
+                <option value="AUTO">{nl ? 'Automatisch' : 'Automatic'}</option>
+                <option value="PINNED">{nl ? 'Voorrang geven' : 'Give priority'}</option>
+                <option value="HIDDEN">{nl ? 'Niet tonen' : 'Do not show'}</option>
+              </Select>
+              <p className="vtk-ef-hint">
+                {nl
+                  ? 'Het overzicht toont hoogstens drie evenementen per dag en tien in totaal. Voorrang zet dit evenement vooraan op zijn dag; niet tonen houdt het van de homepage zonder het uit de kalender te halen.'
+                  : 'The overview shows at most three events per day and ten in total. Priority puts this event first on its day; do not show keeps it off the home page without removing it from the calendar.'}
+              </p>
+            </div>
+          ) : null}
+        </div>
+      </details>
     </SaveForm>
   );
 }

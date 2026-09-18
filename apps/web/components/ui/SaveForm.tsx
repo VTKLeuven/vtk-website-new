@@ -50,6 +50,7 @@ export function SaveForm({
   resetOnSuccess = true,
   submitDisabled = false,
   secondarySubmit,
+  header,
   footer,
   className,
   children,
@@ -75,6 +76,23 @@ export function SaveForm({
    */
   /** Eén of meer alternatieve submitacties met elk hun eigen name/value. */
   secondarySubmit?: SecondarySubmit | SecondarySubmit[];
+  /**
+   * Zet een eigen balk vóór de velden, met de actieknoppen erin (zoals de
+   * meescrollende kop van het evenementenformulier). Krijgt dezelfde knoppen en
+   * dialoog mee als `footer`, en vervangt net als `footer` de standaard
+   * knoppenrij onderaan; geef er hoogstens één van de twee de knoppen, anders
+   * staat dezelfde submitknop twee keer in het formulier.
+   *
+   * De submitknop blijft de eerste submit in het formulier, ook hierboven: die
+   * bepaalt wat Enter in een tekstveld doet.
+   */
+  header?: (props: {
+    pending: boolean;
+    disabled: boolean;
+    submitButton: ReactNode;
+    secondaryButtons: ReactNode;
+    confirmDialog: ReactNode;
+  }) => ReactNode;
   /**
    * Vervangt de standaard knoppenrij onderaan door een eigen footer (zoals de
    * sticky actiebalk van het evenementenformulier). Krijgt de actieknoppen en
@@ -215,18 +233,21 @@ export function SaveForm({
     />
   ) : null;
 
+  const chrome = {
+    pending,
+    disabled: pending || submitDisabled || busy,
+    submitButton,
+    secondaryButtons,
+    confirmDialog,
+  };
+
   return (
     <form ref={formRef} onSubmit={onSubmit} className={className}>
+      {header ? header(chrome) : null}
       <FormBusyProvider register={register}>{children}</FormBusyProvider>
       {footer ? (
-        footer({
-          pending,
-          disabled: pending || submitDisabled || busy,
-          submitButton,
-          secondaryButtons,
-          confirmDialog,
-        })
-      ) : (
+        footer(chrome)
+      ) : header ? null : (
         <>
           <div className="flex flex-wrap items-center gap-3">
             {submitButton}

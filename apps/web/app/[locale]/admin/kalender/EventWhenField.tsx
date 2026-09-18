@@ -113,36 +113,41 @@ export function EventWhenField({
   }
 
   return (
-    <div className="md:col-span-2 space-y-3">
-      <fieldset>
-        <legend className="text-sm font-medium text-vtk-ink">{nl ? 'Wanneer' : 'When'}</legend>
-        <div className="mt-2 flex flex-wrap gap-4">
-          <label className="inline-flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name="whenMode"
-              value="single"
-              checked={mode === 'single'}
-              onChange={() => setMode('single')}
-            />
-            {nl ? 'Eén doorlopende periode' : 'One continuous period'}
-          </label>
-          <label className="inline-flex items-center gap-2 text-sm">
-            <input
-              type="radio"
-              name="whenMode"
-              value="moments"
-              checked={mode === 'moments'}
-              onChange={() => setMode('moments')}
-            />
-            {nl ? 'Meerdere momenten' : 'Several moments'}
-          </label>
-        </div>
-        <p className="mt-1 text-xs text-vtk-muted">
-          {nl
-            ? 'Kies momenten wanneer het evenement op meerdere dagen doorgaat zonder ertussen door te lopen, bijvoorbeeld elke dag van de week een loopje. Het blijft dan één evenement met één pagina, maar het staat enkel op de dagen waarop er echt iets is, telkens met het juiste uur, en in de agenda van de leden komt er een aparte afspraak per moment.'
-            : 'Pick moments when the event happens on several days without running through in between, for instance a run every day of the week. It stays one event with one page, but it only shows on the days something actually happens, each with the right time, and members get a separate appointment per moment in their calendar.'}
-        </p>
+    <div className="space-y-4">
+      {/* De twee vormen als keuzekaarten: de keuze bepaalt welke velden er
+          verderop staan, en dat is meer dan een vinkje in een rij verdient. */}
+      <fieldset className="vtk-ef-modes">
+        <legend className="sr-only">{nl ? 'Vorm van het evenement' : 'Shape of the event'}</legend>
+        <label className="vtk-ef-mode" data-active={mode === 'single'}>
+          <input
+            type="radio"
+            name="whenMode"
+            value="single"
+            checked={mode === 'single'}
+            onChange={() => setMode('single')}
+          />
+          <span>
+            <b>{nl ? 'Eén doorlopende periode' : 'One continuous period'}</b>
+            <small>{nl ? 'Een fuif, een cantus, een weekend.' : 'A party, a cantus, a weekend.'}</small>
+          </span>
+        </label>
+        <label className="vtk-ef-mode" data-active={mode === 'moments'}>
+          <input
+            type="radio"
+            name="whenMode"
+            value="moments"
+            checked={mode === 'moments'}
+            onChange={() => setMode('moments')}
+          />
+          <span>
+            <b>{nl ? 'Meerdere momenten' : 'Several moments'}</b>
+            <small>
+              {nl
+                ? 'Een loopweek, een reeks workshops: elke dag een eigen uur.'
+                : 'A running week, a series of workshops: a time of its own per day.'}
+            </small>
+          </span>
+        </label>
       </fieldset>
 
       {mode === 'single' ? (
@@ -177,6 +182,12 @@ export function EventWhenField({
           {/* Eén verborgen veld met alle rijen: de action leest ze in één keer
               en leidt er start en einde van het evenement uit af. */}
           <input type="hidden" name="moments" value={JSON.stringify(rows)} />
+
+          <p className="text-xs text-vtk-muted">
+            {nl
+              ? 'Het blijft één evenement met één pagina en één affiche, maar het staat enkel op de dagen waarop er echt iets is, telkens met het juiste uur. In de agenda van de leden komt er een aparte afspraak per moment.'
+              : 'It stays one event with one page and one poster, but it only shows on the days something actually happens, each with the right time. Members get a separate appointment per moment in their calendar.'}
+          </p>
 
           {rows.length > 0 ? (
             <div className="space-y-2">

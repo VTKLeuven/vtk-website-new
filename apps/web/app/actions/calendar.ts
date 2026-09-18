@@ -385,11 +385,6 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   if (created && formData.get("andThen") === "tickets") {
     redirect(`/admin/tickets/new?calendarEvent=${created.id}`);
   }
-  // Aanmaken in twee stappen (optie C): na stap 1 (het minimale concept) land je
-  // meteen op het bewerkscherm met de checklist van wat er nog ontbreekt (stap 2).
-  if (created) {
-    redirect(`/admin/kalender/${created.id}`);
-  }
   redirect("/admin/kalender");
 }
 

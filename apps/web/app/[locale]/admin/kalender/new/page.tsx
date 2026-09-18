@@ -44,9 +44,10 @@ export default async function NewEventPage({
     )
   ).some(Boolean);
 
+  // Geen <h1> hier: de titel staat in de meescrollende kop van het formulier,
+  // samen met de status en de opslagknoppen.
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">{locale === "nl" ? "Nieuw evenement" : "New event"}</h1>
       <EventForm
         event={{}}
         groups={groups}

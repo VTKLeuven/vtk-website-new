@@ -1152,149 +1152,78 @@ a.vtk-shortcut-tile:hover {
 /* ---------------------------------------------------------------------------
  * Evenementenformulier (/admin/kalender/new en /admin/kalender/[id])
  *
- * Twee stappen:
- * - Aanmaken (optie C): minimaal concept in vier compacte kaarten met een
- *   stapbalk erboven en "Aanmaken en verder" in de sticky balk.
- * - Bewerken (optie A): acht benoemde secties met een checklist "Klaar om te
- *   publiceren?" erboven, tweetalige velden achter compacte NL/EN-tabs en de
- *   status en opslagknoppen in de meescrollende actiebalk onderaan.
+ * Eén scherm in benoemde secties: aanmaken en bewerken tonen dezelfde velden in
+ * dezelfde volgorde, met de status en de opslagknoppen in een meescrollende kop
+ * erboven, en het werk dat je zelden nodig hebt achter "Meer instellingen".
+ *
+ * Alles hangt onder `.vtk-ef`, want dit bestand wordt door elk beheerscherm
+ * geladen: een losse `.pill` of `.sec-title` in de globale ruimte is een
+ * botsing die op zich laat wachten.
  * ------------------------------------------------------------------------- */
 
-.sec-title {
+.vtk-ef {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin: 0 0 3px;
+  flex-direction: column;
+  gap: 18px;
 }
 
-.sec-title h2,
-.sec-title h3 {
-  margin: 0;
-  font-size: 15px;
+/* De kop blijft staan onder de sitebalk: bij een formulier van twee schermen
+   hoog hoort "wat ben ik aan het bewerken en hoe bewaar ik het" niet pas na het
+   scrollen in beeld te komen. */
+.vtk-ef-head {
+  position: sticky;
+  top: var(--vtk-header-height, 73px);
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px 20px;
+  margin-bottom: -8px;
+  padding: 14px 0 12px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-ef-head-text {
+  min-width: 0;
+}
+
+.vtk-ef-head h1 {
+  margin: 3px 0 0;
+  font-size: clamp(1.4rem, 2.4vw, 1.9rem);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
   font-weight: 600;
-  letter-spacing: -0.01em;
   color: var(--ink);
 }
 
-.sec-note {
-  margin: 0 0 14px;
-  font-size: 12.5px;
-  color: var(--muted);
-  max-width: 72ch;
-}
-
-/* Stap-indicator bij aanmaken in twee stappen (optie C) */
-.step-head {
+.vtk-ef-crumbs {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 14px;
-  font-size: 12.5px;
-  color: var(--muted);
-}
-
-.step-head b {
-  color: var(--ink);
-}
-
-.step-head .bar {
-  flex: 1;
-  height: 3px;
-  border-radius: 999px;
-  background: var(--paper-2);
-  overflow: hidden;
-}
-
-.step-head .bar i {
-  display: block;
-  height: 100%;
-  width: 50%;
-  background: var(--yellow);
-}
-
-/* Checklist boven het bewerkscherm */
-.todo-card {
-  border: 1px solid rgba(224, 174, 29, 0.55);
-  background: rgba(255, 210, 63, 0.12);
-  border-radius: 16px;
-  padding: 14px 16px;
-  margin-bottom: 20px;
-}
-
-.todo-card.all-done {
-  border: 1px solid rgba(46, 155, 118, 0.4);
-  background: rgba(46, 155, 118, 0.08);
-}
-
-.todo-card h2,
-.todo-card h3 {
-  margin: 0 0 8px;
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--ink);
-}
-
-.todo-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 5px;
-  font-size: 13px;
-}
-
-.todo-list li {
-  display: flex;
-  gap: 9px;
-  align-items: baseline;
-  color: var(--body);
-}
-
-.todo-list .mark {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  gap: 6px;
   font-size: 12px;
-  font-weight: 700;
-}
-
-.todo-list .done .mark {
-  color: #16a34a;
-}
-
-.todo-list .miss .mark {
-  color: #b45309;
-}
-
-/* Compacte taalknoppen bij tweetalige velden (titel, beschrijving, knoptekst) */
-.langtabs {
-  display: inline-flex;
-  gap: 2px;
-  margin-left: 8px;
-  vertical-align: -1px;
-}
-
-.langtabs button {
-  padding: 1px 7px;
-  border-radius: 6px;
-  font-size: 10px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
   color: var(--muted);
-  background: var(--paper-2);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
 }
 
-.langtabs button:hover {
+.vtk-ef-crumbs a {
+  color: var(--muted);
+  text-decoration: none;
+}
+
+.vtk-ef-crumbs a:hover {
   color: var(--ink);
+  text-decoration: underline;
 }
 
-.langtabs button[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--paper);
+.vtk-ef-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
 }
 
-/* Status-pil */
-.pill {
+.vtk-ef-pill {
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -1304,43 +1233,288 @@ a.vtk-shortcut-tile:hover {
   font-weight: 600;
 }
 
-.pill.draft {
+.vtk-ef-pill.is-draft {
   border: 1px solid var(--line-2);
   background: var(--paper-2);
   color: var(--muted);
 }
 
-.pill.live {
+.vtk-ef-pill.is-live {
   background: rgba(255, 210, 63, 0.25);
   border: 1px solid rgba(224, 174, 29, 0.4);
   color: var(--ink);
 }
 
-/* Vaste actiebalk onderaan het formulier */
-.stickybar {
-  position: sticky;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  margin-top: 24px;
-  padding: 12px 16px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.94);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 -8px 24px -20px rgba(10, 15, 31, 0.5);
-  z-index: 20;
-}
-
-.stickybar .state {
+/* Eén regel onder de kop die zegt wat de status betekent. Buiten de sticky
+   balk, want hij hoeft niet de hele pagina lang mee te schuiven. */
+.vtk-ef-state {
+  margin: 0;
   font-size: 13px;
-  color: var(--muted);
-  margin-right: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
+  line-height: 1.5;
 }
 
+/* Wat er nog ontbreekt aan een bestaand evenement. */
+.vtk-ef-todo {
+  border: 1px solid rgba(224, 174, 29, 0.55);
+  background: rgba(255, 210, 63, 0.12);
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+
+.vtk-ef-todo.is-done {
+  border-color: rgba(46, 155, 118, 0.4);
+  background: rgba(46, 155, 118, 0.08);
+}
+
+.vtk-ef-todo h2 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vtk-ef-todo ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+}
+
+.vtk-ef-todo li {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  color: var(--body);
+}
+
+.vtk-ef-todo .mark {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.vtk-ef-todo .is-ok .mark {
+  color: #15803d;
+}
+
+.vtk-ef-todo .is-missing .mark {
+  color: #b45309;
+}
+
+/* Eén sectie: titel met de gele regel eronder, één regel uitleg, dan velden. */
+.vtk-ef-section {
+  padding: 20px 22px 22px;
+}
+
+.vtk-ef-section-title {
+  margin: 0;
+  width: fit-content;
+  padding-bottom: 6px;
+  border-bottom: 3px solid var(--yellow);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.vtk-ef-section-note {
+  margin: 10px 0 18px;
+  max-width: 72ch;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.vtk-ef-section-title + *:not(.vtk-ef-section-note) {
+  margin-top: 18px;
+}
+
+/* Opschrift plus de NL/EN-knoppen op één regel boven het veld. */
+.vtk-ef-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.vtk-ef-field-head > label {
+  margin-bottom: 0;
+}
+
+.vtk-ef-langtabs {
+  display: inline-flex;
+  gap: 2px;
+  flex-shrink: 0;
+}
+
+.vtk-ef-langtabs button {
+  padding: 2px 8px;
+  border-radius: 7px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: var(--paper-2);
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+.vtk-ef-langtabs button:hover {
+  color: var(--ink);
+}
+
+.vtk-ef-langtabs button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.vtk-ef-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.vtk-ef-rule {
+  margin: 18px 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+/* De keuze tussen één periode en losse momenten, en het logistiekvinkje: een
+   keuze die bepaalt welke velden er verderop staan, verdient meer dan een
+   bolletje in een rij. */
+.vtk-ef-modes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.vtk-ef-mode,
+.vtk-ef-check {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.vtk-ef-mode[data-active="true"] {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+.vtk-ef-mode input,
+.vtk-ef-check input {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+
+.vtk-ef-mode b,
+.vtk-ef-check b {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vtk-ef-mode small,
+.vtk-ef-check small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--muted);
+}
+
+/* Zelden nodig, dus dicht: de URL-naam ontstaat vanzelf uit de titel, de meeste
+   events hebben geen externe link en het weekoverzicht staat goed op
+   automatisch. Wel op dit scherm, niet op een tweede tabblad. */
+.vtk-ef-more {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 10px 30px -24px rgba(10, 15, 31, 0.35);
+}
+
+.vtk-ef-more > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 16px 22px;
+  cursor: pointer;
+  list-style: none;
+  border-radius: 18px;
+}
+
+.vtk-ef-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+.vtk-ef-more > summary b {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vtk-ef-more > summary small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.vtk-ef-more > summary .chev {
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.vtk-ef-more[open] > summary {
+  border-bottom: 1px solid var(--line);
+  border-radius: 18px 18px 0 0;
+}
+
+.vtk-ef-more[open] > summary .chev {
+  transform: rotate(180deg);
+}
+
+.vtk-ef-more-body {
+  display: grid;
+  gap: 18px;
+  padding: 18px 22px 20px;
+}
+
+@media (max-width: 700px) {
+  /* Op een telefoon is een balk die blijft staan een balk die de helft van het
+     scherm opeet zodra de knoppen wikkelen. */
+  .vtk-ef-head {
+    position: static;
+  }
+
+  .vtk-ef-modes {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vtk-ef-section {
+    padding: 16px 16px 18px;
+  }
+
+  .vtk-ef-more > summary,
+  .vtk-ef-more-body {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+}

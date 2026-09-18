@@ -60,11 +60,10 @@ export default async function EditEventPage({
 
   const base = locale === "nl" ? "" : "/en";
 
+  // Geen <h1> hier: de titel van het evenement staat in de meescrollende kop
+  // van het formulier, samen met de status en de opslagknoppen.
   return (
     <div className="space-y-4">
-      <h1 className="text-2xl font-semibold">
-        {locale === "nl" ? "Evenement bewerken" : "Edit event"}
-      </h1>
       <EventForm
         event={{
           ...event,
