@@ -8,7 +8,8 @@ import { useToast } from "@/components/ui/toast";
 import { registerShift, type MergedShift, type PostNames } from "@/components/shift/shiftData";
 import { ShiftDialog } from "@/components/shift/ShiftDialog";
 import "@/components/shift/shift-board.css";
-import type { ShiftResponse } from "@/lib/shift";
+import type { ShiftRosterEntry } from "@/lib/shift";
+import { Coins } from "lucide-react";
 
 export type FrontpageShiftItem = {
   id: string;
@@ -25,6 +26,7 @@ export type FrontpageShiftItem = {
   takenSpots: number;
   availableSpots: number;
   viewerRegistered: boolean;
+  roster: ShiftRosterEntry[];
 };
 
 function formatShiftTileDay(date: Date, now: Date, locale: Locale): string {
@@ -59,6 +61,7 @@ export function FrontpageShiftBand({
   postNames,
   signedIn,
   totalOpenSpots,
+  userName,
 }: {
   locale: Locale;
   base: string;
@@ -66,6 +69,7 @@ export function FrontpageShiftBand({
   postNames: PostNames;
   signedIn: boolean;
   totalOpenSpots: number;
+  userName?: string | null;
 }) {
   const [shifts, setShifts] = useState(initialShifts);
   const [selectedEntry, setSelectedEntry] = useState<MergedShift | null>(null);
@@ -83,6 +87,7 @@ export function FrontpageShiftBand({
     const ok = await registerShift(shift.id, showToast, t);
     setRegisteringId(null);
     if (ok) {
+      const selfName = userName?.trim() || (nl ? "Jij" : "You");
       setShifts((prev) =>
         prev.map((s) =>
           s.id === shift.id
@@ -91,6 +96,9 @@ export function FrontpageShiftBand({
                 viewerRegistered: true,
                 takenSpots: s.takenSpots + 1,
                 availableSpots: Math.max(0, s.availableSpots - 1),
+                roster: s.roster.some((p) => p.isSelf)
+                  ? s.roster
+                  : [...s.roster, { name: selfName, isSelf: true }],
               }
             : s
         )
@@ -159,12 +167,24 @@ export function FrontpageShiftBand({
                     : `${shift.reward} vouchers`
                 : null;
 
+            const roster = shift.roster ?? [];
+            const rosterNames = roster.map((p) =>
+              p.isSelf ? `${p.name} (${nl ? "jij" : "you"})` : p.name
+            );
+            const spotsTitle =
+              rosterNames.length > 0
+                ? `${nl ? "Ingeschreven" : "Registered"}: ${rosterNames.join(", ")}`
+                : nl
+                  ? "Nog geen inschrijvingen"
+                  : "No sign-ups yet";
+
             const entry: MergedShift = {
               shift: {
                 participantIds: [],
                 sourceSystem: null,
                 sourceId: null,
                 ...shift,
+                roster: shift.roster,
               },
               registered: isRegistered,
             };
@@ -172,24 +192,81 @@ export function FrontpageShiftBand({
             return (
               <article key={shift.id} className="shift-tile">
                 <div className="shift-tile-head">
-                  <div className="shift-tile-when">
+                  <div className="shift-tile-when" title={spotsTitle}>
                     <p className="shift-tile-day">{formatShiftTileDay(start, now, locale)}</p>
                     <p className="shift-tile-hours">{formatTimeRange(start, end)}</p>
                   </div>
-                  <span className={`shift-spots ${badgeClass}`}>{badgeLabel}</span>
+                  <div className="shift-spots-wrap">
+                    <button
+                      type="button"
+                      className={`shift-spots ${badgeClass}`}
+                      title={spotsTitle}
+                      onClick={() => setSelectedEntry(entry)}
+                      aria-label={`${badgeLabel}. ${spotsTitle}`}
+                    >
+                      {badgeLabel}
+                    </button>
+                    <div className="shift-spots-popover" role="tooltip" aria-hidden="true">
+                      <div className="shift-spots-popover-head">
+                        <span className="shift-spots-popover-title">
+                          {nl ? "Ingeschreven" : "Registered"}
+                        </span>
+                        <span className="shift-spots-popover-count">
+                          {shift.takenSpots}/{shift.maxParticipants}
+                        </span>
+                      </div>
+                      {roster.length === 0 ? (
+                        <p className="shift-spots-popover-empty">
+                          {nl ? "Nog geen inschrijvingen" : "No sign-ups yet"}
+                        </p>
+                      ) : (
+                        <ul className="shift-spots-popover-list">
+                          {roster.map((person, idx) => (
+                            <li
+                              key={idx}
+                              className="shift-spots-popover-person"
+                              data-self={person.isSelf ? "true" : undefined}
+                            >
+                              <span className="shift-spots-popover-initial">
+                                {person.name.trim().slice(0, 1).toUpperCase() || "?"}
+                              </span>
+                              <span className="shift-spots-popover-name">
+                                {person.name}
+                                {person.isSelf ? (
+                                  <span className="shift-spots-popover-you">
+                                    {" "}
+                                    ({nl ? "jij" : "you"})
+                                  </span>
+                                ) : null}
+                              </span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  </div>
                 </div>
 
                 <h4>{shift.name}</h4>
 
                 <div className="shift-tile-facts">
-                  {postLabelText ? (
-                    <span className="shift-tile-post">{postLabelText}</span>
-                  ) : null}
-                  {shift.location ? (
-                    <span className="shift-tile-loc">{shift.location}</span>
-                  ) : null}
-                  {rewardText ? (
-                    <span className="shift-tile-reward">{rewardText}</span>
+                  <div className="shift-tile-meta">
+                    {postLabelText ? (
+                      <span className="shift-tile-post">{postLabelText}</span>
+                    ) : null}
+                    {shift.location ? (
+                      <span className="shift-tile-loc">{shift.location}</span>
+                    ) : null}
+                  </div>
+                  {shift.reward > 0 ? (
+                    <span
+                      className="shift-tile-reward"
+                      title={rewardText ?? undefined}
+                      aria-label={rewardText ?? undefined}
+                    >
+                      <span className="shift-tile-reward-val">{shift.reward}</span>
+                      <Coins className="shift-tile-coin" aria-hidden="true" />
+                    </span>
                   ) : null}
                 </div>
 
@@ -198,6 +275,7 @@ export function FrontpageShiftBand({
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
+                      title={spotsTitle}
                       onClick={() => setSelectedEntry(entry)}
                     >
                       {nl ? "Ingeschreven" : "Registered"}
@@ -255,6 +333,7 @@ export function FrontpageShiftBand({
               : undefined
           }
           onSuccess={(newRegistered) => {
+            const selfName = userName?.trim() || (nl ? "Jij" : "You");
             setShifts((prev) =>
               prev.map((s) =>
                 s.id === selectedEntry.shift.id
@@ -265,6 +344,11 @@ export function FrontpageShiftBand({
                       availableSpots: newRegistered
                         ? Math.max(0, s.availableSpots - 1)
                         : s.availableSpots + 1,
+                      roster: newRegistered
+                        ? s.roster.some((p) => p.isSelf)
+                          ? s.roster
+                          : [...s.roster, { name: selfName, isSelf: true }]
+                        : s.roster.filter((p) => !p.isSelf),
                     }
                   : s
               )

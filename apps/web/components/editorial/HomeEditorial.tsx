@@ -18,6 +18,7 @@ import { PocBand, type PocBandGroup } from "./PocBand";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
 import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
 import { FrontpageShiftBand, type FrontpageShiftItem } from "./FrontpageShiftBand";
+import { ROSTER_PARTICIPANT_SELECT, toRoster } from "@/lib/shift/roster";
 import { loadPostNames } from "@/lib/shift/postNames";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
 import { elixirScheduleFromSetting, openingWindowPhase } from "@/lib/elixir/openingWindow";
@@ -226,17 +227,17 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         openToInternationals: true,
         _count: { select: { participants: true } },
         participants: {
-          where: { userId: session?.user.id ?? "" },
-          select: { userId: true },
+          select: ROSTER_PARTICIPANT_SELECT,
         },
       },
     }),
     loadPostNames(locale),
   ]);
+  const viewerId = session?.user.id ?? "";
   const openShifts: FrontpageShift[] = shifts.map(({ _count, participants, ...shift }) => ({
     ...shift,
     takenSpots: _count.participants,
-    viewerRegistered: participants.length > 0,
+    viewerRegistered: participants.some((p) => p.userId === viewerId),
   }));
 
   const weekEnd = addDays(now, 7);
@@ -246,13 +247,14 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     0
   );
   const shiftBandItems: FrontpageShiftItem[] = weekShifts
-    .filter((s) => s.maxParticipants - s._count.participants > 0 || s.participants.length > 0)
+    .filter((s) => s.maxParticipants - s._count.participants > 0 || s.participants.some((p) => p.userId === viewerId))
     .slice(0, 4)
     .map(({ _count, participants, ...shift }) => ({
       ...shift,
       takenSpots: _count.participants,
       availableSpots: Math.max(0, shift.maxParticipants - _count.participants),
-      viewerRegistered: participants.length > 0,
+      viewerRegistered: participants.some((p) => p.userId === viewerId),
+      roster: toRoster(participants, viewerId),
     }));
   const viewerInterestIds = new Set(viewerInterestMap.keys());
 
@@ -879,6 +881,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           postNames={postNames}
           signedIn={Boolean(session)}
           totalOpenSpots={totalOpenSpots}
+          userName={session?.user?.name ?? null}
         />
       )}
 
