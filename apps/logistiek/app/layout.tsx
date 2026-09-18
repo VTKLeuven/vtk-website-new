@@ -13,7 +13,25 @@ const inter = Inter({ variable: "--font-vtk-sans", subsets: ["latin"] });
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  return { title: copy[locale].appTitle, description: copy[locale].appDescription };
+  return {
+    title: copy[locale].appTitle,
+    description: copy[locale].appDescription,
+    icons: {
+      icon: [
+        {
+          url: "/vtk-shield-favicon-32.png",
+          type: "image/png",
+          sizes: "32x32",
+        },
+        {
+          url: "/vtk-shield-favicon.png",
+          type: "image/png",
+          sizes: "512x512",
+        },
+      ],
+      shortcut: "/vtk-shield-favicon-32.png",
+    },
+  };
 }
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
