@@ -47,7 +47,14 @@ type PublicEventRecord = Prisma.TicketEventGetPayload<{
 }>;
 
 const orderInclude = {
-  event: true,
+  // Dezelfde poster als in de shop: een ticketevent heeft geen eigen foto, het
+  // gekoppelde kalender-event wel. De bestelpagina toont ze bij het event in
+  // het bestelpaneel.
+  event: {
+    include: {
+      calendarEvent: { select: { imageKey: true, imageFocusX: true, imageFocusY: true } },
+    },
+  },
   items: { include: { ticket: true } },
 } satisfies Prisma.TicketOrderInclude;
 
@@ -367,6 +374,39 @@ export async function getOrderForViewer(orderId: string) {
   return orderDto(order, session?.user.id === order.buyerUserId);
 }
 
+/**
+ * De bestelregels: per tickettype en prijs één regel met een aantal erbij.
+ *
+ * Bewust uit `items` en niet uit de uitgegeven tickets: een bestelling die nog
+ * op betaling wacht, heeft nog geen tickets maar wel al regels, en juist daar
+ * wil de koper zien wat hij besteld heeft. Eén item is één ticket, dus het
+ * aantal is gewoon het aantal items van dezelfde soort aan dezelfde prijs (de
+ * ledenprijs en de gewone prijs van hetzelfde type blijven zo uit elkaar).
+ */
+function orderLines(items: OrderItemRecord[]) {
+  const lines = new Map<
+    string,
+    { key: string; name: string; quantity: number; unitPriceCents: number; totalCents: number }
+  >();
+  for (const item of items) {
+    const key = `${item.ticketTypeId}:${item.unitPriceCents}`;
+    const line = lines.get(key);
+    if (line) {
+      line.quantity += 1;
+      line.totalCents += item.totalCents;
+    } else {
+      lines.set(key, {
+        key,
+        name: item.ticketTypeName,
+        quantity: 1,
+        unitPriceCents: item.unitPriceCents,
+        totalCents: item.totalCents,
+      });
+    }
+  }
+  return [...lines.values()];
+}
+
 function orderDto(order: OrderRecord, authenticatedOwner: boolean) {
   return {
     id: order.id,
@@ -385,10 +425,20 @@ function orderDto(order: OrderRecord, authenticatedOwner: boolean) {
       title: order.locale === "EN" && order.event.titleEn ? order.event.titleEn : order.event.titleNl,
       startsAt: order.event.startsAt,
       location: order.event.location,
+      poster: order.event.calendarEvent?.imageKey
+        ? {
+            src: publicUrl(order.event.calendarEvent.imageKey)!,
+            position: focusPosition({
+              x: order.event.calendarEvent.imageFocusX,
+              y: order.event.calendarEvent.imageFocusY,
+            }),
+          }
+        : null,
       confirmationMessage: order.locale === "EN"
         ? order.event.confirmationMessageEn || order.event.confirmationMessageNl
         : order.event.confirmationMessageNl,
     },
+    lines: orderLines(order.items),
     tickets: order.items.filter(isIssued).map((item) => ({
       id: item.ticket.id,
       publicId: item.ticket.publicCode,

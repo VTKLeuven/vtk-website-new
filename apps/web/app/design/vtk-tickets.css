@@ -30,9 +30,7 @@
 }
 
 .ticket-primary-button,
-.ticket-secondary-button,
-.ticket-download-button,
-.ticket-wallet-button {
+.ticket-secondary-button {
   display: inline-flex;
   min-height: 42px;
   align-items: center;
@@ -72,36 +70,17 @@
   background: var(--paper-2);
 }
 
-.ticket-section-title-row {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-.ticket-section-title-row > div > span {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.ticket-section-title-row h2 {
-  margin: 5px 0 0;
-  font-size: 30px;
-  line-height: 1.2;
-}
-
-.ticket-attendee-list,
-.ticket-pass-list {
+.ticket-attendee-list {
   display: grid;
   gap: 10px;
 }
 
-.ticket-error,
-.ticket-status-warning,
-.ticket-mail-note,
-.ticket-processing-row {
+.ticket-pass-list {
+  display: grid;
+  gap: 14px;
+}
+
+.ticket-error {
   display: flex;
   align-items: flex-start;
   gap: 9px;
@@ -300,183 +279,460 @@
   to { transform: rotate(360deg); }
 }
 
-/* Order status and ticket passes */
+/* ---------- De bestelpagina (/tickets/bestelling/[orderId]) ----------
+
+   Dezelfde pagina als de ticketpagina van het event, maar dan na de kassa: de
+   donkere kop van `vtk-event.css`, de kolommen en het paneel van
+   `vtk-ticket-shop.css` (.tshop, .tshop-panel). Links de toegangsbewijzen,
+   rechts het paneel dat daar je winkelmandje droeg en hier je bestelling.
+   Enkel wat deze pagina extra heeft, staat hieronder.
+
+   `.ticket-order-page` blijft de schil van de Bancontact-pagina ernaast; die
+   heeft geen paginakop en zet haar eigen paneel gewoon op papier. */
 
 .ticket-order-page {
   min-height: 70vh;
   padding: 56px clamp(20px, 3vw, 36px) 96px;
 }
 
-.ticket-order-status {
-  width: min(100%, 860px);
-  margin: 0 auto;
+/* De titel is een zin ("Je tickets zijn klaar"), geen eventnaam: op de maat van
+   de eventkop zou ze over drie regels lopen. */
+.torder-head .vtk-page-title {
+  font-size: clamp(30px, 4.2vw, 52px);
 }
 
-.ticket-status-hero {
+.torder-total {
   display: grid;
-  grid-template-columns: 58px minmax(0, 1fr);
-  gap: 20px;
-  border-bottom: 1px solid var(--line);
-  padding: 12px 0 34px;
+  gap: 2px;
 }
 
-.ticket-status-icon {
-  display: flex;
-  width: 54px;
-  height: 54px;
+.torder-total > b {
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.torder-total > em {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  border-radius: 50%;
+  gap: 7px;
+  margin-top: 4px;
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 700;
 }
 
-.ticket-status-icon svg {
-  width: 29px;
-  height: 29px;
+.torder-total > em[data-tone="ok"] { color: var(--ticket-green); }
+.torder-total > em[data-tone="wait"] { color: var(--ticket-amber); }
+.torder-total > em[data-tone="bad"] { color: var(--ticket-red); }
+
+/* ---------- De linkerkolom ---------- */
+
+.torder-section-head {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 18px;
 }
 
-.ticket-status-hero.is-paid .ticket-status-icon {
+.torder-section-head .tshop-heading {
+  margin-bottom: 0;
+}
+
+.torder-eyebrow {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.torder-warning,
+.torder-mail,
+.torder-processing,
+.torder-message {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.torder-warning {
+  margin-bottom: 18px;
+  background: var(--ticket-amber-soft);
+  color: var(--ticket-amber);
+}
+
+.torder-mail {
+  margin-top: 14px;
   background: var(--ticket-green-soft);
   color: var(--ticket-green);
 }
 
-.ticket-status-hero.is-pending .ticket-status-icon {
+/* Een woord van de organisator bij deze bestelling: het staat boven de tickets
+   en krijgt de gele rail van een uitgelichte kaart, niet de kleur van een
+   status. */
+.torder-message {
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: inset 3px 0 0 var(--yellow);
+  background: var(--surface);
+  color: var(--body);
+  white-space: pre-line;
+}
+
+.torder-processing {
   background: var(--ticket-amber-soft);
   color: var(--ticket-amber);
 }
 
-.ticket-status-hero.is-failed .ticket-status-icon {
+/* Wachten op de betaling, of de mededeling dat er niets uitgegeven is. Een
+   gestippelde omtrek in plaats van een kaart: er staat nog niets in. */
+.torder-wait {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
+  padding: clamp(28px, 5vw, 44px) 24px;
+  border: 1px dashed var(--line-2);
+  border-radius: 20px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.torder-wait h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 650;
+}
+
+.torder-wait p {
+  max-width: 46ch;
+  margin: 0;
+  color: var(--body);
+  font-size: 14.5px;
+  line-height: 1.55;
+}
+
+.torder-wait-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border-radius: 50%;
+}
+
+.torder-wait[data-tone="wait"] .torder-wait-icon {
+  background: var(--ticket-amber-soft);
+  color: var(--ticket-amber);
+}
+
+.torder-wait[data-tone="bad"] .torder-wait-icon {
   background: var(--ticket-red-soft);
   color: var(--ticket-red);
 }
 
-.ticket-status-hero span {
+.torder-wait .ticket-primary-button {
+  margin-top: 4px;
+}
+
+/* ---------- Het bestelpaneel ---------- */
+
+/* De titel houdt haar breedte; een lang bestelnummer breekt ernaast af in
+   plaats van "Je bestelling" over twee regels te duwen. */
+.torder-panel .tshop-panel-head h2 {
+  flex: none;
+}
+
+.torder-panel .tshop-panel-head small {
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.torder-event {
+  display: flex;
+  gap: 13px;
+  align-items: flex-start;
+}
+
+.torder-poster {
+  position: relative;
+  flex: none;
+  width: 76px;
+  aspect-ratio: 1 / 1;
+  overflow: hidden;
+  border-radius: 14px;
+  /* Zonder gekoppeld kalender-event is er geen poster; dan blijft het
+     streepjesvlak staan, net als op /tickets. */
+  background: repeating-linear-gradient(135deg, var(--paper-2) 0 10px, var(--paper) 10px 20px);
+}
+
+.torder-event > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.torder-event strong {
+  color: var(--ink);
+  font-size: 15.5px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.torder-event span {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
   color: var(--muted);
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
-.ticket-status-hero h1 {
-  margin: 5px 0 8px;
-  font-family: var(--sans);
-  font-size: clamp(26px, 3vw, 36px);
-  font-style: normal;
-  font-weight: 600;
-  line-height: 1.1;
+.torder-event span svg {
+  flex: none;
+  margin-top: 2px;
 }
 
-.ticket-status-hero p {
+.torder-lines {
   margin: 0;
-  color: var(--body);
-  line-height: 1.55;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
 }
 
-.ticket-status-warning {
-  margin-top: 16px;
-  padding: 12px 14px;
+.torder-lines li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 14px;
+}
+
+.torder-lines i {
+  color: var(--muted);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.torder-lines li > span {
+  min-width: 0;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.torder-lines small {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.torder-lines b {
+  color: var(--ink);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.torder-facts {
+  display: grid;
+  gap: 11px;
+  margin: 0;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+}
+
+.torder-facts > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.torder-facts dt {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.torder-facts dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.torder-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.torder-chip[data-tone="ok"] {
+  background: var(--ticket-green-soft);
+  color: var(--ticket-green);
+}
+
+.torder-chip[data-tone="wait"] {
   background: var(--ticket-amber-soft);
   color: var(--ticket-amber);
 }
 
-.ticket-order-details,
-.ticket-issued-section {
-  padding: 32px 0;
-  border-bottom: 1px solid var(--line);
+.torder-chip[data-tone="bad"] {
+  background: var(--ticket-red-soft);
+  color: var(--ticket-red);
 }
 
-.ticket-order-detail-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 20px;
-}
-
-.ticket-order-detail-head span {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
-.ticket-order-detail-head h2 {
-  margin: 4px 0 0;
-  font-size: 23px;
-}
-
-.ticket-order-detail-head > strong {
-  font-size: 22px;
-  white-space: nowrap;
-}
-
-.ticket-order-details dl {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin: 24px 0 0;
+/* De betaalwijzen staan al op wit; een tweede kaart eromheen zou een kaart in
+   een kaart zijn, net als in het gegevensblok van de shop. */
+.torder-panel .ticket-pay-choice {
+  margin: 0;
+  padding: 15px 0 0;
+  border: 0;
   border-top: 1px solid var(--line);
-  border-left: 1px solid var(--line);
+  border-radius: 0;
 }
 
-.ticket-order-details dl div {
-  border-right: 1px solid var(--line);
-  border-bottom: 1px solid var(--line);
-  padding: 13px 15px;
-  background: white;
+.torder-actions {
+  display: grid;
+  gap: 9px;
 }
 
-.ticket-order-details dt {
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
+.torder-actions button {
+  cursor: pointer;
 }
 
-.ticket-order-details dd {
-  margin: 4px 0 0;
-  font-size: 13px;
-  font-weight: 700;
-  text-transform: capitalize;
-}
-
-.ticket-issued-section .ticket-section-title-row {
-  margin-bottom: 19px;
-}
-
-.ticket-issued-section .ticket-section-title-row > svg {
-  color: var(--ticket-green);
-}
+/* ---------- De toegangsbewijzen ---------- */
 
 .ticket-pass {
   display: grid;
-  grid-template-columns: 210px minmax(0, 1fr);
-  min-height: 228px;
+  grid-template-columns: 186px minmax(0, 1fr);
   overflow: hidden;
-  border: 1px solid var(--line-2);
-  border-radius: 8px;
-  background: white;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(14, 26, 54, 0.04);
 }
 
 .ticket-pass-stub {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  border-right: 1px dashed rgba(255, 255, 255, 0.28);
-  background: var(--ink);
+  display: grid;
+  gap: 10px;
+  place-items: center;
+  align-content: center;
+  padding: 20px;
+  background: var(--navy);
   color: white;
-}
-
-.ticket-pass-stub span {
-  margin-top: 8px;
-  font-family: var(--mono);
-  font-size: 10px;
 }
 
 .ticket-pass-stub img {
   display: block;
-  width: 176px;
-  height: 176px;
-  border-radius: 7px;
+  width: 136px;
+  height: 136px;
+  padding: 7px;
+  border-radius: 8px;
   background: #fff;
+}
+
+.ticket-pass-stub span {
+  font-size: 11px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.16em;
+}
+
+.ticket-pass.is-used .ticket-pass-stub {
+  background: var(--ticket-green);
+}
+
+.ticket-pass.is-invalid .ticket-pass-stub {
+  background: var(--ticket-red);
+}
+
+.ticket-pass-body {
+  display: grid;
+  gap: 14px;
+  align-content: center;
+  min-width: 0;
+  padding: 20px 22px;
+}
+
+.ticket-pass-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+/* De soort is het enige gele op de kaart: het is wat dit ticket van het andere
+   ticket in dezelfde bestelling onderscheidt. */
+.ticket-pass-type {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.ticket-pass-body h3 {
+  margin: 9px 0 3px;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.ticket-pass-body p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.ticket-pass-state {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px 5px 9px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.ticket-pass-state[data-tone="valid"],
+.ticket-pass-state[data-tone="used"] {
+  background: var(--ticket-green-soft);
+  color: var(--ticket-green);
+}
+
+.ticket-pass-state[data-tone="invalid"] {
+  background: var(--ticket-red-soft);
+  color: var(--ticket-red);
+}
+
+.ticket-pass-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .ticket-terms-check {
@@ -496,121 +752,7 @@
   text-underline-offset: 3px;
 }
 
-.ticket-pass.is-used .ticket-pass-stub {
-  background: var(--ticket-green);
-}
-
-.ticket-pass.is-invalid .ticket-pass-stub {
-  background: var(--ticket-red);
-}
-
-.ticket-pass-body {
-  display: flex;
-  min-width: 0;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  padding: 18px 20px;
-}
-
-.ticket-pass-type {
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 800;
-  text-transform: uppercase;
-}
-
-.ticket-pass-body h3 {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  margin: 5px 0;
-  font-size: 17px;
-}
-
-.ticket-pass-body p {
-  margin: 0;
-  color: var(--muted);
-  font-family: var(--mono);
-  font-size: 10px;
-  overflow-wrap: anywhere;
-}
-
-.ticket-pass-state {
-  display: flex;
-  flex: 0 0 auto;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 9px;
-}
-
-.ticket-pass-state > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.ticket-pass-state .ticket-state-valid {
-  color: var(--ticket-green);
-}
-
-.ticket-pass-state .ticket-state-used {
-  color: var(--ticket-green);
-}
-
-.ticket-pass-state .ticket-state-invalid {
-  color: var(--ticket-red);
-}
-
-.ticket-download-button {
-  min-height: 34px;
-  border: 1px solid var(--line-2);
-  padding: 8px 10px;
-  color: var(--ink);
-}
-
-.ticket-download-button:hover {
-  border-color: var(--ink);
-  background: var(--paper-2);
-}
-
-.ticket-wallet-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.ticket-wallet-button {
-  min-height: 30px;
-  padding: 6px 11px;
-  border: 1px solid var(--line-2);
-  color: var(--ink);
-  font-size: 12px;
-}
-
-.ticket-wallet-button:hover {
-  border-color: var(--ink);
-  background: var(--paper-2);
-}
-
-.ticket-mail-note {
-  margin-top: 13px;
-  padding: 11px 13px;
-  background: var(--ticket-green-soft);
-  color: var(--ticket-green);
-}
-
-.ticket-processing-row {
-  margin-top: 20px;
-  padding: 13px 15px;
-  background: var(--ticket-amber-soft);
-  color: var(--ticket-amber);
-}
-
+/* De knoppenrij onderaan de Bancontact-pagina. */
 .ticket-order-actions {
   display: flex;
   justify-content: space-between;
@@ -621,6 +763,34 @@
 .ticket-order-actions button {
   cursor: pointer;
 }
+
+@media (max-width: 960px) {
+  /* De shop zet haar paneel altijd bovenaan; hier hangt het van de bestelling
+     af. Wie betaald heeft, wil zijn QR-code zien; wie nog moet betalen, wil de
+     betaalknop. */
+  .torder .tshop-panel {
+    order: 0;
+  }
+
+  .torder[data-panel-first] .tshop-panel {
+    order: -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .ticket-pass {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .ticket-pass-stub {
+    padding: 18px;
+  }
+
+  .ticket-pass-body {
+    padding: 18px;
+  }
+}
+
 
 /* Scanner */
 
@@ -1494,46 +1664,6 @@
     padding-bottom: 70px;
   }
 
-  .ticket-status-hero {
-    grid-template-columns: 44px minmax(0, 1fr);
-    gap: 13px;
-  }
-
-  .ticket-status-icon {
-    width: 42px;
-    height: 42px;
-  }
-
-  .ticket-status-icon svg {
-    width: 23px;
-    height: 23px;
-  }
-
-  .ticket-status-hero h1 {
-    font-size: 32px;
-  }
-
-  .ticket-order-details dl {
-    grid-template-columns: 1fr;
-  }
-
-  .ticket-pass {
-    grid-template-columns: 76px minmax(0, 1fr);
-  }
-
-  .ticket-pass-body {
-    align-items: flex-start;
-    flex-direction: column;
-    padding: 15px;
-  }
-
-  .ticket-pass-state {
-    width: 100%;
-    flex-direction: row;
-    align-items: center;
-    justify-content: space-between;
-  }
-
   .scanner-app {
     display: block;
     min-height: 100dvh;
@@ -1670,11 +1800,6 @@
 }
 
 @media (max-width: 430px) {
-  .ticket-section-title-row h2 {
-    font-size: 24px;
-  }
-
-  .ticket-order-detail-head,
   .ticket-order-actions {
     align-items: flex-start;
     flex-direction: column;
@@ -1682,22 +1807,6 @@
 
   .ticket-order-actions .ticket-secondary-button {
     width: 100%;
-  }
-
-  .ticket-pass {
-    grid-template-columns: 1fr;
-  }
-
-  .ticket-pass-stub {
-    min-height: 210px;
-    flex-direction: column;
-    gap: 0;
-    border-right: 0;
-    border-bottom: 1px dashed rgba(255, 255, 255, 0.28);
-  }
-
-  .ticket-pass-stub span {
-    margin-top: 8px;
   }
 
   .scanner-manual-form > div {
@@ -2555,7 +2664,6 @@
 
 .ticket-same-buyer { margin: 0; font-size: 13px; }
 .ticket-privacy-note { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.5; }
-.ticket-confirmation-message { padding: 18px; margin-top: 20px; border-radius: 12px; background: var(--surface); white-space: pre-wrap; }
 
 .scanner-header { color: #ffffff; }
 .scanner-header .scanner-close { color: #ffffff; }

@@ -7360,6 +7360,56 @@ werd **de kalenderpagina met tickets per soort** gekozen.
   aan het kiezen bent, duwt de beschrijving weg voor je ze gelezen hebt.
 - **Op een gsm staan de tickets eerst**, daarvoor kwam je.
 
+## De bestelpagina: je bestelling in het paneel waar je mandje stond
+
+`/tickets/bestelling/[orderId]` was het enige scherm van de ticketreeks zonder
+donkere paginakop: een statusregel op kaal papier, het event in een hokjesraster
+van vier velden, en daaronder de tickets. Uit vier richtingen (deze, de eventkop
+met het beheer in de marge, de toegangsbewijzen op een donkere band, en alles in
+één bon met een lijntabel) werd **het bestelpaneel naast de tickets** gekozen.
+
+- **De pagina die je net verliet, komt terug.** Dezelfde kop als de ticketpagina
+  van het event (`vtk-event-head`), dezelfde twee kolommen en hetzelfde witte
+  paneel rechts (`.tshop`, `.tshop-panel`). Het paneel dat daar je winkelmandje
+  droeg, draagt hier je bestelling. Bouw er geen tweede kaart naast: dat is
+  precies hoe de eventkaart ooit twee keer bestond en uit elkaar liep.
+- **De kop draagt de status, niet de eventnaam.** Kicker "Tickets · <event>",
+  als titel wat er met je bestelling gebeurd is ("Je tickets zijn klaar"), en in
+  het blokje rechts (waar op de eventpagina organisator en locatie staan) het
+  bedrag met het bestelnummer en de status eronder. De titel is een zin en staat
+  daarom een maat kleiner dan een eventtitel.
+- **Het paneel zegt wát je betaald hebt.** Poster, event, dan een regel per
+  tickettype met het aantal en het bedrag, en het totaal. Dat ontbrak volledig:
+  een bestelling van twee bier- en twee watertickets toonde enkel "€ 39,00". De
+  regels komen uit de bestelitems en niet uit de uitgegeven tickets, zodat een
+  bestelling die nog op betaling wacht ze ook heeft.
+- **De stukprijs staat er enkel bij meer dan één.** Bij één ticket zou twee keer
+  hetzelfde bedrag onder elkaar staan.
+- **De betaalwijzen staan in dat paneel**, zonder eigen kaart eromheen: wie nog
+  moet betalen, vindt de knop op de plaats waar bij een betaalde bestelling het
+  totaal staat. Een kaart in een kaart is hier dezelfde fout als in het
+  gegevensblok van de shop.
+- **Links staat altijd iets.** Betaald: de toegangsbewijzen onder "Jouw
+  toegangsbewijzen" met de gele streep. Anders een gestippeld vlak dat zegt dat
+  de QR-codes hier verschijnen, of dat er geen uitgegeven zijn, met "Opnieuw
+  bestellen" erbij. Een lege kolom naast een vol paneel leest als een fout.
+- **Op een gsm hangt de volgorde van de bestelling af.** De shop zet haar paneel
+  altijd bovenaan; hier staan de tickets eerst zodra ze er zijn (daarvoor open je
+  deze pagina), en staat het paneel eerst zolang er nog betaald moet worden,
+  want dan is dat de handeling.
+- **Het toegangsbewijs is een brede witte kaart** met de QR op een navy strook
+  links, de soort als gele pil, de naam als titel en het ticketnummer eronder.
+  Het geel is het enige accent op de kaart: het is wat dit ticket onderscheidt
+  van het andere ticket in dezelfde bestelling.
+- **De wallet-knoppen staan uit** (`SHOW_WALLET_BUTTONS` in `TicketPass.tsx`)
+  tot Apple/Google Wallet echt werkt. De routes en de links in de
+  bevestigingsmail blijven bestaan; een knop die niets oplevert, kost meer
+  vertrouwen dan ze waard is.
+- **"Mijn tickets" in je account spreekt dezelfde taal**: per bestelling de
+  poster, de titel met wanneer en waar eronder, en rechts het bedrag met de
+  statuspil. Haarlijnen in plaats van kaartjes in een kaart, en het navy
+  datumblokje is weg: de poster zegt sneller welk event het is.
+
 ## Het ticketoverzicht: brede kaarten met de prijzen erbij
 
 `/tickets` toonde elk event als een smalle kaart met een grijze datum en één

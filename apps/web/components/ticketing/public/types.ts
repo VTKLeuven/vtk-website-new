@@ -99,6 +99,19 @@ export type PublicTicket = {
   walletGoogleUrl?: string | null;
 };
 
+/**
+ * Eén regel van een bestelling: een tickettype aan één prijs, met het aantal
+ * erbij. Ook gevuld voor een bestelling die nog niet betaald is; de tickets
+ * bestaan dan nog niet.
+ */
+export type PublicOrderLine = {
+  key: string;
+  name: string;
+  quantity: number;
+  unitPriceCents: number;
+  totalCents: number;
+};
+
 export type PublicOrder = {
   id: string;
   orderNumber: string;
@@ -113,8 +126,11 @@ export type PublicOrder = {
     title: string;
     startsAt: string | Date;
     location?: string | null;
+    /** De foto van het gekoppelde kalender-event, met zijn uitsnede. */
+    poster?: { src: string; position: string } | null;
     confirmationMessage?: string | null;
   };
+  lines: PublicOrderLine[];
   tickets: PublicTicket[];
 };
 
@@ -159,6 +175,29 @@ export function formatTicketDate(value: string | Date, locale: "nl" | "en") {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function brussels(
+  value: string | Date,
+  locale: "nl" | "en",
+  options: Intl.DateTimeFormatOptions,
+): string {
+  return new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-BE", {
+    timeZone: "Europe/Brussels",
+    ...options,
+  })
+    .format(new Date(value))
+    .replace(".", "");
+}
+
+/**
+ * "di 22 sep, 20:00": kort genoeg voor één regel naast de plaats. Gedeeld door
+ * de kaart op /tickets, het bestelpaneel en de lijst in je account, zodat een
+ * event er overal hetzelfde bij staat.
+ */
+export function formatTicketMoment(value: string | Date, locale: "nl" | "en"): string {
+  const day = brussels(value, locale, { weekday: "short", day: "numeric", month: "short" });
+  return `${day}, ${brussels(value, locale, { hour: "2-digit", minute: "2-digit" })}`;
 }
 
 /**

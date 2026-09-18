@@ -3,6 +3,7 @@ import Link from "next/link";
 import { ArrowRight, CalendarDays, MapPin } from "lucide-react";
 import {
   availableTicketCount,
+  formatTicketMoment,
   formatTicketPrice,
   type PublicTicketEvent,
 } from "./types";
@@ -19,12 +20,6 @@ function brussels(value: string | Date, locale: "nl" | "en", options: Intl.DateT
   })
     .format(new Date(value))
     .replace(".", "");
-}
-
-/** "di 22 sep, 20:00": kort genoeg voor één regel naast de plaats. */
-function shortMoment(value: string | Date, locale: "nl" | "en"): string {
-  const day = brussels(value, locale, { weekday: "short", day: "numeric", month: "short" });
-  return `${day}, ${brussels(value, locale, { hour: "2-digit", minute: "2-digit" })}`;
 }
 
 /** De eerste alinea, op één regel. De kaart knipt ze zelf af op twee regels. */
@@ -49,7 +44,7 @@ function eventStatus(event: PublicTicketEvent, locale: "nl" | "en") {
   if (event.salesOpensAt) {
     return {
       tone: "info",
-      label: `${nl ? "Te koop vanaf" : "On sale from"} ${shortMoment(event.salesOpensAt, locale)}`,
+      label: `${nl ? "Te koop vanaf" : "On sale from"} ${formatTicketMoment(event.salesOpensAt, locale)}`,
     };
   }
   if (event.requiresLogin) return { tone: "info", label: nl ? "Inloggen voor tickets" : "Sign in for tickets" };
@@ -108,7 +103,7 @@ export function TicketEventCard({
         <p className="tcat-facts">
           <span>
             <CalendarDays size={15} aria-hidden="true" />
-            {shortMoment(event.startsAt, locale)}
+            {formatTicketMoment(event.startsAt, locale)}
           </span>
           <span>
             <MapPin size={15} aria-hidden="true" />

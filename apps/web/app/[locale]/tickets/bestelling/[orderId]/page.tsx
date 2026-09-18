@@ -7,7 +7,9 @@ import { staticMetadata } from "@/lib/pageMetadata";
 import { OrderStatus } from "@/components/ticketing/public/OrderStatus";
 import type { PublicOrder } from "@/components/ticketing/public/types";
 
+import "@/app/design/vtk-event.css";
 import "@/app/design/vtk-tickets.css";
+import "@/app/design/vtk-ticket-shop.css";
 
 type Params = Promise<{ locale: string; orderId: string }>;
 
@@ -27,13 +29,15 @@ export default async function TicketOrderPage({ params }: { params: Params }) {
   const order = (await getOrderForViewer(orderId)) as PublicOrder | null;
   if (!order) notFound();
 
+  // Dezelfde schil als /tickets en /tickets/[slug]: de kop en de kolommen zitten
+  // in OrderStatus, want ze veranderen mee met de status van de bestelling.
   return (
-    <main className="vtk-page ticket-order-page">
+    <div className="vtk-page vtk-tickets-page">
       <OrderStatus
         initialOrder={order}
         locale={localeParam}
         paymentChoice={paymentMethodChoice(localeParam)}
       />
-    </main>
+    </div>
   );
 }

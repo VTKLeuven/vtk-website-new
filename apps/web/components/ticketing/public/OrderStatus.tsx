@@ -2,15 +2,19 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { trackTicketPurchased } from "@/lib/analytics-client";
 import {
   AlertTriangle,
   ArrowLeft,
+  CalendarDays,
   CheckCircle2,
   CircleDashed,
   Clock3,
   MailCheck,
+  MapPin,
   RefreshCw,
+  RotateCcw,
   TicketCheck,
   XCircle,
 } from "lucide-react";
@@ -33,10 +37,85 @@ const TERMINAL = new Set([
   "REFUNDED",
 ]);
 
+const TEXT = {
+  nl: {
+    tickets: "Tickets",
+    order: "Bestelling",
+    orderPanel: "Je bestelling",
+    total: "Totaal",
+    buyer: "Koper",
+    confirmationTo: "Bevestiging naar",
+    status: "Status",
+    paidTitle: "Je tickets zijn klaar",
+    paidLead: "Een bevestiging is verstuurd naar",
+    reservedTitle: "Je tickets staan klaar",
+    reservedLead: "Ze blijven gereserveerd tot je betaling rond is.",
+    processingTitle: "We verwerken je betaling",
+    processingLead: "Dit wordt automatisch bijgewerkt. Je mag deze pagina open laten staan.",
+    failedTitle: "De bestelling is niet voltooid",
+    failedLead: "Er werden geen geldige tickets uitgegeven voor deze bestelling.",
+    passes: "Jouw toegangsbewijzen",
+    ticket: "ticket",
+    ticketsPlural: "tickets",
+    inMailbox: "Dezelfde tickets vind je ook in je mailbox.",
+    waitingTitle: "Je toegangsbewijzen verschijnen hier",
+    waitingLead:
+      "Zodra je betaling rond is, staan de QR-codes op deze pagina en in je mailbox.",
+    noneTitle: "Er zijn geen tickets uitgegeven",
+    noneLead:
+      "De betaling is afgebroken of verlopen, en de plaatsen zijn weer vrijgegeven.",
+    orderAgain: "Opnieuw bestellen",
+    waitingProvider: "Wachten op bevestiging van de betaalprovider",
+    pollFailed: "De status kon even niet worden opgehaald. We proberen opnieuw.",
+    refresh: "Vernieuwen",
+    myTickets: "Mijn tickets",
+    allEvents: "Naar alle events",
+  },
+  en: {
+    tickets: "Tickets",
+    order: "Order",
+    orderPanel: "Your order",
+    total: "Total",
+    buyer: "Buyer",
+    confirmationTo: "Confirmation to",
+    status: "Status",
+    paidTitle: "Your tickets are ready",
+    paidLead: "A confirmation was sent to",
+    reservedTitle: "Your tickets are reserved",
+    reservedLead: "They stay reserved until your payment goes through.",
+    processingTitle: "We are processing your payment",
+    processingLead: "This page updates automatically. You can leave it open.",
+    failedTitle: "The order was not completed",
+    failedLead: "No valid tickets were issued for this order.",
+    passes: "Your admission tickets",
+    ticket: "ticket",
+    ticketsPlural: "tickets",
+    inMailbox: "The same tickets are also in your inbox.",
+    waitingTitle: "Your admission tickets appear here",
+    waitingLead: "As soon as your payment goes through, the QR codes show up here and in your inbox.",
+    noneTitle: "No tickets were issued",
+    noneLead: "The payment was cancelled or expired, and the seats were released.",
+    orderAgain: "Order again",
+    waitingProvider: "Waiting for payment confirmation",
+    pollFailed: "We could not refresh the status. Retrying automatically.",
+    refresh: "Refresh",
+    myTickets: "My tickets",
+    allEvents: "All events",
+  },
+} as const;
+
 function isOrder(value: StatusPayload): value is PublicOrder {
   return "id" in value && typeof value.id === "string";
 }
 
+/**
+ * De bestelpagina: de donkere paginakop met de status, links de
+ * toegangsbewijzen en rechts het bestelpaneel.
+ *
+ * De kop, de kolommen en dat paneel zijn dezelfde als op de ticketpagina van
+ * het event (`vtk-event.css`, `vtk-ticket-shop.css`): het paneel dat daar je
+ * winkelmandje droeg, draagt hier je bestelling. Zie docs/design-decisions.md.
+ */
 export function OrderStatus({
   initialOrder,
   locale,
@@ -48,6 +127,7 @@ export function OrderStatus({
   paymentChoice?: PaymentMethodChoice;
 }) {
   const base = locale === "nl" ? "" : "/en";
+  const t = TEXT[locale];
   const [order, setOrder] = useState(initialOrder);
   const [pollError, setPollError] = useState(false);
 
@@ -98,6 +178,7 @@ export function OrderStatus({
     paymentChoice != null &&
     paymentChoice.variant !== "single" &&
     paymentChoice.options.length > 0;
+  const tone = paid ? "ok" : failed ? "bad" : "wait";
   const trackedRef = useRef(false);
 
   useEffect(() => {
@@ -110,104 +191,232 @@ export function OrderStatus({
     }
   }, [paid, order.event.slug, order.tickets.length]);
 
+  const title = paid
+    ? t.paidTitle
+    : failed
+      ? t.failedTitle
+      : canChoosePayment
+        ? t.reservedTitle
+        : t.processingTitle;
+  const lead = paid
+    ? `${t.paidLead} ${order.buyerEmail}.`
+    : failed
+      ? t.failedLead
+      : canChoosePayment
+        ? t.reservedLead
+        : t.processingLead;
+  const orderAgainHref = order.event.slug ? `${base}/tickets/${order.event.slug}` : `${base}/tickets`;
+
   return (
-    <div className="ticket-order-status">
-      <section
-        className={`ticket-status-hero${paid ? " is-paid" : failed ? " is-failed" : " is-pending"}`}
+    <>
+      {/* Dezelfde kop als de ticketpagina van het event, met de status van de
+          bestelling in plaats van organisator en locatie. */}
+      <header
+        className="vtk-page-head vtk-event-head torder-head"
         aria-live="polite"
         aria-atomic="true"
       >
-        <div className="ticket-status-icon">
-          {paid ? (
-            <CheckCircle2 aria-hidden="true" />
-          ) : failed ? (
-            <XCircle aria-hidden="true" />
-          ) : canChoosePayment ? (
-            // Wie nog moet kiezen, wacht nergens op: een draaiend icoon zou hier
-            // beweging tonen zonder dat er iets gebeurt.
-            <Clock3 aria-hidden="true" />
-          ) : (
-            <CircleDashed className="is-spinning" aria-hidden="true" />
-          )}
-        </div>
         <div>
-          <span>{locale === "nl" ? "Bestelling" : "Order"} {order.orderNumber}</span>
-          <h1>
-            {paid
-              ? locale === "nl" ? "Je tickets zijn klaar" : "Your tickets are ready"
-              : failed
-                ? locale === "nl" ? "De bestelling is niet voltooid" : "The order was not completed"
-                : canChoosePayment
-                  ? locale === "nl" ? "Je tickets staan klaar" : "Your tickets are reserved"
-                  : locale === "nl" ? "We verwerken je betaling" : "We are processing your payment"}
-          </h1>
-          <p>
-            {paid
-              ? locale === "nl" ? `Een bevestiging is verstuurd naar ${order.buyerEmail}.` : `A confirmation was sent to ${order.buyerEmail}.`
-              : failed
-                ? locale === "nl" ? "Er werden geen geldige tickets uitgegeven voor deze bestelling." : "No valid tickets were issued for this order."
-                : canChoosePayment
-                  ? locale === "nl" ? "Ze blijven gereserveerd tot je betaling rond is." : "They stay reserved until your payment goes through."
-                  : locale === "nl" ? "Dit wordt automatisch bijgewerkt. Je mag deze pagina openlaten." : "This page updates automatically. You can leave it open."}
-          </p>
-        </div>
-      </section>
-
-      {pollError && !failed ? (
-        <div className="ticket-status-warning" role="status">
-          <AlertTriangle size={18} aria-hidden="true" />
-          {locale === "nl" ? "De status kon even niet worden opgehaald. We proberen opnieuw." : "We could not refresh the status. Retrying automatically."}
-        </div>
-      ) : null}
-
-      <section className="ticket-order-details" aria-labelledby="order-details-title">
-        <div className="ticket-order-detail-head">
-          <div>
-            <span>{locale === "nl" ? "Event" : "Event"}</span>
-            <h2 id="order-details-title">{order.event.title}</h2>
+          <div className="vtk-page-kicker">
+            <Link href={`${base}/tickets`} className="vtk-link">
+              {t.tickets}
+            </Link>{" "}
+            · {order.event.title}
           </div>
-          <strong>{formatTicketPrice(order.totalCents, order.currency, locale)}</strong>
+          <h1 className="vtk-page-title">{title}</h1>
+          <p className="vtk-page-subtitle">{lead}</p>
         </div>
-        <dl>
-          <div><dt>{locale === "nl" ? "Datum" : "Date"}</dt><dd>{formatTicketDate(order.event.startsAt, locale)}</dd></div>
-          <div><dt>{locale === "nl" ? "Locatie" : "Location"}</dt><dd>{order.event.location ?? "-"}</dd></div>
-          <div><dt>{locale === "nl" ? "Koper" : "Buyer"}</dt><dd>{order.buyerName}</dd></div>
-          <div><dt>Status</dt><dd>{formatTicketOrderStatus(order.status, locale)}</dd></div>
-        </dl>
-      </section>
+        <div className="vtk-event-meta">
+          <div className="torder-total">
+            <span>
+              {t.order} {order.orderNumber}
+            </span>
+            <b>{formatTicketPrice(order.totalCents, order.currency, locale)}</b>
+            <em data-tone={tone}>
+              {paid ? (
+                <CheckCircle2 size={15} aria-hidden="true" />
+              ) : failed ? (
+                <XCircle size={15} aria-hidden="true" />
+              ) : (
+                <Clock3 size={15} aria-hidden="true" />
+              )}
+              {formatTicketOrderStatus(order.status, locale)}
+            </em>
+          </div>
+        </div>
+      </header>
 
-      {paid && order.event.confirmationMessage ? (
-        <p className="ticket-confirmation-message">{order.event.confirmationMessage}</p>
-      ) : null}
+      <main className="tshop-shell">
+        {/* Op een smal scherm staan de tickets eerst; wie nog moet betalen,
+            krijgt het paneel eerst, want dat is dan de handeling. */}
+        <div className="tshop torder" data-panel-first={!paid || undefined}>
+          <div className="tshop-main">
+            {pollError && !failed ? (
+              <p className="torder-warning" role="status">
+                <AlertTriangle size={18} aria-hidden="true" />
+                {t.pollFailed}
+              </p>
+            ) : null}
 
-      {paid && order.tickets.length > 0 ? (
-        <section className="ticket-issued-section" aria-labelledby="issued-tickets-title">
-          <div className="ticket-section-title-row">
-            <div>
-              <span>{order.tickets.length} {locale === "nl" ? "tickets" : "tickets"}</span>
-              <h2 id="issued-tickets-title">{locale === "nl" ? "Jouw toegangsbewijzen" : "Your admission tickets"}</h2>
+            {paid && order.event.confirmationMessage ? (
+              <p className="torder-message">{order.event.confirmationMessage}</p>
+            ) : null}
+
+            {paid && order.tickets.length > 0 ? (
+              <section aria-labelledby="issued-tickets-title">
+                <div className="torder-section-head">
+                  <span className="torder-eyebrow">
+                    {order.tickets.length}{" "}
+                    {order.tickets.length === 1 ? t.ticket : t.ticketsPlural}
+                  </span>
+                  <h2 id="issued-tickets-title" className="tshop-heading">
+                    {t.passes}
+                  </h2>
+                </div>
+                <div className="ticket-pass-list">
+                  {order.tickets.map((ticket) => (
+                    <TicketPass key={ticket.id} ticket={ticket} locale={locale} />
+                  ))}
+                </div>
+                <p className="torder-mail">
+                  <MailCheck size={18} aria-hidden="true" />
+                  {t.inMailbox}
+                </p>
+              </section>
+            ) : (
+              <section className="torder-wait" data-tone={tone}>
+                <span className="torder-wait-icon">
+                  {failed ? (
+                    <XCircle size={24} aria-hidden="true" />
+                  ) : (
+                    <CircleDashed className="is-spinning" size={24} aria-hidden="true" />
+                  )}
+                </span>
+                <h2>{failed ? t.noneTitle : t.waitingTitle}</h2>
+                <p>{failed ? t.noneLead : t.waitingLead}</p>
+                {failed ? (
+                  <Link className="ticket-primary-button" href={orderAgainHref}>
+                    <RotateCcw size={17} aria-hidden="true" />
+                    {t.orderAgain}
+                  </Link>
+                ) : null}
+              </section>
+            )}
+          </div>
+
+          <aside className="tshop-panel torder-panel" aria-labelledby="torder-panel-title">
+            <div className="tshop-panel-head">
+              <h2 id="torder-panel-title">{t.orderPanel}</h2>
+              <small>{order.orderNumber}</small>
             </div>
-            <TicketCheck size={28} aria-hidden="true" />
-          </div>
-          <div className="ticket-pass-list">
-            {order.tickets.map((ticket) => <TicketPass key={ticket.id} ticket={ticket} locale={locale} />)}
-          </div>
-          <div className="ticket-mail-note"><MailCheck size={18} aria-hidden="true" /> {locale === "nl" ? "Dezelfde tickets vind je ook in je mailbox." : "The same tickets are also in your inbox."}</div>
-        </section>
-      ) : null}
 
-      {canChoosePayment ? (
-        <PaymentMethodChooser orderId={order.id} locale={locale} choice={paymentChoice} />
-      ) : null}
+            <div className="torder-event">
+              <span className="torder-poster">
+                {order.event.poster ? (
+                  <Image
+                    src={order.event.poster.src}
+                    alt=""
+                    fill
+                    sizes="88px"
+                    style={{ objectFit: "cover", objectPosition: order.event.poster.position }}
+                  />
+                ) : null}
+              </span>
+              <div>
+                <strong>{order.event.title}</strong>
+                <span>
+                  <CalendarDays size={14} aria-hidden="true" />
+                  {formatTicketDate(order.event.startsAt, locale)}
+                </span>
+                {order.event.location ? (
+                  <span>
+                    <MapPin size={14} aria-hidden="true" />
+                    {order.event.location}
+                  </span>
+                ) : null}
+              </div>
+            </div>
 
-      {!paid && !failed && !canChoosePayment ? (
-        <div className="ticket-processing-row"><Clock3 size={18} aria-hidden="true" /> {locale === "nl" ? "Wachten op bevestiging van de betaalprovider" : "Waiting for payment confirmation"}</div>
-      ) : null}
+            {order.lines.length > 0 ? (
+              <ul className="torder-lines">
+                {order.lines.map((line) => (
+                  <li key={line.key}>
+                    <i>{line.quantity}&times;</i>
+                    <span>
+                      {line.name}
+                      {/* De stukprijs enkel bij meer dan één: anders staat er
+                          twee keer hetzelfde bedrag onder elkaar. */}
+                      {line.quantity > 1 ? (
+                        <small>
+                          {formatTicketPrice(line.unitPriceCents, order.currency, locale)}{" "}
+                          {locale === "nl" ? "per stuk" : "each"}
+                        </small>
+                      ) : null}
+                    </span>
+                    <b>{formatTicketPrice(line.totalCents, order.currency, locale)}</b>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
 
-      <div className="ticket-order-actions">
-        <Link className="ticket-secondary-button" href={`${base}/tickets`}><ArrowLeft size={17} aria-hidden="true" /> {locale === "nl" ? "Naar alle events" : "All events"}</Link>
-        {pollError ? <button type="button" className="ticket-secondary-button" onClick={() => window.location.reload()}><RefreshCw size={17} aria-hidden="true" /> {locale === "nl" ? "Vernieuwen" : "Refresh"}</button> : null}
-      </div>
-    </div>
+            <div className="tshop-total">
+              <span>{t.total}</span>
+              <strong>{formatTicketPrice(order.totalCents, order.currency, locale)}</strong>
+            </div>
+
+            <dl className="torder-facts">
+              <div>
+                <dt>{t.buyer}</dt>
+                <dd>{order.buyerName}</dd>
+              </div>
+              <div>
+                <dt>{t.confirmationTo}</dt>
+                <dd>{order.buyerEmail}</dd>
+              </div>
+              <div>
+                <dt>{t.status}</dt>
+                <dd>
+                  <span className="torder-chip" data-tone={tone}>
+                    {formatTicketOrderStatus(order.status, locale)}
+                  </span>
+                </dd>
+              </div>
+            </dl>
+
+            {canChoosePayment ? (
+              <PaymentMethodChooser orderId={order.id} locale={locale} choice={paymentChoice} />
+            ) : null}
+
+            {!paid && !failed && !canChoosePayment ? (
+              <p className="torder-processing">
+                <Clock3 size={17} aria-hidden="true" />
+                {t.waitingProvider}
+              </p>
+            ) : null}
+
+            <div className="torder-actions">
+              <Link className="ticket-secondary-button" href={`${base}/account#mijn-vtk-tickets`}>
+                <TicketCheck size={17} aria-hidden="true" />
+                {t.myTickets}
+              </Link>
+              <Link className="ticket-secondary-button" href={`${base}/tickets`}>
+                <ArrowLeft size={17} aria-hidden="true" />
+                {t.allEvents}
+              </Link>
+              {pollError ? (
+                <button
+                  type="button"
+                  className="ticket-secondary-button"
+                  onClick={() => window.location.reload()}
+                >
+                  <RefreshCw size={17} aria-hidden="true" />
+                  {t.refresh}
+                </button>
+              ) : null}
+            </div>
+          </aside>
+        </div>
+      </main>
+    </>
   );
 }
