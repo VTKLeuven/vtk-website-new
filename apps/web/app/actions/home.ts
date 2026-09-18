@@ -8,6 +8,16 @@ import { readImageField, resolveImageKey } from "@/lib/imageField";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
 import { logAudit } from "@/lib/audit";
+import {
+  POC_BAND_SETTING,
+  readPocBandSetting,
+  type PocBandMode,
+  type PocBandSetting,
+} from "@/lib/home/pocBand";
+import {
+  SHIFTS_BAND_SETTING,
+  type ShiftsBandSetting,
+} from "@/lib/home/shiftBand";
 
 /** Tekstveld uit het formulier: leeg betekent "terug naar de standaardzin". */
 function readOptionalText(formData: FormData, name: string): string | null {
@@ -197,6 +207,58 @@ export async function saveAftermoviesAction(_prev: SaveState, formData: FormData
   revalidatePath("/");
   revalidatePath("/media");
   revalidatePath("/en/media");
+  revalidatePath("/admin/home");
+  return saveOk();
+}
+
+export async function saveHomePocBandAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("home.edit");
+  const mode = (formData.get("mode") as PocBandMode) || "representatives";
+  const row = await prisma.setting.findUnique({ where: { key: POC_BAND_SETTING } });
+  const current = readPocBandSetting(row?.value);
+  const value: PocBandSetting = {
+    ...current,
+    mode,
+  };
+  await prisma.setting.upsert({
+    where: { key: POC_BAND_SETTING },
+    update: { value },
+    create: { key: POC_BAND_SETTING, value },
+  });
+  await logAudit({
+    action: "update",
+    entity: "home",
+    target: "POC-band",
+    summary: `weergave: ${mode}`,
+  });
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/home");
+  revalidatePath("/admin/pocs");
+  return saveOk();
+}
+
+export async function saveHomeShiftsBandAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("home.edit");
+  const visible = formData.get("visible") === "true";
+  const value: ShiftsBandSetting = { visible };
+  await prisma.setting.upsert({
+    where: { key: SHIFTS_BAND_SETTING },
+    update: { value },
+    create: { key: SHIFTS_BAND_SETTING, value },
+  });
+  await logAudit({
+    action: "update",
+    entity: "home",
+    target: "Shiften-band",
+    summary: visible ? "ingeschakeld" : "uitgeschakeld",
+  });
+  revalidatePath("/", "layout");
   revalidatePath("/admin/home");
   return saveOk();
 }

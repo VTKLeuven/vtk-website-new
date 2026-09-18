@@ -16,6 +16,7 @@ import { addDays } from "date-fns";
 import { getDictionary } from "@vtk/i18n";
 import { PocBand, type PocBandGroup } from "./PocBand";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
+import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
 import { FrontpageShiftBand, type FrontpageShiftItem } from "./FrontpageShiftBand";
 import { loadPostNames } from "@/lib/shift/postNames";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
@@ -121,6 +122,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       "home.slogans",
       DEFAULT_EVENT_IMAGE_SETTING,
       POC_BAND_SETTING,
+      SHIFTS_BAND_SETTING,
     ]),
     // Dezelfde doelgroepregel als /kalender: standaard staat alles erop, en enkel
     // wie op /account koos zijn kalender toe te spitsen krijgt hier minder.
@@ -317,6 +319,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
   const map = new Map(settings.map((s) => [s.key, s.value as unknown]));
   const pocSetting = readPocBandSetting(map.get(POC_BAND_SETTING));
+  const shiftsBandSetting = readShiftsBandSetting(map.get(SHIFTS_BAND_SETTING));
   const theokot = readOpeningHoursSetting(map.get("home.openingHours.theokot"), "theokot");
   const cursusdienst = readOpeningHoursSetting(
     map.get("home.openingHours.cursusdienst"),
@@ -868,14 +871,16 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         </section>
       )}
 
-      <FrontpageShiftBand
-        locale={locale}
-        base={base}
-        shifts={shiftBandItems}
-        postNames={postNames}
-        signedIn={Boolean(session)}
-        totalOpenSpots={totalOpenSpots}
-      />
+      {shiftsBandSetting.visible && (
+        <FrontpageShiftBand
+          locale={locale}
+          base={base}
+          shifts={shiftBandItems}
+          postNames={postNames}
+          signedIn={Boolean(session)}
+          totalOpenSpots={totalOpenSpots}
+        />
+      )}
 
       <section className="section band career-band">
         <div className="sec-head">

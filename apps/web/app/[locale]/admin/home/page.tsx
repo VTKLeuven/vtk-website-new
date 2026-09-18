@@ -13,11 +13,15 @@ import {
 } from "@/lib/aanbodCards";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
+import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
+import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
 import {
   saveDefaultEventImageAction,
   saveHomepageCardAction,
   saveCareerAction,
   saveAftermoviesAction,
+  saveHomePocBandAction,
+  saveHomeShiftsBandAction,
 } from "@/app/actions/home";
 
 type Career = { titleNl: string; titleEn: string; bodyNl: string; bodyEn: string; ctaLabelNl?: string; ctaLabelEn?: string; ctaUrl?: string };
@@ -83,6 +87,8 @@ export default async function AdminHome({
             "media.aftermovies",
             "home.aftermovies",
             DEFAULT_EVENT_IMAGE_SETTING,
+            POC_BAND_SETTING,
+            SHIFTS_BAND_SETTING,
           ],
         },
       },
@@ -108,6 +114,8 @@ export default async function AdminHome({
     ?? { titleNl: "", titleEn: "", items: [] };
   const defaultEventImageKey =
     (map.get(DEFAULT_EVENT_IMAGE_SETTING) as { imageKey?: string | null } | undefined)?.imageKey ?? null;
+  const pocSetting = readPocBandSetting(map.get(POC_BAND_SETTING));
+  const shiftsBand = readShiftsBandSetting(map.get(SHIFTS_BAND_SETTING));
 
   return (
     <div className="space-y-6">
@@ -212,6 +220,62 @@ export default async function AdminHome({
               : "There are no visible categories yet. Create them under Content first."}
           </p>
         )}
+      </Card>
+
+      <Card className="p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div>
+            <h2 className="font-semibold">{locale === "nl" ? "POC-band" : "POC band"}</h2>
+            <p className="text-sm text-[#5c667f]">
+              {locale === "nl"
+                ? "Toont de vertegenwoordigers van de student op basis van studierichting, of de verkiezingsoproep. Schakel de band hier uit of kies de weergave."
+                : "Shows the student's representatives based on their programme, or the election call. Disable the band here or choose its display mode."}
+            </p>
+          </div>
+          <Link
+            href={`${base}/admin/pocs`}
+            className="text-xs text-vtk-blue hover:underline whitespace-nowrap self-start sm:self-auto shrink-0"
+          >
+            {locale === "nl" ? "Teksten & tijdlijn beheren" : "Manage texts & timeline"} →
+          </Link>
+        </div>
+
+        <SaveForm
+          action={saveHomePocBandAction}
+          className="space-y-4"
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          fallbackErrorMessage={dict.common.saveError}
+        >
+          <div className="space-y-1.5 max-w-md">
+            <Label htmlFor="poc-band-mode">
+              {locale === "nl" ? "Weergave op de homepage" : "Homepage display"}
+            </Label>
+            <Select id="poc-band-mode" name="mode" defaultValue={pocSetting.mode}>
+              <option value="representatives">
+                {locale === "nl"
+                  ? "Vertegenwoordigers tonen (foto's & namen van jouw richtingen)"
+                  : "Show representatives (photos & names of your programmes)"}
+              </option>
+              <option value="elections">
+                {locale === "nl"
+                  ? "Verkiezingen tonen (paneel met oproep, deadline & procedure)"
+                  : "Show elections (panel with call, deadline & procedure)"}
+              </option>
+              <option value="hidden">
+                {locale === "nl"
+                  ? "Band uitschakelen (verborgen op de homepage)"
+                  : "Disable band (hidden on homepage)"}
+              </option>
+            </Select>
+            <p className="text-xs text-[#5c667f]">
+              {locale === "nl"
+                ? "Kies 'Band uitschakelen' om de POC-band volledig te verbergen van de homepage."
+                : "Choose 'Disable band' to hide the POC band completely from the homepage."}
+            </p>
+          </div>
+        </SaveForm>
       </Card>
 
       <Card className="p-5">
@@ -360,6 +424,61 @@ export default async function AdminHome({
               })}
             </tbody>
           </table>
+        </SaveForm>
+      </Card>
+
+      <Card className="p-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
+          <div>
+            <h2 className="font-semibold">{locale === "nl" ? "Shiften-band" : "Shifts band"}</h2>
+            <p className="text-sm text-[#5c667f]">
+              {locale === "nl"
+                ? "Toont maximaal 4 openstaande shiften voor de komende 7 dagen op de homepage, inclusief directe inschrijfknop en detailvenster."
+                : "Shows up to 4 open shifts for the next 7 days on the homepage, including direct registration and details dialog."}
+            </p>
+          </div>
+          <Link
+            href={`${base}/shift`}
+            className="text-xs text-vtk-blue hover:underline whitespace-nowrap self-start sm:self-auto shrink-0"
+          >
+            {locale === "nl" ? "Naar shiftpagina" : "Go to shifts page"} →
+          </Link>
+        </div>
+
+        <SaveForm
+          action={saveHomeShiftsBandAction}
+          className="space-y-4"
+          submitLabel={dict.admin.save}
+          savingLabel={dict.common.saving}
+          savedMessage={dict.common.saved}
+          fallbackErrorMessage={dict.common.saveError}
+        >
+          <div className="space-y-1.5 max-w-md">
+            <Label htmlFor="shifts-band-visible">
+              {locale === "nl" ? "Zichtbaarheid op de homepage" : "Homepage visibility"}
+            </Label>
+            <Select
+              id="shifts-band-visible"
+              name="visible"
+              defaultValue={shiftsBand.visible ? "true" : "false"}
+            >
+              <option value="true">
+                {locale === "nl"
+                  ? "Zichtbaar (shiften tonen op homepage)"
+                  : "Visible (show shifts on homepage)"}
+              </option>
+              <option value="false">
+                {locale === "nl"
+                  ? "Band uitschakelen (verborgen op de homepage)"
+                  : "Disable band (hidden on homepage)"}
+              </option>
+            </Select>
+            <p className="text-xs text-[#5c667f]">
+              {locale === "nl"
+                ? "Kies 'Band uitschakelen' om de shiften-band volledig te verbergen van de homepage."
+                : "Choose 'Disable band' to hide the shifts band completely from the homepage."}
+            </p>
+          </div>
         </SaveForm>
       </Card>
 
