@@ -475,6 +475,15 @@ the design language into the application instead of copying mockup content.
     on, which opens the full grouped list as a panel underneath
     (`AdminNav` + `vtk-admin.css`). Do not reintroduce the horizontal scroller
     that was there: fifteen tabs in a scroll strip hide most of the navigation.
+  - **A preview of a public screen inside the admin gets `.vtk-admin-preview`.**
+    `vtk-admin.css` paints every `<p>` under `.vtk-admin-main` in `--muted` with
+    `!important`, because each admin screen brings its own Tailwind colour. That
+    beats any class a public component carries: the white title on the Career
+    photo (`/admin/it/flows`) turned grey and became unreadable, which is why
+    that block looked different in the admin than in its own design. The rule
+    therefore skips `:not(.vtk-admin-preview *)`. Do not "fix" such a case with a
+    second `!important`: that overrides the component too, only in another
+    colour.
   - **A wide table inside a horizontal scroller must have a positioned wrapper.**
     `sr-only` is `position: absolute`; without a positioned ancestor it anchors
     on the page instead of on the table, lands at the x of its column, and a

@@ -60,15 +60,26 @@
   letter-spacing: -0.01em;
 }
 
-.vtk-admin-main p,
-.vtk-admin-main .text-zinc-500,
-.vtk-admin-main .text-zinc-600,
-.vtk-admin-main .text-zinc-700,
+/* Elke <p> in de admin grijs, en met `!important`, want de schermen eronder
+   dragen elk hun eigen Tailwind-kleur mee.
+
+   `:not(.vtk-admin-preview *)` is de uitzondering daarop. In een voorvertoning
+   staat een écht stuk van de publieke site (de Career-vraag en de
+   lidmaatschapsvraag op /admin/it/flows), en die brengt zijn eigen kleuren mee.
+   Zonder deze uitzondering wint dit `!important` van elke klasse van zo'n
+   component: de witte titel op de Career-foto werd grijs en was op die felle
+   zaalfoto niet meer te lezen, terwijl ze op het echte scherm wel klopte.
+   Vandaar dat het blok er in de admin anders uitzag dan in de voorstelling.
+   Kleur terugzetten kan hier niet: een tweede `!important` zou de component
+   óók overschrijven, alleen met een andere kleur. */
+.vtk-admin-main :is(p, .text-zinc-500, .text-zinc-600, .text-zinc-700):not(
+    .vtk-admin-preview *
+  ),
 /* `text-vtk-blue-muted` is de papierkleur (#EFF2F8), bedoeld als achtergrond.
    Op een witte kaart is die tekst onzichtbaar: "0 evenementen", de feed-link en
    "Nog niets gekozen" stonden er wel, maar je zag ze niet. Op een <p> viel dat
    niet op omdat de regel hierboven die toch al overschreef. */
-.vtk-admin-main .text-vtk-blue-muted {
+.vtk-admin-main .text-vtk-blue-muted:not(.vtk-admin-preview *) {
   color: var(--muted) !important;
 }
 

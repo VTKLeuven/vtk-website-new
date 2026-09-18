@@ -50,8 +50,10 @@ export function FlowPreview({
         </div>
       </div>
 
+      {/* `vtk-admin-preview`: hierbinnen staat een echt stuk van de publieke
+          site, dus laat de admin-typografie (vtk-admin.css) het met rust. */}
       {open ? (
-        <div className="rounded-2xl border border-dashed border-vtk-blue/25 bg-vtk-surface p-5">
+        <div className="vtk-admin-preview rounded-2xl border border-dashed border-vtk-blue/25 bg-vtk-surface p-5">
           {children}
         </div>
       ) : null}
