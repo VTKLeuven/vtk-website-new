@@ -176,18 +176,18 @@
   color-scheme: dark;
 
   /* --- Ondergrond en vlakken ------------------------------------------- */
-  --paper: #05070d;
+  --paper: #14181f;
   --paper-2: #0a0e18;
-  --surface: #0d1220;
+  --surface: #1c222c;
   --surface-2: #141b2c;
-  --field: #070b14;
-  --chrome: #000308;
+  --field: #101419;
+  --chrome: #0e1a36;
   --chrome-line: rgba(255, 255, 255, 0.14);
 
   /* --- Tekst ------------------------------------------------------------ */
-  --ink: #ffffff;
+  --ink: #f1f4f9;
   --body: #d6dcec;
-  --muted: #97a1ba;
+  --muted: #909aab;
 
   --emphasis: #dbe3f7;
   --on-emphasis: #05070d;
