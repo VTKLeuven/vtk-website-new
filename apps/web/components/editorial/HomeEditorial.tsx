@@ -12,6 +12,12 @@ import {
 } from "@/lib/cachedContent";
 import { videoEmbed } from "@/lib/videoEmbed";
 import { getCurrentSession } from "@/lib/session";
+import { addDays } from "date-fns";
+import { getDictionary } from "@vtk/i18n";
+import { PocBand, type PocBandGroup } from "./PocBand";
+import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
+import { FrontpageShiftBand, type FrontpageShiftItem } from "./FrontpageShiftBand";
+import { loadPostNames } from "@/lib/shift/postNames";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
 import { elixirScheduleFromSetting, openingWindowPhase } from "@/lib/elixir/openingWindow";
 import { readBarStatus } from "@/lib/elixir/status";
@@ -114,6 +120,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       "home.career",
       "home.slogans",
       DEFAULT_EVENT_IMAGE_SETTING,
+      POC_BAND_SETTING,
     ]),
     // Dezelfde doelgroepregel als /kalender: standaard staat alles erop, en enkel
     // wie op /account koos zijn kalender toe te spitsen krijgt hier minder.
@@ -193,34 +200,28 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   // drempel; zie lib/calendar/interest.ts voor waarom een laag getal averechts
   // werkt. Eén lezing voor de hero én de kaarten hieronder.
   const eventIds = calendarEvents.map((event) => event.id);
-  const [interested, viewerInterestMap, shifts] = await Promise.all([
+  const [interested, viewerInterestMap, shifts, postNames] = await Promise.all([
     publicInterestCounts(eventIds),
     // Wat de bezoeker zelf al aanduidde, voor de ster in het weekoverzicht.
     // Zonder sessie blijft dit leeg en is de ster een link naar het aanmelden.
     viewerInterests(eventIds, session?.user.id ?? null),
-    // De shiften onder de herotekst. Hier en niet in de ronde hierboven, omdat
-    // de sessie nodig is om je eigen shiften eruit te laten.
-    //
-    // Geen `participants` in de selectie: het aantal volstaat om te weten of er
-    // nog plaats is, en wie er ingeschreven staat hoeft de homepage niet te
-    // kennen. De enige naam die wél opgevraagd wordt, is die van de bezoeker
-    // zelf, om zijn eigen shiften weg te laten. Zonder sessie matcht die filter
-    // niets en blijft de rij leeg.
-    //
-    // Ruimer opgehaald dan de hoogstens drie rijen die de hero toont: er vallen
-    // er nog volle en eigen shiften weg, en dat filteren gebeurt in
-    // `pickHeroShifts`, waar het getest is.
+    // De shiften onder de herotekst én voor de shiftband.
     prisma.shift.findMany({
       where: { endTime: { gte: now } },
       orderBy: { startTime: "asc" },
-      take: 24,
+      take: 40,
       select: {
         id: true,
         name: true,
         startTime: true,
         endTime: true,
+        location: true,
+        description: true,
+        instructions: true,
         maxParticipants: true,
         reward: true,
+        post: true,
+        openToInternationals: true,
         _count: { select: { participants: true } },
         participants: {
           where: { userId: session?.user.id ?? "" },
@@ -228,12 +229,29 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         },
       },
     }),
+    loadPostNames(locale),
   ]);
   const openShifts: FrontpageShift[] = shifts.map(({ _count, participants, ...shift }) => ({
     ...shift,
     takenSpots: _count.participants,
     viewerRegistered: participants.length > 0,
   }));
+
+  const weekEnd = addDays(now, 7);
+  const weekShifts = shifts.filter((s) => s.startTime <= weekEnd);
+  const totalOpenSpots = weekShifts.reduce(
+    (acc, s) => acc + Math.max(0, s.maxParticipants - s._count.participants),
+    0
+  );
+  const shiftBandItems: FrontpageShiftItem[] = weekShifts
+    .filter((s) => s.maxParticipants - s._count.participants > 0 || s.participants.length > 0)
+    .slice(0, 4)
+    .map(({ _count, participants, ...shift }) => ({
+      ...shift,
+      takenSpots: _count.participants,
+      availableSpots: Math.max(0, shift.maxParticipants - _count.participants),
+      viewerRegistered: participants.length > 0,
+    }));
   const viewerInterestIds = new Set(viewerInterestMap.keys());
 
   // Dezelfde ster als in het weekoverzicht van de hero, met dezelfde teksten:
@@ -280,8 +298,25 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       : [];
   // Een POC zonder vertegenwoordigers levert een lege kaart op; die tonen we niet.
   const pocsWithPeople = myPocs.filter((poc) => poc.representatives.length > 0);
+  const pocGroups: PocBandGroup[] = pocsWithPeople.map((poc) => ({
+    id: poc.id,
+    name: pick(poc.nameNl, poc.nameEn ?? poc.nameNl, locale),
+    email: poc.email,
+    people: poc.representatives.map((rep) => ({
+      id: rep.id,
+      name: rep.user.name,
+      avatarUrl: publicUrl(rep.user.avatarKey),
+      role: pick(rep.roleNl ?? "", rep.roleEn ?? rep.roleNl ?? "", locale) || null,
+    })),
+  }));
+
+  const dict = getDictionary(locale);
+  const myProgrammeNames = myProgrammes.map(
+    (prog) => dict.onboarding.programmes[prog] ?? prog
+  );
 
   const map = new Map(settings.map((s) => [s.key, s.value as unknown]));
+  const pocSetting = readPocBandSetting(map.get(POC_BAND_SETTING));
   const theokot = readOpeningHoursSetting(map.get("home.openingHours.theokot"), "theokot");
   const cursusdienst = readOpeningHoursSetting(
     map.get("home.openingHours.cursusdienst"),
@@ -668,21 +703,14 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         </div>
       </section>
 
-      {aftermovies.length > 0 && (
-        <section className="section band aftermovie-band">
-          <div className="sec-head">
-            <h2>{nl ? "Aftermovies." : "Aftermovies."}</h2>
-            <div className="meta">
-              {nl ? "Beelden van de afgelopen jaren" : "Footage from past years"} ·{" "}
-              <Link href={`${base}/media`}>{nl ? "alle media" : "all media"}</Link>
-            </div>
-          </div>
-          <AftermovieGrid
-            items={aftermovies}
-            playLabel={nl ? "Video afspelen" : "Play video"}
-          />
-        </section>
-      )}
+      <PocBand
+        locale={locale}
+        base={base}
+        now={now}
+        setting={pocSetting}
+        groups={pocGroups}
+        myProgrammes={myProgrammeNames}
+      />
 
       {eventCards.length > 0 && (
         <section className="section band events-band">
@@ -824,6 +852,31 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         </section>
       )}
 
+      {aftermovies.length > 0 && (
+        <section className="section band aftermovie-band">
+          <div className="sec-head">
+            <h2>{nl ? "Aftermovies." : "Aftermovies."}</h2>
+            <div className="meta">
+              {nl ? "Beelden van de afgelopen jaren" : "Footage from past years"} ·{" "}
+              <Link href={`${base}/media`}>{nl ? "alle media" : "all media"}</Link>
+            </div>
+          </div>
+          <AftermovieGrid
+            items={aftermovies}
+            playLabel={nl ? "Video afspelen" : "Play video"}
+          />
+        </section>
+      )}
+
+      <FrontpageShiftBand
+        locale={locale}
+        base={base}
+        shifts={shiftBandItems}
+        postNames={postNames}
+        signedIn={Boolean(session)}
+        totalOpenSpots={totalOpenSpots}
+      />
+
       <section className="section band career-band">
         <div className="sec-head">
           <h2>
@@ -896,58 +949,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           </figure>
         </div>
       </section>
-
-      {pocsWithPeople.length > 0 && (
-        <section className="section band poc-band">
-          <div className="sec-head">
-            <h2>{nl ? "Jouw richtingsvertegenwoordigers." : "Your student representatives."}</h2>
-            <div className="meta">
-              {nl ? "Op basis van je richtingen" : "Based on your programmes"} ·{" "}
-              <Link href={`${base}/pocs`}>{nl ? "bekijk alles" : "see all"}</Link>
-            </div>
-          </div>
-          {/* Een lid zit in één POC, soms twee, uitzonderlijk drie; per POC gaat
-              het meestal om 3 tot 8 mensen. De kaart groeit dus in hoogte met het
-              aantal mensen en niet in breedte: `data-groups` bepaalt hoeveel
-              kolommen de band krijgt (zie vtk-home.css). */}
-          <div className="poc-grid" data-groups={Math.min(pocsWithPeople.length, 3)}>
-            {pocsWithPeople.map((poc) => (
-              <div className="poccard" key={poc.id}>
-                <div className="poccard-head">
-                  <h3>{pick(poc.nameNl, poc.nameEn ?? poc.nameNl, locale)}</h3>
-                  {/* Studenten mailen de POC als geheel, niet één vertegenwoordiger. */}
-                  {poc.email ? (
-                    <a className="poc-mail" href={`mailto:${poc.email}`}>
-                      {poc.email}
-                    </a>
-                  ) : null}
-                </div>
-                <ul className="poc-people">
-                  {poc.representatives.map((rep) => {
-                    const avatar = publicUrl(rep.user.avatarKey);
-                    return (
-                      <li key={rep.id}>
-                        <span className="poc-face">
-                          {avatar ? (
-                            // .poc-face is 64x64 (vtk-home.css); die maat meegeven
-                            // scheelt het verschil met de volledige profielfoto.
-                            <Image src={avatar} alt="" width={64} height={64} />
-                          ) : (
-                            <span className="poc-initial" aria-hidden="true">
-                              {rep.user.name.slice(0, 1).toUpperCase()}
-                            </span>
-                          )}
-                        </span>
-                        <span className="poc-name">{rep.user.name}</span>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
 
       <section className="partners">
         <div className="partners-head">

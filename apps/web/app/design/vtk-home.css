@@ -1485,7 +1485,8 @@
    mag geen ruis staan. Wit op navy, laag genoeg om tekst niet te storen. */
 .vtk-design .hours-strip::after,
 .vtk-design .career-band::after,
-.vtk-design .aftermovie-band::after {
+.vtk-design .aftermovie-band::after,
+.vtk-design .poc-band::after {
   content: "";
   position: absolute;
   z-index: -1;
@@ -1527,6 +1528,10 @@
 
 .vtk-design .aftermovie-band::after {
   background-position: calc(50% - 420px) -240px;
+}
+
+.vtk-design .poc-band::after {
+  background-position: calc(50% + 180px) -160px;
 }
 
 .vtk-design .hours-strip .sec-head h2 {
@@ -1676,29 +1681,19 @@
   letter-spacing: -0.01em;
 }
 
-/* Evenementen en POC's delen de lichtblauwe band. De lichtblauwe band leest als
-   een lichter tussenblok, geen groot statement zoals de navy banden: bij één rij
-   kaarten voelt zware padding als lege ruimte, dus houden we die hier compacter
-   dan bij de aftermovie-/career-band. */
+/* Evenementen en Shiften delen de lichtblauwe band (--paper-2).
+   De lichtblauwe band leest als een lichter tussenblok tussen de navy banden. */
 .vtk-design .events-band,
-.vtk-design .poc-band {
+.vtk-design .shift-band {
   position: relative;
   z-index: 0;
   margin-top: clamp(84px, 10vw, 120px);
-  padding-top: clamp(36px, 4vw, 52px);
-  padding-bottom: clamp(40px, 4.5vw, 58px);
-}
-
-/* De evenementenband krijgt bewust meer verticale ademruimte dan de POC-band.
-   Die extra ruimte zit binnen de band, dus valt ze in het lichtblauw (--paper-2)
-   dat de ::before voluit trekt; het witte paper eromheen blijft ongemoeid. */
-.vtk-design .events-band {
   padding-top: clamp(56px, 7.3vw, 96px);
   padding-bottom: clamp(60px, 7.9vw, 104px);
 }
 
 .vtk-design .events-band::before,
-.vtk-design .poc-band::before {
+.vtk-design .shift-band::before {
   content: "";
   position: absolute;
   z-index: -1;
@@ -1709,133 +1704,534 @@
   background: var(--paper-2);
 }
 
-/* Het raster en de kaart van deze band staan in `vtk-eventcard.css`: het zijn
-   dezelfde kaarten als in het raster van /kalender. Ze stonden hier als
-   `.evcard` met een eigen datumblok, een eigen voetregel en een eigen ster, en
-   dat liep uiteen zodra er aan één van de twee iets veranderde. `.ev-grid` stond
-   bovendien in beide stylesheets met een andere kolomregel, terwijl ze allebei
-   globaal geladen worden; welke won hing af van de volgorde in het document. */
+/* POC-band: navy band met technisch patroon, direct onder "Wat we doen". */
+.vtk-design .poc-band {
+  position: relative;
+  z-index: 0;
+  margin-top: clamp(84px, 10vw, 120px);
+  padding-top: clamp(56px, 7vw, 88px);
+  padding-bottom: clamp(64px, 8vw, 96px);
+}
 
-/* "Richtingsvertegenwoordigers" is één woord van 27 letters: op de gewone
-   sectiegrootte breekt de kop van deze band altijd over twee regels. */
+.vtk-design .poc-band::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  background: var(--navy);
+}
+
 .vtk-design .poc-band .sec-head h2 {
-  font-size: clamp(26px, 3.1vw, 38px);
-  line-height: 1.05;
+  color: var(--paper);
+  font-size: clamp(28px, 3.4vw, 40px);
+  line-height: 1;
+  letter-spacing: -0.03em;
 }
 
 .vtk-design .poc-band .sec-head .meta {
+  color: var(--on-dark-muted);
   flex: 0 0 auto;
   white-space: nowrap;
 }
 
-/*
- * Een POC-kaart groeit in hoogte met het aantal mensen (meestal 3 tot 8, soms
- * 15), nooit in breedte. Het aantal POC's bepaalt de kolommen: drie of meer
- * vullen de band, meer dan drie schuiven door naar een tweede rij.
- */
-.vtk-design .poc-grid {
+.vtk-design .poc-band .sec-head .meta a {
+  color: var(--paper);
+  border-bottom: 1px solid var(--paper);
+}
+
+/* POC Wallrij (Weergave A) */
+.vtk-design .poc-wall {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(0, calc((100% - 36px) / 3)));
-  justify-content: start;
-  align-items: start;
-  gap: 18px;
+  gap: 0;
 }
 
-.vtk-design .poc-grid[data-groups="1"] {
-  grid-template-columns: minmax(0, 1fr);
+.vtk-design .poc-wall-row {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: clamp(22px, 2.5vw, 36px);
+  padding: 28px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
-.vtk-design .poc-grid[data-groups="2"] {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+.vtk-design .poc-wall-row:first-of-type {
+  border-top: 0;
+  padding-top: 4px;
 }
 
-.vtk-design .poccard {
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
-  padding: 24px 26px 26px;
-}
-
-.vtk-design .poccard-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 14px;
-  padding-bottom: 16px;
-  margin-bottom: 18px;
-  border-bottom: 1px solid var(--line);
-}
-
-.vtk-design .poccard-head h3 {
+.vtk-design .poc-wall-label h3 {
   margin: 0;
-  color: var(--ink);
+  color: var(--paper);
   font-size: 20px;
-  line-height: 1.15;
-  letter-spacing: -0.02em;
   font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
 }
 
-.vtk-design .poc-mail {
-  flex: 0 0 auto;
-  color: var(--muted);
-  font-size: 12.5px;
-  white-space: nowrap;
+.vtk-design .poc-wall-mail {
+  display: inline-block;
+  margin-top: 6px;
+  color: var(--on-dark-muted);
+  font-size: 13px;
+  border-bottom: 1px solid var(--yellow);
+  transition: color 140ms ease;
 }
 
-.vtk-design .poc-mail:hover {
-  color: var(--ink);
-  border-bottom: 1px solid var(--ink);
+.vtk-design .poc-wall-mail:hover {
+  color: var(--paper);
 }
 
-.vtk-design .poc-people {
+.vtk-design .poc-wall-faces {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(88px, 1fr));
-  gap: 18px 14px;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 20px 16px;
+  list-style: none;
   margin: 0;
   padding: 0;
-  list-style: none;
 }
 
-.vtk-design .poc-people li {
+.vtk-design .poc-wall-faces li {
   display: flex;
-  min-width: 0;
   flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 2px;
+  min-width: 0;
 }
 
-.vtk-design .poc-face {
+.vtk-design .poc-wall-face {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 14px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 14px 30px -20px rgba(0, 0, 0, 0.5);
   display: grid;
   place-items: center;
-  width: 64px;
-  height: 64px;
-  margin-bottom: 6px;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--paper-2);
 }
 
-.vtk-design .poc-face img {
+.vtk-design .poc-wall-photo {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  border-radius: 14px;
 }
 
-.vtk-design .poc-initial {
-  color: var(--muted);
-  font-size: 20px;
+.vtk-design .poc-wall-face.is-blank {
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.vtk-design .poc-wall-initial {
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--paper);
+  opacity: 0.9;
+}
+
+.vtk-design .poc-wall-name {
+  margin: 8px 0 0;
+  color: var(--paper);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.vtk-design .poc-wall-role {
+  margin: 2px 0 0;
+  color: var(--on-dark-muted);
+  font-size: 12px;
+}
+
+/* POC Verkiezingen (Weergave V2: paneel + tijdlijn zonder geel randje links) */
+.vtk-design .poc-elect {
+  display: grid;
+  gap: 24px;
+}
+
+.vtk-design .poc-elect-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: clamp(24px, 3vw, 44px);
+  padding: clamp(26px, 3vw, 36px);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 20px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.vtk-design .poc-elect-prose h3 {
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  width: fit-content;
+  margin: 0;
+}
+
+.vtk-design .poc-elect-prose h3::after {
+  content: "";
+  display: block;
+  height: 3px;
+  margin-top: 9px;
+  border-radius: 2px;
+  background: var(--yellow);
+}
+
+.vtk-design .poc-elect-prose p {
+  margin-top: 12px;
+  color: var(--body);
+  font-size: 14.5px;
+  line-height: 1.65;
+}
+
+.vtk-design .poc-elect-prose strong {
+  color: var(--ink);
   font-weight: 600;
 }
 
-.vtk-design .poc-name {
-  max-width: 100%;
+.vtk-design .poc-elect-prose a {
   color: var(--ink);
+  font-weight: 500;
+  border-bottom: 1px solid var(--yellow);
+}
+
+.vtk-design .poc-elect-aside {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding-left: clamp(16px, 2vw, 28px);
+  border-left: 1px solid var(--rule-soft);
+}
+
+.vtk-design .poc-elect-deadline {
+  display: grid;
+  gap: 2px;
+}
+
+.vtk-design .poc-elect-deadline .k {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.vtk-design .poc-elect-deadline .v {
+  color: var(--ink);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+
+.vtk-design .poc-elect-deadline .sub {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.vtk-design .poc-elect-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.vtk-design .poc-elect-mine {
+  padding-top: 15px;
+  border-top: 1px solid var(--rule-soft);
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.vtk-design .poc-elect-mine b {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.vtk-design .poc-elect-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 18px;
+  background: var(--surface);
+  overflow: clip;
+}
+
+.vtk-design .poc-elect-step {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  padding: 20px 22px 22px;
+  border-left: 1px solid var(--rule-soft);
+}
+
+.vtk-design .poc-elect-step:first-child {
+  border-left: 0;
+}
+
+.vtk-design .poc-elect-step::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto auto 0;
+  width: 100%;
+  height: 3px;
+  background: var(--line-2);
+}
+
+.vtk-design .poc-elect-step[data-state="now"]::before {
+  background: var(--yellow);
+}
+
+.vtk-design .poc-elect-step[data-state="done"]::before {
+  background: var(--navy);
+}
+
+.vtk-design .poc-elect-step .when {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+
+.vtk-design .poc-elect-step[data-state="now"] .when {
+  color: var(--low-ink);
+}
+
+.vtk-design .poc-elect-step h4 {
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+.vtk-design .poc-elect-step p {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* Shiftband (S2: shiftkaarten naast elkaar op lichtblauwe band) */
+.vtk-design .shift-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+  gap: 18px;
+}
+
+@media (min-width: 1100px) {
+  .vtk-design .shift-cards-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+}
+
+.vtk-design .shift-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 4px 16px -10px rgba(14, 26, 54, 0.08);
+}
+
+.vtk-design .shift-tile-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.vtk-design .shift-tile-when {
+  display: grid;
+  gap: 4px;
+}
+
+.vtk-design .shift-tile-day {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+.vtk-design .shift-tile-hours {
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  margin: 0;
+}
+
+.vtk-design .shift-spots {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-design .shift-spots::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.vtk-design .shift-spots.spots-ok {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+.vtk-design .shift-spots.spots-low {
+  background: var(--low-bg);
+  color: var(--low-ink);
+}
+
+.vtk-design .shift-spots.spots-mine {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.vtk-design .shift-spots.spots-mine::before {
+  background: var(--yellow);
+}
+
+.vtk-design .shift-spots.spots-full {
+  background: var(--full-bg);
+  color: var(--full-ink);
+}
+
+.vtk-design .shift-tile h4 {
+  margin: 12px 0 0;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  width: fit-content;
+}
+
+.vtk-design .shift-tile h4::after {
+  content: "";
+  display: block;
+  height: 3px;
+  margin-top: 8px;
+  border-radius: 2px;
+  background: var(--yellow);
+}
+
+.vtk-design .shift-tile-facts {
+  display: grid;
+  gap: 5px;
+  margin-top: 14px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vtk-design .shift-tile-post {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.vtk-design .shift-tile-post::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--navy);
+}
+
+.vtk-design .shift-tile-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: auto;
+  padding-top: 16px;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.vtk-design .shift-tile-details {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--muted);
   font-size: 13px;
   font-weight: 500;
-  line-height: 1.3;
-  overflow-wrap: anywhere;
+  cursor: pointer;
+  transition: color 140ms ease;
+}
+
+.vtk-design .shift-tile-details:hover {
+  color: var(--ink);
+  text-decoration: underline;
+}
+
+.vtk-design .shift-empty-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 40px 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  text-align: center;
+  color: var(--muted);
+  font-size: 14.5px;
+}
+
+@media (max-width: 768px) {
+  .vtk-design .poc-wall-row {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+  .vtk-design .poc-elect-panel {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  .vtk-design .poc-elect-aside {
+    padding-left: 0;
+    border-left: 0;
+    border-top: 1px solid var(--rule-soft);
+    padding-top: 20px;
+  }
+  .vtk-design .poc-elect-steps {
+    grid-template-columns: 1fr;
+  }
+  .vtk-design .poc-elect-step {
+    border-left: 0;
+    border-top: 1px solid var(--rule-soft);
+  }
+  .vtk-design .poc-elect-step:first-child {
+    border-top: 0;
+  }
 }
 
 /* Auto-fit: drie kaarten naast elkaar, maar de rij blijft kloppen wanneer er

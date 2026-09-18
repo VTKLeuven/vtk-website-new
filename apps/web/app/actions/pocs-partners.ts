@@ -10,6 +10,13 @@ import { describeChanges, logAudit } from "@/lib/audit";
 import { STUDY_PROGRAMMES } from "@/lib/profile";
 import { deleteObject } from "@vtk/storage";
 import { currentWorkingYear } from "@/lib/workingYear";
+import {
+  POC_BAND_SETTING,
+  POC_BAND_MAX_STEPS,
+  type PocBandMode,
+  type PocBandSetting,
+  type PocBandStep,
+} from "@/lib/home/pocBand";
 
 /** `P2002` op een bepaald veld: de unieke constraint die Prisma noemt. */
 function isUniqueViolation(err: unknown, field: string): boolean {
@@ -287,4 +294,74 @@ export async function deletePartnerAction(formData: FormData): Promise<void> {
   revalidatePath("/", "layout");
   // Geen redirect: het raster staat op deze pagina en ververst ter plaatse.
   revalidatePath("/admin/partners");
+}
+
+// ---- POC Homepage Band ------------------------------------------------------
+
+export async function savePocBandAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requirePermission("pocs.manage");
+
+  const mode = (formData.get("mode") as PocBandMode) || "representatives";
+
+  const steps: PocBandStep[] = [];
+  for (let i = 0; i < POC_BAND_MAX_STEPS; i++) {
+    const titleNl = (formData.get(`step-titleNl-${i}`) as string)?.trim() ?? "";
+    const titleEn = (formData.get(`step-titleEn-${i}`) as string)?.trim() ?? "";
+    if (!titleNl && !titleEn) continue;
+    steps.push({
+      titleNl,
+      titleEn,
+      bodyNl: (formData.get(`step-bodyNl-${i}`) as string)?.trim() ?? "",
+      bodyEn: (formData.get(`step-bodyEn-${i}`) as string)?.trim() ?? "",
+      from: (formData.get(`step-from-${i}`) as string)?.trim() || null,
+      to: (formData.get(`step-to-${i}`) as string)?.trim() || null,
+    });
+  }
+
+  const rawDeadline = (formData.get("deadline") as string)?.trim();
+  let deadline: string | null = null;
+  if (rawDeadline) {
+    const parsed = new Date(rawDeadline);
+    if (!Number.isNaN(parsed.getTime())) {
+      deadline = parsed.toISOString();
+    }
+  }
+
+  const value: PocBandSetting = {
+    mode,
+    headingNl: (formData.get("headingNl") as string)?.trim() || "Riververkiezingen.",
+    headingEn: (formData.get("headingEn") as string)?.trim() || "Student rep elections.",
+    metaNl: (formData.get("metaNl") as string)?.trim() || "",
+    metaEn: (formData.get("metaEn") as string)?.trim() || "",
+    titleNl: (formData.get("titleNl") as string)?.trim() || "Word jij vertegenwoordiger van je richting?",
+    titleEn: (formData.get("titleEn") as string)?.trim() || "Will you represent your programme?",
+    bodyNl: (formData.get("bodyNl") as string)?.trim() || "",
+    bodyEn: (formData.get("bodyEn") as string)?.trim() || "",
+    deadline,
+    ctaLabelNl: (formData.get("ctaLabelNl") as string)?.trim() || "",
+    ctaLabelEn: (formData.get("ctaLabelEn") as string)?.trim() || "",
+    ctaUrl: (formData.get("ctaUrl") as string)?.trim() || "",
+    secondaryLabelNl: (formData.get("secondaryLabelNl") as string)?.trim() || "",
+    secondaryLabelEn: (formData.get("secondaryLabelEn") as string)?.trim() || "",
+    secondaryUrl: (formData.get("secondaryUrl") as string)?.trim() || "",
+    steps,
+  };
+
+  await prisma.setting.upsert({
+    where: { key: POC_BAND_SETTING },
+    update: { value },
+    create: { key: POC_BAND_SETTING, value },
+  });
+
+  await logAudit({
+    action: "update",
+    entity: "poc",
+    target: "POC homepage-band",
+    summary: `weergave: ${mode}`,
+  });
+
+  revalidatePath("/", "layout");
+  revalidatePath("/admin/pocs");
+  revalidatePath("/pocs");
+  return saveOk();
 }

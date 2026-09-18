@@ -8,7 +8,9 @@ import { publicUrl } from "@/lib/storage";
 import { saveErrorMessages } from "@/lib/saveMessages";
 import { STUDY_PROGRAMMES } from "@/lib/profile";
 import { formatWorkingYear, parseWorkingYear, workingYearTabs } from "@/lib/workingYear";
+import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
 import { PocsTable, type PocRow } from "./PocsTable";
+import { PocBandAdminCard } from "./PocBandAdminCard";
 
 export default async function AdminPocs({
   params,
@@ -30,7 +32,7 @@ export default async function AdminPocs({
 
   // Enkel de POC's + hun vertegenwoordigers van het geselecteerde werkingsjaar;
   // de user-picker zoekt server-side (/api/users/search).
-  const [pocs, distinctYears] = await Promise.all([
+  const [pocs, distinctYears, pocBandSettingRow] = await Promise.all([
     prisma.poc.findMany({
       orderBy: { order: "asc" },
       include: {
@@ -45,7 +47,12 @@ export default async function AdminPocs({
       distinct: ["year"],
       select: { year: true },
     }),
+    prisma.setting.findUnique({
+      where: { key: POC_BAND_SETTING },
+    }),
   ]);
+
+  const pocBandSetting = readPocBandSetting(pocBandSettingRow?.value);
 
   const tabs = workingYearTabs(distinctYears.map((r) => r.year));
 
@@ -108,6 +115,8 @@ export default async function AdminPocs({
             : "Points of contact per study track. Open a POC to manage its representatives. Representatives apply per working year."}
         </p>
       </div>
+
+      <PocBandAdminCard setting={pocBandSetting} locale={locale} />
 
       {/* Werkingsjaar-tabjes */}
       <div className="flex flex-wrap gap-2">
