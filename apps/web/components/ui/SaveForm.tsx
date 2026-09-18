@@ -50,6 +50,7 @@ export function SaveForm({
   resetOnSuccess = true,
   submitDisabled = false,
   secondarySubmit,
+  footer,
   className,
   children,
 }: {
@@ -74,6 +75,19 @@ export function SaveForm({
    */
   /** Eén of meer alternatieve submitacties met elk hun eigen name/value. */
   secondarySubmit?: SecondarySubmit | SecondarySubmit[];
+  /**
+   * Vervangt de standaard knoppenrij onderaan door een eigen footer (zoals de
+   * sticky actiebalk van het evenementenformulier). Krijgt de actieknoppen en
+   * de bevestigingsdialoog mee zodat de submit-, toestand- en dialooglogica van
+   * `SaveForm` intact blijft.
+   */
+  footer?: (props: {
+    pending: boolean;
+    disabled: boolean;
+    submitButton: ReactNode;
+    secondaryButtons: ReactNode;
+    confirmDialog: ReactNode;
+  }) => ReactNode;
   className?: string;
   children?: ReactNode;
 }) {
@@ -165,42 +179,62 @@ export function SaveForm({
     resetOnSuccess,
   ]);
 
+  const submitButton = (
+    <Button type="submit" disabled={pending || submitDisabled || busy}>
+      {pending ? savingLabel : submitLabel}
+    </Button>
+  );
+
+  const secondaryButtons = secondarySubmits.map((submit) => (
+    // `name`/`value` op de knop: die waarde komt enkel mee wanneer je op
+    // déze knop klikt, zodat de action ziet welke van de twee je gebruikte.
+    // Staat er een bevestiging op, dan is het een gewone knop en gaat de
+    // waarde pas mee wanneer de dialoog bevestigd wordt.
+    <Button
+      key={`${submit.name}:${submit.value}`}
+      type={submit.confirm ? "button" : "submit"}
+      variant="secondary"
+      {...(submit.confirm ? {} : { name: submit.name, value: submit.value })}
+      onClick={submit.confirm ? () => setConfirming(submit) : undefined}
+      disabled={pending || submitDisabled || busy}
+    >
+      {submit.label}
+    </Button>
+  ));
+
+  const confirmDialog = confirming?.confirm ? (
+    <ConfirmDialog
+      open
+      title={confirming.confirm.title}
+      description={confirming.confirm.description}
+      confirmLabel={confirming.confirm.confirmLabel}
+      cancelLabel={confirming.confirm.cancelLabel}
+      pending={pending}
+      onConfirm={() => submitWith(confirming)}
+      onCancel={() => setConfirming(null)}
+    />
+  ) : null;
+
   return (
     <form ref={formRef} onSubmit={onSubmit} className={className}>
       <FormBusyProvider register={register}>{children}</FormBusyProvider>
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={pending || submitDisabled || busy}>
-          {pending ? savingLabel : submitLabel}
-        </Button>
-        {secondarySubmits.map((submit) => (
-          // `name`/`value` op de knop: die waarde komt enkel mee wanneer je op
-          // déze knop klikt, zodat de action ziet welke van de twee je gebruikte.
-          // Staat er een bevestiging op, dan is het een gewone knop en gaat de
-          // waarde pas mee wanneer de dialoog bevestigd wordt.
-          <Button
-            key={`${submit.name}:${submit.value}`}
-            type={submit.confirm ? "button" : "submit"}
-            variant="secondary"
-            {...(submit.confirm ? {} : { name: submit.name, value: submit.value })}
-            onClick={submit.confirm ? () => setConfirming(submit) : undefined}
-            disabled={pending || submitDisabled || busy}
-          >
-            {submit.label}
-          </Button>
-        ))}
-      </div>
-      {confirming?.confirm ? (
-        <ConfirmDialog
-          open
-          title={confirming.confirm.title}
-          description={confirming.confirm.description}
-          confirmLabel={confirming.confirm.confirmLabel}
-          cancelLabel={confirming.confirm.cancelLabel}
-          pending={pending}
-          onConfirm={() => submitWith(confirming)}
-          onCancel={() => setConfirming(null)}
-        />
-      ) : null}
+      {footer ? (
+        footer({
+          pending,
+          disabled: pending || submitDisabled || busy,
+          submitButton,
+          secondaryButtons,
+          confirmDialog,
+        })
+      ) : (
+        <>
+          <div className="flex flex-wrap items-center gap-3">
+            {submitButton}
+            {secondaryButtons}
+          </div>
+          {confirmDialog}
+        </>
+      )}
     </form>
   );
 }

@@ -1148,3 +1148,199 @@ a.vtk-shortcut-tile:hover {
 .vtk-slogan-preview[data-size="s"] {
   font-size: clamp(17px, 2.1vw, 20px);
 }
+
+/* ---------------------------------------------------------------------------
+ * Evenementenformulier (/admin/kalender/new en /admin/kalender/[id])
+ *
+ * Twee stappen:
+ * - Aanmaken (optie C): minimaal concept in vier compacte kaarten met een
+ *   stapbalk erboven en "Aanmaken en verder" in de sticky balk.
+ * - Bewerken (optie A): acht benoemde secties met een checklist "Klaar om te
+ *   publiceren?" erboven, tweetalige velden achter compacte NL/EN-tabs en de
+ *   status en opslagknoppen in de meescrollende actiebalk onderaan.
+ * ------------------------------------------------------------------------- */
+
+.sec-title {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 0 3px;
+}
+
+.sec-title h2,
+.sec-title h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.sec-note {
+  margin: 0 0 14px;
+  font-size: 12.5px;
+  color: var(--muted);
+  max-width: 72ch;
+}
+
+/* Stap-indicator bij aanmaken in twee stappen (optie C) */
+.step-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.step-head b {
+  color: var(--ink);
+}
+
+.step-head .bar {
+  flex: 1;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+
+.step-head .bar i {
+  display: block;
+  height: 100%;
+  width: 50%;
+  background: var(--yellow);
+}
+
+/* Checklist boven het bewerkscherm */
+.todo-card {
+  border: 1px solid rgba(224, 174, 29, 0.55);
+  background: rgba(255, 210, 63, 0.12);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.todo-card.all-done {
+  border: 1px solid rgba(46, 155, 118, 0.4);
+  background: rgba(46, 155, 118, 0.08);
+}
+
+.todo-card h2,
+.todo-card h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.todo-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 5px;
+  font-size: 13px;
+}
+
+.todo-list li {
+  display: flex;
+  gap: 9px;
+  align-items: baseline;
+  color: var(--body);
+}
+
+.todo-list .mark {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.todo-list .done .mark {
+  color: #16a34a;
+}
+
+.todo-list .miss .mark {
+  color: #b45309;
+}
+
+/* Compacte taalknoppen bij tweetalige velden (titel, beschrijving, knoptekst) */
+.langtabs {
+  display: inline-flex;
+  gap: 2px;
+  margin-left: 8px;
+  vertical-align: -1px;
+}
+
+.langtabs button {
+  padding: 1px 7px;
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  background: var(--paper-2);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.langtabs button:hover {
+  color: var(--ink);
+}
+
+.langtabs button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
+}
+
+/* Status-pil */
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+}
+
+.pill.draft {
+  border: 1px solid var(--line-2);
+  background: var(--paper-2);
+  color: var(--muted);
+}
+
+.pill.live {
+  background: rgba(255, 210, 63, 0.25);
+  border: 1px solid rgba(224, 174, 29, 0.4);
+  color: var(--ink);
+}
+
+/* Vaste actiebalk onderaan het formulier */
+.stickybar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 24px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.94);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 -8px 24px -20px rgba(10, 15, 31, 0.5);
+  z-index: 20;
+}
+
+.stickybar .state {
+  font-size: 13px;
+  color: var(--muted);
+  margin-right: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
