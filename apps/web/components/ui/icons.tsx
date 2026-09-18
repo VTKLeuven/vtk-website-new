@@ -40,6 +40,28 @@ export function TrashIcon() {
   );
 }
 
+/** Voorrang: dit evenement staat vooraan op zijn dag in het weekoverzicht. */
+export function PinIcon() {
+  return (
+    <Icon>
+      <path d="M12 17v5" />
+      <path d="M9 10.5V4h6v6.5l3 3.5H6l3-3.5Z" />
+    </Icon>
+  );
+}
+
+/** Niet tonen: wel in de kalender, niet op de homepage. */
+export function EyeOffIcon() {
+  return (
+    <Icon>
+      <path d="M10.6 6.2A9.9 9.9 0 0 1 12 6c5 0 9 4.5 9 6a10.9 10.9 0 0 1-2.4 3.2" />
+      <path d="M6.6 6.8A11.4 11.4 0 0 0 3 12c0 1.5 4 6 9 6a9.7 9.7 0 0 0 4.1-.9" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+      <path d="M3 3l18 18" />
+    </Icon>
+  );
+}
+
 export function CopyIcon() {
   return (
     <Icon>

@@ -6,7 +6,8 @@ import { requireSession } from "@/lib/session";
 import { hasPermission } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { Button, Card } from "@vtk/ui";
-import { EventRowActions } from "./EventRowActions";
+import { sharedMomentTime } from "@/lib/calendar/moments";
+import { EventRow } from "./EventRow";
 
 export default async function AdminCalendar({
   params,
@@ -26,6 +27,9 @@ export default async function AdminCalendar({
 
   const canAll = session.user.isSuperAdmin || hasPermission(session, "calendar.manageAll");
   const canCreate = canAll || hasPermission(session, "calendar.create");
+  // Het weekoverzicht op de homepage is een eigen permissie; zie het veld in het
+  // formulier en `setEventHeroWeekAction`.
+  const canHeroWeek = session.user.isSuperAdmin || hasPermission(session, "calendar.heroWeek");
 
   if (!canCreate) {
     return <p>{nl ? "Geen toegang." : "No access."}</p>;
@@ -41,6 +45,10 @@ export default async function AdminCalendar({
     where: { ...scope, ...period },
     include: {
       group: true,
+      // De losse momenten van een reeks: de kolom "Wanneer" schrijft ze als een
+      // periode met het gedeelde uur, in plaats van als één blok van vrijdag tot
+      // woensdag. Zie `CalendarEventMoment`.
+      moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
       _count: { select: { interests: true, guestInterests: true } },
     },
     // Aankomend: eerstvolgende bovenaan. Verleden: recentste bovenaan.
@@ -48,14 +56,69 @@ export default async function AdminCalendar({
     take: 100,
   });
 
-  const dateFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
-    timeZone: "Europe/Brussels",
+  const tag = nl ? "nl-BE" : "en-GB";
+  const zone = "Europe/Brussels";
+  const dayFmt = new Intl.DateTimeFormat(tag, {
+    timeZone: zone,
     day: "2-digit",
-    month: "2-digit",
+    month: "short",
     year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
   });
+  const shortDayFmt = new Intl.DateTimeFormat(tag, { timeZone: zone, day: "2-digit", month: "short" });
+  const timeFmt = new Intl.DateTimeFormat(tag, { timeZone: zone, hour: "2-digit", minute: "2-digit" });
+  const dayKey = (date: Date) =>
+    new Intl.DateTimeFormat("en-CA", { timeZone: zone, year: "numeric", month: "2-digit", day: "2-digit" }).format(
+      date,
+    );
+
+  /**
+   * Eén kolom "Wanneer" in plaats van Start en Einde apart.
+   *
+   * Twee kolommen met een volledige datum en een uur erin namen samen bijna de
+   * halve tabel, terwijl het einde bijna altijd dezelfde dag is; die ruimte is nu
+   * de kolom Homepage. Een reeks losse momenten leest hier bovendien als een
+   * periode met haar gedeelde uur, in plaats van als één blok dat van vrijdag tot
+   * woensdag doorloopt (dat is precies wat de momenten niet zijn).
+   */
+  function whenLabel(event: {
+    start: Date;
+    end: Date;
+    allDay: boolean;
+    moments: Array<{ start: Date; end: Date; label: string | null }>;
+  }): { main: string; sub: string | null } {
+    if (event.moments.length > 0) {
+      const first = event.moments[0]!.start;
+      const last = event.moments[event.moments.length - 1]!.start;
+      // Het aantal staat er altijd bij; het uur enkel wanneer elk moment
+      // hetzelfde uur draagt, want anders is elke samenvatting op één uur
+      // gelogen (zie `sharedMomentTime`).
+      const shared = sharedMomentTime(event.moments, zone);
+      const count = `${event.moments.length} ${nl ? "momenten" : "moments"}`;
+      return {
+        main: `${shortDayFmt.format(first)} ${nl ? "t.e.m." : "to"} ${dayFmt.format(last)}`,
+        sub: shared ? `${count} · ${nl ? "telkens" : "each time"} ${shared}` : count,
+      };
+    }
+    if (event.allDay) {
+      const sameDay = dayKey(event.start) === dayKey(event.end);
+      return {
+        main: sameDay
+          ? dayFmt.format(event.start)
+          : `${shortDayFmt.format(event.start)} ${nl ? "t.e.m." : "to"} ${dayFmt.format(event.end)}`,
+        sub: nl ? "hele dag" : "all day",
+      };
+    }
+    if (dayKey(event.start) === dayKey(event.end)) {
+      return {
+        main: dayFmt.format(event.start),
+        sub: `${timeFmt.format(event.start)} - ${timeFmt.format(event.end)}`,
+      };
+    }
+    return {
+      main: `${shortDayFmt.format(event.start)} ${nl ? "t.e.m." : "to"} ${dayFmt.format(event.end)}`,
+      sub: `${timeFmt.format(event.start)} - ${timeFmt.format(event.end)}`,
+    };
+  }
 
   return (
     <div className="space-y-5">
@@ -90,54 +153,34 @@ export default async function AdminCalendar({
           <thead className="bg-vtk-blue-soft text-left">
             <tr>
               <th className="px-4 py-2">{nl ? "Titel" : "Title"}</th>
-              <th className="px-4 py-2">{nl ? "Groep" : "Group"}</th>
+              <th className="px-4 py-2">{nl ? "Wanneer" : "When"}</th>
               <th className="px-4 py-2">Status</th>
               <th className="px-4 py-2 text-right">{nl ? "Geïnteresseerd" : "Interested"}</th>
-              <th className="px-4 py-2">Start</th>
-              <th className="px-4 py-2">{nl ? "Einde" : "End"}</th>
+              {canHeroWeek ? <th className="px-4 py-2">{nl ? "Homepage" : "Home page"}</th> : null}
               <th className="px-4 py-2"></th>
             </tr>
           </thead>
           <tbody>
             {events.map((e) => (
-              <tr key={e.id} className="border-t border-zinc-200">
-                <td className="px-4 py-2 font-medium">{e.titleNl}</td>
-                <td className="px-4 py-2 text-zinc-500">{nl ? e.group.nameNl : e.group.nameEn}</td>
-                <td className="px-4 py-2">
-                  <span
-                    className={[
-                      "inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium",
-                      e.publishedAt
-                        ? "bg-vtk-yellow/20 text-vtk-ink"
-                        : "border border-vtk-blue/15 text-vtk-blue-muted",
-                    ].join(" ")}
-                  >
-                    {e.publishedAt ? (nl ? "Gepubliceerd" : "Published") : nl ? "Concept" : "Draft"}
-                  </span>
-                </td>
-                <td className="px-4 py-2 text-right tabular-nums text-zinc-600">
-                  {e._count.interests + e._count.guestInterests > 0 ? (
-                    <Link
-                      href={`${base}/admin/kalender/${e.id}#geinteresseerden`}
-                      className="font-medium text-vtk-ink underline hover:text-vtk-blue"
-                      title={nl ? "Bekijk geïnteresseerden" : "View interested attendees"}
-                    >
-                      {e._count.interests + e._count.guestInterests}
-                    </Link>
-                  ) : (
-                    0
-                  )}
-                </td>
-                <td className="px-4 py-2 tabular-nums text-zinc-500">{dateFmt.format(e.start)}</td>
-                <td className="px-4 py-2 tabular-nums text-zinc-500">{dateFmt.format(e.end)}</td>
-                <td className="px-4 py-2 text-right">
-                  <EventRowActions locale={locale} id={e.id} title={e.titleNl} base={base} />
-                </td>
-              </tr>
+              <EventRow
+                key={e.id}
+                locale={locale}
+                base={base}
+                canHeroWeek={canHeroWeek}
+                event={{
+                  id: e.id,
+                  title: e.titleNl,
+                  group: nl ? e.group.nameNl : e.group.nameEn,
+                  published: Boolean(e.publishedAt),
+                  interested: e._count.interests + e._count.guestInterests,
+                  when: whenLabel(e),
+                  heroWeek: e.heroWeek,
+                }}
+              />
             ))}
             {events.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={canHeroWeek ? 6 : 5} className="px-4 py-8 text-center text-zinc-500">
                   {showPast
                     ? nl
                       ? "Geen evenementen in het verleden"

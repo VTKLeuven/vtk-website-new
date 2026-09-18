@@ -4,27 +4,32 @@ import { useState, useTransition } from "react";
 import { ConfirmDialog } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
 import { useToast } from "@/components/ui/toast";
-import { IconButton, IconLink, RowActions } from "@/components/ui/IconButton";
-import { PencilIcon, TrashIcon } from "@/components/ui/icons";
+import { IconButton, RowActions } from "@/components/ui/IconButton";
+import { TrashIcon } from "@/components/ui/icons";
 import { deleteEventAction } from "@/app/actions/calendar";
 
+/**
+ * Wat er per rij overblijft: verwijderen.
+ *
+ * Het potloodje stond hier tot de rij zelf het evenement opende; twee wegen naar
+ * hetzelfde scherm, waarvan er één een icoon kostte in elke rij. Verwijderen
+ * blijft wel een knop, want het is de enige handeling die je niet ook door de
+ * rij te openen kan doen.
+ */
 export function EventRowActions({
   locale,
   id,
   title,
-  base,
 }: {
   locale: Locale;
   id: string;
   title: string;
-  base: string;
 }) {
   const nl = locale === "nl";
   const showToast = useToast();
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
 
-  const editLabel = nl ? "Bewerken" : "Edit";
   const deleteLabel = nl ? "Verwijderen" : "Delete";
 
   function onConfirm() {
@@ -42,13 +47,6 @@ export function EventRowActions({
 
   return (
     <RowActions>
-      <IconLink
-        href={`${base}/admin/kalender/${id}`}
-        label={editLabel}
-        srLabel={`${editLabel}: ${title}`}
-      >
-        <PencilIcon />
-      </IconLink>
       <IconButton
         label={deleteLabel}
         srLabel={`${deleteLabel}: ${title}`}

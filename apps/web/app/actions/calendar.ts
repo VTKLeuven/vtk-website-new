@@ -627,6 +627,54 @@ export async function deleteCalendarCategoryAction(formData: FormData): Promise<
   revalidateCalendar();
 }
 
+/**
+ * Het weekoverzicht op de homepage aan- of uitzetten vanuit de evenementenlijst.
+ *
+ * Dezelfde keuze als het veld in het formulier (`heroWeek`), maar op de plaats
+ * waar ze in de praktijk gemaakt wordt: je ziet pas dat een dag te vol staat
+ * wanneer je de week naast elkaar ziet, en dan is een evenement openen, een
+ * keuzelijst zoeken en opslaan drie stappen te veel.
+ *
+ * Aparte permissie, net als in het formulier: wie ze niet heeft, krijgt de
+ * knoppen niet te zien en kan ze ook niet omzeilen door zelf te posten.
+ */
+export async function setEventHeroWeekAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const session = await requireSession();
+  const id = (formData.get("id") as string) || "";
+  const parsed = z.enum(["AUTO", "PINNED", "HIDDEN"]).safeParse(formData.get("heroWeek"));
+  if (!id || !parsed.success) return saveError("INVALID_INPUT");
+
+  const superOrAll =
+    session.user.isSuperAdmin || hasPermission(session, "calendar.manageAll");
+  if (!session.user.isSuperAdmin && !hasPermission(session, "calendar.heroWeek")) {
+    throw new Error("forbidden");
+  }
+  const evt = await prisma.calendarEvent.findUnique({ where: { id } });
+  if (!evt) return saveError("NOT_FOUND");
+  await assertCanManageEvent(
+    session.groups.map((g) => g.id),
+    evt.groupId,
+    superOrAll,
+  );
+  if (evt.heroWeek === parsed.data) return saveOk();
+
+  await prisma.calendarEvent.update({ where: { id }, data: { heroWeek: parsed.data } });
+  await logAudit({
+    action: "update",
+    entity: "calendarEvent",
+    entityId: id,
+    target: evt.titleNl,
+    summary: `weekoverzicht op de homepage: ${parsed.data.toLowerCase()}`,
+  });
+  // De homepage leest dit veld, en de lijst hiernaast toont de nieuwe stand.
+  revalidateCalendar();
+  revalidatePath("/admin/kalender");
+  return saveOk();
+}
+
 export async function deleteEventAction(formData: FormData): Promise<void> {
   const session = await requireSession();
   const id = formData.get("id") as string;
