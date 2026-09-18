@@ -7,6 +7,7 @@ import { Markdown } from "@/components/ui/Markdown";
 import { MapPinIcon, UsersIcon } from "@/components/ui/icons";
 import { hasLocale } from "@/lib/locale";
 import { organiserName } from "@/lib/calendar/organiser";
+import { eventLinkLabel } from "@/lib/calendar/eventLink";
 import { publicUrl } from "@/lib/storage";
 import { eventMetadata } from "@/lib/pageMetadata";
 import { loadCalendarCategory, loadCalendarEvent, loadDefaultEventImage } from "@/lib/pageQueries";
@@ -325,7 +326,7 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
               </Link>
             ) : event.url ? (
               <a href={event.url} className="btn btn-primary arrow">
-                {locale === "nl" ? "Externe eventlink" : "External event link"}
+                {eventLinkLabel(event, locale)}
               </a>
             ) : null}
             <Link href={`${base}/kalender`} className="btn btn-ghost vtk-event-back-btn">

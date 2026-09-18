@@ -338,6 +338,12 @@ export type AppCalendarEventDetail = AppCalendarEvent & {
   description: string | null;
   /** Externe link bij het evenement, indien ingevuld. */
   url: string | null;
+  /**
+   * De tekst op de knop naar die link, in de taal van het verzoek. Al opgelost
+   * op de server (de redacteur kiest ze per evenement), dus de app toont ze
+   * zoals ze binnenkomt. `null` zonder link.
+   */
+  urlLabel: string | null;
   /** Slug van het inschrijvingsformulier wanneer dat openstaat. */
   formSlug: string | null;
   /**

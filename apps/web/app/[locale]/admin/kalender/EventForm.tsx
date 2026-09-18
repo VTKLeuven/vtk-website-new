@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { Card, Input, Label, Select } from '@vtk/ui';
 import { saveEventAction } from '@/app/actions/calendar';
+import { DEFAULT_EVENT_LINK_LABEL, EVENT_LINK_LABEL_MAX } from '@/lib/calendar/eventLink';
 import { MarkdownEditorField } from '@/components/editor/MarkdownEditor';
 import { SaveForm } from '@/components/ui/SaveForm';
 import { saveErrorMessages } from '@/lib/saveMessages';
@@ -24,6 +25,9 @@ type Event = {
   end?: Date | null;
   allDay?: boolean;
   url?: string | null;
+  /** De tekst op de knop naar `url`; leeg = "Externe eventlink". */
+  urlLabelNl?: string | null;
+  urlLabelEn?: string | null;
   imageKey?: string | null;
   /** Waar de uitsnede van die foto rond draait; zie lib/imageFocus.ts. */
   imageFocusX?: number | null;
@@ -307,9 +311,43 @@ export function EventForm({
               </span>
             </label>
           </div>
-          <div>
-            <Label>URL</Label>
-            <Input name="url" defaultValue={event.url ?? ''} placeholder="https://..." />
+          {/* De knoptekst hoort bij de link en staat er dus onder, niet in een
+              eigen rij verderop: leeg blijven is de normale toestand, en wie de
+              link invult, ziet meteen dat hij ze een naam kan geven. */}
+          <div className="md:col-span-2">
+            <Label htmlFor="event-url">URL</Label>
+            <Input id="event-url" name="url" defaultValue={event.url ?? ''} placeholder="https://..." />
+            <div className="mt-3 grid grid-cols-1 gap-4 md:grid-cols-2">
+              <div>
+                <Label htmlFor="event-url-label-nl">
+                  {nl ? 'Knoptekst (NL)' : 'Button text (NL)'}
+                </Label>
+                <Input
+                  id="event-url-label-nl"
+                  name="urlLabelNl"
+                  defaultValue={event.urlLabelNl ?? ''}
+                  maxLength={EVENT_LINK_LABEL_MAX}
+                  placeholder={DEFAULT_EVENT_LINK_LABEL.nl}
+                />
+              </div>
+              <div>
+                <Label htmlFor="event-url-label-en">
+                  {nl ? 'Knoptekst (EN)' : 'Button text (EN)'}
+                </Label>
+                <Input
+                  id="event-url-label-en"
+                  name="urlLabelEn"
+                  defaultValue={event.urlLabelEn ?? ''}
+                  maxLength={EVENT_LINK_LABEL_MAX}
+                  placeholder={DEFAULT_EVENT_LINK_LABEL.en}
+                />
+              </div>
+            </div>
+            <p className="mt-1 text-xs text-vtk-muted">
+              {nl
+                ? 'Laat leeg voor "Externe eventlink". Gaat de link naar de inschrijvingen of de ticketverkoop van iemand anders, zet er dan "Inschrijflink" of "Ticketverkoop": dat scheelt of iemand klikt. De Engelse tekst valt terug op de Nederlandse.'
+                : 'Leave empty for "External event link". If the link goes to someone else’s sign-up form or ticket sales, write "Sign-up link" or "Tickets": that decides whether people click. The English text falls back to the Dutch one.'}
+            </p>
           </div>
           {canHeroWeek ? (
             <div>

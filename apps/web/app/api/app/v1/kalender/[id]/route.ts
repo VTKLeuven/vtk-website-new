@@ -15,6 +15,7 @@ import {
 import { absoluteMediaUrl, absoluteUrl } from "@/lib/app-api/media";
 import { appErrorResponse, appJson, appNotFound } from "@/lib/app-api/respond";
 import { organiserName } from "@/lib/calendar/organiser";
+import { eventLinkLabel } from "@/lib/calendar/eventLink";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -92,6 +93,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       })),
       description: pick(event.descriptionNl, event.descriptionEn, locale) || null,
       url: event.url,
+      urlLabel: event.url ? eventLinkLabel(event, locale) : null,
       ticketSlug: event.ticketEvent?.status === "PUBLISHED" ? event.ticketEvent.slug : null,
       formSlug: formOpen ? (event.form?.slug ?? null) : null,
       interested: interest > 0,

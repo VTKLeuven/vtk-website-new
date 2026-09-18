@@ -1597,6 +1597,15 @@ model CalendarEvent {
   end           DateTime
   allDay        Boolean   @default(false)
   url           String?
+  /// De tekst op de knop naar `url`. Leeg = "Externe eventlink".
+  ///
+  /// Wél per taal, in tegenstelling tot `organiserName` hierboven: dit is geen
+  /// eigennaam maar knoptekst, en "Inschrijflink" hoort op de Engelse site
+  /// "Sign-up link" te zijn. De Engelse valt terug op de Nederlandse, zodat één
+  /// ingevuld veld al beter is dan de algemene standaardtekst. Zie
+  /// lib/calendar/eventLink.ts.
+  urlLabelNl    String?
+  urlLabelEn    String?
   imageKey      String?
   /// Welk punt van de foto in beeld moet blijven wanneer ze bijgesneden wordt:
   /// 0..1, met (0, 0) linksboven. De site toont dezelfde foto in drie

@@ -19,6 +19,7 @@ import {
   SLUG_PATTERN,
   uniqueEventSlug,
 } from "@/lib/calendar/slug";
+import { EVENT_LINK_LABEL_MAX } from "@/lib/calendar/eventLink";
 
 const eventSchema = z.object({
   id: z.string().optional(),
@@ -38,6 +39,10 @@ const eventSchema = z.object({
   end: z.string().min(1),
   allDay: z.coerce.boolean().default(false),
   url: z.string().optional().nullable(),
+  // De tekst op de knop naar die link. Kort gehouden: het is een knop naast twee
+  // andere, geen zin. Leeg = de standaardtekst; zie lib/calendar/eventLink.ts.
+  urlLabelNl: z.string().trim().max(EVENT_LINK_LABEL_MAX).optional().nullable(),
+  urlLabelEn: z.string().trim().max(EVENT_LINK_LABEL_MAX).optional().nullable(),
   heroWeek: z.enum(["AUTO", "PINNED", "HIDDEN"]).default("AUTO"),
 });
 
@@ -55,6 +60,8 @@ const EVENT_FIELD_LABELS: Record<string, string> = {
   end: "eindmoment",
   allDay: "hele dag",
   url: "link",
+  urlLabelNl: "knoptekst van de link",
+  urlLabelEn: "Engelse knoptekst van de link",
   imageKey: "afbeelding",
   imageFocusX: "uitsnede van de afbeelding",
   imageFocusY: "uitsnede van de afbeelding",
@@ -85,6 +92,8 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     end: formData.get("end"),
     allDay: formData.get("allDay") === "on",
     url: formData.get("url") || null,
+    urlLabelNl: formData.get("urlLabelNl") || null,
+    urlLabelEn: formData.get("urlLabelEn") || null,
     heroWeek: formData.get("heroWeek") || "AUTO",
   });
   const image = readImageField(formData);
@@ -138,6 +147,10 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     end,
     allDay: input.allDay,
     url: input.url,
+    // Enkel spaties is hetzelfde als niets: dan staat de standaardtekst op de
+    // knop in plaats van een lege knop.
+    urlLabelNl: input.urlLabelNl || null,
+    urlLabelEn: input.urlLabelEn || null,
     imageFocusX: focus.x,
     imageFocusY: focus.y,
     createdById: session.user.id,

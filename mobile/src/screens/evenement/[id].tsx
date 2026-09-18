@@ -240,8 +240,10 @@ export default function EventScreen() {
           />
         ) : null}
         {event.url ? (
+          // De redacteur kiest zelf wat er op deze knop staat ("Inschrijflink",
+          // "Ticketverkoop"); de server stuurt ze al in de juiste taal mee.
           <Button
-            label="Meer info"
+            label={event.urlLabel ?? 'Meer info'}
             variant="ghost"
             onPress={() => void WebBrowser.openBrowserAsync(event.url as string)}
           />

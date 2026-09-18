@@ -6025,6 +6025,27 @@ Drie keuzes die daarbij horen:
 Het label op de eventpagina heet daarom "Organisator" en niet meer "Groep": dat
 opschrift klopt in beide gevallen.
 
+### De knop naar `CalendarEvent.url` draagt zijn eigen tekst
+
+Die knop zei altijd "Externe eventlink". Dat zegt enkel dat je de site verlaat,
+niet wat er aan de andere kant staat, terwijl die link in de praktijk bijna altijd
+iets concreets is: de inschrijvingen van een partner, de ticketverkoop van een
+andere kring, een infopagina. `urlLabelNl` / `urlLabelEn` laten de redacteur er
+"Inschrijflink" of "Ticketverkoop" van maken; leeg blijft de oude tekst staan.
+
+- **Wél een NL/EN-paar, anders dan `organiserName` hierboven.** Dit is geen
+  eigennaam maar knoptekst, en die vertaalt wel.
+- **Het Engels valt terug op het Nederlands, niet op de standaardtekst.** Wie één
+  veld invult, bedoelt dat voor beide talen, en "Inschrijflink" is op de Engelse
+  site nog altijd duidelijker dan "External event link".
+- **Hoogstens veertig tekens.** Het is een knop naast "Zet in mijn agenda" en
+  "Terug naar kalender", geen zin.
+- **De app toont dezelfde tekst.** `urlLabel` in de app-API komt al opgelost in
+  de gevraagde taal binnen; de app koos vroeger zelf "Meer info", waardoor
+  dezelfde link daar anders heette dan op de site.
+
+`lib/calendar/eventLink.ts` is de enige plaats waar die keuze gemaakt wordt.
+
 ---
 
 ## Doelgroepen zijn een label, geen slot
