@@ -7513,19 +7513,31 @@ De link naar dit scherm verschijnt ook voor wie **geen** chauffeur is maar wel
 een rit op zijn post heeft staan. Anders raakt die persoon er enkel via de mail,
 en mist hij de tweede rit, waar geen mail meer voor vertrekt.
 
-## Het nummer van een chauffeur komt uit zijn eigen aanvragen
+## Het nummer van een chauffeur: drie bronnen, in volgorde van betrouwbaarheid
 
-Er staat geen telefoonnummer op een account: dat is een gegeven van de hele site
-en van elk lid, en de uitleendienst gaat daar niet over. Maar bijna iedereen die
-ooit zelf iets aanvroeg, tikte toen een contactnummer in. `driverPhones` neemt
-dat over: het meest recente nummer dat deze persoon zelf bij een rit of een
-materiaalaanvraag opgaf, zodat "bel de chauffeur" niet begint met "vraag eerst
-zijn nummer aan iemand".
+"Bel de chauffeur" mag niet beginnen met "vraag eerst zijn nummer aan iemand".
+`driverPhones` legt daarom drie bronnen samen en neemt de sterkste die iets
+heeft (`resolveDriverPhones` in apps/logistiek/lib/driver-phones.ts):
 
-Het team kan er een vastleggen bij Chauffeurs (`UitleenDriver.phone`); dat wint
-altijd van wat uit de historiek komt, en het scherm zegt erbij welk van de twee
-je ziet. Wat gevonden wordt, wordt **niet** weggeschreven: dit draait op een
-leespad, en een pagina die stil rijen bijwerkt terwijl je ze bekijkt, is een
+1. **Het team.** Wat Logistiek zelf invulde bij Chauffeurs
+   (`UitleenDriver.phone`). Dat is nagekeken en wint van alles.
+2. **Het profiel.** Het gsm-nummer op het account (`User.phone`), ingevuld door
+   het lid zelf tijdens de onboarding of op /account. Het klopt dus per
+   definitie voor die persoon, maar niemand van Logistiek heeft het bevestigd.
+3. **De historiek.** Het meest recente nummer dat deze persoon zelf bij een rit
+   of een materiaalaanvraag opgaf. Het laatste redmiddel: het kan het nummer van
+   toen zijn en niet van vandaag.
+
+Die derde bron was er eerst alleen, want een nummer op het account bestond nog
+niet. Nu het er wel is, zakt ze naar onderen in plaats van te verdwijnen: een
+oud nummer uit een aanvraag is nog altijd beter dan niets, en het is bovendien
+het enige dat bestaat voor iemand die zijn profiel nooit invulde.
+
+**Het scherm zegt erbij waar het nummer vandaan komt**, maar enkel wanneer dat
+niet het team is: "van zijn profiel", "uit een eerdere aanvraag". Stond er ook
+iets bij een vastgelegd nummer, dan las elke rij hetzelfde zodra het beheer zijn
+werk gedaan had. Wat gevonden wordt, wordt **niet** weggeschreven: dit draait op
+een leespad, en een pagina die stil rijen bijwerkt terwijl je ze bekijkt, is een
 pagina waarvan je de gegevens niet meer kan verklaren.
 
 Het nummer van een **bijrijder** telt hier niet mee. Dat is het nummer van die

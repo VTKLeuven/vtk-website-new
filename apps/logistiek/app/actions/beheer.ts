@@ -3004,11 +3004,11 @@ export async function saveDriverNoteAction(_prev: SaveState, formData: FormData)
  * Op `userId` en met een upsert, net als de karvlag: een lid van de post
  * Logistiek heeft pas een rij zodra iemand er iets aan instelt.
  *
- * Wat het scherm toont zolang dit leeg is, is het nummer dat deze persoon ooit
- * zelf bij een aanvraag opgaf (`driverPhones`). Opslaan zet dat vast; leeg maken
- * laat het weer aan de historiek over, en dat is iets anders dan "heeft geen
- * nummer". Een nummer wissen dat nergens in de historiek staat, laat het veld
- * gewoon leeg, zoals het hoort.
+ * Wat het scherm toont zolang dit leeg is, is het gsm-nummer van het profiel van
+ * deze persoon, of anders het nummer dat hij ooit zelf bij een aanvraag opgaf
+ * (`driverPhones`). Opslaan zet dat vast; leeg maken laat het weer aan die twee
+ * over, en dat is iets anders dan "heeft geen nummer". Is er ook daar niets te
+ * vinden, dan blijft het veld gewoon leeg, zoals het hoort.
  */
 export async function saveDriverPhoneAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requireManage();

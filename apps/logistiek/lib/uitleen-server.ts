@@ -7,6 +7,7 @@ import type {
   UitleenTransportBookingStatus,
 } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
+import { resolveDriverPhones, type DriverPhone, type DriverPhoneSource } from './driver-phones';
 import {
   DEFAULT_LAST_MINUTE_DAYS,
   NOTIFY_KINDS,
@@ -1386,8 +1387,8 @@ export type DriverOption = {
   colorIndex: number | null;
   /**
    * Het nummer waarop deze chauffeur bereikbaar is, of `null`. Zie
-   * {@link driverPhones}: vastgelegd door het team, anders het laatste nummer
-   * dat deze persoon zelf bij een aanvraag opgaf.
+   * {@link driverPhones}: vastgelegd door het team, anders het gsm-nummer van
+   * zijn profiel, anders het laatste nummer dat hij zelf bij een aanvraag opgaf.
    */
   phone: string | null;
 };
@@ -1547,7 +1548,9 @@ export async function driverOptions(): Promise<DriverOption[]> {
       source: 'POST',
       canDriveVan: row?.canDriveVan ?? false,
       colorIndex: row?.colorIndex ?? null,
-      phone: row?.phone?.trim() || phones.get(member.id) || null,
+      // `row.phone` niet meer apart: dat is de bron TEAM en die wint al binnen
+      // `driverPhones` zelf.
+      phone: phones.get(member.id)?.number ?? null,
     });
   }
   for (const row of extra) {
@@ -1558,7 +1561,7 @@ export async function driverOptions(): Promise<DriverOption[]> {
       source: 'EXTRA',
       canDriveVan: row.canDriveVan,
       colorIndex: row.colorIndex,
-      phone: row.phone?.trim() || phones.get(row.user.id) || null,
+      phone: phones.get(row.user.id)?.number ?? null,
     });
   }
 
@@ -1568,14 +1571,8 @@ export async function driverOptions(): Promise<DriverOption[]> {
 /**
  * Het nummer waarop je een chauffeur bereikt, per gebruikers-id.
  *
- * Het staat nergens als vast gegeven op een account, maar het staat wél al
- * ergens: bijna iedereen die ooit zelf iets aanvroeg, tikte toen een
- * contactnummer in. Deze functie neemt dat over, zodat "bel de chauffeur" niet
- * begint met "vraag eerst zijn nummer aan iemand".
- *
- * De volgorde is die van betrouwbaarheid: wat het team zelf invulde
- * (`UitleenDriver.phone`) gaat voor op wat deze persoon ooit ergens meegaf, en
- * daarbinnen telt het meest recente.
+ * Haalt de drie bronnen op; welke er wint staat in `resolveDriverPhones`
+ * (lib/driver-phones.ts), samen met het waarom.
  *
  * Wat hier bewust **niet** in zit: het nummer van een bijrijder
  * (`UitleenTransportHelper.phone`). Dat is het nummer van de bijrijder zelf en
@@ -1585,17 +1582,20 @@ export async function driverOptions(): Promise<DriverOption[]> {
  *
  * Het gevondene wordt niet weggeschreven: dit draait op een leespad, en een
  * pagina die stil rijen bijwerkt terwijl je ze bekijkt, is een pagina waarvan
- * je de gegevens niet meer kan verklaren. Het team legt een nummer vast bij
- * Chauffeurs; tot dan is dit een voorstel uit de historiek.
+ * je de gegevens niet meer kan verklaren.
  */
-export async function driverPhones(userIds: string[]): Promise<Map<string, string>> {
+export async function driverPhones(userIds: string[]): Promise<Map<string, DriverPhone>> {
   const ids = [...new Set(userIds.filter(Boolean))];
   if (ids.length === 0) return new Map();
 
-  const [saved, bookings, reservations] = await Promise.all([
+  const [team, profile, bookings, reservations] = await Promise.all([
     prisma.uitleenDriver.findMany({
       where: { userId: { in: ids }, phone: { not: null } },
       select: { userId: true, phone: true },
+    }),
+    prisma.user.findMany({
+      where: { id: { in: ids }, phone: { not: null } },
+      select: { id: true, phone: true },
     }),
     prisma.uitleenTransportBooking.findMany({
       where: { userId: { in: ids }, contactPhone: { not: null } },
@@ -1609,20 +1609,15 @@ export async function driverPhones(userIds: string[]): Promise<Map<string, strin
     }),
   ]);
 
-  const phones = new Map<string, string>();
-  // Van oud naar nieuw zou hier ook kunnen, maar dan schrijf je elke rij over de
-  // vorige heen; zo stopt het bij de eerste (en dus meest recente) per persoon.
-  for (const row of [...bookings, ...reservations].sort(
-    (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
-  )) {
-    const phone = row.contactPhone?.trim();
-    if (phone && !phones.has(row.userId)) phones.set(row.userId, phone);
-  }
-  for (const row of saved) {
-    const phone = row.phone?.trim();
-    if (phone) phones.set(row.userId, phone);
-  }
-  return phones;
+  return resolveDriverPhones({
+    team,
+    profile: profile.map((row) => ({ userId: row.id, phone: row.phone })),
+    history: [...bookings, ...reservations].map((row) => ({
+      userId: row.userId,
+      phone: row.contactPhone,
+      createdAt: row.createdAt,
+    })),
+  });
 }
 
 export type DriverPoolEntry = DriverOption & {
@@ -1634,8 +1629,12 @@ export type DriverPoolEntry = DriverOption & {
   inactive: boolean;
   /** Het nummer waarop deze chauffeur bereikbaar is; zie {@link driverPhones}. */
   phone: string | null;
-  /** Staat het nummer vast (door het team ingevuld) of komt het uit de historiek? */
-  phoneFromHistory: boolean;
+  /**
+   * Waar dat nummer vandaan komt, of `null` wanneer er geen is. Het scherm zegt
+   * het erbij: een nummer uit een oude aanvraag is iets anders dan een nummer
+   * dat het team bevestigde.
+   */
+  phoneSource: DriverPhoneSource | null;
   upcomingTrips: number;
   totalTrips: number;
 };
@@ -1708,8 +1707,8 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       canDriveVan: row?.canDriveVan ?? false,
       colorIndex: row?.colorIndex ?? null,
       inactive: false,
-      phone: row?.phone?.trim() || phones.get(member.id) || null,
-      phoneFromHistory: !row?.phone?.trim() && Boolean(phones.get(member.id)),
+      phone: phones.get(member.id)?.number ?? null,
+      phoneSource: phones.get(member.id)?.source ?? null,
     });
   }
   for (const row of extra) {
@@ -1723,8 +1722,8 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
       canDriveVan: row.canDriveVan,
       colorIndex: row.colorIndex,
       inactive: !row.user.active,
-      phone: row.phone?.trim() || phones.get(row.user.id) || null,
-      phoneFromHistory: !row.phone?.trim() && Boolean(phones.get(row.user.id)),
+      phone: phones.get(row.user.id)?.number ?? null,
+      phoneSource: phones.get(row.user.id)?.source ?? null,
     });
   }
 

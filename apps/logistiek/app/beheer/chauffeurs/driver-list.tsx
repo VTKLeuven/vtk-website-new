@@ -26,6 +26,17 @@ import type { DriverPoolEntry } from '@/lib/uitleen-server';
 
 const inputClass = 'h-9 w-full rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
 
+/**
+ * Wat er achter "Telefoon" staat. Enkel wanneer het nummer niet van het team
+ * komt: bij een vastgelegd nummer zou "(vastgelegd)" op elke rij staan zodra het
+ * beheer zijn werk gedaan heeft, en dat zegt dan niets meer.
+ */
+function phoneOrigin(source: DriverPoolEntry['phoneSource']): string {
+  if (source === 'PROFILE') return ' (van zijn profiel)';
+  if (source === 'HISTORY') return ' (uit een eerdere aanvraag)';
+  return '';
+}
+
 function tripsLabel(entry: DriverPoolEntry): string {
   if (entry.upcomingTrips > 0) {
     return `${entry.upcomingTrips} komende rit${entry.upcomingTrips === 1 ? '' : 'ten'}`;
@@ -230,12 +241,12 @@ function DriverRow({ entry }: { entry: DriverPoolEntry }) {
             {/* Het nummer waarop je deze chauffeur bereikt. Staat naast de
                 e-mail en niet in de notitie: een chauffeur die niet komt
                 opdagen, bel je, en dan wil je niet eerst een vrije tekst
-                moeten lezen. Komt het uit de historiek, dan zegt het label
-                dat: het is dan het laatste nummer dat deze persoon zelf
-                ergens opgaf en niet iets wat het team bevestigde. */}
+                moeten lezen. Komt het niet van het team, dan zegt het label
+                waar het wél vandaan komt: van zijn profiel, of uit de laatste
+                aanvraag die hij zelf indiende. */}
             <div>
               <dt className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">
-                Telefoon{entry.phoneFromHistory ? ' (uit een eerdere aanvraag)' : ''}
+                Telefoon{phoneOrigin(entry.phoneSource)}
               </dt>
               <dd className="mt-0.5 text-vtk-body">
                 {entry.phone ? <PhoneLink number={entry.phone} /> : <span className="text-vtk-muted">niet gekend</span>}
@@ -302,7 +313,7 @@ function DriverRow({ entry }: { entry: DriverPoolEntry }) {
           net als de karvlag en de kleur. */}
       <details className="mt-2">
         <summary className="cursor-pointer text-xs font-semibold text-vtk-navy">
-          {entry.phone && !entry.phoneFromHistory ? 'Telefoon bewerken' : 'Telefoon vastleggen'}
+          {entry.phone && entry.phoneSource === 'TEAM' ? 'Telefoon bewerken' : 'Telefoon vastleggen'}
         </summary>
         <SaveForm
           action={saveDriverPhoneAction}
@@ -316,8 +327,8 @@ function DriverRow({ entry }: { entry: DriverPoolEntry }) {
           <input
             type="tel"
             name="phone"
-            defaultValue={entry.phoneFromHistory ? '' : (entry.phone ?? '')}
-            placeholder={entry.phoneFromHistory && entry.phone ? entry.phone : '+32 4..'}
+            defaultValue={entry.phoneSource === 'TEAM' ? (entry.phone ?? '') : ''}
+            placeholder={entry.phoneSource !== 'TEAM' && entry.phone ? entry.phone : '+32 4..'}
             className={inputClass}
           />
         </SaveForm>

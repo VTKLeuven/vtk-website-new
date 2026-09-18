@@ -372,7 +372,9 @@ export default async function RittenPage() {
                     trip={trip}
                     locale={locale}
                     past={false}
-                    driverPhone={trip.driverId ? (groupDriverPhones.get(trip.driverId) ?? null) : null}
+                    driverPhone={
+                      trip.driverId ? (groupDriverPhones.get(trip.driverId)?.number ?? null) : null
+                    }
                     groupMembers={
                       trip.assignedGroup && myGroupIds.includes(trip.assignedGroup.id)
                         ? (membersPerGroup.get(trip.assignedGroup.id) ?? [])
