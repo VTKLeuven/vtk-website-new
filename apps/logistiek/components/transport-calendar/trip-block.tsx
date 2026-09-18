@@ -70,7 +70,7 @@ export function blockLook({
     // Rood en niet subtiel: een botsing mag bestaan (het team plant eerst in en
     // schuift daarna), maar enkel zolang ze niet te missen valt.
     block.conflict
-      ? 'border-2 border-red-500 bg-red-50 text-red-900'
+      ? 'border-2 border-vtk-danger bg-vtk-danger-soft text-vtk-danger'
       : awaitsDriver
         ? // Gele vulling plus een rode streepjesrand. Streepjes en niet vol, want
           // een volle rode rand betekent al iets anders: een conflict.
@@ -167,7 +167,7 @@ export function BlockContent({
         block.driver ? (
           <span className="block truncate font-medium">{block.driver.name}</span>
         ) : awaitsDriver ? (
-          <span className="block truncate font-semibold text-red-700">geen chauffeur</span>
+          <span className="block truncate font-semibold text-vtk-danger">geen chauffeur</span>
         ) : (
           // De aanvrager rijdt zelf (bakfiets): dat is geen ontbrekende
           // chauffeur, dus het staat er gewoon en niet in het rood.

@@ -22,14 +22,21 @@ import type { DriverStat, GroupStat, StatsRow, TransportStats } from '@/lib/uitl
  * lezen als vulling; het zou bovendien "dit is de belangrijkste reeks" zeggen
  * over een voertuig dat toevallig derde in de lijst staat.
  */
-const SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100'] as const;
-const SERIES_REST = '#5c667f';
+const SERIES = ['var(--chart-1)', 'var(--chart-2)', 'var(--chart-3)', 'var(--chart-4)'] as const;
+const SERIES_REST = 'var(--chart-rest)';
 
 /** Eén tint, licht naar donker: de schaal van de drukteweergave. */
-const RAMP = ['#eff2f8', '#d3e0f0', '#a8c2e2', '#6e93c9', '#3a63a4', '#1f3f77'] as const;
+const RAMP = [
+  'var(--chart-ramp-1)',
+  'var(--chart-ramp-2)',
+  'var(--chart-ramp-3)',
+  'var(--chart-ramp-4)',
+  'var(--chart-ramp-5)',
+  'var(--chart-ramp-6)',
+] as const;
 
-const MUTED = '#5c667f';
-const GRID = 'rgba(14, 26, 54, 0.12)';
+const MUTED = 'var(--muted)';
+const GRID = 'var(--chart-grid)';
 
 const WEEKDAYS = ['ma', 'di', 'wo', 'do', 'vr', 'za', 'zo'];
 
@@ -227,7 +234,7 @@ function DriverLeaderboard({
                         style={{
                           width: `${(value / driver.hours) * 100}%`,
                           backgroundColor: colorOf(vehicle.id),
-                          boxShadow: 'inset -2px 0 0 #ffffff',
+                          boxShadow: 'inset -2px 0 0 var(--chart-seam)',
                         }}
                       />
                     );
@@ -454,10 +461,10 @@ function WeekChart({
                 x2={width}
                 y1={height - fraction * height}
                 y2={height - fraction * height}
-                stroke={GRID}
+                style={{ stroke: GRID }}
                 strokeWidth={1}
               />
-              <text x={2} y={height - fraction * height - 3} fill={MUTED} fontSize={9}>
+              <text x={2} y={height - fraction * height - 3} style={{ fill: MUTED }} fontSize={9}>
                 {format(max * fraction)}
               </text>
             </g>
@@ -473,11 +480,14 @@ function WeekChart({
                 width={12}
                 height={Math.max(barHeight, value > 0 ? 2 : 0)}
                 rx={4}
-                fill={color}
+                style={{ fill: color }}
               >
-                <title>
-                  Week van {week.label}: {format(value)}
-                </title>
+                {/* Eén expressie en niet drie stukken tekst naast elkaar: in een
+                    SVG-<title> maakte dat drie tekstknopen, en daarop faalde de
+                    hydratie van deze pagina. React tekende de boom dan opnieuw en
+                    wiste onderweg `data-theme` van <html>, dus het scherm sprong
+                    terug naar licht. */}
+                <title>{`Week van ${week.label}: ${format(value)}`}</title>
               </rect>
             );
           })}
@@ -487,7 +497,7 @@ function WeekChart({
                 key={week.key}
                 x={index * 18 + 9}
                 y={height + 12}
-                fill={MUTED}
+                style={{ fill: MUTED }}
                 fontSize={9}
                 textAnchor="middle"
               >
@@ -629,7 +639,7 @@ function TripTable({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="naam, post, evenement"
-            className="h-9 w-56 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+            className="h-9 w-56 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
           />
         </label>
         {driverFilter || groupFilter ? (
@@ -644,7 +654,7 @@ function TripTable({
         <button
           type="button"
           onClick={exportCsv}
-          className="ml-auto h-9 rounded-full border border-vtk-navy bg-vtk-navy px-3.5 text-sm font-semibold text-white transition hover:bg-vtk-ink"
+          className="ml-auto h-9 rounded-full border border-vtk-navy bg-vtk-navy px-3.5 text-sm font-semibold text-vtk-on-emphasis transition hover:bg-vtk-ink"
         >
           Exporteer naar CSV
         </button>

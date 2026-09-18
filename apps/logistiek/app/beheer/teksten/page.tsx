@@ -56,7 +56,7 @@ const SECTIONS: Array<{
 ];
 
 const textareaClass =
-  'min-h-20 w-full resize-y rounded-[10px] border border-vtk-navy/15 bg-white px-3 py-2 text-sm leading-6 text-vtk-ink';
+  'min-h-20 w-full resize-y rounded-[10px] border border-vtk-navy/15 bg-vtk-field px-3 py-2 text-sm leading-6 text-vtk-ink';
 
 export default async function BeheerTekstenPage() {
   await requireManage();

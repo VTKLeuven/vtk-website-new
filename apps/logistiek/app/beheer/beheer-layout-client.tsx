@@ -82,7 +82,7 @@ export function BeheerLayoutClient({
             onClick={toggle}
             className={`inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs font-semibold transition ${
               collapsed
-                ? 'border-vtk-navy bg-vtk-navy text-white shadow-sm hover:bg-vtk-navy/90'
+                ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis shadow-sm hover:bg-vtk-navy/90'
                 : 'border-vtk-navy/20 bg-vtk-surface text-vtk-ink hover:border-vtk-navy/40 hover:bg-vtk-paper'
             }`}
             title={

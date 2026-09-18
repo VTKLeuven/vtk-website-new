@@ -77,7 +77,7 @@ function LineRow({ line }: { line: DecisionLine }) {
               Niet toegekend
             </span>
           ) : line.available !== null ? (
-            <span className={short ? 'font-semibold text-red-700' : 'text-vtk-muted'}>
+            <span className={short ? 'font-semibold text-vtk-danger' : 'text-vtk-muted'}>
               {line.available} beschikbaar in deze periode
             </span>
           ) : null}
@@ -109,7 +109,7 @@ function LineRow({ line }: { line: DecisionLine }) {
             placeholder={
               rejected ? 'Waarom niet toegekend?' : 'Bv. staat al klaar bij het rek'
             }
-            className="h-8 min-w-0 flex-1 rounded-lg border border-vtk-navy/15 bg-white px-2.5 text-xs text-vtk-ink"
+            className="h-8 min-w-0 flex-1 rounded-lg border border-vtk-navy/15 bg-vtk-field px-2.5 text-xs text-vtk-ink"
           />
         </label>
         {/* De knop verschijnt pas zodra er iets veranderd is: een knop die altijd

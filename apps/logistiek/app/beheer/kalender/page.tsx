@@ -163,7 +163,7 @@ export default async function BeheerKalenderPage({
   const KIND_STYLES: Record<CalendarKind, string> = {
     afhaling: 'bg-vtk-yellow/25 text-vtk-ink',
     terugbrengen: 'bg-vtk-paper-2 text-vtk-navy',
-    vervoer: 'bg-vtk-navy text-white',
+    vervoer: 'bg-vtk-navy text-vtk-on-emphasis',
   };
 
   const spanDays = Math.round((to.getTime() - from.getTime()) / DAY_MS);
@@ -207,7 +207,7 @@ export default async function BeheerKalenderPage({
         <span className="inline-flex items-center gap-1.5">
           <span
             aria-hidden="true"
-            className="inline-block rounded-full bg-vtk-navy px-1.5 py-0.5 text-[9px] font-semibold text-white"
+            className="inline-block rounded-full bg-vtk-navy px-1.5 py-0.5 text-[9px] font-semibold text-vtk-on-emphasis"
           >
             Transport
           </span>

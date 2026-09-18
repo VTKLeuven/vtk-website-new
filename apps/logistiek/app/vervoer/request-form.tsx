@@ -266,10 +266,10 @@ export function VanRequestForm({
     });
   }
 
-  const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink';
+  const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-vtk-ink';
   /* Rood sterretje bij wat verplicht is (R7). */
   const required = (
-    <span aria-hidden="true" className="text-red-600">
+    <span aria-hidden="true" className="text-vtk-danger">
       {' '}*
     </span>
   );
@@ -354,7 +354,7 @@ export function VanRequestForm({
                 key={v.id}
                 className={`flex cursor-pointer items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-sm font-medium transition has-[:focus-visible]:outline has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-offset-2 has-[:focus-visible]:outline-vtk-navy ${
                   selected
-                    ? 'border-vtk-navy bg-vtk-navy text-white'
+                    ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
                     : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
                 }`}
               >
@@ -585,7 +585,7 @@ export function VanRequestForm({
             value={note}
             onChange={(e) => setNote(e.target.value)}
             rows={3}
-            className="rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-vtk-ink"
+            className="rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 py-2 text-vtk-ink"
           />
         </label>
       </div>
@@ -604,7 +604,7 @@ export function VanRequestForm({
       </p>
 
       {error ? (
-        <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" className="mt-4 rounded-lg border border-vtk-danger-line bg-vtk-danger-soft px-3 py-2 text-sm text-vtk-danger">
           {error}
         </p>
       ) : null}

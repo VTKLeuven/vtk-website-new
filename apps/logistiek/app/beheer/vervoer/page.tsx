@@ -500,7 +500,7 @@ export default async function BeheerVervoerPage({
           <Link
             href="/ritten/beschikbaarheid"
             title="Doorgeven wanneer je zelf kan rijden; vandaar kan je ook naar je eigen ritten"
-            className="inline-flex items-center gap-2 rounded-full bg-vtk-navy px-3.5 py-1.5 text-sm font-semibold text-white transition hover:bg-vtk-navy/90"
+            className="inline-flex items-center gap-2 rounded-full bg-vtk-navy px-3.5 py-1.5 text-sm font-semibold text-vtk-on-emphasis transition hover:bg-vtk-navy/90"
           >
             <LogisticsIcon name="driver" className="h-4 w-4" />
             Mijn beschikbaarheid
@@ -577,7 +577,7 @@ export default async function BeheerVervoerPage({
                               aanvrager (T5): de uren waarover je beslist had,
                               zijn niet meer de uren die er nu staan. */}
                           {first.decidedAt ? (
-                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+                            <span className="rounded-full bg-vtk-warn-fill px-2 py-0.5 text-[11px] font-semibold text-vtk-warn">
                               Gewijzigd, opnieuw beslissen
                             </span>
                           ) : null}
@@ -686,7 +686,7 @@ export default async function BeheerVervoerPage({
                       booking.id === rit
                         ? 'border-vtk-yellow bg-vtk-yellow/15 outline outline-2 outline-vtk-yellow'
                         : awaitsDriver(booking)
-                          ? 'border-amber-300 bg-amber-50/30'
+                          ? 'border-vtk-warn-line bg-vtk-warn-soft'
                           : 'border-vtk-navy/10'
                     }`}
                   >

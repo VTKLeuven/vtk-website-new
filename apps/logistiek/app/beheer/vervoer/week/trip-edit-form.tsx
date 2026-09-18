@@ -23,7 +23,7 @@ import { materialListHref } from '@/lib/material-list-link';
  */
 
 const inputClass =
-  'w-full rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-sm text-vtk-ink';
+  'w-full rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 py-2 text-sm text-vtk-ink';
 
 export type TripEditValues = {
   startAt: string;
@@ -215,7 +215,7 @@ export function TripEditForm({
       </label>
 
       {error ? (
-        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" className="rounded-lg border border-vtk-danger-line bg-vtk-danger-soft px-3 py-2 text-sm text-vtk-danger">
           {error}
         </p>
       ) : null}

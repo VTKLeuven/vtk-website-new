@@ -31,7 +31,7 @@ export function DayPartSelect({
       value={value}
       aria-label={label}
       onChange={(event) => onChange(event.target.value)}
-      className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-2 text-sm text-vtk-ink"
+      className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-2 text-sm text-vtk-ink"
     >
       <option value="">{en ? 'Time of day?' : 'Dagdeel?'}</option>
       {DAY_PARTS.map((part) => (

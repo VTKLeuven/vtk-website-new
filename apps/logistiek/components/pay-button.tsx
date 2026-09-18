@@ -38,7 +38,7 @@ export function PayButton({
         {pending ? (en ? 'One moment...' : 'Even geduld...') : en ? `Pay ${amountLabel} online` : `Betaal ${amountLabel} online`}
       </Button>
       {error ? (
-        <p role="alert" className="mt-2 text-sm text-red-700">
+        <p role="alert" className="mt-2 text-sm text-vtk-danger">
           {error}
         </p>
       ) : null}

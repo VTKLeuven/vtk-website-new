@@ -90,7 +90,7 @@ export function FeedTokens({
           <p className="text-sm font-semibold text-vtk-ink">
             Kopieer deze link nu; hij is hierna niet meer op te vragen.
           </p>
-          <code className="block break-all rounded-lg bg-white px-3 py-2 text-xs text-vtk-ink">
+          <code className="block break-all rounded-lg bg-vtk-field px-3 py-2 text-xs text-vtk-ink">
             {fresh}
           </code>
           <div className="flex flex-wrap items-center gap-2">
@@ -123,7 +123,7 @@ export function FeedTokens({
             value={label}
             onChange={(event) => setLabel(event.target.value)}
             placeholder="bv. mijn gsm"
-            className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+            className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
           />
         </label>
         {canTeam && canDriver ? (
@@ -132,7 +132,7 @@ export function FeedTokens({
             <select
               value={scope}
               onChange={(event) => setScope(event.target.value as FeedTokenRow['scope'])}
-              className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+              className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
             >
               <option value="TEAM">{SCOPE_LABELS.TEAM}</option>
               <option value="DRIVER">{SCOPE_LABELS.DRIVER}</option>

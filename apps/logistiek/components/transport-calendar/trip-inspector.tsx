@@ -183,7 +183,7 @@ export function TripInspector({
         type="button"
         aria-label="Sluiten"
         onClick={onClose}
-        className="fixed inset-0 z-[60] cursor-default bg-vtk-ink/40 sm:bg-transparent"
+        className="fixed inset-0 z-[60] cursor-default bg-vtk-scrim/40 sm:bg-transparent"
       />
       <div
         ref={panel}

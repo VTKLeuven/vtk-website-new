@@ -1,0 +1,332 @@
+/*
+ * Het palet van de uitleendienst, licht en donker ("Nachtdienst").
+ *
+ * Dit is de enige plek met kleurwaarden. Alles daarbuiten (globals.css, de
+ * Tailwind-utilities `bg-vtk-*`, de componenten) verwijst naar een token uit dit
+ * bestand, dus je hertunet de hele site door hieronder een hex te wijzigen. Zet
+ * er geen kleur bij in een component: dan flipt ze niet mee en heb je in de
+ * andere modus een vlak dat niemand ziet.
+ *
+ * Twee blokken, dezelfde tokennamen:
+ *
+ *   :root                      de lichte modus (identiek aan hoe de site was)
+ *   :root[data-theme='dark']   de donkere modus
+ *
+ * De keuze staat als `data-theme` op <html>. Het script in app/layout.tsx zet
+ * dat attribuut vóór de eerste verf: het leest de keuze uit localStorage en valt
+ * terug op de systeemvoorkeur. Er is daarom bewust géén losse
+ * `@media (prefers-color-scheme: dark)`-kopie van het donkere blok: twee lijsten
+ * met dezelfde tokens lopen uit elkaar zodra iemand er één aanpast, en dat is
+ * precies wat dit bestand wil voorkomen.
+ *
+ * `color-scheme` staat in beide blokken. Zonder dat blijven de scrollbalk, de
+ * uitklaplijst van een `select`, de datumprikker en het selectievakje wit; die
+ * tekent de browser zelf en die kijkt enkel naar deze eigenschap.
+ *
+ * Contrast: de tekstkleuren (`--ink`, `--body`, `--muted`) halen in beide modi
+ * minstens 4.5:1 op hun eigen vlak. Zak je met `--muted` dieper weg in het
+ * donker, dan is een grijze kolomkop op een telefoon in de kelder niet meer te
+ * lezen.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* --- Ondergrond en vlakken ------------------------------------------- */
+  --paper: #eff2f8; /* de pagina zelf */
+  --paper-2: #e6ecf5; /* ingelegde strook, tabelkop, actieve rij */
+  --surface: #ffffff; /* kaart, paneel, modal */
+  --surface-2: #f5f8fc; /* een vlak op een kaart (hover, tweede laag) */
+  --field: #ffffff; /* invoervelden; in het donker dieper dan een kaart */
+  --chrome: #0e1a36; /* kop, paginakop, voetnoot: altijd donker */
+  --chrome-line: rgba(255, 255, 255, 0.08);
+
+  /* --- Tekst ------------------------------------------------------------ */
+  --ink: #0a0f1f; /* titels en waarden */
+  --body: #34405e; /* lopende tekst */
+  --muted: #5c667f; /* labels, bijschriften, kolomkoppen */
+
+  /* De nadrukkleur draagt drie dingen tegelijk: een volle knop of actieve pil,
+     nadrukkelijke tekst, en (met een alfa) elke haarlijn en elk licht vlak op
+     de site. In het donker is dat dus géén navy meer maar een lichte tint:
+     `border-vtk-navy/15` moet in beide modi een lijn zijn die je net ziet. De
+     donkere chrome staat hierboven los als `--chrome`. */
+  --emphasis: #0e1a36;
+  --on-emphasis: #eff2f8; /* tekst op een volle nadrukvlak */
+
+  /* Tekst op de donkere chrome en op een foto: in beide modi licht. */
+  --on-chrome: #eff2f8;
+  --on-chrome-muted: #b7c0dc;
+  --scrim: #0a0f1f; /* waas over een foto; blijft donker */
+
+  /* --- Lijnen ----------------------------------------------------------- */
+  --line: rgba(14, 26, 54, 0.1);
+  --line-2: rgba(14, 26, 54, 0.18);
+
+  /* --- Accent ----------------------------------------------------------- */
+  --yellow: #ffd23f;
+  --yellow-dark: #edbd22;
+  --on-yellow: #0a0f1f; /* tekst op geel, in beide modi donker */
+
+  /* --- Statuskleuren ---------------------------------------------------- */
+  /* Drie per status: de tekstkleur, het zachte vlak eronder en de rand. Eén hex
+     met een alfa volstaat niet: rood op 10% over wit is roze, over bijna zwart
+     is het niets. */
+  --danger: #b91c1c;
+  --danger-soft: #fef2f2;
+  --danger-fill: #fee2e2;
+  --danger-line: #fecaca;
+
+  --warn: #78350f;
+  --warn-soft: #fffbeb;
+  --warn-fill: #fef3c7;
+  --warn-line: #fcd34d;
+
+  --success: #2f6f33;
+  --success-soft: #eef8ea;
+  --success-line: #b8dec1;
+
+  --info-soft: #eef2ff;
+  --info-line: #c9d5ff;
+
+  /* --- Schaduw ---------------------------------------------------------- */
+  /* In het donker tilt een schaduw niets op (zwart op zwart); daar doet een
+     lichte rand het werk en blijft de schaduw enkel om diepte te suggereren. */
+  --shadow-1: 0 8px 24px rgba(10, 15, 31, 0.12);
+  --shadow-2: 0 18px 42px rgba(10, 15, 31, 0.14);
+  --shadow-3: 0 24px 70px rgba(10, 15, 31, 0.25);
+
+  /* --- Het technische patroon op de donkere banden ---------------------- */
+  --pattern-opacity: 0.3;
+  --pattern-opacity-footer: 0.14;
+
+  /* --- Grafieken (/beheer/statistieken) --------------------------------- */
+  --chart-1: #2a78d6;
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-rest: #5c667f;
+  --chart-grid: rgba(14, 26, 54, 0.12);
+  --chart-seam: #ffffff; /* de naad tussen twee segmenten van een balk */
+  --chart-ramp-1: #eff2f8;
+  --chart-ramp-2: #d3e0f0;
+  --chart-ramp-3: #a8c2e2;
+  --chart-ramp-4: #6e93c9;
+  --chart-ramp-5: #3a63a4;
+  --chart-ramp-6: #1f3f77;
+
+  /* --- Chauffeurskleuren voor de transportplanning (B4, T7, K1) ---------
+     Vierentwintig tinten in plaats van acht, want acht was op een drukke week
+     te weinig: dan deelden twee chauffeurs een kleur en was het onderscheid
+     precies weg waar je het nodig had. Ze staan in huisvolgorde (blauw, groen,
+     geel, oranje, rood, roze, paars, neutraal), zodat het palet in het
+     kiesscherm als een spectrum leest en niet als een zak snoep.
+
+     In de lichte modus zijn ze licht met donkere tekst; in de donkere modus is
+     het omgekeerd, met dezelfde tint en dezelfde volgorde. Beide reeksen zijn
+     op `--driver-ink` gecontroleerd op minstens 4.5:1, ook met een arcering van
+     het voertuig eroverheen. Daarom is dit een palet en geen vrije
+     kleurkiezer; zie docs/design-decisions.md.
+
+     `--driver-none` is voor een rit zonder chauffeur: neutraal grijs, want dat
+     is een rit die nog niemand toegewezen kreeg en niet een fout. Het was de
+     gele accentkleur met een rode streepjesrand, en op een week waarin de helft
+     nog niet verdeeld is schreeuwt dat scherm zichzelf stuk. Grijs zegt
+     "hier moet nog iets gebeuren" zonder alarm; de tekst "geen chauffeur" in het
+     blok zegt wát er moet gebeuren. Dezelfde kleur draagt de rit die je aan het
+     aanmaken bent: die heeft per definitie nog geen chauffeur. */
+  --driver-1: #cfe0ff;
+  --driver-2: #bdd4f7;
+  --driver-3: #c3e2f2;
+  --driver-4: #c2e8ee;
+  --driver-5: #c6eee6;
+  --driver-6: #c9edd7;
+  --driver-7: #d7f0d8;
+  --driver-8: #dff0c4;
+  --driver-9: #e8ecc4;
+  --driver-10: #f2eec0;
+  --driver-11: #ffeeb8;
+  --driver-12: #ffe4b3;
+  --driver-13: #ffdcc2;
+  --driver-14: #ffd3c0;
+  --driver-15: #ffcccc;
+  --driver-16: #ffcedd;
+  --driver-17: #f9d2ea;
+  --driver-18: #eed4f4;
+  --driver-19: #e2d9f8;
+  --driver-20: #d3d6f6;
+  --driver-21: #e6ded2;
+  --driver-22: #ded9cd;
+  --driver-23: #d8dde6;
+  --driver-24: #d6dcd8;
+  --driver-none: #e2e6ee;
+  --driver-ink: #0a0f1f; /* tekst in een blok */
+  --driver-edge: rgba(14, 26, 54, 0.45); /* streepjesrand "nog geen chauffeur" */
+  --driver-pattern: rgba(14, 26, 54, 0.13); /* arcering per voertuig */
+  --driver-pattern-strong: rgba(14, 26, 54, 0.2); /* de stippenversie */
+  --driver-pattern-faint: rgba(14, 26, 54, 0.11); /* de ruitversie */
+  --driver-requested: rgba(14, 26, 54, 0.14); /* "nog te beslissen" */
+  --driver-glow: rgba(255, 255, 255, 0.7); /* leesrandje onder tekst op een blok */
+  --avail-pattern: rgba(255, 255, 255, 0.62); /* "liever niet" */
+  --avail-pattern-strong: rgba(255, 255, 255, 0.85); /* "enkel in nood" */
+  --now-line: #d64545; /* de streep op het huidige uur */
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* --- Ondergrond en vlakken ------------------------------------------- */
+  --paper: #05070d;
+  --paper-2: #0a0e18;
+  --surface: #0d1220;
+  --surface-2: #141b2c;
+  --field: #070b14;
+  --chrome: #000308;
+  --chrome-line: rgba(255, 255, 255, 0.14);
+
+  /* --- Tekst ------------------------------------------------------------ */
+  --ink: #ffffff;
+  --body: #d6dcec;
+  --muted: #97a1ba;
+
+  --emphasis: #dbe3f7;
+  --on-emphasis: #05070d;
+
+  --on-chrome: #eff2f8;
+  --on-chrome-muted: #b7c0dc;
+  --scrim: #0a0f1f;
+
+  /* --- Lijnen ----------------------------------------------------------- */
+  /* Hoger dan de 10% van de lichte modus: dit is de variant voor een telefoon
+     in de kelder, en daar verdwijnt een zachte grijze rand gewoon. */
+  --line: rgba(255, 255, 255, 0.16);
+  --line-2: rgba(255, 255, 255, 0.24);
+
+  /* --- Accent ----------------------------------------------------------- */
+  --yellow: #ffd23f;
+  --yellow-dark: #edbd22;
+  --on-yellow: #0a0f1f;
+
+  /* --- Statuskleuren ---------------------------------------------------- */
+  --danger: #ff9d9d;
+  --danger-soft: rgba(248, 113, 113, 0.14);
+  --danger-fill: rgba(248, 113, 113, 0.24);
+  --danger-line: rgba(248, 113, 113, 0.45);
+
+  --warn: #ffd98a;
+  --warn-soft: rgba(255, 210, 63, 0.12);
+  --warn-fill: rgba(255, 210, 63, 0.22);
+  --warn-line: rgba(255, 210, 63, 0.42);
+
+  --success: #9df0b8;
+  --success-soft: rgba(74, 222, 128, 0.14);
+  --success-line: rgba(74, 222, 128, 0.42);
+
+  --info-soft: rgba(147, 170, 255, 0.14);
+  --info-line: rgba(147, 170, 255, 0.4);
+
+  /* --- Schaduw ---------------------------------------------------------- */
+  --shadow-1: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --shadow-2: 0 18px 42px rgba(0, 0, 0, 0.65);
+  --shadow-3: 0 24px 70px rgba(0, 0, 0, 0.75);
+
+  /* --- Het technische patroon ------------------------------------------- */
+  /* Wit op bijna zwart is harder dan wit op navy: halveren, anders staat het
+     patroon voor de tekst in plaats van erachter. */
+  --pattern-opacity: 0.14;
+  --pattern-opacity-footer: 0.08;
+
+  /* --- Grafieken -------------------------------------------------------- */
+  --chart-1: #6fb0f5;
+  --chart-2: #ff9463;
+  --chart-3: #4fd6a3;
+  --chart-4: #ffc94d;
+  --chart-rest: #97a1ba;
+  --chart-grid: rgba(255, 255, 255, 0.14);
+  --chart-seam: #05070d;
+  --chart-ramp-1: #131a2b;
+  --chart-ramp-2: #1c2a47;
+  --chart-ramp-3: #2a4370;
+  --chart-ramp-4: #3b5f9c;
+  --chart-ramp-5: #5b85c8;
+  --chart-ramp-6: #8fb4e8;
+
+  /* --- Chauffeurskleuren ------------------------------------------------ */
+  /* Dezelfde tinten in dezelfde volgorde, donker in plaats van licht. De
+     helderheid wisselt licht per buur (0.23 / 0.29), want vierentwintig tinten
+     enkel uit elkaar houden op tint lukt niet: twee blauwen naast elkaar zijn
+     anders hetzelfde blok. */
+  --driver-1: #203357;
+  --driver-2: #28426b;
+  --driver-3: #204457;
+  --driver-4: #28626b;
+  --driver-5: #20574c;
+  --driver-6: #286b42;
+  --driver-7: #205722;
+  --driver-8: #516b28;
+  --driver-9: #515720;
+  --driver-10: #6b6528;
+  --driver-11: #574a20;
+  --driver-12: #6b5328;
+  --driver-13: #573720;
+  --driver-14: #6b3c28;
+  --driver-15: #572020;
+  --driver-16: #6b283c;
+  --driver-17: #572042;
+  --driver-18: #5e286b;
+  --driver-19: #302057;
+  --driver-20: #282d6b;
+  --driver-21: #4f3f28;
+  --driver-22: #5a5038;
+  --driver-23: #2c374a;
+  --driver-24: #395944;
+  --driver-none: #262c38;
+  --driver-ink: #f2f6ff;
+  --driver-edge: rgba(255, 255, 255, 0.45);
+  --driver-pattern: rgba(255, 255, 255, 0.16);
+  --driver-pattern-strong: rgba(255, 255, 255, 0.24);
+  --driver-pattern-faint: rgba(255, 255, 255, 0.13);
+  --driver-requested: rgba(255, 255, 255, 0.17);
+  --driver-glow: rgba(0, 0, 0, 0.55);
+  --avail-pattern: rgba(0, 0, 0, 0.45);
+  --avail-pattern-strong: rgba(0, 0, 0, 0.6);
+  --now-line: #ff6b6b;
+}
+
+/*
+ * Op papier is alles licht, ongeacht de keuze op het scherm: een klaarzetlijst
+ * in de donkere modus is een blad vol inkt en onleesbaar in een kelder. Dit is
+ * geen kopie van het lichte palet maar een eigen, kleurloos printpalet; enkel
+ * de tokens die op een blad terechtkomen staan hier.
+ */
+@media print {
+  :root,
+  :root[data-theme='dark'] {
+    color-scheme: light;
+    --paper: #ffffff;
+    --paper-2: #ffffff;
+    --surface: #ffffff;
+    --surface-2: #ffffff;
+    --field: #ffffff;
+    --chrome: #ffffff;
+    --ink: #000000;
+    --body: #1a1a1a;
+    --muted: #444444;
+    --emphasis: #000000;
+    --on-emphasis: #ffffff;
+    --line: rgba(0, 0, 0, 0.25);
+    --line-2: rgba(0, 0, 0, 0.4);
+    --shadow-1: none;
+    --shadow-2: none;
+    --shadow-3: none;
+    --danger: #8a0f0f;
+    --warn: #5a2a08;
+    --success: #14521a;
+    --danger-soft: #ffffff;
+    --warn-soft: #ffffff;
+    --success-soft: #ffffff;
+    --danger-fill: #ffffff;
+    --warn-fill: #ffffff;
+    --driver-ink: #000000;
+  }
+}

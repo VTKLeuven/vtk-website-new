@@ -11,7 +11,7 @@ import {
 export { emptyEventValues };
 export type { EventReservationValues, RequesterOption };
 
-const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
 /**
  * De groepen van het lid als keuzelijst. Posten en werkgroepen staan onder een
@@ -93,7 +93,7 @@ export function EventRequesterFields({
                 key={type}
                 className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
                   value.requesterType === type
-                    ? 'border-vtk-navy bg-vtk-navy text-white'
+                    ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
                     : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
                 }`}
               >
@@ -189,7 +189,7 @@ export function EventRequesterFields({
           <label className="grid gap-1 text-sm sm:col-span-2">
             <span className="font-medium text-vtk-ink">
               {en ? 'Event / activity' : 'Evenement / activiteit'}
-              <span aria-hidden="true" className="text-red-600"> *</span>
+              <span aria-hidden="true" className="text-vtk-danger"> *</span>
             </span>
             <input
               type="text"

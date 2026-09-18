@@ -56,7 +56,7 @@ export function TemplatesManager({
             <button
               type="button"
               onClick={() => setEditing('new')}
-              className="rounded-full bg-vtk-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-vtk-ink"
+              className="rounded-full bg-vtk-navy px-4 py-2 text-sm font-semibold text-vtk-on-emphasis transition hover:bg-vtk-ink"
             >
               Nieuw sjabloon
             </button>
@@ -106,7 +106,7 @@ export function TemplatesManager({
                         .join(', ') || 'Geen items'}
                     </p>
                     {inactive > 0 ? (
-                      <p className="mt-0.5 text-xs text-amber-800">
+                      <p className="mt-0.5 text-xs text-vtk-warn">
                         {inactive === 1
                           ? '1 item staat niet meer in de catalogus en wordt overgeslagen.'
                           : `${inactive} items staan niet meer in de catalogus en worden overgeslagen.`}

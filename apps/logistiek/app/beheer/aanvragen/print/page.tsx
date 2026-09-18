@@ -56,7 +56,7 @@ export default async function DagPrintPage({
               type="date"
               name="datum"
               defaultValue={toDateInputValue(day)}
-              className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+              className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
             />
             <button
               type="submit"

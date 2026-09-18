@@ -99,7 +99,7 @@ export function EventPicker({
                 placeholder={en ? 'Search an event...' : 'Zoek een evenement...'}
                 aria-label={en ? 'Search an event' : 'Zoek een evenement'}
                 aria-controls={listId}
-                className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+                className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
               />
               <ul id={listId} className="grid max-h-64 gap-1 overflow-y-auto pr-1">
                 {own.length > 0 ? (

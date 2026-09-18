@@ -502,7 +502,7 @@ export function TransportCalendar({
                 aria-current={option === view ? 'true' : undefined}
                 className={`px-3.5 py-1.5 text-sm font-medium transition ${
                   option === view
-                    ? 'bg-vtk-navy text-white'
+                    ? 'bg-vtk-navy text-vtk-on-emphasis'
                     : 'text-vtk-ink hover:bg-vtk-navy/5'
                 }`}
               >
@@ -573,9 +573,9 @@ export function TransportCalendar({
             aria-pressed={Boolean(fullscreen)}
             className={
               fullscreen
-                ? 'grid h-8 w-8 place-items-center rounded-full border border-vtk-navy bg-vtk-navy text-white transition'
+                ? 'grid h-8 w-8 place-items-center rounded-full border border-vtk-navy bg-vtk-navy text-vtk-on-emphasis transition'
                 : narrow
-                  ? 'inline-flex h-8 items-center gap-1.5 rounded-full border border-vtk-navy bg-vtk-navy px-3 text-sm font-semibold text-white transition'
+                  ? 'inline-flex h-8 items-center gap-1.5 rounded-full border border-vtk-navy bg-vtk-navy px-3 text-sm font-semibold text-vtk-on-emphasis transition'
                   : iconButton
             }
           >
@@ -708,7 +708,7 @@ export function CalendarNav({
         aria-current={isToday ? 'true' : undefined}
         className={
           isToday
-            ? 'rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1.5 font-semibold text-white'
+            ? 'rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1.5 font-semibold text-vtk-on-emphasis'
             : buttonClass
         }
       >

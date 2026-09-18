@@ -54,7 +54,7 @@ export function SaveTemplateForm({ reservationId }: { reservationId: string }) {
           type="text"
           name="name"
           placeholder="Bv. Cantus"
-          className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+          className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-vtk-ink"
         />
       </label>
       <label className="grid gap-1 text-sm">
@@ -63,7 +63,7 @@ export function SaveTemplateForm({ reservationId }: { reservationId: string }) {
           type="text"
           name="description"
           placeholder="Bv. zonder de vaten"
-          className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+          className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-vtk-ink"
         />
       </label>
       <button

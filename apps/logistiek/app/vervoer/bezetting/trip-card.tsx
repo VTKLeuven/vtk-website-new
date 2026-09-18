@@ -105,7 +105,7 @@ export function TripCard({
             {trip.driverName ? (
               trip.driverName
             ) : trip.needsDriver ? (
-              <span className="text-red-700">
+              <span className="text-vtk-danger">
                 {en ? 'not assigned yet' : 'nog niet toegewezen'}
               </span>
             ) : (

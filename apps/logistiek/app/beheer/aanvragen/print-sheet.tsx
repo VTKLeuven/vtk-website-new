@@ -60,7 +60,7 @@ function requesterLabel(reservation: PrintSheetReservation): string {
 export function PrintSheet({ reservation }: { reservation: PrintSheetReservation }) {
   const granted = reservation.lines.filter((line) => line.lineStatus !== 'REJECTED');
   return (
-    <article className="print-sheet mx-auto w-full max-w-[820px] rounded-[18px] border border-vtk-navy/15 bg-white p-8 text-vtk-ink print:max-w-none print:rounded-none print:border-0 print:p-0">
+    <article className="print-sheet mx-auto w-full max-w-[820px] rounded-[18px] border border-vtk-navy/15 bg-vtk-surface p-8 text-vtk-ink print:max-w-none print:rounded-none print:border-0 print:p-0">
       <header className="flex flex-wrap items-baseline justify-between gap-3 border-b border-vtk-navy/20 pb-3">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-vtk-muted">

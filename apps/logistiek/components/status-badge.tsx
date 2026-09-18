@@ -8,11 +8,11 @@ import type { LogistiekLocale } from '@/lib/i18n-shared';
 
 const STYLES: Record<string, string> = {
   REQUESTED: 'bg-vtk-yellow/25 text-vtk-ink border-vtk-yellow-dark/40',
-  APPROVED: 'bg-vtk-navy text-white border-vtk-navy',
+  APPROVED: 'bg-vtk-navy text-vtk-on-emphasis border-vtk-navy',
   PICKED_UP: 'bg-vtk-paper-2 text-vtk-navy border-vtk-navy/20',
   RETURNED: 'bg-vtk-paper-2 text-vtk-muted border-vtk-navy/10',
   COMPLETED: 'bg-vtk-paper-2 text-vtk-muted border-vtk-navy/10',
-  REJECTED: 'bg-red-50 text-red-700 border-red-200',
+  REJECTED: 'bg-vtk-danger-soft text-vtk-danger border-vtk-danger-line',
   CANCELLED: 'bg-vtk-paper-2 text-vtk-muted border-vtk-navy/10',
 };
 

@@ -679,7 +679,7 @@ export function TimeGrid({
                     // Ook hier `pointer-events-none`, om dezelfde reden als bij
                     // de uurlijnen: de nu-lijn ligt op het uur waarop je het
                     // vaakst iets inplant.
-                    className="pointer-events-none absolute inset-x-0 z-10 border-t-2 border-red-500"
+                    className="pointer-events-none absolute inset-x-0 z-10 border-t-2 border-vtk-danger"
                     style={{ top: ((nowMinutes - firstHour * 60) / 60) * hourPx }}
                   />
                 ) : null}

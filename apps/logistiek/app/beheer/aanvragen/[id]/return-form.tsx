@@ -55,7 +55,7 @@ export function ReturnForm({ reservationId, flesserkeLines }: { reservationId: s
                 max={line.quantity}
                 value={returned[line.id] ?? '0'}
                 onChange={(e) => setReturned((prev) => ({ ...prev, [line.id]: e.target.value }))}
-                className="h-9 w-20 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+                className="h-9 w-20 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
               />
             </label>
           ))}

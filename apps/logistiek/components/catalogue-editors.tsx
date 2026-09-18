@@ -74,7 +74,7 @@ export function PhotosEditor({ initial }: { initial: Array<{ key: string }> }) {
         <figure key={photo.key} className={`relative h-24 w-24 overflow-hidden rounded-lg border bg-vtk-paper-2 ${index === 0 ? 'border-vtk-yellow' : 'border-vtk-navy/15'}`}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={mediaUrl(photo.key)} alt={`Foto ${index + 1}`} className="h-full w-full object-cover" />
-          <button type="button" onClick={() => setPhotos((all) => all.filter((p) => p.key !== photo.key))} className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-vtk-ink/80 text-white" aria-label={`Foto ${index + 1} verwijderen`}>×</button>
+          <button type="button" onClick={() => setPhotos((all) => all.filter((p) => p.key !== photo.key))} className="absolute right-1 top-1 grid h-6 w-6 place-items-center rounded-full bg-vtk-scrim/80 text-white" aria-label={`Foto ${index + 1} verwijderen`}>×</button>
           {index === 0 ? (
             <figcaption className="absolute inset-x-0 bottom-0 grid bg-vtk-yellow text-center text-[10px] font-semibold text-vtk-ink">
               <span className="py-0.5">Thumbnail</span>
@@ -89,7 +89,7 @@ export function PhotosEditor({ initial }: { initial: Array<{ key: string }> }) {
           ) : (
             // Altijd zichtbaar en niet enkel bij hoveren: op een tablet in de
             // loods bestaat hoveren niet.
-            <button type="button" onClick={() => makeCover(photo.key)} className="absolute inset-x-0 bottom-0 bg-vtk-ink/75 py-0.5 text-center text-[10px] font-semibold text-white transition hover:bg-vtk-ink">
+            <button type="button" onClick={() => makeCover(photo.key)} className="absolute inset-x-0 bottom-0 bg-vtk-scrim/75 py-0.5 text-center text-[10px] font-semibold text-white transition hover:bg-vtk-scrim">
               Thumbnail maken
             </button>
           )}
@@ -101,7 +101,7 @@ export function PhotosEditor({ initial }: { initial: Array<{ key: string }> }) {
     </div>
     <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => { add(e.target.files); e.target.value = ''; }} />
     <p className="text-xs font-normal text-vtk-muted">De eerste foto is de thumbnail in de catalogus; de rest staat op de detailpagina.</p>
-    {error ? <p className="text-xs text-red-700">{error}</p> : null}
+    {error ? <p className="text-xs text-vtk-danger">{error}</p> : null}
     {cropping ? (
       <PhotoCropper
         src={mediaUrl(cropping)}
@@ -119,8 +119,8 @@ export function PropertiesEditor({ initial }: { initial: Property[] }) {
   return <div className="grid gap-2">
     <input type="hidden" name="properties" value={JSON.stringify(rows.filter((row) => row.label.trim() && row.value.trim()))} />
     {rows.map((row, index) => <div key={index} className="flex gap-2">
-      <input value={row.label} onChange={(e) => update(index, { label: e.target.value })} placeholder="Bv. Afmetingen" className="h-10 min-w-0 flex-1 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm" />
-      <input value={row.value} onChange={(e) => update(index, { value: e.target.value })} placeholder="Bv. 40 × 30 cm" className="h-10 min-w-0 flex-[2] rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm" />
+      <input value={row.label} onChange={(e) => update(index, { label: e.target.value })} placeholder="Bv. Afmetingen" className="h-10 min-w-0 flex-1 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm" />
+      <input value={row.value} onChange={(e) => update(index, { value: e.target.value })} placeholder="Bv. 40 × 30 cm" className="h-10 min-w-0 flex-[2] rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm" />
       <button type="button" onClick={() => setRows((all) => all.filter((_, i) => i !== index))} className="h-10 w-10 rounded-full border border-vtk-navy/15 text-vtk-muted" aria-label="Eigenschap verwijderen">×</button>
     </div>)}
     <button type="button" onClick={() => setRows((all) => [...all, { label: '', value: '' }])} className="justify-self-start text-sm font-semibold text-vtk-navy">+ Eigenschap</button>
@@ -141,7 +141,7 @@ export function DownloadsEditor({ initial }: { initial: Download[] }) {
   return <div className="grid gap-2">
     <input type="hidden" name="downloads" value={JSON.stringify(rows.filter((row) => row.key && row.label.trim()))} />
     {rows.map((row, index) => <div key={row.key} className="flex gap-2">
-      <input value={row.label} onChange={(e) => setRows((all) => all.map((entry, i) => i === index ? { ...entry, label: e.target.value } : entry))} className="h-10 min-w-0 flex-1 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm" aria-label="Naam download" />
+      <input value={row.label} onChange={(e) => setRows((all) => all.map((entry, i) => i === index ? { ...entry, label: e.target.value } : entry))} className="h-10 min-w-0 flex-1 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm" aria-label="Naam download" />
       <button type="button" onClick={() => setRows((all) => all.filter((_, i) => i !== index))} className="h-10 rounded-full border border-vtk-navy/15 px-3 text-sm text-vtk-muted">Verwijderen</button>
     </div>)}
     <button type="button" onClick={() => inputRef.current?.click()} disabled={busy} className="justify-self-start rounded-full border border-vtk-navy/15 px-3 py-1.5 text-sm font-semibold text-vtk-ink">{busy ? 'Uploaden…' : '+ Pdf toevoegen'}</button>

@@ -34,6 +34,12 @@
   --color-vtk-surface: #eff2f8;
   --color-vtk-surface-elevated: #ffffff;
 
+  /* Gedeeld met de uitleendienst via packages/ui: die componenten mogen geen
+     `bg-white` of een losse hex dragen, want daar flipt dezelfde knop mee met
+     de donkere modus. Hier zijn het gewoon de huidige waarden. */
+  --color-vtk-muted: #5c667f;
+  --color-vtk-on-yellow: #0a0f1f;
+
   --font-sans: var(--font-vtk-sans), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }

@@ -273,12 +273,12 @@ export function FlesserkeForm({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={en ? 'Search flesserke...' : 'Zoek flesserke...'}
-              className="h-10 min-w-[200px] flex-1 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+              className="h-10 min-w-[200px] flex-1 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
             />
             <select
               value={activeCategory}
               onChange={(e) => setActiveCategory(e.target.value)}
-              className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+              className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
             >
               <option value="all">{en ? 'All categories' : 'Alle categorieën'}</option>
               {catalog.map((category) => (
@@ -386,7 +386,7 @@ export function FlesserkeForm({
             <label className="grid gap-1 text-sm">
               <span className="font-medium text-vtk-ink">
                 {en ? 'Ready by' : 'Klaarzetten tegen'}
-                <span aria-hidden="true" className="text-red-600"> *</span>
+                <span aria-hidden="true" className="text-vtk-danger"> *</span>
               </span>
               <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                 <input
@@ -396,7 +396,7 @@ export function FlesserkeForm({
                   data-field="pickupDate"
                   aria-invalid={missing?.name === 'pickupDate'}
                   className={fieldClass(
-                    'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink',
+                    'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-vtk-ink',
                     'pickupDate',
                     missing
                   )}
@@ -421,7 +421,7 @@ export function FlesserkeForm({
                 value={returnDate || pickupDate}
                 min={pickupDate || undefined}
                 onChange={(e) => setReturnDate(e.target.value)}
-                className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+                className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-vtk-ink"
               />
               <span className="text-xs text-vtk-muted">
                 {en
@@ -436,7 +436,7 @@ export function FlesserkeForm({
                 value={note}
                 onChange={(e) => setNote(e.target.value)}
                 rows={3}
-                className="rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-vtk-ink"
+                className="rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 py-2 text-vtk-ink"
               />
             </label>
           </div>
@@ -470,7 +470,7 @@ export function FlesserkeForm({
           </p>
 
           {error ? (
-            <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+            <p role="alert" className="mt-4 rounded-lg border border-vtk-danger-line bg-vtk-danger-soft px-3 py-2 text-sm text-vtk-danger">
               {error}
             </p>
           ) : null}

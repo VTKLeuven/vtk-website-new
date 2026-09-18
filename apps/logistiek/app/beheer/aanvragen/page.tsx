@@ -209,19 +209,19 @@ export default async function BeheerAanvragenPage({
                 die staat weer in de wachtrij, maar met een andere inhoud dan
                 waarover het team beslist had. */}
             {reservation.status === 'REQUESTED' && reservation.decidedAt ? (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+              <span className="rounded-full bg-vtk-warn-fill px-2 py-0.5 text-[11px] font-semibold text-vtk-warn">
                 Gewijzigd, opnieuw beslissen
               </span>
             ) : null}
             {lastMinute ? (
-              <span className="rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-semibold text-red-700">
+              <span className="rounded-full bg-vtk-danger-soft px-2 py-0.5 text-[11px] font-semibold text-vtk-danger">
                 Last minute
               </span>
             ) : null}
             {/* Deze aanvraag past niet naast wat al goedgekeurd is. Altijd
                 opnieuw berekend: annuleert de andere partij, dan is het weg. */}
             {conflicting.has(reservation.id) ? (
-              <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-900">
+              <span className="rounded-full bg-vtk-warn-fill px-2 py-0.5 text-[11px] font-semibold text-vtk-warn">
                 Conflict
               </span>
             ) : null}
@@ -315,7 +315,7 @@ export default async function BeheerAanvragenPage({
               aria-current={activeTab === tab.value ? 'page' : undefined}
               className={
                 activeTab === tab.value
-                  ? 'rounded-full bg-vtk-navy px-4 py-1.5 text-sm font-semibold text-white'
+                  ? 'rounded-full bg-vtk-navy px-4 py-1.5 text-sm font-semibold text-vtk-on-emphasis'
                   : 'rounded-full border border-vtk-navy/15 px-4 py-1.5 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/40'
               }
             >

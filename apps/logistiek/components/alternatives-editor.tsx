@@ -51,7 +51,7 @@ export function AlternativesEditor({
                 type="button"
                 onClick={() => setChosen((current) => current.filter((other) => other !== id))}
                 aria-label={`Alternatief verwijderen: ${nameOf(id)}`}
-                className="text-vtk-muted transition hover:text-red-700"
+                className="text-vtk-muted transition hover:text-vtk-danger"
               >
                 ×
               </button>
@@ -74,7 +74,7 @@ export function AlternativesEditor({
             }
           }}
           placeholder="Zoek een item..."
-          className="h-10 min-w-0 flex-1 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+          className="h-10 min-w-0 flex-1 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
         />
         <datalist id={listId}>
           {options

@@ -380,7 +380,7 @@ export function AvailabilityBoard({
             aria-pressed={kinds.length === 0}
             className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
               kinds.length === 0
-                ? 'border-vtk-navy bg-vtk-navy text-white'
+                ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
                 : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
             }`}
           >
@@ -480,7 +480,7 @@ export function AvailabilityBoard({
           aria-pressed={only.length === 0}
           className={`rounded-full border px-2.5 py-1 text-xs font-medium transition ${
             only.length === 0
-              ? 'border-vtk-navy bg-vtk-navy text-white'
+              ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
               : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
           }`}
         >
@@ -683,7 +683,7 @@ export function AvailabilityBoard({
                           }}
                         >
                           {showLabel ? (
-                            <span className="truncate drop-shadow-[0_1px_1px_rgba(255,255,255,0.7)]">
+                            <span className="truncate drop-shadow-[0_1px_1px_var(--driver-glow)]">
                               {bar.width * zoom >= 7 ? bar.label : bar.shortLabel}
                             </span>
                           ) : null}

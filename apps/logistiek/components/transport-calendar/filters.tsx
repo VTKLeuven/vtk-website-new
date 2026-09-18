@@ -256,7 +256,7 @@ export function TransportFilterBar({
         aria-expanded={open}
         className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm font-medium transition ${
           active > 0
-            ? 'border-vtk-navy bg-vtk-navy text-white'
+            ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
             : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
         }`}
       >

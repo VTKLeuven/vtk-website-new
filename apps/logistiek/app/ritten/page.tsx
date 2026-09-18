@@ -197,7 +197,7 @@ function TripCard({
           accentrand die op de site een uitgelicht paneel markeert, terwijl de
           nota van de aanvrager gewoon een nota blijft. */}
       {trip.adminNote ? (
-        <p className="mt-4 rounded-lg bg-vtk-paper px-4 py-3 text-sm text-vtk-body shadow-[inset_3px_0_0_var(--color-vtk-yellow)]">
+        <p className="mt-4 rounded-lg bg-vtk-paper px-4 py-3 text-sm text-vtk-body shadow-[inset_3px_0_0_var(--yellow)]">
           <span className="font-medium text-vtk-ink">{en ? 'Note from Logistics:' : 'Nota van Logistiek:'}</span>{' '}
           <LinkedText text={trip.adminNote} />
         </p>

@@ -92,7 +92,7 @@ export function EventLink({
         onChange={(event) => {
           if (event.target.value) apply(event.target.value);
         }}
-        className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+        className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
       >
         <option value="">Kies een evenement...</option>
         {events.map((event) => (

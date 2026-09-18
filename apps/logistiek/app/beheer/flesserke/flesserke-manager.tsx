@@ -58,7 +58,7 @@ function dateLabel(date: Date | null): string {
     : 'geen datum';
 }
 
-const inputClass = 'h-9 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+const inputClass = 'h-9 min-w-0 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
 function isExpiringSoon(date: Date | null): boolean {
   if (!date) return false;
@@ -164,7 +164,7 @@ function BatchEditor({ item }: { item: AdminFlesserkeItem }) {
 
       <ul className="grid gap-2">
         {item.batches.map((batch) => (
-          <li key={batch.id} className="rounded-[12px] border border-vtk-navy/10 bg-white p-3">
+          <li key={batch.id} className="rounded-[12px] border border-vtk-navy/10 bg-vtk-surface p-3">
             <SaveForm
               action={saveFlesserkeBatchAction}
               submitLabel="Opslaan"
@@ -398,12 +398,12 @@ export function FlesserkeManager({
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Zoek een item..."
-          className="h-10 min-w-[200px] flex-1 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+          className="h-10 min-w-[200px] flex-1 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
         />
         <select
           value={activeCategory}
           onChange={(e) => setActiveCategory(e.target.value)}
-          className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+          className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
         >
           <option value="all">Alle categorieën</option>
           {activeCategories.map((c) => (
@@ -441,7 +441,7 @@ export function FlesserkeManager({
                       <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                         <div>
                           <dt className="text-vtk-muted">Vervalt</dt>
-                          <dd className={soon ? 'font-semibold text-red-700' : 'text-vtk-body'}>
+                          <dd className={soon ? 'font-semibold text-vtk-danger' : 'text-vtk-body'}>
                             {item.expiryDate ? dateLabel(item.expiryDate) : '—'}
                             {item.batches.length > 1 ? (
                               <span className="block font-normal text-vtk-muted">{item.batches.length} ladingen</span>
@@ -454,7 +454,7 @@ export function FlesserkeManager({
                         </div>
                         <div>
                           <dt className="text-vtk-muted">Beschikbaar</dt>
-                          <dd className={`font-semibold ${available <= 0 ? 'text-red-700' : 'text-vtk-ink'}`}>{available}</dd>
+                          <dd className={`font-semibold ${available <= 0 ? 'text-vtk-danger' : 'text-vtk-ink'}`}>{available}</dd>
                         </div>
                         <div>
                           <dt className="text-vtk-muted">Voorraad</dt>
@@ -543,7 +543,7 @@ export function FlesserkeManager({
                         {formatContentAmount(item.contentAmount, item.contentUnit)}
                       </td>
                       <td className="py-2 pr-3 text-vtk-muted">{categoryName}</td>
-                      <td className={`py-2 pr-3 ${soon ? 'font-semibold text-red-700' : 'text-vtk-muted'}`}>
+                      <td className={`py-2 pr-3 ${soon ? 'font-semibold text-vtk-danger' : 'text-vtk-muted'}`}>
                         {item.expiryDate ? dateLabel(item.expiryDate) : '—'}
                         {multiBatch ? (
                           <span className="block text-[11px] font-normal text-vtk-muted">
@@ -552,7 +552,7 @@ export function FlesserkeManager({
                         ) : null}
                       </td>
                       <td className="py-2 pr-3 text-vtk-muted">{item.reserved}</td>
-                      <td className={`py-2 pr-3 font-semibold ${available <= 0 ? 'text-red-700' : 'text-vtk-ink'}`}>
+                      <td className={`py-2 pr-3 font-semibold ${available <= 0 ? 'text-vtk-danger' : 'text-vtk-ink'}`}>
                         {available}
                       </td>
                       <td className="py-2 pr-3 font-semibold text-vtk-ink">

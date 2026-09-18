@@ -136,7 +136,7 @@ function EventCard({ event }: { event: AdminEvent }) {
       </dl>
 
       {missing.length > 0 ? (
-        <p className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="mt-3 rounded-lg border border-vtk-warn-line bg-vtk-warn-soft px-3 py-2 text-sm text-vtk-warn">
           Nog geen {missing.join(' en ')} aangevraagd voor dit evenement.
         </p>
       ) : null}

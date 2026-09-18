@@ -26,7 +26,7 @@ export type ExtraItem = {
  * (±20 tekens plus spinner) en steekt het buiten zijn kolom en buiten de kaart.
  */
 const inputClass =
-  'h-10 w-full rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+  'h-10 w-full rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
 export function EventExtraItems({
   eventId,
@@ -161,7 +161,7 @@ export function EventExtraItems({
             role="status"
             aria-live="polite"
             className={`text-sm font-medium ${
-              notice.kind === 'error' ? 'text-red-700' : 'text-vtk-ink'
+              notice.kind === 'error' ? 'text-vtk-danger' : 'text-vtk-ink'
             }`}
           >
             {notice.text}

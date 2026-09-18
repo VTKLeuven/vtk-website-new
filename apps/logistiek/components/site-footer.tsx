@@ -9,34 +9,34 @@ export async function SiteFooter() {
   const t = copy[locale];
   const content = await getPublicCopy(locale);
   return (
-    <footer className="logistics-footer mt-auto text-white">
+    <footer className="logistics-footer mt-auto text-vtk-on-dark">
       <div className="mx-auto grid w-full max-w-[1240px] gap-8 px-5 py-10 sm:px-9 md:grid-cols-[minmax(0,1fr)_auto] md:items-end">
         <div className="flex items-start gap-4">
           <Image src="/VTK.png" alt="" width={660} height={777} className="h-12 w-auto" />
           <div>
-            <p className="text-lg font-semibold tracking-tight text-vtk-paper">
+            <p className="text-lg font-semibold tracking-tight text-vtk-on-dark">
               {t.footerTitle}
             </p>
             {content.footerLead ? (
-              <p className="mt-2 max-w-lg text-sm leading-6 text-[#b7c0dc]">
+              <p className="mt-2 max-w-lg text-sm leading-6 text-vtk-on-dark-muted">
                 {content.footerLead}
               </p>
             ) : null}
           </div>
         </div>
-        <p className="text-sm leading-6 text-[#b7c0dc] md:text-right">
+        <p className="text-sm leading-6 text-vtk-on-dark-muted md:text-right">
           {t.questions} Mail{' '}
-          <a href="mailto:logistiek@vtk.be" className="text-white underline decoration-vtk-yellow underline-offset-4">
+          <a href="mailto:logistiek@vtk.be" className="text-vtk-on-dark underline decoration-vtk-yellow underline-offset-4">
             logistiek@vtk.be
           </a>{' '}
           <br className="hidden md:block" />
-          <a href={MAIN_URL} className="text-white underline decoration-vtk-yellow underline-offset-4">
+          <a href={MAIN_URL} className="text-vtk-on-dark underline decoration-vtk-yellow underline-offset-4">
             vtk.be
           </a>
           {' · '}
           <a
             href={`${MAIN_URL}${locale === 'en' ? '/en' : ''}/privacy`}
-            className="text-white underline decoration-vtk-yellow underline-offset-4"
+            className="text-vtk-on-dark underline decoration-vtk-yellow underline-offset-4"
           >
             {locale === 'en' ? 'Privacy' : 'Privacy'}
           </a>

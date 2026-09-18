@@ -33,7 +33,7 @@ export function MemberEventForm({
   const [notice, setNotice] = useState<{ kind: 'ok' | 'error'; text: string } | null>(null);
 
   const inputClass =
-    'h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+    'h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
   function set<K extends keyof typeof values>(key: K, value: (typeof values)[K]) {
     setValues((current) => ({ ...current, [key]: value }));
@@ -150,7 +150,7 @@ export function MemberEventForm({
             role="status"
             aria-live="polite"
             className={`text-sm font-medium ${
-              notice.kind === 'error' ? 'text-red-700' : 'text-vtk-ink'
+              notice.kind === 'error' ? 'text-vtk-danger' : 'text-vtk-ink'
             }`}
           >
             {notice.text}

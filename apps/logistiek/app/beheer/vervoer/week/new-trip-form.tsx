@@ -23,7 +23,7 @@ import type { DriverOption } from '@/lib/uitleen-server';
  */
 
 const inputClass =
-  'w-full rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-sm text-vtk-ink';
+  'w-full rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 py-2 text-sm text-vtk-ink';
 
 /**
  * De waarde van "Andere..." in de postkeuze.
@@ -296,7 +296,7 @@ export function NewTripForm({
       </label>
 
       {error ? (
-        <p role="alert" className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+        <p role="alert" className="rounded-lg border border-vtk-danger-line bg-vtk-danger-soft px-3 py-2 text-sm text-vtk-danger">
           {error}
         </p>
       ) : null}

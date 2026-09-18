@@ -24,7 +24,7 @@ import { SortChips, useSort } from '@/app/beheer/sortable-header';
 import { compareText, type SortDir } from '@/app/beheer/sort';
 import type { DriverPoolEntry } from '@/lib/uitleen-server';
 
-const inputClass = 'h-9 w-full rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+const inputClass = 'h-9 w-full rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
 /**
  * Wat er achter "Telefoon" staat. Enkel wanneer het nummer niet van het team

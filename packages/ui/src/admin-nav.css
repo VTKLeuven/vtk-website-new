@@ -68,7 +68,7 @@
     padding: 8px;
     border: 1px solid var(--line);
     border-radius: 18px;
-    background: rgba(255, 255, 255, 0.56);
+    background: color-mix(in oklab, var(--surface, #ffffff) 56%, transparent);
   }
 }
 
@@ -93,7 +93,7 @@
   min-width: 0;
   padding: 9px 11px;
   border-radius: 999px;
-  color: rgba(10, 15, 31, 0.72);
+  color: color-mix(in oklab, var(--ink, #0a0f1f) 72%, transparent);
   text-decoration: none;
   white-space: nowrap;
   font-size: 13px;
@@ -164,7 +164,7 @@
 }
 
 .vtk-admin-nav-pin:hover {
-  background: rgba(14, 26, 54, 0.09);
+  background: color-mix(in oklab, var(--ink, #0a0f1f) 9%, transparent);
   color: var(--ink);
 }
 
@@ -194,7 +194,7 @@
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: rgba(10, 15, 31, 0.72);
+  color: color-mix(in oklab, var(--ink, #0a0f1f) 72%, transparent);
   font-family: inherit;
   font-size: 13px;
   font-weight: 500;

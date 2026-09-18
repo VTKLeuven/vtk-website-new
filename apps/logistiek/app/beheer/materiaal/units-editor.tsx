@@ -23,7 +23,7 @@ import type { AdminInventoryItem } from '@/lib/uitleen-server';
 const CONDITIONS = Object.entries(ITEM_CONDITION_LABELS).map(([value, label]) => ({ value, label }));
 
 const inputClass =
-  'h-9 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+  'h-9 min-w-0 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
 type Row = {
   /** Sleutel voor React; blijft gelijk terwijl je typt, ook zonder id. */
@@ -141,7 +141,7 @@ export function UnitsEditor({ item }: { item: AdminInventoryItem }) {
               <div
                 key={row.key}
                 className={`grid items-end gap-2 rounded-[12px] border-b border-vtk-navy/5 px-2 py-2 last:border-0 sm:grid-cols-[7rem_9rem_minmax(0,1fr)_auto_auto] ${
-                  row.condition === 'KAPOT' ? 'bg-red-50' : ''
+                  row.condition === 'KAPOT' ? 'bg-vtk-danger-soft' : ''
                 }`}
               >
                 <label className="grid gap-1 text-[11px] font-medium text-vtk-muted">

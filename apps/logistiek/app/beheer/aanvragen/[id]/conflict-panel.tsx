@@ -77,7 +77,7 @@ function ShiftForm({ party }: { party: ConflictParty }) {
             setPickup(event.target.value);
             setPreview(null);
           }}
-          className="h-9 rounded-lg border border-vtk-navy/15 bg-white px-2 text-sm text-vtk-ink"
+          className="h-9 rounded-lg border border-vtk-navy/15 bg-vtk-field px-2 text-sm text-vtk-ink"
         />
       </label>
       <label className="grid gap-1 text-[11px] font-medium text-vtk-muted">
@@ -90,7 +90,7 @@ function ShiftForm({ party }: { party: ConflictParty }) {
             setRet(event.target.value);
             setPreview(null);
           }}
-          className="h-9 rounded-lg border border-vtk-navy/15 bg-white px-2 text-sm text-vtk-ink"
+          className="h-9 rounded-lg border border-vtk-navy/15 bg-vtk-field px-2 text-sm text-vtk-ink"
         />
       </label>
       <button
@@ -103,7 +103,7 @@ function ShiftForm({ party }: { party: ConflictParty }) {
       </button>
       {preview ? (
         <p
-          className={`text-xs ${preview.fits ? 'font-semibold text-green-700' : 'text-amber-900'}`}
+          className={`text-xs ${preview.fits ? 'font-semibold text-vtk-success' : 'text-vtk-warn'}`}
           aria-live="polite"
         >
           {preview.detail}
@@ -123,9 +123,9 @@ export function ConflictPanel({
   parties: ConflictParty[];
 }) {
   return (
-    <section className="mt-5 rounded-[16px] border border-amber-300 bg-amber-50/70 p-4">
-      <h3 className="text-sm font-semibold text-amber-900">Botst met een andere aanvraag</h3>
-      <ul className="mt-1.5 space-y-0.5 text-sm text-amber-900">
+    <section className="mt-5 rounded-[16px] border border-vtk-warn-line bg-vtk-warn-soft p-4">
+      <h3 className="text-sm font-semibold text-vtk-warn">Botst met een andere aanvraag</h3>
+      <ul className="mt-1.5 space-y-0.5 text-sm text-vtk-warn">
         {lines.map((line) => (
           <li key={line.itemName}>
             <span className="font-medium">{line.itemName}</span>: {line.requested} gevraagd,{' '}
@@ -133,14 +133,14 @@ export function ConflictPanel({
           </li>
         ))}
       </ul>
-      <p className="mt-2 text-xs text-amber-900">
+      <p className="mt-2 text-xs text-vtk-warn">
         Goedkeuren kan pas wanneer het past. Verschuif de periode van een van beide aanvragen; de
         aanvrager krijgt daar automatisch bericht van.
       </p>
 
       <div className="mt-3 grid gap-3">
         {parties.map((party) => (
-          <div key={party.id} className="rounded-[12px] border border-amber-200 bg-white/70 p-3">
+          <div key={party.id} className="rounded-[12px] border border-vtk-warn-line bg-vtk-surface/70 p-3">
             <p className="flex flex-wrap items-baseline gap-x-2 text-sm">
               <span className="font-semibold text-vtk-ink">
                 {party.self ? 'Deze aanvraag' : party.label}

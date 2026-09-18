@@ -25,7 +25,7 @@ const ERRORS = {
 };
 
 const inputClass =
-  'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+  'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
 export type TemplateDraft = {
   id: string;
@@ -185,7 +185,7 @@ export function TemplateEditor({
           value={search}
           onChange={(event) => setSearch(event.target.value)}
           placeholder="Zoek materiaal..."
-          className="h-10 min-w-[200px] flex-1 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+          className="h-10 min-w-[200px] flex-1 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
         />
         <select
           value={activeCategory}
@@ -248,7 +248,7 @@ export function TemplateEditor({
                   return (
                     <li
                       key={item.id}
-                      className="flex flex-col overflow-hidden rounded-[14px] border border-vtk-navy/10 bg-white"
+                      className="flex flex-col overflow-hidden rounded-[14px] border border-vtk-navy/10 bg-vtk-surface"
                     >
                       <div className="aspect-[4/3] w-full bg-vtk-paper-2">
                         {imageKey ? (
@@ -297,7 +297,7 @@ export function TemplateEditor({
                             onClick={() => setQuantity(item.id, quantity + 1)}
                             disabled={quantity >= item.quantity}
                             aria-label={`Meer: ${item.name}`}
-                            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-vtk-navy text-lg font-medium text-white transition hover:bg-vtk-ink disabled:opacity-30"
+                            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-vtk-navy text-lg font-medium text-vtk-on-emphasis transition hover:bg-vtk-ink disabled:opacity-30"
                           >
                             +
                           </button>

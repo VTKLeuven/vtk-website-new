@@ -16,7 +16,7 @@ import { chargesRequester } from '@/lib/uitleen';
 import type { DriverOption } from '@/lib/uitleen-server';
 import { DriverOptions } from './driver-select';
 
-const selectClass = 'h-9 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+const selectClass = 'h-9 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
 /** Beheeracties op een goedgekeurde rit: voertuig, chauffeur, afronden, betaald. */
 export function TransportControls({

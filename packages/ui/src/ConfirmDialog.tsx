@@ -53,11 +53,11 @@ export function ConfirmDialog({
       onClick={onCancel}
     >
       <div
-        className="w-full max-w-sm rounded-2xl border border-vtk-blue/15 bg-white p-5 shadow-lg"
+        className="w-full max-w-sm rounded-2xl border border-vtk-blue/15 bg-vtk-surface-elevated p-5 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >
         <h2 className="font-semibold text-vtk-ink">{title}</h2>
-        {description ? <div className="mt-2 text-sm text-[#5c667f]">{description}</div> : null}
+        {description ? <div className="mt-2 text-sm text-vtk-muted">{description}</div> : null}
         <div className="mt-5 flex items-center justify-end gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={onCancel} disabled={pending}>
             {cancelLabel}

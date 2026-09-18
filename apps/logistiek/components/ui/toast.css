@@ -22,9 +22,9 @@
   padding: 12px 14px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: #fff;
+  background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 8px 24px rgba(10, 15, 31, 0.12);
+  box-shadow: var(--shadow-1);
   font-size: 14px;
   line-height: 1.45;
   animation: vtk-toast-in 160ms ease-out;
@@ -61,24 +61,28 @@
   opacity: 1;
 }
 
+/* De vier soorten dragen hun eigen kleur. De waarden staan in
+   app/design/theme.css, zodat ze in de donkere modus meeflippen: een groene
+   toast op wit is daar een groene toast op bijna zwart, met lichte tekst. */
 .vtk-toast-success {
-  border-color: #b8dec1;
-  background: #eef8ea;
-  color: #2f6f33;
+  border-color: var(--success-line);
+  background: var(--success-soft);
+  color: var(--success);
 }
 
 .vtk-toast-error {
-  border-color: #f0c6bd;
-  background: #fff0ed;
-  color: #9d2f1f;
+  border-color: var(--danger-line);
+  background: var(--danger-soft);
+  color: var(--danger);
 }
 
 .vtk-toast-warning {
-  border-color: #f0d76d;
-  background: #fff7cf;
+  border-color: var(--warn-line);
+  background: var(--warn-soft);
+  color: var(--warn);
 }
 
 .vtk-toast-info {
-  border-color: #c9d5ff;
-  background: #eef2ff;
+  border-color: var(--info-line);
+  background: var(--info-soft);
 }

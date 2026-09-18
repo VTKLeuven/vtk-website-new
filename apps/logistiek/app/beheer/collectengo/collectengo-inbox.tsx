@@ -116,7 +116,7 @@ export function CollectEnGoInbox({
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Bv. 40288042"
-            className="h-10 w-56 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+            className="h-10 w-56 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
           />
         </label>
       </div>
@@ -234,7 +234,7 @@ export function CollectEnGoInbox({
                 name="mail"
                 rows={8}
                 placeholder="Bedankt voor je reservatie ..."
-                className="w-full rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-sm text-vtk-ink"
+                className="w-full rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 py-2 text-sm text-vtk-ink"
               />
             </label>
             <label className="grid gap-1 text-xs font-medium text-vtk-muted">

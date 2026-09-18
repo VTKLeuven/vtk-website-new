@@ -117,8 +117,8 @@ export function KalenderFilters({
   const chipClass =
     'inline-flex cursor-pointer items-center gap-2 rounded-full border border-vtk-navy/15 px-3 py-1.5 text-sm font-medium text-vtk-ink transition hover:border-vtk-navy/40';
   const activeChipClass =
-    'inline-flex cursor-pointer items-center gap-2 rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1.5 text-sm font-semibold text-white';
-  const inputClass = 'h-9 rounded-lg border border-vtk-navy/15 bg-white px-2.5 text-sm text-vtk-ink';
+    'inline-flex cursor-pointer items-center gap-2 rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1.5 text-sm font-semibold text-vtk-on-emphasis';
+  const inputClass = 'h-9 rounded-lg border border-vtk-navy/15 bg-vtk-field px-2.5 text-sm text-vtk-ink';
 
   return (
     <div className="grid gap-3 rounded-[16px] border border-vtk-navy/10 bg-vtk-surface p-4">

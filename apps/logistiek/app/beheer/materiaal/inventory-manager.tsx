@@ -42,7 +42,7 @@ const CONDITIONS = Object.entries(ITEM_CONDITION_LABELS).map(([value, label]) =>
 
 const CONDITION_LABEL = ITEM_CONDITION_LABELS;
 
-const inputClass = 'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+const inputClass = 'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
 /**
  * Een veld dat de app zelf invult. Onderbroken rand, doffe vulling en een
@@ -235,7 +235,7 @@ function ItemFields({
               defaultValue={item?.description ?? ''}
               placeholder="Bv. inclusief statief en kabel"
               rows={3}
-              className="min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-sm text-vtk-ink"
+              className="min-w-0 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 py-2 text-sm text-vtk-ink"
             />
           </label>
           <label className="grid gap-1 text-xs font-medium text-vtk-muted col-span-full">
@@ -366,9 +366,9 @@ function QuantityQuickEdit({
 
 const CONDITION_TONE: Record<string, string> = {
   WERKT: 'text-vtk-muted',
-  TESTEN: 'text-amber-700',
-  ONVOLLEDIG: 'text-amber-700',
-  KAPOT: 'font-semibold text-red-700',
+  TESTEN: 'text-vtk-warn',
+  ONVOLLEDIG: 'text-vtk-warn',
+  KAPOT: 'font-semibold text-vtk-danger',
 };
 
 /**
@@ -413,7 +413,7 @@ function ItemTable({
           const conditionClass =
             item.units.length > 0
               ? broken > 0
-                ? 'font-semibold text-red-700'
+                ? 'font-semibold text-vtk-danger'
                 : 'text-vtk-muted'
               : (CONDITION_TONE[item.condition] ?? 'text-vtk-muted');
           return (
@@ -553,7 +553,7 @@ function ItemTable({
                     </td>
                     <td className="py-2 pr-3 text-vtk-muted">{categoryName(item.categoryId)}</td>
                     {item.units.length > 0 ? (
-                      <td className={`py-2 pr-3 ${broken > 0 ? 'font-semibold text-red-700' : 'text-vtk-muted'}`}>
+                      <td className={`py-2 pr-3 ${broken > 0 ? 'font-semibold text-vtk-danger' : 'text-vtk-muted'}`}>
                         {broken > 0 ? `${broken} kapot van ${item.units.length}` : 'Per exemplaar'}
                       </td>
                     ) : (
@@ -722,7 +722,7 @@ export function InventoryManager({
               aria-expanded={openPanel === 'item'}
               aria-controls="inventory-new-item-panel"
               onClick={() => setOpenPanel((current) => (current === 'item' ? null : 'item'))}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${openPanel === 'item' ? 'bg-vtk-navy text-white' : 'border border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40 hover:bg-vtk-paper'}`}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${openPanel === 'item' ? 'bg-vtk-navy text-vtk-on-emphasis' : 'border border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40 hover:bg-vtk-paper'}`}
             >
               {openPanel === 'item' ? 'Formulier sluiten' : '+ Nieuw item'}
             </button>
@@ -731,7 +731,7 @@ export function InventoryManager({
               aria-expanded={openPanel === 'categories'}
               aria-controls="inventory-categories-panel"
               onClick={() => setOpenPanel((current) => (current === 'categories' ? null : 'categories'))}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${openPanel === 'categories' ? 'bg-vtk-navy text-white' : 'border border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40 hover:bg-vtk-paper'}`}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${openPanel === 'categories' ? 'bg-vtk-navy text-vtk-on-emphasis' : 'border border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40 hover:bg-vtk-paper'}`}
             >
               Categorieën
             </button>
@@ -873,12 +873,12 @@ export function InventoryManager({
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Zoek een item..."
-            className="h-10 min-w-[200px] flex-1 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+            className="h-10 min-w-[200px] flex-1 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
           />
           <select
             value={activeCategory}
             onChange={(e) => setActiveCategory(e.target.value)}
-            className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+            className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
           >
             <option value="all">Alle categorieën</option>
             {activeCategories.map((c) => (
@@ -922,7 +922,7 @@ export function InventoryManager({
                       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                   });
                 }}
-                className="mt-4 rounded-full bg-vtk-navy px-4 py-2 text-sm font-semibold text-white transition hover:bg-vtk-ink"
+                className="mt-4 rounded-full bg-vtk-navy px-4 py-2 text-sm font-semibold text-vtk-on-emphasis transition hover:bg-vtk-ink"
               >
                 Eerste item toevoegen
               </button>

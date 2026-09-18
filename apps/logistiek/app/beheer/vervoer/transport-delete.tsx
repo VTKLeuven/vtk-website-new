@@ -29,7 +29,7 @@ export function TransportDeleteButton({
   description: string;
 }) {
   return (
-    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed border-red-300 pt-3">
+    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-dashed border-vtk-danger-line pt-3">
       <span className="text-xs font-semibold text-vtk-muted">Verwijderen</span>
       <ConfirmActionButton
         label={`Verwijderen: ${title}`}

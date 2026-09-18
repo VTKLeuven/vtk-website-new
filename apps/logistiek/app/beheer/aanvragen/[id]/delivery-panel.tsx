@@ -116,7 +116,7 @@ export function DeliveryPanel({
     });
   }
 
-  const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+  const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
   return (
     <section className="rounded-[18px] border border-vtk-yellow bg-vtk-surface p-5">
@@ -175,7 +175,7 @@ export function DeliveryPanel({
                   key={vehicle.id}
                   className={`cursor-pointer rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
                     vehicleIds.includes(vehicle.id)
-                      ? 'border-vtk-navy bg-vtk-navy text-white'
+                      ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
                       : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
                   }`}
                 >
@@ -301,7 +301,7 @@ export function DeliveryPanel({
                 value={note}
                 onChange={(event) => setNote(event.target.value)}
                 rows={2}
-                className="rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-sm text-vtk-ink"
+                className="rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 py-2 text-sm text-vtk-ink"
               />
             </label>
           </div>

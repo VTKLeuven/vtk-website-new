@@ -120,7 +120,7 @@ export default async function BeheerDashboardPage() {
     {
       label: 'Teruggebracht',
       value: value(reservationCount, 'RETURNED'),
-      tone: 'bg-emerald-600',
+      tone: 'bg-vtk-success',
     },
   ];
   const vanCounts: StatusCount[] = [
@@ -138,7 +138,7 @@ export default async function BeheerDashboardPage() {
     {
       label: 'Uitgevoerd',
       value: value(vanCount, 'COMPLETED'),
-      tone: 'bg-emerald-600',
+      tone: 'bg-vtk-success',
     },
     {
       label: 'Niet doorgegaan',
@@ -222,7 +222,7 @@ export default async function BeheerDashboardPage() {
               <AgendaRow
                 key={`v-${booking.id}`}
                 kind="Transport"
-                tone="rounded-full bg-vtk-navy px-2.5 py-1 text-xs font-semibold text-white"
+                tone="rounded-full bg-vtk-navy px-2.5 py-1 text-xs font-semibold text-vtk-on-emphasis"
                 requester={booking.user.name}
                 detailLabel="Rit"
                 detail={

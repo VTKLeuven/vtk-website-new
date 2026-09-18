@@ -41,7 +41,7 @@ export function EditTripForm({
   const [error, setError] = useState<string | null>(null);
 
   const inputClass =
-    'h-10 w-full rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+    'h-10 w-full rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
   if (!open) {
     return (
@@ -67,7 +67,7 @@ export function EditTripForm({
   return (
     <div className="mt-2 grid gap-3 rounded-[14px] border border-vtk-navy/10 bg-vtk-paper p-4">
       {approved ? (
-        <p className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="rounded-lg border border-vtk-warn-line bg-vtk-warn-soft px-3 py-2 text-sm text-vtk-warn">
           {en
             ? 'This trip is already approved. If you change it, Logistics has to approve it again and the driver may change.'
             : 'Deze rit is al goedgekeurd. Pas je ze aan, dan moet Logistiek ze opnieuw goedkeuren en kan de chauffeur veranderen.'}
@@ -129,7 +129,7 @@ export function EditTripForm({
       </div>
 
       {error ? (
-        <p role="alert" className="text-sm font-medium text-red-700">
+        <p role="alert" className="text-sm font-medium text-vtk-danger">
           {error}
         </p>
       ) : null}

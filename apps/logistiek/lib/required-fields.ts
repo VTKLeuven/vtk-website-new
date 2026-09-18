@@ -42,5 +42,5 @@ export function focusField(name: string): void {
  * stylesheet, niet van de volgorde in het attribuut.
  */
 export function fieldClass(base: string, name: string, missing: MissingField | null): string {
-  return missing?.name === name ? `${base} border-red-500! ring-1 ring-red-500` : base;
+  return missing?.name === name ? `${base} border-vtk-danger! ring-1 ring-vtk-danger` : base;
 }

@@ -512,6 +512,34 @@ the design language into the application instead of copying mockup content.
     (the Theokot offering editor) need a per-field label on narrow screens; the
     column headings above the table are hidden there.
 
+## Donkere modus (uitleendienst)
+
+`apps/logistiek` heeft een lichte en een donkere modus; `apps/web` niet.
+
+- **Het palet staat één keer, in `apps/logistiek/app/design/theme.css`**: twee
+  blokken met dezelfde tokennamen (`:root` en `:root[data-theme='dark']`), plus
+  een kleurloos printpalet. Zet daar een hex bij en hertune daar; zet er nooit
+  een kleur buiten. Een losse hex of een Tailwind-palletklasse (`bg-white`,
+  `text-red-700`, `bg-amber-50`) flipt niet mee en levert in de andere modus een
+  onleesbaar of onzichtbaar vlak op. Gebruik `bg-vtk-surface`, `bg-vtk-field`,
+  `text-vtk-danger`, `bg-vtk-warn-soft`, `border-vtk-danger-line` enzovoort; de
+  volledige lijst staat in het `@theme inline`-blok van `app/globals.css`.
+- **Drie tokens keren bewust niet om.** `--chrome` (kop, paginakop, voetnoot)
+  blijft de donkerste laag, `--scrim` (waas over een foto, achtergrond van een
+  modal) blijft donker en `--on-chrome` blijft licht: daar ligt in beide modi
+  hetzelfde soort vlak onder. Tekst op geel gebruikt `text-vtk-on-yellow`, niet
+  `text-vtk-ink`.
+- **`--emphasis` (in Tailwind nog `vtk-navy`) is in het donker licht.** Dat token
+  draagt de volle knop, nadrukkelijke tekst én met een alfa elke haarlijn, dus
+  `border-vtk-navy/15` blijft in beide modi een haarlijn en `bg-vtk-navy` blijft
+  een knop die opvalt. Tekst erop is `text-vtk-on-emphasis`.
+- `packages/ui` wordt door drie apps gebruikt, waarvan er twee donker kunnen
+  staan (logistiek en fakbar). Voeg daar geen `bg-white` of losse hex toe: hangt
+  een kleur aan een token, geef die dan in álle drie de `@theme`-blokken een
+  waarde, ook in `apps/fakbar`.
+- Het waarom van de variant, van de tweede chauffeursreeks en van de knop staat
+  in `docs/design-decisions.md`.
+
 ## Implementation Constraints
 
 - Keep Tailwind v4 source scanning explicit and do not switch to auto-detection.

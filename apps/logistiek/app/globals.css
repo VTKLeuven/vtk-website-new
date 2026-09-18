@@ -1,27 +1,76 @@
 /* See apps/web/app/globals.css for Tailwind source locking rationale. */
 @import 'tailwindcss' source(none);
+
+/* Het palet, licht en donker. Alle kleurwaarden van de uitleendienst staan in
+   dat ene bestand; hier staat enkel de vertaling naar Tailwind. */
+@import './design/theme.css';
+
 @source "../app";
 @source "../components";
 @source "../lib";
 @source "../../../packages/ui/src";
 
-/* Palet gespiegeld aan het canonieke koele palet in
-   apps/web/app/design/vtk-base.css; hertune je daar, hertune dan ook hier. */
-@theme {
-  --color-vtk-ink: #0a0f1f;
-  --color-vtk-navy: #0e1a36;
-  --color-vtk-blue: #0e1a36;
-  --color-vtk-blue-dark: #0a0f1f;
-  --color-vtk-blue-light: #34405e;
-  --color-vtk-blue-soft: #e6ecf5;
-  --color-vtk-blue-muted: #5c667f;
-  --color-vtk-yellow: #ffd23f;
-  --color-vtk-yellow-dark: #edbd22;
-  --color-vtk-paper: #eff2f8;
-  --color-vtk-paper-2: #e6ecf5;
-  --color-vtk-surface: #ffffff;
-  --color-vtk-body: #34405e;
-  --color-vtk-muted: #5c667f;
+/*
+ * De Tailwind-utilities (`bg-vtk-*`, `text-vtk-*`, `border-vtk-*`) wijzen naar
+ * de tokens uit design/theme.css in plaats van naar een vaste hex. Daardoor
+ * flipt élke bestaande utility mee met de donkere modus zonder dat er ook maar
+ * één className verandert: `text-vtk-ink` is donkere tekst op wit en lichte
+ * tekst op bijna zwart, `border-vtk-navy/15` is in beide modi een haarlijn die
+ * je net ziet.
+ *
+ * `@theme inline` en niet `@theme`: zonder `inline` zet Tailwind hier een eigen
+ * variabele met deze waarde neer, en dan rekent de utility met de waarde zoals
+ * ze op :root stond in plaats van met de waarde van dat moment. Met `inline`
+ * verwijst de utility rechtstreeks naar `var(--ink)` en klopt ze altijd.
+ *
+ * Let op: door `inline` bestaan `--color-vtk-*` niet meer als variabele. Wil je
+ * een kleur in handgeschreven CSS, gebruik dan het token zelf (`var(--yellow)`)
+ * en niet `var(--color-vtk-yellow)`.
+ */
+@theme inline {
+  --color-vtk-ink: var(--ink);
+  --color-vtk-body: var(--body);
+  --color-vtk-muted: var(--muted);
+
+  /* De nadrukkleur. Ze heet nog "navy" omdat honderden utilities zo heten, maar
+     ze is in het donker licht; zie de uitleg bij `--emphasis` in theme.css. */
+  --color-vtk-navy: var(--emphasis);
+  --color-vtk-blue: var(--emphasis);
+  --color-vtk-blue-dark: var(--ink);
+  --color-vtk-blue-light: var(--body);
+  --color-vtk-blue-soft: var(--paper-2);
+  --color-vtk-blue-muted: var(--muted);
+  --color-vtk-on-emphasis: var(--on-emphasis);
+
+  --color-vtk-yellow: var(--yellow);
+  --color-vtk-yellow-dark: var(--yellow-dark);
+  --color-vtk-on-yellow: var(--on-yellow);
+
+  --color-vtk-paper: var(--paper);
+  --color-vtk-paper-2: var(--paper-2);
+  --color-vtk-surface: var(--surface);
+  --color-vtk-surface-elevated: var(--surface);
+  --color-vtk-surface-2: var(--surface-2);
+  --color-vtk-field: var(--field);
+
+  /* Tekst op de donkere chrome en op een foto: licht in beide modi. */
+  --color-vtk-chrome: var(--chrome);
+  --color-vtk-on-dark: var(--on-chrome);
+  --color-vtk-on-dark-muted: var(--on-chrome-muted);
+  --color-vtk-scrim: var(--scrim);
+
+  --color-vtk-danger: var(--danger);
+  --color-vtk-danger-soft: var(--danger-soft);
+  --color-vtk-danger-fill: var(--danger-fill);
+  --color-vtk-danger-line: var(--danger-line);
+  --color-vtk-warn: var(--warn);
+  --color-vtk-warn-soft: var(--warn-soft);
+  --color-vtk-warn-fill: var(--warn-fill);
+  --color-vtk-warn-line: var(--warn-line);
+  --color-vtk-success: var(--success);
+  --color-vtk-success-soft: var(--success-soft);
+  --color-vtk-success-line: var(--success-line);
+
   --font-sans: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
@@ -34,65 +83,6 @@ body {
 :root {
   --vtk-header-height: 73px;
   --max: 1240px;
-  --ink: #0a0f1f;
-  --navy: #0e1a36;
-  --paper: #eff2f8;
-  --paper-2: #e6ecf5;
-  --surface: #ffffff;
-  --line: rgba(14, 26, 54, 0.1);
-  --line-2: rgba(14, 26, 54, 0.18);
-  --yellow: #ffd23f;
-  --muted: #5c667f;
-  --body: #34405e;
-  --on-dark-muted: #b7c0dc;
-  --success: #2f6f33;
-  --success-soft: #eef8ea;
-
-  /* Chauffeurskleuren voor de transportplanning (B4, T7, K1).
-
-     Vierentwintig tinten in plaats van acht, want acht was op een drukke week
-     te weinig: dan deelden twee chauffeurs een kleur en was het onderscheid
-     precies weg waar je het nodig had. Ze staan hier in huisvolgorde (blauw,
-     groen, geel, oranje, rood, roze, paars, neutraal), zodat het palet in het
-     kiesscherm als een spectrum leest en niet als een zak snoep.
-
-     Alle vierentwintig zijn licht gehouden: de tekst in een blok is donker
-     (`--ink`) en moet leesbaar blijven, ook met een arcering van het voertuig
-     eroverheen. Daarom is dit een palet en geen vrije kleurkiezer; zie
-     docs/design-decisions.md.
-
-     `--driver-none` is voor een rit zonder chauffeur: neutraal grijs, want dat
-     is een rit die nog niemand toegewezen kreeg en niet een fout. Het was de
-     gele accentkleur met een rode streepjesrand, en op een week waarin de helft
-     nog niet verdeeld is schreeuwt dat scherm zichzelf stuk. Grijs zegt
-     "hier moet nog iets gebeuren" zonder alarm; de tekst "geen chauffeur" in het
-     blok zegt wát er moet gebeuren. Dezelfde kleur draagt de rit die je aan het
-     aanmaken bent: die heeft per definitie nog geen chauffeur. */
-  --driver-1: #cfe0ff;
-  --driver-2: #bdd4f7;
-  --driver-3: #c3e2f2;
-  --driver-4: #c2e8ee;
-  --driver-5: #c6eee6;
-  --driver-6: #c9edd7;
-  --driver-7: #d7f0d8;
-  --driver-8: #dff0c4;
-  --driver-9: #e8ecc4;
-  --driver-10: #f2eec0;
-  --driver-11: #ffeeb8;
-  --driver-12: #ffe4b3;
-  --driver-13: #ffdcc2;
-  --driver-14: #ffd3c0;
-  --driver-15: #ffcccc;
-  --driver-16: #ffcedd;
-  --driver-17: #f9d2ea;
-  --driver-18: #eed4f4;
-  --driver-19: #e2d9f8;
-  --driver-20: #d3d6f6;
-  --driver-21: #e6ded2;
-  --driver-22: #ded9cd;
-  --driver-23: #d8dde6;
-  --driver-24: #d6dcd8;
-  --driver-none: #e2e6ee;
 }
 
 /* Nog te beslissen rit in de transportplanning: gestreept, zodat je ziet dat
@@ -101,7 +91,7 @@ body {
 .week-block-requested {
   background-image: repeating-linear-gradient(
     135deg,
-    rgba(14, 26, 54, 0.14) 0 5px,
+    var(--driver-requested) 0 5px,
     transparent 5px 11px
   );
 }
@@ -120,7 +110,7 @@ body {
 .trip-pattern-diagonal {
   background-image: repeating-linear-gradient(
     45deg,
-    rgba(14, 26, 54, 0.13) 0 4px,
+    var(--driver-pattern) 0 4px,
     transparent 4px 10px
   );
 }
@@ -128,20 +118,20 @@ body {
 .trip-pattern-vertical {
   background-image: repeating-linear-gradient(
     90deg,
-    rgba(14, 26, 54, 0.13) 0 3px,
+    var(--driver-pattern) 0 3px,
     transparent 3px 9px
   );
 }
 
 .trip-pattern-dots {
-  background-image: radial-gradient(rgba(14, 26, 54, 0.2) 1.2px, transparent 1.3px);
+  background-image: radial-gradient(var(--driver-pattern-strong) 1.2px, transparent 1.3px);
   background-size: 7px 7px;
 }
 
 .trip-pattern-grid {
   background-image:
-    repeating-linear-gradient(0deg, rgba(14, 26, 54, 0.11) 0 1px, transparent 1px 8px),
-    repeating-linear-gradient(90deg, rgba(14, 26, 54, 0.11) 0 1px, transparent 1px 8px);
+    repeating-linear-gradient(0deg, var(--driver-pattern-faint) 0 1px, transparent 1px 8px),
+    repeating-linear-gradient(90deg, var(--driver-pattern-faint) 0 1px, transparent 1px 8px);
 }
 
 /* De transportplanning is een agenda-pane, geen stuk pagina.
@@ -261,13 +251,13 @@ body {
 .avail-fill-liever-niet {
   background-image: repeating-linear-gradient(
     45deg,
-    rgba(255, 255, 255, 0.62) 0 3px,
+    var(--avail-pattern) 0 3px,
     transparent 3px 7px
   );
 }
 
 .avail-fill-nood {
-  background-image: radial-gradient(rgba(255, 255, 255, 0.85) 1.4px, transparent 1.5px);
+  background-image: radial-gradient(var(--avail-pattern-strong) 1.4px, transparent 1.5px);
   background-size: 7px 7px;
 }
 
@@ -298,7 +288,7 @@ body {
   flex: 0 0 auto;
   width: 36px;
   height: 36px;
-  border: 1px solid rgb(14 26 54 / 0.15);
+  border: 1px solid var(--line-2);
   border-radius: 999px;
   color: var(--ink);
   font-size: 15px;
@@ -328,7 +318,7 @@ body {
   gap: 6px;
   flex: 0 0 auto;
   padding: 5px 11px;
-  border: 1px solid rgb(14 26 54 / 0.18);
+  border: 1px solid var(--line-2);
   border-radius: 999px;
   background: transparent;
   color: var(--muted);
@@ -338,9 +328,9 @@ body {
 }
 
 .paint-brush-option[aria-pressed='true'] {
-  border-color: var(--navy);
-  background: var(--navy);
-  color: var(--paper);
+  border-color: var(--emphasis);
+  background: var(--emphasis);
+  color: var(--on-emphasis);
 }
 
 /* Het staaltje van de soort in de pil: hetzelfde geel met hetzelfde patroon als
@@ -349,7 +339,7 @@ body {
 .paint-brush-swatch {
   width: 14px;
   height: 14px;
-  border: 1px solid rgb(14 26 54 / 0.25);
+  border: 1px solid var(--line-2);
   border-radius: 4px;
   background-color: var(--yellow);
 }
@@ -443,16 +433,16 @@ body {
 }
 
 .mob-cal-day.is-today .mob-cal-day-number {
-  color: var(--navy);
+  color: var(--emphasis);
 }
 
 .mob-cal-day.is-active {
-  background: var(--navy);
+  background: var(--emphasis);
 }
 
 .mob-cal-day.is-active,
 .mob-cal-day.is-active .mob-cal-day-number {
-  color: var(--paper);
+  color: var(--on-emphasis);
 }
 
 /* Een stip zegt dat er die dag iets staat. Dat is de vraag waarmee je op een
@@ -485,10 +475,10 @@ body {
   max-width: 100%;
   min-height: 32px;
   padding: 4px 10px;
-  border: 1px solid rgb(14 26 54 / 0.2);
+  border: 1px solid var(--line-2);
   border-radius: 999px;
   background: var(--surface);
-  color: var(--navy);
+  color: var(--emphasis);
   font-size: 12px;
 }
 
@@ -541,7 +531,7 @@ body {
   left: 0;
   right: 0;
   height: 1px;
-  background: rgb(14 26 54 / 0.07);
+  background: var(--line);
 }
 
 .mob-cal-band {
@@ -575,7 +565,7 @@ body {
   left: 0;
   right: 0;
   height: 2px;
-  background: #d64545;
+  background: var(--now-line);
 }
 
 .mob-cal-hint {
@@ -683,7 +673,7 @@ body {
    hele scherm in alarmkleuren. */
 .trip-no-driver {
   border-style: dashed;
-  border-color: rgb(14 26 54 / 0.45);
+  border-color: var(--driver-edge);
 }
 
 /* De rit die je aan het aanmaken bent, terwijl het formulier openstaat. Dezelfde
@@ -691,9 +681,9 @@ body {
    je opslaat of annuleert: zonder dat verdween je selectie op het moment dat je
    ze ging invullen, en dan stond je te typen zonder te zien waar de rit komt. */
 .trip-draft {
-  border: 2px dashed rgb(14 26 54 / 0.5);
+  border: 2px dashed var(--driver-edge);
   background: var(--driver-none);
-  color: var(--ink);
+  color: var(--driver-ink);
 }
 
 /* De uitleendienst gebruikt dezelfde vaste headerstructuur als vtk.be. Enkel
@@ -710,7 +700,7 @@ body {
   gap: 8px 14px;
   padding: 7px clamp(12px, 3vw, 24px);
   background: var(--yellow);
-  color: var(--ink);
+  color: var(--on-yellow);
   font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
   font-size: 13px;
   line-height: 1.35;
@@ -741,13 +731,13 @@ body {
   background: rgba(255, 255, 255, 0.55);
   font-size: 13px;
   font-weight: 600;
-  color: var(--ink);
+  color: var(--on-yellow);
   cursor: pointer;
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
 .impersonation-bar-button:hover {
-  border-color: var(--ink);
+  border-color: var(--on-yellow);
   background: #fff;
 }
 
@@ -755,9 +745,9 @@ body {
   position: sticky;
   top: 0;
   z-index: 50;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: var(--navy);
-  color: var(--paper);
+  border-bottom: 1px solid var(--chrome-line);
+  background: var(--chrome);
+  color: var(--on-chrome);
   font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
@@ -776,7 +766,7 @@ body {
   display: inline-flex;
   flex: 0 0 auto;
   align-items: center;
-  color: var(--paper);
+  color: var(--on-chrome);
   text-decoration: none;
 }
 
@@ -859,6 +849,49 @@ body {
   color: rgba(250, 250, 247, 0.4);
 }
 
+/* De knop die licht en donker wisselt, links van de taalkeuze: dezelfde toon
+   als NL/EN, want het is chrome en geen derde avatar naast het profielrondje.
+
+   Beide pictogrammen staan in de knop en de CSS kiest er één. De knop weet bij
+   het renderen op de server niet welke modus je hebt (die staat in localStorage
+   en wordt pas in de browser gezet), dus alles wat van de modus afhangt, moet
+   hier gebeuren en niet in React. Je ziet de maan wanneer het licht is: het
+   pictogram toont waar je naartoe gaat, niet waar je staat. */
+.vtk-site-header .theme-toggle {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: rgba(250, 250, 247, 0.72);
+  cursor: pointer;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.vtk-site-header .theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+
+.vtk-site-header .theme-toggle:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+.theme-toggle-icon {
+  width: 18px;
+  height: 18px;
+}
+
+:root[data-theme='dark'] .theme-toggle-moon,
+:root:not([data-theme='dark']) .theme-toggle-sun {
+  display: none;
+}
+
 .vtk-site-header .profile-menu-trigger,
 .vtk-site-header .nav-login {
   display: inline-grid;
@@ -869,7 +902,7 @@ body {
   border: 1px solid rgba(250, 250, 247, 0.34);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.12);
-  color: var(--paper);
+  color: var(--on-chrome);
   font-weight: 600;
   text-decoration: none;
   transition:
@@ -879,7 +912,7 @@ body {
 
 .vtk-site-header .profile-menu-trigger:hover,
 .vtk-site-header .nav-login:hover {
-  border-color: var(--paper);
+  border-color: var(--on-chrome);
   background: rgba(255, 255, 255, 0.22);
 }
 
@@ -898,7 +931,7 @@ body {
   border: 1px solid var(--line);
   border-radius: 14px;
   background: var(--surface);
-  box-shadow: 0 18px 42px rgba(10, 15, 31, 0.12);
+  box-shadow: var(--shadow-2);
 }
 
 .vtk-site-header .profile-menu-item {
@@ -962,7 +995,7 @@ body {
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  background: var(--navy);
+  background: var(--chrome);
 }
 
 .logistics-page-head {
@@ -981,7 +1014,7 @@ body {
   background-image: url('/technisch-pattern.svg');
   background-repeat: repeat;
   background-size: 880px 880px;
-  opacity: 0.3;
+  opacity: var(--pattern-opacity);
   -webkit-mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 36px), transparent);
   mask-image: linear-gradient(to bottom, transparent, #000 48px, #000 calc(100% - 36px), transparent);
 }
@@ -1070,7 +1103,7 @@ body {
   padding: 0 18px;
   border-radius: 999px;
   background: var(--yellow);
-  color: var(--ink);
+  color: var(--on-yellow);
   font-size: 15px;
   font-weight: 600;
   white-space: nowrap;
@@ -1085,14 +1118,14 @@ body {
   display: flex;
   align-items: center;
   gap: 10px;
-  color: var(--on-dark-muted);
+  color: var(--on-chrome-muted);
   font-size: 13px;
 }
 
 .logistics-page-head h1 {
   max-width: 900px;
   margin: 14px 0 0;
-  color: var(--paper);
+  color: var(--on-chrome);
   font-size: clamp(32px, 4.4vw, 56px);
   font-weight: 600;
   letter-spacing: -0.03em;
@@ -1102,7 +1135,7 @@ body {
 .logistics-page-intro {
   max-width: 60ch;
   margin: 18px 0 0;
-  color: var(--on-dark-muted);
+  color: var(--on-chrome-muted);
   font-size: 17px;
   line-height: 1.6;
 }
@@ -1165,7 +1198,7 @@ body {
   place-items: center;
   border-radius: 14px;
   background: var(--yellow);
-  color: var(--ink);
+  color: var(--on-yellow);
 }
 
 .logistics-home-content {
@@ -1231,7 +1264,7 @@ body {
   place-items: center;
   border-radius: 10px;
   background: var(--yellow);
-  color: var(--ink);
+  color: var(--on-yellow);
 }
 
 .logistics-inline-link {
@@ -1286,9 +1319,9 @@ body {
   gap: 18px 28px;
   align-items: end;
   padding: clamp(20px, 3vw, 26px);
-  border: 1px solid rgba(237, 189, 34, 0.55);
+  border: 1px solid color-mix(in oklab, var(--yellow-dark) 55%, transparent);
   border-radius: 18px;
-  background: rgba(255, 210, 63, 0.13);
+  background: color-mix(in oklab, var(--yellow) 13%, transparent);
   box-shadow: inset 4px 0 0 var(--yellow);
 }
 
@@ -1342,7 +1375,7 @@ body {
   grid-column: 1 / -1;
   gap: 12px;
   padding-top: 14px;
-  border-top: 1px solid rgba(237, 189, 34, 0.45);
+  border-top: 1px solid color-mix(in oklab, var(--yellow-dark) 45%, transparent);
 }
 
 /* Uitkomst van "sjabloon bewaren": groen bij succes, rood bij een dubbele naam
@@ -1356,7 +1389,7 @@ body {
 }
 
 .logistics-template-note.is-error {
-  color: #b42318;
+  color: var(--danger);
 }
 
 .logistics-template-feedback {
@@ -1366,7 +1399,7 @@ body {
   gap: 8px;
   margin: 0;
   padding-top: 14px;
-  border-top: 1px solid rgba(237, 189, 34, 0.45);
+  border-top: 1px solid color-mix(in oklab, var(--yellow-dark) 45%, transparent);
   color: var(--success);
   font-size: 14px;
   font-weight: 600;
@@ -1444,8 +1477,8 @@ body {
 }
 
 .logistics-reservation-row:hover {
-  border-color: rgba(0, 43, 73, 0.35);
-  box-shadow: 0 8px 24px rgba(10, 15, 31, 0.06);
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-1);
 }
 
 .logistics-reservation-cell,
@@ -1511,8 +1544,8 @@ body {
 }
 
 .logistics-admin-request-row:hover {
-  border-color: rgba(0, 43, 73, 0.35);
-  box-shadow: 0 8px 24px rgba(10, 15, 31, 0.06);
+  border-color: var(--line-2);
+  box-shadow: var(--shadow-1);
 }
 
 .logistics-agenda-row {
@@ -1594,10 +1627,10 @@ body {
 .logistics-auth-panel {
   position: relative;
   padding: clamp(28px, 5vw, 44px);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--chrome-line);
   border-radius: 22px;
-  background: rgba(239, 242, 248, 0.96);
-  box-shadow: 0 24px 70px rgba(10, 15, 31, 0.25);
+  background: color-mix(in oklab, var(--surface) 96%, transparent);
+  box-shadow: var(--shadow-3);
 }
 
 .logistics-login-button {
@@ -1607,16 +1640,16 @@ body {
 }
 
 .logistics-login-button:hover {
-  background: var(--navy);
+  background: var(--emphasis);
 }
 
 .logistics-footer {
-  border-top: 1px solid rgba(255, 255, 255, 0.11);
+  border-top: 1px solid var(--chrome-line);
 }
 
 .logistics-footer::after {
   background-position: calc(50% - 240px) -420px;
-  opacity: 0.14;
+  opacity: var(--pattern-opacity-footer);
   -webkit-mask-image: linear-gradient(to right, transparent, #000 28%, #000 72%, transparent);
   mask-image: linear-gradient(to right, transparent, #000 28%, #000 72%, transparent);
 }
@@ -1642,8 +1675,8 @@ input:focus,
 textarea:focus,
 select:focus {
   outline: none;
-  border-color: var(--navy) !important;
-  box-shadow: 0 0 0 3px rgba(255, 210, 63, 0.32);
+  border-color: var(--emphasis) !important;
+  box-shadow: 0 0 0 3px color-mix(in oklab, var(--yellow) 32%, transparent);
 }
 
 @media (max-width: 960px) {

@@ -57,7 +57,7 @@ export function TripHelpers({
   }
 
   const inputClass =
-    'h-9 w-full rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+    'h-9 w-full rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
   return (
     <div className="grid gap-2">

@@ -184,7 +184,7 @@ export default async function ItemDetailPage({ params }: { params: Promise<{ id:
           </p>
           <Link
             href="/materiaal"
-            className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-vtk-ink px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-vtk-navy"
+            className="mt-5 inline-flex w-full items-center justify-center rounded-full bg-vtk-ink px-5 py-2.5 text-sm font-semibold text-vtk-on-emphasis transition hover:bg-vtk-navy"
           >
             {en ? 'To the catalogue' : 'Naar de catalogus'}
           </Link>

@@ -66,7 +66,7 @@ export function DecisionForms({
             type="text"
             name="adminNote"
             placeholder="Bv. afhalen kan tussen 18u en 19u"
-            className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+            className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-vtk-ink"
           />
         </label>
       </SaveForm>
@@ -88,7 +88,7 @@ export function DecisionForms({
             type="text"
             name="adminNote"
             placeholder="Bv. materiaal nodig voor de 24 urenloop"
-            className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+            className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-vtk-ink"
           />
         </label>
       </SaveForm>

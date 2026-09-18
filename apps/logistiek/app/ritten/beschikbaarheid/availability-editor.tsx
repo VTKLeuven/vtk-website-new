@@ -205,7 +205,7 @@ export function AvailabilityEditor({
           <select
             value={brush}
             onChange={(event) => setBrush(event.target.value as AvailabilityKind)}
-            className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+            className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
           >
             {AVAILABILITY_KINDS.map((kind) => (
               <option key={kind} value={kind}>
@@ -341,7 +341,7 @@ export function AvailabilityEditor({
                   onClick={() => setBrush(kind)}
                   className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold transition ${
                     brush === kind
-                      ? 'border-vtk-navy bg-vtk-navy text-white'
+                      ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
                       : 'border-vtk-navy/20 text-vtk-muted hover:border-vtk-navy/50'
                   }`}
                 >

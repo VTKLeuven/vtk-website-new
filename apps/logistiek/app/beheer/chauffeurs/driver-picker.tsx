@@ -13,7 +13,7 @@ const ADD_ERRORS = {
   ALREADY_DRIVER: 'Dit lid staat al in de chauffeurslijst.',
 };
 
-const inputClass = 'h-10 w-full rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+const inputClass = 'h-10 w-full rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
 /**
  * Chauffeur toevoegen: zoekt leden van vtk.be (naam, e-mail of r-nummer) en
@@ -87,7 +87,7 @@ export function DriverPicker() {
             />
           </label>
           {open && !selected ? (
-            <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-[12px] border border-vtk-navy/15 bg-white shadow-lg">
+            <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-[12px] border border-vtk-navy/15 bg-vtk-surface shadow-lg">
               {results.length === 0 ? (
                 <li className="px-3 py-2 text-sm text-vtk-muted">
                   {searching ? 'Zoeken...' : 'Geen leden gevonden.'}

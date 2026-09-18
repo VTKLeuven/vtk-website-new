@@ -7720,3 +7720,72 @@ is "waar komt deze inschrijving vandaan", niet "hoe vaak twijfelde dit lid".
 aangeduid en niet `notAtFaculty`. Dat is precies het publiek dat Career aan
 bedrijven belooft, en het is dezelfde grens als wie de vraag te zien krijgt, dus
 het percentage en het scherm gaan over dezelfde groep (`lib/careerStats.ts`).
+
+## De donkere modus van de uitleendienst
+
+De uitleendienst wordt gebruikt waar het donker is: in de kelder bij het
+klaarzetten, in een camionette onderweg, op een telefoon tijdens een opbouw.
+Een site die daar vol wit scherm opengaat, is er eentje die je wegdraait. Sinds
+de donkere modus bestaat, kiest de uitleendienst hem niet zelf: hij volgt je
+toestel, en de knop in de kop overrulet dat.
+
+**Er is één palet en het staat in `apps/logistiek/app/design/theme.css`.** Twee
+blokken met dezelfde tokennamen, `:root` voor licht en
+`:root[data-theme='dark']` voor donker; elke kleur van de site komt daaruit.
+Dat is de hele afspraak: staat er een hex in een component, dan flipt die niet
+mee en heeft iemand in de andere modus een vlak dat hij niet ziet. De
+Tailwind-utilities (`bg-vtk-surface`, `text-vtk-muted`, `border-vtk-navy/15`)
+wijzen via `@theme inline` naar diezelfde tokens, dus ze flippen mee zonder dat
+er één className verandert.
+
+**De variant heet "Nachtdienst" en is de hardste van drie.** Er lagen er drie
+voor: het navy van de huisstijl doorgetrokken tot in de werkvlakken, een koel
+grafiet met navy enkel als chrome, en dit: bijna zwart met zichtbare randen.
+Het werd de derde omdat dit scherm zelden in een kantoor staat. Vandaar ook de
+randen op 16% in plaats van 10%: een zachte grijze lijn is op een telefoon in de
+zon of in een donkere kelder gewoon geen lijn.
+
+**De chrome blijft de donkerste laag, niet de lichtste.** In de lichte modus
+herken je de paginakop, de header en de voetnoot omdát ze donker zijn. Zet je de
+pagina zelf donker, dan is dat contrast weg. Ze gaan daarom nog een stap dieper
+dan de pagina (`--chrome` is `#000308` op een grond van `#05070d`) en de gele
+regel onder de kop doet het echte scheidingswerk. Omgekeerd meekleuren zou van
+de kop een lichte balk maken, en dan is het de hele site die van vorm verandert
+in plaats van van kleur.
+
+**De nadrukkleur is in het donker licht.** Het token `--emphasis` (in Tailwind
+nog altijd `vtk-navy`, want honderden utilities heten zo) draagt drie dingen
+tegelijk: de volle knop of actieve pil, nadrukkelijke tekst, en met een alfa élke
+haarlijn en elk licht vlak. Precies daarom moet het omkeren: `border-vtk-navy/15`
+hoort in beide modi een lijn te zijn die je net ziet, en een volle knop hoort op
+te vallen tegen zijn grond. Een navy knop op bijna zwart valt weg. Wat niet
+meekeert, staat apart: `--scrim` (de waas over een foto of onder een modal) en
+`--on-chrome` blijven donker respectievelijk licht, want daar ligt altijd
+hetzelfde soort vlak onder.
+
+**De chauffeurskleuren hebben een tweede reeks.** De vierentwintig tinten waren
+bewust licht met donkere tekst; in het donker zijn dat vierentwintig felle
+vlakken op bijna zwart. Er is dus een donkere reeks met dezelfde tinten in
+dezelfde huisvolgorde, en `--driver-ink` keert mee. De arcering per voertuig en
+het streeppatroon voor "nog te beslissen" gaan van donkere naar lichte alfa,
+anders verdwijnen ze in hun eigen blok. De helderheid wisselt licht per buur
+(0,23 en 0,29), want vierentwintig kleuren enkel op tint uit elkaar houden lukt
+niet: twee blauwen naast elkaar zijn anders één blok.
+
+**Op papier is alles licht.** `@media print` in hetzelfde bestand zet een eigen,
+kleurloos palet: een klaarzetlijst of een aanvraagblad hoort niet als een blad
+vol inkt uit de printer te komen omdat iemand zijn scherm donker had staan.
+
+**De knop wisselt tussen twee standen, niet tussen drie.** Geen "systeem /
+licht / donker" om door te fietsen: zolang je niets kiest, volgt de site je
+toestel (ook wanneer je dat toestel 's avonds omzet), en vanaf je eerste klik
+staat je keuze vast tot je opnieuw duwt. Het pictogram toont waar je naartoe
+gaat en niet waar je staat: een maan wanneer het licht is.
+
+**De keuze staat op `<html>` voor de eerste verf.** Een inline script bovenaan de
+body leest localStorage en valt terug op de systeemvoorkeur; zonder dat flitst
+elke pagina eerst wit op, want de server weet niet wat er in je browser staat.
+Datzelfde script bewaakt het attribuut met een `MutationObserver`. Dat is geen
+overdaad: faalt de hydratie ergens op een pagina, dan tekent React de hele boom
+opnieuw vanaf `<html>` en gooit het attribuut weg dat de server nooit
+gerenderd heeft, en dan sprong het scherm middenin het kijken terug naar licht.

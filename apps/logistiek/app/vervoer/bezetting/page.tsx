@@ -352,7 +352,7 @@ export default async function VervoerBezettingPage({
             aria-current={monday.getTime() === thisWeek.getTime() ? 'true' : undefined}
             className={
               monday.getTime() === thisWeek.getTime()
-                ? 'rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1.5 font-semibold text-white'
+                ? 'rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1.5 font-semibold text-vtk-on-emphasis'
                 : 'rounded-full border border-vtk-navy/15 px-3 py-1.5 font-medium text-vtk-ink transition hover:border-vtk-navy/40'
             }
           >

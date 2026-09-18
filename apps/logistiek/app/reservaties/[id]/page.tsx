@@ -291,7 +291,7 @@ export default async function ReservatieDetailPage({
                   goedkeuring nog een tafel bijzet, verandert wat het team
                   beloofd heeft, en dat moet opnieuw langs de voorraadcheck. */}
               {reservation.status === 'APPROVED' ? (
-                <p className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <p className="mb-3 rounded-lg border border-vtk-warn-line bg-vtk-warn-soft px-3 py-2 text-sm text-vtk-warn">
                   {en
                     ? 'This request is already approved. If you change it, Logistics has to approve it again.'
                     : 'Deze aanvraag is al goedgekeurd. Pas je ze aan, dan moet Logistiek ze opnieuw goedkeuren.'}

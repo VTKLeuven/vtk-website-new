@@ -152,15 +152,15 @@ export default async function LogistiekHome() {
       <section className="logistics-info-band">
         <div className="mx-auto grid w-full max-w-[1240px] gap-8 px-5 py-10 sm:px-9 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)] lg:py-14">
           <div>
-            <p className="logistics-eyebrow text-white/70">
+            <p className="logistics-eyebrow text-vtk-on-dark/70">
               <span className="h-1.5 w-1.5 rounded-full bg-vtk-yellow" aria-hidden />
               {t.infoKicker}
             </p>
-            <h2 className="mt-4 max-w-xl text-3xl font-semibold tracking-[-0.03em] text-vtk-paper sm:text-4xl">
+            <h2 className="mt-4 max-w-xl text-3xl font-semibold tracking-[-0.03em] text-vtk-on-dark sm:text-4xl">
               {content.infoTitle}
             </h2>
           </div>
-          <p className="max-w-xl self-end leading-7 text-[#b7c0dc]">
+          <p className="max-w-xl self-end leading-7 text-vtk-on-dark-muted">
             {content.infoLead}
           </p>
         </div>

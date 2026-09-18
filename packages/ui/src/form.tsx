@@ -9,7 +9,7 @@ import type {
 import { cn } from "./cn";
 
 const base =
-  "w-full rounded-xl border border-vtk-blue/12 bg-white px-3 py-2 text-sm text-vtk-ink shadow-sm placeholder:text-zinc-400 focus:border-vtk-ink focus:outline-none focus:ring-2 focus:ring-vtk-blue/10 disabled:cursor-not-allowed disabled:opacity-50";
+  "w-full rounded-xl border border-vtk-blue/12 bg-vtk-surface-elevated px-3 py-2 text-sm text-vtk-ink shadow-sm placeholder:text-zinc-400 focus:border-vtk-ink focus:outline-none focus:ring-2 focus:ring-vtk-blue/10 disabled:cursor-not-allowed disabled:opacity-50";
 
 // forwardRef zodat callers (bvb een auto-focus scannerveld) een ref kunnen meegeven.
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
@@ -41,7 +41,7 @@ export function Label({
   ...rest
 }: LabelHTMLAttributes<HTMLLabelElement> & { children: ReactNode }) {
   return (
-    <label className={cn("block text-xs font-semibold uppercase tracking-[0.08em] text-[#5c667f] mb-1.5", className)} {...rest}>
+    <label className={cn("block text-xs font-semibold uppercase tracking-[0.08em] text-vtk-muted mb-1.5", className)} {...rest}>
       {children}
     </label>
   );

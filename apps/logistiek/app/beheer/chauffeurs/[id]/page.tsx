@@ -68,7 +68,7 @@ export default async function BeheerChauffeurRittenPage({
                   <td className="py-2 pr-3 tabular-nums text-vtk-body">
                     {tripHoursLabel(trip.startAt, trip.endAt)}
                     {isNightTrip(trip.startAt, trip.endAt) ? (
-                      <span className="ml-2 rounded-full bg-vtk-navy px-2 py-0.5 text-[11px] font-semibold text-white">
+                      <span className="ml-2 rounded-full bg-vtk-navy px-2 py-0.5 text-[11px] font-semibold text-vtk-on-emphasis">
                         Nacht
                       </span>
                     ) : null}

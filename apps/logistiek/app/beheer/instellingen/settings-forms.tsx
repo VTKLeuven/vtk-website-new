@@ -24,7 +24,7 @@ const PRICING_MODES: Array<{ value: string; label: string }> = [
   { value: 'FLAT', label: 'Vast bedrag' },
 ];
 
-const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
 function euroInput(cents: number): string {
   return cents === 0 ? '' : (cents / 100).toFixed(2).replace('.', ',');
@@ -328,7 +328,7 @@ export function GeneralSettings({
               <span className="font-normal">
                 {NOTIFY_LABELS[kind].hint}{' '}
                 {notifyEmails[kind].length === 0 ? (
-                  <span className="font-semibold text-red-700">
+                  <span className="font-semibold text-vtk-danger">
                     Nu leeg: er vertrekt geen enkele melding voor deze soort.
                   </span>
                 ) : null}

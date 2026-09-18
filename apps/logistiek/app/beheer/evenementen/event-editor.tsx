@@ -85,7 +85,7 @@ export function EventEditor({
           name="name"
           defaultValue={event?.name ?? ''}
           placeholder="Bv. 24 urenloop"
-          className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+          className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
         />
       </label>
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
@@ -94,7 +94,7 @@ export function EventEditor({
           type="text"
           name="location"
           defaultValue={event?.location ?? ''}
-          className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+          className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
         />
       </label>
       {/* Dag en uur apart, en het uur mag leeg blijven (E2): bij het aanmaken
@@ -106,7 +106,7 @@ export function EventEditor({
           type="date"
           name="startDate"
           defaultValue={event?.startDate ?? ''}
-          className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+          className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
         />
       </label>
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
@@ -115,7 +115,7 @@ export function EventEditor({
           type="time"
           name="startTime"
           defaultValue={event?.startTime ?? ''}
-          className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+          className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
         />
       </label>
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
@@ -124,7 +124,7 @@ export function EventEditor({
           type="date"
           name="endDate"
           defaultValue={event?.endDate ?? ''}
-          className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+          className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
         />
       </label>
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
@@ -133,7 +133,7 @@ export function EventEditor({
           type="time"
           name="endTime"
           defaultValue={event?.endTime ?? ''}
-          className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+          className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
         />
       </label>
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
@@ -143,7 +143,7 @@ export function EventEditor({
           name="note"
           defaultValue={event?.note ?? ''}
           placeholder="Bv. materiaal blijft staan tot maandag"
-          className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+          className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
         />
       </label>
       <button

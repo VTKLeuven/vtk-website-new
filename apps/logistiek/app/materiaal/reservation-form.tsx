@@ -529,7 +529,7 @@ export function ReservationForm({
                   value={newTemplate.name}
                   onChange={(field) => setNewTemplate({ name: field.target.value })}
                   placeholder={en ? 'E.g. Cantus' : 'Bv. Cantus'}
-                  className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+                  className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
                 />
                 <span className="text-xs text-vtk-muted">
                   {en
@@ -609,12 +609,12 @@ export function ReservationForm({
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder={en ? 'Search equipment...' : 'Zoek materiaal...'}
-              className="h-10 min-w-[200px] flex-1 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+              className="h-10 min-w-[200px] flex-1 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
             />
             <select
               value={activeCategory}
               onChange={(e) => setActiveCategory(e.target.value)}
-              className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+              className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
             >
               <option value="all">{en ? 'All categories' : 'Alle categorieën'}</option>
               {catalog.map((category) => (
@@ -646,7 +646,7 @@ export function ReservationForm({
                   onClick={() => chooseView(value)}
                   aria-pressed={view === value}
                   className={`h-8 rounded-md px-2.5 text-sm font-medium transition ${
-                    view === value ? 'bg-vtk-navy text-white' : 'text-vtk-ink hover:bg-vtk-navy/5'
+                    view === value ? 'bg-vtk-navy text-vtk-on-emphasis' : 'text-vtk-ink hover:bg-vtk-navy/5'
                   }`}
                 >
                   {label}
@@ -742,7 +742,7 @@ export function ReservationForm({
                             </span>
                           ) : null}
                           {short ? (
-                            <span className="ml-2 text-xs text-amber-900">
+                            <span className="ml-2 text-xs text-vtk-warn">
                               {en
                                 ? `only ${available} free then`
                                 : `maar ${available} vrij in die periode`}
@@ -751,7 +751,7 @@ export function ReservationForm({
                         </span>
                         <span
                           className={`shrink-0 text-sm tabular-nums ${
-                            available === 0 ? 'font-semibold text-red-700' : 'text-vtk-muted'
+                            available === 0 ? 'font-semibold text-vtk-danger' : 'text-vtk-muted'
                           }`}
                         >
                           {available !== undefined ? available : item.quantity}{' '}
@@ -778,7 +778,7 @@ export function ReservationForm({
                             onClick={() => setQuantity(item.id, quantity + 1)}
                             disabled={atMax}
                             aria-label={`${en ? 'More' : 'Meer'}: ${item.name}`}
-                            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-vtk-navy text-lg font-medium text-white transition hover:bg-vtk-ink disabled:opacity-30"
+                            className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-vtk-navy text-lg font-medium text-vtk-on-emphasis transition hover:bg-vtk-ink disabled:opacity-30"
                           >
                             +
                           </button>
@@ -788,7 +788,7 @@ export function ReservationForm({
                   }
 
                   return (
-                    <li key={item.id} className="flex flex-col overflow-hidden rounded-[14px] border border-vtk-navy/10 bg-white">
+                    <li key={item.id} className="flex flex-col overflow-hidden rounded-[14px] border border-vtk-navy/10 bg-vtk-surface">
                       <Link href={`/materiaal/${item.id}`} className="block aspect-[4/3] w-full bg-vtk-paper-2">
                         {imageKey ? (
                           <img
@@ -849,14 +849,14 @@ export function ReservationForm({
                                   : 'Voorraad'}
                             </dt>
                             <dd
-                              className={`mt-0.5 font-semibold ${available === 0 ? 'text-red-700' : 'text-vtk-ink'}`}
+                              className={`mt-0.5 font-semibold ${available === 0 ? 'text-vtk-danger' : 'text-vtk-ink'}`}
                             >
                               {available !== undefined ? available : item.quantity}
                             </dd>
                           </div>
                         </dl>
                         {short ? (
-                          <p className="mt-1.5 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">
+                          <p className="mt-1.5 rounded-lg bg-vtk-warn-soft px-2 py-1 text-xs text-vtk-warn">
                             {en
                               ? `You are asking for ${quantity}, but only ${available} are free then. Logistics will look at it.`
                               : `Je vraagt er ${quantity}, maar in die periode zijn er maar ${available} vrij. Logistiek bekijkt het.`}
@@ -909,7 +909,7 @@ export function ReservationForm({
                             onClick={() => setQuantity(item.id, quantity + 1)}
                             disabled={atMax}
                             aria-label={`${en ? 'More' : 'Meer'}: ${item.name}`}
-                            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-vtk-navy text-lg font-medium text-white transition hover:bg-vtk-ink disabled:opacity-30"
+                            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-vtk-navy text-lg font-medium text-vtk-on-emphasis transition hover:bg-vtk-ink disabled:opacity-30"
                           >
                             +
                           </button>
@@ -950,7 +950,7 @@ export function ReservationForm({
               <label className="grid gap-1 text-sm">
                 <span className="font-medium text-vtk-ink">
                   {en ? 'Collect on' : 'Afhalen op'}
-                  <span aria-hidden="true" className="text-red-600"> *</span>
+                  <span aria-hidden="true" className="text-vtk-danger"> *</span>
                 </span>
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                   <input
@@ -960,7 +960,7 @@ export function ReservationForm({
                     data-field="pickupDate"
                     aria-invalid={missing?.name === 'pickupDate'}
                     className={fieldClass(
-                      'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink',
+                      'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-vtk-ink',
                       'pickupDate',
                       missing
                     )}
@@ -984,7 +984,7 @@ export function ReservationForm({
                     data-field="returnDate"
                     aria-invalid={missing?.name === 'returnDate'}
                     className={fieldClass(
-                      'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink',
+                      'h-10 min-w-0 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-vtk-ink',
                       'returnDate',
                       missing
                     )}
@@ -1007,7 +1007,7 @@ export function ReservationForm({
                   onChange={(e) => setNote(e.target.value)}
                   rows={3}
                   placeholder={en ? 'Anything the team should know' : 'Iets dat het team moet weten'}
-                  className="rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-vtk-ink"
+                  className="rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 py-2 text-vtk-ink"
                 />
               </label>
             </div>
@@ -1031,7 +1031,7 @@ export function ReservationForm({
                             type="button"
                             onClick={() => setQuantity(item.id, 0)}
                             aria-label={`${en ? 'Remove' : 'Verwijderen'}: ${item.name}`}
-                            className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-base font-semibold text-red-600 transition hover:bg-red-50 hover:text-red-700"
+                            className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-base font-semibold text-vtk-danger transition hover:bg-vtk-danger-soft hover:text-vtk-danger"
                           >
                             ×
                           </button>
@@ -1048,7 +1048,7 @@ export function ReservationForm({
                         }
                         placeholder={en ? 'Note (optional)' : 'Opmerking (optioneel)'}
                         aria-label={`${en ? 'Note' : 'Opmerking'}: ${item.name}`}
-                        className="mt-0.5 h-8 w-full rounded-lg border border-vtk-navy/15 bg-white px-2 text-xs text-vtk-ink"
+                        className="mt-0.5 h-8 w-full rounded-lg border border-vtk-navy/15 bg-vtk-field px-2 text-xs text-vtk-ink"
                       />
                     </div>
                   ))}
@@ -1092,7 +1092,7 @@ export function ReservationForm({
                 zegt hier expliciet dat hij dat weet. Zonder die stap belandt het
                 conflict bij Logistiek zonder dat de aanvrager het doorhad. */}
             {conflictLines.length > 0 ? (
-              <div className="mt-4 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm text-amber-900">
+              <div className="mt-4 rounded-lg border border-vtk-warn-line bg-vtk-warn-soft px-3 py-2.5 text-sm text-vtk-warn">
                 <p className="font-semibold">
                   {en ? 'Not everything is free then' : 'Niet alles is vrij in je periode'}
                 </p>
@@ -1122,7 +1122,7 @@ export function ReservationForm({
             ) : null}
 
             {error ? (
-              <p role="alert" className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <p role="alert" className="mt-4 rounded-lg border border-vtk-danger-line bg-vtk-danger-soft px-3 py-2 text-sm text-vtk-danger">
                 {error}
               </p>
             ) : null}

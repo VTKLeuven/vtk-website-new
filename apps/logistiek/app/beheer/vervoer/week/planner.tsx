@@ -347,7 +347,7 @@ export function TransportPlanner({
               <button
                 type="button"
                 onClick={nextClash}
-                className="rounded-full border border-red-400 bg-red-50 px-3 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+                className="rounded-full border border-vtk-danger-line bg-vtk-danger-soft px-3 py-1.5 text-sm font-semibold text-vtk-danger transition hover:bg-vtk-danger-fill"
               >
                 {clashing.length} {clashing.length === 1 ? 'botsing' : 'botsingen'}
               </button>
@@ -365,7 +365,7 @@ export function TransportPlanner({
                 start.setHours(start.getHours() + 1);
                 createRange(start, new Date(start.getTime() + 60 * 60 * 1000));
               }}
-              className="rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-vtk-ink disabled:cursor-not-allowed disabled:border-vtk-navy/20 disabled:bg-vtk-navy/30"
+              className="rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1.5 text-sm font-semibold text-vtk-on-emphasis transition hover:bg-vtk-ink disabled:cursor-not-allowed disabled:border-vtk-navy/20 disabled:bg-vtk-navy/30"
             >
               Nieuwe rit
             </button>
@@ -477,7 +477,7 @@ export function TransportPlanner({
                   de andere rit wat je nodig hebt om het op te lossen: een klik
                   brengt je erheen om er een van beide te verschuiven. */}
               {trip.conflictsWith.length > 0 ? (
-                <div className="rounded-[12px] border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+                <div className="rounded-[12px] border border-vtk-danger-line bg-vtk-danger-soft px-3 py-2 text-sm text-vtk-danger">
                   <p className="font-semibold">
                     Dubbel geboekt met {trip.vehicleName}
                   </p>

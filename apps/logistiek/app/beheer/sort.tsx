@@ -48,7 +48,7 @@ export function nextSortDir(
 /** De pil van een sorteerknop, actief of niet. Eén plek, zodat ze overal gelijk is. */
 export function sortChipClass(active: boolean): string {
   return active
-    ? 'inline-flex items-center gap-1 rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1 font-semibold text-white'
+    ? 'inline-flex items-center gap-1 rounded-full border border-vtk-navy bg-vtk-navy px-3 py-1 font-semibold text-vtk-on-emphasis'
     : 'inline-flex items-center gap-1 rounded-full border border-vtk-navy/15 px-3 py-1 font-medium text-vtk-ink transition hover:border-vtk-navy/40';
 }
 

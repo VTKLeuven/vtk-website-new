@@ -90,7 +90,7 @@ export default async function StatistiekenPage({
   const chip = (active: boolean) =>
     `rounded-full border px-3 py-1 text-sm font-medium transition ${
       active
-        ? 'border-vtk-navy bg-vtk-navy text-white'
+        ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
         : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
     }`;
 
@@ -145,7 +145,7 @@ export default async function StatistiekenPage({
                     type="date"
                     name="van"
                     defaultValue={query.van ?? toDateInputValue(period.from)}
-                    className="h-9 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+                    className="h-9 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
                   />
                 </label>
                 <label className="grid gap-1 text-xs font-medium text-vtk-muted">
@@ -154,12 +154,12 @@ export default async function StatistiekenPage({
                     type="date"
                     name="tot"
                     defaultValue={query.tot ?? toDateInputValue(new Date(period.to.getTime() - 86_400_000))}
-                    className="h-9 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink"
+                    className="h-9 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink"
                   />
                 </label>
                 <button
                   type="submit"
-                  className="h-9 rounded-full border border-vtk-navy bg-vtk-navy px-3.5 text-sm font-semibold text-white transition hover:bg-vtk-ink"
+                  className="h-9 rounded-full border border-vtk-navy bg-vtk-navy px-3.5 text-sm font-semibold text-vtk-on-emphasis transition hover:bg-vtk-ink"
                 >
                   Toon
                 </button>

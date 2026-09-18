@@ -5,6 +5,7 @@ import { copy, getLocale } from '@/lib/i18n';
 import { driverStatus, showsMyTrips } from '@/lib/uitleen-server';
 import { LanguageSwitcher } from './language-switcher';
 import { ProfileMenu } from './profile-menu';
+import { ThemeToggle } from './theme-toggle';
 
 const MAIN_URL = process.env.VTK_MAIN_URL || 'https://vtk.be';
 
@@ -95,6 +96,7 @@ export async function SiteHeader() {
         </div>
 
         <div className="nav-right">
+          <ThemeToggle label={t.themeToggle} />
           <LanguageSwitcher locale={locale} />
           {session ? (
             <ProfileMenu

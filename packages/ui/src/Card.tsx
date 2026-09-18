@@ -8,7 +8,7 @@ export function Card({ className, children, ...rest }: Props) {
     <div
       data-vtk-ui="card"
       className={cn(
-        "rounded-[18px] border border-vtk-blue/10 bg-white shadow-[0_10px_30px_-24px_rgba(10,15,31,0.35)]",
+        "rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated shadow-[0_10px_30px_-24px_rgba(10,15,31,0.35)]",
         className
       )}
       {...rest}

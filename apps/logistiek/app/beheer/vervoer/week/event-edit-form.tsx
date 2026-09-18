@@ -23,7 +23,7 @@ const ERRORS = {
 };
 
 const inputClass =
-  'w-full rounded-lg border border-vtk-navy/15 bg-white px-3 py-2 text-sm text-vtk-ink';
+  'w-full rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 py-2 text-sm text-vtk-ink';
 
 export type PlannerEvent = {
   id: string;

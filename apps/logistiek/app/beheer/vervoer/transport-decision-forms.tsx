@@ -29,7 +29,7 @@ const REJECT_ERRORS = {
   NOT_REQUESTED: 'Deze rit is al beslist.',
 };
 
-const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink';
+const inputClass = 'h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-vtk-ink';
 
 export type DecisionLeg = {
   id: string;
@@ -146,7 +146,7 @@ export function TransportDecisionForms({
             </p>
 
             {sameDayBookings.length > 0 ? (
-              <div className="rounded-[12px] bg-white px-3 py-2 text-xs text-vtk-body">
+              <div className="rounded-[12px] bg-vtk-surface px-3 py-2 text-xs text-vtk-body">
                 <p className="font-semibold text-vtk-ink">Dit voertuig staat die dag al vast:</p>
                 <ul className="mt-1 grid gap-0.5">
                   {sameDayBookings.map((line) => (
@@ -166,7 +166,7 @@ export function TransportDecisionForms({
               </span>
               <select
                 name="driverId"
-                className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+                className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-vtk-ink"
                 defaultValue=""
               >
                 <option value="">{needsDriver ? 'Nog geen chauffeur' : 'Geen chauffeur nodig'}</option>
@@ -203,14 +203,14 @@ export function TransportDecisionForms({
               <input
                 type="text"
                 name="adminNote"
-                className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+                className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-vtk-ink"
               />
             </label>
 
             {/* Pas ná een geweigerde botsing: altijd tonen zou dit vinkje tot
                 standaarduitrusting maken, en dan remt de weigering niets meer. */}
             {state.status === 'error' && state.code === 'OVERLAP' ? (
-              <label className="flex items-start gap-2 rounded-[12px] border border-red-300 bg-red-50 p-3 text-sm">
+              <label className="flex items-start gap-2 rounded-[12px] border border-vtk-danger-line bg-vtk-danger-soft p-3 text-sm">
                 <input type="checkbox" name="allowOverlap" className="mt-0.5 h-4 w-4" />
                 <span>
                   Toch goedkeuren
@@ -241,7 +241,7 @@ export function TransportDecisionForms({
           <input
             type="text"
             name="adminNote"
-            className="h-10 rounded-lg border border-vtk-navy/15 bg-white px-3 text-vtk-ink"
+            className="h-10 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-vtk-ink"
           />
         </label>
       </SaveForm>

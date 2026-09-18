@@ -77,7 +77,7 @@ const IMPORT_ERRORS = {
   NAME_REQUIRED: 'Geef elk nieuw item een naam.',
 };
 
-const inputClass = 'h-9 min-w-0 rounded-lg border border-vtk-navy/15 bg-white px-3 text-sm text-vtk-ink';
+const inputClass = 'h-9 min-w-0 rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 text-sm text-vtk-ink';
 
 function dateTimeLabel(date: Date | null): string {
   if (!date) return '-';

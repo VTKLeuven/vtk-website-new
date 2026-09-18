@@ -33,6 +33,13 @@
   --color-vtk-paper: #0b0e13;
   --color-vtk-paper-2: #11161e;
   --color-vtk-surface: #171d26;
+  /* Gedeeld met @vtk/ui: `ConfirmDialog` en de formuliervelden droegen `bg-white`
+     en de secundaire knop `text-vtk-ink`. Nu het ook in de uitleendienst donker
+     kan worden, hangen die aan een token in plaats van aan een vaste kleur, en
+     vult elke app het zelf in. De waarden hier zijn wat de correcties onderaan
+     dit bestand al afdwongen. */
+  --color-vtk-surface-elevated: #171d26;
+  --color-vtk-on-yellow: #05070a;
   --color-vtk-body: #c2cad4;
   --color-vtk-muted: #8d99a8;
   --font-sans: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
@@ -1361,9 +1368,9 @@ select:focus {
   accent-color: var(--yellow);
 }
 
-/* ConfirmDialog: `bg-white` met `text-vtk-ink` erop. */
+/* ConfirmDialog: een verhoogd paneel met `text-vtk-ink` erop. */
 .vtk-fakbar-dark [role='dialog'] > div,
-[role='dialog'] > div.bg-white {
+[role='dialog'] > div.bg-vtk-surface-elevated {
   border-color: var(--line-2) !important;
   background: var(--surface) !important;
   color: var(--ink);

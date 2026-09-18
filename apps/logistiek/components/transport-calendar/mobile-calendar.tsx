@@ -385,7 +385,7 @@ export function MobileCalendar({
               const start = new Date(base + hour * 60 * 60 * 1000);
               onCreate(start, new Date(start.getTime() + 60 * 60 * 1000));
             }}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-vtk-navy text-lg leading-none text-white"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-vtk-navy text-lg leading-none text-vtk-on-emphasis"
           >
             <span aria-hidden>+</span>
             <span className="sr-only">Rit toevoegen op deze dag</span>
