@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import { staticMetadata } from '@/lib/pageMetadata';
 import { hasLocale } from '@/lib/locale';
-import { Locale, getDictionary } from '@vtk/i18n';
+import { Locale } from '@vtk/i18n';
 import { notFound } from 'next/navigation';
 import { requireSession } from '@/lib/session';
 import { PleaseLogin } from '@/components/site/pleaseLogin';
 import { prisma } from '@vtk/db';
+import { addDays, startOfWeek } from 'date-fns';
 import { academicYearRange, currentAcademicYear } from '@/lib/shift';
 import { loadPostNames } from '@/lib/shift/postNames';
 import { ShiftBoard } from '@/components/shift/ShiftBoard';
@@ -58,7 +59,6 @@ export default async function ShiftPage({ params }: { params: Promise<{ locale: 
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const base = locale === 'nl' ? '' : '/en';
-  const t = getDictionary(locale).shift;
 
   let session;
   // TODO doe dit op een andere (betere manier?)
@@ -68,10 +68,37 @@ export default async function ShiftPage({ params }: { params: Promise<{ locale: 
     return <PleaseLogin locale={locale} nextPath={`${base}/shift`} className="vtk-page-shell" />;
   }
 
-  const [stats, postNames] = await Promise.all([
+  const now = new Date();
+  const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 });
+  const currentWeekEnd = addDays(currentWeekStart, 7);
+
+  const [stats, postNames, shiftThisWeek] = await Promise.all([
     yearStats(session.user.id),
     loadPostNames(locale),
+    prisma.shift.findFirst({
+      where: {
+        endTime: { gte: now },
+        startTime: { lt: currentWeekEnd },
+        manualGrantId: null,
+      },
+      select: { id: true },
+    }),
   ]);
+
+  let initialWeekStart = currentWeekStart;
+  if (!shiftThisWeek) {
+    const nextShift = await prisma.shift.findFirst({
+      where: {
+        endTime: { gte: now },
+        manualGrantId: null,
+      },
+      orderBy: { startTime: 'asc' },
+      select: { startTime: true },
+    });
+    if (nextShift) {
+      initialWeekStart = startOfWeek(nextShift.startTime, { weekStartsOn: 1 });
+    }
+  }
 
   return (
     <div className="vtk-page">
@@ -80,6 +107,7 @@ export default async function ShiftPage({ params }: { params: Promise<{ locale: 
         historyHref={`${base}/shift/history`}
         stats={stats}
         postNames={postNames}
+        initialWeekStart={initialWeekStart.toISOString()}
       />
     </div>
   );

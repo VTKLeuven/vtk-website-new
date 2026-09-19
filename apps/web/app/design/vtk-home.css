@@ -2089,6 +2089,7 @@
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--surface);
+  cursor: pointer;
   transition:
     transform 140ms ease,
     border-color 140ms ease,
@@ -2099,6 +2100,11 @@
   transform: translateY(-2px);
   border-color: var(--line-2);
   box-shadow: 0 12px 26px -18px rgba(14, 26, 54, 0.6);
+}
+
+.vtk-design .shift-tile:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
 }
 
 .vtk-design .shift-tile-head {
@@ -2377,22 +2383,25 @@
 .vtk-design .shift-tile-meta-loc {
   flex-shrink: 1;
   min-width: 0;
-  cursor: pointer;
   outline: none;
   transition: color 120ms ease;
 }
 
-.vtk-design .shift-tile-meta-loc:hover,
-.vtk-design .shift-tile-meta-loc:focus-visible {
+.vtk-design .shift-tile-meta-loc[data-overflow="true"] {
+  cursor: help;
+}
+
+.vtk-design .shift-tile-meta-loc[data-overflow="true"]:hover,
+.vtk-design .shift-tile-meta-loc[data-overflow="true"]:focus-visible {
   color: var(--ink);
 }
 
-.vtk-design .shift-tile-meta-loc:hover .shift-tile-meta-icon,
-.vtk-design .shift-tile-meta-loc:focus-visible .shift-tile-meta-icon {
+.vtk-design .shift-tile-meta-loc[data-overflow="true"]:hover .shift-tile-meta-icon,
+.vtk-design .shift-tile-meta-loc[data-overflow="true"]:focus-visible .shift-tile-meta-icon {
   color: var(--ink);
 }
 
-.vtk-design .shift-tile-meta-loc:hover .shift-tile-meta-text {
+.vtk-design .shift-tile-meta-loc[data-overflow="true"]:hover .shift-tile-meta-text {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
@@ -2466,8 +2475,8 @@
   right: 12px;
 }
 
-.vtk-design .shift-tile-meta-loc:hover .shift-tile-loc-tooltip,
-.vtk-design .shift-tile-meta-loc:focus-visible .shift-tile-loc-tooltip {
+.vtk-design .shift-tile-meta-loc[data-overflow="true"]:hover .shift-tile-loc-tooltip,
+.vtk-design .shift-tile-meta-loc[data-overflow="true"]:focus-visible .shift-tile-loc-tooltip {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);

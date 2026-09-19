@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { isSameDay, addDays } from "date-fns";
 import { getDictionary, type Locale } from "@vtk/i18n";
@@ -10,6 +10,43 @@ import { ShiftDialog } from "@/components/shift/ShiftDialog";
 import "@/components/shift/shift-board.css";
 import type { ShiftRosterEntry } from "@/lib/shift";
 import { MapPin, Users } from "lucide-react";
+
+function ShiftLocation({ locationText }: { locationText: string }) {
+  const textRef = useRef<HTMLSpanElement>(null);
+  const [isOverflowing, setIsOverflowing] = useState(false);
+
+  useEffect(() => {
+    const el = textRef.current;
+    if (!el) return;
+    const check = () => {
+      setIsOverflowing(el.scrollWidth > el.clientWidth);
+    };
+    check();
+    const ro = new ResizeObserver(check);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [locationText]);
+
+  return (
+    <span
+      className="shift-tile-meta-item shift-tile-meta-loc"
+      data-overflow={isOverflowing ? "true" : undefined}
+      tabIndex={isOverflowing ? 0 : undefined}
+      title={isOverflowing ? locationText : undefined}
+      aria-label={locationText}
+    >
+      <MapPin className="shift-tile-meta-icon" aria-hidden="true" />
+      <span ref={textRef} className="shift-tile-meta-text">
+        {locationText}
+      </span>
+      {isOverflowing ? (
+        <span className="shift-tile-loc-tooltip" role="tooltip">
+          {locationText}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 export type FrontpageShiftItem = {
   id: string;
@@ -194,10 +231,22 @@ export function FrontpageShiftBand({
             };
 
             return (
-              <article key={shift.id} className="shift-tile">
+              <article
+                key={shift.id}
+                className="shift-tile"
+                role="button"
+                tabIndex={0}
+                onClick={() => setSelectedEntry(entry)}
+                onKeyDown={(e) => {
+                  if ((e.key === "Enter" || e.key === " ") && e.target === e.currentTarget) {
+                    e.preventDefault();
+                    setSelectedEntry(entry);
+                  }
+                }}
+              >
                 <div className="shift-tile-head">
                   <p className="shift-tile-day">{formatShiftTileDay(start, now, locale)}</p>
-                  <div className="shift-spots-wrap">
+                  <div className="shift-spots-wrap" onClick={(e) => e.stopPropagation()}>
                     <button
                       type="button"
                       className={`shift-spots ${badgeClass}`}
@@ -287,18 +336,7 @@ export function FrontpageShiftBand({
                     ) : null}
 
                     {hasLocation ? (
-                      <span
-                        className="shift-tile-meta-item shift-tile-meta-loc"
-                        tabIndex={0}
-                        title={locationText}
-                        aria-label={locationText}
-                      >
-                        <MapPin className="shift-tile-meta-icon" aria-hidden="true" />
-                        <span className="shift-tile-meta-text">{locationText}</span>
-                        <span className="shift-tile-loc-tooltip" role="tooltip">
-                          {locationText}
-                        </span>
-                      </span>
+                      <ShiftLocation locationText={locationText} />
                     ) : null}
                   </div>
                 ) : null}
@@ -309,7 +347,10 @@ export function FrontpageShiftBand({
                       type="button"
                       className="btn btn-ghost btn-sm"
                       title={spotsTitle}
-                      onClick={() => setSelectedEntry(entry)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedEntry(entry);
+                      }}
                     >
                       {nl ? "Ingeschreven" : "Registered"}
                     </button>
@@ -317,11 +358,17 @@ export function FrontpageShiftBand({
                     <Link
                       href={`${base}/inloggen?next=${encodeURIComponent(base || "/")}`}
                       className="btn btn-primary btn-sm"
+                      onClick={(e) => e.stopPropagation()}
                     >
                       {nl ? "Inschrijven" : "Sign up"}
                     </Link>
                   ) : free <= 0 ? (
-                    <button type="button" className="btn btn-ghost btn-sm" disabled>
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-sm"
+                      disabled
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {nl ? "Vol" : "Full"}
                     </button>
                   ) : (
@@ -329,7 +376,10 @@ export function FrontpageShiftBand({
                       type="button"
                       className="btn btn-primary btn-sm"
                       disabled={registeringId === shift.id}
-                      onClick={() => handleRegister(shift)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRegister(shift);
+                      }}
                     >
                       {registeringId === shift.id
                         ? nl
@@ -344,7 +394,10 @@ export function FrontpageShiftBand({
                   <button
                     type="button"
                     className="shift-tile-details"
-                    onClick={() => setSelectedEntry(entry)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedEntry(entry);
+                    }}
                   >
                     {nl ? "Details" : "Details"}
                   </button>

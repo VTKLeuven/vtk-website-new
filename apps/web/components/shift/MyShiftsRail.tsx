@@ -27,12 +27,17 @@ function whenLabel(start: Date, now: number, locale: Locale, t: ShiftDict): stri
   const days = differenceInCalendarDays(start, now);
   if (days <= 0) return t.rel.today;
   if (days === 1) return t.rel.tomorrow;
-  if (days <= 6) return fill(t.rel.inDays, { n: days });
-  return new Intl.DateTimeFormat(locale === 'nl' ? 'nl-BE' : 'en-GB', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  }).format(start);
+
+  const intl = locale === 'nl' ? 'nl-BE' : 'en-GB';
+  const rawDay = new Intl.DateTimeFormat(intl, { weekday: 'long' }).format(start);
+  const weekday = rawDay.charAt(0).toUpperCase() + rawDay.slice(1);
+  const dayMonth = new Intl.DateTimeFormat(intl, { day: 'numeric', month: 'short' }).format(start);
+  const explicitDay = `${weekday} ${dayMonth}`;
+
+  if (days <= 6) {
+    return `${explicitDay} (${fill(t.rel.inDays, { n: days }).toLowerCase()})`;
+  }
+  return explicitDay;
 }
 
 /**

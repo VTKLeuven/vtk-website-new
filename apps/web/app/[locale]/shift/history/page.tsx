@@ -39,10 +39,13 @@ export default async function ShiftHistoryPage({
     return <PleaseLogin locale={locale} nextPath={`${base}/shift/history`} className="vtk-page-shell" />;
   }
 
-  // Alle shiften waarvoor de user (ooit) ingeschreven was, per post geteld.
+  // Alle voorbije shiften waarvoor de user ingeschreven was, per post geteld.
   const [participations, postNames] = await Promise.all([
     prisma.shiftParticipant.findMany({
-      where: { userId: session.user.id },
+      where: {
+        userId: session.user.id,
+        shift: { endTime: { lt: new Date() } },
+      },
       select: { shift: { select: { post: true } } },
     }),
     loadPostNames(locale),

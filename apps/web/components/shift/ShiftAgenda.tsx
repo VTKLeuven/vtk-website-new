@@ -193,6 +193,23 @@ export function ShiftAgenda({
                       )
                     : null;
 
+                  const roster = shift.roster ?? [];
+                  const nl = locale === 'nl';
+                  const rosterNames = roster.map((p) =>
+                    p.isSelf ? `${p.name} (${nl ? 'jij' : 'you'})` : p.name
+                  );
+                  const spotsTitle =
+                    rosterNames.length > 0
+                      ? `${nl ? 'Ingeschreven' : 'Registered'}: ${rosterNames.join(', ')}`
+                      : nl
+                        ? 'Nog geen inschrijvingen'
+                        : 'No sign-ups yet';
+                  const taken = shift.takenSpots ?? (shift.maxParticipants - freeSpots(shift));
+                  const spotsBadgeLabel = registered ? t.isRegistered : spotsLabel(shift, t);
+                  const spotsBadgeClass = registered
+                    ? 'vtk-shift-spots-mine'
+                    : `vtk-shift-spots-${spotsVariant(shift)}`;
+
                   return (
                     <li
                       key={shift.id}
@@ -246,43 +263,74 @@ export function ShiftAgenda({
                       </button>
 
                       <div className="vtk-shift-act">
-                        {registered ? (
-                          <>
-                            <span className="vtk-shift-spots vtk-shift-spots-mine">
-                              {t.isRegistered}
-                            </span>
-                            <button
-                              type="button"
-                              className="vtk-shift-btn vtk-shift-btn-ghost vtk-shift-btn-sm"
-                              disabled={locked}
-                              title={locked ? t.error.tooLateToUnregister : undefined}
-                              onClick={() => unregisterShift(shift.id, showToast, t)}
-                            >
-                              {t.unregister}
-                            </button>
-                          </>
-                        ) : (
-                          <>
-                            <span
-                              className={`vtk-shift-spots vtk-shift-spots-${spotsVariant(shift)}`}
-                              title={fill(t.spots.taken, {
-                                taken: shift.takenSpots ?? 0,
-                                max: shift.maxParticipants,
-                              })}
-                            >
-                              {spotsLabel(shift, t)}
-                            </span>
-                            {/* Een volle shift krijgt geen uitgeschakelde knop: "Vol" zegt het al. */}
-                            {isFull ? null : (
-                              <button
-                                type="button"
-                                className="vtk-shift-btn vtk-shift-btn-sm"
-                                onClick={() => registerShift(shift.id, showToast, t)}
-                              >
-                                {t.register}
-                              </button>
+                        <div className="vtk-shift-spots-wrap">
+                          <button
+                            type="button"
+                            className={`vtk-shift-spots ${spotsBadgeClass}`}
+                            title={spotsTitle}
+                            onClick={() => onOpen(entry)}
+                            aria-label={`${spotsBadgeLabel}. ${spotsTitle}`}
+                          >
+                            {spotsBadgeLabel}
+                          </button>
+                          <div className="vtk-shift-spots-popover" role="tooltip" aria-hidden="true">
+                            <div className="vtk-shift-spots-popover-head">
+                              <span className="vtk-shift-spots-popover-title">
+                                {nl ? 'Ingeschreven' : 'Registered'}
+                              </span>
+                              <span className="vtk-shift-spots-popover-count">
+                                {taken}/{shift.maxParticipants}
+                              </span>
+                            </div>
+                            {roster.length === 0 ? (
+                              <p className="vtk-shift-spots-popover-empty">
+                                {nl ? 'Nog geen inschrijvingen' : 'No sign-ups yet'}
+                              </p>
+                            ) : (
+                              <ul className="vtk-shift-spots-popover-list">
+                                {roster.map((person, idx) => (
+                                  <li
+                                    key={idx}
+                                    className="vtk-shift-spots-popover-person"
+                                    data-self={person.isSelf ? 'true' : undefined}
+                                  >
+                                    <span className="vtk-shift-spots-popover-initial">
+                                      {person.name.trim().slice(0, 1).toUpperCase() || '?'}
+                                    </span>
+                                    <span className="vtk-shift-spots-popover-name">
+                                      {person.name}
+                                      {person.isSelf ? (
+                                        <span className="vtk-shift-spots-popover-you">
+                                          {' '}
+                                          ({nl ? 'jij' : 'you'})
+                                        </span>
+                                      ) : null}
+                                    </span>
+                                  </li>
+                                ))}
+                              </ul>
                             )}
-                          </>
+                          </div>
+                        </div>
+
+                        {registered ? (
+                          <button
+                            type="button"
+                            className="vtk-shift-btn vtk-shift-btn-ghost vtk-shift-btn-sm"
+                            disabled={locked}
+                            title={locked ? t.error.tooLateToUnregister : undefined}
+                            onClick={() => unregisterShift(shift.id, showToast, t)}
+                          >
+                            {t.unregister}
+                          </button>
+                        ) : isFull ? null : (
+                          <button
+                            type="button"
+                            className="vtk-shift-btn vtk-shift-btn-sm"
+                            onClick={() => registerShift(shift.id, showToast, t)}
+                          >
+                            {t.register}
+                          </button>
                         )}
                       </div>
                     </li>

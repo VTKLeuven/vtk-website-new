@@ -39,11 +39,13 @@ export function ShiftBoard({
   historyHref,
   stats,
   postNames,
+  initialWeekStart,
 }: {
   locale: Locale;
   historyHref: string;
   stats: ShiftYearStats;
   postNames: PostNames;
+  initialWeekStart?: Date | string;
 }) {
   const t = getDictionary(locale).shift;
 
@@ -51,7 +53,9 @@ export function ShiftBoard({
   const registered = useShiftList('/api/shift/register');
 
   const [view, setView] = useState<View>('list');
-  const [weekStart, setWeekStart] = useState(() => mondayOf(new Date()));
+  const [weekStart, setWeekStart] = useState(() =>
+    initialWeekStart ? mondayOf(new Date(initialWeekStart)) : mondayOf(new Date())
+  );
   const [postFilter, setPostFilter] = useState<string>(ALL_POSTS);
   const [opened, setOpened] = useState<MergedShift | null>(null);
 

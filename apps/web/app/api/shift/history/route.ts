@@ -19,7 +19,10 @@ export async function GET() {
   }
 
   const participations = await prisma.shiftParticipant.findMany({
-    where: { userId: session.user.id },
+    where: {
+      userId: session.user.id,
+      shift: { endTime: { lt: new Date() } },
+    },
     select: {
       rewardPaid: true,
       shift: { select: { post: true, endTime: true, reward: true } },

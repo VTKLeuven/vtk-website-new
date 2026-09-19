@@ -60,18 +60,23 @@ export async function GET(request: Request) {
   // bedenktijd nog loopt en of de uitschrijfknop dus actief mag zijn. De namen
   // gaan enkel via `roster` mee, niet in `participants`.
   return NextResponse.json(
-    shifts.map(({ participants, ...shift }) => ({
-      ...shift,
-      participants: participants.map(({ userId, payedOut, registeredAt }) => ({
-        userId,
-        payedOut,
-        registeredAt,
-      })),
-      registeredAt:
-        participants.find((participant) => participant.userId === targetUserId)?.registeredAt ??
-        null,
-      roster: toRoster(participants, session.user.id),
-    })),
+    shifts.map(({ participants, ...shift }) => {
+      const takenSpots = participants.length;
+      return {
+        ...shift,
+        takenSpots,
+        availableSpots: Math.max(0, shift.maxParticipants - takenSpots),
+        participants: participants.map(({ userId, payedOut, registeredAt }) => ({
+          userId,
+          payedOut,
+          registeredAt,
+        })),
+        registeredAt:
+          participants.find((participant) => participant.userId === targetUserId)?.registeredAt ??
+          null,
+        roster: toRoster(participants, session.user.id),
+      };
+    }),
   );
 }
 
