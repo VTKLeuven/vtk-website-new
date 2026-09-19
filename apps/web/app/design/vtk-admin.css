@@ -1164,7 +1164,7 @@ a.vtk-shortcut-tile:hover {
 .vtk-ef {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 10px;
 }
 
 /* De kop blijft staan onder de sitebalk: bij een formulier van twee schermen
@@ -1302,9 +1302,12 @@ a.vtk-shortcut-tile:hover {
   color: #b45309;
 }
 
-/* Eén sectie: titel met de gele regel eronder, één regel uitleg, dan velden. */
+/* Eén sectie: titel met de gele regel eronder, één regel uitleg, dan velden.
+   De witruimte tussen twee secties is de onderrand plus de tussenruimte plus de
+   bovenrand; hou die drie samen klein, anders staat er een halve schermhoogte
+   tussen "Het evenement" en "Wanneer en waar". */
 .vtk-ef-section {
-  padding: 20px 22px 22px;
+  padding: 18px 22px 18px;
 }
 
 .vtk-ef-section-title {
@@ -1390,7 +1393,11 @@ a.vtk-shortcut-tile:hover {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
-  margin: 0;
+  /* De onderruimte staat hier en niet in een `space-y-*` op de wikkel: die
+     utility hangt in Tailwind v4 in een `:where()` en verliest dus van deze
+     regel, waardoor "Start" tegen de keuzekaarten aan bleef plakken hoe groot
+     je de utility ook zette. */
+  margin: 0 0 28px;
   padding: 0;
   border: 0;
 }

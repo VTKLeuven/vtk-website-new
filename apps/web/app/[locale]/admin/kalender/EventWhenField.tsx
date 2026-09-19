@@ -115,7 +115,9 @@ export function EventWhenField({
   return (
     // De keuze staat verder van de velden dan de velden onderling: ze bepaalt
     // welke velden er staan, en plakte ze er tegenaan, dan las "Start" als een
-    // label van de keuzekaart erboven in plaats van van het veld eronder.
+    // label van de keuzekaart erboven in plaats van van het veld eronder. Die
+    // extra ruimte staat op `.vtk-ef-modes` zelf: `space-y-*` hangt in Tailwind
+    // v4 in een `:where()` en verliest van de margin-reset op de fieldset.
     <div className="space-y-6">
       {/* De twee vormen als keuzekaarten: de keuze bepaalt welke velden er
           verderop staan, en dat is meer dan een vinkje in een rij verdient. */}
