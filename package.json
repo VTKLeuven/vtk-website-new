@@ -44,7 +44,7 @@
   },
   "overrides": {
     "passkit-generator": {
-      "joi": "17.13.4"
+      "joi": "17.13.6"
     }
   }
 }
