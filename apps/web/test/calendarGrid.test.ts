@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   eventLeadDate,
   eventOccursOnDay,
+  isEventPast,
   isMultiDayEvent,
   momentOnDay,
   startOfWeek,
@@ -251,5 +252,68 @@ describe('the day a card sits on', () => {
     const gala = { start: '2026-10-21T18:00:00.000Z', end: '2026-10-22T02:00:00.000Z', allDay: false };
     const now = new Date('2026-10-01T09:00:00.000Z');
     expect(eventLeadDate(gala, now)).toEqual(new Date(gala.start));
+  });
+});
+
+describe('isEventPast', () => {
+  it('returns true when a timed event end is before now', () => {
+    const event = {
+      start: '2026-09-16T14:00:00.000Z',
+      end: '2026-09-16T18:00:00.000Z',
+      allDay: false,
+    };
+    const now = new Date('2026-09-19T18:13:00.000Z');
+    expect(isEventPast(event, now)).toBe(true);
+  });
+
+  it('returns false when a timed event is in the future or currently ongoing', () => {
+    const future = {
+      start: '2026-09-20T18:00:00.000Z',
+      end: '2026-09-20T23:00:00.000Z',
+      allDay: false,
+    };
+    const ongoing = {
+      start: '2026-09-19T17:00:00.000Z',
+      end: '2026-09-19T22:00:00.000Z',
+      allDay: false,
+    };
+    const now = new Date('2026-09-19T18:13:00.000Z');
+    expect(isEventPast(future, now)).toBe(false);
+    expect(isEventPast(ongoing, now)).toBe(false);
+  });
+
+  it('handles allDay events until the end of the final day', () => {
+    const pastAllDay = {
+      start: '2026-09-16T00:00:00.000Z',
+      end: '2026-09-16T00:00:00.000Z',
+      allDay: true,
+    };
+    const todayAllDay = {
+      start: '2026-09-19T00:00:00.000Z',
+      end: '2026-09-19T00:00:00.000Z',
+      allDay: true,
+    };
+    const now = new Date(2026, 8, 19, 18, 0, 0);
+    expect(isEventPast(pastAllDay, now)).toBe(true);
+    expect(isEventPast(todayAllDay, now)).toBe(false);
+  });
+
+  it('checks moments and remains upcoming as long as at least one moment is to come', () => {
+    const loopweek = {
+      start: '2026-09-16T18:00:00.000Z',
+      end: '2026-09-20T20:00:00.000Z',
+      allDay: false,
+      moments: [
+        { start: '2026-09-16T18:00:00.000Z', end: '2026-09-16T20:00:00.000Z' },
+        { start: '2026-09-17T18:00:00.000Z', end: '2026-09-17T20:00:00.000Z' },
+        { start: '2026-09-20T18:00:00.000Z', end: '2026-09-20T20:00:00.000Z' },
+      ],
+    };
+
+    const midWeek = new Date('2026-09-18T10:00:00.000Z');
+    expect(isEventPast(loopweek, midWeek)).toBe(false);
+
+    const afterAll = new Date('2026-09-21T10:00:00.000Z');
+    expect(isEventPast(loopweek, afterAll)).toBe(true);
   });
 });

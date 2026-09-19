@@ -2187,6 +2187,16 @@
   gap: 9px;
 }
 
+.vtk-design .ev-grid-past-bar {
+  display: flex;
+  align-items: center;
+}
+
+.vtk-design .ev-grid-past[aria-pressed="true"] {
+  background: var(--paper-2);
+  border-color: var(--line-2);
+}
+
 .vtk-design .ev-grid-past span {
   padding: 1px 8px;
   border-radius: 999px;

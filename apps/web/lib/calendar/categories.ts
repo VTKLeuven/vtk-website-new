@@ -67,5 +67,6 @@ export function calendarLabels(locale: Locale) {
     /** Boven een blok kaarten in de rasterweergave: "Week van 14 september". */
     gridWeek: nl ? "Week van" : "Week of",
     showPast: nl ? "Ook tonen wat al voorbij is" : "Also show what has already passed",
+    hidePast: nl ? "Voorbije evenementen verbergen" : "Hide past events",
   };
 }

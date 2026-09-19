@@ -44,6 +44,14 @@
   border-color: var(--line-2);
 }
 
+.vtk-design .ev-card.is-past {
+  opacity: 0.72;
+}
+
+.vtk-design .ev-card.is-past:hover {
+  opacity: 1;
+}
+
 /* 16:9 en niet 3:2: dat is de verhouding waarin een evenementenbanner sowieso al
    gemaakt wordt (Facebook, Instagram), en de kaart wordt er 40 pixels korter
    van, dus er past een rij meer op het scherm. Een affiche die staand of

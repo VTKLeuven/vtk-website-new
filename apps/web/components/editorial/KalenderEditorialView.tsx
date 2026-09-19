@@ -15,6 +15,7 @@ import { MomentDays } from '@/components/calendar/MomentDays';
 import {
   eventLeadDate,
   eventOccursOnDay,
+  isEventPast,
   isMultiDayEvent,
   momentOnDay,
   toMoments,
@@ -137,6 +138,7 @@ export function KalenderEditorialView({
     views: { grid: string; agenda: string; week: string };
     gridWeek: string;
     showPast: string;
+    hidePast?: string;
   };
   categories: CalendarCategoryOption[];
   /** Absolute URL van de hoofdfeed; de abonneerdialoog stelt de selectie samen. */
@@ -358,14 +360,32 @@ export function KalenderEditorialView({
    * ze op maandag achter "toon voorbije weken" terwijl er nog vier loopjes
    * komen.
    *
-   * Binnen de huidige maand vallen de weken weg die al voorbij zijn. Het raster
-   * is de eerste weergave die iemand ziet, en dan is "wat komt er" de vraag, niet
-   * "wat heb ik gemist"; de knop eronder haalt ze alsnog terug. In een maand die
-   * volledig achter ons ligt gebeurt dat niet, want dan blijft er niets over.
+   * Binnen de huidige maand vallen de evenementen weg die al voorbij zijn. Het
+   * raster is de eerste weergave die iemand ziet, en dan is "wat komt er" de
+   * vraag, niet "wat heb ik gemist"; de knop erbij haalt ze alsnog terug. In een
+   * maand die volledig achter ons ligt gebeurt dat niet, want dan blijft er niets
+   * over.
    */
+  const isPastMonth = useMemo(() => {
+    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+    return monthEnd < now;
+  }, [year, month, now]);
+
+  const pastEventsInMonth = useMemo(() => {
+    return isPastMonth ? [] : monthOnlyEvents.filter((event) => isEventPast(event, now));
+  }, [isPastMonth, monthOnlyEvents, now]);
+
+  const upcomingEventsInMonth = useMemo(() => {
+    return isPastMonth ? monthOnlyEvents : monthOnlyEvents.filter((event) => !isEventPast(event, now));
+  }, [isPastMonth, monthOnlyEvents, now]);
+
+  const eventsForGrid = useMemo(() => {
+    return showPast || isPastMonth ? monthOnlyEvents : upcomingEventsInMonth;
+  }, [showPast, isPastMonth, monthOnlyEvents, upcomingEventsInMonth]);
+
   const gridWeeks = useMemo(() => {
     const groups = new Map<string, { monday: Date; events: ApiEvent[] }>();
-    for (const event of monthOnlyEvents) {
+    for (const event of eventsForGrid) {
       const monday = startOfWeek(eventLeadDate(event, now));
       const key = dayKey(monday);
       const group = groups.get(key);
@@ -373,18 +393,11 @@ export function KalenderEditorialView({
       else groups.set(key, { monday, events: [event] });
     }
     return [...groups.values()].sort((a, b) => +a.monday - +b.monday);
-  }, [monthOnlyEvents, now]);
+  }, [eventsForGrid, now]);
 
-  const pastWeekCount = useMemo(() => {
-    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
-    if (monthEnd < new Date()) return 0;
-    const thisMonday = startOfWeek(new Date());
-    return gridWeeks.filter((group) => group.monday < thisMonday).length;
-  }, [gridWeeks, year, month]);
-
-  const shownGridWeeks = showPast || pastWeekCount === 0 ? gridWeeks : gridWeeks.slice(pastWeekCount);
-  const shownGridCount = shownGridWeeks.reduce((total, group) => total + group.events.length, 0);
-  const hiddenGridCount = monthOnlyEvents.length - shownGridCount;
+  const shownGridWeeks = gridWeeks;
+  const shownGridCount = eventsForGrid.length;
+  const hiddenGridCount = pastEventsInMonth.length;
 
   /**
    * De dag die op smal scherm opengeklapt staat. Bewust afgeleid in plaats van in
@@ -528,6 +541,7 @@ export function KalenderEditorialView({
    * zes rijen hoog, precies wat het venster moest oplossen.
    */
   function shiftPeriod(delta: number) {
+    setShowPast(false);
     if (view === 'grid') {
       setCursor(new Date(year, month + delta, 1));
       return;
@@ -805,9 +819,10 @@ export function KalenderEditorialView({
     const going = interestLine(e);
     const title = pickTitle(e);
     const start = leadDate(e);
+    const isPast = isEventPast(e, now);
     const addToCalendar = locale === 'nl' ? 'Zet in mijn agenda' : 'Add to my calendar';
     return (
-      <article key={e.id} className="ev-card">
+      <article key={e.id} className={`ev-card${isPast ? ' is-past' : ''}`}>
         <div className="ev-card-shot">
           <Image
             src={e.extendedProps.image}
@@ -1469,6 +1484,22 @@ export function KalenderEditorialView({
         {/* Raster: de maand als kaarten met de affiche erop, per week gebundeld. */}
         {view === 'grid' && (
           <section className="ev-grid-wrap">
+            {hiddenGridCount > 0 ? (
+              <div className="ev-grid-past-bar">
+                <button
+                  type="button"
+                  className="ev-grid-past"
+                  onClick={() => setShowPast((prev) => !prev)}
+                  aria-pressed={showPast}
+                >
+                  {showPast
+                    ? labels.hidePast ?? (locale === 'nl' ? 'Voorbije evenementen verbergen' : 'Hide past events')
+                    : labels.showPast}
+                  {!showPast ? <span>{hiddenGridCount}</span> : null}
+                </button>
+              </div>
+            ) : null}
+
             {shownGridWeeks.length === 0 ? (
               <p className="agenda-empty">{labels.emptyMonth}</p>
             ) : (
@@ -1482,11 +1513,17 @@ export function KalenderEditorialView({
                 </div>
               ))
             )}
-            {pastWeekCount > 0 && !showPast ? (
-              <button type="button" className="ev-grid-past" onClick={() => setShowPast(true)}>
-                {labels.showPast}
-                <span>{hiddenGridCount}</span>
-              </button>
+
+            {hiddenGridCount > 0 && showPast && shownGridWeeks.length > 0 ? (
+              <div className="ev-grid-past-bar">
+                <button
+                  type="button"
+                  className="ev-grid-past"
+                  onClick={() => setShowPast(false)}
+                >
+                  {labels.hidePast ?? (locale === 'nl' ? 'Voorbije evenementen verbergen' : 'Hide past events')}
+                </button>
+              </div>
             ) : null}
           </section>
         )}

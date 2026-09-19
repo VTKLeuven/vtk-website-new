@@ -184,6 +184,30 @@ export function eventOccursOnDay(event: CalendarInterval, day: Date): boolean {
 }
 
 /**
+ * Bepaalt of een evenement al volledig voorbij is.
+ *
+ * Bij een evenement met losse momenten: enkel voorbij wanneer het laatste moment
+ * afgelopen is; zolang er nog minstens één moment bezig is of moet beginnen, is
+ * het evenement actief.
+ *
+ * Bij een heledagevenement: voorbij na het einde van de laatste dag (23:59:59.999).
+ *
+ * Bij een gewoon evenement: voorbij zodra de eindtijd voorbij is.
+ */
+export function isEventPast(event: CalendarInterval, now: Date): boolean {
+  const moments = toMoments(event);
+  if (moments.length > 0) {
+    return !moments.some((m) => m.end >= now);
+  }
+  if (event.allDay) {
+    const { last } = eventDayRange(event);
+    const endOfDay = new Date(last.getFullYear(), last.getMonth(), last.getDate(), 23, 59, 59, 999);
+    return endOfDay < now;
+  }
+  return new Date(event.end) < now;
+}
+
+/**
  * Loopt dit evenement over meerdere dagen **door**? Dat is wat een balk over het
  * rooster rechtvaardigt.
  *
