@@ -263,17 +263,24 @@ export async function sendCalendarFollowPush(now: Date = new Date()): Promise<No
 const INTEREST_REMINDER_MS = 24 * 60 * 60 * 1000;
 
 export async function sendInterestReminderPush(now: Date = new Date()): Promise<NotificationRun> {
+  const until = new Date(now.getTime() + INTEREST_REMINDER_MS);
   const interests = await prisma.calendarEventInterest.findMany({
     where: {
       remindedAt: null,
-      event: {
-        start: { gte: now, lte: new Date(now.getTime() + INTEREST_REMINDER_MS) },
-        publishedAt: { not: null },
-      },
+      event: { publishedAt: { not: null } },
+      // Een markering voor één dag van een reeks (een loopweek) telt af naar díé
+      // dag; een markering voor het evenement zelf naar de start ervan. Anders
+      // kreeg wie enkel donderdag aanduidde zijn herinnering op maandag, en
+      // daarna nooit meer.
+      OR: [
+        { momentStart: { gte: now, lte: until } },
+        { momentStart: null, event: { start: { gte: now, lte: until } } },
+      ],
     },
     select: {
       id: true,
       userId: true,
+      momentStart: true,
       event: { select: { id: true, titleNl: true, start: true, location: true } },
     },
     take: 500,
@@ -300,7 +307,7 @@ export async function sendInterestReminderPush(now: Date = new Date()): Promise<
     const wanting = await usersWantingTopic([interest.userId], "calendar.interest");
     if (wanting.length === 0) continue;
 
-    const when = timeFormat.format(interest.event.start);
+    const when = timeFormat.format(interest.momentStart ?? interest.event.start);
     const outcome = await sendPushToUsers(wanting, {
       title: interest.event.titleNl,
       body: interest.event.location ? `${when}, ${interest.event.location}` : when,

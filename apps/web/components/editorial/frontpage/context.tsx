@@ -58,9 +58,16 @@ export type FrontpageEvent = {
   heroWeek: HeroWeekPlacement;
   /**
    * Of de bezoeker zelf al aanduidde dat hij komt. Zonder aanmelding altijd
-   * `false`: de ster vraagt dan eerst om aan te melden.
+   * `false`: de ster vraagt dan eerst om aan te melden. Bij een reeks staat dit
+   * op `true` zodra hij één van de dagen aanduidde.
    */
   viewerInterested: boolean;
+  /**
+   * De dagen van een reeks die hij zelf aanduidde, als ISO-instant. Daarmee
+   * zet het weekoverzicht de ster per dag: bij een loopweek kies je de loopjes
+   * waar je naartoe komt, niet de hele week. Leeg bij een gewoon evenement.
+   */
+  viewerInterestedMoments: string[];
 };
 
 /**

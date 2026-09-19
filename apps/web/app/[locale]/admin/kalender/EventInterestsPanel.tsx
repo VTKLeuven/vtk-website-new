@@ -41,6 +41,20 @@ export function EventInterestsPanel({
     });
   }, [rows, search]);
 
+  // De dagen van een reeks staan kort: de dag en het uur volstaan om te zien wie
+  // op welk loopje komt.
+  const dayFmt = useMemo(
+    () =>
+      new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+        timeZone: "Europe/Brussels",
+        weekday: "short",
+        day: "2-digit",
+        month: "short",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    [nl],
+  );
   const dateFmt = useMemo(
     () =>
       new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
@@ -212,6 +226,22 @@ export function EventInterestsPanel({
                         <div className="mt-0.5 text-[11px] text-zinc-500">
                           {nl ? "Weergavenaam:" : "Display name:"}{" "}
                           <span className="italic">{row.displayName}</span>
+                        </div>
+                      )}
+                      {/* Bij een reeks (een loopweek) duidt iemand losse dagen
+                          aan. Die staan hier onder de naam en niet in een eigen
+                          kolom: de inhoudskolom van de admin is 900 px en een
+                          vijfde kolom duwt de tabel achter een scrollbalk. */}
+                      {row.momentStarts.length > 0 && (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {row.momentStarts.map((start) => (
+                            <span
+                              key={String(start)}
+                              className="rounded-full bg-vtk-blue-soft px-2 py-0.5 text-[11px] text-zinc-700"
+                            >
+                              {dayFmt.format(new Date(start))}
+                            </span>
+                          ))}
                         </div>
                       )}
                     </td>

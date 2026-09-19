@@ -34,7 +34,12 @@ import { CalendarPlusIcon } from "@/components/ui/icons";
 import { focusPosition } from "@/lib/imageFocus";
 import { hasUpcomingMoment, momentsSummary, nextOccurrenceAt } from "@/lib/calendar/moments";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
-import { interestLabel, publicInterestCounts, viewerInterests } from "@/lib/calendar/interest";
+import {
+  interestLabel,
+  publicInterestCounts,
+  viewerInterests,
+  viewerMomentStarts,
+} from "@/lib/calendar/interest";
 import {
   FRONTPAGE_EVENT_INCLUDE,
   frontpageEventsSince,
@@ -203,11 +208,13 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   // drempel; zie lib/calendar/interest.ts voor waarom een laag getal averechts
   // werkt. Eén lezing voor de hero én de kaarten hieronder.
   const eventIds = calendarEvents.map((event) => event.id);
-  const [interested, viewerInterestMap, shifts, postNames] = await Promise.all([
+  const [interested, viewerInterestMap, viewerMoments, shifts, postNames] = await Promise.all([
     publicInterestCounts(eventIds),
     // Wat de bezoeker zelf al aanduidde, voor de ster in het weekoverzicht.
     // Zonder sessie blijft dit leeg en is de ster een link naar het aanmelden.
     viewerInterests(eventIds, session?.user.id ?? null),
+    // En bij een reeks: welke dagen ervan. Het weekoverzicht zet de ster per dag.
+    viewerMomentStarts(eventIds, session?.user.id ?? null),
     // De shiften onder de herotekst én voor de shiftband.
     prisma.shift.findMany({
       where: { endTime: { gte: now }, manualGrantId: null },
@@ -486,8 +493,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           locale={locale}
           base={base}
           now={now}
-          upcomingEvents={toFrontpageEvents(upcomingEvents, interested, viewerInterestIds)}
-          weekEvents={toFrontpageEvents(calendarEvents, interested, viewerInterestIds)}
+          upcomingEvents={toFrontpageEvents(upcomingEvents, interested, viewerInterestIds, viewerMoments)}
+          weekEvents={toFrontpageEvents(calendarEvents, interested, viewerInterestIds, viewerMoments)}
           signedIn={session !== null}
           openShifts={openShifts}
           partners={partners}

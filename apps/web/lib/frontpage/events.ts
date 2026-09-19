@@ -71,7 +71,12 @@ function categoryColour(row: FrontpageEventRow): string | null {
 
 export function toFrontpageEvent(
   row: FrontpageEventRow,
-  extras: { interestedCount: number | null; viewerInterested: boolean },
+  extras: {
+    interestedCount: number | null;
+    viewerInterested: boolean;
+    /** De dagen van een reeks die de bezoeker aanduidde; zie `FrontpageEvent`. */
+    viewerInterestedMoments?: string[];
+  },
 ): FrontpageEvent {
   return {
     id: row.id,
@@ -93,6 +98,7 @@ export function toFrontpageEvent(
     categoryColour: categoryColour(row),
     heroWeek: row.heroWeek,
     viewerInterested: extras.viewerInterested,
+    viewerInterestedMoments: extras.viewerInterestedMoments ?? [],
   };
 }
 
@@ -106,11 +112,14 @@ export function toFrontpageEvents(
   rows: readonly FrontpageEventRow[],
   interested: Map<string, number>,
   viewerInterestIds: ReadonlySet<string>,
+  /** Per evenement de aangeduide dagen; zie `viewerMomentStarts` in lib/calendar/interest.ts. */
+  viewerMoments?: ReadonlyMap<string, string[]>,
 ): FrontpageEvent[] {
   return rows.map((row) =>
     toFrontpageEvent(row, {
       interestedCount: interested.get(row.id) ?? null,
       viewerInterested: viewerInterestIds.has(row.id),
+      viewerInterestedMoments: viewerMoments?.get(row.id) ?? [],
     }),
   );
 }

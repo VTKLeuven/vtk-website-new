@@ -38,6 +38,14 @@ export async function eventIsVisible(eventId: string): Promise<boolean> {
   return count > 0;
 }
 
+/**
+ * De ster in de app staat voor het evenement als geheel.
+ *
+ * Bij een evenement met losse momenten (een loopweek) betekent dat: alle dagen
+ * tegelijk. Per dag aanduiden kan op de site, in het weekoverzicht en op de
+ * eventpagina; de app kent die momenten nog niet en mag er daarom ook geen
+ * halve toestand van maken. Zie `CalendarEventInterest.momentStart`.
+ */
 export async function setEventInterest(
   userId: string,
   eventId: string,
@@ -50,12 +58,30 @@ export async function setEventInterest(
 
   if (!(await eventIsVisible(eventId))) throw new Error("NOT_FOUND");
 
-  // Twee keer op de ster tikken hoort niets te doen, niet te falen.
-  await prisma.calendarEventInterest.upsert({
-    where: { userId_eventId: { userId, eventId } },
-    update: {},
-    create: { userId, eventId },
+  const moments = await prisma.calendarEventMoment.findMany({
+    where: { eventId },
+    select: { start: true },
   });
+
+  // Twee keer op de ster tikken hoort niets te doen, niet te falen. Zonder
+  // momenten kan dat geen upsert zijn: `momentStart` zit in de unieke sleutel en
+  // Postgres ziet twee NULL's als verschillend.
+  if (moments.length === 0) {
+    const existing = await prisma.calendarEventInterest.findFirst({
+      where: { userId, eventId, momentStart: null },
+      select: { id: true },
+    });
+    if (!existing) await prisma.calendarEventInterest.create({ data: { userId, eventId } });
+    return;
+  }
+
+  for (const moment of moments) {
+    await prisma.calendarEventInterest.upsert({
+      where: { userId_eventId_momentStart: { userId, eventId, momentStart: moment.start } },
+      update: {},
+      create: { userId, eventId, momentStart: moment.start },
+    });
+  }
 }
 
 /** De id's van de evenementen waarin dit lid interesse aanduidde, uit een set. */
@@ -67,6 +93,7 @@ export async function interestedEventIds(
   const rows = await prisma.calendarEventInterest.findMany({
     where: { userId, eventId: { in: eventIds } },
     select: { eventId: true },
+    distinct: ["eventId"],
   });
   return new Set(rows.map((row) => row.eventId));
 }

@@ -38,18 +38,43 @@ describe("publicInterestCounts", () => {
     guestFindMany.mockReset();
   });
 
+  /**
+   * De ledenkant groepeert per (evenement, lid): bij een reeks met losse
+   * momenten heeft één lid een rij per dag die het aanduidde, en dat blijft
+   * één persoon die komt.
+   */
+  function memberRows(eventId: string, members: number) {
+    return Array.from({ length: members }, (_, index) => ({ eventId, userId: `u-${index}` }));
+  }
+
   it("telt leden en gasten samen", async () => {
-    groupBy.mockResolvedValue([{ eventId: "ev-1", _count: { _all: 20 } }]);
+    groupBy.mockResolvedValue(memberRows("ev-1", 20));
     guestGroupBy.mockResolvedValue([{ eventId: "ev-1", _count: { _all: 15 } }]);
 
     const counts = await publicInterestCounts(["ev-1"]);
     expect(counts.get("ev-1")).toBe(35);
   });
 
+  it("telt een lid dat meerdere dagen van een reeks aanduidde één keer", async () => {
+    // Vier rijen, twee leden: de query groepeert per paar, dus dit zijn de dagen
+    // van twee mensen en geen vier geïnteresseerden.
+    groupBy.mockResolvedValue([
+      { eventId: "loopweek", userId: "u-1" },
+      { eventId: "loopweek", userId: "u-1" },
+      { eventId: "loopweek", userId: "u-2" },
+      { eventId: "loopweek", userId: "u-2" },
+    ]);
+    guestGroupBy.mockResolvedValue([]);
+
+    // De drempel houdt het getal binnen; wat telt, is dat het er niet vier zijn.
+    const counts = await publicInterestCounts(["loopweek"]);
+    expect(counts.has("loopweek")).toBe(false);
+  });
+
   it("laat een evenement onder de drempel volledig weg", async () => {
     groupBy.mockResolvedValue([
-      { eventId: "laag", _count: { _all: INTEREST_PUBLIC_THRESHOLD - 1 } },
-      { eventId: "net-genoeg", _count: { _all: INTEREST_PUBLIC_THRESHOLD } },
+      ...memberRows("laag", INTEREST_PUBLIC_THRESHOLD - 1),
+      ...memberRows("net-genoeg", INTEREST_PUBLIC_THRESHOLD),
     ]);
     guestGroupBy.mockResolvedValue([]);
 
@@ -277,6 +302,7 @@ describe("adminAttendeeList en CSV export", () => {
         showGraduationYear: true,
         showWasInVtk: false,
         createdAt: new Date("2026-08-20T10:00:00Z"),
+        momentStarts: [new Date("2026-09-19T18:00:00Z")],
       },
     ];
 
@@ -284,6 +310,9 @@ describe("adminAttendeeList en CSV export", () => {
     expect(csv).toContain("Type,Naam,E-mail,KU Leuven r-nummer");
     expect(csv).toContain("Account,Jeroen Peeters,jeroen@example.com,r0123456");
     expect(csv).toContain("Ja (naam, afstudeerjaar)");
+    // De dagen van een reeks staan in hun eigen kolom, pipe-gescheiden.
+    expect(csv).toContain("Dagen");
+    expect(csv).toContain("2026-09-19T18:00:00.000Z");
   });
 });
 

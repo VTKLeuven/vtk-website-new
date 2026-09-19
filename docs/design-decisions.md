@@ -7973,3 +7973,42 @@ Datzelfde script bewaakt het attribuut met een `MutationObserver`. Dat is geen
 overdaad: faalt de hydratie ergens op een pagina, dan tekent React de hele boom
 opnieuw vanaf `<html>` en gooit het attribuut weg dat de server nooit
 gerenderd heeft, en dan sprong het scherm middenin het kijken terug naar licht.
+
+## Interesse per dag van een reeks
+
+Een evenement met losse momenten (`CalendarEventMoment`: een loopweek met elke
+dag een loopje, een filmreeks met drie avonden) is één evenement met één pagina
+en één affiche. De vraag "kom je?" is er wél per dag: naar het loopje van
+woensdag komen zegt niets over dat van vrijdag.
+
+**De ster staat per dag waar de site een dag toont.** In het weekoverzicht van de
+homepage is elke rij al één moment, en op de eventpagina staat onder "Wanneer"
+de lijst van die dagen; op beide plaatsen hangt de ster aan díé dag. Voordien
+stond er één ster op de eerste rij die de reeks kreeg en een grijze plaatshouder
+op alle volgende, waardoor je je bij Loopje 3 wel kon aanduiden en bij Loopje 4,
+5 en 6 niet.
+
+**De ster staat voor de hele reeks waar de site de reeks als geheel toont.** Op
+een eventkaart (de homepage, /kalender) en op de knop "Geïnteresseerd" onderaan
+de eventpagina is er geen dag om op te mikken; die zetten alle dagen tegelijk
+aan of uit. Hetzelfde geldt voor de ster in de app: die kent de momenten nog
+niet, en een halve toestand tonen is erger dan geen keuze aanbieden.
+
+**De teller telt mensen, niet markeringen.** Wie vier loopjes aanduidt, is één
+persoon die komt. Alle tellers groeperen daarom per lid, en de publieke
+aanwezigheidslijst van een alumni-evenement toont elke persoon één keer. In het
+beheer staan de aangeduide dagen als kleine chips onder de naam en niet in een
+eigen kolom: de inhoudskolom van de admin is 900 px en een vijfde kolom duwt de
+tabel achter een scrollbalk.
+
+**De herinnering telt af naar de dag die je aanduidde.** Een markering voor één
+moment krijgt haar bericht 24 uur voor dát moment; een markering voor het
+evenement zelf 24 uur voor de start. Anders kreeg wie enkel donderdag aanduidde
+zijn herinnering op maandag, en daarna nooit meer.
+
+**De markering hangt aan het startinstant en niet aan de moment-id.** Dat is
+geen elegantie maar noodzaak: de bewaaractie van een evenement gooit alle
+momenten weg en maakt ze opnieuw aan, dus elke id verandert zodra iemand een
+komma in de beschrijving aanpast, en dat zou de interesse van iedereen wissen.
+Verzet een organisator het uur van een dag, dan laat de markering voor die dag
+los; dat is gewenst, want het is een ander moment geworden.

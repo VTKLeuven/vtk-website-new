@@ -8,6 +8,7 @@ import { eventIsVisible } from "@/lib/app-api/interest";
 import {
   ensureGuestDeviceHash,
   eventIsForAlumni,
+  eventMomentStarts,
   readGuestDeviceHash,
 } from "@/lib/calendar/interest";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
@@ -35,6 +36,13 @@ const yearField = z
 
 const attendanceSchema = z.object({
   eventId: z.string().min(1),
+  /**
+   * Het moment waarvoor dit geldt, als ISO-instant, bij een evenement met losse
+   * momenten. Leeg = het evenement als geheel: dat is elk gewoon evenement, en
+   * op een kaart die de hele reeks toont ook een evenement met momenten (dan
+   * gaan alle momenten tegelijk aan of uit).
+   */
+  momentStart: z.string().trim().default(""),
   displayName: z.string().trim().max(80).default(""),
   graduationYear: yearField,
   wasInVtk: z.boolean().default(false),
@@ -65,6 +73,7 @@ function missesVisibleValue(input: AttendanceInput): boolean {
 function parseAttendance(formData: FormData) {
   return attendanceSchema.safeParse({
     eventId: formData.get("eventId") ?? "",
+    momentStart: formData.get("momentStart") ?? "",
     displayName: formData.get("displayName") ?? "",
     graduationYear: formData.get("graduationYear") ?? "",
     wasInVtk: formData.get("wasInVtk") === "on",
@@ -101,12 +110,21 @@ export async function setEventInterestAction(
   const parsed = parseAttendance(formData);
   if (!parsed.success) return saveError("INVALID_INPUT" satisfies InterestErrorCode);
 
-  const { eventId } = parsed.data;
+  const { eventId, momentStart } = parsed.data;
   const interested = formData.get("interested") !== "off";
+  const userId = session.user.id;
+
+  // Een moment meegeven betekent: enkel die dag van de reeks. Zonder moment gaat
+  // het over het evenement als geheel, en bij een reeks dus over al haar dagen
+  // tegelijk (de ster op een kaart die de hele reeks toont).
+  const when = momentStart ? new Date(momentStart) : null;
+  if (when && Number.isNaN(when.getTime())) {
+    return saveError("INVALID_INPUT" satisfies InterestErrorCode);
+  }
 
   if (!interested) {
     await prisma.calendarEventInterest.deleteMany({
-      where: { userId: session.user.id, eventId },
+      where: { userId, eventId, ...(when ? { momentStart: when } : {}) },
     });
     revalidateEventPage();
     return saveOk();
@@ -134,14 +152,58 @@ export async function setEventInterestAction(
         showWasInVtk: false,
       };
 
-  await prisma.calendarEventInterest.upsert({
-    where: { userId_eventId: { userId: session.user.id, eventId } },
-    update: data,
-    create: { userId: session.user.id, eventId, ...data },
-  });
+  const starts = await eventMomentStarts(eventId);
+  if (when) {
+    // Een willekeurig instant mag hier niet binnenkomen: enkel een moment dat dit
+    // evenement echt heeft. Anders staat er een markering voor een dag die niet
+    // bestaat, en die haalt niemand er ooit nog af.
+    if (!starts.some((start) => start.getTime() === when.getTime())) {
+      return saveError("NOT_FOUND" satisfies InterestErrorCode);
+    }
+    await writeInterest(userId, eventId, when, data);
+  } else if (starts.length > 0) {
+    for (const start of starts) await writeInterest(userId, eventId, start, data);
+  } else {
+    await writeInterest(userId, eventId, null, data);
+  }
 
   revalidateEventPage();
   return saveOk();
+}
+
+/**
+ * Eén markering schrijven, voor het evenement (`momentStart` null) of voor één
+ * moment ervan.
+ *
+ * Zonder moment kan het geen `upsert` zijn: de unieke sleutel bevat
+ * `momentStart`, en Postgres ziet twee NULL's als verschillend, dus een upsert
+ * zou daar nooit de bestaande rij vinden. Twee keer aanduiden hoort niets te
+ * doen en niet te falen, vandaar eerst lezen.
+ */
+async function writeInterest(
+  userId: string,
+  eventId: string,
+  momentStart: Date | null,
+  data: ReturnType<typeof attendanceData>,
+): Promise<void> {
+  if (momentStart) {
+    await prisma.calendarEventInterest.upsert({
+      where: { userId_eventId_momentStart: { userId, eventId, momentStart } },
+      update: data,
+      create: { userId, eventId, momentStart, ...data },
+    });
+    return;
+  }
+
+  const existing = await prisma.calendarEventInterest.findFirst({
+    where: { userId, eventId, momentStart: null },
+    select: { id: true },
+  });
+  if (existing) {
+    await prisma.calendarEventInterest.update({ where: { id: existing.id }, data });
+    return;
+  }
+  await prisma.calendarEventInterest.create({ data: { userId, eventId, ...data } });
 }
 
 /**

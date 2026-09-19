@@ -11,7 +11,11 @@ import { legacyHeroFrom } from "@/lib/frontpage/resolve";
 import { readSlogansSetting, resolveSlogans } from "@/lib/slogans";
 import { splitFullName } from "@vtk/auth";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
-import { publicInterestCounts, viewerInterests } from "@/lib/calendar/interest";
+import {
+  publicInterestCounts,
+  viewerInterests,
+  viewerMomentStarts,
+} from "@/lib/calendar/interest";
 import {
   FRONTPAGE_EVENT_INCLUDE,
   frontpageEventsSince,
@@ -90,9 +94,10 @@ export default async function FrontpagePreview({
   // Ook de shiften, en met dezelfde regels: ze staan in de voet van de
   // tekstkolom en bepalen mee hoe hoog die uitvalt. Een voorbeeld zonder dat
   // blok toont een andere hero dan de echte. Zie lib/frontpage/heroShifts.ts.
-  const [interested, viewerInterestMap, shifts] = await Promise.all([
+  const [interested, viewerInterestMap, viewerMoments, shifts] = await Promise.all([
     publicInterestCounts(eventIds),
     viewerInterests(eventIds, session.user.id),
+    viewerMomentStarts(eventIds, session.user.id),
     prisma.shift.findMany({
       where: { endTime: { gte: now }, manualGrantId: null },
       orderBy: { startTime: "asc" },
@@ -150,8 +155,8 @@ export default async function FrontpagePreview({
             locale={locale}
             base={base}
             now={now}
-            upcomingEvents={toFrontpageEvents(upcomingEvents, interested, viewerInterestIds)}
-            weekEvents={toFrontpageEvents(calendarEvents, interested, viewerInterestIds)}
+            upcomingEvents={toFrontpageEvents(upcomingEvents, interested, viewerInterestIds, viewerMoments)}
+            weekEvents={toFrontpageEvents(calendarEvents, interested, viewerInterestIds, viewerMoments)}
             signedIn
             openShifts={openShifts}
             partners={partners}

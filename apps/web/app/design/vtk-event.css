@@ -153,11 +153,20 @@
   border-top: 1px solid var(--line);
 }
 
+.vtk-event-moments-hint {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Drie kolommen: de dag, het uur en de ster van díé dag. De naam van het moment
+   loopt eronder over de volle breedte, want "Loopje 1" hoort bij de dag erboven
+   en niet naast het uur. */
 .vtk-event-moment {
   display: grid;
-  grid-template-columns: 1fr auto;
+  grid-template-columns: 1fr auto auto;
   gap: 2px 16px;
-  align-items: baseline;
+  align-items: center;
   padding: 8px 0;
   border-bottom: 1px solid var(--line);
   font-size: 13px;
@@ -173,10 +182,49 @@
   font-variant-numeric: tabular-nums;
 }
 
-.vtk-event-moment .label {
+/* De eigen naam van dit moment. Bewust niet de klasse `.label` uit de basislaag:
+   die zet tekst in kapitalen met 0.08em spatiëring, en dat maakte van "Loopje 1"
+   een rubriekkop in plaats van de naam van die avond. */
+.vtk-event-moment .name {
   grid-column: 1 / -1;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
+}
+
+.vtk-event-moment-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin: -6px -6px -6px 0;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  transition:
+    color 140ms ease,
+    background 140ms ease;
+}
+
+.vtk-event-moment-star:hover {
+  color: var(--ink);
+  background: rgba(14, 26, 54, 0.06);
+}
+
+.vtk-event-moment-star[aria-pressed="true"] {
+  color: var(--accent-2);
+}
+
+.vtk-event-moment-star svg {
+  width: 17px;
+  height: 17px;
+}
+
+.vtk-event-moment-star[data-pending] {
+  opacity: 0.6;
 }
 
 .vtk-event-actions {

@@ -158,12 +158,16 @@ describe("GET /api/app/v1/kalender", () => {
    * app en de website een ander antwoord op dezelfde vraag.
    */
   it("stuurt de teller pas mee vanaf de drempel, leden en gasten samen", async () => {
-    mocks.interestGroupBy.mockResolvedValue([{ eventId: "ev-1", _count: { _all: 20 } }]);
+    // De ledenkant groepeert per (evenement, lid), dus één rij per persoon: bij
+    // een reeks met losse momenten telt wie vier dagen aanduidde één keer mee.
+    const leden = (aantal: number) =>
+      Array.from({ length: aantal }, (_, index) => ({ eventId: "ev-1", userId: `u-${index}` }));
+    mocks.interestGroupBy.mockResolvedValue(leden(20));
     mocks.guestInterestGroupBy.mockResolvedValue([{ eventId: "ev-1", _count: { _all: 15 } }]);
     const veel = await (await calendarGet(appRequest("/api/app/v1/kalender"))).json();
     expect(veel.events[0].interestedCount).toBe(35);
 
-    mocks.interestGroupBy.mockResolvedValue([{ eventId: "ev-1", _count: { _all: 3 } }]);
+    mocks.interestGroupBy.mockResolvedValue(leden(3));
     mocks.guestInterestGroupBy.mockResolvedValue([]);
     const weinig = await (await calendarGet(appRequest("/api/app/v1/kalender"))).json();
     // `null` en niet `0`: een oudere app-versie valt daarmee vanzelf in de

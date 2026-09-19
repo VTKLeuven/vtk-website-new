@@ -5993,6 +5993,26 @@ model CalendarEventInterest {
   userId  String
   eventId String
 
+  /// Het moment waarvoor deze interesse geldt, bij een evenement met losse
+  /// momenten (`CalendarEventMoment`): een loopweek met elke dag een loopje.
+  /// NULL = het evenement als geheel, wat het geval is bij elk evenement zonder
+  /// momenten.
+  ///
+  /// **Waarom het startinstant en niet `momentId`.** De bewaaractie van een
+  /// evenement gooit alle momenten weg en maakt ze opnieuw aan
+  /// (`moments: { deleteMany: {}, create: [...] }` in app/actions/calendar.ts),
+  /// dus elke id verandert zodra iemand ook maar een komma in de beschrijving
+  /// aanpast. Een verwijzing naar die id zou de interesse van iedereen wissen bij
+  /// de eerstvolgende bewaring. Het startinstant blijft wel gelijk; verzet een
+  /// organisator het uur van een dag, dan laat de interesse voor die dag los, en
+  /// dat is het gedrag dat we willen: het is een ander moment geworden.
+  ///
+  /// Een evenement met momenten krijgt nooit een rij zonder `momentStart`: de
+  /// ster op een kaart die de hele reeks toont, zet alle momenten tegelijk aan.
+  /// Oudere rijen van voor die regel blijven geldig en tellen mee als interesse
+  /// in het evenement.
+  momentStart DateTime? @db.Timestamptz(3)
+
   /// Alumni-informatie voor dit ene evenement. Ze wordt bewust niet uit het
   /// profiel gelezen: iemand kan per activiteit een andere naam gebruiken en
   /// kiest hier ook per veld wat andere bezoekers mogen zien.
@@ -6015,7 +6035,11 @@ model CalendarEventInterest {
   user  User          @relation("CalendarInterestUser", fields: [userId], references: [id], onDelete: Cascade)
   event CalendarEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
 
-  @@unique([userId, eventId])
+  /// Een rij per lid per moment. Postgres ziet twee NULL's als verschillend, dus
+  /// dit belet niet dat er twee rijen zonder `momentStart` voor hetzelfde
+  /// evenement komen; de tellers tellen daarom unieke leden en geen rijen.
+  @@unique([userId, eventId, momentStart])
+  @@index([userId, eventId])
   @@index([eventId])
   @@index([remindedAt])
 }

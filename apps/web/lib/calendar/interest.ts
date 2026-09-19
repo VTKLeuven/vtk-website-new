@@ -35,6 +35,20 @@ import type { Locale } from "@vtk/i18n";
  */
 export const INTEREST_PUBLIC_THRESHOLD = 30;
 
+/**
+ * De sleutel van één markering: het evenement, of één moment ervan.
+ *
+ * Een evenement met losse momenten (een loopweek met elke dag een loopje) draagt
+ * de markering per moment; zie `CalendarEventInterest.momentStart`. Overal waar
+ * de site een verzameling markeringen doorgeeft aan een client component is dit
+ * de vorm, want een `Map` of een `Date` overleeft die grens niet.
+ */
+export function interestKey(eventId: string, momentStart?: Date | string | null): string {
+  if (!momentStart) return eventId;
+  const iso = momentStart instanceof Date ? momentStart.toISOString() : momentStart;
+  return `${eventId}@${iso}`;
+}
+
 /** Naam van het cookie waarmee een bezoeker zonder account zijn keuze terugneemt. */
 const GUEST_COOKIE = "vtk_alumni_gast";
 const GUEST_COOKIE_MAX_AGE = 400 * 24 * 60 * 60; // browsers kappen langer toch af
@@ -80,10 +94,12 @@ export async function publicInterestCounts(eventIds: string[]): Promise<Map<stri
   if (eventIds.length === 0) return counts;
 
   const [members, guests] = await Promise.all([
+    // Per lid en niet per rij: wie bij een loopweek vier dagen aanduidt, is één
+    // persoon die komt. `groupBy` op twee velden geeft één rij per paar, en die
+    // rijen tellen we per evenement.
     prisma.calendarEventInterest.groupBy({
-      by: ["eventId"],
+      by: ["eventId", "userId"],
       where: { eventId: { in: eventIds } },
-      _count: { _all: true },
     }),
     prisma.calendarEventGuestInterest.groupBy({
       by: ["eventId"],
@@ -93,7 +109,7 @@ export async function publicInterestCounts(eventIds: string[]): Promise<Map<stri
   ]);
 
   const total = new Map<string, number>();
-  for (const row of members) total.set(row.eventId, row._count._all);
+  for (const row of members) total.set(row.eventId, (total.get(row.eventId) ?? 0) + 1);
   for (const row of guests) {
     total.set(row.eventId, (total.get(row.eventId) ?? 0) + row._count._all);
   }
@@ -106,10 +122,54 @@ export async function publicInterestCounts(eventIds: string[]): Promise<Map<stri
 /** Het totaal voor één evenement, ook onder de drempel (voor de eigen knop). */
 export async function interestTotal(eventId: string): Promise<number> {
   const [members, guests] = await Promise.all([
-    prisma.calendarEventInterest.count({ where: { eventId } }),
+    // Unieke leden: bij een evenement met momenten heeft één lid een rij per dag
+    // die het aanduidde.
+    prisma.calendarEventInterest.groupBy({ by: ["userId"], where: { eventId } }),
     prisma.calendarEventGuestInterest.count({ where: { eventId } }),
   ]);
-  return members + guests;
+  return members.length + guests;
+}
+
+/**
+ * De momenten van dit evenement die dit lid aanduidde, als ISO-startinstant.
+ *
+ * Een lijst van strings en geen `Date[]`: hiermee wordt in het weekoverzicht en
+ * op de eventpagina per rij beslist of de ster vol staat, en die componenten
+ * draaien in de browser.
+ */
+export async function viewerMomentStarts(
+  eventIds: string[],
+  userId: string | null,
+): Promise<Map<string, string[]>> {
+  const result = new Map<string, string[]>();
+  if (!userId || eventIds.length === 0) return result;
+
+  const rows = await prisma.calendarEventInterest.findMany({
+    where: { userId, eventId: { in: eventIds }, momentStart: { not: null } },
+    select: { eventId: true, momentStart: true },
+  });
+  for (const row of rows) {
+    if (!row.momentStart) continue;
+    const list = result.get(row.eventId) ?? [];
+    list.push(row.momentStart.toISOString());
+    result.set(row.eventId, list);
+  }
+  return result;
+}
+
+/**
+ * De startinstanten van de losse momenten van dit evenement, oplopend.
+ *
+ * Leeg = een gewoon evenement dat van start tot einde doorloopt; dan hangt de
+ * markering aan het evenement zelf.
+ */
+export async function eventMomentStarts(eventId: string): Promise<Date[]> {
+  const rows = await prisma.calendarEventMoment.findMany({
+    where: { eventId },
+    select: { start: true },
+    orderBy: { start: "asc" },
+  });
+  return rows.map((row) => row.start);
 }
 
 /** Draagt dit evenement de alumni-doelgroep? Alleen dan mag iemand zonder account meedoen. */
@@ -145,6 +205,9 @@ export async function attendeeList(eventId: string): Promise<AttendeeRow[]> {
         eventId,
         OR: [{ showName: true }, { showGraduationYear: true }, { showWasInVtk: true }],
       },
+      // Eén rij per lid, ook wanneer het bij een loopweek vier dagen aanduidde:
+      // dit is een lijst van mensen, niet van markeringen.
+      distinct: ["userId"],
       select: {
         id: true,
         displayName: true,
@@ -247,8 +310,13 @@ export async function viewerInterests(
         showGraduationYear: true,
         showWasInVtk: true,
       },
+      // Bij een evenement met momenten staan hier meerdere rijen van hetzelfde
+      // lid. De rij zonder moment (de hele reeks) gaat voor; anders de vroegste,
+      // zodat de alumnivelden deterministisch zijn.
+      orderBy: { momentStart: { sort: "asc", nulls: "first" } },
     });
     for (const { eventId, ...details } of rows) {
+      if (result.has(eventId)) continue;
       result.set(eventId, { kind: "member", ...details });
     }
     return result;
@@ -308,6 +376,12 @@ export type AdminAttendeeRow = {
   showGraduationYear: boolean;
   showWasInVtk: boolean;
   createdAt: Date;
+  /**
+   * De dagen van een reeks die deze persoon aanduidde (`momentStart`), oplopend.
+   * Leeg bij een gewoon evenement en bij een gast: die duiden het evenement als
+   * geheel aan. Zie `CalendarEventInterest.momentStart`.
+   */
+  momentStarts: Date[];
 };
 
 /**
@@ -343,34 +417,57 @@ export async function adminAttendeeList(eventId: string): Promise<AdminAttendeeR
     }),
   ]);
 
+  // Eén rij per persoon, ook wanneer die bij een loopweek vier dagen aanduidde.
+  // Welke dagen dat zijn, staat in `momentStarts`; een tabel met vier keer
+  // dezelfde naam is voor een organisator geen lijst meer.
+  const momentsByUser = new Map<string, Date[]>();
+  for (const row of members) {
+    if (!row.momentStart) continue;
+    const list = momentsByUser.get(row.userId) ?? [];
+    list.push(row.momentStart);
+    momentsByUser.set(row.userId, list);
+  }
+  const seenUsers = new Set<string>();
+
   const rows: AdminAttendeeRow[] = [
-    ...members.map((row) => {
-      const u = row.user;
-      const fullName =
-        u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.name || u.email;
-      return {
-        id: row.id,
-        kind: "member" as const,
-        userId: u.id,
-        name: fullName,
-        email: u.email,
-        rNumber: u.rNumber,
-        isAlumni: u.alumni,
-        firwStudent: u.firwStudent,
-        profileGraduationYear: u.graduationYear,
-        profileWasInVtk: u.wasInVtk,
-        alumniMailOptIn: u.alumniMailOptIn,
-        displayName: row.displayName,
-        graduationYear: row.graduationYear,
-        effectiveGraduationYear: row.graduationYear ?? u.graduationYear,
-        wasInVtk: row.wasInVtk,
-        effectiveWasInVtk: row.wasInVtk || u.wasInVtk,
-        showName: row.showName,
-        showGraduationYear: row.showGraduationYear,
-        showWasInVtk: row.showWasInVtk,
-        createdAt: row.createdAt,
-      };
-    }),
+    ...members
+      .filter((row) => {
+        // De vroegste rij van dit lid draagt de persoon; de andere rijen zijn
+        // zijn andere dagen en staan hieronder in `momentStarts`.
+        if (seenUsers.has(row.userId)) return false;
+        seenUsers.add(row.userId);
+        return true;
+      })
+      .map((row) => {
+        const u = row.user;
+        const fullName =
+          u.firstName && u.lastName ? `${u.firstName} ${u.lastName}` : u.name || u.email;
+        return {
+          id: row.id,
+          kind: "member" as const,
+          userId: u.id,
+          name: fullName,
+          email: u.email,
+          rNumber: u.rNumber,
+          isAlumni: u.alumni,
+          firwStudent: u.firwStudent,
+          profileGraduationYear: u.graduationYear,
+          profileWasInVtk: u.wasInVtk,
+          alumniMailOptIn: u.alumniMailOptIn,
+          displayName: row.displayName,
+          graduationYear: row.graduationYear,
+          effectiveGraduationYear: row.graduationYear ?? u.graduationYear,
+          wasInVtk: row.wasInVtk,
+          effectiveWasInVtk: row.wasInVtk || u.wasInVtk,
+          showName: row.showName,
+          showGraduationYear: row.showGraduationYear,
+          showWasInVtk: row.showWasInVtk,
+          createdAt: row.createdAt,
+          momentStarts: (momentsByUser.get(row.userId) ?? [])
+            .slice()
+            .sort((a, b) => a.getTime() - b.getTime()),
+        };
+      }),
     ...guests.map((row) => ({
       id: row.id,
       kind: "guest" as const,
@@ -392,6 +489,7 @@ export async function adminAttendeeList(eventId: string): Promise<AdminAttendeeR
       showGraduationYear: row.showGraduationYear,
       showWasInVtk: row.showWasInVtk,
       createdAt: row.createdAt,
+      momentStarts: [] as Date[],
     })),
   ];
 
@@ -411,6 +509,7 @@ export function attendeesToCsv(rows: AdminAttendeeRow[], locale: Locale): string
     nl ? "Alumnus" : "Alumnus",
     nl ? "Alumni-mailinglijst" : "Alumni mailing list",
     nl ? "Aangeduid op" : "Marked at",
+    nl ? "Dagen" : "Days",
     nl ? "Weergavenaam (evenement)" : "Display name (event)",
     nl ? "Afstudeerjaar" : "Graduation year",
     nl ? "In VTK Praesidium" : "In VTK Praesidium",
@@ -450,6 +549,9 @@ export function attendeesToCsv(rows: AdminAttendeeRow[], locale: Locale): string
       row.kind === "member" ? isAlumniStr : "",
       row.kind === "member" ? mailOptInStr : "",
       row.createdAt.toISOString(),
+      // Leeg bij een evenement zonder losse momenten: dan is er maar één dag om
+      // aan te duiden en zegt een kolom met steeds dezelfde datum niets.
+      row.momentStarts.map((start) => start.toISOString()).join(" | "),
       row.displayName ?? "",
       row.effectiveGraduationYear ?? "",
       wasInVtkStr,

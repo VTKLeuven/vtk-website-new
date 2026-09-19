@@ -40,6 +40,7 @@ export type EventStarLabels = {
 
 export function EventStar({
   eventId,
+  momentStart,
   title,
   interested: initialInterested,
   signedIn,
@@ -49,6 +50,12 @@ export function EventStar({
   onChanged,
 }: {
   eventId: string;
+  /**
+   * De dag van een evenement met losse momenten, als ISO-instant: dan staat deze
+   * ster voor díé dag. Weglaten betekent het evenement als geheel, en bij een
+   * reeks dus al haar dagen tegelijk. Zie `CalendarEventInterest.momentStart`.
+   */
+  momentStart?: string;
   /** De naam van het evenement, enkel voor de schermlezer. */
   title: string;
   interested: boolean;
@@ -97,6 +104,7 @@ export function EventStar({
         startTransition(async () => {
           const data = new FormData();
           data.set("eventId", eventId);
+          if (momentStart) data.set("momentStart", momentStart);
           // De action leest "off" als uitzetten; al de rest is aanzetten.
           if (!next) data.set("interested", "off");
           const result = await setEventInterestAction(SAVE_IDLE, data);

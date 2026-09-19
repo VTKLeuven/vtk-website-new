@@ -21,8 +21,10 @@ import {
   INTEREST_PUBLIC_THRESHOLD,
   interestTotal,
   viewerInterest,
+  viewerMomentStarts,
 } from "@/lib/calendar/interest";
 import { EventInterest } from "@/components/calendar/EventInterest";
+import { EventStar } from "@/components/calendar/EventStar";
 import { AttendeeTable } from "@/components/calendar/AttendeeTable";
 import { CategoryCalendar } from "./CategoryCalendar";
 
@@ -178,15 +180,32 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
   // lib/calendar/interest.ts voor waarom een laag getal averechts werkt.
   const isAlumniEvent = audiences.some((c) => c.audience === "ALUMNI");
   const session = await getCurrentSession();
-  const [total, viewer, attendees] = await Promise.all([
+  const [total, viewer, attendees, viewerMoments] = await Promise.all([
     interestTotal(event.id),
     viewerInterest(event.id, session?.user.id ?? null),
     // Enkel een alumni-evenement heeft een namenlijst; elders is interesse een
     // private markering en zou een lijst een deelnemerslijst suggereren.
     isAlumniEvent ? attendeeList(event.id) : Promise.resolve([]),
+    // Welke dagen van een reeks dit lid aanduidde; per dag staat er een ster in
+    // de lijst onder "Wanneer".
+    viewerMomentStarts([event.id], session?.user.id ?? null),
   ]);
+  const interestedMoments = new Set(viewerMoments.get(event.id) ?? []);
   const countLine = interestLabel(total >= INTEREST_PUBLIC_THRESHOLD ? total : null, locale);
   const nl = locale === "nl";
+  const interestLoginHref = `${base}/inloggen?next=${encodeURIComponent(
+    `${base}/kalender/${event.slug}`,
+  )}`;
+  // Dezelfde handeling als de ster in het weekoverzicht, maar over één dag van
+  // de reeks; daarom dezelfde teksten met "die dag" erin.
+  const momentStarLabels = {
+    mark: nl ? "Ik kom die dag" : "I am coming that day",
+    marked: nl ? "Je komt die dag" : "You are coming that day",
+    signIn: nl ? "Meld je aan om aan te duiden dat je komt" : "Sign in to mark that you are coming",
+    failed: nl
+      ? "Aanduiden lukte niet. Probeer het straks opnieuw."
+      : "Marking this did not work. Try again in a moment.",
+  };
 
   return (
     <article className="vtk-page">
@@ -283,16 +302,43 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
           {event.moments.length > 0 ? (
             <section className="vtk-event-moments">
               <h3>{nl ? "Wanneer" : "When"}</h3>
+              {/* Een ster per dag, en niet enkel de knop hieronder: bij een
+                  loopweek kom je naar het loopje van woensdag, niet naar "de
+                  loopweek". Die knop blijft staan en zet ze alle samen aan. */}
+              <p className="vtk-event-moments-hint">
+                {nl ? "Duid per dag aan of je erbij bent." : "Mark the days you are coming to."}
+              </p>
               <ol>
-                {event.moments.map((moment) => (
-                  <li key={moment.start.toISOString()} className="vtk-event-moment">
-                    <span className="day">{dayLabel(moment.start, locale, "short")}</span>
-                    <span className="time">
-                      {clockLabel(moment.start, locale)} - {clockLabel(moment.end, locale)}
-                    </span>
-                    {moment.label ? <span className="label">{moment.label}</span> : null}
-                  </li>
-                ))}
+                {event.moments.map((moment) => {
+                  const momentIso = moment.start.toISOString();
+                  const momentTitle = moment.label
+                    ? `${title} (${moment.label})`
+                    : `${title}, ${dayLabel(moment.start, locale, "short")}`;
+                  return (
+                    <li key={momentIso} className="vtk-event-moment">
+                      <span className="day">{dayLabel(moment.start, locale, "short")}</span>
+                      <span className="time">
+                        {clockLabel(moment.start, locale)} - {clockLabel(moment.end, locale)}
+                      </span>
+                      <EventStar
+                        eventId={event.id}
+                        momentStart={momentIso}
+                        title={momentTitle}
+                        interested={interestedMoments.has(momentIso)}
+                        signedIn={Boolean(session)}
+                        loginHref={interestLoginHref}
+                        labels={momentStarLabels}
+                        className="vtk-event-moment-star"
+                      />
+                      {/* De eigen naam van dit moment ("Nachtloop") is een
+                          eigennaam en geen labeltje: `.label` uit de basislaag
+                          zette ze in kapitalen met spatiëring, waardoor
+                          "Loopje 1" als een rubriek las in plaats van als de
+                          naam van die avond. */}
+                      {moment.label ? <span className="name">{moment.label}</span> : null}
+                    </li>
+                  );
+                })}
               </ol>
             </section>
           ) : (
@@ -321,7 +367,7 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
               isAlumniEvent={isAlumniEvent}
               signedIn={Boolean(session)}
               viewer={viewer}
-              loginHref={`${base}/inloggen?next=${encodeURIComponent(`${base}/kalender/${event.slug}`)}`}
+              loginHref={interestLoginHref}
               labels={{
                 interested: nl ? "Geïnteresseerd" : "Interested",
                 removeInterest: nl ? "Niet meer geïnteresseerd" : "Remove interest",

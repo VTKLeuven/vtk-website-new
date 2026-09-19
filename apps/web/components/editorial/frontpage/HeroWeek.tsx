@@ -240,8 +240,26 @@ export function HeroWeek({
                           ) : null}
                         </Link>
                         <span className="time">{entryTimeLabel(entry, locale, nl)}</span>
-                        {/* Eén evenement, één ster: enkel op de eerste rij die het krijgt. */}
-                        {repeat ? (
+                        {/* Een reeks met losse momenten (een loopweek met elke dag
+                            een loopje) krijgt een ster per dag: elke rij hier ís
+                            een van die dagen, en je komt naar het loopje van
+                            woensdag zonder daarmee de hele week aan te duiden.
+                            Een evenement dat gewoon dagen aan een stuk doorloopt,
+                            blijft één ding en houdt één ster op de eerste rij. */}
+                        {entry.moment ? (
+                          <EventStar
+                            eventId={event.id}
+                            momentStart={entry.moment.start.toISOString()}
+                            title={`${title}${entry.moment.label ? ` (${entry.moment.label})` : ""}`}
+                            interested={event.viewerInterestedMoments.includes(
+                              entry.moment.start.toISOString(),
+                            )}
+                            signedIn={signedIn}
+                            loginHref={loginHref}
+                            labels={starLabels}
+                            className="hero-week-star"
+                          />
+                        ) : repeat ? (
                           <span className="hero-week-star-spacer" aria-hidden="true" />
                         ) : (
                           <EventStar
