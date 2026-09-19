@@ -123,6 +123,10 @@ native binding". It has bitten us twice: `@rolldown/binding-*` (fixed in
   Installing just the one missing binary (`npm install --no-save
   lightningcss-win32-x64-msvc`) unblocks your machine but leaves the lockfile
   broken for Linux and macOS. Fix the lockfile instead.
+- Renovate bumps dependencies for us and updates the lockfile incrementally,
+  so its PRs can trip this. The `Renovate lockfile` workflow re-resolves the
+  lockfile on such a PR when `verify:lockfile` fails; `docs/dependencies.md`
+  describes that setup, the version pins and the app's EAS Update rule.
 
 # Prisma client must not be re-exported from @vtk/db
 
