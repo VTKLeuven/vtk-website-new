@@ -13,7 +13,7 @@ Naast Renovate staan er drie workflows:
 | --- | --- | --- |
 | `security-audit.yml` | wekelijks, en op een PR die aan een manifest of lockfile raakt | `npm audit` voor de site en voor de app; faalt op een critical, rapporteert alles vanaf high |
 | `audit-fix.yml` | wekelijks | herresolvet de lockfile bij openstaande kwetsbaarheden, en opent enkel een PR wanneer er daardoor echt minder advisories overblijven |
-| `renovate-lockfile.yml` | op elke Renovate-PR | herstelt de lockfile wanneer de platform-binaries eruit gevallen zijn |
+| `renovate-lockfile.yml` | op elke Renovate-PR | herstelt de lockfile wanneer de platform-binaries ontbreken of de lockfile niet in sync is met package.json |
 
 ## Opzetten
 
@@ -132,15 +132,27 @@ regel; de PR bevat daarna dus meer lockfile-wijzigingen dan de titel belooft.
   via de better-auth-CLI, `joi` via `passkit-generator`, `@expo/config-plugins`
   in de app) waar de fix een major bump vraagt. Daarom faalt de audit pas op een
   critical; het volledige high-rapport staat in de samenvatting van de run.
-- **Renovate stopt met rebasen zodra iemand anders op haar branch commit.** Duwt
-  `renovate-lockfile.yml` een fix naar de PR-branch, dan zet Renovate er een
-  waarschuwing bij dat eigen wijzigingen verloren kunnen gaan en laat ze de branch
-  verder ongemoeid. Mergen kan gewoon; loopt de PR achter of geeft ze een
-  conflict, sluit ze dan en laat Renovate een nieuwe maken.
-- **`next` staat exact gepind** (`"next": "16.3.0"`, in drie apps). `npm audit fix`
-  kan daar niets aan doen: de fix valt buiten de gedeclareerde range. Zulke
-  advisories lost Renovate op, niet de audit-workflow.
-- **De `overrides` in de wortel-`package.json`** (nu `joi` voor
+- **Renovate stopt met rebasen zodra een onbekende auteur op haar branch commit.**
+  Daarom staat in `renovate.json` `gitIgnoredAuthors` geconfigureerd voor
+  `github-actions[bot]`. Hierdoor kan `renovate-lockfile.yml` de herstelde
+  lockfile pushen zónder dat Renovate de branch markeert als extern bewerkt en de
+  automerge uitschakelt.
+- **Renovate negeert groepen standaard bij `vulnerabilityAlerts`.** Security fixes
+  krijgen van Renovate voorrang en bypassen `groupName`. Bij pakketten met een
+  strikte peer dependency (zoals `better-auth` en `@better-auth/oauth-provider`)
+  kan Renovate daardoor één pakket bumpen terwijl de ander achterblijft, waardoor
+  de interne npm-install van de bot faalt. Zulke PR's vereisen dat beide samen
+  geüpdatet worden.
+- **`audit-fix.yml` merget bewust niet automatisch.** Omdat `main` geen
+  verplichte branch protection checks heeft, zou GitHub auto-merge een PR
+  onmiddellijk mergen zonder te wachten tot de CI-tests gedraaid hebben. De PR
+  wacht op een handmatige merge zodra CI groen is.
+- **`next` staat exact gepind** (in drie apps). `npm audit fix` kan daar niets
+  aan doen: de fix valt buiten de gedeclareerde range. Zulke advisories lost
+  Renovate op, niet de audit-workflow.
+- **De `overrides` in de wortel-`package.json`** (zoals `joi` voor
   `passkit-generator`) blijven buiten het zicht van de audit-fix: een override is
   een keuze, geen resolutie. Controleer bij een advisory op een overriden pakket
-  of de override nog de juiste versie noemt.
+  of de override nog de juiste versie noemt. Wanneer Renovate een override aanpast,
+  zorgt `renovate-lockfile.yml` (via `npm ci --dry-run`) dat ontbrekende entries
+  meteen hersteld worden.
