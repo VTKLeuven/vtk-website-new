@@ -113,7 +113,10 @@ export function EventWhenField({
   }
 
   return (
-    <div className="space-y-4">
+    // De keuze staat verder van de velden dan de velden onderling: ze bepaalt
+    // welke velden er staan, en plakte ze er tegenaan, dan las "Start" als een
+    // label van de keuzekaart erboven in plaats van van het veld eronder.
+    <div className="space-y-6">
       {/* De twee vormen als keuzekaarten: de keuze bepaalt welke velden er
           verderop staan, en dat is meer dan een vinkje in een rij verdient. */}
       <fieldset className="vtk-ef-modes">
