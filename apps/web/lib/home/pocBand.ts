@@ -73,11 +73,34 @@ export type PocBandSetting = {
   secondaryLabelNl: string;
   secondaryLabelEn: string;
   secondaryUrl: string;
+  /**
+   * De disclaimer boven de gezichten op `/pocs`, in Markdown. Hoort bij de
+   * verkiezingsmodus en niet bij de band: wie op "Kandidaten bekijken" klikt,
+   * komt op een pagina die er het hele jaar hetzelfde uitziet en waar niets
+   * zegt dat deze mensen nog kandidaat zijn. Zie `pocPageNotice`.
+   */
+  noticeNl: string;
+  noticeEn: string;
   steps: PocBandStep[];
 };
 
 /** Meer stappen dan dit passen niet naast elkaar op een laptop. */
 export const POC_BAND_MAX_STEPS = 4;
+
+/**
+ * De standaardtekst van de disclaimer. De redactie past hem elk jaar aan (de
+ * datum van de bezwarentermijn verschuift), dus hij staat hier enkel zodat een
+ * site die er nog nooit iets aan instelde niet met een leeg vakje begint.
+ */
+const DEFAULT_NOTICE_NL =
+  "De onderstaande personen zijn POC-kandidaat, maar zijn nog niet verkozen. " +
+  "Je kan bezwaar indienen tegen de kandidaten door een mail te sturen naar " +
+  "[neucom@vtk.be](mailto:neucom@vtk.be).";
+
+const DEFAULT_NOTICE_EN =
+  "The people below are POC candidates; they have not been elected yet. " +
+  "You can object to a candidate by sending an email to " +
+  "[neucom@vtk.be](mailto:neucom@vtk.be).";
 
 const DEFAULT_STEPS: PocBandStep[] = [
   {
@@ -125,6 +148,8 @@ export function defaultPocBandSetting(): PocBandSetting {
     secondaryLabelNl: "",
     secondaryLabelEn: "",
     secondaryUrl: "",
+    noticeNl: DEFAULT_NOTICE_NL,
+    noticeEn: DEFAULT_NOTICE_EN,
     steps: DEFAULT_STEPS.map((step) => ({ ...step })),
   };
 }
@@ -198,6 +223,8 @@ export function readPocBandSetting(value: unknown): PocBandSetting {
     secondaryLabelNl: text(record, "secondaryLabelNl", base.secondaryLabelNl),
     secondaryLabelEn: text(record, "secondaryLabelEn", base.secondaryLabelEn),
     secondaryUrl: text(record, "secondaryUrl", base.secondaryUrl),
+    noticeNl: text(record, "noticeNl", base.noticeNl),
+    noticeEn: text(record, "noticeEn", base.noticeEn),
     steps,
   };
 }
@@ -264,4 +291,35 @@ export function pocBandStepWhen(step: PocBandStep, locale: Locale): string {
   if (step.to) return `${nl ? "tot" : "until"} ${label(step.to)}`;
   if (step.from) return `${nl ? "vanaf" : "from"} ${label(step.from)}`;
   return "";
+}
+
+/**
+ * De disclaimer die op `/pocs` boven de gezichten hoort, of `null`.
+ *
+ * Drie voorwaarden, en alle drie om dezelfde reden: de tekst zegt "deze mensen
+ * zijn nog niet verkozen", en dat mag nergens staan waar het niet waar is.
+ *
+ * - **Enkel in verkiezingsmodus.** Staat de band op `representatives`, dan zijn
+ *   de verkiezingen gelopen en zijn de namen op de pagina gewoon de
+ *   vertegenwoordigers.
+ * - **Enkel bij het huidige werkingsjaar.** De jaarbalk op `/pocs` gaat terug
+ *   tot 2019; die jaargangen zijn al jaren verkozen.
+ * - **Enkel met tekst.** De redactie mag de velden leegmaken om de disclaimer
+ *   weg te halen zonder de hele band uit verkiezingsmodus te halen.
+ */
+export function pocPageNotice(
+  setting: PocBandSetting,
+  locale: Locale,
+  year: number,
+  currentYear: number,
+): string | null {
+  if (setting.mode !== "elections") return null;
+  if (year !== currentYear) return null;
+  // Dezelfde taalval als de band zelf: een lege Engelse tekst valt terug op de
+  // Nederlandse, want een halfvertaalde instelling mag de waarschuwing niet
+  // laten verdwijnen voor wie de site in het Engels leest.
+  const notice = (
+    locale === "nl" ? setting.noticeNl : setting.noticeEn || setting.noticeNl
+  ).trim();
+  return notice === "" ? null : notice;
 }

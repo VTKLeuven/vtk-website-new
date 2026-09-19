@@ -348,6 +348,46 @@ export function PocBandAdminCard({
             </div>
           </div>
 
+          {/* Disclaimer op /pocs */}
+          <div className="space-y-4 pt-4 border-t border-[#0e1a36]/10">
+            <div>
+              <h3 className="text-sm font-semibold text-[#10162a]">
+                {nl ? "Disclaimer op de POC-pagina" : "Notice on the POC page"}
+              </h3>
+              <p className="text-xs text-[#5c667f] mt-0.5">
+                {nl
+                  ? "Staat boven de gezichten op /pocs, maar enkel in verkiezingsmodus en enkel bij het huidige werkingsjaar. Laat beide velden leeg om er geen te tonen."
+                  : "Shown above the faces on /pocs, but only in election mode and only for the current working year. Leave both fields empty to show none."}
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
+                  {nl ? "Disclaimer (Markdown, NL)" : "Notice (Markdown, NL)"}
+                </label>
+                <MarkdownEditorField
+                  name="noticeNl"
+                  defaultValue={setting.noticeNl}
+                  locale="nl"
+                  rows={4}
+                  allowImages={false}
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-[#5c667f] uppercase tracking-wider mb-1">
+                  {nl ? "Disclaimer (Markdown, EN)" : "Notice (Markdown, EN)"}
+                </label>
+                <MarkdownEditorField
+                  name="noticeEn"
+                  defaultValue={setting.noticeEn}
+                  locale="en"
+                  rows={4}
+                  allowImages={false}
+                />
+              </div>
+            </div>
+          </div>
+
           {/* Procedure stappen */}
           <div className="space-y-4 pt-4 border-t border-[#0e1a36]/10">
             <div>

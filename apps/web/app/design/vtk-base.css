@@ -1316,6 +1316,30 @@
   padding: 0 clamp(20px, 3vw, 36px);
 }
 
+/* De disclaimer tijdens de riververkiezingen: de gezichten eronder zijn
+   kandidaten en nog geen verkozen vertegenwoordigers. Behandeld als een
+   uitgelichte kaart (witte kaart met gele rail) en niet als een alarmvlak: het
+   is een mededeling over de stand van de procedure, geen fout en geen
+   waarschuwing. Ze staat boven de springchips omdat ze over de hele pagina gaat
+   en niet over één POC. Enkel de startpagina van deze band toont hem; zie
+   `pocPageNotice` in lib/home/pocBand.ts voor wanneer. */
+.vtk-wall-notice {
+  margin-bottom: clamp(20px, 3vw, 28px);
+  padding: clamp(14px, 2vw, 18px) clamp(16px, 2.2vw, 22px);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-wall-notice > :first-child {
+  margin-top: 0;
+}
+
+.vtk-wall-notice > :last-child {
+  margin-bottom: 0;
+}
+
 /* "POSTEN" staat op een eigen regel (`flex-basis: 100%`) en niet vóór de chips:
    dat scheelt het label plus zijn marge, en pas daarmee halen de veertien posten
    samen één regel op een gewone laptop (1146px in 1168px inhoudsbreedte).

@@ -344,6 +344,10 @@ export async function savePocBandAction(_prev: SaveState, formData: FormData): P
     secondaryLabelNl: (formData.get("secondaryLabelNl") as string)?.trim() || "",
     secondaryLabelEn: (formData.get("secondaryLabelEn") as string)?.trim() || "",
     secondaryUrl: (formData.get("secondaryUrl") as string)?.trim() || "",
+    // Geen standaardtekst als terugval: een leeggemaakt veld betekent hier
+    // "geen disclaimer op /pocs", en die keuze moet bewaard blijven.
+    noticeNl: (formData.get("noticeNl") as string)?.trim() ?? "",
+    noticeEn: (formData.get("noticeEn") as string)?.trim() ?? "",
     steps,
   };
 

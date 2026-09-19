@@ -5,6 +5,7 @@ import {
   pocBandIsOpen,
   pocBandStepState,
   pocBandStepWhen,
+  pocPageNotice,
   readPocBandSetting,
   type PocBandStep,
 } from "@/lib/home/pocBand";
@@ -143,6 +144,35 @@ describe("pocBand", () => {
       };
       expect(pocBandStepWhen(step, "nl")).toMatch(/^tot\s+7\s+okt/);
       expect(pocBandStepWhen(step, "en")).toMatch(/^until\s+7\s+Oct/);
+    });
+  });
+
+  describe("pocPageNotice", () => {
+    const setting = { ...defaultPocBandSetting(), mode: "elections" as const };
+
+    it("toont de disclaimer in verkiezingsmodus bij het huidige werkingsjaar", () => {
+      expect(pocPageNotice(setting, "nl", 2026, 2026)).toContain("nog niet verkozen");
+      expect(pocPageNotice(setting, "en", 2026, 2026)).toContain("not been elected");
+    });
+
+    it("zwijgt bij een ouder werkingsjaar", () => {
+      expect(pocPageNotice(setting, "nl", 2024, 2026)).toBeNull();
+    });
+
+    it("zwijgt buiten verkiezingsmodus", () => {
+      expect(pocPageNotice(defaultPocBandSetting(), "nl", 2026, 2026)).toBeNull();
+      expect(pocPageNotice({ ...setting, mode: "hidden" }, "nl", 2026, 2026)).toBeNull();
+    });
+
+    it("zwijgt wanneer de redactie beide velden leegmaakt", () => {
+      const empty = { ...setting, noticeNl: "", noticeEn: "   " };
+      expect(pocPageNotice(empty, "nl", 2026, 2026)).toBeNull();
+      expect(pocPageNotice(empty, "en", 2026, 2026)).toBeNull();
+    });
+
+    it("valt voor Engels terug op de Nederlandse tekst", () => {
+      const half = { ...setting, noticeNl: "Nog kandidaat.", noticeEn: "" };
+      expect(pocPageNotice(half, "en", 2026, 2026)).toBe("Nog kandidaat.");
     });
   });
 });

@@ -7,6 +7,8 @@ import { notFound } from "next/navigation";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
+import { Markdown } from "@/components/ui/Markdown";
+import { POC_BAND_SETTING, pocPageNotice, readPocBandSetting } from "@/lib/home/pocBand";
 import { currentWorkingYear, formatWorkingYear, splitYearBar } from "@/lib/workingYear";
 
 /** Aantal jaren dat los in de jaarbalk staat; de rest zit achter "Archief". */
@@ -41,12 +43,14 @@ export default async function PocsPage({
   const base = nl ? "" : "/en";
   const t = getDictionary(locale).pocs;
 
-  const distinctYears = (
-    await prisma.pocRepresentative.findMany({
+  const [yearRows, bandSettingRow] = await Promise.all([
+    prisma.pocRepresentative.findMany({
       distinct: ["year"],
       select: { year: true },
-    })
-  ).map((r) => r.year);
+    }),
+    prisma.setting.findUnique({ where: { key: POC_BAND_SETTING } }),
+  ]);
+  const distinctYears = yearRows.map((r) => r.year);
 
   const current = currentWorkingYear();
   const yearSet = new Set<number>([...distinctYears, current]);
@@ -55,6 +59,10 @@ export default async function PocsPage({
   const newestWithData = distinctYears.length ? Math.max(...distinctYears) : current;
   const requested = Number(jaar);
   const year = Number.isInteger(requested) && yearSet.has(requested) ? requested : newestWithData;
+
+  // De verkiezingsmodus van de homepage-band bepaalt ook of deze pagina zegt dat
+  // de gezichten nog kandidaten zijn; zie `pocPageNotice`.
+  const notice = pocPageNotice(readPocBandSetting(bandSettingRow?.value), locale, year, current);
 
   const { bar: barYears, archive: archiveYears } = splitYearBar(allYears, year, YEARS_IN_BAR);
   const oldestArchived = archiveYears.at(-1);
@@ -135,6 +143,12 @@ export default async function PocsPage({
       ) : (
         <section className="vtk-wall">
           <div className="vtk-wall-inner">
+            {notice ? (
+              <div className="vtk-wall-notice prose-vtk" role="note">
+                <Markdown locale={locale}>{notice}</Markdown>
+              </div>
+            ) : null}
+
             {/* Quick jump navigatie naar de verschillende POC's */}
             <nav className="vtk-wall-jump" aria-label={t.pocs}>
               <span className="vtk-wall-jump-label">{t.pocs}</span>

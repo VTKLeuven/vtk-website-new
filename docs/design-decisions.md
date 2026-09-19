@@ -2184,6 +2184,38 @@ liedjesboek ("Glory, glory, wij zijn VTK!", "Het verstand zit aan deze kant").
   is één gerichte query extra (de richtingen van de ingelogde gebruiker), en enkel
   voor wie ingelogd is.
 
+### Verkiezingsmodus loopt door tot op `/pocs`
+
+De POC-band op de homepage heeft een verkiezingsweergave (`Setting` `home.poc`,
+modus `elections`): in september zijn er nog geen vertegenwoordigers, en dan
+roept de band op om je kandidaat te stellen in plaats van een lege rij gezichten
+te tonen. Zie `apps/web/lib/home/pocBand.ts` voor waarom die modus een
+redactionele keuze is en geen automatisme.
+
+- **De secundaire knop van die band ("Kandidaten bekijken") gaat naar `/pocs`, en
+  die pagina zag er het hele jaar hetzelfde uit.** Wie doorklikte tijdens de
+  bezwarentermijn kreeg de kandidaten te zien als waren het de verkozen
+  vertegenwoordigers. Daarom draagt `/pocs` in verkiezingsmodus een disclaimer
+  boven de gezichten: deze mensen zijn kandidaat, nog niet verkozen, en je kan
+  bezwaar indienen bij het neutraal comité.
+- **De tekst is redactioneel** (`noticeNl`/`noticeEn` in dezelfde instelling,
+  bewerkbaar in **Admin → Onderwijs → POC's**, Markdown). Hij moet dat zijn: de
+  uiterste datum van de bezwarentermijn verschuift elk jaar, en die datum in de
+  code zetten betekent een deploy per academiejaar. Beide velden leegmaken haalt
+  de disclaimer weg zonder de band uit verkiezingsmodus te halen.
+- **Eén instelling voor twee schermen, geen tweede schakelaar.** De vraag "loopt
+  de procedure nog?" heeft één antwoord; twee plekken om dat te zetten lopen
+  gegarandeerd uit elkaar, en dan staat er op de ene pagina een oproep om je
+  kandidaat te stellen terwijl de andere de kandidaten al verkozen noemt.
+- **Enkel bij het huidige werkingsjaar.** De jaarbalk op `/pocs` gaat terug tot
+  2019; die jaargangen zijn al lang verkozen en mogen de disclaimer niet erven
+  omdat er dit jaar toevallig verkiezingen lopen (`pocPageNotice`).
+- **Uitgelichte kaart, geen alarmvlak.** `.vtk-wall-notice` is een witte kaart
+  met de gele rail, de behandeling van elke uitgelichte kaart op de site. Een
+  rood of oranje vlak leest als een fout of een storing, terwijl dit gewoon zegt
+  waar de procedure staat. Hij staat boven de springchips omdat hij over de hele
+  pagina gaat en niet over één POC.
+
 ### Cursusdienst-openingsuren komen live van cudi.vtk.be
 
 - De **Theokot**-uren beheert VTK zelf in de admin (`Setting`
