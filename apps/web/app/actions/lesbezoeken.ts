@@ -1017,7 +1017,6 @@ export async function saveLesbezoekSettingsAction(
 ): Promise<SaveState> {
   await requirePermission("lesbezoeken.manage");
 
-  const signature = toMessageText(formData.get("signature")).slice(0, 500);
   const notifyEmail = toSingleLine(formData.get("notifyEmail"));
   if (!notifyEmail) return saveError("INVALID_INPUT");
 
@@ -1025,7 +1024,10 @@ export async function saveLesbezoekSettingsAction(
   // vriendelijker dan een rode toast over een getal dat niemand bewust koos.
   const nudgeLeadDays = clampNudgeLeadDays(toSingleLine(formData.get("nudgeLeadDays")));
 
-  const value = { signature, notifyEmail, nudgeLeadDays };
+  const value = {
+    notifyEmail,
+    nudgeLeadDays,
+  };
   await prisma.setting.upsert({
     where: { key: LESBEZOEK_CONFIG_KEY },
     create: { key: LESBEZOEK_CONFIG_KEY, value },

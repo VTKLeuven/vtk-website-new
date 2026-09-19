@@ -10,6 +10,9 @@ import {
   buildDefaultVtkEmail,
   DEFAULT_MAPS_URL,
 } from '@/lib/signature';
+import { saveSignatureProfileAction } from '@/app/actions/signature';
+import { saveErrorMessages } from '@/lib/saveMessages';
+import { signatureRolePresets } from '@/lib/signatureProfile';
 
 export type UserMembershipInfo = {
   groupNameNl: string;
@@ -30,6 +33,37 @@ type StoredSignatureData = {
   phoneDisplay?: string;
 };
 
+/**
+ * Wat er nog in `localStorage` van de vorige opzet staat.
+ *
+ * De handtekening woont nu op het profiel, want de server moet ze kunnen lezen
+ * om een uitgaande mail ermee te ondertekenen. Deze twee lezers blijven staan
+ * zodat wie zijn gegevens ooit in deze browser invulde, ze niet opnieuw moet
+ * intikken: ze vullen het formulier voor, en de eerste keer opslaan zet ze op
+ * het profiel.
+ */
+function legacyField(key: keyof StoredSignatureData): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as StoredSignatureData;
+    const value = parsed[key];
+    return value ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+function legacyPhone(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return localStorage.getItem(STORAGE_PHONE_KEY);
+  } catch {
+    return null;
+  }
+}
+
 const T = {
   nl: {
     title: 'E-mailhandtekening',
@@ -46,7 +80,9 @@ const T = {
     previewTitle: 'Voorbeeldweergave',
     saveDetails: 'Gegevens opslaan',
     savedDetails: 'Opgeslagen!',
-    saveSuccessToast: 'Handtekeninggegevens opgeslagen voor de volgende keer.',
+    saveSuccessToast: 'Handtekening opgeslagen op je profiel.',
+    savingDetails: 'Opslaan…',
+    saveErrorToast: 'Niet opgeslagen. Probeer het opnieuw.',
     resetDefaults: 'Standaard herstellen',
     resetToast: 'Standaardgegevens hersteld.',
     copySignature: 'Handtekening kopiëren',
@@ -77,7 +113,9 @@ const T = {
     previewTitle: 'Live preview',
     saveDetails: 'Save details',
     savedDetails: 'Saved!',
-    saveSuccessToast: 'Signature details saved for next time.',
+    saveSuccessToast: 'Signature saved to your profile.',
+    savingDetails: 'Saving…',
+    saveErrorToast: 'Not saved. Please try again.',
     resetDefaults: 'Reset to defaults',
     resetToast: 'Default values restored.',
     copySignature: 'Copy signature',
@@ -100,6 +138,7 @@ export function AccountSignature({
   user,
   memberships = [],
   currentYearCode,
+  stored,
 }: {
   locale: 'nl' | 'en';
   user: {
@@ -110,6 +149,17 @@ export function AccountSignature({
   };
   memberships?: UserMembershipInfo[];
   currentYearCode: string;
+  /**
+   * Wat er op het profiel staat. Leeg veld = afgeleid (zie
+   * `lib/signatureProfile.ts`), en dat is ook wat de mails van de lesbezoeken en
+   * de Theokot-verhuur onder een mail van dit lid zetten.
+   */
+  stored: {
+    signatureName: string | null;
+    signatureRoleTitle: string | null;
+    signatureEmail: string | null;
+    signaturePhone: string | null;
+  };
 }) {
   const t = T[locale];
   const selectId = useId();
@@ -122,166 +172,101 @@ export function AccountSignature({
   // Standaard VTK mail
   const defaultEmail = buildDefaultVtkEmail(user.firstName, user.lastName, user.email);
 
-  // Rolpresets opstellen uit memberships
-  const rolePresets: Array<{ label: string; value: string }> = [];
-  const addedValues = new Set<string>();
-
-  for (const m of memberships) {
-    const groupName = locale === 'en' ? m.groupNameEn : m.groupNameNl;
-    const title = locale === 'en' ? m.titleEn : m.titleNl;
-
-    if (title && title.trim()) {
-      const formattedTitle = title.startsWith('VTK') ? title : `VTK ${title} ${m.yearCode}`;
-      if (!addedValues.has(formattedTitle)) {
-        rolePresets.push({
-          label: `${formattedTitle} (${m.yearCode})`,
-          value: formattedTitle,
-        });
-        addedValues.add(formattedTitle);
-      }
-    }
-
-    if (groupName && groupName.trim()) {
-      const formattedGroup = `VTK ${groupName} ${m.yearCode}`;
-      if (!addedValues.has(formattedGroup)) {
-        rolePresets.push({
-          label: `${formattedGroup} (${m.yearCode})`,
-          value: formattedGroup,
-        });
-        addedValues.add(formattedGroup);
-      }
-    }
-  }
-
-  // Fallback preset als er geen memberships zijn
+  // Rolpresets uit de postlidmaatschappen. Staat in `lib/signatureProfile.ts`,
+  // want de mails van de lesbezoeken en de Theokot-verhuur leiden dezelfde
+  // functie af voor wie ze verstuurt; twee kopieen lopen uiteen.
+  const rolePresets = signatureRolePresets(memberships, locale, currentYearCode);
   const fallbackRole = `VTK ${currentYearCode}`;
-  if (rolePresets.length === 0) {
-    rolePresets.push({
-      label: fallbackRole,
-      value: fallbackRole,
-    });
-  }
-
   const initialRole = rolePresets[0]?.value ?? fallbackRole;
 
-  const [fullName, setFullName] = useState(() => {
-    if (typeof window === 'undefined') return defaultFullName;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as StoredSignatureData;
-        if (parsed.fullName) return parsed.fullName;
-      }
-    } catch {
-      // Negeer
-    }
-    return defaultFullName;
-  });
+  // Het profiel wint van de browser: dat is sinds deze handtekening ook onder de
+  // uitgaande mails komt de enige bron die de server kan lezen. Wat er nog in
+  // `localStorage` staat, blijft dienen als eenmalige overname voor wie zijn
+  // gegevens ooit hier invulde; opslaan zet ze op het profiel.
+  const [fullName, setFullName] = useState(
+    () => stored.signatureName ?? legacyField('fullName') ?? defaultFullName,
+  );
 
-  const [roleTitle, setRoleTitle] = useState(() => {
-    if (typeof window === 'undefined') return initialRole;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as StoredSignatureData;
-        if (parsed.roleTitle) return parsed.roleTitle;
-      }
-    } catch {
-      // Negeer
-    }
-    return initialRole;
-  });
+  const [roleTitle, setRoleTitle] = useState(
+    () => stored.signatureRoleTitle ?? legacyField('roleTitle') ?? initialRole,
+  );
 
-  const [emailAddress, setEmailAddress] = useState(() => {
-    if (typeof window === 'undefined') return defaultEmail;
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as StoredSignatureData;
-        if (parsed.emailAddress) return parsed.emailAddress;
-      }
-    } catch {
-      // Negeer
-    }
-    return defaultEmail;
-  });
+  const [emailAddress, setEmailAddress] = useState(
+    () => stored.signatureEmail ?? legacyField('emailAddress') ?? defaultEmail,
+  );
 
-  const [phoneDisplay, setPhoneDisplay] = useState(() => {
-    if (typeof window === 'undefined') return '';
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as StoredSignatureData;
-        if (parsed.phoneDisplay !== undefined) return parsed.phoneDisplay;
-      }
-      const legacyPhone = localStorage.getItem(STORAGE_PHONE_KEY);
-      if (legacyPhone) return legacyPhone;
-    } catch {
-      // Negeer
-    }
-    return '';
-  });
+  const [phoneDisplay, setPhoneDisplay] = useState(
+    () => stored.signaturePhone ?? legacyField('phoneDisplay') ?? legacyPhone() ?? '',
+  );
 
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [copiedRich, setCopiedRich] = useState(false);
   const [copiedHtml, setCopiedHtml] = useState(false);
   const [showHowTo, setShowHowTo] = useState(false);
 
-  function persistData(patch: Partial<StoredSignatureData>) {
-    const updated: StoredSignatureData = {
-      fullName: patch.fullName ?? fullName,
-      roleTitle: patch.roleTitle ?? roleTitle,
-      emailAddress: patch.emailAddress ?? emailAddress,
-      phoneDisplay: patch.phoneDisplay ?? phoneDisplay,
-    };
-    try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
-      if (updated.phoneDisplay !== undefined) {
-        localStorage.setItem(STORAGE_PHONE_KEY, updated.phoneDisplay);
-      }
-    } catch {
-      // Negeer opslagfouten
-    }
-  }
-
+  // Tikken bewaart niets meer: de handtekening staat op het profiel en dat is
+  // een bewuste opslaan-klik. Elke toetsaanslag naar de server sturen zou van
+  // een handtekening een formulier maken dat zichzelf half invult.
   function handleFullNameChange(val: string) {
     setFullName(val);
-    persistData({ fullName: val });
   }
 
   function handleRoleTitleChange(val: string) {
     setRoleTitle(val);
-    persistData({ roleTitle: val });
   }
 
   function handleEmailChange(val: string) {
     setEmailAddress(val);
-    persistData({ emailAddress: val });
   }
 
   function handlePhoneChange(val: string) {
     setPhoneDisplay(val);
-    persistData({ phoneDisplay: val });
   }
 
-  function handleSaveDetails() {
-    persistData({ fullName, roleTitle, emailAddress, phoneDisplay });
-    setSavedSuccess(true);
-    setTimeout(() => setSavedSuccess(false), 2500);
-    showToast({ message: t.saveSuccessToast, variant: 'success' });
-  }
+  async function handleSaveDetails() {
+    const formData = new FormData();
+    formData.set('signatureName', fullName);
+    formData.set('signatureRoleTitle', roleTitle);
+    formData.set('signatureEmail', emailAddress);
+    formData.set('signaturePhone', phoneDisplay);
 
-  function handleResetDefaults() {
-    setFullName(defaultFullName);
-    setRoleTitle(initialRole);
-    setEmailAddress(defaultEmail);
-    setPhoneDisplay('');
+    setSaving(true);
+    const result = await saveSignatureProfileAction({ status: 'idle' }, formData);
+    setSaving(false);
+
+    if (result.status === 'error') {
+      const messages = saveErrorMessages(locale);
+      showToast({
+        message: messages[result.code ?? ''] ?? t.saveErrorToast,
+        variant: 'error',
+        duration: 0,
+      });
+      return;
+    }
+
+    // De oude browseropslag is vanaf nu overbodig en mag niet blijven
+    // rondslingeren: ze zou bij een volgende sessie het profiel overschrijven in
+    // het formulier.
     try {
       localStorage.removeItem(STORAGE_KEY);
       localStorage.removeItem(STORAGE_PHONE_KEY);
     } catch {
       // Negeer opslagfouten
     }
+
+    setSavedSuccess(true);
+    setTimeout(() => setSavedSuccess(false), 2500);
+    showToast({ message: t.saveSuccessToast, variant: 'success' });
+  }
+
+  // Terugzetten vult het formulier opnieuw met het afgeleide; opslaan maakt het
+  // pas definitief. Zo is een misklik hier niet meteen je handtekening kwijt.
+  function handleResetDefaults() {
+    setFullName(defaultFullName);
+    setRoleTitle(initialRole);
+    setEmailAddress(defaultEmail);
+    setPhoneDisplay('');
     showToast({ message: t.resetToast, variant: 'info' });
   }
 
@@ -647,9 +632,15 @@ export function AccountSignature({
           {copiedRich ? t.copiedSignature : t.copySignature}
         </Button>
 
-        <Button type="button" variant="ghost" onClick={handleSaveDetails} className="inline-flex items-center gap-2">
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={handleSaveDetails}
+          disabled={saving}
+          className="inline-flex items-center gap-2"
+        >
           {savedSuccess ? <CheckIcon /> : null}
-          {savedSuccess ? t.savedDetails : t.saveDetails}
+          {saving ? t.savingDetails : savedSuccess ? t.savedDetails : t.saveDetails}
         </Button>
 
         <Button type="button" variant="ghost" onClick={handleCopyHtml} className="inline-flex items-center gap-2">

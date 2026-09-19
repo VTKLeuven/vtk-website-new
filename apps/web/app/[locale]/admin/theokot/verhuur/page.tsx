@@ -22,6 +22,7 @@ import {
   getRentalTemplates,
   rentalSenderLabel,
 } from "@/lib/theokotVerhuur-server";
+import { signatureTextForUser } from "@/lib/mailSignature-server";
 import { rentalMailVars, rentalReplyTo } from "@/lib/theokotVerhuurMail";
 import { siteBaseUrl } from "@/lib/calendar/feeds";
 import { RentalCalendarSubscribe } from "@/components/theokot/RentalCalendarSubscribe";
@@ -131,6 +132,11 @@ export default async function AdminTheokotVerhuurPage({
     }),
     getRentalFeedToken(),
   ]);
+
+  // De ondertekening onder elke mail is die van wie ze verstuurt, dus van wie nu
+  // naar dit scherm kijkt. De voorbeelden tonen daarmee wat deze persoon straks
+  // effectief onder zijn mail krijgt.
+  const signature = await signatureTextForUser(session.user.id, nl ? "nl" : "en");
 
   const feedBaseUrl = `${siteBaseUrl()}/api/theokot/verhuur/feed/${feedToken}.ics`;
 
@@ -369,7 +375,7 @@ export default async function AdminTheokotVerhuurPage({
             nl={nl}
             templates={templates}
             senderLabel={rentalSenderLabel()}
-            signature={config.signature}
+            signature={signature}
             replyTo={rentalReplyTo(config)}
           />
           <RentalContractsCard nl={nl} contracts={contracts} />
@@ -403,7 +409,7 @@ export default async function AdminTheokotVerhuurPage({
             rentals={tab === "kalender" ? rentals : tab === "verwerkt" ? processed : open}
             templates={templates}
             senderLabel={rentalSenderLabel()}
-            signature={config.signature}
+            signature={signature}
             contractAvailable={contractAvailable}
             canManage={canManage}
             feedBaseUrl={feedBaseUrl}

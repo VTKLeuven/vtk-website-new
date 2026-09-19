@@ -29,7 +29,6 @@ import type { DepositChoice, RenterType } from "@/lib/theokotVerhuur";
  */
 export type RentalConfig = {
   notifyEmails: string[];
-  signature: string;
   /**
    * Hoeveel dagen op voorhand een aanvraag minstens binnen moet zijn. Nul laat
    * alles toe; dat was in het Google Form ook zo, maar wie de verhuur doet mag
@@ -47,7 +46,6 @@ export type RentalConfig = {
 
 export const DEFAULT_RENTAL_CONFIG: RentalConfig = {
   notifyEmails: ["theokot@vtk.be"],
-  signature: "Theokot\ntheokot@vtk.be",
   minLeadDays: 0,
   formOpen: true,
   closedNoticeNl: "",
@@ -68,10 +66,6 @@ export function parseRentalConfig(value: unknown): RentalConfig {
 
   return {
     notifyEmails: notify.length > 0 ? notify : DEFAULT_RENTAL_CONFIG.notifyEmails,
-    signature:
-      typeof stored.signature === "string" && stored.signature.trim()
-        ? stored.signature
-        : DEFAULT_RENTAL_CONFIG.signature,
     minLeadDays: clampLeadDays(stored.minLeadDays),
     formOpen: stored.formOpen !== false,
     closedNoticeNl: typeof stored.closedNoticeNl === "string" ? stored.closedNoticeNl : "",

@@ -7447,10 +7447,74 @@ praesidiumlid houdt de generator; het beheer zet hem **per post** aan in
 `/admin/roles` — een werkgroep, een losse post of één persoon die hem nodig heeft
 krijgt er een rol met dit recht bij.
 
-De generator zelf verandert niet: de HTML, de functiepresets uit de
-groepslidmaatschappen en het opslaan van de gegevens in de browser blijven zoals
-ze waren. Wie het recht niet heeft, ziet de kaart niet, en de lidmaatschappen
-worden voor die pagina dan ook niet meer opgehaald.
+De generator zelf verandert niet: de HTML en de functiepresets uit de
+groepslidmaatschappen blijven zoals ze waren. Wie het recht niet heeft, ziet de
+kaart niet, en de lidmaatschappen worden voor die pagina dan ook niet meer
+opgehaald. Waar de ingevulde gegevens bewaard worden, is sindsdien wel
+veranderd: zie de sectie hieronder.
+
+## De ondertekening van een beheersmail is die van wie ze verstuurt
+
+Dit gaat over de mails die een post zelf verstuurt vanuit een beheerscherm: de
+lesbezoeken naar een professor, de verhuurmails van het Theokot. Onderaan elk
+sjabloon staat `{ondertekening}`, en wat daarvoor in de plaats kwam, was een
+instelling per werking: een tekstvak van drie regels in /admin.
+
+Dat klopte niet met hoe het werkt. Een lesbezoek wordt geregeld door iemand van
+Onderwijs, een verhuur door iemand van Theokot, en die persoon schrijft de mail
+ook. Een vaste tekst onder elke mail betekent dat de professor een naam ziet die
+niets te maken heeft met wie hem geschreven heeft, of, vaker, een postnaam
+waarop hij dan maar antwoordt. Het tekstvak liep ook elk jaar uiteen met de
+werkelijkheid: het ene jaar stond er "VTK Onderwijs", het volgende de voornaam
+van iemand die er al een jaar niet meer zat.
+
+**De ondertekening is daarom de handtekening van het lid dat de mail
+verstuurt**, dezelfde als die op /account. Er is een generator
+(`lib/signature.ts`) en die blijft de enige; deze mails nemen er de platte
+variant van, want ze vertrekken als platte tekst.
+
+**Daarvoor moest die handtekening verhuizen.** Ze stond in `localStorage`, dus
+ze was weg op een andere browser en de server kon ze niet lezen. Ze staat nu op
+het profiel (`User.signatureName`, `signatureRoleTitle`, `signatureEmail`,
+`signaturePhone`). Wie ze ooit in deze browser invulde, ziet ze nog een keer
+voorgevuld staan; opslaan zet ze op het profiel en ruimt de browseropslag op.
+
+**Elk veld mag leeg blijven.** Leeg betekent "leid maar af" en niet "leeg in de
+mail": de naam van het lid, `buildDefaultVtkEmail` voor het adres, en de post van
+dit werkingsjaar voor de functie. Dat is per veld, niet alles-of-niets, zodat wie
+enkel zijn nummer invulde een kloppende naam en functie houdt. De functiepresets
+staan in `lib/signatureProfile.ts` en worden door het handtekeningscherm en de
+mails allebei gebruikt: twee kopieen van die regel lopen uiteen zodra iemand er
+een aanpast.
+
+**Het adres is dat van de persoon**, niet dat van de post. Het antwoordadres van
+de mail blijft wel de postmailbox (`notifyEmail` / `notifyEmails`), dus een
+professor die op "beantwoorden" klikt, komt nog altijd bij de hele post terecht
+en niet bij iemand die in blok zit. Wat er in de handtekening staat, zegt wie
+geschreven heeft; wat er gebeurt bij antwoorden, is een zaak van de post.
+
+**Het nummer is opt-in.** `User.phone` bestaat al, maar dat is het nummer dat een
+lid aan de kring gaf, niet een nummer dat het onder elke mail naar een professor
+wil zetten. Daarom een apart veld dat leeg begint. Leeg laat de regel weg in
+plaats van een kale "M:" achter te laten; onder een persoonlijke mail is dat een
+schoonheidsfout, onder elke lesbezoek- en verhuurmail van het jaar leest het als
+een half ingevuld formulier.
+
+**Twee mails hebben geen afzender, en die tekenen met de post.** De
+ontvangstbevestiging van een verhuuraanvraag vertrekt vanuit het publieke
+formulier, en de goedkeuring of weigering via de knop in de meldingsmail hangt
+aan een token dat zegt welke aanvraag het is en niet wie erop klikt. Daar zet
+`signatureTextForPost` de post zelf onder de mail, met het postadres. Een mail
+van de kring hoort niet naamloos te vertrekken, en een willekeurig lid eronder
+zetten zou een naam beloven die niemand gecontroleerd heeft.
+
+De geplande mails (de herinnering aan een professor) zijn hier geen uitzondering
+op: hun tekst wordt opgeslagen op het moment dat iemand ze inplant, dus ze dragen
+de handtekening van wie ze ingepland heeft, ook als ze pas dagen later vertrekt.
+
+Dit staat los van `signature.generate` hierboven. Dat recht gaat over de kaart op
+/account; deze ondertekening hoort bij het versturen van een mail en zit al
+achter het beheerrecht van de werking zelf.
 
 ## Voorverkoop: een duur voor de verkoopstart, niet een tweede datum
 

@@ -54,10 +54,6 @@ export async function getLesbezoekConfig(): Promise<LesbezoekConfig> {
   const row = await prisma.setting.findUnique({ where: { key: LESBEZOEK_CONFIG_KEY } });
   const value = (row?.value ?? {}) as Partial<LesbezoekConfig>;
   return {
-    signature:
-      typeof value.signature === "string" && value.signature.trim()
-        ? value.signature
-        : DEFAULT_LESBEZOEK_CONFIG.signature,
     notifyEmail:
       typeof value.notifyEmail === "string" && value.notifyEmail.trim()
         ? value.notifyEmail.trim()

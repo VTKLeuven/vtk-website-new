@@ -41,7 +41,13 @@ import type { ContractDocView } from "./types";
 // Wie krijgt de meldingen, en staat het formulier open
 // -----------------------------------------------------------------------------
 
-export function RentalConfigCard({ nl, config }: { nl: boolean; config: RentalConfig }) {
+export function RentalConfigCard({
+  nl,
+  config,
+}: {
+  nl: boolean;
+  config: RentalConfig;
+}) {
   const errors = rentalAdminErrors(nl);
   const [open, setOpen] = useState(config.formOpen);
 
@@ -50,8 +56,8 @@ export function RentalConfigCard({ nl, config }: { nl: boolean; config: RentalCo
       <h2 className="mb-1 text-lg font-semibold">{nl ? "Instellingen" : "Settings"}</h2>
       <p className="mb-4 text-sm text-[#5c667f]">
         {nl
-          ? "Wie een nieuwe aanvraag te zien krijgt, en hoe de mails ondertekend worden."
-          : "Who sees a new request, and how the emails are signed."}
+          ? "Wie een nieuwe aanvraag te zien krijgt. De mails worden ondertekend door wie ze verstuurt; die handtekening pas je aan op /account."
+          : "Who sees a new request. Emails are signed by whoever sends them; you change that signature on /account."}
       </p>
 
       <SaveForm
@@ -79,16 +85,6 @@ export function RentalConfigCard({ nl, config }: { nl: boolean; config: RentalCo
             {nl
               ? "Eén adres per regel (komma's mogen ook). Zij krijgen bij elke nieuwe aanvraag een mail met de knoppen om goed te keuren of te weigeren, en zij zijn ook het antwoordadres van elke mail die hier vertrekt. Het eerste adres staat op de publieke pagina onder “Een vraag?”."
               : "One address per line (commas are fine too). They get an email on every new request, with the buttons to approve or deny, and they are also the reply-to on every email sent from here. The first address is shown on the public page under “A question?”."}
-          </p>
-        </div>
-
-        <div>
-          <Label htmlFor="tv-signature">{nl ? "Ondertekening" : "Signature"}</Label>
-          <Textarea id="tv-signature" name="signature" rows={3} defaultValue={config.signature} />
-          <p className="mt-1 text-xs text-[#5c667f]">
-            {nl
-              ? "Komt onder elke mail, in de plaats van {ondertekening}."
-              : "Goes under every email, in place of {ondertekening}."}
           </p>
         </div>
 
