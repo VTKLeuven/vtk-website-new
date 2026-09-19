@@ -31,6 +31,7 @@ export function RentalBoard({
   templates,
   senderLabel,
   signature,
+  postSignature,
   contractAvailable,
   canManage,
   emptyMessage,
@@ -42,6 +43,8 @@ export function RentalBoard({
   templates: RentalTemplate[];
   senderLabel: string;
   signature: MailSignature;
+  /** De ondertekening van de post; de tweede keuze bij "Ondertekenen als". */
+  postSignature: MailSignature;
   contractAvailable: Record<string, boolean>;
   canManage: boolean;
   emptyMessage: string;
@@ -187,6 +190,7 @@ export function RentalBoard({
             templates={templates}
             senderLabel={senderLabel}
             signature={signature}
+          postSignature={postSignature}
             contractAvailable={contractAvailable}
             canManage={canManage}
           />
