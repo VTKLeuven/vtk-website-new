@@ -4,6 +4,7 @@ import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
 import { toSingleLine } from "@/lib/contactForm";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
+import { isPlausibleEmail } from "@/lib/signature";
 
 /**
  * De handtekening van een lid opslaan op zijn profiel.
@@ -36,8 +37,10 @@ export async function saveSignatureProfileAction(
   const phone = toSingleLine(formData.get("signaturePhone"));
 
   // Een adres dat geen adres is, hoort niet onder elke mail van de kring te
-  // belanden. De rest is vrije tekst: een functietitel heeft geen vorm.
-  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+  // belanden. Dezelfde controle als bij het afleiden (`isPlausibleEmail`), zodat
+  // een ingevuld adres niet strenger beoordeeld wordt dan een afgeleid. De rest
+  // is vrije tekst: een functietitel heeft geen vorm.
+  if (email && !isPlausibleEmail(email)) {
     return saveError("INVALID_EMAIL");
   }
 
