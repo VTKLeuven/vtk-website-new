@@ -264,15 +264,22 @@ export function ShiftAgenda({
 
                       <div className="vtk-shift-act">
                         <div className="vtk-shift-spots-wrap">
-                          <button
-                            type="button"
+                          <span
                             className={`vtk-shift-spots ${spotsBadgeClass}`}
                             title={spotsTitle}
+                            tabIndex={0}
+                            role="button"
                             onClick={() => onOpen(entry)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                onOpen(entry);
+                              }
+                            }}
                             aria-label={`${spotsBadgeLabel}. ${spotsTitle}`}
                           >
                             {spotsBadgeLabel}
-                          </button>
+                          </span>
                           <div className="vtk-shift-spots-popover" role="tooltip" aria-hidden="true">
                             <div className="vtk-shift-spots-popover-head">
                               <span className="vtk-shift-spots-popover-title">

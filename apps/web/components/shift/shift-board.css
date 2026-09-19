@@ -520,6 +520,10 @@
 .vtk-shift-spots-wrap {
   position: relative;
   display: inline-flex;
+  flex: none;
+  flex-shrink: 0;
+  width: fit-content;
+  align-self: center;
 }
 
 .vtk-shift-spots-wrap:hover,
@@ -527,19 +531,11 @@
   z-index: 50;
 }
 
-button.vtk-shift-spots {
-  border: none;
-  font: inherit;
-  cursor: pointer;
-  transition: opacity 120ms ease;
-}
-
-button.vtk-shift-spots:hover {
-  opacity: 0.85;
-}
-
 /* Status-badges (stippen) */
 .vtk-shift-spots {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -550,6 +546,19 @@ button.vtk-shift-spots:hover {
   line-height: 1.2;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
+  border: none;
+  margin: 0;
+  width: auto;
+  height: auto;
+  min-height: 0;
+  flex: none;
+  flex-shrink: 0;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+.vtk-shift-spots:hover {
+  opacity: 0.85;
 }
 
 .vtk-shift-spots::before {
@@ -594,7 +603,7 @@ button.vtk-shift-spots:hover {
 }
 
 .vtk-shift-spots-wrap:hover .vtk-shift-spots-popover,
-.vtk-shift-spots-wrap:focus-within .vtk-shift-spots-popover {
+.vtk-shift-spots-wrap:focus-within:has(:focus-visible) .vtk-shift-spots-popover {
   opacity: 1;
   visibility: visible;
   pointer-events: auto;
