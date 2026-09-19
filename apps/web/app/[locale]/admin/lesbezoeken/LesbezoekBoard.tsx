@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { MailSignature } from "@/lib/signatureProfile";
 import { Button, Select } from "@vtk/ui";
 import { SearchBar } from "@/app/[locale]/admin/admin-table";
 import {
@@ -51,7 +52,7 @@ export function LesbezoekBoard({
   visits: VisitView[];
   organisations: OrganisationView[];
   templates: LesbezoekTemplates;
-  signature: string;
+  signature: MailSignature;
   /** Hoeveel dagen op voorhand de werklijst om een herinnering vraagt. */
   nudgeLeadDays: number;
 }) {

@@ -174,9 +174,12 @@ export function generateSignaturePlainText(data: SignatureData): string {
     'Vlaamse Technische Kring vzw | RPR Leuven',
     'A: Studentenwijk Arenberg 6/1, 3001 Heverlee',
     `E: ${data.emailAddress.trim().toLowerCase()}`,
-    data.phoneDisplay.trim() ? `M: ${data.phoneDisplay.trim()}` : 'M: ',
+    // Zonder nummer valt de regel weg. Een kale "M:" onderaan een mail leest als
+    // een half ingevuld formulier, en in de ondertekening van een lesbezoek of
+    // een verhuurmail staat ze echt onder elke mail.
+    data.phoneDisplay.trim() ? `M: ${data.phoneDisplay.trim()}` : null,
     'W: www.vtk.be',
     'VAT: BE0479482282',
-  ];
+  ].filter((line): line is string => Boolean(line && line.trim()));
   return lines.join('\n');
 }

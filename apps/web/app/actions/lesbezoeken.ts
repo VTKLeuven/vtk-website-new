@@ -5,6 +5,7 @@ import { headers } from "next/headers";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
+import { signatureForUser } from "@/lib/mailSignature-server";
 import { RateLimiter, clientKeyFromHeaders, toMessageText, toSingleLine } from "@/lib/contactForm";
 import { brusselsWallClockMinutes } from "@/lib/brussels";
 import { logAudit } from "@/lib/audit";
@@ -426,7 +427,7 @@ export async function sendLesbezoekMailAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  await requirePermission("lesbezoeken.manage");
+  const session = await requirePermission("lesbezoeken.manage");
 
   const id = toSingleLine(formData.get("id"));
   const kind = toSingleLine(formData.get("kind"));
@@ -457,6 +458,7 @@ export async function sendLesbezoekMailAction(
     // De mailbox van de organisatie leest mee bij een terugkoppeling: de persoon
     // die aanvroeg is volgend jaar weg, de post blijft.
     cc: kind === "requester" ? (visit.organisation.contactEmail ?? undefined) : undefined,
+    signature: await signatureForUser(session.user.id),
   });
   if (!delivered) return saveError("MAIL_FAILED");
 
@@ -628,6 +630,9 @@ export async function sendNowLesbezoekScheduledMailAction(
     cc: item.cc ?? undefined,
     subject: item.subject,
     text: item.body,
+    // De tekst is opgeslagen toen iemand ze inplande, ondertekening inbegrepen;
+    // de opgemaakte versie hoort dan van diezelfde persoon te zijn.
+    signature: item.createdById ? await signatureForUser(item.createdById) : undefined,
   });
 
   if (delivered) {
@@ -820,12 +825,17 @@ export async function sendBulkLesbezoekMailsAction(
   const now = new Date();
   let failed = 0;
 
+  // Een keer opgehaald voor de hele reeks: het is dezelfde persoon die deze
+  // mails nu verstuurt.
+  const signature = await signatureForUser(session.user.id);
+
   for (const item of ready) {
     const delivered = await sendLesbezoekMail({
       to: item.to,
       cc: item.cc ?? undefined,
       subject: item.subject,
       text: item.body,
+      signature,
     });
 
     if (!delivered) {
@@ -1017,7 +1027,6 @@ export async function saveLesbezoekSettingsAction(
 ): Promise<SaveState> {
   await requirePermission("lesbezoeken.manage");
 
-  const signature = toMessageText(formData.get("signature")).slice(0, 500);
   const notifyEmail = toSingleLine(formData.get("notifyEmail"));
   if (!notifyEmail) return saveError("INVALID_INPUT");
 
@@ -1025,7 +1034,10 @@ export async function saveLesbezoekSettingsAction(
   // vriendelijker dan een rode toast over een getal dat niemand bewust koos.
   const nudgeLeadDays = clampNudgeLeadDays(toSingleLine(formData.get("nudgeLeadDays")));
 
-  const value = { signature, notifyEmail, nudgeLeadDays };
+  const value = {
+    notifyEmail,
+    nudgeLeadDays,
+  };
   await prisma.setting.upsert({
     where: { key: LESBEZOEK_CONFIG_KEY },
     create: { key: LESBEZOEK_CONFIG_KEY, value },

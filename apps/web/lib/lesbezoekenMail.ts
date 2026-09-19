@@ -21,16 +21,17 @@ import { LESBEZOEK_NUDGE_LEAD_DAYS, type LesbezoekStatusCode } from "@/lib/lesbe
 /**
  * Instellingen van de werking, beheerd in /admin/lesbezoeken.
  *
- * `signature` is wat er onder elke mail komt: dat is de naam van wie dit jaar de
- * lesbezoeken doet, en die wisselt elk werkingsjaar. `notifyEmail` is de mailbox
- * die een seintje krijgt bij een nieuwe aanvraag en die als antwoordadres op elke
- * uitgaande mail staat.
+ * `notifyEmail` is de mailbox die een seintje krijgt bij een nieuwe aanvraag en
+ * die als antwoordadres op elke uitgaande mail staat.
+ *
+ * De ondertekening staat hier bewust **niet** meer tussen. Ze komt van wie de
+ * mail verstuurt (`lib/mailSignature-server.ts`), want dat is dezelfde
+ * handtekening als die op /account en dus maar een bron om te onderhouden.
  *
  * Staat hier en niet in `lesbezoeken-server.ts` omdat het beheerscherm een client
  * component is: die mag het type kennen zonder de server-only module aan te raken.
  */
 export type LesbezoekConfig = {
-  signature: string;
   notifyEmail: string;
   /**
    * Hoeveel dagen voor het bezoek de werklijst roept dat de professor een
@@ -40,7 +41,6 @@ export type LesbezoekConfig = {
 };
 
 export const DEFAULT_LESBEZOEK_CONFIG: LesbezoekConfig = {
-  signature: "VTK Onderwijs\nlesbezoeken@vtk.be",
   notifyEmail: "lesbezoeken@vtk.be",
   nudgeLeadDays: LESBEZOEK_NUDGE_LEAD_DAYS,
 };

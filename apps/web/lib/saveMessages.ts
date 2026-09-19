@@ -12,11 +12,13 @@ export function saveErrorMessages(locale: Locale): Record<string, string> {
         INVALID_URL:
           "Niet opgeslagen: een adres moet een pad op deze site zijn (/praesidium) of een volledig adres (https://...).",
         SLUG_TAKEN: "Niet opgeslagen: die slug is al in gebruik.",
+        INVALID_EMAIL: "Niet opgeslagen: dat is geen geldig e-mailadres.",
       }
     : {
         INVALID_INPUT: "Not saved: please check the fields you entered.",
         INVALID_URL:
           "Not saved: an address must be a path on this site (/praesidium) or a full address (https://...).",
         SLUG_TAKEN: "Not saved: that slug is already in use.",
+        INVALID_EMAIL: "Not saved: that is not a valid email address.",
       };
 }

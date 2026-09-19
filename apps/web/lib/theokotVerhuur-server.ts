@@ -4,6 +4,8 @@ import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
 import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@vtk/db";
 import { sendMail } from "@/lib/email";
+import { mailBodyToHtml } from "@/lib/mailBodyHtml";
+import type { MailSignature } from "@/lib/mailSignature-server";
 import { getObjectBuffer } from "@vtk/storage";
 import { siteUrl } from "@/lib/seo";
 import {
@@ -156,6 +158,8 @@ export async function sendRentalMail(input: {
   cc?: string | string[];
   replyTo?: string;
   attachments?: RentalAttachment[];
+  /** Zie `sendLesbezoekMail`: met ondertekening gaat de opgemaakte versie mee. */
+  signature?: MailSignature;
 }): Promise<boolean> {
   const config = await getRentalConfig();
   const delivered = await sendMail(
@@ -166,6 +170,7 @@ export async function sendRentalMail(input: {
       replyTo: input.replyTo ?? rentalReplyTo(config),
       subject: input.subject,
       text: input.text,
+      html: input.signature ? mailBodyToHtml(input.text, input.signature) : undefined,
       attachments: input.attachments,
     },
     { source: "theokotRental" },

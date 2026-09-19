@@ -957,6 +957,23 @@ a.vtk-shortcut-tile:hover {
   color: var(--body);
 }
 
+/*
+ * De ondertekening in het voorbeeld is de echte handtekening (de HTML-tabel uit
+ * `lib/signature.ts`), niet de platte regels. Ze komt onder de tekst zonder
+ * eigen kader: in een mailbox staat ze ook gewoon onderaan het bericht. De
+ * tekst erboven houdt haar `pre-wrap`, dus de padding hier vervangt die van het
+ * tekstblok en verdubbelt ze niet.
+ */
+.vtk-mail-preview-signature {
+  padding: 0 16px 16px;
+  overflow-x: auto;
+}
+
+.vtk-mail-preview-signature img {
+  max-width: 100%;
+  height: auto;
+}
+
 .vtk-mail-preview-attachments {
   margin: 0;
   padding: 10px 16px;

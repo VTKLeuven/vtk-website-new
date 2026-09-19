@@ -59,6 +59,7 @@ import {
   type RentalTemplate,
   type RentalTemplateCategory,
 } from "@/lib/theokotVerhuurMail";
+import { signatureForPost, signatureForUser } from "@/lib/mailSignature-server";
 
 /**
  * Server actions van de Theokot-verhuur.
@@ -75,6 +76,14 @@ import {
  */
 
 const ADMIN_PATHS = ["/admin/theokot/verhuur", "/en/admin/theokot/verhuur"];
+
+/**
+ * Wie er tekent onder een mail die niemand verstuurt: de ontvangstbevestiging
+ * van het publieke formulier en de beslissing vanuit de meldingsmail. Beide
+ * hebben geen lid achter zich, en een mail van de kring hoort niet naamloos te
+ * vertrekken.
+ */
+const RENTAL_POST_NAME = "Theokot";
 
 function revalidateRentals() {
   for (const path of ADMIN_PATHS) revalidatePath(path);
@@ -269,11 +278,15 @@ async function sendConfirmationMail(rentalId: string): Promise<void> {
     const template = defaultTemplateFor(templates, "confirmation", locale);
     if (!template) return;
 
-    const rendered = renderRentalMail(template, mailVarsForRow(rental, config.signature, locale));
+    // Deze mail vertrekt vanuit het publieke formulier: er is geen lid dat ze
+    // verstuurt, dus tekent de post zelf. Zie `lib/mailSignature-server.ts`.
+    const signature = signatureForPost(RENTAL_POST_NAME, config.notifyEmails[0] ?? "");
+    const rendered = renderRentalMail(template, mailVarsForRow(rental, signature.text, locale));
     const delivered = await sendRentalMail({
       to: rental.email,
       subject: rendered.subject,
       text: rendered.body,
+      signature,
     });
     if (!delivered) return;
 
@@ -480,6 +493,7 @@ export async function sendRentalReplyAction(
     subject,
     text: body,
     attachments: attachment ? [attachment] : undefined,
+    signature: await signatureForUser(session.user.id),
   });
   if (!delivered) return saveError("MAIL_FAILED");
 
@@ -592,7 +606,13 @@ export async function loadRentalDecision(token: string): Promise<RentalDecisionP
   const category: RentalTemplateCategory = lookup.action === "APPROVE" ? "approved" : "rejected";
   const template = defaultTemplateFor(templates, category, locale);
 
-  const vars = mailVarsForRow(rental, config.signature, locale);
+  // De token zegt welke aanvraag het is, niet wie erop klikt, dus ook hier tekent
+  // de post en niet een willekeurig lid.
+  const vars = mailVarsForRow(
+    rental,
+    signatureForPost(RENTAL_POST_NAME, config.notifyEmails[0] ?? "").text,
+    locale,
+  );
   const rendered = templates.map((item) => ({
     id: item.id,
     name: item.name,
@@ -685,11 +705,13 @@ export async function decideRentalByTokenAction(
     // token niet opbranden, anders staat wie op de knop drukte met lege handen.
     if (!(await consumeDecisionToken(lookup.tokenId, now))) return saveError("NOT_FOUND");
 
+    const rentalConfig = await getRentalConfig();
     const delivered = await sendRentalMail({
       to: rental.email,
       subject,
       text: body,
       attachments: attachment ? [attachment] : undefined,
+      signature: signatureForPost(RENTAL_POST_NAME, rentalConfig.notifyEmails[0] ?? ""),
     });
     if (!delivered) return saveError("MAIL_FAILED");
 
@@ -800,14 +822,12 @@ export async function saveRentalConfigAction(
   const notifyEmails = splitEmails(toMessageText(formData.get("notifyEmails")));
   if (notifyEmails.length === 0) return saveError("NO_NOTIFY_EMAIL");
 
-  const signature = toMessageText(formData.get("signature"));
   const minLeadDays = clampLeadDays(formData.get("minLeadDays"));
   const formOpen = formData.get("formOpen") === "on";
 
   const current = await getRentalConfig();
   await writeSetting(RENTAL_CONFIG_KEY, {
     notifyEmails,
-    signature,
     minLeadDays,
     formOpen,
     closedNoticeNl: toMessageText(formData.get("closedNoticeNl")),

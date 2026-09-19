@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { MailSignature } from "@/lib/signatureProfile";
 import { Button, Card, Input, Label, Select, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import {
@@ -30,6 +31,7 @@ export function MailSettingsCard({
   config,
   templates,
   senderLabel,
+  signature,
 }: {
   nl: boolean;
   canManage: boolean;
@@ -37,11 +39,14 @@ export function MailSettingsCard({
   templates: LesbezoekTemplates;
   /** De afzender zoals ze in de inbox van de docent staat; voor het voorbeeld. */
   senderLabel: string;
+  /**
+   * De ondertekening van wie dit scherm open heeft, zoals ze onder zijn mails
+   * komt. Enkel om de voorbeelden te tonen: ze wordt hier niet bewerkt, want ze
+   * hoort bij de persoon en staat op /account.
+   */
+  signature: MailSignature;
 }) {
   const errors = lesbezoekAdminErrors(nl);
-  // De ondertekening staat los van het sjabloon maar hoort wel in het voorbeeld:
-  // zonder haar eindigt elke voorbeeldmail op een lege regel.
-  const [signature, setSignature] = useState(config.signature);
   const [items, setItems] = useState<LesbezoekTemplateItem[]>(() => {
     return templates.items && templates.items.length > 0
       ? templates.items
@@ -112,8 +117,8 @@ export function MailSettingsCard({
         <h2 className="mb-1 text-lg font-semibold">{nl ? "Instellingen" : "Settings"}</h2>
         <p className="mb-4 text-sm text-[#5c667f]">
           {nl
-            ? "De ondertekening staat onder elke mail; ze wisselt elk werkingsjaar mee met wie de lesbezoeken doet."
-            : "The signature goes under every email; it changes each working year with whoever handles the visits."}
+            ? "De mailbox krijgt een seintje bij een nieuwe aanvraag en staat als antwoordadres op elke mail. De ondertekening komt van wie de mail verstuurt; je past ze aan bij je handtekening op /account."
+            : "The mailbox is notified of new requests and is the reply-to address on every email. The signature comes from whoever sends the email; you change it with your signature on /account."}
         </p>
         <SaveForm
           action={saveLesbezoekSettingsAction}
@@ -125,16 +130,6 @@ export function MailSettingsCard({
           resetOnSuccess={false}
           className="space-y-4"
         >
-          <div>
-            <Label htmlFor="lb-signature">{nl ? "Ondertekening" : "Signature"}</Label>
-            <Textarea
-              id="lb-signature"
-              name="signature"
-              rows={3}
-              value={signature}
-              onChange={(event) => setSignature(event.target.value)}
-            />
-          </div>
           <div>
             <Label htmlFor="lb-notify">{nl ? "Mailbox lesbezoeken" : "Classroom-visit mailbox"}</Label>
             <Input
@@ -406,11 +401,11 @@ function TemplatePreview({
 }: {
   nl: boolean;
   item: LesbezoekTemplateItem;
-  signature: string;
+  signature: MailSignature;
   senderLabel: string;
   replyTo: string;
 }) {
-  const vars = previewTemplateVars(item.lang === "en" ? "en" : "nl", signature);
+  const vars = previewTemplateVars(item.lang === "en" ? "en" : "nl", signature.text);
   const isRequester = item.category === "requester";
   return (
     <MailPreview
@@ -426,6 +421,7 @@ function TemplatePreview({
       replyTo={replyTo}
       subject={renderTemplate(item.subject, vars).replace(/\s+/g, " ").trim()}
       body={renderTemplate(item.body, vars)}
+      signature={signature}
       source={nl ? "met voorbeeldgegevens" : "with example data"}
     />
   );

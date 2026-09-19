@@ -98,6 +98,12 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         mailUnsubscribedAt: true,
         shiftReminderDayBefore: true,
         shiftReminderSoon: true,
+        // De handtekening staat op het profiel sinds ze ook onder de uitgaande
+        // mails van de werkingen komt; zie `lib/signatureProfile.ts`.
+        signatureName: true,
+        signatureRoleTitle: true,
+        signatureEmail: true,
+        signaturePhone: true,
         calendarOnlyMyAudiences: true,
         studyYears: true,
         studyProgrammes: true,
@@ -426,6 +432,12 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                   }}
                   memberships={userMemberships}
                   currentYearCode={formatWorkingYear(workingYear)}
+                  stored={{
+                    signatureName: profile.signatureName,
+                    signatureRoleTitle: profile.signatureRoleTitle,
+                    signatureEmail: profile.signatureEmail,
+                    signaturePhone: profile.signaturePhone,
+                  }}
                 />
               </Card>
             ) : null}

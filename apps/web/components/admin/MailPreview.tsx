@@ -15,6 +15,7 @@
  */
 
 import { remainingPlaceholders } from "@/lib/mailPreview";
+import { splitSignature } from "@/lib/mailBodyHtml";
 
 export type MailPreviewProps = {
   nl: boolean;
@@ -27,6 +28,14 @@ export type MailPreviewProps = {
   body: string;
   /** Bestandsnamen van de bijlagen die meegaan. */
   attachments?: string[];
+  /**
+   * De ondertekening in haar twee vormen. Staat de platte versie onderaan
+   * `body`, dan toont het voorbeeld in haar plaats de opgemaakte handtekening:
+   * het schild en de gele streep, zoals ze in de mailbox aankomt. Zonder dit
+   * blijft het voorbeeld platte tekst, en dat is wat de andere beheerschermen
+   * (rekeningen) versturen.
+   */
+  signature?: { text: string; html: string };
   /**
    * Waar de ingevulde waarden vandaan komen ("voorbeeldgegevens" of "deze
    * aanvraag"). Zonder dat leest een voorbeeld met verzonnen namen als een fout.
@@ -46,8 +55,12 @@ export function MailPreview({
   attachments = [],
   source,
   className,
+  signature,
 }: MailPreviewProps) {
   const open = remainingPlaceholders(`${subject}\n${body}`);
+
+  // De tekst tot waar de ondertekening begint; de rest wordt opgemaakt getoond.
+  const { text: bodyText, signatureHtml } = splitSignature(body, signature);
 
   return (
     <figure className={`vtk-mail-preview${className ? ` ${className}` : ""}`}>
@@ -86,7 +99,16 @@ export function MailPreview({
           </div>
         </dl>
 
-        <div className="vtk-mail-preview-body">{body}</div>
+        <div className="vtk-mail-preview-body">{bodyText}</div>
+
+        {signatureHtml ? (
+          <div
+            className="vtk-mail-preview-signature"
+            // Eigen generator (`lib/signature.ts`), die elk ingevuld veld al
+            // escapet; er komt hier geen tekst van buiten binnen.
+            dangerouslySetInnerHTML={{ __html: signatureHtml }}
+          />
+        ) : null}
 
         {attachments.length > 0 ? (
           <ul className="vtk-mail-preview-attachments">

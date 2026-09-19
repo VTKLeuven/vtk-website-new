@@ -549,6 +549,23 @@ model User {
   // @vtk.be-account heeft. Zonder deze ontsnapping sluit de gate iemand buiten
   // die niets kan doen aan wat de gate vraagt; de gate komt gewoon terug.
   googleLinkDeferredAt    DateTime?
+
+  // De e-mailhandtekening van dit lid, zoals /account ze genereert.
+  //
+  // Stond vroeger enkel in `localStorage`, dus ze was weg op een andere browser
+  // en de server kon ze niet lezen. Dat laatste werd een probleem toen de mails
+  // van de lesbezoeken en de Theokot-verhuur ondertekend moesten worden door wie
+  // ze effectief verstuurt: die ondertekening hoort dezelfde te zijn als de
+  // handtekening van dat lid, en er is maar een bron nodig.
+  //
+  // Allemaal optioneel: leeg valt terug op wat afgeleid kan worden (de naam van
+  // het lid, `buildDefaultVtkEmail`, de post van dit werkingsjaar). Het nummer
+  // is de uitzondering die nergens anders staat; zonder nummer valt die regel
+  // gewoon weg. Zie `apps/web/lib/signature.ts`.
+  signatureName           String?
+  signatureRoleTitle      String?
+  signatureEmail          String?
+  signaturePhone          String?
   // Laatst toegepaste staat van het Google-account, zodat de sync niet elke
   // ronde dezelfde OU-verhuizing opnieuw doet. Afgeleid uit de posten en de
   // kiesploeg; zie lib/google/accountState.ts.

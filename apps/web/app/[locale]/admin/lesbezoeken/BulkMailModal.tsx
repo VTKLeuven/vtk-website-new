@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { MailSignature } from "@/lib/signatureProfile";
 import { Button, Input, Label, Select, Textarea } from "@vtk/ui";
 import { Modal } from "@/app/[locale]/admin/admin-table";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -75,7 +76,7 @@ export function BulkMailModal({
   /** De aangevinkte lesbezoeken, in de volgorde van de werklijst. */
   visits: VisitView[];
   templates: LesbezoekTemplateItem[];
-  signature: string;
+  signature: MailSignature;
   onClose: () => void;
   /** Loopt enkel wanneer er echt iets vertrokken of ingepland is. */
   onSent: () => void;
@@ -128,7 +129,7 @@ export function BulkMailModal({
             templates[0];
           if (!template) continue;
 
-          const rendered = renderMailTemplate(template, mailVarsFor(visit, locale, signature));
+          const rendered = renderMailTemplate(template, mailVarsFor(visit, locale, signature.text));
 
           drafts.push({
             key: visit.id,
@@ -177,7 +178,7 @@ export function BulkMailModal({
               visits: group,
             },
             locale,
-            signature,
+            signature.text,
           ),
         );
 
