@@ -10,9 +10,11 @@ import { describeChanges, logAudit } from "@/lib/audit";
 import { STUDY_PROGRAMMES } from "@/lib/profile";
 import { deleteObject } from "@vtk/storage";
 import { currentWorkingYear } from "@/lib/workingYear";
+import { readImageField, resolveImageKey } from "@/lib/imageField";
 import {
   POC_BAND_SETTING,
   POC_BAND_MAX_STEPS,
+  readPocBandSetting,
   type PocBandMode,
   type PocBandSetting,
   type PocBandStep,
@@ -303,6 +305,13 @@ export async function savePocBandAction(_prev: SaveState, formData: FormData): P
 
   const mode = (formData.get("mode") as PocBandMode) || "representatives";
 
+  const image = readImageField(formData);
+  if (image.kind === "invalid") return saveError("INVALID_INPUT");
+
+  const existingRow = await prisma.setting.findUnique({ where: { key: POC_BAND_SETTING } });
+  const existingImageKey = readPocBandSetting(existingRow?.value).imageKey;
+  const imageKey = resolveImageKey(image, existingImageKey);
+
   const steps: PocBandStep[] = [];
   for (let i = 0; i < POC_BAND_MAX_STEPS; i++) {
     const titleNl = (formData.get(`step-titleNl-${i}`) as string)?.trim() ?? "";
@@ -337,6 +346,7 @@ export async function savePocBandAction(_prev: SaveState, formData: FormData): P
     titleEn: (formData.get("titleEn") as string)?.trim() || "Will you represent your programme?",
     bodyNl: (formData.get("bodyNl") as string)?.trim() || "",
     bodyEn: (formData.get("bodyEn") as string)?.trim() || "",
+    imageKey,
     deadline,
     ctaLabelNl: (formData.get("ctaLabelNl") as string)?.trim() || "",
     ctaLabelEn: (formData.get("ctaLabelEn") as string)?.trim() || "",
@@ -357,11 +367,24 @@ export async function savePocBandAction(_prev: SaveState, formData: FormData): P
     create: { key: POC_BAND_SETTING, value },
   });
 
+  // De vervangen foto pas opruimen nadat de instelling bewaard is; faalt de
+  // opruiming, dan blijft de wijziging gewoon geldig.
+  if (existingImageKey && existingImageKey !== imageKey) {
+    try {
+      await deleteObject(existingImageKey);
+    } catch {
+      /* Een achtergebleven bestand in storage is minder erg dan een mislukt opslaan. */
+    }
+  }
+
   await logAudit({
     action: "update",
     entity: "poc",
     target: "POC homepage-band",
-    summary: `weergave: ${mode}`,
+    summary:
+      imageKey === existingImageKey
+        ? `weergave: ${mode}`
+        : `weergave: ${mode}, foto ${imageKey ? "vervangen" : "teruggezet op de standaardfoto"}`,
   });
 
   revalidatePath("/", "layout");

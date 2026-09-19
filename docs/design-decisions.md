@@ -2216,6 +2216,40 @@ redactionele keuze is en geen automatisme.
   waar de procedure staat. Hij staat boven de springchips omdat hij over de hele
   pagina gaat en niet over één POC.
 
+### De foto in het verkiezingspaneel
+
+Het paneel van de verkiezingsweergave opent met een foto in een eigen kolom
+links, tot tegen de kaartrand (`.poc-elect-photo`).
+
+- **Waarom een foto.** De band vraagt iemand om zich kandidaat te stellen voor
+  een orgaan waarvan hij het bestaan meestal net leert kennen. Een kaart met
+  enkel tekst, een datum en twee knoppen zegt wat de procedure is, niet wat je
+  komt doen; de foto van vertegenwoordigers rond een tafel zegt dat wel in één
+  keer. Elders op de homepage opent elke inhoudskaart met een echte foto, dus
+  dit paneel was de uitzondering.
+- **Vier richtingen bekeken:** de foto in het paneel (deze), de foto als
+  fotokop boven het paneel met de kop erop, de foto als grond van de hele band
+  onder een navy waas, en de foto als staande kolom naast paneel én stappen. De
+  fotokop maakt de band ~200 px hoger op een pagina die al lang is; de bandfoto
+  vervangt het technisch patroon, dat nu net op elke navy band terugkeert als
+  eigen uitsnede; de staande kolom knijpt de tekst en de deadline samen. De foto
+  in het paneel voegt geen hoogte toe en houdt de bestaande breedteverhouding
+  tussen uitleg en deadline intact.
+- **Geen waas over deze foto.** Er staat geen tekst op, dus ze heeft er geen
+  nodig; dezelfde regel als de fotoplaat op een inhoudspagina.
+- **De foto raakt de kaartrand.** De padding staat op de tekstkolommen en niet
+  op het paneel: een foto met een witte rand eromheen leest als een plaatje ín
+  de kaart in plaats van als een kant ervan.
+- **Redactioneel, met een meegeleverde standaardfoto.** De key staat in dezelfde
+  `home.poc`-instelling en wordt geüpload in **Admin → Onderwijs → POC's**;
+  zonder upload toont de band `public/pocs/riververkiezingen.jpg`. Een band
+  zonder foto is geen optie: de kolom zou een leeg gestreept vlak zijn naast een
+  kaart die verder niets mist. Wie de foto wist, krijgt dus de standaardfoto
+  terug en niet een kaart in twee kolommen.
+- **Onder 1080 px wordt de kolom een strook over de hele kaart** (21:9, en 16:9
+  onder 768 px): drie kolommen naast elkaar lieten de uitleg in een koker van
+  vijf woorden breed lopen.
+
 ### Cursusdienst-openingsuren komen live van cudi.vtk.be
 
 - De **Theokot**-uren beheert VTK zelf in de admin (`Setting`

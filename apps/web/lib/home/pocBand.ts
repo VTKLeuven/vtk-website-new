@@ -29,6 +29,14 @@ import { brusselsYMD, parseYMD, ymdKey } from "@/lib/brussels";
 export const POC_BAND_SETTING = "home.poc";
 
 /**
+ * De meegeleverde foto in het verkiezingspaneel, en meteen de preview-fallback
+ * in de admin. Een band zonder foto bestaat niet: de kolom zou dan een leeg
+ * gestreept vlak zijn naast een kaart die verder niets mist. De redactie
+ * vervangt de foto via /admin/pocs, wat geen deploy vraagt.
+ */
+export const POC_BAND_DEFAULT_PHOTO = "/pocs/riververkiezingen.jpg";
+
+/**
  * `hidden` is er voor de zomer: tussen de laatste verkiezing en het nieuwe
  * academiejaar zegt geen van beide weergaven iets zinnigs.
  */
@@ -65,6 +73,11 @@ export type PocBandSetting = {
   /** De uitleg zelf, in Markdown. */
   bodyNl: string;
   bodyEn: string;
+  /**
+   * De foto links in het paneel, als storage-key. Leeg betekent de
+   * meegeleverde `POC_BAND_DEFAULT_PHOTO`, niet "geen foto".
+   */
+  imageKey: string | null;
   /** Wanneer de kandidaatstelling sluit; ISO met uur, of leeg. */
   deadline: string | null;
   ctaLabelNl: string;
@@ -141,6 +154,7 @@ export function defaultPocBandSetting(): PocBandSetting {
     titleEn: "Will you represent your programme?",
     bodyNl: "",
     bodyEn: "",
+    imageKey: null,
     deadline: null,
     ctaLabelNl: "",
     ctaLabelEn: "",
@@ -162,6 +176,15 @@ function text(record: Record<string, unknown>, key: string, fallback: string): s
 /** Een dag als `yyyy-mm-dd`, of `null`. Alles wat daar niet op lijkt, valt weg. */
 function day(value: unknown): string | null {
   return typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null;
+}
+
+/**
+ * Een storage-key van de upload-route, of `null`. Alles wat niet onder
+ * `images/` staat, valt weg: dat is geknoei met de opgeslagen instelling en
+ * zou een pad van elders uit de bucket op de homepage zetten.
+ */
+function storageKey(value: unknown): string | null {
+  return typeof value === "string" && value.startsWith("images/") ? value : null;
 }
 
 /** Een tijdstip dat `Date` kan lezen, of `null`. */
@@ -216,6 +239,7 @@ export function readPocBandSetting(value: unknown): PocBandSetting {
     titleEn: text(record, "titleEn", base.titleEn),
     bodyNl: text(record, "bodyNl", base.bodyNl),
     bodyEn: text(record, "bodyEn", base.bodyEn),
+    imageKey: storageKey(record.imageKey),
     deadline: instant(record.deadline),
     ctaLabelNl: text(record, "ctaLabelNl", base.ctaLabelNl),
     ctaLabelEn: text(record, "ctaLabelEn", base.ctaLabelEn),

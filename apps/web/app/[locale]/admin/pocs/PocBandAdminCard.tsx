@@ -4,8 +4,14 @@ import { useState } from "react";
 import type { Locale } from "@vtk/i18n";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
+import { StorageImageField } from "@/components/admin/StorageImageField";
 import { savePocBandAction } from "@/app/actions/pocs-partners";
-import type { PocBandMode, PocBandSetting, PocBandStep } from "@/lib/home/pocBand";
+import {
+  POC_BAND_DEFAULT_PHOTO,
+  type PocBandMode,
+  type PocBandSetting,
+  type PocBandStep,
+} from "@/lib/home/pocBand";
 
 function formatDateTimeLocal(isoString: string | null): string {
   if (!isoString) return "";
@@ -251,6 +257,23 @@ export function PocBandAdminCard({
                 rows={5}
               />
             </div>
+          </div>
+
+          <div>
+            <StorageImageField
+              defaultKey={setting.imageKey}
+              locale={locale}
+              label={nl ? "Foto in het paneel" : "Photo in the panel"}
+              fallbackUrl={POC_BAND_DEFAULT_PHOTO}
+              previewPosition="46% 58%"
+              srContext={nl ? "Riververkiezingen" : "Student rep elections"}
+              minWidth={800}
+              helpText={
+                nl
+                  ? "Staat links in het paneel en raakt de kaartrand. Zonder upload gebruikt de band de standaardfoto uit de preview."
+                  : "Sits left in the panel and touches the card edge. Without an upload the band uses the default photo shown here."
+              }
+            />
           </div>
 
           <div>

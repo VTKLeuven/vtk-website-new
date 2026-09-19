@@ -1849,15 +1849,42 @@
   gap: 24px;
 }
 
+/* Drie kolommen: een foto die de kaartrand raakt, de uitleg, en de deadline met
+   de knoppen. De padding zit daarom op de tekstkolommen en niet op het paneel;
+   een foto met een witte rand eromheen leest als een plaatje in de kaart in
+   plaats van als een kant ervan. */
 .vtk-design .poc-elect-panel {
+  --poc-pad: clamp(24px, 3vw, 36px);
+  --poc-gutter: clamp(20px, 2.2vw, 30px);
   display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
-  gap: clamp(24px, 3vw, 44px);
-  padding: clamp(26px, 3vw, 36px);
+  grid-template-columns: clamp(220px, 26%, 340px) minmax(0, 1.4fr) minmax(0, 1fr);
   border: 1px solid rgba(255, 255, 255, 0.14);
   border-radius: 20px;
   background: var(--surface);
   color: var(--ink);
+  overflow: clip;
+}
+
+/* De kolom is de foto: geen waas, want er staat geen tekst op. Het gestreepte
+   patroon eronder houdt de kolom zichtbaar zolang de foto laadt. */
+.vtk-design .poc-elect-photo {
+  position: relative;
+  display: block;
+  min-height: 240px;
+  background: repeating-linear-gradient(
+    135deg,
+    var(--paper-2) 0 10px,
+    var(--paper) 10px 20px
+  );
+}
+
+.vtk-design .poc-elect-photo img {
+  object-fit: cover;
+  object-position: 46% 58%;
+}
+
+.vtk-design .poc-elect-prose {
+  padding: var(--poc-pad) var(--poc-gutter) var(--poc-pad) var(--poc-pad);
 }
 
 .vtk-design .poc-elect-prose h3 {
@@ -1900,7 +1927,7 @@
   display: grid;
   align-content: start;
   gap: 16px;
-  padding-left: clamp(16px, 2vw, 28px);
+  padding: var(--poc-pad) var(--poc-pad) var(--poc-pad) var(--poc-gutter);
   border-left: 1px solid var(--rule-soft);
 }
 
@@ -2554,6 +2581,20 @@
   font-size: 14.5px;
 }
 
+/* Onder de laptopbreedte wordt de fotokolom een strook over de hele kaart: drie
+   kolommen naast elkaar laten de uitleg anders in een koker van vijf woorden
+   breed lopen. */
+@media (max-width: 1080px) {
+  .vtk-design .poc-elect-panel {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  }
+  .vtk-design .poc-elect-photo {
+    grid-column: 1 / -1;
+    min-height: 0;
+    aspect-ratio: 21 / 9;
+  }
+}
+
 @media (max-width: 768px) {
   .vtk-design .poc-wall-row {
     grid-template-columns: 1fr;
@@ -2561,13 +2602,15 @@
   }
   .vtk-design .poc-elect-panel {
     grid-template-columns: 1fr;
-    gap: 24px;
+    --poc-gutter: var(--poc-pad);
+  }
+  .vtk-design .poc-elect-photo {
+    aspect-ratio: 16 / 9;
   }
   .vtk-design .poc-elect-aside {
-    padding-left: 0;
+    padding-top: 20px;
     border-left: 0;
     border-top: 1px solid var(--rule-soft);
-    padding-top: 20px;
   }
   .vtk-design .poc-elect-steps {
     grid-template-columns: 1fr;

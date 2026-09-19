@@ -3,11 +3,13 @@ import Link from "next/link";
 import { type Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
 import { isExternalUrl, withLocaleBase } from "@/lib/href";
+import { publicUrl } from "@/lib/storage";
 import {
   pocBandDaysLeft,
   pocBandIsOpen,
   pocBandStepState,
   pocBandStepWhen,
+  POC_BAND_DEFAULT_PHOTO,
   type PocBandSetting,
 } from "@/lib/home/pocBand";
 
@@ -22,6 +24,10 @@ import {
  *
  * De vertegenwoordigers staan hier in dezelfde taal als /pocs: de naam van de
  * POC in de linkermarge, de portretten los op de band.
+ *
+ * Het verkiezingspaneel opent met een foto die de kaartrand raakt. De redactie
+ * vervangt ze via /admin/pocs; zonder upload staat er de meegeleverde
+ * `POC_BAND_DEFAULT_PHOTO`. Zie docs/design-decisions.md.
  */
 
 /** Eén vertegenwoordiger zoals de band hem toont. */
@@ -136,6 +142,7 @@ export function PocBand({
     if (!heading && !body && !title) return null;
 
     const meta = pick(setting.metaNl, setting.metaEn).trim();
+    const photo = publicUrl(setting.imageKey) ?? POC_BAND_DEFAULT_PHOTO;
 
     return (
       <section className="section band poc-band" aria-labelledby="poc-band-head">
@@ -146,6 +153,17 @@ export function PocBand({
 
         <div className="poc-elect">
           <div className="poc-elect-panel">
+            {/* De foto raakt de kaartrand en draagt geen tekst, dus ook geen
+                waas: de kolom is de foto. Zie docs/design-decisions.md. */}
+            <span className="poc-elect-photo" aria-hidden="true">
+              <Image
+                src={photo}
+                alt=""
+                fill
+                sizes="(max-width: 768px) 100vw, (max-width: 1080px) 92vw, 340px"
+              />
+            </span>
+
             <div className="poc-elect-prose">
               {title ? <h3>{title}</h3> : null}
               {body ? <Markdown locale={locale}>{body}</Markdown> : null}

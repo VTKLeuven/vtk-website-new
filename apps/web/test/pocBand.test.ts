@@ -52,6 +52,15 @@ describe("pocBand", () => {
       expect(result.steps[0].from).toBe("2026-10-01");
       expect(result.steps[0].to).toBe("2026-10-07");
     });
+
+    it("houdt enkel een fotokey van de upload-route over", () => {
+      expect(readPocBandSetting({ imageKey: "images/abc.jpg" }).imageKey).toBe("images/abc.jpg");
+      // Alles van buiten `images/` is geknoei met de instelling en valt weg;
+      // de band toont dan de meegeleverde standaardfoto.
+      expect(readPocBandSetting({ imageKey: "vault/config.json" }).imageKey).toBeNull();
+      expect(readPocBandSetting({ imageKey: 42 }).imageKey).toBeNull();
+      expect(readPocBandSetting({}).imageKey).toBeNull();
+    });
   });
 
   describe("pocBandStepState", () => {
