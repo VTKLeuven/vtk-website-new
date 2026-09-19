@@ -638,6 +638,28 @@
   color: white;
 }
 
+.ticket-pass-qr-trigger {
+  display: grid;
+  gap: 10px;
+  place-items: center;
+  align-content: center;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: zoom-in;
+  border-radius: 10px;
+}
+
+.ticket-pass-qr-box {
+  position: relative;
+  display: inline-block;
+}
+
+.ticket-pass-qr-box img,
 .ticket-pass-stub img {
   display: block;
   width: 136px;
@@ -645,6 +667,38 @@
   padding: 7px;
   border-radius: 8px;
   background: #fff;
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.ticket-pass-qr-zoom-badge {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  background: rgba(14, 26, 54, 0.82);
+  color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+  transition: transform 150ms ease, background-color 150ms ease;
+  pointer-events: none;
+}
+
+.ticket-pass-qr-trigger:hover .ticket-pass-qr-box img {
+  transform: scale(1.04);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.38);
+}
+
+.ticket-pass-qr-trigger:hover .ticket-pass-qr-zoom-badge {
+  transform: scale(1.1);
+  background: var(--navy);
+}
+
+.ticket-pass-qr-trigger:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 4px;
 }
 
 .ticket-pass-stub span {
@@ -733,6 +787,313 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+/* --- Ticket QR Detailvenster (matches ShiftDialog / Kalenderblad) --- */
+
+.ticket-dialog-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow-y: auto;
+  padding: clamp(24px, 5vh, 48px) 16px;
+  background: rgba(10, 15, 31, 0.55);
+  backdrop-filter: blur(2px);
+}
+
+.ticket-dialog-overlay,
+.ticket-dialog-overlay * {
+  box-sizing: border-box;
+}
+
+.ticket-dialog {
+  position: relative;
+  width: 100%;
+  max-width: 480px;
+  margin: auto;
+  overflow: clip;
+  border-radius: 20px;
+  background: var(--surface);
+  box-shadow: 0 30px 70px -30px rgba(10, 15, 31, 0.75);
+}
+
+.ticket-dialog:focus {
+  outline: none;
+}
+
+.ticket-dialog-top {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 5px;
+  min-height: 108px;
+  padding: 18px 96px 20px 22px;
+  background: var(--navy);
+  color: var(--paper);
+}
+
+.ticket-dialog-top::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url('/technisch-pattern.svg');
+  background-size: 640px 640px;
+  background-repeat: repeat;
+  background-position: -150px -70px;
+  opacity: 0.3;
+}
+
+.ticket-dialog-top-event {
+  color: var(--on-dark-muted);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-dialog-top-when {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ticket-dialog-pin {
+  position: absolute;
+  right: 22px;
+  bottom: -29px;
+  z-index: 1;
+  display: grid;
+  flex: none;
+  align-content: center;
+  justify-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 15px;
+  background: var(--yellow);
+  color: var(--ink);
+  text-align: center;
+  box-shadow: 0 10px 22px -10px rgba(8, 13, 28, 0.75);
+}
+
+.ticket-dialog-pin b {
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.ticket-dialog-pin i {
+  color: rgba(10, 15, 31, 0.62);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.ticket-dialog-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(183, 192, 220, 0.34);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--paper);
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
+}
+
+.ticket-dialog-close:hover {
+  border-color: var(--paper);
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.ticket-dialog-body {
+  display: grid;
+  gap: 16px;
+  padding: 16px 22px 6px;
+}
+
+.ticket-dialog-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  padding-right: 70px;
+}
+
+.ticket-dialog-title {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  font-size: 23px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.ticket-dialog-title::after {
+  content: '';
+  display: block;
+  height: 4px;
+  margin-top: 9px;
+  border-radius: 2px;
+  background: var(--yellow);
+}
+
+.ticket-dialog-lead {
+  margin: 0;
+  color: var(--body);
+  font-size: 13.5px;
+  line-height: 1.5;
+}
+
+.ticket-dialog-code-inline {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--mono);
+  font-weight: 600;
+}
+
+.ticket-dialog-qr-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 2px;
+}
+
+.ticket-dialog-qr-frame {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 290px;
+  padding: 20px;
+  border-radius: 16px;
+  background: var(--navy);
+  color: white;
+  box-shadow: 0 10px 26px -8px rgba(10, 15, 31, 0.4);
+}
+
+.ticket-dialog-qr-img {
+  display: block;
+  width: 230px;
+  height: 230px;
+  max-width: 100%;
+  padding: 9px;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.ticket-dialog-qr-code {
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.18em;
+}
+
+.ticket-dialog-qr-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12.5px;
+  text-align: center;
+}
+
+.ticket-dialog-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 24px;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: var(--paper);
+}
+
+.ticket-dialog-facts div {
+  display: grid;
+  gap: 2px;
+}
+
+.ticket-dialog-facts dt {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ticket-dialog-facts dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+  word-break: break-word;
+}
+
+.ticket-dialog-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 22px 20px;
+  border-top: 1px solid var(--line);
+}
+
+.ticket-dialog-note {
+  max-width: 28ch;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.ticket-dialog-actions {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+@media (max-width: 480px) {
+  .ticket-dialog-facts {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .ticket-dialog-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ticket-dialog-actions {
+    margin-left: 0;
+    justify-content: stretch;
+  }
+
+  .ticket-dialog-actions > * {
+    flex: 1;
+    text-align: center;
+  }
 }
 
 .ticket-terms-check {

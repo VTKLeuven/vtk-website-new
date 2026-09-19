@@ -1,7 +1,9 @@
 "use client";
 
-import { CheckCircle2, Clock3, Download, QrCode, XCircle } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, Clock3, Download, Maximize2, QrCode, XCircle } from "lucide-react";
 import type { PublicTicket } from "./types";
+import { TicketQrModal } from "./TicketQrModal";
 
 /**
  * De wallet-knoppen staan uit tot Apple/Google Wallet echt werkt: een knop die
@@ -15,30 +17,60 @@ const SHOW_WALLET_BUTTONS = false;
  * Eén toegangsbewijs: de QR op een navy strook links, de gegevens rechts.
  * Zie `vtk-tickets.css` (.ticket-pass) en docs/design-decisions.md.
  */
-export function TicketPass({ ticket, locale }: { ticket: PublicTicket; locale: "nl" | "en" }) {
+export function TicketPass({
+  ticket,
+  locale,
+  eventTitle,
+  eventDate,
+  eventLocation,
+}: {
+  ticket: PublicTicket;
+  locale: "nl" | "en";
+  eventTitle?: string;
+  eventDate?: string | Date;
+  eventLocation?: string | null;
+}) {
+  const [modalOpen, setModalOpen] = useState(false);
   const valid = ticket.status === "VALID" || ticket.status === "ISSUED";
   const checkedIn = Boolean(ticket.checkedInAt) || ticket.status === "CHECKED_IN";
   const showQr = Boolean(ticket.credential) && (valid || checkedIn);
   const nl = locale === "nl";
 
   return (
-    <article
-      className={`ticket-pass${checkedIn ? " is-used" : ""}${!valid && !checkedIn ? " is-invalid" : ""}`}
-    >
-      <div className="ticket-pass-stub">
-        {showQr ? (
-          // Deze beveiligde route gebruikt dezelfde rasterrenderer als de
-          // verkorte links. De ticketcredential komt zo niet in de afbeeldings-URL.
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={`/api/tickets/${encodeURIComponent(ticket.id)}/qr`}
-            alt={nl ? "QR-code van ticket" : "Ticket QR code"}
-          />
-        ) : (
-          <QrCode size={40} aria-hidden="true" />
-        )}
-        <span>{ticket.publicId.slice(-6).toUpperCase()}</span>
-      </div>
+    <>
+      <article
+        className={`ticket-pass${checkedIn ? " is-used" : ""}${!valid && !checkedIn ? " is-invalid" : ""}`}
+      >
+        <div className="ticket-pass-stub">
+          {showQr ? (
+            <button
+              type="button"
+              className="ticket-pass-qr-trigger"
+              onClick={() => setModalOpen(true)}
+              aria-label={nl ? "QR-code vergroten om te scannen" : "Enlarge QR code to scan"}
+              title={nl ? "Klik om te vergroten" : "Click to enlarge"}
+            >
+              <div className="ticket-pass-qr-box">
+                {/* Deze beveiligde route gebruikt dezelfde rasterrenderer als de
+                    verkorte links. De ticketcredential komt zo niet in de afbeeldings-URL. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/api/tickets/${encodeURIComponent(ticket.id)}/qr`}
+                  alt={nl ? "QR-code van ticket" : "Ticket QR code"}
+                />
+                <span className="ticket-pass-qr-zoom-badge" aria-hidden="true">
+                  <Maximize2 size={12} />
+                </span>
+              </div>
+              <span>{ticket.publicId.slice(-6).toUpperCase()}</span>
+            </button>
+          ) : (
+            <>
+              <QrCode size={40} aria-hidden="true" />
+              <span>{ticket.publicId.slice(-6).toUpperCase()}</span>
+            </>
+          )}
+        </div>
       <div className="ticket-pass-body">
         <div className="ticket-pass-top">
           <div>
@@ -97,5 +129,17 @@ export function TicketPass({ ticket, locale }: { ticket: PublicTicket; locale: "
         ) : null}
       </div>
     </article>
-  );
+
+    {modalOpen && showQr ? (
+      <TicketQrModal
+        ticket={ticket}
+        locale={locale}
+        eventTitle={eventTitle}
+        eventDate={eventDate}
+        eventLocation={eventLocation}
+        onClose={() => setModalOpen(false)}
+      />
+    ) : null}
+  </>
+);
 }

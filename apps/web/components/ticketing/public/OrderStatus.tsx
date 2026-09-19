@@ -275,7 +275,14 @@ export function OrderStatus({
                 </div>
                 <div className="ticket-pass-list">
                   {order.tickets.map((ticket) => (
-                    <TicketPass key={ticket.id} ticket={ticket} locale={locale} />
+                    <TicketPass
+                      key={ticket.id}
+                      ticket={ticket}
+                      locale={locale}
+                      eventTitle={order.event.title}
+                      eventDate={order.event.startsAt}
+                      eventLocation={order.event.location}
+                    />
                   ))}
                 </div>
                 <p className="torder-mail">
