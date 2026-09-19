@@ -4,7 +4,7 @@ import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@vtk/db";
 import { sendMail } from "@/lib/email";
 import { mailBodyToHtml } from "@/lib/mailBodyHtml";
-import { signatureForUser, type MailSignature } from "@/lib/mailSignature-server";
+import { signatureForBody, type MailSignature } from "@/lib/mailSignature-server";
 import { clampNudgeLeadDays } from "@/lib/lesbezoeken";
 import {
   DEFAULT_LESBEZOEK_CONFIG,
@@ -312,7 +312,7 @@ export async function processDueLesbezoekScheduledMails(
         text: item.body,
         // Deze mail vertrekt vanzelf, maar iemand heeft ze ingepland en zijn
         // ondertekening staat al in de tekst; de opgemaakte versie volgt die.
-        signature: item.createdById ? await signatureForUser(item.createdById) : undefined,
+        signature: item.createdById ? await signatureForBody(item.createdById, item.body) : undefined,
       });
 
       if (delivered) {

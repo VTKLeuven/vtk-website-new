@@ -41,6 +41,19 @@ describe('signature library', () => {
     it('valt terug op info@vtk.be als alle velden leeg zijn', () => {
       expect(buildDefaultVtkEmail(null, null, null)).toBe('info@vtk.be');
     });
+
+    // Een krom adres op een account kwam hier ongecontroleerd door en belandde zo
+    // onder elke mail die met deze handtekening ondertekend werd.
+    it('negeert een bestaand @vtk.be-adres dat geen adres is', () => {
+      expect(buildDefaultVtkEmail('Jasper', 'Van Elsacker', 'jasper.van elsacker@vtk.be')).toBe(
+        'jasper.vanelsacker@vtk.be',
+      );
+    });
+
+    it('valt op de naam terug wanneer het bestaande adres geen punt heeft', () => {
+      expect(buildDefaultVtkEmail('Jan', 'Janssens', 'jan@vtk.be')).toBe('jan@vtk.be');
+      expect(buildDefaultVtkEmail('Jan', 'Janssens', '@vtk.be')).toBe('jan.janssens@vtk.be');
+    });
   });
 
   describe('generateSignatureHtml', () => {

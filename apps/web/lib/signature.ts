@@ -44,6 +44,19 @@ export function sanitizePhoneForTel(phone: string): string {
 }
 
 /**
+ * Ziet dit eruit als een e-mailadres?
+ *
+ * Bewust ruim: geen poging om de standaard na te bouwen, wel genoeg om de
+ * gevallen te vangen die als adres onbruikbaar zijn (een spatie erin, geen apenstaartje,
+ * geen punt achteraan). Het opslaan van een handtekening gebruikt dezelfde
+ * controle, zodat een adres dat afgeleid wordt niet losser beoordeeld wordt dan
+ * een adres dat iemand zelf intikt.
+ */
+export function isPlausibleEmail(value: string): boolean {
+  return /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(value.trim());
+}
+
+/**
  * Berekent een standaard VTK-e-mailadres op basis van voor- en achternaam of bestaand account-adres.
  */
 export function buildDefaultVtkEmail(
@@ -51,8 +64,14 @@ export function buildDefaultVtkEmail(
   lastName?: string | null,
   currentEmail?: string | null,
 ): string {
+  // Een bestaand @vtk.be-adres wint, maar enkel als het er ook als adres
+  // uitziet. Stond er ooit een krom adres op een account (een spatie in de
+  // achternaam is het klassieke geval), dan kwam dat hier ongecontroleerd door
+  // en belandde het onder elke mail die met deze handtekening ondertekend werd.
+  // Opbouwen uit de naam geeft dan een adres dat tenminste klopt van vorm.
   if (currentEmail && currentEmail.toLowerCase().endsWith('@vtk.be')) {
-    return currentEmail.toLowerCase();
+    const existing = currentEmail.trim().toLowerCase();
+    if (isPlausibleEmail(existing)) return existing;
   }
 
   const cleanPart = (s?: string | null) =>

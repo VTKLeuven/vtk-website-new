@@ -5,7 +5,11 @@ import { headers } from "next/headers";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { requirePermission } from "@/lib/session";
-import { signatureForUser } from "@/lib/mailSignature-server";
+import {
+  pickSignature,
+  signatureForBody,
+  signaturesForUser,
+} from "@/lib/mailSignature-server";
 import { RateLimiter, clientKeyFromHeaders, toMessageText, toSingleLine } from "@/lib/contactForm";
 import { brusselsWallClockMinutes } from "@/lib/brussels";
 import { logAudit } from "@/lib/audit";
@@ -458,7 +462,7 @@ export async function sendLesbezoekMailAction(
     // De mailbox van de organisatie leest mee bij een terugkoppeling: de persoon
     // die aanvroeg is volgend jaar weg, de post blijft.
     cc: kind === "requester" ? (visit.organisation.contactEmail ?? undefined) : undefined,
-    signature: await signatureForUser(session.user.id),
+    signature: await signatureForBody(session.user.id, body),
   });
   if (!delivered) return saveError("MAIL_FAILED");
 
@@ -632,7 +636,7 @@ export async function sendNowLesbezoekScheduledMailAction(
     text: item.body,
     // De tekst is opgeslagen toen iemand ze inplande, ondertekening inbegrepen;
     // de opgemaakte versie hoort dan van diezelfde persoon te zijn.
-    signature: item.createdById ? await signatureForUser(item.createdById) : undefined,
+    signature: item.createdById ? await signatureForBody(item.createdById, item.body) : undefined,
   });
 
   if (delivered) {
@@ -826,8 +830,8 @@ export async function sendBulkLesbezoekMailsAction(
   let failed = 0;
 
   // Een keer opgehaald voor de hele reeks: het is dezelfde persoon die deze
-  // mails nu verstuurt.
-  const signature = await signatureForUser(session.user.id);
+  // mails nu verstuurt. Welke taal het per mail wordt, hangt van de tekst af.
+  const signatures = await signaturesForUser(session.user.id);
 
   for (const item of ready) {
     const delivered = await sendLesbezoekMail({
@@ -835,7 +839,7 @@ export async function sendBulkLesbezoekMailsAction(
       cc: item.cc ?? undefined,
       subject: item.subject,
       text: item.body,
-      signature,
+      signature: pickSignature(signatures, item.body),
     });
 
     if (!delivered) {

@@ -59,7 +59,7 @@ import {
   type RentalTemplate,
   type RentalTemplateCategory,
 } from "@/lib/theokotVerhuurMail";
-import { signatureForPost, signatureForUser } from "@/lib/mailSignature-server";
+import { signatureForBody, signatureForPost } from "@/lib/mailSignature-server";
 
 /**
  * Server actions van de Theokot-verhuur.
@@ -493,7 +493,7 @@ export async function sendRentalReplyAction(
     subject,
     text: body,
     attachments: attachment ? [attachment] : undefined,
-    signature: await signatureForUser(session.user.id),
+    signature: await signatureForBody(session.user.id, body),
   });
   if (!delivered) return saveError("MAIL_FAILED");
 
