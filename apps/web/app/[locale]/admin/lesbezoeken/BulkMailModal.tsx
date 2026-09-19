@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { MailSignature } from "@/lib/signatureProfile";
+import { signatureName, type MailSignature } from "@/lib/signatureProfile";
 import { Button, Input, Label, Select, Textarea } from "@vtk/ui";
 import { Modal } from "@/app/[locale]/admin/admin-table";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -68,6 +68,7 @@ export function BulkMailModal({
   visits,
   templates,
   signature,
+  postSignature,
   onClose,
   onSent,
 }: {
@@ -77,6 +78,8 @@ export function BulkMailModal({
   visits: VisitView[];
   templates: LesbezoekTemplateItem[];
   signature: MailSignature;
+  /** De ondertekening van de post; de tweede keuze bij "Ondertekenen als". */
+  postSignature: MailSignature;
   onClose: () => void;
   /** Loopt enkel wanneer er echt iets vertrokken of ingepland is. */
   onSent: () => void;
@@ -84,6 +87,10 @@ export function BulkMailModal({
   const errors = lesbezoekAdminErrors(nl);
 
   const [lang, setLang] = useState<"auto" | "nl" | "en">("auto");
+  // Dezelfde keuze als in het opstelscherm van een enkele mail; ze geldt voor de
+  // hele reeks, want het is een reeks van dezelfde afzender.
+  const [signAs, setSignAs] = useState<"self" | "post">("self");
+  const activeSignature = signAs === "post" ? postSignature : signature;
   const [templateId, setTemplateId] = useState<string>(AUTO);
 
   // Wie er niet in de merge past, en waarom. Beter zichtbaar bovenaan dan
@@ -129,7 +136,7 @@ export function BulkMailModal({
             templates[0];
           if (!template) continue;
 
-          const rendered = renderMailTemplate(template, mailVarsFor(visit, locale, signature.text));
+          const rendered = renderMailTemplate(template, mailVarsFor(visit, locale, activeSignature.text));
 
           drafts.push({
             key: visit.id,
@@ -178,7 +185,7 @@ export function BulkMailModal({
               visits: group,
             },
             locale,
-            signature.text,
+            activeSignature.text,
           ),
         );
 
@@ -206,7 +213,7 @@ export function BulkMailModal({
 
       return bundles;
     },
-    [mode, usable, templates, signature, nl],
+    [mode, usable, templates, activeSignature, nl],
   );
 
   const [drafts, setDrafts] = useState<Draft[]>(() => build(lang, templateId));
@@ -349,6 +356,21 @@ export function BulkMailModal({
                   </option>
                   <option value="nl">Nederlands</option>
                   <option value="en">English</option>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="bulk-sign-as">{nl ? "Ondertekenen als" : "Sign as"}</Label>
+                <Select
+                  id="bulk-sign-as"
+                  value={signAs}
+                  onChange={(event) => setSignAs(event.target.value as "self" | "post")}
+                >
+                  <option value="self">
+                    {signatureName(signature) || (nl ? "Jezelf" : "Yourself")}
+                  </option>
+                  <option value="post">
+                    {signatureName(postSignature) || (nl ? "De post" : "The post")}
+                  </option>
                 </Select>
               </div>
             </div>

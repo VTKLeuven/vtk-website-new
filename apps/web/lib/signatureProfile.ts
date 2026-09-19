@@ -62,6 +62,32 @@ export type SignaturePreset = { label: string; value: string };
 export type MailSignature = { text: string; html: string };
 
 /**
+ * De naam bovenaan een ondertekening, om een keuze te benoemen.
+ *
+ * Het scherm laat kiezen tussen jezelf en de post, en dan is "Jasper Van
+ * Elsacker" of "VTK Onderwijs" duidelijker dan "Jezelf" of "De post".
+ */
+export function signatureName(signature: MailSignature): string {
+  return signature.text.split("\n")[0]?.trim() ?? "";
+}
+
+/**
+ * Welke van twee ondertekeningen in deze tekst staat.
+ *
+ * De clientkant van `pickSignature` uit `lib/mailSignature-server.ts`: een
+ * voorvertoning van een opgeslagen mail moet dezelfde vraag beantwoorden, maar
+ * mag die server-only module niet aanraken.
+ */
+export function pickLocal(
+  body: string,
+  self: MailSignature,
+  post: MailSignature,
+): MailSignature {
+  const postText = post.text.trim();
+  return postText && body.includes(postText) ? post : self;
+}
+
+/**
  * De functies die dit lid kan kiezen, uit zijn postlidmaatschappen.
  *
  * Een lidmaatschap levert er twee: de eigen titel ("VTK Onderwijs 26-27") en de

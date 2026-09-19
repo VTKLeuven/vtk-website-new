@@ -1,7 +1,11 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { MailSignature } from "@/lib/signatureProfile";
+import {
+  pickLocal,
+  signatureName,
+  type MailSignature,
+} from "@/lib/signatureProfile";
 import { splitSignature } from "@/lib/mailBodyHtml";
 import { Button, Input, Label, Select, Textarea } from "@vtk/ui";
 import { Modal } from "@/app/[locale]/admin/admin-table";
@@ -61,6 +65,7 @@ export function LesbezoekInspector({
   canManage,
   templates,
   signature,
+  postSignature,
   onClose,
   onEdit,
 }: {
@@ -69,6 +74,8 @@ export function LesbezoekInspector({
   canManage: boolean;
   templates: LesbezoekTemplates;
   signature: MailSignature;
+  /** De ondertekening van de post; de tweede keuze bij "Ondertekenen als". */
+  postSignature: MailSignature;
   onClose: () => void;
   onEdit: () => void;
 }) {
@@ -170,7 +177,13 @@ export function LesbezoekInspector({
         )}
 
         {/* Eventuele geplande mails */}
-        <ScheduledMailBanner nl={nl} visit={visit} canManage={canManage} signature={signature} />
+        <ScheduledMailBanner
+          nl={nl}
+          visit={visit}
+          canManage={canManage}
+          signature={signature}
+          postSignature={postSignature}
+        />
 
         {activeTab === "details" ? (
           <div className="space-y-4">
@@ -368,6 +381,7 @@ export function LesbezoekInspector({
             visit={visit}
             templates={templateItems}
             signature={signature}
+            postSignature={postSignature}
             errors={errors}
             onBack={() => setActiveTab("details")}
           />
@@ -530,6 +544,7 @@ function ScheduledMailBanner({
   visit,
   canManage,
   signature,
+  postSignature,
 }: {
   nl: boolean;
   visit: VisitView;
@@ -540,6 +555,8 @@ function ScheduledMailBanner({
    * opgeslagen toen ze ingepland werd.
    */
   signature: MailSignature;
+  /** De ondertekening van de post; de tweede keuze bij "Ondertekenen als". */
+  postSignature: MailSignature;
 }) {
   if (!visit.scheduledMails || visit.scheduledMails.length === 0) return null;
 
@@ -616,14 +633,14 @@ function ScheduledMailBanner({
               </summary>
               <div className="mt-1.5 rounded-lg border border-zinc-200/60 bg-zinc-50 p-2.5 text-[12px] leading-relaxed text-zinc-700 max-h-64 overflow-y-auto">
                 <p className="whitespace-pre-wrap font-mono">
-                  {splitSignature(mail.body, signature).text}
+                  {splitSignature(mail.body, pickLocal(mail.body, signature, postSignature)).text}
                 </p>
-                {splitSignature(mail.body, signature).signatureHtml ? (
+                {splitSignature(mail.body, pickLocal(mail.body, signature, postSignature)).signatureHtml ? (
                   <div
                     className="vtk-mail-preview-signature mt-2 px-0 pb-0"
                     // Eigen generator, die elk ingevuld veld al escapet.
                     dangerouslySetInnerHTML={{
-                      __html: splitSignature(mail.body, signature).signatureHtml!,
+                      __html: splitSignature(mail.body, pickLocal(mail.body, signature, postSignature)).signatureHtml!,
                     }}
                   />
                 ) : null}
@@ -802,6 +819,7 @@ function MailComposer({
   visit,
   templates,
   signature,
+  postSignature,
   errors,
   onBack,
 }: {
@@ -809,10 +827,17 @@ function MailComposer({
   visit: VisitView;
   templates: LesbezoekTemplateItem[];
   signature: MailSignature;
+  /** De ondertekening van de post; de tweede keuze bij "Ondertekenen als". */
+  postSignature: MailSignature;
   errors: Record<string, string>;
   onBack: () => void;
 }) {
   const [lang, setLang] = useState<"nl" | "en">(visit.teacherLocale);
+  // Wie er onder de mail komt te staan. Standaard jezelf: een lesbezoek wordt
+  // geregeld door een persoon, en een professor antwoordt liever aan iemand.
+  // Met de post tekenen is er voor wie namens de post schrijft.
+  const [signAs, setSignAs] = useState<"self" | "post">("self");
+  const activeSignature = signAs === "post" ? postSignature : signature;
   const defaultId = useMemo(
     () => suggestedTemplateId(visit, lang),
     [visit, lang],
@@ -858,11 +883,11 @@ function MailComposer({
         mailTime: visit.mailTime,
       },
       lang,
-      signature.text,
+      activeSignature.text,
     );
 
     return renderMailTemplate(selectedTemplate, vars);
-  }, [selectedTemplate, lang, signature, visit]);
+  }, [selectedTemplate, lang, activeSignature, visit]);
 
   const kind =
     selectedTemplate.category === "nudge" || selectedId.toLowerCase().includes("nudge")
@@ -931,6 +956,19 @@ function MailComposer({
           >
             <option value="nl">Nederlands</option>
             <option value="en">English</option>
+          </Select>
+        </div>
+        <div>
+          <Label htmlFor={`sign-as-${visit.id}`}>
+            {nl ? "Ondertekenen als" : "Sign as"}
+          </Label>
+          <Select
+            id={`sign-as-${visit.id}`}
+            value={signAs}
+            onChange={(e) => setSignAs(e.target.value as "self" | "post")}
+          >
+            <option value="self">{signatureName(signature) || (nl ? "Jezelf" : "Yourself")}</option>
+            <option value="post">{signatureName(postSignature) || (nl ? "De post" : "The post")}</option>
           </Select>
         </div>
       </div>

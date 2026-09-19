@@ -21,9 +21,10 @@ import {
   getLesbezoekConfig,
   getLesbezoekTemplates,
   lesbezoekSenderLabel,
+  LESBEZOEK_POST_NAME,
   processDueLesbezoekScheduledMails,
 } from "@/lib/lesbezoeken-server";
-import { signatureForUser } from "@/lib/mailSignature-server";
+import { signatureForPost, signatureForUser } from "@/lib/mailSignature-server";
 import {
   currentWorkingYear,
   formatWorkingYear,
@@ -188,6 +189,9 @@ export default async function AdminLesbezoekenPage({
   // werklijst en de sjabloonvoorbeelden; zo tonen de voorbeelden exact wat deze
   // persoon straks verstuurt.
   const signature = await signatureForUser(session.user.id, nl ? "nl" : "en");
+  // De tweede keuze in het opstelscherm: tekenen met de post in plaats van met
+  // je eigen naam. Zie `docs/design-decisions.md`.
+  const postSignature = signatureForPost(LESBEZOEK_POST_NAME, config.notifyEmail);
 
   const peculiarities: PeculiarityView[] = peculiarityRows.map((row) => ({
     id: row.id,
@@ -412,6 +416,7 @@ export default async function AdminLesbezoekenPage({
             )}
             templates={templates}
             signature={signature}
+            postSignature={postSignature}
             nudgeLeadDays={config.nudgeLeadDays}
           />
         </Card>

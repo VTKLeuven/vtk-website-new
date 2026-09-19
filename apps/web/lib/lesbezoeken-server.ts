@@ -4,7 +4,11 @@ import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@vtk/db";
 import { sendMail } from "@/lib/email";
 import { mailBodyToHtml } from "@/lib/mailBodyHtml";
-import { signatureForBody, type MailSignature } from "@/lib/mailSignature-server";
+import {
+  signatureForBody,
+  signatureForPost,
+  type MailSignature,
+} from "@/lib/mailSignature-server";
 import { clampNudgeLeadDays } from "@/lib/lesbezoeken";
 import {
   DEFAULT_LESBEZOEK_CONFIG,
@@ -31,6 +35,12 @@ export const LESBEZOEK_CONFIG_KEY = "lesbezoeken.config";
  * bewust niet het adres van de aanvrager: dan spooft onze mailserver een domein
  * dat hij niet mag ondertekenen en belandt de vraag in de spam.
  */
+/**
+ * Wie de post is wanneer een mail niet met een persoon ondertekend wordt.
+ * Hetzelfde idee als `RENTAL_POST_NAME` bij de verhuur.
+ */
+export const LESBEZOEK_POST_NAME = "VTK Onderwijs";
+
 const LESBEZOEK_FROM =
   process.env.MAIL_FROM_LESBEZOEKEN?.trim() || "VTK Onderwijs <lesbezoeken@vtk.be>";
 
@@ -294,6 +304,9 @@ export async function processDueLesbezoekScheduledMails(
 
     if (due.length === 0) return { sent: 0, failed: 0 };
 
+    // Een keer voor de hele ronde: het adres van de post staat in de instellingen.
+    const config = await getLesbezoekConfig();
+
     let sent = 0;
     let failed = 0;
 
@@ -312,7 +325,13 @@ export async function processDueLesbezoekScheduledMails(
         text: item.body,
         // Deze mail vertrekt vanzelf, maar iemand heeft ze ingepland en zijn
         // ondertekening staat al in de tekst; de opgemaakte versie volgt die.
-        signature: item.createdById ? await signatureForBody(item.createdById, item.body) : undefined,
+        // De post is een kandidaat naast de twee talen van het lid: wie deze
+        // mail opstelde, kon kiezen om met de post te tekenen.
+        signature: item.createdById
+          ? await signatureForBody(item.createdById, item.body, [
+              signatureForPost(LESBEZOEK_POST_NAME, config.notifyEmail),
+            ])
+          : undefined,
       });
 
       if (delivered) {

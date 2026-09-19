@@ -7504,7 +7504,7 @@ een half ingevuld formulier.
 ontvangstbevestiging van een verhuuraanvraag vertrekt vanuit het publieke
 formulier, en de goedkeuring of weigering via de knop in de meldingsmail hangt
 aan een token dat zegt welke aanvraag het is en niet wie erop klikt. Daar zet
-`signatureTextForPost` de post zelf onder de mail, met het postadres. Een mail
+`signatureForPost` de post zelf onder de mail, met het postadres. Een mail
 van de kring hoort niet naamloos te vertrekken, en een willekeurig lid eronder
 zetten zou een naam beloven die niemand gecontroleerd heeft.
 
@@ -7515,6 +7515,27 @@ de handtekening van wie ze ingepland heeft, ook als ze pas dagen later vertrekt.
 Dit staat los van `signature.generate` hierboven. Dat recht gaat over de kaart op
 /account; deze ondertekening hoort bij het versturen van een mail en zit al
 achter het beheerrecht van de werking zelf.
+
+**Je kan ook met de post tekenen.** In het opstelscherm staat naast het sjabloon
+en de taal een keuze "Ondertekenen als", met twee standen: jezelf of de post. De
+eerste is de standaard, want een lesbezoek of een verhuur wordt geregeld door een
+persoon en een professor antwoordt liever aan iemand. Met de post tekenen is er
+voor de gevallen waarin dat niet klopt: een formele melding die van Onderwijs
+komt en niet van een lid, iemand die antwoordt namens iemand die ziek is, of een
+nieuw lid dat zijn naam liever niet naar een externe professor stuurt.
+
+Bewust **twee** keuzes en geen lijst met handtekeningen. Een vrije keuze zou de
+oude instelling terugbrengen onder een andere naam, met hetzelfde gevolg: iets
+wat elk jaar scheefgroeit en waar niemand meer weet welke de juiste is. De
+post-ondertekening bestond bovendien al, voor de twee mails die niemand
+verstuurt.
+
+**De keuze staat nergens opgeslagen.** De tekst van de mail wordt opgesteld voor
+ze vertrekt en draagt de ondertekening dus al in zich; bij het versturen wordt
+teruggelezen welke van de kandidaten erin staat (`pickSignature`). Daarom heeft
+een mail die dagen blijft wachten geen extra kolom nodig om te onthouden hoe ze
+getekend was, en blijft een ondertekening die iemand met de hand herschreef
+gewoon staan zoals ze is.
 
 ## Voorverkoop: een duur voor de verkoopstart, niet een tweede datum
 

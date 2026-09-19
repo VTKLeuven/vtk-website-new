@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { MailSignature } from "@/lib/signatureProfile";
+import { signatureName, type MailSignature } from "@/lib/signatureProfile";
 import { Input, Label, Select, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
@@ -50,6 +50,7 @@ export function RentalInspector({
   templates,
   senderLabel,
   signature,
+  postSignature,
   contractAvailable,
   canManage,
 }: {
@@ -58,6 +59,8 @@ export function RentalInspector({
   templates: RentalTemplate[];
   senderLabel: string;
   signature: MailSignature;
+  /** De ondertekening van de post; de tweede keuze bij "Ondertekenen als". */
+  postSignature: MailSignature;
   /** Per soort huurder en taal: staat er een huurcontract klaar? */
   contractAvailable: Record<string, boolean>;
   canManage: boolean;
@@ -88,6 +91,7 @@ export function RentalInspector({
             templates={templates}
             senderLabel={senderLabel}
             signature={signature}
+            postSignature={postSignature}
             renterType={renterType}
             contractAvailable={contractAvailable}
             errors={errors}
@@ -388,6 +392,7 @@ function ReplyForm({
   templates,
   senderLabel,
   signature,
+  postSignature,
   renterType,
   contractAvailable,
   errors,
@@ -397,14 +402,20 @@ function ReplyForm({
   templates: RentalTemplate[];
   senderLabel: string;
   signature: MailSignature;
+  /** De ondertekening van de post; de tweede keuze bij "Ondertekenen als". */
+  postSignature: MailSignature;
   renterType: RentalView["renterType"];
   contractAvailable: Record<string, boolean>;
   errors: Record<string, string>;
 }) {
   const lang = nl ? "nl" : "en";
+  // Wie er onder de mail komt. Standaard jezelf; met de post tekenen is er voor
+  // wie namens de post antwoordt.
+  const [signAs, setSignAs] = useState<"self" | "post">("self");
+  const activeSignature = signAs === "post" ? postSignature : signature;
   const vars: RentalTemplateVars = useMemo(
-    () => ({ ...rental.mailVars, ondertekening: signature.text }),
-    [rental.mailVars, signature],
+    () => ({ ...rental.mailVars, ondertekening: activeSignature.text }),
+    [rental.mailVars, activeSignature],
   );
 
   // Het sjabloon dat past bij de taal van de aanvrager staat vooraan; die koos
@@ -431,10 +442,12 @@ function ReplyForm({
   // Dit gebeurt tijdens het renderen en niet in een effect: React tekent dan
   // meteen met de nieuwe waarden, in plaats van eerst het oude sjabloon te tonen
   // en er daarna overheen te schrijven.
-  const [appliedId, setAppliedId] = useState(template?.id ?? "");
-  if (template && template.id !== appliedId) {
+  // Een andere ondertekening telt hier mee als een ander sjabloon: ze staat in
+  // de tekst en moet er dus opnieuw in.
+  const [appliedId, setAppliedId] = useState(`${template?.id ?? ""}|self`);
+  if (template && `${template.id}|${signAs}` !== appliedId) {
     const rendered = renderRentalMail(template, vars);
-    setAppliedId(template.id);
+    setAppliedId(`${template.id}|${signAs}`);
     setSubject(rendered.subject);
     setBody(rendered.body);
     setStatus(statusForCategory(template.category));
@@ -481,6 +494,23 @@ function ReplyForm({
                   {item.name}
                 </option>
               ))}
+            </Select>
+          </div>
+          <div>
+            <Label htmlFor={`sign-as-${rental.id}`}>
+              {nl ? "Ondertekenen als" : "Sign as"}
+            </Label>
+            <Select
+              id={`sign-as-${rental.id}`}
+              value={signAs}
+              onChange={(event) => setSignAs(event.target.value as "self" | "post")}
+            >
+              <option value="self">
+                {signatureName(signature) || (nl ? "Jezelf" : "Yourself")}
+              </option>
+              <option value="post">
+                {signatureName(postSignature) || (nl ? "De post" : "The post")}
+              </option>
             </Select>
           </div>
           <div>
@@ -556,7 +586,7 @@ function ReplyForm({
           to={rental.email}
           subject={subject}
           body={body}
-          signature={signature}
+          signature={activeSignature}
           attachments={attach && contractReady ? [nl ? "huurcontract.pdf" : "rental-contract.pdf"] : []}
           source={nl ? "met de gegevens van deze aanvraag" : "with the details of this request"}
         />
