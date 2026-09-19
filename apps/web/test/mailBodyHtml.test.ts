@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mailBodyToHtml } from "@/lib/mailBodyHtml";
+import { mailBodyToHtml, splitSignature } from "@/lib/mailBodyHtml";
 
 const signature = {
   text: "JAN VAN DEN BROECK\nVTK Onderwijs 26-27\nE: jan@vtk.be",
@@ -48,5 +48,22 @@ describe("mailBodyToHtml", () => {
     const html = mailBodyToHtml(body, signature);
     expect(html.startsWith("<!doctype html>")).toBe(true);
     expect(html).toContain("</html>");
+  });
+});
+
+describe("de taal van de ondertekening", () => {
+  // De sjablonen bestaan in twee talen en de functie verschilt mee. Wordt de
+  // ondertekening in de verkeerde taal opgezocht, dan vindt `splitSignature`
+  // niets terug en vertrekt een Engelse mail zonder de opgemaakte versie.
+  const nl = { text: "JASPER\nVTK Onderwijs 26-27", html: "<table>nl</table>" };
+  const en = { text: "JASPER\nVTK Education 26-27", html: "<table>en</table>" };
+  const engelseMail = `Dear professor,\n\nKind regards,\n${en.text}`;
+
+  it("vindt de handtekening niet met de verkeerde taal", () => {
+    expect(splitSignature(engelseMail, nl).signatureHtml).toBeNull();
+  });
+
+  it("vindt ze wel met de juiste", () => {
+    expect(splitSignature(engelseMail, en).signatureHtml).toBe(en.html);
   });
 });
