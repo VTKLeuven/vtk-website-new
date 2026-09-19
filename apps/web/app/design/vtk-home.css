@@ -2342,16 +2342,52 @@
   font-variant-numeric: tabular-nums;
 }
 
+.vtk-design .shift-tile-coins {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .vtk-design .shift-tile-coin {
-  width: 18px;
-  height: 18px;
+  position: relative;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
   flex-shrink: 0;
   border-radius: 999px;
   background: var(--yellow);
   border: 1.5px solid var(--coin-rim);
-  box-shadow:
-    inset 0 0 0 1.5px rgba(255, 255, 255, 0.55),
-    0 1px 2px rgba(14, 26, 54, 0.18);
+}
+
+/* Het VTK-wordmark als stempel op de munt, als masker en niet als <img>, zodat
+   het de kleur van de muntrand aanneemt en als reliëf leest. Op 20 px is het
+   merk geen leesbare naam meer maar een stempel, en net dat onderscheidt een
+   munt van een cirkel. Het schild kan hier niet: vier kwartieren met een leeuw
+   en een passer worden op deze grootte één vlek. */
+.vtk-design .shift-tile-coin::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--coin-rim);
+  -webkit-mask: url("/vtk-logo.png") center / 74% auto no-repeat;
+  mask: url("/vtk-logo.png") center / 74% auto no-repeat;
+}
+
+/* Het schijfje dat achter de voorste munt uitsteekt is donkerder en zijn stempel
+   staat flauwer: het ligt in de schaduw van de munt erboven. Twee muntjes zeggen
+   "bonnen" zonder dat er iets te tellen valt; hoeveel het er zijn, zegt het
+   cijfer ernaast. */
+.vtk-design .shift-tile-coin-back {
+  background: var(--accent-2);
+}
+
+.vtk-design .shift-tile-coin-back::after {
+  opacity: 0.7;
+}
+
+.vtk-design .shift-tile-coin-face {
+  margin-left: -10px;
+  box-shadow: 0 1px 2px rgba(14, 26, 54, 0.18);
 }
 
 .vtk-design .shift-tile-foot {

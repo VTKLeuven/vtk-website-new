@@ -265,7 +265,10 @@ export function FrontpageShiftBand({
                       aria-label={rewardText ?? undefined}
                     >
                       {shift.reward}
-                      <span className="shift-tile-coin" aria-hidden="true" />
+                      <span className="shift-tile-coins" aria-hidden="true">
+                        <span className="shift-tile-coin shift-tile-coin-back" />
+                        <span className="shift-tile-coin shift-tile-coin-face" />
+                      </span>
                     </span>
                   ) : null}
                 </div>
