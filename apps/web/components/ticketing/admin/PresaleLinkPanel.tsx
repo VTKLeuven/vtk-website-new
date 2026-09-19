@@ -10,7 +10,7 @@ const T = {
   nl: {
     title: "Private voorverkooplink",
     intro:
-      "Wie deze link opent, koopt mee tijdens de voorverkoop, ook zonder post en zonder shiften. Voor een groep die je niet in een post kan vatten: de band, de sponsors, de ouders van.",
+      "Wie deze link opent, koopt mee tijdens de voorverkoop, ook zonder post en zonder shiften.",
     needsPresale:
       "Zet eerst een voorverkoop aan hierboven; zonder voorverkoop valt er niets vroeger open te zetten.",
     create: "Link aanmaken",
@@ -32,7 +32,7 @@ const T = {
   en: {
     title: "Private presale link",
     intro:
-      "Whoever opens this link buys during the presale, without a post and without shifts. For a group you cannot capture in a post: the band, the sponsors, the parents.",
+      "Whoever opens this link buys during the presale, without a post and without shifts.",
     needsPresale: "Turn on a presale above first; without one there is nothing to open earlier.",
     create: "Create link",
     renew: "Renew",

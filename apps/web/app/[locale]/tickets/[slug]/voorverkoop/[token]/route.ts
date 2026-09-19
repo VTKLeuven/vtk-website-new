@@ -20,13 +20,13 @@ export const runtime = "nodejs";
  * te hebben. De cookie vervalt wanneer de verkoop voor iedereen opengaat.
  */
 export async function GET(
-  request: Request,
+  _request: Request,
   { params }: { params: Promise<{ locale: string; slug: string; token: string }> },
 ) {
   const { locale, slug, token } = await params;
   if (!hasLocale(locale)) return NextResponse.json({ error: "NOT_FOUND" }, { status: 404 });
   const base = locale === "en" ? "/en" : "";
-  const shop = new URL(`${base}/tickets/${slug}`, request.url);
+  const shopPath = `${base}/tickets/${slug}`;
 
   const event = await prisma.ticketEvent.findUnique({
     where: { slug },
@@ -35,11 +35,22 @@ export async function GET(
   // Een verkeerde of ingetrokken link leidt gewoon naar de ticketpagina: die
   // zegt zelf wel dat de verkoop nog niet open staat. Een foutmelding zou enkel
   // verklappen dat er een link bestaat.
+  //
+  // Relatieve Location-header en geen NextResponse.redirect(new URL(..., request.url)):
+  // achter een reverse proxy (zoals Caddy voor de Node-container) draagt
+  // request.url de interne loopback-origin (localhost:3000), waardoor
+  // new URL(..., request.url) bezoekers naar https://localhost:3000/... stuurde.
   if (!event || !presaleTokenMatches(event.presaleToken, token)) {
-    return NextResponse.redirect(shop);
+    return new NextResponse(null, {
+      status: 307,
+      headers: { Location: shopPath },
+    });
   }
 
-  const response = NextResponse.redirect(shop);
+  const response = new NextResponse(null, {
+    status: 307,
+    headers: { Location: shopPath },
+  });
   response.cookies.set(
     presaleCookieName(event.id),
     token,
