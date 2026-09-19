@@ -242,6 +242,19 @@ export function clientKeyFromHeaders(headers: { get(name: string): string | null
 // De mail zelf
 // -----------------------------------------------------------------------------
 
+import {
+  escapeHtml,
+  mailButton,
+  mailContentRow,
+  mailDocument,
+  mailFooterRow,
+  mailHeaderRow,
+  mailHeading,
+  mailInfoTable,
+  mailMessageBox,
+  mailParagraph,
+} from "@/lib/mailDesign";
+
 /**
  * Onderwerp en tekst van de mail naar `info@vtk.be`.
  *
@@ -250,17 +263,47 @@ export function clientKeyFromHeaders(headers: { get(name: string): string | null
  * Naam en adres staan ook in de tekst: wie de mail doorstuurt, verliest het
  * antwoordadres anders.
  */
-export function contactMailBody(message: ContactMessage): { subject: string; text: string } {
-  return {
-    subject: `[Website] ${message.subject}`,
-    text: [
-      `Van: ${message.name} <${message.email}>`,
-      `Onderwerp: ${message.subject}`,
-      "",
-      message.message,
-      "",
-      "--",
+export function contactMailBody(message: ContactMessage): {
+  subject: string;
+  text: string;
+  html: string;
+} {
+  const subject = `[Website] ${message.subject}`;
+  const text = [
+    `Van: ${message.name} <${message.email}>`,
+    `Onderwerp: ${message.subject}`,
+    "",
+    message.message,
+    "",
+    "--",
+    "Verstuurd via het contactformulier op vtk.be. Antwoorden gaat rechtstreeks naar de afzender.",
+  ].join("\n");
+
+  const items = [
+    { label: "Van", value: message.name },
+    { label: "E-mail", value: message.email },
+    { label: "Onderwerp", value: message.subject },
+  ];
+
+  const html = mailDocument({
+    lang: "nl",
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: "VTK Contact" })}${mailContentRow(
+      `${mailHeading("Contactformulier")}${mailParagraph(
+        `Er is een nieuw bericht binnengekomen via het contactformulier van <strong>${escapeHtml(
+          message.name,
+        )}</strong>:`,
+      )}${mailInfoTable(items)}${mailMessageBox(
+        message.message,
+        "Bericht van de bezoeker",
+      )}<div style="margin:22px 0 10px">${mailButton(
+        `mailto:${message.email}?subject=${encodeURIComponent("Re: " + message.subject)}`,
+        "Beantwoord bezoeker",
+      )}</div>`,
+    )}${mailFooterRow(
       "Verstuurd via het contactformulier op vtk.be. Antwoorden gaat rechtstreeks naar de afzender.",
-    ].join("\n"),
-  };
+    )}`,
+  });
+
+  return { subject, text, html };
 }

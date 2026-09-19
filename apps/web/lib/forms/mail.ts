@@ -42,6 +42,23 @@ export function answersAsText(lines: readonly AnswerLine[]): string {
   return lines.map((line) => `${line.label}: ${line.value}`).join("\n");
 }
 
+import {
+  MAIL_COLOR,
+  MAIL_FONT,
+  escapeHtml,
+  mailButton,
+  mailContentRow,
+  mailDateStub,
+  mailDocument,
+  mailFooterRow,
+  mailHeaderRow,
+  mailHeading,
+  mailInfoTable,
+  mailNoticeBox,
+  mailParagraph,
+  mailPill,
+} from "@/lib/mailDesign";
+
 export function confirmationMail(input: {
   locale: MailLocale;
   formTitle: string;
@@ -119,12 +136,53 @@ export function confirmationMail(input: {
       ]
     : undefined;
 
+  const subject =
+    (input.subject ? fillPlaceholders(input.subject, placeholders) : null) ??
+    (nl ? `Bevestiging: ${input.formTitle}` : `Confirmation: ${input.formTitle}`);
+
+  const eventCard = input.event
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border:1px solid ${
+        MAIL_COLOR.line
+      };border-radius:18px;overflow:hidden;margin:18px 0"><tr>${mailDateStub({
+        date: input.event.start,
+        locale: nl ? "nl" : "en",
+      })}<td valign="middle" style="padding:18px 20px;font-family:${MAIL_FONT}"><div style="font-size:12px;font-weight:600;color:${
+        MAIL_COLOR.muted
+      }">${nl ? "Gekoppeld evenement" : "Linked event"}</div><div style="margin:4px 0 6px;font-size:18px;font-weight:650;letter-spacing:-.02em;color:${
+        MAIL_COLOR.ink
+      }">${escapeHtml(input.event.title)}</div><div style="font-size:13px;line-height:1.5;color:${
+        MAIL_COLOR.body
+      }">${
+        input.event.location
+          ? `${nl ? "Locatie:" : "Location:"} <strong>${escapeHtml(input.event.location)}</strong><br>`
+          : ""
+      }${nl ? "Het agenda-bestand (.ics) is als bijlage toegevoegd." : "The calendar invite (.ics) has been attached."}</div></td></tr></table>`
+    : "";
+
+  const answersHtml =
+    input.includeAnswers && input.answers.length > 0
+      ? `<div style="margin-top:20px"><div style="font-family:${MAIL_FONT};font-size:14px;font-weight:600;color:${
+          MAIL_COLOR.ink
+        };margin-bottom:8px">${
+          nl ? "Dit vulde je in:" : "This is what you filled in:"
+        }</div>${mailInfoTable([...input.answers])}</div>`
+      : "";
+
+  const html = mailDocument({
+    lang: input.locale,
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: "VTK Formulieren" })}${mailContentRow(
+      `${mailHeading(input.formTitle)}${mailParagraph(greeting)}${mailParagraph(
+        intro,
+      )}${answersHtml}${eventCard}`,
+    )}${mailFooterRow(nl ? "VTK Formulieren · vtk.be" : "VTK Forms · vtk.be")}`,
+  });
+
   return {
     to: input.recipient,
-    subject:
-      (input.subject ? fillPlaceholders(input.subject, placeholders) : null) ??
-      (nl ? `Bevestiging: ${input.formTitle}` : `Confirmation: ${input.formTitle}`),
+    subject,
     text: parts.join("\n"),
+    html,
     attachments,
   };
 }
@@ -139,9 +197,24 @@ export function notificationMail(input: {
   entryCount: number;
 }) {
   const who = input.submitterName || input.submitterEmail || "iemand";
+  const subject = `[Formulier] Nieuwe inzending: ${input.formTitle}`;
+
+  const html = mailDocument({
+    lang: "nl",
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: "VTK Formulieren" })}${mailContentRow(
+      `${mailHeading("Nieuwe inzending")}${mailParagraph(
+        `<strong>${escapeHtml(who)}</strong> vulde "${escapeHtml(input.formTitle)}" in:`,
+      )}${mailInfoTable([...input.answers])}<div style="margin:22px 0 10px">${mailButton(
+        formUrl(input.slug, "nl"),
+        "Bekijk alle inzendingen",
+      )}</div>`,
+    )}${mailFooterRow(`In totaal ${input.entryCount} inzending(en) voor dit formulier.`)}`,
+  });
+
   return {
     to: input.recipients.join(", "),
-    subject: `[Formulier] Nieuwe inzending: ${input.formTitle}`,
+    subject,
     text: [
       `${who} vulde "${input.formTitle}" in.`,
       "",
@@ -149,6 +222,7 @@ export function notificationMail(input: {
       "",
       `Alle inzendingen (${input.entryCount}): ${formUrl(input.slug, "nl")}`,
     ].join("\n"),
+    html,
   };
 }
 
@@ -159,15 +233,36 @@ export function digestMail(input: {
   count: number;
   total: number;
 }) {
+  const subject = `[Formulier] ${input.count} nieuwe inzending(en): ${input.formTitle}`;
+
+  const html = mailDocument({
+    lang: "nl",
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: "VTK Formulieren" })}${mailContentRow(
+      `${mailHeading("Overzicht inzendingen")}${mailParagraph(
+        `Er kwamen <strong>${input.count}</strong> nieuwe inzending(en) binnen voor "${escapeHtml(
+          input.formTitle,
+        )}".`,
+      )}${mailNoticeBox(
+        `In totaal staan er nu ${input.total} geregistreerde inzendingen in het beheer.`,
+        "Totaal aantal inzendingen",
+      )}<div style="margin:22px 0 10px">${mailButton(
+        formUrl(input.slug, "nl"),
+        "Bekijk alle inzendingen",
+      )}</div>`,
+    )}${mailFooterRow("VTK Formulieren · Dagelijkse samenvatting")}`,
+  });
+
   return {
     to: input.recipients.join(", "),
-    subject: `[Formulier] ${input.count} nieuwe inzending(en): ${input.formTitle}`,
+    subject,
     text: [
       `Er kwamen ${input.count} nieuwe inzendingen binnen voor "${input.formTitle}".`,
       `In totaal staan er nu ${input.total}.`,
       "",
       formUrl(input.slug, "nl"),
     ].join("\n"),
+    html,
   };
 }
 
@@ -186,11 +281,45 @@ export function draftReminderMail(input: {
     timeZone: "Europe/Brussels",
   }).format(input.closesAt);
 
+  const subject = nl
+    ? `Je inzending voor ${input.formTitle} is nog niet verstuurd`
+    : `Your entry for ${input.formTitle} has not been submitted yet`;
+
+  const greeting = input.recipientName
+    ? nl
+      ? `Dag ${input.recipientName},`
+      : `Hi ${input.recipientName},`
+    : nl
+      ? "Dag,"
+      : "Hi,";
+
+  const html = mailDocument({
+    lang: input.locale,
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: "VTK Formulieren" })}${mailContentRow(
+      `${mailHeading(
+        nl ? "Inzending nog niet verstuurd" : "Entry not yet submitted",
+      )}${mailParagraph(greeting)}${mailParagraph(
+        nl
+          ? `Je begon aan "<strong>${escapeHtml(
+              input.formTitle,
+            )}</strong>", maar je inzending werd nog niet voltooid.`
+          : `You started "<strong>${escapeHtml(
+              input.formTitle,
+            )}</strong>", but your submission was not finalized.`,
+      )}${mailNoticeBox(
+        nl ? `Het formulier sluit op ${deadline}.` : `The form closes on ${deadline}.`,
+        nl ? "Sluitingsmoment" : "Deadline",
+      )}<div style="margin:22px 0 10px">${mailButton(
+        formUrl(input.slug, input.locale),
+        nl ? "Maak je inzending af" : "Complete your submission",
+      )}</div>`,
+    )}${mailFooterRow(nl ? "VTK Formulieren · vtk.be" : "VTK Forms · vtk.be")}`,
+  });
+
   return {
     to: input.recipient,
-    subject: nl
-      ? `Je inzending voor ${input.formTitle} is nog niet verstuurd`
-      : `Your entry for ${input.formTitle} has not been submitted yet`,
+    subject,
     text: [
       input.recipientName ? (nl ? `Dag ${input.recipientName},` : `Hi ${input.recipientName},`) : nl ? "Dag," : "Hi,",
       "",
@@ -202,5 +331,6 @@ export function draftReminderMail(input: {
       "",
       nl ? "Groeten,\nVTK" : "Regards,\nVTK",
     ].join("\n"),
+    html,
   };
 }

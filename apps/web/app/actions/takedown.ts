@@ -122,6 +122,7 @@ export async function submitTakedownAction(
       replyTo: `${submission.name} <${submission.email}>`,
       subject: body.subject,
       text: body.text,
+      html: body.html,
     },
     { source: "takedowns" },
   );

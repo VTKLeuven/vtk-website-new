@@ -7,12 +7,23 @@
  * bestand houdt enkel de berichten over die over broodjes gaan.
  */
 import { sendMail } from '@/lib/email';
+import {
+  mailButton,
+  mailContentRow,
+  mailDocument,
+  mailFooterRow,
+  mailHeaderRow,
+  mailHeading,
+  mailInfoTable,
+  mailNoticeBox,
+  mailParagraph,
+} from '@/lib/mailDesign';
 
 type MailUser = { name: string; email: string; locale: 'NL' | 'EN' };
 
 /** Onderwerp en tekst, los van het versturen, zodat /admin/it/flows exact
  *  dezelfde mail kan tonen als de ontvanger krijgt. */
-export type TheokotMail = { subject: string; text: string };
+export type TheokotMail = { subject: string; text: string; html: string };
 
 /**
  * Bericht dat een gereserveerd broodje voor een grocomeet of bureau niet meer
@@ -25,14 +36,42 @@ export function meetingReservationInvalidatedMail(
   meeting: { meetingLabel: string; dateLabel: string; reason: string; url: string },
 ): TheokotMail {
   const nl = user.locale !== 'EN';
-  return {
-    subject: nl
-      ? `${meeting.meetingLabel}: je broodje van ${meeting.dateLabel} kan niet meer`
-      : `${meeting.meetingLabel}: your sandwich for ${meeting.dateLabel} is no longer available`,
-    text: nl
-      ? `Dag ${user.name},\n\nJe reserveerde een broodje voor de ${meeting.meetingLabel} van ${meeting.dateLabel}, maar dat kan niet meer: ${meeting.reason}\n\nKies een ander broodje (of enkel een drankje) op ${meeting.url}\n\nGroeten,\nVTK`
-      : `Hi ${user.name},\n\nYou reserved a sandwich for the ${meeting.meetingLabel} of ${meeting.dateLabel}, but it is no longer possible: ${meeting.reason}\n\nPick another sandwich (or just a drink) at ${meeting.url}\n\nRegards,\nVTK`,
-  };
+  const subject = nl
+    ? `${meeting.meetingLabel}: je broodje van ${meeting.dateLabel} kan niet meer`
+    : `${meeting.meetingLabel}: your sandwich for ${meeting.dateLabel} is no longer available`;
+
+  const text = nl
+    ? `Dag ${user.name},\n\nJe reserveerde een broodje voor de ${meeting.meetingLabel} van ${meeting.dateLabel}, maar dat kan niet meer: ${meeting.reason}\n\nKies een ander broodje (of enkel een drankje) op ${meeting.url}\n\nGroeten,\nVTK`
+    : `Hi ${user.name},\n\nYou reserved a sandwich for the ${meeting.meetingLabel} of ${meeting.dateLabel}, but it is no longer possible: ${meeting.reason}\n\nPick another sandwich (or just a drink) at ${meeting.url}\n\nRegards,\nVTK`;
+
+  const info = mailInfoTable([
+    { label: nl ? 'Vergadering' : 'Meeting', value: meeting.meetingLabel },
+    { label: nl ? 'Datum' : 'Date', value: meeting.dateLabel },
+    { label: nl ? 'Reden' : 'Reason', value: meeting.reason },
+  ]);
+
+  const html = mailDocument({
+    lang: nl ? 'nl' : 'en',
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: 'Theokot' })}${mailContentRow(
+      `${mailHeading(nl ? 'Broodje niet beschikbaar' : 'Sandwich not available')}${mailParagraph(
+        nl ? `Dag ${user.name},` : `Hi ${user.name},`,
+      )}${mailParagraph(
+        nl
+          ? `Je reserveerde een broodje voor de ${meeting.meetingLabel} van ${meeting.dateLabel}, maar dat kan helaas niet meer doorgaan:`
+          : `You reserved a sandwich for the ${meeting.meetingLabel} of ${meeting.dateLabel}, but it is no longer available:`,
+      )}${info}${mailParagraph(
+        nl
+          ? 'Kies gerust een ander broodje (of enkel een drankje) via de knop hieronder:'
+          : 'Feel free to pick another sandwich (or just a drink) via the button below:',
+      )}<div style="margin:22px 0">${mailButton(
+        meeting.url,
+        nl ? 'Kies een ander broodje' : 'Pick another sandwich',
+      )}</div>`,
+    )}${mailFooterRow('Theokot VTK · vtk.be/theokot')}`,
+  });
+
+  return { subject, text, html };
 }
 
 export async function sendMeetingReservationInvalidated(
@@ -59,14 +98,39 @@ export function noShowWarningMail(
   sessionDateLabel: string,
 ): TheokotMail {
   const nl = user.locale !== 'EN';
-  return {
-    subject: nl
-      ? 'Theokot: je bestelling werd niet opgehaald'
-      : 'Theokot: your order was not picked up',
-    text: nl
-      ? `Dag ${user.name},\n\nJe hebt broodjes gereserveerd bij Theokot voor ${sessionDateLabel}, maar deze werden niet opgehaald.\n\nGereserveerde broodjes die niet worden afgehaald, gaan verloren. Herhaaldelijk niet komen opdagen kan leiden tot een tijdelijke schorsing van het reservatiesysteem.\n\nGroeten,\nTheokot VTK`
-      : `Hi ${user.name},\n\nYou reserved sandwiches at Theokot for ${sessionDateLabel}, but they were not picked up.\n\nReserved sandwiches that are not collected go to waste. Repeatedly not showing up can lead to a temporary suspension from the reservation system.\n\nRegards,\nTheokot VTK`,
-  };
+  const subject = nl
+    ? 'Theokot: je bestelling werd niet opgehaald'
+    : 'Theokot: your order was not picked up';
+
+  const text = nl
+    ? `Dag ${user.name},\n\nJe hebt broodjes gereserveerd bij Theokot voor ${sessionDateLabel}, maar deze werden niet opgehaald.\n\nGereserveerde broodjes die niet worden afgehaald, gaan verloren. Herhaaldelijk niet komen opdagen kan leiden tot een tijdelijke schorsing van het reservatiesysteem.\n\nGroeten,\nTheokot VTK`
+    : `Hi ${user.name},\n\nYou reserved sandwiches at Theokot for ${sessionDateLabel}, but they were not picked up.\n\nReserved sandwiches that are not collected go to waste. Repeatedly not showing up can lead to a temporary suspension from the reservation system.\n\nRegards,\nTheokot VTK`;
+
+  const html = mailDocument({
+    lang: nl ? 'nl' : 'en',
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: 'Theokot' })}${mailContentRow(
+      `${mailHeading(nl ? 'Bestelling niet opgehaald' : 'Order not picked up')}${mailParagraph(
+        nl ? `Dag ${user.name},` : `Hi ${user.name},`,
+      )}${mailParagraph(
+        nl
+          ? `Je hebt broodjes gereserveerd bij Theokot voor ${sessionDateLabel}, maar deze werden helaas niet opgehaald.`
+          : `You reserved sandwiches at Theokot for ${sessionDateLabel}, but they were not picked up.`,
+      )}${mailNoticeBox(
+        nl
+          ? 'Gereserveerde broodjes die niet worden afgehaald, gaan verloren. Herhaaldelijk niet komen opdagen kan leiden tot een tijdelijke schorsing van het reservatiesysteem.'
+          : 'Reserved sandwiches that are not collected go to waste. Repeatedly not showing up can lead to a temporary suspension from the reservation system.',
+        nl ? 'Belangrijk' : 'Important',
+      )}${mailParagraph(
+        nl
+          ? 'Heb je vragen over je reservatie of liep er iets mis? Laat het gerust weten aan het Theokot-team.'
+          : 'If you have questions about your reservation or if something went wrong, please reach out to the Theokot team.',
+        { muted: true },
+      )}`,
+    )}${mailFooterRow('Theokot VTK · vtk.be/theokot')}`,
+  });
+
+  return { subject, text, html };
 }
 
 export async function sendNoShowWarning(

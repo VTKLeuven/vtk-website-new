@@ -71,6 +71,7 @@ export async function sendContactMessageAction(
       replyTo: `${parsed.message.name} <${parsed.message.email}>`,
       subject: body.subject,
       text: body.text,
+      html: body.html,
     },
     { source: "contact" },
   );

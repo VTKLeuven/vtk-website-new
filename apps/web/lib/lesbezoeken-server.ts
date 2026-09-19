@@ -143,26 +143,64 @@ type NewLesbezoekInput = {
   organisation: { name: string };
 };
 
+import {
+  escapeHtml,
+  mailButton,
+  mailContentRow,
+  mailDocument,
+  mailFooterRow,
+  mailHeaderRow,
+  mailHeading,
+  mailInfoTable,
+  mailParagraph,
+} from "@/lib/mailDesign";
+
 /** Onderwerp en tekst van de melding, los van het versturen. */
 export function newLesbezoekNotificationMail(visit: NewLesbezoekInput): {
   subject: string;
   text: string;
+  html: string;
 } {
   const { date, time } = formatMailMoment(visit.startsAt, "nl");
-  return {
-    subject: `[Lesbezoek] ${visit.organisation.name} — ${visit.course} op ${date}`,
-    text: [
-      `Organisatie: ${visit.organisation.name}`,
-      `Onderwerp: ${visit.subject}`,
-      `Doelgroep: ${visit.audience}`,
-      `Vak: ${visit.course}`,
-      `Wanneer: ${date} om ${time}`,
-      `Professor: ${visit.teacherEmail}`,
-      `Aanvrager: ${visit.requesterEmail ?? "—"}`,
-      "",
-      "Beoordelen doe je in het beheer onder Lesbezoeken.",
-    ].join("\n"),
-  };
+  const subject = `[Lesbezoek] ${visit.organisation.name} — ${visit.course} op ${date}`;
+  const text = [
+    `Organisatie: ${visit.organisation.name}`,
+    `Onderwerp: ${visit.subject}`,
+    `Doelgroep: ${visit.audience}`,
+    `Vak: ${visit.course}`,
+    `Wanneer: ${date} om ${time}`,
+    `Professor: ${visit.teacherEmail}`,
+    `Aanvrager: ${visit.requesterEmail ?? "—"}`,
+    "",
+    "Beoordelen doe je in het beheer onder Lesbezoeken.",
+  ].join("\n");
+
+  const items = [
+    { label: "Organisatie", value: visit.organisation.name },
+    { label: "Onderwerp", value: visit.subject },
+    { label: "Doelgroep", value: visit.audience },
+    { label: "Vak", value: visit.course },
+    { label: "Wanneer", value: `${date} om ${time}` },
+    { label: "Professor", value: visit.teacherEmail },
+    { label: "Aanvrager", value: visit.requesterEmail ?? "—" },
+  ];
+
+  const html = mailDocument({
+    lang: "nl",
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: "VTK Lesbezoeken" })}${mailContentRow(
+      `${mailHeading("Nieuwe lesbezoekaanvraag")}${mailParagraph(
+        `Er is een nieuwe aanvraag voor een lesbezoek binnengekomen van <strong>${escapeHtml(
+          visit.organisation.name,
+        )}</strong>:`,
+      )}${mailInfoTable(items)}<div style="margin:22px 0 10px">${mailButton(
+        "https://vtk.be/admin/lesbezoeken",
+        "Beoordeel in het beheer",
+      )}</div>`,
+    )}${mailFooterRow("VTK Onderwijs · Lesbezoeken · vtk.be/admin/lesbezoeken")}`,
+  });
+
+  return { subject, text, html };
 }
 
 export async function notifyNewLesbezoek(visit: NewLesbezoekInput): Promise<void> {

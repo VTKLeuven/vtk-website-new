@@ -11,41 +11,87 @@
  * gelezen op een telefoon naast een looppiste.
  */
 
-export type UrenloopCodeMail = { subject: string; text: string };
+import {
+  mailCodeBox,
+  mailContentRow,
+  mailDocument,
+  mailFooterRow,
+  mailHeaderRow,
+  mailHeading,
+  mailNoticeBox,
+  mailParagraph,
+} from "@/lib/mailDesign";
+
+export type UrenloopCodeMail = { subject: string; text: string; html: string };
 
 export function urenloopDownloadCodeMail(input: {
   code: string;
   minutes: number;
 }): UrenloopCodeMail {
-  return {
-    subject: `Je code voor de 24urenloop-app: ${input.code}`,
-    text: [
-      "Hallo,",
-      "",
-      `Je code om de 24urenloop-app te downloaden is: ${input.code}`,
-      "",
-      `De code blijft ${input.minutes} minuten geldig en werkt één keer.`,
-      "Vroeg je zelf geen code aan? Dan hoef je niets te doen; zonder de code gebeurt er niets.",
-      "",
-      "VTK Leuven",
-    ].join("\n"),
-  };
+  const subject = `Je code voor de 24urenloop-app: ${input.code}`;
+  const text = [
+    "Hallo,",
+    "",
+    `Je code om de 24urenloop-app te downloaden is: ${input.code}`,
+    "",
+    `De code blijft ${input.minutes} minuten geldig en werkt één keer.`,
+    "Vroeg je zelf geen code aan? Dan hoef je niets te doen; zonder de code gebeurt er niets.",
+    "",
+    "VTK Leuven",
+  ].join("\n");
+
+  const html = mailDocument({
+    lang: "nl",
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: "24urenloop" })}${mailContentRow(
+      `${mailHeading("Code 24urenloop-app")}${mailParagraph("Hallo,")}${mailParagraph(
+        "Hier is je persoonlijke code om de 24urenloop-app te downloaden:",
+      )}${mailCodeBox(
+        input.code,
+        `Geldig voor ${input.minutes} minuten · éénmalig gebruik`,
+      )}${mailNoticeBox(
+        "Vroeg je zelf geen code aan? Dan hoef je niets te doen; zonder deze code gebeurt er niets.",
+        "Veiligheid",
+      )}`,
+    )}${mailFooterRow("24urenloop VTK Leuven · vtk.be")}`,
+  });
+
+  return { subject, text, html };
 }
 
 export function urenloopPairCodeMail(input: { code: string; minutes: number }): UrenloopCodeMail {
-  return {
-    subject: `Je code om de 24urenloop-app te koppelen: ${input.code}`,
-    text: [
-      "Hallo,",
-      "",
-      `Je code om deze computer aan de 24urenloop-app te koppelen is: ${input.code}`,
-      "",
-      `De code blijft ${input.minutes} minuten geldig en werkt één keer.`,
-      "Koppelen zorgt dat de app zelf nieuwe versies vindt; de app werkt ook zonder.",
-      "",
-      "Vroeg je zelf geen code aan? Dan hoef je niets te doen.",
-      "",
-      "VTK Leuven",
-    ].join("\n"),
-  };
+  const subject = `Je code om de 24urenloop-app te koppelen: ${input.code}`;
+  const text = [
+    "Hallo,",
+    "",
+    `Je code om deze computer aan de 24urenloop-app te koppelen is: ${input.code}`,
+    "",
+    `De code blijft ${input.minutes} minuten geldig en werkt één keer.`,
+    "Koppelen zorgt dat de app zelf nieuwe versies vindt; de app werkt ook zonder.",
+    "",
+    "Vroeg je zelf geen code aan? Dan hoef je niets te doen.",
+    "",
+    "VTK Leuven",
+  ].join("\n");
+
+  const html = mailDocument({
+    lang: "nl",
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: "24urenloop" })}${mailContentRow(
+      `${mailHeading("Computer koppelen")}${mailParagraph("Hallo,")}${mailParagraph(
+        "Gebruik de onderstaande code om deze computer te koppelen aan de 24urenloop-app:",
+      )}${mailCodeBox(
+        input.code,
+        `Geldig voor ${input.minutes} minuten · éénmalig gebruik`,
+      )}${mailParagraph(
+        "Koppelen zorgt dat de app zelf nieuwe versies vindt; de app werkt ook zonder.",
+        { muted: true },
+      )}${mailNoticeBox(
+        "Vroeg je zelf geen koppelcode aan? Dan hoef je niets te doen.",
+        "Veiligheid",
+      )}`,
+    )}${mailFooterRow("24urenloop VTK Leuven · vtk.be")}`,
+  });
+
+  return { subject, text, html };
 }

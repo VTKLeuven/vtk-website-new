@@ -78,6 +78,22 @@ const timeFormat = new Intl.DateTimeFormat('nl-BE', {
   minute: '2-digit',
 });
 
+import {
+  MAIL_COLOR,
+  MAIL_FONT,
+  escapeHtml,
+  mailButton,
+  mailContentRow,
+  mailDateStub,
+  mailDocument,
+  mailFooterRow,
+  mailHeaderRow,
+  mailHeading,
+  mailNoticeBox,
+  mailParagraph,
+  mailPill,
+} from '@/lib/mailDesign';
+
 export type ReminderShift = {
   name: string;
   startTime: Date;
@@ -94,7 +110,7 @@ export function shiftReminderMail(
   lead: ReminderLead['key'],
   user: { name: string; locale: 'NL' | 'EN' },
   shift: ReminderShift,
-): { subject: string; text: string } {
+): { subject: string; text: string; html: string } {
   const nl = user.locale !== 'EN';
   const when = (nl ? dateTimeFormat : dateTimeFormatEn).format(shift.startTime);
   const until = timeFormat.format(shift.endTime);
@@ -151,7 +167,73 @@ export function shiftReminderMail(
         'VTK',
       ];
 
-  return { subject, text: lines.join('\n') };
+  const headingText =
+    lead === 'dayBefore'
+      ? nl
+        ? 'Morgen sta je ingepland'
+        : 'Scheduled for tomorrow'
+      : nl
+        ? 'Straks sta je ingepland'
+        : 'Your shift starts soon';
+
+  const noticeText =
+    lead === 'dayBefore'
+      ? nl
+        ? 'Uitschrijven kan vanaf nu niet meer via de site. Kan je toch niet, laat het dan zo snel mogelijk weten aan de verantwoordelijke.'
+        : 'You can no longer unregister through the website. If you really cannot make it, tell the person in charge as soon as possible.'
+      : nl
+        ? 'Kan je toch niet komen, laat het dan meteen weten aan de verantwoordelijke.'
+        : 'If you cannot make it after all, tell the person in charge right away.';
+
+  const rewardLabel =
+    shift.reward > 0
+      ? nl
+        ? shift.reward === 1
+          ? '1 bonnetje'
+          : `${shift.reward} bonnetjes`
+        : shift.reward === 1
+          ? '1 token'
+          : `${shift.reward} tokens`
+      : null;
+
+  const card = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border:1px solid ${MAIL_COLOR.line};border-radius:18px;overflow:hidden"><tr>${mailDateStub(
+    { date: shift.startTime, locale: nl ? 'nl' : 'en' },
+  )}<td valign="middle" style="padding:18px 20px;font-family:${MAIL_FONT}"><div style="font-size:12px;font-weight:600;color:${MAIL_COLOR.muted}">${nl ? 'Shift' : 'Shift'}</div><div style="margin:4px 0 6px;font-size:18px;font-weight:650;letter-spacing:-.02em;color:${MAIL_COLOR.ink}">${escapeHtml(
+    shift.name,
+  )}</div><div style="font-size:13px;line-height:1.5;color:${MAIL_COLOR.body}"><strong>${escapeHtml(
+    when,
+  )}</strong> ${nl ? 'tot' : 'until'} <strong>${escapeHtml(until)}</strong><br>${
+    nl ? 'Locatie:' : 'Location:'
+  } ${escapeHtml(shift.location)}</div>${
+    rewardLabel ? `<div style="margin-top:10px">${mailPill(rewardLabel, 'yellow')}</div>` : ''
+  }</td></tr></table>`;
+
+  const html = mailDocument({
+    lang: nl ? 'nl' : 'en',
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: 'VTK Shiften' })}${mailContentRow(
+      `${mailHeading(headingText)}${mailParagraph(
+        nl ? `Dag ${user.name},` : `Hi ${user.name},`,
+      )}${mailParagraph(
+        lead === 'dayBefore'
+          ? nl
+            ? 'Morgen sta je ingepland voor een shift bij VTK:'
+            : 'You are scheduled for a shift with VTK tomorrow:'
+          : nl
+            ? 'Straks begint je shift bij VTK:'
+            : 'Your VTK shift starts soon:',
+      )}${card}${mailNoticeBox(noticeText, nl ? 'Aandachtspunt' : 'Important')}<div style="margin-top:22px">${mailButton(
+        'https://vtk.be/shift',
+        nl ? 'Bekijk je shiften' : 'View your shifts',
+      )}</div>`,
+    )}${mailFooterRow(
+      nl
+        ? 'Je krijgt deze herinnering omdat je ingeschreven bent voor deze shift. Herinneringen beheer je in je profiel op vtk.be.'
+        : 'You received this reminder because you signed up for this shift. Manage reminders in your profile on vtk.be.',
+    )}`,
+  });
+
+  return { subject, text: lines.join('\n'), html };
 }
 
 const FROM = 'VTK Shiften <shiften@vtk.be>';

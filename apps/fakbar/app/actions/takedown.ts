@@ -122,6 +122,7 @@ export async function submitTakedownAction(_prev: SaveState, formData: FormData)
     replyTo: `${submission.name} <${submission.email}>`,
     subject: body.subject,
     text: body.text,
+    html: body.html,
   });
 
   // Mislukt de mail, dan staat het verzoek er nog steeds. Dat is geen fout voor

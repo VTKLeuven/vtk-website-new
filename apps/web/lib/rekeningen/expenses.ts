@@ -251,23 +251,63 @@ export function expenseReportFilename(expense: {
  * tonen als wat er straks vertrekt. Twee plekken die "ongeveer hetzelfde"
  * opstellen, lopen na één bewerking uiteen, en dan liegt het voorbeeld.
  */
+import {
+  escapeHtml,
+  mailContentRow,
+  mailDocument,
+  mailFooterRow,
+  mailHeaderRow,
+  mailHeading,
+  mailInfoTable,
+  mailNoticeBox,
+  mailParagraph,
+} from "@/lib/mailDesign";
+
 export function expenseMailDraft(expense: {
   postLabel: string;
   payerName: string;
   description: string;
   amountCents: number;
-}): { subject: string; body: string } {
+}): { subject: string; body: string; html: string } {
+  const subject = `[REKENING] ${expense.postLabel} - ${expense.payerName}`;
+  const body = [
+    "Dag,",
+    "",
+    `In bijlage de rekening "${expense.description}" van ${expense.payerName} (post ${expense.postLabel}), ` +
+      `voor ${formatEuro(expense.amountCents)}.`,
+    "",
+    "Met vriendelijke groeten,",
+    "VTK",
+  ].join("\n");
+
+  const items = [
+    { label: "Post", value: expense.postLabel },
+    { label: "Ingediend door", value: expense.payerName },
+    { label: "Omschrijving", value: expense.description },
+    { label: "Bedrag", value: formatEuro(expense.amountCents) },
+  ];
+
+  const html = mailDocument({
+    lang: "nl",
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: "VTK Rekeningen" })}${mailContentRow(
+      `${mailHeading("Rekening voor boekhouding")}${mailParagraph("Dag,")}${mailParagraph(
+        `In bijlage vind je de rekening "<strong>${escapeHtml(
+          expense.description,
+        )}</strong>" van <strong>${escapeHtml(expense.payerName)}</strong> voor post <strong>${escapeHtml(
+          expense.postLabel,
+        )}</strong>:`,
+      )}${mailInfoTable(items)}${mailNoticeBox(
+        "Het declaratieoverzicht en het bijbehorende bonnetje zijn samengevoegd als pdf in de bijlage van deze mail.",
+        "Bijlagen",
+      )}`,
+    )}${mailFooterRow("VTK Penning · Boekhouding · vtk.be")}`,
+  });
+
   return {
-    subject: `[REKENING] ${expense.postLabel} - ${expense.payerName}`,
-    body: [
-      "Dag,",
-      "",
-      `In bijlage de rekening "${expense.description}" van ${expense.payerName} (post ${expense.postLabel}), ` +
-        `voor ${formatEuro(expense.amountCents)}.`,
-      "",
-      "Met vriendelijke groeten,",
-      "VTK",
-    ].join("\n"),
+    subject,
+    body,
+    html,
   };
 }
 

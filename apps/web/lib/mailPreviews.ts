@@ -53,7 +53,7 @@ export type MailPreview = {
   file: string;
   subject: string;
   text: string;
-  /** Enkel voor de mails met een opmaak; de rest is bewust platte tekst. */
+  /** De opgemaakte HTML-versie van het bericht in de VTK-huisstijl. */
   html?: string;
   /** Bijzonderheden die je aan de mail zelf niet ziet. */
   notes?: string[];
@@ -87,8 +87,7 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
     {
       id: "account",
       title: "Accounts",
-      description:
-        "Bewust platte tekst met één link: deze mails moeten door een spamfilter en op elk toestel leesbaar zijn.",
+      description: "De mails voor het aanmaken, bevestigen en herstellen van accounts.",
       mails: accountPreviews(),
     },
     {
@@ -424,6 +423,7 @@ function formPreviews(): MailPreview[] {
       file: "lib/forms/mail.ts",
       subject: confirmation.subject,
       text: confirmation.text,
+      html: confirmation.html,
       notes: [
         "Onderwerp en begeleidende tekst komen per formulier uit de admin; hier staat de standaardtekst omdat dit voorbeeldformulier niets eigen ingevuld heeft.",
         "De antwoorden eronder staan er enkel wanneer de redacteur dat aanvinkte, en een gekoppeld evenement gaat als .ics mee.",
@@ -438,6 +438,7 @@ function formPreviews(): MailPreview[] {
       file: "lib/forms/mail.ts",
       subject: notification.subject,
       text: notification.text,
+      html: notification.html,
     },
   ];
 }
@@ -521,6 +522,7 @@ function notificationPreviews(): MailPreview[] {
       file: "lib/rekeningen/expenses.ts",
       subject: expense.subject,
       text: expense.body,
+      html: expense.html,
       notes: ["Het blad voor de boekhouder en het bonnetje gaan als pdf mee."],
     },
   ];

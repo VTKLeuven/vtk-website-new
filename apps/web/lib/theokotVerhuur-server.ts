@@ -343,13 +343,27 @@ export type NotifyRentalInput = {
  * goedkeuren, en wie klikt hoort eerst te zien welke mail er in zijn naam
  * vertrekt.
  */
+import {
+  escapeHtml,
+  mailButton,
+  mailContentRow,
+  mailDocument,
+  mailFooterRow,
+  mailHeaderRow,
+  mailHeading,
+  mailInfoTable,
+  mailMessageBox,
+  mailNoticeBox,
+  mailParagraph,
+} from "@/lib/mailDesign";
+
 export function newRentalNotificationMail(input: {
   rental: NotifyRentalInput;
   /** Volledige links naar het beslissingsscherm, eenmalig en 30 dagen geldig. */
   approveUrl: string;
   rejectUrl: string;
   adminUrl: string;
-}): { subject: string; text: string } {
+}): { subject: string; text: string; html: string } {
   const { rental } = input;
   const start = formatRentalMoment(rental.startsAt, "nl");
   const end = formatRentalMoment(rental.endsAt, "nl");
@@ -399,9 +413,61 @@ export function newRentalNotificationMail(input: {
     `In het beheer: ${input.adminUrl}`,
   );
 
+  const subject = `[Theokot verhuur] ${rental.responsibleName} — ${start.date}`;
+
+  const items = [
+    { label: "Verantwoordelijke", value: rental.responsibleName },
+    { label: "E-mail", value: rental.email },
+    { label: "Telefoon", value: rental.phone || "—" },
+    { label: "Wanneer", value: `${start.date} van ${start.time} tot ${end.time}${start.date === end.date ? "" : ` (${end.date})`}` },
+    { label: "Activiteit", value: rental.purpose },
+    { label: "Aanwezigen", value: rental.attendees ? String(rental.attendees) : "—" },
+    { label: "Waarborg", value: depositChoiceLabel(rental.depositChoice, "nl") },
+    { label: "Huurder", value: rental.renterType === "INTERNAL" ? "Post / werkgroep VTK" : "Externe huurder" },
+    ...rental.extraAnswers.map((extra) => ({ label: extra.label, value: extra.value })),
+  ];
+
+  const html = mailDocument({
+    lang: "nl",
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: "Theokot Verhuur" })}${mailContentRow(
+      `${mailHeading("Nieuwe verhuuraanvraag")}${mailParagraph(
+        `Er is een nieuwe aanvraag binnengekomen voor de zaalverhuur van Theokot door <strong>${escapeHtml(
+          rental.responsibleName,
+        )}</strong>:`,
+      )}${mailInfoTable(items)}${
+        rental.remarks?.trim() ? mailMessageBox(rental.remarks.trim(), "Opmerkingen van de aanvrager") : ""
+      }${
+        rental.clashes.length > 0
+          ? mailNoticeBox(
+              rental.clashes.map((c) => `• ${c}`).join("\n"),
+              "Let op: mogelijke conflicten",
+            )
+          : ""
+      }${mailParagraph(
+        "De links hieronder openen het beslissingsscherm. Daar zie je welke mail er naar de aanvrager vertrekt en kan je deze vooraf nalezen of aanpassen:",
+      )}<div style="margin:22px 0 16px">${mailButton(
+        input.approveUrl,
+        "Aanvraag goedkeuren",
+      )} <span style="display:inline-block;width:8px"></span> ${mailButton(
+        input.rejectUrl,
+        "Aanvraag weigeren",
+        "secondary",
+      )} <span style="display:inline-block;width:8px"></span> ${mailButton(
+        input.adminUrl,
+        "In beheer bekijken",
+        "secondary",
+      )}</div>${mailNoticeBox(
+        "Beide beslissingslinks werken eenmalig en vervallen na 30 dagen. Zodra er beslist is, doet de andere link niets meer. Er vertrekt nog niets door enkel op de knop te klikken.",
+        "Beslissingslink",
+      )}`,
+    )}${mailFooterRow("Theokot VTK Verhuur · vtk.be/theokot/verhuur")}`,
+  });
+
   return {
-    subject: `[Theokot verhuur] ${rental.responsibleName} — ${start.date}`,
+    subject,
     text: lines.join("\n"),
+    html,
   };
 }
 

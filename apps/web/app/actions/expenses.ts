@@ -381,7 +381,7 @@ export async function sendExpenseAction(
 
   // Dezelfde opsteller als het voorbeeldvenster in het beheer; zie
   // `expenseMailDraft` in lib/rekeningen/expenses.ts.
-  const { subject, body } = expenseMailDraft(expense);
+  const { subject, body, html } = expenseMailDraft(expense);
 
   const sent = await sendMail(
     {
@@ -389,6 +389,7 @@ export async function sendExpenseAction(
       from: config.fromEmail || undefined,
       subject,
       text: body,
+      html,
       attachments: [
         { filename, content: Buffer.from(bytes), contentType: "application/pdf" },
       ],

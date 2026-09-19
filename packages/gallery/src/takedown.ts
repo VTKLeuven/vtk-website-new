@@ -178,6 +178,19 @@ const GALLERY_LABELS: Record<GalleryId, string> = {
  * afzender; die moet een adres blijven dat onze mailserver mag ondertekenen,
  * anders vangt SPF/DKIM het bericht weg. De melder zit in `replyTo`.
  */
+function escapeHtml(value: string): string {
+  return value.replace(/[&<>'"]/g, (ch) => {
+    const map: Record<string, string> = {
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      "'": '&#39;',
+      '"': '&quot;',
+    };
+    return map[ch] ?? ch;
+  });
+}
+
 export function takedownMailBody(input: {
   gallery: GalleryId;
   submission: TakedownSubmission;
@@ -187,7 +200,7 @@ export function takedownMailBody(input: {
   adminUrl: string;
   /** De publieke pagina van het album, om de foto te kunnen bekijken. */
   albumUrl: string;
-}): { subject: string; text: string } {
+}): { subject: string; text: string; html: string } {
   const { submission } = input;
   const lines = [
     `Er is gevraagd om een foto uit de galerij van ${GALLERY_LABELS[input.gallery]} te halen.`,
@@ -209,9 +222,57 @@ export function takedownMailBody(input: {
     'Antwoorden op deze mail gaat rechtstreeks naar de melder.',
   );
 
+  const subject = `Verwijderverzoek foto: ${input.albumTitle}`;
+
+  const FONT = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif";
+  const items = [
+    { label: 'Album', value: input.albumTitle },
+    { label: 'Foto', value: input.photoFilename },
+    { label: 'Reden', value: takedownReasonLabel(submission.reason) },
+    { label: 'Melder', value: `${submission.name} (${submission.email})` },
+  ];
+
+  const rows = items
+    .map(
+      (item, idx) =>
+        `<tr><td valign="top" style="padding:10px 14px;${
+          idx > 0 ? 'border-top:1px solid #e7e8eb;' : ''
+        }font-family:${FONT};font-size:12.5px;font-weight:600;color:#5c667f;white-space:nowrap;width:125px">${escapeHtml(
+          item.label,
+        )}</td><td valign="top" style="padding:10px 14px;${
+          idx > 0 ? 'border-top:1px solid #e7e8eb;' : ''
+        }font-family:${FONT};font-size:14px;color:#0a0f1f;line-height:1.5">${escapeHtml(
+          item.value,
+        )}</td></tr>`,
+    )
+    .join('');
+
+  const tableHtml = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border:1px solid #e7e8eb;border-radius:14px;overflow:hidden;background:#e6ecf5;margin:18px 0">${rows}</table>`;
+
+  const messageBox = submission.message
+    ? `<div style="margin:18px 0;padding:14px 18px;border-left:4px solid #ffd23f;background:#eff2f8;border-radius:0 12px 12px 0;font-family:${FONT}"><div style="font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#5c667f;margin-bottom:6px">Toelichting van de melder</div><div style="font-size:14.5px;line-height:1.6;color:#34405e;white-space:pre-wrap">${escapeHtml(
+        submission.message,
+      )}</div></div>`
+    : '';
+
+  const buttons = `<a href="${escapeHtml(
+    input.adminUrl,
+  )}" style="display:inline-block;background:#0a0f1f;color:#ffffff;border:1px solid #0a0f1f;text-decoration:none;padding:12px 19px;border-radius:999px;font-family:${FONT};font-size:14px;font-weight:700;line-height:1">Verzoek afhandelen</a> <span style="display:inline-block;width:8px"></span> <a href="${escapeHtml(
+    input.albumUrl,
+  )}" style="display:inline-block;background:#ffffff;color:#0a0f1f;border:1px solid #d5d9e4;text-decoration:none;padding:12px 19px;border-radius:999px;font-family:${FONT};font-size:14px;font-weight:700;line-height:1">Album bekijken</a>`;
+
+  const html = `<!doctype html><html lang="nl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(
+    subject,
+  )}</title></head><body style="margin:0;padding:0;background:#eff2f8;color:#0a0f1f;font-family:${FONT}"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background:#eff2f8"><tr><td align="center" style="padding:32px 16px"><!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600"><tr><td><![endif]--><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:600px;background:#ffffff;border:1px solid #e7e8eb;border-radius:18px;overflow:hidden"><tr><td style="padding:16px 26px;background:#0e1a36"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%"><tr><td><img src="https://vtk.be/vtk-logo.png" width="48" alt="VTK" style="display:block;width:48px;height:auto;border:0"></td><td align="right" style="font-family:${FONT};font-size:11.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:#b7c0dc">VTK Galerij (${escapeHtml(
+    GALLERY_LABELS[input.gallery],
+  )})</td></tr></table></td></tr><tr><td style="height:4px;background:#ffd23f;font-size:0;line-height:0">&nbsp;</td></tr><tr><td style="padding:28px 30px 30px"><table role="presentation" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse"><tr><td style="padding:0"><h1 style="margin:0;font-family:${FONT};font-size:26px;font-weight:650;line-height:1.2;letter-spacing:-.02em;color:#0a0f1f">Verwijderverzoek foto</h1><div style="height:4px;margin-top:8px;border-radius:2px;background:#ffd23f;font-size:0;line-height:0">&nbsp;</div></td></tr></table><p style="margin:16px 0;font-family:${FONT};font-size:15.5px;line-height:1.6;color:#34405e">Er is gevraagd om een foto uit de galerij van <strong>${escapeHtml(
+    GALLERY_LABELS[input.gallery],
+  )}</strong> te halen:</p>${tableHtml}${messageBox}<div style="margin:22px 0 10px">${buttons}</div></td></tr><tr><td style="padding:16px 30px;background:#e6ecf5;border-top:1px solid #e7e8eb;font-family:${FONT};font-size:12px;line-height:1.5;color:#5c667f">Antwoorden op deze mail gaat rechtstreeks naar de melder via het antwoordadres.</td></tr></table><!--[if mso]></td></tr></table><![endif]--></td></tr></table></body></html>`;
+
   return {
-    subject: `Verwijderverzoek foto: ${input.albumTitle}`,
+    subject,
     text: lines.join('\n'),
+    html,
   };
 }
 

@@ -63,12 +63,28 @@ export function revalidatePiano(): void {
  * Deze mail is meteen het toegangsbewijs: de bewaking van het kasteel mag ernaar
  * vragen. Zie docs/design-decisions.md, "De bevestigingsmail als bewijs".
  */
+import {
+  MAIL_COLOR,
+  MAIL_FONT,
+  escapeHtml,
+  mailButton,
+  mailContentRow,
+  mailDateStub,
+  mailDocument,
+  mailFooterRow,
+  mailHeaderRow,
+  mailHeading,
+  mailNoticeBox,
+  mailParagraph,
+  mailPill,
+} from "@/lib/mailDesign";
+
 export function pianoConfirmationMail(input: {
   name: string;
   locale: "NL" | "EN";
   startsAt: Date;
   endsAt: Date;
-}): { subject: string; text: string } {
+}): { subject: string; text: string; html: string } {
   const isNl = input.locale !== "EN";
   const dateLocale = isNl ? "nl-BE" : "en-GB";
   const dayFmt = new Intl.DateTimeFormat(dateLocale, {
@@ -84,40 +100,75 @@ export function pianoConfirmationMail(input: {
   });
   const dateStr = dayFmt.format(input.startsAt);
   const timeStr = `${timeFmt.format(input.startsAt)} - ${timeFmt.format(input.endsAt)}`;
-  return {
-    subject: isNl
-      ? `Bevestiging reservatie piano: ${dateStr}`
-      : `Piano booking confirmation: ${dateStr}`,
-    text: isNl
-      ? [
-          `Dag ${input.name},`,
-          "",
-          `Je reservatie voor de piano in lokaal 01.52 van het kasteel Arenberg is bevestigd:`,
-          "",
-          `• Datum: ${dateStr}`,
-          `• Tijdstip: ${timeStr}`,
-          `• Locatie: Lokaal 01.52, kasteel Arenberg`,
-          "",
-          `Hou deze bevestigingsmail bij tijdens het spelen: de bewaking kan ernaar vragen als bewijs.`,
-          "",
-          `Groeten,`,
-          `VTK`,
-        ].join("\n")
-      : [
-          `Hi ${input.name},`,
-          "",
-          `Your reservation for the piano in room 01.52 of Arenberg castle has been confirmed:`,
-          "",
-          `• Date: ${dateStr}`,
-          `• Time: ${timeStr}`,
-          `• Location: Room 01.52, Arenberg castle`,
-          "",
-          `Please keep this confirmation email with you while playing: security may ask for it as proof.`,
-          "",
-          `Best regards,`,
-          `VTK`,
-        ].join("\n"),
-  };
+  const subject = isNl
+    ? `Bevestiging reservatie piano: ${dateStr}`
+    : `Piano booking confirmation: ${dateStr}`;
+
+  const text = isNl
+    ? [
+        `Dag ${input.name},`,
+        "",
+        `Je reservatie voor de piano in lokaal 01.52 van het kasteel Arenberg is bevestigd:`,
+        "",
+        `• Datum: ${dateStr}`,
+        `• Tijdstip: ${timeStr}`,
+        `• Locatie: Lokaal 01.52, kasteel Arenberg`,
+        "",
+        `Hou deze bevestigingsmail bij tijdens het spelen: de bewaking kan ernaar vragen als bewijs.`,
+        "",
+        `Groeten,`,
+        `VTK`,
+      ].join("\n")
+    : [
+        `Hi ${input.name},`,
+        "",
+        `Your reservation for the piano in room 01.52 of Arenberg castle has been confirmed:`,
+        "",
+        `• Date: ${dateStr}`,
+        `• Time: ${timeStr}`,
+        `• Location: Room 01.52, Arenberg castle`,
+        "",
+        `Please keep this confirmation email with you while playing: security may ask for it as proof.`,
+        "",
+        `Best regards,`,
+        `VTK`,
+      ].join("\n");
+
+  const card = `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border:1px solid ${MAIL_COLOR.line};border-radius:18px;overflow:hidden"><tr>${mailDateStub(
+    { date: input.startsAt, locale: isNl ? "nl" : "en" },
+  )}<td valign="middle" style="padding:18px 20px;font-family:${MAIL_FONT}"><div style="font-size:12px;font-weight:600;color:${MAIL_COLOR.muted}">${isNl ? "Pianoreservatie" : "Piano booking"}</div><div style="margin:4px 0 6px;font-size:18px;font-weight:650;letter-spacing:-.02em;color:${MAIL_COLOR.ink}">${isNl ? "Lokaal 01.52 (Kasteel Arenberg)" : "Room 01.52 (Arenberg Castle)"}</div><div style="font-size:13px;line-height:1.5;color:${MAIL_COLOR.body}"><strong>${escapeHtml(
+    dateStr,
+  )}</strong><br>${isNl ? "Tijdstip:" : "Time:"} <strong>${escapeHtml(
+    timeStr,
+  )}</strong></div><div style="margin-top:10px">${mailPill(isNl ? "Geldig bewijs" : "Valid proof", "yellow")}</div></td></tr></table>`;
+
+  const html = mailDocument({
+    lang: isNl ? "nl" : "en",
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: "VTK Piano" })}${mailContentRow(
+      `${mailHeading(isNl ? "Pianoreservatie bevestigd" : "Piano booking confirmed")}${mailParagraph(
+        isNl ? `Dag ${input.name},` : `Hi ${input.name},`,
+      )}${mailParagraph(
+        isNl
+          ? "Je reservatie voor de piano in lokaal 01.52 van het kasteel Arenberg is bevestigd:"
+          : "Your reservation for the piano in room 01.52 of Arenberg castle has been confirmed:",
+      )}${card}${mailNoticeBox(
+        isNl
+          ? "Hou deze bevestigingsmail bij tijdens het spelen: de bewaking van het kasteel kan ernaar vragen als bewijs van reservatie."
+          : "Please keep this confirmation email with you while playing: castle security may ask for it as proof of booking.",
+        isNl ? "Toegangsbewijs" : "Proof of booking",
+      )}<div style="margin:22px 0 10px">${mailButton(
+        "https://vtk.be/cultuur/piano",
+        isNl ? "Bekijk pianokalender" : "View piano schedule",
+      )}</div>`,
+    )}${mailFooterRow(
+      isNl
+        ? "VTK Cultuur · Lokaal 01.52 Kasteel Arenberg · vtk.be"
+        : "VTK Culture · Room 01.52 Arenberg Castle · vtk.be",
+    )}`,
+  });
+
+  return { subject, text, html };
 }
 
 export async function reservePianoSlot(
