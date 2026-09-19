@@ -2041,49 +2041,66 @@
   }
 }
 
+/* De kaart draagt één accent: de gele streep onder de titel en de munt ernaast.
+   Alles wat daarnaast om aandacht vroeg (een groene pil rechtsboven, een gele
+   beloningspil met eigen rand halverwege) is tekst geworden; twee gekleurde
+   pillen op twee hoogtes lazen als twee systemen in één kaart. */
 .vtk-design .shift-tile {
   position: relative;
   display: flex;
   flex-direction: column;
-  padding: 20px 20px;
+  padding: 22px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--surface);
-  box-shadow: 0 4px 16px -10px rgba(14, 26, 54, 0.08);
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.vtk-design .shift-tile:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-2);
+  box-shadow: 0 12px 26px -18px rgba(14, 26, 54, 0.6);
 }
 
 .vtk-design .shift-tile-head {
   display: flex;
-  align-items: flex-start;
+  align-items: baseline;
   justify-content: space-between;
   gap: 8px;
-}
-
-.vtk-design .shift-tile-when {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  flex: 1 1 auto;
 }
 
 .vtk-design .shift-tile-day {
   color: var(--muted);
   font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.05em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
   margin: 0;
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* Wanneer en wat je ervoor krijgt, op één regel: dat zijn de twee dingen
+   waarop je een shift kiest. */
+.vtk-design .shift-tile-time {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 8px;
+}
+
 .vtk-design .shift-tile-hours {
   color: var(--ink);
-  font-size: 18px;
+  font-size: 21px;
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
   margin: 0;
   white-space: nowrap;
@@ -2099,23 +2116,23 @@
   appearance: none;
   -webkit-appearance: none;
   border: none;
+  background: none;
+  padding: 0;
   font: inherit;
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 3px 8px;
-  border-radius: 999px;
-  font-size: 11.5px;
+  font-size: 12px;
   font-weight: 600;
   line-height: 1.2;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
   cursor: pointer;
-  transition: transform 120ms ease;
 }
 
 .vtk-design .shift-spots:hover {
-  transform: translateY(-1px);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .vtk-design .shift-spots::before {
@@ -2127,19 +2144,18 @@
   flex-shrink: 0;
 }
 
+/* Het bolletje draagt de kleur, de tekst de betekenis: zonder vlak eromaan
+   blijft er per kaart één gekleurd vlak over, en dat is de gele streep. */
 .vtk-design .shift-spots.spots-ok {
-  background: var(--ok-bg);
   color: var(--ok-ink);
 }
 
 .vtk-design .shift-spots.spots-low {
-  background: var(--low-bg);
   color: var(--low-ink);
 }
 
 .vtk-design .shift-spots.spots-mine {
-  background: var(--ink);
-  color: var(--paper);
+  color: var(--ink);
 }
 
 .vtk-design .shift-spots.spots-mine::before {
@@ -2147,7 +2163,6 @@
 }
 
 .vtk-design .shift-spots.spots-full {
-  background: var(--full-bg);
   color: var(--full-ink);
 }
 
@@ -2275,9 +2290,9 @@
 }
 
 .vtk-design .shift-tile h4 {
-  margin: 12px 0 0;
+  margin: 14px 0 0;
   color: var(--ink);
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.015em;
   line-height: 1.25;
@@ -2293,77 +2308,41 @@
   background: var(--yellow);
 }
 
-.vtk-design .shift-tile-facts {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-top: 14px;
-  min-height: 38px;
-}
-
+/* Post en plaats staan op één grijze regel. Als kolom van twee regels lieten ze
+   bij Theokot twee keer dezelfde naam zien, en de vaste hoogte eronder liet
+   lucht over in elke kaart. */
 .vtk-design .shift-tile-meta {
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 0;
-  flex: 1 1 auto;
-}
-
-.vtk-design .shift-tile-post {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-weight: 600;
-  font-size: 13px;
-  color: var(--ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.vtk-design .shift-tile-post::before {
-  content: "";
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--navy);
-  flex-shrink: 0;
-}
-
-.vtk-design .shift-tile-loc {
+  margin: 12px 0 0;
   color: var(--muted);
-  font-size: 13px;
-  white-space: nowrap;
+  font-size: 13.5px;
+  line-height: 1.4;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* De beloning is altijd een aantal bonnen, dus ze staat als muntje met het
+   aantal erin en niet als "3 drankbonnen". Het cijfer staat in de munt zelf en
+   niet ernaast in losse muntjes: tellen lukt tot vier, daarna niet meer, en het
+   aantal bonnen ligt niet vast. Het volledige label blijft in `aria-label` en
+   in de tooltip staan. */
 .vtk-design .shift-tile-reward {
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px 8px;
+  justify-content: center;
+  box-sizing: border-box;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
   border-radius: 999px;
-  background: var(--low-bg);
-  color: var(--low-ink);
+  background: var(--yellow);
+  border: 1.5px solid var(--accent-2);
+  color: var(--ink);
   font-size: 13px;
   font-weight: 700;
   line-height: 1;
-  border: 1px solid rgba(122, 78, 5, 0.18);
-  box-shadow: 0 1px 2px rgba(122, 78, 5, 0.08);
-}
-
-.vtk-design .shift-tile-reward-val {
   font-variant-numeric: tabular-nums;
-}
-
-.vtk-design .shift-tile-coin {
-  width: 14px;
-  height: 14px;
-  color: var(--low-ink);
-  flex-shrink: 0;
 }
 
 .vtk-design .shift-tile-foot {
@@ -2372,8 +2351,7 @@
   justify-content: space-between;
   gap: 12px;
   margin-top: auto;
-  padding-top: 16px;
-  border-top: 1px solid var(--rule-soft);
+  padding-top: 22px;
 }
 
 .vtk-design .shift-tile-details {

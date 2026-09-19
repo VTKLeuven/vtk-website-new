@@ -9,7 +9,6 @@ import { registerShift, type MergedShift, type PostNames } from "@/components/sh
 import { ShiftDialog } from "@/components/shift/ShiftDialog";
 import "@/components/shift/shift-board.css";
 import type { ShiftRosterEntry } from "@/lib/shift";
-import { Coins } from "lucide-react";
 
 export type FrontpageShiftItem = {
   id: string;
@@ -156,6 +155,17 @@ export function FrontpageShiftBand({
             }
 
             const postLabelText = shift.post ? postNames[shift.post] ?? shift.post : null;
+            // Post en plaats staan op één regel; bij Theokot heten ze allebei
+            // "Theokot" en stond die naam twee keer onder elkaar.
+            const locationText = shift.location?.trim() ?? "";
+            const factsLine = [
+              postLabelText,
+              locationText && locationText.toLowerCase() !== postLabelText?.toLowerCase()
+                ? locationText
+                : null,
+            ]
+              .filter(Boolean)
+              .join(" · ");
             const rewardText =
               shift.reward > 0
                 ? shift.reward === 1
@@ -193,10 +203,7 @@ export function FrontpageShiftBand({
             return (
               <article key={shift.id} className="shift-tile">
                 <div className="shift-tile-head">
-                  <div className="shift-tile-when" title={spotsTitle}>
-                    <p className="shift-tile-day">{formatShiftTileDay(start, now, locale)}</p>
-                    <p className="shift-tile-hours">{formatTimeRange(start, end)}</p>
-                  </div>
+                  <p className="shift-tile-day">{formatShiftTileDay(start, now, locale)}</p>
                   <div className="shift-spots-wrap">
                     <button
                       type="button"
@@ -248,28 +255,23 @@ export function FrontpageShiftBand({
                   </div>
                 </div>
 
-                <h4>{shift.name}</h4>
-
-                <div className="shift-tile-facts">
-                  <div className="shift-tile-meta">
-                    {postLabelText ? (
-                      <span className="shift-tile-post">{postLabelText}</span>
-                    ) : null}
-                    {shift.location ? (
-                      <span className="shift-tile-loc">{shift.location}</span>
-                    ) : null}
-                  </div>
+                <div className="shift-tile-time">
+                  <p className="shift-tile-hours">{formatTimeRange(start, end)}</p>
                   {shift.reward > 0 ? (
                     <span
                       className="shift-tile-reward"
+                      role="img"
                       title={rewardText ?? undefined}
                       aria-label={rewardText ?? undefined}
                     >
-                      <span className="shift-tile-reward-val">{shift.reward}</span>
-                      <Coins className="shift-tile-coin" aria-hidden="true" />
+                      {shift.reward}
                     </span>
                   ) : null}
                 </div>
+
+                <h4>{shift.name}</h4>
+
+                {factsLine ? <p className="shift-tile-meta">{factsLine}</p> : null}
 
                 <div className="shift-tile-foot">
                   {isRegistered ? (
