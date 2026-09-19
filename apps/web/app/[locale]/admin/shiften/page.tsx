@@ -34,8 +34,9 @@ export default async function AdminShifts({
   const canReward = has("shift.reward");
   const canRanking = has("shift.ranking");
   const canTemplates = has("shift.templates");
+  const canManual = has("shift.manual");
 
-  if (!canEdit && !canReward && !canRanking) {
+  if (!canEdit && !canReward && !canRanking && !canManual) {
     // Wie enkel de sjablonen beheert, heeft hier geen tabblad maar hoort ook
     // niet op "Geen toegang." te botsen: dit is de tab waarachter zijn scherm
     // hangt, en zonder dit lijntje is het nergens te vinden.
@@ -63,7 +64,7 @@ export default async function AdminShifts({
   const now = new Date();
   const { from: fromParam, to: toParam, year: yearParam } = await searchParams;
 
-  // Geselecteerd academiejaar voor ranglijst + bonnetjes (standaard huidige).
+  // Geselecteerd academiejaar voor ranglijst + bonnetjes + manuele shiften (standaard huidige).
   const parsedYear = Number(yearParam);
   const selectedYear = Number.isInteger(parsedYear) ? parsedYear : currentAcademicYear(now);
   const ay = academicYearRangeFor(selectedYear);
@@ -79,10 +80,10 @@ export default async function AdminShifts({
   // `to` is inclusief: tel er een dag bij op voor de exclusieve bovengrens.
   const rangeEnd = new Date(rangeToDay.getFullYear(), rangeToDay.getMonth(), rangeToDay.getDate() + 1);
 
-  const [shiftsRaw, rankingRaw, rewardsRaw, shiftBounds] = await Promise.all([
+  const [shiftsRaw, rankingRaw, rewardsRaw, shiftBounds, manualGrantsRaw, grantYears] = await Promise.all([
     canEdit
       ? prisma.shift.findMany({
-          where: { startTime: { gte: rangeStart, lt: rangeEnd } },
+          where: { startTime: { gte: rangeStart, lt: rangeEnd }, manualGrantId: null },
           orderBy: { startTime: "asc" },
           include: {
             participants: {
@@ -118,14 +119,31 @@ export default async function AdminShifts({
     canRanking || canReward
       ? prisma.shift.aggregate({ _min: { startTime: true }, _max: { endTime: true } })
       : Promise.resolve(null),
+    canManual
+      ? prisma.manualShiftGrant.findMany({
+          where: { academicYear: selectedYear },
+          orderBy: { createdAt: "desc" },
+          include: {
+            user: { select: { id: true, name: true, email: true, rNumber: true } },
+            createdBy: { select: { id: true, name: true } },
+          },
+        })
+      : Promise.resolve([]),
+    canManual
+      ? prisma.manualShiftGrant.findMany({
+          select: { academicYear: true },
+          distinct: ["academicYear"],
+        })
+      : Promise.resolve([]),
   ]);
 
   // Beschikbare academiejaren voor de jaarkiezer: van het vroegste tot het laatste
-  // shift-jaar, plus het huidige en het geselecteerde jaar.
+  // shift-jaar, plus het huidige en het geselecteerde jaar, én manuele toekenningen.
   const yearsSet = new Set<number>([currentAcademicYear(now), selectedYear]);
   const minYear = shiftBounds?._min.startTime ? currentAcademicYear(shiftBounds._min.startTime) : selectedYear;
   const maxYear = shiftBounds?._max.endTime ? currentAcademicYear(shiftBounds._max.endTime) : selectedYear;
   for (let y = minYear; y <= maxYear; y += 1) yearsSet.add(y);
+  for (const gy of grantYears) yearsSet.add(gy.academicYear);
   const availableYears = [...yearsSet].sort((a, b) => b - a);
 
   const shifts = shiftsRaw.map((s) => ({
@@ -203,6 +221,22 @@ export default async function AdminShifts({
   }
   const rewards = [...rewardMap.values()];
 
+  const manualGrants = manualGrantsRaw.map((g) => ({
+    id: g.id,
+    createdAt: g.createdAt,
+    userId: g.userId,
+    userName: g.user.name,
+    userEmail: g.user.email,
+    userRNumber: g.user.rNumber,
+    count: g.count,
+    post: g.post,
+    reason: g.reason,
+    academicYear: g.academicYear,
+    reward: g.reward,
+    payedOut: g.payedOut,
+    createdByName: g.createdBy?.name ?? null,
+  }));
+
   // Postkeuzes voor nieuwe/te bewerken shiften: de codes van de actieve posten.
   // Gedeactiveerde posten vallen weg uit de keuzes; hun historiek op oude shiften
   // blijft wel als opgeslagen tekst bestaan.
@@ -221,10 +255,11 @@ export default async function AdminShifts({
       <h1 className="text-2xl font-semibold">{locale === "nl" ? "Shiften" : "Shifts"}</h1>
       <ShiftAdmin
         locale={locale}
-        capabilities={{ canEdit, canReward, canRanking }}
+        capabilities={{ canEdit, canReward, canRanking, canManual }}
         shifts={shifts}
         ranking={ranking}
         rewards={rewards}
+        manualGrants={manualGrants}
         postOptions={postOptions}
         userPostCodes={userPostCodes}
         isSuperAdmin={session.user.isSuperAdmin}

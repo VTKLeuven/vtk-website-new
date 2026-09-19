@@ -94,7 +94,7 @@ export default async function FrontpagePreview({
     publicInterestCounts(eventIds),
     viewerInterests(eventIds, session.user.id),
     prisma.shift.findMany({
-      where: { endTime: { gte: now } },
+      where: { endTime: { gte: now }, manualGrantId: null },
       orderBy: { startTime: "asc" },
       take: 24,
       select: {

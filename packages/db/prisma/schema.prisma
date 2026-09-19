@@ -676,6 +676,8 @@ model User {
   dashboardTilePrefs   UserDashboardTilePref[]
   adminNavPins         UserAdminNavPin[]
   participatingShifts  ShiftParticipant[]
+  manualShiftGrants        ManualShiftGrant[] @relation("UserManualShiftGrants")
+  createdManualShiftGrants ManualShiftGrant[] @relation("CreatedManualShiftGrants")
   createdShortLinks    ShortLink[]             @relation("ShortLinkCreatedBy")
   alumniContacts       AlumniContact[]         @relation("AlumniContactCreatedBy")
   accountEmailTokens   AccountEmailToken[]     @relation("AccountEmailTokenUser")
@@ -2753,7 +2755,12 @@ model Shift {
   sourceSystem String?
   sourceId     String?
 
+  /// Gekoppelde manuele toekenning (overdracht vorige website, etc.).
+  manualGrantId String?
+  manualGrant   ManualShiftGrant? @relation(fields: [manualGrantId], references: [id], onDelete: Cascade)
+
   @@unique([sourceSystem, sourceId])
+  @@index([manualGrantId])
 }
 
 model ShiftParticipant {
@@ -2781,6 +2788,36 @@ model ShiftParticipant {
   reminderSoonAt      DateTime?
 
   @@id([shiftId, userId])
+}
+
+/// Manueel toegekende extra shiften (overdracht vorige website, etc.).
+/// Beheerd via /admin/shiften onder het recht `shift.manual`.
+/// Maakt gekoppelde Shift- en ShiftParticipant-rijen aan zodat alle
+/// bestaande queries (ranking, medewerkersstatus/voorverkoop, historiek)
+/// automatisch mee optellen.
+model ManualShiftGrant {
+  id           String   @id @default(cuid())
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  userId       String
+  user         User     @relation("UserManualShiftGrants", fields: [userId], references: [id], onDelete: Cascade)
+
+  count        Int
+  post         String?
+  reason       String
+  academicYear Int
+  reward       Int      @default(0)
+  payedOut     Boolean  @default(true)
+
+  createdById  String?
+  createdBy    User?    @relation("CreatedManualShiftGrants", fields: [createdById], references: [id], onDelete: SetNull)
+
+  shifts       Shift[]
+
+  @@index([userId])
+  @@index([academicYear])
+  @@index([createdAt])
 }
 
 // -----------------------------------------------------------------------------

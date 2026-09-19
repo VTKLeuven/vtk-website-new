@@ -99,6 +99,7 @@ export const AUDIT_ENTITIES = {
   shift: { nl: "Shift", en: "Shift", group: "shift" },
   shiftReward: { nl: "Shiftbonnetje", en: "Shift voucher", group: "shift" },
   shiftTemplate: { nl: "Shiftsjabloon", en: "Shift template", group: "shift" },
+  shiftManual: { nl: "Manuele shift", en: "Manual shift", group: "shift" },
   theokotSession: { nl: "Theokotsessie", en: "Theokot session", group: "theokot" },
   theokotProduct: { nl: "Theokotproduct", en: "Theokot product", group: "theokot" },
   theokotOrder: { nl: "Theokotbestelling", en: "Theokot order", group: "theokot" },

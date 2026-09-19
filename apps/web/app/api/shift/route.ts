@@ -36,7 +36,7 @@ export async function GET() {
 
   const now = new Date();
   const shifts = await prisma.shift.findMany({
-    where: { endTime: { gte: now } },
+    where: { endTime: { gte: now }, manualGrantId: null },
     orderBy: { startTime: 'asc' },
     include: { participants: { select: ROSTER_PARTICIPANT_SELECT } },
   });

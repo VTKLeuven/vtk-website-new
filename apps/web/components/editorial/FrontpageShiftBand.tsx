@@ -183,6 +183,7 @@ export function FrontpageShiftBand({
                 participantIds: [],
                 sourceSystem: null,
                 sourceId: null,
+                manualGrantId: null,
                 ...shift,
                 roster: shift.roster,
               },

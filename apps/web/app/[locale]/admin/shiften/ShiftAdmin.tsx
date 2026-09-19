@@ -4,6 +4,7 @@ import type { Locale } from "@vtk/i18n";
 import { ShiftManage } from "./ShiftManage";
 import { ShiftRanking } from "./ShiftRanking";
 import { ShiftRewards } from "./ShiftRewards";
+import { ShiftManual, type ManualGrantRow } from "./ShiftManual";
 
 export type AdminParticipant = {
   userId: string;
@@ -39,9 +40,14 @@ export type RewardRow = {
   outstandingBonnetjes: number;
   outstandingShiftIds: string[];
 };
-export type Capabilities = { canEdit: boolean; canReward: boolean; canRanking: boolean };
+export type Capabilities = {
+  canEdit: boolean;
+  canReward: boolean;
+  canRanking: boolean;
+  canManual: boolean;
+};
 
-type Tab = "manage" | "ranking" | "rewards";
+type Tab = "manage" | "ranking" | "rewards" | "manual";
 
 export function ShiftAdmin({
   locale,
@@ -49,6 +55,7 @@ export function ShiftAdmin({
   shifts,
   ranking,
   rewards,
+  manualGrants = [],
   postOptions,
   userPostCodes = [],
   isSuperAdmin = false,
@@ -62,6 +69,7 @@ export function ShiftAdmin({
   shifts: AdminShift[];
   ranking: RankingRow[];
   rewards: RewardRow[];
+  manualGrants?: ManualGrantRow[];
   postOptions: string[];
   userPostCodes?: string[];
   isSuperAdmin?: boolean;
@@ -75,6 +83,7 @@ export function ShiftAdmin({
     { key: "manage", label: nl ? "Beheer" : "Manage", show: capabilities.canEdit },
     { key: "ranking", label: nl ? "Ranglijst" : "Rankings", show: capabilities.canRanking },
     { key: "rewards", label: nl ? "Bonnetjes" : "Vouchers", show: capabilities.canReward },
+    { key: "manual", label: nl ? "Extra shiften" : "Extra shifts", show: capabilities.canManual },
   ];
   const visible = tabs.filter((t) => t.show);
   const [tab, setTab] = useState<Tab>(visible[0]?.key ?? "manage");
@@ -114,6 +123,15 @@ export function ShiftAdmin({
       )}
       {tab === "rewards" && capabilities.canReward && (
         <ShiftRewards locale={locale} rewards={rewards} year={year} years={years} />
+      )}
+      {tab === "manual" && capabilities.canManual && (
+        <ShiftManual
+          locale={locale}
+          grants={manualGrants}
+          postOptions={postOptions}
+          year={year}
+          years={years}
+        />
       )}
     </div>
   );

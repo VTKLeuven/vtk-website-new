@@ -99,6 +99,9 @@ export const PERMISSIONS = [
   // voor één avond, dit verandert de reeks die iederéén daarna neerzet, en één
   // sjabloon (theokot) hangt aan het automatisch bemannen van een verkoopweek.
   { code: "shift.templates", labelNl: "Shiftsjablonen beheren", labelEn: "Manage shift templates", category: "shift" },
+  // Manueel extra shiften toekennen (bv. overdracht van de vorige website).
+  // Bewust een eigen recht dat enkel admin-users standaard dragen.
+  { code: "shift.manual", labelNl: "Manueel extra shiften toekennen", labelEn: "Manually grant extra shifts", category: "shift" },
 
   // Theokot (cafetaria / broodjesbar)
   { code: "theokot.manage", labelNl: "Theokot beheren (sessies, aanbod, bans, instellingen)", labelEn: "Manage Theokot (sessions, offering, bans, settings)", category: "theokot" },

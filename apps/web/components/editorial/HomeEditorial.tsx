@@ -210,7 +210,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     viewerInterests(eventIds, session?.user.id ?? null),
     // De shiften onder de herotekst én voor de shiftband.
     prisma.shift.findMany({
-      where: { endTime: { gte: now } },
+      where: { endTime: { gte: now }, manualGrantId: null },
       orderBy: { startTime: "asc" },
       take: 40,
       select: {
