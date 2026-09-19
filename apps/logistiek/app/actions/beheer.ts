@@ -2176,6 +2176,36 @@ export async function deleteTransportAction(bookingId: string): Promise<ActionRe
 }
 
 /**
+ * De zin achter "ingepland" of "doorgegeven", over de mail naar de post.
+ *
+ * Drie uitkomsten en geen twee: een post zonder verantwoordelijke verwittig je
+ * zelf, een mail die niet vertrok is meestal de mailserver, en dat zijn twee
+ * verschillende dingen om te gaan doen. Ze allebei als "geen verantwoordelijke"
+ * melden, stuurde het team achter de verkeerde oorzaak aan.
+ */
+function handoverNote(
+  groupName: string,
+  outcome: { leads: number | null; sent: number }
+): { message: string; warning: boolean } {
+  if (outcome.leads === 0) {
+    return {
+      warning: true,
+      message: `Doorgegeven aan ${groupName}, maar die post heeft dit werkingsjaar geen verantwoordelijke; er vertrok geen mail. Verwittig hen zelf.`,
+    };
+  }
+  if (outcome.sent === 0) {
+    return {
+      warning: true,
+      message: `Doorgegeven aan ${groupName}, maar de mail naar de verantwoordelijken vertrok niet. Verwittig hen zelf, en kijk de mailinstellingen na.`,
+    };
+  }
+  return {
+    warning: false,
+    message: `Doorgegeven aan ${groupName}; de verantwoordelijke${outcome.sent === 1 ? '' : 'n'} kreeg${outcome.sent === 1 ? '' : 'en'} een mail om een chauffeur aan te duiden.`,
+  };
+}
+
+/**
  * Een rit aanmaken vanuit de planning (P4).
  *
  * Meteen `APPROVED` en niet `REQUESTED`: het team vraagt niets aan zichzelf. Een
@@ -2199,6 +2229,14 @@ export async function adminCreateTransportAction(
     userId?: string | null;
     eventId?: string | null;
     driverId?: string | null;
+    /**
+     * De post die de rit zelf mag invullen, of null. Hetzelfde als
+     * `assignTripGroupAction` achteraf doet, maar meteen bij het intekenen: het
+     * team plant vaak een rit in precies omdat er nog geen chauffeur is, en die
+     * rit dan eerst opslaan om ze daarna opnieuw te moeten openen, is een stap
+     * die niets beslist.
+     */
+    assignedGroupId?: string | null;
     /** Bewust over een bestaande rit inplannen; zie `overlapAuditNote`. */
     allowOverlap?: boolean;
   }
@@ -2234,6 +2272,30 @@ export async function adminCreateTransportAction(
     return { ok: false, error: 'Deze persoon staat niet in de chauffeurslijst.' };
   }
 
+  // Doorgeven aan een post, met dezelfde twee regels als `assignTripGroupAction`:
+  // de post moet bestaan, en de kar gaat niet mee (die vraagt een goedgekeurde
+  // karchauffeur). Het formulier toont de keuzelijst niet bij de kar, maar een
+  // keuzelijst is de poort niet.
+  const assignedGroupId = input.assignedGroupId?.trim() || null;
+  let assignedGroup: { id: string; nameNl: string } | null = null;
+  if (assignedGroupId) {
+    assignedGroup = await prisma.group.findFirst({
+      where: { id: assignedGroupId, active: true },
+      select: { id: true, nameNl: true },
+    });
+    if (!assignedGroup) return { ok: false, error: 'Die post of werkgroep bestaat niet meer.' };
+    const van = await prisma.uitleenVehicle.findFirst({
+      where: { id: { in: built.bookings.map((booking) => booking.vehicleId) }, needsVanDriver: true },
+      select: { nameNl: true },
+    });
+    if (van) {
+      return {
+        ok: false,
+        error: `${van.nameNl} vraagt een goedgekeurde karchauffeur en kan niet aan een post doorgegeven worden.`,
+      };
+    }
+  }
+
   const outcome = await runSerializable(async (tx) => {
     // Per rit apart, zodat de historiekregel bij de rit staat die effectief
     // over een andere valt.
@@ -2260,6 +2322,7 @@ export async function adminCreateTransportAction(
         // bij het veld in schema.prisma.
         plannedByTeam: true,
         driverId,
+        assignedGroupId: assignedGroup?.id ?? null,
         decidedAt: now,
         decidedById: session.user.id,
         // Het team tekent dit zelf in en vraagt niets aan zichzelf; direct
@@ -2301,15 +2364,35 @@ export async function adminCreateTransportAction(
 
   revalidateBeheer();
   const overlaps = outcome.overlaps ?? [];
+  const base =
+    overlaps.length > 0
+      ? `Ingepland, maar het voertuig staat nu dubbel geboekt: ${overlaps.join('; ')}. Verschuif een van beide.`
+      : built.roundTrip || built.vehicleCount > 1
+        ? 'Ritten ingepland.'
+        : 'Rit ingepland.';
+  if (!assignedGroup) return { ok: true, warning: overlaps.length > 0, message: base };
+
+  // Ná de write, zoals elke mail hier, en per aangemaakte rit: zijn het er meer
+  // dan een (heen en terug, of twee voertuigen), dan zoekt de post voor elk
+  // daarvan een chauffeur en gaat het dus over meer dan een rit.
+  revalidatePath('/ritten');
+  let leads: number | null = 0;
+  let sent = 0;
+  for (const id of outcome.ids ?? []) {
+    const result = await notifyGroupAssignedForTrip(id);
+    // De ritten gaan naar dezelfde post, dus het aantal verantwoordelijken is
+    // overal hetzelfde; het onbekende geval (`null`) wint, want dan weten we het
+    // van deze post niet meer.
+    leads = result.leads === null || leads === null ? null : Math.max(leads, result.leads);
+    sent += result.sent;
+  }
+  const note = handoverNote(assignedGroup.nameNl, { leads, sent });
   return {
     ok: true,
-    warning: overlaps.length > 0,
-    message:
-      overlaps.length > 0
-        ? `Ingepland, maar het voertuig staat nu dubbel geboekt: ${overlaps.join('; ')}. Verschuif een van beide.`
-        : built.roundTrip || built.vehicleCount > 1
-          ? 'Ritten ingepland.'
-          : 'Rit ingepland.',
+    // Gelukt met een staartje: de melding blijft staan tot je ze wegklikt, want
+    // ze vraagt nog iets van je.
+    warning: overlaps.length > 0 || note.warning,
+    message: `${base} ${note.message}`,
   };
 }
 
@@ -2632,15 +2715,8 @@ export async function assignTripGroupAction(
   // Ná de write, zoals elke mail hier. Vertrekt er niets omdat de post geen
   // verantwoordelijke heeft, dan zegt de melding dat: de toewijzing zelf is
   // gelukt, maar ze bereikt zo niemand, en dat wil je weten voor je verder gaat.
-  const sent = await notifyGroupAssignedForTrip(bookingId);
-  return {
-    ok: true,
-    warning: sent === 0,
-    message:
-      sent === 0
-        ? `Doorgegeven aan ${group.nameNl}, maar die post heeft dit werkingsjaar geen verantwoordelijke; er vertrok geen mail. Verwittig hen zelf.`
-        : `Doorgegeven aan ${group.nameNl}; de verantwoordelijke${sent === 1 ? '' : 'n'} kreeg${sent === 1 ? '' : 'en'} een mail om een chauffeur aan te duiden.`,
-  };
+  const note = handoverNote(group.nameNl, await notifyGroupAssignedForTrip(bookingId));
+  return { ok: true, warning: note.warning, message: note.message };
 }
 
 /** Voertuig wisselen: tarief opnieuw snapshotten en de prijs herberekenen. */

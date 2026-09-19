@@ -268,6 +268,7 @@ export function TransportPlanner({
         groupId: '',
         requesterName: '',
         driverId: '',
+        assignedGroupId: '',
         eventId: '',
         purpose: '',
         cargoNote: '',

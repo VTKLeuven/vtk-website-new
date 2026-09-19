@@ -7601,6 +7601,20 @@ werkingsjaar geen verantwoordelijke, dan vertrekt er niets en zégt de melding
 dat: de toewijzing lukte, maar ze bereikt zo niemand, en dat wil je weten voor
 je verder gaat in plaats van een week later.
 
+**De melding kent drie uitkomsten en niet twee.** "Geen verantwoordelijke" en
+"de mail vertrok niet" zijn twee verschillende dingen om te gaan doen: het
+eerste verwittig je zelf, het tweede is meestal de mailserver. Ze allebei als
+"0 verstuurd" melden zag er correct uit en stuurde het team achter de verkeerde
+oorzaak aan; dat kwam pas boven bij een test op een laptop zonder SMTP, waar de
+post twee verantwoordelijken had en het scherm zei dat er geen was.
+
+**Doorgeven kan ook meteen bij het intekenen**, in de transportplanning, en niet
+enkel achteraf op een bestaande rit. Het team plant een rit vaak in precies
+omdat er nog geen chauffeur is; die dan eerst opslaan om ze daarna opnieuw te
+moeten openen, is een stap die niets beslist. Dezelfde twee regels gelden
+(bestaande post, nooit bij de kar), en wisselen naar de kar wist de keuze in
+plaats van ze onzichtbaar mee te sturen.
+
 **Wie de post aanduidt, hoeft geen chauffeur van Logistiek te zijn.** Dat is het
 hele punt. De server aanvaardt een lid van diezelfde post van dit werkingsjaar,
 of iemand die al in de chauffeurslijst staat; iemand anders niet, want een

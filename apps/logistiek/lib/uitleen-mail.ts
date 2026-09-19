@@ -390,8 +390,17 @@ export async function notifyTransport(
  *
  * Dezelfde regels als de rest van dit bestand: aanroepen ná de transactie, en
  * falen mag de toewijzing niet ongedaan maken.
+ *
+ * Geeft `leads` en `sent` los van elkaar terug, want dat zijn twee verschillende
+ * problemen aan de kant van de oproeper: een post zonder verantwoordelijke moet
+ * je zelf verwittigen, terwijl een mail die niet vertrok meestal betekent dat de
+ * mailserver even niet meewilde. Ze allebei als "0 verstuurd" melden stuurde het
+ * team achter de verkeerde oorzaak aan. `leads: null` is de derde mogelijkheid:
+ * het liep ergens mis en we weten het niet.
  */
-export async function notifyGroupAssignedForTrip(bookingId: string): Promise<number> {
+export async function notifyGroupAssignedForTrip(
+  bookingId: string
+): Promise<{ leads: number | null; sent: number }> {
   try {
     const booking = await prisma.uitleenTransportBooking.findUnique({
       where: { id: bookingId },
@@ -408,10 +417,10 @@ export async function notifyGroupAssignedForTrip(bookingId: string): Promise<num
         assignedGroup: { select: { id: true, nameNl: true } },
       },
     });
-    if (!booking?.assignedGroup) return 0;
+    if (!booking?.assignedGroup) return { leads: 0, sent: 0 };
 
     const leads = await groupLeads(booking.assignedGroup.id);
-    if (leads.length === 0) return 0;
+    if (leads.length === 0) return { leads: 0, sent: 0 };
 
     const what = booking.eventName?.trim() || booking.purpose;
     const url = `${logistiekBaseUrl()}/ritten`;
@@ -443,10 +452,10 @@ export async function notifyGroupAssignedForTrip(bookingId: string): Promise<num
         : `${SUBJECT_PREFIX}: driver needed for ${what} (${formatDateOnly(booking.startAt)})`;
       if (await deliver(recipient, subject, text)) sent += 1;
     }
-    return sent;
+    return { leads: leads.length, sent };
   } catch (err) {
     console.error('[uitleen-mail] mail naar de postverantwoordelijke mislukt:', err);
-    return 0;
+    return { leads: null, sent: 0 };
   }
 }
 

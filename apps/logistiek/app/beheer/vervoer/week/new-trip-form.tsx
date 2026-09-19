@@ -44,6 +44,8 @@ export type NewTripValues = {
   /** Enkel bij {@link OTHER_GROUP}: voor wie de rit dan wél rijdt. */
   requesterName: string;
   driverId: string;
+  /** De post die zelf een chauffeur aanduidt, of leeg (Logistiek regelt het). */
+  assignedGroupId: string;
   /** Het evenement waar de rit onder hangt (A8); leeg is geen evenement. */
   eventId: string;
   purpose: string;
@@ -93,6 +95,21 @@ export function NewTripForm({
     setValues((current) => ({ ...current, [key]: value }));
   }
 
+  /**
+   * Van voertuig wisselen haalt een doorgegeven post weg zodra het de kar wordt.
+   * Het veld verdwijnt dan namelijk van het scherm, en een keuze die je niet
+   * meer ziet maar wel nog meegestuurd wordt, is een keuze die je niet gemaakt
+   * hebt; de server weigert ze trouwens toch.
+   */
+  function chooseVehicle(vehicleId: string) {
+    const needsVanDriver = vehicles.find((vehicle) => vehicle.id === vehicleId)?.needsVanDriver ?? false;
+    setValues((current) => ({
+      ...current,
+      vehicleId,
+      assignedGroupId: needsVanDriver ? '' : current.assignedGroupId,
+    }));
+  }
+
   // De uren terugmelden in een effect en niet in de setter: een `setState` van
   // de ouder oproepen binnen een updater draait tijdens de render van dit
   // formulier, en React klaagt daar terecht over ("Cannot update a component
@@ -139,6 +156,7 @@ export function NewTripForm({
         requesterType: isOther ? 'WERKGROEP' : 'INTERN',
         requesterName: isOther ? values.requesterName.trim() : null,
         driverId: values.driverId || null,
+        assignedGroupId: values.assignedGroupId || null,
       });
       if (result.ok) {
         // De actie meldt zelf wanneer de rit bewust over een andere ligt; dat is
@@ -180,7 +198,7 @@ export function NewTripForm({
         Voertuig
         <select
           value={values.vehicleId}
-          onChange={(event) => set('vehicleId', event.target.value)}
+          onChange={(event) => chooseVehicle(event.target.value)}
           className={inputClass}
         >
           {vehicles.map((vehicle) => (
@@ -239,6 +257,34 @@ export function NewTripForm({
           />
         </select>
       </label>
+
+      {/* Doorgeven aan een post, die er zelf iemand op zet. Onder "Chauffeur"
+          omdat het het antwoord is op dezelfde vraag: wie rijdt dit. Enkel bij
+          de auto, want de kar vraagt een goedgekeurde karchauffeur en die keuze
+          is niet aan de post; ze staat er dus niet in plaats van er te staan en
+          te weigeren. */}
+      {!(chosenVehicle?.needsVanDriver ?? false) ? (
+        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+          Post vult zelf in
+          <select
+            value={values.assignedGroupId}
+            onChange={(event) => set('assignedGroupId', event.target.value)}
+            className={inputClass}
+          >
+            <option value="">Logistiek regelt het</option>
+            {groups.map((group) => (
+              <option key={group.id} value={group.id}>
+                {group.name}
+              </option>
+            ))}
+          </select>
+          {values.assignedGroupId ? (
+            <span className="font-normal text-vtk-muted">
+              De verantwoordelijken van die post krijgen een mail om een chauffeur aan te duiden.
+            </span>
+          ) : null}
+        </label>
+      ) : null}
 
       {/* Tussen "voor wie" en "waarvoor": het evenement is de koepel waar die
           twee onder hangen, en zo leest het formulier als één zin. Valt weg
