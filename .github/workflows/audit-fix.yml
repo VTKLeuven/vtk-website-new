@@ -41,10 +41,10 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Set up Node.js
-        uses: actions/setup-node@v5
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 20
           cache: npm
@@ -101,7 +101,7 @@ jobs:
       - name: Create pull request
         id: create-pr
         if: env.has_fix == 'true'
-        uses: peter-evans/create-pull-request@v8
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
           # Een PR die met GITHUB_TOKEN wordt aangemaakt, start geen enkele
           # workflow: de checks blijven leeg en auto-merge komt nooit aan de

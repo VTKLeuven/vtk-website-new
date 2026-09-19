@@ -30,10 +30,10 @@
   },
   "devDependencies": {
     "@vtk/tsconfig": "*",
-    "dotenv-cli": "^7.4.2",
+    "dotenv-cli": "7.4.4",
     "prisma": "^6.19.3",
-    "tsx": "^4.19.2",
-    "typescript": "^5"
+    "tsx": "4.23.13",
+    "typescript": "5.9.3"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

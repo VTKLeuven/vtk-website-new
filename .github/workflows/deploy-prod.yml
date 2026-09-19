@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Check CI test status on main for this commit
         env:
@@ -71,7 +71,7 @@ jobs:
     steps:
       # Enkel nodig om infra/deploy.sh mee te hebben; de runner bouwt niets.
       - name: Checkout deploy script
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           sparse-checkout: infra/deploy.sh
           sparse-checkout-cone-mode: false
@@ -88,7 +88,7 @@ jobs:
           fi
 
       - name: Install SSH key
-        uses: webfactory/ssh-agent@v0.9.1
+        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
         with:
           ssh-private-key: ${{ secrets.PROD_SSH_KEY || secrets.SSH_KEY }}
 

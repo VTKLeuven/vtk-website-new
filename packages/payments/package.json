@@ -11,8 +11,8 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
-    "@types/node": "^20.19.43",
+    "@types/node": "20.19.43",
     "@vtk/tsconfig": "*",
-    "typescript": "^5"
+    "typescript": "5.9.3"
   }
 }

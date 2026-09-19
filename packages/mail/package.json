@@ -12,9 +12,9 @@
     "server-only": "^0.0.1"
   },
   "devDependencies": {
-    "@types/node": "^20.19.43",
-    "@types/nodemailer": "^8.0.1",
+    "@types/node": "20.19.43",
+    "@types/nodemailer": "8.0.2",
     "@vtk/tsconfig": "*",
-    "typescript": "^5"
+    "typescript": "5.9.3"
   }
 }
