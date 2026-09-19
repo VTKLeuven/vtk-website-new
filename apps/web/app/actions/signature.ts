@@ -1,12 +1,18 @@
 "use server";
 
 import { prisma } from "@vtk/db";
-import { requireSession } from "@/lib/session";
+import { requirePermission } from "@/lib/session";
 import { toSingleLine } from "@/lib/contactForm";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 
 /**
  * De handtekening van een lid opslaan op zijn profiel.
+ *
+ * Achter `signature.generate`, hetzelfde recht als de kaart op /account waar dit
+ * formulier staat. Anders is het scherm verborgen maar de action niet. Dat sluit
+ * niemand buiten die deze handtekening nodig heeft: de geseede rol `praesidium`
+ * draagt het recht en geldt voor elk praesidiumlid op elke post, en de posten die
+ * mails versturen (Onderwijs, Theokot) zijn praesidiumposten.
  *
  * Ze stond in `localStorage`, dus ze was weg op een andere browser en de server
  * kon ze niet lezen. Dat laatste is wat telt: de mails van de lesbezoeken en de
@@ -22,7 +28,7 @@ export async function saveSignatureProfileAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  const session = await requireSession();
+  const session = await requirePermission("signature.generate");
 
   const name = toSingleLine(formData.get("signatureName"));
   const roleTitle = toSingleLine(formData.get("signatureRoleTitle"));
