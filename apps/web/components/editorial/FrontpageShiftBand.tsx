@@ -9,6 +9,7 @@ import { registerShift, type MergedShift, type PostNames } from "@/components/sh
 import { ShiftDialog } from "@/components/shift/ShiftDialog";
 import "@/components/shift/shift-board.css";
 import type { ShiftRosterEntry } from "@/lib/shift";
+import { MapPin, Users } from "lucide-react";
 
 export type FrontpageShiftItem = {
   id: string;
@@ -155,17 +156,9 @@ export function FrontpageShiftBand({
             }
 
             const postLabelText = shift.post ? postNames[shift.post] ?? shift.post : null;
-            // Post en plaats staan op één regel; bij Theokot heten ze allebei
-            // "Theokot" en stond die naam twee keer onder elkaar.
             const locationText = shift.location?.trim() ?? "";
-            const factsLine = [
-              postLabelText,
-              locationText && locationText.toLowerCase() !== postLabelText?.toLowerCase()
-                ? locationText
-                : null,
-            ]
-              .filter(Boolean)
-              .join(" · ");
+            const hasPost = Boolean(postLabelText);
+            const hasLocation = Boolean(locationText);
             const rewardText =
               shift.reward > 0
                 ? shift.reward === 1
@@ -273,9 +266,42 @@ export function FrontpageShiftBand({
                   ) : null}
                 </div>
 
-                <h4>{shift.name}</h4>
+                <h4 title={shift.name}>{shift.name}</h4>
 
-                {factsLine ? <p className="shift-tile-meta">{factsLine}</p> : null}
+                {hasPost || hasLocation ? (
+                  <div className="shift-tile-meta">
+                    {hasPost ? (
+                      <span
+                        className="shift-tile-meta-item shift-tile-meta-post"
+                        title={postLabelText!}
+                      >
+                        <Users className="shift-tile-meta-icon" aria-hidden="true" />
+                        <span className="shift-tile-meta-text">{postLabelText}</span>
+                      </span>
+                    ) : null}
+
+                    {hasPost && hasLocation ? (
+                      <span className="shift-tile-meta-sep" aria-hidden="true">
+                        ·
+                      </span>
+                    ) : null}
+
+                    {hasLocation ? (
+                      <span
+                        className="shift-tile-meta-item shift-tile-meta-loc"
+                        tabIndex={0}
+                        title={locationText}
+                        aria-label={locationText}
+                      >
+                        <MapPin className="shift-tile-meta-icon" aria-hidden="true" />
+                        <span className="shift-tile-meta-text">{locationText}</span>
+                        <span className="shift-tile-loc-tooltip" role="tooltip">
+                          {locationText}
+                        </span>
+                      </span>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 <div className="shift-tile-foot">
                   {isRegistered ? (

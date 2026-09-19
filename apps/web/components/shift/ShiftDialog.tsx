@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Globe } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { canUnregister } from '@/lib/shift';
@@ -128,7 +129,9 @@ export function ShiftDialog({
 
   const freeLabel = free === 1 ? t.spots.one : fill(t.spots.few, { n: free });
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <div className="vtk-shift-overlay" onClick={onClose}>
       <div
         className="vtk-shift-dialog"
@@ -272,6 +275,7 @@ export function ShiftDialog({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
