@@ -49,7 +49,7 @@ export const KUL_OIDC_TOKEN_URL =
 // The index signature lets us also read claims we don't name explicitly (uid,
 // sub, ...) when scanning for the r-number.
 type ProfileLike = {
-  email?: string;
+  email?: string | null;
   preferred_username?: string;
   upn?: string;
   name?: string;
@@ -65,7 +65,7 @@ type ProfileLike = {
 /** Best-effort email extraction from an OIDC profile, normalized lower-case. */
 function profileEmail(profile: ProfileLike): string | undefined {
   const raw = profile.email ?? profile.preferred_username ?? profile.upn;
-  return raw ? raw.trim().toLowerCase() : undefined;
+  return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim().toLowerCase() : undefined;
 }
 
 function profileName(profile: ProfileLike): string {

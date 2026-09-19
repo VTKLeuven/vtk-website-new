@@ -339,6 +339,9 @@ export const auth = betterAuth({
   },
 
   advanced: {
+    database: {
+      validateSchema: false,
+    },
     cookiePrefix: process.env.BETTER_AUTH_COOKIE_PREFIX || 'vtk',
     useSecureCookies: isProduction,
     crossSubDomainCookies: {
