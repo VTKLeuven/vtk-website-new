@@ -22,7 +22,7 @@ import {
   getRentalTemplates,
   rentalSenderLabel,
 } from "@/lib/theokotVerhuur-server";
-import { signatureForUser } from "@/lib/mailSignature-server";
+import { signatureForPost, signatureForUser } from "@/lib/mailSignature-server";
 import { rentalMailVars, rentalReplyTo } from "@/lib/theokotVerhuurMail";
 import { siteBaseUrl } from "@/lib/calendar/feeds";
 import { RentalCalendarSubscribe } from "@/components/theokot/RentalCalendarSubscribe";
@@ -137,6 +137,8 @@ export default async function AdminTheokotVerhuurPage({
   // naar dit scherm kijkt. De voorbeelden tonen daarmee wat deze persoon straks
   // effectief onder zijn mail krijgt.
   const signature = await signatureForUser(session.user.id, nl ? "nl" : "en");
+  // De tweede keuze in het antwoordscherm: tekenen met de post.
+  const postSignature = signatureForPost("Theokot", config.notifyEmails[0] ?? "");
 
   const feedBaseUrl = `${siteBaseUrl()}/api/theokot/verhuur/feed/${feedToken}.ics`;
 
@@ -410,6 +412,7 @@ export default async function AdminTheokotVerhuurPage({
             templates={templates}
             senderLabel={rentalSenderLabel()}
             signature={signature}
+            postSignature={postSignature}
             contractAvailable={contractAvailable}
             canManage={canManage}
             feedBaseUrl={feedBaseUrl}

@@ -493,7 +493,9 @@ export async function sendRentalReplyAction(
     subject,
     text: body,
     attachments: attachment ? [attachment] : undefined,
-    signature: await signatureForBody(session.user.id, body),
+    signature: await signatureForBody(session.user.id, body, [
+      signatureForPost(RENTAL_POST_NAME, (await getRentalConfig()).notifyEmails[0] ?? ""),
+    ]),
   });
   if (!delivered) return saveError("MAIL_FAILED");
 

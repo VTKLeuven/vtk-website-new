@@ -45,23 +45,35 @@ export async function signatureForUser(
 export async function signatureForBody(
   userId: string,
   body: string,
+  extra: readonly MailSignature[] = [],
 ): Promise<MailSignature> {
-  return pickSignature(await signaturesForUser(userId), body);
+  const both = await signaturesForUser(userId);
+  return pickSignature([...extra, both.en, both.nl], body);
 }
 
 /**
- * Welke van de twee talen in deze tekst staat.
+ * Welke van de kandidaten in deze tekst staat.
+ *
+ * De tekst van de mail is al opgesteld voor ze hier komt en draagt dus zelf het
+ * antwoord: met welke handtekening is ze geschreven. Daarom staat de keuze
+ * tussen jezelf en de post nergens opgeslagen, ook niet bij een mail die dagen
+ * blijft wachten; ze wordt teruggelezen uit de tekst. De volgorde telt:
+ * specifiek voor algemeen.
  *
  * Apart van {@link signatureForBody} zodat een reeks mails de bevraging kan
  * delen: de bulkronde verstuurt er tientallen na elkaar, elk met hun eigen taal.
  */
 export function pickSignature(
-  both: Record<"nl" | "en", MailSignature>,
+  candidates: readonly MailSignature[],
   body: string,
 ): MailSignature {
-  const en = both.en.text.trim();
-  if (en && body.includes(en)) return both.en;
-  return both.nl;
+  for (const candidate of candidates) {
+    const text = candidate.text.trim();
+    if (text && body.includes(text)) return candidate;
+  }
+  // De laatste is de terugval: een ondertekening die iemand herschreven heeft,
+  // wordt door `mailBodyToHtml` evenmin teruggevonden, dus er komt niets bij.
+  return candidates[candidates.length - 1] ?? { text: "", html: "" };
 }
 
 /** Beide talen in een keer, uit een enkele bevraging. */

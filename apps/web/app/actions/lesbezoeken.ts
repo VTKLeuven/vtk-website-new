@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/session";
 import {
   pickSignature,
   signatureForBody,
+  signatureForPost,
   signaturesForUser,
 } from "@/lib/mailSignature-server";
 import { RateLimiter, clientKeyFromHeaders, toMessageText, toSingleLine } from "@/lib/contactForm";
@@ -30,8 +31,10 @@ import {
 } from "@/lib/lesbezoeken";
 import {
   applyScheduledMailStamps,
+  getLesbezoekConfig,
   LESBEZOEK_CONFIG_KEY,
   LESBEZOEK_MAIL_KEY,
+  LESBEZOEK_POST_NAME,
   notifyNewLesbezoek,
   sendLesbezoekMail,
 } from "@/lib/lesbezoeken-server";
@@ -462,7 +465,9 @@ export async function sendLesbezoekMailAction(
     // De mailbox van de organisatie leest mee bij een terugkoppeling: de persoon
     // die aanvroeg is volgend jaar weg, de post blijft.
     cc: kind === "requester" ? (visit.organisation.contactEmail ?? undefined) : undefined,
-    signature: await signatureForBody(session.user.id, body),
+    signature: await signatureForBody(session.user.id, body, [
+      signatureForPost(LESBEZOEK_POST_NAME, (await getLesbezoekConfig()).notifyEmail),
+    ]),
   });
   if (!delivered) return saveError("MAIL_FAILED");
 
@@ -636,7 +641,11 @@ export async function sendNowLesbezoekScheduledMailAction(
     text: item.body,
     // De tekst is opgeslagen toen iemand ze inplande, ondertekening inbegrepen;
     // de opgemaakte versie hoort dan van diezelfde persoon te zijn.
-    signature: item.createdById ? await signatureForBody(item.createdById, item.body) : undefined,
+    signature: item.createdById
+      ? await signatureForBody(item.createdById, item.body, [
+          signatureForPost(LESBEZOEK_POST_NAME, (await getLesbezoekConfig()).notifyEmail),
+        ])
+      : undefined,
   });
 
   if (delivered) {
@@ -830,8 +839,15 @@ export async function sendBulkLesbezoekMailsAction(
   let failed = 0;
 
   // Een keer opgehaald voor de hele reeks: het is dezelfde persoon die deze
-  // mails nu verstuurt. Welke taal het per mail wordt, hangt van de tekst af.
-  const signatures = await signaturesForUser(session.user.id);
+  // mails nu verstuurt. Welke van de kandidaten het per mail wordt (zijn twee
+  // talen of de post), hangt van de tekst van die mail af.
+  const config = await getLesbezoekConfig();
+  const both = await signaturesForUser(session.user.id);
+  const candidates = [
+    signatureForPost(LESBEZOEK_POST_NAME, config.notifyEmail),
+    both.en,
+    both.nl,
+  ];
 
   for (const item of ready) {
     const delivered = await sendLesbezoekMail({
@@ -839,7 +855,7 @@ export async function sendBulkLesbezoekMailsAction(
       cc: item.cc ?? undefined,
       subject: item.subject,
       text: item.body,
-      signature: pickSignature(signatures, item.body),
+      signature: pickSignature(candidates, item.body),
     });
 
     if (!delivered) {

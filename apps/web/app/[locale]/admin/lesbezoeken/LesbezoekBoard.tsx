@@ -44,6 +44,7 @@ export function LesbezoekBoard({
   organisations,
   templates,
   signature,
+  postSignature,
   nudgeLeadDays,
 }: {
   nl: boolean;
@@ -53,6 +54,8 @@ export function LesbezoekBoard({
   organisations: OrganisationView[];
   templates: LesbezoekTemplates;
   signature: MailSignature;
+  /** De ondertekening van de post, als tweede keuze in het opstelscherm. */
+  postSignature: MailSignature;
   /** Hoeveel dagen op voorhand de werklijst om een herinnering vraagt. */
   nudgeLeadDays: number;
 }) {
@@ -256,6 +259,7 @@ export function LesbezoekBoard({
           canManage={canManage}
           templates={templates}
           signature={signature}
+          postSignature={postSignature}
           onClose={() => setSelectedId(null)}
           onEdit={() => {
             setEditing(selected);
@@ -271,6 +275,7 @@ export function LesbezoekBoard({
           visits={checkedVisits}
           templates={templateItems}
           signature={signature}
+          postSignature={postSignature}
           onClose={() => setBulkMode(null)}
           onSent={() => setChecked(new Set())}
         />
