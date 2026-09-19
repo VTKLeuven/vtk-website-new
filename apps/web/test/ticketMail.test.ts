@@ -82,6 +82,83 @@ describe("wat de mail over zijn bijlagen zegt", () => {
   });
 });
 
+describe("hoe de bevestigingsmail eruitziet", () => {
+  const event = {
+    startsAt: new Date("2026-10-02T18:00:00.000Z"),
+    timeZone: "Europe/Brussels",
+    location: "Theokot",
+    posterUrl: "https://vtk.be/api/media/events/abc.jpg",
+    ownerName: "Activiteiten",
+  };
+  const summary = {
+    lines: [
+      { name: "Ticket lid", quantity: 2, unitPriceCents: 1200, totalCents: 2400 },
+      { name: "Ticket niet-lid", quantity: 1, unitPriceCents: 1800, totalCents: 1800 },
+    ],
+    totalCents: 4200,
+    currency: "EUR",
+    paidAt: new Date("2026-09-19T09:00:00.000Z"),
+  };
+
+  it("zet de poster bovenaan en de datum in de gele pin", () => {
+    const mail = orderConfirmationMail({ ...base, event });
+    expect(mail.html).toContain(event.posterUrl);
+    // De pin: weekdag, dagnummer en maand, in het tijdzone-uur van het event
+    // (20:00 in Brussel, niet 18:00 UTC).
+    expect(mail.html).toContain("#ffd23f");
+    expect(mail.html).toContain(">2<");
+    expect(mail.html).toContain("vrijdag 2 oktober 2026, 20:00");
+    expect(mail.text).toContain("vrijdag 2 oktober 2026, 20:00");
+    expect(mail.text).toContain("Theokot");
+  });
+
+  it("blijft een volwaardige mail zonder poster, locatie of bestellijnen", () => {
+    // Een ticketevent zonder gekoppeld kalender-event heeft geen foto, en dan
+    // hoort er geen gebroken afbeelding in de mail te staan.
+    const mail = orderConfirmationMail({
+      ...base,
+      event: { startsAt: event.startsAt, timeZone: event.timeZone },
+    });
+    expect(mail.html).not.toContain("<img");
+    expect(mail.html).toContain("Galabal");
+    expect(mail.html).toContain(base.orderUrl.replace(/&/g, "&amp;"));
+    expect(mail.text).not.toContain("null");
+  });
+
+  it("toont de bestellijnen met het totaal, en de stukprijs enkel bij meerdere", () => {
+    const mail = orderConfirmationMail({ ...base, event, summary });
+    expect(mail.html).toContain("Ticket lid");
+    expect(mail.html).toContain("2x");
+    expect(mail.html).toContain("per stuk");
+    expect(mail.html).toContain("Betaald op 19 september");
+    expect(mail.html).toMatch(/42,00/);
+    // Eén ticket niet-lid: die regel herhaalt haar eigen bedrag niet als stukprijs.
+    expect(mail.html.split("per stuk").length - 1).toBe(1);
+    expect(mail.text).toContain("2x Ticket lid");
+    expect(mail.text).toContain("Totaal betaald");
+  });
+
+  it("zegt het wanneer er al terugbetaald is", () => {
+    // De outbox levert ook bij PARTIALLY_REFUNDED af; dan klopt "betaald"
+    // alleen nog met de terugbetaling erbij.
+    const mail = orderConfirmationMail({
+      ...base,
+      event,
+      summary: { ...summary, refundedCents: 1800 },
+    });
+    expect(mail.html).toContain("Terugbetaald");
+    expect(mail.html).toMatch(/18,00/);
+  });
+
+  it("schrijft de Engelse mail in het Engels", () => {
+    const mail = orderConfirmationMail({ ...base, locale: "en", event, summary });
+    expect(mail.html).toContain("Friday, 2 October 2026 at 20:00");
+    expect(mail.html).toContain("each");
+    expect(mail.html).toContain("Paid on 19 September");
+    expect(mail.html).not.toContain("per stuk");
+  });
+});
+
 describe("hoe we ons voorstellen bij de mailserver", () => {
   afterEach(() => {
     vi.unstubAllEnvs();

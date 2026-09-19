@@ -5089,6 +5089,47 @@ save-link binnen), dus die staat als knop in de mail.
   (de tweede komt uit de cache van tien minuten), dus reken op één aanroep per
   ticket. Op het gratis plan zijn dat er 1000 per maand.
 
+### De mail is de ticketkaart van /tickets, niet een eigen ontwerp
+
+De bevestigingsmail opent met de poster van het event, daaronder de post, de
+titel met de gele streep eronder en de gele datumpin ernaast, de praktische
+regels, en onderaan de bestellijnen met het totaal. Dat is bewust de taal van de
+kaart op /tickets (`.tcat-card`): wie de mail opent, herkent het scherm waar hij
+net besteld heeft.
+
+Vier richtingen lagen naast elkaar: de donkere paginakop van de site, deze
+poster-voorop-kaart, de mail als het toegangsbewijs zelf (met de qr erin), en
+een kale bestelbon. De poster won omdat ze als enige het event zelf toont, en
+omdat de mail vaak doorgestuurd wordt naar wie meekomt.
+
+- **De oude mail stond nog op het warme papier** (`#f2f0e9`, randen `#d9dbe0`,
+  hoeken van 4px) van voor de herstijling. Dat, en niets anders, was waarom ze
+  niet meer bij de site paste. De kleuren staan nu als hex in `lib/ticketing/mail.ts`
+  omdat een mailbox geen stylesheet en dus ook geen custom properties laadt; ze
+  zijn wel letterlijk de tokens uit `app/design/vtk-base.css`.
+- **Elk blok valt afzonderlijk weg.** Geen gekoppeld kalender-event betekent geen
+  poster, geen locatie betekent geen lege regel, geen bestellijnen betekent geen
+  lege tabel. Een ticketevent zonder foto hoort geen gebroken afbeelding in de
+  mailbox te zetten.
+- **De datumpin hangt hier niet over de poster, zoals op de kaart.** Dat is
+  geprobeerd en het werkt niet: een mailbox kent geen `position`, en een pin die
+  met een negatieve marge over de foto geschoven wordt, verdwijnt erachter. Een
+  afbeelding tekent nu eenmaal over de achtergrond van elk blok eronder,
+  ongeacht de volgorde in de broncode. De pin staat daarom naast de titel.
+- **De kaart is vloeiend, behalve voor Outlook.** `width:100%` met
+  `max-width:600px`, plus een tabel van 600 px die enkel Outlook ziet
+  (`<!--[if mso]>`): de Word-engine rekent `max-width` niet mee en zou de kaart
+  over de volle vensterbreedte trekken, terwijl een vaste 600 op de kaart zelf
+  een telefoon in horizontaal scrollen duwt. Verder negeert Outlook
+  `border-radius`, dus daar zijn de hoeken vierkant; dat is enkel decoratie.
+- **De stukprijs verschijnt enkel vanaf twee stuks**, anders herhaalt ze het
+  bedrag dat er rechts al staat. Is er al (deels) terugbetaald, dan komt er een
+  regel "Terugbetaald" bij: de outbox levert ook bij `PARTIALLY_REFUNDED` af, en
+  dan klopt "betaald" alleen nog met die regel erbij.
+- **De tekstversie draagt hetzelfde**, in dezelfde volgorde: datum, plaats, link,
+  bijlagen, lijnen, waarschuwing. Enkel de wallet-links blijven eruit (zie
+  hierboven).
+
 ---
 
 ## De mailserver wil weten wie er belt (EHLO)

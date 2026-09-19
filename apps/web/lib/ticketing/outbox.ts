@@ -3,9 +3,10 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@vtk/db";
 import { createOrderAccessToken } from "./crypto";
-import { orderConfirmationMail, sendMail } from "./mail";
+import { orderConfirmationMail, sendMail, type OrderMailLine } from "./mail";
 import { orderMailBundle } from "./mailBundle";
 import { ticketingBaseUrl } from "./config";
+import { publicUrl } from "@/lib/storage";
 
 type ClaimedMessage = {
   id: string;
@@ -43,13 +44,51 @@ async function claimMessages(workerId: string, limit: number): Promise<ClaimedMe
   `;
 }
 
+/**
+ * De bestellijnen zoals de mail ze toont: per tickettype en prijs één regel,
+ * dezelfde groepering als op de bestelpagina (`orderLines` in queries.ts). Twee
+ * tickets van hetzelfde type aan een verschillende prijs (lid en niet-lid)
+ * blijven dus twee regels.
+ */
+function orderMailLines(
+  items: Array<{ ticketTypeId: string; ticketTypeName: string; unitPriceCents: number; totalCents: number }>
+): OrderMailLine[] {
+  const lines = new Map<string, OrderMailLine>();
+  for (const item of items) {
+    const key = `${item.ticketTypeId}:${item.unitPriceCents}`;
+    const line = lines.get(key);
+    if (line) {
+      line.quantity += 1;
+      line.totalCents += item.totalCents;
+    } else {
+      lines.set(key, {
+        name: item.ticketTypeName,
+        quantity: 1,
+        unitPriceCents: item.unitPriceCents,
+        totalCents: item.totalCents,
+      });
+    }
+  }
+  return [...lines.values()];
+}
+
 async function deliver(message: ClaimedMessage): Promise<string> {
   if (message.type !== "ORDER_CONFIRMATION" || !message.orderId) {
     throw new Error(`Unsupported outbox message: ${message.type}`);
   }
   const order = await prisma.ticketOrder.findUnique({
     where: { id: message.orderId },
-    include: { event: true, items: { include: { ticket: true } } },
+    include: {
+      // De poster komt van het gekoppelde kalender-event: een ticketevent heeft
+      // zelf geen foto. De post erbij, want die staat boven de titel in de mail.
+      event: {
+        include: {
+          calendarEvent: { select: { imageKey: true } },
+          ownerGroup: { select: { nameNl: true, nameEn: true } },
+        },
+      },
+      items: { include: { ticket: true } },
+    },
   });
   if (!order || !["PAID", "PARTIALLY_REFUNDED", "REFUNDED"].includes(order.status)) {
     throw new Error("Order is not ready for delivery");
@@ -59,6 +98,9 @@ async function deliver(message: ClaimedMessage): Promise<string> {
   const prefix = locale === "en" ? "/en" : "";
   const orderUrl = `${ticketingBaseUrl()}${prefix}/tickets/toegang?orderId=${encodeURIComponent(order.id)}#access=${encodeURIComponent(access)}`;
   const { attachments, contents } = await orderMailBundle(order);
+  // Een pad volstaat niet in een mailbox: de afbeelding wordt daar buiten de
+  // site geladen en heeft dus de volledige URL nodig.
+  const posterPath = publicUrl(order.event.calendarEvent?.imageKey);
   const mail = orderConfirmationMail({
     locale,
     buyerName: order.buyerName,
@@ -70,6 +112,23 @@ async function deliver(message: ClaimedMessage): Promise<string> {
     replyTo: order.event.contactEmail,
     contents,
     attachments,
+    event: {
+      startsAt: order.event.startsAt,
+      timeZone: order.event.timeZone,
+      location: order.event.location,
+      posterUrl: posterPath ? `${ticketingBaseUrl()}${posterPath}` : null,
+      ownerName:
+        locale === "en" && order.event.ownerGroup.nameEn
+          ? order.event.ownerGroup.nameEn
+          : order.event.ownerGroup.nameNl,
+    },
+    summary: {
+      lines: orderMailLines(order.items),
+      totalCents: order.totalCents,
+      refundedCents: order.refundedCents,
+      currency: order.currency,
+      paidAt: order.paidAt,
+    },
   });
   return sendMail(mail);
 }
