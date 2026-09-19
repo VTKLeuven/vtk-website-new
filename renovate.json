@@ -11,6 +11,10 @@
   "prConcurrentLimit": 4,
   "minimumReleaseAge": "3 days",
   "platformAutomerge": false,
+  "gitIgnoredAuthors": [
+    "github-actions[bot]",
+    "41898282+github-actions[bot]@users.noreply.github.com"
+  ],
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
     "description": "Security fixes bypass the release-age wait and the PR concurrency limit, so a red audit never sits blocked behind routine dependency PRs.",
@@ -56,18 +60,30 @@
     },
     {
       "description": "better-auth core and its plugins are released as a set.",
-      "matchPackageNames": ["better-auth", "@better-auth/*"],
+      "matchPackageNames": ["better-auth", "@better-auth/*", "auth"],
       "groupName": "better-auth"
     },
     {
       "description": "Node 20 is the whole stack: engines, the CI runners and the three Dockerfiles. Moving to a new major is a deliberate exercise, not a dependency PR.",
-      "matchPackageNames": ["node"],
+      "matchPackageNames": ["node", "docker.io/library/node", "docker.io/node"],
       "allowedVersions": "^20"
     },
     {
       "description": "Postgres stays on 16. A major bump leaves the existing data directory unreadable (pg_upgrade), and the same image backs CI, the dev compose file and the deploy stack.",
       "matchPackageNames": ["postgres", "docker.io/postgres", "docker.io/library/postgres"],
-      "allowedVersions": "16"
+      "allowedVersions": "/^16/"
+    },
+    {
+      "description": "Vaultwarden updates contain password database migrations; never automerge them.",
+      "matchPackageNames": ["vaultwarden/server", "docker.io/vaultwarden/server"],
+      "groupName": "vaultwarden",
+      "addLabels": ["vaultwarden"],
+      "automerge": false
+    },
+    {
+      "description": "Curl worker images used across docker-compose background workers move together.",
+      "matchPackageNames": ["curlimages/curl", "docker.io/curlimages/curl"],
+      "groupName": "curl"
     },
     {
       "description": "Immich server and machine-learning must move together, and an upgrade touches the photo archive; never automerge it. See docs/immich-disaster-recovery.md.",
@@ -84,6 +100,7 @@
     {
       "description": "MinIO tags look like RELEASE.2025-09-07T16-13-09Z; without its own versioning scheme Renovate cannot compare them.",
       "matchPackageNames": ["quay.io/minio/minio", "quay.io/minio/mc"],
+      "groupName": "minio",
       "versioning": "regex:^RELEASE\\.(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})T(?<build>.+)$"
     },
     {

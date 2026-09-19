@@ -119,11 +119,11 @@ jobs:
         if: steps.create-pr.outputs.pull-request-number && env.HAS_BOT_TOKEN != 'true'
         run: echo "::warning::DEPS_BOT_TOKEN ontbreekt, dus deze PR krijgt geen CI-run. Push er een leeg commit op of zet het secret in (docs/dependencies.md)."
 
-      - name: Enable auto-merge
+      # Auto-merge wordt bewust NIET automatisch aangezet: op main staan momenteel
+      # geen verplichte branch protection checks, waardoor GitHub auto-merge de
+      # PR direct zou mergen zonder op de CI-tests te wachten. De PR wacht op een
+      # handmatige merge na het slagen van CI.
+      - name: Inform about manual review
         if: steps.create-pr.outputs.pull-request-number
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR: ${{ steps.create-pr.outputs.pull-request-number }}
         run: |
-          gh pr merge "$PR" --auto --squash ||
-            echo "::warning::Auto-merge staat uit voor deze repo; PR #$PR wacht op een handmatige merge."
+          echo "Audit-fix PR #${{ steps.create-pr.outputs.pull-request-number }} is aangemaakt. Zodra de CI groen is kan ze gemerged worden."

@@ -59,7 +59,7 @@ jobs:
       - name: Check lockfile
         id: check
         run: |
-          if npm run verify:lockfile; then
+          if npm run verify:lockfile && npm ci --dry-run; then
             echo "needs_fix=false" >> "$GITHUB_OUTPUT"
           else
             echo "needs_fix=true" >> "$GITHUB_OUTPUT"
@@ -68,7 +68,7 @@ jobs:
       - name: Warn when no bot token is configured
         if: steps.check.outputs.needs_fix == 'true' && env.HAS_BOT_TOKEN != 'true'
         run: |
-          echo "::warning::De lockfile van deze PR mist platform-binaries. Zonder DEPS_BOT_TOKEN kan deze workflow de fix niet pushen: doe het lokaal met 'rm -rf node_modules package-lock.json && npm install'."
+          echo "::warning::De lockfile van deze PR mist platform-binaries of is niet in sync met package.json. Zonder DEPS_BOT_TOKEN kan deze workflow de fix niet pushen: doe het lokaal met 'rm -rf node_modules package-lock.json && npm install'."
 
       - name: Resolve dependencies again and push the fix
         if: steps.check.outputs.needs_fix == 'true' && env.HAS_BOT_TOKEN == 'true'
@@ -78,7 +78,7 @@ jobs:
           npm run verify:lockfile
 
           if git diff --quiet package-lock.json; then
-            echo "::error::De lockfile mist platform-binaries, maar een verse resolve verandert niets. Dit vraagt handwerk."
+            echo "::error::De lockfile is niet in sync of mist platform-binaries, maar een verse resolve verandert niets. Dit vraagt handwerk."
             exit 1
           fi
 
@@ -86,4 +86,4 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add package-lock.json
           git commit -m 'fix(deps): herresolve package-lock.json voor alle platforms'
-          git push
+          git push origin "HEAD:${{ github.event.pull_request.head.ref }}"
