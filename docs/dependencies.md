@@ -24,9 +24,17 @@ Naast Renovate staan er drie workflows:
 2. **Zet Dependabot alerts aan** (Settings → Code security). `vulnerabilityAlerts`
    in `renovate.json` hangt daarvan af: zonder die alerts weet Renovate niet welke
    updates een security fix zijn en vervalt de uitzondering op de wachttijd.
-3. **Zet auto-merge aan** voor de repo (Settings → General → "Allow auto-merge")
-   en maak de checks van `Deploy to Dev (elise)` verplicht op `main`. Automerge
-   zonder verplichte checks is niet "CI is groen", maar "er is niets gevraagd".
+3. **Renovate mergt zelf, niet via GitHub** (`platformAutomerge: false`). De
+   auto-merge van GitHub merget een PR zodra die mergebaar is, en zonder
+   verplichte checks op `main` is dat meteen, zonder op de CI te wachten. Renovate
+   wacht daarentegen tot ze de branch groen ziet en merget dan zelf. De prijs is
+   dat dat op haar volgende run gebeurt, dus tot een uur later.
+
+   Zet je later toch verplichte checks op `main` (`Types, lint and tests` en
+   `Production build and browser smoke`; die twee draaien op elke PR, de audit
+   enkel op PR's die aan een manifest raken), zet dan ook `platformAutomerge`
+   terug aan. Hou er rekening mee dat verplichte checks ook een directe push naar
+   `main` blokkeren; met een ruleset kan je daar mensen van vrijstellen.
 4. **Optioneel: een secret `DEPS_BOT_TOKEN`** (een fine-grained PAT of een
    GitHub App-token met *contents: write* en *pull requests: write*). Dat is nodig
    voor twee dingen die met de standaard `GITHUB_TOKEN` niet lukken:

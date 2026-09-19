@@ -10,6 +10,7 @@
   "labels": ["dependencies"],
   "prConcurrentLimit": 4,
   "minimumReleaseAge": "3 days",
+  "platformAutomerge": false,
   "osvVulnerabilityAlerts": true,
   "vulnerabilityAlerts": {
     "description": "Security fixes bypass the release-age wait and the PR concurrency limit, so a red audit never sits blocked behind routine dependency PRs.",
