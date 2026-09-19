@@ -302,3 +302,4 @@ For full guides and operational instructions, visit the developer wiki in `vtk-w
 - [docs/door-apple-shortcut.md](docs/door-apple-shortcut.md): Door access Apple Shortcut.
 - [docs/elixir-barstatus.md](docs/elixir-barstatus.md): Munisense 't ElixIr bar status integration.
 - [docs/immich-gallery.md](docs/immich-gallery.md): Immich public gallery.
+- [docs/dependencies.md](docs/dependencies.md): Renovate dependency bot, version pins and audit workflows.

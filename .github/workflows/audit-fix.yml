@@ -1,0 +1,129 @@
+name: Audit fix
+
+# Haalt de transitieve dependencies naar de nieuwste versie binnen de bestaande
+# ranges en opent daar een PR voor. Dat is wat `npm audit fix` hier zou doen, met
+# één verschil: audit fix werkt incrementeel en laat dan de native binaries van
+# andere platforms uit de lockfile vallen (npm/cli#4828), precies de val die
+# AGENTS.md beschrijft. Daarom gooit deze job de lockfile weg en laat npm vers
+# resolven; een verse resolve kiest per dependency de nieuwste versie binnen de
+# range, dus minstens wat audit fix zou kiezen, en houdt alle platforms binnen.
+#
+# Wat hier blijft staan zijn de advisories die een major bump of een andere
+# dependency nodig hebben. Die horen op het Renovate-dashboard, niet in een
+# automatische PR.
+#
+# De mobiele app blijft hier bewust buiten: die heeft na een merge altijd een
+# EAS Update nodig (zie docs/app-ontwikkelen.md), en dat kan deze job niet doen.
+
+on:
+  schedule:
+    - cron: '30 4 * * 1' # Maandag 06:30 in Brussel, voor de wekelijkse audit
+  workflow_dispatch:
+
+# Eén auto-fix tegelijk.
+concurrency:
+  group: audit-fix
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  refresh-lockfile:
+    name: Refresh lockfile for vulnerable transitive dependencies
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    env:
+      # `secrets` bestaat niet in de `if` van een stap, wel in de env van de job.
+      HAS_BOT_TOKEN: ${{ secrets.DEPS_BOT_TOKEN != '' }}
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Resolve dependencies again from scratch
+        run: |
+          count() {
+            npm audit --json |
+              node -e "const v=JSON.parse(require('fs').readFileSync(0,'utf8')).metadata.vulnerabilities;console.log(v.high+v.critical)"
+          }
+
+          before=$(count || echo 0)
+          echo "Kwetsbaarheden van high of hoger: ${before:-0}"
+          if [ "${before:-0}" -eq 0 ]; then
+            echo "has_fix=false" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          rm -rf node_modules package-lock.json
+          npm install --no-audit --no-fund
+          npm run verify:lockfile
+
+          after=$(count || echo "$before")
+          echo "Na een verse resolve: ${after:-$before}"
+
+          # Enkel een PR wanneer de audit er echt op vooruitgaat. Een verse
+          # resolve schuift altijd wel iets op binnen de ranges, en een wekelijkse
+          # PR met het label security die niets oplost, leert niemand nog iets.
+          # De lockfile zelf houdt Renovate bij met lockFileMaintenance.
+          if [ "${after:-$before}" -lt "$before" ] && ! git diff --quiet package-lock.json; then
+            echo "has_fix=true" >> "$GITHUB_ENV"
+          else
+            echo "Deze advisories vragen een major bump of een andere dependency; zie het Renovate-dashboard."
+            echo "has_fix=false" >> "$GITHUB_ENV"
+          fi
+
+      - name: Write pull request body
+        if: env.has_fix == 'true'
+        run: |
+          {
+            echo 'De lockfile is opnieuw geresolved (`rm -rf node_modules package-lock.json && npm install`),'
+            echo 'omdat `npm audit fix` incrementeel werkt en dan de native binaries van andere'
+            echo 'platforms laat vallen. `npm run verify:lockfile` is groen.'
+            echo
+            echo 'Automatisch aangemaakt door de **Audit fix**-workflow.'
+            echo
+            echo 'Wat er na deze refresh nog openstaat:'
+            echo
+            echo '```'
+            npm audit --audit-level high || true
+            echo '```'
+          } > /tmp/audit-rest.md
+
+      - name: Create pull request
+        id: create-pr
+        if: env.has_fix == 'true'
+        uses: peter-evans/create-pull-request@v8
+        with:
+          # Een PR die met GITHUB_TOKEN wordt aangemaakt, start geen enkele
+          # workflow: de checks blijven leeg en auto-merge komt nooit aan de
+          # beurt. Staat DEPS_BOT_TOKEN ingesteld (zie docs/dependencies.md),
+          # dan draait CI gewoon.
+          token: ${{ secrets.DEPS_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+          commit-message: 'fix(deps): herresolve package-lock.json voor kwetsbare dependencies'
+          title: 'fix(deps): herresolve package-lock.json voor kwetsbare dependencies'
+          body-path: /tmp/audit-rest.md
+          branch: auto/audit-fix
+          labels: dependencies, security
+          delete-branch: true
+
+      - name: Warn when CI cannot run on this pull request
+        if: steps.create-pr.outputs.pull-request-number && env.HAS_BOT_TOKEN != 'true'
+        run: echo "::warning::DEPS_BOT_TOKEN ontbreekt, dus deze PR krijgt geen CI-run. Push er een leeg commit op of zet het secret in (docs/dependencies.md)."
+
+      - name: Enable auto-merge
+        if: steps.create-pr.outputs.pull-request-number
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR: ${{ steps.create-pr.outputs.pull-request-number }}
+        run: |
+          gh pr merge "$PR" --auto --squash ||
+            echo "::warning::Auto-merge staat uit voor deze repo; PR #$PR wacht op een handmatige merge."

@@ -1,0 +1,87 @@
+name: Security audit
+
+# Renovate opent zelf PR's voor kwetsbare dependencies (vulnerabilityAlerts +
+# osvVulnerabilityAlerts), maar dat vertelt niets over wat er blijft staan.
+# Deze audit doet dat: wekelijks een volledig rapport, en op een PR die aan een
+# lockfile raakt een harde stop zodra er een critical binnenkomt.
+#
+# De drempel staat bewust op `critical` en niet op `high`: de bestaande high's
+# zitten in build- en CLI-tooling (prisma's deepmerge-ts, chevrotain via
+# better-auth, joi via passkit-generator) en horen niet elke PR rood te maken.
+# Het volledige high-rapport staat wel in de samenvatting van de run.
+
+on:
+  schedule:
+    - cron: '0 6 * * 1' # Maandag 08:00 in Brussel
+  pull_request:
+    branches: ['main']
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'apps/*/package.json'
+      - 'packages/*/package.json'
+      - 'mobile/package.json'
+      - 'mobile/package-lock.json'
+  workflow_dispatch:
+
+concurrency:
+  group: security-audit-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  npm-audit:
+    name: Audit website dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Report high and critical advisories
+        run: |
+          {
+            echo '## npm audit (root, high en hoger)'
+            echo '```'
+            npm audit --audit-level high || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail on critical advisories
+        run: npm audit --audit-level critical
+
+  npm-audit-mobile:
+    name: Audit mobile app dependencies
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Report high and critical advisories
+        run: |
+          {
+            echo '## npm audit (mobile, high en hoger)'
+            echo '```'
+            npm audit --audit-level high || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Fail on critical advisories
+        run: npm audit --audit-level critical

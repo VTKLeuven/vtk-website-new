@@ -1,0 +1,89 @@
+name: Renovate lockfile
+
+# Renovate werkt package-lock.json incrementeel bij. Dat is dezelfde soort
+# bewerking waarbij npm de optionalDependencies van andere platforms laat vallen
+# (npm/cli#4828, zie AGENTS.md "Never hand-edit deps"). `npm run verify:lockfile`
+# in de CI betrapt dat, maar laat de PR dan wel rood staan tot iemand hem met de
+# hand herresolvet. Deze job doet dat zelf: enkel wanneer de check faalt, gooit
+# ze de lockfile weg, laat npm vers resolven en pusht de fix naar de PR-branch.
+#
+# Let op: een verse resolve haalt elke dependency naar de nieuwste versie binnen
+# haar range, dus de PR bevat daarna meer lockfile-wijzigingen dan Renovate zelf
+# voorstelde. Dat is de prijs van de regel, niet een neveneffect van deze job.
+#
+# Zonder DEPS_BOT_TOKEN kan deze job niet duwen op een manier die de CI opnieuw
+# start (een push met GITHUB_TOKEN start geen workflows). Ze zegt dat dan met een
+# waarschuwing in plaats van stil niets te doen; zie docs/dependencies.md.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: ['main']
+    paths:
+      - 'package.json'
+      - 'package-lock.json'
+      - 'apps/*/package.json'
+      - 'packages/*/package.json'
+
+concurrency:
+  group: renovate-lockfile-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    name: Re-resolve lockfile when a platform binary went missing
+    if: startsWith(github.head_ref, 'renovate/')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      # `secrets` bestaat niet in de `if` van een stap, wel in de env van de job.
+      HAS_BOT_TOKEN: ${{ secrets.DEPS_BOT_TOKEN != '' }}
+
+    steps:
+      - name: Checkout pull request branch
+        uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          token: ${{ secrets.DEPS_BOT_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Check lockfile
+        id: check
+        run: |
+          if npm run verify:lockfile; then
+            echo "needs_fix=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needs_fix=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Warn when no bot token is configured
+        if: steps.check.outputs.needs_fix == 'true' && env.HAS_BOT_TOKEN != 'true'
+        run: |
+          echo "::warning::De lockfile van deze PR mist platform-binaries. Zonder DEPS_BOT_TOKEN kan deze workflow de fix niet pushen: doe het lokaal met 'rm -rf node_modules package-lock.json && npm install'."
+
+      - name: Resolve dependencies again and push the fix
+        if: steps.check.outputs.needs_fix == 'true' && env.HAS_BOT_TOKEN == 'true'
+        run: |
+          rm -rf node_modules package-lock.json
+          npm install --no-audit --no-fund
+          npm run verify:lockfile
+
+          if git diff --quiet package-lock.json; then
+            echo "::error::De lockfile mist platform-binaries, maar een verse resolve verandert niets. Dit vraagt handwerk."
+            exit 1
+          fi
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          git commit -m 'fix(deps): herresolve package-lock.json voor alle platforms'
+          git push

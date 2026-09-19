@@ -1,0 +1,120 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:best-practices",
+    ":semanticCommits",
+    ":semanticCommitScopeDisabled",
+    "mergeConfidence:all-badges"
+  ],
+  "timezone": "Europe/Brussels",
+  "labels": ["dependencies"],
+  "prConcurrentLimit": 4,
+  "minimumReleaseAge": "3 days",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "description": "Security fixes bypass the release-age wait and the PR concurrency limit, so a red audit never sits blocked behind routine dependency PRs.",
+    "enabled": true,
+    "minimumReleaseAge": null,
+    "labels": ["dependencies", "security"]
+  },
+  "lockFileMaintenance": {
+    "description": "Refreshes transitive dependencies once a week. CI runs verify:lockfile before npm ci, so a refresh that drops another platform's native binaries fails the PR instead of the deploy.",
+    "enabled": true,
+    "schedule": ["before 6am on monday"],
+    "automerge": true
+  },
+  "packageRules": [
+    {
+      "description": "Automerge patch/minor updates, digest bumps, pins and lockfile maintenance when CI passes. Major bumps still require manual review.",
+      "matchUpdateTypes": ["patch", "minor", "pin", "digest", "lockFileMaintenance"],
+      "automerge": true
+    },
+    {
+      "description": "Prisma CLI and client must move together; a mismatch fails at generate time.",
+      "matchPackageNames": ["prisma", "@prisma/*"],
+      "groupName": "prisma"
+    },
+    {
+      "description": "Next and React share peer ranges, so they belong in one PR. Mobile is excluded: there React is pinned by the Expo SDK.",
+      "matchFileNames": ["package.json", "apps/**", "packages/**"],
+      "matchPackageNames": [
+        "next",
+        "@next/*",
+        "eslint-config-next",
+        "react",
+        "react-dom",
+        "@types/react",
+        "@types/react-dom"
+      ],
+      "groupName": "next and react"
+    },
+    {
+      "description": "Tailwind v4 and lightningcss ship native binaries; one PR means the lockfile check judges them together.",
+      "matchPackageNames": ["tailwindcss", "@tailwindcss/*", "lightningcss", "lightningcss-*"],
+      "groupName": "tailwind"
+    },
+    {
+      "description": "better-auth core and its plugins are released as a set.",
+      "matchPackageNames": ["better-auth", "@better-auth/*"],
+      "groupName": "better-auth"
+    },
+    {
+      "description": "Node 20 is the whole stack: engines, the CI runners and the three Dockerfiles. Moving to a new major is a deliberate exercise, not a dependency PR.",
+      "matchPackageNames": ["node"],
+      "allowedVersions": "^20"
+    },
+    {
+      "description": "Postgres stays on 16. A major bump leaves the existing data directory unreadable (pg_upgrade), and the same image backs CI, the dev compose file and the deploy stack.",
+      "matchPackageNames": ["postgres", "docker.io/postgres", "docker.io/library/postgres"],
+      "allowedVersions": "16"
+    },
+    {
+      "description": "Immich server and machine-learning must move together, and an upgrade touches the photo archive; never automerge it. See docs/immich-disaster-recovery.md.",
+      "matchPackageNames": ["ghcr.io/immich-app/immich-server", "ghcr.io/immich-app/immich-machine-learning"],
+      "groupName": "immich",
+      "addLabels": ["immich"],
+      "automerge": false
+    },
+    {
+      "description": "Immich pins its own database and cache image; those follow upstream's compose file, not Renovate.",
+      "matchPackageNames": ["ghcr.io/immich-app/postgres", "docker.io/valkey/valkey"],
+      "enabled": false
+    },
+    {
+      "description": "MinIO tags look like RELEASE.2025-09-07T16-13-09Z; without its own versioning scheme Renovate cannot compare them.",
+      "matchPackageNames": ["quay.io/minio/minio", "quay.io/minio/mc"],
+      "versioning": "regex:^RELEASE\\.(?<major>\\d{4})-(?<minor>\\d{2})-(?<patch>\\d{2})T(?<build>.+)$"
+    },
+    {
+      "description": "The mobile app lives outside the workspaces and needs an EAS Update after every merge, so it is never automerged. See docs/app-ontwikkelen.md.",
+      "matchFileNames": ["mobile/package.json"],
+      "addLabels": ["mobile"],
+      "automerge": false
+    },
+    {
+      "description": "Expo ships its SDK as one set: expo, the expo-* modules, React, React Native and the babel/eslint presets belong in a single PR.",
+      "matchFileNames": ["mobile/package.json"],
+      "matchPackageNames": [
+        "expo",
+        "expo-*",
+        "@expo/*",
+        "@expo-google-fonts/*",
+        "react",
+        "react-dom",
+        "@types/react",
+        "react-native",
+        "react-native-*",
+        "babel-preset-expo",
+        "eslint-config-expo"
+      ],
+      "groupName": "expo sdk"
+    },
+    {
+      "description": "Action digest pins in one weekly PR. A major bump of an action stays manual: it can change inputs.",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["patch", "minor", "digest", "pin"],
+      "groupName": "github actions",
+      "automerge": true
+    }
+  ]
+}
