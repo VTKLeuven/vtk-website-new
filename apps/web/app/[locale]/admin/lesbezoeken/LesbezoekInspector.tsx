@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { MailSignature } from "@/lib/signatureProfile";
+import { splitSignature } from "@/lib/mailBodyHtml";
 import { Button, Input, Label, Select, Textarea } from "@vtk/ui";
 import { Modal } from "@/app/[locale]/admin/admin-table";
 import { SaveForm } from "@/components/ui/SaveForm";
@@ -66,7 +68,7 @@ export function LesbezoekInspector({
   visit: VisitView;
   canManage: boolean;
   templates: LesbezoekTemplates;
-  signature: string;
+  signature: MailSignature;
   onClose: () => void;
   onEdit: () => void;
 }) {
@@ -168,7 +170,7 @@ export function LesbezoekInspector({
         )}
 
         {/* Eventuele geplande mails */}
-        <ScheduledMailBanner nl={nl} visit={visit} canManage={canManage} />
+        <ScheduledMailBanner nl={nl} visit={visit} canManage={canManage} signature={signature} />
 
         {activeTab === "details" ? (
           <div className="space-y-4">
@@ -527,10 +529,17 @@ function ScheduledMailBanner({
   nl,
   visit,
   canManage,
+  signature,
 }: {
   nl: boolean;
   visit: VisitView;
   canManage: boolean;
+  /**
+   * Om de ondertekening in de voorvertoning opgemaakt te tonen, net als in het
+   * voorbeeld bij de sjablonen. De tekst van de mail staat al vast: die is
+   * opgeslagen toen ze ingepland werd.
+   */
+  signature: MailSignature;
 }) {
   if (!visit.scheduledMails || visit.scheduledMails.length === 0) return null;
 
@@ -605,9 +614,20 @@ function ScheduledMailBanner({
               <summary className="cursor-pointer font-medium text-indigo-700 hover:text-indigo-900">
                 {nl ? "Voorvertoning van bericht tonen" : "Show message preview"}
               </summary>
-              <p className="mt-1.5 whitespace-pre-wrap font-mono text-[12px] text-zinc-700 bg-zinc-50 p-2.5 rounded-lg border border-zinc-200/60 leading-relaxed max-h-40 overflow-y-auto">
-                {mail.body}
-              </p>
+              <div className="mt-1.5 rounded-lg border border-zinc-200/60 bg-zinc-50 p-2.5 text-[12px] leading-relaxed text-zinc-700 max-h-64 overflow-y-auto">
+                <p className="whitespace-pre-wrap font-mono">
+                  {splitSignature(mail.body, signature).text}
+                </p>
+                {splitSignature(mail.body, signature).signatureHtml ? (
+                  <div
+                    className="vtk-mail-preview-signature mt-2 px-0 pb-0"
+                    // Eigen generator, die elk ingevuld veld al escapet.
+                    dangerouslySetInnerHTML={{
+                      __html: splitSignature(mail.body, signature).signatureHtml!,
+                    }}
+                  />
+                ) : null}
+              </div>
             </details>
           </div>
 
@@ -788,7 +808,7 @@ function MailComposer({
   nl: boolean;
   visit: VisitView;
   templates: LesbezoekTemplateItem[];
-  signature: string;
+  signature: MailSignature;
   errors: Record<string, string>;
   onBack: () => void;
 }) {
@@ -838,7 +858,7 @@ function MailComposer({
         mailTime: visit.mailTime,
       },
       lang,
-      signature,
+      signature.text,
     );
 
     return renderMailTemplate(selectedTemplate, vars);

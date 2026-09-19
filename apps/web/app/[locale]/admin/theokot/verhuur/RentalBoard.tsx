@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { MailSignature } from "@/lib/signatureProfile";
 import { Modal } from "@/app/[locale]/admin/admin-table";
 import {
   CONTRACT_STATE_META,
@@ -40,7 +41,7 @@ export function RentalBoard({
   rentals: RentalView[];
   templates: RentalTemplate[];
   senderLabel: string;
-  signature: string;
+  signature: MailSignature;
   contractAvailable: Record<string, boolean>;
   canManage: boolean;
   emptyMessage: string;

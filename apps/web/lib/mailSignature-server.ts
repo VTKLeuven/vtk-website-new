@@ -2,8 +2,14 @@ import "server-only";
 
 import { prisma } from "@vtk/db";
 import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
-import { generateSignaturePlainText } from "@/lib/signature";
-import { resolveSignatureData, type SignatureMembership } from "@/lib/signatureProfile";
+import { generateSignatureHtml, generateSignaturePlainText } from "@/lib/signature";
+import {
+  resolveSignatureData,
+  type MailSignature,
+  type SignatureMembership,
+} from "@/lib/signatureProfile";
+
+export type { MailSignature } from "@/lib/signatureProfile";
 
 /**
  * De ondertekening onder een uitgaande beheersmail.
@@ -13,13 +19,13 @@ import { resolveSignatureData, type SignatureMembership } from "@/lib/signatureP
  * geen instelling per werking meer is: de vorige opzet zette een vaste tekst
  * onder elke mail, en die liep elk jaar opnieuw uiteen met wie het werk deed.
  *
- * De mails vertrekken als platte tekst (`sendMail({ text })`), dus dit geeft de
- * platte variant terug en nooit de HTML-tabel.
+ * Geeft beide vormen terug: het bewerkveld en de platte mail werken met `text`,
+ * de mailbox toont `html`.
  */
-export async function signatureTextForUser(
+export async function signatureForUser(
   userId: string,
   locale: "nl" | "en" = "nl",
-): Promise<string> {
+): Promise<MailSignature> {
   const [user, memberships] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
@@ -41,7 +47,7 @@ export async function signatureTextForUser(
     }),
   ]);
 
-  if (!user) return "";
+  if (!user) return { text: "", html: "" };
 
   const data = resolveSignatureData(
     user,
@@ -59,7 +65,7 @@ export async function signatureTextForUser(
     formatWorkingYear(currentWorkingYear()),
   );
 
-  return generateSignaturePlainText(data);
+  return { text: generateSignaturePlainText(data), html: generateSignatureHtml(data) };
 }
 
 /**
@@ -70,11 +76,12 @@ export async function signatureTextForUser(
  * zelf, en niet met een willekeurig lid of met niets. Het adres is dat van de
  * post, want daar komt het antwoord ook toe.
  */
-export function signatureTextForPost(postName: string, postEmail: string): string {
-  return generateSignaturePlainText({
+export function signatureForPost(postName: string, postEmail: string): MailSignature {
+  const data = {
     fullName: postName,
     roleTitle: `VTK ${formatWorkingYear(currentWorkingYear())}`,
     emailAddress: postEmail,
     phoneDisplay: "",
-  });
+  };
+  return { text: generateSignaturePlainText(data), html: generateSignatureHtml(data) };
 }

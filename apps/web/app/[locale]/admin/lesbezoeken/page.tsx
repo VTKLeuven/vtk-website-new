@@ -23,7 +23,7 @@ import {
   lesbezoekSenderLabel,
   processDueLesbezoekScheduledMails,
 } from "@/lib/lesbezoeken-server";
-import { signatureTextForUser } from "@/lib/mailSignature-server";
+import { signatureForUser } from "@/lib/mailSignature-server";
 import {
   currentWorkingYear,
   formatWorkingYear,
@@ -187,7 +187,7 @@ export default async function AdminLesbezoekenPage({
   // naar dit scherm kijkt. Ze wordt hier een keer opgehaald en meegegeven aan de
   // werklijst en de sjabloonvoorbeelden; zo tonen de voorbeelden exact wat deze
   // persoon straks verstuurt.
-  const signature = await signatureTextForUser(session.user.id, nl ? "nl" : "en");
+  const signature = await signatureForUser(session.user.id, nl ? "nl" : "en");
 
   const peculiarities: PeculiarityView[] = peculiarityRows.map((row) => ({
     id: row.id,

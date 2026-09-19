@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { MailSignature } from "@/lib/signatureProfile";
 import { Input, Label, Select, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
@@ -56,7 +57,7 @@ export function RentalInspector({
   rental: RentalView;
   templates: RentalTemplate[];
   senderLabel: string;
-  signature: string;
+  signature: MailSignature;
   /** Per soort huurder en taal: staat er een huurcontract klaar? */
   contractAvailable: Record<string, boolean>;
   canManage: boolean;
@@ -395,14 +396,14 @@ function ReplyForm({
   rental: RentalView;
   templates: RentalTemplate[];
   senderLabel: string;
-  signature: string;
+  signature: MailSignature;
   renterType: RentalView["renterType"];
   contractAvailable: Record<string, boolean>;
   errors: Record<string, string>;
 }) {
   const lang = nl ? "nl" : "en";
   const vars: RentalTemplateVars = useMemo(
-    () => ({ ...rental.mailVars, ondertekening: signature }),
+    () => ({ ...rental.mailVars, ondertekening: signature.text }),
     [rental.mailVars, signature],
   );
 
@@ -555,6 +556,7 @@ function ReplyForm({
           to={rental.email}
           subject={subject}
           body={body}
+          signature={signature}
           attachments={attach && contractReady ? [nl ? "huurcontract.pdf" : "rental-contract.pdf"] : []}
           source={nl ? "met de gegevens van deze aanvraag" : "with the details of this request"}
         />

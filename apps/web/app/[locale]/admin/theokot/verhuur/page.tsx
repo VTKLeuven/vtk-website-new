@@ -22,7 +22,7 @@ import {
   getRentalTemplates,
   rentalSenderLabel,
 } from "@/lib/theokotVerhuur-server";
-import { signatureTextForUser } from "@/lib/mailSignature-server";
+import { signatureForUser } from "@/lib/mailSignature-server";
 import { rentalMailVars, rentalReplyTo } from "@/lib/theokotVerhuurMail";
 import { siteBaseUrl } from "@/lib/calendar/feeds";
 import { RentalCalendarSubscribe } from "@/components/theokot/RentalCalendarSubscribe";
@@ -136,7 +136,7 @@ export default async function AdminTheokotVerhuurPage({
   // De ondertekening onder elke mail is die van wie ze verstuurt, dus van wie nu
   // naar dit scherm kijkt. De voorbeelden tonen daarmee wat deze persoon straks
   // effectief onder zijn mail krijgt.
-  const signature = await signatureTextForUser(session.user.id, nl ? "nl" : "en");
+  const signature = await signatureForUser(session.user.id, nl ? "nl" : "en");
 
   const feedBaseUrl = `${siteBaseUrl()}/api/theokot/verhuur/feed/${feedToken}.ics`;
 

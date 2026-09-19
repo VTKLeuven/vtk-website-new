@@ -49,6 +49,19 @@ export type SignatureUser = {
 export type SignaturePreset = { label: string; value: string };
 
 /**
+ * De ondertekening in haar twee vormen.
+ *
+ * `text` staat in het bewerkveld en in de platte mail; `html` is dezelfde
+ * handtekening met het schild en de gele streep, zoals /account ze kopieert. De
+ * beheerschermen dragen ze allebei mee: composeren gebeurt met de tekst, het
+ * voorbeeld en de verstuurde mail tonen de opmaak.
+ *
+ * Staat hier en niet in de server-only module, zodat een client component het
+ * type mag kennen.
+ */
+export type MailSignature = { text: string; html: string };
+
+/**
  * De functies die dit lid kan kiezen, uit zijn postlidmaatschappen.
  *
  * Een lidmaatschap levert er twee: de eigen titel ("VTK Onderwijs 26-27") en de

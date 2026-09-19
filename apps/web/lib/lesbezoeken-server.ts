@@ -3,6 +3,8 @@ import "server-only";
 import * as Sentry from "@sentry/nextjs";
 import { prisma } from "@vtk/db";
 import { sendMail } from "@/lib/email";
+import { mailBodyToHtml } from "@/lib/mailBodyHtml";
+import { signatureForUser, type MailSignature } from "@/lib/mailSignature-server";
 import { clampNudgeLeadDays } from "@/lib/lesbezoeken";
 import {
   DEFAULT_LESBEZOEK_CONFIG,
@@ -101,6 +103,11 @@ export async function sendLesbezoekMail(input: {
   subject: string;
   text: string;
   cc?: string;
+  /**
+   * De ondertekening van wie deze mail verstuurt. Draagt ze mee, dan gaat de
+   * opgemaakte handtekening als HTML-deel mee; zonder blijft het een platte mail.
+   */
+  signature?: MailSignature;
 }): Promise<boolean> {
   const config = await getLesbezoekConfig();
   const delivered = await sendMail(
@@ -111,6 +118,7 @@ export async function sendLesbezoekMail(input: {
       replyTo: config.notifyEmail,
       subject: input.subject,
       text: input.text,
+      html: input.signature ? mailBodyToHtml(input.text, input.signature) : undefined,
     },
     { source: "lesbezoeken" },
   );
@@ -264,6 +272,9 @@ export async function processDueLesbezoekScheduledMails(
         cc: item.cc ?? undefined,
         subject: item.subject,
         text: item.body,
+        // Deze mail vertrekt vanzelf, maar iemand heeft ze ingepland en zijn
+        // ondertekening staat al in de tekst; de opgemaakte versie volgt die.
+        signature: item.createdById ? await signatureForUser(item.createdById) : undefined,
       });
 
       if (delivered) {

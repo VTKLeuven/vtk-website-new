@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { MailSignature } from "@/lib/signatureProfile";
 import { Button, Card, Input, Label, Select, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
@@ -43,7 +44,7 @@ export function RentalTemplatesCard({
   nl: boolean;
   templates: RentalTemplate[];
   senderLabel: string;
-  signature: string;
+  signature: MailSignature;
   replyTo: string;
 }) {
   const [draft, setDraft] = useState<RentalTemplate | null>(null);
@@ -155,7 +156,7 @@ function TemplateEditor({
   nl: boolean;
   template: RentalTemplate;
   senderLabel: string;
-  signature: string;
+  signature: MailSignature;
   replyTo: string;
   open: boolean;
   onSaved?: () => void;
@@ -170,7 +171,7 @@ function TemplateEditor({
   const [body, setBody] = useState(template.body);
   const [attachContract, setAttachContract] = useState(template.attachContract);
 
-  const vars = previewRentalVars(templateLang, signature);
+  const vars = previewRentalVars(templateLang, signature.text);
   const rendered = renderRentalMail({ subject, body }, vars);
 
   return (
@@ -319,6 +320,7 @@ function TemplateEditor({
           replyTo={replyTo}
           subject={rendered.subject}
           body={rendered.body}
+          signature={signature}
           attachments={
             attachContract ? [templateLang === "nl" ? "huurcontract.pdf" : "rental-contract.pdf"] : []
           }

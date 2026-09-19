@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { MailSignature } from "@/lib/signatureProfile";
 import { Button, Card, Input, Label, Select, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import {
@@ -43,7 +44,7 @@ export function MailSettingsCard({
    * komt. Enkel om de voorbeelden te tonen: ze wordt hier niet bewerkt, want ze
    * hoort bij de persoon en staat op /account.
    */
-  signature: string;
+  signature: MailSignature;
 }) {
   const errors = lesbezoekAdminErrors(nl);
   const [items, setItems] = useState<LesbezoekTemplateItem[]>(() => {
@@ -400,11 +401,11 @@ function TemplatePreview({
 }: {
   nl: boolean;
   item: LesbezoekTemplateItem;
-  signature: string;
+  signature: MailSignature;
   senderLabel: string;
   replyTo: string;
 }) {
-  const vars = previewTemplateVars(item.lang === "en" ? "en" : "nl", signature);
+  const vars = previewTemplateVars(item.lang === "en" ? "en" : "nl", signature.text);
   const isRequester = item.category === "requester";
   return (
     <MailPreview
@@ -420,6 +421,7 @@ function TemplatePreview({
       replyTo={replyTo}
       subject={renderTemplate(item.subject, vars).replace(/\s+/g, " ").trim()}
       body={renderTemplate(item.body, vars)}
+      signature={signature}
       source={nl ? "met voorbeeldgegevens" : "with example data"}
     />
   );
