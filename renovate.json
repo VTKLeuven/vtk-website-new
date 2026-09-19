@@ -62,7 +62,10 @@
     {
       "description": "better-auth core and its plugins are released as a set.",
       "matchPackageNames": ["better-auth", "@better-auth/*", "auth"],
-      "groupName": "better-auth"
+      "groupName": "better-auth",
+      "vulnerabilityAlerts": {
+        "groupName": "better-auth"
+      }
     },
     {
       "description": "Node 20 is the whole stack: engines, the CI runners and the three Dockerfiles. Moving to a new major is a deliberate exercise, not a dependency PR.",

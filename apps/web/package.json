@@ -28,7 +28,7 @@
     "@vtk/ui": "*",
     "@zxing/browser": "^0.2.1",
     "archiver": "^7.0.1",
-    "better-auth": "1.6.26",
+    "better-auth": "1.7.5",
     "jsonwebtoken": "^9.0.3",
     "lucide-react": "^1.24.0",
     "next": "16.3.5",

@@ -5,13 +5,14 @@
  * merge both claim sets.
  */
 import "server-only";
-import type { OAuth2Tokens, OAuth2UserInfo } from "better-auth/oauth2";
+import type { OAuth2Tokens } from "better-auth/oauth2";
+import type { GenericOAuthUserInfo } from "better-auth/plugins/generic-oauth";
 
 export const KUL_USERINFO_URL = "https://idp.kuleuven.be/idp/profile/oidc/userinfo";
 const KUL_USERINFO_FETCHED = Symbol("KUL_USERINFO_FETCHED");
 
 type Claims = Record<string, unknown>;
-type KulUserInfo = OAuth2UserInfo &
+type KulUserInfo = GenericOAuthUserInfo &
   Claims & {
     [KUL_USERINFO_FETCHED]?: true;
   };
