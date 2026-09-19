@@ -13,6 +13,32 @@
   toestellen en Expo Go de wijzigingen ontvangen:
   `cd mobile && npx eas update --branch preview --environment preview --message "<korte beschrijving>"`.
 
+# Wat je niet kan zien, zet je in /admin/it/flows
+
+Sommige schermen en berichten krijg je met de site alleen nooit te zien: een mail
+vertrekt wanneer iemand anders iets doet (soms dagen later, soms enkel op een
+server met een mailserver erachter), en de onboarding zie je precies één keer.
+Wie wil weten of zoiets nog klopt, moest een bestelling naspelen of een kolom in
+de database leegzetten.
+
+**Voeg je zo'n mail of scherm toe, dan zet je er meteen een voorvertoning bij op
+/admin/it/flows.** Dat is geen apart verzoek: het hoort bij de feature, net als
+een toast bij een opslaan-knop.
+
+- Een mail komt in het register in `apps/web/lib/mailPreviews.ts`, met wanneer ze
+  vertrekt, naar wie, uit welk bestand en wat er verder over te weten valt.
+- **Het register roept de echte template aan, nooit een kopie van de tekst.**
+  Staat de tekst nog binnen de verzendfunctie, haal ze er dan eerst uit als een
+  pure functie die `{ subject, text }` (of `html`) teruggeeft en laat de
+  verzender die gebruiken. Een voorvertoning die de mail naschrijft, wijkt na de
+  eerste wijziging af en is dan erger dan geen voorvertoning.
+- Opgemaakte mails bouwen op `apps/web/lib/mailDesign.ts` (kaart, kleuren, kop
+  met de gele streep, pilknop); zet er geen tweede huisstijl naast.
+- Hetzelfde geldt voor een scherm dat enkel onder bepaalde omstandigheden
+  verschijnt (een gate, een modal na een eenmalige gebeurtenis): toon het echte
+  formulier met een actie die niets bewaart, zoals `previewNoopAction` daar al
+  doet.
+
 # UX-conventies
 
 Deze drie regels horen bij elkaar: elke actie zegt vooraf wat ze gaat doen

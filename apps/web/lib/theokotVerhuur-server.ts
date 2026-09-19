@@ -343,77 +343,88 @@ export type NotifyRentalInput = {
  * goedkeuren, en wie klikt hoort eerst te zien welke mail er in zijn naam
  * vertrekt.
  */
+export function newRentalNotificationMail(input: {
+  rental: NotifyRentalInput;
+  /** Volledige links naar het beslissingsscherm, eenmalig en 30 dagen geldig. */
+  approveUrl: string;
+  rejectUrl: string;
+  adminUrl: string;
+}): { subject: string; text: string } {
+  const { rental } = input;
+  const start = formatRentalMoment(rental.startsAt, "nl");
+  const end = formatRentalMoment(rental.endsAt, "nl");
+
+  const lines = [
+    `Verantwoordelijke: ${rental.responsibleName}`,
+    `E-mail: ${rental.email}`,
+    `Telefoon: ${rental.phone || "—"}`,
+    `Taal: ${rental.locale === "nl" ? "Nederlands" : "Engels"}`,
+    "",
+    `Wanneer: ${start.date} van ${start.time} tot ${end.time}${
+      start.date === end.date ? "" : ` (${end.date})`
+    }`,
+    `Aard van de activiteit: ${rental.purpose}`,
+    `Aantal aanwezigen: ${rental.attendees ?? "—"}`,
+    `Waarborg: ${depositChoiceLabel(rental.depositChoice, "nl")}`,
+    `Vermoedelijk: ${rental.renterType === "INTERNAL" ? "een post of werkgroep van VTK" : "een externe huurder"}`,
+  ];
+
+  if (rental.remarks?.trim()) {
+    lines.push("", "Opmerkingen:", rental.remarks.trim());
+  }
+  for (const extra of rental.extraAnswers) {
+    lines.push("", `${extra.label}:`, extra.value);
+  }
+  if (rental.clashes.length > 0) {
+    lines.push("", "! Let op, dit botst met:", ...rental.clashes.map((clash) => `- ${clash}`));
+  }
+
+  lines.push(
+    "",
+    "-------------------------------------------------------------------",
+    "BESLISSEN VANUIT DEZE MAIL",
+    "",
+    "De twee links hieronder openen een bevestigingsscherm. Daar zie je welke",
+    "mail er naar de aanvrager vertrekt en kan je ze nog aanpassen. Op datzelfde",
+    "scherm staat ook een knop die enkel de status zet, zonder te mailen.",
+    "Er vertrekt dus niets door hier te klikken.",
+    "",
+    `Goedkeuren: ${input.approveUrl}`,
+    `Weigeren:   ${input.rejectUrl}`,
+    "",
+    "Beide links werken eenmalig en vervallen na 30 dagen. Zodra er beslist is,",
+    "doet de andere link niets meer.",
+    "-------------------------------------------------------------------",
+    "",
+    `In het beheer: ${input.adminUrl}`,
+  );
+
+  return {
+    subject: `[Theokot verhuur] ${rental.responsibleName} — ${start.date}`,
+    text: lines.join("\n"),
+  };
+}
+
 export async function notifyNewRental(rental: NotifyRentalInput): Promise<void> {
   try {
     const config = await getRentalConfig();
     if (config.notifyEmails.length === 0) return;
 
-    const start = formatRentalMoment(rental.startsAt, "nl");
-    const end = formatRentalMoment(rental.endsAt, "nl");
     const base = siteUrl();
-
     const [approveToken, rejectToken] = await Promise.all([
       createDecisionToken(rental.id, "APPROVE"),
       createDecisionToken(rental.id, "REJECT"),
     ]);
 
-    const lines = [
-      `Verantwoordelijke: ${rental.responsibleName}`,
-      `E-mail: ${rental.email}`,
-      `Telefoon: ${rental.phone || "—"}`,
-      `Taal: ${rental.locale === "nl" ? "Nederlands" : "Engels"}`,
-      "",
-      `Wanneer: ${start.date} van ${start.time} tot ${end.time}${
-        start.date === end.date ? "" : ` (${end.date})`
-      }`,
-      `Aard van de activiteit: ${rental.purpose}`,
-      `Aantal aanwezigen: ${rental.attendees ?? "—"}`,
-      `Waarborg: ${depositChoiceLabel(rental.depositChoice, "nl")}`,
-      `Vermoedelijk: ${rental.renterType === "INTERNAL" ? "een post of werkgroep van VTK" : "een externe huurder"}`,
-    ];
-
-    if (rental.remarks?.trim()) {
-      lines.push("", "Opmerkingen:", rental.remarks.trim());
-    }
-    for (const extra of rental.extraAnswers) {
-      lines.push("", `${extra.label}:`, extra.value);
-    }
-    if (rental.clashes.length > 0) {
-      lines.push(
-        "",
-        "! Let op, dit botst met:",
-        ...rental.clashes.map((clash) => `- ${clash}`),
-      );
-    }
-
-    lines.push(
-      "",
-      "-------------------------------------------------------------------",
-      "BESLISSEN VANUIT DEZE MAIL",
-      "",
-      "De twee links hieronder openen een bevestigingsscherm. Daar zie je welke",
-      "mail er naar de aanvrager vertrekt en kan je ze nog aanpassen. Op datzelfde",
-      "scherm staat ook een knop die enkel de status zet, zonder te mailen.",
-      "Er vertrekt dus niets door hier te klikken.",
-      "",
-      `Goedkeuren: ${base}/theokot/verhuur/beslissing/${approveToken}`,
-      `Weigeren:   ${base}/theokot/verhuur/beslissing/${rejectToken}`,
-      "",
-      "Beide links werken eenmalig en vervallen na 30 dagen. Zodra er beslist is,",
-      "doet de andere link niets meer.",
-      "-------------------------------------------------------------------",
-      "",
-      `In het beheer: ${base}/admin/theokot/verhuur`,
-    );
+    const mail = newRentalNotificationMail({
+      rental,
+      approveUrl: `${base}/theokot/verhuur/beslissing/${approveToken}`,
+      rejectUrl: `${base}/theokot/verhuur/beslissing/${rejectToken}`,
+      adminUrl: `${base}/admin/theokot/verhuur`,
+    });
 
     await sendMail(
-      {
-        to: config.notifyEmails.join(", "),
-        from: RENTAL_FROM,
-        replyTo: rental.email,
-        subject: `[Theokot verhuur] ${rental.responsibleName} — ${start.date}`,
-        text: lines.join("\n"),
-      },
+      { to: config.notifyEmails.join(", "), from: RENTAL_FROM, replyTo: rental.email, ...mail },
       { source: "theokotRental" },
     );
   } catch (err) {

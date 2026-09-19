@@ -56,6 +56,70 @@ export function revalidatePiano(): void {
  * De unieke index op `startsAt` vangt de race af waarin twee leden tegelijk
  * hetzelfde slot indrukken: de tweede krijgt een P2002 en dus `TAKEN`.
  */
+/**
+ * De bevestiging van een pianoreservatie. Puur, los van het versturen: zo toont
+ * de voorvertoning in /admin/it/flows dezelfde mail als de speler krijgt.
+ *
+ * Deze mail is meteen het toegangsbewijs: de bewaking van het kasteel mag ernaar
+ * vragen. Zie docs/design-decisions.md, "De bevestigingsmail als bewijs".
+ */
+export function pianoConfirmationMail(input: {
+  name: string;
+  locale: "NL" | "EN";
+  startsAt: Date;
+  endsAt: Date;
+}): { subject: string; text: string } {
+  const isNl = input.locale !== "EN";
+  const dateLocale = isNl ? "nl-BE" : "en-GB";
+  const dayFmt = new Intl.DateTimeFormat(dateLocale, {
+    timeZone: "Europe/Brussels",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const timeFmt = new Intl.DateTimeFormat(dateLocale, {
+    timeZone: "Europe/Brussels",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const dateStr = dayFmt.format(input.startsAt);
+  const timeStr = `${timeFmt.format(input.startsAt)} - ${timeFmt.format(input.endsAt)}`;
+  return {
+    subject: isNl
+      ? `Bevestiging reservatie piano: ${dateStr}`
+      : `Piano booking confirmation: ${dateStr}`,
+    text: isNl
+      ? [
+          `Dag ${input.name},`,
+          "",
+          `Je reservatie voor de piano in lokaal 01.52 van het kasteel Arenberg is bevestigd:`,
+          "",
+          `• Datum: ${dateStr}`,
+          `• Tijdstip: ${timeStr}`,
+          `• Locatie: Lokaal 01.52, kasteel Arenberg`,
+          "",
+          `Hou deze bevestigingsmail bij tijdens het spelen: de bewaking kan ernaar vragen als bewijs.`,
+          "",
+          `Groeten,`,
+          `VTK`,
+        ].join("\n")
+      : [
+          `Hi ${input.name},`,
+          "",
+          `Your reservation for the piano in room 01.52 of Arenberg castle has been confirmed:`,
+          "",
+          `• Date: ${dateStr}`,
+          `• Time: ${timeStr}`,
+          `• Location: Room 01.52, Arenberg castle`,
+          "",
+          `Please keep this confirmation email with you while playing: security may ask for it as proof.`,
+          "",
+          `Best regards,`,
+          `VTK`,
+        ].join("\n"),
+  };
+}
+
 export async function reservePianoSlot(
   userId: string,
   startsAt: Date,
@@ -109,59 +173,13 @@ export async function reservePianoSlot(
       select: { email: true, firstName: true, name: true, locale: true },
     });
     if (user?.email) {
-      const isNl = user.locale !== "EN";
-      const dateLocale = isNl ? "nl-BE" : "en-GB";
-      const dayFmt = new Intl.DateTimeFormat(dateLocale, {
-        timeZone: "Europe/Brussels",
-        weekday: "long",
-        day: "numeric",
-        month: "long",
+      const mail = pianoConfirmationMail({
+        name: user.firstName || user.name || "student",
+        locale: user.locale === "EN" ? "EN" : "NL",
+        startsAt: slot.startsAt,
+        endsAt: slot.endsAt,
       });
-      const timeFmt = new Intl.DateTimeFormat(dateLocale, {
-        timeZone: "Europe/Brussels",
-        hour: "2-digit",
-        minute: "2-digit",
-      });
-      const dateStr = dayFmt.format(slot.startsAt);
-      const timeStr = `${timeFmt.format(slot.startsAt)} - ${timeFmt.format(slot.endsAt)}`;
-      const name = user.firstName || user.name || "student";
-      const subject = isNl
-        ? `Bevestiging reservatie piano: ${dateStr}`
-        : `Piano booking confirmation: ${dateStr}`;
-      const text = isNl
-        ? [
-            `Dag ${name},`,
-            "",
-            `Je reservatie voor de piano in lokaal 01.52 van het kasteel Arenberg is bevestigd:`,
-            "",
-            `• Datum: ${dateStr}`,
-            `• Tijdstip: ${timeStr}`,
-            `• Locatie: Lokaal 01.52, kasteel Arenberg`,
-            "",
-            `Hou deze bevestigingsmail bij tijdens het spelen: de bewaking kan ernaar vragen als bewijs.`,
-            "",
-            `Groeten,`,
-            `VTK`,
-          ].join("\n")
-        : [
-            `Hi ${name},`,
-            "",
-            `Your reservation for the piano in room 01.52 of Arenberg castle has been confirmed:`,
-            "",
-            `• Date: ${dateStr}`,
-            `• Time: ${timeStr}`,
-            `• Location: Room 01.52, Arenberg castle`,
-            "",
-            `Please keep this confirmation email with you while playing: security may ask for it as proof.`,
-            "",
-            `Best regards,`,
-            `VTK`,
-          ].join("\n");
-
-      await sendMail(
-        { to: user.email, subject, text },
-        { source: "website", throwOnError: false },
-      );
+      await sendMail({ to: user.email, ...mail }, { source: "website", throwOnError: false });
     }
   } catch {
     // Een mislukte mail mag de reservatie zelf nooit blokkeren.

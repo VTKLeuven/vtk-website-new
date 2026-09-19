@@ -133,7 +133,7 @@ export async function sendLesbezoekMail(input: {
  * Faalt nooit naar buiten toe: als deze mail niet vertrekt, staat de aanvraag nog
  * altijd in het beheer, en de aanvrager mag daar geen foutmelding voor krijgen.
  */
-export async function notifyNewLesbezoek(visit: {
+type NewLesbezoekInput = {
   startsAt: Date;
   course: string;
   audience: string;
@@ -141,27 +141,39 @@ export async function notifyNewLesbezoek(visit: {
   teacherEmail: string;
   requesterEmail: string | null;
   organisation: { name: string };
-}): Promise<void> {
+};
+
+/** Onderwerp en tekst van de melding, los van het versturen. */
+export function newLesbezoekNotificationMail(visit: NewLesbezoekInput): {
+  subject: string;
+  text: string;
+} {
+  const { date, time } = formatMailMoment(visit.startsAt, "nl");
+  return {
+    subject: `[Lesbezoek] ${visit.organisation.name} — ${visit.course} op ${date}`,
+    text: [
+      `Organisatie: ${visit.organisation.name}`,
+      `Onderwerp: ${visit.subject}`,
+      `Doelgroep: ${visit.audience}`,
+      `Vak: ${visit.course}`,
+      `Wanneer: ${date} om ${time}`,
+      `Professor: ${visit.teacherEmail}`,
+      `Aanvrager: ${visit.requesterEmail ?? "—"}`,
+      "",
+      "Beoordelen doe je in het beheer onder Lesbezoeken.",
+    ].join("\n"),
+  };
+}
+
+export async function notifyNewLesbezoek(visit: NewLesbezoekInput): Promise<void> {
   try {
     const config = await getLesbezoekConfig();
-    const { date, time } = formatMailMoment(visit.startsAt, "nl");
     await sendMail(
       {
         to: config.notifyEmail,
         from: LESBEZOEK_FROM,
         replyTo: visit.requesterEmail ?? undefined,
-        subject: `[Lesbezoek] ${visit.organisation.name} — ${visit.course} op ${date}`,
-        text: [
-          `Organisatie: ${visit.organisation.name}`,
-          `Onderwerp: ${visit.subject}`,
-          `Doelgroep: ${visit.audience}`,
-          `Vak: ${visit.course}`,
-          `Wanneer: ${date} om ${time}`,
-          `Professor: ${visit.teacherEmail}`,
-          `Aanvrager: ${visit.requesterEmail ?? "—"}`,
-          "",
-          "Beoordelen doe je in het beheer onder Lesbezoeken.",
-        ].join("\n"),
+        ...newLesbezoekNotificationMail(visit),
       },
       { source: "lesbezoeken" },
     );

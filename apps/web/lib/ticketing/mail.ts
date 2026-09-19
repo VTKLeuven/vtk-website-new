@@ -1,6 +1,13 @@
 import "server-only";
 
 import { deliverWebsiteMail } from "@/lib/email";
+import {
+  MAIL_COLOR as COLOR,
+  MAIL_FONT as FONT,
+  escapeHtml,
+  mailButton,
+  mailDocument,
+} from "@/lib/mailDesign";
 import { formatMoney } from "./money";
 
 export type MailAttachment = {
@@ -113,40 +120,12 @@ export function attachmentLine(contents: OrderMailContents, nl: boolean): string
 
    Dezelfde taal als de ticketkaart op /tickets: de poster van het event, de
    titel met de gele streep eronder en de gele datumpin ernaast, en daaronder de
-   praktische regels en de bestellijnen. De kleuren
-   zijn de tokens uit `app/design/vtk-base.css`; ze staan hier als hex omdat
-   een mailbox geen stylesheet en geen custom properties laadt.
+   praktische regels en de bestellijnen.
 
-   Wat een mailclient niet meedoet, valt netjes terug: Outlook (de Word-engine)
-   negeert `border-radius`, dus daar zijn de hoeken van de kaart, de pin en de
-   knop vierkant. Verder staat er niets in deze mail dat op meer dan tabellen en
-   inline stijlen rekent.
+   De kaart, de kleuren, de knop en de kop met de gele streep komen uit
+   `lib/mailDesign.ts`; hier staat enkel wat deze mail eigen is. Verder rekent
+   niets hier op meer dan tabellen en inline stijlen.
    ------------------------------------------------------------------------- */
-
-const COLOR = {
-  paper: "#eff2f8",
-  paper2: "#e6ecf5",
-  surface: "#ffffff",
-  ink: "#0a0f1f",
-  navy: "#0e1a36",
-  body: "#34405e",
-  muted: "#5c667f",
-  yellow: "#ffd23f",
-  /** `--line` (10% navy) uitgerekend op wit; een mail kent geen rgba-mengsel. */
-  line: "#e7e8eb",
-} as const;
-
-/**
- * Outlook (de Word-engine) rekent `max-width` niet mee, dus daar zou de kaart de
- * volle breedte van het venster innemen. Deze twee stukken zetten er enkel voor
- * Outlook een tabel van 600 px omheen. Andersom kan niet: een vaste breedte van
- * 600 op de kaart zelf duwt een telefoon in horizontaal scrollen.
- */
-const MSO_OPEN =
-  '<!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600"><tr><td><![endif]-->';
-const MSO_CLOSE = "<!--[if mso]></td></tr></table><![endif]-->";
-
-const FONT = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',Arial,sans-serif";
 
 function dateLocale(nl: boolean): string {
   return nl ? "nl-BE" : "en-GB";
@@ -274,10 +253,6 @@ function summaryHtml(summary: OrderMailSummary | undefined, nl: boolean): string
   return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-collapse:collapse;margin-top:22px;font-family:${FONT}"><tr><td colspan="3" style="border-top:1px solid ${COLOR.line};font-size:0;line-height:0">&nbsp;</td></tr>${lines}${total}${refunded}</table>`;
 }
 
-function buttonHtml(url: string, label: string): string {
-  return `<a href="${escapeHtml(url)}" style="display:inline-block;background:${COLOR.ink};color:#ffffff;text-decoration:none;padding:13px 20px;border-radius:999px;font-family:${FONT};font-size:14px;font-weight:700;line-height:1">${escapeHtml(label)}</a>`;
-}
-
 export function orderConfirmationMail(input: {
   locale: "nl" | "en";
   buyerName: string;
@@ -365,7 +340,11 @@ export function orderConfirmationMail(input: {
     ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%"><tr><td valign="top" style="padding-right:14px">${ownerHtml}${titleHtml(input.eventName)}${factsHtml(input.event, nl)}</td><td valign="top" align="right" width="64" style="width:64px">${pinHtml(input.event, nl)}</td></tr></table>`
     : `${ownerHtml}${titleHtml(input.eventName)}`;
 
-  const html = `<!doctype html><html lang="${nl ? "nl" : "en"}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(subject)}</title></head><body style="margin:0;padding:0;background:${COLOR.paper};color:${COLOR.ink};font-family:${FONT}"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background:${COLOR.paper}"><tr><td align="center" style="padding:32px 16px">${MSO_OPEN}<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;max-width:600px;background:${COLOR.surface};border:1px solid ${COLOR.line};border-radius:18px;overflow:hidden">${posterHtml(input.event)}<tr><td style="padding:26px 30px 30px">${headHtml}<p style="margin:20px 0 0;font-size:15.5px;line-height:1.6;color:${COLOR.body}">${escapeHtml(intro)}</p><p style="margin:22px 0 0">${buttonHtml(input.orderUrl, button)}</p>${attachedHtml}${googleHtml}${summaryHtml(input.summary, nl)}</td></tr><tr><td style="padding:16px 30px;background:${COLOR.paper2};border-top:1px solid ${COLOR.line}"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%"><tr><td style="font-size:12px;line-height:1.5;color:${COLOR.muted}">${escapeHtml(warning)}</td><td align="right" style="font-size:12px;font-weight:600;color:${COLOR.muted};white-space:nowrap;padding-left:14px">${escapeHtml(input.orderNumber)}</td></tr></table></td></tr></table>${MSO_CLOSE}</td></tr></table></body></html>`;
+  const html = mailDocument({
+    lang: nl ? "nl" : "en",
+    title: subject,
+    rows: `${posterHtml(input.event)}<tr><td style="padding:26px 30px 30px">${headHtml}<p style="margin:20px 0 0;font-size:15.5px;line-height:1.6;color:${COLOR.body}">${escapeHtml(intro)}</p><p style="margin:22px 0 0">${mailButton(input.orderUrl, button)}</p>${attachedHtml}${googleHtml}${summaryHtml(input.summary, nl)}</td></tr><tr><td style="padding:16px 30px;background:${COLOR.paper2};border-top:1px solid ${COLOR.line}"><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%"><tr><td style="font-size:12px;line-height:1.5;color:${COLOR.muted}">${escapeHtml(warning)}</td><td align="right" style="font-size:12px;font-weight:600;color:${COLOR.muted};white-space:nowrap;padding-left:14px">${escapeHtml(input.orderNumber)}</td></tr></table></td></tr>`,
+  });
 
   return {
     to: input.buyerEmail,
@@ -375,17 +354,4 @@ export function orderConfirmationMail(input: {
     text: textLines.join("\n"),
     html,
   };
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>'"]/g, (character) => {
-    const entities: Record<string, string> = {
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      "'": "&#39;",
-      '"': "&quot;",
-    };
-    return entities[character] ?? character;
-  });
 }

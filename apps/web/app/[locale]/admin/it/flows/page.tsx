@@ -28,11 +28,14 @@ import {
   type MembershipOffer,
 } from "@/lib/membership";
 import { SaveForm } from "@/components/ui/SaveForm";
+import { mailPreviewGroups } from "@/lib/mailPreviews";
 import { FlowPreview } from "./FlowPreview";
+import { MailPreviewList } from "./MailPreviewList";
 
 /**
- * Voorvertoning van de twee gates: de onboarding en de jaarlijkse
- * studiebevestiging.
+ * Voorvertoning van alles wat je op de site zelf niet te zien krijgt: de twee
+ * gates (onboarding en de jaarlijkse studiebevestiging) en elke mail die de
+ * site opstelt.
  *
  * Beide schermen zie je precies één keer, en daarna nooit meer. Daardoor is er
  * geen manier om te controleren of ze nog kloppen: je eigen account is al
@@ -45,6 +48,13 @@ import { FlowPreview } from "./FlowPreview";
  * niets bewaart (`previewNoopAction`). Een nagebouwde kopie zou vroeg of laat
  * afwijken van wat een nieuw lid werkelijk ziet, en dan is de voorvertoning
  * erger dan geen voorvertoning.
+ *
+ * Voor de mails geldt hetzelfde, en om dezelfde reden: die vertrekken wanneer
+ * iemand anders iets doet, soms dagen later en soms enkel op een server met een
+ * mailserver erachter. `lib/mailPreviews.ts` roept per mail de echte template
+ * aan met verzonnen gegevens. **Komt er een mail bij (of een scherm dat je enkel
+ * onder bepaalde omstandigheden ziet), dan hoort ze daar meteen bij**; zie
+ * CLAUDE.md.
  *
  * De regels erboven zijn geen documentatie maar afgeleide waarden: het huidige
  * academiejaar, de eerstvolgende omslag, en de eigen staat van de kijker.
@@ -204,12 +214,12 @@ export default async function AdminFlowPreview({
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-semibold text-vtk-ink">
-          {nl ? "Onboarding & jaarlijkse bevestiging" : "Onboarding & yearly confirmation"}
+          {nl ? "Mails & schermen" : "Emails & screens"}
         </h1>
         <p className="mt-1 max-w-3xl text-sm text-[#5c667f]">
           {nl
-            ? "De twee schermen die een lid maar één keer ziet. Hieronder staat wanneer ze verschijnen en hoe ze eruitzien; het zijn de echte formulieren, maar de opslaan-knop bewaart hier niets. Je eigen profiel en je studiebevestiging blijven dus ongemoeid."
-            : "The two screens a member only ever sees once. Below is when they appear and what they look like; these are the real forms, but the save button stores nothing here. Your own profile and study confirmation stay untouched."}
+            ? "Alles wat je op de site zelf niet te zien krijgt: de twee schermen die een lid maar één keer ziet, en elke mail die de site opstelt. Hieronder staat per stuk wanneer het verschijnt en hoe het eruitziet. Het zijn de echte formulieren en de echte templates, maar er wordt hier niets opgeslagen en er vertrekt geen mail."
+            : "Everything you cannot see on the site itself: the two screens a member only ever sees once, and every email the site composes. Below is when each one appears and what it looks like. These are the real forms and the real templates, but nothing is saved here and no email is sent."}
         </p>
       </div>
 
@@ -438,6 +448,20 @@ export default async function AdminFlowPreview({
           />
         </SaveForm>
       </FlowPreview>
+
+      <section className="space-y-4 pt-2">
+        <div>
+          <h2 className="text-xl font-semibold text-vtk-ink">
+            {nl ? "Mails die de site verstuurt" : "Emails the site sends"}
+          </h2>
+          <p className="mt-1 max-w-3xl text-sm text-[#5c667f]">
+            {nl
+              ? "Elke voorvertoning roept dezelfde template aan als de verzender, met verzonnen gegevens. Wat er werkelijk verstuurd is, staat in het maillogboek."
+              : "Every preview calls the same template as the sender, with made-up data. What was actually sent is in the email log."}
+          </p>
+        </div>
+        <MailPreviewList groups={mailPreviewGroups()} />
+      </section>
 
       {/* De echte schermen, voor wie wil zien hoe ze in hun eigen paginakader
           staan. Enkel zinvol wanneer de gate voor jou actief is; anders stuurt

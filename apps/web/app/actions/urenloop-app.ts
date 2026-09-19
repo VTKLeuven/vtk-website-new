@@ -5,6 +5,7 @@ import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { sendMail } from "@/lib/email";
+import { urenloopDownloadCodeMail } from "@/lib/urenloopAppMail";
 import { requirePermission } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
@@ -137,22 +138,8 @@ export async function requestCodeAction(
   const issued = await issueCode(email);
   if (!issued.ok) return saveOk();
 
-  const minutes = CODE_TTL_MINUTES;
   await sendMail(
-    {
-      to: email,
-      subject: `Je code voor de 24urenloop-app: ${issued.code}`,
-      text: [
-        "Hallo,",
-        "",
-        `Je code om de 24urenloop-app te downloaden is: ${issued.code}`,
-        "",
-        `De code blijft ${minutes} minuten geldig en werkt één keer.`,
-        "Vroeg je zelf geen code aan? Dan hoef je niets te doen; zonder de code gebeurt er niets.",
-        "",
-        "VTK Leuven",
-      ].join("\n"),
-    },
+    { to: email, ...urenloopDownloadCodeMail({ code: issued.code, minutes: CODE_TTL_MINUTES }) },
     { source: "urenloopApp" },
   );
 

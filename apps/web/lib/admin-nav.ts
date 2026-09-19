@@ -181,8 +181,10 @@ export function getAdminNav(): NavEntry[] {
       item('door', '/deur', { perm: 'door.manage' }),
       item('sso', '/sso', { perm: 'oauth.client.edit' }),
       item('authorizationPreview', '/it/preview', { superAdminOnly: true }),
-      // De onboarding en de jaarlijkse bevestiging zie je maar één keer; zonder
-      // deze pagina is er geen manier om te controleren of ze nog kloppen.
+      // Alles wat je op de site zelf niet te zien krijgt: de onboarding en de
+      // jaarlijkse bevestiging (die zie je maar één keer) en elke mail die de
+      // site opstelt. Zonder deze pagina is er geen manier om te controleren of
+      // ze nog kloppen.
       item('flowPreview', '/it/flows', { superAdminOnly: true }),
       item('urenloopApp', '/it/24ul-app', { perm: 'urenloopApp.manage' }),
       // Wat leden over de site zelf melden. Onder IT en niet onder Website: het

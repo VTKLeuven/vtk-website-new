@@ -5132,6 +5132,62 @@ omdat de mail vaak doorgestuurd wordt naar wie meekomt.
 
 ---
 
+## Een evenement dat bijna op de homepage staat, mailt zijn post
+
+Komt een evenement in het weekoverzicht van de hero terwijl het nog een concept
+is of nog geen eigen banner heeft, dan krijgt de post die het beheert daar één
+mail over, op haar eigen adres (`onthaal@vtk.be` voor Onthaal).
+
+**Waarom.** Het weekoverzicht vult zich vanzelf: een evenement schuift erin zodra
+het binnen zes dagen valt. Precies dan is het te laat om nog rustig een affiche
+te laten maken, en een concept verschijnt helemaal nergens. Wie het evenement
+aanmaakte, kijkt op dat moment meestal al naar de volgende activiteit.
+
+- **Het venster is dat van de hero zelf** (`lib/calendar/heroWeekNotice.ts`), niet
+  "vijf dagen vooraf". Verandert de hero ooit van vorm, dan schuift deze
+  herinnering mee in plaats van er stilletjes naast te gaan lopen.
+- **Een concept telt mee, ook al staat het nergens.** Dat is het punt: het zou in
+  het overzicht staan als het gepubliceerd was.
+- **`heroWeek = HIDDEN` krijgt niets.** Iemand heeft dat evenement bewust uit het
+  weekoverzicht gehaald; "het komt bijna op de homepage" is dan onjuist.
+- **Eén mail per evenement** (`CalendarEvent.heroWeekNoticeAt`, geclaimd voor er
+  iets vertrekt, nooit teruggezet). Ontbreken de banner én de publicatie, dan is
+  dat één mail met twee punten. Wie daarna enkel de banner toevoegt, krijgt geen
+  tweede herinnering: twee mails over hetzelfde evenement lezen als spam, en dan
+  wordt ook de eerste genegeerd.
+- **Naar de post en niet naar de maker.** Een evenement is van een post, en de
+  persoon die het aanmaakte is een maand later misschien met iets anders bezig.
+  Het adres volgt de regel van de kring (post op `@vtk.be`); staat het adres als
+  lijst in de site, dan gaat dat voor (`lib/groupMail.ts`).
+- Ze vertrekt mee met de `background-worker`, elke vijf minuten, naast de
+  Theokot-no-shows en de geplande lesbezoekmails.
+
+---
+
+## Elke mail en elk eenmalig scherm heeft een voorvertoning in de admin
+
+/admin/it/flows toont de twee gates (onboarding en de jaarlijkse
+studiebevestiging) én elke mail die de site opstelt, met per stuk wanneer ze
+vertrekt en naar wie.
+
+**Waarom.** Deze dingen zie je met de site alleen nooit: een mail vertrekt
+wanneer iemand anders iets doet, en de onboarding zie je precies één keer.
+Nakijken of een tekst nog klopt, betekende een bestelling naspelen of
+`onboardedAt` leegzetten, en dat laatste is precies hoe je je eigen profiel wist.
+
+- **De voorvertoning roept de echte template aan** (`lib/mailPreviews.ts`), nooit
+  een kopie van de tekst. Daarom zijn de teksten die nog binnen hun
+  verzendfunctie stonden, eruit gehaald als pure functies. Een voorvertoning die
+  de mail naschrijft, wijkt na de eerste wijziging af.
+- **De gegevens zijn zichtbaar verzonnen** (Wannes Voorbeeld, VTK-26-VOORBEELD):
+  niemand mag deze pagina voor een echte bestelling aanzien, en er staat geen
+  ledengegeven op een scherm waar het niet hoort.
+- Een opgemaakte mail staat in een `iframe` met `sandbox`: die mail brengt haar
+  eigen html mee, en die hoort niet in de opmaak van de admin te lekken.
+- De regel dat een nieuwe mail hier meteen bij hoort, staat in CLAUDE.md.
+
+---
+
 ## De mailserver wil weten wie er belt (EHLO)
 
 Beide mailers zetten expliciet de naam waarmee de site zich voorstelt bij de

@@ -1655,6 +1655,13 @@ model CalendarEvent {
   /// met de permissie `calendar.heroWeek`.
   heroWeek HeroWeekPlacement @default(AUTO)
 
+  /// Wanneer de post een mail kreeg dat dit evenement in het weekoverzicht van
+  /// de homepage komt terwijl het nog een concept is of nog geen eigen banner
+  /// heeft. Zelfde afspraak als `announcedPushAt` hierboven: geclaimd voor er
+  /// iets vertrekt, en nooit teruggezet, want een tweede herinnering voor
+  /// hetzelfde evenement is spam. Zie apps/web/lib/calendar/heroWeekNotice.ts.
+  heroWeekNoticeAt DateTime? @db.Timestamptz(3)
+
   group          Group                        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy      User?                        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
   ticketEvent    TicketEvent?
@@ -1672,6 +1679,7 @@ model CalendarEvent {
 
   @@index([start])
   @@index([publishedAt, announcedPushAt])
+  @@index([heroWeekNoticeAt, start])
   @@index([groupId])
   @@index([searchNl], type: Gin)
   @@index([searchEn], type: Gin)
