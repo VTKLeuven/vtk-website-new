@@ -8,6 +8,7 @@ import {
   formatPriceCents,
   isoWeekNumber,
   parseDateOnly,
+  onTripForNotes,
   requesterChoiceOf,
   requesterLabel,
   toBrusselsDateValue,
@@ -34,6 +35,7 @@ import {
   eventsInRange,
   getLogistiekSettings,
   transportAuditLogsByBooking,
+  tripNotesFor,
   transportRange,
   type TransportBooking,
 } from '@/lib/uitleen-server';
@@ -101,7 +103,7 @@ export default async function VervoerWeekPage({
     aanvrager?: string;
   }>;
 }) {
-  await requireManage();
+  const session = await requireManage();
   const query = await searchParams;
   const { weergave, datum, week } = query;
 
@@ -163,6 +165,20 @@ export default async function VervoerWeekPage({
   // De historiek van de getoonde ritten in één query; ze staat ingeklapt in het
   // paneel, maar wordt hier server-side gerenderd, zoals op /beheer/vervoer.
   const history = await transportAuditLogsByBooking(bookings.map((booking) => booking.id));
+  // De eigen nota's van de getoonde ritten (F4.20): wat er met Logistiek gedeeld
+  // is, plus wat dit teamlid zelf schreef. Andermans privénota's komen niet uit
+  // de databank, ook niet met `logistiek.manage`. `onTripIds` zijn de ritten
+  // waar dit teamlid zelf bij hoort, want daar leest hij ook de nota's die enkel
+  // voor de post bedoeld zijn: dan ís het zijn post.
+  const viewer = { userId: session.user.id, groupIds: session.groups.map((group) => group.id) };
+  const notesPerTrip = await tripNotesFor(
+    bookings.map((booking) => booking.id),
+    {
+      userId: session.user.id,
+      onTripIds: bookings.filter((booking) => onTripForNotes(booking, viewer)).map((b) => b.id),
+      logistiek: true,
+    }
+  );
 
   // De filters blijven staan wanneer je van week naar week bladert: ze horen bij
   // waar je naar kijkt, niet bij wanneer.
@@ -267,6 +283,7 @@ export default async function VervoerWeekPage({
       deleteCount: legs.length,
       deleteDescription: transportDeleteDescription(legs),
       history: history.get(booking.id) ?? [],
+      notes: notesPerTrip.get(booking.id) ?? [],
       legs: legs
         .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
         .map((leg) => ({

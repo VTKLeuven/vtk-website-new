@@ -733,27 +733,28 @@ model User {
 
   pianoReservations PianoReservation[]
 
-  uitleenReservations     UitleenReservation[]        @relation("UitleenReservationUser")
-  uitleenDecided          UitleenReservation[]        @relation("UitleenDecidedBy")
-  uitleenPickedUp         UitleenReservation[]        @relation("UitleenPickedUpBy")
-  uitleenReturned         UitleenReservation[]        @relation("UitleenReturnedBy")
-  uitleenLinesPrepared    UitleenReservationLine[]    @relation("UitleenLinePreparedBy")
-  uitleenTemplates        UitleenRequestTemplate[]    @relation("UitleenTemplateCreatedBy")
-  ticketTemplates         TicketEventTemplate[]       @relation("TicketTemplateCreatedBy")
-  uitleenEvents           UitleenEvent[]              @relation("UitleenEventCreatedBy")
-  uitleenEventExtraItems  UitleenEventExtraItem[]     @relation("UitleenEventExtraItemCreatedBy")
-  uitleenTransport        UitleenTransportBooking[]   @relation("UitleenTransportUser")
-  uitleenTransportDriven  UitleenTransportBooking[]   @relation("UitleenTransportDriver")
-  uitleenTransportDecided UitleenTransportBooking[]   @relation("UitleenTransportDecidedBy")
-  uitleenTransportDone    UitleenTransportBooking[]   @relation("UitleenTransportCompletedBy")
-  collectEnGoImported     CollectEnGoOrder[]          @relation("CollectEnGoImportedBy")
-  uitleenDriver           UitleenDriver?              @relation("UitleenDriverUser")
-  uitleenFeedTokens       UitleenFeedToken[]          @relation("UitleenFeedTokenUser")
-  uitleenAvailability     UitleenDriverAvailability[] @relation("UitleenDriverAvailabilityUser")
+  uitleenReservations      UitleenReservation[]            @relation("UitleenReservationUser")
+  uitleenDecided           UitleenReservation[]            @relation("UitleenDecidedBy")
+  uitleenPickedUp          UitleenReservation[]            @relation("UitleenPickedUpBy")
+  uitleenReturned          UitleenReservation[]            @relation("UitleenReturnedBy")
+  uitleenLinesPrepared     UitleenReservationLine[]        @relation("UitleenLinePreparedBy")
+  uitleenTemplates         UitleenRequestTemplate[]        @relation("UitleenTemplateCreatedBy")
+  ticketTemplates          TicketEventTemplate[]           @relation("TicketTemplateCreatedBy")
+  uitleenEvents            UitleenEvent[]                  @relation("UitleenEventCreatedBy")
+  uitleenEventExtraItems   UitleenEventExtraItem[]         @relation("UitleenEventExtraItemCreatedBy")
+  uitleenTransport         UitleenTransportBooking[]       @relation("UitleenTransportUser")
+  uitleenTransportDriven   UitleenTransportBooking[]       @relation("UitleenTransportDriver")
+  uitleenTransportDecided  UitleenTransportBooking[]       @relation("UitleenTransportDecidedBy")
+  uitleenTransportDone     UitleenTransportBooking[]       @relation("UitleenTransportCompletedBy")
+  collectEnGoImported      CollectEnGoOrder[]              @relation("CollectEnGoImportedBy")
+  uitleenDriver            UitleenDriver?                  @relation("UitleenDriverUser")
+  uitleenFeedTokens        UitleenFeedToken[]              @relation("UitleenFeedTokenUser")
+  uitleenAvailability      UitleenDriverAvailability[]     @relation("UitleenDriverAvailabilityUser")
   uitleenAvailabilityNotes UitleenDriverAvailabilityNote[] @relation("UitleenDriverAvailabilityNoteUser")
-  uitleenHelpersAdded     UitleenTransportHelper[]    @relation("UitleenTransportHelperAddedBy")
-  uitleenDriversAdded     UitleenDriver[]             @relation("UitleenDriverAddedBy")
-  uitleenAuditLogs        UitleenAuditLog[]           @relation("UitleenAuditActor")
+  uitleenHelpersAdded      UitleenTransportHelper[]        @relation("UitleenTransportHelperAddedBy")
+  uitleenTripNotes         UitleenTransportNote[]          @relation("UitleenTransportNoteAuthor")
+  uitleenDriversAdded      UitleenDriver[]                 @relation("UitleenDriverAddedBy")
+  uitleenAuditLogs         UitleenAuditLog[]               @relation("UitleenAuditActor")
 
   doorGrants         DoorAccessGrant[]
   doorLogs           DoorAccessLog[]
@@ -4344,6 +4345,7 @@ model UitleenTransportBooking {
   payments  UitleenPayment[]
   auditLogs UitleenAuditLog[]
   helpers   UitleenTransportHelper[]
+  notes     UitleenTransportNote[]
 
   @@index([userId])
   @@index([status, startAt])
@@ -4431,6 +4433,46 @@ model UitleenTransportHelper {
   addedBy User?                   @relation("UitleenTransportHelperAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
 
   @@index([transportBookingId])
+}
+
+/// Wie deze nota mag lezen.
+///
+/// `PRIVE` betekent letterlijk privé: ook Logistiek leest ze niet. Dat staat zo
+/// in het formulier, want een nota waarvan je dénkt dat het team ze leest, is
+/// erger dan geen nota. De drie waarden zijn geen hiërarchie van rollen maar van
+/// kringen rond de rit: jezelf, iedereen die deze rit al ziet, en daarbovenop
+/// het team.
+enum UitleenTransportNoteVisibility {
+  PRIVE
+  POST
+  POST_EN_LOGISTIEK
+}
+
+/// Een eigen nota bij een rit (F4.20).
+///
+/// Naast `memberNote` (wat de aanvrager bij het aanvragen schreef) en
+/// `adminNote` (de boodschap van Logistiek, die meegaat in de mail): die twee
+/// horen bij de rit zelf en staan er één keer op. Dit zijn de notities van de
+/// mensen eromheen, met elk hun eigen auteur en hun eigen zichtbaarheid, en er
+/// kunnen er meer dan één zijn. De twee oude velden blijven waar ze staan.
+model UitleenTransportNote {
+  id        String @id @default(cuid())
+  bookingId String
+  authorId  String
+
+  text       String
+  visibility UitleenTransportNoteVisibility @default(POST_EN_LOGISTIEK)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  booking UitleenTransportBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  /// Verdwijnt de auteur, dan verdwijnt zijn nota mee: een nota zonder auteur is
+  /// niet te plaatsen, en bij `PRIVE` is er ook niemand meer die ze mag lezen.
+  author  User                    @relation("UitleenTransportNoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([authorId])
 }
 
 /// Spiegel van TicketPayment (zonder refunds): provider is een vrije string

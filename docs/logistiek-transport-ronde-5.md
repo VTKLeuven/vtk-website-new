@@ -57,16 +57,16 @@ Alles wordt op **390px breed** nagekeken, niet alleen op desktop.
 | 3 | Breedte en gsm | F4.6, F4.7, F4.14 | ✅ af (`e65da138`) |
 | 4 | Chauffeursnummers en werkgroepen | F4.3, F4.10 | 🟡 schermen af (`503735c0`), één nummer open |
 | 5 | Beschikbaarheid | F4.2, F4.5 | ✅ af (`435ecf21`) |
-| 6 | Ritten bewerken en noteren | F4.4, F4.20 | ⬜ open |
+| 6 | Ritten bewerken en noteren | F4.4, F4.20 | ✅ af (`634313e0`, deze commit) |
 | 7 | Voertuigen | F4.21, F4.22 | ⬜ open |
 | 8 | Statistiek | F4.23 | ⬜ open |
 | - | Bewust niet gedaan | F4.11 | ⛔ |
 
 Fase 1 eerst: daar zit het enige echte defect van deze ronde, en het draagt zeven
-van de drieëntwintig punten. **Fase 1, 2, 3 en 5 zijn af** (`dce13cf7`,
-`5835b84f`, `e65da138`, `435ecf21`) en van fase 4 staat alle code er
+van de drieëntwintig punten. **Fase 1, 2, 3, 5 en 6 zijn af** (`dce13cf7`,
+`5835b84f`, `e65da138`, `435ecf21`, `634313e0`) en van fase 4 staat alle code er
 (`503735c0`); daar blijft enkel het juiste nummer van Sofie Bruggeman over, en
-dat is geen code maar één veld op liv. Fase 6 is de volgende.
+dat is geen code maar één veld op liv. Fase 7 is de volgende.
 
 ---
 
@@ -569,23 +569,38 @@ worden nooit herrekend (zie `docs/uitleendienst.md`), dus een rit die als extern
 is aangemaakt en naar een post verhuist, houdt haar tarief. Het formulier zegt
 dat op het moment dat het erop aankomt, in plaats van het stil te doen.
 
-### ⬜ F4.20. Eigen nota's, met zichtbaarheid
+### ✅ F4.20. Eigen nota's, met zichtbaarheid
 **P3 · code · 🗄️ · 📝**
 
 *"Optie tot eigen nota toevoegen aan komende ritten en aan ritten van mijn post.
 Miss optie tot zichtbaar voor mij alleen, zichtbaar voor mijn post, zichtbaar
 voor mijn post en logi."*
 
-Nieuw model `UitleenTransportNote`: rit, auteur, tekst, zichtbaarheid
-(`PRIVE` / `POST` / `POST_EN_LOGISTIEK`).
+**Gedaan.** Nieuw model `UitleenTransportNote` (rit, auteur, tekst,
+zichtbaarheid). Het blok staat op elke ritkaart van `/ritten` én in het paneel
+van de planning, uit één component (`components/trip-notes.tsx`). De drie keuzes
+staan alle drie in beeld met een regel wat ze betekenen, niet in een keuzelijst.
+Standaard staat de meest gedeelde aan (post én Logistiek): een nota bij een rit
+is meestal iets dat de anderen moeten weten.
 
-🗄️ Bestaande ritten krijgen nul rijen in die tabel, dus geen backfill. Het model
-moet wel in `RIT_MODELLEN` in `apps/logistiek/test/rit-kolommen.test.ts`: die
-test faalt op elk nieuw `UitleenTransport*`-model, en dat is de bedoeling.
+🗄️ Een nieuwe tabel, dus nul rijen voor bestaande ritten. Gevraagd en beslist:
+`memberNote` en `adminNote` blijven staan waar ze staan in plaats van hierheen
+gekopieerd te worden, want `adminNote` hangt aan de mail naar de aanvrager en een
+tekst die op twee plaatsen staat, loopt bij de eerste wijziging uiteen. Het model
+staat in `RIT_MODELLEN` in `test/rit-kolommen.test.ts`.
 
-📝 `PRIVE` betekent letterlijk privé, ook voor Logistiek. Dat hoort in
-`design-decisions.md` én in het formulier zelf te staan, want een nota waarvan je
-denkt dat het team ze leest, is erger dan geen nota.
+📝 **`PRIVE` betekent letterlijk privé, ook voor Logistiek**, en die belofte
+staat in de query en niet in het scherm: `tripNotesFor` haalt andermans
+privénota niet uit de databank, ook niet met `logistiek.manage` en ook niet voor
+een superadmin. Nagekeken in beide richtingen: een privénota van de aanvrager
+staat niet in de HTML van de planning, en een privénota van de superadmin staat
+niet in die van het teamlid. `canReadTripNote` is dezelfde regel als pure
+functie, om de knoppen mee te tekenen.
+
+**De chauffeur telt mee bij "wie hoort bij deze rit".** `onTripForNotes` is
+ruimer dan `ownsTransportBooking`: die gaat over wie de rit mag wijzigen, deze
+over wie erbij hoort. Wijzigen en wissen doet enkel de auteur, ook een beheerder
+niet.
 
 ---
 

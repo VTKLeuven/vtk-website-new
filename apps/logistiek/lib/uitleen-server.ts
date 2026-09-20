@@ -6,6 +6,7 @@ import type {
   Prisma,
   UitleenAvailabilityKind,
   UitleenTransportBookingStatus,
+  UitleenTransportNoteVisibility,
 } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
 import { resolveDriverPhones, type DriverPhone, type DriverPhoneSource } from './driver-phones';
@@ -1211,6 +1212,10 @@ export async function transportRange(from: Date, to: Date, filters?: TransportFi
     },
     select: {
       id: true,
+      // De aanvrager, als id naast `user.name`: de nota's van een rit hangen af
+      // van wie er bij die rit hoort (`onTripForNotes`), en een naam is daar
+      // geen sleutel voor.
+      userId: true,
       vehicleId: true,
       tripGroupId: true,
       tripLeg: true,
@@ -2111,6 +2116,84 @@ const driverTripInclude = {
   // onderweg nodig heeft.
   helpers: { orderBy: { createdAt: 'asc' as const }, select: { id: true, name: true, phone: true } },
 };
+
+/** Eén eigen nota bij een rit, klaar om te tekenen (F4.20). */
+export type TripNote = {
+  id: string;
+  bookingId: string;
+  text: string;
+  visibility: UitleenTransportNoteVisibility;
+  authorId: string;
+  authorName: string;
+  createdAt: Date;
+  /** Van jou, dus te wijzigen en te wissen. */
+  mine: boolean;
+};
+
+/**
+ * De eigen nota's bij een reeks ritten, zoals déze kijker ze mag zien (F4.20).
+ *
+ * **Een aparte query en geen `include` op de rittenquery.** Die twee queries
+ * worden ook gebruikt om een rit van iemand anders te tonen (de chauffeurspagina
+ * in het beheer toont de ritten van één chauffeur), en dan zou de kijker een
+ * ander zijn dan de chauffeur. Eén gedeelde include zou daar stilzwijgend
+ * andermans privénota's meeleveren, en dat is precies de fout die dit veld niet
+ * mag maken.
+ *
+ * De zichtbaarheid zit dan ook in de `where` en niet in het scherm: andermans
+ * privénota's komen niet uit de databank. Zie `canReadTripNote` voor dezelfde
+ * regel als pure functie; die tekent de knoppen, deze haalt de rijen.
+ *
+ * `onTripIds` zijn de ritten waar de kijker zelf bij hoort (aanvrager,
+ * chauffeur, of lid van de post erachter). De oproeper rekent dat uit met
+ * `onTripForNotes`, want die kent de ritten al die op het scherm komen.
+ */
+export async function tripNotesFor(
+  bookingIds: string[],
+  viewer: { userId: string; onTripIds: string[]; logistiek: boolean }
+): Promise<Map<string, TripNote[]>> {
+  const byBooking = new Map<string, TripNote[]>();
+  if (bookingIds.length === 0) return byBooking;
+
+  const rows = await prisma.uitleenTransportNote.findMany({
+    where: {
+      bookingId: { in: bookingIds },
+      OR: [
+        { authorId: viewer.userId },
+        ...(viewer.onTripIds.length > 0
+          ? [{ bookingId: { in: viewer.onTripIds }, visibility: { not: 'PRIVE' as const } }]
+          : []),
+        ...(viewer.logistiek ? [{ visibility: 'POST_EN_LOGISTIEK' as const }] : []),
+      ],
+    },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      bookingId: true,
+      text: true,
+      visibility: true,
+      authorId: true,
+      createdAt: true,
+      author: { select: { name: true } },
+    },
+  });
+
+  for (const row of rows) {
+    const list = byBooking.get(row.bookingId) ?? [];
+    list.push({
+      id: row.id,
+      bookingId: row.bookingId,
+      text: row.text,
+      visibility: row.visibility,
+      authorId: row.authorId,
+      authorName: row.author.name,
+      createdAt: row.createdAt,
+      mine: row.authorId === viewer.userId,
+    });
+    byBooking.set(row.bookingId, list);
+  }
+  return byBooking;
+}
 
 /**
  * De ritten die aan dit lid toegewezen zijn. Enkel goedgekeurde en afgeronde

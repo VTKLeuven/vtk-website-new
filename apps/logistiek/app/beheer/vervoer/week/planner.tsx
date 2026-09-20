@@ -21,6 +21,7 @@ import type { TransportFilters } from '@/lib/transport-filters';
 import { AuditTimeline } from '@/components/audit-timeline';
 import { PhoneLink } from '@/components/phone-link';
 import { TripHelpers } from '@/components/trip-helpers';
+import { TripNotes, type TripNoteView } from '@/components/trip-notes';
 import { VanStatusBadge } from '@/components/status-badge';
 import type { UitleenAuditEntry, DriverOption } from '@/lib/uitleen-server';
 import { TransportControls } from '../transport-controls';
@@ -122,6 +123,12 @@ export type PlannerTrip = {
   /** Goedgekeurde ritten met hetzelfde voertuig die deze overlappen. */
   conflictsWith: Array<{ id: string; label: string }>;
   history: UitleenAuditEntry[];
+  /**
+   * De eigen nota's bij deze rit (F4.20), al gefilterd op wat dit teamlid mag
+   * lezen. Andermans privénota's komen niet eens uit de databank; zie
+   * `tripNotesFor`.
+   */
+  notes: TripNoteView[];
 };
 
 export function TransportPlanner({
@@ -657,6 +664,12 @@ export function TransportPlanner({
                 legacyNote={trip.helpersNote}
                 canEdit={trip.status === 'REQUESTED' || trip.status === 'APPROVED'}
               />
+
+              {/* De eigen nota's (F4.20). Je leest hier wat er met Logistiek
+                  gedeeld is en wat je zelf schreef, nooit de privénota van
+                  iemand anders. Schrijven mag op elke rit: het team slaat ze
+                  hier toch al open, en een nota verandert niets aan de rit. */}
+              <TripNotes bookingId={trip.id} notes={trip.notes} canWrite />
 
               <section>
                 <h3 className="text-sm font-semibold text-vtk-ink">Rit aanpassen</h3>

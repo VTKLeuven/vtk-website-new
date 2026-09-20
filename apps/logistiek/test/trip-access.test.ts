@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { SessionPayload } from '@vtk/auth';
 import { canSeeTripDetails } from '../lib/session';
-import { ownsTransportBooking } from '../lib/uitleen';
+import { canReadTripNote, onTripForNotes, ownsTransportBooking } from '../lib/uitleen';
 
 /**
  * Wie mag de bijrijders van een rit bijwerken vanaf het bezettingsoverzicht?
@@ -150,5 +150,74 @@ describe('canSeeTripDetails', () => {
 
   it('geeft een superadmin toegang tot ritdetails', () => {
     expect(canSeeTripDetails(makeSession([], [], true))).toBe(true);
+  });
+});
+
+/**
+ * De eigen nota's bij een rit (F4.20).
+ *
+ * Twee regels, en ze hangen samen: `onTripForNotes` zegt wie er bij de rit
+ * hoort, `canReadTripNote` wat dat per zichtbaarheid betekent. De query in
+ * lib/uitleen-server.ts filtert met dezelfde regel, zodat andermans privénota
+ * niet eens uit de databank komt.
+ */
+describe('onTripForNotes', () => {
+  const rit = {
+    userId: 'aanvrager',
+    requesterType: 'INTERN' as const,
+    groupId: 'post-sport',
+    assignedGroupId: null,
+    driverId: 'chauffeur',
+  };
+
+  it('telt de toegewezen chauffeur mee, ook zonder post', () => {
+    // Het verschil met `ownsTransportBooking`: die gaat over wie de gegevens van
+    // de rit mag wijzigen, deze over wie erbij hoort. De chauffeur rijdt hem.
+    expect(onTripForNotes(rit, { userId: 'chauffeur', groupIds: [] })).toBe(true);
+    expect(ownsTransportBooking(rit, { userId: 'chauffeur', groupIds: [] })).toBe(false);
+  });
+
+  it('telt de aanvrager en zijn post mee', () => {
+    expect(onTripForNotes(rit, { userId: 'aanvrager', groupIds: [] })).toBe(true);
+    expect(onTripForNotes(rit, { userId: 'iemand', groupIds: ['post-sport'] })).toBe(true);
+  });
+
+  it('laat een buitenstaander erbuiten', () => {
+    expect(onTripForNotes(rit, { userId: 'iemand', groupIds: ['post-feest'] })).toBe(false);
+  });
+});
+
+describe('canReadTripNote', () => {
+  const ik = { userId: 'ik', onTrip: true, logistiek: false };
+  const collega = { userId: 'collega', onTrip: true, logistiek: false };
+  const logi = { userId: 'logi', onTrip: false, logistiek: true };
+  const vreemde = { userId: 'vreemde', onTrip: false, logistiek: false };
+
+  it('laat je je eigen nota altijd lezen', () => {
+    for (const visibility of ['PRIVE', 'POST', 'POST_EN_LOGISTIEK'] as const) {
+      expect(canReadTripNote({ authorId: 'ik', visibility }, ik)).toBe(true);
+    }
+  });
+
+  it('houdt een privénota privé, ook voor Logistiek', () => {
+    // De hele belofte van dat vakje. Zonder deze regel is het een nota waarvan
+    // je dénkt dat niemand ze leest, en dat is erger dan geen nota.
+    const note = { authorId: 'ik', visibility: 'PRIVE' as const };
+    expect(canReadTripNote(note, collega)).toBe(false);
+    expect(canReadTripNote(note, logi)).toBe(false);
+  });
+
+  it('geeft een postnota aan wie de rit ziet, en niet aan Logistiek erbuiten', () => {
+    const note = { authorId: 'ik', visibility: 'POST' as const };
+    expect(canReadTripNote(note, collega)).toBe(true);
+    expect(canReadTripNote(note, logi)).toBe(false);
+    expect(canReadTripNote(note, vreemde)).toBe(false);
+  });
+
+  it('geeft de gedeelde nota aan allebei', () => {
+    const note = { authorId: 'ik', visibility: 'POST_EN_LOGISTIEK' as const };
+    expect(canReadTripNote(note, collega)).toBe(true);
+    expect(canReadTripNote(note, logi)).toBe(true);
+    expect(canReadTripNote(note, vreemde)).toBe(false);
   });
 });

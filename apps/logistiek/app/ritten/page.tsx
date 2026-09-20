@@ -5,20 +5,22 @@ import { PageShell } from '@/components/page-shell';
 import { LinkedText } from '@/components/linked-text';
 import { PhoneLink } from '@/components/phone-link';
 import { copy, getLocale } from '@/lib/i18n';
-import { getSession } from '@/lib/session';
-import { formatTripWindow } from '@/lib/uitleen';
+import { canManage, getSession } from '@/lib/session';
+import { formatTripWindow, onTripForNotes } from '@/lib/uitleen';
 import {
   driverPhones,
   feedTokensForUser,
   groupMemberOptions,
   isDriver,
   isVanDriver,
+  tripNotesFor,
   tripsForDriver,
   tripsForGroups,
   type DriverTrip,
 } from '@/lib/uitleen-server';
 import { GroupDriverPicker } from './group-driver-picker';
 import { TripHelpers } from '@/components/trip-helpers';
+import { TripNotes, type TripNoteView } from '@/components/trip-notes';
 import { FeedTokens } from '@/components/feed-tokens';
 import { ToastProvider } from '@/components/ui/toast';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
@@ -56,6 +58,7 @@ function TripCard({
   groupMembers,
   youDrive = false,
   canEditHelpers = false,
+  notes = [],
 }: {
   trip: DriverTrip;
   locale: LogistiekLocale;
@@ -75,6 +78,8 @@ function TripCard({
   youDrive?: boolean;
   /** Bijrijders toevoegen en weghalen vanaf deze kaart (F4.8a). */
   canEditHelpers?: boolean;
+  /** De eigen nota's bij deze rit, al gefilterd op wat je mag lezen (F4.20). */
+  notes?: TripNoteView[];
 }) {
   const en = locale === 'en';
   const vehicle = en ? trip.vehicle.nameEn : trip.vehicle.nameNl;
@@ -260,6 +265,15 @@ function TripCard({
         </p>
       ) : null}
 
+      {/* De eigen nota's (F4.20). Onder de nota van Logistiek en die van de
+          aanvrager, want het is dezelfde soort informatie; maar in een eigen
+          blok met een rand erboven, omdat dit het enige is waar je zelf iets aan
+          toevoegt. Wie de rit op dit scherm ziet, hoort er ook bij, dus mag hij
+          schrijven; de actie toetst dat nog eens. */}
+      <div className="mt-4 border-t border-vtk-navy/10 pt-4">
+        <TripNotes bookingId={trip.id} notes={notes} canWrite locale={locale} />
+      </div>
+
       {/* Doorgegeven aan jouw post: dan duid je hier zelf iemand aan. Onderaan
           de kaart en niet bovenaan: eerst weten wat de rit is, dan pas kiezen
           wie hem doet. */}
@@ -312,11 +326,24 @@ export default async function RittenPage() {
         .filter((id): id is string => Boolean(id) && myGroupIds.includes(id as string))
     ),
   ];
-  const [groupDriverPhones, membersPerGroup] = await Promise.all([
+  // De eigen nota's bij alles wat op dit scherm komt (F4.20). Eén query voor de
+  // hele pagina: elke kaart heeft ze nodig, en per kaart vragen is per kaart een
+  // rondje naar de databank. Elke rit hier is er een waar je zelf bij hoort (je
+  // rijdt hem, of hij is van je post), dus `onTripIds` is gewoon de hele lijst;
+  // `onTripForNotes` staat er toch bij, zodat de regel op één plaats ligt en
+  // niet op de aanname dat deze query dat altijd zal blijven garanderen.
+  const shownTrips = [...trips, ...groupTrips];
+  const viewer = { userId: session.user.id, groupIds: myGroupIds };
+  const [groupDriverPhones, membersPerGroup, notesPerTrip] = await Promise.all([
     driverPhones(groupTrips.map((trip) => trip.driverId).filter((id): id is string => Boolean(id))),
     Promise.all(
       assignedGroupIds.map(async (groupId) => [groupId, await groupMemberOptions(groupId)] as const)
     ).then((entries) => new Map(entries)),
+    tripNotesFor([...new Set(shownTrips.map((trip) => trip.id))], {
+      userId: session.user.id,
+      onTripIds: shownTrips.filter((trip) => onTripForNotes(trip, viewer)).map((trip) => trip.id),
+      logistiek: canManage(session),
+    }),
   ]);
 
   // Grens tussen komend en voorbij: het einde van de rit, niet de start. Een rit
@@ -374,92 +401,105 @@ export default async function RittenPage() {
         </p>
       ) : null}
 
-      <div className="grid gap-8">
-        <section>
-          <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-            {en ? 'Upcoming trips' : 'Komende ritten'} ({upcoming.length})
-          </h2>
-          {upcoming.length === 0 ? (
-            <p className="mt-3 text-sm text-vtk-muted">
-              {driver
-                ? en
-                  ? 'Nothing yet. Logistics usually assigns a driver in the week before the trip.'
-                  : 'Nog niets. Logistiek wijst een chauffeur meestal pas de week voor de rit toe.'
-                : en
-                  ? 'Nothing planned.'
-                  : 'Niets gepland.'}
-            </p>
-          ) : (
-            <ul className="mt-4 grid gap-4">
-              {upcoming.map((trip) => (
-                <TripCard key={trip.id} trip={trip} locale={locale} past={false} />
-              ))}
-            </ul>
-          )}
-        </section>
-
-        {/* De ritten van je post. Een tweede sectie en geen tweede tabblad: het
-            zijn er meestal een handvol, en een tabblad verstopt precies de rit
-            die nog een chauffeur zoekt. Valt helemaal weg wanneer er niets is;
-            een lege sectie met een uitleg erbij zou op elk scherm staan van
-            iedereen die bij een post zit. */}
-        {groupUpcoming.length > 0 ? (
-          <ToastProvider>
-            <section>
-              <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-                {en ? 'Trips of my post' : 'Ritten van mijn post'}
-                {groupNames.length > 0 ? ` (${groupNames.join(', ')})` : ''}
-              </h2>
-              <p className="mt-1 text-sm text-vtk-muted">
-                {en
-                  ? 'What your fellow members are driving, and the trips Logistics handed to your post to fill in yourselves.'
-                  : 'Wat je medeleden rijden, en de ritten die Logistiek aan je post doorgaf om zelf in te vullen.'}
+      {/* De ledenkant heeft geen ToastProvider in de layout (die staat enkel
+          rond /beheer). Sinds elke ritkaart nota's draagt, hangt hij hier rond
+          het hele scherm in plaats van rond twee blokken: twee providers tekenen
+          twee meldingsstapels, elk in hun eigen hoek. */}
+      <ToastProvider>
+        <div className="grid gap-8">
+          <section>
+            <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
+              {en ? 'Upcoming trips' : 'Komende ritten'} ({upcoming.length})
+            </h2>
+            {upcoming.length === 0 ? (
+              <p className="mt-3 text-sm text-vtk-muted">
+                {driver
+                  ? en
+                    ? 'Nothing yet. Logistics usually assigns a driver in the week before the trip.'
+                    : 'Nog niets. Logistiek wijst een chauffeur meestal pas de week voor de rit toe.'
+                  : en
+                    ? 'Nothing planned.'
+                    : 'Niets gepland.'}
               </p>
+            ) : (
               <ul className="mt-4 grid gap-4">
-                {groupUpcoming.map((trip) => (
+                {upcoming.map((trip) => (
                   <TripCard
                     key={trip.id}
                     trip={trip}
                     locale={locale}
                     past={false}
-                    driverPhone={
-                      trip.driverId ? (groupDriverPhones.get(trip.driverId)?.number ?? null) : null
-                    }
-                    groupMembers={
-                      trip.assignedGroup && myGroupIds.includes(trip.assignedGroup.id)
-                        ? (membersPerGroup.get(trip.assignedGroup.id) ?? [])
-                        : undefined
-                    }
-                    youDrive={trip.driverId === session.user.id}
-                    /* Dezelfde regel als `canEditHelpers` op de server: je eigen
-                       post, of een rit die aan je post doorgegeven is. Een
-                       gereden of geannuleerde rit niet meer; die is historiek. */
-                    canEditHelpers={trip.status === 'APPROVED'}
+                    notes={notesPerTrip.get(trip.id) ?? []}
+                  />
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {/* De ritten van je post. Een tweede sectie en geen tweede tabblad: het
+              zijn er meestal een handvol, en een tabblad verstopt precies de rit
+              die nog een chauffeur zoekt. Valt helemaal weg wanneer er niets is;
+              een lege sectie met een uitleg erbij zou op elk scherm staan van
+              iedereen die bij een post zit. */}
+          {groupUpcoming.length > 0 ? (
+            <section>
+                <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
+                  {en ? 'Trips of my post' : 'Ritten van mijn post'}
+                  {groupNames.length > 0 ? ` (${groupNames.join(', ')})` : ''}
+                </h2>
+                <p className="mt-1 text-sm text-vtk-muted">
+                  {en
+                    ? 'What your fellow members are driving, and the trips Logistics handed to your post to fill in yourselves.'
+                    : 'Wat je medeleden rijden, en de ritten die Logistiek aan je post doorgaf om zelf in te vullen.'}
+                </p>
+                <ul className="mt-4 grid gap-4">
+                  {groupUpcoming.map((trip) => (
+                    <TripCard
+                      key={trip.id}
+                      trip={trip}
+                      locale={locale}
+                      past={false}
+                      driverPhone={
+                        trip.driverId ? (groupDriverPhones.get(trip.driverId)?.number ?? null) : null
+                      }
+                      groupMembers={
+                        trip.assignedGroup && myGroupIds.includes(trip.assignedGroup.id)
+                          ? (membersPerGroup.get(trip.assignedGroup.id) ?? [])
+                          : undefined
+                      }
+                      youDrive={trip.driverId === session.user.id}
+                      /* Dezelfde regel als `canEditHelpers` op de server: je eigen
+                         post, of een rit die aan je post doorgegeven is. Een
+                         gereden of geannuleerde rit niet meer; die is historiek. */
+                      canEditHelpers={trip.status === 'APPROVED'}
+                      notes={notesPerTrip.get(trip.id) ?? []}
+                    />
+                  ))}
+                </ul>
+            </section>
+          ) : null}
+
+          {past.length > 0 ? (
+            <section>
+              <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
+                {en ? 'Past trips' : 'Gereden ritten'} ({past.length})
+              </h2>
+              <ul className="mt-4 grid gap-4">
+                {past.map((trip) => (
+                  <TripCard
+                    key={trip.id}
+                    trip={trip}
+                    locale={locale}
+                    past
+                    notes={notesPerTrip.get(trip.id) ?? []}
                   />
                 ))}
               </ul>
             </section>
-          </ToastProvider>
-        ) : null}
+          ) : null}
 
-        {past.length > 0 ? (
-          <section>
-            <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">
-              {en ? 'Past trips' : 'Gereden ritten'} ({past.length})
-            </h2>
-            <ul className="mt-4 grid gap-4">
-              {past.map((trip) => (
-                <TripCard key={trip.id} trip={trip} locale={locale} past />
-              ))}
-            </ul>
-          </section>
-        ) : null}
-
-        {/* Je ritten in je eigen agenda (A1). Enkel voor wie chauffeur is; de
-            ledenkant heeft geen ToastProvider (die staat enkel rond /beheer),
-            dus die komt hier rond dit ene blok. */}
-        {driver ? (
-          <ToastProvider>
+          {/* Je ritten in je eigen agenda (A1). Enkel voor wie chauffeur is. */}
+          {driver ? (
             <FeedTokens
               canTeam={false}
               canDriver
@@ -473,9 +513,9 @@ export default async function RittenPage() {
                   lastUsedAt: token.lastUsedAt?.toISOString() ?? null,
                 }))}
             />
-          </ToastProvider>
-        ) : null}
-      </div>
+          ) : null}
+        </div>
+      </ToastProvider>
     </PageShell>
   );
 }

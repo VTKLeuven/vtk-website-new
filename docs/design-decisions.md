@@ -3195,6 +3195,52 @@ intekenformulier, en de wijziging komt in de historiek van de rit.
   `adminEditTransportAction` wijzigt ze enkel wanneer ze die expliciet krijgt. Een
   rit een half uur verschuiven mag nooit een rit van eigenaar veranderen.
 
+### Een eigen nota bij een rit, en wie ze mag lezen
+
+Een rit droeg al twee nota's: `memberNote` (wat de aanvrager bij het aanvragen
+schreef) en `adminNote` (de boodschap van Logistiek, die meegaat in de mail naar
+de aanvrager). Allebei horen ze bij de rit zelf en staan ze er één keer op.
+Logistiek vroeg om er een derde soort naast: notities van de mensen eromheen, elk
+met een auteur, en met de keuze wie ze leest. `UitleenTransportNote`.
+
+- **`PRIVE` betekent letterlijk privé, ook voor Logistiek.** Geen uitzondering
+  voor `logistiek.manage`, geen uitzondering voor de superadmin. Een nota
+  waarvan je dénkt dat het team ze niet leest, is erger dan geen nota: dan
+  schrijf je er iets in dat je nergens anders zou schrijven. Het staat ook in het
+  formulier, onder die keuze, in zoveel woorden.
+- **De belofte staat in de query, niet in het scherm.** `tripNotesFor` haalt
+  andermans privénota niet uit de databank; `canReadTripNote` is dezelfde regel
+  als pure functie, om de knoppen mee te tekenen. Een filter die enkel bij het
+  renderen gebeurt, is er een die de volgende `include` stilzwijgend omzeilt.
+- **De drie waarden zijn kringen rond de rit, geen rollen.** Jezelf, iedereen die
+  de rit al ziet (aanvrager, chauffeur en de post erachter), en die kring plus
+  het team. Iemand van Logistiek die zelf bij die post hoort, leest een
+  `POST`-nota dus gewoon mee; dan ís het zijn post.
+- **De chauffeur hoort erbij.** `onTripForNotes` is ruimer dan
+  `ownsTransportBooking`: die laatste gaat over wie de gegevens van de rit mag
+  wijzigen, deze over wie erbij hoort. De toegewezen chauffeur zit niet
+  noodzakelijk bij de aanvragende post en is toch degene die rijdt, en "de poort
+  achteraan zit op slot" is precies voor hem bedoeld.
+- **De standaard is de meest gedeelde van de drie.** Een nota bij een rit is
+  meestal iets dat de anderen moeten weten, en een standaard die niets deelt,
+  levert nota's op die niemand leest. De drie keuzes staan daarom alle drie in
+  beeld, elk met een regel wat ze betekent, in plaats van in een keuzelijst: wie
+  iets persoonlijks typt, ziet op dat moment dat er "Mijn post en Logistiek"
+  aanstaat.
+- **Enkel de auteur wijzigt of wist zijn nota**, ook een beheerder niet. Het heet
+  een eigen nota; een privénota die iemand anders kan bewerken is er geen. De
+  acties doen dat met de auteur in de `where` van de `updateMany`/`deleteMany`,
+  zodat er geen moment bestaat waarop andermans nota geladen is.
+- **Schrijven mag op elke rit, ook een gereden.** Anders dan bij de bijrijders,
+  waar een gereden rit geschiedenis is die niet meer mag veranderen: een nota
+  verandert niets aan de rit, en "de kar stond bijna leeg" is net iets dat je
+  achteraf opschrijft.
+- **Bestaande ritten krijgen nul rijen, en `memberNote`/`adminNote` blijven waar
+  ze staan.** Uitdrukkelijk zo beslist en niet de weg van de minste weerstand.
+  `adminNote` hangt aan de mail naar de aanvrager (die logica leest de kolom),
+  en een tekst die op twee plaatsen tegelijk staat, loopt bij de eerste
+  wijziging uiteen.
+
 ### Een rit mag aansluiten op het einde van de vorige
 
 Het einde van een rit is **open**: eindigt een rit om 12:00, dan is de kar om

@@ -4,6 +4,7 @@ import type {
   UitleenRequesterType,
   UitleenReservationStatus,
   UitleenTransportBookingStatus,
+  UitleenTransportNoteVisibility,
 } from '@prisma/client';
 import type { LogistiekLocale } from './i18n-shared';
 
@@ -848,6 +849,68 @@ export function ownsTransportBooking(
  */
 export function chargesRequester(requesterType: UitleenRequesterType): boolean {
   return requesterType === 'EXTERN';
+}
+
+/**
+ * Hoort deze rit bij jou, voor de eigen nota's (F4.20)?
+ *
+ * Ruimer dan `ownsTransportBooking`: de toegewezen chauffeur telt hier wél mee.
+ * Die zit niet noodzakelijk bij de aanvragende post en is toch degene die rijdt,
+ * en een nota als "de poort achteraan zit op slot" is precies voor hem bedoeld.
+ * Voor de bijrijders geldt dat niet, want daar gaat het over wie de gegevens van
+ * de rit mag wijzigen.
+ */
+export function onTripForNotes(
+  booking: {
+    userId: string;
+    requesterType: UitleenRequesterType;
+    groupId: string | null;
+    assignedGroupId?: string | null;
+    driverId?: string | null;
+  },
+  viewer: { userId: string; groupIds: string[] }
+): boolean {
+  if (booking.driverId && booking.driverId === viewer.userId) return true;
+  return ownsTransportBooking(booking, viewer);
+}
+
+/**
+ * Mag deze kijker deze nota lezen (F4.20)?
+ *
+ * De drie waarden zijn geen hiërarchie van rollen maar van kringen rond de rit:
+ * jezelf, iedereen die deze rit al ziet, en daarbovenop het team.
+ *
+ * - `PRIVE` is letterlijk privé. **Ook Logistiek leest ze niet**, ook niet met
+ *   `logistiek.manage`. Een nota waarvan je dénkt dat het team ze leest, is
+ *   erger dan geen nota, dus die belofte kent geen uitzondering. Het formulier
+ *   zegt het er in zoveel woorden bij.
+ * - `POST` is voor wie de rit al ziet: de aanvrager, de chauffeur en de post
+ *   erachter. Iemand van Logistiek die daar zelf bij hoort, leest dus mee, en
+ *   dat is juist: dan is het zijn post.
+ * - `POST_EN_LOGISTIEK` is die kring plus het team.
+ *
+ * Je eigen nota lees je altijd, wat je ook koos. Dit is de leesregel; de
+ * queries in lib/uitleen-server.ts halen andermans privénota's al niet eens uit
+ * de databank, want een belofte die enkel in het scherm staat, is er geen.
+ */
+export function canReadTripNote(
+  note: { authorId: string; visibility: UitleenTransportNoteVisibility },
+  viewer: { userId: string; onTrip: boolean; logistiek: boolean }
+): boolean {
+  if (note.authorId === viewer.userId) return true;
+  if (note.visibility === 'PRIVE') return false;
+  if (note.visibility === 'POST') return viewer.onTrip;
+  return viewer.onTrip || viewer.logistiek;
+}
+
+/** De drie keuzes in het formulier, in de volgorde waarin ze er staan. */
+export const TRIP_NOTE_VISIBILITIES = ['PRIVE', 'POST', 'POST_EN_LOGISTIEK'] as const;
+
+export function isTripNoteVisibility(value: unknown): value is UitleenTransportNoteVisibility {
+  return (
+    typeof value === 'string' &&
+    (TRIP_NOTE_VISIBILITIES as readonly string[]).includes(value)
+  );
 }
 
 /**

@@ -51,6 +51,7 @@ zelf doet staat in `docs/logistiek-ingebruikname.md`.
 | `UitleenVehicle` | Voertuig (kar/auto/bakfiets); `pricingMode` (FREE/PER_HOUR/PER_KM/FLAT) + `rateCents`, team-configureerbaar. `pattern` = de arcering in de transportplanning. |
 | `UitleenTransportBooking` | Rit met voertuig, tijdvenster, chauffeur, tarief-snapshot, `kilometers`/`priceCents` (nullable). `cargoNote` = wat er mee moet (ronde 3). |
 | `UitleenTransportHelper` | Bijrijder op een rit: naam + optioneel nummer, `addedById`. Vervangt `helpersNote`/`helpersPhone`, die voor bestaande ritten blijven staan. Ook achteraf te wijzigen door de aanvrager, een collega van dezelfde post, of het team. |
+| `UitleenTransportNote` | Eigen nota bij een rit (F4.20), met auteur en `visibility` (`PRIVE` / `POST` / `POST_EN_LOGISTIEK`). Naast `memberNote` en `adminNote`, die bij de rit zelf horen en er één keer op staan; hier kunnen er meer zijn, elk van iemand anders. `PRIVE` is letterlijk privé, ook voor Logistiek: de queries halen andermans privénota niet eens op. Enkel de auteur wijzigt of wist ze. |
 | `UitleenDriver` | Chauffeur die het team zelf toevoegt (uniek per `userId`, met notitie en `addedById`). Niet werkingsjaar-gescoped; verwijderen laat toegewezen ritten staan. `colorIndex` overschrijft de kleur die uit zijn id volgt. |
 | `UitleenDriverAvailability` | Wanneer een chauffeur kan rijden: vensters, geen rooster, elk met een `kind` (`JA`, `LIEVER_NIET`, `NOOD`). Een hint voor de planning, geen blokkade. |
 | `UitleenDriverAvailabilityNote` | Eén vrije nota per chauffeur per week (F4.5), naast de nota per venster. "Die week examens" hoort bij de week en niet bij een uurvak. Leeg maken wist de rij; het team leest ze onder de beschikbaarheidsstrook in de planning. |
@@ -260,6 +261,9 @@ de same-origin `publicUrl`.
   In het bewerkveld van dat paneel staat ook **voor wie de rit rijdt**: die lag
   tot september 2026 vast bij het aanmaken. Een rit wordt daar niet extern en een
   externe rit met een betaling verhuist niet; zie `docs/design-decisions.md`.
+  De eigen nota's bij een rit (`components/trip-notes.tsx`, F4.20) staan zowel
+  hier als op elke kaart van `/ritten`; welke je ziet, hangt af van wie je bent
+  (`tripNotesFor` + `canReadTripNote`).
 - **Beheer** (`app/beheer/`): `aanvragen/` (tabs, last-minute, decision/edit/
   return-forms, klaarzetlijst per lijn + printblad `[id]/print` en dag-afdruk
   `print?datum=`), `vervoer/` (decision + controls: chauffeur, voertuigwissel, km;
