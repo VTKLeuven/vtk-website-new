@@ -150,7 +150,7 @@ export default async function LogistiekHome() {
       </div>
 
       <section className="logistics-info-band">
-        <div className="mx-auto grid w-full max-w-[1240px] gap-8 px-5 py-10 sm:px-9 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)] lg:py-14">
+        <div className="logistics-gutter grid gap-8 py-10 lg:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)] lg:py-14">
           <div>
             <p className="logistics-eyebrow text-vtk-on-dark/70">
               <span className="h-1.5 w-1.5 rounded-full bg-vtk-yellow" aria-hidden />

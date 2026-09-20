@@ -6,7 +6,7 @@ import { LinkedText } from '@/components/linked-text';
 import { PhoneLink } from '@/components/phone-link';
 import { copy, getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
-import { formatDateTime } from '@/lib/uitleen';
+import { formatTripWindow } from '@/lib/uitleen';
 import {
   driverPhones,
   feedTokensForUser,
@@ -93,7 +93,7 @@ function TripCard({
             <span className="font-medium text-vtk-ink">{trip.purpose}</span>
           </p>
           <p className="mt-1 text-sm text-vtk-muted">
-            {formatDateTime(trip.startAt, locale)} {en ? 'to' : 'tot'} {formatDateTime(trip.endAt, locale)}
+            {formatTripWindow(trip.startAt, trip.endAt, locale)}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -113,7 +113,13 @@ function TripCard({
         </div>
       </div>
 
-      <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+      {/* Op een telefoon staat dit raster in één kolom, en dan is de afstand
+          tussen twee rijen het enige wat een label nog aan zijn waarde bindt:
+          met één gap stonden "Laadadres" en "Brouwerij Haacht" even ver uit
+          elkaar als twee losse feiten (F4.14). De rij-afstand is daarom groter
+          dan de regelafstand binnen een rij, en de kolomafstand telt enkel mee
+          vanaf `sm`, waar er echt twee kolommen zijn. */}
+      <dl className="mt-4 grid gap-x-8 gap-y-3 text-sm sm:grid-cols-2">
         {trip.pickupAddress ? (
           <div>
             <dt className="text-vtk-muted">{en ? 'Loading address' : 'Laadadres'}</dt>

@@ -62,11 +62,11 @@ export function BeheerLayoutClient({
   }, []);
 
   return (
-    <main
-      className={`mx-auto w-full flex-1 px-4 py-8 sm:px-8 transition-all duration-200 ${
-        collapsed ? 'max-w-[1720px]' : 'max-w-[1440px]'
-      }`}
-    >
+    // Geen maximumbreedte (F4.6, D1): de hele uitleendienst gebruikt het venster
+    // dat ze krijgt. Het inklappen van de zijbalk wint nu enkel nog de breedte
+    // van die zijbalk, en niet ook een ruimere kolom; op het scherm waar dit om
+    // begonnen was, de weekplanning, is dat precies dezelfde winst.
+    <main className="logistics-gutter flex-1 py-8">
       <div data-print="hide" className="border-b border-vtk-navy/10 pb-5">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>

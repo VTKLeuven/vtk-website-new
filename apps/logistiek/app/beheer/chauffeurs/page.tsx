@@ -8,7 +8,7 @@ export default async function BeheerChauffeursPage() {
   const drivers = await driverPool();
 
   return (
-    <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
+    <section className="logistics-form-width rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
       <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">Chauffeurs</h2>
       <p className="mt-1 max-w-2xl text-sm text-vtk-muted">
         Wie hier staat, kan je bij een rit als chauffeur kiezen. De lijst is de post Logistiek van dit

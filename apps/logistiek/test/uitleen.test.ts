@@ -12,6 +12,7 @@ import {
   formatEuro,
   formatEventMoment,
   formatPriceCents,
+  formatTripWindow,
   isEmailish,
   isLastMinute,
   isNightTrip,
@@ -414,6 +415,42 @@ describe('formatEventMoment', () => {
 
   it('zonder startmoment is er niets te tonen', () => {
     expect(formatEventMoment({ startAt: null, startTimeKnown: false })).toBeNull();
+  });
+});
+
+describe('formatTripWindow', () => {
+  it('schrijft de dag één keer wanneer de rit binnen één dag valt', () => {
+    const start = new Date('2026-09-22T15:00:00.000Z'); // 17:00 Brussel
+    const end = new Date('2026-09-22T20:00:00.000Z'); // 22:00 Brussel
+    const text = formatTripWindow(start, end);
+    expect(text).toContain('17:00');
+    expect(text).toContain('22:00');
+    // "22 september" hoort er precies één keer in te staan; twee keer was de
+    // twee regels op een telefoon waar F4.14 over ging.
+    expect(text.match(/september/g)).toHaveLength(1);
+  });
+
+  it('schrijft de einddag voluit wanneer de rit over middernacht gaat', () => {
+    const start = new Date('2026-09-22T20:12:00.000Z'); // 22:12 Brussel
+    const end = new Date('2026-09-22T22:12:00.000Z'); // 00:12 op 23 september
+    const text = formatTripWindow(start, end);
+    expect(text).toContain('22:12');
+    expect(text).toContain('00:12');
+    expect(text).toMatch(/23/);
+  });
+
+  it('kijkt naar de Belgische dag en niet naar de UTC-dag', () => {
+    // 22:30 tot 23:30 Brussel op 22 september staat in UTC op twee kanten van
+    // middernacht; dat is geen rit over middernacht.
+    const start = new Date('2026-09-22T20:30:00.000Z');
+    const end = new Date('2026-09-22T21:30:00.000Z');
+    expect(formatTripWindow(start, end).match(/september/g)).toHaveLength(1);
+  });
+
+  it('gebruikt "to" in het Engels', () => {
+    const start = new Date('2026-09-22T15:00:00.000Z');
+    const end = new Date('2026-09-22T20:00:00.000Z');
+    expect(formatTripWindow(start, end, 'en')).toContain(' to ');
   });
 });
 

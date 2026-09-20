@@ -8280,6 +8280,41 @@ bedrijven belooft. Het scherm is nog een tikje nauwer (eerste bachelors krijgen
 de vraag niet), maar de noemer blijft de volledige groep: zij kunnen het vinkje
 op `/account` wel aanzetten en horen dus in het percentage (`lib/careerStats.ts`).
 
+## De uitleendienst gebruikt de volle vensterbreedte
+
+Elke pagina van vtk.be staat in een kolom van 1240px. Dat is geen willekeurig
+getal: het is de breedte waarop een regel tekst nog te volgen is. Loopt een
+alinea over een breed scherm door, dan raak je aan het einde van een regel kwijt
+waar de volgende begint.
+
+**De uitleendienst is geen leestekst maar een werkblad, en heeft daarom geen
+`--max`.** Logistiek vroeg het zelf: "die zijkanten mogen opgevuld worden, zodat
+ik niet hoef in te zoomen." Wat daar op het scherm staat, is een week met zeven
+dagkolommen naast een urenkolom, en een ritlijst met zeven kolommen. Die worden
+in een kolom van 1240px niet rustiger maar smaller: een rit van vier uur wordt
+een blokje waarin "Cantusmateriaal ophalen bij de brouwerij" drie woorden is, en
+dan zit je te zoomen op een scherm waar plaats zat op staat. Het beheer stond om
+dezelfde reden al op 1440px met een knop om de zijbalk in te klappen; die knop
+was het symptoom.
+
+De zijmarge blijft wel bestaan (`clamp(20px, 3vw, 36px)`, de klasse
+`.logistics-gutter`), dus niets plakt tegen de vensterrand. Die marge is sindsdien
+ook het enige wat de koptekst, de pagina, het beheerblad en de voettekst nog onder
+elkaar uitlijnt; daarvoor deed de gedeelde kolombreedte dat vanzelf.
+
+**Wat er wél als tekst leest, houdt zijn leesbreedte** (`.logistics-form-width`,
+1100px): de instellingen, de teksten, de chauffeurs, de sjablonen, het
+aanvraagformulier voor een rit en de detailkaart van een rit of een aanvraag.
+Een invoerveld van negenhonderd pixels voor één zin is geen ruimte maar leegte,
+en een opslaanknop die over de hele breedte loopt, ziet er niet uit als een knop.
+Die 1100px is precies wat die schermen vóór deze beslissing hadden, dus ze zijn
+er niet op achteruit gegaan; enkel de roosters, de tabellen en de lijsten hebben
+er iets bij gekregen.
+
+Dit is de enige plek waar de uitleendienst van de huisstijl afwijkt. Alles
+anders (het palet, de donkere paginakop, de kaarten, de typografie) blijft
+hetzelfde als op vtk.be; zie de uitzondering in `CLAUDE.md` onder "Layout".
+
 ## De donkere modus van de uitleendienst
 
 De uitleendienst wordt gebruikt waar het donker is: in de kelder bij het

@@ -237,6 +237,14 @@ the design language into the application instead of copying mockup content.
   them in sync when you retune.
 - Layout: use generous max-width containers around 1240px (`--max`), the cool `--paper`
   page ground, thin navy-tinted `--line` borders, and clear horizontal rhythm.
+  - **De uitleendienst (`apps/logistiek`) is de uitzondering en heeft geen
+    `--max`.** Daar loopt elke pagina tot tegen de zijmarge
+    (`clamp(20px, 3vw, 36px)`, de klasse `.logistics-gutter`), omdat dat geen
+    leestekst is maar een werkblad: een week met zeven dagkolommen en een
+    beheertabel met zeven kolommen worden in een kolom van 1240px smaller tot je
+    moet inzoomen. Wat er wél als tekst leest (een formulier, een detailkaart)
+    houdt daar zijn eigen leesbreedte met `.logistics-form-width`. Zie
+    `docs/design-decisions.md`.
 - Shape: cards and panels should be softly rounded, usually 16-22px. Small
   controls can be pill-shaped when they are CTAs or filters.
 - Tone: prefer dense editorial utility over marketing decoration. Do not add
@@ -500,7 +508,9 @@ the design language into the application instead of copying mockup content.
 - Functional pages and modules, including Media and Logistiek, use the same
   visual system as the main website. A separate subdomain or operational flow
   is not a reason to invent another hero, type treatment, palette, container
-  width, or card language.
+  width, or card language. The one agreed exception is the container width of
+  the uitleendienst, see Layout above; everything else there stays the shared
+  system.
   - Only the homepage may use a full-bleed photo hero and italic serif headline
     accent. Every other public or functional landing page starts with the
     canonical dark page head. Do not add a unique photo hero to Media,

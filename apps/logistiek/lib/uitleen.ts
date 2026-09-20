@@ -568,6 +568,29 @@ export function formatDateTime(date: Date, locale: LogistiekLocale = 'nl'): stri
 }
 
 /**
+ * Het tijdvenster van een rit in woorden: "di 22 september 2026 om 17:00 tot 22:00".
+ *
+ * **De dag staat er één keer in** (F4.14). Bijna elke rit begint en eindigt op
+ * dezelfde dag, en die dag twee keer voluit schrijven kostte op een telefoon twee
+ * regels voor wat één zin is: "di 22 september 2026 om 17:00 tot di 22 september
+ * 2026 om 22:00". Loopt de rit wél over middernacht, dan staat de tweede dag er
+ * voluit, want dat is precies het geval waarin je hem moet zien.
+ *
+ * Hetzelfde stramien als {@link formatEventMoment}; de uitgeschreven vorm, en
+ * niet die van {@link tripHoursLabel}, want daar staat de dag al in de kolom
+ * ernaast.
+ */
+export function formatTripWindow(
+  startAt: Date,
+  endAt: Date,
+  locale: LogistiekLocale = 'nl'
+): string {
+  const sameDay = toBrusselsDateValue(startAt) === toBrusselsDateValue(endAt);
+  const end = sameDay ? formatBrusselsTime(endAt, locale) : formatDateTime(endAt, locale);
+  return `${formatDateTime(startAt, locale)} ${locale === 'en' ? 'to' : 'tot'} ${end}`;
+}
+
+/**
  * De uren van een rit, met de einddag erbij wanneer ze over middernacht gaat.
  * Gedeeld door het ritoverzicht en de chauffeurspagina, zodat "22:12-00:12 (di
  * 28 jul)" er overal hetzelfde uitziet.

@@ -63,7 +63,7 @@ export default async function BeheerTekstenPage() {
   const content = await getPublicCopyByLocale();
 
   return (
-    <div className="grid gap-6">
+    <div className="logistics-form-width grid gap-6">
       <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-5 sm:p-6">
         <p className="text-sm text-vtk-muted">Frontend</p>
         <h2 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-vtk-ink">

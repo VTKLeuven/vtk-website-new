@@ -40,7 +40,7 @@ export default async function VervoerPage() {
       }
       intro={content.pageVanLead}
     >
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="logistics-form-width grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         {blocked ? (
           <ExternClosed locale={locale} />
         ) : (

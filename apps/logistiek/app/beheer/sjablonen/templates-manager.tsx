@@ -41,7 +41,7 @@ export function TemplatesManager({
   });
 
   return (
-    <div className="grid gap-6">
+    <div className="logistics-form-width grid gap-6">
       <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-5 sm:p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>

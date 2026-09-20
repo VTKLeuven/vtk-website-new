@@ -80,9 +80,20 @@ body {
   font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* De uitleendienst heeft bewust géén `--max` (F4.6, D1).
+   Op vtk.be staat elke pagina in een kolom van 1240px, want dat is leestekst:
+   een regel die over een breed scherm loopt, raak je kwijt. Dit is geen
+   leestekst maar een werkblad. Een week is een urenkolom plus zeven dagen, en
+   een ritlijst draagt er zeven; wat daar niet past, verdwijnt niet, maar wordt
+   smaller tot je moet inzoomen om een naam te lezen. Logistiek vroeg precies
+   dat: "die zijkanten mogen opgevuld worden, zodat ik niet hoef in te zoomen."
+   De zijmarge blijft wel bestaan (`.logistics-gutter`), dus de inhoud plakt
+   nooit tegen de vensterrand, en wat wél een leesbreedte nodig heeft, zet die
+   met `.logistics-form-width` op zijn eigen blok in plaats van op de hele app.
+   De styleguide in CLAUDE.md pint die 1240px voor vtk.be en noemt deze
+   uitzondering. */
 :root {
   --vtk-header-height: 73px;
-  --max: 1240px;
 }
 
 /* Arcering per voertuig (K1). De vulkleur blijft van de chauffeur, dus het
@@ -790,10 +801,8 @@ body {
 .vtk-site-header .nav-inner {
   display: flex;
   min-height: 72px;
-  max-width: var(--max);
   align-items: center;
   gap: clamp(18px, 3vw, 46px);
-  margin: 0 auto;
   padding: 0 clamp(20px, 3vw, 36px);
 }
 
@@ -1058,11 +1067,18 @@ body {
   background-position: calc(50% + 340px) -160px;
 }
 
+/* Eén zijmarge voor de hele app, en het enige wat de inhoud nog van de
+   vensterrand houdt sinds `--max` weg is (F4.6).
+
+   Alles wat over de volle breedte staat, draagt ze: de paginakop, de inhoud,
+   het beheerblad, de voettekst en de donkere band op de startpagina. Zolang er
+   een kolom van 1240px was, lijnden die vanzelf onder elkaar uit; nu doet enkel
+   deze marge dat nog, dus een blok dat haar niet draagt, springt zichtbaar in.
+   `.logistics-gutter` is daarom de klasse die je op zo'n blok zet. */
 .logistics-page-head-inner,
-.logistics-page-content {
+.logistics-page-content,
+.logistics-gutter {
   width: 100%;
-  max-width: var(--max);
-  margin: 0 auto;
   padding-inline: clamp(20px, 3vw, 36px);
 }
 
@@ -1318,6 +1334,18 @@ body {
 
 .logistics-inline-link:hover {
   border-color: var(--line-2);
+}
+
+/* Een beheerscherm dat uit velden bestaat, houdt een leesbreedte (F4.6).
+
+   Zonder `--max` krijgt elk scherm het volle venster, en dat is precies wat een
+   rooster, een tabel of een lijst kaarten nodig heeft. Een formulier niet: een
+   tekstvak van negenhonderd pixels voor één zin is geen ruimte maar leegte, en
+   je oog moet van het label helemaal naar rechts en weer terug. 1100px is de
+   breedte die deze schermen vóór F4.6 hadden (1440 min de kop, de zijbalk en de
+   kloof ertussen), dus ze zien er nog uit zoals toen. */
+.logistics-form-width {
+  max-width: 1100px;
 }
 
 .logistics-admin-layout {
