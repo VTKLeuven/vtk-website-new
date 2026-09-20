@@ -15,11 +15,14 @@ export function CategoryList({
   locale,
   kind,
   emptyLabel,
+  siteDefaultImage,
 }: {
   categories: CategoryRow[];
   locale: Locale;
   kind: "category" | "audience";
   emptyLabel: string;
+  /** De sitebrede standaardfoto, voor de preview van de banner per categorie. */
+  siteDefaultImage: string;
 }) {
   const nl = locale === "nl";
   const base = nl ? "" : "/en";
@@ -111,8 +114,16 @@ export function CategoryList({
               title={nl ? "Categorie verwijderen?" : "Delete category?"}
               description={
                 nl
-                  ? `De categorie "${c.nameNl}" verdwijnt, samen met haar kalenderpagina /kalender/${c.slug} en haar agenda-feed; wie daarop geabonneerd is, krijgt geen updates meer. De ${c.eventCount} evenementen zelf blijven bestaan en blijven op /kalender staan, ze verliezen enkel deze categorie.`
-                  : `The category "${c.nameEn}" disappears, along with its calendar page /kalender/${c.slug} and its calendar feed; anyone subscribed to it stops receiving updates. The ${c.eventCount} events themselves remain and stay on /kalender, they only lose this category.`
+                  ? `De categorie "${c.nameNl}" verdwijnt, samen met haar kalenderpagina /kalender/${c.slug} en haar agenda-feed; wie daarop geabonneerd is, krijgt geen updates meer. De ${c.eventCount} evenementen zelf blijven bestaan en blijven op /kalender staan, ze verliezen enkel deze categorie.${
+                      c.imageKey
+                        ? " De standaardbanner verdwijnt mee: evenementen zonder eigen affiche vallen terug op de sitebrede standaardfoto."
+                        : ""
+                    }`
+                  : `The category "${c.nameEn}" disappears, along with its calendar page /kalender/${c.slug} and its calendar feed; anyone subscribed to it stops receiving updates. The ${c.eventCount} events themselves remain and stay on /kalender, they only lose this category.${
+                      c.imageKey
+                        ? " Its default banner goes with it: events without their own poster fall back to the site-wide default photo."
+                        : ""
+                    }`
               }
               confirmLabel={nl ? "Verwijderen" : "Delete"}
               cancelLabel={nl ? "Annuleren" : "Cancel"}
@@ -123,6 +134,7 @@ export function CategoryList({
             category={c}
             locale={locale}
             kind={kind}
+            siteDefaultImage={siteDefaultImage}
           />
         </div>
       ))}

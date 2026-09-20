@@ -7,6 +7,7 @@ import { AANBOD_PHOTOS, aanbodCardBody } from "@/lib/aanbodCards";
 import {
   getCachedHeaderTabs,
   getCachedMediaContent,
+  getCachedDefaultEventImages,
   getCachedPartners,
   getCachedSettings,
 } from "@/lib/cachedContent";
@@ -24,7 +25,7 @@ import { getCursusdienstHours } from "@/lib/cursusdienstHours";
 import { elixirScheduleFromSetting, openingWindowPhase } from "@/lib/elixir/openingWindow";
 import { readBarStatus } from "@/lib/elixir/status";
 import { publicUrl } from "@/lib/storage";
-import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
+import { defaultEventImageFor, eventCategorySlugs } from "@/lib/defaultEventImage";
 import { splitFullName } from "@vtk/auth";
 import { readSlogansSetting, resolveSlogans } from "@/lib/slogans";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
@@ -110,6 +111,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     settings,
     calendarEvents,
     tabs,
+    defaultEventImages,
     partners,
     media,
     session,
@@ -126,7 +128,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       "home.openingHours.elixir",
       "home.career",
       "home.slogans",
-      DEFAULT_EVENT_IMAGE_SETTING,
       POC_BAND_SETTING,
       SHIFTS_BAND_SETTING,
     ]),
@@ -154,6 +155,9 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       }),
     ),
     getCachedHeaderTabs(locale),
+    // De standaardfoto's voor evenementen zonder eigen affiche: de sitebrede en
+    // die per thema. Zie lib/defaultEventImage.ts.
+    getCachedDefaultEventImages(),
     getCachedPartners(),
     getCachedMediaContent(),
     // De POC-sectie is persoonlijk, dus de homepage leest de sessie. Dat maakt
@@ -339,9 +343,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   const elixirHoursEntries = entriesForService(elixir, "elixir", locale);
   const cursusUnavailable = cursusEntries === null;
   const career = map.get("home.career") as CareerSetting | undefined;
-  const defaultEventImage =
-    publicUrl((map.get(DEFAULT_EVENT_IMAGE_SETTING) as { imageKey?: string | null } | undefined)?.imageKey) ??
-    BUILTIN_DEFAULT_EVENT_IMAGE;
   const user = session?.user
     ? {
         name: session.user.name,
@@ -739,7 +740,11 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               // gewoon zijn start.
               const start = nextOccurrenceAt(event, now);
               const eventPhoto = publicUrl(event.imageKey);
-              const photo = eventPhoto ?? defaultEventImage;
+              // Zonder eigen affiche: de standaardbanner van het thema, en
+              // anders de sitebrede foto.
+              const photo =
+                eventPhoto ??
+                defaultEventImageFor(defaultEventImages, eventCategorySlugs(event.categories));
               const title = pick(event.titleNl, event.titleEn ?? event.titleNl, locale);
               const going = interestLabel(interested.get(event.id), locale);
               const location = event.location?.trim() || null;

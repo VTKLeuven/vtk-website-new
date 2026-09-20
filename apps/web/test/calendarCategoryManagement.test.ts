@@ -33,4 +33,14 @@ describe("calendar category management UI", () => {
     expect(formSource).toContain('<option value="LAST_YEARS">');
     expect(formSource).toContain('<option value="ALUMNI">');
   });
+
+  it("carries a default banner on themes only, with the site-wide photo as preview", () => {
+    // Een doelgroep zegt voor wie het evenement is, niet hoe het eruitziet; die
+    // hoort dus geen bannerveld te krijgen. Zie docs/design-decisions.md.
+    expect(formSource).toContain('kind === "category" && (');
+    expect(formSource).toContain("<StorageImageField");
+    expect(formSource).toContain('"Standaardbanner"');
+    expect(formSource).toContain("fallbackUrl={siteDefaultImage}");
+    expect(pageSource).toContain("getDefaultEventImage()");
+  });
 });

@@ -6,6 +6,8 @@ import { hasPermission } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { canCreateTicketEventForGroup } from "@/lib/ticketing/authorization";
 import { adminAttendeeList } from "@/lib/calendar/interest";
+import { getDefaultEventImage } from "@/lib/defaultEventImage";
+import { publicUrl } from "@/lib/storage";
 import { EventForm } from "../EventForm";
 import { EventInterestsPanel } from "../EventInterestsPanel";
 import { EventTicketsPanel } from "../EventTicketsPanel";
@@ -50,13 +52,20 @@ export default async function EditEventPage({
         where: { id: { in: session.groups.map((g) => g.id) } },
         orderBy: { orderInPraesidium: "asc" },
       });
-  const [categories, interests] = await Promise.all([
+  const [categoryRows, interests, siteDefaultImage] = await Promise.all([
     prisma.calendarCategory.findMany({
-      select: { id: true, nameNl: true, nameEn: true, colour: true, audience: true },
+      select: { id: true, nameNl: true, nameEn: true, colour: true, audience: true, imageKey: true },
       orderBy: [{ order: "asc" }, { nameNl: "asc" }],
     }),
     adminAttendeeList(event.id),
+    // De preview van de affiche toont de foto die dit evenement zonder upload
+    // krijgt: die van zijn thema, en anders deze.
+    getDefaultEventImage(),
   ]);
+  const categories = categoryRows.map(({ imageKey, ...category }) => ({
+    ...category,
+    bannerUrl: publicUrl(imageKey),
+  }));
 
   const base = locale === "nl" ? "" : "/en";
 
@@ -73,6 +82,7 @@ export default async function EditEventPage({
         groups={groups}
         categories={categories}
         locale={locale}
+        siteDefaultImage={siteDefaultImage}
         canManageCategories={canAll}
         canHeroWeek={canHeroWeek}
       />

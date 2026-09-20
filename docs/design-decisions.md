@@ -1630,6 +1630,49 @@ De homepage ("Opkomende evenementen") past dezelfde filter toe. Anders zou een
 eerstejaarsevent bij iedereen op de homepage staan terwijl het uit de kalender
 gefilterd is.
 
+### Elk thema heeft zijn eigen standaardbanner
+
+Een evenement zonder eigen affiche kreeg overal dezelfde foto: één sitebrede
+`Setting` uit /admin/home. In een rustige maand staat die dan zes keer naast
+elkaar in het raster, en een career-avond ziet er op de homepage uit als een
+cantus. Elk **thema** (Feest, Ontspanning, Career, Cantus, Cultuur, Sport,
+Studie) draagt daarom een eigen `CalendarCategory.imageKey`, te uploaden op
+/admin/kalender/categorieen. De sitebrede foto blijft bestaan als laatste
+terugval, en een evenement met een eigen affiche verandert nergens.
+
+De volgorde is dus: **eigen affiche → banner van het thema → sitebrede foto →
+het meegeleverde `/default-event.jpg`**. Alle vier de lagen gelden overal
+tegelijk: de kalender, de eventpagina, de homepage, de postpagina, de agenda- en
+de app-API lezen dezelfde resolver (`lib/defaultEventImage.ts`), want een
+evenement dat op de homepage een cantusfoto draagt en op de kalender een andere,
+leest als twee evenementen.
+
+**Enkel een thema draagt er een, geen doelgroep.** Een doelgroep zegt voor wie
+het evenement is, niet hoe het eruitziet: "Eerstejaars" is een label op een
+cantus, een career-avond en een sportdag tegelijk, en één foto voor die drie zou
+precies het onderscheid wegvegen dat het thema maakt. Het veld staat daarom niet
+op het doelgroepformulier.
+
+**Draagt een evenement meerdere thema's, dan wint het hoogste uit het
+categoriebeheer.** Een career-cantus moet één foto krijgen en er is geen
+inhoudelijke regel die zegt welke; de volgorde in /admin/kalender/categorieen is
+al een prioriteit die een redacteur zelf versleept, dus die doet hier dienst.
+Wie liever de cantusfoto ziet, sleept Cantus boven Career; dat is een handeling
+in het beheer en geen deploy. De code laat de aanroeper daarom bewust niet kiezen:
+`defaultEventImageFor` zoekt zelf de laagste `order` op en negeert de volgorde
+waarin de categorieën binnenkomen.
+
+**Geen uitsnedepunt per banner.** Een eigen affiche heeft er wel een
+(`imageFocusX/Y`), want die is per evenement anders. Een standaardbanner is één
+foto die de post zelf kiest en die overal in drie verhoudingen terugkomt; wie ze
+bijsnijdt, doet dat één keer goed vóór de upload. Een tweede uitsnedeveld per
+categorie zou het beheerscherm zwaarder maken dan de keuze waard is.
+
+**Het evenementformulier toont welke foto er komt.** De preview onder "Affiche"
+volgt de aangevinkte thema's en zegt in haar label welke het is ("Standaardfoto
+Cantus"); anders belooft het scherm een standaardfoto zonder te tonen welke, en
+dat is precies waar de vorige versie al op vastliep.
+
 ### Eén dynamisch segment onder `/kalender`
 
 `/kalender/<slug>` (categorie) en `/kalender/<slug>` (evenement) delen hetzelfde
@@ -2137,8 +2180,9 @@ liedjesboek ("Glory, glory, wij zijn VTK!", "Het verstand zit aan deze kant").
 ### Opkomende evenementen op de homepage
 
 - Tot **zes** publieke, toekomstige evenementen in een 2×3 rooster, met de foto
-  van het evenement (`CalendarEvent.imageKey`, met `/default-event.jpg` als
-  fallback) op dezelfde manier als de "Wat we doen"-kaarten.
+  van het evenement (`CalendarEvent.imageKey`, met de standaardbanner van zijn
+  thema en anders de sitebrede foto als fallback; zie "Elk thema heeft zijn eigen
+  standaardbanner") op dezelfde manier als de "Wat we doen"-kaarten.
 - **Minder dan zes vult geen lege plaatsen op:** het rooster krimpt mee (1, 2 of
   3 kaarten op een rij, links uitgelijnd) in plaats van gaten te tonen.
 - Valt weg als er geen enkel toekomstig evenement is.
@@ -7307,9 +7351,11 @@ een afgekapte titel, op deze kaart staat alles al.
 
 **Een evenement zonder eigen affiche houdt de standaardfoto.** Dat is bewust
 gekozen boven een gegenereerde plaat met de titel op de categoriekleur: de
-standaardfoto is een echte VTK-foto en blijft herkenbaar. De keerzijde is dat een
-maand met weinig eigen affiches dezelfde foto meermaals naast elkaar zet; dat is
-een reden om affiches te uploaden, niet om de weergave aan te passen.
+standaardfoto is een echte VTK-foto en blijft herkenbaar. Welke dat is, hangt af
+van het thema (zie "Elk thema heeft zijn eigen standaardbanner"), zodat een maand
+met weinig eigen affiches niet één foto naast zichzelf zet maar de foto's van de
+thema's die er staan. Binnen één thema blijft die herhaling bestaan; dat is een
+reden om affiches te uploaden, niet om de weergave aan te passen.
 
 ## Shiftsjablonen zijn beheerbaar, en dat is een eigen recht
 

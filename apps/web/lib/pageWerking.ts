@@ -108,6 +108,8 @@ export type WerkingEvent = {
   imageKey: string | null;
   imageFocusX: number;
   imageFocusY: number;
+  /** De thema's van het evenement; bepalen welke standaardbanner het krijgt. */
+  categories: { category: { slug: string } }[];
 };
 
 /**
@@ -140,6 +142,9 @@ export const loadWerkingEvents = cache(async (groupId: string): Promise<WerkingE
       imageKey: true,
       imageFocusX: true,
       imageFocusY: true,
+      // Enkel de slug: het evenement zonder eigen affiche krijgt hiermee de
+      // standaardbanner van zijn thema. Zie lib/defaultEventImage.ts.
+      categories: { select: { category: { select: { slug: true } } } },
     },
   });
 });

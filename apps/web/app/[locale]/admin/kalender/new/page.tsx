@@ -5,6 +5,8 @@ import { requireSession } from "@/lib/session";
 import { hasPermission } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { canCreateTicketEventForGroup } from "@/lib/ticketing/authorization";
+import { getDefaultEventImage } from "@/lib/defaultEventImage";
+import { publicUrl } from "@/lib/storage";
 import { EventForm } from "../EventForm";
 
 export default async function NewEventPage({
@@ -29,10 +31,19 @@ export default async function NewEventPage({
         where: { id: { in: session.groups.map((g) => g.id) } },
         orderBy: { orderInPraesidium: "asc" },
       });
-  const categories = await prisma.calendarCategory.findMany({
-    select: { id: true, nameNl: true, nameEn: true, colour: true, audience: true },
-    orderBy: [{ order: "asc" }, { nameNl: "asc" }],
-  });
+  const [categoryRows, siteDefaultImage] = await Promise.all([
+    prisma.calendarCategory.findMany({
+      select: { id: true, nameNl: true, nameEn: true, colour: true, audience: true, imageKey: true },
+      orderBy: [{ order: "asc" }, { nameNl: "asc" }],
+    }),
+    // De preview van de affiche toont de foto die dit evenement zonder upload
+    // krijgt: die van zijn thema, en anders deze.
+    getDefaultEventImage(),
+  ]);
+  const categories = categoryRows.map(({ imageKey, ...category }) => ({
+    ...category,
+    bannerUrl: publicUrl(imageKey),
+  }));
 
   // Ticketevents aanmaken is een eigen permissie: wie enkel mag inplannen, krijgt
   // de doorstuurknop niet te zien.
@@ -53,6 +64,7 @@ export default async function NewEventPage({
         groups={groups}
         categories={categories}
         locale={locale}
+        siteDefaultImage={siteDefaultImage}
         canCreateTickets={canCreateTickets}
         canManageCategories={canAll}
         canHeroWeek={canHeroWeek}

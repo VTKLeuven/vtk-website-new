@@ -18,7 +18,12 @@ import { PageFormPanel } from "@/components/forms/public/PageFormPanel";
 import { formRailMeta } from "@/components/forms/public/FormBody";
 import { loadPublicForm } from "@/lib/forms/publicForm";
 import { buildFormSurface } from "@/lib/forms/surface";
-import { loadDefaultEventImage } from "@/lib/pageQueries";
+import { loadDefaultEventImages } from "@/lib/pageQueries";
+import {
+  defaultEventImageFor,
+  eventCategorySlugs,
+  type DefaultEventImages,
+} from "@/lib/defaultEventImage";
 import {
   loadSiblingTiles,
   loadWerkingEvents,
@@ -103,11 +108,11 @@ export async function PageView({
   // standaardfoto voor evenementen zonder eigen cover. Alle drie optioneel: een
   // pagina zonder post en zonder categorie haalt niets extra op en blijft de
   // pagina die ze vandaag is.
-  const [group, events, siblings, defaultEventImage] = await Promise.all([
+  const [group, events, siblings, defaultEventImages] = await Promise.all([
     page.groupId ? loadWerkingGroup(page.groupId) : null,
     page.groupId ? loadWerkingEvents(page.groupId) : [],
     page.headerTabId ? loadSiblingTiles(page.headerTabId, page.id) : [],
-    page.groupId ? loadDefaultEventImage() : null,
+    page.groupId ? loadDefaultEventImages() : null,
   ]);
   const groupName = group ? pick(group.nameNl, group.nameEn, locale) : "";
   const tabLabel = tab ? pick(tab.labelNl, tab.labelEn, locale) : "";
@@ -404,7 +409,7 @@ export async function PageView({
                     locale={locale}
                     base={base}
                     allDayLabel={t.allDay}
-                    defaultImage={defaultEventImage ?? ""}
+                    defaultImages={defaultEventImages}
                   />
                 </li>
               ))}
@@ -537,16 +542,19 @@ function EventCard({
   locale,
   base,
   allDayLabel,
-  defaultImage,
+  defaultImages,
 }: {
   event: WerkingEvent;
   locale: Locale;
   base: string;
   allDayLabel: string;
-  defaultImage: string;
+  defaultImages: DefaultEventImages | null;
 }) {
   const tag = locale === "nl" ? "nl-BE" : "en-GB";
-  const photo = publicUrl(event.imageKey) ?? defaultImage;
+  // Zonder eigen affiche: de standaardbanner van het thema, anders de sitebrede.
+  const photo =
+    publicUrl(event.imageKey) ??
+    (defaultImages ? defaultEventImageFor(defaultImages, eventCategorySlugs(event.categories)) : null);
   const when = event.start.toLocaleDateString(tag, {
     weekday: "short",
     day: "numeric",

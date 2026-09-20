@@ -10,8 +10,9 @@ import { organiserName } from "@/lib/calendar/organiser";
 import { eventLinkLabel } from "@/lib/calendar/eventLink";
 import { momentsSummary } from "@/lib/calendar/moments";
 import { publicUrl } from "@/lib/storage";
+import { defaultEventImageFor, eventCategorySlugs } from "@/lib/defaultEventImage";
 import { eventMetadata } from "@/lib/pageMetadata";
-import { loadCalendarCategory, loadCalendarEvent, loadDefaultEventImage } from "@/lib/pageQueries";
+import { loadCalendarCategory, loadCalendarEvent, loadDefaultEventImages } from "@/lib/pageQueries";
 import { focusPosition } from "@/lib/imageFocus";
 import { buildMetadata } from "@/lib/seo";
 import { getCurrentSession } from "@/lib/session";
@@ -127,7 +128,9 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const event = await loadCalendarEvent(slugOrId);
   if (!event) return {};
 
-  const image = publicUrl(event.imageKey) ?? (await loadDefaultEventImage());
+  const image =
+    publicUrl(event.imageKey) ??
+    defaultEventImageFor(await loadDefaultEventImages(), eventCategorySlugs(event.categories));
   return eventMetadata(event, locale, `/kalender/${event.slug}`, image);
 }
 
@@ -165,7 +168,11 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
   // lib/calendar/organiser.ts.
   const organiser = organiserName(event.organiserName, event.group, locale);
   const eventPhoto = publicUrl(event.imageKey);
-  const imageSrc = eventPhoto ?? (await loadDefaultEventImage());
+  // Zonder eigen affiche: de standaardbanner van het thema (Cantus, Career, ...)
+  // en anders de sitebrede foto. Zie lib/defaultEventImage.ts.
+  const imageSrc =
+    eventPhoto ??
+    defaultEventImageFor(await loadDefaultEventImages(), eventCategorySlugs(event.categories));
   // De uitsnede hoort bij de foto die de redactie zelf koos; de standaardfoto
   // valt terug op het midden, want dat punt is voor elk evenement hetzelfde.
   const imagePosition = eventPhoto

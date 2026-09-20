@@ -2,7 +2,11 @@ import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { prisma } from "@vtk/db";
 import { audienceFilter, viewerAudiences } from "@/lib/calendar/audience";
-import { getDefaultEventImage } from "@/lib/defaultEventImage";
+import {
+  defaultEventImageFor,
+  eventCategorySlugs,
+  getDefaultEventImages,
+} from "@/lib/defaultEventImage";
 import { focusPosition } from "@/lib/imageFocus";
 import { publicUrl } from "@/lib/storage";
 import { publicInterestCounts, viewerInterests } from "@/lib/calendar/interest";
@@ -76,7 +80,7 @@ export async function GET(request: Request) {
   // `viewerInterests` geeft uitsluitend de rij van de huidige sessie of het
   // huidige gastcookie terug.
   const session = await getCurrentSession();
-  const [counts, mine, defaultImage] = await Promise.all([
+  const [counts, mine, defaultImages] = await Promise.all([
     publicInterestCounts(events.map((e) => e.id)),
     viewerInterests(
       events.map((e) => e.id),
@@ -84,9 +88,10 @@ export async function GET(request: Request) {
     ),
     // De lijst onder de kalender toont de cover van het evenement in plaats van
     // een afgekapte beschrijving. Welke foto een evenement zonder eigen cover
-    // krijgt, is een instelling (/admin/home); de browser kan dat niet weten en
-    // daarom kiest de server de fallback al.
-    getDefaultEventImage(),
+    // krijgt, is een instelling (de standaardbanner van zijn thema, en anders de
+    // sitebrede uit /admin/home); de browser kan dat niet weten en daarom kiest
+    // de server de fallback al.
+    getDefaultEventImages(),
   ]);
 
   const payload = events.map((e) => ({
@@ -116,7 +121,7 @@ export async function GET(request: Request) {
       descriptionNl: e.descriptionNl,
       descriptionEn: e.descriptionEn,
       categories: e.categories.map((c) => c.category),
-      image: publicUrl(e.imageKey) ?? defaultImage,
+      image: publicUrl(e.imageKey) ?? defaultEventImageFor(defaultImages, eventCategorySlugs(e.categories)),
       // Enkel de eigen foto draagt een gekozen uitsnede; de standaardfoto blijft
       // gecentreerd.
       imagePosition: e.imageKey

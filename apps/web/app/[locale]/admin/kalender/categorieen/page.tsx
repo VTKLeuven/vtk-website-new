@@ -4,6 +4,7 @@ import { hasPermission } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { Card } from "@vtk/ui";
 import { hasLocale } from "@/lib/locale";
+import { getDefaultEventImage } from "@/lib/defaultEventImage";
 import { requireSession } from "@/lib/session";
 import { CategoryForm } from "./CategoryForm";
 import { CategoryList } from "./CategoryList";
@@ -25,10 +26,15 @@ export default async function AdminCalendarCategories({
     return <p>{nl ? "Geen toegang." : "No access."}</p>;
   }
 
-  const categories = await prisma.calendarCategory.findMany({
-    orderBy: [{ order: "asc" }, { nameNl: "asc" }],
-    include: { _count: { select: { events: true } } },
-  });
+  const [categories, siteDefaultImage] = await Promise.all([
+    prisma.calendarCategory.findMany({
+      orderBy: [{ order: "asc" }, { nameNl: "asc" }],
+      include: { _count: { select: { events: true } } },
+    }),
+    // De foto die geldt zolang een categorie er zelf geen heeft; de preview van
+    // het bannerveld toont ze, in plaats van te beweren dat ze bestaat.
+    getDefaultEventImage(),
+  ]);
   const ordinaryCategories = categories
     .filter((category) => category.audience === null)
     .map((c) => ({ ...c, eventCount: c._count.events }));
@@ -55,11 +61,11 @@ export default async function AdminCalendarCategories({
         </h2>
         <p className="mb-4 mt-1 text-sm text-vtk-blue-muted">
           {nl
-            ? "Categorieën beschrijven wat voor evenement het is, bijvoorbeeld Career, Feest en Ontspanning. Ze kunnen als filter op de kalender verschijnen."
-            : "Categories describe what kind of event it is, for example Career, Party and Recreation. They can appear as filters on the calendar."}
+            ? "Categorieën beschrijven wat voor evenement het is, bijvoorbeeld Career, Feest en Ontspanning. Ze kunnen als filter op de kalender verschijnen en dragen elk hun eigen standaardbanner voor evenementen zonder affiche."
+            : "Categories describe what kind of event it is, for example Career, Party and Recreation. They can appear as filters on the calendar and each carries its own default banner for events without a poster."}
         </p>
         <h3 className="mb-3 font-medium">{nl ? "Nieuwe categorie" : "New category"}</h3>
-        <CategoryForm locale={locale} kind="category" />
+        <CategoryForm locale={locale} kind="category" siteDefaultImage={siteDefaultImage} />
       </Card>
 
       <Card className="p-0">
@@ -68,6 +74,7 @@ export default async function AdminCalendarCategories({
           locale={locale}
           kind="category"
           emptyLabel={nl ? "Nog geen gewone categorieën." : "No ordinary categories yet."}
+          siteDefaultImage={siteDefaultImage}
         />
       </Card>
 
@@ -79,7 +86,7 @@ export default async function AdminCalendarCategories({
             : "Target audiences describe who an event is intended for, for example First years, Internationals, Last years and Alumni. Visitors can filter by them or tailor the calendar to their profile."}
         </p>
         <h3 className="mb-3 font-medium">{nl ? "Nieuwe doelgroep" : "New target audience"}</h3>
-        <CategoryForm locale={locale} kind="audience" />
+        <CategoryForm locale={locale} kind="audience" siteDefaultImage={siteDefaultImage} />
       </Card>
 
       <Card className="p-0">
@@ -88,6 +95,7 @@ export default async function AdminCalendarCategories({
           locale={locale}
           kind="audience"
           emptyLabel={nl ? "Nog geen doelgroepen." : "No target audiences yet."}
+          siteDefaultImage={siteDefaultImage}
         />
       </Card>
     </div>

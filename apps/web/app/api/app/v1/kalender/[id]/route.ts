@@ -4,7 +4,11 @@ import { prisma } from "@vtk/db";
 
 import { corsPreflight } from "@/lib/cors";
 import { loadCalendarEvent } from "@/lib/pageQueries";
-import { getDefaultEventImage } from "@/lib/defaultEventImage";
+import {
+  defaultEventImageFor,
+  eventCategorySlugs,
+  getDefaultEventImages,
+} from "@/lib/defaultEventImage";
 import { getCurrentSession } from "@/lib/session";
 import { appLocaleFrom, type AppCalendarEventDetail } from "@/lib/app-api/contract";
 import {
@@ -46,12 +50,17 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     const event = await loadCalendarEvent(id);
     if (!event) return appNotFound(request, "Evenement niet gevonden.");
 
-    // Een evenement zonder eigen foto krijgt de standaardfoto uit /admin/home,
-    // net als op de site; anders opent de helft van de lijst op een grijs vlak.
-    // `getDefaultEventImage` geeft al een pad terug (soms een bestand uit
-    // `public/`), dus die gaat langs `absoluteUrl` en niet langs de media-helper.
+    // Een evenement zonder eigen foto krijgt de standaardbanner van zijn thema
+    // en anders de sitebrede foto uit /admin/home, net als op de site; anders
+    // opent de helft van de lijst op een grijs vlak. De resolver geeft al een
+    // pad terug (soms een bestand uit `public/`), dus dat gaat langs
+    // `absoluteUrl` en niet langs de media-helper.
     const imageUrl =
-      absoluteMediaUrl(request, event.imageKey) ?? absoluteUrl(request, await getDefaultEventImage());
+      absoluteMediaUrl(request, event.imageKey) ??
+      absoluteUrl(
+        request,
+        defaultEventImageFor(await getDefaultEventImages(), eventCategorySlugs(event.categories)),
+      );
 
     // De alumni-doelgroep bepaalt of er een aanwezigheidslijst bestaat.
     const isAlumniEvent = event.categories.some(({ category }) => category.audience === "ALUMNI");

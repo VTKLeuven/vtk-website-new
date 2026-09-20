@@ -21,15 +21,25 @@ import { CENTER_FOCUS, focusPosition, type ImageFocus } from "@/lib/imageFocus";
  * niet aan de opgeslagen waarde, zodat het meteen de zopas gekozen foto toont;
  * bij een evenement dat al een foto heeft, staat het er van bij het openen en is
  * de uitsnede dus achteraf nog recht te zetten zonder opnieuw te uploaden.
+ *
+ * `fallbackUrl` is de foto die dit evenement zónder upload krijgt: de
+ * standaardbanner van zijn thema, en anders de sitebrede. Ze verandert dus mee
+ * met de aangevinkte thema's; de preview toont dan wat er echt komt te staan in
+ * plaats van altijd dezelfde meegeleverde foto.
  */
 export function EventImageField({
   defaultKey,
   defaultFocus,
   locale,
+  fallbackUrl,
+  fallbackHint,
 }: {
   defaultKey?: string | null;
   defaultFocus?: ImageFocus | null;
   locale: "nl" | "en";
+  fallbackUrl: string;
+  /** Waar die foto vandaan komt ("Standaardfoto Cantus"), als label op de preview. */
+  fallbackHint: string;
 }) {
   const nl = locale === "nl";
   const [key, setKey] = useState(defaultKey ?? "");
@@ -43,8 +53,8 @@ export function EventImageField({
       <StorageImageField
         defaultKey={defaultKey}
         locale={locale}
-        fallbackUrl="/default-event.jpg"
-        emptyHint={nl ? "Standaardfoto" : "Default photo"}
+        fallbackUrl={fallbackUrl}
+        emptyHint={fallbackHint}
         helpText={
           nl
             ? "Optioneel, maar neem de originele affiche van minstens 1600 px breed: een kleine foto wordt op de eventpagina uitvergroot en oogt wazig. Zonder afbeelding toont de eventpagina de standaardfoto uit de preview."

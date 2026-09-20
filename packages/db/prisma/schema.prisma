@@ -1796,6 +1796,12 @@ model CalendarCategory {
   // Uit = de categorie bestaat nog (feed en pagina blijven werken) maar staat
   // niet meer tussen de filterchips op /kalender.
   showOnCalendarPage Boolean           @default(true)
+  // De standaardbanner voor evenementen in deze categorie zonder eigen affiche:
+  // een cantus zonder affiche krijgt dan een cantusfoto in plaats van dezelfde
+  // sitebrede foto als een career-event. Leeg = de sitebrede standaardfoto uit
+  // /admin/home. Enkel een thema draagt er een; een doelgroep zegt voor wie het
+  // evenement is, niet hoe het eruitziet. Zie docs/design-decisions.md.
+  imageKey           String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

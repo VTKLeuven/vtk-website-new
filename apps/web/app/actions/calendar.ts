@@ -498,6 +498,7 @@ const CATEGORY_FIELD_LABELS: Record<string, string> = {
   colour: "kleur",
   showOnCalendarPage: "tonen op de kalenderpagina",
   audience: "doelgroep",
+  imageKey: "standaardbanner",
 };
 
 function revalidateCalendar() {
@@ -535,12 +536,18 @@ export async function saveCalendarCategoryAction(
     audience: formData.get("audience") || null,
   });
   if (!parsed.success) return saveError("INVALID_INPUT");
+  const image = readImageField(formData);
+  if (image.kind === "invalid") return saveError("INVALID_INPUT");
   const { id, kind, ...parsedData } = parsed.data;
   if (kind === "audience" && !parsedData.audience) return saveError("INVALID_INPUT");
+  const existing = id ? await prisma.calendarCategory.findUnique({ where: { id } }) : null;
   const data = {
     ...parsedData,
     audience: kind === "category" ? null : parsedData.audience,
     showOnCalendarPage: kind === "category" ? parsedData.showOnCalendarPage : false,
+    // De standaardbanner hoort bij een thema; een doelgroep zegt voor wie het
+    // evenement is, niet hoe het eruitziet. Zie docs/design-decisions.md.
+    imageKey: kind === "category" ? resolveImageKey(image, existing?.imageKey ?? null) : null,
   };
 
   // Een dubbele slug is gewone invoerfout, geen serverfout: hij hoort als rode
@@ -551,8 +558,15 @@ export async function saveCalendarCategoryAction(
   if (await categorySlugTaken(data.slug, id)) return saveError("SLUG_TAKEN");
 
   if (id) {
-    const existing = await prisma.calendarCategory.findUnique({ where: { id } });
     await prisma.calendarCategory.update({ where: { id }, data });
+    // De vervangen of gewiste foto hoeft niet in de opslag te blijven staan.
+    if (existing?.imageKey && existing.imageKey !== data.imageKey) {
+      try {
+        await deleteObject(existing.imageKey);
+      } catch {
+        /* De databasewijziging blijft geldig als storage-opruiming faalt. */
+      }
+    }
     await logAudit({
       action: "update",
       entity: "calendarCategory",
@@ -617,6 +631,13 @@ export async function deleteCalendarCategoryAction(formData: FormData): Promise<
   if (!id) return;
 
   const category = await prisma.calendarCategory.delete({ where: { id } });
+  if (category.imageKey) {
+    try {
+      await deleteObject(category.imageKey);
+    } catch {
+      /* De categorie is weg; een achtergebleven bestand is geen reden om te falen. */
+    }
+  }
   await logAudit({
     action: "delete",
     entity: "calendarCategory",

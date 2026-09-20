@@ -2,6 +2,11 @@ import "server-only";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@vtk/db";
 import type { Locale } from "@vtk/i18n";
+import {
+  defaultEventImages,
+  readDefaultEventImageRows,
+  type DefaultEventImages,
+} from "@/lib/defaultEventImage";
 import { getVisibleHeaderTabsForNav, type NavHeaderTab } from "@/lib/headerTabs";
 import { getMediaContent } from "@/lib/media-content";
 
@@ -93,6 +98,21 @@ export function getCachedSettings(keys: string[]): Promise<{ key: string; value:
 export async function getCachedSetting(key: string): Promise<unknown> {
   const rows = await cachedSettings([key]);
   return rows[0]?.value ?? undefined;
+}
+
+const cachedDefaultEventImageRows = unstable_cache(
+  async () => readDefaultEventImageRows(),
+  ["site", "default-event-images"],
+  { revalidate: TTL_SECONDS, tags: [SITE_CONTENT_TAG] },
+);
+
+/**
+ * De standaardfoto's voor evenementen zonder eigen affiche: de sitebrede en die
+ * per thema. Enkel de ruwe rijen gaan door de cache; de `Map` eromheen wordt na
+ * het lezen opgebouwd, want die overleeft de JSON-serialisatie niet.
+ */
+export async function getCachedDefaultEventImages(): Promise<DefaultEventImages> {
+  return defaultEventImages(await cachedDefaultEventImageRows());
 }
 
 const cachedPartners = unstable_cache(

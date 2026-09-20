@@ -55,15 +55,34 @@ type Category = {
   nameEn: string;
   colour: string;
   audience: string | null;
+  /** De standaardbanner van dit thema, voor een evenement zonder eigen affiche. */
+  bannerUrl?: string | null;
 };
 
 type Lang = 'nl' | 'en';
 
 /** Eén aanvinkbare categorie; doelgroep en thema gebruiken dezelfde `name`. */
-function CategoryCheckbox({ category, checked, nl }: { category: Category; checked: boolean; nl: boolean }) {
+function CategoryCheckbox({
+  category,
+  checked,
+  nl,
+  onToggle,
+}: {
+  category: Category;
+  checked: boolean;
+  nl: boolean;
+  /** Enkel bij een thema: de preview van de affiche volgt de keuze. */
+  onToggle?: (checked: boolean) => void;
+}) {
   return (
     <label className="inline-flex items-center gap-2 text-sm">
-      <input type="checkbox" name="categoryIds" value={category.id} defaultChecked={checked} />
+      <input
+        type="checkbox"
+        name="categoryIds"
+        value={category.id}
+        defaultChecked={checked}
+        onChange={onToggle ? (e) => onToggle(e.target.checked) : undefined}
+      />
       <span aria-hidden className="inline-block size-2.5 rounded-full" style={{ background: category.colour }} />
       {nl ? category.nameNl : category.nameEn}
     </label>
@@ -151,6 +170,7 @@ export function EventForm({
   groups,
   categories,
   locale,
+  siteDefaultImage,
   canCreateTickets = false,
   canManageCategories = false,
   canHeroWeek = false,
@@ -159,6 +179,8 @@ export function EventForm({
   groups: Group[];
   categories: Category[];
   locale: 'nl' | 'en';
+  /** De sitebrede standaardfoto, voor een evenement waarvan geen thema er een draagt. */
+  siteDefaultImage: string;
   /**
    * Toont "Publiceren en tickets toevoegen" bij een nieuw evenement.
    * Ticketevents aanmaken is een aparte permissie, dus wie enkel mag inplannen
@@ -189,6 +211,20 @@ export function EventForm({
   const selected = new Set(event.categoryIds ?? []);
   const audienceCategories = categories.filter((c) => c.audience !== null);
   const themeCategories = categories.filter((c) => c.audience === null);
+
+  /**
+   * De aangevinkte thema's, enkel om de affiche-preview te laten kloppen: zonder
+   * eigen foto krijgt dit evenement de standaardbanner van zijn thema, en een
+   * preview die dan de sitebrede foto toont liegt. De vinkjes zelf blijven
+   * ongecontroleerd; dit is een kopie, geen bron.
+   */
+  const [selectedThemes, setSelectedThemes] = useState<Set<string>>(
+    () => new Set(themeCategories.filter((c) => selected.has(c.id)).map((c) => c.id)),
+  );
+  // Het thema dat wint, is het hoogste uit het categoriebeheer; `categories`
+  // komt al in die volgorde binnen. Zie lib/defaultEventImage.ts.
+  const fallbackTheme =
+    themeCategories.find((c) => selectedThemes.has(c.id) && c.bannerUrl) ?? null;
 
   const secondarySubmits = [
     ...(isNew || isDraft
@@ -620,6 +656,14 @@ export function EventForm({
           defaultKey={event.imageKey}
           defaultFocus={toImageFocus(event.imageFocusX, event.imageFocusY)}
           locale={locale}
+          fallbackUrl={fallbackTheme?.bannerUrl ?? siteDefaultImage}
+          fallbackHint={
+            fallbackTheme
+              ? `${nl ? 'Standaardfoto' : 'Default photo'} ${nl ? fallbackTheme.nameNl : fallbackTheme.nameEn}`
+              : nl
+                ? 'Sitebrede standaardfoto'
+                : 'Site-wide default photo'
+          }
         />
       </Section>
 
@@ -656,7 +700,20 @@ export function EventForm({
             <div className="flex flex-wrap gap-x-5 gap-y-2">
               {themeCategories.length > 0 ? (
                 themeCategories.map((c) => (
-                  <CategoryCheckbox key={c.id} category={c} checked={selected.has(c.id)} nl={nl} />
+                  <CategoryCheckbox
+                    key={c.id}
+                    category={c}
+                    checked={selected.has(c.id)}
+                    nl={nl}
+                    onToggle={(on) =>
+                      setSelectedThemes((prev) => {
+                        const next = new Set(prev);
+                        if (on) next.add(c.id);
+                        else next.delete(c.id);
+                        return next;
+                      })
+                    }
+                  />
                 ))
               ) : (
                 <EmptyCategoryMessage
@@ -667,6 +724,13 @@ export function EventForm({
                 />
               )}
             </div>
+            {fallbackTheme && !event.imageKey ? (
+              <p className="vtk-ef-hint">
+                {nl
+                  ? `Zonder eigen affiche krijgt dit evenement de standaardbanner van ${fallbackTheme.nameNl}.`
+                  : `Without its own poster this event gets the default banner of ${fallbackTheme.nameEn}.`}
+              </p>
+            ) : null}
           </div>
         </div>
       </Section>

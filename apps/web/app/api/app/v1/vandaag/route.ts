@@ -7,10 +7,13 @@ import { viewerAudienceFilter } from "@/lib/calendar/audience";
 import { publicInterestCounts } from "@/lib/calendar/interest";
 import { corsPreflight } from "@/lib/cors";
 import { getCursusdienstHours } from "@/lib/cursusdienstHours";
-import { BUILTIN_DEFAULT_EVENT_IMAGE, DEFAULT_EVENT_IMAGE_SETTING } from "@/lib/defaultEventImage";
+import {
+  defaultEventImageFor,
+  eventCategorySlugs,
+  getDefaultEventImages,
+} from "@/lib/defaultEventImage";
 import { readBarStatus } from "@/lib/elixir/status";
 import { getCurrentSession } from "@/lib/session";
-import { publicUrl } from "@/lib/storage";
 import { appAbilities } from "@/lib/app-api/abilities";
 import {
   appLocaleFrom,
@@ -60,7 +63,6 @@ export async function GET(request: Request) {
                 "home.openingHours.theokot",
                 "home.openingHours.cursusdienst",
                 "home.openingHours.elixir",
-                DEFAULT_EVENT_IMAGE_SETTING,
               ],
             },
           },
@@ -99,10 +101,9 @@ export async function GET(request: Request) {
       },
     });
 
-    const defaultEventImage =
-      publicUrl(
-        (map.get(DEFAULT_EVENT_IMAGE_SETTING) as { imageKey?: string | null } | undefined)?.imageKey,
-      ) ?? BUILTIN_DEFAULT_EVENT_IMAGE;
+    // De standaardbanner van het thema, en anders de sitebrede foto uit
+    // /admin/home; zie lib/defaultEventImage.ts.
+    const defaultEventImages = await getDefaultEventImages();
 
     const [interested, publicCounts] = await Promise.all([
       interestedEventIds(session?.user.id ?? null, upcoming.map((event) => event.id)),
@@ -118,7 +119,11 @@ export async function GET(request: Request) {
       allDay: event.allDay,
       location: event.location,
       imageUrl:
-        absoluteMediaUrl(request, event.imageKey) ?? absoluteUrl(request, defaultEventImage),
+        absoluteMediaUrl(request, event.imageKey) ??
+        absoluteUrl(
+          request,
+          defaultEventImageFor(defaultEventImages, eventCategorySlugs(event.categories)),
+        ),
       groupName: organiserName(event.organiserName, event.group, locale),
       groupSlug: event.group.slug,
       categories: event.categories.map(({ category }) => ({

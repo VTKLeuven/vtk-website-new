@@ -1,6 +1,6 @@
 import { cache } from "react";
 import { prisma } from "@vtk/db";
-import { getDefaultEventImage } from "@/lib/defaultEventImage";
+import { getDefaultEventImages } from "@/lib/defaultEventImage";
 
 /**
  * De queries die een publieke route twee keer nodig heeft: één keer voor
@@ -94,5 +94,9 @@ export const loadCalendarEvent = cache(async (slugOrId: string) =>
   }),
 );
 
-/** De standaardfoto voor evenementen zonder eigen cover; komt uit /admin/home. */
-export const loadDefaultEventImage = cache(getDefaultEventImage);
+/**
+ * De standaardfoto's voor evenementen zonder eigen cover: de sitebrede uit
+ * /admin/home en die per thema uit /admin/kalender/categorieen. Vraag de juiste
+ * op met `defaultEventImageFor`.
+ */
+export const loadDefaultEventImages = cache(getDefaultEventImages);
