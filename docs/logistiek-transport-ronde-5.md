@@ -57,16 +57,17 @@ Alles wordt op **390px breed** nagekeken, niet alleen op desktop.
 | 3 | Breedte en gsm | F4.6, F4.7, F4.14 | ✅ af (`e65da138`) |
 | 4 | Chauffeursnummers en werkgroepen | F4.3, F4.10 | 🟡 schermen af (`503735c0`), één nummer open |
 | 5 | Beschikbaarheid | F4.2, F4.5 | ✅ af (`435ecf21`) |
-| 6 | Ritten bewerken en noteren | F4.4, F4.20 | ✅ af (`634313e0`, deze commit) |
+| 6 | Ritten bewerken en noteren | F4.4, F4.20 | ✅ af (`634313e0`, `40c934b7`) |
 | 7 | Voertuigen | F4.21, F4.22 | ⬜ open |
 | 8 | Statistiek | F4.23 | ⬜ open |
 | - | Bewust niet gedaan | F4.11 | ⛔ |
 
 Fase 1 eerst: daar zit het enige echte defect van deze ronde, en het draagt zeven
 van de drieëntwintig punten. **Fase 1, 2, 3, 5 en 6 zijn af** (`dce13cf7`,
-`5835b84f`, `e65da138`, `435ecf21`, `634313e0`) en van fase 4 staat alle code er
-(`503735c0`); daar blijft enkel het juiste nummer van Sofie Bruggeman over, en
-dat is geen code maar één veld op liv. Fase 7 is de volgende.
+`5835b84f`, `e65da138`, `435ecf21`, `634313e0` en `40c934b7`) en van fase 4 staat
+alle code er (`503735c0`); daar blijft enkel het juiste nummer van Sofie
+Bruggeman over, en dat is geen code maar één veld op liv. Fase 7 is de
+volgende.
 
 ---
 
