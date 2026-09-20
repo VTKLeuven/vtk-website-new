@@ -111,6 +111,7 @@ export type CreateSsoClientInput = {
   skipConsent?: boolean;
   /** `native` en `user-agent-based` zijn publieke clients: die krijgen geen secret. */
   type?: 'web' | 'native' | 'user-agent-based';
+  tokenEndpointAuthMethod?: 'client_secret_basic' | 'client_secret_post' | 'none';
 };
 
 /**
@@ -135,6 +136,7 @@ export async function createSsoClient(
       ...(input.contacts?.length ? { contacts: input.contacts } : {}),
       ...(input.skipConsent !== undefined ? { skip_consent: input.skipConsent } : {}),
       ...(input.type ? { type: input.type } : {}),
+      ...(input.tokenEndpointAuthMethod ? { token_endpoint_auth_method: input.tokenEndpointAuthMethod } : {}),
     },
   });
 
@@ -155,6 +157,7 @@ export type UpdateSsoClientInput = {
   logoUri?: string;
   contacts?: string[];
   skipConsent?: boolean;
+  tokenEndpointAuthMethod?: 'client_secret_basic' | 'client_secret_post' | 'none';
 };
 
 /**
@@ -184,6 +187,9 @@ export async function updateSsoClient(
         ...(input.logoUri !== undefined ? { logo_uri: input.logoUri } : {}),
         ...(input.contacts ? { contacts: input.contacts } : {}),
         ...(input.skipConsent !== undefined ? { skip_consent: input.skipConsent } : {}),
+        ...(input.tokenEndpointAuthMethod !== undefined
+          ? { token_endpoint_auth_method: input.tokenEndpointAuthMethod }
+          : {}),
       },
     },
   });

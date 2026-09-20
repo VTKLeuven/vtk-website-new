@@ -16,7 +16,183 @@ import { NextRequest, NextResponse } from 'next/server';
 import { AUTH_BASE_PATH, RouteContext, RouteHandler, ApiHandlers } from '../index';
 import { notFound, notFoundHandlers, methodNotAllowed } from './basicHandlers';
 
+import { prisma } from '@vtk/db';
+
 const handlers: ApiHandlers = toNextJsHandler(auth);
+
+/**
+ * Paden waarop een OAuth-client zich kan authenticeren met client_secret_basic
+ * of client_secret_post.
+ */
+const OAUTH_CLIENT_AUTH_PATHS = new Set([
+  `${AUTH_BASE_PATH}/oauth2/token`,
+  `${AUTH_BASE_PATH}/oauth2/revoke`,
+  `${AUTH_BASE_PATH}/oauth2/introspect`,
+]);
+
+function encodeBasicCredentials(clientId: string, clientSecret: string): string {
+  const formUrlEncode = (val: string) => new URLSearchParams({ v: val }).toString().slice(2);
+  const payload = `${formUrlEncode(clientId)}:${formUrlEncode(clientSecret)}`;
+  return `Basic ${Buffer.from(payload).toString('base64')}`;
+}
+
+function decodeBasicCredentials(authorization: string): { clientId: string; clientSecret: string } | null {
+  const match = authorization.match(/^Basic +(.*)$/i);
+  if (!match) return null;
+  try {
+    const decoded = Buffer.from(match[1], 'base64').toString('utf8');
+    const separatorIndex = decoded.indexOf(':');
+    if (separatorIndex === -1) return null;
+    const rawClientId = decoded.slice(0, separatorIndex);
+    const rawClientSecret = decoded.slice(separatorIndex + 1);
+    const formUrlDecode = (val: string) => new URLSearchParams(`v=${val}`).get('v') ?? val;
+    return {
+      clientId: formUrlDecode(rawClientId),
+      clientSecret: formUrlDecode(rawClientSecret),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Ondersteunt zowel `client_secret_basic` als `client_secret_post` voor alle
+ * vertrouwelijke clients.
+ *
+ * Better Auth 1.7 introduceerde een strikte controle: een client geregistreerd
+ * voor `client_secret_basic` (de standaard als `tokenEndpointAuthMethod` leeg is)
+ * mag géén `client_secret_post` meer sturen en faalt met:
+ *   "client registered for client_secret_basic cannot use client_secret_post".
+ *
+ * Externe applicaties (zoals BurgieClan met Symfony / league/oauth2-client, of
+ * clients in Go, Python, etc.) sturen credentials standaard in de POST body.
+ * In RFC 6749 (§2.3.1) zijn beide methoden gelijkwaardig voor gedeelde geheimen.
+ *
+ * Deze helper normaliseert de transportmethode naar wat in de databank staat
+ * (of vice versa), zodat elke client via beide methoden kan aanmelden zonder
+ * dat een library-update of configuratieverschil de flow breekt.
+ */
+export async function normalizeOAuthClientAuth(request: NextRequest): Promise<NextRequest> {
+  const url = new URL(request.url);
+  if (!OAUTH_CLIENT_AUTH_PATHS.has(url.pathname)) return request;
+
+  const authHeader = request.headers.get('authorization');
+  const contentType = request.headers.get('content-type') || '';
+
+  const basicAuth = authHeader ? decodeBasicCredentials(authHeader) : null;
+
+  let bodyText: string;
+  try {
+    bodyText = await request.text();
+  } catch {
+    return request;
+  }
+
+  const isForm = contentType.includes('application/x-www-form-urlencoded');
+  const isJson = contentType.includes('application/json');
+
+  let bodyClientId: string | null = null;
+  let bodyClientSecret: string | null = null;
+  let formParams: URLSearchParams | null = null;
+  let jsonBody: Record<string, unknown> | null = null;
+
+  if (isForm) {
+    formParams = new URLSearchParams(bodyText);
+    bodyClientId = formParams.get('client_id');
+    bodyClientSecret = formParams.get('client_secret');
+  } else if (isJson) {
+    try {
+      jsonBody = JSON.parse(bodyText);
+      if (jsonBody && typeof jsonBody === 'object') {
+        if (typeof jsonBody.client_id === 'string') bodyClientId = jsonBody.client_id;
+        if (typeof jsonBody.client_secret === 'string') bodyClientSecret = jsonBody.client_secret;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  // Geval A: client stuurt client_secret_post (geheimen in body, geen Basic header)
+  if (!basicAuth && bodyClientId && bodyClientSecret) {
+    const dbClient = await prisma.oauthClient
+      .findUnique({
+        where: { clientId: bodyClientId },
+        select: { tokenEndpointAuthMethod: true },
+      })
+      .catch(() => null);
+
+    // Als de client in de databank geregistreerd staat voor client_secret_basic (of null/leeg, wat better-auth
+    // als client_secret_basic interpreteert), zet de credentials dan om naar de Authorization: Basic header.
+    if (!dbClient || dbClient.tokenEndpointAuthMethod !== 'client_secret_post') {
+      const headers = new Headers(request.headers);
+      headers.set('authorization', encodeBasicCredentials(bodyClientId, bodyClientSecret));
+
+      let newBody: string;
+      if (isForm && formParams) {
+        formParams.delete('client_secret');
+        newBody = formParams.toString();
+      } else if (isJson && jsonBody) {
+        const { client_secret: _, ...rest } = jsonBody;
+        newBody = JSON.stringify(rest);
+      } else {
+        newBody = bodyText;
+      }
+
+      return new NextRequest(url, {
+        method: request.method,
+        headers,
+        body: newBody,
+      });
+    }
+  }
+
+  // Geval B: client stuurt client_secret_basic, maar staat geregistreerd voor client_secret_post
+  if (basicAuth) {
+    const dbClient = await prisma.oauthClient
+      .findUnique({
+        where: { clientId: basicAuth.clientId },
+        select: { tokenEndpointAuthMethod: true },
+      })
+      .catch(() => null);
+
+    if (dbClient?.tokenEndpointAuthMethod === 'client_secret_post') {
+      const headers = new Headers(request.headers);
+      headers.delete('authorization');
+
+      let newBody: string;
+      if (isForm) {
+        const p = formParams ?? new URLSearchParams(bodyText);
+        p.set('client_id', basicAuth.clientId);
+        p.set('client_secret', basicAuth.clientSecret);
+        newBody = p.toString();
+      } else if (isJson) {
+        const j = jsonBody ?? (JSON.parse(bodyText) as Record<string, unknown>);
+        j.client_id = basicAuth.clientId;
+        j.client_secret = basicAuth.clientSecret;
+        newBody = JSON.stringify(j);
+      } else {
+        headers.set('content-type', 'application/x-www-form-urlencoded');
+        const p = new URLSearchParams({
+          client_id: basicAuth.clientId,
+          client_secret: basicAuth.clientSecret,
+        });
+        newBody = p.toString();
+      }
+
+      return new NextRequest(url, {
+        method: request.method,
+        headers,
+        body: newBody,
+      });
+    }
+  }
+
+  return new NextRequest(url, {
+    method: request.method,
+    headers: request.headers,
+    body: bodyText,
+  });
+}
 
 /**
  * Het pad waarop een terugkerende student binnenkomt, met één providersegment
@@ -50,6 +226,7 @@ function toCoreCallback(request: NextRequest): NextRequest {
 const betterAuthHandlers: ApiHandlers = {
   ...handlers,
   GET: (request, context) => handlers.GET(toCoreCallback(request), context),
+  POST: async (request, context) => handlers.POST(await normalizeOAuthClientAuth(request), context),
 };
 
 const remoteHandlers: ApiHandlers = {

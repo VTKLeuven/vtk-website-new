@@ -405,6 +405,28 @@ Elk punt hier heeft ooit tijd gekost.
     (en `plugins/jwt/schema.mjs` voor de `jwks`-tabel, die 1.7 `alg` en `crv`
     gaf) naast `packages/db/prisma/schema.prisma`.
 
+18. **Better Auth 1.7 dwingt de token-authenticatiemethode strikt af per client.**
+    In OAuth 2.0 (RFC 6749 §2.3.1) mag een vertrouwelijke client zijn geheim sturen
+    via `Authorization: Basic` (`client_secret_basic`) óf via de POST-body
+    (`client_secret_post`). Vóór 1.7 accepteerde de server beide methoden voor
+    elke client met een geheim.
+
+    Sinds 1.7 controleert `validateClientCredentials` echter:
+    ```javascript
+    const registeredAuthMethod = client.tokenEndpointAuthMethod ?? "client_secret_basic";
+    if (authMethod && registeredAuthMethod !== authMethod)
+      throwInvalidClient(`client registered for ${registeredAuthMethod} cannot use ${authMethod}`);
+    ```
+    Omdat bestaande clients in de databank `tokenEndpointAuthMethod: null` hebben
+    (wat de plugin als `client_secret_basic` interpreteert), faalt elke externe client
+    die credentials in de POST-body meestuurt (zoals PHP's `league/oauth2-client` op
+    BurgieClan) met 400 Bad Request:
+    `client registered for client_secret_basic cannot use client_secret_post`.
+
+    `apiHandlers/apiHandler.ts` normaliseert de transportmethode daarom automatisch
+    naar wat in de databank geregistreerd staat (en omgekeerd), zodat alle
+    vertrouwelijke clients transparant via beide RFC 6749-methoden kunnen aanmelden.
+
 ---
 
 ## Bewust niet gebouwd
