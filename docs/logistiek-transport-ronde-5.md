@@ -52,7 +52,7 @@ Alles wordt op **390px breed** nagekeken, niet alleen op desktop.
 
 | Fase | Inhoud | Taken | Status |
 | --- | --- | --- | --- |
-| 1 | De post ziet en regelt haar eigen ritten | F4.18, F4.19, F4.9, F4.8a, F4.8b, F4.12, F4.17 | ⬜ open |
+| 1 | De post ziet en regelt haar eigen ritten | F4.18, F4.19, F4.9, F4.8a, F4.8b, F4.12, F4.17 | ✅ af (`dce13cf7`) |
 | 2 | Leesbaarheid van de planning | F4.16, F4.1, F4.13, F4.15 | ⬜ open |
 | 3 | Breedte en gsm | F4.6, F4.7, F4.14 | ⬜ open |
 | 4 | Chauffeursnummers en werkgroepen | F4.3, F4.10 | 🟡 parser en script klaar |
@@ -63,14 +63,14 @@ Alles wordt op **390px breed** nagekeken, niet alleen op desktop.
 | - | Bewust niet gedaan | F4.11 | ⛔ |
 
 Fase 1 eerst: daar zit het enige echte defect van deze ronde, en het draagt zeven
-van de drieëntwintig punten.
+van de drieëntwintig punten. **Fase 1 is af** (`dce13cf7`); fase 2 is de volgende.
 
 ---
 
 # Fase 1: de post ziet en regelt haar eigen ritten
 
-### ⬜ F4.18. Een goedgekeurde rit van je post staat niet onder "Mijn ritten"
-**P1 · code**
+### ✅ F4.18. Een goedgekeurde rit van je post staat niet onder "Mijn ritten"
+**P1 · code · `dce13cf7`**
 
 Logistiek speelde het na: post vraagt een autorit, Logistiek keurt goed, en de
 rit verschijnt níét onder "Ritten van mijn post" van die post. Hij verschijnt
@@ -88,12 +88,17 @@ OR: [
 De tweede tak eist een chauffeur. Een goedgekeurde rit die er nog geen heeft,
 valt dus weg, en dat is precies de rit waar een post iets mee moet.
 
-**Fix.** `driverId: { not: null }` weg. De sectie heet "wat je medeleden rijden
-én wat er nog een chauffeur mist"; die tweede helft werkte enkel via
+**Gedaan.** `driverId: { not: null }` is weg. De sectie heet "wat je medeleden
+rijden én wat er nog een chauffeur mist"; die tweede helft werkte enkel via
 `assignedGroupId`.
 
-### ⬜ F4.19. Een rit die je zelf rijdt, verdwijnt bij je post
-**P1 · code · 📝**
+`driverStatus` telt nu dezelfde twee takken, anders belooft de navigatie iets
+anders dan het scherm toont. De integratietest legde het omgekeerde vast ("zonder
+chauffeur valt de rit uit die lijst") en keert nu om: dat was de bug, zwart op
+wit.
+
+### ✅ F4.19. Een rit die je zelf rijdt, verdwijnt bij je post
+**P1 · code · 📝 · `dce13cf7`**
 
 Zelfde functie, de regel eronder:
 
@@ -104,43 +109,45 @@ return trips.filter((trip) => trip.driverId !== userId);
 Kies je jezelf als chauffeur, dan verhuist de rit van "Ritten van mijn post" naar
 "Komende ritten". Logistiek wil hem in **beide** lijsten (D3).
 
-**Fix.** De filter weg. Dan staat dezelfde rit twee keer op `/ritten`, en dat is
-de bedoeling, maar de kaart in de postlijst moet dan wel zeggen dat jij het bent;
-anders leest het als een dubbel. 📝 Eén bullet in `docs/design-decisions.md`: de
-twee lijsten beantwoorden twee vragen ("wat moet ik doen" en "wat staat er bij
-ons open"), en een rit kan in allebei thuishoren.
+**Gedaan.** De filter is weg; de kaart in de postlijst draagt nu het merkteken
+**"Jij rijdt"**, anders leest dezelfde rit twee keer als twee ritten. De teller op
+de hub was daardoor dubbel (`ownTrips + groupTrips`) en is één telling geworden.
+📝 Staat in `docs/design-decisions.md` onder "Een rit van je post staat op Mijn
+ritten, ook als jij hem rijdt".
 
-### ⬜ F4.9. Enkel chauffeurs van die post zijn kiesbaar
-**P2 · code**
+### ✅ F4.9. Enkel chauffeurs van die post zijn kiesbaar
+**P2 · code · `dce13cf7`**
 
 `groupMemberOptions` geeft élk lid van de post terug, dus een post kan iemand
 zonder rijbewijs op een autorit zetten. Logistiek wil de doorsnede: leden van de
 post die ook in de chauffeurspool zitten.
 
-**Fix.** De pool is `logistiekTeamMembers()` plus de rijen in `UitleenDriver`,
-zoals `driverOptions` hem samenstelt. Snijd daarmee.
+**Gedaan.** `groupMemberOptions` snijdt met de pool (`logistiekTeamMembers()`
+plus de rijen in `UitleenDriver`, zoals `driverOptions` hem samenstelt).
 
-**Let op de lege lijst.** Een post zonder chauffeurs krijgt zo een keuzelijst
-zonder opties. Die moet zeggen wat er ontbreekt en naar wie ("niemand van jullie
-staat in de chauffeurslijst; mail logistiek@vtk.be"), niet leeg blijven staan.
-Dat is meteen de reden dat F4.10 in dezelfde ronde zit.
+**De lege lijst is afgehandeld.** Staat er niemand van die post in de
+chauffeurslijst, dan toont `GroupDriverPicker` geen keuzelijst maar een zin met
+het mailadres erin. Blijft wél een keuzelijst wanneer Logistiek er al iemand op
+zette; anders verdwijnt die naam van het scherm. F4.10 (chauffeurs aan posten en
+werkgroepen toevoegen) is het andere eind van dit punt en staat nog open.
 
-### ⬜ F4.8a. Een postlid voegt een bijrijder toe vanuit "Ritten van mijn post"
-**P2 · code**
+### ✅ F4.8a. Een postlid voegt een bijrijder toe vanuit "Ritten van mijn post"
+**P2 · code · `dce13cf7`**
 
 De serverkant kan het al: `addTripHelperAction` laat een collega van dezelfde
 post toe, en `TripHelpers` is een bestaande component. Op `/ritten` worden de
 bijrijders enkel **getoond**.
 
-**Fix.** `<TripHelpers canEdit>` in de kaart van een postrit.
+**Gedaan.** `<TripHelpers canEdit>` staat onder het raster van een postrit, op
+dezelfde plek als op het bezettingsoverzicht. De oude losse velden
+(`helpersNote`, `helpersPhone`) reizen mee als één `legacyNote`.
 
-**Eén uitbreiding nodig.** `vanBookingForMember` matcht op `groupId` (de post die
-de rit vroeg), niet op `assignedGroupId` (de post die hem rijdt). Zonder die tak
-kan een post geen bijrijder zetten op een rit die ze doorgegeven kreeg van een
-andere post, terwijl die rit wel in haar lijst staat.
+`vanBookingForMember` kreeg de derde tak (`assignedGroupId`), en de leeskant
+(`ownsTransportBooking`, `transportWeekForPraesidium`) is meegegaan: die twee
+regels moeten hetzelfde zeggen, en `test/trip-access.test.ts` dwingt dat af.
 
-### ⬜ F4.8b. Geen mail meer naar de verantwoordelijken, tenzij je dat instelt
-**P2 · code · 📝**
+### ✅ F4.8b. Geen mail meer naar de verantwoordelijken, tenzij je dat instelt
+**P2 · code · 📝 · `dce13cf7`**
 
 Vandaag mailt `notifyGroupAssignedForTrip` altijd `groupLeads()`. Dat wordt een
 keuze in `/beheer/instellingen`, naast `showRentPrices` in dezelfde
@@ -154,14 +161,23 @@ Wie verwittigen bij het doorgeven van een rit aan een post?
 ( ) Een vast adres: [                    ]
 ```
 
-**De melding ná het doorgeven moet meelopen.** Die zegt nu "de verantwoordelijken
-krijgen een mail om een chauffeur aan te duiden". Staat de instelling op niemand,
-dan belooft dat scherm iets wat niet gebeurt. 📝 Kort in `design-decisions.md`:
-waarom de standaard "niemand" is (de postlijst op `/ritten` is de melding
-geworden).
+**Gedaan**, precies zoals hierboven. Het postadres komt uit de mailinglijsten
+(`MailGroup`), en enkel uit een lijst die precies díé ene post als bron heeft:
+`praesidium@vtk.be` is "elke actieve post" en is niet het adres van deze post.
 
-### ⬜ F4.12. "Post vult zelf in" heet voortaan "Post kiest zelf de chauffeur"
-**P2 · code**
+**Twee schermen zeggen nu de waarheid in plaats van een belofte.** De zin onder
+"Post kiest zelf de chauffeur" volgt de instelling, en de melding ná het doorgeven
+ook: "geen mail" is daar geen waarschuwing meer (het is de bedoeling), terwijl een
+post zonder verantwoordelijke of zonder eigen adres dat wél blijft. Die teksten
+staan in `lib/uitleen.ts` (`handoverNote`, `mergeHandover`) en zijn getest;
+ze zaten in een `'use server'`-module en waren daar niet te bereiken. Daar kwam
+ook een tikfout uit boven die er al stond: "kreegen".
+
+📝 `design-decisions.md`, "Een rit doorgeven aan een post mailt standaard
+niemand".
+
+### ✅ F4.12. "Post vult zelf in" heet voortaan "Post kiest zelf de chauffeur"
+**P2 · code · `dce13cf7`**
 
 Logistiek vroeg letterlijk wat het veld betekent. Het zet `assignedGroupId`, en
 dat is exact "deze post duidt zelf de chauffeur aan".
@@ -169,17 +185,17 @@ dat is exact "deze post duidt zelf de chauffeur aan".
 Twee plekken: `app/beheer/vervoer/week/new-trip-form.tsx:268` en
 `app/beheer/vervoer/transport-controls.tsx:128`.
 
-### ⬜ F4.17. De aanvragende post staat meteen voorgesteld
-**P2 · code**
+### ✅ F4.17. De aanvragende post staat meteen voorgesteld
+**P2 · code · `dce13cf7`**
 
 Maak je een autorit voor Sport, dan mag Sport meteen in "Post kiest zelf de
 chauffeur" staan. Een voorstel en geen dwang: het veld blijft leeg te zetten,
 anders krijgt elke rit die Logistiek zelf rijdt er stil een post op.
 
-In `new-trip-form.tsx`: zet `assignedGroupId` mee wanneer de gebruiker een post
-kiest bij "voor wie", zolang de gebruiker het veld zelf nog niet aanraakte, en
-enkel voor een voertuig zonder `needsVanDriver` (de kar vraagt een goedgekeurde
-karchauffeur; dat blijft een keuze van Logistiek).
+**Gedaan** in `new-trip-form.tsx`, met een `assignedTouched`-vlag: zodra je het
+veld zelf aanraakt, volgt het niets meer. Wisselen naar de kar haalt het voorstel
+weg en terugwisselen naar de auto zet het terug, zolang je er zelf van af bleef;
+anders verdwijnt het bij een wissel heen en weer zonder dat je het merkt.
 
 ---
 
