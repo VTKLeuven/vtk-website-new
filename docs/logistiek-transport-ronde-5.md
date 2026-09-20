@@ -315,11 +315,32 @@ is Sofie Bruggeman. Viktor Meekers staat er met een nummer dat van vorm klopt
 maar volgens Logistiek niet van inhoud: de import ziet dat niet, een mens wel.
 Samen zijn dat de twee redenen dat dit een nakijklijst is en geen knop.
 
+**Gedraaid op liv, 20 september 2026.** Via de web-container, die `tsx`,
+`packages/auth` en `packages/db` bevat en de `DATABASE_URL` al in haar omgeving
+heeft (dezelfde weg als `prisma migrate deploy` bij het opstarten):
+
+```
+docker cp vcard.ts import-gsm.ts infra-web-1:/app/
+docker cp lijst.vcf infra-web-1:/tmp/lijst.vcf
+docker exec infra-web-1 npx tsx /app/import-gsm.ts /tmp/lijst.vcf [--apply]
+```
+
+Resultaat: 41 chauffeurs in de pool, **30 kregen een nummer**, 1 geweigerd (zie
+hieronder), 11 staan niet in de lijst. Niets overschreven: geen enkele chauffeur
+had al een nummer van het team. **De gekopieerde bestanden zijn daarna verwijderd**,
+zowel uit `/tmp` op de host als uit de container; een lijst met 94 namen en
+nummers hoort daar niet te blijven staan.
+
+Lokaal levert het nul koppelingen op: de dev-databank draait op fixtures met
+verzonnen namen.
+
 **Nog te doen:**
 
-- Draaien op productie. Lokaal levert het nul koppelingen op, want de
-  dev-databank draait op fixtures met verzonnen namen; de echte koppelgraad is
-  enkel tegen dev of liv te meten.
+- Het nummer van Sofie Bruggeman met de hand rechtzetten. In het bestand staat
+  `0032573712678`: na het landnummer negen cijfers die met een 5 beginnen, wat
+  noch een gsm (`4` plus acht) noch een vaste lijn (acht) is. Het is ofwel
+  `0473 71 26 78` (een 5 waar een 4 hoorde) ofwel `057 37 12 67` (een cijfer te
+  veel achteraan), en dat is niet uit het bestand af te leiden.
 - Een importscherm in `/beheer/chauffeurs`, zodat de lijst elk jaar opnieuw te
   gebruiken is zonder shell. Per rij: de chauffeur, wat er nu staat en waar dat
   vandaan komt, wat de lijst voorstelt, en een vinkje. Standaard aangevinkt
