@@ -58,6 +58,63 @@ zelf doet staat in `docs/logistiek-ingebruikname.md`.
 | `CollectEnGoOrder` / `...Line` / `CollectEnGoProductMatch` | Een uitgelezen Collect&Go-bevestigingsmail, klaar om als ladingen in de flesserke-voorraad te zetten. Lijnen bewaren aantal, prijs, leeggoed en de notitie van de besteller ("Acti - livecantus"); `...ProductMatch` onthoudt naar welk item een Colruyt-product ging. Zie "Collect&Go-import" hieronder. |
 | `UitleenPayment` / `UitleenPaymentWebhook` | Spiegel van `TicketPayment`; `provider` vrije string; precies één van `reservationId`/`transportBookingId`. |
 
+## Een veld toevoegen aan een rit
+
+Wat een nieuwe kolom op `UitleenTransportBooking` doet met de ritten die er al
+staan, hangt af van wat je toevoegt. De regel erachter is er maar één.
+
+- **Een rit uit vorig jaar is geen rit van vandaag met lege velden.** Ze is
+  afgesproken onder de regels van toen. Een nieuwe kolom verandert daar niets
+  aan, en een backfill die doet alsof ze er toen al was, verzint geschiedenis.
+- **Leeg betekent "niet gevraagd", nooit "nee".** Een oude rit zonder
+  `cargoNote` is geen rit zonder lading; het is een rit waarvan niemand de
+  lading noteerde. Elk scherm dat zo'n veld toont, moet dat verschil kunnen
+  maken.
+- **Snapshots worden nooit herrekend.** `pricingMode` en `rateCents` staan op de
+  rij omdat het tarief van dat moment telt. Een tariefwijziging raakt geen
+  enkele bestaande rit, en dat is geen achterstand maar de bedoeling.
+
+| Wat je toevoegt | Krijgen bestaande ritten het? |
+| --- | --- |
+| Nullable kolom (`cargoNote`, `assignedGroupId`) | Ja, als `NULL`. Elk scherm dat het toont, moet "niet ingevuld" aankunnen. |
+| `NOT NULL` met een default (`plannedByTeam`) | Ja, ze krijgen de default. Postgres 11+ doet dat zonder table rewrite, dus ook op een volle tabel snel. Maar de default is voor oude rijen meestal fout; dan hoort er een backfill bij. |
+| `NOT NULL` zonder default | Nee, de migratie faalt op een niet-lege tabel. Voeg nullable toe, backfill, span pas in een tweede migratie aan. |
+| Nieuwe tabel (`UitleenTransportHelper`) | Nee, nul rijen. Oude ritten houden wat ze hadden (`helpersNote`, `helpersPhone`), en die kolommen blijven daarom staan. |
+| Snapshot-veld (`rateCents`, `pricingMode`) | Nee, en dat blijft zo. Een oude rit houdt de prijs die ze toen kreeg. |
+| Afgeleide waarde | Enkel met een expliciete backfill in de migratie. Kan de oude waarde niet geweten zijn, dan hoort de kolom nullable te blijven. |
+
+### Twee precedenten
+
+- **`plannedByTeam`** (`20260911100000_uitleen_transport_planned_by_team`).
+  `DEFAULT false` was voor elke bestaande rit fout: ook de ritten die het team
+  zelf intekende werden zo onverwijderbaar. De migratie reconstrueert de waarde
+  uit `UitleenAuditLog.note = 'ingepland door Logistiek'`, omdat die note uit
+  precies één plek in de code komt.
+- **`assignedGroupId`** (`20260917160000_transport_group_assignment`). Geen
+  backfill, en terecht: er is geen bron waaruit je kan afleiden aan welke post
+  een rit van vorig jaar doorgegeven zou zijn. `NULL` is hier het eerlijke
+  antwoord. Het gevolg staat wel in de code, en dat is het soort stil verschil
+  waar dit hoofdstuk voor bestaat: `tripsForGroups` bereikt zo'n rit enkel nog
+  via zijn tweede tak (aangevraagd door de post, mét chauffeur), nooit via de
+  tak op `assignedGroupId`.
+
+### Hoe dit afgedwongen wordt
+
+Beantwoord in de comment van elke migratie op `UitleenTransportBooking` de vraag
+"wat betekent dit voor een rit van vorig jaar?". Is het eerlijke antwoord "de
+default is voor hen fout", dan hoort er een `UPDATE` bij. Is het "dat kunnen we
+niet weten", dan blijft de kolom nullable.
+
+Dat is geen erewoord maar een klem:
+
+- `apps/logistiek/test/rit-kolommen.test.ts` leest de kolommen uit de
+  Prisma-DMMF en faalt zodra er één bijkomt die niet in zijn lijst staat, met
+  de beslissing erbij. Die test heeft geen database nodig en draait dus mee in
+  `npm run verify`, vóór elke push.
+- `apps/logistiek/test/integration/oude-rit.integration.ts` maakt een rit zoals
+  die er vóór september 2026 uitzag (nieuwe kolommen `NULL`, geen bijrijders)
+  en haalt ze door `tripsForDriver`, `tripsForGroups` en `buildTransportFeed`.
+
 ## Toegang & zichtbaarheid
 
 - **Leden**: elk ingelogd vtk.be-lid (`requireSession`) voor materiaal en vervoer;

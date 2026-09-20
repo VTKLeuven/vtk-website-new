@@ -9,6 +9,7 @@
     "start": "next start -p 3100",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "import:inventaris": "dotenv -e ../../.env -- tsx scripts/import-inventaris.ts",
     "group:events": "dotenv -e ../../.env -- tsx scripts/group-events.ts",
     "mail:test": "dotenv -e ../../.env -- tsx scripts/test-mail.ts",

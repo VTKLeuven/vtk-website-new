@@ -108,6 +108,7 @@ jobs:
         run: |
           npx prisma migrate deploy --schema packages/db/prisma/schema.prisma
           npm run test:integration --workspace=@vtk/web
+          npm run test:integration --workspace=@vtk/logistiek
 
   build:
     name: Production build and browser smoke

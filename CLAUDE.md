@@ -168,6 +168,36 @@ of uitgeschakeld aangemaakt.
   over te nemen: die tabel bevat naast redactionele blokken ook `s3.config`,
   `vault.config`, `door.config` en `brevo.lists`.
 
+# Ritten van de uitleendienst
+
+`docs/uitleendienst.md` is de referentie voor de uitleendienst
+(`apps/logistiek`). Lees zeker "Een veld toevoegen aan een rit" voor je iets
+toevoegt aan `UitleenTransportBooking`. De kringkeuzes staan in
+`docs/design-decisions.md`.
+
+- **Een bestaande rit verandert nooit mee met een nieuwe feature.** Beslis bij
+  elke nieuwe kolom wat ze betekent voor een rit van vorig jaar, en schrijf dat
+  in de comment van de migratie. Is de default voor oude rijen fout, dan hoort
+  er een `UPDATE` in diezelfde migratie (zoals `plannedByTeam` doet vanuit de
+  auditlog). Kan de oude waarde niet geweten zijn, dan blijft de kolom nullable
+  en moet het scherm "niet ingevuld" aankunnen (zoals `assignedGroupId`).
+- **`apps/logistiek/test/rit-kolommen.test.ts` faalt zodra er een kolom
+  bijkomt** die niet in zijn lijst staat, net zoals de typecheck faalt bij een
+  permissie zonder MCP-policy. Zet de kolom erbij mét de beslissing; zet de test
+  niet stil. Ze leest de Prisma-DMMF en heeft dus geen database nodig, dus dit
+  faalt al in de pre-push hook.
+- **Een leeg veld op een oude rit betekent "niet gevraagd", niet "nee".** Toon
+  het verschil, of laat de regel weg zoals de agendafeed doet (`.filter(Boolean)`
+  in `lib/calendar/transport-feed.ts`); zet er nooit een lege waarde of een
+  standaardtekst voor in de plaats.
+- **Snapshots (`pricingMode`, `rateCents`) worden nooit herrekend.** Een
+  tariefwijziging raakt geen enkele bestaande rit, en dat is de bedoeling.
+- Raak je het gedrag van een rit aan, draai dan
+  `npm run test:integration -w @vtk/logistiek` (vraagt een database, zie
+  `make up`). `test/integration/oude-rit.integration.ts` haalt een rit zonder
+  de nieuwe velden door `tripsForDriver`, `tripsForGroups` en
+  `buildTransportFeed`.
+
 # Styling Guidelines
 
 Use `design/new-design.html` as the visual source of truth for VTK surfaces.
