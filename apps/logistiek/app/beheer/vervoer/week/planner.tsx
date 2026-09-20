@@ -97,6 +97,13 @@ export type PlannerTrip = {
   driver: { id: string; name: string } | null;
   /** De post die deze rit zelf mag invullen, of null. */
   assignedGroupId: string | null;
+  /**
+   * De post waarvoor deze rit rijdt, met haar naam (F4.4). Staat naast
+   * `edit.requesterChoice` omdat die enkel een id draagt: is de post intussen
+   * op non-actief gezet, dan staat ze niet meer in `groups` en heeft de
+   * keuzelijst niets om te tonen.
+   */
+  requesterGroup: { id: string; name: string } | null;
   pricingMode: UitleenPricingMode;
   requesterType: UitleenRequesterType;
   priceLabel: string | null;
@@ -218,9 +225,12 @@ export function TransportPlanner({
     (blockId: string, startAt: Date, endAt: Date) => {
       const target = trips.find((entry) => entry.id === blockId);
       if (!target) return;
+      // "Voor wie" blijft hier bewust achter: slepen verzet uren, en de actie
+      // raakt de post enkel aan wanneer ze die expliciet meekrijgt.
+      const { requesterChoice: _choice, requesterOther: _other, ...fields } = target.edit;
       startTransition(async () => {
         const result = await adminEditTransportAction(blockId, {
-          ...target.edit,
+          ...fields,
           startAt: toDatetimeLocalValue(startAt),
           endAt: toDatetimeLocalValue(endAt),
           allowOverlap: true,
@@ -654,6 +664,8 @@ export function TransportPlanner({
                   <TripEditForm
                     bookingId={trip.id}
                     initial={trip.edit}
+                    groups={groups}
+                    currentGroup={trip.requesterGroup}
                     events={eventOptions}
                     reservationId={trip.reservationId}
                     locked={trip.status !== 'REQUESTED' && trip.status !== 'APPROVED'}

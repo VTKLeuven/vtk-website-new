@@ -759,6 +759,49 @@ export function requesterLabel(request: {
 }
 
 /**
+ * "Andere...": een werkgroep met een vrije naam, in de twee formulieren waar het
+ * team kiest voor wie een rit rijdt (intekenen en bewerken).
+ *
+ * Een sentinel in hetzelfde veld en geen tweede veld ernaast: het is één vraag
+ * ("voor wie rijdt deze rit") met één antwoord, en twee velden waarvan er altijd
+ * precies één gevuld hoort te zijn, lopen vroeg of laat allebei ingevuld. Botst
+ * niet met een echte id: die zijn cuids.
+ *
+ * Géén externe: enkel een externe krijgt prijs, tarief en betaalstatus
+ * (`chargesRequester`), en dat is niet wat "andere" hier betekent. Zie
+ * docs/design-decisions.md.
+ */
+export const OTHER_REQUESTER = 'andere';
+
+/**
+ * Een externe. Staat enkel in de keuzelijst bij een rit die al extern is, zodat
+ * die er eerlijk in staat; een rit wordt hier niet extern gemáákt. Dat is een
+ * geldbeslissing, en die hoort niet in een keuzelijst tussen twintig posten.
+ * `adminEditTransportAction` weigert het ook.
+ */
+export const EXTERN_REQUESTER = 'extern';
+
+/** Welke keuze in die lijst hoort bij een rit zoals ze nu opgeslagen staat. */
+export function requesterChoiceOf(booking: {
+  requesterType: UitleenRequesterType;
+  groupId: string | null;
+}): string {
+  if (booking.requesterType === 'EXTERN') return EXTERN_REQUESTER;
+  if (booking.requesterType === 'WERKGROEP') return OTHER_REQUESTER;
+  return booking.groupId ?? '';
+}
+
+/** En omgekeerd: wat de actie van de keuze en de vrije naam moet maken. */
+export function requesterFromChoice(
+  choice: string,
+  other: string
+): { type: UitleenRequesterType; groupId: string | null; name: string | null } {
+  if (choice === EXTERN_REQUESTER) return { type: 'EXTERN', groupId: null, name: other.trim() };
+  if (choice === OTHER_REQUESTER) return { type: 'WERKGROEP', groupId: null, name: other.trim() };
+  return { type: 'INTERN', groupId: choice || null, name: null };
+}
+
+/**
  * Is deze rit van jou of van je post of werkgroep?
  *
  * Dezelfde regel als `vanBookingForMember` in lib/uitleen-server.ts, maar dan om

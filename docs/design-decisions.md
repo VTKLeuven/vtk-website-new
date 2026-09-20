@@ -3165,6 +3165,36 @@ het "Logistiek zelf" met de naam in het doel van de rit.
   rijdt deze rit") met één antwoord; twee velden waarvan er altijd precies één
   gevuld hoort te zijn, lopen vroeg of laat allebei ingevuld.
 
+### Voor wie een rit rijdt, blijft te wijzigen na het aanmaken
+
+`groupId`, `requesterType` en `requesterName` lagen vast bij het aanmaken. Een
+rit die op de verkeerde post staat, is nu net iets dat je pas later ziet: bij het
+doornemen van de week, of wanneer die post haar eigen ritten niet terugvindt. Het
+bewerkformulier in de planning heeft er daarom dezelfde keuzelijst bij als het
+intekenformulier, en de wijziging komt in de historiek van de rit.
+
+- **Wie de rit ziet, verandert mee.** "Ritten van mijn post" op `/ritten` kijkt
+  naar `groupId` én `assignedGroupId`. Die tweede staat er los van en beweegt
+  niet mee: de post die een chauffeur aanduidt, hoeft niet de post te zijn
+  waarvoor gereden wordt. Het formulier zegt dat.
+- **Een rit wordt hier niet extern.** De keuzelijst toont "Externe" enkel bij een
+  rit die het al is, zodat die er eerlijk in staat, en de actie weigert de
+  overgang ook wanneer de client omzeild wordt. Dezelfde reden als hierboven:
+  `EXTERN` is de enige waarde waar `chargesRequester` op afgaat, en een prijs en
+  een betaalstatus laten ontstaan met een keuzelijst, maakt van een
+  geldbeslissing een tikfout. Wie echt factureert, laat de externe aanvragen.
+- **Een externe rit met een betaling verhuist niet.** Bij een post verdwijnen
+  prijs en betaalstatus van beide schermen; een betaald bedrag dat daarna nergens
+  meer staat, is erger dan een rit op de verkeerde naam. Geldt zowel voor een
+  `UitleenPayment` als voor een offline betaling (`paidOfflineAt`).
+- **Het tarief blijft staan.** `pricingMode` en `rateCents` zijn momentopnames en
+  worden nooit herrekend, ook niet bij deze verhuizing. Het formulier zegt dat op
+  het moment dat het erop aankomt (een externe rit die naar een post gaat), in
+  plaats van het stil te doen.
+- **Slepen in de kalender raakt het niet.** Die actie stuurt de post niet mee, en
+  `adminEditTransportAction` wijzigt ze enkel wanneer ze die expliciet krijgt. Een
+  rit een half uur verschuiven mag nooit een rit van eigenaar veranderen.
+
 ### Een rit mag aansluiten op het einde van de vorige
 
 Het einde van een rit is **open**: eindigt een rit om 12:00, dan is de kar om

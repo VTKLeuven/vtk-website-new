@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
   billedHours,
+  EXTERN_REQUESTER,
+  OTHER_REQUESTER,
+  requesterChoiceOf,
+  requesterFromChoice,
   dayPartLabel,
   describeReservationChanges,
   handoverNote,
@@ -683,5 +687,71 @@ describe('mergeHandover', () => {
 
   it('zonder ritten is er niets doorgegeven', () => {
     expect(mergeHandover([])).toEqual({ mode: 'NIEMAND' });
+  });
+});
+
+/**
+ * De keuzelijst "voor wie rijdt deze rit" (F4.4).
+ *
+ * Deze twee moeten elkaars omgekeerde zijn: het bewerkformulier vult zich met
+ * `requesterChoiceOf` en slaat op met `requesterFromChoice`, dus zodra ze uiteen
+ * lopen, verhuist een rit die niemand aanraakte.
+ */
+describe('requesterChoiceOf en requesterFromChoice', () => {
+  it('kent een interne post aan haar id', () => {
+    expect(requesterChoiceOf({ requesterType: 'INTERN', groupId: 'cln1feest' })).toBe('cln1feest');
+    expect(requesterFromChoice('cln1feest', '')).toEqual({
+      type: 'INTERN',
+      groupId: 'cln1feest',
+      name: null,
+    });
+  });
+
+  it('leest een rit van Logistiek zelf als de lege keuze', () => {
+    expect(requesterChoiceOf({ requesterType: 'INTERN', groupId: null })).toBe('');
+    expect(requesterFromChoice('', '')).toEqual({ type: 'INTERN', groupId: null, name: null });
+  });
+
+  it('zet een werkgroep op de sentinel en houdt de naam apart', () => {
+    expect(requesterChoiceOf({ requesterType: 'WERKGROEP', groupId: null })).toBe(OTHER_REQUESTER);
+    expect(requesterFromChoice(OTHER_REQUESTER, '  Alumni ')).toEqual({
+      type: 'WERKGROEP',
+      groupId: null,
+      name: 'Alumni',
+    });
+  });
+
+  it('houdt een externe rit extern', () => {
+    expect(requesterChoiceOf({ requesterType: 'EXTERN', groupId: null })).toBe(EXTERN_REQUESTER);
+    expect(requesterFromChoice(EXTERN_REQUESTER, 'De faculteit')).toEqual({
+      type: 'EXTERN',
+      groupId: null,
+      name: 'De faculteit',
+    });
+  });
+
+  it('laat een post nooit een naam meedragen', () => {
+    // Anders leest een rit die van werkgroep naar post verhuist als allebei:
+    // `requesterLabel` kijkt enkel naar het type, maar de naam blijft in de
+    // databank staan en duikt op zodra iemand ze terugzet.
+    expect(requesterFromChoice('cln1feest', 'Alumni').name).toBeNull();
+  });
+
+  it('is rond: elke rit komt op zichzelf uit', () => {
+    const rides = [
+      { requesterType: 'INTERN' as const, groupId: 'cln1feest', requesterName: null },
+      { requesterType: 'INTERN' as const, groupId: null, requesterName: null },
+      { requesterType: 'WERKGROEP' as const, groupId: null, requesterName: 'Alumni' },
+      { requesterType: 'EXTERN' as const, groupId: null, requesterName: 'De faculteit' },
+    ];
+    for (const ride of rides) {
+      const choice = requesterChoiceOf(ride);
+      const other = ride.requesterType === 'INTERN' ? '' : (ride.requesterName ?? '');
+      expect(requesterFromChoice(choice, other)).toEqual({
+        type: ride.requesterType,
+        groupId: ride.groupId,
+        name: ride.requesterName,
+      });
+    }
   });
 });

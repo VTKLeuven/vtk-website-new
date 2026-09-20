@@ -538,17 +538,36 @@ week (de maandweergave), dan staat het weeknummer erbij.
 
 # Fase 6: ritten bewerken en noteren
 
-### ⬜ F4.4. De post van een rit is nog te wijzigen na aanmaak
+### ✅ F4.4. De post van een rit is nog te wijzigen na aanmaak
 **P2 · code**
 
-`adminEditTransportAction` raakt `groupId`, `requesterType` en `requesterName`
-niet aan; die liggen vast bij het aanmaken. Veld "Voor wie" erbij, met een regel
-in de historiek.
+`adminEditTransportAction` raakte `groupId`, `requesterType` en `requesterName`
+niet aan; die lagen vast bij het aanmaken.
+
+**Gedaan.** Het paneel naast de kalender heeft nu dezelfde keuzelijst als het
+intekenformulier ("Logistiek zelf", de posten en werkgroepen, "Andere..." met een
+vrij naamveld), en de wijziging komt als regel in de historiek van de rit: "Voor
+wie: Logistiek → Sport". Staat de rit op een post die intussen op non-actief
+staat, dan zet het formulier die er zelf bij; anders zou de lijst stilstaan op
+"Logistiek zelf" en verhuisde één klik op opslaan de rit weg van een post die
+niemand koos.
+
+**Slepen in de kalender raakt het niet.** Dat gebaar stuurt de post niet mee, en
+de actie wijzigt ze enkel wanneer ze die expliciet krijgt. Nagekeken: een rit
+verschuiven laat `groupId` staan en schrijft enkel de urenregel.
+
+**Twee grenzen.** Een rit wordt hier niet extern: `EXTERN` is de enige waarde
+waar `chargesRequester` op afgaat, en prijs plus betaalstatus laten ontstaan met
+een keuzelijst maakt van een geldbeslissing een tikfout. De lijst toont "Externe"
+enkel bij een rit die het al is, en de actie weigert het ook wanneer de client
+omzeild wordt (nagekeken met een gesmokkelde optie). En een externe rit met een
+betaling (`UitleenPayment` of `paidOfflineAt`) verhuist niet naar een post, want
+daar verdwijnen prijs en betaalstatus van het scherm.
 
 **De prijs verhuist niet mee.** `pricingMode` en `rateCents` zijn snapshots en
 worden nooit herrekend (zie `docs/uitleendienst.md`), dus een rit die als extern
-is aangemaakt en naar een post verhuist, houdt haar tarief. Het scherm moet dat
-zeggen in plaats van het stil te doen.
+is aangemaakt en naar een post verhuist, houdt haar tarief. Het formulier zegt
+dat op het moment dat het erop aankomt, in plaats van het stil te doen.
 
 ### ⬜ F4.20. Eigen nota's, met zichtbaarheid
 **P3 · code · 🗄️ · 📝**

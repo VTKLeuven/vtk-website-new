@@ -8,6 +8,7 @@ import {
   formatPriceCents,
   isoWeekNumber,
   parseDateOnly,
+  requesterChoiceOf,
   requesterLabel,
   toBrusselsDateValue,
   toBrusselsTimeValue,
@@ -234,7 +235,13 @@ export default async function VervoerWeekPage({
         destination: booking.destination ?? '',
         adminNote: booking.adminNote ?? '',
         eventId: booking.eventId ?? '',
+        requesterChoice: requesterChoiceOf(booking),
+        requesterOther: booking.requesterType === 'INTERN' ? '' : (booking.requesterName ?? ''),
       },
+      requesterGroup:
+        booking.groupId && booking.group
+          ? { id: booking.groupId, name: booking.group.nameNl }
+          : null,
       status: booking.status,
       vehicleId: booking.vehicleId,
       vehicleName: booking.vehicle.nameNl,

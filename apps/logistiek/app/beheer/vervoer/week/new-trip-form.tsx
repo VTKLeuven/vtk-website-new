@@ -8,7 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { DriverOptions } from '../driver-select';
 import { TripEventSelect, type TripEventOption } from '@/components/trip-event-select';
 import type { DriverOption } from '@/lib/uitleen-server';
-import type { TripHandoverMode } from '@/lib/uitleen';
+import { OTHER_REQUESTER, type TripHandoverMode } from '@/lib/uitleen';
 
 /**
  * Een rit inplannen vanuit de kalender (P4).
@@ -25,16 +25,6 @@ import type { TripHandoverMode } from '@/lib/uitleen';
 
 const inputClass =
   'w-full rounded-lg border border-vtk-navy/15 bg-vtk-field px-3 py-2 text-sm text-vtk-ink';
-
-/**
- * De waarde van "Andere..." in de postkeuze.
- *
- * Een sentinel in `groupId` en geen tweede veld ernaast: het is één vraag ("voor
- * wie rijdt deze rit") met één antwoord, en twee velden waarvan er altijd
- * precies één gevuld hoort te zijn, lopen vroeg of laat allebei ingevuld.
- * Botst niet met een echte id: die zijn cuids.
- */
-const OTHER_GROUP = 'andere';
 
 /**
  * Wat er gebeurt zodra je de rit doorgeeft, volgens de instelling (F4.8b).
@@ -55,9 +45,9 @@ export type NewTripValues = {
   startAt: string;
   endAt: string;
   vehicleId: string;
-  /** Een post- of werkgroep-id, leeg (Logistiek zelf) of {@link OTHER_GROUP}. */
+  /** Een post- of werkgroep-id, leeg (Logistiek zelf) of {@link OTHER_REQUESTER}. */
   groupId: string;
-  /** Enkel bij {@link OTHER_GROUP}: voor wie de rit dan wél rijdt. */
+  /** Enkel bij {@link OTHER_REQUESTER}: voor wie de rit dan wél rijdt. */
   requesterName: string;
   driverId: string;
   /** De post die zelf een chauffeur aanduidt, of leeg (Logistiek regelt het). */
@@ -133,7 +123,7 @@ export function NewTripForm({
    */
   function suggestedGroup(groupId: string, vehicleId: string): string {
     const needsVanDriver = vehicles.find((vehicle) => vehicle.id === vehicleId)?.needsVanDriver ?? false;
-    if (needsVanDriver || groupId === OTHER_GROUP) return '';
+    if (needsVanDriver || groupId === OTHER_REQUESTER) return '';
     return groupId;
   }
 
@@ -185,7 +175,7 @@ export function NewTripForm({
   }, [values.startAt, values.endAt]);
 
   /** "Andere" gekozen, dus er hoort een naam bij. */
-  const isOther = values.groupId === OTHER_GROUP;
+  const isOther = values.groupId === OTHER_REQUESTER;
 
   function save(allowOverlap = false) {
     setError(null);
@@ -288,7 +278,7 @@ export function NewTripForm({
           ))}
           {/* Onderaan en niet bovenaan: het is de uitzondering, en Logistiek
               rijdt meestal voor een post die gewoon in de lijst staat. */}
-          <option value={OTHER_GROUP}>Andere...</option>
+          <option value={OTHER_REQUESTER}>Andere...</option>
         </select>
       </label>
 

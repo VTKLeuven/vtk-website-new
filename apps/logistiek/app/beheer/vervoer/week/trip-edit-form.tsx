@@ -7,6 +7,7 @@ import { QuarterDateTime } from '@/components/quarter-datetime';
 import { useToast } from '@/components/ui/toast';
 import { TripEventSelect, type TripEventOption } from '@/components/trip-event-select';
 import { materialListHref } from '@/lib/material-list-link';
+import { EXTERN_REQUESTER, OTHER_REQUESTER, requesterFromChoice } from '@/lib/uitleen';
 
 /**
  * De feiten van een rit aanpassen, in de inspector naast de kalender (P4).
@@ -35,11 +36,20 @@ export type TripEditValues = {
   adminNote: string;
   /** Het evenement waar de rit onder hangt (A8); leeg is geen evenement. */
   eventId: string;
+  /**
+   * Voor wie de rit rijdt (F4.4): een post-id, leeg (Logistiek zelf), of een
+   * van de twee sentinels hierboven.
+   */
+  requesterChoice: string;
+  /** Enkel bij een sentinel: de vrije naam van de werkgroep of de externe. */
+  requesterOther: string;
 };
 
 export function TripEditForm({
   bookingId,
   initial,
+  groups,
+  currentGroup,
   events,
   reservationId,
   locked,
@@ -47,6 +57,17 @@ export function TripEditForm({
 }: {
   bookingId: string;
   initial: TripEditValues;
+  /** De posten en werkgroepen waarvoor de rit kan rijden (F4.4). */
+  groups: Array<{ id: string; name: string }>;
+  /**
+   * De post waar de rit nu op staat, als die niet meer actief is.
+   *
+   * `activeGroups` levert enkel actieve posten, en een rit van vorig jaar kan
+   * op een post staan die er niet meer is. Zonder deze staat de keuzelijst dan
+   * stil op "Logistiek zelf" en verhuist één klik op opslaan de rit weg van een
+   * post die niemand koos.
+   */
+  currentGroup: { id: string; name: string } | null;
   /** De evenementen rond deze periode, om de rit aan te hangen (A8). */
   events: TripEventOption[];
   /** De materiaalaanvraag waarvan deze rit de levering is, als er een is. */
@@ -79,14 +100,35 @@ export function TripEditForm({
     (key) => values[key] !== initial[key]
   );
 
+  /** Een sentinel: dan vraagt het formulier zelf om de naam. */
+  const freeName =
+    values.requesterChoice === OTHER_REQUESTER || values.requesterChoice === EXTERN_REQUESTER;
+  const requesterDirty =
+    values.requesterChoice !== initial.requesterChoice ||
+    values.requesterOther !== initial.requesterOther;
+  /** Was extern en wordt het niet meer: dan verandert er iets aan het geld. */
+  const leavingExtern =
+    initial.requesterChoice === EXTERN_REQUESTER && values.requesterChoice !== EXTERN_REQUESTER;
+
   function save(allowOverlap = false) {
     setError(null);
+    if (freeName && values.requesterOther.trim() === '') {
+      // Anders staat de rit als kale "Werkgroep" in de planning, en dan is "voor
+      // wie is dit" precies de vraag die je niet meer beantwoord krijgt.
+      setError('Vul in voor wie deze rit rijdt, of kies een post uit de lijst.');
+      return;
+    }
+    const { requesterChoice, requesterOther, ...fields } = values;
     startTransition(async () => {
       // `eventName` staat hier niet bij: de actie zoekt de naam zelf op bij het
       // gekozen evenement. Het slepen van een blok in de kalender roept dezelfde
       // actie aan met deze waarden, en dat gebaar heeft geen lijst evenementen
       // bij de hand om een naam uit te halen.
-      const result = await adminEditTransportAction(bookingId, { ...values, allowOverlap });
+      const result = await adminEditTransportAction(bookingId, {
+        ...fields,
+        requester: requesterFromChoice(requesterChoice, requesterOther),
+        allowOverlap,
+      });
       if (result.ok) {
         // Een bewust geforceerde botsing is goed nieuws met een staartje: die
         // melding blijft staan tot je ze wegklikt.
@@ -132,6 +174,61 @@ export function TripEditForm({
           />
         </label>
       </div>
+
+      {/* Voor wie de rit rijdt (F4.4). Boven "Waarvoor" en niet onderaan: het is
+          dezelfde vraag als in het intekenformulier, waar ze ook bovenaan staat,
+          en het is het eerste wat je nakijkt wanneer een rit op de verkeerde
+          naam blijkt te staan. */}
+      <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+        Voor welke post of werkgroep
+        <select
+          value={values.requesterChoice}
+          onChange={(event) => set('requesterChoice', event.target.value)}
+          className={inputClass}
+        >
+          <option value="">Logistiek zelf</option>
+          {groups.map((group) => (
+            <option key={group.id} value={group.id}>
+              {group.name}
+            </option>
+          ))}
+          {currentGroup && !groups.some((group) => group.id === currentGroup.id) ? (
+            <option value={currentGroup.id}>{currentGroup.name} (niet meer actief)</option>
+          ) : null}
+          <option value={OTHER_REQUESTER}>Andere...</option>
+          {/* Enkel bij een rit die al extern is: zie `EXTERN_REQUESTER`. */}
+          {initial.requesterChoice === EXTERN_REQUESTER ? (
+            <option value={EXTERN_REQUESTER}>Externe</option>
+          ) : null}
+        </select>
+      </label>
+
+      {freeName ? (
+        <label className="grid gap-1 text-xs font-medium text-vtk-muted">
+          Voor wie dan
+          <input
+            type="text"
+            value={values.requesterOther}
+            onChange={(event) => set('requesterOther', event.target.value)}
+            placeholder="bv. Alumni, een bevriende kring, de faculteit"
+            className={inputClass}
+          />
+        </label>
+      ) : null}
+
+      {requesterDirty ? (
+        <p className="rounded-lg border border-vtk-navy/10 bg-vtk-paper px-3 py-2 text-xs leading-5 text-vtk-body">
+          Wie deze rit ziet bij "Ritten van mijn post" verandert mee. De post die zelf een chauffeur
+          aanduidt, staat daar los van en blijft staan.
+          {leavingExtern ? (
+            <>
+              {' '}
+              Het bewaarde tarief blijft ook staan, want een tarief wordt nooit herrekend; de prijs
+              en de betaalstatus verdwijnen wel van het scherm, omdat enkel een externe betaalt.
+            </>
+          ) : null}
+        </p>
+      ) : null}
 
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
         Waarvoor

@@ -257,6 +257,9 @@ de same-origin `publicUrl`.
   (`components/transport-calendar/types.ts`, getest in `test/calendar-zoom.test.ts`);
   waarom, staat in `docs/design-decisions.md`.
   **"Rit afronden" staat hier bewust niet**; dat blijft op `/beheer/vervoer`.
+  In het bewerkveld van dat paneel staat ook **voor wie de rit rijdt**: die lag
+  tot september 2026 vast bij het aanmaken. Een rit wordt daar niet extern en een
+  externe rit met een betaling verhuist niet; zie `docs/design-decisions.md`.
 - **Beheer** (`app/beheer/`): `aanvragen/` (tabs, last-minute, decision/edit/
   return-forms, klaarzetlijst per lijn + printblad `[id]/print` en dag-afdruk
   `print?datum=`), `vervoer/` (decision + controls: chauffeur, voertuigwissel, km;
