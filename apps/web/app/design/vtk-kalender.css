@@ -36,8 +36,13 @@
   text-decoration: none;
   border-bottom: 1px solid var(--line-2);
 }
-.vtk-design .page-head .crumbs a:hover {
-  color: var(--ink);
+/* Deze kop is de donkere band (vtk-base.css), dus het kruimelpad licht op naar
+   `--paper` en niet naar `--ink`: dat is de tekstkleur van een lichte
+   achtergrond en viel hier gewoon weg tegen het navy. Waar je nu staat, is het
+   enige item zonder link en daarom meteen de lichtste. */
+.vtk-design .page-head .crumbs a:hover,
+.vtk-design .page-head .crumbs .crumbs-here {
+  color: var(--paper);
 }
 
 /* Introtekst van een categoriepagina, direct onder de titel. */
@@ -1121,24 +1126,34 @@
   align-items: stretch;
 }
 
-/* Flex met wrap i.p.v. een vaste driekolomsgrid: wordt het krap, dan zakt de
-   weergavekeuze naar een eigen regel in plaats van tegen de kaartrand geduwd te
-   worden. De maandtitel is het enige dat mag krimpen. */
-.vtk-design .toolbar-top {
+/* De maandregel: de eerste regel van de werkbalk, met enkel het bladeren erin.
+   De weergavekeuze en abonneren blijven in de donkere kop staan; wat hier komt,
+   is wat het raster eronder bepaalt. De maandtitel is het enige dat mag
+   krimpen. */
+.vtk-design .toolbar-month {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 12px 14px;
 }
 
-.vtk-design .toolbar-top .nav-mo,
-.vtk-design .toolbar-top .view-switch {
+.vtk-design .toolbar-month .nav-mo {
   flex: none;
 }
 
-.vtk-design .toolbar-top .mo-label {
-  flex: 1 1 200px;
+/* Kleiner dan toen deze regel de kop van de pagina was: boven haar staat nu de
+   titel van 40 px, en twee koppen onder elkaar laten je twee keer beginnen. */
+.vtk-design .toolbar-month .mo-label {
+  flex: 0 1 auto;
   min-width: 0;
+  font-size: 22px;
+}
+
+/* Het aantal hoort achter de maand en niet eronder: op één regel blijft de rij
+   even hoog als de pijlen ernaast. */
+.vtk-design .toolbar-month .mo-label small {
+  display: inline;
+  margin-left: 10px;
 }
 
 .vtk-design .toolbar-filters {
@@ -1235,23 +1250,6 @@
 .vtk-design .category-filter.on::before,
 .vtk-design .audience-filter.on::before {
   background: currentColor;
-}
-
-/* Alleen de knop leeft in de toolbar; alle uitleg staat in de dialoog nadat de
-   bezoeker bewust voor abonneren koos. */
-.vtk-design .toolbar-top .subscribe-compact {
-  flex: none;
-  margin: 0;
-  padding: 0;
-  border: 0;
-}
-
-.vtk-design .toolbar-top .subscribe-compact .subscribe-open {
-  width: auto;
-  min-height: 38px;
-  margin: 0;
-  padding-inline: 16px;
-  white-space: nowrap;
 }
 
 /* Weekweergave: zeven gelijkwaardige dagkolommen, met alle evenementen zichtbaar
@@ -1386,13 +1384,11 @@
 }
 
 @media (max-width: 720px) {
-  .vtk-design .toolbar-top {
-    grid-template-columns: 1fr;
-  }
   .vtk-design .toolbar-filters {
     justify-content: flex-start;
   }
-  .vtk-design .audience-toggle {
+  .vtk-design .audience-toggle,
+  .vtk-design .toolbar-filters .toolbar-past {
     margin-left: 0;
   }
   .vtk-design .week-cal {
@@ -1915,61 +1911,6 @@
   gap: 10px 14px;
 }
 
-/* De pijlen en de maandregel zitten samen in een groep zodat ze niet
-   afzonderlijk kunnen wrappen. De maandregel heeft een stabiele minimumbreedte
-   zodat de vorige/volgende-knoppen niet verspringen wanneer de maandnaam van
-   lengte verandert (bv. "Mei" vs "September"). */
-.vtk-design .page-head-tools .mo-nav-group {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex: none;
-}
-
-.vtk-design .page-head-tools .nav-mo {
-  display: flex;
-  flex: none;
-  gap: 8px;
-}
-
-.vtk-design .page-head-tools .nav-mo button {
-  width: 36px;
-  height: 36px;
-  border: 1px solid rgba(183, 192, 220, 0.34);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--paper);
-  font-size: 14px;
-}
-
-.vtk-design .page-head-tools .nav-mo button:hover {
-  border-color: var(--paper);
-  background: var(--paper);
-  color: var(--ink);
-}
-
-.vtk-design .page-head-tools .mo-label {
-  flex: 0 1 auto;
-  min-width: 11em;
-  color: var(--paper);
-  font-size: clamp(18px, 1.9vw, 24px);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
-  font-variant-numeric: tabular-nums;
-}
-
-.vtk-design .page-head-tools .mo-label small {
-  display: block;
-  margin-top: 3px;
-  color: var(--on-dark-muted);
-  font-family: var(--sans);
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0;
-  text-transform: none;
-}
-
 .vtk-design .page-head-tools .view-switch {
   flex: none;
   display: flex;
@@ -2057,13 +1998,6 @@
 @media (max-width: 900px) {
   .vtk-design .page-head-tools {
     justify-content: flex-start;
-  }
-  .vtk-design .page-head-tools .mo-nav-group {
-    flex: 1 1 auto;
-  }
-  .vtk-design .page-head-tools .mo-label {
-    flex: 1 1 200px;
-    min-width: 0;
   }
 }
 
@@ -2190,6 +2124,14 @@
 .vtk-design .ev-grid-past-bar {
   display: flex;
   align-items: center;
+}
+
+/* Dezelfde knop, maar dan rechts op de rij met de categoriechips. `align-self`
+   staat hierboven op `flex-start` voor de balk onder het raster; in een rij die
+   op de middellijn uitlijnt hoort ze gewoon mee te centreren. */
+.vtk-design .toolbar-filters .toolbar-past {
+  align-self: center;
+  margin-left: auto;
 }
 
 .vtk-design .ev-grid-past[aria-pressed="true"] {

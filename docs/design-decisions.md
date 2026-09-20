@@ -7210,15 +7210,39 @@ de kalender anderhalve week, en het raster liep tot ver voorbij 1400.
 
 Drie ingrepen samen brengen dat terug naar 385:
 
-- **De balk staat in de donkere kop, naast de titel.** Bladeren, de weergave en
-  Abonneren zijn de bediening van de kalender, dus horen ze bij de titel en niet
-  in een tweede kaart eronder. De filterchips blijven wel op papier: dat zijn er
-  vijftien en ze horen bij het raster.
+- **De balk staat in de donkere kop, naast de titel.** De weergave en Abonneren
+  zijn de bediening van de kalender, dus horen ze bij de titel en niet in een
+  tweede kaart eronder. De filterchips blijven wel op papier: dat zijn er
+  vijftien en ze horen bij het raster. Het bladeren stond er eerst ook bij, maar
+  is teruggekeerd naar het papier; zie hieronder.
 - **De filters staan los op het papier**, zonder witte kaart eromheen. De chips
   zijn zelf al omlijnde pillen; de kaart voegde een tweede rand en 28 pixels
   padding toe.
 - **Vier weken in plaats van zes**, en de pijlen houden dat venster vast. Sprong
   je vroeger naar een maandraster, dan was het raster meteen weer zes rijen hoog.
+
+### De maandregel staat op papier, de weergaveknoppen in de kop
+
+Bladeren stond eerst mee in de donkere kop, tussen de titel en de knoppenrij in.
+Daar hing het los in het midden: de rechterkolom lijnt naar rechts uit en de
+maand is daarin het meest linkse van drie dingen, dus er stond aan beide kanten
+lucht. Een maandregel die nergens tegenaan ligt, leest als een widget die per
+ongeluk in het midden is blijven staan.
+
+Ze staat nu als eerste regel op het papier, boven de filterchips: op dezelfde
+linkerlijn als de chips en het raster die ze bepaalt, en in leesvolgorde vlak
+voor wat ze verandert. Dat kost één regel van een veertigtal pixels, niet de 250
+van de oude witte kaart, want de weergavekeuze en Abonneren blijven in de kop
+staan. De maand is daar ook kleiner dan toen ze de kop van de pagina was (22 px):
+boven haar staat de paginatitel, en twee koppen onder elkaar laten je twee keer
+beginnen. Het aantal evenementen staat achter de maand in plaats van eronder,
+zodat de regel even hoog blijft als de pijlen ernaast.
+
+Vier andere posities zijn bekeken: laten staan, rechts in één blok bij de
+weergaveknoppen, onder de titel in de donkere band, en als kop van het raster
+onder de filters. De eerste twee houden de maand bij knoppen die iets anders
+doen (van weergave wisselen verandert niet welke periode je ziet), de derde zet
+twee titels onder elkaar in de band.
 
 **De week die net voorbij is, valt weg.** Het oude venster begon een week terug.
 Een venster dat vooruitkijkt heeft daar niets aan, en die rij kostte evenveel

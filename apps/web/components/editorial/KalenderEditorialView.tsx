@@ -1040,7 +1040,7 @@ export function KalenderEditorialView({
                 ·{' '}
               </>
             ) : null}
-            <span style={{ color: 'var(--ink)' }}>
+            <span className="crumbs-here">
               {selectedCategory ? categoryName(selectedCategory) : labels.crumbsHere}
             </span>
           </div>
@@ -1060,49 +1060,14 @@ export function KalenderEditorialView({
             </div>
           ) : null}
         </div>
-        {/* Bladeren, weergave en abonneren staan in de donkere band zelf. Ze
-            stonden eronder in een kaart op papier, en die kaart plus de kop
-            samen duwden het raster zo ver naar beneden dat je bij het openen van
-            de kalender nog geen anderhalve week zag. De filterchips blijven wel
-            op papier: dat zijn er elf en die horen bij het raster, niet bij de
-            titel. */}
+        {/* Weergave en abonneren staan in de donkere band zelf. Ze stonden
+            eronder in een kaart op papier, en die kaart plus de kop samen
+            duwden het raster zo ver naar beneden dat je bij het openen van de
+            kalender nog geen anderhalve week zag. De filterchips blijven wel op
+            papier: dat zijn er elf en die horen bij het raster, niet bij de
+            titel. Het bladeren hoort daar intussen ook bij; zie
+            `.toolbar-month` hieronder. */}
         <div className="page-head-tools">
-          <div className="mo-nav-group">
-            <div className="nav-mo">
-              <button type="button" onClick={() => shiftPeriod(-1)} aria-label={previousLabel}>
-                ←
-              </button>
-              <button type="button" onClick={() => shiftPeriod(1)} aria-label={nextLabel}>
-                →
-              </button>
-            </div>
-            <div className="mo-label">
-              {view === 'week'
-                ? weekLabel
-                : view === 'grid'
-                  ? monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
-                  : windowLabel}
-              <small>
-                {view === 'week'
-                  ? locale === 'nl'
-                    ? 'Weekoverzicht · '
-                    : 'Week overview · '
-                  : view === 'grid'
-                    ? ''
-                    : locale === 'nl'
-                      ? 'Vier weken · '
-                      : 'Four weeks · '}
-                {periodCount}{' '}
-                {periodCount === 1
-                  ? locale === 'nl'
-                    ? 'evenement'
-                    : 'event'
-                  : locale === 'nl'
-                    ? 'evenementen'
-                    : 'events'}
-              </small>
-            </div>
-          </div>
           <div className="view-switch" role="group" aria-label={locale === 'nl' ? 'Weergave' : 'View'}>
             <button
               type="button"
@@ -1142,6 +1107,47 @@ export function KalenderEditorialView({
 
       <div className="kal-wrap">
         <div className="toolbar">
+          {/* De maand staat op papier, als eerste regel boven de filters. In de
+              donkere band stond ze tussen de titel en de knoppenrij in, en daar
+              hing ze los in het midden: ze is het meest linkse van drie dingen
+              die naar rechts uitlijnen, met aan beide kanten lucht. Hier begint
+              ze op dezelfde lijn als de chips en het raster die ze bepaalt. */}
+          <div className="toolbar-month">
+            <div className="nav-mo">
+              <button type="button" onClick={() => shiftPeriod(-1)} aria-label={previousLabel}>
+                ←
+              </button>
+              <button type="button" onClick={() => shiftPeriod(1)} aria-label={nextLabel}>
+                →
+              </button>
+            </div>
+            <div className="mo-label">
+              {view === 'week'
+                ? weekLabel
+                : view === 'grid'
+                  ? monthLabel.charAt(0).toUpperCase() + monthLabel.slice(1)
+                  : windowLabel}
+              <small>
+                {view === 'week'
+                  ? locale === 'nl'
+                    ? 'Weekoverzicht · '
+                    : 'Week overview · '
+                  : view === 'grid'
+                    ? ''
+                    : locale === 'nl'
+                      ? 'Vier weken · '
+                      : 'Four weeks · '}
+                {periodCount}{' '}
+                {periodCount === 1
+                  ? locale === 'nl'
+                    ? 'evenement'
+                    : 'event'
+                  : locale === 'nl'
+                    ? 'evenementen'
+                    : 'events'}
+              </small>
+            </div>
+          </div>
           {/* De chips zijn links, geen knoppen: een categorie heeft een eigen
               pagina (/kalender/alumni) en die hoort in de adresbalk te staan.
               Zo is ze deelbaar, staat ze in de geschiedenis, en ziet iemand die
@@ -1170,6 +1176,23 @@ export function KalenderEditorialView({
                 </a>
               ))}
             </div>
+            {/* Rechts op dezelfde rij als de categorieën: het is geen filter op
+                inhoud maar op de periode, en het hoort wel bij deze rij knoppen
+                in plaats van als losse balk boven het raster te hangen. Enkel in
+                het raster, want alleen daar valt er iets te verbergen. */}
+            {view === 'grid' && hiddenGridCount > 0 ? (
+              <button
+                type="button"
+                className="ev-grid-past toolbar-past"
+                onClick={() => setShowPast((prev) => !prev)}
+                aria-pressed={showPast}
+              >
+                {showPast
+                  ? labels.hidePast ?? (locale === 'nl' ? 'Voorbije evenementen verbergen' : 'Hide past events')
+                  : labels.showPast}
+                {!showPast ? <span>{hiddenGridCount}</span> : null}
+              </button>
+            ) : null}
             {audienceOptions.length > 0 ? (
               <div className="audience-filters" aria-label={labels.audienceFilters}>
                 <span>{labels.audienceFilters}</span>
@@ -1484,22 +1507,6 @@ export function KalenderEditorialView({
         {/* Raster: de maand als kaarten met de affiche erop, per week gebundeld. */}
         {view === 'grid' && (
           <section className="ev-grid-wrap">
-            {hiddenGridCount > 0 ? (
-              <div className="ev-grid-past-bar">
-                <button
-                  type="button"
-                  className="ev-grid-past"
-                  onClick={() => setShowPast((prev) => !prev)}
-                  aria-pressed={showPast}
-                >
-                  {showPast
-                    ? labels.hidePast ?? (locale === 'nl' ? 'Voorbije evenementen verbergen' : 'Hide past events')
-                    : labels.showPast}
-                  {!showPast ? <span>{hiddenGridCount}</span> : null}
-                </button>
-              </div>
-            ) : null}
-
             {shownGridWeeks.length === 0 ? (
               <p className="agenda-empty">{labels.emptyMonth}</p>
             ) : (
