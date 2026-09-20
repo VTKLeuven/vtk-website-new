@@ -58,16 +58,16 @@ Alles wordt op **390px breed** nagekeken, niet alleen op desktop.
 | 4 | Chauffeursnummers en werkgroepen | F4.3, F4.10 | 🟡 schermen af (`503735c0`), één nummer open |
 | 5 | Beschikbaarheid | F4.2, F4.5 | ✅ af (`435ecf21`) |
 | 6 | Ritten bewerken en noteren | F4.4, F4.20 | ✅ af (`634313e0`, `40c934b7`) |
-| 7 | Voertuigen | F4.21, F4.22 | ⬜ open |
+| 7 | Voertuigen | F4.21, F4.22 | ✅ af (`19db13f5`, `e65658c0`) |
 | 8 | Statistiek | F4.23 | ⬜ open |
 | - | Bewust niet gedaan | F4.11 | ⛔ |
 
 Fase 1 eerst: daar zit het enige echte defect van deze ronde, en het draagt zeven
-van de drieëntwintig punten. **Fase 1, 2, 3, 5 en 6 zijn af** (`dce13cf7`,
-`5835b84f`, `e65da138`, `435ecf21`, `634313e0` en `40c934b7`) en van fase 4 staat
-alle code er (`503735c0`); daar blijft enkel het juiste nummer van Sofie
-Bruggeman over, en dat is geen code maar één veld op liv. Fase 7 is de
-volgende.
+van de drieëntwintig punten. **Fase 1, 2, 3, 5, 6 en 7 zijn af** (`dce13cf7`,
+`5835b84f`, `e65da138`, `435ecf21`, `634313e0`, `40c934b7`, `19db13f5` en
+`e65658c0`) en van fase 4 staat alle code er (`503735c0`); daar blijft enkel het
+juiste nummer van Sofie Bruggeman over, en dat is geen code maar één veld op
+liv. Fase 8 is de volgende.
 
 ---
 
@@ -607,31 +607,80 @@ niet.
 
 # Fase 7: voertuigen
 
-### ⬜ F4.21. Een icoon per voertuig
-**P3 · code · 🗄️**
+### ✅ F4.21. Een icoon per voertuig
+**P3 · code · 🗄️ · `19db13f5`**
 
 *"Kunnen we een auto icoontje voor de auto fixen? Mogelijks aanpasbaar in
 instellingen → voertuigen en tarieven."*
 
-`UitleenVehicle` heeft al `pattern` (de arcering) maar geen icoon. Kolom `icon`
-erbij, te kiezen uit de bestaande `LogisticsIcon`-set. Bestaande voertuigen
-krijgen `null` en vallen terug op wat er nu getekend wordt.
+**Gedaan.** Kolom `icon` op `UitleenVehicle`, te kiezen op
+/beheer/instellingen → Voertuigen & tarieven, met het icoon zelf naast de
+keuzelijst getekend: "Bestelwagen" tegenover "Auto" zegt niet welk van de twee
+tekeningetjes straks in het blok staat. De keuze telt door op de drie plaatsen
+waar een voertuigicoon staat: het ritblok in de week- en dagweergave, de balk in
+de maandweergave en de voertuigenrij onder de kalender, op de planning van het
+team én op het publieke bezettingsoverzicht.
 
-### ⬜ F4.22. Klaar voor een gehuurd busje
-**P3 · uitzoeken**
+🗄️ Bestaande voertuigen krijgen `null`, en dat is hier de juiste waarde:
+`null` betekent "automatisch", en automatisch is precies wat er vandaag al
+getekend wordt. Nagekeken in beide richtingen: met `null` tekent de auto een
+auto en met `icon = 'van'` een bestelwagen, op de drie plaatsen. Geen backfill:
+een waarde wegschrijven die toevallig gelijk is aan de afleiding, maakt van "nog
+niet gekozen" en "bewust gekozen" hetzelfde, en dan volgt een hernoemd voertuig
+zijn naam niet meer.
+
+**"Automatisch" volgt de naam, ook in het formulier.** Wie een voertuig toevoegt
+en "Tweede auto" typt, ziet de voorvertoning meteen een auto worden; bij "Dockx
+busje" blijft het een bestelwagen. Dat is meteen het geval waarvoor de keuze
+bestaat (zie F4.22): de afleiding leest mee in de naam, en een gehuurd busje
+heet niet naar wat het is.
+
+**Enkel iconen die een voertuig voorstellen staan in de lijst.** De set telt er
+dertig; een keuzelijst waarin een krat of een fles naast een bestelwagen staat,
+vraagt niet welk voertuig dit is maar of je oplet.
+
+### ✅ F4.22. Klaar voor een gehuurd busje
+**P3 · uitzoeken · `e65658c0`**
 
 *"Soms gaan we een dockx busje moeten huren (bv gala, jobfair). Kunnen we ons
 daar nu al op voorbereiden dat er dan geen problemen zijn?"*
 
-Technisch staat er niets in de weg: voertuig toevoegen, `needsVanDriver` en het
-tarief zetten, plannen. Na te kijken:
+**Nagespeeld met een echt vierde voertuig.** "Dockx busje" toegevoegd via
+Voertuigen & tarieven (per kilometer, 0,45, vraagt een chauffeur die de kar mag
+rijden), vier ritten naast elkaar op dezelfde avond gepland, één ervan extern en
+afgerond met 40 km, en daarna het voertuig gedeactiveerd. Eén echt probleem
+gevonden, en dat is hersteld.
 
-- De planning met vier voertuigen naast elkaar, ook op 390px.
-- Achteraf op inactief zetten zonder dat gereden ritten of hun prijzen
-  veranderen. `rateCents` is een snapshot, dus dat hoort te kloppen; bevestigen.
-- Dat het niet het hele jaar in het aanvraagformulier blijft staan. Vraagt
-  mogelijk een "beschikbaar van/tot" per voertuig; pas beslissen als de rest
-  werkt.
+**Vier voertuigen naast elkaar passen, ook op 390px.** Nergens horizontale
+overloop (de pagina blijft 375px breed in een venster van 390), en de vier namen
+staan op één regel onder de kalender. In de dagweergave krijgt elke rit een baan
+van 50px: het uur staat er, de titel breekt af. De weekweergave perst vier
+gelijktijdige ritten samen tot stroken van 14 à 16px, maar dat is wat zeven
+dagkolommen op een telefoon altijd al doen en precies waarom volledig scherm
+daar een eigen dagweergave opent (`components/transport-calendar/mobile-calendar.tsx`);
+daar is een baan ongeveer 72px.
+
+**De prijs van een gereden rit verandert niet bij het deactiveren.** Bevestigd:
+na het deactiveren staat de afgeronde rit nog altijd op per kilometer, 0,45, 40
+km, € 18,00, op het scherm en in de databank. `pricingMode` en `rateCents` zijn
+snapshots.
+
+**Wat wél veranderde, en nu niet meer: de planning zelf.** De kalender haalde
+enkel de *actieve* voertuigen op, dus een rit op een gedeactiveerd voertuig
+verloor zijn naam, zijn icoon en zijn arcering, en `needsDriver` viel terug op
+"wel". Gemeten, niet geredeneerd: een gedeactiveerde bakfiets kreeg achteraf
+"geen chauffeur" in het rood in plaats van "rijdt zelf", terwijl niemand daar
+ooit een chauffeur voor hoorde te zoeken. `vehiclesToDraw` tekent nu de actieve
+voertuigen plus wie in dít venster gereden heeft; een week waarin het busje niet
+reed, noemt het niet. Kiezen doe je nog altijd enkel uit de actieve, zowel in
+"Nieuwe rit" als in het aanvraagformulier van een lid.
+
+**Het blijft niet het hele jaar in het aanvraagformulier staan.** Deactiveren
+haalt het er meteen uit, en dat is één klik met een dialoog die zegt wat er
+gebeurt ("Leden kunnen dit voertuig niet meer kiezen. Bestaande ritten blijven
+bewaard."). Een "beschikbaar van/tot" per voertuig is daarvoor niet nodig; het
+zou enkel schelen dat iemand eraan moet dénken. Dat is een afweging voor
+Logistiek zelf, en niets houdt het gala tegen tot ze ze maakt.
 
 ---
 
