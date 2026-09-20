@@ -53,7 +53,7 @@ Alles wordt op **390px breed** nagekeken, niet alleen op desktop.
 | Fase | Inhoud | Taken | Status |
 | --- | --- | --- | --- |
 | 1 | De post ziet en regelt haar eigen ritten | F4.18, F4.19, F4.9, F4.8a, F4.8b, F4.12, F4.17 | ✅ af (`dce13cf7`) |
-| 2 | Leesbaarheid van de planning | F4.16, F4.1, F4.13, F4.15 | ⬜ open |
+| 2 | Leesbaarheid van de planning | F4.16, F4.1, F4.13, F4.15 | ✅ af (`5835b84f`) |
 | 3 | Breedte en gsm | F4.6, F4.7, F4.14 | ⬜ open |
 | 4 | Chauffeursnummers en werkgroepen | F4.3, F4.10 | 🟡 parser en script klaar |
 | 5 | Beschikbaarheid | F4.2, F4.5 | ⬜ open |
@@ -63,7 +63,8 @@ Alles wordt op **390px breed** nagekeken, niet alleen op desktop.
 | - | Bewust niet gedaan | F4.11 | ⛔ |
 
 Fase 1 eerst: daar zit het enige echte defect van deze ronde, en het draagt zeven
-van de drieëntwintig punten. **Fase 1 is af** (`dce13cf7`); fase 2 is de volgende.
+van de drieëntwintig punten. **Fase 1 en 2 zijn af** (`dce13cf7`, `5835b84f`);
+fase 3 is de volgende.
 
 ---
 
@@ -201,8 +202,8 @@ anders verdwijnt het bij een wissel heen en weer zonder dat je het merkt.
 
 # Fase 2: leesbaarheid van de planning
 
-### ⬜ F4.16. De legende klopt niet, en "aangevraagd" is niet te herkennen
-**P1 · code · 📝**
+### ✅ F4.16. De legende klopt niet, en "aangevraagd" is niet te herkennen
+**P1 · code · 📝 · `5835b84f`**
 
 Twee dingen in één punt.
 
@@ -223,40 +224,68 @@ staan stippen, verticale strepen en ruitjes door elkaar, en niets zegt welke
 streep "dit moment kan nog vrijkomen" betekent. Met een voertuig op `diagonal`
 zijn de twee letterlijk hetzelfde.
 
-**Fix.** Geef "aangevraagd" een markering die géén arcering is, zodat ze naast
-elk voertuigpatroon leesbaar blijft, en schrijf de legende naar wat er echt
-staat. 📝 In `design-decisions.md`: de vulkleur is de chauffeur, de arcering is
-het voertuig, en de status mag dus geen derde patroon zijn.
+**Gedaan, en er zat meer achter dan onleesbaarheid.** De twee patronen
+*stapelden niet eens*: `.week-block-requested` en `.trip-pattern-*` zetten
+allebei `background-image`, en die van het voertuig stond verderop in
+`globals.css` en won. Een aangevraagde rit met een gearceerd voertuig droeg dus
+**helemaal geen** markering meer; de comment die beweerde dat 45 en 135 graden
+samen als een ruit lezen, beschreef iets wat de browser nooit getekend heeft.
 
-### ⬜ F4.1. Filteren op post
-**P2 · code**
+"Nog te beslissen" is nu een volle streep langs de bovenrand (`.trip-requested`),
+als **rand** en niet als pseudo-element: hetzelfde blok is in de weekweergave een
+absoluut gepositioneerde doos en in de maandweergave een `flex`-rij, waar een
+`::before` een flex-item naast de tekst wordt in plaats van een streep erboven.
+
+**De legende tekent nu de echte blokken** (`components/transport-calendar/legend.tsx`),
+met dezelfde klassen. Een legende in woorden is een tweede waarheid over
+hetzelfde, en precies daarom stond er nog "geel met een rode streepjesrand".
+Alleen de voertuigen die écht een arcering hebben staan erin: drie identieke
+vakjes met drie namen ernaast beweren dat je ze uit elkaar kan houden.
+
+Nagekeken in de browser, in beide modi, met de auto op `diagonal` en de rit op
+aangevraagd: de streep, de gele rail en de arcering zijn alle drie tegelijk te
+zien. 📝 `design-decisions.md`, "Een blok op de transportplanning draagt drie
+dingen, elk in een eigen taal".
+
+### ✅ F4.1. Filteren op post
+**P2 · code · `5835b84f`**
 
 Met veel chauffeurs wordt de planning onoverzichtelijk; Logistiek wil "alle
 ritten van Acti" kunnen zien. Er is al een filter op voertuig, chauffeur, status
 en aanvragertype.
 
-Nieuwe sleutel `post` in `lib/transport-filters.ts`, die matcht op `groupId`
-**én** `assignedGroupId`. Vergeet `FILTER_QUERY_KEYS` niet: een filter die daar
-niet in staat, is niet meer uit te zetten (dat was F4-ronde-4's R8). Zowel in het
-beheer als op de publieke bezetting, want het punt zegt expliciet "zowel beheer
-als algemeen".
+**Gedaan:** sleutel `post`, die matcht op `groupId` **én** `assignedGroupId`,
+in `FILTER_QUERY_KEYS` (met een test die dat afdwingt), in beide schermen.
 
-### ⬜ F4.13. Het nummer van de chauffeur in de post- en werkgroepweergave
-**P2 · code**
+Twee dingen die onderweg bleken. `transportFilterWhere` gebruikte `OR` al voor de
+chauffeursfilter, en twee `OR`-sleutels in hetzelfde object kan niet: het zijn nu
+takken van één `AND`, zodat "van Acti én zonder chauffeur" ook echt een EN is. En
+de filter wordt op het publieke overzicht gewist voor wie geen aanvrager mag
+zien; een keuzelijst verbergen is geen poort, en `?post=<id>` zou anders laten
+uitvissen wanneer één post rijdt.
 
-`driverPhones()` levert nummer plus bron al; `app/vervoer/bezetting/trip-card.tsx`
-toont enkel `driverName`. Nummer erbij met `PhoneLink`, zodat bellen één tik is.
+### ✅ F4.13. Het nummer van de chauffeur in de post- en werkgroepweergave
+**P2 · code · `5835b84f`**
 
-### ⬜ F4.15. De ritten van je eigen post vallen op
-**P2 · code**
+**Gedaan** met `PhoneLink`, in allebei de lagen van het kaartje (het team en een
+post), uit één `driverPhones`-query op precies de chauffeurs die op dat scherm
+staan. Niets zonder login: daar staat geen naam, dus al zeker geen nummer.
+
+### ✅ F4.15. De ritten van je eigen post vallen op
+**P2 · code · `5835b84f`**
 
 Kijkt iemand van Sport naar de planning, dan mogen alle ritten voor Sport (door
 Logistiek én door henzelf) eruit springen.
 
-**Let op de bestaande randtaal.** Rood vol = conflict, grijs gestreept = nog geen
-chauffeur. Een derde randkleur erbij maakt er ruis van; gebruik de gele accentrail
-(`box-shadow: inset 3px 0 0 var(--yellow)`), net zoals een uitgelichte kaart op
-vtk.be.
+**Gedaan** met de gele accentrail, maar als `border-left` en niet als
+`box-shadow`: de selectie in de kalender is een Tailwind-`ring`, en dat ís een
+box-shadow, dus een tweede schaduw had de ring van het aangeklikte blok
+weggenomen. Rood vol blijft een conflict en grijs gestreept blijft "nog geen
+chauffeur"; die staan op de andere randen en blijven dus zichtbaar.
+
+Enkel op het bezettingsoverzicht. Op de planning van het team zou het niets
+onderscheiden: daar is elke rit van jou. Een rit telt als "van ons" wanneer je
+post ze aanvroeg **of** ze doorgegeven kreeg, net zoals de filter hierboven.
 
 ---
 
