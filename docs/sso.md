@@ -343,7 +343,7 @@ Elk punt hier heeft ooit tijd gekost.
     op `/sign-in*` is **3 verzoeken per 10 seconden**: voor alle bezoekers samen.
 
     Een SSO-client botst daar als eerste op, want `signInKul` post vanuit de
-    browser naar `/sign-in/oauth2`. Het lid ziet enkel de foutpagina van de
+    browser naar `/sign-in/social`. Het lid ziet enkel de foutpagina van de
     client, terwijl de oorzaak hier ligt; in onze logs staat het als
     `ERROR [Better Auth]: Too many requests`. Zet daarom
     `advanced.ipAddress.trustedProxies` (dan leest de resolver de keten van
@@ -380,6 +380,30 @@ Elk punt hier heeft ooit tijd gekost.
     met twee spaties na de dubbele punt. Dat is `logger.error("", e)` in
     `generic-oauth/routes.mjs`, waar de client de mislukte token-uitwisseling
     opvangt.
+
+17. **Onze Prisma-modellen zijn met de hand geschreven, dus een opwaardering van
+    de plugin laat ze stilletjes achter.** `@better-auth/oauth-provider` bepaalt
+    zelf welke kolommen ze schrijft; staat er één niet in het schema, dan weigert
+    Prisma de hele `create` en faalt de token-uitwisseling met
+    `Unknown argument`. Zo bracht 1.7 `authorizationCodeId` mee (de plugin trekt
+    daarmee elk token in dat uit een hergebruikte autorisatiecode kwam), plus
+    `resources`, `requestedUserInfoClaims`, `revoked`, `confirmation`, de
+    rotatievelden en drie tabellen. Een veld dat `undefined` blijft wordt eruit
+    gefilterd, dus de helft van zo'n gat valt pas op bij intrekken of
+    vernieuwen.
+
+    `advanced.database.validateSchema` in `packages/auth/src/auth.ts` doet die
+    vergelijking wel, en hard: bij een verschil gooit de adapter een
+    `SchemaMismatchError` op elke aanroep, dus de **hele site** geeft 500 en de
+    foutmelding somt precies op wat ontbreekt. Dat is de luide versie van
+    dezelfde stuk gelopen aanmelding, en de browser-smoke in CI valt erover
+    voor een Renovate-bump gemerged raakt. Zet die vlag dus niet uit om de site
+    te laten laden; vul het schema aan en maak een migratie. Ze stond even uit,
+    en dat is precies waarom 1.7 een week lang kon lijken te werken.
+
+    Handmatig naslaan kan ook: `const schema = {` in de `dist` van de plugin
+    (en `plugins/jwt/schema.mjs` voor de `jwks`-tabel, die 1.7 `alg` en `crv`
+    gaf) naast `packages/db/prisma/schema.prisma`.
 
 ---
 

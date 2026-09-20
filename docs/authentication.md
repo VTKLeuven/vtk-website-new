@@ -222,11 +222,22 @@ met enkel wachtwoord-login (`isKulEnabled()`).
 }
 ```
 
-- **Callback-URL wordt afgeleid, niet gehardcodeerd.** better-auth bouwt de
-  redirect-URI als `<baseURL><basePath>/oauth2/callback/<providerId>`, dus
-  `<BETTER_AUTH_URL>/api/auth/better/oauth2/callback/kuleuven`. Die moet exact
-  matchen met wat bij ICTS geregistreerd staat. `KUL_OIDC_REDIRECT_URI` overschrijft
-  dit enkel indien nodig; normaal leeg laten.
+- **De callback-URL is gepind, niet afgeleid.** Ze blijft
+  `<BETTER_AUTH_URL>/api/auth/better/oauth2/callback/kuleuven`, want zo staat ze
+  bij ICTS geregistreerd en moet ze exact matchen. Enkel de host komt nog uit
+  `BETTER_AUTH_URL`; het pad staat als `KUL_CALLBACK_PATH` in
+  `packages/auth/src/index.ts`. `KUL_OIDC_REDIRECT_URI` overschrijft het geheel,
+  en blijft normaal leeg.
+
+  Dat pad was ooit wel een afleiding: het was waar de `genericOAuth`-plugin haar
+  callback aanbood. **Better Auth 1.7 verhuisde elke provider naar de gedeelde
+  core-route `/callback/<providerId>`** en bedient het oude pad niet meer. Die
+  nieuwe URI staat niet bij ICTS, dus zonder pin weigert Shibboleth de
+  autorisatie met `InvalidRedirectionURI`, nog voor het loginformulier.
+  `apiHandlers/apiHandler.ts` geeft een callback op het oude pad daarom door aan
+  de core-route. Wil je ooit naar het nieuwe pad, dan is dat één registratie per
+  omgeving bij ICTS (dev en prod zijn aparte configs) en pas daarna deze pin
+  weg.
 - **Endpoints zijn expliciet geconfigureerd.** Ze komen overeen met KU Leuvens
   officiële discoverydocument, maar Better Auth krijgt bewust geen
   `discoveryUrl`: anders haalt de plugin dat document op vóór elke redirect en
@@ -313,8 +324,10 @@ duplicaat.
 - `isKulEnabled()` bepaalt of de knop getoond wordt (`inloggen/page.tsx`); zonder
   de env-vars verschijnt ze niet.
 - `KulSignInButton` roept `signInKul(next)` aan (`src/client.ts`), dat
-  `authClient.signIn.oauth2({ providerId: "kuleuven", callbackURL, errorCallbackURL })`
-  start. Bij een fout keert het lid terug naar `/inloggen?error=kul`.
+  `authClient.signIn.social({ provider: "kuleuven", callbackURL, errorCallbackURL })`
+  start. Sinds 1.7 is dat de gewone social-route: de `genericOAuth`-plugin
+  registreert KU Leuven als volwaardige provider en heeft geen eigen endpoints
+  meer. Bij een fout keert het lid terug naar `/inloggen?error=kul`.
 
 ### Registratie bij ICTS
 

@@ -340,7 +340,22 @@ export const auth = betterAuth({
 
   advanced: {
     database: {
-      validateSchema: false,
+      // Vergelijkt de modellen die better-auth en haar plugins declareren met
+      // ons Prisma-datamodel. Onze modellen zijn met de hand geschreven, dus
+      // een versiesprong van een plugin laat ze anders stilletjes achter.
+      //
+      // Dit is bewust expliciet aan, al is het de standaard: het stond even
+      // uit, en daardoor kwam een kolom die 1.7 toevoegde
+      // (`oauthAccessToken.authorizationCodeId`) pas aan het licht als een
+      // mislukte login. Zet ze niet terug uit om de site te laten laden: de
+      // aanmelding is dan evengoed stuk, enkel stiller.
+      //
+      // Let op wat "aan" betekent: bij een verschil gooit de adapter een
+      // `SchemaMismatchError` op élke aanroep, dus de hele site geeft 500.
+      // Dat is met opzet luid, en de browser-smoke in CI valt erover voor een
+      // bump gemerged raakt. Vul bij zo'n fout het schema aan (zie
+      // docs/sso.md) in plaats van deze vlag.
+      validateSchema: true,
     },
     cookiePrefix: process.env.BETTER_AUTH_COOKIE_PREFIX || 'vtk',
     useSecureCookies: isProduction,

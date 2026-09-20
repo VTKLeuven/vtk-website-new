@@ -5003,6 +5003,11 @@ model Jwks {
   privateKey String
   createdAt  DateTime  @db.Timestamptz(3)
   expiresAt  DateTime? @db.Timestamptz(3)
+  /// Better Auth 1.7 schrijft het algoritme en de curve bij de sleutel in
+  /// plaats van ze uit de configuratie af te leiden. Rijen van voor die versie
+  /// houden null en gelden dan als de geconfigureerde standaard (EdDSA).
+  alg        String?
+  crv        String?
 
   @@map("jwks")
 }
@@ -5041,6 +5046,19 @@ model OauthClient {
   requirePKCE             Boolean?
   metadata                Json?
 
+  // Velden die @better-auth/oauth-provider 1.7 toevoegde. We gebruiken ze
+  // vandaag geen van alle (geen backchannel logout, geen DPoP, geen
+  // private_key_jwt), maar de plugin schrijft naar elk veld dat ze declareert
+  // en Prisma weigert een create met een kolom die niet bestaat.
+  clientDiscoveryId                String?
+  clientCredentialsScopes          String[]
+  backchannelLogoutUri             String?
+  backchannelLogoutSessionRequired Boolean?
+  applicationType                  String?
+  jwks                             String?
+  jwksUri                          String?
+  dpopBoundAccessTokens            Boolean?
+
   /// Wie hier mag inloggen; zie SsoAccessMode. Staat bewust op deze tabel en
   /// niet in een aparte VTK-tabel: de poort draait op het hete pad van élke
   /// autorisatie en moet zonder join te beantwoorden zijn. De plugin negeert
@@ -5054,6 +5072,7 @@ model OauthClient {
   oauthAccessTokens  OauthAccessToken[]
   oauthConsents      OauthConsent[]
   clientPermissions  SsoClientPermission[]
+  clientResources    OauthClientResource[]
 
   @@map("oauthClient")
 }
@@ -5168,6 +5187,19 @@ model OauthRefreshToken {
   expiresAt         DateTime           @db.Timestamptz(3)
   oauthAccessTokens OauthAccessToken[]
 
+  /// Velden van @better-auth/oauth-provider 1.7. `authorizationCodeId` is de
+  /// autorisatiecode waaruit dit token kwam: bij hergebruik van een code trekt
+  /// de plugin elk token in dat er ooit uit voortkwam, en ze zoekt daarvoor op
+  /// dit veld. De rotatievelden houden het vorige token nog even geldig, zodat
+  /// een herhaalde call van een trage client niet de hele keten intrekt.
+  authorizationCodeId     String?
+  resources               String[]
+  requestedUserInfoClaims String[]
+  rotatedAt               DateTime? @db.Timestamptz(3)
+  rotationReplayResponse  String?
+  rotationReplayExpiresAt DateTime? @db.Timestamptz(3)
+  confirmation            Json?
+
   // De plugin declareert deze indexen wel, de Prisma-modellen droegen ze niet.
   // Ze bedienen de hete paden: token-uitwisseling zoekt op clientId/userId, en
   // de opkuis van verlopen tokens scant op expiresAt.
@@ -5175,6 +5207,7 @@ model OauthRefreshToken {
   @@index([userId])
   @@index([sessionId])
   @@index([expiresAt])
+  @@index([authorizationCodeId])
   @@map("oauthRefreshToken")
 }
 
@@ -5194,11 +5227,19 @@ model OauthAccessToken {
   createdAt   DateTime           @db.Timestamptz(3)
   expiresAt   DateTime           @db.Timestamptz(3)
 
+  /// Zie OauthRefreshToken.authorizationCodeId.
+  authorizationCodeId     String?
+  resources               String[]
+  requestedUserInfoClaims String[]
+  revoked                 DateTime? @db.Timestamptz(3)
+  confirmation            Json?
+
   @@index([clientId])
   @@index([userId])
   @@index([sessionId])
   @@index([refreshId])
   @@index([expiresAt])
+  @@index([authorizationCodeId])
   @@map("oauthAccessToken")
 }
 
@@ -5213,6 +5254,9 @@ model OauthConsent {
   createdAt   DateTime    @db.Timestamptz(3)
   updatedAt   DateTime    @db.Timestamptz(3)
 
+  resources               String[]
+  requestedUserInfoClaims String[]
+
   // De uniciteit van een toestemming (clientId, userId, referenceId) staat NIET
   // hier maar als expressie-index in de migratie: Postgres beschouwt NULL's als
   // onderling verschillend, dus een gewone @@unique zou net het courante geval
@@ -5221,6 +5265,59 @@ model OauthConsent {
   @@index([clientId])
   @@index([userId])
   @@map("oauthConsent")
+}
+
+/// Een resource-server (de RFC 8707 `resource`-parameter) waarvoor een token
+/// uitgegeven kan worden. Wij geven enkel tokens voor VTK zelf uit, dus deze
+/// tabel blijft leeg. Ze staat er omdat de plugin ze sinds 1.7 declareert en
+/// haar beheerendpoints er blind naar schrijven; een ontbrekende tabel faalt
+/// pas bij de eerste call.
+model OauthResource {
+  id                            String    @id
+  identifier                    String    @unique
+  name                          String
+  accessTokenTtl                Int?
+  refreshTokenTtl               Int?
+  signingAlgorithm              String?
+  signingKeyId                  String?
+  allowedScopes                 String[]
+  customClaims                  Json?
+  dpopBoundAccessTokensRequired Boolean?
+  disabled                      Boolean?
+  createdAt                     DateTime? @db.Timestamptz(3)
+  updatedAt                     DateTime? @db.Timestamptz(3)
+  policyVersion                 Int?
+  metadata                      Json?
+
+  clientResources OauthClientResource[]
+
+  @@map("oauthResource")
+}
+
+/// Welke client bij welke resource mag; zie OauthResource.
+model OauthClientResource {
+  id         String        @id
+  client     OauthClient   @relation(fields: [clientId], references: [clientId], onDelete: Cascade)
+  clientId   String
+  resource   OauthResource @relation(fields: [resourceId], references: [identifier], onDelete: Cascade)
+  resourceId String
+  metadata   Json?
+  createdAt  DateTime?     @db.Timestamptz(3)
+
+  @@unique([clientId, resourceId])
+  @@index([resourceId])
+  @@map("oauthClientResource")
+}
+
+/// De `jti`'s van client assertions die al gebruikt zijn, zodat eenzelfde
+/// assertion niet twee keer telt. Enkel van toepassing op `private_key_jwt`;
+/// onze clients authenticeren met een secret, dus ook deze tabel blijft leeg.
+model OauthClientAssertion {
+  id        String   @id
+  expiresAt DateTime @db.Timestamptz(3)
+
+  @@index([expiresAt])
+  @@map("oauthClientAssertion")
 }
 
 /// Wie heeft wat gewijzigd aan welke OAuth-client. Bewust geen veld-diffs: het

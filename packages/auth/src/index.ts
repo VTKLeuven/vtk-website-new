@@ -56,6 +56,23 @@ export {
 export const AUTH_BASE_PATH = '/api/auth/better';
 
 /**
+ * Het pad waarop KU Leuven ons na de login terugstuurt.
+ *
+ * Dit was het pad van de `genericOAuth`-plugin. Better Auth 1.7 bedient elke
+ * provider vanaf de gedeelde core-route `/callback/<provider>` en registreert
+ * dit pad niet meer, maar de URI staat zo bij ICTS geregistreerd en die
+ * registratie wijzigen kost een aanvraag per omgeving (dev en prod zijn aparte
+ * configs). We houden ze dus vast: `logins/kul.ts` pint de `redirect_uri`
+ * hierop en `apiHandlers/apiHandler.ts` geeft een callback op dit pad door aan
+ * de core-route. Stuur je het nieuwe pad mee, dan weigert Shibboleth de
+ * autorisatie met `InvalidRedirectionURI`, nog voor het loginformulier.
+ *
+ * Het providerdeel spiegelt `KUL_PROVIDER_ID` in `logins/kul.ts`; het staat
+ * hier los omdat dit bestand niets van de server mag binnentrekken.
+ */
+export const KUL_CALLBACK_PATH = `${AUTH_BASE_PATH}/oauth2/callback/kuleuven`;
+
+/**
  * Eigenaar van elke OAuth-client. Vast, want clients zijn van VTK en niet van
  * de beheerder die ze toevallig aanmaakte; zie `clientReference` in auth.ts.
  */

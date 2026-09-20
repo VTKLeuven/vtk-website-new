@@ -9,6 +9,8 @@
  * (with a sensible default) rather than from the host.
  */
 
+import { KUL_CALLBACK_PATH } from "@vtk/auth";
+
 /** The logo registered in metadata. Lives in apps/web/public. */
 export const SSO_LOGO = { path: "/VTK.png", width: 660, height: 777 } as const;
 
@@ -32,10 +34,9 @@ export function ssoMetadata(): SsoMetadata {
   return {
     base,
     entityId: process.env.KUL_OIDC_CLIENT_ID || DEFAULT_ENTITY_ID,
-    // Mirrors how better-auth derives the genericOAuth callback from baseURL.
-    redirectUri:
-      process.env.KUL_OIDC_REDIRECT_URI ||
-      `${base}/api/auth/better/oauth2/callback/kuleuven`,
+    // Het pad staat vast (KUL_CALLBACK_PATH), want het is wat bij ICTS
+    // geregistreerd staat; better-auth 1.7 verhuisde zijn eigen callback.
+    redirectUri: process.env.KUL_OIDC_REDIRECT_URI || `${base}${KUL_CALLBACK_PATH}`,
     infoUrl: `${base}/nl/ledenportaal`,
     privacyUrl: `${base}/nl/privacy`,
     logoUrl: `${base}${SSO_LOGO.path}`,

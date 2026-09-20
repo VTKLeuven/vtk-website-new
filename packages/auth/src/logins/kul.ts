@@ -25,10 +25,12 @@
  *
  * Default callback URL (register this redirect URI with ICTS):
  *   <BETTER_AUTH_URL>/api/auth/better/oauth2/callback/kuleuven
+ * Dat pad is geen afleiding meer maar een pin; zie `KUL_CALLBACK_PATH`.
  */
 
 import { prisma } from "@vtk/db";
 
+import { KUL_CALLBACK_PATH } from "../index";
 import { firwStudentFromProfile, syncFirwStudent } from "./kul-firw";
 import {
   getKulUserInfo,
@@ -165,11 +167,33 @@ export function isKulEnabled(): boolean {
 }
 
 /**
+ * De redirect-URI die we naar KU Leuven sturen, of `undefined` wanneer er geen
+ * `BETTER_AUTH_URL` is om ze absoluut te maken.
+ *
+ * Dit is bewust een pin en geen afleiding. Better Auth 1.7 verhuisde de
+ * callback van `genericOAuth` naar de gedeelde core-route `/callback/<id>`, en
+ * die URI staat niet bij ICTS geregistreerd; Shibboleth weigert ze met
+ * `InvalidRedirectionURI`. `KUL_CALLBACK_PATH` houdt het geregistreerde pad
+ * vast en `apiHandlers/apiHandler.ts` geeft dat pad door aan de core-route.
+ *
+ * Better Auth gebruikt deze waarde zowel voor de autorisatie-URL als voor de
+ * token-call (`options.redirectURI || redirectURI`), dus beide kanten sturen
+ * exact wat er geregistreerd staat.
+ */
+function kulRedirectUri(): string | undefined {
+  if (process.env.KUL_OIDC_REDIRECT_URI) return process.env.KUL_OIDC_REDIRECT_URI;
+  const base = (process.env.BETTER_AUTH_URL ?? "").replace(/\/+$/, "");
+  return base ? `${base}${KUL_CALLBACK_PATH}` : undefined;
+}
+
+/**
  * Provider config for the better-auth `genericOAuth` plugin, or `null` when the
  * KU Leuven OIDC env vars are not configured.
  */
 export function kulOAuthConfig() {
   if (!isKulEnabled()) return null;
+
+  const redirectURI = kulRedirectUri();
 
   return {
     providerId: KUL_PROVIDER_ID,
@@ -184,9 +208,7 @@ export function kulOAuthConfig() {
     authorizationUrl: KUL_OIDC_AUTHORIZATION_URL,
     tokenUrl: KUL_OIDC_TOKEN_URL,
     userInfoUrl: KUL_USERINFO_URL,
-    ...(process.env.KUL_OIDC_REDIRECT_URI
-      ? { redirectURI: process.env.KUL_OIDC_REDIRECT_URI }
-      : {}),
+    ...(redirectURI ? { redirectURI } : {}),
     // KU Leuven's own OIDC test client requests `allattributes` in addition to
     // the standard scopes. It is not advertised in discovery, but it is the
     // scope that makes the client-specific ICTS attribute release available.
