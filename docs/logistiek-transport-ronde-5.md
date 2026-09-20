@@ -56,17 +56,17 @@ Alles wordt op **390px breed** nagekeken, niet alleen op desktop.
 | 2 | Leesbaarheid van de planning | F4.16, F4.1, F4.13, F4.15 | ✅ af (`5835b84f`) |
 | 3 | Breedte en gsm | F4.6, F4.7, F4.14 | ✅ af (`e65da138`) |
 | 4 | Chauffeursnummers en werkgroepen | F4.3, F4.10 | 🟡 schermen af (`503735c0`), één nummer open |
-| 5 | Beschikbaarheid | F4.2, F4.5 | ⬜ open |
+| 5 | Beschikbaarheid | F4.2, F4.5 | ✅ af (`435ecf21`) |
 | 6 | Ritten bewerken en noteren | F4.4, F4.20 | ⬜ open |
 | 7 | Voertuigen | F4.21, F4.22 | ⬜ open |
 | 8 | Statistiek | F4.23 | ⬜ open |
 | - | Bewust niet gedaan | F4.11 | ⛔ |
 
 Fase 1 eerst: daar zit het enige echte defect van deze ronde, en het draagt zeven
-van de drieëntwintig punten. **Fase 1, 2 en 3 zijn af** (`dce13cf7`, `5835b84f`,
-`e65da138`) en van fase 4 staat alle code er (`503735c0`); daar blijft enkel het
-juiste nummer van Sofie Bruggeman over, en dat is geen code maar één veld op
-liv. Fase 5 is de volgende.
+van de drieëntwintig punten. **Fase 1, 2, 3 en 5 zijn af** (`dce13cf7`,
+`5835b84f`, `e65da138`, `435ecf21`) en van fase 4 staat alle code er
+(`503735c0`); daar blijft enkel het juiste nummer van Sofie Bruggeman over, en
+dat is geen code maar één veld op liv. Fase 6 is de volgende.
 
 ---
 
@@ -471,29 +471,68 @@ plaats van een tweede kopie die er na de eerste wijziging naast loopt.
 
 # Fase 5: beschikbaarheid
 
-### ⬜ F4.2. Een dag loopt van 5u tot 5u
+### ✅ F4.2. Een dag loopt van 5u tot 5u
 **P1 · code**
 
 *"Zodat mensen gemakkelijker 's nachts aanduiden."* Zaterdagnacht 02:00 hoort bij
 zaterdag, niet bij zondag.
 
-`lib/availability-day.ts` rekent in uren 0 tot 23 vanaf `startOfBrusselsDay`. Eén
-constante `DAG_START_UUR = 5` erbij, waarna vakje 0 om 05:00 ligt en vakje 23 om
-04:00 de volgende ochtend. Raakt het intekenraster, `availability-paint.tsx` en
-de beschikbaarheidsband in de planning.
+**Gedaan.** `DAG_START_UUR = 5` staat in `lib/availability-day.ts`, en
+`availabilityDayBounds` is de enige plek waar een dagrand berekend wordt. Vakje 0
+ligt op 05:00 en vakje 23 op 04:00 de ochtend erna; op een breed scherm loopt de
+kolom van zaterdag door tot zondagochtend 05:00 (`placeForDay` kreeg een
+`dayStartMinutes`, de `TimeGrid` een `dayStartHour`). Eén sleep van 22:00 tot
+02:00 is nu één venster in plaats van twee, en dat is nagekeken: op het brede
+scherm gaf één sleep één rij in de databank, op de telefoon gaf één veeg over de
+vakjes 17 tot 20 hetzelfde.
 
-**Dit is het enige stuk van deze ronde waar stil iets fout kan gaan.**
-`clipOutsideDay` knipt vensters op de dagrand; verschuift die rand zonder dat de
-opgeslagen vensters meeschuiven, dan veegt het herschrijven van één dag de
-buurdag weg. `test/availability-day.test.ts` moet mee.
+**De band in de planning verschuift bewust niet mee.** De opgeslagen vensters
+zijn gewone tijdstippen; enkel het intekenen kent een dag als eenheid. Een rit om
+02:00 hoort in de planning op de datum waarop hij rijdt, en een band die daar vijf
+uur naast de ritten erboven ligt, is een tweede soort dag op hetzelfde scherm.
 
-### ⬜ F4.5. Eén algemene nota bij je beschikbaarheid
-**P2 · code**
+**Het risico lag bij `clipOutsideDay`, en dat is uitgetest.** Een venster van
+zaterdag 22:00 tot zondag 02:00 overleeft het herschrijven van zondag; een venster
+dat écht over de nieuwe rand loopt (03:00 tot 07:00) blijft aan de kant van de
+buurdag staan wanneer je de andere dag herschrijft. Beide gevallen staan nu in
+`test/availability-day.test.ts` en `test/week-lanes.test.ts` (samen 393 tests,
+was 379), en ze zijn ook end-to-end nagespeeld tegen de databank.
+
+**De nachtknop is weg.** Van 00:00 tot 06:00 stond ingeklapt omdat er zelden
+iemand rijdt, maar dat is precies wat deze mensen wél doen: na het opschuiven van
+de dagrand zou die knop net de uren verbergen waarvoor de vraag gesteld werd. Het
+raster toont nu alle vierentwintig rijen (op 390px: 24 rijen van ~24px, het
+scherm loopt niet over) met een streepje op de middernachtgrens.
+
+### ✅ F4.5. Eén algemene nota bij je beschikbaarheid
+**P2 · code · 🗄️**
 
 Er bestaat al een nota per venster (`UitleenDriverAvailability.note`); Logistiek
-wil er één in het algemeen, "ni per individueel stukje". Eén vrij veld per
-chauffeur per week, bovenaan het intekenscherm, dat het team in de
-beschikbaarheidsband terugziet.
+wil er één in het algemeen, "ni per individueel stukje".
+
+**Gedaan.** Nieuw model `UitleenDriverAvailabilityNote` (chauffeur, maandag,
+tekst), één rij per chauffeur per week. Het veld staat bovenaan allebei de
+intekenschermen: een tekstvak op een computer, één regel boven het raster op een
+telefoon, met dezelfde component erachter (`availability-note.tsx`).
+
+🗄️ Een nieuwe tabel, dus nul rijen voor wat er al staat, en dat klopt: een nota
+die niemand schreef, bestaat niet. De nota's per venster blijven staan waar ze
+staan. Dit raakt geen enkele rit, dus `rit-kolommen.test.ts` heeft er niets over
+te zeggen.
+
+**Opslaan gebeurt bij het verlaten van het veld en niet met een knop**, zoals de
+rest van dit scherm (je veeg is de opdracht). Maar wél zichtbaar: er staat
+"Opslaan..." en daarna even "Bewaard". Een veeg zie je gebeuren, tekst niet, en
+een veld waarvan je nooit weet of het aankwam is precies het soort stil verlies
+waar deze nota tegen moet beschermen. Leeg maken wist de nota; een lege nota en
+geen nota zijn hetzelfde.
+
+**Het team leest ze onder de strook "Wie kan er rijden", niet in de naamkolom
+ernaast.** Die kolom is 144px breed en draagt al een naam plus een urentelling;
+"die week examens" wordt daar afgekapt tot ze niets meer zegt. Belangrijker: wie
+een nota schreef maar niets aanduidde, heeft daar helemaal geen rij, en precies
+díé nota is degene die het team moet lezen. Bestrijkt de weergave meer dan één
+week (de maandweergave), dan staat het weeknummer erbij.
 
 ---
 
