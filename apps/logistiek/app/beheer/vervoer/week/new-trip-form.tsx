@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { DriverOptions } from '../driver-select';
 import { TripEventSelect, type TripEventOption } from '@/components/trip-event-select';
 import type { DriverOption } from '@/lib/uitleen-server';
+import type { TripHandoverMode } from '@/lib/uitleen';
 
 /**
  * Een rit inplannen vanuit de kalender (P4).
@@ -35,6 +36,21 @@ const inputClass =
  */
 const OTHER_GROUP = 'andere';
 
+/**
+ * Wat er gebeurt zodra je de rit doorgeeft, volgens de instelling (F4.8b).
+ *
+ * Deze zin stond hier hard als "de verantwoordelijken krijgen een mail". Staat
+ * de melding op niemand, dan beloofde het formulier iets wat niet gebeurde, en
+ * dat is precies het soort belofte waarvan je pas de dag van de rit merkt dat
+ * ze niet klopte.
+ */
+const HANDOVER_HINTS: Record<TripHandoverMode, string> = {
+  NIEMAND: 'Die post ziet de rit onder "Mijn ritten" en duidt daar zelf een chauffeur aan. Er vertrekt geen mail.',
+  LEADS: 'De verantwoordelijken van die post krijgen een mail om een chauffeur aan te duiden.',
+  POSTADRES: 'Het postadres van die post krijgt een mail om een chauffeur aan te duiden.',
+  ADRES: 'Het vaste adres uit de instellingen krijgt een mail om een chauffeur aan te duiden.',
+};
+
 export type NewTripValues = {
   startAt: string;
   endAt: string;
@@ -58,6 +74,7 @@ export function NewTripForm({
   initial,
   vehicles,
   groups,
+  handoverNotify,
   events,
   drivers,
   onDone,
@@ -68,6 +85,8 @@ export function NewTripForm({
   vehicles: Array<{ id: string; name: string; needsVanDriver: boolean }>;
   /** De posten en werkgroepen waarvoor de rit rijdt. */
   groups: Array<{ id: string; name: string }>;
+  /** Wie er een mail krijgt bij het doorgeven (F4.8b); zie de zin onder het veld. */
+  handoverNotify: TripHandoverMode;
   /** De evenementen rond deze periode, om de rit aan te hangen (A8). */
   events: TripEventOption[];
   drivers: DriverOption[];
@@ -90,9 +109,47 @@ export function NewTripForm({
    * staat, wordt de knop waarop je klikt.
    */
   const [clashed, setClashed] = useState(false);
+  /**
+   * Heeft de gebruiker "Post kiest zelf de chauffeur" zelf al aangeraakt?
+   *
+   * Zolang niet, volgt dat veld de post waarvoor de rit rijdt (F4.17). Daarna
+   * niet meer: wie het veld leegzet omdat Logistiek deze rit zelf doet, wil niet
+   * dat het bij de volgende tik aan de postkeuze terugspringt.
+   */
+  const [assignedTouched, setAssignedTouched] = useState(false);
 
   function set<K extends keyof NewTripValues>(key: K, value: NewTripValues[K]) {
     setValues((current) => ({ ...current, [key]: value }));
+  }
+
+  /**
+   * Wat er voorgesteld wordt in "Post kiest zelf de chauffeur" (F4.17): de post
+   * waarvoor de rit rijdt.
+   *
+   * Een voorstel en geen dwang: het veld blijft leeg te zetten, want Logistiek
+   * rijdt ook ritten voor een post zelf. Niet bij de kar (`needsVanDriver`), die
+   * vraagt een goedgekeurde karchauffeur en dat blijft een keuze van Logistiek;
+   * niet bij "Andere...", want dat is geen post op de site.
+   */
+  function suggestedGroup(groupId: string, vehicleId: string): string {
+    const needsVanDriver = vehicles.find((vehicle) => vehicle.id === vehicleId)?.needsVanDriver ?? false;
+    if (needsVanDriver || groupId === OTHER_GROUP) return '';
+    return groupId;
+  }
+
+  function chooseGroup(groupId: string) {
+    setValues((current) => ({
+      ...current,
+      groupId,
+      assignedGroupId: assignedTouched
+        ? current.assignedGroupId
+        : suggestedGroup(groupId, current.vehicleId),
+    }));
+  }
+
+  function chooseAssignedGroup(assignedGroupId: string) {
+    setAssignedTouched(true);
+    set('assignedGroupId', assignedGroupId);
   }
 
   /**
@@ -106,7 +163,14 @@ export function NewTripForm({
     setValues((current) => ({
       ...current,
       vehicleId,
-      assignedGroupId: needsVanDriver ? '' : current.assignedGroupId,
+      // Naar de kar: weg. Terug naar de auto: het voorstel komt terug zolang
+      // niemand het veld zelf aanraakte, anders verdwijnt het bij een wissel
+      // heen en weer zonder dat je het merkt.
+      assignedGroupId: needsVanDriver
+        ? ''
+        : assignedTouched
+          ? current.assignedGroupId
+          : suggestedGroup(current.groupId, vehicleId),
     }));
   }
 
@@ -213,7 +277,7 @@ export function NewTripForm({
         Voor welke post of werkgroep
         <select
           value={values.groupId}
-          onChange={(event) => set('groupId', event.target.value)}
+          onChange={(event) => chooseGroup(event.target.value)}
           className={inputClass}
         >
           <option value="">Logistiek zelf</option>
@@ -265,10 +329,10 @@ export function NewTripForm({
           te weigeren. */}
       {!(chosenVehicle?.needsVanDriver ?? false) ? (
         <label className="grid gap-1 text-xs font-medium text-vtk-muted">
-          Post vult zelf in
+          Post kiest zelf de chauffeur
           <select
             value={values.assignedGroupId}
-            onChange={(event) => set('assignedGroupId', event.target.value)}
+            onChange={(event) => chooseAssignedGroup(event.target.value)}
             className={inputClass}
           >
             <option value="">Logistiek regelt het</option>
@@ -279,9 +343,7 @@ export function NewTripForm({
             ))}
           </select>
           {values.assignedGroupId ? (
-            <span className="font-normal text-vtk-muted">
-              De verantwoordelijken van die post krijgen een mail om een chauffeur aan te duiden.
-            </span>
+            <span className="font-normal text-vtk-muted">{HANDOVER_HINTS[handoverNotify]}</span>
           ) : null}
         </label>
       ) : null}

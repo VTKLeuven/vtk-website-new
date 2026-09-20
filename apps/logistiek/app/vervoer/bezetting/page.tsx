@@ -164,6 +164,7 @@ export default async function VervoerBezettingPage({
     userId: string;
     requesterType: UitleenRequesterType;
     groupId: string | null;
+    assignedGroupId: string | null;
   }) =>
     (booking.status === 'REQUESTED' || booking.status === 'APPROVED') &&
     (allHelpers || (viewer !== null && ownsTransportBooking(booking, viewer)));

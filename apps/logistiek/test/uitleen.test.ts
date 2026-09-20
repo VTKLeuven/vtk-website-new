@@ -3,6 +3,8 @@ import {
   billedHours,
   dayPartLabel,
   describeReservationChanges,
+  handoverNote,
+  mergeHandover,
   formatDateOnly,
   formatDateWithPart,
   formatDateRange,
@@ -554,5 +556,95 @@ describe('dagdelen', () => {
     expect(changes).toHaveLength(1);
     expect(changes[0]).toContain('voormiddag');
     expect(changes[0]).toContain('avond');
+  });
+});
+
+/**
+ * De melding na het doorgeven van een rit aan een post (F4.8b).
+ *
+ * Ze bestaat om één reden: zeggen of er iemand verwittigd is, en zo niet, of
+ * dat de bedoeling was. Sinds er vier keuzes zijn, is "0 verstuurd" niet meer
+ * hetzelfde als "er ging iets mis", en dat verschil hoort in de tekst te staan.
+ */
+describe('handoverNote', () => {
+  it('waarschuwt niet wanneer er bewust niemand gemaild wordt', () => {
+    const note = handoverNote('Sport', { mode: 'NIEMAND' });
+    expect(note.warning).toBe(false);
+    // En het zegt waar de post de rit dan wél ziet.
+    expect(note.message).toContain('Ritten van mijn post');
+  });
+
+  it('waarschuwt bij een post zonder verantwoordelijke', () => {
+    const note = handoverNote('Sport', { mode: 'LEADS', leads: 0, sent: 0 });
+    expect(note.warning).toBe(true);
+    expect(note.message).toContain('geen verantwoordelijke');
+  });
+
+  it('houdt een mislukte verzending uit elkaar van een lege post', () => {
+    const note = handoverNote('Sport', { mode: 'LEADS', leads: 2, sent: 0 });
+    expect(note.warning).toBe(true);
+    expect(note.message).toContain('vertrok niet');
+    expect(note.message).not.toContain('geen verantwoordelijke');
+  });
+
+  it('meldt gewoon dat het gelukt is', () => {
+    expect(handoverNote('Sport', { mode: 'LEADS', leads: 2, sent: 2 })).toEqual({
+      warning: false,
+      message:
+        'Doorgegeven aan Sport; de verantwoordelijken kregen een mail om een chauffeur aan te duiden.',
+    });
+  });
+
+  it('noemt het adres waar de mail naartoe ging', () => {
+    const note = handoverNote('Sport', { mode: 'POSTADRES', address: 'sport@vtk.be', sent: 1 });
+    expect(note.warning).toBe(false);
+    expect(note.message).toContain('sport@vtk.be');
+  });
+
+  it('waarschuwt bij een post zonder eigen adres in de mailinglijsten', () => {
+    const note = handoverNote('Sport', { mode: 'POSTADRES', address: null, sent: 0 });
+    expect(note.warning).toBe(true);
+    expect(note.message).toContain('geen eigen adres');
+  });
+
+  it('zegt het wanneer we het niet weten', () => {
+    const note = handoverNote('Sport', { mode: 'MISLUKT' });
+    expect(note.warning).toBe(true);
+    expect(note.message).toContain('weten niet');
+  });
+});
+
+/**
+ * Heen en terug in één keer inplannen geeft twee ritten en dus twee uitkomsten,
+ * maar één melding. Het slechtste geval wint, want dat is het geval waar het
+ * team iets mee moet.
+ */
+describe('mergeHandover', () => {
+  it('telt de verstuurde mails op', () => {
+    expect(
+      mergeHandover([
+        { mode: 'LEADS', leads: 2, sent: 2 },
+        { mode: 'LEADS', leads: 2, sent: 2 },
+      ])
+    ).toEqual({ mode: 'LEADS', leads: 2, sent: 4 });
+  });
+
+  it('laat één mislukking de melding bepalen', () => {
+    expect(
+      mergeHandover([{ mode: 'LEADS', leads: 2, sent: 2 }, { mode: 'MISLUKT' }])
+    ).toEqual({ mode: 'MISLUKT' });
+  });
+
+  it('houdt een ontbrekend postadres vast', () => {
+    expect(
+      mergeHandover([
+        { mode: 'POSTADRES', address: 'sport@vtk.be', sent: 1 },
+        { mode: 'POSTADRES', address: null, sent: 0 },
+      ])
+    ).toEqual({ mode: 'POSTADRES', address: null, sent: 1 });
+  });
+
+  it('zonder ritten is er niets doorgegeven', () => {
+    expect(mergeHandover([])).toEqual({ mode: 'NIEMAND' });
   });
 });

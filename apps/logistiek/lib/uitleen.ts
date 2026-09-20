@@ -22,6 +22,184 @@ export type NotifyKind = (typeof NOTIFY_KINDS)[number];
 export type LogistiekNotifyEmails = Record<NotifyKind, string[]>;
 
 /**
+ * Wie er verwittigd wordt wanneer Logistiek een rit aan een post doorgeeft
+ * (F4.8b).
+ *
+ * Tot september 2026 mailde dat onvoorwaardelijk de verantwoordelijken van die
+ * post. Sinds /ritten de doorgegeven ritten toont, is die mail voor Logistiek
+ * een dubbel bericht geworden, en veertien posten met elk twee verantwoordelijken
+ * maken van een gewone planningsdag een mailstorm. Vandaar een keuze, met
+ * **niemand** als standaard: de postlijst op /ritten is de melding geworden.
+ *
+ * Hier en niet in `lib/uitleen-server.ts`: het instellingenscherm is een
+ * client-component. Zie de comment bij `NOTIFY_KINDS`.
+ */
+export const TRIP_HANDOVER_MODES = ['NIEMAND', 'LEADS', 'POSTADRES', 'ADRES'] as const;
+
+export type TripHandoverMode = (typeof TRIP_HANDOVER_MODES)[number];
+
+export type TripHandoverNotify = {
+  mode: TripHandoverMode;
+  /** Enkel bij `ADRES`: het vaste adres. Leeg bij de rest. */
+  email: string;
+};
+
+export function isTripHandoverMode(value: unknown): value is TripHandoverMode {
+  return TRIP_HANDOVER_MODES.includes(value as TripHandoverMode);
+}
+
+
+/**
+ * Wat er gebeurd is met de melding over een doorgegeven rit (F4.8b).
+ *
+ * Geeft terug wat er **echt** gebeurd is en niet enkel een aantal: "0 verstuurd"
+ * kan drie dingen betekenen die elk iets anders van het team vragen. Een post
+ * zonder verantwoordelijke of zonder postadres verwittig je zelf; een mail die
+ * niet vertrok, is meestal de mailserver; en bij `NIEMAND` is er niets
+ * misgegaan. Ze allemaal als "geen verantwoordelijke" melden, stuurde het team
+ * achter de verkeerde oorzaak aan.
+ *
+ * Hier en niet in `lib/uitleen-mail.ts`: `handoverNote` hieronder is de tekst
+ * die het team te zien krijgt, en die hoort in een test te staan en niet in een
+ * server-only module. Zie de comment bij `NOTIFY_KINDS`.
+ */
+export type TripHandoverOutcome =
+  /** De instelling staat op "niemand"; de postlijst op /ritten is de melding. */
+  | { mode: 'NIEMAND' }
+  /** `leads: null`: het liep mis en we weten niet hoeveel er waren. */
+  | { mode: 'LEADS'; leads: number | null; sent: number }
+  /** `address: null`: deze post heeft geen eigen adres in de mailinglijsten. */
+  | { mode: 'POSTADRES'; address: string | null; sent: number }
+  | { mode: 'ADRES'; address: string; sent: number }
+  /** Er liep iets mis en we weten niet of er iets vertrok. */
+  | { mode: 'MISLUKT' };
+
+/**
+ * De zin achter "ingepland" of "doorgegeven", over de melding naar de post.
+ *
+ * Elk van de uitkomsten hierboven krijgt zijn eigen zin, en enkel wat nog iets
+ * van het team vraagt is een waarschuwing (die blijft staan tot ze weggeklikt
+ * wordt). "Niemand" is dus géén waarschuwing: dat is de bedoeling, en de zin
+ * zegt in de plaats waar de post de rit dan wél ziet.
+ */
+export function handoverNote(
+  groupName: string,
+  outcome: TripHandoverOutcome
+): { message: string; warning: boolean } {
+  const given = `Doorgegeven aan ${groupName}`;
+  switch (outcome.mode) {
+    case 'NIEMAND':
+      // Geen mail is hier de bedoeling en geen storing (F4.8b), dus ook geen
+      // waarschuwing. De melding zegt wel wáár de post het dan ziet, anders
+      // leest "doorgegeven" als "en nu?".
+      return {
+        warning: false,
+        message: `${given}; de rit staat bij hen onder "Ritten van mijn post". Er vertrok geen mail (zie instellingen).`,
+      };
+    case 'LEADS':
+      if (outcome.leads === 0) {
+        return {
+          warning: true,
+          message: `${given}, maar die post heeft dit werkingsjaar geen verantwoordelijke; er vertrok geen mail. Verwittig hen zelf.`,
+        };
+      }
+      if (outcome.leads === null || outcome.sent === 0) {
+        return {
+          warning: true,
+          message: `${given}, maar de mail naar de verantwoordelijken vertrok niet. Verwittig hen zelf, en kijk de mailinstellingen na.`,
+        };
+      }
+      // "kregen" en niet "kreegen": dat stond er, en een melding die het team
+      // elke planningsdag leest, is de verkeerde plek voor een tikfout.
+      return {
+        warning: false,
+        message:
+          outcome.sent === 1
+            ? `${given}; de verantwoordelijke kreeg een mail om een chauffeur aan te duiden.`
+            : `${given}; de verantwoordelijken kregen een mail om een chauffeur aan te duiden.`,
+      };
+    case 'POSTADRES':
+      if (outcome.address === null) {
+        return {
+          warning: true,
+          message: `${given}, maar die post heeft geen eigen adres in de mailinglijsten; er vertrok geen mail. Verwittig hen zelf, of kies een andere melding in de instellingen.`,
+        };
+      }
+      if (outcome.sent === 0) {
+        return {
+          warning: true,
+          message: `${given}, maar de mail naar ${outcome.address} vertrok niet. Verwittig hen zelf, en kijk de mailinstellingen na.`,
+        };
+      }
+      return {
+        warning: false,
+        message: `${given}; ${outcome.address} kreeg een mail om een chauffeur aan te duiden.`,
+      };
+    case 'ADRES':
+      if (outcome.sent === 0) {
+        return {
+          warning: true,
+          message: `${given}, maar de mail naar ${outcome.address} vertrok niet. Verwittig hen zelf, en kijk de mailinstellingen na.`,
+        };
+      }
+      return {
+        warning: false,
+        message: `${given}; ${outcome.address} kreeg een mail om een chauffeur aan te duiden.`,
+      };
+    case 'MISLUKT':
+      return {
+        warning: true,
+        message: `${given}, maar we weten niet of de melding vertrok. Verwittig hen zelf, en kijk de mailinstellingen na.`,
+      };
+  }
+}
+
+/**
+ * Meerdere ritten in één keer doorgegeven (heen en terug, of twee voertuigen):
+ * één melding in plaats van vier.
+ *
+ * Ze gaan naar dezelfde post met dezelfde instelling, dus de manier is overal
+ * dezelfde; wat verschilt is of het gelukt is. Het slechtste geval wint, want
+ * dat is het geval waar het team iets mee moet.
+ */
+export function mergeHandover(outcomes: TripHandoverOutcome[]): TripHandoverOutcome {
+  if (outcomes.length === 0) return { mode: 'NIEMAND' };
+  if (outcomes.some((outcome) => outcome.mode === 'MISLUKT')) return { mode: 'MISLUKT' };
+  const first = outcomes[0];
+  const sent = outcomes.reduce(
+    (total, outcome) => total + ('sent' in outcome ? outcome.sent : 0),
+    0
+  );
+  switch (first.mode) {
+    // Hierboven al afgevangen; TypeScript weet dat niet van een `.some()`.
+    case 'MISLUKT':
+    case 'NIEMAND':
+      return { mode: first.mode };
+    case 'LEADS': {
+      // Het onbekende geval wint: weten we het van één rit niet, dan weten we
+      // het van deze post niet.
+      const leads = outcomes.reduce<number | null>(
+        (worst, outcome) =>
+          worst === null || outcome.mode !== 'LEADS' || outcome.leads === null
+            ? null
+            : Math.min(worst, outcome.leads),
+        first.leads
+      );
+      return { mode: 'LEADS', leads, sent };
+    }
+    case 'POSTADRES': {
+      // Eén rit zonder adres betekent geen adres: het is dezelfde post.
+      const missing = outcomes.some(
+        (outcome) => outcome.mode === 'POSTADRES' && outcome.address === null
+      );
+      return { mode: 'POSTADRES', address: missing ? null : first.address, sent };
+    }
+    case 'ADRES':
+      return { mode: 'ADRES', address: first.address, sent };
+  }
+}
+
+/**
  * Hoeveel bijrijders er op een rit passen (V2). Een grens tegen tikfouten en
  * tegen een formulier dat oneindig groeit, geen beleid: in de kar passen er twee
  * naast de chauffeur, en wie er meer meeneemt, schrijft dat in de nota.
@@ -569,10 +747,19 @@ export function requesterLabel(request: {
  * toetst dit nog eens op de server, want een knop verbergen is geen poort.
  */
 export function ownsTransportBooking(
-  booking: { userId: string; requesterType: UitleenRequesterType; groupId: string | null },
+  booking: {
+    userId: string;
+    requesterType: UitleenRequesterType;
+    groupId: string | null;
+    /** De post waaraan Logistiek de rit doorgaf; zie `vanBookingForMember`. */
+    assignedGroupId?: string | null;
+  },
   viewer: { userId: string; groupIds: string[] }
 ): boolean {
   if (booking.userId === viewer.userId) return true;
+  // Doorgegeven aan jouw post: dan zet die post er zelf de chauffeur en de
+  // bijrijders op, ongeacht wie de rit vroeg (F4.8a).
+  if (booking.assignedGroupId && viewer.groupIds.includes(booking.assignedGroupId)) return true;
   return (
     booking.requesterType === 'INTERN' &&
     booking.groupId !== null &&

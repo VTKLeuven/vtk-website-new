@@ -42,6 +42,40 @@ describe('ownsTransportBooking', () => {
     ).toBe(false);
   });
 
+  /**
+   * F4.8a: Logistiek geeft een rit door aan een post, en dan zet die post er
+   * zelf de chauffeur en de bijrijders op. Zonder deze tak kon dat enkel bij een
+   * rit die je eigen post ook aangevraagd had, terwijl ze wel in haar lijst
+   * staat.
+   */
+  it('laat de post erbij waaraan de rit doorgegeven is', () => {
+    expect(
+      ownsTransportBooking(
+        {
+          userId: 'u2',
+          requesterType: 'WERKGROEP',
+          groupId: null,
+          assignedGroupId: 'post-sport',
+        },
+        viewer
+      )
+    ).toBe(true);
+  });
+
+  it('laat de post van iemand anders er niet bij via de doorgeeftak', () => {
+    expect(
+      ownsTransportBooking(
+        {
+          userId: 'u2',
+          requesterType: 'INTERN',
+          groupId: 'post-cultuur',
+          assignedGroupId: 'post-cultuur',
+        },
+        viewer
+      )
+    ).toBe(false);
+  });
+
   it('rekent een werkgroepaanvraag niet tot de post', () => {
     // Zoals `vanBookingForMember`: enkel INTERN hangt aan de groep. Een
     // werkgroeprit blijft dus van wie ze indiende.

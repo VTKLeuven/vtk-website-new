@@ -30,6 +30,7 @@ import {
   availabilityInRange,
   driverOptions,
   eventsInRange,
+  getLogistiekSettings,
   transportAuditLogsByBooking,
   transportRange,
   type TransportBooking,
@@ -109,7 +110,7 @@ export default async function VervoerWeekPage({
   const anchor = (datum && parseDateOnly(datum)) || (week && parseDateOnly(week)) || todayDateOnly();
   const { days, from, to } = calendarRange(view, anchor);
 
-  const [bookings, vehicles, drivers, driverColors, groups, events, availability] =
+  const [bookings, vehicles, drivers, driverColors, groups, events, availability, settings] =
     await Promise.all([
     transportRange(from, to, filters),
     activeVehicles(),
@@ -129,6 +130,9 @@ export default async function VervoerWeekPage({
     // dus altijd nodig. De filter bepaalt enkel of ze óók achter de ritten
     // liggen.
     availabilityInRange(from, to),
+    // Enkel voor de zin onder "Post kiest zelf de chauffeur": die moet zeggen
+    // wie er dan een mail krijgt, en dat is een instelling (F4.8b).
+    getLogistiekSettings(),
   ]);
 
   // De strook boven het rooster toont enkel wat dit venster raakt, en enkel
@@ -340,6 +344,7 @@ export default async function VervoerWeekPage({
             needsVanDriver: vehicle.needsVanDriver,
           }))}
         groups={groups.map((group) => ({ id: group.id, name: group.nameNl }))}
+        handoverNotify={settings.tripHandover.mode}
         availability={availability.map((window) => ({
           id: window.id,
           driverId: window.userId,

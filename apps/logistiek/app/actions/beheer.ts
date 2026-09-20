@@ -18,19 +18,21 @@ import {
   describeReservationChanges,
   formatBrusselsTime,
   formatDateTime,
+  handoverNote,
+  isEmailish,
   isOnQuarterHour,
+  isTripHandoverMode,
+  mergeHandover,
   NOTIFY_KINDS,
   parseDateOnly,
   parseNotifyEmails,
   momentsOverlap,
   toBrusselsDateValue,
   transportPriceCents,
+  type TripHandoverMode,
+  type TripHandoverOutcome,
 } from '@/lib/uitleen';
-import {
-  notifyGroupAssignedForTrip,
-  notifyReservation,
-  notifyTransport,
-} from '@/lib/uitleen-mail';
+import { notifyGroupAssignedForTrip, notifyReservation, notifyTransport } from '@/lib/uitleen-mail';
 import {
   consumeFlesserkeStock,
   flesserkeReserved,
@@ -2176,36 +2178,6 @@ export async function deleteTransportAction(bookingId: string): Promise<ActionRe
 }
 
 /**
- * De zin achter "ingepland" of "doorgegeven", over de mail naar de post.
- *
- * Drie uitkomsten en geen twee: een post zonder verantwoordelijke verwittig je
- * zelf, een mail die niet vertrok is meestal de mailserver, en dat zijn twee
- * verschillende dingen om te gaan doen. Ze allebei als "geen verantwoordelijke"
- * melden, stuurde het team achter de verkeerde oorzaak aan.
- */
-function handoverNote(
-  groupName: string,
-  outcome: { leads: number | null; sent: number }
-): { message: string; warning: boolean } {
-  if (outcome.leads === 0) {
-    return {
-      warning: true,
-      message: `Doorgegeven aan ${groupName}, maar die post heeft dit werkingsjaar geen verantwoordelijke; er vertrok geen mail. Verwittig hen zelf.`,
-    };
-  }
-  if (outcome.sent === 0) {
-    return {
-      warning: true,
-      message: `Doorgegeven aan ${groupName}, maar de mail naar de verantwoordelijken vertrok niet. Verwittig hen zelf, en kijk de mailinstellingen na.`,
-    };
-  }
-  return {
-    warning: false,
-    message: `Doorgegeven aan ${groupName}; de verantwoordelijke${outcome.sent === 1 ? '' : 'n'} kreeg${outcome.sent === 1 ? '' : 'en'} een mail om een chauffeur aan te duiden.`,
-  };
-}
-
-/**
  * Een rit aanmaken vanuit de planning (P4).
  *
  * Meteen `APPROVED` en niet `REQUESTED`: het team vraagt niets aan zichzelf. Een
@@ -2376,17 +2348,11 @@ export async function adminCreateTransportAction(
   // dan een (heen en terug, of twee voertuigen), dan zoekt de post voor elk
   // daarvan een chauffeur en gaat het dus over meer dan een rit.
   revalidatePath('/ritten');
-  let leads: number | null = 0;
-  let sent = 0;
+  const outcomes: TripHandoverOutcome[] = [];
   for (const id of outcome.ids ?? []) {
-    const result = await notifyGroupAssignedForTrip(id);
-    // De ritten gaan naar dezelfde post, dus het aantal verantwoordelijken is
-    // overal hetzelfde; het onbekende geval (`null`) wint, want dan weten we het
-    // van deze post niet meer.
-    leads = result.leads === null || leads === null ? null : Math.max(leads, result.leads);
-    sent += result.sent;
+    outcomes.push(await notifyGroupAssignedForTrip(id));
   }
-  const note = handoverNote(assignedGroup.nameNl, { leads, sent });
+  const note = handoverNote(assignedGroup.nameNl, mergeHandover(outcomes));
   return {
     ok: true,
     // Gelukt met een staartje: de melding blijft staan tot je ze wegklikt, want
@@ -3281,7 +3247,25 @@ export async function saveLogistiekSettingsAction(_prev: SaveState, formData: Fo
     notifyEmails[kind] = parsed;
   }
 
-  const value = { showRentPrices, lastMinuteDays, externalRequestsOpen, notifyEmails };
+  // Wie er verwittigd wordt bij het doorgeven van een rit aan een post (F4.8b).
+  // Een onbekende waarde wordt "niemand" en niet een foutmelding: dat is de
+  // standaard, en het is de enige keuze die niemand ongevraagd mailt.
+  const handoverMode = String(formData.get('tripHandoverMode') ?? '');
+  const mode: TripHandoverMode = isTripHandoverMode(handoverMode) ? handoverMode : 'NIEMAND';
+  // Het adres blijft bewaard wanneer je tijdelijk op iets anders staat: anders
+  // moet je het opnieuw intikken zodra je terugschakelt. Enkel wanneer het echt
+  // gebruikt wordt, moet het er ook zijn.
+  const handoverEmail = String(formData.get('tripHandoverEmail') ?? '').trim();
+  if (mode === 'ADRES' && !isEmailish(handoverEmail)) return saveError('HANDOVER_EMAIL_INVALID');
+  const tripHandover = { mode, email: handoverEmail };
+
+  const value = {
+    showRentPrices,
+    lastMinuteDays,
+    externalRequestsOpen,
+    notifyEmails,
+    tripHandover,
+  };
   await prisma.setting.upsert({
     where: { key: LOGISTIEK_SETTINGS_KEY },
     update: { value },

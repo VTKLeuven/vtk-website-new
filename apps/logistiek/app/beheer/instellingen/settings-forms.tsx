@@ -2,7 +2,14 @@
 
 import { useState } from 'react';
 import type { UitleenVehicle } from '@prisma/client';
-import { NOTIFY_KINDS, type LogistiekNotifyEmails, type NotifyKind } from '@/lib/uitleen';
+import {
+  NOTIFY_KINDS,
+  TRIP_HANDOVER_MODES,
+  type LogistiekNotifyEmails,
+  type NotifyKind,
+  type TripHandoverMode,
+  type TripHandoverNotify,
+} from '@/lib/uitleen';
 import { saveLogistiekSettingsAction, saveVehicleAction, setVehicleActiveAction } from '@/app/actions/beheer';
 import {
   VEHICLE_PATTERNS,
@@ -228,7 +235,78 @@ const GENERAL_ERRORS = {
   LAST_MINUTE_INVALID: 'De last-minute-termijn moet een aantal dagen tussen 1 en 90 zijn.',
   NOTIFY_EMAIL_INVALID:
     'Een van de meldingsadressen ziet er niet uit als een adres. Splits meerdere adressen met een komma.',
+  HANDOVER_EMAIL_INVALID:
+    'Vul het vaste adres in waar de melding over een doorgegeven rit naartoe moet, of kies een andere ontvanger.',
 };
+
+/** Wat elke keuze doet wanneer Logistiek een rit aan een post doorgeeft (F4.8b). */
+const HANDOVER_LABELS: Record<TripHandoverMode, { title: string; hint: string }> = {
+  NIEMAND: {
+    title: 'Niemand',
+    hint: 'De rit verschijnt bij die post onder "Ritten van mijn post". Er vertrekt geen mail.',
+  },
+  LEADS: {
+    title: 'De verantwoordelijken van die post',
+    hint: 'Elke verantwoordelijke (LEAD) van dit werkingsjaar krijgt een mail met de rit en een link om een chauffeur te kiezen.',
+  },
+  POSTADRES: {
+    title: 'Het postadres',
+    hint: 'De mailinglijst van die post zelf (bv. sport@vtk.be). Een post zonder eigen lijst krijgt geen mail; dat zegt de melding na het doorgeven.',
+  },
+  ADRES: {
+    title: 'Een vast adres',
+    hint: 'Altijd hetzelfde adres, ongeacht de post. Handig wanneer één iemand de ritten opvolgt.',
+  },
+};
+
+/**
+ * De ontvanger van de melding bij het doorgeven van een rit.
+ *
+ * Een radiogroep en geen keuzelijst: het zijn vier keuzes die elk iets anders
+ * doen met de mailbox van iemand anders, en die lees je liever naast elkaar dan
+ * één voor één. Het adresveld hangt onder zijn eigen keuze en blijft bewaard
+ * wanneer je tijdelijk iets anders aanduidt.
+ */
+function TripHandoverField({ value }: { value: TripHandoverNotify }) {
+  const [mode, setMode] = useState<TripHandoverMode>(value.mode);
+  return (
+    <div className="mt-4 grid gap-3 border-t border-vtk-navy/10 pt-4">
+      <p className="text-sm font-semibold text-vtk-ink">Melding bij het doorgeven van een rit aan een post</p>
+      <p className="text-xs text-vtk-muted">
+        Geef je een autorit door, dan duidt die post zelf de chauffeur aan. Wie daarover een mail
+        krijgt, kies je hier. Standaard niemand: de rit staat bij hen op &quot;Mijn ritten&quot;, en dat
+        scherm is de melding.
+      </p>
+      {TRIP_HANDOVER_MODES.map((option) => (
+        <label key={option} className="grid gap-1 text-sm text-vtk-ink">
+          <span className="flex items-center gap-2">
+            <input
+              type="radio"
+              name="tripHandoverMode"
+              value={option}
+              checked={mode === option}
+              onChange={() => setMode(option)}
+              className="h-4 w-4"
+            />
+            {HANDOVER_LABELS[option].title}
+          </span>
+          <span className="ml-6 text-xs font-normal text-vtk-muted">{HANDOVER_LABELS[option].hint}</span>
+        </label>
+      ))}
+      <label className="ml-6 grid gap-1 text-xs font-medium text-vtk-muted sm:max-w-[22rem]">
+        Vast adres
+        <input
+          type="email"
+          name="tripHandoverEmail"
+          defaultValue={value.email}
+          placeholder="logistiek@vtk.be"
+          disabled={mode !== 'ADRES'}
+          className={`${inputClass} disabled:opacity-50`}
+        />
+      </label>
+    </div>
+  );
+}
 
 /** Wat er per soort in de melding staat, zodat je weet wie je waarvoor aanschrijft. */
 const NOTIFY_LABELS: Record<NotifyKind, { title: string; hint: string }> = {
@@ -251,11 +329,13 @@ export function GeneralSettings({
   lastMinuteDays,
   externalRequestsOpen,
   notifyEmails,
+  tripHandover,
 }: {
   showRentPrices: boolean;
   lastMinuteDays: number;
   externalRequestsOpen: boolean;
   notifyEmails: LogistiekNotifyEmails;
+  tripHandover: TripHandoverNotify;
 }) {
   return (
     <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
@@ -349,6 +429,8 @@ export function GeneralSettings({
             meteen.
           </p>
         </div>
+
+        <TripHandoverField value={tripHandover} />
       </SaveForm>
     </section>
   );

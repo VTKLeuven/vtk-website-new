@@ -18,6 +18,7 @@ import {
   type DriverTrip,
 } from '@/lib/uitleen-server';
 import { GroupDriverPicker } from './group-driver-picker';
+import { TripHelpers } from '@/components/trip-helpers';
 import { FeedTokens } from '@/components/feed-tokens';
 import { ToastProvider } from '@/components/ui/toast';
 import type { LogistiekLocale } from '@/lib/i18n-shared';
@@ -53,6 +54,8 @@ function TripCard({
   past,
   driverPhone,
   groupMembers,
+  youDrive = false,
+  canEditHelpers = false,
 }: {
   trip: DriverTrip;
   locale: LogistiekLocale;
@@ -60,10 +63,18 @@ function TripCard({
   /** Het nummer van wie rijdt; enkel op een rit van je post, niet op je eigen. */
   driverPhone?: string | null;
   /**
-   * De leden van de post waaraan deze rit doorgegeven is. Aanwezig betekent:
-   * jij mag hier de chauffeur kiezen.
+   * De leden van de post waaraan deze rit doorgegeven is die ook chauffeur zijn.
+   * Aanwezig betekent: jij mag hier de chauffeur kiezen. Leeg is een echt
+   * antwoord en geen fout; zie `groupMemberOptions`.
    */
   groupMembers?: Array<{ id: string; name: string }>;
+  /**
+   * Jij rijdt deze rit zelf (F4.19). Dezelfde rit staat dan ook bovenaan onder
+   * "Komende ritten", en zonder dit merkteken leest dat als twee ritten.
+   */
+  youDrive?: boolean;
+  /** Bijrijders toevoegen en weghalen vanaf deze kaart (F4.8a). */
+  canEditHelpers?: boolean;
 }) {
   const en = locale === 'en';
   const vehicle = en ? trip.vehicle.nameEn : trip.vehicle.nameNl;
@@ -85,11 +96,21 @@ function TripCard({
             {formatDateTime(trip.startAt, locale)} {en ? 'to' : 'tot'} {formatDateTime(trip.endAt, locale)}
           </p>
         </div>
-        {trip.status === 'COMPLETED' ? (
-          <span className="rounded-full bg-vtk-navy/8 px-2.5 py-0.5 text-xs font-semibold text-vtk-navy">
-            {en ? 'Completed' : 'Afgerond'}
-          </span>
-        ) : null}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* "Jij rijdt": deze rit staat ook in je eigen lijst hierboven, en dat
+              is de bedoeling. Zonder dit merkteken leest dezelfde rit twee keer
+              op één scherm als twee ritten. */}
+          {youDrive ? (
+            <span className="rounded-full bg-vtk-yellow px-2.5 py-0.5 text-xs font-semibold text-vtk-on-yellow">
+              {en ? 'You drive' : 'Jij rijdt'}
+            </span>
+          ) : null}
+          {trip.status === 'COMPLETED' ? (
+            <span className="rounded-full bg-vtk-navy/8 px-2.5 py-0.5 text-xs font-semibold text-vtk-navy">
+              {en ? 'Completed' : 'Afgerond'}
+            </span>
+          ) : null}
+        </div>
       </div>
 
       <dl className="mt-4 grid gap-2 text-sm sm:grid-cols-2">
@@ -163,7 +184,9 @@ function TripCard({
             </dd>
           </div>
         ) : null}
-        {trip.helpers.length > 0 ? (
+        {/* Enkel de lijst wanneer je ze niet mag wijzigen; anders staat het hele
+            blok onder het raster, zoals op het bezettingsoverzicht. */}
+        {!canEditHelpers && trip.helpers.length > 0 ? (
           <div className="sm:col-span-2">
             <dt className="text-vtk-muted">{en ? 'Passengers' : 'Bijrijders'}</dt>
             <dd className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 font-medium text-vtk-ink">
@@ -176,7 +199,7 @@ function TripCard({
             </dd>
           </div>
         ) : null}
-        {trip.helpersNote || trip.helpersPhone ? (
+        {!canEditHelpers && (trip.helpersNote || trip.helpersPhone) ? (
           <div className="sm:col-span-2">
             <dt className="text-vtk-muted">{en ? 'Helpers' : 'Bijrijders'}</dt>
             <dd className="font-medium text-vtk-ink">
@@ -191,6 +214,26 @@ function TripCard({
           </div>
         ) : null}
       </dl>
+
+      {/* De bijrijders bijwerken vanaf deze kaart (F4.8a). De serverkant kon dit
+          al (`addTripHelperAction` laat een collega van dezelfde post toe); hier
+          stonden ze enkel te lezen, zodat een post naar het bezettingsoverzicht
+          moest voor iets wat op haar eigen ritlijst hoort. Onder het raster en
+          niet erin: het is het enige blok waar je iets wijzigt, en een veld met
+          een knop tussen twee feiten leest als een feit. */}
+      {canEditHelpers ? (
+        <div className="mt-4 border-t border-vtk-navy/10 pt-4">
+          <TripHelpers
+            bookingId={trip.id}
+            helpers={trip.helpers}
+            /* De vrije tekst van vóór V2, met het nummer dat er los naast stond:
+               samen één regel, want TripHelpers kent enkel die ene. */
+            legacyNote={[trip.helpersNote, trip.helpersPhone].filter(Boolean).join(' · ') || null}
+            canEdit
+            locale={locale}
+          />
+        </div>
+      ) : null}
 
       {/* De boodschap van Logistiek is geen voetnoot: daar staat de code van de
           poort in, of bij wie de sleutel ligt. Ze krijgt daarom de gele
@@ -244,9 +287,10 @@ export default async function RittenPage() {
 
   const [trips, groupTrips, driver, vanDriver, feedTokens] = await Promise.all([
     tripsForDriver(session.user.id),
-    // Wat je medepostleden rijden, en wat er nog een chauffeur mist omdat
-    // Logistiek de rit aan jouw post doorgaf.
-    tripsForGroups(session.user.id, myGroupIds),
+    // Wat je post aanvroeg, wat je medepostleden rijden, en wat er nog een
+    // chauffeur mist omdat Logistiek de rit aan jouw post doorgaf. Ook de rit
+    // die je zelf rijdt voor je post: die staat dan in allebei de lijsten (D3).
+    tripsForGroups(myGroupIds),
     isDriver(session.user.id),
     isVanDriver(session.user.id),
     feedTokensForUser(session.user.id),
@@ -380,6 +424,11 @@ export default async function RittenPage() {
                         ? (membersPerGroup.get(trip.assignedGroup.id) ?? [])
                         : undefined
                     }
+                    youDrive={trip.driverId === session.user.id}
+                    /* Dezelfde regel als `canEditHelpers` op de server: je eigen
+                       post, of een rit die aan je post doorgegeven is. Een
+                       gereden of geannuleerde rit niet meer; die is historiek. */
+                    canEditHelpers={trip.status === 'APPROVED'}
                   />
                 ))}
               </ul>

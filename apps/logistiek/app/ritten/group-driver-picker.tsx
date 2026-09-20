@@ -12,9 +12,11 @@ import { useToast } from '@/components/ui/toast';
  * zet meestal iemand anders op de rit, en een knop die enkel jezelf kan
  * aanduiden dwingt hem eerst die persoon te laten inloggen.
  *
- * Bijrijders blijven waar ze al stonden (`TripHelpers`): dat scherm bestaat en
- * werkt, en een tweede manier om hetzelfde te doen is een tweede manier om het
- * verkeerd te doen.
+ * De lijst is de doorsnede van de post en de chauffeurspool (`groupMemberOptions`,
+ * F4.9): wie mag rijden, beslist Logistiek en niet de post die iets te vervoeren
+ * heeft. **Is die doorsnede leeg, dan staat hier geen keuzelijst maar een zin
+ * die zegt wat er ontbreekt en bij wie je dan moet zijn.** Een select zonder
+ * opties ziet eruit als een scherm dat stuk is, en dan mailt niemand.
  */
 export function GroupDriverPicker({
   bookingId,
@@ -40,6 +42,22 @@ export function GroupDriverPicker({
         showToast({ message: result.error, variant: 'error', duration: 0 });
       }
     });
+  }
+
+  // Niemand van deze post staat in de chauffeurslijst. De rit blijft staan en
+  // Logistiek kan er nog altijd zelf iemand op zetten; wat hier ontbreekt is de
+  // keuze, en dat is precies wat er moet staan.
+  if (members.length === 0 && !driverId) {
+    return (
+      <p className="mt-4 rounded-lg bg-vtk-paper px-4 py-3 text-sm leading-6 text-vtk-body shadow-[inset_3px_0_0_var(--yellow)]">
+        <span className="font-medium text-vtk-ink">Niemand van {groupName} staat in de chauffeurslijst.</span>{' '}
+        Mail{' '}
+        <a href="mailto:logistiek@vtk.be" className="font-medium text-vtk-navy underline underline-offset-4">
+          logistiek@vtk.be
+        </a>{' '}
+        met wie er bij jullie mag rijden, dan kan je hier zelf een chauffeur kiezen.
+      </p>
+    );
   }
 
   return (

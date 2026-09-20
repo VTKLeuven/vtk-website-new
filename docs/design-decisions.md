@@ -4027,6 +4027,60 @@ lag dan al twee dagen stil.
 - **Naar één adres met de rest in kopie**, niet drie losse berichten: drie mails
   naar dezelfde mailbox lezen als drie aanvragen.
 
+### Een rit van je post staat op "Mijn ritten", ook als jij hem rijdt
+
+`/ritten` heeft twee lijsten, en die beantwoorden twee verschillende vragen:
+**"Komende ritten"** is *wat moet ik doen*, **"Ritten van mijn post"** is *wat
+staat er bij ons open*. Een rit kan in allebei thuishoren.
+
+- **Kies je jezelf als chauffeur van een rit van je post, dan blijft hij ook in
+  de postlijst staan.** Hij verdween daar, omdat dezelfde rit twee keer op één
+  scherm als twee ritten leest. In de praktijk was het omgekeerde erger: de
+  andere postleden zagen de rit verdwijnen zodra er iemand op stond, en wisten
+  dus niet meer of er al iemand reed. De kaart draagt daarom het merkteken
+  **"Jij rijdt"**; dat is wat het verschil tussen de twee lijsten leesbaar houdt.
+- **Een goedgekeurde rit die je post zelf aanvroeg, staat er ook zonder
+  chauffeur.** Dat is net de rit waar een post iets mee moet. Hij verscheen pas
+  zodra Logistiek er iemand op zette of hem uitdrukkelijk doorgaf, en dat is de
+  bug waarmee ronde 4 opende.
+- **Wie er van een post mag rijden, beslist Logistiek.** De keuzelijst "chauffeur
+  van deze post" is de doorsnede van de post en de chauffeurslijst, niet de hele
+  post: anders zet een post iemand zonder rijbewijs op een autorit. Staat er
+  niemand van die post in de lijst, dan komt er géén lege keuzelijst maar een zin
+  die zegt wat er ontbreekt en naar welk adres je daarvoor mailt.
+- **De bijrijders zijn vanaf die kaart te bewerken.** De serverkant liet een
+  collega van dezelfde post dat al toe; ze stonden er enkel te lezen, dus moest
+  een post naar het bezettingsoverzicht voor iets wat op haar eigen ritlijst
+  hoort.
+
+### Een rit doorgeven aan een post mailt standaard niemand
+
+Geeft Logistiek een autorit door aan een post, dan duidt die post zelf de
+chauffeur aan. Daar vertrok altijd een mail over naar de verantwoordelijken van
+die post. Dat is nu een keuze op /beheer/instellingen, met **niemand** als
+standaard.
+
+- **De postlijst op `/ritten` is de melding geworden.** Toen die mail ontstond,
+  was ze het enige spoor van een doorgegeven rit; sinds die ritten op het scherm
+  van de post staan, is ze een tweede bericht over iets wat er al staat. Op een
+  planningsdag met tien ritten leest niemand die nog, en een melding die niemand
+  leest, maakt de melding die er wél toe doet ook onleesbaar.
+- **Vier keuzes:** niemand, de verantwoordelijken van die post, het postadres, of
+  een vast adres. Drie zijn er te weinig: een kring waar één iemand de ritten
+  opvolgt, wil dat vaste adres, en een post met een eigen mailbox wil niet dat
+  het van de verantwoordelijken van dit jaar afhangt.
+- **Het postadres komt uit de mailinglijsten** (`MailGroup`), niet uit een nieuwe
+  kolom op de post: die adressen staan daar al en lopen daar vanzelf mee met het
+  werkingsjaar. Enkel een lijst die precies díé ene post als bron heeft telt;
+  `praesidium@vtk.be` is "elke actieve post" en is niet het adres van deze post.
+- **Het formulier belooft wat de instelling doet.** Onder "Post kiest zelf de
+  chauffeur" stond hard dat de verantwoordelijken een mail krijgen. Staat de
+  melding op niemand, dan beloofde dat scherm iets wat niet gebeurde, en dat merk
+  je pas de dag van de rit.
+- **De melding ná het doorgeven zegt wat er echt gebeurd is.** "Geen mail" is dan
+  geen waarschuwing (het is de bedoeling), maar een post zonder verantwoordelijke
+  of zonder eigen adres is dat wél: dan is er iemand die het niet weet.
+
 ### De uitleendienst gaat in fases open, en externen zijn de laatste
 
 Vanaf het semester 2026-2027 werkt Logistiek écht met de app, maar niet met

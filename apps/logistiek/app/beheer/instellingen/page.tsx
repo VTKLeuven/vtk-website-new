@@ -20,6 +20,7 @@ export default async function BeheerInstellingenPage() {
         lastMinuteDays={settings.lastMinuteDays}
         externalRequestsOpen={settings.externalRequestsOpen}
         notifyEmails={settings.notifyEmails}
+        tripHandover={settings.tripHandover}
       />
       <FeedTokens
         canTeam

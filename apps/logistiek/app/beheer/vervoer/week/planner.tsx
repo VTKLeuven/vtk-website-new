@@ -26,6 +26,7 @@ import { TransportControls } from '../transport-controls';
 import { TransportDecisionForms, type DecisionLeg } from '../transport-decision-forms';
 import { TripEditForm, type TripEditValues } from './trip-edit-form';
 import { NewTripForm, type NewTripValues } from './new-trip-form';
+import type { TripHandoverMode } from '@/lib/uitleen';
 import { EventEditForm, type PlannerEvent } from './event-edit-form';
 import type { TripEventOption } from '@/components/trip-event-select';
 import { AvailabilityBoard } from '@/components/transport-calendar/availability-board';
@@ -122,6 +123,7 @@ export function TransportPlanner({
   drivers,
   vehicleOptions,
   groups,
+  handoverNotify,
   events,
   eventOptions,
   availability,
@@ -140,6 +142,13 @@ export function TransportPlanner({
   vehicleOptions: Array<{ id: string; name: string; needsVanDriver: boolean }>;
   /** Posten en werkgroepen waarvoor het team zelf een rit kan inplannen. */
   groups: Array<{ id: string; name: string }>;
+  /**
+   * Wie er een mail krijgt wanneer je de rit aan een post doorgeeft (F4.8b).
+   * Het formulier zegt dat ter plaatse, want die instelling staat twee schermen
+   * verderop en beloven dat er iemand verwittigd wordt terwijl dat niet gebeurt,
+   * is erger dan niets beloven.
+   */
+  handoverNotify: TripHandoverMode;
   /** De evenementen boven het rooster, met wat het paneel nodig heeft (P5). */
   events: PlannerEvent[];
   /**
@@ -428,6 +437,7 @@ export function TransportPlanner({
               }
               vehicles={vehicleOptions}
               groups={groups}
+              handoverNotify={handoverNotify}
               events={eventOptions}
               drivers={drivers}
               onDone={() => {
