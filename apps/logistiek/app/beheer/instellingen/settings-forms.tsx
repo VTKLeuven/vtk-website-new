@@ -16,6 +16,8 @@ import {
   VEHICLE_PATTERN_LABELS,
   vehiclePatternClass,
 } from '@/lib/driver-colors';
+import { VEHICLE_ICONS, VEHICLE_ICON_LABELS, vehicleIconName } from '@/lib/vehicle-icon';
+import { LogisticsIcon } from '@/components/logistics-icon';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
 import { SaveForm } from '@/components/ui/save-form';
 
@@ -78,13 +80,75 @@ function VehiclePatternField({ pattern }: { pattern: string }) {
   );
 }
 
+/**
+ * Het icoon van dit voertuig in de transportplanning (F4.21), getekend naast de
+ * keuzelijst.
+ *
+ * Met "Automatisch" erin en niet enkel de drie iconen: wat er nu staat, is
+ * afgeleid uit de naam, en dat klopt voor de kar, de auto en de bakfiets. Die
+ * afleiding vervangen door een keuze die iemand ooit gemaakt heeft, betekent dat
+ * een hernoemd voertuig zijn oude icoon blijft dragen. Kiezen doe je pas wanneer
+ * de afleiding ernaast zit, bijvoorbeeld bij een gehuurd busje dat "Dockx" heet.
+ */
+function VehicleIconField({ icon, code }: { icon: string; code: string }) {
+  const [chosen, setChosen] = useState(icon);
+  return (
+    <label className="grid gap-1 text-xs font-medium text-vtk-muted sm:col-span-2">
+      Icoon in de transportplanning
+      <span className="flex items-center gap-3">
+        <select
+          name="icon"
+          value={chosen}
+          onChange={(event) => setChosen(event.target.value)}
+          className={`${inputClass} flex-1`}
+        >
+          {/* Kort, en niet "Automatisch, uit de naam": de breedte van een
+              `select` is die van zijn langste optie, en die telt door tot in de
+              breedte van de hele pagina. Met die zin erin liep het beheerscherm
+              op een telefoon van 390px over de rand. Wat automatisch doet, staat
+              eronder, waar tekst gewoon afbreekt. */}
+          <option value="">Automatisch</option>
+          {VEHICLE_ICONS.map((value) => (
+            <option key={value} value={value}>
+              {VEHICLE_ICON_LABELS[value]}
+            </option>
+          ))}
+        </select>
+        {/* Het echte icoon en geen naam ernaast: "Bestelwagen" tegenover "Auto"
+            zegt niet welk van de twee tekeningetjes straks in het blok staat. */}
+        <span
+          aria-hidden
+          className="flex h-10 w-16 shrink-0 items-center justify-center rounded-lg border border-vtk-navy/15 bg-vtk-paper text-vtk-ink"
+        >
+          <LogisticsIcon name={vehicleIconName({ code, icon: chosen })} className="h-5 w-5" />
+        </span>
+      </span>
+      <span className="font-normal text-vtk-muted">
+        Staat in elk blok van de planning, naast de naam van het voertuig. Automatisch leidt het
+        af uit de naam; kies zelf zodra dat ernaast zit, bijvoorbeeld bij een gehuurd busje.
+      </span>
+    </label>
+  );
+}
+
 function VehicleFields({ vehicle }: { vehicle?: UitleenVehicle }) {
+  // De naam wordt hier gestuurd om één reden: bij een voertuig dat nog niet
+  // bestaat is er geen code, en dan is de naam waar "Automatisch" straks uit
+  // afgeleid wordt. Zonder dit toont de voorvertoning een bestelwagen terwijl je
+  // "Auto" aan het typen bent.
+  const [nameNl, setNameNl] = useState(vehicle?.nameNl ?? '');
   return (
     <div className="grid gap-3 sm:grid-cols-2">
       {vehicle ? <input type="hidden" name="id" value={vehicle.id} /> : null}
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
         Naam (NL)
-        <input type="text" name="nameNl" defaultValue={vehicle?.nameNl ?? ''} className={inputClass} />
+        <input
+          type="text"
+          name="nameNl"
+          value={nameNl}
+          onChange={(event) => setNameNl(event.target.value)}
+          className={inputClass}
+        />
       </label>
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">
         Naam (EN)
@@ -115,6 +179,7 @@ function VehicleFields({ vehicle }: { vehicle?: UitleenVehicle }) {
         Omschrijving (optioneel)
         <input type="text" name="description" defaultValue={vehicle?.description ?? ''} className={inputClass} />
       </label>
+      <VehicleIconField icon={vehicle?.icon ?? ''} code={vehicle?.code ?? nameNl} />
       <VehiclePatternField pattern={vehicle?.pattern ?? 'none'} />
       <label className="flex items-start gap-2 text-sm text-vtk-ink sm:col-span-2">
         <input

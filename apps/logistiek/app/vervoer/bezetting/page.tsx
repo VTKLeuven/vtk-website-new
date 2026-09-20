@@ -429,6 +429,7 @@ export default async function VervoerBezettingPage({
               id: vehicle.id,
               name: en ? vehicle.nameEn : vehicle.nameNl,
               code: vehicle.code,
+              icon: vehicle.icon,
               pattern: vehicle.pattern,
               needsDriver: vehicle.needsDriver,
             }))}

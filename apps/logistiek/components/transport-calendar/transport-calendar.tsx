@@ -16,7 +16,7 @@ import { TripFieldPicker } from './field-picker';
 import { MobileCalendar } from './mobile-calendar';
 import { MonthGrid } from './month-grid';
 import { TimeGrid, timeGridColumns } from './time-grid';
-import { vehicleIcon } from './trip-block';
+import { vehicleIconName } from '@/lib/vehicle-icon';
 import {
   DEFAULT_TRIP_FIELDS,
   TRIP_FIELDS_STORAGE_KEY,
@@ -663,7 +663,7 @@ export function TransportCalendar({
                   )}`}
                 />
               ) : null}
-              <LogisticsIcon name={vehicleIcon(vehicle.code)} className="h-3.5 w-3.5 shrink-0" />
+              <LogisticsIcon name={vehicleIconName(vehicle)} className="h-3.5 w-3.5 shrink-0" />
               {vehicle.name}
             </li>
           ))}

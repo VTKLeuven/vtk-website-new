@@ -1,0 +1,11 @@
+-- Een icoon per voertuig in de transportplanning (F4.21).
+--
+-- Bestaande voertuigen krijgen `NULL` en dat is hier de juiste waarde: `NULL`
+-- betekent "automatisch", en automatisch is precies wat er vandaag al getekend
+-- wordt (`vehicleIconName` in apps/logistiek/lib/vehicle-icon.ts leidt het
+-- icoon af uit `code`). De kar blijft dus een bestelwagen, de auto een auto en
+-- de bakfiets een bakfiets, tot iemand op /beheer/instellingen iets anders
+-- kiest. Geen backfill: een waarde wegschrijven die toevallig gelijk is aan de
+-- afleiding, maakt van "nog niet gekozen" en "bewust gekozen" hetzelfde, en dan
+-- volgt een hernoemd voertuig zijn naam niet meer.
+ALTER TABLE "UitleenVehicle" ADD COLUMN "icon" TEXT;

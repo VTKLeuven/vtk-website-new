@@ -13,6 +13,7 @@ import {
 import { logistiekBaseUrl } from '@/lib/payments';
 import { writeAudit } from '@/lib/audit';
 import { isDriverColorIndex, isVehiclePattern } from '@/lib/driver-colors';
+import { isVehicleIcon } from '@/lib/vehicle-icon';
 import { normaliseBelgianPhone } from '@/lib/vcard';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 import {
@@ -3398,6 +3399,7 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
     : 'FREE';
   const rateCents = parseEuroToCents(formData.get('rate'));
   const patternRaw = String(formData.get('pattern') ?? '').trim();
+  const iconRaw = String(formData.get('icon') ?? '').trim();
   if (!nameNl) return saveError('NAME_REQUIRED');
   if (rateCents === null) return saveError('AMOUNT_INVALID');
 
@@ -3413,6 +3415,9 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
     // databank is dat dezelfde toestand, en twee schrijfwijzen voor hetzelfde
     // lopen vroeg of laat uiteen in een query.
     pattern: isVehiclePattern(patternRaw) && patternRaw !== 'none' ? patternRaw : null,
+    // Leeg is hier "automatisch", en dat bewaren we als null: het icoon volgt dan
+    // de naam van het voertuig, zoals het deed voor deze keuze bestond.
+    icon: isVehicleIcon(iconRaw) ? iconRaw : null,
   };
   if (id) {
     await prisma.uitleenVehicle.update({ where: { id }, data });

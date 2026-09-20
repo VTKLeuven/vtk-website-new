@@ -8498,3 +8498,32 @@ momenten weg en maakt ze opnieuw aan, dus elke id verandert zodra iemand een
 komma in de beschrijving aanpast, en dat zou de interesse van iedereen wissen.
 Verzet een organisator het uur van een dag, dan laat de markering voor die dag
 los; dat is gewenst, want het is een ander moment geworden.
+
+## Het icoon van een voertuig: automatisch, tenzij
+
+In elk blok van de transportplanning staat een icoon naast de naam van het
+voertuig. Dat icoon werd afgeleid uit de code van het voertuig: iets met
+"fiets" wordt een bakfiets, iets met "auto" of "wagen" een auto, en al de rest
+een bestelwagen. Voor de kar, de auto en de bakfiets klopt dat, en niemand
+heeft er ooit iets voor moeten instellen.
+
+**De afleiding blijft de standaard, en `UitleenVehicle.icon` overschrijft ze.**
+`null` betekent dus "automatisch" en niet "geen icoon"; een voertuig zonder
+icoon bestaat niet, want in een blok van een kwartier is het icoon vaak het
+enige dat nog leesbaar is. Dat de keuze er nu is, komt omdat de afleiding
+raadt: het team voert zelf voertuigen in, en een gehuurd busje dat "Dockx" heet
+bevat geen van de woorden waar ze op let.
+
+**Bestaande voertuigen krijgen geen ingevulde waarde, ook niet de waarde die de
+afleiding toch al geeft.** Anders is "nog niet gekozen" niet meer van "bewust
+gekozen" te onderscheiden, en blijft een voertuig dat hernoemd wordt zijn oude
+icoon dragen zonder dat iemand weet waarom.
+
+**Enkel iconen die een voertuig voorstellen staan in de lijst.** De set telt er
+dertig, maar een keuzelijst waarin een krat of een fles naast een bestelwagen
+staat, vraagt niet welk voertuig dit is maar of je oplet.
+
+**Het icoon staat naast de arcering, niet in de plaats ervan.** De arcering
+(zie de kleurenkeuzes van de planning) herken je over een hele week heen, het
+icoon lees je van dichtbij in één blok. Ze zeggen hetzelfde en dat is de
+bedoeling: op afstand zie je het patroon, van dichtbij het tekeningetje.

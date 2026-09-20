@@ -1,6 +1,6 @@
 import type { ReactNode, SVGProps } from 'react';
 
-type IconName =
+export type IconName =
   | 'material'
   | 'van'
   | 'car'

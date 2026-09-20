@@ -4058,6 +4058,20 @@ model UitleenVehicle {
   /// toestand is van elk voertuig tot iemand er een kiest.
   pattern String?
 
+  /// Het icoon van dit voertuig in de transportplanning, als naam uit de
+  /// `LogisticsIcon`-set (`van`, `car`, `cargobike`). `null` = automatisch, en
+  /// dat leidt het icoon af uit `code` zoals het altijd al deed: de kar wordt
+  /// een bestelwagen, de auto een auto, de bakfiets een bakfiets.
+  ///
+  /// Instelbaar omdat die afleiding raadt. Ze leest mee in de naam die het team
+  /// zelf intikt, en een gehuurd busje dat "Dockx" heet, bevat geen van die
+  /// woorden en zou als bestelwagen getekend worden zonder dat er iets aan te
+  /// doen valt.
+  ///
+  /// Een vrije string en geen enum, om dezelfde reden als bij `pattern`: er een
+  /// icoon bij zetten is een SVG erbij en hoort geen migratie te vragen.
+  icon String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 

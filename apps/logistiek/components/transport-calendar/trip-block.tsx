@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { driverColorVar, vehiclePatternClass, type DriverColorOverrides } from '@/lib/driver-colors';
 import { LogisticsIcon } from '@/components/logistics-icon';
+import { vehicleIconName } from '@/lib/vehicle-icon';
 import { DEFAULT_TRIP_FIELDS, type CalendarVehicle, type TripBlock, type TripFields } from './types';
 
 /**
@@ -31,17 +32,6 @@ const timeFormatter = new Intl.DateTimeFormat('nl-BE', {
 
 export function formatTime(moment: Date): string {
   return timeFormatter.format(moment);
-}
-
-/**
- * Het icoon bij een voertuig, op zijn code. Niet op een exacte gelijkheid, want
- * het team voert zelf voertuigen in: een tweede bestelwagen heet geen `kar`.
- */
-export function vehicleIcon(code: string): 'van' | 'car' | 'cargobike' {
-  const normalized = code.toLowerCase();
-  if (normalized.includes('fiets')) return 'cargobike';
-  if (normalized.includes('auto') || normalized.includes('wagen')) return 'car';
-  return 'van';
 }
 
 export type BlockLook = {
@@ -169,7 +159,7 @@ export function BlockContent({
       ) : null}
       {fields.vehicle && vehicle ? (
         <span className="flex items-center gap-1">
-          <LogisticsIcon name={vehicleIcon(vehicle.code)} className="h-3 w-3 shrink-0" />
+          <LogisticsIcon name={vehicleIconName(vehicle)} className="h-3 w-3 shrink-0" />
           <span className="truncate">{vehicle.name}</span>
         </span>
       ) : null}

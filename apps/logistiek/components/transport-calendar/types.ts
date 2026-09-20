@@ -137,6 +137,11 @@ export type CalendarVehicle = {
   name: string;
   /** `kar`, `auto`, `bakfiets`, ...: bepaalt welk icoon in het blok staat. */
   code: string;
+  /**
+   * Het ingestelde icoon (F4.21), of niets. Weggelaten of `null` = automatisch,
+   * en dan leidt `vehicleIconName` het af uit `code`.
+   */
+  icon?: string | null;
   /** Arcering van dit voertuig (K1); null of `none` = geen. */
   pattern?: string | null;
   /**

@@ -48,7 +48,7 @@ zelf doet staat in `docs/logistiek-ingebruikname.md`.
 | `UitleenRequestTemplate` / `...Line` | Vaste set materiaal die het aanvraagformulier invult (M17). Beheerd door Logistiek; aanmaken gebeurt vanaf een bestaande aanvraag. |
 | `UitleenItemUnit` | Eén fysiek exemplaar met een eigen staat, optioneel per item. Bestaan er exemplaren, dan is `item.quantity` de telling van de bruikbare (actief en niet KAPOT), bijgehouden door `syncItemQuantityFromUnits`. |
 | `UitleenReservation` + `UitleenReservationLine` | Aanvraag met event-context + `requesterType` (+ `groupId`/`requesterName`), dagbereik, snapshots. Statusmachine `REQUESTED -> APPROVED/REJECTED/CANCELLED -> PICKED_UP -> RETURNED`. Per lijn: `note` (M15) en `preparedAt`/`preparedById` (klaarzetten, A7). `pickupPart`/`returnPart` zijn een afspraak tussen mensen: de voorraad rekent op hele dagen. |
-| `UitleenVehicle` | Voertuig (kar/auto/bakfiets); `pricingMode` (FREE/PER_HOUR/PER_KM/FLAT) + `rateCents`, team-configureerbaar. `pattern` = de arcering in de transportplanning. |
+| `UitleenVehicle` | Voertuig (kar/auto/bakfiets); `pricingMode` (FREE/PER_HOUR/PER_KM/FLAT) + `rateCents`, team-configureerbaar. `pattern` = de arcering in de transportplanning, `icon` = het icoon in een ritblok (`null` = automatisch, uit de code). |
 | `UitleenTransportBooking` | Rit met voertuig, tijdvenster, chauffeur, tarief-snapshot, `kilometers`/`priceCents` (nullable). `cargoNote` = wat er mee moet (ronde 3). |
 | `UitleenTransportHelper` | Bijrijder op een rit: naam + optioneel nummer, `addedById`. Vervangt `helpersNote`/`helpersPhone`, die voor bestaande ritten blijven staan. Ook achteraf te wijzigen door de aanvrager, een collega van dezelfde post, of het team. |
 | `UitleenTransportNote` | Eigen nota bij een rit (F4.20), met auteur en `visibility` (`PRIVE` / `POST` / `POST_EN_LOGISTIEK`). Naast `memberNote` en `adminNote`, die bij de rit zelf horen en er één keer op staan; hier kunnen er meer zijn, elk van iemand anders. `PRIVE` is letterlijk privé, ook voor Logistiek: de queries halen andermans privénota niet eens op. Enkel de auteur wijzigt of wist ze. |
@@ -252,7 +252,8 @@ de same-origin `publicUrl`.
   op een telefoon geeft volledig scherm een eigen dagweergave
   (`mobile-calendar`) in plaats van de week in het klein; de
   berekeningen zijn puur en getest (`lib/week-lanes.ts`, `lib/month-lanes.ts`,
-  `lib/calendar-range.ts`, `lib/transport-filters.ts`, `lib/driver-colors.ts`).
+  `lib/calendar-range.ts`, `lib/transport-filters.ts`, `lib/driver-colors.ts`,
+  `lib/vehicle-icon.ts`).
   Het tijdrooster is gedeeld met het publieke `/vervoer/bezetting`. De zoom is
   een factor op "de hele dag past in beeld" en geen pixelmaat
   (`components/transport-calendar/types.ts`, getest in `test/calendar-zoom.test.ts`);

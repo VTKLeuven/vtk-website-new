@@ -361,6 +361,7 @@ export default async function VervoerWeekPage({
           id: vehicle.id,
           name: vehicle.nameNl,
           code: vehicle.code,
+          icon: vehicle.icon,
           pattern: vehicle.pattern,
           needsDriver: vehicle.needsDriver,
         }))}
