@@ -32,6 +32,15 @@ enum GroupType {
   WERKGROEP
 }
 
+// Hoe de verantwoordelijke (membership.role == LEAD) van een werkgroep heet.
+// Bij VTK is dat de G3 of de G4 van die werkgroep, en welke van de twee het is,
+// verschilt per werkgroep. Enkel zinvol voor type = WERKGROEP; een
+// praesidiumpost houdt het bij "Verantwoordelijke".
+enum GroupLeadLabel {
+  G3
+  G4
+}
+
 // Hoe een post (Group) een rol toekent aan haar leden.
 // DEFAULT: elk lid van de post krijgt de rol. LEADER: enkel de
 // verantwoordelijke (membership.role == LEAD) krijgt de rol, bovenop de
@@ -806,26 +815,29 @@ model User {
 }
 
 model Group {
-  id                String    @id @default(cuid())
+  id                String         @id @default(cuid())
   // Vrije, GUI-beheerde code (was een `GroupCode`-enum). Uniek, en de waarde die
   // shiften opslaan in `Shift.post` en de sessie meegeeft als `groups[].code`.
-  code              String    @unique
-  slug              String    @unique
+  code              String         @unique
+  slug              String         @unique
   nameNl            String
   nameEn            String
   descriptionNl     String?
   descriptionEn     String?
-  orderInPraesidium Int       @default(0)
+  orderInPraesidium Int            @default(0)
   photoKey          String?
   // Praesidiumpost of werkgroep. Een werkgroep gebruikt dezelfde leden/rollen
   // maar staat niet op /praesidium; ze krijgt /werkgroepen met haar eigen
   // infotekst (description*, door de leden zelf bewerkbaar) en optionele website.
-  type              GroupType @default(PRAESIDIUM)
+  type              GroupType      @default(PRAESIDIUM)
+  // Hoe de verantwoordelijke van deze werkgroep heet op /werkgroepen en in het
+  // ledenbeheer: G3 of G4. Wordt genegeerd voor praesidiumposten.
+  leadLabel         GroupLeadLabel @default(G3)
   website           String?
   // Een gedeactiveerde post verdwijnt uit de nieuwe-shift-keuzes en het
   // postenbeheer voor nieuwe jaren, maar de historiek (memberships per jaar)
   // blijft bewaard i.p.v. de post te verwijderen.
-  active            Boolean   @default(true)
+  active            Boolean        @default(true)
 
   memberships       GroupMembership[]
   /// Contentpagina's die deze post als werking tonen (agenda, ploeg, website).

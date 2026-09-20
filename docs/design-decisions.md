@@ -1248,6 +1248,16 @@ terug (`apps/web/lib/brevo/unsubscribe.ts`).
   "Posten" en de shift-postkeuzes filteren op `type = PRAESIDIUM`; werkgroepen
   krijgen hun eigen publieke `/werkgroepen` (zelfde ledenraster + werkingsjaar-
   tabjes als praesidium) en een eigen admin-tab "Werkgroepen".
+- **De verantwoordelijke heet G3 of G4, en dat kiest de werkgroep zelf.** Een
+  werkgroep wordt niet getrokken door een "verantwoordelijke" maar door haar G3
+  of haar G4, en welke van de twee dat is, verschilt per werkgroep. Daarom is het
+  een keuze per werkgroep (`Group.leadLabel`, `G3` | `G4`, default `G3`) en geen
+  vaste tekst: ze staat in de werkgroepinstellingen op `/admin/werkgroepen` en
+  vervangt het woord "Verantwoordelijke" overal waar die lead benoemd wordt (de
+  ledenlijst en het pilletje in het ledenbeheer, de rolkeuze bij lid toevoegen,
+  de kolom "Enkel G3/G4" bij de rol-grants, en de ploeg op de publieke
+  `/werkgroepen`). Een **praesidiumpost** houdt wél "Verantwoordelijke": het veld
+  hangt aan `Group`, maar enkel werkgroepen tonen het.
 - **Eigen infotekst + website.** De werkgroep-`description*` is de blurb op
   `/werkgroepen`; `Group.website` is een optionele link (mag zonder schema
   ingevuld worden, wordt genormaliseerd naar `https://`). Beide staan los van de

@@ -567,6 +567,7 @@ const GROUP_FIELD_LABELS: Record<string, string> = {
   nameEn: "Engelse naam",
   descriptionNl: "beschrijving",
   descriptionEn: "Engelse beschrijving",
+  leadLabel: "titel van de verantwoordelijke",
   active: "actief",
 };
 
@@ -731,6 +732,9 @@ const werkgroepSchema = z.object({
   code: z.string().trim().optional(),
   nameNl: z.string().trim().min(1),
   nameEn: z.string().trim().min(1),
+  // Hoe de verantwoordelijke van deze werkgroep heet: de G3 of de G4. Dat
+  // verschilt per werkgroep, dus het is een keuze en geen vaste tekst.
+  leadLabel: z.enum(["G3", "G4"]).default("G3"),
   active: z.coerce.boolean().default(true),
 });
 
@@ -749,6 +753,7 @@ export async function saveWerkgroepAction(
     code: (formData.get("code") as string) || undefined,
     nameNl: formData.get("nameNl"),
     nameEn: formData.get("nameEn"),
+    leadLabel: (formData.get("leadLabel") as string) || undefined,
     active: formData.get("active") === "on",
   });
   if (!result.success) return saveError("INVALID_INPUT");
@@ -757,6 +762,7 @@ export async function saveWerkgroepAction(
   const data = {
     nameNl: parsed.nameNl,
     nameEn: parsed.nameEn,
+    leadLabel: parsed.leadLabel,
     active: parsed.active,
   };
 

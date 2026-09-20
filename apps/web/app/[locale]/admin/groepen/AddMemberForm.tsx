@@ -10,15 +10,20 @@ type SearchUser = { id: string; name: string; email: string; rNumber: string | n
  * Compacte "lid toevoegen"-balk voor een post in een bepaald werkingsjaar.
  * Zoekt actieve gebruikers server-side (naam/e-mail/r-nummer) en post het
  * gekozen lid via {@link addMembershipAction}.
+ *
+ * `leadLabel` overschrijft hoe de LEAD-rol heet: een werkgroep noemt die haar
+ * G3 of G4, een praesidiumpost houdt het bij "Verantwoordelijke".
  */
 export function AddMemberForm({
   groupId,
   year,
   locale,
+  leadLabel,
 }: {
   groupId: string;
   year: number;
   locale: "nl" | "en";
+  leadLabel?: string;
 }) {
   const nl = locale === "nl";
   const [query, setQuery] = useState("");
@@ -119,7 +124,7 @@ export function AddMemberForm({
         </label>
         <Select name="role" defaultValue="MEMBER" className="w-32">
           <option value="MEMBER">{nl ? "Lid" : "Member"}</option>
-          <option value="LEAD">{nl ? "Verantwoordelijke" : "Lead"}</option>
+          <option value="LEAD">{leadLabel ?? (nl ? "Verantwoordelijke" : "Lead")}</option>
         </Select>
       </div>
 
