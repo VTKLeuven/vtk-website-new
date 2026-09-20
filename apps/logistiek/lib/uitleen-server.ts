@@ -580,6 +580,19 @@ export async function adminVehicles() {
   return prisma.uitleenVehicle.findMany({ orderBy: [{ active: 'desc' }, { sortIndex: 'asc' }] });
 }
 
+/**
+ * Alle voertuigen in hun eigen volgorde, actief of niet.
+ *
+ * Voor een kalender, die ook een rit moet kunnen tekenen op een voertuig dat
+ * intussen op non-actief staat; `vehiclesToDraw` snoeit de lijst daarna terug
+ * tot de actieve plus wie in dit venster effectief gereden heeft. Niet
+ * `adminVehicles`, want die zet de gedeactiveerde achteraan en de legende hoort
+ * de eigen volgorde van het team te houden.
+ */
+export async function calendarVehicles() {
+  return prisma.uitleenVehicle.findMany({ orderBy: { sortIndex: 'asc' } });
+}
+
 const LOGISTIEK_SETTINGS_KEY = 'logistiek.settings';
 
 export type LogistiekSettings = {

@@ -17,6 +17,7 @@ import {
   toDatetimeLocalValue,
   todayDateOnly,
   transportDeleteDescription,
+  vehiclesToDraw,
 } from '@/lib/uitleen';
 import {
   calendarRange,
@@ -26,7 +27,7 @@ import {
   type CalendarView,
 } from '@/lib/calendar-range';
 import {
-  activeVehicles,
+  calendarVehicles,
   driverColorOverrides,
   activeGroups,
   availabilityInRange,
@@ -116,7 +117,7 @@ export default async function VervoerWeekPage({
 
   const [
     bookings,
-    vehicles,
+    allVehicles,
     drivers,
     driverColors,
     groups,
@@ -126,7 +127,7 @@ export default async function VervoerWeekPage({
     settings,
   ] = await Promise.all([
     transportRange(from, to, filters),
-    activeVehicles(),
+    calendarVehicles(),
     driverOptions(),
     driverColorOverrides(),
     // Voor wie het team zelf een rit inplant. Alle posten en werkgroepen, niet
@@ -213,6 +214,11 @@ export default async function VervoerWeekPage({
     `${booking.eventName?.trim() || booking.purpose} (${timeFormatter.format(booking.startAt)}-${timeFormatter.format(booking.endAt)})`;
   const bookingById = new Map(bookings.map((booking) => [booking.id, booking]));
 
+  // De actieve voertuigen, plus wie in dit venster gereden heeft: een gehuurd
+  // busje dat na het gala op non-actief gaat, houdt zo zijn naam, zijn icoon en
+  // zijn arcering in de week waarin het reed (F4.22). Kiezen doe je verderop nog
+  // altijd uit de actieve.
+  const vehicles = vehiclesToDraw(allVehicles, bookings);
   const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
 
   const trips: PlannerTrip[] = bookings.map((booking) => {

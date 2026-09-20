@@ -1199,3 +1199,26 @@ export function formatContentAmount(
   if (!value) return suffix;
   return suffix ? `${value} ${suffix}` : value;
 }
+
+/**
+ * De voertuigen die een planning moet kunnen tekenen (F4.22).
+ *
+ * Niet enkel de actieve, en dat is het hele punt. Een gehuurd busje gaat na het
+ * gala terug naar Dockx en wordt dan op non-actief gezet, en tot nu verdween het
+ * daarmee ook uit elke week waarin het gereden had: het blok verloor zijn naam,
+ * zijn icoon en zijn arcering, en `needsDriver` viel terug op "wel", waardoor een
+ * gedeactiveerde bakfiets achteraf alsnog in het rood "geen chauffeur" kreeg. De
+ * prijs van zo'n rit klopte wel, want `rateCents` is een snapshot; wat eronder
+ * stond, klopte niet meer.
+ *
+ * Wat er niet gebeurt, is dat een gedeactiveerd voertuig overal blijft staan:
+ * het komt enkel mee in een venster waarin het effectief een rit heeft. Wie er
+ * eentje kiest, kiest nog altijd uit de actieve; die lijst staat hier los van.
+ */
+export function vehiclesToDraw<Vehicle extends { id: string; active: boolean }>(
+  vehicles: Vehicle[],
+  bookings: Array<{ vehicleId: string }>
+): Vehicle[] {
+  const used = new Set(bookings.map((booking) => booking.vehicleId));
+  return vehicles.filter((vehicle) => vehicle.active || used.has(vehicle.id));
+}

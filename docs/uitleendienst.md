@@ -254,6 +254,10 @@ de same-origin `publicUrl`.
   berekeningen zijn puur en getest (`lib/week-lanes.ts`, `lib/month-lanes.ts`,
   `lib/calendar-range.ts`, `lib/transport-filters.ts`, `lib/driver-colors.ts`,
   `lib/vehicle-icon.ts`).
+  **De kalender tekent de actieve voertuigen plus wie in dit venster gereden
+  heeft** (`vehiclesToDraw`): een gehuurd busje dat achteraf op non-actief
+  gaat, houdt zo zijn naam, icoon en arcering in de week waarin het reed.
+  Kiezen gebeurt wel enkel uit de actieve (`activeVehicles`).
   Het tijdrooster is gedeeld met het publieke `/vervoer/bezetting`. De zoom is
   een factor op "de hele dag past in beeld" en geen pixelmaat
   (`components/transport-calendar/types.ts`, getest in `test/calendar-zoom.test.ts`);

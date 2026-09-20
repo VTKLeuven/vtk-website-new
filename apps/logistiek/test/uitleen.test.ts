@@ -36,6 +36,7 @@ import {
   tripHoursLabel,
   tripWindowFor,
   vanStatusLabel,
+  vehiclesToDraw,
 } from '@/lib/uitleen';
 
 describe('formatEuro', () => {
@@ -753,5 +754,29 @@ describe('requesterChoiceOf en requesterFromChoice', () => {
         name: ride.requesterName,
       });
     }
+  });
+});
+
+describe('vehiclesToDraw', () => {
+  const kar = { id: 'kar', active: true };
+  const dockx = { id: 'dockx', active: false };
+  const oud = { id: 'oud', active: false };
+
+  it('houdt de actieve voertuigen, in hun eigen volgorde', () => {
+    expect(vehiclesToDraw([kar, dockx], [])).toEqual([kar]);
+  });
+
+  it('haalt een gedeactiveerd voertuig terug wanneer er deze week op gereden is', () => {
+    // F4.22: het gehuurde busje is terug naar Dockx, maar de rit van het gala
+    // staat er nog en hoort zijn naam, icoon en arcering te houden.
+    expect(vehiclesToDraw([kar, dockx], [{ vehicleId: 'dockx' }])).toEqual([kar, dockx]);
+  });
+
+  it('laat de andere gedeactiveerde voertuigen weg', () => {
+    expect(vehiclesToDraw([kar, dockx, oud], [{ vehicleId: 'dockx' }])).toEqual([kar, dockx]);
+  });
+
+  it('kan tegen een rit op een voertuig dat niet meer bestaat', () => {
+    expect(vehiclesToDraw([kar], [{ vehicleId: 'weg' }])).toEqual([kar]);
   });
 });

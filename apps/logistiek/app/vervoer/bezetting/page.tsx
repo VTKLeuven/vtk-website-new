@@ -17,10 +17,11 @@ import {
   startOfWeek,
   toDateInputValue,
   tripHoursLabel,
+  vehiclesToDraw,
 } from '@/lib/uitleen';
 import {
   activeGroups,
-  activeVehicles,
+  calendarVehicles,
   driverColorOverrides,
   driverOptions,
   driverPhones,
@@ -118,7 +119,7 @@ export default async function VervoerBezettingPage({
     postBookings,
     memberBookings,
     publicBookings,
-    vehicles,
+    allVehicles,
     driverColors,
     drivers,
     groups,
@@ -131,7 +132,7 @@ export default async function VervoerBezettingPage({
       ? transportWeekForMembers(monday, nextMonday, filters)
       : Promise.resolve(null),
     session ? Promise.resolve(null) : transportWeekPublic(monday, nextMonday, filters),
-    activeVehicles(),
+    calendarVehicles(),
     // Enkel zinvol voor wie de chauffeurs ook te zien krijgt; zonder login staat
     // er geen naam en dus ook geen kleur per persoon.
     session ? driverColorOverrides() : Promise.resolve({}),
@@ -154,6 +155,12 @@ export default async function VervoerBezettingPage({
   const nextHref = weekHref(nextMonday);
   const thisWeekHref = filterQuery ? `/vervoer/bezetting?${filterQuery}` : '/vervoer/bezetting';
 
+  // Precies één van de vier lijsten is gevuld; welke, hangt af van wie er kijkt.
+  const shownBookings = teamBookings ?? postBookings ?? memberBookings ?? publicBookings ?? [];
+  // De actieve voertuigen, plus wie deze week gereden heeft: een gehuurd busje
+  // dat achteraf op non-actief gaat, houdt zo zijn naam en zijn arcering in de
+  // week waarin het reed (F4.22).
+  const vehicles = vehiclesToDraw(allVehicles, shownBookings);
   const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
 
   /**

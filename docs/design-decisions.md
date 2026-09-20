@@ -8527,3 +8527,29 @@ staat, vraagt niet welk voertuig dit is maar of je oplet.
 (zie de kleurenkeuzes van de planning) herken je over een hele week heen, het
 icoon lees je van dichtbij in één blok. Ze zeggen hetzelfde en dat is de
 bedoeling: op afstand zie je het patroon, van dichtbij het tekeningetje.
+
+## Een gehuurd voertuig blijft bestaan in de weken waarin het reed
+
+VTK huurt soms een busje bij Dockx, voor een gala of een jobfair. Dat is geen
+uitzonderingsgeval in de app: je voegt het toe bij Voertuigen & tarieven, zet
+het tarief en de vlag "vraagt een chauffeur die de kar mag rijden", plant ermee,
+en zet het daarna op non-actief.
+
+**Op non-actief zetten haalt het uit elke keuzelijst, maar niet uit het
+verleden.** Wie een rit aanvraagt of inplant, kiest uit de actieve voertuigen;
+de planning tekent daarnaast elk voertuig waar in het getoonde venster een rit
+op staat. Zonder dat tweede verloor een gereden rit zijn voertuignaam, zijn
+icoon en zijn arcering op het moment dat het busje terugging, en een
+gedeactiveerde bakfiets kreeg achteraf "geen chauffeur" in het rood terwijl daar
+nooit een chauffeur bij hoorde. De prijs klopte wel, want die is een snapshot;
+alles eronder niet meer.
+
+**Een week waarin het busje niet reed, noemt het niet.** De legende onder de
+kalender zou anders volstaan met voertuigen van vorig jaar.
+
+**Er is geen "beschikbaar van/tot" per voertuig.** Dat is overwogen omdat
+deactiveren iets is waar iemand aan moet denken. Het is niet gebouwd: een datum
+die vooruit beslist wanneer een gehuurd busje terug moet, is een tweede waarheid
+naast de huurovereenkomst, en een verhuur die uitloopt zou het voertuig midden
+in een weekend uit het aanvraagformulier halen. Eén klik met een dialoog die
+zegt wat er gebeurt, weegt daar niet tegen op.
