@@ -107,6 +107,20 @@ const BIJRIJDER_KOLOMMEN: Record<string, Beslissing> = {
   addedById: 'nullable',
 };
 
+/**
+ * Elk model dat bij een rit hoort, met zijn kolommenlijst.
+ *
+ * Dit bestaat om het gat te dichten dat de twee lijsten hierboven openlieten:
+ * ze vangen een nieuwe **kolom**, maar een compleet nieuwe **tabel** naast de
+ * rit zag niemand. En dat is precies de soort waarvan bestaande ritten nul
+ * rijen krijgen, dus de soort waarvoor de vraag "wat betekent dit voor een rit
+ * van vorig jaar?" het hardst nodig is.
+ */
+const RIT_MODELLEN: Record<string, { kolommen: Record<string, Beslissing>; doc: string }> = {
+  UitleenTransportBooking: { kolommen: RIT_KOLOMMEN, doc: 'RIT_KOLOMMEN' },
+  UitleenTransportHelper: { kolommen: BIJRIJDER_KOLOMMEN, doc: 'BIJRIJDER_KOLOMMEN' },
+};
+
 type Kolom = { name: string; isRequired: boolean; hasDefault: boolean; isUpdatedAt: boolean };
 
 function kolommenVan(model: string): Kolom[] {
@@ -150,12 +164,33 @@ function controleer(model: string, verwacht: Record<string, Beslissing>, doc: st
 }
 
 describe('de kolommen van een rit dragen een beslissing', () => {
-  it('kent elke kolom van UitleenTransportBooking', () => {
-    controleer('UitleenTransportBooking', RIT_KOLOMMEN, 'RIT_KOLOMMEN');
+  /**
+   * Een nieuwe tabel naast de rit is net zo goed een nieuwe feature op een rit:
+   * bestaande ritten krijgen er nul rijen in, en of dat klopt, is een vraag en
+   * geen vanzelfsprekendheid. `UitleenTransportHelper` was precies dat geval,
+   * en daar moesten `helpersNote`/`helpersPhone` voor bestaande ritten blijven
+   * staan.
+   */
+  it('kent elk model dat bij een rit hoort', () => {
+    const inSchema = Prisma.dmmf.datamodel.models
+      .map((model) => model.name)
+      .filter((name) => name.startsWith('UitleenTransport'));
+
+    const onbekend = inSchema.filter((name) => !(name in RIT_MODELLEN));
+    expect(
+      onbekend,
+      `Nieuw model naast de rit: ${onbekend.join(', ')}.\n` +
+        `Bestaande ritten krijgen hier nul rijen in. Lees "Een veld toevoegen aan ` +
+        `een rit" in docs/uitleendienst.md, vraag na wat dat voor een rit van ` +
+        `vorig jaar hoort te betekenen, en zet het model in RIT_MODELLEN.`
+    ).toEqual([]);
+
+    const verdwenen = Object.keys(RIT_MODELLEN).filter((name) => !inSchema.includes(name));
+    expect(verdwenen, `RIT_MODELLEN noemt modellen die niet meer bestaan.`).toEqual([]);
   });
 
-  it('kent elke kolom van UitleenTransportHelper', () => {
-    controleer('UitleenTransportHelper', BIJRIJDER_KOLOMMEN, 'BIJRIJDER_KOLOMMEN');
+  it.each(Object.entries(RIT_MODELLEN))('kent elke kolom van %s', (model, { kolommen, doc }) => {
+    controleer(model, kolommen, doc);
   });
 
   /**
@@ -163,10 +198,7 @@ describe('de kolommen van een rit dragen een beslissing', () => {
    * dan is de beslissing "nullable" onwaar geworden zonder dat er een kolom
    * bijkwam, en dat is precies een wijziging die bestaande ritten wél raakt.
    */
-  it.each([
-    ['UitleenTransportBooking', RIT_KOLOMMEN],
-    ['UitleenTransportHelper', BIJRIJDER_KOLOMMEN],
-  ] as const)('%s: de beslissing klopt met het schema', (model, verwacht) => {
+  it.each(Object.entries(RIT_MODELLEN))('%s: de beslissing klopt met het schema', (model, { kolommen: verwacht }) => {
     for (const kolom of kolommenVan(model)) {
       const beslissing = verwacht[kolom.name];
       if (!beslissing) continue; // de test hierboven meldt dit al gerichter.

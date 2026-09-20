@@ -175,12 +175,25 @@ of uitgeschakeld aangemaakt.
 toevoegt aan `UitleenTransportBooking`. De kringkeuzes staan in
 `docs/design-decisions.md`.
 
-- **Een bestaande rit verandert nooit mee met een nieuwe feature.** Beslis bij
-  elke nieuwe kolom wat ze betekent voor een rit van vorig jaar, en schrijf dat
-  in de comment van de migratie. Is de default voor oude rijen fout, dan hoort
-  er een `UPDATE` in diezelfde migratie (zoals `plannedByTeam` doet vanuit de
-  auditlog). Kan de oude waarde niet geweten zijn, dan blijft de kolom nullable
-  en moet het scherm "niet ingevuld" aankunnen (zoals `assignedGroupId`).
+- **Vraag het aan de gebruiker voor je de migratie schrijft.** Voeg je een veld
+  toe aan een rit, stel dan expliciet de vraag: *wat moet hier staan bij ritten
+  die er al zijn?* Kies die waarde nooit zelf, ook niet wanneer "leeg" voor de
+  hand lijkt te liggen. Geef bij de vraag mee wat er zonder beslissing gebeurt
+  (leeg, de default, geen rijen) en wat dat op het scherm betekent, want dat is
+  precies wat de gebruiker nodig heeft om te antwoorden. Pas daarna schema,
+  migratie en backfill.
+- **Een bestaande rit verandert nooit mee met een nieuwe feature.** Schrijf het
+  antwoord op die vraag in de comment van de migratie. Is de default voor oude
+  rijen fout, dan hoort er een `UPDATE` in diezelfde migratie (zoals
+  `plannedByTeam` doet vanuit de auditlog). Kan de oude waarde niet geweten
+  zijn, dan blijft de kolom nullable en moet het scherm "niet ingevuld"
+  aankunnen (zoals `assignedGroupId`).
+- **Wat werkt er direct, en wat niet.** Nullable kolom: ja, oude ritten krijgen
+  `NULL`, mits het scherm leeg aankan. `NOT NULL` met een default: ze krijgen de
+  default, en die is voor hen meestal onwaar, dus backfill. `NOT NULL` zonder
+  default: de migratie faalt op een niet-lege tabel. Nieuwe tabel: nul rijen, en
+  de oude velden blijven staan. Afgeleide waarde: enkel met een backfill. De
+  zes gevallen staan uitgeschreven in `docs/uitleendienst.md`.
 - **`apps/logistiek/test/rit-kolommen.test.ts` faalt zodra er een kolom
   bijkomt** die niet in zijn lijst staat, net zoals de typecheck faalt bij een
   permissie zonder MCP-policy. Zet de kolom erbij mét de beslissing; zet de test

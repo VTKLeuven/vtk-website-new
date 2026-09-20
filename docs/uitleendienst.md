@@ -100,20 +100,37 @@ staan, hangt af van wat je toevoegt. De regel erachter is er maar één.
 
 ### Hoe dit afgedwongen wordt
 
-Beantwoord in de comment van elke migratie op `UitleenTransportBooking` de vraag
-"wat betekent dit voor een rit van vorig jaar?". Is het eerlijke antwoord "de
-default is voor hen fout", dan hoort er een `UPDATE` bij. Is het "dat kunnen we
-niet weten", dan blijft de kolom nullable.
+**Vraag het na voor je de migratie schrijft.** "Wat moet hier staan bij ritten
+die er al zijn?" is geen technische detailvraag maar een keuze van de kring, en
+ze is achteraf duur: een default die voor bestaande ritten onwaar is, staat er
+zodra de migratie gedraaid heeft, en niemand ziet het aan het scherm. Kies die
+waarde dus niet zelf, ook niet wanneer "leeg" voor de hand lijkt te liggen.
+Schrijf het antwoord daarna in de comment van de migratie. Is het "de default is
+voor hen fout", dan hoort er een `UPDATE` bij; is het "dat kunnen we niet
+weten", dan blijft de kolom nullable.
 
-Dat is geen erewoord maar een klem:
+Dat is geen erewoord maar een klem. Zonder database, dus mee in
+`npm run verify` en dus vóór elke push:
 
 - `apps/logistiek/test/rit-kolommen.test.ts` leest de kolommen uit de
-  Prisma-DMMF en faalt zodra er één bijkomt die niet in zijn lijst staat, met
-  de beslissing erbij. Die test heeft geen database nodig en draait dus mee in
-  `npm run verify`, vóór elke push.
+  Prisma-DMMF en faalt zodra er één bijkomt die niet in zijn lijst staat, met de
+  beslissing erbij.
+- Datzelfde bestand faalt ook op een **nieuw model** naast de rit (alles wat
+  `UitleenTransport...` heet en niet in `RIT_MODELLEN` staat). Een nieuwe tabel
+  is net zo goed een nieuwe feature op een rit: bestaande ritten krijgen er nul
+  rijen in, en of dat klopt is een vraag. `UitleenTransportHelper` was precies
+  dat geval, en daar moesten `helpersNote`/`helpersPhone` blijven staan.
+- Het controleert ook de omgekeerde richting: een kolom die van nullable naar
+  `NOT NULL` gaat, is een wijziging die bestaande ritten wél raakt.
+
+Met een database, en dus pas in CI:
+
 - `apps/logistiek/test/integration/oude-rit.integration.ts` maakt een rit zoals
   die er vóór september 2026 uitzag (nieuwe kolommen `NULL`, geen bijrijders)
   en haalt ze door `tripsForDriver`, `tripsForGroups` en `buildTransportFeed`.
+
+Wat de klem **niet** doet: nakijken of je backfill er echt is. Ze dwingt de
+beslissing af, niet de uitvoering.
 
 ## Toegang & zichtbaarheid
 
