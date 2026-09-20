@@ -54,7 +54,7 @@ Alles wordt op **390px breed** nagekeken, niet alleen op desktop.
 | --- | --- | --- | --- |
 | 1 | De post ziet en regelt haar eigen ritten | F4.18, F4.19, F4.9, F4.8a, F4.8b, F4.12, F4.17 | ✅ af (`dce13cf7`) |
 | 2 | Leesbaarheid van de planning | F4.16, F4.1, F4.13, F4.15 | ✅ af (`5835b84f`) |
-| 3 | Breedte en gsm | F4.6, F4.7, F4.14 | ⬜ open |
+| 3 | Breedte en gsm | F4.6, F4.7, F4.14 | ✅ af (`e65da138`) |
 | 4 | Chauffeursnummers en werkgroepen | F4.3, F4.10 | 🟡 parser en script klaar |
 | 5 | Beschikbaarheid | F4.2, F4.5 | ⬜ open |
 | 6 | Ritten bewerken en noteren | F4.4, F4.20 | ⬜ open |
@@ -63,8 +63,9 @@ Alles wordt op **390px breed** nagekeken, niet alleen op desktop.
 | - | Bewust niet gedaan | F4.11 | ⛔ |
 
 Fase 1 eerst: daar zit het enige echte defect van deze ronde, en het draagt zeven
-van de drieëntwintig punten. **Fase 1 en 2 zijn af** (`dce13cf7`, `5835b84f`);
-fase 3 is de volgende.
+van de drieëntwintig punten. **Fase 1, 2 en 3 zijn af** (`dce13cf7`, `5835b84f`,
+`e65da138`); fase 4 is de volgende, en daarin wacht F4.3 nog op het juiste
+nummer van Sofie Bruggeman.
 
 ---
 
@@ -291,39 +292,72 @@ post ze aanvroeg **of** ze doorgegeven kreeg, net zoals de filter hierboven.
 
 # Fase 3: breedte en gsm
 
-### ⬜ F4.6. De app gebruikt de volle breedte
-**P1 · code · 📝**
+### ✅ F4.6. De app gebruikt de volle breedte
+**P1 · code · 📝** (`e65da138`)
 
 *"Die zijkanten mogen opgevuld worden, zodat ik niet hoef in te zoomen."*
 
-`--max: 1240px` uit `apps/logistiek/app/globals.css`; de bestaande
-`clamp(20px, 3vw, 36px)` blijft de zijmarge. Geldt voor de hele app (D1).
+**Gedaan.** `--max` is weg uit `apps/logistiek/app/globals.css`, en met hem de
+twee `max-width`-regels die eraan hingen. De zijmarge
+(`clamp(20px, 3vw, 36px)`) heet nu `.logistics-gutter` en staat op alles wat over
+de volle breedte loopt: de paginakop, de inhoud, het beheerblad, de voettekst en
+de donkere band op de startpagina. Die klasse was nodig, geen opsmuk: zolang er
+een kolom van 1240px was, lijnden die blokken vanzelf onder elkaar uit, en nu
+doet enkel die marge dat nog. De voettekst en de band op de startpagina hadden
+hun eigen `max-w-[1240px]` en sprongen dus in.
 
-**Nadien nakijken:** de beheertabellen met vaste `minmax()`-kolommen (die rekken
-nu mee en mogen niet uit elkaar vallen) en de leesbreedte van lange formulieren.
-📝 In `design-decisions.md` plus een uitzondering in `CLAUDE.md`, want daar staat
-1240px als regel voor alle VTK-oppervlakken.
+Het beheer had geen `--max` maar zijn eigen 1440/1720px met een knop om de
+zijbalk in te klappen; die grens is ook weg (D1 zegt de hele app). Inklappen wint
+nu enkel nog de breedte van de zijbalk, wat op de weekplanning dezelfde winst is.
 
-### ⬜ F4.7. "Vandaag" springt niet naar vandaag
-**P1 · code**
+**Nagekeken:** de beheertabellen met `minmax(0,1fr)`-kolommen rekken netjes mee.
+De formulieren niet: een invoerveld van negenhonderd pixels voor één zin is
+leegte, en een opslaanknop over de volle breedte ziet er niet uit als een knop.
+Die houden hun leesbreedte met `.logistics-form-width` (1100px, precies wat ze
+hiervoor hadden): instellingen, teksten, chauffeurs, sjablonen, het
+aanvraagformulier voor een rit en de detailkaart van een rit of een aanvraag. De
+catalogus van materiaal en flesserke blijft wél vol, want meer breedte is daar
+meer items per rij.
 
-In de dagweergave op gsm zet de knop wel de juiste week, maar niet de juiste dag.
-`mobile-calendar.tsx` zet `index` één keer bij het monteren:
+📝 Staat in `design-decisions.md` ("De uitleendienst gebruikt de volle
+vensterbreedte") met de uitzondering in `CLAUDE.md`, op de twee plekken die de
+breedte pinden: de Layout-regel en de regel over functionele modules.
 
-```ts
-const [index, setIndex] = useState(() => { … });
-```
+### ✅ F4.7. "Vandaag" springt niet naar vandaag
+**P1 · code** (`e65da138`)
 
-`onToday` wisselt de week in de ouder; `index` blijft staan. **Fix.** Spring
-lokaal naar vandaag wanneer die in het venster zit, en laat een effect `index`
-verzetten wanneer `days` verandert en vandaag erbij zit.
+In de dagweergave op gsm zette de knop wel de juiste week, maar niet de juiste
+dag: `onToday` navigeert naar deze week, en sta je daar al, dan verandert `days`
+niet en gebeurt er dus niets.
 
-### ⬜ F4.14. "Mijn ritten" is geen gsm-scherm
-**P1 · code**
+**Gedaan.** De knop springt nu zelf naar vandaag wanneer die in het venster zit,
+en een effect kiest de dag opnieuw zodra `days` verandert.
 
-De kaarten in `app/ritten/page.tsx` hebben enkel `sm:`-breekpunten; daaronder
-staat alles onder elkaar zonder ritme. Op 390px nakijken, samen met de bijrijders
-uit F4.8a die er nog bij komen.
+Onderweg bleek dezelfde oorzaak een tweede bug te dragen: vegen voorbij zondag
+bracht je op zondag van de week erna in plaats van op maandag, want `index` bleef
+staan terwijl het venster opschoof. Een veeg zet daarom nu de richting klaar, en
+die wint van vandaag: terugvegen naar deze week hoort op zondag uit te komen en
+niet op woensdag. Alle drie de gevallen nagekeken in de browser op 390px.
+
+### ✅ F4.14. "Mijn ritten" is geen gsm-scherm
+**P1 · code** (`e65da138`)
+
+**Nagekeken op 390px**, met de bijrijders van F4.8a erbij. De kaart stapelt
+correct, niets loopt buiten het scherm, en het blok bijrijders en de
+chauffeurskeuze passen. Twee dingen aangepast:
+
+- Het tijdvenster schreef de dag twee keer voluit ("di 22 september 2026 om 17:00
+  tot di 22 september 2026 om 22:00"), goed voor twee regels. `formatTripWindow`
+  in `lib/uitleen.ts` schrijft de dag één keer en zet de tweede dag er enkel bij
+  wanneer de rit over middernacht gaat, hetzelfde stramien als
+  `formatEventMoment`. Vier tests.
+- Het feitenraster had één `gap`, dus "Laadadres" stond even ver van "VTK-kelder"
+  als van "Bestemming": in één kolom bindt enkel die afstand een label nog aan
+  zijn waarde. De rij-afstand is nu groter dan de afstand binnen een rij.
+
+De koptekst van de site schuift op een telefoon horizontaal (zeven links in een
+scroller). Dat is zo gebouwd en niet van deze taak, maar het valt op 390px op;
+als het moet veranderen, is dat een eigen punt.
 
 ---
 
