@@ -7,6 +7,63 @@
  * niet stil wegvegen.
  */
 
+import { startOfBrusselsDay } from './week-lanes';
+
+const HOUR_MS = 60 * 60 * 1000;
+const DAY_MS = 24 * HOUR_MS;
+
+/**
+ * Vanaf welk uur een dag begint op het intekenscherm (F4.2).
+ *
+ * Zaterdagnacht 02:00 hoort bij zaterdag. Wie tot twee uur 's nachts rijdt,
+ * heeft dat niet op zondag gedaan, en toch stond het vakje daar: bovenaan de
+ * kolom ernaast, twintig rijen van zaterdagavond vandaan. Eén veeg van 22:00
+ * tot 02:00 bestond niet; het waren twee vensters op twee dagen, en wie het
+ * tweede vergat, stond in de planning als niet-beschikbaar op precies het uur
+ * waarop er gereden wordt.
+ *
+ * Vijf en niet vier of zes: het is het uur waarop hier zeker niemand meer
+ * onderweg is, en het laat de late uren bij de avond waar ze bij horen.
+ *
+ * **Dit verschuift enkel waar een dag een eenheid is**: het intekenraster en de
+ * actie die één dag herschrijft. De vensters zelf blijven gewone tijdstippen,
+ * dus de planning, de agendafeed en de beschikbaarheidsband hoeven hier niets
+ * van te weten.
+ */
+export const DAG_START_UUR = 5;
+
+/**
+ * Het begin en het einde van één intekendag.
+ *
+ * `dayAsUtcMidnight` is een dag zoals de rest van de app ze doorgeeft:
+ * UTC-middernacht van een Belgische datum. De dagrand zelf is Belgisch, want
+ * anders knipt een zomeruurwissel de dag een uur naast de klok.
+ */
+export function availabilityDayBounds(dayAsUtcMidnight: Date): { dayStart: Date; dayEnd: Date } {
+  const offset = DAG_START_UUR * HOUR_MS;
+  const next = new Date(dayAsUtcMidnight.getTime() + DAY_MS);
+  return {
+    dayStart: new Date(startOfBrusselsDay(dayAsUtcMidnight) + offset),
+    dayEnd: new Date(startOfBrusselsDay(next) + offset),
+  };
+}
+
+/**
+ * Welk uur er op de klok staat bij vakje `cell`.
+ *
+ * Vakje 0 is 05:00 en vakje 23 is 04:00 de ochtend erna. De vakjes zelf blijven
+ * tellen vanaf het begin van de dag (0 tot en met 23), zodat alles hieronder en
+ * de server met hetzelfde getal rekenen; enkel wat je léést, schuift mee.
+ */
+export function clockHourOfCell(cell: number): number {
+  return (DAG_START_UUR + cell) % 24;
+}
+
+/** Ligt dit vakje al na middernacht, en dus op de kalenderdag erna? */
+export function isAfterMidnight(cell: number): boolean {
+  return DAG_START_UUR + cell >= 24;
+}
+
 /**
  * Hoe graag iemand op dat moment rijdt. Dezelfde drie waarden als de enum
  * `UitleenAvailabilityKind`; hier als union, want dit bestand mag geen Prisma
@@ -102,21 +159,22 @@ export function clipOutsideDay(range: Range, dayStart: Date, dayEnd: Date): Rang
   return subtractRange(range, dayStart, dayEnd);
 }
 
-/** Eén aangeduid uurvakje: welk uur van de dag, en welke soort. */
+/** Eén aangeduid uurvakje: het hoeveelste uur van de dag, en welke soort. */
 export type HourCell = { hour: number; kind: AvailabilityKind };
 
 /**
  * Aangevinkte uurvakjes omzetten naar bereiken.
  *
- * `hours` zijn uren sinds middernacht op deze dag (0 tot en met 23), in gelijk
+ * `hours` zijn uren sinds het begin van deze dag (0 tot en met 23), in gelijk
  * welke volgorde. Opeenvolgende uren **van dezelfde soort** worden één bereik:
  * acht losse vakjes van 09 tot 17 zijn één venster van 09:00 tot 17:00, en niet
  * acht vensters van een uur waar het beheer zich een weg doorheen moet lezen.
  * Slaat de soort om, dan begint er een nieuw venster; anders zou "tot 14:00 ja,
  * daarna liever niet" één onleesbaar blok worden.
  *
- * `dayStart` is het begin van de Belgische dag als tijdstip; de aanroeper rekent
- * dat om met `startOfBrusselsDay`, zodat een zomeruurwissel hier geen rol speelt.
+ * `dayStart` is dat begin als tijdstip, en dat is niet middernacht maar 05:00;
+ * de aanroeper rekent het om met `availabilityDayBounds`. Uur 21 op zaterdag is
+ * dus zondagochtend 02:00, en dat is precies de bedoeling.
  */
 export function hoursToRanges(hours: readonly HourCell[], dayStart: Date): Range[] {
   // Per uur hoogstens één soort; komt hetzelfde uur twee keer voor, dan wint de
@@ -132,7 +190,6 @@ export function hoursToRanges(hours: readonly HourCell[], dayStart: Date): Range
 
   const sorted = [...perHour.keys()].sort((a, b) => a - b);
   const out: Range[] = [];
-  const HOUR_MS = 60 * 60 * 1000;
 
   for (const hour of sorted) {
     const kind = perHour.get(hour) as AvailabilityKind;
@@ -151,17 +208,16 @@ export function hoursToRanges(hours: readonly HourCell[], dayStart: Date): Range
 /**
  * De uren die een venster raakt op deze dag, om de vakjes mee te vullen.
  *
- * Een venster van 09:15 tot 12:00 kleurt de vakjes 9, 10 en 11: het vakje is
- * een uur breed, en half kleuren bestaat niet. Dat is ook waarom het intekenen
- * op een telefoon per uur gaat en niet per kwartier; met de vinger mik je geen
- * kwartier.
+ * Een venster van 09:15 tot 12:00 kleurt op een dag die om 05:00 begint de
+ * vakjes 4, 5 en 6: het vakje is een uur breed, en half kleuren bestaat niet.
+ * Dat is ook waarom het intekenen op een telefoon per uur gaat en niet per
+ * kwartier; met de vinger mik je geen kwartier.
  */
 export function rangeToHours(
   range: { startAt: Date; endAt: Date },
   dayStart: Date,
   dayEnd: Date
 ): number[] {
-  const HOUR_MS = 60 * 60 * 1000;
   const from = Math.max(range.startAt.getTime(), dayStart.getTime());
   const to = Math.min(range.endAt.getTime(), dayEnd.getTime());
   if (to <= from) return [];

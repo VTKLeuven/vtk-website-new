@@ -11,7 +11,12 @@ import {
   startOfWeek,
   toDateInputValue,
 } from '@/lib/uitleen';
-import { availabilityForDriver, isDriver, isVanDriver } from '@/lib/uitleen-server';
+import {
+  availabilityForDriver,
+  availabilityNoteForWeek,
+  isDriver,
+  isVanDriver,
+} from '@/lib/uitleen-server';
 import { AvailabilityEditor } from './availability-editor';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -35,13 +40,15 @@ export default async function BeschikbaarheidPage({
   if (!session) return <LoginGate variant="trips" returnTo="/ritten/beschikbaarheid" />;
   const en = locale === 'en';
 
-  const [driver, vanDriver, windows] = await Promise.all([
+  const monday = startOfWeek((week && parseDateOnly(week)) || new Date());
+
+  const [driver, vanDriver, windows, note] = await Promise.all([
     isDriver(session.user.id),
     isVanDriver(session.user.id),
     availabilityForDriver(session.user.id),
+    availabilityNoteForWeek(session.user.id, monday),
   ]);
 
-  const monday = startOfWeek((week && parseDateOnly(week)) || new Date());
   const days = Array.from({ length: 7 }, (_, index) =>
     new Date(monday.getTime() + index * DAY_MS).toISOString()
   );
@@ -117,6 +124,8 @@ export default async function BeschikbaarheidPage({
           <ToastProvider>
             <AvailabilityEditor
               weekLabel={`${en ? 'Week' : 'Week'} ${isoWeekNumber(monday)}`}
+              weekValue={toDateInputValue(monday)}
+              note={note ?? ''}
               previousHref={hrefFor(new Date(monday.getTime() - 7 * DAY_MS))}
               nextHref={hrefFor(new Date(monday.getTime() + 7 * DAY_MS))}
               backHref="/ritten"

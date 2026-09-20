@@ -28,6 +28,7 @@ import {
   driverColorOverrides,
   activeGroups,
   availabilityInRange,
+  availabilityNotesInRange,
   driverOptions,
   eventsInRange,
   getLogistiekSettings,
@@ -110,8 +111,17 @@ export default async function VervoerWeekPage({
   const anchor = (datum && parseDateOnly(datum)) || (week && parseDateOnly(week)) || todayDateOnly();
   const { days, from, to } = calendarRange(view, anchor);
 
-  const [bookings, vehicles, drivers, driverColors, groups, events, availability, settings] =
-    await Promise.all([
+  const [
+    bookings,
+    vehicles,
+    drivers,
+    driverColors,
+    groups,
+    events,
+    availability,
+    availabilityNotes,
+    settings,
+  ] = await Promise.all([
     transportRange(from, to, filters),
     activeVehicles(),
     driverOptions(),
@@ -130,6 +140,9 @@ export default async function VervoerWeekPage({
     // dus altijd nodig. De filter bepaalt enkel of ze óók achter de ritten
     // liggen.
     availabilityInRange(from, to),
+    // De algemene nota's bij die weken (F4.5). Om dezelfde reden altijd: ze
+    // staan in de strook eronder, niet in het rooster.
+    availabilityNotesInRange(from, to),
     // Enkel voor de zin onder "Post kiest zelf de chauffeur": die moet zeggen
     // wie er dan een mail krijgt, en dat is een instelling (F4.8b).
     getLogistiekSettings(),
@@ -354,6 +367,11 @@ export default async function VervoerWeekPage({
           endAt: window.endAt.toISOString(),
           kind: window.kind,
           note: window.note,
+        }))}
+        availabilityNotes={availabilityNotes.map((note) => ({
+          driverId: note.userId,
+          weekStart: note.weekStart.toISOString(),
+          text: note.text,
         }))}
         eventOptions={events.map((event) => ({
           id: event.id,

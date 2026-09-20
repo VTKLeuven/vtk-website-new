@@ -1488,6 +1488,43 @@ export async function availabilityInRange(from: Date, to: Date) {
 }
 
 /** De vensters van één chauffeur, vanaf vandaag: wat hij zelf beheert. */
+/**
+ * De algemene nota van één chauffeur voor één week (F4.5).
+ *
+ * `null` wanneer hij er geen schreef; een lege nota bestaat niet (zie
+ * `setAvailabilityNoteAction`).
+ */
+export async function availabilityNoteForWeek(userId: string, weekStart: Date) {
+  const row = await prisma.uitleenDriverAvailabilityNote.findUnique({
+    where: { userId_weekStart: { userId, weekStart } },
+    select: { text: true },
+  });
+  return row?.text ?? null;
+}
+
+/**
+ * De algemene nota's van alle karchauffeurs voor de weken die dit venster raken
+ * (F4.5), voor de strook onder de planning.
+ *
+ * `from` en `to` zijn de randen van de weergave; de nota hangt aan een maandag,
+ * dus een venster dat halverwege een week begint, moet ook de maandag ervóór
+ * meenemen. Vandaar de zes dagen speling aan de voorkant.
+ */
+export async function availabilityNotesInRange(from: Date, to: Date) {
+  return prisma.uitleenDriverAvailabilityNote.findMany({
+    where: {
+      weekStart: { gte: new Date(from.getTime() - 6 * 24 * 60 * 60 * 1000), lt: to },
+      user: {
+        uitleenDriver: { canDriveVan: true },
+        active: true,
+        deletedAt: null,
+      },
+    },
+    select: { userId: true, weekStart: true, text: true },
+    orderBy: { weekStart: 'asc' },
+  });
+}
+
 export async function availabilityForDriver(userId: string, now = new Date()) {
   // Vensters die al voorbij zijn, blijven in de databank staan (ze zeggen
   // achteraf wie er die dag kon), maar horen niet in de lijst waar je dingen

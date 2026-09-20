@@ -77,7 +77,7 @@ export type Spanning = {
 export type Placed<T> = T & {
   start: Date;
   end: Date;
-  /** Minuten sinds middernacht, geknipt op deze dag. */
+  /** Minuten sinds het begin van deze dag, geknipt op die dag. */
   from: number;
   to: number;
   /** De baan waarop dit blok staat, en hoeveel banen er in zijn groep zijn. */
@@ -108,6 +108,19 @@ function assignLanes<T>(cluster: Array<Placed<T>>): void {
 }
 
 /**
+ * Minuten sinds het begin van de dag, met een dag die niet om middernacht hoeft
+ * te beginnen.
+ *
+ * Bij `dayStartMinutes` 0 is dit gewoon `minutesOfDay`. Begint de dag om 05:00,
+ * dan ligt 02:00 er niet drie uur vóór maar eenentwintig uur ná: het is de nacht
+ * van deze dag en niet de ochtend van de vorige.
+ */
+function minutesSinceDayStart(moment: Date, dayStartMinutes: number): number {
+  const raw = minutesOfDay(moment);
+  return raw < dayStartMinutes ? raw + MINUTES_PER_DAY : raw;
+}
+
+/**
  * De blokken die deze dag raken, met hun baan.
  *
  * Geknipt op de dag: een rit van zaterdag 22:00 tot zondag 02:00 verschijnt op
@@ -117,10 +130,23 @@ function assignLanes<T>(cluster: Array<Placed<T>>): void {
  * elkaar niet raken, staan alle vier volledig breed. Zou je de banen over de
  * hele dag tellen, dan werd elke rit een kwart breed omdat er ergens anders op
  * die dag toevallig iets overlapte.
+ *
+ * `dayStartMinutes` schuift de dagrand op. De planning laat die op middernacht
+ * staan, want een rit om 02:00 is een rit op die datum; het intekenscherm voor
+ * beschikbaarheid zet ze op 05:00, zodat zaterdagnacht bij zaterdag hoort (zie
+ * `DAG_START_UUR` in `availability-day.ts`). `from` en `to` tellen dan door
+ * voorbij 1440, en dat is precies wat de kolom nodig heeft om die uren onderaan
+ * te tekenen.
  */
-export function placeForDay<T extends Spanning>(blocks: readonly T[], day: Date): Array<Placed<T>> {
-  const dayStart = startOfBrusselsDay(day);
-  const dayEnd = startOfBrusselsDay(new Date(day.getTime() + DAY_MS));
+export function placeForDay<T extends Spanning>(
+  blocks: readonly T[],
+  day: Date,
+  dayStartMinutes = 0
+): Array<Placed<T>> {
+  const offset = dayStartMinutes * 60_000;
+  const dayStart = startOfBrusselsDay(day) + offset;
+  const dayEnd = startOfBrusselsDay(new Date(day.getTime() + DAY_MS)) + offset;
+  const dayLast = dayStartMinutes + MINUTES_PER_DAY;
 
   const touching = blocks
     .map((block) => ({ ...block, start: new Date(block.startAt), end: new Date(block.endAt) }))
@@ -128,14 +154,15 @@ export function placeForDay<T extends Spanning>(blocks: readonly T[], day: Date)
     .map((block) => {
       const continuesBefore = block.start.getTime() < dayStart;
       const continuesAfter = block.end.getTime() > dayEnd;
+      const endsAt = minutesSinceDayStart(block.end, dayStartMinutes);
       return {
         ...block,
         continuesBefore,
         continuesAfter,
-        from: continuesBefore ? 0 : minutesOfDay(block.start),
-        // Een rit die om middernacht eindigt, geeft 0 minuten; dat is het einde
-        // van deze dag en niet het begin ervan.
-        to: continuesAfter ? MINUTES_PER_DAY : minutesOfDay(block.end) || MINUTES_PER_DAY,
+        from: continuesBefore ? dayStartMinutes : minutesSinceDayStart(block.start, dayStartMinutes),
+        // Een rit die precies op de dagrand eindigt, geeft het beginuur terug;
+        // dat is het einde van deze dag en niet het begin ervan.
+        to: continuesAfter || endsAt === dayStartMinutes ? dayLast : endsAt,
         lane: 0,
         lanes: 1,
       };

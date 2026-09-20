@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  availabilityDayBounds,
   cellsForDay,
   clipOutsideDay,
+  clockHourOfCell,
+  DAG_START_UUR,
   hoursToRanges,
   mergeRanges,
   rangeToHours,
@@ -211,5 +214,101 @@ describe('rangeToHours', () => {
         dayEnd
       )
     ).toEqual([]);
+  });
+});
+
+describe('availabilityDayBounds', () => {
+  /** Een dag zoals de app ze doorgeeft: UTC-middernacht van een Belgische datum. */
+  const day = (iso: string) => new Date(`${iso}T00:00Z`);
+
+  it('begint om 05:00 Belgische tijd en niet om middernacht', () => {
+    // Dit is de hele reden van F4.2: wie tot twee uur 's nachts rijdt, duidt dat
+    // aan onder de avond ervoor en niet bovenaan de dag erna.
+    const { dayStart, dayEnd } = availabilityDayBounds(day('2026-09-05'));
+    // Zomertijd: 05:00 in Brussel is 03:00 UTC.
+    expect(dayStart.toISOString()).toBe('2026-09-05T03:00:00.000Z');
+    expect(dayEnd.toISOString()).toBe('2026-09-06T03:00:00.000Z');
+  });
+
+  it('volgt de winteruurwissel mee', () => {
+    // In de winter is 05:00 in Brussel 04:00 UTC. Rekenden we met een vaste
+    // offset, dan knipte de dag er een uur naast en veegde het herschrijven van
+    // één dag een uur van de buurdag weg.
+    const { dayStart } = availabilityDayBounds(day('2026-12-05'));
+    expect(dayStart.toISOString()).toBe('2026-12-05T04:00:00.000Z');
+  });
+
+  it('duurt vierentwintig uur op een gewone dag', () => {
+    const { dayStart, dayEnd } = availabilityDayBounds(day('2026-09-05'));
+    expect(dayEnd.getTime() - dayStart.getTime()).toBe(24 * 60 * 60 * 1000);
+  });
+});
+
+describe('clockHourOfCell', () => {
+  it('legt vakje 0 op 05:00 en vakje 23 op 04:00', () => {
+    expect(clockHourOfCell(0)).toBe(DAG_START_UUR);
+    expect(clockHourOfCell(23)).toBe(4);
+  });
+
+  it('legt zaterdagnacht 02:00 op vakje 21 van zaterdag', () => {
+    // Het geval uit de feedback. Vroeger was dat vakje 2 van zóndag.
+    expect(clockHourOfCell(21)).toBe(2);
+  });
+});
+
+describe('een dag herschrijven met de verschoven dagrand', () => {
+  const { dayStart, dayEnd } = availabilityDayBounds(new Date('2026-09-05T00:00Z'));
+
+  it('houdt de nacht van zaterdag binnen zaterdag', () => {
+    // Zaterdag 22:00 tot zondag 02:00 ligt volledig binnen de zaterdagdag, dus
+    // er blijft niets van over buiten die dag en het herschrijven van zaterdag
+    // vervangt het in zijn geheel. Met een dagrand op middernacht waren dit twee
+    // stukken op twee dagen.
+    const out = clipOutsideDay(ja('2026-09-05T20:00Z', '2026-09-06T00:00Z'), dayStart, dayEnd);
+    expect(out).toEqual([]);
+  });
+
+  it('knipt nog altijd wat echt op de dag erna ligt', () => {
+    // Tot zondagochtend 08:00 is voorbij de dagrand van 05:00; dat stuk hoort
+    // bij zondag en mag niet verdwijnen wanneer je zaterdag herschrijft.
+    const out = clipOutsideDay(ja('2026-09-05T20:00Z', '2026-09-06T06:00Z'), dayStart, dayEnd);
+    expect(out).toHaveLength(1);
+    expect(out[0].startAt.toISOString()).toBe(dayEnd.toISOString());
+  });
+
+  it('zet vakje 21 op zaterdag om naar zondagnacht 02:00', () => {
+    const out = hoursToRanges([{ hour: 21, kind: 'JA' }], dayStart);
+    expect(out).toHaveLength(1);
+    expect(out[0].startAt.toISOString()).toBe('2026-09-06T00:00:00.000Z');
+    expect(out[0].endAt.toISOString()).toBe('2026-09-06T01:00:00.000Z');
+  });
+
+  it('maakt van 22:00 tot 02:00 één venster in plaats van twee', () => {
+    // Dit is wat één veeg over de vakjes 17 tot en met 20 oplevert. Zonder de
+    // verschoven dagrand waren dit twee vensters op twee dagen, en wie het
+    // tweede vergat, stond in de planning als niet-beschikbaar op precies het
+    // uur waarop er gereden wordt.
+    const out = hoursToRanges(
+      [17, 18, 19, 20].map((hour) => ({ hour, kind: 'JA' as const })),
+      dayStart
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].startAt.toISOString()).toBe('2026-09-05T20:00:00.000Z');
+    expect(out[0].endAt.toISOString()).toBe('2026-09-06T00:00:00.000Z');
+  });
+
+  it('kleurt dat venster ook weer op zaterdag en niet op zondag', () => {
+    const cells = cellsForDay(
+      [{ startAt: at('2026-09-05T20:00Z'), endAt: at('2026-09-06T00:00Z'), kind: 'JA' }],
+      dayStart,
+      dayEnd
+    );
+    expect([...cells.keys()].sort((a, b) => a - b)).toEqual([17, 18, 19, 20]);
+    const sunday = availabilityDayBounds(new Date('2026-09-06T00:00Z'));
+    expect(cellsForDay(
+      [{ startAt: at('2026-09-05T20:00Z'), endAt: at('2026-09-06T00:00Z'), kind: 'JA' }],
+      sunday.dayStart,
+      sunday.dayEnd
+    ).size).toBe(0);
   });
 });

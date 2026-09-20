@@ -355,6 +355,20 @@ body {
   padding: 8px 12px 0;
 }
 
+/* De weeknota (F4.5), tussen de penseelrij en het raster.
+
+   Boven het raster en niet in de voetregel: het is iets wat over de hele week
+   gaat, en dat lees je voor je begint aan te duiden, niet erna. Eén regel hoog,
+   want elke pixel hier is er een die het raster niet krijgt. */
+.paint-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
 .paint-foot {
   display: flex;
   align-items: center;

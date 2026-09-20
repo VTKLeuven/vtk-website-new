@@ -750,6 +750,7 @@ model User {
   uitleenDriver           UitleenDriver?              @relation("UitleenDriverUser")
   uitleenFeedTokens       UitleenFeedToken[]          @relation("UitleenFeedTokenUser")
   uitleenAvailability     UitleenDriverAvailability[] @relation("UitleenDriverAvailabilityUser")
+  uitleenAvailabilityNotes UitleenDriverAvailabilityNote[] @relation("UitleenDriverAvailabilityNoteUser")
   uitleenHelpersAdded     UitleenTransportHelper[]    @relation("UitleenTransportHelperAddedBy")
   uitleenDriversAdded     UitleenDriver[]             @relation("UitleenDriverAddedBy")
   uitleenAuditLogs        UitleenAuditLog[]           @relation("UitleenAuditActor")
@@ -4150,6 +4151,37 @@ model UitleenDriverAvailability {
 
   @@index([userId, startAt])
   @@index([startAt, endAt])
+}
+
+/// Eén vrije nota bij de beschikbaarheid van één chauffeur voor één week (F4.5).
+///
+/// Naast `UitleenDriverAvailability.note`, die bij één venster hoort, en niet in
+/// de plaats ervan: Logistiek vroeg om er één "in het algemeen, ni per
+/// individueel stukje". Dingen als "ik heb die week examens" of "bel me liever
+/// dan te mailen" horen bij de week en niet bij een uurvak, en wie ze bij een
+/// venster moest zetten, koos er willekeurig één uit of schreef ze nergens.
+///
+/// Eén rij per chauffeur per week, en de rij verdwijnt zodra het veld leeg
+/// gemaakt wordt: een lege nota is hetzelfde als geen nota, en twee manieren om
+/// "niets" te zeggen is er één te veel.
+model UitleenDriverAvailabilityNote {
+  id     String @id @default(cuid())
+  userId String
+
+  /// De maandag van de week, als Belgische kalenderdatum (zoals `startOfWeek`
+  /// ze maakt). Een datum en geen tijdstip: het is een week en geen moment.
+  weekStart DateTime @db.Date
+
+  /// Wat deze chauffeur kwijt wil over deze week.
+  text String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation("UitleenDriverAvailabilityNoteUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekStart])
+  @@index([weekStart])
 }
 
 /// Hoe graag een chauffeur op een moment rijdt.

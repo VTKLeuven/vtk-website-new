@@ -30,7 +30,10 @@ import { NewTripForm, type NewTripValues } from './new-trip-form';
 import type { TripHandoverMode } from '@/lib/uitleen';
 import { EventEditForm, type PlannerEvent } from './event-edit-form';
 import type { TripEventOption } from '@/components/trip-event-select';
-import { AvailabilityBoard } from '@/components/transport-calendar/availability-board';
+import {
+  AvailabilityBoard,
+  type BoardNote,
+} from '@/components/transport-calendar/availability-board';
 import type { CalendarEventBar } from '@/components/transport-calendar/event-bars';
 import { adminEditTransportAction, deleteTransportAction } from '@/app/actions/beheer';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
@@ -128,6 +131,7 @@ export function TransportPlanner({
   events,
   eventOptions,
   availability,
+  availabilityNotes,
   driverColors,
   filters,
   hiddenNote,
@@ -160,6 +164,8 @@ export function TransportPlanner({
   eventOptions: TripEventOption[];
   /** Wanneer de chauffeurs kunnen rijden (V1); leeg wanneer de filter uitstaat. */
   availability: AvailabilityBand[];
+  /** Wat ze over de week in het algemeen kwijt wilden (F4.5). */
+  availabilityNotes: BoardNote[];
   driverColors?: DriverColorOverrides;
   filters: TransportFilters;
   /** Wat er door de filters niet getoond wordt, in woorden. */
@@ -699,6 +705,7 @@ export function TransportPlanner({
         drivers={drivers
           .filter((driver) => driver.canDriveVan)
           .map((driver) => ({ id: driver.id, name: driver.name }))}
+        notes={availabilityNotes}
         driverColors={driverColors}
       />
     </>

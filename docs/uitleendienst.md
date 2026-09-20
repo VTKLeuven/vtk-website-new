@@ -53,6 +53,7 @@ zelf doet staat in `docs/logistiek-ingebruikname.md`.
 | `UitleenTransportHelper` | Bijrijder op een rit: naam + optioneel nummer, `addedById`. Vervangt `helpersNote`/`helpersPhone`, die voor bestaande ritten blijven staan. Ook achteraf te wijzigen door de aanvrager, een collega van dezelfde post, of het team. |
 | `UitleenDriver` | Chauffeur die het team zelf toevoegt (uniek per `userId`, met notitie en `addedById`). Niet werkingsjaar-gescoped; verwijderen laat toegewezen ritten staan. `colorIndex` overschrijft de kleur die uit zijn id volgt. |
 | `UitleenDriverAvailability` | Wanneer een chauffeur kan rijden: vensters, geen rooster, elk met een `kind` (`JA`, `LIEVER_NIET`, `NOOD`). Een hint voor de planning, geen blokkade. |
+| `UitleenDriverAvailabilityNote` | Eén vrije nota per chauffeur per week (F4.5), naast de nota per venster. "Die week examens" hoort bij de week en niet bij een uurvak. Leeg maken wist de rij; het team leest ze onder de beschikbaarheidsstrook in de planning. |
 | `UitleenFeedToken` | Abonneerbare `.ics`-feed op de planning (`TEAM` of `DRIVER`). Enkel de sha256 staat opgeslagen; `revokedAt` in plaats van verwijderen. |
 | `UitleenFlesserkeCategory` / `UitleenFlesserkeItem` / `UitleenFlesserkeLine` | Verbruiksstock (vervaldatum, merk, Colruyt-link). Lijnen hangen aan `UitleenReservation`. Beschikbaar wordt berekend, nooit opgeslagen; `returnedQuantity` legt het verbruik vast. |
 | `CollectEnGoOrder` / `...Line` / `CollectEnGoProductMatch` | Een uitgelezen Collect&Go-bevestigingsmail, klaar om als ladingen in de flesserke-voorraad te zetten. Lijnen bewaren aantal, prijs, leeggoed en de notitie van de besteller ("Acti - livecantus"); `...ProductMatch` onthoudt naar welk item een Colruyt-product ging. Zie "Collect&Go-import" hieronder. |
@@ -238,6 +239,8 @@ de same-origin `publicUrl`.
   is het intekenscherm: op een breed scherm het tijdrooster, op een telefoon een
   raster van uurvakjes waar je met je vinger over veegt
   (`availability-paint.tsx`, met het rekenwerk in `lib/availability-day.ts`).
+  Zie "De dag van het intekenscherm" hieronder; bovenaan staat op allebei de
+  weeknota (`availability-note.tsx`).
 - **Transportplanning** (`/beheer/vervoer/week`, ronde 3): een agenda-app met
   dag-, week- en maandweergave, zoom, volledig scherm, filters, en een paneel
   waarin je een rit opent, aanpast of aanmaakt; dat paneel is op een breed
@@ -340,6 +343,41 @@ post die een doorgegeven rit krijgt, kan enkel haar eigen leden kiezen die
 chauffeur zijn, en zonder dit scherm is een lege keuzelijst daar niet te
 verklaren. De lijst is wel van de kring en niet van de post: iemand hier
 toevoegen maakt hem overal kiesbaar.
+
+## De dag van het intekenscherm
+
+**Een dag loopt hier van 05:00 tot 05:00, niet van middernacht tot middernacht**
+(`DAG_START_UUR` in `lib/availability-day.ts`). Zaterdagnacht 02:00 hoort bij
+zaterdag: dat is het uur waarop hier gereden wordt, en met een dagrand op
+middernacht stond dat vakje bovenaan de kolom van zóndag, twintig rijen van
+zaterdagavond vandaan. Eén veeg van 22:00 tot 02:00 bestond dan niet; het waren
+twee vensters op twee dagen, en wie het tweede vergat, stond in de planning als
+niet-beschikbaar op precies het uur waarvoor hij zich opgaf.
+
+Wat er wél en niet mee verschuift:
+
+- **Mee**: het intekenraster op de telefoon (`availability-paint.tsx`, vakje 0 is
+  05:00 en vakje 23 is 04:00), het tijdrooster op een breed scherm (de `TimeGrid`
+  krijgt daar `dayStartHour={DAG_START_UUR}`) en `setAvailabilityDayAction`, dat
+  één dag herschrijft.
+- **Niet mee**: de opgeslagen vensters zelf. Dat blijven gewone tijdstippen, dus
+  de planning, de agendafeed en de beschikbaarheidsband weten hier niets van en
+  houden hun eigen dagrand op middernacht. Een rit om 02:00 staat in de planning
+  gewoon op de datum waarop hij rijdt.
+
+**Het risico zit in `clipOutsideDay`.** Eén dag herschrijven verwijdert alles wat
+die dag raakt en zet terug wat erbuiten viel; verschuift de dagrand zonder dat
+die functie meeschuift, dan veegt het intekenen van één dag stil de buurdag weg.
+`availabilityDayBounds` is daarom de enige plek waar die rand berekend wordt, en
+`test/availability-day.test.ts` en `test/week-lanes.test.ts` leggen het vast.
+
+**De weeknota** (`availability-note.tsx`, F4.5) staat bovenaan allebei de
+schermen: één vrij veld per chauffeur per week, naast de nota per venster die er
+al was. Ze slaat op bij het verlaten van het veld en niet met een knop, zoals de
+rest van dit scherm, maar zegt dat wel ("Opslaan..." en dan "Bewaard"): een veeg
+zie je gebeuren, tekst niet. Het team leest ze onder de strook "Wie kan er
+rijden", en niet in de naamkolom ernaast: die is te smal voor een zin, en wie een
+nota schreef zonder iets aan te duiden, heeft daar geen rij.
 
 ## Collect&Go-import
 

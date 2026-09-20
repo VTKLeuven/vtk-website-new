@@ -135,7 +135,11 @@ function snap(minutes: number): number {
 function minutesLabel(minutes: number): string {
   const hours = Math.floor(minutes / 60);
   const rest = Math.round(minutes % 60);
-  return `${String(hours).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
+  // Voorbij middernacht telt de dag door (zie `dayStartHour`), maar de klok
+  // niet. 24:00 blijft wél staan: dat is het einde van de dag en niet het begin
+  // van de volgende, en zo leest een band tot middernacht ook.
+  const clock = hours > 24 ? hours - 24 : hours;
+  return `${String(clock).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
 }
 
 /** De verticale padding van een element; gaat van de bruikbare hoogte af. */
@@ -169,6 +173,7 @@ export function TimeGrid({
   bands,
   bandsProminent = false,
   draft,
+  dayStartHour = 0,
 }: {
   /** De dagen, als ISO-strings van UTC-middernacht (date-only). */
   days: string[];
@@ -228,6 +233,16 @@ export function TimeGrid({
    * aangeduid heb".
    */
   bandsProminent?: boolean;
+  /**
+   * Vanaf welk uur een dagkolom begint (F4.2).
+   *
+   * De planning laat dit op 0: een rit om 02:00 staat op de datum waarop hij
+   * rijdt. Het beschikbaarheidsscherm zet het op `DAG_START_UUR` (5), zodat de
+   * zaterdagkolom doorloopt tot zondagochtend 05:00 en je van 22:00 naar 02:00
+   * kan slepen zonder van kolom te wisselen. De kolom toont dan onderaan de uren
+   * 00 tot 04 van de dag erna.
+   */
+  dayStartHour?: number;
 }) {
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
   const vehicleById = useMemo(
@@ -236,8 +251,8 @@ export function TimeGrid({
   );
 
   const placedPerDay = useMemo(
-    () => parsedDays.map((day) => placeForDay(blocks, day)),
-    [blocks, parsedDays]
+    () => parsedDays.map((day) => placeForDay(blocks, day, dayStartHour * 60)),
+    [blocks, dayStartHour, parsedDays]
   );
 
   // Dezelfde dagknip als de ritten, zodat een venster van 22:00 tot 02:00 ook op
@@ -252,23 +267,27 @@ export function TimeGrid({
       draft
         ? parsedDays.map(
             (day) =>
-              placeForDay([{ id: 'draft', startAt: draft.startAt, endAt: draft.endAt }], day)[0] ??
-              null
+              placeForDay(
+                [{ id: 'draft', startAt: draft.startAt, endAt: draft.endAt }],
+                day,
+                dayStartHour * 60
+              )[0] ?? null
           )
         : parsedDays.map(() => null),
-    [draft, parsedDays]
+    [dayStartHour, draft, parsedDays]
   );
 
   const bandsPerDay = useMemo(
-    () => parsedDays.map((day) => (bands ? placeForDay(bands, day) : [])),
-    [bands, parsedDays]
+    () => parsedDays.map((day) => (bands ? placeForDay(bands, day, dayStartHour * 60) : [])),
+    [bands, dayStartHour, parsedDays]
   );
 
-  // De kalender toont altijd de hele dag; het eerste uur is dus 0. Een variabele
-  // die overal in de berekeningen meeloopt, is er niet meer, maar de naam blijft
-  // omdat de blokken hem als nulpunt gebruiken.
-  const firstHour = 0;
-  const lastHour = DAY_HOURS;
+  // De kalender toont altijd de hele dag, en die is altijd vierentwintig uur
+  // lang; enkel wáár ze begint verschilt (zie `dayStartHour`). De blokken
+  // gebruiken `firstHour` als nulpunt, dus op het beschikbaarheidsscherm lopen
+  // de uren van 5 tot 29 en staat er onderaan 04:00 van de ochtend erna.
+  const firstHour = dayStartHour;
+  const lastHour = dayStartHour + DAY_HOURS;
 
   /**
    * De uurhoogte waarbij de hele dag precies in de pane past, gemeten aan de
@@ -507,8 +526,15 @@ export function TimeGrid({
    */
   const minWidth = timeGridMinWidth(parsedDays.length);
 
-  const todayKey = now ? dayKeyFormatter.format(now) : null;
-  const nowMinutes = now ? minutesOfDay(now) : 0;
+  // "Vandaag" is de dag waar dit uur bij hoort, en dat is met een verschoven
+  // dagrand niet dezelfde als de datum: om 02:00 sta je nog in de kolom van
+  // gisteren. Bij een dagrand op middernacht valt dit allebei terug op wat het
+  // was.
+  const todayKey = now
+    ? dayKeyFormatter.format(new Date(now.getTime() - dayStartHour * 60 * 60 * 1000))
+    : null;
+  const nowRaw = now ? minutesOfDay(now) : 0;
+  const nowMinutes = nowRaw < firstHour * 60 ? nowRaw + DAY_HOURS * 60 : nowRaw;
 
   // Het rooster blijft staan wanneer er niets is. Vroeger kwam er één zin in de
   // plaats, en dat was een kalender die verdween precies op de dag waarop je er
@@ -593,7 +619,7 @@ export function TimeGrid({
                   }`}
                   style={{ top: index * hourPx }}
                 >
-                  {String(hour).padStart(2, '0')}:00
+                  {String(hour % 24).padStart(2, '0')}:00
                 </span>
               ))}
             </div>

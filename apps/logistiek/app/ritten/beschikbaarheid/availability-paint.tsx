@@ -7,7 +7,10 @@ import { LogisticsIcon } from '@/components/logistics-icon';
 import { useToast } from '@/components/ui/toast';
 import {
   AVAILABILITY_KINDS,
+  availabilityDayBounds,
   cellsForDay,
+  clockHourOfCell,
+  DAG_START_UUR,
   type AvailabilityKind,
 } from '@/lib/availability-day';
 import {
@@ -15,7 +18,7 @@ import {
   AVAILABILITY_KIND_SHORT,
   availabilityFillClass,
 } from '@/lib/availability-kinds';
-import { startOfBrusselsDay } from '@/lib/week-lanes';
+import { AvailabilityNote } from './availability-note';
 import type { AvailabilityWindow } from './availability-editor';
 
 /**
@@ -45,11 +48,16 @@ import type { AvailabilityWindow } from './availability-editor';
  *   het precies wil, gebruikt de twee velden eronder of een computer.
  * - **`touch-action: none` op het raster.** Anders scrolt de pagina mee met je
  *   veeg en wordt er niets aangeduid. De pagina blijft scrollen buiten het
- *   raster, en het raster past standaard op één scherm doordat de nacht
- *   ingeklapt is.
- * - **De nacht staat ingeklapt.** Van 00:00 tot 06:00 rijdt er zelden iemand, en
- *   die zes rijen zijn precies wat het raster van het scherm duwt. Eén knop zet
- *   ze erbij.
+ *   raster, en het raster zelf past altijd op één scherm.
+ * - **Een dag loopt van 05:00 tot 05:00** (F4.2). De kolom van zaterdag eindigt
+ *   dus op de uren 00 tot 04 van zondagochtend, met een streepje op de
+ *   middernachtgrens. Wie tot twee uur rijdt, duidt dat aan onder de avond
+ *   waarbij het hoort, in dezelfde veeg.
+ * - **Alle vierentwintig rijen staan er.** De nacht stond ingeklapt achter een
+ *   knop omdat er van 00:00 tot 06:00 zelden iemand rijdt, maar dat is precies
+ *   wat deze mensen wél doen, en na het opschuiven van de dagrand zou die knop
+ *   net de uren verbergen waarvoor ze kwamen. De rijen delen de hoogte, dus dit
+ *   kost geen scherm; enkel een paar pixels per rij.
  * - **Het is een eigen volledig scherm.** Boven het raster stonden de sitekop,
  *   de donkere paginakop en de weeknavigatie samen ruim driehonderd pixels, en
  *   dan blijft er voor achttien rijen te weinig over: het raster puilde uit zijn
@@ -64,10 +72,9 @@ import type { AvailabilityWindow } from './availability-editor';
  */
 
 const HOUR_MS = 60 * 60 * 1000;
-const DAY_MS = 24 * HOUR_MS;
 
-/** Vanaf welk uur het raster standaard begint; de nacht klapt open op verzoek. */
-const DEFAULT_FIRST_HOUR = 6;
+/** De vakjes van één dag: vierentwintig, vanaf `DAG_START_UUR`. */
+const CELLS = Array.from({ length: 24 }, (_, index) => index);
 
 const ROW_GAP_PX = 2;
 
@@ -95,6 +102,8 @@ export function AvailabilityPaint({
   days,
   windows,
   weekLabel,
+  weekValue,
+  note,
   previousHref,
   nextHref,
   backHref,
@@ -104,6 +113,10 @@ export function AvailabilityPaint({
   windows: AvailabilityWindow[];
   /** "Week 36": wat er in de balk bovenaan staat. */
   weekLabel: string;
+  /** De maandag als `YYYY-MM-DD`, voor de weeknota. */
+  weekValue: string;
+  /** De algemene nota van deze week (F4.5), of een lege string. */
+  note: string;
   previousHref: string;
   nextHref: string;
   /** Terug naar waar dit scherm vandaan komt. */
@@ -111,7 +124,6 @@ export function AvailabilityPaint({
 }) {
   const showToast = useToast();
   const [, startTransition] = useTransition();
-  const [showNight, setShowNight] = useState(false);
   /**
    * Wat een veeg neerzet. `null` wist.
    *
@@ -122,6 +134,16 @@ export function AvailabilityPaint({
 
   const parsedDays = useMemo(() => days.map((day) => new Date(day)), [days]);
 
+  /**
+   * Het begin van elke dagkolom: 05:00 en niet middernacht (`DAG_START_UUR`).
+   * Ook het moment waaruit een vakje zijn echte datum en uur krijgt, en dat is
+   * voor de vakjes na middernacht de dag erna.
+   */
+  const dayStarts = useMemo(
+    () => parsedDays.map((day) => availabilityDayBounds(day).dayStart),
+    [parsedDays]
+  );
+
   /** De vakjes zoals ze uit de opgeslagen vensters volgen, met hun soort. */
   const saved = useMemo(() => {
     const map = new Map<string, AvailabilityKind>();
@@ -131,8 +153,7 @@ export function AvailabilityPaint({
       kind: window.kind,
     }));
     for (const day of parsedDays) {
-      const dayStart = new Date(startOfBrusselsDay(day));
-      const dayEnd = new Date(startOfBrusselsDay(new Date(day.getTime() + DAY_MS)));
+      const { dayStart, dayEnd } = availabilityDayBounds(day);
       const iso = day.toISOString();
       for (const [hour, kind] of cellsForDay(parsed, dayStart, dayEnd)) {
         map.set(cellKey(iso, hour), kind);
@@ -183,12 +204,6 @@ export function AvailabilityPaint({
   const footer = useRef<HTMLDivElement>(null);
   /** De veeg die bezig is: wat ze neerzet (`null` = wissen), en welke dagen ze raakte. */
   const stroke = useRef<{ paint: AvailabilityKind | null; touched: Set<string> } | null>(null);
-
-  const hours = useMemo(() => {
-    const first = showNight ? 0 : DEFAULT_FIRST_HOUR;
-    return Array.from({ length: 24 - first }, (_, index) => first + index);
-  }, [showNight]);
-
 
   const save = useCallback(
     (dayIso: string, next: Map<string, AvailabilityKind>) => {
@@ -290,7 +305,9 @@ export function AvailabilityPaint({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [save]);
 
-  const todayKey = dayKeyFormatter.format(new Date());
+  // Welke kolom "vandaag" is, volgt de verschoven dagrand: om 02:00 sta je nog
+  // in de kolom van gisteren, want daar staat het vakje dat je dan aanduidt.
+  const todayKey = dayKeyFormatter.format(new Date(Date.now() - DAG_START_UUR * HOUR_MS));
   /** Hoeveel uur je van elke soort aanduidde; nul soorten laten we weg. */
   const totals = AVAILABILITY_KINDS.map((kind) => ({
     kind,
@@ -346,6 +363,9 @@ export function AvailabilityPaint({
         </button>
       </div>
 
+      {/* Eén regel voor wat over de hele week gaat (F4.5). */}
+      <AvailabilityNote week={weekValue} initial={note} variant="paint" />
+
       <div className="paint-body">
         {/* De dagkoppen, op dezelfde kolommen als het raster eronder. */}
         <div
@@ -384,58 +404,66 @@ export function AvailabilityPaint({
           className="grid min-h-0 flex-1 touch-none select-none overflow-hidden"
           style={{
             gap: ROW_GAP_PX,
-            gridTemplateRows: `repeat(${hours.length}, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(${CELLS.length}, minmax(0, 1fr))`,
           }}
         >
-          {hours.map((hour) => (
-            <div
-              key={hour}
-              className="grid items-stretch"
-              style={{
-                gap: ROW_GAP_PX,
-                gridTemplateColumns: `2.25rem repeat(${parsedDays.length}, minmax(0, 1fr))`,
-              }}
-            >
-              <span className="self-center text-right text-[10px] tabular-nums text-vtk-muted">
-                {String(hour).padStart(2, '0')}
-              </span>
-              {parsedDays.map((day) => {
-                const iso = day.toISOString();
-                const kind = cells.get(cellKey(iso, hour));
-                return (
-                  <button
-                    key={iso}
-                    type="button"
-                    data-day={iso}
-                    data-hour={hour}
-                    aria-pressed={Boolean(kind)}
-                    className={`h-full rounded-[6px] border transition-colors ${
-                      kind
-                        ? `border-vtk-navy/25 bg-vtk-yellow ${availabilityFillClass(kind)}`
-                        : 'border-vtk-navy/10 bg-vtk-paper/70'
-                    }`}
-                  >
-                    <span className="sr-only">
-                      {weekdayFormatter.format(day)} {dayNumberFormatter.format(day)} om{' '}
-                      {String(hour).padStart(2, '0')}:00
-                      {kind ? `, ${AVAILABILITY_KIND_LABEL[kind].toLowerCase()}` : ''}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          ))}
+          {CELLS.map((cell) => {
+            const clock = clockHourOfCell(cell);
+            return (
+              <div
+                key={cell}
+                // Eén streepje op de middernachtgrens. Zonder dat springt de
+                // urenkolom van 23 naar 00 zonder te zeggen dat je daar een dag
+                // verder bent, en dan lijkt het een fout in plaats van de nacht
+                // die bij deze avond hoort.
+                className={`grid items-stretch ${
+                  clock === 0 ? 'border-t border-dashed border-vtk-navy/30 pt-[2px]' : ''
+                }`}
+                style={{
+                  gap: ROW_GAP_PX,
+                  gridTemplateColumns: `2.25rem repeat(${parsedDays.length}, minmax(0, 1fr))`,
+                }}
+              >
+                <span className="self-center text-right text-[10px] tabular-nums text-vtk-muted">
+                  {String(clock).padStart(2, '0')}
+                </span>
+                {parsedDays.map((day, dayIndex) => {
+                  const iso = day.toISOString();
+                  const kind = cells.get(cellKey(iso, cell));
+                  // Het echte moment van dit vakje, en dus de echte datum: een
+                  // vakje na middernacht ligt op de dag ná de kolomkop.
+                  const moment = new Date(dayStarts[dayIndex].getTime() + cell * HOUR_MS);
+                  return (
+                    <button
+                      key={iso}
+                      type="button"
+                      data-day={iso}
+                      data-hour={cell}
+                      aria-pressed={Boolean(kind)}
+                      className={`h-full rounded-[6px] border transition-colors ${
+                        kind
+                          ? `border-vtk-navy/25 bg-vtk-yellow ${availabilityFillClass(kind)}`
+                          : 'border-vtk-navy/10 bg-vtk-paper/70'
+                      }`}
+                    >
+                      <span className="sr-only">
+                        {weekdayFormatter.format(moment)} {dayNumberFormatter.format(moment)} om{' '}
+                        {String(clock).padStart(2, '0')}:00
+                        {kind ? `, ${AVAILABILITY_KIND_LABEL[kind].toLowerCase()}` : ''}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            );
+          })}
         </div>
       </div>
 
       <div ref={footer} className="paint-foot">
-        <button
-          type="button"
-          onClick={() => setShowNight((value) => !value)}
-          className="rounded-full border border-vtk-navy/20 px-2.5 py-1 text-xs font-medium text-vtk-muted transition hover:border-vtk-navy/50"
-        >
-          {showNight ? 'Nacht verbergen' : 'Ook 00:00 tot 06:00 tonen'}
-        </button>
+        {/* Waarom er onder zaterdag uren van zondagochtend staan. Eén regel,
+            want het raster zegt het verder zelf. */}
+        <p className="text-xs text-vtk-muted">De nacht hoort bij de avond ervoor.</p>
         {/* De telling per soort als staaltje plus uren, en niet uitgeschreven:
             "1u beschikbaar · 1u liever niet · 1u in noodgeval" nam twee regels
             en duwde de nachtknop weg. De pillen erboven zeggen al welk staaltje
