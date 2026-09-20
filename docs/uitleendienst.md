@@ -258,7 +258,9 @@ de same-origin `publicUrl`.
   return-forms, klaarzetlijst per lijn + printblad `[id]/print` en dag-afdruk
   `print?datum=`), `vervoer/` (decision + controls: chauffeur, voertuigwissel, km;
   `driver-select.tsx` groepeert de chauffeurs per bron), `chauffeurs/`
-  (chauffeurslijst + user-picker op vtk.be-leden), `materiaal/` (inventaris +
+  (chauffeurslijst + user-picker op vtk.be-leden, de nummers uit de gedeelde
+  gsm-lijst en de doorsnede per post; zie "De chauffeurslijst" hieronder),
+  `materiaal/` (inventaris +
   set-editor + foto-upload), `flesserke/` (stockscherm met inline voorraad +
   vervaldatum-highlight), `collectengo/` (klaarstaande Collect&Go-mails +
   importscherm per bestelling), `kalender/`, `instellingen/` (voertuigtarieven +
@@ -302,6 +304,42 @@ de same-origin `publicUrl`.
 naam+categorie), deletet nooit, telt created/updated/skipped. Niet-numerieke
 hoeveelheden -> aantal 1 + tekst in de beschrijving. Gereserveerd/Beschikbaar uit
 de sheet worden genegeerd (live berekend).
+
+## De chauffeurslijst
+
+`/beheer/chauffeurs` doet drie dingen, in die volgorde: de lijst zelf, de
+nummers, en de doorsnede per post.
+
+**De lijst** is `driverPool()`: de leden van de post `LOGISTIEK` van dit
+werkingsjaar plus de rijen in `UitleenDriver`. Wie via de post chauffeur is,
+verdwijnt vanzelf op 15 juli; wie hier toegevoegd is, blijft staan.
+
+**De nummers uit de gedeelde gsm-lijst** (F4.3). Het praesidium houdt ze bij als
+contactenexport (`.vcf`). Er zijn twee wegen naar dezelfde kolom:
+
+- `scripts/import-driver-phones.ts` (`npm run import:gsm`), voor wie al aan een
+  shell zit. Schrijft niets zonder `--apply`.
+- Het scherm in `/beheer/chauffeurs` (`phone-import.tsx`). **Het bestand blijft
+  in de browser**: lezen, opkuisen en koppelen gebeuren daar, en naar de server
+  gaan enkel de regels die aangevinkt staan. Een lijst met vierennegentig namen
+  en nummers hoort niet in een request of een log, en het bestand daarom ook niet
+  in de repo.
+
+Het rekenwerk is pure TypeScript en getest: `lib/vcard.ts` (parsen, normaliseren
+naar `0470 12 34 56`, koppelen op naam) en `lib/phone-import.ts` (wat er met elke
+koppeling gebeurt). Koppelen doet exact op de naam en daarna op gesorteerde
+naamdelen, **nooit op een deel van een naam**: twee leden die Wout heten, zijn
+twee leden. Enkel een nummer dat het team zelf vastlegde (bron `TEAM`) staat
+standaard uit; een nummer van iemands profiel of uit een oude aanvraag is nooit
+bevestigd en mag de lijst overschrijven.
+
+**Per post en werkgroep** (F4.10) staat onderaan: de doorsnede van de leden van
+dit werkingsjaar en de chauffeurslijst (`driversPerGroup()`), met een knop om
+iemand erbij te zetten. Dat is het andere eind van `groupMemberOptions()`: een
+post die een doorgegeven rit krijgt, kan enkel haar eigen leden kiezen die
+chauffeur zijn, en zonder dit scherm is een lege keuzelijst daar niet te
+verklaren. De lijst is wel van de kring en niet van de post: iemand hier
+toevoegen maakt hem overal kiesbaar.
 
 ## Collect&Go-import
 

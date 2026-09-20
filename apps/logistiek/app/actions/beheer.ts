@@ -13,6 +13,7 @@ import {
 import { logistiekBaseUrl } from '@/lib/payments';
 import { writeAudit } from '@/lib/audit';
 import { isDriverColorIndex, isVehiclePattern } from '@/lib/driver-colors';
+import { normaliseBelgianPhone } from '@/lib/vcard';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 import {
   describeReservationChanges,
@@ -2989,6 +2990,41 @@ export async function searchDriverCandidatesAction(query: string): Promise<Drive
   return searchDriverCandidates(query);
 }
 
+/**
+ * De regels achter "deze persoon wordt chauffeur", gedeeld door de picker
+ * bovenaan en de knop per post (F4.10). Geeft een foutcode terug, of `null`
+ * wanneer de rij er staat.
+ *
+ * Bewust één functie: de twee wegen komen op hetzelfde neer, en een tweede
+ * kopie van deze vier controles loopt vroeg of laat uiteen met deze.
+ */
+async function createDriverRow(
+  userId: string,
+  note: string | null,
+  addedById: string
+): Promise<'NOT_FOUND' | 'INACTIVE' | 'IN_POST' | 'ALREADY_DRIVER' | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, active: true, deletedAt: true },
+  });
+  if (!user || user.deletedAt) return 'NOT_FOUND';
+  if (!user.active) return 'INACTIVE';
+
+  // Al chauffeur via de post: dan voegt een rij hier niets toe, en de melding
+  // legt uit waarom de naam toch al in de keuzelijst staat.
+  const inPost = await prisma.groupMembership.count({
+    where: { userId, year: currentWorkingYear(), group: { code: 'LOGISTIEK' } },
+  });
+  if (inPost > 0) return 'IN_POST';
+
+  const existing = await prisma.uitleenDriver.count({ where: { userId } });
+  if (existing > 0) return 'ALREADY_DRIVER';
+
+  await prisma.uitleenDriver.create({ data: { userId, note, addedById } });
+  revalidateBeheer();
+  return null;
+}
+
 /** Chauffeur toevoegen aan de pool, gekozen uit de leden van vtk.be. */
 export async function addDriverAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const session = await requireManage();
@@ -2997,29 +3033,33 @@ export async function addDriverAction(_prev: SaveState, formData: FormData): Pro
   const note = String(formData.get('note') ?? '').trim();
   if (!userId) return saveError('USER_REQUIRED');
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, active: true, deletedAt: true },
-  });
-  if (!user || user.deletedAt) return saveError('NOT_FOUND');
-  if (!user.active) return saveError('INACTIVE');
+  const code = await createDriverRow(userId, note || null, session.user.id);
+  return code ? saveError(code) : saveOk();
+}
 
-  // Al chauffeur via de post: dan voegt een rij hier niets toe, en de melding
-  // legt uit waarom de naam toch al in de keuzelijst staat.
-  const inPost = await prisma.groupMembership.count({
-    where: { userId, year: currentWorkingYear(), group: { code: 'LOGISTIEK' } },
-  });
-  if (inPost > 0) return saveError('IN_POST');
+/**
+ * Een lid van een post of werkgroep chauffeur maken, vanaf de lijst per post
+ * (F4.10).
+ *
+ * Geen notitie: je klikt hier op een naam die al op het scherm staat, er valt
+ * niets te zoeken en niets toe te lichten. De meldingen staan hier in volle
+ * zinnen in plaats van als code, want deze knop hangt niet aan een `SaveForm`
+ * met zijn `errorMessages`.
+ */
+export async function addDriverFromGroupAction(userId: string): Promise<ActionResult> {
+  const session = await requireManage();
 
-  const existing = await prisma.uitleenDriver.count({ where: { userId } });
-  if (existing > 0) return saveError('ALREADY_DRIVER');
-
-  await prisma.uitleenDriver.create({
-    data: { userId, note: note || null, addedById: session.user.id },
-  });
-
-  revalidateBeheer();
-  return saveOk();
+  const code = await createDriverRow(userId, null, session.user.id);
+  if (code === 'NOT_FOUND') return { ok: false, error: 'Dit lid bestaat niet (meer) op vtk.be.' };
+  if (code === 'INACTIVE') {
+    return { ok: false, error: 'Dit lid is gedeactiveerd op vtk.be en kan geen chauffeur zijn.' };
+  }
+  if (code === 'IN_POST') {
+    return { ok: false, error: 'Dit lid zit in de post Logistiek en is daardoor al chauffeur.' };
+  }
+  if (code === 'ALREADY_DRIVER') return { ok: false, error: 'Dit lid staat al in de chauffeurslijst.' };
+  // Zonder melding: de knop weet wiens naam het is en zet die in de toast.
+  return { ok: true };
 }
 
 /** Notitie bij een chauffeur bewerken. */
@@ -3073,6 +3113,62 @@ export async function saveDriverPhoneAction(_prev: SaveState, formData: FormData
 
   revalidateBeheer();
   return saveOk();
+}
+
+/**
+ * De aangevinkte nummers uit de gedeelde gsm-lijst wegschrijven (F4.3).
+ *
+ * **Het bestand komt hier niet aan.** Het scherm leest de `.vcf` in de browser,
+ * koppelt daar op naam en stuurt enkel de rijen die aangevinkt staan, als
+ * `<userId>|<nummer>`. Een lijst met vierennegentig namen en nummers reist dus
+ * niet over de lijn en belandt in geen enkele log; wat hier binnenkomt, is
+ * precies wat iemand gezien en goedgekeurd heeft.
+ *
+ * **Het nummer wordt hier opnieuw genormaliseerd.** Niet omdat de client niet te
+ * vertrouwen zou zijn (wie dit scherm mag openen, mag het nummer er evengoed met
+ * de hand intikken), maar omdat één functie de vorm bepaalt: zo staat er in deze
+ * kolom altijd `0470 12 34 56`, langs welke weg ze ook gevuld wordt.
+ *
+ * Schrijft `UitleenDriver.phone`, de bron `TEAM`, die binnen `driverPhones` al
+ * wint van het profielnummer en van wat iemand ooit bij een aanvraag opgaf.
+ */
+export async function importDriverPhonesAction(
+  _prev: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  await requireManage();
+
+  const picks = formData.getAll('pick').map((value) => String(value));
+  if (picks.length === 0) return saveError('NOTHING_PICKED');
+
+  // Op gebruiker en niet als lijst: twee vinkjes voor dezelfde chauffeur zijn
+  // geen twee schrijfbeurten, en dan klopt het aantal in de melding ook.
+  const byUser = new Map<string, string>();
+  for (const pick of picks) {
+    const at = pick.indexOf('|');
+    if (at === -1) return saveError('BAD_PICK');
+    const userId = pick.slice(0, at).trim();
+    const phone = normaliseBelgianPhone(pick.slice(at + 1));
+    if (!userId || !phone.ok) return saveError('BAD_PICK');
+    byUser.set(userId, phone.phone);
+  }
+
+  const known = await prisma.user.findMany({
+    where: { id: { in: [...byUser.keys()] }, active: true, deletedAt: null },
+    select: { id: true },
+  });
+  if (known.length !== byUser.size) return saveError('NOT_FOUND');
+
+  for (const [userId, phone] of byUser) {
+    await prisma.uitleenDriver.upsert({
+      where: { userId },
+      update: { phone },
+      create: { userId, phone },
+    });
+  }
+
+  revalidateBeheer();
+  return saveOk(`${byUser.size} nummer${byUser.size === 1 ? '' : 's'} opgeslagen.`);
 }
 
 /**

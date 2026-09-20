@@ -2,6 +2,7 @@ import 'server-only';
 
 import { prisma } from '@vtk/db';
 import type {
+  GroupType,
   Prisma,
   UitleenAvailabilityKind,
   UitleenTransportBookingStatus,
@@ -1780,6 +1781,87 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
   }
 
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'nl'));
+}
+
+/** Eén post of werkgroep met haar leden, gesplitst op wie chauffeur is (F4.10). */
+export type GroupDrivers = {
+  id: string;
+  /** De Nederlandse naam: dit is beheer, en dat staat altijd in het Nederlands. */
+  name: string;
+  type: GroupType;
+  /** Leden van dit werkingsjaar die in de chauffeurspool zitten. */
+  drivers: Array<{ id: string; name: string }>;
+  /** De andere leden: wie je met één klik chauffeur kan maken. */
+  others: Array<{ id: string; name: string }>;
+};
+
+/**
+ * Wie er per post en werkgroep chauffeur is (F4.10).
+ *
+ * Dit is het andere eind van F4.9. Daar werd de keuzelijst bij een doorgegeven
+ * rit de doorsnede van de post en de chauffeurspool, en een post waarvan niemand
+ * in die pool zit, houdt dus geen keuzelijst over. Wie dat leest terwijl de rit
+ * er al ligt, weet nog altijd niet wie hij dan wél moet toevoegen. Hier staat
+ * diezelfde doorsnede voor elke post op het scherm, vóór er een rit aan hangt.
+ *
+ * **De pool is van de kring en niet van de post.** Iemand hier toevoegen maakt
+ * hem overal chauffeur, precies zoals de picker bovenaan; een chauffeur "van
+ * Sport alleen" bestaat niet. Het scherm zegt dat er met zoveel woorden bij,
+ * want een knop onder een postnaam belooft anders iets kleiners dan ze doet.
+ *
+ * Enkel actieve groepen met leden dit werkingsjaar: een post zonder leden is een
+ * rij die niets zegt, en het zijn er vijfentwintig.
+ */
+export async function driversPerGroup(): Promise<GroupDrivers[]> {
+  const [memberships, team, extra] = await Promise.all([
+    prisma.groupMembership.findMany({
+      where: {
+        year: currentWorkingYear(),
+        user: { active: true, deletedAt: null },
+        group: { active: true },
+      },
+      select: {
+        user: { select: { id: true, name: true } },
+        group: { select: { id: true, nameNl: true, type: true, orderInPraesidium: true } },
+      },
+    }),
+    logistiekTeamMembers(),
+    prisma.uitleenDriver.findMany({
+      where: { user: { active: true, deletedAt: null } },
+      select: { userId: true },
+    }),
+  ]);
+
+  // Dezelfde unie als `driverOptions` en `groupMemberOptions`: de post Logistiek
+  // van dit werkingsjaar plus de rijen in `UitleenDriver`.
+  const pool = new Set([...team.map((member) => member.id), ...extra.map((row) => row.userId)]);
+
+  const byGroup = new Map<string, GroupDrivers & { order: number }>();
+  for (const membership of memberships) {
+    const group = membership.group;
+    let entry = byGroup.get(group.id);
+    if (!entry) {
+      entry = {
+        id: group.id,
+        name: group.nameNl,
+        type: group.type,
+        order: group.orderInPraesidium,
+        drivers: [],
+        others: [],
+      };
+      byGroup.set(group.id, entry);
+    }
+    (pool.has(membership.user.id) ? entry.drivers : entry.others).push(membership.user);
+  }
+
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'nl');
+  return [...byGroup.values()]
+    .sort((a, b) => a.order - b.order || byName(a, b))
+    .map(({ order: _order, ...group }) => ({
+      ...group,
+      drivers: [...group.drivers].sort(byName),
+      others: [...group.others].sort(byName),
+    }));
 }
 
 /**
