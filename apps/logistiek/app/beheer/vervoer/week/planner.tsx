@@ -8,6 +8,7 @@ import {
   TransportCalendar,
 } from '@/components/transport-calendar/transport-calendar';
 import { TransportFilterBar } from '@/components/transport-calendar/filters';
+import { TransportLegend } from '@/components/transport-calendar/legend';
 import { TripInspector } from '@/components/transport-calendar/trip-inspector';
 import type {
   AvailabilityBand,
@@ -351,6 +352,7 @@ export function TransportPlanner({
               filters={filters}
               vehicles={vehicles.map((vehicle) => ({ id: vehicle.id, name: vehicle.name }))}
               drivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
+              posts={groups}
               driverColors={driverColors}
             />
             {clashing.length > 0 ? (
@@ -390,15 +392,27 @@ export function TransportPlanner({
 
         {/* `tg-hint`: in volledig scherm valt deze uitleg weg. Daar wil je zoveel
             mogelijk kalender, en wie fullscreen aanzet, heeft de legende al
-            gelezen. */}
-        <p className="tg-hint text-xs text-vtk-muted">
-          De vulkleur is de chauffeur, de arcering is het voertuig; een rit zonder chauffeur is geel
-          met een rode streepjesrand. Kleuren stel je in bij Chauffeurs, arceringen bij
-          Instellingen. Gestreept = nog te beslissen, doorzichtig = afgerond, volle rode rand = twee
-          goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. Dat laatste mag tijdelijk:
-          plan gerust in wat mensen vragen en schuif het daarna passend; de teller boven de kalender
-          houdt bij wat er nog dubbel staat. Klik een rit aan om ze te beslissen of aan te passen.
-        </p>
+            gelezen.
+
+            De legende tekent de echte blokken (F4.16); wat er hier in woorden
+            onder staat, is wat je aan een blok níét kan zien: waar je de kleuren
+            en de arceringen instelt, en dat een botsing tijdelijk mag. */}
+        <div className="grid gap-2">
+          {/* De legende blijft ook in volledig scherm staan: ze verklaart de
+              kleuren die je op dat moment bekijkt. Enkel de zin eronder draagt
+              `tg-hint` en valt daar weg. */}
+          <TransportLegend
+            vehicles={vehicles.map((vehicle) => ({ name: vehicle.name, pattern: vehicle.pattern }))}
+            showDriver
+            showConflict
+          />
+          <p className="tg-hint text-xs text-vtk-muted">
+            Kleuren stel je in bij Chauffeurs, arceringen bij Instellingen. Een botsing mag
+            tijdelijk: plan gerust in wat mensen vragen en schuif het daarna passend; de teller boven
+            de kalender houdt bij wat er nog dubbel staat. Klik een rit aan om ze te beslissen of aan
+            te passen.
+          </p>
+        </div>
 
         {openEvent ? (
           <TripInspector

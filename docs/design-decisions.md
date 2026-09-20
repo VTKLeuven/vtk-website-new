@@ -4027,6 +4027,33 @@ lag dan al twee dagen stil.
 - **Naar één adres met de rest in kopie**, niet drie losse berichten: drie mails
   naar dezelfde mailbox lezen als drie aanvragen.
 
+### Een blok op de transportplanning draagt drie dingen, elk in een eigen taal
+
+De vulkleur is de **chauffeur**, de arcering is het **voertuig**, en de rand en
+de streep zijn de **staat**. Die drie assen mogen elkaars taal niet lenen.
+
+- **Een status is nooit een tweede arcering.** "Nog te beslissen" was een schuin
+  streeppatroon, met de gedachte dat het naast de schuine arcering van een
+  voertuig als een ruit zou lezen. Dat werkte niet, en erger: allebei zetten ze
+  `background-image`, dus ze stapelden niet eens. De arcering van het voertuig
+  won, en een aangevraagde rit met een gearceerd voertuig droeg helemaal geen
+  markering meer. Het is nu een volle streep langs de bovenrand, die naast elk
+  patroon leesbaar blijft.
+- **De randen zijn op: rood vol is een conflict, grijs gestreept is "nog geen
+  chauffeur", en geel links is "van jouw post".** Een vierde randkleur erbij
+  maakt er ruis van; wat er nog bij komt, hoort dus op een andere as.
+- **De legende tekent de echte blokken, met dezelfde klassen.** Ze bestond uit
+  een zin, en die beloofde "geel met een rode streepjesrand" terwijl de CSS al
+  een ronde lang grijs tekende. Een legende in woorden is een tweede waarheid
+  over hetzelfde, en die twee lopen uit elkaar zodra iemand er één aanpast. Wat
+  er in woorden onder blijft staan, is wat je aan een blok niet kan zien: waar je
+  de kleuren en de arceringen instelt, en dat een botsing tijdelijk mag.
+- **Wat een blok zegt, hangt af van wie kijkt.** Zonder login staan er geen
+  chauffeurs op het rooster, dus zegt de vulkleur daar niets en staat ze niet in
+  de legende. De gele rail voor "van jouw post" staat er enkel waar een post naar
+  de planning van de hele kring kijkt; op de planning van het team zou ze niets
+  onderscheiden, want daar is alles van jou.
+
 ### Een rit van je post staat op "Mijn ritten", ook als jij hem rijdt
 
 `/ritten` heeft twee lijsten, en die beantwoorden twee verschillende vragen:

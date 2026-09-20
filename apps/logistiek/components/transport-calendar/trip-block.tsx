@@ -8,9 +8,19 @@ import { DEFAULT_TRIP_FIELDS, type CalendarVehicle, type TripBlock, type TripFie
 /**
  * Het uiterlijk van één rit, gedeeld door de dag-, week- en maandweergave.
  *
- * Twee assen tegelijk (K1): de **vulkleur** is de chauffeur, de **arcering** is
- * het voertuig. Een rit zonder chauffeur is het enige wat op deze kalender nog
- * werk is, dus die krijgt de gele vulling plus een rode streepjesrand.
+ * Drie assen, elk met hun eigen taal (K1, F4.16), en dat is de hele regel:
+ *
+ * - **De vulkleur is de chauffeur.** Wie rijdt, lees je aan de kleur.
+ * - **De arcering is het voertuig.** Waarmee, lees je aan het patroon.
+ * - **De rand en de streep zijn de staat.** Nog geen chauffeur: een grijze
+ *   streepjesrand. Nog te beslissen: een streep langs de bovenrand. Conflict:
+ *   een volle rode rand. Van je eigen post: een gele rail links.
+ *
+ * Een status mag dus **nooit** een tweede arcering zijn. Ze was dat wel ("nog te
+ * beslissen" was een schuin streeppatroon), en naast een gearceerd voertuig was
+ * ze daardoor niet te onderscheiden; erger nog, ze verdween er letterlijk onder,
+ * want allebei zetten ze `background-image`. Zie `.trip-requested` in
+ * `globals.css`.
  */
 
 const timeFormatter = new Intl.DateTimeFormat('nl-BE', {
@@ -72,16 +82,19 @@ export function blockLook({
     block.conflict
       ? 'border-2 border-vtk-danger bg-vtk-danger-soft text-vtk-danger'
       : awaitsDriver
-        ? // Gele vulling plus een rode streepjesrand. Streepjes en niet vol, want
-          // een volle rode rand betekent al iets anders: een conflict.
+        ? // Een grijze streepjesrand. Streepjes en niet vol, want een volle rode
+          // rand betekent al iets anders: een conflict.
           'border-2 trip-no-driver'
         : 'border border-vtk-navy/15',
     // De arcering van het voertuig (K1); bij een conflict niet, want dan is de
     // rode vulling het enige wat je moet zien.
     block.conflict ? '' : vehiclePatternClass(vehicle?.pattern),
-    // Nog te beslissen: gestreept, zodat je ziet dat dit moment nog kan
-    // vrijkomen (T8). Afgerond: lichter, want het is geschiedenis.
-    requested ? 'week-block-requested' : '',
+    // Nog te beslissen: een streep langs de bovenrand, zodat je ziet dat dit
+    // moment nog kan vrijkomen (T8). Afgerond: lichter, want het is geschiedenis.
+    requested ? 'trip-requested' : '',
+    // Van je eigen post (F4.15). Ook bij een conflict: dat de rit van jou is,
+    // verandert niet omdat er iets mee mis is.
+    block.mine ? 'trip-mine' : '',
     done ? 'opacity-60' : '',
     selected ? 'ring-2 ring-vtk-navy ring-offset-1' : '',
   ]
@@ -91,9 +104,8 @@ export function blockLook({
   return {
     className,
     style: {
-      // `backgroundColor` en niet de `background`-shorthand: die laatste wist het
-      // streeppatroon van `.week-block-requested` en de arcering van het voertuig
-      // weer uit.
+      // `backgroundColor` en niet de `background`-shorthand: die laatste wist de
+      // arcering van het voertuig weer uit.
       backgroundColor: block.conflict ? undefined : driverColorVar(block.driver?.id, driverColors),
     },
     awaitsDriver,

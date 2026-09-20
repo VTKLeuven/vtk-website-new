@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import type { UitleenRequesterType } from '@prisma/client';
 import { PageShell } from '@/components/page-shell';
 import { PublicWeek } from './public-week';
+import { TransportLegend } from '@/components/transport-calendar/legend';
 import type { TripBlock } from '@/components/transport-calendar/types';
 import { getLocale } from '@/lib/i18n';
 import { canEditAllHelpers, canManage, canSeeTripDetails, getSession } from '@/lib/session';
@@ -18,9 +19,11 @@ import {
   tripHoursLabel,
 } from '@/lib/uitleen';
 import {
+  activeGroups,
   activeVehicles,
   driverColorOverrides,
   driverOptions,
+  driverPhones,
   transportRange,
   transportWeekForMembers,
   transportWeekForPraesidium,
@@ -72,6 +75,7 @@ export default async function VervoerBezettingPage({
     week?: string;
     voertuig?: string;
     chauffeur?: string;
+    post?: string;
     status?: string;
     aanvrager?: string;
   }>;
@@ -94,6 +98,10 @@ export default async function VervoerBezettingPage({
   const filters = {
     ...parsed,
     driverIds: session ? parsed.driverIds : [],
+    // Dezelfde reden voor de postfilter (F4.1): zonder login staat er geen
+    // aanvrager in een blok, en `?post=<id>` zou anders een bezoeker laten
+    // uitvissen wanneer één bepaalde post rijdt.
+    groupIds: team || praesidium ? parsed.groupIds : [],
     requesterTypes: team || praesidium ? parsed.requesterTypes : [],
   };
 
@@ -113,6 +121,7 @@ export default async function VervoerBezettingPage({
     vehicles,
     driverColors,
     drivers,
+    groups,
   ] = await Promise.all([
     team ? transportRange(monday, nextMonday, filters) : Promise.resolve(null),
     praesidium
@@ -130,6 +139,9 @@ export default async function VervoerBezettingPage({
     // login staat er geen chauffeur op het rooster, en dan hoort er ook geen
     // lijst met namen in een filterpaneel te staan.
     session ? driverOptions() : Promise.resolve([]),
+    // De posten en werkgroepen om op te filteren (F4.1). Enkel voor wie de
+    // aanvrager toch al ziet; de filter zelf wordt hierboven ook gewist.
+    team || praesidium ? activeGroups() : Promise.resolve([]),
   ]);
 
   const thisWeek = startOfWeek(new Date());
@@ -169,11 +181,35 @@ export default async function VervoerBezettingPage({
     (booking.status === 'REQUESTED' || booking.status === 'APPROVED') &&
     (allHelpers || (viewer !== null && ownsTransportBooking(booking, viewer)));
 
+  /**
+   * Is dit een rit van een post of werkgroep van de kijker (F4.15)?
+   *
+   * Aangevraagd dóór je post of doorgegeven áán je post: allebei "van ons", net
+   * zoals de filter op post allebei de velden neemt. Zonder sessie staat dit
+   * overal uit; dan is er geen "mijn post".
+   */
+  const isMine = (booking: { groupId?: string | null; assignedGroupId?: string | null }) =>
+    viewer !== null &&
+    ((booking.groupId !== null &&
+      booking.groupId !== undefined &&
+      viewer.groupIds.includes(booking.groupId)) ||
+      (booking.assignedGroupId !== null &&
+        booking.assignedGroupId !== undefined &&
+        viewer.groupIds.includes(booking.assignedGroupId)));
+
   /** Dag plus tijdvenster, hier al tekst: dat formatteren hoort in Belgische tijd. */
   const whenLabel = (startAt: Date, endAt: Date) =>
     `${formatBrusselsDay(startAt)} · ${tripHoursLabel(startAt, endAt)}`;
   const legLabel = (leg: 'HEEN' | 'TERUG' | null) =>
     leg === 'HEEN' ? 'Heenrit' : leg === 'TERUG' ? 'Terugrit' : null;
+
+  // Het nummer van de chauffeur in het kaartje (F4.13). Eén query op precies de
+  // chauffeurs die op dit scherm staan, en niets zonder login: daar staat geen
+  // naam, dus al zeker geen nummer.
+  const cardBookings = teamBookings ?? postBookings ?? [];
+  const cardDriverPhones = await driverPhones(
+    [...new Set(cardBookings.map((booking) => booking.driverId).filter((id): id is string => Boolean(id)))]
+  );
 
   /**
    * Wat er in het kaartje staat wanneer iemand een rit aanklikt.
@@ -194,6 +230,7 @@ export default async function VervoerBezettingPage({
     legLabel: legLabel(booking.tripLeg),
     purpose: booking.purpose,
     driverName: booking.driver?.name ?? null,
+    driverPhone: booking.driverId ? (cardDriverPhones.get(booking.driverId)?.number ?? null) : null,
     needsDriver: vehicleById.get(booking.vehicleId)?.needsDriver ?? true,
     cargoNote: booking.cargoNote,
     pickupAddress: booking.pickupAddress,
@@ -221,6 +258,10 @@ export default async function VervoerBezettingPage({
       legLabel: legLabel(booking.tripLeg),
       purpose: booking.purpose,
       driverName: booking.driver?.name ?? null,
+      // Ook voor een post: "wie rijdt en hoe bereik ik hem" is de vraag van de
+      // dag zelf, en het nummer van de chauffeur is daarvoor bedoeld. Het
+      // nummer van de aanvrager blijft van het team; dat is iets anders.
+      driverPhone: booking.driverId ? (cardDriverPhones.get(booking.driverId)?.number ?? null) : null,
       needsDriver: vehicleById.get(booking.vehicleId)?.needsDriver ?? true,
       cargoNote: booking.cargoNote,
       destination: booking.destination,
@@ -268,6 +309,7 @@ export default async function VervoerBezettingPage({
       destination: booking.destination,
       cargoNote: booking.cargoNote,
       conflict: false,
+      mine: isMine(booking),
     })) ??
     postBookings?.map((booking) => ({
       id: booking.id,
@@ -284,6 +326,7 @@ export default async function VervoerBezettingPage({
       destination: booking.destination,
       cargoNote: booking.cargoNote,
       conflict: false,
+      mine: isMine(booking),
     })) ??
     memberBookings?.map((booking) => ({
       id: booking.id,
@@ -403,19 +446,27 @@ export default async function VervoerBezettingPage({
               name: en ? vehicle.nameEn : vehicle.nameNl,
             }))}
             filterDrivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
+            filterPosts={groups.map((group) => ({
+              id: group.id,
+              name: en ? group.nameEn : group.nameNl,
+            }))}
             canFilterRequester={team || praesidium}
             nav={{ previousHref, nextHref, todayHref: thisWeekHref }}
           />
 
-          <p className="text-xs text-vtk-muted">
-            {session
-              ? en
-                ? 'The fill colour is the driver, the hatching is the vehicle; a trip without a driver is yellow with a red dashed border. Diagonal stripes mean requested but not decided yet, so that slot may still become free.'
-                : 'De vulkleur is de chauffeur, de arcering is het voertuig; een rit zonder chauffeur is geel met een rode streepjesrand. Schuine strepen betekenen aangevraagd maar nog niet beslist, dus dat moment kan nog vrijkomen.'
-              : en
-                ? 'The hatching tells the vehicles apart. Striped means requested but not yet decided; the vehicle may still become free.'
-                : 'De arcering onderscheidt de voertuigen. Gestreept is aangevraagd maar nog niet beslist; dat moment kan dus nog vrijkomen.'}
-          </p>
+          {/* De legende tekent de echte blokken (F4.16). De zin die hier stond,
+              beloofde "geel met een rode streepjesrand" terwijl de CSS al een
+              ronde lang grijs tekende; een legende in woorden is een tweede
+              waarheid over hetzelfde. */}
+          <TransportLegend
+            vehicles={vehicles.map((vehicle) => ({
+              name: en ? vehicle.nameEn : vehicle.nameNl,
+              pattern: vehicle.pattern,
+            }))}
+            showDriver={Boolean(session)}
+            showMine={team || praesidium}
+            locale={locale}
+          />
         </div>
       )}
     </PageShell>

@@ -85,17 +85,6 @@ body {
   --max: 1240px;
 }
 
-/* Nog te beslissen rit in de transportplanning: gestreept, zodat je ziet dat
-   dat moment nog kan vrijkomen (T7, T8). Een streeppatroon en geen kleur, want
-   de kleur is al bezet door de chauffeur. */
-.week-block-requested {
-  background-image: repeating-linear-gradient(
-    135deg,
-    var(--driver-requested) 0 5px,
-    transparent 5px 11px
-  );
-}
-
 /* Arcering per voertuig (K1). De vulkleur blijft van de chauffeur, dus het
    voertuig krijgt het patroon: zo lees je in één blok wie rijdt én waarmee.
 
@@ -104,9 +93,8 @@ body {
    weer uit. Ze zijn bewust licht (alfa rond 0.13): het is een tweede laag
    informatie, geen tweede kleur, en de tekst in het blok moet leesbaar blijven.
 
-   Een blok kan tegelijk `week-block-requested` dragen. Twee schuine patronen
-   over elkaar worden soep, daarom staat `diagonal` op 45 graden en de
-   te-beslissen-arcering op 135: samen lezen ze als een ruit en niet als ruis. */
+   Een blok kan tegelijk `trip-requested` dragen; die tekent een streep langs de
+   bovenrand en geen tweede arcering, precies zodat ze hier niet mee vecht. */
 .trip-pattern-diagonal {
   background-image: repeating-linear-gradient(
     45deg,
@@ -674,6 +662,53 @@ body {
 .trip-no-driver {
   border-style: dashed;
   border-color: var(--driver-edge);
+}
+
+/* Nog te beslissen (T7, T8, F4.16): een volle streep langs de bovenrand, zodat
+   je ziet dat dat moment nog kan vrijkomen.
+
+   **Geen arcering**, en dat is de hele correctie. Ze was een schuin streeppatroon
+   op 135 graden, met de gedachte dat het naast de 45 graden van een voertuig als
+   een ruit zou lezen. Twee dingen klopten daar niet aan. Ten eerste zetten
+   allebei `background-image`, dus ze stapelden niet: de arcering van het voertuig
+   won gewoon, waardoor een aangevraagde rit met een gearceerd voertuig géén
+   markering meer droeg. Ten tweede is arcering al de taal van het voertuig; een
+   status in diezelfde taal is niet te lezen, ook niet wanneer ze wél zou
+   stapelen. De vulkleur is de chauffeur, de arcering is het voertuig, en de
+   status hoort dus op een derde as.
+
+   Een rand en geen pseudo-element: hetzelfde blok is in de weekweergave een
+   absoluut gepositioneerde doos, in de maandweergave een `flex`-rij en op gsm nog
+   iets anders. Een `::before` wordt in die tweede een flex-item naast de tekst in
+   plaats van een streep erboven, en absoluut positioneren zou hem in dat geval
+   aan een voorouder ophangen. Een rand ligt altijd waar hij hoort.
+
+   Ná `.trip-no-driver` in dit bestand, want die zet `border-style: dashed` op
+   alle vier de randen; bij gelijke specificiteit wint de laatste regel, en deze
+   streep hoort vol te zijn. */
+.trip-requested {
+  border-top-width: 3px;
+  border-top-style: solid;
+  border-top-color: var(--driver-requested);
+}
+
+/* Een rit van je eigen post of werkgroep (F4.15): een gele rail langs de
+   linkerrand, dezelfde taal als een uitgelichte kaart op vtk.be.
+
+   Een `border-left` en geen `box-shadow`, om dezelfde reden als hierboven plus
+   een eigen: de selectie in de kalender is een Tailwind-`ring`, en dat ís een
+   box-shadow, dus een tweede schaduw hier zou de ring van het aangeklikte blok
+   wegnemen. Ook geen derde randkleur: rood vol blijft een conflict en grijs
+   gestreept blijft "nog geen chauffeur". Die staan op de andere randen en
+   blijven dus zichtbaar naast deze rail.
+
+   Enkel op het bezettingsoverzicht, waar een post naar de planning van de hele
+   kring kijkt. Op de planning van het team zou het niets onderscheiden: daar is
+   alles van jou. */
+.trip-mine {
+  border-left-width: 3px;
+  border-left-style: solid;
+  border-left-color: var(--yellow);
 }
 
 /* De rit die je aan het aanmaken bent, terwijl het formulier openstaat. Dezelfde

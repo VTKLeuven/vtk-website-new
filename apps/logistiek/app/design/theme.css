@@ -129,7 +129,7 @@
      kleurkiezer; zie docs/design-decisions.md.
 
      `--driver-none` is voor een rit zonder chauffeur: neutraal grijs, want dat
-     is een rit die nog niemand toegewezen kreeg en niet een fout. Het was de
+     is een rit die nog niemand toegewezen kreeg en niet een fout. Het wás de
      gele accentkleur met een rode streepjesrand, en op een week waarin de helft
      nog niet verdeeld is schreeuwt dat scherm zichzelf stuk. Grijs zegt
      "hier moet nog iets gebeuren" zonder alarm; de tekst "geen chauffeur" in het
@@ -165,7 +165,11 @@
   --driver-pattern: rgba(14, 26, 54, 0.13); /* arcering per voertuig */
   --driver-pattern-strong: rgba(14, 26, 54, 0.2); /* de stippenversie */
   --driver-pattern-faint: rgba(14, 26, 54, 0.11); /* de ruitversie */
-  --driver-requested: rgba(14, 26, 54, 0.14); /* "nog te beslissen" */
+  /* De streep langs de bovenrand van een rit die nog beslist moet worden. Vol en
+     niet doorzichtig: ze ligt op een blok dat al een vulkleur en een arcering
+     draagt, en een lichte tint erbovenop is daar niet meer van te onderscheiden.
+     Zie de comment bij `.trip-requested` in globals.css. */
+  --driver-requested: #0e1a36;
   --driver-glow: rgba(255, 255, 255, 0.7); /* leesrandje onder tekst op een blok */
   --avail-pattern: rgba(255, 255, 255, 0.62); /* "liever niet" */
   --avail-pattern-strong: rgba(255, 255, 255, 0.85); /* "enkel in nood" */
@@ -286,7 +290,7 @@
   --driver-pattern: rgba(255, 255, 255, 0.16);
   --driver-pattern-strong: rgba(255, 255, 255, 0.24);
   --driver-pattern-faint: rgba(255, 255, 255, 0.13);
-  --driver-requested: rgba(255, 255, 255, 0.17);
+  --driver-requested: #dbe3f7;
   --driver-glow: rgba(0, 0, 0, 0.55);
   --avail-pattern: rgba(0, 0, 0, 0.45);
   --avail-pattern-strong: rgba(0, 0, 0, 0.6);
@@ -328,5 +332,8 @@
     --danger-fill: #ffffff;
     --warn-fill: #ffffff;
     --driver-ink: #000000;
+    /* De statusstreep blijft ook op papier zichtbaar; ze zegt of een moment nog
+       kan vrijkomen, en dat is precies wat er op een afgedrukte week toe doet. */
+    --driver-requested: #000000;
   }
 }

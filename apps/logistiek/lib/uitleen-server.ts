@@ -1131,17 +1131,32 @@ function transportFilterWhere(
   if (!filters) return {};
   const named = filters.driverIds.filter((id) => id !== NO_DRIVER);
   const wantsNone = filters.driverIds.includes(NO_DRIVER);
+  // Twee filters die elk een OF zijn, en die moeten als EN naast elkaar staan:
+  // "van Acti én zonder chauffeur". Ze allebei als `OR` in hetzelfde object
+  // zetten kan niet (één sleutel per object), en dan wint stil de laatste.
+  const anyOf: Prisma.UitleenTransportBookingWhereInput[] = [];
+  if (filters.driverIds.length > 0) {
+    anyOf.push({
+      OR: [
+        ...(named.length > 0 ? [{ driverId: { in: named } }] : []),
+        ...(wantsNone ? [{ driverId: null }] : []),
+      ],
+    });
+  }
+  // De post die de rit vroeg én de post die hem rijdt (F4.1). Zie `groupIds` in
+  // lib/transport-filters.ts voor waarom het allebei is.
+  if (filters.groupIds.length > 0) {
+    anyOf.push({
+      OR: [
+        { groupId: { in: filters.groupIds } },
+        { assignedGroupId: { in: filters.groupIds } },
+      ],
+    });
+  }
   return {
     ...(filters.vehicleIds.length > 0 ? { vehicleId: { in: filters.vehicleIds } } : {}),
     ...(filters.requesterTypes.length > 0 ? { requesterType: { in: filters.requesterTypes } } : {}),
-    ...(filters.driverIds.length > 0
-      ? {
-          OR: [
-            ...(named.length > 0 ? [{ driverId: { in: named } }] : []),
-            ...(wantsNone ? [{ driverId: null }] : []),
-          ],
-        }
-      : {}),
+    ...(anyOf.length > 0 ? { AND: anyOf } : {}),
   };
 }
 
@@ -1229,6 +1244,10 @@ export async function transportRange(from: Date, to: Date, filters?: TransportFi
       // de rijen ze toch al dragen.
       plannedByTeam: true,
       payments: { select: { id: true } },
+      // De post die de rit aanvroeg, en de post die ze zelf mag invullen (zie
+      // `assignTripGroupAction`). Allebei, want allebei maken ze een rit "van
+      // jouw post" (F4.1, F4.15).
+      groupId: true,
       // De post die deze rit zelf mag invullen (zie `assignTripGroupAction`).
       assignedGroupId: true,
       assignedGroup: { select: { nameNl: true } },

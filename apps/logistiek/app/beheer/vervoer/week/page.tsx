@@ -335,6 +335,7 @@ export default async function VervoerWeekPage({
         hiddenNote={describeFilters(filters, {
           vehicles: new Map(vehicles.map((vehicle) => [vehicle.id, vehicle.nameNl])),
           drivers: new Map(drivers.map((driver) => [driver.id, driver.name])),
+          groups: new Map(groups.map((group) => [group.id, group.nameNl])),
         })}
         vehicleOptions={vehicles
           .filter((vehicle) => vehicle.active)

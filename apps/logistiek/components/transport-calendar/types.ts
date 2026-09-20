@@ -32,6 +32,15 @@ export type TripBlock = {
   cargoNote?: string | null;
   /** Rood: twee goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. */
   conflict: boolean;
+  /**
+   * Deze rit is van een post of werkgroep van de kijker (F4.15): gele rail links.
+   *
+   * Een vlag op het blok en geen groep-id plus een vergelijking in de kalender:
+   * wie de kijker is, weet de server, en de kalender is een client-component die
+   * op drie schermen hergebruikt wordt. Op de planning van het team staat ze
+   * nergens aan; daar is elke rit van jou en zou ze niets onderscheiden.
+   */
+  mine?: boolean;
 };
 
 /**
