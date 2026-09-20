@@ -48,14 +48,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             browser de eerste pixel tekent, anders flitst elke pagina wit op. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
         {analytics && (
-          <Script
-            strategy="afterInteractive"
-            src={analytics.src}
-            data-website-id={analytics.websiteId}
-            data-exclude-search="true"
-            data-exclude-hash="true"
-            data-performance="true"
-          />
+          <>
+            <Script
+              strategy="afterInteractive"
+              src={analytics.src}
+              data-website-id={analytics.websiteId}
+              data-exclude-search="true"
+              data-exclude-hash="true"
+              data-performance="true"
+            />
+            <script
+              defer
+              src="https://analytics.vtk.be/recorder.js"
+              data-website-id="logistiek.vtk.be"
+            ></script>
+          </>
         )}
         <ImpersonationBanner />
         <SiteHeader />

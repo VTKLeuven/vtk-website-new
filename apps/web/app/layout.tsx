@@ -112,6 +112,11 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               data-exclude-hash="true"
               data-performance="true"
             />
+            <script
+              defer
+              src="https://analytics.vtk.be/recorder.js"
+              data-website-id="vtk.be"
+            ></script>
           </>
         )}
         {children}
