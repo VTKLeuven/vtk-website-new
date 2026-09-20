@@ -53,6 +53,8 @@ export type FrontpageShiftItem = {
   name: string;
   startTime: Date;
   endTime: Date;
+  /** Enkel om de `Shift`-vorm compleet te maken voor `ShiftDialog`; niet getoond. */
+  updatedAt: Date;
   location: string;
   description: string;
   instructions: string | null;

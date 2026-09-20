@@ -203,7 +203,14 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   // Het einde mag niet voor de start liggen. Anders is het evenement tegelijk
   // "aankomend" op de homepage (die op `start` filtert) en "verleden" in de
   // admin (die op `end` filtert): dezelfde datum, twee tegengestelde statussen.
-  if (end < start) return saveError("END_BEFORE_START");
+  //
+  // Even lang als niets telt daarbij mee, maar enkel wanneer er uren aan
+  // hangen: `DTEND` van een hele-dag-event is exclusief, dus daar ís start
+  // gelijk aan eind precies één dag. Een tijdstip-evenement van nul minuten is
+  // altijd een typfout, en in een agenda-app is het een streepje zonder hoogte
+  // dat je niet ziet staan. Er stond er zo een in de feed.
+  const zeroLength = !input.allDay && !moments && end.getTime() === start.getTime();
+  if (end < start || zeroLength) return saveError("END_BEFORE_START");
 
   const superOrAll =
     session.user.isSuperAdmin || hasPermission(session, "calendar.manageAll");

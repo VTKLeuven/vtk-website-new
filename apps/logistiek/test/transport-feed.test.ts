@@ -10,10 +10,18 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
  * niet gevangen hebben; die stonden er.
  */
 
-const { findMany } = vi.hoisted(() => ({ findMany: vi.fn() }));
+const { findMany, membershipFindMany } = vi.hoisted(() => ({
+  findMany: vi.fn(),
+  membershipFindMany: vi.fn(),
+}));
 
 vi.mock('@vtk/db', () => ({
-  prisma: { uitleenTransportBooking: { findMany } },
+  prisma: {
+    uitleenTransportBooking: { findMany },
+    // De chauffeursfeed draagt sinds de postritten ook de posten van deze
+    // persoon; zonder sessie moet hij die zelf opzoeken.
+    groupMembership: { findMany: membershipFindMany },
+  },
 }));
 
 process.env.LOGISTIEK_PUBLIC_URL = 'https://logistiek.vtk.be';
@@ -74,6 +82,10 @@ function eventDescription(all: string[]): string {
 
 beforeEach(() => {
   findMany.mockReset();
+  membershipFindMany.mockReset();
+  // De meeste tests gaan over wat er in een VEVENT staat, niet over welke
+  // posten iemand heeft; standaard dus geen.
+  membershipFindMany.mockResolvedValue([]);
 });
 
 describe('buildTransportFeed', () => {
@@ -115,13 +127,57 @@ describe('buildTransportFeed', () => {
     expect(await lines([booking()])).toContain('LOCATION:Zaal Alma 3');
   });
 
-  it('haalt voor een chauffeursfeed enkel zijn eigen ritten op', async () => {
+  it('haalt voor een chauffeursfeed enkel ritten op die hem aangaan', async () => {
     // Een eigen `where` en geen filter achteraf: zie de comment bij de functie.
     findMany.mockResolvedValue([]);
+    membershipFindMany.mockResolvedValue([{ groupId: 'g1' }]);
     await buildTransportFeed('DRIVER', 'u9');
+
     const where = findMany.mock.calls[0][0].where;
-    expect(where.driverId).toBe('u9');
-    expect(where.status).toEqual({ in: ['APPROVED', 'COMPLETED'] });
+    const [{ OR: bronnen }] = where.AND;
+    expect(bronnen).toContainEqual({ driverId: 'u9' });
+    // De rit die aan zijn post doorgegeven is: precies degene die nog een
+    // chauffeur zoekt, en die hier vroeger ontbrak.
+    expect(bronnen).toContainEqual({ assignedGroupId: { in: ['g1'] } });
+    expect(bronnen).toContainEqual({ groupId: { in: ['g1'] }, driverId: { not: null } });
+  });
+
+  it('valt terug op enkel de eigen ritten wanneer je in geen enkele post zit', async () => {
+    findMany.mockResolvedValue([]);
+    membershipFindMany.mockResolvedValue([]);
+    await buildTransportFeed('DRIVER', 'u9');
+
+    const [{ OR: bronnen }] = findMany.mock.calls[0][0].where.AND;
+    expect(bronnen).toEqual([{ driverId: 'u9' }]);
+  });
+
+  it('laat een afgelaste rit niet stil verdwijnen maar stuurt een grafsteen', async () => {
+    // Een VEVENT dat gewoon wegvalt, ruimt Apple op en laat Google geregeld
+    // staan. `STATUS:CANCELLED` is de expliciete instructie om te schrappen.
+    const afgelast = booking({ status: 'CANCELLED' });
+    const ics = await lines([afgelast]);
+
+    expect(ics).toContain('STATUS:CANCELLED');
+    // En ook leesbaar, voor een client die STATUS negeert.
+    expect(ics.find((line) => line.startsWith('SUMMARY:'))).toContain('Afgelast:');
+  });
+
+  it('zet een levende rit gewoon op CONFIRMED', async () => {
+    expect(await lines([booking()])).toContain('STATUS:CONFIRMED');
+  });
+
+  it('vraagt afgelaste ritten enkel op zolang ze vers zijn', async () => {
+    findMany.mockResolvedValue([]);
+    membershipFindMany.mockResolvedValue([]);
+    const now = new Date('2026-09-20T12:00:00.000Z');
+    await buildTransportFeed('DRIVER', 'u9', now);
+
+    const [, statusWhere] = findMany.mock.calls[0][0].where.AND;
+    const grafsteen = statusWhere.OR.find((tak: { status: { in: string[] } }) => tak.status.in.includes('CANCELLED'));
+    expect(grafsteen.status.in).toEqual(['REJECTED', 'CANCELLED']);
+    // Dertig dagen: elke client heeft intussen minstens één keer opgehaald.
+    const dagen = Math.round((now.getTime() - grafsteen.updatedAt.gte.getTime()) / 86_400_000);
+    expect(dagen).toBe(30);
   });
 });
 

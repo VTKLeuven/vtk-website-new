@@ -1825,15 +1825,25 @@ plaats van een leeg vlak te tonen.
 ### Wat er in welke feed zit
 
 - Publieke feeds (`/api/calendar/feed`, `.../feed/c/<slug>`, `.../feed/g/<slug>`)
-  bevatten **enkel** `PUBLIC`-events. Een feed-URL is per definitie deelbaar, dus
-  ledenexclusieve evenementen horen daar niet in.
-- De algemene feed en de postfeeds laten **doelgroepevents weg**: dat is het
-  algemene programma. Wie enkel de eerstejaarskalender wil, abonneert zich op
-  `/feed/c/eerstejaars`.
-- De persoonlijke feed (`/api/calendar/feed/me/<token>`) is de enige met
-  `MEMBERS`-events, voegt de shiften toe waarvoor het lid is ingeschreven, en
-  volgt de doelgroepen van dat lid; een eerstejaars hoeft zich dus niet apart op
-  de eerstejaarsfeed te abonneren.
+  bevatten elk gepubliceerd evenement. Er is geen ledenexclusief evenement meer
+  (`EventVisibility.MEMBERS` is verdwenen; zie § Doelgroepen zijn een label, geen
+  slot), dus er valt hier ook niets meer weg te laten om die reden.
+- **De postfeed laat doelgroepevents niet weg.** Dat deed hij wel, met
+  `audienceFilter([])`, en dat betekent "enkel evenementen zonder
+  doelgroepcategorie": wie zich op de feed van Onthaal abonneerde, kreeg daardoor
+  stil geen enkele eerstejaarsactiviteit van Onthaal, terwijl de hoofdfeed ze wel
+  droeg. Twee feeds die iets anders bedoelen met hetzelfde woord, en de
+  gebruiker merkt enkel dat er iets ontbreekt. Een doelgroep is een label en geen
+  slot, dus een postfeed draagt alles wat die post organiseert.
+- De persoonlijke feed (`/api/calendar/feed/me/<token>`) voegt de shiften toe
+  waarvoor het lid is ingeschreven, en volgt de doelgroepvoorkeur van dat lid.
+- **Een shift in die feed is geen privé-afspraak.** Ze stond op `CLASS:PRIVATE`,
+  omdat de feed-URL een geheim draagt. Een agenda-client leest dat veld anders:
+  Google toont een geabonneerd privé-event enkel als "Bezet", zonder titel en
+  zonder plaats, en Outlook laat de details weg. De naam, de plaats en de uitleg
+  stonden dus wél in het bestand, met de instructie aan de agenda om ze niet te
+  tonen. Geheimhouding hangt aan het token, `no-store` en `noindex`; `CLASS` is
+  een weergavehint. Dezelfde fout stond ooit op de ritten van Logistiek.
 - Elke feed draagt een venster van 12 maanden terug tot 24 vooruit. Clients halen
   het bestand elk paar uur opnieuw op; de volledige historiek meesturen kost enkel
   bandbreedte.
@@ -3950,6 +3960,25 @@ geeft de planning als `.ics`.
   (AGENTS.md) en die laat `better-auth` doorfloaten naar een versie waarop
   `packages/auth` niet meer typecheckt. De generator is klein,
   afhankelijkheidsvrij en getest; de kopie kost minder dan die val.
+- **"Mijn ritten" in de feed is meer dan de ritten waar jouw naam op staat.**
+  De chauffeursfeed draaide op `driverId` alleen. Sinds een autorit aan een post
+  doorgegeven kan worden, staat op `/ritten` ook wat jouw post nog moet invullen,
+  en die stonden hier niet: precies de verkeerde helft om weg te laten, want een
+  rit met een chauffeur is geregeld en een rit die er nog een zoekt is werk. De
+  feed volgt nu dezelfde drie bronnen als `tripsForGroups` (aan jou toegewezen,
+  aan jouw post doorgegeven, of door jouw post aangevraagd en al toegewezen), en
+  de posten zijn werkingsjaar-gescoped: wie vorig jaar bij Feest zat, krijgt de
+  ritten van Feest niet meer in zijn agenda.
+- **Een afgelaste rit verdwijnt niet, ze krijgt een grafsteen.** Een rit die
+  afgewezen of geannuleerd wordt, viel gewoon uit de feed. Dat is niet hetzelfde
+  als ze weghalen: een geabonneerde agenda hoort een verdwenen VEVENT op te
+  ruimen, Apple doet dat ook, en Google laat hem geregeld gewoon staan. Wie zijn
+  rit zag afgelast worden, hield er dan een afspraak aan over die nergens meer
+  bestaat, en dat is erger dan geen feed hebben: hij rekent erop. Ze rijdt nu nog
+  dertig dagen mee met `STATUS:CANCELLED`, de expliciete instructie om te
+  schrappen, en met "Afgelast:" vooraan in de titel voor een client die dat veld
+  negeert. Dertig dagen omdat elke client intussen minstens één keer opgehaald
+  heeft, en omdat het bestand anders volloopt met de annulaties van het hele jaar.
 
 ### Een nieuwe aanvraag mailt het team, per soort een ander adres
 

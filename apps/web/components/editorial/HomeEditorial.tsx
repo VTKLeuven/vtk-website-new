@@ -229,6 +229,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         name: true,
         startTime: true,
         endTime: true,
+        // Niet getoond; `ShiftDialog` verwacht de volledige `Shift`-vorm.
+        updatedAt: true,
         location: true,
         description: true,
         instructions: true,

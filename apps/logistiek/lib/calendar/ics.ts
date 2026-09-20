@@ -52,6 +52,22 @@ export type IcsEvent = {
    * weergavehint aan de client en geen slot.
    */
   private?: boolean;
+  /**
+   * Zet `STATUS:CANCELLED` in plaats van `STATUS:CONFIRMED`.
+   *
+   * **Een afspraak die uit de feed verdwijnt, verdwijnt niet overal.** Een
+   * geabonneerde agenda die een VEVENT niet meer ziet, hoort hem op te ruimen,
+   * en Apple doet dat ook; Google laat hem geregeld gewoon staan. Wie zijn rit
+   * geannuleerd zag worden, hield er dan een afspraak aan over die nergens meer
+   * bestaat, en dat is erger dan geen feed: hij rekent erop.
+   *
+   * Een grafsteen lost dat op. We blijven de afspraak meesturen, met
+   * `STATUS:CANCELLED`, zodat elke client de instructie krijgt om hem te
+   * schrappen of door te strepen. Dat mag niet eeuwig duren (zie
+   * `TOMBSTONE_DAYS` bij de feed die hem aanmaakt), want dan groeit het bestand
+   * met elke afgelaste rit.
+   */
+  cancelled?: boolean;
 };
 
 export type IcsCalendar = {
@@ -176,7 +192,7 @@ function eventLines(event: IcsEvent, dtstamp: string): string[] {
   }
 
   lines.push(`CLASS:${event.private ? "PRIVATE" : "PUBLIC"}`);
-  lines.push("STATUS:CONFIRMED");
+  lines.push(`STATUS:${event.cancelled ? "CANCELLED" : "CONFIRMED"}`);
   lines.push(`LAST-MODIFIED:${formatUtc(event.updatedAt)}`);
   lines.push(`SEQUENCE:${sequenceFor(event.updatedAt)}`);
   lines.push("END:VEVENT");

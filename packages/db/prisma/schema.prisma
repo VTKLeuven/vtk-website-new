@@ -505,50 +505,50 @@ model User {
 
   // Onboarding-profiel (ingevuld bij de eerste KUL SSO-login). Zolang
   // onboardedAt null is, wordt het lid naar de onboarding-flow gestuurd.
-  onboardedAt             DateTime?
+  onboardedAt          DateTime?
   // Kotadres. `noKot` is expliciet: lege velden alleen kunnen niet onderscheiden
   // of iemand geen kot heeft of het adres nog niet invulde.
-  noKot                   Boolean             @default(false)
-  street                  String?
-  houseNumber             String?
-  bus                     String? // busnummer, optioneel
-  postalCode              String?
-  city                    String?
+  noKot                Boolean         @default(false)
+  street               String?
+  houseNumber          String?
+  bus                  String? // busnummer, optioneel
+  postalCode           String?
+  city                 String?
   // Thuisadres is functioneel verplicht in onboarding en studiebevestiging.
   // De kolommen blijven nullable zodat bestaande leden pas bij hun volgende
   // bevestiging een echt adres moeten opgeven, zonder verzonnen migratiedata.
-  homeStreet              String?
-  homeHouseNumber         String?
-  homeBus                 String? // busnummer, optioneel
-  homePostalCode          String?
-  homeCity                String?
-  birthDate               DateTime?
+  homeStreet           String?
+  homeHouseNumber      String?
+  homeBus              String? // busnummer, optioneel
+  homePostalCode       String?
+  homeCity             String?
+  birthDate            DateTime?
   // Contact: `email` is de login-/universiteitsmail (via SSO). Persoonlijke
   // mail en de voorkeur voor communicatie komen erbij.
-  personalEmail           String?
-  emailPreference         EmailPreference     @default(UNIVERSITY)
+  personalEmail        String?
+  emailPreference      EmailPreference @default(UNIVERSITY)
   // Gsm-nummer, optioneel en vrije tekst: we bellen ermee, we valideren er niets
   // mee. Buitenlandse nummers, een spatie hier en een streepje daar; een regex
   // die daar streng op is, weigert vroeg of laat een nummer dat gewoon werkt.
   // Bestaat voor de dagelijkse werking: wie een shift doet en niet komt opdagen,
   // bel je. Daarom staat het in de ingeschrevenenlijst van een shift, en niet in
   // een publieke lijst.
-  phone                   String?
+  phone                String?
   // Optionele standaard voor persoonlijke terugbetalingen. Elke rekening
   // bewaart nog steeds haar eigen IBAN, zodat een afwijking of latere
   // profielwijziging historische rekeningen niet verandert.
-  defaultIban             String?
+  defaultIban          String?
   // Het `@vtk.be`-account in Google Workspace. `googleUserId` is het immutable
   // id van Google: dat blijft kloppen wanneer iemand van naam of adres wisselt.
   // Op naam matchen doen we bewust nooit (naamgenoten, tussenvoegsels), dus dit
   // veld is de enige koppeling. Zie docs/design-decisions.md, "Google Workspace".
-  googleUserId            String?             @unique
-  googleEmail             String?             @unique
-  googleLinkedAt          DateTime?
+  googleUserId         String?         @unique
+  googleEmail          String?         @unique
+  googleLinkedAt       DateTime?
   // Wanneer het lid de verplichte koppeling uitstelde omdat het nog geen
   // @vtk.be-account heeft. Zonder deze ontsnapping sluit de gate iemand buiten
   // die niets kan doen aan wat de gate vraagt; de gate komt gewoon terug.
-  googleLinkDeferredAt    DateTime?
+  googleLinkDeferredAt DateTime?
 
   // De e-mailhandtekening van dit lid, zoals /account ze genereert.
   //
@@ -677,27 +677,27 @@ model User {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
 
-  memberships          GroupMembership[]
+  memberships              GroupMembership[]
   // Lidmaatschap van de kring per academiejaar. Bewust een andere as dan
   // `memberships` hierboven: dat zijn posten per werkingsjaar.
-  vtkMemberships       Membership[]            @relation("MembershipUser")
-  membershipsGranted   Membership[]            @relation("MembershipGrantedBy")
-  roles                UserRole[]
-  vaultMember          VaultMember?
-  pocRepresentative    PocRepresentative[]
-  createdPages         Page[]                  @relation("PageCreatedBy")
-  createdAnnouncements Announcement[]          @relation("AnnouncementCreatedBy")
-  updatedFrontpages    Frontpage[]             @relation("FrontpageUpdatedBy")
-  createdEvents        CalendarEvent[]         @relation("EventCreatedBy")
-  dashboardTiles       DashboardTile[]
-  dashboardTilePrefs   UserDashboardTilePref[]
-  adminNavPins         UserAdminNavPin[]
-  participatingShifts  ShiftParticipant[]
-  manualShiftGrants        ManualShiftGrant[] @relation("UserManualShiftGrants")
-  createdManualShiftGrants ManualShiftGrant[] @relation("CreatedManualShiftGrants")
-  createdShortLinks    ShortLink[]             @relation("ShortLinkCreatedBy")
-  alumniContacts       AlumniContact[]         @relation("AlumniContactCreatedBy")
-  accountEmailTokens   AccountEmailToken[]     @relation("AccountEmailTokenUser")
+  vtkMemberships           Membership[]            @relation("MembershipUser")
+  membershipsGranted       Membership[]            @relation("MembershipGrantedBy")
+  roles                    UserRole[]
+  vaultMember              VaultMember?
+  pocRepresentative        PocRepresentative[]
+  createdPages             Page[]                  @relation("PageCreatedBy")
+  createdAnnouncements     Announcement[]          @relation("AnnouncementCreatedBy")
+  updatedFrontpages        Frontpage[]             @relation("FrontpageUpdatedBy")
+  createdEvents            CalendarEvent[]         @relation("EventCreatedBy")
+  dashboardTiles           DashboardTile[]
+  dashboardTilePrefs       UserDashboardTilePref[]
+  adminNavPins             UserAdminNavPin[]
+  participatingShifts      ShiftParticipant[]
+  manualShiftGrants        ManualShiftGrant[]      @relation("UserManualShiftGrants")
+  createdManualShiftGrants ManualShiftGrant[]      @relation("CreatedManualShiftGrants")
+  createdShortLinks        ShortLink[]             @relation("ShortLinkCreatedBy")
+  alumniContacts           AlumniContact[]         @relation("AlumniContactCreatedBy")
+  accountEmailTokens       AccountEmailToken[]     @relation("AccountEmailTokenUser")
 
   meetingsCreated           Meeting[]                  @relation("MeetingCreatedBy")
   meetingReservations       MeetingReservation[]       @relation("MeetingReservationUser")
@@ -2790,6 +2790,16 @@ model Shift {
   manualGrantId String?
   manualGrant   ManualShiftGrant? @relation(fields: [manualGrantId], references: [id], onDelete: Cascade)
 
+  /// Wanneer deze shift voor het laatst gewijzigd is.
+  ///
+  /// Bestaat voor de agendafeed. Die vult `LAST-MODIFIED` en `SEQUENCE` van een
+  /// VEVENT, en daar stond `startTime` omdat er niets beters was. Gevolg: een
+  /// shift hernoemen, verplaatsen of van omschrijving veranderen liet dat getal
+  /// ongemoeid, en een agenda-client die op `SEQUENCE` let, hield de oude versie.
+  /// De starttijd is wanneer de shift doorgaat, niet wanneer we er iets aan
+  /// veranderd hebben; dat zijn twee dingen.
+  updatedAt DateTime @default(now()) @updatedAt
+
   @@unique([sourceSystem, sourceId])
   @@index([manualGrantId])
 }
@@ -2827,24 +2837,24 @@ model ShiftParticipant {
 /// bestaande queries (ranking, medewerkersstatus/voorverkoop, historiek)
 /// automatisch mee optellen.
 model ManualShiftGrant {
-  id           String   @id @default(cuid())
-  createdAt    DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  userId       String
-  user         User     @relation("UserManualShiftGrants", fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation("UserManualShiftGrants", fields: [userId], references: [id], onDelete: Cascade)
 
   count        Int
   post         String?
   reason       String
   academicYear Int
-  reward       Int      @default(0)
-  payedOut     Boolean  @default(true)
+  reward       Int     @default(0)
+  payedOut     Boolean @default(true)
 
-  createdById  String?
-  createdBy    User?    @relation("CreatedManualShiftGrants", fields: [createdById], references: [id], onDelete: SetNull)
+  createdById String?
+  createdBy   User?   @relation("CreatedManualShiftGrants", fields: [createdById], references: [id], onDelete: SetNull)
 
-  shifts       Shift[]
+  shifts Shift[]
 
   @@index([userId])
   @@index([academicYear])

@@ -365,8 +365,8 @@ export function EventForm({
           ? 'Niet opgeslagen: die URL-naam is al van een ander evenement of van een kalendercategorie. Kies een andere, bijvoorbeeld met het jaartal erachter.'
           : 'Not saved: that URL name already belongs to another event or to a calendar category. Pick a different one, for instance with the year after it.',
         END_BEFORE_START: nl
-          ? 'Niet opgeslagen: het einde ligt voor de start. Kies een einde na de startdatum.'
-          : 'Not saved: the end is before the start. Pick an end after the start date.',
+          ? 'Niet opgeslagen: het einde ligt voor of op de start. Een evenement met uren duurt minstens een minuut; duurt het een hele dag, vink dan "hele dag" aan.'
+          : 'Not saved: the end is at or before the start. An event with hours lasts at least a minute; if it takes all day, tick "all day".',
         NO_MOMENTS: nl
           ? 'Niet opgeslagen: er staat geen enkel moment ingevuld. Voeg er één toe, of kies "Eén doorlopende periode".'
           : 'Not saved: no moment has been filled in. Add one, or pick "One continuous period".',

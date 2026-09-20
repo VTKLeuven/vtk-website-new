@@ -3,7 +3,7 @@ import "server-only";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { markdownToPlainText } from "@/lib/markdown";
-import { audienceFilter, audienceFilterForUser } from "./audience";
+import { audienceFilterForUser } from "./audience";
 import { buildIcs, formatDate, type IcsCalendar, type IcsEvent } from "./ics";
 
 /**
@@ -286,12 +286,18 @@ export async function buildFeed(
         select: { id: true, slug: true, nameNl: true, nameEn: true },
       });
       if (!group) return null;
+      // **Geen doelgroepfilter, net als de hoofdfeed.** Dit stond hier op
+      // `audienceFilter([])`, wat neerkomt op "enkel evenementen zonder
+      // doelgroepcategorie": wie zich op de feed van Onthaal abonneerde, kreeg
+      // daardoor stil geen enkele eerstejaarsactiviteit van Onthaal te zien.
+      // Een doelgroep is een label en geen slot (zie design-decisions.md,
+      // "Doelgroepen zijn een label, geen slot"), dus een postfeed hoort alles
+      // te dragen wat die post organiseert.
       const events = await prisma.calendarEvent.findMany({
         where: {
           publishedAt: { not: null },
           groupId: group.id,
           ...window,
-          ...audienceFilter([]),
         },
         select: eventSelect,
         orderBy: { start: "asc" },
@@ -327,6 +333,7 @@ export async function buildFeed(
                 description: true,
                 startTime: true,
                 endTime: true,
+                updatedAt: true,
               },
             },
           },
@@ -347,10 +354,16 @@ export async function buildFeed(
           location: shift.location || null,
           url: `${siteBaseUrl()}${locale === "en" ? "/en" : ""}/shift`,
           categories: [locale === "nl" ? "Shiften" : "Shifts"],
-          // `Shift` heeft geen `updatedAt`; de starttijd is het beste signaal dat
-          // we hebben, en die verandert wanneer de shift verzet wordt.
-          updatedAt: shift.startTime,
-          private: true,
+          updatedAt: shift.updatedAt,
+          // **Bewust géén `private: true`.** Dat zette `CLASS:PRIVATE` op elke
+          // shift, en Google toont een geabonneerd privé-event enkel als
+          // "Bezet", zonder titel en zonder plaats (Outlook laat de details
+          // weg). Je zag dus wel dát je iets had, maar niet wat of waar, en
+          // daarvoor abonneer je je nu net. Dezelfde fout stond ooit op de
+          // ritten van Logistiek; zie de comment bij `private` in ics.ts.
+          //
+          // Deze feed is geheim door het token in de URL, `no-store` en
+          // `noindex`, niet door een weergavehint aan de agenda-app.
         });
       }
       icsEvents.sort((a, b) => a.start.getTime() - b.start.getTime());
