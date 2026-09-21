@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
   typescript: {
     tsconfigPath: process.env.NODE_ENV === "production" ? "tsconfig.build.json" : "tsconfig.json",
   },
+  // Een dev-server die je over het netwerk opent (LAN, Tailscale, tunnel) moet
+  // hier staan. Anders weigert Next de HMR-websocket en hydrateert de pagina
+  // nooit: de HTML staat er, maar geen enkele knop, menu of formulier reageert.
+  allowedDevOrigins: ["127.0.0.1", "apollo", "100.113.230.81", "**.ts.net"],
   transpilePackages: ["@vtk/auth", "@vtk/ui", "@vtk/db", "@vtk/mail", "@vtk/payments", "@vtk/storage"],
   // Keep the generated Prisma client and native image lib out of the bundler
   // module graph; see apps/web/next.config.ts for the full rationale.
