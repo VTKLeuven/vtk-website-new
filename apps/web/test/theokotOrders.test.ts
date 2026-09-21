@@ -157,6 +157,45 @@ describe("bestellen bij het Theokot", () => {
       placeOrder("user-1", "sess-1", [{ sessionItemId: "item-2", quantity: 2 }], NOW),
     ).rejects.toBeInstanceOf(TheokotValidationError);
   });
+
+  /**
+   * Dezelfde bestelling in vijf lijnen is nog altijd één bestelling van vijf
+   * broodjes. Werd elke lijn apart naast de voorraad gelegd, dan kwam dit door
+   * de check van een broodje waar er één van was, en hield enkel
+   * `maxItemsPerOrder` het nog tegen. De bestelpagina kan dit niet sturen; de
+   * app-API en een rechtstreekse aanroep wel.
+   */
+  it("legt dubbele lijnen samen naast de voorraad", async () => {
+    mocks.usageForSessionItemsTx.mockResolvedValue(new Map([["item-1", 9]]));
+
+    const lines = Array.from({ length: 5 }, () => ({ sessionItemId: "item-1", quantity: 1 }));
+
+    await expect(placeOrder("user-1", "sess-1", lines, NOW)).rejects.toBeInstanceOf(
+      TheokotValidationError,
+    );
+    expect(mocks.createOrder).not.toHaveBeenCalled();
+  });
+
+  it("voegt dubbele lijnen samen tot één bestellijn", async () => {
+    await placeOrder(
+      "user-1",
+      "sess-1",
+      [
+        { sessionItemId: "item-1", quantity: 1 },
+        { sessionItemId: "item-1", quantity: 2 },
+      ],
+      NOW,
+    );
+
+    expect(mocks.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          totalCents: 780,
+          lines: { create: [{ sessionItemId: "item-1", quantity: 3, unitPriceCents: 260 }] },
+        }),
+      }),
+    );
+  });
 });
 
 describe("annuleren bij het Theokot", () => {

@@ -17,7 +17,8 @@ COMPOSE := docker compose -f infra/compose.dev.yml
 
 .PHONY: help up down db postgres admin dev logistiek seed migrate generate deps \
         lint test verify psql logs status backup backups backup-immich restore reset fixtures \
-        verhuur
+        verhuur \
+        broodjes
 
 ## help: show this list
 help:
@@ -82,6 +83,10 @@ seed:
 ## verhuur: vul de verhuurkalender met voorbeelden (lokaal)
 verhuur:
 	npm run db:demo:verhuur
+
+## broodjes: vul het broodjessysteem met voorbeelden (lokaal)
+broodjes:
+	npm run db:demo:broodjes
 
 ## dev: start only the website, assuming the database already runs
 dev:

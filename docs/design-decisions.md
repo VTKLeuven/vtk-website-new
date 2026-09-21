@@ -292,6 +292,58 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 - Bans en no-show-historiek zijn zichtbaar en **corrigeerbaar** in het admin-paneel
   (`/admin/theokot/bans`). Een correctie kan meteen de actieve ban opheffen.
 
+### Afsluiten, verwijderen en te weinig broodjes
+
+Vijf keuzes die in september 2026 gemaakt zijn, nadat een doorlichting ze als
+open vragen opleverde (`docs/theokot-broodjes-audit-2026-09-21.md`).
+
+- **Afsluiten en verwijderen zijn twee verschillende dingen.**
+  - **"Afhaalronde afsluiten"** is voor de verkoper die klaar is. De afhaal is
+    voorbij (`pickupEnd` op nu), er kan niets meer bijbesteld of geannuleerd
+    worden, en de no-show-klok loopt vanaf daar: een kwartier later telt wat er
+    niet opgehaald is als niet opgehaald, precies zoals bij een dag die uitloopt.
+    Wat daarna toch nog uitgedeeld wordt, zet de balie op opgehaald.
+  - **"Verkoopdag verwijderen"** is voor de dag die niet doorgaat. De dag gaat weg
+    met haar aanbod en haar bestellingen, en iedereen die besteld had krijgt een
+    mail. Dat kan enkel zolang er niets afgehaald is en er geen bonnetjes op
+    afgeboekt zijn: die zijn echt gebeurd en komen niet terug.
+  - **Afsluiten raakt `isOpen` bewust niet aan.** Dat vinkje betekent elders "die
+    dag gaat door": `syncMeetingReservations` maakt elke grocomeet- en
+    bureaureservatie van een dag die niet open staat ongeldig, met een mail. Zou
+    afsluiten dat vinkje omzetten, dan werd de vergadering van die middag
+    geannuleerd op het moment dat de balie afrondt. Het formulier zegt daarom nu
+    ook uit wat het vinkje betekent en waar de knop voor dient.
+- **Een broodje mag ook na sluitingstijd nog over de toog.** De balie toont een
+  bestelling die als niet-opgehaald geboekt staat gewoon, met de melding dat ze
+  laattijdig is en een knop "toch nog uitgedeeld". Ze krijgt dan de notitie
+  "Laattijdig afgehaald aan de balie" en telt niet meer mee als no-show. De
+  beheerder beslist dat zelf: er staat wel eens iemand een kwartier na sluiting,
+  en wat overblijft wordt soms meteen uitgedeeld. Een ban die al uitgesproken
+  was, blijft staan; die hef je op bij Bans & no-shows.
+- **Twee medewerkersbonnetjes zijn exact één broodje**: het duurste uit de
+  bestelling. Geen opleg wanneer dat broodje duurder uitvalt, geen geld terug
+  wanneer het goedkoper is. De balie toont daardoor "nog te betalen" en moet zelf
+  niets meer aftrekken. Bonnetjes kunnen ook nog bij een laattijdige afhaling.
+- **Het aanbod van een dag mag onder het aantal dat al besteld is, en er wordt
+  niets automatisch geschrapt.** Er valt een plateau of de bakker levert minder,
+  en dan moet dat in het systeem kunnen. Wat er dan gebeurt:
+  - De aanbod-editor toont per broodje hoeveel er al besteld zijn en hoeveel er
+    te veel zijn, en opslaan vraagt een bevestiging die dat zegt.
+  - **Wie zijn broodje verliest, kiest een mens.** Automatisch de laatst
+    geplaatste bestellingen schrappen is overwogen en afgewezen: het treft soms
+    de verkeerde, en het gebeurt onomkeerbaar op het moment dat iemand een getal
+    aanpast. Onder de verkoopdag staat daarom de lijst met bestellingen, met per
+    bestelling een schrapknop.
+  - **Schrappen is wissen**, net zoals wanneer de student zelf annuleert: de
+    broodjes komen vrij en het bestelslot van die dag komt vrij, zodat er iemand
+    anders kan reserveren. De student krijgt er een mail over.
+- **De status "Geannuleerd" bestaat niet meer als correctie.** Ze stond in het
+  keuzelijstje bij Bans & no-shows en zette enkel het woord om: de bestellijnen
+  bleven staan, dus de broodjes bleven van de voorraad af en die student kon die
+  dag niets nieuws bestellen. Twee knoppen die "annuleren" heten en iets anders
+  doen, is er één te veel. Corrigeren gaat nu over opgehaald, niet opgehaald en
+  gereserveerd; een bestelling echt weghalen doe je bij de verkoopdag zelf.
+
 ### Turf-lijst
 
 - Voor elke verkoopdag kan een **turf-lijst** geprint worden (`/admin/theokot/turflijst`,

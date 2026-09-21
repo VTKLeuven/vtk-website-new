@@ -3,7 +3,10 @@ import { notFound, redirect } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
+import { formatEuro } from "@/lib/theokot";
 import { getTheokotConfig } from "@/lib/theokot-server";
+import { usageForSessionItems } from "@/lib/meetings-server";
+import { brusselsWallClock, brusselsYMD, shiftYMD } from "@/lib/brussels";
 import { TheokotAdminNav } from "./TheokotAdminNav";
 import { SessionsManager, type AdminSession } from "./SessionsManager";
 import type { OfferingRow } from "./OfferingRows";
@@ -43,20 +46,45 @@ export default async function AdminTheokot({ params }: { params: Promise<{ local
   // Wie enkel de balie mag bedienen start op de afhaalpagina.
   if (!caps.manage) redirect(`${base}/admin/theokot/afhalen`);
 
-  // Toon sessies van gisteren tot in de toekomst.
-  const from = new Date(new Date().getTime() - 86400000);
+  // Toon sessies van gisteren tot in de toekomst. In Brussel-tijd en niet in de
+  // tijdzone van de container, en één dag terug in plaats van twee (de oude
+  // berekening trok er na het aftrekken van een etmaal nog een dag af).
+  const yesterday = shiftYMD(brusselsYMD(new Date()), -1);
+  const from = brusselsWallClock(yesterday.year, yesterday.month, yesterday.day, "00:00");
   const [sessions, config, products] = await Promise.all([
     prisma.theokotSession.findMany({
-      where: { date: { gte: new Date(from.getFullYear(), from.getMonth(), from.getDate() - 1) } },
+      where: { date: { gte: from } },
       orderBy: { date: "asc" },
       include: {
         items: { orderBy: { order: "asc" }, include: { _count: { select: { lines: true } } } },
+        orders: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            status: true,
+            totalCents: true,
+            createdAt: true,
+            user: { select: { name: true, rNumber: true } },
+            lines: {
+              orderBy: { sessionItem: { order: "asc" } },
+              select: { quantity: true, sessionItem: { select: { nameNl: true, nameEn: true } } },
+            },
+            voucherRedemption: { select: { id: true } },
+          },
+        },
         _count: { select: { orders: true } },
       },
     }),
     getTheokotConfig(),
     prisma.theokotProduct.findMany({ where: { active: true }, orderBy: { order: "asc" } }),
   ]);
+
+  // Hoeveel er van elk broodje al weg is. De aanbod-editor heeft dat nodig om
+  // vooraf te kunnen zeggen hoeveel bestellingen sneuvelen wanneer iemand het
+  // aantal verlaagt; de vergaderingen tellen mee, want ze komen uit dezelfde
+  // voorraad.
+  const itemIds = sessions.flatMap((s) => s.items.map((i) => i.id));
+  const ordered = await usageForSessionItems(itemIds);
 
   const dayFmt = (d: Date) => brussels(d, { weekday: "long", day: "numeric", month: "long" });
 
@@ -71,6 +99,25 @@ export default async function AdminTheokot({ params }: { params: Promise<{ local
     orderOpenAt: ymdhm(s.orderOpenAt),
     processed: s.processedAt !== null,
     orderCount: s._count.orders,
+    // Wat de dag onverwijderbaar maakt: opgehaalde bestellingen en bestellingen
+    // waarop al bonnetjes afgeboekt zijn. Allebei zijn ze echt gebeurd.
+    pickedUpCount: s.orders.filter(
+      (o) => o.status === "PICKED_UP" || o.voucherRedemption !== null,
+    ).length,
+    closed: s.pickupEnd <= new Date(),
+    orders: s.orders.map((o) => ({
+      id: o.id,
+      userName: o.user.name,
+      rNumber: o.user.rNumber ?? "",
+      status: o.status,
+      totalLabel: formatEuro(o.totalCents),
+      itemsLabel: o.lines
+        .map((l) => `${l.quantity}\u00d7 ${nl ? l.sessionItem.nameNl : l.sessionItem.nameEn ?? l.sessionItem.nameNl}`)
+        .join(", "),
+      // Opgehaald of met bonnetjes betaald: dat is echt gebeurd en gaat er niet
+      // meer af.
+      canRemove: o.status !== "PICKED_UP" && o.voucherRedemption === null,
+    })),
     items: s.items.map((i) => ({
       id: i.id,
       nameNl: i.nameNl,
@@ -82,6 +129,7 @@ export default async function AdminTheokot({ params }: { params: Promise<{ local
       ingredientsNl: i.ingredientsNl ?? "",
       ingredientsEn: i.ingredientsEn ?? "",
       hasLines: i._count.lines > 0,
+      ordered: ordered.get(i.id) ?? 0,
     })),
   }));
 
@@ -97,6 +145,7 @@ export default async function AdminTheokot({ params }: { params: Promise<{ local
     ingredientsNl: p.ingredientsNl ?? "",
     ingredientsEn: p.ingredientsEn ?? "",
     hasLines: false,
+    ordered: 0,
   }));
   const defaultHours = {
     pickupStart: config.pickupDefaultStart,
