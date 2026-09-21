@@ -6,7 +6,6 @@ import {
   useEffect,
   useRef,
   useState,
-  useSyncExternalStore,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -40,9 +39,6 @@ type SecondarySubmit = {
  * De velden komen als children binnen en mogen server-gerenderd zijn; enkel deze
  * schil is client. De submitknop hoort erbij en toont de bezig-toestand.
  */
-/** Enkel op de client bekend: false op de server en tijdens de hydratie. */
-const subscribeToHydration = () => () => undefined;
-
 export function SaveForm({
   action,
   submitLabel,
@@ -115,12 +111,6 @@ export function SaveForm({
 }) {
   const [state, formAction, pending] = useActionState(action, SAVE_IDLE);
   const showToast = useToast();
-  // Zolang de pagina niet gehydrateerd is bestaat `onSubmit` niet, en verstuurt
-  // de browser het formulier zelf: een GET naar dezelfde URL met elk veld in de
-  // querystring (naam, r-nummer, adres, gsm), zonder dat er iets bewaard wordt.
-  // In dev, met on-demand compilatie, duurt dat venster seconden. Een
-  // uitgeschakelde submitknop houdt ook Enter in een tekstveld tegen.
-  const hydrated = useSyncExternalStore(subscribeToHydration, () => true, () => false);
   // Een veld kan nog bezig zijn (een upload die pas achteraf zijn key kent).
   // Verzenden zou dan een lege waarde bewaren onder een groene toast.
   const { busy, register } = useFormBusy();
@@ -208,7 +198,7 @@ export function SaveForm({
   ]);
 
   const submitButton = (
-    <Button type="submit" disabled={pending || submitDisabled || busy || !hydrated}>
+    <Button type="submit" disabled={pending || submitDisabled || busy}>
       {pending ? savingLabel : submitLabel}
     </Button>
   );
@@ -224,7 +214,7 @@ export function SaveForm({
       variant="secondary"
       {...(submit.confirm ? {} : { name: submit.name, value: submit.value })}
       onClick={submit.confirm ? () => setConfirming(submit) : undefined}
-      disabled={pending || submitDisabled || busy || !hydrated}
+      disabled={pending || submitDisabled || busy}
     >
       {submit.label}
     </Button>
@@ -245,16 +235,14 @@ export function SaveForm({
 
   const chrome = {
     pending,
-    disabled: pending || submitDisabled || busy || !hydrated,
+    disabled: pending || submitDisabled || busy,
     submitButton,
     secondaryButtons,
     confirmDialog,
   };
 
   return (
-    // `method="post"` is het vangnet voor een submit die toch voor de hydratie
-    // langskomt (een eigen knop in de children): dan blijven de velden uit de URL.
-    <form ref={formRef} method="post" onSubmit={onSubmit} className={className}>
+    <form ref={formRef} onSubmit={onSubmit} className={className}>
       {header ? header(chrome) : null}
       <FormBusyProvider register={register}>{children}</FormBusyProvider>
       {footer ? (
