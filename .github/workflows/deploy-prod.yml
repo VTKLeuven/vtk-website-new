@@ -67,6 +67,9 @@ jobs:
     name: Deploy through SSH to Liv
     needs: [verify]
     runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://vtk.be
 
     steps:
       # Enkel nodig om infra/deploy.sh mee te hebben; de runner bouwt niets.

@@ -195,6 +195,9 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
     needs: [checks, build]
     runs-on: ubuntu-latest
+    environment:
+      name: dev
+      url: https://dev.vtk.be
 
     steps:
       # Enkel nodig om infra/deploy.sh mee te hebben; de runner bouwt niets.
