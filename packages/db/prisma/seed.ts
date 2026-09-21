@@ -24,6 +24,22 @@ function readSeedEnv(raw: string | undefined): string | undefined {
   return s === "" ? undefined : s;
 }
 
+/** Het startjaar van het lopende academiejaar in Brussel (omslag 14 september). */
+function seedStudyYear(date: Date = new Date()): number {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Brussels",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const year = get("year");
+  const month = get("month");
+  const day = get("day");
+  const afterCutover = month > 9 || (month === 9 && day >= 14);
+  return afterCutover ? year : year - 1;
+}
+
 function richText(paragraphs: string[]): object {
   return {
     type: "doc",
@@ -923,15 +939,25 @@ async function main() {
   // Create-only: bestaande prototype-gebruikers, hun wachtwoord en lidmaatschappen
   // niet overschrijven bij een reseed op een DB met data.
   const prototypeUserByEmail = new Map<string, { id: string; email: string; name: string }>();
+  const prototypeStudyYear = seedStudyYear();
   for (const u of prototypeUsers) {
     const user = await prisma.user.upsert({
       where: { email: u.email },
-      update: {},
+      update: {
+        onboardedAt: new Date(),
+        studyConfirmedYear: prototypeStudyYear,
+        studyYears: ["MASTER_1"],
+        studyProgrammes: ["COMPUTER_SCIENCE"],
+      },
       create: {
         email: u.email,
         name: u.name,
         locale: u.locale,
         active: true,
+        onboardedAt: new Date(),
+        studyConfirmedYear: prototypeStudyYear,
+        studyYears: ["MASTER_1"],
+        studyProgrammes: ["COMPUTER_SCIENCE"],
       },
     });
     await prisma.account.upsert({
@@ -1576,11 +1602,20 @@ async function main() {
     // de admin-UI of verwijder de rij eerst en herseed.
     const admin = await prisma.user.upsert({
       where: { email: adminEmail },
-      update: {},
+      update: {
+        onboardedAt: new Date(),
+        studyConfirmedYear: prototypeStudyYear,
+        studyYears: ["MASTER_1"],
+        studyProgrammes: ["COMPUTER_SCIENCE"],
+      },
       create: {
         email: adminEmail,
         name: "VTK Admin",
         isSuperAdmin: true,
+        onboardedAt: new Date(),
+        studyConfirmedYear: prototypeStudyYear,
+        studyYears: ["MASTER_1"],
+        studyProgrammes: ["COMPUTER_SCIENCE"],
       },
     });
     await prisma.account.upsert({

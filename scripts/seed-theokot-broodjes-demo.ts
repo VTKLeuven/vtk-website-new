@@ -20,6 +20,7 @@
  */
 
 import { PrismaClient } from "@prisma/client";
+import { currentStudyYear } from "@vtk/auth";
 import { brusselsWallClock, brusselsYMD, shiftYMD } from "../apps/web/lib/brussels";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
@@ -149,6 +150,10 @@ async function main() {
           rNumber: student.rNumber,
           locale: "NL",
           emailVerified: true,
+          onboardedAt: new Date(),
+          studyConfirmedYear: currentStudyYear(),
+          studyYears: ["MASTER_1"],
+          studyProgrammes: ["COMPUTER_SCIENCE"],
         },
         select: { id: true },
       });
