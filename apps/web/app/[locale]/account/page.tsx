@@ -10,7 +10,7 @@ import { passwordStatus } from '@vtk/auth/server';
 import { getDictionary, pick } from '@vtk/i18n';
 import { hasPermission } from '@vtk/auth';
 import { formatEuro } from '@/lib/theokot';
-import { meetingKindLabel, meetingPath } from '@/lib/meetings';
+import { meetingKindLabel, meetingPath, meetingPricesVisible } from '@/lib/meetings';
 import { updateProfileAction, logoutAction } from '@/app/actions/auth';
 import { ProfileForm } from '@/components/profile/ProfileForm';
 import { PasswordPanel } from '@/components/profile/PasswordPanel';
@@ -293,10 +293,19 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                         ) : (
                           <p className="mt-1 text-[#34405e]">
                             {reservation.itemNameNl ?? (nl ? 'geen broodje' : 'no sandwich')}
-                            {reservation.drinkName ? ` · ${reservation.drinkName}` : ''} ·{' '}
-                            <span className="tabular-nums">
-                              {formatEuro(reservation.itemPriceCents + reservation.drinkPriceCents)}
-                            </span>{' '}
+                            {reservation.drinkName ? ` · ${reservation.drinkName}` : ''}
+                            {/* Een VTK Bureau is gratis voor de student (Onderwijs
+                                betaalt); toon daar dus geen bedrag. */}
+                            {meetingPricesVisible(reservation.meeting.kind) && (
+                              <>
+                                {' · '}
+                                <span className="tabular-nums">
+                                  {formatEuro(
+                                    reservation.itemPriceCents + reservation.drinkPriceCents,
+                                  )}
+                                </span>
+                              </>
+                            )}{' '}
                             ·{' '}
                             <Link href={href} className="font-medium text-vtk-ink underline">
                               {nl ? 'Aanpassen' : 'Change'}
