@@ -123,7 +123,13 @@ function Legend({ entries }: { entries: Array<{ color: string; label: string }> 
 
 function Panel({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
-    <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-5">
+    // `min-w-0`: zonder dat is de kleinste breedte van een raster-item zijn
+    // inhoud, en dan groeit de kolom mee met de breedste tabel erin in plaats
+    // van dat de schuifbalk zijn werk doet. Het hele scherm was daardoor op een
+    // telefoon twee keer zo breed als het venster: de tabel met alle ritten
+    // (46rem) en de drukteweergave (34rem) duwden de kolom naar 778px in een
+    // venster van 390.
+    <section className="min-w-0 rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-5">
       <h3 className="text-base font-semibold tracking-tight text-vtk-ink">{title}</h3>
       {hint ? <p className="mt-1 text-sm text-vtk-muted">{hint}</p> : null}
       <div className="mt-4">{children}</div>
