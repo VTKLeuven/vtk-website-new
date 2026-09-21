@@ -62,7 +62,7 @@ const CREATE_PERMISSIONS = {
   page: ["pages.edit", "pages.editAll", "pages.manage"],
   header_tab: ["header.manage"],
   header_link: ["header.manage"],
-  announcement: ["home.edit"],
+  announcement: ["announcements.manage"],
   poc: ["pocs.manage"],
   partner: ["partners.manage"],
   calendar_event: ["calendar.create", "calendar.manageAll"],

@@ -12,7 +12,7 @@ import { isEditableDestination } from "@/lib/href";
 
 /**
  * Aankondigingen: het bericht dat als modal verschijnt, op de homepage of op de
- * hele site. Beheer valt onder `home.edit`, want het begon als homepage-inhoud.
+ * hele site. Beheer valt onder `announcements.manage`.
  */
 
 const schema = z.object({
@@ -70,7 +70,7 @@ export async function saveAnnouncementAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  const session = await requirePermission("home.edit");
+  const session = await requirePermission("announcements.manage");
   const parsed = schema.safeParse({
     id: (formData.get("id") as string) || undefined,
     titleNl: formData.get("titleNl") ?? "",
@@ -159,7 +159,7 @@ export async function saveAnnouncementAction(
 
 /** Aan/uit zetten zonder het formulier te openen. */
 export async function setAnnouncementActiveAction(formData: FormData): Promise<void> {
-  await requirePermission("home.edit");
+  await requirePermission("announcements.manage");
   const id = formData.get("id") as string;
   if (!id) return;
   const active = formData.get("active") === "1";
@@ -178,7 +178,7 @@ export async function setAnnouncementActiveAction(formData: FormData): Promise<v
 }
 
 export async function deleteAnnouncementAction(formData: FormData): Promise<void> {
-  await requirePermission("home.edit");
+  await requirePermission("announcements.manage");
   const id = formData.get("id") as string;
   if (!id) return;
   const announcement = await prisma.announcement.delete({ where: { id } });

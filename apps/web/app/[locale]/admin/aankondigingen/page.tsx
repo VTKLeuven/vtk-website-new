@@ -21,7 +21,7 @@ export default async function AdminAnnouncements({
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const nl = locale === "nl";
-  await requirePermission("home.edit");
+  await requirePermission("announcements.manage");
 
   const rows = await prisma.announcement.findMany({
     orderBy: [{ createdAt: "desc" }],

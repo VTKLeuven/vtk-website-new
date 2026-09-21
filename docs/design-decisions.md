@@ -134,8 +134,7 @@ is "even offline halen" in de praktijk hetzelfde als kwijtspelen.
 ## Aankondigingen op de homepage
 
 Een aankondiging is een bericht dat als venster over de homepage komt, beheerd
-via **Admin → Website → Aankondigingen** (recht: `home.edit`, want het is
-homepage-inhoud).
+via **Admin → Website → Aankondigingen** (recht: `announcements.manage`).
 
 - **Meerdere aankondigingen mogen naast elkaar bestaan**, elk met hun eigen
   venster (`startsAt`/`endsAt`, allebei optioneel) en een aan/uit-schakelaar. Zo
