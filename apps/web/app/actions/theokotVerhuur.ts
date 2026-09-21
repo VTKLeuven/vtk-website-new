@@ -218,6 +218,7 @@ export async function requestRentalAction(
       // Een post of werkgroep betaalt geen waarborg en tekent geen contract met
       // zichzelf; die twee velden mogen dan meteen op NVT staan.
       contract: renterType === "INTERNAL" ? "NVT" : "PENDING",
+      purposePublic: true,
     },
     select: { id: true },
   });

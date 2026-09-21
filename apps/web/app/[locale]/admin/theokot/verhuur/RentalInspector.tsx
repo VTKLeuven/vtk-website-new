@@ -377,7 +377,7 @@ function StatusForm({
             <input
               type="checkbox"
               name="purposePublic"
-              defaultChecked={rental.purposePublic}
+              defaultChecked={rental.purposePublic || rental.status === "UNANSWERED"}
               className="mt-0.5 h-4 w-4 shrink-0 accent-[#0e1a36]"
             />
             <span className="min-w-0">
