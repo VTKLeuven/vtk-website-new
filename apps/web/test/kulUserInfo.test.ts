@@ -15,6 +15,10 @@ import {
   firwStudentFromProfile,
   syncFirwStudent,
 } from "../../../packages/auth/src/logins/kul-firw";
+import {
+  resolveKulLink,
+  type KulLinkLookups,
+} from "../../../packages/auth/src/logins/kul-link";
 
 function idToken(claims: Record<string, unknown>): string {
   const encode = (value: Record<string, unknown>) =>
@@ -181,7 +185,7 @@ describe("FirW status", () => {
 
     await expect(
       syncFirwStudent(
-        "student@kuleuven.be",
+        "user-1",
         true,
         changedAt,
         updateMany,
@@ -190,7 +194,7 @@ describe("FirW status", () => {
 
     expect(updateMany).toHaveBeenCalledWith({
       where: {
-        email: "student@kuleuven.be",
+        id: "user-1",
         OR: [
           { firwStudent: false },
           { firwStudentChangedAt: null },
@@ -208,11 +212,92 @@ describe("FirW status", () => {
 
     await expect(
       syncFirwStudent(
-        "student@kuleuven.be",
+        "user-1",
         false,
         new Date("2026-07-24T10:00:00.000Z"),
         updateMany,
       ),
     ).resolves.toBe(false);
+  });
+});
+
+type FakeUser = { id: string; email: string; rNumber?: string; emailVerified: boolean };
+
+/** Een databank van enkele accounts plus de KU Leuven-logins die eraan hangen. */
+function fakeLookups(users: FakeUser[], kulAccounts: Record<string, string> = {}) {
+  const lookups: KulLinkLookups = {
+    userIdForKulAccount: vi.fn(async (accountId: string) => kulAccounts[accountId] ?? null),
+    userByRNumber: vi.fn(
+      async (rNumber: string) =>
+        users.find((user) => user.rNumber?.toLowerCase() === rNumber.toLowerCase()) ?? null,
+    ),
+    userByEmail: vi.fn(async (email: string) => users.find((user) => user.email === email) ?? null),
+  };
+  return lookups;
+}
+
+describe("resolveKulLink", () => {
+  const kul = { accountId: "kul-sub-1", email: "voornaam.naam@student.kuleuven.be", rNumber: "r0123456" };
+
+  it("lands on the account that carries the r-number under a private address", async () => {
+    const lookups = fakeLookups([
+      { id: "private", email: "voornaam@gmail.com", rNumber: "r0123456", emailVerified: true },
+    ]);
+
+    await expect(resolveKulLink(kul, lookups)).resolves.toEqual({
+      email: "voornaam@gmail.com",
+      userId: "private",
+    });
+  });
+
+  it("keeps landing there once the KU Leuven login is linked, whatever the addresses say", async () => {
+    const lookups = fakeLookups(
+      [{ id: "private", email: "voornaam@gmail.com", rNumber: "r0123456", emailVerified: true }],
+      { "kul-sub-1": "private" },
+    );
+
+    await expect(resolveKulLink(kul, lookups)).resolves.toMatchObject({ userId: "private" });
+    expect(lookups.userByRNumber).not.toHaveBeenCalled();
+  });
+
+  it("matches an r-number an admin typed in capitals", async () => {
+    const lookups = fakeLookups([
+      { id: "admin-made", email: "voornaam@vtk.be", rNumber: "R0123456", emailVerified: true },
+    ]);
+
+    await expect(resolveKulLink(kul, lookups)).resolves.toEqual({
+      email: "voornaam@vtk.be",
+      userId: "admin-made",
+    });
+  });
+
+  it("prefers an exact match on the KU Leuven address over the r-number", async () => {
+    const lookups = fakeLookups([
+      { id: "private", email: "voornaam@gmail.com", rNumber: "r0123456", emailVerified: true },
+      { id: "kul", email: "voornaam.naam@student.kuleuven.be", emailVerified: true },
+    ]);
+
+    await expect(resolveKulLink(kul, lookups)).resolves.toEqual({
+      email: "voornaam.naam@student.kuleuven.be",
+      userId: "kul",
+    });
+  });
+
+  it("does not claim an unverified account, which better-auth refuses to link", async () => {
+    const lookups = fakeLookups([
+      { id: "squatter", email: "voornaam.naam@student.kuleuven.be", emailVerified: false },
+    ]);
+
+    await expect(resolveKulLink(kul, lookups)).resolves.toEqual({
+      email: "voornaam.naam@student.kuleuven.be",
+      userId: null,
+    });
+  });
+
+  it("reports no account when better-auth will create one", async () => {
+    await expect(resolveKulLink(kul, fakeLookups([]))).resolves.toEqual({
+      email: "voornaam.naam@student.kuleuven.be",
+      userId: null,
+    });
   });
 });

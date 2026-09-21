@@ -258,7 +258,8 @@ met enkel wachtwoord-login (`isKulEnabled()`).
     Wordt **enkel bij de eerste login** (user-aanmaak) gezet; latere logins
     overschrijven bewust niets (anders zou een naamswijziging uit onboarding
     telkens teruggezet worden). Vereist het `rNumber`-`additionalField` in
-    `auth.ts`.
+    `auth.ts`. Het stuurt daarnaast de koppeling aan een bestaand account onder
+    een ander adres; zie "Account-linking" hieronder.
   - **`rNumberFromKul`**: `true` wanneer het r-nummer van KU Leuven kwam. Dan
     staat het veld in het profielformulier **read-only** (net als de e-mail) en
     weigert `saveProfileAction` het te wijzigen. Wie zelf een r-nummer intypte
@@ -293,7 +294,9 @@ met enkel wachtwoord-login (`isKulEnabled()`).
   licht daarnaast `KULemployeeType`, `KULdipl` en `KULopl` uit als die door ICTS
   worden vrijgegeven.
 - **Opgeslagen FirW-status**: na elke geslaagde userinfo-call wordt
-  `User.firwStudent` afgeleid uit nummer `50000486` in `eduPersonOrgUnitDN`.
+  `User.firwStudent` afgeleid uit nummer `50000486` in `eduPersonOrgUnitDN`, op
+  het account waarop de login landt (niet op het KU Leuven-adres; zie
+  "Account-linking").
   `User.firwStudentChangedAt` wordt bij de eerste geldige controle ingevuld en
   daarna alleen aangepast als de boolean effectief wijzigt. Een tijdelijke
   userinfo-fout wijzigt geen van beide velden. De update is atomair, zodat ook
@@ -314,10 +317,34 @@ duplicaat.
   aangemaakt, gebeurt dit enkel voor SSO. Het nieuwe lid komt binnen zonder
   posten/permissies en met `onboardedAt = null`, waardoor de onboarding-gate het
   eerst het profiel laat invullen.
-- **Match op e-mail is exact.** Geeft KU Leuven `voornaam.naam@student.kuleuven.be`
-  terug terwijl het voorgeprovisioneerde lid een ander adres heeft, dan linkt het
-  niet maar ontstaat een tweede account. Zorg dat voorgeprovisioneerde accounts
-  het KU Leuven-mailadres als `email` hebben.
+- **Bestaand lid onder een ander adres, met hetzelfde r-nummer**: better-auth
+  koppelt enkel op e-mail, dus `resolveKulLink` (`logins/kul-link.ts`) geeft haar
+  het adres van het account dat dit r-nummer al draagt. Zo landt een lid dat
+  zich registreerde op `voornaam@gmail.com` en zijn r-nummer invulde, na zijn
+  eerste KU Leuven-login op datzelfde account, met beide logins eraan. Een
+  exacte match op het KU Leuven-adres wint altijd, en het r-nummer wordt
+  hoofdletterongevoelig vergeleken. Zonder r-nummer en met een ander adres
+  ontstaat er wél een tweede account; die smelten achteraf niet vanzelf samen.
+
+Vallen waar we in gelopen zijn:
+
+- **better-auth neemt bij een koppeling niets uit het profiel over.** Wat
+  `mapProfileToUser` teruggeeft (`firwStudent`, `rNumber`, `rNumberFromKul`)
+  landt enkel op een nieuw account. De FirW-status schrijven we daarom zelf, op
+  het account dat `resolveKulLink` aanwijst. Die schreef lang op het KU
+  Leuven-adres, en een lid dat via zijn r-nummer gekoppeld was, draagt dat adres
+  nergens: het bleef `firwStudent = false`, dus geen lid en geen ledenprijs,
+  hoe vaak het ook via KU Leuven inlogde. `updateUserInfoOnLink` aanzetten is
+  geen alternatief: de `user.update`-hook in `auth.ts` weigert `firwStudent`.
+- **better-auth koppelt enkel aan een account met `emailVerified = true`**
+  (`requireLocalEmailVerified`, standaard aan en volgens de docs binnenkort
+  onvoorwaardelijk). Is het doelaccount niet bevestigd, dan stuurt ze het lid
+  naar `/inloggen?error=kul` met `account_not_linked` in de log. Dat raakte elk
+  account van een beheerder en elk account van vóór de overstap naar
+  better-auth: de kolom kwam er met `DEFAULT false` en `createUser` zette hem
+  nooit. Sinds `20260921120000_admin_accounts_email_verified` geldt elk account
+  dat niet zichzelf registreerde als bevestigd. Enkel een zelfgemaakt account
+  zonder bevestigde mail blijft geweigerd, en daar is de regel ook voor.
 
 ### De login-knop
 

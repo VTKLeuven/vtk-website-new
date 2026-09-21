@@ -53,6 +53,15 @@ function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
+/**
+ * Kleine letters en geen spaties, zoals de onboarding het bewaart. Een
+ * `R0123456` botst niet op de unieke index met `r0123456`, dus zonder dit
+ * maakte een KU Leuven-login er een tweede account naast.
+ */
+function normalizeRNumber(rNumber: string | null | undefined): string | null {
+  return rNumber?.replace(/\s+/g, '').toLowerCase() || null;
+}
+
 function assertStrongEnoughPassword(password: string): void {
   if (password.length < 8) throw new AuthError('PASSWORD_TOO_SHORT');
 }
@@ -79,7 +88,11 @@ export async function createUser(actor: SessionPayload, input: CreateUserInput):
         avatarKey: input.avatarKey ?? null,
         active: input.active ?? true,
         isSuperAdmin: input.isSuperAdmin ?? false,
-        rNumber: input.rNumber?.trim() || null,
+        rNumber: normalizeRNumber(input.rNumber),
+        // Een beheerder zette dit adres, dus het geldt als bevestigd. Zonder dit
+        // weigert better-auth er een KU Leuven-login aan te koppelen
+        // (`requireLocalEmailVerified`), en krijgt het lid enkel een foutmelding.
+        emailVerified: true,
       },
     });
 
@@ -115,7 +128,7 @@ export async function updateUser(
     ...(input.active !== undefined ? { active: input.active } : {}),
     ...(input.isSuperAdmin !== undefined ? { isSuperAdmin: input.isSuperAdmin } : {}),
     ...(input.honoraryMember !== undefined ? { honoraryMember: input.honoraryMember } : {}),
-    ...(input.rNumber !== undefined ? { rNumber: input.rNumber?.trim() || null } : {}),
+    ...(input.rNumber !== undefined ? { rNumber: normalizeRNumber(input.rNumber) } : {}),
     ...(input.phone !== undefined ? { phone: input.phone?.trim() || null } : {}),
   };
   return prisma.$transaction(async (tx) => {
