@@ -12,6 +12,8 @@ import {
 import { hasLocale } from "@/lib/locale";
 import { MapPinIcon, UsersIcon } from "@/components/ui/icons";
 import { buildMetadata } from "@/lib/seo";
+import { markdownToPlainText } from "@/lib/markdown";
+import { Markdown } from "@/components/ui/Markdown";
 import { paymentMethodChoice } from "@/lib/ticketing/paymentMethods";
 import { TicketShop } from "@/components/ticketing/public/TicketShop";
 import {
@@ -61,9 +63,12 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   // iemand wil weten, en de beschrijving van een event begint zelden met de dag.
   const date = formatTicketDate(event.startsAt, locale);
   const place = event.location ? ` · ${event.location}` : "";
+  // Platte tekst: de beschrijving is markdown, en `**` of `##` hoort niet in een
+  // zoekresultaat of een deelvoorbeeld.
+  const body = markdownToPlainText(event.description ?? "");
   return buildMetadata({
     title: event.title,
-    description: `${date}${place}${event.description ? ` · ${event.description}` : ""}`,
+    description: `${date}${place}${body ? ` · ${body}` : ""}`,
     path: `/tickets/${slug}`,
     locale,
     type: "article",
@@ -161,9 +166,10 @@ function formatTicketTime(value: string | Date, locale: Locale): string {
 /**
  * Poster, beschrijving en het praktische, onder de gegevens in de linkerkolom.
  *
- * De beschrijving is platte tekst uit het beheer: een lege regel is een nieuwe
- * alinea en een enkele regelovergang blijft staan (`white-space: pre-line`),
- * want redacteurs schrijven er opsommingen in met gewone regels.
+ * De beschrijving is markdown, net als bij een kalenderevent: een gekoppeld
+ * event neemt die tekst letterlijk over. Een enkele regelovergang blijft wel
+ * staan (`white-space: pre-line` in vtk-ticket-shop.css), want de oudere
+ * beschrijvingen zijn platte tekst met opsommingen in gewone regels.
  */
 function TicketEventAbout({
   event,
@@ -176,10 +182,7 @@ function TicketEventAbout({
   organiser: string;
   location: string;
 }) {
-  const paragraphs = (event.description ?? "")
-    .split(/\n\s*\n/)
-    .map((paragraph) => paragraph.trim())
-    .filter(Boolean);
+  const description = event.description?.trim() ?? "";
   // Een cantus loopt over middernacht; "tot 02:00" zegt dan genoeg. Pas een
   // event van meer dan een dag krijgt de volledige einddatum.
   const sameNight =
@@ -200,14 +203,12 @@ function TicketEventAbout({
           />
         </figure>
       ) : null}
-      <div className="tshop-about" data-has-text={paragraphs.length > 0 || undefined}>
-        {paragraphs.length > 0 ? (
+      <div className="tshop-about" data-has-text={description ? true : undefined}>
+        {description ? (
           <section>
             <h2 className="tshop-heading">{locale === "nl" ? "Over dit event" : "About this event"}</h2>
-            <div className="tshop-description">
-              {paragraphs.map((paragraph, index) => (
-                <p key={index}>{paragraph}</p>
-              ))}
+            <div className="prose-vtk tshop-description">
+              <Markdown locale={locale}>{description}</Markdown>
             </div>
           </section>
         ) : null}

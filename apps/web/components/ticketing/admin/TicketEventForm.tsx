@@ -22,6 +22,8 @@ import { PresaleFields, type PresaleGroupOption } from "./PresaleFields";
 import { SettingsPanel } from "./SettingsPanel";
 import { TicketTemplateTypeRows } from "./TicketTemplateTypeRows";
 import type { TicketEventTemplate } from "@/lib/ticketing/templates";
+import { TICKET_DESCRIPTION_MAX_LENGTH } from "@/lib/ticketing/description";
+import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
 
 const initialState: TicketEventFormActionState = { status: "idle" };
 
@@ -499,24 +501,34 @@ export function TicketEventForm({
             defaultLongitude={event.locationLongitude}
             locale={locale}
           />
+          {/* Markdown, zoals de beschrijving van een kalenderevent: een gekoppeld
+              event neemt die tekst letterlijk over. Geen uploads: /api/admin/upload
+              kent de ticketrechten niet, dus wie enkel tickets beheert, kreeg
+              een uploadknop die altijd faalt. De poster komt al van de kalender. */}
           {linkedCalendarEvent ? null : (
             <>
               <div className="ticket-admin-field" data-span="2">
                 <label htmlFor="ticket-description-nl">Beschrijving (NL)</label>
-                <textarea
-                  id="ticket-description-nl"
+                <MarkdownEditorField
                   name="descriptionNl"
-                  defaultValue={event.descriptionNl ?? ""}
-                  rows={4}
+                  defaultValue={event.descriptionNl}
+                  locale={locale}
+                  rows={8}
+                  textareaId="ticket-description-nl"
+                  allowImages={false}
+                  maxLength={TICKET_DESCRIPTION_MAX_LENGTH}
                 />
               </div>
               <div className="ticket-admin-field" data-span="2">
                 <label htmlFor="ticket-description-en">Beschrijving (EN)</label>
-                <textarea
-                  id="ticket-description-en"
+                <MarkdownEditorField
                   name="descriptionEn"
-                  defaultValue={event.descriptionEn ?? ""}
-                  rows={4}
+                  defaultValue={event.descriptionEn}
+                  locale={locale}
+                  rows={8}
+                  textareaId="ticket-description-en"
+                  allowImages={false}
+                  maxLength={TICKET_DESCRIPTION_MAX_LENGTH}
                 />
               </div>
             </>

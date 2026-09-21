@@ -73,14 +73,50 @@
   line-height: 1.65;
 }
 
+/* De opmaak van de markdown komt van `.prose-vtk` (globals.css), zoals bij een
+   kalenderevent. Hier enkel wat dit blok anders maakt. */
+
+/* Een enkele regelovergang blijft een regelovergang: de oudere beschrijvingen
+   zijn platte tekst met opsommingen in gewone regels. */
 .tshop-description p {
-  margin: 0 0 14px;
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
 
-.tshop-description p:last-child {
+/* De kop "Over dit event" draagt al de ruimte erboven, net als
+   `.vtk-page-content > .prose-vtk` op een contentpagina. */
+.prose-vtk.tshop-description > :first-child {
+  margin-top: 0;
+}
+
+.prose-vtk.tshop-description > :last-child {
   margin-bottom: 0;
+}
+
+/* Een kop in de tekst blijft onder "Over dit event" (.tshop-heading, tot 28px);
+   de standaardmaten van `.prose-vtk` zijn voor een kop die de pagina opent. */
+.prose-vtk.tshop-description :is(h1, h2) {
+  font-size: 20px;
+}
+
+.prose-vtk.tshop-description h3 {
+  font-size: 17px;
+}
+
+/* `.prose-vtk` geeft een tabel geen opmaak. Een brede tabel scrolt hier in haar
+   eigen blok in plaats van de linkerkolom onder het ticketpaneel te duwen. */
+.tshop-description table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-collapse: collapse;
+}
+
+.tshop-description :is(th, td) {
+  padding: 6px 12px 6px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
 }
 
 /* Een register in de marge, zoals op een contentpagina: haarlijn, klein
