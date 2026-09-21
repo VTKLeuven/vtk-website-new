@@ -278,12 +278,16 @@ de same-origin `publicUrl`.
   `materiaal/` (inventaris +
   set-editor + foto-upload), `flesserke/` (stockscherm met inline voorraad +
   vervaldatum-highlight), `collectengo/` (klaarstaande Collect&Go-mails +
-  importscherm per bestelling), `kalender/`, `instellingen/` (voertuigtarieven +
-  huurprijs-toggle).
+  importscherm per bestelling), `kalender/`, `statistieken/` (wie reed wanneer,
+  hoelang en voor wie; zie hieronder), `instellingen/` (voertuigtarieven +
+  huurprijs-toggle, en het icoon per voertuig).
 - **Actions**: `app/actions/uitleen.ts` (leden), `app/actions/beheer.ts` (team),
   `app/actions/collectengo.ts` (mails ophalen, plakken, importeren).
 - **Lib**: `lib/uitleen.ts` (helpers), `lib/uitleen-server.ts` (queries +
-  voorraad), `lib/reservation-form.ts` (`buildReservationData`, gedeeld),
+  voorraad), `lib/uitleen-stats.ts` (de cijfers achter de planning, uit één
+  query), `lib/driver-hours.ts` (de balken per uur van de dag; puur en getest,
+  want dat rekenwerk draait in de browser),
+  `lib/reservation-form.ts` (`buildReservationData`, gedeeld),
   `lib/uitleen-mail.ts` (mails naar de aanvrager), `lib/payments.ts`,
   `lib/runtime-config.ts`, `lib/storage.ts`, `lib/session.ts`,
   `lib/collectengo/` (`parse.ts` + `match.ts` zijn puur en getest; `imap.ts`,
@@ -355,6 +359,32 @@ post die een doorgegeven rit krijgt, kan enkel haar eigen leden kiezen die
 chauffeur zijn, en zonder dit scherm is een lege keuzelijst daar niet te
 verklaren. De lijst is wel van de kring en niet van de post: iemand hier
 toevoegen maakt hem overal kiesbaar.
+
+## Statistieken over het vervoer
+
+`/beheer/statistieken` staat op één query over de ritten van de gekozen periode;
+al de rest gebeurt in geheugen (`lib/uitleen-stats.ts`). Twaalf keer dezelfde
+rijen apart ophalen levert twaalf queries op die elk hetzelfde lezen, plus een
+teller die niet meer optelt zodra er één een ander filter krijgt.
+
+**Uren worden per kwartier uitgesmeerd.** Eén wandeling over de rit (`eachQuarter`)
+voedt zowel de drukteweergave per weekdag en uur als de uren per chauffeur per
+uur van de dag (F4.23). Wandel er niet een tweede keer overheen voor een derde
+grafiek; hang ze aan diezelfde `add`.
+
+**De balken per uur rekenen in de browser** (`lib/driver-hours.ts`, puur en
+getest): de keuze tussen blokken van 1, 2 of 4 uur mag geen nieuwe pagina vragen.
+Die module hangt daarom niet aan `uitleen-stats.ts`, dat `server-only` is en
+Prisma meetrekt. `charts.tsx` is `'use client'` en mag er enkel types uit halen.
+
+**De kleur van een chauffeur komt uit `lib/driver-colors.ts`**, dezelfde als in
+de kalender, via `colorIndex` op elke `DriverStat`. Twee chauffeurs kunnen op
+dezelfde kleur vallen; het scherm noemt dat en wijst naar `/beheer/chauffeurs`.
+Zie `docs/design-decisions.md`.
+
+**Elke grafiek draagt een tabelweergave.** Drie van de reekskleuren halen de
+3:1 tegen wit niet, dus kleur is hier nooit de enige uitleg. Een nieuwe grafiek
+krijgt er dus ook een.
 
 ## De dag van het intekenscherm
 

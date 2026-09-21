@@ -8553,3 +8553,42 @@ die vooruit beslist wanneer een gehuurd busje terug moet, is een tweede waarheid
 naast de huurovereenkomst, en een verhuur die uitloopt zou het voertuig midden
 in een weekend uit het aanvraagformulier halen. Eén klik met een dialoog die
 zegt wat er gebeurt, weegt daar niet tegen op.
+
+## Op welk uur er gereden wordt: de kleuren van de kalender
+
+Naast de drukteweergave (bezette uren per weekdag en uur) staat een tweede
+tijdsgrafiek: uren per uur van de dag, met een segment per chauffeur. De eerste
+zegt wanneer de voertuigen weg zijn, de tweede wie er dan reed. Dat is de vraag
+die erna komt zodra er iemand gezocht wordt voor een rit om zes uur 's ochtends.
+
+**Een rit wordt per kwartier uitgesmeerd, niet in het uur waarin ze begint.** Een
+rit van 14:15 tot 15:45 staat voor een half uur op 14 en voor drie kwartier op
+15. Anders wordt de piek een streep op precies de uren waarop iedereen vertrekt.
+Dezelfde wandeling voedt de drukteweergave, zodat de twee grafieken niet uit
+elkaar kunnen lopen.
+
+**Enkel ritten met een chauffeur staan in de balken, en wat wegvalt staat
+eronder.** Een bakfiets die iemand zelf rijdt, heeft geen chauffeur, en zo'n rit
+als een grijs blok "niemand" meetekenen zou in dit beeld vaak het grootste blok
+zijn terwijl de as over chauffeurs gaat. Eén regel onder de grafiek zegt hoeveel
+uren er buiten vallen, zodat het verschil met "Uren onderweg" verklaard is en
+niet als een telfout leest.
+
+**De kleur van een chauffeur is die van de planning.** Wie in de kalender mint
+is, is dat hier ook; een eigen palet naast dat van het scherm waar het team elke
+dag op kijkt, is een tweede taal leren voor dezelfde mensen. De keerzijde is dat
+de kalender die kleur uit een hash over vierentwintig kleuren afleidt, dus twee
+chauffeurs kunnen erop samenvallen. In een kalender valt dat mee (ze staan zelden
+in hetzelfde blok), in een gestapelde balk niet. Daarom noemt het scherm het bij
+naam zodra het gebeurt, met een link naar Chauffeurs, waar een kleur zetten al
+bestond. Zo is het één keer rechtzetten, voor beide schermen tegelijk.
+
+**Acht chauffeurs bij naam, de rest samen.** Een balk met veertig segmenten is
+geen grafiek meer en een legende met veertig namen leest niemand; de hoogte van
+de balk blijft wel kloppen, want de rest staat er samen in. Wie verder wil
+kijken, klikt iemand aan bij "Wie reed het meest": de grafiek toont dan enkel de
+uren van die persoon, en de tabel onderaan enkel zijn ritten.
+
+**Per 1, 2 of 4 uur.** Vierentwintig balken vragen breedte die een telefoon niet
+heeft, en over een werkingsjaar is het verschil tussen 14u en 15u vaak ruis. Per
+4 uur past het beeld op 390px zonder te schuiven.

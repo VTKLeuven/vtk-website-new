@@ -3,6 +3,8 @@ import 'server-only';
 import { prisma } from '@vtk/db';
 import { currentWorkingYear, FIRST_WORKING_YEAR } from '@vtk/auth';
 import type { Prisma } from '@prisma/client';
+import { driverColorIndex } from './driver-colors';
+import { driverColorOverrides } from './uitleen-server';
 
 /**
  * De cijfers achter de transportplanning: wie reed wanneer, hoelang en voor wie.
@@ -128,6 +130,22 @@ export type DriverStat = {
   hours: number;
   /** Uren per voertuig, op voertuig-id; samen exact `hours`. */
   perVehicle: Record<string, number>;
+  /**
+   * Uren per uur van de dag (F4.23): 24 getallen, index 0 is middernacht, in
+   * Belgische tijd. Samen `hours`, op het afronden per getal na.
+   *
+   * Uitgesmeerd met dezelfde kwartiersampling als de drukteweergave, dus een rit
+   * van 14:15 tot 15:45 staat voor een half uur op 14 en voor drie kwartier op
+   * 15.
+   */
+  perHour: number[];
+  /**
+   * De kleur van deze chauffeur in de planning, 1 tot 24.
+   *
+   * Meegegeven zodat een grafiek dezelfde kleur kan gebruiken als de kalender:
+   * wie daar mint is, is dat hier ook.
+   */
+  colorIndex: number;
 };
 
 export type GroupStat = {
@@ -148,6 +166,13 @@ export type TransportStats = {
     averageHours: number;
     /** Zonder chauffeur, van de ritten die er een nodig hadden. */
     withoutDriver: number;
+    /**
+     * Uren van ritten waar geen chauffeur op staat, inclusief de voertuigen die
+     * er geen nodig hebben. Die uren zitten in `hours` en in `heatmap`, maar in
+     * geen enkele `perDriver`; een grafiek per chauffeur hoort te zeggen hoeveel
+     * er buiten valt.
+     */
+    hoursWithoutDriver: number;
     cancelled: number;
     rejected: number;
   };
@@ -208,23 +233,32 @@ function requesterOf(booking: StatsBooking): { key: string; name: string } {
  * hij begint" maakt van de piek een streep op precies de uren waarop iedereen
  * vertrekt. Werken met echte momenten en niet met uurgetallen houdt het bovendien
  * correct op de nacht van een uurwissel.
+ *
+ * Eén wandeling met een `add` erbij, en niet twee lussen: de drukteweergave en
+ * de uren per chauffeur (F4.23) smeren dezelfde rit over dezelfde kwartieren
+ * uit, en twee keer wandelen levert twee tellingen op die na de eerstvolgende
+ * wijziging uit elkaar kunnen lopen.
  */
 const SAMPLE_MS = 15 * 60 * 1000;
 const SAMPLE_HOURS = SAMPLE_MS / 3_600_000;
 
-function addToHeatmap(heatmap: number[][], startAt: Date, endAt: Date) {
+function eachQuarter(
+  startAt: Date,
+  endAt: Date,
+  add: (day: number, hour: number, amount: number) => void
+) {
   const end = endAt.getTime();
   // Een rit kan volgens het model tot dertig dagen duren; dan is dit 2880
   // stappen, en dat is nog altijd goedkoper dan een tweede query.
   for (let at = startAt.getTime(); at < end; at += SAMPLE_MS) {
     const cell = brusselsCell(new Date(at));
-    heatmap[cell.day][cell.hour] += Math.min(SAMPLE_HOURS, (end - at) / 3_600_000);
+    add(cell.day, cell.hour, Math.min(SAMPLE_HOURS, (end - at) / 3_600_000));
   }
 }
 
 export async function transportStats(filters: StatsFilters): Promise<TransportStats> {
   const span = filters.to.getTime() - filters.from.getTime();
-  const [bookings, previousBookings, vehicles] = await Promise.all([
+  const [bookings, previousBookings, vehicles, colors] = await Promise.all([
     prisma.uitleenTransportBooking.findMany({
       where: where(filters),
       select: statsSelect,
@@ -241,6 +275,7 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
       orderBy: { sortIndex: 'asc' },
       select: { id: true, nameNl: true },
     }),
+    driverColorOverrides(),
   ]);
 
   const driven = bookings.filter((booking) => (DRIVEN as readonly string[]).includes(booking.status));
@@ -251,13 +286,16 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
   const heatmap = Array.from({ length: 7 }, () => new Array<number>(24).fill(0));
 
   let hours = 0;
+  let hoursWithoutDriver = 0;
   let withoutDriver = 0;
 
   for (const booking of driven) {
     const duration = hoursBetween(booking.startAt, booking.endAt);
     hours += duration;
     if (!booking.driverId && booking.vehicle.needsDriver) withoutDriver += 1;
+    if (!booking.driverId) hoursWithoutDriver += duration;
 
+    let driverEntry: DriverStat | null = null;
     if (booking.driverId) {
       const name = booking.driver?.name ?? 'Onbekend';
       const entry = perDriver.get(booking.driverId) ?? {
@@ -266,11 +304,14 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
         trips: 0,
         hours: 0,
         perVehicle: {},
+        perHour: new Array<number>(24).fill(0),
+        colorIndex: driverColorIndex(booking.driverId, colors),
       };
       entry.trips += 1;
       entry.hours += duration;
       entry.perVehicle[booking.vehicleId] = (entry.perVehicle[booking.vehicleId] ?? 0) + duration;
       perDriver.set(booking.driverId, entry);
+      driverEntry = entry;
     }
 
     const requester = requesterOf(booking);
@@ -305,7 +346,10 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
     weekEntry.hours += duration;
     perWeek.set(week, weekEntry);
 
-    addToHeatmap(heatmap, booking.startAt, booking.endAt);
+    eachQuarter(booking.startAt, booking.endAt, (day, hour, amount) => {
+      heatmap[day][hour] += amount;
+      if (driverEntry) driverEntry.perHour[hour] += amount;
+    });
   }
 
   const previousHours = previousBookings.reduce(
@@ -345,6 +389,7 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
       drivers: perDriver.size,
       averageHours: driven.length > 0 ? round(hours / driven.length) : 0,
       withoutDriver,
+      hoursWithoutDriver: round(hoursWithoutDriver),
       cancelled: bookings.filter((booking) => booking.status === 'CANCELLED').length,
       rejected: bookings.filter((booking) => booking.status === 'REJECTED').length,
     },
@@ -361,6 +406,7 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
         perVehicle: Object.fromEntries(
           Object.entries(entry.perVehicle).map(([key, value]) => [key, round(value)])
         ),
+        perHour: entry.perHour.map(round),
       }))
       .sort((a, b) => b.hours - a.hours || a.name.localeCompare(b.name, 'nl')),
     perGroup: [...perGroup.values()]

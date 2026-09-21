@@ -1,7 +1,9 @@
 'use client';
 
+import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import type { DriverStat, GroupStat, StatsRow, TransportStats } from '@/lib/uitleen-stats';
+import { driverHourChart, HOUR_BUCKETS, HOUR_BUCKET_LABELS, REST_KEY, type HourBucket } from '@/lib/driver-hours';
 
 /**
  * De grafieken van het statistiekenscherm, als gewone SVG en HTML.
@@ -53,8 +55,23 @@ function niceCeiling(value: number): number {
   return 10 * magnitude;
 }
 
-/** Een tabel onder elke grafiek; kleur alleen is nooit de enige uitleg. */
-function TableView({ columns, rows }: { columns: string[]; rows: Array<Array<string | number>> }) {
+/**
+ * Een tabel onder elke grafiek; kleur alleen is nooit de enige uitleg.
+ *
+ * Getallen staan rechts, de eerste kolom links. `align` is er voor een kolom die
+ * tekst draagt in plaats van een getal (wie er reed, in de uren van de dag):
+ * rechts uitgelijnd wordt een opsomming van namen een rafelrand.
+ */
+function TableView({
+  columns,
+  rows,
+  align,
+}: {
+  columns: string[];
+  rows: Array<Array<string | number>>;
+  align?: Array<'left' | 'right'>;
+}) {
+  const alignOf = (index: number) => align?.[index] ?? (index === 0 ? 'left' : 'right');
   return (
     <details className="mt-3">
       <summary className="cursor-pointer text-xs font-semibold text-vtk-navy">Toon als tabel</summary>
@@ -63,7 +80,7 @@ function TableView({ columns, rows }: { columns: string[]; rows: Array<Array<str
           <thead>
             <tr className="border-b border-vtk-navy/10 text-vtk-muted">
               {columns.map((column, index) => (
-                <th key={column} className={`py-1 pr-3 font-medium ${index === 0 ? '' : 'text-right'}`}>
+                <th key={column} className={`py-1 pr-3 font-medium ${alignOf(index) === 'right' ? 'text-right' : ''}`}>
                   {column}
                 </th>
               ))}
@@ -75,7 +92,9 @@ function TableView({ columns, rows }: { columns: string[]; rows: Array<Array<str
                 {row.map((cell, index) => (
                   <td
                     key={index}
-                    className={`py-1 pr-3 ${index === 0 ? 'text-vtk-ink' : 'text-right tabular-nums text-vtk-body'}`}
+                    className={`py-1 pr-3 ${
+                      index === 0 ? 'text-vtk-ink' : 'tabular-nums text-vtk-body'
+                    } ${alignOf(index) === 'right' ? 'text-right' : ''}`}
                   >
                     {cell}
                   </td>
@@ -94,11 +113,7 @@ function Legend({ entries }: { entries: Array<{ color: string; label: string }> 
     <ul className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-vtk-muted">
       {entries.map((entry) => (
         <li key={entry.label} className="flex items-center gap-1.5">
-          <span
-            aria-hidden
-            className="h-2.5 w-2.5 rounded-[3px]"
-            style={{ backgroundColor: entry.color }}
-          />
+          <span aria-hidden className="h-2.5 w-2.5 rounded-[3px]" style={{ backgroundColor: entry.color }} />
           {entry.label}
         </li>
       ))}
@@ -106,15 +121,7 @@ function Legend({ entries }: { entries: Array<{ color: string; label: string }> 
   );
 }
 
-function Panel({
-  title,
-  hint,
-  children,
-}: {
-  title: string;
-  hint?: string;
-  children: React.ReactNode;
-}) {
+function Panel({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
   return (
     <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-5">
       <h3 className="text-base font-semibold tracking-tight text-vtk-ink">{title}</h3>
@@ -143,9 +150,7 @@ function StatTile({
   previous?: { value: number; now: number };
 }) {
   const trend =
-    previous && previous.value > 0
-      ? Math.round(((previous.now - previous.value) / previous.value) * 100)
-      : null;
+    previous && previous.value > 0 ? Math.round(((previous.now - previous.value) / previous.value) * 100) : null;
   return (
     <div className="rounded-[16px] border border-vtk-navy/10 bg-vtk-surface px-4 py-3">
       <p className="text-[10px] font-semibold uppercase tracking-[0.08em] text-vtk-muted">{label}</p>
@@ -198,12 +203,8 @@ function DriverLeaderboard({
     <div>
       <Legend
         entries={[
-          ...vehicles
-            .slice(0, SERIES.length)
-            .map((vehicle, index) => ({ color: SERIES[index], label: vehicle.name })),
-          ...(vehicles.length > SERIES.length
-            ? [{ color: SERIES_REST, label: 'Overige voertuigen' }]
-            : []),
+          ...vehicles.slice(0, SERIES.length).map((vehicle, index) => ({ color: SERIES[index], label: vehicle.name })),
+          ...(vehicles.length > SERIES.length ? [{ color: SERIES_REST, label: 'Overige voertuigen' }] : []),
         ]}
       />
       <ul className="mt-3 grid gap-2">
@@ -212,7 +213,7 @@ function DriverLeaderboard({
             <button
               type="button"
               onClick={() => onPickDriver(driver.id)}
-              title={`Enkel de ritten van ${driver.name} in de tabel onderaan`}
+              title={`Enkel de uren en de ritten van ${driver.name}`}
               className="grid w-full grid-cols-[1.25rem_minmax(6rem,9rem)_1fr_4.5rem] items-center gap-2 rounded-lg px-1 py-0.5 text-left transition hover:bg-vtk-paper"
             >
               <span aria-hidden className="text-sm tabular-nums text-vtk-muted">
@@ -241,9 +242,7 @@ function DriverLeaderboard({
                   })}
                 </span>
               </span>
-              <span className="text-right text-sm tabular-nums text-vtk-body">
-                {hours(driver.hours)}
-              </span>
+              <span className="text-right text-sm tabular-nums text-vtk-body">{hours(driver.hours)}</span>
             </button>
           </li>
         ))}
@@ -273,13 +272,7 @@ function DriverLeaderboard({
  * komt, en ze beantwoorden op een ander scherm zou betekenen dat niemand ze
  * stelt.
  */
-function GroupBars({
-  groups,
-  onPickGroup,
-}: {
-  groups: GroupStat[];
-  onPickGroup: (groupKey: string | null) => void;
-}) {
+function GroupBars({ groups, onPickGroup }: { groups: GroupStat[]; onPickGroup: (groupKey: string | null) => void }) {
   const [open, setOpen] = useState<string | null>(null);
   const max = niceCeiling(groups[0]?.hours ?? 1);
 
@@ -312,9 +305,7 @@ function GroupBars({
             {open === group.key ? (
               <div className="mb-2 ml-2 mt-1 border-l-2 border-vtk-yellow pl-3">
                 {group.drivers.length === 0 ? (
-                  <p className="text-xs text-vtk-muted">
-                    Er stond nog geen chauffeur op deze ritten.
-                  </p>
+                  <p className="text-xs text-vtk-muted">Er stond nog geen chauffeur op deze ritten.</p>
                 ) : (
                   <ul className="grid gap-0.5 text-xs text-vtk-body">
                     {group.drivers.map((driver) => (
@@ -414,6 +405,205 @@ function Heatmap({ heatmap }: { heatmap: number[][] }) {
         ))}
         <span>meer ({hours(max)} op het drukste uur)</span>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Op welk uur er gereden wordt, en door wie (F4.23).
+ *
+ * De drukteweergave hierboven zegt wanneer de voertuigen weg zijn; deze balken
+ * zeggen wie er dan reed. Dat is de vraag die erna komt zodra er een rit om zes
+ * uur 's ochtends gepland moet worden.
+ *
+ * **Per 1, 2 of 4 uur.** Vierentwintig balken vragen breedte die een telefoon
+ * niet heeft, en over een werkingsjaar is het verschil tussen 14u en 15u vaak
+ * ruis. Per 4 uur past het scherm zonder te schuiven.
+ *
+ * **De kleuren zijn die van de kalender**, en de rest van het waarom staat in
+ * `lib/driver-hours.ts`. Alleen de acht met de meeste uren krijgen hun eigen
+ * kleur; daarboven wordt een gestapelde balk een streepjescode.
+ */
+const TOP_DRIVERS = 8;
+
+function HourOfDay({
+  drivers,
+  focus,
+  hoursWithoutDriver,
+  onClearFocus,
+}: {
+  drivers: DriverStat[];
+  focus: DriverStat | null;
+  hoursWithoutDriver: number;
+  onClearFocus: () => void;
+}) {
+  const [bucket, setBucket] = useState<HourBucket>(1);
+  const chart = useMemo(
+    () => driverHourChart(focus ? [focus] : drivers, { bucket, top: TOP_DRIVERS }),
+    [drivers, focus, bucket]
+  );
+
+  /**
+   * Chauffeurs die in deze grafiek dezelfde kleur dragen.
+   *
+   * De kalender leidt een kleur af uit een hash over vierentwintig kleuren, dus
+   * twee chauffeurs kunnen erop uitkomen. In de kalender vallen ze uit elkaar
+   * (ze staan zelden in hetzelfde blok), in een gestapelde balk niet. Zeggen dat
+   * het zo is, is hier het eerlijkste: het recht kunnen zetten bestaat al.
+   */
+  const clashing = useMemo(() => {
+    const byColor = new Map<string, string[]>();
+    for (const entry of chart.legend) {
+      if (entry.key === REST_KEY) continue;
+      byColor.set(entry.color, [...(byColor.get(entry.color) ?? []), entry.name]);
+    }
+    return [...byColor.values()].filter((names) => names.length > 1);
+  }, [chart.legend]);
+
+  if (drivers.length === 0) {
+    return <p className="text-sm text-vtk-muted">Niemand reed in deze periode.</p>;
+  }
+
+  const max = niceCeiling(Math.max(...chart.columns.map((column) => column.hours)));
+
+  return (
+    <div>
+      <div className="flex flex-wrap gap-1.5">
+        {HOUR_BUCKETS.map((option) => (
+          <button
+            key={option}
+            type="button"
+            onClick={() => setBucket(option)}
+            aria-pressed={bucket === option}
+            className={`rounded-full border px-3 py-1 text-xs font-medium transition ${
+              bucket === option
+                ? 'border-vtk-navy bg-vtk-navy text-vtk-on-emphasis'
+                : 'border-vtk-navy/15 text-vtk-ink hover:border-vtk-navy/40'
+            }`}
+          >
+            {HOUR_BUCKET_LABELS[option]}
+          </button>
+        ))}
+      </div>
+
+      <Legend entries={chart.legend.map((entry) => ({ color: entry.color, label: entry.name }))} />
+
+      {/* `position: relative` op de scroller, zoals bij elke tabel hier: de
+          sr-only tekst per balk is absoluut gepositioneerd en ankert anders op
+          de pagina in plaats van op de grafiek. */}
+      <div className="relative mt-3 overflow-x-auto">
+        <div className="grid grid-cols-[2.25rem_1fr] gap-x-1" style={{ minWidth: bucket === 1 ? '22rem' : undefined }}>
+          <div className="relative h-40">
+            {[0, 0.5, 1].map((fraction) => (
+              <span
+                key={fraction}
+                className="absolute right-0 translate-y-1/2 text-[10px] tabular-nums text-vtk-muted"
+                style={{ bottom: `${fraction * 100}%` }}
+              >
+                {Math.round(max * fraction)}
+              </span>
+            ))}
+          </div>
+          <div className="relative h-40">
+            {[0, 0.5, 1].map((fraction) => (
+              <span
+                key={fraction}
+                aria-hidden
+                className="absolute inset-x-0 border-t border-vtk-navy/10"
+                style={{ bottom: `${fraction * 100}%` }}
+              />
+            ))}
+            <div className="absolute inset-0 flex items-end gap-[2px]">
+              {chart.columns.map((column) => (
+                <div
+                  key={column.key}
+                  title={`${column.rangeLabel}: ${hours(column.hours)}`}
+                  className="flex h-full flex-1 flex-col justify-end"
+                >
+                  <span className="sr-only">
+                    {column.rangeLabel}: {hours(column.hours)}
+                  </span>
+                  {/* Van boven naar onder tekenen: het eerste segment uit de
+                      data hoort onderaan te staan, en een kolom vult van boven
+                      af. De naad van 1px houdt twee chauffeurs uit elkaar. */}
+                  {[...column.segments].reverse().map((segment) => (
+                    <span
+                      key={segment.key}
+                      title={`${segment.name} · ${column.rangeLabel}: ${hours(segment.hours)}`}
+                      className="block w-full shrink-0 first:rounded-t-[3px]"
+                      style={{
+                        height: `${(segment.hours / max) * 100}%`,
+                        backgroundColor: segment.color,
+                        boxShadow: 'inset 0 -1px 0 var(--chart-seam)',
+                      }}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </div>
+          <span aria-hidden />
+          <div className="mt-1 flex gap-[2px]">
+            {chart.columns.map((column, index) => (
+              <span key={column.key} className="flex-1 text-center text-[10px] tabular-nums text-vtk-muted">
+                {/* Bij balken van een uur elk derde getal: vierentwintig
+                    getallen naast elkaar worden een grijze streep, net als in de
+                    drukteweergave. */}
+                {bucket > 1 || index % 3 === 0 ? column.label : ''}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <p className="mt-2 text-xs text-vtk-muted">
+        Het beginuur staat onder de balk; uren in Belgische tijd.
+        {hoursWithoutDriver > 0 ? (
+          <span>
+            {' '}
+            {hours(hoursWithoutDriver)} staat hier niet bij: ritten waar geen chauffeur op staat, bijvoorbeeld op een
+            voertuig dat er geen nodig heeft.
+          </span>
+        ) : null}
+      </p>
+
+      {clashing.length > 0 ? (
+        <p className="mt-1 text-xs text-vtk-muted">
+          {clashing.map((names) => names.join(' en ')).join('; ')} hebben dezelfde kleur in de planning.{' '}
+          <Link
+            href="/beheer/chauffeurs"
+            className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+          >
+            Geef er een andere bij Chauffeurs
+          </Link>
+          .
+        </p>
+      ) : null}
+
+      {focus ? (
+        <p className="mt-1 text-xs text-vtk-muted">
+          Enkel de uren van {focus.name}.{' '}
+          <button
+            type="button"
+            onClick={onClearFocus}
+            className="font-semibold text-vtk-navy underline decoration-vtk-yellow underline-offset-4"
+          >
+            Alle chauffeurs tonen
+          </button>
+        </p>
+      ) : null}
+
+      <TableView
+        columns={['Uur', 'Uren', 'Wie']}
+        align={['left', 'right', 'left']}
+        rows={chart.columns
+          .filter((column) => column.hours > 0)
+          .map((column) => [
+            column.rangeLabel,
+            hours(column.hours),
+            column.segments.map((segment) => `${segment.name} ${hours(segment.hours)}`).join(', '),
+          ])}
+      />
     </div>
   );
 }
@@ -576,16 +766,7 @@ function TripTable({
   }
 
   function exportCsv() {
-    const header = [
-      'Datum',
-      'Uren van-tot',
-      'Duur (u)',
-      'Voertuig',
-      'Chauffeur',
-      'Voor',
-      'Waarvoor',
-      'Status',
-    ];
+    const header = ['Datum', 'Uren van-tot', 'Duur (u)', 'Voertuig', 'Chauffeur', 'Voor', 'Waarvoor', 'Status'];
     const escape = (value: string | number) => `"${String(value).replace(/"/g, '""')}"`;
     const lines = [
       header.map(escape).join(';'),
@@ -704,25 +885,18 @@ function TripTable({
             ))}
           </tbody>
         </table>
-        {shown.length === 0 ? (
-          <p className="py-4 text-sm text-vtk-muted">Geen ritten die hierop passen.</p>
-        ) : null}
+        {shown.length === 0 ? <p className="py-4 text-sm text-vtk-muted">Geen ritten die hierop passen.</p> : null}
       </div>
     </div>
   );
 }
 
-export function TransportCharts({
-  stats,
-  periodLabel,
-}: {
-  stats: TransportStats;
-  periodLabel: string;
-}) {
+export function TransportCharts({ stats, periodLabel }: { stats: TransportStats; periodLabel: string }) {
   const [driverFilter, setDriverFilter] = useState<string | null>(null);
   const [groupFilter, setGroupFilter] = useState<string | null>(null);
 
   const busiest = stats.perGroup[0] ?? null;
+  const focusedDriver = stats.perDriver.find((driver) => driver.id === driverFilter) ?? null;
 
   return (
     <div className="grid gap-5">
@@ -770,7 +944,7 @@ export function TransportCharts({
 
       <Panel
         title="Wie reed het meest"
-        hint="Uren per chauffeur, opgesplitst per voertuig. Klik iemand aan om zijn ritten in de tabel onderaan te zien."
+        hint="Uren per chauffeur, opgesplitst per voertuig. Klik iemand aan om enkel zijn uren en zijn ritten te zien, hieronder en in de tabel onderaan."
       >
         <DriverLeaderboard
           drivers={stats.perDriver}
@@ -782,10 +956,7 @@ export function TransportCharts({
         />
       </Panel>
 
-      <Panel
-        title="Voor wie er gereden werd"
-        hint="Klik een post open om te zien wie er voor hen reed."
-      >
+      <Panel title="Voor wie er gereden werd" hint="Klik een post open om te zien wie er voor hen reed.">
         <GroupBars
           groups={stats.perGroup}
           onPickGroup={(key) => {
@@ -800,6 +971,18 @@ export function TransportCharts({
         hint="Bezette uren per weekdag en uur van de dag, over de hele periode opgeteld."
       >
         <Heatmap heatmap={stats.heatmap} />
+      </Panel>
+
+      <Panel
+        title="Op welk uur er gereden wordt"
+        hint="Uren per uur van de dag, met een segment per chauffeur. Op een smal scherm zet je de balken per 2 of 4 uur samen."
+      >
+        <HourOfDay
+          drivers={stats.perDriver}
+          focus={focusedDriver}
+          hoursWithoutDriver={stats.totals.hoursWithoutDriver}
+          onClearFocus={() => setDriverFilter(null)}
+        />
       </Panel>
 
       <div className="grid gap-5 lg:grid-cols-2">

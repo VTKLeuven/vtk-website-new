@@ -104,13 +104,24 @@ export function driverColorIndex(
   return (hash(driverId) % DRIVER_COLOR_COUNT) + 1;
 }
 
+/**
+ * De CSS-variabele van een kleurnummer uit {@link driverColorIndex}; 0 is de
+ * neutrale kleur zonder chauffeur.
+ *
+ * Apart van {@link driverColorVar} omdat het statistiekenscherm het nummer al
+ * bewaart per chauffeur en de overrides daar niet meer bij de hand heeft: dat
+ * scherm draait in de browser en haalt geen chauffeurs op.
+ */
+export function driverColorVarFromIndex(index: number): string {
+  return index === 0 ? 'var(--driver-none)' : `var(--driver-${index})`;
+}
+
 /** De CSS-variabele voor deze chauffeur, of de neutrale kleur zonder chauffeur. */
 export function driverColorVar(
   driverId: string | null | undefined,
   overrides?: DriverColorOverrides
 ): string {
-  const index = driverColorIndex(driverId, overrides);
-  return index === 0 ? 'var(--driver-none)' : `var(--driver-${index})`;
+  return driverColorVarFromIndex(driverColorIndex(driverId, overrides));
 }
 
 /**
