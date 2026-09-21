@@ -1081,7 +1081,20 @@
     "languageNl": "Nederlands",
     "languageEn": "Engels",
     "newRequest": "Nog een aanvraag indienen",
-    "errorFallback": "Je aanvraag is niet verstuurd. Probeer het opnieuw."
+    "errorFallback": "Je aanvraag is niet verstuurd. Probeer het opnieuw.",
+    "availabilityTitle": "Is de zaal nog vrij?",
+    "availabilityIntro": "Kijk eerst of je avond nog vrij is; dat scheelt een aanvraag die we anders moeten weigeren. Enkel wat goedgekeurd is staat hier; een aanvraag waarover nog beslist wordt, houdt een avond niet bezet.",
+    "availabilityPrevious": "Vorige maand",
+    "availabilityNext": "Volgende maand",
+    "availabilityToday": "Deze maand",
+    "availabilityFree": "Vrij: nog aan te vragen",
+    "availabilityBusy": "Bezet",
+    "availabilitySoon": "Te kort dag om nog aan te vragen",
+    "availabilityPast": "Voorbij",
+    "availabilityClosed": "Aanvragen staan even dicht; hieronder staat enkel wat al vastligt.",
+    "availabilityListTitle": "Bezet in",
+    "availabilityListEmpty": "Geen enkele avond bezet deze maand.",
+    "availabilityLead": "Een aanvraag moet minstens {dagen} dagen op voorhand binnen zijn, dus de eerstkomende dagen staan niet als vrij."
   },
   "register": {
     "kicker": "Alumni & externen",

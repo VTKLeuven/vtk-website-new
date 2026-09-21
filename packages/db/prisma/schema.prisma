@@ -3374,6 +3374,14 @@ model TheokotRental {
   attendees Int?
   remarks   String?
 
+  /// Mag die aard van de activiteit publiek op /theokot/verhuur staan?
+  /// Standaard niet. Een post schrijft er iets neutraals ("[Theokot] Kaas- en
+  /// wijnavond"), maar een externe huurder schrijft er even vaak een naam of een
+  /// verjaardag in, en dat hoort niet op een publieke pagina. Wie de verhuur doet
+  /// leest de tekst en zet dit per aanvraag aan; staat het uit, dan leest de
+  /// publieke kalender enkel "bezet" met de uren.
+  purposePublic Boolean @default(false)
+
   depositChoice TheokotRentalDepositChoice @default(NVT)
 
   /// De antwoorden op de vragen die Theokot zelf toevoegde, als
