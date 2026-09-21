@@ -10,7 +10,7 @@ import { heroWeekNoticeMail } from "@/lib/calendar/heroWeekNoticeMail";
 import { contactMailBody } from "@/lib/contactForm";
 import type { EmailSource } from "@/lib/email";
 import { confirmationMail, notificationMail } from "@/lib/forms/mail";
-import { meetingReservationInvalidatedMail, noShowWarningMail } from "@/lib/mail";
+import { meetingReservationInvalidatedMail, noShowWarningMail, orderCancelledMail } from "@/lib/mail";
 import { pianoConfirmationMail } from "@/lib/piano-reservations";
 import { expenseMailDraft } from "@/lib/rekeningen/expenses";
 import { shiftReminderMail } from "@/lib/shift/reminders";
@@ -308,6 +308,15 @@ function theokotPreviews(): MailPreview[] {
     },
   );
   const noShow = noShowWarningMail({ name: "Wannes", locale: "NL" }, "dinsdag 6 oktober");
+  const cancelled = orderCancelledMail(
+    { name: "Wannes", locale: "NL" },
+    {
+      dateLabel: "dinsdag 6 oktober",
+      reason: "Er waren minder broodjes beschikbaar dan er gereserveerd waren.",
+      itemsLabel: "1\u00d7 Broodje voorbeeld",
+      url: "https://vtk.be/theokot",
+    },
+  );
   const rental = newRentalNotificationMail({
     rental: {
       id: "voorbeeld",
@@ -348,6 +357,19 @@ function theokotPreviews(): MailPreview[] {
       source: "theokot",
       file: "lib/mail.ts",
       ...noShow,
+    },
+    {
+      id: "theokot-order-cancelled",
+      title: "Je bestelling is geannuleerd",
+      when: "Wanneer een verkoopdag verwijderd wordt, of wanneer het aanbod van een dag onder het aantal gereserveerde broodjes gezet wordt en de laatste bestellingen sneuvelen.",
+      to: "Wie de bestelling plaatste",
+      source: "theokot",
+      file: "lib/mail.ts",
+      ...cancelled,
+      notes: [
+        "Bij het verlagen van het aanbod sneuvelen de laatst geplaatste bestellingen eerst: wie het eerst reserveerde, houdt zijn broodje.",
+        "Deze mail houdt de verwerking niet tegen wanneer ze niet vertrekt; de bestelling is dan al geschrapt en de mislukking staat in het maillogboek.",
+      ],
     },
     {
       id: "theokot-rental",

@@ -3015,8 +3015,6 @@ model TheokotSession {
   orderCloseAt         DateTime // annulatie-/besteldeadline (turf-lijst wordt geprint)
   pickupStart          DateTime
   pickupEnd            DateTime
-  weeklySpecialLabelNl String? // welk broodje deze week "van de week" is
-  weeklySpecialLabelEn String?
   processedAt          DateTime? // wanneer no-shows verwerkt zijn (idempotentie)
   processingStartedAt  DateTime? // lease/claim voor een actieve no-show-worker
   /// Wanneer het pushbericht "de bestelronde is open" voor deze dag vertrokken

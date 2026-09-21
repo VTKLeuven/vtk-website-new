@@ -26,6 +26,7 @@
     "db:sync": "npm run sync --workspace=@vtk/db",
     "db:admin": "dotenv -e .env -- tsx scripts/create-local-admin.ts",
     "db:demo:verhuur": "dotenv -e .env -- tsx scripts/seed-theokot-verhuur-demo.ts",
+    "db:demo:broodjes": "dotenv -e .env -- tsx scripts/seed-theokot-broodjes-demo.ts",
     "fixtures:export": "dotenv -e .env -- tsx scripts/export-fixtures.ts",
     "import:praesidium": "dotenv -e .env -- tsx scripts/import-praesidium-history.ts",
     "import:pocs": "dotenv -e .env -- tsx scripts/import-poc-history.ts",

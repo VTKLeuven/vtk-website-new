@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button, Input, Label } from "@vtk/ui";
 import { StorageImageField } from "@/components/admin/StorageImageField";
 
@@ -17,6 +17,14 @@ export type OfferingRow = {
   ingredientsEn: string;
   /** Heeft dit item al bestellingen? Dan blijft het bij opslaan behouden. */
   hasLines: boolean;
+  /**
+   * Hoeveel stuks er van dit broodje al weg zijn: bestellingen van studenten
+   * plus de broodjes die voor een vergadering opzijgezet zijn. Zet je het aantal
+   * daaronder, dan mag dat, maar er wordt niets automatisch geschrapt: het
+   * scherm zegt hoeveel er te veel besteld zijn en het beheer kiest zelf wie
+   * eruit gaat. Nul in de catalogus: die heeft geen bestellingen.
+   */
+  ordered: number;
 };
 
 /** Nieuwe, lege rij. Prijs en aantal zijn het gangbare startpunt, geen dogma. */
@@ -32,6 +40,7 @@ export function emptyOfferingRow(): OfferingRow {
     ingredientsNl: "",
     ingredientsEn: "",
     hasLines: false,
+    ordered: 0,
   };
 }
 
@@ -52,11 +61,18 @@ export function OfferingRows({
   initial,
   prefix,
   countField,
+  onShortfall,
 }: {
   nl: boolean;
   initial: OfferingRow[];
   prefix: "item" | "product";
   countField: "itemCount" | "productCount";
+  /**
+   * Hoeveel gereserveerde broodjes er bij opslaan zouden sneuvelen. Het
+   * formulier eromheen gebruikt dat voor zijn bevestiging; deze tabel weet het,
+   * want zij houdt de ingetikte aantallen bij.
+   */
+  onShortfall?: (total: number) => void;
 }) {
   // Een rij-id dat niet mee opschuift bij verwijderen: de React-key moet aan de
   // rij hangen en niet aan de index, anders houdt het fotoveld van rij 3 zijn
@@ -64,6 +80,17 @@ export function OfferingRows({
   const nextUid = useRef(initial.length);
   const [rows, setRows] = useState<Editable[]>(() => initial.map((row, i) => ({ ...row, uid: i })));
   const locale = nl ? "nl" : "en";
+
+  const shortfall = rows.reduce(
+    (total, row) => total + Math.max(0, row.ordered - row.quantity),
+    0,
+  );
+  // Enkel de rijen die blijven staan: een rij die je uit de lijst haalt terwijl
+  // ze bestellingen heeft, blijft bij het opslaan gewoon bestaan (zie
+  // `updateSessionItemsAction`), dus daar sneuvelt niets door.
+  useEffect(() => {
+    onShortfall?.(shortfall);
+  }, [shortfall, onShortfall]);
 
   function update(uid: number, patch: Partial<OfferingRow>) {
     setRows((r) => r.map((row) => (row.uid === uid ? { ...row, ...patch } : row)));
@@ -125,6 +152,21 @@ export function OfferingRows({
                 value={row.quantity}
                 onChange={(e) => update(row.uid, { quantity: Number(e.target.value) })}
               />
+              {row.ordered > 0 && (
+                <p
+                  className={`mt-1 text-xs ${
+                    row.quantity < row.ordered ? "font-medium text-red-600" : "text-[#5c667f]"
+                  }`}
+                >
+                  {row.quantity < row.ordered
+                    ? nl
+                      ? `${row.ordered} besteld: ${row.ordered - row.quantity} te veel`
+                      : `${row.ordered} ordered: ${row.ordered - row.quantity} too many`
+                    : nl
+                      ? `${row.ordered} besteld`
+                      : `${row.ordered} ordered`}
+                </p>
+              )}
             </Cell>
             <label
               className="inline-flex items-center gap-2 text-sm sm:justify-center sm:gap-0"
