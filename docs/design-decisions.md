@@ -6982,6 +6982,53 @@ weekraster tot zeven kolommen van een centimeter knijpen is een slechte ruil. Bi
 de lijsten blijft dat paneel wel staan: daar is elke rij één regel tekst, en die
 over de volle breedte uitrekken leest slechter dan de hint ernaast.
 
+### De publieke kalender toont wat vrij is, niet wie er zit
+
+De zaal hing vroeger in een publieke agenda, en dat was geen detail: wie wilde
+huren, keek eerst of zijn avond nog vrij was. Toen het formulier hierheen
+verhuisde, verdween die kalender, en de dubbele aanvragen kwamen terug; de groco
+vroeg ze expliciet terug. Ze staat daarom boven het formulier op
+`/theokot/verhuur`, in die volgorde: eerst kijken, dan pas invullen.
+
+Drie keuzes die niet vanzelf spreken.
+
+**Enkel wat de zaal echt bezet houdt** (`PUBLIC_BUSY_STATUSES`): goedgekeurd,
+afgelopen en afgerond. Een **onbeantwoorde** aanvraag staat er bewust níét op,
+terwijl ze in het beheer wel meetelt. Publiek zou ze een avond wegnemen die
+niemand heeft: de volgende bezoeker ziet bezet, vraagt niet aan, en wordt de
+eerste aanvraag daarna geweigerd, dan is die avond voor niets leeg gebleven.
+Intern is het omgekeerde waar, want daar moet je net zien dat er al iemand
+aanklopte. Afgelopen en afgerond staan er wel op: dat zijn goedgekeurde verhuren
+die intussen voorbij zijn, en zonder hen lijkt elke voorbije week leeg zodra
+Theokot haar opvolging bijwerkt.
+
+**Anoniem, tenzij iemand de activiteit vrijgeeft.** Standaard staat er enkel
+"bezet" met de uren. De aard van de activiteit komt er per aanvraag bij met een
+vinkje in het beheer (`TheokotRental.purposePublic`). Dat is met opzet geen
+instelling voor alles samen: een post schrijft er "[Theokot] Kaas- en wijnavond",
+een externe huurder even vaak een naam of een verjaardag, en één schakelaar zou
+die twee niet uit elkaar houden. Het vinkje staat onder de interne notitie met de
+tekst er letterlijk bij, want het is het enige veld van dat kader dat buiten het
+beheer terechtkomt. Verder geeft de server niets mee: naam, adres, telefoon en
+notities komen niet uit de database, dus ze kunnen ook niet onzichtbaar in de
+HTML van de pagina belanden.
+
+**Vrij is een eigen toestand, geen lege cel.** De vraag is "wanneer kan ik", niet
+"wat staat er te gebeuren", en een lege dag in een raster beantwoordt die vraag
+maar half: ze kan ook betekenen dat de kalender niets weet. Een dag die nog aan
+te vragen valt, draagt daarom de gele streep. De wachttijd uit de instellingen
+(`minLeadDays`) is een derde toestand: die dagen zijn niet bezet maar ook niet
+meer aan te vragen, en ze vrij noemen levert precies de aanvraag op die het
+formulier tien seconden later weigert. Staat het formulier dicht, dan valt "vrij"
+helemaal weg; dan is er niets om aan te vragen.
+
+Het raster zelf is hetzelfde als in het beheer
+(`components/theokot/RentalMonthGrid.tsx` en `rentalGrid.ts`): de component bezit
+de 42 cellen en de weekdagen, de beller vult de inhoud. Een tweede kalender ernaast
+zou binnen het jaar uiteenlopen, net zoals de eventkaart dat ooit deed. Onder de
+700px vervangt een lijst van de bezette avonden het raster; zeven kolommen van een
+centimeter zijn op een telefoon geen kalender meer.
+
 ### Vier opvolgvelden die los van elkaar staan
 
 Status, waarborg, contract en sleutel zijn vier aparte kolommen, precies zoals de

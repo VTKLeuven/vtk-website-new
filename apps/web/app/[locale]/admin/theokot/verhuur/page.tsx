@@ -228,6 +228,7 @@ export default async function AdminTheokotVerhuurPage({
       purpose: row.purpose,
       attendees: row.attendees,
       remarks: row.remarks,
+      purposePublic: row.purposePublic,
       extraAnswers: Object.entries(answers)
         .filter(([, value]) => Boolean(value))
         .map(([id, value]) => ({

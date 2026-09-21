@@ -16,7 +16,8 @@ COMPOSE := docker compose -f infra/compose.dev.yml
 .DEFAULT_GOAL := help
 
 .PHONY: help up down db postgres admin dev logistiek seed migrate generate deps \
-        lint test verify psql logs status backup backups backup-immich restore reset fixtures
+        lint test verify psql logs status backup backups backup-immich restore reset fixtures \
+        verhuur
 
 ## help: show this list
 help:
@@ -77,6 +78,10 @@ migrate:
 ## seed: fill the database with fixtures and prototype data
 seed:
 	npm run db:seed
+
+## verhuur: vul de verhuurkalender met voorbeelden (lokaal)
+verhuur:
+	npm run db:demo:verhuur
 
 ## dev: start only the website, assuming the database already runs
 dev:

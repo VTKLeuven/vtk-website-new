@@ -78,6 +78,14 @@ import { signatureForBody, signatureForPost } from "@/lib/mailSignature-server";
 const ADMIN_PATHS = ["/admin/theokot/verhuur", "/en/admin/theokot/verhuur"];
 
 /**
+ * De publieke aanvraagpagina draagt sinds de beschikbaarheidskalender dezelfde
+ * gegevens als het beheer. Wie een verhuur goedkeurt of verschuift, verandert dus
+ * ook wat een bezoeker daar ziet; blijft deze lijst achter, dan staat een
+ * pas goedgekeurde avond er nog als vrij.
+ */
+const PUBLIC_PATHS = ["/theokot/verhuur", "/en/theokot/verhuur"];
+
+/**
  * Wie er tekent onder een mail die niemand verstuurt: de ontvangstbevestiging
  * van het publieke formulier en de beslissing vanuit de meldingsmail. Beide
  * hebben geen lid achter zich, en een mail van de kring hoort niet naamloos te
@@ -86,7 +94,7 @@ const ADMIN_PATHS = ["/admin/theokot/verhuur", "/en/admin/theokot/verhuur"];
 const RENTAL_POST_NAME = "Theokot";
 
 function revalidateRentals() {
-  for (const path of ADMIN_PATHS) revalidatePath(path);
+  for (const path of [...ADMIN_PATHS, ...PUBLIC_PATHS]) revalidatePath(path);
 }
 
 /** Wandklok naar instant; `null` wanneer datum of uur niet kloppen. */
@@ -387,6 +395,8 @@ export async function updateRentalAction(
 
   const internalNote = toMessageText(formData.get("internalNote"));
   const decisionNote = toMessageText(formData.get("decisionNote"));
+  // Een vinkje dat uit staat, stuurt geen veld mee; afwezig is dus "niet publiek".
+  const purposePublic = formData.get("purposePublic") !== null;
   if (internalNote.length > RENTAL_LIMITS.remarks || decisionNote.length > RENTAL_LIMITS.remarks) {
     return saveError("REMARKS_TOO_LONG");
   }
@@ -405,6 +415,7 @@ export async function updateRentalAction(
       endsAt,
       internalNote: internalNote || null,
       decisionNote: decisionNote || null,
+      purposePublic,
       ...(decided
         ? { decidedAt: new Date(), decidedById: session.user.id, decidedViaMail: false }
         : {}),
@@ -421,7 +432,15 @@ export async function updateRentalAction(
     entity: "theokotRental",
     entityId: id,
     target: existing.responsibleName,
-    summary: `status ${RENTAL_STATUS_META[existing.status].nl} → ${RENTAL_STATUS_META[status].nl}, zonder mail`,
+    // Wat er publiek van deze aanvraag te zien is, hoort in de historiek: dat is
+    // de enige wijziging hier die buiten het beheer zichtbaar wordt.
+    summary:
+      `status ${RENTAL_STATUS_META[existing.status].nl} → ${RENTAL_STATUS_META[status].nl}, zonder mail` +
+      (purposePublic === existing.purposePublic
+        ? ""
+        : purposePublic
+          ? "; activiteit publiek gezet"
+          : "; activiteit niet meer publiek"),
   });
 
   revalidateRentals();

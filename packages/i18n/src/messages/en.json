@@ -1081,7 +1081,20 @@
     "languageNl": "Dutch",
     "languageEn": "English",
     "newRequest": "Submit another request",
-    "errorFallback": "Your request was not sent. Please try again."
+    "errorFallback": "Your request was not sent. Please try again.",
+    "availabilityTitle": "Is the room still free?",
+    "availabilityIntro": "Check whether your evening is still free before you fill in the form; it saves a request we would have to turn down. Only approved rentals are shown here: a request still being decided does not take an evening.",
+    "availabilityPrevious": "Previous month",
+    "availabilityNext": "Next month",
+    "availabilityToday": "This month",
+    "availabilityFree": "Free: still available",
+    "availabilityBusy": "Taken",
+    "availabilitySoon": "Too soon to request",
+    "availabilityPast": "Past",
+    "availabilityClosed": "Requests are closed for now; below is only what is already booked.",
+    "availabilityListTitle": "Taken in",
+    "availabilityListEmpty": "No evening is taken this month.",
+    "availabilityLead": "A request has to be in at least {dagen} days in advance, so the next few days are not shown as free."
   },
   "register": {
     "kicker": "Alumni & externals",
