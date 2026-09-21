@@ -11,7 +11,13 @@ import type { Meeting, MeetingOption, MeetingReservation } from "@prisma/client"
 import { pick, type Locale } from "@vtk/i18n";
 
 import type { MeetingCardView } from "@/components/meetings/MeetingReservationCard";
-import { meetingCloseAt, meetingWindowState, offeringNameKey, type MeetingDrinks } from "./meetings";
+import {
+  meetingCloseAt,
+  meetingPricesVisible,
+  meetingWindowState,
+  offeringNameKey,
+  type MeetingDrinks,
+} from "./meetings";
 import { offeringForMeeting, sessionForMeeting } from "./meetings-server";
 
 type MeetingWithOptions = Meeting & { options: MeetingOption[] };
@@ -56,6 +62,7 @@ export async function buildMeetingCard(
     })),
     drinks,
     askComment: meeting.kind === "BUREAU",
+    showPrices: meetingPricesVisible(meeting.kind),
     // Zonder verkoopdag komt het aanbod uit de catalogus; wat er die week echt
     // ligt, beslist Theokot pas bij het aanmaken van de week.
     offeringProvisional: meeting.useTheokot && session === null,

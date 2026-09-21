@@ -40,12 +40,42 @@ export type MeetingCardView = {
   choices: MeetingChoiceView[];
   drinks: { priceCents: number; items: string[] };
   askComment: boolean;
+  /**
+   * Prijzen (per broodje, per drankje en het totaal) tonen. Bij een VTK Bureau
+   * is de bestelling gratis voor de student — Onderwijs betaalt — dus daar
+   * blijven die bedragen weg. Zie `meetingPricesVisible` in `lib/meetings.ts`.
+   */
+  showPrices: boolean;
   /** Theokot heeft voor die dag nog geen verkoopdag klaarstaan. */
   offeringProvisional: boolean;
   reservation: MeetingReservationView | null;
 };
 
 const NONE = "";
+
+/**
+ * De regel onder een broodje: de prijs, de resterende voorraad, of allebei.
+ * Waar de student niet betaalt (een VTK Bureau) valt de prijs weg en blijft
+ * alleen de beschikbaarheid over; is er ook geen voorraad gekend, dan is er
+ * niets om te tonen.
+ */
+function choiceDescription(
+  option: MeetingChoiceView,
+  showPrices: boolean,
+  nl: boolean,
+): string | undefined {
+  const stock =
+    option.remaining === null
+      ? null
+      : option.remaining <= 0
+        ? nl
+          ? "uitverkocht"
+          : "sold out"
+        : `${option.remaining} ${nl ? "beschikbaar" : "available"}`;
+  const price = showPrices ? formatEuro(option.priceCents) : null;
+  const description = [price, stock].filter((part): part is string => part !== null).join(" · ");
+  return description === "" ? undefined : description;
+}
 
 /**
  * Eén vergadering met het bestelformulier eronder: een broodje, een drankje, en
@@ -65,12 +95,7 @@ export function MeetingReservationCard({ nl, meeting }: { nl: boolean; meeting: 
     ...meeting.choices.map((option) => ({
       value: option.key,
       label: option.label,
-      description:
-        option.remaining === null
-          ? formatEuro(option.priceCents)
-          : option.remaining <= 0
-            ? `${formatEuro(option.priceCents)} · ${nl ? "uitverkocht" : "sold out"}`
-            : `${formatEuro(option.priceCents)} · ${option.remaining} ${nl ? "beschikbaar" : "available"}`,
+      description: choiceDescription(option, meeting.showPrices, nl),
       // Wel tonen, niet kiesbaar; behalve wanneer het al je eigen keuze is.
       disabled: option.remaining !== null && option.remaining <= 0 && option.key !== reservation?.choiceKey,
     })),
@@ -80,7 +105,7 @@ export function MeetingReservationCard({ nl, meeting }: { nl: boolean; meeting: 
     { value: NONE, label: nl ? "Geen drankje" : "No drink" },
     ...meeting.drinks.items.map((item) => ({
       value: item,
-      label: `${item} · ${formatEuro(meeting.drinks.priceCents)}`,
+      label: meeting.showPrices ? `${item} · ${formatEuro(meeting.drinks.priceCents)}` : item,
     })),
   ];
 
@@ -193,10 +218,12 @@ export function MeetingReservationCard({ nl, meeting }: { nl: boolean; meeting: 
           )}
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-vtk-blue/10 pt-3">
-            <span className="text-sm text-[#34405e]">
-              {nl ? "Totaal" : "Total"}:{" "}
-              <span className="font-semibold tabular-nums text-vtk-ink">{formatEuro(totalCents)}</span>
-            </span>
+            {meeting.showPrices && (
+              <span className="text-sm text-[#34405e]">
+                {nl ? "Totaal" : "Total"}:{" "}
+                <span className="font-semibold tabular-nums text-vtk-ink">{formatEuro(totalCents)}</span>
+              </span>
+            )}
             <span className="text-xs text-[#5c667f]">
               {nl ? "Aanpassen kan tot " : "You can change this until "}
               {meeting.closeLabel}.
@@ -254,10 +281,12 @@ function ClosedSummary({ nl, meeting }: { nl: boolean; meeting: MeetingCardView 
             {nl ? "Drankje" : "Drink"}:{" "}
             <span className="font-medium">{reservation.drink ?? (nl ? "geen" : "none")}</span>
           </li>
-          <li className="mt-1 border-t border-vtk-blue/10 pt-1">
-            {nl ? "Totaal" : "Total"}:{" "}
-            <span className="font-semibold tabular-nums">{formatEuro(reservation.totalCents)}</span>
-          </li>
+          {meeting.showPrices && (
+            <li className="mt-1 border-t border-vtk-blue/10 pt-1">
+              {nl ? "Totaal" : "Total"}:{" "}
+              <span className="font-semibold tabular-nums">{formatEuro(reservation.totalCents)}</span>
+            </li>
+          )}
         </ul>
       )}
     </div>
