@@ -52,6 +52,7 @@ const nextConfig: NextConfig = {
     "sharp",
     "archiver",
     "nodemailer",
+    "@opentelemetry/semantic-conventions",
   ],
   // Pin the workspace root explicitly so Next.js / webpack / Turbopack do
   // not walk upwards and try to index the user's home directory (there's
