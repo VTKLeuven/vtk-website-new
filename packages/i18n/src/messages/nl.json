@@ -551,6 +551,11 @@
     "saveError": "Er ging iets mis bij het opslaan.",
     "close": "Sluiten"
   },
+  "announcement": {
+    "kicker": "Aankondiging",
+    "readMore": "Lees verder",
+    "readLess": "Minder"
+  },
   "info": {
     "kicker": "VTK · KU Leuven",
     "title": "Over het ledenportaal",

@@ -133,7 +133,8 @@ is "even offline halen" in de praktijk hetzelfde als kwijtspelen.
 
 ## Aankondigingen op de homepage
 
-Een aankondiging is een bericht dat als venster over de homepage komt, beheerd
+Een aankondiging is een bericht dat als kaart op de site verschijnt (rechtsonder,
+op een telefoon bovenaan; zie "Aankondigingen: een kaart, geen venster"), beheerd
 via **Admin → Website → Aankondigingen** (recht: `announcements.manage`).
 
 - **Meerdere aankondigingen mogen naast elkaar bestaan**, elk met hun eigen
@@ -142,7 +143,7 @@ via **Admin → Website → Aankondigingen** (recht: `announcements.manage`).
 - **De homepage toont er hoogstens één**: twee berichten tegelijk over dezelfde
   pagina leest niemand. Staan er meerdere klaar, dan wint de meest recente.
 - **Wie ze wegklikt, ziet ze niet opnieuw.** Dat onthoudt de browser per id in
-  localStorage (de laatste tien), niet de server: het gaat om een venster
+  localStorage (de laatste tien), niet de server: het gaat om een kaart
   wegklikken, niet om iets dat we per lid willen bijhouden. Een nieuwe
   aankondiging verschijnt dus wel weer, ook bij wie de vorige wegklikte.
 - **Oude aankondigingen blijven staan** als historiek in het beheerscherm. Uit
@@ -5081,7 +5082,7 @@ de globale velden zetten, de shiften nakijken en aanmaken.
 
 ## Aankondigingen: homepage of de hele site
 
-Een aankondiging is het venster dat over de site verschijnt, beheerd op
+Een aankondiging is de kaart die op de site verschijnt, beheerd op
 `/admin/aankondigingen`. Er is één keuze per bericht: **enkel de homepage** of **elke
 pagina**.
 
@@ -5097,15 +5098,66 @@ pagina**.
   draait op een gsm aan de deur. Die lijst staat los van de lijst met paden die niet
   gemeten worden, ook al is ze vandaag dezelfde: het ene gaat over wat we niet meten,
   het andere over waar we de bezoeker niet onderbreken.
-- **Wegklikken geldt voor de hele site.** Dat zat al zo: de modal onthoudt in
+- **Wegklikken geldt voor de hele site.** Dat zat al zo: de kaart onthoudt in
   `localStorage` welke id's weggeklikt zijn. Nu ze op elke pagina kan verschijnen, is
-  dat het verschil tussen één venster en een venster bij elke klik.
-- **Het venster hangt in de gedeelde layout.** Die is toch al dynamisch (de header
+  dat het verschil tussen één kaart en een kaart bij elke klik.
+- **De kaart hangt in de gedeelde layout.** Die is toch al dynamisch (de header
   leest de sessie), dus het kost één query per render en geen omslag in caching. Wel
   belangrijk: de save-action revalideert daarom `revalidatePath("/", "layout")` en
   niet enkel `"/"`, anders blijft een site-brede aankondiging overal onzichtbaar tot
   ze vanzelf verloopt.
 
+
+---
+
+## Aankondigingen: een kaart, geen venster
+
+Tot september 2026 kwam een aankondiging als modal over de pagina: een witte
+kaart op een navy waas, het enige venster op de site dat niet oogde als het
+shiftvenster of de ticket-QR. Vier richtingen zijn naast elkaar bekeken, in hun
+echte omgeving op de homepage en /kalender: hetzelfde venster als een shift
+(navy kop, hangende pin), een liggend venster in de vorm van een ticket, een
+kaart in de hoek, en een smalle band boven de sitekop. **De kaart in de hoek
+won** (`AnnouncementCard`, stijl in `vtk-base.css`).
+
+- **Geen venster, want de meeste bezoekers komen niet voor het bericht.** Het
+  bereik "hele site" maakte dat pijnlijk: wie via Google of een QR-code op een
+  infopagina landt, moest eerst een modal wegklikken voor die pagina leesbaar
+  was. De kaart laat de pagina bruikbaar en valt toch op. De prijs is dat een
+  afgelasting minder dwingend binnenkomt dan in een venster; dat is bewust
+  aanvaard.
+- **Wel dezelfde taal als de vensters.** Navy kop met het technisch patroon, een
+  gele pin die over de onderrand in het tekstblok hangt, de titel met de gele
+  streep, lijstjes met gele ruitjes. De band boven de kop viel af omdat de
+  meeste mensen er enkel de eerste zin van lezen; het ticketvenster omdat het op
+  een telefoon toch weer het shiftvenster werd.
+- **Een megafoon in de pin, geen datum.** Op een evenement of shift zegt de pin
+  wanneer het gebeurt; een aankondiging gaat niet over een dag, en een datum
+  daar las als "dit gebeurt op maandag". Sinds wanneer het bericht er staat
+  (`startsAt`, anders `createdAt`) staat als gewone regel in de kop.
+- **Geen foto.** Er is bekeken met een foto onder een navy waas in de kop; dat
+  vraagt een extra veld en upload, en in een kaart van 384 pixels breed voegt
+  het weinig toe.
+- **Rechtsonder op een groot scherm, bovenaan op een telefoon** (onder de
+  sitekop, vanaf 640 pixels breed en smaller). Onderaan op een telefoon dekt de
+  kaart precies de plek waar je met je duim naartoe wil, en daar hangt ook de
+  cookiebanner.
+- **Boven de cookiebanner, niet eronder.** Bij een eerste bezoek staan die twee
+  precies samen open. `CookieConsent` zet de hoogte die de banner inneemt in
+  `--vtk-cookie-consent-space` op `<html>`, en de kaart schuift daarmee omhoog
+  (op een telefoon wordt ze er korter van). Zonder die regel viel de kaart onder
+  de banner weg, net bij wie de site voor het eerst ziet.
+- **Ingeklapt op drie regels.** Een lang bericht krijgt "Lees verder"; dat wordt
+  gemeten en niet op tekens geteld, want hoeveel er op drie regels past hangt
+  van de breedte af. Uitgeklapt scrolt de tekst binnen de kaart, zodat kop en
+  knoppen blijven staan.
+- **De kaart neemt de focus niet over.** Ze staat in de bron direct na de
+  sitekop, dus wie met het toetsenbord werkt komt ze meteen tegen, en Escape
+  sluit ze enkel wanneer de focus erin staat. Een Escape ergens anders op de
+  pagina (bv. om een ander venster te sluiten) mag de aankondiging niet
+  meenemen.
+- **Onder de sitekop en de toasts in de stapel** (z-index 35): het uitklapmenu
+  en een melding na een klik vallen erover, en elk venster ook.
 ---
 
 ## Praesidiumlijst (CSV-export op /admin/groepen)

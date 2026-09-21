@@ -11,7 +11,7 @@ import { localDateTimeToUtc } from "@/lib/ticketing/time";
 import { isEditableDestination } from "@/lib/href";
 
 /**
- * Aankondigingen: het bericht dat als modal verschijnt, op de homepage of op de
+ * Aankondigingen: het bericht dat als kaart verschijnt, op de homepage of op de
  * hele site. Beheer valt onder `announcements.manage`.
  */
 
@@ -23,7 +23,7 @@ const schema = z.object({
   bodyEn: z.string().trim().min(1),
   ctaLabelNl: z.string().trim().optional(),
   ctaLabelEn: z.string().trim().optional(),
-  // Mag een pad op deze site zijn: de modal opent enkel een nieuw tabblad voor
+  // Mag een pad op deze site zijn: de kaart opent enkel een nieuw tabblad voor
   // een extern adres, dus een interne knop werd altijd al correct gerenderd.
   ctaUrl: z
     .string()
@@ -48,7 +48,7 @@ function parseMoment(value: string | undefined): Date | null {
 }
 
 function revalidate() {
-  // De modal hangt in de gedeelde layout, dus "/" alleen volstaat niet: zonder
+  // De kaart hangt in de gedeelde layout, dus "/" alleen volstaat niet: zonder
   // het tweede argument blijft een site-brede aankondiging op elke andere route
   // onzichtbaar tot ze vanzelf verloopt.
   revalidatePath("/", "layout");

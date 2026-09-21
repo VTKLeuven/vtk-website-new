@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { usePathname } from "next/navigation";
 import {
   COOKIE_CONSENT_EVENT,
@@ -35,6 +35,9 @@ function copy() {
       };
 }
 
+/** Zie het effect in `CookieConsent`; vtk-base.css leest deze variabele. */
+const COOKIE_CONSENT_SPACE_VAR = "--vtk-cookie-consent-space";
+
 function setConsent(choice: CookieConsentChoice) {
   const secure = window.location.protocol === "https:" ? "; Secure" : "";
   document.cookie = `${COOKIE_CONSENT_NAME}=${choice}; Path=/; Max-Age=${COOKIE_CONSENT_MAX_AGE_SECONDS}; SameSite=Lax${secure}`;
@@ -57,6 +60,9 @@ export function CookieConsent() {
   );
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [draft, setDraft] = useState<CookieConsentChoice>("essential");
+  const panelRef = useRef<HTMLElement>(null);
+  const visible =
+    !hidesCookieBanner(pathname) && current !== "server" && (preferencesOpen || current === null);
 
   useEffect(() => {
     const showPreferences = () => {
@@ -67,8 +73,30 @@ export function CookieConsent() {
     return () => window.removeEventListener(OPEN_COOKIE_PREFERENCES_EVENT, showPreferences);
   }, []);
 
-  if (hidesCookieBanner(pathname)) return null;
-  if (current === "server" || (!preferencesOpen && current !== null)) return null;
+  // Hoeveel van de onderkant van het scherm de banner inneemt, als variabele op
+  // <html>. De aankondiging (AnnouncementCard) staat rechtsonder en schuift
+  // daarmee boven de banner in plaats van eronder te verdwijnen; bij een eerste
+  // bezoek staan ze precies samen open. Gemeten en niet vast: de hoogte hangt af
+  // van de taal en de breedte, want de tekst loopt over meer of minder regels.
+  useEffect(() => {
+    const panel = panelRef.current;
+    if (!visible || !panel) return;
+    const root = document.documentElement;
+    const publish = () => {
+      const space = Math.max(0, window.innerHeight - panel.getBoundingClientRect().top);
+      root.style.setProperty(COOKIE_CONSENT_SPACE_VAR, `${Math.round(space)}px`);
+    };
+    const observer = new ResizeObserver(publish);
+    observer.observe(panel);
+    window.addEventListener("resize", publish);
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", publish);
+      root.style.removeProperty(COOKIE_CONSENT_SPACE_VAR);
+    };
+  }, [visible]);
+
+  if (!visible) return null;
   const labels = copy();
   const base = window.location.pathname === "/en" || window.location.pathname.startsWith("/en/") ? "/en" : "";
 
@@ -83,7 +111,13 @@ export function CookieConsent() {
 
   return (
     <div className="vtk-cookie-consent-positioner">
-      <section className="vtk-cookie-consent" role="dialog" aria-modal="true" aria-labelledby="vtk-cookie-title">
+      <section
+        ref={panelRef}
+        className="vtk-cookie-consent"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="vtk-cookie-title"
+      >
         <div className="vtk-cookie-consent-copy">
           <h2 id="vtk-cookie-title">{labels.title}</h2>
           <p>

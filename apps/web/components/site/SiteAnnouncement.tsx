@@ -1,14 +1,14 @@
 import { headers } from "next/headers";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
-import { AnnouncementModal } from "@/components/site/AnnouncementModal";
+import { AnnouncementCard } from "@/components/site/AnnouncementCard";
 import { Markdown } from "@/components/ui/Markdown";
 import { announcementFits } from "@/lib/announcements";
 import { getCachedAnnouncement } from "@/lib/cachedContent";
 
 /**
- * Het aankondigingsvenster, voor elke pagina van de site.
+ * De aankondiging, voor elke pagina van de site.
  *
- * Het hangt in de layout en niet meer in de homepage: wie via Google of een
+ * Ze hangt in de layout en niet meer in de homepage: wie via Google of een
  * gedeelde link op een gewone pagina binnenkomt, zag een afgelasting anders
  * nooit. Of ze hier ook echt verschijnt hangt af van het bereik dat in het
  * beheer gekozen is; `announcementFits` beslist dat op basis van het pad.
@@ -33,16 +33,42 @@ export async function SiteAnnouncement({ locale }: { locale: Locale }) {
       : null;
 
   return (
-    <AnnouncementModal
+    <AnnouncementCard
       id={announcement.id}
       title={pick(announcement.titleNl, announcement.titleEn, locale)}
+      kicker={dict.announcement.kicker}
+      dateLabel={postedOn(announcement.startsAt ?? announcement.createdAt, locale)}
       closeLabel={dict.common.close}
+      readMoreLabel={dict.announcement.readMore}
+      readLessLabel={dict.announcement.readLess}
       ctaLabel={ctaLabel}
       ctaUrl={announcement.ctaUrl}
     >
-      {/* De markdown wordt hier op de server gerenderd; de modal zelf is client,
+      {/* De markdown wordt hier op de server gerenderd; de kaart zelf is client,
           want wegklikken onthouden gebeurt in localStorage. */}
       <Markdown>{pick(announcement.bodyNl, announcement.bodyEn, locale)}</Markdown>
-    </AnnouncementModal>
+    </AnnouncementCard>
   );
+}
+
+/**
+ * Sinds wanneer het bericht er staat: het begin van het venster, of de
+ * aanmaakdatum als het meteen zichtbaar was. "Maandag 21 september".
+ *
+ * `new Date(...)` en niet de waarde zelf: uit de cache komt een datum als
+ * string terug (zie lib/cachedContent.ts). Een ingang uit de cache van vóór
+ * deze velden er waren, heeft er geen; dan valt de regel weg in plaats van te
+ * crashen op een ongeldige datum.
+ */
+function postedOn(value: Date | string | null | undefined, locale: Locale): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  const label = date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "Europe/Brussels",
+  });
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }

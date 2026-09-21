@@ -551,6 +551,11 @@
     "saveError": "Something went wrong while saving.",
     "close": "Close"
   },
+  "announcement": {
+    "kicker": "Announcement",
+    "readMore": "Read more",
+    "readLess": "Show less"
+  },
   "info": {
     "kicker": "VTK · KU Leuven",
     "title": "About the member portal",

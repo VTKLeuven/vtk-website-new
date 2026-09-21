@@ -84,8 +84,8 @@ export default async function AdminAnnouncements({
         <h1 className="text-2xl font-semibold">{nl ? "Aankondigingen" : "Announcements"}</h1>
         <p className="mt-1 text-sm text-zinc-500">
           {nl
-            ? "Een bericht dat als venster over de site verschijnt, op de homepage of op elke pagina. Bezoekers krijgen het één keer te zien; wie het wegklikt, ziet het niet opnieuw."
-            : "A message that appears as a dialog, on the homepage or on every page. Visitors see it once; anyone who dismisses it will not see it again."}
+            ? "Een bericht dat als kaart op de site verschijnt (rechtsonder, op een telefoon bovenaan), op de homepage of op elke pagina. Bezoekers krijgen het één keer te zien; wie het wegklikt, ziet het niet opnieuw."
+            : "A message that appears as a card on the site (bottom right, at the top on a phone), on the homepage or on every page. Visitors see it once; anyone who dismisses it will not see it again."}
         </p>
       </header>
 
