@@ -7,7 +7,7 @@ import { CUDI_SHIFT_SOURCE } from '@/lib/cudiShiftMirror';
 import { pushCudiRegistration } from '@/lib/cudiRegistrationSync';
 import { handledLeadFields } from '@/lib/shift/reminders';
 import { withSerializableTransaction } from '@/lib/ticketing/transactions';
-import { ROSTER_PARTICIPANT_SELECT, toRoster } from '@/lib/shift/roster';
+import { registeredShifts } from '@/lib/shift/lists';
 
 /** Binnen dit venster voor de start kan een user zichzelf niet meer uitschrijven. */
 const UNREGISTER_LOCK_MS = 24 * 60 * 60 * 1000;
@@ -46,38 +46,7 @@ export async function GET(request: Request) {
     targetUserId = requestedUserId;
   }
 
-  const now = new Date();
-  const shifts = await prisma.shift.findMany({
-    where: {
-      endTime: { gte: now },
-      participants: { some: { userId: targetUserId } },
-    },
-    orderBy: { startTime: 'asc' },
-    include: { participants: { select: { ...ROSTER_PARTICIPANT_SELECT, payedOut: true } } },
-  });
-
-  // `registeredAt` van deze user apart meegeven: de tabel bepaalt daarmee of de
-  // bedenktijd nog loopt en of de uitschrijfknop dus actief mag zijn. De namen
-  // gaan enkel via `roster` mee, niet in `participants`.
-  return NextResponse.json(
-    shifts.map(({ participants, ...shift }) => {
-      const takenSpots = participants.length;
-      return {
-        ...shift,
-        takenSpots,
-        availableSpots: Math.max(0, shift.maxParticipants - takenSpots),
-        participants: participants.map(({ userId, payedOut, registeredAt }) => ({
-          userId,
-          payedOut,
-          registeredAt,
-        })),
-        registeredAt:
-          participants.find((participant) => participant.userId === targetUserId)?.registeredAt ??
-          null,
-        roster: toRoster(participants, session.user.id),
-      };
-    }),
-  );
+  return NextResponse.json(await registeredShifts(targetUserId, session.user.id));
 }
 
 /**

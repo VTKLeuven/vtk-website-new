@@ -15,16 +15,11 @@ import { withCors, corsPreflight } from '@/lib/cors';
 import { handledLeadFields } from '@/lib/shift/reminders';
 import { describeChanges, logAudit } from '@/lib/audit';
 import { createShift } from '@/lib/shift/server';
-import { ROSTER_PARTICIPANT_SELECT, toRoster } from '@/lib/shift/roster';
+import { availableShifts } from '@/lib/shift/lists';
 
 /**
- * Get de huidige shiften (waar een user zich voor kan registreren)
- *
- * Alle shiften worden doorgestuurd, ook als shift al volzet is, of een user geregistreerd is.
- * Enkel shiften waar de user al voor geregistreerd is worden weggelaten.
- *
- * Per shift gaat `roster` mee: de namen van wie er al ingeschreven is. De
- * `participants` zelf, met hun user-id's, blijven op de server.
+ * Get de huidige shiften (waar een user zich voor kan registreren); zie
+ * `availableShifts`.
  */
 export async function GET() {
   let session;
@@ -34,27 +29,7 @@ export async function GET() {
     return authErrorResponse(err);
   }
 
-  const now = new Date();
-  const shifts = await prisma.shift.findMany({
-    where: { endTime: { gte: now }, manualGrantId: null },
-    orderBy: { startTime: 'asc' },
-    include: { participants: { select: ROSTER_PARTICIPANT_SELECT } },
-  });
-
-  const available = shifts
-    .map(({ participants, ...shift }) => {
-      const takenSpots = participants.length;
-      return {
-        ...shift,
-        takenSpots,
-        availableSpots: Math.max(0, shift.maxParticipants - takenSpots),
-        isRegistered: participants.some((p) => p.userId === session.user.id),
-        roster: toRoster(participants, session.user.id),
-      };
-    })
-    .filter((shift) => !shift.isRegistered);
-
-  return NextResponse.json(available);
+  return NextResponse.json(await availableShifts(session.user.id));
 }
 
 /**

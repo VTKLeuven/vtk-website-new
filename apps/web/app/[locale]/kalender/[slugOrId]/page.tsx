@@ -151,7 +151,7 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
   const base = locale === "nl" ? "" : "/en";
 
   const category = await loadCalendarCategory(slugOrId);
-  if (category) return <CategoryCalendar locale={locale} />;
+  if (category) return <CategoryCalendar locale={locale} slug={category.slug} />;
 
   const event = await loadCalendarEvent(slugOrId);
 

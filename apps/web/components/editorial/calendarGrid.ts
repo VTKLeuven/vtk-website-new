@@ -65,6 +65,41 @@ export function startOfWeek(date: Date): Date {
   return monday;
 }
 
+/**
+ * Het tijdsbereik dat de kalender voor deze dagen ophaalt: van middernacht van
+ * de eerste dag tot het laatste moment van de laatste, in lokale tijd.
+ */
+export function dayRange(days: Date[]): { start: Date; end: Date } {
+  const start = new Date(days[0]!);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(days.at(-1)!);
+  end.setHours(23, 59, 59, 999);
+  return { start, end };
+}
+
+/**
+ * Het bereik dat de kalender bij het openen toont: het maandraster rond `now`,
+ * want het affichesraster is de standaardweergave. De pagina haalt precies dit
+ * bereik al op de server op, zodat de eerste HTML de kaarten al bevat.
+ */
+export function openingRange(now: Date): { start: Date; end: Date } {
+  return dayRange(monthGridCells(now.getFullYear(), now.getMonth()).map((cell) => cell.date));
+}
+
+/**
+ * Welke evenementen een ophaling oplevert: het bereik, de categorie (`all` of
+ * een slug) en het doelgroepfilter. De server geeft deze sleutel mee met wat hij
+ * al ophaalde; de browser haalt enkel opnieuw op wanneer zijn eigen sleutel
+ * afwijkt, wat bij een bezoeker in een andere tijdzone gebeurt.
+ */
+export function eventsRequestKey(
+  range: { start: Date; end: Date },
+  filter: string,
+  onlyMyAudiences: boolean
+): string {
+  return [range.start.toISOString(), range.end.toISOString(), filter, onlyMyAudiences ? 'mine' : 'all'].join('|');
+}
+
 function mondayFirstWeekdayIndex(d: Date): number {
   const js = d.getDay();
   return js === 0 ? 6 : js - 1;
