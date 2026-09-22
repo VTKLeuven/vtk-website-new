@@ -360,6 +360,7 @@
     "required": "Required field",
     "saved": "Details saved",
     "errorInvalid": "Not saved: please check the details you entered.",
+    "errorGraduationYear": "Not saved: the graduation year can be {max} at the latest. Enter the year you graduated, not the year you expect to graduate.",
     "errorRnumberTaken": "Not saved: this r-number already belongs to another member.",
     "errorAvatarTooLarge": "Not saved: your profile picture is larger than 8 MB.",
     "errorAvatarFailed": "Not saved: your profile picture could not be processed.",
@@ -399,7 +400,8 @@
       "MECHANICAL": "Mechanical Engineering"
     },
     "graduationYear": "Graduation year",
-    "graduationYearHint": "The year you graduated. Groups you with your own year in the alumni network.",
+    "graduationYearHint": "The year you graduated, not the year you expect to graduate. Groups you with your own year in the alumni network.",
+    "graduationYearInvalid": "Enter a year between 1920 and {max}: the year you graduated.",
     "wasInVtk": "I was part of the VTK Praesidium",
     "wasInVtkHint": "Praesidium, work group or helper; whenever that was. You can show this at alumni events you attend.",
     "alumniMailOptIn": "Keep me posted about alumni events by email",
@@ -502,7 +504,10 @@
     "stepOf": "Step {step} of {total}",
     "continueLabel": "Continue",
     "back": "Back",
-    "submit": "Confirm"
+    "submit": "Confirm",
+    "errorInvalid": "Not confirmed: please check your study details.",
+    "errorGraduationYear": "Not confirmed: the graduation year can be {max} at the latest. Enter the year you graduated, not the year you expect to graduate.",
+    "errorAddress": "Not confirmed: your addresses are incomplete. Fill in the street, house number, postal code and city for each address."
   },
   "mailinglists": {
     "title": "Mailing lists",

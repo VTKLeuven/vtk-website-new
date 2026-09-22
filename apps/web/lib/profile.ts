@@ -33,6 +33,29 @@ export type AcademicStaffRoleValue = (typeof ACADEMIC_STAFF_ROLES)[number];
 export const R_NUMBER_PATTERN = "r[0-9]{7}";
 export const R_NUMBER_REGEX = new RegExp(`^${R_NUMBER_PATTERN}$`);
 
+// Een afstudeerjaar dat een mens kan hebben. De ondergrens is het stichtingsjaar
+// van VTK; de bovengrens loopt mee, want wie in juni afstudeert vult dat in
+// september als "vorig jaar" in en wie het laatste examen nog moet doen denkt al
+// aan volgend jaar. Nog verder is het jaar waarin iemand verwacht af te studeren,
+// en dat vraagt het veld niet.
+export const EARLIEST_GRADUATION_YEAR = 1920;
+
+export function latestGraduationYear(now: Date = new Date()): number {
+  return now.getFullYear() + 1;
+}
+
+/** Leeg mag; anders vier cijfers binnen de grenzen hierboven. */
+export function isValidGraduationYear(
+  value: string,
+  latest: number = latestGraduationYear(),
+): boolean {
+  const v = value.trim();
+  if (v === "") return true;
+  if (!/^\d{4}$/.test(v)) return false;
+  const year = Number(v);
+  return year >= EARLIEST_GRADUATION_YEAR && year <= latest;
+}
+
 export const STUDY_YEARS = [
   "BACHELOR_1",
   "BACHELOR_2",

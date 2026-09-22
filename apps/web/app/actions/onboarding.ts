@@ -19,6 +19,7 @@ import {
   STUDY_PROGRAMMES,
   ACADEMIC_STAFF_ROLES,
   R_NUMBER_REGEX,
+  isValidGraduationYear,
 } from "@/lib/profile";
 import { syncUserToBrevo } from "@/lib/brevo/sync";
 import {
@@ -67,19 +68,12 @@ const studyFieldsSchema = {
     .default(""),
   internationalStudent: z.boolean().default(false),
   alumni: z.boolean().default(false),
-  // Het afstudeerjaar komt als tekst binnen en mag leeg blijven. De ondergrens
-  // is het stichtingsjaar van VTK; de bovengrens loopt mee, want wie in juni
-  // afstudeert vult dat in september als "vorig jaar" in en wie zijn laatste
-  // examen nog moet doen denkt al aan volgend jaar.
+  // Het afstudeerjaar komt als tekst binnen en mag leeg blijven; de grenzen en
+  // hun reden staan bij `isValidGraduationYear`.
   graduationYear: z
     .string()
     .trim()
-    .refine((v) => {
-      if (v === "") return true;
-      if (!/^\d{4}$/.test(v)) return false;
-      const year = Number(v);
-      return year >= 1920 && year <= new Date().getFullYear() + 1;
-    })
+    .refine((v) => isValidGraduationYear(v))
     .default(""),
   wasInVtk: z.boolean().default(false),
   alumniMailOptIn: z.boolean().default(false),
@@ -102,6 +96,17 @@ function validateStudy(data: StudyInput, ctx: z.RefinementCtx): void {
 }
 
 const studySchema = studyObjectSchema.superRefine(validateStudy);
+
+/**
+ * De foutcode voor een geweigerde studiekeuze. Het afstudeerjaar krijgt een
+ * eigen code: het is het enige studieveld dat vrij ingetikt wordt, en "kijk je
+ * gegevens na" zegt niet dat een lid het verwachte afstudeerjaar invulde.
+ */
+function studyErrorCode(error: z.ZodError): "INVALID_GRADUATION_YEAR" | "INVALID_PROFILE" {
+  return error.issues.some((issue) => issue.path[0] === "graduationYear")
+    ? "INVALID_GRADUATION_YEAR"
+    : "INVALID_PROFILE";
+}
 
 /**
  * De `next`-waarde uit een formulier, of `null`. Enkel paden op deze site:
@@ -222,6 +227,7 @@ async function storeAvatar(file: File | null): Promise<string | null> {
 /** Fouten die het lid zelf kan oplossen; `ProfileForm` vertaalt ze naar een toast. */
 export type ProfileErrorCode =
   | "INVALID_PROFILE"
+  | "INVALID_GRADUATION_YEAR"
   | "RNUMBER_TAKEN"
   | "AVATAR_TOO_LARGE"
   | "AVATAR_FAILED";
@@ -264,7 +270,7 @@ export async function saveProfileAction(
   });
 
   if (!parsed.success) {
-    return saveError("INVALID_PROFILE" satisfies ProfileErrorCode);
+    return saveError(studyErrorCode(parsed.error) satisfies ProfileErrorCode);
   }
   const data = parsed.data;
 
@@ -402,6 +408,12 @@ export async function saveProfileAction(
   return saveOk();
 }
 
+/** Invoerfouten van de studiebevestiging; de pagina vertaalt ze naar een toast. */
+export type ConfirmStudyErrorCode =
+  | "INVALID_PROFILE"
+  | "INVALID_GRADUATION_YEAR"
+  | "INVALID_ADDRESS";
+
 /**
  * Jaarlijkse bevestiging van het studieprofiel en de adressen (zie de gate in
  * `proxy.ts`). Zet `studyConfirmedYear` op het huidige academiejaar, waardoor
@@ -409,14 +421,24 @@ export async function saveProfileAction(
  *
  * De volledige studiekeuze wordt altijd gepost. Voor de adressen kiest het lid
  * expliciet tussen de bestaande waarden bevestigen en aangepaste waarden posten.
+ *
+ * Een geweigerde invoer komt als foutcode terug en niet als throw: dit scherm
+ * is een poort, dus een error boundary zet het lid vast op een crashpagina
+ * zonder te zeggen welk veld het probleem is. Een lid dat als student ook
+ * "alumnus" aanvinkte met 2028 als afstudeerjaar, kwam er zo niet meer voorbij.
  */
-export async function confirmStudyAction(formData: FormData): Promise<void> {
+export async function confirmStudyAction(
+  _prevState: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   const session = await requireSession();
   // De actie is rechtstreeks aanroepbaar. Een niet-student hoort deze aparte
   // mutatieroute evenmin te gebruiken als de pagina of proxygate.
   if (!session.user.isStudent) redirect(safeNext(formData) ?? "/");
   const parsedStudy = studySchema.safeParse(studyFields(formData));
-  if (!parsedStudy.success) throw new Error("INVALID_PROFILE");
+  if (!parsedStudy.success) {
+    return saveError(studyErrorCode(parsedStudy.error) satisfies ConfirmStudyErrorCode);
+  }
 
   // Bij "de adressen kloppen" vertrouwen we geen verborgen clientwaarden: lees
   // de huidige rij opnieuw. Een oud, onvolledig profiel kan zo evenmin via een
@@ -443,7 +465,9 @@ export async function confirmStudyAction(formData: FormData): Promise<void> {
         )
       : addressFieldsFromForm(formData);
   const parsedAddress = addressSchema.safeParse(addressCandidate);
-  if (!parsedAddress.success) throw new Error("INVALID_PROFILE");
+  if (!parsedAddress.success) {
+    return saveError("INVALID_ADDRESS" satisfies ConfirmStudyErrorCode);
+  }
 
   // Hoe het lid er voor dit scherm voor stond: de Career-regel hangt ervan af,
   // en de update hieronder overschrijft het.

@@ -7,9 +7,10 @@ import { getDictionary, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { currentStudyYear, formatWorkingYear } from "@/lib/workingYear";
+import { latestGraduationYear } from "@/lib/profile";
 import { needsStudyConfirmation } from "@vtk/auth";
 import { logoutAction } from "@/app/actions/auth";
-import { confirmStudyAction } from "@/app/actions/onboarding";
+import { confirmStudyAction, type ConfirmStudyErrorCode } from "@/app/actions/onboarding";
 import { StudyFieldset } from "@/components/profile/StudyFieldset";
 import { AddressConfirmation } from "@/components/profile/AddressConfirmation";
 import { MembershipChoice } from "@/components/profile/MembershipChoice";
@@ -98,6 +99,14 @@ export default async function ConfirmStudyPage({
   const dict = getDictionary(locale);
   const t = dict.confirmStudy;
   const addressT = dict.onboarding;
+  const errorMessages: Record<ConfirmStudyErrorCode, string> = {
+    INVALID_PROFILE: t.errorInvalid,
+    INVALID_GRADUATION_YEAR: t.errorGraduationYear.replace(
+      "{max}",
+      String(latestGraduationYear()),
+    ),
+    INVALID_ADDRESS: t.errorAddress,
+  };
 
   // Het lidmaatschap hangt aan hetzelfde academiejaar als deze bevestiging, dus
   // wordt het hier gevraagd en niet op een scherm dat niemand uit zichzelf opent.
@@ -134,6 +143,9 @@ export default async function ConfirmStudyPage({
         <ConfirmStudySteps
           action={confirmStudyAction}
           next={home}
+          savingLabel={dict.common.saving}
+          errorMessages={errorMessages}
+          fallbackErrorMessage={dict.common.saveError}
           labels={{
             stepOf: t.stepOf,
             continueLabel: t.continueLabel,

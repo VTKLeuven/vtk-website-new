@@ -360,6 +360,7 @@
     "required": "Verplicht veld",
     "saved": "Gegevens opgeslagen",
     "errorInvalid": "Niet opgeslagen: kijk de ingevulde gegevens na.",
+    "errorGraduationYear": "Niet opgeslagen: het afstudeerjaar kan ten laatste {max} zijn. Vul het jaar in waarin je afstudeerde, niet dat waarin je verwacht af te studeren.",
     "errorRnumberTaken": "Niet opgeslagen: dit r-nummer hoort al bij een ander lid.",
     "errorAvatarTooLarge": "Niet opgeslagen: je profielfoto is groter dan 8 MB.",
     "errorAvatarFailed": "Niet opgeslagen: je profielfoto kon niet verwerkt worden.",
@@ -399,7 +400,8 @@
       "MECHANICAL": "Werktuigkunde"
     },
     "graduationYear": "Afstudeerjaar",
-    "graduationYearHint": "Het jaar waarin je afstudeerde. Groepeert je bij je eigen lichting in de alumniwerking.",
+    "graduationYearHint": "Het jaar waarin je afstudeerde, niet dat waarin je verwacht af te studeren. Groepeert je bij je eigen lichting in de alumniwerking.",
+    "graduationYearInvalid": "Vul een jaar in tussen 1920 en {max}: het jaar waarin je afstudeerde.",
     "wasInVtk": "Ik heb ooit in VTK Praesidium gezeten",
     "wasInVtkHint": "Praesidium, werkgroep of medewerker; wanneer dan ook. Je kan dit tonen bij alumni-evenementen waar je naartoe komt.",
     "alumniMailOptIn": "Hou me via mail op de hoogte van alumni-evenementen",
@@ -502,7 +504,10 @@
     "stepOf": "Stap {step} van {total}",
     "continueLabel": "Ga verder",
     "back": "Terug",
-    "submit": "Bevestigen"
+    "submit": "Bevestigen",
+    "errorInvalid": "Niet bevestigd: kijk je studiegegevens na.",
+    "errorGraduationYear": "Niet bevestigd: het afstudeerjaar kan ten laatste {max} zijn. Vul het jaar in waarin je afstudeerde, niet dat waarin je verwacht af te studeren.",
+    "errorAddress": "Niet bevestigd: je adressen zijn onvolledig. Vul voor elk adres straat, huisnummer, postcode en gemeente in."
   },
   "mailinglists": {
     "title": "Mailinglijsten",

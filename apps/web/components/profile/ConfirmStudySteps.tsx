@@ -1,7 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  startTransition,
+  useActionState,
+  useEffect,
+  useRef,
+  useState,
+  type FormEvent,
+  type ReactNode,
+} from "react";
 import { Button } from "@vtk/ui";
+import { useToast } from "@/components/ui/toast";
+import { SAVE_IDLE, type SaveAction, type SaveState } from "@/lib/saveState";
 
 export type ConfirmStudyStepsLabels = {
   /** "Stap {step} van {total}" */
@@ -24,6 +34,11 @@ type Panes = {
   secondVisible?: boolean;
   labels: ConfirmStudyStepsLabels;
 };
+
+/** De voorvertoning verstuurt niets; `useActionState` wil toch een action. */
+async function idleAction(): Promise<SaveState> {
+  return SAVE_IDLE;
+}
 
 /** Staat er in dit paneel nog een vraag die niet `hidden` is? */
 function hasVisibleQuestion(pane: HTMLElement): boolean {
@@ -49,6 +64,10 @@ function hasVisibleQuestion(pane: HTMLElement): boolean {
  * Zonder JavaScript staan beide panelen open en verstuurt de gewone submitknop
  * het hele formulier; een server action werkt daar ook zonder JS. Een gate die
  * op "Ga verder" blijft steken zou niemand nog binnenlaten.
+ *
+ * Geen `SaveForm`, om diezelfde reden: die verstuurt enkel via JavaScript. Wel
+ * hetzelfde contract: de action geeft bij een invoerfout een `SaveState` terug,
+ * die hier een rode toast wordt, en bij succes redirect ze zelf.
  */
 export function ConfirmStudySteps(
   props: Panes &
@@ -64,8 +83,12 @@ export function ConfirmStudySteps(
         }
       | {
           preview?: false;
-          action: (formData: FormData) => void | Promise<void>;
+          action: SaveAction;
           next: string;
+          savingLabel: string;
+          /** Foutcode uit de action -> vertaalde melding. */
+          errorMessages: Record<string, string>;
+          fallbackErrorMessage: string;
         }
     ),
 ) {
@@ -74,6 +97,31 @@ export function ConfirmStudySteps(
   const formRef = useRef<HTMLFormElement>(null);
   const secondRef = useRef<HTMLDivElement>(null);
   const [secondVisible, setSecondVisible] = useState(props.secondVisible ?? true);
+  const [state, formAction, pending] = useActionState(
+    props.preview ? idleAction : props.action,
+    SAVE_IDLE,
+  );
+  const showToast = useToast();
+  // Per submit exact één toast, ook wanneer de component om een andere reden
+  // hertekent met dezelfde state.
+  const handled = useRef<number | null>(null);
+  const errorMessages = props.preview ? null : props.errorMessages;
+  const fallbackErrorMessage = props.preview ? "" : props.fallbackErrorMessage;
+
+  // Een geslaagde bevestiging redirect, dus hier komt enkel een fout aan. Alles
+  // wat de action kan weigeren (studie, afstudeerjaar, adressen) staat in stap 1:
+  // daar naartoe, anders staat de melding boven een veld dat het lid niet ziet.
+  useEffect(() => {
+    if (state.status !== "error" || handled.current === state.nonce) return;
+    handled.current = state.nonce;
+    setStep(1);
+    formRef.current?.scrollIntoView({ block: "start" });
+    showToast({
+      message: errorMessages?.[state.code] ?? state.detail ?? fallbackErrorMessage,
+      variant: "error",
+      duration: 0,
+    });
+  }, [state, showToast, errorMessages, fallbackErrorMessage]);
 
   // De vragen in stap 2 kunnen zichzelf verbergen (de Career-vraag doet dat
   // wanneer stap 1 niet meer bij Career past). Valt daardoor alles weg, dan is
@@ -135,9 +183,24 @@ export function ConfirmStudySteps(
     formRef.current?.scrollIntoView({ block: "start" });
   };
 
+  /**
+   * Zelf verzenden, zoals `SaveForm`: React leegt een uncontrolled formulier na
+   * elke afgelopen form action, ook na een geweigerde. Dan stond het lid na de
+   * foutmelding weer voor de waarden van vorig jaar, zonder de invoer die het
+   * net probeerde. Omdat hier `preventDefault` loopt, slaat React die reset
+   * over; `action={formAction}` blijft staan voor wie zonder JavaScript komt.
+   */
+  const onSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const data = new FormData(event.currentTarget);
+    startTransition(() => formAction(data));
+  };
+
   const submitRow = (
     <div className="flex flex-wrap items-center gap-3">
-      <Button type="submit">{labels.submitLabel}</Button>
+      <Button type="submit" disabled={pending}>
+        {pending ? props.savingLabel : labels.submitLabel}
+      </Button>
       {twoStep ? (
         <Button type="button" variant="ghost" onClick={goBack}>
           {labels.backLabel}
@@ -148,7 +211,12 @@ export function ConfirmStudySteps(
   );
 
   return (
-    <form ref={formRef} action={props.action} className="vtk-steps space-y-6">
+    <form
+      ref={formRef}
+      action={formAction}
+      onSubmit={onSubmit}
+      className="vtk-steps space-y-6"
+    >
       <input type="hidden" name="next" value={props.next} />
 
       {twoStep ? kicker(step) : null}
