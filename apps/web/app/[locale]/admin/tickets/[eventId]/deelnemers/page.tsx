@@ -22,6 +22,7 @@ import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
 import { saveAttendeeRNumberAction } from "@/app/actions/tickets";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
+import { AttendeeQr } from "@/components/ticketing/admin/AttendeeQr";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { StatusBadge } from "@/components/ticketing/admin/StatusBadge";
 import {
@@ -298,6 +299,14 @@ export default async function TicketAttendeesPage({
                                   </dl>
                                 ) : <p className="ticket-admin-empty-copy">{locale === "nl" ? "Nog geen scan geregistreerd." : "No scan registered yet."}</p>}
                               </div>
+                            </div>
+                            <div className="ticket-admin-detail-section">
+                              <h3>{locale === "nl" ? "QR-code" : "QR code"}</h3>
+                              <AttendeeQr
+                                src={`/api/tickets/events/${eventId}/attendees/${ticket.id}/qr`}
+                                code={ticket.publicCode}
+                                locale={locale}
+                              />
                             </div>
                             {event.cardCheckIn ? (
                               <div className="ticket-admin-detail-section">
