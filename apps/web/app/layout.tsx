@@ -112,11 +112,17 @@ export default async function RootLayout({ children }: { children: React.ReactNo
               data-exclude-hash="true"
               data-performance="true"
             />
-            <script
-              defer
-              src="https://analytics.vtk.be/recorder.js"
-              data-website-id="vtk.be"
-            ></script>
+            {/* Sessie-opname. Dezelfde website-id als het tracker-script
+                hierboven: de recorder haalt zijn configuratie op bij
+                `/api/websites/<id>/recorder` en stopt stil wanneer die
+                aanvraag faalt. Hij start pas zodra `umami.getSession().cache`
+                bestaat, dus hij moet na het tracker-script komen. */}
+            <Script
+              strategy="afterInteractive"
+              src={analytics.recorderSrc}
+              data-website-id={analytics.websiteId}
+              data-host-url={analytics.hostUrl}
+            />
           </>
         )}
         {children}

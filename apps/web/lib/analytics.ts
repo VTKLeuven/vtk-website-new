@@ -37,6 +37,17 @@ export type AnalyticsConfig = {
 
 export type AnalyticsScript = {
   src: string;
+  /**
+   * De sessie-opname (Umami "recorder"), naast het tracker-script. Zelfde
+   * server, zelfde website-id: de recorder leest `data-website-id` van zijn
+   * eigen `<script>` en haalt daarmee zijn configuratie op bij
+   * `/api/websites/<id>/recorder`. Staat daar een hostnaam in plaats van de
+   * id uit het dashboard, dan geeft die aanvraag een 500 en stopt de recorder
+   * zonder een spoor in de console; dat is precies wat hier ooit stond.
+   */
+  recorderSrc: string;
+  /** Waarde voor `data-host-url` op de recorder: waar hij zijn opnames heen stuurt. */
+  hostUrl: string;
   websiteId: string;
   /** Waarde voor `data-before-send`: de naam van de globale filterfunctie. */
   beforeSend: string;
@@ -131,6 +142,8 @@ export function analyticsScript(input: {
 
   return {
     src: `${config.url}/script.js`,
+    recorderSrc: `${config.url}/recorder.js`,
+    hostUrl: config.url,
     websiteId: config.websiteId,
     beforeSend: ANALYTICS_BEFORE_SEND_FUNCTION,
     filterSource: analyticsFilterSource(),

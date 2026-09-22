@@ -48,6 +48,19 @@ describe('toestemming', () => {
     });
   });
 
+  // De sessie-opname hing ooit aan een hardgecodeerde URL met de hostnaam als
+  // `data-website-id`. De recorder haalt daarmee zijn configuratie op bij
+  // `/api/websites/<id>/recorder`, kreeg een 500 en stopte zonder iets te
+  // loggen. Website-id en host horen dus uit dezelfde configuratie te komen als
+  // het tracker-script.
+  it('geeft de recorder dezelfde server en website-id als het tracker-script', () => {
+    expect(script('analytics')).toMatchObject({
+      recorderSrc: 'https://stats.vtk.be/recorder.js',
+      hostUrl: 'https://stats.vtk.be',
+      websiteId: 'website-id',
+    });
+  });
+
   it('laadt niets zonder configuratie, ook niet met toestemming', () => {
     expect(analyticsScript({ config: null, consent: 'analytics', pathname: '/nl' })).toBeNull();
   });
