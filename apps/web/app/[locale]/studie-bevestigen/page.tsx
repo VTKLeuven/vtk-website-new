@@ -16,7 +16,8 @@ import { MembershipChoice } from "@/components/profile/MembershipChoice";
 import { CareerOptIn } from "@/components/profile/CareerOptIn";
 import { ConfirmStudySteps } from "@/components/profile/ConfirmStudySteps";
 import { hasCompleteAddresses } from "@/lib/profile-address";
-import { careerChoiceLabels, shouldAskCareerOptIn } from "@/lib/careerOptIn";
+import { careerFitsStudy, careerOptInOpen } from "@/lib/careerOptIn";
+import { careerOptInCopy } from "@/lib/careerOptInCopy";
 import "@/app/design/vtk-career-optin.css";
 import {
   getMembership,
@@ -107,8 +108,16 @@ export default async function ConfirmStudyPage({
   const offer = membershipOffer(user, membership, membershipConfig);
 
   // De Career-vraag stellen we enkel aan wie ze nog niet beantwoordde; zie
-  // `lib/careerOptIn.ts` voor de drie gevallen waarin ze wegvalt.
-  const askCareer = shouldAskCareerOptIn(user);
+  // `lib/careerOptIn.ts` voor de gevallen waarin ze wegvalt. Wat van de studie
+  // afhangt, beslist het blok zelf op wat het lid in stap 1 invult: het profiel
+  // hier is nog dat van vorig jaar.
+  const careerOpen = careerOptInOpen(user);
+  const careerStudy = {
+    isStudent: user.isStudent,
+    notAtFaculty: user.notAtFaculty,
+    studyYears: user.studyYears,
+    studyProgrammes: user.studyProgrammes,
+  };
 
   return (
     <div className="vtk-page vtk-page-shell vtk-page-narrow space-y-6">
@@ -179,19 +188,23 @@ export default async function ConfirmStudyPage({
           second={
             // Een tweede stap zonder vraag erop is een extra klik voor niets:
             // wie al lid is én Career al aanduidde, houdt één pagina.
-            offer.kind !== "none" || askCareer ? (
+            offer.kind !== "none" || careerOpen ? (
               <>
                 <MembershipChoice
                   offer={offer}
                   labels={membershipChoiceLabels(locale, offer, year)}
                 />
                 <CareerOptIn
-                  labels={askCareer ? careerChoiceLabels(locale, user) : null}
+                  copy={careerOpen ? careerOptInCopy(locale) : null}
+                  initial={careerStudy}
                   photoAlt={t.careerPhotoAlt}
                 />
               </>
             ) : null
           }
+          // Of stap 2 bij het laden al iets toont; de Career-vraag kan pas
+          // verschijnen wanneer het lid in stap 1 zijn nieuwe jaar aanduidt.
+          secondVisible={offer.kind !== "none" || (careerOpen && careerFitsStudy(careerStudy))}
         />
       </Card>
 

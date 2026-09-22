@@ -8294,6 +8294,22 @@ in de Algemene Bachelor, dus er valt niet eens een richting te noemen in de
 titel. Vanaf de tweede bachelor krijgt iedereen ze wel. Wie het als eerstejaars
 tóch wil, vindt het vinkje gewoon op `/account`.
 
+**De regel kijkt naar dit jaar, dus naar stap 1.** Het profiel dat de server bij
+het openen van de gate kent, is dat van vorig jaar: de bevestiging is net het
+moment waarop het lid zijn nieuwe jaar aanduidt. Het scherm besliste eerst op dat
+oude profiel, en dan kreeg precies de groep die er voor het eerst bij hoort de
+vraag niet: wie vorig jaar eerste bachelor was, is nu tweede. De titel noemde om
+dezelfde reden het jaar van vorig jaar ("Bedrijven zoeken 1ste masters" aan een
+tweede master). Sinds 22 september 2026 volgt het blok live wat het lid in stap 1
+aanvinkt (`CareerOptIn` leest het formulier bij elke wijziging): het verschijnt,
+verdwijnt en past zijn titel aan. Wat niet van stap 1 afhangt (Career al aan,
+uitgeschreven via een mail) ligt vast bij het laden. Valt de vraag door stap 1
+weg en is er ook geen lidmaatschapsvraag, dan wordt het weer één stap. Een
+verborgen blok staat ook `disabled`, zodat een vinkje dat het lid zette voor het
+terugging en "niet aan de faculteit" aanduidde, niet ongezien meegaat. De server
+beslist bij het opslaan opnieuw, op dezelfde regel en op de studie die net
+bevestigd is.
+
 **De titel noemt zijn richting.** "Bedrijven zoeken 2de masters Energie" is
 moeilijker over te slaan dan "blijf op de hoogte", en het is waar: de lijst
 splitst echt per studiejaar en per richting (`lib/careerLists.ts`).
@@ -8348,9 +8364,57 @@ plaatsen en zonder dat is niet te zien welke ervan werkt.
 `User.careerOptInSource` (`ONBOARDING`, `ACCOUNT`, `STUDY_CONFIRMATION`) plus
 `careerOptInAt` hangen aan de **lopende** opt-in: zet het lid Career weer uit,
 dan gaan ze mee op null. Anders telt /admin/mailinglijsten herkomsten van mensen
-die niet meer op de lijst staan. Wie al aangeduid stond voor we dit bijhielden,
-valt onder "Eerder". Bewust geen logtabel met alle aan- en uitzettingen: de vraag
-is "waar komt deze inschrijving vandaan", niet "hoe vaak twijfelde dit lid".
+die niet meer op de lijst staan. Wie al aangeduid stond voor we dit bijhielden
+(17 september 2026), heeft geen herkomst. Die stonden eerst apart als "Eerder",
+maar dat waren in de praktijk allemaal onboardings: de admin telt ze daarom bij
+de onboarding, met `onboardedAt` als datum in de grafiek. In de database blijft
+de kolom leeg, want gemeten is het niet. Bewust geen logtabel met alle aan- en
+uitzettingen: de vraag is "waar komt deze inschrijving vandaan", niet "hoe vaak
+twijfelde dit lid".
+
+**Wie de vraag gezien heeft, wordt apart geregistreerd** (`StudyConfirmation`,
+sinds 22 september 2026). De herkomst hierboven telt enkel de ja's, en een
+conversie heeft een noemer nodig: hoeveel studenten de vraag kregen. Die is
+achteraf niet af te leiden, want de bevestiging overschrijft net het profiel
+waarvan de vraag afhing. Per lid en per academiejaar komt er één rij met het
+moment, het scherm (`CONFIRMATION`, `ONBOARDING`, of `ACCOUNT` voor een opslag op
+/account die tussen 14 en 21 september een nieuw jaar bevestigde), of Career al
+aan stond, of de vraag op het scherm stond en of het lid ja zei, plus een
+momentopname van studiejaar en richting voor de uitsplitsing.
+- "De vraag stond op het scherm" is een verborgen veld dat enkel meegaat wanneer
+  het blok zichtbaar was, **én** de regel die op de nieuwe studie ja zegt. Het
+  veld alleen is te vervalsen; de regel alleen telt wie zonder JavaScript een
+  blok zag dat stap 1 niet volgde.
+- Een rij is één bevestiging, geen opslag: een tweede POST of een latere opslag
+  op /account laat de eerste staan.
+- Een fout bij het wegschrijven houdt de bevestiging niet tegen. Een lid dat voor
+  de gate blijft staan omdat een teltabel haperde, is erger dan een rij die
+  ontbreekt.
+- Wie bevestigde voor de registratie bestond (21 en 22 september 2026), heeft
+  geen rij. De admin toont die groep als "niet geregistreerd" en de 46 Career-ja's
+  van toen als "aangeduid voor de registratie", in plaats van een reconstructie
+  als meting op te slaan.
+- Bij een verwijdering van het account gaan de rijen mee weg (ze dragen studiejaar
+  en richting); de tellingen van die ronde zakken dan met één.
+
+**Het verloop van een lijst wordt dagelijks geteld**
+(`MailingListDailyCount`), want een lijst is een momentopname: wie Career uitzet
+of zijn studie niet bevestigt, verdwijnt eruit zonder spoor. De
+background-worker schrijft elke vijf minuten de stand van vandaag weg, voor élke
+lijst en niet enkel Career: een verloop dat je pas begint te meten wanneer iemand
+erom vraagt, heeft geen verleden. Voor de eerste telling is "Career aan"
+gestippeld opgeteld uit de opt-in-datums (wie Career intussen uitzette, ontbreekt
+daarin); "op de lijst" heeft geen verleden, want de datum van een bevestiging
+werd voordien nergens bewaard. Een dag waarop de worker stil lag, blijft een gat.
+
+**Elke uitsplitsing in de admin sluit.** Het scherm toonde "Career: 498 leden"
+bovenaan en "870 met Career aan" eronder, zonder dat ergens stond waarom die
+verschilden (de bevestigingsronde was de dag ervoor opengegaan, en wie nog niet
+bevestigde, valt tot dan uit de lijst). Nu loopt elk blok van een totaal naar
+een deel, met de stappen ertussen als min-regels: van alle opt-ins naar de lijst,
+van alle studentaccounts naar onze studenten, van alle bevestigingen via de gate
+naar wie de vraag kreeg. De rij Career bovenaan zegt er zelf bij hoeveel opt-ins
+nog op hun bevestiging wachten.
 
 **"Onze studenten" is de noemer van het percentage**, en die is nauwer dan
 "iedereen met een account": actief, status Student, een richting van de faculteit
@@ -8358,6 +8422,12 @@ aangeduid en niet `notAtFaculty`. Dat is precies het publiek dat Career aan
 bedrijven belooft. Het scherm is nog een tikje nauwer (eerste bachelors krijgen
 de vraag niet), maar de noemer blijft de volledige groep: zij kunnen het vinkje
 op `/account` wel aanzetten en horen dus in het percentage (`lib/careerStats.ts`).
+De database kent enkel wie al eens inlogde, dus dit is het bereik binnen de site
+en niet binnen de faculteit. Daarom staat ernaast hoeveel accounts volgens de
+KU Leuven-login (`firwStudent`) van de faculteit zijn, los van wat ze zelf
+aanduidden, en waar de rest van de studentaccounts naartoe gaat (onboarding niet
+afgewerkt, niet aan de faculteit, geen richting): `isStudent` staat standaard aan,
+dus ook wie na de eerste login nooit verder kwam, telt als student.
 
 ## De donkere modus van de uitleendienst
 

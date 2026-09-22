@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button } from "@vtk/ui";
 
 export type ConfirmStudyStepsLabels = {
@@ -16,8 +16,19 @@ type Panes = {
   first: ReactNode;
   /** `null` wanneer er niets te vragen valt; dan blijft het één pagina. */
   second: ReactNode | null;
+  /**
+   * Of er bij het laden iets zichtbaars in stap 2 staat. De Career-vraag volgt
+   * stap 1 en kan dus leeg beginnen (of leeg worden); zonder deze beginstand
+   * toont de server "Stap 1 van 2" boven een formulier met maar één stap.
+   */
+  secondVisible?: boolean;
   labels: ConfirmStudyStepsLabels;
 };
+
+/** Staat er in dit paneel nog een vraag die niet `hidden` is? */
+function hasVisibleQuestion(pane: HTMLElement): boolean {
+  return Array.from(pane.children).some((child) => !(child as HTMLElement).hidden);
+}
 
 /**
  * De jaarlijkse studiebevestiging in twee stappen: eerst wie je bent en waar je
@@ -61,8 +72,27 @@ export function ConfirmStudySteps(
   const { first, second, labels } = props;
   const [step, setStep] = useState<1 | 2>(1);
   const formRef = useRef<HTMLFormElement>(null);
+  const secondRef = useRef<HTMLDivElement>(null);
+  const [secondVisible, setSecondVisible] = useState(props.secondVisible ?? true);
 
-  const twoStep = second !== null;
+  // De vragen in stap 2 kunnen zichzelf verbergen (de Career-vraag doet dat
+  // wanneer stap 1 niet meer bij Career past). Valt daardoor alles weg, dan is
+  // stap 2 een lege pagina en een klik voor niets: dan wordt het één stap.
+  useEffect(() => {
+    const pane = secondRef.current;
+    if (!pane) return;
+    const update = () => setSecondVisible(hasVisibleQuestion(pane));
+    update();
+    const observer = new MutationObserver(update);
+    observer.observe(pane, { subtree: true, childList: true, attributeFilter: ["hidden"] });
+    return () => observer.disconnect();
+  }, []);
+
+  const hasSecond = second !== null;
+  // Het tweede paneel blijft altijd gemount zolang er een is, ook wanneer het
+  // leeg staat: anders verliest de Career-vraag haar luisteraar op stap 1 en
+  // komt ze niet meer terug wanneer het antwoord daar opnieuw verandert.
+  const twoStep = hasSecond && secondVisible;
   const stepLabel = (n: number) =>
     labels.stepOf.replace("{step}", String(n)).replace("{total}", "2");
 
@@ -127,11 +157,14 @@ export function ConfirmStudySteps(
         {first}
       </div>
 
+      {hasSecond ? (
+        <div ref={secondRef} className="space-y-6" hidden={!twoStep || step !== 2} data-step-pane>
+          {second}
+        </div>
+      ) : null}
+
       {twoStep ? (
         <>
-          <div className="space-y-6" hidden={step !== 2} data-step-pane>
-            {second}
-          </div>
           <div hidden={step !== 1} data-step-nav>
             <Button type="button" onClick={goForward}>
               {labels.continueLabel}

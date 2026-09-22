@@ -18,6 +18,16 @@
   --body: #34405e;
   /* Muted text on a navy/ink ground (intentional dark bands only). */
   --on-dark-muted: #b7c0dc;
+  /* Grafieken (/admin/mailinglijsten). Drie categorische kleuren in vaste
+     volgorde, samen gevalideerd tegen --surface op kleurenblindheid (elk paar
+     dE >= 11,9) en op onderscheid bij gewoon zicht; hertune ze enkel met die
+     controle erbij. Het amber haalt geen 3:1 op wit, dus elke grafiek met deze
+     kleuren draagt een legende en een tabelweergave. --chart-context is de
+     grijze lijn naast de lijn waar het om gaat. */
+  --chart-1: #3a5fc4;
+  --chart-2: #eda100;
+  --chart-3: #1b9e77;
+  --chart-context: #98a2b8;
   /* Beschikbaarheid van een plaats (shiften): ruim, bijna vol, vol. Vol is
      bewust grijs en niet rood: het is geen fout maar een keuze die wegvalt, en
      in een drukke week staat het tien keer op het scherm. */

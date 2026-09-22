@@ -1542,3 +1542,259 @@ a.vtk-shortcut-tile:hover {
     padding-right: 16px;
   }
 }
+
+/* Dagelijkse grafieken (components/admin/DailyChart). Het raster en de assen
+   zijn haarlijnen in --line, de tekst staat in de teksttokens en nooit in de
+   kleur van een reeks; de kleur draagt enkel het merkteken ernaast. */
+.vtk-chart {
+  margin-top: 12px;
+}
+
+.vtk-chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--body);
+}
+
+.vtk-chart-legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.vtk-chart-swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.vtk-chart-linekey {
+  width: 14px;
+  height: 2px;
+  border-radius: 1px;
+  flex: none;
+}
+
+.vtk-chart-linekey-dashed {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--chart-context) 0 4px,
+    transparent 4px 7px
+  ) !important;
+}
+
+.vtk-chart-plot {
+  position: relative;
+}
+
+/* De SVG meet zichzelf op (ResizeObserver); tot dan schaalt ze mee in plaats
+   van de kolom op te rekken. */
+.vtk-chart-plot svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  outline: none;
+  touch-action: pan-y;
+}
+
+.vtk-chart-plot svg:focus-visible {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--chart-1);
+  border-radius: 8px;
+}
+
+.vtk-chart-grid {
+  stroke: var(--line);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.vtk-chart-tick {
+  fill: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-chart-end {
+  fill: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-chart-hover {
+  fill: var(--paper-2);
+}
+
+.vtk-chart-line {
+  fill: none;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+
+.vtk-chart-line-dashed {
+  stroke-dasharray: 4 4;
+  opacity: 0.8;
+}
+
+.vtk-chart-crosshair {
+  stroke: var(--line-2);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+
+.vtk-chart-dot {
+  stroke: var(--surface);
+  stroke-width: 2;
+}
+
+.vtk-chart-tooltip {
+  position: absolute;
+  top: 0;
+  z-index: 2;
+  min-width: 150px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+  box-shadow: 0 6px 18px rgba(14, 26, 54, 0.1);
+  pointer-events: none;
+  font-size: 12px;
+}
+
+.vtk-admin-main .vtk-chart-tooltip p.vtk-chart-tooltip-day {
+  margin: 0 0 4px;
+  color: var(--muted) !important;
+}
+
+.vtk-admin-main .vtk-chart-tooltip p.vtk-chart-tooltip-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 2px 0 0;
+  color: var(--body) !important;
+}
+
+.vtk-chart-tooltip-row strong {
+  min-width: 2.5ch;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-chart-tooltip-total {
+  border-top: 1px solid var(--line);
+  padding-top: 3px;
+}
+
+.vtk-chart-table {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.vtk-chart-table > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.vtk-chart-table table {
+  margin-top: 8px;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-chart-table th,
+.vtk-chart-table td {
+  padding: 3px 14px 3px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.vtk-chart-table th:first-child {
+  text-align: left;
+  font-weight: 500;
+  color: var(--body);
+}
+
+.vtk-chart-table thead th {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.vtk-admin-main .vtk-chart-table p.vtk-chart-footnote {
+  margin-top: 6px;
+}
+
+/* Per studiejaar en per richting (/admin/mailinglijsten). Zeven kolommen met
+   getallen: op een telefoon wordt elke rij een blok met het label bij elke
+   waarde, in plaats van de koppen weg te laten. */
+.vtk-seg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-seg-table th,
+.vtk-seg-table td {
+  padding: 7px 10px 7px 0;
+  border-bottom: 1px solid var(--line);
+  text-align: right;
+  white-space: nowrap;
+  color: var(--ink);
+}
+
+.vtk-seg-table th[scope='row'],
+.vtk-seg-table thead th:first-child {
+  text-align: left;
+  white-space: normal;
+  font-weight: 500;
+  color: var(--body);
+}
+
+.vtk-seg-table thead th {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+  vertical-align: bottom;
+}
+
+@media (max-width: 640px) {
+  .vtk-seg-table thead {
+    display: none;
+  }
+
+  .vtk-seg-table tr {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 4px 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .vtk-seg-table th[scope='row'] {
+    grid-column: 1 / -1;
+    padding: 0;
+    border: 0;
+    color: var(--ink);
+  }
+
+  .vtk-seg-table td {
+    padding: 0;
+    border: 0;
+    text-align: left;
+  }
+
+  .vtk-seg-table td::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    color: var(--muted);
+  }
+}

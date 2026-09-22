@@ -33,7 +33,19 @@ import {
   membershipOffer,
   recordMembershipChoice,
 } from "@/lib/membership";
-import { CAREER_OPT_IN_FIELD, careerOptInUpdate, withCareerCategory } from "@/lib/careerOptIn";
+import {
+  CAREER_CATEGORY,
+  CAREER_OPT_IN_FIELD,
+  CAREER_OPT_IN_SHOWN_FIELD,
+  careerOptInUpdate,
+  shouldAskCareerOptIn,
+  withCareerCategory,
+} from "@/lib/careerOptIn";
+import {
+  profileCareerOutcome,
+  profileConfirmationVia,
+  type StudyConfirmationViaValue,
+} from "@/lib/studyConfirmation";
 
 /**
  * De studievelden, gedeeld door het volledige profielformulier en de jaarlijkse
@@ -277,7 +289,12 @@ export async function saveProfileAction(
   // zelfs een gemanipuleerde submit laat het r-nummer dan ongemoeid.
   const existing = await prisma.user.findUnique({
     where: { id: session.user.id },
-    select: { rNumberFromKul: true, mailUnsubscribedAt: true, mailCategories: true },
+    select: {
+      rNumberFromKul: true,
+      mailUnsubscribedAt: true,
+      mailCategories: true,
+      studyConfirmedYear: true,
+    },
   });
   const rNumberLocked = existing?.rNumberFromKul ?? false;
   // Hetzelfde formulier draagt de onboarding en /account, dus de herkomst van
@@ -290,6 +307,9 @@ export async function saveProfileAction(
   // Alleen een lid dat écht uitgeschreven stond, schrijft zich opnieuw in; zo
   // blijft een gewone profielopslag een gewone push naar Brevo.
   const resubscribe = existing?.mailUnsubscribedAt != null && data.mailResubscribe;
+  // Eén keer gelezen, zodat de stempel en de registratie hieronder hetzelfde
+  // jaar dragen, ook wanneer iemand om middernacht op 14 september opslaat.
+  const year = currentStudyYear();
 
   try {
     await prisma.user.update({
@@ -314,7 +334,7 @@ export async function saveProfileAction(
         ...studyUpdate(data),
         // Wie dit formulier invult, declareert daarmee zijn studie voor dit
         // academiejaar; de bevestigingsgate hoeft er dan niet meer op te vallen.
-        studyConfirmedYear: data.isStudent ? currentStudyYear() : null,
+        studyConfirmedYear: data.isStudent ? year : null,
         ...(newAvatarKey ? { avatarKey: newAvatarKey } : {}),
         // Stamp completion only once; account edits keep the original timestamp.
         ...(wasOnboarded ? {} : { onboardedAt: new Date() }),
@@ -333,6 +353,25 @@ export async function saveProfileAction(
     // Onverwachte serverfouten blijven gooien: die horen in de error boundary
     // en in de monitoring, niet in een toast die "probeer opnieuw" suggereert.
     throw err;
+  }
+
+  // Bevestigde deze opslag een nieuw academiejaar (de onboarding altijd, /account
+  // enkel tussen 14 en 21 september), dan telt ze mee in de bevestigingsronde.
+  const via = profileConfirmationVia({
+    wasOnboarded,
+    isStudent: data.isStudent,
+    previousConfirmedYear: existing?.studyConfirmedYear ?? null,
+    year,
+  });
+  if (via) {
+    await recordStudyConfirmation({
+      userId: session.user.id,
+      year,
+      via,
+      ...profileCareerOutcome(existing?.mailCategories ?? [], data.mailCategories),
+      studyYears: data.studyYears,
+      studyProgrammes: data.studyProgrammes,
+    });
   }
 
   // Clean up the replaced avatar object (best-effort) to avoid orphans.
@@ -406,17 +445,54 @@ export async function confirmStudyAction(formData: FormData): Promise<void> {
   const parsedAddress = addressSchema.safeParse(addressCandidate);
   if (!parsedAddress.success) throw new Error("INVALID_PROFILE");
 
+  // Hoe het lid er voor dit scherm voor stond: de Career-regel hangt ervan af,
+  // en de update hieronder overschrijft het.
+  const before = await prisma.user.findUniqueOrThrow({
+    where: { id: session.user.id },
+    select: { mailCategories: true, mailUnsubscribedAt: true },
+  });
+
+  const year = currentStudyYear();
   await prisma.user.update({
     where: { id: session.user.id },
     data: {
       ...studyUpdate(parsedStudy.data),
       ...addressUpdate(parsedAddress.data),
-      studyConfirmedYear: parsedStudy.data.isStudent ? currentStudyYear() : null,
+      studyConfirmedYear: parsedStudy.data.isStudent ? year : null,
     },
   });
 
+  // Stond de Career-vraag op het scherm? Het verborgen veld zegt dat het blok
+  // zichtbaar was; de regel, op de studie die het lid net bevestigde, zegt dat
+  // het er ook hoorde. Beide moeten kloppen: het veld alleen is te vervalsen, de
+  // regel alleen telt wie zonder JavaScript een verouderd blok zag.
+  const careerAsked =
+    formData.get(CAREER_OPT_IN_SHOWN_FIELD) === "1" &&
+    shouldAskCareerOptIn({
+      mailCategories: before.mailCategories,
+      mailUnsubscribedAt: before.mailUnsubscribedAt,
+      isStudent: parsedStudy.data.isStudent,
+      notAtFaculty: parsedStudy.data.notAtFaculty,
+      studyYears: parsedStudy.data.studyYears,
+      studyProgrammes: parsedStudy.data.studyProgrammes,
+    });
+
   const chosen = await recordMembershipFromForm(session.user.id, formData);
-  await recordCareerOptIn(session.user.id, formData);
+  const careerChosen = careerAsked && (await recordCareerOptIn(session.user.id, formData));
+
+  // Wie in stap 1 "student" uitvinkte, bevestigde geen studie; dat is geen rij.
+  if (parsedStudy.data.isStudent) {
+    await recordStudyConfirmation({
+      userId: session.user.id,
+      year,
+      via: "CONFIRMATION",
+      careerBefore: before.mailCategories.includes(CAREER_CATEGORY),
+      careerAsked,
+      careerChosen,
+      studyYears: parsedStudy.data.studyYears,
+      studyProgrammes: parsedStudy.data.studyProgrammes,
+    });
+  }
 
   revalidatePath("/account");
   // Studiejaar/richting/bevestiging kunnen net gewijzigd zijn: houd Brevo gelijk.
@@ -469,7 +545,8 @@ async function recordMembershipFromForm(
 }
 
 /**
- * Legt de Career-opt-in van het bevestigingsformulier vast.
+ * Legt de Career-opt-in van het bevestigingsformulier vast, en zegt of dat
+ * gebeurde. Enkel aan te roepen wanneer de vraag op het scherm stond.
  *
  * Voegt enkel toe en schrijft nooit uit: een leeg gelaten vakje is "nu niet",
  * en de andere categorieën van het lid staan niet op dit scherm. Een blinde
@@ -479,14 +556,14 @@ async function recordMembershipFromForm(
  * POST twee keer aankomt, vandaar de lezing plus {@link withCareerCategory}:
  * die geeft `null` terug zodra Career er al in staat, en dan schrijven we niets.
  */
-async function recordCareerOptIn(userId: string, formData: FormData): Promise<void> {
-  if (formData.get(CAREER_OPT_IN_FIELD) !== "on") return;
+async function recordCareerOptIn(userId: string, formData: FormData): Promise<boolean> {
+  if (formData.get(CAREER_OPT_IN_FIELD) !== "on") return false;
   const user = await prisma.user.findUniqueOrThrow({
     where: { id: userId },
     select: { mailCategories: true },
   });
   const next = withCareerCategory(user.mailCategories);
-  if (!next) return;
+  if (!next) return false;
   await prisma.user.update({
     where: { id: userId },
     data: {
@@ -494,4 +571,38 @@ async function recordCareerOptIn(userId: string, formData: FormData): Promise<vo
       ...(careerOptInUpdate(user.mailCategories, next, "STUDY_CONFIRMATION") ?? {}),
     },
   });
+  return true;
+}
+
+/**
+ * Schrijft de rij van een bevestiging weg (zie `StudyConfirmation`).
+ *
+ * Eén rij per lid per jaar: een tweede POST van hetzelfde formulier, of een
+ * opslag op /account na de gate, laat de eerste staan (`skipDuplicates`). Die
+ * eerste is het moment dat telt.
+ *
+ * Een fout hier houdt de bevestiging niet tegen. Dit is een meting, en een lid
+ * dat voor de gate blijft staan omdat een teltabel haperde, is erger dan een
+ * rij die ontbreekt. De fout gaat wel naar de logs.
+ */
+async function recordStudyConfirmation(row: {
+  userId: string;
+  year: number;
+  via: StudyConfirmationViaValue;
+  careerBefore: boolean;
+  careerAsked: boolean;
+  careerChosen: boolean;
+  studyYears: readonly (typeof STUDY_YEARS)[number][];
+  studyProgrammes: readonly (typeof STUDY_PROGRAMMES)[number][];
+}): Promise<void> {
+  try {
+    await prisma.studyConfirmation.createMany({
+      data: [
+        { ...row, studyYears: [...row.studyYears], studyProgrammes: [...row.studyProgrammes] },
+      ],
+      skipDuplicates: true,
+    });
+  } catch (err) {
+    console.error("[study-confirmation] registratie mislukt:", err);
+  }
 }
