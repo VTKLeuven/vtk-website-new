@@ -357,7 +357,7 @@ export const DEFAULT_RENTAL_QUESTIONS: RentalQuestions = {
       labelNl: "Startuur",
       labelEn: "Starting hour",
       helpNl: "Op weekdagen is de zaal ten vroegste beschikbaar vanaf 18u00.",
-      helpEn: "On weekdays the room is available from 18:00 (6 PM) at the earliest.",
+      helpEn: "On weekdays the room is available from 18:00 at the earliest.",
       required: true,
     },
     endTime: {

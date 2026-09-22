@@ -43,12 +43,25 @@ export function addDays(date: Date, days: number): Date {
   return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
 }
 
-/** Zes rijen van zeven dagen, maandag eerst; hetzelfde raster als /kalender. */
+/**
+ * De weken van deze maand, maandag eerst.
+ *
+ * Zoveel rijen als de maand nodig heeft, en geen zes vaste. Een maand die op een
+ * donderdag begint en 31 dagen telt (oktober 2026) past in vijf rijen; de zesde
+ * stond dan volledig in de volgende maand en las als een lege rij onderaan de
+ * kalender. Het worden er vier bij een februari die op een maandag begint, en zes
+ * bij een lange maand die laat in de week start.
+ */
 export function monthCells(cursor: Date): Date[] {
   const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
   const start = mondayOf(first);
+  // Dag 0 van de volgende maand is de laatste van deze; zo hoeft er hier geen
+  // schrikkeljaarregel te staan.
+  const daysInMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 0).getDate();
+  const leading = (first.getDay() + 6) % 7;
+  const weeks = Math.ceil((leading + daysInMonth) / 7);
   return Array.from(
-    { length: 42 },
+    { length: weeks * 7 },
     (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i),
   );
 }

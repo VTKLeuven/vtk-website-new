@@ -52,10 +52,10 @@ const AUDIENCE_LABELS: Record<SloganAudience, { nl: string; en: string }> = {
 
 const WINDOW_LABELS: Record<SloganWindow, { nl: string; en: string }> = {
   any: { nl: "Altijd", en: "Always" },
-  morning: { nl: "Ochtend (6u-12u)", en: "Morning (6am-12pm)" },
-  afternoon: { nl: "Middag (12u-18u)", en: "Afternoon (12pm-6pm)" },
-  evening: { nl: "Avond (18u-24u)", en: "Evening (6pm-12am)" },
-  night: { nl: "Nacht (0u-6u)", en: "Night (12am-6am)" },
+  morning: { nl: "Ochtend (6u-12u)", en: "Morning (06:00-12:00)" },
+  afternoon: { nl: "Middag (12u-18u)", en: "Afternoon (12:00-18:00)" },
+  evening: { nl: "Avond (18u-24u)", en: "Evening (18:00-24:00)" },
+  night: { nl: "Nacht (0u-6u)", en: "Night (00:00-06:00)" },
 };
 
 /** De slogan zoals de hero ze zet: geel schuin accent, echte regelafbrekingen. */
