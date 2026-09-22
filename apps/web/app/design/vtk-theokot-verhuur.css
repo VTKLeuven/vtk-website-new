@@ -745,9 +745,25 @@
   position: relative;
 }
 
+/* Het merkteken van een vrije dag is een kort streepje in de hoek, geen streep
+   over de volle celbreedte. Die laatste stond er eerst, en naast elkaar liepen
+   zes vrije dagen samen tot één gele lijn dwars over de week: dat leest als een
+   scheiding tussen twee rijen in plaats van als "deze dagen kan je vragen".
+   Dezelfde reden waarom de gele streep onder een titel even breed is als de
+   titel zelf. */
 .tv-avail .tv-day[data-state="free"] {
   background: var(--surface);
-  box-shadow: inset 0 -3px 0 var(--yellow);
+}
+
+.tv-avail .tv-day[data-state="free"]::after {
+  content: "";
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  width: 22px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--yellow);
 }
 
 .tv-avail .tv-day[data-state="busy"] {

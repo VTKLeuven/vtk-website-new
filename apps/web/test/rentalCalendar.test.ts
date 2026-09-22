@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRentalTimeSegments } from "@/components/theokot/rentalGrid";
+import { buildRentalTimeSegments, monthCells } from "@/components/theokot/rentalGrid";
 import type { RentalView } from "@/app/[locale]/admin/theokot/verhuur/types";
 
 function mockRental(overrides: Partial<RentalView> = {}): RentalView {
@@ -141,5 +141,34 @@ describe("buildRentalTimeSegments", () => {
       endMinutes: 180,
       isContinuation: true,
     });
+  });
+});
+
+describe("monthCells", () => {
+  it("tekent geen rij die volledig in de volgende maand valt", () => {
+    // Oktober 2026 begint op een donderdag en telt 31 dagen: drie dagen van
+    // september plus 31 is 34, dus vijf rijen. De zesde rij stond vroeger leeg
+    // onderaan de kalender.
+    const cells = monthCells(new Date(2026, 9, 1));
+    expect(cells).toHaveLength(35);
+    expect(cells[0]).toEqual(new Date(2026, 8, 28));
+    expect(cells.at(-1)).toEqual(new Date(2026, 10, 1));
+  });
+
+  it("neemt een zesde rij wanneer de maand ze nodig heeft", () => {
+    // Augustus 2026 begint op een zaterdag: vijf dagen aanloop plus 31 is 36.
+    expect(monthCells(new Date(2026, 7, 1))).toHaveLength(42);
+  });
+
+  it("houdt het op vier rijen bij een februari die op maandag begint", () => {
+    expect(monthCells(new Date(2027, 1, 1))).toHaveLength(28);
+  });
+
+  it("begint elke rij op een maandag", () => {
+    for (const month of [0, 1, 4, 7, 9, 11]) {
+      const cells = monthCells(new Date(2026, month, 1));
+      expect(cells[0]!.getDay()).toBe(1);
+      expect(cells.length % 7).toBe(0);
+    }
   });
 });
