@@ -6,8 +6,8 @@ export { announcementFits, ANNOUNCEMENT_EXCLUDED_PREFIXES } from "./announcement
 /**
  * De aankondiging die nu aan de beurt is.
  *
- * Er kunnen er meerdere klaarstaan (elk met hun eigen venster), maar de modal
- * toont er één: twee berichten tegelijk over de pagina leest niemand. Bij
+ * Er kunnen er meerdere klaarstaan (elk met hun eigen venster), maar de site
+ * toont er één: twee berichten tegelijk op de pagina leest niemand. Bij
  * overlap wint de laatst aangemaakte, want dat is het meest recente nieuws.
  *
  * Een leeg `startsAt` betekent "meteen", een leeg `endsAt` "blijft staan".

@@ -143,6 +143,26 @@ export function defaultWindowsFor(day: Date, config: TheokotConfig): SessionWind
   };
 }
 
+/** Wat er mis kan zijn met de uren van een verkoopdag. */
+export type SessionWindowProblem = 'ORDER_WINDOW_EMPTY' | 'PICKUP_WINDOW_EMPTY';
+
+/**
+ * Kijkt of de uren van een verkoopdag elkaar niet uitsluiten.
+ *
+ * Een dag met een besteldeadline vóór het openingsuur staat gewoon online en is
+ * door niemand te bestellen: `canOrderNow` blijft altijd false en er staat
+ * nergens waarom. Dat is met een lead van 0 dagen zo gebeurd (openen om 12:00,
+ * deadline om 10:30). Hetzelfde voor een afhaaluur dat eindigt voor het begint.
+ *
+ * Een ongeldige datum (een vervalste tijd uit een formulier) valt hier ook uit,
+ * want een vergelijking met NaN is nooit waar.
+ */
+export function checkSessionWindows(windows: SessionWindows): SessionWindowProblem | null {
+  if (!(windows.orderOpenAt < windows.orderCloseAt)) return 'ORDER_WINDOW_EMPTY';
+  if (!(windows.pickupStart < windows.pickupEnd)) return 'PICKUP_WINDOW_EMPTY';
+  return null;
+}
+
 /** Minimale sessie-vorm voor de venster-checks. */
 export type OrderableSession = {
   isOpen: boolean;
@@ -206,30 +226,43 @@ export function validateOrderLines(
   const errors: string[] = [];
   const byId = new Map(items.map((i) => [i.id, i]));
 
-  const lines: NormalizedOrder['lines'] = [];
-  let totalItems = 0;
-  let totalWeeklySpecial = 0;
-  let totalCents = 0;
-
+  // Eerst optellen per broodje, dan pas toetsen.
+  //
+  // Twee lijnen voor hetzelfde sessie-item zijn samen één bestelling van dat
+  // broodje. Wie ze los laat staan, legt elke helft apart naast de voorraad en
+  // laat zo meer door dan er is: vijf lijnen van één stuk kwamen door de check
+  // van een broodje waar er één van was, en enkel `maxItemsPerOrder` hield het
+  // nog tegen. De bestelpagina telt zelf al per item op, maar de app-API en elke
+  // rechtstreekse aanroep sturen wat ze willen.
+  const wanted = new Map<string, number>();
   for (const line of input) {
     if (!Number.isInteger(line.quantity) || line.quantity < 0) {
       errors.push(`aantal voor item ${line.sessionItemId} moet een geheel getal ≥ 0 zijn`);
       continue;
     }
     if (line.quantity === 0) continue;
-    const item = byId.get(line.sessionItemId);
+    wanted.set(line.sessionItemId, (wanted.get(line.sessionItemId) ?? 0) + line.quantity);
+  }
+
+  const lines: NormalizedOrder['lines'] = [];
+  let totalItems = 0;
+  let totalWeeklySpecial = 0;
+  let totalCents = 0;
+
+  for (const [sessionItemId, quantity] of wanted) {
+    const item = byId.get(sessionItemId);
     if (!item) {
-      errors.push(`item ${line.sessionItemId} hoort niet bij deze sessie`);
+      errors.push(`item ${sessionItemId} hoort niet bij deze sessie`);
       continue;
     }
-    if (line.quantity > item.quantity) {
+    if (quantity > item.quantity) {
       errors.push(`aantal voor dit broodje overschrijdt de voorraad (${item.quantity})`);
       continue;
     }
-    lines.push({ sessionItemId: item.id, quantity: line.quantity, unitPriceCents: item.priceCents });
-    totalItems += line.quantity;
-    if (item.isWeeklySpecial) totalWeeklySpecial += line.quantity;
-    totalCents += line.quantity * item.priceCents;
+    lines.push({ sessionItemId: item.id, quantity, unitPriceCents: item.priceCents });
+    totalItems += quantity;
+    if (item.isWeeklySpecial) totalWeeklySpecial += quantity;
+    totalCents += quantity * item.priceCents;
   }
 
   if (lines.length === 0) {

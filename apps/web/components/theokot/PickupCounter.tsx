@@ -24,6 +24,7 @@ export function PickupCounter({ nl }: { nl: boolean }) {
   const [voucherPending, startVoucherTransition] = useTransition();
   const [voucherOrderId, setVoucherOrderId] = useState<string | null>(null);
   const [voucherError, setVoucherError] = useState<string | null>(null);
+  const [voucherCovers, setVoucherCovers] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // Voorkomt dubbel zoeken wanneer de scanner én een newline-char én een Enter stuurt.
   const busyRef = useRef(false);
@@ -48,10 +49,12 @@ export function PickupCounter({ nl }: { nl: boolean }) {
           res.ok && res.outstandingBonnetjes >= 2
             ? res.orders.find(
                 (order) =>
-                  order.status === "RESERVED" && !order.voucherRedemption,
+                  (order.status === "RESERVED" || order.status === "NO_SHOW") &&
+                  !order.voucherRedemption,
               )
             : null;
         setVoucherOrderId(eligibleOrder?.orderId ?? null);
+        setVoucherCovers(eligibleOrder?.voucherCoversCents ?? null);
         setVoucherError(null);
         setValue("");
       } finally {
@@ -76,6 +79,7 @@ export function PickupCounter({ nl }: { nl: boolean }) {
   function reset() {
     setResult(null);
     setVoucherOrderId(null);
+    setVoucherCovers(null);
     setVoucherError(null);
     setValue("");
     requestAnimationFrame(() => inputRef.current?.focus());
@@ -188,6 +192,13 @@ export function PickupCounter({ nl }: { nl: boolean }) {
                 ? "Wilt de student 2 medewerkersbonnetjes gebruiken in ruil voor dit broodje?"
                 : "Does the student want to use 2 staff vouchers for this sandwich?"}
             </p>
+            {voucherCovers !== null && (
+              <p>
+                {nl
+                  ? `Twee bonnetjes dekken één broodje: het duurste uit deze bestelling, ${formatEuro(voucherCovers)}. Geen opleg, geen geld terug.`
+                  : `Two vouchers cover one sandwich: the most expensive in this order, ${formatEuro(voucherCovers)}. No surcharge, no change.`}
+              </p>
+            )}
             <p>
               {nl
                 ? "Kies Nee wanneer de student ter plaatse betaalt of fysieke bonnetjes gebruikt."
@@ -225,12 +236,26 @@ function PickupOrderPanel({ nl, order }: { nl: boolean; order: PickupOrder }) {
   }
 
   const pickedUp = status === "PICKED_UP";
+  // Te laat, maar niet verloren: het broodje mag nog over de toog. Enkel de
+  // shifter hoort te weten dat de afhaal van die dag al voorbij was.
+  const late = status === "NO_SHOW";
+  // Twee bonnetjes zijn exact één broodje: het duurste uit deze bestelling.
+  const stillToPay = order.voucherRedemption
+    ? Math.max(0, order.totalCents - order.voucherCoversCents)
+    : null;
 
   return (
     <div className="rounded-xl border border-vtk-blue/12 p-4">
       <div className="mb-2 text-sm text-[#5c667f]">
         {nl ? "Afhalen" : "Pickup"}: {order.pickupStart} – {order.pickupEnd}
       </div>
+      {late && (
+        <div className="mb-3 rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-900">
+          {nl
+            ? "Deze bestelling stond als niet opgehaald geboekt. Je kan ze nog altijd uitdelen."
+            : "This order was booked as not picked up. You can still hand it over."}
+        </div>
+      )}
       <ul className="text-sm text-[#34405e]">
         {order.lines.map((l, i) => (
           <li key={i} className="flex justify-between py-0.5">
@@ -242,15 +267,38 @@ function PickupOrderPanel({ nl, order }: { nl: boolean; order: PickupOrder }) {
         ))}
       </ul>
       <div className="mt-2 flex items-center justify-between border-t border-vtk-blue/10 pt-2">
-        <span className="text-lg font-semibold">{nl ? "Bestelwaarde" : "Order value"}</span>
-        <span className="text-lg font-semibold tabular-nums">{formatEuro(order.totalCents)}</span>
+        <span className={stillToPay === null ? "text-lg font-semibold" : "text-sm text-[#5c667f]"}>
+          {nl ? "Bestelwaarde" : "Order value"}
+        </span>
+        <span
+          className={
+            stillToPay === null
+              ? "text-lg font-semibold tabular-nums"
+              : "text-sm tabular-nums text-[#5c667f]"
+          }
+        >
+          {formatEuro(order.totalCents)}
+        </span>
       </div>
       {order.voucherRedemption ? (
-        <div className="mt-3 rounded-lg bg-vtk-blue-soft px-3 py-2 text-sm font-medium text-vtk-ink">
-          {nl
-            ? `${order.voucherRedemption.amount} openstaande medewerkersbonnetjes gebruikt voor één broodje in deze bestelling.`
-            : `${order.voucherRedemption.amount} outstanding staff vouchers used for one sandwich in this order.`}
-        </div>
+        <>
+          <div className="flex items-center justify-between text-sm text-[#5c667f]">
+            <span>
+              {nl
+                ? `${order.voucherRedemption.amount} bonnetjes (1 broodje)`
+                : `${order.voucherRedemption.amount} vouchers (1 sandwich)`}
+            </span>
+            <span className="tabular-nums">- {formatEuro(order.voucherCoversCents)}</span>
+          </div>
+          {/* Het bedrag dat de shifter moet vragen, en niets anders in die
+              tekengrootte: hij staat met een rij voor zich. */}
+          <div className="mt-2 flex items-center justify-between border-t border-vtk-blue/10 pt-2">
+            <span className="text-lg font-semibold">{nl ? "Nog te betalen" : "Still to pay"}</span>
+            <span className="text-lg font-semibold tabular-nums">
+              {formatEuro(stillToPay ?? 0)}
+            </span>
+          </div>
+        </>
       ) : null}
       <div className="mt-3">
         {pickedUp ? (
@@ -259,7 +307,17 @@ function PickupOrderPanel({ nl, order }: { nl: boolean; order: PickupOrder }) {
           </div>
         ) : (
           <Button onClick={mark} disabled={pending} className="w-full">
-            {pending ? (nl ? "Bezig..." : "...") : nl ? "Markeer als opgehaald" : "Mark as picked up"}
+            {pending
+              ? nl
+                ? "Bezig..."
+                : "..."
+              : late
+                ? nl
+                  ? "Toch nog uitgedeeld"
+                  : "Handed over anyway"
+                : nl
+                  ? "Markeer als opgehaald"
+                  : "Mark as picked up"}
           </Button>
         )}
         {error && <p className="mt-2 text-sm text-red-600">{error}</p>}

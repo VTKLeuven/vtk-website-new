@@ -10,6 +10,7 @@
  * en gebruikt dezelfde vragenlijst en dezelfde limieten.
  */
 
+import { brusselsMinutesOfDay, brusselsYMD, ymdKey } from "@/lib/brussels";
 import { isValidEmail, toMessageText, toSingleLine } from "@/lib/contactForm";
 
 // -----------------------------------------------------------------------------
@@ -152,6 +153,79 @@ export function isDeclinedRental(status: RentalStatus): boolean {
 /** Blokkeert deze aanvraag de zaal? Enkel wat nog kan of zal doorgaan. */
 export function blocksRoom(status: RentalStatus): boolean {
   return status === "APPROVED" || status === "UNANSWERED" || status === "ENDED" || status === "COMPLETED";
+}
+
+/**
+ * Statussen die op de **publieke** kalender als bezet gelden.
+ *
+ * Dit is met opzet niet `blocksRoom`: die rekent een onbeantwoorde aanvraag mee,
+ * want wie de verhuur doet moet zien dat er al iemand voor die avond aanklopte.
+ * Publiek zou dat de omgekeerde fout maken. Een aanvraag die nog niet beslist is,
+ * neemt daar een avond weg die niemand heeft: de volgende bezoeker ziet "bezet",
+ * vraagt ze niet aan, en als de eerste aanvraag daarna geweigerd wordt is de
+ * avond voor niets leeg gebleven.
+ *
+ * Afgelopen en afgerond staan er wel in. Dat zijn goedgekeurde verhuren die
+ * intussen voorbij zijn; laat je die weg, dan lijkt elke voorbije week plots leeg
+ * zodra Theokot haar opvolging bijwerkt.
+ */
+export const PUBLIC_BUSY_STATUSES: readonly RentalStatus[] = [
+  "APPROVED",
+  "ENDED",
+  "COMPLETED",
+] as const;
+
+/** Houdt deze verhuur de zaal bezet voor een bezoeker van de publieke pagina? */
+export function isPubliclyBusy(status: RentalStatus): boolean {
+  return (PUBLIC_BUSY_STATUSES as readonly string[]).includes(status);
+}
+
+// -----------------------------------------------------------------------------
+// Van twee instants naar een plaats in het raster
+// -----------------------------------------------------------------------------
+
+export type RentalGridSlot = {
+  /** "YYYY-MM-DD" in Brussel: de dag waarop de verhuur begint. */
+  day: string;
+  /** Minuten sinds middernacht van die dag. */
+  minutes: number;
+  /**
+   * Het einde in minuten sinds diezelfde middernacht. Een fuif die om 02:00 stopt
+   * levert hier dus een getal boven de 1440; het raster kapt zelf af op 24:00 en
+   * de tekst ernaast toont het echte uur.
+   */
+  endMinutes: number;
+  /** `endsAt` met een dag erbij wanneer het einduur voor het startuur valt. */
+  effectiveEndsAt: Date;
+};
+
+/**
+ * Twee instants naar de plaats die ze in een kalenderraster innemen, in
+ * Brussel-wandklok.
+ *
+ * Deze rekensom stond inline in de beheerpagina en moest er uit zodra de
+ * publieke pagina dezelfde verhuren tekent: twee kopieën van "einduur voor
+ * startuur is de volgende ochtend" lopen uiteen, en dan staat dezelfde verhuur
+ * publiek op een andere dag dan in het beheer.
+ */
+export function rentalGridSlot(startsAt: Date, endsAt: Date): RentalGridSlot {
+  const day = ymdKey(brusselsYMD(startsAt));
+  const minutes = brusselsMinutesOfDay(startsAt);
+  const rawEndMinutes = brusselsMinutesOfDay(endsAt);
+  const isNextDay =
+    ymdKey(brusselsYMD(endsAt)) !== day ||
+    rawEndMinutes <= minutes ||
+    endsAt.getTime() <= startsAt.getTime();
+
+  return {
+    day,
+    minutes,
+    endMinutes: rawEndMinutes + (isNextDay ? 24 * 60 : 0),
+    effectiveEndsAt:
+      isNextDay && endsAt.getTime() <= startsAt.getTime()
+        ? new Date(endsAt.getTime() + 86_400_000)
+        : endsAt,
+  };
 }
 
 /**

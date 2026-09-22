@@ -13,7 +13,7 @@ import "server-only";
 import { prisma } from "@vtk/db";
 import type { Meeting, MeetingOption, Prisma } from "@prisma/client";
 
-import { brusselsTimeOnDay } from "./brussels";
+import { brusselsTimeOnDay, brusselsWallClock, brusselsYMD, shiftYMD } from "./brussels";
 import { sendMeetingReservationInvalidated } from "./mail";
 import {
   meetingKindLabel,
@@ -275,7 +275,10 @@ export async function syncMeetingsForSession(sessionId: string): Promise<SyncRes
 /** Idem, voor elk moment op deze kalenderdag (Brussel). */
 export async function syncMeetingsOnDay(day: Date): Promise<SyncResult> {
   const from = brusselsTimeOnDay(day, "00:00");
-  const to = new Date(from.getTime() + 86400000);
+  // Niet "plus 24 uur": op de twee dagen dat de klok verspringt, schuift dat
+  // venster een uur en valt een vergadering er net binnen of buiten.
+  const next = shiftYMD(brusselsYMD(day), 1);
+  const to = brusselsWallClock(next.year, next.month, next.day, "00:00");
   const meetings = await prisma.meeting.findMany({
     where: { startsAt: { gte: from, lt: to } },
     select: { id: true },

@@ -7,16 +7,18 @@ import { getDictionary, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { currentStudyYear, formatWorkingYear } from "@/lib/workingYear";
+import { latestGraduationYear } from "@/lib/profile";
 import { needsStudyConfirmation } from "@vtk/auth";
 import { logoutAction } from "@/app/actions/auth";
-import { confirmStudyAction } from "@/app/actions/onboarding";
+import { confirmStudyAction, type ConfirmStudyErrorCode } from "@/app/actions/onboarding";
 import { StudyFieldset } from "@/components/profile/StudyFieldset";
 import { AddressConfirmation } from "@/components/profile/AddressConfirmation";
 import { MembershipChoice } from "@/components/profile/MembershipChoice";
 import { CareerOptIn } from "@/components/profile/CareerOptIn";
 import { ConfirmStudySteps } from "@/components/profile/ConfirmStudySteps";
 import { hasCompleteAddresses } from "@/lib/profile-address";
-import { careerChoiceLabels, shouldAskCareerOptIn } from "@/lib/careerOptIn";
+import { careerFitsStudy, careerOptInOpen } from "@/lib/careerOptIn";
+import { careerOptInCopy } from "@/lib/careerOptInCopy";
 import "@/app/design/vtk-career-optin.css";
 import {
   getMembership,
@@ -97,6 +99,14 @@ export default async function ConfirmStudyPage({
   const dict = getDictionary(locale);
   const t = dict.confirmStudy;
   const addressT = dict.onboarding;
+  const errorMessages: Record<ConfirmStudyErrorCode, string> = {
+    INVALID_PROFILE: t.errorInvalid,
+    INVALID_GRADUATION_YEAR: t.errorGraduationYear.replace(
+      "{max}",
+      String(latestGraduationYear()),
+    ),
+    INVALID_ADDRESS: t.errorAddress,
+  };
 
   // Het lidmaatschap hangt aan hetzelfde academiejaar als deze bevestiging, dus
   // wordt het hier gevraagd en niet op een scherm dat niemand uit zichzelf opent.
@@ -107,8 +117,16 @@ export default async function ConfirmStudyPage({
   const offer = membershipOffer(user, membership, membershipConfig);
 
   // De Career-vraag stellen we enkel aan wie ze nog niet beantwoordde; zie
-  // `lib/careerOptIn.ts` voor de drie gevallen waarin ze wegvalt.
-  const askCareer = shouldAskCareerOptIn(user);
+  // `lib/careerOptIn.ts` voor de gevallen waarin ze wegvalt. Wat van de studie
+  // afhangt, beslist het blok zelf op wat het lid in stap 1 invult: het profiel
+  // hier is nog dat van vorig jaar.
+  const careerOpen = careerOptInOpen(user);
+  const careerStudy = {
+    isStudent: user.isStudent,
+    notAtFaculty: user.notAtFaculty,
+    studyYears: user.studyYears,
+    studyProgrammes: user.studyProgrammes,
+  };
 
   return (
     <div className="vtk-page vtk-page-shell vtk-page-narrow space-y-6">
@@ -125,6 +143,9 @@ export default async function ConfirmStudyPage({
         <ConfirmStudySteps
           action={confirmStudyAction}
           next={home}
+          savingLabel={dict.common.saving}
+          errorMessages={errorMessages}
+          fallbackErrorMessage={dict.common.saveError}
           labels={{
             stepOf: t.stepOf,
             continueLabel: t.continueLabel,
@@ -179,19 +200,23 @@ export default async function ConfirmStudyPage({
           second={
             // Een tweede stap zonder vraag erop is een extra klik voor niets:
             // wie al lid is én Career al aanduidde, houdt één pagina.
-            offer.kind !== "none" || askCareer ? (
+            offer.kind !== "none" || careerOpen ? (
               <>
                 <MembershipChoice
                   offer={offer}
                   labels={membershipChoiceLabels(locale, offer, year)}
                 />
                 <CareerOptIn
-                  labels={askCareer ? careerChoiceLabels(locale, user) : null}
+                  copy={careerOpen ? careerOptInCopy(locale) : null}
+                  initial={careerStudy}
                   photoAlt={t.careerPhotoAlt}
                 />
               </>
             ) : null
           }
+          // Of stap 2 bij het laden al iets toont; de Career-vraag kan pas
+          // verschijnen wanneer het lid in stap 1 zijn nieuwe jaar aanduidt.
+          secondVisible={offer.kind !== "none" || (careerOpen && careerFitsStudy(careerStudy))}
         />
       </Card>
 

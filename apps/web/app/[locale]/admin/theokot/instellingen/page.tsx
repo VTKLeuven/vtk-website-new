@@ -41,6 +41,9 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
     ingredientsNl: p.ingredientsNl ?? "",
     ingredientsEn: p.ingredientsEn ?? "",
     hasLines: false,
+    // De catalogus is een sjabloon; bestellingen hangen aan het aanbod van een
+    // verkoopdag, niet hieraan.
+    ordered: 0,
   }));
 
   const numField = (name: string, labelNl: string, labelEn: string, value: number, min = 0) => (

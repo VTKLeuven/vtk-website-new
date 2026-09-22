@@ -1,6 +1,4 @@
-import { getDictionary, type Locale } from "@vtk/i18n";
-import type { MailCategoryValue, StudyProgrammeValue, StudyYearValue } from "@/lib/profile";
-import type { CareerOptInLabels } from "@/components/profile/CareerOptIn";
+import type { MailCategoryValue } from "@/lib/profile";
 
 /**
  * De losse Career-vraag op de jaarlijkse studiebevestiging.
@@ -15,8 +13,10 @@ import type { CareerOptInLabels } from "@/components/profile/CareerOptIn";
  * soort toestemming: wie het hier aanduidt, ziet het op /account gewoon
  * aangevinkt staan en zet het daar ook weer uit.
  *
- * Bewust puur (geen prisma): zo is te testen wie de vraag krijgt en wat er
- * staat, en dat is de helft van deze feature.
+ * Bewust puur (geen prisma, geen i18n): zo is te testen wie de vraag krijgt en
+ * wat er staat, en draait dezelfde regel in de browser. Het blok volgt daar live
+ * wat het lid in stap 1 invult (zie `CareerOptIn`); de vertaalde teksten komen
+ * uit `lib/careerOptInCopy.ts`.
  */
 
 export const CAREER_CATEGORY = "CAREER" satisfies MailCategoryValue;
@@ -25,16 +25,26 @@ export const CAREER_CATEGORY = "CAREER" satisfies MailCategoryValue;
 export const CAREER_OPT_IN_FIELD = "careerOptIn";
 
 /**
+ * Een verborgen veld dat enkel meegaat wanneer het blok op het scherm stond.
+ *
+ * Zo weet de action of het lid de vraag echt gezien heeft, en dat is de noemer
+ * van de conversie in /admin/mailinglijsten. Het blok zet zich uit (en neemt dit
+ * veld mee) wanneer de antwoorden in stap 1 niet meer bij Career passen, en
+ * zonder JavaScript volgt het stap 1 niet; afleiden uit het profiel alleen zou
+ * die twee gevallen als "gevraagd" tellen.
+ */
+export const CAREER_OPT_IN_SHOWN_FIELD = "careerOptInShown";
+
+/**
  * Waar een lopende opt-in vandaan komt. Spiegelt `CareerOptInSource` in de
  * Prisma-schema; de admin telt erop (zie `lib/careerStats.ts`).
  */
 export const CAREER_OPT_IN_SOURCES = ["ONBOARDING", "ACCOUNT", "STUDY_CONFIRMATION"] as const;
 export type CareerOptInSourceValue = (typeof CAREER_OPT_IN_SOURCES)[number];
 
-export type CareerOptInState = {
-  mailCategories: readonly string[];
-  /** Zette het lid via de uitschrijflink in een mail álle lijstmail uit? */
-  mailUnsubscribedAt: Date | null;
+/** De studievelden waar de vraag van afhangt; precies wat stap 1 van de bevestiging vraagt. */
+export type CareerStudyState = {
+  isStudent: boolean;
   /** Studeert het lid buiten de faculteit Ingenieurswetenschappen? */
   notAtFaculty: boolean;
   /** De richtingen die het lid aanduidde. Leeg = niet één van de onze. */
@@ -43,12 +53,18 @@ export type CareerOptInState = {
   studyYears: readonly string[];
 };
 
-/** Het eerste bachelorjaar; zie `shouldAskCareerOptIn`. */
+export type CareerOptInState = CareerStudyState & {
+  mailCategories: readonly string[];
+  /** Zette het lid via de uitschrijflink in een mail álle lijstmail uit? */
+  mailUnsubscribedAt: Date | null;
+};
+
+/** Het eerste bachelorjaar; zie `careerFitsStudy`. */
 const FIRST_BACHELOR = "BACHELOR_1";
 
 /**
  * De "richting" van wie nog niet gekozen heeft. Geen richting waar een bedrijf
- * naar zoekt, dus ze komt niet in de titel; zie `careerChoiceLabels`.
+ * naar zoekt, dus ze komt niet in de titel; zie `careerHeading`.
  */
 const COMMON_BACHELOR = "COMMON_BACHELOR";
 
@@ -56,7 +72,22 @@ const COMMON_BACHELOR = "COMMON_BACHELOR";
  * Of we het dit jaar nog vragen.
  *
  * Vijf keer nee, en telkens om dezelfde reden: een vinkje dat niets toevoegt,
- * hoort niet op een scherm dat je maar één keer ziet.
+ * hoort niet op een scherm dat je maar één keer ziet. De eerste twee gaan over
+ * het lid ({@link careerOptInOpen}), de rest over zijn studie
+ * ({@link careerFitsStudy}).
+ *
+ * **Welke studie?** Die van dit jaar, dus wat het lid in stap 1 invult, en niet
+ * wat er van vorig jaar in het profiel staat. Het scherm besliste dit vroeger op
+ * het oude profiel, en dan kreeg precies de groep die er voor het eerst bij hoort
+ * de vraag niet: wie vorig jaar eerste bachelor was, is nu tweede. De titel
+ * noemde om dezelfde reden het studiejaar van vorig jaar.
+ */
+export function shouldAskCareerOptIn(user: CareerOptInState): boolean {
+  return careerOptInOpen(user) && careerFitsStudy(user);
+}
+
+/**
+ * Het deel van de regel dat niet in stap 1 staat, en dus op het scherm vastligt.
  *
  * - **Al aangeduid**, in welk jaar dan ook: `mailCategories` is een voorkeur en
  *   geen jaarlijkse keuze, dus die staat er al. Opnieuw vragen zou het vinkje
@@ -64,6 +95,19 @@ const COMMON_BACHELOR = "COMMON_BACHELOR";
  * - **Uitgeschreven via een mail** (`mailUnsubscribedAt`): dat blokkeert élke
  *   lijstmail, dus dit vinkje zou een belofte doen die de sync niet nakomt.
  *   Terugkomen doet het lid zelf, met de opt-in op /account.
+ */
+export function careerOptInOpen(
+  user: Pick<CareerOptInState, "mailCategories" | "mailUnsubscribedAt">,
+): boolean {
+  if (user.mailCategories.includes(CAREER_CATEGORY)) return false;
+  if (user.mailUnsubscribedAt !== null) return false;
+  return true;
+}
+
+/**
+ * Het deel van de regel dat meebeweegt met stap 1.
+ *
+ * - **Geen student** meer: dan bewaart de bevestiging geen richting en geen jaar.
  * - **Geen richting van ons aangeduid**: Career draait om studenten van deze
  *   faculteit, en de lijst is opgesplitst per richting. Zonder richting past het
  *   lid in geen enkel deel, dus levert de aanduiding niets op.
@@ -75,9 +119,8 @@ const COMMON_BACHELOR = "COMMON_BACHELOR";
  *   allemaal in de Algemene Bachelor, dus er valt niet eens een richting te
  *   noemen. Vanaf de tweede bachelor krijgt iedereen de vraag wel.
  */
-export function shouldAskCareerOptIn(user: CareerOptInState): boolean {
-  if (user.mailCategories.includes(CAREER_CATEGORY)) return false;
-  if (user.mailUnsubscribedAt !== null) return false;
+export function careerFitsStudy(user: CareerStudyState): boolean {
+  if (!user.isStudent) return false;
   if (user.studyProgrammes.length === 0) return false;
   if (user.notAtFaculty) return false;
   // Een leeg jaar sluit niets uit: dan weten we het niet, en de algemene
@@ -130,7 +173,25 @@ export function careerOptInUpdate(
 }
 
 /**
- * De teksten van het blok, met de richting van het lid in de titel.
+ * De teksten van het blok, al vertaald. De server stelt ze samen
+ * (`careerOptInCopy`) en geeft ze als prop door, zodat de titel in de browser
+ * kan meebewegen zonder de hele dictionary in de clientbundel.
+ */
+export type CareerOptInCopy = {
+  /** De Nederlandse of de Engelse zinsbouw voor het publiek in de titel. */
+  nl: boolean;
+  kicker: string;
+  lead: string;
+  option: string;
+  hint: string;
+  /** "Bedrijven zoeken {audience}" */
+  headingTemplate: string;
+  years: Readonly<Record<string, string>>;
+  programmes: Readonly<Record<string, string>>;
+};
+
+/**
+ * De titel van het blok, met de richting van het lid erin.
  *
  * "Bedrijven zoeken 2de masters Energie" is moeilijker over te slaan dan
  * "blijf op de hoogte", en het is waar: de Career-lijst is echt opgesplitst per
@@ -144,22 +205,16 @@ export function careerOptInUpdate(
  * ("Bedrijven zoeken 2de bachelors"), en pas zonder allebei valt het terug op
  * de algemene zin.
  */
-export function careerChoiceLabels(
-  locale: Locale,
+export function careerHeading(
+  copy: CareerOptInCopy,
   user: { studyYears: readonly string[]; studyProgrammes: readonly string[] },
-): CareerOptInLabels {
-  const dict = getDictionary(locale);
-  const t = dict.confirmStudy;
-  const nl = locale === "nl";
-
-  const years = dict.onboarding.years as Record<string, string>;
-  const programmes = dict.onboarding.programmes as Record<string, string>;
+): string {
+  const { nl } = copy;
   // De eerste echte richting; Algemene Bachelor enkel wanneer er niets anders
   // staat, en dan nog liever het studiejaar hieronder.
   const named = user.studyProgrammes.filter((code) => code !== COMMON_BACHELOR);
-  const programme = named.length > 0 ? programmes[named[0] as StudyProgrammeValue] : null;
-  const year =
-    user.studyYears.length === 1 ? years[user.studyYears[0] as StudyYearValue] : null;
+  const programme = named.length > 0 ? (copy.programmes[named[0]] ?? null) : null;
+  const year = user.studyYears.length === 1 ? (copy.years[user.studyYears[0]] ?? null) : null;
 
   let audience: string;
   if (programme && year) {
@@ -172,11 +227,5 @@ export function careerChoiceLabels(
     audience = nl ? "studenten van jouw richtingen" : "students in your programmes";
   }
 
-  return {
-    kicker: t.careerKicker,
-    heading: t.careerHeading.replace("{audience}", audience),
-    option: t.careerOption,
-    hint: t.careerHint,
-    lead: t.careerLead,
-  };
+  return copy.headingTemplate.replace("{audience}", audience);
 }

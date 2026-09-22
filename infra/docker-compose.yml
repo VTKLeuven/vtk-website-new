@@ -110,7 +110,7 @@ services:
   # Vangnet voor de uitleen-betalingen: reconciliatie + verlopen checkouts,
   # zelfde curl-loop-patroon als de ticket-worker hieronder.
   logistiek-worker:
-    image: curlimages/curl:8.10.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
       logistiek:
@@ -145,7 +145,7 @@ services:
   # hangen mag die reconciliatie niet meesleuren. Boodschappen worden hoogstens
   # een paar keer per week besteld, dus vijf minuten is ruim genoeg.
   collectengo-worker:
-    image: curlimages/curl:8.10.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
       logistiek:
@@ -179,7 +179,7 @@ services:
       start_period: 60s
 
   ticket-worker:
-    image: curlimages/curl:8.10.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
       web:
@@ -218,7 +218,7 @@ services:
   # seconden voor een betaling die de bezoeker staat af te wachten, terwijl
   # formuliermail gerust een minuut mag wachten.
   forms-worker:
-    image: curlimages/curl:8.10.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
       web:
@@ -256,7 +256,7 @@ services:
   # cachet de barstatus. Dit is de enige plek die Munisense aanspreekt: de
   # website leest enkel de cache, hoeveel bezoekers er ook zijn.
   elixir-worker:
-    image: curlimages/curl:8.10.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
       web:
@@ -293,7 +293,7 @@ services:
   # per lid uitzetbaar in het profiel. Elke vijf minuten is ruim genoeg voor een
   # bericht dat uren op voorhand vertrekt, en houdt de mailserver rustig.
   shift-worker:
-    image: curlimages/curl:8.10.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
       web:
@@ -335,7 +335,7 @@ services:
   # Een eigen worker en niet meeliftend op `shift-worker`, om dezelfde reden als
   # daar: een klemgelopen Expo mag de herinneringsmails niet meesleuren.
   app-push-worker:
-    image: curlimages/curl:8.10.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
       web:
@@ -374,7 +374,7 @@ services:
   # een timer daar draait in elke instance mee, dus bij een tweede webcontainer
   # vertrekt elke mail dubbel. Zelfde ritme als voorheen, vijf minuten.
   background-worker:
-    image: curlimages/curl:8.10.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
       web:
@@ -638,7 +638,7 @@ services:
   # post meer heeft eruit halen. Vijf minuten volstaat; de admin duwt een
   # wijziging meteen door en dit is het vangnet (zelfde opzet als forms-worker).
   vault-worker:
-    image: curlimages/curl:8.10.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
       web:
@@ -678,7 +678,7 @@ services:
   # cron: de eerste ronde na de kanteling vult elke lijst met het nieuwe
   # praesidium.
   google-worker:
-    image: curlimages/curl:8.10.1
+    image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
       web:

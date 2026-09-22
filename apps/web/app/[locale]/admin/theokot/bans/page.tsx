@@ -44,6 +44,15 @@ export default async function TheokotBansPage({ params }: { params: Promise<{ lo
     month: "2-digit",
     year: "numeric",
   });
+  // Het datumveld toonde de UTC-dag terwijl het label ernaast in Brussel-tijd
+  // staat; bij een ban die na middernacht Brussel eindigt, scheelde dat een dag.
+  const dayValue = (date: Date) =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Brussels",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date);
 
   const banRows: BanRow[] = bans.map((b) => ({
     id: b.id,
@@ -52,7 +61,7 @@ export default async function TheokotBansPage({ params }: { params: Promise<{ lo
     reason: b.reason,
     note: b.note ?? "",
     startsLabel: dateFmt.format(b.startsAt),
-    endsValue: b.endsAt.toISOString().slice(0, 10),
+    endsValue: dayValue(b.endsAt),
     endsLabel: dateFmt.format(b.endsAt),
     active: b.active && b.startsAt <= now && b.endsAt > now,
     stored: b.active,

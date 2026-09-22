@@ -366,6 +366,37 @@ function StatusForm({
             {nl ? "Enkel zichtbaar in het beheer." : "Only visible in the admin."}
           </p>
         </div>
+
+        {/* Het tegenovergestelde van de notitie erboven, en daarom staat het
+            eronder: dit is het enige veld van dit kader dat buiten het beheer
+            terechtkomt. De tekst staat er letterlijk bij, want een aanvraag
+            vrijgeven zonder ze te lezen is precies hoe er een verjaardag van
+            iemand op vtk.be belandt. */}
+        <div className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/40 p-3">
+          <label className="flex items-start gap-2.5 text-sm">
+            <input
+              type="checkbox"
+              name="purposePublic"
+              defaultChecked={rental.purposePublic || rental.status === "UNANSWERED"}
+              className="mt-0.5 h-4 w-4 shrink-0 accent-[#0e1a36]"
+            />
+            <span className="min-w-0">
+              <span className="block font-semibold text-vtk-ink">
+                {nl
+                  ? "Aard van de activiteit publiek tonen"
+                  : "Show the activity on the public calendar"}
+              </span>
+              <span className="mt-0.5 block text-xs text-[#5c667f]">
+                {nl
+                  ? "Op de kalender van /theokot/verhuur staat anders enkel dat de zaal bezet is, met de uren. Aanzetten zet deze tekst erbij:"
+                  : "The calendar on /theokot/verhuur otherwise only says the room is taken, with the hours. Turning this on adds this text:"}
+              </span>
+              <span className="mt-1 block truncate text-xs font-medium italic text-[#34405e]">
+                {rental.purpose}
+              </span>
+            </span>
+          </label>
+        </div>
       </SaveForm>
     </div>
   );

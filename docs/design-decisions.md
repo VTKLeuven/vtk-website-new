@@ -133,9 +133,9 @@ is "even offline halen" in de praktijk hetzelfde als kwijtspelen.
 
 ## Aankondigingen op de homepage
 
-Een aankondiging is een bericht dat als venster over de homepage komt, beheerd
-via **Admin → Website → Aankondigingen** (recht: `home.edit`, want het is
-homepage-inhoud).
+Een aankondiging is een bericht dat als kaart op de site verschijnt (rechtsonder,
+op een telefoon bovenaan; zie "Aankondigingen: een kaart, geen venster"), beheerd
+via **Admin → Website → Aankondigingen** (recht: `announcements.manage`).
 
 - **Meerdere aankondigingen mogen naast elkaar bestaan**, elk met hun eigen
   venster (`startsAt`/`endsAt`, allebei optioneel) en een aan/uit-schakelaar. Zo
@@ -143,7 +143,7 @@ homepage-inhoud).
 - **De homepage toont er hoogstens één**: twee berichten tegelijk over dezelfde
   pagina leest niemand. Staan er meerdere klaar, dan wint de meest recente.
 - **Wie ze wegklikt, ziet ze niet opnieuw.** Dat onthoudt de browser per id in
-  localStorage (de laatste tien), niet de server: het gaat om een venster
+  localStorage (de laatste tien), niet de server: het gaat om een kaart
   wegklikken, niet om iets dat we per lid willen bijhouden. Een nieuwe
   aankondiging verschijnt dus wel weer, ook bij wie de vorige wegklikte.
 - **Oude aankondigingen blijven staan** als historiek in het beheerscherm. Uit
@@ -291,6 +291,58 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   ban met een schone lei begint en niet meteen opnieuw geband wordt.
 - Bans en no-show-historiek zijn zichtbaar en **corrigeerbaar** in het admin-paneel
   (`/admin/theokot/bans`). Een correctie kan meteen de actieve ban opheffen.
+
+### Afsluiten, verwijderen en te weinig broodjes
+
+Vijf keuzes die in september 2026 gemaakt zijn, nadat een doorlichting ze als
+open vragen opleverde (`docs/theokot-broodjes-audit-2026-09-21.md`).
+
+- **Afsluiten en verwijderen zijn twee verschillende dingen.**
+  - **"Afhaalronde afsluiten"** is voor de verkoper die klaar is. De afhaal is
+    voorbij (`pickupEnd` op nu), er kan niets meer bijbesteld of geannuleerd
+    worden, en de no-show-klok loopt vanaf daar: een kwartier later telt wat er
+    niet opgehaald is als niet opgehaald, precies zoals bij een dag die uitloopt.
+    Wat daarna toch nog uitgedeeld wordt, zet de balie op opgehaald.
+  - **"Verkoopdag verwijderen"** is voor de dag die niet doorgaat. De dag gaat weg
+    met haar aanbod en haar bestellingen, en iedereen die besteld had krijgt een
+    mail. Dat kan enkel zolang er niets afgehaald is en er geen bonnetjes op
+    afgeboekt zijn: die zijn echt gebeurd en komen niet terug.
+  - **Afsluiten raakt `isOpen` bewust niet aan.** Dat vinkje betekent elders "die
+    dag gaat door": `syncMeetingReservations` maakt elke grocomeet- en
+    bureaureservatie van een dag die niet open staat ongeldig, met een mail. Zou
+    afsluiten dat vinkje omzetten, dan werd de vergadering van die middag
+    geannuleerd op het moment dat de balie afrondt. Het formulier zegt daarom nu
+    ook uit wat het vinkje betekent en waar de knop voor dient.
+- **Een broodje mag ook na sluitingstijd nog over de toog.** De balie toont een
+  bestelling die als niet-opgehaald geboekt staat gewoon, met de melding dat ze
+  laattijdig is en een knop "toch nog uitgedeeld". Ze krijgt dan de notitie
+  "Laattijdig afgehaald aan de balie" en telt niet meer mee als no-show. De
+  beheerder beslist dat zelf: er staat wel eens iemand een kwartier na sluiting,
+  en wat overblijft wordt soms meteen uitgedeeld. Een ban die al uitgesproken
+  was, blijft staan; die hef je op bij Bans & no-shows.
+- **Twee medewerkersbonnetjes zijn exact één broodje**: het duurste uit de
+  bestelling. Geen opleg wanneer dat broodje duurder uitvalt, geen geld terug
+  wanneer het goedkoper is. De balie toont daardoor "nog te betalen" en moet zelf
+  niets meer aftrekken. Bonnetjes kunnen ook nog bij een laattijdige afhaling.
+- **Het aanbod van een dag mag onder het aantal dat al besteld is, en er wordt
+  niets automatisch geschrapt.** Er valt een plateau of de bakker levert minder,
+  en dan moet dat in het systeem kunnen. Wat er dan gebeurt:
+  - De aanbod-editor toont per broodje hoeveel er al besteld zijn en hoeveel er
+    te veel zijn, en opslaan vraagt een bevestiging die dat zegt.
+  - **Wie zijn broodje verliest, kiest een mens.** Automatisch de laatst
+    geplaatste bestellingen schrappen is overwogen en afgewezen: het treft soms
+    de verkeerde, en het gebeurt onomkeerbaar op het moment dat iemand een getal
+    aanpast. Onder de verkoopdag staat daarom de lijst met bestellingen, met per
+    bestelling een schrapknop.
+  - **Schrappen is wissen**, net zoals wanneer de student zelf annuleert: de
+    broodjes komen vrij en het bestelslot van die dag komt vrij, zodat er iemand
+    anders kan reserveren. De student krijgt er een mail over.
+- **De status "Geannuleerd" bestaat niet meer als correctie.** Ze stond in het
+  keuzelijstje bij Bans & no-shows en zette enkel het woord om: de bestellijnen
+  bleven staan, dus de broodjes bleven van de voorraad af en die student kon die
+  dag niets nieuws bestellen. Twee knoppen die "annuleren" heten en iets anders
+  doen, is er één te veel. Corrigeren gaat nu over opgehaald, niet opgehaald en
+  gereserveerd; een bestelling echt weghalen doe je bij de verkoopdag zelf.
 
 ### Turf-lijst
 
@@ -1248,6 +1300,16 @@ terug (`apps/web/lib/brevo/unsubscribe.ts`).
   "Posten" en de shift-postkeuzes filteren op `type = PRAESIDIUM`; werkgroepen
   krijgen hun eigen publieke `/werkgroepen` (zelfde ledenraster + werkingsjaar-
   tabjes als praesidium) en een eigen admin-tab "Werkgroepen".
+- **De verantwoordelijke heet G3 of G4, en dat kiest de werkgroep zelf.** Een
+  werkgroep wordt niet getrokken door een "verantwoordelijke" maar door haar G3
+  of haar G4, en welke van de twee dat is, verschilt per werkgroep. Daarom is het
+  een keuze per werkgroep (`Group.leadLabel`, `G3` | `G4`, default `G3`) en geen
+  vaste tekst: ze staat in de werkgroepinstellingen op `/admin/werkgroepen` en
+  vervangt het woord "Verantwoordelijke" overal waar die lead benoemd wordt (de
+  ledenlijst en het pilletje in het ledenbeheer, de rolkeuze bij lid toevoegen,
+  de kolom "Enkel G3/G4" bij de rol-grants, en de ploeg op de publieke
+  `/werkgroepen`). Een **praesidiumpost** houdt wél "Verantwoordelijke": het veld
+  hangt aan `Group`, maar enkel werkgroepen tonen het.
 - **Eigen infotekst + website.** De werkgroep-`description*` is de blurb op
   `/werkgroepen`; `Group.website` is een optionele link (mag zonder schema
   ingevuld worden, wordt genormaliseerd naar `https://`). Beide staan los van de
@@ -5229,7 +5291,7 @@ de globale velden zetten, de shiften nakijken en aanmaken.
 
 ## Aankondigingen: homepage of de hele site
 
-Een aankondiging is het venster dat over de site verschijnt, beheerd op
+Een aankondiging is de kaart die op de site verschijnt, beheerd op
 `/admin/aankondigingen`. Er is één keuze per bericht: **enkel de homepage** of **elke
 pagina**.
 
@@ -5245,15 +5307,66 @@ pagina**.
   draait op een gsm aan de deur. Die lijst staat los van de lijst met paden die niet
   gemeten worden, ook al is ze vandaag dezelfde: het ene gaat over wat we niet meten,
   het andere over waar we de bezoeker niet onderbreken.
-- **Wegklikken geldt voor de hele site.** Dat zat al zo: de modal onthoudt in
+- **Wegklikken geldt voor de hele site.** Dat zat al zo: de kaart onthoudt in
   `localStorage` welke id's weggeklikt zijn. Nu ze op elke pagina kan verschijnen, is
-  dat het verschil tussen één venster en een venster bij elke klik.
-- **Het venster hangt in de gedeelde layout.** Die is toch al dynamisch (de header
+  dat het verschil tussen één kaart en een kaart bij elke klik.
+- **De kaart hangt in de gedeelde layout.** Die is toch al dynamisch (de header
   leest de sessie), dus het kost één query per render en geen omslag in caching. Wel
   belangrijk: de save-action revalideert daarom `revalidatePath("/", "layout")` en
   niet enkel `"/"`, anders blijft een site-brede aankondiging overal onzichtbaar tot
   ze vanzelf verloopt.
 
+
+---
+
+## Aankondigingen: een kaart, geen venster
+
+Tot september 2026 kwam een aankondiging als modal over de pagina: een witte
+kaart op een navy waas, het enige venster op de site dat niet oogde als het
+shiftvenster of de ticket-QR. Vier richtingen zijn naast elkaar bekeken, in hun
+echte omgeving op de homepage en /kalender: hetzelfde venster als een shift
+(navy kop, hangende pin), een liggend venster in de vorm van een ticket, een
+kaart in de hoek, en een smalle band boven de sitekop. **De kaart in de hoek
+won** (`AnnouncementCard`, stijl in `vtk-base.css`).
+
+- **Geen venster, want de meeste bezoekers komen niet voor het bericht.** Het
+  bereik "hele site" maakte dat pijnlijk: wie via Google of een QR-code op een
+  infopagina landt, moest eerst een modal wegklikken voor die pagina leesbaar
+  was. De kaart laat de pagina bruikbaar en valt toch op. De prijs is dat een
+  afgelasting minder dwingend binnenkomt dan in een venster; dat is bewust
+  aanvaard.
+- **Wel dezelfde taal als de vensters.** Navy kop met het technisch patroon, een
+  gele pin die over de onderrand in het tekstblok hangt, de titel met de gele
+  streep, lijstjes met gele ruitjes. De band boven de kop viel af omdat de
+  meeste mensen er enkel de eerste zin van lezen; het ticketvenster omdat het op
+  een telefoon toch weer het shiftvenster werd.
+- **Een megafoon in de pin, geen datum.** Op een evenement of shift zegt de pin
+  wanneer het gebeurt; een aankondiging gaat niet over een dag, en een datum
+  daar las als "dit gebeurt op maandag". Sinds wanneer het bericht er staat
+  (`startsAt`, anders `createdAt`) staat als gewone regel in de kop.
+- **Geen foto.** Er is bekeken met een foto onder een navy waas in de kop; dat
+  vraagt een extra veld en upload, en in een kaart van 384 pixels breed voegt
+  het weinig toe.
+- **Rechtsonder op een groot scherm, bovenaan op een telefoon** (onder de
+  sitekop, vanaf 640 pixels breed en smaller). Onderaan op een telefoon dekt de
+  kaart precies de plek waar je met je duim naartoe wil, en daar hangt ook de
+  cookiebanner.
+- **Boven de cookiebanner, niet eronder.** Bij een eerste bezoek staan die twee
+  precies samen open. `CookieConsent` zet de hoogte die de banner inneemt in
+  `--vtk-cookie-consent-space` op `<html>`, en de kaart schuift daarmee omhoog
+  (op een telefoon wordt ze er korter van). Zonder die regel viel de kaart onder
+  de banner weg, net bij wie de site voor het eerst ziet.
+- **Ingeklapt op drie regels.** Een lang bericht krijgt "Lees verder"; dat wordt
+  gemeten en niet op tekens geteld, want hoeveel er op drie regels past hangt
+  van de breedte af. Uitgeklapt scrolt de tekst binnen de kaart, zodat kop en
+  knoppen blijven staan.
+- **De kaart neemt de focus niet over.** Ze staat in de bron direct na de
+  sitekop, dus wie met het toetsenbord werkt komt ze meteen tegen, en Escape
+  sluit ze enkel wanneer de focus erin staat. Een Escape ergens anders op de
+  pagina (bv. om een ander venster te sluiten) mag de aankondiging niet
+  meenemen.
+- **Onder de sitekop en de toasts in de stapel** (z-index 35): het uitklapmenu
+  en een melding na een klik vallen erover, en elk venster ook.
 ---
 
 ## Praesidiumlijst (CSV-export op /admin/groepen)
@@ -7078,6 +7191,53 @@ weekraster tot zeven kolommen van een centimeter knijpen is een slechte ruil. Bi
 de lijsten blijft dat paneel wel staan: daar is elke rij één regel tekst, en die
 over de volle breedte uitrekken leest slechter dan de hint ernaast.
 
+### De publieke kalender toont wat vrij is, niet wie er zit
+
+De zaal hing vroeger in een publieke agenda, en dat was geen detail: wie wilde
+huren, keek eerst of zijn avond nog vrij was. Toen het formulier hierheen
+verhuisde, verdween die kalender, en de dubbele aanvragen kwamen terug; de groco
+vroeg ze expliciet terug. Ze staat daarom boven het formulier op
+`/theokot/verhuur`, in die volgorde: eerst kijken, dan pas invullen.
+
+Drie keuzes die niet vanzelf spreken.
+
+**Enkel wat de zaal echt bezet houdt** (`PUBLIC_BUSY_STATUSES`): goedgekeurd,
+afgelopen en afgerond. Een **onbeantwoorde** aanvraag staat er bewust níét op,
+terwijl ze in het beheer wel meetelt. Publiek zou ze een avond wegnemen die
+niemand heeft: de volgende bezoeker ziet bezet, vraagt niet aan, en wordt de
+eerste aanvraag daarna geweigerd, dan is die avond voor niets leeg gebleven.
+Intern is het omgekeerde waar, want daar moet je net zien dat er al iemand
+aanklopte. Afgelopen en afgerond staan er wel op: dat zijn goedgekeurde verhuren
+die intussen voorbij zijn, en zonder hen lijkt elke voorbije week leeg zodra
+Theokot haar opvolging bijwerkt.
+
+**Anoniem, tenzij iemand de activiteit vrijgeeft.** Standaard staat er enkel
+"bezet" met de uren. De aard van de activiteit komt er per aanvraag bij met een
+vinkje in het beheer (`TheokotRental.purposePublic`). Dat is met opzet geen
+instelling voor alles samen: een post schrijft er "[Theokot] Kaas- en wijnavond",
+een externe huurder even vaak een naam of een verjaardag, en één schakelaar zou
+die twee niet uit elkaar houden. Het vinkje staat onder de interne notitie met de
+tekst er letterlijk bij, want het is het enige veld van dat kader dat buiten het
+beheer terechtkomt. Verder geeft de server niets mee: naam, adres, telefoon en
+notities komen niet uit de database, dus ze kunnen ook niet onzichtbaar in de
+HTML van de pagina belanden.
+
+**Vrij is een eigen toestand, geen lege cel.** De vraag is "wanneer kan ik", niet
+"wat staat er te gebeuren", en een lege dag in een raster beantwoordt die vraag
+maar half: ze kan ook betekenen dat de kalender niets weet. Een dag die nog aan
+te vragen valt, draagt daarom de gele streep. De wachttijd uit de instellingen
+(`minLeadDays`) is een derde toestand: die dagen zijn niet bezet maar ook niet
+meer aan te vragen, en ze vrij noemen levert precies de aanvraag op die het
+formulier tien seconden later weigert. Staat het formulier dicht, dan valt "vrij"
+helemaal weg; dan is er niets om aan te vragen.
+
+Het raster zelf is hetzelfde als in het beheer
+(`components/theokot/RentalMonthGrid.tsx` en `rentalGrid.ts`): de component bezit
+de 42 cellen en de weekdagen, de beller vult de inhoud. Een tweede kalender ernaast
+zou binnen het jaar uiteenlopen, net zoals de eventkaart dat ooit deed. Onder de
+700px vervangt een lijst van de bezette avonden het raster; zeven kolommen van een
+centimeter zijn op een telefoon geen kalender meer.
+
 ### Vier opvolgvelden die los van elkaar staan
 
 Status, waarborg, contract en sleutel zijn vier aparte kolommen, precies zoals de
@@ -8291,6 +8451,22 @@ in de Algemene Bachelor, dus er valt niet eens een richting te noemen in de
 titel. Vanaf de tweede bachelor krijgt iedereen ze wel. Wie het als eerstejaars
 tóch wil, vindt het vinkje gewoon op `/account`.
 
+**De regel kijkt naar dit jaar, dus naar stap 1.** Het profiel dat de server bij
+het openen van de gate kent, is dat van vorig jaar: de bevestiging is net het
+moment waarop het lid zijn nieuwe jaar aanduidt. Het scherm besliste eerst op dat
+oude profiel, en dan kreeg precies de groep die er voor het eerst bij hoort de
+vraag niet: wie vorig jaar eerste bachelor was, is nu tweede. De titel noemde om
+dezelfde reden het jaar van vorig jaar ("Bedrijven zoeken 1ste masters" aan een
+tweede master). Sinds 22 september 2026 volgt het blok live wat het lid in stap 1
+aanvinkt (`CareerOptIn` leest het formulier bij elke wijziging): het verschijnt,
+verdwijnt en past zijn titel aan. Wat niet van stap 1 afhangt (Career al aan,
+uitgeschreven via een mail) ligt vast bij het laden. Valt de vraag door stap 1
+weg en is er ook geen lidmaatschapsvraag, dan wordt het weer één stap. Een
+verborgen blok staat ook `disabled`, zodat een vinkje dat het lid zette voor het
+terugging en "niet aan de faculteit" aanduidde, niet ongezien meegaat. De server
+beslist bij het opslaan opnieuw, op dezelfde regel en op de studie die net
+bevestigd is.
+
 **De titel noemt zijn richting.** "Bedrijven zoeken 2de masters Energie" is
 moeilijker over te slaan dan "blijf op de hoogte", en het is waar: de lijst
 splitst echt per studiejaar en per richting (`lib/careerLists.ts`).
@@ -8345,9 +8521,57 @@ plaatsen en zonder dat is niet te zien welke ervan werkt.
 `User.careerOptInSource` (`ONBOARDING`, `ACCOUNT`, `STUDY_CONFIRMATION`) plus
 `careerOptInAt` hangen aan de **lopende** opt-in: zet het lid Career weer uit,
 dan gaan ze mee op null. Anders telt /admin/mailinglijsten herkomsten van mensen
-die niet meer op de lijst staan. Wie al aangeduid stond voor we dit bijhielden,
-valt onder "Eerder". Bewust geen logtabel met alle aan- en uitzettingen: de vraag
-is "waar komt deze inschrijving vandaan", niet "hoe vaak twijfelde dit lid".
+die niet meer op de lijst staan. Wie al aangeduid stond voor we dit bijhielden
+(17 september 2026), heeft geen herkomst. Die stonden eerst apart als "Eerder",
+maar dat waren in de praktijk allemaal onboardings: de admin telt ze daarom bij
+de onboarding, met `onboardedAt` als datum in de grafiek. In de database blijft
+de kolom leeg, want gemeten is het niet. Bewust geen logtabel met alle aan- en
+uitzettingen: de vraag is "waar komt deze inschrijving vandaan", niet "hoe vaak
+twijfelde dit lid".
+
+**Wie de vraag gezien heeft, wordt apart geregistreerd** (`StudyConfirmation`,
+sinds 22 september 2026). De herkomst hierboven telt enkel de ja's, en een
+conversie heeft een noemer nodig: hoeveel studenten de vraag kregen. Die is
+achteraf niet af te leiden, want de bevestiging overschrijft net het profiel
+waarvan de vraag afhing. Per lid en per academiejaar komt er één rij met het
+moment, het scherm (`CONFIRMATION`, `ONBOARDING`, of `ACCOUNT` voor een opslag op
+/account die tussen 14 en 21 september een nieuw jaar bevestigde), of Career al
+aan stond, of de vraag op het scherm stond en of het lid ja zei, plus een
+momentopname van studiejaar en richting voor de uitsplitsing.
+- "De vraag stond op het scherm" is een verborgen veld dat enkel meegaat wanneer
+  het blok zichtbaar was, **én** de regel die op de nieuwe studie ja zegt. Het
+  veld alleen is te vervalsen; de regel alleen telt wie zonder JavaScript een
+  blok zag dat stap 1 niet volgde.
+- Een rij is één bevestiging, geen opslag: een tweede POST of een latere opslag
+  op /account laat de eerste staan.
+- Een fout bij het wegschrijven houdt de bevestiging niet tegen. Een lid dat voor
+  de gate blijft staan omdat een teltabel haperde, is erger dan een rij die
+  ontbreekt.
+- Wie bevestigde voor de registratie bestond (21 en 22 september 2026), heeft
+  geen rij. De admin toont die groep als "niet geregistreerd" en de 46 Career-ja's
+  van toen als "aangeduid voor de registratie", in plaats van een reconstructie
+  als meting op te slaan.
+- Bij een verwijdering van het account gaan de rijen mee weg (ze dragen studiejaar
+  en richting); de tellingen van die ronde zakken dan met één.
+
+**Het verloop van een lijst wordt dagelijks geteld**
+(`MailingListDailyCount`), want een lijst is een momentopname: wie Career uitzet
+of zijn studie niet bevestigt, verdwijnt eruit zonder spoor. De
+background-worker schrijft elke vijf minuten de stand van vandaag weg, voor élke
+lijst en niet enkel Career: een verloop dat je pas begint te meten wanneer iemand
+erom vraagt, heeft geen verleden. Voor de eerste telling is "Career aan"
+gestippeld opgeteld uit de opt-in-datums (wie Career intussen uitzette, ontbreekt
+daarin); "op de lijst" heeft geen verleden, want de datum van een bevestiging
+werd voordien nergens bewaard. Een dag waarop de worker stil lag, blijft een gat.
+
+**Elke uitsplitsing in de admin sluit.** Het scherm toonde "Career: 498 leden"
+bovenaan en "870 met Career aan" eronder, zonder dat ergens stond waarom die
+verschilden (de bevestigingsronde was de dag ervoor opengegaan, en wie nog niet
+bevestigde, valt tot dan uit de lijst). Nu loopt elk blok van een totaal naar
+een deel, met de stappen ertussen als min-regels: van alle opt-ins naar de lijst,
+van alle studentaccounts naar onze studenten, van alle bevestigingen via de gate
+naar wie de vraag kreeg. De rij Career bovenaan zegt er zelf bij hoeveel opt-ins
+nog op hun bevestiging wachten.
 
 **"Onze studenten" is de noemer van het percentage**, en die is nauwer dan
 "iedereen met een account": actief, status Student, een richting van de faculteit
@@ -8355,6 +8579,12 @@ aangeduid en niet `notAtFaculty`. Dat is precies het publiek dat Career aan
 bedrijven belooft. Het scherm is nog een tikje nauwer (eerste bachelors krijgen
 de vraag niet), maar de noemer blijft de volledige groep: zij kunnen het vinkje
 op `/account` wel aanzetten en horen dus in het percentage (`lib/careerStats.ts`).
+De database kent enkel wie al eens inlogde, dus dit is het bereik binnen de site
+en niet binnen de faculteit. Daarom staat ernaast hoeveel accounts volgens de
+KU Leuven-login (`firwStudent`) van de faculteit zijn, los van wat ze zelf
+aanduidden, en waar de rest van de studentaccounts naartoe gaat (onboarding niet
+afgewerkt, niet aan de faculteit, geen richting): `isStudent` staat standaard aan,
+dus ook wie na de eerste login nooit verder kwam, telt als student.
 
 ## De uitleendienst gebruikt de volle vensterbreedte
 

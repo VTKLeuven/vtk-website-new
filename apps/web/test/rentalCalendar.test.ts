@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildRentalTimeSegments } from "@/app/[locale]/admin/theokot/verhuur/RentalCalendar";
+import { buildRentalTimeSegments } from "@/components/theokot/rentalGrid";
 import type { RentalView } from "@/app/[locale]/admin/theokot/verhuur/types";
 
 function mockRental(overrides: Partial<RentalView> = {}): RentalView {
@@ -24,6 +24,7 @@ function mockRental(overrides: Partial<RentalView> = {}): RentalView {
     email: "yana@example.com",
     phone: "0499123456",
     purpose: "[Biomedix] Sportavond",
+    purposePublic: false,
     attendees: 30,
     remarks: null,
     extraAnswers: [],
@@ -62,7 +63,7 @@ describe("buildRentalTimeSegments", () => {
       minutes: 1080,
       endMinutes: 1440,
       isContinuation: false,
-      rental,
+      item: rental,
     });
 
     const day2 = segments.get("2026-10-08");
@@ -74,7 +75,7 @@ describe("buildRentalTimeSegments", () => {
       minutes: 0,
       endMinutes: 120, // 02:00
       isContinuation: true,
-      rental,
+      item: rental,
     });
   });
 

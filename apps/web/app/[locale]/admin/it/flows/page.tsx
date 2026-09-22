@@ -18,7 +18,8 @@ import { MembershipChoice } from "@/components/profile/MembershipChoice";
 import { CareerOptIn } from "@/components/profile/CareerOptIn";
 import { ConfirmStudySteps } from "@/components/profile/ConfirmStudySteps";
 import { hasCompleteAddresses } from "@/lib/profile-address";
-import { careerChoiceLabels, shouldAskCareerOptIn } from "@/lib/careerOptIn";
+import { shouldAskCareerOptIn } from "@/lib/careerOptIn";
+import { careerOptInCopy } from "@/lib/careerOptInCopy";
 import "@/app/design/vtk-career-optin.css";
 import {
   getMembership,
@@ -169,7 +170,7 @@ export default async function AdminFlowPreview({
   // staat: wie ze ooit aanduidde krijgt ze niet meer te zien, dus zou ze uit de
   // voorvertoning verdwijnen net wanneer je ze wil nakijken.
   const askCareer = shouldAskCareerOptIn(user);
-  const careerLabels = careerChoiceLabels(locale, user);
+  const careerCopy = careerOptInCopy(locale);
   const careerState = (
     <>
       <div className="flex justify-between gap-4">
@@ -331,8 +332,8 @@ export default async function AdminFlowPreview({
               <li>{membershipRule}</li>
               <li>
                 {nl
-                  ? "Daaronder staat de Career-opt-in: één vinkje voor de mailinglijst Career, niet voor de andere categorieën. We vragen ze enkel aan wie ze nog nooit aanduidde; ook wie zich via een mail uitschreef of buiten de faculteit studeert krijgt ze niet, want hun aanduiding zou geen mail opleveren. Hieronder staat ze altijd."
-                  : "Below that sits the Career opt-in: one checkbox for the Career mailing list, not for the other categories. We only ask it of anyone who never ticked it; anyone who unsubscribed by email or studies outside the faculty does not get it either, as their tick would never produce a mail. Below it is always shown."}
+                  ? "Daaronder staat de Career-opt-in: één vinkje voor de mailinglijst Career, niet voor de andere categorieën. We vragen ze enkel aan wie ze nog nooit aanduidde; ook wie zich via een mail uitschreef, buiten de faculteit studeert, geen richting aanduidt of enkel in eerste bachelor zit krijgt ze niet, want hun aanduiding zou geen mail opleveren. Dat laatste beslist het blok op wat het lid in stap 1 invult, niet op het profiel van vorig jaar: wie vorig jaar eerste bachelor was, krijgt ze nu dus wel. Hieronder staat ze altijd; de titel volgt wel wat je in stap 1 aanduidt."
+                  : "Below that sits the Career opt-in: one checkbox for the Career mailing list, not for the other categories. We only ask it of anyone who never ticked it; anyone who unsubscribed by email, studies outside the faculty, picks no programme or is only in first bachelor does not get it either, as their tick would never produce a mail. The block decides that last part on what the member fills in at step 1, not on last year's profile: someone who was in first bachelor last year does get it now. Below it is always shown; the title does follow what you pick in step 1."}
               </li>
             </ul>
           </>
@@ -442,7 +443,17 @@ export default async function AdminFlowPreview({
             second={
               <>
                 <MembershipChoice offer={previewOffer} labels={previewLabels} />
-                <CareerOptIn labels={careerLabels} photoAlt={dict.confirmStudy.careerPhotoAlt} />
+                <CareerOptIn
+                  copy={careerCopy}
+                  initial={{
+                    isStudent: user.isStudent,
+                    notAtFaculty: user.notAtFaculty,
+                    studyYears: user.studyYears,
+                    studyProgrammes: user.studyProgrammes,
+                  }}
+                  photoAlt={dict.confirmStudy.careerPhotoAlt}
+                  alwaysShow
+                />
               </>
             }
           />

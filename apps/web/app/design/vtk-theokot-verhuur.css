@@ -682,3 +682,178 @@
     min-height: 76px;
   }
 }
+
+/* -------------------------------------------------------------------------- */
+/* Publiek: de beschikbaarheidskalender                                       */
+/*                                                                            */
+/* Dezelfde rasters als in het beheer, maar met een andere vraag erachter: niet */
+/* "wat staat er te gebeuren" maar "kan ik deze avond nog krijgen". Daarom is   */
+/* vrij hier een eigen toestand met een gele streep onderaan de dag, en geen    */
+/* lege cel: een lege cel kan ook betekenen dat de kalender niets weet.         */
+/* -------------------------------------------------------------------------- */
+
+.tv-avail-panel {
+  /* Dezelfde afstand als de kolommen van het formulier eronder. */
+  margin-bottom: clamp(18px, 2.5vw, 28px);
+}
+
+.tv-avail .tv-toolbar {
+  margin-top: 14px;
+}
+
+.tv-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.tv-step:disabled:hover {
+  background: var(--surface);
+}
+
+.tv-today {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 12px;
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.tv-today:hover {
+  background: var(--paper-2);
+}
+
+.tv-legend i[data-state="free"] {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 -3px 0 var(--yellow);
+}
+
+.tv-legend i[data-state="busy"] {
+  background: color-mix(in srgb, var(--navy) 55%, white);
+}
+
+/* Een dag die nog te krijgen is, draagt de gele streep; bezet is een navy waas
+   met het blokje erin; voorbij en te-kort-dag krijgen hetzelfde grijs als de
+   dagen van de aangrenzende maand, want ze zijn allebei geen keuze meer. */
+/* De onzichtbare toestandstekst in een cel is `position: absolute`; zonder deze
+   regel hangt ze aan de pagina in plaats van aan haar dag, en dat is precies de
+   fout die op /admin/tickets een namiddag heeft gekost. */
+.tv-avail .tv-day {
+  position: relative;
+}
+
+.tv-avail .tv-day[data-state="free"] {
+  background: var(--surface);
+  box-shadow: inset 0 -3px 0 var(--yellow);
+}
+
+.tv-avail .tv-day[data-state="busy"] {
+  background: color-mix(in srgb, var(--navy) 6%, white);
+}
+
+.tv-avail .tv-day[data-state="soon"],
+.tv-avail .tv-day[data-state="past"] {
+  background: var(--paper);
+}
+
+/* Vandaag blijft vandaag, ook op een vrije dag: deze regel staat na de vier
+   hierboven, met dezelfde soortelijkheid, en wint daarom. */
+.tv-avail .tv-day[data-today="true"] {
+  background: #fffdf2;
+}
+
+/* Het publieke blokje is geen knop: er valt niets open te klikken, want er is
+   niets meer over deze verhuur te vertellen dan wat er al op staat. */
+.tv-slot {
+  display: block;
+  border-left: 3px solid var(--navy);
+  border-radius: 6px;
+  padding: 2px 6px;
+  background: color-mix(in srgb, var(--navy) 12%, white);
+  color: var(--ink);
+  font-size: 11.5px;
+  line-height: 1.35;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.tv-slot strong {
+  font-weight: 700;
+  margin-right: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-slot > span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tv-avail-note {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+/* Onder de 700px vervangt de lijst het raster. Zeven kolommen van een
+   centimeter zijn daar geen kalender meer, en wie op zijn telefoon kijkt wil
+   toch enkel weten welke avonden weg zijn. */
+.tv-avail-list {
+  display: none;
+}
+
+.tv-avail-list h3 {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.tv-avail-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.tv-avail-list li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 2px 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.tv-avail-day {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tv-avail-time {
+  color: var(--body);
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-avail-what {
+  grid-column: 1 / -1;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+@media (max-width: 700px) {
+  .tv-avail .tv-month,
+  .tv-avail .tv-legend {
+    display: none;
+  }
+
+  .tv-avail-list {
+    display: block;
+    margin-top: 14px;
+  }
+}

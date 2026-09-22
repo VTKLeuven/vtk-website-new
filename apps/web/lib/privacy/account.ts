@@ -59,6 +59,21 @@ export async function exportUserData(userId: string) {
       honoraryMember: true,
       calendarOnlyMyAudiences: true,
       studyConfirmedYear: true,
+      // Wanneer en via welk scherm het lid zijn studie bevestigde, en wat het met
+      // de Career-vraag deed: een gegeven over dit lid, net als de herkomst hierboven.
+      studyConfirmations: {
+        select: {
+          year: true,
+          via: true,
+          confirmedAt: true,
+          careerBefore: true,
+          careerAsked: true,
+          careerChosen: true,
+          studyYears: true,
+          studyProgrammes: true,
+        },
+        orderBy: { year: "asc" },
+      },
       createdAt: true,
       updatedAt: true,
       memberships: {
@@ -341,6 +356,10 @@ export async function eraseUserData(userId: string) {
     // alumni-evenement staat er mogelijk een naam van hem publiek op de site.
     // Een tombstone hoort daar niet meer in te staan.
     await tx.calendarEventInterest.deleteMany({ where: { userId } });
+    // De bevestigingen dragen een momentopname van studiejaar en richting; aan
+    // een tombstone hoort die niet meer te hangen. De tellingen van die rondes
+    // zakken daardoor met één, en dat is de prijs van een echte verwijdering.
+    await tx.studyConfirmation.deleteMany({ where: { userId } });
 
     await tx.doorAccessLog.updateMany({
       where: { userId },

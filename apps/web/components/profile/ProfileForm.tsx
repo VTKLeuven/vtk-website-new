@@ -3,7 +3,7 @@ import { Input, Label } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { nameParts } from "@vtk/auth";
 import { publicUrl } from "@/lib/storage";
-import { MAIL_CATEGORIES, R_NUMBER_PATTERN } from "@/lib/profile";
+import { MAIL_CATEGORIES, R_NUMBER_PATTERN, latestGraduationYear } from "@/lib/profile";
 import { CheckboxChip, StudyFieldset } from "./StudyFieldset";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { saveProfileAction, type ProfileErrorCode } from "@/app/actions/onboarding";
@@ -146,6 +146,10 @@ export function ProfileForm({
   const common = getDictionary(locale).common;
   const errorMessages: Record<ProfileErrorCode, string> = {
     INVALID_PROFILE: t.errorInvalid,
+    INVALID_GRADUATION_YEAR: t.errorGraduationYear.replace(
+      "{max}",
+      String(latestGraduationYear()),
+    ),
     RNUMBER_TAKEN: t.errorRnumberTaken,
     AVATAR_TOO_LARGE: t.errorAvatarTooLarge,
     AVATAR_FAILED: t.errorAvatarFailed,

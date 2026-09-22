@@ -147,8 +147,11 @@ export default async function WerkgroepenPage({
                             </div>
                             <div className="mt-2 text-sm font-medium">{m.user.name}</div>
                             <div className="text-xs text-[#5c667f]">
+                              {/* De verantwoordelijke heet hier de G3 of de G4 van
+                                  deze werkgroep; dat staat per werkgroep in de
+                                  admin. */}
                               {m.role === "LEAD"
-                                ? t.lead
+                                ? group.leadLabel
                                 : pick(m.titleNl ?? "", m.titleEn ?? "", locale) || t.member}
                             </div>
                           </li>

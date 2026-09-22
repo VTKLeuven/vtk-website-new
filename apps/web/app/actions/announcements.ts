@@ -11,8 +11,8 @@ import { localDateTimeToUtc } from "@/lib/ticketing/time";
 import { isEditableDestination } from "@/lib/href";
 
 /**
- * Aankondigingen: het bericht dat als modal verschijnt, op de homepage of op de
- * hele site. Beheer valt onder `home.edit`, want het begon als homepage-inhoud.
+ * Aankondigingen: het bericht dat als kaart verschijnt, op de homepage of op de
+ * hele site. Beheer valt onder `announcements.manage`.
  */
 
 const schema = z.object({
@@ -23,7 +23,7 @@ const schema = z.object({
   bodyEn: z.string().trim().min(1),
   ctaLabelNl: z.string().trim().optional(),
   ctaLabelEn: z.string().trim().optional(),
-  // Mag een pad op deze site zijn: de modal opent enkel een nieuw tabblad voor
+  // Mag een pad op deze site zijn: de kaart opent enkel een nieuw tabblad voor
   // een extern adres, dus een interne knop werd altijd al correct gerenderd.
   ctaUrl: z
     .string()
@@ -48,7 +48,7 @@ function parseMoment(value: string | undefined): Date | null {
 }
 
 function revalidate() {
-  // De modal hangt in de gedeelde layout, dus "/" alleen volstaat niet: zonder
+  // De kaart hangt in de gedeelde layout, dus "/" alleen volstaat niet: zonder
   // het tweede argument blijft een site-brede aankondiging op elke andere route
   // onzichtbaar tot ze vanzelf verloopt.
   revalidatePath("/", "layout");
@@ -70,7 +70,7 @@ export async function saveAnnouncementAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  const session = await requirePermission("home.edit");
+  const session = await requirePermission("announcements.manage");
   const parsed = schema.safeParse({
     id: (formData.get("id") as string) || undefined,
     titleNl: formData.get("titleNl") ?? "",
@@ -159,7 +159,7 @@ export async function saveAnnouncementAction(
 
 /** Aan/uit zetten zonder het formulier te openen. */
 export async function setAnnouncementActiveAction(formData: FormData): Promise<void> {
-  await requirePermission("home.edit");
+  await requirePermission("announcements.manage");
   const id = formData.get("id") as string;
   if (!id) return;
   const active = formData.get("active") === "1";
@@ -178,7 +178,7 @@ export async function setAnnouncementActiveAction(formData: FormData): Promise<v
 }
 
 export async function deleteAnnouncementAction(formData: FormData): Promise<void> {
-  await requirePermission("home.edit");
+  await requirePermission("announcements.manage");
   const id = formData.get("id") as string;
   if (!id) return;
   const announcement = await prisma.announcement.delete({ where: { id } });

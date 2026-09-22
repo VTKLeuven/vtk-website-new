@@ -95,6 +95,7 @@ export default async function AdminWerkgroepen({
       name,
       nameNl: group.nameNl,
       nameEn: group.nameEn,
+      leadLabel: group.leadLabel as "G3" | "G4",
       descriptionNl: group.descriptionNl ?? "",
       descriptionEn: group.descriptionEn ?? "",
       website: group.website ?? "",

@@ -486,6 +486,15 @@ the design language into the application instead of copying mockup content.
     so the day card gets the full width (the pin moves beside the day name).
     Three directions were reviewed; this cleaned-up agenda won over a table and
     over event-style tiles.
+  - **De verhuurkalender bestaat twee keer en het raster maar één keer.** Het
+    beheer (`/admin/theokot/verhuur`) en de publieke beschikbaarheidskalender op
+    `/theokot/verhuur` delen `components/theokot/RentalMonthGrid.tsx` en
+    `rentalGrid.ts`; de component bezit de cellen, de beller de inhoud. Publiek
+    staat enkel wat de zaal echt bezet houdt (`PUBLIC_BUSY_STATUSES`: goedgekeurd,
+    afgelopen, afgerond), zonder naam of adres, en met de aard van de activiteit
+    enkel wanneer `TheokotRental.purposePublic` aan staat. Zet er geen
+    onbeantwoorde aanvraag bij en geef er geen velden aan mee die je niet toont:
+    alles wat de client krijgt, staat in de HTML. Zie `docs/design-decisions.md`.
   - **The event tile lives in `apps/web/app/design/vtk-eventcard.css` and is
     shared** by the `/kalender` grid and the homepage band "Aankomende
     evenementen"; both import that file, and `.ev-grid` belongs to it too. Do not

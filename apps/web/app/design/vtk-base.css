@@ -18,6 +18,16 @@
   --body: #34405e;
   /* Muted text on a navy/ink ground (intentional dark bands only). */
   --on-dark-muted: #b7c0dc;
+  /* Grafieken (/admin/mailinglijsten). Drie categorische kleuren in vaste
+     volgorde, samen gevalideerd tegen --surface op kleurenblindheid (elk paar
+     dE >= 11,9) en op onderscheid bij gewoon zicht; hertune ze enkel met die
+     controle erbij. Het amber haalt geen 3:1 op wit, dus elke grafiek met deze
+     kleuren draagt een legende en een tabelweergave. --chart-context is de
+     grijze lijn naast de lijn waar het om gaat. */
+  --chart-1: #3a5fc4;
+  --chart-2: #eda100;
+  --chart-3: #1b9e77;
+  --chart-context: #98a2b8;
   /* Beschikbaarheid van een plaats (shiften): ruim, bijna vol, vol. Vol is
      bewust grijs en niet rood: het is geen fout maar een keuze die wegvalt, en
      in een drukke week staat het tien keer op het scherm. */
@@ -602,96 +612,296 @@
   text-decoration: underline;
 }
 
-/* Aankondigingsvenster op de homepage (AnnouncementModal). Rustige witte kaart
-   op een navy waas: hetzelfde materiaal als de rest van de site, niet een
-   pop-up die eruit springt met eigen kleuren. */
-.vtk-announcement-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: grid;
-  place-items: center;
-  padding: clamp(16px, 5vw, 40px);
-  background: rgba(10, 15, 31, 0.55);
-  animation: vtk-announcement-fade 180ms ease-out;
-}
+/* Aankondiging (AnnouncementCard): een kaart rechtsonder, op een telefoon
+   bovenaan onder de sitekop. Dezelfde taal als het shiftvenster en de
+   ticket-QR: een navy kop met het technisch patroon, een gele pin die over de
+   onderrand hangt en een titel met de gele streep. Hier met een megafoon in de
+   pin in plaats van een datum, want een aankondiging gaat niet over een dag.
 
+   Geen venster en geen waas meer: de pagina blijft bruikbaar terwijl de kaart
+   er staat. Zie docs/design-decisions.md.
+
+   Onder de sitekop (50) en onder de toasts (40): een uitklapmenu of een
+   melding na een klik hoort over de kaart te vallen, niet eronder. Elk venster
+   (shift, ticket, feedback) ligt er vanzelf boven. */
 .vtk-announcement {
-  width: min(100%, 520px);
-  max-height: min(80dvh, 720px);
-  overflow-y: auto;
-  padding: clamp(20px, 3vw, 28px);
+  /* Onderaan en rechts op een groot scherm. Staat de cookiebanner open, dan
+     schuift de kaart erboven: die banner publiceert zijn eigen hoogte in
+     `--vtk-cookie-consent-space` (CookieConsent). Zonder die regel viel de
+     kaart bij een eerste bezoek, precies wanneer er een aankondiging is, onder
+     de banner weg. */
+  --vtk-announcement-edge: clamp(16px, 2.5vw, 28px);
+  --vtk-announcement-bottom: max(
+    var(--vtk-announcement-edge),
+    calc(var(--vtk-cookie-consent-space, 0px) + 12px)
+  );
+
+  position: fixed;
+  right: var(--vtk-announcement-edge);
+  bottom: var(--vtk-announcement-bottom);
+  z-index: 35;
+  display: flex;
+  flex-direction: column;
+  width: min(384px, calc(100vw - 32px));
+  /* Een lang bericht dat openklapt, scrolt binnen de kaart: kop en knoppen
+     blijven staan, en de kaart schuift nooit onder de sitekop. */
+  max-height: calc(100dvh - var(--vtk-header-height, 73px) - var(--vtk-announcement-bottom) - 16px);
+  overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 22px;
+  border-radius: 18px;
   background: var(--surface);
   color: var(--ink);
-  box-shadow: 0 30px 70px rgba(10, 15, 31, 0.35);
-  animation: vtk-announcement-rise 200ms ease-out;
+  font-family: var(--sans);
+  box-shadow: 0 28px 56px -24px rgba(10, 15, 31, 0.6);
+  animation: vtk-announcement-rise 240ms ease-out;
 }
 
-.vtk-announcement-head {
+.vtk-announcement-top {
+  position: relative;
+  isolation: isolate;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  flex: none;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 3px;
+  min-height: 70px;
+  padding: 12px 70px 14px 18px;
+  background: var(--navy);
+  color: var(--paper);
 }
 
-.vtk-announcement-head h2 {
-  margin: 0;
-  font-size: clamp(20px, 2.4vw, 24px);
-  line-height: 1.15;
-  letter-spacing: -0.02em;
+.vtk-announcement-top::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-image: url("/technisch-pattern.svg");
+  background-size: 640px 640px;
+  background-repeat: repeat;
+  background-position: -150px -70px;
+  opacity: 0.3;
+}
+
+.vtk-announcement-kicker {
+  color: var(--on-dark-muted);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.vtk-announcement-date {
+  font-size: 14px;
   font-weight: 600;
-  text-wrap: balance;
+  line-height: 1.3;
+  font-variant-numeric: tabular-nums;
+}
+
+/* De pin hangt aan de kop en steekt in het tekstblok eronder, zoals in het
+   shiftvenster; de titel houdt daarom rechts plaats vrij. */
+.vtk-announcement-pin {
+  position: absolute;
+  right: 18px;
+  bottom: -23px;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  background: var(--yellow);
+  color: var(--ink);
+  box-shadow: 0 10px 22px -10px rgba(8, 13, 28, 0.75);
+}
+
+.vtk-announcement-pin svg {
+  width: 21px;
+  height: 21px;
 }
 
 .vtk-announcement-close {
+  position: absolute;
+  top: 10px;
+  right: 10px;
   display: inline-grid;
-  width: 32px;
-  height: 32px;
-  flex: none;
   place-items: center;
-  border: 1px solid var(--line);
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(183, 192, 220, 0.34);
   border-radius: 999px;
   background: transparent;
-  color: var(--muted);
+  color: var(--paper);
   cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease;
 }
 
 .vtk-announcement-close:hover {
-  border-color: var(--line-2);
-  background: var(--paper-2);
+  border-color: var(--paper);
+  background: var(--paper);
   color: var(--ink);
 }
 
+/* Bewust niet gepositioneerd: de pin moet over dit blok vallen, en een
+   gepositioneerd blok dat later in de bron staat, schildert erover. */
 .vtk-announcement-body {
-  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 16px 18px 2px;
+}
+
+.vtk-announcement-title {
+  width: fit-content;
+  max-width: calc(100% - 52px);
+  margin: 0;
+  color: var(--ink);
+  font-size: 18.5px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.22;
+  text-wrap: balance;
+}
+
+.vtk-announcement-title::after {
+  content: "";
+  display: block;
+  height: 3px;
+  margin-top: 7px;
+  border-radius: 2px;
+  background: var(--yellow);
+}
+
+/* Ingeklapt zijn het drie regels. Ook een kort bericht draagt die maximale
+   hoogte: AnnouncementCard meet ertegen of er iets verborgen is. Pas dan komt
+   de vervaging en de knop "Lees verder". */
+.vtk-announcement-text {
+  max-height: 4.9em;
+  overflow: hidden;
   color: var(--body);
-  font-size: 15px;
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+.vtk-announcement-text[data-state="clamped"] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 55%, transparent);
+  mask-image: linear-gradient(to bottom, #000 55%, transparent);
+}
+
+.vtk-announcement-text[data-state="open"] {
+  max-height: none;
+}
+
+/* Met `.vtk-announcement` ervoor: het blok draagt ook `.prose-vtk`
+   (globals.css), en bij gelijke specificiteit hangt het van de volgorde van de
+   stylesheets af wie wint. */
+.vtk-announcement .vtk-announcement-text p {
+  margin: 0 0 0.65em;
+  line-height: 1.55;
+}
+
+.vtk-announcement .vtk-announcement-text > :last-child {
+  margin-bottom: 0;
+}
+
+/* Gele ruitjes en navy vet, zoals de instructies in het shiftvenster. */
+.vtk-announcement .vtk-announcement-text ul {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 0.65em;
+  padding-left: 1.35rem;
+  list-style: none;
+}
+
+.vtk-announcement .vtk-announcement-text ul > li {
+  position: relative;
+}
+
+.vtk-announcement .vtk-announcement-text ul > li::before {
+  content: "";
+  position: absolute;
+  left: -1rem;
+  top: 0.62em;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--yellow);
+  transform: rotate(45deg);
+}
+
+.vtk-announcement .vtk-announcement-text strong {
+  color: var(--navy);
+  font-weight: 600;
+}
+
+.vtk-announcement-more {
+  justify-self: start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: var(--line-2);
+  cursor: pointer;
+}
+
+.vtk-announcement-more:hover {
+  text-decoration-color: var(--ink);
 }
 
 .vtk-announcement-actions {
   display: flex;
+  flex: none;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 20px;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 18px 16px;
 }
 
-@keyframes vtk-announcement-fade {
-  from {
-    opacity: 0;
+.vtk-announcement-actions .vtk-button {
+  min-height: 36px;
+  padding: 8px 14px;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+/* Op een telefoon bovenaan, net onder de sitekop, over de volle breedte. Daar
+   staat niets anders vast: onderaan hangt de cookiebanner, en een kaart die
+   van onder komt dekt precies de knop waar je met je duim naartoe wil. */
+@media (max-width: 640px) {
+  .vtk-announcement {
+    top: calc(var(--vtk-header-height, 65px) + 10px);
+    right: 12px;
+    bottom: auto;
+    left: 12px;
+    width: auto;
+    max-height: calc(100dvh - var(--vtk-header-height, 65px) - 22px - var(--vtk-cookie-consent-space, 0px));
+    animation-name: vtk-announcement-drop;
   }
 }
 
 @keyframes vtk-announcement-rise {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(16px);
+  }
+}
+
+@keyframes vtk-announcement-drop {
+  from {
+    opacity: 0;
+    transform: translateY(-12px);
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .vtk-announcement-backdrop,
   .vtk-announcement {
     animation: none;
   }

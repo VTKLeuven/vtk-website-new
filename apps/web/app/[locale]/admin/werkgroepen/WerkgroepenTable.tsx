@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
-import { Input, Label } from "@vtk/ui";
+import { Input, Label, Select } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
 import {
@@ -35,6 +35,8 @@ export type Member = {
   title: string | null;
 };
 export type GrantedRole = { roleId: string; code: string; name: string; kind: "DEFAULT" | "LEADER" };
+/** Hoe de verantwoordelijke van een werkgroep heet: de G3 of de G4. */
+export type LeadLabel = "G3" | "G4";
 export type RoleOption = { roleId: string; code: string; name: string };
 
 export type WerkgroepRow = {
@@ -43,6 +45,7 @@ export type WerkgroepRow = {
   name: string;
   nameNl: string;
   nameEn: string;
+  leadLabel: LeadLabel;
   descriptionNl: string;
   descriptionEn: string;
   website: string;
@@ -54,6 +57,28 @@ export type WerkgroepRow = {
   /** Voorbereide, lowercased zoekstring (naam, code, rollen, leden). */
   searchText: string;
 };
+
+/**
+ * De keuze G3/G4. Ze staat in twee formulieren (nieuwe werkgroep en de
+ * werkgroepinstellingen) en meerdere rijen kunnen tegelijk openstaan, dus het
+ * veld krijgt per formulier een eigen id.
+ */
+function LeadLabelField({ id, value, nl }: { id: string; value: LeadLabel; nl: boolean }) {
+  return (
+    <div>
+      <Label htmlFor={id}>{nl ? "Titel van de verantwoordelijke" : "Title of the lead"}</Label>
+      <Select id={id} name="leadLabel" defaultValue={value}>
+        <option value="G3">G3</option>
+        <option value="G4">G4</option>
+      </Select>
+      <p className="mt-1 text-xs text-[#5c667f]">
+        {nl
+          ? "Zo heet de verantwoordelijke van deze werkgroep, hier en op /werkgroepen."
+          : "How this werkgroep's lead is named, here and on /werkgroepen."}
+      </p>
+    </div>
+  );
+}
 
 export type SaveLabels = {
   submitLabel: string;
@@ -196,7 +221,8 @@ export function WerkgroepenTable({
           >
             <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" required /></div>
             <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" required /></div>
-            <div className="md:col-span-2"><Label>{nl ? "Code" : "Code"}</Label><Input name="code" placeholder={nl ? "auto" : "auto"} /></div>
+            <div><Label>{nl ? "Code" : "Code"}</Label><Input name="code" placeholder={nl ? "auto" : "auto"} /></div>
+            <LeadLabelField id="werkgroep-new-lead-label" value="G3" nl={nl} />
             <input type="hidden" name="active" value="on" />
           </SaveForm>
         </Modal>
@@ -334,8 +360,9 @@ function WerkgroepDetail({
   saveLabels: SaveLabels;
 }) {
   const grants = useMemo(() => new Set(werkgroep.roleGrants.map((g) => `${g.roleId}:${g.kind}`)), [werkgroep.roleGrants]);
-  const roleLabel = (m: Member) =>
-    m.role === "LEAD" ? (nl ? "Verantwoordelijke" : "Lead") : nl ? "Lid" : "Member";
+  // De verantwoordelijke van een werkgroep heet bij VTK de G3 of de G4; welke
+  // van de twee staat per werkgroep in de werkgroepinstellingen.
+  const roleLabel = (m: Member) => (m.role === "LEAD" ? werkgroep.leadLabel : nl ? "Lid" : "Member");
 
   return (
     <div className="space-y-4 py-1">
@@ -418,7 +445,7 @@ function WerkgroepDetail({
               ) : (
                 <p className="text-sm text-[#5c667f]">{nl ? "Nog geen leden voor dit jaar." : "No members for this year yet."}</p>
               )}
-              <AddMemberForm groupId={werkgroep.id} year={year} locale={locale} />
+              <AddMemberForm groupId={werkgroep.id} year={year} locale={locale} leadLabel={werkgroep.leadLabel} />
             </div>
           ) : werkgroep.members.length > 0 ? (
             <ul className="flex flex-wrap gap-2">
@@ -428,7 +455,7 @@ function WerkgroepDetail({
                   <span className="text-sm text-vtk-ink">{m.name}</span>
                   {m.role === "LEAD" && (
                     <span className="rounded-full bg-vtk-yellow/70 px-1.5 py-0.5 text-[10px] font-semibold text-vtk-ink">
-                      {nl ? "lead" : "lead"}
+                      {werkgroep.leadLabel}
                     </span>
                   )}
                 </li>
@@ -455,13 +482,16 @@ function WerkgroepDetail({
                 <div className="grid grid-cols-[1fr_auto_auto] items-center gap-x-4 gap-y-1 text-sm">
                   <span className="text-[11px] font-semibold uppercase text-zinc-500">{nl ? "Rol" : "Role"}</span>
                   <span className="text-[11px] font-semibold uppercase text-zinc-500">{nl ? "Elk lid" : "Every member"}</span>
-                  <span className="text-[11px] font-semibold uppercase text-zinc-500">{nl ? "Enkel lead" : "Lead only"}</span>
+                  <span className="text-[11px] font-semibold uppercase text-zinc-500">
+                    {nl ? `Enkel ${werkgroep.leadLabel}` : `${werkgroep.leadLabel} only`}
+                  </span>
                   {allRoles.map((role) => (
                     <RoleGrantRow
                       key={role.roleId}
                       role={role}
                       groupId={werkgroep.id}
                       werkgroepName={werkgroep.name}
+                      leadLabel={werkgroep.leadLabel}
                       defaultOn={grants.has(`${role.roleId}:DEFAULT`)}
                       leaderOn={grants.has(`${role.roleId}:LEADER`)}
                       nl={nl}
@@ -479,7 +509,14 @@ function WerkgroepDetail({
                     <li key={`${g.roleId}:${g.kind}`} className="rounded-full border border-vtk-blue/12 bg-white px-3 py-1 text-sm text-vtk-ink">
                       {g.name}
                       <span className="ml-1 text-xs text-[#5c667f]">
-                        · {g.kind === "DEFAULT" ? (nl ? "elk lid" : "every member") : nl ? "enkel lead" : "lead only"}
+                        ·{" "}
+                        {g.kind === "DEFAULT"
+                          ? nl
+                            ? "elk lid"
+                            : "every member"
+                          : nl
+                            ? `enkel ${werkgroep.leadLabel}`
+                            : `${werkgroep.leadLabel} only`}
                       </span>
                     </li>
                   ))}
@@ -503,6 +540,7 @@ function WerkgroepDetail({
                 <input type="hidden" name="id" value={werkgroep.id} />
                 <div><Label>{nl ? "Naam (NL)" : "Name (NL)"}</Label><Input name="nameNl" defaultValue={werkgroep.nameNl} required /></div>
                 <div><Label>{nl ? "Naam (EN)" : "Name (EN)"}</Label><Input name="nameEn" defaultValue={werkgroep.nameEn} required /></div>
+                <LeadLabelField id={`werkgroep-${werkgroep.id}-lead-label`} value={werkgroep.leadLabel} nl={nl} />
                 <label className="md:col-span-2 inline-flex items-center gap-2 text-sm text-vtk-ink">
                   <input type="checkbox" name="active" defaultChecked={werkgroep.active} className="size-4 rounded border-zinc-400" />
                   {nl
@@ -522,6 +560,7 @@ function RoleGrantRow({
   role,
   groupId,
   werkgroepName,
+  leadLabel,
   defaultOn,
   leaderOn,
   nl,
@@ -529,6 +568,7 @@ function RoleGrantRow({
   role: RoleOption;
   groupId: string;
   werkgroepName: string;
+  leadLabel: LeadLabel;
   defaultOn: boolean;
   leaderOn: boolean;
   nl: boolean;
@@ -539,8 +579,8 @@ function RoleGrantRow({
         <span className="text-vtk-ink">{role.name}</span>
         <code className="rounded bg-vtk-blue-soft/60 px-1.5 py-0.5 text-[11px] text-[#5c667f]">{role.code}</code>
       </div>
-      <GrantToggle role={role} groupId={groupId} werkgroepName={werkgroepName} kind="DEFAULT" on={defaultOn} nl={nl} />
-      <GrantToggle role={role} groupId={groupId} werkgroepName={werkgroepName} kind="LEADER" on={leaderOn} nl={nl} />
+      <GrantToggle role={role} groupId={groupId} werkgroepName={werkgroepName} leadLabel={leadLabel} kind="DEFAULT" on={defaultOn} nl={nl} />
+      <GrantToggle role={role} groupId={groupId} werkgroepName={werkgroepName} leadLabel={leadLabel} kind="LEADER" on={leaderOn} nl={nl} />
     </>
   );
 }
@@ -549,6 +589,7 @@ function GrantToggle({
   role,
   groupId,
   werkgroepName,
+  leadLabel,
   kind,
   on,
   nl,
@@ -556,11 +597,19 @@ function GrantToggle({
   role: RoleOption;
   groupId: string;
   werkgroepName: string;
+  leadLabel: LeadLabel;
   kind: "DEFAULT" | "LEADER";
   on: boolean;
   nl: boolean;
 }) {
-  const which = kind === "DEFAULT" ? (nl ? "elk lid" : "every member") : nl ? "enkel de lead" : "lead only";
+  const which =
+    kind === "DEFAULT"
+      ? nl
+        ? "elk lid"
+        : "every member"
+      : nl
+        ? `enkel de ${leadLabel}`
+        : `${leadLabel} only`;
   return (
     <form action={setGroupRoleAction} className="justify-self-center">
       <input type="hidden" name="groupId" value={groupId} />

@@ -27,7 +27,19 @@ const nextConfig: NextConfig = {
   typescript: {
     tsconfigPath: process.env.NODE_ENV === "production" ? "tsconfig.build.json" : "tsconfig.json",
   },
-  allowedDevOrigins: ["192.168.9.206", "192.168.9.226", "127.0.0.1", "*.trycloudflare.com"],
+  // Een dev-server die je over het netwerk opent (LAN, Tailscale, tunnel) moet
+  // hier staan. Anders weigert Next de HMR-websocket en hydrateert de pagina
+  // nooit: de HTML staat er, maar geen enkele knop, menu of formulier reageert.
+  allowedDevOrigins: [
+    "192.168.9.206",
+    "192.168.9.226",
+    "127.0.0.1",
+    "*.trycloudflare.com",
+    // Tailscale: MagicDNS-naam, kort en volledig, en het tailnet-adres.
+    "apollo",
+    "100.113.230.81",
+    "**.ts.net",
+  ],
   transpilePackages: ["@vtk/gallery", "@vtk/ui", "@vtk/auth", "@vtk/db", "@vtk/i18n", "@vtk/mail", "@vtk/storage", "@vtk/payments"],
   // Keep heavy, native, or generated server-only packages OUT of the
   // bundler module graph. Without this, the bundler tries to fully
@@ -40,6 +52,7 @@ const nextConfig: NextConfig = {
     "sharp",
     "archiver",
     "nodemailer",
+    "@opentelemetry/semantic-conventions",
   ],
   // Pin the workspace root explicitly so Next.js / webpack / Turbopack do
   // not walk upwards and try to index the user's home directory (there's

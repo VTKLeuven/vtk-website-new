@@ -31,6 +31,19 @@ export type PickupOrder = {
   pickupStart: string;
   pickupEnd: string;
   voucherRedemption: { amount: number } | null;
+  /**
+   * Wat twee medewerkersbonnetjes van deze bestelling dekken: de prijs van het
+   * duurste broodje erin. Twee bonnetjes zijn exact één broodje, dus geen opleg
+   * wanneer dat broodje duurder is en geen geld terug wanneer het goedkoper is.
+   * De balie hoeft daardoor niets meer zelf af te trekken.
+   */
+  voucherCoversCents: number;
+  /**
+   * De afhaal van deze dag is voorbij en de bestelling stond als niet-opgehaald
+   * geboekt. Ze mag nog altijd uitgedeeld worden; de balie hoort enkel te weten
+   * dat het laattijdig is.
+   */
+  isLate: boolean;
 };
 
 export type PickupLookupResult =
@@ -44,7 +57,13 @@ export type PickupLookupResult =
     }
   | { ok: false; error: string };
 
-/** Bestelling(en) van vandaag plus het bonnetjessaldo, voor één gebruiker. */
+/**
+ * Bestelling(en) van vandaag plus het bonnetjessaldo, voor één gebruiker.
+ *
+ * Ook een bestelling die als niet-opgehaald geboekt staat komt mee. De verkoop is
+ * dan gedaan, maar het broodje mag nog uitgedeeld worden, en "deze persoon heeft
+ * niets besteld" zeggen terwijl de bestelling er staat, is gewoon onwaar.
+ */
 export async function pickupForUser(
   userId: string,
   now: Date = new Date(),
@@ -62,11 +81,13 @@ export async function pickupForUser(
     prisma.theokotOrder.findMany({
       where: {
         userId: user.id,
-        status: { in: ["RESERVED", "PICKED_UP"] },
+        status: { in: ["RESERVED", "PICKED_UP", "NO_SHOW"] },
         session: { date: { gte: today, lt: tomorrow } },
       },
       include: {
         session: { select: { pickupStart: true, pickupEnd: true } },
+        // volgorde hieronder hangt hieraan: de duurste lijn bepaalt wat de
+        // bonnetjes dekken.
         voucherRedemption: { select: { amount: true } },
         lines: {
           include: { sessionItem: { select: { nameNl: true, nameEn: true } } },
@@ -110,6 +131,11 @@ export async function pickupForUser(
       pickupStart: fmt(order.session.pickupStart),
       pickupEnd: fmt(order.session.pickupEnd),
       voucherRedemption: order.voucherRedemption,
+      voucherCoversCents: order.lines.reduce(
+        (highest, line) => Math.max(highest, line.unitPriceCents),
+        0,
+      ),
+      isLate: order.status === "NO_SHOW" || order.session.pickupEnd < now,
       lines: order.lines.map((line) => ({
         nameNl: line.sessionItem.nameNl,
         nameEn: line.sessionItem.nameEn,
