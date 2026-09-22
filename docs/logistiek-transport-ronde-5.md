@@ -55,7 +55,7 @@ Alles wordt op **390px breed** nagekeken, niet alleen op desktop.
 | 1 | De post ziet en regelt haar eigen ritten | F4.18, F4.19, F4.9, F4.8a, F4.8b, F4.12, F4.17 | ✅ af (`dce13cf7`) |
 | 2 | Leesbaarheid van de planning | F4.16, F4.1, F4.13, F4.15 | ✅ af (`5835b84f`) |
 | 3 | Breedte en gsm | F4.6, F4.7, F4.14 | ✅ af (`e65da138`) |
-| 4 | Chauffeursnummers en werkgroepen | F4.3, F4.10 | 🟡 code af (`503735c0`), één nummer nog in te vullen op liv |
+| 4 | Chauffeursnummers en werkgroepen | F4.3, F4.10 | ✅ af (`503735c0`) |
 | 5 | Beschikbaarheid | F4.2, F4.5 | ✅ af (`435ecf21`) |
 | 6 | Ritten bewerken en noteren | F4.4, F4.20 | ✅ af (`634313e0`, `40c934b7`) |
 | 7 | Voertuigen | F4.21, F4.22 | ✅ af (`19db13f5`, `e65658c0`) |
@@ -65,9 +65,9 @@ Alles wordt op **390px breed** nagekeken, niet alleen op desktop.
 Fase 1 eerst: daar zit het enige echte defect van deze ronde, en het draagt zeven
 van de drieëntwintig punten. **Alle fases zijn af** (`dce13cf7`, `5835b84f`,
 `e65da138`, `503735c0`, `435ecf21`, `634313e0`, `40c934b7`, `19db13f5`,
-`e65658c0`, `054e9501` en `dbce861c`). Er blijft één handeling over, en dat is
-geen code: het nummer van Sofie Bruggeman (`0473 71 26 78`) met de hand
-invullen op liv.
+`e65658c0`, `054e9501` en `dbce861c`), en het laatste losse eindje (het nummer
+van Sofie Bruggeman) staat sinds 22 september 2026 op liv. Deze ronde is
+daarmee rond.
 
 ---
 
@@ -365,9 +365,8 @@ als het moet veranderen, is dat een eigen punt.
 
 # Fase 4: chauffeursnummers en werkgroepen
 
-### 🟡 F4.3. De nummers komen uit de gedeelde gsm-lijst
-**P2 · code · `503735c0`** (de code is af; enkel het nummer van Sofie Bruggeman staat
-nog open, en dat is een veld op liv)
+### ✅ F4.3. De nummers komen uit de gedeelde gsm-lijst
+**P2 · code · `503735c0`**
 
 *"Zou het mogelijk zijn om de telefoonnummers van de chauffeurs automatisch uit
 deze lijst te halen? (Alleen de nummer van Viktor Meekers staat fout in die
@@ -432,15 +431,13 @@ repo. De verdeling over de drie gevallen zit apart in `lib/phone-import.ts` met
 zes tests: dat vinkje beslist of een bevestigd nummer overschreven wordt, en dat
 zie je achteraf aan niets.
 
-**Het nummer van Sofie Bruggeman is beslist: `0473 71 26 78`.** In het bestand
-staat `0032573712678`: na het landnummer negen cijfers die met een 5 beginnen,
-wat noch een gsm (`4` plus acht) noch een vaste lijn (acht) is. Het was ofwel
-`0473 71 26 78` (een 5 waar een 4 hoorde) ofwel `057 37 12 67` (een cijfer te
-veel achteraan), en dat viel niet uit het bestand af te leiden; Logistiek koos op
-21 september 2026 het eerste.
-
-**Nog te doen, en dit is geen code:** dat nummer invullen op liv, bij die
-chauffeur in `/beheer/chauffeurs`. Eén veld, en daarna is fase 4 volledig af.
+**Het nummer van Sofie Bruggeman staat op liv** (22 september 2026). In het
+bestand stond negen cijfers na het landnummer, beginnend met een 5: noch een gsm
+(`4` plus acht) noch een vaste lijn (acht). Het kon een gsm zijn met een 5 waar
+een 4 hoorde, of een vaste lijn met een cijfer te veel achteraan, en dat viel
+niet uit het bestand af te leiden. Logistiek koos het eerste; het nummer zelf
+staat hier niet, om dezelfde reden als waarom het bestand hier niet staat.
+Daarmee hebben 31 van de 41 chauffeurs een nummer van het team.
 
 ### ✅ F4.10. Chauffeurs aan werkgroepen toevoegen
 **P2 · code · `503735c0`**
