@@ -10,10 +10,19 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 export type SortDir = "asc" | "desc";
 export type Sort = { key: "name" | "count"; dir: SortDir } | null;
 
+export function normalizeSearchText(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase();
+}
+
 /**
  * Zoek-, sorteer- en uitklap-state voor een beheertabel. Sorteren gaat over twee
  * generieke sleutels: "name" (alfabetisch) en "count" (numeriek). Derde klik op
  * dezelfde kolom zet de sortering terug op de bronvolgorde.
+ *
+ * Zoeken is hoofdletter-, accent- en trema-onafhankelijk via NFD-normalisatie.
  */
 export function useTableControls<T>(
   rows: T[],
@@ -30,8 +39,8 @@ export function useTableControls<T>(
   const [open, setOpen] = useState<Set<string>>(new Set());
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const list = q ? rows.filter((r) => searchOf(r).includes(q)) : rows.slice();
+    const q = normalizeSearchText(query.trim());
+    const list = q ? rows.filter((r) => normalizeSearchText(searchOf(r)).includes(q)) : rows.slice();
     if (sort) {
       list.sort((a, b) => {
         const cmp = sort.key === "name" ? nameOf(a).localeCompare(nameOf(b), locale) : countOf(a) - countOf(b);

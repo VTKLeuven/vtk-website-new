@@ -129,8 +129,8 @@ export async function deletePocAction(formData: FormData): Promise<void> {
 }
 
 const repSchema = z.object({
-  pocId: z.string(),
-  userId: z.string(),
+  pocId: z.string().min(1, "POC is verplicht"),
+  userId: z.string().min(1, "Gebruiker is verplicht"),
   year: z.coerce.number().int().optional(),
   order: z.coerce.number().int().default(0),
 });
@@ -144,22 +144,34 @@ export async function addPocRepresentativeAction(formData: FormData): Promise<vo
     year: rawYear ? Number(rawYear) : undefined,
     order: formData.get("order") || 0,
   });
+
+  const [poc, user] = await Promise.all([
+    prisma.poc.findUnique({ where: { id: parsed.pocId }, select: { id: true, nameNl: true } }),
+    prisma.user.findFirst({
+      where: { id: parsed.userId, active: true, deletedAt: null },
+      select: { id: true, name: true },
+    }),
+  ]);
+
+  if (!poc) {
+    throw new Error("POC niet gevonden.");
+  }
+  if (!user) {
+    throw new Error("Lid niet gevonden of inactief.");
+  }
+
   const year = parsed.year ?? currentWorkingYear();
   await prisma.pocRepresentative.upsert({
     where: { pocId_userId_year: { pocId: parsed.pocId, userId: parsed.userId, year } },
     update: { order: parsed.order },
     create: { pocId: parsed.pocId, userId: parsed.userId, year, order: parsed.order },
   });
-  const [poc, user] = await Promise.all([
-    prisma.poc.findUnique({ where: { id: parsed.pocId }, select: { nameNl: true } }),
-    prisma.user.findUnique({ where: { id: parsed.userId }, select: { name: true } }),
-  ]);
   await logAudit({
     action: "create",
     entity: "poc",
     entityId: parsed.pocId,
-    target: poc?.nameNl ?? parsed.pocId,
-    summary: `${user?.name ?? parsed.userId} toegevoegd als vertegenwoordiger`,
+    target: poc.nameNl ?? parsed.pocId,
+    summary: `${user.name} toegevoegd als vertegenwoordiger`,
   });
   revalidatePath("/pocs");
   revalidatePath("/admin/pocs");

@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@vtk/db';
+import { prisma, searchUsers } from '@vtk/db';
 import { requireSession, authErrorResponse } from '@/lib/session';
 
 /**
  * Zoek actieve gebruikers op naam, e-mail of r-nummer (server-side, gelimiteerd).
  *
  * `GET /api/users/search?q=<term>&limit=<n>`: bedoeld voor pickers zoals de
- * deelnemer-selectie in shiftbeheer. Schaalt naar duizenden users: er wordt
- * altijd maar een klein aantal matches teruggegeven i.p.v. de hele tabel.
+ * deelnemer-selectie in shiftbeheer en POC-vertegenwoordigers. Schaalt naar
+ * duizenden users: er wordt altijd maar een klein aantal matches teruggegeven
+ * i.p.v. de hele tabel, met ondersteuning voor accenten en trema's.
  *
  * Toegang: ingelogd én `users.search`, of superadmin. Dat recht zit in de
  * praesidium-rol, dus elk praesidiumlid heeft het; rollen die een user-picker
@@ -31,27 +32,7 @@ export async function GET(request: Request) {
   const limitParam = Number(url.searchParams.get('limit'));
   const limit = Number.isFinite(limitParam) && limitParam > 0 ? Math.min(limitParam, 50) : 20;
 
-  // Vermijd zware "match alles"-queries: pas zoeken vanaf 2 tekens.
-  if (q.length < 2) {
-    return NextResponse.json([]);
-  }
-
-  const users = await prisma.user.findMany({
-    where: {
-      active: true,
-      OR: [
-        { name: { contains: q, mode: 'insensitive' } },
-        { email: { contains: q, mode: 'insensitive' } },
-        { rNumber: { contains: q, mode: 'insensitive' } },
-      ],
-    },
-    orderBy: { name: 'asc' },
-    take: limit,
-    // Het gsm-nummer staat erbij omdat de shiftpicker het meteen in zijn
-    // ingeschrevenenlijst toont; wie dit recht heeft, krijgt met e-mail en
-    // r-nummer al de contactgegevens van hetzelfde lid.
-    select: { id: true, name: true, email: true, rNumber: true, phone: true },
-  });
+  const users = await searchUsers(q, { limit, db: prisma });
 
   return NextResponse.json(users);
 }
