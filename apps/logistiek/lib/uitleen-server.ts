@@ -1,6 +1,6 @@
 import 'server-only';
 
-import { prisma } from '@vtk/db';
+import { prisma, searchUsers } from '@vtk/db';
 import type {
   GroupType,
   Prisma,
@@ -1925,23 +1925,13 @@ export async function driversPerGroup(): Promise<GroupDrivers[]> {
  * de picker ook met duizenden leden werkt.
  */
 export async function searchDriverCandidates(query: string, limit = 10) {
-  const q = query.trim();
-  if (q.length < 2) return [];
-
-  return prisma.user.findMany({
-    where: {
-      active: true,
-      deletedAt: null,
-      OR: [
-        { name: { contains: q, mode: 'insensitive' } },
-        { email: { contains: q, mode: 'insensitive' } },
-        { rNumber: { contains: q, mode: 'insensitive' } },
-      ],
-    },
-    select: { id: true, name: true, email: true, rNumber: true },
-    orderBy: { name: 'asc' },
-    take: Math.min(limit, 25),
-  });
+  const users = await searchUsers(query, { limit: Math.min(limit, 25), db: prisma });
+  return users.map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    rNumber: u.rNumber,
+  }));
 }
 
 export type DriverCandidate = Awaited<ReturnType<typeof searchDriverCandidates>>[number];

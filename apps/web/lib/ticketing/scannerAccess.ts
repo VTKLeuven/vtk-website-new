@@ -1,6 +1,6 @@
 import "server-only";
 
-import { prisma } from "@vtk/db";
+import { prisma, searchUsers } from "@vtk/db";
 import { z } from "zod";
 import { logAudit } from "@/lib/audit";
 import { requireTicketEventCapability } from "./authorization";
@@ -33,23 +33,7 @@ export const scannerGrantSchema = z.object({ grantId: z.string().min(1).max(64) 
  */
 export async function searchScannerCandidates(eventId: string, rawQuery: string) {
   await requireTicketEventCapability(eventId, "MANAGE_SCANNERS");
-  const query = rawQuery.trim().slice(0, 200);
-  if (query.length < 2) return [];
-
-  return prisma.user.findMany({
-    where: {
-      active: true,
-      deletedAt: null,
-      OR: [
-        { name: { contains: query, mode: "insensitive" } },
-        { email: { contains: query, mode: "insensitive" } },
-        { rNumber: { contains: query, mode: "insensitive" } },
-      ],
-    },
-    orderBy: { name: "asc" },
-    take: 20,
-    select: { id: true, name: true, email: true, rNumber: true },
-  });
+  return searchUsers(rawQuery, 20);
 }
 
 /**

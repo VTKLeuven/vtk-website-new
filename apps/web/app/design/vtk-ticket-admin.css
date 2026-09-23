@@ -1265,6 +1265,61 @@
   border-top: 1px solid var(--line);
 }
 
+/* De QR van een deelnemer, in het detailpaneel van de deelnemerslijst. Het
+   beeld is de credential zelf, dus het staat op wit met een haarlijn errond en
+   niet op de papieren grond van het paneel: een scanner leest een QR met te
+   weinig contrast rond de rand niet. */
+.ticket-admin-qr {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: 16px;
+}
+
+.ticket-admin-qr-frame {
+  display: grid;
+  width: 220px;
+  max-width: 100%;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: #fff;
+  place-items: center;
+}
+
+.ticket-admin-qr-img,
+.ticket-admin-qr-placeholder {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1;
+  border-radius: 8px;
+}
+
+.ticket-admin-qr-placeholder {
+  background: repeating-linear-gradient(
+    135deg,
+    var(--paper-2) 0 8px,
+    var(--paper) 8px 16px
+  );
+}
+
+.ticket-admin-qr-side {
+  display: grid;
+  justify-items: start;
+  gap: 10px;
+}
+
+.ticket-admin-qr-side .ticket-admin-empty-copy {
+  margin: 0;
+}
+
+@media (min-width: 560px) {
+  .ticket-admin-qr {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+}
+
 .ticket-admin-detail-actions {
   display: flex;
   flex-wrap: wrap;

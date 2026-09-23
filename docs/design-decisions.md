@@ -5973,6 +5973,30 @@ Er is bewust geen tabel voor die uitnodigingen. Een token dat dertig seconden
 leeft, hoef je niet te kunnen intrekken; het formaat staat in
 `lib/ticketing/crypto.ts` naast de andere ondertekende tokens.
 
+### De QR van een deelnemer staat in het beheer
+
+Onder **Deelnemers** toont het detailpaneel van een rij de QR-code van dat
+ticket: dezelfde code als op het ticket van de deelnemer zelf.
+
+Dat bestaat om de deur te kunnen proberen. Zonder die QR kan wie de scanner wil
+testen enkel een bestelling naspelen met een eigen e-mailadres, of de code
+handmatig intikken in de scanner; het eerste is omslachtig en het tweede toetst
+net niet wat er aan de deur gebeurt, namelijk een camera op een scherm. Het is
+hetzelfde argument als bij de voorvertoningen op `/admin/it/flows`: wat je met de
+site alleen nooit te zien krijgt, zet je in het beheer.
+
+**Er komt hier geen recht bij.** De capability is `VIEW_ATTENDEES`, en die toont
+de deelnemerslijst al mét `publicCode`; de scanner aanvaardt zo'n code ook
+handmatig ingetikt (versie 0 in `verifyOffline`). De QR maakt dat sneller, niet
+mogelijk. De route staat wel op het event gescoped (`/api/tickets/events/<event>/
+attendees/<ticket>/qr`), zodat een beheerder van het ene event geen ticket van
+het andere kan laten tekenen; de publieke route ernaast blijft aan de ordercookie
+of de koper hangen.
+
+**Een scan telt echt mee.** Wie de code in het beheer scant, checkt die
+deelnemer in, met zijn naam in het scanlogboek. Dat is geen testmodus en het
+paneel zegt dat er ook bij; terugdraaien doe je in de scanner zelf.
+
 ---
 
 ## Wanneer de app een pushbericht stuurt
