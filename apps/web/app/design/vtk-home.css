@@ -2580,6 +2580,23 @@
   text-decoration: underline;
 }
 
+/* De plaatsen-knop (14 pixels hoog) en "Details" (19) waren op een telefoon te
+   klein om zeker te raken; WCAG 2.5.8 vraagt minstens 24 bij 24. Het
+   pseudo-element vergroot enkel het vlak dat een tik opvangt, niet wat er
+   getekend wordt, dus de kaart ziet er hetzelfde uit. `::after` omdat
+   `.shift-spots::before` het gekleurde bolletje al is. */
+.vtk-design .shift-spots,
+.vtk-design .shift-tile-details {
+  position: relative;
+}
+
+.vtk-design .shift-spots::after,
+.vtk-design .shift-tile-details::after {
+  content: "";
+  position: absolute;
+  inset: -6px -4px;
+}
+
 .vtk-design .shift-empty-box {
   display: flex;
   flex-direction: column;
