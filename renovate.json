@@ -68,9 +68,9 @@
       }
     },
     {
-      "description": "Node 20 is the whole stack: engines, the CI runners and the three Dockerfiles. Moving to a new major is a deliberate exercise, not a dependency PR.",
+      "description": "Node 22 is the whole stack: engines, the CI runners and the three Dockerfiles. Moving to a new major is a deliberate exercise, not a dependency PR. (20 went end-of-life in April 2026.)",
       "matchPackageNames": ["node", "docker.io/library/node", "docker.io/node"],
-      "allowedVersions": "^20"
+      "allowedVersions": "^22"
     },
     {
       "description": "Postgres stays on 16. A major bump leaves the existing data directory unreadable (pg_upgrade), and the same image backs CI, the dev compose file and the deploy stack.",

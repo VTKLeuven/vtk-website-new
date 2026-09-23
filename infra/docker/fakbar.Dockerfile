@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1
-ARG NODE_VERSION=20
+ARG NODE_VERSION=22
 FROM node:${NODE_VERSION}-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /repo
@@ -28,6 +28,8 @@ RUN --mount=type=cache,target=/root/.npm,sharing=locked \
 FROM node:${NODE_VERSION}-alpine AS builder
 WORKDIR /repo
 ENV NEXT_TELEMETRY_DISABLED=1
+# Vaste heap voor `next build`, net zoals in web.Dockerfile (zie de uitleg daar).
+ENV NODE_OPTIONS=--max-old-space-size=4096
 COPY --from=deps /repo/node_modules ./node_modules
 COPY --from=deps /repo/packages ./packages
 # De Prisma-client hangt enkel van het schema af, dus die genereren we vóór de

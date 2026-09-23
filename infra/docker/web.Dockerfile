@@ -2,7 +2,7 @@
 # De `RUN --mount=type=cache` hieronder heeft de BuildKit-frontend nodig; die
 # regel bovenaan pint ze expliciet in plaats van op de ingebouwde versie van de
 # daemon te vertrouwen.
-ARG NODE_VERSION=20
+ARG NODE_VERSION=22
 FROM node:${NODE_VERSION}-alpine AS deps
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /repo
@@ -35,6 +35,11 @@ FROM node:${NODE_VERSION}-alpine AS builder
 RUN apk add --no-cache libc6-compat openssl
 WORKDIR /repo
 ENV NEXT_TELEMETRY_DISABLED=1
+# Node neemt standaard een kwart van het geheugen van de machine als heap. Op
+# liv (30 GB) is dat ruim 4 GB, op een laptop met een Docker-VM van 8 GB net 2,
+# en dan valt `next build` in de TypeScript-stap om met "heap out of memory".
+# Vast op 4 GB: wat liv altijd al kreeg, maar nu overal hetzelfde.
+ENV NODE_OPTIONS=--max-old-space-size=4096
 
 COPY --from=deps /repo/node_modules ./node_modules
 COPY --from=deps /repo/packages ./packages
