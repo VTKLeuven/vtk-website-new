@@ -113,3 +113,32 @@ describe("maten van een foto in de tekst", () => {
     expect(html).not.toContain("height=");
   });
 });
+
+/**
+ * Een video is een `<div>`. Staat ze in dezelfde alinea als tekst, dan belandt
+ * die `<div>` binnen een `<p>`: de browser sluit de alinea er zelf voor, en
+ * React geeft bij de hydration fout #418 en rendert de hele pagina opnieuw.
+ */
+describe("video in een alinea met tekst", () => {
+  const video = "![Video](https://www.youtube.com/watch?v=dQw4w9WgXcQ)";
+  const blockInParagraph = /<p>(?:(?!<\/p>).)*<div/s;
+
+  it("zet de video tussen twee alinea's in plaats van erin", () => {
+    const html = render(`Vorig jaar:\n${video}\nEn dit jaar opnieuw.`);
+    expect(html).not.toMatch(blockInParagraph);
+    expect(html).toMatch(/<p>Vorig jaar:\s*<\/p><div/);
+    expect(html).toMatch(/<\/div><p>\s*En dit jaar opnieuw.<\/p>/);
+  });
+
+  it("maakt geen lege alinea wanneer er enkel witruimte rond de video staat", () => {
+    const html = render(`Vorig jaar:\n${video}`);
+    expect(html).not.toMatch(blockInParagraph);
+    expect(html.match(/<p>/g)).toHaveLength(1);
+  });
+
+  it("laat een alinea zonder video ongemoeid", () => {
+    expect(render("Gewoon tekst met [een link](https://vtk.be).")).toBe(
+      '<p>Gewoon tekst met <a href="https://vtk.be" target="_blank" rel="noopener noreferrer">een link</a>.</p>'
+    );
+  });
+});

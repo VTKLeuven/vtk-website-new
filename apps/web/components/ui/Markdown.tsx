@@ -1,4 +1,5 @@
 import { Children, type ReactNode } from "react";
+import type { Element } from "hast";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { DEFAULT_LOCALE, type Locale } from "@vtk/i18n";
@@ -31,6 +32,50 @@ export function preprocessMarkdownVideos(markdown: string): string {
   );
 
   return result;
+}
+
+/**
+ * Knipt een alinea met een video erin op: de tekst ervoor en erna blijven
+ * alinea's, de video staat ertussen. Null wanneer er geen video in staat.
+ *
+ * Een video is een blok (`InlineVideoPlayer` is een `<div>`), en een `<div>`
+ * binnen een `<p>` is ongeldige HTML: de browser sluit de alinea er zelf voor,
+ * en React struikelt bij de hydration over het verschil met de server-uitvoer
+ * (React #418) en rendert de hele pagina opnieuw in de browser. Dat gebeurt
+ * zodra een redacteur een video op de regel onder een zin zet, zonder witregel
+ * ertussen ("Vorig jaar:" + video op /eerstejaars/eerstejaarswerking).
+ */
+function splitAroundVideos(node: Element | undefined, children: ReactNode): ReactNode[] | null {
+  if (!node || !Array.isArray(node.children)) return null;
+  const isVideo = (child: Element["children"][number]) =>
+    child.type === "element" &&
+    child.tagName === "img" &&
+    isVideoUrl(typeof child.properties?.src === "string" ? child.properties.src : null);
+  if (!node.children.some(isVideo)) return null;
+
+  // react-markdown geeft per kind van de alinea precies één gerenderd kind
+  // door, in dezelfde volgorde. Klopt dat niet, dan valt er niets veilig te
+  // knippen en blijft de alinea zoals ze was.
+  const rendered = Array.isArray(children) ? children : [children];
+  if (rendered.length !== node.children.length) return null;
+
+  const parts: ReactNode[] = [];
+  let text: ReactNode[] = [];
+  const flush = () => {
+    const hasContent = text.some((item) => typeof item !== "string" || item.trim() !== "");
+    if (hasContent) parts.push(<p key={`p${parts.length}`}>{text}</p>);
+    text = [];
+  };
+  node.children.forEach((child, index) => {
+    if (isVideo(child)) {
+      flush();
+      parts.push(rendered[index]);
+    } else {
+      text.push(rendered[index]);
+    }
+  });
+  flush();
+  return parts;
 }
 
 /**
@@ -133,6 +178,9 @@ export function Markdown({
               </figure>
             );
           }
+
+          const parts = splitAroundVideos(node, paragraphChildren);
+          if (parts) return <>{parts}</>;
 
           return <p>{paragraphChildren}</p>;
         },
