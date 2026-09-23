@@ -68,10 +68,10 @@ const validationMessages: Record<string, Record<ErrorLocale, string>> = {
 
 export default function TicketAdminError({
   error,
-  unstable_retry,
+  retry,
 }: {
   error: Error & { digest?: string };
-  unstable_retry: () => void;
+  retry: () => void;
 }) {
   const pathname = usePathname();
   const locale: ErrorLocale = pathname === "/en" || pathname.startsWith("/en/") ? "en" : "nl";
@@ -96,7 +96,7 @@ export default function TicketAdminError({
           : "Something went wrong while processing the action. Try again; contact an administrator if the problem persists.")}
       </p>
       <div className="ticket-admin-error-actions">
-        <button className="ticket-admin-button" data-variant="primary" type="button" onClick={() => unstable_retry()}>
+        <button className="ticket-admin-button" data-variant="primary" type="button" onClick={() => retry()}>
           <RefreshCw aria-hidden="true" size={15} />
           {locale === "nl" ? "Opnieuw proberen" : "Try again"}
         </button>
