@@ -40,7 +40,7 @@
   --color-vtk-muted: #5c667f;
   --color-vtk-on-yellow: #0a0f1f;
 
-  --font-sans: var(--font-vtk-sans), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-sans: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
@@ -75,7 +75,7 @@ body {
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: var(--font-vtk-sans), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
 /* Gedeelde opmaak voor content uit de Markdown-renderer. */

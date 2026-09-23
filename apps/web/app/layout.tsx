@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Instrument_Serif, Inter } from "next/font/google";
+import { Geist_Mono, Instrument_Serif, Inter } from "next/font/google";
 import Script from "next/script";
 import { cookies, headers } from "next/headers";
 import { getSentryDsn } from "@/lib/runtimeConfig";
@@ -15,8 +15,14 @@ import {
 } from "@/lib/seo";
 import "./globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+// Elk font hier wordt standaard op élke pagina vooraf geladen, dus dit lijstje
+// kost op mobiel echt tijd. Inter is de letter van de site. De mono staat enkel
+// in kleine labels (datums, tellers) en mag laat binnenkomen, dus zonder
+// preload. Instrument Serif staat wel in de kop van de homepage, maar enkel
+// cursief (`.serif` in vtk-base.css), dus de rechte variant laden we niet.
+// Geist Sans stond hier ook, als reserve achter Inter die altijd laadt: vijf
+// fonts vooraf, samen 130 KB, waar er twee volstaan.
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], preload: false });
 const vtkSans = Inter({
   variable: "--font-vtk-sans",
   subsets: ["latin"],
@@ -25,7 +31,7 @@ const vtkSerif = Instrument_Serif({
   variable: "--font-vtk-serif",
   subsets: ["latin"],
   weight: ["400"],
-  style: ["normal", "italic"],
+  style: ["italic"],
 });
 
 export const metadata: Metadata = {
@@ -89,7 +95,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   return (
     <html
       lang={HTML_LANG[locale]}
-      className={`${geistSans.variable} ${geistMono.variable} ${vtkSans.variable} ${vtkSerif.variable} h-full antialiased`}
+      className={`${geistMono.variable} ${vtkSans.variable} ${vtkSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-vtk-surface text-vtk-ink antialiased selection:bg-vtk-yellow/40 selection:text-vtk-ink">
         {sentryDsn && (
