@@ -43,6 +43,9 @@ type TokenCache = { token: string; expiresAt: number };
 // kosten.
 const tokens = new Map<string, TokenCache>();
 
+/** Hoe lang één aanroep naar Vaultwarden mag duren; zonder grens tot vijf minuten. */
+const VAULT_TIMEOUT_MS = 15_000;
+
 /**
  * Een geldig access token voor het botaccount.
  *
@@ -55,6 +58,7 @@ async function accessToken(cfg: VaultConfig): Promise<string> {
 
   const res = await fetch(`${cfg.url}/identity/connect/token`, {
     method: "POST",
+    signal: AbortSignal.timeout(VAULT_TIMEOUT_MS),
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "client_credentials",
@@ -103,6 +107,7 @@ async function request<T>(
 ): Promise<T> {
   const res = await fetch(`${cfg.url}${path}`, {
     method,
+    signal: AbortSignal.timeout(VAULT_TIMEOUT_MS),
     headers: {
       authorization: `Bearer ${await accessToken(cfg)}`,
       ...(body === undefined ? {} : { "content-type": "application/json" }),

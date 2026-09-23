@@ -26,6 +26,7 @@ export async function GET(request: Request) {
       upstream = await fetch(`https://i.ytimg.com/vi/${id}/${variant}.jpg`, {
         // Een dag cachen op de server; thumbnails wijzigen zelden.
         next: { revalidate: 86400 },
+        signal: AbortSignal.timeout(5_000),
       });
     } catch {
       return new Response("Bad gateway", { status: 502 });

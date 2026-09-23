@@ -17,6 +17,12 @@ import { CUDI_SHIFT_SOURCE } from "@/lib/cudiShiftMirror";
 
 const CUDI_ORIGIN = process.env.CURSUSDIENST_ORIGIN || "https://cudi.vtk.be";
 
+/**
+ * Hoe lang een inschrijving op cudi mag wachten. Dit loopt mee in het
+ * inschrijven voor een shift; een hangende cudi mag dat niet laten hangen.
+ */
+const CUDI_TIMEOUT_MS = 8_000;
+
 type Action = "register" | "unregister";
 
 export type PushResult = {
@@ -50,6 +56,7 @@ async function postToCudi(payload: unknown): Promise<{ ok: boolean; status: numb
   try {
     const res = await fetch(`${CUDI_ORIGIN}/api/integrations/main/registrations`, {
       method: "POST",
+      signal: AbortSignal.timeout(CUDI_TIMEOUT_MS),
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${secret}` },
       body: JSON.stringify(payload),
       cache: "no-store",

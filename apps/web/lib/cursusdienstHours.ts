@@ -43,6 +43,9 @@ async function fetchWeek(expectedWeekStart: string): Promise<CachedWeek | null> 
     url.searchParams.set("week", expectedWeekStart);
     const res = await fetch(url, {
       next: { revalidate: 3600, tags: ["cursusdienst-hours"] },
+      // Deze lezing zit in de render van de homepage. Hangt cudi, dan wacht de
+      // homepage mee; na drie seconden valt ze terug op de laatst bewaarde week.
+      signal: AbortSignal.timeout(3_000),
     });
     if (!res.ok) return null;
     const payload = await res.json();
