@@ -50,11 +50,13 @@ services:
     environment:
       NODE_ENV: production
       # Elke app krijgt een vaste pool. Zonder `connection_limit` neemt Prisma
-      # 2 x cores + 1 verbindingen, op liv (16 cores) 33 per app: web, logistiek,
-      # fakbar en Umami samen konden er zo 132 openen, tegen `max_connections`
-      # 100 van Postgres. Wie dan als laatste een verbinding vraagt, krijgt
-      # "too many clients", en dat is net onder de meeste drukte. Samen met
-      # Vaultwarden (10) blijft dit rond 70.
+      # 2 x cores + 1 verbindingen, op liv (16 cores) 33 per app: web, logistiek
+      # en fakbar samen konden er zo 99 openen, tegen `max_connections` 100 van
+      # Postgres. Wie dan als laatste een verbinding vraagt, krijgt "too many
+      # clients", en dat is net onder de meeste drukte. Met Umami en Vaultwarden
+      # erbij (elk hun eigen pool van 10) blijft dit rond 70. Umami krijgt hier
+      # geen `connection_limit`: het praat via `@prisma/adapter-pg` met de
+      # pg-driver, die die parameter niet kent.
       DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public&connection_limit=30
       # VTK_MAIN_URL en LOGISTIEK_PUBLIC_URL stonden hier met een
       # productiestandaard (`https://vtk.be`, `https://logistiek.vtk.be`) en dat
@@ -524,7 +526,7 @@ services:
       DATABASE_TYPE: postgresql
       # Staat expliciet hier en wint daarmee van wat er in de root-`.env` zit:
       # Umami hoort in zijn eigen database, niet in die van de website.
-      DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/umami?connection_limit=10
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/umami
       # Umami meldt zich anders bij elke start bij zijn eigen telemetriedienst.
       # Dat is precies de derde partij die we hier niet willen.
       DISABLE_TELEMETRY: '1'
