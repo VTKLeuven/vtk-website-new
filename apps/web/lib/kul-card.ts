@@ -14,6 +14,12 @@ const DEFAULT_AUTH_ENDPOINT =
   "https://idp.kuleuven.be/auth/realms/kuleuven/protocol/openid-connect/token";
 const DEFAULT_ID_ENDPOINT = "https://account.kuleuven.be/api/v1/idverification";
 
+/**
+ * Hoe lang we op KU Leuven wachten. Iemand staat met zijn kaart aan de lezer;
+ * na tien seconden zeggen dat het niet lukt, is beter dan blijven draaien.
+ */
+const KUL_TIMEOUT_MS = 10_000;
+
 export type CardVerifyResult =
   | { ok: true; rNumber: string; firstName: string; lastName: string }
   | { ok: false; error: string };
@@ -53,6 +59,7 @@ export async function verifyStudentCard(scanned: string): Promise<CardVerifyResu
     const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
     const tokenRes = await fetch(authEndpoint, {
       method: "POST",
+      signal: AbortSignal.timeout(KUL_TIMEOUT_MS),
       headers: {
         Authorization: `Basic ${basic}`,
         "Content-Type": "application/x-www-form-urlencoded",
@@ -67,6 +74,7 @@ export async function verifyStudentCard(scanned: string): Promise<CardVerifyResu
     // 2) idverification → { userName (r-nummer), firstName, lastName, ... }
     const verifyRes = await fetch(idEndpoint, {
       method: "POST",
+      signal: AbortSignal.timeout(KUL_TIMEOUT_MS),
       headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": "application/json" },
       body: JSON.stringify({ cardAppId, serialNr: serial }),
     });

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { pick } from "@vtk/i18n";
 import { choiceValue, pickField, rangeValue } from "@/lib/frontpage/fields";
 import {

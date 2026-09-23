@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import type { Locale } from "@vtk/i18n";
 import { getAuthorizationPreview } from "@/lib/session";
 import { AUTHORIZATION_PREVIEW_STOP_PATH } from "@/lib/authorization-preview-constants";

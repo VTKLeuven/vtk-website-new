@@ -1,11 +1,11 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Instrument_Serif, Inter } from "next/font/google";
+import { Geist_Mono, Instrument_Serif, Inter } from "next/font/google";
 import Script from "next/script";
 import { cookies, headers } from "next/headers";
 import { getSentryDsn } from "@/lib/runtimeConfig";
 import { CookieConsent } from "@/components/site/CookieConsent";
 import { HTML_LANG, currentLocale } from "@/lib/locale";
-import { analyticsConfigFromEnv, analyticsScript } from "@/lib/analytics";
+import { analyticsConfigFromEnv, analyticsScript, analyticsScriptAttributes } from "@/lib/analytics";
 import { COOKIE_CONSENT_NAME, parseCookieConsent } from "@/lib/cookie-consent";
 import {
   SITE_DESCRIPTION,
@@ -15,8 +15,14 @@ import {
 } from "@/lib/seo";
 import "./globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+// Elk font hier wordt standaard op élke pagina vooraf geladen, dus dit lijstje
+// kost op mobiel echt tijd. Inter is de letter van de site. De mono staat enkel
+// in kleine labels (datums, tellers) en mag laat binnenkomen, dus zonder
+// preload. Instrument Serif staat wel in de kop van de homepage, maar enkel
+// cursief (`.serif` in vtk-base.css), dus de rechte variant laden we niet.
+// Geist Sans stond hier ook, als reserve achter Inter die altijd laadt: vijf
+// fonts vooraf, samen 130 KB, waar er twee volstaan.
+const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"], preload: false });
 const vtkSans = Inter({
   variable: "--font-vtk-sans",
   subsets: ["latin"],
@@ -25,7 +31,7 @@ const vtkSerif = Instrument_Serif({
   variable: "--font-vtk-serif",
   subsets: ["latin"],
   weight: ["400"],
-  style: ["normal", "italic"],
+  style: ["italic"],
 });
 
 export const metadata: Metadata = {
@@ -80,16 +86,23 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // bestelschermen; `lib/analytics.ts` neemt die beslissing. Het pad komt uit
   // dezelfde `x-pathname`-header als de taal hierboven.
   const [cookieStore, requestHeaders] = await Promise.all([cookies(), headers()]);
-  const analytics = analyticsScript({
-    config: analyticsConfigFromEnv(),
-    consent: parseCookieConsent(cookieStore.get(COOKIE_CONSENT_NAME)?.value),
-    pathname: requestHeaders.get("x-pathname") ?? "",
-  });
+  const consent = parseCookieConsent(cookieStore.get(COOKIE_CONSENT_NAME)?.value);
+  const analyticsConfig = analyticsConfigFromEnv();
+  const pathname = requestHeaders.get("x-pathname") ?? "";
+  const analytics = analyticsScript({ config: analyticsConfig, consent, pathname });
+
+  // Wat de cookiebanner op de pagina zet wanneer de bezoeker hier toestemming
+  // geeft. Zo hoeft ze de pagina niet te herladen om Umami te starten; dezelfde
+  // regels (uitgesloten paden, geen configuratie) gelden.
+  const analyticsOnConsent =
+    consent === "analytics"
+      ? null
+      : analyticsScript({ config: analyticsConfig, consent: "analytics", pathname });
 
   return (
     <html
       lang={HTML_LANG[locale]}
-      className={`${geistSans.variable} ${geistMono.variable} ${vtkSans.variable} ${vtkSerif.variable} h-full antialiased`}
+      className={`${geistMono.variable} ${vtkSans.variable} ${vtkSerif.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-vtk-surface text-vtk-ink antialiased selection:bg-vtk-yellow/40 selection:text-vtk-ink">
         {sentryDsn && (
@@ -106,21 +119,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Script
               strategy="afterInteractive"
               src={analytics.src}
-              data-website-id={analytics.websiteId}
-              data-before-send={analytics.beforeSend}
-              data-exclude-search="true"
-              data-exclude-hash="true"
-              data-performance="true"
+              {...analyticsScriptAttributes(analytics)}
             />
-            <script
-              defer
-              src="https://analytics.vtk.be/recorder.js"
-              data-website-id="vtk.be"
-            ></script>
           </>
         )}
         {children}
-        <CookieConsent />
+        <CookieConsent
+          initialConsent={consent}
+          analyticsOnConsent={
+            analyticsOnConsent && {
+              src: analyticsOnConsent.src,
+              filterSource: analyticsOnConsent.filterSource,
+              attributes: analyticsScriptAttributes(analyticsOnConsent),
+            }
+          }
+        />
       </body>
     </html>
   );

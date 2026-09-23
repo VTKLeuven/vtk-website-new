@@ -63,6 +63,11 @@ const nextConfig: NextConfig = {
     root: monorepoRoot,
   },
   experimental: {
+    // `@vtk/i18n` is een barrel: `pick` en `LOCALES` staan in hetzelfde
+    // indexbestand als de woordenboeken. Zonder dit trok elke clientcomponent
+    // die enkel `pick` gebruikt beide JSON-bestanden mee (~40 KB gzip op elke
+    // pagina); hiermee laadt enkel de module die echt gebruikt wordt.
+    optimizePackageImports: ["@vtk/i18n"],
     // Proxy otherwise truncates uploads at 10 MB, before our upload routes can
     // validate them. Match the action limit, above the 46 MB multipart limit.
     proxyClientMaxBodySize: "50mb",
@@ -71,6 +76,14 @@ const nextConfig: NextConfig = {
       bodySizeLimit: "50mb",
     },
   },
+  // Vertelt enkel aan aanvallers welk framework en welke versie hier draait.
+  poweredByHeader: false,
+  // Standaard comprimeert Next zelf met gzip, in hetzelfde proces dat de
+  // pagina's rendert. Laat je Caddy dat doen (`encode zstd gzip` in de
+  // Caddyfile, zie docs/performance.md), zet dan NEXT_COMPRESSION=off: dan
+  // gebeurt het in Go op andere cores, en met zstd. De config wordt bij elke
+  // start opnieuw gelezen, dus dit vraagt geen nieuwe build.
+  compress: process.env.NEXT_COMPRESSION !== "off",
   images: {
     // Next 16 laat standaard enkel kwaliteit 75 toe. Een `quality={90}` op een
     // <Image> werd daardoor stilzwijgend 75, en een URL met q=90 gaf een 400.
@@ -141,6 +154,33 @@ const nextConfig: NextConfig = {
   },
   async headers() {
     return [
+      // Voor elke route. Staat bewust eerst: bij twee regels met dezelfde
+      // header wint de laatste, dus de strengere regels hieronder (scan,
+      // bestelling) overschrijven deze.
+      //
+      // - nosniff: een upload die zich als afbeelding voordoet, wordt nooit als
+      //   script of HTML uitgevoerd.
+      // - SAMEORIGIN: geen andere site kan het inlogscherm of het beheer in een
+      //   onzichtbaar iframe leggen (clickjacking). De eigen previews in het
+      //   beheer zijn same-origin en blijven werken.
+      // - HSTS enkel in productie: een browser die het ooit over http op
+      //   localhost kreeg, weigert anders de dev-server. Zonder
+      //   includeSubDomains, want niet elk *.vtk.be-adres is van ons of loopt
+      //   over https.
+      //
+      // Geen globale Permissions-Policy: de gezichtsherkenning op /media
+      // gebruikt de camera.
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          ...(process.env.NODE_ENV === "production"
+            ? [{ key: "Strict-Transport-Security", value: "max-age=31536000" }]
+            : []),
+        ],
+      },
       {
         source: "/scan/:path*",
         headers: [

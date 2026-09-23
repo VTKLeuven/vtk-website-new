@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Fragment } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { SiteSearchForm } from "@/components/site/SiteSearchForm";

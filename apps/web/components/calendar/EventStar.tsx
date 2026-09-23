@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { setEventInterestAction } from "@/app/actions/eventInterest";
 import { StarIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";

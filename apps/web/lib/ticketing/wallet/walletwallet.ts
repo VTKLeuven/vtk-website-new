@@ -8,6 +8,9 @@ import { walletWalletConfig } from "./config";
 import type { WalletTicketInput } from "./types";
 
 const API_BASE = "https://api.walletwallet.dev";
+
+/** Hoe lang het aanmaken van een wallet-pas mag duren; zonder grens tot vijf minuten. */
+const WALLET_TIMEOUT_MS = 20_000;
 const CACHE_TTL_MS = 10 * 60_000;
 
 type WalletWalletResult = { applePassBuffer: Buffer; googleSaveUrl: string };
@@ -46,6 +49,7 @@ export async function generateViaWalletWallet(input: WalletTicketInput): Promise
 
   const response = await fetch(`${API_BASE}/api/passes`, {
     method: "POST",
+    signal: AbortSignal.timeout(WALLET_TIMEOUT_MS),
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${config.apiKey}` },
     body: JSON.stringify({
       barcodeValue: createTicketCredential(input.publicId, input.qrVersion),

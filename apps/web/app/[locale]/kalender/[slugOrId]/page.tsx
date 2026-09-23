@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import Image from "next/image";
 import { notFound, permanentRedirect } from "next/navigation";
 import { pick, type Locale } from "@vtk/i18n";
@@ -151,7 +151,7 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
   const base = locale === "nl" ? "" : "/en";
 
   const category = await loadCalendarCategory(slugOrId);
-  if (category) return <CategoryCalendar locale={locale} />;
+  if (category) return <CategoryCalendar locale={locale} slug={category.slug} />;
 
   const event = await loadCalendarEvent(slugOrId);
 

@@ -1,11 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { markdownToPlainText } from '@/lib/markdown';
 import { CalendarSubscribe } from '@/components/site/CalendarSubscribe';
-import { Markdown } from '@/components/ui/Markdown';
+import dynamic from 'next/dynamic';
+
+// Via `next/dynamic`: de markdown-renderer (react-markdown, micromark en, via de
+// fotogalerij, beide woordenboeken) is ~80 KB gzip. Statisch geïmporteerd kwam
+// hij in een chunk die de bundler deelt met `Link` en dus op elke pagina laadde;
+// zo komt hij enkel mee waar er echt markdown gerenderd wordt.
+const Markdown = dynamic(() => import('@/components/ui/Markdown').then((m) => m.Markdown));
 import { EventInterest } from '@/components/calendar/EventInterest';
 import { EventStar, type EventStarLabels } from '@/components/calendar/EventStar';
 import { CalendarPlusIcon } from '@/components/ui/icons';
@@ -23,6 +29,8 @@ import {
   monthGridCells,
   rollingWeeksGridCells,
   weekGridDays,
+  dayRange,
+  eventsRequestKey,
   isSameCalendarDay,
   startOfWeek,
   type GridDay,
@@ -34,11 +42,12 @@ import {
  */
 const AGENDA_WEEKS = 4;
 
-type ApiEvent = {
+/** Eén evenement zoals `/api/calendar/events` het teruggeeft; zie `lib/calendar/publicEvents.ts`. */
+export type CalendarApiEvent = {
   id: string;
   slug: string;
   title: string;
-  titleEn: string;
+  titleEn: string | null;
   start: string;
   end: string;
   allDay: boolean;
@@ -52,6 +61,7 @@ type ApiEvent = {
   moments: Array<{ start: string; end: string; label: string | null }>;
   extendedProps: {
     groupCode: string;
+    groupSlug: string;
     groupNameNl: string;
     groupNameEn: string;
     /** Ingevuld = die naam organiseert, niet de groep hierboven. */
@@ -120,6 +130,7 @@ export function KalenderEditorialView({
   feedBaseUrl,
   defaultOnlyMyAudiences = false,
   signedIn = false,
+  initialEvents,
 }: {
   locale: 'nl' | 'en';
   labels: {
@@ -151,6 +162,13 @@ export function KalenderEditorialView({
   defaultOnlyMyAudiences?: boolean;
   /** Bepaalt of de voorvertoning een knop toont of een verwijzing naar inloggen. */
   signedIn?: boolean;
+  /**
+   * De evenementen van de eerste weergave, al op de server opgehaald, met de
+   * sleutel van de ophaling waarvoor ze gelden (`eventsRequestKey`). Zonder dit
+   * stond er eerst "Geen evenementen deze maand" en sprong de pagina open zodra
+   * de fetch binnenkwam. Zie `loadOpeningCalendarEvents`.
+   */
+  initialEvents?: { key: string; events: CalendarApiEvent[] };
 }) {
   const base = locale === 'nl' ? '' : '/en';
   const pathname = usePathname();
@@ -184,13 +202,17 @@ export function KalenderEditorialView({
   // een telefoon passen de eventpillen niet in een cel van 45 pixels, dus toont
   // het raster daar stippen en lees je de dag zelf hieronder.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [monthEvents, setMonthEvents] = useState<ApiEvent[]>([]);
-  const [agendaEvents, setAgendaEvents] = useState<ApiEvent[]>([]);
+  const [monthEvents, setMonthEvents] = useState<CalendarApiEvent[]>(initialEvents?.events ?? []);
+  // Zolang dit staat, zijn `monthEvents` nog die van de server. Het valt weg
+  // zodra de kalender iets anders ophaalt; terugkeren naar dezelfde weergave
+  // haalt dan gewoon opnieuw op.
+  const prefetchedKey = useRef(initialEvents?.key ?? null);
+  const [agendaEvents, setAgendaEvents] = useState<CalendarApiEvent[]>([]);
   // Het evenement waarvan de voorvertoning openstaat. Een klik in het raster
   // opent eerst dit kaartje: in een cel past hoogstens een afgekapte titel, en
   // meteen doorsturen naar een volledige pagina is een dure manier om te
   // ontdekken dat je het verkeerde evenement aanklikte.
-  const [preview, setPreview] = useState<ApiEvent | null>(null);
+  const [preview, setPreview] = useState<CalendarApiEvent | null>(null);
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -224,7 +246,7 @@ export function KalenderEditorialView({
       if (onlyMyAudiences) url.searchParams.set('audience', 'mine');
       const res = await fetch(url.toString());
       if (!res.ok) return [];
-      return (await res.json()) as ApiEvent[];
+      return (await res.json()) as CalendarApiEvent[];
     },
     [filter, onlyMyAudiences]
   );
@@ -240,10 +262,11 @@ export function KalenderEditorialView({
   }, [view, weekDays, monthCells, cells]);
 
   useEffect(() => {
-    const start = new Date(rangeDays[0]!);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(rangeDays.at(-1)!);
-    end.setHours(23, 59, 59, 999);
+    const { start, end } = dayRange(rangeDays);
+    // De server gaf de eerste weergave al mee. Rekent de browser een ander
+    // bereik uit (een bezoeker in een andere tijdzone), dan haalt hij alsnog op.
+    if (prefetchedKey.current === eventsRequestKey({ start, end }, filter, onlyMyAudiences)) return;
+    prefetchedKey.current = null;
     let cancelled = false;
     void (async () => {
       const data = await fetchForRange(start, end);
@@ -252,7 +275,7 @@ export function KalenderEditorialView({
     return () => {
       cancelled = true;
     };
-  }, [rangeDays, fetchForRange]);
+  }, [rangeDays, filter, onlyMyAudiences, fetchForRange]);
 
   useEffect(() => {
     const start = new Date();
@@ -284,7 +307,7 @@ export function KalenderEditorialView({
   }, [preview]);
 
   const eventsByDay = useMemo(() => {
-    const m = new Map<string, ApiEvent[]>();
+    const m = new Map<string, CalendarApiEvent[]>();
     for (const { date } of cells) {
       m.set(
         dayKey(date),
@@ -384,7 +407,7 @@ export function KalenderEditorialView({
   }, [showPast, isPastMonth, monthOnlyEvents, upcomingEventsInMonth]);
 
   const gridWeeks = useMemo(() => {
-    const groups = new Map<string, { monday: Date; events: ApiEvent[] }>();
+    const groups = new Map<string, { monday: Date; events: CalendarApiEvent[] }>();
     for (const event of eventsForGrid) {
       const monday = startOfWeek(eventLeadDate(event, now));
       const key = dayKey(monday);
@@ -448,11 +471,11 @@ export function KalenderEditorialView({
     year: 'numeric',
   })}`;
 
-  function pickTitle(e: ApiEvent) {
+  function pickTitle(e: CalendarApiEvent) {
     return locale === 'nl' ? e.title : e.titleEn || e.title;
   }
 
-  function pickDesc(e: ApiEvent) {
+  function pickDesc(e: CalendarApiEvent) {
     const d = locale === 'nl' ? e.extendedProps.descriptionNl : e.extendedProps.descriptionEn;
     return markdownToPlainText(d ?? '');
   }
@@ -463,14 +486,14 @@ export function KalenderEditorialView({
    * lib/calendar/organiser.ts; hier in de browser zonder die helper, want die
    * leest een Prisma-rij.
    */
-  function pickGroup(e: ApiEvent) {
+  function pickGroup(e: CalendarApiEvent) {
     const organiser = e.extendedProps.organiserName?.trim();
     if (organiser) return organiser;
     return locale === 'nl' ? e.extendedProps.groupNameNl : e.extendedProps.groupNameEn;
   }
 
   /** De eerste categorie bepaalt de kleur van de pil en het label in de agendalijst. */
-  function primaryCategory(e: ApiEvent) {
+  function primaryCategory(e: CalendarApiEvent) {
     return e.extendedProps.categories[0] ?? null;
   }
 
@@ -479,7 +502,7 @@ export function KalenderEditorialView({
    * voor eerstejaars of internationals bedoeld is, mag niet als een gewoon
    * evenement in het raster staan waar iemand anders zich dan op verkijkt.
    */
-  function audienceCategories(e: ApiEvent) {
+  function audienceCategories(e: CalendarApiEvent) {
     return e.extendedProps.categories.filter((c) => c.audience !== null);
   }
 
@@ -497,7 +520,7 @@ export function KalenderEditorialView({
    * Zonder dag (een kaart, een lijstrij) wordt het de samenvatting van de
    * momenten: zeven keer "18:00" op één kaart zegt minder dan "telkens 18:00".
    */
-  function eventTime(e: ApiEvent, day?: Date | null) {
+  function eventTime(e: CalendarApiEvent, day?: Date | null) {
     if (e.allDay) return locale === 'nl' ? 'Hele dag' : 'All day';
     if (e.moments.length > 0) {
       const moment = day ? momentOnDay(e, day) : null;
@@ -511,7 +534,7 @@ export function KalenderEditorialView({
    * De dag waarop een kaart of lijstrij staat: de eerstvolgende keer dat er iets
    * is, en niet de dag waarop een reeks momenten ooit begon.
    */
-  function leadDate(e: ApiEvent): Date {
+  function leadDate(e: CalendarApiEvent): Date {
     return eventLeadDate(e, now);
   }
 
@@ -520,7 +543,7 @@ export function KalenderEditorialView({
    * leest als een periode met het gedeelde uur erachter; de dagen ertussen
    * waarop niets staat, zijn daarbij de kalender zelf die het toont.
    */
-  function whenLine(e: ApiEvent): string {
+  function whenLine(e: CalendarApiEvent): string {
     const dateLocale = locale === 'nl' ? 'nl-BE' : 'en-GB';
     const dayText = (date: Date) =>
       date.toLocaleDateString(dateLocale, { weekday: 'long', day: 'numeric', month: 'long' });
@@ -551,7 +574,7 @@ export function KalenderEditorialView({
     setCursor(next);
   }
 
-  function eventHref(e: ApiEvent) {
+  function eventHref(e: CalendarApiEvent) {
     return `${base}/kalender/${e.slug}`;
   }
 
@@ -580,7 +603,7 @@ export function KalenderEditorialView({
    * horen gewoon naar de pagina te gaan, en een zoekmachine ziet nog altijd een
    * echte link.
    */
-  function openPreview(event: React.MouseEvent, item: ApiEvent) {
+  function openPreview(event: React.MouseEvent, item: CalendarApiEvent) {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
       return;
     }
@@ -598,7 +621,7 @@ export function KalenderEditorialView({
    */
   function markInterest(eventId: string, nextViewer: ViewerInterest) {
     const next = nextViewer.kind !== 'none';
-    const apply = (list: ApiEvent[]) =>
+    const apply = (list: CalendarApiEvent[]) =>
       list.map((item) =>
         item.id === eventId
           ? {
@@ -636,7 +659,7 @@ export function KalenderEditorialView({
   }
 
   /** "32 komen", of niets zolang de teller onder de drempel zit. */
-  function interestLine(e: ApiEvent): string | null {
+  function interestLine(e: CalendarApiEvent): string | null {
     const count = e.extendedProps.interestedCount;
     if (!count) return null;
     return locale === 'nl' ? `${count} komen` : `${count} going`;
@@ -676,7 +699,7 @@ export function KalenderEditorialView({
    * evenement niet achterblijven. Bestaande alumnigegevens blijven staan: de ster
    * zet enkel de markering aan of uit.
    */
-  function starChanged(e: ApiEvent, interested: boolean) {
+  function starChanged(e: CalendarApiEvent, interested: boolean) {
     const previous = e.extendedProps.viewerInterest;
     markInterest(
       e.id,
@@ -714,7 +737,7 @@ export function KalenderEditorialView({
    * is de link en spant zich over de kaart (`.ag-link::after`); de ster ligt
    * erboven.
    */
-  function renderRow(e: ApiEvent) {
+  function renderRow(e: CalendarApiEvent) {
     // Het label rechts toont het thema. De doelgroep staat al bij de titel, dus
     // die hier herhalen zou twee keer "Eerstejaars" geven.
     const cat = e.extendedProps.categories.find((c) => c.audience === null) ?? null;
@@ -814,7 +837,7 @@ export function KalenderEditorialView({
    * een rij stonden dan ongelijk. De ster en de agendaknop staan er altijd, dus
    * de rij houdt haar hoogte.
    */
-  function renderCard(e: ApiEvent) {
+  function renderCard(e: CalendarApiEvent) {
     const cat = e.extendedProps.categories.find((c) => c.audience === null) ?? null;
     const going = interestLine(e);
     const title = pickTitle(e);

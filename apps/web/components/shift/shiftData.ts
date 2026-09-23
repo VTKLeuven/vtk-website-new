@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import type { Dictionary } from '@vtk/i18n';
 import { parseShiftArray, type ShiftResponse } from '@/lib/shift';
@@ -107,9 +107,15 @@ function registerErrorMessage(body: unknown, t: ShiftDict): string {
 /**
  * Haalt een shift-lijst op van `url`, herlaadt bij mount en telkens een view
  * een (uit)schrijving signaleert via de event-bus.
+ *
+ * Met `initial` (de lijst die de pagina al op de server ophaalde) slaat hij de
+ * eerste ophaling over: anders stond er eerst een lege week en sprong de pagina
+ * open zodra de fetch binnenkwam.
  */
-export function useShiftList(url: string): ShiftResponse[] {
-  const [shifts, setShifts] = useState<ShiftResponse[]>([]);
+export function useShiftList(url: string, initial?: ShiftResponse[]): ShiftResponse[] {
+  const [shifts, setShifts] = useState<ShiftResponse[]>(initial ?? []);
+  // Zolang dit gelijk is aan `url`, zijn `shifts` nog die van de server.
+  const prefetchedUrl = useRef(initial ? url : null);
 
   useEffect(() => {
     let ignore = false;
@@ -120,7 +126,10 @@ export function useShiftList(url: string): ShiftResponse[] {
       if (!ignore) setShifts(data); // discard if stale
     }
 
-    load();
+    if (prefetchedUrl.current !== url) {
+      prefetchedUrl.current = null;
+      load();
+    }
     shiftsChanged.addEventListener('changed', load);
 
     return () => {

@@ -38,7 +38,27 @@ const eslintConfig = defineConfig([
     // `next/image` te staan.
     rules: {
       "@next/next/no-img-element": "error",
+      // `next/link` prefetcht elke link zodra ze in beeld komt, en elke
+      // prefetch is op deze dynamische site een volledige server-render: op
+      // productie 13 tot 42 per paginaweergave. `@/components/ui/Link`
+      // prefetcht pas bij hover of aanraking. Zie docs/performance.md.
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "next/link",
+              message: "Gebruik `@/components/ui/Link`: die prefetcht pas bij hover. Zie docs/performance.md.",
+            },
+          ],
+        },
+      ],
     },
+  },
+  {
+    // De wrapper zelf is de enige plek die `next/link` rechtstreeks mag laden.
+    files: ["components/ui/Link.tsx"],
+    rules: { "no-restricted-imports": "off" },
   },
 ]);
 

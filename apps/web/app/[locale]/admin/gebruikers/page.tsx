@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";

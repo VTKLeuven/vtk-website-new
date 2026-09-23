@@ -168,6 +168,25 @@ of uitgeschakeld aangemaakt.
   over te nemen: die tabel bevat naast redactionele blokken ook `s3.config`,
   `vault.config`, `door.config` en `brevo.lists`.
 
+# Performance van vtk.be
+
+`docs/performance.md` is de referentie: wat er gemeten is, wat er gedaan is en
+wat er nog op de server moet gebeuren. Lees zeker "Vallen waar we in gelopen
+zijn"; al die punten zetten stil tientallen kilobytes terug op elke pagina.
+
+- **Links komen uit `@/components/ui/Link`, niet uit `next/link`.** Die
+  prefetcht pas bij hover of aanraking; `next/link` prefetcht elke link in beeld,
+  en elke prefetch is hier een volledige server-render.
+- **Geen statische import van `@sentry/nextjs` in clientcode.** Gebruik
+  `startSentry()` uit `lib/sentryClient.ts` of een dynamische import.
+- **Geen `getDictionary` in een clientcomponent die in de layout of op veel
+  pagina's staat**: dat zet beide woordenboeken op elke pagina. Geef de labels
+  mee van de server.
+- **Een zwaar clientcomponent dat zelden rendert, laad je met `next/dynamic`**
+  (markdown, een dialoog achter een klik).
+- **Een pagina die leeg rendert en zich in de browser vult, springt**: geef de
+  eerste data mee van de server, zoals /kalender en /shift doen.
+
 # Ritten van de uitleendienst
 
 `docs/uitleendienst.md` is de referentie voor de uitleendienst

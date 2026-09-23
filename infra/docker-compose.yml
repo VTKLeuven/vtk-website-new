@@ -1,3 +1,15 @@
+# Logrotatie voor de diensten die bij elke deploy toch opnieuw starten (de
+# drie apps en de workers). De json-file-driver van Docker houdt standaard alles
+# bij, zonder grens; op een gedeelde server loopt dat vroeg of laat de schijf
+# vol. Postgres, Immich en Vaultwarden krijgen dit hier bewust niet: een andere
+# logconfig laat compose die containers bij de volgende deploy opnieuw maken.
+# Voor hen hoort het in /etc/docker/daemon.json op de server.
+x-app-logging: &app-logging
+  driver: json-file
+  options:
+    max-size: '20m'
+    max-file: '5'
+
 x-immich-env: &immich-env
   - path: ./immich/.env.example
   - path: ./immich/.env
@@ -20,6 +32,7 @@ services:
       retries: 5
 
   web:
+    logging: *app-logging
     build:
       context: ..
       dockerfile: infra/docker/web.Dockerfile
@@ -36,7 +49,15 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public
+      # Elke app krijgt een vaste pool. Zonder `connection_limit` neemt Prisma
+      # 2 x cores + 1 verbindingen, op liv (16 cores) 33 per app: web, logistiek
+      # en fakbar samen konden er zo 99 openen, tegen `max_connections` 100 van
+      # Postgres. Wie dan als laatste een verbinding vraagt, krijgt "too many
+      # clients", en dat is net onder de meeste drukte. Met Umami en Vaultwarden
+      # erbij (elk hun eigen pool van 10) blijft dit rond 70. Umami krijgt hier
+      # geen `connection_limit`: het praat via `@prisma/adapter-pg` met de
+      # pg-driver, die die parameter niet kent.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public&connection_limit=30
       # VTK_MAIN_URL en LOGISTIEK_PUBLIC_URL stonden hier met een
       # productiestandaard (`https://vtk.be`, `https://logistiek.vtk.be`) en dat
       # was dezelfde val als bij de lege standaarden in de logistiek-service
@@ -63,8 +84,23 @@ services:
       - web-image-cache:/app/apps/web/.next/cache/images
     ports:
       - '127.0.0.1:3011:3000'
+    # Zonder healthcheck stond de site in `docker ps` op "Up", ook wanneer ze
+    # niet meer antwoordde of de database kwijt was. De image heeft geen curl,
+    # vandaar node zelf. Ruime start_period: bij het starten lopen eerst de
+    # migraties en de config-sync.
+    healthcheck:
+      test:
+        - CMD
+        - node
+        - -e
+        - "fetch('http://127.0.0.1:3000/api/health',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
 
   logistiek:
+    logging: *app-logging
     build:
       context: ..
       dockerfile: infra/docker/logistiek.Dockerfile
@@ -78,12 +114,13 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public&connection_limit=15
       LOGISTIEK_PAYMENT_PROVIDER: ${LOGISTIEK_PAYMENT_PROVIDER:-mollie}
     ports:
       - '127.0.0.1:3100:3000'
 
   fakbar:
+    logging: *app-logging
     build:
       context: ..
       dockerfile: infra/docker/fakbar.Dockerfile
@@ -100,7 +137,7 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public
+      DATABASE_URL: postgresql://${POSTGRES_USER:-vtk}:${POSTGRES_PASSWORD:-vtk}@postgres:5432/${POSTGRES_DB:-vtk}?schema=public&connection_limit=5
       GALLERY_IMMICH_API_URL: http://immich-server:2283/api
       GALLERY_DATABASE_HOST: immich-database
       GALLERY_FAKBAR_FACE_SEARCH_ENABLED: ${GALLERY_FAKBAR_FACE_SEARCH_ENABLED:-false}
@@ -110,6 +147,7 @@ services:
   # Vangnet voor de uitleen-betalingen: reconciliatie + verlopen checkouts,
   # zelfde curl-loop-patroon als de ticket-worker hieronder.
   logistiek-worker:
+    logging: *app-logging
     image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
@@ -145,6 +183,7 @@ services:
   # hangen mag die reconciliatie niet meesleuren. Boodschappen worden hoogstens
   # een paar keer per week besteld, dus vijf minuten is ruim genoeg.
   collectengo-worker:
+    logging: *app-logging
     image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
@@ -179,6 +218,7 @@ services:
       start_period: 60s
 
   ticket-worker:
+    logging: *app-logging
     image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
@@ -218,6 +258,7 @@ services:
   # seconden voor een betaling die de bezoeker staat af te wachten, terwijl
   # formuliermail gerust een minuut mag wachten.
   forms-worker:
+    logging: *app-logging
     image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
@@ -255,7 +296,9 @@ services:
   # Haalt elke 3 minuten de geluidsmeting van 't ElixIr op bij Munisense en
   # cachet de barstatus. Dit is de enige plek die Munisense aanspreekt: de
   # website leest enkel de cache, hoeveel bezoekers er ook zijn.
+  # Optioneel, net zoals de google-worker: zonder secret bewust uit en gezond.
   elixir-worker:
+    logging: *app-logging
     image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
@@ -283,7 +326,7 @@ services:
       test:
         - CMD-SHELL
         - >-
-          test -n "$${ELIXIR_MAINTENANCE_SECRET:-}" && test -f /tmp/elixir-worker-heartbeat && [ "$$(($$(date +%s) - $$(cat /tmp/elixir-worker-heartbeat)))" -lt 600 ]
+          test -z "$${ELIXIR_MAINTENANCE_SECRET:-}" || test -f /tmp/elixir-worker-heartbeat && [ "$$(($$(date +%s) - $$(cat /tmp/elixir-worker-heartbeat)))" -lt 600 ]
       interval: 60s
       timeout: 5s
       retries: 2
@@ -293,6 +336,7 @@ services:
   # per lid uitzetbaar in het profiel. Elke vijf minuten is ruim genoeg voor een
   # bericht dat uren op voorhand vertrekt, en houdt de mailserver rustig.
   shift-worker:
+    logging: *app-logging
     image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
@@ -335,6 +379,7 @@ services:
   # Een eigen worker en niet meeliftend op `shift-worker`, om dezelfde reden als
   # daar: een klemgelopen Expo mag de herinneringsmails niet meesleuren.
   app-push-worker:
+    logging: *app-logging
     image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
@@ -374,6 +419,7 @@ services:
   # een timer daar draait in elke instance mee, dus bij een tweede webcontainer
   # vertrekt elke mail dubbel. Zelfde ritme als voorheen, vijf minuten.
   background-worker:
+    logging: *app-logging
     image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
@@ -638,6 +684,7 @@ services:
   # post meer heeft eruit halen. Vijf minuten volstaat; de admin duwt een
   # wijziging meteen door en dit is het vangnet (zelfde opzet als forms-worker).
   vault-worker:
+    logging: *app-logging
     image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
@@ -677,7 +724,12 @@ services:
   # vangnet. Het is ook wat de 15-juli-wissel doet, want die heeft geen eigen
   # cron: de eerste ronde na de kanteling vult elke lijst met het nieuwe
   # praesidium.
+  # Optionele koppeling: zonder GOOGLE_MAINTENANCE_SECRET staat ze bewust uit, en
+  # dan telt de worker als gezond. Anders stond hij maanden op "unhealthy" en
+  # keek niemand nog naar die status, ook niet toen de background-worker (die
+  # wel verplicht is en dus rood blijft zonder secret) stil lag.
   google-worker:
+    logging: *app-logging
     image: curlimages/curl:8.22.0@sha256:58adaa4e8dca9c988bae2aba4ab3434a0bb2da16bbe3f92dec39ec7785166777
     restart: unless-stopped
     depends_on:
@@ -705,7 +757,7 @@ services:
       test:
         - CMD-SHELL
         - >-
-          test -n "$${GOOGLE_MAINTENANCE_SECRET:-}" && test -f /tmp/google-worker-heartbeat && [ "$$(($$(date +%s) - $$(cat /tmp/google-worker-heartbeat)))" -lt 900 ]
+          test -z "$${GOOGLE_MAINTENANCE_SECRET:-}" || test -f /tmp/google-worker-heartbeat && [ "$$(($$(date +%s) - $$(cat /tmp/google-worker-heartbeat)))" -lt 900 ]
       interval: 120s
       timeout: 5s
       retries: 1

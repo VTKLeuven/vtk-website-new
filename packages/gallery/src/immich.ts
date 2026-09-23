@@ -15,6 +15,11 @@ export class GalleryError extends Error {
   }
 }
 
+/** Hoe lang een lezing mag wachten tot Immich begint te antwoorden. */
+const READ_TIMEOUT_MS = 15_000;
+/** Idem voor een schrijfactie; een upload stuurt eerst het hele bestand door. */
+const WRITE_TIMEOUT_MS = 120_000;
+
 type RequestOptions = Omit<RequestInit, 'body'> & {
   body?: BodyInit | Record<string, unknown> | Array<unknown> | null;
   requiresAuth?: boolean;
@@ -71,7 +76,25 @@ export async function immichRequest(path: string, options: RequestOptions = {}):
     body = options.body as BodyInit | null | undefined;
   }
 
-  return fetch(`${config.apiUrl}${path}`, { ...options, headers, body, cache: 'no-store' });
+  // Een grens tot de headers binnen zijn, niet op het hele antwoord: een
+  // origineel van twintig megabyte dat naar een trage telefoon doorstroomt, mag
+  // er langer over doen. Zonder grens wacht `fetch` tot vijf minuten, en een
+  // Immich die vastzit (ML bezig, NFS die hapert) neemt /media dan mee.
+  const method = (options.method ?? 'GET').toUpperCase();
+  const timeoutMs = method === 'GET' || method === 'HEAD' ? READ_TIMEOUT_MS : WRITE_TIMEOUT_MS;
+  const timeout = new AbortController();
+  const timer = setTimeout(() => timeout.abort(), timeoutMs);
+  const signal = options.signal ? AbortSignal.any([options.signal, timeout.signal]) : timeout.signal;
+  try {
+    return await fetch(`${config.apiUrl}${path}`, { ...options, headers, body, cache: 'no-store', signal });
+  } catch (error) {
+    if (timeout.signal.aborted) {
+      throw new GalleryError(504, 'Immich antwoordde niet op tijd.', 'immich_timeout');
+    }
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function immichJson<T>(path: string, options: RequestOptions = {}): Promise<T> {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { Button, Card, ConfirmDialog, Input, Label, Select, Textarea } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { SaveForm } from "@/components/ui/SaveForm";

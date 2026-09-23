@@ -9,6 +9,9 @@ import "server-only";
 
 const BREVO_BASE = "https://api.brevo.com/v3";
 
+/** Hoe lang één aanroep naar Brevo mag duren; zonder grens tot vijf minuten. */
+const BREVO_TIMEOUT_MS = 30_000;
+
 /** De API-key uit de omgeving; ontbreekt hij, dan staat de integratie uit. */
 export function brevoApiKey(): string | null {
   return process.env.BREVO_KEY?.trim() || null;
@@ -42,6 +45,7 @@ async function brevoFetch<T = unknown>(
 
   const res = await fetch(url, {
     method: init.method ?? "GET",
+    signal: AbortSignal.timeout(BREVO_TIMEOUT_MS),
     headers: {
       "api-key": key,
       accept: "application/json",

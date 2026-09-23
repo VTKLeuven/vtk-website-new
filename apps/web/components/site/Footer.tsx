@@ -1,5 +1,5 @@
 import Image from 'next/image';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { CookieSettingsButton } from './CookieConsent';
 

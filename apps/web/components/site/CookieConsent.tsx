@@ -11,10 +11,43 @@ import {
   hidesCookieBanner,
   type CookieConsentChoice,
 } from "@/lib/cookie-consent";
+import { startSentry } from "@/lib/sentryClient";
 
-function copy() {
-  const english = window.location.pathname === "/en" || window.location.pathname.startsWith("/en/");
-  return english
+/**
+ * Het Umami-script zoals de root layout het zou renderen, voor wanneer de
+ * bezoeker hier toestemming geeft. Null wanneer er op dit pad niets gemeten mag
+ * worden of Umami niet geconfigureerd is.
+ */
+export type AnalyticsOnConsent = {
+  src: string;
+  filterSource: string;
+  attributes: Record<string, string>;
+};
+
+/**
+ * Start Sentry en Umami op de pagina die al openstaat. Voorheen herlaadde de
+ * banner daarvoor de hele pagina: een tweede volledige paginaweergave voor
+ * iedere nieuwe bezoeker, op een telefoon al snel twee seconden.
+ */
+function startAnalytics(umami: AnalyticsOnConsent | null) {
+  void startSentry();
+  if (!umami || document.querySelector(`script[src="${umami.src}"]`)) return;
+  const filter = document.createElement("script");
+  filter.text = umami.filterSource;
+  document.head.appendChild(filter);
+  const tracker = document.createElement("script");
+  tracker.src = umami.src;
+  tracker.defer = true;
+  for (const [name, value] of Object.entries(umami.attributes)) tracker.setAttribute(name, value);
+  document.head.appendChild(tracker);
+}
+
+function isEnglish(pathname: string): boolean {
+  return pathname === "/en" || pathname.startsWith("/en/");
+}
+
+function copy(pathname: string) {
+  return isEnglish(pathname)
     ? {
         title: "Your cookie choices",
         body: "VTK uses essential cookies for sign-in, security, language and ticket access. With your permission we also count page views with Umami, which runs on VTK's own server and sets no cookies, and Sentry may collect error diagnostics, performance traces and masked session replays.",
@@ -44,25 +77,35 @@ function setConsent(choice: CookieConsentChoice) {
   window.dispatchEvent(new CustomEvent(COOKIE_CONSENT_EVENT, { detail: choice }));
 }
 
-export function CookieConsent() {
+export function CookieConsent({
+  initialConsent,
+  analyticsOnConsent,
+}: {
+  /**
+   * De keuze uit de cookie, zoals de server ze las. Daarmee rendert de banner
+   * al in de HTML. Voorheen verscheen hij pas na de hydration, en werd hij bij
+   * een eerste bezoek op tekstpagina's het late LCP-element.
+   */
+  initialConsent: CookieConsentChoice | null;
+  analyticsOnConsent: AnalyticsOnConsent | null;
+}) {
   // Bewust het pad uit de router en niet uit de root-layout: die layout wordt
   // bij een client-side navigatie niet opnieuw gerenderd, dus een server-side
   // controle zou de banner op de linkpagina alsnog laten staan wanneer je er
   // vanaf een andere pagina naartoe navigeert.
   const pathname = usePathname();
-  const current = useSyncExternalStore<CookieConsentChoice | null | "server">(
+  const current = useSyncExternalStore<CookieConsentChoice | null>(
     (onChange) => {
       window.addEventListener(COOKIE_CONSENT_EVENT, onChange);
       return () => window.removeEventListener(COOKIE_CONSENT_EVENT, onChange);
     },
     browserCookieConsent,
-    () => "server",
+    () => initialConsent,
   );
   const [preferencesOpen, setPreferencesOpen] = useState(false);
   const [draft, setDraft] = useState<CookieConsentChoice>("essential");
   const panelRef = useRef<HTMLElement>(null);
-  const visible =
-    !hidesCookieBanner(pathname) && current !== "server" && (preferencesOpen || current === null);
+  const visible = !hidesCookieBanner(pathname) && (preferencesOpen || current === null);
 
   useEffect(() => {
     const showPreferences = () => {
@@ -97,16 +140,20 @@ export function CookieConsent() {
   }, [visible]);
 
   if (!visible) return null;
-  const labels = copy();
-  const base = window.location.pathname === "/en" || window.location.pathname.startsWith("/en/") ? "/en" : "";
+  const labels = copy(pathname);
+  const base = isEnglish(pathname) ? "/en" : "";
 
   const save = (next: CookieConsentChoice) => {
+    const previous = current;
     setConsent(next);
     setPreferencesOpen(false);
-    // instrumentation-client runs before hydration and the analytics script is
-    // rendered server-side. Reload so a newly granted choice can start Sentry
-    // and Umami, or a withdrawn choice stops both immediately.
-    window.location.reload();
+    if (next === "analytics" && previous !== "analytics") {
+      startAnalytics(analyticsOnConsent);
+    } else if (next !== "analytics" && previous === "analytics") {
+      // Sentry en Umami draaien al en zijn niet netjes te stoppen; enkel een
+      // nieuwe pagina zonder hun scripts doet dat meteen.
+      window.location.reload();
+    }
   };
 
   return (

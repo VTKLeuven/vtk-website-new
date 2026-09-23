@@ -1,7 +1,7 @@
 import { prisma } from "@vtk/db";
 import { format } from "date-fns";
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";

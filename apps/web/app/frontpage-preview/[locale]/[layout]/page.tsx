@@ -1,5 +1,5 @@
-import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
+import { HomeHeroPhoto } from "@/components/editorial/HomeHeroPhoto";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission, requireSession } from "@/lib/session";
@@ -137,7 +137,6 @@ export default async function FrontpagePreview({
     fallback: legacyHeroFrom(row?.values),
   });
   const heroPhoto = frontpagePhoto(layoutModule, publicUrl(values.photo));
-  const style = { "--home-hero-photo": `url("${heroPhoto}")` } as CSSProperties;
 
   return (
     <div className="vtk-design">
@@ -148,7 +147,8 @@ export default async function FrontpagePreview({
           en de ster van het weekoverzicht meldt via een toast wanneer de server
           weigert. Zonder provider gooit die hook en gaat het voorbeeld stuk. */}
       <ToastProvider>
-        <div className="home-dark-zone" style={style}>
+        <div className="home-dark-zone">
+          <HomeHeroPhoto src={heroPhoto} />
           <Frontpage
             id={layoutModule.id}
             values={values}

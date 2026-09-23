@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState, useEffect, useState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { loginAction, type LoginState } from '@/app/actions/auth';
 import { resendVerificationAction } from '@/app/actions/register';
 import { SAVE_IDLE, type SaveState } from '@/lib/saveState';

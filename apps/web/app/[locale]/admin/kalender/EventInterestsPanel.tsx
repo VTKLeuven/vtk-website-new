@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { Download, Mail, Search, Check, Copy, UserCheck, Users, UserX } from "lucide-react";
 import { Card } from "@vtk/ui";
 import type { AdminAttendeeRow } from "@/lib/calendar/interest";

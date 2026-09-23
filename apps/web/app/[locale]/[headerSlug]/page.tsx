@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { notFound, redirect } from "next/navigation";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";

@@ -36,7 +36,7 @@
     "explain:access": "dotenv -e .env -- tsx scripts/explain-access.ts"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "devDependencies": {
     "@types/node": "^26.0.0"

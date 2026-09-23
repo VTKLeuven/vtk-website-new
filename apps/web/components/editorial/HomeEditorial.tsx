@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import type { CSSProperties } from "react";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
@@ -16,6 +16,7 @@ import { getCurrentSession } from "@/lib/session";
 import { addDays } from "date-fns";
 import { getDictionary } from "@vtk/i18n";
 import { PocBand, type PocBandGroup } from "./PocBand";
+import { HomeHeroPhoto } from "./HomeHeroPhoto";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
 import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
 import { FrontpageShiftBand, type FrontpageShiftItem } from "./FrontpageShiftBand";
@@ -367,7 +368,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   // than a deploy. The value is an /api/media/... path or a path in public/;
   // neither can contain a quote, because storageKeyPath percent-encodes.
   const heroPhoto = frontpagePhoto(frontpage.module, publicUrl(frontpage.values.photo));
-  const heroPhotoStyle = { "--home-hero-photo": `url("${heroPhoto}")` } as CSSProperties;
 
   const theoToday = entryForDate(theokotEntries, now, locale);
   const theoOpen = theoToday && isOpenAt(theoToday.hours, now);
@@ -489,7 +489,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
           Loopt er een campagne, dan neemt haar layout de hero over; de quick
           links eronder blijven in beide gevallen staan. Zie lib/frontpage.ts. */}
-      <div className="home-dark-zone" style={heroPhotoStyle}>
+      <div className="home-dark-zone">
+        <HomeHeroPhoto src={heroPhoto} />
         <Frontpage
           id={frontpage.module.id}
           values={frontpage.values}
@@ -896,6 +897,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           signedIn={Boolean(session)}
           totalOpenSpots={totalOpenSpots}
           userName={session?.user?.name ?? null}
+          t={getDictionary(locale).shift}
         />
       )}
 

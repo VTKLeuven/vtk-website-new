@@ -1,12 +1,19 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { isSameDay, addDays } from "date-fns";
-import { getDictionary, type Locale } from "@vtk/i18n";
+import type { Locale } from "@vtk/i18n";
 import { useToast } from "@/components/ui/toast";
 import { registerShift, type MergedShift, type PostNames } from "@/components/shift/shiftData";
-import { ShiftDialog } from "@/components/shift/ShiftDialog";
+import dynamic from "next/dynamic";
+import type { ShiftDict } from "@/components/shift/shiftData";
+
+// Pas geladen bij een klik op een shift. Het venster haalt zelf beide
+// woordenboeken binnen, en deze band staat op de homepage.
+const ShiftDialog = dynamic(() => import("@/components/shift/ShiftDialog").then((m) => m.ShiftDialog), {
+  ssr: false,
+});
 import "@/components/shift/shift-board.css";
 import type { ShiftRosterEntry } from "@/lib/shift";
 import { MapPin, Users } from "lucide-react";
@@ -101,6 +108,7 @@ export function FrontpageShiftBand({
   signedIn,
   totalOpenSpots,
   userName,
+  t,
 }: {
   locale: Locale;
   base: string;
@@ -109,12 +117,16 @@ export function FrontpageShiftBand({
   signedIn: boolean;
   totalOpenSpots: number;
   userName?: string | null;
+  /**
+   * De shift-sectie van het woordenboek, van de server. Met `getDictionary` hier
+   * kwamen beide woordenboeken in de bundel van de homepage.
+   */
+  t: ShiftDict;
 }) {
   const [shifts, setShifts] = useState(initialShifts);
   const [selectedEntry, setSelectedEntry] = useState<MergedShift | null>(null);
   const [registeringId, setRegisteringId] = useState<string | null>(null);
   const showToast = useToast();
-  const t = getDictionary(locale).shift;
   const nl = locale === "nl";
   const now = new Date();
 
