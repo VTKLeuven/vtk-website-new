@@ -81,6 +81,14 @@ export function youtubeThumbnailUrl(videoId: string): string {
   return `/api/video-thumbnail?id=${encodeURIComponent(videoId)}`;
 }
 
+/**
+ * Dezelfde poster als miniatuur (320 pixels breed). Een poster die een redacteur
+ * zelf opgaf, blijft ongewijzigd: daar is geen kleinere variant van te kennen.
+ */
+export function smallVideoThumbnailUrl(posterUrl: string): string {
+  return posterUrl.startsWith("/api/video-thumbnail?") ? `${posterUrl}&size=small` : posterUrl;
+}
+
 export type VideoEmbed = {
   embedUrl: string;
   externalUrl: string;

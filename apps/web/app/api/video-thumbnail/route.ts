@@ -15,12 +15,16 @@ const YOUTUBE_ID = /^[a-zA-Z0-9_-]{11}$/;
 
 // maxresdefault bestaat niet voor elke video; hqdefault altijd.
 const VARIANTS = ["maxresdefault", "hqdefault"] as const;
+// `size=small` voor een miniatuur, zoals de lijst op /media (88 pixels breed):
+// mqdefault is 320 bij 180 en 13 KB, maxresdefault 1280 bij 720 en 134 KB.
+const SMALL_VARIANTS = ["mqdefault"] as const;
 
 export async function GET(request: Request) {
-  const id = new URL(request.url).searchParams.get("id");
+  const params = new URL(request.url).searchParams;
+  const id = params.get("id");
   if (!id || !YOUTUBE_ID.test(id)) return new Response("Not found", { status: 404 });
 
-  for (const variant of VARIANTS) {
+  for (const variant of params.get("size") === "small" ? SMALL_VARIANTS : VARIANTS) {
     let upstream: Response;
     try {
       upstream = await fetch(`https://i.ytimg.com/vi/${id}/${variant}.jpg`, {

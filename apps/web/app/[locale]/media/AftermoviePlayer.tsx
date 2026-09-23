@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ExternalLink, Play, Video, VideoOff } from "lucide-react";
 
-import { safeUrl, vimeoVideoId, youtubeThumbnailUrl, youtubeVideoId } from "@/lib/videoEmbed";
+import { safeUrl, smallVideoThumbnailUrl, vimeoVideoId, youtubeThumbnailUrl, youtubeVideoId } from "@/lib/videoEmbed";
 import styles from "./AftermoviePlayer.module.css";
 import { trackAftermovie } from '@/lib/analytics-client';
 
@@ -118,14 +118,14 @@ function withAutoplay(embedUrl: string) {
   return url.toString();
 }
 
-function Poster({ item }: { item: NormalizedItem }) {
+function Poster({ item, small = false }: { item: NormalizedItem; small?: boolean }) {
   if (item.source.posterUrl) {
     return (
       // Poster hosts are editor-provided, so they cannot be enumerated in Next image remotePatterns.
       // eslint-disable-next-line @next/next/no-img-element
       <img
         className={styles["vtk-media-aftermovie-poster"]}
-        src={item.source.posterUrl}
+        src={small ? smallVideoThumbnailUrl(item.source.posterUrl) : item.source.posterUrl}
         alt=""
         onError={(event) => {
           event.currentTarget.hidden = true;
@@ -305,7 +305,7 @@ export function AftermoviePlayer({
                   aria-label={item.title}
                 >
                   <span className={styles["vtk-media-aftermovie-thumbnail"]}>
-                    <Poster item={item} />
+                    <Poster item={item} small />
                     {item.source.kind === "external" ? (
                       <ExternalLink aria-hidden="true" />
                     ) : (

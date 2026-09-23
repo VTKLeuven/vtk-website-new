@@ -142,3 +142,17 @@ describe("video in een alinea met tekst", () => {
     );
   });
 });
+
+import { smallVideoThumbnailUrl, youtubeThumbnailUrl } from "@/lib/videoEmbed";
+
+describe("miniatuur van een videoposter", () => {
+  it("vraagt de kleine variant van onze eigen thumbnail-route", () => {
+    expect(smallVideoThumbnailUrl(youtubeThumbnailUrl("WdGqhrVUJog"))).toBe(
+      "/api/video-thumbnail?id=WdGqhrVUJog&size=small"
+    );
+  });
+
+  it("laat een poster die een redacteur opgaf ongemoeid", () => {
+    expect(smallVideoThumbnailUrl("https://example.com/poster.jpg")).toBe("https://example.com/poster.jpg");
+  });
+});
