@@ -1,7 +1,7 @@
 "use client";
 
 import { LayoutTemplate } from "lucide-react";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { saveTicketTemplateFromEventAction } from "@/app/actions/ticketTemplates";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { SettingsPanel } from "./SettingsPanel";

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { Card } from "@vtk/ui";
 

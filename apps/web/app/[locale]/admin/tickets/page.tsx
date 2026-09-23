@@ -1,5 +1,5 @@
 import { InteractiveRow } from "@/components/ticketing/admin/InteractiveRow";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasPermission } from "@vtk/auth";

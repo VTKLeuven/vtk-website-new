@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { PaymentMethodChooser, type PaymentMethodChoice } from "./PaymentMethodChooser";
 import { useRouter } from "next/navigation";
 import {

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import type { Locale } from "@vtk/i18n";
 import type { FieldValues } from "@/lib/frontpage/fields";
 import type { HeroWeekMoment, HeroWeekPlacement } from "@/lib/calendar/heroWeek";

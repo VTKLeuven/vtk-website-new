@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { staticMetadata } from "@/lib/pageMetadata";
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { prisma } from "@vtk/db";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";

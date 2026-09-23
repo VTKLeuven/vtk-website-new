@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { useState } from "react";
 import { Card, Input, Label } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";

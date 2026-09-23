@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import type { Semester } from "@/lib/meetings";
 
 /** Semester 1 of 2 van het lopende werkingsjaar; de kalender hangt eraan vast. */

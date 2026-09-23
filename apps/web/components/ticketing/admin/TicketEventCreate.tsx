@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { useState } from "react";
 import { LayoutTemplate } from "lucide-react";
 import { ConfirmDialog } from "@vtk/ui";

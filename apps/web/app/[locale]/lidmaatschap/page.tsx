@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { prisma } from "@vtk/db";
 import { Card } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";

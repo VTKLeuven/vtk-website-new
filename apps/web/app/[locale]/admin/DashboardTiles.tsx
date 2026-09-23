@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { ConfirmDialog } from "@vtk/ui";
 import { TileVisualPicker } from "@/components/admin/TileVisualPicker";

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { Card, Input, Label, Select } from '@vtk/ui';
 import { saveEventAction } from '@/app/actions/calendar';
 import { DEFAULT_EVENT_LINK_LABEL, EVENT_LINK_LABEL_MAX } from '@/lib/calendar/eventLink';

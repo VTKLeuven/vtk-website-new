@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { pick, type Locale } from "@vtk/i18n";
 import {
   HERO_WEEK_TIME_ZONE,
