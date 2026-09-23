@@ -143,6 +143,22 @@ export function analyticsScript(input: {
   };
 }
 
+/**
+ * De `data-`-attributen van het tracker-script. Eén bron voor de twee plaatsen
+ * waar het script op de pagina komt: de root layout rendert het wanneer er al
+ * toestemming is, de cookiebanner zet het erbij op het moment dat iemand ze
+ * geeft (zonder de pagina te herladen).
+ */
+export function analyticsScriptAttributes(script: AnalyticsScript): Record<string, string> {
+  return {
+    "data-website-id": script.websiteId,
+    "data-before-send": script.beforeSend,
+    "data-exclude-search": "true",
+    "data-exclude-hash": "true",
+    "data-performance": "true",
+  };
+}
+
 // -----------------------------------------------------------------------------
 // Magazines: per nummer meten
 // -----------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  analyticsScriptAttributes,
   ANALYTICS_BEFORE_SEND_FUNCTION,
   analyticsConfigFromEnv,
   analyticsFilterSource,
@@ -214,5 +215,25 @@ describe('bestemming van een externe link', () => {
     // de knop op een pagina mee als een klik naar buiten.
     expect(outboundHost('/en/shift')).toBe('');
     expect(outboundHost('mailto:info@vtk.be')).toBe('');
+  });
+});
+
+/**
+ * Het tracker-script komt op twee manieren op de pagina: de root layout rendert
+ * het bij een bestaande toestemming, de cookiebanner zet het erbij op het moment
+ * dat iemand ze geeft. Beide halen hun attributen hier; wijkt er één af, dan
+ * meet Umami die bezoekers anders (bv. met de zoekparameters erbij).
+ */
+describe('attributen van het tracker-script', () => {
+  it('geeft website-id, filter en de uitsluitingen mee', () => {
+    const tracker = script('analytics');
+    expect(tracker).not.toBeNull();
+    expect(analyticsScriptAttributes(tracker!)).toEqual({
+      'data-website-id': 'website-id',
+      'data-before-send': '__vtkAnalyticsFilter',
+      'data-exclude-search': 'true',
+      'data-exclude-hash': 'true',
+      'data-performance': 'true',
+    });
   });
 });

@@ -5,7 +5,7 @@ import { cookies, headers } from "next/headers";
 import { getSentryDsn } from "@/lib/runtimeConfig";
 import { CookieConsent } from "@/components/site/CookieConsent";
 import { HTML_LANG, currentLocale } from "@/lib/locale";
-import { analyticsConfigFromEnv, analyticsScript } from "@/lib/analytics";
+import { analyticsConfigFromEnv, analyticsScript, analyticsScriptAttributes } from "@/lib/analytics";
 import { COOKIE_CONSENT_NAME, parseCookieConsent } from "@/lib/cookie-consent";
 import {
   SITE_DESCRIPTION,
@@ -86,11 +86,18 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   // bestelschermen; `lib/analytics.ts` neemt die beslissing. Het pad komt uit
   // dezelfde `x-pathname`-header als de taal hierboven.
   const [cookieStore, requestHeaders] = await Promise.all([cookies(), headers()]);
-  const analytics = analyticsScript({
-    config: analyticsConfigFromEnv(),
-    consent: parseCookieConsent(cookieStore.get(COOKIE_CONSENT_NAME)?.value),
-    pathname: requestHeaders.get("x-pathname") ?? "",
-  });
+  const consent = parseCookieConsent(cookieStore.get(COOKIE_CONSENT_NAME)?.value);
+  const analyticsConfig = analyticsConfigFromEnv();
+  const pathname = requestHeaders.get("x-pathname") ?? "";
+  const analytics = analyticsScript({ config: analyticsConfig, consent, pathname });
+
+  // Wat de cookiebanner op de pagina zet wanneer de bezoeker hier toestemming
+  // geeft. Zo hoeft ze de pagina niet te herladen om Umami te starten; dezelfde
+  // regels (uitgesloten paden, geen configuratie) gelden.
+  const analyticsOnConsent =
+    consent === "analytics"
+      ? null
+      : analyticsScript({ config: analyticsConfig, consent: "analytics", pathname });
 
   return (
     <html
@@ -112,16 +119,21 @@ export default async function RootLayout({ children }: { children: React.ReactNo
             <Script
               strategy="afterInteractive"
               src={analytics.src}
-              data-website-id={analytics.websiteId}
-              data-before-send={analytics.beforeSend}
-              data-exclude-search="true"
-              data-exclude-hash="true"
-              data-performance="true"
+              {...analyticsScriptAttributes(analytics)}
             />
           </>
         )}
         {children}
-        <CookieConsent />
+        <CookieConsent
+          initialConsent={consent}
+          analyticsOnConsent={
+            analyticsOnConsent && {
+              src: analyticsOnConsent.src,
+              filterSource: analyticsOnConsent.filterSource,
+              attributes: analyticsScriptAttributes(analyticsOnConsent),
+            }
+          }
+        />
       </body>
     </html>
   );
