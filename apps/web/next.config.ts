@@ -78,6 +78,12 @@ const nextConfig: NextConfig = {
   },
   // Vertelt enkel aan aanvallers welk framework en welke versie hier draait.
   poweredByHeader: false,
+  // Standaard comprimeert Next zelf met gzip, in hetzelfde proces dat de
+  // pagina's rendert. Laat je Caddy dat doen (`encode zstd gzip` in de
+  // Caddyfile, zie docs/performance.md), zet dan NEXT_COMPRESSION=off: dan
+  // gebeurt het in Go op andere cores, en met zstd. De config wordt bij elke
+  // start opnieuw gelezen, dus dit vraagt geen nieuwe build.
+  compress: process.env.NEXT_COMPRESSION !== "off",
   images: {
     // Next 16 laat standaard enkel kwaliteit 75 toe. Een `quality={90}` op een
     // <Image> werd daardoor stilzwijgend 75, en een URL met q=90 gaf een 400.
