@@ -2,13 +2,18 @@ import { Children, type ReactNode } from "react";
 import type { Element } from "hast";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { DEFAULT_LOCALE, type Locale } from "@vtk/i18n";
+import { DEFAULT_LOCALE, getDictionary, type Locale } from "@vtk/i18n";
 import { galleryPhotos, imageSize, solePhoto } from "@/lib/gallery";
 import { headingId, headingText } from "@/lib/pageOutline";
 import { LETTER_LIMIT, revealLetters, revealWords } from "@/lib/revealWords";
 import { isVideoUrl } from "@/lib/videoEmbed";
-import { PageGallery } from "@/components/site/PageGallery";
+import dynamic from "next/dynamic";
 import { InlineVideoPlayer } from "./InlineVideoPlayer";
+
+// Via `next/dynamic`: deze renderer draait ook in de browser (de kalender, het
+// voorbeeld in de editor), en een statische import trok de galerij met beide
+// woordenboeken mee in die bundels, ook waar er nooit een galerij staat.
+const PageGallery = dynamic(() => import("@/components/site/PageGallery").then((m) => m.PageGallery));
 
 /**
  * Zet ingesloten video-iframes of losstaande video-links om naar de markdown-media-syntax `![Titel](url)`.
@@ -158,7 +163,21 @@ export function Markdown({
         // ertussen, een enkele foto, een video) blijft een gewone alinea.
         p: ({ node, children: paragraphChildren }) => {
           const photos = galleryPhotos(node);
-          if (photos) return <PageGallery photos={photos} locale={locale} />;
+          if (photos) {
+            const t = getDictionary(locale).photos;
+            return (
+              <PageGallery
+                photos={photos}
+                labels={{
+                  openPhoto: t.openPhoto,
+                  close: t.close,
+                  photoCounter: t.photoCounter,
+                  previousPhoto: t.previousPhoto,
+                  nextPhoto: t.nextPhoto,
+                }}
+              />
+            );
+          }
 
           // Eén foto in een alinea die verder niets bevat, wordt een figuur; de
           // markdown-titel (`![alt](url "Cantus 2025")`) wordt het bijschrift.

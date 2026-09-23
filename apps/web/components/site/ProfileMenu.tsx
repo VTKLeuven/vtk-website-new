@@ -1,13 +1,20 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { logoutAction } from "@/app/actions/auth";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
 import type { PostAdminLink } from "@/lib/postAdminLinks";
 import type { Locale } from "@vtk/i18n";
-import { FeedbackDialog } from "./FeedbackDialog";
+import dynamic from "next/dynamic";
+
+// Pas geladen wanneer iemand het venster opent. Dit menu staat in de header van
+// elke pagina, en het venster trok met `getDictionary` beide woordenboeken mee
+// in de bundel van elke pagina.
+const FeedbackDialog = dynamic(() => import("./FeedbackDialog").then((m) => m.FeedbackDialog), {
+  ssr: false,
+});
 
 export function ProfileMenu({
   name,

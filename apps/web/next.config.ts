@@ -63,6 +63,11 @@ const nextConfig: NextConfig = {
     root: monorepoRoot,
   },
   experimental: {
+    // `@vtk/i18n` is een barrel: `pick` en `LOCALES` staan in hetzelfde
+    // indexbestand als de woordenboeken. Zonder dit trok elke clientcomponent
+    // die enkel `pick` gebruikt beide JSON-bestanden mee (~40 KB gzip op elke
+    // pagina); hiermee laadt enkel de module die echt gebruikt wordt.
+    optimizePackageImports: ["@vtk/i18n"],
     // Proxy otherwise truncates uploads at 10 MB, before our upload routes can
     // validate them. Match the action limit, above the 46 MB multipart limit.
     proxyClientMaxBodySize: "50mb",

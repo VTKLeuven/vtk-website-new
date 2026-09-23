@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import type { CSSProperties } from "react";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
@@ -897,6 +897,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           signedIn={Boolean(session)}
           totalOpenSpots={totalOpenSpots}
           userName={session?.user?.name ?? null}
+          t={getDictionary(locale).shift}
         />
       )}
 

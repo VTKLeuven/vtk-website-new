@@ -5,7 +5,13 @@ import { Globe } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { canUnregister } from '@/lib/shift';
 import { useToast } from '@/components/ui/toast';
-import { Markdown } from '@/components/ui/Markdown';
+import dynamic from 'next/dynamic';
+
+// Via `next/dynamic`: de markdown-renderer (react-markdown, micromark en, via de
+// fotogalerij, beide woordenboeken) is ~80 KB gzip. Statisch geïmporteerd kwam
+// hij in een chunk die de bundler deelt met `Link` en dus op elke pagina laadde;
+// zo komt hij enkel mee waar er echt markdown gerenderd wordt.
+const Markdown = dynamic(() => import('@/components/ui/Markdown').then((m) => m.Markdown));
 import {
   fill,
   fmtDateTime,

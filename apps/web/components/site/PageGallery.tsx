@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { DEFAULT_LOCALE, getDictionary, type Locale } from "@vtk/i18n";
+import type { Dictionary } from "@vtk/i18n";
 import type { GalleryPhoto } from "@/lib/gallery";
 
 import "@/app/design/vtk-gallery.css";
@@ -69,14 +69,24 @@ function toRows(photos: GalleryPhoto[]): GalleryPhoto[][] {
   return rows;
 }
 
+/** De labels van de galerij; `Markdown` haalt ze uit het woordenboek. */
+export type PageGalleryLabels = Pick<
+  Dictionary["photos"],
+  "openPhoto" | "close" | "photoCounter" | "previousPhoto" | "nextPhoto"
+>;
+
 export function PageGallery({
   photos,
-  locale = DEFAULT_LOCALE,
+  labels: t,
 }: {
   photos: GalleryPhoto[];
-  locale?: Locale;
+  /**
+   * Van de server en niet via `getDictionary` hier: deze galerij hoort bij de
+   * gedeelde bundel van de site, en daarmee kwamen beide woordenboeken
+   * (~40 KB gzip) op elke pagina.
+   */
+  labels: PageGalleryLabels;
 }) {
-  const t = getDictionary(locale).photos;
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const pointerStartX = useRef<number | null>(null);
   const openerRef = useRef<HTMLButtonElement | null>(null);
