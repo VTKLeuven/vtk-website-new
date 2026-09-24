@@ -634,7 +634,7 @@ services:
   # niet door Vaultwarden. Zonder die twee samen zou elk lid met een VTK-account
   # zich hier een kluis kunnen aanmaken.
   vaultwarden:
-    image: vaultwarden/server:1.37.2
+    image: vaultwarden/server:1.37.3@sha256:1587c45feaa479f1f5e8af3b00eded36bff77bcf1880cf8dbf0541706dd470e0
     restart: unless-stopped
     depends_on:
       postgres:
