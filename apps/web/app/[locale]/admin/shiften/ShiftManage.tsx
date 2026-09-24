@@ -149,7 +149,7 @@ export function ShiftManage({
             href={`${nl ? "" : "/en"}/admin/shiften/sjablonen`}
             className="inline-flex h-10 items-center justify-center whitespace-nowrap rounded-full border border-vtk-blue/15 px-4 text-sm font-medium text-vtk-ink transition-colors hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70"
           >
-            {nl ? "Uit sjabloon" : "From template"}
+            {nl ? "Meerdere shiften / Reeks" : "Multiple shifts / Series"}
           </Link>
           <Button onClick={() => setCreating(true)}>{nl ? "Nieuwe shift" : "New shift"}</Button>
         </div>
@@ -187,7 +187,7 @@ export function ShiftManage({
               // te landen. Zie CLAUDE.md > Admin.
               <tr
                 key={s.id}
-                className={`border-t border-zinc-200 ${
+                className={`border-t border-vtk-navy/10 ${
                   canManage(s) ? "cursor-pointer hover:bg-vtk-blue-soft/60" : ""
                 }`}
                 onClick={canManage(s) ? () => setEditing(s) : undefined}
@@ -208,19 +208,19 @@ export function ShiftManage({
                     s.name
                   )}
                 </td>
-                <td className="px-4 py-2 text-zinc-500">
+                <td className="px-4 py-2 text-vtk-muted">
                   {format(s.startTime, "dd/MM/yyyy HH:mm")}–{format(s.endTime, "HH:mm")}
                 </td>
-                <td className="px-4 py-2 text-zinc-500">{s.post ?? "—"}</td>
-                <td className="px-4 py-2 text-zinc-500">
+                <td className="px-4 py-2 text-vtk-muted">{s.post ?? "—"}</td>
+                <td className="px-4 py-2 text-vtk-muted">
                   {s.participants.length}/{s.maxParticipants}
                 </td>
-                <td className="px-4 py-2 text-zinc-500">{s.reward}</td>
+                <td className="px-4 py-2 text-vtk-muted">{s.reward}</td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={5} className="px-4 py-8 text-center text-vtk-muted">
                   {nl ? "Geen shiften." : "No shifts."}
                 </td>
               </tr>

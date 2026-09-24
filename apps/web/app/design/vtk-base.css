@@ -40,6 +40,8 @@
   /* Een handeling die iets terugdraait, zoals uitschrijven. */
   --danger-bg: #fdecea;
   --danger-ink: #b42318;
+  /* Rand rond een veld of kaart met een fout. */
+  --danger-line: #f3c4bf;
   --ink-2: var(--body);
   --rule: var(--line);
   --rule-soft: rgba(14, 26, 54, 0.07);

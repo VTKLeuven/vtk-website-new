@@ -249,3 +249,76 @@ export function parseTemplateEntries(raw: unknown, posts: string[]): ParsedTempl
     .sort((a, b) => a.entry.startOffsetMinutes - b.entry.startOffsetMinutes || a.index - b.index)
     .map((row) => row.entry);
 }
+
+// -----------------------------------------------------------------------------
+// Datum- en weekhulpjes voor reeksen van shiften (terugkerende shiften)
+// -----------------------------------------------------------------------------
+
+/** Tel `days` kalenderdagen op bij "YYYY-MM-DD" via UTC-middernacht. */
+export function addDaysToYmd(ymdStr: string, days: number): string {
+  const [y, m, d] = ymdStr.split('-').map(Number);
+  if (!y || !m || !d) return ymdStr;
+  const dt = new Date(Date.UTC(y, m - 1, d, 12) + days * 86_400_000);
+  return `${dt.getUTCFullYear()}-${pad(dt.getUTCMonth() + 1)}-${pad(dt.getUTCDate())}`;
+}
+
+/** Maandag van de week waarin `refDateStr` ("YYYY-MM-DD") valt. */
+export function getCurrentMonday(refDateStr: string): string {
+  const [y, m, d] = refDateStr.split('-').map(Number);
+  if (!y || !m || !d) return refDateStr;
+  const dt = new Date(Date.UTC(y, m - 1, d, 12));
+  const dow = dt.getUTCDay(); // 0=zo..6=za
+  const daysBack = (dow + 6) % 7;
+  return addDaysToYmd(refDateStr, -daysBack);
+}
+
+/** Eerstvolgende maandag ná `refDateStr` ("YYYY-MM-DD"). */
+export function getNextMonday(refDateStr: string): string {
+  const [y, m, d] = refDateStr.split('-').map(Number);
+  if (!y || !m || !d) return refDateStr;
+  const dt = new Date(Date.UTC(y, m - 1, d, 12));
+  const dow = dt.getUTCDay(); // 0=zo..6=za
+  const daysToMonday = ((8 - dow) % 7) || 7;
+  return addDaysToYmd(refDateStr, daysToMonday);
+}
+
+/**
+ * Lijst van kalenderdagen ("YYYY-MM-DD") tussen `startDate` en `endDate` inclusief,
+ * gefilterd op `activeWeekdays` (0=zo, 1=ma, 2=di, 3=wo, 4=do, 5=vr, 6=za).
+ */
+export function getDatesBetween(startDate: string, endDate: string, activeWeekdays: number[]): string[] {
+  const dates: string[] = [];
+  const [sy, sm, sd] = startDate.split('-').map(Number);
+  const [ey, em, ed] = endDate.split('-').map(Number);
+  if (!sy || !sm || !sd || !ey || !em || !ed) return [];
+  const cur = new Date(Date.UTC(sy, sm - 1, sd, 12));
+  const end = new Date(Date.UTC(ey, em - 1, ed, 12));
+  // Enkel een vangnet tegen een eindeloze lus; de grens op de lengte van een
+  // reeks en op het aantal shiften legt het scherm op, met een foutmelding.
+  let guard = 0;
+  while (cur <= end && guard < 3660) {
+    guard++;
+    const y = cur.getUTCFullYear();
+    const m = pad(cur.getUTCMonth() + 1);
+    const d = pad(cur.getUTCDate());
+    const dayOfWeek = cur.getUTCDay();
+    if (activeWeekdays.includes(dayOfWeek)) {
+      dates.push(`${y}-${m}-${d}`);
+    }
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return dates;
+}
+
+/** Compacte datumtitel: "ma 28/09" of "Mon 28/09". */
+export function formatDayLabel(dateStr: string, locale: 'nl' | 'en'): string {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  if (!y || !m || !d) return dateStr;
+  const dt = new Date(Date.UTC(y, m - 1, d, 12));
+  return new Intl.DateTimeFormat(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+    weekday: 'short',
+    day: '2-digit',
+    month: '2-digit',
+    timeZone: 'UTC',
+  }).format(dt);
+}

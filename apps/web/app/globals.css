@@ -39,6 +39,16 @@
      de donkere modus. Hier zijn het gewoon de huidige waarden. */
   --color-vtk-muted: #5c667f;
   --color-vtk-on-yellow: #0a0f1f;
+  --color-vtk-body: #34405e;
+
+  /* Fout en waarschuwing, gespiegeld uit vtk-base.css: --danger-ink,
+     --danger-bg, --danger-line, --low-ink en --low-bg. Dezelfde namen als in
+     de uitleendienst, zodat een klasse in beide apps hetzelfde betekent. */
+  --color-vtk-danger: #b42318;
+  --color-vtk-danger-soft: #fdecea;
+  --color-vtk-danger-line: #f3c4bf;
+  --color-vtk-warn: #7a4e05;
+  --color-vtk-warn-soft: #fff2c7;
 
   --font-sans: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;

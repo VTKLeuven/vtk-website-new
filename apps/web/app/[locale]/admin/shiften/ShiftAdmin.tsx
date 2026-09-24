@@ -90,7 +90,7 @@ export function ShiftAdmin({
 
   return (
     <div className="space-y-4">
-      <div className="flex gap-1 border-b border-zinc-200">
+      <div className="flex gap-1 border-b border-vtk-navy/10">
         {visible.map((t) => (
           <button
             key={t.key}
@@ -99,7 +99,7 @@ export function ShiftAdmin({
             className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium ${
               tab === t.key
                 ? "border-vtk-blue text-vtk-blue"
-                : "border-transparent text-zinc-500 hover:text-zinc-800"
+                : "border-transparent text-vtk-muted hover:text-vtk-ink"
             }`}
           >
             {t.label}

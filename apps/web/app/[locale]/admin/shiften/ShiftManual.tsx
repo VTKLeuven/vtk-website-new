@@ -118,13 +118,13 @@ export function ShiftManual({
           </thead>
           <tbody>
             {filteredGrants.map((g) => (
-              <tr key={g.id} className="border-t border-zinc-200 hover:bg-zinc-50/50">
-                <td className="px-4 py-2 text-xs text-zinc-500 whitespace-nowrap">
+              <tr key={g.id} className="border-t border-vtk-navy/10 hover:bg-vtk-blue-muted/50">
+                <td className="px-4 py-2 text-xs text-vtk-muted whitespace-nowrap">
                   {format(g.createdAt, "dd/MM/yyyy HH:mm")}
                 </td>
                 <td className="px-4 py-2">
-                  <div className="font-medium text-zinc-900">{g.userName}</div>
-                  <div className="text-xs text-zinc-500">
+                  <div className="font-medium text-vtk-ink">{g.userName}</div>
+                  <div className="text-xs text-vtk-muted">
                     {g.userEmail}
                     {g.userRNumber ? ` • ${g.userRNumber}` : ""}
                   </div>
@@ -132,19 +132,19 @@ export function ShiftManual({
                 <td className="px-4 py-2 font-semibold text-vtk-blue whitespace-nowrap">
                   +{g.count} {nl ? (g.count === 1 ? "shift" : "shiften") : g.count === 1 ? "shift" : "shifts"}
                 </td>
-                <td className="px-4 py-2 text-zinc-600">{g.post ?? "—"}</td>
-                <td className="px-4 py-2 text-zinc-700">{g.reason}</td>
-                <td className="px-4 py-2 text-xs text-zinc-600 whitespace-nowrap">
+                <td className="px-4 py-2 text-vtk-body">{g.post ?? "—"}</td>
+                <td className="px-4 py-2 text-vtk-body">{g.reason}</td>
+                <td className="px-4 py-2 text-xs text-vtk-body whitespace-nowrap">
                   {g.reward > 0
                     ? `${g.reward} pp ${g.payedOut ? (nl ? "(uitbetaald)" : "(paid)") : nl ? "(openstaand)" : "(unpaid)"}`
                     : "0"}
                 </td>
-                <td className="px-4 py-2 text-xs text-zinc-500">{g.createdByName ?? "—"}</td>
+                <td className="px-4 py-2 text-xs text-vtk-muted">{g.createdByName ?? "—"}</td>
                 <td className="px-4 py-2 text-right">
                   <button
                     type="button"
                     onClick={() => setDeleting(g)}
-                    className="text-xs font-medium text-red-600 hover:text-red-800 hover:underline"
+                    className="text-xs font-medium text-vtk-danger hover:text-vtk-danger hover:underline"
                   >
                     {nl ? "Intrekken" : "Revoke"}
                   </button>
@@ -153,7 +153,7 @@ export function ShiftManual({
             ))}
             {filteredGrants.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={8} className="px-4 py-8 text-center text-vtk-muted">
                   {nl
                     ? "Geen manueel toegekende shiften voor dit academiejaar."
                     : "No manually granted shifts for this academic year."}

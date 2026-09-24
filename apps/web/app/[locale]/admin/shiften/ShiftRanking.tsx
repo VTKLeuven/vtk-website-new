@@ -73,15 +73,15 @@ export function ShiftRanking({
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={r.name + i} className="border-t border-zinc-200">
-                <td className="px-4 py-2 text-zinc-400">{i + 1}</td>
+              <tr key={r.name + i} className="border-t border-vtk-navy/10">
+                <td className="px-4 py-2 text-vtk-muted">{i + 1}</td>
                 <td className="px-4 py-2 font-medium">{r.name}</td>
-                <td className="px-4 py-2 text-zinc-500">{r.count}</td>
+                <td className="px-4 py-2 text-vtk-muted">{r.count}</td>
               </tr>
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={3} className="px-4 py-8 text-center text-zinc-500">
+                <td colSpan={3} className="px-4 py-8 text-center text-vtk-muted">
                   {nl ? "Nog geen voltooide shiften." : "No completed shifts yet."}
                 </td>
               </tr>
