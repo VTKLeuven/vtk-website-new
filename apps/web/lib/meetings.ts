@@ -238,6 +238,19 @@ export function offeringNameKey(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, ' ');
 }
 
+/**
+ * Draagt deze inschrijving een bestelling, of komt die persoon enkel? Allebei
+ * zijn ze een geldige inschrijving: wie niets bestelt staat even goed op de
+ * aanwezigheidslijst (zie docs/design-decisions.md). Enkel wat er te eten, te
+ * drinken en te betalen valt, hangt hieraan; de aanwezigheid niet.
+ */
+export function hasMeetingOrder(reservation: {
+  itemName?: string | null;
+  drinkName?: string | null;
+}): boolean {
+  return Boolean(reservation.itemName) || Boolean(reservation.drinkName);
+}
+
 export type ReservationAmounts = { itemPriceCents: number; drinkPriceCents: number };
 
 export function reservationTotalCents(reservation: ReservationAmounts): number {

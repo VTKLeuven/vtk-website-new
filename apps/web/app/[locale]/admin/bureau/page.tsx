@@ -78,17 +78,20 @@ export default async function AdminBureauPage({
         <h2 className="mb-1 text-lg font-semibold">{nl ? "Totalen" : "Totals"}</h2>
         <p className="mb-4 text-sm text-[#5c667f]">
           {nl
-            ? "Wat de broodjes en drankjes van de bureaus kosten. Studenten betalen niets; dit is voor de boekhouding van de post."
-            : "What the sandwiches and drinks of the bureaus cost. Students pay nothing; this is for the post's bookkeeping."}
+            ? "Hoeveel mensen er komen en wat hun broodjes en drankjes kosten. Wie zich inschrijft zonder iets te bestellen, telt mee voor de zaal maar niet voor het bedrag. Studenten betalen niets; dit is voor de boekhouding van de post."
+            : "How many people are coming and what their sandwiches and drinks cost. Someone who registers without ordering counts for the room but not for the amount. Students pay nothing; this is for the post's bookkeeping."}
         </p>
         {totals.perMeeting.length === 0 ? (
-          <p className="text-sm text-[#5c667f]">{nl ? "Nog geen bestellingen." : "No orders yet."}</p>
+          <p className="text-sm text-[#5c667f]">
+            {nl ? "Nog geen inschrijvingen." : "No registrations yet."}
+          </p>
         ) : (
           <div className="relative overflow-x-auto">
             <table className="w-full min-w-[28rem] text-sm">
               <thead>
                 <tr className="text-left text-xs font-semibold uppercase tracking-wide text-[#5c667f]">
                   <th className="py-1 pr-3">{nl ? "Bureau" : "Bureau"}</th>
+                  <th className="py-1 pr-3 text-right">{nl ? "Ingeschreven" : "Registered"}</th>
                   <th className="py-1 pr-3 text-right">{nl ? "Bestellingen" : "Orders"}</th>
                   <th className="py-1 text-right">{nl ? "Bedrag" : "Amount"}</th>
                 </tr>
@@ -97,12 +100,13 @@ export default async function AdminBureauPage({
                 {totals.perMeeting.map((row) => (
                   <tr key={row.id} className="border-t border-vtk-blue/10">
                     <td className="py-1.5 pr-3 capitalize">{row.dateLabel}</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums">{row.attendees}</td>
                     <td className="py-1.5 pr-3 text-right tabular-nums">{row.orders}</td>
                     <td className="py-1.5 text-right tabular-nums">{formatEuro(row.totalCents)}</td>
                   </tr>
                 ))}
                 <tr className="border-t-2 border-vtk-blue/20">
-                  <td className="py-1.5 pr-3 font-semibold" colSpan={2}>
+                  <td className="py-1.5 pr-3 font-semibold" colSpan={3}>
                     {nl ? `Totaal ${formatWorkingYear(workingYear)}` : `Total ${formatWorkingYear(workingYear)}`}
                   </td>
                   <td className="py-1.5 text-right font-semibold tabular-nums">
@@ -110,7 +114,7 @@ export default async function AdminBureauPage({
                   </td>
                 </tr>
                 <tr>
-                  <td className="py-1.5 pr-3 text-[#5c667f]" colSpan={2}>
+                  <td className="py-1.5 pr-3 text-[#5c667f]" colSpan={3}>
                     {nl ? "Totaal over alle bureaus" : "Total across all bureaus"}
                   </td>
                   <td className="py-1.5 text-right tabular-nums text-[#5c667f]">

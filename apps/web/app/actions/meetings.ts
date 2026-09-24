@@ -519,12 +519,11 @@ export async function saveMeetingReservationAction(
   const choice = choiceKey ? offering.find((option) => option.key === choiceKey) : undefined;
   if (choiceKey && !choice) return saveError("UNKNOWN_CHOICE");
 
-  // Niets gekozen: dan is er ook niets te bewaren.
-  if (!choice && !drinkName) {
-    await prisma.meetingReservation.deleteMany({ where: { meetingId, userId } });
-    revalidateMeeting(meeting.kind, meeting.slug);
-    return saveOk();
-  }
+  // Niets besteld is geen lege bestelling maar een inschrijving: wie komt zonder
+  // broodje of drankje hoort even goed op de aanwezigheidslijst, en zijn
+  // opmerking hoort bij het beheer te raken. Uitschrijven gebeurt met "Inschrijving
+  // annuleren" (`cancelMeetingReservationAction`), niet door alles op "geen" te
+  // zetten: dat wiste hier de inschrijving en gaf toch een groene toast.
 
   try {
     await withSerializableTransaction(async (tx) => {

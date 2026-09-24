@@ -7,6 +7,7 @@ import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import { ExclusiveChoiceGroup, type ExclusiveChoice } from "@/components/ui/ExclusiveChoiceGroup";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import { formatEuro } from "@/lib/theokot";
+import { hasMeetingOrder } from "@/lib/meetings";
 import {
   cancelMeetingReservationAction,
   saveMeetingReservationAction,
@@ -78,14 +79,26 @@ function choiceDescription(
 }
 
 /**
- * Eén vergadering met het bestelformulier eronder: een broodje, een drankje, en
- * bij een bureau een opmerking. Gedeeld door de grocomeet-pagina en de
- * bureaupagina, want het is dezelfde bestelling.
+ * Eén vergadering met het inschrijfformulier eronder: een broodje, een drankje,
+ * en bij een bureau een opmerking. Gedeeld door de grocomeet-pagina en de
+ * bureaupagina, want het is dezelfde inschrijving.
+ *
+ * Alle drie zijn ze optioneel: opslaan zonder broodje en zonder drankje is een
+ * inschrijving zonder bestelling, en die hoort even goed op de
+ * aanwezigheidslijst (zie docs/design-decisions.md). Uitschrijven gebeurt enkel
+ * met de knop onderaan, want anders is er geen verschil tussen "ik kom, zonder
+ * broodje" en "ik kom niet".
  */
 export function MeetingReservationCard({ nl, meeting }: { nl: boolean; meeting: MeetingCardView }) {
   const reservation = meeting.reservation;
   const [choice, setChoice] = useState(reservation?.choiceKey ?? NONE);
   const [drink, setDrink] = useState(reservation?.drink ?? NONE);
+
+  // Wat er bewaard staat, niet wat er nu in het formulier gekozen is.
+  const registeredWithoutOrder =
+    reservation !== null &&
+    reservation.invalidReason === null &&
+    !hasMeetingOrder({ itemName: reservation.choiceLabel, drinkName: reservation.drink });
 
   const selected = meeting.choices.find((option) => option.key === choice);
   const totalCents = (selected?.priceCents ?? 0) + (drink ? meeting.drinks.priceCents : 0);
@@ -138,14 +151,30 @@ export function MeetingReservationCard({ nl, meeting }: { nl: boolean; meeting: 
         </div>
       )}
 
+      {registeredWithoutOrder && (
+        <p className="mb-3 rounded-xl border border-vtk-blue/10 bg-vtk-blue-soft/40 px-3 py-2 text-sm text-[#34405e]">
+          {nl
+            ? "Je bent ingeschreven. Je bestelde geen broodje en geen drankje; dat hoeft ook niet."
+            : "You are registered. You did not order a sandwich or a drink, which is fine."}
+        </p>
+      )}
+
       {meeting.state === "OPEN" ? (
         <SaveForm
           action={saveMeetingReservationAction}
           className="space-y-4"
           resetOnSuccess={false}
-          submitLabel={reservation ? (nl ? "Bestelling bijwerken" : "Update order") : nl ? "Reserveren" : "Reserve"}
+          submitLabel={
+            reservation
+              ? nl
+                ? "Inschrijving bijwerken"
+                : "Update registration"
+              : nl
+                ? "Inschrijven"
+                : "Register"
+          }
           savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
-          savedMessage={nl ? "Je bestelling is opgeslagen" : "Your order has been saved"}
+          savedMessage={nl ? "Je inschrijving is opgeslagen" : "Your registration has been saved"}
           errorMessages={
             nl
               ? {
@@ -163,7 +192,9 @@ export function MeetingReservationCard({ nl, meeting }: { nl: boolean; meeting: 
                   UNKNOWN_DRINK: "That drink is not on the list.",
                 }
           }
-          fallbackErrorMessage={nl ? "Opslaan van je bestelling mislukt." : "Saving your order failed."}
+          fallbackErrorMessage={
+            nl ? "Opslaan van je inschrijving mislukt." : "Saving your registration failed."
+          }
         >
           <input type="hidden" name="meetingId" value={meeting.id} />
 
@@ -239,17 +270,19 @@ export function MeetingReservationCard({ nl, meeting }: { nl: boolean; meeting: 
           <DeleteButton
             action={cancelMeetingReservationAction}
             fields={{ meetingId: meeting.id }}
-            title={nl ? "Bestelling annuleren" : "Cancel order"}
+            title={nl ? "Inschrijving annuleren" : "Cancel registration"}
             description={
               nl
-                ? "Je broodje en drankje voor deze vergadering worden geschrapt. Zolang de deadline niet verstreken is, kan je nadien opnieuw bestellen."
-                : "Your sandwich and drink for this meeting will be removed. You can order again until the deadline."
+                ? "Je inschrijving voor deze vergadering verdwijnt, samen met je broodje, je drankje en je opmerking. Zolang de deadline niet verstreken is, kan je je nadien opnieuw inschrijven."
+                : "Your registration for this meeting will be removed, together with your sandwich, your drink and your comment. You can register again until the deadline."
             }
-            confirmLabel={nl ? "Annuleren" : "Cancel order"}
+            confirmLabel={nl ? "Uitschrijven" : "Cancel registration"}
             cancelLabel={nl ? "Terug" : "Back"}
-            successMessage={nl ? "Je bestelling is geannuleerd" : "Your order has been cancelled"}
+            successMessage={
+              nl ? "Je inschrijving is geannuleerd" : "Your registration has been cancelled"
+            }
           >
-            {nl ? "Bestelling annuleren" : "Cancel order"}
+            {nl ? "Inschrijving annuleren" : "Cancel registration"}
           </DeleteButton>
         </div>
       )}
@@ -257,7 +290,11 @@ export function MeetingReservationCard({ nl, meeting }: { nl: boolean; meeting: 
   );
 }
 
-/** Wat er te zien is wanneer er (nog) niet besteld kan worden. */
+/**
+ * Wat er te zien is wanneer er (nog) niet ingeschreven of gewijzigd kan worden.
+ * Een bestaande inschrijving blijft staan, ook zonder broodje of drankje: dat is
+ * dan de bevestiging dat je op de lijst staat.
+ */
 function ClosedSummary({ nl, meeting }: { nl: boolean; meeting: MeetingCardView }) {
   const reservation = meeting.reservation;
   return (
@@ -273,6 +310,9 @@ function ClosedSummary({ nl, meeting }: { nl: boolean; meeting: MeetingCardView 
       </p>
       {reservation && (
         <ul className="rounded-xl border border-vtk-blue/10 bg-vtk-blue-soft/40 p-3">
+          <li className="font-medium text-vtk-ink">
+            {nl ? "Je bent ingeschreven." : "You are registered."}
+          </li>
           <li>
             {nl ? "Broodje" : "Sandwich"}:{" "}
             <span className="font-medium">{reservation.choiceLabel ?? (nl ? "geen" : "none")}</span>

@@ -27,6 +27,8 @@ export type MeetingReservationRow = {
   totalCents: number;
   paid: boolean;
   invalid: boolean;
+  /** Er is een broodje of een drankje besteld; anders komt die persoon enkel. */
+  hasOrder: boolean;
 };
 
 export type MeetingAdminView = {
@@ -45,6 +47,8 @@ export type MeetingAdminView = {
   /** Staat er die dag een Theokot-verkoopdag klaar? */
   sessionState: "NONE" | "OPEN" | "CLOSED";
   reservations: MeetingReservationRow[];
+  /** Hoeveel van de inschrijvingen ook echt iets bestelden. */
+  orderCount: number;
   totalCents: number;
   openCents: number;
   /** Toont de betaalkolom (de GM rekent per persoon af, het bureau niet). */
@@ -53,7 +57,9 @@ export type MeetingAdminView = {
 
 /**
  * Eén moment in het beheer: de gegevens, het eigen aanbod wanneer Theokot die
- * dag niets voorziet, en de bestellingen die eraan hangen.
+ * dag niets voorziet, en wie er komt. Die lijst is een aanwezigheidslijst: een
+ * inschrijving zonder broodje of drankje staat er even goed in, met een streepje
+ * in de kolommen ernaast.
  */
 export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: MeetingAdminView }) {
   const [useTheokot, setUseTheokot] = useState(meeting.useTheokot);
@@ -65,7 +71,8 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
         <div>
           <h3 className="text-lg font-semibold capitalize text-vtk-ink">{meeting.dateLabel}</h3>
           <p className="text-sm text-[#5c667f]">
-            {meeting.reservations.length} {nl ? "bestellingen" : "orders"} ·{" "}
+            {meeting.reservations.length} {nl ? "ingeschreven" : "registered"} ·{" "}
+            {meeting.orderCount} {nl ? "met bestelling" : "with an order"} ·{" "}
             <span className="tabular-nums">{formatEuro(meeting.totalCents)}</span>
             {meeting.location ? ` · ${meeting.location}` : ""}
           </p>
@@ -80,8 +87,8 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
             title={nl ? "Vergadering verwijderen" : "Delete meeting"}
             description={
               nl
-                ? `De vergadering van ${meeting.dateLabel} verdwijnt, samen met ${meeting.reservations.length} bestelling(en). De broodjes komen terug vrij voor studenten. Dit kan niet ongedaan gemaakt worden.`
-                : `The meeting of ${meeting.dateLabel} will be removed, together with ${meeting.reservations.length} order(s). The sandwiches become available to students again. This cannot be undone.`
+                ? `De vergadering van ${meeting.dateLabel} verdwijnt, samen met ${meeting.reservations.length} inschrijving(en) en hun opmerkingen. De broodjes komen terug vrij voor studenten. Dit kan niet ongedaan gemaakt worden.`
+                : `The meeting of ${meeting.dateLabel} will be removed, together with ${meeting.reservations.length} registration(s) and their comments. The sandwiches become available to students again. This cannot be undone.`
             }
             confirmLabel={nl ? "Verwijderen" : "Delete"}
             cancelLabel={nl ? "Annuleren" : "Cancel"}
@@ -195,11 +202,13 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
 
       <details className="group mt-2">
         <summary className="cursor-pointer text-sm text-vtk-ink/80 hover:text-vtk-ink">
-          {nl ? `Bestellingen (${meeting.reservations.length})` : `Orders (${meeting.reservations.length})`}
+          {nl
+            ? `Wie komt (${meeting.reservations.length})`
+            : `Who is coming (${meeting.reservations.length})`}
         </summary>
         {meeting.reservations.length === 0 ? (
           <p className="mt-3 text-sm text-[#5c667f]">
-            {nl ? "Nog geen bestellingen." : "No orders yet."}
+            {nl ? "Nog niemand ingeschreven." : "Nobody registered yet."}
           </p>
         ) : (
           <div className="relative mt-3 overflow-x-auto">
@@ -231,10 +240,22 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
                       )}
                     </td>
                     <td className="py-1.5 pr-3">{row.drink ?? <span className="text-[#5c667f]">—</span>}</td>
-                    <td className="py-1.5 pr-3 text-right tabular-nums">{formatEuro(row.totalCents)}</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums">
+                      {row.hasOrder ? (
+                        formatEuro(row.totalCents)
+                      ) : (
+                        <span className="text-[#5c667f]">—</span>
+                      )}
+                    </td>
                     {meeting.showPaid && (
                       <td className="py-1.5 text-right">
-                        <PaidToggle nl={nl} reservationId={row.id} paid={row.paid} name={row.name} />
+                        {/* Zonder bestelling valt er niets af te vinken; een knop van
+                            nul euro leest als een openstaande schuld. */}
+                        {row.hasOrder ? (
+                          <PaidToggle nl={nl} reservationId={row.id} paid={row.paid} name={row.name} />
+                        ) : (
+                          <span className="text-[#5c667f]">—</span>
+                        )}
                       </td>
                     )}
                   </tr>

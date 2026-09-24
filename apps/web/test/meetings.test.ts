@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_DRINK_PRICE_CENTS,
   DEFAULT_MEETING_DRINKS,
+  hasMeetingOrder,
   isoWeekNumber,
   meetingCloseAt,
   meetingPath,
@@ -184,5 +185,20 @@ describe("prijzen per soort", () => {
 
   it("toont prijzen bij een grocomeet: daar wordt het bedrag per persoon afgevinkt", () => {
     expect(meetingPricesVisible("GROCOMEET")).toBe(true);
+  });
+});
+
+describe("inschrijving zonder bestelling", () => {
+  it("herkent een inschrijving met enkel een broodje, enkel een drankje, of allebei", () => {
+    expect(hasMeetingOrder({ itemName: "Broodje kaas", drinkName: null })).toBe(true);
+    expect(hasMeetingOrder({ itemName: null, drinkName: "Cola" })).toBe(true);
+    expect(hasMeetingOrder({ itemName: "Broodje kaas", drinkName: "Cola" })).toBe(true);
+  });
+
+  it("telt wie komt zonder broodje en zonder drankje niet als bestelling", () => {
+    expect(hasMeetingOrder({ itemName: null, drinkName: null })).toBe(false);
+    // Zo komt het uit een formulier dat op "geen" blijft staan.
+    expect(hasMeetingOrder({ itemName: "", drinkName: "" })).toBe(false);
+    expect(hasMeetingOrder({})).toBe(false);
   });
 });

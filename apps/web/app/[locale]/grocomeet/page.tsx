@@ -61,11 +61,13 @@ export default async function GrocomeetPage({ params }: { params: Promise<{ loca
     <div className="vtk-page">
       <header className="vtk-page-head">
         <div>
-          <h1 className="vtk-page-title">{nl ? "Broodjes voor de grocomeet" : "Sandwiches for the grocomeet"}</h1>
+          <h1 className="vtk-page-title">
+            {nl ? "Inschrijven voor de grocomeet" : "Register for the grocomeet"}
+          </h1>
           <p className="vtk-page-subtitle">
             {nl
-              ? "Kies per vergadering een broodje en een drankje. Aanpassen kan tot de besteldeadline van Theokot die dag."
-              : "Pick a sandwich and a drink per meeting. You can change it until Theokot's order deadline that day."}
+              ? "Schrijf je in per vergadering, met een broodje en een drankje als je dat wil. Aanpassen kan tot de besteldeadline van Theokot die dag."
+              : "Register per meeting, with a sandwich and a drink if you want one. You can change it until Theokot's order deadline that day."}
           </p>
         </div>
       </header>

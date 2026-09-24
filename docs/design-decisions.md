@@ -397,10 +397,33 @@ generieke `FormEntry` niet kan: broodjes van de **Theokot-voorraad** afromen, de
 turflijst** verschijnen (de doos voor de vergadering), en **ongeldig worden** wanneer
 het aanbod van die dag wijzigt. Dat is domeinlogica, geen formulierveld.
 
+### Een inschrijving is geen bestelling
+
+Het formulier is een **inschrijving** voor de vergadering; het broodje, het drankje
+en (bij een bureau) de opmerking zijn wat je er optioneel bij zet. Wie opslaat met
+"geen broodje" en "geen drankje" is dus ingeschreven en staat op de
+aanwezigheidslijst, met een streepje in de kolommen ernaast. Dat geldt voor de
+grocomeet en het bureau hetzelfde.
+
+- **Uitschrijven gebeurt enkel met "Inschrijving annuleren".** Alles op "geen"
+  zetten en opslaan is geen manier om je terug te trekken: dat is niet te
+  onderscheiden van "ik kom, ik eet niets mee".
+- **Waarom dit een beslissing is.** Het stond er eerst omgekeerd in: niets gekozen
+  wiste je reservatie en gaf tóch de groene toast "Je bestelling is opgeslagen".
+  Omdat "Geen broodje" en "Geen drankje" de voorgeselecteerde keuzes zijn, was de
+  **standaardtoestand van het formulier precies de toestand die niets bewaarde**.
+  Studenten schreven zich in, kregen een bevestiging, en Onderwijs zag hen nergens;
+  wie enkel onderwijsfeedback wou meegeven, zag die stil verdwijnen. Een halve
+  inschrijving bewaren is beter dan een bevestiging die niet klopt.
+- **Aanwezigheid en geld zijn twee kolommen.** Het beheerscherm toont "X ingeschreven
+  · Y met bestelling"; de totalen van Onderwijs en de schuldenlijst van de GM tellen
+  enkel wie echt iets bestelde, want een inschrijving zonder bestelling kost niets.
+  `hasMeetingOrder` in `lib/meetings.ts` is het ene punt waar dat onderscheid staat.
+
 ### Aanbod en het uitlijnen met de verkoopdag
 
 - Er kan **één broodje en één drankje** per persoon per vergadering besteld worden,
-  allebei optioneel: enkel een drankje (of niets) kan ook.
+  allebei optioneel: enkel een drankje (of niets) kan ook, zie hierboven.
 - Het **broodje van de week** staat er nooit bij: dat blijft voor de studenten.
 - Een reservatie wordt vaak **weken vooraf** gemaakt, terwijl Theokot het aanbod van
   die week pas een week op voorhand vastlegt. Zolang die verkoopdag niet bestaat,
