@@ -9,6 +9,11 @@ import {
   templateClockAt,
   templateTimeOfDay,
   toDraftEntry,
+  addDaysToYmd,
+  getCurrentMonday,
+  getNextMonday,
+  getDatesBetween,
+  formatDayLabel,
   type ShiftTemplateDraftEntry,
   type ShiftTemplateEntry,
 } from "@/lib/shift/templates";
@@ -178,5 +183,54 @@ describe("de shiftnaam", () => {
   it("zet het evenement achter de shift, en laat het weg als het leeg is", () => {
     expect(composeName("Cantus", "Inkom")).toBe("Inkom - Cantus");
     expect(composeName("  ", "Inkom")).toBe("Inkom");
+  });
+});
+
+describe("datumhulpjes voor terugkerende reeksen", () => {
+  it("rekent de huidige en volgende maandag uit", () => {
+    // 2026-09-24 is een donderdag.
+    expect(getCurrentMonday("2026-09-24")).toBe("2026-09-21");
+    expect(getNextMonday("2026-09-24")).toBe("2026-09-28");
+    // Op een maandag zelf: huidige is vandaag, volgende is +7d.
+    expect(getCurrentMonday("2026-09-21")).toBe("2026-09-21");
+    expect(getNextMonday("2026-09-21")).toBe("2026-09-28");
+  });
+
+  it("telt dagen op bij YMD", () => {
+    expect(addDaysToYmd("2026-09-28", 4)).toBe("2026-10-02");
+    expect(addDaysToYmd("2026-09-28", -7)).toBe("2026-09-21");
+  });
+
+  it("geeft de juiste weekdagen terug tussen twee datums", () => {
+    // Maandag 2026-09-28 tot vrijdag 2026-10-02, weekdagen 1..5 (Ma..Vr)
+    const weekdays = [1, 2, 3, 4, 5];
+    const dates = getDatesBetween("2026-09-28", "2026-10-02", weekdays);
+    expect(dates).toEqual([
+      "2026-09-28",
+      "2026-09-29",
+      "2026-09-30",
+      "2026-10-01",
+      "2026-10-02",
+    ]);
+
+    // Als woensdag niet actief is (bv. [1, 2, 4, 5])
+    const noWed = getDatesBetween("2026-09-28", "2026-10-02", [1, 2, 4, 5]);
+    expect(noWed).toEqual(["2026-09-28", "2026-09-29", "2026-10-01", "2026-10-02"]);
+  });
+
+  it("kapt een lang bereik niet stil af", () => {
+    // 28/09 tot 20/12: twaalf volle weken van vijf weekdagen.
+    expect(getDatesBetween("2026-09-28", "2026-12-20", [1, 2, 3, 4, 5])).toHaveLength(60);
+    // Elke maandag tot eind januari.
+    expect(getDatesBetween("2026-09-28", "2027-01-31", [1])).toHaveLength(18);
+  });
+
+  it("geeft niets terug als het einde voor het begin ligt", () => {
+    expect(getDatesBetween("2026-10-02", "2026-09-28", [1, 2, 3, 4, 5])).toEqual([]);
+  });
+
+  it("formatteert de datumtitel kort", () => {
+    expect(formatDayLabel("2026-09-28", "nl")).toContain("28");
+    expect(formatDayLabel("2026-09-28", "en")).toContain("28");
   });
 });

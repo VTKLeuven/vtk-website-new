@@ -139,7 +139,7 @@ export function ShiftRewards({
 
   return (
     <div className="space-y-4">
-      <div className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/35 p-4 text-sm text-[#34405e]">
+      <div className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/35 p-4 text-sm text-vtk-body">
         <h2 className="font-semibold text-vtk-ink">
           {nl ? "Bonnetjessaldo lezen" : "Understanding the voucher balance"}
         </h2>
@@ -203,15 +203,15 @@ export function ShiftRewards({
                 amount <= row.outstandingBonnetjes;
 
               return (
-                <tr key={row.userId} className="border-t border-zinc-200">
+                <tr key={row.userId} className="border-t border-vtk-navy/10">
                   <td className="px-4 py-3 font-medium">{row.name}</td>
-                  <td className="px-4 py-3 text-zinc-500">{row.email}</td>
+                  <td className="px-4 py-3 text-vtk-muted">{row.email}</td>
                   <td className="px-4 py-3">
                     <strong className="block text-base text-vtk-ink">
                       {row.outstandingBonnetjes}{" "}
                       {nl ? "bonnetjes" : "vouchers"}
                     </strong>
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-xs text-vtk-muted">
                       {nl
                         ? `saldo uit ${row.outstandingShiftCount} shiften`
                         : `balance from ${row.outstandingShiftCount} shifts`}
@@ -221,7 +221,7 @@ export function ShiftRewards({
                     <strong className="block text-base text-vtk-ink">
                       {row.paidBonnetjes} {nl ? "bonnetjes" : "vouchers"}
                     </strong>
-                    <span className="text-xs text-zinc-500">
+                    <span className="text-xs text-vtk-muted">
                       {nl
                         ? `toegekend over ${row.paidShiftCount} shiften`
                         : `awarded across ${row.paidShiftCount} shifts`}
@@ -253,7 +253,7 @@ export function ShiftRewards({
                           row.outstandingBonnetjes === 0
                         }
                       />
-                      <span className="whitespace-nowrap text-xs text-zinc-500">
+                      <span className="whitespace-nowrap text-xs text-vtk-muted">
                         {nl ? `van ${row.outstandingBonnetjes}` : `of ${row.outstandingBonnetjes}`}
                       </span>
                       <Button
@@ -283,7 +283,7 @@ export function ShiftRewards({
               <tr>
                 <td
                   colSpan={5}
-                  className="px-4 py-8 text-center text-zinc-500"
+                  className="px-4 py-8 text-center text-vtk-muted"
                 >
                   {nl
                     ? "Geen bonnetjes voor dit jaar."

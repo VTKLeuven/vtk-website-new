@@ -44,21 +44,21 @@ export default async function AdminShifts({
       return (
         <div className="space-y-3">
           <h1 className="text-2xl font-semibold">{locale === "nl" ? "Shiften" : "Shifts"}</h1>
-          <p className="text-sm text-[#5c667f]">
+          <p className="text-sm text-vtk-muted">
             {locale === "nl"
               ? "Je beheert de shiftsjablonen: de vaste reeks shiften van een evenement dat telkens terugkomt."
               : "You manage the shift templates: the fixed series of shifts of a recurring event."}
           </p>
           <Link
             href={`${locale === "nl" ? "" : "/en"}/admin/shiften/sjablonen/beheer`}
-            className="inline-flex h-10 items-center rounded-full bg-vtk-ink px-4 text-sm font-medium text-white"
+            className="inline-flex h-10 items-center rounded-full bg-vtk-ink px-4 text-sm font-medium text-vtk-surface-elevated"
           >
             {locale === "nl" ? "Naar de sjablonen" : "To the templates"}
           </Link>
         </div>
       );
     }
-    return <p className="text-sm text-zinc-500">{locale === "nl" ? "Geen toegang." : "No access."}</p>;
+    return <p className="text-sm text-vtk-muted">{locale === "nl" ? "Geen toegang." : "No access."}</p>;
   }
 
   const now = new Date();

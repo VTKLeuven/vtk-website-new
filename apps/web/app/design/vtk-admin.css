@@ -71,9 +71,15 @@
    zaalfoto niet meer te lezen, terwijl ze op het echte scherm wel klopte.
    Vandaar dat het blok er in de admin anders uitzag dan in de voorstelling.
    Kleur terugzetten kan hier niet: een tweede `!important` zou de component
-   óók overschrijven, alleen met een andere kleur. */
+   óók overschrijven, alleen met een andere kleur.
+
+   Een fout- of waarschuwingsregel (`text-vtk-danger`, `text-vtk-warn`) is de
+   tweede uitzondering: grijs gemaakt leest "de einddatum ligt voor de
+   startdatum" als een voetnoot en niet als de reden dat de knop niet werkt. */
 .vtk-admin-main :is(p, .text-zinc-500, .text-zinc-600, .text-zinc-700):not(
-    .vtk-admin-preview *
+    .vtk-admin-preview *,
+    .text-vtk-danger,
+    .text-vtk-warn
   ),
 /* `text-vtk-blue-muted` is de papierkleur (#EFF2F8), bedoeld als achtergrond.
    Op een witte kaart is die tekst onzichtbaar: "0 evenementen", de feed-link en

@@ -23,7 +23,7 @@ export function ShiftTemplateNav({
   const base = nl ? '' : '/en';
 
   const links: { key: 'build' | 'manage'; href: string; label: string }[] = [
-    { key: 'build', href: `${base}/admin/shiften/sjablonen`, label: nl ? 'Shiften aanmaken' : 'Create shifts' },
+    { key: 'build', href: `${base}/admin/shiften/sjablonen`, label: nl ? 'Meerdere shiften' : 'Multiple shifts' },
     ...(canManage
       ? [
           {
@@ -44,7 +44,7 @@ export function ShiftTemplateNav({
           aria-current={link.key === current ? 'page' : undefined}
           className={`inline-flex h-9 items-center rounded-full px-4 text-sm font-medium transition-colors ${
             link.key === current
-              ? 'bg-vtk-ink text-white'
+              ? 'bg-vtk-ink text-vtk-surface-elevated'
               : 'border border-vtk-blue/15 text-vtk-ink hover:border-vtk-blue/30 hover:bg-vtk-blue-soft/70'
           }`}
         >
