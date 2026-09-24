@@ -7,6 +7,7 @@ import {
   formatTicketPrice,
   type PublicTicketEvent,
 } from "./types";
+import { ticketDescriptionExcerpt } from "@/lib/ticketing/description";
 
 /** Onder dit aantal zegt de kaart hoeveel er nog zijn, net als het ticketpaneel. */
 const LOW_STOCK = 20;
@@ -20,12 +21,6 @@ function brussels(value: string | Date, locale: "nl" | "en", options: Intl.DateT
   })
     .format(new Date(value))
     .replace(".", "");
-}
-
-/** De eerste alinea, op één regel. De kaart knipt ze zelf af op twee regels. */
-function excerpt(description: string | null | undefined): string {
-  const first = (description ?? "").split(/\n\s*\n/)[0] ?? "";
-  return first.replace(/\s+/g, " ").trim();
 }
 
 export type TicketEventState = "open" | "soon";
@@ -73,7 +68,9 @@ export function TicketEventCard({
   const shownTypes = types.slice(0, MAX_PRICE_ROWS);
   const status = eventStatus(event, locale);
   const soldOut = status.tone === "out";
-  const summary = excerpt(event.description);
+  // De eerste alinea, op één regel en zonder markdown. De kaart knipt ze zelf
+  // af op twee regels.
+  const summary = ticketDescriptionExcerpt(event.description);
 
   return (
     <li className="tcat-card" data-sold-out={soldOut || undefined}>

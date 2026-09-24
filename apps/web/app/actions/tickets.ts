@@ -28,6 +28,7 @@ import {
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { TICKET_TERMS_SETTING_KEY } from "@/lib/ticketing/terms";
+import { TICKET_DESCRIPTION_MAX_LENGTH } from "@/lib/ticketing/description";
 import { ticketAudienceFrom, type TicketAudience } from "@/lib/ticketing/audience";
 import { getTicketEventTemplate } from "@/lib/ticketing/templateStore";
 import {
@@ -480,8 +481,8 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         slug,
         titleNl,
         titleEn: limitedOptionalValue(formData, "titleEn", 200) ?? calendarEvent?.titleEn,
-        descriptionNl: limitedOptionalValue(formData, "descriptionNl", 20_000) ?? calendarEvent?.descriptionNl,
-        descriptionEn: limitedOptionalValue(formData, "descriptionEn", 20_000) ?? calendarEvent?.descriptionEn,
+        descriptionNl: limitedOptionalValue(formData, "descriptionNl", TICKET_DESCRIPTION_MAX_LENGTH) ?? calendarEvent?.descriptionNl,
+        descriptionEn: limitedOptionalValue(formData, "descriptionEn", TICKET_DESCRIPTION_MAX_LENGTH) ?? calendarEvent?.descriptionEn,
         location: limitedOptionalValue(formData, "location", 300) ?? calendarEvent?.location,
         ...createdLocationGeo,
         startsAt,
@@ -713,10 +714,10 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
         titleEn: linked ? linked.titleEn : limitedOptionalValue(formData, "titleEn", 200),
         descriptionNl: linked
           ? linked.descriptionNl
-          : limitedOptionalValue(formData, "descriptionNl", 20_000),
+          : limitedOptionalValue(formData, "descriptionNl", TICKET_DESCRIPTION_MAX_LENGTH),
         descriptionEn: linked
           ? linked.descriptionEn
-          : limitedOptionalValue(formData, "descriptionEn", 20_000),
+          : limitedOptionalValue(formData, "descriptionEn", TICKET_DESCRIPTION_MAX_LENGTH),
         location: linked ? linked.location : limitedOptionalValue(formData, "location", 300),
         ...locationGeo,
         startsAt,
