@@ -96,6 +96,31 @@ idempotency key (`<orderId>:<attempt>`) and the gateway's `attempt`. A fixed key
 would collide on `@@unique([provider, idempotencyKey])` and make the provider
 silently hand back the first checkout.
 
+### The two logs are append-only, with three exceptions
+
+`TicketScanLog` and `TicketAuditLog` are append-only, enforced by a database
+trigger and not by discipline in the code. What a row says (which action, on
+which event, when, with which result) can never be changed or rewritten, and a
+row of an event that ever had an order can never be deleted.
+
+Three paths are allowed, and they are the only ones:
+
+- **Erasing an account** (`lib/privacy/account.ts`) nulls `actorUserId` and
+  `ipAddress` and replaces `metadata` with `{ "purged": true }` on the audit log,
+  and nulls `scannerUserId`, `deviceId` and `gateId` on the scan log.
+- **Retention** (`lib/privacy/retention.ts`) does the same to `ipAddress` and
+  `metadata` once a row is older than `PRIVACY_RAW_PAYLOAD_DAYS`.
+- **Deleting a ticket event that never had a single order**
+  (`deleteTicketEventAction`) takes its audit log and scan lines with it. The
+  trigger checks that itself: it counts the orders of the event, so this is not a
+  promise the calling code has to keep.
+
+Every scrub only goes one way, towards empty: `metadata` can only become the
+purge marker, never other content, or the log would be rewritable through a
+detour. The trigger used to allow `actorUserId` only, which quietly broke all
+three paths; an account with one ticket audit row could not be erased at all.
+`test/integration/ticketing-db.integration.ts` holds both sides of this.
+
 ### Mollie specifics
 
 - **Payments API** (single amount for the order total, EUR). Mollie amounts are
