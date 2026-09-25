@@ -2486,74 +2486,9 @@
   transform: translateY(0);
 }
 
-/* De beloning is een aantal bonnen, en die bonnen zijn fysiek muntjes (die ook
-   voor een broodje gelden, dus geen bier- of ticketsymbool). Ze staat daarom als
-   cijfer plus muntje, en niet als "3 drankbonnen".
-
-   Het cijfer staat náást de munt en niet erin: een getal in een gevulde cirkel
-   is op het web een notificatiebadge, en zo werd het ook gelezen. De munt zelf
-   heeft een rand, een lichte binnenring en een schaduwtje, want zonder die
-   dieptecues blijft het een gele vlek. Het volledige label blijft in
-   `aria-label` en in de tooltip staan. */
-.vtk-design .shift-tile-reward {
-  flex-shrink: 0;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ink);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.vtk-design .shift-tile-coins {
-  display: inline-flex;
-  align-items: center;
-  flex-shrink: 0;
-}
-
-.vtk-design .shift-tile-coin {
-  position: relative;
-  box-sizing: border-box;
-  width: 20px;
-  height: 20px;
-  flex-shrink: 0;
-  border-radius: 999px;
-  background: var(--yellow);
-  border: 1.5px solid var(--coin-rim);
-}
-
-/* Het VTK-wordmark als stempel op de munt, als masker en niet als <img>, zodat
-   het de kleur van de muntrand aanneemt en als reliëf leest. Op 20 px is het
-   merk geen leesbare naam meer maar een stempel, en net dat onderscheidt een
-   munt van een cirkel. Het schild kan hier niet: vier kwartieren met een leeuw
-   en een passer worden op deze grootte één vlek. */
-.vtk-design .shift-tile-coin::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--coin-rim);
-  -webkit-mask: url("/vtk-logo.png") center / 74% auto no-repeat;
-  mask: url("/vtk-logo.png") center / 74% auto no-repeat;
-}
-
-/* Het schijfje dat achter de voorste munt uitsteekt is donkerder en zijn stempel
-   staat flauwer: het ligt in de schaduw van de munt erboven. Twee muntjes zeggen
-   "bonnen" zonder dat er iets te tellen valt; hoeveel het er zijn, zegt het
-   cijfer ernaast. */
-.vtk-design .shift-tile-coin-back {
-  background: var(--accent-2);
-}
-
-.vtk-design .shift-tile-coin-back::after {
-  opacity: 0.7;
-}
-
-.vtk-design .shift-tile-coin-face {
-  margin-left: -10px;
-  box-shadow: 0 1px 2px rgba(14, 26, 54, 0.18);
-}
+/* De beloning op een kaartje (`.vtk-reward`, cijfer plus muntjes) staat in
+   `components/shift/shift-board.css`, dat deze band ook laadt: /shift tekent
+   dezelfde bonnen. */
 
 .vtk-design .shift-tile-foot {
   display: flex;

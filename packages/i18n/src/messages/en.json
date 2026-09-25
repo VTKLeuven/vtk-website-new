@@ -737,7 +737,7 @@
     "locked": "Locked within 24h",
     "until": "until {time}",
     "intl": {
-      "badge": "No Dutch required",
+      "badge": "Internationals welcome!",
       "hint": "You do not need to speak Dutch for this shift."
     },
     "instructions": "What does this shift involve?",

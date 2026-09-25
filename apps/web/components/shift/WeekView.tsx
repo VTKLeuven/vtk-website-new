@@ -298,7 +298,7 @@ export function ShiftWeekView({
                       data-overlap={isOverlap ? 'true' : undefined}
                       data-clash={conflict ? 'true' : undefined}
                       data-compact={height < 60 ? 'true' : undefined}
-                      title={`${shift.name} (${fmtTime(shift.startTime)} - ${fmtTime(shift.endTime)}) · ${shift.location} · ${statusText}${clashTooltip}`}
+                      title={`${shift.name} (${fmtTime(shift.startTime)} - ${fmtTime(shift.endTime)}) · ${shift.location} · ${statusText}${shift.openToInternationals ? ` · ${t.intl.badge}` : ''}${clashTooltip}`}
                       aria-label={`${t.dialog.open}: ${shift.name}, ${fmtTime(shift.startTime)} - ${fmtTime(shift.endTime)}, ${shift.location}`}
                       onClick={() => onOpen(s.merged)}
                       style={{

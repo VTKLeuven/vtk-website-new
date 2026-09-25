@@ -5,7 +5,13 @@ import Link from "@/components/ui/Link";
 import { isSameDay, addDays } from "date-fns";
 import type { Locale } from "@vtk/i18n";
 import { useToast } from "@/components/ui/toast";
-import { registerShift, type MergedShift, type PostNames } from "@/components/shift/shiftData";
+import {
+  registerShift,
+  rewardLabel,
+  type MergedShift,
+  type PostNames,
+} from "@/components/shift/shiftData";
+import { RewardCoins } from "@/components/shift/RewardCoins";
 import dynamic from "next/dynamic";
 import type { ShiftDict } from "@/components/shift/shiftData";
 
@@ -210,16 +216,7 @@ export function FrontpageShiftBand({
             const locationText = shift.location?.trim() ?? "";
             const hasPost = Boolean(postLabelText);
             const hasLocation = Boolean(locationText);
-            const rewardText =
-              shift.reward > 0
-                ? shift.reward === 1
-                  ? nl
-                    ? "1 drankbon"
-                    : "1 voucher"
-                  : nl
-                    ? `${shift.reward} drankbonnen`
-                    : `${shift.reward} vouchers`
-                : null;
+            const rewardText = shift.reward > 0 ? rewardLabel(shift.reward, t) : null;
 
             const roster = shift.roster ?? [];
             const rosterNames = roster.map((p) =>
@@ -314,18 +311,7 @@ export function FrontpageShiftBand({
                 <div className="shift-tile-time">
                   <p className="shift-tile-hours">{formatTimeRange(start, end)}</p>
                   {shift.reward > 0 ? (
-                    <span
-                      className="shift-tile-reward"
-                      role="img"
-                      title={rewardText ?? undefined}
-                      aria-label={rewardText ?? undefined}
-                    >
-                      {shift.reward}
-                      <span className="shift-tile-coins" aria-hidden="true">
-                        <span className="shift-tile-coin shift-tile-coin-back" />
-                        <span className="shift-tile-coin shift-tile-coin-face" />
-                      </span>
-                    </span>
+                    <RewardCoins amount={shift.reward} label={rewardText ?? ""} />
                   ) : null}
                 </div>
 

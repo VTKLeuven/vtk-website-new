@@ -1,11 +1,12 @@
 'use client';
 import { Fragment, useMemo, useState } from 'react';
 import { addDays, isSameDay } from 'date-fns';
-import { AlertTriangle, MapPin, Ticket } from 'lucide-react';
+import { AlertTriangle, MapPin } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { canUnregister, type ShiftResponse } from '@/lib/shift';
 import { useToast } from '@/components/ui/toast';
 import { InternationalsBadge } from './ShiftDialog';
+import { RewardCoins } from './RewardCoins';
 import {
   fill,
   fmtTime,
@@ -233,7 +234,7 @@ export function ShiftAgenda({
                           <span className="vtk-shift-title">
                             <span className="vtk-shift-title-text">{shift.name}</span>
                             {shift.openToInternationals ? (
-                              <InternationalsBadge locale={locale} compact />
+                              <InternationalsBadge locale={locale} />
                             ) : null}
                           </span>
 
@@ -247,10 +248,13 @@ export function ShiftAgenda({
                               <MapPin aria-hidden="true" />
                               <span>{shift.location}</span>
                             </span>
-                            <span className="vtk-shift-meta-i">
-                              <Ticket aria-hidden="true" />
-                              <span>{rewardLabel(shift.reward, t)}</span>
-                            </span>
+                            {shift.reward > 0 ? (
+                              <RewardCoins
+                                amount={shift.reward}
+                                label={rewardLabel(shift.reward, t)}
+                                size="sm"
+                              />
+                            ) : null}
                             {conflict ? (
                               <span
                                 className="vtk-shift-clash-warning"

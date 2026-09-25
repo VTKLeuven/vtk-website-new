@@ -478,6 +478,88 @@
   height: 13px;
 }
 
+/* --- De beloning: een cijfer met muntjes --- */
+
+/* De beloning is een aantal bonnen, en die bonnen zijn fysiek muntjes (die ook
+   voor een broodje gelden, dus geen bier- of ticketsymbool). Ze staat daarom als
+   cijfer plus muntje, en niet als "3 drankbonnen".
+
+   Het cijfer staat náást de munt en niet erin: een getal in een gevulde cirkel
+   is op het web een notificatiebadge, en zo werd het ook gelezen. De munt zelf
+   heeft een rand, een lichte binnenring en een schaduwtje, want zonder die
+   dieptecues blijft het een gele vlek. Het volledige label blijft in
+   `aria-label` en in de tooltip staan.
+
+   Dit staat hier en niet in `vtk-home.css`, want de shiftkaartjes op de
+   homepage laden dit bestand ook: de bonnen tekenen zich één keer, voor de
+   kaartjes én voor de agenda op /shift. De maat hangt aan `--coin`. */
+.vtk-reward {
+  --coin: 20px;
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-reward[data-size='sm'] {
+  --coin: 15px;
+  gap: 5px;
+  font-size: 13px;
+}
+
+.vtk-reward-coins {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+}
+
+.vtk-reward-coin {
+  position: relative;
+  box-sizing: border-box;
+  width: var(--coin);
+  height: var(--coin);
+  flex: none;
+  border-radius: 999px;
+  background: var(--yellow);
+  border: 1.5px solid var(--coin-rim);
+}
+
+/* Het VTK-wordmark als stempel op de munt, als masker en niet als <img>, zodat
+   het de kleur van de muntrand aanneemt en als reliëf leest. Op deze grootte is
+   het merk geen leesbare naam meer maar een stempel, en net dat onderscheidt een
+   munt van een cirkel. Het schild kan hier niet: vier kwartieren met een leeuw
+   en een passer worden zo klein één vlek. */
+.vtk-reward-coin::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--coin-rim);
+  -webkit-mask: url('/vtk-logo.png') center / 74% auto no-repeat;
+  mask: url('/vtk-logo.png') center / 74% auto no-repeat;
+}
+
+/* Het schijfje dat achter de voorste munt uitsteekt is donkerder en zijn stempel
+   staat flauwer: het ligt in de schaduw van de munt erboven. Twee muntjes zeggen
+   "bonnen" zonder dat er iets te tellen valt; hoeveel het er zijn, zegt het
+   cijfer ernaast. */
+.vtk-reward-coin-back {
+  background: var(--accent-2);
+}
+
+.vtk-reward-coin-back::after {
+  opacity: 0.7;
+}
+
+.vtk-reward-coin-face {
+  margin-left: calc(var(--coin) / -2);
+  box-shadow: 0 1px 2px rgba(14, 26, 54, 0.18);
+}
+
 .vtk-shift-post {
   display: inline-flex;
   align-items: center;
@@ -724,7 +806,6 @@
 }
 
 .vtk-shift-intl {
-  position: relative;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -742,21 +823,6 @@
 .vtk-shift-intl svg {
   width: 13px;
   height: 13px;
-}
-
-.vtk-shift-intl-compact {
-  padding: 3px;
-}
-
-/* Het label van het compacte bolletje is enkel voor een screenreader. De klasse
-   bestond nergens, dus de tekst stond gewoon naast de wereldbol. */
-.vtk-shift-intl .vtk-sr-only {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-  white-space: nowrap;
 }
 
 /* --- Knoppen --- */

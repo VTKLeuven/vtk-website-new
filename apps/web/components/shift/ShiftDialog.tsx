@@ -39,13 +39,20 @@ function Detail({ k, v }: { k: string; v: string }) {
   );
 }
 
-/** De markering voor shiften die je zonder Nederlands kan doen. */
-export function InternationalsBadge({ locale, compact }: { locale: Locale; compact?: boolean }) {
+/**
+ * De markering voor shiften die je zonder Nederlands kan doen.
+ *
+ * De tekst staat er altijd bij. Enkel een wereldbol was een raadsel: wie ze niet
+ * herkende, zag geen reden om zich in te schrijven, en net die persoon is hier
+ * het publiek. Ze staat ook op de Nederlandse site in het Engels, want ze is aan
+ * internationals gericht en niet aan wie de rest van de pagina al leest.
+ */
+export function InternationalsBadge({ locale }: { locale: Locale }) {
   const t = getDictionary(locale).shift;
   return (
-    <span className={`vtk-shift-intl${compact ? ' vtk-shift-intl-compact' : ''}`} title={t.intl.hint}>
+    <span className="vtk-shift-intl" title={t.intl.hint}>
       <Globe aria-hidden="true" />
-      <span className={compact ? 'vtk-sr-only' : undefined}>{t.intl.badge}</span>
+      <span>{t.intl.badge}</span>
     </span>
   );
 }

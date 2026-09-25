@@ -4402,16 +4402,38 @@ bestaan als snelle weg voor wie de shift al kent.
 
 ### `openToInternationals`: over de taal, niet over wie welkom is
 
-De markering **"Ook voor internationals"** (EN: "No Dutch required") betekent: je
-kan deze shift doen zónder Nederlands. Ze zegt niets over wie mag inschrijven,
-want dat mag iedereen. Zo blijft ze bruikbaar voor de vraag die een international
-zich effectief stelt, en leest een Nederlandstalige ze niet als "niet voor mij".
+De markering **"Internationals welcome!"** betekent: je kan deze shift doen
+zónder Nederlands. Ze zegt niets over wie mag inschrijven, want dat mag iedereen.
+Zo blijft ze bruikbaar voor de vraag die een international zich effectief stelt,
+en leest een Nederlandstalige ze niet als "niet voor mij". De zin staat ook op de
+Nederlandse site in het Engels: ze is gericht aan wie de rest van de pagina net
+níét leest. Waarom het zonder Nederlands kan, staat in de tooltip en die is wel
+vertaald.
 
-De markering krijgt een eigen, blauwe pil. Geel, groen en rood zijn op deze pagina
+De markering krijgt een eigen, blauwe pil, en die pil draagt haar tekst overal.
+In de lijst stond er een tijd enkel een wereldbol met een screenreader-label
+erachter: wie het icoon niet herkende, zag geen reden om zich in te schrijven, en
+net die persoon is hier het publiek. Geel, groen en rood zijn op deze pagina
 gereserveerd voor de vrije plaatsen; een taalmarkering in diezelfde kleuren zou
-als een capaciteitsstatus lezen. In een roosterblok is er enkel plaats voor het
-wereldbol-icoon; de volledige tekst zit in de tooltip, het aria-label en het
-detailvenster.
+als een capaciteitsstatus lezen. Enkel in een roosterblok is er geen plaats voor
+de pil; daar blijft het het wereldbol-icoon, met de tekst in de tooltip van het
+blok en in het detailvenster.
+
+### De beloning is een cijfer met muntjes, overal hetzelfde
+
+Een bon is bij VTK fysiek een muntje, en dat muntje geldt ook voor een broodje;
+een bier- of ticketsymbool zegt dus te weinig. De beloning staat daarom als
+cijfer met twee muntjes ernaast, en niet als "3 drankbonnen". Het cijfer staat
+náást de munt en niet erin, want een getal in een gevulde cirkel leest op het web
+als een notificatiebadge. Het volledige label ("3 bonnetjes") blijft in de
+tooltip en het aria-label staan.
+
+Dat tekeningetje stond eerst enkel op de shiftkaartjes van de homepage, terwijl
+de lijst op /shift een ticket-icoontje met tekst gebruikte: twee tekens voor
+precies hetzelfde ding, op twee pagina's die naar elkaar linken. Het is nu één
+component (`components/shift/RewardCoins.tsx`) met zijn CSS in
+`shift-board.css`, dat de homepageband ook al laadt. Een shift zonder beloning
+toont niets, ook in de lijst; "0 bonnetjes" is geen informatie.
 
 ### `instructions`: de lange uitleg, apart van `description`
 
