@@ -1,7 +1,12 @@
+import { healthcheckResponse } from "@/lib/healthcheck";
+
+export const dynamic = "force-dynamic";
+
 /**
  * Het pad dat de healthcheck van de web-container bevraagt
- * (`infra/docker-compose.yml`). De statuspagina's van de kring staan op
- * `/api/healthcheck` ingesteld, dus daar staat de implementatie; dit is
- * hetzelfde antwoord op het andere pad.
+ * (`infra/docker-compose.yml`). Zelfde antwoord als `/api/healthcheck`; zie
+ * `lib/healthcheck.ts`.
  */
-export { GET, dynamic } from "../healthcheck/route";
+export async function GET() {
+  return healthcheckResponse();
+}
