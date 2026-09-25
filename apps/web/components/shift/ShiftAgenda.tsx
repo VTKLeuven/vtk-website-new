@@ -14,7 +14,9 @@ import {
   registerShift,
   rewardLabel,
   spotsLabel,
+  spotsSpoken,
   spotsVariant,
+  takenSpots,
   unregisterShift,
   type MergedShift,
   type PostNames,
@@ -204,8 +206,8 @@ export function ShiftAgenda({
                       : nl
                         ? 'Nog geen inschrijvingen'
                         : 'No sign-ups yet';
-                  const taken = shift.takenSpots ?? (shift.maxParticipants - freeSpots(shift));
-                  const spotsBadgeLabel = registered ? t.isRegistered : spotsLabel(shift, t);
+                  const taken = takenSpots(shift);
+                  const spotsBadgeLabel = registered ? t.isRegistered : spotsLabel(shift);
                   const spotsBadgeClass = registered
                     ? 'vtk-shift-spots-mine'
                     : `vtk-shift-spots-${spotsVariant(shift)}`;
@@ -266,7 +268,6 @@ export function ShiftAgenda({
                         <div className="vtk-shift-spots-wrap">
                           <span
                             className={`vtk-shift-spots ${spotsBadgeClass}`}
-                            title={spotsTitle}
                             tabIndex={0}
                             role="button"
                             onClick={() => onOpen(entry)}
@@ -276,7 +277,7 @@ export function ShiftAgenda({
                                 onOpen(entry);
                               }
                             }}
-                            aria-label={`${spotsBadgeLabel}. ${spotsTitle}`}
+                            aria-label={`${registered ? t.isRegistered : spotsSpoken(shift, t)}. ${spotsTitle}`}
                           >
                             {spotsBadgeLabel}
                           </span>

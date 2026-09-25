@@ -21,7 +21,9 @@ import {
   registerShift,
   rewardLabel,
   spotsLabel,
+  spotsSpoken,
   spotsVariant,
+  takenSpots,
   unregisterShift,
   type MergedShift,
   type PostNames,
@@ -90,7 +92,7 @@ export function ShiftDialog({
   const isFull = !registered && freeSpots(shift) <= 0;
   const locked = registered && !canUnregister(shift, now);
   const free = freeSpots(shift);
-  const taken = shift.takenSpots ?? shift.participants?.length ?? 0;
+  const taken = takenSpots(shift);
 
   useEffect(() => {
     panelRef.current?.focus();
@@ -179,8 +181,11 @@ export function ShiftDialog({
                 {t.isRegistered}
               </span>
             ) : (
-              <span className={`vtk-shift-spots vtk-shift-spots-${spotsVariant(shift)}`}>
-                {spotsLabel(shift, t)}
+              <span
+                className={`vtk-shift-spots vtk-shift-spots-${spotsVariant(shift)}`}
+                aria-label={spotsSpoken(shift, t)}
+              >
+                {spotsLabel(shift)}
               </span>
             )}
             {shift.openToInternationals ? <InternationalsBadge locale={locale} /> : null}

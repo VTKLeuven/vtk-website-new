@@ -4,7 +4,7 @@ import { addDays } from 'date-fns';
 import { AlertTriangle, ChevronDown, ChevronUp, Globe, MapPin } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { canUnregister, type ShiftResponse } from '@/lib/shift';
-import { fill, fmtTime, freeSpots, spotsLabel, type MergedShift } from './shiftData';
+import { fill, fmtTime, freeSpots, spotsLabel, spotsSpoken, type MergedShift } from './shiftData';
 
 const HOUR_PX = 48;
 const TOTAL_HOURS = 24;
@@ -279,11 +279,9 @@ export function ShiftWeekView({
                       )
                     : null;
 
-                  const statusText = registered
-                    ? t.isRegistered
-                    : isFull
-                      ? t.spots.full
-                      : fill(t.spots.few, { n: freeSpots(shift) });
+                  // De tooltip van het blok schrijft het voluit; de pil erin toont
+                  // dezelfde bezetting als teller.
+                  const statusText = registered ? t.isRegistered : spotsSpoken(shift, t);
 
                   const clashTooltip = conflict
                     ? ` · ${fill(t.clashWarning, { name: conflict.name })}`
@@ -328,11 +326,12 @@ export function ShiftWeekView({
                         <span className="vtk-week-block-status">
                           {registered ? (
                             <span className="vtk-week-pill-mine">{t.isRegistered}</span>
-                          ) : isFull ? (
-                            <span className="vtk-week-pill-full">{t.spots.full}</span>
                           ) : (
-                            <span className="vtk-week-pill-open">
-                              {fill(t.spots.few, { n: freeSpots(shift) })}
+                            <span
+                              className={isFull ? 'vtk-week-pill-full' : 'vtk-week-pill-open'}
+                              aria-label={spotsSpoken(shift, t)}
+                            >
+                              {spotsLabel(shift)}
                             </span>
                           )}
                         </span>
