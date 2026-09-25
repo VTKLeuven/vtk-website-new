@@ -1,6 +1,7 @@
 "use server";
 
 import { after } from "next/server";
+import * as Sentry from "@sentry/nextjs";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
@@ -11,11 +12,29 @@ import { hasPermission, fullName, splitFullName } from "@vtk/auth";
 import { requirePermission, requireSession } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { currentWorkingYear } from "@/lib/workingYear";
-import { eraseUserData } from "@/lib/privacy/account";
+import { eraseUserData, StorageUnavailableError } from "@/lib/privacy/account";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { pushMailGroupsForGroup } from "@/lib/google/sync";
 import { isKuLeuvenEmail } from "@/lib/accountAccess";
 import { sendManagedPasswordSetupMail } from "@/lib/accountMail";
+
+/**
+ * Een fout in één regel, ook wanneer ze geen bruikbare `message` heeft.
+ *
+ * De S3-client gooit een `AggregateError` met een lege `message`: de reden zit
+ * in `code` en in de onderliggende fouten. Enkel `err.message` tonen leverde
+ * dan een melding die eindigde op een dubbele punt en verder niets.
+ */
+function describeError(err: unknown): string {
+  if (!(err instanceof Error)) return String(err);
+  const code = (err as { code?: unknown }).code;
+  const inner = (err as { errors?: unknown[] }).errors?.find((e) => e instanceof Error);
+  const parts = [
+    err.message.trim() || (inner instanceof Error ? inner.message.trim() : "") || err.name,
+    typeof code === "string" ? `(${code})` : "",
+  ].filter(Boolean);
+  return parts.join(" ").replace(/\s+/g, " ").slice(0, 300);
+}
 
 /** `P2002` op een bepaald veld: de unieke constraint die Prisma noemt. */
 function isUniqueViolation(err: unknown, field: string): boolean {
@@ -264,7 +283,25 @@ export async function deleteUserAction(formData: FormData): Promise<SaveState> {
     // kon weten dat het een rechtenkwestie was; het is een verwachte uitkomst en
     // hoort dus als melding terug te komen.
     if (target?.isSuperAdmin && !session.user.isSuperAdmin) return saveError("FORBIDDEN");
-    await eraseUserData(id);
+    try {
+      await eraseUserData(id);
+    } catch (err) {
+      // Dit gooide, en de beheerder kreeg dus een lege foutpagina met een
+      // foutcode: geen reden, geen volgende stap, en niets dat in een
+      // foutmelding te plakken viel. Wissen raakt twintig tabellen en
+      // objectopslag, dus er zijn genoeg manieren om te stranden die niets met
+      // de beheerder te maken hebben.
+      //
+      // Dit scherm zit achter `users.edit`, dus de technische reden mag hier
+      // gewoon staan. Ze gaat daarnaast naar de monitoring en naar de
+      // serverlog, want dit hoort een bug te zijn en geen dagelijkse uitkomst.
+      Sentry.captureException(err, { tags: { action: "deleteUser" }, extra: { targetUserId: id } });
+      console.error("[gebruikers] account wissen mislukt", { targetUserId: id }, err);
+      // De opslag krijgt een eigen code met een eigen zin: dat is de enige
+      // reden waar de beheerder zelf iets aan kan doen.
+      if (err instanceof StorageUnavailableError) return saveError("STORAGE_UNAVAILABLE");
+      return saveError("DELETE_FAILED", `Niet verwijderd: ${describeError(err)}`);
+    }
     await logAudit({
       action: "delete",
       entity: "user",

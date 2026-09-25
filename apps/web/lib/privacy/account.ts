@@ -275,6 +275,32 @@ export async function exportUserData(userId: string) {
 }
 
 /**
+ * De objectopslag deed niet mee. Bewust een eigen fout: dit is geen kapotte
+ * query maar een dienst die er even of blijvend niet is, en het scherm hoort
+ * daar iets anders over te zeggen. De S3-client gooit hier een `AggregateError`
+ * met een lege `message` en de echte reden in `code` (`ECONNREFUSED`,
+ * `AccessDenied`), dus die wordt hier bijgehouden in plaats van weggegooid.
+ */
+export class StorageUnavailableError extends Error {
+  constructor(
+    readonly key: string,
+    override readonly cause: unknown,
+  ) {
+    super(`De objectopslag kon ${key} niet verwijderen`);
+    this.name = "StorageUnavailableError";
+  }
+}
+
+/** Eén bestand wissen, met een fout die zegt dat het de opslag was. */
+async function removeObject(key: string): Promise<void> {
+  try {
+    await deleteObject(key);
+  } catch (err) {
+    throw new StorageUnavailableError(key, err);
+  }
+}
+
+/**
  * Remove authentication and current-membership data and replace the user with a
  * stable tombstone. Transaction/payment records remain referentially intact but
  * directly identifying fields are scrubbed.
@@ -289,7 +315,7 @@ export async function eraseUserData(userId: string) {
 
   // Fail before changing the database if object storage is unavailable, so the
   // request can be retried and the object key is not lost in a tombstone.
-  if (user.avatarKey) await deleteObject(user.avatarKey);
+  if (user.avatarKey) await removeObject(user.avatarKey);
 
   // Formulierinzendingen gaan volledig weg in plaats van geanonimiseerd te
   // worden. Bij een ticketbestelling volstaat het de identiteit te strippen,
@@ -300,7 +326,7 @@ export async function eraseUserData(userId: string) {
     where: { entry: { submittedById: userId } },
     select: { storageKey: true },
   });
-  for (const upload of formUploads) await deleteObject(upload.storageKey);
+  for (const upload of formUploads) await removeObject(upload.storageKey);
 
   await prisma.$transaction(
     async (tx) => {

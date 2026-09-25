@@ -18,6 +18,9 @@ export function userErrorMessages(locale: Locale): Record<string, string> {
     PASSWORD_TOO_SHORT: nl
       ? "Niet opgeslagen: een wachtwoord moet minstens 8 tekens bevatten."
       : "Not saved: a password must contain at least 8 characters.",
+    STORAGE_UNAVAILABLE: nl
+      ? "Niet verwijderd: de objectopslag antwoordt niet, dus de foto's en bestanden van dit account konden niet gewist worden. Kijk de S3-instellingen na bij Admin → IT en probeer opnieuw."
+      : "Not deleted: object storage is not responding, so this account's photos and files could not be removed. Check the S3 settings under Admin → IT and try again.",
     FORBIDDEN: nl
       ? "Niet verwijderd: enkel een superadmin kan het account van een superadmin verwijderen."
       : "Not deleted: only a superadmin can delete a superadmin account.",
