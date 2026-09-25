@@ -5,10 +5,16 @@ import { Button, ConfirmDialog } from "@vtk/ui";
 import { IconButton } from "@/components/ui/IconButton";
 import { TrashIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
+import type { SaveState } from "@/lib/saveState";
 
 type Common = {
-  /** Server action-referentie; serialiseerbaar, dus bruikbaar vanuit server components. */
-  action: (formData: FormData) => Promise<void>;
+  /**
+   * Server action-referentie; serialiseerbaar, dus bruikbaar vanuit server
+   * components. Geeft ze een `SaveState` terug, dan wordt een `status: "error"`
+   * een rode toast in plaats van een stille mislukking; `void` blijft werken voor
+   * acties die enkel kunnen slagen of redirecten.
+   */
+  action: (formData: FormData) => Promise<void | SaveState>;
   /** Wordt als FormData naar de action gestuurd. */
   fields: Record<string, string>;
   title: string;
@@ -20,10 +26,22 @@ type Common = {
    * deze component is dan al ge-unmount voor de toast kan verschijnen.
    */
   successMessage?: string;
+  /**
+   * Foutcode uit de action naar een vertaalde melding, net als bij `SaveForm`.
+   * `errorFallback` vangt de codes die hier niet in staan.
+   */
+  errorMessages?: Record<string, string>;
+  errorFallback?: string;
 };
 
 /** Bevestigen, uitvoeren en melden; gedeeld door beide varianten. */
-function useDeleteFlow({ action, fields, successMessage }: Pick<Common, "action" | "fields" | "successMessage">) {
+function useDeleteFlow({
+  action,
+  fields,
+  successMessage,
+  errorMessages,
+  errorFallback,
+}: Pick<Common, "action" | "fields" | "successMessage" | "errorMessages" | "errorFallback">) {
   const [confirming, setConfirming] = useState(false);
   const [pending, startTransition] = useTransition();
   const showToast = useToast();
@@ -32,8 +50,21 @@ function useDeleteFlow({ action, fields, successMessage }: Pick<Common, "action"
     const form = new FormData();
     for (const [key, value] of Object.entries(fields)) form.append(key, value);
     startTransition(async () => {
-      await action(form);
+      const result = await action(form);
       setConfirming(false);
+      if (result && result.status === "error") {
+        // Fout-toasts blijven staan tot de gebruiker ze wegklikt.
+        showToast({
+          message:
+            errorMessages?.[result.code] ??
+            result.detail ??
+            errorFallback ??
+            "Er ging iets mis. Probeer het opnieuw.",
+          variant: "error",
+          duration: 0,
+        });
+        return;
+      }
       if (successMessage) showToast({ message: successMessage, variant: "success" });
     });
   }
@@ -86,7 +117,7 @@ function Dialog({
   pending,
   onConfirm,
   onCancel,
-}: Omit<Common, "action" | "fields" | "successMessage"> & {
+}: Omit<Common, "action" | "fields" | "successMessage" | "errorMessages" | "errorFallback"> & {
   open: boolean;
   pending: boolean;
   onConfirm: () => void;

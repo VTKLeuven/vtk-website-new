@@ -18,5 +18,8 @@ export function userErrorMessages(locale: Locale): Record<string, string> {
     PASSWORD_TOO_SHORT: nl
       ? "Niet opgeslagen: een wachtwoord moet minstens 8 tekens bevatten."
       : "Not saved: a password must contain at least 8 characters.",
+    FORBIDDEN: nl
+      ? "Niet verwijderd: enkel een superadmin kan het account van een superadmin verwijderen."
+      : "Not deleted: only a superadmin can delete a superadmin account.",
   };
 }

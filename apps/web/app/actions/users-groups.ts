@@ -251,7 +251,7 @@ export async function sendUserAccessLinkAction(
   return saveOk();
 }
 
-export async function deleteUserAction(formData: FormData): Promise<void> {
+export async function deleteUserAction(formData: FormData): Promise<SaveState> {
   const session = await requirePermission("users.edit");
   const id = formData.get("id") as string;
   if (id) {
@@ -259,7 +259,11 @@ export async function deleteUserAction(formData: FormData): Promise<void> {
       where: { id },
       select: { isSuperAdmin: true, name: true, email: true },
     });
-    if (target?.isSuperAdmin && !session.user.isSuperAdmin) throw new Error("forbidden");
+    // Een superadmin verwijderen mag enkel een superadmin. Dit gooide vroeger,
+    // waardoor de beheerder een lege foutpagina met een foutcode kreeg en niet
+    // kon weten dat het een rechtenkwestie was; het is een verwachte uitkomst en
+    // hoort dus als melding terug te komen.
+    if (target?.isSuperAdmin && !session.user.isSuperAdmin) return saveError("FORBIDDEN");
     await eraseUserData(id);
     await logAudit({
       action: "delete",

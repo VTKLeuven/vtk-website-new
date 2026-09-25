@@ -302,185 +302,196 @@ export async function eraseUserData(userId: string) {
   });
   for (const upload of formUploads) await deleteObject(upload.storageKey);
 
-  await prisma.$transaction(async (tx) => {
-    const orders = await tx.ticketOrder.findMany({
-      where: { buyerUserId: userId },
-      select: { id: true },
-    });
-    const orderIds = orders.map((order) => order.id);
+  await prisma.$transaction(
+    async (tx) => {
+      const orders = await tx.ticketOrder.findMany({
+        where: { buyerUserId: userId },
+        select: { id: true },
+      });
+      const orderIds = orders.map((order) => order.id);
 
-    await tx.session.deleteMany({ where: { userId } });
-    await tx.account.deleteMany({ where: { userId } });
-    await tx.verification.deleteMany({ where: { identifier: user.email } });
-    await tx.groupMembership.deleteMany({ where: { userId } });
-    await tx.userRole.deleteMany({ where: { userId } });
-    await tx.pocRepresentative.deleteMany({ where: { userId } });
-    await tx.userDashboardTilePref.deleteMany({ where: { userId } });
-    await tx.dashboardTile.deleteMany({ where: { userId } });
-    await tx.shiftParticipant.deleteMany({ where: { userId } });
-    await tx.ticketEventUserGrant.deleteMany({ where: { userId } });
-    await tx.formUserGrant.deleteMany({ where: { userId } });
+      await tx.session.deleteMany({ where: { userId } });
+      await tx.account.deleteMany({ where: { userId } });
+      await tx.verification.deleteMany({ where: { identifier: user.email } });
+      await tx.groupMembership.deleteMany({ where: { userId } });
+      await tx.userRole.deleteMany({ where: { userId } });
+      await tx.pocRepresentative.deleteMany({ where: { userId } });
+      await tx.userDashboardTilePref.deleteMany({ where: { userId } });
+      await tx.dashboardTile.deleteMany({ where: { userId } });
+      await tx.shiftParticipant.deleteMany({ where: { userId } });
+      await tx.ticketEventUserGrant.deleteMany({ where: { userId } });
+      await tx.formUserGrant.deleteMany({ where: { userId } });
 
-    // De quota van geschrapte inzendingen komen weer vrij; anders blijft een
-    // gewist account een plaats bezetten die niemand meer kan innemen.
-    const ownEntries = await tx.formEntry.findMany({
-      where: { submittedById: userId },
-      select: { id: true, formId: true, status: true, answers: { select: { valueOptions: true } } },
-    });
-    for (const entry of ownEntries) {
-      if (entry.status !== "SUBMITTED") continue;
-      for (const code of entry.answers.flatMap((answer) => answer.valueOptions)) {
-        await tx.formFieldOption.updateMany({
-          where: { formId: entry.formId, code, quotaUsed: { gt: 0 } },
-          data: { quotaUsed: { decrement: 1 }, version: { increment: 1 } },
+      // De quota van geschrapte inzendingen komen weer vrij; anders blijft een
+      // gewist account een plaats bezetten die niemand meer kan innemen.
+      const ownEntries = await tx.formEntry.findMany({
+        where: { submittedById: userId },
+        select: { id: true, formId: true, status: true, answers: { select: { valueOptions: true } } },
+      });
+      for (const entry of ownEntries) {
+        if (entry.status !== "SUBMITTED") continue;
+        for (const code of entry.answers.flatMap((answer) => answer.valueOptions)) {
+          await tx.formFieldOption.updateMany({
+            where: { formId: entry.formId, code, quotaUsed: { gt: 0 } },
+            data: { quotaUsed: { decrement: 1 }, version: { increment: 1 } },
+          });
+        }
+      }
+      await tx.formEntry.deleteMany({ where: { submittedById: userId } });
+      await tx.formEntry.updateMany({ where: { reviewerId: userId }, data: { reviewerId: null } });
+      await tx.formAuditLog.updateMany({
+        where: { actorUserId: userId },
+        data: { actorUserId: null, ipAddress: null, metadata: { purged: true } },
+      });
+      await tx.doorAccessGrant.deleteMany({ where: { userId } });
+      // De User-rij blijft als anonieme tombstone bestaan, dus een FK-cascade zou
+      // deze credentials niet opruimen. Verwijder ze expliciet vóór anonimisering.
+      await tx.doorShortcutToken.deleteMany({ where: { userId } });
+      // Om dezelfde reden: een persoonlijke feed-URL blijft anders werken en zou de
+      // agenda van een gewist account aan de houder van de link blijven tonen.
+      await tx.calendarFeedToken.deleteMany({ where: { userId } });
+      // Bevestigings- en herstellinks per mail: een openstaande link zou na het
+      // wissen nog altijd een wachtwoord op deze rij kunnen zetten.
+      await tx.accountEmailToken.deleteMany({ where: { userId } });
+      // "Ik kom naar dit evenement" hangt aan een persoon, en bij een
+      // alumni-evenement staat er mogelijk een naam van hem publiek op de site.
+      // Een tombstone hoort daar niet meer in te staan.
+      await tx.calendarEventInterest.deleteMany({ where: { userId } });
+      // De bevestigingen dragen een momentopname van studiejaar en richting; aan
+      // een tombstone hoort die niet meer te hangen. De tellingen van die rondes
+      // zakken daardoor met één, en dat is de prijs van een echte verwijdering.
+      await tx.studyConfirmation.deleteMany({ where: { userId } });
+
+      await tx.doorAccessLog.updateMany({
+        where: { userId },
+        data: { userId: null, rNumber: null, cardName: null, reason: null },
+      });
+      await tx.ticketAuditLog.updateMany({
+        where: { actorUserId: userId },
+        data: { actorUserId: null, ipAddress: null, metadata: { purged: true } },
+      });
+      await tx.ticketScanLog.updateMany({
+        where: { scannerUserId: userId },
+        data: { scannerUserId: null },
+      });
+
+      if (orderIds.length > 0) {
+        await tx.ticketOrder.updateMany({
+          where: { id: { in: orderIds } },
+          data: {
+            buyerUserId: null,
+            buyerName: "Deleted user",
+            buyerEmail: deletedEmail,
+            requestFingerprint: null,
+          },
+        });
+        await tx.ticketOrderItem.updateMany({
+          where: {
+            orderId: { in: orderIds },
+            OR: [{ attendeeEmail: user.email }, { attendeeName: user.name }],
+          },
+          data: { attendeeName: "Deleted attendee", attendeeEmail: null },
+        });
+        await tx.ticketOutboxMessage.updateMany({
+          where: { orderId: { in: orderIds } },
+          data: { recipient: null, payload: { purged: true }, lastError: null },
         });
       }
-    }
-    await tx.formEntry.deleteMany({ where: { submittedById: userId } });
-    await tx.formEntry.updateMany({ where: { reviewerId: userId }, data: { reviewerId: null } });
-    await tx.formAuditLog.updateMany({
-      where: { actorUserId: userId },
-      data: { actorUserId: null, ipAddress: null, metadata: { purged: true } },
-    });
-    await tx.doorAccessGrant.deleteMany({ where: { userId } });
-    // De User-rij blijft als anonieme tombstone bestaan, dus een FK-cascade zou
-    // deze credentials niet opruimen. Verwijder ze expliciet vóór anonimisering.
-    await tx.doorShortcutToken.deleteMany({ where: { userId } });
-    // Om dezelfde reden: een persoonlijke feed-URL blijft anders werken en zou de
-    // agenda van een gewist account aan de houder van de link blijven tonen.
-    await tx.calendarFeedToken.deleteMany({ where: { userId } });
-    // Bevestigings- en herstellinks per mail: een openstaande link zou na het
-    // wissen nog altijd een wachtwoord op deze rij kunnen zetten.
-    await tx.accountEmailToken.deleteMany({ where: { userId } });
-    // "Ik kom naar dit evenement" hangt aan een persoon, en bij een
-    // alumni-evenement staat er mogelijk een naam van hem publiek op de site.
-    // Een tombstone hoort daar niet meer in te staan.
-    await tx.calendarEventInterest.deleteMany({ where: { userId } });
-    // De bevestigingen dragen een momentopname van studiejaar en richting; aan
-    // een tombstone hoort die niet meer te hangen. De tellingen van die rondes
-    // zakken daardoor met één, en dat is de prijs van een echte verwijdering.
-    await tx.studyConfirmation.deleteMany({ where: { userId } });
 
-    await tx.doorAccessLog.updateMany({
-      where: { userId },
-      data: { userId: null, rNumber: null, cardName: null, reason: null },
-    });
-    await tx.ticketAuditLog.updateMany({
-      where: { actorUserId: userId },
-      data: { actorUserId: null, ipAddress: null, metadata: { purged: true } },
-    });
-    await tx.ticketScanLog.updateMany({
-      where: { scannerUserId: userId },
-      data: { scannerUserId: null },
-    });
-
-    if (orderIds.length > 0) {
-      await tx.ticketOrder.updateMany({
-        where: { id: { in: orderIds } },
+      await tx.theokotOrder.updateMany({
+        where: { userId },
+        data: { statusNote: null },
+      });
+      await tx.theokotBan.updateMany({
+        where: { userId },
+        data: { reason: "Anonymised account", note: null, active: false },
+      });
+      await tx.uitleenReservation.updateMany({
+        where: { userId },
+        data: { memberNote: null, adminNote: null },
+      });
+      await tx.uitleenTransportBooking.updateMany({
+        where: { userId },
         data: {
-          buyerUserId: null,
-          buyerName: "Deleted user",
-          buyerEmail: deletedEmail,
-          requestFingerprint: null,
+          purpose: "Anonymised booking",
+          pickupAddress: null,
+          destination: null,
+          memberNote: null,
+          adminNote: null,
         },
       });
-      await tx.ticketOrderItem.updateMany({
-        where: {
-          orderId: { in: orderIds },
-          OR: [{ attendeeEmail: user.email }, { attendeeName: user.name }],
+
+      await tx.user.update({
+        where: { id: userId },
+        data: {
+          name: "Deleted user",
+          firstName: null,
+          lastName: null,
+          email: deletedEmail,
+          rNumber: null,
+          rNumberFromKul: false,
+          firwStudent: false,
+          firwStudentChangedAt: null,
+          emailVerified: false,
+          // Markeert de rij als tombstone in plaats van als gedeactiveerd lid, zodat
+          // gebruikerslijsten hem kunnen wegfilteren zonder ook echte inactieve
+          // leden te verbergen.
+          deletedAt: new Date(),
+          avatarKey: null,
+          image: null,
+          locale: "NL",
+          active: false,
+          isSuperAdmin: false,
+          onboardedAt: null,
+          noKot: false,
+          street: null,
+          houseNumber: null,
+          bus: null,
+          postalCode: null,
+          city: null,
+          homeStreet: null,
+          homeHouseNumber: null,
+          homeBus: null,
+          homePostalCode: null,
+          homeCity: null,
+          birthDate: null,
+          personalEmail: null,
+          phone: null,
+          defaultIban: null,
+          emailPreference: "UNIVERSITY",
+          mailCategories: { set: [] },
+          // De herkomst van de Career-opt-in hangt aan die opt-in; met de
+          // categorieën verdwijnt ze mee.
+          careerOptInAt: null,
+          careerOptInSource: null,
+          studyYears: { set: [] },
+          studyProgrammes: { set: [] },
+          isStudent: false,
+          notAtFaculty: false,
+          notStudying: false,
+          academicStaffRole: null,
+          internationalStudent: false,
+          alumni: false,
+          graduationYear: null,
+          wasInVtk: false,
+          alumniMailOptIn: false,
+          // Ook de eretitel: een tombstone hoort geen toegang meer te geven tot
+          // ticketsoorten die voor iedereen anders niet bestaan.
+          honoraryMember: false,
+          calendarOnlyMyAudiences: false,
+          studyConfirmedYear: null,
         },
-        data: { attendeeName: "Deleted attendee", attendeeEmail: null },
       });
-      await tx.ticketOutboxMessage.updateMany({
-        where: { orderId: { in: orderIds } },
-        data: { recipient: null, payload: { purged: true }, lastError: null },
-      });
-    }
-
-    await tx.theokotOrder.updateMany({
-      where: { userId },
-      data: { statusNote: null },
-    });
-    await tx.theokotBan.updateMany({
-      where: { userId },
-      data: { reason: "Anonymised account", note: null, active: false },
-    });
-    await tx.uitleenReservation.updateMany({
-      where: { userId },
-      data: { memberNote: null, adminNote: null },
-    });
-    await tx.uitleenTransportBooking.updateMany({
-      where: { userId },
-      data: {
-        purpose: "Anonymised booking",
-        pickupAddress: null,
-        destination: null,
-        memberNote: null,
-        adminNote: null,
-      },
-    });
-
-    await tx.user.update({
-      where: { id: userId },
-      data: {
-        name: "Deleted user",
-        firstName: null,
-        lastName: null,
-        email: deletedEmail,
-        rNumber: null,
-        rNumberFromKul: false,
-        firwStudent: false,
-        firwStudentChangedAt: null,
-        emailVerified: false,
-        // Markeert de rij als tombstone in plaats van als gedeactiveerd lid, zodat
-        // gebruikerslijsten hem kunnen wegfilteren zonder ook echte inactieve
-        // leden te verbergen.
-        deletedAt: new Date(),
-        avatarKey: null,
-        image: null,
-        locale: "NL",
-        active: false,
-        isSuperAdmin: false,
-        onboardedAt: null,
-        noKot: false,
-        street: null,
-        houseNumber: null,
-        bus: null,
-        postalCode: null,
-        city: null,
-        homeStreet: null,
-        homeHouseNumber: null,
-        homeBus: null,
-        homePostalCode: null,
-        homeCity: null,
-        birthDate: null,
-        personalEmail: null,
-        phone: null,
-        defaultIban: null,
-        emailPreference: "UNIVERSITY",
-        mailCategories: { set: [] },
-        // De herkomst van de Career-opt-in hangt aan die opt-in; met de
-        // categorieën verdwijnt ze mee.
-        careerOptInAt: null,
-        careerOptInSource: null,
-        studyYears: { set: [] },
-        studyProgrammes: { set: [] },
-        isStudent: false,
-        notAtFaculty: false,
-        notStudying: false,
-        academicStaffRole: null,
-        internationalStudent: false,
-        alumni: false,
-        graduationYear: null,
-        wasInVtk: false,
-        alumniMailOptIn: false,
-        // Ook de eretitel: een tombstone hoort geen toegang meer te geven tot
-        // ticketsoorten die voor iedereen anders niet bestaan.
-        honoraryMember: false,
-        calendarOnlyMyAudiences: false,
-        studyConfirmedYear: null,
-      },
-    });
-  });
-
+    },
+    {
+      // Deze transactie doet dertig statements over evenveel tabellen. Prisma's
+      // standaard van vijf seconden is genoeg voor een vers account, maar niet
+      // voor een lid met jaren bestellingen, tickets, formulieren en deurlogs:
+      // dan sluit de transactie halverwege en faalt het verwijderen met een
+      // fout die niets uitlegt. Ruim genomen; ze draait hoogstens een paar keer
+      // per jaar.
+      timeout: 60_000,
+      maxWait: 15_000,
+    },
+  );
 }

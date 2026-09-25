@@ -345,8 +345,16 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
         }
         confirmLabel={locale === 'nl' ? 'Verwijderen' : 'Delete'}
         cancelLabel={locale === 'nl' ? 'Annuleren' : 'Cancel'}
-        // Geen toast: deze action redirect naar de gebruikerslijst, want deze
-        // pagina bestaat nadien niet meer. Die navigatie is de bevestiging.
+        errorMessages={userErrorMessages(locale)}
+        errorFallback={
+          locale === 'nl'
+            ? 'Niet verwijderd. Probeer het opnieuw; blijft het misgaan, mail dan naar it@vtk.be.'
+            : 'Not deleted. Try again; if it keeps failing, email it@vtk.be.'
+        }
+        // Geen toast bij succes: deze action redirect naar de gebruikerslijst,
+        // want deze pagina bestaat nadien niet meer. Die navigatie is de
+        // bevestiging. Een mislukking redirect niet en heeft dus wel een melding
+        // nodig, anders lijkt de knop niets te doen.
       >
         {locale === 'nl' ? 'Gebruiker verwijderen' : 'Delete user'}
       </DeleteButton>
