@@ -59,15 +59,15 @@
   margin: 0 auto;
   padding: clamp(32px, 4.5vw, 56px) clamp(20px, 3vw, 36px) clamp(72px, 8vw, 112px);
   display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(340px, 0.85fr);
-  gap: clamp(20px, 3vw, 34px);
+  grid-template-columns: minmax(0, 1fr) 400px;
+  gap: clamp(24px, 3.5vw, 44px);
   align-items: start;
 }
 
-.vtk-event-media-col {
-  display: flex;
-  flex-direction: column;
-  gap: clamp(20px, 3vw, 34px);
+/* Links de foto, de omschrijving en (bij een alumni-evenement) wie er komt. */
+.vtk-event-main {
+  display: grid;
+  gap: clamp(24px, 3vw, 36px);
   min-width: 0;
 }
 
@@ -86,13 +86,16 @@
   object-fit: cover;
 }
 
-.vtk-event-info {
-  padding: clamp(24px, 3vw, 32px);
+/* De omschrijving leest als gewone tekst onder de foto, zonder kaart eromheen:
+   een lange tekst krijgt zo een prettige regellengte in plaats van een smalle
+   kolom naast de foto. */
+.vtk-event-about {
+  max-width: 68ch;
 }
 
 /* `width: fit-content` omdat de gele streep hieronder 100% is van een blok dat
    om de tekst sluit; zie de sectiekop op een inhoudspagina. */
-.vtk-event-info > h2 {
+.vtk-event-about > h2 {
   width: fit-content;
   max-width: 100%;
   margin: 0 0 16px;
@@ -106,7 +109,7 @@
    (`.vtk-page-content .prose-vtk h2::after`) en onder de titel van een
    eventkaart. Dit is de kop die de inhoud van de pagina opent, dus hij hoort
    eruit te zien als elke andere sectiekop op de site. */
-.vtk-event-info > h2::after {
+.vtk-event-about > h2::after {
   content: "";
   display: block;
   width: 100%;
@@ -116,15 +119,50 @@
   background: var(--yellow);
 }
 
-.vtk-event-info > p {
+.vtk-event-about > p {
   margin: 0;
   color: var(--body);
   font-size: 15px;
   line-height: 1.7;
 }
 
-.vtk-event-info .spec {
-  margin-top: 26px;
+/* Rechts het paneel: wanneer en de knoppen, dat blijft staan terwijl je de
+   omschrijving leest. Dezelfde kaart als het ticketpaneel (vtk-ticket-shop.css). */
+.vtk-event-side {
+  position: sticky;
+  top: 96px;
+  display: grid;
+  gap: 18px;
+  padding: 22px;
+  border-radius: 20px;
+  box-shadow: 0 1px 2px rgba(14, 26, 54, 0.04), 0 12px 32px -18px rgba(14, 26, 54, 0.25);
+}
+
+.vtk-event-side-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-event-side-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.vtk-event-side-head small {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.vtk-event-side .spec {
+  margin: 0;
 }
 
 /*
@@ -134,7 +172,7 @@
  * dit is een opsomming van dagen binnen een paneel dat er al is.
  */
 .vtk-event-moments {
-  margin-top: 26px;
+  min-width: 0;
 }
 
 .vtk-event-moments h3 {
@@ -157,6 +195,25 @@
   margin: 0 0 8px;
   color: var(--muted);
   font-size: 13px;
+}
+
+/* Ingeklapt staan enkel de eerste dagen (EVENT_MOMENTS_VISIBLE in
+   lib/calendar/moments.ts); de server zet `is-extra` op de rest. */
+.vtk-event-moments ol[data-collapsed] .vtk-event-moment.is-extra {
+  display: none;
+}
+
+.vtk-event-moments-more {
+  margin-top: 10px;
+  padding: 0 0 2px;
+  border: 0;
+  border-bottom: 2px solid var(--yellow);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 650;
+  cursor: pointer;
 }
 
 /* Drie kolommen: de dag, het uur en de ster van díé dag. De naam van het moment
@@ -227,23 +284,44 @@
   opacity: 0.6;
 }
 
+/* De knoppen onder elkaar over de breedte van het paneel, zoals de betaalknop
+   in de ticketshop. Het formulier voor alumni en een foutmelding volgen via
+   hun `order` (zie hieronder) en krijgen de volle breedte. */
 .vtk-event-actions {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
+  align-items: stretch;
   gap: 10px;
-  margin-top: 30px;
 }
 
-.vtk-event-back-btn {
-  flex-basis: 100%;
-  width: fit-content;
-  margin-top: 4px;
+.vtk-event-actions .btn {
+  justify-content: center;
+  width: 100%;
+}
+
+.vtk-event-actions .vtk-interest-pill {
+  align-self: center;
 }
 
 @media (max-width: 960px) {
   .vtk-event-head,
   .vtk-event-layout {
     grid-template-columns: 1fr;
+  }
+
+  /* Op een smal scherm: de foto, dan het paneel (wat je moet weten en doen),
+     dan de omschrijving. Het paneel blijft er niet meer staan. */
+  .vtk-event-main {
+    display: contents;
+  }
+
+  .vtk-event-photo {
+    order: -2;
+  }
+
+  .vtk-event-side {
+    position: static;
+    order: -1;
   }
 
   .vtk-event-meta {
@@ -358,7 +436,7 @@
 }
 
 .vtk-interest-expand {
-  flex: 1 0 100%;
+  flex: none;
   order: 20;
   margin-top: 4px;
   padding: 18px 20px;
@@ -488,7 +566,6 @@
 }
 
 .vtk-interest-toggle-error {
-  flex: 1 0 100%;
   order: 19;
 }
 

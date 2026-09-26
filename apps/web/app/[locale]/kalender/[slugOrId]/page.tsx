@@ -8,7 +8,7 @@ import { MapPinIcon, UsersIcon } from "@/components/ui/icons";
 import { hasLocale } from "@/lib/locale";
 import { organiserName } from "@/lib/calendar/organiser";
 import { eventLinkLabel } from "@/lib/calendar/eventLink";
-import { momentsSummary } from "@/lib/calendar/moments";
+import { EVENT_MOMENTS_VISIBLE, momentsSummary } from "@/lib/calendar/moments";
 import { publicUrl } from "@/lib/storage";
 import { defaultEventImageFor, eventCategorySlugs } from "@/lib/defaultEventImage";
 import { eventMetadata } from "@/lib/pageMetadata";
@@ -26,6 +26,7 @@ import {
 } from "@/lib/calendar/interest";
 import { EventInterest } from "@/components/calendar/EventInterest";
 import { EventStar } from "@/components/calendar/EventStar";
+import { EventMomentsList } from "@/components/calendar/EventMomentsList";
 import { AttendeeTable } from "@/components/calendar/AttendeeTable";
 import { CategoryCalendar } from "./CategoryCalendar";
 
@@ -65,6 +66,12 @@ function clockLabel(date: Date, locale: Locale) {
     hour: "2-digit",
     minute: "2-digit",
   });
+}
+
+/** Een tijdstip in het paneel: "ma 28 sep, 18:30", of enkel de dag bij een heledagevenement. */
+function specMoment(date: Date, allDay: boolean, locale: Locale) {
+  const day = dayLabel(date, locale, "short");
+  return allDay ? day : `${day}, ${clockLabel(date, locale)}`;
 }
 
 /**
@@ -214,6 +221,22 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
       : "Marking this did not work. Try again in a moment.",
   };
 
+  // Het regeltje rechts van "Doe mee": hoeveel dagen, of het uur. Een
+  // evenement over meerdere dagen heeft geen kort uur; de start en het einde
+  // staan dan voluit in het paneel zelf.
+  const sideSummary =
+    event.moments.length > 0
+      ? nl
+        ? `${event.moments.length} ${event.moments.length === 1 ? "dag" : "dagen"}`
+        : `${event.moments.length} ${event.moments.length === 1 ? "day" : "days"}`
+      : event.allDay
+        ? nl
+          ? "Hele dag"
+          : "All day"
+        : dayLabel(event.start, locale, "short") === dayLabel(event.end, locale, "short")
+          ? `${clockLabel(event.start, locale)} - ${clockLabel(event.end, locale)}`
+          : null;
+
   return (
     <article className="vtk-page">
       <header className="vtk-page-head vtk-event-head">
@@ -272,8 +295,13 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
         </div>
       </header>
 
+      {/* Dezelfde opbouw als de ticketpagina: links de foto met de omschrijving
+          eronder, rechts een paneel met wanneer en de knoppen dat blijft staan
+          terwijl je leest. Zo eindigt een lange omschrijving niet meer naast
+          een leeg vlak, met de knoppen drie schermen lager. Zie
+          docs/design-decisions.md. */}
       <div className="vtk-event-layout">
-        <div className="vtk-event-media-col">
+        <div className="vtk-event-main">
           <figure className="vtk-event-photo">
             <Image
               src={imageSrc}
@@ -287,22 +315,29 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
             />
           </figure>
 
+          <section className="vtk-event-about">
+            <h2>{locale === "nl" ? "Over dit event" : "About this event"}</h2>
+            {description ? (
+              <div className="prose-vtk vtk-event-description">
+                <Markdown locale={locale}>{description}</Markdown>
+              </div>
+            ) : (
+              <p>
+                {locale === "nl"
+                  ? "Meer details worden later aangevuld door de organiserende werkgroep."
+                  : "More details will be added later by the organising work group."}
+              </p>
+            )}
+          </section>
+
           {isAlumniEvent ? <AttendeeTable rows={attendees} locale={locale} /> : null}
         </div>
 
-        <section className="vtk-panel vtk-event-info">
-          <h2>{locale === "nl" ? "Over dit event" : "About this event"}</h2>
-          {description ? (
-            <div className="prose-vtk vtk-event-description">
-              <Markdown locale={locale}>{description}</Markdown>
-            </div>
-          ) : (
-            <p>
-              {locale === "nl"
-                ? "Meer details worden later aangevuld door de organiserende werkgroep."
-                : "More details will be added later by the organising work group."}
-            </p>
-          )}
+        <aside className="vtk-panel vtk-event-side" aria-labelledby="event-side-title">
+          <div className="vtk-event-side-head">
+            <h2 id="event-side-title">{nl ? "Doe mee" : "Join in"}</h2>
+            {sideSummary ? <small>{sideSummary}</small> : null}
+          </div>
           {/* Een evenement met losse momenten zegt hier wannéér het doorgaat, dag
               per dag. Dat is precies wat één start en één einde niet kunnen
               zeggen: die zouden er een blok van maken dat de hele week doorloopt. */}
@@ -315,14 +350,27 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
               <p className="vtk-event-moments-hint">
                 {nl ? "Duid per dag aan of je erbij bent." : "Mark the days you are coming to."}
               </p>
-              <ol>
-                {event.moments.map((moment) => {
+              <EventMomentsList
+                total={event.moments.length}
+                labels={{
+                  more: nl
+                    ? `Toon alle ${event.moments.length} dagen`
+                    : `Show all ${event.moments.length} days`,
+                  less: nl ? "Toon minder dagen" : "Show fewer days",
+                }}
+              >
+                {event.moments.map((moment, index) => {
                   const momentIso = moment.start.toISOString();
                   const momentTitle = moment.label
                     ? `${title} (${moment.label})`
                     : `${title}, ${dayLabel(moment.start, locale, "short")}`;
                   return (
-                    <li key={momentIso} className="vtk-event-moment">
+                    <li
+                      key={momentIso}
+                      className={
+                        index >= EVENT_MOMENTS_VISIBLE ? "vtk-event-moment is-extra" : "vtk-event-moment"
+                      }
+                    >
                       <span className="day">{dayLabel(moment.start, locale, "short")}</span>
                       <span className="time">
                         {clockLabel(moment.start, locale)} - {clockLabel(moment.end, locale)}
@@ -346,22 +394,14 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
                     </li>
                   );
                 })}
-              </ol>
+              </EventMomentsList>
             </section>
           ) : (
             <dl className="spec">
               <dt>{locale === "nl" ? "Start" : "Start"}</dt>
-              <dd>
-                {event.start.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", {
-                  timeZone: "Europe/Brussels",
-                })}
-              </dd>
+              <dd>{specMoment(event.start, event.allDay, locale)}</dd>
               <dt>{locale === "nl" ? "Einde" : "End"}</dt>
-              <dd>
-                {event.end.toLocaleString(locale === "nl" ? "nl-BE" : "en-GB", {
-                  timeZone: "Europe/Brussels",
-                })}
-              </dd>
+              <dd>{specMoment(event.end, event.allDay, locale)}</dd>
             </dl>
           )}
           <div className="vtk-event-actions">
@@ -447,7 +487,7 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
               ← {locale === "nl" ? "Terug naar kalender" : "Back to calendar"}
             </Link>
           </div>
-        </section>
+        </aside>
       </div>
     </article>
   );

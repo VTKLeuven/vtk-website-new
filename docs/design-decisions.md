@@ -8964,3 +8964,25 @@ klik te veel, de volle breedte duwde de openingsuren een scherm naar beneden.
 **/nieuws** toont alles wat nu in het nieuws staat (zonder de grens van de
 band) en de eerdere mededelingen en woordjes. Automatische berichten hebben
 daar geen historiek: hun bron staat nog op zijn eigen plek.
+
+## De eventpagina: omschrijving onder de foto, een paneel ernaast
+
+Op de eventpagina stond alles wat bij een evenement hoort (de omschrijving, de
+dagen, de knoppen) in één kaart naast de foto. Bij een korte omschrijving stonden
+foto en kaart mooi even hoog naast elkaar. Bij een lange (de Speedytrainingen:
+een pagina tekst en twaalf dagen) werd die kaart drie schermen hoog, bleef links
+een leeg vlak staan en stonden de knoppen helemaal onderaan.
+
+Nu heeft de pagina dezelfde opbouw als de ticketpagina: links de foto met de
+omschrijving eronder, als gewone leestekst zonder kaart; rechts een paneel
+"Doe mee" met wanneer en de knoppen, dat blijft staan terwijl je leest. Een
+evenement met losse momenten toont er de eerste zeven dagen, met "Toon alle
+dagen" voor de rest (`EVENT_MOMENTS_VISIBLE` in `lib/calendar/moments.ts`).
+Op een smal scherm komt het paneel meteen onder de foto, voor de omschrijving.
+
+Vier richtingen werden bekeken. De omschrijving inkorten naast de foto hield
+de korte events exact zoals ze waren, maar wie alles wou lezen, moest klikken
+en de knoppen schoven dan alsnog naar onder. De foto als brede plaat met een
+rail ernaast leest als een artikel, maar een affiche in staand formaat valt in
+een brede strook slecht. De opbouw van de ticketpagina won: lang of kort maakt
+er niet uit, en een event en zijn ticketshop zien er nu uit als één geheel.

@@ -717,14 +717,23 @@ export default async function SamplePage({
         </section>
 
         <section id="event" className="vtk-event-layout !px-0 !pb-0">
-          <figure className="vtk-event-photo ph">
-            <span className="ph-label">event media</span>
-          </figure>
-          <article className="vtk-panel vtk-event-info">
-            <h2>Event detail panel</h2>
-            <p>
-              Event pages use a two-column media and information layout, with compact metadata blocks and action buttons.
-            </p>
+          <div className="vtk-event-main">
+            <figure className="vtk-event-photo ph">
+              <span className="ph-label">event media</span>
+            </figure>
+            <section className="vtk-event-about">
+              <h2>About this event</h2>
+              <p>
+                Event pages show the photo with the description below it, and a panel beside it that stays put with the
+                date and the actions.
+              </p>
+            </section>
+          </div>
+          <article className="vtk-panel vtk-event-side">
+            <div className="vtk-event-side-head">
+              <h2>Join in</h2>
+              <small>20:00 - 23:00</small>
+            </div>
             <dl className="spec">
               <dt>Date</dt>
               <dd>05 Sep</dd>
