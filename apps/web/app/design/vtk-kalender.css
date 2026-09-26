@@ -1252,108 +1252,6 @@
   background: currentColor;
 }
 
-/* Weekweergave: zeven gelijkwaardige dagkolommen, met alle evenementen zichtbaar
-   in plaats van de twee compacte pillen uit het maandraster. */
-.vtk-design .week-cal {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(120px, 1fr));
-  overflow-x: auto;
-  border: 1px solid var(--rule);
-  background: var(--paper);
-}
-
-.vtk-design .week-day {
-  min-height: 430px;
-  border-right: 1px solid var(--rule);
-}
-
-.vtk-design .week-day:last-child {
-  border-right: 0;
-}
-
-.vtk-design .week-day > header {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  padding: 12px;
-  border-bottom: 1px solid var(--rule);
-  background: var(--paper-2);
-  font-family: var(--mono);
-  text-transform: uppercase;
-}
-
-.vtk-design .week-day > header span,
-.vtk-design .week-day > header small {
-  font-size: 10px;
-  letter-spacing: 0.06em;
-  color: var(--muted);
-}
-
-.vtk-design .week-day > header b {
-  font-family: var(--sans);
-  font-size: 22px;
-  font-weight: 600;
-}
-
-.vtk-design .week-day.today > header b {
-  padding: 1px 6px;
-  background: var(--accent);
-}
-
-.vtk-design .week-events {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px;
-}
-
-.vtk-design .week-empty {
-  padding: 10px 2px;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.vtk-design .week-event {
-  display: block;
-  padding: 10px;
-  border: 1px solid var(--rule);
-  border-left: 4px solid var(--cat, var(--ink));
-  color: inherit;
-  text-decoration: none;
-  transition: 120ms;
-}
-
-.vtk-design .week-event:hover {
-  background: var(--paper-2);
-  border-color: var(--cat, var(--ink));
-}
-
-.vtk-design .week-event-time,
-.vtk-design .week-event small {
-  display: block;
-  font-family: var(--mono);
-  font-size: 10px;
-  color: var(--muted);
-}
-
-.vtk-design .week-event b {
-  display: block;
-  margin: 3px 0;
-  font-size: 13px;
-  line-height: 1.25;
-}
-
-.vtk-design .week-audience {
-  display: inline-block;
-  margin-top: 7px;
-  padding: 2px 7px;
-  border-radius: 999px;
-  background: var(--cat);
-  color: #fff;
-  font-size: 10px;
-  font-weight: 600;
-}
-
 /* Doelgroeplabel op een eventpil in het maandraster. Staat boven de titel, want
    "voor wie is dit" bepaalt of de rest van de regel je nog aanbelangt. */
 .vtk-design .ev-pill .ev-audience {
@@ -1390,28 +1288,6 @@
   .vtk-design .audience-toggle,
   .vtk-design .toolbar-filters .toolbar-past {
     margin-left: 0;
-  }
-  .vtk-design .week-cal {
-    display: block;
-    min-width: 0;
-  }
-  .vtk-design .week-day {
-    display: grid;
-    grid-template-columns: 76px minmax(0, 1fr);
-    min-height: 0;
-    border-right: 0;
-    border-bottom: 1px solid var(--rule);
-  }
-  .vtk-design .week-day:last-child {
-    border-bottom: 0;
-  }
-  .vtk-design .week-day > header {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-    border-right: 1px solid var(--rule);
-    border-bottom: 0;
   }
 }
 
@@ -2034,29 +1910,6 @@
   border-left-color: var(--cat);
 }
 
-/* De weekweergave gebruikt dezelfde kaart als een dagcel: wit met een streep in
-   de categoriekleur. Ze stond nog op de oude vierkante variant met monospace
-   tijden, en dat las als een tweede kalender op dezelfde pagina. */
-.vtk-design .week-event {
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--cat, var(--navy));
-  border-radius: 9px;
-  background: var(--surface);
-}
-
-.vtk-design .week-event:hover {
-  border-color: var(--line-2);
-  border-left-color: var(--cat, var(--navy));
-  background: var(--paper);
-}
-
-.vtk-design .week-event-time,
-.vtk-design .week-event small {
-  font-family: var(--sans);
-  font-size: 11.5px;
-  letter-spacing: 0;
-}
-
 /* ---------------------------------------------------------------------------
    Rasterweergave: de maand als kaarten met de affiche erop.
 
@@ -2134,6 +1987,16 @@
   margin-left: auto;
 }
 
+/* Op een telefoon breken de chips over meerdere regels, en dan hing de knop
+   rechts los onder de laatste chip. Links volgt hij de leesrichting van de rij.
+   Dit stond ook al hoger in een mediaquery, maar de regel hierboven kwam later
+   in het bestand en won het. */
+@media (max-width: 720px) {
+  .vtk-design .toolbar-filters .toolbar-past {
+    margin-left: 0;
+  }
+}
+
 .vtk-design .ev-grid-past[aria-pressed="true"] {
   background: var(--paper-2);
   border-color: var(--line-2);
@@ -2146,4 +2009,288 @@
   color: var(--muted);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
+}
+
+/* ---------------------------------------------------------------------------
+   Week en agenda in de taal van het raster.
+
+   Het raster (`.ev-card`, vtk-eventcard.css) is de eerste weergave die iemand
+   ziet, en de week en de agenda lazen daarnaast als een andere site: een
+   vierkant kader met monospace kapitalen, een kleurstreep links op elk
+   evenement en een gevuld blok in de themakleur. Ze nemen nu de onderdelen van
+   de kaart over: de datum als pin (weekdag, getal, maand; geel is vandaag), het
+   thema als stip met een woord, de doelgroep als gevulde pil, de titel met de
+   gele streep, en witte kaarten met een haarlijn die bij hover licht optillen.
+   Enkel de affiche blijft weg in de week: zeven smalle kolommen met een foto per
+   evenement worden een scrollwand, en in de week zoek je op datum, niet op beeld.
+   --------------------------------------------------------------------------- */
+
+.vtk-design .week-cal {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.vtk-design .week-day {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.vtk-design .week-day > header {
+  display: flex;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* De pin van `.ev-card-pin`, maar in de stroom en niet over een foto. */
+.vtk-design .week-pin,
+.vtk-design .ag-date {
+  display: grid;
+  flex: none;
+  align-content: center;
+  justify-items: center;
+  width: 58px;
+  height: 58px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: center;
+}
+
+.vtk-design .week-day.today .week-pin {
+  border-color: var(--yellow);
+  background: var(--yellow);
+}
+
+.vtk-design .week-pin b,
+.vtk-design .ag-date b {
+  display: block;
+  font-family: var(--mono);
+  font-size: 20px;
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-design .week-pin i,
+.vtk-design .ag-date i {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-style: normal;
+  line-height: 1.3;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.vtk-design .week-day.today .week-pin i {
+  color: rgba(10, 15, 31, 0.62);
+}
+
+.vtk-design .week-events {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.vtk-design .week-empty {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.vtk-design .week-event {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 12px 13px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--ink);
+  text-decoration: none;
+  transition:
+    transform 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease;
+}
+
+.vtk-design .week-event:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-2);
+  box-shadow: 0 12px 26px -18px rgba(14, 26, 54, 0.6);
+}
+
+.vtk-design .week-event:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.vtk-design .week-event-tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px 8px;
+  margin-bottom: 7px;
+}
+
+.vtk-design .week-event-tags .ev-card-cat {
+  font-size: 12px;
+}
+
+/* De gele streep onder de titel, even breed als de titel zelf. */
+.vtk-design .week-event-title {
+  width: fit-content;
+  max-width: 100%;
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+
+.vtk-design .week-event-title::after {
+  content: '';
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: var(--yellow);
+}
+
+.vtk-design .week-event-when {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-design .week-event .ev-going {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+/* Het maandraster: dezelfde witte kaart per evenement, en het thema als stip
+   voor de titel in plaats van een kleurstreep links. */
+.vtk-design .ev-pill,
+.vtk-design .ev-pill.tinted {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.vtk-design .ev-pill:hover,
+.vtk-design .ev-pill.tinted:hover {
+  border-color: var(--line-2);
+  background: var(--surface);
+  box-shadow: 0 8px 18px -14px rgba(14, 26, 54, 0.6);
+}
+
+.vtk-design .ev-pill.tinted b::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-right: 6px;
+  border-radius: 999px;
+  background: var(--cat);
+  vertical-align: 1px;
+}
+
+.vtk-design .ev-pill.more {
+  border-style: dashed;
+}
+
+.vtk-design .cal-cell.today .num {
+  border-radius: 8px;
+}
+
+/* De lijstrij onder de maand: de pin als datum, een titel op kaartmaat en het
+   thema als stip met een woord. */
+.vtk-design .ag-date {
+  align-self: center;
+}
+
+.vtk-design .ag-title {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+.vtk-design .ag-title small {
+  font-size: 12.5px;
+}
+
+.vtk-design .ag-media {
+  aspect-ratio: 16 / 9;
+}
+
+.vtk-design .ag-tag {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+@media (max-width: 960px) {
+  .vtk-design .ag-date {
+    width: 52px;
+    height: 52px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .vtk-design .week-cal {
+    grid-template-columns: repeat(7, minmax(150px, 1fr));
+    overflow-x: auto;
+    padding-bottom: 8px;
+  }
+}
+
+/* Op een telefoon wordt de week een lijst: per dag de pin links en de
+   evenementen ernaast, met een haarlijn tussen de dagen. */
+@media (max-width: 720px) {
+  .vtk-design .week-cal {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    overflow: visible;
+    padding-bottom: 0;
+  }
+
+  .vtk-design .week-day {
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr);
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .vtk-design .week-day:first-child {
+    padding-top: 0;
+  }
+
+  .vtk-design .week-day > header {
+    padding-bottom: 0;
+    border-bottom: 0;
+  }
+
+  /* Op de middellijn van de pin (58 px) en links, niet gecentreerd in de kolom. */
+  .vtk-design .week-empty {
+    padding-top: 19px;
+  }
 }

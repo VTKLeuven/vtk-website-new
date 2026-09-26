@@ -12,6 +12,7 @@ import {
   getDefaultEventImages,
 } from "@/lib/defaultEventImage";
 import { focusPosition } from "@/lib/imageFocus";
+import { publishedTicketSlug } from "@/lib/frontpage/events";
 import { getCurrentSession } from "@/lib/session";
 import { publicUrl } from "@/lib/storage";
 
@@ -70,6 +71,7 @@ export async function loadCalendarEvents(query: CalendarEventsQuery): Promise<Ca
       // zet het daarmee op elk van die dagen met het juiste uur, in plaats van
       // als één balk over de hele periode.
       moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
+      ticketEvent: { select: { slug: true, status: true } },
       categories: {
         select: {
           category: {
@@ -140,6 +142,7 @@ export async function loadCalendarEvents(query: CalendarEventsQuery): Promise<Ca
       interestedCount: counts.get(e.id) ?? null,
       viewerInterest: mine.get(e.id) ?? { kind: "none" },
       interested: mine.has(e.id),
+      ticketSlug: publishedTicketSlug(e.ticketEvent),
     },
   }));
 }

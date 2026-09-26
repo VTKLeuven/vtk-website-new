@@ -34,7 +34,7 @@ import { readSlogansSetting, resolveSlogans } from "@/lib/slogans";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
 import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar";
 import { MomentDays } from "@/components/calendar/MomentDays";
-import { CalendarPlusIcon } from "@/components/ui/icons";
+import { CalendarPlusIcon, TicketIcon } from "@/components/ui/icons";
 import { focusPosition } from "@/lib/imageFocus";
 import { hasUpcomingMoment, momentsSummary, nextOccurrenceAt } from "@/lib/calendar/moments";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
@@ -47,6 +47,7 @@ import {
 import {
   FRONTPAGE_EVENT_INCLUDE,
   frontpageEventsSince,
+  publishedTicketSlug,
   toFrontpageEvents,
 } from "@/lib/frontpage/events";
 import { resolveFrontpage } from "@/lib/frontpage/resolve";
@@ -721,6 +722,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               const categories = event.categories.map((link) => link.category);
               const theme = categories.find((category) => category.audience === null) ?? null;
               const audiences = categories.filter((category) => category.audience !== null);
+              const ticketSlug = publishedTicketSlug(event.ticketEvent);
               return (
                 // Dezelfde kaart als in het raster van /kalender, uit
                 // `vtk-eventcard.css`. Een kaart met knoppen erin kan geen link
@@ -829,6 +831,19 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                         >
                           <CalendarPlusIcon />
                         </a>
+                        {/* Rechtstreeks naar de tickets, zonder eerst langs de
+                            eventpagina. Enkel wanneer de ticketpagina online
+                            staat, dezelfde regel als de knop daar. */}
+                        {ticketSlug ? (
+                          <Link
+                            href={`${base}/tickets/${ticketSlug}`}
+                            className="ev-card-action"
+                            title={nl ? "Tickets kopen" : "Buy tickets"}
+                            aria-label={`${nl ? "Tickets kopen" : "Buy tickets"}: ${title}`}
+                          >
+                            <TicketIcon />
+                          </Link>
+                        ) : null}
                       </span>
                     </div>
                   </div>

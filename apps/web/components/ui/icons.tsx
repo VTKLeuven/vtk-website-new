@@ -138,6 +138,18 @@ export function CalendarPlusIcon() {
   );
 }
 
+/** Een ticket met een inkeping: "koop hier je ticket". */
+export function TicketIcon() {
+  return (
+    <Icon>
+      <path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4Z" />
+      <path d="M14 6v2" />
+      <path d="M14 11v2" />
+      <path d="M14 16v2" />
+    </Icon>
+  );
+}
+
 export function UploadIcon() {
   return (
     <Icon>

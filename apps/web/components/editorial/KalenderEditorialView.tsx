@@ -14,7 +14,8 @@ import dynamic from 'next/dynamic';
 const Markdown = dynamic(() => import('@/components/ui/Markdown').then((m) => m.Markdown));
 import { EventInterest } from '@/components/calendar/EventInterest';
 import { EventStar, type EventStarLabels } from '@/components/calendar/EventStar';
-import { CalendarPlusIcon } from '@/components/ui/icons';
+import { CalendarPlusIcon, TicketIcon } from '@/components/ui/icons';
+import Link from '@/components/ui/Link';
 import { saveCalendarAudiencePreferenceAction } from '@/app/actions/calendarPreference';
 import type { ViewerInterest } from '@/lib/calendar/interest';
 import { momentsSummary } from '@/lib/calendar/moments';
@@ -91,6 +92,8 @@ export type CalendarApiEvent = {
     viewerInterest: ViewerInterest;
     /** Heb jij dit aangeduid, afgeleid van `viewerInterest`. */
     interested: boolean;
+    /** De slug van de ticketpagina, enkel wanneer die online staat. */
+    ticketSlug: string | null;
   };
 };
 
@@ -770,10 +773,11 @@ export function KalenderEditorialView({
     const title = pickTitle(e);
     return (
       <article key={e.id} className="ag-row">
+        {/* De datum als dezelfde pin als op de rasterkaart. */}
         <div className="ag-date">
-          <b>{String(d.getDate()).padStart(2, '0')}</b>
-          {d.toLocaleDateString(dateLocale, { month: 'short' })} ·{' '}
-          {d.toLocaleDateString(dateLocale, { weekday: 'short' })}
+          <i>{d.toLocaleDateString(dateLocale, { weekday: 'short' })}</i>
+          <b>{d.getDate()}</b>
+          <i>{d.toLocaleDateString(dateLocale, { month: 'short' })}</i>
         </div>
         <span className="ag-media" aria-hidden="true">
           <Image
@@ -800,19 +804,16 @@ export function KalenderEditorialView({
           <MomentDays moments={toMoments(e)} now={now} locale={locale} className="ag-days" />
           {going ? <span className="ev-going">{going}</span> : null}
         </div>
-        <div
-          className="ag-tag"
-          style={
-            cat
-              ? ({
-                  background: cat.colour,
-                  borderColor: cat.colour,
-                  color: '#fff',
-                } as React.CSSProperties)
-              : undefined
-          }
-        >
-          {cat ? categoryName(cat) : pickGroup(e)}
+        {/* Het thema als stip met een woord, zoals op de rasterkaart; een
+            gevuld blok in de themakleur riep harder dan de titel ernaast. */}
+        <div className="ag-tag">
+          {cat ? (
+            <span className="ev-card-cat" style={{ '--cat': cat.colour } as React.CSSProperties}>
+              {categoryName(cat)}
+            </span>
+          ) : (
+            pickGroup(e)
+          )}
         </div>
         {/* De ster houdt zijn eigen stand bij; de sleutel laat hem opnieuw
             beginnen wanneer dit evenement elders van stand wisselt, bijvoorbeeld
@@ -865,6 +866,7 @@ export function KalenderEditorialView({
     const start = leadDate(e);
     const isPast = isEventPast(e, now);
     const addToCalendar = locale === 'nl' ? 'Zet in mijn agenda' : 'Add to my calendar';
+    const buyTickets = locale === 'nl' ? 'Tickets kopen' : 'Buy tickets';
     return (
       <article key={e.id} className={`ev-card${isPast ? ' is-past' : ''}`}>
         <div className="ev-card-shot">
@@ -935,6 +937,16 @@ export function KalenderEditorialView({
               >
                 <CalendarPlusIcon />
               </a>
+              {e.extendedProps.ticketSlug ? (
+                <Link
+                  href={`${base}/tickets/${e.extendedProps.ticketSlug}`}
+                  className="ev-card-action"
+                  title={buyTickets}
+                  aria-label={`${buyTickets}: ${title}`}
+                >
+                  <TicketIcon />
+                </Link>
+              ) : null}
             </span>
           </div>
         </div>
@@ -1477,45 +1489,65 @@ export function KalenderEditorialView({
                   const today = isSameCalendarDay(date, new Date());
                   return (
                     <div key={dayKey(date)} className={`week-day${today ? ' today' : ''}`}>
+                      {/* Dezelfde pin als op de kaart in het raster: weekdag,
+                          getal, maand. Geel is vandaag. */}
                       <header>
-                        <span>
-                          {date.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
-                            weekday: 'short',
-                          })}
+                        <span className="week-pin">
+                          <i>
+                            {date.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+                              weekday: 'short',
+                            })}
+                          </i>
+                          <b>{date.getDate()}</b>
+                          <i>
+                            {date.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+                              month: 'short',
+                            })}
+                          </i>
                         </span>
-                        <b>{date.getDate()}</b>
-                        <small>
-                          {date.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
-                            month: 'short',
-                          })}
-                        </small>
                       </header>
                       <div className="week-events">
                         {events.length === 0 ? (
                           <span className="week-empty">{locale === 'nl' ? 'Geen evenementen' : 'No events'}</span>
                         ) : (
                           events.map((event) => {
-                            const cat = primaryCategory(event);
+                            // Het lichaam van de rasterkaart zonder de affiche:
+                            // thema als stip met een woord en de doelgroep als
+                            // pil bovenaan, de titel met de gele streep, en het
+                            // uur en de plaats eronder. Dezelfde klassen als de
+                            // kaart, uit vtk-eventcard.css.
+                            const theme = event.extendedProps.categories.find((c) => c.audience === null) ?? null;
+                            const audiences = audienceCategories(event);
                             return (
                               <a
                                 key={event.id}
                                 href={eventHref(event)}
                                 className="week-event"
-                                style={cat ? ({ '--cat': cat.colour } as React.CSSProperties) : undefined}
                                 onClick={(clicked) => openPreview(clicked, event)}
                               >
-                                <span className="week-event-time">{eventTime(event, date)}</span>
-                                <b>{pickTitle(event)}</b>
-                                {event.location ? <small>{event.location}</small> : null}
-                                {audienceCategories(event).map((audience) => (
-                                  <span
-                                    key={audience.slug}
-                                    className="week-audience"
-                                    style={{ '--cat': audience.colour } as React.CSSProperties}
-                                  >
-                                    {categoryName(audience)}
+                                {theme || audiences.length > 0 ? (
+                                  <span className="week-event-tags">
+                                    {theme ? (
+                                      <span className="ev-card-cat" style={{ '--cat': theme.colour } as React.CSSProperties}>
+                                        {categoryName(theme)}
+                                      </span>
+                                    ) : null}
+                                    {audiences.map((audience) => (
+                                      <span
+                                        key={audience.slug}
+                                        className="ev-card-aud"
+                                        style={{ '--cat': audience.colour } as React.CSSProperties}
+                                      >
+                                        {categoryName(audience)}
+                                      </span>
+                                    ))}
                                   </span>
-                                ))}
+                                ) : null}
+                                <b className="week-event-title">{pickTitle(event)}</b>
+                                <span className="week-event-when">
+                                  {eventTime(event, date)}
+                                  {event.location ? ` · ${event.location}` : ''}
+                                </span>
                                 {interestLine(event) ? <span className="ev-going">{interestLine(event)}</span> : null}
                               </a>
                             );

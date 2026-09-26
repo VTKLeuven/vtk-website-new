@@ -41,7 +41,20 @@ export const FRONTPAGE_EVENT_INCLUDE = {
   group: true,
   categories: { include: { category: true } },
   moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
+  // Voor het ticketicoon op de evenementkaart; zie `publishedTicketSlug`.
+  ticketEvent: { select: { slug: true, status: true } },
 } as const;
+
+/**
+ * De slug van de ticketpagina, enkel wanneer die online staat. Dezelfde regel
+ * als de knop "Tickets kopen" op de eventpagina: een concept of een gearchiveerd
+ * ticketevent heeft geen pagina die een bezoeker kan openen.
+ */
+export function publishedTicketSlug(
+  ticketEvent: { slug: string; status: string } | null | undefined,
+): string | null {
+  return ticketEvent?.status === "PUBLISHED" ? ticketEvent.slug : null;
+}
 
 /**
  * Vanaf wanneer de homepage evenementen leest: middernacht gisteren, in
