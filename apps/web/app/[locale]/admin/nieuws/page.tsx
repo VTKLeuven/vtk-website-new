@@ -53,6 +53,7 @@ export default async function AdminNews({ params }: { params: Promise<{ locale: 
       line: entry.line,
       dateLabel: dateFormat.format(new Date(entry.date)),
       automatic: entry.source !== "notice" && entry.source !== "praeses",
+      picked: entry.featured,
       place: entry.hidden
         ? "hidden"
         : featured?.key === entry.key

@@ -19,7 +19,13 @@ import {
   type NewsComposable,
   type NewsSource,
 } from "./rules";
-import { NEWS_SETTING, readNewsSetting, type NewsSetting } from "./setting";
+import {
+  NEWS_FEATURED_SETTING,
+  NEWS_SETTING,
+  readNewsFeatured,
+  readNewsSetting,
+  type NewsSetting,
+} from "./setting";
 
 /**
  * Het nieuws op de homepage lezen: de zelfgeschreven berichten uit `NewsPost`,
@@ -85,7 +91,7 @@ export async function collectNews(
   const nl = locale === "nl";
   const { sources } = setting;
 
-  const [posts, hiddenRows, tickets, signups, media, gallery] = await Promise.all([
+  const [posts, hiddenRows, featuredRow, tickets, signups, media, gallery] = await Promise.all([
     prisma.newsPost.findMany({
       where: {
         active: true,
@@ -95,6 +101,7 @@ export async function collectNews(
       orderBy: { publishedAt: "desc" },
     }),
     prisma.newsHidden.findMany({ select: { source: true, ref: true } }),
+    prisma.setting.findUnique({ where: { key: NEWS_FEATURED_SETTING } }),
     sources.tickets
       ? prisma.ticketEvent.findMany({
           where: {
@@ -281,7 +288,15 @@ export async function collectNews(
     });
   }
 
-  return entries.map((entry) => ({ ...entry, hidden: hidden.has(entry.key) }));
+  // Een automatisch bericht is uitgelicht wanneer de redactie het zo aanduidde;
+  // een zelfgeschreven bericht draagt dat al zelf.
+  const choice = readNewsFeatured(featuredRow?.value);
+  const picked = choice ? `${choice.source}:${choice.ref}` : null;
+  return entries.map((entry) => ({
+    ...entry,
+    featured: entry.featured || entry.key === picked,
+    hidden: hidden.has(entry.key),
+  }));
 }
 
 export async function readNewsSettingFromDb(): Promise<NewsSetting> {

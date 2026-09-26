@@ -23,6 +23,7 @@ import {
   deleteNewsPostAction,
   saveNewsPostAction,
   saveNewsSettingAction,
+  setNewsFeaturedAction,
   setNewsHiddenAction,
   setNewsPostActiveAction,
 } from "@/app/actions/news";
@@ -36,6 +37,8 @@ export type NewsCandidateRow = {
   line: string;
   dateLabel: string;
   automatic: boolean;
+  /** Door de redactie uitgelicht (los van waar het nu staat). */
+  picked: boolean;
   /** Waar het nu staat: uitgelicht, in de band, erbuiten (band vol) of verborgen. */
   place: "featured" | "band" | "overflow" | "hidden";
 };
@@ -273,8 +276,8 @@ export function NewsManager({
               ? "De band staat uit: niets hiervan staat op de homepage."
               : "The band is off: none of this is on the homepage."
             : nl
-              ? "Nieuwste eerst. Een automatisch bericht haal je hier uit het nieuws zonder aan de bron te komen: de verkoop loopt door, het album blijft op /media."
-              : "Newest first. Taking an automatic post out of the news leaves its source alone: sales go on, the album stays on /media."}
+              ? "Nieuwste eerst. Met de ster kies je wat de grote kaart krijgt, ook een ticketverkoop of een album; zonder keuze is dat het woordje van de praeses, anders het nieuwste. Een automatisch bericht haal je hier uit het nieuws zonder aan de bron te komen: de verkoop loopt door, het album blijft op /media."
+              : "Newest first. The star picks what gets the large card, including a ticket sale or an album; without a pick that is the word from the praeses, otherwise the newest. Taking an automatic post out of the news leaves its source alone: sales go on, the album stays on /media."}
         </p>
         {candidates.length === 0 ? (
           <p className="text-sm text-zinc-500">
@@ -298,6 +301,39 @@ export function NewsManager({
                     </span>
                   </span>
                   <div className="ml-auto flex shrink-0 items-center gap-2">
+                    {row.place !== "hidden" ? (
+                      <form action={setNewsFeaturedAction}>
+                        <input type="hidden" name="source" value={row.source} />
+                        <input type="hidden" name="ref" value={row.ref} />
+                        <input type="hidden" name="title" value={row.title} />
+                        <input type="hidden" name="featured" value={row.picked ? "0" : "1"} />
+                        <IconButton
+                          type="submit"
+                          label={
+                            row.picked
+                              ? nl
+                                ? "Niet meer uitlichten"
+                                : "Stop featuring"
+                              : nl
+                                ? "Uitlichten"
+                                : "Feature"
+                          }
+                          srLabel={`${
+                            row.picked
+                              ? nl
+                                ? "Niet meer uitlichten"
+                                : "Stop featuring"
+                              : nl
+                                ? "Uitlichten"
+                                : "Feature"
+                          }: ${row.title}`}
+                        >
+                          <span className={row.picked ? "text-amber-600" : undefined}>
+                            <StarIcon filled={row.picked} />
+                          </span>
+                        </IconButton>
+                      </form>
+                    ) : null}
                     {row.automatic ? (
                       <form action={setNewsHiddenAction}>
                         <input type="hidden" name="source" value={row.source} />
@@ -555,8 +591,8 @@ export function NewsManager({
           </div>
           <p className="-mt-2 text-xs text-[#5c667f]">
             {nl
-              ? "Hoogstens één bericht is uitgelicht; een ander uitlichten haalt het vorige eraf. Is er niets uitgelicht, dan krijgt het woordje van de praeses die plaats, en anders het nieuwste bericht."
-              : "At most one post is featured; featuring another removes the previous one. With nothing featured, the word from the praeses takes that place, and otherwise the newest post."}
+              ? "Hoogstens één bericht is uitgelicht; een ander uitlichten (ook een ticketverkoop, met de ster in \"Nu in het nieuws\") haalt het vorige eraf. Is er niets uitgelicht, dan krijgt het woordje van de praeses die plaats, en anders het nieuwste bericht."
+              : "At most one post is featured; featuring another (also a ticket sale, with the star under \"In the news now\") removes the previous one. With nothing featured, the word from the praeses takes that place, and otherwise the newest post."}
           </p>
         </SaveForm>
       </Card>

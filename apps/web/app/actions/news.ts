@@ -11,11 +11,12 @@ import { isEditableDestination } from "@/lib/href";
 import { readImageField, resolveImageKey } from "@/lib/imageField";
 import { NEWS_TAG } from "@/lib/news/load";
 import { NEWS_AUTO_SOURCES, NEWS_COUNT_MAX, NEWS_COUNT_MIN, isNewsAutoSource } from "@/lib/news/rules";
-import { NEWS_SETTING } from "@/lib/news/setting";
+import { NEWS_FEATURED_SETTING, NEWS_SETTING, readNewsFeatured } from "@/lib/news/setting";
 
 /**
  * Het nieuws op de homepage: de band aan of uit, de zelfgeschreven berichten,
- * en automatische berichten uit het nieuws halen. Alles onder `news.manage`.
+ * welk bericht uitgelicht staat, en automatische berichten uit het nieuws
+ * halen. Alles onder `news.manage`.
  */
 
 function revalidate() {
@@ -180,11 +181,13 @@ export async function saveNewsPostAction(
   const saved = await prisma.$transaction(async (tx) => {
     // Hoogstens één uitgelicht bericht: wie een ander aanduidt, haalt het vorige
     // er stil af in plaats van twee kaarten om dezelfde plek te laten vechten.
+    // Dat geldt ook voor een uitgelicht automatisch bericht.
     if (data.featured) {
       await tx.newsPost.updateMany({
         where: { featured: true, ...(input.id ? { id: { not: input.id } } : {}) },
         data: { featured: false },
       });
+      await tx.setting.deleteMany({ where: { key: NEWS_FEATURED_SETTING } });
     }
     return input.id
       ? tx.newsPost.update({ where: { id: input.id }, data })
@@ -249,6 +252,71 @@ export async function deleteNewsPostAction(formData: FormData): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
+// Uitlichten
+// ---------------------------------------------------------------------------
+
+/**
+ * Duidt één bericht aan als het uitgelichte, of haalt die keuze weg; dan geldt
+ * weer de standaard (het woordje, anders het nieuwste). Werkt voor een
+ * zelfgeschreven bericht (`NewsPost.featured`) en voor een automatisch
+ * (`NEWS_FEATURED_SETTING`), en laat er hoogstens één over.
+ */
+export async function setNewsFeaturedAction(formData: FormData): Promise<void> {
+  await requirePermission("news.manage");
+  const source = text(formData, "source") ?? "";
+  const ref = text(formData, "ref") ?? "";
+  const title = text(formData, "title") ?? ref;
+  if (!ref || ref.length > 200) return;
+  const feature = formData.get("featured") === "1";
+  const written = source === "notice" || source === "praeses";
+  if (!written && !isNewsAutoSource(source)) return;
+
+  await prisma.$transaction(async (tx) => {
+    if (written) {
+      if (feature) {
+        await tx.newsPost.updateMany({ where: { featured: true, id: { not: ref } }, data: { featured: false } });
+        await tx.setting.deleteMany({ where: { key: NEWS_FEATURED_SETTING } });
+      }
+      await tx.newsPost.updateMany({ where: { id: ref }, data: { featured: feature } });
+      return;
+    }
+    if (feature) {
+      await tx.newsPost.updateMany({ where: { featured: true }, data: { featured: false } });
+      const value = { source, ref };
+      await tx.setting.upsert({
+        where: { key: NEWS_FEATURED_SETTING },
+        update: { value },
+        create: { key: NEWS_FEATURED_SETTING, value },
+      });
+    } else {
+      await clearFeaturedPick(tx, source, ref);
+    }
+  });
+
+  await logAudit({
+    action: "update",
+    entity: written ? "newsPost" : "news",
+    entityId: written ? ref : `${source}:${ref}`,
+    target: title,
+    summary: feature ? "uitgelicht" : "niet meer uitgelicht",
+  });
+  revalidate();
+}
+
+/** Wist de keuze van een automatisch bericht, enkel als het dit bericht is. */
+async function clearFeaturedPick(
+  tx: Pick<typeof prisma, "setting">,
+  source: string,
+  ref: string,
+): Promise<void> {
+  const row = await tx.setting.findUnique({ where: { key: NEWS_FEATURED_SETTING } });
+  const current = readNewsFeatured(row?.value);
+  if (!current || (current.source === source && current.ref === ref)) {
+    await tx.setting.deleteMany({ where: { key: NEWS_FEATURED_SETTING } });
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Automatische berichten uit het nieuws halen
 // ---------------------------------------------------------------------------
 
@@ -270,6 +338,9 @@ export async function setNewsHiddenAction(formData: FormData): Promise<void> {
       update: {},
       create: { source, ref },
     });
+    // Een verborgen bericht kan niet uitgelicht staan; zonder dit zou het na
+    // het terugzetten ongevraagd weer de grote kaart innemen.
+    await clearFeaturedPick(prisma, source, ref);
   } else {
     await prisma.newsHidden.deleteMany({ where: { source, ref } });
   }

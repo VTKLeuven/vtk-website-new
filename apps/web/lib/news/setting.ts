@@ -3,6 +3,7 @@ import {
   NEWS_COUNT_DEFAULT,
   NEWS_COUNT_MAX,
   NEWS_COUNT_MIN,
+  isNewsAutoSource,
   type NewsAutoSource,
 } from "./rules";
 
@@ -55,4 +56,26 @@ export function readNewsSetting(value: unknown): NewsSetting {
     count,
     sources,
   };
+}
+
+/**
+ * Welk automatisch bericht de redactie uitlichtte, bv. een ticketverkoop die een
+ * duwtje nodig heeft. Een zelfgeschreven bericht draagt dat in
+ * `NewsPost.featured`; de actions houden de twee exclusief, zodat er hoogstens
+ * één keuze tegelijk bestaat.
+ *
+ * Een eigen sleutel en niet in `home.news`: dat formulier schrijft zijn waarde
+ * in één keer weg en zou de keuze bij elk opslaan wissen.
+ */
+export const NEWS_FEATURED_SETTING = "home.news.featured";
+
+export type NewsFeaturedPick = { source: NewsAutoSource; ref: string };
+
+/** Leest de opgeslagen keuze; wat niet klopt, is geen keuze. */
+export function readNewsFeatured(value: unknown): NewsFeaturedPick | null {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return null;
+  const { source, ref } = value as Record<string, unknown>;
+  if (typeof source !== "string" || !isNewsAutoSource(source)) return null;
+  if (typeof ref !== "string" || ref === "") return null;
+  return { source, ref };
 }

@@ -8961,6 +8961,16 @@ Zo blijft de band even hoog tot iemand klikt. Een venster en een brief over de
 volle breedte werden ook bekeken; het venster verstopte de tekst achter een
 klik te veel, de volle breedte duwde de openingsuren een scherm naar beneden.
 
+**Ook een automatisch bericht kan uitgelicht worden.** Een ticketverkoop die
+een duwtje nodig heeft (het Oktoberfest), hoort in de grote kaart met zijn
+affiche en een knop "Tickets kopen", niet als regel in het register. De ster in
+"Nu in het nieuws" werkt daarom voor elk bericht. Een zelfgeschreven bericht
+draagt de keuze in `NewsPost.featured`, een automatisch in de instelling
+`home.news.featured`; de actions houden de twee exclusief. De keuze verlengt de
+houdbaarheid niet: wie een ticketverkoop uitlicht, ziet ze na twee weken toch
+verdwijnen, en dan neemt de standaard het over. Een bericht dat uit het nieuws
+gehaald wordt, verliest zijn ster.
+
 **/nieuws** toont alles wat nu in het nieuws staat (zonder de grens van de
 band) en de eerdere mededelingen en woordjes. Automatische berichten hebben
 daar geen historiek: hun bron staat nog op zijn eigen plek.

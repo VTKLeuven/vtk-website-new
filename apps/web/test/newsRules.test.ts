@@ -10,7 +10,7 @@ import {
   ticketNewsDate,
   type NewsComposable,
 } from "@/lib/news/rules";
-import { defaultNewsSetting, readNewsSetting } from "@/lib/news/setting";
+import { defaultNewsSetting, readNewsFeatured, readNewsSetting } from "@/lib/news/setting";
 
 /**
  * De regels van de Nieuws-band. "Nu" is zaterdag 26 september 2026 om 10u in
@@ -146,6 +146,13 @@ describe("samenstelling", () => {
     expect(composeNews(pinned, 6).featured?.key).toBe("fiets");
   });
 
+  it("licht een automatisch bericht uit wanneer de redactie het kiest", () => {
+    const pinned = entries.map((item) => (item.key === "galabal" ? { ...item, featured: true } : item));
+    const { featured, rest } = composeNews(pinned, 6);
+    expect(featured?.key).toBe("galabal");
+    expect(rest.map((item) => item.key)).toEqual(["bakske", "album", "skireis", "fiets", "praeses"]);
+  });
+
   it("licht zonder woordje het nieuwste bericht uit", () => {
     const withoutPraeses = entries.filter((item) => item.source !== "praeses");
     expect(composeNews(withoutPraeses, 6).featured?.key).toBe("bakske");
@@ -175,5 +182,18 @@ describe("de instelling", () => {
     expect(setting.count).toBe(8);
     expect(setting.sources.album).toBe(false);
     expect(setting.sources.tickets).toBe(true);
+  });
+});
+
+describe("uitgelicht automatisch bericht", () => {
+  it("leest een geldige keuze", () => {
+    expect(readNewsFeatured({ source: "tickets", ref: "abc" })).toEqual({ source: "tickets", ref: "abc" });
+  });
+
+  it("negeert wat geen automatisch bericht is", () => {
+    expect(readNewsFeatured(undefined)).toBeNull();
+    expect(readNewsFeatured({ source: "notice", ref: "abc" })).toBeNull();
+    expect(readNewsFeatured({ source: "tickets", ref: "" })).toBeNull();
+    expect(readNewsFeatured(["tickets", "abc"])).toBeNull();
   });
 });
