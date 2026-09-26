@@ -190,8 +190,16 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   (meestal vrijdag/zaterdag) de sessies van de **volgende week** online.
 - Er is een **standaardaanbod** (`TheokotProduct`, geseed) met vaste broodjes,
   aantallen en prijzen. Bij het aanmaken van een week wordt dit als **snapshot**
-  naar `TheokotSessionItem` gekopieerd. Reden: latere catalogus- of prijswijzigingen
-  mogen bestaande sessies en bestellingen niet met terugwerkende kracht veranderen.
+  naar `TheokotSessionItem` gekopieerd. Reden: een wijziging in de catalogus mag
+  verkoopdagen die al online staan niet met terugwerkende kracht veranderen.
+- **Een prijs die je per dag aanpast, geldt ook voor wie al gereserveerd had**
+  (september 2026). Aan de balie betaal je wat er die dag op het bord staat, niet
+  wat er stond toen je klikte: anders zag een student 2,80 in zijn reservatie
+  terwijl het broodje intussen 3,00 kostte, en rekende de afhaalpagina nog met het
+  oude bedrag. "Aanbod bewerken" zet daarom elke openstaande reservatie van die
+  dag op de nieuwe prijs (`repriceReservedOrders` in `lib/theokot-orders.ts`).
+  Een opgehaalde bestelling is betaald en blijft staan. `unitPriceCents` op een
+  bestellijn is dus geen vaste snapshot meer zolang de bestelling `RESERVED` is.
 - **Een verkoopdag aanmaken zet meteen de shiften van die dag neer.** Wie de week
   online zet, vinkt de dagen aan; voor elke dag die daadwerkelijk nieuw is, komen
   ook de drie Theokot-shiften (smeren, middag, namiddag) op `/shift` te staan. Dat
@@ -214,6 +222,24 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   ('Afhalen vanaf/tot', 'Besteldeadline', 'Bestellen opent') in die voor álle gekozen
   dagen gelden. Dat scheelt werk in weken met een volledig ander aanbod. **Nadien** kan
   je nog steeds per dag bijsturen (uren, open/dicht, aanbod).
+- **Het beheer toont de dagen per week, en het aanbod is per week aan te passen**
+  (september 2026). Het formulier "Verkoopweek aanmaken" stond altijd volledig
+  open bovenaan, met elf broodjesrijen, zodat de dagen die er al waren pas onder
+  de vouw begonnen; en een prijs voor de hele week aanpassen was vijf keer
+  "Aanbod bewerken" openen. Nu:
+  - staat "Nieuwe verkoopweek" achter een knop, met ernaast een link naar het
+    standaardaanbod;
+  - staan de dagen per week in een compacte tabel (afhalen, bestelvenster,
+    bestellingen, status); een klik op een dag klapt zijn uren, aanbod en
+    bestellingen open, één dag tegelijk;
+  - past **"Aanbod van de week"** het aanbod in één keer toe op de aangevinkte
+    dagen van die week. De editor toont het aanbod van de eerste dag die nog komt
+    als voorbeeld. Welk broodje op een andere dag bij welke rij hoort, gaat via
+    het catalogusproduct en anders via de naam (`planDayOffering` in
+    `lib/theokot.ts`). Per dag gebeurt hetzelfde als bij het aanbod van één dag:
+    een broodje met bestellingen blijft staan en openstaande reservaties krijgen
+    de nieuwe prijs. Een dag met een eigen afwijking wordt daarbij
+    overschreven; wie dat niet wil, vinkt die dag uit.
 - **Foto en ingrediënten per broodje zijn optioneel.** Beheer ze in dezelfde
   aanbod-editor (uitklap "Foto & ingrediënten" per rij), zowel op het standaardaanbod
   als per verkoopdag. Een broodje zonder foto toont het gestreepte placeholder-patroon
@@ -226,6 +252,28 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   weinig foto's zijn. Ze staat bij de overige Theokot-instellingen en geldt voor de
   hele bestelpagina (`itemLayout`). De standaard is een lijst, zodat een aanbod zonder
   foto's er niet leger uitziet dan vroeger.
+- **Sinds september 2026 zijn het twee echte ontwerpen, geen twee rijstijlen.** De
+  pagina was een stapel kaarten, één per verkoopdag, met dagen die nog niet open
+  waren als halflege kaarten tussen de rest, en na het bestellen een grijs vakje
+  met een groene zin eronder. Uit drie richtingen (tweekoloms, dagen in de marge,
+  één opgeruimde kolom) koos Theokot er twee, per weergave:
+  - **Lijst**: de dagen als tabs bovenaan, links het aanbod als rijen, rechts een
+    vast mandje met je keuze, het totaal en hoe ver je van de limiet zit. Na het
+    bestellen wordt dat mandje je reservatie: wanneer je afhaalt, wat je aan de
+    balie betaalt, Aanpassen en Annuleren.
+  - **Raster met foto's**: de dagen in de linkermarge met een datumblokje, het
+    aanbod als fotokaarten, en een balk met het totaal en de knop die onderaan
+    blijft hangen. Na het bestellen staat de reservatie breed boven het aanbod.
+  - Wat beide delen: **één dag tegelijk** (je kiest de dag, niet scrollt erlangs),
+    het broodje van de week bovenaan met de gele rail, en voorraad enkel waar ze
+    iets zegt ("nog 5" vanaf vijf of minder, "uitverkocht"; "10 beschikbaar" onder
+    elk broodje was ruis). Een dag die nog niet open is, toont wanneer hij opent
+    en het aanbod eronder zonder knoppen, zodat je al ziet wat er komt.
+  - Op een gsm vallen de kolommen weg: de dagen worden een rij datumknoppen, de
+    reservatie staat bovenaan, en het totaal met de knop hangt als balk onderaan
+    het scherm.
+  - Annuleren vraagt een bevestiging (`ConfirmDialog`), zoals elke actie die iets
+    weggooit.
 - **Een foto in de catalogus vervangen verwijdert het oude bestand niet.** De
   storage-key wordt mee gekopieerd naar de sessie-items van elke week die er al mee
   aangemaakt is; opruimen zou de foto weghalen bij verkoopdagen die ze nog tonen.
@@ -251,6 +299,14 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 - Max **X** items per bestelling (`maxItemsPerOrder`) waarvan max **Y** broodje van
   de week (`maxWeeklySpecialPerOrder`), met **X > Y**. Instelbaar in het admin-paneel;
   hoeft niet wekelijks te wijzigen.
+- **Een reservatie is aanpasbaar zolang het bestelvenster open is**: broodjes
+  erbij, eraf of andere, binnen dezelfde limieten als een nieuwe bestelling. De
+  eigen reservatie telt daarbij mee als vrije voorraad, zodat wie de laatste twee
+  van een broodje heeft die kan houden terwijl hij er iets bij neemt. Aanpassen
+  naar nul broodjes kan niet; dat is annuleren. Tot september 2026 kon je enkel
+  annuleren en opnieuw bestellen, en dan was je je broodjes kwijt als iemand
+  anders er intussen de laatste van nam. De VTK-app heeft die knop nog niet; de
+  logica (`updateOrder`) staat al klaar voor een app-route.
 - Eén bestelling per persoon per sessie (DB-uniek). **Annuleren = verwijderen** van de
   bestelling (geeft voorraad + het uniek-slot vrij, zodat opnieuw bestellen kan vóór
   de deadline). Er wordt dus geen annulatie-historiek bijgehouden: enkel no-shows.
@@ -272,6 +328,12 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   Eén invoerveld verwerkt beide: bevat de invoer een `;` dan gaat ze naar de KU Leuven
   `idverification`-API (`lib/kul-card.ts`) die een r-nummer teruggeeft; anders wordt de
   invoer als r-nummer behandeld. Credentials (`KUL_CARD_*`) staan los van de OIDC-login (zie README).
+- **Scannen werkt overal op de balie, niet enkel in het veld.** Na een klik op
+  "Opgehaald" stond de focus op die knop, en scande de volgende student in het
+  niets. Elke gewone toets op de pagina zet nu eerst de focus in het scanveld
+  (`lib/scannerFocus.ts`). Niet voor sneltoetsen, Tab, Enter, spatie en de
+  pijltjes (die horen bij de knop met de focus), en niet terwijl er een
+  bevestigingsvenster open staat.
 - **Afhaaluren** (default **12:00–16:00**, per dag aanpasbaar) zijn NIET dezelfde als de
   **openingsuren van Theokot** op de startpagina (default ma–vr **10:30–18:00**). De
   r-nummerpagina werkt ook vóór 12:00.
@@ -2190,16 +2252,20 @@ De homepage is opgebouwd uit volle-breedte banden die bewust van kleur
 afwisselen (zie ook de styling-sectie in `CLAUDE.md`). De volgorde van de
 onderste helft is een ontwerpkeuze, geen toeval:
 
-- **Wat we doen** (paper) → **Aftermovies** (navy + technisch patroon) →
-  **Opkomende evenementen** (lichtblauw) → **VTK Career** (navy) → **Jouw POC's**
-  (lichtblauw) → **Hoofdpartners** (paper).
-- **Waarom POC's ná Career en niet ervoor?** De POC-band is _persoonlijk_: ze
-  verschijnt enkel voor wie ingelogd is én richtingen op zijn profiel heeft. Voor
-  iedereen anders valt ze weg. Stond ze tussen twee navy banden, dan botsten die
-  twee zodra de band verdwijnt (navy tegen navy, geen naad). Als laatste
-  lichtblauwe band vóór de paper-partners klopt het ritme in beide gevallen: valt
-  ze weg, dan volgt Career (navy) gewoon op Partners (paper), precies zoals de
-  pagina eruitzag vóór deze feature.
+- **Openingsuren** (navy) → **Aankomende evenementen** (lichtblauw) → **POC's**
+  (navy, wanneer ze getoond wordt) → **Wat we doen** (paper) → **Aftermovies**
+  (navy + technisch patroon) → **Shiften** (lichtblauw, wanneer aan) → **VTK
+  Career** (navy) → **Hoofdpartners** (paper).
+- **Waarom de evenementen vóór "Wat we doen"?** Sinds september 2026 op vraag
+  van de kring: wat er deze week te doen is, is voor wie de homepage opent
+  dringender dan het vaste aanbod, dat het hele jaar hetzelfde blijft. De
+  evenementen volgen daardoor direct op de navy openingsuren, met een strakke
+  naad (`.hours-strip + .band`) in plaats van een paper-gat ertussen.
+- **De POC-band staat nooit tussen twee navy banden.** Ze kan wegvallen
+  (verborgen in /admin/pocs, of geen vertegenwoordigers voor wie kijkt), en dan
+  zouden die twee tegen elkaar botsen (navy tegen navy, geen naad). Tussen de
+  lichtblauwe evenementen en het paper van "Wat we doen" klopt het ritme in beide
+  gevallen.
 
 ### De frontpage: het donkere blok bovenaan
 
@@ -6225,7 +6291,7 @@ minder dan vier evenementen in het venster, dan toont de hero in de plaats de
 **eerstvolgende evenementen**, ook al zijn die pas over drie weken. Precies vier
 telt als genoeg om het venster te vullen. De lijst toont er standaard maximaal
 zeven: met dezelfde ademruimte als het weekoverzicht vult dat de ruimte naast de
-herotekst tot aan de feitenlijn, zonder eronder te zakken. Het maximum is
+herotekst tot aan de onderkant van de shiften, zonder eronder te zakken. Het maximum is
 instelbaar van vier tot zeven in Admin → Website → Frontpage.
 
 De terugval kijkt niet terug: gisteren hoort bij "deze week", niet bij "wat er
@@ -6368,10 +6434,14 @@ evenementen niet opzij duwt.
 
 ## Openstaande shiften onder de herotekst
 
-Onder de herotekst staan de **shiften waar nog plaats is**, en daaronder pas de
-feitenlijn (werkingsjaar, binnenkort, sinds). Daarvoor stond daar niets: de
-tekstkolom eindigde ruim boven de agenda ernaast en de rest van de hoogte was
-lege foto.
+Onder de herotekst staan de **shiften waar nog plaats is**, hoogstens drie.
+Daarvoor stond daar niets: de tekstkolom eindigde ruim boven de agenda ernaast en
+de rest van de hoogte was lege foto.
+
+Tot september 2026 stond daaronder nog een feitenlijn (werkingsjaar, binnenkort,
+sinds). Die is weggehaald: ze zei niets wat iemand kon doen, en met haar erbij
+paste er onder de titel van drie regels maar één shift. Zet ze niet terug zonder
+te beseffen dat ze die ruimte weer van de shiften afneemt.
 
 De regel die bepaalt wat daar wel en niet hoort: **de rij snelle links eronder
 zegt waar je naartoe kan, dit blok zegt waar er nu handen tekort zijn.** Bijna
@@ -6427,9 +6497,10 @@ die overblijft, komt bóven het blok te staan, waar ze leest als ademruimte onde
 de knoppen in plaats van als een gat onderaan.
 
 De server schat die titelhoogte, want hij weet niet waar de browser afbreekt. Dat
-hoeft niet exact: de schatting kiest enkel tussen nul en drie rijen, en het
-budget ligt bewust wat lager dan de ruimte die er is. Een rij te weinig oogt
-altijd beter dan een kolom die onder de agenda uitsteekt.
+hoeft niet exact: de schatting kiest enkel tussen nul en drie rijen. Het budget
+ligt een tiental pixels boven de ruimte naast een heel kort weekoverzicht, zodat
+een titel van drie regels op de grootste trap nog drie shiften draagt; een
+gewoon gevuld weekoverzicht is ruim hoger dan die schatting.
 
 Eén gevolg om te kennen: het budget rekent met de breedste hero. Op een telefoon
 concurreert niets om die hoogte en zou er meer passen, maar de server rekent één
@@ -6814,8 +6885,14 @@ de kalender, de zoekresultaten, de app en de persoonlijke agendafeed. Gebruik
 `viewerAudienceFilter()` en niet `audienceFilter(await viewerAudiences())`: die
 laatste combinatie negeert de voorkeur.
 
-Op /kalender blijft de chip "Afstemmen op mijn profiel" bestaan om het per bezoek
-aan of uit te zetten; zijn beginstand komt uit die accountvoorkeur.
+Op /kalender staat de chip "Afstemmen op mijn profiel"; zijn beginstand komt uit
+die accountvoorkeur. **Sinds september 2026 bewaart de chip ook**: wie hem
+aanvinkt, zet de accountvoorkeur aan, en /kalender opent de volgende keer zo.
+Daarvoor gold hij enkel voor dat ene bezoek, en moest je hem telkens opnieuw
+aanzetten. Er is bewust geen tweede, kalender-eigen voorkeur: het vinkje op
+/kalender en dat op /account zouden anders uit elkaar lopen. Het gevolg is dat
+de chip ook de homepage, de zoekresultaten, de app en de persoonlijke agendafeed
+mee omzet. Zonder account wordt er niets bewaard.
 
 ### Er is geen ledenexclusief evenement meer
 
@@ -8984,7 +9061,13 @@ bron, zodat een album dat verdwijnt of een verkoop die sluit vanzelf wegvalt:
 
 - **Ticketverkoop**: twee weken vanaf de publieke start van de verkoop (of het
   publiceren, als dat later kwam), zolang de verkoop loopt en het event niet
-  begonnen is. Een voorverkoop voor posten telt niet.
+  begonnen is. Een voorverkoop staat enkel in het nieuws van **wie erin mag**
+  (post, vaste medewerker, extra groep of de private link), vanaf haar start tot
+  de publieke verkoop begint; daarna neemt het gewone bericht het over met
+  dezelfde sleutel. Voor iemand anders zou het een knop naar een shop zijn die
+  "Binnenkort" zegt. Omdat dat per bezoeker verschilt, staat het los van het
+  gedeelde, gecachete nieuws (`getPresaleNews` in `lib/news/load.ts`). Tijdens
+  de voorverkoop staat het bericht nog niet in /admin/nieuws.
 - **Inschrijvingen**: een evenement met een externe link waarbij in de
   kalender aangevinkt is dat die link de inschrijvingen opent
   (`CalendarEvent.registrationNewsAt`), tot het evenement begint. Het is een
