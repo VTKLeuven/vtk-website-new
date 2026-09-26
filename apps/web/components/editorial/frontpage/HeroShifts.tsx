@@ -2,14 +2,16 @@ import Link from "@/components/ui/Link";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { HERO_WEEK_TIME_ZONE } from "@/lib/calendar/heroWeek";
 import { heroShiftFreeSpots, isHeroShiftUrgent } from "@/lib/frontpage/heroShifts";
+import { RewardCoins } from "@/components/shift/RewardCoins";
+import { ShiftRosterPopover, shiftRosterSummary } from "../ShiftRosterPopover";
 import type { FrontpageShift } from "./context";
 
 /**
  * De shiften die nog openstaan, onder de herotekst.
  *
  * Bewust geen kaart en geen paneel, net als het weekoverzicht ernaast: een
- * bovenschrift, rijen met een haarlijn ertussen die naar rechts oplost, en geel
- * enkel voor wat binnen een dag begint. De rij snelle links eronder zegt waar je
+ * bovenschrift, rijen met een haarlijn ertussen die naar rechts oplost, en een
+ * gele stip enkel voor wat binnen een dag begint. De rij snelle links eronder zegt waar je
  * naartoe kan; dit blok zegt waar er nu handen tekort zijn, en dat is het enige
  * wat het hier komt doen.
  *
@@ -98,25 +100,47 @@ export function HeroShifts({
         const spots = free === 1 ? t.spots.one : fill(t.spots.few, { n: free });
         const reward =
           shift.reward === 1 ? t.reward.one : fill(t.reward.many, { n: shift.reward });
+        const rosterSummary = shiftRosterSummary(shift.roster, nl);
+        // Geen <a> om de hele rij: de knop met de namen mag niet in een link
+        // staan. De naam is de link, en zijn ::after spant over de rij.
         return (
-          <Link
+          <div
             key={shift.id}
-            href={`${base}/shift`}
             className={`hero-shift-row${isHeroShiftUrgent(shift, now) ? " urgent" : ""}`}
           >
             <span className="dot" aria-hidden="true" />
             <span className="body">
-              <span className="t">{shift.name}</span>
+              <Link href={`${base}/shift`} className="t">
+                {shift.name}
+              </Link>
               <span className="d">
                 {dayLabel(shift.startTime, now, locale, nl)} {timeLabel(shift.startTime, locale)}
                 {nl ? " tot " : " to "}
-                {timeLabel(shift.endTime, locale)}, {spots.toLowerCase()}
+                {timeLabel(shift.endTime, locale)},{" "}
+                {/* Dezelfde popover als op de shiftkaartjes verderop: wie er
+                    al op staat, zegt meer dan het getal alleen. */}
+                <span className="shift-spots-wrap">
+                  <button
+                    type="button"
+                    className="hero-shift-spots"
+                    aria-label={`${spots}. ${rosterSummary}`}
+                  >
+                    {spots.toLowerCase()}
+                  </button>
+                  <ShiftRosterPopover
+                    roster={shift.roster}
+                    taken={shift.takenSpots}
+                    max={shift.maxParticipants}
+                    nl={nl}
+                  />
+                </span>
               </span>
             </span>
             {/* De beloning staat rechts, waar in het weekoverzicht het uur staat:
-                dezelfde kolom, dezelfde rol. Het is wat je eraan overhoudt. */}
-            <span className="reward">{reward}</span>
-          </Link>
+                dezelfde kolom, dezelfde rol. Het is wat je eraan overhoudt, en
+                dezelfde muntjes als op de shiftkaartjes en op /shift. */}
+            {shift.reward > 0 ? <RewardCoins amount={shift.reward} label={reward} /> : null}
+          </div>
         );
       })}
     </section>

@@ -157,6 +157,22 @@ export function ShiftWeekView({
     return withCols;
   }, [shifts, weekStart]);
 
+  // Het weekend krijgt enkel een kolom wanneer er die dag iets is: twee lege
+  // kolommen voor zaterdag en zondag maakten maandag tot vrijdag zo smal dat
+  // overlappende shiften er onleesbaar werden. `d` blijft de index in de week,
+  // zodat de segmenten en de nu-lijn gewoon blijven kloppen.
+  const visibleDays = useMemo(
+    () =>
+      days
+        .map((day, d) => ({ day, d }))
+        .filter(
+          ({ day, d }) =>
+            (day.getDay() !== 0 && day.getDay() !== 6) ||
+            segments.some((s) => s.dayIndex === d)
+        ),
+    [days, segments]
+  );
+
   const gridHeight = TOTAL_HOURS * HOUR_PX;
   const hours = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => i);
 
@@ -198,9 +214,12 @@ export function ShiftWeekView({
           setViewportHeight(e.currentTarget.clientHeight);
         }}
       >
-        <div className="vtk-week-grid">
+        <div
+          className="vtk-week-grid"
+          style={{ '--week-days': visibleDays.length } as React.CSSProperties}
+        >
           <div className="vtk-week-corner" />
-          {days.map((day, d) => {
+          {visibleDays.map(({ day, d }) => {
             const isToday = nowLine?.index === d;
             return (
               <div
@@ -223,7 +242,7 @@ export function ShiftWeekView({
             ))}
           </div>
 
-          {days.map((day, d) => {
+          {visibleDays.map(({ day, d }) => {
             const daySegs = segments.filter((s) => s.dayIndex === d);
             const shiftsAbove = daySegs.filter((s) => s.startFrac < visibleTopFrac);
             const shiftsBelow = daySegs.filter((s) => s.endFrac > visibleBottomFrac);

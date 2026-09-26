@@ -6,12 +6,14 @@ import { isSameDay, addDays } from "date-fns";
 import type { Locale } from "@vtk/i18n";
 import { useToast } from "@/components/ui/toast";
 import {
+  fill,
   registerShift,
   rewardLabel,
   type MergedShift,
   type PostNames,
 } from "@/components/shift/shiftData";
 import { RewardCoins } from "@/components/shift/RewardCoins";
+import { ShiftRosterPopover, shiftRosterSummary } from "./ShiftRosterPopover";
 import dynamic from "next/dynamic";
 import type { ShiftDict } from "@/components/shift/shiftData";
 
@@ -199,17 +201,22 @@ export function FrontpageShiftBand({
             const isRegistered = shift.viewerRegistered;
             const free = shift.availableSpots;
 
+            // Bezet over het maximum, zoals op /shift (`spotsLabel`): "0/2"
+            // zegt meteen hoe groot de ploeg is, "2 vrij" enkel wat er rest.
             let badgeClass = "spots-ok";
-            let badgeLabel = nl ? `${free} vrij` : `${free} open`;
+            let badgeLabel = `${shift.takenSpots}/${shift.maxParticipants}`;
+            let badgeSpoken = fill(t.spots.taken, {
+              taken: shift.takenSpots,
+              max: shift.maxParticipants,
+            });
             if (isRegistered) {
               badgeClass = "spots-mine";
               badgeLabel = nl ? "Ingeschreven" : "Registered";
+              badgeSpoken = badgeLabel;
             } else if (free <= 0) {
               badgeClass = "spots-full";
-              badgeLabel = nl ? "Vol" : "Full";
             } else if (free <= 2) {
               badgeClass = "spots-low";
-              badgeLabel = nl ? `${free} vrij` : `${free} open`;
             }
 
             const postLabelText = shift.post ? postNames[shift.post] ?? shift.post : null;
@@ -219,15 +226,7 @@ export function FrontpageShiftBand({
             const rewardText = shift.reward > 0 ? rewardLabel(shift.reward, t) : null;
 
             const roster = shift.roster ?? [];
-            const rosterNames = roster.map((p) =>
-              p.isSelf ? `${p.name} (${nl ? "jij" : "you"})` : p.name
-            );
-            const spotsTitle =
-              rosterNames.length > 0
-                ? `${nl ? "Ingeschreven" : "Registered"}: ${rosterNames.join(", ")}`
-                : nl
-                  ? "Nog geen inschrijvingen"
-                  : "No sign-ups yet";
+            const spotsTitle = shiftRosterSummary(roster, nl);
 
             const entry: MergedShift = {
               shift: {
@@ -258,53 +257,22 @@ export function FrontpageShiftBand({
                 <div className="shift-tile-head">
                   <p className="shift-tile-day">{formatShiftTileDay(start, now, locale)}</p>
                   <div className="shift-spots-wrap" onClick={(e) => e.stopPropagation()}>
+                    {/* Geen `title`: de popover hieronder toont de namen al, en
+                        een native tooltip kwam er na een tel bovenop. */}
                     <button
                       type="button"
                       className={`shift-spots ${badgeClass}`}
-                      title={spotsTitle}
                       onClick={() => setSelectedEntry(entry)}
-                      aria-label={`${badgeLabel}. ${spotsTitle}`}
+                      aria-label={`${badgeSpoken}. ${spotsTitle}`}
                     >
                       {badgeLabel}
                     </button>
-                    <div className="shift-spots-popover" role="tooltip" aria-hidden="true">
-                      <div className="shift-spots-popover-head">
-                        <span className="shift-spots-popover-title">
-                          {nl ? "Ingeschreven" : "Registered"}
-                        </span>
-                        <span className="shift-spots-popover-count">
-                          {shift.takenSpots}/{shift.maxParticipants}
-                        </span>
-                      </div>
-                      {roster.length === 0 ? (
-                        <p className="shift-spots-popover-empty">
-                          {nl ? "Nog geen inschrijvingen" : "No sign-ups yet"}
-                        </p>
-                      ) : (
-                        <ul className="shift-spots-popover-list">
-                          {roster.map((person, idx) => (
-                            <li
-                              key={idx}
-                              className="shift-spots-popover-person"
-                              data-self={person.isSelf ? "true" : undefined}
-                            >
-                              <span className="shift-spots-popover-initial">
-                                {person.name.trim().slice(0, 1).toUpperCase() || "?"}
-                              </span>
-                              <span className="shift-spots-popover-name">
-                                {person.name}
-                                {person.isSelf ? (
-                                  <span className="shift-spots-popover-you">
-                                    {" "}
-                                    ({nl ? "jij" : "you"})
-                                  </span>
-                                ) : null}
-                              </span>
-                            </li>
-                          ))}
-                        </ul>
-                      )}
-                    </div>
+                    <ShiftRosterPopover
+                      roster={roster}
+                      taken={shift.takenSpots}
+                      max={shift.maxParticipants}
+                      nl={nl}
+                    />
                   </div>
                 </div>
 
@@ -346,7 +314,6 @@ export function FrontpageShiftBand({
                     <button
                       type="button"
                       className="btn btn-ghost btn-sm"
-                      title={spotsTitle}
                       onClick={(e) => {
                         e.stopPropagation();
                         setSelectedEntry(entry);

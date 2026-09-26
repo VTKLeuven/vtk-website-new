@@ -24,6 +24,7 @@ import {
 import { ToastProvider } from "@/components/ui/toast";
 import { Frontpage } from "@/components/editorial/frontpage";
 import type { FrontpageShift } from "@/components/editorial/frontpage/context";
+import { ROSTER_PARTICIPANT_SELECT, toRoster } from "@/lib/shift/roster";
 
 // Outside `app/[locale]/` on purpose, so the site header, the footer and the
 // admin navigation stay out of the frame; only the root layout wraps this. That
@@ -110,14 +111,15 @@ export default async function FrontpagePreview({
         maxParticipants: true,
         reward: true,
         _count: { select: { participants: true } },
-        participants: { where: { userId: session.user.id }, select: { userId: true } },
+        participants: { select: ROSTER_PARTICIPANT_SELECT },
       },
     }),
   ]);
   const openShifts: FrontpageShift[] = shifts.map(({ _count, participants, ...shift }) => ({
     ...shift,
     takenSpots: _count.participants,
-    viewerRegistered: participants.length > 0,
+    viewerRegistered: participants.some((p) => p.userId === session.user.id),
+    roster: toRoster(participants, session.user.id),
   }));
   const viewerInterestIds = new Set(viewerInterestMap.keys());
   const upcomingEvents = calendarEvents.filter((event) => event.start >= now);

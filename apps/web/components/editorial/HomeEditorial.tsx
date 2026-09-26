@@ -271,6 +271,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     ...shift,
     takenSpots: _count.participants,
     viewerRegistered: participants.some((p) => p.userId === viewerId),
+    roster: toRoster(participants, viewerId),
   }));
 
   const weekEnd = addDays(now, 7);

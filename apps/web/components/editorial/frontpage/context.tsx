@@ -3,6 +3,7 @@ import type { Locale } from "@vtk/i18n";
 import type { FieldValues } from "@/lib/frontpage/fields";
 import type { HeroWeekMoment, HeroWeekPlacement } from "@/lib/calendar/heroWeek";
 import type { ResolvedSlogans } from "@/lib/slogans";
+import type { ShiftRosterEntry } from "@/lib/shift";
 
 /**
  * What every front page component receives.
@@ -72,8 +73,8 @@ export type FrontpageEvent = {
 
 /**
  * Eén shift zoals de hero ze nodig heeft. Bewust niet de hele `Shift`: de
- * beschrijving, de uitleg en de deelnemers horen op /shift, niet op de
- * voorpagina. Zie lib/frontpage/heroShifts.ts voor wat er met deze velden
+ * beschrijving en de uitleg horen op /shift, niet op de voorpagina. Wie er al
+ * op staat wel, als namen: dat toont de shiftband verderop ook. Zie lib/frontpage/heroShifts.ts voor wat er met deze velden
  * gebeurt.
  */
 export type FrontpageShift = {
@@ -88,6 +89,8 @@ export type FrontpageShift = {
   viewerRegistered: boolean;
   /** Het aantal bonnetjes dat de shift opbrengt. */
   reward: number;
+  /** Wie er al ingeschreven is, enkel de namen. Zie lib/shift/roster.ts. */
+  roster: ShiftRosterEntry[];
 };
 
 export type FrontpagePartner = {
