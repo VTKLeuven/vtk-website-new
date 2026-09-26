@@ -21,12 +21,18 @@ export type MembershipErrorCode =
   | "INVALID_PRICE"
   | "INVALID_USER"
   | "ALREADY_MEMBER"
+  | "ALREADY_HONORARY"
   | "MEMBERSHIP_CLOSED";
 
 function revalidate(): void {
   revalidatePath("/admin/leden");
   revalidatePath("/lidmaatschap");
   revalidatePath("/account");
+}
+
+function revalidateHonorary(userId: string): void {
+  revalidatePath("/admin/leden");
+  revalidatePath(`/admin/gebruikers/${userId}`);
 }
 
 const priceSchema = z
@@ -150,6 +156,68 @@ export async function revokeMembershipAction(formData: FormData): Promise<void> 
     summary: `lidmaatschap ${formatWorkingYear(membership.year)} ingetrokken`,
   });
   revalidate();
+}
+
+/**
+ * Iemand erelid maken (`User.honoraryMember`).
+ *
+ * Staat bij de leden en niet op de gebruikerspagina: wie ereleden beheert, wil
+ * de lijst zien en er iemand bij zetten, niet elk account apart openen. Het
+ * recht is `leden.manage`, hetzelfde als iemand gratis lid maken: beide geven
+ * toegang tot tickets die anderen niet zien.
+ */
+export async function grantHonoraryAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("leden.manage");
+
+  const userId = String(formData.get("userId") ?? "").trim();
+  if (!userId) return saveError("INVALID_USER" satisfies MembershipErrorCode);
+
+  const user = await prisma.user.findFirst({
+    where: { id: userId, deletedAt: null },
+    select: { id: true, name: true, honoraryMember: true },
+  });
+  if (!user) return saveError("INVALID_USER" satisfies MembershipErrorCode);
+  if (user.honoraryMember) return saveError("ALREADY_HONORARY" satisfies MembershipErrorCode);
+
+  await prisma.user.update({ where: { id: userId }, data: { honoraryMember: true } });
+  await logAudit({
+    action: "grant",
+    entity: "honoraryMember",
+    entityId: userId,
+    target: user.name,
+    summary: "erelid gemaakt",
+  });
+  revalidateHonorary(userId);
+  return saveOk();
+}
+
+/**
+ * Het erelidmaatschap intrekken. Raakt enkel de vlag: het account, een
+ * lidmaatschap van de kring en tickets die al gekocht zijn, blijven staan.
+ */
+export async function revokeHonoraryAction(formData: FormData): Promise<void> {
+  await requirePermission("leden.manage");
+  const userId = String(formData.get("userId") ?? "");
+  if (!userId) return;
+
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, honoraryMember: true },
+  });
+  if (!user?.honoraryMember) return;
+
+  await prisma.user.update({ where: { id: userId }, data: { honoraryMember: false } });
+  await logAudit({
+    action: "revoke",
+    entity: "honoraryMember",
+    entityId: userId,
+    target: user.name,
+    summary: "erelidmaatschap ingetrokken",
+  });
+  revalidateHonorary(userId);
 }
 
 /**

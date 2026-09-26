@@ -6694,9 +6694,18 @@ gewoon open; er valt dan niets te verbergen.
 ### Ereleden
 
 Een alumnus kan door een beheerder als **erelid** aangeduid worden
-(`User.honoraryMember`, op `/admin/gebruikers/<id>`; nooit door het lid zelf).
-Daarmee ziet hij ticketsoorten met `TicketAudience.HONORARY`, bijvoorbeeld
-gratis naar een cantus.
+(`User.honoraryMember`; nooit door het lid zelf). Daarmee ziet die persoon
+ticketsoorten met `TicketAudience.HONORARY`, bijvoorbeeld gratis naar een
+cantus.
+
+**De ereleden worden beheerd als tweede lijst op `/admin/leden`** (keuze Leden /
+Ereleden bovenaan, `?lijst=ereleden`), met een zoekbalk om iemand toe te voegen
+en een intrekknop per rij. Dat was eerst een vinkje op `/admin/gebruikers/<id>`:
+wie de ereleden bijhoudt, moest dan elk account apart openen en had nergens een
+overzicht van wie het al was. Het recht is `leden.manage`, net als iemand gratis
+lid maken; beide geven toegang tot tickets die anderen niet zien. Ereleden
+hangen niet aan een academiejaar, dus die lijst heeft geen jaarkeuze. Op de
+gebruikerspagina staat de status nog enkel ter info.
 
 Zo'n ticketsoort wordt voor iedereen anders **weggefilterd**, niet uitgegrijsd.
 Wat de kring aan haar ereleden geeft, hoort geen zichtbare uitzondering te zijn

@@ -17,6 +17,7 @@ import { revokeMembershipAction } from "@/app/actions/membership";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { GrantMembershipForm } from "./GrantMembershipForm";
 import { MembershipSettingsForm } from "./MembershipSettingsForm";
+import { HonoraryList } from "./HonoraryList";
 
 /**
  * Ledenbeheer: wie is er dit academiejaar lid van VTK.
@@ -29,13 +30,17 @@ import { MembershipSettingsForm } from "./MembershipSettingsForm";
  * Het ledenaantal staat bovenaan, want dat is de vraag waarmee iemand deze
  * pagina opent; de uitsplitsing per herkomst staat ernaast zodat "hoeveel
  * betalende leden" niet apart geteld hoeft te worden.
+ *
+ * Een tweede lijst toont de ereleden (`?lijst=ereleden`): die hangen niet aan een
+ * academiejaar, maar wie ze beheert, zoekt ze bij de leden en niet in een
+ * vinkje op elk account apart.
  */
 export default async function AdminLeden({
   params,
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ jaar?: string; openstaand?: string }>;
+  searchParams: Promise<{ jaar?: string; openstaand?: string; lijst?: string }>;
 }) {
   const [{ locale: localeParam }, filters] = await Promise.all([params, searchParams]);
   if (!hasLocale(localeParam)) notFound();
@@ -47,6 +52,53 @@ export default async function AdminLeden({
   const year =
     filters.jaar && /^\d{4}$/.test(filters.jaar) ? Number(filters.jaar) : currentStudyYear();
   const pending = filters.openstaand === "1";
+  const honorary = filters.lijst === "ereleden";
+
+  const header = (
+    <div className="space-y-4">
+      <div>
+        <h1 className="text-2xl font-semibold text-vtk-ink">{nl ? "Leden" : "Members"}</h1>
+        <p className="mt-1 max-w-3xl text-sm text-[#5c667f]">
+          {nl
+            ? "Wie dit academiejaar lid is van VTK: gratis als student van de faculteit Ingenieurswetenschappen, betalend als niet-facultair lid, of hier toegekend. Daarnaast de ereleden."
+            : "Who is a member of VTK this academic year: free as a student of the Faculty of Engineering Science, paying as a non-faculty member, or granted here. Plus the honorary members."}
+        </p>
+      </div>
+      <nav aria-label={nl ? "Lijst" : "List"} className="flex flex-wrap gap-2">
+        {[
+          { key: "leden", href: `${base}/admin/leden`, label: nl ? "Leden" : "Members", active: !honorary },
+          {
+            key: "ereleden",
+            href: `${base}/admin/leden?lijst=ereleden`,
+            label: nl ? "Ereleden" : "Honorary members",
+            active: honorary,
+          },
+        ].map((tab) => (
+          <Link
+            key={tab.key}
+            href={tab.href}
+            aria-current={tab.active ? "page" : undefined}
+            className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+              tab.active
+                ? "border-vtk-ink bg-vtk-ink text-white"
+                : "border-vtk-blue/15 text-vtk-ink hover:bg-vtk-blue-soft/70"
+            }`}
+          >
+            {tab.label}
+          </Link>
+        ))}
+      </nav>
+    </div>
+  );
+
+  if (honorary) {
+    return (
+      <div className="space-y-6">
+        {header}
+        <HonoraryList nl={nl} />
+      </div>
+    );
+  }
 
   const [years, totals, rows, config] = await Promise.all([
     membershipYears(),
@@ -68,14 +120,7 @@ export default async function AdminLeden({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-vtk-ink">{nl ? "Leden" : "Members"}</h1>
-        <p className="mt-1 max-w-3xl text-sm text-[#5c667f]">
-          {nl
-            ? "Wie dit academiejaar lid is van VTK: gratis als student van de faculteit Ingenieurswetenschappen, betalend als niet-facultair lid, of hier toegekend."
-            : "Who is a member of VTK this academic year: free as a student of the Faculty of Engineering Science, paying as a non-faculty member, or granted here."}
-        </p>
-      </div>
+      {header}
 
       {/* Het ledenaantal zelf, met de uitsplitsing ernaast. */}
       <Card className="p-5">

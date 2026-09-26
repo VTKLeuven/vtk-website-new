@@ -659,7 +659,7 @@ model User {
   // `MailCategory`: die lijsten zijn studiegericht en vallen weg zodra iemand
   // zijn studie niet meer bevestigt, wat voor een alumnus altijd het geval is.
   alumniMailOptIn         Boolean             @default(false)
-  // Erelid. Enkel door een beheerder te zetten (zie `users.edit`), nooit door
+  // Erelid. Enkel door een beheerder te zetten (/admin/leden, `leden.manage`), nooit door
   // het lid zelf. Geeft toegang tot ticketsoorten met `TicketAudience.HONORARY`,
   // die voor iedereen anders onzichtbaar blijven.
   honoraryMember          Boolean             @default(false)

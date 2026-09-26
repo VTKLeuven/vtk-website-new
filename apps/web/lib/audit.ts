@@ -52,6 +52,7 @@ export const AUDIT_ENTITIES = {
   // Het lidmaatschap van de kring zelf, per academiejaar. Bewust een andere
   // naam dan `membership` hierboven: dat is een post in een werkingsjaar.
   vtkMembership: { nl: "Lidmaatschap", en: "Membership", group: "users" },
+  honoraryMember: { nl: "Erelid", en: "Honorary member", group: "users" },
   post: { nl: "Post", en: "Post", group: "users" },
   postTask: { nl: "Taak van een post", en: "Post task", group: "users" },
   werkgroep: { nl: "Werkgroep", en: "Werkgroep", group: "users" },
