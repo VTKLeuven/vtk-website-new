@@ -701,6 +701,7 @@ model User {
   pocRepresentative        PocRepresentative[]
   createdPages             Page[]                  @relation("PageCreatedBy")
   createdAnnouncements     Announcement[]          @relation("AnnouncementCreatedBy")
+  createdNewsPosts         NewsPost[]              @relation("NewsPostCreatedBy")
   updatedFrontpages        Frontpage[]             @relation("FrontpageUpdatedBy")
   createdEvents            CalendarEvent[]         @relation("EventCreatedBy")
   dashboardTiles           DashboardTile[]
@@ -1525,6 +1526,75 @@ enum AnnouncementScope {
 }
 
 /**
+ * Een bericht in de Nieuws-band op de homepage dat iemand zelf schrijft: een
+ * mededeling of een woordje van de praeses.
+ *
+ * De automatische berichten (ticketverkoop, inschrijvingen, het Bakske,
+ * Ir.Reëel, fotoalbums) staan níét in deze tabel: die worden bij het lezen
+ * afgeleid uit hun bron, zodat een album dat verdwijnt of een verkoop die sluit
+ * vanzelf uit het nieuws valt. Zie apps/web/lib/news.
+ */
+model NewsPost {
+  id      String       @id @default(cuid())
+  kind    NewsPostKind @default(NOTICE)
+  titleNl String
+  /// Leeg = de Nederlandse titel, ook op de Engelse site.
+  titleEn String?
+  /// Markdown, bewerkt met de gedeelde MarkdownEditor.
+  bodyNl  String
+  bodyEn  String?
+
+  ctaLabelNl String?
+  ctaLabelEn String?
+  ctaUrl     String?
+
+  /// Bij een mededeling de foto boven de kaart; bij een woordje het portret.
+  imageKey String?
+
+  /// Wie het woordje ondertekent ("Alexander", "Praeses VTK Leuven").
+  authorName   String?
+  authorRoleNl String?
+  authorRoleEn String?
+
+  /// Het uitgelichte bericht in de band. Hoogstens één tegelijk; de action zet
+  /// de andere uit.
+  featured Boolean @default(false)
+  /// Uit = nooit tonen, ongeacht het venster.
+  active   Boolean @default(true)
+
+  /// Vanaf wanneer het in het nieuws staat, en de datum die erbij staat.
+  publishedAt DateTime  @default(now()) @db.Timestamptz(3)
+  /// Leeg = blijft staan tot iemand het uitzet.
+  endsAt      DateTime? @db.Timestamptz(3)
+
+  createdById String?
+  createdBy   User?    @relation("NewsPostCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([active, publishedAt])
+}
+
+enum NewsPostKind {
+  NOTICE
+  PRAESES
+}
+
+/**
+ * Een automatisch bericht dat iemand uit het nieuws gehaald heeft, zonder aan de
+ * bron te komen: de ticketverkoop blijft lopen, het album blijft op /media.
+ * `source` is de soort ("tickets", "signup", "bakske", "irreeel", "album"),
+ * `ref` de id binnen die bron.
+ */
+model NewsHidden {
+  source    String
+  ref       String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([source, ref])
+}
+
+/**
  * One configurable front page: the dark block at the top of the homepage.
  * Which front pages exist is decided in code, not here. Each one is its own
  * component with its own layout, free to look nothing like the others; a
@@ -1770,6 +1840,11 @@ model CalendarEvent {
   /// iets vertrekt, en nooit teruggezet, want een tweede herinnering voor
   /// hetzelfde evenement is spam. Zie apps/web/lib/calendar/heroWeekNotice.ts.
   heroWeekNoticeAt DateTime? @db.Timestamptz(3)
+
+  /// Wanneer iemand aanduidde dat de externe link de inschrijvingen opent. Dan
+  /// staat het evenement als "Inschrijvingen" in het nieuws op de homepage, tot
+  /// het begint. NULL = niet aangeduid (ook voor alles van voor deze kolom).
+  registrationNewsAt DateTime? @db.Timestamptz(3)
 
   group          Group                        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy      User?                        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)

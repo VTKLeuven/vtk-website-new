@@ -8907,3 +8907,60 @@ uren van die persoon, en de tabel onderaan enkel zijn ritten.
 **Per 1, 2 of 4 uur.** Vierentwintig balken vragen breedte die een telefoon niet
 heeft, en over een werkingsjaar is het verschil tussen 14u en 15u vaak ruis. Per
 4 uur past het beeld op 390px zonder te schuiven.
+
+## Nieuws tussen de hero en de openingsuren
+
+De homepage heeft een Nieuws-band tussen de snelle links en de openingsuren:
+één uitgelicht bericht links, de rest als register ernaast (soort, titel, één
+regel). Beheer via Admin → Website → Nieuws (`news.manage`), waar de band ook
+helemaal uit kan. Code: `apps/web/lib/news` (regels, instelling, lezen) en
+`components/editorial/NewsBand.tsx`.
+
+**Waarom een band en geen aankondiging.** Een aankondiging is één bericht dat
+je wegklikt. Veel dingen die de kring wil zeggen, passen daar niet in: een
+mededeling met veel uitleg, een link naar een pagina die niet in de header
+hoort, of gewoon "de ticketverkoop van het galabal is open". Die horen op een
+vaste plek waar je ze terugvindt.
+
+**Vier richtingen bekeken, deze gekozen.** Naast dit register werden een raster
+van ticketpassen, glaskaarten op de herofoto en de kaarten van /tickets bekeken.
+Het register won: het werkt even goed met en zonder foto's (een Bakske of een
+ticketverkoop heeft er vaak geen), met drie of acht berichten, en een lange
+handgeschreven tekst en een korte automatische regel krijgen elk hun eigen
+vorm. De band is lichtblauw (`--paper-2`), dus de strakke naad onder de donkere
+zone is nu een naad tussen donker en lichtblauw, en de openingsuren sluiten er
+navy op aan. Zonder berichten, of met de band uit, valt hij helemaal weg en
+staat alles zoals voordien.
+
+**Half automatisch.** Wat iemand zelf schrijft (een mededeling, een woordje van
+de praeses) staat in `NewsPost`. De rest wordt bij het lezen afgeleid uit zijn
+bron, zodat een album dat verdwijnt of een verkoop die sluit vanzelf wegvalt:
+
+- **Ticketverkoop**: twee weken vanaf de publieke start van de verkoop (of het
+  publiceren, als dat later kwam), zolang de verkoop loopt en het event niet
+  begonnen is. Een voorverkoop voor posten telt niet.
+- **Inschrijvingen**: een evenement met een externe link waarbij in de
+  kalender aangevinkt is dat die link de inschrijvingen opent
+  (`CalendarEvent.registrationNewsAt`), tot het evenement begint. Het is een
+  vinkje en geen gok op de knoptekst: "Inschrijflink" staat ook bij events waar
+  je je al lang niet meer kan inschrijven.
+- **Het Bakske en Ir.Reëel**: per blad het nieuwste nummer, drie weken lang.
+- **Fotoalbums**: twee weken vanaf de datum van het album. Bewust die datum en
+  niet het uploadmoment: Immich geeft dat niet mee, en een album van een
+  activiteit van een maand geleden is geen nieuws meer.
+
+Een automatisch bericht kan uit het nieuws gehaald worden zonder aan de bron te
+komen (`NewsHidden`); per bron kan het ook helemaal uit.
+
+**Uitgelicht: de keuze van de redactie, anders het woordje, anders het
+nieuwste.** Het woordje van de praeses is voor het Bakske geschreven, een halve
+A5 met aanhef en groet. Het wordt dus niet tussen de korte regels van het
+register gedrukt, maar staat in de uitgelichte kaart: de eerste negen regels
+met een zachte uitloop, en "Lees de hele brief" klapt de rest ter plekke open.
+Zo blijft de band even hoog tot iemand klikt. Een venster en een brief over de
+volle breedte werden ook bekeken; het venster verstopte de tekst achter een
+klik te veel, de volle breedte duwde de openingsuren een scherm naar beneden.
+
+**/nieuws** toont alles wat nu in het nieuws staat (zonder de grens van de
+band) en de eerdere mededelingen en woordjes. Automatische berichten hebben
+daar geen historiek: hun bron staat nog op zijn eigen plek.

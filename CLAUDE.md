@@ -293,7 +293,9 @@ the design language into the application instead of copying mockup content.
   drops; do not put a fixed number back. The dark zone (`.home-dark-zone`) stretches the photo
   through the quick-links row, which sits on it as a dark glass panel; the zone
   ends on a crisp seam: a short bottom-anchored vignette settles the photo edge
-  and the openingsuren band starts right below it. Both a paper gap and a long
+  and the light-blue **Nieuws** band starts right below it (or, when there is
+  no news or it is switched off in /admin/nieuws, the openingsuren band). Both
+  an empty paper gap and a long
   dissolve into navy were reviewed and rejected there (the gap broke the dark
   flow; the dissolve read as murky, empty dark). The sticky header sits
   transparently over this hero and turns solid once scrolled past it (desktop;
@@ -307,8 +309,8 @@ the design language into the application instead of copying mockup content.
   **Hoofdpartners** (paper). The navy bands (openingsuren, aftermovies, career)
   carry the full-bleed `::before` navy fill plus the shared `::after` technical
   pattern, each with its own crop of `technisch-pattern.svg` so no two bands show
-  the same wallpaper. The openingsuren band butts directly against the dark
-  zone's crisp seam with a compact heading. The full-bleed bands
+  the same wallpaper. The openingsuren band follows the Nieuws band (or the
+  dark zone's crisp seam when there is no news) with a compact heading. The full-bleed bands
   (aftermovies, evenementen, career, POC's) share a `band` class: each carries a
   top margin to separate from the paper section above it, but two consecutive
   bands butt directly against each other with a crisp navy/light-blue seam
@@ -321,6 +323,13 @@ the design language into the application instead of copying mockup content.
   with study programmes) and therefore sits _after_ Career, never between two
   navy bands: were it between them, the two navy bands would collide the moment it
   disappears. See `docs/design-decisions.md` for the section ordering rationale.
+- News (`components/editorial/NewsBand.tsx`, `lib/news`): one featured card on
+  the left and a hairline register on the right, on `--paper-2`. The kind of a
+  post is its colour (from the ticket palette, mapped once in `vtk-news.css`)
+  and its icon tile, never a pill over a photo. The word from the praeses is
+  Bakske length: it stays clamped to nine lines in the featured card with
+  "Lees de hele brief" to open it in place; do not print it in the register or
+  let the card grow to its full length. See `docs/design-decisions.md`.
 - Photography: content cards open with a real photo under a navy scrim, never a
   decorative illustration. Aanbod cards ("Wat we doen") carry a photo header
   (16:9, light 115deg scrim) and are uniform: every card in the grid gets the

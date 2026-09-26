@@ -431,6 +431,7 @@
     "frontpage": "Frontpage",
     "slogans": "Slogans",
     "announcements": "Aankondigingen",
+    "news": "Nieuws",
     "linkPage": "Linktree",
     "dashboardTiles": "Dashboardtegels",
     "tickets": "Tickets",
@@ -913,6 +914,10 @@
     "kindAlbum": "Fotoalbum"
   },
   "seo": {
+    "nieuws": {
+      "title": "Nieuws",
+      "description": "Wat er nu speelt bij VTK: ticketverkoop, inschrijvingen, het Bakske, nieuwe foto's en mededelingen van het praesidium."
+    },
     "home": {
       "title": "Vlaamse Technische Kring",
       "description": "VTK is de studentenvereniging van de faculteit Ingenieurswetenschappen aan de KU Leuven: activiteiten, cursussen, Theokot en meer."

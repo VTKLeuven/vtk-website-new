@@ -36,6 +36,11 @@ type Event = {
   /** De tekst op de knop naar `url`; leeg = "Externe eventlink". */
   urlLabelNl?: string | null;
   urlLabelEn?: string | null;
+  /**
+   * Wanneer aangeduid werd dat `url` de inschrijvingen opent; dan staat het
+   * evenement in het nieuws op de homepage. Zie lib/news/rules.ts.
+   */
+  registrationNewsAt?: Date | null;
   imageKey?: string | null;
   /** Waar de uitsnede van die foto rond draait; zie lib/imageFocus.ts. */
   imageFocusX?: number | null;
@@ -281,6 +286,7 @@ export function EventForm({
   // evenement heeft er een.
   const hasMoreSettings = Boolean(
     event.url ||
+      event.registrationNewsAt ||
       event.urlLabelNl ||
       event.urlLabelEn ||
       (canHeroWeek && event.heroWeek && event.heroWeek !== 'AUTO')
@@ -822,6 +828,24 @@ export function EventForm({
                   : 'Leave empty for "External event link". If the link goes to someone else’s sign-up form or ticket sales, write "Sign-up link" or "Tickets": that decides whether people click. The English text falls back to the Dutch one.'}
               </p>
             </div>
+            <label className="mt-3 inline-flex items-start gap-2 text-sm text-vtk-ink">
+              <input
+                type="checkbox"
+                name="registrationNews"
+                defaultChecked={Boolean(event.registrationNewsAt)}
+                className="mt-0.5"
+              />
+              <span>
+                {nl
+                  ? 'Deze link opent de inschrijvingen: zet dit in het nieuws op de homepage'
+                  : 'This link opens the sign-ups: put this in the news on the homepage'}
+              </span>
+            </label>
+            <p className="vtk-ef-hint">
+              {nl
+                ? 'Dan staat het evenement als "Inschrijvingen" in de nieuwsband, tot het begint. Enkel voor een gepubliceerd evenement met een link. Gebruik je tickets van VTK, dan hoeft dit niet: een ticketverkoop komt vanzelf in het nieuws.'
+                : 'The event then appears as "Sign-ups" in the news band until it starts. Only for a published event with a link. If you sell VTK tickets, you do not need this: ticket sales appear in the news by themselves.'}
+            </p>
           </div>
 
           {canHeroWeek ? (

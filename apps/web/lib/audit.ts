@@ -64,6 +64,8 @@ export const AUDIT_ENTITIES = {
   page: { nl: "Pagina", en: "Page", group: "pages" },
   pageAsset: { nl: "Paginabijlage", en: "Page download", group: "pages" },
   announcement: { nl: "Aankondiging", en: "Announcement", group: "home" },
+  newsPost: { nl: "Nieuwsbericht", en: "News post", group: "home" },
+  news: { nl: "Nieuws", en: "News", group: "home" },
   home: { nl: "Homepagina", en: "Homepage", group: "home" },
   frontpage: { nl: "Frontpage", en: "Front page", group: "home" },
   linkPage: { nl: "Linktree", en: "Linktree", group: "home" },

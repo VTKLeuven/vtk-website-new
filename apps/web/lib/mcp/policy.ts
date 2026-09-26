@@ -62,6 +62,7 @@ export const MCP_PERMISSION_POLICY = {
   "partners.manage": { reads: ["partners"], creates: ["app_create:partner"], blocked: ["upload logos, update or delete partners"] },
   "home.edit": { reads: ["editorial_settings"], creates: [], blocked: ["overwrite homepage settings"] },
   "announcements.manage": { reads: ["announcements"], creates: ["app_create:announcement"], blocked: ["activate announcements"] },
+  "news.manage": { reads: [], creates: [], blocked: ["create, publish or hide homepage news"] },
   // Een pushbericht gaat rechtstreeks naar de telefoons van de leden en is niet
   // terug te nemen. Dat is geen `create` maar een operationeel neveneffect, dus
   // MCP mag het onder geen enkele voorwaarde.

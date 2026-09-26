@@ -62,6 +62,15 @@ export function EyeOffIcon() {
   );
 }
 
+export function EyeIcon() {
+  return (
+    <Icon>
+      <path d="M3 12c0-1.5 4-6 9-6s9 4.5 9 6-4 6-9 6-9-4.5-9-6Z" />
+      <circle cx="12" cy="12" r="3" />
+    </Icon>
+  );
+}
+
 export function CopyIcon() {
   return (
     <Icon>

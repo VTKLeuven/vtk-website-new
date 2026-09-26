@@ -1,0 +1,477 @@
+@import "./vtk-ticket-colors.css";
+
+/* De Nieuws-band op de homepage, en dezelfde rijen op /nieuws.
+
+   Eén uitgelicht bericht links, een register ernaast. Dezelfde taal als het
+   ticketpaneel: een witte kaart met de gele streep onder de titel, en
+   haarlijnen in plaats van een kaart per rij. Zie components/editorial/NewsBand.tsx
+   en docs/design-decisions.md.
+
+   Elke soort heeft een kleur uit het ticketpalet (vtk-ticket-colors.css), zodat
+   je de soort herkent voor je de regel leest. Hier enkel de toewijzing; de
+   kleuren zelf staan daar.
+
+   Links en knoppen dragen `:is(.vtk-design, .vtk-page)` voor hun klasse: de
+   reset in vtk-base.css (`.vtk-design a`, `.vtk-design button`) is anders
+   specifieker en wist hun kleur, rand en achtergrond. */
+
+:root {
+  --news-notice: var(--ticket-color-navy);
+  --news-praeses: var(--ticket-color-amber);
+  --news-tickets: var(--ticket-color-blue);
+  --news-signup: var(--ticket-color-green);
+  --news-bakske: var(--ticket-color-violet);
+  --news-irreeel: var(--ticket-color-rose);
+  --news-album: var(--ticket-color-slate);
+}
+
+/* Volle-breedteband in lichtblauw, tussen de donkere zone en de navy
+   openingsuren; dezelfde opbouw als .hours-strip (vtk-home.css). */
+.vtk-design .news-band {
+  position: relative;
+  z-index: 0;
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 52px clamp(20px, 3vw, 36px) clamp(56px, 7vw, 72px);
+}
+
+.vtk-design .news-band::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  bottom: 0;
+  left: calc(50% - 50vw);
+  right: calc(50% - 50vw);
+  background: var(--paper-2);
+}
+
+.vtk-design .news-band .sec-head .meta a {
+  font-weight: 600;
+}
+
+.news-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  gap: clamp(24px, 3.4vw, 44px);
+  align-items: start;
+}
+
+.news-grid.is-solo {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 760px;
+}
+
+/* ---------- Soort, datum, nieuw ---------- */
+
+.news-kick {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.news-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--news-type);
+}
+
+.news-kick time {
+  color: var(--muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.news-new {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+/* ---------- Het uitgelichte bericht ---------- */
+
+.news-feat {
+  position: relative;
+  display: grid;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+}
+
+/* Zonder foto: de gele rail van een uitgelichte kaart. Met foto draagt de foto
+   de nadruk al. */
+.news-feat.is-plain,
+.news-feat.is-letter {
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.news-feat-media {
+  position: relative;
+  aspect-ratio: 16 / 9;
+}
+
+.news-feat-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.news-pin {
+  position: absolute;
+  right: 16px;
+  bottom: -22px;
+  z-index: 1;
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  align-content: center;
+  border-radius: 12px;
+  background: var(--yellow);
+  color: var(--ink);
+  line-height: 1;
+  text-align: center;
+  box-shadow: 0 6px 14px -6px rgba(10, 15, 31, 0.35);
+}
+
+.news-pin small {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.news-pin b {
+  margin: 2px 0 1px;
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.news-feat-body {
+  display: grid;
+  gap: 12px;
+  padding: 22px 24px 24px;
+  min-width: 0;
+}
+
+.news-quote {
+  color: var(--news-type);
+}
+
+/* De gele streep onder de titel, even breed als de titel. */
+.news-title {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  color: var(--ink);
+  font-size: 25px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.18;
+  text-wrap: balance;
+}
+
+.news-title::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin-top: 6px;
+  border-radius: 2px;
+  background: var(--yellow);
+}
+
+:is(.vtk-design, .vtk-page) .news-feat-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+/* Het klikvlak over de hele kaart; `.news-feat` is de geplaatste voorouder. */
+:is(.vtk-design, .vtk-page) .news-feat-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.news-excerpt {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--body);
+  font-size: 15px;
+  line-height: 1.62;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+}
+
+.news-feat-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+/* Boven het klikvlak van de kaart, anders opent de knop het bericht in plaats
+   van zijn eigen bestemming. */
+:is(.vtk-design, .vtk-page) .news-go {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 0 16px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+:is(.vtk-design, .vtk-page) .news-go:hover {
+  border-color: var(--ink);
+}
+
+:is(.vtk-design, .vtk-page) .news-go.is-primary {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+:is(.vtk-design, .vtk-page) .news-go.is-primary:hover {
+  background: var(--navy);
+}
+
+/* ---------- Het woordje: ingekort, met "Lees de hele brief" ---------- */
+
+.news-letter {
+  color: var(--body);
+  font-size: 15px;
+  line-height: 1.62;
+}
+
+.news-letter p {
+  margin: 0 0 0.8em;
+}
+
+.news-letter > :last-child,
+.news-letter > div > :last-child {
+  margin-bottom: 0;
+}
+
+:is(.vtk-design, .vtk-page) .news-letter a {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--yellow);
+  text-underline-offset: 3px;
+}
+
+.news-letter[data-clamped="true"] {
+  max-height: calc(var(--news-lines, 9) * 1.62em);
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 3.4em), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 3.4em), transparent);
+}
+
+:is(.vtk-design, .vtk-page) .news-more {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 0 2px;
+  border: 0;
+  border-bottom: 2px solid var(--yellow);
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  cursor: pointer;
+}
+
+:is(.vtk-design, .vtk-page) .news-more svg {
+  transition: transform 150ms ease;
+}
+
+:is(.vtk-design, .vtk-page) .news-more[aria-expanded="true"] svg {
+  transform: rotate(180deg);
+}
+
+.news-who {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.news-who b {
+  display: block;
+  color: var(--ink);
+  font-size: 14.5px;
+}
+
+.news-who span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.news-avatar {
+  display: grid;
+  flex: none;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: repeating-linear-gradient(135deg, var(--paper-2) 0 8px, var(--paper) 8px 16px);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 800;
+  object-fit: cover;
+}
+
+/* ---------- Het register ---------- */
+
+.news-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+:is(.vtk-design, .vtk-page) .news-row {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 10px 14px 6px;
+  border-bottom: 1px solid var(--line);
+  color: var(--ink);
+  text-decoration: none;
+  transition: background 150ms ease;
+}
+
+:is(.vtk-design, .vtk-page) .news-row:hover {
+  background: rgba(255, 210, 63, 0.14);
+}
+
+:is(.vtk-design, .vtk-page) .news-row:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: -2px;
+}
+
+.news-ico {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--news-type);
+  color: var(--surface);
+}
+
+.news-row-text {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.news-row-text b {
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.news-row-line {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 13.5px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.news-row-arrow {
+  color: var(--muted);
+}
+
+@media (max-width: 860px) {
+  .news-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vtk-design .news-band {
+    padding-top: 40px;
+    padding-bottom: 48px;
+  }
+
+  .news-feat-body {
+    padding: 18px 18px 20px;
+  }
+
+  .news-title {
+    font-size: 21px;
+  }
+}
+
+@media (max-width: 460px) {
+  :is(.vtk-design, .vtk-page) .news-row {
+    grid-template-columns: 40px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .news-ico {
+    width: 40px;
+    height: 40px;
+  }
+
+  .news-row-arrow {
+    display: none;
+  }
+}
+
+/* ---------- /nieuws en een bericht voluit ---------- */
+
+.news-page {
+  display: grid;
+  gap: clamp(36px, 5vw, 56px);
+}
+
+.news-page-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.news-page-earlier h2 {
+  width: fit-content;
+  margin: 0 0 14px;
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.news-post-photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 18px;
+}

@@ -16,6 +16,8 @@ import { getCurrentSession } from "@/lib/session";
 import { addDays } from "date-fns";
 import { getDictionary } from "@vtk/i18n";
 import { PocBand, type PocBandGroup } from "./PocBand";
+import { NewsBand } from "./NewsBand";
+import { getCachedNews } from "@/lib/news/load";
 import { HomeHeroPhoto } from "./HomeHeroPhoto";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
 import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
@@ -119,6 +121,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     cursusEntries,
     barStatus,
     frontpage,
+    news,
   ] = await Promise.all([
     // Redactionele inhoud: voor elke bezoeker gelijk, dus uit de gedeelde cache
     // (lib/cachedContent.ts). Wat hieronder persoonlijk is (de kalenderfilter,
@@ -175,6 +178,12 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     readBarStatus(now),
     // Which front page is live, and its field values. See lib/frontpage/.
     resolveFrontpage(now),
+    // Het nieuws tussen de snelle links en de openingsuren; ook gedeeld over
+    // alle bezoekers. Faalt de lezing, dan valt enkel de band weg.
+    getCachedNews(locale).catch((error) => {
+      console.error("Nieuws lezen mislukt", error);
+      return { enabled: false, count: 0, entries: [] };
+    }),
   ]);
 
   // Aftermovies: `media.aftermovies` is dezelfde instelling als op /media, te
@@ -536,6 +545,13 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           </div>
         </section>
       </div>
+
+      {/* Tussen de donkere zone en de openingsuren: een lichtblauwe band, die
+          helemaal wegvalt zonder berichten of wanneer ze uitstaat in
+          /admin/nieuws. Zie lib/news. */}
+      {news.enabled ? (
+        <NewsBand entries={news.entries} count={news.count} locale={locale} base={base} now={now} />
+      ) : null}
 
       {(theokot || cursusEntries || cursusUnavailable) && (
         <section className="hours-strip">

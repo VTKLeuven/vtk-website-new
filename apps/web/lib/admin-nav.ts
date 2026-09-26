@@ -105,7 +105,7 @@ export function getAdminNav(): NavEntry[] {
       item('slogans', '/slogans', { perm: 'home.edit' }),
       item('openingHours', '/openingsuren', { perm: 'openingHours.manageOwn' }),
       item('announcements', '/aankondigingen', { perm: 'announcements.manage' }),
-      item('linkPage', '/linkpagina', { perm: 'home.edit' }),
+      item('news', '/nieuws', { perm: 'news.manage' }),
       item('header', '/header', { perm: 'pages.manage' }),
       item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
       item('partners', '/partners', { perm: 'partners.manage' }),
@@ -145,6 +145,9 @@ export function getAdminNav(): NavEntry[] {
       item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
       item('mailGroups', '/groepsadressen', { perm: 'mailgroups.manage' }),
       item('appPush', '/app-push', { perm: 'app.push' }),
+      // De linkpagina hangt in de bio van de sociale media: dat is het werk van
+      // communicatie, niet van wie de website onderhoudt.
+      item('linkPage', '/linkpagina', { perm: 'home.edit' }),
       // Fotoalbums hebben één ingang: /admin/media. Daar staat de Immich-galerij,
       // en dat is de enige bron die de publieke mediapagina leest.
       item('media', '/media', { anyPerm: ['media.manage', 'photos.manageAlbums'] }),

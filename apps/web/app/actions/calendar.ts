@@ -131,6 +131,7 @@ const EVENT_FIELD_LABELS: Record<string, string> = {
   url: "link",
   urlLabelNl: "knoptekst van de link",
   urlLabelEn: "Engelse knoptekst van de link",
+  registrationNewsAt: "inschrijvingen in het nieuws",
   imageKey: "afbeelding",
   imageFocusX: "uitsnede van de afbeelding",
   imageFocusY: "uitsnede van de afbeelding",
@@ -176,6 +177,8 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   const input = parsed.data;
   const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
   const saveAsDraft = formData.get("publication") === "draft";
+  // "Deze link opent de inschrijvingen": zonder link valt er niets te openen.
+  const registrationNews = formData.get("registrationNews") === "on" && Boolean(input.url);
   // E1: hangt er een logistiek-evenement aan dit evenement?
   const needsLogistics = formData.get("needsLogistics") === "on";
 
@@ -285,9 +288,20 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     // een al gepubliceerd evenement. Alleen de expliciete conceptknop haalt het
     // evenement offline.
     const publishedAt = saveAsDraft ? null : (existing.publishedAt ?? new Date());
+    // Het moment van aanduiden blijft staan zolang het vinkje aan blijft: anders
+    // zou elke kleine correctie het evenement opnieuw als vers nieuws tonen.
+    const registrationNewsAt = registrationNews ? (existing.registrationNewsAt ?? new Date()) : null;
     await prisma.calendarEvent.update({
       where: { id: input.id },
-      data: { ...data, slug, imageKey, publishedAt, categories: setCategories, moments: setMoments },
+      data: {
+        ...data,
+        slug,
+        imageKey,
+        publishedAt,
+        registrationNewsAt,
+        categories: setCategories,
+        moments: setMoments,
+      },
     });
     // Een gekoppeld ticketevent erft deze velden. Zonder deze duw blijft de
     // ticketshop de oude datum of locatie tonen tot iemand daar toevallig ook
@@ -325,7 +339,7 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
       target: input.titleNl,
       summary: describeChanges(
         existing,
-        { ...data, slug, imageKey, publishedAt },
+        { ...data, slug, imageKey, publishedAt, registrationNewsAt },
         EVENT_FIELD_LABELS,
       ),
     });
@@ -355,6 +369,7 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
         slug,
         imageKey: resolveImageKey(image, null),
         publishedAt: saveAsDraft ? null : new Date(),
+        registrationNewsAt: registrationNews ? new Date() : null,
         categories: { create: categoryIds.map((categoryId) => ({ categoryId })) },
         ...(moments ? { moments: { create: moments } } : {}),
       },

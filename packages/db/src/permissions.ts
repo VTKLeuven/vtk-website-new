@@ -65,6 +65,9 @@ export const PERMISSIONS = [
   // Announcements
   { code: "announcements.manage", labelNl: "Aankondigingen beheren", labelEn: "Manage announcements", category: "general" },
 
+  // Nieuws-band op de homepage (mededelingen, woordje van de praeses, aan/uit)
+  { code: "news.manage", labelNl: "Nieuws op de homepage beheren", labelEn: "Manage homepage news", category: "general" },
+
   // VTK-app (pushberichten naar de telefoons van de leden)
   { code: "app.push", labelNl: "Pushberichten sturen naar de app", labelEn: "Send push notifications to the app", category: "general" },
   { code: "openingHours.manageOwn", labelNl: "Openingsuren van eigen post beheren", labelEn: "Manage own post's opening hours", category: "general" },

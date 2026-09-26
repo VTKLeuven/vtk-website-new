@@ -431,6 +431,7 @@
     "frontpage": "Front page",
     "slogans": "Slogans",
     "announcements": "Announcements",
+    "news": "News",
     "linkPage": "Linktree",
     "dashboardTiles": "Dashboard tiles",
     "tickets": "Tickets",
@@ -913,6 +914,10 @@
     "kindAlbum": "Photo album"
   },
   "seo": {
+    "nieuws": {
+      "title": "News",
+      "description": "What is going on at VTK: ticket sales, sign-ups, Het Bakske, new photos and notices from the board."
+    },
     "home": {
       "title": "Vlaamse Technische Kring",
       "description": "VTK is the student association of the Faculty of Engineering Science at KU Leuven: activities, course notes, Theokot and more."
