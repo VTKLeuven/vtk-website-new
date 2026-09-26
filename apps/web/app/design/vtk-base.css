@@ -1322,15 +1322,8 @@
   object-fit: cover;
 }
 
-/* Lichte navy scrim, zoals op de fotokoppen van de aanbod-kaarten. Zwakker dan
-   daar: op een thumbnail van 148px maakt een zware scrim de foto enkel modderig.
-   Zonder foto blijft het technische patroon onaangeroerd. */
-.vtk-tile-media.has-photo::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(115deg, rgba(10, 15, 31, 0.28) 0%, rgba(14, 26, 54, 0) 70%);
-}
+/* Geen scrim over de foto: er staat geen tekst op, en de navy waas die er lag
+   las op een duimnagel van 148px als een vlek linksboven. */
 
 .vtk-tile-body {
   display: flex;

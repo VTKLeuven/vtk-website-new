@@ -77,7 +77,7 @@ export default async function HeaderOverviewPage({ params }: { params: Params })
                   {/* Decoratief: de titel ernaast zegt al waar de kaart heen gaat,
                       dus een alt-tekst zou de link enkel twee keer voorlezen. */}
                   <span
-                    className={`vtk-tile-media${photo ? " has-photo" : ""}`}
+                    className="vtk-tile-media"
                     aria-hidden="true"
                   >
                     {photo && (

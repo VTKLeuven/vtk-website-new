@@ -477,7 +477,7 @@ export async function PageView({
                     {/* Decoratief: de titel ernaast zegt al waar de kaart heen
                         gaat. Zelfde tegel als op de categoriepagina zelf. */}
                     <span
-                      className={`vtk-tile-media${photo ? " has-photo" : ""}`}
+                      className="vtk-tile-media"
                       aria-hidden="true"
                     >
                       {photo && (
