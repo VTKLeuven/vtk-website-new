@@ -142,7 +142,8 @@ export default async function TicketEventPage({
           locale={locale}
           paymentChoice={paymentMethodChoice(locale)}
           preview={preview}
-          about={<TicketEventAbout event={event} locale={locale} organiser={organiser} location={location} />}
+          about={<TicketEventAbout event={event} locale={locale} />}
+          practical={<TicketEventPractical event={event} locale={locale} organiser={organiser} location={location} />}
         />
       </main>
     </div>
@@ -159,31 +160,17 @@ function formatTicketTime(value: string | Date, locale: Locale): string {
 }
 
 /**
- * Poster, beschrijving en het praktische, onder de gegevens in de linkerkolom.
+ * Poster en beschrijving, onder de gegevens in de linkerkolom.
  *
  * De beschrijving is platte tekst uit het beheer: een lege regel is een nieuwe
  * alinea en een enkele regelovergang blijft staan (`white-space: pre-line`),
  * want redacteurs schrijven er opsommingen in met gewone regels.
  */
-function TicketEventAbout({
-  event,
-  locale,
-  organiser,
-  location,
-}: {
-  event: PublicTicketEvent;
-  locale: Locale;
-  organiser: string;
-  location: string;
-}) {
+function TicketEventAbout({ event, locale }: { event: PublicTicketEvent; locale: Locale }) {
   const paragraphs = (event.description ?? "")
     .split(/\n\s*\n/)
     .map((paragraph) => paragraph.trim())
     .filter(Boolean);
-  // Een cantus loopt over middernacht; "tot 02:00" zegt dan genoeg. Pas een
-  // event van meer dan een dag krijgt de volledige einddatum.
-  const sameNight =
-    new Date(event.endsAt).getTime() - new Date(event.startsAt).getTime() < 24 * 60 * 60 * 1000;
 
   return (
     <>
@@ -200,59 +187,81 @@ function TicketEventAbout({
           />
         </figure>
       ) : null}
-      <div className="tshop-about" data-has-text={paragraphs.length > 0 || undefined}>
-        {paragraphs.length > 0 ? (
-          <section>
-            <h2 className="tshop-heading">{locale === "nl" ? "Over dit event" : "About this event"}</h2>
-            <div className="tshop-description">
-              {paragraphs.map((paragraph, index) => (
-                <p key={index}>{paragraph}</p>
-              ))}
-            </div>
-          </section>
-        ) : null}
-        <aside className="tshop-rail" aria-labelledby="ticket-practical-heading">
-          <h2 id="ticket-practical-heading">{locale === "nl" ? "Praktisch" : "Practical"}</h2>
-          <dl>
-            <div>
-              <dt>{locale === "nl" ? "Wanneer" : "When"}</dt>
-              <dd>
-                {formatTicketDate(event.startsAt, locale)}
-                {sameNight ? (
-                  <span>
-                    {locale === "nl" ? "tot " : "until "}
-                    {formatTicketTime(event.endsAt, locale)}
-                  </span>
-                ) : (
-                  <span>
-                    {locale === "nl" ? "tot " : "until "}
-                    {formatTicketDate(event.endsAt, locale)}
-                  </span>
-                )}
-              </dd>
-            </div>
-            <div>
-              <dt>{locale === "nl" ? "Locatie" : "Location"}</dt>
-              <dd>
-                {location}
-                {event.locationAddress ? <span>{event.locationAddress}</span> : null}
-              </dd>
-            </div>
-            <div>
-              <dt>{locale === "nl" ? "Organisator" : "Organiser"}</dt>
-              <dd>{organiser}</dd>
-            </div>
-            {event.contactEmail ? (
-              <div>
-                <dt>{locale === "nl" ? "Vragen" : "Questions"}</dt>
-                <dd>
-                  <a href={`mailto:${event.contactEmail}`}>{event.contactEmail}</a>
-                </dd>
-              </div>
-            ) : null}
-          </dl>
-        </aside>
-      </div>
+      {paragraphs.length > 0 ? (
+        <section className="tshop-about">
+          <h2 className="tshop-heading">{locale === "nl" ? "Over dit event" : "About this event"}</h2>
+          <div className="tshop-description">
+            {paragraphs.map((paragraph, index) => (
+              <p key={index}>{paragraph}</p>
+            ))}
+          </div>
+        </section>
+      ) : null}
     </>
+  );
+}
+
+/**
+ * Wanneer, waar en wie: een register onder het ticketpaneel. Op een smal scherm
+ * zakt het onder de beschrijving (zie vtk-ticket-shop.css).
+ */
+function TicketEventPractical({
+  event,
+  locale,
+  organiser,
+  location,
+}: {
+  event: PublicTicketEvent;
+  locale: Locale;
+  organiser: string;
+  location: string;
+}) {
+  // Een cantus loopt over middernacht; "tot 02:00" zegt dan genoeg. Pas een
+  // event van meer dan een dag krijgt de volledige einddatum.
+  const sameNight =
+    new Date(event.endsAt).getTime() - new Date(event.startsAt).getTime() < 24 * 60 * 60 * 1000;
+
+  return (
+    <aside className="tshop-rail" aria-labelledby="ticket-practical-heading">
+      <h2 id="ticket-practical-heading">{locale === "nl" ? "Praktisch" : "Practical"}</h2>
+      <dl>
+        <div>
+          <dt>{locale === "nl" ? "Wanneer" : "When"}</dt>
+          <dd>
+            {formatTicketDate(event.startsAt, locale)}
+            {sameNight ? (
+              <span>
+                {locale === "nl" ? "tot " : "until "}
+                {formatTicketTime(event.endsAt, locale)}
+              </span>
+            ) : (
+              <span>
+                {locale === "nl" ? "tot " : "until "}
+                {formatTicketDate(event.endsAt, locale)}
+              </span>
+            )}
+          </dd>
+        </div>
+        <div>
+          <dt>{locale === "nl" ? "Locatie" : "Location"}</dt>
+          <dd>
+            {location}
+            {event.locationAddress ? <span>{event.locationAddress}</span> : null}
+          </dd>
+        </div>
+        <div>
+          <dt>{locale === "nl" ? "Organisator" : "Organiser"}</dt>
+          <dd>{organiser}</dd>
+        </div>
+        {event.contactEmail ? (
+          <div>
+            <dt>{locale === "nl" ? "Vragen" : "Questions"}</dt>
+            <dd>
+              <a href={`mailto:${event.contactEmail}`}>{event.contactEmail}</a>
+            </dd>
+          </div>
+        ) : null}
+      </dl>
+    </aside>
   );
 }

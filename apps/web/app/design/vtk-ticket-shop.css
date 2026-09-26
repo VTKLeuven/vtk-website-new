@@ -57,15 +57,6 @@
   min-height: 0;
 }
 
-.tshop-about {
-  display: grid;
-  gap: 36px;
-}
-
-.tshop-about[data-has-text] {
-  grid-template-columns: minmax(0, 1fr) 210px;
-}
-
 .tshop-description {
   max-width: 66ch;
   color: var(--body);
@@ -83,12 +74,14 @@
   margin-bottom: 0;
 }
 
-/* Een register in de marge, zoals op een contentpagina: haarlijn, klein
-   opschrift, geen kaart. */
+/* Het praktische: een register onder het ticketpaneel, zoals in de marge van
+   een contentpagina (haarlijn, klein opschrift, geen kaart). Het stond eerst
+   naast de beschrijving, maar kneep die dan tot een smalle kolom. De inspringing
+   volgt de binnenkant van het paneel erboven. */
 .tshop-rail {
-  align-self: start;
-  border-left: 1px solid var(--line-2);
-  padding-left: 20px;
+  margin: 0 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-2);
 }
 
 .tshop-rail h2 {
@@ -133,6 +126,20 @@
 }
 
 /* ---------- Het ticketpaneel ---------- */
+
+/* De rechterkolom: het paneel en het praktische eronder blijven samen staan
+   terwijl je door de beschrijving scrolt. */
+.tshop-side {
+  position: sticky;
+  top: 96px;
+  display: grid;
+  gap: 22px;
+  align-self: start;
+}
+
+.tshop-side > .tshop-panel {
+  position: static;
+}
 
 .tshop-panel {
   position: sticky;
@@ -509,23 +516,21 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  /* Op een smal scherm staan de tickets eerst: daarvoor kwam je. */
+  /* Op een smal scherm staan de tickets eerst: daarvoor kwam je. Het
+     praktische zakt dan onder de beschrijving, zodat het niet tussen de
+     tickets en de poster in staat. */
+  .tshop-side {
+    display: contents;
+  }
+
   .tshop-panel {
     position: static;
     order: -1;
   }
-}
 
-@media (max-width: 700px) {
-  .tshop-about[data-has-text] {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 24px;
-  }
-
-  .tshop-rail {
-    border-left: 0;
-    border-top: 1px solid var(--line-2);
-    padding: 16px 0 0;
+  .tshop-side > .tshop-rail {
+    order: 1;
+    margin: 0;
   }
 }
 
