@@ -151,7 +151,9 @@ export function NewsKicker({
         {icon ? <Icon size={14} aria-hidden="true" /> : null}
         {newsSourceLabel(entry.source, locale)}
       </span>
-      <time dateTime={entry.date}>{newsDate(entry.date, locale)}</time>
+      <time dateTime={entry.shownDate ?? entry.date}>
+        {newsDate(entry.shownDate ?? entry.date, locale)}
+      </time>
       {isFreshNews(entry.date, now) ? (
         <span className="news-new">{locale === "nl" ? "Nieuw" : "New"}</span>
       ) : null}
@@ -237,7 +239,7 @@ function Featured({
           {/* Posters en albumcovers komen uit de eigen media-routes. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={entry.imageUrl} alt="" />
-          {datePin(entry.date, locale)}
+          {datePin(entry.shownDate ?? entry.date, locale)}
         </div>
       ) : null}
       <div className="news-feat-body">

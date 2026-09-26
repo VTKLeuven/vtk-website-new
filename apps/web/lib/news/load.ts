@@ -57,6 +57,15 @@ export type NewsEntry = NewsComposable & {
   ctaHref: string | null;
   imageUrl: string | null;
   author: { name: string; role: string | null; imageUrl: string | null } | null;
+  /**
+   * De datum die het bericht toont (pin en kopregel), wanneer dat een andere
+   * is dan `date`. Bij een ticketverkoop en een inschrijving is dat de dag van
+   * het evenement: wanneer de verkoop of de inschrijving opende, zegt een
+   * lezer weinig, en "do 24 sep" boven een uitstap op de 29ste leest als de
+   * dag van de uitstap. `date` blijft wel de volgorde en het label "Nieuw"
+   * bepalen.
+   */
+  shownDate?: string;
 };
 
 /** Een bericht zoals het beheer het ziet: ook wat uit het nieuws gehaald is. */
@@ -122,6 +131,7 @@ function ticketEntry(event: TicketNewsEvent, date: Date, locale: Locale, presale
     source: "tickets",
     ref: event.id,
     date: date.toISOString(),
+    shownDate: event.startsAt.toISOString(),
     featured: false,
     title: pick(event.titleNl, event.titleEn, locale),
     line: presale
@@ -256,6 +266,7 @@ export async function collectNews(
       source: "signup",
       ref: event.id,
       date: date.toISOString(),
+      shownDate: event.start.toISOString(),
       featured: false,
       title: pick(event.titleNl, event.titleEn, locale),
       line: nl

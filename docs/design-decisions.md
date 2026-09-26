@@ -9085,6 +9085,12 @@ bron, zodat een album dat verdwijnt of een verkoop die sluit vanzelf wegvalt:
 Een automatisch bericht kan uit het nieuws gehaald worden zonder aan de bron te
 komen (`NewsHidden`); per bron kan het ook helemaal uit.
 
+**Een ticketverkoop en een inschrijving tonen de dag van het evenement.** De
+datumpin en de kopregel stonden op het moment dat de verkoop opende, en "do 24
+sep" boven een uitstap op de 29ste las als de dag van de uitstap. Wanneer de
+verkoop begon, is voor een lezer niet relevant. Dat moment blijft wel de
+volgorde en het label "Nieuw" bepalen (`NewsEntry.shownDate` naast `date`).
+
 **Uitgelicht: de keuze van de redactie, anders het woordje, anders het
 nieuwste.** Het woordje van de praeses is voor het Bakske geschreven, een halve
 A5 met aanhef en groet. Het wordt dus niet tussen de korte regels van het
