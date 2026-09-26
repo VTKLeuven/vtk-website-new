@@ -24,6 +24,23 @@ export function monthGridCells(year: number, monthIndex: number): GridDay[] {
 }
 
 /**
+ * Alle dagen van de weken die in deze maand vallen, ook de dagen van die weken
+ * die in de vorige of de volgende maand liggen. Dat is wat het affichesraster
+ * toont: het deelt de kaarten op per week, en een blok "Week van 28 september"
+ * dat op 30 september ophoudt, verzwijgt de evenementen van 1 en 2 oktober.
+ * Zo'n week staat daardoor in beide maanden, telkens volledig.
+ */
+export function monthWeekDays(year: number, monthIndex: number): Date[] {
+  const cells = monthGridCells(year, monthIndex);
+  const days: Date[] = [];
+  for (let index = 0; index < cells.length; index += 7) {
+    const week = cells.slice(index, index + 7);
+    if (week.some((cell) => cell.inMonth)) days.push(...week.map((cell) => cell.date));
+  }
+  return days;
+}
+
+/**
  * Rollend venster van `weeks` weken vanaf de maandag van de week rond `anchor`.
  * Alle dagen in dit venster zijn actief (inMonth: true).
  *

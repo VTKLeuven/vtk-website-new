@@ -15,6 +15,7 @@ const Markdown = dynamic(() => import('@/components/ui/Markdown').then((m) => m.
 import { EventInterest } from '@/components/calendar/EventInterest';
 import { EventStar, type EventStarLabels } from '@/components/calendar/EventStar';
 import { CalendarPlusIcon } from '@/components/ui/icons';
+import { saveCalendarAudiencePreferenceAction } from '@/app/actions/calendarPreference';
 import type { ViewerInterest } from '@/lib/calendar/interest';
 import { momentsSummary } from '@/lib/calendar/moments';
 import { MomentDays } from '@/components/calendar/MomentDays';
@@ -27,6 +28,7 @@ import {
   toMoments,
   weekEventSpans,
   monthGridCells,
+  monthWeekDays,
   rollingWeeksGridCells,
   weekGridDays,
   dayRange,
@@ -198,6 +200,21 @@ export function KalenderEditorialView({
   // algemene events plus de doelgroepevents die bij het profiel horen over; de
   // beginstand komt uit de accountvoorkeur van het lid.
   const [onlyMyAudiences, setOnlyMyAudiences] = useState(defaultOnlyMyAudiences);
+  // Het vinkje is dezelfde voorkeur als in het profiel en wordt dus bewaard,
+  // zodat /kalender de volgende keer zo opent. Enkel met een account: zonder
+  // profiel valt er niets af te stemmen of te onthouden. Lukt het bewaren niet,
+  // dan werkt de filter wel in deze weergave; dat is geen reden om hem terug te
+  // draaien.
+  const changeOnlyMyAudiences = useCallback(
+    (next: boolean) => {
+      setOnlyMyAudiences(next);
+      if (!signedIn) return;
+      saveCalendarAudiencePreferenceAction(next).catch((error) => {
+        console.error('Kalendervoorkeur bewaren mislukt', error);
+      });
+    },
+    [signedIn]
+  );
   // Enkel voor het smalle scherm: welke dag staat er open onder het raster. Op
   // een telefoon passen de eventpillen niet in een cel van 45 pixels, dus toont
   // het raster daar stippen en lees je de dag zelf hieronder.
@@ -353,21 +370,22 @@ export function KalenderEditorialView({
   );
 
   /**
-   * De evenementen van de maand zelf, chronologisch. Het maandraster loopt door
-   * in de vorige en de volgende maand; die uitlopers horen niet in een lijst met
-   * "Augustus 2026" erboven.
+   * De evenementen van de weken van deze maand, chronologisch. Het raster deelt
+   * ze per week op, dus een week die over de maandgrens loopt, staat er
+   * volledig in: onder "Week van 28 september" horen ook 1 en 2 oktober. De
+   * zesde rij van het maandraster, die helemaal in de volgende maand ligt, valt
+   * wel weg. Zie `monthWeekDays`.
    */
+  const monthWeeks = useMemo(() => monthWeekDays(year, month), [year, month]);
   const monthOnlyEvents = useMemo(
     () =>
       monthEvents
-        .filter((e) => {
-          return monthCells.some(({ date, inMonth }) => inMonth && eventOccursOnDay(e, date));
-        })
+        .filter((e) => monthWeeks.some((date) => eventOccursOnDay(e, date)))
         // Op de datum die de kaart ook draagt, en niet op de start van de
         // envelop: een reeks die vorige week begon, hoort tussen de dagen die
         // nog komen te staan. Zie `eventLeadDate`.
         .sort((a, b) => +eventLeadDate(a, now) - +eventLeadDate(b, now)),
-    [monthEvents, monthCells, now]
+    [monthEvents, monthWeeks, now]
   );
 
   /**
@@ -390,9 +408,12 @@ export function KalenderEditorialView({
    * over.
    */
   const isPastMonth = useMemo(() => {
-    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+    // Het einde van de laatste week, niet van de maand: op 1 oktober komt er in
+    // de laatste week van september nog iets.
+    const lastDay = monthWeeks.at(-1)!;
+    const monthEnd = new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate(), 23, 59, 59, 999);
     return monthEnd < now;
-  }, [year, month, now]);
+  }, [monthWeeks, now]);
 
   const pastEventsInMonth = useMemo(() => {
     return isPastMonth ? [] : monthOnlyEvents.filter((event) => isEventPast(event, now));
@@ -1238,7 +1259,7 @@ export function KalenderEditorialView({
                     <input
                       type="checkbox"
                       checked={onlyMyAudiences}
-                      onChange={(e) => setOnlyMyAudiences(e.target.checked)}
+                      onChange={(e) => changeOnlyMyAudiences(e.target.checked)}
                     />
                     {labels.onlyMyAudiences}
                   </label>

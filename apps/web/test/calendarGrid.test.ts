@@ -4,6 +4,7 @@ import {
   eventLeadDate,
   eventsRequestKey,
   monthGridCells,
+  monthWeekDays,
   openingRange,
   eventOccursOnDay,
   isEventPast,
@@ -89,6 +90,25 @@ describe('the range the calendar opens on', () => {
     expect(eventsRequestKey(range, 'alumni', false)).not.toBe(key);
     expect(eventsRequestKey(range, 'all', true)).not.toBe(key);
     expect(eventsRequestKey(openingRange(new Date(2026, 9, 1)), 'all', false)).not.toBe(key);
+  });
+});
+
+describe('the weeks of a month in the poster grid', () => {
+  it('keeps a week that runs into the next month whole', () => {
+    const days = monthWeekDays(2026, 8);
+    // September 2026: maandag 31 augustus tot zondag 4 oktober, vijf weken.
+    expect(days).toHaveLength(35);
+    expect(days[0]).toEqual(new Date(2026, 7, 31));
+    expect(days.at(-1)).toEqual(new Date(2026, 9, 4));
+    expect(days).toContainEqual(new Date(2026, 9, 2));
+  });
+
+  it('drops the sixth grid row that lies entirely in the next month', () => {
+    expect(monthWeekDays(2026, 8)).not.toContainEqual(new Date(2026, 9, 5));
+  });
+
+  it('puts the straddling week in the next month as well', () => {
+    expect(monthWeekDays(2026, 9)[0]).toEqual(new Date(2026, 8, 28));
   });
 });
 
