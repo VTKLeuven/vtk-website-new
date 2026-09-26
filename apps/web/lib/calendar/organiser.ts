@@ -1,6 +1,17 @@
 import { pick, type Locale } from "@vtk/i18n";
 
 /**
+ * Organisatoren die de kring zelf vaak nodig heeft, als snelkeuze naast het vrije
+ * veld in het evenementformulier.
+ *
+ * "VTK Alumni" is geen eigen groep: Groep 5 beheert de alumni-activiteiten, maar
+ * "Groep 5" als organisator van een alumni-avond leest voor een alumnus als een
+ * interne code. Groep 5 blijft gewoon de organisator van al de rest; dit is een
+ * keuze per evenement, geen automatisme.
+ */
+export const ORGANISER_PRESETS = ["VTK Alumni"] as const;
+
+/**
  * Van wie een evenement is, zoals een bezoeker het te zien krijgt.
  *
  * De groep achter een evenement (`CalendarEvent.groupId`) is wie het mag

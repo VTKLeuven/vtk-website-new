@@ -9,6 +9,7 @@ import { MarkdownEditorField } from '@/components/editor/MarkdownEditor';
 import { SaveForm } from '@/components/ui/SaveForm';
 import { saveErrorMessages } from '@/lib/saveMessages';
 import { toImageFocus } from '@/lib/imageFocus';
+import { ORGANISER_PRESETS } from '@/lib/calendar/organiser';
 import { EventImageField } from './EventImageField';
 import { EventWhenField, type MomentValue } from './EventWhenField';
 
@@ -212,6 +213,9 @@ export function EventForm({
    * taal tikte niet verdwijnt bij het wisselen en gewoon mee opgeslagen wordt.
    */
   const [activeLang, setActiveLang] = useState<Lang>('nl');
+  // Wie er als organisator getoond wordt. Gecontroleerd, zodat een snelkeuze
+  // (VTK Alumni) het veld kan invullen zonder dat iemand de naam moet tikken.
+  const [organiser, setOrganiser] = useState(event.organiserName ?? '');
 
   const selected = new Set(event.categoryIds ?? []);
   const audienceCategories = categories.filter((c) => c.audience !== null);
@@ -541,14 +545,28 @@ export function EventForm({
               <Input
                 id="event-organiser"
                 name="organiserName"
-                defaultValue={event.organiserName ?? ''}
+                value={organiser}
+                onChange={(e) => setOrganiser(e.target.value)}
                 maxLength={120}
                 placeholder={nl ? 'bv. Development x GHC' : 'e.g. Development x GHC'}
               />
+              <div className="vtk-ef-presets">
+                {ORGANISER_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className="vtk-ef-preset"
+                    aria-pressed={organiser.trim() === preset}
+                    onClick={() => setOrganiser(organiser.trim() === preset ? '' : preset)}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
               <p className="vtk-ef-hint">
                 {nl
-                  ? 'Enkel bij een crossover; leeg = de groep zelf.'
-                  : 'Only for a crossover; empty = the group itself.'}
+                  ? 'Bij een crossover of een alumni-activiteit; leeg = de groep zelf.'
+                  : 'For a crossover or an alumni activity; empty = the group itself.'}
               </p>
             </div>
           </div>

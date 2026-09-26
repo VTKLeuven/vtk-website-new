@@ -1403,6 +1403,36 @@ a.vtk-shortcut-tile:hover {
   line-height: 1.45;
 }
 
+/* Snelkeuzes onder een vrij veld (de organisator): een klik vult de naam in,
+   een tweede klik maakt het veld weer leeg. */
+.vtk-ef-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.vtk-ef-preset {
+  padding: 3px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--body);
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+.vtk-ef-preset:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+
+.vtk-ef-preset[aria-pressed="true"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--paper);
+}
+
 .vtk-ef-rule {
   margin: 18px 0;
   border: 0;
