@@ -53,6 +53,7 @@ export const AUDIT_ENTITIES = {
   // naam dan `membership` hierboven: dat is een post in een werkingsjaar.
   vtkMembership: { nl: "Lidmaatschap", en: "Membership", group: "users" },
   post: { nl: "Post", en: "Post", group: "users" },
+  postTask: { nl: "Taak van een post", en: "Post task", group: "users" },
   werkgroep: { nl: "Werkgroep", en: "Werkgroep", group: "users" },
   poc: { nl: "POC", en: "POC", group: "users" },
   role: { nl: "Rol", en: "Role", group: "roles" },

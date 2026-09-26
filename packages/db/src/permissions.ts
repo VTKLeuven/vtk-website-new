@@ -41,6 +41,13 @@ export const PERMISSIONS = [
   { code: "groups.manage", labelNl: "Posten en hun rollen beheren", labelEn: "Manage posts and their roles", category: "users" },
   { code: "werkgroepen.manage", labelNl: "Werkgroepen en hun rollen beheren", labelEn: "Manage werkgroepen and their roles", category: "users" },
   { code: "roles.manage", labelNl: "Rollen beheren en toewijzen", labelEn: "Manage and assign roles", category: "users" },
+  // Wie doet wat (/admin/wie-doet-wat): de taakverdeling binnen de posten.
+  // Lezen staat los van bewerken omdat het register er is om iemand te vinden,
+  // en dat moet elk praesidiumlid kunnen. `manageOwn` verdeelt de taken van je
+  // eigen post(en) dit werkingsjaar, `manage` die van elke post.
+  { code: "tasks.view", labelNl: "Zien wie wat doet binnen de posten", labelEn: "See who does what within the posts", category: "users" },
+  { code: "tasks.manageOwn", labelNl: "Taken van de eigen post verdelen", labelEn: "Divide the tasks of your own post", category: "users" },
+  { code: "tasks.manage", labelNl: "Taken van elke post verdelen", labelEn: "Divide the tasks of every post", category: "users" },
 
   // Mailing lists
   { code: "mailinglists.export", labelNl: "Mailinglijsten exporteren", labelEn: "Export mailing lists", category: "users" },

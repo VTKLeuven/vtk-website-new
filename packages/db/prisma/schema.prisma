@@ -873,6 +873,11 @@ model Group {
   uitleenEventsGroup       UitleenEvent[]
   mailGroupSources         MailGroupSource[]
   expenses                 Expense[]
+  /// De vaste taken van deze post (/admin/wie-doet-wat).
+  tasks                    GroupTask[]                @relation("GroupTaskOwner")
+  /// Taken van een andere post die het aanspreekpunt voor deze post zijn
+  /// ("IT-contact voor Theokot").
+  tasksFor                 GroupTask[]                @relation("GroupTaskFor")
 }
 
 model GroupMembership {
@@ -891,9 +896,68 @@ model GroupMembership {
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
+  /// Welke taken van de post dit lid dit werkingsjaar opneemt.
+  taskAssignments GroupTaskAssignment[]
+
   @@unique([userId, groupId, year])
   @@index([groupId])
   @@index([year])
+}
+
+// -----------------------------------------------------------------------------
+// Wie doet wat: de taakverdeling binnen een post
+// -----------------------------------------------------------------------------
+// Een taak ("Verhuur van de zaal") hoort bij de post en blijft over de
+// werkingsjaren heen staan. Wie ze doet, hangt aan een `GroupMembership`, en is
+// daarmee vanzelf per werkingsjaar: op 15 juli begint elke post met dezelfde
+// takenlijst en niemand erachter. Zie docs/design-decisions.md, "Wie doet wat".
+
+/// Een vaste taak van een post, waarvoor één of meer postleden het
+/// aanspreekpunt zijn.
+model GroupTask {
+  id          String  @id @default(cuid())
+  groupId     String
+  /// Optioneel: de post waarvoor deze taak het aanspreekpunt is. "IT-contact
+  /// voor Theokot" hoort bij IT, maar staat ook bij Theokot in het register.
+  forGroupId  String?
+  name        String
+  description String?
+  /// Woorden waarmee iemand zoekt die de naam van de taak niet kent ("huren",
+  /// "fuif" voor de verhuur). Enkel voor de zoekfunctie, nergens getoond.
+  keywords    String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  group       Group                 @relation("GroupTaskOwner", fields: [groupId], references: [id], onDelete: Cascade)
+  forGroup    Group?                @relation("GroupTaskFor", fields: [forGroupId], references: [id], onDelete: SetNull)
+  assignments GroupTaskAssignment[]
+
+  @@index([groupId])
+  @@index([forGroupId])
+}
+
+/// Neemt een lid de taak zelf op, of is het de backup (wie je aanspreekt als de
+/// verantwoordelijke niet antwoordt)?
+enum GroupTaskRole {
+  HOLDER
+  BACKUP
+}
+
+/// Wie een taak opneemt in één werkingsjaar. Hangt aan het postlidmaatschap en
+/// niet aan de gebruiker: het jaar zit daar al in, en wie van de post gehaald
+/// wordt, verliest zijn taken vanzelf (cascade).
+model GroupTaskAssignment {
+  id           String        @id @default(cuid())
+  taskId       String
+  membershipId String
+  kind         GroupTaskRole @default(HOLDER)
+
+  task       GroupTask       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  membership GroupMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, membershipId])
+  @@index([membershipId])
 }
 
 // -----------------------------------------------------------------------------

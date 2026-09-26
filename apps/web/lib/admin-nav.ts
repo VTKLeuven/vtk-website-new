@@ -128,6 +128,9 @@ export function getAdminNav(): NavEntry[] {
       // groep is: elk praesidiumlid is lid, lang niet elk lid heeft een post.
       item('leden', '/leden', { perm: 'leden.manage' }),
       item('groups', '/groepen', { perm: 'groups.manage' }),
+      // Direct onder Posten: dezelfde posten, maar gelezen als "bij wie moet ik
+      // zijn voor X". Zichtbaar voor elk praesidiumlid, niet enkel voor beheer.
+      item('tasks', '/wie-doet-wat', { anyPerm: ['tasks.view', 'tasks.manageOwn', 'tasks.manage'] }),
       item('werkgroepen', '/werkgroepen', { werkgroep: true }),
       item('roles', '/roles', { perm: 'roles.manage' }),
       // Alumni is een adresboek per lichting, geen opt-in mailinglijst: een

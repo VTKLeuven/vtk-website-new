@@ -260,8 +260,8 @@ async function main() {
     "Praesidium",
     "Praesidium",
     1,
-    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) en formulieren voor de eigen groep aanmaken, foto's uploaden, gebruikers opzoeken, je e-mailhandtekening genereren, bonnetjes aanvaarden aan de toog en shift- en ticketsjablonen beheren.",
-    "Base role for every praesidium member: create events (incl. ticket events) and forms for the own group, upload photos, search users, generate your email signature, accept vouchers at the bar and manage shift and ticket templates.",
+    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) en formulieren voor de eigen groep aanmaken, foto's uploaden, gebruikers opzoeken, je e-mailhandtekening genereren, bonnetjes aanvaarden aan de toog, shift- en ticketsjablonen beheren, en zien en verdelen wie wat doet binnen de eigen post.",
+    "Base role for every praesidium member: create events (incl. ticket events) and forms for the own group, upload photos, search users, generate your email signature, accept vouchers at the bar, manage shift and ticket templates, and see and divide who does what within the own post.",
   );
   await setRolePermissions(praesidiumRole.id, [
     "calendar.create",
@@ -294,6 +294,11 @@ async function main() {
     // opnieuw ingetikt wordt. Breed recht (je wijzigt wat iedereen daarna
     // aanmaakt), dus een vertrekpunt: afnemen doe je per rol in /admin/roles.
     "tickets.templates",
+    // Wie doet wat: elk praesidiumlid moet kunnen opzoeken wie waarvoor het
+    // aanspreekpunt is, en elke post verdeelt haar eigen taken. Alle posten
+    // verdelen blijft bij de rol admin (IT en Groep 5).
+    "tasks.view",
+    "tasks.manageOwn",
   ]);
   for (const g of GROUP_SEEDS) {
     await grantRoleToGroup(g.code, praesidiumRole.id, "DEFAULT");

@@ -1804,3 +1804,309 @@ a.vtk-shortcut-tile:hover {
     color: var(--muted);
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Wie doet wat (/admin/wie-doet-wat)
+   Per post één paneel: de naam en de leden bovenaan, eronder haar taken als
+   tabel. De post is zo de kop van een blok en geen laatste kolom die je per
+   rij moet lezen. Zie docs/design-decisions.md, "Wie doet wat".
+   --------------------------------------------------------------------------- */
+
+.vtk-task-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 18px;
+  border: 1.5px solid var(--line-2);
+  border-radius: 18px;
+  background: var(--surface);
+  color: var(--muted);
+}
+
+.vtk-task-search:focus-within {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 3px rgba(14, 26, 54, 0.08);
+}
+
+.vtk-admin-main .vtk-task-search input[type='search'] {
+  flex: 1;
+  min-width: 0;
+  border: 0 !important;
+  padding: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 17px;
+  outline: none;
+}
+
+.vtk-task-chip {
+  appearance: none;
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.vtk-task-chip:hover {
+  background: var(--paper-2);
+}
+
+.vtk-task-chip[aria-pressed='true'] {
+  background: var(--navy);
+  border-color: var(--navy);
+  color: var(--paper);
+}
+
+.vtk-task-chip[data-warn][aria-pressed='false'] {
+  background: var(--low-bg);
+  border-color: rgba(122, 78, 5, 0.25);
+  color: var(--low-ink);
+}
+
+.vtk-task-post {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 12px 40px rgba(10, 15, 31, 0.04);
+}
+
+.vtk-task-post-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding: 18px 20px 16px;
+}
+
+.vtk-task-post-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.vtk-admin-main .vtk-task-post-head p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.vtk-task-post-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.vtk-task-status {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.vtk-task-status[data-tone='open'] {
+  background: var(--low-bg);
+  color: var(--low-ink);
+}
+
+.vtk-task-status[data-tone='ok'] {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+.vtk-task-table-wrap {
+  position: relative;
+  overflow-x: auto;
+  border-top: 1px solid var(--line);
+}
+
+/* Vaste kolommen, zodat Verantwoordelijk en Backup in elk postblok op dezelfde
+   plek beginnen; anders springen ze per tabel naar een andere breedte. */
+.vtk-task-table {
+  table-layout: fixed;
+}
+
+.vtk-task-table th:nth-child(1) {
+  width: 48%;
+}
+
+.vtk-task-table th:nth-child(2) {
+  width: 28%;
+}
+
+.vtk-task-table tbody tr:last-child {
+  border-bottom: 0;
+}
+
+.vtk-task-row {
+  cursor: pointer;
+}
+
+.vtk-task-title {
+  appearance: none;
+  border: 0;
+  background: none;
+  padding: 0;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vtk-task-title:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.vtk-task-tag {
+  display: inline-block;
+  margin-left: 8px;
+  border-radius: 999px;
+  padding: 1px 8px;
+  background: var(--paper-2);
+  color: var(--body);
+  font-size: 11.5px;
+  font-weight: 500;
+  vertical-align: 1px;
+}
+
+.vtk-admin-main .vtk-task-desc {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.vtk-admin-main .vtk-task-prev {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.vtk-task-nobackup {
+  color: var(--muted);
+}
+
+.vtk-task-people {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vtk-task-people li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.vtk-task-sub th {
+  padding: 10px 14px 6px !important;
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.vtk-admin-main .vtk-task-none,
+.vtk-admin-main .vtk-task-idle {
+  margin: 0;
+  padding: 14px 20px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+}
+
+.vtk-admin-main .vtk-task-idle {
+  background: var(--paper);
+}
+
+.vtk-admin-main .vtk-task-empty {
+  padding: 28px 20px;
+  border: 1px dashed var(--line-2);
+  border-radius: 18px;
+  text-align: center;
+}
+
+.vtk-task-detail {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+}
+
+.vtk-task-detail dt {
+  margin-top: 10px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-task-detail dt:first-child {
+  margin-top: 0;
+}
+
+.vtk-task-detail dd {
+  margin: 0;
+}
+
+/* Smal scherm: elke taak een blok, met de kolomkop als label per waarde. */
+@media (max-width: 640px) {
+  .vtk-task-table thead {
+    display: none;
+  }
+
+  .vtk-task-table,
+  .vtk-task-table tbody,
+  .vtk-task-table tr,
+  .vtk-task-table td,
+  .vtk-task-table th {
+    display: block;
+    width: 100% !important;
+  }
+
+  /* Verantwoordelijk en backup naast elkaar: kort genoeg, en het halveert de
+     hoogte van een lange takenlijst op een telefoon. */
+  .vtk-task-table tr.vtk-task-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding: 8px 0;
+  }
+
+  .vtk-task-table tr.vtk-task-row td:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .vtk-admin-main .vtk-task-table td {
+    padding: 6px 20px;
+  }
+
+  .vtk-task-table td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .vtk-admin-main .vtk-task-search input[type='search'] {
+    font-size: 16px;
+  }
+}

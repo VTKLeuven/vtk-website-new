@@ -1346,6 +1346,52 @@ terug (`apps/web/lib/brevo/unsubscribe.ts`).
   server-side. Beheerders (met het recht of superadmin) zien en beheren alles.
 - **Footer** linkt naar zowel `/praesidium` als `/werkgroepen`.
 
+### Wie doet wat (taakverdeling binnen een post)
+
+Binnen een post heeft iedereen zijn eigen stuk: bij Theokot een fixer, iemand
+voor de verhuur en iemand voor de communicatie, bij Communicatie iemand voor
+social media, foto's en het Bakske, bij IT een aanspreekpunt per post. Wie niet
+op die post zit, wist niet bij wie hij moest zijn. `/admin/wie-doet-wat` is het
+register daarvan.
+
+- **Een taak hoort bij de post, wie ze doet bij het werkingsjaar.** "Verhuur van
+  de zaal" is elk jaar een taak van Theokot; enkel de persoon verandert.
+  `GroupTask` hangt daarom aan `Group` en blijft staan, en de toewijzing
+  (`GroupTaskAssignment`) hangt aan een `GroupMembership`, dus aan één
+  werkingsjaar. Op 15 juli begint elke post met dezelfde takenlijst en niemand
+  erachter; wie de taak het jaar ervoor deed, staat erbij zolang niemand ze
+  heeft. Wie van een post gehaald wordt, verliest zijn taken vanzelf.
+- **Een register per post, niet een lijst met de post als kolom.** In het
+  ontwerp stond de post als laatste kolom van één lange lijst; dat las als een
+  detail van elke rij terwijl het de indeling is. Nu is elke post een eigen
+  blok met haar naam en leden bovenaan, haar taken eronder, en onderaan wie nog
+  geen taak heeft. De zoekbalk en de postfilters werken over alle blokken; een
+  blok zonder treffer valt weg. Vier richtingen werden bekeken (in het
+  postenbeheer, een matrix per post, een sleepbord en dit register); het
+  register won omdat het de vraag beantwoordt waarmee iemand binnenkomt.
+- **Eén of meer verantwoordelijken, en hoogstens één backup.** Het Galabal
+  doen er twee; de backup is wie je aanspreekt als de verantwoordelijke niet
+  antwoordt, en is nooit ook zelf verantwoordelijk voor dezelfde taak.
+- **Een taak kan het aanspreekpunt van een andere post zijn** (`forGroupId`).
+  "IT-contact voor Theokot" is een taak van IT, maar staat ook in het blok van
+  Theokot, apart onder de eigen taken. Zo vindt Theokot zijn IT'er zonder de
+  IT-ploeg te kennen.
+- **Zoekwoorden per taak.** Wie een zaal wil huren, zoekt op "huren" en niet
+  op "Verhuur van de zaal". De zoekwoorden staan nergens op het scherm; ze
+  voeden enkel de zoekbalk.
+- **Eéntalig.** Naam en omschrijving van een taak staan in één taal, zoals de
+  omschrijving van een rekening: het is interne werking die de post zelf
+  schrijft, geen publieke tekst.
+- **Wie mag wat.** Kijken is `tasks.view`, de eigen post(en) verdelen
+  `tasks.manageOwn`, elke post `tasks.manage`. De eerste twee zitten in de
+  geseede rol `praesidium`: elk praesidiumlid moet iemand kunnen opzoeken, en
+  elke post verdeelt haar eigen taken. Of dat bij elk lid of enkel bij de
+  verantwoordelijke hoort, regel je met de rolgrant van de post, niet in code.
+  Verdelen kan enkel in het werkingsjaar van nu; een vorig jaar is historiek.
+- **Nog niet publiek.** Het register staat enkel in de admin. Taken tonen op
+  `/praesidium` of een persoon vinden via de zoekbalk van de site werd
+  voorgesteld, maar vraagt eerst een beslissing over wie dat mag zien.
+
 ### Mailinglijsten (opt-in)
 
 - Acht categorieën: **Feest, Career, Sport, Evenementen, Onderwijs, VTK

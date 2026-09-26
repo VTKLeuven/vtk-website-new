@@ -260,6 +260,17 @@ const icons: Record<string, ReactNode> = {
       <path d="m15.5 13 2.5 9-6-3.5L6 22l2.5-9" />
     </Svg>
   ),
+  // tasks: klembord met een afgevinkte lijst; wie waarvoor het aanspreekpunt is
+  tasks: (
+    <Svg>
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path d="M9 4V3h6v1" />
+      <path d="m8.5 10 1.5 1.5 2.5-2.5" />
+      <path d="M14 10.5h2" />
+      <path d="m8.5 15.5 1.5 1.5 2.5-2.5" />
+      <path d="M14 16h2" />
+    </Svg>
+  ),
   // mailGroups: groepsmailadressen (@vtk.be)
   mailGroups: (
     <Svg>

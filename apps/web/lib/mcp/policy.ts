@@ -50,6 +50,11 @@ export const MCP_PERMISSION_POLICY = {
   "groups.manage": { reads: ["groups"], creates: ["app_create:group(PRAESIDIUM)"], blocked: ["modify memberships or grants"] },
   "werkgroepen.manage": { reads: ["groups"], creates: ["app_create:group(WERKGROEP)"], blocked: ["modify memberships or grants"] },
   "roles.manage": { reads: ["roles"], creates: ["app_create:role"], blocked: ["assign roles or permissions"] },
+  // De taakverdeling koppelt namen van postleden aan wat ze doen. Een agent
+  // heeft daar niets te zoeken, en iemand een taak geven is geen create.
+  "tasks.view": { reads: [], creates: [], blocked: ["read who does what within the posts"] },
+  "tasks.manageOwn": { reads: [], creates: [], blocked: ["create, assign or delete post tasks"] },
+  "tasks.manage": { reads: [], creates: [], blocked: ["create, assign or delete post tasks"] },
   "mailinglists.export": { reads: ["mailing_lists"], creates: [], blocked: ["send mail or change subscriptions"] },
   // Het alumni-adresboek is een lijst met naam, e-mail en afstudeerjaar van
   // mensen die geen account hebben en dus nooit zelf iets aanvinkten. Niets
