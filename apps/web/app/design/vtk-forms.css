@@ -182,6 +182,13 @@
   flex: none;
 }
 
+.vtk-form-check-note {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
 .vtk-form-soldout,
 .vtk-form-remaining {
   margin-left: 8px;
