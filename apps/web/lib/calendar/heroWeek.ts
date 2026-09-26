@@ -7,6 +7,12 @@
  *
  * De regels, en waarom ze zo zijn (zie ook docs/design-decisions.md):
  *
+ * - **De komende zeven dagen, niet verder.** Het venster is vandaag plus zes
+ *   kalenderdagen. Wat daarbuiten valt, staat er niet, ook niet wanneer het
+ *   weekend er rijen uit haalt: op zaterdag eindigt het op vrijdag, en de
+ *   maandag erna komt er pas dinsdag bij. Een venster dat doorschoof tot er zes
+ *   rijen stonden, toonde op zaterdag al de maandag van volgende week, en dat
+ *   las als "deze week" terwijl het dat niet was.
  * - **Zaterdag valt weg.** VTK organiseert er nooit iets, dus een zaterdagkolom
  *   is een lege kolom. Staat er toch iets op een zaterdag, dan valt het uit het
  *   overzicht; het blijft wel gewoon in de kalender staan.
@@ -28,8 +34,8 @@
  *   verdwijnt een cantus van gisteren om middernacht van de homepage, terwijl de
  *   halve kring er de dag erna nog over praat. Maar gisteren is wel het minst
  *   belangrijke: hij komt er enkel bij wanneer de dagen vanaf vandaag het
- *   overzicht niet vol krijgen én de laatste dag van het venster leeg is. Die
- *   lege dag staat hij dan af, zodat het blok even hoog blijft.
+ *   overzicht niet vol krijgen, en dan in de plaats die het weekend vrijliet of
+ *   in die van een lege laatste dag. Meer dan zes dagen worden het nooit.
  * - **Bij een rustige week toont het de eerstvolgende evenementen.** Zes dagen
  *   met twee dingen erin leest als een lege kring; dan is een korte lijst met wat
  *   er wél aankomt eerlijker, ook al is dat pas over drie weken. Hoeveel die
@@ -55,8 +61,11 @@ import { NIGHT_EVENT_MAX_MS, type EventMoment } from "./moments";
 
 export const HERO_WEEK_TIME_ZONE = "Europe/Brussels";
 
-/** Aantal dagen in het venster, zaterdagen en lege zondagen niet meegeteld. */
-export const HERO_WEEK_DAYS = 6;
+/**
+ * Aantal kalenderdagen in het venster, vandaag inbegrepen. Zaterdag en een lege
+ * zondag vallen er daarna uit, dus er staan er meestal vijf of zes.
+ */
+export const HERO_WEEK_DAYS = 7;
 
 /**
  * Hoogstens zoveel evenementen per dag; de rest wordt "+n meer".
@@ -221,9 +230,10 @@ export function heroWeekEventRange(
 /**
  * De dagen van het venster, in volgorde.
  *
- * Begint gisteren wanneer daar iets stond, anders vandaag, en telt vooruit tot
- * er zes dagen zijn. Zaterdagen worden overgeslagen en tellen dus niet mee, ook
- * niet als startdag: wie op zaterdag langskomt, ziet het venster van zondag.
+ * Zeven kalenderdagen vanaf vandaag, of vanaf gisteren wanneer daar iets stond.
+ * Zaterdagen vallen eruit, ook als startdag: wie op zaterdag langskomt, ziet het
+ * venster vanaf zondag. Het venster schuift niet verder om dat goed te maken:
+ * op zaterdag loopt het tot en met vrijdag.
  *
  * Een zondag telt enkel mee wanneer `keepSunday` zegt dat er die dag iets is.
  * Zonder die functie blijft elke zondag staan: deze functie kent de evenementen
@@ -249,7 +259,8 @@ export function heroWeekDayKeys(
   const start = options.includeYesterday && !skipped(yesterday) ? yesterday : today;
 
   const keys: string[] = [];
-  for (let cursor = start; keys.length < HERO_WEEK_DAYS; cursor = shiftDayKey(cursor, 1)) {
+  for (let offset = 0; offset < HERO_WEEK_DAYS; offset += 1) {
+    const cursor = shiftDayKey(start, offset);
     if (!skipped(cursor)) keys.push(cursor);
   }
   return keys;
@@ -372,8 +383,8 @@ export function selectHeroWeek<T extends HeroWeekInput>(
   const yesterday = shiftDayKey(today, -1);
 
   // Het venster begint vandaag; gisteren komt er pas achteraf bij, wanneer
-  // blijkt dat er plaats over is. Een zondag zonder evenement valt weg, en het
-  // venster loopt dan een dag verder zodat het zes dagen blijven.
+  // blijkt dat er plaats over is. Een zondag zonder evenement valt weg; het
+  // venster loopt daarom niet verder dan zeven dagen.
   const futureKeys = heroWeekDayKeys(now, {
     includeYesterday: false,
     timeZone,
@@ -474,14 +485,19 @@ export function selectHeroWeek<T extends HeroWeekInput>(
   }
 
   // En pas dan gisteren, en enkel wanneer hij niets verdringt: er moet nog een
-  // rij over zijn én de laatste dag van het venster moet leeg staan. Die dag
-  // geeft hij op, zodat het blok even hoog blijft als anders.
+  // rij over zijn, en ofwel liet het weekend een dag vrij (minder dan zes
+  // dagen), ofwel staat de laatste dag van het venster leeg en geeft die zijn
+  // plaats af. Zo wordt het blok nooit hoger dan zes dagen.
   let keys = futureKeys;
   const lastKey = futureKeys[futureKeys.length - 1];
-  if (yesterdayFits && budget > 0 && lastKey && chosen.get(lastKey)!.size === 0) {
+  const spareDay = futureKeys.length < HERO_WEEK_DAYS - 1;
+  const emptyLast = Boolean(lastKey) && chosen.get(lastKey!)!.size === 0;
+  if (yesterdayFits && budget > 0 && (spareDay || emptyLast)) {
     fill(yesterday, "first", HERO_WEEK_MAX_PER_DAY);
     fill(yesterday, "repeat", HERO_WEEK_MAX_PER_DAY);
-    if (chosen.get(yesterday)!.size > 0) keys = [yesterday, ...futureKeys.slice(0, -1)];
+    if (chosen.get(yesterday)!.size > 0) {
+      keys = spareDay ? [yesterday, ...futureKeys] : [yesterday, ...futureKeys.slice(0, -1)];
+    }
   }
 
   const shownIds = new Set<string>();

@@ -5639,7 +5639,7 @@ is of nog geen eigen banner heeft, dan krijgt de post die het beheert daar één
 mail over, op haar eigen adres (`onthaal@vtk.be` voor Onthaal).
 
 **Waarom.** Het weekoverzicht vult zich vanzelf: een evenement schuift erin zodra
-het binnen zes dagen valt. Precies dan is het te laat om nog rustig een affiche
+het binnen de komende zeven dagen valt. Precies dan is het te laat om nog rustig een affiche
 te laten maken, en een concept verschijnt helemaal nergens. Wie het evenement
 aanmaakte, kijkt op dat moment meestal al naar de volgende activiteit.
 
@@ -6246,17 +6246,16 @@ De regels staan in `apps/web/lib/calendar/heroWeek.ts` en zijn los getest
 ### Zaterdag valt weg
 
 VTK organiseert nooit iets op zaterdag, dus een zaterdagrij is een lege rij. Ze
-wordt overgeslagen bij het tellen van de zes dagen: het venster loopt gewoon door
-tot de volgende dag. Staat er tóch iets op een zaterdag, dan valt het uit het
-overzicht; het blijft wel in de kalender, in de feeds en in de app staan. Wie op
-een zaterdag langskomt, ziet het venster vanaf zondag.
+valt uit het venster, en het venster loopt daarvoor níet een dag verder (zie
+"De komende zeven dagen" hieronder). Staat er tóch iets op een zaterdag, dan valt
+het uit het overzicht; het blijft wel in de kalender, in de feeds en in de app
+staan. Wie op een zaterdag langskomt, ziet het venster vanaf zondag.
 
 ### Een lege zondag valt ook weg
 
 Op zondag gebeurt er soms iets (de Onthaaldagen beginnen er, een weekend loopt
 erin door), maar meestal niet. Een zondag zonder evenement wordt daarom net als
-zaterdag overgeslagen, en het venster loopt een dag verder zodat het zes dagen
-blijven. Staat er wél iets, dan staat de zondag er gewoon. Een verborgen
+zaterdag overgeslagen. Staat er wél iets, dan staat de zondag er gewoon. Een verborgen
 evenement (`HIDDEN`) houdt de zondag niet vast.
 
 Een lege **weekdag** blijft wel staan: dat er dinsdag niets is, is ook iets om te
@@ -6267,19 +6266,24 @@ De herinneringsmail voor de post (`heroWeekNotice.ts`) kent de andere
 evenementen niet; die neemt een lege zondag aan, tenzij het evenement zelf op
 zondag valt.
 
-### Zes dagen, rollend, met gisteren erbij als er plaats is
+### De komende zeven dagen, rollend, met gisteren erbij als er plaats is
 
 Een vaste week (maandag tot zondag) staat op vrijdagavond zo goed als leeg,
 terwijl er dan net het meest te beleven valt. Daarom rolt het venster mee:
 
 - Het begint **vandaag**. Wie op de homepage kijkt, kijkt in de eerste plaats
   naar vandaag, en die dag hoort dus bovenaan te staan.
+- Het loopt **zeven kalenderdagen**, vandaag inbegrepen, en niet verder.
+  Zaterdag en een lege zondag vallen eruit, dus er staan er meestal vijf of zes.
+  Tot september 2026 telde het venster door tot er zes rijen stonden; op
+  zaterdag stond daardoor de maandag van volgende week er al in, en dat las als
+  "deze week" terwijl het dat niet was. Nu komt die maandag er pas op dinsdag bij.
 - **Gisteren** komt er enkel bij wanneer hij niets verdringt: er moet nog een
-  rij vrij zijn in het totaal van tien én de laatste dag van het venster moet
-  leeg staan. Die lege dag staat hij dan af, zodat het altijd zes dagen blijven
-  en de hoogte van het blok niet per dag verspringt. Zo verdwijnt een cantus van
-  gisteren niet om middernacht van de homepage terwijl de halve kring er de dag
-  erna nog over praat, maar duwt hij ook nooit iets weg dat nog moet komen.
+  rij vrij zijn in het totaal van tien, en ofwel liet het weekend een dag vrij
+  (minder dan zes dagen), ofwel staat de laatste dag van het venster leeg en
+  staat die zijn plaats af. Meer dan zes dagen worden het dus nooit. Zo
+  verdwijnt een cantus van gisteren niet om middernacht van de homepage terwijl
+  de halve kring er de dag erna nog over praat, maar duwt hij ook nooit iets weg dat nog moet komen.
 - Wat gisteren begon en vandaag nog loopt, telt daar niet voor: het staat vandaag
   al in het overzicht, en een tentoonstelling van een maand zou het venster anders
   elke dag laten terugkijken.

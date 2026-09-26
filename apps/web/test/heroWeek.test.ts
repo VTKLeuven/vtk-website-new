@@ -43,7 +43,7 @@ function ids(day: HeroWeekDay<HeroWeekInput> | undefined): string[] {
 const sunday13 = at("2026-09-13T10:00:00+02:00");
 
 describe("heroWeekDayKeys", () => {
-  it("shows six days from today and skips Saturday", () => {
+  it("shows the seven days from today and skips Saturday", () => {
     expect(heroWeekDayKeys(sunday13)).toEqual([
       "2026-09-13",
       "2026-09-14",
@@ -78,9 +78,9 @@ describe("heroWeekDayKeys", () => {
     expect(heroWeekDayKeys(saturday19)[0]).toBe("2026-09-20");
   });
 
-  it("keeps counting past the skipped Saturday", () => {
-    // Woensdag 16: het venster loopt tot en met maandag 21, want zaterdag 19
-    // telt niet mee als een van de zes.
+  it("stops after seven calendar days, Saturday or not", () => {
+    // Woensdag 16: het venster loopt tot en met dinsdag 22. Zaterdag 19 valt
+    // weg, maar het venster schuift daarvoor niet op tot woensdag 23.
     const wednesday16 = at("2026-09-16T08:00:00+02:00");
     expect(heroWeekDayKeys(wednesday16)).toEqual([
       "2026-09-16",
@@ -92,7 +92,7 @@ describe("heroWeekDayKeys", () => {
     ]);
   });
 
-  it("skips a Sunday without events and keeps counting past it", () => {
+  it("skips a Sunday without events without counting past it", () => {
     const wednesday16 = at("2026-09-16T08:00:00+02:00");
     expect(heroWeekDayKeys(wednesday16, { keepSunday: () => false })).toEqual([
       "2026-09-16",
@@ -100,8 +100,24 @@ describe("heroWeekDayKeys", () => {
       "2026-09-18",
       "2026-09-21",
       "2026-09-22",
-      "2026-09-23",
     ]);
+  });
+
+  it("does not show next Monday on a Saturday", () => {
+    // Zaterdag 26 september met een lege zondag: maandag 28 tot en met vrijdag
+    // 2 oktober. Maandag 5 oktober komt er pas dinsdag 29 bij.
+    const saturday26 = at("2026-09-26T13:00:00+02:00");
+    expect(heroWeekDayKeys(saturday26, { keepSunday: () => false })).toEqual([
+      "2026-09-28",
+      "2026-09-29",
+      "2026-09-30",
+      "2026-10-01",
+      "2026-10-02",
+    ]);
+    const monday28 = at("2026-09-28T09:00:00+02:00");
+    expect(heroWeekDayKeys(monday28, { keepSunday: () => false }).at(-1)).toBe("2026-10-02");
+    const tuesday29 = at("2026-09-29T09:00:00+02:00");
+    expect(heroWeekDayKeys(tuesday29, { keepSunday: () => false }).at(-1)).toBe("2026-10-05");
   });
 
   it("starts on Monday when today is an empty Sunday", () => {
@@ -137,8 +153,9 @@ describe("selectHeroWeek", () => {
   });
 
   it("leaves out a Sunday without events, but keeps an empty weekday", () => {
-    // Woensdag 16 tot en met woensdag 23: zaterdag 19 valt altijd weg, zondag 20
-    // hier ook omdat er niets is; dinsdag 22 blijft leeg staan.
+    // Woensdag 16 tot en met dinsdag 22: zaterdag 19 valt altijd weg, zondag 20
+    // hier ook omdat er niets is; dinsdag 22 blijft leeg staan. Woensdag 23 valt
+    // buiten de zeven dagen, ook al kwam er een rij vrij.
     const wednesday16 = at("2026-09-16T08:00:00+02:00");
     const week = [
       event("bedrijven", "2026-09-16T19:30:00+02:00"),
@@ -155,7 +172,6 @@ describe("selectHeroWeek", () => {
       "2026-09-18",
       "2026-09-21",
       "2026-09-22",
-      "2026-09-23",
     ]);
     expect(ids(result.days[4])).toEqual([]);
   });
