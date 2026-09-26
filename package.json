@@ -47,7 +47,7 @@
   },
   "overrides": {
     "passkit-generator": {
-      "joi": "17.13.6"
+      "joi": "17.13.8"
     },
     "@better-auth/core": "1.7.5",
     "@better-fetch/fetch": "1.3.2"
