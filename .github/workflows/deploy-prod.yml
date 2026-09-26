@@ -19,7 +19,7 @@ jobs:
 
     steps:
       - name: Checkout repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Check CI test status on main for this commit
         env:
@@ -74,7 +74,7 @@ jobs:
     steps:
       # Enkel nodig om infra/deploy.sh mee te hebben; de runner bouwt niets.
       - name: Checkout deploy script
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           sparse-checkout: infra/deploy.sh
           sparse-checkout-cone-mode: false
