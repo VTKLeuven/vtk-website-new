@@ -9,13 +9,20 @@ import {
   brusselsYMD,
   checkSessionWindows,
   coerceItemLayout,
+  planDayOffering,
   SANDWICH_VOUCHER_COST,
   TheokotValidationError,
   type OrderLineInput,
 } from "@/lib/theokot";
 import { readImageField, resolveImageKey, type ImageFieldValue } from "@/lib/imageField";
 import { getTheokotConfig, removeOrder, removeSession } from "@/lib/theokot-server";
-import { cancelOrder, placeOrder, TheokotOrderError } from "@/lib/theokot-orders";
+import {
+  cancelOrder,
+  placeOrder,
+  repriceReservedOrders,
+  TheokotOrderError,
+  updateOrder,
+} from "@/lib/theokot-orders";
 import { syncMeetingsForSession, syncMeetingsOnDay } from "@/lib/meetings-server";
 import { resolveStudentCard } from "@/lib/student-card";
 import {
@@ -456,12 +463,18 @@ export async function updateSessionItemsAction(
     }
   }
 
+  // Een nieuwe prijs geldt ook voor wie al gereserveerd had: aan de balie
+  // betaal je wat er vandaag op het bord staat. Zie `repriceReservedOrders`.
+  const repriced = await repriceReservedOrders(sessionId);
+
   await logAudit({
     action: "update",
     entity: "theokotSession",
     entityId: sessionId,
     target: sessionLabel(existing.date),
-    summary: `aanbod aangepast naar ${rows.length} broodje(s)`,
+    summary:
+      `aanbod aangepast naar ${rows.length} broodje(s)` +
+      (repriced > 0 ? `, ${repriced} reservatie(s) aan de nieuwe prijs gezet` : ""),
   });
 
   // Dit is precies het geval waarvoor het uitlijnen bestaat: een week met een
@@ -471,6 +484,110 @@ export async function updateSessionItemsAction(
 
   revalidateTheokot();
   return saveOk();
+}
+
+/**
+ * Zet hetzelfde aanbod op meerdere verkoopdagen tegelijk: "Aanbod van de week".
+ *
+ * Een prijs of een broodje voor de hele week aanpassen betekende vijf keer
+ * "Aanbod bewerken" openen en vijf keer hetzelfde intikken. De editor toont nu
+ * het aanbod van één dag van die week als voorbeeld (`templateSessionId`); bij
+ * opslaan krijgt elke aangevinkte dag (`applyTo`) dat aanbod. Welk broodje op
+ * een andere dag bij welke rij hoort, beslist `planDayOffering`.
+ *
+ * Per dag gebeurt precies wat "Aanbod bewerken" voor één dag doet: een broodje
+ * met bestellingen blijft staan, openstaande reservaties krijgen de nieuwe
+ * prijs, en een vergadering die een verdwenen broodje had, wordt verwittigd.
+ * Een dag waarvan de afhaal al voorbij is, wordt overgeslagen.
+ */
+export async function updateWeekItemsAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("theokot.manage");
+  const templateId = formData.get("templateSessionId") as string;
+  const applyTo = [...new Set(formData.getAll("applyTo").map(String).filter(Boolean))];
+  if (applyTo.length === 0) return saveError("NO_DAYS_SELECTED");
+
+  const template = await prisma.theokotSession.findUnique({
+    where: { id: templateId },
+    select: { id: true, items: { select: { id: true, productId: true, nameNl: true, imageKey: true } } },
+  });
+  if (!template) return saveError("SESSION_NOT_FOUND");
+
+  const rows = parseOfferingRows(formData, "item", "itemCount");
+  if (!rows) return saveError("INVALID_IMAGE");
+  const templateIds = new Set(template.items.map((item) => item.id));
+  const templateImages = new Map(template.items.map((item) => [item.id, item.imageKey]));
+  if (rows.some((row) => row.id && !templateIds.has(row.id))) return saveError("ITEM_NOT_IN_SESSION");
+
+  const now = new Date();
+  const days = await prisma.theokotSession.findMany({
+    where: { id: { in: applyTo }, pickupEnd: { gt: now } },
+    orderBy: { date: "asc" },
+    include: { items: { include: { _count: { select: { lines: true } } } } },
+  });
+  if (days.length === 0) return saveError("NO_DAYS_SELECTED");
+
+  let repricedTotal = 0;
+  for (const day of days) {
+    const plan = planDayOffering(
+      template.items,
+      day.items.map((item) => ({ ...item, hasLines: item._count.lines > 0 })),
+      rows.map((row) => ({ sourceId: row.id || null })),
+    );
+    const currentKeys = new Map(day.items.map((item) => [item.id, item.imageKey]));
+    // `id` hoort bij de voorbeelddag en gaat dus niet mee naar de andere dagen.
+    const fieldsOf = (index: number) => {
+      const { image, order, nameNl, nameEn, priceCents, quantity, isWeeklySpecial, ingredientsNl, ingredientsEn } =
+        rows[index]!;
+      return {
+        image,
+        order,
+        fields: { nameNl, nameEn, priceCents, quantity, isWeeklySpecial, ingredientsNl, ingredientsEn },
+      };
+    };
+    for (const { row: index, targetId } of plan.update) {
+      const { image, order, fields } = fieldsOf(index);
+      await prisma.theokotSessionItem.update({
+        where: { id: targetId },
+        data: { ...fields, imageKey: resolveImageKey(image, currentKeys.get(targetId) ?? null), order },
+      });
+    }
+    for (const index of plan.create) {
+      const { image, order, fields } = fieldsOf(index);
+      // Een nieuwe rij zonder eigen upload neemt de foto van het broodje op de
+      // voorbeelddag over, als dat er een had.
+      const sourceId = rows[index]!.id;
+      const sourceKey = sourceId ? (templateImages.get(sourceId) ?? null) : null;
+      await prisma.theokotSessionItem.create({
+        data: { sessionId: day.id, ...fields, imageKey: resolveImageKey(image, sourceKey), order },
+      });
+    }
+    for (const id of plan.remove) {
+      await prisma.theokotSessionItem.delete({ where: { id } });
+    }
+
+    const repriced = await repriceReservedOrders(day.id);
+    repricedTotal += repriced;
+    await logAudit({
+      action: "update",
+      entity: "theokotSession",
+      entityId: day.id,
+      target: sessionLabel(day.date),
+      summary:
+        `aanbod van de week toegepast: ${rows.length} broodje(s)` +
+        (repriced > 0 ? `, ${repriced} reservatie(s) aan de nieuwe prijs gezet` : ""),
+    });
+    await syncMeetingsForSession(day.id);
+  }
+
+  revalidateTheokot();
+  return saveOk(
+    `Aanbod toegepast op ${days.length} dag(en)` +
+      (repricedTotal > 0 ? `, ${repricedTotal} reservatie(s) aan de nieuwe prijs gezet` : "") +
+      ".",
+  );
 }
 
 /**
@@ -1187,6 +1304,32 @@ export async function placeOrderAction(sessionId: string, lines: OrderLineInput[
   }
 
   return { ok: true, message: "Je bestelling is geplaatst." };
+}
+
+/** Past de reservatie van de student aan zolang het bestelvenster open is. */
+export async function updateOrderAction(orderId: string, lines: OrderLineInput[]): Promise<ActionResult> {
+  let session;
+  try {
+    session = await requireSession();
+  } catch {
+    return { ok: false, error: "Je moet ingelogd zijn." };
+  }
+
+  try {
+    await updateOrder(session.user.id, orderId, lines);
+  } catch (err) {
+    if (err instanceof TheokotOrderError) {
+      // De code is gedeeld met annuleren; de zin hoort bij wat je probeerde.
+      if (err.code === "NOT_CANCELABLE") return { ok: false, error: "Deze bestelling kan niet meer aangepast worden." };
+      if (err.code === "ORDER_CLOSED") return { ok: false, error: "Aanpassen kan niet meer: het bestelvenster voor deze dag is dicht." };
+      return { ok: false, error: orderErrorMessage(err) };
+    }
+    if (err instanceof TheokotValidationError) return { ok: false, error: err.details.join(" ") };
+    console.error("[theokot] updateOrder mislukt:", err);
+    return { ok: false, error: "Er ging iets mis bij het aanpassen van je bestelling." };
+  }
+
+  return { ok: true, message: "Je bestelling is aangepast." };
 }
 
 /** Annuleert (verwijdert) de bestelling van de student vóór de deadline. */

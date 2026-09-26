@@ -10,6 +10,7 @@ import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import {
   canCancel,
   canOrderNow,
+  repriceOrder,
   validateOrderLines,
   TheokotValidationError,
   type OrderLineInput,
@@ -203,6 +204,129 @@ export async function placeOrder(
 
   revalidateTheokotOrders();
   return { orderId: created.id, totalCents: created.totalCents };
+}
+
+/**
+ * Past de eigen reservatie aan: broodjes erbij, eraf of andere.
+ *
+ * Hetzelfde venster als bestellen (`canOrderNow`): wat je op dat moment mag
+ * bestellen, mag je ook aan je reservatie veranderen. Dezelfde limieten ook,
+ * want `validateOrderLines` kijkt naar de hele nieuwe bestelling en niet naar
+ * het verschil.
+ *
+ * De voorraad telt je eigen reservatie mee als vrij: wie de laatste twee
+ * broodjes kip had, moet die kunnen houden terwijl hij er een smos bij neemt.
+ * Alle lijnen krijgen de prijs van nu, net als bij een nieuwe bestelling.
+ *
+ * Nul broodjes is geen wijziging maar een annulatie; daarvoor bestaat
+ * `cancelOrder`, en `validateOrderLines` weigert een lege bestelling.
+ */
+export async function updateOrder(
+  userId: string,
+  orderId: string,
+  lines: OrderLineInput[],
+  now: Date = new Date(),
+): Promise<{ orderId: string; totalCents: number }> {
+  const config = await getTheokotConfig();
+
+  const ban = await activeBanFor(userId, now);
+  if (ban) throw new TheokotOrderError("BANNED", ban.endsAt);
+
+  const updated = await withSerializableTransaction(async (tx) => {
+    const order = await tx.theokotOrder.findUnique({
+      where: { id: orderId },
+      include: { lines: true, session: { include: { items: true } } },
+    });
+    // Zelfde antwoord voor niet van jou en niet bestaand, zoals bij annuleren.
+    if (!order || order.userId !== userId) throw new TheokotOrderError("ORDER_NOT_FOUND");
+    if (order.status !== "RESERVED") throw new TheokotOrderError("NOT_CANCELABLE");
+    if (!canOrderNow(order.session, now)) throw new TheokotOrderError("ORDER_CLOSED");
+
+    const own = new Map<string, number>();
+    for (const line of order.lines) {
+      own.set(line.sessionItemId, (own.get(line.sessionItemId) ?? 0) + line.quantity);
+    }
+    const usedMap = await usageForSessionItemsTx(tx, order.sessionId);
+    const items = order.session.items.map((item) => ({
+      id: item.id,
+      priceCents: item.priceCents,
+      quantity: remainingFor(item, usedMap) + (own.get(item.id) ?? 0),
+      isWeeklySpecial: item.isWeeklySpecial,
+    }));
+
+    const normalized = validateOrderLines(lines, items, config);
+
+    await tx.theokotOrderLine.deleteMany({ where: { orderId } });
+    return tx.theokotOrder.update({
+      where: { id: orderId },
+      data: {
+        totalCents: normalized.totalCents,
+        lines: {
+          create: normalized.lines.map((line) => ({
+            sessionItemId: line.sessionItemId,
+            quantity: line.quantity,
+            unitPriceCents: line.unitPriceCents,
+          })),
+        },
+      },
+      select: { id: true, totalCents: true },
+    });
+  });
+
+  revalidateTheokotOrders();
+  return { orderId: updated.id, totalCents: updated.totalCents };
+}
+
+/**
+ * Zet de openstaande reservaties van een verkoopdag op de prijzen van nu.
+ *
+ * Aangeroepen na "Aanbod bewerken": een prijswijziging geldt ook voor wie al
+ * gereserveerd had, anders staat er aan de balie een ander bedrag dan op het
+ * bord. Enkel `RESERVED`; een opgehaalde bestelling is betaald. De regel zelf
+ * staat in `repriceOrder`. Geeft terug hoeveel reservaties er veranderden.
+ */
+export async function repriceReservedOrders(sessionId: string): Promise<number> {
+  const orders = await prisma.theokotOrder.findMany({
+    where: { sessionId, status: "RESERVED" },
+    select: {
+      id: true,
+      totalCents: true,
+      lines: {
+        select: {
+          id: true,
+          quantity: true,
+          unitPriceCents: true,
+          sessionItem: { select: { priceCents: true } },
+        },
+      },
+    },
+  });
+
+  let changed = 0;
+  for (const order of orders) {
+    const next = repriceOrder({
+      totalCents: order.totalCents,
+      lines: order.lines.map((line) => ({ ...line, currentPriceCents: line.sessionItem.priceCents })),
+    });
+    if (!next) continue;
+    await prisma.$transaction([
+      // Voorwaardelijk: wie tussen het lezen en nu aan de balie opgehaald werd,
+      // heeft betaald wat er toen stond, en die bestelling blijft dus staan.
+      ...next.lines.map((line) =>
+        prisma.theokotOrderLine.updateMany({
+          where: { id: line.id, order: { status: "RESERVED" } },
+          data: { unitPriceCents: line.unitPriceCents },
+        }),
+      ),
+      prisma.theokotOrder.updateMany({
+        where: { id: order.id, status: "RESERVED" },
+        data: { totalCents: next.totalCents },
+      }),
+    ]);
+    changed += 1;
+  }
+  if (changed > 0) revalidateTheokotOrders();
+  return changed;
 }
 
 /** Annuleert de eigen bestelling, zolang de deadline niet voorbij is. */

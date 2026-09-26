@@ -219,3 +219,17 @@ export function InfoIcon() {
     </Icon>
   );
 }
+
+/** Een lijst om af te vinken, bv. de lijst bestelde broodjes van een verkoopdag. */
+export function ListCheckIcon() {
+  return (
+    <Icon>
+      <path d="M11 6h9" />
+      <path d="M11 12h9" />
+      <path d="M11 18h9" />
+      <path d="m3.5 6 1.5 1.5L7.5 5" />
+      <path d="m3.5 12 1.5 1.5L7.5 11" />
+      <path d="m3.5 18 1.5 1.5L7.5 17" />
+    </Icon>
+  );
+}

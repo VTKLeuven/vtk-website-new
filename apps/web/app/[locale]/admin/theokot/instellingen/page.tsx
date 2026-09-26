@@ -112,8 +112,9 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
         </SaveForm>
       </Card>
 
-      {/* Standaardaanbod (catalogus) */}
-      <Card className="p-5">
+      {/* Standaardaanbod (catalogus). Het id is het anker van de link op het
+          scherm met de verkoopdagen. */}
+      <Card className="p-5" id="standaardaanbod">
         <h2 className="mb-1 text-lg font-semibold">{nl ? "Standaardaanbod" : "Default offering"}</h2>
         <p className="mb-4 text-sm text-[#5c667f]">
           {nl

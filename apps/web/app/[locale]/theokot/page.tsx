@@ -11,6 +11,7 @@ import { publicUrl } from "@/lib/storage";
 import { TheokotOrderClient, type OrderSession, type OrderMessage } from "./TheokotOrderClient";
 
 import "@/app/design/vtk-basic.css";
+import "@/app/design/vtk-theokot.css";
 
 export async function generateMetadata({
   params,
@@ -54,21 +55,29 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
     hour: "2-digit",
     minute: "2-digit",
   });
+  // De korte vormen voor de dagtabs en de dagkolom: "ma 28 sep", "zo 12:00".
+  const part = (date: Date, options: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", { timeZone: "Europe/Brussels", ...options })
+      .format(date)
+      .replace(/\./g, "");
+  const shortMoment = (date: Date) => `${part(date, { weekday: "short" })} ${timeFmt.format(date)}`;
 
   const orderSessions: OrderSession[] = sessions.map((s) => {
     const existing = s.orders[0];
-    // "Broodje van de week" = het aanbod-item dat als weekly special gemarkeerd is;
-    // de naam ervan is wat het die week concreet is (ingesteld bij "Aanbod bewerken").
-    const special = s.items.find((i) => i.isWeeklySpecial);
     return {
       id: s.id,
       dateLabel: dayFmt.format(s.date),
+      weekdayLabel: part(s.date, { weekday: "long" }),
+      shortLabel: part(s.date, { weekday: "short", day: "numeric", month: "short" }),
+      dow: part(s.date, { weekday: "short" }),
+      dayNumber: part(s.date, { day: "numeric" }),
+      orderOpenShort: shortMoment(s.orderOpenAt),
+      orderCloseShort: shortMoment(s.orderCloseAt),
       pickupLabel: `${timeFmt.format(s.pickupStart)} – ${timeFmt.format(s.pickupEnd)}`,
       orderOpenLabel: `${dayFmt.format(s.orderOpenAt)}, ${timeFmt.format(s.orderOpenAt)}`,
       orderCloseLabel: `${dayFmt.format(s.orderCloseAt)}, ${timeFmt.format(s.orderCloseAt)}`,
       orderWindowState:
         now < s.orderOpenAt ? "UPCOMING" : now >= s.orderCloseAt ? "CLOSED" : "OPEN",
-      weeklySpecialLabel: special ? (pick(special.nameNl, special.nameEn, locale) ?? special.nameNl) : null,
       canOrder: canOrderNow(s, now),
       items: s.items.map((i) => ({
         id: i.id,
@@ -86,7 +95,10 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
             status: existing.status,
             totalCents: existing.totalCents,
             canCancel: existing.status === "RESERVED" && canCancel(s, now),
+            // Aanpassen volgt het bestelvenster, net als bestellen zelf.
+            canEdit: existing.status === "RESERVED" && canOrderNow(s, now),
             lines: existing.lines.map((l) => ({
+              sessionItemId: l.sessionItemId,
               name: pick(l.sessionItem.nameNl, l.sessionItem.nameEn, locale) ?? l.sessionItem.nameNl,
               quantity: l.quantity,
               unitPriceCents: l.unitPriceCents,
@@ -109,7 +121,9 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
               wel hetzelfde Theokot; wie hier belandt op zoek naar de zaal, moet
               niet terug naar het menu. */}
           <p className="vtk-page-subtitle">
-            {nl ? "Wil je de zaal zelf huren? " : "Looking to rent the room itself? "}
+            {nl
+              ? "Reserveer vooraf, haal af aan de balie en betaal daar. Wil je de zaal zelf huren? "
+              : "Reserve ahead, pick up at the counter and pay there. Looking to rent the room itself? "}
             <a className="vtk-link" href={`${base}/theokot/verhuur`}>
               {nl ? "Dien hier een verhuuraanvraag in" : "Submit a rental request here"}
             </a>

@@ -186,6 +186,82 @@ export function canCancel(session: Pick<OrderableSession, 'orderCloseAt'>, now: 
 
 export type OrderLineInput = { sessionItemId: string; quantity: number };
 
+/**
+ * Welk broodje op een andere dag "hetzelfde" is als een broodje op de dag die je
+ * als voorbeeld bewerkt.
+ *
+ * Elke verkoopdag heeft zijn eigen kopie van het aanbod (`TheokotSessionItem`),
+ * dus een prijs voor de hele week aanpassen raakt vijf verschillende rijen. Ze
+ * horen bij elkaar via het catalogusproduct waaruit ze gemaakt zijn, en anders
+ * via hun naam (een broodje dat met de hand toegevoegd is, heeft geen product).
+ * Hoofdletters en spaties aan de rand tellen niet mee.
+ */
+export function offeringKey(item: { productId: string | null; nameNl: string }): string {
+  return item.productId ? `product:${item.productId}` : `name:${item.nameNl.trim().toLocaleLowerCase("nl")}`;
+}
+
+/**
+ * Wat er op één dag moet gebeuren wanneer het aanbod van de week opgeslagen
+ * wordt: welke rij een bestaand broodje van die dag bijwerkt, welke rij een
+ * nieuw broodje wordt, en welke broodjes van die dag verdwijnen.
+ *
+ * `rows[i].sourceId` is het broodje op de voorbeelddag waaruit de rij komt, of
+ * `null` voor een rij die in de editor toegevoegd is. Een broodje dat al
+ * bestellingen heeft, verdwijnt nooit: dat zou de historiek van een echte
+ * bestelling breken, net als bij het aanbod van één dag.
+ */
+export function planDayOffering(
+  source: ReadonlyArray<{ id: string; productId: string | null; nameNl: string }>,
+  target: ReadonlyArray<{ id: string; productId: string | null; nameNl: string; hasLines: boolean }>,
+  rows: ReadonlyArray<{ sourceId: string | null }>,
+): { update: Array<{ row: number; targetId: string }>; create: number[]; remove: string[] } {
+  const sourceKey = new Map(source.map((item) => [item.id, offeringKey(item)]));
+  const byKey = new Map<string, string>();
+  for (const item of target) {
+    const key = offeringKey(item);
+    if (!byKey.has(key)) byKey.set(key, item.id);
+  }
+  const update: Array<{ row: number; targetId: string }> = [];
+  const create: number[] = [];
+  const kept = new Set<string>();
+  rows.forEach((row, index) => {
+    const key = row.sourceId ? sourceKey.get(row.sourceId) : undefined;
+    const targetId = key ? byKey.get(key) : undefined;
+    if (targetId && !kept.has(targetId)) {
+      kept.add(targetId);
+      update.push({ row: index, targetId });
+    } else {
+      create.push(index);
+    }
+  });
+  const remove = target.filter((item) => !kept.has(item.id) && !item.hasLines).map((item) => item.id);
+  return { update, create, remove };
+}
+
+/**
+ * Een openstaande reservatie aan de huidige prijs van haar broodjes.
+ *
+ * De prijs van een reservatie volgt het aanbod van die dag zolang ze nog niet
+ * opgehaald is: aan de balie betaal je wat er die dag op het bord staat, niet
+ * wat er stond toen je klikte. Wie de prijs in "Aanbod bewerken" aanpast, ziet
+ * die dus meteen terug in elke reservatie en op de afhaalpagina. Een opgehaalde
+ * bestelling is betaald en blijft staan. Zie docs/design-decisions.md.
+ *
+ * Geeft `null` wanneer er niets verandert, anders de lijnen die een nieuwe prijs
+ * krijgen en het nieuwe totaal.
+ */
+export function repriceOrder(order: {
+  totalCents: number;
+  lines: ReadonlyArray<{ id: string; quantity: number; unitPriceCents: number; currentPriceCents: number }>;
+}): { lines: Array<{ id: string; unitPriceCents: number }>; totalCents: number } | null {
+  const lines = order.lines
+    .filter((line) => line.unitPriceCents !== line.currentPriceCents)
+    .map((line) => ({ id: line.id, unitPriceCents: line.currentPriceCents }));
+  const totalCents = order.lines.reduce((sum, line) => sum + line.quantity * line.currentPriceCents, 0);
+  if (lines.length === 0 && totalCents === order.totalCents) return null;
+  return { lines, totalCents };
+}
+
 /** Sessie-item zoals de validatie het nodig heeft (voorraad = `quantity`). */
 export type ValidatableItem = {
   id: string;

@@ -2,10 +2,10 @@
 
 import Image from "next/image";
 import { useEffect, useId, useMemo, useRef, useState, useTransition } from "react";
-import { Button, Card } from "@vtk/ui";
+import { ConfirmDialog } from "@vtk/ui";
 import type { TheokotOrderStatus } from "@prisma/client";
 import { formatEuro, type TheokotItemLayout } from "@/lib/theokot";
-import { cancelOrderAction, placeOrderAction } from "@/app/actions/theokot";
+import { cancelOrderAction, placeOrderAction, updateOrderAction } from "@/app/actions/theokot";
 
 export type OrderItem = {
   id: string;
@@ -24,17 +24,31 @@ export type ExistingOrder = {
   status: TheokotOrderStatus;
   totalCents: number;
   canCancel: boolean;
-  lines: Array<{ name: string; quantity: number; unitPriceCents: number }>;
+  /** Broodjes erbij of eraf: zolang het bestelvenster open is. */
+  canEdit: boolean;
+  lines: Array<{ sessionItemId: string; name: string; quantity: number; unitPriceCents: number }>;
 };
 
 export type OrderSession = {
   id: string;
+  /** "maandag 28 september" */
   dateLabel: string;
+  /** "maandag" */
+  weekdayLabel: string;
+  /** "ma 28 sep" */
+  shortLabel: string;
+  /** "ma" */
+  dow: string;
+  /** "28" */
+  dayNumber: string;
   pickupLabel: string;
   orderOpenLabel: string;
   orderCloseLabel: string;
+  /** "zo 12:00" */
+  orderOpenShort: string;
+  /** "ma 10:30" */
+  orderCloseShort: string;
   orderWindowState: "UPCOMING" | "OPEN" | "CLOSED";
-  weeklySpecialLabel: string | null;
   canOrder: boolean;
   items: OrderItem[];
   existingOrder: ExistingOrder | null;
@@ -42,13 +56,37 @@ export type OrderSession = {
 
 export type OrderMessage = { body: string };
 
-const STATUS_LABELS: Record<TheokotOrderStatus, { nl: string; en: string; cls: string }> = {
-  RESERVED: { nl: "Gereserveerd", en: "Reserved", cls: "vtk-basic-badge-accent" },
-  PICKED_UP: { nl: "Opgehaald", en: "Picked up", cls: "vtk-basic-badge-success" },
-  NO_SHOW: { nl: "Niet opgehaald", en: "Not picked up", cls: "vtk-basic-badge-danger" },
-  CANCELLED: { nl: "Geannuleerd", en: "Cancelled", cls: "vtk-basic-badge-muted" },
+/**
+ * Onder dit aantal staat er "nog 5" bij een broodje. Daarboven zegt de voorraad
+ * niets wat iemand moet weten: "10 beschikbaar" onder elk broodje was ruis.
+ */
+const LOW_STOCK = 5;
+
+const STATUS_LABELS: Record<TheokotOrderStatus, { nl: string; en: string; tone: string }> = {
+  RESERVED: { nl: "Gereserveerd", en: "Reserved", tone: "reserved" },
+  PICKED_UP: { nl: "Opgehaald", en: "Picked up", tone: "done" },
+  NO_SHOW: { nl: "Niet opgehaald", en: "Not picked up", tone: "danger" },
+  CANCELLED: { nl: "Geannuleerd", en: "Cancelled", tone: "muted" },
 };
 
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/**
+ * De bestelpagina van het Theokot, in de weergave die Theokot instelde.
+ *
+ * Twee ontwerpen, gekozen in september 2026 uit drie richtingen (zie
+ * docs/design-decisions.md):
+ *
+ * - **Lijst**: de dagen als tabs, links het aanbod als rijen, rechts een vast
+ *   mandje met je keuze, het totaal en hoe ver je van de limiet zit. Na het
+ *   bestellen wordt dat mandje je reservatie.
+ * - **Raster met foto's**: de dagen in de linkermarge, het aanbod als
+ *   fotokaarten, een balk met het totaal eronder. Na het bestellen staat je
+ *   reservatie boven het aanbod.
+ *
+ * Eén dag tegelijk: wie maandag bestelt, hoeft dinsdag (dat pas zondag opent)
+ * niet onder zijn neus te hebben.
+ */
 export function TheokotOrderClient({
   nl,
   sessions,
@@ -67,8 +105,14 @@ export function TheokotOrderClient({
   layout: TheokotItemLayout;
   ban: { until: string } | null;
 }) {
+  // Standaard de eerste dag waar iets te doen of te zien valt: je reservatie of
+  // een open bestelvenster. Anders gewoon de eerstvolgende.
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const fallback = sessions.find((s) => s.existingOrder || s.canOrder) ?? sessions[0] ?? null;
+  const selected = sessions.find((s) => s.id === selectedId) ?? fallback;
+
   return (
-    <div className="vtk-basic-stack">
+    <div className="th">
       {message.body && (
         <div className="vtk-basic-alert vtk-basic-alert-info">
           <div className="vtk-basic-alert-text">
@@ -91,76 +135,91 @@ export function TheokotOrderClient({
         </div>
       )}
 
-      <p className="vtk-basic-help">
-        {nl
-          ? `Je kan maximaal ${maxItems} broodjes per dag reserveren, waarvan maximaal ${maxWeeklySpecial} broodje van de week.`
-          : `You can reserve up to ${maxItems} sandwiches per day, of which at most ${maxWeeklySpecial} sandwich of the week.`}
-      </p>
-
-      {sessions.length === 0 && (
+      {!selected ? (
         <div className="vtk-basic-empty">
           {nl
             ? "Er zijn momenteel geen verkoopdagen open om te reserveren."
             : "There are currently no sale days open for reservation."}
         </div>
-      )}
-
-      {sessions.map((s) => (
-        <SessionCard
-          key={s.id}
+      ) : (
+        <DayView
+          // Een andere dag is een nieuwe keuze: niets van de vorige dag mag
+          // blijven hangen in het mandje.
+          key={selected.id}
           nl={nl}
-          session={s}
-          maxItems={maxItems}
-          maxWeeklySpecial={maxWeeklySpecial}
           layout={layout}
+          sessions={sessions}
+          session={selected}
+          onSelect={setSelectedId}
+          limits={{ maxItems, maxWeeklySpecial }}
           disabled={ban !== null}
         />
-      ))}
+      )}
     </div>
   );
 }
 
-function SessionCard({
-  nl,
-  session,
-  maxItems,
-  maxWeeklySpecial,
-  layout,
-  disabled,
-}: {
-  nl: boolean;
-  session: OrderSession;
-  maxItems: number;
-  maxWeeklySpecial: number;
-  layout: TheokotItemLayout;
-  disabled: boolean;
-}) {
+// -----------------------------------------------------------------------------
+// De bestelling van één dag
+// -----------------------------------------------------------------------------
+
+type Limits = { maxItems: number; maxWeeklySpecial: number };
+type DayOrder = ReturnType<typeof useDayOrder>;
+
+/**
+ * Alles wat een dag bijhoudt, los van hoe hij getekend wordt: de gekozen
+ * aantallen, het aanpassen van een reservatie en de knoppen naar de server.
+ */
+function useDayOrder(session: OrderSession, disabled: boolean) {
+  const existing = session.existingOrder;
   const [qty, setQty] = useState<Record<string, number>>({});
+  const [editing, setEditing] = useState(false);
   const [pending, startTransition] = useTransition();
-  const [feedback, setFeedback] = useState<{ ok: boolean; text: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const reservedQty = useMemo(() => {
+    const own: Record<string, number> = {};
+    for (const line of existing?.lines ?? []) {
+      own[line.sessionItemId] = (own[line.sessionItemId] ?? 0) + line.quantity;
+    }
+    return own;
+  }, [existing]);
+
+  // Wat je zelf al gereserveerd hebt, is bij het aanpassen voor jou vrij: anders
+  // kan wie de laatste twee broodjes kip heeft, er geen enkel meer houden.
+  const items = useMemo(() => {
+    const withOwn = session.items.map((item) => ({
+      ...item,
+      remaining: item.remaining + (editing ? (reservedQty[item.id] ?? 0) : 0),
+    }));
+    // Het broodje van de week bovenaan: dat is wat er deze week anders is.
+    return [
+      ...withOwn.filter((item) => item.isWeeklySpecial),
+      ...withOwn.filter((item) => !item.isWeeklySpecial),
+    ];
+  }, [session.items, editing, reservedQty]);
 
   const totals = useMemo(() => {
-    let items = 0;
+    let count = 0;
     let weekly = 0;
     let cents = 0;
-    for (const item of session.items) {
+    const lines: Array<{ id: string; name: string; quantity: number; cents: number }> = [];
+    for (const item of items) {
       const n = qty[item.id] ?? 0;
-      items += n;
+      if (n === 0) continue;
+      count += n;
       if (item.isWeeklySpecial) weekly += n;
       cents += n * item.priceCents;
+      lines.push({ id: item.id, name: item.name, quantity: n, cents: n * item.priceCents });
     }
-    return { items, weekly, cents };
-  }, [qty, session.items]);
+    return { count, weekly, cents, lines };
+  }, [qty, items]);
 
-  const overLimit = totals.items > maxItems;
-  const overWeekly = totals.weekly > maxWeeklySpecial;
-  // In de lijst verschijnt de duimnagelkolom pas zodra er iets te tonen valt;
-  // anders krijgt een aanbod zonder foto's een kolom lege vierkantjes.
-  const hasPhotos = session.items.some((item) => item.imageUrl !== null);
+  const showOffer = !disabled && (editing || (!existing && session.canOrder));
 
   function setItemQty(item: OrderItem, next: number) {
     const clamped = Math.max(0, Math.min(next, item.remaining));
-    setQty((q) => ({ ...q, [item.id]: clamped }));
+    setQty((current) => ({ ...current, [item.id]: clamped }));
   }
 
   function submit() {
@@ -168,133 +227,392 @@ function SessionCard({
       .filter(([, n]) => n > 0)
       .map(([sessionItemId, quantity]) => ({ sessionItemId, quantity }));
     startTransition(async () => {
-      const res = await placeOrderAction(session.id, lines);
-      setFeedback({ ok: res.ok, text: res.ok ? res.message ?? "" : res.error });
-      if (res.ok) setQty({});
+      const res =
+        editing && existing
+          ? await updateOrderAction(existing.orderId, lines)
+          : await placeOrderAction(session.id, lines);
+      if (!res.ok) {
+        setError(res.error);
+        return;
+      }
+      // De server ververst de pagina; de reservatie die dan verschijnt, is de
+      // bevestiging.
+      setError(null);
+      setQty({});
+      setEditing(false);
     });
   }
 
-  const existing = session.existingOrder;
+  function startEditing() {
+    setQty({ ...reservedQty });
+    setError(null);
+    setEditing(true);
+  }
+
+  function stopEditing() {
+    setQty({});
+    setError(null);
+    setEditing(false);
+  }
+
+  function cancel(onDone: () => void) {
+    if (!existing) return;
+    startTransition(async () => {
+      const res = await cancelOrderAction(existing.orderId);
+      if (!res.ok) setError(res.error);
+      onDone();
+    });
+  }
+
+  return {
+    existing,
+    editing,
+    pending,
+    error,
+    qty,
+    items,
+    totals,
+    reservedQty,
+    showOffer,
+    setItemQty,
+    submit,
+    startEditing,
+    stopEditing,
+    cancel,
+  };
+}
+
+type LayoutProps = {
+  nl: boolean;
+  sessions: OrderSession[];
+  session: OrderSession;
+  onSelect: (id: string) => void;
+  order: DayOrder;
+  limits: Limits;
+  disabled: boolean;
+};
+
+function DayView({
+  layout,
+  ...props
+}: Omit<LayoutProps, "order"> & { layout: TheokotItemLayout }) {
+  const order = useDayOrder(props.session, props.disabled);
+  return layout === "grid" ? <GridLayout {...props} order={order} /> : <ListLayout {...props} order={order} />;
+}
+
+// -----------------------------------------------------------------------------
+// A · Lijst: aanbod links, mandje rechts
+// -----------------------------------------------------------------------------
+
+function ListLayout({ nl, sessions, session, onSelect, order, limits, disabled }: LayoutProps) {
+  const specials = order.items.filter((item) => item.isWeeklySpecial);
+  const regular = order.items.filter((item) => !item.isWeeklySpecial);
+  const hasPhotos = order.items.some((item) => item.imageUrl !== null);
+  const readOnly = !order.showOffer;
+  const atMax = order.totals.count >= limits.maxItems;
+  const weeklyAtMax = order.totals.weekly >= limits.maxWeeklySpecial;
+
+  const row = (item: OrderItem) => (
+    <ListRow
+      key={item.id}
+      nl={nl}
+      item={item}
+      showThumb={hasPhotos}
+      quantity={order.qty[item.id] ?? 0}
+      reserved={readOnly ? (order.reservedQty[item.id] ?? 0) : 0}
+      readOnly={readOnly}
+      atMax={atMax || (item.isWeeklySpecial && weeklyAtMax)}
+      onChange={(next) => order.setItemQty(item, next)}
+    />
+  );
 
   return (
-    <Card className="p-5">
-      <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-semibold capitalize text-vtk-ink">{session.dateLabel}</h2>
-        <span className="text-sm text-[#5c667f]">
-          {nl ? "Afhalen" : "Pickup"}: {session.pickupLabel}
-        </span>
-      </div>
-
-      {session.weeklySpecialLabel && (
-        <p className="mb-3 text-sm text-[#34405e]">
-          <span className="font-semibold">{nl ? "Broodje van de week" : "Sandwich of the week"}:</span>{" "}
-          {session.weeklySpecialLabel}
-        </p>
-      )}
-
-      {existing && <ExistingOrderPanel nl={nl} order={existing} />}
-
-      {!existing && session.canOrder && !disabled && (
-        <>
-          <ul
-            className={
-              layout === "grid"
-                ? "grid gap-3 [grid-template-columns:repeat(auto-fill,minmax(150px,1fr))] sm:gap-4 sm:[grid-template-columns:repeat(auto-fill,minmax(210px,1fr))]"
-                : "divide-y divide-vtk-blue/10"
-            }
-          >
-            {session.items.map((item) => (
-              <OfferItem
-                key={item.id}
-                nl={nl}
-                item={item}
-                layout={layout}
-                showThumb={hasPhotos}
-                quantity={qty[item.id] ?? 0}
-                atMax={totals.items >= maxItems}
-                onChange={(next) => setItemQty(item, next)}
-              />
-            ))}
-          </ul>
-
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="text-sm text-[#34405e]">
-              {totals.items} {nl ? "broodjes" : "sandwiches"} · <span className="font-semibold">{formatEuro(totals.cents)}</span>
-              {overLimit && (
-                <span className="ml-2 text-red-600">{nl ? `max ${maxItems}` : `max ${maxItems}`}</span>
-              )}
-              {overWeekly && (
-                <span className="ml-2 text-red-600">
-                  {nl ? `max ${maxWeeklySpecial} vd week` : `max ${maxWeeklySpecial} of the week`}
-                </span>
-              )}
-            </div>
-            <Button onClick={submit} disabled={pending || totals.items === 0 || overLimit || overWeekly}>
-              {pending ? (nl ? "Bezig..." : "Placing...") : nl ? "Reserveren" : "Reserve"}
-            </Button>
+    <>
+      <DayTabs nl={nl} sessions={sessions} selected={session} onSelect={onSelect} />
+      <div className="th-a">
+        <section className="th-a-main" aria-labelledby="th-day-title">
+          <div className="th-dayhead">
+            <h2 id="th-day-title">{capitalize(session.dateLabel)}</h2>
+            <span className="th-tn">
+              {nl ? "Afhalen" : "Pickup"} {session.pickupLabel}
+            </span>
           </div>
-          <p className="mt-2 text-xs text-[#5c667f]">
-            {nl ? "Annuleren kan tot " : "Cancel until "}
-            {session.orderCloseLabel}.
-          </p>
-        </>
-      )}
+          <DayIntro nl={nl} session={session} order={order} limits={limits} disabled={disabled} />
 
-      {!existing && !session.canOrder && !disabled && (
-        <p className="text-sm text-[#5c667f]">
-          {session.orderWindowState === "UPCOMING"
-            ? nl
-              ? `Reserveren opent op ${session.orderOpenLabel} en sluit op ${session.orderCloseLabel}.`
-              : `Ordering opens on ${session.orderOpenLabel} and closes on ${session.orderCloseLabel}.`
-            : nl
-              ? `Reserveren is gesloten sinds ${session.orderCloseLabel}. Reservaties waren open vanaf ${session.orderOpenLabel}.`
-              : `Ordering has been closed since ${session.orderCloseLabel}. Reservations were open from ${session.orderOpenLabel}.`}
-        </p>
-      )}
+          {specials.length > 0 && <ul className="th-rows is-special">{specials.map(row)}</ul>}
+          {regular.length > 0 && (
+            <ul className="th-rows">
+              {specials.length > 0 && (
+                <li className="th-rows-label" aria-hidden="true">
+                  {nl ? "Vast aanbod" : "Regular menu"}
+                </li>
+              )}
+              {regular.map(row)}
+            </ul>
+          )}
+        </section>
 
-      {feedback && (
-        <p className={`mt-3 text-sm ${feedback.ok ? "text-emerald-700" : "text-red-600"}`}>{feedback.text}</p>
+        {(order.showOffer || order.existing) && (
+          <aside className={`th-a-side${order.showOffer ? "" : " is-reservation"}`}>
+            {order.showOffer ? (
+              <Basket nl={nl} session={session} order={order} limits={limits} />
+            ) : (
+              <Reservation nl={nl} session={session} order={order} disabled={disabled} />
+            )}
+          </aside>
+        )}
+      </div>
+      {/* Op een smal scherm staat het mandje onder de hele lijst; deze balk
+          houdt het totaal en de knop in beeld. */}
+      {order.showOffer && (
+        <OrderBar nl={nl} session={session} order={order} limits={limits} className="th-bar-sticky th-mobile-only" />
       )}
-    </Card>
+    </>
   );
 }
 
-/**
- * Eén broodje in het aanbod, in de weergave die Theokot instelde.
- *
- * Raster: een fotokaart (16:10 onder een lichte scrim) met naam, prijs en de
- * plusknop eronder; zonder foto komt daar het gestreepte patroon van de site,
- * zodat een half ingevuld aanbod geen gaten toont. Lijst: dezelfde rij als
- * vroeger, met de foto als duimnagel ervoor.
- */
-function OfferItem({
+function ListRow({
   nl,
   item,
-  layout,
   showThumb,
   quantity,
+  reserved,
+  readOnly,
   atMax,
   onChange,
 }: {
   nl: boolean;
   item: OrderItem;
-  layout: TheokotItemLayout;
-  /** Toont de lijstweergave een duimnagelkolom? (Enkel als er foto's zijn.) */
   showThumb: boolean;
   quantity: number;
-  /** Het maximum aantal broodjes is bereikt: enkel minder kan nog. */
+  /** Zoveel staan er van dit broodje in je reservatie (enkel zonder stappers). */
+  reserved: number;
+  readOnly: boolean;
+  atMax: boolean;
+  onChange: (next: number) => void;
+}) {
+  const [showInfo, setShowInfo] = useState(false);
+  const infoId = useId();
+  return (
+    <li className={`th-row${quantity > 0 ? " is-picked" : ""}`}>
+      {showThumb && <Thumb item={item} className="th-row-thumb" sizes="56px" />}
+      <div className="th-row-text">
+        {item.isWeeklySpecial && <SpecialLabel nl={nl} />}
+        <div className="th-name">
+          <span>{item.name}</span>
+          {item.ingredients && (
+            <InfoButton
+              nl={nl}
+              name={item.name}
+              open={showInfo}
+              controls={infoId}
+              onToggle={() => setShowInfo((open) => !open)}
+            />
+          )}
+        </div>
+        <div className="th-row-meta">
+          <span className="th-tn">{formatEuro(item.priceCents)}</span>
+          <StockPill nl={nl} remaining={item.remaining} />
+        </div>
+        {showInfo && item.ingredients && (
+          <p id={infoId} className="th-ingredients">
+            <b>{nl ? "Ingrediënten" : "Ingredients"}:</b> {item.ingredients}
+          </p>
+        )}
+      </div>
+      {readOnly ? (
+        reserved > 0 ? (
+          <span className="th-mine">{nl ? `${reserved}× in je reservatie` : `${reserved}× in your reservation`}</span>
+        ) : null
+      ) : (
+        <Stepper nl={nl} item={item} quantity={quantity} atMax={atMax} onChange={onChange} />
+      )}
+    </li>
+  );
+}
+
+function Basket({
+  nl,
+  session,
+  order,
+  limits,
+}: {
+  nl: boolean;
+  session: OrderSession;
+  order: DayOrder;
+  limits: Limits;
+}) {
+  const { totals } = order;
+  return (
+    <div className="th-card th-basket">
+      <div>
+        <div className="th-card-title">
+          {order.editing
+            ? nl
+              ? "Je reservatie aanpassen"
+              : "Change your reservation"
+            : nl
+              ? "Jouw bestelling"
+              : "Your order"}
+        </div>
+        <div className="th-card-sub">
+          {nl ? "Voor " : "For "}
+          {session.dateLabel}
+        </div>
+      </div>
+
+      {totals.lines.length === 0 ? (
+        <p className="th-basket-empty">{nl ? "Kies hiernaast je broodjes." : "Pick your sandwiches on the left."}</p>
+      ) : (
+        <ul className="th-lines">
+          {totals.lines.map((line) => (
+            <li key={line.id}>
+              <span>
+                {line.quantity}× {line.name}
+              </span>
+              <span className="th-tn">{formatEuro(line.cents)}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      <div className="th-total">
+        <span>{nl ? "Totaal" : "Total"}</span>
+        <span className="th-tn">{formatEuro(totals.cents)}</span>
+      </div>
+
+      <div className="th-meters">
+        <Meter label={nl ? "Broodjes" : "Sandwiches"} value={totals.count} max={limits.maxItems} nl={nl} />
+        {limits.maxWeeklySpecial > 0 && (
+          <Meter
+            label={nl ? "Broodje van de week" : "Sandwich of the week"}
+            value={totals.weekly}
+            max={limits.maxWeeklySpecial}
+            nl={nl}
+          />
+        )}
+      </div>
+
+      {order.error && (
+        <p className="th-error" role="alert">
+          {order.error}
+        </p>
+      )}
+
+      <SubmitButton nl={nl} session={session} order={order} limits={limits} className="th-btn-block" />
+      {order.editing && (
+        <button
+          type="button"
+          className="th-btn th-btn-ghost th-btn-block"
+          onClick={order.stopEditing}
+          disabled={order.pending}
+        >
+          {nl ? "Niet aanpassen" : "Keep as is"}
+        </button>
+      )}
+      <p className="th-fine">
+        {order.editing && totals.count === 0
+          ? nl
+            ? "Geen broodjes meer nodig? Annuleer dan je reservatie."
+            : "No sandwiches needed any more? Cancel your reservation instead."
+          : nl
+            ? `Je betaalt aan de balie bij het afhalen. Aanpassen of annuleren kan tot ${session.orderCloseShort}.`
+            : `You pay at the counter when you pick up. Change or cancel until ${session.orderCloseShort}.`}
+      </p>
+    </div>
+  );
+}
+
+function Meter({ label, value, max, nl }: { label: string; value: number; max: number; nl: boolean }) {
+  return (
+    <div className={`th-meter${value > max ? " is-over" : ""}`}>
+      <div className="th-meter-head">
+        <span>{label}</span>
+        <span className="th-tn">
+          {value} {nl ? "van" : "of"} {max}
+        </span>
+      </div>
+      <div className="th-meter-track" aria-hidden="true">
+        <div style={{ width: `${Math.min(100, (value / Math.max(1, max)) * 100)}%` }} />
+      </div>
+    </div>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// B · Raster: dagen in de marge, fotokaarten
+// -----------------------------------------------------------------------------
+
+function GridLayout({ nl, sessions, session, onSelect, order, limits, disabled }: LayoutProps) {
+  const readOnly = !order.showOffer;
+  const atMax = order.totals.count >= limits.maxItems;
+  const weeklyAtMax = order.totals.weekly >= limits.maxWeeklySpecial;
+  return (
+    <>
+      <DayTabs nl={nl} sessions={sessions} selected={session} onSelect={onSelect} className="th-mobile-only" />
+      <div className="th-b">
+        <DayRail nl={nl} sessions={sessions} selected={session} onSelect={onSelect} limits={limits} />
+        <section className="th-b-main" aria-labelledby="th-day-title">
+          {order.existing && !order.editing && (
+            <Reservation nl={nl} session={session} order={order} disabled={disabled} wide />
+          )}
+          <div className="th-dayhead">
+            <h2 id="th-day-title">
+              {nl ? "Aanbod van " : "Menu for "}
+              {session.weekdayLabel}
+            </h2>
+            <span className="th-tn">
+              {order.showOffer
+                ? nl
+                  ? `Bestellen tot ${session.orderCloseShort}`
+                  : `Order until ${session.orderCloseShort}`
+                : `${nl ? "Afhalen" : "Pickup"} ${session.pickupLabel}`}
+            </span>
+          </div>
+          <DayIntro nl={nl} session={session} order={order} limits={limits} disabled={disabled} hideLimits />
+          <ul className="th-cards">
+            {order.items.map((item) => (
+              <GridCard
+                key={item.id}
+                nl={nl}
+                item={item}
+                quantity={order.qty[item.id] ?? 0}
+                reserved={readOnly ? (order.reservedQty[item.id] ?? 0) : 0}
+                readOnly={readOnly}
+                atMax={atMax || (item.isWeeklySpecial && weeklyAtMax)}
+                onChange={(next) => order.setItemQty(item, next)}
+              />
+            ))}
+          </ul>
+          {order.showOffer && (
+            <OrderBar nl={nl} session={session} order={order} limits={limits} className="th-bar-sticky" />
+          )}
+        </section>
+      </div>
+    </>
+  );
+}
+
+function GridCard({
+  nl,
+  item,
+  quantity,
+  reserved,
+  readOnly,
+  atMax,
+  onChange,
+}: {
+  nl: boolean;
+  item: OrderItem;
+  quantity: number;
+  reserved: number;
+  readOnly: boolean;
   atMax: boolean;
   onChange: (next: number) => void;
 }) {
   const [showInfo, setShowInfo] = useState(false);
   const infoId = useId();
   const rootRef = useRef<HTMLLIElement>(null);
-  const soldOut = item.remaining <= 0;
-  const stock = soldOut
-    ? nl
-      ? "uitverkocht"
-      : "sold out"
-    : `${item.remaining} ${nl ? "beschikbaar" : "available"}`;
 
   // Escape en een klik ernaast sluiten de ingrediënten, zoals bij elk ander
   // paneel op de site. Enkel luisteren wanneer er iets open staat.
@@ -314,114 +632,34 @@ function OfferItem({
     };
   }, [showInfo]);
 
-  const infoButton = item.ingredients ? (
-    <button
-      type="button"
-      onClick={() => setShowInfo((open) => !open)}
-      aria-expanded={showInfo}
-      aria-controls={infoId}
-      // `relative`: het sr-only label is absoluut gepositioneerd en moet aan deze
-      // knop hangen, niet aan een voorouder ergens hoger op de pagina.
-      className="relative mt-0.5 grid h-[18px] w-[18px] shrink-0 place-items-center rounded-full border-[1.5px] border-vtk-blue/25 text-[11px] font-bold leading-none text-[#5c667f] transition-colors hover:border-vtk-ink hover:text-vtk-ink"
-    >
-      <span aria-hidden="true">i</span>
-      <span className="sr-only">
-        {nl ? `Ingrediënten van ${item.name}` : `Ingredients of ${item.name}`}
-      </span>
-    </button>
-  ) : null;
-
-  const stepper = (
-    <div className="flex items-center gap-2">
-      <button
-        type="button"
-        className="h-7 w-7 rounded-full border border-vtk-blue/20 text-vtk-ink disabled:opacity-40"
-        onClick={() => onChange(quantity - 1)}
-        disabled={quantity <= 0}
-        aria-label={nl ? `Eén ${item.name} minder` : `One ${item.name} less`}
-      >
-        −
-      </button>
-      <span className="w-6 text-center text-sm tabular-nums">{quantity}</span>
-      <button
-        type="button"
-        className="h-7 w-7 rounded-full border border-vtk-blue/20 text-vtk-ink disabled:opacity-40"
-        onClick={() => onChange(quantity + 1)}
-        disabled={soldOut || atMax}
-        aria-label={nl ? `Eén ${item.name} meer` : `One more ${item.name}`}
-      >
-        +
-      </button>
-    </div>
-  );
-
-  if (layout === "list") {
-    return (
-      <li ref={rootRef} className="flex items-center gap-3 py-2">
-        {showThumb && <Thumb item={item} className="h-14 w-14 shrink-0 rounded-xl" sizes="56px" />}
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-1.5">
-            <span className="text-sm font-medium text-vtk-ink">
-              {item.name}
-              {item.isWeeklySpecial && (
-                <span className="ml-2 align-middle text-[10px] uppercase tracking-wide text-vtk-yellow-dark">
-                  ★ {nl ? "vd week" : "of the week"}
-                </span>
-              )}
-            </span>
-            {infoButton}
-          </div>
-          <div className="text-xs text-[#5c667f]">
-            {formatEuro(item.priceCents)} · {stock}
-          </div>
-          {showInfo && item.ingredients && (
-            <p
-              id={infoId}
-              className="mt-1.5 rounded-lg border border-vtk-blue/10 bg-vtk-blue-soft/50 px-2.5 py-1.5 text-xs leading-relaxed text-[#34405e]"
-            >
-              <span className="font-semibold">{nl ? "Ingrediënten" : "Ingredients"}:</span>{" "}
-              {item.ingredients}
-            </p>
+  const picked = quantity > 0 || reserved > 0;
+  return (
+    <li ref={rootRef} className={`th-gcard${picked ? " is-picked" : ""}${item.isWeeklySpecial ? " is-special" : ""}`}>
+      <Thumb item={item} className="th-gcard-photo" sizes="(max-width: 640px) 50vw, 240px" />
+      <div className="th-gcard-body">
+        {item.isWeeklySpecial && <SpecialLabel nl={nl} />}
+        <div className="th-name">
+          <span>{item.name}</span>
+          {item.ingredients && (
+            <InfoButton
+              nl={nl}
+              name={item.name}
+              open={showInfo}
+              controls={infoId}
+              onToggle={() => setShowInfo((open) => !open)}
+            />
           )}
         </div>
-        {stepper}
-      </li>
-    );
-  }
-
-  return (
-    <li ref={rootRef} className="relative flex flex-col rounded-2xl border border-vtk-blue/12 bg-white">
-      <div className="relative aspect-[16/10] w-full overflow-hidden rounded-t-2xl bg-[repeating-linear-gradient(-45deg,var(--paper-2)_0_8px,var(--paper)_8px_16px)]">
-        {item.imageUrl && (
-          <>
-            <Image
-              src={item.imageUrl}
-              alt=""
-              fill
-              sizes="(max-width: 640px) 50vw, 220px"
-              className="object-cover"
-            />
-            <span className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,rgba(14,26,54,0.22),rgba(14,26,54,0)_62%)]" />
-          </>
-        )}
-        {item.isWeeklySpecial && (
-          <span className="absolute left-2 top-2 rounded-full bg-vtk-yellow px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-vtk-ink">
-            ★ {nl ? "vd week" : "of the week"}
-          </span>
-        )}
-      </div>
-
-      <div className="flex flex-1 flex-col p-3">
-        <div className="flex items-start gap-1.5">
-          <span className="text-sm font-medium leading-snug text-vtk-ink">{item.name}</span>
-          {infoButton}
-        </div>
-        <div className="mt-1 text-xs text-[#5c667f]">{stock}</div>
-        <div className="mt-3 flex items-center justify-between gap-2">
-          <span className="text-sm font-semibold tabular-nums text-vtk-ink">
-            {formatEuro(item.priceCents)}
-          </span>
-          {stepper}
+        <StockPill nl={nl} remaining={item.remaining} />
+        <div className="th-gcard-foot">
+          <span className="th-tn th-gcard-price">{formatEuro(item.priceCents)}</span>
+          {readOnly ? (
+            reserved > 0 ? (
+              <span className="th-mine">{nl ? `${reserved}× van jou` : `${reserved}× yours`}</span>
+            ) : null
+          ) : (
+            <Stepper nl={nl} item={item} quantity={quantity} atMax={atMax} onChange={onChange} />
+          )}
         </div>
       </div>
 
@@ -429,93 +667,481 @@ function OfferItem({
           hoger maken, en een zwevend kadertje valt in de buitenste kolom buiten
           het scherm. */}
       {showInfo && item.ingredients && (
-        <div
-          id={infoId}
-          className="absolute inset-0 z-10 flex flex-col rounded-2xl border border-vtk-blue/15 bg-white/95 p-3 backdrop-blur-[2px]"
-        >
-          <div className="flex items-start justify-between gap-2">
-            <span className="text-[10px] font-bold uppercase tracking-[0.1em] text-[#5c667f]">
-              {nl ? "Ingrediënten" : "Ingredients"}
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowInfo(false)}
-              className="relative -mr-1 -mt-1 shrink-0 px-1 text-sm leading-none text-[#5c667f] hover:text-vtk-ink"
-            >
+        <div id={infoId} className="th-gcard-info">
+          <div className="th-gcard-info-head">
+            <span>{nl ? "Ingrediënten" : "Ingredients"}</span>
+            <button type="button" onClick={() => setShowInfo(false)}>
               <span aria-hidden="true">✕</span>
               <span className="sr-only">{nl ? "Ingrediënten sluiten" : "Close ingredients"}</span>
             </button>
           </div>
-          <p className="mt-1 overflow-auto text-xs leading-relaxed text-[#34405e]">
-            {item.ingredients}
-          </p>
+          <p>{item.ingredients}</p>
         </div>
       )}
     </li>
   );
 }
 
-/** Duimnagel in de lijstweergave; zonder foto het gestreepte patroon. */
-function Thumb({
-  item,
-  className,
-  sizes,
+function DayRail({
+  nl,
+  sessions,
+  selected,
+  onSelect,
+  limits,
 }: {
-  item: OrderItem;
-  className: string;
-  sizes: string;
+  nl: boolean;
+  sessions: OrderSession[];
+  selected: OrderSession;
+  onSelect: (id: string) => void;
+  limits: Limits;
 }) {
   return (
-    <div
-      className={`relative overflow-hidden border border-vtk-blue/10 bg-[repeating-linear-gradient(-45deg,var(--paper-2)_0_8px,var(--paper)_8px_16px)] ${className}`}
-    >
-      {item.imageUrl && (
-        <Image src={item.imageUrl} alt="" fill sizes={sizes} className="object-cover" />
+    <nav className="th-rail th-desktop-only" aria-label={nl ? "Verkoopdagen" : "Sale days"}>
+      <div className="th-rail-label">{nl ? "Verkoopdagen" : "Sale days"}</div>
+      {sessions.map((s) => {
+        const on = s.id === selected.id;
+        return (
+          <button
+            key={s.id}
+            type="button"
+            className={`th-rail-day${on ? " is-on" : ""}`}
+            aria-pressed={on}
+            onClick={() => onSelect(s.id)}
+          >
+            <DatePin dow={s.dow} day={s.dayNumber} />
+            <span className="th-rail-text">
+              <span className="th-rail-name">{capitalize(s.weekdayLabel)}</span>
+              <DayState nl={nl} session={s} />
+            </span>
+          </button>
+        );
+      })}
+      <p className="th-rail-note">
+        {nl
+          ? `Maximaal ${limits.maxItems} broodjes per dag, waarvan ${limits.maxWeeklySpecial} broodje van de week.`
+          : `Up to ${limits.maxItems} sandwiches per day, of which ${limits.maxWeeklySpecial} sandwich of the week.`}
+      </p>
+    </nav>
+  );
+}
+
+// -----------------------------------------------------------------------------
+// Gedeeld
+// -----------------------------------------------------------------------------
+
+/** De dagen als tabs: bovenaan in de lijst, en op een smal scherm ook in het raster. */
+function DayTabs({
+  nl,
+  sessions,
+  selected,
+  onSelect,
+  className = "",
+}: {
+  nl: boolean;
+  sessions: OrderSession[];
+  selected: OrderSession;
+  onSelect: (id: string) => void;
+  className?: string;
+}) {
+  if (sessions.length < 2) return null;
+  return (
+    <div className={`th-tabs ${className}`} role="group" aria-label={nl ? "Verkoopdagen" : "Sale days"}>
+      {sessions.map((s) => {
+        const on = s.id === selected.id;
+        return (
+          <button
+            key={s.id}
+            type="button"
+            className={`th-tab${on ? " is-on" : ""}`}
+            aria-pressed={on}
+            aria-label={capitalize(s.dateLabel)}
+            onClick={() => onSelect(s.id)}
+          >
+            <span className="th-tab-full">
+              <span className="th-tab-day">{capitalize(s.shortLabel)}</span>
+              <DayState nl={nl} session={s} />
+            </span>
+            <span className="th-tab-compact" aria-hidden="true">
+              <span className="th-tab-dow">{s.dow}</span>
+              <span className="th-tab-num th-tn">{s.dayNumber}</span>
+              {s.existingOrder?.status === "RESERVED" && <span className="th-dot" />}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Wat er met een dag aan de hand is, in een paar woorden. */
+function DayState({ nl, session }: { nl: boolean; session: OrderSession }) {
+  const existing = session.existingOrder;
+  if (existing) {
+    const label = STATUS_LABELS[existing.status];
+    return (
+      <span className="th-daystate">
+        {existing.status === "RESERVED" && <span className="th-dot" aria-hidden="true" />}
+        {nl ? label.nl : label.en}
+      </span>
+    );
+  }
+  const text =
+    session.orderWindowState === "UPCOMING"
+      ? nl
+        ? `Opent ${session.orderOpenShort}`
+        : `Opens ${session.orderOpenShort}`
+      : session.canOrder
+        ? nl
+          ? `Open tot ${session.orderCloseShort}`
+          : `Open until ${session.orderCloseShort}`
+        : nl
+          ? "Gesloten"
+          : "Closed";
+  return <span className="th-daystate">{text}</span>;
+}
+
+/**
+ * De regel onder de dagkop: de limiet, of waarom je nu niet kan bestellen. Het
+ * aanbod staat er ook dan onder, zodat je al ziet wat er komt.
+ */
+function DayIntro({
+  nl,
+  session,
+  order,
+  limits,
+  disabled,
+  hideLimits = false,
+}: {
+  nl: boolean;
+  session: OrderSession;
+  order: DayOrder;
+  limits: Limits;
+  disabled: boolean;
+  hideLimits?: boolean;
+}) {
+  if (order.editing) {
+    return (
+      <p className="th-hint">
+        {nl
+          ? "Je past je reservatie aan. Wat je nu kiest, vervangt wat je had."
+          : "You are changing your reservation. What you pick now replaces what you had."}
+      </p>
+    );
+  }
+  if (order.existing) return null;
+  if (order.showOffer) {
+    return hideLimits ? null : (
+      <p className="th-hint">
+        {nl
+          ? `Maximaal ${limits.maxItems} broodjes, waarvan ${limits.maxWeeklySpecial} broodje van de week.`
+          : `Up to ${limits.maxItems} sandwiches, of which ${limits.maxWeeklySpecial} sandwich of the week.`}
+      </p>
+    );
+  }
+  if (disabled) return null;
+  return (
+    <p className="th-notice">
+      {session.orderWindowState === "UPCOMING"
+        ? nl
+          ? `Reserveren voor ${session.weekdayLabel} opent ${session.orderOpenLabel} en sluit ${session.orderCloseLabel}. Dit is het aanbod.`
+          : `Ordering for ${session.weekdayLabel} opens ${session.orderOpenLabel} and closes ${session.orderCloseLabel}. This is the menu.`
+        : nl
+          ? `Reserveren is gesloten sinds ${session.orderCloseLabel}.`
+          : `Ordering has been closed since ${session.orderCloseLabel}.`}
+    </p>
+  );
+}
+
+/**
+ * De reservatie van die dag: wanneer je afhaalt, wat je betaalt, en aanpassen
+ * of annuleren. In de lijst staat ze rechts in de plaats van het mandje, in het
+ * raster breed boven het aanbod.
+ */
+function Reservation({
+  nl,
+  session,
+  order,
+  disabled,
+  wide = false,
+}: {
+  nl: boolean;
+  session: OrderSession;
+  order: DayOrder;
+  disabled: boolean;
+  wide?: boolean;
+}) {
+  const [confirming, setConfirming] = useState(false);
+  const existing = order.existing;
+  if (!existing) return null;
+  const status = STATUS_LABELS[existing.status];
+  const canEdit = existing.canEdit && !disabled;
+  const count = existing.lines.reduce((sum, line) => sum + line.quantity, 0);
+
+  return (
+    <div className={`th-card th-reservation${wide ? " is-wide" : ""}`}>
+      <div className="th-reservation-head">
+        <span className="th-card-title">{nl ? "Jouw reservatie" : "Your reservation"}</span>
+        <span className={`th-status is-${status.tone}`}>{nl ? status.nl : status.en}</span>
+      </div>
+
+      <div className="th-pickup">
+        <DatePin dow={session.dow} day={session.dayNumber} large />
+        <div className="th-pickup-text">
+          <span className="th-pickup-label">{nl ? "Afhalen" : "Pickup"}</span>
+          <span className="th-pickup-time th-tn">{session.pickupLabel}</span>
+          <span className="th-pickup-where">{nl ? "aan de balie van het Theokot" : "at the Theokot counter"}</span>
+        </div>
+      </div>
+
+      <div className="th-reservation-body">
+        <ul className="th-lines">
+          {existing.lines.map((line) => (
+            <li key={line.sessionItemId}>
+              <span>
+                {line.quantity}× {line.name}
+              </span>
+              <span className="th-tn">{formatEuro(line.quantity * line.unitPriceCents)}</span>
+            </li>
+          ))}
+        </ul>
+        <div className="th-total">
+          <span>
+            {existing.status === "RESERVED"
+              ? nl
+                ? "Te betalen aan de balie"
+                : "To pay at the counter"
+              : nl
+                ? "Totaal"
+                : "Total"}
+          </span>
+          <span className="th-tn">{formatEuro(existing.totalCents)}</span>
+        </div>
+      </div>
+
+      {(existing.canCancel || canEdit) && (
+        <div className="th-reservation-actions">
+          <div className="th-reservation-buttons">
+            {canEdit && (
+              <button type="button" className="th-btn th-btn-primary" onClick={order.startEditing} disabled={order.pending}>
+                {nl ? "Aanpassen" : "Change"}
+              </button>
+            )}
+            {existing.canCancel && (
+              <button
+                type="button"
+                className="th-btn th-btn-ghost"
+                onClick={() => setConfirming(true)}
+                disabled={order.pending}
+              >
+                {nl ? "Annuleren" : "Cancel"}
+              </button>
+            )}
+          </div>
+          <p className="th-fine">
+            {nl ? `Kan tot ${session.orderCloseShort}.` : `Possible until ${session.orderCloseShort}.`}
+          </p>
+        </div>
+      )}
+      {order.error && (
+        <p className="th-error" role="alert">
+          {order.error}
+        </p>
+      )}
+
+      <ConfirmDialog
+        open={confirming}
+        title={nl ? "Reservatie annuleren?" : "Cancel reservation?"}
+        description={
+          nl
+            ? `Je reservatie voor ${session.dateLabel} (${count} ${count === 1 ? "broodje" : "broodjes"}) verdwijnt en de broodjes gaan terug naar de voorraad. Bedenk je je, dan bestel je opnieuw zolang er nog zijn.`
+            : `Your reservation for ${session.dateLabel} (${count} ${count === 1 ? "sandwich" : "sandwiches"}) is removed and the sandwiches go back into stock. If you change your mind, order again while there are some left.`
+        }
+        confirmLabel={nl ? "Reservatie annuleren" : "Cancel reservation"}
+        cancelLabel={nl ? "Behouden" : "Keep it"}
+        pending={order.pending}
+        onConfirm={() => order.cancel(() => setConfirming(false))}
+        onCancel={() => setConfirming(false)}
+      />
+    </div>
+  );
+}
+
+/** Het totaal en de knop in één balk: onder het raster, en op gsm onder de lijst. */
+function OrderBar({
+  nl,
+  session,
+  order,
+  limits,
+  className = "",
+}: {
+  nl: boolean;
+  session: OrderSession;
+  order: DayOrder;
+  limits: Limits;
+  className?: string;
+}) {
+  const { totals } = order;
+  return (
+    <div className={`th-bar ${className}`}>
+      <div className="th-bar-text">
+        <span className="th-bar-kicker">{capitalize(session.weekdayLabel)}</span>
+        <span className="th-tn">
+          {totals.count} {nl ? "van" : "of"} {limits.maxItems} {nl ? "broodjes" : "sandwiches"}
+        </span>
+      </div>
+      <span className="th-bar-total th-tn">{formatEuro(totals.cents)}</span>
+      {order.editing && (
+        <button type="button" className="th-btn th-btn-ghost" onClick={order.stopEditing} disabled={order.pending}>
+          {nl ? "Niet aanpassen" : "Keep as is"}
+        </button>
+      )}
+      <SubmitButton nl={nl} session={session} order={order} limits={limits} short />
+      {order.error && (
+        <p className="th-error th-bar-error" role="alert">
+          {order.error}
+        </p>
       )}
     </div>
   );
 }
 
-function ExistingOrderPanel({ nl, order }: { nl: boolean; order: ExistingOrder }) {
-  const [pending, startTransition] = useTransition();
-  const [error, setError] = useState<string | null>(null);
-  const status = STATUS_LABELS[order.status];
-
-  function cancel() {
-    startTransition(async () => {
-      const res = await cancelOrderAction(order.orderId);
-      if (!res.ok) setError(res.error);
-    });
-  }
-
+function SubmitButton({
+  nl,
+  session,
+  order,
+  limits,
+  className = "",
+  short = false,
+}: {
+  nl: boolean;
+  session: OrderSession;
+  order: DayOrder;
+  limits: Limits;
+  className?: string;
+  /** In een smalle balk volstaat "Reserveren"; de dag staat er al naast. */
+  short?: boolean;
+}) {
+  const { totals } = order;
+  const blocked =
+    order.pending ||
+    totals.count === 0 ||
+    totals.count > limits.maxItems ||
+    totals.weekly > limits.maxWeeklySpecial;
+  const label = order.pending
+    ? nl
+      ? "Bezig..."
+      : "Saving..."
+    : order.editing
+      ? nl
+        ? "Wijziging opslaan"
+        : "Save changes"
+      : short
+        ? nl
+          ? "Reserveren"
+          : "Reserve"
+        : nl
+          ? `Reserveer voor ${session.weekdayLabel}`
+          : `Reserve for ${session.weekdayLabel}`;
   return (
-    <div className="rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/40 p-4">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-sm font-semibold text-vtk-ink">{nl ? "Jouw reservatie" : "Your reservation"}</span>
-        <span className={`vtk-basic-badge ${status.cls}`}>{nl ? status.nl : status.en}</span>
-      </div>
-      <ul className="text-sm text-[#34405e]">
-        {order.lines.map((l, i) => (
-          <li key={i} className="flex justify-between py-0.5">
-            <span>
-              {l.quantity}× {l.name}
-            </span>
-            <span className="tabular-nums">{formatEuro(l.quantity * l.unitPriceCents)}</span>
-          </li>
-        ))}
-      </ul>
-      <div className="mt-2 flex items-center justify-between border-t border-vtk-blue/10 pt-2 text-sm">
-        <span className="font-semibold">{nl ? "Totaal" : "Total"}</span>
-        <span className="font-semibold tabular-nums">{formatEuro(order.totalCents)}</span>
-      </div>
-      {order.canCancel && (
-        <div className="mt-3 text-right">
-          <Button variant="ghost" size="sm" onClick={cancel} disabled={pending}>
-            {pending ? (nl ? "Bezig..." : "Cancelling...") : nl ? "Annuleren" : "Cancel"}
-          </Button>
-        </div>
-      )}
-      {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
+    <button type="button" className={`th-btn th-btn-primary ${className}`} onClick={order.submit} disabled={blocked}>
+      {label}
+    </button>
+  );
+}
+
+function Stepper({
+  nl,
+  item,
+  quantity,
+  atMax,
+  onChange,
+}: {
+  nl: boolean;
+  item: OrderItem;
+  quantity: number;
+  /** Het maximum is bereikt: enkel minder kan nog. */
+  atMax: boolean;
+  onChange: (next: number) => void;
+}) {
+  return (
+    <div className="th-stepper">
+      <button
+        type="button"
+        onClick={() => onChange(quantity - 1)}
+        disabled={quantity <= 0}
+        aria-label={nl ? `Eén ${item.name} minder` : `One ${item.name} less`}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+          <path d="M5 12h14" />
+        </svg>
+      </button>
+      <span className={`th-tn${quantity > 0 ? " is-set" : ""}`}>{quantity}</span>
+      <button
+        type="button"
+        onClick={() => onChange(quantity + 1)}
+        disabled={quantity >= item.remaining || atMax}
+        aria-label={nl ? `Eén ${item.name} meer` : `One more ${item.name}`}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+      </button>
+    </div>
+  );
+}
+
+function StockPill({ nl, remaining }: { nl: boolean; remaining: number }) {
+  if (remaining <= 0) return <span className="th-stock is-out">{nl ? "uitverkocht" : "sold out"}</span>;
+  if (remaining > LOW_STOCK) return null;
+  return <span className="th-stock">{nl ? `nog ${remaining}` : `${remaining} left`}</span>;
+}
+
+function SpecialLabel({ nl }: { nl: boolean }) {
+  return (
+    <span className="th-special">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--yellow)" stroke="var(--coin-rim)" strokeWidth="1.5" strokeLinejoin="round" aria-hidden="true">
+        <path d="M12 3l2.8 5.7 6.2.9-4.5 4.4 1 6.2-5.5-2.9-5.5 2.9 1-6.2L3 9.6l6.2-.9z" />
+      </svg>
+      {nl ? "Broodje van de week" : "Sandwich of the week"}
+    </span>
+  );
+}
+
+function InfoButton({
+  nl,
+  name,
+  open,
+  controls,
+  onToggle,
+}: {
+  nl: boolean;
+  name: string;
+  open: boolean;
+  controls: string;
+  onToggle: () => void;
+}) {
+  return (
+    <button type="button" className="th-info" onClick={onToggle} aria-expanded={open} aria-controls={controls}>
+      <span aria-hidden="true">i</span>
+      <span className="sr-only">{nl ? `Ingrediënten van ${name}` : `Ingredients of ${name}`}</span>
+    </button>
+  );
+}
+
+function DatePin({ dow, day, large = false }: { dow: string; day: string; large?: boolean }) {
+  return (
+    <span className={`th-pin${large ? " is-large" : ""}`} aria-hidden="true">
+      <span className="th-pin-dow">{dow}</span>
+      <span className="th-pin-day th-tn">{day}</span>
+    </span>
+  );
+}
+
+/** De foto van een broodje; zonder foto het gestreepte patroon van de site. */
+function Thumb({ item, className, sizes }: { item: OrderItem; className: string; sizes: string }) {
+  return (
+    <div className={`th-photo ${className}`}>
+      {item.imageUrl && <Image src={item.imageUrl} alt="" fill sizes={sizes} className="object-cover" />}
     </div>
   );
 }

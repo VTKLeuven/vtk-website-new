@@ -86,12 +86,49 @@ export default async function AdminTheokot({ params }: { params: Promise<{ local
   const itemIds = sessions.flatMap((s) => s.items.map((i) => i.id));
   const ordered = await usageForSessionItems(itemIds);
 
-  const dayFmt = (d: Date) => brussels(d, { weekday: "long", day: "numeric", month: "long" });
+  // In de taal van de pagina: dit stond in het Engels ("Monday 28 September")
+  // op een Nederlandstalig scherm.
+  const loc = nl ? "nl-BE" : "en-GB";
+  const fmt = (d: Date, opts: Intl.DateTimeFormatOptions) =>
+    new Intl.DateTimeFormat(loc, { timeZone: "Europe/Brussels", ...opts }).format(d).replace(/\./g, "");
+  const dayFmt = (d: Date) => fmt(d, { weekday: "long", day: "numeric", month: "long" });
+  // Enkel de eerste letter groot: "Ma 28 sep", niet "Ma 28 Sep".
+  const shortDay = (d: Date) => {
+    const text = fmt(d, { weekday: "short", day: "numeric", month: "short" });
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  };
+  const moment = (d: Date) => `${fmt(d, { weekday: "short" })} ${hhmm(d)}`;
+  // De maandag van de week waarin een dag valt, als "YYYY-MM-DD". De dagen
+  // worden per week getoond, want zo worden ze ook aangemaakt.
+  const mondayOf = (d: Date) => {
+    const [y, m, day] = ymd(d).split("-").map(Number);
+    const noon = Date.UTC(y, m - 1, day, 12);
+    const back = (new Date(noon).getUTCDay() + 6) % 7;
+    return new Date(noon - back * 86400000);
+  };
+  const now = new Date();
 
   const adminSessions: AdminSession[] = sessions.map((s) => ({
     id: s.id,
     dateLabel: dayFmt(s.date),
+    shortLabel: shortDay(s.date),
     dateValue: ymd(s.date),
+    weekStart: ymd(mondayOf(s.date)),
+    weekLabel: nl
+      ? `Week van ${fmt(mondayOf(s.date), { day: "numeric", month: "long" })}`
+      : `Week of ${fmt(mondayOf(s.date), { day: "numeric", month: "long" })}`,
+    pickupLabel: `${hhmm(s.pickupStart)}–${hhmm(s.pickupEnd)}`,
+    orderWindowLabel: `${moment(s.orderOpenAt)} – ${moment(s.orderCloseAt)}`,
+    status:
+      s.pickupEnd <= now
+        ? "past"
+        : !s.isOpen
+          ? "off"
+          : now < s.orderOpenAt
+            ? "upcoming"
+            : now < s.orderCloseAt
+              ? "ordering"
+              : "pickup",
     isOpen: s.isOpen,
     pickupStart: hhmm(s.pickupStart),
     pickupEnd: hhmm(s.pickupEnd),

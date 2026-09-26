@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   findUniqueOrder: vi.fn(),
   findUniqueOrderTx: vi.fn(),
   createOrder: vi.fn(),
+  updateOrderTx: vi.fn(),
+  deleteLinesTx: vi.fn(),
   deleteOrder: vi.fn(),
   activeBanFor: vi.fn(),
   getTheokotConfig: vi.fn(),
@@ -48,12 +50,17 @@ vi.mock("@/lib/ticketing/transactions", () => ({
   withSerializableTransaction: (fn: (tx: unknown) => unknown) =>
     fn({
       theokotSession: { findUnique: mocks.findUniqueSession },
-      theokotOrder: { findUnique: mocks.findUniqueOrderTx, create: mocks.createOrder },
+      theokotOrder: {
+        findUnique: mocks.findUniqueOrderTx,
+        create: mocks.createOrder,
+        update: mocks.updateOrderTx,
+      },
+      theokotOrderLine: { deleteMany: mocks.deleteLinesTx },
     }),
 }));
 
-import { cancelOrder, placeOrder, TheokotOrderError } from "@/lib/theokot-orders";
-import { TheokotValidationError } from "@/lib/theokot";
+import { cancelOrder, placeOrder, TheokotOrderError, updateOrder } from "@/lib/theokot-orders";
+import { repriceOrder, TheokotValidationError } from "@/lib/theokot";
 
 const NOW = new Date("2026-09-15T09:00:00.000Z");
 
@@ -264,5 +271,126 @@ describe("annuleren bij het Theokot", () => {
     await expect(cancelOrder("user-1", "order-1", NOW)).rejects.toMatchObject({
       code: "NOT_CANCELABLE",
     });
+  });
+});
+
+describe("een reservatie aanpassen", () => {
+  function reservation(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "order-1",
+      userId: "user-1",
+      sessionId: "sess-1",
+      status: "RESERVED",
+      lines: [{ sessionItemId: "item-1", quantity: 2, unitPriceCents: 260 }],
+      session: { ...openSession(), orderCloseAt: new Date("2026-09-15T10:00:00.000Z") },
+      ...overrides,
+    };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getTheokotConfig.mockResolvedValue(CONFIG);
+    mocks.activeBanFor.mockResolvedValue(null);
+    mocks.usageForSessionItemsTx.mockResolvedValue(new Map());
+    mocks.findUniqueOrderTx.mockResolvedValue(reservation());
+    mocks.updateOrderTx.mockResolvedValue({ id: "order-1", totalCents: 820 });
+  });
+
+  it("vervangt de lijnen, aan de prijs van nu", async () => {
+    await updateOrder(
+      "user-1",
+      "order-1",
+      [
+        { sessionItemId: "item-1", quantity: 2 },
+        { sessionItemId: "item-2", quantity: 1 },
+      ],
+      NOW,
+    );
+
+    expect(mocks.deleteLinesTx).toHaveBeenCalledWith({ where: { orderId: "order-1" } });
+    expect(mocks.updateOrderTx).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          totalCents: 820,
+          lines: {
+            create: [
+              { sessionItemId: "item-1", quantity: 2, unitPriceCents: 260 },
+              { sessionItemId: "item-2", quantity: 1, unitPriceCents: 300 },
+            ],
+          },
+        }),
+      }),
+    );
+  });
+
+  /**
+   * Wie de laatste stukken van een broodje heeft, moet die kunnen houden: de
+   * eigen reservatie telt bij het aanpassen mee als vrij.
+   */
+  it("telt de eigen reservatie mee als vrije voorraad", async () => {
+    // Alle tien van item-1 zijn weg, waarvan twee door deze reservatie zelf.
+    mocks.usageForSessionItemsTx.mockResolvedValue(new Map([["item-1", 10]]));
+
+    await expect(
+      updateOrder("user-1", "order-1", [{ sessionItemId: "item-1", quantity: 2 }], NOW),
+    ).resolves.toEqual({ orderId: "order-1", totalCents: 820 });
+
+    await expect(
+      updateOrder("user-1", "order-1", [{ sessionItemId: "item-1", quantity: 3 }], NOW),
+    ).rejects.toBeInstanceOf(TheokotValidationError);
+  });
+
+  it("houdt zich aan dezelfde limieten als bestellen", async () => {
+    await expect(
+      updateOrder("user-1", "order-1", [{ sessionItemId: "item-1", quantity: 6 }], NOW),
+    ).rejects.toBeInstanceOf(TheokotValidationError);
+    expect(mocks.updateOrderTx).not.toHaveBeenCalled();
+  });
+
+  it("weigert zodra het bestelvenster dicht is", async () => {
+    mocks.findUniqueOrderTx.mockResolvedValue(reservation({ session: openSession() }));
+
+    await expect(
+      updateOrder("user-1", "order-1", [{ sessionItemId: "item-1", quantity: 1 }], NOW),
+    ).rejects.toMatchObject({ code: "ORDER_CLOSED" });
+  });
+
+  it("raakt een opgehaalde bestelling niet aan", async () => {
+    mocks.findUniqueOrderTx.mockResolvedValue(reservation({ status: "PICKED_UP" }));
+
+    await expect(
+      updateOrder("user-1", "order-1", [{ sessionItemId: "item-1", quantity: 1 }], NOW),
+    ).rejects.toMatchObject({ code: "NOT_CANCELABLE" });
+  });
+
+  it("geeft voor de bestelling van een ander hetzelfde antwoord als voor geen", async () => {
+    mocks.findUniqueOrderTx.mockResolvedValue(reservation({ userId: "user-2" }));
+
+    await expect(
+      updateOrder("user-1", "order-1", [{ sessionItemId: "item-1", quantity: 1 }], NOW),
+    ).rejects.toMatchObject({ code: "ORDER_NOT_FOUND" });
+  });
+});
+
+describe("een reservatie aan een nieuwe prijs", () => {
+  it("zet de lijnen op de prijs van nu en rekent het totaal opnieuw", () => {
+    expect(
+      repriceOrder({
+        totalCents: 820,
+        lines: [
+          { id: "l1", quantity: 2, unitPriceCents: 280, currentPriceCents: 300 },
+          { id: "l2", quantity: 1, unitPriceCents: 260, currentPriceCents: 260 },
+        ],
+      }),
+    ).toEqual({ lines: [{ id: "l1", unitPriceCents: 300 }], totalCents: 860 });
+  });
+
+  it("laat een reservatie waarvan niets veranderde met rust", () => {
+    expect(
+      repriceOrder({
+        totalCents: 560,
+        lines: [{ id: "l1", quantity: 2, unitPriceCents: 280, currentPriceCents: 280 }],
+      }),
+    ).toBeNull();
   });
 });

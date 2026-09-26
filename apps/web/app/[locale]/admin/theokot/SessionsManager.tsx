@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "@/components/ui/Link";
-import { useState } from "react";
-import { Card, Input, Label } from "@vtk/ui";
+import { Fragment, useMemo, useState } from "react";
+import { Button, Card, Input, Label } from "@vtk/ui";
+import { IconLink } from "@/components/ui/IconButton";
+import { ListCheckIcon } from "@/components/ui/icons";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import {
@@ -12,13 +14,28 @@ import {
   removeSessionAction,
   updateSessionAction,
   updateSessionItemsAction,
+  updateWeekItemsAction,
 } from "@/app/actions/theokot";
 import { OfferingRows, type OfferingRow } from "./OfferingRows";
+
+/** Waar een verkoopdag staat; de tabel toont het als een woord met een kleur. */
+export type AdminSessionStatus = "upcoming" | "ordering" | "pickup" | "past" | "off";
 
 export type AdminSession = {
   id: string;
   dateLabel: string;
+  /** "ma 28 sep" */
+  shortLabel: string;
   dateValue: string;
+  /** De maandag van de week, "YYYY-MM-DD": de dagen staan per week. */
+  weekStart: string;
+  /** "Week van 28 september" */
+  weekLabel: string;
+  /** "12:00–16:00" */
+  pickupLabel: string;
+  /** "za 12:00 – ma 10:30" */
+  orderWindowLabel: string;
+  status: AdminSessionStatus;
   isOpen: boolean;
   pickupStart: string;
   pickupEnd: string;
@@ -78,133 +95,403 @@ export function SessionsManager({
   defaultProducts: OfferingRow[];
   defaultHours: DefaultHours;
 }) {
+  const base = nl ? "" : "/en";
+  // Eén bewerktaak tegelijk: een nieuwe week, het aanbod van een week, of één
+  // dag. Openen van het ene sluit het andere.
+  const [open, setOpen] = useState<
+    { kind: "create" } | { kind: "week"; weekStart: string } | { kind: "day"; id: string } | null
+  >(null);
+
+  const weeks = useMemo(() => {
+    const groups: Array<{ weekStart: string; label: string; days: AdminSession[] }> = [];
+    for (const session of sessions) {
+      const last = groups.at(-1);
+      if (last && last.weekStart === session.weekStart) last.days.push(session);
+      else groups.push({ weekStart: session.weekStart, label: session.weekLabel, days: [session] });
+    }
+    return groups;
+  }, [sessions]);
+
+  const creating = open?.kind === "create";
+
   return (
-    <div className="space-y-6">
-      <Card className="p-5">
-        <h2 className="mb-1 text-lg font-semibold">{nl ? "Verkoopweek aanmaken" : "Create a sale week"}</h2>
-        <p className="mb-4 text-sm text-[#5c667f]">
-          {nl
-            ? "Uren en aanbod gelden voor de hele week. Pas ze hier aan (bv. een week met een ander aanbod) en maak dan de week aan. Nadien kan je nog per dag bijsturen. Bestaande dagen worden overgeslagen. Elke dag die je hier aanmaakt, krijgt meteen ook zijn Theokot-shiften (smeren, middag, namiddag), gerekend vanaf het afhaaluur van die dag; staan er al Theokot-shiften op een dag, dan blijven die ongemoeid."
-            : "Hours and offering apply to the whole week. Adjust them here (e.g. a week with a different offering), then create the week. You can still tweak individual days afterwards. Existing days are skipped. Every day you create here also gets its Theokot shifts (spreading, midday, afternoon) right away, counted from that day's pickup time; days that already have Theokot shifts are left alone."}
-        </p>
-        <SaveForm
-          action={createWeekSessionsAction}
-          className="space-y-4"
-          submitLabel={nl ? "Week aanmaken" : "Create week"}
-          savingLabel={nl ? "Bezig..." : "Creating..."}
-          savedMessage={nl ? "Verkoopweek aangemaakt" : "Sale week created"}
-          resetOnSuccess={false}
-          errorMessages={
-            nl
-              ? {
-                  INVALID_WEEKSTART: "Kies een geldige maandag voor deze week.",
-                  INVALID_IMAGE: "Eén van de foto's is niet geldig. Laad ze opnieuw op.",
-                  ORDER_WINDOW_EMPTY:
-                    "Niet aangemaakt: met deze uren sluit het bestellen voor het opengaat. Kijk 'Bestellen opent', de besteldeadline en het aantal dagen vooraf na.",
-                  PICKUP_WINDOW_EMPTY:
-                    "Niet aangemaakt: het afhaaluur eindigt voor het begint.",
-                }
-              : {
-                  INVALID_WEEKSTART: "Pick a valid Monday for this week.",
-                  INVALID_IMAGE: "One of the photos is not valid. Upload it again.",
-                  ORDER_WINDOW_EMPTY:
-                    "Not created: with these hours ordering closes before it opens. Check 'Ordering opens', the order deadline and the lead days.",
-                  PICKUP_WINDOW_EMPTY: "Not created: the pickup window ends before it starts.",
-                }
-          }
-          fallbackErrorMessage={nl ? "Week aanmaken mislukt." : "Creating the week failed."}
+    <div className="space-y-5">
+      {/* Wat je hier kan doen, boven de vouw: een nieuwe week openzetten of het
+          standaardaanbod aanpassen. De bestaande dagen staan eronder per week. */}
+      <div className="flex flex-wrap items-center gap-3">
+        <Button type="button" onClick={() => setOpen(creating ? null : { kind: "create" })} aria-expanded={creating}>
+          {nl ? "Nieuwe verkoopweek" : "New sale week"}
+        </Button>
+        <Link
+          href={`${base}/admin/theokot/instellingen#standaardaanbod`}
+          className="rounded-full border border-vtk-blue/15 px-4 py-2 text-sm text-vtk-ink hover:bg-vtk-blue-soft/60"
         >
-          <div className="flex flex-wrap items-end gap-4">
-            <div>
-              <Label>{nl ? "Maandag van de week" : "Monday of the week"}</Label>
-              <Input type="date" name="weekStart" defaultValue={nextMonday} required />
-            </div>
-            <div>
-              <Label>{nl ? "Dagen" : "Days"}</Label>
-              <div className="flex flex-wrap gap-2 pt-1">
-                {DAYS.map((d) => (
-                  <label key={d.v} className="inline-flex items-center gap-1 text-sm">
-                    <input type="checkbox" name="days" value={d.v} defaultChecked={d.v <= 4} />
-                    {nl ? d.nl : d.en}
-                  </label>
-                ))}
-              </div>
-            </div>
-          </div>
+          {nl ? "Standaardaanbod aanpassen" : "Edit default offering"}
+        </Link>
+      </div>
 
-          <div className="grid gap-3 sm:grid-cols-4">
-            <div>
-              <Label>{nl ? "Afhalen vanaf" : "Pickup from"}</Label>
-              <Input type="time" name="pickupStart" defaultValue={defaultHours.pickupStart} />
-            </div>
-            <div>
-              <Label>{nl ? "Afhalen tot" : "Pickup until"}</Label>
-              <Input type="time" name="pickupEnd" defaultValue={defaultHours.pickupEnd} />
-            </div>
-            <div>
-              <Label>{nl ? "Besteldeadline (uur)" : "Order deadline (time)"}</Label>
-              <Input type="time" name="orderCloseTime" defaultValue={defaultHours.orderCloseTime} />
-            </div>
-            <div>
-              <Label>{nl ? "Bestellen opent (uur)" : "Ordering opens (time)"}</Label>
-              <Input type="time" name="orderOpenTime" defaultValue={defaultHours.orderOpenTime} />
-            </div>
-          </div>
+      {creating && (
+        <CreateWeek
+          nl={nl}
+          nextMonday={nextMonday}
+          defaultProducts={defaultProducts}
+          defaultHours={defaultHours}
+          onDone={() => setOpen(null)}
+        />
+      )}
 
-          <details open className="group rounded-xl border border-vtk-blue/10 p-3">
-            <summary className="cursor-pointer text-sm font-medium text-vtk-ink">
-              {nl ? "Aanbod voor deze week" : "Offering for this week"}
-            </summary>
-            <div className="mt-3">
-              <OfferingRows nl={nl} initial={defaultProducts} prefix="item" countField="itemCount" />
-            </div>
-          </details>
-
-        </SaveForm>
-      </Card>
-
-      {sessions.length === 0 && (
+      {weeks.length === 0 && !creating && (
         <div className="vtk-basic-empty">
-          {nl ? "Nog geen verkoopdagen aangemaakt." : "No sale days created yet."}
+          {nl
+            ? "Er staan geen verkoopdagen gepland. Zet er met “Nieuwe verkoopweek” een hele week in één keer online."
+            : "No sale days are planned. Use “New sale week” to put a whole week online at once."}
         </div>
       )}
 
-      {sessions.map((s) => (
-        <SessionEditor key={s.id} nl={nl} session={s} />
+      {weeks.map((week) => (
+        <WeekCard
+          key={week.weekStart}
+          nl={nl}
+          label={week.label}
+          days={week.days}
+          editingWeek={open?.kind === "week" && open.weekStart === week.weekStart}
+          openDayId={open?.kind === "day" ? open.id : null}
+          onToggleWeek={(on) => setOpen(on ? { kind: "week", weekStart: week.weekStart } : null)}
+          onToggleDay={(id) => setOpen(open?.kind === "day" && open.id === id ? null : { kind: "day", id })}
+        />
       ))}
     </div>
   );
 }
 
-function SessionEditor({ nl, session }: { nl: boolean; session: AdminSession }) {
+function CreateWeek({
+  nl,
+  nextMonday,
+  defaultProducts,
+  defaultHours,
+  onDone,
+}: {
+  nl: boolean;
+  nextMonday: string;
+  defaultProducts: OfferingRow[];
+  defaultHours: DefaultHours;
+  onDone: () => void;
+}) {
+  return (
+    <Card className="p-5">
+      <div className="mb-1 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="text-lg font-semibold">{nl ? "Nieuwe verkoopweek" : "New sale week"}</h2>
+        <button type="button" onClick={onDone} className="text-sm text-[#5c667f] underline underline-offset-2 hover:text-vtk-ink">
+          {nl ? "Sluiten" : "Close"}
+        </button>
+      </div>
+      <p className="mb-4 text-sm text-[#5c667f]">
+        {nl
+          ? "Uren en aanbod gelden voor de hele week; nadien kan je per dag of per week bijsturen. Dagen die al bestaan, worden overgeslagen. Elke nieuwe dag krijgt meteen zijn Theokot-shiften (smeren, middag, namiddag)."
+          : "Hours and offering apply to the whole week; you can adjust per day or per week afterwards. Existing days are skipped. Every new day gets its Theokot shifts (spreading, midday, afternoon) right away."}
+      </p>
+      <SaveForm
+        action={createWeekSessionsAction}
+        className="space-y-4"
+        submitLabel={nl ? "Week aanmaken" : "Create week"}
+        savingLabel={nl ? "Bezig..." : "Creating..."}
+        savedMessage={nl ? "Verkoopweek aangemaakt" : "Sale week created"}
+        resetOnSuccess={false}
+        onSuccess={onDone}
+        errorMessages={
+          nl
+            ? {
+                INVALID_WEEKSTART: "Kies een geldige maandag voor deze week.",
+                INVALID_IMAGE: "Eén van de foto's is niet geldig. Laad ze opnieuw op.",
+                ORDER_WINDOW_EMPTY:
+                  "Niet aangemaakt: met deze uren sluit het bestellen voor het opengaat. Kijk 'Bestellen opent', de besteldeadline en het aantal dagen vooraf na.",
+                PICKUP_WINDOW_EMPTY:
+                  "Niet aangemaakt: het afhaaluur eindigt voor het begint.",
+              }
+            : {
+                INVALID_WEEKSTART: "Pick a valid Monday for this week.",
+                INVALID_IMAGE: "One of the photos is not valid. Upload it again.",
+                ORDER_WINDOW_EMPTY:
+                  "Not created: with these hours ordering closes before it opens. Check 'Ordering opens', the order deadline and the lead days.",
+                PICKUP_WINDOW_EMPTY: "Not created: the pickup window ends before it starts.",
+              }
+        }
+        fallbackErrorMessage={nl ? "Week aanmaken mislukt." : "Creating the week failed."}
+      >
+        <div className="flex flex-wrap items-end gap-4">
+          <div>
+            <Label>{nl ? "Maandag van de week" : "Monday of the week"}</Label>
+            <Input type="date" name="weekStart" defaultValue={nextMonday} required />
+          </div>
+          <div>
+            <Label>{nl ? "Dagen" : "Days"}</Label>
+            <div className="flex flex-wrap gap-2 pt-1">
+              {DAYS.map((d) => (
+                <label key={d.v} className="inline-flex items-center gap-1 text-sm">
+                  <input type="checkbox" name="days" value={d.v} defaultChecked={d.v <= 4} />
+                  {nl ? d.nl : d.en}
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-4">
+          <div>
+            <Label>{nl ? "Afhalen vanaf" : "Pickup from"}</Label>
+            <Input type="time" name="pickupStart" defaultValue={defaultHours.pickupStart} />
+          </div>
+          <div>
+            <Label>{nl ? "Afhalen tot" : "Pickup until"}</Label>
+            <Input type="time" name="pickupEnd" defaultValue={defaultHours.pickupEnd} />
+          </div>
+          <div>
+            <Label>{nl ? "Besteldeadline (uur)" : "Order deadline (time)"}</Label>
+            <Input type="time" name="orderCloseTime" defaultValue={defaultHours.orderCloseTime} />
+          </div>
+          <div>
+            <Label>{nl ? "Bestellen opent (uur)" : "Ordering opens (time)"}</Label>
+            <Input type="time" name="orderOpenTime" defaultValue={defaultHours.orderOpenTime} />
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-vtk-blue/10 p-3">
+          <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+            <span className="text-sm font-medium text-vtk-ink">
+              {nl ? "Aanbod voor deze week" : "Offering for this week"}
+            </span>
+            <span className="text-xs text-[#5c667f]">
+              {nl
+                ? "Ingevuld met het standaardaanbod. Wat je hier aanpast, geldt enkel voor deze week."
+                : "Filled in from the default offering. Changes here only apply to this week."}
+            </span>
+          </div>
+          <OfferingRows nl={nl} initial={defaultProducts} prefix="item" countField="itemCount" />
+        </div>
+
+      </SaveForm>
+    </Card>
+  );
+}
+
+const STATUS_STYLE: Record<AdminSessionStatus, { nl: string; en: string; className: string }> = {
+  upcoming: { nl: "Nog niet open", en: "Not open yet", className: "bg-[var(--paper-2)] text-[var(--muted)]" },
+  ordering: { nl: "Bestellen open", en: "Ordering open", className: "bg-[var(--yellow)] text-[var(--ink)]" },
+  pickup: { nl: "Afhalen", en: "Pickup", className: "bg-[var(--ok-bg)] text-[var(--ok-ink)]" },
+  past: { nl: "Voorbij", en: "Past", className: "bg-[var(--paper-2)] text-[var(--muted)]" },
+  off: { nl: "Gaat niet door", en: "Not happening", className: "bg-[var(--danger-bg)] text-[var(--danger-ink)]" },
+};
+
+/**
+ * Eén week: de dagen als compacte rijen, met één knop om het aanbod van de hele
+ * week in één keer aan te passen. Een klik op een rij klapt die dag open.
+ */
+function WeekCard({
+  nl,
+  label,
+  days,
+  editingWeek,
+  openDayId,
+  onToggleWeek,
+  onToggleDay,
+}: {
+  nl: boolean;
+  label: string;
+  days: AdminSession[];
+  editingWeek: boolean;
+  openDayId: string | null;
+  onToggleWeek: (on: boolean) => void;
+  onToggleDay: (id: string) => void;
+}) {
   const base = nl ? "" : "/en";
+  const editable = days.filter((day) => day.status !== "past");
+  const orders = days.reduce((sum, day) => sum + day.orderCount, 0);
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="flex flex-wrap items-center justify-between gap-3 px-5 pt-4 pb-3">
+        <div>
+          <h2 className="text-lg font-semibold">{label}</h2>
+          <p className="text-sm text-[#5c667f]">
+            {days.length} {nl ? (days.length === 1 ? "verkoopdag" : "verkoopdagen") : days.length === 1 ? "sale day" : "sale days"} ·{" "}
+            {orders} {nl ? (orders === 1 ? "bestelling" : "bestellingen") : orders === 1 ? "order" : "orders"}
+          </p>
+        </div>
+        {editable.length > 0 && (
+          <Button
+            type="button"
+            variant={editingWeek ? "primary" : "ghost"}
+            size="sm"
+            onClick={() => onToggleWeek(!editingWeek)}
+            aria-expanded={editingWeek}
+          >
+            {nl ? "Aanbod van de week" : "Offering for the week"}
+          </Button>
+        )}
+      </div>
+
+      {editingWeek && editable.length > 0 && (
+        <WeekOfferingEditor nl={nl} days={editable} onDone={() => onToggleWeek(false)} />
+      )}
+
+      <div className="relative overflow-x-auto border-t border-vtk-blue/10">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-[#5c667f]">
+              <th className="px-5 py-2 font-semibold">{nl ? "Dag" : "Day"}</th>
+              <th className="px-3 py-2 font-semibold">{nl ? "Afhalen" : "Pickup"}</th>
+              <th className="px-3 py-2 font-semibold">{nl ? "Bestellen" : "Ordering"}</th>
+              <th className="px-3 py-2 text-right font-semibold">{nl ? "Bestellingen" : "Orders"}</th>
+              <th className="px-3 py-2 font-semibold">{nl ? "Status" : "Status"}</th>
+              <th className="px-5 py-2">
+                <span className="sr-only">{nl ? "Acties" : "Actions"}</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {days.map((day) => {
+              const isOpen = openDayId === day.id;
+              const status = STATUS_STYLE[day.status];
+              return (
+                <Fragment key={day.id}>
+                  <tr
+                    className={`cursor-pointer border-t border-vtk-blue/10 hover:bg-vtk-blue-soft/40 ${isOpen ? "bg-vtk-blue-soft/50" : ""}`}
+                    onClick={() => onToggleDay(day.id)}
+                  >
+                    <td className="px-5 py-3">
+                      {/* De rij zelf is klikbaar; deze knop is er voor het
+                          toetsenbord en de screenreader. */}
+                      <button
+                        type="button"
+                        className="font-medium text-vtk-ink"
+                        aria-expanded={isOpen}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onToggleDay(day.id);
+                        }}
+                      >
+                        {day.shortLabel}
+                      </button>
+                    </td>
+                    <td className="px-3 py-3 tabular-nums text-[#34405e]">{day.pickupLabel}</td>
+                    <td className="px-3 py-3 tabular-nums text-[#5c667f]">{day.orderWindowLabel}</td>
+                    <td className="px-3 py-3 text-right tabular-nums">{day.orderCount}</td>
+                    <td className="px-3 py-3">
+                      <span className={`inline-block rounded-full px-2.5 py-0.5 text-xs font-semibold ${status.className}`}>
+                        {nl ? status.nl : status.en}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3" onClick={(event) => event.stopPropagation()}>
+                      <div className="flex items-center justify-end gap-2">
+                        <IconLink
+                          href={`${base}/admin/theokot/turflijst?date=${day.dateValue}`}
+                          label={nl ? "Lijst bestelde broodjes" : "Ordered sandwiches list"}
+                          srLabel={nl ? `Lijst bestelde broodjes: ${day.dateLabel}` : `Ordered sandwiches list: ${day.dateLabel}`}
+                        >
+                          <ListCheckIcon />
+                        </IconLink>
+                      </div>
+                    </td>
+                  </tr>
+                  {isOpen && (
+                    <tr>
+                      <td colSpan={6} className="border-t border-vtk-blue/10 bg-vtk-blue-soft/20 px-5 py-4">
+                        <SessionEditor nl={nl} session={day} />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
+/**
+ * Het aanbod van een hele week in één keer: de editor toont het aanbod van de
+ * eerste dag die nog komt, en wat je opslaat, komt op elke aangevinkte dag.
+ */
+function WeekOfferingEditor({
+  nl,
+  days,
+  onDone,
+}: {
+  nl: boolean;
+  days: AdminSession[];
+  onDone: () => void;
+}) {
+  const template = days[0]!;
+  // Wat er op de voorbeelddag al besteld is, zegt niets over de andere dagen;
+  // de melding "x besteld" per rij zou hier misleiden.
+  const initial = useMemo(
+    () => template.items.map((item) => ({ ...item, ordered: 0 })),
+    [template.items],
+  );
+  return (
+    <div className="border-t border-vtk-blue/10 bg-vtk-blue-soft/20 px-5 py-4">
+      <p className="mb-3 text-sm text-[#34405e]">
+        {nl
+          ? `Dit is het aanbod van ${template.dateLabel}. Wat je opslaat, komt op elke aangevinkte dag, ook als die dag een eigen afwijking had. Een broodje dat al besteld is, blijft staan; openstaande reservaties krijgen de nieuwe prijs.`
+          : `This is the offering of ${template.dateLabel}. What you save goes onto every ticked day, even if that day had its own changes. A sandwich that has orders stays; open reservations get the new price.`}
+      </p>
+      <SaveForm
+        action={updateWeekItemsAction}
+        className="space-y-4"
+        submitLabel={nl ? "Aanbod op deze dagen zetten" : "Apply offering to these days"}
+        savingLabel={nl ? "Bezig..." : "Saving..."}
+        savedMessage={nl ? "Aanbod van de week opgeslagen" : "Week offering saved"}
+        resetOnSuccess={false}
+        onSuccess={onDone}
+        errorMessages={
+          nl
+            ? {
+                NO_DAYS_SELECTED: "Niet opgeslagen: vink minstens één dag aan die nog moet komen.",
+                SESSION_NOT_FOUND: "Deze verkoopdag bestaat niet meer. Herlaad de pagina.",
+                ITEM_NOT_IN_SESSION: "Niet opgeslagen: het aanbod is intussen veranderd. Herlaad de pagina.",
+                INVALID_IMAGE: "Eén van de foto's is niet geldig. Laad ze opnieuw op.",
+              }
+            : {
+                NO_DAYS_SELECTED: "Not saved: tick at least one upcoming day.",
+                SESSION_NOT_FOUND: "This sale day no longer exists. Reload the page.",
+                ITEM_NOT_IN_SESSION: "Not saved: the offering changed meanwhile. Reload the page.",
+                INVALID_IMAGE: "One of the photos is not valid. Upload it again.",
+              }
+        }
+        fallbackErrorMessage={nl ? "Opslaan van het aanbod mislukt." : "Saving the offering failed."}
+      >
+        <input type="hidden" name="templateSessionId" value={template.id} />
+        <fieldset>
+          <legend className="text-xs font-semibold uppercase tracking-wide text-[#5c667f]">
+            {nl ? "Toepassen op" : "Apply to"}
+          </legend>
+          <div className="mt-1.5 flex flex-wrap gap-2">
+            {days.map((day) => (
+              <label
+                key={day.id}
+                className="inline-flex items-center gap-2 rounded-full border border-vtk-blue/15 bg-white px-3 py-1.5 text-sm"
+              >
+                <input type="checkbox" name="applyTo" value={day.id} defaultChecked />
+                {day.shortLabel}
+              </label>
+            ))}
+          </div>
+        </fieldset>
+        <OfferingRows nl={nl} initial={initial} prefix="item" countField="itemCount" />
+      </SaveForm>
+    </div>
+  );
+}
+
+function SessionEditor({ nl, session }: { nl: boolean; session: AdminSession }) {
   // Hoeveel gereserveerde broodjes er sneuvelen als het aanbod zo opgeslagen
   // wordt. De aanbodtabel rekent het uit; hier hangt de bevestiging eraan.
   const [shortfall, setShortfall] = useState(0);
+  // Staat open onder zijn rij in de weektabel; de datum, de uren en het aantal
+  // bestellingen staan al in die rij, dus hier enkel wat je ermee kan doen.
   return (
-    <Card className="p-5">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="text-lg font-semibold capitalize">
-          {session.dateLabel}
-          {!session.isOpen && (
-            <span className="ml-2 align-middle text-xs font-normal text-red-600">
-              {nl ? "gesloten" : "closed"}
-            </span>
-          )}
-        </h3>
-        <div className="flex items-center gap-3 text-sm text-[#5c667f]">
-          <span>
-            {session.orderCount} {nl ? "bestellingen" : "orders"}
-          </span>
-          <Link
-            href={`${base}/admin/theokot/turflijst?date=${session.dateValue}`}
-            className="rounded-full border border-vtk-blue/15 px-3 py-1 text-vtk-ink hover:bg-vtk-blue-soft/60"
-          >
-            {nl ? "Lijst bestelde broodjes" : "Ordered sandwiches list"}
-          </Link>
-        </div>
-      </div>
-
+    <div className="space-y-1">
       {/* Twee handelingen die op elkaar lijken en het niet zijn: sluiten rondt de
           verkoop af (wat niet opgehaald is, telt als niet opgehaald), verwijderen
           is voor de dag die niet doorgaat. */}
@@ -438,6 +725,6 @@ function SessionEditor({ nl, session }: { nl: boolean; session: AdminSession }) 
           </ul>
         </details>
       )}
-    </Card>
+    </div>
   );
 }
