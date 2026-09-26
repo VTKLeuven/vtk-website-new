@@ -17,7 +17,7 @@ import { addDays } from "date-fns";
 import { getDictionary } from "@vtk/i18n";
 import { PocBand, type PocBandGroup } from "./PocBand";
 import { NewsBand } from "./NewsBand";
-import { getCachedNews } from "@/lib/news/load";
+import { getCachedNews, getPresaleNews } from "@/lib/news/load";
 import { HomeHeroPhoto } from "./HomeHeroPhoto";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
 import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
@@ -185,6 +185,16 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
       return { enabled: false, count: 0, entries: [] };
     }),
   ]);
+
+  // Een voorverkoop staat enkel in het nieuws van wie erin mag, en hangt dus aan
+  // de sessie; daarom los van het gedeelde nieuws. Zie `getPresaleNews`.
+  const presaleNews = news.enabled
+    ? await getPresaleNews(locale, session, now).catch((error) => {
+        console.error("Voorverkoop in het nieuws lezen mislukt", error);
+        return [];
+      })
+    : [];
+  const newsEntries = presaleNews.length > 0 ? [...news.entries, ...presaleNews] : news.entries;
 
   // Aftermovies: `media.aftermovies` is dezelfde instelling als op /media, te
   // beheren via /admin/home. Enkel echte embeds tonen; een losse mp4 of een
@@ -550,7 +560,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           helemaal wegvalt zonder berichten of wanneer ze uitstaat in
           /admin/nieuws. Zie lib/news. */}
       {news.enabled ? (
-        <NewsBand entries={news.entries} count={news.count} locale={locale} base={base} now={now} />
+        <NewsBand entries={newsEntries} count={news.count} locale={locale} base={base} now={now} />
       ) : null}
 
       {(theokot || cursusEntries || cursusUnavailable) && (
@@ -683,66 +693,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           </div>
         </section>
       )}
-
-      <section className="section">
-        <div className="sec-head">
-          <h2>{nl ? "Wat we doen." : "What we do."}</h2>
-          <div className="meta">
-            <Link href={`${base}/info`}>{nl ? "bekijk alles" : "see all"}</Link>
-          </div>
-        </div>
-        <div className="aanbod">
-          {aanbodCards.slice(0, 6).map((card) => {
-            const photo = card.photo;
-            const label = pick(card.labelNl, card.labelEn, locale);
-            const cardTitle = pick(card.titleNl, card.titleEn, locale);
-            // Alle aanbod-kaarten zijn identiek: dezelfde fotokop in 16:9 en
-            // dezelfde witte body als een eventkaart. Geen enkele kaart krijgt
-            // een aparte featured-stijl.
-            return (
-              <Link
-                key={card.href}
-                href={card.href}
-                className="acard"
-                {...umamiEvent(HOME_LINK_EVENT, { soort: "aanbodkaart", naar: card.href })}
-              >
-                <span
-                  className={`acard-media${photo ? "" : " acard-media-ph"}`}
-                  aria-hidden="true"
-                >
-                  {photo ? (
-                    <Image
-                      src={photo}
-                      alt=""
-                      fill
-                      sizes="(max-width: 620px) 100vw, (max-width: 1000px) 50vw, 380px"
-                    />
-                  ) : null}
-                </span>
-                <div className="acard-body">
-                  {/* Bij een headertab is het label de titel; dan stond hier
-                      hetzelfde woord twee keer onder elkaar. */}
-                  {label && label !== cardTitle ? <div className="tag">{label}</div> : null}
-                  <div className="acard-head">
-                    <h3>{cardTitle}</h3>
-                    <span className="cta">{nl ? "Ontdek" : "Explore"}</span>
-                  </div>
-                  <p>{pick(card.bodyNl, card.bodyEn, locale)}</p>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      <PocBand
-        locale={locale}
-        base={base}
-        now={now}
-        setting={pocSetting}
-        groups={pocGroups}
-        myProgrammes={myProgrammeNames}
-      />
 
       {eventCards.length > 0 && (
         <section className="section band events-band">
@@ -887,6 +837,66 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           </div>
         </section>
       )}
+
+      <PocBand
+        locale={locale}
+        base={base}
+        now={now}
+        setting={pocSetting}
+        groups={pocGroups}
+        myProgrammes={myProgrammeNames}
+      />
+
+      <section className="section">
+        <div className="sec-head">
+          <h2>{nl ? "Wat we doen." : "What we do."}</h2>
+          <div className="meta">
+            <Link href={`${base}/info`}>{nl ? "bekijk alles" : "see all"}</Link>
+          </div>
+        </div>
+        <div className="aanbod">
+          {aanbodCards.slice(0, 6).map((card) => {
+            const photo = card.photo;
+            const label = pick(card.labelNl, card.labelEn, locale);
+            const cardTitle = pick(card.titleNl, card.titleEn, locale);
+            // Alle aanbod-kaarten zijn identiek: dezelfde fotokop in 16:9 en
+            // dezelfde witte body als een eventkaart. Geen enkele kaart krijgt
+            // een aparte featured-stijl.
+            return (
+              <Link
+                key={card.href}
+                href={card.href}
+                className="acard"
+                {...umamiEvent(HOME_LINK_EVENT, { soort: "aanbodkaart", naar: card.href })}
+              >
+                <span
+                  className={`acard-media${photo ? "" : " acard-media-ph"}`}
+                  aria-hidden="true"
+                >
+                  {photo ? (
+                    <Image
+                      src={photo}
+                      alt=""
+                      fill
+                      sizes="(max-width: 620px) 100vw, (max-width: 1000px) 50vw, 380px"
+                    />
+                  ) : null}
+                </span>
+                <div className="acard-body">
+                  {/* Bij een headertab is het label de titel; dan stond hier
+                      hetzelfde woord twee keer onder elkaar. */}
+                  {label && label !== cardTitle ? <div className="tag">{label}</div> : null}
+                  <div className="acard-head">
+                    <h3>{cardTitle}</h3>
+                    <span className="cta">{nl ? "Ontdek" : "Explore"}</span>
+                  </div>
+                  <p>{pick(card.bodyNl, card.bodyEn, locale)}</p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
       {aftermovies.length > 0 && (
         <section className="section band aftermovie-band">

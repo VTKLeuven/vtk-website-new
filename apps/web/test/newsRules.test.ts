@@ -8,6 +8,8 @@ import {
   signupInNews,
   ticketInNews,
   ticketNewsDate,
+  ticketPresaleInNews,
+  ticketPresaleNewsDate,
   type NewsComposable,
 } from "@/lib/news/rules";
 import { defaultNewsSetting, readNewsFeatured, readNewsSetting } from "@/lib/news/setting";
@@ -53,6 +55,43 @@ describe("ticketverkoop", () => {
     expect(ticketInNews({ ...base, salesEndAt: at("2026-09-25T12:00:00+02:00") }, now)).toBe(false);
     expect(ticketInNews({ ...base, startsAt: at("2026-09-25T21:00:00+02:00") }, now)).toBe(false);
     expect(ticketInNews({ ...base, status: "DRAFT" }, now)).toBe(false);
+  });
+});
+
+describe("voorverkoop", () => {
+  // Publieke verkoop maandag 28 september om 12u, voorverkoop drie dagen eerder.
+  const presale = {
+    status: "PUBLISHED",
+    startsAt: at("2026-11-27T21:00:00+01:00"),
+    salesStartAt: at("2026-09-28T12:00:00+02:00"),
+    salesEndAt: null,
+    publishedAt: at("2026-09-20T12:00:00+02:00"),
+    presaleLeadMinutes: 3 * 24 * 60,
+  };
+
+  it("staat erin zolang de voorverkoop loopt", () => {
+    expect(ticketPresaleInNews(presale, now)).toBe(true);
+    expect(ticketPresaleNewsDate(presale)).toEqual(at("2026-09-25T12:00:00+02:00"));
+  });
+
+  it("valt nog niet voor de voorverkoop begint", () => {
+    expect(ticketPresaleInNews({ ...presale, presaleLeadMinutes: 60 }, now)).toBe(false);
+  });
+
+  it("maakt plaats voor het gewone bericht zodra de publieke verkoop start", () => {
+    const later = at("2026-09-28T13:00:00+02:00");
+    expect(ticketPresaleInNews(presale, later)).toBe(false);
+    expect(ticketInNews(presale, later)).toBe(true);
+  });
+
+  it("staat nooit in het gedeelde nieuws tijdens de voorverkoop", () => {
+    expect(ticketInNews(presale, now)).toBe(false);
+  });
+
+  it("vraagt een echte voorverkoop", () => {
+    expect(ticketPresaleInNews({ ...presale, presaleLeadMinutes: null }, now)).toBe(false);
+    expect(ticketPresaleInNews({ ...presale, status: "DRAFT" }, now)).toBe(false);
+    expect(ticketPresaleInNews({ ...presale, publishedAt: null }, now)).toBe(false);
   });
 });
 

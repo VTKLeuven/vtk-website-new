@@ -213,20 +213,6 @@
   color: rgba(250, 250, 247, 0.74);
 }
 
-.vtk-design .home-hero .hero-meta {
-  border-top-color: rgba(250, 250, 247, 0.2);
-}
-
-.vtk-design .home-hero .hero-meta .k {
-  color: rgba(250, 250, 247, 0.62);
-}
-
-/* Enkel in de hero kleiner; `.meta .v` is een gedeelde klasse. */
-.vtk-design .home-hero .hero-meta .v {
-  color: var(--paper);
-  font-size: 20px;
-}
-
 .vtk-design .home-hero .btn-primary {
   background: var(--paper);
   border-color: var(--paper);
@@ -269,15 +255,6 @@
   gap: 10px;
   flex-wrap: wrap;
   margin-top: 26px;
-}
-
-.vtk-design .hero-meta {
-  margin-top: 44px;
-  padding-top: 20px;
-  border-top: 1px solid var(--line);
-  display: flex;
-  gap: clamp(24px, 4vw, 48px);
-  flex-wrap: wrap;
 }
 
 .vtk-design .meta .k,
@@ -444,12 +421,6 @@
   text-decoration: underline;
   text-underline-offset: 3px;
   text-decoration-color: rgba(255, 255, 255, 0.5);
-}
-
-/* De feitenlijn sluit de voet af; boven de shiften staat geen tweede lijn, want
-   de kop van het blok markeert die grens al. */
-.vtk-design .hero-shifts + .hero-meta {
-  margin-top: 24px;
 }
 
 /*
@@ -1086,8 +1057,10 @@
    banden na elkaar mogen die marge niet houden: een paper-gat tussen navy en
    lichtblauw leest als een fout. Volgt een band direct op een andere band, dan
    raken ze elkaar met een strakke naad (margin-top 0). De marge blijft enkel
-   wanneer een band op paper volgt. */
-.vtk-design .band + .band {
+   wanneer een band op paper volgt. De navy openingsuren tellen hier ook als
+   band: sinds de evenementen boven "Wat we doen" staan, volgen die er direct op. */
+.vtk-design .band + .band,
+.vtk-design .hours-strip + .band {
   margin-top: 0;
 }
 
@@ -1708,7 +1681,7 @@
   background: var(--paper-2);
 }
 
-/* POC-band: navy band met technisch patroon, direct onder "Wat we doen". */
+/* POC-band: navy band met technisch patroon, tussen de evenementen en "Wat we doen". */
 .vtk-design .poc-band {
   position: relative;
   z-index: 0;
@@ -1991,7 +1964,9 @@
   margin: 0;
   padding: 0;
   list-style: none;
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  /* Geen rand: de gekleurde balk bovenaan elke stap ís de bovenrand. Een
+     haarlijn eromheen kwam er als een pixel boven het geel en grijs uit. Op de
+     navy band heeft een witte kaart ook geen rand nodig om los te staan. */
   border-radius: 18px;
   background: var(--surface);
   overflow: clip;
@@ -2010,11 +1985,14 @@
   border-left: 0;
 }
 
+/* De balk loopt over de scheidingslijn links van de stap heen (`left: -1px`),
+   anders snijdt die lijn als een grijs streepje door het geel. */
 .vtk-design .poc-elect-step::before {
   content: "";
   position: absolute;
-  inset: 0 auto auto 0;
-  width: 100%;
+  top: 0;
+  left: -1px;
+  width: calc(100% + 1px);
   height: 4px;
   background: var(--line-2);
 }
@@ -2586,6 +2564,15 @@
   }
   .vtk-design .poc-elect-step:first-child {
     border-top: 0;
+  }
+  /* Onder elkaar ligt de scheidingslijn boven de stap; de balk dekt ze af. */
+  .vtk-design .poc-elect-step::before {
+    top: -1px;
+    left: 0;
+    width: 100%;
+  }
+  .vtk-design .poc-elect-step:first-child::before {
+    top: 0;
   }
 }
 

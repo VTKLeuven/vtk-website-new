@@ -82,22 +82,18 @@ describe("heroShifts", () => {
       );
     });
 
-    it("laat een rij vallen zodra de titel groeit", () => {
-      const short = heroShiftRowCount([slogan("Kort en krachtig.")], "s");
-      const tall = heroShiftRowCount([slogan("Kort en krachtig.")], "l");
-      expect(tall).toBeLessThan(short);
+    it("toont er drie onder een titel van drie regels op de grootste trap", () => {
+      expect(heroShiftRowCount([slogan("Kort.\nKort.\nKort.")], "l")).toBe(HERO_SHIFT_MAX_ROWS);
     });
 
-    it("laat er nog een vallen bij elke regel erbij", () => {
-      const one = heroShiftRowCount([slogan("Kort.")], "l");
-      const two = heroShiftRowCount([slogan("Kort.\nKort.")], "l");
+    it("laat een rij vallen zodra de titel groeit", () => {
       const three = heroShiftRowCount([slogan("Kort.\nKort.\nKort.")], "l");
-      expect(one).toBeGreaterThanOrEqual(two);
-      expect(two).toBeGreaterThan(three);
+      const four = heroShiftRowCount([slogan("Kort.\nKort.\nKort.\nKort.")], "l");
+      expect(four).toBeLessThan(three);
     });
 
     it("valt terug op geen enkel blok wanneer de titel de kolom vult", () => {
-      expect(heroShiftRowCount([slogan("Kort.\nKort.\nKort.\nKort.")], "l")).toBe(0);
+      expect(heroShiftRowCount([slogan("Kort.\nKort.\nKort.\nKort.\nKort.")], "l")).toBe(0);
     });
 
     it("toont er nooit meer dan het maximum, hoe kort de titel ook is", () => {

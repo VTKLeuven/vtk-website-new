@@ -23,6 +23,8 @@
  *   en wordt dus niet tussen de korte regels van het register gedrukt.
  */
 
+import { presaleStart, type PresaleConfig } from "@/lib/ticketing/presale";
+
 /** Waar een bericht vandaan komt. Ook de sleutel van `NewsHidden.source`. */
 export type NewsSource =
   | "notice"
@@ -79,8 +81,9 @@ function within(date: Date, now: Date, days: number): boolean {
 /**
  * Wanneer een ticketverkoop nieuws werd: bij de publieke start van de verkoop,
  * of bij het publiceren wanneer dat later kwam (een event dat gepubliceerd wordt
- * terwijl de verkoop al "open" stond, is pas dan te zien). Een voorverkoop voor
- * posten telt niet: dat is geen nieuws voor wie er niet in mag.
+ * terwijl de verkoop al "open" stond, is pas dan te zien). Een voorverkoop telt
+ * hier niet: dat is geen nieuws voor wie er niet in mag. Wie er wel in mag,
+ * krijgt een eigen bericht; zie {@link ticketPresaleInNews}.
  */
 export function ticketNewsDate(event: {
   salesStartAt: Date | null;
@@ -106,6 +109,47 @@ export function ticketInNews(
   if (event.startsAt <= now) return false;
   if (event.salesEndAt && event.salesEndAt <= now) return false;
   const date = ticketNewsDate(event);
+  return date !== null && within(date, now, TICKETS_NEWS_DAYS);
+}
+
+/**
+ * Wanneer een voorverkoop nieuws werd, voor wie erin mag: bij haar start, of bij
+ * het publiceren wanneer dat later kwam. `null` zonder voorverkoop.
+ */
+export function ticketPresaleNewsDate(
+  event: PresaleConfig & { salesStartAt: Date | null; publishedAt: Date | null },
+): Date | null {
+  if (!event.publishedAt) return null;
+  const start = presaleStart(event);
+  if (!start) return null;
+  return start > event.publishedAt ? start : event.publishedAt;
+}
+
+/**
+ * Loopt de voorverkoop van deze ticketverkoop nu, zodat ze in het nieuws kan
+ * staan van wie erin mag? Of de bezoeker erin mag, beslist `inPresaleAudience`;
+ * dat hangt aan een sessie en hoort dus niet in het gedeelde nieuws.
+ *
+ * Enkel tot de publieke start. Vanaf dan neemt het gewone bericht
+ * (`ticketInNews`) het over, met dezelfde sleutel: het bericht blijft voor wie
+ * het al zag dus hetzelfde bericht, en een redacteur die het verborg of
+ * uitlichtte, raakt beide.
+ */
+export function ticketPresaleInNews(
+  event: PresaleConfig & {
+    status: string;
+    startsAt: Date;
+    salesStartAt: Date | null;
+    salesEndAt: Date | null;
+    publishedAt: Date | null;
+  },
+  now: Date,
+): boolean {
+  if (event.status !== "PUBLISHED") return false;
+  if (event.startsAt <= now) return false;
+  if (event.salesEndAt && event.salesEndAt <= now) return false;
+  if (!event.salesStartAt || event.salesStartAt <= now) return false;
+  const date = ticketPresaleNewsDate(event);
   return date !== null && within(date, now, TICKETS_NEWS_DAYS);
 }
 

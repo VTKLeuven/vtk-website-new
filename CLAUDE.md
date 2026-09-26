@@ -283,8 +283,9 @@ the design language into the application instead of copying mockup content.
   dissolves outward, because the photo is at its lightest exactly there. Do not
   put a card back around it, and see `docs/design-decisions.md` for the rules
   behind the days it shows. The foot of the text column carries the shifts that
-  still have room (`.hero-shifts`) and, below them, the facts line; both hang on
-  the bottom so the column ends on the agenda's last line. That block is the one
+  still have room (`.hero-shifts`), up to three; it hangs on the bottom so the
+  column ends on the agenda's last line. The facts line that sat below it
+  (working year, coming up, since) was removed to make room for those shifts. That block is the one
   place on the homepage for live state, never for another destination: the
   quick-links row below already says where you can go. **How many rows it shows
   is computed from how tall the title turns out** (`lib/frontpage/heroShifts.ts`),
@@ -304,9 +305,11 @@ the design language into the application instead of copying mockup content.
   navy bands and the site-wide dark footer closes the bookend. Header, bands and
   footer share the same `--navy` so the dark chrome reads as one system. The
   lower half of the page alternates navy and light-blue (`--paper-2`) bands:
-  **Wat we doen** (paper) → **Aftermovies** (navy) → **Opkomende evenementen**
-  (`--paper-2`) → **VTK Career** (navy) → **Jouw POC's** (`--paper-2`) →
-  **Hoofdpartners** (paper). The navy bands (openingsuren, aftermovies, career)
+  **Openingsuren** (navy) → **Aankomende evenementen** (`--paper-2`) → **POC's**
+  (navy, when shown) → **Wat we doen** (paper) → **Aftermovies** (navy) →
+  **Shiften** (`--paper-2`, when shown) → **VTK Career** (navy) →
+  **Hoofdpartners** (paper). The events come before "Wat we doen" on purpose:
+  what is coming up this week matters more than the standing offer. The navy bands (openingsuren, aftermovies, career)
   carry the full-bleed `::before` navy fill plus the shared `::after` technical
   pattern, each with its own crop of `technisch-pattern.svg` so no two bands show
   the same wallpaper. The openingsuren band follows the Nieuws band (or the
@@ -314,15 +317,15 @@ the design language into the application instead of copying mockup content.
   (aftermovies, evenementen, career, POC's) share a `band` class: each carries a
   top margin to separate from the paper section above it, but two consecutive
   bands butt directly against each other with a crisp navy/light-blue seam
-  (`.band + .band { margin-top: 0 }`) rather than a paper gap; the light-blue
+  (`.band + .band, .hours-strip + .band { margin-top: 0 }`) rather than a paper gap; the light-blue
   bands also keep tighter internal padding than the navy ones. On a navy band,
   panels are dark glass
   (`rgba(255,255,255,.06)` fill, `.14` white border), headings go `--paper`,
   muted text uses `--on-dark-muted`, and the primary button inverts like on the
-  hero. The **Jouw POC's** band is personal (only rendered for a logged-in member
-  with study programmes) and therefore sits _after_ Career, never between two
-  navy bands: were it between them, the two navy bands would collide the moment it
-  disappears. See `docs/design-decisions.md` for the section ordering rationale.
+  hero. The **POC's** band can disappear (hidden in /admin/pocs, or no
+  representatives for this visitor), so it never sits between two navy bands:
+  were it there, those two would collide the moment it disappears. See
+  `docs/design-decisions.md` for the section ordering rationale.
 - News (`components/editorial/NewsBand.tsx`, `lib/news`): one featured card on
   the left and a hairline register on the right, on `--paper-2`. The kind of a
   post is its colour (from the ticket palette, mapped once in `vtk-news.css`)

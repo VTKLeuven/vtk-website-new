@@ -7,6 +7,9 @@ import { markdownToPlainText } from "@/lib/markdown";
 import { getMediaContent } from "@/lib/media-content";
 import { listImmichGalleryAlbums } from "@/lib/immich-gallery";
 import { SITE_CONTENT_TAG } from "@/lib/cachedContent";
+import type { SessionPayload } from "@vtk/auth";
+import { inPresaleAudience } from "@/lib/ticketing/presale";
+import { presaleViewerFor } from "@/lib/ticketing/presaleViewer";
 import {
   albumInNews,
   albumNewsDate,
@@ -16,6 +19,8 @@ import {
   signupNewsDate,
   ticketInNews,
   ticketNewsDate,
+  ticketPresaleInNews,
+  ticketPresaleNewsDate,
   type NewsComposable,
   type NewsSource,
 } from "./rules";
@@ -79,6 +84,62 @@ function isoDate(value: string): string {
   return date.toISOString();
 }
 
+const TICKET_NEWS_SELECT = {
+  id: true,
+  slug: true,
+  titleNl: true,
+  titleEn: true,
+  location: true,
+  status: true,
+  startsAt: true,
+  salesStartAt: true,
+  salesEndAt: true,
+  publishedAt: true,
+  calendarEvent: { select: { imageKey: true } },
+} as const;
+
+type TicketNewsEvent = {
+  id: string;
+  slug: string;
+  titleNl: string;
+  titleEn: string | null;
+  location: string | null;
+  startsAt: Date;
+  calendarEvent: { imageKey: string | null } | null;
+};
+
+/**
+ * Het bericht van een ticketverkoop, publiek of in voorverkoop. Beide dragen
+ * dezelfde sleutel (`tickets:<id>`), zodat verbergen en uitlichten in
+ * /admin/nieuws voor allebei geldt.
+ */
+function ticketEntry(event: TicketNewsEvent, date: Date, locale: Locale, presale: boolean): NewsEntry {
+  const nl = locale === "nl";
+  const day = newsDay(event.startsAt, locale);
+  const where = event.location ? `, ${event.location}` : "";
+  return {
+    key: `tickets:${event.id}`,
+    source: "tickets",
+    ref: event.id,
+    date: date.toISOString(),
+    featured: false,
+    title: pick(event.titleNl, event.titleEn, locale),
+    line: presale
+      ? nl
+        ? `Voorverkoop voor ${day}${where}, jij kan al bestellen`
+        : `Presale for ${day}${where}, you can already order`
+      : nl
+        ? `Tickets te koop voor ${day}${where}`
+        : `Tickets on sale for ${day}${where}`,
+    body: null,
+    href: `/tickets/${event.slug}`,
+    ctaLabel: nl ? "Tickets kopen" : "Buy tickets",
+    ctaHref: null,
+    imageUrl: publicUrl(event.calendarEvent?.imageKey),
+    author: null,
+  };
+}
+
 /**
  * Alle berichten die nu in het nieuws kunnen staan, met of ze uit het nieuws
  * gehaald zijn. Ongecachet: het beheer hoort te tonen wat er nét veranderde.
@@ -110,19 +171,7 @@ export async function collectNews(
             publishedAt: { not: null },
             OR: [{ salesEndAt: null }, { salesEndAt: { gt: now } }],
           },
-          select: {
-            id: true,
-            slug: true,
-            titleNl: true,
-            titleEn: true,
-            location: true,
-            status: true,
-            startsAt: true,
-            salesStartAt: true,
-            salesEndAt: true,
-            publishedAt: true,
-            calendarEvent: { select: { imageKey: true } },
-          },
+          select: TICKET_NEWS_SELECT,
         })
       : Promise.resolve([]),
     sources.signup
@@ -195,25 +244,7 @@ export async function collectNews(
 
   for (const event of tickets) {
     if (!ticketInNews(event, now)) continue;
-    const date = ticketNewsDate(event)!;
-    const day = newsDay(event.startsAt, locale);
-    entries.push({
-      key: `tickets:${event.id}`,
-      source: "tickets",
-      ref: event.id,
-      date: date.toISOString(),
-      featured: false,
-      title: pick(event.titleNl, event.titleEn, locale),
-      line: nl
-        ? `Tickets te koop voor ${day}${event.location ? `, ${event.location}` : ""}`
-        : `Tickets on sale for ${day}${event.location ? `, ${event.location}` : ""}`,
-      body: null,
-      href: `/tickets/${event.slug}`,
-      ctaLabel: nl ? "Tickets kopen" : "Buy tickets",
-      ctaHref: null,
-      imageUrl: publicUrl(event.calendarEvent?.imageKey),
-      author: null,
-    });
+    entries.push(ticketEntry(event, ticketNewsDate(event)!, locale, false));
   }
 
   for (const event of signups) {
@@ -329,4 +360,71 @@ const cachedNews = unstable_cache(
 
 export function getCachedNews(locale: Locale) {
   return cachedNews(locale);
+}
+
+/**
+ * De ticketverkopen die nu in voorverkoop staan, enkel voor wie erin mag.
+ *
+ * Bewust naast het gedeelde nieuws en niet erin: wie in de voorverkoop zit,
+ * hangt aan de sessie (post, shiften) of aan het cookie van de private link, en
+ * `cachedNews` is voor iedereen hetzelfde. Een voorverkoop die in dat gedeelde
+ * nieuws stond, zou dus ook bij wie niet mag kopen verschijnen, met een knop naar
+ * een shop die "Binnenkort" zegt.
+ *
+ * Kost voor een gewone bezoeker één kleine lezing: pas wanneer er een
+ * voorverkoop loopt, wordt de bezoeker, de verborgen lijst en de uitgelichte
+ * keuze erbij gehaald.
+ */
+export async function getPresaleNews(
+  locale: Locale,
+  session: SessionPayload | null | undefined,
+  now: Date,
+): Promise<NewsEntry[]> {
+  const candidates = await prisma.ticketEvent.findMany({
+    where: {
+      status: "PUBLISHED",
+      startsAt: { gt: now },
+      publishedAt: { not: null },
+      salesStartAt: { gt: now },
+      presaleLeadMinutes: { gt: 0 },
+      OR: [{ salesEndAt: null }, { salesEndAt: { gt: now } }],
+    },
+    select: {
+      ...TICKET_NEWS_SELECT,
+      presaleLeadMinutes: true,
+      presalePraesidium: true,
+      presaleHelpers: true,
+      presaleToken: true,
+      presaleGroups: { select: { groupId: true } },
+    },
+  });
+  const running = candidates.filter((event) => ticketPresaleInNews(event, now));
+  if (running.length === 0) return [];
+
+  const setting = await readNewsSettingFromDb();
+  if (!setting.enabled || !setting.sources.tickets) return [];
+
+  // Per event, want de private link geldt enkel voor het event waarvan ze is.
+  const allowed: typeof running = [];
+  for (const event of running) {
+    const viewer = await presaleViewerFor(session, [event]);
+    if (inPresaleAudience(viewer, event)) allowed.push(event);
+  }
+  if (allowed.length === 0) return [];
+
+  const [hiddenRows, featuredRow] = await Promise.all([
+    prisma.newsHidden.findMany({
+      where: { source: "tickets", ref: { in: allowed.map((event) => event.id) } },
+      select: { ref: true },
+    }),
+    prisma.setting.findUnique({ where: { key: NEWS_FEATURED_SETTING } }),
+  ]);
+  const hidden = new Set(hiddenRows.map((row) => row.ref));
+  const choice = readNewsFeatured(featuredRow?.value);
+  return allowed
+    .filter((event) => !hidden.has(event.id))
+    .map((event) => ({
+      ...ticketEntry(event, ticketPresaleNewsDate(event)!, locale, true),
+      featured: choice?.source === "tickets" && choice.ref === event.id,
+    }));
 }
