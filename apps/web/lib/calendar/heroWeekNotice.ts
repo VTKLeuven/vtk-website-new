@@ -79,8 +79,18 @@ export function inHeroWeekWindow(
 ): boolean {
   if (event.heroWeek === "HIDDEN") return false;
   // Zonder gisteren: het gaat om wat eraan komt, niet om wat geweest is.
-  const window = new Set(heroWeekDayKeys(now, { includeYesterday: false, timeZone }));
-  return heroWeekEventDays(event, timeZone).some((day) => window.has(day));
+  // Een zondag telt mee wanneer dit evenement er zelf op staat; de andere
+  // evenementen kennen we hier niet, dus een lege zondag wordt aangenomen en
+  // het venster loopt dan een dag verder, net als op de homepage.
+  const days = heroWeekEventDays(event, timeZone);
+  const window = new Set(
+    heroWeekDayKeys(now, {
+      includeYesterday: false,
+      timeZone,
+      keepSunday: (key) => days.includes(key),
+    }),
+  );
+  return days.some((day) => window.has(day));
 }
 
 /**

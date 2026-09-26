@@ -92,6 +92,23 @@ describe("heroWeekDayKeys", () => {
     ]);
   });
 
+  it("skips a Sunday without events and keeps counting past it", () => {
+    const wednesday16 = at("2026-09-16T08:00:00+02:00");
+    expect(heroWeekDayKeys(wednesday16, { keepSunday: () => false })).toEqual([
+      "2026-09-16",
+      "2026-09-17",
+      "2026-09-18",
+      "2026-09-21",
+      "2026-09-22",
+      "2026-09-23",
+    ]);
+  });
+
+  it("starts on Monday when today is an empty Sunday", () => {
+    const sunday20 = at("2026-09-20T09:00:00+02:00");
+    expect(heroWeekDayKeys(sunday20, { keepSunday: () => false })[0]).toBe("2026-09-21");
+  });
+
   it("puts a late-evening moment on the Brussels day, not the UTC one", () => {
     // 23:30 Brusselse tijd is 21:30 UTC; de dag mag niet doorschuiven.
     expect(heroWeekDayKeys(at("2026-09-13T23:30:00+02:00"))[0]).toBe("2026-09-13");
@@ -117,6 +134,63 @@ describe("selectHeroWeek", () => {
     expect(result.mode).toBe("window");
     expect(result.days).toHaveLength(6);
     expect(result.days.map((day) => day.events.length)).toEqual([1, 2, 1, 1, 3, 2]);
+  });
+
+  it("leaves out a Sunday without events, but keeps an empty weekday", () => {
+    // Woensdag 16 tot en met woensdag 23: zaterdag 19 valt altijd weg, zondag 20
+    // hier ook omdat er niets is; dinsdag 22 blijft leeg staan.
+    const wednesday16 = at("2026-09-16T08:00:00+02:00");
+    const week = [
+      event("bedrijven", "2026-09-16T19:30:00+02:00"),
+      event("lezing", "2026-09-17T17:00:00+02:00"),
+      event("alma", "2026-09-18T12:00:00+02:00"),
+      event("info", "2026-09-21T14:00:00+02:00"),
+      event("cantus", "2026-09-23T20:00:00+02:00"),
+    ];
+    const result = selectHeroWeek(week, wednesday16);
+    expect(result.mode).toBe("window");
+    expect(result.days.map((day) => day.key)).toEqual([
+      "2026-09-16",
+      "2026-09-17",
+      "2026-09-18",
+      "2026-09-21",
+      "2026-09-22",
+      "2026-09-23",
+    ]);
+    expect(ids(result.days[4])).toEqual([]);
+  });
+
+  it("keeps a Sunday that has an event", () => {
+    const wednesday16 = at("2026-09-16T08:00:00+02:00");
+    const week = [
+      event("bedrijven", "2026-09-16T19:30:00+02:00"),
+      event("lezing", "2026-09-17T17:00:00+02:00"),
+      event("alma", "2026-09-18T12:00:00+02:00"),
+      event("onthaal", "2026-09-20T14:00:00+02:00"),
+    ];
+    const result = selectHeroWeek(week, wednesday16);
+    expect(result.days.map((day) => day.key)).toEqual([
+      "2026-09-16",
+      "2026-09-17",
+      "2026-09-18",
+      "2026-09-20",
+      "2026-09-21",
+      "2026-09-22",
+    ]);
+    expect(ids(result.days[3])).toEqual(["onthaal"]);
+  });
+
+  it("does not keep a Sunday for a hidden event", () => {
+    const wednesday16 = at("2026-09-16T08:00:00+02:00");
+    const week = [
+      event("bedrijven", "2026-09-16T19:30:00+02:00"),
+      event("lezing", "2026-09-17T17:00:00+02:00"),
+      event("alma", "2026-09-18T12:00:00+02:00"),
+      event("info", "2026-09-21T14:00:00+02:00"),
+      event("geheim", "2026-09-20T14:00:00+02:00", "HIDDEN"),
+    ];
+    const result = selectHeroWeek(week, wednesday16);
+    expect(result.days.map((day) => day.key)).not.toContain("2026-09-20");
   });
 
   it("caps a day at three events and reports the rest", () => {

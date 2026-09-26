@@ -10,6 +10,11 @@
  * - **Zaterdag valt weg.** VTK organiseert er nooit iets, dus een zaterdagkolom
  *   is een lege kolom. Staat er toch iets op een zaterdag, dan valt het uit het
  *   overzicht; het blijft wel gewoon in de kalender staan.
+ * - **Een lege zondag valt ook weg.** Op zondag gebeurt er soms iets (de
+ *   Onthaaldagen beginnen er), maar meestal niet, en dan is het net zo goed een
+ *   lege rij. Zonder evenement wordt hij overgeslagen zoals zaterdag; met een
+ *   evenement staat hij er gewoon. Een lege weekdag blijft wel staan: dat er
+ *   dinsdag niets is, is ook iets om te weten.
  * - **Het venster rolt mee.** Een vaste week (maandag tot zondag) staat op
  *   vrijdagavond zo goed als leeg, terwijl er dan net het meest te beleven valt.
  * - **Vandaag staat bovenaan en wordt volledig getoond.** Wie op de homepage
@@ -50,7 +55,7 @@ import { NIGHT_EVENT_MAX_MS, type EventMoment } from "./moments";
 
 export const HERO_WEEK_TIME_ZONE = "Europe/Brussels";
 
-/** Aantal dagen in het venster, zaterdagen niet meegeteld. */
+/** Aantal dagen in het venster, zaterdagen en lege zondagen niet meegeteld. */
 export const HERO_WEEK_DAYS = 6;
 
 /**
@@ -178,6 +183,11 @@ export function isHeroWeekSkippedDay(key: string): boolean {
   return heroWeekDayDate(key).getUTCDay() === 6;
 }
 
+/** Zondag: die staat enkel in het overzicht wanneer er die dag iets gepland is. */
+export function isHeroWeekSunday(key: string): boolean {
+  return heroWeekDayDate(key).getUTCDay() === 0;
+}
+
 /**
  * De eerste en de laatste dag van een evenement in Brussel, als dagsleutels.
  *
@@ -214,23 +224,33 @@ export function heroWeekEventRange(
  * Begint gisteren wanneer daar iets stond, anders vandaag, en telt vooruit tot
  * er zes dagen zijn. Zaterdagen worden overgeslagen en tellen dus niet mee, ook
  * niet als startdag: wie op zaterdag langskomt, ziet het venster van zondag.
+ *
+ * Een zondag telt enkel mee wanneer `keepSunday` zegt dat er die dag iets is.
+ * Zonder die functie blijft elke zondag staan: deze functie kent de evenementen
+ * niet, dat doet de oproeper.
  */
 export function heroWeekDayKeys(
   now: Date,
-  options: { includeYesterday?: boolean; timeZone?: string } = {},
+  options: {
+    includeYesterday?: boolean;
+    timeZone?: string;
+    keepSunday?: (key: string) => boolean;
+  } = {},
 ): string[] {
   const timeZone = options.timeZone ?? HERO_WEEK_TIME_ZONE;
+  const keepSunday = options.keepSunday ?? (() => true);
+  const skipped = (key: string) =>
+    isHeroWeekSkippedDay(key) || (isHeroWeekSunday(key) && !keepSunday(key));
   const today = heroWeekDayKey(now, timeZone);
   const yesterday = shiftDayKey(today, -1);
 
   // Gisteren als startdag heeft alleen zin wanneer die dag zelf getoond kan
-  // worden. Was gisteren een zaterdag, dan valt hij hoe dan ook weg.
-  const start =
-    options.includeYesterday && !isHeroWeekSkippedDay(yesterday) ? yesterday : today;
+  // worden. Was gisteren een zaterdag of een lege zondag, dan valt hij weg.
+  const start = options.includeYesterday && !skipped(yesterday) ? yesterday : today;
 
   const keys: string[] = [];
   for (let cursor = start; keys.length < HERO_WEEK_DAYS; cursor = shiftDayKey(cursor, 1)) {
-    if (!isHeroWeekSkippedDay(cursor)) keys.push(cursor);
+    if (!skipped(cursor)) keys.push(cursor);
   }
   return keys;
 }
@@ -352,8 +372,13 @@ export function selectHeroWeek<T extends HeroWeekInput>(
   const yesterday = shiftDayKey(today, -1);
 
   // Het venster begint vandaag; gisteren komt er pas achteraf bij, wanneer
-  // blijkt dat er plaats over is.
-  const futureKeys = heroWeekDayKeys(now, { includeYesterday: false, timeZone });
+  // blijkt dat er plaats over is. Een zondag zonder evenement valt weg, en het
+  // venster loopt dan een dag verder zodat het zes dagen blijven.
+  const futureKeys = heroWeekDayKeys(now, {
+    includeYesterday: false,
+    timeZone,
+    keepSunday: (key) => visible.some((item) => occursOn(item, key)),
+  });
 
   // Gisteren telt enkel voor wat er gisteren ophield. Wat vandaag nog loopt,
   // staat vandaag al in het overzicht; zonder die uitzondering zou een

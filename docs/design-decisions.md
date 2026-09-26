@@ -6139,6 +6139,22 @@ tot de volgende dag. Staat er tóch iets op een zaterdag, dan valt het uit het
 overzicht; het blijft wel in de kalender, in de feeds en in de app staan. Wie op
 een zaterdag langskomt, ziet het venster vanaf zondag.
 
+### Een lege zondag valt ook weg
+
+Op zondag gebeurt er soms iets (de Onthaaldagen beginnen er, een weekend loopt
+erin door), maar meestal niet. Een zondag zonder evenement wordt daarom net als
+zaterdag overgeslagen, en het venster loopt een dag verder zodat het zes dagen
+blijven. Staat er wél iets, dan staat de zondag er gewoon. Een verborgen
+evenement (`HIDDEN`) houdt de zondag niet vast.
+
+Een lege **weekdag** blijft wel staan: dat er dinsdag niets is, is ook iets om te
+weten, en het houdt de week leesbaar als week. Zondag is de uitzondering omdat
+een lege zondag het normale geval is en dus niets vertelt.
+
+De herinneringsmail voor de post (`heroWeekNotice.ts`) kent de andere
+evenementen niet; die neemt een lege zondag aan, tenzij het evenement zelf op
+zondag valt.
+
 ### Zes dagen, rollend, met gisteren erbij als er plaats is
 
 Een vaste week (maandag tot zondag) staat op vrijdagavond zo goed als leeg,

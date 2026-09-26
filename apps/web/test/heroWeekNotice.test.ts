@@ -56,6 +56,23 @@ describe("wanneer de post een herinnering verdient", () => {
     expect(needsHeroWeekNotice(later, sunday13)).toBe(false);
   });
 
+  it("loopt een dag verder wanneer de zondag leeg is, en telt een zondag met dit evenement", () => {
+    // Vanaf woensdag 16: zaterdag valt weg en een lege zondag ook, dus woensdag
+    // 23 valt in het venster. Staat het evenement zelf op zondag 20, dan blijft
+    // die zondag staan.
+    const wednesday16 = new Date("2026-09-16T08:00:00+02:00");
+    const nextWednesday = event({
+      start: new Date("2026-09-23T20:00:00+02:00"),
+      end: new Date("2026-09-23T23:00:00+02:00"),
+    });
+    const sunday = event({
+      start: new Date("2026-09-20T14:00:00+02:00"),
+      end: new Date("2026-09-20T17:00:00+02:00"),
+    });
+    expect(inHeroWeekWindow(nextWednesday, wednesday16)).toBe(true);
+    expect(inHeroWeekWindow(sunday, wednesday16)).toBe(true);
+  });
+
   it("telt een meerdaags evenement zodra één van zijn dagen meetelt", () => {
     // Begint buiten het venster, loopt er wel doorheen.
     const long = event({

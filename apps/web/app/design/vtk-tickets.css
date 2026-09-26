@@ -444,6 +444,15 @@
 
 /* ---------- Het bestelpaneel ---------- */
 
+/* Iets breder dan het winkelmandje van de shop: een studentenadres
+   (voornaam.naam@student.kuleuven.be) past zo op één regel naast
+   "Bevestiging naar", in plaats van op de laatste letter af te breken. */
+@media (min-width: 961px) {
+  .tshop.torder {
+    grid-template-columns: minmax(0, 1fr) 440px;
+  }
+}
+
 /* De titel houdt haar breedte; een lang bestelnummer breekt ernaast af in
    plaats van "Je bestelling" over twee regels te duwen. */
 .torder-panel .tshop-panel-head h2 {
@@ -1143,8 +1152,38 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* Op een gsm staat de QR aan de inkom meteen scanbaar: ze vult de hele
+     strook, met enkel een rand in de kleur van de status errond. Tikken
+     opent nog steeds het detailvenster, maar is niet meer nodig. */
   .ticket-pass-stub {
-    padding: 18px;
+    padding: 12px 12px 14px;
+  }
+
+  .ticket-pass-qr-box {
+    display: block;
+    width: 100%;
+  }
+
+  .ticket-pass-qr-box img,
+  .ticket-pass-stub img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .ticket-pass-qr-trigger {
+    cursor: pointer;
+  }
+
+  .ticket-pass-qr-trigger:hover .ticket-pass-qr-box img {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .ticket-pass-qr-zoom-badge {
+    display: none;
   }
 
   .ticket-pass-body {

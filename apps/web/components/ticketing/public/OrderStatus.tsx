@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import Link from "@/components/ui/Link";
 import Image from "next/image";
 import { trackTicketPurchased } from "@/lib/analytics-client";
@@ -378,7 +378,20 @@ export function OrderStatus({
               </div>
               <div>
                 <dt>{t.confirmationTo}</dt>
-                <dd>{order.buyerEmail}</dd>
+                <dd>
+                  {/* Past een adres toch niet, dan breekt het voor de @ en niet
+                      voor de laatste letter. */}
+                  {order.buyerEmail.split("@").map((part, i) => (
+                    <Fragment key={i}>
+                      {i > 0 ? (
+                        <>
+                          <wbr />@
+                        </>
+                      ) : null}
+                      {part}
+                    </Fragment>
+                  ))}
+                </dd>
               </div>
               <div>
                 <dt>{t.status}</dt>
