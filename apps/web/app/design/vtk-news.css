@@ -468,6 +468,34 @@
   letter-spacing: -0.015em;
 }
 
+/* Links uitgelijnd onder de titel van de paginakop, zoals een contentpagina, en
+   niet als gecentreerde kolom: anders begint de tekst een eind rechts van de
+   titel erboven. De breedte houdt de regels leesbaar. */
+.news-post {
+  max-width: 780px;
+}
+
+/* Onder een brief staat de afzender voluit: groter dan in de nieuwsband, waar
+   hij een regel naast de tekst is. Hier is hij de ondertekening. */
+.news-post .news-who {
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.news-post .news-who .news-avatar {
+  width: 76px;
+  height: 76px;
+  font-size: 22px;
+}
+
+.news-post .news-who b {
+  font-size: 17px;
+}
+
+.news-post .news-who div span {
+  font-size: 14px;
+}
+
 .news-post-photo {
   display: block;
   width: 100%;

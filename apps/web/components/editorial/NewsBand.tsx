@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Markdown } from "@/components/ui/Markdown";
 import { isExternalUrl, withLocaleBase } from "@/lib/href";
+import { magazineEventName, umamiEvent } from "@/lib/analytics";
 import { NEWS_LETTER_LINES, composeNews, isFreshNews, type NewsSource } from "@/lib/news/rules";
 import type { NewsEntry } from "@/lib/news/load";
 import { newsSourceLabel } from "@/lib/news/labels";
@@ -46,30 +47,56 @@ export function newsHref(href: string, base: string): string {
   return withLocaleBase(href, base);
 }
 
+/**
+ * Een nummer van het Bakske of IrReëel opent vanuit het nieuws rechtstreeks de
+ * pdf, buiten de lezer op /media om, en telde daardoor niet mee. Met dezelfde
+ * gebeurtenis en dezelfde gegevens als daar (zie `trackMagazineView`) komt het
+ * vanzelf in de cijfers in /admin/media; `vanaf` houdt het onderscheid.
+ */
+function newsTracking(entry: NewsEntry): Record<string, string> | undefined {
+  if (entry.source !== "bakske" && entry.source !== "irreeel") return undefined;
+  const kind = entry.source === "bakske" ? "bakske" : "ir-reeel";
+  return umamiEvent(magazineEventName(kind, "bekeken"), {
+    publicatie: kind,
+    nummer: entry.ref,
+    vanaf: "nieuws",
+  });
+}
+
 /** Een link naar binnen of naar buiten, met dezelfde klasse. */
 export function NewsLink({
   href,
   base,
   className,
   style,
+  tracking,
   children,
 }: {
   href: string;
   base: string;
   className?: string;
   style?: CSSProperties;
+  /** Umami-attributen, uit `umamiEvent`. */
+  tracking?: Record<string, string>;
   children: ReactNode;
 }) {
   const target = newsHref(href, base);
   if (isExternalUrl(target) || target.startsWith("/api/")) {
     return (
-      <a className={className} style={style} href={target} target="_blank" rel="noopener noreferrer">
+      <a
+        className={className}
+        style={style}
+        href={target}
+        target="_blank"
+        rel="noopener noreferrer"
+        {...tracking}
+      >
         {children}
       </a>
     );
   }
   return (
-    <Link className={className} style={style} href={target}>
+    <Link className={className} style={style} href={target} {...tracking}>
       {children}
     </Link>
   );
@@ -216,14 +243,19 @@ function Featured({
       <div className="news-feat-body">
         <NewsKicker entry={entry} locale={locale} now={now} />
         <h3 className="news-title">
-          <NewsLink href={entry.href} base={base} className="news-feat-link">
+          <NewsLink href={entry.href} base={base} className="news-feat-link" tracking={newsTracking(entry)}>
             {entry.title}
           </NewsLink>
         </h3>
         <p className="news-excerpt">{entry.line}</p>
         <div className="news-feat-foot">
           <span />
-          <NewsLink href={entry.ctaHref ?? entry.href} base={base} className="news-go is-primary">
+          <NewsLink
+            href={entry.ctaHref ?? entry.href}
+            base={base}
+            className="news-go is-primary"
+            tracking={newsTracking(entry)}
+          >
             {entry.ctaLabel} <ArrowRight size={15} aria-hidden="true" />
           </NewsLink>
         </div>
@@ -245,7 +277,13 @@ export function NewsRow({
 }) {
   const Icon = ICONS[entry.source];
   return (
-    <NewsLink href={entry.href} base={base} className="news-row" style={newsTypeStyle(entry.source)}>
+    <NewsLink
+      href={entry.href}
+      base={base}
+      className="news-row"
+      style={newsTypeStyle(entry.source)}
+      tracking={newsTracking(entry)}
+    >
       <span className="news-ico">
         <Icon size={20} aria-hidden="true" />
       </span>

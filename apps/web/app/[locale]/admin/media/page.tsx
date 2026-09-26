@@ -92,7 +92,12 @@ export default async function AdminMedia({
       <>
       {/* Bovenaan, want dit is waar de redactie voor komt kijken; uploaden doe je
           een paar keer per jaar, cijfers bekijk je vaker. */}
-      <MagazineStats locale={locale} publications={publications} period={parsePeriod(statsPeriod)} />
+      <MagazineStats
+        locale={locale}
+        publications={publications}
+        videos={videos}
+        period={parsePeriod(statsPeriod)}
+      />
 
       <Card className="p-5">
         <h2 className="font-semibold mb-1">{nl ? "Nieuwe magazine-editie" : "New magazine issue"}</h2>

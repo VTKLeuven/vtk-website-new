@@ -88,7 +88,10 @@ export default async function NewsPostPage({
         </div>
       </header>
 
-      <main className="vtk-page-shell vtk-page-narrow">
+      {/* Niet `vtk-page-narrow`: dat centreert de hele kolom, en dan begint de
+          tekst een eind rechts van de titel erboven. De leesbreedte zit op
+          `.news-post` zelf. */}
+      <main className="vtk-page-shell">
         <article className="vtk-page-content news-post">
           {photo ? (
             // Een upload uit de eigen media-route.

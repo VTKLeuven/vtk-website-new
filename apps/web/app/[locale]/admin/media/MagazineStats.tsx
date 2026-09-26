@@ -2,7 +2,7 @@ import Link from "@/components/ui/Link";
 import { Card } from "@vtk/ui";
 import type { Locale } from "@vtk/i18n";
 import { magazineViewUrl } from "@/lib/analytics";
-import type { MediaPublication } from "@/lib/media-content";
+import type { MediaPublication, MediaVideo } from "@/lib/media-content";
 import { magazineStats, type UmamiPeriod } from "@/lib/umami-stats";
 
 /**
@@ -40,10 +40,13 @@ type Row = {
 export async function MagazineStats({
   locale,
   publications,
+  videos,
   period,
 }: {
   locale: Locale;
   publications: MediaPublication[];
+  /** De aftermovies uit dezelfde instelling; hun starts staan onder de nummers. */
+  videos: MediaVideo[];
   period: UmamiPeriod;
 }) {
   const nl = locale === "nl";
@@ -56,8 +59,8 @@ export async function MagazineStats({
           <h2 className="font-semibold">{nl ? "Statistieken" : "Statistics"}</h2>
           <p className="text-sm text-zinc-500">
             {nl
-              ? "Hoe vaak een nummer geopend is op de mediapagina."
-              : "How often an issue was opened on the media page."}
+              ? "Hoe vaak een nummer geopend is, op de mediapagina en via het nieuws, en hoe vaak een aftermovie gestart is."
+              : "How often an issue was opened, on the media page and from the news, and how often an aftermovie was started."}
           </p>
         </div>
         <nav className="flex flex-wrap gap-1" aria-label={nl ? "Periode" : "Period"}>
@@ -81,7 +84,7 @@ export async function MagazineStats({
 
       {!stats.ok ? (
         <p className="text-sm text-zinc-500">{errorMessage(stats.error, nl)}</p>
-      ) : publications.length === 0 ? (
+      ) : publications.length === 0 && videos.length === 0 ? (
         <p className="text-sm text-zinc-500">
           {nl ? "Nog geen edities om te tellen." : "No issues to count yet."}
         </p>
@@ -135,6 +138,9 @@ export async function MagazineStats({
               </ul>
             </section>
           ))}
+          {videos.length > 0 ? (
+            <AftermovieRows videos={videos} plays={stats.aftermovies} nl={nl} />
+          ) : null}
           <p className="text-xs text-zinc-500">
             {nl
               ? `Geteld sinds ${formatDate(stats.since, nl)}. Enkel bezoekers die statistieken aanvaard hebben, tellen mee.`
@@ -143,6 +149,60 @@ export async function MagazineStats({
         </div>
       )}
     </Card>
+  );
+}
+
+/**
+ * Hoe vaak elke aftermovie gestart is, op /media en op de homepage samen. Een
+ * start en geen weergave: de video speelt bij YouTube of Vimeo, en wat daar
+ * gebeurt, zien wij niet. Dezelfde rij als bij de nummers, zodat het één blok
+ * cijfers blijft.
+ */
+function AftermovieRows({
+  videos,
+  plays,
+  nl,
+}: {
+  videos: MediaVideo[];
+  plays: Record<string, number>;
+  nl: boolean;
+}) {
+  const rows = videos.map((video) => ({
+    id: video.id,
+    label: nl ? video.titleNl : video.titleEn || video.titleNl,
+    plays: plays[video.id] ?? 0,
+  }));
+  const total = rows.reduce((sum, row) => sum + row.plays, 0);
+  const max = Math.max(1, ...rows.map((row) => row.plays));
+  return (
+    <section>
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <h3 className="text-sm font-semibold text-vtk-ink">Aftermovies</h3>
+        <p className="text-xs text-zinc-500">
+          {formatNumber(total, nl)} {nl ? "keer gestart" : "plays"}
+        </p>
+      </div>
+      <ul className="divide-y divide-zinc-200">
+        {rows.map((row) => (
+          <li
+            key={row.id}
+            className="grid grid-cols-1 gap-x-4 gap-y-1 py-2 sm:grid-cols-[minmax(0,1fr)_auto]"
+          >
+            <span className="min-w-0 text-sm text-vtk-ink">{row.label}</span>
+            <span className="flex items-center gap-3 text-sm tabular-nums text-zinc-600 sm:justify-end">
+              <span className="font-medium text-vtk-ink">{formatNumber(row.plays, nl)}</span>
+              <span className="text-xs text-zinc-500">{nl ? "keer gestart" : "plays"}</span>
+            </span>
+            <span aria-hidden="true" className="h-1 rounded-full bg-vtk-blue-soft sm:col-span-2">
+              <span
+                className="block h-1 rounded-full bg-vtk-ink/70"
+                style={{ width: `${share(row.plays, max)}%` }}
+              />
+            </span>
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 
