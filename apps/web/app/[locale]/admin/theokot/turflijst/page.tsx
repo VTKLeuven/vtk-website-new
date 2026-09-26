@@ -8,6 +8,7 @@ import { brusselsTimeOnDay } from "@/lib/theokot";
 import { brusselsWallClock, brusselsYMD, shiftYMD } from "@/lib/brussels";
 import { TheokotAdminNav } from "../TheokotAdminNav";
 import { PrintButton } from "./PrintButton";
+import { SaleDayPicker } from "./SaleDayPicker";
 
 import "@/app/design/vtk-basic.css";
 
@@ -52,7 +53,14 @@ export default async function TurflijstPage({
   const dayLabel = (d: Date) =>
     new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", { timeZone: "Europe/Brussels", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(d);
 
-  const selected = allSessions.find((s) => ymd(s.date) === date) ?? allSessions[0];
+  // Zonder gekozen dag de eerstvolgende verkoopdag, vandaag inbegrepen: dat is
+  // de lijst die iemand in de Theokot nodig heeft. De kiezer staat van nieuw
+  // naar oud, dus de eerste rij is de verste dag die al gepland is, niet de
+  // volgende. Staat er niets meer gepland, dan de laatste die voorbij is.
+  const today = ymd(new Date());
+  const upcoming = allSessions.filter((s) => ymd(s.date) >= today).at(-1);
+  const selected =
+    allSessions.find((s) => ymd(s.date) === date) ?? upcoming ?? allSessions[0];
 
   type TurfRow = { id: string; name: string; students: number; grocomeet: number; bureau: number };
   let items: TurfRow[] = [];
@@ -156,27 +164,16 @@ export default async function TurflijstPage({
       <div className="no-print space-y-5">
         <h1 className="text-2xl font-semibold">Theokot · {nl ? "Lijst bestelde broodjes" : "Ordered sandwiches list"}</h1>
         <TheokotAdminNav base={base} nl={nl} active="turflijst" caps={caps} />
-        <form method="get" className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-[#5c667f]">
-              {nl ? "Verkoopdag" : "Sale day"}
-            </label>
-            <select
-              name="date"
-              defaultValue={selected ? ymd(selected.date) : ""}
-              className="mt-1 rounded-xl border border-vtk-blue/12 bg-white px-3 py-2 text-sm"
-            >
-              {allSessions.map((s) => (
-                <option key={s.id} value={ymd(s.date)}>
-                  {dayLabel(s.date)}
-                </option>
-              ))}
-            </select>
-          </div>
-          {showAll && <input type="hidden" name="alles" value="1" />}
-          <button type="submit" className="rounded-full border border-vtk-blue/15 px-4 py-2 text-sm hover:bg-vtk-blue-soft/60">
-            {nl ? "Tonen" : "Show"}
-          </button>
+        <div className="flex flex-wrap items-end gap-3">
+          {allSessions.length > 0 && (
+            <SaleDayPicker
+              base={base}
+              label={nl ? "Verkoopdag" : "Sale day"}
+              options={allSessions.map((s) => ({ value: ymd(s.date), label: dayLabel(s.date) }))}
+              selected={selected ? ymd(selected.date) : ""}
+              showAll={showAll}
+            />
+          )}
           {olderCount > 0 && (
             <Link
               href={`${base}/admin/theokot/turflijst?alles=1`}
@@ -188,7 +185,7 @@ export default async function TurflijstPage({
             </Link>
           )}
           {items.length > 0 && <PrintButton label={nl ? "Print / Download" : "Print / Download"} />}
-        </form>
+        </div>
       </div>
 
       {!selected && (

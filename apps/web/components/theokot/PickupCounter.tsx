@@ -1,8 +1,9 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Button, Card, ConfirmDialog, Input, Label } from "@vtk/ui";
 import { formatEuro } from "@/lib/theokot";
+import { shouldRedirectToScanner } from "@/lib/scannerFocus";
 import {
   lookupPickupByCardAction,
   lookupPickupByPassAction,
@@ -28,6 +29,23 @@ export function PickupCounter({ nl }: { nl: boolean }) {
   const inputRef = useRef<HTMLInputElement>(null);
   // Voorkomt dubbel zoeken wanneer de scanner én een newline-char én een Enter stuurt.
   const busyRef = useRef(false);
+
+  // De kaartlezer is een toetsenbord: wat hij tikt, moet in het scanveld landen,
+  // ook als de focus net op een knop staat. Zie `shouldRedirectToScanner`.
+  // In de capture-fase en zonder `preventDefault`: de focus verschuift vóór de
+  // browser het teken verwerkt, dus het teken zelf komt gewoon in het veld.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      const input = inputRef.current;
+      if (!input || document.activeElement === input) return;
+      const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      const dialogOpen = document.querySelector('[role="dialog"][aria-modal="true"]') !== null;
+      if (!shouldRedirectToScanner(event, active, dialogOpen)) return;
+      input.focus();
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, []);
 
   function run(raw: string) {
     const cleaned = raw.replace(/[\r\n]+/g, "").trim();
@@ -143,8 +161,8 @@ export function PickupCounter({ nl }: { nl: boolean }) {
             />
             <p className="mt-1 text-xs text-[#5c667f]">
               {nl
-                ? "Scan de kaart of tik het r-nummer en druk op Enter."
-                : "Scan the card or type the r-number and press Enter."}
+                ? "Scan de kaart of tik het r-nummer en druk op Enter. Scannen werkt overal op deze pagina, ook zonder eerst in dit veld te klikken."
+                : "Scan the card or type the r-number and press Enter. Scanning works anywhere on this page, without clicking this field first."}
             </p>
           </div>
           <Button type="submit" disabled={pending}>
