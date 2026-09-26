@@ -157,6 +157,20 @@ describe("hoe de bevestigingsmail eruitziet", () => {
     expect(mail.html).toContain("Paid on 19 September");
     expect(mail.html).not.toContain("per stuk");
   });
+
+  it("gebruikt het enkelvoud in het onderwerp bij één ticket", () => {
+    const singleNl = orderConfirmationMail({ ...base, ticketCount: 1 });
+    expect(singleNl.subject).toBe("Je ticket voor Galabal");
+
+    const multiNl = orderConfirmationMail({ ...base, ticketCount: 2 });
+    expect(multiNl.subject).toBe("Je tickets voor Galabal");
+
+    const singleEn = orderConfirmationMail({ ...base, locale: "en", ticketCount: 1 });
+    expect(singleEn.subject).toBe("Your ticket for Galabal");
+
+    const multiEn = orderConfirmationMail({ ...base, locale: "en", ticketCount: 2 });
+    expect(multiEn.subject).toBe("Your tickets for Galabal");
+  });
 });
 
 describe("hoe we ons voorstellen bij de mailserver", () => {

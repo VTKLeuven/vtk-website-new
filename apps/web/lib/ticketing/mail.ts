@@ -270,8 +270,8 @@ export function orderConfirmationMail(input: {
   const nl = input.locale === "nl";
   const contents = input.contents ?? NO_CONTENTS;
   const subject = nl
-    ? `Je tickets voor ${input.eventName}`
-    : `Your tickets for ${input.eventName}`;
+    ? `${input.ticketCount === 1 ? "Je ticket" : "Je tickets"} voor ${input.eventName}`
+    : `${input.ticketCount === 1 ? "Your ticket" : "Your tickets"} for ${input.eventName}`;
   const intro = nl
     ? `Dag ${input.buyerName}, je betaling is ontvangen. Je vindt ${input.ticketCount === 1 ? "je ticket" : `je ${input.ticketCount} tickets`} via onderstaande link.`
     : `Hi ${input.buyerName}, your payment was received. Open ${input.ticketCount === 1 ? "your ticket" : `your ${input.ticketCount} tickets`} using the link below.`;
