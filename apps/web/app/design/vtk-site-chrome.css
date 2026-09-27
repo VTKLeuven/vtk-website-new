@@ -574,3 +574,42 @@
     width: 100%;
   }
 }
+
+/* Autorisatievoorbeeld (AuthorizationPreviewBanner): een zwevende balk
+   onderaan, boven al de rest. Stond ze in de flow onder de kop, dan schoof de
+   homepagehero er met haar negatieve marge overheen en was er geen uitweg meer
+   uit het voorbeeld. Terwijl ze er staat, schuiven de cookiekeuze en de
+   onderkant van de pagina mee omhoog, zodat ze niets afdekt. */
+.vtk-preview-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 12px;
+  z-index: 1100;
+  width: min(calc(100% - 24px), var(--max));
+  transform: translateX(-50%);
+  padding: 10px 12px 10px 18px;
+  border: 1px solid rgba(122, 78, 5, 0.28);
+  border-radius: 18px;
+  background: var(--low-bg);
+  color: var(--low-ink);
+  box-shadow: 0 14px 34px -18px rgba(14, 26, 54, 0.55);
+  box-sizing: border-box;
+}
+
+body:has(.vtk-preview-bar) {
+  padding-bottom: 76px;
+}
+
+body:has(.vtk-preview-bar) .vtk-cookie-consent-positioner {
+  bottom: calc(clamp(12px, 2.5vw, 24px) + 76px);
+}
+
+@media (max-width: 640px) {
+  body:has(.vtk-preview-bar) {
+    padding-bottom: 128px;
+  }
+
+  body:has(.vtk-preview-bar) .vtk-cookie-consent-positioner {
+    bottom: calc(12px + 128px);
+  }
+}

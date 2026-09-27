@@ -9228,3 +9228,20 @@ studieprofiel (`lib/calendar/audienceProfile.ts`).
   goedkopere prijs voor wie vorig jaar eerstejaars was. Internationaal en
   alumnus zijn geen jaarlijkse gegevens en tellen altijd. Een studiejaar telt
   ook niet voor wie geen student meer is.
+
+## Het autorisatievoorbeeld: de uitweg staat altijd in beeld
+
+Tijdens een autorisatievoorbeeld blokkeert `proxy.ts` elke POST, behalve de
+stoproute. Twee dingen liepen daardoor vast. De balk met "Voorbeeld stoppen"
+stond in de flow onder de kop, en op de homepage schuift de hero onder de
+transparante kop door: die dekte de balk af en de kop verloor haar donkere
+achtergrond. En uitloggen is een server action, dus een 403 en een crashende
+pagina.
+
+- **De balk zweeft onderaan** (`.vtk-preview-bar`), op elke pagina en bij
+  elke scrollpositie. De cookiekeuze en de onderkant van de pagina schuiven mee
+  omhoog. Bovenaan in de kop was ook een optie, maar dan moest de homepagehero
+  de hoogte van een balk kennen die er meestal niet is.
+- **Uitloggen loopt tijdens een voorbeeld via de stoproute** (`logout=1`): die
+  wist het voorbeeld en logt daarna uit. De proxy blijft zo streng als ze was;
+  er komt geen tweede uitzondering bij.

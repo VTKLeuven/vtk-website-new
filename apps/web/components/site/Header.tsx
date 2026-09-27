@@ -4,7 +4,7 @@ import { Search } from 'lucide-react';
 import { getDictionary, pick, type Locale } from '@vtk/i18n';
 import { entryForDate, isClosedHours } from '@/components/editorial/hoursUtils';
 import { getCachedHeaderTabs, getCachedSetting } from '@/lib/cachedContent';
-import { getCurrentSession } from '@/lib/session';
+import { getAuthorizationPreview, getCurrentSession } from '@/lib/session';
 import { hasPermission } from '@vtk/auth';
 import { hasPendingMeetingNotice } from '@/lib/meetings-server';
 import { postAdminLinks } from '@/lib/postAdminLinks';
@@ -178,6 +178,10 @@ export async function Header({ locale }: { locale: Locale }) {
               base={base}
               locale={locale}
               variant="editorial"
+              // Tijdens een autorisatievoorbeeld is elke POST geblokkeerd, ook
+              // de server action van het uitloggen; dan loopt uitloggen via de
+              // stoproute, die het voorbeeld eerst beëindigt.
+              previewActive={Boolean(await getAuthorizationPreview())}
             />
           ) : (
             <Link
