@@ -1643,12 +1643,14 @@
   color: var(--ink);
 }
 
-/* Zeven per rij op een volle kolom, en vanzelf minder naarmate het smaller
-   wordt. Op een telefoon blijven dat er twee, niet één: een lijst van negentig
-   volle-breedte foto's scrolt eindeloos. */
+/* Vijf per rij op een volle kolom (zo'n 180px per tegel), en vanzelf minder
+   naarmate het smaller wordt. Met zes per rij was een tegel 148px, en dan brak
+   "Eerstejaarsverantwoordelijke" op haar laatste letter af. Op een telefoon
+   blijven dat er twee, niet één (zie de media query hieronder): een lijst van
+   negentig volle-breedte foto's scrolt eindeloos. */
 .vtk-wall-faces {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(132px, 100%), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
   gap: 22px 16px;
   list-style: none;
   margin: 0;
@@ -1679,6 +1681,11 @@
 
   .vtk-wall-email {
     margin-top: 0;
+  }
+
+  /* Met de 160px van hierboven paste er op een telefoon maar één tegel. */
+  .vtk-wall-faces {
+    grid-template-columns: repeat(auto-fill, minmax(min(132px, 100%), 1fr));
   }
 }
 
