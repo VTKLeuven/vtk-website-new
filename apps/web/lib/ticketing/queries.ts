@@ -9,11 +9,14 @@ import { orderAccessCookieName } from "./access";
 import { isAppleWalletAvailable, isGoogleWalletAvailable } from "./wallet";
 import { ticketTermsPath } from "./terms";
 import {
+  isTargetAudience,
   ticketTypeIsHidden,
   ticketTypeMemberPrice,
   ticketTypeNeedsMembership,
   ticketTypeRequiresLogin,
+  type TicketTargetAudience,
 } from "./audience";
+import { ticketViewerProfile } from "./viewerProfile";
 import { publicUrl } from "@/lib/storage";
 import { focusPosition } from "@/lib/imageFocus";
 import { getTicketEventAccess } from "./authorization";
@@ -71,18 +74,17 @@ function isIssued(item: OrderItemRecord): item is IssuedOrderItem {
 }
 
 /**
- * Is de ingelogde bezoeker erelid? Een DB-lezing, want `SessionPayload` draagt
- * permissies en rollen, geen ledenstatus, en dat uitbreiden zou elke
- * sessielezing op de hele site duurder maken voor iets wat enkel de ticketshop
- * nodig heeft.
+ * De doelgroepen waarvoor dit event een ticket heeft dat een uitgelogde
+ * bezoeker niet ziet. Enkel voor wie niet ingelogd is: een ingelogd lid dat er
+ * niet bij hoort, hoort er ook na inloggen niet bij. Ereleden staan hier bewust
+ * niet tussen; dat ticket bestaat voor de rest van de site niet.
  */
-async function viewerIsHonorary(userId: string | undefined): Promise<boolean> {
-  if (!userId) return false;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { honoraryMember: true },
-  });
-  return user?.honoraryMember ?? false;
+function audienceLoginHint(
+  types: { audience: string }[],
+  signedIn: boolean,
+): TicketTargetAudience[] {
+  if (signedIn) return [];
+  return [...new Set(types.map((type) => type.audience).filter(isTargetAudience))];
 }
 
 function ticketTypeIsOnSale(
@@ -247,8 +249,8 @@ export async function listPublishedTicketEvents(
     }),
     getSession(await headers()),
   ]);
-  const [isHonorary, isMember, viewer] = await Promise.all([
-    viewerIsHonorary(session?.user.id),
+  const [profile, isMember, viewer] = await Promise.all([
+    ticketViewerProfile(session?.user.id),
     userIsMember(session?.user.id),
     presaleViewerFor(session, events),
   ]);
@@ -256,12 +258,15 @@ export async function listPublishedTicketEvents(
     const dto = publicEventDto(event, locale, viewer);
     const opensLater = Boolean(dto.salesStart && new Date(dto.salesStart) > now);
     if (opensLater && !overview) return [];
-    const selectableTypes = dto.ticketTypes.filter(
-      (type) =>
-        (overview
-          ? !type.salesEnd || new Date(type.salesEnd) > now
-          : ticketTypeIsOnSale(type, now) && type.available >= (type.minPerOrder ?? 1)) &&
-        !ticketTypeIsHidden(type, isHonorary)
+    const windowTypes = dto.ticketTypes.filter((type) =>
+      overview
+        ? !type.salesEnd || new Date(type.salesEnd) > now
+        : ticketTypeIsOnSale(type, now) && type.available >= (type.minPerOrder ?? 1)
+    );
+    const selectableTypes = windowTypes.filter((type) => !ticketTypeIsHidden(type, profile));
+    const loginHint = audienceLoginHint(
+      windowTypes.filter((type) => ticketTypeIsHidden(type, profile)),
+      Boolean(session),
     );
     const ticketTypes = selectableTypes.filter(
       (type) =>
@@ -276,7 +281,8 @@ export async function listPublishedTicketEvents(
       requiresLogin:
         !session &&
         ticketTypes.length === 0 &&
-        selectableTypes.some(ticketTypeRequiresLogin),
+        (selectableTypes.some(ticketTypeRequiresLogin) || loginHint.length > 0),
+      audienceLoginHint: loginHint,
       requiresMembership:
         Boolean(session) &&
         ticketTypes.length === 0 &&
@@ -293,13 +299,17 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
   if (!event || event.status !== "PUBLISHED") return null;
 
   const session = await getSession(await headers());
-  const [isHonorary, isMember, viewer] = await Promise.all([
-    viewerIsHonorary(session?.user.id),
+  const [profile, isMember, viewer] = await Promise.all([
+    ticketViewerProfile(session?.user.id),
     userIsMember(session?.user.id),
     presaleViewerFor(session, [event]),
   ]);
   const dto = publicEventDto(event, locale, viewer);
-  const visibleTypes = dto.ticketTypes.filter((type) => !ticketTypeIsHidden(type, isHonorary));
+  const visibleTypes = dto.ticketTypes.filter((type) => !ticketTypeIsHidden(type, profile));
+  const loginHint = audienceLoginHint(
+    dto.ticketTypes.filter((type) => ticketTypeIsHidden(type, profile)),
+    Boolean(session),
+  );
   const ticketTypes = visibleTypes.filter(
     (type) =>
       (Boolean(session) || !ticketTypeRequiresLogin(type)) &&
@@ -312,7 +322,8 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
     requiresLogin:
       !session &&
       ticketTypes.length === 0 &&
-      visibleTypes.some(ticketTypeRequiresLogin),
+      (visibleTypes.some(ticketTypeRequiresLogin) || loginHint.length > 0),
+    audienceLoginHint: loginHint,
     requiresMembership:
       Boolean(session) &&
       ticketTypes.length === 0 &&
@@ -349,6 +360,7 @@ export async function getTicketEventPreviewBySlug(slug: string, locale: PublicLo
   return {
     ...publicEventDto(event, locale, session),
     requiresLogin: false,
+    audienceLoginHint: [] as TicketTargetAudience[],
     viewer: { id: session.user.id, name: session.user.name, email: session.user.email },
   };
 }

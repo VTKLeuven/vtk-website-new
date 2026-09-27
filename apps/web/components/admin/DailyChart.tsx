@@ -24,10 +24,20 @@ export type DailyChartLabels = {
   reconstructed?: string;
 };
 
+/**
+ * Wat een sleutel op de x-as is. Standaard een dag; de ticketstatistieken
+ * tonen ook weken (de maandag als `yyyy-mm-dd`), uren (`0` tot `23`), weekdagen
+ * (`1` = maandag tot `7`) en kwartieren (`20:15`). Een enum en geen functie,
+ * want dit is een clientcomponent en een servercomponent kan geen functie
+ * meegeven.
+ */
+export type ChartKeyFormat = "day" | "week" | "hour" | "weekday" | "time";
+
 type Props = {
   kind: "bars" | "lines";
-  /** Brusselse dagen, `yyyy-mm-dd`, even lang als elke `values`. */
+  /** De sleutels van de x-as, standaard Brusselse dagen (`yyyy-mm-dd`), even lang als elke `values`. */
   days: string[];
+  keyFormat?: ChartKeyFormat;
   series: ChartSeries[];
   locale: "nl" | "en";
   /** De toegankelijke naam van de grafiek; de zichtbare titel staat erboven. */
@@ -49,6 +59,29 @@ function formatDay(day: string, locale: "nl" | "en", withYear = false): string {
     ...(withYear ? { year: "numeric" } : {}),
     timeZone: "UTC",
   });
+}
+
+function formatKey(key: string, format: ChartKeyFormat, locale: "nl" | "en", full = false): string {
+  switch (format) {
+    case "week":
+      return full
+        ? `${locale === "nl" ? "Week van" : "Week of"} ${formatDay(key, locale, true)}`
+        : `${locale === "nl" ? "wk" : "wk"} ${formatDay(key, locale)}`;
+    case "hour":
+      return locale === "nl" ? `${key}u` : `${key.padStart(2, "0")}:00`;
+    case "weekday": {
+      // 5 januari 2026 is een maandag; `key` 1 = maandag.
+      const date = new Date(Date.UTC(2026, 0, 4 + Number(key), 12));
+      return date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", {
+        weekday: full ? "long" : "short",
+        timeZone: "UTC",
+      });
+    }
+    case "time":
+      return key;
+    default:
+      return formatDay(key, locale, full);
+  }
 }
 
 /** Staaf met een afgeronde bovenkant en een vlakke voet. */
@@ -81,7 +114,7 @@ function barPath(x: number, top: number, bottom: number, width: number, rounded:
  * mag nooit enkel achter een muisbeweging zitten, en het amber van het palet
  * haalt geen 3:1 op wit.
  */
-export function DailyChart({ kind, days, series, locale, title, labels }: Props) {
+export function DailyChart({ kind, days, keyFormat = "day", series, locale, title, labels }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(720);
   const [active, setActive] = useState<number | null>(null);
@@ -250,7 +283,7 @@ export function DailyChart({ kind, days, series, locale, title, labels }: Props)
               textAnchor={kind === "lines" && i === 0 ? "start" : kind === "lines" && i === n - 1 ? "end" : "middle"}
               className="vtk-chart-tick"
             >
-              {formatDay(day, locale)}
+              {formatKey(day, keyFormat, locale)}
             </text>
           ))}
 
@@ -356,7 +389,7 @@ export function DailyChart({ kind, days, series, locale, title, labels }: Props)
             }
             aria-hidden
           >
-            <p className="vtk-chart-tooltip-day">{formatDay(days[active], locale, true)}</p>
+            <p className="vtk-chart-tooltip-day">{formatKey(days[active], keyFormat, locale, true)}</p>
             {series.map((s) => (
               <p key={s.key} className="vtk-chart-tooltip-row">
                 <span className="vtk-chart-linekey" style={{ background: s.color }} />
@@ -391,13 +424,14 @@ export function DailyChart({ kind, days, series, locale, title, labels }: Props)
               </tr>
             </thead>
             <tbody>
-              {/* Nieuwste dag bovenaan: daar kijkt wie deze tabel opent. */}
-              {days
-                .map((day, i) => ({ day, i }))
-                .reverse()
-                .map(({ day, i }) => (
+              {/* Nieuwste dag bovenaan: daar kijkt wie deze tabel opent. Een
+                  uur of weekdag heeft geen "nieuwste" en blijft in volgorde. */}
+              {(keyFormat === "day" || keyFormat === "week"
+                ? days.map((day, i) => ({ day, i })).reverse()
+                : days.map((day, i) => ({ day, i }))
+              ).map(({ day, i }) => (
                   <tr key={day}>
-                    <th scope="row">{formatDay(day, locale, true)}</th>
+                    <th scope="row">{formatKey(day, keyFormat, locale, true)}</th>
                     {series.map((s) => (
                       <td key={s.key}>
                         {s.values[i] === null ? "–" : fmt.format(s.values[i] ?? 0)}

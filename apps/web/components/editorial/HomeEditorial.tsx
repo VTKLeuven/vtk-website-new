@@ -79,6 +79,7 @@ import {
   outboundHost,
   umamiEvent,
 } from "@/lib/analytics";
+import { withSource } from "@/lib/ticketing/source";
 
 type CareerSetting = {
   titleNl: string;
@@ -784,7 +785,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                       ))}
                     </div>
                     <h3 className="ev-card-title">
-                      <Link href={`${base}/kalender/${event.slug}`} className="ev-card-link">
+                      <Link href={withSource(`${base}/kalender/${event.slug}`, "home-evenementen")} className="ev-card-link">
                         {title}
                       </Link>
                     </h3>
@@ -836,7 +837,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                             staat, dezelfde regel als de knop daar. */}
                         {ticketSlug ? (
                           <Link
-                            href={`${base}/tickets/${ticketSlug}`}
+                            href={withSource(`${base}/tickets/${ticketSlug}`, "home-evenementen")}
                             className="ev-card-action"
                             title={nl ? "Tickets kopen" : "Buy tickets"}
                             aria-label={`${nl ? "Tickets kopen" : "Buy tickets"}: ${title}`}

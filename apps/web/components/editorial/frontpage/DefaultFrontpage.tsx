@@ -14,6 +14,7 @@ import { HeroWeek } from "./HeroWeek";
 import { HeroSlogan } from "./HeroSlogan";
 import { HeroShifts } from "./HeroShifts";
 import { Cta, ctaFrom, type FrontpageProps } from "./context";
+import { withSource } from "@/lib/ticketing/source";
 
 /**
  * The regular front page: copy on the left, the agenda on the right.
@@ -209,7 +210,7 @@ export function DefaultFrontpage({
                 {group.events.map((event, eventIndex) => (
                   <Link
                     key={event.id}
-                    href={`${base}/kalender/${event.slug}`}
+                    href={withSource(`${base}/kalender/${event.slug}`, "home-agenda")}
                     className={`hero-ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}
                   >
                     <div className="t">{formatTime(new Date(event.start))}</div>

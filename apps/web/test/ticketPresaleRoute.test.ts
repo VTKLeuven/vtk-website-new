@@ -37,7 +37,7 @@ describe("GET /[locale]/tickets/[slug]/voorverkoop/[token]", () => {
 
     expect(response.status).toBe(307);
     // Crucial: relative Location prevents leaking internal reverse-proxy origin (e.g. localhost:3000)
-    expect(response.headers.get("location")).toBe("/tickets/cantus");
+    expect(response.headers.get("location")).toBe("/tickets/cantus?via=voorverkoop");
     expect(response.headers.get("location")).not.toContain("localhost:3000");
 
     const cookie = response.headers.get("set-cookie");
@@ -57,7 +57,7 @@ describe("GET /[locale]/tickets/[slug]/voorverkoop/[token]", () => {
     const response = await GET(request, context("en", "cantus", "valid-token-1234"));
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("/en/tickets/cantus");
+    expect(response.headers.get("location")).toBe("/en/tickets/cantus?via=voorverkoop");
   });
 
   it("redirects to shop without presale cookie if token does not match", async () => {

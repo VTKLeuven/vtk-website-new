@@ -33,6 +33,9 @@ import {
   type TicketQuestion,
 } from "./types";
 import { trackCheckoutStart } from "@/lib/analytics-client";
+import { audienceLoginHintQuestion } from "@/lib/ticketing/audience";
+import { sourceQuery } from "@/lib/ticketing/source";
+import { useLandingSource } from "./useLandingSource";
 
 export type Attendee = {
   attendeeName: string;
@@ -331,8 +334,12 @@ export function TicketShop({
 }) {
   const router = useRouter();
   const base = locale === "nl" ? "" : "/en";
-  const loginHref = `${base}/inloggen?next=${encodeURIComponent(`${base}/tickets/${event.slug}`)}`;
+  // Langs waar deze koper kwam; gaat mee met de bestelling en met de
+  // login-link, anders komt wie eerst moet inloggen terug als "direct".
+  const landingSource = useLandingSource();
+  const loginHref = `${base}/inloggen?next=${encodeURIComponent(`${base}/tickets/${event.slug}${sourceQuery(landingSource)}`)}`;
   const membershipHref = `${base}/lidmaatschap`;
+  const audienceHint = audienceLoginHintQuestion(event.audienceLoginHint ?? [], locale);
   const detailsRef = useRef<HTMLElement>(null);
   // Per regel (type × prijs), niet per type: zie `TicketLine`.
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -455,6 +462,10 @@ export function TicketShop({
           locale,
           termsAccepted: true,
           items,
+          // Een lege string als de pagina nog niet gemount was: dat is
+          // "direct", en geen oude pagina zonder meting.
+          source: landingSource?.source ?? "",
+          sourceCampaign: landingSource?.campaign ?? undefined,
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as CheckoutResponse;
@@ -789,6 +800,14 @@ export function TicketShop({
                       ? "Er zijn momenteel geen tickettypes beschikbaar voor dit event."
                       : "There are currently no ticket types available for this event."}
               </p>
+              {event.requiresLogin && audienceHint ? (
+                <p>
+                  {audienceHint}{" "}
+                  {locale === "nl"
+                    ? "Er zijn tickets voor jou; log in om ze te zien."
+                    : "There are tickets for you; sign in to see them."}
+                </p>
+              ) : null}
               {event.requiresLogin ? (
                 <Link className="tshop-cta" href={loginHref}>
                   <LogIn size={17} aria-hidden="true" />
@@ -852,6 +871,17 @@ export function TicketShop({
                       <Link href={membershipHref}>{locale === "nl" ? "Word lid." : "Become a member."}</Link>
                     </>
                   )}
+                </p>
+              ) : null}
+
+              {audienceHint ? (
+                <p className="tshop-hint">
+                  {audienceHint}{" "}
+                  <Link href={loginHref}>
+                    {locale === "nl"
+                      ? "Log in, er zijn ook tickets voor jou."
+                      : "Sign in, there are tickets for you too."}
+                  </Link>
                 </p>
               ) : null}
 

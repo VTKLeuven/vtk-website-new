@@ -31,6 +31,7 @@ import {
   readNewsSetting,
   type NewsSetting,
 } from "./setting";
+import { withSource } from "@/lib/ticketing/source";
 
 /**
  * Het nieuws op de homepage lezen: de zelfgeschreven berichten uit `NewsPost`,
@@ -142,7 +143,7 @@ function ticketEntry(event: TicketNewsEvent, date: Date, locale: Locale, presale
         ? `Tickets te koop voor ${day}${where}`
         : `Tickets on sale for ${day}${where}`,
     body: null,
-    href: `/tickets/${event.slug}`,
+    href: withSource(`/tickets/${event.slug}`, "nieuws"),
     ctaLabel: nl ? "Tickets kopen" : "Buy tickets",
     ctaHref: null,
     imageUrl: publicUrl(event.calendarEvent?.imageKey),
@@ -273,7 +274,7 @@ export async function collectNews(
         ? `Inschrijven kan tot ${day}${event.location ? `, ${event.location}` : ""}`
         : `Sign up before ${day}${event.location ? `, ${event.location}` : ""}`,
       body: null,
-      href: `/kalender/${event.slug}`,
+      href: withSource(`/kalender/${event.slug}`, "nieuws"),
       ctaLabel: pick(event.urlLabelNl ?? "", event.urlLabelEn, locale) || (nl ? "Inschrijven" : "Sign up"),
       ctaHref: event.url,
       imageUrl: publicUrl(event.imageKey),

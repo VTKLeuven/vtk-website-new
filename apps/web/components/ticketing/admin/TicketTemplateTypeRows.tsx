@@ -1,5 +1,6 @@
 "use client";
 
+import { AudienceOptions } from "./AudienceOptions";
 import { useState } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { TICKET_COLORS } from "@/lib/ticketing/ticketColors";
@@ -164,9 +165,7 @@ export function TicketTemplateTypeRows({
                       });
                     }}
                   >
-                    <option value="PUBLIC">{nl ? "Iedereen" : "Everyone"}</option>
-                    <option value="MEMBERS">{nl ? "Alleen leden" : "Members only"}</option>
-                    <option value="HONORARY">{nl ? "Alleen ereleden" : "Honorary only"}</option>
+                    <AudienceOptions locale={nl ? "nl" : "en"} publicLabel={nl ? "Iedereen" : "Everyone"} />
                   </select>
                 </td>
                 <td>

@@ -31,6 +31,7 @@ import { AttendeeTable } from "@/components/calendar/AttendeeTable";
 import { CategoryCalendar } from "./CategoryCalendar";
 
 import "@/app/design/vtk-event.css";
+import { TicketShopLink } from "@/components/ticketing/public/TicketShopLink";
 
 /**
  * De zin op het doelgroeplabel. Bewust afgeleid van de doelgroep en niet van de
@@ -475,9 +476,9 @@ export default async function CalendarSegmentPage({ params }: { params: Params }
               </Link>
             ) : null}
             {event.ticketEvent?.status === "PUBLISHED" ? (
-              <Link href={`${base}/tickets/${event.ticketEvent.slug}`} className="btn btn-primary">
+              <TicketShopLink href={`${base}/tickets/${event.ticketEvent.slug}`} className="btn btn-primary">
                 {locale === "nl" ? "Tickets kopen" : "Buy tickets"}
-              </Link>
+              </TicketShopLink>
             ) : event.url ? (
               <a href={event.url} className="btn btn-primary arrow">
                 {eventLinkLabel(event, locale)}

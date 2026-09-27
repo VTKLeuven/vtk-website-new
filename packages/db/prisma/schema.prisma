@@ -88,6 +88,16 @@ enum TicketAudience {
   /// weigert ze. Bedoeld voor wat de kring aan ereleden geeft (bv. gratis
   /// naar een cantus) zonder dat de rest van de site die uitzondering ziet.
   HONORARY
+  /// Doelgroepen uit het studieprofiel, dezelfde vier als de kalender
+  /// (`CalendarAudience`, afgeleid in `lib/calendar/audienceProfile.ts`). Net
+  /// als een erelidticket onzichtbaar voor wie er niet bij hoort; een
+  /// uitgelogde bezoeker krijgt enkel de hint dat inloggen iets kan opleveren.
+  /// Eerste- en laatstejaars tellen enkel met een studiebevestiging van de
+  /// lopende ronde, anders zou vorig jaar zijn profiel nog meetellen.
+  FIRST_YEARS
+  LAST_YEARS
+  INTERNATIONALS
+  ALUMNI
 }
 
 enum TicketQuestionType {
@@ -2339,6 +2349,17 @@ model TicketOrder {
   failedAt             DateTime?         @db.Timestamptz(3)
   expiredAt            DateTime?         @db.Timestamptz(3)
   cancelledAt          DateTime?         @db.Timestamptz(3)
+  // Langs waar de koper op de ticketpagina kwam: een vaste sleutel van een
+  // plek op de site (`kalender`, `home-evenementen`, `nieuws`), een kanaal uit
+  // een deelbare link (`?via=facebook`, of `utm_source`) of een afgeleide van
+  // de referrer. `null` = bestelling van voor die meting; de statistieken tonen
+  // dat als "niet gemeten", nooit als "direct". Enkel een label, geen
+  // persoonsgegeven: geen volledige referrer-URL, geen klik-id. Zie
+  // `lib/ticketing/source.ts` en docs/ticketing.md.
+  source               String?
+  // `utm_campaign` of `?c=` uit dezelfde link: om twee posts op hetzelfde
+  // kanaal uit elkaar te houden ("affiche" vs "story").
+  sourceCampaign       String?
   createdAt            DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
 

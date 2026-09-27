@@ -9155,3 +9155,76 @@ en de knoppen schoven dan alsnog naar onder. De foto als brede plaat met een
 rail ernaast leest als een artikel, maar een affiche in staand formaat valt in
 een brede strook slecht. De opbouw van de ticketpagina won: lang of kort maakt
 er niet uit, en een event en zijn ticketshop zien er nu uit als één geheel.
+
+## Ticketstatistieken: wat telt, voor wie, en welke events
+
+Onder alf.io had de kring per event een grafiek van de verkoop per dag en per
+tickettype. De nieuwe ticketmodule had enkel tellers. Nu is er een tab
+"Statistieken" per event en een pagina `/admin/tickets/statistieken` voor een
+selectie: een werkingsjaar, een post, alles met "cantus" in de naam, of een
+eigen lijst aangevinkte events. De rekenkant staat in
+`lib/ticketing/statsCompute.ts`, het ophalen en de toegang in `stats.ts`.
+
+- **Verkocht is een geldig ticket.** Terugbetaald en ongeldig gemaakt tellen
+  apart. Het moment van verkoop is de betaling, en een dag of uur is Brusselse
+  tijd. Voor de verkoopsnelheid ("uitverkocht na 4 min") telt wat later
+  terugbetaald werd wel mee: op dat moment was het weg.
+- **Wie statistieken ziet, volgt `VIEW_REPORTS`**: dezelfde grants als het
+  eventoverzicht, niet de standaard scantoegang. De omzet enkel waar ook
+  `VIEW_FINANCE` geldt; in een selectie met gemengde toegang staat erbij over
+  hoeveel events de omzet gaat, in plaats van een getal dat stil een deel mist.
+- **Een concept telt standaard niet mee in een selectie.** Het verkoopt niets,
+  maar zijn capaciteit trok de bezetting van het hele jaar omlaag. Aanvinken
+  kan wel.
+- **Filters en selectie zijn twee formulieren.** In één formulier reisden de
+  vinkjes van het vorige jaar mee wanneer je van jaar wisselde.
+
+## Afgelopen ticketevents staan standaard niet in de lijst
+
+`/admin/tickets` toont standaard enkel wat nog moet komen of nu loopt. Na een
+paar maanden duwden afgelopen events de lopende verkoop onder de vouw. Een
+event is afgelopen zodra het voorbij is (`endsAt`), niet zodra het begint:
+tijdens de cantus staat ze er nog. De lijst zegt hoeveel er verborgen is, met
+een link om ze te tonen, en de periodefilter heeft "Afgelopen" en "Alle
+evenementen".
+
+## De herkomst van een koper: een label op de bestelling, geen tracking
+
+Het bestuur wil weten langs waar kopers binnenkomen: de agenda bovenaan de
+homepage, de band met aankomende evenementen, het nieuws, de kalender, een post
+op Facebook. Dat staat nu als één label op `TicketOrder.source` (plus een
+optionele `sourceCampaign`), afgeleid in `lib/ticketing/source.ts`.
+
+- **Onze eigen links dragen `?via=`.** Een referrer zegt enkel "de homepage",
+  niet welk blok erop. Een eventpagina geeft haar eigen herkomst door aan de
+  ticketknop, zodat wie via de homepage-agenda naar een event klikt en daar
+  koopt, voor de homepage telt.
+- **Een deelbare link uit het beheer** (`?via=instagram&c=story`) vangt wat
+  een referrer niet vangt: Instagram, WhatsApp en mail geven meestal niets mee.
+  Geen opgeslagen campagnes: de link draagt alles zelf.
+- **Geen cookie, geen storage, geen volledige referrer.** De shop leest de
+  herkomst bij het laden, houdt ze in het geheugen, haalt de parameters uit de
+  adresbalk (anders erft wie de link doorstuurt de herkomst mee) en geeft ze
+  mee aan de login-link. Van een externe referrer bewaren we enkel het kanaal of
+  de host. Het label zegt iets over de bestelling, niet over de bezoeker.
+- **Oudere bestellingen zijn "niet gemeten", nooit "direct".** Direct is een
+  meting (er was niets om op af te gaan); niet gemeten is een gat in de meting.
+
+## Tickettypes voor een doelgroep
+
+Een tickettype kan nu voor eerstejaars, laatstejaars, internationals of alumni
+zijn: dezelfde vier doelgroepen als de kalender, afgeleid uit hetzelfde
+studieprofiel (`lib/calendar/audienceProfile.ts`).
+
+- **Onzichtbaar voor wie er niet bij hoort**, zoals een erelidticket en anders
+  dan een ledenticket. Een tweedejaars heeft niets aan een uitgegrijsd
+  eerstejaarsticket, en een event met vier doelgroepprijzen zou vooral tonen
+  wat je niet mag.
+- **Een uitgelogde bezoeker krijgt wel een hint** ("Eerstejaars? Log in, er
+  zijn ook tickets voor jou."): die kan er misschien bij horen. Ereleden blijven
+  daar buiten; dat ticket bestaat voor de rest van de site niet.
+- **Het studiejaar telt enkel na de studiebevestiging van de lopende ronde.**
+  In de kalender is een verouderd profiel onschuldig; bij een ticket is het een
+  goedkopere prijs voor wie vorig jaar eerstejaars was. Internationaal en
+  alumnus zijn geen jaarlijkse gegevens en tellen altijd. Een studiejaar telt
+  ook niet voor wie geen student meer is.

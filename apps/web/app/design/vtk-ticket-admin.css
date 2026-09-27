@@ -2400,3 +2400,121 @@
 .ticket-admin-table tbody tr[data-open="true"] {
   background: var(--paper-2);
 }
+
+/* ---------------------------------------------------------------------------
+   Statistieken (/admin/tickets/statistieken en de tab per event). De grafieken
+   zelf zijn `DailyChart` (vtk-admin.css); dit is enkel wat eromheen staat.
+   --------------------------------------------------------------------------- */
+
+/* Twee rijen kerncijfers na elkaar: de tweede sluit aan op de eerste. */
+.ticket-admin-metrics + .ticket-admin-metrics {
+  margin-top: -12px;
+}
+
+.ticket-stats-table th[data-num],
+.ticket-stats-table td[data-num] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ticket-stats-table {
+  min-width: 560px;
+}
+
+.ticket-stats-muted {
+  color: var(--muted);
+}
+
+/* Een campagne onder haar kanaal: ingesprongen en stiller. */
+.ticket-stats-subrow td {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ticket-stats-subrow td:first-child {
+  padding-left: 28px;
+}
+
+/* Het aandeel als dunne balk onder de naam: zo lees je de verhouding tussen
+   kanalen zonder elk percentage te vergelijken. Het getal staat ernaast. */
+.ticket-stats-bar-label {
+  display: grid;
+  gap: 5px;
+  min-width: 140px;
+}
+
+.ticket-stats-bar {
+  display: block;
+  height: 4px;
+  min-width: 2px;
+  border-radius: 2px;
+  background: var(--chart-1);
+}
+
+.ticket-stats-table tr[data-kind="unknown"] .ticket-stats-bar,
+.ticket-stats-table tr[data-kind="direct"] .ticket-stats-bar {
+  background: var(--chart-context);
+}
+
+.ticket-stats-table tr[data-kind="unknown"] strong {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.ticket-stats-linkbuilder {
+  margin-top: 16px;
+}
+
+.ticket-stats-link-row {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ticket-stats-link-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ticket-stats-picker {
+  margin-top: 4px;
+}
+
+.ticket-stats-picker-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  gap: 6px 16px;
+  max-height: 360px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 0;
+}
+
+.ticket-stats-picker-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.ticket-stats-picker-item input {
+  margin-top: 3px;
+  flex: none;
+}
+
+.ticket-stats-picker-item > span {
+  display: grid;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.ticket-stats-picker-item .ticket-admin-row-meta {
+  margin: 0;
+}
+
+.ticket-stats-picker-actions {
+  margin-top: 14px;
+}
