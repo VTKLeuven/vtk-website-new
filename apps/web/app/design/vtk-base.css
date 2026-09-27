@@ -1593,7 +1593,7 @@
 /* Eén post/POC per rij: de naam links in de marge, de gezichten rechts. */
 .vtk-wall-row {
   display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
+  grid-template-columns: 160px minmax(0, 1fr);
   gap: clamp(22px, 2.5vw, 32px);
   padding: clamp(28px, 3vw, 36px) 0;
   border-top: 1px solid var(--line-2);
@@ -1643,15 +1643,19 @@
   color: var(--ink);
 }
 
-/* Vijf per rij op een volle kolom (zo'n 180px per tegel), en vanzelf minder
-   naarmate het smaller wordt. Met zes per rij was een tegel 148px, en dan brak
-   "Eerstejaarsverantwoordelijke" op haar laatste letter af. Op een telefoon
-   blijven dat er twee, niet één (zie de media query hieronder): een lijst van
-   negentig volle-breedte foto's scrolt eindeloos. */
+/* Zes per rij op een volle kolom, en vanzelf minder naarmate het smaller
+   wordt. Op een telefoon blijven dat er twee, niet één: een lijst van negentig
+   volle-breedte foto's scrolt eindeloos.
+
+   De kolomafstand (12px) en de marge voor de postnaam (160px) zijn zo gekozen
+   dat een tegel op een volle kolom net 152px haalt: breed genoeg voor
+   "Eerstejaarsverantwoordelijke" op één regel. Met 16px en 168px was dat 148px
+   en brak de laatste letter af. Vijf per rij loste dat ook op, maar maakte de
+   portretten te groot. */
 .vtk-wall-faces {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(160px, 100%), 1fr));
-  gap: 22px 16px;
+  grid-template-columns: repeat(auto-fill, minmax(min(132px, 100%), 1fr));
+  gap: 22px 12px;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -1681,11 +1685,6 @@
 
   .vtk-wall-email {
     margin-top: 0;
-  }
-
-  /* Met de 160px van hierboven paste er op een telefoon maar één tegel. */
-  .vtk-wall-faces {
-    grid-template-columns: repeat(auto-fill, minmax(min(132px, 100%), 1fr));
   }
 }
 
