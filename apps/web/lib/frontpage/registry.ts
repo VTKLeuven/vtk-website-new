@@ -317,6 +317,63 @@ export const FRONTPAGE_MODULES: FrontpageModule[] = [
       listUrl: { type: "url", labelNl: "Tweede link", labelEn: "Second link" },
     },
   },
+  {
+    id: "nieuw",
+    labelNl: "Nieuw (rustige stijl)",
+    labelEn: "New (calm style)",
+    descriptionNl:
+      "Herontwerp met een rustige achtergrond, kalender van de komende 7 dagen (inclusief zaterdag) en links uitgelijnde titel.",
+    descriptionEn:
+      "Redesign with a calm background, 7-day calendar (including Saturday), and left-aligned headline.",
+    fields: {
+      photo: {
+        type: "image",
+        labelNl: "Achtergrondfoto",
+        labelEn: "Background photo",
+        helpNl: "Rustige, donkere foto zonder storende details (standaard /hero-clean.jpg).",
+        helpEn: "Calm, dark photo without distracting details (default /hero-clean.jpg).",
+        fallbackUrl: "/hero-clean.jpg",
+      },
+      agendaTitleNl: {
+        type: "text",
+        labelNl: "Titel kalender (NL)",
+        labelEn: "Calendar title (NL)",
+        placeholder: "Komende week",
+      },
+      agendaTitleEn: {
+        type: "text",
+        labelNl: "Titel kalender (EN)",
+        labelEn: "Calendar title (EN)",
+        placeholder: "Upcoming week",
+      },
+      eyebrowNl: { type: "text", labelNl: "Bovenschrift (NL)", labelEn: "Eyebrow (NL)" },
+      eyebrowEn: { type: "text", labelNl: "Bovenschrift (EN)", labelEn: "Eyebrow (EN)" },
+      subtitleNl: { type: "textarea", labelNl: "Subtekst (NL)", labelEn: "Subtitle (NL)" },
+      subtitleEn: { type: "textarea", labelNl: "Subtekst (EN)", labelEn: "Subtitle (EN)" },
+      primaryLabelNl: { type: "text", labelNl: "Knop 1 (NL)", labelEn: "Button 1 (NL)" },
+      primaryLabelEn: { type: "text", labelNl: "Knop 1 (EN)", labelEn: "Button 1 (EN)" },
+      primaryUrl: {
+        type: "url",
+        labelNl: "Knop 1 link",
+        labelEn: "Button 1 link",
+        placeholder: "/aanbod",
+      },
+      secondaryLabelNl: { type: "text", labelNl: "Knop 2 (NL)", labelEn: "Button 2 (NL)" },
+      secondaryLabelEn: { type: "text", labelNl: "Knop 2 (EN)", labelEn: "Button 2 (EN)" },
+      secondaryUrl: {
+        type: "url",
+        labelNl: "Knop 2 link (NL)",
+        labelEn: "Button 2 link (NL)",
+        placeholder: "/eerstejaars",
+      },
+      secondaryUrlEn: {
+        type: "url",
+        labelNl: "Knop 2 link (EN)",
+        labelEn: "Button 2 link (EN)",
+        placeholder: "/internationals",
+      },
+    },
+  },
 ];
 
 /**

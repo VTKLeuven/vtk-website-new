@@ -259,3 +259,381 @@
     gap: 22px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Nieuw: Verfijnde, compacte frontpage (viewport-fit & modern design)
+--------------------------------------------------------------------------- */
+.vtk-design .fp-nieuw {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(420px, 520px);
+  gap: clamp(32px, 5vw, 64px);
+  align-items: start;
+  padding: clamp(20px, 3vh, 32px) clamp(20px, 3vw, 36px) clamp(20px, 3vh, 32px);
+  max-width: var(--max);
+  margin: 0 auto;
+}
+
+@media (min-width: 981px) {
+  .vtk-design .fp-nieuw {
+    padding-top: calc(var(--vtk-header-height) + clamp(16px, 2.5vh, 28px));
+  }
+}
+
+/* Linker kolom: naar links getrokken, royale ruimte */
+.vtk-design .fp-nieuw .hero-copy {
+  max-width: 520px;
+}
+
+/* Eyebrow: strak zonder bolletje */
+.vtk-design .fp-nieuw .fp-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--yellow);
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+/* Slogan typografie: compact en punchy zodat het op het scherm past */
+.vtk-design .fp-nieuw .hero-slogans {
+  margin: 8px 0 0;
+  font-size: clamp(32px, 3.8vw, 48px);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+
+.vtk-design .fp-nieuw .hero-slogans[data-size="m"] {
+  font-size: clamp(30px, 3.4vw, 44px);
+}
+
+.vtk-design .fp-nieuw .hero-slogans[data-size="s"] {
+  font-size: clamp(26px, 3vw, 38px);
+}
+
+/* Slogan accent: strak sans-serif vet geel accent (geen cursief serif) */
+.vtk-design .fp-nieuw .hero-slogans .serif {
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 800;
+  color: var(--yellow);
+  letter-spacing: -0.02em;
+}
+
+/* Subtitel */
+.vtk-design .fp-nieuw .hero-sub {
+  margin: 12px 0 0;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: rgba(250, 250, 247, 0.88);
+  max-width: 44ch;
+  text-shadow: 0 1px 16px rgba(10, 15, 31, 0.5);
+}
+
+/* CTA Knoppen */
+.vtk-design .fp-nieuw .hero-cta {
+  margin-top: 16px;
+  display: flex;
+  gap: 12px;
+}
+
+/* Shift chip */
+.vtk-design .fp-nieuw .fp-shift-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 12px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  margin-top: 16px;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.vtk-design .fp-nieuw .fp-chip-pulse {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--yellow);
+  box-shadow: 0 0 8px var(--yellow);
+  flex-shrink: 0;
+  animation: pulse-glow 2s infinite ease-in-out;
+}
+
+.vtk-design .fp-nieuw .fp-chip-link {
+  color: var(--yellow);
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.vtk-design .fp-nieuw .fp-chip-link:hover {
+  opacity: 0.8;
+}
+
+/* ---------------------------------------------------------------------------
+   Rechter kolom: Verticale weekkalender (7 dagen, strakke lijnen, compact)
+--------------------------------------------------------------------------- */
+.vtk-design .fp-nieuw .hero-cal-week {
+  position: relative;
+  border-radius: 16px;
+  background: rgba(8, 14, 30, 0.78);
+  backdrop-filter: blur(20px) saturate(160%);
+  -webkit-backdrop-filter: blur(20px) saturate(160%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  padding: 14px 18px 12px;
+  box-shadow:
+    0 20px 40px -10px rgba(0, 0, 0, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+/* Kalenderkop */
+.vtk-design .fp-nieuw .cal-week-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.vtk-design .fp-nieuw .cal-week-title-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.vtk-design .fp-nieuw .cal-week-head h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: -0.01em;
+}
+
+.vtk-design .fp-nieuw .cal-week-range {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.vtk-design .fp-nieuw .cal-week-all {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--yellow);
+  text-decoration: none;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: opacity 0.15s ease;
+}
+
+.vtk-design .fp-nieuw .cal-week-all:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+/* Dagenlijst */
+.vtk-design .fp-nieuw .cal-week-days {
+  display: flex;
+  flex-direction: column;
+}
+
+/* Dagrij: strakke scheidingslijnen zonder wazige gradient fade-out */
+.vtk-design .fp-nieuw .cal-week-day-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 5px 0;
+}
+
+.vtk-design .fp-nieuw .cal-week-day-row + .cal-week-day-row {
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.vtk-design .fp-nieuw .cal-week-day-row.is-empty {
+  padding: 3.5px 0;
+  align-items: center;
+}
+
+/* Datumkolom: dagnummer op kop, weekdag eronder */
+.vtk-design .fp-nieuw .cal-date-col {
+  width: 36px;
+  flex-shrink: 0;
+}
+
+.vtk-design .fp-nieuw .cal-date-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  padding: 2px 0;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  line-height: 1;
+}
+
+.vtk-design .fp-nieuw .cal-week-day-row.is-today .cal-date-badge {
+  background: rgba(255, 210, 63, 0.12);
+  border-color: rgba(255, 210, 63, 0.45);
+}
+
+.vtk-design .fp-nieuw .cal-date-num {
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: #ffffff;
+  line-height: 1.1;
+}
+
+.vtk-design .fp-nieuw .cal-week-day-row.is-today .cal-date-num {
+  color: var(--yellow);
+}
+
+.vtk-design .fp-nieuw .cal-date-dow {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.65);
+  margin-top: 1px;
+}
+
+.vtk-design .fp-nieuw .cal-week-day-row.is-today .cal-date-dow {
+  color: var(--yellow);
+}
+
+/* Evenementenkolom */
+.vtk-design .fp-nieuw .cal-events-col {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+/* Lege dag */
+.vtk-design .fp-nieuw .cal-empty-row {
+  display: flex;
+  align-items: center;
+  min-height: 22px;
+}
+
+.vtk-design .fp-nieuw .cal-empty-text {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.5);
+  font-style: italic;
+}
+
+/* Individuele evenementrij */
+.vtk-design .fp-nieuw .cal-ev-row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 1.5px 0;
+  min-height: 24px;
+}
+
+.vtk-design .fp-nieuw .cal-ev-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cat, var(--yellow));
+  transform: translateY(3px);
+  flex-shrink: 0;
+}
+
+.vtk-design .fp-nieuw .cal-ev-row.is-repeat .cal-ev-dot {
+  background: transparent;
+  box-shadow: inset 0 0 0 1.5px var(--cat, var(--yellow));
+}
+
+.vtk-design .fp-nieuw .cal-ev-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.vtk-design .fp-nieuw .cal-ev-title {
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.25;
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.vtk-design .fp-nieuw .cal-ev-title:hover {
+  text-decoration: underline;
+  color: #ffffff;
+}
+
+.vtk-design .fp-nieuw .cal-ev-meta {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.vtk-design .fp-nieuw .cal-ev-time {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vtk-design .fp-nieuw .cal-ev-star {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  margin: -3px -3px -3px 0;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.45);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: color 0.15s ease;
+}
+
+.vtk-design .fp-nieuw .cal-ev-star:hover {
+  color: #ffffff;
+}
+
+.vtk-design .fp-nieuw .cal-ev-star[aria-pressed="true"] {
+  color: var(--yellow);
+}
+
+@media (max-width: 980px) {
+  .vtk-design .fp-nieuw {
+    grid-template-columns: 1fr;
+    gap: 28px;
+  }
+
+  .vtk-design .fp-nieuw .hero-copy {
+    max-width: 100%;
+  }
+
+  .vtk-design .fp-nieuw .hero-cal-week {
+    max-width: 100%;
+  }
+}
