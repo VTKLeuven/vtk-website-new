@@ -104,7 +104,7 @@ describe("datum uit een date-input", () => {
 });
 
 describe("bestandsnaam van het blad", () => {
-  it("houdt het formaat van billsheet aan, zodat de map bij de boekhouder doorloopt", () => {
+  it("zet jaar, post, activiteit, omschrijving en bedrag achter elkaar met underscores", () => {
     expect(
       expenseReportFilename({
         spentOn: new Date(Date.UTC(2026, 8, 18)),
@@ -113,7 +113,7 @@ describe("bestandsnaam van het blad", () => {
         description: "Bierbestelling",
         amountCents: 24890,
       }),
-    ).toBe("26-27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf");
+    ).toBe("26_27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf");
   });
 
   it("gooit tekens weg die niet in een bestandsnaam horen", () => {
@@ -125,7 +125,7 @@ describe("bestandsnaam van het blad", () => {
         description: "Verf & penselen",
         amountCents: 3115,
       }),
-    ).toBe("26-27_Cultuur_ExpoKunst_Verf  penselen_31.15.pdf");
+    ).toBe("26_27_Cultuur_ExpoKunst_Verf  penselen_31.15.pdf");
   });
 });
 

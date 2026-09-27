@@ -160,6 +160,17 @@ export function UploadIcon() {
   );
 }
 
+/** Pijl naar beneden in een bak: een bestand dat meteen binnenkomt. */
+export function DownloadIcon() {
+  return (
+    <Icon>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="M7 10l5 5 5-5" />
+      <path d="M12 15V3" />
+    </Icon>
+  );
+}
+
 /**
  * Persoon en sleutel: twee kopieerknoppen naast elkaar met hetzelfde
  * kopieer-icoon zijn een raadsel, dus het icoon zegt wát je kopieert.

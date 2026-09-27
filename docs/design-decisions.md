@@ -7133,10 +7133,19 @@ Alles daarvan zit nu in `/admin/rekeningen`. De werkende keuzes:
 
 **De boekhouder wil één vast blad, dus dat blad blijft.** `blad.pdf` staat onder
 `apps/web/public/rekeningen/`, en `lib/rekeningen/report.ts` vult het in op exact
-dezelfde coördinaten als billsheet, met dezelfde bestandsnaam
-(`26-27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf`). De bladen van vóór en na de
-overstap liggen bij de boekhouder in dezelfde map; ze moeten er dus hetzelfde
-uitzien. Een mooiere, zelfgetekende PDF was hier de verkeerde verbetering.
+dezelfde coördinaten als billsheet. De bladen van vóór en na de overstap liggen
+bij de boekhouder in dezelfde map; ze moeten er dus hetzelfde uitzien. Een
+mooiere, zelfgetekende PDF was hier de verkeerde verbetering.
+
+**De bestandsnaam is `JJ_JJ_POST_EVENEMENT_OMSCHRIJVING_BEDRAG`**
+(`26_27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf`), op vraag van de penning
+in september 2026. Billsheet schreef het jaar als `26-27`; dat streepje is een
+underscore geworden, zodat elk deel met hetzelfde teken gescheiden is. De
+download en de bijlage van de mail naar de boekhouder dragen dezelfde naam
+(`expenseReportFilename`). Een rij in de lijst heeft daarom een vierde knop die
+het blad meteen downloadt, naast "Blad bekijken": wie een reeks rekeningen in een
+map wil zetten, hoeft niet voor elke rekening het voorbeeldvenster te openen.
+Draaien kan enkel in dat venster.
 
 **Het bonnetje kan gedraaid worden voor het vertrekt.** Een kassaticket komt van
 een telefoon en ligt vaak op zijn kant. Het voorbeeldvenster genereert bij elke

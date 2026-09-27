@@ -229,7 +229,12 @@ function replaceBadCharacters(value: string): string {
   return value.replace(/[^\w\s.-]/g, (char) => map[char] ?? "");
 }
 
-/** "26-27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf" */
+/**
+ * "26_27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf": jaar, post, activiteit,
+ * omschrijving en bedrag, allemaal met een underscore ertussen. Het jaar staat
+ * hier dus als "26_27", niet als het "26-27" van `academicYearTag`: zo vraagt de
+ * penning het. Download en mailbijlage gebruiken allebei deze naam.
+ */
 export function expenseReportFilename(expense: {
   spentOn: Date;
   postLabel: string;
@@ -238,7 +243,7 @@ export function expenseReportFilename(expense: {
   amountCents: number;
 }): string {
   return replaceBadCharacters(
-    `${academicYearTag(expense.spentOn)}_${expense.postLabel}_${expense.activity}_${expense.description}_${
+    `${academicYearTag(expense.spentOn).replace("-", "_")}_${expense.postLabel}_${expense.activity}_${expense.description}_${
       expense.amountCents / 100
     }.pdf`,
   );
