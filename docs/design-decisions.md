@@ -7137,10 +7137,12 @@ dezelfde coördinaten als billsheet. De bladen van vóór en na de overstap ligg
 bij de boekhouder in dezelfde map; ze moeten er dus hetzelfde uitzien. Een
 mooiere, zelfgetekende PDF was hier de verkeerde verbetering.
 
-**De bestandsnaam is `JJ_JJ_POST_EVENEMENT_OMSCHRIJVING_BEDRAG`**
-(`26_27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf`), op vraag van de penning
-in september 2026. Billsheet schreef het jaar als `26-27`; dat streepje is een
-underscore geworden, zodat elk deel met hetzelfde teken gescheiden is. De
+**De bestandsnaam is `JJ_JJ_POST_ACTIVITEIT_BEDRAG`**
+(`26_27_Fakbar_Doopcantus_248.9.pdf`), op vraag van de penning in september
+2026. Billsheet schreef het jaar als `26-27` en zette de omschrijving er nog
+achter; dat streepje is een underscore geworden, zodat elk deel met hetzelfde
+teken gescheiden is, en de omschrijving is eruit. Die is een hele zin, terwijl
+de activiteit ("Doopcantus") al zegt waarvoor de uitgave was. De
 download en de bijlage van de mail naar de boekhouder dragen dezelfde naam
 (`expenseReportFilename`). Een rij in de lijst heeft daarom een vierde knop die
 het blad meteen downloadt, naast "Blad bekijken": wie een reeks rekeningen in een

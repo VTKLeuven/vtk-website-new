@@ -230,20 +230,21 @@ function replaceBadCharacters(value: string): string {
 }
 
 /**
- * "26_27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf": jaar, post, activiteit,
- * omschrijving en bedrag, allemaal met een underscore ertussen. Het jaar staat
- * hier dus als "26_27", niet als het "26-27" van `academicYearTag`: zo vraagt de
- * penning het. Download en mailbijlage gebruiken allebei deze naam.
+ * "26_27_Fakbar_Doopcantus_248.9.pdf": jaar, post, activiteit en bedrag, met een
+ * underscore ertussen. De omschrijving staat er bewust niet in: die is een zin
+ * ("Een kleine vuilbak voor secri aangekocht in de action") en de activiteit zegt
+ * al waarvoor het was. Het jaar staat hier als "26_27", niet als het "26-27" van
+ * `academicYearTag`: zo vraagt de penning het. Download en mailbijlage gebruiken
+ * allebei deze naam.
  */
 export function expenseReportFilename(expense: {
   spentOn: Date;
   postLabel: string;
   activity: string;
-  description: string;
   amountCents: number;
 }): string {
   return replaceBadCharacters(
-    `${academicYearTag(expense.spentOn).replace("-", "_")}_${expense.postLabel}_${expense.activity}_${expense.description}_${
+    `${academicYearTag(expense.spentOn).replace("-", "_")}_${expense.postLabel}_${expense.activity}_${
       expense.amountCents / 100
     }.pdf`,
   );
