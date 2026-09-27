@@ -82,7 +82,7 @@ const MASTERS_ONLY_PROGRAMME_GROUPS: CareerYearGroup[] = [MASTERS_GROUP];
  * Niet elke richting heeft dezelfde deellijsten:
  * - Architectuur heeft een eigen 1ste bachelor (en dus 4 deellijsten);
  * - Algemene Bachelor heeft geen eigen deellijsten (0);
- * - De 7 masters-only richtingen (bv. Cybersecurity, Energie) hebben enkel een masters-deel (1);
+ * - De 8 masters-only richtingen (bv. Cybersecurity, Energie) hebben enkel een masters-deel (1);
  * - De overige 7 ingenieursrichtingen hebben 2de bachelor, 3de bachelor en masters (3).
  */
 export const CAREER_PROGRAMME_GROUPS: Record<StudyProgramme, CareerYearGroup[]> = {
@@ -98,6 +98,7 @@ export const CAREER_PROGRAMME_GROUPS: Record<StudyProgramme, CareerYearGroup[]> 
   ENERGY: MASTERS_ONLY_PROGRAMME_GROUPS,
   ARTIFICIAL_INTELLIGENCE: MASTERS_ONLY_PROGRAMME_GROUPS,
   MATERIALS: STANDARD_PROGRAMME_GROUPS,
+  MOBILITY_SUPPLY_CHAIN: MASTERS_ONLY_PROGRAMME_GROUPS,
   NANO: MASTERS_ONLY_PROGRAMME_GROUPS,
   URBANISM: MASTERS_ONLY_PROGRAMME_GROUPS,
   MATHEMATICAL: MASTERS_ONLY_PROGRAMME_GROUPS,

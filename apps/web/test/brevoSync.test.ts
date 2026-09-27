@@ -181,10 +181,10 @@ describe("Career-deellijsten", () => {
     user({ mailCategories: ["CAREER"], ...overrides });
 
   it("beheert één Brevo-lijst per deel, naast de algemene Career-lijst", () => {
-    // Zes jaargroepen plus 32 richting-delen (Architectuur 4, 7 bachelor+master-richtingen 3,
-    // 7 masters-only richtingen 1, Algemene Bachelor 0); de algemene lijst is de
+    // Zes jaargroepen plus 33 richting-delen (Architectuur 4, 7 bachelor+master-richtingen 3,
+    // 8 masters-only richtingen 1, Algemene Bachelor 0); de algemene lijst is de
     // categorie `CAREER` zelf en telt hier dus niet mee.
-    expect(CAREER_SEGMENTS).toHaveLength(6 + 32);
+    expect(CAREER_SEGMENTS).toHaveLength(6 + 33);
 
     const keys = CAREER_LIST_SEGMENTS.map((s) => s.key);
     expect(new Set(keys).size).toBe(keys.length);
@@ -265,12 +265,13 @@ describe("Career-deellijsten", () => {
     expect(ma).toContain("CAREER:richting:architecture:masters");
   });
 
-  it("plaatst de 7 masters-only richtingen uitsluitend in masters en niet in bachelor-delen", () => {
+  it("plaatst de 8 masters-only richtingen uitsluitend in masters en niet in bachelor-delen", () => {
     const mastersOnly = [
       "CYBERSECURITY",
       "DIGITAL_HUMANITIES",
       "ENERGY",
       "ARTIFICIAL_INTELLIGENCE",
+      "MOBILITY_SUPPLY_CHAIN",
       "NANO",
       "URBANISM",
       "MATHEMATICAL",

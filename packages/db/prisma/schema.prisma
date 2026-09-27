@@ -458,6 +458,9 @@ enum StudyProgramme {
   ENERGY
   ARTIFICIAL_INTELLIGENCE
   MATERIALS
+  // Master Mobility & Supply Chain Engineering: enkel een master, net als
+  // Energie of Cybersecurity.
+  MOBILITY_SUPPLY_CHAIN
   NANO
   URBANISM
   MATHEMATICAL
