@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { Button, Input, Label } from "@vtk/ui";
 import { saveMagazineAction } from "@/app/actions/media";
 import { FileField } from "@/components/ui/FileField";
-import { renderPdfCover } from "@/lib/pdfCover";
 
 const ERRORS: Record<string, { nl: string; en: string }> = {
   missing_fields: { nl: "Vul soort, titel en editie in.", en: "Fill in kind, title, and issue." },
@@ -31,18 +30,8 @@ export function MagazineUploadForm({ locale }: { locale: "nl" | "en" }) {
     setMessage(null);
     setError(null);
     try {
-      const data = new FormData(form);
-      // De kaft voor de tegel in het nieuws, van bladzijde 1. Lukt dat niet
-      // (een kapotte of beveiligde pdf), dan gaat de editie zonder kaft op.
-      const pdf = data.get("file");
-      if (pdf instanceof File && pdf.size > 0) {
-        try {
-          data.set("cover", await renderPdfCover(pdf), "cover.jpg");
-        } catch {
-          /* zonder kaft */
-        }
-      }
-      const result = await saveMagazineAction(data);
+      // De kaft van bladzijde 1 maakt de server (lib/magazineCover.ts).
+      const result = await saveMagazineAction(new FormData(form));
       if (result.ok) {
         form.reset();
         setKind("bakske");

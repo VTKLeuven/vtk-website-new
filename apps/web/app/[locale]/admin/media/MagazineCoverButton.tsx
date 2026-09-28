@@ -6,22 +6,19 @@ import { IconButton } from "@/components/ui/IconButton";
 import { ImageIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { setMagazineCoverAction } from "@/app/actions/media";
-import { renderPdfCover } from "@/lib/pdfCover";
 
 /**
- * Maakt de kaft van een bestaande editie uit bladzijde 1 van haar pdf, voor een
- * editie die geüpload werd voor de kaften bestonden. Nieuwe edities krijgen ze
- * al bij het uploaden (`MagazineUploadForm`).
+ * Maakt de kaft van een editie opnieuw uit bladzijde 1 van haar pdf, op de
+ * server (lib/magazineCover.ts). Een editie zonder kaft krijgt er ook vanzelf
+ * een; dit is de knop om niet te wachten, of om een kaft te vervangen.
  */
 export function MagazineCoverButton({
   id,
-  documentUrl,
   hasCover,
   context,
   locale,
 }: {
   id: string;
-  documentUrl: string;
   hasCover: boolean;
   /** Titel en editie, voor de screenreader. */
   context: string;
@@ -45,7 +42,6 @@ export function MagazineCoverButton({
     try {
       const data = new FormData();
       data.set("id", id);
-      data.set("cover", await renderPdfCover(documentUrl), "cover.jpg");
       const result = await setMagazineCoverAction(data);
       if (result.status === "success") {
         toast({ message: nl ? "Kaft gemaakt" : "Cover made", variant: "success" });

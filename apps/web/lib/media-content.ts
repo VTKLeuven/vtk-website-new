@@ -24,7 +24,7 @@ export type MediaPublication = {
   pdfUrl?: string;
   storageKey?: string;
   /**
-   * Bladzijde 1 als JPEG, gemaakt bij het uploaden (lib/pdfCover.ts). Voor de
+   * Bladzijde 1 als JPEG, gemaakt op de server (lib/magazineCover.ts). Voor de
    * tegel in het nieuws; een oudere editie zonder kaft valt terug op het
    * streepjesvlak.
    */
