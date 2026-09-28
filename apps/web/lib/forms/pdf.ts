@@ -10,11 +10,13 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
  * CSV blijft het formaat om mee te rekenen.
  */
 
-const A4 = { width: 595.28, height: 841.89 };
-const MARGIN = 48;
-const INK = rgb(0.04, 0.06, 0.12);
-const MUTED = rgb(0.36, 0.4, 0.5);
-const LINE = rgb(0.85, 0.87, 0.91);
+// Gedeeld met de groepslijst (`lib/forms/grouping/pdf.ts`): dezelfde marges en
+// kleuren, zodat twee PDF's van dezelfde site er niet anders uitzien.
+export const A4 = { width: 595.28, height: 841.89 };
+export const MARGIN = 48;
+export const INK = rgb(0.04, 0.06, 0.12);
+export const MUTED = rgb(0.36, 0.4, 0.5);
+export const LINE = rgb(0.85, 0.87, 0.91);
 
 export type PdfEntry = {
   title: string;
@@ -27,7 +29,7 @@ export type PdfEntry = {
  * zou anders de hele export laten mislukken met "WinAnsi cannot encode", dus
  * vervangen we wat niet kan door een vraagteken in plaats van te crashen.
  */
-function toWinAnsi(value: string): string {
+export function toWinAnsi(value: string): string {
   return value
     .normalize("NFC")
     .replace(/[‘’‚′]/g, "'")
@@ -38,10 +40,11 @@ function toWinAnsi(value: string): string {
     .replace(/[^\x09\x0a\x20-\x7e¡-ÿ€]/g, "?");
 }
 
-type Font = Awaited<ReturnType<PDFDocument["embedFont"]>>;
+export type PdfFont = Awaited<ReturnType<PDFDocument["embedFont"]>>;
+type Font = PdfFont;
 
 /** Breekt een regel af op woordgrens, en desnoods midden in een lang woord. */
-function wrap(text: string, font: Font, size: number, maxWidth: number): string[] {
+export function wrap(text: string, font: Font, size: number, maxWidth: number): string[] {
   const lines: string[] = [];
   for (const paragraph of text.split("\n")) {
     let current = "";

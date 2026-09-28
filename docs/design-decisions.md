@@ -8316,3 +8316,65 @@ momenten weg en maakt ze opnieuw aan, dus elke id verandert zodra iemand een
 komma in de beschrijving aanpast, en dat zou de interesse van iedereen wissen.
 Verzet een organisator het uur van een dag, dan laat de markering voor die dag
 los; dat is gewenst, want het is een ander moment geworden.
+
+## De groepjesmaker
+
+Onthaal deelt eerstejaars in peter-metergroepen, internationaal maakt
+kwisploegen. Beide laten iedereen een publieke form invullen en willen daarna
+groepjes op basis van de antwoorden. De technische kant staat in
+`docs/forms.md`, "Groepjesmaker"; hier staat waarom het zo werkt.
+
+**Het hangt aan een gewone form, geen eigen module.** Een inschrijving met een
+publieke link, een sluitmoment, een maximum, een export en toegang per post
+bestaat al; een tweede soort inschrijvingsformulier zou daar na een jaar van
+afwijken. De groepjesmaker hangt dus aan een form, en een vraag krijgt er een
+rol in. In het beheer staat hij wel onder **Apps** en niet onder Forms: er
+komen nog hulpmiddelen bij, en die horen samen op één plek in plaats van elk
+een eigen tab of verstopt in een ander scherm. Elke app is een item in de
+zijbalkgroep Apps; een aparte lijstpagina met de apps werd bekeken en
+vervangen, want dat is een klik extra voor wat de zijbalk al toont.
+
+**Wie samen inschrijft, vult één keer in.** Het verslag van onthaal zegt het
+letterlijk: "als ze samen willen zitten moet 1 persoon ze inschrijven". Die
+persoon geeft aan met hoeveel ze zijn en somt de namen op, met komma's. Die
+inschrijving is één blok dat nooit gesplitst wordt en telt voor iedereen die ze
+meebrengt. Een formulier met herhaalbare velden per persoon was de andere weg,
+maar dat bestaat niet en vraagt de invuller gegevens van anderen die hij niet
+kent.
+
+**Peters en meters zijn de kern van een groep, met eigen grenzen.** Onthaal wil
+groepen van ongeveer 14 à 15 petekinderen met 5 à 6 peters en meters. Dat zijn
+twee soorten grenzen: de min/max per groep gaat over de gewone leden, de
+kerngrenzen apart over de peters en meters. Een groep peters en meters die zich
+samen inschreef, krijgt altijd een eigen groep (ook al is ze groter dan het
+maximum), en wie aangeeft "geen losse peters of meters meer", krijgt er geen
+bij. Losse peters en meters worden over de groepen verdeeld die nog openstaan.
+
+**Internationaal kiest een partner, geen vriendengroep.** Een kwis mengt
+landen; wie één iemand meebrengt, is niet alleen, maar een groep van vijf
+vrienden uit hetzelfde land maakt het mengen zinloos. Daarom is de partner een
+eigen rol naast de groepsinschrijving: een form van internationaal zet enkel
+een partnervraag, die van onthaal het aantal en de namen. De partnervraag zoekt
+de andere inzending op naam, e-mail of r-nummer. Vindt ze niemand, dan deelt de
+site gewoon in en meldt ze het; ze blokkeert niet op een tikfout.
+
+**De grenzen zijn een doel, geen voorwaarde.** Met 61 inschrijvingen lukt
+"precies 15 per groep" niet. De indeling faalt dan niet maar komt zo dicht
+mogelijk, en zegt per groep wat er buiten valt. Een indeling die weigert, laat
+onthaal op de avond zelf zonder groepen.
+
+**Automatisch indelen gebeurt één keer.** "Zodra alle antwoorden er zijn" is het
+sluitmoment, het maximum aantal inzendingen of een verwacht aantal personen,
+wat eerst komt; dan sluit de form en maakt de site de groepjes. Daarna schuift
+een beheerder met de hand, en een worker die elke minuut opnieuw indeelt, zou
+dat werk stil weggooien. Opnieuw indelen kan met de knop, na een bevestiging
+die zegt hoeveel verplaatsingen verloren gaan.
+
+**Dezelfde inschrijvingen geven dezelfde groepen.** Het toeval in de indeling
+hangt aan een vaste seed per form. Anders gaf "opnieuw indelen" om een
+waarschuwing te bekijken telkens andere groepen, en kan je twee versies niet
+vergelijken.
+
+**Enkel de organisatoren zien de groepen.** Het verslag van onthaal: "maar enkel
+naar ons en niet naar die personen zelf". Er gaat geen mail naar de deelnemers
+en de publieke pagina toont niets; de groepen staan in het beheer en in een CSV.

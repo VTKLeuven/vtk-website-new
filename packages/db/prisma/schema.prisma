@@ -786,6 +786,7 @@ model User {
   formGroupGrantsGiven FormGroupGrant[] @relation("FormGroupGrantGrantedBy")
   formEntries          FormEntry[]      @relation("FormEntrySubmittedBy")
   reviewedFormEntries  FormEntry[]      @relation("FormEntryReviewer")
+  formGroupingsRun     FormGrouping[]   @relation("FormGroupingRanBy")
   formAuditLogs        FormAuditLog[]   @relation("FormAuditActor")
 
   //Oauth / SSO fields
@@ -5485,6 +5486,7 @@ model Form {
   groupGrants    FormGroupGrant[]
   auditLogs      FormAuditLog[]
   outboxMessages FormOutboxMessage[]
+  grouping       FormGrouping?
 
   @@index([ownerGroupId])
   @@index([status, opensAt, closesAt])
@@ -5561,6 +5563,7 @@ model FormField {
   uploads          FormFileUpload[]
   conditions       FormFieldCondition[] @relation("FormFieldConditionTarget")
   conditionSources FormFieldCondition[] @relation("FormFieldConditionSource")
+  groupingRoles    FormGroupingField[]
 
   @@unique([formId, code])
   @@unique([id, formId])
@@ -5670,8 +5673,9 @@ model FormEntry {
   submittedBy User? @relation("FormEntrySubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   reviewer    User? @relation("FormEntryReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
 
-  answers FormAnswer[]
-  uploads FormFileUpload[]
+  answers         FormAnswer[]
+  uploads         FormFileUpload[]
+  groupingMembers FormGroupingMember[]
 
   @@unique([id, formId])
   @@index([formId, status, submittedAt])
@@ -5767,6 +5771,119 @@ model FormGroupGrant {
 
 /// Wie wijzigde welk formulier, wie verwijderde welke inzending. In de stijl van
 /// TicketAuditLog; de retentie wist het IP-adres en de ruwe metadata.
+/// Wat een vraag betekent voor de groepjesmaker. Een veld zonder rol is gewoon
+/// een gegeven (telefoonnummer, allergieën) en telt niet mee in de indeling.
+enum FormGroupingRole {
+  /// Naam van de invuller; zo heet de rij in het resultaat.
+  NAME
+  /// Iets waarmee een ander naar deze inzending kan verwijzen (e-mail,
+  /// r-nummer). Ook de naam telt daarvoor mee.
+  IDENTIFIER
+  /// Met hoeveel personen deze inzending zich inschrijft (inclusief de invuller).
+  GROUP_SIZE
+  /// De namen van de anderen in die inschrijving, met komma's gescheiden.
+  GROUP_NAMES
+  /// Naar wie deze inzending verwijst om samen te zitten; wordt gezocht in de
+  /// NAME- en IDENTIFIER-velden van de andere inzendingen.
+  PARTNER
+  /// Welke optie(s) een inzending tot "kern" van een groep maken (peters en
+  /// meters bij onthaal). Zonder rolveld is iedereen gewoon lid.
+  ANCHOR
+  /// Voor een kerninschrijving: aanvaarden ze nog andere kernleden erbij?
+  ACCEPTS_EXTRA
+  /// Wie hetzelfde antwoordt, zit liefst samen.
+  SIMILAR
+  /// Wie hetzelfde antwoordt, zit liefst apart.
+  DIVERSE
+}
+
+/// De groepjesmaker van één formulier: de parameters, de rol van elke vraag en
+/// het laatste resultaat. Zie docs/forms.md, "Groepjesmaker".
+model FormGrouping {
+  id     String @id @default(cuid())
+  formId String @unique
+
+  /// Grenzen per groep, in personen (een inschrijving van drie telt drie keer).
+  /// Tellen enkel de gewone leden; de kern heeft zijn eigen grenzen.
+  minMembers Int  @default(10)
+  maxMembers Int  @default(15)
+  minGroups  Int?
+  maxGroups  Int?
+  minAnchors Int?
+  maxAnchors Int?
+
+  /// Zelf indelen zodra het formulier dicht is: bij het sluitmoment, wanneer
+  /// het vol zit, of wanneer `expectedPeople` personen ingeschreven zijn.
+  autoRun        Boolean @default(false)
+  /// Hoeveel personen er verwacht worden. Bereikt: het formulier sluit.
+  expectedPeople Int?
+
+  ranAt       DateTime? @db.Timestamptz(3)
+  ranById     String?
+  /// Aantal handmatige verplaatsingen sinds de laatste indeling; opnieuw
+  /// indelen gooit die weg, dus de bevestiging noemt het aantal.
+  manualMoves Int       @default(0)
+  /// Wat de indeling niet kon waarmaken (een partner die niet gevonden werd,
+  /// een groep onder het minimum), als lijst van { code, detail }.
+  warnings    Json      @default("[]")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  form    Form                 @relation(fields: [formId], references: [id], onDelete: Cascade)
+  ranBy   User?                @relation("FormGroupingRanBy", fields: [ranById], references: [id], onDelete: SetNull)
+  fields  FormGroupingField[]
+  groups  FormGroupingGroup[]
+  members FormGroupingMember[]
+}
+
+model FormGroupingField {
+  id         String           @id @default(cuid())
+  groupingId String
+  fieldId    String
+  role       FormGroupingRole
+  /// Hoe zwaar deze vraag doorweegt bij SIMILAR en DIVERSE (1 tot 5).
+  weight     Int              @default(1)
+  /// Bij ANCHOR en ACCEPTS_EXTRA: de optiecodes die "ja" betekenen, of "true"
+  /// bij een ja/nee-vraag.
+  options    String[]         @default([])
+
+  grouping FormGrouping @relation(fields: [groupingId], references: [id], onDelete: Cascade)
+  field    FormField    @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([groupingId, fieldId])
+  @@index([fieldId])
+}
+
+model FormGroupingGroup {
+  id         String @id @default(cuid())
+  groupingId String
+  number     Int
+
+  grouping FormGrouping         @relation(fields: [groupingId], references: [id], onDelete: Cascade)
+  members  FormGroupingMember[]
+
+  @@unique([groupingId, number])
+}
+
+/// Eén inzending in een groep. Een inzending van drie personen is één rij: de
+/// groep blijft samen, ook bij een handmatige verplaatsing.
+model FormGroupingMember {
+  id         String  @id @default(cuid())
+  groupingId String
+  groupId    String
+  entryId    String
+  isAnchor   Boolean @default(false)
+
+  grouping FormGrouping      @relation(fields: [groupingId], references: [id], onDelete: Cascade)
+  group    FormGroupingGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  entry    FormEntry         @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@unique([groupingId, entryId])
+  @@index([groupId])
+  @@index([entryId])
+}
+
 model FormAuditLog {
   id          String   @id @default(cuid())
   formId      String

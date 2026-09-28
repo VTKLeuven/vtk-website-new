@@ -451,6 +451,26 @@ const icons: Record<string, ReactNode> = {
       <path d="m19 4 2 2" />
     </Svg>
   ),
+  // apps: een raster van vier tegels
+  apps: (
+    <Svg>
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
+    </Svg>
+  ),
+  // groupMaker: mensen in groepjes -> twee groepjes van drie
+  groupMaker: (
+    <Svg>
+      <circle cx="6" cy="7" r="2" />
+      <circle cx="12" cy="5" r="2" />
+      <circle cx="18" cy="7" r="2" />
+      <circle cx="6" cy="17" r="2" />
+      <circle cx="12" cy="19" r="2" />
+      <circle cx="18" cy="17" r="2" />
+    </Svg>
+  ),
   // grocomeet: vergaderen -> mensen rond een tafel
   grocomeet: (
     <Svg>

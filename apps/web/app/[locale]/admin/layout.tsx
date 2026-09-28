@@ -89,10 +89,11 @@ export default async function AdminLayout({
     if ('group' in entry) {
       const items = entry.items.filter(canSee).map(toItem);
       // Een groep waarvan je maar één item mag zien, is een klik om niets: toon
-      // dat item dan gewoon als los item.
-      if (items.length === 1) {
+      // dat item dan gewoon als los item. Behalve bij een groep die bewust
+      // groeit (Apps): die blijft staan, zodat het item niet van plaats wisselt.
+      if (items.length === 1 && !entry.keepSingle) {
         nodes.push({ type: 'item', item: items[0] });
-      } else if (items.length > 1) {
+      } else if (items.length > 0) {
         nodes.push({ type: 'group', key: entry.group, label: adminDict[entry.group], items });
       }
     } else if (canSee(entry)) {
