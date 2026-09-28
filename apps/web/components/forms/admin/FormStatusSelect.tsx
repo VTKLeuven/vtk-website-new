@@ -65,6 +65,7 @@ export function FormStatusSelect({
   return (
     <span
       className="form-admin-status-select ticket-admin-status"
+      data-row-action
       data-tone={formStatusTone(status)}
     >
       <span className="ticket-admin-status-dot" aria-hidden="true" />

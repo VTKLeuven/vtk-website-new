@@ -10,6 +10,7 @@ import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { FormStatusBadge } from "@/components/forms/admin/FormStatusBadge";
 import { FormStatusSelect } from "@/components/forms/admin/FormStatusSelect";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
+import { LinkedRow } from "@/components/ui/LinkedRow";
 import {
   formatDateTime,
   formatNumber,
@@ -189,10 +190,14 @@ export default async function FormsAdminOverview({
                 {visibleForms.map((form) => {
                   const title = locale === "en" && form.titleEn ? form.titleEn : form.titleNl;
                   return (
-                    <tr key={form.id} className="ticket-admin-linked-row">
+                    <LinkedRow
+                      key={form.id}
+                      className="ticket-admin-linked-row"
+                      href={`${base}/admin/formulieren/${form.id}`}
+                    >
                       <td data-wrap="true">
-                        {/* De link overspant de hele rij (zie .ticket-admin-row-link),
-                            zodat je niet op het pijltje hoeft te mikken. */}
+                        {/* De hele rij is klikbaar (LinkedRow), zodat je niet op
+                            het pijltje hoeft te mikken; de link blijft de tabstop. */}
                         <Link
                           className="ticket-admin-row-link"
                           href={`${base}/admin/formulieren/${form.id}`}
@@ -236,7 +241,7 @@ export default async function FormsAdminOverview({
                           size={18}
                         />
                       </td>
-                    </tr>
+                    </LinkedRow>
                   );
                 })}
               </tbody>
