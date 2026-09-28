@@ -317,12 +317,13 @@ function imageKeyFromFormConfig(config: unknown): string | null {
  * gedeelde categorie: fysiek mag het maar één keer meegeteld worden.
  */
 async function getReferencedStorageFeatures(): Promise<Map<string, string>> {
-  const [groups, headerTabs, headerLinks, pages, events, formFields, products, sessionItems] = await Promise.all([
+  const [groups, headerTabs, headerLinks, pages, events, ticketEvents, formFields, products, sessionItems] = await Promise.all([
     prisma.group.findMany({ where: { photoKey: { not: null } }, select: { photoKey: true } }),
     prisma.headerTab.findMany({ where: { imageKey: { not: null } }, select: { imageKey: true } }),
     prisma.headerTabLink.findMany({ where: { imageKey: { not: null } }, select: { imageKey: true } }),
     prisma.page.findMany({ where: { imageKey: { not: null } }, select: { imageKey: true } }),
     prisma.calendarEvent.findMany({ where: { imageKey: { not: null } }, select: { imageKey: true } }),
+    prisma.ticketEvent.findMany({ where: { imageKey: { not: null } }, select: { imageKey: true } }),
     prisma.formField.findMany({ select: { config: true } }),
     prisma.theokotProduct.findMany({ where: { imageKey: { not: null } }, select: { imageKey: true } }),
     prisma.theokotSessionItem.findMany({ where: { imageKey: { not: null } }, select: { imageKey: true } }),
@@ -341,7 +342,7 @@ async function getReferencedStorageFeatures(): Promise<Map<string, string>> {
   add('post-photos', groups.map((row) => row.photoKey));
   add('homepage-images', headerTabs.map((row) => row.imageKey));
   add('page-images', [...headerLinks.map((row) => row.imageKey), ...pages.map((row) => row.imageKey)]);
-  add('event-images', events.map((row) => row.imageKey));
+  add('event-images', [...events.map((row) => row.imageKey), ...ticketEvents.map((row) => row.imageKey)]);
   add('form-images', formFields.map((row) => imageKeyFromFormConfig(row.config)));
   add('theokot-images', [...products.map((row) => row.imageKey), ...sessionItems.map((row) => row.imageKey)]);
 

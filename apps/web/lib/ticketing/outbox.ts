@@ -6,7 +6,7 @@ import { createOrderAccessToken } from "./crypto";
 import { orderConfirmationMail, sendMail, type OrderMailLine } from "./mail";
 import { orderMailBundle } from "./mailBundle";
 import { ticketingBaseUrl } from "./config";
-import { publicUrl } from "@/lib/storage";
+import { ticketPosterSelect, ticketPosterUrl } from "./poster";
 
 type ClaimedMessage = {
   id: string;
@@ -79,11 +79,12 @@ async function deliver(message: ClaimedMessage): Promise<string> {
   const order = await prisma.ticketOrder.findUnique({
     where: { id: message.orderId },
     include: {
-      // De poster komt van het gekoppelde kalender-event: een ticketevent heeft
-      // zelf geen foto. De post erbij, want die staat boven de titel in de mail.
+      // De banner zoals in de shop (lib/ticketing/poster.ts). De post erbij,
+      // want die staat boven de titel in de mail.
       event: {
         include: {
-          calendarEvent: { select: { imageKey: true } },
+          imageCategory: ticketPosterSelect.imageCategory,
+          calendarEvent: ticketPosterSelect.calendarEvent,
           ownerGroup: { select: { nameNl: true, nameEn: true } },
         },
       },
@@ -100,7 +101,7 @@ async function deliver(message: ClaimedMessage): Promise<string> {
   const { attachments, contents } = await orderMailBundle(order);
   // Een pad volstaat niet in een mailbox: de afbeelding wordt daar buiten de
   // site geladen en heeft dus de volledige URL nodig.
-  const posterPath = publicUrl(order.event.calendarEvent?.imageKey);
+  const posterPath = ticketPosterUrl(order.event);
   const mail = orderConfirmationMail({
     locale,
     buyerName: order.buyerName,

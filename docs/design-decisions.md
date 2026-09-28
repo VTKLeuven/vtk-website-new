@@ -9445,3 +9445,29 @@ alles op 100%.
   `--vtk-vw`/`--vtk-dvh`. Code die muisposities of hoogtes meet, rekent met een
   verhouding in plaats van met losse pixels (grafiek-hover, de meeschuivende
   beheerzijbalk, de ruimte onder de cookiebanner).
+
+## De banner van een ticketevent: eigen foto, themabanner of die van de kalender
+
+Een ticketevent kiest zijn banner zelf, in het paneel "Banner" van de
+instellingen (en al bij het aanmaken). Tot dan kwam de foto enkel van het
+gekoppelde kalenderevent, dus een ticketverkoop zonder kalenderevent (een
+losse inschrijving, een verkoop voor iets dat niet in de kalender hoort) had
+nergens een foto: niet in de shop, niet op /tickets en niet in het nieuws.
+
+- **Drie keuzes, hoogstens één actief.** Een eigen foto (met een uitsnede, zoals
+  bij een kalenderevent), de standaardbanner van een kalenderthema (dezelfde
+  foto die een evenement van dat thema zonder affiche krijgt), of geen eigen
+  keuze. Code: `lib/ticketing/poster.ts`, veld `TicketBannerField`.
+- **Een eigen keuze wint van het kalenderevent.** Wie ze maakt, doet dat op het
+  scherm waar het om de ticketverkoop gaat; die keuze stil laten overschrijven
+  door een foto op een ander scherm zou verrassen. Zonder eigen keuze blijft
+  de foto van het kalenderevent staan, zodat bestaande ticketevents niets zien
+  veranderen.
+- **Enkel een thema met een banner is te kiezen.** Een doelgroep draagt er geen
+  (zie `lib/defaultEventImage.ts`), en een thema zonder banner zou een keuze
+  tonen die op de site niets oplevert.
+- **Achteraf aanpasbaar, en de oude foto wordt opgeruimd.** Een vervangen of
+  weggeklikte eigen foto gaat uit de opslag, zoals bij een kalenderevent.
+- Wie een ticketevent beheert via een grant maar geen globaal uploadrecht heeft,
+  mag er toch een banner voor uploaden: de uploadroute kijkt naar `MANAGE_EVENT`
+  op dat ene event.

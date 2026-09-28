@@ -2050,8 +2050,10 @@ model CalendarCategory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  events    CalendarEventCategory[]
-  followers CalendarCategoryFollow[]
+  events        CalendarEventCategory[]
+  followers     CalendarCategoryFollow[]
+  // Ticketevents die de standaardbanner van dit thema lenen.
+  ticketBanners TicketEvent[]
 
   @@index([order])
 }
@@ -2155,15 +2157,26 @@ model TicketEvent {
   confirmationMessageNl String?
   confirmationMessageEn String?
   settings              Json              @default("{}")
+  // De banner in de shop, op /tickets, in het nieuws en in de bevestigingsmail.
+  // Een eigen foto (`imageKey`, met zijn uitsnede zoals bij CalendarEvent), of
+  // de standaardbanner van een kalenderthema (`imageCategoryId`); hoogstens één
+  // van de twee staat ingevuld. Leeg valt terug op de foto van het gekoppelde
+  // kalenderevent, zodat een ticketevent zonder koppeling ook een banner kan
+  // dragen. Zie lib/ticketing/poster.ts en docs/design-decisions.md.
+  imageKey              String?
+  imageFocusX           Float             @default(0.5)
+  imageFocusY           Float             @default(0.5)
+  imageCategoryId       String?
   createdById           String?
   publishedAt           DateTime?         @db.Timestamptz(3)
   archivedAt            DateTime?         @db.Timestamptz(3)
   createdAt             DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt             DateTime          @updatedAt @db.Timestamptz(3)
 
-  calendarEvent CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
-  ownerGroup    Group          @relation("TicketEventOwnerGroup", fields: [ownerGroupId], references: [id], onDelete: Restrict)
-  createdBy     User?          @relation("TicketEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  calendarEvent CalendarEvent?    @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
+  imageCategory CalendarCategory? @relation(fields: [imageCategoryId], references: [id], onDelete: SetNull)
+  ownerGroup    Group             @relation("TicketEventOwnerGroup", fields: [ownerGroupId], references: [id], onDelete: Restrict)
+  createdBy     User?             @relation("TicketEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   inventoryPools TicketInventoryPool[]
   ticketTypes    TicketType[]

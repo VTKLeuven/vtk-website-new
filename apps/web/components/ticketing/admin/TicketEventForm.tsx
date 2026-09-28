@@ -9,6 +9,7 @@ import {
   AlertTriangle,
   CalendarRange,
   CheckCircle2,
+  ImageIcon,
   Info,
   LoaderCircle,
   Plus,
@@ -21,7 +22,9 @@ import { AddressPicker } from "./AddressPicker";
 import { PresaleFields, type PresaleGroupOption } from "./PresaleFields";
 import { SettingsPanel } from "./SettingsPanel";
 import { TicketTemplateTypeRows } from "./TicketTemplateTypeRows";
+import { TicketBannerField } from "./TicketBannerField";
 import type { TicketEventTemplate } from "@/lib/ticketing/templates";
+import type { TicketBannerCategory } from "@/lib/ticketing/bannerCategories";
 
 const initialState: TicketEventFormActionState = { status: "idle" };
 
@@ -38,6 +41,7 @@ const formErrorMessages: Record<string, { nl: string; en: string }> = {
   INVALID_SLUG: { nl: "Vul een geldige URL-naam in.", en: "Enter a valid URL slug." },
   SLUG_ALREADY_EXISTS: { nl: "Deze URL-naam is al in gebruik.", en: "This URL slug is already in use." },
   TICKET_TYPE_REQUIRED_TO_PUBLISH: { nl: "Voeg een actief tickettype toe voordat je publiceert.", en: "Add an active ticket type before publishing." },
+  INVALID_BANNER: { nl: "De banner is niet opgeslagen: kies een foto of een thema met een standaardbanner.", en: "The banner was not saved: choose a photo or a theme with a default banner." },
 };
 
 function formErrorMessage(code: string | undefined, locale: AdminLocale): string {
@@ -74,6 +78,10 @@ type TicketEventFormValue = {
   contactEmail?: string | null;
   confirmationMessageNl?: string | null;
   confirmationMessageEn?: string | null;
+  imageKey?: string | null;
+  imageFocusX?: number;
+  imageFocusY?: number;
+  imageCategoryId?: string | null;
 };
 
 /** Korte datum voor de statusregel in een dichte kop; leeg wordt een streepje. */
@@ -174,6 +182,8 @@ export function TicketEventForm({
   hasActiveTicketType = false,
   template = null,
   linkedCalendarEvent,
+  bannerCategories = [],
+  linkedImageUrl = null,
   locale,
 }: {
   event?: TicketEventFormValue;
@@ -193,6 +203,10 @@ export function TicketEventForm({
    * beschrijving, locatie en datums worden dan niet gevraagd maar overgenomen.
    */
   linkedCalendarEvent?: LinkedCalendarEvent | null;
+  /** De kalenderthema's met een standaardbanner, voor de keuze van de banner. */
+  bannerCategories?: TicketBannerCategory[];
+  /** De foto van het gekoppelde kalenderevent, als die er is. */
+  linkedImageUrl?: string | null;
   locale: AdminLocale;
 }) {
   const isEdit = Boolean(event.id);
@@ -225,6 +239,25 @@ export function TicketEventForm({
     : nl
       ? "Geen verkoopvenster ingesteld"
       : "No sales window set";
+  const bannerStatus = event.imageKey
+    ? nl
+      ? "Eigen foto"
+      : "Own photo"
+    : event.imageCategoryId
+      ? `${nl ? "Standaardbanner" : "Default banner"}: ${
+          bannerCategories.find((category) => category.id === event.imageCategoryId)?.[nl ? "nameNl" : "nameEn"] ?? ""
+        }`
+      : linkedCalendarEvent
+        ? linkedImageUrl
+          ? nl
+            ? "Van het kalenderevent"
+            : "From the calendar event"
+          : nl
+            ? "Geen banner: het kalenderevent heeft geen foto"
+            : "No banner: the calendar event has no photo"
+        : nl
+          ? "Geen banner"
+          : "No banner";
   const presaleStatus = event.presaleLeadMinutes
     ? ` · ${nl ? "voorverkoop" : "presale"} ${describeLead(event.presaleLeadMinutes, locale)}`
     : "";
@@ -340,6 +373,32 @@ export function TicketEventForm({
               defaultValue={event.contactEmail ?? ""}
             />
           </div>
+        </div>
+      </SettingsPanel>
+
+      <SettingsPanel
+        title={nl ? "Banner" : "Banner"}
+        status={isEdit ? bannerStatus : nl ? "Optioneel · foto in de shop, op /tickets en in het nieuws" : "Optional · photo in the shop, on /tickets and in the news"}
+        icon={<ImageIcon aria-hidden="true" size={17} />}
+      >
+        <p className="ticket-admin-help">
+          {nl
+            ? "De foto bovenaan de ticketshop, op /tickets, in het nieuws op de homepage en in de bevestigingsmail."
+            : "The photo at the top of the ticket shop, on /tickets, in the news on the homepage and in the confirmation email."}
+        </p>
+        <div className="ticket-admin-form-grid">
+          <TicketBannerField
+            eventId={event.id}
+            locale={locale}
+            defaultKey={event.imageKey}
+            defaultFocus={
+              event.imageKey ? { x: event.imageFocusX ?? 0.5, y: event.imageFocusY ?? 0.5 } : null
+            }
+            defaultCategoryId={event.imageCategoryId}
+            categories={bannerCategories}
+            linked={Boolean(linkedCalendarEvent)}
+            linkedImageUrl={linkedImageUrl}
+          />
         </div>
       </SettingsPanel>
 

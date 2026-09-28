@@ -26,6 +26,9 @@ import {
   type TicketDesignDraft,
 } from "@/lib/ticketing/design";
 import { logAudit } from "@/lib/audit";
+import { deleteObject } from "@vtk/storage";
+import { readImageField, resolveImageKey } from "@/lib/imageField";
+import { readImageFocus } from "@/lib/imageFocus";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { TICKET_TERMS_SETTING_KEY } from "@/lib/ticketing/terms";
 import { ticketAudienceFrom, ticketAudienceLabel, type TicketAudience } from "@/lib/ticketing/audience";
@@ -232,6 +235,58 @@ async function resolveLocationGeo(
     locationLatitude: found?.latitude ?? null,
     locationLongitude: found?.longitude ?? null,
   };
+}
+
+type TicketBanner = {
+  imageKey: string | null;
+  imageFocusX: number;
+  imageFocusY: number;
+  imageCategoryId: string | null;
+};
+
+/**
+ * De banner uit `TicketBannerField`: een eigen foto, de standaardbanner van een
+ * kalenderthema, of geen van beide (dan die van het kalenderevent, zie
+ * lib/ticketing/poster.ts). Hoogstens één van de twee blijft staan. Zonder
+ * `bannerMode` in het formulier verandert er niets.
+ */
+async function readTicketBanner(formData: FormData, existing: TicketBanner): Promise<TicketBanner> {
+  const mode = value(formData, "bannerMode");
+  if (mode === "own") {
+    const image = readImageField(formData);
+    if (image.kind === "invalid") throw new Error("INVALID_BANNER");
+    const imageKey = resolveImageKey(image, existing.imageKey);
+    const focus = readImageFocus(formData);
+    return { imageKey, imageFocusX: focus.x, imageFocusY: focus.y, imageCategoryId: null };
+  }
+  if (mode === "category") {
+    const imageCategoryId = value(formData, "imageCategoryId");
+    // Enkel een thema dat een banner draagt: een doelgroep heeft er geen, en
+    // een thema zonder banner zou een ticketevent zonder foto opleveren terwijl
+    // het scherm een keuze toonde.
+    const category = imageCategoryId
+      ? await prisma.calendarCategory.findFirst({
+          where: { id: imageCategoryId, audience: null, imageKey: { not: null } },
+          select: { id: true },
+        })
+      : null;
+    if (!category) throw new Error("INVALID_BANNER");
+    return { imageKey: null, imageFocusX: 0.5, imageFocusY: 0.5, imageCategoryId: category.id };
+  }
+  if (mode === "inherit") {
+    return { imageKey: null, imageFocusX: 0.5, imageFocusY: 0.5, imageCategoryId: null };
+  }
+  return existing;
+}
+
+/** De vervangen of gewiste eigen foto opruimen; mislukt dat, dan is dat geen opslaanfout. */
+async function removeReplacedBanner(previous: string | null, next: string | null) {
+  if (!previous || previous === next) return;
+  try {
+    await deleteObject(previous);
+  } catch {
+    /* ignore */
+  }
 }
 
 function refreshTicketEvent(locale: "nl" | "en", eventId: string) {
@@ -446,6 +501,12 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
   const slugExists = await prisma.ticketEvent.findUnique({ where: { slug: requestedSlug } });
   const slug = slugExists ? `${requestedSlug}-${randomBytes(3).toString("hex")}` : requestedSlug;
   const createdLocationGeo = await resolveLocationGeo(formData, { locationAddress: null, locationLatitude: null, locationLongitude: null });
+  const createdBanner = await readTicketBanner(formData, {
+    imageKey: null,
+    imageFocusX: 0.5,
+    imageFocusY: 0.5,
+    imageCategoryId: null,
+  });
 
   // Het sjabloon waaruit dit event ontstaat. De tickettypes komen uit het
   // formulier, niet rechtstreeks uit het sjabloon: in het aanmaakscherm zijn ze
@@ -483,6 +544,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         descriptionEn: limitedOptionalValue(formData, "descriptionEn", 20_000) ?? calendarEvent?.descriptionEn,
         location: limitedOptionalValue(formData, "location", 300) ?? calendarEvent?.location,
         ...createdLocationGeo,
+        ...createdBanner,
         startsAt,
         endsAt,
         salesStartAt,
@@ -702,6 +764,7 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
     }
   }
   const locationGeo = await resolveLocationGeo(formData, event);
+  const banner = await readTicketBanner(formData, event);
 
   await prisma.$transaction(async (tx) => {
     await tx.ticketEvent.update({
@@ -718,6 +781,7 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
           : limitedOptionalValue(formData, "descriptionEn", 20_000),
         location: linked ? linked.location : limitedOptionalValue(formData, "location", 300),
         ...locationGeo,
+        ...banner,
         startsAt,
         endsAt,
         salesStartAt,
@@ -776,6 +840,7 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
     target: await ticketEventTitle(eventId),
     summary: status === event.status ? "instellingen bewerkt" : `status gezet op ${status}`,
   });
+  await removeReplacedBanner(event.imageKey, banner.imageKey);
   refreshTicketEvent(locale, eventId);
 }
 
@@ -891,6 +956,7 @@ export async function deleteTicketEventAction(formData: FormData): Promise<Ticke
       target: event.titleNl,
       summary: "ticketevent verwijderd; er stond nog geen enkele bestelling op",
     });
+    await removeReplacedBanner(event.imageKey, null);
     refreshTicketEvent(locale, eventId);
   } catch (error) {
     unstable_rethrow(error);

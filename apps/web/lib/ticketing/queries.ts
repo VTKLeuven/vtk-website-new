@@ -17,8 +17,6 @@ import {
   type TicketTargetAudience,
 } from "./audience";
 import { ticketViewerProfile } from "./viewerProfile";
-import { publicUrl } from "@/lib/storage";
-import { focusPosition } from "@/lib/imageFocus";
 import { getTicketEventAccess } from "./authorization";
 import {
   isInPresaleNow,
@@ -27,15 +25,17 @@ import {
   type PresaleViewer,
 } from "./presale";
 import { presaleViewerFor } from "./presaleViewer";
+import { ticketPoster, ticketPosterSelect } from "./poster";
 import { userIsMember } from "@/lib/membership";
 
 type PublicLocale = "nl" | "en";
 
 const publicEventInclude = {
   ownerGroup: true,
-  // Enkel voor de poster: een ticketevent heeft geen eigen foto, het gekoppelde
-  // kalender-event wel.
-  calendarEvent: { select: { imageKey: true, imageFocusX: true, imageFocusY: true } },
+  // Voor de banner: een themabanner of het gekoppelde kalender-event, wanneer
+  // het ticketevent geen eigen foto heeft. Zie lib/ticketing/poster.ts.
+  imageCategory: ticketPosterSelect.imageCategory,
+  calendarEvent: ticketPosterSelect.calendarEvent,
   presaleGroups: { select: { groupId: true } },
   questions: { where: { active: true }, orderBy: { sortOrder: "asc" } },
   ticketTypes: {
@@ -50,12 +50,12 @@ type PublicEventRecord = Prisma.TicketEventGetPayload<{
 }>;
 
 const orderInclude = {
-  // Dezelfde poster als in de shop: een ticketevent heeft geen eigen foto, het
-  // gekoppelde kalender-event wel. De bestelpagina toont ze bij het event in
-  // het bestelpaneel.
+  // Dezelfde banner als in de shop (lib/ticketing/poster.ts). De bestelpagina
+  // toont ze bij het event in het bestelpaneel.
   event: {
     include: {
-      calendarEvent: { select: { imageKey: true, imageFocusX: true, imageFocusY: true } },
+      imageCategory: ticketPosterSelect.imageCategory,
+      calendarEvent: ticketPosterSelect.calendarEvent,
     },
   },
   items: { include: { ticket: true } },
@@ -114,15 +114,7 @@ function publicEventDto(
     description: localized(event.descriptionNl ?? "", event.descriptionEn, locale),
     location: event.location,
     locationAddress: event.locationAddress,
-    poster: event.calendarEvent?.imageKey
-      ? {
-          src: publicUrl(event.calendarEvent.imageKey)!,
-          position: focusPosition({
-            x: event.calendarEvent.imageFocusX,
-            y: event.calendarEvent.imageFocusY,
-          }),
-        }
-      : null,
+    poster: ticketPoster(event),
     startsAt: event.startsAt,
     endsAt: event.endsAt,
     currentTime: new Date().toISOString(),
@@ -437,15 +429,7 @@ function orderDto(order: OrderRecord, authenticatedOwner: boolean) {
       title: order.locale === "EN" && order.event.titleEn ? order.event.titleEn : order.event.titleNl,
       startsAt: order.event.startsAt,
       location: order.event.location,
-      poster: order.event.calendarEvent?.imageKey
-        ? {
-            src: publicUrl(order.event.calendarEvent.imageKey)!,
-            position: focusPosition({
-              x: order.event.calendarEvent.imageFocusX,
-              y: order.event.calendarEvent.imageFocusY,
-            }),
-          }
-        : null,
+      poster: ticketPoster(order.event),
       confirmationMessage: order.locale === "EN"
         ? order.event.confirmationMessageEn || order.event.confirmationMessageNl
         : order.event.confirmationMessageNl,

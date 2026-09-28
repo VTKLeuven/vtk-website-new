@@ -12,6 +12,7 @@ import {
 } from "@/lib/ticketing/templates";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
 import { TicketEventForm, type LinkedCalendarEvent } from "./TicketEventForm";
+import type { TicketBannerCategory } from "@/lib/ticketing/bannerCategories";
 import { SettingsPanel } from "./SettingsPanel";
 import { ticketBase, type AdminLocale } from "./format";
 
@@ -37,6 +38,8 @@ export function TicketEventCreate({
   groups,
   calendarEvents,
   linkedCalendarEvent,
+  linkedImageUrl = null,
+  bannerCategories = [],
   baseEvent,
   canManageTemplates,
   locale,
@@ -48,6 +51,8 @@ export function TicketEventCreate({
   groups: { id: string; nameNl: string; nameEn: string }[];
   calendarEvents: { id: string; titleNl: string; titleEn: string | null; start: Date }[];
   linkedCalendarEvent?: LinkedCalendarEvent | null;
+  linkedImageUrl?: string | null;
+  bannerCategories?: TicketBannerCategory[];
   /** Wat het formulier zonder sjabloon al meekreeg (een gekoppeld kalenderevent). */
   baseEvent?: { ownerGroupId?: string; slug?: string };
   canManageTemplates: boolean;
@@ -203,6 +208,8 @@ export function TicketEventCreate({
           groups={groups}
           calendarEvents={calendarEvents}
           linkedCalendarEvent={linkedCalendarEvent}
+          linkedImageUrl={linkedImageUrl}
+          bannerCategories={bannerCategories}
           template={template}
           event={prefill}
           locale={locale}

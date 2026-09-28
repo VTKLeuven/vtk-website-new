@@ -695,6 +695,30 @@
   font-size: 11px;
 }
 
+/* De banner van een ticketevent (TicketBannerField): de keuzes zijn de
+   radiokaarten van hierboven, met eronder de foto die er komt te staan. */
+.ticket-banner-own:not([hidden]) {
+  display: grid;
+  gap: 16px;
+  margin-top: 6px;
+}
+
+.ticket-banner-category {
+  display: grid;
+  gap: 10px;
+  max-width: 360px;
+  margin-top: 6px;
+}
+
+.ticket-banner-preview {
+  width: 240px;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
 /* Adreskiezer: het suggestielijstje hangt onder het invoerveld, dus de
    container is het positioneringsanker. */
 .ticket-address-picker {
