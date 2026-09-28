@@ -449,6 +449,36 @@ open vragen opleverde (`docs/theokot-broodjes-audit-2026-09-21.md`).
   doen, is er één te veel. Corrigeren gaat nu over opgehaald, niet opgehaald en
   gereserveerd; een bestelling echt weghalen doe je bij de verkoopdag zelf.
 
+### Een voorbije dag wissen, en "Er liep iets mis" terugdraaien
+
+Twee keuzes uit september 2026, toen testdagen van voor de lancering de
+statistieken scheeftrokken en "Er liep iets mis" per ongeluk aangeduid werd.
+
+- **Een voorbije verkoopdag kan gewist worden, ook met opgehaalde broodjes**
+  ("Verkoopdag wissen" op Overzicht per dag, `purgeFinishedSession`). Dat is iets
+  anders dan "Verkoopdag verwijderen" (een dag die niet doorgaat, met mail):
+  - Enkel wanneer de afhaal voorbij is; een komende dag verwijder je nog altijd
+    op de gewone manier.
+  - Er vertrekt geen mail: niemand staat nog voor een gesloten deur.
+  - Eerst tellen de no-shows van die dag niet meer mee, zoals bij "Er liep iets
+    mis", zodat een automatische ban die op die dag steunde kan wegvallen.
+  - Afgeboekte bonnetjes blijven uitgegeven. Het saldo komt uit de shiften
+    (`rewardPaid`), niet uit `TheokotVoucherRedemption`; enkel de regel in de
+    historiek van de app verdwijnt.
+  - Een vlag "telt niet mee in de statistieken" is overwogen en afgewezen: een
+    testdag hoort ook niet in de historiek, het overzicht en de no-show-telling,
+    en een vlag die elke query moet onthouden, wordt ergens vergeten.
+- **"Er liep iets mis" kan teruggedraaid worden**, alsof de dag nooit aangeduid
+  was (`unwaiveSessionNoShows`):
+  - Een automatische ban die de aanduiding ophief, gaat opnieuw in tot haar
+    oorspronkelijke einddatum (start plus `banDurationDays`).
+  - Wie door de aanduiding geen no-showmail kreeg, krijgt ze alsnog, en wie
+    daardoor de drempel haalt, krijgt een ban. De bevestiging zegt hoeveel
+    mails er vertrekken. Staat de verwerking gepauzeerd, dan blijven die
+    no-shows net als tijdens elke pauze buiten beschouwing.
+  - Een no-show die al vóór de aanduiding niet meetelde, blijft zo: enkel wat de
+    aanduiding zelf wegnam, komt terug.
+
 ### Afhaalbalie: suggesties en automatisch op afgehaald
 
 - **Tijdens het tikken verschijnen suggesties**: wie vandaag besteld heeft en op
@@ -9233,12 +9263,16 @@ bron, zodat een album dat verdwijnt of een verkoop die sluit vanzelf wegvalt:
   je je al lang niet meer kan inschrijven.
 - **Het Bakske en Ir.Reëel**: per blad het nieuwste nummer, drie weken lang.
   De tegel toont de bovenkant van bladzijde 1 als foto (`coverKey`). Die kaft
-  wordt één keer gemaakt, in de browser van wie de editie uploadt
-  (`lib/pdfCover.ts`), en niet bij elke bezoeker: pdf.js op de homepage zou
-  iedereen een megabyte script en een stuk pdf laten laden voor één tegel, en de
-  server kan geen pdf tekenen (sharp is zonder pdf-ondersteuning gebouwd). Een
-  editie van voor de kaften krijgt er een met het fotoknopje in /admin/media;
-  zonder kaft blijft het streepjesvlak.
+  wordt één keer gemaakt, op de server (`lib/magazineCover.ts`, pdf.js op
+  `@napi-rs/canvas`), en niet bij elke bezoeker: pdf.js op de homepage zou
+  iedereen een megabyte script en een stuk pdf laten laden voor één tegel.
+  - Eerst gebeurde dit in de browser van wie uploadde, met een knop voor oudere
+    edities. Het nummer dat al online stond, bleef zo zonder kaft tot iemand aan
+    die knop dacht. Nu komt een kaft er vanzelf: bij het uploaden, na het
+    antwoord zodra het nieuws een editie zonder kaft toont, en voor oudere
+    nummers een paar per ronde van de onderhoudstaak.
+  - Zonder kaft (een kapotte pdf, een oude link die niet meer bestaat) blijft
+    het streepjesvlak. Het fotoknopje in /admin/media maakt een kaft opnieuw.
 - **Fotoalbums**: twee weken vanaf de datum van het album. Bewust die datum en
   niet het uploadmoment: Immich geeft dat niet mee, en een album van een
   activiteit van een maand geleden is geen nieuws meer.
@@ -9541,3 +9575,24 @@ vergelijken.
 naar ons en niet naar die personen zelf". Er gaat geen mail naar de deelnemers
 en de publieke pagina toont niets; de groepen staan in het beheer en in een CSV.
 
+## Admin: de zijbalk inklappen
+
+September 2026. Op een laptop krijgt de inhoud van de admin 900px, en een brede
+beheertabel schuift dan achter een scrollbalk. Drie richtingen zijn als ontwerp
+naast elkaar gelegd: een icoonrail, een rail die over de inhoud openklapt, en
+de zijbalk helemaal weg achter één knop.
+
+- **Standaard verandert er niets.** De zijbalk met namen blijft de standaard;
+  inklappen is een keuze per browser (cookie), met een kleine knop naast ADMIN.
+  Iemand die de admin twee keer per jaar opent, vindt een tab aan zijn naam en
+  niet aan een icoon.
+- **De rail won** (60px, dezelfde kaart en iconen als de zijbalk, de groep waar
+  je bent in het lichtblauw van de actieve rij). Een klik op een groep opent
+  haar tabs in een kaart ernaast; een losse tab is gewoon een link. De rail die
+  bij hover de volledige zijbalk over de inhoud legde, is afgewezen; de variant
+  zonder zijbalk ook, omdat elke wissel dan een extra klik kost.
+- **Een compactere rail (52px, knoppen van 36px) is geprobeerd en teruggedraaid**:
+  die las krap. Wat wel bleef: 20px tussen rail en inhoud in plaats van 48.
+- **De rail begint op de hoogte van de eerste kaart of tabel**, niet naast de
+  paginatitel: een smalle rail die boven de inhoud uitsteekt, hangt er los naast.
+  Omdat elke pagina een andere kop heeft, wordt dat gemeten, met een maximum.

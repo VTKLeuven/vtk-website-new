@@ -330,8 +330,9 @@ the design language into the application instead of copying mockup content.
   the left (usually the word from the praeses, as a letter) and the rest as the
   shared event tile (`vtk-eventcard.css`) in a carousel beside it, on
   `--paper-2`. Only the tiles move: one per click or every 10 seconds, with a
-  pause button, no autoplay under `prefers-reduced-motion`; do not let it rotate
-  without that pause control. The kind of a post is a small-caps word, never a
+  pause button, no autoplay under `prefers-reduced-motion`, and every page scroll
+  restarts the 10 seconds so no tile slides away while someone scrolls past it;
+  do not let it rotate without that pause control. The kind of a post is a small-caps word, never a
   colour or an icon tile (those were reviewed and removed: they appeared nowhere
   else on the site). The word from the praeses is Bakske length: it stays
   clamped to nine lines in the featured card with "Lees de hele brief" to open
@@ -596,6 +597,15 @@ the design language into the application instead of copying mockup content.
     hoogstens één primaire bewerktaak tegelijk open. Open bij een lege dataset
     niet automatisch een lang formulier naast een leeg tweede paneel; toon een
     gerichte empty state met een duidelijke startactie.
+  - **De zijbalk kan ingeklapt worden, maar staat standaard uit.** De knop naast
+    ADMIN (enkel vanaf 860px) maakt er een rail van 60px van met enkel de
+    iconen; een groep opent haar tabs in een kaart ernaast, de naam staat in een
+    tooltip. De rail begint op de hoogte van de eerste kaart of tabel, niet naast
+    de paginatitel (`RAIL_ALIGN` in `packages/ui/src/AdminNav.tsx`), en de
+    inhoud schuift tot 20px ervan. Onthouden in een cookie
+    (`lib/adminNavCookie.ts`), zodat de server de juiste stand meteen rendert.
+    Maak inklappen nooit de standaard: wie de admin zelden gebruikt, vindt een
+    tab sneller aan zijn naam dan aan een icoon. Zie `docs/design-decisions.md`.
   - Below 860px the left column collapses into one button naming the tab you are
     on, which opens the full grouped list as a panel underneath
     (`AdminNav` + `vtk-admin.css`). Do not reintroduce the horizontal scroller
@@ -625,9 +635,25 @@ the design language into the application instead of copying mockup content.
     kolommen voor drie bits. Ze zijn nu één `.vtk-expense-track` van drie
     segmenten met het statuswoord erachter. Zoek bij een te brede tabel dus
     eerst naar kolommen die hetzelfde zeggen, voor je kolommen versmalt.
+  - **Een lijst van blokken die samen meer dan één schermhoogte inneemt, klapt
+    dicht.** Gebruik `AdminDisclosure` (`apps/web/components/admin/AdminDisclosure.tsx`):
+    de kop met naam, status en een korte samenvatting blijft zichtbaar, de velden
+    komen pas na een klik. Open waren de frontpages en de slogans een muur van
+    formulieren waarin je het blok dat je zocht niet meer terugvond.
+    - Standaard dicht. Wat je net aanmaakt of wat nog leeg is, staat open: dat
+      wil je net invullen.
+    - Acties die ook dichtgeklapt nodig zijn (aan/uit, verplaatsen,
+      verwijderen), gaan in `actions`, naast de uitklapknop en niet erin.
+    - `variant="row"` voor een item binnen een kaart (geen kaart in een kaart).
+    - Een korte lijst die in één scherm past, klapt niet dicht: elk blok een
+      klik verder wegzetten, helpt daar niemand.
   - **Een rij in een beheertabel opent zijn detail met een klik op de rij zelf**,
-    niet enkel via een `i`-knop ernaast. De cel met de rij-acties stopt de
-    propagatie, en de titelknop in de rij blijft bestaan omdat een toetsenbord
+    niet enkel via een `i`-knop ernaast. Leidt de rij naar een andere pagina,
+    gebruik dan `LinkedRow` (`apps/web/components/ui/LinkedRow.tsx`) en geen
+    `::after` over de rijlink: Safari ankerde dat vlak niet op de `<tr>`, zodat
+    de laatste rij over alle andere lag en de eerste niet meer aan te klikken
+    was. Zet `data-row-action` op een cel of bediening die de klik zelf houdt.
+    De cel met de rij-acties stopt de propagatie, en de titelknop in de rij blijft bestaan omdat een toetsenbord
     en een screenreader een echt focusbaar element nodig hebben. Verwijderen
     hoort dan in de detailmodal en niet meer in de rij: het is de enige
     onomkeerbare actie en het scheelt een icoon per rij.
