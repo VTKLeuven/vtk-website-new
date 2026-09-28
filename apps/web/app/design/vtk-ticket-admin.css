@@ -1126,6 +1126,18 @@
   white-space: nowrap;
 }
 
+/* Een tabel met enkel getallen, in een halve kolom of met veel kolommen (de
+   broodjesstatistieken): geen minimumbreedte, en koppen die mogen afbreken.
+   Een kop op twee regels is beter dan een tabel die achter een scrollbalk
+   verdwijnt. */
+.ticket-admin-table[data-compact] {
+  min-width: 0;
+}
+
+.ticket-admin-table[data-compact] th {
+  white-space: normal;
+}
+
 .vtk-admin-main .ticket-admin-table th {
   letter-spacing: 0;
 }

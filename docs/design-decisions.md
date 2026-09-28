@@ -482,6 +482,33 @@ wie Theokot beheert, ziet ook het geld en de historiek van alle verkoopdagen.
   medewerkersbonnetjes betaalden. **"Aan de balie"** is de opbrengst min wat die
   bonnetjes dekten (het duurste broodje van elke zulke bestelling, zie hierboven).
 
+### Statistieken van de broodjes
+
+`/admin/theokot/statistieken` (`theokot.manage`) is er om het aanbod en de
+werking bij te sturen: hoeveel van welke soort je bij de bakker bestelt, op welke
+dag minder, en wanneer de balie de meeste handen nodig heeft. Dezelfde
+bouwstenen als de ticketstatistieken (`DailyChart`, de kengetal-tegels, de
+tabellen met een balkje), zodat de twee één familie zijn. De regels staan in
+`lib/theokot-stats.ts`, puur en getest.
+
+- **Verkocht is opgehaald**, zoals op het overzicht per dag. **Besteld** is
+  alles wat nog een bestelling is; een annulatie wist de bestelling en bestaat
+  dus niet in de cijfers.
+- **Vergaderingen (GM, bureau) spreken het aanbod aan.** Ze tellen mee voor "hoeveel
+  van het aanbod raakte besteld" en "uitverkocht", niet voor de opbrengst van de
+  balie.
+- **Uitverkocht na** is gemeten vanaf het openen van de bestelronde tot de
+  bestelling die de voorraad van die dag bereikte, in de volgorde waarin ze
+  binnenkwamen, en gemiddeld over de dagen waarop de soort uitverkocht raakte.
+  Een voorraad die achteraf verlaagd werd, telt zoals ze nu staat.
+- **Per weekdag is een gemiddelde per verkoopdag**, geen som: er zijn niet op elke
+  weekdag evenveel verkoopdagen.
+- **Het blok "Opvallend" vergelijkt enkel soorten die geregeld aangeboden werden**
+  (minstens drie dagen en een kwart van de verkoopdagen). Een broodje van de week
+  dat twee dagen bestond, is anders meteen "het traagste".
+- Boven 45 verkoopdagen tekenen de grafieken per week; per dag worden het
+  streepjes.
+
 ### Turf-lijst
 
 - Voor elke verkoopdag kan een **turf-lijst** geprint worden (`/admin/theokot/turflijst`,
