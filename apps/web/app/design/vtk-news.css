@@ -30,8 +30,8 @@
   z-index: -1;
   top: 0;
   bottom: 0;
-  left: calc(50% - 50vw);
-  right: calc(50% - 50vw);
+  left: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
+  right: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
   background: var(--paper-2);
 }
 

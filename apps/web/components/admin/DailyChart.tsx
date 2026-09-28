@@ -164,7 +164,10 @@ export function DailyChart({ kind, days, keyFormat = "day", series, locale, titl
     );
 
   const indexAt = (clientX: number, rect: DOMRect) => {
-    const x = clientX - rect.left - MARGIN.left;
+    // Als deel van de zichtbare breedte, niet in pixels: onder `zoom` (laptops
+    // tot 14 inch, zie vtk-base.css) is `rect` in zichtbare pixels en `width`
+    // in layoutpixels, en dan wees de tooltip naar rechts toe een staaf te ver.
+    const x = ((clientX - rect.left) / Math.max(1, rect.width)) * width - MARGIN.left;
     const i = kind === "bars" ? Math.floor(x / slot) : Math.round((x / plotW) * (n - 1));
     return Math.min(n - 1, Math.max(0, i));
   };

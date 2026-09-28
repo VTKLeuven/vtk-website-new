@@ -9400,3 +9400,27 @@ pagina.
 - **Uitloggen loopt tijdens een voorbeeld via de stoproute** (`logout=1`): die
   wist het voorbeeld en logt daarna uit. De proxy blijft zo streng als ze was;
   er komt geen tweede uitzondering bij.
+
+## De site op 90% op een laptop tot 14 inch
+
+Op een MacBook Air 13" en een MacBook Pro 14" oogde de site op 100% te groot
+(de hero, de koppen, de knoppen), en na één keer Ctrl - net goed. Dat is nu de
+standaard: `zoom: 0.9` op de hele pagina (`vtk-base.css`), vanaf 15 inch blijft
+alles op 100%.
+
+- **Een schermgrootte in inch bestaat niet in CSS.** De breedte in CSS-pixels komt
+  het dichtst bij: 1024 tot 1600 vangt de 13- en 14-inch-laptops (1280 tot 1512),
+  en laat een MacBook Air 15" (1710), een MacBook Pro 16" (1728) en een extern
+  scherm op 100%. Een Windows-laptop van 15,6 inch op 125% schaal (1536) valt er
+  wel binnen; dat is aanvaard.
+- **Enkel met een muis of trackpad** (`hover: hover` en `pointer: fine`): een tablet
+  in liggende stand is geen laptop, en daar is kleiner vooral moeilijker aan te
+  tikken.
+- **Waarom `zoom` en geen kleinere maten.** De site rekent in pixels, niet in rem;
+  alle maten 10% kleiner zetten zou elke component raken. `zoom` doet precies wat
+  Ctrl - doet.
+- **Wat `zoom` niet meeneemt, is opgevangen.** `vw` en `vh` schalen niet mee, dus
+  een volle-breedteband hield 5% voor elke rand op; die maten lopen via
+  `--vtk-vw`/`--vtk-dvh`. Code die muisposities of hoogtes meet, rekent met een
+  verhouding in plaats van met losse pixels (grafiek-hover, de meeschuivende
+  beheerzijbalk, de ruimte onder de cookiebanner).

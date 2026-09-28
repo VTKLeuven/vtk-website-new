@@ -562,7 +562,7 @@ a.vtk-shortcut-tile:hover {
   padding: 24px;
   width: 100%;
   max-width: 460px;
-  max-height: 90vh;
+  max-height: calc(90 * var(--vtk-vh, 1vh));
   overflow-y: auto;
   display: flex;
   flex-direction: column;

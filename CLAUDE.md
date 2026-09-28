@@ -667,6 +667,20 @@ the design language into the application instead of copying mockup content.
 
 ## Implementation Constraints
 
+- **On a laptop up to 14 inch the whole site renders at 90%** (`zoom: 0.9` on
+  `:root` between 1024 and 1600 CSS px with a fine pointer, in `vtk-base.css`),
+  because it looked right after one Ctrl - and too large at 100%. `zoom` does not
+  scale `vw`/`vh`, so **anything that must reach the screen edge or the full
+  height uses the variables, never the bare unit**: `calc(50 * var(--vtk-vw, 1vw))`
+  for a full-bleed band, `calc(100 * var(--vtk-dvh, 1dvh))` for a screen-high
+  block. A bare `50vw` leaves a strip on each side under the zoom. Fluid padding
+  (`clamp(20px, 3vw, 36px)`) may keep the bare unit.
+  - JavaScript that mixes `getBoundingClientRect`/`clientX`/`innerHeight` (visual
+    pixels) with `offsetWidth`/`offsetHeight`/a width from `ResizeObserver`
+    (layout pixels) is off by 10% under the zoom. Compute a ratio of the visible
+    size, or divide by `rect.height / element.offsetHeight`, as `DailyChart`,
+    `AdminNav` and `CookieConsent` do.
+
 - Keep Tailwind v4 source scanning explicit and do not switch to auto-detection.
 - Keep `next dev --webpack` for both apps; do not re-enable Turbopack in dev.
 - Keep `turbopack.root` and `outputFileTracingRoot` pinned in both Next configs.

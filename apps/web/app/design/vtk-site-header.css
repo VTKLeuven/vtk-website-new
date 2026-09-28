@@ -572,7 +572,7 @@
     right: 0;
     z-index: 60;
     display: block;
-    max-height: calc(100dvh - var(--vtk-header-height));
+    max-height: calc(calc(100 * var(--vtk-dvh, 1dvh)) - var(--vtk-header-height));
     overflow-y: auto;
     padding: 8px clamp(16px, 5vw, 28px) 20px;
     background: var(--navy);

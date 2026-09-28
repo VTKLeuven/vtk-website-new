@@ -126,7 +126,11 @@ export function CookieConsent({
     if (!visible || !panel) return;
     const root = document.documentElement;
     const publish = () => {
-      const space = Math.max(0, window.innerHeight - panel.getBoundingClientRect().top);
+      const rect = panel.getBoundingClientRect();
+      // In layoutpixels: onder CSS-`zoom` (vtk-base.css) zijn `rect` en
+      // `innerHeight` zichtbare pixels, en de variabele wordt mee verkleind.
+      const scale = panel.offsetHeight > 0 ? rect.height / panel.offsetHeight || 1 : 1;
+      const space = Math.max(0, (window.innerHeight - rect.top) / scale);
       root.style.setProperty(COOKIE_CONSENT_SPACE_VAR, `${Math.round(space)}px`);
     };
     const observer = new ResizeObserver(publish);
