@@ -4,6 +4,7 @@ import { AdminNav as SharedAdminNav, type AdminNavItem, type AdminNavNode } from
 import type { ReactNode } from 'react';
 import { toggleAdminNavPinAction } from '@/app/actions/admin-nav';
 import { useToast } from '@/components/ui/toast';
+import { ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
 
 export type NavItem = AdminNavItem;
 export type NavNode = AdminNavNode;
@@ -16,16 +17,27 @@ export type PinLabels = {
   error: string;
 };
 
+/** Onthoudt de keuze voor de volgende pagina; zie `lib/adminNavCookie.ts`. */
+function rememberCollapsed(collapsed: boolean) {
+  document.cookie = collapsed
+    ? `${ADMIN_NAV_COLLAPSED_COOKIE}=1; path=/; max-age=31536000; samesite=lax`
+    : `${ADMIN_NAV_COLLAPSED_COOKIE}=; path=/; max-age=0; samesite=lax`;
+}
+
 export function AdminNav({
   title,
   nodes,
   pinnedKeys,
   pinLabels,
+  collapsed,
+  collapseLabels,
 }: {
   title: string;
   nodes: NavNode[];
   pinnedKeys: string[];
   pinLabels: PinLabels;
+  collapsed: boolean;
+  collapseLabels: { collapse: string; expand: string };
 }) {
   const showToast = useToast();
   const { error, ...labels } = pinLabels;
@@ -35,6 +47,7 @@ export function AdminNav({
       title={title}
       nodes={nodes}
       icons={icons}
+      collapse={{ initial: collapsed, onChange: rememberCollapsed, labels: collapseLabels }}
       pins={{
         keys: pinnedKeys,
         labels,

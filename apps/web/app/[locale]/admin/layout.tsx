@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { prisma } from '@vtk/db';
 import { hasLocale } from '@/lib/locale';
 import { requireSession } from '@/lib/session';
@@ -8,6 +9,7 @@ import { canAccessAnyTicketEvent } from '@/lib/ticketing/authorization';
 import { canAccessAnyForm } from '@/lib/forms/authorization';
 import { isExternalUrl } from '@/lib/href';
 import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
+import { ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
 
 import '@/app/design/vtk-admin.css';
@@ -109,6 +111,8 @@ export default async function AdminLayout({
     select: { key: true },
   });
 
+  const collapsed = (await cookies()).get(ADMIN_NAV_COLLAPSED_COOKIE)?.value === '1';
+
   return (
     <div className="vtk-admin-surface">
       <div className="vtk-admin-surface-inner">
@@ -126,6 +130,8 @@ export default async function AdminLayout({
               unpin: adminDict.unpinTab,
               error: adminDict.pinError,
             }}
+            collapsed={collapsed}
+            collapseLabels={{ collapse: adminDict.collapseNav, expand: adminDict.expandNav }}
           />
         </aside>
         <section className="vtk-admin-main">{children}</section>

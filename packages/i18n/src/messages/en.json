@@ -485,6 +485,8 @@
     "pinTab": "Pin",
     "unpinTab": "Unpin",
     "pinError": "Could not pin this tab. Please try again.",
+    "collapseNav": "Collapse sidebar",
+    "expandNav": "Expand sidebar",
     "takedowns": "Takedown requests",
     "feedback": "Website feedback"
   },

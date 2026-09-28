@@ -2,8 +2,16 @@
   min-width: 0;
 }
 
-.vtk-admin-nav-title {
+.vtk-admin-nav-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
   margin: 0 0 12px;
+}
+
+.vtk-admin-nav-title {
+  margin: 0;
   color: var(--muted);
   font-size: 12px;
   font-weight: 600;
@@ -247,4 +255,203 @@
   .vtk-admin-nav a.vtk-admin-nav-sublink {
     font-size: 13.5px;
   }
+}
+
+/* ---------------------------------------------------------------------------
+   Inklappen (optioneel, enkel vanaf 860px). Standaard blijft de zijbalk zoals
+   hij is; de knop naast de titel klapt hem in tot een rail met enkel iconen.
+   Smaller dan 860px is er al de uitklapknop, dus daar verandert niets.
+   --------------------------------------------------------------------------- */
+
+.vtk-admin-nav-collapse {
+  appearance: none;
+  display: none;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  margin: -6px -4px -6px 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.vtk-admin-nav-collapse:hover,
+.vtk-admin-nav-collapse:focus-visible {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.vtk-admin-rail {
+  display: none;
+}
+
+@media (min-width: 860px) {
+  .vtk-admin-nav-collapse {
+    display: grid;
+  }
+
+  /* Ingeklapt: titel en volledige lijst weg, de rail in de plaats. De rail
+     ligt boven de inhoud, want tooltip en groepskaart steken erover. */
+  .vtk-admin-nav-sticky[data-collapsed='true'] {
+    position: relative;
+    z-index: 20;
+  }
+
+  .vtk-admin-nav-sticky[data-collapsed='true'] > .vtk-admin-nav-head,
+  .vtk-admin-nav-sticky[data-collapsed='true'] > .vtk-admin-nav {
+    display: none;
+  }
+
+  .vtk-admin-nav-sticky[data-collapsed='true'] > .vtk-admin-rail {
+    display: block;
+  }
+
+  .vtk-admin-nav-sticky[data-collapsed='true']:not([data-aligned='true']) > .vtk-admin-rail {
+    visibility: hidden;
+  }
+}
+
+.vtk-admin-rail-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 6px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: color-mix(in oklab, var(--surface, #ffffff) 56%, transparent);
+}
+
+.vtk-admin-rail-slot {
+  position: relative;
+}
+
+.vtk-admin-rail-btn {
+  appearance: none;
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: color-mix(in oklab, var(--ink, #0a0f1f) 72%, transparent);
+  cursor: pointer;
+}
+
+.vtk-admin-rail-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+.vtk-admin-rail-btn:hover,
+.vtk-admin-rail-btn:focus-visible,
+.vtk-admin-rail-btn.is-open {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+/* De tab of groep waar je bent: hetzelfde lichtblauw als de actieve rij. */
+.vtk-admin-rail-btn.is-active {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+/* Een vastgepinde tab: het gele speldje van de uitgeklapte zijbalk, als stip. */
+.vtk-admin-rail-pin {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--accent-2, #edbd22);
+}
+
+.vtk-admin-rail-sep {
+  width: 28px;
+  height: 1px;
+  margin: 4px 0;
+  background: var(--line);
+}
+
+.vtk-admin-rail-tip {
+  position: absolute;
+  top: 50%;
+  left: calc(100% + 12px);
+  z-index: 2;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--navy, #0e1a36);
+  color: var(--paper, #eff2f8);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-50%);
+  transition: opacity 0.12s ease;
+}
+
+.vtk-admin-rail-slot:hover > .vtk-admin-rail-tip,
+.vtk-admin-rail-btn:focus-visible + .vtk-admin-rail-tip {
+  opacity: 1;
+}
+
+.vtk-admin-rail-flyout {
+  position: absolute;
+  top: -8px;
+  left: calc(100% + 14px);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 230px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface, #ffffff);
+  box-shadow: 0 18px 40px -20px rgba(10, 15, 31, 0.35);
+}
+
+.vtk-admin-rail-flyout-title {
+  margin: 0;
+  padding: 6px 11px 4px;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vtk-admin-rail-flyout-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 11px;
+  border-radius: 999px;
+  color: color-mix(in oklab, var(--ink, #0a0f1f) 72%, transparent);
+  font-size: 12.5px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.vtk-admin-rail-flyout-link span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vtk-admin-rail-flyout-link:hover,
+.vtk-admin-rail-flyout-link:focus-visible {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.vtk-admin-rail-flyout-link.is-active {
+  background: var(--paper-2);
+  color: var(--ink);
+  font-weight: 600;
 }

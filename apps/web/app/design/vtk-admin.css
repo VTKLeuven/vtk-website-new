@@ -35,6 +35,16 @@
   .vtk-admin-surface-inner > aside {
     align-self: stretch;
   }
+
+  /*
+   * Ingeklapte zijbalk (de knop naast ADMIN, zie AdminNav in @vtk/ui): een rail
+   * van 60px, en de inhoud schuift dichter aan. 20px en niet 48: de rail is
+   * smal genoeg om zonder brede marge bij de inhoud te horen.
+   */
+  .vtk-admin-surface-inner:has(> aside [data-collapsed='true']) {
+    grid-template-columns: 60px minmax(0, 1fr);
+    gap: 20px;
+  }
 }
 
 .vtk-admin-main {
