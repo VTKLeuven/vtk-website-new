@@ -6,6 +6,9 @@ import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 /** Zo lang staat een rij tegels stil voor de carrousel zelf één verder schuift. */
 const AUTOPLAY_MS = 15_000;
 
+/** Hoe hoog een tegel is, als deel van het uitgelichte bericht ernaast. */
+const TILE_HEIGHT_RATIO = 0.75;
+
 /**
  * De tegels naast het uitgelichte bericht in de Nieuws-band, als carrousel.
  *
@@ -22,6 +25,12 @@ const AUTOPLAY_MS = 15_000;
  * wacht zolang de muis erop staat, de focus erin zit of het tabblad verborgen
  * is, en wie in zijn systeem minder beweging vraagt, krijgt geen autoplay.
  * Passen alle tegels, dan is er niets te schuiven en vallen knoppen en wekker weg.
+ *
+ * Een tegel is driekwart zo hoog als het uitgelichte bericht ernaast (het
+ * element vlak voor deze carrousel); de foto groeit mee. Die kaart haalt haar
+ * hoogte uit haar tekst, dus dat is te meten en niet in CSS te zeggen. Staat de
+ * brief opengeklapt, of staat de kaart boven de tegels in plaats van ernaast,
+ * dan blijft de laatste maat staan of valt ze weg.
  */
 export function NewsCarousel({
   items,
@@ -38,6 +47,7 @@ export function NewsCarousel({
     slide: string;
   };
 }) {
+  const root = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLOListElement>(null);
   const hold = useRef(false);
   const [scrollable, setScrollable] = useState(false);
@@ -55,6 +65,26 @@ export function NewsCarousel({
     observer.observe(el);
     return () => observer.disconnect();
   }, [items.length]);
+
+  useEffect(() => {
+    const el = root.current;
+    const featured = el?.previousElementSibling;
+    if (!el || !(featured instanceof HTMLElement)) return;
+    const measure = () => {
+      // Een opengeklapte brief is tijdelijk; de tegels groeien daar niet mee.
+      if (featured.querySelector('[aria-expanded="true"]')) return;
+      const beside = Math.abs(featured.getBoundingClientRect().top - el.getBoundingClientRect().top) < 2;
+      el.style.setProperty(
+        "--news-tile-h",
+        beside ? `${Math.round(featured.offsetHeight * TILE_HEIGHT_RATIO)}px` : "0px",
+      );
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(featured);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const query = window.matchMedia("(prefers-reduced-motion: reduce)");
@@ -99,6 +129,7 @@ export function NewsCarousel({
 
   return (
     <div
+      ref={root}
       className="news-carousel"
       role="region"
       aria-roledescription="carousel"

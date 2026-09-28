@@ -366,10 +366,11 @@
    op de pagina. De padding geeft de hover-lift en de schaduw van een tegel
    ruimte; de negatieve marge zet de rand terug op zijn plaats. */
 .news-track {
+  --news-tile-w: calc((100cqw - 2 * var(--news-gap)) / 3);
   position: relative;
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: calc((100% - 2 * var(--news-gap)) / 3);
+  grid-auto-columns: var(--news-tile-w);
   gap: var(--news-gap);
   margin: -6px -4px -18px;
   padding: 6px 4px 18px;
@@ -385,15 +386,31 @@
   display: none;
 }
 
+/* Driekwart van de hoogte van het uitgelichte bericht (`--news-tile-h`, gezet
+   door NewsCarousel); een minimum, zodat een tegel met een lange titel nooit
+   afgekapt wordt. */
 .news-slide {
   display: flex;
   min-width: 0;
+  min-height: var(--news-tile-h, 0px);
   scroll-snap-align: start;
 }
 
 .news-slide > .ev-card {
   flex: 1;
   min-width: 0;
+}
+
+/* De extra hoogte gaat naar de foto, niet naar een leeg vlak onder de titel:
+   minstens 16:9 van de tegelbreedte, en verder groeit ze mee. */
+.vtk-design .news-tile .ev-card-shot {
+  flex: 1 0 auto;
+  aspect-ratio: auto;
+  min-height: calc(var(--news-tile-w) * 9 / 16);
+}
+
+.vtk-design .news-tile .ev-card-body {
+  flex: none;
 }
 
 /* Een post, album of Bakske zonder beeld: het streepjesvlak. */
@@ -421,7 +438,13 @@
 :is(.vtk-design, .vtk-page) .news-nav {
   position: absolute;
   --news-tile: calc((100cqw - 2 * var(--news-gap)) / 3);
-  top: calc(var(--news-tile) * 9 / 32 - 20px);
+  /* Het midden van de foto: 16:9 van de tegel, of lager wanneer de tegel naar
+     driekwart van de uitgelichte kaart gegroeid is (de tekst eronder is zo'n
+     125px). */
+  top: max(
+    calc(var(--news-tile) * 9 / 32 - 20px),
+    calc((var(--news-tile-h, 0px) - 125px) / 2 - 20px)
+  );
   z-index: 3;
   display: grid;
   width: 40px;
@@ -823,7 +846,7 @@
   }
 
   .news-track {
-    grid-auto-columns: calc((100% - var(--news-gap)) / 2);
+    --news-tile-w: calc((100cqw - var(--news-gap)) / 2);
   }
 
   :is(.vtk-design, .vtk-page) .news-nav {
@@ -877,7 +900,7 @@
    er te swipen valt; de knoppen vallen weg. */
 @media (max-width: 620px) {
   .news-track {
-    grid-auto-columns: 84%;
+    --news-tile-w: 84cqw;
   }
 
   :is(.vtk-design, .vtk-page) .news-nav {
