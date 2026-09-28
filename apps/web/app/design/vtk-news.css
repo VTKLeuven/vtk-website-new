@@ -386,7 +386,7 @@
   display: none;
 }
 
-/* Driekwart van de hoogte van het uitgelichte bericht (`--news-tile-h`, gezet
+/* 85% van de hoogte van het uitgelichte bericht (`--news-tile-h`, gezet
    door NewsCarousel); een minimum, zodat een tegel met een lange titel nooit
    afgekapt wordt. */
 .news-slide {
@@ -439,7 +439,7 @@
   position: absolute;
   --news-tile: calc((100cqw - 2 * var(--news-gap)) / 3);
   /* Het midden van de foto: 16:9 van de tegel, of lager wanneer de tegel naar
-     driekwart van de uitgelichte kaart gegroeid is (de tekst eronder is zo'n
+     85% van de uitgelichte kaart gegroeid is (de tekst eronder is zo'n
      125px). */
   top: max(
     calc(var(--news-tile) * 9 / 32 - 20px),

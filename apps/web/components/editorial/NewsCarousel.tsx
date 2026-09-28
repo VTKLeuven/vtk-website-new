@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 const AUTOPLAY_MS = 15_000;
 
 /** Hoe hoog een tegel is, als deel van het uitgelichte bericht ernaast. */
-const TILE_HEIGHT_RATIO = 0.75;
+const TILE_HEIGHT_RATIO = 0.85;
 
 /**
  * De tegels naast het uitgelichte bericht in de Nieuws-band, als carrousel.
@@ -26,7 +26,7 @@ const TILE_HEIGHT_RATIO = 0.75;
  * is, en wie in zijn systeem minder beweging vraagt, krijgt geen autoplay.
  * Passen alle tegels, dan is er niets te schuiven en vallen knoppen en wekker weg.
  *
- * Een tegel is driekwart zo hoog als het uitgelichte bericht ernaast (het
+ * Een tegel is 85% zo hoog als het uitgelichte bericht ernaast (het
  * element vlak voor deze carrousel); de foto groeit mee. Die kaart haalt haar
  * hoogte uit haar tekst, dus dat is te meten en niet in CSS te zeggen. Staat de
  * brief opengeklapt, of staat de kaart boven de tegels in plaats van ernaast,

@@ -9117,12 +9117,13 @@ datumpin op de foto en de soort als woord in kleine kapitalen, zoals
   wacht zolang de muis erop staat, de focus erin zit of het tabblad verborgen
   is, en bij `prefers-reduced-motion` is er geen autoplay. Passen alle tegels,
   dan vallen knoppen en wekker weg.
-- **De brief bepaalt zijn eigen hoogte, de tegels zijn driekwart daarvan.**
+- **De brief bepaalt zijn eigen hoogte, de tegels zijn 85% daarvan.**
   Drie varianten werden gemeten waarin de tegels de hoogte bepalen en de brief
   die ruimte vult (over twee rijen tegels, als strook erboven, of met foto's
   die meerekken). Gekozen is de eenvoudigste: de brief houdt zijn negen regels.
   Tegels op hun natuurlijke hoogte voelden daarnaast te klein, dus
-  `NewsCarousel` meet de uitgelichte kaart en maakt elke tegel 75% zo hoog; de
+  `NewsCarousel` meet de uitgelichte kaart en maakt elke tegel 85% zo hoog (75%
+  werd geprobeerd en voelde nog te klein); de
   extra hoogte gaat naar de foto, niet naar een leeg vlak onder de titel. Een
   opengeklapte brief verandert die maat niet, en waar de kaart boven de tegels
   staat (smal scherm), geldt ze niet.
