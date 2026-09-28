@@ -9185,7 +9185,7 @@ datumpin op de foto en de soort als woord in kleine kapitalen, zoals
   weg; kom er niet op terug zonder dat die kleuren ook elders iets betekenen.
 - **De tegels schuiven, de brief blijft staan.** Drie tegels in beeld (twee
   op een tablet, één en een stukje op een telefoon), met een knop links en
-  rechts, en om de vijftien seconden vanzelf één verder; na de laatste begint
+  rechts, en om de tien seconden vanzelf één verder; na de laatste begint
   het weer vooraan. Zo kan de band meer dan vier berichten tonen zonder hoger
   te worden. Het is een gewone scroller met snap-punten, zodat een telefoon
   erdoor swipet en een toetsenbord dat naar een tegel buiten beeld tabt, hem
@@ -9242,8 +9242,25 @@ komen (`NewsHidden`); per bron kan het ook helemaal uit.
 **Een ticketverkoop en een inschrijving tonen de dag van het evenement.** De
 datumpin en de kopregel stonden op het moment dat de verkoop opende, en "do 24
 sep" boven een uitstap op de 29ste las als de dag van de uitstap. Wanneer de
-verkoop begon, is voor een lezer niet relevant. Dat moment blijft wel de
-volgorde en het label "Nieuw" bepalen (`NewsEntry.shownDate` naast `date`).
+verkoop begon, is voor een lezer niet relevant. Dat moment blijft wel het label
+"Nieuw" en de keuze van het uitgelichte bericht bepalen (`NewsEntry.shownDate`
+naast `date`).
+
+**De tegels volgen hun pin: eerst wat komt, het vroegste eerst.** Gesorteerd op
+wanneer iets nieuws werd, stond een verkoop die gisteren opende voor een cantus
+over twee weken vóór de sector night van morgen, en sprongen de pinnen heen en
+weer (1 okt, 6 okt, 28 sep). Nu staat in de carrousel eerst alles met een dag
+die nog moet komen, het vroegste eerst, en daarna wat al gebeurde (een woordje,
+een album, een Bakske), het recentste eerst (`compareNewsTiles` in
+`lib/news/rules.ts`). Een tijdlijn van oud naar nieuw werd niet gekozen: dan
+opent de band met het oudste album.
+
+**Er is geen maximum aantal berichten.** Er was een instelling van 3 tot 8, en
+wat erbuiten viel, stond in het beheer als "Band vol". Maar de tegels staan in
+een carrousel die schuift, dus er is geen plaats die volloopt; het maximum liet
+enkel berichten vallen die wel in het nieuws hoorden. Wat te oud is, valt er al
+uit via de houdbaarheid hierboven, en wat er niet in hoort, haal je er in het
+beheer uit. Een opgeslagen `count` in `home.news` wordt genegeerd.
 
 **Uitgelicht: de keuze van de redactie, anders het woordje, anders het
 nieuwste.** Het woordje van de praeses is voor het Bakske geschreven, een halve
@@ -9265,9 +9282,13 @@ verdwijnen, en dan neemt de standaard het over. Een bericht dat uit het nieuws
 gehaald wordt, verliest zijn ster.
 
 **/nieuws** toont alles wat nu in het nieuws staat (zonder de grens van de
-band) en de eerdere mededelingen en woordjes, als agenda: deze week, vorige
-week en daarvoor per maand (`groupNewsByPeriod` in `lib/news/rules.ts`), naar
-het moment waarop iets nieuws werd. Bovenaan filterchips per soort met hun
+band) en de eerdere mededelingen en woordjes, als agenda (`groupNewsByPeriod`
+in `lib/news/rules.ts`), op de dag die een bericht toont: bij een ticketverkoop
+of inschrijving de dag van het evenement. Eerst wat komt (deze week, volgende
+week, daarna per maand, het vroegste eerst), dan wat voorbij is (vorige week,
+daarvoor per maand, het recentste eerst), in dezelfde volgorde als de band.
+Eerder telde het moment waarop iets nieuws werd, en stond een cantus van
+donderdag onder "Vorige week" omdat de tickets toen te koop gingen. Bovenaan filterchips per soort met hun
 aantal, dezelfde als op /tickets en in de URL (`?soort=inschrijvingen`), zodat
 je een filter kan doorsturen. Rechts een rail met het laatste woordje van de
 praeses en het laatste nummer van het Bakske en Ir.Reëel: tussen tien
@@ -9425,6 +9446,32 @@ alles op 100%.
   verhouding in plaats van met losse pixels (grafiek-hover, de meeschuivende
   beheerzijbalk, de ruimte onder de cookiebanner).
 
+## De banner van een ticketevent: eigen foto, themabanner of die van de kalender
+
+Een ticketevent kiest zijn banner zelf, in het paneel "Banner" van de
+instellingen (en al bij het aanmaken). Tot dan kwam de foto enkel van het
+gekoppelde kalenderevent, dus een ticketverkoop zonder kalenderevent (een
+losse inschrijving, een verkoop voor iets dat niet in de kalender hoort) had
+nergens een foto: niet in de shop, niet op /tickets en niet in het nieuws.
+
+- **Drie keuzes, hoogstens één actief.** Een eigen foto (met een uitsnede, zoals
+  bij een kalenderevent), de standaardbanner van een kalenderthema (dezelfde
+  foto die een evenement van dat thema zonder affiche krijgt), of geen eigen
+  keuze. Code: `lib/ticketing/poster.ts`, veld `TicketBannerField`.
+- **Een eigen keuze wint van het kalenderevent.** Wie ze maakt, doet dat op het
+  scherm waar het om de ticketverkoop gaat; die keuze stil laten overschrijven
+  door een foto op een ander scherm zou verrassen. Zonder eigen keuze blijft
+  de foto van het kalenderevent staan, zodat bestaande ticketevents niets zien
+  veranderen.
+- **Enkel een thema met een banner is te kiezen.** Een doelgroep draagt er geen
+  (zie `lib/defaultEventImage.ts`), en een thema zonder banner zou een keuze
+  tonen die op de site niets oplevert.
+- **Achteraf aanpasbaar, en de oude foto wordt opgeruimd.** Een vervangen of
+  weggeklikte eigen foto gaat uit de opslag, zoals bij een kalenderevent.
+- Wie een ticketevent beheert via een grant maar geen globaal uploadrecht heeft,
+  mag er toch een banner voor uploaden: de uploadroute kijkt naar `MANAGE_EVENT`
+  op dat ene event.
+
 ## De groepjesmaker
 
 Onthaal deelt eerstejaars in peter-metergroepen, internationaal maakt
@@ -9486,3 +9533,4 @@ vergelijken.
 **Enkel de organisatoren zien de groepen.** Het verslag van onthaal: "maar enkel
 naar ons en niet naar die personen zelf". Er gaat geen mail naar de deelnemers
 en de publieke pagina toont niets; de groepen staan in het beheer en in een CSV.
+

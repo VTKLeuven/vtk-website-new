@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Card, Input, Label, Select } from "@vtk/ui";
+import { Card, Input, Label } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
@@ -12,8 +12,6 @@ import { StorageImageField } from "@/components/admin/StorageImageField";
 import { saveErrorMessages } from "@/lib/saveMessages";
 import {
   NEWS_AUTO_SOURCES,
-  NEWS_COUNT_MAX,
-  NEWS_COUNT_MIN,
   NEWS_LETTER_LINES,
   type NewsAutoSource,
   type NewsSource,
@@ -39,8 +37,8 @@ export type NewsCandidateRow = {
   automatic: boolean;
   /** Door de redactie uitgelicht (los van waar het nu staat). */
   picked: boolean;
-  /** Waar het nu staat: uitgelicht, in de band, erbuiten (band vol) of verborgen. */
-  place: "featured" | "band" | "overflow" | "hidden";
+  /** Waar het nu staat: uitgelicht, in de band of verborgen. */
+  place: "featured" | "band" | "hidden";
 };
 
 export type NewsPostRow = {
@@ -124,14 +122,13 @@ const SOURCE_LABELS: Record<NewsAutoSource, { nl: string; en: string; hintNl: st
 };
 
 const PLACE = {
-  nl: { featured: "Uitgelicht", band: "In de band", overflow: "Band vol", hidden: "Verborgen" },
-  en: { featured: "Featured", band: "In the band", overflow: "Band full", hidden: "Hidden" },
+  nl: { featured: "Uitgelicht", band: "In de band", hidden: "Verborgen" },
+  en: { featured: "Featured", band: "In the band", hidden: "Hidden" },
 } as const;
 
 const PLACE_CLASS = {
   featured: "bg-amber-50 text-amber-800",
   band: "bg-emerald-50 text-emerald-800",
-  overflow: "bg-vtk-blue-soft text-[#5c667f]",
   hidden: "bg-vtk-blue-soft text-[#5c667f]",
 } as const;
 
@@ -211,31 +208,13 @@ export function NewsManager({
           submitLabel={dict.admin.save}
           savingLabel={dict.common.saving}
           savedMessage={nl ? "Instellingen opgeslagen" : "Settings saved"}
-          errorMessages={{
-            ...errorMessages,
-            INVALID_INPUT: nl
-              ? `Kies tussen ${NEWS_COUNT_MIN} en ${NEWS_COUNT_MAX} berichten.`
-              : `Pick between ${NEWS_COUNT_MIN} and ${NEWS_COUNT_MAX} posts.`,
-          }}
+          errorMessages={errorMessages}
           fallbackErrorMessage={dict.common.saveError}
         >
           <label className="inline-flex items-center gap-2 text-sm font-medium text-vtk-ink">
             <input type="checkbox" name="enabled" defaultChecked={setting.enabled} />
             {nl ? "Nieuws tonen op de homepage" : "Show news on the homepage"}
           </label>
-
-          <div className="max-w-xs">
-            <Label htmlFor="news-count">{nl ? "Aantal berichten" : "Number of posts"}</Label>
-            <Select id="news-count" name="count" defaultValue={String(setting.count)}>
-              {Array.from({ length: NEWS_COUNT_MAX - NEWS_COUNT_MIN + 1 }, (_, i) => NEWS_COUNT_MIN + i).map(
-                (n) => (
-                  <option key={n} value={n}>
-                    {nl ? `${n} (1 uitgelicht, ${n - 1} in de lijst)` : `${n} (1 featured, ${n - 1} in the list)`}
-                  </option>
-                ),
-              )}
-            </Select>
-          </div>
 
           <fieldset>
             <legend className="text-sm font-medium text-vtk-ink">
@@ -276,8 +255,8 @@ export function NewsManager({
               ? "De band staat uit: niets hiervan staat op de homepage."
               : "The band is off: none of this is on the homepage."
             : nl
-              ? "Nieuwste eerst. Met de ster kies je wat de grote kaart krijgt, ook een ticketverkoop of een album; zonder keuze is dat het woordje van de praeses, anders het nieuwste. Een automatisch bericht haal je hier uit het nieuws zonder aan de bron te komen: de verkoop loopt door, het album blijft op /media."
-              : "Newest first. The star picks what gets the large card, including a ticket sale or an album; without a pick that is the word from the praeses, otherwise the newest. Taking an automatic post out of the news leaves its source alone: sales go on, the album stays on /media."}
+              ? "Nieuwste eerst. Alles wat hier niet verborgen is, staat in de band: de carrousel schuift, dus er is geen maximum. Op de homepage staan de tegels in de volgorde van hun datumpin: eerst wat nog komt, het vroegste eerst, dan wat al gebeurde. Met de ster kies je wat de grote kaart krijgt, ook een ticketverkoop of een album; zonder keuze is dat het woordje van de praeses, anders het nieuwste. Een automatisch bericht haal je hier uit het nieuws zonder aan de bron te komen: de verkoop loopt door, het album blijft op /media."
+              : "Newest first. Everything here that is not hidden is in the band: the carousel scrolls, so there is no maximum. On the homepage the tiles follow their date pin: what is still to come first, soonest first, then what already happened. The star picks what gets the large card, including a ticket sale or an album; without a pick that is the word from the praeses, otherwise the newest. Taking an automatic post out of the news leaves its source alone: sales go on, the album stays on /media."}
         </p>
         {candidates.length === 0 ? (
           <p className="text-sm text-zinc-500">

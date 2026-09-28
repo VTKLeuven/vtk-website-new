@@ -10,7 +10,7 @@ import { localDateTimeToUtc } from "@/lib/ticketing/time";
 import { isEditableDestination } from "@/lib/href";
 import { readImageField, resolveImageKey } from "@/lib/imageField";
 import { NEWS_TAG } from "@/lib/news/load";
-import { NEWS_AUTO_SOURCES, NEWS_COUNT_MAX, NEWS_COUNT_MIN, isNewsAutoSource } from "@/lib/news/rules";
+import { NEWS_AUTO_SOURCES, isNewsAutoSource } from "@/lib/news/rules";
 import { NEWS_FEATURED_SETTING, NEWS_SETTING, readNewsFeatured } from "@/lib/news/setting";
 
 /**
@@ -51,15 +51,11 @@ export async function saveNewsSettingAction(
   formData: FormData,
 ): Promise<SaveState> {
   await requirePermission("news.manage");
-  const count = Number(formData.get("count"));
-  if (!Number.isInteger(count) || count < NEWS_COUNT_MIN || count > NEWS_COUNT_MAX) {
-    return saveError("INVALID_INPUT");
-  }
   const enabled = formData.get("enabled") === "on";
   const sources = Object.fromEntries(
     NEWS_AUTO_SOURCES.map((source) => [source, formData.get(`source-${source}`) === "on"]),
   );
-  const value = { enabled, count, sources };
+  const value = { enabled, sources };
 
   await prisma.setting.upsert({
     where: { key: NEWS_SETTING },
@@ -71,7 +67,7 @@ export async function saveNewsSettingAction(
     entity: "news",
     entityId: NEWS_SETTING,
     target: "Nieuws op de homepage",
-    summary: `${enabled ? "aan" : "uit"}, ${count} berichten, bronnen: ${
+    summary: `${enabled ? "aan" : "uit"}, bronnen: ${
       NEWS_AUTO_SOURCES.filter((source) => sources[source]).join(", ") || "geen"
     }`,
   });

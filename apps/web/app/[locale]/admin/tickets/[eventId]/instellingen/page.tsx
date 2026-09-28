@@ -16,6 +16,8 @@ import { PresaleLinkPanel } from "@/components/ticketing/admin/PresaleLinkPanel"
 import { hasPresale } from "@/lib/ticketing/presale";
 import type { AdminLocale } from "@/components/ticketing/admin/format";
 import { readTicketDesignSettings } from "@/lib/ticketing/design";
+import { listTicketBannerCategories } from "@/lib/ticketing/bannerCategories";
+import { publicUrl } from "@/lib/storage";
 
 export default async function TicketEventSettingsPage({
   params,
@@ -84,6 +86,9 @@ export default async function TicketEventSettingsPage({
         take: 100,
       })
     : [];
+  const bannerCategories = canManageEvent ? await listTicketBannerCategories() : [];
+  const linkedCalendarEvent =
+    calendarEvents.find((candidate) => candidate.id === event.calendarEventId) ?? null;
   const ticketDesign = readTicketDesignSettings(event.settings, eventId);
   // Bepaalt of het event nog weg mag of enkel gearchiveerd kan worden. Eén
   // bestelling volstaat om het te bewaren, ook een vervallen: daar hangen een
@@ -119,9 +124,9 @@ export default async function TicketEventSettingsPage({
             groups={groups}
             presaleGroups={presaleGroups}
             calendarEvents={calendarEvents}
-            linkedCalendarEvent={
-              calendarEvents.find((candidate) => candidate.id === event.calendarEventId) ?? null
-            }
+            linkedCalendarEvent={linkedCalendarEvent}
+            linkedImageUrl={publicUrl(linkedCalendarEvent?.imageKey)}
+            bannerCategories={bannerCategories}
             hasActiveTicketType={event.ticketTypes.some((ticketType) => ticketType.active)}
             locale={locale}
           />

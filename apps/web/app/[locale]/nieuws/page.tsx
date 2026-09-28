@@ -57,12 +57,17 @@ function periodLabel(period: NewsPeriod<NewsEntry>, locale: Locale): { title: st
         .toLocaleDateString(tag, { timeZone: "UTC", day: "numeric", ...(month ? { month: "short" } : {}) })
         .replace(/\./g, "");
     const sameMonth = monday.getUTCMonth() === sunday.getUTCMonth();
+    const titles = {
+      this: nl ? "Deze week" : "This week",
+      next: nl ? "Volgende week" : "Next week",
+      last: nl ? "Vorige week" : "Last week",
+    } as const;
     return {
-      title: period.key === "this-week" ? (nl ? "Deze week" : "This week") : nl ? "Vorige week" : "Last week",
+      title: titles[period.week ?? "this"],
       range: `${short(monday, !sameMonth)} – ${short(sunday, true)}`,
     };
   }
-  const month = new Date(`${period.key}-15T12:00:00Z`).toLocaleDateString(tag, {
+  const month = new Date(`${period.month}-15T12:00:00Z`).toLocaleDateString(tag, {
     timeZone: "UTC",
     month: "long",
     year: "numeric",
@@ -83,8 +88,9 @@ function newestIssues(publications: MediaPublication[], now: Date): MediaPublica
 
 /**
  * Alle berichten: wat nu in het nieuws staat (zonder de grens van de band op de
- * homepage) en de eerdere mededelingen en woordjes, samen als agenda per week,
- * met chips per soort zoals op /tickets. Rechts een rail met het laatste woordje
+ * homepage) en de eerdere mededelingen en woordjes, samen als agenda per week
+ * op de dag van het evenement (zie `groupNewsByPeriod`), met chips per soort
+ * zoals op /tickets. Rechts een rail met het laatste woordje
  * van de praeses en de laatste nummers van het Bakske en Ir.Reëel, zodat die
  * niet wegzakken tussen de ticketverkoop.
  *

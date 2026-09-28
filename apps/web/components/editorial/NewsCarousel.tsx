@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { ChevronLeft, ChevronRight, Pause, Play } from "lucide-react";
 
 /** Zo lang staat een rij tegels stil voor de carrousel zelf één verder schuift. */
-const AUTOPLAY_MS = 15_000;
+const AUTOPLAY_MS = 10_000;
 
 /** Hoe hoog een tegel is, als deel van het uitgelichte bericht ernaast. */
 const TILE_HEIGHT_RATIO = 0.85;
@@ -13,7 +13,7 @@ const TILE_HEIGHT_RATIO = 0.85;
  * De tegels naast het uitgelichte bericht in de Nieuws-band, als carrousel.
  *
  * Het uitgelichte bericht blijft staan; enkel de tegels schuiven, één per keer,
- * met een knop links en rechts, en om de vijftien seconden vanzelf. Na de
+ * met een knop links en rechts, en om de tien seconden vanzelf. Na de
  * laatste begint hij weer vooraan.
  *
  * Het is een gewone horizontale scroller met snap-punten, geen eigen

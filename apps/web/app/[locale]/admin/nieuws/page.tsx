@@ -26,14 +26,12 @@ export default async function AdminNews({ params }: { params: Promise<{ locale: 
     }),
   ]);
 
-  // Waar elk bericht nu staat: uitgelicht, in de band, of erbuiten omdat de band
-  // vol zit. Dezelfde samenstelling als de homepage, zodat het beheer niets
-  // anders belooft dan wat er staat.
-  const { featured, rest } = composeNews(
+  // Waar elk bericht nu staat: uitgelicht of in de band. Dezelfde samenstelling
+  // als de homepage, zodat het beheer niets anders belooft dan wat er staat.
+  const { featured } = composeNews(
     candidates.filter((entry) => !entry.hidden),
-    setting.count,
+    now,
   );
-  const inBand = new Set(rest.map((entry) => entry.key));
 
   const dateFormat = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     timeZone: "Europe/Brussels",
@@ -54,13 +52,7 @@ export default async function AdminNews({ params }: { params: Promise<{ locale: 
       dateLabel: dateFormat.format(new Date(entry.date)),
       automatic: entry.source !== "notice" && entry.source !== "praeses",
       picked: entry.featured,
-      place: entry.hidden
-        ? "hidden"
-        : featured?.key === entry.key
-          ? "featured"
-          : inBand.has(entry.key)
-            ? "band"
-            : "overflow",
+      place: entry.hidden ? "hidden" : featured?.key === entry.key ? "featured" : "band",
     }));
 
   const postRows: NewsPostRow[] = posts.map((post) => ({

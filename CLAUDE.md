@@ -329,7 +329,7 @@ the design language into the application instead of copying mockup content.
 - News (`components/editorial/NewsBand.tsx`, `lib/news`): the featured post on
   the left (usually the word from the praeses, as a letter) and the rest as the
   shared event tile (`vtk-eventcard.css`) in a carousel beside it, on
-  `--paper-2`. Only the tiles move: one per click or every 15 seconds, with a
+  `--paper-2`. Only the tiles move: one per click or every 10 seconds, with a
   pause button, no autoplay under `prefers-reduced-motion`; do not let it rotate
   without that pause control. The kind of a post is a small-caps word, never a
   colour or an icon tile (those were reviewed and removed: they appeared nowhere
