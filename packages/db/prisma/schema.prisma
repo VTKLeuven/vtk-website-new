@@ -3260,6 +3260,9 @@ model TheokotSession {
   pickupEnd            DateTime
   processedAt          DateTime? // wanneer no-shows verwerkt zijn (idempotentie)
   processingStartedAt  DateTime? // lease/claim voor een actieve no-show-worker
+  /// "Er liep iets mis" op deze dag: de no-shows tellen niet mee en de
+  /// verwerking stuurt er geen mails voor. Zie `waiveSessionNoShows`.
+  noShowsWaivedAt      DateTime? @db.Timestamptz(3)
   /// Wanneer het pushbericht "de bestelronde is open" voor deze dag vertrokken
   /// is. Zelfde claim-dan-versturen-aanpak als `TheokotOrder.pickupPushedAt`.
   orderOpenPushedAt    DateTime? @db.Timestamptz(3)
@@ -3312,6 +3315,11 @@ model TheokotOrder {
   pickedUpAt        DateTime?
   pickedUpById      String? // wie aan de balie op "opgehaald" drukte
   noShowProcessedAt DateTime? // mail + eventuele ban voor deze order afgewerkt
+  /// Deze no-show telt niet mee voor een ban: ze viel terwijl de verwerking
+  /// gepauzeerd stond (`theokot.config` `noShowPaused`), of de verkoopdag werd
+  /// als "er liep iets mis" aangeduid (`TheokotSession.noShowsWaivedAt`). Geen
+  /// mail zolang die nog niet vertrokken was. NULL bij elke andere bestelling.
+  noShowWaivedAt    DateTime?          @db.Timestamptz(3)
   /// Wanneer het pushbericht "je broodje ligt klaar" voor deze bestelling
   /// verstuurd is. Dezelfde claim-dan-versturen-aanpak als bij de
   /// shift-herinneringen: eerst de markering zetten in een voorwaardelijke

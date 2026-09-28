@@ -118,6 +118,18 @@ describe("parseTheokotConfig", () => {
     expect(config.orderOpenTime).toBe("12:00"); // default
   });
 
+  it("zet de pauze en het automatisch afhalen standaard uit, en neemt enkel echte booleans over", () => {
+    expect(parseTheokotConfig({})).toMatchObject({ noShowPaused: false, autoPickup: false });
+    expect(parseTheokotConfig({ noShowPaused: true, autoPickup: true })).toMatchObject({
+      noShowPaused: true,
+      autoPickup: true,
+    });
+    expect(parseTheokotConfig({ noShowPaused: "ja", autoPickup: 1 })).toMatchObject({
+      noShowPaused: false,
+      autoPickup: false,
+    });
+  });
+
   it("aanvaardt geldige configuratie", () => {
     const config = parseTheokotConfig({
       maxItemsPerOrder: 4,

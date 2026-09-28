@@ -18,8 +18,13 @@ export function SaleDayPicker({
   options,
   selected,
   showAll,
+  path = "/admin/theokot/turflijst",
+  id = "turf-sale-day",
 }: {
   base: string;
+  /** Welke pagina de keuze opent; ook gebruikt door het overzicht per dag. */
+  path?: string;
+  id?: string;
   label: string;
   options: ThemedSelectOption[];
   selected: string;
@@ -31,20 +36,20 @@ export function SaleDayPicker({
   function choose(date: string) {
     const params = new URLSearchParams({ date });
     if (showAll) params.set("alles", "1");
-    startTransition(() => router.push(`${base}/admin/theokot/turflijst?${params.toString()}`));
+    startTransition(() => router.push(`${base}${path}?${params.toString()}`));
   }
 
   return (
     <div aria-busy={pending} style={{ minWidth: 260, opacity: pending ? 0.6 : 1 }}>
       <label
-        htmlFor="turf-sale-day"
+        htmlFor={id}
         className="block text-xs font-semibold uppercase tracking-wide text-[#5c667f]"
       >
         {label}
       </label>
       <div className="mt-1">
         <ThemedSelect
-          id="turf-sale-day"
+          id={id}
           name="date"
           options={options}
           defaultValue={selected}

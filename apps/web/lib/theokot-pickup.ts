@@ -59,7 +59,13 @@ export type PickupLookupResult =
   | { ok: false; error: string };
 
 /** Een persoon die op een naamzoekopdracht past en vandaag iets besteld heeft. */
-export type PickupCandidate = { userId: string; name: string; rNumber: string | null };
+export type PickupCandidate = {
+  userId: string;
+  name: string;
+  rNumber: string | null;
+  /** De status van de bestelling van vandaag, zodat een suggestie al zegt "al opgehaald". */
+  status: TheokotOrderStatus | null;
+};
 
 /**
  * Het antwoord op een ingetikte zoekopdracht: dezelfde opzoeking, of een keuze
@@ -74,6 +80,9 @@ const PICKUP_STATUSES: TheokotOrderStatus[] = ["RESERVED", "PICKED_UP", "NO_SHOW
 
 /** Hoeveel namen de balie hoogstens toont om uit te kiezen. */
 const MAX_CANDIDATES = 12;
+
+/** Hoeveel suggesties er onder het veld verschijnen terwijl de shifter tikt. */
+const MAX_SUGGESTIONS = 8;
 
 /** Vandaag, van middernacht tot middernacht in Brussel. */
 function pickupDay(now: Date): { gte: Date; lt: Date } {
@@ -216,11 +225,42 @@ export async function pickupByQuery(
   const rNumber = normalizeRNumber(query);
   if (rNumber) return pickupByRNumber(rNumber, { now });
 
+  const users = await findPickupCandidates(query, now, MAX_CANDIDATES + 1);
+
+  if (users.length === 0) {
+    return { ok: false, error: `Niemand met een bestelling voor vandaag past op "${query}".` };
+  }
+  if (users.length === 1) return pickupForUser(users[0].userId, now);
+
+  const candidates = users.slice(0, MAX_CANDIDATES);
+  return {
+    ok: false,
+    error:
+      users.length > MAX_CANDIDATES
+        ? `Meer dan ${MAX_CANDIDATES} mensen met een bestelling passen op "${query}". Kies hieronder, of typ meer van de naam.`
+        : `${users.length} mensen met een bestelling passen op "${query}". Kies de juiste persoon.`,
+    candidates,
+  };
+}
+
+/**
+ * Wie er vandaag iets besteld heeft en op de zoekopdracht past, op naam of
+ * (een stuk van een) r-nummer. Dezelfde grens als de naamzoekopdracht: enkel
+ * wie vandaag een bestelling heeft, zodat een shifter niet door het ledenbestand
+ * kan bladeren.
+ */
+async function findPickupCandidates(
+  query: string,
+  now: Date,
+  limit: number,
+): Promise<PickupCandidate[]> {
+  const day = pickupDay(now);
   const terms = pickupSearchTerms(query);
+  if (terms.length === 0) return [];
   const users = await prisma.user.findMany({
     where: {
       deletedAt: null,
-      theokotOrders: { some: { status: { in: PICKUP_STATUSES }, session: { date: pickupDay(now) } } },
+      theokotOrders: { some: { status: { in: PICKUP_STATUSES }, session: { date: day } } },
       AND: terms.map((term) => ({
         OR: [
           { name: { contains: term, mode: "insensitive" as const } },
@@ -230,25 +270,37 @@ export async function pickupByQuery(
         ],
       })),
     },
-    select: { id: true, name: true, rNumber: true },
+    select: {
+      id: true,
+      name: true,
+      rNumber: true,
+      theokotOrders: {
+        where: { status: { in: PICKUP_STATUSES }, session: { date: day } },
+        select: { status: true },
+        take: 1,
+      },
+    },
     orderBy: { name: "asc" },
-    take: MAX_CANDIDATES + 1,
+    take: limit,
   });
+  return users.map((user) => ({
+    userId: user.id,
+    name: user.name,
+    rNumber: user.rNumber,
+    status: user.theokotOrders[0]?.status ?? null,
+  }));
+}
 
-  if (users.length === 0) {
-    return { ok: false, error: `Niemand met een bestelling voor vandaag past op "${query}".` };
-  }
-  if (users.length === 1) return pickupForUser(users[0].id, now);
-
-  const candidates = users
-    .slice(0, MAX_CANDIDATES)
-    .map((user) => ({ userId: user.id, name: user.name, rNumber: user.rNumber }));
-  return {
-    ok: false,
-    error:
-      users.length > MAX_CANDIDATES
-        ? `Meer dan ${MAX_CANDIDATES} mensen met een bestelling passen op "${query}". Kies hieronder, of typ meer van de naam.`
-        : `${users.length} mensen met een bestelling passen op "${query}". Kies de juiste persoon.`,
-    candidates,
-  };
+/**
+ * Suggesties onder het veld van de afhaalbalie terwijl de shifter tikt. Pas
+ * vanaf twee tekens, en niet voor wat de kaartlezer of de app-pas tikt: die
+ * eindigen op een Enter en zoeken dan zelf.
+ */
+export async function pickupSuggestions(
+  raw: string,
+  now: Date = new Date(),
+): Promise<PickupCandidate[]> {
+  const query = raw.trim();
+  if (query.length < 2 || query.includes(";") || query.startsWith("vtkpas")) return [];
+  return findPickupCandidates(query, now, MAX_SUGGESTIONS);
 }

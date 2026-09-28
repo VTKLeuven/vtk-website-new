@@ -379,6 +379,23 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   ban met een schone lei begint en niet meteen opnieuw geband wordt.
 - Bans en no-show-historiek zijn zichtbaar en **corrigeerbaar** in het admin-paneel
   (`/admin/theokot/bans`). Een correctie kan meteen de actieve ban opheffen.
+- **De verwerking kan gepauzeerd worden** (`noShowPaused` in de instellingen), en
+  een **verkoopdag kan als "er liep iets mis" aangeduid worden** (knop op
+  `/admin/theokot/overzicht`, `TheokotSession.noShowsWaivedAt`). In beide gevallen:
+  - **De bestelling blijft als niet opgehaald geboekt.** De cijfers (opbrengst,
+    wat er overbleef) horen te kloppen, ook op een dag waar iets misliep.
+  - **Geen mail, geen ban, en ook later niet meetellen.** Zo'n no-show krijgt
+    `TheokotOrder.noShowWaivedAt`, en de ban-telling slaat die over. Bewust niet
+    "de verwerking laten liggen tot de pauze voorbij is": dan vertrokken bij het
+    hervatten alle mails van de hele pauze tegelijk, voor dagen die iedereen al
+    vergeten is.
+  - **Achteraf aanduiden kan, maar een mail haal je niet terug.** Was de dag al
+    verwerkt, dan telt de knop elke lopende automatische ban opnieuw zonder die
+    dag; zakt iemand onder de drempel, dan valt de ban weg (einddatum naar nu,
+    zoals bij opheffen). Een ban die de beheerder zelf uitsprak, blijft staan: die
+    had een eigen reden. De bevestiging zegt dat de mails al vertrokken zijn.
+  - Lopende bans blijven lopen tijdens een pauze. Pauzeren is "geen nieuwe
+    gevolgen", niet "vergeven".
 
 ### Afsluiten, verwijderen en te weinig broodjes
 
@@ -431,6 +448,39 @@ open vragen opleverde (`docs/theokot-broodjes-audit-2026-09-21.md`).
   dag niets nieuws bestellen. Twee knoppen die "annuleren" heten en iets anders
   doen, is er één te veel. Corrigeren gaat nu over opgehaald, niet opgehaald en
   gereserveerd; een bestelling echt weghalen doe je bij de verkoopdag zelf.
+
+### Afhaalbalie: suggesties en automatisch op afgehaald
+
+- **Tijdens het tikken verschijnen suggesties**: wie vandaag besteld heeft en op
+  de naam of het r-nummer past, met erbij of die al opgehaald heeft. Dezelfde
+  grens als de naamzoekopdracht (enkel wie vandaag een bestelling heeft), zodat
+  een shifter met enkel `theokot.pickup` niet door het ledenbestand kan
+  bladeren. Wat de kaartlezer of een QR-lezer tikt, krijgt geen suggesties: dat
+  eindigt op een Enter en zoekt zelf.
+- **"Automatisch op afgehaald zetten"** (`autoPickup`, standaard uit): zodra de
+  student gevonden is, langs welke weg ook, staat een gewone reservatie meteen
+  op opgehaald. Aan een drukke balie scheelt dat een klik per broodje.
+  - **Na de bonnetjesvraag, niet ervoor.** Eerst weten of er nog iets te betalen
+    valt, dan pas uitdelen.
+  - **Een laattijdige bestelling blijft een klik.** Die kreeg al een no-show; ze
+    alsnog uitdelen is een bewuste keuze.
+  - **Een foute match is meteen te herstellen**: "Ongedaan maken" zet de
+    bestelling terug op gereserveerd. Smal gehouden, want een shifter heeft geen
+    `theokot.manage`: enkel een afhaling die hij zelf registreerde, binnen een
+    kwartier, en niet meer eens de dag verwerkt is.
+
+### Overzicht per dag en de historiek
+
+`/admin/theokot/overzicht` toont per verkoopdag wie nog moet komen, wie al
+opgehaald heeft (uur en door wie) en wie niet kwam. Aan de balie zie je enkel de
+persoon voor je; hier de hele dag. Een shifter (`theokot.pickup`) ziet de lijsten;
+wie Theokot beheert, ziet ook het geld en de historiek van alle verkoopdagen.
+
+- **Opbrengst is wat opgehaald werd**, niet wat besteld werd: een no-show brengt
+  niets op.
+- **"Met bonnetjes" telt mensen**, niet bonnetjes: hoeveel studenten met twee
+  medewerkersbonnetjes betaalden. **"Aan de balie"** is de opbrengst min wat die
+  bonnetjes dekten (het duurste broodje van elke zulke bestelling, zie hierboven).
 
 ### Turf-lijst
 

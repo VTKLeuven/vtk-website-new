@@ -9,6 +9,9 @@ import { DEFAULT_THEOKOT_CONFIG, parseTheokotConfig, type TheokotConfig } from '
 import { sendNoShowWarning, sendOrderCancelled } from './mail';
 import { withSerializableTransaction } from './ticketing/transactions';
 
+/** De notitie waarmee de no-show-verwerking een ban aanmaakt; zo is hij te herkennen. */
+const AUTOMATIC_BAN_NOTE = 'Automatisch aangemaakt door de no-show-verwerking.';
+
 /** Leest `theokot.config` uit de Setting-tabel, aangevuld met defaults. */
 export async function getTheokotConfig(): Promise<TheokotConfig> {
   try {
@@ -82,6 +85,8 @@ async function applyNoShowConsequences(
       where: {
         userId: order.userId,
         status: 'NO_SHOW',
+        // Wat tijdens een pauze viel, telt ook achteraf niet mee.
+        noShowWaivedAt: null,
         // `noShowProcessedAt` is wanneer de no-show verwerkt is en blijft daarna
         // staan; `updatedAt` schuift mee met elke latere wijziging, dus een oude
         // no-show die nog een notitie kreeg, telde opnieuw mee. Wie nog niet
@@ -104,7 +109,7 @@ async function applyNoShowConsequences(
         userId: order.userId,
         reason: `${noShowCount} niet-opgehaalde bestellingen`,
         endsAt: new Date(now.getTime() + config.banDurationDays * 86400000),
-        note: 'Automatisch aangemaakt door de no-show-verwerking.',
+        note: AUTOMATIC_BAN_NOTE,
       },
     });
   });
@@ -113,7 +118,15 @@ async function applyNoShowConsequences(
 /**
  * Verwerkt alle vervallen verkoopsessies: markeert nog-gereserveerde bestellingen
  * als no-show, verstuurt waarschuwingsmails en past bans toe. Idempotent via
- * `session.processedAt` — een reeds verwerkte sessie wordt overgeslagen.
+ * `session.processedAt`: een reeds verwerkte sessie wordt overgeslagen.
+ *
+ * Staat de verwerking gepauzeerd (`noShowPaused`), of is de dag als "er liep
+ * iets mis" aangeduid (`noShowsWaivedAt`), dan wordt de dag wel afgesloten en
+ * blijven de bestellingen als niet opgehaald geboekt, maar vertrekt er geen
+ * mail, komt er geen ban, en krijgt de bestelling `noShowWaivedAt`, zodat ze
+ * ook later niet meetelt. Bewust niet "de dag laten liggen tot de pauze
+ * voorbij is": dan vertrokken bij het hervatten alle mails van de hele pauze in
+ * één keer, voor dagen die iedereen al vergeten is.
  *
  * Wordt periodiek aangeroepen door de scheduler (`instrumentation.ts`) en kan ook
  * manueel getriggerd worden vanuit het admin-paneel.
@@ -165,6 +178,14 @@ export async function processDueNoShows(now: Date = new Date()): Promise<{ sessi
       });
 
       for (const order of session.orders) {
+        if (config.noShowPaused || session.noShowsWaivedAt) {
+          await prisma.theokotOrder.updateMany({
+            where: { id: order.id, noShowProcessedAt: null },
+            data: { noShowProcessedAt: new Date(), noShowWaivedAt: new Date() },
+          });
+          noShows += 1;
+          continue;
+        }
         await applyNoShowConsequences(order, session.date, config);
         await prisma.theokotOrder.updateMany({
           where: { id: order.id, noShowProcessedAt: null },
@@ -193,6 +214,83 @@ export async function processDueNoShows(now: Date = new Date()): Promise<{ sessi
   }
 
   return { sessions: processedSessions, noShows };
+}
+
+/**
+ * "Er liep iets mis" op een verkoopdag: de no-shows van die dag tellen niet
+ * mee, en de verwerking stuurt er geen mail meer voor.
+ *
+ * Was de dag al verwerkt, dan zijn de mails vertrokken; die zijn niet terug te
+ * halen. Wat wel kan: elke automatische ban die nog loopt bij iemand met een
+ * no-show op die dag, opnieuw tellen zonder de no-shows die niet meer meetellen.
+ * Komt die persoon dan onder de drempel, dan valt de ban weg, op dezelfde
+ * manier als `liftBanAction` (einddatum naar nu). Een ban die de beheerder zelf
+ * uitsprak, blijft staan.
+ */
+export async function waiveSessionNoShows(
+  sessionId: string,
+  now: Date = new Date(),
+): Promise<{ date: Date; orders: number; liftedBans: number; alreadyMailed: boolean } | null> {
+  const session = await prisma.theokotSession.findUnique({
+    where: { id: sessionId },
+    select: { id: true, date: true, processedAt: true, noShowsWaivedAt: true },
+  });
+  if (!session) return null;
+
+  if (!session.noShowsWaivedAt) {
+    await prisma.theokotSession.update({ where: { id: session.id }, data: { noShowsWaivedAt: now } });
+  }
+  const affected = await prisma.theokotOrder.findMany({
+    where: { sessionId: session.id, status: 'NO_SHOW', noShowWaivedAt: null },
+    select: { id: true, userId: true, noShowProcessedAt: true },
+  });
+  if (affected.length > 0) {
+    await prisma.theokotOrder.updateMany({
+      where: { id: { in: affected.map((order) => order.id) } },
+      data: { noShowWaivedAt: now },
+    });
+  }
+
+  const config = await getTheokotConfig();
+  let liftedBans = 0;
+  for (const userId of new Set(affected.map((order) => order.userId))) {
+    const ban = await prisma.theokotBan.findFirst({
+      where: { userId, active: true, endsAt: { gt: now }, note: AUTOMATIC_BAN_NOTE },
+      orderBy: { endsAt: 'desc' },
+    });
+    if (!ban) continue;
+    // Dezelfde telling als bij het uitspreken (`applyNoShowConsequences`): sinds
+    // het einde van de ban daarvoor, zonder wat niet meetelt.
+    const previous = await prisma.theokotBan.findFirst({
+      where: { userId, id: { not: ban.id }, endsAt: { lte: ban.startsAt } },
+      orderBy: { endsAt: 'desc' },
+    });
+    const since = previous ? previous.endsAt : new Date(0);
+    const count = await prisma.theokotOrder.count({
+      where: {
+        userId,
+        status: 'NO_SHOW',
+        noShowWaivedAt: null,
+        OR: [
+          { noShowProcessedAt: { gt: since } },
+          { noShowProcessedAt: null, updatedAt: { gt: since } },
+        ],
+      },
+    });
+    if (count >= config.noShowThreshold) continue;
+    await prisma.theokotBan.update({
+      where: { id: ban.id },
+      data: { active: false, endsAt: now },
+    });
+    liftedBans += 1;
+  }
+
+  return {
+    date: session.date,
+    orders: affected.length,
+    liftedBans,
+    alreadyMailed: session.processedAt !== null || affected.some((order) => order.noShowProcessedAt !== null),
+  };
 }
 
 // -----------------------------------------------------------------------------

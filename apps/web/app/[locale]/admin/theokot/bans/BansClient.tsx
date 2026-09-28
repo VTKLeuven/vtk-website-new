@@ -29,6 +29,8 @@ export type NoShowRow = {
   dateLabel: string;
   totalLabel: string;
   note: string;
+  /** Viel tijdens een pauze van de no-show-verwerking: geen mail, telt niet mee. */
+  paused: boolean;
 };
 
 export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[]; noShows: NoShowRow[] }) {
@@ -174,8 +176,15 @@ export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[];
                     <span className="font-medium text-vtk-ink">{o.userName}</span>{" "}
                     <span className="text-xs text-[#5c667f]">{o.rNumber}</span>
                   </div>
-                  <span className="text-xs text-[#5c667f]">
-                    {o.dateLabel} · {o.totalLabel}
+                  <span className="flex flex-wrap items-center gap-2 text-xs text-[#5c667f]">
+                    {o.paused ? (
+                      <span className="rounded-full bg-vtk-blue-soft px-2 py-0.5 font-medium text-vtk-ink">
+                        {nl ? "Tijdens pauze, telt niet mee" : "During a pause, not counted"}
+                      </span>
+                    ) : null}
+                    <span>
+                      {o.dateLabel} · {o.totalLabel}
+                    </span>
                   </span>
                 </div>
                 <SaveForm

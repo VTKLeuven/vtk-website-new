@@ -15,7 +15,7 @@ import {
   type OrderLineInput,
 } from "@/lib/theokot";
 import { readImageField, resolveImageKey, type ImageFieldValue } from "@/lib/imageField";
-import { getTheokotConfig, removeOrder, removeSession } from "@/lib/theokot-server";
+import { getTheokotConfig, removeOrder, removeSession, waiveSessionNoShows } from "@/lib/theokot-server";
 import {
   cancelOrder,
   placeOrder,
@@ -29,6 +29,8 @@ import {
   pickupByQuery,
   pickupByRNumber,
   pickupForUser,
+  pickupSuggestions,
+  type PickupCandidate,
   type PickupLookupResult,
   type PickupSearchResult,
 } from "@/lib/theokot-pickup";
@@ -747,6 +749,8 @@ export async function saveConfigAction(
     noShowThreshold: num("noShowThreshold", 1),
     banDurationDays: num("banDurationDays", 1),
     itemLayout: coerceItemLayout(formData.get("itemLayout")),
+    noShowPaused: formData.get("noShowPaused") === "on",
+    autoPickup: formData.get("autoPickup") === "on",
   };
   // X > Y, zoals docs/design-decisions.md het stelt: een limiet op broodjes van
   // de week die even hoog ligt als de limiet op de hele bestelling, is geen
@@ -764,7 +768,9 @@ export async function saveConfigAction(
     action: "update",
     entity: "theokotSettings",
     target: "Theokot-instellingen",
-    summary: `max ${value.maxItemsPerOrder} per bestelling, bestellen opent om ${value.orderOpenTime}, annuleren tot ${value.cancelDeadline}, ban van ${value.banDurationDays} dag(en)`,
+    summary: `max ${value.maxItemsPerOrder} per bestelling, bestellen opent om ${value.orderOpenTime}, annuleren tot ${value.cancelDeadline}, ban van ${value.banDurationDays} dag(en)${
+      value.noShowPaused ? ", no-shows gepauzeerd" : ""
+    }${value.autoPickup ? ", automatisch op afgehaald" : ""}`,
   });
   revalidatePath(`${ADMIN_PATH}/instellingen`);
   revalidateTheokot();
@@ -1065,6 +1071,32 @@ export async function correctOrderStatusAction(
   return saveOk();
 }
 
+/**
+ * "Er liep iets mis" op een verkoopdag: de no-shows van die dag tellen niet
+ * mee en krijgen geen mail meer. Zie {@link waiveSessionNoShows} voor wat er met
+ * al vertrokken mails en lopende bans gebeurt.
+ */
+export async function waiveSessionNoShowsAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("theokot.manage");
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const result = await waiveSessionNoShows(sessionId);
+  if (!result) return saveError("SESSION_NOT_FOUND");
+
+  await logAudit({
+    action: "update",
+    entity: "theokotSession",
+    entityId: sessionId,
+    target: sessionLabel(result.date),
+    summary: `no-shows tellen niet mee (${result.orders} bestelling(en)${
+      result.liftedBans ? `, ${result.liftedBans} ban(s) opgeheven` : ""
+    })`,
+  });
+  revalidatePath(`${ADMIN_PATH}/overzicht`);
+  revalidatePath(`${ADMIN_PATH}/bans`);
+  revalidateTheokot();
+  return saveOk();
+}
+
 // -----------------------------------------------------------------------------
 // Afhaalbalie (theokot.pickup)
 // -----------------------------------------------------------------------------
@@ -1190,6 +1222,67 @@ export async function markPickedUpAction(orderId: string): Promise<ActionResult>
     ok: true,
     message: late ? "Laattijdig afgehaald geregistreerd." : "Opgehaald geregistreerd.",
   };
+}
+
+/** Hoe lang een shifter een eigen afhaling nog zelf kan terugdraaien. */
+const UNDO_PICKUP_MINUTES = 15;
+
+/**
+ * Suggesties onder het veld van de afhaalbalie terwijl de shifter tikt: wie
+ * vandaag besteld heeft en op de naam of het r-nummer past.
+ */
+export async function suggestPickupAction(query: string): Promise<PickupCandidate[]> {
+  await requirePermission("theokot.pickup");
+  return pickupSuggestions(query);
+}
+
+/**
+ * Draait een afhaling terug naar gereserveerd. Er voor een foute match wanneer
+ * de balie automatisch op afgehaald zet (`autoPickup`): een shifter die de
+ * verkeerde persoon aanklikte, moet dat meteen zelf kunnen herstellen, zonder
+ * `theokot.manage`.
+ *
+ * Daarom smal: enkel een afhaling die deze shifter zelf registreerde, enkel
+ * binnen een kwartier, en niet meer eens de dag afgesloten is (dan hoort een
+ * correctie bij Bans & no-shows, waar ook de no-show-telling meeloopt).
+ */
+export async function undoPickupAction(orderId: string): Promise<ActionResult> {
+  const admin = await requirePermission("theokot.pickup");
+  const order = await prisma.theokotOrder.findUnique({
+    where: { id: orderId },
+    include: {
+      session: { select: { date: true, processedAt: true } },
+      user: { select: { name: true } },
+    },
+  });
+  if (!order) return { ok: false, error: "Bestelling niet gevonden." };
+  if (order.status !== "PICKED_UP") return { ok: false, error: "Deze bestelling staat niet op opgehaald." };
+  if (order.pickedUpById !== admin.user.id) {
+    return { ok: false, error: "Enkel wie de afhaling registreerde, kan ze terugdraaien." };
+  }
+  const since = order.pickedUpAt ? Date.now() - order.pickedUpAt.getTime() : Infinity;
+  if (since > UNDO_PICKUP_MINUTES * 60_000) {
+    return { ok: false, error: "Dit kan enkel vlak na het ophalen. Corrigeer bij Bans & no-shows." };
+  }
+  if (order.session.processedAt) {
+    return { ok: false, error: "Deze dag is al afgesloten. Corrigeer bij Bans & no-shows." };
+  }
+
+  const { count } = await prisma.theokotOrder.updateMany({
+    where: { id: orderId, status: "PICKED_UP", pickedUpById: admin.user.id },
+    data: { status: "RESERVED", pickedUpAt: null, pickedUpById: null },
+  });
+  if (count === 0) return { ok: false, error: "Deze bestelling is intussen al gewijzigd." };
+
+  await logAudit({
+    action: "update",
+    entity: "theokotOrder",
+    entityId: orderId,
+    target: order.user.name,
+    summary: `afhaling teruggedraaid aan de balie (${sessionLabel(order.session.date)})`,
+  });
+  revalidateTheokot();
+  return { ok: true, message: "Teruggezet naar gereserveerd." };
 }
 
 /**

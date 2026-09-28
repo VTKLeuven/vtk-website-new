@@ -51,6 +51,19 @@ export type TheokotConfig = {
   banDurationDays: number;
   /** Weergave van het aanbod op de bestelpagina. */
   itemLayout: TheokotItemLayout;
+  /**
+   * De no-show-verwerking staat gepauzeerd: wie niet ophaalt, krijgt geen mail
+   * en telt niet mee voor een ban. De bestelling wordt wel als niet opgehaald
+   * geboekt, zodat de cijfers kloppen. Zie `processDueNoShows`.
+   */
+  noShowPaused: boolean;
+  /**
+   * Aan de afhaalbalie meteen "opgehaald" zetten zodra iemand gevonden is (kaart,
+   * pas, r-nummer, naam of een keuze uit de lijst), in plaats van op de knop te
+   * moeten drukken. Enkel voor een gewone reservatie; een laattijdige blijft een
+   * bewuste klik.
+   */
+  autoPickup: boolean;
 };
 
 export const DEFAULT_THEOKOT_CONFIG: TheokotConfig = {
@@ -65,6 +78,8 @@ export const DEFAULT_THEOKOT_CONFIG: TheokotConfig = {
   noShowThreshold: 3,
   banDurationDays: 14,
   itemLayout: 'list',
+  noShowPaused: false,
+  autoPickup: false,
 };
 
 const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -99,6 +114,8 @@ export function parseTheokotConfig(value: unknown): TheokotConfig {
     noShowThreshold: coerceInt(src.noShowThreshold, d.noShowThreshold, 1),
     banDurationDays: coerceInt(src.banDurationDays, d.banDurationDays, 1),
     itemLayout: coerceItemLayout(src.itemLayout, d.itemLayout),
+    noShowPaused: typeof src.noShowPaused === 'boolean' ? src.noShowPaused : d.noShowPaused,
+    autoPickup: typeof src.autoPickup === 'boolean' ? src.autoPickup : d.autoPickup,
   };
 }
 
