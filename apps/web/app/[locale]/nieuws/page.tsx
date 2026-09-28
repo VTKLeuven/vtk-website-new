@@ -273,7 +273,13 @@ export default async function NewsPage({
                       className="news-mag"
                       tracking={magazineTracking(source, issue.id)}
                     >
-                      <span className="news-mag-cover" aria-hidden="true" />
+                      {issue.coverKey ? (
+                        // De kaft die bij het uploaden van bladzijde 1 gemaakt werd.
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img className="news-mag-cover is-photo" src={publicUrl(issue.coverKey) ?? undefined} alt="" loading="lazy" />
+                      ) : (
+                        <span className="news-mag-cover" aria-hidden="true" />
+                      )}
                       <span>
                         <b>
                           {pick(issue.titleNl, issue.titleEn, locale)}, {pick(issue.issueNl, issue.issueEn, locale)}

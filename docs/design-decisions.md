@@ -9232,6 +9232,13 @@ bron, zodat een album dat verdwijnt of een verkoop die sluit vanzelf wegvalt:
   vinkje en geen gok op de knoptekst: "Inschrijflink" staat ook bij events waar
   je je al lang niet meer kan inschrijven.
 - **Het Bakske en Ir.Reëel**: per blad het nieuwste nummer, drie weken lang.
+  De tegel toont de bovenkant van bladzijde 1 als foto (`coverKey`). Die kaft
+  wordt één keer gemaakt, in de browser van wie de editie uploadt
+  (`lib/pdfCover.ts`), en niet bij elke bezoeker: pdf.js op de homepage zou
+  iedereen een megabyte script en een stuk pdf laten laden voor één tegel, en de
+  server kan geen pdf tekenen (sharp is zonder pdf-ondersteuning gebouwd). Een
+  editie van voor de kaften krijgt er een met het fotoknopje in /admin/media;
+  zonder kaft blijft het streepjesvlak.
 - **Fotoalbums**: twee weken vanaf de datum van het album. Bewust die datum en
   niet het uploadmoment: Immich geeft dat niet mee, en een album van een
   activiteit van een maand geleden is geen nieuws meer.

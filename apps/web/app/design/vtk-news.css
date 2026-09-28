@@ -743,6 +743,14 @@
   box-shadow: 0 6px 12px -8px rgba(14, 26, 54, 0.5);
 }
 
+.news-mag-cover.is-photo {
+  width: 100%;
+  object-fit: cover;
+  object-position: top;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
 .news-mag b {
   display: block;
   font-size: 14px;
