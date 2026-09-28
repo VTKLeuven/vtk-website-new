@@ -32,6 +32,7 @@ import {
   type NewsSetting,
 } from "./setting";
 import { withSource } from "@/lib/ticketing/source";
+import { ticketPosterSelect, ticketPosterUrl, type TicketPosterSource } from "@/lib/ticketing/poster";
 
 /**
  * Het nieuws op de homepage lezen: de zelfgeschreven berichten uit `NewsPost`,
@@ -69,8 +70,9 @@ export type NewsEntry = NewsComposable & {
    * is dan `date`. Bij een ticketverkoop en een inschrijving is dat de dag van
    * het evenement: wanneer de verkoop of de inschrijving opende, zegt een
    * lezer weinig, en "do 24 sep" boven een uitstap op de 29ste leest als de
-   * dag van de uitstap. `date` blijft wel de volgorde en het label "Nieuw"
-   * bepalen.
+   * dag van de uitstap. `date` blijft wel het label "Nieuw", het uitgelichte
+   * bericht en de volgorde op /nieuws bepalen; de tegels op de homepage volgen
+   * de pin (zie `compareNewsTiles`).
    */
   shownDate?: string;
 };
@@ -111,17 +113,16 @@ const TICKET_NEWS_SELECT = {
   salesStartAt: true,
   salesEndAt: true,
   publishedAt: true,
-  calendarEvent: { select: { imageKey: true } },
+  ...ticketPosterSelect,
 } as const;
 
-type TicketNewsEvent = {
+type TicketNewsEvent = TicketPosterSource & {
   id: string;
   slug: string;
   titleNl: string;
   titleEn: string | null;
   location: string | null;
   startsAt: Date;
-  calendarEvent: { imageKey: string | null } | null;
 };
 
 /**
@@ -152,7 +153,7 @@ function ticketEntry(event: TicketNewsEvent, date: Date, locale: Locale, presale
     href: withSource(`/tickets/${event.slug}`, "nieuws"),
     ctaLabel: nl ? "Tickets kopen" : "Buy tickets",
     ctaHref: null,
-    imageUrl: publicUrl(event.calendarEvent?.imageKey),
+    imageUrl: ticketPosterUrl(event),
     author: null,
     place: event.location,
   };
@@ -372,10 +373,10 @@ export const NEWS_TAG = "news";
 const cachedNews = unstable_cache(
   async (locale: Locale) => {
     const setting = await readNewsSettingFromDb();
-    if (!setting.enabled) return { enabled: false, count: setting.count, entries: [] as NewsEntry[] };
+    if (!setting.enabled) return { enabled: false, entries: [] as NewsEntry[] };
     const candidates = await collectNews(locale, new Date(), setting);
     const entries: NewsEntry[] = candidates.flatMap(({ hidden, ...entry }) => (hidden ? [] : [entry]));
-    return { enabled: true, count: setting.count, entries };
+    return { enabled: true, entries };
   },
   ["site", "news"],
   { revalidate: 60, tags: [SITE_CONTENT_TAG, NEWS_TAG] },

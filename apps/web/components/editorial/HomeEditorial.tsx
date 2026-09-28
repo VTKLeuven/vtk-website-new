@@ -184,7 +184,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     // alle bezoekers. Faalt de lezing, dan valt enkel de band weg.
     getCachedNews(locale).catch((error) => {
       console.error("Nieuws lezen mislukt", error);
-      return { enabled: false, count: 0, entries: [] };
+      return { enabled: false, entries: [] };
     }),
   ]);
 
@@ -563,7 +563,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           helemaal wegvalt zonder berichten of wanneer ze uitstaat in
           /admin/nieuws. Zie lib/news. */}
       {news.enabled ? (
-        <NewsBand entries={newsEntries} count={news.count} locale={locale} base={base} now={now} />
+        <NewsBand entries={newsEntries} locale={locale} base={base} now={now} />
       ) : null}
 
       {(theokot || cursusEntries || cursusUnavailable) && (

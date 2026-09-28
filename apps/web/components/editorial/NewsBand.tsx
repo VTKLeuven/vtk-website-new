@@ -412,18 +412,16 @@ export function NewsRow({
 
 export function NewsBand({
   entries,
-  count,
   locale,
   base,
   now,
 }: {
   entries: NewsEntry[];
-  count: number;
   locale: Locale;
   base: string;
   now: Date;
 }) {
-  const { featured, rest } = composeNews(entries, count);
+  const { featured, rest } = composeNews(entries, now);
   if (!featured) return null;
   const nl = locale === "nl";
   const Featured = featured.source === "praeses" ? FeaturedLetter : FeaturedPost;
