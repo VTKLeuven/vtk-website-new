@@ -1883,7 +1883,9 @@
   --poc-gutter: clamp(20px, 2.2vw, 30px);
   display: grid;
   grid-template-columns: clamp(220px, 26%, 340px) minmax(0, 1.4fr) minmax(0, 1fr);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  /* Geen rand: de halfdoorzichtige witte rand van een glaspaneel liet hier de
+     witte achtergrond van de kaart doorschijnen, als een lijn van 1px rond de
+     foto. Een wit paneel op navy heeft geen rand nodig om te bestaan. */
   border-radius: 20px;
   background: var(--surface);
   color: var(--ink);
