@@ -26,6 +26,12 @@ const DIRECTORY = "https://admin.googleapis.com/admin/directory/v1";
 const GROUPS_SETTINGS = "https://www.googleapis.com/groups/v1/groups";
 
 /**
+ * Hoe lang één aanroep naar Google mag duren. Zonder grens wacht `fetch` tot vijf
+ * minuten, en de sync van de groepsadressen staat zolang stil.
+ */
+const GOOGLE_TIMEOUT_MS = 30_000;
+
+/**
  * Scopes voor het service-account, aangeroepen als de beheerder uit de config.
  * `admin.directory.user` (schrijven) is nodig om accounts aan te maken en om
  * iemand tussen organisatie-eenheden te verplaatsen.
@@ -108,6 +114,7 @@ async function accessToken(
 
   const res = await fetch(TOKEN_URL, {
     method: "POST",
+    signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
@@ -154,6 +161,7 @@ async function request<T>(
   const scope = as.scope ?? GOOGLE_SCOPES;
   const res = await fetch(url, {
     method,
+    signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
     headers: {
       authorization: `Bearer ${await accessToken(cfg, subject, scope)}`,
       ...(body === undefined ? {} : { "content-type": "application/json" }),

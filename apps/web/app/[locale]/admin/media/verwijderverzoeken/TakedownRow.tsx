@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { ConfirmDialog } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { useToast } from "@/components/ui/toast";

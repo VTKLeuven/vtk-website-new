@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  dayRange,
   eventLeadDate,
+  eventsRequestKey,
+  monthGridCells,
+  monthWeekDays,
+  openingRange,
   eventOccursOnDay,
   isEventPast,
   isMultiDayEvent,
@@ -60,6 +65,50 @@ describe('rolling weeks grid', () => {
     expect(cells[0].date).toEqual(new Date(2026, 11, 28));
     // Week 4 (+3 weeks): Sun 24 Jan 2027
     expect(cells[27].date).toEqual(new Date(2027, 0, 24));
+  });
+});
+
+describe('the range the calendar opens on', () => {
+  it('runs from midnight of the first day to the last moment of the last', () => {
+    const { start, end } = dayRange([new Date(2026, 8, 7, 15, 30), new Date(2026, 8, 13, 9)]);
+    expect(start).toEqual(new Date(2026, 8, 7, 0, 0, 0, 0));
+    expect(end).toEqual(new Date(2026, 8, 13, 23, 59, 59, 999));
+  });
+
+  it('covers the whole month grid around today, like the default view fetches', () => {
+    const range = openingRange(new Date(2026, 8, 22, 20, 5));
+    const cells = monthGridCells(2026, 8);
+    // Het raster van september 2026 begint op maandag 31 augustus.
+    expect(range.start).toEqual(new Date(2026, 7, 31));
+    expect(range).toEqual(dayRange(cells.map((cell) => cell.date)));
+  });
+
+  it('keys the same request the same way, and a different filter differently', () => {
+    const range = openingRange(new Date(2026, 8, 22));
+    const key = eventsRequestKey(range, 'all', false);
+    expect(eventsRequestKey(openingRange(new Date(2026, 8, 1)), 'all', false)).toBe(key);
+    expect(eventsRequestKey(range, 'alumni', false)).not.toBe(key);
+    expect(eventsRequestKey(range, 'all', true)).not.toBe(key);
+    expect(eventsRequestKey(openingRange(new Date(2026, 9, 1)), 'all', false)).not.toBe(key);
+  });
+});
+
+describe('the weeks of a month in the poster grid', () => {
+  it('keeps a week that runs into the next month whole', () => {
+    const days = monthWeekDays(2026, 8);
+    // September 2026: maandag 31 augustus tot zondag 4 oktober, vijf weken.
+    expect(days).toHaveLength(35);
+    expect(days[0]).toEqual(new Date(2026, 7, 31));
+    expect(days.at(-1)).toEqual(new Date(2026, 9, 4));
+    expect(days).toContainEqual(new Date(2026, 9, 2));
+  });
+
+  it('drops the sixth grid row that lies entirely in the next month', () => {
+    expect(monthWeekDays(2026, 8)).not.toContainEqual(new Date(2026, 9, 5));
+  });
+
+  it('puts the straddling week in the next month as well', () => {
+    expect(monthWeekDays(2026, 9)[0]).toEqual(new Date(2026, 8, 28));
   });
 });
 

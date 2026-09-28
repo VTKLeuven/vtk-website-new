@@ -8,8 +8,10 @@
  *   hoort niet de eerste te verdringen. Het icoon in het blok zegt hetzelfde,
  *   maar een icoon van 12 pixels lees je pas van dichtbij; een streeppatroon
  *   herken je over de hele week heen.
- * - **Geen chauffeur schreeuwt.** Dat is de enige toestand die nog werk is; ze
- *   krijgt de gele vulling van het huis en een rode streepjesrand.
+ * - **De rand en de streep zijn de staat.** Nog geen chauffeur is de enige
+ *   toestand die nog werk is: neutraal grijs met een streepjesrand. Nog te
+ *   beslissen krijgt een streep langs de bovenrand, en nooit een tweede
+ *   arcering; zie `.trip-requested` in `app/globals.css`.
  *
  * De kleur volgt standaard uit de id van de chauffeur en niet uit een instelling:
  * het doel is onderscheiden wie welke rit doet, niet dat Jonas geel wil. Een
@@ -102,13 +104,24 @@ export function driverColorIndex(
   return (hash(driverId) % DRIVER_COLOR_COUNT) + 1;
 }
 
+/**
+ * De CSS-variabele van een kleurnummer uit {@link driverColorIndex}; 0 is de
+ * neutrale kleur zonder chauffeur.
+ *
+ * Apart van {@link driverColorVar} omdat het statistiekenscherm het nummer al
+ * bewaart per chauffeur en de overrides daar niet meer bij de hand heeft: dat
+ * scherm draait in de browser en haalt geen chauffeurs op.
+ */
+export function driverColorVarFromIndex(index: number): string {
+  return index === 0 ? 'var(--driver-none)' : `var(--driver-${index})`;
+}
+
 /** De CSS-variabele voor deze chauffeur, of de neutrale kleur zonder chauffeur. */
 export function driverColorVar(
   driverId: string | null | undefined,
   overrides?: DriverColorOverrides
 ): string {
-  const index = driverColorIndex(driverId, overrides);
-  return index === 0 ? 'var(--driver-none)' : `var(--driver-${index})`;
+  return driverColorVarFromIndex(driverColorIndex(driverId, overrides));
 }
 
 /**

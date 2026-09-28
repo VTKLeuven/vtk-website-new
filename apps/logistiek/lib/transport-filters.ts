@@ -44,6 +44,16 @@ export type TransportFilters = {
   vehicleIds: string[];
   /** Leeg = alle chauffeurs; kan {@link NO_DRIVER} bevatten. */
   driverIds: string[];
+  /**
+   * Leeg = alle posten en werkgroepen (F4.1).
+   *
+   * Matcht op **allebei** de groepsvelden: de post die de rit aanvroeg
+   * (`groupId`) en de post die hem toegewezen kreeg (`assignedGroupId`). "Alle
+   * ritten van Acti" betekent allebei; enkel op de aanvrager filteren zou een rit
+   * wegmoffelen die Acti effectief rijdt, en dat is net de rit waar ze iets mee
+   * moeten.
+   */
+  groupIds: string[];
   /** Leeg = alle statussen. */
   statuses: TripStatus[];
   /** Leeg = alle aanvragertypes. */
@@ -65,6 +75,7 @@ export type TransportFilters = {
 export const EMPTY_FILTERS: TransportFilters = {
   vehicleIds: [],
   driverIds: [],
+  groupIds: [],
   statuses: [],
   requesterTypes: [],
   showEvents: true,
@@ -82,6 +93,7 @@ function parseList(value: string | undefined): string[] {
 export function parseTransportFilters(query: {
   voertuig?: string;
   chauffeur?: string;
+  post?: string;
   status?: string;
   aanvrager?: string;
   evenementen?: string;
@@ -94,6 +106,7 @@ export function parseTransportFilters(query: {
     showEvents: query.evenementen !== '0',
     vehicleIds: parseList(query.voertuig),
     driverIds: parseList(query.chauffeur),
+    groupIds: parseList(query.post),
     statuses: parseList(query.status).filter((value): value is TripStatus =>
       (TRIP_STATUSES as readonly string[]).includes(value)
     ),
@@ -123,6 +136,7 @@ export function parseTransportFilters(query: {
 export const FILTER_QUERY_KEYS = [
   'voertuig',
   'chauffeur',
+  'post',
   'status',
   'aanvrager',
   'evenementen',
@@ -134,6 +148,7 @@ export function filtersToQuery(filters: TransportFilters): Record<string, string
   const query: Record<string, string> = {};
   if (filters.vehicleIds.length > 0) query.voertuig = filters.vehicleIds.join(',');
   if (filters.driverIds.length > 0) query.chauffeur = filters.driverIds.join(',');
+  if (filters.groupIds.length > 0) query.post = filters.groupIds.join(',');
   if (filters.statuses.length > 0) query.status = filters.statuses.join(',');
   if (filters.requesterTypes.length > 0) query.aanvrager = filters.requesterTypes.join(',');
   if (!filters.showEvents) query.evenementen = '0';
@@ -146,6 +161,7 @@ export function countActiveFilters(filters: TransportFilters): number {
   return (
     (filters.vehicleIds.length > 0 ? 1 : 0) +
     (filters.driverIds.length > 0 ? 1 : 0) +
+    (filters.groupIds.length > 0 ? 1 : 0) +
     (filters.statuses.length > 0 ? 1 : 0) +
     (filters.requesterTypes.length > 0 ? 1 : 0) +
     (filters.showEvents ? 0 : 1) +
@@ -166,7 +182,7 @@ export function hasActiveFilters(filters: TransportFilters): boolean {
  */
 export function describeFilters(
   filters: TransportFilters,
-  names: { vehicles: Map<string, string>; drivers: Map<string, string> }
+  names: { vehicles: Map<string, string>; drivers: Map<string, string>; groups?: Map<string, string> }
 ): string[] {
   const parts: string[] = [];
   if (filters.vehicleIds.length > 0) {
@@ -179,6 +195,11 @@ export function describeFilters(
       `enkel ${filters.driverIds
         .map((id) => (id === NO_DRIVER ? 'ritten zonder chauffeur' : (names.drivers.get(id) ?? 'onbekende chauffeur')))
         .join(', ')}`
+    );
+  }
+  if (filters.groupIds.length > 0) {
+    parts.push(
+      `enkel ${filters.groupIds.map((id) => names.groups?.get(id) ?? 'onbekende post').join(', ')}`
     );
   }
   if (filters.statuses.length > 0) {

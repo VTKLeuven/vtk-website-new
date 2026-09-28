@@ -46,6 +46,20 @@ export function meetingPath(kind: MeetingKind, slug: string, base = ''): string 
   return kind === 'GROCOMEET' ? `${base}/grocomeet` : `${base}/bureau/${slug}`;
 }
 
+/**
+ * Of de deelnemer zelf de rekening krijgt, en dus prijzen te zien krijgt. Bij de
+ * grocomeet wordt het bedrag per persoon bijgehouden en afgevinkt; bij een VTK
+ * Bureau betaalt Onderwijs het geheel (`docs/design-decisions.md`). Voor de
+ * student is een bureaubestelling dus gratis, en dan tonen we ook geen prijs per
+ * broodje, geen drankprijs en geen totaal.
+ *
+ * Enkel presentatie: de prijzen blijven op de reservatie staan (snapshot op het
+ * moment van bestellen) en het beheer blijft de totalen zien.
+ */
+export function meetingPricesVisible(kind: MeetingKind): boolean {
+  return kind !== 'BUREAU';
+}
+
 // -----------------------------------------------------------------------------
 // Semesters
 //
@@ -222,6 +236,19 @@ export function parseMeetingDrinks(value: unknown): MeetingDrinks {
  */
 export function offeringNameKey(name: string): string {
   return name.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+/**
+ * Draagt deze inschrijving een bestelling, of komt die persoon enkel? Allebei
+ * zijn ze een geldige inschrijving: wie niets bestelt staat even goed op de
+ * aanwezigheidslijst (zie docs/design-decisions.md). Enkel wat er te eten, te
+ * drinken en te betalen valt, hangt hieraan; de aanwezigheid niet.
+ */
+export function hasMeetingOrder(reservation: {
+  itemName?: string | null;
+  drinkName?: string | null;
+}): boolean {
+  return Boolean(reservation.itemName) || Boolean(reservation.drinkName);
 }
 
 export type ReservationAmounts = { itemPriceCents: number; drinkPriceCents: number };

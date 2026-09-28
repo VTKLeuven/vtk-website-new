@@ -1,8 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   billedHours,
+  EXTERN_REQUESTER,
+  OTHER_REQUESTER,
+  requesterChoiceOf,
+  requesterFromChoice,
   dayPartLabel,
   describeReservationChanges,
+  handoverNote,
+  mergeHandover,
   formatDateOnly,
   formatDateWithPart,
   formatDateRange,
@@ -10,6 +16,7 @@ import {
   formatEuro,
   formatEventMoment,
   formatPriceCents,
+  formatTripWindow,
   isEmailish,
   isLastMinute,
   isNightTrip,
@@ -29,6 +36,7 @@ import {
   tripHoursLabel,
   tripWindowFor,
   vanStatusLabel,
+  vehiclesToDraw,
 } from '@/lib/uitleen';
 
 describe('formatEuro', () => {
@@ -415,6 +423,42 @@ describe('formatEventMoment', () => {
   });
 });
 
+describe('formatTripWindow', () => {
+  it('schrijft de dag één keer wanneer de rit binnen één dag valt', () => {
+    const start = new Date('2026-09-22T15:00:00.000Z'); // 17:00 Brussel
+    const end = new Date('2026-09-22T20:00:00.000Z'); // 22:00 Brussel
+    const text = formatTripWindow(start, end);
+    expect(text).toContain('17:00');
+    expect(text).toContain('22:00');
+    // "22 september" hoort er precies één keer in te staan; twee keer was de
+    // twee regels op een telefoon waar F4.14 over ging.
+    expect(text.match(/september/g)).toHaveLength(1);
+  });
+
+  it('schrijft de einddag voluit wanneer de rit over middernacht gaat', () => {
+    const start = new Date('2026-09-22T20:12:00.000Z'); // 22:12 Brussel
+    const end = new Date('2026-09-22T22:12:00.000Z'); // 00:12 op 23 september
+    const text = formatTripWindow(start, end);
+    expect(text).toContain('22:12');
+    expect(text).toContain('00:12');
+    expect(text).toMatch(/23/);
+  });
+
+  it('kijkt naar de Belgische dag en niet naar de UTC-dag', () => {
+    // 22:30 tot 23:30 Brussel op 22 september staat in UTC op twee kanten van
+    // middernacht; dat is geen rit over middernacht.
+    const start = new Date('2026-09-22T20:30:00.000Z');
+    const end = new Date('2026-09-22T21:30:00.000Z');
+    expect(formatTripWindow(start, end).match(/september/g)).toHaveLength(1);
+  });
+
+  it('gebruikt "to" in het Engels', () => {
+    const start = new Date('2026-09-22T15:00:00.000Z');
+    const end = new Date('2026-09-22T20:00:00.000Z');
+    expect(formatTripWindow(start, end, 'en')).toContain(' to ');
+  });
+});
+
 describe('tripHoursLabel', () => {
   it('toont enkel de uren binnen dezelfde dag', () => {
     const start = new Date('2026-09-12T08:00:00.000Z'); // 10:00 Brussel
@@ -554,5 +598,185 @@ describe('dagdelen', () => {
     expect(changes).toHaveLength(1);
     expect(changes[0]).toContain('voormiddag');
     expect(changes[0]).toContain('avond');
+  });
+});
+
+/**
+ * De melding na het doorgeven van een rit aan een post (F4.8b).
+ *
+ * Ze bestaat om één reden: zeggen of er iemand verwittigd is, en zo niet, of
+ * dat de bedoeling was. Sinds er vier keuzes zijn, is "0 verstuurd" niet meer
+ * hetzelfde als "er ging iets mis", en dat verschil hoort in de tekst te staan.
+ */
+describe('handoverNote', () => {
+  it('waarschuwt niet wanneer er bewust niemand gemaild wordt', () => {
+    const note = handoverNote('Sport', { mode: 'NIEMAND' });
+    expect(note.warning).toBe(false);
+    // En het zegt waar de post de rit dan wél ziet.
+    expect(note.message).toContain('Ritten van mijn post');
+  });
+
+  it('waarschuwt bij een post zonder verantwoordelijke', () => {
+    const note = handoverNote('Sport', { mode: 'LEADS', leads: 0, sent: 0 });
+    expect(note.warning).toBe(true);
+    expect(note.message).toContain('geen verantwoordelijke');
+  });
+
+  it('houdt een mislukte verzending uit elkaar van een lege post', () => {
+    const note = handoverNote('Sport', { mode: 'LEADS', leads: 2, sent: 0 });
+    expect(note.warning).toBe(true);
+    expect(note.message).toContain('vertrok niet');
+    expect(note.message).not.toContain('geen verantwoordelijke');
+  });
+
+  it('meldt gewoon dat het gelukt is', () => {
+    expect(handoverNote('Sport', { mode: 'LEADS', leads: 2, sent: 2 })).toEqual({
+      warning: false,
+      message:
+        'Doorgegeven aan Sport; de verantwoordelijken kregen een mail om een chauffeur aan te duiden.',
+    });
+  });
+
+  it('noemt het adres waar de mail naartoe ging', () => {
+    const note = handoverNote('Sport', { mode: 'POSTADRES', address: 'sport@vtk.be', sent: 1 });
+    expect(note.warning).toBe(false);
+    expect(note.message).toContain('sport@vtk.be');
+  });
+
+  it('waarschuwt bij een post zonder eigen adres in de mailinglijsten', () => {
+    const note = handoverNote('Sport', { mode: 'POSTADRES', address: null, sent: 0 });
+    expect(note.warning).toBe(true);
+    expect(note.message).toContain('geen eigen adres');
+  });
+
+  it('zegt het wanneer we het niet weten', () => {
+    const note = handoverNote('Sport', { mode: 'MISLUKT' });
+    expect(note.warning).toBe(true);
+    expect(note.message).toContain('weten niet');
+  });
+});
+
+/**
+ * Heen en terug in één keer inplannen geeft twee ritten en dus twee uitkomsten,
+ * maar één melding. Het slechtste geval wint, want dat is het geval waar het
+ * team iets mee moet.
+ */
+describe('mergeHandover', () => {
+  it('telt de verstuurde mails op', () => {
+    expect(
+      mergeHandover([
+        { mode: 'LEADS', leads: 2, sent: 2 },
+        { mode: 'LEADS', leads: 2, sent: 2 },
+      ])
+    ).toEqual({ mode: 'LEADS', leads: 2, sent: 4 });
+  });
+
+  it('laat één mislukking de melding bepalen', () => {
+    expect(
+      mergeHandover([{ mode: 'LEADS', leads: 2, sent: 2 }, { mode: 'MISLUKT' }])
+    ).toEqual({ mode: 'MISLUKT' });
+  });
+
+  it('houdt een ontbrekend postadres vast', () => {
+    expect(
+      mergeHandover([
+        { mode: 'POSTADRES', address: 'sport@vtk.be', sent: 1 },
+        { mode: 'POSTADRES', address: null, sent: 0 },
+      ])
+    ).toEqual({ mode: 'POSTADRES', address: null, sent: 1 });
+  });
+
+  it('zonder ritten is er niets doorgegeven', () => {
+    expect(mergeHandover([])).toEqual({ mode: 'NIEMAND' });
+  });
+});
+
+/**
+ * De keuzelijst "voor wie rijdt deze rit" (F4.4).
+ *
+ * Deze twee moeten elkaars omgekeerde zijn: het bewerkformulier vult zich met
+ * `requesterChoiceOf` en slaat op met `requesterFromChoice`, dus zodra ze uiteen
+ * lopen, verhuist een rit die niemand aanraakte.
+ */
+describe('requesterChoiceOf en requesterFromChoice', () => {
+  it('kent een interne post aan haar id', () => {
+    expect(requesterChoiceOf({ requesterType: 'INTERN', groupId: 'cln1feest' })).toBe('cln1feest');
+    expect(requesterFromChoice('cln1feest', '')).toEqual({
+      type: 'INTERN',
+      groupId: 'cln1feest',
+      name: null,
+    });
+  });
+
+  it('leest een rit van Logistiek zelf als de lege keuze', () => {
+    expect(requesterChoiceOf({ requesterType: 'INTERN', groupId: null })).toBe('');
+    expect(requesterFromChoice('', '')).toEqual({ type: 'INTERN', groupId: null, name: null });
+  });
+
+  it('zet een werkgroep op de sentinel en houdt de naam apart', () => {
+    expect(requesterChoiceOf({ requesterType: 'WERKGROEP', groupId: null })).toBe(OTHER_REQUESTER);
+    expect(requesterFromChoice(OTHER_REQUESTER, '  Alumni ')).toEqual({
+      type: 'WERKGROEP',
+      groupId: null,
+      name: 'Alumni',
+    });
+  });
+
+  it('houdt een externe rit extern', () => {
+    expect(requesterChoiceOf({ requesterType: 'EXTERN', groupId: null })).toBe(EXTERN_REQUESTER);
+    expect(requesterFromChoice(EXTERN_REQUESTER, 'De faculteit')).toEqual({
+      type: 'EXTERN',
+      groupId: null,
+      name: 'De faculteit',
+    });
+  });
+
+  it('laat een post nooit een naam meedragen', () => {
+    // Anders leest een rit die van werkgroep naar post verhuist als allebei:
+    // `requesterLabel` kijkt enkel naar het type, maar de naam blijft in de
+    // databank staan en duikt op zodra iemand ze terugzet.
+    expect(requesterFromChoice('cln1feest', 'Alumni').name).toBeNull();
+  });
+
+  it('is rond: elke rit komt op zichzelf uit', () => {
+    const rides = [
+      { requesterType: 'INTERN' as const, groupId: 'cln1feest', requesterName: null },
+      { requesterType: 'INTERN' as const, groupId: null, requesterName: null },
+      { requesterType: 'WERKGROEP' as const, groupId: null, requesterName: 'Alumni' },
+      { requesterType: 'EXTERN' as const, groupId: null, requesterName: 'De faculteit' },
+    ];
+    for (const ride of rides) {
+      const choice = requesterChoiceOf(ride);
+      const other = ride.requesterType === 'INTERN' ? '' : (ride.requesterName ?? '');
+      expect(requesterFromChoice(choice, other)).toEqual({
+        type: ride.requesterType,
+        groupId: ride.groupId,
+        name: ride.requesterName,
+      });
+    }
+  });
+});
+
+describe('vehiclesToDraw', () => {
+  const kar = { id: 'kar', active: true };
+  const dockx = { id: 'dockx', active: false };
+  const oud = { id: 'oud', active: false };
+
+  it('houdt de actieve voertuigen, in hun eigen volgorde', () => {
+    expect(vehiclesToDraw([kar, dockx], [])).toEqual([kar]);
+  });
+
+  it('haalt een gedeactiveerd voertuig terug wanneer er deze week op gereden is', () => {
+    // F4.22: het gehuurde busje is terug naar Dockx, maar de rit van het gala
+    // staat er nog en hoort zijn naam, icoon en arcering te houden.
+    expect(vehiclesToDraw([kar, dockx], [{ vehicleId: 'dockx' }])).toEqual([kar, dockx]);
+  });
+
+  it('laat de andere gedeactiveerde voertuigen weg', () => {
+    expect(vehiclesToDraw([kar, dockx, oud], [{ vehicleId: 'dockx' }])).toEqual([kar, dockx]);
+  });
+
+  it('kan tegen een rit op een voertuig dat niet meer bestaat', () => {
+    expect(vehiclesToDraw([kar], [{ vehicleId: 'weg' }])).toEqual([kar]);
   });
 });

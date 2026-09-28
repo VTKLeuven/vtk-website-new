@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import type { Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
 import { PublicForm } from "@/components/forms/public/PublicForm";

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { prisma } from "@vtk/db";
+import { prisma, searchUsers } from "@vtk/db";
 import { requireFormCapability } from "@/lib/forms/authorization";
 
 /** Zoek enkel na een live MANAGE_ACCESS-check, zodat de picker geen extra recht vereist. */
@@ -15,22 +15,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ form
 
   const url = new URL(request.url);
   const query = (url.searchParams.get("q") ?? "").trim().slice(0, 200);
-  if (query.length < 2) return NextResponse.json([]);
 
-  const users = await prisma.user.findMany({
-    where: {
-      active: true,
-      deletedAt: null,
-      OR: [
-        { name: { contains: query, mode: "insensitive" } },
-        { email: { contains: query, mode: "insensitive" } },
-        { rNumber: { contains: query, mode: "insensitive" } },
-      ],
-    },
-    orderBy: { name: "asc" },
-    take: 20,
-    select: { id: true, name: true, email: true, rNumber: true },
-  });
+  const users = await searchUsers(query, { limit: 20, db: prisma });
 
   return NextResponse.json(users);
 }

@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import type { Dictionary } from '@vtk/i18n';
 import { parseShiftArray, type ShiftResponse } from '@/lib/shift';
@@ -47,12 +47,29 @@ export function freeSpots(shift: ShiftResponse): number {
   return shift.availableSpots ?? shift.maxParticipants - (shift.takenSpots ?? 0);
 }
 
-/** "Vol", "Nog 1 plaats", "Nog 3 plaatsen": zegt wat je eraan hebt, niet enkel 5/6. */
-export function spotsLabel(shift: ShiftResponse, t: ShiftDict): string {
-  const free = freeSpots(shift);
-  if (free <= 0) return t.spots.full;
-  if (free === 1) return t.spots.one;
-  return fill(t.spots.few, { n: free });
+/** Het aantal bezette plaatsen, ongeacht welk endpoint de shift leverde. */
+export function takenSpots(shift: ShiftResponse): number {
+  return shift.takenSpots ?? shift.maxParticipants - freeSpots(shift);
+}
+
+/**
+ * "0/2", "4/4": bezette plaatsen op het totaal.
+ *
+ * Bewust een teller en geen zin ("Vol", "Nog 2 plaatsen"): wie een shift zoekt,
+ * vergelijkt er tien naast elkaar, en dan leest een getal sneller dan een zin.
+ * Het totaal staat er meteen bij, dus "nog 2" op een shift van twee en op een
+ * shift van tien zien er niet langer hetzelfde uit.
+ */
+export function spotsLabel(shift: ShiftResponse): string {
+  return `${takenSpots(shift)}/${shift.maxParticipants}`;
+}
+
+/**
+ * Hetzelfde getal uitgeschreven, voor een `aria-label`: een screenreader die
+ * "vier schuine streep vier" voorleest, zegt niets.
+ */
+export function spotsSpoken(shift: ShiftResponse, t: ShiftDict): string {
+  return fill(t.spots.taken, { taken: takenSpots(shift), max: shift.maxParticipants });
 }
 
 /** Groen = ruim plaats, geel = bijna vol, grijs = vol. */
@@ -107,9 +124,15 @@ function registerErrorMessage(body: unknown, t: ShiftDict): string {
 /**
  * Haalt een shift-lijst op van `url`, herlaadt bij mount en telkens een view
  * een (uit)schrijving signaleert via de event-bus.
+ *
+ * Met `initial` (de lijst die de pagina al op de server ophaalde) slaat hij de
+ * eerste ophaling over: anders stond er eerst een lege week en sprong de pagina
+ * open zodra de fetch binnenkwam.
  */
-export function useShiftList(url: string): ShiftResponse[] {
-  const [shifts, setShifts] = useState<ShiftResponse[]>([]);
+export function useShiftList(url: string, initial?: ShiftResponse[]): ShiftResponse[] {
+  const [shifts, setShifts] = useState<ShiftResponse[]>(initial ?? []);
+  // Zolang dit gelijk is aan `url`, zijn `shifts` nog die van de server.
+  const prefetchedUrl = useRef(initial ? url : null);
 
   useEffect(() => {
     let ignore = false;
@@ -120,7 +143,10 @@ export function useShiftList(url: string): ShiftResponse[] {
       if (!ignore) setShifts(data); // discard if stale
     }
 
-    load();
+    if (prefetchedUrl.current !== url) {
+      prefetchedUrl.current = null;
+      load();
+    }
     shiftsChanged.addEventListener('changed', load);
 
     return () => {

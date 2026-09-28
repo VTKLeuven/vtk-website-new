@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { hasLocale } from '@/lib/locale';
 import { requirePermission } from '@/lib/session';
 import { SCOPES } from '@vtk/auth';

@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import type { ComponentProps, ReactNode } from "react";
 
 /**
@@ -71,6 +71,36 @@ export function IconLink({
     >
       {children}
     </Link>
+  );
+}
+
+/**
+ * Een kale `<a>` voor een echte download (een API-route met
+ * `Content-Disposition`). `IconLink` gaat via de router, die zo'n route als
+ * pagina probeert te laden in plaats van het bestand binnen te halen.
+ */
+export function IconAnchor({
+  label,
+  srLabel,
+  tone = "neutral",
+  className,
+  children,
+  ...rest
+}: Omit<ComponentProps<"a">, "aria-label" | "title"> & {
+  label: string;
+  srLabel?: string;
+  tone?: IconTone;
+  children: ReactNode;
+}) {
+  return (
+    <a
+      {...rest}
+      aria-label={srLabel ?? label}
+      title={label}
+      className={[BASE, TONES[tone], className ?? ""].join(" ")}
+    >
+      {children}
+    </a>
   );
 }
 

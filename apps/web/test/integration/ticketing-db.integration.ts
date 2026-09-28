@@ -814,4 +814,82 @@ describe.sequential("ticketing database invariants", () => {
       })
     ).rejects.toThrow();
   });
+  /**
+   * De twee logboeken zijn append-only, met een trigger in de databank. Die
+   * trigger was een tijd strenger dan de site zelf: hij liet enkel `actorUserId`
+   * op NULL zetten, terwijl een wisverzoek ook het IP-adres en de metadata
+   * leegschrijft en een event zonder één bestelling zijn logboek meeneemt. Een
+   * account met één ticketlogregel raakte daardoor niet gewist.
+   *
+   * Deze test houdt beide kanten vast: wat een wisverzoek nodig heeft mag, en
+   * wat er gebeurd is blijft staan.
+   */
+  it("wist en anonimiseert een logregel, maar laat ze nooit herschrijven", async () => {
+    const emptyEventId = randomUUID();
+    await prisma.ticketEvent.create({
+      data: {
+        id: emptyEventId,
+        ownerGroupId: ids.group,
+        slug: `integration-empty-${emptyEventId}`,
+        titleNl: "Integratie zonder bestellingen",
+        startsAt: new Date("2027-06-20T19:00:00.000Z"),
+        endsAt: new Date("2027-06-21T01:00:00.000Z"),
+        createdById: ids.user,
+      },
+    });
+
+    const log = await prisma.ticketAuditLog.create({
+      data: {
+        eventId: emptyEventId,
+        actorUserId: ids.user,
+        action: "EVENT_CREATED",
+        entityType: "TicketEvent",
+        ipAddress: "10.0.0.1",
+        metadata: { who: "integratie" },
+      },
+    });
+
+    // Een account wissen (lib/privacy/account.ts) en de bewaartermijnen
+    // (lib/privacy/retention.ts) schrijven precies deze drie velden leeg.
+    await expect(
+      prisma.ticketAuditLog.update({
+        where: { id: log.id },
+        data: { actorUserId: null, ipAddress: null, metadata: { purged: true } },
+      })
+    ).resolves.toMatchObject({ actorUserId: null, ipAddress: null });
+
+    // Wat er gebeurd is, en met welke inhoud, blijft onaanraakbaar.
+    await expect(
+      prisma.ticketAuditLog.update({ where: { id: log.id }, data: { action: "EVENT_DELETED" } })
+    ).rejects.toThrow(/append-only/);
+    await expect(
+      prisma.ticketAuditLog.update({
+        where: { id: log.id },
+        data: { metadata: { who: "iemand anders" } },
+      })
+    ).rejects.toThrow(/append-only/);
+
+    // Een event waar ooit besteld is, houdt zijn logboek. `ids.event` draagt de
+    // bestellingen van de tests hierboven; zonder die bestelling zou deze regel
+    // wél mogen verdwijnen, en dan test dit niets.
+    expect(await prisma.ticketOrder.count({ where: { eventId: ids.event } })).toBeGreaterThan(0);
+    const soldLog = await prisma.ticketAuditLog.create({
+      data: { eventId: ids.event, action: "EVENT_CREATED", entityType: "TicketEvent" },
+    });
+    await expect(prisma.ticketAuditLog.deleteMany({ where: { id: soldLog.id } })).rejects.toThrow(
+      /append-only/
+    );
+
+    // Een event zonder één bestelling mag weg, en dan gaan het logboek en de
+    // scanlijnen mee (`deleteTicketEventAction`).
+    const scan = await prisma.ticketScanLog.create({
+      data: { eventId: emptyEventId, clientScanId: randomUUID(), result: "ACCEPTED" },
+    });
+    await expect(
+      prisma.ticketScanLog.deleteMany({ where: { id: scan.id } })
+    ).resolves.toMatchObject({ count: 1 });
+    await expect(prisma.ticketAuditLog.deleteMany({ where: { id: log.id } })).resolves.toMatchObject(
+      { count: 1 }
+    );
+  });
 });

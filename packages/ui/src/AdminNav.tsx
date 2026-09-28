@@ -100,9 +100,14 @@ function useSmartSticky<T extends HTMLElement>() {
       const y = window.scrollY;
       const scrollingDown = y > lastY;
       lastY = y;
-      const viewport = window.innerHeight;
+      // Alles in layoutpixels. Onder CSS-`zoom` (de site op 90% op een laptop)
+      // zijn `getBoundingClientRect` en `innerHeight` zichtbare pixels en
+      // `offsetHeight` en de transform layoutpixels; zonder zoom is dit 1.
+      const columnRect = column.getBoundingClientRect();
+      const scale = column.offsetHeight > 0 ? columnRect.height / column.offsetHeight || 1 : 1;
+      const viewport = window.innerHeight / scale;
       const navHeight = element.offsetHeight;
-      const columnTop = column.getBoundingClientRect().top;
+      const columnTop = columnRect.top / scale;
       const top = columnTop + offset;
 
       if (navHeight + TOP_GAP + BOTTOM_GAP <= viewport) {

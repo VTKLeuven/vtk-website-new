@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { notFound, redirect } from "next/navigation";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
@@ -77,7 +77,7 @@ export default async function HeaderOverviewPage({ params }: { params: Params })
                   {/* Decoratief: de titel ernaast zegt al waar de kaart heen gaat,
                       dus een alt-tekst zou de link enkel twee keer voorlezen. */}
                   <span
-                    className={`vtk-tile-media${photo ? " has-photo" : ""}`}
+                    className="vtk-tile-media"
                     aria-hidden="true"
                   >
                     {photo && (

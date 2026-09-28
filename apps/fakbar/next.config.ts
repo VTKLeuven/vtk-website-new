@@ -22,6 +22,23 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@vtk/gallery", "@vtk/auth", "@vtk/ui", "@vtk/db"],
   serverExternalPackages: ["@prisma/client", ".prisma/client"],
   outputFileTracingRoot: monorepoRoot,
+  // Dezelfde basis als apps/web/next.config.ts; de uitleg per header staat daar.
+  poweredByHeader: false,
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          ...(process.env.NODE_ENV === "production"
+            ? [{ key: "Strict-Transport-Security", value: "max-age=31536000" }]
+            : []),
+        ],
+      },
+    ];
+  },
   turbopack: {
     root: monorepoRoot,
   },

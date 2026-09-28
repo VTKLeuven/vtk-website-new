@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import type { CSSProperties } from "react";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
@@ -16,6 +16,9 @@ import { getCurrentSession } from "@/lib/session";
 import { addDays } from "date-fns";
 import { getDictionary } from "@vtk/i18n";
 import { PocBand, type PocBandGroup } from "./PocBand";
+import { NewsBand } from "./NewsBand";
+import { getCachedNews, getPresaleNews } from "@/lib/news/load";
+import { HomeHeroPhoto } from "./HomeHeroPhoto";
 import { POC_BAND_SETTING, readPocBandSetting } from "@/lib/home/pocBand";
 import { SHIFTS_BAND_SETTING, readShiftsBandSetting } from "@/lib/home/shiftBand";
 import { FrontpageShiftBand, type FrontpageShiftItem } from "./FrontpageShiftBand";
@@ -31,7 +34,7 @@ import { readSlogansSetting, resolveSlogans } from "@/lib/slogans";
 import { PartnerLogo } from "@/components/site/PartnerLogo";
 import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar";
 import { MomentDays } from "@/components/calendar/MomentDays";
-import { CalendarPlusIcon } from "@/components/ui/icons";
+import { CalendarPlusIcon, TicketIcon } from "@/components/ui/icons";
 import { focusPosition } from "@/lib/imageFocus";
 import { hasUpcomingMoment, momentsSummary, nextOccurrenceAt } from "@/lib/calendar/moments";
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
@@ -44,6 +47,7 @@ import {
 import {
   FRONTPAGE_EVENT_INCLUDE,
   frontpageEventsSince,
+  publishedTicketSlug,
   toFrontpageEvents,
 } from "@/lib/frontpage/events";
 import { resolveFrontpage } from "@/lib/frontpage/resolve";
@@ -75,6 +79,7 @@ import {
   outboundHost,
   umamiEvent,
 } from "@/lib/analytics";
+import { withSource } from "@/lib/ticketing/source";
 
 type CareerSetting = {
   titleNl: string;
@@ -118,6 +123,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     cursusEntries,
     barStatus,
     frontpage,
+    news,
   ] = await Promise.all([
     // Redactionele inhoud: voor elke bezoeker gelijk, dus uit de gedeelde cache
     // (lib/cachedContent.ts). Wat hieronder persoonlijk is (de kalenderfilter,
@@ -174,7 +180,23 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     readBarStatus(now),
     // Which front page is live, and its field values. See lib/frontpage/.
     resolveFrontpage(now),
+    // Het nieuws tussen de snelle links en de openingsuren; ook gedeeld over
+    // alle bezoekers. Faalt de lezing, dan valt enkel de band weg.
+    getCachedNews(locale).catch((error) => {
+      console.error("Nieuws lezen mislukt", error);
+      return { enabled: false, count: 0, entries: [] };
+    }),
   ]);
+
+  // Een voorverkoop staat enkel in het nieuws van wie erin mag, en hangt dus aan
+  // de sessie; daarom los van het gedeelde nieuws. Zie `getPresaleNews`.
+  const presaleNews = news.enabled
+    ? await getPresaleNews(locale, session, now).catch((error) => {
+        console.error("Voorverkoop in het nieuws lezen mislukt", error);
+        return [];
+      })
+    : [];
+  const newsEntries = presaleNews.length > 0 ? [...news.entries, ...presaleNews] : news.entries;
 
   // Aftermovies: `media.aftermovies` is dezelfde instelling als op /media, te
   // beheren via /admin/home. Enkel echte embeds tonen; een losse mp4 of een
@@ -251,6 +273,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     ...shift,
     takenSpots: _count.participants,
     viewerRegistered: participants.some((p) => p.userId === viewerId),
+    roster: toRoster(participants, viewerId),
   }));
 
   const weekEnd = addDays(now, 7);
@@ -367,7 +390,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
   // than a deploy. The value is an /api/media/... path or a path in public/;
   // neither can contain a quote, because storageKeyPath percent-encodes.
   const heroPhoto = frontpagePhoto(frontpage.module, publicUrl(frontpage.values.photo));
-  const heroPhotoStyle = { "--home-hero-photo": `url("${heroPhoto}")` } as CSSProperties;
 
   const theoToday = entryForDate(theokotEntries, now, locale);
   const theoOpen = theoToday && isOpenAt(theoToday.hours, now);
@@ -489,7 +511,8 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
           Loopt er een campagne, dan neemt haar layout de hero over; de quick
           links eronder blijven in beide gevallen staan. Zie lib/frontpage.ts. */}
-      <div className="home-dark-zone" style={heroPhotoStyle}>
+      <div className="home-dark-zone">
+        <HomeHeroPhoto src={heroPhoto} />
         <Frontpage
           id={frontpage.module.id}
           values={frontpage.values}
@@ -535,6 +558,13 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           </div>
         </section>
       </div>
+
+      {/* Tussen de donkere zone en de openingsuren: een lichtblauwe band, die
+          helemaal wegvalt zonder berichten of wanneer ze uitstaat in
+          /admin/nieuws. Zie lib/news. */}
+      {news.enabled ? (
+        <NewsBand entries={newsEntries} count={news.count} locale={locale} base={base} now={now} />
+      ) : null}
 
       {(theokot || cursusEntries || cursusUnavailable) && (
         <section className="hours-strip">
@@ -667,66 +697,6 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
         </section>
       )}
 
-      <section className="section">
-        <div className="sec-head">
-          <h2>{nl ? "Wat we doen." : "What we do."}</h2>
-          <div className="meta">
-            <Link href={`${base}/info`}>{nl ? "bekijk alles" : "see all"}</Link>
-          </div>
-        </div>
-        <div className="aanbod">
-          {aanbodCards.slice(0, 6).map((card) => {
-            const photo = card.photo;
-            const label = pick(card.labelNl, card.labelEn, locale);
-            const cardTitle = pick(card.titleNl, card.titleEn, locale);
-            // Alle aanbod-kaarten zijn identiek: dezelfde fotokop in 16:9 en
-            // dezelfde witte body als een eventkaart. Geen enkele kaart krijgt
-            // een aparte featured-stijl.
-            return (
-              <Link
-                key={card.href}
-                href={card.href}
-                className="acard"
-                {...umamiEvent(HOME_LINK_EVENT, { soort: "aanbodkaart", naar: card.href })}
-              >
-                <span
-                  className={`acard-media${photo ? "" : " acard-media-ph"}`}
-                  aria-hidden="true"
-                >
-                  {photo ? (
-                    <Image
-                      src={photo}
-                      alt=""
-                      fill
-                      sizes="(max-width: 620px) 100vw, (max-width: 1000px) 50vw, 380px"
-                    />
-                  ) : null}
-                </span>
-                <div className="acard-body">
-                  {/* Bij een headertab is het label de titel; dan stond hier
-                      hetzelfde woord twee keer onder elkaar. */}
-                  {label && label !== cardTitle ? <div className="tag">{label}</div> : null}
-                  <div className="acard-head">
-                    <h3>{cardTitle}</h3>
-                    <span className="cta">{nl ? "Ontdek" : "Explore"}</span>
-                  </div>
-                  <p>{pick(card.bodyNl, card.bodyEn, locale)}</p>
-                </div>
-              </Link>
-            );
-          })}
-        </div>
-      </section>
-
-      <PocBand
-        locale={locale}
-        base={base}
-        now={now}
-        setting={pocSetting}
-        groups={pocGroups}
-        myProgrammes={myProgrammeNames}
-      />
-
       {eventCards.length > 0 && (
         <section className="section band events-band">
           <div className="sec-head">
@@ -753,6 +723,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               const categories = event.categories.map((link) => link.category);
               const theme = categories.find((category) => category.audience === null) ?? null;
               const audiences = categories.filter((category) => category.audience !== null);
+              const ticketSlug = publishedTicketSlug(event.ticketEvent);
               return (
                 // Dezelfde kaart als in het raster van /kalender, uit
                 // `vtk-eventcard.css`. Een kaart met knoppen erin kan geen link
@@ -814,7 +785,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                       ))}
                     </div>
                     <h3 className="ev-card-title">
-                      <Link href={`${base}/kalender/${event.slug}`} className="ev-card-link">
+                      <Link href={withSource(`${base}/kalender/${event.slug}`, "home-evenementen")} className="ev-card-link">
                         {title}
                       </Link>
                     </h3>
@@ -861,6 +832,19 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                         >
                           <CalendarPlusIcon />
                         </a>
+                        {/* Rechtstreeks naar de tickets, zonder eerst langs de
+                            eventpagina. Enkel wanneer de ticketpagina online
+                            staat, dezelfde regel als de knop daar. */}
+                        {ticketSlug ? (
+                          <Link
+                            href={withSource(`${base}/tickets/${ticketSlug}`, "home-evenementen")}
+                            className="ev-card-action"
+                            title={nl ? "Tickets kopen" : "Buy tickets"}
+                            aria-label={`${nl ? "Tickets kopen" : "Buy tickets"}: ${title}`}
+                          >
+                            <TicketIcon />
+                          </Link>
+                        ) : null}
                       </span>
                     </div>
                   </div>
@@ -870,6 +854,66 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           </div>
         </section>
       )}
+
+      <PocBand
+        locale={locale}
+        base={base}
+        now={now}
+        setting={pocSetting}
+        groups={pocGroups}
+        myProgrammes={myProgrammeNames}
+      />
+
+      <section className="section">
+        <div className="sec-head">
+          <h2>{nl ? "Wat we doen." : "What we do."}</h2>
+          <div className="meta">
+            <Link href={`${base}/info`}>{nl ? "bekijk alles" : "see all"}</Link>
+          </div>
+        </div>
+        <div className="aanbod">
+          {aanbodCards.slice(0, 6).map((card) => {
+            const photo = card.photo;
+            const label = pick(card.labelNl, card.labelEn, locale);
+            const cardTitle = pick(card.titleNl, card.titleEn, locale);
+            // Alle aanbod-kaarten zijn identiek: dezelfde fotokop in 16:9 en
+            // dezelfde witte body als een eventkaart. Geen enkele kaart krijgt
+            // een aparte featured-stijl.
+            return (
+              <Link
+                key={card.href}
+                href={card.href}
+                className="acard"
+                {...umamiEvent(HOME_LINK_EVENT, { soort: "aanbodkaart", naar: card.href })}
+              >
+                <span
+                  className={`acard-media${photo ? "" : " acard-media-ph"}`}
+                  aria-hidden="true"
+                >
+                  {photo ? (
+                    <Image
+                      src={photo}
+                      alt=""
+                      fill
+                      sizes="(max-width: 620px) 100vw, (max-width: 1000px) 50vw, 380px"
+                    />
+                  ) : null}
+                </span>
+                <div className="acard-body">
+                  {/* Bij een headertab is het label de titel; dan stond hier
+                      hetzelfde woord twee keer onder elkaar. */}
+                  {label && label !== cardTitle ? <div className="tag">{label}</div> : null}
+                  <div className="acard-head">
+                    <h3>{cardTitle}</h3>
+                    <span className="cta">{nl ? "Ontdek" : "Explore"}</span>
+                  </div>
+                  <p>{pick(card.bodyNl, card.bodyEn, locale)}</p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
 
       {aftermovies.length > 0 && (
         <section className="section band aftermovie-band">
@@ -896,6 +940,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           signedIn={Boolean(session)}
           totalOpenSpots={totalOpenSpots}
           userName={session?.user?.name ?? null}
+          t={getDictionary(locale).shift}
         />
       )}
 

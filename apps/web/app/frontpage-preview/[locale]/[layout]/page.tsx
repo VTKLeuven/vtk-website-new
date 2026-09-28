@@ -1,5 +1,5 @@
-import type { CSSProperties } from "react";
 import { notFound } from "next/navigation";
+import { HomeHeroPhoto } from "@/components/editorial/HomeHeroPhoto";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission, requireSession } from "@/lib/session";
@@ -24,6 +24,7 @@ import {
 import { ToastProvider } from "@/components/ui/toast";
 import { Frontpage } from "@/components/editorial/frontpage";
 import type { FrontpageShift } from "@/components/editorial/frontpage/context";
+import { ROSTER_PARTICIPANT_SELECT, toRoster } from "@/lib/shift/roster";
 
 // Outside `app/[locale]/` on purpose, so the site header, the footer and the
 // admin navigation stay out of the frame; only the root layout wraps this. That
@@ -110,14 +111,15 @@ export default async function FrontpagePreview({
         maxParticipants: true,
         reward: true,
         _count: { select: { participants: true } },
-        participants: { where: { userId: session.user.id }, select: { userId: true } },
+        participants: { select: ROSTER_PARTICIPANT_SELECT },
       },
     }),
   ]);
   const openShifts: FrontpageShift[] = shifts.map(({ _count, participants, ...shift }) => ({
     ...shift,
     takenSpots: _count.participants,
-    viewerRegistered: participants.length > 0,
+    viewerRegistered: participants.some((p) => p.userId === session.user.id),
+    roster: toRoster(participants, session.user.id),
   }));
   const viewerInterestIds = new Set(viewerInterestMap.keys());
   const upcomingEvents = calendarEvents.filter((event) => event.start >= now);
@@ -137,7 +139,6 @@ export default async function FrontpagePreview({
     fallback: legacyHeroFrom(row?.values),
   });
   const heroPhoto = frontpagePhoto(layoutModule, publicUrl(values.photo));
-  const style = { "--home-hero-photo": `url("${heroPhoto}")` } as CSSProperties;
 
   return (
     <div className="vtk-design">
@@ -148,7 +149,8 @@ export default async function FrontpagePreview({
           en de ster van het weekoverzicht meldt via een toast wanneer de server
           weigert. Zonder provider gooit die hook en gaat het voorbeeld stuk. */}
       <ToastProvider>
-        <div className="home-dark-zone" style={style}>
+        <div className="home-dark-zone">
+          <HomeHeroPhoto src={heroPhoto} />
           <Frontpage
             id={layoutModule.id}
             values={values}

@@ -64,7 +64,7 @@ export default async function VanBookingDetailPage({
 
       {/* `items-start`: zonder dat rekt de linkerkaart mee met de zijbalk, en
           bij een korte rit is dat een half scherm leeg wit. */}
-      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="logistics-form-width grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{booking.purpose}</h2>

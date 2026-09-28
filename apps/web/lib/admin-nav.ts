@@ -127,8 +127,8 @@ export function getAdminNav(): NavEntry[] {
       item('frontpage', '/frontpage', { perm: 'home.edit' }),
       item('slogans', '/slogans', { perm: 'home.edit' }),
       item('openingHours', '/openingsuren', { perm: 'openingHours.manageOwn' }),
-      item('announcements', '/aankondigingen', { perm: 'home.edit' }),
-      item('linkPage', '/linkpagina', { perm: 'home.edit' }),
+      item('announcements', '/aankondigingen', { perm: 'announcements.manage' }),
+      item('news', '/nieuws', { perm: 'news.manage' }),
       item('header', '/header', { perm: 'pages.manage' }),
       item('pages', '/paginas', { anyPerm: ['pages.edit', 'pages.editAll'] }),
       item('partners', '/partners', { perm: 'partners.manage' }),
@@ -151,6 +151,9 @@ export function getAdminNav(): NavEntry[] {
       // groep is: elk praesidiumlid is lid, lang niet elk lid heeft een post.
       item('leden', '/leden', { perm: 'leden.manage' }),
       item('groups', '/groepen', { perm: 'groups.manage' }),
+      // Direct onder Posten: dezelfde posten, maar gelezen als "bij wie moet ik
+      // zijn voor X". Zichtbaar voor elk praesidiumlid, niet enkel voor beheer.
+      item('tasks', '/wie-doet-wat', { anyPerm: ['tasks.view', 'tasks.manageOwn', 'tasks.manage'] }),
       item('werkgroepen', '/werkgroepen', { werkgroep: true }),
       item('roles', '/roles', { perm: 'roles.manage' }),
       // Alumni is een adresboek per lichting, geen opt-in mailinglijst: een
@@ -168,6 +171,9 @@ export function getAdminNav(): NavEntry[] {
       item('mailinglists', '/mailinglijsten', { perm: 'mailinglists.export' }),
       item('mailGroups', '/groepsadressen', { perm: 'mailgroups.manage' }),
       item('appPush', '/app-push', { perm: 'app.push' }),
+      // De linkpagina hangt in de bio van de sociale media: dat is het werk van
+      // communicatie, niet van wie de website onderhoudt.
+      item('linkPage', '/linkpagina', { perm: 'home.edit' }),
       // Fotoalbums hebben één ingang: /admin/media. Daar staat de Immich-galerij,
       // en dat is de enige bron die de publieke mediapagina leest.
       item('media', '/media', { anyPerm: ['media.manage', 'photos.manageAlbums'] }),

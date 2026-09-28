@@ -88,6 +88,16 @@ enum TicketAudience {
   /// weigert ze. Bedoeld voor wat de kring aan ereleden geeft (bv. gratis
   /// naar een cantus) zonder dat de rest van de site die uitzondering ziet.
   HONORARY
+  /// Doelgroepen uit het studieprofiel, dezelfde vier als de kalender
+  /// (`CalendarAudience`, afgeleid in `lib/calendar/audienceProfile.ts`). Net
+  /// als een erelidticket onzichtbaar voor wie er niet bij hoort; een
+  /// uitgelogde bezoeker krijgt enkel de hint dat inloggen iets kan opleveren.
+  /// Eerste- en laatstejaars tellen enkel met een studiebevestiging van de
+  /// lopende ronde, anders zou vorig jaar zijn profiel nog meetellen.
+  FIRST_YEARS
+  LAST_YEARS
+  INTERNATIONALS
+  ALUMNI
 }
 
 enum TicketQuestionType {
@@ -448,6 +458,9 @@ enum StudyProgramme {
   ENERGY
   ARTIFICIAL_INTELLIGENCE
   MATERIALS
+  // Master Mobility & Supply Chain Engineering: enkel een master, net als
+  // Energie of Cybersecurity.
+  MOBILITY_SUPPLY_CHAIN
   NANO
   URBANISM
   MATHEMATICAL
@@ -599,7 +612,9 @@ model User {
   // Career is de lijst waar bedrijven voor betalen. Zet het lid Career weer uit,
   // dan gaan beide velden mee op null; anders telt /admin/mailinglijsten
   // herkomsten van mensen die niet meer op de lijst staan. Leeg bij wie al
-  // aangeduid stond voor dit bijgehouden werd: die tellen als "eerder".
+  // aangeduid stond voor dit bijgehouden werd (17 september 2026). Dat was in
+  // de praktijk allemaal de onboarding, dus de admin telt die daar ook bij, met
+  // `onboardedAt` als datum; zie `lib/careerStats.ts`.
   careerOptInAt           DateTime?           @db.Timestamptz(3)
   careerOptInSource       CareerOptInSource?
   // Herinneringen voor een shift waarvoor je jezelf inschreef. Bewust geen
@@ -657,7 +672,7 @@ model User {
   // `MailCategory`: die lijsten zijn studiegericht en vallen weg zodra iemand
   // zijn studie niet meer bevestigt, wat voor een alumnus altijd het geval is.
   alumniMailOptIn         Boolean             @default(false)
-  // Erelid. Enkel door een beheerder te zetten (zie `users.edit`), nooit door
+  // Erelid. Enkel door een beheerder te zetten (/admin/leden, `leden.manage`), nooit door
   // het lid zelf. Geeft toegang tot ticketsoorten met `TicketAudience.HONORARY`,
   // die voor iedereen anders onzichtbaar blijven.
   honoraryMember          Boolean             @default(false)
@@ -691,11 +706,15 @@ model User {
   // `memberships` hierboven: dat zijn posten per werkingsjaar.
   vtkMemberships           Membership[]            @relation("MembershipUser")
   membershipsGranted       Membership[]            @relation("MembershipGrantedBy")
+  // Per academiejaar: wanneer en via welk scherm de studie bevestigd werd, en wat
+  // het lid daar met de Career-vraag deed. Zie `StudyConfirmation`.
+  studyConfirmations       StudyConfirmation[]
   roles                    UserRole[]
   vaultMember              VaultMember?
   pocRepresentative        PocRepresentative[]
   createdPages             Page[]                  @relation("PageCreatedBy")
   createdAnnouncements     Announcement[]          @relation("AnnouncementCreatedBy")
+  createdNewsPosts         NewsPost[]              @relation("NewsPostCreatedBy")
   updatedFrontpages        Frontpage[]             @relation("FrontpageUpdatedBy")
   createdEvents            CalendarEvent[]         @relation("EventCreatedBy")
   dashboardTiles           DashboardTile[]
@@ -742,26 +761,28 @@ model User {
 
   pianoReservations PianoReservation[]
 
-  uitleenReservations     UitleenReservation[]        @relation("UitleenReservationUser")
-  uitleenDecided          UitleenReservation[]        @relation("UitleenDecidedBy")
-  uitleenPickedUp         UitleenReservation[]        @relation("UitleenPickedUpBy")
-  uitleenReturned         UitleenReservation[]        @relation("UitleenReturnedBy")
-  uitleenLinesPrepared    UitleenReservationLine[]    @relation("UitleenLinePreparedBy")
-  uitleenTemplates        UitleenRequestTemplate[]    @relation("UitleenTemplateCreatedBy")
-  ticketTemplates         TicketEventTemplate[]       @relation("TicketTemplateCreatedBy")
-  uitleenEvents           UitleenEvent[]              @relation("UitleenEventCreatedBy")
-  uitleenEventExtraItems  UitleenEventExtraItem[]     @relation("UitleenEventExtraItemCreatedBy")
-  uitleenTransport        UitleenTransportBooking[]   @relation("UitleenTransportUser")
-  uitleenTransportDriven  UitleenTransportBooking[]   @relation("UitleenTransportDriver")
-  uitleenTransportDecided UitleenTransportBooking[]   @relation("UitleenTransportDecidedBy")
-  uitleenTransportDone    UitleenTransportBooking[]   @relation("UitleenTransportCompletedBy")
-  collectEnGoImported     CollectEnGoOrder[]          @relation("CollectEnGoImportedBy")
-  uitleenDriver           UitleenDriver?              @relation("UitleenDriverUser")
-  uitleenFeedTokens       UitleenFeedToken[]          @relation("UitleenFeedTokenUser")
-  uitleenAvailability     UitleenDriverAvailability[] @relation("UitleenDriverAvailabilityUser")
-  uitleenHelpersAdded     UitleenTransportHelper[]    @relation("UitleenTransportHelperAddedBy")
-  uitleenDriversAdded     UitleenDriver[]             @relation("UitleenDriverAddedBy")
-  uitleenAuditLogs        UitleenAuditLog[]           @relation("UitleenAuditActor")
+  uitleenReservations      UitleenReservation[]            @relation("UitleenReservationUser")
+  uitleenDecided           UitleenReservation[]            @relation("UitleenDecidedBy")
+  uitleenPickedUp          UitleenReservation[]            @relation("UitleenPickedUpBy")
+  uitleenReturned          UitleenReservation[]            @relation("UitleenReturnedBy")
+  uitleenLinesPrepared     UitleenReservationLine[]        @relation("UitleenLinePreparedBy")
+  uitleenTemplates         UitleenRequestTemplate[]        @relation("UitleenTemplateCreatedBy")
+  ticketTemplates          TicketEventTemplate[]           @relation("TicketTemplateCreatedBy")
+  uitleenEvents            UitleenEvent[]                  @relation("UitleenEventCreatedBy")
+  uitleenEventExtraItems   UitleenEventExtraItem[]         @relation("UitleenEventExtraItemCreatedBy")
+  uitleenTransport         UitleenTransportBooking[]       @relation("UitleenTransportUser")
+  uitleenTransportDriven   UitleenTransportBooking[]       @relation("UitleenTransportDriver")
+  uitleenTransportDecided  UitleenTransportBooking[]       @relation("UitleenTransportDecidedBy")
+  uitleenTransportDone     UitleenTransportBooking[]       @relation("UitleenTransportCompletedBy")
+  collectEnGoImported      CollectEnGoOrder[]              @relation("CollectEnGoImportedBy")
+  uitleenDriver            UitleenDriver?                  @relation("UitleenDriverUser")
+  uitleenFeedTokens        UitleenFeedToken[]              @relation("UitleenFeedTokenUser")
+  uitleenAvailability      UitleenDriverAvailability[]     @relation("UitleenDriverAvailabilityUser")
+  uitleenAvailabilityNotes UitleenDriverAvailabilityNote[] @relation("UitleenDriverAvailabilityNoteUser")
+  uitleenHelpersAdded      UitleenTransportHelper[]        @relation("UitleenTransportHelperAddedBy")
+  uitleenTripNotes         UitleenTransportNote[]          @relation("UitleenTransportNoteAuthor")
+  uitleenDriversAdded      UitleenDriver[]                 @relation("UitleenDriverAddedBy")
+  uitleenAuditLogs         UitleenAuditLog[]               @relation("UitleenAuditActor")
 
   doorGrants         DoorAccessGrant[]
   doorLogs           DoorAccessLog[]
@@ -866,6 +887,11 @@ model Group {
   uitleenEventsGroup       UitleenEvent[]
   mailGroupSources         MailGroupSource[]
   expenses                 Expense[]
+  /// De vaste taken van deze post (/admin/wie-doet-wat).
+  tasks                    GroupTask[]                @relation("GroupTaskOwner")
+  /// Taken van een andere post die het aanspreekpunt voor deze post zijn
+  /// ("IT-contact voor Theokot").
+  tasksFor                 GroupTask[]                @relation("GroupTaskFor")
 }
 
 model GroupMembership {
@@ -884,9 +910,68 @@ model GroupMembership {
   user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
   group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
+  /// Welke taken van de post dit lid dit werkingsjaar opneemt.
+  taskAssignments GroupTaskAssignment[]
+
   @@unique([userId, groupId, year])
   @@index([groupId])
   @@index([year])
+}
+
+// -----------------------------------------------------------------------------
+// Wie doet wat: de taakverdeling binnen een post
+// -----------------------------------------------------------------------------
+// Een taak ("Verhuur van de zaal") hoort bij de post en blijft over de
+// werkingsjaren heen staan. Wie ze doet, hangt aan een `GroupMembership`, en is
+// daarmee vanzelf per werkingsjaar: op 15 juli begint elke post met dezelfde
+// takenlijst en niemand erachter. Zie docs/design-decisions.md, "Wie doet wat".
+
+/// Een vaste taak van een post, waarvoor één of meer postleden het
+/// aanspreekpunt zijn.
+model GroupTask {
+  id          String  @id @default(cuid())
+  groupId     String
+  /// Optioneel: de post waarvoor deze taak het aanspreekpunt is. "IT-contact
+  /// voor Theokot" hoort bij IT, maar staat ook bij Theokot in het register.
+  forGroupId  String?
+  name        String
+  description String?
+  /// Woorden waarmee iemand zoekt die de naam van de taak niet kent ("huren",
+  /// "fuif" voor de verhuur). Enkel voor de zoekfunctie, nergens getoond.
+  keywords    String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  group       Group                 @relation("GroupTaskOwner", fields: [groupId], references: [id], onDelete: Cascade)
+  forGroup    Group?                @relation("GroupTaskFor", fields: [forGroupId], references: [id], onDelete: SetNull)
+  assignments GroupTaskAssignment[]
+
+  @@index([groupId])
+  @@index([forGroupId])
+}
+
+/// Neemt een lid de taak zelf op, of is het de backup (wie je aanspreekt als de
+/// verantwoordelijke niet antwoordt)?
+enum GroupTaskRole {
+  HOLDER
+  BACKUP
+}
+
+/// Wie een taak opneemt in één werkingsjaar. Hangt aan het postlidmaatschap en
+/// niet aan de gebruiker: het jaar zit daar al in, en wie van de post gehaald
+/// wordt, verliest zijn taken vanzelf (cascade).
+model GroupTaskAssignment {
+  id           String        @id @default(cuid())
+  taskId       String
+  membershipId String
+  kind         GroupTaskRole @default(HOLDER)
+
+  task       GroupTask       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  membership GroupMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, membershipId])
+  @@index([membershipId])
 }
 
 // -----------------------------------------------------------------------------
@@ -955,6 +1040,79 @@ model Membership {
 
   @@unique([userId, year])
   @@index([year, activatedAt])
+}
+
+/// Via welk scherm een lid zijn studie voor een academiejaar bevestigde.
+enum StudyConfirmationVia {
+  /// Het profiel in de onboarding, bij de eerste login.
+  ONBOARDING
+  /// De jaarlijkse gate op /studie-bevestigen.
+  CONFIRMATION
+  /// Een opslag op /account die een nieuw academiejaar bevestigde (tussen
+  /// 14 en 21 september kan dat, voor de gate opengaat).
+  ACCOUNT
+}
+
+/// Eén rij per lid per academiejaar: wanneer het lid zijn studie bevestigde, via
+/// welk scherm, en wat het daar met de Career-vraag deed.
+///
+/// Bestaat voor /admin/mailinglijsten. `User.studyConfirmedYear` zegt enkel
+/// *dat* iemand bevestigde. Niet wanneer, niet via welk scherm, en niet of de
+/// Career-vraag op dat scherm stond. Dat laatste hangt af van het profiel op dat
+/// moment en is achteraf niet meer af te leiden, want de bevestiging overschrijft
+/// net dat profiel.
+///
+/// Er is geen historiek van voor deze tabel (22 september 2026): wie eerder
+/// bevestigde, heeft voor dat jaar geen rij, en de admin toont die groep apart
+/// als "niet geregistreerd" in plaats van ze te reconstrueren.
+model StudyConfirmation {
+  id     String @id @default(cuid())
+  userId String
+  /// Het bevestigde academiejaar; dezelfde waarde als `User.studyConfirmedYear`
+  /// (2026 = "26-27").
+  year   Int
+  via    StudyConfirmationVia
+
+  /// Stond Career al aan voor dit scherm? Dan kreeg het lid de vraag niet.
+  careerBefore Boolean
+  /// Stond de Career-vraag op het scherm bij het versturen? In de onboarding en
+  /// op /account is dat de lijst met categorieën; op de gate het aparte blok,
+  /// dat enkel verschijnt volgens `shouldAskCareerOptIn`.
+  careerAsked  Boolean
+  /// Zette het lid Career op dit scherm aan?
+  careerChosen Boolean
+
+  /// Het studiejaar en de richting zoals bevestigd, voor de uitsplitsing per
+  /// jaar en per richting. Bewust een momentopname: de bevestiging van volgend
+  /// jaar overschrijft `User`, niet deze rij.
+  studyYears      StudyYear[]      @default([])
+  studyProgrammes StudyProgramme[] @default([])
+
+  confirmedAt DateTime @default(now()) @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, year])
+  @@index([year, confirmedAt])
+}
+
+/// Dagelijkse tellingen van de mailinglijsten, voor de evolutie in
+/// /admin/mailinglijsten.
+///
+/// Een lijst is een momentopname: wie Career uitzet of zijn studie niet
+/// bevestigt, verdwijnt eruit zonder spoor. Het verloop van de lijst is dus niet
+/// achteraf uit `User` te halen, en daarom schrijft de background-worker elke
+/// vijf minuten de tellingen van vandaag (Brussel) weg. De laatste schrijfbeurt
+/// van een dag blijft staan. Enkel aantallen, geen leden.
+model MailingListDailyCount {
+  /// De Brusselse kalenderdag.
+  day       DateTime @db.Date
+  /// Wat er geteld is, bv. `list:CAREER`; zie `lib/mailingListHistory.ts`.
+  key       String
+  value     Int
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  @@id([day, key])
 }
 
 /// Spiegel van `UitleenPayment`, zonder refunds: een lidmaatschap wordt niet
@@ -1446,6 +1604,75 @@ enum AnnouncementScope {
 }
 
 /**
+ * Een bericht in de Nieuws-band op de homepage dat iemand zelf schrijft: een
+ * mededeling of een woordje van de praeses.
+ *
+ * De automatische berichten (ticketverkoop, inschrijvingen, het Bakske,
+ * Ir.Reëel, fotoalbums) staan níét in deze tabel: die worden bij het lezen
+ * afgeleid uit hun bron, zodat een album dat verdwijnt of een verkoop die sluit
+ * vanzelf uit het nieuws valt. Zie apps/web/lib/news.
+ */
+model NewsPost {
+  id      String       @id @default(cuid())
+  kind    NewsPostKind @default(NOTICE)
+  titleNl String
+  /// Leeg = de Nederlandse titel, ook op de Engelse site.
+  titleEn String?
+  /// Markdown, bewerkt met de gedeelde MarkdownEditor.
+  bodyNl  String
+  bodyEn  String?
+
+  ctaLabelNl String?
+  ctaLabelEn String?
+  ctaUrl     String?
+
+  /// Bij een mededeling de foto boven de kaart; bij een woordje het portret.
+  imageKey String?
+
+  /// Wie het woordje ondertekent ("Alexander", "Praeses VTK Leuven").
+  authorName   String?
+  authorRoleNl String?
+  authorRoleEn String?
+
+  /// Het uitgelichte bericht in de band. Hoogstens één tegelijk; de action zet
+  /// de andere uit.
+  featured Boolean @default(false)
+  /// Uit = nooit tonen, ongeacht het venster.
+  active   Boolean @default(true)
+
+  /// Vanaf wanneer het in het nieuws staat, en de datum die erbij staat.
+  publishedAt DateTime  @default(now()) @db.Timestamptz(3)
+  /// Leeg = blijft staan tot iemand het uitzet.
+  endsAt      DateTime? @db.Timestamptz(3)
+
+  createdById String?
+  createdBy   User?    @relation("NewsPostCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([active, publishedAt])
+}
+
+enum NewsPostKind {
+  NOTICE
+  PRAESES
+}
+
+/**
+ * Een automatisch bericht dat iemand uit het nieuws gehaald heeft, zonder aan de
+ * bron te komen: de ticketverkoop blijft lopen, het album blijft op /media.
+ * `source` is de soort ("tickets", "signup", "bakske", "irreeel", "album"),
+ * `ref` de id binnen die bron.
+ */
+model NewsHidden {
+  source    String
+  ref       String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([source, ref])
+}
+
+/**
  * One configurable front page: the dark block at the top of the homepage.
  * Which front pages exist is decided in code, not here. Each one is its own
  * component with its own layout, free to look nothing like the others; a
@@ -1691,6 +1918,11 @@ model CalendarEvent {
   /// iets vertrekt, en nooit teruggezet, want een tweede herinnering voor
   /// hetzelfde evenement is spam. Zie apps/web/lib/calendar/heroWeekNotice.ts.
   heroWeekNoticeAt DateTime? @db.Timestamptz(3)
+
+  /// Wanneer iemand aanduidde dat de externe link de inschrijvingen opent. Dan
+  /// staat het evenement als "Inschrijvingen" in het nieuws op de homepage, tot
+  /// het begint. NULL = niet aangeduid (ook voor alles van voor deze kolom).
+  registrationNewsAt DateTime? @db.Timestamptz(3)
 
   group          Group                        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy      User?                        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
@@ -2121,6 +2353,17 @@ model TicketOrder {
   failedAt             DateTime?         @db.Timestamptz(3)
   expiredAt            DateTime?         @db.Timestamptz(3)
   cancelledAt          DateTime?         @db.Timestamptz(3)
+  // Langs waar de koper op de ticketpagina kwam: een vaste sleutel van een
+  // plek op de site (`kalender`, `home-evenementen`, `nieuws`), een kanaal uit
+  // een deelbare link (`?via=facebook`, of `utm_source`) of een afgeleide van
+  // de referrer. `null` = bestelling van voor die meting; de statistieken tonen
+  // dat als "niet gemeten", nooit als "direct". Enkel een label, geen
+  // persoonsgegeven: geen volledige referrer-URL, geen klik-id. Zie
+  // `lib/ticketing/source.ts` en docs/ticketing.md.
+  source               String?
+  // `utm_campaign` of `?c=` uit dezelfde link: om twee posts op hetzelfde
+  // kanaal uit elkaar te houden ("affiche" vs "story").
+  sourceCampaign       String?
   createdAt            DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
 
@@ -3016,10 +3259,11 @@ model TheokotSession {
   orderCloseAt         DateTime // annulatie-/besteldeadline (turf-lijst wordt geprint)
   pickupStart          DateTime
   pickupEnd            DateTime
-  weeklySpecialLabelNl String? // welk broodje deze week "van de week" is
-  weeklySpecialLabelEn String?
   processedAt          DateTime? // wanneer no-shows verwerkt zijn (idempotentie)
   processingStartedAt  DateTime? // lease/claim voor een actieve no-show-worker
+  /// "Er liep iets mis" op deze dag: de no-shows tellen niet mee en de
+  /// verwerking stuurt er geen mails voor. Zie `waiveSessionNoShows`.
+  noShowsWaivedAt      DateTime? @db.Timestamptz(3)
   /// Wanneer het pushbericht "de bestelronde is open" voor deze dag vertrokken
   /// is. Zelfde claim-dan-versturen-aanpak als `TheokotOrder.pickupPushedAt`.
   orderOpenPushedAt    DateTime? @db.Timestamptz(3)
@@ -3072,6 +3316,11 @@ model TheokotOrder {
   pickedUpAt        DateTime?
   pickedUpById      String? // wie aan de balie op "opgehaald" drukte
   noShowProcessedAt DateTime? // mail + eventuele ban voor deze order afgewerkt
+  /// Deze no-show telt niet mee voor een ban: ze viel terwijl de verwerking
+  /// gepauzeerd stond (`theokot.config` `noShowPaused`), of de verkoopdag werd
+  /// als "er liep iets mis" aangeduid (`TheokotSession.noShowsWaivedAt`). Geen
+  /// mail zolang die nog niet vertrokken was. NULL bij elke andere bestelling.
+  noShowWaivedAt    DateTime?          @db.Timestamptz(3)
   /// Wanneer het pushbericht "je broodje ligt klaar" voor deze bestelling
   /// verstuurd is. Dezelfde claim-dan-versturen-aanpak als bij de
   /// shift-herinneringen: eerst de markering zetten in een voorwaardelijke
@@ -3114,7 +3363,10 @@ model TheokotOrderLine {
   orderId        String
   sessionItemId  String
   quantity       Int
-  unitPriceCents Int // snapshot van de prijs op besteldatum
+  // Prijs per stuk. Volgt de prijs van het broodje zolang de bestelling niet
+  // betaald is (RESERVED, NO_SHOW: zie `repriceReservedOrders`); vanaf het
+  // ophalen is dit wat er betaald werd en verandert het niet meer.
+  unitPriceCents Int
 
   order       TheokotOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   sessionItem TheokotSessionItem @relation(fields: [sessionItemId], references: [id], onDelete: Cascade)
@@ -3374,6 +3626,14 @@ model TheokotRental {
   purpose   String
   attendees Int?
   remarks   String?
+
+  /// Mag die aard van de activiteit publiek op /theokot/verhuur staan?
+  /// Standaard niet. Een post schrijft er iets neutraals ("[Theokot] Kaas- en
+  /// wijnavond"), maar een externe huurder schrijft er even vaak een naam of een
+  /// verjaardag in, en dat hoort niet op een publieke pagina. Wie de verhuur doet
+  /// leest de tekst en zet dit per aanvraag aan; staat het uit, dan leest de
+  /// publieke kalender enkel "bezet" met de uren.
+  purposePublic Boolean @default(false)
 
   depositChoice TheokotRentalDepositChoice @default(NVT)
 
@@ -4069,6 +4329,20 @@ model UitleenVehicle {
   /// toestand is van elk voertuig tot iemand er een kiest.
   pattern String?
 
+  /// Het icoon van dit voertuig in de transportplanning, als naam uit de
+  /// `LogisticsIcon`-set (`van`, `car`, `cargobike`). `null` = automatisch, en
+  /// dat leidt het icoon af uit `code` zoals het altijd al deed: de kar wordt
+  /// een bestelwagen, de auto een auto, de bakfiets een bakfiets.
+  ///
+  /// Instelbaar omdat die afleiding raadt. Ze leest mee in de naam die het team
+  /// zelf intikt, en een gehuurd busje dat "Dockx" heet, bevat geen van die
+  /// woorden en zou als bestelwagen getekend worden zonder dat er iets aan te
+  /// doen valt.
+  ///
+  /// Een vrije string en geen enum, om dezelfde reden als bij `pattern`: er een
+  /// icoon bij zetten is een SVG erbij en hoort geen migratie te vragen.
+  icon String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -4163,6 +4437,37 @@ model UitleenDriverAvailability {
 
   @@index([userId, startAt])
   @@index([startAt, endAt])
+}
+
+/// Eén vrije nota bij de beschikbaarheid van één chauffeur voor één week (F4.5).
+///
+/// Naast `UitleenDriverAvailability.note`, die bij één venster hoort, en niet in
+/// de plaats ervan: Logistiek vroeg om er één "in het algemeen, ni per
+/// individueel stukje". Dingen als "ik heb die week examens" of "bel me liever
+/// dan te mailen" horen bij de week en niet bij een uurvak, en wie ze bij een
+/// venster moest zetten, koos er willekeurig één uit of schreef ze nergens.
+///
+/// Eén rij per chauffeur per week, en de rij verdwijnt zodra het veld leeg
+/// gemaakt wordt: een lege nota is hetzelfde als geen nota, en twee manieren om
+/// "niets" te zeggen is er één te veel.
+model UitleenDriverAvailabilityNote {
+  id     String @id @default(cuid())
+  userId String
+
+  /// De maandag van de week, als Belgische kalenderdatum (zoals `startOfWeek`
+  /// ze maakt). Een datum en geen tijdstip: het is een week en geen moment.
+  weekStart DateTime @db.Date
+
+  /// Wat deze chauffeur kwijt wil over deze week.
+  text String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation("UitleenDriverAvailabilityNoteUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, weekStart])
+  @@index([weekStart])
 }
 
 /// Hoe graag een chauffeur op een moment rijdt.
@@ -4325,6 +4630,7 @@ model UitleenTransportBooking {
   payments  UitleenPayment[]
   auditLogs UitleenAuditLog[]
   helpers   UitleenTransportHelper[]
+  notes     UitleenTransportNote[]
 
   @@index([userId])
   @@index([status, startAt])
@@ -4412,6 +4718,46 @@ model UitleenTransportHelper {
   addedBy User?                   @relation("UitleenTransportHelperAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
 
   @@index([transportBookingId])
+}
+
+/// Wie deze nota mag lezen.
+///
+/// `PRIVE` betekent letterlijk privé: ook Logistiek leest ze niet. Dat staat zo
+/// in het formulier, want een nota waarvan je dénkt dat het team ze leest, is
+/// erger dan geen nota. De drie waarden zijn geen hiërarchie van rollen maar van
+/// kringen rond de rit: jezelf, iedereen die deze rit al ziet, en daarbovenop
+/// het team.
+enum UitleenTransportNoteVisibility {
+  PRIVE
+  POST
+  POST_EN_LOGISTIEK
+}
+
+/// Een eigen nota bij een rit (F4.20).
+///
+/// Naast `memberNote` (wat de aanvrager bij het aanvragen schreef) en
+/// `adminNote` (de boodschap van Logistiek, die meegaat in de mail): die twee
+/// horen bij de rit zelf en staan er één keer op. Dit zijn de notities van de
+/// mensen eromheen, met elk hun eigen auteur en hun eigen zichtbaarheid, en er
+/// kunnen er meer dan één zijn. De twee oude velden blijven waar ze staan.
+model UitleenTransportNote {
+  id        String @id @default(cuid())
+  bookingId String
+  authorId  String
+
+  text       String
+  visibility UitleenTransportNoteVisibility @default(POST_EN_LOGISTIEK)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  booking UitleenTransportBooking @relation(fields: [bookingId], references: [id], onDelete: Cascade)
+  /// Verdwijnt de auteur, dan verdwijnt zijn nota mee: een nota zonder auteur is
+  /// niet te plaatsen, en bij `PRIVE` is er ook niemand meer die ze mag lezen.
+  author  User                    @relation("UitleenTransportNoteAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([bookingId])
+  @@index([authorId])
 }
 
 /// Spiegel van TicketPayment (zonder refunds): provider is een vrije string

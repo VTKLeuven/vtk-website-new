@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { prisma } from "@vtk/db";
 import { Check, ScanLine, Smartphone, TimerOff } from "lucide-react";
 

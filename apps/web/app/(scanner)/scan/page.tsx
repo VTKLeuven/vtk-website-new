@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { CalendarDays, MapPin, ScanLine, X } from "lucide-react";
 
 import { InstallButton } from "@/components/ticketing/scanner/InstallButton";

@@ -35,6 +35,12 @@ export type AnalyticsConfig = {
   websiteId: string;
 };
 
+/**
+ * Enkel het tracker-script, geen Umami-recorder. Sessie-opname doet Sentry
+ * Replay al (`instrumentation-client.ts`); twee opnames tegelijk verdubbelden
+ * het werk op de main thread, net bij de bezoekers wier Web Vitals we meten
+ * (die hebben allebei toestemming gegeven).
+ */
 export type AnalyticsScript = {
   src: string;
   websiteId: string;
@@ -134,6 +140,22 @@ export function analyticsScript(input: {
     websiteId: config.websiteId,
     beforeSend: ANALYTICS_BEFORE_SEND_FUNCTION,
     filterSource: analyticsFilterSource(),
+  };
+}
+
+/**
+ * De `data-`-attributen van het tracker-script. Eén bron voor de twee plaatsen
+ * waar het script op de pagina komt: de root layout rendert het wanneer er al
+ * toestemming is, de cookiebanner zet het erbij op het moment dat iemand ze
+ * geeft (zonder de pagina te herladen).
+ */
+export function analyticsScriptAttributes(script: AnalyticsScript): Record<string, string> {
+  return {
+    "data-website-id": script.websiteId,
+    "data-before-send": script.beforeSend,
+    "data-exclude-search": "true",
+    "data-exclude-hash": "true",
+    "data-performance": "true",
   };
 }
 

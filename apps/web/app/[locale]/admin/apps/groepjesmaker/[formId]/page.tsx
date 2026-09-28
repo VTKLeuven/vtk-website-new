@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
 import { FileSpreadsheet, Printer, Shuffle, TriangleAlert, UsersRound } from "lucide-react";
 import { hasLocale } from "@/lib/locale";

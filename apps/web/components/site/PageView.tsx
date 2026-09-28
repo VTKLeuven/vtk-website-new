@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import {
   DOWNLOAD_EVENT,
   OUTBOUND_EVENT,
@@ -477,7 +477,7 @@ export async function PageView({
                     {/* Decoratief: de titel ernaast zegt al waar de kaart heen
                         gaat. Zelfde tegel als op de categoriepagina zelf. */}
                     <span
-                      className={`vtk-tile-media${photo ? " has-photo" : ""}`}
+                      className="vtk-tile-media"
                       aria-hidden="true"
                     >
                       {photo && (

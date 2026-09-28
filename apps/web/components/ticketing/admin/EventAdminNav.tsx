@@ -1,9 +1,10 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { useSelectedLayoutSegment } from "next/navigation";
 import {
   ArrowLeft,
+  BarChart3,
   ExternalLink,
   LayoutDashboard,
   ScanLine,
@@ -43,6 +44,13 @@ export function EventAdminNav({
       icon: LayoutDashboard,
       segment: null,
       visible: can("VIEW_EVENT"),
+    },
+    {
+      href: `${base}/statistieken`,
+      label: locale === "nl" ? "Statistieken" : "Statistics",
+      icon: BarChart3,
+      segment: "statistieken",
+      visible: can("VIEW_REPORTS"),
     },
     {
       href: `${base}/instellingen`,

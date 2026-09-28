@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { Card } from "@vtk/ui";
 
 export type AccountShift = {

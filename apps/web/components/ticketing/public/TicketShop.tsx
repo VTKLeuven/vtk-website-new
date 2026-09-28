@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { PaymentMethodChooser, type PaymentMethodChoice } from "./PaymentMethodChooser";
 import { useRouter } from "next/navigation";
 import {
@@ -33,6 +33,9 @@ import {
   type TicketQuestion,
 } from "./types";
 import { trackCheckoutStart } from "@/lib/analytics-client";
+import { audienceLoginHintQuestion } from "@/lib/ticketing/audience";
+import { sourceQuery } from "@/lib/ticketing/source";
+import { useLandingSource } from "./useLandingSource";
 
 export type Attendee = {
   attendeeName: string;
@@ -306,6 +309,7 @@ export function TicketShop({
   paymentChoice,
   preview = false,
   about,
+  practical,
 }: {
   paymentChoice: PaymentMethodChoice;
   event: SerializedTicketEvent;
@@ -322,11 +326,20 @@ export function TicketShop({
    * gegevens. Van de server, want daar hoeft de shop niets van te weten.
    */
   about?: ReactNode;
+  /**
+   * Het praktische (wanneer, waar, wie), onder het ticketpaneel in de
+   * rechterkolom. Naast de beschrijving kneep het die tot een smalle kolom.
+   */
+  practical?: ReactNode;
 }) {
   const router = useRouter();
   const base = locale === "nl" ? "" : "/en";
-  const loginHref = `${base}/inloggen?next=${encodeURIComponent(`${base}/tickets/${event.slug}`)}`;
+  // Langs waar deze koper kwam; gaat mee met de bestelling en met de
+  // login-link, anders komt wie eerst moet inloggen terug als "direct".
+  const landingSource = useLandingSource();
+  const loginHref = `${base}/inloggen?next=${encodeURIComponent(`${base}/tickets/${event.slug}${sourceQuery(landingSource)}`)}`;
   const membershipHref = `${base}/lidmaatschap`;
+  const audienceHint = audienceLoginHintQuestion(event.audienceLoginHint ?? [], locale);
   const detailsRef = useRef<HTMLElement>(null);
   // Per regel (type × prijs), niet per type: zie `TicketLine`.
   const [quantities, setQuantities] = useState<Record<string, number>>({});
@@ -449,6 +462,10 @@ export function TicketShop({
           locale,
           termsAccepted: true,
           items,
+          // Een lege string als de pagina nog niet gemount was: dat is
+          // "direct", en geen oude pagina zonder meting.
+          source: landingSource?.source ?? "",
+          sourceCampaign: landingSource?.campaign ?? undefined,
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as CheckoutResponse;
@@ -709,186 +726,208 @@ export function TicketShop({
         {about}
       </div>
 
-      <aside className="tshop-panel" aria-labelledby="ticket-types-heading">
-        <div className="tshop-panel-head">
-          <h2 id="ticket-types-heading">Tickets</h2>
-          {lines.length > 0 ? (
-            <small>
-              {locale === "nl"
-                ? `Max. ${event.maxTicketsPerOrder} per bestelling`
-                : `Max. ${event.maxTicketsPerOrder} per order`}
-            </small>
-          ) : null}
-        </div>
-
-        {/* Enkel voor wie nu in voorverkoop koopt. Wie er niet in mag, krijgt
-            hier niets te zien: dan is het gewoon een verkoop die later start. */}
-        {event.presale ? (
-          <p className="tshop-notice" data-tone="presale">
-            <Sparkles size={18} aria-hidden="true" />
-            <span>
-              <strong>{locale === "nl" ? "Jij zit in de voorverkoop." : "You are in the presale."}</strong>{" "}
-              {locale === "nl"
-                ? `Voor iedereen opent de verkoop ${formatTicketDate(event.presale.publicStart, locale)}.`
-                : `Sales open for everyone on ${formatTicketDate(event.presale.publicStart, locale)}.`}
-            </span>
-          </p>
-        ) : null}
-
-        {/* In voorbeeldmodus staat de verkoop open zodat de beheerder door de
-            vragen kan klikken; wat een bezoeker nu te zien zou krijgen, staat
-            er dan als mededeling bij in plaats van als blokkade. */}
-        {!salesOpen || (preview && (beforeSales || afterSales)) ? (
-          <p className="tshop-notice">
-            <Clock size={18} aria-hidden="true" />
-            <span>
-              {preview ? (locale === "nl" ? "Bezoekers zien nu: " : "Visitors currently see: ") : null}
-              <strong>
-                {beforeSales
-                  ? locale === "nl"
-                    ? `De verkoop start ${formatTicketDate(event.salesStart!, locale)}.`
-                    : `Sales start on ${formatTicketDate(event.salesStart!, locale)}.`
-                  : locale === "nl"
-                    ? "De ticketverkoop is gesloten."
-                    : "Ticket sales are closed."}
-              </strong>
-              {beforeSales && !preview
-                ? locale === "nl" ? " De prijzen staan hieronder al." : " Prices are listed below."
-                : null}
-            </span>
-          </p>
-        ) : null}
-
-        {lines.length === 0 ? (
-          <div className="tshop-empty">
-            <TicketX size={26} aria-hidden="true" />
-            <h3>
-              {event.requiresLogin
-                ? locale === "nl" ? "Log in om tickets te bestellen" : "Sign in to order tickets"
-                : event.requiresMembership
-                  ? locale === "nl" ? "Alleen voor leden" : "Members only"
-                  : locale === "nl" ? "Geen tickets beschikbaar" : "No tickets available"}
-            </h3>
-            <p>
-              {event.requiresLogin
-                ? locale === "nl"
-                  ? "Voor de beschikbare tickets moet je ingelogd zijn."
-                  : "You need to sign in for the available tickets."
-                : event.requiresMembership
-                  ? locale === "nl"
-                    ? "De tickets voor dit event zijn er voor leden van VTK."
-                    : "The tickets for this event are for members of VTK."
-                  : locale === "nl"
-                    ? "Er zijn momenteel geen tickettypes beschikbaar voor dit event."
-                    : "There are currently no ticket types available for this event."}
-            </p>
-            {event.requiresLogin ? (
-              <Link className="tshop-cta" href={loginHref}>
-                <LogIn size={17} aria-hidden="true" />
-                {locale === "nl" ? "Inloggen" : "Sign in"}
-              </Link>
-            ) : event.requiresMembership ? (
-              <Link className="tshop-cta" href={membershipHref}>
-                {locale === "nl" ? "Word lid" : "Become a member"}
-              </Link>
+      <div className="tshop-side">
+        <aside className="tshop-panel" aria-labelledby="ticket-types-heading">
+          <div className="tshop-panel-head">
+            <h2 id="ticket-types-heading">Tickets</h2>
+            {lines.length > 0 ? (
+              <small>
+                {locale === "nl"
+                  ? `Max. ${event.maxTicketsPerOrder} per bestelling`
+                  : `Max. ${event.maxTicketsPerOrder} per order`}
+              </small>
             ) : null}
           </div>
-        ) : (
-          <>
-            <ul className="tshop-types">
-              {activeTypes.map((type) => {
-                const typeLines = ticketLinesForType(type);
-                const split = typeLines.length > 1;
-                return (
-                  <li key={type.id} className="tshop-type" data-split={split || undefined}>
-                    {split ? (
-                      <>
-                        <h3>{type.name}</h3>
-                        {renderTypeNotes(type)}
-                        {typeLines.map((line) => (
-                          <div className="tshop-line" key={line.key}>
-                            <span className="tshop-audience">
-                              {line.memberPrice
-                                ? locale === "nl" ? "Lid" : "Member"
-                                : locale === "nl" ? "Niet-lid" : "Non-member"}
-                            </span>
-                            {renderLineControl(line)}
-                          </div>
-                        ))}
-                      </>
-                    ) : (
-                      <div className="tshop-line">
-                        <div className="tshop-line-name">
+
+          {/* Enkel voor wie nu in voorverkoop koopt. Wie er niet in mag, krijgt
+              hier niets te zien: dan is het gewoon een verkoop die later start. */}
+          {event.presale ? (
+            <p className="tshop-notice" data-tone="presale">
+              <Sparkles size={18} aria-hidden="true" />
+              <span>
+                <strong>{locale === "nl" ? "Jij zit in de voorverkoop." : "You are in the presale."}</strong>{" "}
+                {locale === "nl"
+                  ? `Voor iedereen opent de verkoop ${formatTicketDate(event.presale.publicStart, locale)}.`
+                  : `Sales open for everyone on ${formatTicketDate(event.presale.publicStart, locale)}.`}
+              </span>
+            </p>
+          ) : null}
+
+          {/* In voorbeeldmodus staat de verkoop open zodat de beheerder door de
+              vragen kan klikken; wat een bezoeker nu te zien zou krijgen, staat
+              er dan als mededeling bij in plaats van als blokkade. */}
+          {!salesOpen || (preview && (beforeSales || afterSales)) ? (
+            <p className="tshop-notice">
+              <Clock size={18} aria-hidden="true" />
+              <span>
+                {preview ? (locale === "nl" ? "Bezoekers zien nu: " : "Visitors currently see: ") : null}
+                <strong>
+                  {beforeSales
+                    ? locale === "nl"
+                      ? `De verkoop start ${formatTicketDate(event.salesStart!, locale)}.`
+                      : `Sales start on ${formatTicketDate(event.salesStart!, locale)}.`
+                    : locale === "nl"
+                      ? "De ticketverkoop is gesloten."
+                      : "Ticket sales are closed."}
+                </strong>
+                {beforeSales && !preview
+                  ? locale === "nl" ? " De prijzen staan hieronder al." : " Prices are listed below."
+                  : null}
+              </span>
+            </p>
+          ) : null}
+
+          {lines.length === 0 ? (
+            <div className="tshop-empty">
+              <TicketX size={26} aria-hidden="true" />
+              <h3>
+                {event.requiresLogin
+                  ? locale === "nl" ? "Log in om tickets te bestellen" : "Sign in to order tickets"
+                  : event.requiresMembership
+                    ? locale === "nl" ? "Alleen voor leden" : "Members only"
+                    : locale === "nl" ? "Geen tickets beschikbaar" : "No tickets available"}
+              </h3>
+              <p>
+                {event.requiresLogin
+                  ? locale === "nl"
+                    ? "Voor de beschikbare tickets moet je ingelogd zijn."
+                    : "You need to sign in for the available tickets."
+                  : event.requiresMembership
+                    ? locale === "nl"
+                      ? "De tickets voor dit event zijn er voor leden van VTK."
+                      : "The tickets for this event are for members of VTK."
+                    : locale === "nl"
+                      ? "Er zijn momenteel geen tickettypes beschikbaar voor dit event."
+                      : "There are currently no ticket types available for this event."}
+              </p>
+              {event.requiresLogin && audienceHint ? (
+                <p>
+                  {audienceHint}{" "}
+                  {locale === "nl"
+                    ? "Er zijn tickets voor jou; log in om ze te zien."
+                    : "There are tickets for you; sign in to see them."}
+                </p>
+              ) : null}
+              {event.requiresLogin ? (
+                <Link className="tshop-cta" href={loginHref}>
+                  <LogIn size={17} aria-hidden="true" />
+                  {locale === "nl" ? "Inloggen" : "Sign in"}
+                </Link>
+              ) : event.requiresMembership ? (
+                <Link className="tshop-cta" href={membershipHref}>
+                  {locale === "nl" ? "Word lid" : "Become a member"}
+                </Link>
+              ) : null}
+            </div>
+          ) : (
+            <>
+              <ul className="tshop-types">
+                {activeTypes.map((type) => {
+                  const typeLines = ticketLinesForType(type);
+                  const split = typeLines.length > 1;
+                  return (
+                    <li key={type.id} className="tshop-type" data-split={split || undefined}>
+                      {split ? (
+                        <>
                           <h3>{type.name}</h3>
                           {renderTypeNotes(type)}
+                          {typeLines.map((line) => (
+                            <div className="tshop-line" key={line.key}>
+                              <span className="tshop-audience">
+                                {line.memberPrice
+                                  ? locale === "nl" ? "Lid" : "Member"
+                                  : locale === "nl" ? "Niet-lid" : "Non-member"}
+                              </span>
+                              {renderLineControl(line)}
+                            </div>
+                          ))}
+                        </>
+                      ) : (
+                        <div className="tshop-line">
+                          <div className="tshop-line-name">
+                            <h3>{type.name}</h3>
+                            {renderTypeNotes(type)}
+                          </div>
+                          {renderLineControl(typeLines[0])}
                         </div>
-                        {renderLineControl(typeLines[0])}
-                      </div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-
-            {event.memberPriceHint ? (
-              <p className="tshop-hint">
-                {event.memberPriceHint === "login" ? (
-                  <>
-                    {locale === "nl" ? "Lid van VTK? " : "VTK member? "}
-                    <Link href={loginHref}>
-                      {locale === "nl" ? "Log in voor de ledenprijs." : "Sign in for the member price."}
-                    </Link>
-                  </>
-                ) : (
-                  <>
-                    {locale === "nl" ? "Leden betalen minder. " : "Members pay less. "}
-                    <Link href={membershipHref}>{locale === "nl" ? "Word lid." : "Become a member."}</Link>
-                  </>
-                )}
-              </p>
-            ) : null}
-
-            <div className="tshop-summary">
-              {selectedLines.length > 0 ? (
-                <ul className="tshop-summary-lines">
-                  {selectedLines.map((line) => (
-                    <li key={line.key}>
-                      <span>{quantities[line.key]} × {lineLabel(line, locale)}</span>
-                      <span>{formatTicketPrice(quantities[line.key] * line.priceCents, event.currency, locale)}</span>
+                      )}
                     </li>
-                  ))}
-                </ul>
+                  );
+                })}
+              </ul>
+
+              {event.memberPriceHint ? (
+                <p className="tshop-hint">
+                  {event.memberPriceHint === "login" ? (
+                    <>
+                      {locale === "nl" ? "Lid van VTK? " : "VTK member? "}
+                      <Link href={loginHref}>
+                        {locale === "nl" ? "Log in voor de ledenprijs." : "Sign in for the member price."}
+                      </Link>
+                    </>
+                  ) : (
+                    <>
+                      {locale === "nl" ? "Leden betalen minder. " : "Members pay less. "}
+                      <Link href={membershipHref}>{locale === "nl" ? "Word lid." : "Become a member."}</Link>
+                    </>
+                  )}
+                </p>
               ) : null}
-              <div className="tshop-total">
-                <span>{locale === "nl" ? "Totaal" : "Total"}</span>
-                <strong>{formatTicketPrice(totalCents, event.currency, locale)}</strong>
+
+              {audienceHint ? (
+                <p className="tshop-hint">
+                  {audienceHint}{" "}
+                  <Link href={loginHref}>
+                    {locale === "nl"
+                      ? "Log in, er zijn ook tickets voor jou."
+                      : "Sign in, there are tickets for you too."}
+                  </Link>
+                </p>
+              ) : null}
+
+              <div className="tshop-summary">
+                {selectedLines.length > 0 ? (
+                  <ul className="tshop-summary-lines">
+                    {selectedLines.map((line) => (
+                      <li key={line.key}>
+                        <span>{quantities[line.key]} × {lineLabel(line, locale)}</span>
+                        <span>{formatTicketPrice(quantities[line.key] * line.priceCents, event.currency, locale)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <div className="tshop-total">
+                  <span>{locale === "nl" ? "Totaal" : "Total"}</span>
+                  <strong>{formatTicketPrice(totalCents, event.currency, locale)}</strong>
+                </div>
+                <button
+                  className="tshop-cta"
+                  type="button"
+                  disabled={!salesOpen || selectedCount === 0}
+                  onClick={openDetails}
+                >
+                  {selectedCount === 0 || !salesOpen ? (
+                    <>
+                      <LockKeyhole size={17} aria-hidden="true" />
+                      <span>{checkoutDisabledLabel}</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>{locale === "nl" ? "Verder naar gegevens" : "Continue to details"}</span>
+                      <ArrowRight size={17} aria-hidden="true" />
+                    </>
+                  )}
+                </button>
+                <div className="tshop-trust">
+                  <span><ShieldCheck size={14} aria-hidden="true" /> {locale === "nl" ? "Beveiligde betaling" : "Secure payment"}</span>
+                  <span><Check size={14} aria-hidden="true" /> {locale === "nl" ? "Ticket per e-mail" : "Ticket by email"}</span>
+                </div>
               </div>
-              <button
-                className="tshop-cta"
-                type="button"
-                disabled={!salesOpen || selectedCount === 0}
-                onClick={openDetails}
-              >
-                {selectedCount === 0 || !salesOpen ? (
-                  <>
-                    <LockKeyhole size={17} aria-hidden="true" />
-                    <span>{checkoutDisabledLabel}</span>
-                  </>
-                ) : (
-                  <>
-                    <span>{locale === "nl" ? "Verder naar gegevens" : "Continue to details"}</span>
-                    <ArrowRight size={17} aria-hidden="true" />
-                  </>
-                )}
-              </button>
-              <div className="tshop-trust">
-                <span><ShieldCheck size={14} aria-hidden="true" /> {locale === "nl" ? "Beveiligde betaling" : "Secure payment"}</span>
-                <span><Check size={14} aria-hidden="true" /> {locale === "nl" ? "Ticket per e-mail" : "Ticket by email"}</span>
-              </div>
-            </div>
-          </>
-        )}
-      </aside>
+            </>
+          )}
+        </aside>
+        {practical}
+      </div>
     </form>
   );
 }

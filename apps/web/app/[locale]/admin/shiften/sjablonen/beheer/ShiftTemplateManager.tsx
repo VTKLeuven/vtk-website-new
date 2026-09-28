@@ -116,7 +116,7 @@ export function ShiftTemplateManager({
 
       {templates.length === 0 ? (
         <Card className="p-8 text-center">
-          <p className="text-sm text-[#5c667f]">
+          <p className="text-sm text-vtk-muted">
             {nl
               ? 'Er staat nog geen enkel sjabloon klaar. Zet de reeks van een evenement dat telkens terugkomt hier één keer neer; daarna staat ze in twee klikken op de kalender.'
               : 'There are no templates yet. Put the series of a recurring event here once; after that it takes two clicks to schedule.'}
@@ -208,15 +208,15 @@ function TemplateTable({
                   >
                     {template.label}
                   </button>
-                  {template.note && <p className="mt-0.5 text-xs text-[#5c667f]">{template.note}</p>}
+                  {template.note && <p className="mt-0.5 text-xs text-vtk-muted">{template.note}</p>}
                 </td>
-                <td className="px-4 py-2">{template.post ?? <span className="text-[#5c667f]">—</span>}</td>
-                <td className="px-4 py-2">{template.location || <span className="text-[#5c667f]">—</span>}</td>
+                <td className="px-4 py-2">{template.post ?? <span className="text-vtk-muted">—</span>}</td>
+                <td className="px-4 py-2">{template.location || <span className="text-vtk-muted">—</span>}</td>
                 <td className="px-4 py-2 tabular-nums">{templateTimeOfDay(template)}</td>
                 <td className="px-4 py-2 tabular-nums">
                   {enabled.length}
                   {enabled.length !== template.shifts.length && (
-                    <span className="text-[#5c667f]">
+                    <span className="text-vtk-muted">
                       {' '}
                       (+{template.shifts.length - enabled.length} {nl ? 'uit' : 'off'})
                     </span>
@@ -312,7 +312,7 @@ function TemplateEditor({
           <h2 className="text-lg font-semibold">
             {isNew ? (nl ? 'Nieuw sjabloon' : 'New template') : template.label}
           </h2>
-          <p className="mt-1 max-w-2xl text-sm text-[#5c667f]">
+          <p className="mt-1 max-w-2xl text-sm text-vtk-muted">
             {nl
               ? 'De tijden staan als afstand tot de start van het evenement, niet als klokuur: zo staat hetzelfde sjabloon volgende maand op een ander uur even goed. Naast elk veld zie je op welk uur dat uitkomt bij het startuur hieronder.'
               : 'Times are stored as a distance from the start of the event, not as a clock time, so the same template works next month at another hour. Next to each field you see which time that works out to at the start time below.'}
@@ -362,7 +362,7 @@ function TemplateEditor({
               placeholder={nl ? 'Cantus' : 'Cantus'}
               required
             />
-            <p className="mt-1 text-xs text-[#5c667f]">
+            <p className="mt-1 text-xs text-vtk-muted">
               {nl ? 'Dit staat in de keuzelijst bij "Shiften aanmaken".' : 'This is what the list on "Create shifts" shows.'}
             </p>
           </div>
@@ -384,7 +384,7 @@ function TemplateEditor({
               value={eventName}
               onChange={(e) => setEventName(e.target.value)}
             />
-            <p className="mt-1 text-xs text-[#5c667f]">
+            <p className="mt-1 text-xs text-vtk-muted">
               {nl
                 ? `Komt achter elke shiftnaam: "${composeName(eventName || 'Cantus', nl ? 'Tap 1' : 'Tap 1')}".`
                 : `Comes after every shift name: "${composeName(eventName || 'Cantus', 'Tap 1')}".`}
@@ -399,7 +399,7 @@ function TemplateEditor({
               value={time}
               onChange={(e) => setTime(e.target.value || '20:00')}
             />
-            <p className="mt-1 text-xs text-[#5c667f]">
+            <p className="mt-1 text-xs text-vtk-muted">
               {nl
                 ? 'Enkel een voorstel: wie een reeks neerzet, kiest zelf datum en uur.'
                 : 'Only a suggestion: whoever schedules a series picks date and time.'}
@@ -427,7 +427,7 @@ function TemplateEditor({
               {/* Een sjabloon kan een post noemen die intussen gedeactiveerd is. */}
               {post !== '' && !postOptions.includes(post) && <option value={post}>{post}</option>}
             </Select>
-            <p className="mt-1 text-xs text-[#5c667f]">
+            <p className="mt-1 text-xs text-vtk-muted">
               {nl ? 'Waarvoor de shiften meetellen in de ranglijst.' : 'Which group the shifts count towards in the ranking.'}
             </p>
           </div>
@@ -455,7 +455,7 @@ function TemplateEditor({
           </div>
 
           {rows.length === 0 && (
-            <p className="rounded-xl border border-dashed border-vtk-blue/20 px-4 py-6 text-center text-sm text-[#5c667f]">
+            <p className="rounded-xl border border-dashed border-vtk-blue/20 px-4 py-6 text-center text-sm text-vtk-muted">
               {nl
                 ? 'Nog geen shiften. Voeg de eerste toe; de volgende begint vanzelf waar deze eindigt.'
                 : 'No shifts yet. Add the first one; the next starts where this one ends.'}
@@ -501,7 +501,7 @@ function TemplateEditor({
         </div>
       )}
       {!isNew && template.builtIn && (
-        <p className="mt-4 border-t border-vtk-blue/10 pt-4 text-xs text-[#5c667f]">
+        <p className="mt-4 border-t border-vtk-blue/10 pt-4 text-xs text-vtk-muted">
           {nl
             ? 'Dit sjabloon wordt meegeleverd en kan niet verwijderd worden: de site gebruikt het zelf, onder meer om elke Theokot-verkoopdag te bemannen. Aanpassen mag wel.'
             : 'This template ships with the site and cannot be deleted: the site uses it itself, among other things to staff every Theokot sales day. Editing is fine.'}
@@ -545,7 +545,7 @@ function EntryRow({
         <span className="font-medium">
           {index + 1}. {row.name.trim() === '' ? (nl ? 'Naamloze shift' : 'Unnamed shift') : row.name}
         </span>
-        <span className="text-xs tabular-nums text-[#5c667f]">
+        <span className="text-xs tabular-nums text-vtk-muted">
           {start} &rarr; {end} &middot; {formatTemplateDuration(Math.max(row.durationMinutes, 0), nl)}
         </span>
         <span className="ml-auto">
@@ -579,7 +579,7 @@ function EntryRow({
             value={row.startOffsetMinutes}
             onChange={(e) => onChange({ startOffsetMinutes: Math.round(Number(e.target.value) || 0) })}
           />
-          <p className="mt-1 text-xs text-[#5c667f]">
+          <p className="mt-1 text-xs text-vtk-muted">
             {formatTemplateOffset(row.startOffsetMinutes, nl)} &middot; {start}
           </p>
         </div>
@@ -593,7 +593,7 @@ function EntryRow({
             value={row.durationMinutes}
             onChange={(e) => onChange({ durationMinutes: Math.round(Number(e.target.value) || 0) })}
           />
-          <p className="mt-1 text-xs text-[#5c667f]">
+          <p className="mt-1 text-xs text-vtk-muted">
             {nl ? 'tot' : 'until'} {end}
           </p>
         </div>
@@ -616,7 +616,7 @@ function EntryRow({
             value={row.reward}
             onChange={(e) => onChange({ reward: Math.round(Number(e.target.value) || 0) })}
           />
-          <p className="mt-1 text-xs text-[#5c667f]">{nl ? 'per deelnemer' : 'per participant'}</p>
+          <p className="mt-1 text-xs text-vtk-muted">{nl ? 'per deelnemer' : 'per participant'}</p>
         </div>
         <div>
           <Label htmlFor={`${id}-location`}>{nl ? 'Eigen locatie' : 'Own location'}</Label>
@@ -626,7 +626,7 @@ function EntryRow({
             onChange={(e) => onChange({ location: e.target.value })}
             placeholder={templateLocation || (nl ? 'Zelfde als het sjabloon' : 'Same as the template')}
           />
-          <p className="mt-1 text-xs text-[#5c667f]">
+          <p className="mt-1 text-xs text-vtk-muted">
             {nl
               ? 'Leeg = de locatie van het sjabloon. Vul enkel in wat er echt van afwijkt, bv. bijrijden aan de loods.'
               : 'Empty = the template location. Only fill in what really differs, e.g. loading at the shed.'}
@@ -657,7 +657,7 @@ function EntryRow({
             onChange={(e) => onChange({ description: e.target.value })}
             placeholder={nl ? 'Bier tappen en de kannen rondbrengen' : 'Tap beer and carry the jugs around'}
           />
-          <p className="mt-1 text-xs text-[#5c667f]">
+          <p className="mt-1 text-xs text-vtk-muted">
             {nl ? 'Dit leest een lid op /shift voor hij inschrijft.' : 'This is what a member reads on /shift before signing up.'}
           </p>
         </div>
@@ -687,7 +687,7 @@ function EntryRow({
             />
             <span>
               {nl ? 'Standaard aangevinkt' : 'Ticked by default'}
-              <span className="ml-1 text-xs text-[#5c667f]">
+              <span className="ml-1 text-xs text-vtk-muted">
                 {nl ? '(uit = enkel bij een grote editie)' : '(off = only for a big edition)'}
               </span>
             </span>

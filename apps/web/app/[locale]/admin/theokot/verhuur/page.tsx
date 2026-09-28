@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { Card } from "@vtk/ui";
@@ -228,6 +228,7 @@ export default async function AdminTheokotVerhuurPage({
       purpose: row.purpose,
       attendees: row.attendees,
       remarks: row.remarks,
+      purposePublic: row.purposePublic,
       extraAnswers: Object.entries(answers)
         .filter(([, value]) => Boolean(value))
         .map(([id, value]) => ({

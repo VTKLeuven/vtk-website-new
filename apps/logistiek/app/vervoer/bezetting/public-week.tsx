@@ -46,6 +46,7 @@ export function PublicWeek({
   filters,
   filterVehicles,
   filterDrivers,
+  filterPosts,
   canFilterRequester,
   nav,
 }: {
@@ -70,6 +71,12 @@ export function PublicWeek({
    * de kalender bewust weglaat.
    */
   filterDrivers: Array<{ id: string; name: string }>;
+  /**
+   * De posten en werkgroepen om op te filteren (F4.1). Leeg zonder login, om
+   * dezelfde reden als de chauffeurs: wie geen aanvrager op het rooster ziet,
+   * hoort er ook niet op te kunnen filteren.
+   */
+  filterPosts: Array<{ id: string; name: string }>;
   /** Filteren op post/werkgroep/extern; enkel voor wie de aanvrager al ziet. */
   canFilterRequester: boolean;
   nav: { previousHref: string; nextHref: string; todayHref: string };
@@ -96,12 +103,14 @@ export function PublicWeek({
           filters={filters}
           vehicles={filterVehicles}
           drivers={filterDrivers}
+          posts={filterPosts}
           driverColors={driverColors}
           // Een eigen sleutel: wat je op de planning van het team aanvinkte,
           // hoort dit scherm niet te filteren.
           storageKey="logistiek.bezetting.filters"
           groups={{
             drivers: filterDrivers.length > 0,
+            posts: filterPosts.length > 0,
             requesters: canFilterRequester,
             // Beide horen bij de planning van het team: hier hangt geen
             // evenementenstrook boven het rooster en geen beschikbaarheidsband

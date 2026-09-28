@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { Card, Input, Label } from "@vtk/ui";
 import { Check, ClipboardList, Copy } from "lucide-react";
 import type { Locale } from "@vtk/i18n";

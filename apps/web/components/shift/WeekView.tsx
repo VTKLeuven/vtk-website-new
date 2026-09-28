@@ -4,7 +4,7 @@ import { addDays } from 'date-fns';
 import { AlertTriangle, ChevronDown, ChevronUp, Globe, MapPin } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { canUnregister, type ShiftResponse } from '@/lib/shift';
-import { fill, fmtTime, freeSpots, spotsLabel, type MergedShift } from './shiftData';
+import { fill, fmtTime, freeSpots, spotsLabel, spotsSpoken, type MergedShift } from './shiftData';
 
 const HOUR_PX = 48;
 const TOTAL_HOURS = 24;
@@ -157,6 +157,22 @@ export function ShiftWeekView({
     return withCols;
   }, [shifts, weekStart]);
 
+  // Het weekend krijgt enkel een kolom wanneer er die dag iets is: twee lege
+  // kolommen voor zaterdag en zondag maakten maandag tot vrijdag zo smal dat
+  // overlappende shiften er onleesbaar werden. `d` blijft de index in de week,
+  // zodat de segmenten en de nu-lijn gewoon blijven kloppen.
+  const visibleDays = useMemo(
+    () =>
+      days
+        .map((day, d) => ({ day, d }))
+        .filter(
+          ({ day, d }) =>
+            (day.getDay() !== 0 && day.getDay() !== 6) ||
+            segments.some((s) => s.dayIndex === d)
+        ),
+    [days, segments]
+  );
+
   const gridHeight = TOTAL_HOURS * HOUR_PX;
   const hours = Array.from({ length: TOTAL_HOURS + 1 }, (_, i) => i);
 
@@ -198,9 +214,12 @@ export function ShiftWeekView({
           setViewportHeight(e.currentTarget.clientHeight);
         }}
       >
-        <div className="vtk-week-grid">
+        <div
+          className="vtk-week-grid"
+          style={{ '--week-days': visibleDays.length } as React.CSSProperties}
+        >
           <div className="vtk-week-corner" />
-          {days.map((day, d) => {
+          {visibleDays.map(({ day, d }) => {
             const isToday = nowLine?.index === d;
             return (
               <div
@@ -223,7 +242,7 @@ export function ShiftWeekView({
             ))}
           </div>
 
-          {days.map((day, d) => {
+          {visibleDays.map(({ day, d }) => {
             const daySegs = segments.filter((s) => s.dayIndex === d);
             const shiftsAbove = daySegs.filter((s) => s.startFrac < visibleTopFrac);
             const shiftsBelow = daySegs.filter((s) => s.endFrac > visibleBottomFrac);
@@ -279,11 +298,9 @@ export function ShiftWeekView({
                       )
                     : null;
 
-                  const statusText = registered
-                    ? t.isRegistered
-                    : isFull
-                      ? t.spots.full
-                      : fill(t.spots.few, { n: freeSpots(shift) });
+                  // De tooltip van het blok schrijft het voluit; de pil erin toont
+                  // dezelfde bezetting als teller.
+                  const statusText = registered ? t.isRegistered : spotsSpoken(shift, t);
 
                   const clashTooltip = conflict
                     ? ` · ${fill(t.clashWarning, { name: conflict.name })}`
@@ -300,7 +317,7 @@ export function ShiftWeekView({
                       data-overlap={isOverlap ? 'true' : undefined}
                       data-clash={conflict ? 'true' : undefined}
                       data-compact={height < 60 ? 'true' : undefined}
-                      title={`${shift.name} (${fmtTime(shift.startTime)} - ${fmtTime(shift.endTime)}) · ${shift.location} · ${statusText}${clashTooltip}`}
+                      title={`${shift.name} (${fmtTime(shift.startTime)} - ${fmtTime(shift.endTime)}) · ${shift.location} · ${statusText}${shift.openToInternationals ? ` · ${t.intl.badge}` : ''}${clashTooltip}`}
                       aria-label={`${t.dialog.open}: ${shift.name}, ${fmtTime(shift.startTime)} - ${fmtTime(shift.endTime)}, ${shift.location}`}
                       onClick={() => onOpen(s.merged)}
                       style={{
@@ -328,11 +345,12 @@ export function ShiftWeekView({
                         <span className="vtk-week-block-status">
                           {registered ? (
                             <span className="vtk-week-pill-mine">{t.isRegistered}</span>
-                          ) : isFull ? (
-                            <span className="vtk-week-pill-full">{t.spots.full}</span>
                           ) : (
-                            <span className="vtk-week-pill-open">
-                              {fill(t.spots.few, { n: freeSpots(shift) })}
+                            <span
+                              className={isFull ? 'vtk-week-pill-full' : 'vtk-week-pill-open'}
+                              aria-label={spotsSpoken(shift, t)}
+                            >
+                              {spotsLabel(shift)}
                             </span>
                           )}
                         </span>

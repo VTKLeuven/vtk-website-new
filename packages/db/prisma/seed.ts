@@ -25,6 +25,22 @@ function readSeedEnv(raw: string | undefined): string | undefined {
   return s === "" ? undefined : s;
 }
 
+/** Het startjaar van het lopende academiejaar in Brussel (omslag 14 september). */
+function seedStudyYear(date: Date = new Date()): number {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Brussels",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const get = (t: string) => Number(parts.find((p) => p.type === t)?.value);
+  const year = get("year");
+  const month = get("month");
+  const day = get("day");
+  const afterCutover = month > 9 || (month === 9 && day >= 14);
+  return afterCutover ? year : year - 1;
+}
+
 function richText(paragraphs: string[]): object {
   return {
     type: "doc",
@@ -245,8 +261,8 @@ async function main() {
     "Praesidium",
     "Praesidium",
     1,
-    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) en formulieren voor de eigen groep aanmaken, foto's uploaden, gebruikers opzoeken, je e-mailhandtekening genereren, bonnetjes aanvaarden aan de toog en shift- en ticketsjablonen beheren.",
-    "Base role for every praesidium member: create events (incl. ticket events) and forms for the own group, upload photos, search users, generate your email signature, accept vouchers at the bar and manage shift and ticket templates.",
+    "Basisrol voor elk praesidiumlid: evenementen (incl. ticketevents) en formulieren voor de eigen groep aanmaken, foto's uploaden, gebruikers opzoeken, je e-mailhandtekening genereren, bonnetjes aanvaarden aan de toog, shift- en ticketsjablonen beheren, en zien en verdelen wie wat doet binnen de eigen post.",
+    "Base role for every praesidium member: create events (incl. ticket events) and forms for the own group, upload photos, search users, generate your email signature, accept vouchers at the bar, manage shift and ticket templates, and see and divide who does what within the own post.",
   );
   await setRolePermissions(praesidiumRole.id, [
     "calendar.create",
@@ -279,6 +295,11 @@ async function main() {
     // opnieuw ingetikt wordt. Breed recht (je wijzigt wat iedereen daarna
     // aanmaakt), dus een vertrekpunt: afnemen doe je per rol in /admin/roles.
     "tickets.templates",
+    // Wie doet wat: elk praesidiumlid moet kunnen opzoeken wie waarvoor het
+    // aanspreekpunt is, en elke post verdeelt haar eigen taken. Alle posten
+    // verdelen blijft bij de rol admin (IT en Groep 5).
+    "tasks.view",
+    "tasks.manageOwn",
   ]);
   for (const g of GROUP_SEEDS) {
     await grantRoleToGroup(g.code, praesidiumRole.id, "DEFAULT");
@@ -924,15 +945,25 @@ async function main() {
   // Create-only: bestaande prototype-gebruikers, hun wachtwoord en lidmaatschappen
   // niet overschrijven bij een reseed op een DB met data.
   const prototypeUserByEmail = new Map<string, { id: string; email: string; name: string }>();
+  const prototypeStudyYear = seedStudyYear();
   for (const u of prototypeUsers) {
     const user = await prisma.user.upsert({
       where: { email: u.email },
-      update: {},
+      update: {
+        onboardedAt: new Date(),
+        studyConfirmedYear: prototypeStudyYear,
+        studyYears: ["MASTER_1"],
+        studyProgrammes: ["COMPUTER_SCIENCE"],
+      },
       create: {
         email: u.email,
         name: u.name,
         locale: u.locale,
         active: true,
+        onboardedAt: new Date(),
+        studyConfirmedYear: prototypeStudyYear,
+        studyYears: ["MASTER_1"],
+        studyProgrammes: ["COMPUTER_SCIENCE"],
       },
     });
     await prisma.account.upsert({
@@ -1577,11 +1608,20 @@ async function main() {
     // de admin-UI of verwijder de rij eerst en herseed.
     const admin = await prisma.user.upsert({
       where: { email: adminEmail },
-      update: {},
+      update: {
+        onboardedAt: new Date(),
+        studyConfirmedYear: prototypeStudyYear,
+        studyYears: ["MASTER_1"],
+        studyProgrammes: ["COMPUTER_SCIENCE"],
+      },
       create: {
         email: adminEmail,
         name: "VTK Admin",
         isSuperAdmin: true,
+        onboardedAt: new Date(),
+        studyConfirmedYear: prototypeStudyYear,
+        studyYears: ["MASTER_1"],
+        studyProgrammes: ["COMPUTER_SCIENCE"],
       },
     });
     await prisma.account.upsert({

@@ -6,6 +6,7 @@ import {
   useEffect,
   useRef,
   useState,
+  type ComponentProps,
   type FormEvent,
   type ReactNode,
 } from "react";
@@ -42,6 +43,9 @@ type SecondarySubmit = {
 export function SaveForm({
   action,
   submitLabel,
+  submitVariant,
+  submitSize,
+  confirmSubmit,
   savingLabel,
   savedMessage,
   errorMessages,
@@ -57,6 +61,25 @@ export function SaveForm({
 }: {
   action: SaveAction;
   submitLabel: string;
+  /**
+   * Uitzicht van de submitknop, voor een opslaan-actie die naast een zwaardere
+   * knop staat (een "ban opheffen" onder het opslaan van diezelfde ban). De
+   * standaard blijft de volle primaire knop.
+   */
+  submitVariant?: ComponentProps<typeof Button>["variant"];
+  submitSize?: ComponentProps<typeof Button>["size"];
+  /**
+   * Vraagt een bevestiging voor de gewone opslaan-knop. Voor een formulier dat
+   * bij het opslaan iets onomkeerbaars doet waar de gebruiker niet om vroeg (het
+   * aanbod verlagen schrapt bestellingen). Laat weg wanneer opslaan gewoon
+   * opslaan is; de tekst hoort te zeggen wát er weg is, niet enkel "zeker?".
+   */
+  confirmSubmit?: {
+    title: string;
+    description: ReactNode;
+    confirmLabel: string;
+    cancelLabel: string;
+  } | null;
   savingLabel: string;
   savedMessage: string;
   /** Foutcode uit de action -> vertaalde melding. Onbekende codes vallen terug. */
@@ -126,6 +149,9 @@ export function SaveForm({
   // Welke secundaire knop op een bevestiging staat te wachten. De knop zelf mag
   // het formulier dan niet verzenden; dat gebeurt pas in de dialoog.
   const [confirming, setConfirming] = useState<SecondarySubmit | null>(null);
+  // Bevestiging op de gewone opslaan-knop staat los van die op een secundaire
+  // knop: die tweede draagt een name/value mee, deze niet.
+  const [confirmingSubmit, setConfirmingSubmit] = useState(false);
 
   /**
    * Verstuurt het formulier alsof er op `submit` geklikt was. Nodig omdat de
@@ -176,7 +202,7 @@ export function SaveForm({
 
     if (state.status === "success") {
       if (resetOnSuccess) formRef.current?.reset();
-      showToast({ message: savedMessage, variant: "success" });
+      showToast({ message: state.detail ?? savedMessage, variant: "success" });
       onSuccess?.();
     } else {
       // Blijft staan tot het lid ze wegklikt: een foutmelding die na vier
@@ -197,8 +223,23 @@ export function SaveForm({
     resetOnSuccess,
   ]);
 
+  /** Verstuurt het formulier zoals het staat, zonder extra name/value. */
+  function submitPlain() {
+    const form = formRef.current;
+    if (!form) return;
+    const data = new FormData(form);
+    setConfirmingSubmit(false);
+    startTransition(() => formAction(data));
+  }
+
   const submitButton = (
-    <Button type="submit" disabled={pending || submitDisabled || busy}>
+    <Button
+      type={confirmSubmit ? "button" : "submit"}
+      variant={submitVariant}
+      size={submitSize}
+      onClick={confirmSubmit ? () => setConfirmingSubmit(true) : undefined}
+      disabled={pending || submitDisabled || busy}
+    >
       {pending ? savingLabel : submitLabel}
     </Button>
   );
@@ -230,6 +271,17 @@ export function SaveForm({
       pending={pending}
       onConfirm={() => submitWith(confirming)}
       onCancel={() => setConfirming(null)}
+    />
+  ) : confirmSubmit && confirmingSubmit ? (
+    <ConfirmDialog
+      open
+      title={confirmSubmit.title}
+      description={confirmSubmit.description}
+      confirmLabel={confirmSubmit.confirmLabel}
+      cancelLabel={confirmSubmit.cancelLabel}
+      pending={pending}
+      onConfirm={submitPlain}
+      onCancel={() => setConfirmingSubmit(false)}
     />
   ) : null;
 

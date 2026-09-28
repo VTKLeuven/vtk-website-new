@@ -171,6 +171,10 @@ const cachedAnnouncement = unstable_cache(
         ctaLabelEn: true,
         ctaUrl: true,
         scope: true,
+        // Datums: komen uit de cache terug als string, zie de kop van dit
+        // bestand. SiteAnnouncement wekt ze weer op met `new Date(...)`.
+        startsAt: true,
+        createdAt: true,
       },
     });
   },
@@ -179,7 +183,7 @@ const cachedAnnouncement = unstable_cache(
 );
 
 /**
- * De aankondiging die nu aan de beurt is, met enkel de velden die de modal
+ * De aankondiging die nu aan de beurt is, met enkel de velden die de kaart
  * toont. De volledige rij (inclusief het venster) leest `getCurrentAnnouncement`
  * in lib/announcements.ts; die blijft het beheer bedienen.
  */

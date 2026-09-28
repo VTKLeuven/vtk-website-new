@@ -36,6 +36,32 @@ describe('parseTransportFilters', () => {
   it('negeert lege stukken', () => {
     expect(parseTransportFilters({ voertuig: 'kar,,  ,auto' }).vehicleIds).toEqual(['kar', 'auto']);
   });
+
+  /**
+   * F4.1: "alle ritten van Acti". De sleutel heet `post`, zoals de rest van deze
+   * module in het Nederlands staat, en ze moet in `FILTER_QUERY_KEYS` staan,
+   * anders is de filter niet meer uit te zetten (dat was R8 van ronde 4).
+   */
+  it('leest de postfilter en schrijft ze terug', () => {
+    const filters = parseTransportFilters({ post: 'acti,sport' });
+    expect(filters.groupIds).toEqual(['acti', 'sport']);
+    expect(filtersToQuery(filters)).toEqual({ post: 'acti,sport' });
+    expect(FILTER_QUERY_KEYS).toContain('post');
+  });
+
+  it('telt de postfilter mee als actieve filter', () => {
+    const filters = { ...EMPTY_FILTERS, groupIds: ['acti'] };
+    expect(countActiveFilters(filters)).toBe(1);
+    expect(hasActiveFilters(filters)).toBe(true);
+  });
+
+  it('noemt de post bij naam in de zin onder de kalender', () => {
+    const parts = describeFilters(
+      { ...EMPTY_FILTERS, groupIds: ['acti'] },
+      { vehicles: new Map(), drivers: new Map(), groups: new Map([['acti', 'Activiteiten']]) }
+    );
+    expect(parts).toEqual(['enkel Activiteiten']);
+  });
 });
 
 describe('filtersToQuery', () => {
@@ -184,6 +210,7 @@ describe('de filters over een bestaande URL leggen', () => {
     const all = filtersToQuery({
       vehicleIds: ['v1'],
       driverIds: ['d1'],
+      groupIds: ['g1'],
       statuses: ['APPROVED'],
       requesterTypes: ['EXTERN'],
       showEvents: false,

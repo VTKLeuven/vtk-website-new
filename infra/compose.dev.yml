@@ -96,7 +96,7 @@ services:
   # Zet SSO pas aan wanneer je die flow zelf wil testen; de deploy-stack in
   # `docker-compose.yml` heeft ze wel aan.
   vaultwarden:
-    image: vaultwarden/server:1.37.2
+    image: vaultwarden/server:1.37.3@sha256:1587c45feaa479f1f5e8af3b00eded36bff77bcf1880cf8dbf0541706dd470e0
     container_name: vtk-dev-vaultwarden
     restart: unless-stopped
     environment:

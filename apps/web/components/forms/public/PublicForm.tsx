@@ -403,6 +403,13 @@ export function PublicForm({
             {nl
               ? "Dit is een testinzending (telt niet mee in de resultaten)"
               : "This is a test entry (does not count in the results)"}
+            {/* Beheerders dachten dat elke invuller dit vakje krijgt en zochten
+                hoe het weg moest; zeg dus dat het enkel voor hen staat. */}
+            <small className="vtk-form-check-note">
+              {nl
+                ? "Je ziet dit vakje enkel omdat je dit formulier beheert. Wie het formulier invult, krijgt het niet te zien."
+                : "You only see this box because you manage this form. People filling in the form never see it."}
+            </small>
           </span>
         </label>
       ) : null}

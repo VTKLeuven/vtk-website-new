@@ -1,10 +1,12 @@
 import 'server-only';
 
-import { prisma } from '@vtk/db';
+import { prisma, searchUsers } from '@vtk/db';
 import type {
+  GroupType,
   Prisma,
   UitleenAvailabilityKind,
   UitleenTransportBookingStatus,
+  UitleenTransportNoteVisibility,
 } from '@prisma/client';
 import { currentWorkingYear } from '@vtk/auth';
 import { resolveDriverPhones, type DriverPhone, type DriverPhoneSource } from './driver-phones';
@@ -12,8 +14,10 @@ import {
   DEFAULT_LAST_MINUTE_DAYS,
   NOTIFY_KINDS,
   STOCK_CONSUMING_STATUSES,
+  isTripHandoverMode,
   type LogistiekNotifyEmails,
   type NotifyKind,
+  type TripHandoverNotify,
 } from './uitleen';
 import { NO_DRIVER, type TransportFilters } from './transport-filters';
 
@@ -576,6 +580,19 @@ export async function adminVehicles() {
   return prisma.uitleenVehicle.findMany({ orderBy: [{ active: 'desc' }, { sortIndex: 'asc' }] });
 }
 
+/**
+ * Alle voertuigen in hun eigen volgorde, actief of niet.
+ *
+ * Voor een kalender, die ook een rit moet kunnen tekenen op een voertuig dat
+ * intussen op non-actief staat; `vehiclesToDraw` snoeit de lijst daarna terug
+ * tot de actieve plus wie in dit venster effectief gereden heeft. Niet
+ * `adminVehicles`, want die zet de gedeactiveerde achteraan en de legende hoort
+ * de eigen volgorde van het team te houden.
+ */
+export async function calendarVehicles() {
+  return prisma.uitleenVehicle.findMany({ orderBy: { sortIndex: 'asc' } });
+}
+
 const LOGISTIEK_SETTINGS_KEY = 'logistiek.settings';
 
 export type LogistiekSettings = {
@@ -603,6 +620,12 @@ export type LogistiekSettings = {
    * want het is het team dat beslist wanneer het opengaat, niet een deploy.
    */
   externalRequestsOpen: boolean;
+  /**
+   * Wie er een mail krijgt wanneer een rit aan een post doorgegeven wordt
+   * (F4.8b). Standaard **niemand**: de rit staat onder "Ritten van mijn post",
+   * en dat scherm is de melding geworden. Zie `TripHandoverNotify`.
+   */
+  tripHandover: TripHandoverNotify;
 };
 
 /**
@@ -618,12 +641,21 @@ export async function getLogistiekSettings(): Promise<LogistiekSettings> {
     lastMinuteDays?: number;
     externalRequestsOpen?: boolean;
     notifyEmails?: Partial<Record<NotifyKind, unknown>>;
+    tripHandover?: { mode?: unknown; email?: unknown };
   } | null;
   const days = Number(value?.lastMinuteDays);
+  const handoverMode = value?.tripHandover?.mode;
   return {
     showRentPrices: Boolean(value?.showRentPrices),
     lastMinuteDays: Number.isFinite(days) && days > 0 ? Math.floor(days) : DEFAULT_LAST_MINUTE_DAYS,
     externalRequestsOpen: Boolean(value?.externalRequestsOpen),
+    tripHandover: {
+      // Een onbekende of ontbrekende waarde wordt "niemand", net zoals hierboven:
+      // dit is een instelling en geen invoer. Stil naar de verantwoordelijken
+      // terugvallen zou van een kapotte sleutel een mailstorm maken.
+      mode: isTripHandoverMode(handoverMode) ? handoverMode : 'NIEMAND',
+      email: typeof value?.tripHandover?.email === 'string' ? value.tripHandover.email : '',
+    },
     notifyEmails: Object.fromEntries(
       NOTIFY_KINDS.map((kind) => {
         const stored = value?.notifyEmails?.[kind];
@@ -676,7 +708,16 @@ export async function reservationForMember(id: string, userId: string, groupIds:
   });
 }
 
-/** Zoals `reservationForMember`: eigen rit, of een interne rit van je post. */
+/**
+ * Zoals `reservationForMember`: eigen rit, of een interne rit van je post.
+ *
+ * Plus een derde tak: een rit die Logistiek **aan** jouw post doorgaf
+ * (`assignedGroupId`, F4.8a). Die post moet er zelf een chauffeur en bijrijders
+ * op zetten, dus ze moet er ook aan kunnen; zonder deze tak kon dat enkel bij
+ * een rit die je eigen post ook aangevraagd had, terwijl ze wel in haar lijst
+ * staat. Geen voorwaarde op `requesterType`: het doorgeven is een uitdrukkelijke
+ * daad van Logistiek, en die staat los van wie de rit vroeg.
+ */
 export async function vanBookingForMember(id: string, userId: string, groupIds: string[]) {
   return prisma.uitleenTransportBooking.findFirst({
     where: {
@@ -684,7 +725,10 @@ export async function vanBookingForMember(id: string, userId: string, groupIds: 
       OR: [
         { userId },
         ...(groupIds.length > 0
-          ? [{ requesterType: 'INTERN' as const, groupId: { in: groupIds } }]
+          ? [
+              { requesterType: 'INTERN' as const, groupId: { in: groupIds } },
+              { assignedGroupId: { in: groupIds } },
+            ]
           : []),
       ],
     },
@@ -693,6 +737,7 @@ export async function vanBookingForMember(id: string, userId: string, groupIds: 
       driver: { select: { name: true } },
       vehicle: { select: { nameNl: true, nameEn: true } },
       user: { select: { id: true, name: true } },
+      assignedGroup: { select: { id: true, nameNl: true, nameEn: true } },
       helpers: { orderBy: { createdAt: 'asc' }, select: { id: true, name: true, phone: true } },
     },
   });
@@ -1101,17 +1146,32 @@ function transportFilterWhere(
   if (!filters) return {};
   const named = filters.driverIds.filter((id) => id !== NO_DRIVER);
   const wantsNone = filters.driverIds.includes(NO_DRIVER);
+  // Twee filters die elk een OF zijn, en die moeten als EN naast elkaar staan:
+  // "van Acti én zonder chauffeur". Ze allebei als `OR` in hetzelfde object
+  // zetten kan niet (één sleutel per object), en dan wint stil de laatste.
+  const anyOf: Prisma.UitleenTransportBookingWhereInput[] = [];
+  if (filters.driverIds.length > 0) {
+    anyOf.push({
+      OR: [
+        ...(named.length > 0 ? [{ driverId: { in: named } }] : []),
+        ...(wantsNone ? [{ driverId: null }] : []),
+      ],
+    });
+  }
+  // De post die de rit vroeg én de post die hem rijdt (F4.1). Zie `groupIds` in
+  // lib/transport-filters.ts voor waarom het allebei is.
+  if (filters.groupIds.length > 0) {
+    anyOf.push({
+      OR: [
+        { groupId: { in: filters.groupIds } },
+        { assignedGroupId: { in: filters.groupIds } },
+      ],
+    });
+  }
   return {
     ...(filters.vehicleIds.length > 0 ? { vehicleId: { in: filters.vehicleIds } } : {}),
     ...(filters.requesterTypes.length > 0 ? { requesterType: { in: filters.requesterTypes } } : {}),
-    ...(filters.driverIds.length > 0
-      ? {
-          OR: [
-            ...(named.length > 0 ? [{ driverId: { in: named } }] : []),
-            ...(wantsNone ? [{ driverId: null }] : []),
-          ],
-        }
-      : {}),
+    ...(anyOf.length > 0 ? { AND: anyOf } : {}),
   };
 }
 
@@ -1165,6 +1225,10 @@ export async function transportRange(from: Date, to: Date, filters?: TransportFi
     },
     select: {
       id: true,
+      // De aanvrager, als id naast `user.name`: de nota's van een rit hangen af
+      // van wie er bij die rit hoort (`onTripForNotes`), en een naam is daar
+      // geen sleutel voor.
+      userId: true,
       vehicleId: true,
       tripGroupId: true,
       tripLeg: true,
@@ -1199,6 +1263,10 @@ export async function transportRange(from: Date, to: Date, filters?: TransportFi
       // de rijen ze toch al dragen.
       plannedByTeam: true,
       payments: { select: { id: true } },
+      // De post die de rit aanvroeg, en de post die ze zelf mag invullen (zie
+      // `assignTripGroupAction`). Allebei, want allebei maken ze een rit "van
+      // jouw post" (F4.1, F4.15).
+      groupId: true,
       // De post die deze rit zelf mag invullen (zie `assignTripGroupAction`).
       assignedGroupId: true,
       assignedGroup: { select: { nameNl: true } },
@@ -1291,6 +1359,9 @@ export async function transportWeekForPraesidium(
       // bij zo'n eigen rit; zie de pagina.
       userId: true,
       groupId: true,
+      // Ook de post waaraan de rit doorgegeven is: die mag de bijrijders
+      // bijwerken zonder de rit zelf aangevraagd te hebben (F4.8a).
+      assignedGroupId: true,
       helpersNote: true,
       driverId: true,
       driver: { select: { name: true } },
@@ -1435,6 +1506,43 @@ export async function availabilityInRange(from: Date, to: Date) {
 }
 
 /** De vensters van één chauffeur, vanaf vandaag: wat hij zelf beheert. */
+/**
+ * De algemene nota van één chauffeur voor één week (F4.5).
+ *
+ * `null` wanneer hij er geen schreef; een lege nota bestaat niet (zie
+ * `setAvailabilityNoteAction`).
+ */
+export async function availabilityNoteForWeek(userId: string, weekStart: Date) {
+  const row = await prisma.uitleenDriverAvailabilityNote.findUnique({
+    where: { userId_weekStart: { userId, weekStart } },
+    select: { text: true },
+  });
+  return row?.text ?? null;
+}
+
+/**
+ * De algemene nota's van alle karchauffeurs voor de weken die dit venster raken
+ * (F4.5), voor de strook onder de planning.
+ *
+ * `from` en `to` zijn de randen van de weergave; de nota hangt aan een maandag,
+ * dus een venster dat halverwege een week begint, moet ook de maandag ervóór
+ * meenemen. Vandaar de zes dagen speling aan de voorkant.
+ */
+export async function availabilityNotesInRange(from: Date, to: Date) {
+  return prisma.uitleenDriverAvailabilityNote.findMany({
+    where: {
+      weekStart: { gte: new Date(from.getTime() - 6 * 24 * 60 * 60 * 1000), lt: to },
+      user: {
+        uitleenDriver: { canDriveVan: true },
+        active: true,
+        deletedAt: null,
+      },
+    },
+    select: { userId: true, weekStart: true, text: true },
+    orderBy: { weekStart: 'asc' },
+  });
+}
+
 export async function availabilityForDriver(userId: string, now = new Date()) {
   // Vensters die al voorbij zijn, blijven in de databank staan (ze zeggen
   // achteraf wie er die dag kon), maar horen niet in de lijst waar je dingen
@@ -1730,29 +1838,100 @@ export async function driverPool(): Promise<DriverPoolEntry[]> {
   return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, 'nl'));
 }
 
+/** Eén post of werkgroep met haar leden, gesplitst op wie chauffeur is (F4.10). */
+export type GroupDrivers = {
+  id: string;
+  /** De Nederlandse naam: dit is beheer, en dat staat altijd in het Nederlands. */
+  name: string;
+  type: GroupType;
+  /** Leden van dit werkingsjaar die in de chauffeurspool zitten. */
+  drivers: Array<{ id: string; name: string }>;
+  /** De andere leden: wie je met één klik chauffeur kan maken. */
+  others: Array<{ id: string; name: string }>;
+};
+
+/**
+ * Wie er per post en werkgroep chauffeur is (F4.10).
+ *
+ * Dit is het andere eind van F4.9. Daar werd de keuzelijst bij een doorgegeven
+ * rit de doorsnede van de post en de chauffeurspool, en een post waarvan niemand
+ * in die pool zit, houdt dus geen keuzelijst over. Wie dat leest terwijl de rit
+ * er al ligt, weet nog altijd niet wie hij dan wél moet toevoegen. Hier staat
+ * diezelfde doorsnede voor elke post op het scherm, vóór er een rit aan hangt.
+ *
+ * **De pool is van de kring en niet van de post.** Iemand hier toevoegen maakt
+ * hem overal chauffeur, precies zoals de picker bovenaan; een chauffeur "van
+ * Sport alleen" bestaat niet. Het scherm zegt dat er met zoveel woorden bij,
+ * want een knop onder een postnaam belooft anders iets kleiners dan ze doet.
+ *
+ * Enkel actieve groepen met leden dit werkingsjaar: een post zonder leden is een
+ * rij die niets zegt, en het zijn er vijfentwintig.
+ */
+export async function driversPerGroup(): Promise<GroupDrivers[]> {
+  const [memberships, team, extra] = await Promise.all([
+    prisma.groupMembership.findMany({
+      where: {
+        year: currentWorkingYear(),
+        user: { active: true, deletedAt: null },
+        group: { active: true },
+      },
+      select: {
+        user: { select: { id: true, name: true } },
+        group: { select: { id: true, nameNl: true, type: true, orderInPraesidium: true } },
+      },
+    }),
+    logistiekTeamMembers(),
+    prisma.uitleenDriver.findMany({
+      where: { user: { active: true, deletedAt: null } },
+      select: { userId: true },
+    }),
+  ]);
+
+  // Dezelfde unie als `driverOptions` en `groupMemberOptions`: de post Logistiek
+  // van dit werkingsjaar plus de rijen in `UitleenDriver`.
+  const pool = new Set([...team.map((member) => member.id), ...extra.map((row) => row.userId)]);
+
+  const byGroup = new Map<string, GroupDrivers & { order: number }>();
+  for (const membership of memberships) {
+    const group = membership.group;
+    let entry = byGroup.get(group.id);
+    if (!entry) {
+      entry = {
+        id: group.id,
+        name: group.nameNl,
+        type: group.type,
+        order: group.orderInPraesidium,
+        drivers: [],
+        others: [],
+      };
+      byGroup.set(group.id, entry);
+    }
+    (pool.has(membership.user.id) ? entry.drivers : entry.others).push(membership.user);
+  }
+
+  const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name, 'nl');
+  return [...byGroup.values()]
+    .sort((a, b) => a.order - b.order || byName(a, b))
+    .map(({ order: _order, ...group }) => ({
+      ...group,
+      drivers: [...group.drivers].sort(byName),
+      others: [...group.others].sort(byName),
+    }));
+}
+
 /**
  * Actieve leden zoeken voor de chauffeurspicker, op naam, e-mail of r-nummer.
  * Spiegelt /api/users/search op de hoofdsite: server-side en gelimiteerd, zodat
  * de picker ook met duizenden leden werkt.
  */
 export async function searchDriverCandidates(query: string, limit = 10) {
-  const q = query.trim();
-  if (q.length < 2) return [];
-
-  return prisma.user.findMany({
-    where: {
-      active: true,
-      deletedAt: null,
-      OR: [
-        { name: { contains: q, mode: 'insensitive' } },
-        { email: { contains: q, mode: 'insensitive' } },
-        { rNumber: { contains: q, mode: 'insensitive' } },
-      ],
-    },
-    select: { id: true, name: true, email: true, rNumber: true },
-    orderBy: { name: 'asc' },
-    take: Math.min(limit, 25),
-  });
+  const users = await searchUsers(query, { limit: Math.min(limit, 25), db: prisma });
+  return users.map((u) => ({
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    rNumber: u.rNumber,
+  }));
 }
 
 export type DriverCandidate = Awaited<ReturnType<typeof searchDriverCandidates>>[number];
@@ -1806,22 +1985,26 @@ export async function driverStatus(
   groupIds: string[] = []
 ): Promise<{ isDriver: boolean; upcomingTrips: number }> {
   const now = new Date();
-  const [driver, ownTrips, groupTrips] = await Promise.all([
+  // Eén telling en geen twee die je optelt: sinds F4.19 staat een rit die je
+  // zelf rijdt voor je eigen post in allebei de lijsten, en opgeteld stond er
+  // dan "2 komende ritten" voor één rit. De takken zijn dezelfde als die van
+  // `tripsForGroups`, anders belooft de navigatie iets anders dan het scherm.
+  const [driver, upcomingTrips] = await Promise.all([
     isDriver(userId),
     prisma.uitleenTransportBooking.count({
-      where: { driverId: userId, status: 'APPROVED', endAt: { gte: now } },
+      where: {
+        status: 'APPROVED',
+        endAt: { gte: now },
+        OR: [
+          { driverId: userId },
+          ...(groupIds.length > 0
+            ? [{ assignedGroupId: { in: groupIds } }, { groupId: { in: groupIds } }]
+            : []),
+        ],
+      },
     }),
-    groupIds.length > 0
-      ? prisma.uitleenTransportBooking.count({
-          where: {
-            assignedGroupId: { in: groupIds },
-            status: 'APPROVED',
-            endAt: { gte: now },
-          },
-        })
-      : Promise.resolve(0),
   ]);
-  return { isDriver: driver, upcomingTrips: ownTrips + groupTrips };
+  return { isDriver: driver, upcomingTrips };
 }
 
 /** Toont de app "Mijn ritten" voor dit lid? */
@@ -1839,6 +2022,30 @@ export function showsMyTrips(status: { isDriver: boolean; upcomingTrips: number 
  * Staat er niemand als verantwoordelijke, dan komt er een lege lijst terug en
  * vertrekt er geen mail; de actie zegt dat, in plaats van stil niets te doen.
  */
+/**
+ * Het eigen mailadres van een post of werkgroep (`sport@vtk.be`), of `null`.
+ *
+ * Komt uit de mailinglijsten van de hoofdsite (`MailGroup`), want daar staan die
+ * adressen al en ze lopen daar vanzelf mee met de leden van het werkingsjaar.
+ * Een tweede kolom "postadres" ernaast zou dezelfde waarheid een tweede keer
+ * bewaren, en dan is er één die na een jaar niet meer klopt.
+ *
+ * **Enkel een lijst die precies deze ene post als bron heeft.** `praesidium@vtk.be`
+ * staat er met "elke actieve post" in en `activiteiten@vtk.be` is "Activiteiten
+ * plus Groep 5"; zo'n gedeeld adres is niet het adres van déze post, en een rit
+ * doorgeven mag niet in de mailbox van het hele praesidium belanden. Ook geen
+ * lijst die enkel de verantwoordelijken aanschrijft (`onlyLead`): dat is de
+ * andere keuze in deze instelling en niet deze.
+ */
+export async function groupMailAddress(groupId: string): Promise<string | null> {
+  const lists = await prisma.mailGroup.findMany({
+    where: { enabled: true, sources: { some: { groupId, onlyLead: false } } },
+    select: { email: true, _count: { select: { sources: true } } },
+    orderBy: { email: 'asc' },
+  });
+  return lists.find((list) => list._count.sources === 1)?.email ?? null;
+}
+
 export async function groupLeads(groupId: string) {
   const memberships = await prisma.groupMembership.findMany({
     where: { groupId, year: currentWorkingYear(), role: 'LEAD' },
@@ -1863,24 +2070,42 @@ export async function groupLeads(groupId: string) {
 }
 
 /**
- * De leden van een post of werkgroep dit werkingsjaar, om er een chauffeur uit
- * te kiezen.
+ * De leden van een post of werkgroep die ook chauffeur zijn, om er een op een
+ * doorgegeven rit te zetten.
  *
- * Bewust niet gefilterd op de chauffeurslijst: dat is precies het punt van een
- * rit doorgeven aan een post. De kar vraagt een goedgekeurde karchauffeur, maar
- * met de auto rijdt elk lid met een rijbewijs, en wie dat is weet de post zelf.
+ * De doorsnede van twee lijsten (F4.9): de leden van dit werkingsjaar, en de
+ * chauffeurspool zoals `driverOptions` hem samenstelt (de post Logistiek plus
+ * de rijen in `UitleenDriver`). Ze gaf eerst élk lid van de post terug, en dan
+ * kan een post iemand zonder rijbewijs op een autorit zetten; wie er mag rijden,
+ * is een beslissing van Logistiek en niet van de post die iets te vervoeren
+ * heeft.
+ *
+ * **Een lege lijst is een echt antwoord**, geen fout: een post waarvan niemand
+ * in de chauffeurslijst staat, krijgt er geen. Het scherm zegt dat met zoveel
+ * woorden en bij wie je dan moet zijn, want een keuzelijst zonder opties ziet
+ * eruit als een scherm dat stuk is.
  */
 export async function groupMemberOptions(groupId: string) {
-  const memberships = await prisma.groupMembership.findMany({
-    where: {
-      groupId,
-      year: currentWorkingYear(),
-      user: { active: true, deletedAt: null },
-    },
-    select: { user: { select: { id: true, name: true } } },
-  });
+  const [memberships, team, extra] = await Promise.all([
+    prisma.groupMembership.findMany({
+      where: {
+        groupId,
+        year: currentWorkingYear(),
+        user: { active: true, deletedAt: null },
+      },
+      select: { user: { select: { id: true, name: true } } },
+    }),
+    logistiekTeamMembers(),
+    prisma.uitleenDriver.findMany({
+      where: { user: { active: true, deletedAt: null } },
+      select: { userId: true },
+    }),
+  ]);
+
+  const pool = new Set([...team.map((member) => member.id), ...extra.map((row) => row.userId)]);
   return memberships
     .map((membership) => membership.user)
+    .filter((user) => pool.has(user.id))
     .sort((a, b) => a.name.localeCompare(b.name, 'nl'));
 }
 
@@ -1894,6 +2119,84 @@ const driverTripInclude = {
   // onderweg nodig heeft.
   helpers: { orderBy: { createdAt: 'asc' as const }, select: { id: true, name: true, phone: true } },
 };
+
+/** Eén eigen nota bij een rit, klaar om te tekenen (F4.20). */
+export type TripNote = {
+  id: string;
+  bookingId: string;
+  text: string;
+  visibility: UitleenTransportNoteVisibility;
+  authorId: string;
+  authorName: string;
+  createdAt: Date;
+  /** Van jou, dus te wijzigen en te wissen. */
+  mine: boolean;
+};
+
+/**
+ * De eigen nota's bij een reeks ritten, zoals déze kijker ze mag zien (F4.20).
+ *
+ * **Een aparte query en geen `include` op de rittenquery.** Die twee queries
+ * worden ook gebruikt om een rit van iemand anders te tonen (de chauffeurspagina
+ * in het beheer toont de ritten van één chauffeur), en dan zou de kijker een
+ * ander zijn dan de chauffeur. Eén gedeelde include zou daar stilzwijgend
+ * andermans privénota's meeleveren, en dat is precies de fout die dit veld niet
+ * mag maken.
+ *
+ * De zichtbaarheid zit dan ook in de `where` en niet in het scherm: andermans
+ * privénota's komen niet uit de databank. Zie `canReadTripNote` voor dezelfde
+ * regel als pure functie; die tekent de knoppen, deze haalt de rijen.
+ *
+ * `onTripIds` zijn de ritten waar de kijker zelf bij hoort (aanvrager,
+ * chauffeur, of lid van de post erachter). De oproeper rekent dat uit met
+ * `onTripForNotes`, want die kent de ritten al die op het scherm komen.
+ */
+export async function tripNotesFor(
+  bookingIds: string[],
+  viewer: { userId: string; onTripIds: string[]; logistiek: boolean }
+): Promise<Map<string, TripNote[]>> {
+  const byBooking = new Map<string, TripNote[]>();
+  if (bookingIds.length === 0) return byBooking;
+
+  const rows = await prisma.uitleenTransportNote.findMany({
+    where: {
+      bookingId: { in: bookingIds },
+      OR: [
+        { authorId: viewer.userId },
+        ...(viewer.onTripIds.length > 0
+          ? [{ bookingId: { in: viewer.onTripIds }, visibility: { not: 'PRIVE' as const } }]
+          : []),
+        ...(viewer.logistiek ? [{ visibility: 'POST_EN_LOGISTIEK' as const }] : []),
+      ],
+    },
+    orderBy: { createdAt: 'asc' },
+    select: {
+      id: true,
+      bookingId: true,
+      text: true,
+      visibility: true,
+      authorId: true,
+      createdAt: true,
+      author: { select: { name: true } },
+    },
+  });
+
+  for (const row of rows) {
+    const list = byBooking.get(row.bookingId) ?? [];
+    list.push({
+      id: row.id,
+      bookingId: row.bookingId,
+      text: row.text,
+      visibility: row.visibility,
+      authorId: row.authorId,
+      authorName: row.author.name,
+      createdAt: row.createdAt,
+      mine: row.authorId === viewer.userId,
+    });
+    byBooking.set(row.bookingId, list);
+  }
+  return byBooking;
+}
 
 /**
  * De ritten die aan dit lid toegewezen zijn. Enkel goedgekeurde en afgeronde
@@ -1909,37 +2212,39 @@ export async function tripsForDriver(driverId: string) {
 }
 
 /**
- * De ritten van je post: wat je medeleden rijden, en wat er nog een chauffeur
- * mist.
+ * De ritten van je post: wat je medeleden rijden, wat er nog een chauffeur mist,
+ * en wat jij er zelf van rijdt.
  *
  * Twee bronnen, allebei "ritten van mijn post" maar om een andere reden:
  *
  * 1. **Doorgegeven aan je post** (`assignedGroupId`). Die staan hier omdat je er
  *    zelf iemand op moet zetten; zonder dit scherm is die mail naar de
  *    verantwoordelijke het enige spoor.
- * 2. **Aangevraagd door je post** (`groupId`) en al toegewezen aan iemand. Dan
- *    weet je wie er rijdt zonder het te moeten navragen.
+ * 2. **Aangevraagd door je post** (`groupId`), met of zonder chauffeur. Weet je
+ *    wie er rijdt, dan hoef je het niet na te vragen; is er nog niemand, dan is
+ *    dat precies de rit waar je iets mee moet.
  *
- * Wat er níét in zit: je eigen ritten. Die staan bovenaan dat scherm in hun
- * eigen lijst, en twee keer dezelfde rit op één pagina leest als twee ritten.
+ * Die tweede tak eiste ooit `driverId: { not: null }` (F4.18). Gevolg: een
+ * goedgekeurde rit van je eigen post verscheen pas in deze lijst zodra Logistiek
+ * er iemand op zette of hem uitdrukkelijk doorgaf, en dat is net de rit waarvoor
+ * een post hier komt kijken.
+ *
+ * **Je eigen ritten zitten er ook in** (F4.19). Die staan dan twee keer op
+ * /ritten, en dat is de bedoeling: de twee lijsten beantwoorden twee vragen
+ * ("wat moet ik doen" en "wat staat er bij ons open"). De kaart in de postlijst
+ * zegt dat jij het bent, anders leest het als een dubbel. Zie
+ * `docs/design-decisions.md`.
  */
-export async function tripsForGroups(userId: string, groupIds: string[]) {
+export async function tripsForGroups(groupIds: string[]) {
   if (groupIds.length === 0) return [];
-  const trips = await prisma.uitleenTransportBooking.findMany({
+  return prisma.uitleenTransportBooking.findMany({
     where: {
       status: { in: ['APPROVED', 'COMPLETED'] },
-      OR: [
-        { assignedGroupId: { in: groupIds } },
-        { groupId: { in: groupIds }, driverId: { not: null } },
-      ],
+      OR: [{ assignedGroupId: { in: groupIds } }, { groupId: { in: groupIds } }],
     },
     orderBy: { startAt: 'asc' },
     include: driverTripInclude,
   });
-  // Je eigen ritten eruit in code en niet in de `where`: een `not` op een
-  // kolom die null mag zijn, betekent in SQL iets anders dan wat je leest, en
-  // dit is een filter van één regel op een lijst van hoogstens enkele tientallen.
-  return trips.filter((trip) => trip.driverId !== userId);
 }
 
 export type DriverTrip = Awaited<ReturnType<typeof tripsForDriver>>[number];

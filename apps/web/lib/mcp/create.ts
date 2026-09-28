@@ -62,7 +62,7 @@ const CREATE_PERMISSIONS = {
   page: ["pages.edit", "pages.editAll", "pages.manage"],
   header_tab: ["header.manage"],
   header_link: ["header.manage"],
-  announcement: ["home.edit"],
+  announcement: ["announcements.manage"],
   poc: ["pocs.manage"],
   partner: ["partners.manage"],
   calendar_event: ["calendar.create", "calendar.manageAll"],
@@ -123,7 +123,7 @@ const schemas = {
   header_tab: z.object({ code, slug, labelNl: z.string().trim().min(1).max(100), labelEn: z.string().trim().min(1).max(100), externalUrl: url.optional().nullable() }).strict(),
   header_link: z.object({ tabCode: code, labelNl: z.string().trim().min(1).max(160), labelEn: z.string().trim().min(1).max(160), url: destination, order: z.number().int().min(0).max(999).default(0) }).strict(),
   announcement: z.object({ titleNl: z.string().trim().min(1).max(200), titleEn: z.string().trim().min(1).max(200), bodyNl: z.string().trim().min(1).max(20_000), bodyEn: z.string().trim().min(1).max(20_000), scope: z.enum(["HOME", "SITE"]).default("HOME") }).strict(),
-  poc: z.object({ slug, nameNl: z.string().trim().min(1).max(160), nameEn: optionalText(160), email: z.string().email().optional().nullable(), descriptionNl: optionalText(10_000), descriptionEn: optionalText(10_000), studyProgrammes: z.array(z.enum(["ARCHITECTURE", "BIOMEDICAL", "COMMON_BACHELOR", "CIVIL", "CHEMICAL", "COMPUTER_SCIENCE", "CYBERSECURITY", "DIGITAL_HUMANITIES", "ELECTRICAL", "ENERGY", "ARTIFICIAL_INTELLIGENCE", "MATERIALS", "NANO", "URBANISM", "MATHEMATICAL", "MECHANICAL"])).default([]) }).strict(),
+  poc: z.object({ slug, nameNl: z.string().trim().min(1).max(160), nameEn: optionalText(160), email: z.string().email().optional().nullable(), descriptionNl: optionalText(10_000), descriptionEn: optionalText(10_000), studyProgrammes: z.array(z.enum(["ARCHITECTURE", "BIOMEDICAL", "COMMON_BACHELOR", "CIVIL", "CHEMICAL", "COMPUTER_SCIENCE", "CYBERSECURITY", "DIGITAL_HUMANITIES", "ELECTRICAL", "ENERGY", "ARTIFICIAL_INTELLIGENCE", "MATERIALS", "MOBILITY_SUPPLY_CHAIN", "NANO", "URBANISM", "MATHEMATICAL", "MECHANICAL"])).default([]) }).strict(),
   partner: z.object({ name: z.string().trim().min(1).max(200), logoKey: z.string().trim().min(1).max(500), url: url.optional().nullable() }).strict(),
   calendar_event: z.object({ titleNl: z.string(), titleEn: z.string().optional().nullable(), descriptionNl: z.string().optional().nullable(), descriptionEn: z.string().optional().nullable(), location: z.string().optional().nullable(), groupCode: code, start: isoMoment, end: isoMoment, allDay: z.boolean().default(false), url: z.string().optional().nullable(), categorySlugs: z.array(z.string()).default([]), publish: z.literal(false).default(false) }).strict(),
   calendar_category: z.object({ slug, nameNl: z.string().trim().min(1).max(60), nameEn: z.string().trim().min(1).max(60), descriptionNl: optionalText(10_000), descriptionEn: optionalText(10_000), colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#5C667F"), order: z.number().int().min(0).max(999).default(0), showOnCalendarPage: z.boolean().default(true) }).strict(),
@@ -141,7 +141,7 @@ const schemas = {
   short_link: z.object({ slug: z.string().trim().min(1).max(128).regex(/^[a-zA-Z0-9](?:[a-zA-Z0-9._-]*[a-zA-Z0-9])?$/), url, note: optionalText(2_000), expiresAt: isoMoment.optional().nullable() }).strict(),
   shift: z.object({ name: z.string(), startTime: isoMoment, endTime: isoMoment, location: z.string(), description: z.string(), maxParticipants: z.number().int(), reward: z.number().int(), post: z.string().optional().nullable(), openToInternationals: z.boolean().default(false), instructions: z.string().optional().nullable() }).strict(),
   theokot_product: z.object({ nameNl: z.string().trim().min(1).max(160), nameEn: optionalText(160), priceCents: z.number().int().min(0).max(1_000_000), defaultQuantity: z.number().int().min(0).max(100_000).default(0), ingredientsNl: optionalText(2_000), ingredientsEn: optionalText(2_000), order: z.number().int().min(0).max(999).default(0) }).strict(),
-  theokot_session: z.object({ date: isoMoment, orderOpenAt: isoMoment, orderCloseAt: isoMoment, pickupStart: isoMoment, pickupEnd: isoMoment, weeklySpecialLabelNl: optionalText(160), weeklySpecialLabelEn: optionalText(160) }).strict(),
+  theokot_session: z.object({ date: isoMoment, orderOpenAt: isoMoment, orderCloseAt: isoMoment, pickupStart: isoMoment, pickupEnd: isoMoment }).strict(),
   meeting: z.object({ kind: z.enum(["GROCOMEET", "BUREAU"]), year: z.number().int().min(2020).max(2200), semester: z.number().int().min(1).max(2), slug, startsAt: isoMoment, location: optionalText(300), opensAt: isoMoment.optional().nullable(), useTheokot: z.boolean().default(true), noteNl: optionalText(10_000), noteEn: optionalText(10_000) }).strict(),
   lesbezoek_organisation: z.object({ name: z.string().trim().min(1).max(200), colour: z.string().regex(/^#[0-9a-fA-F]{6}$/).default("#3B82F6"), contactEmail: z.string().email().optional().nullable(), note: optionalText(10_000) }).strict(),
   lesbezoek: z.object({ organisationId: z.string().min(1), startsAt: isoMoment, endsAt: isoMoment, longVisit: z.boolean().default(false), audience: z.string().trim().min(1).max(300), course: z.string().trim().min(1).max(300), subject: z.string().trim().min(1).max(500), teacherNote: z.string().trim().min(1).max(20_000), teacherEmail: z.string().email(), teacherName: optionalText(200), requesterName: optionalText(200), requesterEmail: z.string().email().optional().nullable(), requesterPhone: optionalText(80) }).strict(),
@@ -494,7 +494,7 @@ export async function createMcpRecord(principal: McpPrincipal, raw: McpCreateInp
       case "theokot_session": {
         const input = schemas.theokot_session.parse(data); const orderOpenAt = new Date(input.orderOpenAt); const orderCloseAt = new Date(input.orderCloseAt); const pickupStart = new Date(input.pickupStart); const pickupEnd = new Date(input.pickupEnd);
         if (!(orderOpenAt < orderCloseAt && orderCloseAt <= pickupStart && pickupStart < pickupEnd)) throw new McpInputError("INVALID_WINDOW", "Ongeldige volgorde van bestel- en afhaalmomenten.");
-        const row = await prisma.theokotSession.create({ data: { date: new Date(input.date), orderOpenAt, orderCloseAt, pickupStart, pickupEnd, weeklySpecialLabelNl: nullIfEmpty(input.weeklySpecialLabelNl), weeklySpecialLabelEn: nullIfEmpty(input.weeklySpecialLabelEn), isOpen: false } });
+        const row = await prisma.theokotSession.create({ data: { date: new Date(input.date), orderOpenAt, orderCloseAt, pickupStart, pickupEnd, isOpen: false } });
         await audit(principal, "theokotSession", row.id, row.date.toISOString(), "gesloten sessie aangemaakt via MCP");
         result = row; break;
       }

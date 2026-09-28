@@ -95,9 +95,20 @@ const PDF_LOAD_OPTIONS = {
   rangeChunkSize: 262144,
 } as const;
 
-/** Zoomstappen in de lezer; 1 = precies passend op de breedte. */
+/**
+ * Zoomstappen in de lezer. 1 = de hele bladzijde in de hoogte van het venster,
+ * maar nooit smaller dan `READ_MIN_WIDTH` en nooit breder dan het venster. Zie
+ * `renderPage`.
+ */
 const ZOOM_STEPS = [0.5, 0.75, 1, 1.25, 1.5, 2, 3] as const;
 const DEFAULT_ZOOM_INDEX = 2;
+
+/**
+ * Onder deze breedte wordt de tekst van een Bakske of IrReëel te klein om te
+ * lezen; een staande bladzijde op een laag scherm mag daarom iets onder de rand
+ * doorlopen in plaats van te krimpen.
+ */
+const READ_MIN_WIDTH = 720;
 
 function loadPdfJs() {
   if (!pdfJsPromise) {
@@ -276,10 +287,15 @@ function PdfDocumentViewer({ issue, labels }: { issue: MagazineIssue; labels: La
         if (!canvas || disposed) return;
 
         const baseViewport = page.getViewport({ scale: 1 });
-        // Standaard vult de bladzijde de breedte (leesbaar), niet de hoogte; de
-        // zoomknoppen vertrekken van die basis.
+        // Standaard de hele bladzijde in de hoogte, zoals je een blad vasthoudt.
+        // Op de volle breedte van de modal was een staande bladzijde op een
+        // laptop bijna 1800 pixels breed: de kop vulde het scherm en voor één
+        // kolom tekst moest je scrollen. Wel nooit smaller dan leesbaar, en op
+        // een telefoon gewoon de breedte. De zoomknoppen vertrekken hiervan.
         const availableWidth = Math.max(bounds.width, 120);
-        const cssScale = (availableWidth / baseViewport.width) * ZOOM_STEPS[zoomIndex];
+        const fitHeightWidth = (bounds.height / baseViewport.height) * baseViewport.width;
+        const baseWidth = Math.min(availableWidth, Math.max(fitHeightWidth, READ_MIN_WIDTH));
+        const cssScale = (baseWidth / baseViewport.width) * ZOOM_STEPS[zoomIndex];
         const pixelRatio = Math.min(window.devicePixelRatio || 1, 2);
         const viewport = page.getViewport({ scale: cssScale * pixelRatio });
         const context = canvas.getContext('2d', { alpha: false });

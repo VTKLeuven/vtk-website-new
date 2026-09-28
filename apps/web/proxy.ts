@@ -103,7 +103,8 @@ async function gateRedirect(request: NextRequest, internalPath: string): Promise
   }
 
   // 1. Onboarding: profiel nog niet ingevuld -> eerst dat afwerken.
-  if (!user.onboarded) {
+  // In development staat deze gate uit: ontwikkelaars horen niet geblokkeerd te worden.
+  if (process.env.NODE_ENV === 'production' && !user.onboarded) {
     if (segment !== 'onboarding') {
       return NextResponse.redirect(new URL(`${enPrefix}/onboarding`, request.url));
     }
@@ -117,7 +118,10 @@ async function gateRedirect(request: NextRequest, internalPath: string): Promise
   //    bevestigingsronde opent (21 september), niet op 15 juli, want in juli
   //    duidt iedereen nog zijn oude jaar aan. Zie
   //    packages/auth/src/lib/workingYear.ts voor de drie grenzen.
-  if (needsStudyConfirmation(user)) {
+  //
+  //    In development staat deze gate uit: wie lokaal schermen test hoort niet
+  //    omgeleid te worden naar "Klopt je studie nog?".
+  if (process.env.NODE_ENV === 'production' && needsStudyConfirmation(user)) {
     if (segment !== 'studie-bevestigen') {
       return NextResponse.redirect(new URL(`${enPrefix}/studie-bevestigen`, request.url));
     }

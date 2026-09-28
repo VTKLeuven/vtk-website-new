@@ -52,7 +52,9 @@ export const AUDIT_ENTITIES = {
   // Het lidmaatschap van de kring zelf, per academiejaar. Bewust een andere
   // naam dan `membership` hierboven: dat is een post in een werkingsjaar.
   vtkMembership: { nl: "Lidmaatschap", en: "Membership", group: "users" },
+  honoraryMember: { nl: "Erelid", en: "Honorary member", group: "users" },
   post: { nl: "Post", en: "Post", group: "users" },
+  postTask: { nl: "Taak van een post", en: "Post task", group: "users" },
   werkgroep: { nl: "Werkgroep", en: "Werkgroep", group: "users" },
   poc: { nl: "POC", en: "POC", group: "users" },
   role: { nl: "Rol", en: "Role", group: "roles" },
@@ -64,6 +66,8 @@ export const AUDIT_ENTITIES = {
   page: { nl: "Pagina", en: "Page", group: "pages" },
   pageAsset: { nl: "Paginabijlage", en: "Page download", group: "pages" },
   announcement: { nl: "Aankondiging", en: "Announcement", group: "home" },
+  newsPost: { nl: "Nieuwsbericht", en: "News post", group: "home" },
+  news: { nl: "Nieuws", en: "News", group: "home" },
   home: { nl: "Homepagina", en: "Homepage", group: "home" },
   frontpage: { nl: "Frontpage", en: "Front page", group: "home" },
   linkPage: { nl: "Linktree", en: "Linktree", group: "home" },

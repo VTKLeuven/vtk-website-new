@@ -81,3 +81,62 @@ describe('placeForDay', () => {
     );
   });
 });
+
+describe('placeForDay met een verschoven dagrand', () => {
+  /** Zoals het beschikbaarheidsscherm hem doorgeeft: 05:00 (`DAG_START_UUR`). */
+  const FIVE = 5 * 60;
+
+  it('houdt een nachtvenster in de kolom van de avond ervoor', () => {
+    // Het geval uit F4.2. Met een dagrand op middernacht waren dit twee stukken
+    // op twee kolommen; nu is het één blok onderaan de donderdagkolom, en het
+    // loopt door voorbij 1440 omdat de kolom daar ook doorloopt.
+    const overnight = {
+      id: 'nacht',
+      startAt: '2026-09-10T22:00:00+02:00',
+      endAt: '2026-09-11T02:00:00+02:00',
+    };
+    const placed = placeForDay([overnight], day, FIVE);
+    expect(placed).toHaveLength(1);
+    expect(placed[0].from).toBe(22 * 60);
+    expect(placed[0].to).toBe(26 * 60);
+    expect(placed[0].continuesAfter).toBe(false);
+    expect(placed[0].continuesBefore).toBe(false);
+  });
+
+  it('laat dat venster weg bij de dag erna', () => {
+    const overnight = {
+      id: 'nacht',
+      startAt: '2026-09-10T22:00:00+02:00',
+      endAt: '2026-09-11T02:00:00+02:00',
+    };
+    expect(placeForDay([overnight], new Date('2026-09-11T00:00:00.000Z'), FIVE)).toEqual([]);
+  });
+
+  it('knipt nog altijd op de nieuwe dagrand', () => {
+    // Tot 08:00 's ochtends is voorbij 05:00: dat stuk hoort bij de dag erna.
+    const long = {
+      id: 'lang',
+      startAt: '2026-09-10T22:00:00+02:00',
+      endAt: '2026-09-11T08:00:00+02:00',
+    };
+    const [placed] = placeForDay([long], day, FIVE);
+    expect(placed.to).toBe(FIVE + 24 * 60);
+    expect(placed.continuesAfter).toBe(true);
+
+    const [next] = placeForDay([long], new Date('2026-09-11T00:00:00.000Z'), FIVE);
+    expect(next.from).toBe(FIVE);
+    expect(next.to).toBe(8 * 60);
+    expect(next.continuesBefore).toBe(true);
+  });
+
+  it('legt een venster dat op de dagrand eindigt op het einde en niet op het begin', () => {
+    const untilFive = {
+      id: 'tot-vijf',
+      startAt: '2026-09-11T03:00:00+02:00',
+      endAt: '2026-09-11T05:00:00+02:00',
+    };
+    const [placed] = placeForDay([untilFive], day, FIVE);
+    expect(placed.from).toBe(27 * 60);
+    expect(placed.to).toBe(FIVE + 24 * 60);
+  });
+});

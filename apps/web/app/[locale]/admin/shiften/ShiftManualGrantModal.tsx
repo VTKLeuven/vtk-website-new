@@ -130,16 +130,16 @@ export function ShiftManualGrantModal({
       onClick={onClose}
     >
       <div
-        className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl"
+        className="w-full max-w-lg rounded-2xl bg-vtk-surface-elevated p-6 shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
-          <h2 id="grant-modal-title" className="text-lg font-semibold text-zinc-900">
+        <div className="flex items-center justify-between border-b border-vtk-navy/5 pb-3">
+          <h2 id="grant-modal-title" className="text-lg font-semibold text-vtk-ink">
             {nl ? "Extra shiften manueel toekennen" : "Manually grant extra shifts"}
           </h2>
           <button
             type="button"
-            className="text-zinc-400 hover:text-zinc-700"
+            className="text-vtk-muted hover:text-vtk-body"
             onClick={onClose}
             aria-label={nl ? "Sluiten" : "Close"}
           >
@@ -156,8 +156,8 @@ export function ShiftManualGrantModal({
             {selectedUser ? (
               <div className="mt-1 flex items-center justify-between rounded-lg border border-vtk-blue/30 bg-vtk-blue-soft/30 px-3 py-2 text-sm">
                 <div>
-                  <span className="font-semibold text-zinc-900">{selectedUser.name}</span>
-                  <span className="ml-2 text-xs text-zinc-500">
+                  <span className="font-semibold text-vtk-ink">{selectedUser.name}</span>
+                  <span className="ml-2 text-xs text-vtk-muted">
                     {selectedUser.email}
                     {selectedUser.rNumber ? ` (${selectedUser.rNumber})` : ""}
                   </span>
@@ -168,7 +168,7 @@ export function ShiftManualGrantModal({
                     setSelectedUser(null);
                     setSearch("");
                   }}
-                  className="ml-2 text-xs text-red-600 hover:underline"
+                  className="ml-2 text-xs text-vtk-danger hover:underline"
                 >
                   {nl ? "Wijzigen" : "Change"}
                 </button>
@@ -183,7 +183,7 @@ export function ShiftManualGrantModal({
                   autoFocus
                 />
                 {results.length > 0 && (
-                  <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-zinc-200 bg-white shadow-lg">
+                  <ul className="absolute z-10 mt-1 max-h-48 w-full overflow-auto rounded-lg border border-vtk-navy/10 bg-vtk-surface-elevated shadow-lg">
                     {results.map((u) => (
                       <li key={u.id}>
                         <button
@@ -192,10 +192,10 @@ export function ShiftManualGrantModal({
                             setSelectedUser(u);
                             setResults([]);
                           }}
-                          className="flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-zinc-50"
+                          className="flex w-full flex-col px-3 py-2 text-left text-sm hover:bg-vtk-blue-muted"
                         >
-                          <span className="font-medium text-zinc-900">{u.name}</span>
-                          <span className="text-xs text-zinc-500">
+                          <span className="font-medium text-vtk-ink">{u.name}</span>
+                          <span className="text-xs text-vtk-muted">
                             {u.email}
                             {u.rNumber ? ` • ${u.rNumber}` : ""}
                           </span>
@@ -263,13 +263,13 @@ export function ShiftManualGrantModal({
 
           {/* Reeds uitbetaald optie als reward > 0 */}
           {parseInt(reward, 10) > 0 && (
-            <div className="flex items-center gap-2 rounded-lg bg-zinc-50 p-2 text-sm text-zinc-700">
+            <div className="flex items-center gap-2 rounded-lg bg-vtk-blue-muted p-2 text-sm text-vtk-body">
               <input
                 type="checkbox"
                 id="manual-payed-out"
                 checked={payedOut}
                 onChange={(e) => setPayedOut(e.target.checked)}
-                className="h-4 w-4 rounded border-zinc-300 text-vtk-blue"
+                className="h-4 w-4 rounded border-vtk-navy/20 text-vtk-blue"
               />
               <label htmlFor="manual-payed-out" className="cursor-pointer text-xs">
                 {nl
@@ -289,14 +289,14 @@ export function ShiftManualGrantModal({
               placeholder={nl ? "bv. Overdracht vorige website" : "e.g. Migration previous website"}
               required
             />
-            <p className="mt-1 text-xs text-zinc-500">
+            <p className="mt-1 text-xs text-vtk-muted">
               {nl
                 ? "Wordt opgenomen in het adminlogboek en getoond in de shifthistoriek."
                 : "Will be recorded in the admin audit log and shown in shift history."}
             </p>
           </div>
 
-          <div className="mt-6 flex justify-end gap-2 border-t border-zinc-100 pt-3">
+          <div className="mt-6 flex justify-end gap-2 border-t border-vtk-navy/5 pt-3">
             <Button type="button" variant="ghost" onClick={onClose} disabled={busy}>
               {nl ? "Annuleren" : "Cancel"}
             </Button>

@@ -1,13 +1,26 @@
 import { describe, expect, it } from "vitest";
+import type { Locale } from "@vtk/i18n";
 import {
-  careerChoiceLabels,
+  careerFitsStudy,
+  careerHeading,
+  careerOptInOpen,
   careerOptInUpdate,
   shouldAskCareerOptIn,
   withCareerCategory,
 } from "@/lib/careerOptIn";
+import { careerOptInCopy } from "@/lib/careerOptInCopy";
 import { desiredListKeys } from "@/lib/brevo/contacts";
 
+/** Wat het blok als titel toont, voor een taal en een profiel. */
+function careerChoiceLabels(
+  locale: Locale,
+  user: { studyYears: string[]; studyProgrammes: string[] },
+) {
+  return { heading: careerHeading(careerOptInCopy(locale), user) };
+}
+
 const base = {
+  isStudent: true,
   mailCategories: [] as string[],
   mailUnsubscribedAt: null as Date | null,
   notAtFaculty: false,
@@ -81,6 +94,31 @@ describe("shouldAskCareerOptIn", () => {
         2026,
       ),
     ).not.toContain("CAREER");
+  });
+});
+
+describe("de regel volgt stap 1, niet het profiel van vorig jaar", () => {
+  it("vraagt het aan wie vorig jaar eerste bachelor was en nu tweede aanduidt", () => {
+    // Precies de groep die er dit jaar voor het eerst bij hoort. Op het oude
+    // profiel (enkel BACHELOR_1) viel ze weg; op wat het lid nu invult niet.
+    const lastYear = { ...base, studyYears: ["BACHELOR_1"], studyProgrammes: ["CIVIL"] };
+    expect(careerFitsStudy(lastYear)).toBe(false);
+    expect(careerFitsStudy({ ...lastYear, studyYears: ["BACHELOR_2"] })).toBe(true);
+  });
+
+  it("vraagt het niet wanneer het lid in stap 1 geen student meer is", () => {
+    // Dan bewaart de bevestiging geen richting en geen jaar.
+    expect(careerFitsStudy({ ...base, isStudent: false })).toBe(false);
+  });
+
+  it("splitst wat vastligt van wat meebeweegt", () => {
+    // Career al aan of uitgeschreven via een mail: dat verandert stap 1 niet.
+    expect(careerOptInOpen({ mailCategories: ["CAREER"], mailUnsubscribedAt: null })).toBe(false);
+    expect(careerOptInOpen({ mailCategories: [], mailUnsubscribedAt: new Date() })).toBe(false);
+    expect(careerOptInOpen({ mailCategories: ["FEEST"], mailUnsubscribedAt: null })).toBe(true);
+    // En de volledige regel is het een én het ander.
+    expect(shouldAskCareerOptIn({ ...base, notAtFaculty: true })).toBe(false);
+    expect(shouldAskCareerOptIn(base)).toBe(true);
   });
 });
 

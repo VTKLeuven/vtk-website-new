@@ -1,10 +1,11 @@
 import { InteractiveRow } from "@/components/ticketing/admin/InteractiveRow";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { hasPermission } from "@vtk/auth";
 import {
   ArrowRight,
+  BarChart3,
   FileText,
   Filter,
   LayoutTemplate,
@@ -95,9 +96,14 @@ export default async function TicketAdminOverview({
   const selectedStatus = EVENT_STATUSES.includes(filters.status as (typeof EVENT_STATUSES)[number])
     ? filters.status
     : "";
-  const selectedTiming = ["upcoming", "past"].includes(filters.timing ?? "")
-    ? filters.timing
-    : "";
+  // Standaard enkel wat nog moet komen of nu loopt: een afgelopen event is
+  // afgehandeld, en na een paar maanden duwde de lijst van oude events de
+  // lopende verkoop onder de vouw. Wie terug wil kijken, kiest "Afgelopen" of
+  // "Alle evenementen". Een event telt als afgelopen zodra het voorbij is
+  // (`endsAt`), niet zodra het begint: tijdens de cantus zelf staat ze er nog.
+  const selectedTiming = ["upcoming", "past", "all"].includes(filters.timing ?? "")
+    ? filters.timing!
+    : "upcoming";
   const visibleEvents = events.filter((event) => {
     const searchable = [
       event.titleNl,
@@ -112,10 +118,21 @@ export default async function TicketAdminOverview({
       .toLocaleLowerCase(locale === "nl" ? "nl-BE" : "en-BE");
     if (query && !searchable.includes(query)) return false;
     if (selectedStatus && event.status !== selectedStatus) return false;
-    if (selectedTiming === "upcoming" && event.startsAt < now) return false;
-    if (selectedTiming === "past" && event.startsAt >= now) return false;
+    if (selectedTiming === "upcoming" && event.endsAt < now) return false;
+    if (selectedTiming === "past" && event.endsAt >= now) return false;
     return true;
   });
+  // Hoeveel er wegvalt enkel door de standaardperiode, zodat de lijst zegt dat
+  // er meer is in plaats van stil te verbergen.
+  const hiddenPast =
+    selectedTiming === "upcoming"
+      ? events.filter((event) => event.endsAt < now).length
+      : 0;
+  const showAllHref = `${ticketBase(locale)}/admin/tickets?${new URLSearchParams({
+    ...(filters.q ? { q: filters.q } : {}),
+    ...(selectedStatus ? { status: selectedStatus } : {}),
+    timing: "all",
+  })}`;
 
   const base = ticketBase(locale);
 
@@ -131,6 +148,12 @@ export default async function TicketAdminOverview({
           </p>
         </div>
         <div className="ticket-admin-actions">
+          {events.length > 0 ? (
+            <Link className="ticket-admin-button" href={`${base}/admin/tickets/statistieken`}>
+              <BarChart3 aria-hidden="true" size={16} />
+              {locale === "nl" ? "Statistieken" : "Statistics"}
+            </Link>
+          ) : null}
           {canManageTemplates ? (
             <Link className="ticket-admin-button" href={`${base}/admin/tickets/sjablonen`}>
               <LayoutTemplate aria-hidden="true" size={16} />
@@ -160,6 +183,16 @@ export default async function TicketAdminOverview({
               {locale === "nl"
                 ? `${visibleEvents.length} van ${events.length} evenementen`
                 : `${visibleEvents.length} of ${events.length} events`}
+              {hiddenPast > 0 ? (
+                <>
+                  {" · "}
+                  <Link className="ticket-admin-setup-link" href={showAllHref}>
+                    {locale === "nl"
+                      ? `${hiddenPast} afgelopen ${hiddenPast === 1 ? "evenement" : "evenementen"} tonen`
+                      : `Show ${hiddenPast} past ${hiddenPast === 1 ? "event" : "events"}`}
+                  </Link>
+                </>
+              ) : null}
             </p>
           </div>
         </div>
@@ -190,9 +223,9 @@ export default async function TicketAdminOverview({
           <div className="ticket-admin-field">
             <label htmlFor="ticket-event-timing">{locale === "nl" ? "Periode" : "Period"}</label>
             <select id="ticket-event-timing" name="timing" defaultValue={selectedTiming}>
-              <option value="">{locale === "nl" ? "Alle evenementen" : "All events"}</option>
-              <option value="upcoming">{locale === "nl" ? "Aankomend" : "Upcoming"}</option>
+              <option value="upcoming">{locale === "nl" ? "Aankomend en lopend" : "Upcoming and ongoing"}</option>
               <option value="past">{locale === "nl" ? "Afgelopen" : "Past"}</option>
+              <option value="all">{locale === "nl" ? "Alle evenementen" : "All events"}</option>
             </select>
           </div>
           <button className="ticket-admin-button" type="submit">
@@ -219,6 +252,10 @@ export default async function TicketAdminOverview({
                 <Link className="ticket-admin-button" data-variant="primary" href={`${base}/admin/tickets/new`}>
                   <Plus aria-hidden="true" size={16} />
                   {locale === "nl" ? "Event aanmaken" : "Create event"}
+                </Link>
+              ) : hiddenPast > 0 ? (
+                <Link className="ticket-admin-button" href={showAllHref}>
+                  {locale === "nl" ? "Ook afgelopen evenementen tonen" : "Also show past events"}
                 </Link>
               ) : undefined
             }

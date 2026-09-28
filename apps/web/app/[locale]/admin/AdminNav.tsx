@@ -260,6 +260,17 @@ const icons: Record<string, ReactNode> = {
       <path d="m15.5 13 2.5 9-6-3.5L6 22l2.5-9" />
     </Svg>
   ),
+  // tasks: klembord met een afgevinkte lijst; wie waarvoor het aanspreekpunt is
+  tasks: (
+    <Svg>
+      <rect x="5" y="4" width="14" height="17" rx="2" />
+      <path d="M9 4V3h6v1" />
+      <path d="m8.5 10 1.5 1.5 2.5-2.5" />
+      <path d="M14 10.5h2" />
+      <path d="m8.5 15.5 1.5 1.5 2.5-2.5" />
+      <path d="M14 16h2" />
+    </Svg>
+  ),
   // mailGroups: groepsmailadressen (@vtk.be)
   mailGroups: (
     <Svg>
@@ -367,6 +378,15 @@ const icons: Record<string, ReactNode> = {
       <path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1Z" />
       <path d="M14 8a4 4 0 0 1 0 8" />
       <path d="M17 5a8 8 0 0 1 0 14" />
+    </Svg>
+  ),
+  // news: krant
+  news: (
+    <Svg>
+      <path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2" />
+      <path d="M18 14h-8" />
+      <path d="M15 18h-5" />
+      <path d="M10 6h8v4h-8V6Z" />
     </Svg>
   ),
   // frontpage: het bovenste blok van een pagina -> venster met een gevulde kop

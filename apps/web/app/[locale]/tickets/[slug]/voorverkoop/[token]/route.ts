@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
+import { withSource } from "@/lib/ticketing/source";
 import {
   presaleCookieExpiry,
   presaleCookieName,
@@ -47,9 +48,11 @@ export async function GET(
     });
   }
 
+  // Met `via`, zodat wie via de voorverkooplink koopt in de statistieken als
+  // zodanig telt. Enkel bij een geldige link: een foute laat niets na.
   const response = new NextResponse(null, {
     status: 307,
-    headers: { Location: shopPath },
+    headers: { Location: withSource(shopPath, "voorverkoop") },
   });
   response.cookies.set(
     presaleCookieName(event.id),

@@ -46,7 +46,7 @@ export default async function AdminShiftTemplateManage({ params }: { params: Pro
     <div className="space-y-5">
       <h1 className="text-2xl font-semibold">{nl ? 'Shiftsjablonen' : 'Shift templates'}</h1>
       <ShiftTemplateNav locale={locale} current="manage" canManage />
-      <p className="max-w-3xl text-sm text-[#5c667f]">
+      <p className="max-w-3xl text-sm text-vtk-muted">
         {nl
           ? 'Een sjabloon is de vaste reeks shiften van een evenement dat telkens terugkomt: een cantus, een TD, een verkoopdag. Wie shiften mag aanmaken, zet ze hiermee in twee klikken neer. Wat je hier wijzigt, geldt vanaf de volgende reeks; shiften die al op de kalender staan, blijven met hun inschrijvingen ongemoeid.'
           : 'A template is the fixed series of shifts of a recurring event: a cantus, a party, a sales day. Anyone who may create shifts puts them down with it in two clicks. What you change here applies from the next series onwards; shifts already on the calendar keep their sign-ups and stay as they are.'}

@@ -108,6 +108,29 @@ const BIJRIJDER_KOLOMMEN: Record<string, Beslissing> = {
 };
 
 /**
+ * De eigen nota's bij een rit (F4.20), met hun zichtbaarheid.
+ *
+ * Bestaande ritten krijgen hier nul rijen in, en dat is uitdrukkelijk beslist en
+ * niet de weg van de minste weerstand: `memberNote` en `adminNote` blijven staan
+ * waar ze staan in plaats van hierheen gekopieerd te worden. Zie de comment in
+ * de migratie 20260921130000.
+ */
+const NOTA_KOLOMMEN: Record<string, Beslissing> = {
+  id: 'systeem',
+  createdAt: 'systeem',
+  updatedAt: 'systeem',
+
+  bookingId: 'verplicht',
+  authorId: 'verplicht',
+  text: 'verplicht',
+
+  // De standaard is de meest gedeelde van de drie (post én Logistiek). Een nota
+  // die er al stond, bestaat niet, dus die default raakt niets bestaands; hij
+  // geldt enkel voor wie het veld in het formulier niet aanraakt.
+  visibility: 'default',
+};
+
+/**
  * Elk model dat bij een rit hoort, met zijn kolommenlijst.
  *
  * Dit bestaat om het gat te dichten dat de twee lijsten hierboven openlieten:
@@ -119,6 +142,7 @@ const BIJRIJDER_KOLOMMEN: Record<string, Beslissing> = {
 const RIT_MODELLEN: Record<string, { kolommen: Record<string, Beslissing>; doc: string }> = {
   UitleenTransportBooking: { kolommen: RIT_KOLOMMEN, doc: 'RIT_KOLOMMEN' },
   UitleenTransportHelper: { kolommen: BIJRIJDER_KOLOMMEN, doc: 'BIJRIJDER_KOLOMMEN' },
+  UitleenTransportNote: { kolommen: NOTA_KOLOMMEN, doc: 'NOTA_KOLOMMEN' },
 };
 
 type Kolom = { name: string; isRequired: boolean; hasDefault: boolean; isUpdatedAt: boolean };

@@ -113,7 +113,7 @@ export default async function ReservatieDetailPage({
           overbodig (R5). Enkel voor je eigen aanvraag. */}
       {isOwner ? <MarkSeen target="reservation" id={reservation.id} /> : null}
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+      <div className="logistics-form-width grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <section className="rounded-[18px] border border-vtk-navy/10 bg-vtk-surface p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold tracking-tight text-vtk-ink">{en ? 'Request' : 'Aanvraag'}</h2>

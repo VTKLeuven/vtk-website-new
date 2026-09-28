@@ -48,11 +48,13 @@ zelf doet staat in `docs/logistiek-ingebruikname.md`.
 | `UitleenRequestTemplate` / `...Line` | Vaste set materiaal die het aanvraagformulier invult (M17). Beheerd door Logistiek; aanmaken gebeurt vanaf een bestaande aanvraag. |
 | `UitleenItemUnit` | Eén fysiek exemplaar met een eigen staat, optioneel per item. Bestaan er exemplaren, dan is `item.quantity` de telling van de bruikbare (actief en niet KAPOT), bijgehouden door `syncItemQuantityFromUnits`. |
 | `UitleenReservation` + `UitleenReservationLine` | Aanvraag met event-context + `requesterType` (+ `groupId`/`requesterName`), dagbereik, snapshots. Statusmachine `REQUESTED -> APPROVED/REJECTED/CANCELLED -> PICKED_UP -> RETURNED`. Per lijn: `note` (M15) en `preparedAt`/`preparedById` (klaarzetten, A7). `pickupPart`/`returnPart` zijn een afspraak tussen mensen: de voorraad rekent op hele dagen. |
-| `UitleenVehicle` | Voertuig (kar/auto/bakfiets); `pricingMode` (FREE/PER_HOUR/PER_KM/FLAT) + `rateCents`, team-configureerbaar. `pattern` = de arcering in de transportplanning. |
+| `UitleenVehicle` | Voertuig (kar/auto/bakfiets); `pricingMode` (FREE/PER_HOUR/PER_KM/FLAT) + `rateCents`, team-configureerbaar. `pattern` = de arcering in de transportplanning, `icon` = het icoon in een ritblok (`null` = automatisch, uit de code). |
 | `UitleenTransportBooking` | Rit met voertuig, tijdvenster, chauffeur, tarief-snapshot, `kilometers`/`priceCents` (nullable). `cargoNote` = wat er mee moet (ronde 3). |
 | `UitleenTransportHelper` | Bijrijder op een rit: naam + optioneel nummer, `addedById`. Vervangt `helpersNote`/`helpersPhone`, die voor bestaande ritten blijven staan. Ook achteraf te wijzigen door de aanvrager, een collega van dezelfde post, of het team. |
+| `UitleenTransportNote` | Eigen nota bij een rit (F4.20), met auteur en `visibility` (`PRIVE` / `POST` / `POST_EN_LOGISTIEK`). Naast `memberNote` en `adminNote`, die bij de rit zelf horen en er één keer op staan; hier kunnen er meer zijn, elk van iemand anders. `PRIVE` is letterlijk privé, ook voor Logistiek: de queries halen andermans privénota niet eens op. Enkel de auteur wijzigt of wist ze. |
 | `UitleenDriver` | Chauffeur die het team zelf toevoegt (uniek per `userId`, met notitie en `addedById`). Niet werkingsjaar-gescoped; verwijderen laat toegewezen ritten staan. `colorIndex` overschrijft de kleur die uit zijn id volgt. |
 | `UitleenDriverAvailability` | Wanneer een chauffeur kan rijden: vensters, geen rooster, elk met een `kind` (`JA`, `LIEVER_NIET`, `NOOD`). Een hint voor de planning, geen blokkade. |
+| `UitleenDriverAvailabilityNote` | Eén vrije nota per chauffeur per week (F4.5), naast de nota per venster. "Die week examens" hoort bij de week en niet bij een uurvak. Leeg maken wist de rij; het team leest ze onder de beschikbaarheidsstrook in de planning. |
 | `UitleenFeedToken` | Abonneerbare `.ics`-feed op de planning (`TEAM` of `DRIVER`). Enkel de sha256 staat opgeslagen; `revokedAt` in plaats van verwijderen. |
 | `UitleenFlesserkeCategory` / `UitleenFlesserkeItem` / `UitleenFlesserkeLine` | Verbruiksstock (vervaldatum, merk, Colruyt-link). Lijnen hangen aan `UitleenReservation`. Beschikbaar wordt berekend, nooit opgeslagen; `returnedQuantity` legt het verbruik vast. |
 | `CollectEnGoOrder` / `...Line` / `CollectEnGoProductMatch` | Een uitgelezen Collect&Go-bevestigingsmail, klaar om als ladingen in de flesserke-voorraad te zetten. Lijnen bewaren aantal, prijs, leeggoed en de notitie van de besteller ("Acti - livecantus"); `...ProductMatch` onthoudt naar welk item een Colruyt-product ging. Zie "Collect&Go-import" hieronder. |
@@ -238,6 +240,8 @@ de same-origin `publicUrl`.
   is het intekenscherm: op een breed scherm het tijdrooster, op een telefoon een
   raster van uurvakjes waar je met je vinger over veegt
   (`availability-paint.tsx`, met het rekenwerk in `lib/availability-day.ts`).
+  Zie "De dag van het intekenscherm" hieronder; bovenaan staat op allebei de
+  weeknota (`availability-note.tsx`).
 - **Transportplanning** (`/beheer/vervoer/week`, ronde 3): een agenda-app met
   dag-, week- en maandweergave, zoom, volledig scherm, filters, en een paneel
   waarin je een rit opent, aanpast of aanmaakt; dat paneel is op een breed
@@ -248,25 +252,42 @@ de same-origin `publicUrl`.
   op een telefoon geeft volledig scherm een eigen dagweergave
   (`mobile-calendar`) in plaats van de week in het klein; de
   berekeningen zijn puur en getest (`lib/week-lanes.ts`, `lib/month-lanes.ts`,
-  `lib/calendar-range.ts`, `lib/transport-filters.ts`, `lib/driver-colors.ts`).
+  `lib/calendar-range.ts`, `lib/transport-filters.ts`, `lib/driver-colors.ts`,
+  `lib/vehicle-icon.ts`).
+  **De kalender tekent de actieve voertuigen plus wie in dit venster gereden
+  heeft** (`vehiclesToDraw`): een gehuurd busje dat achteraf op non-actief
+  gaat, houdt zo zijn naam, icoon en arcering in de week waarin het reed.
+  Kiezen gebeurt wel enkel uit de actieve (`activeVehicles`).
   Het tijdrooster is gedeeld met het publieke `/vervoer/bezetting`. De zoom is
   een factor op "de hele dag past in beeld" en geen pixelmaat
   (`components/transport-calendar/types.ts`, getest in `test/calendar-zoom.test.ts`);
   waarom, staat in `docs/design-decisions.md`.
   **"Rit afronden" staat hier bewust niet**; dat blijft op `/beheer/vervoer`.
+  In het bewerkveld van dat paneel staat ook **voor wie de rit rijdt**: die lag
+  tot september 2026 vast bij het aanmaken. Een rit wordt daar niet extern en een
+  externe rit met een betaling verhuist niet; zie `docs/design-decisions.md`.
+  De eigen nota's bij een rit (`components/trip-notes.tsx`, F4.20) staan zowel
+  hier als op elke kaart van `/ritten`; welke je ziet, hangt af van wie je bent
+  (`tripNotesFor` + `canReadTripNote`).
 - **Beheer** (`app/beheer/`): `aanvragen/` (tabs, last-minute, decision/edit/
   return-forms, klaarzetlijst per lijn + printblad `[id]/print` en dag-afdruk
   `print?datum=`), `vervoer/` (decision + controls: chauffeur, voertuigwissel, km;
   `driver-select.tsx` groepeert de chauffeurs per bron), `chauffeurs/`
-  (chauffeurslijst + user-picker op vtk.be-leden), `materiaal/` (inventaris +
+  (chauffeurslijst + user-picker op vtk.be-leden, de nummers uit de gedeelde
+  gsm-lijst en de doorsnede per post; zie "De chauffeurslijst" hieronder),
+  `materiaal/` (inventaris +
   set-editor + foto-upload), `flesserke/` (stockscherm met inline voorraad +
   vervaldatum-highlight), `collectengo/` (klaarstaande Collect&Go-mails +
-  importscherm per bestelling), `kalender/`, `instellingen/` (voertuigtarieven +
-  huurprijs-toggle).
+  importscherm per bestelling), `kalender/`, `statistieken/` (wie reed wanneer,
+  hoelang en voor wie; zie hieronder), `instellingen/` (voertuigtarieven +
+  huurprijs-toggle, en het icoon per voertuig).
 - **Actions**: `app/actions/uitleen.ts` (leden), `app/actions/beheer.ts` (team),
   `app/actions/collectengo.ts` (mails ophalen, plakken, importeren).
 - **Lib**: `lib/uitleen.ts` (helpers), `lib/uitleen-server.ts` (queries +
-  voorraad), `lib/reservation-form.ts` (`buildReservationData`, gedeeld),
+  voorraad), `lib/uitleen-stats.ts` (de cijfers achter de planning, uit één
+  query), `lib/driver-hours.ts` (de balken per uur van de dag; puur en getest,
+  want dat rekenwerk draait in de browser),
+  `lib/reservation-form.ts` (`buildReservationData`, gedeeld),
   `lib/uitleen-mail.ts` (mails naar de aanvrager), `lib/payments.ts`,
   `lib/runtime-config.ts`, `lib/storage.ts`, `lib/session.ts`,
   `lib/collectengo/` (`parse.ts` + `match.ts` zijn puur en getest; `imap.ts`,
@@ -302,6 +323,103 @@ de same-origin `publicUrl`.
 naam+categorie), deletet nooit, telt created/updated/skipped. Niet-numerieke
 hoeveelheden -> aantal 1 + tekst in de beschrijving. Gereserveerd/Beschikbaar uit
 de sheet worden genegeerd (live berekend).
+
+## De chauffeurslijst
+
+`/beheer/chauffeurs` doet drie dingen, in die volgorde: de lijst zelf, de
+nummers, en de doorsnede per post.
+
+**De lijst** is `driverPool()`: de leden van de post `LOGISTIEK` van dit
+werkingsjaar plus de rijen in `UitleenDriver`. Wie via de post chauffeur is,
+verdwijnt vanzelf op 15 juli; wie hier toegevoegd is, blijft staan.
+
+**De nummers uit de gedeelde gsm-lijst** (F4.3). Het praesidium houdt ze bij als
+contactenexport (`.vcf`). Er zijn twee wegen naar dezelfde kolom:
+
+- `scripts/import-driver-phones.ts` (`npm run import:gsm`), voor wie al aan een
+  shell zit. Schrijft niets zonder `--apply`.
+- Het scherm in `/beheer/chauffeurs` (`phone-import.tsx`). **Het bestand blijft
+  in de browser**: lezen, opkuisen en koppelen gebeuren daar, en naar de server
+  gaan enkel de regels die aangevinkt staan. Een lijst met vierennegentig namen
+  en nummers hoort niet in een request of een log, en het bestand daarom ook niet
+  in de repo.
+
+Het rekenwerk is pure TypeScript en getest: `lib/vcard.ts` (parsen, normaliseren
+naar `0470 12 34 56`, koppelen op naam) en `lib/phone-import.ts` (wat er met elke
+koppeling gebeurt). Koppelen doet exact op de naam en daarna op gesorteerde
+naamdelen, **nooit op een deel van een naam**: twee leden die Wout heten, zijn
+twee leden. Enkel een nummer dat het team zelf vastlegde (bron `TEAM`) staat
+standaard uit; een nummer van iemands profiel of uit een oude aanvraag is nooit
+bevestigd en mag de lijst overschrijven.
+
+**Per post en werkgroep** (F4.10) staat onderaan: de doorsnede van de leden van
+dit werkingsjaar en de chauffeurslijst (`driversPerGroup()`), met een knop om
+iemand erbij te zetten. Dat is het andere eind van `groupMemberOptions()`: een
+post die een doorgegeven rit krijgt, kan enkel haar eigen leden kiezen die
+chauffeur zijn, en zonder dit scherm is een lege keuzelijst daar niet te
+verklaren. De lijst is wel van de kring en niet van de post: iemand hier
+toevoegen maakt hem overal kiesbaar.
+
+## Statistieken over het vervoer
+
+`/beheer/statistieken` staat op één query over de ritten van de gekozen periode;
+al de rest gebeurt in geheugen (`lib/uitleen-stats.ts`). Twaalf keer dezelfde
+rijen apart ophalen levert twaalf queries op die elk hetzelfde lezen, plus een
+teller die niet meer optelt zodra er één een ander filter krijgt.
+
+**Uren worden per kwartier uitgesmeerd.** Eén wandeling over de rit (`eachQuarter`)
+voedt zowel de drukteweergave per weekdag en uur als de uren per chauffeur per
+uur van de dag (F4.23). Wandel er niet een tweede keer overheen voor een derde
+grafiek; hang ze aan diezelfde `add`.
+
+**De balken per uur rekenen in de browser** (`lib/driver-hours.ts`, puur en
+getest): de keuze tussen blokken van 1, 2 of 4 uur mag geen nieuwe pagina vragen.
+Die module hangt daarom niet aan `uitleen-stats.ts`, dat `server-only` is en
+Prisma meetrekt. `charts.tsx` is `'use client'` en mag er enkel types uit halen.
+
+**De kleur van een chauffeur komt uit `lib/driver-colors.ts`**, dezelfde als in
+de kalender, via `colorIndex` op elke `DriverStat`. Twee chauffeurs kunnen op
+dezelfde kleur vallen; het scherm noemt dat en wijst naar `/beheer/chauffeurs`.
+Zie `docs/design-decisions.md`.
+
+**Elke grafiek draagt een tabelweergave.** Drie van de reekskleuren halen de
+3:1 tegen wit niet, dus kleur is hier nooit de enige uitleg. Een nieuwe grafiek
+krijgt er dus ook een.
+
+## De dag van het intekenscherm
+
+**Een dag loopt hier van 05:00 tot 05:00, niet van middernacht tot middernacht**
+(`DAG_START_UUR` in `lib/availability-day.ts`). Zaterdagnacht 02:00 hoort bij
+zaterdag: dat is het uur waarop hier gereden wordt, en met een dagrand op
+middernacht stond dat vakje bovenaan de kolom van zóndag, twintig rijen van
+zaterdagavond vandaan. Eén veeg van 22:00 tot 02:00 bestond dan niet; het waren
+twee vensters op twee dagen, en wie het tweede vergat, stond in de planning als
+niet-beschikbaar op precies het uur waarvoor hij zich opgaf.
+
+Wat er wél en niet mee verschuift:
+
+- **Mee**: het intekenraster op de telefoon (`availability-paint.tsx`, vakje 0 is
+  05:00 en vakje 23 is 04:00), het tijdrooster op een breed scherm (de `TimeGrid`
+  krijgt daar `dayStartHour={DAG_START_UUR}`) en `setAvailabilityDayAction`, dat
+  één dag herschrijft.
+- **Niet mee**: de opgeslagen vensters zelf. Dat blijven gewone tijdstippen, dus
+  de planning, de agendafeed en de beschikbaarheidsband weten hier niets van en
+  houden hun eigen dagrand op middernacht. Een rit om 02:00 staat in de planning
+  gewoon op de datum waarop hij rijdt.
+
+**Het risico zit in `clipOutsideDay`.** Eén dag herschrijven verwijdert alles wat
+die dag raakt en zet terug wat erbuiten viel; verschuift de dagrand zonder dat
+die functie meeschuift, dan veegt het intekenen van één dag stil de buurdag weg.
+`availabilityDayBounds` is daarom de enige plek waar die rand berekend wordt, en
+`test/availability-day.test.ts` en `test/week-lanes.test.ts` leggen het vast.
+
+**De weeknota** (`availability-note.tsx`, F4.5) staat bovenaan allebei de
+schermen: één vrij veld per chauffeur per week, naast de nota per venster die er
+al was. Ze slaat op bij het verlaten van het veld en niet met een knop, zoals de
+rest van dit scherm, maar zegt dat wel ("Opslaan..." en dan "Bewaard"): een veeg
+zie je gebeuren, tekst niet. Het team leest ze onder de strook "Wie kan er
+rijden", en niet in de naamkolom ernaast: die is te smal voor een zin, en wie een
+nota schreef zonder iets aan te duiden, heeft daar geen rij.
 
 ## Collect&Go-import
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Button, Card, Input, Label, Select } from "@vtk/ui";
+import { Card, Input, Label, Select } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import {
   correctOrderStatusAction,
@@ -29,6 +29,8 @@ export type NoShowRow = {
   dateLabel: string;
   totalLabel: string;
   note: string;
+  /** Viel tijdens een pauze van de no-show-verwerking: geen mail, telt niet mee. */
+  paused: boolean;
 };
 
 export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[]; noShows: NoShowRow[] }) {
@@ -103,6 +105,11 @@ export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[];
                   submitLabel={nl ? "Opslaan" : "Save"}
                   savingLabel={nl ? "Bezig..." : "Saving..."}
                   savedMessage={nl ? "Ban bijgewerkt" : "Ban updated"}
+                  errorMessages={
+                    nl
+                      ? { BAN_NOT_FOUND: "Deze ban bestaat niet meer." }
+                      : { BAN_NOT_FOUND: "This ban no longer exists." }
+                  }
                   fallbackErrorMessage={nl ? "Bijwerken van de ban mislukt." : "Updating the ban failed."}
                 >
                   <input type="hidden" name="banId" value={b.id} />
@@ -120,12 +127,29 @@ export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[];
                   </label>
                 </SaveForm>
                 {b.stored && (
-                  <form action={liftBanAction} className="mt-1">
+                  <SaveForm
+                    action={liftBanAction}
+                    className="mt-1"
+                    submitLabel={nl ? "Ban opheffen" : "Lift ban"}
+                    submitVariant="ghost"
+                    submitSize="sm"
+                    savingLabel={nl ? "Bezig..." : "Lifting..."}
+                    savedMessage={
+                      nl
+                        ? "Ban opgeheven; deze persoon kan weer bestellen."
+                        : "Ban lifted; this person can order again."
+                    }
+                    errorMessages={
+                      nl
+                        ? { BAN_NOT_FOUND: "Deze ban bestaat niet meer." }
+                        : { BAN_NOT_FOUND: "This ban no longer exists." }
+                    }
+                    fallbackErrorMessage={
+                      nl ? "Ban opheffen mislukt." : "Lifting the ban failed."
+                    }
+                  >
                     <input type="hidden" name="banId" value={b.id} />
-                    <Button type="submit" size="sm" variant="ghost">
-                      {nl ? "Ban opheffen" : "Lift ban"}
-                    </Button>
-                  </form>
+                  </SaveForm>
                 )}
               </li>
             ))}
@@ -152,8 +176,15 @@ export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[];
                     <span className="font-medium text-vtk-ink">{o.userName}</span>{" "}
                     <span className="text-xs text-[#5c667f]">{o.rNumber}</span>
                   </div>
-                  <span className="text-xs text-[#5c667f]">
-                    {o.dateLabel} · {o.totalLabel}
+                  <span className="flex flex-wrap items-center gap-2 text-xs text-[#5c667f]">
+                    {o.paused ? (
+                      <span className="rounded-full bg-vtk-blue-soft px-2 py-0.5 font-medium text-vtk-ink">
+                        {nl ? "Tijdens pauze, telt niet mee" : "During a pause, not counted"}
+                      </span>
+                    ) : null}
+                    <span>
+                      {o.dateLabel} · {o.totalLabel}
+                    </span>
                   </span>
                 </div>
                 <SaveForm
@@ -172,9 +203,12 @@ export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[];
                   <input type="hidden" name="orderId" value={o.orderId} />
                   <div>
                     <Label>{nl ? "Corrigeer naar" : "Correct to"}</Label>
+                    {/* "Geannuleerd" stond hier ook: die zette enkel het woord om,
+                        terwijl de broodjes van de voorraad af bleven en die student
+                        die dag niets nieuws kon bestellen. Een bestelling echt
+                        schrappen doe je bij de verkoopdag zelf. */}
                     <Select name="status" defaultValue="PICKED_UP" className="w-44">
                       <option value="PICKED_UP">{nl ? "Opgehaald" : "Picked up"}</option>
-                      <option value="CANCELLED">{nl ? "Geannuleerd" : "Cancelled"}</option>
                       <option value="RESERVED">{nl ? "Gereserveerd" : "Reserved"}</option>
                       <option value="NO_SHOW">{nl ? "Niet opgehaald" : "No-show"}</option>
                     </Select>

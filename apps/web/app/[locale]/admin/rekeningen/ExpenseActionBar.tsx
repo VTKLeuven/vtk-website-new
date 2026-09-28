@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { useState } from "react";
 import { Button } from "@vtk/ui";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";

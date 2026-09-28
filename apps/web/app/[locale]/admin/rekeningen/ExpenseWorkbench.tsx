@@ -1,13 +1,13 @@
 "use client";
 
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
 import type { Locale } from "@vtk/i18n";
 import { Modal } from "@/app/[locale]/admin/admin-table";
-import { IconButton, IconLink, RowActions } from "@/components/ui/IconButton";
-import { CardIcon, PencilIcon, UserIcon } from "@/components/ui/icons";
+import { IconAnchor, IconButton, IconLink, RowActions } from "@/components/ui/IconButton";
+import { CardIcon, DownloadIcon, PencilIcon, UserIcon } from "@/components/ui/icons";
 import {
   deleteExpenseAction,
   sendExpenseAction,
@@ -139,7 +139,7 @@ export function ExpenseWorkbench({
                   <th scope="col" className="w-[104px] px-4 py-3 text-right">{nl ? "Bedrag" : "Amount"}</th>
                   <th scope="col" className="w-[64px] px-4 py-3">{nl ? "Kaart" : "Card"}</th>
                   <th scope="col" className="w-[190px] px-4 py-3">{nl ? "Voortgang" : "Progress"}</th>
-                  <th scope="col" className="w-[124px] px-4 py-3 text-right">{nl ? "Acties" : "Actions"}</th>
+                  <th scope="col" className="w-[184px] px-4 py-3 text-right">{nl ? "Acties" : "Actions"}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-vtk-blue/5">
@@ -239,6 +239,17 @@ export function ExpenseWorkbench({
                           >
                             <DocumentIcon />
                           </IconButton>
+                          {/* Zonder voorbeeld: de route zet de bestandsnaam zelf
+                              (`expenseReportFilename`). Draaien kan enkel via het
+                              blad hierboven. */}
+                          <IconAnchor
+                            href={`/api/admin/rekeningen/${row.id}/blad`}
+                            download={row.mail.attachmentName}
+                            label={nl ? "Blad downloaden" : "Download sheet"}
+                            srLabel={`${nl ? "Blad downloaden" : "Download sheet"}: ${row.description}`}
+                          >
+                            <DownloadIcon />
+                          </IconAnchor>
                           {canManageState && (
                             <IconButton
                               label={nl ? "Doorsturen naar boekhouder" : "Forward to accountant"}

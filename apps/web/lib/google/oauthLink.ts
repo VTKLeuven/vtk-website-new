@@ -30,6 +30,9 @@ import { getUser } from "./client";
 const AUTHORIZE_URL = "https://accounts.google.com/o/oauth2/v2/auth";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 
+/** Hoe lang de code-uitwisseling met Google mag duren; iemand wacht op de terugkeer. */
+const GOOGLE_LINK_TIMEOUT_MS = 15_000;
+
 export const LINK_STATE_COOKIE = "vtk_google_link_state";
 
 export function linkRedirectUri(origin: string): string {
@@ -79,6 +82,7 @@ export async function exchangeLinkCode(
 
   const res = await fetch(TOKEN_URL, {
     method: "POST",
+    signal: AbortSignal.timeout(GOOGLE_LINK_TIMEOUT_MS),
     headers: { "content-type": "application/x-www-form-urlencoded" },
     body: new URLSearchParams({
       code,

@@ -13,7 +13,7 @@ import { pick, type Locale } from "@vtk/i18n";
 import type { MeetingAdminView } from "@/components/meetings/MeetingAdminCard";
 import type { PlannedDay } from "@/components/meetings/MeetingPlanner";
 import { brusselsTimeOnDay, brusselsYMD, ymdKey } from "./brussels";
-import type { Semester } from "./meetings";
+import { hasMeetingOrder, type Semester } from "./meetings";
 import { siteUrl } from "./seo";
 
 function hhmm(date: Date): string {
@@ -96,6 +96,11 @@ export async function loadMeetingAdmin(
       totalCents: reservation.itemPriceCents + reservation.drinkPriceCents,
       paid: reservation.paidAt !== null,
       invalid: reservation.status === "INVALIDATED",
+      // Wie komt zonder broodje en zonder drankje staat even goed ingeschreven.
+      hasOrder: hasMeetingOrder({
+        itemName: reservation.itemNameNl,
+        drinkName: reservation.drinkName,
+      }),
     }));
 
     return {
@@ -117,6 +122,7 @@ export async function loadMeetingAdmin(
       shareUrl: meeting.kind === "BUREAU" ? `${base}/bureau/${meeting.slug}` : null,
       sessionState: session ? (session.isOpen ? "OPEN" : "CLOSED") : "NONE",
       reservations,
+      orderCount: reservations.filter((row) => row.hasOrder).length,
       totalCents: reservations.reduce((total, row) => total + row.totalCents, 0),
       openCents: reservations
         .filter((row) => !row.paid)
@@ -148,7 +154,9 @@ export type DebtRow = {
 
 /**
  * Wie hoeveel verschuldigd is voor de grocomeets van een werkingsjaar. Ongeldig
- * gemaakte bestellingen tellen niet mee: daar staat geen broodje tegenover.
+ * gemaakte bestellingen tellen niet mee: daar staat geen broodje tegenover. Wie
+ * enkel ingeschreven is zonder iets te bestellen evenmin: die is niets
+ * verschuldigd en hoort niet in een schuldenlijst met nul erachter.
  */
 export async function loadGrocomeetDebts(workingYear: number): Promise<DebtRow[]> {
   const reservations = await prisma.meetingReservation.findMany({
@@ -158,6 +166,9 @@ export async function loadGrocomeetDebts(workingYear: number): Promise<DebtRow[]
 
   const byUser = new Map<string, DebtRow>();
   for (const reservation of reservations) {
+    if (!hasMeetingOrder({ itemName: reservation.itemNameNl, drinkName: reservation.drinkName })) {
+      continue;
+    }
     const total = reservation.itemPriceCents + reservation.drinkPriceCents;
     const row = byUser.get(reservation.userId) ?? {
       userId: reservation.userId,
@@ -178,12 +189,24 @@ export async function loadGrocomeetDebts(workingYear: number): Promise<DebtRow[]
 }
 
 export type BureauTotals = {
-  perMeeting: Array<{ id: string; dateLabel: string; orders: number; totalCents: number }>;
+  perMeeting: Array<{
+    id: string;
+    dateLabel: string;
+    /** Iedereen die zich inschreef, met of zonder bestelling. */
+    attendees: number;
+    /** Enkel wie een broodje of een drankje bestelde; dat is wat geld kost. */
+    orders: number;
+    totalCents: number;
+  }>;
   yearCents: number;
   allTimeCents: number;
 };
 
-/** Wat de bureaus kosten: per bureau, dit werkingsjaar en over alle jaren heen. */
+/**
+ * Wie er komt en wat de bureaus kosten: per bureau, dit werkingsjaar en over
+ * alle jaren heen. Aanwezigheid en bestellingen staan bewust naast elkaar; een
+ * inschrijving zonder bestelling kost niets maar telt wel voor de zaal.
+ */
 export async function loadBureauTotals(
   workingYear: number,
   locale: Locale,
@@ -211,7 +234,10 @@ export async function loadBureauTotals(
   const perMeeting = meetings.map((meeting) => ({
     id: meeting.id,
     dateLabel: dateOnly.format(meeting.startsAt),
-    orders: meeting.reservations.length,
+    attendees: meeting.reservations.length,
+    orders: meeting.reservations.filter((reservation) =>
+      hasMeetingOrder({ itemName: reservation.itemNameNl, drinkName: reservation.drinkName }),
+    ).length,
     totalCents: meeting.reservations.reduce(
       (total, reservation) => total + reservation.itemPriceCents + reservation.drinkPriceCents,
       0,

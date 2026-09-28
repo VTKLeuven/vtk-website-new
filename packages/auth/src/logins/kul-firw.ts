@@ -39,16 +39,21 @@ const updateManyFirwUsers: UpdateMany = (args) => prisma.user.updateMany(args);
  * Initialises or changes the stored status atomically. When the status is
  * already equal and a change timestamp exists, the UPDATE matches no rows and
  * therefore leaves both firwStudentChangedAt and User.updatedAt untouched.
+ *
+ * Op het account-id en niet op het KU Leuven-adres: een login die via het
+ * r-nummer aan een account op een privé-adres gekoppeld is, draagt dat adres
+ * nergens. Zo bleef de status daar altijd `false`, en het lid dus zonder
+ * ledenprijs. Welk account het is, bepaalt `resolveKulLink`.
  */
 export async function syncFirwStudent(
-  email: string,
+  userId: string,
   firwStudent: boolean,
   changedAt: Date,
   updateMany: UpdateMany = updateManyFirwUsers,
 ): Promise<boolean> {
   const result = await updateMany({
     where: {
-      email,
+      id: userId,
       OR: [
         { firwStudent: !firwStudent },
         { firwStudentChangedAt: null },

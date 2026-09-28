@@ -5,7 +5,8 @@ import type { DriverColorOverrides } from '@/lib/driver-colors';
 import { isInMonth } from '@/lib/calendar-range';
 import { placeForWeekRow, weekRows } from '@/lib/month-lanes';
 import { LogisticsIcon } from '@/components/logistics-icon';
-import { blockLabel, blockLook, formatTime, vehicleIcon } from './trip-block';
+import { blockLabel, blockLook, formatTime } from './trip-block';
+import { vehicleIconName } from '@/lib/vehicle-icon';
 import type { CalendarVehicle, TripBlock } from './types';
 
 /**
@@ -217,7 +218,7 @@ export function MonthGrid({
                           </span>
                           {vehicle ? (
                             <LogisticsIcon
-                              name={vehicleIcon(vehicle.code)}
+                              name={vehicleIconName(vehicle)}
                               className="h-3 w-3 shrink-0"
                             />
                           ) : null}

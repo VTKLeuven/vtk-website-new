@@ -147,3 +147,72 @@ export async function sendNoShowWarning(
     { throwOnError: true, source: 'theokot' },
   );
 }
+
+/**
+ * Bericht dat een gereserveerde bestelling geschrapt is.
+ *
+ * Twee aanleidingen, één mail: de verkoopdag is verwijderd, of het aanbod van
+ * die dag is verlaagd onder wat er al gereserveerd was. In beide gevallen is er
+ * iets weggenomen dat iemand al had, dus de mail zegt wat er weg is, waarom, en
+ * waar hij opnieuw kan kijken. Zonder die mail staat iemand voor een lege balie.
+ */
+export function orderCancelledMail(
+  user: Pick<MailUser, 'name' | 'locale'>,
+  order: { dateLabel: string; reason: string; itemsLabel: string; url: string },
+): TheokotMail {
+  const nl = user.locale !== 'EN';
+  const subject = nl
+    ? `Theokot: je bestelling van ${order.dateLabel} is geannuleerd`
+    : `Theokot: your order for ${order.dateLabel} has been cancelled`;
+
+  const text = nl
+    ? `Dag ${user.name},\n\nJe bestelling bij Theokot voor ${order.dateLabel} is geannuleerd: ${order.reason}\n\nHet gaat om: ${order.itemsLabel}\n\nJe hoeft niets te betalen. Kijk op ${order.url} of er nog een andere dag openstaat.\n\nGroeten,\nTheokot VTK`
+    : `Hi ${user.name},\n\nYour Theokot order for ${order.dateLabel} has been cancelled: ${order.reason}\n\nThis concerns: ${order.itemsLabel}\n\nYou do not owe anything. Check ${order.url} to see whether another day is open.\n\nRegards,\nTheokot VTK`;
+
+  const info = mailInfoTable([
+    { label: nl ? 'Verkoopdag' : 'Sale day', value: order.dateLabel },
+    { label: nl ? 'Geannuleerd' : 'Cancelled', value: order.itemsLabel },
+    { label: nl ? 'Reden' : 'Reason', value: order.reason },
+  ]);
+
+  const html = mailDocument({
+    lang: nl ? 'nl' : 'en',
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: 'Theokot' })}${mailContentRow(
+      `${mailHeading(nl ? 'Bestelling geannuleerd' : 'Order cancelled')}${mailParagraph(
+        nl ? `Dag ${user.name},` : `Hi ${user.name},`,
+      )}${mailParagraph(
+        nl
+          ? `Je bestelling bij Theokot voor ${order.dateLabel} kan niet doorgaan:`
+          : `Your Theokot order for ${order.dateLabel} cannot go ahead:`,
+      )}${info}${mailParagraph(
+        nl
+          ? 'Je hoeft niets te betalen. Staat er nog een andere verkoopdag open, dan kan je daar gewoon opnieuw reserveren:'
+          : 'You do not owe anything. If another sale day is open, you can simply reserve again:',
+      )}<div style="margin:22px 0">${mailButton(
+        order.url,
+        nl ? 'Naar de broodjes' : 'To the sandwiches',
+      )}</div>`,
+    )}${mailFooterRow('Theokot VTK · vtk.be/theokot')}`,
+  });
+
+  return { subject, text, html };
+}
+
+export async function sendOrderCancelled(
+  user: MailUser,
+  order: { dateLabel: string; reason: string; itemsLabel: string },
+): Promise<void> {
+  const base = (
+    process.env.TICKETING_PUBLIC_URL?.trim() ||
+    process.env.VTK_MAIN_URL?.trim() ||
+    'https://vtk.be'
+  ).replace(/\/$/, '');
+  await sendMail(
+    { to: user.email, ...orderCancelledMail(user, { ...order, url: `${base}/theokot` }) },
+    // Bewust niet `throwOnError`: de bestelling is al geschrapt wanneer deze mail
+    // vertrekt, en één adres dat het begeeft hoort de rest van de ronde niet
+    // tegen te houden. De mislukking staat met haar fout in `EmailLog`.
+    { source: 'theokot' },
+  );
+}

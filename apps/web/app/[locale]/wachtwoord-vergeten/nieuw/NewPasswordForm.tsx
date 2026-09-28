@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { setNewPasswordAction } from '@/app/actions/register';
 import { SAVE_IDLE, type SaveState } from '@/lib/saveState';
 

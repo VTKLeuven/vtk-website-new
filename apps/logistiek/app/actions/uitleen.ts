@@ -3,9 +3,23 @@
 import { revalidatePath } from 'next/cache';
 import { prisma } from '@vtk/db';
 import { currentWorkingYear } from '@vtk/auth';
-import { canEditAllHelpers, externalRequestsBlocked, requireSession } from '@/lib/session';
+import {
+  canEditAllHelpers,
+  canManage,
+  externalRequestsBlocked,
+  requireSession,
+} from '@/lib/session';
 import { getLocale } from '@/lib/i18n';
-import { isEmailish, isOnQuarterHour, MAX_HELPERS, parseDateOnly, todayDateOnly } from '@/lib/uitleen';
+import {
+  isEmailish,
+  isOnQuarterHour,
+  isTripNoteVisibility,
+  MAX_HELPERS,
+  onTripForNotes,
+  parseDateOnly,
+  startOfWeek,
+  todayDateOnly,
+} from '@/lib/uitleen';
 import {
   availabilityForRange,
   getLogistiekSettings,
@@ -23,6 +37,7 @@ import { buildTransportBookings, type TransportFormInput } from '@/lib/transport
 import { expireOpenPayments, logistiekBaseUrl, paymentGateway } from '@/lib/payments';
 import { runSerializable } from '@/lib/tx';
 import {
+  availabilityDayBounds,
   clipOutsideDay,
   hoursToRanges,
   isAvailabilityKind,
@@ -30,7 +45,6 @@ import {
   subtractRange,
   type AvailabilityKind,
 } from '@/lib/availability-day';
-import { startOfBrusselsDay } from '@/lib/week-lanes';
 import { writeAudit } from '@/lib/audit';
 import { notifyReservation, notifyTeamIfUrgent, notifyTransport } from '@/lib/uitleen-mail';
 
@@ -1107,14 +1121,16 @@ export async function addAvailabilityAction(input: {
  * neerkomen op een venster weghalen en er twee terugzetten, met drie
  * roundtrips en een half opgeslagen dag als er eentje faalt.
  *
- * De dagranden zijn Belgisch, en vensters die over middernacht lopen worden
- * gesplitst: één dag herschrijven mag de dagen ernaast niet stil wegvegen. Zie
+ * De dagranden zijn Belgisch en liggen op 05:00, niet op middernacht: wie tot
+ * twee uur 's nachts kan rijden, zegt dat op de dag van de avond ervoor
+ * (`DAG_START_UUR`). Vensters die over die rand lopen worden gesplitst: één dag
+ * herschrijven mag de dagen ernaast niet stil wegvegen. Zie
  * `lib/availability-day.ts`, waar dat rekenwerk puur en getest staat.
  */
 export async function setAvailabilityDayAction(input: {
   /** De dag, als `YYYY-MM-DD` in Belgische tijd. */
   day: string;
-  /** De uren die aan staan (0 tot en met 23), met hun soort. */
+  /** De vakjes die aan staan (0 tot en met 23 vanaf 05:00), met hun soort. */
   hours: Array<{ hour: number; kind: AvailabilityKind }>;
 }): Promise<ActionResult> {
   const session = await requireSession();
@@ -1124,8 +1140,7 @@ export async function setAvailabilityDayAction(input: {
 
   const day = parseDateOnly(input.day);
   if (!day) return { ok: false, error: 'Die dag begrijp ik niet.' };
-  const dayStart = new Date(startOfBrusselsDay(day));
-  const dayEnd = new Date(startOfBrusselsDay(new Date(day.getTime() + 24 * 60 * 60 * 1000)));
+  const { dayStart, dayEnd } = availabilityDayBounds(day);
 
   // Rommel eruit filteren en niet weigeren: dit komt van een raster waarop je
   // veegt, niet van een formulier waarin je typt.
@@ -1165,6 +1180,63 @@ export async function setAvailabilityDayAction(input: {
   revalidatePath('/ritten/beschikbaarheid');
   revalidatePath('/beheer/vervoer/week');
   return { ok: true, message: 'Beschikbaarheid opgeslagen.' };
+}
+
+/**
+ * Hoeveel tekst er in de weeknota past.
+ *
+ * Ruim genoeg voor een paar zinnen en niet meer: dit staat in de planning naast
+ * een naam, en een verhaal van duizend tekens leest daar niemand. Wie meer kwijt
+ * moet, belt.
+ */
+const MAX_AVAILABILITY_NOTE = 500;
+
+/**
+ * De algemene nota bij je beschikbaarheid van één week (F4.5).
+ *
+ * Naast de nota per venster en niet in de plaats ervan: Logistiek vroeg om er
+ * één "in het algemeen, ni per individueel stukje". Leeg maken wist de rij, want
+ * een lege nota en geen nota zijn hetzelfde en twee manieren om niets te zeggen
+ * is er één te veel.
+ *
+ * De week wordt hier op maandag gezet en niet zomaar overgenomen: kwam er een
+ * woensdag binnen, dan stond er een tweede rij voor dezelfde week en won stil de
+ * ene of de andere tekst.
+ */
+export async function setAvailabilityNoteAction(input: {
+  /** Een dag in de week, als `YYYY-MM-DD`; de maandag volgt eruit. */
+  week: string;
+  text: string;
+}): Promise<ActionResult> {
+  const session = await requireSession();
+  if (!(await isVanDriver(session.user.id))) {
+    return { ok: false, error: 'Enkel karchauffeurs kunnen beschikbaarheid doorgeven.' };
+  }
+
+  const day = parseDateOnly(input.week);
+  if (!day) return { ok: false, error: 'Die week begrijp ik niet.' };
+  const weekStart = startOfWeek(day);
+
+  const text = typeof input.text === 'string' ? input.text.trim() : '';
+  if (text.length > MAX_AVAILABILITY_NOTE) {
+    return { ok: false, error: `Hou het bij ${MAX_AVAILABILITY_NOTE} tekens; dit staat naast je naam in de planning.` };
+  }
+
+  if (text === '') {
+    await prisma.uitleenDriverAvailabilityNote.deleteMany({
+      where: { userId: session.user.id, weekStart },
+    });
+  } else {
+    await prisma.uitleenDriverAvailabilityNote.upsert({
+      where: { userId_weekStart: { userId: session.user.id, weekStart } },
+      create: { userId: session.user.id, weekStart, text },
+      update: { text },
+    });
+  }
+
+  revalidatePath('/ritten/beschikbaarheid');
+  revalidatePath('/beheer/vervoer/week');
+  return { ok: true, message: text === '' ? 'Nota weggehaald.' : 'Nota opgeslagen.' };
 }
 
 /** Een venster weghalen. Enkel je eigen; het team beheert dit niet voor je. */
@@ -1209,6 +1281,125 @@ async function canEditHelpers(
     session.groups.map((group) => group.id)
   );
   return booking !== null;
+}
+
+/**
+ * Een eigen nota bij een rit, met een zichtbaarheid per nota (F4.20).
+ *
+ * Naast `memberNote` (wat de aanvrager bij het aanvragen schreef) en
+ * `adminNote` (de boodschap van Logistiek, die meegaat in de mail): die twee
+ * horen bij de rit zelf en staan er één keer op. Dit zijn de notities van de
+ * mensen eromheen, elk met een auteur en een zichtbaarheid.
+ *
+ * **Wie mag er een schrijven**: iedereen die de rit al ziet als de zijne, plus
+ * het team. Dat is ruimer dan `canEditHelpers`, want de toegewezen chauffeur
+ * telt hier mee: hij staat niet noodzakelijk bij de aanvragende post en is toch
+ * degene die rijdt. Zie `onTripForNotes`.
+ *
+ * **Op elke rit, ook een gereden.** Anders dan bij de bijrijders, waar een
+ * gereden rit geschiedenis is die niet meer mag veranderen: een nota verandert
+ * niets aan de rit, en "de kar stond bijna leeg" is net iets dat je achteraf
+ * opschrijft.
+ *
+ * Wijzigen en wissen doet enkel de auteur, ook het team niet: het heet een eigen
+ * nota, en een privénota die een beheerder kan bewerken is er geen.
+ */
+const MAX_TRIP_NOTE = 1000;
+
+async function noteTrip(session: SessionLike, bookingId: string) {
+  const booking = await prisma.uitleenTransportBooking.findUnique({
+    where: { id: bookingId },
+    select: {
+      id: true,
+      userId: true,
+      requesterType: true,
+      groupId: true,
+      assignedGroupId: true,
+      driverId: true,
+    },
+  });
+  if (!booking) return null;
+  const onTrip = onTripForNotes(booking, {
+    userId: session.user.id,
+    groupIds: session.groups.map((group) => group.id),
+  });
+  return { booking, onTrip };
+}
+
+function revalidateTripNotes() {
+  revalidatePath('/ritten');
+  revalidatePath('/vervoer/bezetting');
+  revalidatePath('/beheer/vervoer');
+  revalidatePath('/beheer/vervoer/week');
+}
+
+export async function addTripNoteAction(
+  bookingId: string,
+  input: { text: string; visibility: string }
+): Promise<ActionResult> {
+  const session = await requireSession();
+
+  const text = input.text.trim();
+  if (!text) return { ok: false, error: 'Schrijf iets in de nota.' };
+  if (!isTripNoteVisibility(input.visibility)) {
+    return { ok: false, error: 'Kies wie deze nota mag lezen.' };
+  }
+
+  const found = await noteTrip(session, bookingId);
+  if (!found) return { ok: false, error: 'Rit niet gevonden.' };
+  // Het team mag overal een nota bij zetten; het is de plek waar Logistiek de
+  // rit toch al openslaat.
+  if (!found.onTrip && !canManage(session)) {
+    return { ok: false, error: 'Je kan bij deze rit geen nota schrijven.' };
+  }
+
+  await prisma.uitleenTransportNote.create({
+    data: {
+      bookingId,
+      authorId: session.user.id,
+      text: text.slice(0, MAX_TRIP_NOTE),
+      visibility: input.visibility,
+    },
+  });
+
+  revalidateTripNotes();
+  return { ok: true, message: 'Nota opgeslagen.' };
+}
+
+export async function editTripNoteAction(
+  noteId: string,
+  input: { text: string; visibility: string }
+): Promise<ActionResult> {
+  const session = await requireSession();
+
+  const text = input.text.trim();
+  if (!text) return { ok: false, error: 'Schrijf iets in de nota.' };
+  if (!isTripNoteVisibility(input.visibility)) {
+    return { ok: false, error: 'Kies wie deze nota mag lezen.' };
+  }
+
+  // `updateMany` met de auteur in de `where`: dan bestaat er geen moment waarop
+  // de nota van iemand anders geladen is.
+  const changed = await prisma.uitleenTransportNote.updateMany({
+    where: { id: noteId, authorId: session.user.id },
+    data: { text: text.slice(0, MAX_TRIP_NOTE), visibility: input.visibility },
+  });
+  if (changed.count === 0) return { ok: false, error: 'Dit is jouw nota niet.' };
+
+  revalidateTripNotes();
+  return { ok: true, message: 'Nota aangepast.' };
+}
+
+export async function removeTripNoteAction(noteId: string): Promise<ActionResult> {
+  const session = await requireSession();
+
+  const removed = await prisma.uitleenTransportNote.deleteMany({
+    where: { id: noteId, authorId: session.user.id },
+  });
+  if (removed.count === 0) return { ok: false, error: 'Dit is jouw nota niet.' };
+
+  revalidateTripNotes();
+  return { ok: true, message: 'Nota weggehaald.' };
 }
 
 export async function addTripHelperAction(

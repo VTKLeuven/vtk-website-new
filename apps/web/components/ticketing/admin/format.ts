@@ -98,3 +98,18 @@ export function statusTone(status: string) {
   if (["DRAFT", "ARCHIVED", "EXPIRED", "SALES_CLOSED", "INACTIVE", "REVERSED", "NOT_CHECKED_IN"].includes(status)) return "neutral";
   return "warning";
 }
+
+/** Een duur in ms als "4 min", "2 u 15 min" of "3 dagen". */
+export function formatDuration(ms: number, locale: AdminLocale) {
+  const nl = locale === "nl";
+  const minutes = Math.max(0, Math.round(ms / 60_000));
+  if (minutes < 1) return nl ? "minder dan een minuut" : "under a minute";
+  if (minutes < 60) return `${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 48) {
+    const rest = minutes % 60;
+    return rest > 0 && hours < 10 ? `${hours} ${nl ? "u" : "h"} ${rest} min` : `${hours} ${nl ? "u" : "h"}`;
+  }
+  const days = Math.round(hours / 24);
+  return `${days} ${nl ? "dagen" : "days"}`;
+}

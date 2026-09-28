@@ -136,19 +136,16 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
               <input type="checkbox" name="isSuperAdmin" defaultChecked={user.isSuperAdmin} />
               Superadmin
             </label>
-            {/* Erelid: geeft toegang tot ticketsoorten die voor iedereen anders
-                niet bestaan (bv. gratis naar een cantus). Enkel hier te zetten;
-                het lid ziet zijn eigen status nergens als een schakelaar. */}
-            <label className="inline-flex items-center gap-2 text-sm">
-              <input type="checkbox" name="honoraryMember" defaultChecked={user.honoraryMember} />
-              {locale === 'nl' ? 'Erelid' : 'Honorary member'}
-            </label>
           </div>
-          <p className="md:col-span-2 -mt-1 text-xs text-[#5c667f]">
-            {locale === 'nl'
-              ? 'Een erelid ziet ticketsoorten met doelgroep “Alleen ereleden”. Voor alle andere bezoekers bestaan die soorten niet: ze staan niet in de lijst en de kassa weigert ze.'
-              : 'An honorary member sees ticket types with the “Honorary members only” audience. For every other visitor those types do not exist: they are not listed, and checkout refuses them.'}
-          </p>
+          {/* Erelid wordt beheerd op /admin/leden (lijst Ereleden); hier
+              staat het enkel ter info, zodat je het niet moet gaan zoeken. */}
+          {user.honoraryMember ? (
+            <p className="md:col-span-2 -mt-1 text-xs text-[#5c667f]">
+              {locale === 'nl'
+                ? 'Erelid. Beheer dit onder Ledenbeheer > Leden > Ereleden.'
+                : 'Honorary member. Manage this under Members > Honorary members.'}
+            </p>
+          ) : null}
         </SaveForm>
       </Card>
 
@@ -345,8 +342,16 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
         }
         confirmLabel={locale === 'nl' ? 'Verwijderen' : 'Delete'}
         cancelLabel={locale === 'nl' ? 'Annuleren' : 'Cancel'}
-        // Geen toast: deze action redirect naar de gebruikerslijst, want deze
-        // pagina bestaat nadien niet meer. Die navigatie is de bevestiging.
+        errorMessages={userErrorMessages(locale)}
+        errorFallback={
+          locale === 'nl'
+            ? 'Niet verwijderd. Probeer het opnieuw; blijft het misgaan, mail dan naar it@vtk.be.'
+            : 'Not deleted. Try again; if it keeps failing, email it@vtk.be.'
+        }
+        // Geen toast bij succes: deze action redirect naar de gebruikerslijst,
+        // want deze pagina bestaat nadien niet meer. Die navigatie is de
+        // bevestiging. Een mislukking redirect niet en heeft dus wel een melding
+        // nodig, anders lijkt de knop niets te doen.
       >
         {locale === 'nl' ? 'Gebruiker verwijderen' : 'Delete user'}
       </DeleteButton>

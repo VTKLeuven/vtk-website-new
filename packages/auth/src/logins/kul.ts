@@ -32,6 +32,7 @@ import { prisma } from "@vtk/db";
 
 import { KUL_CALLBACK_PATH } from "../index";
 import { firwStudentFromProfile, syncFirwStudent } from "./kul-firw";
+import { resolveKulLink, type KulLinkLookups } from "./kul-link";
 import {
   getKulUserInfo,
   KUL_USERINFO_URL,
@@ -100,44 +101,39 @@ function profileRNumber(profile: ProfileLike): string | undefined {
 }
 
 /**
- * Resolve the e-mail better-auth should link this KU Leuven login to.
- *
- * better-auth only links an OAuth login to an existing user when the profile
- * e-mail matches that user's e-mail (or an already-linked KUL account). But an
- * account can already carry this r-number under a *different* address: an admin
- * pre-provisioned the member, or the member typed their r-number during
- * onboarding, under a personal or bestuur e-mail; KU Leuven now authenticates
- * the same person under their student e-mail. Without reconciliation better-auth
- * takes the create path and Prisma rejects it on the unique `rNumber`, so the
- * login fails instead of linking.
- *
- * The r-number is KU Leuven-verified and `User.rNumber` is unique, so a match
- * reliably means the same person; only that person can authenticate as that
- * r-number. When such an account exists we return its e-mail, which makes
- * better-auth find it and link the KUL account to it (the account keeps its
- * existing e-mail; better-auth does not override it on link).
- *
- * An exact e-mail match must always win, so we only redirect the link when no
- * account already owns the KUL e-mail. Returns `undefined` to leave the KUL
- * e-mail untouched (no match, same account, or the KUL e-mail is already taken).
+ * The KU Leuven account id better-auth stores for this login. Without a
+ * `discoveryUrl` the generic provider keys accounts on `profile.id`, which
+ * `getKulUserInfo` sets to the OIDC `sub`.
  */
-async function linkEmailForRNumber(
-  rNumber: string,
-  kulEmail: string,
-): Promise<string | undefined> {
-  const byRNumber = await prisma.user.findUnique({
-    where: { rNumber },
-    select: { email: true },
-  });
-  if (!byRNumber || byRNumber.email.toLowerCase() === kulEmail.toLowerCase()) {
-    return undefined;
-  }
-  const byEmail = await prisma.user.findUnique({
-    where: { email: kulEmail },
-    select: { id: true },
-  });
-  return byEmail ? undefined : byRNumber.email;
+function profileAccountId(profile: ProfileLike): string | undefined {
+  const raw = profile.id ?? profile.sub;
+  return typeof raw === "string" || typeof raw === "number" ? String(raw) : undefined;
 }
+
+/** De databankkant van `resolveKulLink`; zie `kul-link.ts` voor de regels. */
+const kulLinkLookups: KulLinkLookups = {
+  async userIdForKulAccount(accountId) {
+    const account = await prisma.account.findFirst({
+      where: { providerId: KUL_PROVIDER_ID, accountId },
+      select: { userId: true },
+    });
+    return account?.userId ?? null;
+  },
+  // Hoofdletterongevoelig: onboarding bewaart het r-nummer in kleine letters,
+  // maar het gebruikersbeheer en de CSV-import deden dat lang niet. Een
+  // `R0123456` van een beheerder liet de koppeling anders stil mislukken, en
+  // KU Leuven maakte er een tweede account naast.
+  userByRNumber: (rNumber) =>
+    prisma.user.findFirst({
+      where: { rNumber: { equals: rNumber, mode: "insensitive" } },
+      select: { email: true },
+    }),
+  userByEmail: (email) =>
+    prisma.user.findUnique({
+      where: { email },
+      select: { id: true, emailVerified: true },
+    }),
+};
 
 /**
  * KU Leuven releases an OIDC `locale` claim as a lower-case BCP47 language tag
@@ -226,8 +222,9 @@ export function kulOAuthConfig() {
     authentication: "post" as const,
     // KU Leuven is authoritative for identity. Map to the fields better-auth
     // uses to locate/link an existing User. The email drives account linking
-    // (see `accountLinking.trustedProviders` in auth.ts), so it must match the
-    // pre-provisioned User.email. `rNumber` is stored so the onboarding form is
+    // (see `accountLinking.trustedProviders` in auth.ts): it is the KU Leuven
+    // address, or the address of the account that already carries this
+    // r-number (see `resolveKulLink`). `rNumber` is stored so the onboarding form is
     // pre-filled; it only persists on first login (user creation), which is when
     // onboarding runs, so no override of later edits is needed. `rNumberFromKul`
     // marks it as authoritative so the form renders it read-only (like the
@@ -241,22 +238,27 @@ export function kulOAuthConfig() {
       const firwStudent = hasUserInfo ? firwStudentFromProfile(profile) : undefined;
       const firwStudentChangedAt = firwStudent === undefined ? undefined : new Date();
 
-      // Bestaande accounts worden bij elke geslaagde KU Leuven-userinfo-call
-      // atomair bijgewerkt. De WHERE-clausule schrijft alleen bij een echte
-      // statuswijziging of bij de eerste controle van een bestaand account.
-      if (email && firwStudent !== undefined && firwStudentChangedAt) {
-        await syncFirwStudent(email, firwStudent, firwStudentChangedAt);
+      // Het account waarop deze login landt, en het adres waarmee better-auth
+      // het moet zoeken. Dat laatste is het adres van het account dat dit
+      // r-nummer al draagt wanneer dat een ander is dan het KU Leuven-adres; zie
+      // `resolveKulLink`.
+      const link = email
+        ? await resolveKulLink(
+            { accountId: profileAccountId(profile), email, rNumber },
+            kulLinkLookups,
+          )
+        : undefined;
+
+      // Een bestaand account krijgt zijn status bij elke geslaagde
+      // userinfo-call, atomair en enkel bij een echte wijziging. Dat moet hier:
+      // better-auth neemt bij een koppeling niets uit het profiel over, dus de
+      // velden hieronder landen enkel op een nieuw account.
+      if (link?.userId && firwStudent !== undefined && firwStudentChangedAt) {
+        await syncFirwStudent(link.userId, firwStudent, firwStudentChangedAt);
       }
 
-      // Link naar een bestaand account dat dit (KU Leuven-geverifieerde)
-      // r-nummer al onder een ander e-mailadres draagt, in plaats van een
-      // duplicaat te maken dat op de unieke `rNumber` botst. Zie
-      // linkEmailForRNumber.
-      const linkEmail =
-        email && rNumber ? await linkEmailForRNumber(rNumber, email) : undefined;
-
       return {
-        email: linkEmail ?? email,
+        email: link?.email ?? email,
         name: profileName(profile),
         emailVerified: true,
         // Normalize KU Leuven's `locale` claim ("nl") to our enum; the raw

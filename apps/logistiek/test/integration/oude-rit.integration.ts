@@ -162,33 +162,53 @@ describe.sequential('een rit van voor de nieuwe velden', () => {
   });
 
   /**
-   * `assignedGroupId` kreeg bewust geen backfill (20260917160000). Het gevolg is
-   * stil en staat nergens anders vast: een oude rit bereikt de postlijst enkel
-   * nog via de tweede tak, "aangevraagd door de post en al toegewezen".
+   * `assignedGroupId` kreeg bewust geen backfill (20260917160000). Een oude rit
+   * bereikt de postlijst dus enkel via de tweede tak, "aangevraagd door de
+   * post", en die tak moet daarom ook zonder chauffeur werken.
+   *
+   * Dat was de bug van F4.18: de tak eiste `driverId: { not: null }`, en dan
+   * viel precies de rit weg waar een post iets mee moet.
    */
-  it('bereikt de postlijst via de aanvragende post, niet via de doorgeeftak', async () => {
-    const viaPost = await tripsForGroups(ids.postgenoot, [ids.post]);
+  it('bereikt de postlijst via de aanvragende post, ook zonder chauffeur', async () => {
+    const viaPost = await tripsForGroups([ids.post]);
     const ids_ = viaPost.map((rit) => rit.id);
 
     expect(ids_).toContain(ids.oudeRit);
     expect(viaPost.find((rit) => rit.id === ids.oudeRit)!.assignedGroupId).toBeNull();
     expect(viaPost.find((rit) => rit.id === ids.nieuweRit)!.assignedGroupId).toBe(ids.post);
 
-    // Zonder chauffeur valt de oude rit uit die lijst, want dan is er geen tak
-    // meer die haar bereikt. Dat is het verschil dat de migratie introduceerde.
+    // Zonder chauffeur blijft ze staan. Dit is de assertie die faalt zodra
+    // iemand die voorwaarde terugzet.
     await prisma.uitleenTransportBooking.update({
       where: { id: ids.oudeRit },
       data: { driverId: null },
     });
-    const zonderChauffeur = await tripsForGroups(ids.postgenoot, [ids.post]);
-    expect(zonderChauffeur.map((rit) => rit.id)).not.toContain(ids.oudeRit);
-    // De nieuwe rit blijft wel staan: die hangt aan `assignedGroupId`.
+    const zonderChauffeur = await tripsForGroups([ids.post]);
+    expect(zonderChauffeur.map((rit) => rit.id)).toContain(ids.oudeRit);
+    // En de nieuwe rit ook: die hangt aan `assignedGroupId`.
     expect(zonderChauffeur.map((rit) => rit.id)).toContain(ids.nieuweRit);
 
     await prisma.uitleenTransportBooking.update({
       where: { id: ids.oudeRit },
       data: { driverId: ids.chauffeur },
     });
+  });
+
+  /**
+   * De rit die je zelf rijdt voor je eigen post staat in allebei de lijsten
+   * (F4.19, D3). `tripsForGroups` filterde hem uit de postlijst omdat hij
+   * bovenaan al onder "Komende ritten" stond; Logistiek wil hem op beide
+   * plaatsen, en de kaart zegt dan dat jij het bent.
+   */
+  it('houdt de rit die je zelf rijdt ook in de lijst van je post', async () => {
+    const viaPost = await tripsForGroups([ids.post]);
+    const eigen = viaPost.find((rit) => rit.id === ids.oudeRit);
+
+    expect(eigen, 'de chauffeur ziet zijn eigen postrit ook hier').toBeDefined();
+    expect(eigen!.driverId).toBe(ids.chauffeur);
+    // En hij staat dus twee keer op het scherm, want dit is dezelfde rit.
+    const eigenLijst = await tripsForDriver(ids.chauffeur);
+    expect(eigenLijst.map((rit) => rit.id)).toContain(ids.oudeRit);
   });
 
   /**

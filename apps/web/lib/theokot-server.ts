@@ -6,8 +6,11 @@
 
 import { prisma } from '@vtk/db';
 import { DEFAULT_THEOKOT_CONFIG, parseTheokotConfig, type TheokotConfig } from './theokot';
-import { sendNoShowWarning } from './mail';
+import { sendNoShowWarning, sendOrderCancelled } from './mail';
 import { withSerializableTransaction } from './ticketing/transactions';
+
+/** De notitie waarmee de no-show-verwerking een ban aanmaakt; zo is hij te herkennen. */
+const AUTOMATIC_BAN_NOTE = 'Automatisch aangemaakt door de no-show-verwerking.';
 
 /** Leest `theokot.config` uit de Setting-tabel, aangevuld met defaults. */
 export async function getTheokotConfig(): Promise<TheokotConfig> {
@@ -41,33 +44,63 @@ function sessionDateLabel(date: Date, locale: 'NL' | 'EN'): string {
  * Past de gevolgen van één no-show toe: waarschuwingsmail versturen en, indien de
  * drempel bereikt is en er nog geen actieve ban loopt, een ban aanmaken.
  *
- * No-shows worden geteld sinds het einde van de laatste ban (of alle tijd wanneer
- * er nog nooit een ban was), zodat een gebruiker na een ban weer met een schone lei
- * begint en niet meteen opnieuw geband wordt.
+ * No-shows worden geteld sinds het einde van de laatste ban die al voorbij is (of
+ * alle tijd wanneer er nog nooit een ban was), zodat een gebruiker na een ban weer
+ * met een schone lei begint en niet meteen opnieuw geband wordt. Een ban die nog
+ * loopt of vroegtijdig opgeheven is, telt niet als ondergrens: anders zou het
+ * opheffen van een ban meteen ook immuniteit geven tot de oorspronkelijke
+ * einddatum.
  */
 async function applyNoShowConsequences(
   order: { id: string; userId: string; user: { name: string; email: string; locale: 'NL' | 'EN' } },
   sessionDate: Date,
   config: TheokotConfig,
 ): Promise<void> {
-  await sendNoShowWarning(
-    order.user,
-    sessionDateLabel(sessionDate, order.user.locale),
-    order.id,
-  );
+  // Een waarschuwing die niet vertrekt, hoort de rest niet tegen te houden. Bij
+  // een adres dat het blijvend begeeft, viel de hele sessie terug en probeerde
+  // de worker het elke vijf minuten opnieuw, terwijl de bestellingen al op
+  // NO_SHOW stonden. De mislukte verzending staat met haar fout in `EmailLog`.
+  try {
+    await sendNoShowWarning(
+      order.user,
+      sessionDateLabel(sessionDate, order.user.locale),
+      order.id,
+    );
+  } catch (error) {
+    console.error(`[theokot] waarschuwingsmail voor bestelling ${order.id} mislukt:`, error);
+  }
 
   await withSerializableTransaction(async (tx) => {
+    const now = new Date();
+    // De laatste ban die effectief afgelopen is. Zonder die `endsAt`-grens telde
+    // een ban die vandaag opgeheven werd (`active: false`, einddatum blijft
+    // staan) mee als ondergrens, en dan stond de teller tot die datum op nul:
+    // wie net vergiffenis kreeg, was twee weken onaantastbaar.
     const lastBan = await tx.theokotBan.findFirst({
-      where: { userId: order.userId },
+      where: { userId: order.userId, endsAt: { lte: now } },
       orderBy: { endsAt: 'desc' },
     });
     const since = lastBan ? lastBan.endsAt : new Date(0);
     const noShowCount = await tx.theokotOrder.count({
-      where: { userId: order.userId, status: 'NO_SHOW', updatedAt: { gt: since } },
+      where: {
+        userId: order.userId,
+        status: 'NO_SHOW',
+        // Wat tijdens een pauze viel, telt ook achteraf niet mee.
+        noShowWaivedAt: null,
+        // `noShowProcessedAt` is wanneer de no-show verwerkt is en blijft daarna
+        // staan; `updatedAt` schuift mee met elke latere wijziging, dus een oude
+        // no-show die nog een notitie kreeg, telde opnieuw mee. Wie nog niet
+        // verwerkt is (deze bestelling, of een handmatige correctie), valt terug
+        // op `updatedAt`.
+        OR: [
+          { noShowProcessedAt: { gt: since } },
+          { noShowProcessedAt: null, updatedAt: { gt: since } },
+        ],
+      },
     });
     if (noShowCount < config.noShowThreshold) return;
     const active = await tx.theokotBan.findFirst({
-      where: { userId: order.userId, active: true, startsAt: { lte: new Date() }, endsAt: { gt: new Date() } },
+      where: { userId: order.userId, active: true, startsAt: { lte: now }, endsAt: { gt: now } },
       select: { id: true },
     });
     if (active) return;
@@ -75,8 +108,8 @@ async function applyNoShowConsequences(
       data: {
         userId: order.userId,
         reason: `${noShowCount} niet-opgehaalde bestellingen`,
-        endsAt: new Date(Date.now() + config.banDurationDays * 86400000),
-        note: 'Automatisch aangemaakt door de no-show-verwerking.',
+        endsAt: new Date(now.getTime() + config.banDurationDays * 86400000),
+        note: AUTOMATIC_BAN_NOTE,
       },
     });
   });
@@ -85,7 +118,15 @@ async function applyNoShowConsequences(
 /**
  * Verwerkt alle vervallen verkoopsessies: markeert nog-gereserveerde bestellingen
  * als no-show, verstuurt waarschuwingsmails en past bans toe. Idempotent via
- * `session.processedAt` — een reeds verwerkte sessie wordt overgeslagen.
+ * `session.processedAt`: een reeds verwerkte sessie wordt overgeslagen.
+ *
+ * Staat de verwerking gepauzeerd (`noShowPaused`), of is de dag als "er liep
+ * iets mis" aangeduid (`noShowsWaivedAt`), dan wordt de dag wel afgesloten en
+ * blijven de bestellingen als niet opgehaald geboekt, maar vertrekt er geen
+ * mail, komt er geen ban, en krijgt de bestelling `noShowWaivedAt`, zodat ze
+ * ook later niet meetelt. Bewust niet "de dag laten liggen tot de pauze
+ * voorbij is": dan vertrokken bij het hervatten alle mails van de hele pauze in
+ * één keer, voor dagen die iedereen al vergeten is.
  *
  * Wordt periodiek aangeroepen door de scheduler (`instrumentation.ts`) en kan ook
  * manueel getriggerd worden vanuit het admin-paneel.
@@ -137,6 +178,14 @@ export async function processDueNoShows(now: Date = new Date()): Promise<{ sessi
       });
 
       for (const order of session.orders) {
+        if (config.noShowPaused || session.noShowsWaivedAt) {
+          await prisma.theokotOrder.updateMany({
+            where: { id: order.id, noShowProcessedAt: null },
+            data: { noShowProcessedAt: new Date(), noShowWaivedAt: new Date() },
+          });
+          noShows += 1;
+          continue;
+        }
         await applyNoShowConsequences(order, session.date, config);
         await prisma.theokotOrder.updateMany({
           where: { id: order.id, noShowProcessedAt: null },
@@ -165,4 +214,230 @@ export async function processDueNoShows(now: Date = new Date()): Promise<{ sessi
   }
 
   return { sessions: processedSessions, noShows };
+}
+
+/**
+ * "Er liep iets mis" op een verkoopdag: de no-shows van die dag tellen niet
+ * mee, en de verwerking stuurt er geen mail meer voor.
+ *
+ * Was de dag al verwerkt, dan zijn de mails vertrokken; die zijn niet terug te
+ * halen. Wat wel kan: elke automatische ban die nog loopt bij iemand met een
+ * no-show op die dag, opnieuw tellen zonder de no-shows die niet meer meetellen.
+ * Komt die persoon dan onder de drempel, dan valt de ban weg, op dezelfde
+ * manier als `liftBanAction` (einddatum naar nu). Een ban die de beheerder zelf
+ * uitsprak, blijft staan.
+ */
+export async function waiveSessionNoShows(
+  sessionId: string,
+  now: Date = new Date(),
+): Promise<{ date: Date; orders: number; liftedBans: number; alreadyMailed: boolean } | null> {
+  const session = await prisma.theokotSession.findUnique({
+    where: { id: sessionId },
+    select: { id: true, date: true, processedAt: true, noShowsWaivedAt: true },
+  });
+  if (!session) return null;
+
+  if (!session.noShowsWaivedAt) {
+    await prisma.theokotSession.update({ where: { id: session.id }, data: { noShowsWaivedAt: now } });
+  }
+  const affected = await prisma.theokotOrder.findMany({
+    where: { sessionId: session.id, status: 'NO_SHOW', noShowWaivedAt: null },
+    select: { id: true, userId: true, noShowProcessedAt: true },
+  });
+  if (affected.length > 0) {
+    await prisma.theokotOrder.updateMany({
+      where: { id: { in: affected.map((order) => order.id) } },
+      data: { noShowWaivedAt: now },
+    });
+  }
+
+  const config = await getTheokotConfig();
+  let liftedBans = 0;
+  for (const userId of new Set(affected.map((order) => order.userId))) {
+    const ban = await prisma.theokotBan.findFirst({
+      where: { userId, active: true, endsAt: { gt: now }, note: AUTOMATIC_BAN_NOTE },
+      orderBy: { endsAt: 'desc' },
+    });
+    if (!ban) continue;
+    // Dezelfde telling als bij het uitspreken (`applyNoShowConsequences`): sinds
+    // het einde van de ban daarvoor, zonder wat niet meetelt.
+    const previous = await prisma.theokotBan.findFirst({
+      where: { userId, id: { not: ban.id }, endsAt: { lte: ban.startsAt } },
+      orderBy: { endsAt: 'desc' },
+    });
+    const since = previous ? previous.endsAt : new Date(0);
+    const count = await prisma.theokotOrder.count({
+      where: {
+        userId,
+        status: 'NO_SHOW',
+        noShowWaivedAt: null,
+        OR: [
+          { noShowProcessedAt: { gt: since } },
+          { noShowProcessedAt: null, updatedAt: { gt: since } },
+        ],
+      },
+    });
+    if (count >= config.noShowThreshold) continue;
+    await prisma.theokotBan.update({
+      where: { id: ban.id },
+      data: { active: false, endsAt: now },
+    });
+    liftedBans += 1;
+  }
+
+  return {
+    date: session.date,
+    orders: affected.length,
+    liftedBans,
+    alreadyMailed: session.processedAt !== null || affected.some((order) => order.noShowProcessedAt !== null),
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Bestellingen schrappen: een verkoopdag die wegvalt, of te weinig broodjes
+// -----------------------------------------------------------------------------
+
+/** Publieke datumvorm voor de mails hieronder. */
+function dayLabel(date: Date, locale: 'NL' | 'EN'): string {
+  return sessionDateLabel(date, locale);
+}
+
+/** "2x Broodje kaas, 1x Broodje hesp" */
+function itemsLabel(lines: Array<{ quantity: number; name: string }>): string {
+  return lines.map((line) => `${line.quantity}x ${line.name}`).join(', ');
+}
+
+/**
+ * Verwijdert een verkoopdag en verwittigt wie er een bestelling op had staan.
+ *
+ * Verwijderen is er voor de dag die niet doorgaat. Sluiten is iets anders: dat
+ * rondt de verkoop af en laat de niet-opgehaalde broodjes gewoon als niet
+ * opgehaald tellen.
+ *
+ * Kan enkel zolang er niets afgehaald is. Een dag met opgehaalde broodjes
+ * wegnemen, wist verkoopcijfers die al gebeurd zijn; die dag hoort gesloten te
+ * worden, niet gewist.
+ *
+ * De mails vertrekken na het wissen en houden het niet tegen: de dag is dan al
+ * weg, en een adres dat het begeeft hoort de rest niet mee te sleuren.
+ */
+export async function removeSession(
+  sessionId: string,
+): Promise<{ ok: true; orders: number } | { ok: false; code: 'SESSION_NOT_FOUND' | 'SESSION_HAS_PICKUPS' }> {
+  const session = await prisma.theokotSession.findUnique({
+    where: { id: sessionId },
+    include: {
+      orders: {
+        include: {
+          user: { select: { name: true, email: true, locale: true } },
+          lines: { include: { sessionItem: { select: { nameNl: true, nameEn: true } } } },
+          voucherRedemption: { select: { id: true } },
+        },
+      },
+    },
+  });
+  if (!session) return { ok: false, code: 'SESSION_NOT_FOUND' };
+  // Alles wat al echt gebeurd is, houdt de dag tegen: een opgehaald broodje, en
+  // ook bonnetjes die al afgeboekt zijn. Die komen niet terug wanneer de
+  // bestelling met de dag mee verdwijnt.
+  if (
+    session.orders.some(
+      (order) =>
+        order.status === 'PICKED_UP' ||
+        order.pickedUpAt !== null ||
+        order.voucherRedemption !== null,
+    )
+  ) {
+    return { ok: false, code: 'SESSION_HAS_PICKUPS' };
+  }
+
+  const notify = session.orders
+    .filter((order) => order.status === 'RESERVED')
+    .map((order) => ({
+      user: order.user,
+      itemsLabel: itemsLabel(
+        order.lines.map((line) => ({
+          quantity: line.quantity,
+          name: order.user.locale === 'EN' ? line.sessionItem.nameEn ?? line.sessionItem.nameNl : line.sessionItem.nameNl,
+        })),
+      ),
+    }));
+
+  // De bestellingen en het aanbod hangen met onDelete: Cascade aan de sessie.
+  await prisma.theokotSession.delete({ where: { id: sessionId } });
+
+  for (const row of notify) {
+    await sendOrderCancelled(row.user, {
+      dateLabel: dayLabel(session.date, row.user.locale),
+      reason:
+        row.user.locale === 'EN'
+          ? 'That sale day has been removed.'
+          : 'Die verkoopdag gaat niet door.',
+      itemsLabel: row.itemsLabel,
+    });
+  }
+
+  return { ok: true, orders: notify.length };
+}
+
+/**
+ * Schrapt één bestelling in opdracht van het beheer, en verwittigt de student.
+ *
+ * Nodig omdat er niets automatisch geschrapt wordt wanneer het aanbod onder het
+ * bestelde aantal zakt: dan kiest een mens wie eruit gaat. Hier gebeurt dat, per
+ * bestelling, met dezelfde mail als bij een verkoopdag die wegvalt.
+ *
+ * Wissen en niet op een status zetten, net zoals wanneer de student zelf
+ * annuleert: dat geeft de broodjes vrij en maakt het bestelslot van die dag weer
+ * leeg, zodat er iemand anders kan reserveren.
+ *
+ * Kan niet meer wanneer de bestelling opgehaald is of er bonnetjes op afgeboekt
+ * zijn; die zijn echt gebeurd en komen niet terug.
+ */
+export async function removeOrder(
+  orderId: string,
+): Promise<
+  | { ok: true; userName: string; dateLabel: string }
+  | { ok: false; code: 'ORDER_NOT_FOUND' | 'ORDER_NOT_REMOVABLE' }
+> {
+  const order = await prisma.theokotOrder.findUnique({
+    where: { id: orderId },
+    include: {
+      user: { select: { name: true, email: true, locale: true } },
+      session: { select: { date: true } },
+      lines: { include: { sessionItem: { select: { nameNl: true, nameEn: true } } } },
+      voucherRedemption: { select: { id: true } },
+    },
+  });
+  if (!order) return { ok: false, code: 'ORDER_NOT_FOUND' };
+  if (order.status === 'PICKED_UP' || order.pickedUpAt !== null || order.voucherRedemption !== null) {
+    return { ok: false, code: 'ORDER_NOT_REMOVABLE' };
+  }
+
+  const label = itemsLabel(
+    order.lines.map((line) => ({
+      quantity: line.quantity,
+      name:
+        order.user.locale === 'EN'
+          ? line.sessionItem.nameEn ?? line.sessionItem.nameNl
+          : line.sessionItem.nameNl,
+    })),
+  );
+
+  await prisma.theokotOrder.delete({ where: { id: orderId } });
+
+  await sendOrderCancelled(order.user, {
+    dateLabel: dayLabel(order.session.date, order.user.locale),
+    reason:
+      order.user.locale === 'EN'
+        ? 'Someone from Theokot cancelled it.'
+        : 'Iemand van Theokot heeft ze geannuleerd.',
+    itemsLabel: label,
+  });
+
+  return {
+    ok: true,
+    userName: order.user.name,
+    dateLabel: dayLabel(order.session.date, order.user.locale),
+  };
 }

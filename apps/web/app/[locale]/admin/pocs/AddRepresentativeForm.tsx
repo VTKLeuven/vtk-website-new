@@ -59,7 +59,13 @@ export function AddRepresentativeForm({
   return (
     <form
       action={addPocRepresentativeAction}
-      onSubmit={() => setTimeout(reset, 0)}
+      onSubmit={(e) => {
+        if (!selected) {
+          e.preventDefault();
+          return;
+        }
+        setTimeout(reset, 0);
+      }}
       className="flex flex-wrap items-end gap-2 rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/30 p-3"
     >
       <input type="hidden" name="pocId" value={pocId} />
@@ -79,27 +85,38 @@ export function AddRepresentativeForm({
               setOpen(false);
             }
           }}
-          onFocus={() => results.length > 0 && setOpen(true)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !selected) {
+              e.preventDefault();
+            }
+          }}
+          onFocus={() => (results.length > 0 || query.trim().length >= 2) && setOpen(true)}
           placeholder={nl ? "Naam, e-mail of r-nummer" : "Name, email or r-number"}
           autoComplete="off"
         />
-        {open && results.length > 0 && (
+        {open && !selected && query.trim().length >= 2 && (
           <ul className="absolute z-10 mt-1 max-h-60 w-full overflow-auto rounded-xl border border-vtk-blue/15 bg-white shadow-lg">
-            {results.map((u) => (
-              <li key={u.id}>
-                <button
-                  type="button"
-                  onClick={() => pick(u)}
-                  className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-vtk-blue-soft/50"
-                >
-                  <span className="font-medium text-vtk-ink">{u.name}</span>
-                  <span className="text-xs text-[#5c667f]">
-                    {u.email}
-                    {u.rNumber ? ` · ${u.rNumber}` : ""}
-                  </span>
-                </button>
+            {results.length === 0 ? (
+              <li className="px-3 py-2 text-sm text-[#5c667f]">
+                {nl ? "Geen leden gevonden." : "No members found."}
               </li>
-            ))}
+            ) : (
+              results.map((u) => (
+                <li key={u.id}>
+                  <button
+                    type="button"
+                    onClick={() => pick(u)}
+                    className="flex w-full flex-col items-start px-3 py-2 text-left text-sm hover:bg-vtk-blue-soft/50"
+                  >
+                    <span className="font-medium text-vtk-ink">{u.name}</span>
+                    <span className="text-xs text-[#5c667f]">
+                      {u.email}
+                      {u.rNumber ? ` · ${u.rNumber}` : ""}
+                    </span>
+                  </button>
+                </li>
+              ))
+            )}
           </ul>
         )}
       </div>

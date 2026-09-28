@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { AcademicStaffRole, StudyProgramme, StudyYear } from "@prisma/client";
-import { ACADEMIC_STAFF_ROLES } from "@/lib/profile";
+import { ACADEMIC_STAFF_ROLES, isValidGraduationYear } from "@/lib/profile";
 import { CheckboxChip } from "./CheckboxChip";
 
 type Labels = {
@@ -23,6 +23,7 @@ type Labels = {
   alumniDetailsHint: string;
   graduationYear: string;
   graduationYearHint: string;
+  graduationYearInvalid: string;
   wasInVtk: string;
   wasInVtkHint: string;
   alumniMailOptIn: string;
@@ -54,6 +55,7 @@ export function StudyStatusFields({
   wasInVtk,
   alumniMailOptIn,
   academicStaffRole,
+  latestGraduationYear,
   studyYearOptions,
   programmeOptions,
   labels,
@@ -69,6 +71,8 @@ export function StudyStatusFields({
   wasInVtk: boolean;
   alumniMailOptIn: boolean;
   academicStaffRole: AcademicStaffRole | null;
+  /** Het laatste afstudeerjaar dat de server aanvaardt; zie `isValidGraduationYear`. */
+  latestGraduationYear: number;
   studyYearOptions: readonly StudyYear[];
   programmeOptions: readonly StudyProgramme[];
   labels: Labels;
@@ -81,6 +85,16 @@ export function StudyStatusFields({
   const selectedProgrammes = new Set(studyProgrammes);
   const statusClass =
     "inline-flex items-center gap-2 rounded-xl border border-vtk-blue/12 bg-vtk-blue-soft/30 px-3 py-2 text-sm";
+
+  // Dezelfde grens als de server, maar dan vóór het versturen: een student die
+  // het verwachte afstudeerjaar invult, krijgt de uitleg bij het veld zelf en
+  // komt op de bevestiging niet voorbij "Ga verder" met een waarde die de server
+  // toch weigert. `pattern` alleen zegt enkel dat het vier cijfers moeten zijn.
+  const checkGraduationYear = (input: HTMLInputElement | null) => {
+    input?.setCustomValidity(
+      isValidGraduationYear(input.value, latestGraduationYear) ? "" : labels.graduationYearInvalid,
+    );
+  };
 
   return (
     <div className="space-y-5">
@@ -210,6 +224,8 @@ export function StudyStatusFields({
               inputMode="numeric"
               pattern="[0-9]{4}"
               maxLength={4}
+              ref={checkGraduationYear}
+              onChange={(event) => checkGraduationYear(event.currentTarget)}
               defaultValue={graduationYear ?? ""}
               placeholder="2019"
               className="mt-1 w-32 rounded-xl border border-vtk-blue/15 bg-white px-3 py-2 text-sm"

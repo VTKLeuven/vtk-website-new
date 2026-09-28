@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { staticMetadata } from "@/lib/pageMetadata";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
 import { ArrowRight, TicketCheck } from "lucide-react";
 import { listPublishedTicketEvents } from "@/lib/ticketing/queries";

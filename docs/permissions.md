@@ -406,6 +406,26 @@ Terugbetalen en inboeken zitten bewust **niet** in `expenses.managePost`: dat is
 geld en boekhouding, en een postverantwoordelijke die zijn eigen uitgaven op
 "betaald" kan zetten is precies het gat dat billsheet had.
 
+## Wie doet wat
+
+Het register van `/admin/wie-doet-wat` (keuzes in `docs/design-decisions.md`,
+"Wie doet wat") voegt drie permissies toe:
+
+- `tasks.view`: het register lezen. Zit in de geseede rol `praesidium`, want het
+  bestaat om iemand te vinden.
+- `tasks.manageOwn`: de taken van je eigen praesidiumpost(en) aanmaken, verdelen
+  en verwijderen. De post-scope komt uit `session.groups` van het huidige
+  werkingsjaar (`lib/tasks/access.ts`), net als `expenses.managePost`. Zit ook in
+  `praesidium`; wil een post dat enkel de verantwoordelijke verdeelt, geef het
+  dan via een rol met `LEADER`-grant in plaats van via de basisrol.
+- `tasks.manage`: elke post. Enkel via de rol `admin` (IT en Groep 5).
+
+De actions (`app/actions/tasks.ts`) toetsen per taak opnieuw of de post binnen
+die scope valt, en aanvaarden enkel lidmaatschappen van die post in het huidige
+werkingsjaar. **Let op:** een deploy draait de seed niet, dus op een bestaande
+databank vink je `tasks.view` en `tasks.manageOwn` één keer zelf aan bij de rol
+`praesidium` in `/admin/roles`. Tot dan zien enkel IT en Groep 5 de tab.
+
 ## E-mailhandtekening
 
 De handtekeninggenerator op `/account` hangt aan `signature.generate`. Daarvoor

@@ -13,24 +13,30 @@ import {
 import { logistiekBaseUrl } from '@/lib/payments';
 import { writeAudit } from '@/lib/audit';
 import { isDriverColorIndex, isVehiclePattern } from '@/lib/driver-colors';
+import { isVehicleIcon } from '@/lib/vehicle-icon';
+import { normaliseBelgianPhone } from '@/lib/vcard';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 import {
+  chargesRequester,
   describeReservationChanges,
   formatBrusselsTime,
   formatDateTime,
+  handoverNote,
+  isEmailish,
   isOnQuarterHour,
+  isTripHandoverMode,
+  mergeHandover,
   NOTIFY_KINDS,
   parseDateOnly,
   parseNotifyEmails,
   momentsOverlap,
+  REQUESTER_TYPE_LABELS,
   toBrusselsDateValue,
   transportPriceCents,
+  type TripHandoverMode,
+  type TripHandoverOutcome,
 } from '@/lib/uitleen';
-import {
-  notifyGroupAssignedForTrip,
-  notifyReservation,
-  notifyTransport,
-} from '@/lib/uitleen-mail';
+import { notifyGroupAssignedForTrip, notifyReservation, notifyTransport } from '@/lib/uitleen-mail';
 import {
   consumeFlesserkeStock,
   flesserkeReserved,
@@ -2176,36 +2182,6 @@ export async function deleteTransportAction(bookingId: string): Promise<ActionRe
 }
 
 /**
- * De zin achter "ingepland" of "doorgegeven", over de mail naar de post.
- *
- * Drie uitkomsten en geen twee: een post zonder verantwoordelijke verwittig je
- * zelf, een mail die niet vertrok is meestal de mailserver, en dat zijn twee
- * verschillende dingen om te gaan doen. Ze allebei als "geen verantwoordelijke"
- * melden, stuurde het team achter de verkeerde oorzaak aan.
- */
-function handoverNote(
-  groupName: string,
-  outcome: { leads: number | null; sent: number }
-): { message: string; warning: boolean } {
-  if (outcome.leads === 0) {
-    return {
-      warning: true,
-      message: `Doorgegeven aan ${groupName}, maar die post heeft dit werkingsjaar geen verantwoordelijke; er vertrok geen mail. Verwittig hen zelf.`,
-    };
-  }
-  if (outcome.sent === 0) {
-    return {
-      warning: true,
-      message: `Doorgegeven aan ${groupName}, maar de mail naar de verantwoordelijken vertrok niet. Verwittig hen zelf, en kijk de mailinstellingen na.`,
-    };
-  }
-  return {
-    warning: false,
-    message: `Doorgegeven aan ${groupName}; de verantwoordelijke${outcome.sent === 1 ? '' : 'n'} kreeg${outcome.sent === 1 ? '' : 'en'} een mail om een chauffeur aan te duiden.`,
-  };
-}
-
-/**
  * Een rit aanmaken vanuit de planning (P4).
  *
  * Meteen `APPROVED` en niet `REQUESTED`: het team vraagt niets aan zichzelf. Een
@@ -2376,17 +2352,11 @@ export async function adminCreateTransportAction(
   // dan een (heen en terug, of twee voertuigen), dan zoekt de post voor elk
   // daarvan een chauffeur en gaat het dus over meer dan een rit.
   revalidatePath('/ritten');
-  let leads: number | null = 0;
-  let sent = 0;
+  const outcomes: TripHandoverOutcome[] = [];
   for (const id of outcome.ids ?? []) {
-    const result = await notifyGroupAssignedForTrip(id);
-    // De ritten gaan naar dezelfde post, dus het aantal verantwoordelijken is
-    // overal hetzelfde; het onbekende geval (`null`) wint, want dan weten we het
-    // van deze post niet meer.
-    leads = result.leads === null || leads === null ? null : Math.max(leads, result.leads);
-    sent += result.sent;
+    outcomes.push(await notifyGroupAssignedForTrip(id));
   }
-  const note = handoverNote(assignedGroup.nameNl, { leads, sent });
+  const note = handoverNote(assignedGroup.nameNl, mergeHandover(outcomes));
   return {
     ok: true,
     // Gelukt met een staartje: de melding blijft staan tot je ze wegklikt, want
@@ -2408,6 +2378,22 @@ export async function adminCreateTransportAction(
  * Wat je hier niet doet: goedkeuren, afwijzen, afronden of een chauffeur
  * toewijzen. Die hebben elk hun eigen actie met hun eigen regels; dit gaat over
  * de feiten van de rit.
+ *
+ * **Voor wie de rit rijdt, hoort wél bij die feiten** (F4.4). Dat lag tot
+ * september 2026 vast bij het aanmaken, terwijl een rit die op de verkeerde post
+ * staat precies iets is dat je pas later ziet. Twee grenzen blijven:
+ *
+ * - **Een rit wordt hier niet extern.** Enkel een externe krijgt prijs, tarief
+ *   en betaalstatus (`chargesRequester`), en die knop omzetten in een keuzelijst
+ *   maakt van een geldbeslissing een tikfout. Dezelfde regel als bij het
+ *   intekenen, waar "Andere..." een werkgroep wordt en geen externe.
+ * - **Een externe rit met een betaling verhuist niet.** Bij een post verdwijnen
+ *   prijs en betaalstatus van het scherm, en een betaald bedrag dat nergens meer
+ *   staat, is erger dan een rit op de verkeerde naam.
+ *
+ * Het tarief zelf blijft staan: `pricingMode` en `rateCents` zijn momentopnames
+ * en worden nooit herrekend (zie docs/uitleendienst.md). Het formulier zegt dat,
+ * in plaats van het stil te doen.
  */
 export async function adminEditTransportAction(
   bookingId: string,
@@ -2426,6 +2412,15 @@ export async function adminEditTransportAction(
      * hoeft te hebben.
      */
     eventId?: string;
+    /**
+     * Voor wie de rit rijdt (F4.4). Weglaten laat het staan: een sleep in de
+     * kalender wijzigt enkel de uren en mag een rit niet stil van post
+     * veranderen.
+     *
+     * Eén object en geen drie losse velden, want ze horen samen: een type zonder
+     * naam, of een naam naast een post, is geen halve wijziging maar een foute.
+     */
+    requester?: { type: UitleenRequesterType; groupId: string | null; name: string | null };
     /** Bewust over een bestaande rit schuiven; zie `overlapAuditNote`. */
     allowOverlap?: boolean;
   }
@@ -2460,6 +2455,42 @@ export async function adminEditTransportAction(
     if (!chosenEvent) return { ok: false, error: 'Dat evenement bestaat niet meer; herlaad de pagina.' };
   }
 
+  // Ook buiten de transactie, en om dezelfde reden: de post bestaat los van deze
+  // rit. `label` is wat er in de historiek komt te staan, in de woorden van de
+  // keuzelijst waarmee je het net veranderde ("Logistiek zelf" en niet "Interne
+  // post"): een historiekregel die iets anders noemt dan de knop, laat je twee
+  // keer nadenken over één wijziging.
+  let requester:
+    | { type: UitleenRequesterType; groupId: string | null; name: string | null; label: string }
+    | null = null;
+  if (input.requester) {
+    const type = input.requester.type;
+    if (type === 'INTERN') {
+      const groupId = input.requester.groupId?.trim() || null;
+      let group: { id: string; nameNl: string } | null = null;
+      if (groupId) {
+        group = await prisma.group.findFirst({
+          where: { id: groupId, active: true },
+          select: { id: true, nameNl: true },
+        });
+        if (!group) return { ok: false, error: 'Die post of werkgroep bestaat niet meer.' };
+      }
+      requester = {
+        type,
+        groupId: group?.id ?? null,
+        name: null,
+        label: group?.nameNl ?? 'Logistiek zelf',
+      };
+    } else {
+      // Zoals bij het intekenen: zonder naam staat de rit als kale "Werkgroep"
+      // in de planning, en dan is "voor wie is dit" precies de vraag die je niet
+      // meer beantwoord krijgt.
+      const name = input.requester.name?.trim().slice(0, 200) || null;
+      if (!name) return { ok: false, error: 'Vul in voor wie deze rit rijdt, of kies een post.' };
+      requester = { type, groupId: null, name, label: name };
+    }
+  }
+
   const outcome = await runSerializable(async (tx) => {
     const existing = await tx.uitleenTransportBooking.findUnique({
       where: { id: bookingId },
@@ -2478,6 +2509,13 @@ export async function adminEditTransportAction(
         eventName: true,
         pricingMode: true,
         rateCents: true,
+        requesterType: true,
+        groupId: true,
+        requesterName: true,
+        group: { select: { nameNl: true } },
+        // Enkel om te weten of er geld aan hangt; zie de betaalcheck hieronder.
+        paidOfflineAt: true,
+        _count: { select: { payments: true } },
       },
     });
     if (!existing) return { error: 'NOT_FOUND' as const };
@@ -2485,6 +2523,18 @@ export async function adminEditTransportAction(
     // afgerekende kilometers laten liegen.
     if (existing.status !== 'REQUESTED' && existing.status !== 'APPROVED') {
       return { error: 'LOCKED' as const };
+    }
+
+    if (requester) {
+      const wasCharged = chargesRequester(existing.requesterType);
+      const willCharge = chargesRequester(requester.type);
+      if (!wasCharged && willCharge) return { error: 'NO_EXTERN' as const };
+      // Een betaling hangt aan de rit (`UitleenPayment`) of staat als offline
+      // ontvangen gestempeld. Bij een post verdwijnen prijs en betaalstatus van
+      // beide schermen, dus dat bedrag zou nergens meer staan.
+      if (wasCharged && !willCharge && (existing.paidOfflineAt !== null || existing._count.payments > 0)) {
+        return { error: 'PAID' as const };
+      }
     }
 
     // Enkel een goedgekeurde rit houdt een voertuig bezet; een aanvraag mag nog
@@ -2524,6 +2574,20 @@ export async function adminEditTransportAction(
         `Evenement: ${existing.eventName?.trim() || 'geen'} → ${chosenEvent?.name ?? 'geen'}`
       );
     }
+    // Alle drie de velden vergelijken en niet enkel de post: van werkgroep
+    // "Alumni" naar werkgroep "Faculteit" verandert enkel de naam.
+    const requesterChanged =
+      requester !== null &&
+      (requester.type !== existing.requesterType ||
+        requester.groupId !== existing.groupId ||
+        requester.name !== existing.requesterName);
+    if (requesterChanged && requester) {
+      const before =
+        existing.requesterType === 'INTERN'
+          ? (existing.group?.nameNl ?? 'Logistiek zelf')
+          : (existing.requesterName ?? REQUESTER_TYPE_LABELS[existing.requesterType]);
+      changes.push(`Voor wie: ${before} → ${requester.label}`);
+    }
     if (changes.length === 0) return { error: 'NO_CHANGES' as const };
 
     await tx.uitleenTransportBooking.update({
@@ -2541,6 +2605,15 @@ export async function adminEditTransportAction(
         // in de planning staan waarvoor deze rit reed.
         ...(eventChanged
           ? { eventId: chosenEvent?.id ?? null, eventName: chosenEvent?.name.slice(0, 300) ?? null }
+          : {}),
+        // De drie samen of geen van drie: een type dat wijzigt terwijl de naam
+        // blijft staan, levert een rit op die als post én als werkgroep leest.
+        ...(requesterChanged && requester
+          ? {
+              requesterType: requester.type,
+              groupId: requester.groupId,
+              requesterName: requester.name,
+            }
           : {}),
         // De prijs volgt de uren bij een per-uur-tarief; bij per km blijft ze
         // null tot het afronden.
@@ -2576,6 +2649,20 @@ export async function adminEditTransportAction(
       ok: false,
       error: `Botst met ${outcome.detail}. Kies een ander moment, of schuif de rit er toch over.`,
       code: 'OVERLAP',
+    };
+  }
+  if (outcome.error === 'NO_EXTERN') {
+    return {
+      ok: false,
+      error:
+        'Een rit extern maken kan hier niet: enkel een externe aanvraag krijgt een prijs en een betaalstatus. Kies een post, of "Andere..." voor een werkgroep.',
+    };
+  }
+  if (outcome.error === 'PAID') {
+    return {
+      ok: false,
+      error:
+        'Aan deze rit hangt een betaling. Bij een post verdwijnen prijs en betaalstatus van het scherm, dus die verhuizing kan niet.',
     };
   }
   if (outcome.error === 'NO_CHANGES') return { ok: true, message: 'Niets gewijzigd.' };
@@ -3023,6 +3110,41 @@ export async function searchDriverCandidatesAction(query: string): Promise<Drive
   return searchDriverCandidates(query);
 }
 
+/**
+ * De regels achter "deze persoon wordt chauffeur", gedeeld door de picker
+ * bovenaan en de knop per post (F4.10). Geeft een foutcode terug, of `null`
+ * wanneer de rij er staat.
+ *
+ * Bewust één functie: de twee wegen komen op hetzelfde neer, en een tweede
+ * kopie van deze vier controles loopt vroeg of laat uiteen met deze.
+ */
+async function createDriverRow(
+  userId: string,
+  note: string | null,
+  addedById: string
+): Promise<'NOT_FOUND' | 'INACTIVE' | 'IN_POST' | 'ALREADY_DRIVER' | null> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { id: true, active: true, deletedAt: true },
+  });
+  if (!user || user.deletedAt) return 'NOT_FOUND';
+  if (!user.active) return 'INACTIVE';
+
+  // Al chauffeur via de post: dan voegt een rij hier niets toe, en de melding
+  // legt uit waarom de naam toch al in de keuzelijst staat.
+  const inPost = await prisma.groupMembership.count({
+    where: { userId, year: currentWorkingYear(), group: { code: 'LOGISTIEK' } },
+  });
+  if (inPost > 0) return 'IN_POST';
+
+  const existing = await prisma.uitleenDriver.count({ where: { userId } });
+  if (existing > 0) return 'ALREADY_DRIVER';
+
+  await prisma.uitleenDriver.create({ data: { userId, note, addedById } });
+  revalidateBeheer();
+  return null;
+}
+
 /** Chauffeur toevoegen aan de pool, gekozen uit de leden van vtk.be. */
 export async function addDriverAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const session = await requireManage();
@@ -3031,29 +3153,33 @@ export async function addDriverAction(_prev: SaveState, formData: FormData): Pro
   const note = String(formData.get('note') ?? '').trim();
   if (!userId) return saveError('USER_REQUIRED');
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true, active: true, deletedAt: true },
-  });
-  if (!user || user.deletedAt) return saveError('NOT_FOUND');
-  if (!user.active) return saveError('INACTIVE');
+  const code = await createDriverRow(userId, note || null, session.user.id);
+  return code ? saveError(code) : saveOk();
+}
 
-  // Al chauffeur via de post: dan voegt een rij hier niets toe, en de melding
-  // legt uit waarom de naam toch al in de keuzelijst staat.
-  const inPost = await prisma.groupMembership.count({
-    where: { userId, year: currentWorkingYear(), group: { code: 'LOGISTIEK' } },
-  });
-  if (inPost > 0) return saveError('IN_POST');
+/**
+ * Een lid van een post of werkgroep chauffeur maken, vanaf de lijst per post
+ * (F4.10).
+ *
+ * Geen notitie: je klikt hier op een naam die al op het scherm staat, er valt
+ * niets te zoeken en niets toe te lichten. De meldingen staan hier in volle
+ * zinnen in plaats van als code, want deze knop hangt niet aan een `SaveForm`
+ * met zijn `errorMessages`.
+ */
+export async function addDriverFromGroupAction(userId: string): Promise<ActionResult> {
+  const session = await requireManage();
 
-  const existing = await prisma.uitleenDriver.count({ where: { userId } });
-  if (existing > 0) return saveError('ALREADY_DRIVER');
-
-  await prisma.uitleenDriver.create({
-    data: { userId, note: note || null, addedById: session.user.id },
-  });
-
-  revalidateBeheer();
-  return saveOk();
+  const code = await createDriverRow(userId, null, session.user.id);
+  if (code === 'NOT_FOUND') return { ok: false, error: 'Dit lid bestaat niet (meer) op vtk.be.' };
+  if (code === 'INACTIVE') {
+    return { ok: false, error: 'Dit lid is gedeactiveerd op vtk.be en kan geen chauffeur zijn.' };
+  }
+  if (code === 'IN_POST') {
+    return { ok: false, error: 'Dit lid zit in de post Logistiek en is daardoor al chauffeur.' };
+  }
+  if (code === 'ALREADY_DRIVER') return { ok: false, error: 'Dit lid staat al in de chauffeurslijst.' };
+  // Zonder melding: de knop weet wiens naam het is en zet die in de toast.
+  return { ok: true };
 }
 
 /** Notitie bij een chauffeur bewerken. */
@@ -3107,6 +3233,62 @@ export async function saveDriverPhoneAction(_prev: SaveState, formData: FormData
 
   revalidateBeheer();
   return saveOk();
+}
+
+/**
+ * De aangevinkte nummers uit de gedeelde gsm-lijst wegschrijven (F4.3).
+ *
+ * **Het bestand komt hier niet aan.** Het scherm leest de `.vcf` in de browser,
+ * koppelt daar op naam en stuurt enkel de rijen die aangevinkt staan, als
+ * `<userId>|<nummer>`. Een lijst met vierennegentig namen en nummers reist dus
+ * niet over de lijn en belandt in geen enkele log; wat hier binnenkomt, is
+ * precies wat iemand gezien en goedgekeurd heeft.
+ *
+ * **Het nummer wordt hier opnieuw genormaliseerd.** Niet omdat de client niet te
+ * vertrouwen zou zijn (wie dit scherm mag openen, mag het nummer er evengoed met
+ * de hand intikken), maar omdat één functie de vorm bepaalt: zo staat er in deze
+ * kolom altijd `0470 12 34 56`, langs welke weg ze ook gevuld wordt.
+ *
+ * Schrijft `UitleenDriver.phone`, de bron `TEAM`, die binnen `driverPhones` al
+ * wint van het profielnummer en van wat iemand ooit bij een aanvraag opgaf.
+ */
+export async function importDriverPhonesAction(
+  _prev: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  await requireManage();
+
+  const picks = formData.getAll('pick').map((value) => String(value));
+  if (picks.length === 0) return saveError('NOTHING_PICKED');
+
+  // Op gebruiker en niet als lijst: twee vinkjes voor dezelfde chauffeur zijn
+  // geen twee schrijfbeurten, en dan klopt het aantal in de melding ook.
+  const byUser = new Map<string, string>();
+  for (const pick of picks) {
+    const at = pick.indexOf('|');
+    if (at === -1) return saveError('BAD_PICK');
+    const userId = pick.slice(0, at).trim();
+    const phone = normaliseBelgianPhone(pick.slice(at + 1));
+    if (!userId || !phone.ok) return saveError('BAD_PICK');
+    byUser.set(userId, phone.phone);
+  }
+
+  const known = await prisma.user.findMany({
+    where: { id: { in: [...byUser.keys()] }, active: true, deletedAt: null },
+    select: { id: true },
+  });
+  if (known.length !== byUser.size) return saveError('NOT_FOUND');
+
+  for (const [userId, phone] of byUser) {
+    await prisma.uitleenDriver.upsert({
+      where: { userId },
+      update: { phone },
+      create: { userId, phone },
+    });
+  }
+
+  revalidateBeheer();
+  return saveOk(`${byUser.size} nummer${byUser.size === 1 ? '' : 's'} opgeslagen.`);
 }
 
 /**
@@ -3217,6 +3399,7 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
     : 'FREE';
   const rateCents = parseEuroToCents(formData.get('rate'));
   const patternRaw = String(formData.get('pattern') ?? '').trim();
+  const iconRaw = String(formData.get('icon') ?? '').trim();
   if (!nameNl) return saveError('NAME_REQUIRED');
   if (rateCents === null) return saveError('AMOUNT_INVALID');
 
@@ -3232,6 +3415,9 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
     // databank is dat dezelfde toestand, en twee schrijfwijzen voor hetzelfde
     // lopen vroeg of laat uiteen in een query.
     pattern: isVehiclePattern(patternRaw) && patternRaw !== 'none' ? patternRaw : null,
+    // Leeg is hier "automatisch", en dat bewaren we als null: het icoon volgt dan
+    // de naam van het voertuig, zoals het deed voor deze keuze bestond.
+    icon: isVehicleIcon(iconRaw) ? iconRaw : null,
   };
   if (id) {
     await prisma.uitleenVehicle.update({ where: { id }, data });
@@ -3281,7 +3467,25 @@ export async function saveLogistiekSettingsAction(_prev: SaveState, formData: Fo
     notifyEmails[kind] = parsed;
   }
 
-  const value = { showRentPrices, lastMinuteDays, externalRequestsOpen, notifyEmails };
+  // Wie er verwittigd wordt bij het doorgeven van een rit aan een post (F4.8b).
+  // Een onbekende waarde wordt "niemand" en niet een foutmelding: dat is de
+  // standaard, en het is de enige keuze die niemand ongevraagd mailt.
+  const handoverMode = String(formData.get('tripHandoverMode') ?? '');
+  const mode: TripHandoverMode = isTripHandoverMode(handoverMode) ? handoverMode : 'NIEMAND';
+  // Het adres blijft bewaard wanneer je tijdelijk op iets anders staat: anders
+  // moet je het opnieuw intikken zodra je terugschakelt. Enkel wanneer het echt
+  // gebruikt wordt, moet het er ook zijn.
+  const handoverEmail = String(formData.get('tripHandoverEmail') ?? '').trim();
+  if (mode === 'ADRES' && !isEmailish(handoverEmail)) return saveError('HANDOVER_EMAIL_INVALID');
+  const tripHandover = { mode, email: handoverEmail };
+
+  const value = {
+    showRentPrices,
+    lastMinuteDays,
+    externalRequestsOpen,
+    notifyEmails,
+    tripHandover,
+  };
   await prisma.setting.upsert({
     where: { key: LOGISTIEK_SETTINGS_KEY },
     update: { value },

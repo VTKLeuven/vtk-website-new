@@ -62,6 +62,15 @@ export function EyeOffIcon() {
   );
 }
 
+export function EyeIcon() {
+  return (
+    <Icon>
+      <path d="M3 12c0-1.5 4-6 9-6s9 4.5 9 6-4 6-9 6-9-4.5-9-6Z" />
+      <circle cx="12" cy="12" r="3" />
+    </Icon>
+  );
+}
+
 export function CopyIcon() {
   return (
     <Icon>
@@ -129,12 +138,35 @@ export function CalendarPlusIcon() {
   );
 }
 
+/** Een ticket met een inkeping: "koop hier je ticket". */
+export function TicketIcon() {
+  return (
+    <Icon>
+      <path d="M3 8a2 2 0 0 0 2-2h14a2 2 0 0 0 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 0-2 2H5a2 2 0 0 0-2-2v-2a2 2 0 0 0 0-4Z" />
+      <path d="M14 6v2" />
+      <path d="M14 11v2" />
+      <path d="M14 16v2" />
+    </Icon>
+  );
+}
+
 export function UploadIcon() {
   return (
     <Icon>
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <path d="M7 9l5-5 5 5" />
       <path d="M12 4v12" />
+    </Icon>
+  );
+}
+
+/** Pijl naar beneden in een bak: een bestand dat meteen binnenkomt. */
+export function DownloadIcon() {
+  return (
+    <Icon>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="M7 10l5 5 5-5" />
+      <path d="M12 15V3" />
     </Icon>
   );
 }
@@ -207,6 +239,20 @@ export function InfoIcon() {
       <circle cx="12" cy="12" r="9" />
       <path d="M12 16v-4" />
       <path d="M12 8h.01" />
+    </Icon>
+  );
+}
+
+/** Een lijst om af te vinken, bv. de lijst bestelde broodjes van een verkoopdag. */
+export function ListCheckIcon() {
+  return (
+    <Icon>
+      <path d="M11 6h9" />
+      <path d="M11 12h9" />
+      <path d="M11 18h9" />
+      <path d="m3.5 6 1.5 1.5L7.5 5" />
+      <path d="m3.5 12 1.5 1.5L7.5 11" />
+      <path d="m3.5 18 1.5 1.5L7.5 17" />
     </Icon>
   );
 }

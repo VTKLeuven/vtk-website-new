@@ -41,6 +41,9 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
     ingredientsNl: p.ingredientsNl ?? "",
     ingredientsEn: p.ingredientsEn ?? "",
     hasLines: false,
+    // De catalogus is een sjabloon; bestellingen hangen aan het aanbod van een
+    // verkoopdag, niet hieraan.
+    ordered: 0,
   }));
 
   const numField = (name: string, labelNl: string, labelEn: string, value: number, min = 0) => (
@@ -87,6 +90,44 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
           {numField("noShowGraceMinutes", "No-show grace (min)", "No-show grace (min)", config.noShowGraceMinutes, 0)}
           {numField("noShowThreshold", "No-shows voor ban", "No-shows before ban", config.noShowThreshold, 1)}
           {numField("banDurationDays", "Ban-duur (dagen)", "Ban duration (days)", config.banDurationDays, 1)}
+          <fieldset className="grid gap-3 sm:col-span-3">
+            <label className="flex items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                name="noShowPaused"
+                defaultChecked={config.noShowPaused}
+                className="mt-0.5 h-4 w-4 accent-vtk-ink"
+              />
+              <span>
+                <span className="block font-medium text-vtk-ink">
+                  {nl ? "No-shows en bans pauzeren" : "Pause no-shows and bans"}
+                </span>
+                <span className="text-[#5c667f]">
+                  {nl
+                    ? "Zolang dit aan staat, krijgt niemand een no-show-mail en komt er geen automatische ban. Een niet-opgehaalde bestelling blijft als niet opgehaald geboekt, maar telt ook later niet mee voor een ban. Lopende bans blijven lopen."
+                    : "While this is on, nobody gets a no-show email and no automatic ban is created. An order that is not picked up is still booked as such, but never counts towards a ban. Running bans stay in place."}
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-3 text-sm">
+              <input
+                type="checkbox"
+                name="autoPickup"
+                defaultChecked={config.autoPickup}
+                className="mt-0.5 h-4 w-4 accent-vtk-ink"
+              />
+              <span>
+                <span className="block font-medium text-vtk-ink">
+                  {nl ? "Automatisch op afgehaald zetten" : "Mark as picked up automatically"}
+                </span>
+                <span className="text-[#5c667f]">
+                  {nl
+                    ? "Aan de afhaalbalie staat een bestelling meteen op opgehaald zodra de student gevonden is: met de kaartlezer, de pas uit de app, een r-nummer, een naam of een keuze uit de lijst. Gebruikt de student bonnetjes, dan gebeurt het na die vraag. Een laattijdige bestelling blijft een klik. Een foute match zet de shifter meteen terug met Ongedaan maken."
+                    : "At the pickup counter an order is marked as picked up as soon as the student is found: with the card reader, the app pass, an r-number, a name or a choice from the list. If the student uses vouchers, it happens after that question. A late order still needs a click. A wrong match can be reverted at once with Undo."}
+                </span>
+              </span>
+            </label>
+          </fieldset>
           <div className="sm:col-span-3">
             <Label htmlFor="itemLayout">{nl ? "Weergave van de broodjes" : "Sandwich display"}</Label>
             <div className="max-w-xs">
@@ -109,8 +150,9 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
         </SaveForm>
       </Card>
 
-      {/* Standaardaanbod (catalogus) */}
-      <Card className="p-5">
+      {/* Standaardaanbod (catalogus). Het id is het anker van de link op het
+          scherm met de verkoopdagen. */}
+      <Card className="p-5" id="standaardaanbod">
         <h2 className="mb-1 text-lg font-semibold">{nl ? "Standaardaanbod" : "Default offering"}</h2>
         <p className="mb-4 text-sm text-[#5c667f]">
           {nl

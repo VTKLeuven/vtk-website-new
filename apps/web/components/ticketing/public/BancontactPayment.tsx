@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { ArrowLeft, CheckCircle2, CircleDashed, RotateCcw, Smartphone, TimerOff } from "lucide-react";

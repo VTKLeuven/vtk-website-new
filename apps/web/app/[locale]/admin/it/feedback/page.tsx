@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { prisma } from "@vtk/db";
 import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";

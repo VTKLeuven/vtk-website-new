@@ -24,6 +24,23 @@ const nextConfig: NextConfig = {
   // module graph; see apps/web/next.config.ts for the full rationale.
   serverExternalPackages: ["@prisma/client", ".prisma/client", "sharp"],
   outputFileTracingRoot: monorepoRoot,
+  // Dezelfde basis als apps/web/next.config.ts; de uitleg per header staat daar.
+  poweredByHeader: false,
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "SAMEORIGIN" },
+          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+          ...(process.env.NODE_ENV === "production"
+            ? [{ key: "Strict-Transport-Security", value: "max-age=31536000" }]
+            : []),
+        ],
+      },
+    ];
+  },
   turbopack: {
     root: monorepoRoot,
   },

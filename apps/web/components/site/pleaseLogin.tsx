@@ -1,4 +1,4 @@
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { getDictionary, type Locale } from '@vtk/i18n';
 
 type PleaseLoginProps = {
@@ -19,9 +19,12 @@ export function PleaseLogin({ locale, nextPath, className }: PleaseLoginProps) {
     <section className={className}>
       <div className="vtk-card mx-auto max-w-2xl text-center">
         <div className="vtk-page-kicker">{dict.auth.loginRequiredKicker}</div>
-        <h2 className="mt-3 text-3xl font-semibold tracking-tight text-vtk-ink">
+        {/* Een h1: deze vraag is de hele pagina (elke plek die haar toont, geeft
+            ze terug in plaats van de pagina), en zonder h1 had die pagina er
+            voor een screenreader en een zoekmachine geen. */}
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-vtk-ink">
           {dict.auth.loginRequiredTitle}
-        </h2>
+        </h1>
         <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-[#34405e]">
           {dict.auth.loginRequiredBody}
         </p>

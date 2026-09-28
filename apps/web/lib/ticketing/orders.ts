@@ -43,6 +43,8 @@ import {
 import { viewerSalesStart, viewerTypeSalesStart } from "./presale";
 import { presaleViewerFor } from "./presaleViewer";
 import { userIsMember } from "@/lib/membership";
+import { ticketViewerProfile } from "./viewerProfile";
+import { sanitizeSourceKey } from "./source";
 
 const answerValueSchema = z.union([
   z.string().max(2_000),
@@ -57,6 +59,10 @@ export const checkoutRequestSchema = z.object({
   locale: z.enum(["nl", "en"]).default("nl"),
   termsAccepted: z.literal(true),
   paymentProvider: z.enum(["bancontact", "mollie", "mock"]).optional(),
+  // Langs waar de koper kwam (`lib/ticketing/source.ts`). Optioneel en nooit
+  // een reden om te weigeren: een rare waarde wordt opgeschoond of valt weg.
+  source: z.string().max(200).optional().catch(undefined),
+  sourceCampaign: z.string().max(200).optional().catch(undefined),
   items: z
     .array(
       z.object({
@@ -193,16 +199,9 @@ export async function createTicketCheckout(
   }
   const now = new Date();
   const [session, terms] = await Promise.all([getSession(await headers()), getTicketTerms()]);
-  // Erelidtickets staan bij niemand anders in de lijst (zie ticketing/queries.ts);
-  // deze controle is het slot erachter.
-  const isHonorary = session
-    ? ((
-        await prisma.user.findUnique({
-          where: { id: session.user.id },
-          select: { honoraryMember: true },
-        })
-      )?.honoraryMember ?? false)
-    : false;
+  // Erelid- en doelgroeptickets staan bij niemand anders in de lijst (zie
+  // ticketing/queries.ts); deze controle is het slot erachter.
+  const viewerProfile = await ticketViewerProfile(session?.user.id);
   // Een ledenticket staat bij een niet-lid niet in de lijst; dit is het slot
   // erachter. "Lid" is meer dan "heeft een account", zie lib/membership.
   const isMember = await userIsMember(session?.user.id);
@@ -246,11 +245,11 @@ export async function createTicketCheckout(
     ) {
       throw new TicketCheckoutError("INVALID_TICKET_TYPE", item.ticketTypeId);
     }
-    // Een erelidticket staat bij niemand anders in de lijst; wie het toch
+    // Een erelid- of doelgroepticket staat bij niemand anders in de lijst; wie het toch
     // meestuurt, krijgt hetzelfde antwoord als bij een onbestaand type. Deze
     // controle staat bewust voor die op de login: anders verraadt een
     // LOGIN_REQUIRED aan een uitgelogde bezoeker dat het type bestaat.
-    if (ticketTypeIsHidden(type, isHonorary)) {
+    if (ticketTypeIsHidden(type, viewerProfile)) {
       throw new TicketCheckoutError("INVALID_TICKET_TYPE", item.ticketTypeId);
     }
     if (
@@ -414,6 +413,10 @@ export async function createTicketCheckout(
             reservationExpiresAt: expiresAt,
             termsAcceptedAt: now,
             termsVersion: terms.version,
+            // Geen `source` meegestuurd (een oude pagina in een open tabblad):
+            // niet gemeten, en dat is iets anders dan "direct".
+            source: input.source === undefined ? null : (sanitizeSourceKey(input.source) ?? "direct"),
+            sourceCampaign: sanitizeSourceKey(input.sourceCampaign),
             items: {
               create: normalizedItems.map((item, index) => ({
                 ticketTypeId: item.ticketTypeId,

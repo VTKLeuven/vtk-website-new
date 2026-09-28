@@ -168,6 +168,25 @@ of uitgeschakeld aangemaakt.
   over te nemen: die tabel bevat naast redactionele blokken ook `s3.config`,
   `vault.config`, `door.config` en `brevo.lists`.
 
+# Performance van vtk.be
+
+`docs/performance.md` is de referentie: wat er gemeten is, wat er gedaan is en
+wat er nog op de server moet gebeuren. Lees zeker "Vallen waar we in gelopen
+zijn"; al die punten zetten stil tientallen kilobytes terug op elke pagina.
+
+- **Links komen uit `@/components/ui/Link`, niet uit `next/link`.** Die
+  prefetcht pas bij hover of aanraking; `next/link` prefetcht elke link in beeld,
+  en elke prefetch is hier een volledige server-render.
+- **Geen statische import van `@sentry/nextjs` in clientcode.** Gebruik
+  `startSentry()` uit `lib/sentryClient.ts` of een dynamische import.
+- **Geen `getDictionary` in een clientcomponent die in de layout of op veel
+  pagina's staat**: dat zet beide woordenboeken op elke pagina. Geef de labels
+  mee van de server.
+- **Een zwaar clientcomponent dat zelden rendert, laad je met `next/dynamic`**
+  (markdown, een dialoog achter een klik).
+- **Een pagina die leeg rendert en zich in de browser vult, springt**: geef de
+  eerste data mee van de server, zoals /kalender en /shift doen.
+
 # Ritten van de uitleendienst
 
 `docs/uitleendienst.md` is de referentie voor de uitleendienst
@@ -237,6 +256,14 @@ the design language into the application instead of copying mockup content.
   them in sync when you retune.
 - Layout: use generous max-width containers around 1240px (`--max`), the cool `--paper`
   page ground, thin navy-tinted `--line` borders, and clear horizontal rhythm.
+  - **De uitleendienst (`apps/logistiek`) is de uitzondering en heeft geen
+    `--max`.** Daar loopt elke pagina tot tegen de zijmarge
+    (`clamp(20px, 3vw, 36px)`, de klasse `.logistics-gutter`), omdat dat geen
+    leestekst is maar een werkblad: een week met zeven dagkolommen en een
+    beheertabel met zeven kolommen worden in een kolom van 1240px smaller tot je
+    moet inzoomen. Wat er wél als tekst leest (een formulier, een detailkaart)
+    houdt daar zijn eigen leesbreedte met `.logistics-form-width`. Zie
+    `docs/design-decisions.md`.
 - Shape: cards and panels should be softly rounded, usually 16-22px. Small
   controls can be pill-shaped when they are CTAs or filters.
 - Tone: prefer dense editorial utility over marketing decoration. Do not add
@@ -256,8 +283,9 @@ the design language into the application instead of copying mockup content.
   dissolves outward, because the photo is at its lightest exactly there. Do not
   put a card back around it, and see `docs/design-decisions.md` for the rules
   behind the days it shows. The foot of the text column carries the shifts that
-  still have room (`.hero-shifts`) and, below them, the facts line; both hang on
-  the bottom so the column ends on the agenda's last line. That block is the one
+  still have room (`.hero-shifts`), up to three; it hangs on the bottom so the
+  column ends on the agenda's last line. The facts line that sat below it
+  (working year, coming up, since) was removed to make room for those shifts. That block is the one
   place on the homepage for live state, never for another destination: the
   quick-links row below already says where you can go. **How many rows it shows
   is computed from how tall the title turns out** (`lib/frontpage/heroShifts.ts`),
@@ -266,7 +294,9 @@ the design language into the application instead of copying mockup content.
   drops; do not put a fixed number back. The dark zone (`.home-dark-zone`) stretches the photo
   through the quick-links row, which sits on it as a dark glass panel; the zone
   ends on a crisp seam: a short bottom-anchored vignette settles the photo edge
-  and the openingsuren band starts right below it. Both a paper gap and a long
+  and the light-blue **Nieuws** band starts right below it (or, when there is
+  no news or it is switched off in /admin/nieuws, the openingsuren band). Both
+  an empty paper gap and a long
   dissolve into navy were reviewed and rejected there (the gap broke the dark
   flow; the dissolve read as murky, empty dark). The sticky header sits
   transparently over this hero and turns solid once scrolled past it (desktop;
@@ -275,25 +305,40 @@ the design language into the application instead of copying mockup content.
   navy bands and the site-wide dark footer closes the bookend. Header, bands and
   footer share the same `--navy` so the dark chrome reads as one system. The
   lower half of the page alternates navy and light-blue (`--paper-2`) bands:
-  **Wat we doen** (paper) → **Aftermovies** (navy) → **Opkomende evenementen**
-  (`--paper-2`) → **VTK Career** (navy) → **Jouw POC's** (`--paper-2`) →
-  **Hoofdpartners** (paper). The navy bands (openingsuren, aftermovies, career)
+  **Openingsuren** (navy) → **Aankomende evenementen** (`--paper-2`) → **POC's**
+  (navy, when shown) → **Wat we doen** (paper) → **Aftermovies** (navy) →
+  **Shiften** (`--paper-2`, when shown) → **VTK Career** (navy) →
+  **Hoofdpartners** (paper). The events come before "Wat we doen" on purpose:
+  what is coming up this week matters more than the standing offer. The navy bands (openingsuren, aftermovies, career)
   carry the full-bleed `::before` navy fill plus the shared `::after` technical
   pattern, each with its own crop of `technisch-pattern.svg` so no two bands show
-  the same wallpaper. The openingsuren band butts directly against the dark
-  zone's crisp seam with a compact heading. The full-bleed bands
+  the same wallpaper. The openingsuren band follows the Nieuws band (or the
+  dark zone's crisp seam when there is no news) with a compact heading. The full-bleed bands
   (aftermovies, evenementen, career, POC's) share a `band` class: each carries a
   top margin to separate from the paper section above it, but two consecutive
   bands butt directly against each other with a crisp navy/light-blue seam
-  (`.band + .band { margin-top: 0 }`) rather than a paper gap; the light-blue
+  (`.band + .band, .hours-strip + .band { margin-top: 0 }`) rather than a paper gap; the light-blue
   bands also keep tighter internal padding than the navy ones. On a navy band,
   panels are dark glass
   (`rgba(255,255,255,.06)` fill, `.14` white border), headings go `--paper`,
   muted text uses `--on-dark-muted`, and the primary button inverts like on the
-  hero. The **Jouw POC's** band is personal (only rendered for a logged-in member
-  with study programmes) and therefore sits _after_ Career, never between two
-  navy bands: were it between them, the two navy bands would collide the moment it
-  disappears. See `docs/design-decisions.md` for the section ordering rationale.
+  hero. The **POC's** band can disappear (hidden in /admin/pocs, or no
+  representatives for this visitor), so it never sits between two navy bands:
+  were it there, those two would collide the moment it disappears. See
+  `docs/design-decisions.md` for the section ordering rationale.
+- News (`components/editorial/NewsBand.tsx`, `lib/news`): the featured post on
+  the left (usually the word from the praeses, as a letter) and the rest as the
+  shared event tile (`vtk-eventcard.css`) in a carousel beside it, on
+  `--paper-2`. Only the tiles move: one per click or every 15 seconds, with a
+  pause button, no autoplay under `prefers-reduced-motion`; do not let it rotate
+  without that pause control. The kind of a post is a small-caps word, never a
+  colour or an icon tile (those were reviewed and removed: they appeared nowhere
+  else on the site). The word from the praeses is Bakske length: it stays
+  clamped to nine lines in the featured card with "Lees de hele brief" to open
+  it in place; do not make it a tile or let the card grow to its full length.
+  /nieuws is an agenda per week with the /tickets filter chips and a rail; a
+  word from the praeses opens with the author's square portrait. See
+  `docs/design-decisions.md`.
 - Photography: content cards open with a real photo under a navy scrim, never a
   decorative illustration. Aanbod cards ("Wat we doen") carry a photo header
   (16:9, light 115deg scrim) and are uniform: every card in the grid gets the
@@ -478,6 +523,15 @@ the design language into the application instead of copying mockup content.
     so the day card gets the full width (the pin moves beside the day name).
     Three directions were reviewed; this cleaned-up agenda won over a table and
     over event-style tiles.
+  - **De verhuurkalender bestaat twee keer en het raster maar één keer.** Het
+    beheer (`/admin/theokot/verhuur`) en de publieke beschikbaarheidskalender op
+    `/theokot/verhuur` delen `components/theokot/RentalMonthGrid.tsx` en
+    `rentalGrid.ts`; de component bezit de cellen, de beller de inhoud. Publiek
+    staat enkel wat de zaal echt bezet houdt (`PUBLIC_BUSY_STATUSES`: goedgekeurd,
+    afgelopen, afgerond), zonder naam of adres, en met de aard van de activiteit
+    enkel wanneer `TheokotRental.purposePublic` aan staat. Zet er geen
+    onbeantwoorde aanvraag bij en geef er geen velden aan mee die je niet toont:
+    alles wat de client krijgt, staat in de HTML. Zie `docs/design-decisions.md`.
   - **The event tile lives in `apps/web/app/design/vtk-eventcard.css` and is
     shared** by the `/kalender` grid and the homepage band "Aankomende
     evenementen"; both import that file, and `.ev-grid` belongs to it too. Do not
@@ -500,7 +554,9 @@ the design language into the application instead of copying mockup content.
 - Functional pages and modules, including Media and Logistiek, use the same
   visual system as the main website. A separate subdomain or operational flow
   is not a reason to invent another hero, type treatment, palette, container
-  width, or card language.
+  width, or card language. The one agreed exception is the container width of
+  the uitleendienst, see Layout above; everything else there stays the shared
+  system.
   - Only the homepage may use a full-bleed photo hero and italic serif headline
     accent. Every other public or functional landing page starts with the
     canonical dark page head. Do not add a unique photo hero to Media,
@@ -610,6 +666,20 @@ the design language into the application instead of copying mockup content.
   in `docs/design-decisions.md`.
 
 ## Implementation Constraints
+
+- **On a laptop up to 14 inch the whole site renders at 90%** (`zoom: 0.9` on
+  `:root` between 1024 and 1600 CSS px with a fine pointer, in `vtk-base.css`),
+  because it looked right after one Ctrl - and too large at 100%. `zoom` does not
+  scale `vw`/`vh`, so **anything that must reach the screen edge or the full
+  height uses the variables, never the bare unit**: `calc(50 * var(--vtk-vw, 1vw))`
+  for a full-bleed band, `calc(100 * var(--vtk-dvh, 1dvh))` for a screen-high
+  block. A bare `50vw` leaves a strip on each side under the zoom. Fluid padding
+  (`clamp(20px, 3vw, 36px)`) may keep the bare unit.
+  - JavaScript that mixes `getBoundingClientRect`/`clientX`/`innerHeight` (visual
+    pixels) with `offsetWidth`/`offsetHeight`/a width from `ResizeObserver`
+    (layout pixels) is off by 10% under the zoom. Compute a ratio of the visible
+    size, or divide by `rect.height / element.offsetHeight`, as `DailyChart`,
+    `AdminNav` and `CookieConsent` do.
 
 - Keep Tailwind v4 source scanning explicit and do not switch to auto-detection.
 - Keep `next dev --webpack` for both apps; do not re-enable Turbopack in dev.

@@ -53,6 +53,8 @@ export type RentalView = {
   purpose: string;
   attendees: number | null;
   remarks: string | null;
+  /** Staat de aard van de activiteit ook op de publieke kalender? */
+  purposePublic: boolean;
   /** De antwoorden op de vragen die Theokot zelf toevoegde. */
   extraAnswers: { id: string; label: string; value: string }[];
 

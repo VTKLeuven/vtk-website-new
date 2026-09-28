@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { Card, Input, Label, Select } from '@vtk/ui';
 import { saveEventAction } from '@/app/actions/calendar';
 import { DEFAULT_EVENT_LINK_LABEL, EVENT_LINK_LABEL_MAX } from '@/lib/calendar/eventLink';
@@ -9,6 +9,7 @@ import { MarkdownEditorField } from '@/components/editor/MarkdownEditor';
 import { SaveForm } from '@/components/ui/SaveForm';
 import { saveErrorMessages } from '@/lib/saveMessages';
 import { toImageFocus } from '@/lib/imageFocus';
+import { ORGANISER_PRESETS } from '@/lib/calendar/organiser';
 import { EventImageField } from './EventImageField';
 import { EventWhenField, type MomentValue } from './EventWhenField';
 
@@ -36,6 +37,11 @@ type Event = {
   /** De tekst op de knop naar `url`; leeg = "Externe eventlink". */
   urlLabelNl?: string | null;
   urlLabelEn?: string | null;
+  /**
+   * Wanneer aangeduid werd dat `url` de inschrijvingen opent; dan staat het
+   * evenement in het nieuws op de homepage. Zie lib/news/rules.ts.
+   */
+  registrationNewsAt?: Date | null;
   imageKey?: string | null;
   /** Waar de uitsnede van die foto rond draait; zie lib/imageFocus.ts. */
   imageFocusX?: number | null;
@@ -207,6 +213,9 @@ export function EventForm({
    * taal tikte niet verdwijnt bij het wisselen en gewoon mee opgeslagen wordt.
    */
   const [activeLang, setActiveLang] = useState<Lang>('nl');
+  // Wie er als organisator getoond wordt. Gecontroleerd, zodat een snelkeuze
+  // (VTK Alumni) het veld kan invullen zonder dat iemand de naam moet tikken.
+  const [organiser, setOrganiser] = useState(event.organiserName ?? '');
 
   const selected = new Set(event.categoryIds ?? []);
   const audienceCategories = categories.filter((c) => c.audience !== null);
@@ -281,6 +290,7 @@ export function EventForm({
   // evenement heeft er een.
   const hasMoreSettings = Boolean(
     event.url ||
+      event.registrationNewsAt ||
       event.urlLabelNl ||
       event.urlLabelEn ||
       (canHeroWeek && event.heroWeek && event.heroWeek !== 'AUTO')
@@ -535,14 +545,28 @@ export function EventForm({
               <Input
                 id="event-organiser"
                 name="organiserName"
-                defaultValue={event.organiserName ?? ''}
+                value={organiser}
+                onChange={(e) => setOrganiser(e.target.value)}
                 maxLength={120}
                 placeholder={nl ? 'bv. Development x GHC' : 'e.g. Development x GHC'}
               />
+              <div className="vtk-ef-presets">
+                {ORGANISER_PRESETS.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    className="vtk-ef-preset"
+                    aria-pressed={organiser.trim() === preset}
+                    onClick={() => setOrganiser(organiser.trim() === preset ? '' : preset)}
+                  >
+                    {preset}
+                  </button>
+                ))}
+              </div>
               <p className="vtk-ef-hint">
                 {nl
-                  ? 'Enkel bij een crossover; leeg = de groep zelf.'
-                  : 'Only for a crossover; empty = the group itself.'}
+                  ? 'Bij een crossover of een alumni-activiteit; leeg = de groep zelf.'
+                  : 'For a crossover or an alumni activity; empty = the group itself.'}
               </p>
             </div>
           </div>
@@ -822,6 +846,24 @@ export function EventForm({
                   : 'Leave empty for "External event link". If the link goes to someone else’s sign-up form or ticket sales, write "Sign-up link" or "Tickets": that decides whether people click. The English text falls back to the Dutch one.'}
               </p>
             </div>
+            <label className="mt-3 inline-flex items-start gap-2 text-sm text-vtk-ink">
+              <input
+                type="checkbox"
+                name="registrationNews"
+                defaultChecked={Boolean(event.registrationNewsAt)}
+                className="mt-0.5"
+              />
+              <span>
+                {nl
+                  ? 'Deze link opent de inschrijvingen: zet dit in het nieuws op de homepage'
+                  : 'This link opens the sign-ups: put this in the news on the homepage'}
+              </span>
+            </label>
+            <p className="vtk-ef-hint">
+              {nl
+                ? 'Dan staat het evenement als "Inschrijvingen" in de nieuwsband, tot het begint. Enkel voor een gepubliceerd evenement met een link. Gebruik je tickets van VTK, dan hoeft dit niet: een ticketverkoop komt vanzelf in het nieuws.'
+                : 'The event then appears as "Sign-ups" in the news band until it starts. Only for a published event with a link. If you sell VTK tickets, you do not need this: ticket sales appear in the news by themselves.'}
+            </p>
           </div>
 
           {canHeroWeek ? (

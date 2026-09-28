@@ -192,7 +192,7 @@ export function ShiftEditModal({
           <h2 className="text-lg font-semibold">
             {isEdit ? (nl ? "Shift bewerken" : "Edit shift") : nl ? "Nieuwe shift" : "New shift"}
           </h2>
-          <button className="text-zinc-400 hover:text-zinc-700" onClick={onClose} aria-label="Close">
+          <button className="text-vtk-muted hover:text-vtk-body" onClick={onClose} aria-label="Close">
             ✕
           </button>
         </div>
@@ -246,7 +246,7 @@ export function ShiftEditModal({
           <div className="sm:col-span-2">
             <Label>{nl ? "Beschrijving" : "Description"}</Label>
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-            <p className="mt-1 text-xs text-zinc-400">
+            <p className="mt-1 text-xs text-vtk-muted">
               {nl
                 ? "Eén korte regel; staat bovenaan het detailvenster op de shiftpagina."
                 : "One short line; shown at the top of the detail dialog on the shift page."}
@@ -265,7 +265,7 @@ export function ShiftEditModal({
                 <span className="text-sm font-medium">
                   {nl ? "Ook voor internationals" : "Open to internationals"}
                 </span>
-                <span className="block text-xs text-zinc-400">
+                <span className="block text-xs text-vtk-muted">
                   {nl
                     ? "Aanvinken wanneer je deze shift kan doen zonder Nederlands. De shift krijgt dan die markering op de shiftpagina."
                     : "Tick when this shift can be done without speaking Dutch. The shift then carries that marker on the shift page."}
@@ -283,7 +283,7 @@ export function ShiftEditModal({
               rows={8}
               allowImages={false}
             />
-            <p className="mt-1 text-xs text-zinc-400">
+            <p className="mt-1 text-xs text-vtk-muted">
               {nl
                 ? "Optioneel: wat moet je doen, waar meld je je, wat mag je verwachten. Leeg laten verbergt dit blok op de shiftpagina."
                 : "Optional: what to do, where to report, what to expect. Leaving it empty hides this block on the shift page."}
@@ -301,11 +301,11 @@ export function ShiftEditModal({
                 bereiken, en dan moeten het r-nummer, de mail en het gsm-nummer
                 naast elkaar staan in plaats van in een tooltip. */}
             {participants.length === 0 ? (
-              <p className="mb-2 text-sm text-zinc-400">
+              <p className="mb-2 text-sm text-vtk-muted">
                 {nl ? "Nog niemand ingeschreven." : "Nobody registered yet."}
               </p>
             ) : (
-              <div className="mb-3 overflow-x-auto rounded-xl border border-zinc-200">
+              <div className="mb-3 overflow-x-auto rounded-xl border border-vtk-navy/10">
                 <table className="w-full text-sm">
                   <thead className="bg-vtk-blue-soft text-left">
                     <tr>
@@ -318,15 +318,15 @@ export function ShiftEditModal({
                   </thead>
                   <tbody>
                     {participants.map((p) => (
-                      <tr key={p.userId} className="border-t border-zinc-200">
+                      <tr key={p.userId} className="border-t border-vtk-navy/10">
                         <td className="px-3 py-2 font-medium">{p.name}</td>
-                        <td className="px-3 py-2 tabular-nums text-zinc-500">{p.rNumber ?? "—"}</td>
-                        <td className="px-3 py-2 text-zinc-500">
+                        <td className="px-3 py-2 tabular-nums text-vtk-muted">{p.rNumber ?? "—"}</td>
+                        <td className="px-3 py-2 text-vtk-muted">
                           <a className="hover:underline" href={`mailto:${p.email}`}>
                             {p.email}
                           </a>
                         </td>
-                        <td className="px-3 py-2 tabular-nums text-zinc-500">
+                        <td className="px-3 py-2 tabular-nums text-vtk-muted">
                           {/* Leeg zolang het lid geen nummer invulde: het veld is
                               optioneel, dus een streepje is hier de waarheid. */}
                           {p.phone ? (
@@ -340,7 +340,7 @@ export function ShiftEditModal({
                         <td className="px-3 py-2 text-right">
                           <button
                             type="button"
-                            className="text-zinc-500 hover:text-red-600"
+                            className="text-vtk-muted hover:text-vtk-danger"
                             onClick={() => removeParticipant(p.userId)}
                             title={nl ? "Uitschrijven" : "Remove"}
                             aria-label={`${nl ? "Uitschrijven" : "Remove"}: ${p.name}`}
@@ -360,7 +360,7 @@ export function ShiftEditModal({
               placeholder={nl ? "Zoek op naam, e-mail of r-nummer..." : "Search by name, email or r-number..."}
             />
             {addSearch.trim().length >= 2 && (
-              <div className="mt-1 overflow-hidden rounded-xl border border-zinc-200">
+              <div className="mt-1 overflow-hidden rounded-xl border border-vtk-navy/10">
                 {addable.map((u) => (
                   <button
                     key={u.id}
@@ -368,27 +368,27 @@ export function ShiftEditModal({
                     onClick={() => addParticipant(u)}
                   >
                     {u.name}{" "}
-                    <span className="text-zinc-400">
+                    <span className="text-vtk-muted">
                       {u.rNumber ? `${u.rNumber} · ` : ""}
                       {u.email}
                     </span>
                   </button>
                 ))}
                 {addable.length === 0 && (
-                  <div className="px-3 py-1.5 text-sm text-zinc-400">
+                  <div className="px-3 py-1.5 text-sm text-vtk-muted">
                     {nl ? "Geen gebruikers gevonden." : "No users found."}
                   </div>
                 )}
               </div>
             )}
-            <p className="mt-1 text-xs text-zinc-400">
+            <p className="mt-1 text-xs text-vtk-muted">
               {nl
                 ? "Als admin kan je deelnemers toevoegen/verwijderen zonder de gewone regels (overlap, vol, verleden)."
                 : "As an admin you can add/remove participants regardless of the usual rules (overlap, full, past)."}
             </p>
           </div>
         ) : (
-          <p className="mt-4 text-xs text-zinc-400">
+          <p className="mt-4 text-xs text-vtk-muted">
             {nl
               ? "Shifters kan je inschrijven na het aanmaken, door de shift in de lijst te openen."
               : "You can register shifters after creating, by opening the shift in the list."}
@@ -403,7 +403,7 @@ export function ShiftEditModal({
           {isEdit && onDelete ? (
             <button
               type="button"
-              className="mr-auto text-sm font-medium text-red-600 hover:underline"
+              className="mr-auto text-sm font-medium text-vtk-danger hover:underline"
               onClick={onDelete}
             >
               {nl ? "Shift verwijderen" : "Delete shift"}

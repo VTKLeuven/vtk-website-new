@@ -80,20 +80,20 @@ body {
   font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
+/* De uitleendienst heeft bewust géén `--max` (F4.6, D1).
+   Op vtk.be staat elke pagina in een kolom van 1240px, want dat is leestekst:
+   een regel die over een breed scherm loopt, raak je kwijt. Dit is geen
+   leestekst maar een werkblad. Een week is een urenkolom plus zeven dagen, en
+   een ritlijst draagt er zeven; wat daar niet past, verdwijnt niet, maar wordt
+   smaller tot je moet inzoomen om een naam te lezen. Logistiek vroeg precies
+   dat: "die zijkanten mogen opgevuld worden, zodat ik niet hoef in te zoomen."
+   De zijmarge blijft wel bestaan (`.logistics-gutter`), dus de inhoud plakt
+   nooit tegen de vensterrand, en wat wél een leesbreedte nodig heeft, zet die
+   met `.logistics-form-width` op zijn eigen blok in plaats van op de hele app.
+   De styleguide in CLAUDE.md pint die 1240px voor vtk.be en noemt deze
+   uitzondering. */
 :root {
   --vtk-header-height: 73px;
-  --max: 1240px;
-}
-
-/* Nog te beslissen rit in de transportplanning: gestreept, zodat je ziet dat
-   dat moment nog kan vrijkomen (T7, T8). Een streeppatroon en geen kleur, want
-   de kleur is al bezet door de chauffeur. */
-.week-block-requested {
-  background-image: repeating-linear-gradient(
-    135deg,
-    var(--driver-requested) 0 5px,
-    transparent 5px 11px
-  );
 }
 
 /* Arcering per voertuig (K1). De vulkleur blijft van de chauffeur, dus het
@@ -104,9 +104,8 @@ body {
    weer uit. Ze zijn bewust licht (alfa rond 0.13): het is een tweede laag
    informatie, geen tweede kleur, en de tekst in het blok moet leesbaar blijven.
 
-   Een blok kan tegelijk `week-block-requested` dragen. Twee schuine patronen
-   over elkaar worden soep, daarom staat `diagonal` op 45 graden en de
-   te-beslissen-arcering op 135: samen lezen ze als een ruit en niet als ruis. */
+   Een blok kan tegelijk `trip-requested` dragen; die tekent een streep langs de
+   bovenrand en geen tweede arcering, precies zodat ze hier niet mee vecht. */
 .trip-pattern-diagonal {
   background-image: repeating-linear-gradient(
     45deg,
@@ -354,6 +353,20 @@ body {
   flex: 1 1 0%;
   min-height: 0;
   padding: 8px 12px 0;
+}
+
+/* De weeknota (F4.5), tussen de penseelrij en het raster.
+
+   Boven het raster en niet in de voetregel: het is iets wat over de hele week
+   gaat, en dat lees je voor je begint aan te duiden, niet erna. Eén regel hoog,
+   want elke pixel hier is er een die het raster niet krijgt. */
+.paint-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--line);
 }
 
 .paint-foot {
@@ -676,6 +689,53 @@ body {
   border-color: var(--driver-edge);
 }
 
+/* Nog te beslissen (T7, T8, F4.16): een volle streep langs de bovenrand, zodat
+   je ziet dat dat moment nog kan vrijkomen.
+
+   **Geen arcering**, en dat is de hele correctie. Ze was een schuin streeppatroon
+   op 135 graden, met de gedachte dat het naast de 45 graden van een voertuig als
+   een ruit zou lezen. Twee dingen klopten daar niet aan. Ten eerste zetten
+   allebei `background-image`, dus ze stapelden niet: de arcering van het voertuig
+   won gewoon, waardoor een aangevraagde rit met een gearceerd voertuig géén
+   markering meer droeg. Ten tweede is arcering al de taal van het voertuig; een
+   status in diezelfde taal is niet te lezen, ook niet wanneer ze wél zou
+   stapelen. De vulkleur is de chauffeur, de arcering is het voertuig, en de
+   status hoort dus op een derde as.
+
+   Een rand en geen pseudo-element: hetzelfde blok is in de weekweergave een
+   absoluut gepositioneerde doos, in de maandweergave een `flex`-rij en op gsm nog
+   iets anders. Een `::before` wordt in die tweede een flex-item naast de tekst in
+   plaats van een streep erboven, en absoluut positioneren zou hem in dat geval
+   aan een voorouder ophangen. Een rand ligt altijd waar hij hoort.
+
+   Ná `.trip-no-driver` in dit bestand, want die zet `border-style: dashed` op
+   alle vier de randen; bij gelijke specificiteit wint de laatste regel, en deze
+   streep hoort vol te zijn. */
+.trip-requested {
+  border-top-width: 3px;
+  border-top-style: solid;
+  border-top-color: var(--driver-requested);
+}
+
+/* Een rit van je eigen post of werkgroep (F4.15): een gele rail langs de
+   linkerrand, dezelfde taal als een uitgelichte kaart op vtk.be.
+
+   Een `border-left` en geen `box-shadow`, om dezelfde reden als hierboven plus
+   een eigen: de selectie in de kalender is een Tailwind-`ring`, en dat ís een
+   box-shadow, dus een tweede schaduw hier zou de ring van het aangeklikte blok
+   wegnemen. Ook geen derde randkleur: rood vol blijft een conflict en grijs
+   gestreept blijft "nog geen chauffeur". Die staan op de andere randen en
+   blijven dus zichtbaar naast deze rail.
+
+   Enkel op het bezettingsoverzicht, waar een post naar de planning van de hele
+   kring kijkt. Op de planning van het team zou het niets onderscheiden: daar is
+   alles van jou. */
+.trip-mine {
+  border-left-width: 3px;
+  border-left-style: solid;
+  border-left-color: var(--yellow);
+}
+
 /* De rit die je aan het aanmaken bent, terwijl het formulier openstaat. Dezelfde
    grijze taal als "nog geen chauffeur", want dat is ze ook. Ze blijft staan tot
    je opslaat of annuleert: zonder dat verdween je selectie op het moment dat je
@@ -755,10 +815,8 @@ body {
 .vtk-site-header .nav-inner {
   display: flex;
   min-height: 72px;
-  max-width: var(--max);
   align-items: center;
   gap: clamp(18px, 3vw, 46px);
-  margin: 0 auto;
   padding: 0 clamp(20px, 3vw, 36px);
 }
 
@@ -1023,11 +1081,18 @@ body {
   background-position: calc(50% + 340px) -160px;
 }
 
+/* Eén zijmarge voor de hele app, en het enige wat de inhoud nog van de
+   vensterrand houdt sinds `--max` weg is (F4.6).
+
+   Alles wat over de volle breedte staat, draagt ze: de paginakop, de inhoud,
+   het beheerblad, de voettekst en de donkere band op de startpagina. Zolang er
+   een kolom van 1240px was, lijnden die vanzelf onder elkaar uit; nu doet enkel
+   deze marge dat nog, dus een blok dat haar niet draagt, springt zichtbaar in.
+   `.logistics-gutter` is daarom de klasse die je op zo'n blok zet. */
 .logistics-page-head-inner,
-.logistics-page-content {
+.logistics-page-content,
+.logistics-gutter {
   width: 100%;
-  max-width: var(--max);
-  margin: 0 auto;
   padding-inline: clamp(20px, 3vw, 36px);
 }
 
@@ -1283,6 +1348,18 @@ body {
 
 .logistics-inline-link:hover {
   border-color: var(--line-2);
+}
+
+/* Een beheerscherm dat uit velden bestaat, houdt een leesbreedte (F4.6).
+
+   Zonder `--max` krijgt elk scherm het volle venster, en dat is precies wat een
+   rooster, een tabel of een lijst kaarten nodig heeft. Een formulier niet: een
+   tekstvak van negenhonderd pixels voor één zin is geen ruimte maar leegte, en
+   je oog moet van het label helemaal naar rechts en weer terug. 1100px is de
+   breedte die deze schermen vóór F4.6 hadden (1440 min de kop, de zijbalk en de
+   kloof ertussen), dus ze zien er nog uit zoals toen. */
+.logistics-form-width {
+  max-width: 1100px;
 }
 
 .logistics-admin-layout {

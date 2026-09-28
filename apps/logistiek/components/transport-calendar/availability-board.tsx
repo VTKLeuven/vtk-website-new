@@ -9,6 +9,7 @@ import {
 } from '@/lib/availability-kinds';
 import type { DriverColorOverrides } from '@/lib/driver-colors';
 import { driverColorVar } from '@/lib/driver-colors';
+import { isoWeekNumber } from '@/lib/uitleen';
 import { startOfBrusselsDay } from '@/lib/week-lanes';
 import type { AvailabilityBand } from './types';
 
@@ -29,6 +30,12 @@ import type { AvailabilityBand } from './types';
  *   tijden tot op het kwartier/halfuur nauwkeurig te bekijken.
  * - **Vastgezette chauffeurskolom (sticky)**: Bij horizontaal scrollen blijven
  *   de namen van de chauffeurs altijd links in beeld.
+ * - **De weeknota's staan onder de balken, niet ernaast** (F4.5). De
+ *   naamkolom is 144 pixels breed en draagt al een naam plus een urentelling;
+ *   een zin als "die week examens" past daar niet in en zou afgekapt worden tot
+ *   ze niets meer zegt. Belangrijker: wie een nota schreef maar niets aanduidde,
+ *   heeft hier helemaal geen balkenrij, en precies díé nota ("ik kan die week
+ *   niet") is degene die het team moet lezen.
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -63,6 +70,14 @@ const timeFormatter = new Intl.DateTimeFormat('nl-BE', {
 
 export type BoardDriver = { id: string; name: string };
 
+/** Eén algemene nota van één chauffeur over één week (F4.5). */
+export type BoardNote = {
+  driverId: string;
+  /** De maandag, als ISO-string van UTC-middernacht. */
+  weekStart: string;
+  text: string;
+};
+
 /** Eén venster als balkje op de strook. */
 type Bar = {
   id: string;
@@ -93,6 +108,7 @@ export function AvailabilityBoard({
   days,
   windows,
   drivers,
+  notes,
   driverColors,
 }: {
   /** De dagen van de weergave, als ISO-strings van UTC-middernacht. */
@@ -100,6 +116,8 @@ export function AvailabilityBoard({
   windows: AvailabilityBand[];
   /** Iedereen die kan rijden (gefilterd op karchauffeurs), ook wie niets doorgaf. */
   drivers: BoardDriver[];
+  /** De algemene nota's bij de weken in beeld (F4.5). */
+  notes?: BoardNote[];
   driverColors?: DriverColorOverrides;
 }) {
   const [only, setOnly] = useState<string[]>([]);
@@ -285,6 +303,28 @@ export function AvailabilityBoard({
     const without = chosen.filter((driver) => (perDriver.get(driver.id)?.length ?? 0) === 0);
     return { withWindows, without };
   }, [drivers, hoursPerDriver, only, perDriver]);
+
+  /**
+   * De nota's die bij deze weergave horen, in de volgorde van de rijen erboven
+   * en met de chauffeursfilter erop (F4.5).
+   *
+   * Het weeknummer staat er enkel bij wanneer de weergave meer dan één week
+   * beslaat; in de weekweergave weet je die al uit de kop erboven.
+   */
+  const shownNotes = useMemo(() => {
+    if (!notes || notes.length === 0) return [];
+    const byId = new Map(drivers.map((driver) => [driver.id, driver.name]));
+    const weeks = new Set(notes.map((note) => note.weekStart));
+    return notes
+      .filter((note) => byId.has(note.driverId))
+      .filter((note) => only.length === 0 || only.includes(note.driverId))
+      .map((note) => ({
+        ...note,
+        name: byId.get(note.driverId) as string,
+        week: weeks.size > 1 ? `week ${isoWeekNumber(new Date(note.weekStart))}` : null,
+      }))
+      .sort((a, b) => a.weekStart.localeCompare(b.weekStart) || a.name.localeCompare(b.name));
+  }, [drivers, notes, only]);
 
   /**
    * Dynamische tijdsverdeling (ticks) afhankelijk van het zoomniveau en het
@@ -710,6 +750,34 @@ export function AvailabilityBoard({
               balk voor het exacte uur en details.
             </p>
           )}
+
+          {/* De algemene nota's (F4.5). Onder de balken, want het is tekst en
+              geen tijdstip: de naamkolom is er te smal voor, en wie enkel een
+              nota schreef zonder iets aan te duiden, heeft hierboven geen rij. */}
+          {shownNotes.length > 0 ? (
+            <div className="mt-3 border-t border-vtk-navy/10 pt-2">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-vtk-muted">
+                Nota&apos;s van de chauffeurs
+              </p>
+              <ul className="mt-1.5 grid gap-1">
+                {shownNotes.map((note) => (
+                  <li key={`${note.driverId}-${note.weekStart}`} className="flex gap-2 text-xs">
+                    <span
+                      aria-hidden
+                      className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full border border-vtk-navy/20"
+                      style={{ backgroundColor: driverColorVar(note.driverId, driverColors) }}
+                    />
+                    <span className="min-w-0">
+                      <span className="font-semibold text-vtk-ink">{note.name}</span>
+                      {note.week ? <span className="text-vtk-muted"> ({note.week})</span> : null}
+                      <span className="text-vtk-muted"> · </span>
+                      <span className="text-vtk-body">{note.text}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
 
           {rows.without.length > 0 ? (
             <p className="mt-2 border-t border-vtk-navy/10 pt-2 text-xs text-vtk-muted">

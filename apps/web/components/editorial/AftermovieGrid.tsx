@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { trackAftermovie } from "@/lib/analytics-client";
 
 export type AftermovieGridItem = {
   id: string;
@@ -44,7 +45,12 @@ export function AftermovieGrid({
               <button
                 type="button"
                 className="am-play"
-                onClick={() => setStartedId(item.id)}
+                onClick={() => {
+                  setStartedId(item.id);
+                  // Hetzelfde event als de speler op /media, zodat een
+                  // aftermovie die op de homepage start ook meetelt.
+                  trackAftermovie({ id: item.id, title: item.title });
+                }}
                 aria-label={`${playLabel}: ${item.title}`}
                 title={playLabel}
               >

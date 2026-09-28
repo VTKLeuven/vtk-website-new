@@ -1,13 +1,19 @@
 import { Children, type ReactNode } from "react";
+import type { Element } from "hast";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { DEFAULT_LOCALE, type Locale } from "@vtk/i18n";
+import { DEFAULT_LOCALE, getDictionary, type Locale } from "@vtk/i18n";
 import { galleryPhotos, imageSize, solePhoto } from "@/lib/gallery";
 import { headingId, headingText } from "@/lib/pageOutline";
 import { LETTER_LIMIT, revealLetters, revealWords } from "@/lib/revealWords";
 import { isVideoUrl } from "@/lib/videoEmbed";
-import { PageGallery } from "@/components/site/PageGallery";
+import dynamic from "next/dynamic";
 import { InlineVideoPlayer } from "./InlineVideoPlayer";
+
+// Via `next/dynamic`: deze renderer draait ook in de browser (de kalender, het
+// voorbeeld in de editor), en een statische import trok de galerij met beide
+// woordenboeken mee in die bundels, ook waar er nooit een galerij staat.
+const PageGallery = dynamic(() => import("@/components/site/PageGallery").then((m) => m.PageGallery));
 
 /**
  * Zet ingesloten video-iframes of losstaande video-links om naar de markdown-media-syntax `![Titel](url)`.
@@ -31,6 +37,50 @@ export function preprocessMarkdownVideos(markdown: string): string {
   );
 
   return result;
+}
+
+/**
+ * Knipt een alinea met een video erin op: de tekst ervoor en erna blijven
+ * alinea's, de video staat ertussen. Null wanneer er geen video in staat.
+ *
+ * Een video is een blok (`InlineVideoPlayer` is een `<div>`), en een `<div>`
+ * binnen een `<p>` is ongeldige HTML: de browser sluit de alinea er zelf voor,
+ * en React struikelt bij de hydration over het verschil met de server-uitvoer
+ * (React #418) en rendert de hele pagina opnieuw in de browser. Dat gebeurt
+ * zodra een redacteur een video op de regel onder een zin zet, zonder witregel
+ * ertussen ("Vorig jaar:" + video op /eerstejaars/eerstejaarswerking).
+ */
+function splitAroundVideos(node: Element | undefined, children: ReactNode): ReactNode[] | null {
+  if (!node || !Array.isArray(node.children)) return null;
+  const isVideo = (child: Element["children"][number]) =>
+    child.type === "element" &&
+    child.tagName === "img" &&
+    isVideoUrl(typeof child.properties?.src === "string" ? child.properties.src : null);
+  if (!node.children.some(isVideo)) return null;
+
+  // react-markdown geeft per kind van de alinea precies één gerenderd kind
+  // door, in dezelfde volgorde. Klopt dat niet, dan valt er niets veilig te
+  // knippen en blijft de alinea zoals ze was.
+  const rendered = Array.isArray(children) ? children : [children];
+  if (rendered.length !== node.children.length) return null;
+
+  const parts: ReactNode[] = [];
+  let text: ReactNode[] = [];
+  const flush = () => {
+    const hasContent = text.some((item) => typeof item !== "string" || item.trim() !== "");
+    if (hasContent) parts.push(<p key={`p${parts.length}`}>{text}</p>);
+    text = [];
+  };
+  node.children.forEach((child, index) => {
+    if (isVideo(child)) {
+      flush();
+      parts.push(rendered[index]);
+    } else {
+      text.push(rendered[index]);
+    }
+  });
+  flush();
+  return parts;
 }
 
 /**
@@ -113,7 +163,21 @@ export function Markdown({
         // ertussen, een enkele foto, een video) blijft een gewone alinea.
         p: ({ node, children: paragraphChildren }) => {
           const photos = galleryPhotos(node);
-          if (photos) return <PageGallery photos={photos} locale={locale} />;
+          if (photos) {
+            const t = getDictionary(locale).photos;
+            return (
+              <PageGallery
+                photos={photos}
+                labels={{
+                  openPhoto: t.openPhoto,
+                  close: t.close,
+                  photoCounter: t.photoCounter,
+                  previousPhoto: t.previousPhoto,
+                  nextPhoto: t.nextPhoto,
+                }}
+              />
+            );
+          }
 
           // Eén foto in een alinea die verder niets bevat, wordt een figuur; de
           // markdown-titel (`![alt](url "Cantus 2025")`) wordt het bijschrift.
@@ -133,6 +197,9 @@ export function Markdown({
               </figure>
             );
           }
+
+          const parts = splitAroundVideos(node, paragraphChildren);
+          if (parts) return <>{parts}</>;
 
           return <p>{paragraphChildren}</p>;
         },

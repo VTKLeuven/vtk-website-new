@@ -1,5 +1,5 @@
 import Image from "next/image";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { type Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
 import { isExternalUrl, withLocaleBase } from "@/lib/href";

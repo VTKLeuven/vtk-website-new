@@ -7,7 +7,8 @@ import { requireSession } from '@/lib/session';
 import { PleaseLogin } from '@/components/site/pleaseLogin';
 import { prisma } from '@vtk/db';
 import { addDays, startOfWeek } from 'date-fns';
-import { academicYearRange, currentAcademicYear } from '@/lib/shift';
+import { academicYearRange, currentAcademicYear, parseShiftArray } from '@/lib/shift';
+import { availableShifts, registeredShifts } from '@/lib/shift/lists';
 import { loadPostNames } from '@/lib/shift/postNames';
 import { ShiftBoard } from '@/components/shift/ShiftBoard';
 import type { ShiftYearStats } from '@/components/shift/MyShiftsRail';
@@ -72,9 +73,11 @@ export default async function ShiftPage({ params }: { params: Promise<{ locale: 
   const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 });
   const currentWeekEnd = addDays(currentWeekStart, 7);
 
-  const [stats, postNames, shiftThisWeek] = await Promise.all([
+  const [stats, postNames, available, registered, shiftThisWeek] = await Promise.all([
     yearStats(session.user.id),
     loadPostNames(locale),
+    availableShifts(session.user.id),
+    registeredShifts(session.user.id, session.user.id),
     prisma.shift.findFirst({
       where: {
         endTime: { gte: now },
@@ -108,6 +111,8 @@ export default async function ShiftPage({ params }: { params: Promise<{ locale: 
         stats={stats}
         postNames={postNames}
         initialWeekStart={initialWeekStart.toISOString()}
+        initialAvailable={parseShiftArray(available)}
+        initialRegistered={parseShiftArray(registered)}
       />
     </div>
   );

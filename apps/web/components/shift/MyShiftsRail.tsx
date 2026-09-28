@@ -1,5 +1,5 @@
 'use client';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { useState } from 'react';
 import { differenceInCalendarDays } from 'date-fns';
 import { getDictionary, type Locale } from '@vtk/i18n';

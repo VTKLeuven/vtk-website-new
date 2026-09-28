@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { Fragment, useEffect, useRef, useState } from "react";
+import Link from "@/components/ui/Link";
 import Image from "next/image";
 import { trackTicketPurchased } from "@/lib/analytics-client";
 import {
@@ -26,6 +26,7 @@ import {
   formatTicketPrice,
   type PublicOrder,
 } from "./types";
+import { withSource } from "@/lib/ticketing/source";
 
 type StatusPayload = PublicOrder | { order?: PublicOrder; error?: string; message?: string };
 const TERMINAL = new Set([
@@ -205,7 +206,9 @@ export function OrderStatus({
       : canChoosePayment
         ? t.reservedLead
         : t.processingLead;
-  const orderAgainHref = order.event.slug ? `${base}/tickets/${order.event.slug}` : `${base}/tickets`;
+  const orderAgainHref = order.event.slug
+    ? withSource(`${base}/tickets/${order.event.slug}`, "bestelling")
+    : `${base}/tickets`;
 
   return (
     <>
@@ -378,7 +381,20 @@ export function OrderStatus({
               </div>
               <div>
                 <dt>{t.confirmationTo}</dt>
-                <dd>{order.buyerEmail}</dd>
+                <dd>
+                  {/* Past een adres toch niet, dan breekt het voor de @ en niet
+                      voor de laatste letter. */}
+                  {order.buyerEmail.split("@").map((part, i) => (
+                    <Fragment key={i}>
+                      {i > 0 ? (
+                        <>
+                          <wbr />@
+                        </>
+                      ) : null}
+                      {part}
+                    </Fragment>
+                  ))}
+                </dd>
               </div>
               <div>
                 <dt>{t.status}</dt>

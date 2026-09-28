@@ -28,7 +28,7 @@ import {
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { TICKET_TERMS_SETTING_KEY } from "@/lib/ticketing/terms";
-import { ticketAudienceFrom, type TicketAudience } from "@/lib/ticketing/audience";
+import { ticketAudienceFrom, ticketAudienceLabel, type TicketAudience } from "@/lib/ticketing/audience";
 import { getTicketEventTemplate } from "@/lib/ticketing/templateStore";
 import {
   applyTicketTemplateType,
@@ -84,10 +84,9 @@ function value(formData: FormData, key: string): string {
 }
 
 /** Het woord dat in de auditlijn staat; de UI vertaalt zelf. */
-function ticketAudienceLabel(audience: TicketAudience): string {
-  if (audience === "MEMBERS") return "alleen leden";
-  if (audience === "HONORARY") return "alleen ereleden";
-  return "publiek";
+function ticketAudienceAuditLabel(audience: TicketAudience): string {
+  if (audience === "PUBLIC") return "publiek";
+  return ticketAudienceLabel(audience, "nl").toLowerCase();
 }
 
 /**
@@ -1175,7 +1174,7 @@ export async function saveTicketTypeAction(
   ]);
   const changes = [
     color === type.color ? null : `kleur op ${color}`,
-    audience === type.audience ? null : `doelgroep op ${ticketAudienceLabel(audience)}`,
+    audience === type.audience ? null : `doelgroep op ${ticketAudienceAuditLabel(audience)}`,
     nameNl === type.nameNl ? null : `naam op ${nameNl}`,
     unitPriceCents === type.unitPriceCents
       ? null

@@ -3,8 +3,16 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { RENTAL_STATUS_META, isDeclinedRental } from "@/lib/theokotVerhuur";
 import { RentalCalendarSubscribe } from "@/components/theokot/RentalCalendarSubscribe";
+import { RentalMonthGrid } from "@/components/theokot/RentalMonthGrid";
+import {
+  addDays,
+  buildRentalTimeSegments,
+  dayKey,
+  groupByDay,
+  mondayOf,
+  weekdayLabels,
+} from "@/components/theokot/rentalGrid";
 import { layoutDayEvents } from "@/lib/calendarLayout";
-import { shiftYMD, ymdKey } from "@/lib/brussels";
 import type { RentalView } from "./types";
 
 /**
@@ -49,82 +57,10 @@ const TONE_COLOUR: Record<string, string> = {
   done: "#5C667F",
 };
 
-function dayKey(date: Date): string {
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${date.getFullYear()}-${month}-${day}`;
-}
-
-/** De maandag van de week waar `date` in valt. */
-function mondayOf(date: Date): Date {
-  const shift = (date.getDay() + 6) % 7;
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() - shift);
-}
-
-/** Zes rijen van zeven dagen, maandag eerst; hetzelfde raster als /kalender. */
-function monthCells(cursor: Date): Date[] {
-  const first = new Date(cursor.getFullYear(), cursor.getMonth(), 1);
-  const start = mondayOf(first);
-  return Array.from(
-    { length: 42 },
-    (_, i) => new Date(start.getFullYear(), start.getMonth(), start.getDate() + i),
-  );
-}
-
-function addDays(date: Date, days: number): Date {
-  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
-}
-
-export type TimeGridSegment = {
-  key: string;
-  day: string;
-  minutes: number;
-  endMinutes: number;
-  isContinuation: boolean;
-  rental: RentalView;
-};
-
-/**
- * Splitst verhuren die na middernacht doorlopen op in twee blokken voor het
- * tijdrooster: avonddeel (start tot 24:00) en ochtenddeel (00:00 tot einde).
- */
-export function buildRentalTimeSegments(rentals: RentalView[]): Map<string, TimeGridSegment[]> {
-  const map = new Map<string, TimeGridSegment[]>();
-  for (const rental of rentals) {
-    const day1End = Math.min(rental.endMinutes, 24 * 60);
-    const seg1: TimeGridSegment = {
-      key: `${rental.id}-start`,
-      day: rental.day,
-      minutes: rental.minutes,
-      endMinutes: day1End,
-      isContinuation: false,
-      rental,
-    };
-    const b1 = map.get(rental.day);
-    if (b1) b1.push(seg1);
-    else map.set(rental.day, [seg1]);
-
-    if (rental.endMinutes > 24 * 60) {
-      const [y, m, d] = rental.day.split("-").map(Number);
-      const nextDay = ymdKey(shiftYMD({ year: y!, month: m!, day: d! }, 1));
-      const seg2: TimeGridSegment = {
-        key: `${rental.id}-cont`,
-        day: nextDay,
-        minutes: 0,
-        endMinutes: Math.min(rental.endMinutes - 24 * 60, 24 * 60),
-        isContinuation: true,
-        rental,
-      };
-      const b2 = map.get(nextDay);
-      if (b2) b2.push(seg2);
-      else map.set(nextDay, [seg2]);
-    }
-  }
-  for (const bucket of map.values()) {
-    bucket.sort((a, b) => a.minutes - b.minutes || a.endMinutes - b.endMinutes);
-  }
-  return map;
-}
+/* De rekenkunde van de rasters (dagsleutels, het maandraster, het opsplitsen van
+   een verhuur die na middernacht doorloopt) staat in
+   `components/theokot/rentalGrid.ts`, omdat de publieke beschikbaarheidskalender
+   op /theokot/verhuur dezelfde verhuren tekent. */
 
 export function RentalCalendar({
   nl,
@@ -153,16 +89,7 @@ export function RentalCalendar({
   );
   const declinedCount = rentals.filter((rental) => isDeclinedRental(rental.status)).length;
 
-  const byDay = useMemo(() => {
-    const map = new Map<string, RentalView[]>();
-    for (const rental of visible) {
-      const bucket = map.get(rental.day);
-      if (bucket) bucket.push(rental);
-      else map.set(rental.day, [rental]);
-    }
-    for (const bucket of map.values()) bucket.sort((a, b) => a.minutes - b.minutes);
-    return map;
-  }, [visible]);
+  const byDay = useMemo(() => groupByDay(visible), [visible]);
 
   const timeSegmentsByDay = useMemo(() => buildRentalTimeSegments(visible), [visible]);
 
@@ -195,9 +122,7 @@ export function RentalCalendar({
   const today = dayKey(new Date());
   const dates =
     view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(mondayOf(cursor), i)) : [cursor];
-  const weekdayLabels = nl
-    ? ["ma", "di", "wo", "do", "vr", "za", "zo"]
-    : ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const dows = weekdayLabels(nl);
 
   return (
     <div>
@@ -283,38 +208,22 @@ export function RentalCalendar({
       </p>
 
       {view === "month" ? (
-        <div className="tv-month">
-          <div className="tv-month-head">
-            {weekdayLabels.map((label) => (
-              <div key={label}>{label}</div>
-            ))}
-          </div>
-          <div className="tv-month-body">
-            {monthCells(cursor).map((date) => {
-              const key = dayKey(date);
-              const dayRentals = byDay.get(key) ?? [];
-              return (
-                <div
-                  key={key}
-                  className="tv-day"
-                  data-outside={date.getMonth() !== cursor.getMonth()}
-                  data-today={key === today}
-                >
-                  <span className="tv-daynum">{date.getDate()}</span>
-                  {dayRentals.map((rental) => (
-                    <Chip
-                      key={rental.id}
-                      nl={nl}
-                      rental={rental}
-                      selected={rental.id === selectedId}
-                      onSelect={onSelect}
-                    />
-                  ))}
-                </div>
-              );
-            })}
-          </div>
-        </div>
+        <RentalMonthGrid
+          nl={nl}
+          cursor={cursor}
+          todayKey={today}
+          renderCell={(cell) =>
+            (byDay.get(cell.key) ?? []).map((rental) => (
+              <Chip
+                key={rental.id}
+                nl={nl}
+                rental={rental}
+                selected={rental.id === selectedId}
+                onSelect={onSelect}
+              />
+            ))
+          }
+        />
       ) : (
         <div className="tv-time">
           <div
@@ -324,7 +233,7 @@ export function RentalCalendar({
             <div />
             {dates.map((date) => (
               <div key={dayKey(date)} data-today={dayKey(date) === today}>
-                <div className="tv-dow">{weekdayLabels[(date.getDay() + 6) % 7]}</div>
+                <div className="tv-dow">{dows[(date.getDay() + 6) % 7]}</div>
                 <div className="tv-dom">{date.getDate()}</div>
               </div>
             ))}
@@ -352,7 +261,7 @@ export function RentalCalendar({
                     <div key={hour} className="tv-hourline" style={{ top: index * HOUR_PX }} />
                   ))}
                   {layout.map((segment) => {
-                    const rental = segment.rental;
+                    const rental = segment.item;
                     const widthPct = 100 / segment.lanes;
                     const leftPct = segment.lane * widthPct;
                     return (

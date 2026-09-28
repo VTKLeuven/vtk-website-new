@@ -1,14 +1,22 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import { markdownToPlainText } from '@/lib/markdown';
 import { CalendarSubscribe } from '@/components/site/CalendarSubscribe';
-import { Markdown } from '@/components/ui/Markdown';
+import dynamic from 'next/dynamic';
+
+// Via `next/dynamic`: de markdown-renderer (react-markdown, micromark en, via de
+// fotogalerij, beide woordenboeken) is ~80 KB gzip. Statisch geïmporteerd kwam
+// hij in een chunk die de bundler deelt met `Link` en dus op elke pagina laadde;
+// zo komt hij enkel mee waar er echt markdown gerenderd wordt.
+const Markdown = dynamic(() => import('@/components/ui/Markdown').then((m) => m.Markdown));
 import { EventInterest } from '@/components/calendar/EventInterest';
 import { EventStar, type EventStarLabels } from '@/components/calendar/EventStar';
-import { CalendarPlusIcon } from '@/components/ui/icons';
+import { CalendarPlusIcon, TicketIcon } from '@/components/ui/icons';
+import Link from '@/components/ui/Link';
+import { saveCalendarAudiencePreferenceAction } from '@/app/actions/calendarPreference';
 import type { ViewerInterest } from '@/lib/calendar/interest';
 import { momentsSummary } from '@/lib/calendar/moments';
 import { MomentDays } from '@/components/calendar/MomentDays';
@@ -21,12 +29,16 @@ import {
   toMoments,
   weekEventSpans,
   monthGridCells,
+  monthWeekDays,
   rollingWeeksGridCells,
   weekGridDays,
+  dayRange,
+  eventsRequestKey,
   isSameCalendarDay,
   startOfWeek,
   type GridDay,
 } from './calendarGrid';
+import { withSource } from '@/lib/ticketing/source';
 
 /**
  * Hoeveel weken de agenda vooruit toont. Zes rijen van 132 pixels waren hoger
@@ -34,11 +46,12 @@ import {
  */
 const AGENDA_WEEKS = 4;
 
-type ApiEvent = {
+/** Eén evenement zoals `/api/calendar/events` het teruggeeft; zie `lib/calendar/publicEvents.ts`. */
+export type CalendarApiEvent = {
   id: string;
   slug: string;
   title: string;
-  titleEn: string;
+  titleEn: string | null;
   start: string;
   end: string;
   allDay: boolean;
@@ -52,6 +65,7 @@ type ApiEvent = {
   moments: Array<{ start: string; end: string; label: string | null }>;
   extendedProps: {
     groupCode: string;
+    groupSlug: string;
     groupNameNl: string;
     groupNameEn: string;
     /** Ingevuld = die naam organiseert, niet de groep hierboven. */
@@ -79,6 +93,8 @@ type ApiEvent = {
     viewerInterest: ViewerInterest;
     /** Heb jij dit aangeduid, afgeleid van `viewerInterest`. */
     interested: boolean;
+    /** De slug van de ticketpagina, enkel wanneer die online staat. */
+    ticketSlug: string | null;
   };
 };
 
@@ -120,6 +136,7 @@ export function KalenderEditorialView({
   feedBaseUrl,
   defaultOnlyMyAudiences = false,
   signedIn = false,
+  initialEvents,
 }: {
   locale: 'nl' | 'en';
   labels: {
@@ -151,6 +168,13 @@ export function KalenderEditorialView({
   defaultOnlyMyAudiences?: boolean;
   /** Bepaalt of de voorvertoning een knop toont of een verwijzing naar inloggen. */
   signedIn?: boolean;
+  /**
+   * De evenementen van de eerste weergave, al op de server opgehaald, met de
+   * sleutel van de ophaling waarvoor ze gelden (`eventsRequestKey`). Zonder dit
+   * stond er eerst "Geen evenementen deze maand" en sprong de pagina open zodra
+   * de fetch binnenkwam. Zie `loadOpeningCalendarEvents`.
+   */
+  initialEvents?: { key: string; events: CalendarApiEvent[] };
 }) {
   const base = locale === 'nl' ? '' : '/en';
   const pathname = usePathname();
@@ -180,17 +204,36 @@ export function KalenderEditorialView({
   // algemene events plus de doelgroepevents die bij het profiel horen over; de
   // beginstand komt uit de accountvoorkeur van het lid.
   const [onlyMyAudiences, setOnlyMyAudiences] = useState(defaultOnlyMyAudiences);
+  // Het vinkje is dezelfde voorkeur als in het profiel en wordt dus bewaard,
+  // zodat /kalender de volgende keer zo opent. Enkel met een account: zonder
+  // profiel valt er niets af te stemmen of te onthouden. Lukt het bewaren niet,
+  // dan werkt de filter wel in deze weergave; dat is geen reden om hem terug te
+  // draaien.
+  const changeOnlyMyAudiences = useCallback(
+    (next: boolean) => {
+      setOnlyMyAudiences(next);
+      if (!signedIn) return;
+      saveCalendarAudiencePreferenceAction(next).catch((error) => {
+        console.error('Kalendervoorkeur bewaren mislukt', error);
+      });
+    },
+    [signedIn]
+  );
   // Enkel voor het smalle scherm: welke dag staat er open onder het raster. Op
   // een telefoon passen de eventpillen niet in een cel van 45 pixels, dus toont
   // het raster daar stippen en lees je de dag zelf hieronder.
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
-  const [monthEvents, setMonthEvents] = useState<ApiEvent[]>([]);
-  const [agendaEvents, setAgendaEvents] = useState<ApiEvent[]>([]);
+  const [monthEvents, setMonthEvents] = useState<CalendarApiEvent[]>(initialEvents?.events ?? []);
+  // Zolang dit staat, zijn `monthEvents` nog die van de server. Het valt weg
+  // zodra de kalender iets anders ophaalt; terugkeren naar dezelfde weergave
+  // haalt dan gewoon opnieuw op.
+  const prefetchedKey = useRef(initialEvents?.key ?? null);
+  const [agendaEvents, setAgendaEvents] = useState<CalendarApiEvent[]>([]);
   // Het evenement waarvan de voorvertoning openstaat. Een klik in het raster
   // opent eerst dit kaartje: in een cel past hoogstens een afgekapte titel, en
   // meteen doorsturen naar een volledige pagina is een dure manier om te
   // ontdekken dat je het verkeerde evenement aanklikte.
-  const [preview, setPreview] = useState<ApiEvent | null>(null);
+  const [preview, setPreview] = useState<CalendarApiEvent | null>(null);
 
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -224,7 +267,7 @@ export function KalenderEditorialView({
       if (onlyMyAudiences) url.searchParams.set('audience', 'mine');
       const res = await fetch(url.toString());
       if (!res.ok) return [];
-      return (await res.json()) as ApiEvent[];
+      return (await res.json()) as CalendarApiEvent[];
     },
     [filter, onlyMyAudiences]
   );
@@ -240,10 +283,11 @@ export function KalenderEditorialView({
   }, [view, weekDays, monthCells, cells]);
 
   useEffect(() => {
-    const start = new Date(rangeDays[0]!);
-    start.setHours(0, 0, 0, 0);
-    const end = new Date(rangeDays.at(-1)!);
-    end.setHours(23, 59, 59, 999);
+    const { start, end } = dayRange(rangeDays);
+    // De server gaf de eerste weergave al mee. Rekent de browser een ander
+    // bereik uit (een bezoeker in een andere tijdzone), dan haalt hij alsnog op.
+    if (prefetchedKey.current === eventsRequestKey({ start, end }, filter, onlyMyAudiences)) return;
+    prefetchedKey.current = null;
     let cancelled = false;
     void (async () => {
       const data = await fetchForRange(start, end);
@@ -252,7 +296,7 @@ export function KalenderEditorialView({
     return () => {
       cancelled = true;
     };
-  }, [rangeDays, fetchForRange]);
+  }, [rangeDays, filter, onlyMyAudiences, fetchForRange]);
 
   useEffect(() => {
     const start = new Date();
@@ -284,7 +328,7 @@ export function KalenderEditorialView({
   }, [preview]);
 
   const eventsByDay = useMemo(() => {
-    const m = new Map<string, ApiEvent[]>();
+    const m = new Map<string, CalendarApiEvent[]>();
     for (const { date } of cells) {
       m.set(
         dayKey(date),
@@ -330,21 +374,22 @@ export function KalenderEditorialView({
   );
 
   /**
-   * De evenementen van de maand zelf, chronologisch. Het maandraster loopt door
-   * in de vorige en de volgende maand; die uitlopers horen niet in een lijst met
-   * "Augustus 2026" erboven.
+   * De evenementen van de weken van deze maand, chronologisch. Het raster deelt
+   * ze per week op, dus een week die over de maandgrens loopt, staat er
+   * volledig in: onder "Week van 28 september" horen ook 1 en 2 oktober. De
+   * zesde rij van het maandraster, die helemaal in de volgende maand ligt, valt
+   * wel weg. Zie `monthWeekDays`.
    */
+  const monthWeeks = useMemo(() => monthWeekDays(year, month), [year, month]);
   const monthOnlyEvents = useMemo(
     () =>
       monthEvents
-        .filter((e) => {
-          return monthCells.some(({ date, inMonth }) => inMonth && eventOccursOnDay(e, date));
-        })
+        .filter((e) => monthWeeks.some((date) => eventOccursOnDay(e, date)))
         // Op de datum die de kaart ook draagt, en niet op de start van de
         // envelop: een reeks die vorige week begon, hoort tussen de dagen die
         // nog komen te staan. Zie `eventLeadDate`.
         .sort((a, b) => +eventLeadDate(a, now) - +eventLeadDate(b, now)),
-    [monthEvents, monthCells, now]
+    [monthEvents, monthWeeks, now]
   );
 
   /**
@@ -367,9 +412,12 @@ export function KalenderEditorialView({
    * over.
    */
   const isPastMonth = useMemo(() => {
-    const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+    // Het einde van de laatste week, niet van de maand: op 1 oktober komt er in
+    // de laatste week van september nog iets.
+    const lastDay = monthWeeks.at(-1)!;
+    const monthEnd = new Date(lastDay.getFullYear(), lastDay.getMonth(), lastDay.getDate(), 23, 59, 59, 999);
     return monthEnd < now;
-  }, [year, month, now]);
+  }, [monthWeeks, now]);
 
   const pastEventsInMonth = useMemo(() => {
     return isPastMonth ? [] : monthOnlyEvents.filter((event) => isEventPast(event, now));
@@ -384,7 +432,7 @@ export function KalenderEditorialView({
   }, [showPast, isPastMonth, monthOnlyEvents, upcomingEventsInMonth]);
 
   const gridWeeks = useMemo(() => {
-    const groups = new Map<string, { monday: Date; events: ApiEvent[] }>();
+    const groups = new Map<string, { monday: Date; events: CalendarApiEvent[] }>();
     for (const event of eventsForGrid) {
       const monday = startOfWeek(eventLeadDate(event, now));
       const key = dayKey(monday);
@@ -448,11 +496,11 @@ export function KalenderEditorialView({
     year: 'numeric',
   })}`;
 
-  function pickTitle(e: ApiEvent) {
+  function pickTitle(e: CalendarApiEvent) {
     return locale === 'nl' ? e.title : e.titleEn || e.title;
   }
 
-  function pickDesc(e: ApiEvent) {
+  function pickDesc(e: CalendarApiEvent) {
     const d = locale === 'nl' ? e.extendedProps.descriptionNl : e.extendedProps.descriptionEn;
     return markdownToPlainText(d ?? '');
   }
@@ -463,14 +511,14 @@ export function KalenderEditorialView({
    * lib/calendar/organiser.ts; hier in de browser zonder die helper, want die
    * leest een Prisma-rij.
    */
-  function pickGroup(e: ApiEvent) {
+  function pickGroup(e: CalendarApiEvent) {
     const organiser = e.extendedProps.organiserName?.trim();
     if (organiser) return organiser;
     return locale === 'nl' ? e.extendedProps.groupNameNl : e.extendedProps.groupNameEn;
   }
 
   /** De eerste categorie bepaalt de kleur van de pil en het label in de agendalijst. */
-  function primaryCategory(e: ApiEvent) {
+  function primaryCategory(e: CalendarApiEvent) {
     return e.extendedProps.categories[0] ?? null;
   }
 
@@ -479,7 +527,7 @@ export function KalenderEditorialView({
    * voor eerstejaars of internationals bedoeld is, mag niet als een gewoon
    * evenement in het raster staan waar iemand anders zich dan op verkijkt.
    */
-  function audienceCategories(e: ApiEvent) {
+  function audienceCategories(e: CalendarApiEvent) {
     return e.extendedProps.categories.filter((c) => c.audience !== null);
   }
 
@@ -497,7 +545,7 @@ export function KalenderEditorialView({
    * Zonder dag (een kaart, een lijstrij) wordt het de samenvatting van de
    * momenten: zeven keer "18:00" op één kaart zegt minder dan "telkens 18:00".
    */
-  function eventTime(e: ApiEvent, day?: Date | null) {
+  function eventTime(e: CalendarApiEvent, day?: Date | null) {
     if (e.allDay) return locale === 'nl' ? 'Hele dag' : 'All day';
     if (e.moments.length > 0) {
       const moment = day ? momentOnDay(e, day) : null;
@@ -511,7 +559,7 @@ export function KalenderEditorialView({
    * De dag waarop een kaart of lijstrij staat: de eerstvolgende keer dat er iets
    * is, en niet de dag waarop een reeks momenten ooit begon.
    */
-  function leadDate(e: ApiEvent): Date {
+  function leadDate(e: CalendarApiEvent): Date {
     return eventLeadDate(e, now);
   }
 
@@ -520,7 +568,7 @@ export function KalenderEditorialView({
    * leest als een periode met het gedeelde uur erachter; de dagen ertussen
    * waarop niets staat, zijn daarbij de kalender zelf die het toont.
    */
-  function whenLine(e: ApiEvent): string {
+  function whenLine(e: CalendarApiEvent): string {
     const dateLocale = locale === 'nl' ? 'nl-BE' : 'en-GB';
     const dayText = (date: Date) =>
       date.toLocaleDateString(dateLocale, { weekday: 'long', day: 'numeric', month: 'long' });
@@ -551,8 +599,10 @@ export function KalenderEditorialView({
     setCursor(next);
   }
 
-  function eventHref(e: ApiEvent) {
-    return `${base}/kalender/${e.slug}`;
+  // Met `via`, zodat een ticket dat via de eventpagina gekocht wordt voor de
+  // kalender telt (zie lib/ticketing/source.ts).
+  function eventHref(e: CalendarApiEvent) {
+    return withSource(`${base}/kalender/${e.slug}`, 'kalender');
   }
 
   function filterHref(slug: string | null): string {
@@ -580,7 +630,7 @@ export function KalenderEditorialView({
    * horen gewoon naar de pagina te gaan, en een zoekmachine ziet nog altijd een
    * echte link.
    */
-  function openPreview(event: React.MouseEvent, item: ApiEvent) {
+  function openPreview(event: React.MouseEvent, item: CalendarApiEvent) {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0) {
       return;
     }
@@ -598,7 +648,7 @@ export function KalenderEditorialView({
    */
   function markInterest(eventId: string, nextViewer: ViewerInterest) {
     const next = nextViewer.kind !== 'none';
-    const apply = (list: ApiEvent[]) =>
+    const apply = (list: CalendarApiEvent[]) =>
       list.map((item) =>
         item.id === eventId
           ? {
@@ -636,7 +686,7 @@ export function KalenderEditorialView({
   }
 
   /** "32 komen", of niets zolang de teller onder de drempel zit. */
-  function interestLine(e: ApiEvent): string | null {
+  function interestLine(e: CalendarApiEvent): string | null {
     const count = e.extendedProps.interestedCount;
     if (!count) return null;
     return locale === 'nl' ? `${count} komen` : `${count} going`;
@@ -676,7 +726,7 @@ export function KalenderEditorialView({
    * evenement niet achterblijven. Bestaande alumnigegevens blijven staan: de ster
    * zet enkel de markering aan of uit.
    */
-  function starChanged(e: ApiEvent, interested: boolean) {
+  function starChanged(e: CalendarApiEvent, interested: boolean) {
     const previous = e.extendedProps.viewerInterest;
     markInterest(
       e.id,
@@ -714,7 +764,7 @@ export function KalenderEditorialView({
    * is de link en spant zich over de kaart (`.ag-link::after`); de ster ligt
    * erboven.
    */
-  function renderRow(e: ApiEvent) {
+  function renderRow(e: CalendarApiEvent) {
     // Het label rechts toont het thema. De doelgroep staat al bij de titel, dus
     // die hier herhalen zou twee keer "Eerstejaars" geven.
     const cat = e.extendedProps.categories.find((c) => c.audience === null) ?? null;
@@ -726,10 +776,11 @@ export function KalenderEditorialView({
     const title = pickTitle(e);
     return (
       <article key={e.id} className="ag-row">
+        {/* De datum als dezelfde pin als op de rasterkaart. */}
         <div className="ag-date">
-          <b>{String(d.getDate()).padStart(2, '0')}</b>
-          {d.toLocaleDateString(dateLocale, { month: 'short' })} ·{' '}
-          {d.toLocaleDateString(dateLocale, { weekday: 'short' })}
+          <i>{d.toLocaleDateString(dateLocale, { weekday: 'short' })}</i>
+          <b>{d.getDate()}</b>
+          <i>{d.toLocaleDateString(dateLocale, { month: 'short' })}</i>
         </div>
         <span className="ag-media" aria-hidden="true">
           <Image
@@ -756,19 +807,16 @@ export function KalenderEditorialView({
           <MomentDays moments={toMoments(e)} now={now} locale={locale} className="ag-days" />
           {going ? <span className="ev-going">{going}</span> : null}
         </div>
-        <div
-          className="ag-tag"
-          style={
-            cat
-              ? ({
-                  background: cat.colour,
-                  borderColor: cat.colour,
-                  color: '#fff',
-                } as React.CSSProperties)
-              : undefined
-          }
-        >
-          {cat ? categoryName(cat) : pickGroup(e)}
+        {/* Het thema als stip met een woord, zoals op de rasterkaart; een
+            gevuld blok in de themakleur riep harder dan de titel ernaast. */}
+        <div className="ag-tag">
+          {cat ? (
+            <span className="ev-card-cat" style={{ '--cat': cat.colour } as React.CSSProperties}>
+              {categoryName(cat)}
+            </span>
+          ) : (
+            pickGroup(e)
+          )}
         </div>
         {/* De ster houdt zijn eigen stand bij; de sleutel laat hem opnieuw
             beginnen wanneer dit evenement elders van stand wisselt, bijvoorbeeld
@@ -814,13 +862,14 @@ export function KalenderEditorialView({
    * een rij stonden dan ongelijk. De ster en de agendaknop staan er altijd, dus
    * de rij houdt haar hoogte.
    */
-  function renderCard(e: ApiEvent) {
+  function renderCard(e: CalendarApiEvent) {
     const cat = e.extendedProps.categories.find((c) => c.audience === null) ?? null;
     const going = interestLine(e);
     const title = pickTitle(e);
     const start = leadDate(e);
     const isPast = isEventPast(e, now);
     const addToCalendar = locale === 'nl' ? 'Zet in mijn agenda' : 'Add to my calendar';
+    const buyTickets = locale === 'nl' ? 'Tickets kopen' : 'Buy tickets';
     return (
       <article key={e.id} className={`ev-card${isPast ? ' is-past' : ''}`}>
         <div className="ev-card-shot">
@@ -891,6 +940,16 @@ export function KalenderEditorialView({
               >
                 <CalendarPlusIcon />
               </a>
+              {e.extendedProps.ticketSlug ? (
+                <Link
+                  href={withSource(`${base}/tickets/${e.extendedProps.ticketSlug}`, "kalender")}
+                  className="ev-card-action"
+                  title={buyTickets}
+                  aria-label={`${buyTickets}: ${title}`}
+                >
+                  <TicketIcon />
+                </Link>
+              ) : null}
             </span>
           </div>
         </div>
@@ -1215,7 +1274,7 @@ export function KalenderEditorialView({
                     <input
                       type="checkbox"
                       checked={onlyMyAudiences}
-                      onChange={(e) => setOnlyMyAudiences(e.target.checked)}
+                      onChange={(e) => changeOnlyMyAudiences(e.target.checked)}
                     />
                     {labels.onlyMyAudiences}
                   </label>
@@ -1433,45 +1492,65 @@ export function KalenderEditorialView({
                   const today = isSameCalendarDay(date, new Date());
                   return (
                     <div key={dayKey(date)} className={`week-day${today ? ' today' : ''}`}>
+                      {/* Dezelfde pin als op de kaart in het raster: weekdag,
+                          getal, maand. Geel is vandaag. */}
                       <header>
-                        <span>
-                          {date.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
-                            weekday: 'short',
-                          })}
+                        <span className="week-pin">
+                          <i>
+                            {date.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+                              weekday: 'short',
+                            })}
+                          </i>
+                          <b>{date.getDate()}</b>
+                          <i>
+                            {date.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
+                              month: 'short',
+                            })}
+                          </i>
                         </span>
-                        <b>{date.getDate()}</b>
-                        <small>
-                          {date.toLocaleDateString(locale === 'nl' ? 'nl-BE' : 'en-GB', {
-                            month: 'short',
-                          })}
-                        </small>
                       </header>
                       <div className="week-events">
                         {events.length === 0 ? (
                           <span className="week-empty">{locale === 'nl' ? 'Geen evenementen' : 'No events'}</span>
                         ) : (
                           events.map((event) => {
-                            const cat = primaryCategory(event);
+                            // Het lichaam van de rasterkaart zonder de affiche:
+                            // thema als stip met een woord en de doelgroep als
+                            // pil bovenaan, de titel met de gele streep, en het
+                            // uur en de plaats eronder. Dezelfde klassen als de
+                            // kaart, uit vtk-eventcard.css.
+                            const theme = event.extendedProps.categories.find((c) => c.audience === null) ?? null;
+                            const audiences = audienceCategories(event);
                             return (
                               <a
                                 key={event.id}
                                 href={eventHref(event)}
                                 className="week-event"
-                                style={cat ? ({ '--cat': cat.colour } as React.CSSProperties) : undefined}
                                 onClick={(clicked) => openPreview(clicked, event)}
                               >
-                                <span className="week-event-time">{eventTime(event, date)}</span>
-                                <b>{pickTitle(event)}</b>
-                                {event.location ? <small>{event.location}</small> : null}
-                                {audienceCategories(event).map((audience) => (
-                                  <span
-                                    key={audience.slug}
-                                    className="week-audience"
-                                    style={{ '--cat': audience.colour } as React.CSSProperties}
-                                  >
-                                    {categoryName(audience)}
+                                {theme || audiences.length > 0 ? (
+                                  <span className="week-event-tags">
+                                    {theme ? (
+                                      <span className="ev-card-cat" style={{ '--cat': theme.colour } as React.CSSProperties}>
+                                        {categoryName(theme)}
+                                      </span>
+                                    ) : null}
+                                    {audiences.map((audience) => (
+                                      <span
+                                        key={audience.slug}
+                                        className="ev-card-aud"
+                                        style={{ '--cat': audience.colour } as React.CSSProperties}
+                                      >
+                                        {categoryName(audience)}
+                                      </span>
+                                    ))}
                                   </span>
-                                ))}
+                                ) : null}
+                                <b className="week-event-title">{pickTitle(event)}</b>
+                                <span className="week-event-when">
+                                  {eventTime(event, date)}
+                                  {event.location ? ` · ${event.location}` : ''}
+                                </span>
                                 {interestLine(event) ? <span className="ev-going">{interestLine(event)}</span> : null}
                               </a>
                             );

@@ -5,8 +5,11 @@
  * gewone `error.tsx`-boundaries heen glippen) en meldt ze aan Sentry. Rendert
  * een minimale fallback-pagina met eigen <html>/<body> omdat de root layout
  * hier niet meer beschikbaar is.
+ *
+ * Sentry via een dynamische import: dit bestand hoort bij de root, dus een
+ * statische import zette de hele SDK in de bundel van elke pagina. Zie
+ * `instrumentation-client.ts`.
  */
-import * as Sentry from "@sentry/nextjs";
 import NextError from "next/error";
 import { useEffect } from "react";
 
@@ -16,7 +19,7 @@ export default function GlobalError({
   error: Error & { digest?: string };
 }) {
   useEffect(() => {
-    Sentry.captureException(error);
+    void import("@sentry/nextjs").then((Sentry) => Sentry.captureException(error));
   }, [error]);
 
   return (

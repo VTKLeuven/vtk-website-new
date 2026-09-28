@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { cache } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";

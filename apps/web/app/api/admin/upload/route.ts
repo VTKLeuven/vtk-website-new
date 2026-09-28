@@ -127,8 +127,15 @@ export async function POST(request: Request) {
     try {
       // Met `resolveWithObject` komen de maten van het resultaat mee: die van na
       // het draaien volgens de EXIF-oriëntatie, dus wat de browser straks toont.
+      //
+      // Hoogstens 2560 pixels aan de lange zijde. Een foto rechtstreeks van een
+      // camera of telefoon (6000 pixels, 3 à 4 MB) bleef anders ongewijzigd
+      // bewaard, en elke `next/image`-variant begon dan met dat origineel door
+      // Node en sharp te halen. 2560 dekt de breedste plek op de site: een foto
+      // over de volle inhoudsbreedte (1240) op een scherm met dubbele dichtheid.
       const output = await sharp(bytes, { failOn: "error", limitInputPixels: 40_000_000 })
         .rotate()
+        .resize({ width: 2560, height: 2560, fit: "inside", withoutEnlargement: true })
         .jpeg({ quality: 86, mozjpeg: true })
         .toBuffer({ resolveWithObject: true });
       body = output.data;

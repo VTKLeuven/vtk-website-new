@@ -5,7 +5,13 @@ import { Globe } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { canUnregister } from '@/lib/shift';
 import { useToast } from '@/components/ui/toast';
-import { Markdown } from '@/components/ui/Markdown';
+import dynamic from 'next/dynamic';
+
+// Via `next/dynamic`: de markdown-renderer (react-markdown, micromark en, via de
+// fotogalerij, beide woordenboeken) is ~80 KB gzip. Statisch geïmporteerd kwam
+// hij in een chunk die de bundler deelt met `Link` en dus op elke pagina laadde;
+// zo komt hij enkel mee waar er echt markdown gerenderd wordt.
+const Markdown = dynamic(() => import('@/components/ui/Markdown').then((m) => m.Markdown));
 import {
   fill,
   fmtDateTime,
@@ -15,7 +21,9 @@ import {
   registerShift,
   rewardLabel,
   spotsLabel,
+  spotsSpoken,
   spotsVariant,
+  takenSpots,
   unregisterShift,
   type MergedShift,
   type PostNames,
@@ -31,13 +39,20 @@ function Detail({ k, v }: { k: string; v: string }) {
   );
 }
 
-/** De markering voor shiften die je zonder Nederlands kan doen. */
-export function InternationalsBadge({ locale, compact }: { locale: Locale; compact?: boolean }) {
+/**
+ * De markering voor shiften die je zonder Nederlands kan doen.
+ *
+ * De tekst staat er altijd bij. Enkel een wereldbol was een raadsel: wie ze niet
+ * herkende, zag geen reden om zich in te schrijven, en net die persoon is hier
+ * het publiek. Ze staat ook op de Nederlandse site in het Engels, want ze is aan
+ * internationals gericht en niet aan wie de rest van de pagina al leest.
+ */
+export function InternationalsBadge({ locale }: { locale: Locale }) {
   const t = getDictionary(locale).shift;
   return (
-    <span className={`vtk-shift-intl${compact ? ' vtk-shift-intl-compact' : ''}`} title={t.intl.hint}>
+    <span className="vtk-shift-intl" title={t.intl.hint}>
       <Globe aria-hidden="true" />
-      <span className={compact ? 'vtk-sr-only' : undefined}>{t.intl.badge}</span>
+      <span>{t.intl.badge}</span>
     </span>
   );
 }
@@ -84,7 +99,7 @@ export function ShiftDialog({
   const isFull = !registered && freeSpots(shift) <= 0;
   const locked = registered && !canUnregister(shift, now);
   const free = freeSpots(shift);
-  const taken = shift.takenSpots ?? shift.participants?.length ?? 0;
+  const taken = takenSpots(shift);
 
   useEffect(() => {
     panelRef.current?.focus();
@@ -173,8 +188,11 @@ export function ShiftDialog({
                 {t.isRegistered}
               </span>
             ) : (
-              <span className={`vtk-shift-spots vtk-shift-spots-${spotsVariant(shift)}`}>
-                {spotsLabel(shift, t)}
+              <span
+                className={`vtk-shift-spots vtk-shift-spots-${spotsVariant(shift)}`}
+                aria-label={spotsSpoken(shift, t)}
+              >
+                {spotsLabel(shift)}
               </span>
             )}
             {shift.openToInternationals ? <InternationalsBadge locale={locale} /> : null}

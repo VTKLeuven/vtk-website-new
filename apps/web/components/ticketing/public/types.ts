@@ -1,3 +1,5 @@
+import type { TicketTargetAudience } from "@/lib/ticketing/audience";
+
 export type TicketQuestion = {
   id: string;
   code?: string;
@@ -78,6 +80,12 @@ export type PublicTicketEvent = {
    * ingelogd is (misschien is hij al lid), "join" wanneer hij het niet is.
    */
   memberPriceHint?: "login" | "join" | null;
+  /**
+   * Doelgroepen (eerstejaars, alumni, ...) met een ticket dat deze uitgelogde
+   * bezoeker niet ziet. Leeg voor wie ingelogd is: wie er dan niet bij hoort,
+   * hoort er ook na inloggen niet bij.
+   */
+  audienceLoginHint?: TicketTargetAudience[];
   /**
    * Enkel in het overzicht: de verkoop opent pas op dit moment (voor deze
    * bezoeker, dus na een eventuele voorverkoop).

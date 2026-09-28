@@ -51,6 +51,16 @@ export type BezettingTrip = {
   legLabel: string | null;
   purpose: string;
   driverName: string | null;
+  /**
+   * Het nummer waarop je die chauffeur bereikt (F4.13), of `null`.
+   *
+   * Staat hier omdat dit kaartje net de plek is waar een post naar kijkt op de
+   * dag zelf: "wie rijdt en hoe bereik ik hem" is één vraag, en het antwoord in
+   * twee schermen laten zoeken is precies de omweg die dit kaartje wegneemt.
+   * Enkel het nummer van de chauffeur, niet dat van de aanvrager: zie
+   * `driverPhones` voor welke bron er wint.
+   */
+  driverPhone: string | null;
   /** Rijdt Logistiek dit voertuig? Zo niet is "geen chauffeur" geen openstaand werk. */
   needsDriver: boolean;
   cargoNote: string | null;
@@ -103,7 +113,17 @@ export function TripCard({
           <dt>{en ? 'Driver' : 'Chauffeur'}</dt>
           <dd>
             {trip.driverName ? (
-              trip.driverName
+              <>
+                {trip.driverName}
+                {trip.driverPhone ? (
+                  <>
+                    <br />
+                    <span className="font-normal">
+                      <PhoneLink number={trip.driverPhone} />
+                    </span>
+                  </>
+                ) : null}
+              </>
             ) : trip.needsDriver ? (
               <span className="text-vtk-danger">
                 {en ? 'not assigned yet' : 'nog niet toegewezen'}

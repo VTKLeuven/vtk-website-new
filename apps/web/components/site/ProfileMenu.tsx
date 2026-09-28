@@ -1,13 +1,21 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { logoutAction } from "@/app/actions/auth";
+import { AUTHORIZATION_PREVIEW_STOP_PATH } from "@/lib/authorization-preview-constants";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
 import type { PostAdminLink } from "@/lib/postAdminLinks";
 import type { Locale } from "@vtk/i18n";
-import { FeedbackDialog } from "./FeedbackDialog";
+import dynamic from "next/dynamic";
+
+// Pas geladen wanneer iemand het venster opent. Dit menu staat in de header van
+// elke pagina, en het venster trok met `getDictionary` beide woordenboeken mee
+// in de bundel van elke pagina.
+const FeedbackDialog = dynamic(() => import("./FeedbackDialog").then((m) => m.FeedbackDialog), {
+  ssr: false,
+});
 
 export function ProfileMenu({
   name,
@@ -19,6 +27,7 @@ export function ProfileMenu({
   base,
   locale,
   variant = "default",
+  previewActive = false,
 }: {
   name: string;
   isAdmin: boolean;
@@ -39,6 +48,8 @@ export function ProfileMenu({
   base: string;
   locale: Locale;
   variant?: "default" | "editorial";
+  /** Loopt er een autorisatievoorbeeld? Dan logt de knop uit via de stoproute. */
+  previewActive?: boolean;
 }) {
   const pathname = usePathname() ?? "/";
   const [open, setOpen] = useState(false);
@@ -201,11 +212,23 @@ export function ProfileMenu({
           >
             {labels.feedback}
           </button>
-          <form action={logoutAction}>
-            <button type="submit" className={`${itemClass} text-left`} role="menuitem">
-              {labels.logout}
-            </button>
-          </form>
+          {previewActive ? (
+            // Een gewone POST en geen server action: die laatste blokkeert
+            // proxy.ts tijdens een voorbeeld, en dan crashte de pagina.
+            <form action={AUTHORIZATION_PREVIEW_STOP_PATH} method="post">
+              <input type="hidden" name="locale" value={locale} />
+              <input type="hidden" name="logout" value="1" />
+              <button type="submit" className={`${itemClass} text-left`} role="menuitem">
+                {labels.logout}
+              </button>
+            </form>
+          ) : (
+            <form action={logoutAction}>
+              <button type="submit" className={`${itemClass} text-left`} role="menuitem">
+                {labels.logout}
+              </button>
+            </form>
+          )}
         </div>
       )}
       {/* Buiten het menu: de modal moet blijven staan wanneer het menu sluit,

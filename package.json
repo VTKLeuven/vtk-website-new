@@ -25,15 +25,18 @@
     "db:seed": "npm run seed --workspace=@vtk/db",
     "db:sync": "npm run sync --workspace=@vtk/db",
     "db:admin": "dotenv -e .env -- tsx scripts/create-local-admin.ts",
+    "db:demo:verhuur": "dotenv -e .env -- tsx scripts/seed-theokot-verhuur-demo.ts",
+    "db:demo:broodjes": "dotenv -e .env -- tsx scripts/seed-theokot-broodjes-demo.ts",
     "fixtures:export": "dotenv -e .env -- tsx scripts/export-fixtures.ts",
     "import:praesidium": "dotenv -e .env -- tsx scripts/import-praesidium-history.ts",
     "import:pocs": "dotenv -e .env -- tsx scripts/import-poc-history.ts",
     "import:pages": "dotenv -e .env -- tsx scripts/import-pages.ts",
+    "import:gsm": "dotenv -e .env -- tsx scripts/import-driver-phones.ts",
     "probe:elixir": "dotenv -e .env -- tsx --conditions=react-server scripts/elixir-probe.ts",
     "explain:access": "dotenv -e .env -- tsx scripts/explain-access.ts"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.0.0"
   },
   "devDependencies": {
     "@types/node": "^26.0.0"
@@ -44,7 +47,7 @@
   },
   "overrides": {
     "passkit-generator": {
-      "joi": "17.13.6"
+      "joi": "17.13.8"
     },
     "@better-auth/core": "1.7.5",
     "@better-fetch/fetch": "1.3.2"

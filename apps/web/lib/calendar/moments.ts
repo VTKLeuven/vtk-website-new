@@ -220,3 +220,10 @@ export function momentsSummary(
   if (shared) return locale === "nl" ? `telkens ${shared}` : `each time ${shared}`;
   return locale === "nl" ? `${moments.length} momenten` : `${moments.length} moments`;
 }
+
+/**
+ * Hoeveel dagen van een evenement met losse momenten er in het paneel van de
+ * eventpagina zichtbaar zijn voor "Toon alle dagen". Zeven past een week
+ * trainingen of een loopweek volledig en houdt het paneel binnen één scherm.
+ */
+export const EVENT_MOMENTS_VISIBLE = 7;

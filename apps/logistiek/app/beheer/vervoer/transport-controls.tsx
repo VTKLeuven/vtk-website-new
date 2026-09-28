@@ -125,7 +125,7 @@ export function TransportControls({
             zegt, leert mensen keuzelijsten te negeren. */}
         {!needsVanDriver ? (
           <label className="flex items-center gap-2 text-sm">
-            <span className="text-vtk-muted">Post vult zelf in</span>
+            <span className="text-vtk-muted">Post kiest zelf de chauffeur</span>
             <select
               value={assignedGroupId ?? ''}
               disabled={pending}

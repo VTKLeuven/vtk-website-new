@@ -1,6 +1,6 @@
 import type { AcademicStaffRole, StudyProgramme, StudyYear } from "@prisma/client";
 import { getDictionary, type Locale } from "@vtk/i18n";
-import { STUDY_YEARS, STUDY_PROGRAMMES } from "@/lib/profile";
+import { STUDY_YEARS, STUDY_PROGRAMMES, latestGraduationYear } from "@/lib/profile";
 import { StudyStatusFields } from "./StudyStatusFields";
 
 /**
@@ -37,6 +37,9 @@ export function StudyFieldset({
   alumniMailOptIn: boolean;
 }) {
   const t = getDictionary(locale).onboarding;
+  // Hier bepaald en niet in de client: de server beslist over de grens, en een
+  // klok die op oudejaarsavond anders staat mag de melding niet laten verschillen.
+  const latestYear = latestGraduationYear();
 
   return (
     <StudyStatusFields
@@ -51,6 +54,7 @@ export function StudyFieldset({
       wasInVtk={wasInVtk}
       alumniMailOptIn={alumniMailOptIn}
       academicStaffRole={academicStaffRole}
+      latestGraduationYear={latestYear}
       studyYearOptions={STUDY_YEARS}
       programmeOptions={STUDY_PROGRAMMES}
       labels={{
@@ -71,6 +75,7 @@ export function StudyFieldset({
         alumniDetailsHint: t.alumniHint,
         graduationYear: t.graduationYear,
         graduationYearHint: t.graduationYearHint,
+        graduationYearInvalid: t.graduationYearInvalid.replace("{max}", String(latestYear)),
         wasInVtk: t.wasInVtk,
         wasInVtkHint: t.wasInVtkHint,
         alumniMailOptIn: t.alumniMailOptIn,

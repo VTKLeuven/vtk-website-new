@@ -1,7 +1,7 @@
 import type { Metadata } from 'next';
 import { staticMetadata } from '@/lib/pageMetadata';
 import { headers } from 'next/headers';
-import Link from 'next/link';
+import Link from '@/components/ui/Link';
 import { notFound } from 'next/navigation';
 import { Card } from '@vtk/ui';
 import { hasLocale } from '@/lib/locale';

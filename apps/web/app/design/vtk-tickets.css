@@ -291,7 +291,7 @@
    heeft geen paginakop en zet haar eigen paneel gewoon op papier. */
 
 .ticket-order-page {
-  min-height: 70vh;
+  min-height: calc(70 * var(--vtk-vh, 1vh));
   padding: 56px clamp(20px, 3vw, 36px) 96px;
 }
 
@@ -443,6 +443,15 @@
 }
 
 /* ---------- Het bestelpaneel ---------- */
+
+/* Iets breder dan het winkelmandje van de shop: een studentenadres
+   (voornaam.naam@student.kuleuven.be) past zo op één regel naast
+   "Bevestiging naar", in plaats van op de laatste letter af te breken. */
+@media (min-width: 961px) {
+  .tshop.torder {
+    grid-template-columns: minmax(0, 1fr) 440px;
+  }
+}
 
 /* De titel houdt haar breedte; een lang bestelnummer breekt ernaast af in
    plaats van "Je bestelling" over twee regels te duwen. */
@@ -799,7 +808,7 @@
   align-items: center;
   justify-content: center;
   overflow-y: auto;
-  padding: clamp(24px, 5vh, 48px) 16px;
+  padding: clamp(24px, calc(5 * var(--vtk-vh, 1vh)), 48px) 16px;
   background: rgba(10, 15, 31, 0.55);
   backdrop-filter: blur(2px);
 }
@@ -1143,8 +1152,38 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
+  /* Op een gsm staat de QR aan de inkom meteen scanbaar: ze vult de hele
+     strook, met enkel een rand in de kleur van de status errond. Tikken
+     opent nog steeds het detailvenster, maar is niet meer nodig. */
   .ticket-pass-stub {
-    padding: 18px;
+    padding: 12px 12px 14px;
+  }
+
+  .ticket-pass-qr-box {
+    display: block;
+    width: 100%;
+  }
+
+  .ticket-pass-qr-box img,
+  .ticket-pass-stub img {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 1;
+    padding: 14px;
+    border-radius: 12px;
+  }
+
+  .ticket-pass-qr-trigger {
+    cursor: pointer;
+  }
+
+  .ticket-pass-qr-trigger:hover .ticket-pass-qr-box img {
+    transform: none;
+    box-shadow: none;
+  }
+
+  .ticket-pass-qr-zoom-badge {
+    display: none;
   }
 
   .ticket-pass-body {
@@ -1156,7 +1195,7 @@
 /* Scanner */
 
 .scanner-route-shell {
-  min-height: 100dvh;
+  min-height: calc(100 * var(--vtk-dvh, 1dvh));
   background: var(--paper);
   color: var(--ink);
   font-family: var(--sans);
@@ -1171,7 +1210,7 @@
 .scanner-app {
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr);
-  min-height: 100dvh;
+  min-height: calc(100 * var(--vtk-dvh, 1dvh));
   background: var(--paper);
 }
 
@@ -1867,7 +1906,7 @@
 
 .scanner-history ol {
   display: grid;
-  max-height: calc(100dvh - 310px);
+  max-height: calc(calc(100 * var(--vtk-dvh, 1dvh)) - 310px);
   overflow-y: auto;
   gap: 5px;
   margin: 9px 0 0;
@@ -1981,7 +2020,7 @@
 
 .scanner-loading {
   display: flex;
-  min-height: 100dvh;
+  min-height: calc(100 * var(--vtk-dvh, 1dvh));
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -2027,7 +2066,7 @@
 
   .scanner-app {
     display: block;
-    min-height: 100dvh;
+    min-height: calc(100 * var(--vtk-dvh, 1dvh));
   }
 
   .scanner-header {
@@ -2112,7 +2151,7 @@
 
 .ticket-access-page {
   display: grid;
-  min-height: 70vh;
+  min-height: calc(70 * var(--vtk-vh, 1vh));
   place-items: center;
   padding: 40px 20px;
   background: #f5f5f2;
@@ -2249,7 +2288,7 @@
 
 .scanner-name-list ul {
   /* Begrensde hoogte: de lijst mag de camera niet van het scherm duwen. */
-  max-height: 46vh;
+  max-height: calc(46 * var(--vtk-vh, 1vh));
   margin: 8px 0 0;
   padding: 0;
   overflow-y: auto;
@@ -2619,7 +2658,7 @@
    scherm: je kan nu scannen, hier klik je. */
 .scanner-invite {
   display: flex;
-  min-height: 100dvh;
+  min-height: calc(100 * var(--vtk-dvh, 1dvh));
   flex-direction: column;
   align-items: center;
   justify-content: center;

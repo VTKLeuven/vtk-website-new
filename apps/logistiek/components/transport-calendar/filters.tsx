@@ -50,6 +50,7 @@ export type FilterOption = { id: string; name: string };
 export type FilterGroups = {
   vehicles?: boolean;
   drivers?: boolean;
+  posts?: boolean;
   statuses?: boolean;
   requesters?: boolean;
   events?: boolean;
@@ -60,6 +61,7 @@ export function TransportFilterBar({
   filters,
   vehicles,
   drivers,
+  posts,
   driverColors,
   groups: shown,
   storageKey = STORAGE_KEY,
@@ -67,6 +69,8 @@ export function TransportFilterBar({
   filters: TransportFilters;
   vehicles: FilterOption[];
   drivers: FilterOption[];
+  /** De posten en werkgroepen om op te filteren (F4.1); leeg verbergt de groep. */
+  posts?: FilterOption[];
   driverColors?: DriverColorOverrides;
   /** Weglaten toont alles; zie {@link FilterGroups}. */
   groups?: FilterGroups;
@@ -115,6 +119,9 @@ export function TransportFilterBar({
     };
     keep('voertuig', vehicles.map((vehicle) => vehicle.id));
     keep('chauffeur', [NO_DRIVER, ...drivers.map((driver) => driver.id)]);
+    // Een post van vorig jaar die er niet meer is, filtert anders alles weg
+    // zonder dat je ziet waarom; dezelfde reden als bij de twee hierboven.
+    keep('post', (posts ?? []).map((post) => post.id));
     const query = stored.toString();
     if (!query) return;
     router.replace(`${pathname}?${query}`);
@@ -168,6 +175,7 @@ export function TransportFilterBar({
   const show = {
     vehicles: shown?.vehicles ?? true,
     drivers: shown?.drivers ?? true,
+    posts: shown?.posts ?? true,
     statuses: shown?.statuses ?? true,
     requesters: shown?.requesters ?? true,
     events: shown?.events ?? true,
@@ -191,6 +199,18 @@ export function TransportFilterBar({
           selected={filters.driverIds}
           onToggle={(id) => toggle('driverIds', id)}
           swatch={(id) => (id === NO_DRIVER ? 'var(--driver-none)' : driverColorVar(id, driverColors))}
+        />
+      ) : null}
+      {/* F4.1: "alle ritten van Acti". Onder de chauffeur en boven de status,
+          want het is dezelfde soort vraag als "wie rijdt": wie hoort hierbij.
+          Staat er één post in de lijst, dan is het geen filter maar een feit;
+          `FilterGroup` laat een lege lijst zelf weg. */}
+      {show.posts ? (
+        <FilterGroup
+          label="Post of werkgroep"
+          options={posts ?? []}
+          selected={filters.groupIds}
+          onToggle={(id) => toggle('groupIds', id)}
         />
       ) : null}
       {show.statuses ? (

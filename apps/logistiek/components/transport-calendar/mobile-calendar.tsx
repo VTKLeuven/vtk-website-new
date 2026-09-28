@@ -136,16 +136,29 @@ export function MobileCalendar({
 
   const todayKey = now ? dayKeyFormatter.format(now) : null;
 
+  /** Waar vandaag in dit venster staat, of -1 wanneer ze er niet in zit. */
+  const todayIndex = useMemo(() => {
+    if (!todayKey) return -1;
+    return parsedDays.findIndex((day) => dayKeyFormatter.format(day) === todayKey);
+  }, [parsedDays, todayKey]);
+
   /**
    * Beginnen op vandaag als die in het venster zit, anders op de eerste dag. Op
    * maandag naar de planning gaan en op zondag uitkomen is geen begin.
    */
-  const [index, setIndex] = useState(() => {
-    if (!todayKey) return 0;
-    const found = parsedDays.findIndex((day) => dayKeyFormatter.format(day) === todayKey);
-    return found === -1 ? 0 : found;
-  });
+  const [index, setIndex] = useState(() => (todayIndex === -1 ? 0 : todayIndex));
   const day = parsedDays[Math.min(index, parsedDays.length - 1)];
+
+  /**
+   * Op welke dag we uitkomen zodra het venster verschuift (F4.7).
+   *
+   * Nodig omdat de dag hier lokaal staat en het venster bij de ouder: die
+   * navigeert naar een andere week, en dan komt `days` terug zonder dat iemand
+   * gezegd heeft welke dag je wil zien. Zonder dit bleef `index` staan, en dan
+   * bracht een veeg voorbij zondag je op zondag van de week erna in plaats van
+   * op maandag.
+   */
+  const landing = useRef<'first' | 'last' | null>(null);
 
   const [hourPx, setHourPx] = useState(DEFAULT_HOUR_PX);
   const scroller = useRef<HTMLDivElement>(null);
@@ -196,10 +209,14 @@ export function MobileCalendar({
   const goto = useCallback(
     (next: number) => {
       if (next < 0) {
+        // Voorbij de eerste dag: de ouder schuift het venster, en wij komen op
+        // de laatste dag ervan uit. Dat is de dag die naast deze ligt.
+        landing.current = 'last';
         onPrevRange?.();
         return;
       }
       if (next > parsedDays.length - 1) {
+        landing.current = 'first';
         onNextRange?.();
         return;
       }
@@ -207,6 +224,36 @@ export function MobileCalendar({
     },
     [onNextRange, onPrevRange, parsedDays.length]
   );
+
+  /**
+   * Het venster is verschoven: kies de dag opnieuw.
+   *
+   * De richting van een veeg wint van vandaag, want een veeg is een stap naar de
+   * dag ernaast; terugvegen naar deze week hoort op zondag uit te komen en niet
+   * op woensdag. Komt het venster om een andere reden terug (de knop "Vandaag",
+   * of een link naar deze week), dan is vandaag wél de dag die je zoekt.
+   */
+  useEffect(() => {
+    const direction = landing.current;
+    landing.current = null;
+    if (direction === 'first') {
+      setIndex(0);
+      return;
+    }
+    if (direction === 'last') {
+      setIndex(parsedDays.length - 1);
+      return;
+    }
+    if (todayIndex !== -1) {
+      setIndex(todayIndex);
+      return;
+    }
+    setIndex((current) => Math.min(current, parsedDays.length - 1));
+    // Op de inhoud van `days` en niet op de array zelf: een nieuwe array met
+    // dezelfde dagen zou dit effect bij elke render opnieuw laten lopen, en dan
+    // stond de dagstrip vast op vandaag zodra je een andere dag aantikte.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days.join('|'), todayIndex]);
 
   // Bij het openen en bij elke dagwissel naar het eerste dat er staat, minus een
   // half uur lucht; staat er niets, dan naar 08:00. Bovenaan beginnen betekent
@@ -366,7 +413,15 @@ export function MobileCalendar({
         {onToday ? (
           <button
             type="button"
-            onClick={onToday}
+            onClick={() => {
+              // Zit vandaag al in dit venster, dan gaat de ouder naar de week
+              // waar we al staan: `days` verandert niet, het effect hierboven
+              // loopt niet, en de knop deed daardoor niets (F4.7). De dag
+              // wisselt dus hier, en de ouder mag daarnaast gewoon navigeren
+              // voor het geval vandaag er níét in zit.
+              if (todayIndex !== -1) setIndex(todayIndex);
+              onToday();
+            }}
             className="h-9 shrink-0 rounded-full border border-vtk-navy/15 bg-vtk-surface px-3 text-xs font-semibold text-vtk-ink"
           >
             Vandaag

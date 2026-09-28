@@ -1,0 +1,1097 @@
+/* De bestelpagina van het Theokot (`/theokot`, TheokotOrderClient).
+
+   Twee weergaven op dezelfde klassen: `.th-a` is de lijst (aanbod links, mandje
+   rechts), `.th-b` het raster (dagen in de marge, fotokaarten). Welke er staat,
+   kiest Theokot onder Admin → Instellingen. Zie docs/design-decisions.md voor
+   waarom deze twee het werden. Alle kleuren komen uit vtk-base.css. */
+
+.th {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.th-tn {
+  font-variant-numeric: tabular-nums;
+}
+
+.th-mobile-only {
+  display: none !important;
+}
+
+/* ---------------------------------------------------------------------------
+   Dagen
+   --------------------------------------------------------------------------- */
+
+.th-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.th-tab {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 150ms ease, background 150ms ease;
+}
+
+.th-tab:hover {
+  border-color: var(--line-2);
+  background: var(--surface);
+}
+
+.th-tab.is-on {
+  border-color: var(--ink);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: inset 0 -3px 0 var(--yellow);
+}
+
+.th-tab-full {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.th-tab-day {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.th-tab-compact {
+  display: none;
+}
+
+.th-daystate {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+}
+
+.th-dot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  background: var(--yellow);
+  box-shadow: 0 0 0 1px var(--coin-rim);
+}
+
+.th-pin {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 50px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--paper-2);
+  color: var(--muted);
+  line-height: 1;
+}
+
+.th-pin-dow {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.th-pin-day {
+  margin-top: 3px;
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.th-pin.is-large {
+  width: 56px;
+  height: 60px;
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.th-pin.is-large .th-pin-day {
+  font-size: 24px;
+}
+
+/* ---------------------------------------------------------------------------
+   Dagkop en uitleg
+   --------------------------------------------------------------------------- */
+
+.th-dayhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 16px;
+}
+
+.th-dayhead h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.th-dayhead > span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.th-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.th-notice {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: var(--paper-2);
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------------------
+   Kleine onderdelen
+   --------------------------------------------------------------------------- */
+
+.th-name {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 15.5px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+.th-special {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--low-ink);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.th-stock {
+  display: inline-block;
+  width: fit-content;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--low-bg);
+  color: var(--low-ink);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.th-stock.is-out {
+  background: var(--paper-2);
+  color: var(--muted);
+}
+
+.th-mine {
+  display: inline-block;
+  flex-shrink: 0;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: var(--paper);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+/* `relative`: het sr-only label is absoluut gepositioneerd en moet aan deze
+   knop hangen, niet aan een voorouder ergens hoger op de pagina. */
+.th-info {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  padding: 0;
+  border: 1.5px solid var(--line-2);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.th-info:hover,
+.th-info[aria-expanded="true"] {
+  border-color: var(--ink);
+  color: var(--ink);
+}
+
+.th-ingredients {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--paper-2);
+  color: var(--body);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.th-stepper {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.th-stepper button {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.th-stepper button:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.th-stepper button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.th-stepper > span {
+  width: 18px;
+  color: var(--muted);
+  font-size: 15px;
+  text-align: center;
+}
+
+.th-stepper > span.is-set {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.th-photo {
+  position: relative;
+  overflow: hidden;
+  background: repeating-linear-gradient(-45deg, var(--paper-2) 0 8px, var(--paper) 8px 16px);
+}
+
+.th-btn {
+  height: 46px;
+  padding: 0 22px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.th-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.th-btn-primary {
+  border: 0;
+  background: var(--navy);
+  color: var(--paper);
+}
+
+.th-btn-primary:hover:not(:disabled) {
+  background: var(--ink);
+}
+
+.th-btn-ghost {
+  border: 1px solid var(--line-2);
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.th-btn-ghost:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+.th-btn-block {
+  width: 100%;
+}
+
+.th-error {
+  margin: 0;
+  color: var(--danger-ink);
+  font-size: 13.5px;
+}
+
+.th-fine {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------------------
+   Kaarten: mandje en reservatie
+   --------------------------------------------------------------------------- */
+
+.th-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 22px 24px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.th-card-title {
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.th-card-sub {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.th-basket-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.th-lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--body);
+  font-size: 14.5px;
+}
+
+.th-lines li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.th-total {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.th-total > span:last-child {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.th-meters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.th-meter-head {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 5px;
+}
+
+.th-meter-head > span:last-child {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+.th-meter-track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+
+.th-meter-track > div {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--navy);
+  transition: width 180ms ease;
+}
+
+.th-meter.is-over .th-meter-head > span:last-child {
+  color: var(--danger-ink);
+}
+
+.th-meter.is-over .th-meter-track > div {
+  background: var(--danger-ink);
+}
+
+.th-reservation {
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
+}
+
+.th-reservation > * {
+  padding-inline: 24px;
+}
+
+.th-reservation-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 22px;
+}
+
+.th-status {
+  padding: 3px 11px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.th-status.is-reserved {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.th-status.is-done {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+.th-status.is-danger {
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+}
+
+.th-status.is-muted {
+  background: var(--paper-2);
+  color: var(--muted);
+}
+
+.th-pickup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 16px 24px 0;
+  padding: 14px !important;
+  border-radius: 14px;
+  background: var(--paper-2);
+}
+
+.th-pickup-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.th-pickup-label {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.th-pickup-time {
+  color: var(--ink);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.th-pickup-where {
+  color: var(--body);
+  font-size: 13.5px;
+}
+
+.th-reservation-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-block: 16px 20px;
+}
+
+.th-reservation-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-block: 16px 22px;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.th-reservation-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 10px;
+}
+
+.th-reservation > .th-error {
+  padding-bottom: 18px;
+}
+
+/* In het raster staat de reservatie breed boven het aanbod: datum, uitleg en
+   knoppen naast elkaar, met de gele rail van een uitgelichte kaart. */
+.th-reservation.is-wide {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) 220px;
+  grid-template-areas:
+    "head head head"
+    "pickup body actions";
+  align-items: start;
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.th-reservation.is-wide .th-reservation-head {
+  grid-area: head;
+}
+
+.th-reservation.is-wide .th-pickup {
+  grid-area: pickup;
+  margin: 16px 0 22px 24px;
+}
+
+.th-reservation.is-wide .th-reservation-body {
+  grid-area: body;
+  padding-block: 16px 22px;
+}
+
+.th-reservation.is-wide .th-reservation-actions {
+  grid-area: actions;
+  border-top: 0;
+  padding: 16px 24px 22px 0;
+}
+
+.th-reservation.is-wide .th-reservation-buttons {
+  grid-template-columns: 1fr;
+}
+
+/* ---------------------------------------------------------------------------
+   Balk met totaal en knop
+   --------------------------------------------------------------------------- */
+
+.th-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  padding: 12px 12px 12px 22px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(14, 26, 54, 0.08);
+}
+
+.th-bar-sticky {
+  position: sticky;
+  bottom: 16px;
+  z-index: 5;
+}
+
+.th-bar-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--body);
+  font-size: 14px;
+}
+
+.th-bar-kicker {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.th-bar-total {
+  margin-left: auto;
+  color: var(--ink);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.th-bar-error {
+  flex-basis: 100%;
+}
+
+/* ---------------------------------------------------------------------------
+   A · Lijst
+   --------------------------------------------------------------------------- */
+
+.th-a {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  gap: 32px;
+  align-items: start;
+}
+
+.th-a-main {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.th-a-side {
+  position: sticky;
+  top: calc(var(--vtk-header-height, 72px) + 20px);
+}
+
+.th-rows {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.th-rows.is-special {
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.th-rows-label {
+  padding: 12px 20px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.th-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 20px;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.th-rows > .th-row:first-child,
+.th-rows-label + .th-row {
+  border-top: 0;
+}
+
+.th-rows-label + .th-row {
+  border-top: 1px solid var(--rule-soft);
+}
+
+.th-row.is-picked {
+  background: color-mix(in srgb, var(--paper) 55%, var(--surface));
+}
+
+.th-row-thumb {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+}
+
+.th-row-text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.th-row-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+/* ---------------------------------------------------------------------------
+   B · Raster
+   --------------------------------------------------------------------------- */
+
+.th-b {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+
+.th-b-main {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.th-rail {
+  position: sticky;
+  top: calc(var(--vtk-header-height, 72px) + 20px);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-left: 1px solid var(--line);
+}
+
+.th-rail-label {
+  padding: 0 0 10px 16px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.th-rail-day {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  margin-left: -1px;
+  padding: 10px 10px 10px 14px;
+  border: 0;
+  border-left: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+
+.th-rail-day:hover {
+  color: var(--ink);
+}
+
+.th-rail-day.is-on {
+  border-left-color: var(--yellow);
+  border-radius: 0 12px 12px 0;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.th-rail-day.is-on .th-pin {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.th-rail-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.th-rail-name {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.th-rail-note {
+  margin: 14px 0 0 16px;
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.th-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.th-gcard {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  transition: border-color 150ms ease;
+}
+
+.th-gcard.is-picked {
+  border-color: var(--ink);
+}
+
+.th-gcard.is-special {
+  box-shadow: inset 0 3px 0 var(--yellow);
+}
+
+.th-gcard-photo {
+  aspect-ratio: 16 / 9;
+  width: 100%;
+}
+
+.th-gcard.is-special .th-gcard-photo {
+  margin-top: 3px;
+}
+
+.th-gcard-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px 14px;
+}
+
+.th-gcard-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: auto;
+  padding-top: 4px;
+}
+
+.th-gcard-price {
+  color: var(--body);
+  font-size: 14.5px;
+  font-weight: 600;
+}
+
+.th-gcard-info {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(2px);
+}
+
+.th-gcard-info-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.th-gcard-info-head button {
+  position: relative;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.th-gcard-info p {
+  margin: 6px 0 0;
+  overflow: auto;
+  color: var(--body);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* ---------------------------------------------------------------------------
+   Smal scherm: één kolom
+   --------------------------------------------------------------------------- */
+
+@media (max-width: 899px) {
+  .th-mobile-only {
+    display: flex !important;
+  }
+
+  .th-tabs.th-mobile-only {
+    display: grid !important;
+  }
+
+  .th-desktop-only {
+    display: none !important;
+  }
+
+  .th-tabs {
+    grid-template-columns: repeat(auto-fit, minmax(54px, 1fr));
+    gap: 6px;
+  }
+
+  .th-tab {
+    justify-content: center;
+    padding: 8px 0;
+    border-radius: 12px;
+  }
+
+  .th-tab-full {
+    display: none;
+  }
+
+  .th-tab-compact {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 1px;
+    width: 100%;
+  }
+
+  .th-tab-dow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .th-tab-num {
+    font-size: 18px;
+    font-weight: 700;
+  }
+
+  .th-tab-compact .th-dot {
+    position: absolute;
+    top: -2px;
+    right: 6px;
+  }
+
+  .th-a,
+  .th-b {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  /* Na het bestellen staat je reservatie bovenaan: dat is waarvoor je de
+     pagina opendoet. Het mandje zelf valt weg; de balk onderaan neemt over. */
+  .th-a-side {
+    position: static;
+  }
+
+  .th-a-side.is-reservation {
+    order: -1;
+  }
+
+  .th-a-side:not(.is-reservation) {
+    display: none;
+  }
+
+  .th-dayhead h2 {
+    font-size: 21px;
+  }
+
+  .th-row {
+    gap: 10px;
+    padding: 11px 14px;
+  }
+
+  .th-row-thumb {
+    width: 48px;
+    height: 48px;
+  }
+
+  .th-cards {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+  }
+
+  .th-gcard-foot {
+    flex-wrap: wrap;
+  }
+
+  .th-reservation.is-wide {
+    display: flex;
+    align-items: stretch;
+  }
+
+  .th-reservation.is-wide .th-pickup {
+    margin: 16px 24px 0;
+  }
+
+  .th-reservation.is-wide .th-reservation-body {
+    padding-inline: 24px;
+  }
+
+  .th-reservation.is-wide .th-reservation-actions {
+    padding: 16px 24px 22px;
+    border-top: 1px solid var(--rule-soft);
+  }
+
+  .th-reservation.is-wide .th-reservation-buttons {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  /* Op gsm: aantal en totaal onder elkaar links, de knop rechts, zoals een
+     afrekenbalk in een app. Bij het aanpassen komt "Niet aanpassen" eronder. */
+  .th-bar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "text submit"
+      "total submit"
+      "ghost ghost"
+      "error error";
+    gap: 0 12px;
+    padding: 10px 10px 10px 16px;
+  }
+
+  .th-bar-kicker {
+    display: none;
+  }
+
+  .th-bar-text {
+    grid-area: text;
+    font-size: 12.5px;
+  }
+
+  .th-bar-total {
+    grid-area: total;
+    margin-left: 0;
+    font-size: 19px;
+  }
+
+  .th-bar > .th-btn-primary {
+    grid-area: submit;
+    align-self: center;
+  }
+
+  .th-bar > .th-btn-ghost {
+    grid-area: ghost;
+    margin-top: 10px;
+  }
+
+  .th-bar-error {
+    grid-area: error;
+    margin-top: 8px;
+  }
+}

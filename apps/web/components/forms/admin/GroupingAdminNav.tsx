@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { useSelectedLayoutSegment } from "next/navigation";
 import { ArrowLeft, ExternalLink, ListChecks, Settings2, UsersRound } from "lucide-react";
 import { FormStatusBadge } from "./FormStatusBadge";

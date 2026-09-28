@@ -40,17 +40,23 @@ export function ShiftBoard({
   stats,
   postNames,
   initialWeekStart,
+  initialAvailable,
+  initialRegistered,
 }: {
   locale: Locale;
   historyHref: string;
   stats: ShiftYearStats;
   postNames: PostNames;
   initialWeekStart?: Date | string;
+  /** Wat `/api/shift` nu zou geven, al op de server opgehaald. */
+  initialAvailable?: ShiftResponse[];
+  /** Wat `/api/shift/register` nu zou geven, al op de server opgehaald. */
+  initialRegistered?: ShiftResponse[];
 }) {
   const t = getDictionary(locale).shift;
 
-  const available = useShiftList('/api/shift');
-  const registered = useShiftList('/api/shift/register');
+  const available = useShiftList('/api/shift', initialAvailable);
+  const registered = useShiftList('/api/shift/register', initialRegistered);
 
   const [view, setView] = useState<View>('list');
   const [weekStart, setWeekStart] = useState(() =>

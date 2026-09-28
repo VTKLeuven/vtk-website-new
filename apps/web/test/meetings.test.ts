@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_DRINK_PRICE_CENTS,
   DEFAULT_MEETING_DRINKS,
+  hasMeetingOrder,
   isoWeekNumber,
   meetingCloseAt,
   meetingPath,
+  meetingPricesVisible,
   meetingWindowState,
   monthDays,
   offeringNameKey,
@@ -173,5 +175,30 @@ describe("meetingPath", () => {
   it("stuurt de grocomeet naar één pagina en een bureau naar zijn eigen link", () => {
     expect(meetingPath("GROCOMEET", "gm-2026-10-16")).toBe("/grocomeet");
     expect(meetingPath("BUREAU", "bureau-2026-10-15", "/en")).toBe("/en/bureau/bureau-2026-10-15");
+  });
+});
+
+describe("prijzen per soort", () => {
+  it("toont geen prijzen bij een VTK Bureau: de bestelling is gratis voor de student", () => {
+    expect(meetingPricesVisible("BUREAU")).toBe(false);
+  });
+
+  it("toont prijzen bij een grocomeet: daar wordt het bedrag per persoon afgevinkt", () => {
+    expect(meetingPricesVisible("GROCOMEET")).toBe(true);
+  });
+});
+
+describe("inschrijving zonder bestelling", () => {
+  it("herkent een inschrijving met enkel een broodje, enkel een drankje, of allebei", () => {
+    expect(hasMeetingOrder({ itemName: "Broodje kaas", drinkName: null })).toBe(true);
+    expect(hasMeetingOrder({ itemName: null, drinkName: "Cola" })).toBe(true);
+    expect(hasMeetingOrder({ itemName: "Broodje kaas", drinkName: "Cola" })).toBe(true);
+  });
+
+  it("telt wie komt zonder broodje en zonder drankje niet als bestelling", () => {
+    expect(hasMeetingOrder({ itemName: null, drinkName: null })).toBe(false);
+    // Zo komt het uit een formulier dat op "geen" blijft staan.
+    expect(hasMeetingOrder({ itemName: "", drinkName: "" })).toBe(false);
+    expect(hasMeetingOrder({})).toBe(false);
   });
 });

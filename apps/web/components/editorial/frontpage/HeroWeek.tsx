@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { pick, type Locale } from "@vtk/i18n";
 import {
   HERO_WEEK_TIME_ZONE,
@@ -10,6 +10,7 @@ import { EventStar, type EventStarLabels } from "@/components/calendar/EventStar
 import { organiserName } from "@/lib/calendar/organiser";
 import { momentDayParts, momentStrip, momentStripRest } from "@/lib/calendar/moments";
 import type { FrontpageEvent } from "./context";
+import { withSource } from "@/lib/ticketing/source";
 
 /**
  * Het weekoverzicht naast de titel op de homepage.
@@ -210,7 +211,7 @@ export function HeroWeek({
                         }
                       >
                         <span className="dot" aria-hidden="true" />
-                        <Link href={`${base}/kalender/${event.slug}`} className="body">
+                        <Link href={withSource(`${base}/kalender/${event.slug}`, "home-agenda")} className="body">
                           <span className="title">{title}</span>
                           {meta ? <small>{meta}</small> : null}
                           {strip ? (

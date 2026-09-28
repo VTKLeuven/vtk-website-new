@@ -1,22 +1,12 @@
 import "server-only";
 
 import { cache } from "react";
-import type { CalendarAudience, Prisma, StudyYear } from "@prisma/client";
+import type { CalendarAudience, Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { getCurrentSession } from "@/lib/session";
+import { audiencesForStudyProfile } from "./audienceProfile";
 
-export function audiencesForStudyProfile(
-  studyYears: StudyYear[],
-  internationalStudent: boolean,
-  alumni: boolean,
-): CalendarAudience[] {
-  const audiences: CalendarAudience[] = [];
-  if (studyYears.includes("BACHELOR_1")) audiences.push("FIRST_YEARS");
-  if (internationalStudent) audiences.push("INTERNATIONALS");
-  if (studyYears.includes("MASTER_2")) audiences.push("LAST_YEARS");
-  if (alumni) audiences.push("ALUMNI");
-  return audiences;
-}
+export { audiencesForStudyProfile };
 
 /**
  * Het doelgroepfilter voor wie nu kijkt.

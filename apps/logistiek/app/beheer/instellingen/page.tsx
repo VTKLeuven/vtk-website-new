@@ -13,13 +13,14 @@ export default async function BeheerInstellingenPage() {
   ]);
 
   return (
-    <div className="grid gap-6">
+    <div className="logistics-form-width grid gap-6">
       <VehicleSettings vehicles={vehicles} />
       <GeneralSettings
         showRentPrices={settings.showRentPrices}
         lastMinuteDays={settings.lastMinuteDays}
         externalRequestsOpen={settings.externalRequestsOpen}
         notifyEmails={settings.notifyEmails}
+        tripHandover={settings.tripHandover}
       />
       <FeedTokens
         canTeam

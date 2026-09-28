@@ -8,6 +8,7 @@ import {
   TransportCalendar,
 } from '@/components/transport-calendar/transport-calendar';
 import { TransportFilterBar } from '@/components/transport-calendar/filters';
+import { TransportLegend } from '@/components/transport-calendar/legend';
 import { TripInspector } from '@/components/transport-calendar/trip-inspector';
 import type {
   AvailabilityBand,
@@ -20,15 +21,20 @@ import type { TransportFilters } from '@/lib/transport-filters';
 import { AuditTimeline } from '@/components/audit-timeline';
 import { PhoneLink } from '@/components/phone-link';
 import { TripHelpers } from '@/components/trip-helpers';
+import { TripNotes, type TripNoteView } from '@/components/trip-notes';
 import { VanStatusBadge } from '@/components/status-badge';
 import type { UitleenAuditEntry, DriverOption } from '@/lib/uitleen-server';
 import { TransportControls } from '../transport-controls';
 import { TransportDecisionForms, type DecisionLeg } from '../transport-decision-forms';
 import { TripEditForm, type TripEditValues } from './trip-edit-form';
 import { NewTripForm, type NewTripValues } from './new-trip-form';
+import type { TripHandoverMode } from '@/lib/uitleen';
 import { EventEditForm, type PlannerEvent } from './event-edit-form';
 import type { TripEventOption } from '@/components/trip-event-select';
-import { AvailabilityBoard } from '@/components/transport-calendar/availability-board';
+import {
+  AvailabilityBoard,
+  type BoardNote,
+} from '@/components/transport-calendar/availability-board';
 import type { CalendarEventBar } from '@/components/transport-calendar/event-bars';
 import { adminEditTransportAction, deleteTransportAction } from '@/app/actions/beheer';
 import { ConfirmActionButton } from '@/components/ui/confirm-action-button';
@@ -92,6 +98,13 @@ export type PlannerTrip = {
   driver: { id: string; name: string } | null;
   /** De post die deze rit zelf mag invullen, of null. */
   assignedGroupId: string | null;
+  /**
+   * De post waarvoor deze rit rijdt, met haar naam (F4.4). Staat naast
+   * `edit.requesterChoice` omdat die enkel een id draagt: is de post intussen
+   * op non-actief gezet, dan staat ze niet meer in `groups` en heeft de
+   * keuzelijst niets om te tonen.
+   */
+  requesterGroup: { id: string; name: string } | null;
   pricingMode: UitleenPricingMode;
   requesterType: UitleenRequesterType;
   priceLabel: string | null;
@@ -110,6 +123,12 @@ export type PlannerTrip = {
   /** Goedgekeurde ritten met hetzelfde voertuig die deze overlappen. */
   conflictsWith: Array<{ id: string; label: string }>;
   history: UitleenAuditEntry[];
+  /**
+   * De eigen nota's bij deze rit (F4.20), al gefilterd op wat dit teamlid mag
+   * lezen. Andermans privénota's komen niet eens uit de databank; zie
+   * `tripNotesFor`.
+   */
+  notes: TripNoteView[];
 };
 
 export function TransportPlanner({
@@ -122,9 +141,11 @@ export function TransportPlanner({
   drivers,
   vehicleOptions,
   groups,
+  handoverNotify,
   events,
   eventOptions,
   availability,
+  availabilityNotes,
   driverColors,
   filters,
   hiddenNote,
@@ -140,6 +161,13 @@ export function TransportPlanner({
   vehicleOptions: Array<{ id: string; name: string; needsVanDriver: boolean }>;
   /** Posten en werkgroepen waarvoor het team zelf een rit kan inplannen. */
   groups: Array<{ id: string; name: string }>;
+  /**
+   * Wie er een mail krijgt wanneer je de rit aan een post doorgeeft (F4.8b).
+   * Het formulier zegt dat ter plaatse, want die instelling staat twee schermen
+   * verderop en beloven dat er iemand verwittigd wordt terwijl dat niet gebeurt,
+   * is erger dan niets beloven.
+   */
+  handoverNotify: TripHandoverMode;
   /** De evenementen boven het rooster, met wat het paneel nodig heeft (P5). */
   events: PlannerEvent[];
   /**
@@ -150,6 +178,8 @@ export function TransportPlanner({
   eventOptions: TripEventOption[];
   /** Wanneer de chauffeurs kunnen rijden (V1); leeg wanneer de filter uitstaat. */
   availability: AvailabilityBand[];
+  /** Wat ze over de week in het algemeen kwijt wilden (F4.5). */
+  availabilityNotes: BoardNote[];
   driverColors?: DriverColorOverrides;
   filters: TransportFilters;
   /** Wat er door de filters niet getoond wordt, in woorden. */
@@ -202,9 +232,12 @@ export function TransportPlanner({
     (blockId: string, startAt: Date, endAt: Date) => {
       const target = trips.find((entry) => entry.id === blockId);
       if (!target) return;
+      // "Voor wie" blijft hier bewust achter: slepen verzet uren, en de actie
+      // raakt de post enkel aan wanneer ze die expliciet meekrijgt.
+      const { requesterChoice: _choice, requesterOther: _other, ...fields } = target.edit;
       startTransition(async () => {
         const result = await adminEditTransportAction(blockId, {
-          ...target.edit,
+          ...fields,
           startAt: toDatetimeLocalValue(startAt),
           endAt: toDatetimeLocalValue(endAt),
           allowOverlap: true,
@@ -342,6 +375,7 @@ export function TransportPlanner({
               filters={filters}
               vehicles={vehicles.map((vehicle) => ({ id: vehicle.id, name: vehicle.name }))}
               drivers={drivers.map((driver) => ({ id: driver.id, name: driver.name }))}
+              posts={groups}
               driverColors={driverColors}
             />
             {clashing.length > 0 ? (
@@ -381,15 +415,27 @@ export function TransportPlanner({
 
         {/* `tg-hint`: in volledig scherm valt deze uitleg weg. Daar wil je zoveel
             mogelijk kalender, en wie fullscreen aanzet, heeft de legende al
-            gelezen. */}
-        <p className="tg-hint text-xs text-vtk-muted">
-          De vulkleur is de chauffeur, de arcering is het voertuig; een rit zonder chauffeur is geel
-          met een rode streepjesrand. Kleuren stel je in bij Chauffeurs, arceringen bij
-          Instellingen. Gestreept = nog te beslissen, doorzichtig = afgerond, volle rode rand = twee
-          goedgekeurde ritten met hetzelfde voertuig op hetzelfde moment. Dat laatste mag tijdelijk:
-          plan gerust in wat mensen vragen en schuif het daarna passend; de teller boven de kalender
-          houdt bij wat er nog dubbel staat. Klik een rit aan om ze te beslissen of aan te passen.
-        </p>
+            gelezen.
+
+            De legende tekent de echte blokken (F4.16); wat er hier in woorden
+            onder staat, is wat je aan een blok níét kan zien: waar je de kleuren
+            en de arceringen instelt, en dat een botsing tijdelijk mag. */}
+        <div className="grid gap-2">
+          {/* De legende blijft ook in volledig scherm staan: ze verklaart de
+              kleuren die je op dat moment bekijkt. Enkel de zin eronder draagt
+              `tg-hint` en valt daar weg. */}
+          <TransportLegend
+            vehicles={vehicles.map((vehicle) => ({ name: vehicle.name, pattern: vehicle.pattern }))}
+            showDriver
+            showConflict
+          />
+          <p className="tg-hint text-xs text-vtk-muted">
+            Kleuren stel je in bij Chauffeurs, arceringen bij Instellingen. Een botsing mag
+            tijdelijk: plan gerust in wat mensen vragen en schuif het daarna passend; de teller boven
+            de kalender houdt bij wat er nog dubbel staat. Klik een rit aan om ze te beslissen of aan
+            te passen.
+          </p>
+        </div>
 
         {openEvent ? (
           <TripInspector
@@ -428,6 +474,7 @@ export function TransportPlanner({
               }
               vehicles={vehicleOptions}
               groups={groups}
+              handoverNotify={handoverNotify}
               events={eventOptions}
               drivers={drivers}
               onDone={() => {
@@ -618,12 +665,20 @@ export function TransportPlanner({
                 canEdit={trip.status === 'REQUESTED' || trip.status === 'APPROVED'}
               />
 
+              {/* De eigen nota's (F4.20). Je leest hier wat er met Logistiek
+                  gedeeld is en wat je zelf schreef, nooit de privénota van
+                  iemand anders. Schrijven mag op elke rit: het team slaat ze
+                  hier toch al open, en een nota verandert niets aan de rit. */}
+              <TripNotes bookingId={trip.id} notes={trip.notes} canWrite />
+
               <section>
                 <h3 className="text-sm font-semibold text-vtk-ink">Rit aanpassen</h3>
                 <div className="mt-2">
                   <TripEditForm
                     bookingId={trip.id}
                     initial={trip.edit}
+                    groups={groups}
+                    currentGroup={trip.requesterGroup}
                     events={eventOptions}
                     reservationId={trip.reservationId}
                     locked={trip.status !== 'REQUESTED' && trip.status !== 'APPROVED'}
@@ -675,6 +730,7 @@ export function TransportPlanner({
         drivers={drivers
           .filter((driver) => driver.canDriveVan)
           .map((driver) => ({ id: driver.id, name: driver.name }))}
+        notes={availabilityNotes}
         driverColors={driverColors}
       />
     </>

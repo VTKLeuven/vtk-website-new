@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { pick } from "@vtk/i18n";
 import { choiceValue, pickField, rangeValue } from "@/lib/frontpage/fields";
 import {
@@ -14,6 +14,7 @@ import { HeroWeek } from "./HeroWeek";
 import { HeroSlogan } from "./HeroSlogan";
 import { HeroShifts } from "./HeroShifts";
 import { Cta, ctaFrom, type FrontpageProps } from "./context";
+import { withSource } from "@/lib/ticketing/source";
 
 /**
  * The regular front page: copy on the left, the agenda on the right.
@@ -112,14 +113,6 @@ export function DefaultFrontpage({
     limit: heroShiftRowCount(slogans.items, slogans.size),
   });
 
-  // "Binnenkort" telt de maand vooruit. Niet alles wat de homepage inlas, want
-  // dat zijn er veertig en "37 events" is geen "binnenkort"; en niet één week,
-  // want dan staat er in september "0 events" naast een agenda die er vier toont.
-  const monthAhead = now.getTime() + 30 * 24 * 60 * 60 * 1000;
-  const eventsSoon = upcomingEvents.filter(
-    (event) => event.start.getTime() < monthAhead,
-  ).length;
-
   const eventGroups = heroEvents.reduce<
     Array<{ key: string; date: Date; events: FrontpageProps["upcomingEvents"] }>
   >((acc, event) => {
@@ -130,14 +123,6 @@ export function DefaultFrontpage({
     else acc.push({ key, date, events: [event] });
     return acc;
   }, []);
-
-  const workingYear = (() => {
-    // The working year starts on 15 July; see @vtk/auth.
-    const y = now.getMonth() > 6 || (now.getMonth() === 6 && now.getDate() >= 15)
-      ? now.getFullYear()
-      : now.getFullYear() - 1;
-    return `${y}-${String(y + 1).slice(-2)}`;
-  })();
 
   return (
     <section className="home-hero">
@@ -161,28 +146,14 @@ export function DefaultFrontpage({
           <Cta cta={primary} className="btn btn-primary arrow" />
           <Cta cta={secondary} className="btn btn-ghost" />
         </div>
-        {/* De shiften en de feitenlijn zijn samen de voet van de kolom en hangen
-            aan de onderkant (`margin-top: auto` in vtk-home.css), zodat ze
-            uitkomen op de onderlijn van de agenda ernaast. De lucht die de titel
-            overlaat, komt daardoor boven dit blok te staan en niet eronder. */}
+        {/* De shiften zijn de voet van de kolom en hangen aan de onderkant
+            (`margin-top: auto` in vtk-home.css), zodat ze uitkomen op de
+            onderlijn van de agenda ernaast. De lucht die de titel overlaat, komt
+            daardoor boven dit blok te staan en niet eronder. De feitenlijn die
+            hier onder stond (werkingsjaar, binnenkort, sinds) is weg: haar
+            hoogte ging naar de shiften. */}
         <div className="hero-foot">
           <HeroShifts shifts={heroShifts} now={now} locale={locale} base={base} />
-          <div className="hero-meta">
-            <div className="meta">
-              <div className="k">{nl ? "Werkingsjaar" : "Working year"}</div>
-              <div className="v">{workingYear}</div>
-            </div>
-            <div className="meta">
-              <div className="k">{nl ? "Binnenkort" : "Coming up"}</div>
-              <div className="v">
-                {eventsSoon} {nl ? "events" : "events"}
-              </div>
-            </div>
-            <div className="meta">
-              <div className="k">{nl ? "Sinds" : "Since"}</div>
-              <div className="v">1920</div>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -239,7 +210,7 @@ export function DefaultFrontpage({
                 {group.events.map((event, eventIndex) => (
                   <Link
                     key={event.id}
-                    href={`${base}/kalender/${event.slug}`}
+                    href={withSource(`${base}/kalender/${event.slug}`, "home-agenda")}
                     className={`hero-ev${groupIndex === 0 && eventIndex === 0 ? " featured" : ""}`}
                   >
                     <div className="t">{formatTime(new Date(event.start))}</div>

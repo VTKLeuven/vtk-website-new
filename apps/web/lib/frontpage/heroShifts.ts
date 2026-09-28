@@ -24,20 +24,24 @@ import type { DisplaySlogan, SloganSize } from "@/lib/slogans";
  *
  * Uit de kolom ernaast. Op de breedste hero (`--max` 1240, tekstkolom 574px) is
  * het weekoverzicht met zes dagen ongeveer 645px hoog. De vaste onderdelen van
- * de linkerkolom nemen daarvan 329px: bovenschrift (19), onderregel (50),
- * knoppen (40), de kop van dit blok (24), de feitenlijn (72) en de
- * tussenruimtes (16 + 24 + 26 + 34 + 24). Blijft er 316px over voor de titel en
- * de shiftrijen samen.
+ * de linkerkolom nemen daarvan 233px: bovenschrift (19), onderregel (50),
+ * knoppen (40), de kop van dit blok (24) en de tussenruimtes (16 + 24 + 26 +
+ * 34). Blijft er 412px over voor de titel en de shiftrijen samen.
  *
- * Het budget hieronder ligt bewust nog een tikje lager. De hoogte van de titel
- * wordt namelijk geschat, want de server weet niet waar de browser afbreekt, en
- * een schatting die één regel misgokt zou de kolom anders alsnog onder de agenda
- * uit duwen. Met 300 blijft er in elk geval wat lucht over, en die komt dankzij
- * `margin-top: auto` boven het blok te staan, waar ze leest als ademruimte
- * onder de knoppen in plaats van als een gat.
+ * Tot september 2026 stond onder de shiften nog een feitenlijn (werkingsjaar,
+ * binnenkort, sinds), die samen met haar tussenruimte 96px innam. Die is
+ * weggehaald om plaats te maken voor drie shiften in plaats van één.
  *
- * Exact hoeft de schatting dus niet te zijn: ze kiest enkel tussen nul en drie
- * rijen. Een rij te weinig oogt altijd beter dan een kolom die uitsteekt.
+ * Het budget ligt bewust iets hóger dan die 412, en dat is een keuze: bij de
+ * langste slogan van nu (drie regels op de grootste trap, 235px) passen er
+ * anders twee shiften, en de vraag was er drie. Het weekoverzicht is in de
+ * praktijk ook zelden zo kort als de 645px hierboven: met een paar evenementen
+ * per dag loopt het eerder tegen de 750px. Bij een heel lege week kan de
+ * linkerkolom daardoor een tiental pixels onder de agenda uitkomen; dat is
+ * geen scherm hoger.
+ *
+ * De schatting van de titelhoogte hoeft niet exact te zijn: ze kiest enkel
+ * tussen nul en drie rijen. Een vierde regel titel kost nog altijd een rij.
  */
 
 /** Hoogstens zoveel shiften in de hero; meer maakt van de titel een prikbord. */
@@ -52,7 +56,7 @@ export const HERO_SHIFT_MAX_ROWS = 3;
 export const HERO_SHIFT_ROW_PX = 62;
 
 /** Wat de titel en de shiftrijen samen mogen innemen. Zie de kop van dit bestand. */
-export const HERO_SHIFT_BUDGET_PX = 300;
+export const HERO_SHIFT_BUDGET_PX = 424;
 
 /**
  * Een shift die binnen dit venster begint (of al bezig is) krijgt de gele stip.

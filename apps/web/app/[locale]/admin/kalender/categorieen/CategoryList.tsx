@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { useRef, useState, useTransition } from "react";
 import type { Locale } from "@vtk/i18n";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";

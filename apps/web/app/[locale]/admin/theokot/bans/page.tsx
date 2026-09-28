@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
+import Link from "@/components/ui/Link";
 import { formatEuro } from "@/lib/theokot";
+import { getTheokotConfig } from "@/lib/theokot-server";
 import { TheokotAdminNav } from "../TheokotAdminNav";
 import { BansClient, type BanRow, type NoShowRow } from "./BansClient";
 
@@ -21,7 +23,7 @@ export default async function TheokotBansPage({ params }: { params: Promise<{ lo
   if (!caps.manage) return <p className="text-sm text-zinc-500">{nl ? "Geen toegang." : "No access."}</p>;
 
   const now = new Date();
-  const [bans, noShows] = await Promise.all([
+  const [bans, noShows, config] = await Promise.all([
     prisma.theokotBan.findMany({
       orderBy: [{ active: "desc" }, { endsAt: "desc" }],
       take: 200,
@@ -36,6 +38,7 @@ export default async function TheokotBansPage({ params }: { params: Promise<{ lo
         session: { select: { date: true } },
       },
     }),
+    getTheokotConfig(),
   ]);
 
   const dateFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
@@ -44,6 +47,15 @@ export default async function TheokotBansPage({ params }: { params: Promise<{ lo
     month: "2-digit",
     year: "numeric",
   });
+  // Het datumveld toonde de UTC-dag terwijl het label ernaast in Brussel-tijd
+  // staat; bij een ban die na middernacht Brussel eindigt, scheelde dat een dag.
+  const dayValue = (date: Date) =>
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Brussels",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(date);
 
   const banRows: BanRow[] = bans.map((b) => ({
     id: b.id,
@@ -52,7 +64,7 @@ export default async function TheokotBansPage({ params }: { params: Promise<{ lo
     reason: b.reason,
     note: b.note ?? "",
     startsLabel: dateFmt.format(b.startsAt),
-    endsValue: b.endsAt.toISOString().slice(0, 10),
+    endsValue: dayValue(b.endsAt),
     endsLabel: dateFmt.format(b.endsAt),
     active: b.active && b.startsAt <= now && b.endsAt > now,
     stored: b.active,
@@ -65,12 +77,25 @@ export default async function TheokotBansPage({ params }: { params: Promise<{ lo
     dateLabel: dateFmt.format(o.session.date),
     totalLabel: formatEuro(o.totalCents),
     note: o.statusNote ?? "",
+    paused: o.noShowWaivedAt !== null,
   }));
 
   return (
     <div className="space-y-5">
       <h1 className="text-2xl font-semibold">Theokot · {nl ? "Bans & no-shows" : "Bans & no-shows"}</h1>
       <TheokotAdminNav base={base} nl={nl} active="bans" caps={caps} />
+      {config.noShowPaused ? (
+        <div className="vtk-basic-alert vtk-basic-alert-warning">
+          <div className="vtk-basic-alert-text">
+            {nl
+              ? "De no-show-verwerking staat gepauzeerd: wie niet ophaalt, krijgt geen mail en telt niet mee voor een ban. Lopende bans blijven gewoon lopen. "
+              : "No-show processing is paused: people who don't pick up get no email and don't count towards a ban. Running bans stay in place. "}
+            <Link href={`${base}/admin/theokot/instellingen`} className="font-semibold underline">
+              {nl ? "Naar de instellingen" : "Go to settings"}
+            </Link>
+          </div>
+        </div>
+      ) : null}
       <BansClient nl={nl} bans={banRows} noShows={noShowRows} />
     </div>
   );

@@ -1,10 +1,14 @@
+import Link from "@/components/ui/Link";
 import { prisma } from "@vtk/db";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
+import { brusselsTimeOnDay } from "@/lib/theokot";
+import { brusselsWallClock, brusselsYMD, shiftYMD } from "@/lib/brussels";
 import { TheokotAdminNav } from "../TheokotAdminNav";
 import { PrintButton } from "./PrintButton";
+import { SaleDayPicker } from "./SaleDayPicker";
 
 import "@/app/design/vtk-basic.css";
 
@@ -13,7 +17,7 @@ export default async function TurflijstPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ date?: string }>;
+  searchParams: Promise<{ date?: string; alles?: string }>;
 }) {
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
@@ -25,21 +29,40 @@ export default async function TurflijstPage({
   const caps = { manage: has("theokot.manage"), pickup: has("theokot.pickup") };
   if (!caps.pickup) return <p className="text-sm text-zinc-500">{nl ? "Geen toegang." : "No access."}</p>;
 
-  const { date } = await searchParams;
+  const { date, alles } = await searchParams;
 
-  // Beschikbare dagen voor de kiezer (met minstens één sessie).
+  // Beschikbare dagen voor de kiezer. Standaard de laatste drie maanden plus
+  // alles wat nog komt: een lijst van elke verkoopdag ooit wordt na een paar
+  // jaar onbruikbaar. Wie verder terug moet, zet ze met één klik helemaal open.
+  const showAll = alles === "1";
+  const since = shiftYMD(brusselsYMD(new Date()), -92);
   const allSessions = await prisma.theokotSession.findMany({
+    where: showAll
+      ? undefined
+      : { date: { gte: brusselsWallClock(since.year, since.month, since.day, "00:00") } },
     orderBy: { date: "desc" },
     select: { id: true, date: true },
   });
+  const olderCount = showAll
+    ? 0
+    : await prisma.theokotSession.count({
+        where: { date: { lt: brusselsWallClock(since.year, since.month, since.day, "00:00") } },
+      });
   const ymd = (d: Date) =>
     new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Brussels", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
   const dayLabel = (d: Date) =>
     new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", { timeZone: "Europe/Brussels", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(d);
 
-  const selected = allSessions.find((s) => ymd(s.date) === date) ?? allSessions[0];
+  // Zonder gekozen dag de eerstvolgende verkoopdag, vandaag inbegrepen: dat is
+  // de lijst die iemand in de Theokot nodig heeft. De kiezer staat van nieuw
+  // naar oud, dus de eerste rij is de verste dag die al gepland is, niet de
+  // volgende. Staat er niets meer gepland, dan de laatste die voorbij is.
+  const today = ymd(new Date());
+  const upcoming = allSessions.filter((s) => ymd(s.date) >= today).at(-1);
+  const selected =
+    allSessions.find((s) => ymd(s.date) === date) ?? upcoming ?? allSessions[0];
 
-  type TurfRow = { name: string; students: number; grocomeet: number; bureau: number };
+  type TurfRow = { id: string; name: string; students: number; grocomeet: number; bureau: number };
   let items: TurfRow[] = [];
   let totalOrders = 0;
   let sessionDate: Date | null = null;
@@ -60,8 +83,11 @@ export default async function TurflijstPage({
       // De broodjes van de grocomeet en het bureau gaan in een aparte doos, dus
       // ze krijgen hun eigen kolom in plaats van in het studentenaantal te
       // verdwijnen. Ze hangen aan hetzelfde aanbod-item.
-      const dayStart = new Date(full.date);
-      const dayEnd = new Date(dayStart.getTime() + 86400000);
+      // Niet "plus 24 uur": op de twee dagen dat de klok verspringt, schuift dat
+      // venster een uur en valt een vergadering er net binnen of buiten.
+      const dayStart = brusselsTimeOnDay(full.date, "00:00");
+      const next = shiftYMD(brusselsYMD(full.date), 1);
+      const dayEnd = brusselsWallClock(next.year, next.month, next.day, "00:00");
       const [used, reservations] = await Promise.all([
         prisma.theokotOrderLine.groupBy({
           by: ["sessionItemId"],
@@ -89,6 +115,7 @@ export default async function TurflijstPage({
 
       items = full.items
         .map((i) => ({
+          id: i.id,
           name: nl ? i.nameNl : i.nameEn ?? i.nameNl,
           students: usedMap.get(i.id) ?? 0,
           grocomeet: meetingCounts.get(i.id)?.grocomeet ?? 0,
@@ -137,28 +164,28 @@ export default async function TurflijstPage({
       <div className="no-print space-y-5">
         <h1 className="text-2xl font-semibold">Theokot · {nl ? "Lijst bestelde broodjes" : "Ordered sandwiches list"}</h1>
         <TheokotAdminNav base={base} nl={nl} active="turflijst" caps={caps} />
-        <form method="get" className="flex flex-wrap items-end gap-3">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wide text-[#5c667f]">
-              {nl ? "Verkoopdag" : "Sale day"}
-            </label>
-            <select
-              name="date"
-              defaultValue={selected ? ymd(selected.date) : ""}
-              className="mt-1 rounded-xl border border-vtk-blue/12 bg-white px-3 py-2 text-sm"
+        <div className="flex flex-wrap items-end gap-3">
+          {allSessions.length > 0 && (
+            <SaleDayPicker
+              base={base}
+              label={nl ? "Verkoopdag" : "Sale day"}
+              options={allSessions.map((s) => ({ value: ymd(s.date), label: dayLabel(s.date) }))}
+              selected={selected ? ymd(selected.date) : ""}
+              showAll={showAll}
+            />
+          )}
+          {olderCount > 0 && (
+            <Link
+              href={`${base}/admin/theokot/turflijst?alles=1`}
+              className="text-sm text-[#5c667f] underline underline-offset-2 hover:text-vtk-ink"
             >
-              {allSessions.map((s) => (
-                <option key={s.id} value={ymd(s.date)}>
-                  {dayLabel(s.date)}
-                </option>
-              ))}
-            </select>
-          </div>
-          <button type="submit" className="rounded-full border border-vtk-blue/15 px-4 py-2 text-sm hover:bg-vtk-blue-soft/60">
-            {nl ? "Tonen" : "Show"}
-          </button>
+              {nl
+                ? `Toon ook de ${olderCount} oudere verkoopdag(en)`
+                : `Also show the ${olderCount} older sale day(s)`}
+            </Link>
+          )}
           {items.length > 0 && <PrintButton label={nl ? "Print / Download" : "Print / Download"} />}
-        </form>
+        </div>
       </div>
 
       {!selected && (
@@ -194,7 +221,7 @@ export default async function TurflijstPage({
               </thead>
               <tbody>
                 {items.map((i) => (
-                  <tr key={i.name}>
+                  <tr key={i.id}>
                     <td>{i.name}</td>
                     <td className="num">{i.students}</td>
                     {hasGrocomeet && <td className="num">{i.grocomeet || ""}</td>}

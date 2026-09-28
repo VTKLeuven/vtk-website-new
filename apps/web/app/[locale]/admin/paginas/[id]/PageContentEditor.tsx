@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/ui/Link";
 import { QrCode } from "lucide-react";
 import { Card, Input, Label } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";

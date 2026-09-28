@@ -16,9 +16,10 @@ import "@/app/design/vtk-forms.css";
 export const metadata: Metadata = { robots: { index: false, follow: false } };
 
 /**
- * Broodjes bestellen voor één VTK Bureau. Elke ingelogde student kan hier
- * terecht, maar enkel via de link die Onderwijs deelt: de pagina staat nergens
- * in de navigatie en wordt niet geïndexeerd.
+ * Inschrijven voor één VTK Bureau, met een broodje en een drankje erbij wanneer
+ * je dat wil. Elke ingelogde student kan hier terecht, maar enkel via de link
+ * die Onderwijs deelt: de pagina staat nergens in de navigatie en wordt niet
+ * geïndexeerd.
  */
 export default async function BureauPage({
   params,
@@ -58,8 +59,8 @@ export default async function BureauPage({
           <h1 className="vtk-page-title">VTK Bureau</h1>
           <p className="vtk-page-subtitle">
             {nl
-              ? "Kom je naar het bureau? Bestel hier je broodje en drankje, en geef alvast je onderwijsfeedback mee."
-              : "Coming to the bureau? Order your sandwich and drink here, and share your education feedback up front."}
+              ? "Kom je naar het bureau? Schrijf je hier in. Een broodje, een drankje en je onderwijsfeedback mag je meteen meegeven, maar hoeft niet."
+              : "Coming to the bureau? Register here. You can add a sandwich, a drink and your education feedback right away, but none of that is required."}
           </p>
         </div>
       </header>

@@ -10,8 +10,9 @@ import { useToast } from '@/components/ui/toast';
 import { TimeGrid } from '@/components/transport-calendar/time-grid';
 import type { AvailabilityBand } from '@/components/transport-calendar/types';
 import { formatDateTime, toDatetimeLocalValue } from '@/lib/uitleen';
-import { AVAILABILITY_KINDS, type AvailabilityKind } from '@/lib/availability-day';
+import { AVAILABILITY_KINDS, DAG_START_UUR, type AvailabilityKind } from '@/lib/availability-day';
 import { AVAILABILITY_KIND_HINT, AVAILABILITY_KIND_LABEL, availabilityFillClass } from '@/lib/availability-kinds';
+import { AvailabilityNote } from './availability-note';
 import { AvailabilityPaint } from './availability-paint';
 
 /**
@@ -55,6 +56,8 @@ export function AvailabilityEditor({
   driverId,
   driverName,
   weekLabel,
+  weekValue,
+  note,
   previousHref,
   nextHref,
   backHref,
@@ -66,6 +69,10 @@ export function AvailabilityEditor({
   driverName: string;
   /** Wat de telefoonweergave in haar balk zet; die heeft geen paginakop. */
   weekLabel: string;
+  /** De maandag als `YYYY-MM-DD`, voor de weeknota. */
+  weekValue: string;
+  /** De algemene nota van deze week (F4.5), of een lege string. */
+  note: string;
   previousHref: string;
   nextHref: string;
   backHref: string;
@@ -209,7 +216,7 @@ export function AvailabilityEditor({
           >
             {AVAILABILITY_KINDS.map((kind) => (
               <option key={kind} value={kind}>
-                {AVAILABILITY_KIND_LABEL[kind]} — {AVAILABILITY_KIND_HINT[kind]}
+                {AVAILABILITY_KIND_LABEL[kind]}: {AVAILABILITY_KIND_HINT[kind]}
               </option>
             ))}
           </select>
@@ -306,6 +313,8 @@ export function AvailabilityEditor({
         days={days}
         windows={shown}
         weekLabel={weekLabel}
+        weekValue={weekValue}
+        note={note}
         previousHref={previousHref}
         nextHref={nextHref}
         backHref={backHref}
@@ -315,12 +324,19 @@ export function AvailabilityEditor({
 
   return (
     <div className="grid gap-5">
+      {/* Bovenaan: wat voor de hele week geldt, voor je aan de uren begint. */}
+      <AvailabilityNote week={weekValue} initial={note} variant="grid" />
+
       <TimeGrid
         days={days}
         vehicles={[]}
         blocks={[]}
         bands={bands}
         bandsProminent
+        // De dag loopt hier van 05:00 tot 05:00 (F4.2): zaterdagnacht 02:00
+        // staat onderaan de zaterdagkolom, waar het hoort, en één sleep van
+        // 22:00 tot 02:00 is één venster in plaats van twee.
+        dayStartHour={DAG_START_UUR}
         // De uitleg staat al in `above`; hier hoort enkel te staan dat er niets
         // is, anders zeggen twee regels onder elkaar hetzelfde.
         emptyLabel="Nog niets ingetekend deze week."
@@ -355,7 +371,9 @@ export function AvailabilityEditor({
             </div>
             <p className="text-xs text-vtk-muted">
               Sleep met de muis over een dag: het venster staat er meteen, in de gekozen soort.
-              Sleep er nog eens over met dezelfde soort om het weg te halen.
+              Sleep er nog eens over met dezelfde soort om het weg te halen. Een dag loopt hier
+              van 05:00 tot 05:00, dus de nacht van zaterdag op zondag staat onderaan bij
+              zaterdag.
             </p>
           </div>
         }

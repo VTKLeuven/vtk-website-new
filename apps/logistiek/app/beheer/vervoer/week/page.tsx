@@ -8,6 +8,8 @@ import {
   formatPriceCents,
   isoWeekNumber,
   parseDateOnly,
+  onTripForNotes,
+  requesterChoiceOf,
   requesterLabel,
   toBrusselsDateValue,
   toBrusselsTimeValue,
@@ -15,6 +17,7 @@ import {
   toDatetimeLocalValue,
   todayDateOnly,
   transportDeleteDescription,
+  vehiclesToDraw,
 } from '@/lib/uitleen';
 import {
   calendarRange,
@@ -24,13 +27,16 @@ import {
   type CalendarView,
 } from '@/lib/calendar-range';
 import {
-  activeVehicles,
+  calendarVehicles,
   driverColorOverrides,
   activeGroups,
   availabilityInRange,
+  availabilityNotesInRange,
   driverOptions,
   eventsInRange,
+  getLogistiekSettings,
   transportAuditLogsByBooking,
+  tripNotesFor,
   transportRange,
   type TransportBooking,
 } from '@/lib/uitleen-server';
@@ -98,7 +104,7 @@ export default async function VervoerWeekPage({
     aanvrager?: string;
   }>;
 }) {
-  await requireManage();
+  const session = await requireManage();
   const query = await searchParams;
   const { weergave, datum, week } = query;
 
@@ -109,10 +115,19 @@ export default async function VervoerWeekPage({
   const anchor = (datum && parseDateOnly(datum)) || (week && parseDateOnly(week)) || todayDateOnly();
   const { days, from, to } = calendarRange(view, anchor);
 
-  const [bookings, vehicles, drivers, driverColors, groups, events, availability] =
-    await Promise.all([
+  const [
+    bookings,
+    allVehicles,
+    drivers,
+    driverColors,
+    groups,
+    events,
+    availability,
+    availabilityNotes,
+    settings,
+  ] = await Promise.all([
     transportRange(from, to, filters),
-    activeVehicles(),
+    calendarVehicles(),
     driverOptions(),
     driverColorOverrides(),
     // Voor wie het team zelf een rit inplant. Alle posten en werkgroepen, niet
@@ -129,6 +144,12 @@ export default async function VervoerWeekPage({
     // dus altijd nodig. De filter bepaalt enkel of ze óók achter de ritten
     // liggen.
     availabilityInRange(from, to),
+    // De algemene nota's bij die weken (F4.5). Om dezelfde reden altijd: ze
+    // staan in de strook eronder, niet in het rooster.
+    availabilityNotesInRange(from, to),
+    // Enkel voor de zin onder "Post kiest zelf de chauffeur": die moet zeggen
+    // wie er dan een mail krijgt, en dat is een instelling (F4.8b).
+    getLogistiekSettings(),
   ]);
 
   // De strook boven het rooster toont enkel wat dit venster raakt, en enkel
@@ -145,6 +166,20 @@ export default async function VervoerWeekPage({
   // De historiek van de getoonde ritten in één query; ze staat ingeklapt in het
   // paneel, maar wordt hier server-side gerenderd, zoals op /beheer/vervoer.
   const history = await transportAuditLogsByBooking(bookings.map((booking) => booking.id));
+  // De eigen nota's van de getoonde ritten (F4.20): wat er met Logistiek gedeeld
+  // is, plus wat dit teamlid zelf schreef. Andermans privénota's komen niet uit
+  // de databank, ook niet met `logistiek.manage`. `onTripIds` zijn de ritten
+  // waar dit teamlid zelf bij hoort, want daar leest hij ook de nota's die enkel
+  // voor de post bedoeld zijn: dan ís het zijn post.
+  const viewer = { userId: session.user.id, groupIds: session.groups.map((group) => group.id) };
+  const notesPerTrip = await tripNotesFor(
+    bookings.map((booking) => booking.id),
+    {
+      userId: session.user.id,
+      onTripIds: bookings.filter((booking) => onTripForNotes(booking, viewer)).map((b) => b.id),
+      logistiek: true,
+    }
+  );
 
   // De filters blijven staan wanneer je van week naar week bladert: ze horen bij
   // waar je naar kijkt, niet bij wanneer.
@@ -179,6 +214,11 @@ export default async function VervoerWeekPage({
     `${booking.eventName?.trim() || booking.purpose} (${timeFormatter.format(booking.startAt)}-${timeFormatter.format(booking.endAt)})`;
   const bookingById = new Map(bookings.map((booking) => [booking.id, booking]));
 
+  // De actieve voertuigen, plus wie in dit venster gereden heeft: een gehuurd
+  // busje dat na het gala op non-actief gaat, houdt zo zijn naam, zijn icoon en
+  // zijn arcering in de week waarin het reed (F4.22). Kiezen doe je verderop nog
+  // altijd uit de actieve.
+  const vehicles = vehiclesToDraw(allVehicles, bookings);
   const vehicleById = new Map(vehicles.map((vehicle) => [vehicle.id, vehicle]));
 
   const trips: PlannerTrip[] = bookings.map((booking) => {
@@ -217,7 +257,13 @@ export default async function VervoerWeekPage({
         destination: booking.destination ?? '',
         adminNote: booking.adminNote ?? '',
         eventId: booking.eventId ?? '',
+        requesterChoice: requesterChoiceOf(booking),
+        requesterOther: booking.requesterType === 'INTERN' ? '' : (booking.requesterName ?? ''),
       },
+      requesterGroup:
+        booking.groupId && booking.group
+          ? { id: booking.groupId, name: booking.group.nameNl }
+          : null,
       status: booking.status,
       vehicleId: booking.vehicleId,
       vehicleName: booking.vehicle.nameNl,
@@ -243,6 +289,7 @@ export default async function VervoerWeekPage({
       deleteCount: legs.length,
       deleteDescription: transportDeleteDescription(legs),
       history: history.get(booking.id) ?? [],
+      notes: notesPerTrip.get(booking.id) ?? [],
       legs: legs
         .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
         .map((leg) => ({
@@ -320,6 +367,7 @@ export default async function VervoerWeekPage({
           id: vehicle.id,
           name: vehicle.nameNl,
           code: vehicle.code,
+          icon: vehicle.icon,
           pattern: vehicle.pattern,
           needsDriver: vehicle.needsDriver,
         }))}
@@ -331,6 +379,7 @@ export default async function VervoerWeekPage({
         hiddenNote={describeFilters(filters, {
           vehicles: new Map(vehicles.map((vehicle) => [vehicle.id, vehicle.nameNl])),
           drivers: new Map(drivers.map((driver) => [driver.id, driver.name])),
+          groups: new Map(groups.map((group) => [group.id, group.nameNl])),
         })}
         vehicleOptions={vehicles
           .filter((vehicle) => vehicle.active)
@@ -340,6 +389,7 @@ export default async function VervoerWeekPage({
             needsVanDriver: vehicle.needsVanDriver,
           }))}
         groups={groups.map((group) => ({ id: group.id, name: group.nameNl }))}
+        handoverNotify={settings.tripHandover.mode}
         availability={availability.map((window) => ({
           id: window.id,
           driverId: window.userId,
@@ -348,6 +398,11 @@ export default async function VervoerWeekPage({
           endAt: window.endAt.toISOString(),
           kind: window.kind,
           note: window.note,
+        }))}
+        availabilityNotes={availabilityNotes.map((note) => ({
+          driverId: note.userId,
+          weekStart: note.weekStart.toISOString(),
+          text: note.text,
         }))}
         eventOptions={events.map((event) => ({
           id: event.id,

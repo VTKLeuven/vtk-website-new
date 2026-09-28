@@ -1,11 +1,12 @@
 'use client';
 import { Fragment, useMemo, useState } from 'react';
 import { addDays, isSameDay } from 'date-fns';
-import { AlertTriangle, MapPin, Ticket } from 'lucide-react';
+import { AlertTriangle, MapPin } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { canUnregister, type ShiftResponse } from '@/lib/shift';
 import { useToast } from '@/components/ui/toast';
 import { InternationalsBadge } from './ShiftDialog';
+import { RewardCoins } from './RewardCoins';
 import {
   fill,
   fmtTime,
@@ -14,7 +15,9 @@ import {
   registerShift,
   rewardLabel,
   spotsLabel,
+  spotsSpoken,
   spotsVariant,
+  takenSpots,
   unregisterShift,
   type MergedShift,
   type PostNames,
@@ -204,8 +207,8 @@ export function ShiftAgenda({
                       : nl
                         ? 'Nog geen inschrijvingen'
                         : 'No sign-ups yet';
-                  const taken = shift.takenSpots ?? (shift.maxParticipants - freeSpots(shift));
-                  const spotsBadgeLabel = registered ? t.isRegistered : spotsLabel(shift, t);
+                  const taken = takenSpots(shift);
+                  const spotsBadgeLabel = registered ? t.isRegistered : spotsLabel(shift);
                   const spotsBadgeClass = registered
                     ? 'vtk-shift-spots-mine'
                     : `vtk-shift-spots-${spotsVariant(shift)}`;
@@ -231,7 +234,7 @@ export function ShiftAgenda({
                           <span className="vtk-shift-title">
                             <span className="vtk-shift-title-text">{shift.name}</span>
                             {shift.openToInternationals ? (
-                              <InternationalsBadge locale={locale} compact />
+                              <InternationalsBadge locale={locale} />
                             ) : null}
                           </span>
 
@@ -245,10 +248,13 @@ export function ShiftAgenda({
                               <MapPin aria-hidden="true" />
                               <span>{shift.location}</span>
                             </span>
-                            <span className="vtk-shift-meta-i">
-                              <Ticket aria-hidden="true" />
-                              <span>{rewardLabel(shift.reward, t)}</span>
-                            </span>
+                            {shift.reward > 0 ? (
+                              <RewardCoins
+                                amount={shift.reward}
+                                label={rewardLabel(shift.reward, t)}
+                                size="sm"
+                              />
+                            ) : null}
                             {conflict ? (
                               <span
                                 className="vtk-shift-clash-warning"
@@ -266,7 +272,6 @@ export function ShiftAgenda({
                         <div className="vtk-shift-spots-wrap">
                           <span
                             className={`vtk-shift-spots ${spotsBadgeClass}`}
-                            title={spotsTitle}
                             tabIndex={0}
                             role="button"
                             onClick={() => onOpen(entry)}
@@ -276,7 +281,7 @@ export function ShiftAgenda({
                                 onOpen(entry);
                               }
                             }}
-                            aria-label={`${spotsBadgeLabel}. ${spotsTitle}`}
+                            aria-label={`${registered ? t.isRegistered : spotsSpoken(shift, t)}. ${spotsTitle}`}
                           >
                             {spotsBadgeLabel}
                           </span>

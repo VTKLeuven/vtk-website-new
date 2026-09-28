@@ -25,3 +25,4 @@ if (process.env.NODE_ENV !== "production") {
 // them.
 
 export { HEADER_TABS } from "./groups";
+export { searchUsers, type SearchUserResult, type SearchUserOptions } from "./userSearch";

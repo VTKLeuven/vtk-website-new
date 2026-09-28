@@ -1,5 +1,12 @@
 "use client";
 
+import { AudienceOptions } from "./AudienceOptions";
+import {
+  ticketAudienceFrom,
+  ticketAudienceHelp,
+  ticketAudienceLabel,
+  type TicketAudience,
+} from "@/lib/ticketing/audience";
 import { useRef, useState, useTransition } from "react";
 import {
   archiveTicketTypeAction,
@@ -56,12 +63,9 @@ type TicketType = {
   _count?: { orderItems: number; questions: number };
 };
 
-type TicketAudience = "PUBLIC" | "MEMBERS" | "HONORARY";
-
 function audienceLabel(audience: string, locale: AdminLocale): string {
-  if (audience === "MEMBERS") return locale === "nl" ? "Alleen leden" : "Members only";
-  if (audience === "HONORARY") return locale === "nl" ? "Alleen ereleden" : "Honorary members only";
-  return locale === "nl" ? "Publiek" : "Public";
+  if (audience === "PUBLIC") return locale === "nl" ? "Publiek" : "Public";
+  return ticketAudienceLabel(audience, locale);
 }
 
 /**
@@ -148,11 +152,7 @@ function TicketTypeEditPanel({
   guestBuyableElsewhere: boolean;
   locale: AdminLocale;
 }) {
-  const [audience, setAudience] = useState<TicketAudience>(
-    ticketType.audience === "MEMBERS" || ticketType.audience === "HONORARY"
-      ? ticketType.audience
-      : "PUBLIC"
-  );
+  const [audience, setAudience] = useState<TicketAudience>(ticketAudienceFrom(ticketType.audience));
   const orderedTickets = ticketType._count?.orderItems ?? 0;
   const closesShopForGuests = audience !== "PUBLIC" && !guestBuyableElsewhere;
   const freeAndPublic = audience === "PUBLIC" && ticketType.unitPriceCents === 0;
@@ -317,30 +317,9 @@ function TicketTypeEditPanel({
               value={audience}
               onChange={(event) => setAudience(event.target.value as TicketAudience)}
             >
-              <option value="PUBLIC">
-                {locale === "nl" ? "Leden en niet-leden" : "Members and non-members"}
-              </option>
-              <option value="MEMBERS">{locale === "nl" ? "Alleen leden" : "Members only"}</option>
-              {/* Onzichtbaar voor iedereen behalve ereleden; niet uitgegrijsd
-                  maar echt weggefilterd, zodat de rest van de site die
-                  uitzondering niet ziet. */}
-              <option value="HONORARY">
-                {locale === "nl" ? "Alleen ereleden" : "Honorary members only"}
-              </option>
+              <AudienceOptions locale={locale} />
             </select>
-            <span className="ticket-admin-help">
-              {audience === "PUBLIC"
-                ? locale === "nl"
-                  ? "Iedereen kan dit ticket kopen, ook zonder account."
-                  : "Anyone can buy this ticket, also without an account."
-                : audience === "MEMBERS"
-                  ? locale === "nl"
-                    ? "Enkel leden van VTK zien dit ticket en kunnen het kopen: studenten van de faculteit en wie dit academiejaar lid is."
-                    : "Only VTK members see this ticket and can buy it: students of the faculty and anyone who is a member this academic year."
-                  : locale === "nl"
-                    ? "Enkel ereleden zien dit ticket; voor alle anderen bestaat het niet."
-                    : "Only honorary members see this ticket; for everyone else it does not exist."}
-            </span>
+            <span className="ticket-admin-help">{ticketAudienceHelp(audience, locale)}</span>
             {freeAndPublic || closesShopForGuests ? (
               <div className="ticket-admin-alert">
                 <TriangleAlert aria-hidden="true" size={16} />
@@ -764,13 +743,9 @@ export function TicketTypeManager({
                       value={newAudience}
                       onChange={(event) => setNewAudience(event.target.value as TicketAudience)}
                     >
-                      <option value="PUBLIC">{locale === "nl" ? "Leden en niet-leden" : "Members and non-members"}</option>
-                      <option value="MEMBERS">{locale === "nl" ? "Alleen leden" : "Members only"}</option>
-                      {/* Onzichtbaar voor iedereen behalve ereleden; niet
-                          uitgegrijsd maar echt weggefilterd, zodat de rest van
-                          de site die uitzondering niet ziet. */}
-                      <option value="HONORARY">{locale === "nl" ? "Alleen ereleden" : "Honorary members only"}</option>
+                      <AudienceOptions locale={locale} />
                     </select>
+                    <span className="ticket-admin-help">{ticketAudienceHelp(newAudience, locale)}</span>
                   </div>
                   <div className="ticket-admin-field" data-span="2">
                     <TicketColorChoice idPrefix="ticket-type-new" locale={locale} />

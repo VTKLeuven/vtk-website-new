@@ -65,6 +65,41 @@ de QR-credentials en het ticketontwerp kloppen echt. De bevestigingsmails worden
 meteen uit de outbox gehaald: die kopers bestaan niet, en een wachtrij vol
 onbestelbare adressen verbergt de mails die je wél test.
 
+## 2b. Het broodjessysteem van Theokot
+
+De seed zet het standaardaanbod klaar, maar geen verkoopdagen en geen
+bestellingen, en net daarmee test je de balie, de turflijst en de bans.
+`scripts/seed-theokot-broodjes-demo.ts` vult dat aan:
+
+```bash
+npm run db:demo:broodjes          # of: make broodjes
+npm run db:demo:broodjes -- --reset   # enkel opruimen
+```
+
+Het script draait **enkel tegen een lokale database**; het maakt bestellingen,
+no-shows en een ban aan op naam van verzonnen studenten, en die horen niet in de
+historiek van de echte site.
+
+Wat je krijgt, en waarom net die gevallen:
+
+| Dag | Waarvoor |
+| --- | --- |
+| gisteren | Volledig afgehandeld (`processedAt` gezet): no-show-historiek en een turflijst van een voorbije dag. |
+| vandaag | De afhaal loopt: hier test je de balie, het laattijdig uitdelen en "afhaalronde afsluiten". Draagt ook een grocomeet, dus de turflijst toont de GM-kolom en het drankje. |
+| morgen | Bestellen staat open en er is niets opgehaald: de enige dag die je nog kan verwijderen. |
+| overmorgen | Vier broodjes kaas besteld terwijl er twee in het aanbod staan: de rode regel in de aanbod-editor, de bevestiging bij het opslaan en het schrappen van een bestelling. |
+| over vijf dagen | Bestellen opent pas later: de student ziet "Reserveren opent op ...". |
+
+De vijf demostudenten hebben een r-nummer (`r9000001` tot en met `r9000005`),
+want dat is waarmee de afhaalbalie zoekt. Joris (`r9000003`) heeft twee
+openstaande bonnetjes uit een afgelopen shift, zodat het bonnetjesvenster
+verschijnt, en zijn bestelling van vandaag staat als niet-opgehaald geboekt,
+zodat je het laattijdig uitdelen kan proberen. Lies (`r9000004`) is geband.
+
+Twee keer draaien levert geen tweede set op: het script onthoudt in de setting
+`theokot.demo.broodjes` wat het aanmaakte en gooit precies dat weg voor het
+opnieuw begint. Verkoopdagen die je zelf aanmaakte, blijven staan.
+
 ## 3. Immich: albums en foto's
 
 Dev heeft een eigen Immich (`infra-immich-server-1`, poort 2283 op localhost).

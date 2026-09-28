@@ -239,3 +239,30 @@ export async function membershipYears(): Promise<number[]> {
   const current = currentStudyYear();
   return years.includes(current) ? years : [current, ...years];
 }
+
+export type HonoraryMemberRow = {
+  userId: string;
+  name: string;
+  email: string;
+  rNumber: string | null;
+};
+
+/**
+ * De ereleden (`User.honoraryMember`), voor de tweede lijst op /admin/leden.
+ *
+ * Niet per academiejaar: erelid ben je tot een beheerder het intrekt. Een
+ * verwijderd account valt weg, ook al zou de vlag nog staan.
+ */
+export async function listHonoraryMembers(): Promise<HonoraryMemberRow[]> {
+  const rows = await prisma.user.findMany({
+    where: { honoraryMember: true, deletedAt: null },
+    select: { id: true, name: true, email: true, rNumber: true },
+    orderBy: { name: "asc" },
+  });
+  return rows.map((row) => ({
+    userId: row.id,
+    name: row.name,
+    email: row.email,
+    rNumber: row.rNumber,
+  }));
+}

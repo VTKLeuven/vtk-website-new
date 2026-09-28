@@ -9,8 +9,9 @@ import {
   parseNotifyEmails,
   requesterLabel,
   type NotifyKind,
+  type TripHandoverOutcome,
 } from './uitleen';
-import { getLogistiekSettings, groupLeads } from './uitleen-server';
+import { getLogistiekSettings, groupLeads, groupMailAddress } from './uitleen-server';
 import type { LogistiekLocale } from './i18n-shared';
 import { logistiekBaseUrl } from './payments';
 
@@ -383,25 +384,35 @@ export async function notifyTransport(
  * andere kant ziet: de post weet niet dat er een rit op hen wacht, en de rit
  * vertrekt zonder chauffeur.
  *
- * Naar de verantwoordelijken (`LEAD`) en niet naar de hele post: het is een
- * taak die iemand moet verdelen, en veertien mensen mailen om er één te laten
- * antwoorden, is precies hoe een mailbox onleesbaar wordt. Zij zien de rit
- * daarna op /ritten, waar ze de chauffeur en de bijrijders invullen.
+ * **Standaard vertrekt er niets** (F4.8b). Wie er verwittigd wordt, is een
+ * instelling in /beheer/instellingen: niemand, de verantwoordelijken van die
+ * post, het postadres, of een vast adres. Tot september 2026 gingen er altijd
+ * mails naar de verantwoordelijken, en sinds de doorgegeven ritten op /ritten
+ * staan, was dat een tweede bericht over iets wat daar al stond; op een
+ * planningsdag met tien ritten leest niemand die nog.
+ *
+ * Naar de verantwoordelijken (`LEAD`) en niet naar de hele post wanneer die
+ * keuze gemaakt is: het is een taak die iemand moet verdelen, en veertien mensen
+ * mailen om er één te laten antwoorden, is precies hoe een mailbox onleesbaar
+ * wordt.
  *
  * Dezelfde regels als de rest van dit bestand: aanroepen ná de transactie, en
  * falen mag de toewijzing niet ongedaan maken.
  *
- * Geeft `leads` en `sent` los van elkaar terug, want dat zijn twee verschillende
- * problemen aan de kant van de oproeper: een post zonder verantwoordelijke moet
- * je zelf verwittigen, terwijl een mail die niet vertrok meestal betekent dat de
- * mailserver even niet meewilde. Ze allebei als "0 verstuurd" melden stuurde het
- * team achter de verkeerde oorzaak aan. `leads: null` is de derde mogelijkheid:
- * het liep ergens mis en we weten het niet.
+ * Geeft terug wat er **echt** gebeurd is, en niet enkel een aantal: de oproeper
+ * schrijft er de melding mee, en "0 verstuurd" kan drie dingen betekenen die elk
+ * iets anders van het team vragen. Een post zonder verantwoordelijke of zonder
+ * postadres moet je zelf verwittigen; een mail die niet vertrok, betekent meestal
+ * dat de mailserver niet meewilde; en bij `NIEMAND` is er niets misgegaan.
  */
 export async function notifyGroupAssignedForTrip(
   bookingId: string
-): Promise<{ leads: number | null; sent: number }> {
+): Promise<TripHandoverOutcome> {
   try {
+    const settings = await getLogistiekSettings();
+    const handover = settings.tripHandover;
+    if (handover.mode === 'NIEMAND') return { mode: 'NIEMAND' };
+
     const booking = await prisma.uitleenTransportBooking.findUnique({
       where: { id: bookingId },
       select: {
@@ -417,26 +428,26 @@ export async function notifyGroupAssignedForTrip(
         assignedGroup: { select: { id: true, nameNl: true } },
       },
     });
-    if (!booking?.assignedGroup) return { leads: 0, sent: 0 };
+    // Geen rit meer, of geen post erop: allebei onmogelijk vanaf de twee plekken
+    // die dit aanroepen (die hebben de post er net op gezet). Gebeurt het toch,
+    // dan is "er vertrok bewust niets" het verkeerde antwoord.
+    if (!booking?.assignedGroup) return { mode: 'MISLUKT' };
 
-    const leads = await groupLeads(booking.assignedGroup.id);
-    if (leads.length === 0) return { leads: 0, sent: 0 };
-
+    const group = booking.assignedGroup;
     const what = booking.eventName?.trim() || booking.purpose;
     const url = `${logistiekBaseUrl()}/ritten`;
 
-    let sent = 0;
-    for (const lead of leads) {
-      const recipient = recipientOf(lead, null);
-      const nl = recipient.locale !== 'en';
-      const text = joinBlocks([
-        nl ? `Dag ${recipient.name},` : `Hi ${recipient.name},`,
+    /** De mail zelf, in de taal van wie ze krijgt. */
+    const body = (name: string, locale: LogistiekLocale) => {
+      const nl = locale !== 'en';
+      return joinBlocks([
+        name ? (nl ? `Dag ${name},` : `Hi ${name},`) : null,
         nl
-          ? `Logistiek heeft een rit met ${booking.vehicle.nameNl} doorgegeven aan ${booking.assignedGroup.nameNl}. Jullie duiden zelf de chauffeur aan (en eventuele bijrijders).`
-          : `Logistics assigned a trip with ${booking.vehicle.nameNl} to ${booking.assignedGroup.nameNl}. Your post picks the driver (and any passengers).`,
+          ? `Logistiek heeft een rit met ${booking.vehicle.nameNl} doorgegeven aan ${group.nameNl}. Jullie duiden zelf de chauffeur aan (en eventuele bijrijders).`
+          : `Logistics assigned a trip with ${booking.vehicle.nameNl} to ${group.nameNl}. Your post picks the driver (and any passengers).`,
         [
           `${nl ? 'Rit' : 'Trip'}: ${what}`,
-          `${nl ? 'Wanneer' : 'When'}: ${formatDateTime(booking.startAt, recipient.locale)} - ${formatDateTime(booking.endAt, recipient.locale)}`,
+          `${nl ? 'Wanneer' : 'When'}: ${formatDateTime(booking.startAt, locale)} - ${formatDateTime(booking.endAt, locale)}`,
           booking.pickupAddress ? `${nl ? 'Laadadres' : 'Loading address'}: ${booking.pickupAddress}` : null,
           booking.destination ? `${nl ? 'Bestemming' : 'Destination'}: ${booking.destination}` : null,
           booking.cargoNote ? `${nl ? 'Lading' : 'Cargo'}: ${booking.cargoNote}` : null,
@@ -447,15 +458,46 @@ export async function notifyGroupAssignedForTrip(
         nl ? `Chauffeur invullen: ${url}` : `Pick a driver: ${url}`,
         nl ? 'Groeten,\nLogistiek VTK' : 'Regards,\nLogistics VTK',
       ]);
-      const subject = nl
+    };
+    const subjectFor = (locale: LogistiekLocale) =>
+      locale !== 'en'
         ? `${SUBJECT_PREFIX}: chauffeur gezocht voor ${what} (${formatDateOnly(booking.startAt)})`
         : `${SUBJECT_PREFIX}: driver needed for ${what} (${formatDateOnly(booking.startAt)})`;
-      if (await deliver(recipient, subject, text)) sent += 1;
+
+    if (handover.mode === 'LEADS') {
+      const leads = await groupLeads(group.id);
+      if (leads.length === 0) return { mode: 'LEADS', leads: 0, sent: 0 };
+      let sent = 0;
+      for (const lead of leads) {
+        const recipient = recipientOf(lead, null);
+        if (await deliver(recipient, subjectFor(recipient.locale), body(recipient.name, recipient.locale)))
+          sent += 1;
+      }
+      return { mode: 'LEADS', leads: leads.length, sent };
     }
-    return { leads: leads.length, sent };
+
+    // Eén mailbox: de postmailinglijst of een vast adres. Geen aanhef met een
+    // naam, want er zit niet één persoon achter; de mail is verder dezelfde. In
+    // het Nederlands, want een mailbox heeft geen taalvoorkeur.
+    const address =
+      handover.mode === 'POSTADRES' ? await groupMailAddress(group.id) : handover.email.trim();
+    if (!address) {
+      // Bij POSTADRES is dit een post zonder eigen adres, en dat moet het team
+      // weten. Bij ADRES kan het niet: het instellingenscherm weigert een lege
+      // waarde, dus dan is de instelling van buitenaf stukgemaakt.
+      return handover.mode === 'POSTADRES'
+        ? { mode: 'POSTADRES', address: null, sent: 0 }
+        : { mode: 'MISLUKT' };
+    }
+    const sent = (await deliver({ to: address, cc: undefined, name: '', locale: 'nl' }, subjectFor('nl'), body('', 'nl')))
+      ? 1
+      : 0;
+    return handover.mode === 'POSTADRES'
+      ? { mode: 'POSTADRES', address, sent }
+      : { mode: 'ADRES', address, sent };
   } catch (err) {
-    console.error('[uitleen-mail] mail naar de postverantwoordelijke mislukt:', err);
-    return { leads: null, sent: 0 };
+    console.error('[uitleen-mail] mail over de doorgegeven rit mislukt:', err);
+    return { mode: 'MISLUKT' };
   }
 }
 
