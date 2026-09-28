@@ -63,3 +63,13 @@ export function allocateShiftReward(
     remaining: available - requestedAmount,
   };
 }
+
+/**
+ * De melding wanneer een praesidiumlid in Theokot met bonnetjes wil betalen
+ * (`paysWithVouchersBlocked` in `voucherEligibility.ts`). Staat hier en niet
+ * daar, omdat de afhaalbalie ze ook in de browser toont.
+ */
+export const PRAESIDIUM_VOUCHERS_MESSAGE = {
+  nl: "Praesidiumleden kunnen in Theokot niet met online bonnetjes betalen. Reken dit gewoon af.",
+  en: "Praesidium members cannot pay with online vouchers in Theokot. Please charge this normally.",
+} as const;

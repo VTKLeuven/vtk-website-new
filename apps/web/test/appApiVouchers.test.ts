@@ -6,7 +6,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * De verdeling zelf (oudste shift eerst) is elders getest; wat hier vastligt is
  * wat er rond die verdeling gebeurt: dat een te laag saldo een antwoord is en
  * geen crash, dat een gelijktijdige tweede scan botst in plaats van dubbel af te
- * boeken, en dat niemand bij zichzelf kan afboeken.
+ * boeken, dat niemand bij zichzelf kan afboeken en dat een praesidiumlid niet
+ * met bonnetjes betaalt.
  */
 
 const mocks = vi.hoisted(() => ({
@@ -15,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   createRedemption: vi.fn(),
   transaction: vi.fn(),
   logAudit: vi.fn(),
+  paysWithVouchersBlocked: vi.fn(),
   // Moet mee gehoist worden: `vi.mock` draait voor de moduleschil, dus een klasse
   // die er in de fabriek gebruikt wordt, mag niet pas hieronder ontstaan.
   FakeConflict: class FakeConflict extends Error {},
@@ -36,6 +38,10 @@ vi.mock("@/lib/ticketing/transactions", () => ({
 
 vi.mock("@/lib/audit", () => ({ logAudit: mocks.logAudit }));
 
+vi.mock("@/lib/shift/voucherEligibility", () => ({
+  paysWithVouchersBlocked: mocks.paysWithVouchersBlocked,
+}));
+
 import { redeemVouchers, VoucherError } from "@/lib/app-api/vouchers";
 
 describe("bonnetjes afboeken", () => {
@@ -44,6 +50,27 @@ describe("bonnetjes afboeken", () => {
     mocks.findFirst.mockResolvedValue({ id: "student", name: "Lotte Peeters" });
     mocks.transaction.mockImplementation((tx: unknown, run: (client: unknown) => unknown) => run(tx));
     mocks.allocate.mockResolvedValue({ allocations: [], available: 8, remaining: 5 });
+    mocks.paysWithVouchersBlocked.mockResolvedValue(false);
+  });
+
+  it("weigert een praesidiumlid en schrijft wie het probeerde in het logboek", async () => {
+    mocks.paysWithVouchersBlocked.mockResolvedValue(true);
+
+    await expect(
+      redeemVouchers({ userId: "student", amount: 2, processedById: "shifter", place: "Toog" }),
+    ).rejects.toMatchObject({ code: "PRAESIDIUM" });
+
+    expect(mocks.paysWithVouchersBlocked).toHaveBeenCalledWith("student");
+    expect(mocks.allocate).not.toHaveBeenCalled();
+    expect(mocks.createRedemption).not.toHaveBeenCalled();
+    expect(mocks.logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "refuse",
+        entity: "shiftReward",
+        entityId: "student",
+        target: "Lotte Peeters",
+      }),
+    );
   });
 
   it("boekt af en schrijft een auditrij", async () => {

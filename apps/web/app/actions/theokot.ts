@@ -46,6 +46,8 @@ import {
   allocateUserShiftReward,
   ShiftRewardConflictError,
 } from "@/lib/shift/rewards.server";
+import { PRAESIDIUM_VOUCHERS_MESSAGE } from "@/lib/shift/rewards";
+import { paysWithVouchersBlocked } from "@/lib/shift/voucherEligibility";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
@@ -1178,7 +1180,8 @@ export type {
 
 export type VoucherRedemptionResult =
   | { ok: true; amount: number; remainingBonnetjes: number }
-  | { ok: false; error: string };
+  // `code` enkel waar de balie een eigen, vertaalde melding toont.
+  | { ok: false; error: string; code?: "PRAESIDIUM" };
 
 /**
  * Zoekt de bestelling(en) van vandaag voor wat de shifter intikte: een r-nummer,
@@ -1348,10 +1351,23 @@ export async function undoPickupAction(orderId: string): Promise<ActionResult> {
   return { ok: true, message: "Teruggezet naar gereserveerd." };
 }
 
+/** Draagt de student mee uit de transactie, voor de auditrij bij de weigering. */
+class PraesidiumVoucherRefusal extends Error {
+  constructor(
+    readonly userId: string,
+    readonly userName: string,
+  ) {
+    super("PRAESIDIUM");
+  }
+}
+
 /**
  * Gebruikt twee nog openstaande medewerkersbonnetjes voor één broodje en
  * schrijft tegelijk een auditrij. De saldo-afboeking en auditregistratie zijn
  * één serialiseerbare transactie.
+ *
+ * Een praesidiumlid van dit werkingsjaar betaalt hier niet met bonnetjes
+ * (`paysWithVouchersBlocked`); de poging komt in het logboek.
  */
 export async function redeemEmployeeVouchersAction(
   orderId: string,
@@ -1367,9 +1383,13 @@ export async function redeemEmployeeVouchersAction(
           userId: true,
           status: true,
           voucherRedemption: { select: { id: true } },
+          user: { select: { name: true } },
         },
       });
       if (!order) throw new Error("ORDER_NOT_FOUND");
+      if (await paysWithVouchersBlocked(order.userId, new Date(), tx)) {
+        throw new PraesidiumVoucherRefusal(order.userId, order.user.name);
+      }
       // Ook een bestelling die als niet-opgehaald geboekt staat: die mag aan de
       // balie nog uitgedeeld worden, en dan hoort ze ook nog met bonnetjes
       // betaald te kunnen worden. Opgehaald en geannuleerd niet meer.
@@ -1407,6 +1427,16 @@ export async function redeemEmployeeVouchersAction(
     }
     if (error instanceof ShiftRewardConflictError) {
       return { ok: false, error: "Het bonnetjessaldo is gewijzigd. Scan de kaart opnieuw." };
+    }
+    if (error instanceof PraesidiumVoucherRefusal) {
+      await logAudit({
+        action: "refuse",
+        entity: "shiftReward",
+        entityId: error.userId,
+        target: error.userName,
+        summary: `${SANDWICH_VOUCHER_COST} bonnetjes aan de afhaalbalie geweigerd (bestelling ${orderId}): praesidiumlid`,
+      });
+      return { ok: false, error: PRAESIDIUM_VOUCHERS_MESSAGE.nl, code: "PRAESIDIUM" };
     }
     if (error instanceof Error) {
       if (error.message === "ORDER_NOT_FOUND") {

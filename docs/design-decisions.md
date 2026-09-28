@@ -429,6 +429,24 @@ open vragen opleverde (`docs/theokot-broodjes-audit-2026-09-21.md`).
   bestelling. Geen opleg wanneer dat broodje duurder uitvalt, geen geld terug
   wanneer het goedkoper is. De balie toont daardoor "nog te betalen" en moet zelf
   niets meer aftrekken. Bonnetjes kunnen ook nog bij een laattijdige afhaling.
+- **Praesidium betaalt in Theokot niet met online bonnetjes** (september 2026).
+  Wie in het lopende werkingsjaar in een post met `Group.type = PRAESIDIUM`
+  zit, kan de bonnetjes op zijn account niet uitgeven; werkgroepen tellen niet
+  mee, en wie vorig werkingsjaar in het praesidium zat, betaalt na 15 juli
+  gewoon weer. De check staat één keer, in `paysWithVouchersBlocked`
+  (`lib/shift/voucherEligibility.ts`), en draait aan de serverkant van beide
+  afboekingen:
+  - de afhaalbalie (`redeemEmployeeVouchersAction`), die de bonnetjesvraag voor
+    zo iemand ook niet meer stelt;
+  - de app (`/api/app/v1/bonnetjes/inwisselen`), die 403 `PRAESIDIUM` geeft.
+    Die route geldt voor elke toog en niet enkel Theokot: de app stuurt altijd
+    `place: "Toog"` en betaalt een Theokot-broodje langs precies deze weg, dus
+    de server kan Theokot er niet uit onderscheiden. Wie het enkel voor Theokot
+    wil, moet de app eerst een echte plaats laten meesturen.
+  - Wat blijft: het saldo zelf, papieren bonnetjes en de uitbetaling in geld
+    door een beheerder (`/api/shift/reward`). Elke geweigerde poging komt in het
+    logboek als "Geweigerd", met de scanner als actor en de student als
+    onderwerp.
 - **Het aanbod van een dag mag onder het aantal dat al besteld is, en er wordt
   niets automatisch geschrapt.** Er valt een plateau of de bakker levert minder,
   en dan moet dat in het systeem kunnen. Wat er dan gebeurt:

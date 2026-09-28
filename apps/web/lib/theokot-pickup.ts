@@ -5,6 +5,7 @@ import type { TheokotOrderStatus } from "@prisma/client";
 
 import { brusselsTimeOnDay } from "@/lib/theokot";
 import { outstandingShiftReward } from "@/lib/shift/rewards";
+import { paysWithVouchersBlocked } from "@/lib/shift/voucherEligibility";
 import { normalizeRNumber, pickupSearchTerms } from "@/lib/theokotPickupQuery";
 
 /**
@@ -54,6 +55,11 @@ export type PickupLookupResult =
       userName: string;
       rNumber: string;
       outstandingBonnetjes: number;
+      /**
+       * Praesidiumlid dit werkingsjaar: betaalt niet met bonnetjes. Enkel voor de
+       * balie; de actie weigert het zelf ook.
+       */
+      vouchersBlocked: boolean;
       orders: PickupOrder[];
     }
   | { ok: false; error: string };
@@ -107,7 +113,7 @@ export async function pickupForUser(
   });
   if (!user) return { ok: false, error: "Deze gebruiker bestaat niet meer." };
 
-  const [orders, shiftBalances] = await Promise.all([
+  const [orders, shiftBalances, vouchersBlocked] = await Promise.all([
     prisma.theokotOrder.findMany({
       where: {
         userId: user.id,
@@ -129,6 +135,7 @@ export async function pickupForUser(
       where: { userId: user.id, shift: { endTime: { lt: now } } },
       select: { rewardPaid: true, shift: { select: { reward: true } } },
     }),
+    paysWithVouchersBlocked(user.id, now),
   ]);
 
   const outstandingBonnetjes = shiftBalances.reduce(
@@ -154,6 +161,7 @@ export async function pickupForUser(
     userName: user.name,
     rNumber: user.rNumber ?? "",
     outstandingBonnetjes,
+    vouchersBlocked,
     orders: orders.map((order) => ({
       orderId: order.id,
       status: order.status,

@@ -6,6 +6,7 @@ import { logAudit } from "@/lib/audit";
 import { academicYearRange } from "@/lib/shift";
 import { outstandingShiftReward } from "@/lib/shift/rewards";
 import { allocateUserShiftReward, ShiftRewardConflictError } from "@/lib/shift/rewards.server";
+import { paysWithVouchersBlocked } from "@/lib/shift/voucherEligibility";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import type { AppVoucherEntry } from "./contract";
 
@@ -25,7 +26,7 @@ import type { AppVoucherEntry } from "./contract";
  */
 
 export class VoucherError extends Error {
-  constructor(readonly code: "NOT_ENOUGH" | "CONFLICT" | "SELF") {
+  constructor(readonly code: "NOT_ENOUGH" | "CONFLICT" | "SELF" | "PRAESIDIUM") {
     super(code);
     this.name = "VoucherError";
   }
@@ -137,6 +138,12 @@ export async function voucherOverview(userId: string, now = new Date()) {
  * **Je kan niet bij jezelf afboeken.** Dat is geen theoretisch geval: wie mag
  * aanvaarden, heeft zelf ook bonnetjes, en zijn eigen pas scannen is de kortste
  * weg naar een gratis pint zonder dat er iemand meekijkt.
+ *
+ * **Een praesidiumlid van dit werkingsjaar betaalt niet met online bonnetjes.**
+ * De app kent de toog niet (`place` is vrije tekst en de app stuurt altijd
+ * "Toog"), en een Theokot-broodje wordt langs deze weg afgerekend, dus de
+ * weigering geldt hier voor elke afboeking. De poging komt in het logboek, met
+ * de scanner als actor en de student als onderwerp.
  */
 export async function redeemVouchers({
   userId,
@@ -161,6 +168,17 @@ export async function redeemVouchers({
   if (!user) throw new Error("NOT_FOUND");
 
   const trimmedPlace = place?.trim().slice(0, 80) || null;
+
+  if (await paysWithVouchersBlocked(user.id)) {
+    await logAudit({
+      action: "refuse",
+      entity: "shiftReward",
+      entityId: userId,
+      target: user.name,
+      summary: `${amount} bonnetje(s) via de app geweigerd${trimmedPlace ? ` (${trimmedPlace})` : ""}: praesidiumlid`,
+    });
+    throw new VoucherError("PRAESIDIUM");
+  }
 
   let remaining: number;
   try {
