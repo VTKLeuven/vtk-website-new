@@ -440,12 +440,15 @@ export async function updateSessionItemsAction(
   const currentKeys = new Map(existing.items.map((i) => [i.id, i.imageKey]));
   const keepIds = new Set<string>();
 
+  // Enkel items van déze verkoopdag. Zonder deze regel is het verborgen id-veld
+  // een manier om het aanbod van een andere dag te herschrijven. Vóór het eerste
+  // schrijven: stond dit in de lus, dan waren de rijen ervoor al opgeslagen
+  // zonder dat de reservaties hieronder hun nieuwe prijs kregen.
+  if (rows.some((row) => row.id && !currentKeys.has(row.id))) return saveError("ITEM_NOT_IN_SESSION");
+
   for (const row of rows) {
     const { id, image, order, ...fields } = row;
     if (id) {
-      // Enkel items van déze verkoopdag. Zonder deze regel is het verborgen
-      // id-veld een manier om het aanbod van een andere dag te herschrijven.
-      if (!currentKeys.has(id)) return saveError("ITEM_NOT_IN_SESSION");
       keepIds.add(id);
       await prisma.theokotSessionItem.update({
         where: { id },

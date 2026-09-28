@@ -3354,7 +3354,10 @@ model TheokotOrderLine {
   orderId        String
   sessionItemId  String
   quantity       Int
-  unitPriceCents Int // snapshot van de prijs op besteldatum
+  // Prijs per stuk. Volgt de prijs van het broodje zolang de bestelling niet
+  // betaald is (RESERVED, NO_SHOW: zie `repriceReservedOrders`); vanaf het
+  // ophalen is dit wat er betaald werd en verandert het niet meer.
+  unitPriceCents Int
 
   order       TheokotOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   sessionItem TheokotSessionItem @relation(fields: [sessionItemId], references: [id], onDelete: Cascade)

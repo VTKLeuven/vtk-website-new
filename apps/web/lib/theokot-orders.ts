@@ -2,7 +2,7 @@ import "server-only";
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
-import { Prisma } from "@prisma/client";
+import { Prisma, type TheokotOrderStatus } from "@prisma/client";
 
 import { usageForSessionItems, usageForSessionItemsTx } from "@/lib/meetings-server";
 import { activeBanFor, getTheokotConfig } from "@/lib/theokot-server";
@@ -278,16 +278,24 @@ export async function updateOrder(
 }
 
 /**
+ * De bestellingen die nog niet betaald zijn en dus de prijs van nu volgen. Ook
+ * `NO_SHOW`: die mag aan de balie nog uitgedeeld worden, en wordt dan betaald
+ * aan wat er dan op het bord staat.
+ */
+const UNPAID_STATUSES: TheokotOrderStatus[] = ["RESERVED", "NO_SHOW"];
+
+/**
  * Zet de openstaande reservaties van een verkoopdag op de prijzen van nu.
  *
  * Aangeroepen na "Aanbod bewerken": een prijswijziging geldt ook voor wie al
  * gereserveerd had, anders staat er aan de balie een ander bedrag dan op het
- * bord. Enkel `RESERVED`; een opgehaalde bestelling is betaald. De regel zelf
- * staat in `repriceOrder`. Geeft terug hoeveel reservaties er veranderden.
+ * bord. Enkel wat nog niet betaald is (`RESERVED`, `NO_SHOW`); een opgehaalde
+ * bestelling is betaald. De regel zelf staat in `repriceOrder`. Geeft terug
+ * hoeveel reservaties er veranderden.
  */
 export async function repriceReservedOrders(sessionId: string): Promise<number> {
   const orders = await prisma.theokotOrder.findMany({
-    where: { sessionId, status: "RESERVED" },
+    where: { sessionId, status: { in: UNPAID_STATUSES } },
     select: {
       id: true,
       totalCents: true,
@@ -314,12 +322,12 @@ export async function repriceReservedOrders(sessionId: string): Promise<number> 
       // heeft betaald wat er toen stond, en die bestelling blijft dus staan.
       ...next.lines.map((line) =>
         prisma.theokotOrderLine.updateMany({
-          where: { id: line.id, order: { status: "RESERVED" } },
+          where: { id: line.id, order: { status: { in: UNPAID_STATUSES } } },
           data: { unitPriceCents: line.unitPriceCents },
         }),
       ),
       prisma.theokotOrder.updateMany({
-        where: { id: order.id, status: "RESERVED" },
+        where: { id: order.id, status: { in: UNPAID_STATUSES } },
         data: { totalCents: next.totalCents },
       }),
     ]);

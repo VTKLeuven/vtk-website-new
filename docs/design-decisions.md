@@ -199,7 +199,12 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   oude bedrag. "Aanbod bewerken" zet daarom elke openstaande reservatie van die
   dag op de nieuwe prijs (`repriceReservedOrders` in `lib/theokot-orders.ts`).
   Een opgehaalde bestelling is betaald en blijft staan. `unitPriceCents` op een
-  bestellijn is dus geen vaste snapshot meer zolang de bestelling `RESERVED` is.
+  bestellijn is dus geen vaste snapshot meer zolang de bestelling niet betaald
+  is: `RESERVED`, en sinds eind september 2026 ook `NO_SHOW`, omdat die aan de
+  balie nog uitgedeeld en dan aan de prijs van het bord betaald wordt. Een
+  reservatie die van voor deze regel nog op de oude prijs stond (2,80 tegen 3,00
+  op het bord), is in migratie `20260928100000_theokot_reprice_open_orders`
+  rechtgezet.
 - **Een verkoopdag aanmaken zet meteen de shiften van die dag neer.** Wie de week
   online zet, vinkt de dagen aan; voor elke dag die daadwerkelijk nieuw is, komen
   ook de drie Theokot-shiften (smeren, middag, namiddag) op `/shift` te staan. Dat
