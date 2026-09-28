@@ -15,7 +15,14 @@ import {
   type OrderLineInput,
 } from "@/lib/theokot";
 import { readImageField, resolveImageKey, type ImageFieldValue } from "@/lib/imageField";
-import { getTheokotConfig, removeOrder, removeSession, waiveSessionNoShows } from "@/lib/theokot-server";
+import {
+  getTheokotConfig,
+  purgeFinishedSession,
+  removeOrder,
+  removeSession,
+  unwaiveSessionNoShows,
+  waiveSessionNoShows,
+} from "@/lib/theokot-server";
 import {
   cancelOrder,
   placeOrder,
@@ -1092,6 +1099,62 @@ export async function waiveSessionNoShowsAction(formData: FormData): Promise<Sav
     })`,
   });
   revalidatePath(`${ADMIN_PATH}/overzicht`);
+  revalidatePath(`${ADMIN_PATH}/bans`);
+  revalidateTheokot();
+  return saveOk();
+}
+
+/**
+ * "Er liep iets mis" terugdraaien, voor wie het per ongeluk aanduidde. Zie
+ * {@link unwaiveSessionNoShows} voor de mails en bans die dan alsnog volgen.
+ */
+export async function unwaiveSessionNoShowsAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("theokot.manage");
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const result = await unwaiveSessionNoShows(sessionId);
+  if (!result) return saveError("SESSION_NOT_FOUND");
+
+  const extra = [
+    result.mailed ? `${result.mailed} mail(s) alsnog verstuurd` : "",
+    result.restoredBans ? `${result.restoredBans} ban(s) hersteld` : "",
+    result.newBans ? `${result.newBans} nieuwe ban(s)` : "",
+  ].filter(Boolean);
+  await logAudit({
+    action: "update",
+    entity: "theokotSession",
+    entityId: sessionId,
+    target: sessionLabel(result.date),
+    summary: `"er liep iets mis" ongedaan gemaakt: no-shows tellen weer mee (${result.orders} bestelling(en)${
+      extra.length ? `; ${extra.join(", ")}` : ""
+    })`,
+  });
+  revalidatePath(`${ADMIN_PATH}/overzicht`);
+  revalidatePath(`${ADMIN_PATH}/bans`);
+  revalidateTheokot();
+  return saveOk();
+}
+
+/**
+ * Wist een voorbije verkoopdag uit de historiek en de statistieken (een testdag,
+ * of een dag die niet klopt). Zie {@link purgeFinishedSession}.
+ */
+export async function purgeFinishedSessionAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("theokot.manage");
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const result = await purgeFinishedSession(sessionId);
+  if (!result.ok) return saveError(result.code);
+
+  await logAudit({
+    action: "delete",
+    entity: "theokotSession",
+    entityId: sessionId,
+    target: sessionLabel(result.date),
+    summary: `voorbije verkoopdag gewist uit historiek en statistieken (${result.orders} bestelling(en), ${
+      result.pickedUp
+    } opgehaald${result.liftedBans ? `; ${result.liftedBans} ban(s) opgeheven` : ""})`,
+  });
+  revalidatePath(`${ADMIN_PATH}/overzicht`);
+  revalidatePath(`${ADMIN_PATH}/statistieken`);
   revalidatePath(`${ADMIN_PATH}/bans`);
   revalidateTheokot();
   return saveOk();

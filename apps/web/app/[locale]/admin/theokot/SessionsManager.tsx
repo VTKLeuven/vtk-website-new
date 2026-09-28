@@ -548,8 +548,12 @@ function SessionEditor({ nl, session }: { nl: boolean; session: AdminSession }) 
         ) : (
           <span className="text-xs text-[#5c667f]">
             {nl
-              ? `Er zijn al ${session.pickedUpCount} bestelling(en) opgehaald of met bonnetjes betaald, dus deze dag kan niet meer verwijderd worden. Sluiten kan wel.`
-              : `${session.pickedUpCount} order(s) have already been picked up or paid with vouchers, so this day can no longer be removed. Closing it still works.`}
+              ? session.closed
+                ? `Er zijn al ${session.pickedUpCount} bestelling(en) opgehaald of met bonnetjes betaald. Een voorbije dag wis je bij Overzicht per dag.`
+                : `Er zijn al ${session.pickedUpCount} bestelling(en) opgehaald of met bonnetjes betaald, dus deze dag kan niet meer verwijderd worden. Sluiten kan wel.`
+              : session.closed
+                ? `${session.pickedUpCount} order(s) have already been picked up or paid with vouchers. Erase a past day under Daily overview.`
+                : `${session.pickedUpCount} order(s) have already been picked up or paid with vouchers, so this day can no longer be removed. Closing it still works.`}
           </span>
         )}
       </div>

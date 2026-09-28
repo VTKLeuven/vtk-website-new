@@ -8,7 +8,11 @@ import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
 import { formatEuro } from "@/lib/theokot";
 import { getTheokotConfig } from "@/lib/theokot-server";
-import { waiveSessionNoShowsAction } from "@/app/actions/theokot";
+import {
+  purgeFinishedSessionAction,
+  unwaiveSessionNoShowsAction,
+  waiveSessionNoShowsAction,
+} from "@/app/actions/theokot";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import { TheokotAdminNav } from "../TheokotAdminNav";
 import { SaleDayPicker } from "../turflijst/SaleDayPicker";
@@ -22,7 +26,8 @@ import "@/app/design/vtk-basic.css";
  *
  * Voor wie Theokot beheert komt daar het geld bij (wat opgehaald werd, niet wat
  * besteld werd: een no-show brengt niets op), de medewerkersbonnetjes, de knop
- * "Er liep iets mis" en de historiek van alle verkoopdagen. Een shifter met
+ * "Er liep iets mis" (en die terugdraaien), het wissen van een voorbije dag en
+ * de historiek van alle verkoopdagen. Een shifter met
  * enkel `theokot.pickup` ziet de lijsten, niet de cijfers.
  */
 
@@ -183,6 +188,16 @@ export default async function TheokotOverviewPage({
     (a, b) => (b.pickedUpAt?.getTime() ?? 0) - (a.pickedUpAt?.getTime() ?? 0),
   );
   const noShows = byStatus("NO_SHOW");
+  // Wat "Er liep iets mis" terugdraaien teweegbrengt: welke no-shows weer
+  // meetellen en wie daardoor alsnog een mail krijgt (verwerkt terwijl de dag
+  // aangeduid stond). Dezelfde grenzen als `unwaiveSessionNoShows`.
+  const waivedAt = selected?.noShowsWaivedAt ?? null;
+  const waivedHere = waivedAt
+    ? noShows.filter((order) => order.noShowWaivedAt !== null && order.noShowWaivedAt >= waivedAt)
+    : [];
+  const unmailed = waivedAt
+    ? waivedHere.filter((order) => order.noShowProcessedAt !== null && order.noShowProcessedAt >= waivedAt).length
+    : 0;
   const selectedTotals = selected ? (totals.get(selected.id) ?? EMPTY_TOTALS) : EMPTY_TOTALS;
   const pickupOver = selected ? selected.pickupEnd <= now : false;
   const started = selected ? selected.pickupStart <= now : false;
@@ -330,12 +345,49 @@ export default async function TheokotOverviewPage({
 
           {caps.manage && started ? (
             selected.noShowsWaivedAt ? (
-              <div className="vtk-basic-alert">
-                <div className="vtk-basic-alert-text">
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-vtk-blue/12 bg-vtk-blue-soft/50 px-4 py-3">
+                <p className="text-sm text-vtk-ink">
                   {nl
                     ? `Voor deze dag liep er iets mis: de no-shows tellen niet mee en krijgen geen mail (aangeduid op ${shortDay(selected.noShowsWaivedAt)}).`
                     : `Something went wrong on this day: its no-shows don't count and get no email (marked on ${shortDay(selected.noShowsWaivedAt)}).`}
-                </div>
+                </p>
+                <DeleteButton
+                  action={unwaiveSessionNoShowsAction}
+                  fields={{ sessionId: selected.id }}
+                  title={nl ? "No-shows weer laten meetellen?" : "Count this day's no-shows again?"}
+                  description={
+                    selected.processedAt
+                      ? nl
+                        ? `De ${waivedHere.length} no-show(s) van ${dayLabel(selected.date)} tellen weer mee voor een ban, alsof de dag nooit aangeduid was. ${
+                            unmailed > 0
+                              ? config.noShowPaused
+                                ? `${unmailed} van hen kregen geen mail; omdat de no-show-verwerking gepauzeerd staat, blijven die buiten beschouwing. `
+                                : `${unmailed} van hen kregen door de aanduiding geen no-showmail; die vertrekt nu alsnog. `
+                              : ""
+                          }Een automatische ban die de aanduiding ophief, gaat opnieuw in, en wie nu de drempel haalt, krijgt een ban.`
+                        : `The ${waivedHere.length} no-show(s) of ${dayLabel(selected.date)} count towards a ban again, as if the day was never marked. ${
+                            unmailed > 0
+                              ? config.noShowPaused
+                                ? `${unmailed} of them got no email; because no-show processing is paused, those stay out of it. `
+                                : `${unmailed} of them got no no-show email because of the mark; it is sent now. `
+                              : ""
+                          }An automatic ban lifted by the mark takes effect again, and anyone who now reaches the threshold is banned.`
+                      : nl
+                        ? `Wie op ${dayLabel(selected.date)} niet ophaalt, telt weer mee voor een ban en krijgt zoals gewoonlijk een no-showmail wanneer de dag verwerkt wordt.`
+                        : `Whoever doesn't pick up on ${dayLabel(selected.date)} counts towards a ban again and gets the usual no-show email once the day is processed.`
+                  }
+                  confirmLabel={nl ? "Weer laten meetellen" : "Count again"}
+                  cancelLabel={nl ? "Annuleren" : "Cancel"}
+                  successMessage={nl ? "De no-shows van deze dag tellen weer mee" : "This day's no-shows count again"}
+                  errorMessages={
+                    nl
+                      ? { SESSION_NOT_FOUND: "Deze verkoopdag bestaat niet meer." }
+                      : { SESSION_NOT_FOUND: "This sale day no longer exists." }
+                  }
+                  errorFallback={nl ? "Terugdraaien is niet gelukt." : "Undoing did not work."}
+                >
+                  {nl ? "Ongedaan maken" : "Undo"}
+                </DeleteButton>
               </div>
             ) : (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-vtk-blue/12 px-4 py-3">
@@ -435,6 +487,43 @@ export default async function TheokotOverviewPage({
               extraHeading=""
               classes={{ th, td, num }}
             />
+          ) : null}
+
+          {caps.manage && pickupOver ? (
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-vtk-blue/12 px-4 py-3">
+              <p className="text-sm text-[#5c667f]">
+                {nl
+                  ? "Was dit een testdag, of klopt deze dag niet? Wis ze dan uit de historiek en de statistieken."
+                  : "Was this a test day, or is this day wrong? Then erase it from the history and the statistics."}
+              </p>
+              <DeleteButton
+                action={purgeFinishedSessionAction}
+                fields={{ sessionId: selected.id }}
+                title={nl ? "Verkoopdag wissen?" : "Erase this sale day?"}
+                description={
+                  nl
+                    ? `${dayLabel(selected.date)} verdwijnt met haar aanbod en haar ${selectedTotals.orders} bestelling(en), waarvan ${selectedTotals.pickedUp} opgehaald, uit de historiek, het overzicht en de statistieken. Dat kan niet ongedaan gemaakt worden. Er vertrekt geen mail. De no-shows van die dag tellen niet meer mee, en een automatische ban die daardoor onder de drempel zakt, wordt opgeheven. Bonnetjes die op die dag afgeboekt werden, blijven uitgegeven. De andere verkoopdagen blijven onaangeroerd.`
+                    : `${dayLabel(selected.date)} disappears with its offering and its ${selectedTotals.orders} order(s), ${selectedTotals.pickedUp} of them picked up, from the history, the overview and the statistics. This cannot be undone. No email is sent. The day's no-shows no longer count, and an automatic ban that falls below the threshold because of it is lifted. Vouchers redeemed that day stay spent. The other sale days are untouched.`
+                }
+                confirmLabel={nl ? "Verkoopdag wissen" : "Erase sale day"}
+                cancelLabel={nl ? "Annuleren" : "Cancel"}
+                successMessage={nl ? "Verkoopdag gewist" : "Sale day erased"}
+                errorMessages={
+                  nl
+                    ? {
+                        SESSION_NOT_FOUND: "Deze verkoopdag bestaat niet meer.",
+                        SESSION_NOT_OVER: "Deze dag is nog niet voorbij; een komende dag verwijder je bij Sessies.",
+                      }
+                    : {
+                        SESSION_NOT_FOUND: "This sale day no longer exists.",
+                        SESSION_NOT_OVER: "This day is not over yet; remove an upcoming day under Sessions.",
+                      }
+                }
+                errorFallback={nl ? "Wissen is niet gelukt." : "Erasing did not work."}
+              >
+                {nl ? "Verkoopdag wissen" : "Erase sale day"}
+              </DeleteButton>
+            </div>
           ) : null}
         </>
       )}
