@@ -23,6 +23,12 @@ export type MediaPublication = {
   publishedAt?: string;
   pdfUrl?: string;
   storageKey?: string;
+  /**
+   * Bladzijde 1 als JPEG, gemaakt bij het uploaden (lib/pdfCover.ts). Voor de
+   * tegel in het nieuws; een oudere editie zonder kaft valt terug op het
+   * streepjesvlak.
+   */
+  coverKey?: string;
 };
 
 const DEFAULT_VIDEOS: MediaVideo[] = [
@@ -249,6 +255,7 @@ function parsePublications(value: unknown): ParsedCollection<MediaPublication> {
     const publishedAt = readDate(item.publishedAt);
     const pdfUrl = readUrl(item.pdfUrl, HTTPS_PROTOCOLS);
     const storageKey = readStorageKey(item.storageKey);
+    const coverKey = readStorageKey(item.coverKey);
     if (!id || usedIds.has(id) || !kind || !titleNl || !issueNl || (!pdfUrl && !storageKey))
       continue;
 
@@ -263,6 +270,7 @@ function parsePublications(value: unknown): ParsedCollection<MediaPublication> {
       ...(publishedAt ? { publishedAt } : {}),
       ...(pdfUrl ? { pdfUrl } : {}),
       ...(storageKey ? { storageKey } : {}),
+      ...(coverKey ? { coverKey } : {}),
     });
   }
 

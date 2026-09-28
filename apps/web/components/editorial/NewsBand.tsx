@@ -266,7 +266,7 @@ function FeaturedPost({
         <div className="news-feat-media">
           {/* Posters en albumcovers komen uit de eigen media-routes. */}
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={entry.imageUrl} alt="" />
+          <img src={entry.imageUrl} alt="" style={{ objectPosition: entry.imagePosition }} />
           <CardPin date={entry.shownDate ?? entry.date} locale={locale} />
         </div>
       ) : null}
@@ -336,7 +336,7 @@ function NewsTile({
         {entry.imageUrl ? (
           // Posters en albumcovers komen uit de eigen media-routes.
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={entry.imageUrl} alt="" loading="lazy" />
+          <img src={entry.imageUrl} alt="" loading="lazy" style={{ objectPosition: entry.imagePosition }} />
         ) : null}
         <CardPin date={entry.shownDate ?? entry.date} locale={locale} />
       </div>
@@ -403,7 +403,7 @@ export function NewsRow({
       <span className={`news-thumb${entry.imageUrl ? "" : " is-blank"}`} aria-hidden="true">
         {entry.imageUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={entry.imageUrl} alt="" loading="lazy" />
+          <img src={entry.imageUrl} alt="" loading="lazy" style={{ objectPosition: entry.imagePosition }} />
         ) : null}
       </span>
     </NewsLink>

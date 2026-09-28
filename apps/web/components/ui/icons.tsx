@@ -160,6 +160,17 @@ export function UploadIcon() {
   );
 }
 
+/** Een foto: een kaft of afbeelding maken of vervangen. */
+export function ImageIcon() {
+  return (
+    <Icon>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21" />
+    </Icon>
+  );
+}
+
 /** Pijl naar beneden in een bak: een bestand dat meteen binnenkomt. */
 export function DownloadIcon() {
   return (

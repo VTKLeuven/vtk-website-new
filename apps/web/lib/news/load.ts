@@ -58,6 +58,11 @@ export type NewsEntry = NewsComposable & {
   /** Waar die knop naartoe gaat, als dat iets anders is dan `href`. */
   ctaHref: string | null;
   imageUrl: string | null;
+  /**
+   * `object-position` van de foto, waar het midden niet volstaat: de kaft van
+   * een Bakske is een staande bladzijde, en de kop staat bovenaan.
+   */
+  imagePosition?: string;
   author: { name: string; role: string | null; imageUrl: string | null } | null;
   /**
    * Een korte regel onder de titel van een tegel, waar `line` te lang is: de
@@ -313,7 +318,8 @@ export async function collectNews(
       href: publicationHref(item.id),
       ctaLabel: nl ? "Lees het nummer" : "Read the issue",
       ctaHref: null,
-      imageUrl: null,
+      imageUrl: publicUrl(item.coverKey),
+      imagePosition: "50% 0%",
       author: null,
     });
   }
