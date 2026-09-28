@@ -7,20 +7,22 @@ import { shouldRedirectToScanner } from "@/lib/scannerFocus";
 import {
   lookupPickupByCardAction,
   lookupPickupByPassAction,
-  lookupPickupByRNumberAction,
+  lookupPickupByQueryAction,
+  lookupPickupByUserAction,
   markPickedUpAction,
   redeemEmployeeVouchersAction,
-  type PickupLookupResult,
+  type PickupCandidate,
   type PickupOrder,
+  type PickupSearchResult,
 } from "@/app/actions/theokot";
 
 /** Waaraan een pas uit de VTK-app te herkennen is; zie `lib/app-api/tokens.ts`. */
 const PASS_PREFIX = "vtkpas1.";
 
-/** Afhaalbalie: r-nummer, studentenkaart of de pas uit de app; bestelling tonen, opgehaald markeren. */
+/** Afhaalbalie: naam, r-nummer, studentenkaart of de pas uit de app; bestelling tonen, opgehaald markeren. */
 export function PickupCounter({ nl }: { nl: boolean }) {
   const [value, setValue] = useState("");
-  const [result, setResult] = useState<PickupLookupResult | null>(null);
+  const [result, setResult] = useState<PickupSearchResult | null>(null);
   const [pending, startTransition] = useTransition();
   const [voucherPending, startVoucherTransition] = useTransition();
   const [voucherOrderId, setVoucherOrderId] = useState<string | null>(null);
@@ -50,18 +52,31 @@ export function PickupCounter({ nl }: { nl: boolean }) {
   function run(raw: string) {
     const cleaned = raw.replace(/[\r\n]+/g, "").trim();
     if (!cleaned || busyRef.current) return;
+    // Drie soorten invoer op één veld, en ze zijn aan hun vorm te herkennen:
+    // de kaartlezer tikt "serial;cardAppId", een QR-lezer tikt de pas uit de
+    // app ("vtkpas1."), en wat overblijft is met de hand ingetikt: een
+    // r-nummer of een naam, dat beslist de server. Eén veld en niet drie, want
+    // aan de balie is er één beweging.
+    lookup(cleaned, () =>
+      cleaned.startsWith(PASS_PREFIX)
+        ? lookupPickupByPassAction(cleaned)
+        : cleaned.includes(";")
+          ? lookupPickupByCardAction(cleaned)
+          : lookupPickupByQueryAction(cleaned),
+    );
+  }
+
+  /** Iemand uit de keuzelijst na een naamzoekopdracht. */
+  function choose(candidate: PickupCandidate) {
+    lookup("", () => lookupPickupByUserAction(candidate.userId));
+  }
+
+  function lookup(submitted: string, fetchResult: () => Promise<PickupSearchResult>) {
+    if (busyRef.current) return;
     busyRef.current = true;
     startTransition(async () => {
       try {
-        // Drie soorten invoer op één veld, en ze zijn aan hun vorm te herkennen:
-        // de kaartlezer tikt "serial;cardAppId", een QR-lezer tikt de pas uit de
-        // app ("vtkpas1."), en wat overblijft is een met de hand ingetikt
-        // r-nummer. Eén veld en niet drie, want aan de balie is er één beweging.
-        const res = cleaned.startsWith(PASS_PREFIX)
-          ? await lookupPickupByPassAction(cleaned)
-          : cleaned.includes(";")
-            ? await lookupPickupByCardAction(cleaned)
-            : await lookupPickupByRNumberAction(cleaned);
+        const res = await fetchResult();
         setResult(res);
         const eligibleOrder =
           res.ok && res.outstandingBonnetjes >= 2
@@ -74,7 +89,9 @@ export function PickupCounter({ nl }: { nl: boolean }) {
         setVoucherOrderId(eligibleOrder?.orderId ?? null);
         setVoucherCovers(eligibleOrder?.voucherCoversCents ?? null);
         setVoucherError(null);
-        setValue("");
+        // Enkel wissen wat er gezocht werd. Hangt een kaartcontrole even, dan
+        // tikt de shifter intussen de naam al in; die mag niet verdwijnen.
+        setValue((current) => (current.trim() === submitted ? "" : current));
       } finally {
         busyRef.current = false;
         requestAnimationFrame(() => inputRef.current?.focus());
@@ -147,8 +164,8 @@ export function PickupCounter({ nl }: { nl: boolean }) {
           <div className="flex-1 min-w-[220px]">
             <Label>
               {nl
-                ? "R-nummer, studentenkaart of de code uit de app"
-                : "R-number, student card or the code from the app"}
+                ? "Naam, r-nummer, studentenkaart of de code uit de app"
+                : "Name, r-number, student card or the code from the app"}
             </Label>
             <Input
               ref={inputRef}
@@ -156,13 +173,13 @@ export function PickupCounter({ nl }: { nl: boolean }) {
               onChange={onChange}
               autoFocus
               autoComplete="off"
-              placeholder="r0123456"
+              placeholder={nl ? "r0123456 of Jan Peeters" : "r0123456 or Jan Peeters"}
               spellCheck={false}
             />
             <p className="mt-1 text-xs text-[#5c667f]">
               {nl
-                ? "Scan de kaart of tik het r-nummer en druk op Enter. Scannen werkt overal op deze pagina, ook zonder eerst in dit veld te klikken."
-                : "Scan the card or type the r-number and press Enter. Scanning works anywhere on this page, without clicking this field first."}
+                ? "Scan de kaart, of tik een r-nummer of naam en druk op Enter. Op naam vind je enkel wie vandaag iets besteld heeft. Scannen werkt overal op deze pagina, ook zonder eerst in dit veld te klikken."
+                : "Scan the card, or type an r-number or name and press Enter. A name only finds people who ordered today. Scanning works anywhere on this page, without clicking this field first."}
             </p>
           </div>
           <Button type="submit" disabled={pending}>
@@ -175,6 +192,28 @@ export function PickupCounter({ nl }: { nl: boolean }) {
         <div className="vtk-basic-alert vtk-basic-alert-warning">
           <div className="vtk-basic-alert-text">{result.error}</div>
         </div>
+      )}
+
+      {result && !result.ok && "candidates" in result && (
+        <Card className="p-2">
+          <ul aria-label={nl ? "Kies de juiste persoon" : "Choose the right person"}>
+            {result.candidates.map((candidate) => (
+              <li key={candidate.userId}>
+                <button
+                  type="button"
+                  onClick={() => choose(candidate)}
+                  disabled={pending}
+                  className="flex w-full items-baseline justify-between gap-3 rounded-lg px-3 py-2.5 text-left hover:bg-vtk-blue-soft/60 focus-visible:bg-vtk-blue-soft/60 disabled:opacity-50"
+                >
+                  <span className="font-medium text-vtk-ink">{candidate.name}</span>
+                  <span className="text-sm tabular-nums text-[#5c667f]">
+                    {candidate.rNumber ?? (nl ? "geen r-nummer" : "no r-number")}
+                  </span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        </Card>
       )}
 
       {result && result.ok && (

@@ -327,7 +327,28 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 - **Kaartscanner**: de scanner werkt als toetsenbord en tikt `serial;cardAppId` + Enter.
   Eén invoerveld verwerkt beide: bevat de invoer een `;` dan gaat ze naar de KU Leuven
   `idverification`-API (`lib/kul-card.ts`) die een r-nummer teruggeeft; anders wordt de
-  invoer als r-nummer behandeld. Credentials (`KUL_CARD_*`) staan los van de OIDC-login (zie README).
+  invoer als r-nummer of naam behandeld. Credentials (`KUL_CARD_*`) staan los van de OIDC-login (zie README).
+- **Zoeken op naam kan ook, maar enkel onder wie vandaag besteld heeft.** Wat geen
+  kaart en geen pas is en niet op een r-nummer lijkt (`r0123456`, `R0123456` of de
+  zeven cijfers), is een naam (`lib/theokotPickupQuery.ts`). Elk woord moet in de
+  naam of het r-nummer voorkomen. Passen er meerdere mensen, dan kiest de shifter
+  uit een lijst; past er één, dan volgt meteen de bestelling. De beperking tot de
+  bestellingen van vandaag is bewust: aan de balie is dat de enige vraag, het houdt
+  de lijst kort, en een shifter met enkel `theokot.pickup` kan zo niet door het
+  hele ledenbestand bladeren.
+- **De balie werkt zonder KU Leuven.** Naam en r-nummer raken de kaartcontrole
+  niet aan en eindigen op dezelfde opzoeking (`pickupForUser`), met dezelfde
+  prijzen, bonnetjes en "opgehaald"-knop. Ligt de kaartcontrole eruit, dan zegt de
+  foutmelding dat ook, en wat de shifter intikt terwijl een scan nog loopt, blijft
+  staan.
+- **De kaartcontrole kan via de relay van de cursusdienst.** KU Leuven dropt
+  verkeer van ons server-adres naar hun net (hetzelfde blok waarvoor de
+  cursusdienst zijn relay bouwde). `KUL_CARD_RELAY_URL` en `KUL_CARD_RELAY_SECRET`
+  zetten ze aan, met dezelfde waarden als daar: het is dezelfde relay en hetzelfde
+  protocol (relay-secret in `Authorization`, onze KU Leuven-credentials in
+  `X-Kul-Authorization`, dus de relay bewaart ze niet). Leeg is rechtstreeks. Dit
+  geldt voor elke kaartlezer, want de deur, de fakscanner en de ticketscanner gaan
+  langs dezelfde `lib/kul-card.ts`.
 - **Scannen werkt overal op de balie, niet enkel in het veld.** Na een klik op
   "Opgehaald" stond de focus op die knop, en scande de volgende student in het
   niets. Elke gewone toets op de pagina zet nu eerst de focus in het scanveld

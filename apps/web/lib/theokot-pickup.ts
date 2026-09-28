@@ -5,12 +5,13 @@ import type { TheokotOrderStatus } from "@prisma/client";
 
 import { brusselsTimeOnDay } from "@/lib/theokot";
 import { outstandingShiftReward } from "@/lib/shift/rewards";
+import { normalizeRNumber, pickupSearchTerms } from "@/lib/theokotPickupQuery";
 
 /**
  * De afhaalbalie, los van de weg waarlangs iemand herkend werd.
  *
- * Er zijn er intussen drie: een r-nummer intikken, een studentenkaart scannen, en
- * sinds de app een pas scannen. Alle drie eindigen ze op dezelfde vraag ("wat
+ * Er zijn er intussen vier: een r-nummer intikken, een naam intikken, een
+ * studentenkaart scannen, en sinds de app een pas scannen. Alle vier eindigen ze op dezelfde vraag ("wat
  * heeft deze persoon vandaag besteld en hoeveel bonnetjes staan er open"), en die
  * hoort dus één keer beantwoord te worden. Dit bestand is dat antwoord; de
  * actions en de app-API zijn enkel de deuren ernaartoe.
@@ -57,6 +58,29 @@ export type PickupLookupResult =
     }
   | { ok: false; error: string };
 
+/** Een persoon die op een naamzoekopdracht past en vandaag iets besteld heeft. */
+export type PickupCandidate = { userId: string; name: string; rNumber: string | null };
+
+/**
+ * Het antwoord op een ingetikte zoekopdracht: dezelfde opzoeking, of een keuze
+ * wanneer er meerdere mensen op de naam passen.
+ */
+export type PickupSearchResult =
+  | PickupLookupResult
+  | { ok: false; error: string; candidates: PickupCandidate[] };
+
+/** De bestellingen die aan de balie nog iets betekenen. */
+const PICKUP_STATUSES: TheokotOrderStatus[] = ["RESERVED", "PICKED_UP", "NO_SHOW"];
+
+/** Hoeveel namen de balie hoogstens toont om uit te kiezen. */
+const MAX_CANDIDATES = 12;
+
+/** Vandaag, van middernacht tot middernacht in Brussel. */
+function pickupDay(now: Date): { gte: Date; lt: Date } {
+  const today = brusselsTimeOnDay(now, "00:00");
+  return { gte: today, lt: new Date(today.getTime() + 86400000) };
+}
+
 /**
  * Bestelling(en) van vandaag plus het bonnetjessaldo, voor één gebruiker.
  *
@@ -74,15 +98,12 @@ export async function pickupForUser(
   });
   if (!user) return { ok: false, error: "Deze gebruiker bestaat niet meer." };
 
-  const today = brusselsTimeOnDay(now, "00:00");
-  const tomorrow = new Date(today.getTime() + 86400000);
-
   const [orders, shiftBalances] = await Promise.all([
     prisma.theokotOrder.findMany({
       where: {
         userId: user.id,
-        status: { in: ["RESERVED", "PICKED_UP", "NO_SHOW"] },
-        session: { date: { gte: today, lt: tomorrow } },
+        status: { in: PICKUP_STATUSES },
+        session: { date: pickupDay(now) },
       },
       include: {
         session: { select: { pickupStart: true, pickupEnd: true } },
@@ -146,16 +167,88 @@ export async function pickupForUser(
   };
 }
 
-/** Dezelfde opzoeking, vertrekkend van een r-nummer. */
+/**
+ * Dezelfde opzoeking, vertrekkend van een r-nummer. `cardName` is de naam die KU
+ * Leuven bij een gescande kaart meegaf: heeft die student geen account, dan
+ * zegt de balie wie er staat in plaats van enkel een nummer.
+ */
 export async function pickupByRNumber(
   rNumberRaw: string,
-  now: Date = new Date(),
+  { now = new Date(), cardName = null }: { now?: Date; cardName?: string | null } = {},
 ): Promise<PickupLookupResult> {
-  const rNumber = rNumberRaw.trim().toLowerCase();
+  const rNumber = normalizeRNumber(rNumberRaw) ?? rNumberRaw.trim().toLowerCase();
   if (!rNumber) return { ok: false, error: "Geef een r-nummer in." };
 
-  const user = await prisma.user.findUnique({ where: { rNumber }, select: { id: true } });
-  if (!user) return { ok: false, error: `Geen gebruiker gevonden met r-nummer ${rNumber}.` };
+  // Niet op hoofdletters vergelijken: in het gebruikersbeheer kan een r-nummer
+  // als "R0123456" opgeslagen zijn, en die student bestaat wel.
+  const user = await prisma.user.findFirst({
+    where: { rNumber: { equals: rNumber, mode: "insensitive" }, deletedAt: null },
+    select: { id: true },
+  });
+  if (!user) {
+    return {
+      ok: false,
+      error: cardName
+        ? `${cardName} (${rNumber}) heeft geen account op vtk.be.`
+        : `Geen gebruiker gevonden met r-nummer ${rNumber}.`,
+    };
+  }
 
   return pickupForUser(user.id, now);
+}
+
+/**
+ * Wat de shifter intikte: een r-nummer, of anders een naam.
+ *
+ * Op naam zoeken we enkel onder wie vandaag een bestelling heeft. Aan de balie
+ * is dat de enige vraag, het houdt de lijst kort bij een veelvoorkomende naam,
+ * en een shifter met enkel `theokot.pickup` kan zo niet door het hele
+ * ledenbestand bladeren. Past er precies één persoon, dan volgt meteen de
+ * bestelling; bij meerdere kiest de shifter.
+ */
+export async function pickupByQuery(
+  raw: string,
+  now: Date = new Date(),
+): Promise<PickupSearchResult> {
+  const query = raw.trim();
+  if (!query) return { ok: false, error: "Geef een naam of r-nummer in." };
+
+  const rNumber = normalizeRNumber(query);
+  if (rNumber) return pickupByRNumber(rNumber, { now });
+
+  const terms = pickupSearchTerms(query);
+  const users = await prisma.user.findMany({
+    where: {
+      deletedAt: null,
+      theokotOrders: { some: { status: { in: PICKUP_STATUSES }, session: { date: pickupDay(now) } } },
+      AND: terms.map((term) => ({
+        OR: [
+          { name: { contains: term, mode: "insensitive" as const } },
+          { firstName: { contains: term, mode: "insensitive" as const } },
+          { lastName: { contains: term, mode: "insensitive" as const } },
+          { rNumber: { contains: term, mode: "insensitive" as const } },
+        ],
+      })),
+    },
+    select: { id: true, name: true, rNumber: true },
+    orderBy: { name: "asc" },
+    take: MAX_CANDIDATES + 1,
+  });
+
+  if (users.length === 0) {
+    return { ok: false, error: `Niemand met een bestelling voor vandaag past op "${query}".` };
+  }
+  if (users.length === 1) return pickupForUser(users[0].id, now);
+
+  const candidates = users
+    .slice(0, MAX_CANDIDATES)
+    .map((user) => ({ userId: user.id, name: user.name, rNumber: user.rNumber }));
+  return {
+    ok: false,
+    error:
+      users.length > MAX_CANDIDATES
+        ? `Meer dan ${MAX_CANDIDATES} mensen met een bestelling passen op "${query}". Kies hieronder, of typ meer van de naam.`
+        : `${users.length} mensen met een bestelling passen op "${query}". Kies de juiste persoon.`,
+    candidates,
+  };
 }

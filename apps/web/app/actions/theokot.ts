@@ -24,11 +24,13 @@ import {
   updateOrder,
 } from "@/lib/theokot-orders";
 import { syncMeetingsForSession, syncMeetingsOnDay } from "@/lib/meetings-server";
-import { resolveStudentCard } from "@/lib/student-card";
+import { cardDisplayName, resolveStudentCard } from "@/lib/student-card";
 import {
+  pickupByQuery,
   pickupByRNumber,
   pickupForUser,
   type PickupLookupResult,
+  type PickupSearchResult,
 } from "@/lib/theokot-pickup";
 import { verifyPassToken } from "@/lib/app-api/tokens";
 import {
@@ -1064,24 +1066,36 @@ export async function correctOrderStatusAction(
 // Afhaalbalie (theokot.pickup)
 // -----------------------------------------------------------------------------
 
-// De opzoeking zelf staat in `lib/theokot-pickup.ts`: er zijn drie wegen naar
-// dezelfde vraag (r-nummer, studentenkaart, pas uit de app) en die hoort maar
+// De opzoeking zelf staat in `lib/theokot-pickup.ts`: er zijn vier wegen naar
+// dezelfde vraag (r-nummer, naam, studentenkaart, pas uit de app) en die hoort maar
 // één keer beantwoord te worden. Deze types worden doorgegeven zodat
 // `PickupCounter` ze uit dezelfde plek kan importeren als vroeger.
 export type {
+  PickupCandidate,
   PickupLine,
   PickupOrder,
   PickupLookupResult,
+  PickupSearchResult,
 } from "@/lib/theokot-pickup";
 
 export type VoucherRedemptionResult =
   | { ok: true; amount: number; remainingBonnetjes: number }
   | { ok: false; error: string };
 
-/** Zoekt de bestelling(en) van vandaag voor een handmatig ingegeven r-nummer. */
-export async function lookupPickupByRNumberAction(rNumber: string): Promise<PickupLookupResult> {
+/**
+ * Zoekt de bestelling(en) van vandaag voor wat de shifter intikte: een r-nummer,
+ * of anders een naam. Passen er meerdere mensen, dan komt er een keuzelijst
+ * terug; zie {@link pickupByQuery}.
+ */
+export async function lookupPickupByQueryAction(query: string): Promise<PickupSearchResult> {
   await requirePermission("theokot.pickup");
-  return pickupByRNumber(rNumber);
+  return pickupByQuery(query);
+}
+
+/** De keuze uit die lijst: de bestelling(en) van vandaag voor die ene persoon. */
+export async function lookupPickupByUserAction(userId: string): Promise<PickupLookupResult> {
+  await requirePermission("theokot.pickup");
+  return pickupForUser(userId);
 }
 
 /**
@@ -1093,8 +1107,12 @@ export async function lookupPickupByRNumberAction(rNumber: string): Promise<Pick
 export async function lookupPickupByCardAction(scanned: string): Promise<PickupLookupResult> {
   await requirePermission("theokot.pickup");
   const resolved = await resolveStudentCard(scanned);
-  if (!resolved.ok) return { ok: false, error: resolved.error };
-  return pickupByRNumber(resolved.rNumber);
+  // Werkt de kaartcontrole niet (KU Leuven of de relay ligt eruit), dan kan de
+  // balie gewoon verder op naam of r-nummer: die weg raakt KU Leuven niet aan.
+  if (!resolved.ok) {
+    return { ok: false, error: `${resolved.error} Zoek de student op naam of r-nummer.` };
+  }
+  return pickupByRNumber(resolved.rNumber, { cardName: cardDisplayName(resolved) });
 }
 
 /**
