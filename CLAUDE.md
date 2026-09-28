@@ -326,13 +326,19 @@ the design language into the application instead of copying mockup content.
   representatives for this visitor), so it never sits between two navy bands:
   were it there, those two would collide the moment it disappears. See
   `docs/design-decisions.md` for the section ordering rationale.
-- News (`components/editorial/NewsBand.tsx`, `lib/news`): one featured card on
-  the left and a hairline register on the right, on `--paper-2`. The kind of a
-  post is its colour (from the ticket palette, mapped once in `vtk-news.css`)
-  and its icon tile, never a pill over a photo. The word from the praeses is
-  Bakske length: it stays clamped to nine lines in the featured card with
-  "Lees de hele brief" to open it in place; do not print it in the register or
-  let the card grow to its full length. See `docs/design-decisions.md`.
+- News (`components/editorial/NewsBand.tsx`, `lib/news`): the featured post on
+  the left (usually the word from the praeses, as a letter) and the rest as the
+  shared event tile (`vtk-eventcard.css`) in a carousel beside it, on
+  `--paper-2`. Only the tiles move: one per click or every 15 seconds, with a
+  pause button, no autoplay under `prefers-reduced-motion`; do not let it rotate
+  without that pause control. The kind of a post is a small-caps word, never a
+  colour or an icon tile (those were reviewed and removed: they appeared nowhere
+  else on the site). The word from the praeses is Bakske length: it stays
+  clamped to nine lines in the featured card with "Lees de hele brief" to open
+  it in place; do not make it a tile or let the card grow to its full length.
+  /nieuws is an agenda per week with the /tickets filter chips and a rail; a
+  word from the praeses opens with the author's square portrait. See
+  `docs/design-decisions.md`.
 - Photography: content cards open with a real photo under a navy scrim, never a
   decorative illustration. Aanbod cards ("Wat we doen") carry a photo header
   (16:9, light 115deg scrim) and are uniform: every card in the grid gets the

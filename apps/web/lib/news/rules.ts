@@ -20,7 +20,7 @@
  *   agenda. Zie de constanten hieronder.
  * - **Uitgelicht is wat de redactie kiest, anders het woordje, anders het
  *   nieuwste.** Het woordje van de praeses is geschreven om gelezen te worden
- *   en wordt dus niet tussen de korte regels van het register gedrukt.
+ *   en wordt dus niet als tegel tussen de andere berichten gezet.
  */
 
 import { presaleStart, type PresaleConfig } from "@/lib/ticketing/presale";
@@ -249,11 +249,11 @@ export type NewsComposable = {
 };
 
 /**
- * Wat de band toont: één uitgelicht bericht en de rest als register, samen
- * hoogstens `count`.
+ * Wat de band toont: één uitgelicht bericht en de rest als tegels in de
+ * carrousel ernaast, samen hoogstens `count`.
  *
  * Uitgelicht is het bericht dat de redactie aanduidde, anders het nieuwste
- * woordje van de praeses, anders gewoon het nieuwste bericht. Het register is de
+ * woordje van de praeses, anders gewoon het nieuwste bericht. De tegels zijn de
  * rest, nieuwste eerst.
  */
 export function composeNews<T extends NewsComposable>(
@@ -267,4 +267,68 @@ export function composeNews<T extends NewsComposable>(
     sorted.find((entry) => entry.source === "praeses") ??
     sorted[0]!;
   return { featured, rest: sorted.filter((entry) => entry !== featured).slice(0, count - 1) };
+}
+
+/** Een kalenderdag in Brussel als `yyyy-mm-dd`, zodat datums als tekst te vergelijken zijn. */
+function brusselsDay(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Brussels",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+/** De maandag van de week van `day` (`yyyy-mm-dd`), `weeksBack` weken terug. */
+function mondayOf(day: string, weeksBack: number): string {
+  const noon = new Date(`${day}T12:00:00Z`);
+  const sinceMonday = (noon.getUTCDay() + 6) % 7;
+  noon.setUTCDate(noon.getUTCDate() - sinceMonday - 7 * weeksBack);
+  return noon.toISOString().slice(0, 10);
+}
+
+/** Een groep op /nieuws: deze week, vorige week, of een maand (`yyyy-mm`). */
+export type NewsPeriod<T> = {
+  key: "this-week" | "last-week" | `${number}-${number}`;
+  /** Maandag van de week (`yyyy-mm-dd`) bij een week, anders `null`. */
+  monday: string | null;
+  entries: T[];
+};
+
+/**
+ * De berichten van /nieuws per periode, zoals de agenda van de kalender: deze
+ * week, vorige week, en daarvoor per maand. Een week begint op maandag, in
+ * Brussel. De volgorde is die van `date` (wanneer het nieuws werd), nieuwste
+ * eerst; de datum die een bericht toont (`shownDate`, de dag van een event)
+ * speelt hier geen rol, want een ticketverkoop voor november is nieuws van nu.
+ */
+export function groupNewsByPeriod<T extends { date: string }>(
+  entries: readonly T[],
+  now: Date,
+): NewsPeriod<T>[] {
+  const today = brusselsDay(now);
+  const thisMonday = mondayOf(today, 0);
+  const lastMonday = mondayOf(today, 1);
+  const groups: NewsPeriod<T>[] = [];
+  const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+  for (const entry of sorted) {
+    const day = brusselsDay(new Date(entry.date));
+    const key: NewsPeriod<T>["key"] =
+      day >= thisMonday
+        ? "this-week"
+        : day >= lastMonday
+          ? "last-week"
+          : (day.slice(0, 7) as `${number}-${number}`);
+    const last = groups[groups.length - 1];
+    if (last && last.key === key) {
+      last.entries.push(entry);
+    } else {
+      groups.push({
+        key,
+        monday: key === "this-week" ? thisMonday : key === "last-week" ? lastMonday : null,
+        entries: [entry],
+      });
+    }
+  }
+  return groups;
 }

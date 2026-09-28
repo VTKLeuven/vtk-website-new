@@ -59,6 +59,12 @@ export type NewsEntry = NewsComposable & {
   imageUrl: string | null;
   author: { name: string; role: string | null; imageUrl: string | null } | null;
   /**
+   * Een korte regel onder de titel van een tegel, waar `line` te lang is: de
+   * plaats van een evenement of het aantal foto's van een album. Leeg valt de
+   * tegel terug op `line`.
+   */
+  place?: string | null;
+  /**
    * De datum die het bericht toont (pin en kopregel), wanneer dat een andere
    * is dan `date`. Bij een ticketverkoop en een inschrijving is dat de dag van
    * het evenement: wanneer de verkoop of de inschrijving opende, zegt een
@@ -73,7 +79,7 @@ export type NewsEntry = NewsComposable & {
 export type NewsCandidate = NewsEntry & { hidden: boolean };
 
 /** Een pdf van de mediapagina, via dezelfde route als de boekenplank daar. */
-function publicationHref(id: string): string {
+export function publicationHref(id: string): string {
   return `/api/media/publications/${encodeURIComponent(id)}`;
 }
 
@@ -148,6 +154,7 @@ function ticketEntry(event: TicketNewsEvent, date: Date, locale: Locale, presale
     ctaHref: null,
     imageUrl: publicUrl(event.calendarEvent?.imageKey),
     author: null,
+    place: event.location,
   };
 }
 
@@ -279,6 +286,7 @@ export async function collectNews(
       ctaHref: event.url,
       imageUrl: publicUrl(event.imageKey),
       author: null,
+      place: event.location,
     });
   }
 
@@ -328,6 +336,9 @@ export async function collectNews(
       ctaHref: null,
       imageUrl: album.coverPhoto?.thumbnailUrl ?? null,
       author: null,
+      place: nl
+        ? `${album.photoCount} ${album.photoCount === 1 ? "foto" : "foto's"}`
+        : `${album.photoCount} ${album.photoCount === 1 ? "photo" : "photos"}`,
     });
   }
 

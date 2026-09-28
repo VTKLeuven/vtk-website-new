@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   albumInNews,
   composeNews,
+  groupNewsByPeriod,
   isFreshNews,
   magazinesInNews,
   postInNews,
@@ -234,5 +235,44 @@ describe("uitgelicht automatisch bericht", () => {
     expect(readNewsFeatured({ source: "notice", ref: "abc" })).toBeNull();
     expect(readNewsFeatured({ source: "tickets", ref: "" })).toBeNull();
     expect(readNewsFeatured(["tickets", "abc"])).toBeNull();
+  });
+});
+
+describe("/nieuws per periode", () => {
+  // "Nu" is zaterdag 26 september 2026: deze week begint op maandag 21 september.
+  const entry = (key: string, date: string) => ({ key, date: at(date).toISOString() });
+
+  it("deelt in in deze week, vorige week en daarvoor per maand", () => {
+    const groups = groupNewsByPeriod(
+      [
+        entry("zaterdag", "2026-09-26T09:00:00+02:00"),
+        entry("maandag", "2026-09-21T00:30:00+02:00"),
+        entry("zondag ervoor", "2026-09-20T23:30:00+02:00"),
+        entry("vorige maandag", "2026-09-14T08:00:00+02:00"),
+        entry("begin september", "2026-09-02T12:00:00+02:00"),
+        entry("augustus", "2026-08-20T12:00:00+02:00"),
+      ],
+      now,
+    );
+    expect(groups.map((group) => [group.key, group.monday, group.entries.map((e) => e.key)])).toEqual([
+      ["this-week", "2026-09-21", ["zaterdag", "maandag"]],
+      ["last-week", "2026-09-14", ["zondag ervoor", "vorige maandag"]],
+      ["2026-09", null, ["begin september"]],
+      ["2026-08", null, ["augustus"]],
+    ]);
+  });
+
+  it("rekent de dag in Brussel, niet in UTC", () => {
+    // Maandag 00:30 in Brussel is nog zondag in UTC.
+    const [group] = groupNewsByPeriod([entry("net na middernacht", "2026-09-21T00:30:00+02:00")], now);
+    expect(group!.key).toBe("this-week");
+  });
+
+  it("sorteert zelf, nieuwste eerst", () => {
+    const [group] = groupNewsByPeriod(
+      [entry("oud", "2026-09-22T08:00:00+02:00"), entry("nieuw", "2026-09-25T08:00:00+02:00")],
+      now,
+    );
+    expect(group!.entries.map((e) => e.key)).toEqual(["nieuw", "oud"]);
   });
 });

@@ -9084,10 +9084,10 @@ heeft, en over een werkingsjaar is het verschil tussen 14u en 15u vaak ruis. Per
 ## Nieuws tussen de hero en de openingsuren
 
 De homepage heeft een Nieuws-band tussen de snelle links en de openingsuren:
-één uitgelicht bericht links, de rest als register ernaast (soort, titel, één
-regel). Beheer via Admin → Website → Nieuws (`news.manage`), waar de band ook
-helemaal uit kan. Code: `apps/web/lib/news` (regels, instelling, lezen) en
-`components/editorial/NewsBand.tsx`.
+links het uitgelichte bericht, rechts de rest als tegels in een carrousel.
+Beheer via Admin → Website → Nieuws (`news.manage`), waar de band ook helemaal
+uit kan. Code: `apps/web/lib/news` (regels, instelling, lezen),
+`components/editorial/NewsBand.tsx` en `NewsCarousel.tsx`.
 
 **Waarom een band en geen aankondiging.** Een aankondiging is één bericht dat
 je wegklikt. Veel dingen die de kring wil zeggen, passen daar niet in: een
@@ -9095,15 +9095,41 @@ mededeling met veel uitleg, een link naar een pagina die niet in de header
 hoort, of gewoon "de ticketverkoop van het galabal is open". Die horen op een
 vaste plek waar je ze terugvindt.
 
-**Vier richtingen bekeken, deze gekozen.** Naast dit register werden een raster
-van ticketpassen, glaskaarten op de herofoto en de kaarten van /tickets bekeken.
-Het register won: het werkt even goed met en zonder foto's (een Bakske of een
-ticketverkoop heeft er vaak geen), met drie of acht berichten, en een lange
-handgeschreven tekst en een korte automatische regel krijgen elk hun eigen
-vorm. De band is lichtblauw (`--paper-2`), dus de strakke naad onder de donkere
-zone is nu een naad tussen donker en lichtblauw, en de openingsuren sluiten er
-navy op aan. Zonder berichten, of met de band uit, valt hij helemaal weg en
-staat alles zoals voordien.
+**De vorm: de brief links, eventtegels in een carrousel ernaast.** Eerst stond
+er een register naast de uitgelichte kaart, met per soort een gekleurde tegel
+en een icoon (blauw voor tickets, groen voor inschrijvingen, oranje voor het
+woordje). Die kleuren en iconen kwamen nergens anders op de site terug. Nu is
+elk bericht de eventtegel van de kalender en de band "Aankomende evenementen"
+(`vtk-eventcard.css`, dezelfde klassen, geen tweede kaart), met de gele
+datumpin op de foto en de soort als woord in kleine kapitalen, zoals
+"TICKETS" op /tickets. Zonder foto krijgt een tegel het streepjesvlak.
+
+- **De soort is een woord, geen kleur.** `--news-*` en de iconentabel zijn
+  weg; kom er niet op terug zonder dat die kleuren ook elders iets betekenen.
+- **De tegels schuiven, de brief blijft staan.** Drie tegels in beeld (twee
+  op een tablet, één en een stukje op een telefoon), met een knop links en
+  rechts, en om de vijftien seconden vanzelf één verder; na de laatste begint
+  het weer vooraan. Zo kan de band meer dan vier berichten tonen zonder hoger
+  te worden. Het is een gewone scroller met snap-punten, zodat een telefoon
+  erdoor swipet en een toetsenbord dat naar een tegel buiten beeld tabt, hem
+  vanzelf in beeld haalt.
+- **Wat vanzelf beweegt, is te stoppen.** Er is een pauzeknop, de wekker
+  wacht zolang de muis erop staat, de focus erin zit of het tabblad verborgen
+  is, en bij `prefers-reduced-motion` is er geen autoplay. Passen alle tegels,
+  dan vallen knoppen en wekker weg.
+- **De brief bepaalt zijn eigen hoogte.** Drie varianten werden gemeten waarin
+  de tegels de hoogte bepalen en de brief die ruimte vult (over twee rijen
+  tegels, als strook erboven, of met foto's die meerekken). Gekozen is de
+  eenvoudigste: de brief houdt zijn negen regels, de tegels staan bovenaan en
+  rekken niet mee. De lege ruimte onder de tegels is aanvaard.
+
+Eerder werden naast het register een raster van ticketpassen, glaskaarten op
+de herofoto en de kaarten van /tickets bekeken; het register won toen omdat het
+met en zonder foto's werkte. Het streepjesvlak lost dat nu op binnen de tegel.
+De band is lichtblauw (`--paper-2`), dus de strakke naad onder de donkere zone
+is een naad tussen donker en lichtblauw, en de openingsuren sluiten er navy op
+aan. Zonder berichten, of met de band uit, valt hij helemaal weg en staat alles
+zoals voordien.
 
 **Half automatisch.** Wat iemand zelf schrijft (een mededeling, een woordje van
 de praeses) staat in `NewsPost`. De rest wordt bij het lezen afgeleid uit zijn
@@ -9139,8 +9165,8 @@ volgorde en het label "Nieuw" bepalen (`NewsEntry.shownDate` naast `date`).
 
 **Uitgelicht: de keuze van de redactie, anders het woordje, anders het
 nieuwste.** Het woordje van de praeses is voor het Bakske geschreven, een halve
-A5 met aanhef en groet. Het wordt dus niet tussen de korte regels van het
-register gedrukt, maar staat in de uitgelichte kaart: de eerste negen regels
+A5 met aanhef en groet. Het wordt dus geen tegel tussen de andere berichten,
+maar staat in de uitgelichte kaart: de eerste negen regels
 met een zachte uitloop, en "Lees de hele brief" klapt de rest ter plekke open.
 Zo blijft de band even hoog tot iemand klikt. Een venster en een brief over de
 volle breedte werden ook bekeken; het venster verstopte de tekst achter een
@@ -9148,7 +9174,7 @@ klik te veel, de volle breedte duwde de openingsuren een scherm naar beneden.
 
 **Ook een automatisch bericht kan uitgelicht worden.** Een ticketverkoop die
 een duwtje nodig heeft (het Oktoberfest), hoort in de grote kaart met zijn
-affiche en een knop "Tickets kopen", niet als regel in het register. De ster in
+affiche en een knop "Tickets kopen", niet als een van de tegels. De ster in
 "Nu in het nieuws" werkt daarom voor elk bericht. Een zelfgeschreven bericht
 draagt de keuze in `NewsPost.featured`, een automatisch in de instelling
 `home.news.featured`; de actions houden de twee exclusief. De keuze verlengt de
@@ -9157,8 +9183,29 @@ verdwijnen, en dan neemt de standaard het over. Een bericht dat uit het nieuws
 gehaald wordt, verliest zijn ster.
 
 **/nieuws** toont alles wat nu in het nieuws staat (zonder de grens van de
-band) en de eerdere mededelingen en woordjes. Automatische berichten hebben
-daar geen historiek: hun bron staat nog op zijn eigen plek.
+band) en de eerdere mededelingen en woordjes, als agenda: deze week, vorige
+week en daarvoor per maand (`groupNewsByPeriod` in `lib/news/rules.ts`), naar
+het moment waarop iets nieuws werd. Bovenaan filterchips per soort met hun
+aantal, dezelfde als op /tickets en in de URL (`?soort=inschrijvingen`), zodat
+je een filter kan doorsturen. Rechts een rail met het laatste woordje van de
+praeses en het laatste nummer van het Bakske en Ir.Reëel: tussen tien
+ticketverkopen zakten die anders weg. Automatische berichten hebben daar geen
+historiek: hun bron staat nog op zijn eigen plek.
+
+- **Op /nieuws is de pin geel voor een dag die nog komt, grijs voor een
+  voorbije.** Een ticketverkoop of inschrijving toont de dag van het event, en
+  die is bijna altijd nog te gaan; een woordje, album of Bakske toont zijn
+  eigen datum, die voorbij is. Zo treedt wat alleen nog te lezen valt terug,
+  zoals een afgelopen event op /kalender. "Nieuw" blijft het gele label.
+
+**Het woordje voluit: het portret eerst.** Op zijn eigen pagina staat de
+afzender links als vierkant portret, zoals een tegel op /praesidium
+(`.vtk-roster-photo`), 200 pixels breed, en het blijft staan terwijl je leest.
+Voordien stond de afzender pas onderaan en bleef de rechterhelft leeg. Bewust
+kleiner dan de 260 pixels van het voorstel: het is een brief met een gezicht,
+geen portretpagina. Een afzender zonder foto krijgt zijn initialen op de zachte
+tint. Er is geen apart veld voor een aanhef; wie er een wil, schrijft die in
+de tekst.
 
 ## De eventpagina: omschrijving onder de foto, een paneel ernaast
 
