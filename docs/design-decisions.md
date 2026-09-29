@@ -9632,9 +9632,10 @@ de zijbalk helemaal weg achter één knop.
   zonder zijbalk ook, omdat elke wissel dan een extra klik kost.
 - **Een compactere rail (52px, knoppen van 36px) is geprobeerd en teruggedraaid**:
   die las krap. Wat wel bleef: 20px tussen rail en inhoud in plaats van 48.
-- **De rail begint op de hoogte van het eerste omkaderde element onder de
-  titel** (een kaart, tabs, een rij tegels), niet naast de paginatitel: een
-  smalle rail die boven de inhoud uitsteekt, hangt er los naast. Omdat elke
-  pagina een andere kop heeft, wordt dat gemeten. Ligt dat element te ver, dan
-  begint de rail bovenaan en niet halverwege: de eerste versie zocht "de eerste
-  kaart of tabel" en zette de rail op het dashboard midden op het scherm.
+- **De rail begint op de hoogte van de paginatitel**: haar bovenkant staat
+  gelijk met het woord "Dashboard". Eerst begon ze bij het eerste omkaderde
+  element onder de titel (een kaart, tabs, een rij tegels), met het idee dat een
+  smalle rail die boven de inhoud uitsteekt er los naast hangt. In de praktijk
+  leek ze zo onder de titel weggezakt, en stond ze op elke pagina op een andere
+  hoogte (september 2026 teruggedraaid). De titel wordt gemeten, zodat een
+  pagina zonder `h1` de rail gewoon bovenaan houdt.

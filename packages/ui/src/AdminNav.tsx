@@ -68,57 +68,24 @@ const BOTTOM_GAP = 24;
 const TWO_COLUMN = '(min-width: 860px)';
 
 /**
- * Waar de ingeklapte rail begint: op de hoogte van het eerste omkaderde element
- * onder de paginatitel (een kaart, een tabel, een rij tabs of tegels), niet
- * naast de titel. Een smalle rail die boven de inhoud uitsteekt, hangt er los
- * naast.
+ * Waar de ingeklapte rail begint: op de hoogte van de paginatitel (de `h1`), dus
+ * de bovenkant van de rail staat gelijk met het woord "Dashboard".
  *
- * Gemeten en niet op een klassenaam gezocht. De eerste versie zocht "de eerste
- * kaart of tabel" en vond op het dashboard een tegel halverwege de pagina; een
- * tweede eiste dat het blok half zo breed was als de inhoud en sloeg zo de rij
- * tegels op een form of op /admin/rekeningen over. Nu telt het hoogste element
- * onder de `h1` met een rand of een achtergrond, ook een smal. Ligt dat verder
- * dan `MAX_LEAD`, of is er geen, dan begint de rail bovenaan: liever naast de
- * titel dan ergens halverwege het scherm.
+ * Eerst begon ze bij het eerste omkaderde element onder de titel (een kaart, een
+ * rij tabs), maar dan leek ze onder de titel weggezakt en begon ze op elke
+ * pagina op een andere hoogte. De titel staat overal op dezelfde plek.
+ *
+ * Gemeten en niet vast gezet: een pagina zonder `h1`, of met een titel die ver
+ * onder de bovenkant staat (verder dan `MAX_LEAD`), houdt de rail bovenaan.
  */
 const MAX_LEAD = 240;
-const MAX_DEPTH = 6;
-const MIN_BLOCK = { width: 60, height: 20 };
 
-function isBoxed(element: Element): boolean {
-  if (element.tagName === 'TABLE') return true;
-  const style = getComputedStyle(element);
-  if (parseFloat(style.borderTopWidth) > 0 || parseFloat(style.borderBottomWidth) > 0) return true;
-  const background = style.backgroundColor;
-  return background !== 'transparent' && background !== 'rgba(0, 0, 0, 0)';
-}
-
-/** De bovenkant (in schermpixels) van het eerste omkaderde element onder de paginatitel. */
-function firstBlockTop(content: Element): number | null {
+/** De bovenkant (in schermpixels) van de paginatitel, of null zonder `h1`. */
+function headingTop(content: Element): number | null {
   const heading = content.querySelector('h1');
   if (!heading) return null;
-  const headBottom = heading.getBoundingClientRect().bottom;
-  let best: number | null = null;
-
-  const walk = (parent: Element, depth: number) => {
-    for (const child of Array.from(parent.children)) {
-      const rect = child.getBoundingClientRect();
-      if (rect.height === 0 || rect.bottom <= headBottom) continue;
-      if (best !== null && rect.top >= best) continue;
-      if (
-        rect.top >= headBottom &&
-        rect.width >= MIN_BLOCK.width &&
-        rect.height >= MIN_BLOCK.height &&
-        isBoxed(child)
-      ) {
-        best = rect.top;
-        continue;
-      }
-      if (depth < MAX_DEPTH) walk(child, depth + 1);
-    }
-  };
-  walk(content, 0);
-  return best;
+  const rect = heading.getBoundingClientRect();
+  return rect.height > 0 ? rect.top : null;
 }
 
 function matches(pathname: string, item: AdminNavItem): boolean {
@@ -193,17 +160,17 @@ function useSmartSticky<T extends HTMLElement>(alignToContent: boolean) {
       const navHeight = element.offsetHeight;
       const columnTop = columnRect.top / scale;
 
-      // De ingeklapte rail begint op de hoogte van het eerste blok onder de
-      // kop. Enkel opnieuw gemeten wanneer er iets veranderde (in- of
-      // uitklappen, een andere pagina, een andere grootte), niet bij elke
-      // scroll: de afstand tot de kolom verandert daar niet mee.
+      // De ingeklapte rail begint op de hoogte van de paginatitel. Enkel
+      // opnieuw gemeten wanneer er iets veranderde (in- of uitklappen, een
+      // andere pagina, een andere grootte), niet bij elke scroll: de afstand tot
+      // de kolom verandert daar niet mee.
       if (dirty) {
         dirty = false;
         lead = 0;
         const content = column.nextElementSibling;
-        const blockTop = alignRef.current && content ? firstBlockTop(content) : null;
-        if (blockTop !== null) {
-          const distance = Math.round((blockTop - columnRect.top) / scale);
+        const titleTop = alignRef.current && content ? headingTop(content) : null;
+        if (titleTop !== null) {
+          const distance = Math.round((titleTop - columnRect.top) / scale);
           lead = distance > 0 && distance <= MAX_LEAD ? distance : 0;
         }
       }

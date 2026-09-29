@@ -600,11 +600,11 @@ the design language into the application instead of copying mockup content.
   - **De zijbalk kan ingeklapt worden, maar staat standaard uit.** De knop naast
     ADMIN (enkel vanaf 860px) maakt er een rail van 60px van met enkel de
     iconen; een groep opent haar tabs in een kaart ernaast, de naam staat in een
-    tooltip. De rail begint op de hoogte van het eerste omkaderde element onder
-    de `h1` (een kaart, tabs, een rij tegels; `firstBlockTop` in
-    `packages/ui/src/AdminNav.tsx`), en anders bovenaan, nooit halverwege. Dat
-    wordt gemeten en niet op een klassenaam gezocht: een zoektocht naar "de
-    eerste kaart" vond op het dashboard een tegel halverwege de pagina. De
+    tooltip. De rail begint op de hoogte van de paginatitel, de `h1`
+    (`headingTop` in `packages/ui/src/AdminNav.tsx`): haar bovenkant staat
+    gelijk met het woord "Dashboard". Zonder `h1` begint ze bovenaan. Het
+    eerste omkaderde element onder de titel is geprobeerd en teruggedraaid: dan
+    leek de rail weggezakt en stond ze op elke pagina op een andere hoogte. De
     inhoud schuift tot 20px ervan. Onthouden in een cookie
     (`lib/adminNavCookie.ts`), zodat de server de juiste stand meteen rendert.
     Maak inklappen nooit de standaard: wie de admin zelden gebruikt, vindt een
