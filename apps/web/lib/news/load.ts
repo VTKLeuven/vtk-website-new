@@ -1,10 +1,12 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
+import { after } from "next/server";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { publicUrl } from "@/lib/storage";
 import { markdownToPlainText } from "@/lib/markdown";
 import { getMediaContent } from "@/lib/media-content";
+import { ensureMagazineCover } from "@/lib/magazineCover";
 import { listImmichGalleryAlbums } from "@/lib/immich-gallery";
 import { SITE_CONTENT_TAG } from "@/lib/cachedContent";
 import type { SessionPayload } from "@vtk/auth";
@@ -191,6 +193,8 @@ export async function collectNews(
       ? prisma.ticketEvent.findMany({
           where: {
             status: "PUBLISHED",
+            // Een privéverkoop is niet voor de hele kring; zie ticketing/privateLink.ts.
+            isPrivate: false,
             startsAt: { gt: now },
             publishedAt: { not: null },
             OR: [{ salesEndAt: null }, { salesEndAt: { gt: now } }],
@@ -388,8 +392,25 @@ const cachedNews = unstable_cache(
   { revalidate: 60, tags: [SITE_CONTENT_TAG, NEWS_TAG] },
 );
 
-export function getCachedNews(locale: Locale) {
-  return cachedNews(locale);
+export async function getCachedNews(locale: Locale) {
+  const news = await cachedNews(locale);
+  // Een Bakske of Ir.Reëel zonder kaft krijgt er een, na het antwoord: deze
+  // bezoeker ziet nog het streepjesvlak, wie na de volgende verversing van de
+  // cache komt (hoogstens een minuut) de eerste bladzijde. Zo hoeft niemand in
+  // /admin/media aan een knop te denken voor een nummer dat al online stond.
+  const missing = news.entries
+    .filter((entry) => (entry.source === "bakske" || entry.source === "irreeel") && !entry.imageUrl)
+    .map((entry) => entry.ref);
+  if (missing.length > 0) {
+    try {
+      after(async () => {
+        for (const id of missing) await ensureMagazineCover(id);
+      });
+    } catch {
+      // Buiten een request (een test, een script) is er geen `after`.
+    }
+  }
+  return news;
 }
 
 /**
@@ -413,6 +434,8 @@ export async function getPresaleNews(
   const candidates = await prisma.ticketEvent.findMany({
     where: {
       status: "PUBLISHED",
+      // Ook niet als voorverkoop: wie erin mag, kreeg de privélink al.
+      isPrivate: false,
       startsAt: { gt: now },
       publishedAt: { not: null },
       salesStartAt: { gt: now },

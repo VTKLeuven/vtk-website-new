@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Card, Input, Label, Select, Textarea } from "@vtk/ui";
+import { Input, Label, Select, Textarea } from "@vtk/ui";
+import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { StorageImageField } from "@/components/admin/StorageImageField";
@@ -236,13 +237,7 @@ function RangeField({
  * pages, not one page in different modes, and seeing them side by side is what
  * makes "which one is live" answerable at a glance.
  */
-export function FrontpageEditor({
-  locale,
-  cards,
-}: {
-  locale: Locale;
-  cards: FrontpageCard[];
-}) {
+export function FrontpageEditor({ locale, cards }: { locale: Locale; cards: FrontpageCard[] }) {
   const nl = locale === "nl";
   const dict = getDictionary(locale);
 
@@ -266,23 +261,34 @@ export function FrontpageEditor({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       {cards.map((card) => (
-        <Card className="p-5" key={card.layout}>
-          <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-2">
-            <h2 className="font-semibold">{card.label}</h2>
-            <span
-              className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[card.status]}`}
-            >
-              {statusLabels[card.status]}
-            </span>
-            {card.showing ? (
-              <span className="rounded-full bg-vtk-ink px-2 py-0.5 text-xs font-medium text-white">
-                {nl ? "Staat nu op de site" : "On the site right now"}
+        <AdminDisclosure
+          key={card.layout}
+          summary={
+            <>
+              <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
+                <span className="font-semibold text-vtk-ink">{card.label}</span>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_CLASS[card.status]}`}
+                >
+                  {statusLabels[card.status]}
+                </span>
+                {card.showing ? (
+                  <span className="rounded-full bg-vtk-ink px-2 py-0.5 text-xs font-medium text-white">
+                    {nl ? "Staat nu op de site" : "On the site right now"}
+                  </span>
+                ) : null}
               </span>
-            ) : null}
-            {!card.isDefault ? (
-              <form action={setFrontpageActiveAction} className="ml-auto">
+              <span className="mt-1 block text-sm text-[#5c667f]">
+                {card.description}
+                {!card.isDefault && card.windowLabel ? ` · ${card.windowLabel}` : ""}
+              </span>
+            </>
+          }
+          actions={
+            !card.isDefault ? (
+              <form action={setFrontpageActiveAction}>
                 <input type="hidden" name="layout" value={card.layout} />
                 <input type="hidden" name="active" value={card.active ? "0" : "1"} />
                 <button
@@ -292,13 +298,9 @@ export function FrontpageEditor({
                   {card.active ? (nl ? "Uitzetten" : "Turn off") : nl ? "Aanzetten" : "Turn on"}
                 </button>
               </form>
-            ) : null}
-          </div>
-          <p className="mb-4 text-sm text-[#5c667f]">
-            {card.description}
-            {!card.isDefault && card.windowLabel ? ` · ${card.windowLabel}` : ""}
-          </p>
-
+            ) : null
+          }
+        >
           <div className="mb-5">
             <Preview url={card.previewUrl} title={card.label} />
             <p className="mt-2 text-xs text-[#5c667f]">
@@ -381,7 +383,7 @@ export function FrontpageEditor({
               </>
             )}
           </SaveForm>
-        </Card>
+        </AdminDisclosure>
       ))}
     </div>
   );

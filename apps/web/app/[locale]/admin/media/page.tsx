@@ -155,7 +155,6 @@ export default async function AdminMedia({
                 </a>
                 <MagazineCoverButton
                   id={p.id}
-                  documentUrl={`/api/media/publications/${encodeURIComponent(p.id)}`}
                   hasCover={Boolean(p.coverKey)}
                   context={`${nl ? p.titleNl : p.titleEn || p.titleNl} ${nl ? p.issueNl : p.issueEn || p.issueNl}`}
                   locale={locale}

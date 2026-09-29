@@ -36,6 +36,9 @@ export const AUDIT_ACTIONS = {
   cancel: { nl: "Geannuleerd", en: "Cancelled" },
   refund: { nl: "Terugbetaald", en: "Refunded" },
   sync: { nl: "Gesynchroniseerd", en: "Synced" },
+  // Een poging die de server tegenhield en die je achteraf wil kunnen nalezen,
+  // zoals een praesidiumlid dat in Theokot met bonnetjes probeerde te betalen.
+  refuse: { nl: "Geweigerd", en: "Refused" },
 } as const;
 
 export type AuditAction = keyof typeof AUDIT_ACTIONS;

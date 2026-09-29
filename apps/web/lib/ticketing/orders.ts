@@ -42,6 +42,7 @@ import {
 } from "./audience";
 import { viewerSalesStart, viewerTypeSalesStart } from "./presale";
 import { presaleViewerFor } from "./presaleViewer";
+import { hasPrivateTicketAccess } from "./privateLink";
 import { userIsMember } from "@/lib/membership";
 import { ticketViewerProfile } from "./viewerProfile";
 import { sanitizeSourceKey } from "./source";
@@ -218,6 +219,12 @@ export async function createTicketCheckout(
   });
 
   if (!event || event.status !== "PUBLISHED") {
+    throw new TicketCheckoutError("EVENT_NOT_ON_SALE");
+  }
+  // Een privéverkoop staat bij niemand zonder de privélink op het scherm (zie
+  // ticketing/privateLink.ts); dit is het slot erachter. Hetzelfde antwoord als
+  // een event dat niet te koop staat, zodat het niet verraadt dat het bestaat.
+  if (!(await hasPrivateTicketAccess(event))) {
     throw new TicketCheckoutError("EVENT_NOT_ON_SALE");
   }
   // Wie deze koper is voor de voorverkoop: zijn posten én zijn shiften. Dezelfde

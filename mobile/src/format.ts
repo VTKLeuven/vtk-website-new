@@ -72,6 +72,15 @@ export function formatEventWhen(
   return `${start} ${formatTime(startIso, locale)} tot ${formatDay(endIso, locale)} ${formatTime(endIso, locale)}`;
 }
 
+/**
+ * Een aantal bonnetjes: "2" of "2,5". Een broodje aan de afhaalbalie kost per
+ * half bonnetje, dus een saldo kan op een half eindigen; zelfde notatie als
+ * `formatVouchers` op de site.
+ */
+export function formatVouchers(amount: number, locale: AppLocale = 'nl'): string {
+  return new Intl.NumberFormat(tag(locale), { maximumFractionDigits: 1 }).format(amount);
+}
+
 /** Eurocent naar "€2,60"; zelfde notatie als `formatEuro` op de site. */
 export function formatEuro(cents: number): string {
   return `€${(cents / 100).toFixed(2).replace('.', ',')}`;

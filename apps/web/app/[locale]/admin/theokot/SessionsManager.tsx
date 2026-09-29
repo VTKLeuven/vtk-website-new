@@ -10,6 +10,7 @@ import { DeleteButton, DeleteIconButton } from "@/components/ui/DeleteIconButton
 import {
   closeSessionNowAction,
   createWeekSessionsAction,
+  processSessionNoShowsAction,
   removeOrderAction,
   removeSessionAction,
   updateSessionAction,
@@ -529,6 +530,39 @@ function SessionEditor({ nl, session }: { nl: boolean; session: AdminSession }) 
           </SaveForm>
         )}
 
+        {session.closed && !session.processed && (
+          <SaveForm
+            action={processSessionNoShowsAction}
+            submitLabel={nl ? "No-shows verwerken" : "Process no-shows"}
+            submitVariant="ghost"
+            submitSize="sm"
+            savingLabel={nl ? "Bezig..." : "Processing..."}
+            savedMessage={nl ? "No-shows verwerkt" : "No-shows processed"}
+            confirmSubmit={{
+              title: nl ? "No-shows nu verwerken?" : "Process no-shows now?",
+              description: nl
+                ? `De nog niet-opgehaalde bestellingen van ${session.dateLabel} worden geboekt als no-show en die studenten krijgen een waarschuwingsmail.`
+                : `Uncollected orders for ${session.dateLabel} will be marked as no-show and those students will receive a warning email.`,
+              confirmLabel: nl ? "No-shows verwerken" : "Process no-shows",
+              cancelLabel: nl ? "Annuleren" : "Cancel",
+            }}
+            errorMessages={
+              nl
+                ? {
+                    SESSION_NOT_FOUND: "Deze verkoopdag bestaat niet meer.",
+                    SESSION_NOT_ENDED: "De afhaal is nog niet afgelopen.",
+                  }
+                : {
+                    SESSION_NOT_FOUND: "This sale day no longer exists.",
+                    SESSION_NOT_ENDED: "Pickup has not ended yet.",
+                  }
+            }
+            fallbackErrorMessage={nl ? "Verwerken mislukt." : "Processing failed."}
+          >
+            <input type="hidden" name="sessionId" value={session.id} />
+          </SaveForm>
+        )}
+
         {session.pickedUpCount === 0 ? (
           <DeleteButton
             action={removeSessionAction}
@@ -548,8 +582,12 @@ function SessionEditor({ nl, session }: { nl: boolean; session: AdminSession }) 
         ) : (
           <span className="text-xs text-[#5c667f]">
             {nl
-              ? `Er zijn al ${session.pickedUpCount} bestelling(en) opgehaald of met bonnetjes betaald, dus deze dag kan niet meer verwijderd worden. Sluiten kan wel.`
-              : `${session.pickedUpCount} order(s) have already been picked up or paid with vouchers, so this day can no longer be removed. Closing it still works.`}
+              ? session.closed
+                ? `Er zijn al ${session.pickedUpCount} bestelling(en) opgehaald of met bonnetjes betaald. Een voorbije dag wis je bij Overzicht per dag.`
+                : `Er zijn al ${session.pickedUpCount} bestelling(en) opgehaald of met bonnetjes betaald, dus deze dag kan niet meer verwijderd worden. Sluiten kan wel.`
+              : session.closed
+                ? `${session.pickedUpCount} order(s) have already been picked up or paid with vouchers. Erase a past day under Daily overview.`
+                : `${session.pickedUpCount} order(s) have already been picked up or paid with vouchers, so this day can no longer be removed. Closing it still works.`}
           </span>
         )}
       </div>

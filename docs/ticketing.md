@@ -225,6 +225,10 @@ without the key and says which one accepts it.
 ### Routes: public (`apps/web/app/[locale]/...`)
 - `tickets/page.tsx`: public shop list (`/tickets`)
 - `tickets/[slug]/page.tsx`: event + purchase page
+- `tickets/[slug]/voorverkoop/[token]/route.ts`: de private voorverkooplink
+  (cookie, dan door naar de shop)
+- `tickets/[slug]/prive/[token]/route.ts`: de privélink van een privé-event
+  (cookie, dan door naar de shop, die zonder die cookie een 404 geeft)
 - `account/page.tsx`: personal ticket overview in the "Mijn VTK" section
 - `tickets/bestelling/[orderId]`: order + QR
 
@@ -528,6 +532,12 @@ webscanner blijft staan als webweg en als vangnet.
   gedeeld door de shoplijst, de eventpagina en `createOrder`. `viewerSalesStart`
   geeft de verkoopstart zoals **deze** bezoeker ze heeft; al de rest rekent
   gewoon met een venster. Zie `docs/design-decisions.md` voor de kringkeuzes
+- `privateLink.ts`: de privéverkoop (`TicketEvent.isPrivate`, `privateToken`).
+  `hasPrivateTicketAccess` is het slot in `getPublishedTicketEventBySlug` en in
+  `createTicketCheckout`; de lijsten (`listPublishedTicketEvents`, het nieuws,
+  `eventPage.ts` voor de kalender, homepage en app) laten een privé-event
+  gewoon weg. `shopPath.ts` bepaalt waar het beheer naartoe linkt. Zie
+  `docs/design-decisions.md`
 - `cardHash.ts`: het hashformaat van de studentenkaart in het offline-manifest;
   draait bewust aan beide kanten
 - `mail.ts`, `outbox.ts`: durable confirmation-mail queue

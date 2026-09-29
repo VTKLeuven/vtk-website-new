@@ -6,6 +6,7 @@ import { logAudit } from "@/lib/audit";
 import { academicYearRange } from "@/lib/shift";
 import { outstandingShiftReward } from "@/lib/shift/rewards";
 import { allocateUserShiftReward, ShiftRewardConflictError } from "@/lib/shift/rewards.server";
+import { paysWithVouchersBlocked } from "@/lib/shift/voucherEligibility";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import type { AppVoucherEntry } from "./contract";
 
@@ -15,17 +16,22 @@ import type { AppVoucherEntry } from "./contract";
  * **Het saldo is geen kolom.** Het is `Shift.reward` min
  * `ShiftParticipant.rewardPaid`, opgeteld over alle shiften die voorbij zijn.
  * Dat is met opzet zo gebleven: er bestaat al een beheerscherm dat bonnetjes in
- * geld uitbetaalt (`/api/shift/reward`) en een afhaalbalie die er twee afboekt
- * voor een broodje, en die schrijven allemaal in diezelfde kolom. Er een tweede
+ * geld uitbetaalt (`/api/shift/reward`) en een afhaalbalie die er afboekt naar
+ * de prijs van een broodje, en die schrijven allemaal in diezelfde kolom. Er een tweede
  * saldo naast leggen zou betekenen dat de twee uit elkaar kunnen lopen, en dan is
  * geen van beide nog te vertrouwen.
  *
  * Wat hier bijkomt is enkel de derde weg om ze uit te geven: iemand achter een
  * toog scant de pas van een student en tikt een bedrag in.
+ *
+ * Het saldo kan op een half eindigen (een broodje kost per half bonnetje, zie
+ * `sandwichVoucherCost`). Aan de toog gaan er enkel hele af, net zoals bij het
+ * uitbetalen: een half bonnetje bestaat daar niet. Dat half blijft staan voor
+ * de afhaalbalie.
  */
 
 export class VoucherError extends Error {
-  constructor(readonly code: "NOT_ENOUGH" | "CONFLICT" | "SELF") {
+  constructor(readonly code: "NOT_ENOUGH" | "CONFLICT" | "SELF" | "PRAESIDIUM") {
     super(code);
     this.name = "VoucherError";
   }
@@ -137,6 +143,12 @@ export async function voucherOverview(userId: string, now = new Date()) {
  * **Je kan niet bij jezelf afboeken.** Dat is geen theoretisch geval: wie mag
  * aanvaarden, heeft zelf ook bonnetjes, en zijn eigen pas scannen is de kortste
  * weg naar een gratis pint zonder dat er iemand meekijkt.
+ *
+ * **Een praesidiumlid van dit werkingsjaar betaalt niet met online bonnetjes.**
+ * De app kent de toog niet (`place` is vrije tekst en de app stuurt altijd
+ * "Toog"), en een Theokot-broodje wordt langs deze weg afgerekend, dus de
+ * weigering geldt hier voor elke afboeking. De poging komt in het logboek, met
+ * de scanner als actor en de student als onderwerp.
  */
 export async function redeemVouchers({
   userId,
@@ -149,6 +161,7 @@ export async function redeemVouchers({
   processedById: string;
   place?: string | null;
 }): Promise<{ name: string; amount: number; remaining: number }> {
+  // Enkel hele bonnetjes aan de toog; zie de uitleg bovenaan.
   if (!Number.isInteger(amount) || amount <= 0 || amount > 100) {
     throw new VoucherError("NOT_ENOUGH");
   }
@@ -161,6 +174,17 @@ export async function redeemVouchers({
   if (!user) throw new Error("NOT_FOUND");
 
   const trimmedPlace = place?.trim().slice(0, 80) || null;
+
+  if (await paysWithVouchersBlocked(user.id)) {
+    await logAudit({
+      action: "refuse",
+      entity: "shiftReward",
+      entityId: userId,
+      target: user.name,
+      summary: `${amount} bonnetje(s) via de app geweigerd${trimmedPlace ? ` (${trimmedPlace})` : ""}: praesidiumlid`,
+    });
+    throw new VoucherError("PRAESIDIUM");
+  }
 
   let remaining: number;
   try {

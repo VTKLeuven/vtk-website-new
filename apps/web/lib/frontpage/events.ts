@@ -1,6 +1,7 @@
 import "server-only";
 
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
+import { TICKET_LINK_SELECT } from "@/lib/ticketing/eventPage";
 import {
   HERO_WEEK_TIME_ZONE,
   heroWeekDayDate,
@@ -42,19 +43,16 @@ export const FRONTPAGE_EVENT_INCLUDE = {
   categories: { include: { category: true } },
   moments: { orderBy: { start: "asc" }, select: { start: true, end: true, label: true } },
   // Voor het ticketicoon op de evenementkaart; zie `publishedTicketSlug`.
-  ticketEvent: { select: { slug: true, status: true } },
+  ticketEvents: { select: TICKET_LINK_SELECT },
 } as const;
 
 /**
  * De slug van de ticketpagina, enkel wanneer die online staat. Dezelfde regel
  * als de knop "Tickets kopen" op de eventpagina: een concept of een gearchiveerd
- * ticketevent heeft geen pagina die een bezoeker kan openen.
+ * ticketevent heeft geen pagina die een bezoeker kan openen. Heeft het event
+ * er meer dan één, dan de eerste; zie lib/ticketing/eventPage.ts.
  */
-export function publishedTicketSlug(
-  ticketEvent: { slug: string; status: string } | null | undefined,
-): string | null {
-  return ticketEvent?.status === "PUBLISHED" ? ticketEvent.slug : null;
-}
+export { publishedTicketSlug } from "@/lib/ticketing/eventPage";
 
 /**
  * Vanaf wanneer de homepage evenementen leest: middernacht gisteren, in

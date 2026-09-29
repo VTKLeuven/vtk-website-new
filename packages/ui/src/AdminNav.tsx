@@ -38,16 +38,55 @@ export type AdminNavPins = {
   };
 };
 
+/**
+ * Inklappen is optioneel, net als vastpinnen: zonder deze prop is er geen knop
+ * en blijft de zijbalk altijd uitgeklapt (Logistiek en de Fakbar).
+ *
+ * Ingeklapt wordt de zijbalk een rail met enkel de iconen, vanaf 860px; smaller
+ * blijft het de gewone uitklapknop. Onthouden doet de app (`onChange`), zodat
+ * de server de juiste toestand meteen rendert en er niets verspringt.
+ */
+export type AdminNavCollapse = {
+  initial: boolean;
+  onChange: (collapsed: boolean) => void;
+  labels: {
+    collapse: string;
+    expand: string;
+  };
+};
+
 export type AdminNavProps = {
   title: string;
   nodes: AdminNavNode[];
   icons?: Record<string, ReactNode>;
   pins?: AdminNavPins;
+  collapse?: AdminNavCollapse;
 };
 
 const TOP_GAP = 96;
 const BOTTOM_GAP = 24;
 const TWO_COLUMN = '(min-width: 860px)';
+
+/**
+ * Waar de ingeklapte rail begint: op de hoogte van de paginatitel (de `h1`), dus
+ * de bovenkant van de rail staat gelijk met het woord "Dashboard".
+ *
+ * Eerst begon ze bij het eerste omkaderde element onder de titel (een kaart, een
+ * rij tabs), maar dan leek ze onder de titel weggezakt en begon ze op elke
+ * pagina op een andere hoogte. De titel staat overal op dezelfde plek.
+ *
+ * Gemeten en niet vast gezet: een pagina zonder `h1`, of met een titel die ver
+ * onder de bovenkant staat (verder dan `MAX_LEAD`), houdt de rail bovenaan.
+ */
+const MAX_LEAD = 240;
+
+/** De bovenkant (in schermpixels) van de paginatitel, of null zonder `h1`. */
+function headingTop(content: Element): number | null {
+  const heading = content.querySelector('h1');
+  if (!heading) return null;
+  const rect = heading.getBoundingClientRect();
+  return rect.height > 0 ? rect.top : null;
+}
 
 function matches(pathname: string, item: AdminNavItem): boolean {
   if (item.exact) return pathname === item.href;
@@ -76,8 +115,17 @@ function isActive(activeHref: string | null, item: AdminNavItem): boolean {
   return activeHref !== null && item.href === activeHref;
 }
 
-function useSmartSticky<T extends HTMLElement>() {
+function useSmartSticky<T extends HTMLElement>(alignToContent: boolean) {
   const ref = useRef<T>(null);
+  const alignRef = useRef(alignToContent);
+  const scheduleRef = useRef<() => void>(() => {});
+
+  // Na het in- of uitklappen, en na een navigatie (andere pagina, andere kop),
+  // opnieuw meten.
+  useEffect(() => {
+    alignRef.current = alignToContent;
+    scheduleRef.current();
+  });
 
   useEffect(() => {
     const element = ref.current;
@@ -87,6 +135,8 @@ function useSmartSticky<T extends HTMLElement>() {
 
     const media = window.matchMedia(TWO_COLUMN);
     let offset = 0;
+    let lead = 0;
+    let dirty = true;
     let lastY = window.scrollY;
     let frame = 0;
 
@@ -94,6 +144,7 @@ function useSmartSticky<T extends HTMLElement>() {
       frame = 0;
       if (!media.matches) {
         element.style.transform = '';
+        element.style.marginBottom = '';
         return;
       }
 
@@ -108,6 +159,29 @@ function useSmartSticky<T extends HTMLElement>() {
       const viewport = window.innerHeight / scale;
       const navHeight = element.offsetHeight;
       const columnTop = columnRect.top / scale;
+
+      // De ingeklapte rail begint op de hoogte van de paginatitel. Enkel
+      // opnieuw gemeten wanneer er iets veranderde (in- of uitklappen, een
+      // andere pagina, een andere grootte), niet bij elke scroll: de afstand tot
+      // de kolom verandert daar niet mee.
+      if (dirty) {
+        dirty = false;
+        lead = 0;
+        const content = column.nextElementSibling;
+        const titleTop = alignRef.current && content ? headingTop(content) : null;
+        if (titleTop !== null) {
+          const distance = Math.round((titleTop - columnRect.top) / scale);
+          lead = distance > 0 && distance <= MAX_LEAD ? distance : 0;
+        }
+      }
+      // De kolom groeit mee met die afstand: op een korte pagina liep de rail
+      // anders onder de inhoud door tot in de footer.
+      const reserve = lead > 0 ? `${lead}px` : '';
+      if (element.style.marginBottom !== reserve) element.style.marginBottom = reserve;
+      offset = Math.max(offset, lead);
+      // Tot de eerste meting staat de rail verborgen (admin-nav.css), anders
+      // verschijnt ze bij elke paginalading eerst bovenaan en springt ze dan.
+      element.dataset.aligned = alignRef.current ? 'true' : '';
       const top = columnTop + offset;
 
       if (navHeight + TOP_GAP + BOTTOM_GAP <= viewport) {
@@ -119,28 +193,38 @@ function useSmartSticky<T extends HTMLElement>() {
         offset -= top - TOP_GAP;
       }
 
-      offset = Math.max(0, Math.min(offset, column.offsetHeight - navHeight));
+      offset = Math.max(lead, Math.min(offset, column.offsetHeight - navHeight));
       element.style.transform = offset > 0 ? `translate3d(0, ${Math.round(offset)}px, 0)` : '';
     };
 
     const schedule = () => {
       if (!frame) frame = window.requestAnimationFrame(apply);
     };
+    const remeasure = () => {
+      dirty = true;
+      schedule();
+    };
+    scheduleRef.current = remeasure;
 
     window.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule);
-    media.addEventListener('change', schedule);
-    const observer = new ResizeObserver(schedule);
+    window.addEventListener('resize', remeasure);
+    media.addEventListener('change', remeasure);
+    const observer = new ResizeObserver(remeasure);
     observer.observe(element);
     observer.observe(column);
+    // De inhoud ernaast: een kop die later groeit, verschuift de eerste kaart.
+    const content = column.nextElementSibling;
+    if (content) observer.observe(content);
 
     return () => {
       if (frame) window.cancelAnimationFrame(frame);
       window.removeEventListener('scroll', schedule);
-      window.removeEventListener('resize', schedule);
-      media.removeEventListener('change', schedule);
+      window.removeEventListener('resize', remeasure);
+      media.removeEventListener('change', remeasure);
       observer.disconnect();
+      scheduleRef.current = () => {};
       element.style.transform = '';
+      element.style.marginBottom = '';
     };
   }, []);
 
@@ -164,9 +248,10 @@ function flatten(nodes: AdminNavNode[]): AdminNavItem[] {
   return nodes.flatMap((node) => (node.type === 'item' ? [node.item] : node.items));
 }
 
-export function AdminNav({ title, nodes, icons = {}, pins }: AdminNavProps) {
+export function AdminNav({ title, nodes, icons = {}, pins, collapse }: AdminNavProps) {
   const pathname = usePathname();
-  const stickyRef = useSmartSticky<HTMLDivElement>();
+  const [collapsed, setCollapsed] = useState(collapse?.initial ?? false);
+  const stickyRef = useSmartSticky<HTMLDivElement>(collapsed);
   const panelId = useId();
   const [open, setOpen] = useState(false);
   const activeHref = activeHrefFor(nodes, pathname);
@@ -178,14 +263,43 @@ export function AdminNav({ title, nodes, icons = {}, pins }: AdminNavProps) {
     if (open) setOpen(false);
   }
 
+  const toggleCollapsed = (next: boolean) => {
+    setCollapsed(next);
+    collapse?.onChange(next);
+  };
+
   const pinState = usePins(pins);
   // Eén context voor elke rij, zodat de rijen zelf niets over de prop hoeven te
   // weten: null betekent gewoon "geen speldjes".
   const pinCtx: PinCtx | null = pins && pinState ? { pins, state: pinState } : null;
 
   return (
-    <div className="vtk-admin-nav-sticky" ref={stickyRef}>
-      <h2 className="vtk-admin-nav-title">{title}</h2>
+    <div className="vtk-admin-nav-sticky" ref={stickyRef} data-collapsed={collapse && collapsed ? 'true' : undefined}>
+      <div className="vtk-admin-nav-head">
+        <h2 className="vtk-admin-nav-title">{title}</h2>
+        {collapse && (
+          <button
+            type="button"
+            className="vtk-admin-nav-collapse"
+            title={collapse.labels.collapse}
+            aria-label={collapse.labels.collapse}
+            onClick={() => toggleCollapsed(true)}
+          >
+            <PanelIcon expand={false} />
+          </button>
+        )}
+      </div>
+      {collapse && collapsed && (
+        <AdminRail
+          title={title}
+          nodes={nodes}
+          icons={icons}
+          activeHref={activeHref}
+          pinnedKeys={pinCtx?.state.keys ?? []}
+          expandLabel={collapse.labels.expand}
+          onExpand={() => toggleCollapsed(false)}
+        />
+      )}
       <button
         type="button"
         className={`vtk-admin-nav-toggle${open ? ' is-open' : ''}`}
@@ -406,6 +520,176 @@ function NavGroup({
         ))}
       </div>
     </div>
+  );
+}
+
+/**
+ * De ingeklapte zijbalk: dezelfde kaart, enkel de iconen. Een losse tab is een
+ * link; een groep opent haar tabs in een kaart ernaast. De naam staat in een
+ * tooltip bij hover en focus, en in de `aria-label` voor een screenreader.
+ */
+function AdminRail({
+  title,
+  nodes,
+  icons,
+  activeHref,
+  pinnedKeys,
+  expandLabel,
+  onExpand,
+}: {
+  title: string;
+  nodes: AdminNavNode[];
+  icons: Record<string, ReactNode>;
+  activeHref: string | null;
+  pinnedKeys: string[];
+  expandLabel: string;
+  onExpand: () => void;
+}) {
+  const pathname = usePathname();
+  const railRef = useRef<HTMLDivElement>(null);
+  const [flyout, setFlyout] = useState<string | null>(null);
+
+  const [previousPath, setPreviousPath] = useState(pathname);
+  if (pathname !== previousPath) {
+    setPreviousPath(pathname);
+    if (flyout) setFlyout(null);
+  }
+
+  // Een open groep sluit bij een klik ernaast en bij Escape.
+  useEffect(() => {
+    if (!flyout) return;
+    const onPointer = (event: PointerEvent) => {
+      if (!railRef.current?.contains(event.target as Node)) setFlyout(null);
+    };
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setFlyout(null);
+    };
+    document.addEventListener('pointerdown', onPointer);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [flyout]);
+
+  const byKey = new Map(flatten(nodes).map((item) => [item.key, item]));
+  const pinned = pinnedKeys.map((key) => byKey.get(key)).filter((item): item is AdminNavItem => !!item);
+
+  return (
+    <div className="vtk-admin-rail" ref={railRef}>
+      <nav className="vtk-admin-rail-card" aria-label={title}>
+        <div className="vtk-admin-rail-slot">
+          <button type="button" className="vtk-admin-rail-btn" aria-label={expandLabel} onClick={onExpand}>
+            <PanelIcon expand />
+          </button>
+          <span className="vtk-admin-rail-tip" aria-hidden>
+            {expandLabel}
+          </span>
+        </div>
+        <span className="vtk-admin-rail-sep" aria-hidden />
+        {pinned.map((item) => (
+          <RailLink key={`pin-${item.key}`} item={item} icons={icons} active={isActive(activeHref, item)} pinned />
+        ))}
+        {pinned.length > 0 && <span className="vtk-admin-rail-sep" aria-hidden />}
+        {nodes.map((node) => {
+          if (node.type === 'item') {
+            return (
+              <RailLink key={node.item.key} item={node.item} icons={icons} active={isActive(activeHref, node.item)} />
+            );
+          }
+          const containsActive = node.items.some((item) => isActive(activeHref, item));
+          const isOpen = flyout === node.key;
+          return (
+            <div className="vtk-admin-rail-slot" key={node.key}>
+              <button
+                type="button"
+                className={`vtk-admin-rail-btn${containsActive ? ' is-active' : ''}${isOpen ? ' is-open' : ''}`}
+                aria-label={node.label}
+                aria-expanded={isOpen}
+                onClick={() => setFlyout(isOpen ? null : node.key)}
+              >
+                {icons[node.key] ?? icons.groups}
+              </button>
+              {!isOpen && (
+                <span className="vtk-admin-rail-tip" aria-hidden>
+                  {node.label}
+                </span>
+              )}
+              {isOpen && (
+                <div className="vtk-admin-rail-flyout" role="group" aria-label={node.label}>
+                  <p className="vtk-admin-rail-flyout-title">{node.label}</p>
+                  {node.items.map((item) => {
+                    const active = isActive(activeHref, item);
+                    return (
+                      <Link
+                        key={item.key}
+                        href={item.href}
+                        aria-current={active ? 'page' : undefined}
+                        className={`vtk-admin-rail-flyout-link${active ? ' is-active' : ''}`}
+                      >
+                        {icons[item.key] ?? icons.groups}
+                        <span>{item.label}</span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </nav>
+    </div>
+  );
+}
+
+function RailLink({
+  item,
+  icons,
+  active,
+  pinned,
+}: {
+  item: AdminNavItem;
+  icons: Record<string, ReactNode>;
+  active: boolean;
+  pinned?: boolean;
+}) {
+  return (
+    <div className="vtk-admin-rail-slot">
+      <Link
+        href={item.href}
+        aria-label={item.label}
+        aria-current={active ? 'page' : undefined}
+        className={`vtk-admin-rail-btn${active ? ' is-active' : ''}`}
+      >
+        {icons[item.key] ?? icons.groups}
+        {pinned && <span className="vtk-admin-rail-pin" aria-hidden />}
+      </Link>
+      <span className="vtk-admin-rail-tip" aria-hidden>
+        {item.label}
+      </span>
+    </div>
+  );
+}
+
+/** Een paneel met een pijltje: naar links is inklappen, naar rechts uitklappen. */
+function PanelIcon({ expand }: { expand: boolean }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden
+    >
+      <rect x="3" y="3" width="18" height="18" rx="3" />
+      <path d="M9 3v18" />
+      <path d={expand ? 'm14 9 3 3-3 3' : 'm16 15-3-3 3-3'} />
+    </svg>
   );
 }
 

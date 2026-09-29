@@ -3,6 +3,7 @@ import { processDueHeroWeekNotices } from "@/lib/calendar/heroWeekNoticeMailer";
 import { processDueLesbezoekScheduledMails } from "@/lib/lesbezoeken-server";
 import { recordMailingListCounts } from "@/lib/mailingListHistory";
 import { processDueNoShows } from "@/lib/theokot-server";
+import { backfillMagazineCovers } from "@/lib/magazineCover";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -44,19 +45,21 @@ export async function POST(request: Request) {
   }
 
   const now = new Date();
-  const [theokot, lesbezoeken, kalender, mailinglijsten] = await Promise.allSettled([
+  const [theokot, lesbezoeken, kalender, mailinglijsten, kaften] = await Promise.allSettled([
     processDueNoShows(now),
     processDueLesbezoekScheduledMails(now),
     processDueHeroWeekNotices(now),
     // De stand van de mailinglijsten van vandaag, voor de grafiek in
     // /admin/mailinglijsten; zie lib/mailingListHistory.ts.
     recordMailingListCounts(now),
+    // Kaften van Bakske en Ir.Reëel die er nog geen hebben; zie lib/magazineCover.ts.
+    backfillMagazineCovers(),
   ]);
 
   // 502 zodra een van de taken viel: de healthcheck van de worker ziet dan dat
   // er iets scheelt in plaats van stil niets te doen. De andere taken zijn wel
   // gedraaid, en alle zijn idempotent, dus de volgende ronde haalt het in.
-  const failed = [theokot, lesbezoeken, kalender, mailinglijsten].some(
+  const failed = [theokot, lesbezoeken, kalender, mailinglijsten, kaften].some(
     (task) => task.status === "rejected",
   );
   if (failed) {
@@ -65,6 +68,7 @@ export async function POST(request: Request) {
       lesbezoeken: describe(lesbezoeken),
       kalender: describe(kalender),
       mailinglijsten: describe(mailinglijsten),
+      kaften: describe(kaften),
     });
   }
 
@@ -74,6 +78,7 @@ export async function POST(request: Request) {
       lesbezoeken: describe(lesbezoeken),
       kalender: describe(kalender),
       mailinglijsten: describe(mailinglijsten),
+      kaften: describe(kaften),
     },
     { status: failed ? 502 : 200, headers: { "Cache-Control": "no-store" } },
   );

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
+import { adminShopLink } from "@/lib/ticketing/shopPath";
 import { EventAdminNav } from "@/components/ticketing/admin/EventAdminNav";
 
 export default async function TicketEventAdminLayout({
@@ -16,7 +17,21 @@ export default async function TicketEventAdminLayout({
 
   return (
     <div className="ticket-admin-event">
-      <EventAdminNav event={event} capabilities={capabilities} locale={locale} />
+      {/* Enkel wat de navigatie toont: dit is een clientcomponent, dus alles wat
+          hier meegaat staat in de pagina, en het volledige event droeg de
+          voorverkoop- en privélink mee naar iedereen met leesrechten. */}
+      <EventAdminNav
+        event={{
+          id: event.id,
+          titleNl: event.titleNl,
+          titleEn: event.titleEn,
+          status: event.status,
+          isPrivate: event.isPrivate,
+        }}
+        shopLink={adminShopLink(event, capabilities.includes("MANAGE_EVENT"))}
+        capabilities={capabilities}
+        locale={locale}
+      />
       {children}
     </div>
   );

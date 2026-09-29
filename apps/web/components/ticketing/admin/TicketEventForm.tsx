@@ -41,6 +41,9 @@ const formErrorMessages: Record<string, { nl: string; en: string }> = {
   INVALID_SLUG: { nl: "Vul een geldige URL-naam in.", en: "Enter a valid URL slug." },
   SLUG_ALREADY_EXISTS: { nl: "Deze URL-naam is al in gebruik.", en: "This URL slug is already in use." },
   TICKET_TYPE_REQUIRED_TO_PUBLISH: { nl: "Voeg een actief tickettype toe voordat je publiceert.", en: "Add an active ticket type before publishing." },
+  LABEL_REQUIRED: { nl: "Er staan al andere tickets van dit event op de eventpagina: geef deze tickets een naam voor hun tab.", en: "Other tickets of this event are already on the event page: give these tickets a name for their tab." },
+  INVALID_LABELNL: { nl: "De naam op de eventpagina mag hoogstens 80 tekens lang zijn.", en: "The name on the event page can be at most 80 characters." },
+  INVALID_LABELEN: { nl: "De Engelse naam op de eventpagina mag hoogstens 80 tekens lang zijn.", en: "The English name on the event page can be at most 80 characters." },
   INVALID_BANNER: { nl: "De banner is niet opgeslagen: kies een foto of een thema met een standaardbanner.", en: "The banner was not saved: choose a photo or a theme with a default banner." },
 };
 
@@ -54,6 +57,10 @@ function formErrorMessage(code: string | undefined, locale: AdminLocale): string
 type TicketEventFormValue = {
   id?: string;
   calendarEventId?: string | null;
+  onEventPage?: boolean;
+  labelNl?: string | null;
+  labelEn?: string | null;
+  ownTimes?: boolean;
   ownerGroupId?: string;
   slug?: string;
   titleNl?: string;
@@ -130,9 +137,12 @@ export type LinkedCalendarEvent = {
  */
 function InheritedFromCalendar({
   event,
+  ownTimes,
   locale,
 }: {
   event: LinkedCalendarEvent;
+  /** Deze verkoop heeft eigen uren; die staan dan bij "Planning en verkoop". */
+  ownTimes: boolean;
   locale: AdminLocale;
 }) {
   const nl = locale === "nl";
@@ -162,7 +172,11 @@ function InheritedFromCalendar({
         <div>
           <dt>{nl ? "Wanneer" : "When"}</dt>
           <dd>
-            {fmt.format(event.start)} – {fmt.format(event.end)}
+            {ownTimes
+              ? nl
+                ? "Eigen uren, zie Planning en verkoop"
+                : "Own times, see Schedule and sales"
+              : `${fmt.format(event.start)} – ${fmt.format(event.end)}`}
           </dd>
         </div>
         <div>
@@ -213,6 +227,10 @@ export function TicketEventForm({
   // Gecontroleerd, omdat de voorverkoop eronder de uitkomst toont: "48 uur
   // eerder" zegt pas iets samen met de datum waar het van afgetrokken wordt.
   const [salesStart, setSalesStart] = useState(toDatetimeLocal(event.salesStartAt));
+  // Welk kalenderevent gekozen is, en of deze verkoop er eigen uren naast heeft:
+  // beide bepalen welke velden er verder nog gevraagd worden.
+  const [calendarId, setCalendarId] = useState(event.calendarEventId ?? linkedCalendarEvent?.id ?? "");
+  const [ownTimes, setOwnTimes] = useState(event.ownTimes ?? false);
   const [state, formAction, pending] = useActionState(
     submitTicketEventFormAction,
     initialState
@@ -280,7 +298,7 @@ export function TicketEventForm({
             : "The information buyers see in the ticket shop."}
         </p>
         {linkedCalendarEvent ? (
-          <InheritedFromCalendar event={linkedCalendarEvent} locale={locale} />
+          <InheritedFromCalendar event={linkedCalendarEvent} ownTimes={ownTimes} locale={locale} />
         ) : null}
         <div className="ticket-admin-form-grid">
           {linkedCalendarEvent ? null : (
@@ -327,32 +345,90 @@ export function TicketEventForm({
               ))}
             </select>
           </div>
-          {linkedCalendarEvent ? (
-            // De koppeling zelf gaat als hidden mee; wisselen doe je door te
-            // ontkoppelen, niet door hier een ander evenement te kiezen.
-            <input type="hidden" name="calendarEventId" value={linkedCalendarEvent.id} />
-          ) : (
-            <div className="ticket-admin-field">
-              <label htmlFor="ticket-calendar-event">
-                {locale === "nl" ? "Gekoppeld kalenderevent" : "Linked calendar event"}
+          {/* Ook bij bewerken te kiezen: een verkoop die al bestond voor ze
+              bij een event mocht, moet er achteraf aan kunnen hangen. Een event
+              kan meerdere ticketpagina's hebben. */}
+          <div className="ticket-admin-field">
+            <label htmlFor="ticket-calendar-event">
+              {locale === "nl" ? "Gekoppeld kalenderevent" : "Linked calendar event"}
+            </label>
+            <select
+              id="ticket-calendar-event"
+              name="calendarEventId"
+              value={calendarId}
+              onChange={(changed) => setCalendarId(changed.target.value)}
+            >
+              <option value="">{locale === "nl" ? "Niet gekoppeld" : "Not linked"}</option>
+              {calendarEvents.map((calendarEvent) => (
+                <option key={calendarEvent.id} value={calendarEvent.id}>
+                  {locale === "en" && calendarEvent.titleEn
+                    ? calendarEvent.titleEn
+                    : calendarEvent.titleNl}
+                  {" · "}
+                  {formatShortDate(calendarEvent.start, locale)}
+                </option>
+              ))}
+            </select>
+          </div>
+          {calendarId ? (
+            <fieldset className="ticket-admin-field ticket-admin-placement" data-span="2">
+              <legend>{nl ? "Op de eventpagina" : "On the event page"}</legend>
+              <label className="ticket-admin-check" htmlFor="ticket-on-event-page">
+                <input
+                  id="ticket-on-event-page"
+                  type="checkbox"
+                  name="onEventPage"
+                  value="true"
+                  // Nieuw vanuit een kalenderevent: meteen op de eventpagina.
+                  // Een bestaande verkoop houdt wat ze had.
+                  defaultChecked={event.onEventPage ?? !isEdit}
+                />
+                {nl ? "De tickets op de eventpagina tonen" : "Show the tickets on the event page"}
               </label>
-              <select
-                id="ticket-calendar-event"
-                name="calendarEventId"
-                defaultValue={event.calendarEventId ?? ""}
-                disabled={isEdit}
-              >
-                <option value="">{locale === "nl" ? "Niet gekoppeld" : "Not linked"}</option>
-                {calendarEvents.map((calendarEvent) => (
-                  <option key={calendarEvent.id} value={calendarEvent.id}>
-                    {locale === "en" && calendarEvent.titleEn
-                      ? calendarEvent.titleEn
-                      : calendarEvent.titleNl}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+              <span className="ticket-admin-help">
+                {nl
+                  ? `Dan staan de tickets in het paneel van de eventpagina, en toont /tickets/${event.slug || "…"} diezelfde pagina met deze tickets gekozen. Uit: een eigen ticketpagina, met een knop op de eventpagina.`
+                  : `The tickets then sit in the panel of the event page, and /tickets/${event.slug || "…"} shows that same page with these tickets selected. Off: a separate ticket page, with a button on the event page.`}
+              </span>
+              <div className="ticket-admin-form-grid">
+                <div className="ticket-admin-field">
+                  <label htmlFor="ticket-label-nl">{nl ? "Naam op de eventpagina (NL)" : "Name on the event page (NL)"}</label>
+                  <input
+                    id="ticket-label-nl"
+                    name="labelNl"
+                    maxLength={80}
+                    defaultValue={event.labelNl ?? ""}
+                    placeholder={nl ? "Volledige 12u" : "Full 12 hours"}
+                  />
+                </div>
+                <div className="ticket-admin-field">
+                  <label htmlFor="ticket-label-en">{nl ? "Naam op de eventpagina (EN)" : "Name on the event page (EN)"}</label>
+                  <input id="ticket-label-en" name="labelEn" maxLength={80} defaultValue={event.labelEn ?? ""} />
+                </div>
+              </div>
+              <span className="ticket-admin-help">
+                {nl
+                  ? "De tab van deze tickets wanneer er meer dan één ticketpagina op het event staat, zoals \"Wave 1\" of \"Eerstejaars\". Dan is ze verplicht; met één ticketpagina mag ze leeg blijven."
+                  : "The tab of these tickets when the event has more than one ticket page, such as \"Wave 1\" or \"First years\". Required then; with one ticket page it may stay empty."}
+              </span>
+              <label className="ticket-admin-check" htmlFor="ticket-own-times">
+                <input
+                  id="ticket-own-times"
+                  type="checkbox"
+                  name="ownTimes"
+                  value="true"
+                  checked={ownTimes}
+                  onChange={(changed) => setOwnTimes(changed.target.checked)}
+                />
+                {nl ? "Eigen uren" : "Own times"}
+              </label>
+              <span className="ticket-admin-help">
+                {nl
+                  ? "Voor tickets die niet op het uur van het event beginnen, zoals een eerstejaarsuur vooraf of een wave. Het uur komt dan in de bevestigingsmail en op het ticket. Titel, beschrijving en locatie blijven van het event."
+                  : "For tickets that do not start at the event's time, such as a first-year hour beforehand or a wave. That time then goes in the confirmation email and on the ticket. Title, description and location stay the event's."}
+              </span>
+            </fieldset>
+          ) : null}
           {linkedCalendarEvent ? null : (
             <div className="ticket-admin-field">
               <label htmlFor="ticket-location">{locale === "nl" ? "Locatie" : "Location"}</label>
@@ -413,30 +489,41 @@ export function TicketEventForm({
             : "Dates are interpreted in Europe/Brussels."}
         </p>
         <div className="ticket-admin-form-grid">
-          {linkedCalendarEvent ? null : (
+          {/* Een gekoppelde verkoop volgt de uren van het kalenderevent, tenzij
+              ze eigen uren heeft; dan staan ze hier, voorgevuld met die van het
+              event. */}
+          {!calendarId || ownTimes ? (
             <>
               <div className="ticket-admin-field">
-                <label htmlFor="ticket-starts-at">{locale === "nl" ? "Start evenement" : "Event start"}</label>
+                <label htmlFor="ticket-starts-at">
+                  {calendarId
+                    ? locale === "nl" ? "Start van deze tickets" : "Start of these tickets"
+                    : locale === "nl" ? "Start evenement" : "Event start"}
+                </label>
                 <input
                   id="ticket-starts-at"
                   name="startsAt"
                   type="datetime-local"
-                  defaultValue={toDatetimeLocal(event.startsAt)}
+                  defaultValue={toDatetimeLocal(event.startsAt ?? linkedCalendarEvent?.start)}
                   required
                 />
               </div>
               <div className="ticket-admin-field">
-                <label htmlFor="ticket-ends-at">{locale === "nl" ? "Einde evenement" : "Event end"}</label>
+                <label htmlFor="ticket-ends-at">
+                  {calendarId
+                    ? locale === "nl" ? "Einde van deze tickets" : "End of these tickets"
+                    : locale === "nl" ? "Einde evenement" : "Event end"}
+                </label>
                 <input
                   id="ticket-ends-at"
                   name="endsAt"
                   type="datetime-local"
-                  defaultValue={toDatetimeLocal(event.endsAt)}
+                  defaultValue={toDatetimeLocal(event.endsAt ?? linkedCalendarEvent?.end)}
                   required
                 />
               </div>
             </>
-          )}
+          ) : null}
           <div className="ticket-admin-field">
             <label htmlFor="ticket-sales-start">{locale === "nl" ? "Start verkoop" : "Sales start"}</label>
             <input

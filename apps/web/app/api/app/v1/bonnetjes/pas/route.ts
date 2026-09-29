@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { corsPreflight } from "@/lib/cors";
 import { requirePermission } from "@/lib/session";
-import { SANDWICH_VOUCHER_COST } from "@/lib/theokot";
 import { pickupForUser } from "@/lib/theokot-pickup";
 import type { AppPassHolder } from "@/lib/app-api/contract";
 import { absoluteMediaUrl } from "@/lib/app-api/media";
@@ -62,6 +61,7 @@ export async function POST(request: Request) {
     ]);
 
     const order = pickup && pickup.ok ? pickup.orders.find((row) => row.status === "RESERVED") : null;
+    const vouchersBlocked = pickup?.ok === true && pickup.vouchersBlocked;
 
     const payload: AppPassHolder = {
       userId: user.id,
@@ -79,9 +79,14 @@ export async function POST(request: Request) {
               quantity: line.quantity,
               unitPriceCents: line.unitPriceCents,
             })),
+            // Een praesidiumlid betaalt niet met bonnetjes; de afboeking weigert
+            // het zelf ook, dit zegt het enkel al voor de toog een bedrag intikt.
             canRedeemVouchers:
-              order.voucherRedemption === null && vouchers >= SANDWICH_VOUCHER_COST,
-            voucherCost: SANDWICH_VOUCHER_COST,
+              !vouchersBlocked &&
+              order.voucherRedemption === null &&
+              order.voucherCost > 0 &&
+              vouchers >= order.voucherCost,
+            voucherCost: order.voucherCost,
           }
         : null,
     };

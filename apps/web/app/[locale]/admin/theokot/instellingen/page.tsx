@@ -4,7 +4,8 @@ import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
 import { Card, Input, Label, Textarea } from "@vtk/ui";
-import { parseTheokotConfig } from "@/lib/theokot";
+import { formatEuro, parseTheokotConfig, sandwichVoucherCost } from "@/lib/theokot";
+import { formatVouchers } from "@/lib/shift/rewards";
 import { saveConfigAction, saveOrderMessageAction } from "@/app/actions/theokot";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
@@ -46,6 +47,15 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
     ordered: 0,
   }));
 
+  // Wat het standaardaanbod met de huidige waarde kost, zodat wie de waarde
+  // aanpast meteen ziet wat dat aan de balie betekent.
+  const voucherExamples = products.map((p) => ({
+    id: p.id,
+    name: nl ? p.nameNl : p.nameEn || p.nameNl,
+    priceCents: p.priceCents,
+    cost: sandwichVoucherCost(p.priceCents, config.voucherHalfCents),
+  }));
+
   const numField = (name: string, labelNl: string, labelEn: string, value: number, min = 0) => (
     <div>
       <Label>{nl ? labelNl : labelEn}</Label>
@@ -79,6 +89,14 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
           savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
           savedMessage={nl ? "Configuratie opgeslagen" : "Configuration saved"}
           fallbackErrorMessage={nl ? "Opslaan van de configuratie mislukt." : "Saving the configuration failed."}
+          errorMessages={{
+            WEEKLY_SPECIAL_TOO_HIGH: nl
+              ? "Het maximum aan broodjes van de week moet lager liggen dan het maximum per bestelling."
+              : "The weekly special limit must be lower than the limit per order.",
+            VOUCHER_HALF_INVALID: nl
+              ? "Geef een bedrag van minstens €0,01 in voor een half bonnetje."
+              : "Enter an amount of at least €0.01 for half a voucher.",
+          }}
         >
           {numField("maxItemsPerOrder", "Max broodjes / bestelling (X)", "Max sandwiches / order (X)", config.maxItemsPerOrder, 1)}
           {numField("maxWeeklySpecialPerOrder", "Max v/d week / bestelling (Y)", "Max weekly special / order (Y)", config.maxWeeklySpecialPerOrder, 0)}
@@ -128,6 +146,53 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
               </span>
             </label>
           </fieldset>
+          <div className="sm:col-span-3">
+            <Label htmlFor="voucherHalfEuro">
+              {nl ? "Een half medewerkersbonnetje per (€)" : "Half a staff voucher per (€)"}
+            </Label>
+            <div className="max-w-[10rem]">
+              <Input
+                id="voucherHalfEuro"
+                name="voucherHalfEuro"
+                type="number"
+                min="0.01"
+                step="0.01"
+                defaultValue={(config.voucherHalfCents / 100).toFixed(2)}
+              />
+            </div>
+            <p className="mt-1.5 text-sm text-[#5c667f]">
+              {nl
+                ? "Wat een broodje aan de afhaalbalie kost in bonnetjes: de prijs gedeeld door dit bedrag, afgerond op het dichtste halve bonnetje. Met €0,60 is een broodje van €2,30 of €2,60 twee bonnetjes en een van €3,00 tweeënhalf. Bij de shiften worden enkel hele bonnetjes fysiek meegegeven; een half blijft openstaan voor de balie."
+                : "What a sandwich costs in vouchers at the pickup counter: its price divided by this amount, rounded to the nearest half voucher. At €0.60 a sandwich of €2.30 or €2.60 is two vouchers and one of €3.00 two and a half. Shift payouts only hand out whole vouchers; a half stays open for the counter."}
+            </p>
+            {voucherExamples.length > 0 ? (
+              <table className="mt-3 w-full max-w-md text-sm">
+                <caption className="mb-1 text-left text-xs font-medium uppercase tracking-wide text-[#5c667f]">
+                  {nl
+                    ? `Het standaardaanbod met ${formatEuro(config.voucherHalfCents)} per half bonnetje`
+                    : `The default offering at ${formatEuro(config.voucherHalfCents)} per half voucher`}
+                </caption>
+                <thead className="text-left text-[#5c667f]">
+                  <tr>
+                    <th className="py-1 pr-3 font-medium">{nl ? "Broodje" : "Sandwich"}</th>
+                    <th className="py-1 pr-3 text-right font-medium">{nl ? "Prijs" : "Price"}</th>
+                    <th className="py-1 text-right font-medium">{nl ? "Bonnetjes" : "Vouchers"}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {voucherExamples.map((example) => (
+                    <tr key={example.id} className="border-t border-vtk-navy/10">
+                      <td className="py-1 pr-3 text-vtk-ink">{example.name}</td>
+                      <td className="py-1 pr-3 text-right tabular-nums">{formatEuro(example.priceCents)}</td>
+                      <td className="py-1 text-right tabular-nums">
+                        {formatVouchers(example.cost, nl ? "nl" : "en")}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : null}
+          </div>
           <div className="sm:col-span-3">
             <Label htmlFor="itemLayout">{nl ? "Weergave van de broodjes" : "Sandwich display"}</Label>
             <div className="max-w-xs">

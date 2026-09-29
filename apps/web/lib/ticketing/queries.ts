@@ -25,6 +25,7 @@ import {
   type PresaleViewer,
 } from "./presale";
 import { presaleViewerFor } from "./presaleViewer";
+import { hasPrivateTicketAccess } from "./privateLink";
 import { ticketPoster, ticketPosterSelect } from "./poster";
 import { userIsMember } from "@/lib/membership";
 
@@ -111,6 +112,14 @@ function publicEventDto(
     id: event.id,
     slug: event.slug,
     title: localized(event.titleNl, event.titleEn, locale),
+    // Staat deze verkoop op de eventpagina, dan toont /tickets/<slug> die
+    // pagina; zie lib/ticketing/eventPage.ts.
+    calendarEventId: event.calendarEventId,
+    onEventPage: event.onEventPage,
+    // Enkel de vlag, nooit het token: alles in deze dto kan in de HTML belanden.
+    isPrivate: event.isPrivate,
+    label: localized(event.labelNl ?? "", event.labelEn, locale) || null,
+    ownTimes: event.ownTimes,
     description: localized(event.descriptionNl ?? "", event.descriptionEn, locale),
     location: event.location,
     locationAddress: event.locationAddress,
@@ -218,6 +227,9 @@ export async function listPublishedTicketEvents(
     prisma.ticketEvent.findMany({
       where: {
         status: "PUBLISHED",
+        // Een privéverkoop staat in geen enkele lijst, ook niet voor wie de
+        // link al volgde: dit overzicht is wat de hele kring ziet.
+        isPrivate: false,
         endsAt: { gte: now },
         AND: [
           overview
@@ -289,6 +301,9 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
     include: publicEventInclude,
   });
   if (!event || event.status !== "PUBLISHED") return null;
+  // Een privé-event zonder de link is voor deze bezoeker onbestaand: dezelfde
+  // 404 als een verkeerde slug, zodat de pagina niet verraadt dat het bestaat.
+  if (!(await hasPrivateTicketAccess(event))) return null;
 
   const session = await getSession(await headers());
   const [profile, isMember, viewer] = await Promise.all([

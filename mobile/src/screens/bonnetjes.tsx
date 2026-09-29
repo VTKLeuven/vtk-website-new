@@ -7,7 +7,7 @@ import { messageFor, useResource } from '../api/useResource';
 import { PageHead } from '../components/PageHead';
 import { PassCode } from '../components/PassCode';
 import { Button, Card, ErrorState, Loading, StaleNotice } from '../components/ui';
-import { formatDate } from '../format';
+import { formatDate, formatVouchers } from '../format';
 import { useApp } from '../state/app';
 import { useTabRouter } from '../navigation';
 import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
@@ -76,7 +76,7 @@ export default function BonnetjesScreen() {
         {resource.stale ? <StaleNotice onRetry={() => void resource.refresh()} /> : null}
 
         <Card style={styles.balanceCard}>
-          <Text style={styles.balanceValue}>{balance}</Text>
+          <Text style={styles.balanceValue}>{formatVouchers(balance, locale)}</Text>
           <Text style={styles.balanceLabel}>
             {balance === 1 ? 'bonnetje staat open' : 'bonnetjes staan open'}
           </Text>
@@ -124,7 +124,7 @@ export default function BonnetjesScreen() {
                   </View>
                   <Text style={entry.kind === 'earned' ? styles.plus : styles.minus}>
                     {entry.kind === 'earned' ? '+' : '-'}
-                    {entry.amount}
+                    {formatVouchers(entry.amount, locale)}
                   </Text>
                 </View>
               ))}

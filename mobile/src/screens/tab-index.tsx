@@ -29,6 +29,7 @@ import { Prose } from '../components/Prose';
 import { ServiceList } from '../components/ServiceList';
 import { TaskCard } from '../components/TaskCard';
 import { Button, Card, ErrorState, Loading, StaleNotice } from '../components/ui';
+import { formatVouchers } from '../format';
 import { useApp } from '../state/app';
 import { useTabRouter } from '../navigation';
 import { COLORS, RADIUS, SPACING, TYPE } from '../theme/tokens';
@@ -112,13 +113,13 @@ export default function HomeScreen() {
               ) : null}
               <Pressable
                 accessibilityRole="button"
-                accessibilityLabel={`Bonnetjes, ${today.vouchers ?? 0} openstaand`}
+                accessibilityLabel={`Bonnetjes, ${formatVouchers(today.vouchers ?? 0, locale)} openstaand`}
                 onPress={() => router.push('/bonnetjes')}
                 hitSlop={10}
                 style={({ pressed }) => [styles.coins, pressed && styles.pressedDark]}
               >
                 <Coins color={COLORS.yellow} size={16} />
-                <Text style={styles.coinsValue}>{today.vouchers ?? 0}</Text>
+                <Text style={styles.coinsValue}>{formatVouchers(today.vouchers ?? 0, locale)}</Text>
               </Pressable>
             </View>
           ) : null}

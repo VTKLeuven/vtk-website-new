@@ -8,6 +8,11 @@ import {
   presaleCookieOptions,
   presaleTokenMatches,
 } from "@/lib/ticketing/presaleLink";
+import {
+  privateCookieExpiry,
+  privateCookieName,
+  privateCookieOptions,
+} from "@/lib/ticketing/privateLink";
 
 export const runtime = "nodejs";
 
@@ -31,7 +36,15 @@ export async function GET(
 
   const event = await prisma.ticketEvent.findUnique({
     where: { slug },
-    select: { id: true, presaleToken: true, salesStartAt: true },
+    select: {
+      id: true,
+      presaleToken: true,
+      salesStartAt: true,
+      salesEndAt: true,
+      endsAt: true,
+      isPrivate: true,
+      privateToken: true,
+    },
   });
   // Een verkeerde of ingetrokken link leidt gewoon naar de ticketpagina: die
   // zegt zelf wel dat de verkoop nog niet open staat. Een foutmelding zou enkel
@@ -59,5 +72,15 @@ export async function GET(
     token,
     presaleCookieOptions(presaleCookieExpiry(event.salesStartAt)),
   );
+  // Op een privéverkoop opent de voorverkooplink ook de pagina zelf: wie vroeger
+  // mag kopen, hoort het event te kunnen zien. Anders stuurde deze link naar
+  // een 404, en moest het beheer twee links naar dezelfde mensen sturen.
+  if (event.isPrivate && event.privateToken) {
+    response.cookies.set(
+      privateCookieName(event.id),
+      event.privateToken,
+      privateCookieOptions(privateCookieExpiry(event)),
+    );
+  }
   return response;
 }

@@ -306,6 +306,9 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
           descriptionEn: true, location: true, startsAt: true, endsAt: true,
           salesStartAt: true, salesEndAt: true, status: true, currency: true,
           maxTicketsPerOrder: true, contactEmail: true, publishedAt: true,
+          // Wel de vlag, nooit `privateToken` of `presaleToken`: die zijn de
+          // toegang zelf en horen bij geen enkele lezer.
+          isPrivate: true,
           ownerGroup: { select: { code: true, nameNl: true } },
           inventoryPools: true, ticketTypes: true, questions: true, gates: true,
           _count: { select: { orders: true, tickets: true, scanLogs: true } },

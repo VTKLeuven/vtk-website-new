@@ -115,11 +115,24 @@ export function NewsCarousel({
 
   useEffect(() => {
     if (!autoplay) return;
-    const timer = window.setInterval(() => {
-      if (document.hidden || hold.current) return;
-      step(1);
-    }, AUTOPLAY_MS);
-    return () => window.clearInterval(timer);
+    let timer = 0;
+    // Elke scroll van de pagina zet de wekker opnieuw op tien seconden: wie
+    // langs de nieuwsband scrolt, is aan het lezen, en een tegel die net dan
+    // wegschuift, trekt het oog weg van waar het was.
+    const arm = () => {
+      window.clearTimeout(timer);
+      timer = window.setTimeout(tick, AUTOPLAY_MS);
+    };
+    const tick = () => {
+      if (!document.hidden && !hold.current) step(1);
+      arm();
+    };
+    arm();
+    window.addEventListener("scroll", arm, { passive: true });
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("scroll", arm);
+    };
   }, [autoplay, step, nudge]);
 
   const go = (direction: 1 | -1) => {

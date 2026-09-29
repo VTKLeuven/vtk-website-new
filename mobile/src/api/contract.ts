@@ -1005,7 +1005,11 @@ export type AppVoucherEntry = {
 };
 
 export type AppVouchers = {
-  /** Wat je nu kan uitgeven: `reward` min `rewardPaid` over al je shiften. */
+  /**
+   * Wat je nu kan uitgeven: `reward` min `rewardPaid` over al je shiften. Kan op
+   * een half eindigen, want een broodje aan de afhaalbalie kost per half
+   * bonnetje.
+   */
   balance: number;
   /** Hoeveel je er dit academiejaar bij verdiend hebt. */
   earnedThisYear: number;
@@ -1027,6 +1031,7 @@ export type AppPassHolder = {
   name: string;
   rNumber: string | null;
   avatarUrl: string | null;
+  /** Openstaand saldo; kan op een half eindigen. Aan de toog gaan enkel hele af. */
   vouchers: number;
   /** De broodjesbestelling van vandaag, of `null`. */
   theokotOrder: {
@@ -1034,9 +1039,12 @@ export type AppPassHolder = {
     status: string;
     totalCents: number;
     lines: AppTheokotOrderLine[];
-    /** Nog niet opgehaald, en er zijn genoeg bonnetjes voor de vaste prijs. */
+    /** Nog niet opgehaald, en er zijn genoeg bonnetjes voor `voucherCost`. */
     canRedeemVouchers: boolean;
-    /** Hoeveel bonnetjes een broodje kost aan de balie. */
+    /**
+     * Hoeveel bonnetjes het duurste broodje uit de bestelling kost aan de balie:
+     * een half per 60 cent (instelbaar bij Theokot), dus soms een half.
+     */
     voucherCost: number;
   } | null;
 };

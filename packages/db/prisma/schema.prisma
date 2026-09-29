@@ -1926,7 +1926,9 @@ model CalendarEvent {
 
   group          Group                        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy      User?                        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  ticketEvent    TicketEvent?
+  /// De ticketverkoop(en) van dit evenement; meestal één, soms meer (zie
+  /// `TicketEvent.calendarEventId`).
+  ticketEvents   TicketEvent[]
   form           Form?
   /// Het logistiek-evenement dat bij dit kalenderevenement hoort (E1). Ontstaat
   /// enkel wanneer iemand in de admin "Logistiek nodig" aanvinkt.
@@ -2099,7 +2101,25 @@ model CalendarFeedToken {
 
 model TicketEvent {
   id                    String            @id @default(cuid())
-  calendarEventId       String?           @unique
+  // Het kalenderevent waar deze verkoop bij hoort. Niet uniek: één event kan
+  // meerdere ticketpagina's hebben (de volledige 12u naast de losse cantussen,
+  // een eerstejaarsuur vooraf, de waves van Galabal).
+  calendarEventId       String?
+  // De tickets staan op de eventpagina (`/kalender/<slug>`) in plaats van op een
+  // eigen pagina. `/tickets/<slug>` toont dan diezelfde eventpagina met deze
+  // verkoop gekozen, zodat elke soort zijn eigen deelbare adres houdt. Enkel
+  // van betekenis met een `calendarEventId`. Bestaande koppelingen staan uit: er
+  // verandert niets tot iemand het aanzet. Zie docs/design-decisions.md.
+  onEventPage           Boolean           @default(false)
+  // De naam van deze verkoop op de eventpagina, als tab naast de andere
+  // ("Volledige 12u", "Wave 1"). De titel komt van het kalenderevent en is dus
+  // voor elke verkoop dezelfde; dit is wat ze uit elkaar houdt.
+  labelNl               String?
+  labelEn               String?
+  // Deze verkoop volgt de uren van het kalenderevent niet: een eerstejaarsuur
+  // dat een uur vroeger begint, of een wave. Titel, beschrijving en locatie
+  // blijven overgenomen; enkel `startsAt` en `endsAt` zijn van hier.
+  ownTimes              Boolean           @default(false)
   ownerGroupId          String
   slug                  String            @unique
   titleNl               String
@@ -2139,6 +2159,15 @@ model TicketEvent {
   // met een groep die de site niet kent (de band, de sponsors, de ouders van).
   // `null` = geen link; regenereren maakt de oude meteen waardeloos.
   presaleToken          String?           @unique
+  // Een privéverkoop: het event staat nergens op de site (niet op /tickets, niet
+  // in de kalender, het nieuws of de app) en `/tickets/<slug>` geeft een 404,
+  // behalve voor wie de privélink met `privateToken` volgde. Voor een verkoop
+  // aan een afgebakende groep (een weekend, een sponsordiner, een werkgroep).
+  // Het token blijft staan wanneer het event terug openbaar wordt, zodat het
+  // opnieuw privé zetten dezelfde, al gedeelde link teruggeeft; enkel
+  // "Vernieuwen" maakt een nieuwe. Zie lib/ticketing/privateLink.ts.
+  isPrivate             Boolean           @default(false)
+  privateToken          String?           @unique
   status                TicketEventStatus @default(DRAFT)
   currency              String            @default("EUR")
   maxTicketsPerOrder    Int               @default(8)
@@ -2194,6 +2223,7 @@ model TicketEvent {
   auditLogs      TicketAuditLog[]
   outboxMessages TicketOutboxMessage[]
 
+  @@index([calendarEventId])
   @@index([ownerGroupId])
   @@index([status, salesStartAt, salesEndAt])
   @@index([startsAt])
@@ -3083,8 +3113,13 @@ model ShiftParticipant {
   // `payedOut` blijft de compatibele "volledig uitbetaald"-vlag voor bestaande
   // API-consumers. `rewardPaid` bewaart het exacte aantal toegekende bonnetjes,
   // zodat een shift ook gedeeltelijk kan worden uitbetaald.
+  //
+  // Een kommagetal omdat een broodje aan de afhaalbalie per half bonnetje kost
+  // (`sandwichVoucherCost`). Altijd een veelvoud van een half, nooit fijner: dat
+  // is exact in een double, dus optellen en de vergelijking op gelijkheid in
+  // `allocateUserShiftReward` blijven kloppen.
   payedOut   Boolean
-  rewardPaid Int     @default(0)
+  rewardPaid Float   @default(0)
 
   /// Moment van inschrijven: binnen een korte bedenktijd mag je je nog
   /// uitschrijven, ook wanneer de shift al binnen 24 uur begint.
@@ -3353,14 +3388,16 @@ model TheokotOrder {
   @@index([status, pickupPushedAt])
 }
 
-/// Auditrij wanneer een student aan de afhaalbalie twee nog openstaande
+/// Auditrij wanneer een student aan de afhaalbalie nog openstaande
 /// medewerkersbonnetjes gebruikt voor een broodje.
 model TheokotVoucherRedemption {
   id            String   @id @default(cuid())
   orderId       String   @unique
   userId        String
   processedById String?
-  amount        Int      @default(2)
+  /// Wat het broodje kostte, per half bonnetje (`sandwichVoucherCost`). Vóór
+  /// oktober 2026 was dat vast twee; die rijen blijven op 2 staan.
+  amount        Float
   createdAt     DateTime @default(now())
 
   order       TheokotOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -6792,7 +6829,7 @@ model AppNotificationPreference {
 /// Eén betaling met openstaande shiftbonnetjes, buiten de Theokot-afhaalbalie om.
 ///
 /// De afhaalbalie heeft haar eigen auditrij (`TheokotVoucherRedemption`) omdat
-/// die aan een bestelling hangt en altijd exact twee bonnetjes kost. Dit is de
+/// die aan een bestelling hangt en de prijs van het broodje volgt. Dit is de
 /// vrije variant: aan de toog van de fakbar tikt iemand een bedrag in. Het saldo
 /// zelf blijft `Shift.reward` min `ShiftParticipant.rewardPaid`; deze tabel is
 /// het logboek, niet de waarheid.

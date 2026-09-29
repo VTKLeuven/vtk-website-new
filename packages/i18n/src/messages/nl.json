@@ -485,6 +485,8 @@
     "pinTab": "Vastpinnen",
     "unpinTab": "Losmaken",
     "pinError": "Vastpinnen is niet gelukt. Probeer het opnieuw.",
+    "collapseNav": "Zijbalk inklappen",
+    "expandNav": "Zijbalk uitklappen",
     "takedowns": "Verwijderverzoeken",
     "feedback": "Feedback Website"
   },
