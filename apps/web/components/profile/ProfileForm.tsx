@@ -178,7 +178,7 @@ export function ProfileForm({
       </p>
 
       {/* Naam & studentennummer */}
-      <fieldset className="space-y-4">
+      <fieldset id="identity" className="scroll-mt-28 space-y-4">
         <legend className="text-lg font-semibold text-vtk-ink">{t.identityHeading}</legend>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <div>
@@ -228,7 +228,7 @@ export function ProfileForm({
       </fieldset>
 
       {/* Kot- en thuisadres */}
-      <fieldset className="space-y-4">
+      <fieldset id="address" className="scroll-mt-28 space-y-4">
         <legend className="text-lg font-semibold text-vtk-ink">{t.addressHeading}</legend>
         <AddressFields
           values={user}
@@ -248,7 +248,7 @@ export function ProfileForm({
       </fieldset>
 
       {/* Contact & voorkeur */}
-      <fieldset className="space-y-4">
+      <fieldset id="contact" className="scroll-mt-28 space-y-4">
         <legend className="text-lg font-semibold text-vtk-ink">{t.contactHeading}</legend>
         {selfRegistered ? (
           <div className="sm:max-w-md">
@@ -381,7 +381,7 @@ export function ProfileForm({
       </fieldset>
 
       {/* Studie: studiejaren + richtingen */}
-      <fieldset className="space-y-4">
+      <fieldset id="study" className="scroll-mt-28 space-y-4">
         <legend className="text-lg font-semibold text-vtk-ink">{t.studyHeading}</legend>
         <StudyFieldset
           locale={locale}
@@ -403,7 +403,7 @@ export function ProfileForm({
       </fieldset>
 
       {/* Profielfoto */}
-      <fieldset className="space-y-3">
+      <fieldset id="photo" className="scroll-mt-28 space-y-3">
         <legend className="text-lg font-semibold text-vtk-ink">{t.photoHeading}</legend>
         <p className="text-sm text-[#5c667f]">{t.photoHint}</p>
         <AvatarCropField locale={locale} currentAvatar={currentAvatar} />
