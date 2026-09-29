@@ -1,7 +1,7 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { prisma } from "@vtk/db";
 import type { Prisma } from "@prisma/client";
@@ -13,6 +13,8 @@ import {
 } from "@/lib/ticketing/authorization";
 import { parseEuroAmount } from "@/lib/ticketing/money";
 import { newPresaleToken } from "@/lib/ticketing/presaleLink";
+import { newPrivateToken } from "@/lib/ticketing/privateLink";
+import { NEWS_TAG } from "@/lib/news/load";
 import { requestTicketRefund } from "@/lib/ticketing/refunds";
 import { slugify } from "@/lib/ticketing/slug";
 import { ticketColorKey } from "@/lib/ticketing/ticketColors";
@@ -2036,4 +2038,128 @@ export async function revokePresaleLinkAction(formData: FormData): Promise<void>
     summary: "private voorverkooplink ingetrokken",
   });
   refreshTicketEvent(locale, eventId);
+}
+
+/**
+ * Na een wissel tussen openbaar en privé: de lijsten waar het event in hoort te
+ * verschijnen of te verdwijnen. Het nieuws leest uit een eigen cache
+ * (`lib/news/load.ts`) die `revalidatePath` niet raakt; zonder `updateTag` bleef
+ * een net privé gezet event nog een minuut in het nieuws staan.
+ */
+function refreshTicketVisibility(locale: "nl" | "en", eventId: string, slug: string) {
+  refreshTicketEvent(locale, eventId);
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/instellingen`));
+  revalidatePath(localePath(locale, `/tickets/${slug}`));
+  updateTag(NEWS_TAG);
+}
+
+/**
+ * Zet een ticketevent privé: het verdwijnt uit /tickets, de kalender, het
+ * nieuws, de homepage en de app, en is enkel nog te openen en te kopen via de
+ * privélink. Zie lib/ticketing/privateLink.ts.
+ *
+ * Een token dat er al stond, blijft: wie het event per ongeluk openbaar zette
+ * en terug privé zet, krijgt dezelfde link terug die al gedeeld was. Enkel
+ * {@link renewPrivateLinkAction} maakt een nieuwe.
+ */
+export async function makeTicketEventPrivateAction(formData: FormData): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const { session, event } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+
+  const privateToken = event.privateToken ?? newPrivateToken();
+  await prisma.$transaction([
+    prisma.ticketEvent.update({ where: { id: eventId }, data: { isPrivate: true, privateToken } }),
+    prisma.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "EVENT_UPDATED",
+        entityType: "TicketEvent",
+        entityId: eventId,
+        metadata: { visibility: "private" },
+      },
+    }),
+  ]);
+  await logAudit({
+    action: "update",
+    entity: "ticketEvent",
+    entityId: eventId,
+    target: event.titleNl,
+    summary: "privé gezet: enkel via de privélink",
+  });
+  refreshTicketVisibility(locale, eventId, event.slug);
+  return saveOk();
+}
+
+/**
+ * Zet een privé-event terug openbaar. Het token blijft bewaard (zie
+ * {@link makeTicketEventPrivateAction}); de link leidt zolang gewoon naar de
+ * openbare pagina.
+ */
+export async function makeTicketEventPublicAction(formData: FormData): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const { session, event } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+
+  await prisma.$transaction([
+    prisma.ticketEvent.update({ where: { id: eventId }, data: { isPrivate: false } }),
+    prisma.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "EVENT_UPDATED",
+        entityType: "TicketEvent",
+        entityId: eventId,
+        metadata: { visibility: "public" },
+      },
+    }),
+  ]);
+  await logAudit({
+    action: "update",
+    entity: "ticketEvent",
+    entityId: eventId,
+    target: event.titleNl,
+    summary: "terug openbaar gezet",
+  });
+  refreshTicketVisibility(locale, eventId, event.slug);
+  return saveOk();
+}
+
+/**
+ * Vervangt de privélink door een nieuwe. De oude werkt meteen niet meer, ook
+ * niet voor wie hem al volgde: de cookie wordt telkens tegen het huidige token
+ * vergeleken. Wie al besteld heeft, houdt zijn tickets en vindt ze in "Mijn
+ * tickets" en in zijn bevestigingsmail.
+ */
+export async function renewPrivateLinkAction(formData: FormData): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const { session, event } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+
+  await prisma.$transaction([
+    prisma.ticketEvent.update({
+      where: { id: eventId },
+      data: { privateToken: newPrivateToken() },
+    }),
+    prisma.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "EVENT_UPDATED",
+        entityType: "TicketEvent",
+        entityId: eventId,
+        metadata: { privateLink: "regenerated" },
+      },
+    }),
+  ]);
+  await logAudit({
+    action: "update",
+    entity: "ticketEvent",
+    entityId: eventId,
+    target: event.titleNl,
+    summary: "privélink vernieuwd",
+  });
+  refreshTicketVisibility(locale, eventId, event.slug);
+  return saveOk();
 }

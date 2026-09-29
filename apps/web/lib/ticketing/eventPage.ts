@@ -17,6 +17,7 @@ export type EventPageTicket = {
   id: string;
   slug: string;
   status: string;
+  isPrivate: boolean;
   onEventPage: boolean;
   labelNl: string | null;
   labelEn: string | null;
@@ -31,6 +32,7 @@ export const EVENT_PAGE_TICKET_SELECT = {
   id: true,
   slug: true,
   status: true,
+  isPrivate: true,
   onEventPage: true,
   labelNl: true,
   labelEn: true,
@@ -40,9 +42,14 @@ export const EVENT_PAGE_TICKET_SELECT = {
   createdAt: true,
 } as const;
 
-/** Enkel een gepubliceerd ticketevent heeft een pagina die een bezoeker kan openen. */
-function isPublished(ticket: { status: string }): boolean {
-  return ticket.status === "PUBLISHED";
+/**
+ * Enkel een gepubliceerd ticketevent heeft een pagina die een bezoeker kan
+ * openen, en een privéverkoop enkel wie de privélink volgde: die hoort als tab
+ * noch als knop op een pagina die iedereen ziet. Wie de link wel volgde, krijgt
+ * haar tab op `/tickets/<slug>` toch (zie die pagina).
+ */
+function isListed(ticket: { status: string; isPrivate: boolean }): boolean {
+  return ticket.status === "PUBLISHED" && !ticket.isPrivate;
 }
 
 /**
@@ -59,37 +66,44 @@ export function sortEventPageTickets<T extends { startsAt: Date; createdAt: Date
 }
 
 /** De verkopen die op de eventpagina zelf staan, in de volgorde van de tabs. */
-export function eventPageTickets<T extends Pick<EventPageTicket, "status" | "onEventPage" | "startsAt" | "createdAt">>(
+export function eventPageTickets<T extends Pick<EventPageTicket, "status" | "isPrivate" | "onEventPage" | "startsAt" | "createdAt">>(
   tickets: readonly T[],
 ): T[] {
-  return sortEventPageTickets(tickets.filter((ticket) => ticket.onEventPage && isPublished(ticket)));
+  return sortEventPageTickets(tickets.filter((ticket) => ticket.onEventPage && isListed(ticket)));
 }
 
 /** De verkopen met een eigen ticketpagina; de eventpagina linkt ernaar. */
-export function separateTicketPages<T extends Pick<EventPageTicket, "status" | "onEventPage" | "startsAt" | "createdAt">>(
+export function separateTicketPages<T extends Pick<EventPageTicket, "status" | "isPrivate" | "onEventPage" | "startsAt" | "createdAt">>(
   tickets: readonly T[],
 ): T[] {
-  return sortEventPageTickets(tickets.filter((ticket) => !ticket.onEventPage && isPublished(ticket)));
+  return sortEventPageTickets(tickets.filter((ticket) => !ticket.onEventPage && isListed(ticket)));
 }
 
 /**
- * De ticketlink van een evenementkaart of van de app: de eerste gepubliceerde
- * verkoop. Staat die op de eventpagina, dan toont haar adres die pagina met de
+ * De ticketlink van een evenementkaart of van de app: de eerste gepubliceerde,
+ * openbare verkoop. Staat die op de eventpagina, dan toont haar adres die pagina met de
  * tickets al gekozen, dus de link klopt in beide gevallen.
  */
 export function publishedTicketSlug(
   tickets: readonly TicketLinkRow[] | null | undefined,
 ): string | null {
-  return sortEventPageTickets((tickets ?? []).filter(isPublished))[0]?.slug ?? null;
+  return sortEventPageTickets((tickets ?? []).filter(isListed))[0]?.slug ?? null;
 }
 
 /** Wat een kaart of de app nodig heeft om de ticketlink te kiezen. */
-export type TicketLinkRow = { slug: string; status: string; startsAt: Date; createdAt: Date };
+export type TicketLinkRow = {
+  slug: string;
+  status: string;
+  isPrivate: boolean;
+  startsAt: Date;
+  createdAt: Date;
+};
 
 /** Het `select`-blok dat bij `TicketLinkRow` hoort. */
 export const TICKET_LINK_SELECT = {
   slug: true,
   status: true,
+  isPrivate: true,
   startsAt: true,
   createdAt: true,
 } as const;

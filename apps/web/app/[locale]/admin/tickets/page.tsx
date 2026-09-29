@@ -17,7 +17,7 @@ import { hasLocale } from "@/lib/locale";
 import { getAuthorizationPreview, requireSession } from "@/lib/session";
 import { hasLiveTicketManageAll } from "@/lib/ticketing/authorization";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
-import { StatusBadge } from "@/components/ticketing/admin/StatusBadge";
+import { PrivateBadge, StatusBadge } from "@/components/ticketing/admin/StatusBadge";
 import {
   formatDateTime,
   formatNumber,
@@ -285,7 +285,12 @@ export default async function TicketAdminOverview({
                       </td>
                       <td data-priority="low">{locale === "en" ? event.ownerGroup.nameEn : event.ownerGroup.nameNl}</td>
                       <td data-wrap="true">{formatDateTime(event.startsAt, locale)}</td>
-                      <td><StatusBadge status={event.status} locale={locale} /></td>
+                      <td>
+                        <span className="ticket-admin-badges">
+                          <StatusBadge status={event.status} locale={locale} />
+                          {event.isPrivate ? <PrivateBadge locale={locale} /> : null}
+                        </span>
+                      </td>
                       <td data-priority="low">
                         <strong>{formatNumber(sold, locale)}</strong>
                         <div className="ticket-admin-row-meta">

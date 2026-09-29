@@ -231,6 +231,15 @@
   white-space: nowrap;
 }
 
+/* De status met het privélabel ernaast: dicht bij elkaar, want ze zeggen samen
+   waar het event staat, en ze mogen onder elkaar in een smalle tabelcel. */
+.ticket-admin-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
 .ticket-admin-status-dot {
   width: 6px;
   height: 6px;

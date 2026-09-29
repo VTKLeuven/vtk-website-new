@@ -193,6 +193,8 @@ export async function collectNews(
       ? prisma.ticketEvent.findMany({
           where: {
             status: "PUBLISHED",
+            // Een privéverkoop is niet voor de hele kring; zie ticketing/privateLink.ts.
+            isPrivate: false,
             startsAt: { gt: now },
             publishedAt: { not: null },
             OR: [{ salesEndAt: null }, { salesEndAt: { gt: now } }],
@@ -432,6 +434,8 @@ export async function getPresaleNews(
   const candidates = await prisma.ticketEvent.findMany({
     where: {
       status: "PUBLISHED",
+      // Ook niet als voorverkoop: wie erin mag, kreeg de privélink al.
+      isPrivate: false,
       startsAt: { gt: now },
       publishedAt: { not: null },
       salesStartAt: { gt: now },

@@ -11,7 +11,10 @@ const T = {
     publish: "Publiceren",
     publishing: "Publiceren...",
     published: "Dit event staat live in de ticketshop.",
+    publishedPrivate:
+      "Dit event staat live als privéverkoop: het staat nergens op de site, enkel wie de privélink heeft, kan het openen.",
     view: "Bekijk de ticketpagina",
+    viewPrivate: "Open via de privélink",
     preview: "Voorbeeld",
     previewHint: "Bekijk de ticketpagina zoals een bezoeker ze krijgt, voor je publiceert.",
     needsType:
@@ -25,7 +28,10 @@ const T = {
     publish: "Publish",
     publishing: "Publishing...",
     published: "This event is live in the ticket shop.",
+    publishedPrivate:
+      "This event is live as a private sale: it is not listed anywhere on the site, only people with the private link can open it.",
     view: "View the ticket page",
+    viewPrivate: "Open through the private link",
     preview: "Preview",
     previewHint: "See the ticket page the way a visitor gets it, before you publish.",
     needsType: "Add an active ticket type first; without a ticket there is nothing to sell.",
@@ -46,12 +52,17 @@ export function TicketPublishBar({
   eventId,
   status,
   slug,
+  shopPath,
+  isPrivate,
   hasActiveTicketType,
   locale,
 }: {
   eventId: string;
   status: string;
   slug: string;
+  /** De live pagina zonder taalprefix; via de privélink bij een privé-event. */
+  shopPath: string;
+  isPrivate: boolean;
   hasActiveTicketType: boolean;
   locale: AdminLocale;
 }) {
@@ -92,9 +103,9 @@ export function TicketPublishBar({
       <div className="ticket-admin-alert" data-tone="success" role="status">
         <CheckCircle2 aria-hidden="true" size={17} />
         <span>
-          {t.published}{" "}
-          <a className="ticket-admin-alert-link" href={`${base}/tickets/${slug}`}>
-            {t.view}
+          {isPrivate ? t.publishedPrivate : t.published}{" "}
+          <a className="ticket-admin-alert-link" href={`${base}${shopPath}`}>
+            {isPrivate ? t.viewPrivate : t.view}
           </a>{" "}
           &middot; {previewLink}
         </span>

@@ -14,6 +14,7 @@ function ticket(overrides: Partial<EventPageTicket>): EventPageTicket {
     id: overrides.slug ?? "t",
     slug: "t",
     status: "PUBLISHED",
+    isPrivate: false,
     onEventPage: true,
     labelNl: null,
     labelEn: null,
@@ -34,6 +35,16 @@ describe("eventPageTickets", () => {
     ];
     expect(eventPageTickets(list).map((t) => t.slug)).toEqual(["volledig"]);
     expect(separateTicketPages(list).map((t) => t.slug)).toEqual(["apart"]);
+  });
+
+  it("laat een privéverkoop weg, als tab en als knop", () => {
+    const list = [
+      ticket({ slug: "volledig" }),
+      ticket({ slug: "sponsortafel", isPrivate: true }),
+      ticket({ slug: "weekend", isPrivate: true, onEventPage: false }),
+    ];
+    expect(eventPageTickets(list).map((t) => t.slug)).toEqual(["volledig"]);
+    expect(separateTicketPages(list)).toEqual([]);
   });
 
   it("zet ze op uur, en bij hetzelfde uur op volgorde van aanmaken", () => {
@@ -57,6 +68,16 @@ describe("publishedTicketSlug", () => {
         ticket({ slug: "vroeger", startsAt: new Date("2026-10-01T09:00:00Z"), onEventPage: false }),
       ]),
     ).toBe("vroeger");
+  });
+
+  it("geeft nooit een privéverkoop, ook niet als ze de eerste is", () => {
+    expect(publishedTicketSlug([ticket({ slug: "prive", isPrivate: true })])).toBeNull();
+    expect(
+      publishedTicketSlug([
+        ticket({ slug: "prive", isPrivate: true, startsAt: new Date("2026-10-01T09:00:00Z") }),
+        ticket({ slug: "openbaar", startsAt: new Date("2026-10-01T12:00:00Z") }),
+      ]),
+    ).toBe("openbaar");
   });
 });
 

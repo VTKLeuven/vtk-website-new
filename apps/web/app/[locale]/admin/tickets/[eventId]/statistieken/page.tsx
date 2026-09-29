@@ -5,6 +5,7 @@ import { loadTicketStats } from "@/lib/ticketing/stats";
 import { TicketStatsView } from "@/components/ticketing/admin/TicketStatsView";
 import { SourceLinkBuilder } from "@/components/ticketing/admin/SourceLinkBuilder";
 import type { AdminLocale } from "@/components/ticketing/admin/format";
+import { privateLinkPath } from "@/lib/ticketing/shopPath";
 
 export default async function TicketEventStatsPage({
   params,
@@ -22,13 +23,22 @@ export default async function TicketEventStatsPage({
     locale,
   );
 
+  // Een privé-event is enkel via de privélink te openen, dus de deelbare link
+  // bouwt daarop verder. Die link is de toegang zelf: wie het event niet beheert
+  // en enkel de statistieken leest, krijgt hier geen linkbouwer.
+  const sharePath = !event.isPrivate
+    ? `/tickets/${event.slug}`
+    : capabilities.includes("MANAGE_EVENT") && event.privateToken
+      ? privateLinkPath(event.slug, event.privateToken)
+      : null;
+
   return (
     <div className="ticket-admin-page">
       <TicketStatsView
         stats={stats}
         locale={locale}
         mode="event"
-        linkBuilder={<SourceLinkBuilder slug={event.slug} locale={locale} />}
+        linkBuilder={sharePath ? <SourceLinkBuilder path={sharePath} locale={locale} /> : null}
       />
     </div>
   );

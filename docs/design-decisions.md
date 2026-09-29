@@ -8420,6 +8420,48 @@ openzetten voor iedereen.
 - Een verkeerde of ingetrokken link leidt gewoon naar de ticketpagina in plaats
   van naar een foutmelding: die zou enkel verklappen dat er een link bestaat.
 
+## Privéverkoop: een event dat enkel via een link bestaat
+
+September 2026. Sommige verkopen zijn niet voor de hele kring: een
+praesidiumweekend, een sponsordiner, een activiteit van één werkgroep. Die
+hoorden niet op /tickets te staan, maar een ticketevent was tot nu toe ofwel
+concept (niemand kan kopen) ofwel gepubliceerd (iedereen ziet het).
+
+**Een ticketevent kan daarom privé zijn** (`TicketEvent.isPrivate`), met een
+eigen geheime link (`privateToken`, `/tickets/<slug>/prive/<token>`). Het beheer
+zet dat in het paneel "Openbaar of privé" bij de instellingen, los van
+publiceren: een privé-event is gewoon gepubliceerd, gepauzeerd of gesloten,
+maar staat nergens.
+
+- **Nergens betekent nergens.** Niet op /tickets, niet als tab of knop bij het
+  kalenderevent, niet op de evenementkaarten van de homepage en de kalender,
+  niet in het nieuws (ook niet als voorverkoop) en niet in de app. Ook niet
+  voor wie de link al volgde: een lijst is wat de hele kring ziet.
+- **Zonder de link bestaat de pagina niet.** `/tickets/<slug>` geeft een 404,
+  dezelfde als een verkeerde slug, en het afrekenen weigert met
+  `EVENT_NOT_ON_SALE`. Een slug is geen geheim ("weekend", "cantus"), dus
+  enkel "niet in de lijst zetten" was geen privéverkoop geweest.
+- **De link werkt zoals de voorverkooplink.** Een cookie voor dat ene event,
+  dan door naar de gewone ticketpagina. Het verschil is hoe lang ze leeft: tot
+  de verkoop sluit (of tot het event voorbij is), want hier komt iemand dagen
+  later terug om te bestellen, na overleg met wie meegaat.
+- **Vernieuwen neemt de link terug**, ook van wie hem al opende. Openbaar
+  maken doet dat niet: het token blijft staan, zodat wie per ongeluk op
+  "Openbaar maken" klikte en het terugdraait dezelfde, al gedeelde link
+  terugkrijgt.
+- **Tickettypes en voorverkoop blijven gelden.** De link bepaalt wie het event
+  ziet, niet wie welk ticket mag: een ledenticket op een privé-event is nog
+  steeds enkel voor leden. De voorverkooplink van een privé-event opent de
+  pagina ook, zodat de groep die vroeger mag geen tweede link nodig heeft.
+- **De link hangt aan het event, niet aan een persoon.** Er is bewust geen
+  lijst van wie mag kopen: de vraag was een link om te delen met een groep, en
+  een gastenlijst per naam is een ander stuk werk (en een ander soort
+  beheer). Wordt de link te breed gedeeld, dan is vernieuwen het antwoord.
+- In het beheer opent "Ticketshop" een privé-event via de privélink, maar enkel
+  voor wie het event beheert; een scanner of een lezer van de statistieken
+  krijgt het voorbeeld. De link is de toegang zelf en hoort niet in elke
+  beheerpagina.
+
 ## Lidmaatschap van de kring
 
 VTK houdt per **academiejaar** bij wie lid is (`Membership`, uniek op lid +

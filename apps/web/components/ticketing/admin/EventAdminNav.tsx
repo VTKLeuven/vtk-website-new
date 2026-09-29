@@ -14,7 +14,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import type { TicketCapability } from "@/lib/ticketing/authorization";
-import { StatusBadge } from "./StatusBadge";
+import { PrivateBadge, StatusBadge } from "./StatusBadge";
 import { ticketBase, type AdminLocale } from "./format";
 
 type EventSummary = {
@@ -22,15 +22,18 @@ type EventSummary = {
   titleNl: string;
   titleEn: string | null;
   status: string;
-  slug: string;
+  isPrivate: boolean;
 };
 
 export function EventAdminNav({
   event,
+  shopLink,
   capabilities,
   locale,
 }: {
   event: EventSummary;
+  /** Zie `adminShopLink`: de echte pagina, via de privélink, of het voorbeeld. */
+  shopLink: { path: string; live: boolean };
   capabilities: TicketCapability[];
   locale: AdminLocale;
 }) {
@@ -100,29 +103,31 @@ export function EventAdminNav({
           <h1>{locale === "en" && event.titleEn ? event.titleEn : event.titleNl}</h1>
         </div>
         <div className="ticket-admin-event-actions">
-          <StatusBadge status={event.status} locale={locale} />
+          <span className="ticket-admin-badges">
+            <StatusBadge status={event.status} locale={locale} />
+            {event.isPrivate ? <PrivateBadge locale={locale} /> : null}
+          </span>
           {/* Zolang het event niet live staat, bestaat de publieke pagina nog
-              niet en gaf dit icoon een 404; dan opent het het voorbeeld. */}
-          <Link
+              niet en gaf dit icoon een 404; dan opent het het voorbeeld. Een
+              privé-event opent via de privélink (zie `adminShopLink`), een
+              route die een cookie zet: vandaar een gewone link en geen
+              client-navigatie. */}
+          <a
             className="ticket-admin-icon-button"
-            href={
-              event.status === "PUBLISHED"
-                ? `${ticketBase(locale)}/tickets/${event.slug}`
-                : `${ticketBase(locale)}/tickets/${event.slug}?preview=1`
-            }
+            href={`${ticketBase(locale)}${shopLink.path}`}
             aria-label={
-              event.status === "PUBLISHED"
+              shopLink.live
                 ? locale === "nl" ? "Ticketshop openen" : "Open ticket shop"
                 : locale === "nl" ? "Voorbeeld van de ticketpagina openen" : "Open the ticket page preview"
             }
             title={
-              event.status === "PUBLISHED"
+              shopLink.live
                 ? locale === "nl" ? "Ticketshop openen" : "Open ticket shop"
                 : locale === "nl" ? "Voorbeeld van de ticketpagina" : "Ticket page preview"
             }
           >
             <ExternalLink aria-hidden="true" size={17} />
-          </Link>
+          </a>
         </div>
       </div>
       <nav className="ticket-admin-tabs" aria-label={locale === "nl" ? "Ticketevent" : "Ticket event"}>

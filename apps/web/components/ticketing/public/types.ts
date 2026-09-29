@@ -48,6 +48,11 @@ export type PublicTicketEvent = {
   calendarEventId?: string | null;
   /** De tickets staan op de eventpagina; zie `TicketEvent.onEventPage`. */
   onEventPage?: boolean;
+  /**
+   * Een privéverkoop, enkel te openen via de privélink. Wie deze pagina ziet,
+   * volgde die link al; zie `lib/ticketing/privateLink.ts`.
+   */
+  isPrivate?: boolean;
   /** De naam van deze verkoop op de eventpagina ("Volledige 12u"), of null. */
   label?: string | null;
   /** Deze verkoop heeft eigen uren en volgt die van het kalenderevent niet. */

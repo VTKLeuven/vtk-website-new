@@ -2159,6 +2159,15 @@ model TicketEvent {
   // met een groep die de site niet kent (de band, de sponsors, de ouders van).
   // `null` = geen link; regenereren maakt de oude meteen waardeloos.
   presaleToken          String?           @unique
+  // Een privéverkoop: het event staat nergens op de site (niet op /tickets, niet
+  // in de kalender, het nieuws of de app) en `/tickets/<slug>` geeft een 404,
+  // behalve voor wie de privélink met `privateToken` volgde. Voor een verkoop
+  // aan een afgebakende groep (een weekend, een sponsordiner, een werkgroep).
+  // Het token blijft staan wanneer het event terug openbaar wordt, zodat het
+  // opnieuw privé zetten dezelfde, al gedeelde link teruggeeft; enkel
+  // "Vernieuwen" maakt een nieuwe. Zie lib/ticketing/privateLink.ts.
+  isPrivate             Boolean           @default(false)
+  privateToken          String?           @unique
   status                TicketEventStatus @default(DRAFT)
   currency              String            @default("EUR")
   maxTicketsPerOrder    Int               @default(8)

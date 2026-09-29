@@ -72,6 +72,9 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
     path: `/tickets/${slug}`,
     locale,
     type: "article",
+    // Een privéverkoop hoort in geen zoekmachine; zonder de link bestaat de
+    // pagina toch niet, maar een browser die haar ooit toonde deelt ze zo niet.
+    noIndex: event.isPrivate,
   });
 }
 
@@ -115,8 +118,10 @@ export default async function TicketEventPage({
     const calendarEvent = await loadCalendarEvent(event.calendarEventId);
     if (calendarEvent) {
       let tabs = eventPageTickets(calendarEvent.ticketEvents);
-      // Een voorbeeld van een verkoop die nog niet gepubliceerd is: die hoort
-      // er dan toch als tab bij, anders toont het voorbeeld een andere verkoop.
+      // Een voorbeeld van een verkoop die nog niet gepubliceerd is, of een
+      // privéverkoop voor wie de link volgde: die hoort er dan toch als tab bij,
+      // anders toont de pagina een andere verkoop. Wie de link niet heeft, komt
+      // hier niet: `loadEvent` gaf dan al null.
       const self = calendarEvent.ticketEvents.find((ticket) => ticket.id === event.id);
       if (self && !tabs.some((ticket) => ticket.id === self.id)) {
         tabs = sortEventPageTickets([...tabs, self]);
@@ -147,7 +152,15 @@ export default async function TicketEventPage({
       <header className="vtk-page-head vtk-event-head">
         <div>
           <div className="vtk-page-kicker">
-            <Link href={`${base}/tickets`} className="vtk-link">Tickets</Link> · {organiser}
+            {/* Een privéverkoop staat niet op /tickets, dus daar hoort geen
+                terugweg naartoe; het woord zegt waarom iemand anders deze pagina
+                niet ziet wanneer je het adres doorstuurt. */}
+            {event.isPrivate ? (
+              locale === "nl" ? "Privéverkoop" : "Private sale"
+            ) : (
+              <Link href={`${base}/tickets`} className="vtk-link">Tickets</Link>
+            )}{" "}
+            · {organiser}
           </div>
           <h1 className="vtk-page-title">{event.title}</h1>
           <p className="vtk-page-subtitle">

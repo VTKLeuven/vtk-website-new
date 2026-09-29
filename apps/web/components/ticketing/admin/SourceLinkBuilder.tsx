@@ -22,7 +22,17 @@ const OTHER = "__other";
  * Enkel een linkbouwer, geen opgeslagen campagnes: de link draagt alles zelf,
  * dus er is niets om bij te houden of op te ruimen.
  */
-export function SourceLinkBuilder({ slug, locale }: { slug: string; locale: AdminLocale }) {
+export function SourceLinkBuilder({
+  path,
+  locale,
+}: {
+  /**
+   * De ticketpagina zonder taalprefix: `/tickets/<slug>`, of de privélink bij
+   * een privé-event (die geeft de herkomst door aan de pagina).
+   */
+  path: string;
+  locale: AdminLocale;
+}) {
   const nl = locale === "nl";
   const id = useId();
   // Pas in de browser: op de server bestaat er geen origin.
@@ -43,7 +53,7 @@ export function SourceLinkBuilder({ slug, locale }: { slug: string; locale: Admi
   if (source) params.set(SOURCE_PARAM, source);
   if (source && campaignKey) params.set(CAMPAIGN_PARAM, campaignKey);
   const query = params.toString();
-  const url = `${origin}${nl ? "" : "/en"}/tickets/${slug}${query ? `?${query}` : ""}`;
+  const url = `${origin}${nl ? "" : "/en"}${path}${query ? `?${query}` : ""}`;
 
   const copied = copiedUrl === url;
 
