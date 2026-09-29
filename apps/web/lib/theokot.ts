@@ -64,6 +64,12 @@ export type TheokotConfig = {
    * bewuste klik.
    */
   autoPickup: boolean;
+  /**
+   * Wat een half medewerkersbonnetje waard is aan de afhaalbalie, in eurocent.
+   * Een broodje kost `sandwichVoucherCost` bonnetjes: zijn prijs gedeeld door
+   * dit bedrag, afgerond op het dichtste halve bonnetje.
+   */
+  voucherHalfCents: number;
 };
 
 export const DEFAULT_THEOKOT_CONFIG: TheokotConfig = {
@@ -80,6 +86,7 @@ export const DEFAULT_THEOKOT_CONFIG: TheokotConfig = {
   itemLayout: 'list',
   noShowPaused: false,
   autoPickup: false,
+  voucherHalfCents: 60,
 };
 
 const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -116,6 +123,7 @@ export function parseTheokotConfig(value: unknown): TheokotConfig {
     itemLayout: coerceItemLayout(src.itemLayout, d.itemLayout),
     noShowPaused: typeof src.noShowPaused === 'boolean' ? src.noShowPaused : d.noShowPaused,
     autoPickup: typeof src.autoPickup === 'boolean' ? src.autoPickup : d.autoPickup,
+    voucherHalfCents: coerceInt(src.voucherHalfCents, d.voucherHalfCents, 1),
   };
 }
 
@@ -123,16 +131,24 @@ export function parseTheokotConfig(value: unknown): TheokotConfig {
 // Geld
 // -----------------------------------------------------------------------------
 
-/** Eurocent → "€2,60" (Belgische notatie met komma). */
 /**
- * Wat een broodje aan de afhaalbalie kost in medewerkersbonnetjes.
+ * Wat een broodje aan de afhaalbalie kost in medewerkersbonnetjes: een half
+ * bonnetje per `voucherHalfCents` (standaard 60 cent), afgerond op het dichtste
+ * halve. Met 60 cent is een broodje van €2,30 of €2,60 twee bonnetjes en een van
+ * €3,00 tweeënhalf; de grens ligt telkens op de helft, hier bij €2,10 en €2,70.
+ * Een broodje met een prijs kost minstens een half bonnetje, een gratis niets.
  *
  * Staat hier en niet in de action, omdat er intussen twee wegen naar toe leiden:
- * de balie op de site en de scanner in de app. Twee getallen die hetzelfde horen
+ * de balie op de site en de scanner in de app. Twee regels die hetzelfde horen
  * te zijn, zijn er één te veel.
  */
-export const SANDWICH_VOUCHER_COST = 2;
+export function sandwichVoucherCost(priceCents: number, voucherHalfCents: number): number {
+  if (priceCents <= 0) return 0;
+  const halves = Math.max(1, Math.round(priceCents / Math.max(1, voucherHalfCents)));
+  return halves / 2;
+}
 
+/** Eurocent → "€2,60" (Belgische notatie met komma). */
 export function formatEuro(cents: number): string {
   return `€${(cents / 100).toFixed(2).replace('.', ',')}`;
 }

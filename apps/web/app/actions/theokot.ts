@@ -9,8 +9,9 @@ import {
   brusselsYMD,
   checkSessionWindows,
   coerceItemLayout,
+  formatEuro,
   planDayOffering,
-  SANDWICH_VOUCHER_COST,
+  sandwichVoucherCost,
   TheokotValidationError,
   type OrderLineInput,
 } from "@/lib/theokot";
@@ -33,6 +34,7 @@ import {
 import { syncMeetingsForSession, syncMeetingsOnDay } from "@/lib/meetings-server";
 import { cardDisplayName, resolveStudentCard } from "@/lib/student-card";
 import {
+  mostExpensiveSandwichCents,
   pickupByQuery,
   pickupByRNumber,
   pickupForUser,
@@ -46,7 +48,10 @@ import {
   allocateUserShiftReward,
   ShiftRewardConflictError,
 } from "@/lib/shift/rewards.server";
-import { PRAESIDIUM_VOUCHERS_MESSAGE } from "@/lib/shift/rewards";
+import {
+  formatVoucherCount,
+  PRAESIDIUM_VOUCHERS_MESSAGE,
+} from "@/lib/shift/rewards";
 import { paysWithVouchersBlocked } from "@/lib/shift/voucherEligibility";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
@@ -760,7 +765,11 @@ export async function saveConfigAction(
     itemLayout: coerceItemLayout(formData.get("itemLayout")),
     noShowPaused: formData.get("noShowPaused") === "on",
     autoPickup: formData.get("autoPickup") === "on",
+    voucherHalfCents: euroToCents(formData.get("voucherHalfEuro")) ?? 0,
   };
+  // Nul zou elk broodje gratis maken voor wie een half bonnetje heeft, en
+  // `parseTheokotConfig` zou het bij het lezen stil door de standaard vervangen.
+  if (value.voucherHalfCents < 1) return saveError("VOUCHER_HALF_INVALID");
   // X > Y, zoals docs/design-decisions.md het stelt: een limiet op broodjes van
   // de week die even hoog ligt als de limiet op de hele bestelling, is geen
   // limiet.
@@ -777,7 +786,7 @@ export async function saveConfigAction(
     action: "update",
     entity: "theokotSettings",
     target: "Theokot-instellingen",
-    summary: `max ${value.maxItemsPerOrder} per bestelling, bestellen opent om ${value.orderOpenTime}, annuleren tot ${value.cancelDeadline}, ban van ${value.banDurationDays} dag(en)${
+    summary: `max ${value.maxItemsPerOrder} per bestelling, bestellen opent om ${value.orderOpenTime}, annuleren tot ${value.cancelDeadline}, ban van ${value.banDurationDays} dag(en), half bonnetje per ${formatEuro(value.voucherHalfCents)}${
       value.noShowPaused ? ", no-shows gepauzeerd" : ""
     }${value.autoPickup ? ", automatisch op afgehaald" : ""}`,
   });
@@ -1362,17 +1371,25 @@ class PraesidiumVoucherRefusal extends Error {
 }
 
 /**
- * Gebruikt twee nog openstaande medewerkersbonnetjes voor één broodje en
- * schrijft tegelijk een auditrij. De saldo-afboeking en auditregistratie zijn
- * één serialiseerbare transactie.
+ * Betaalt één broodje met nog openstaande medewerkersbonnetjes en schrijft
+ * tegelijk een auditrij. De saldo-afboeking en auditregistratie zijn één
+ * serialiseerbare transactie.
+ *
+ * De prijs in bonnetjes rekent de server hier opnieuw uit (het duurste broodje,
+ * `sandwichVoucherCost`), want tussen opzoeken en bevestigen kan de prijs van
+ * een gereserveerde bestelling nog wijzigen, of de instelling. `expectedCost` is
+ * wat de balie de student gezegd heeft; wijkt dat af, dan boeken we niets af in
+ * plaats van stil een ander bedrag.
  *
  * Een praesidiumlid van dit werkingsjaar betaalt hier niet met bonnetjes
  * (`paysWithVouchersBlocked`); de poging komt in het logboek.
  */
 export async function redeemEmployeeVouchersAction(
   orderId: string,
+  expectedCost: number,
 ): Promise<VoucherRedemptionResult> {
   const admin = await requirePermission("theokot.pickup");
+  const config = await getTheokotConfig();
 
   try {
     const result = await withSerializableTransaction(async (tx) => {
@@ -1384,6 +1401,7 @@ export async function redeemEmployeeVouchersAction(
           status: true,
           voucherRedemption: { select: { id: true } },
           user: { select: { name: true } },
+          lines: { select: { unitPriceCents: true } },
         },
       });
       if (!order) throw new Error("ORDER_NOT_FOUND");
@@ -1398,9 +1416,16 @@ export async function redeemEmployeeVouchersAction(
       }
       if (order.voucherRedemption) throw new Error("ALREADY_REDEEMED");
 
+      const cost = sandwichVoucherCost(
+        mostExpensiveSandwichCents(order.lines),
+        config.voucherHalfCents,
+      );
+      if (cost <= 0) throw new Error("NOTHING_TO_PAY");
+      if (cost !== expectedCost) throw new CostChangedError(cost);
+
       const allocation = await allocateUserShiftReward(tx, {
         userId: order.userId,
-        amount: SANDWICH_VOUCHER_COST,
+        amount: cost,
       });
 
       await tx.theokotVoucherRedemption.create({
@@ -1408,17 +1433,17 @@ export async function redeemEmployeeVouchersAction(
           orderId: order.id,
           userId: order.userId,
           processedById: admin.user.id,
-          amount: SANDWICH_VOUCHER_COST,
+          amount: cost,
         },
       });
 
-      return allocation;
+      return { cost, remaining: allocation.remaining };
     });
 
     revalidateTheokot();
     return {
       ok: true,
-      amount: SANDWICH_VOUCHER_COST,
+      amount: result.cost,
       remainingBonnetjes: result.remaining,
     };
   } catch (error) {
@@ -1434,9 +1459,15 @@ export async function redeemEmployeeVouchersAction(
         entity: "shiftReward",
         entityId: error.userId,
         target: error.userName,
-        summary: `${SANDWICH_VOUCHER_COST} bonnetjes aan de afhaalbalie geweigerd (bestelling ${orderId}): praesidiumlid`,
+        summary: `bonnetjes aan de afhaalbalie geweigerd (bestelling ${orderId}): praesidiumlid`,
       });
       return { ok: false, error: PRAESIDIUM_VOUCHERS_MESSAGE.nl, code: "PRAESIDIUM" };
+    }
+    if (error instanceof CostChangedError) {
+      return {
+        ok: false,
+        error: `Dit broodje kost intussen ${formatVoucherCount(error.cost)}. Er is niets afgeboekt; zoek de student opnieuw op.`,
+      };
     }
     if (error instanceof Error) {
       if (error.message === "ORDER_NOT_FOUND") {
@@ -1448,11 +1479,21 @@ export async function redeemEmployeeVouchersAction(
       if (error.message === "ALREADY_REDEEMED") {
         return { ok: false, error: "Voor deze bestelling zijn al medewerkersbonnetjes gebruikt." };
       }
+      if (error.message === "NOTHING_TO_PAY") {
+        return { ok: false, error: "Deze bestelling kost niets, dus er valt niets met bonnetjes te betalen." };
+      }
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return { ok: false, error: "Voor deze bestelling zijn al medewerkersbonnetjes gebruikt." };
     }
     throw error;
+  }
+}
+
+/** De prijs in bonnetjes is veranderd sinds de balie de student opzocht. */
+class CostChangedError extends Error {
+  constructor(readonly cost: number) {
+    super("VOUCHER_COST_CHANGED");
   }
 }
 

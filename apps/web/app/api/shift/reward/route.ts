@@ -102,6 +102,9 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+  // Enkel hele bonnetjes: dit is wat fysiek meegegeven wordt, en een half
+  // bonnetje bestaat niet op papier. Het saldo kan wel op een half eindigen
+  // (een broodje aan de afhaalbalie kost per half); dat half blijft openstaan.
   if (typeof amount !== "number" || !Number.isInteger(amount) || amount <= 0) {
     return NextResponse.json(
       { error: "amount must be a positive integer" },

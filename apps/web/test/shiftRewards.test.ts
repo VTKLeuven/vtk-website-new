@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
   allocateShiftReward,
+  formatVoucherCount,
+  formatVouchers,
+  isVoucherAmount,
   outstandingShiftReward,
+  wholeVouchers,
 } from "@/lib/shift/rewards";
 
 describe("shift reward allocation", () => {
@@ -47,8 +51,46 @@ describe("shift reward allocation", () => {
   it("rejects invalid or excessive amounts", () => {
     const balances = [{ shiftId: "one", reward: 3, rewardPaid: 0 }];
     expect(() => allocateShiftReward(balances, 0)).toThrow(RangeError);
-    expect(() => allocateShiftReward(balances, 1.5)).toThrow(RangeError);
+    expect(() => allocateShiftReward(balances, 1.25)).toThrow(RangeError);
     expect(() => allocateShiftReward(balances, 4)).toThrow(RangeError);
+  });
+
+  it("books half vouchers, the price of a sandwich, across shifts", () => {
+    // 0,5 van de ene shift en 2 van de volgende: een broodje van 2,5.
+    expect(
+      allocateShiftReward(
+        [
+          { shiftId: "old", reward: 2, rewardPaid: 1.5 },
+          { shiftId: "new", reward: 3, rewardPaid: 0 },
+        ],
+        2.5,
+      ),
+    ).toEqual({
+      available: 3.5,
+      remaining: 1,
+      allocations: [
+        { shiftId: "old", amount: 0.5, rewardPaid: 2, fullyPaid: true },
+        { shiftId: "new", amount: 2, rewardPaid: 2, fullyPaid: false },
+      ],
+    });
+  });
+
+  it("only hands out whole vouchers from a balance that ends on a half", () => {
+    expect(wholeVouchers(3.5)).toBe(3);
+    expect(wholeVouchers(0.5)).toBe(0);
+    expect(wholeVouchers(4)).toBe(4);
+    expect(isVoucherAmount(2.5)).toBe(true);
+    expect(isVoucherAmount(0.3)).toBe(false);
+    expect(isVoucherAmount(-1)).toBe(false);
+  });
+
+  it("writes a half with a decimal comma in Dutch", () => {
+    expect(formatVouchers(2.5)).toBe("2,5");
+    expect(formatVouchers(2.5, "en")).toBe("2.5");
+    expect(formatVouchers(3)).toBe("3");
+    expect(formatVoucherCount(1)).toBe("1 bonnetje");
+    expect(formatVoucherCount(0.5)).toBe("0,5 bonnetjes");
+    expect(formatVoucherCount(1, "en")).toBe("1 voucher");
   });
 
   it("never exposes a negative outstanding balance", () => {

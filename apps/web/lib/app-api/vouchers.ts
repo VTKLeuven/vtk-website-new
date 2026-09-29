@@ -16,13 +16,18 @@ import type { AppVoucherEntry } from "./contract";
  * **Het saldo is geen kolom.** Het is `Shift.reward` min
  * `ShiftParticipant.rewardPaid`, opgeteld over alle shiften die voorbij zijn.
  * Dat is met opzet zo gebleven: er bestaat al een beheerscherm dat bonnetjes in
- * geld uitbetaalt (`/api/shift/reward`) en een afhaalbalie die er twee afboekt
- * voor een broodje, en die schrijven allemaal in diezelfde kolom. Er een tweede
+ * geld uitbetaalt (`/api/shift/reward`) en een afhaalbalie die er afboekt naar
+ * de prijs van een broodje, en die schrijven allemaal in diezelfde kolom. Er een tweede
  * saldo naast leggen zou betekenen dat de twee uit elkaar kunnen lopen, en dan is
  * geen van beide nog te vertrouwen.
  *
  * Wat hier bijkomt is enkel de derde weg om ze uit te geven: iemand achter een
  * toog scant de pas van een student en tikt een bedrag in.
+ *
+ * Het saldo kan op een half eindigen (een broodje kost per half bonnetje, zie
+ * `sandwichVoucherCost`). Aan de toog gaan er enkel hele af, net zoals bij het
+ * uitbetalen: een half bonnetje bestaat daar niet. Dat half blijft staan voor
+ * de afhaalbalie.
  */
 
 export class VoucherError extends Error {
@@ -156,6 +161,7 @@ export async function redeemVouchers({
   processedById: string;
   place?: string | null;
 }): Promise<{ name: string; amount: number; remaining: number }> {
+  // Enkel hele bonnetjes aan de toog; zie de uitleg bovenaan.
   if (!Number.isInteger(amount) || amount <= 0 || amount > 100) {
     throw new VoucherError("NOT_ENOUGH");
   }

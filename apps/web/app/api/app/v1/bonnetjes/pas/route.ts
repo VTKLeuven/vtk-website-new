@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { corsPreflight } from "@/lib/cors";
 import { requirePermission } from "@/lib/session";
-import { SANDWICH_VOUCHER_COST } from "@/lib/theokot";
 import { pickupForUser } from "@/lib/theokot-pickup";
 import type { AppPassHolder } from "@/lib/app-api/contract";
 import { absoluteMediaUrl } from "@/lib/app-api/media";
@@ -85,8 +84,9 @@ export async function POST(request: Request) {
             canRedeemVouchers:
               !vouchersBlocked &&
               order.voucherRedemption === null &&
-              vouchers >= SANDWICH_VOUCHER_COST,
-            voucherCost: SANDWICH_VOUCHER_COST,
+              order.voucherCost > 0 &&
+              vouchers >= order.voucherCost,
+            voucherCost: order.voucherCost,
           }
         : null,
     };

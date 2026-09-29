@@ -425,10 +425,30 @@ open vragen opleverde (`docs/theokot-broodjes-audit-2026-09-21.md`).
   beheerder beslist dat zelf: er staat wel eens iemand een kwartier na sluiting,
   en wat overblijft wordt soms meteen uitgedeeld. Een ban die al uitgesproken
   was, blijft staan; die hef je op bij Bans & no-shows.
-- **Twee medewerkersbonnetjes zijn exact één broodje**: het duurste uit de
-  bestelling. Geen opleg wanneer dat broodje duurder uitvalt, geen geld terug
-  wanneer het goedkoper is. De balie toont daardoor "nog te betalen" en moet zelf
-  niets meer aftrekken. Bonnetjes kunnen ook nog bij een laattijdige afhaling.
+- **Medewerkersbonnetjes betalen exact één broodje**: het duurste uit de
+  bestelling. Geen opleg, geen geld terug. De balie toont daardoor "nog te
+  betalen" en moet zelf niets meer aftrekken. Bonnetjes kunnen ook nog bij een
+  laattijdige afhaling.
+  - **Wat dat broodje kost, volgt zijn prijs: een half bonnetje per 60 cent,**
+    afgerond op het dichtste halve (`sandwichVoucherCost` in `lib/theokot.ts`).
+    €2,30 en €2,60 zijn twee bonnetjes, €3,00 tweeënhalf; de grenzen liggen op
+    €2,10 en €2,70. Tot oktober 2026 was het vast twee, wat een duur broodje
+    goedkoper maakte dan een goedkoop. De 60 cent staat in de Theokot-instellingen
+    (`voucherHalfCents`); een broodje met een prijs kost minstens een half.
+  - **Het saldo kan daardoor op een half eindigen**, en `rewardPaid` en
+    `TheokotVoucherRedemption.amount` zijn kommagetallen. Nooit fijner dan een
+    half: dat is exact in een double, dus de optelling en de voorwaardelijke
+    update op `rewardPaid` blijven kloppen. Afboekingen van voor de wijziging
+    blijven op 2 staan; dat is wat ze toen kostten.
+  - **Fysiek gaan er enkel hele bonnetjes mee.** Een half bestaat niet op
+    papier. Uitbetalen bij de shiften (`/api/shift/reward`) en de toog in de app
+    (`redeemVouchers`) aanvaarden daarom enkel gehele aantallen, tot het hele
+    deel van het saldo; het half blijft openstaan voor de afhaalbalie.
+  - **De server rekent de prijs opnieuw uit bij het afboeken.** De prijs van een
+    gereserveerde bestelling kan nog wijzigen (`repriceReservedOrders`), en de
+    instelling ook. Wijkt de prijs af van wat de balie de student gezegd heeft,
+    dan boekt ze niets af en vraagt ze opnieuw op te zoeken, in plaats van stil
+    een ander bedrag.
 - **Praesidium betaalt in Theokot niet met online bonnetjes** (september 2026).
   Wie in het lopende werkingsjaar in een post met `Group.type = PRAESIDIUM`
   zit, kan de bonnetjes op zijn account niet uitgeven; werkgroepen tellen niet
@@ -526,8 +546,8 @@ wie Theokot beheert, ziet ook het geld en de historiek van alle verkoopdagen.
 
 - **Opbrengst is wat opgehaald werd**, niet wat besteld werd: een no-show brengt
   niets op.
-- **"Met bonnetjes" telt mensen**, niet bonnetjes: hoeveel studenten met twee
-  medewerkersbonnetjes betaalden. **"Aan de balie"** is de opbrengst min wat die
+- **"Met bonnetjes" telt mensen**, niet bonnetjes: hoeveel studenten hun
+  broodje met medewerkersbonnetjes betaalden. **"Aan de balie"** is de opbrengst min wat die
   bonnetjes dekten (het duurste broodje van elke zulke bestelling, zie hierboven).
 
 ### Statistieken van de broodjes
@@ -4808,9 +4828,10 @@ centraliseer hem in één helper zodat hij op één plek aanpasbaar is. De rewar
 wordt **verbruikt** in `apps/web/app/api/shift/reward/route.ts`. Per deelname
 houdt `ShiftParticipant.rewardPaid` exact bij hoeveel bonnetjes al toegekend of
 digitaal gebruikt zijn; daardoor kan een beheerder bijvoorbeeld 10 van 12
-openstaande bonnetjes uitbetalen. De afhaalbalie kan twee openstaande bonnetjes
-atomair afboeken voor een broodje en schrijft daarvoor een auditrij in
-`TheokotVoucherRedemption`. Wil je de waardering wijzigen, pas dan de
+openstaande bonnetjes uitbetalen, altijd in hele bonnetjes. De afhaalbalie kan
+openstaande bonnetjes atomair afboeken voor een broodje, per half naar de prijs
+(zie "Afsluiten, verwijderen en te weinig broodjes" bij Theokot), en schrijft
+daarvoor een auditrij in `TheokotVoucherRedemption`. Wil je de waardering wijzigen, pas dan de
 spiegel-helper aan; de saldo- en auditlogica blijft gelijk.
 
 ### Post: "Cursusdienst"

@@ -3083,8 +3083,13 @@ model ShiftParticipant {
   // `payedOut` blijft de compatibele "volledig uitbetaald"-vlag voor bestaande
   // API-consumers. `rewardPaid` bewaart het exacte aantal toegekende bonnetjes,
   // zodat een shift ook gedeeltelijk kan worden uitbetaald.
+  //
+  // Een kommagetal omdat een broodje aan de afhaalbalie per half bonnetje kost
+  // (`sandwichVoucherCost`). Altijd een veelvoud van een half, nooit fijner: dat
+  // is exact in een double, dus optellen en de vergelijking op gelijkheid in
+  // `allocateUserShiftReward` blijven kloppen.
   payedOut   Boolean
-  rewardPaid Int     @default(0)
+  rewardPaid Float   @default(0)
 
   /// Moment van inschrijven: binnen een korte bedenktijd mag je je nog
   /// uitschrijven, ook wanneer de shift al binnen 24 uur begint.
@@ -3353,14 +3358,16 @@ model TheokotOrder {
   @@index([status, pickupPushedAt])
 }
 
-/// Auditrij wanneer een student aan de afhaalbalie twee nog openstaande
+/// Auditrij wanneer een student aan de afhaalbalie nog openstaande
 /// medewerkersbonnetjes gebruikt voor een broodje.
 model TheokotVoucherRedemption {
   id            String   @id @default(cuid())
   orderId       String   @unique
   userId        String
   processedById String?
-  amount        Int      @default(2)
+  /// Wat het broodje kostte, per half bonnetje (`sandwichVoucherCost`). Vóór
+  /// oktober 2026 was dat vast twee; die rijen blijven op 2 staan.
+  amount        Float
   createdAt     DateTime @default(now())
 
   order       TheokotOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -6792,7 +6799,7 @@ model AppNotificationPreference {
 /// Eén betaling met openstaande shiftbonnetjes, buiten de Theokot-afhaalbalie om.
 ///
 /// De afhaalbalie heeft haar eigen auditrij (`TheokotVoucherRedemption`) omdat
-/// die aan een bestelling hangt en altijd exact twee bonnetjes kost. Dit is de
+/// die aan een bestelling hangt en de prijs van het broodje volgt. Dit is de
 /// vrije variant: aan de toog van de fakbar tikt iemand een bedrag in. Het saldo
 /// zelf blijft `Shift.reward` min `ShiftParticipant.rewardPaid`; deze tabel is
 /// het logboek, niet de waarheid.

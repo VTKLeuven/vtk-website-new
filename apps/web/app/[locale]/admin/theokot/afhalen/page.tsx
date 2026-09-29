@@ -8,6 +8,7 @@ import type { Locale } from "@vtk/i18n";
 import { TheokotAdminNav } from "../TheokotAdminNav";
 import { PickupCounter } from "@/components/theokot/PickupCounter";
 import { getTheokotConfig } from "@/lib/theokot-server";
+import { formatVouchers } from "@/lib/shift/rewards";
 
 import "@/app/design/vtk-basic.css";
 
@@ -93,7 +94,7 @@ export default async function TheokotPickupPage({ params }: { params: Promise<{ 
           </Card>
           <Card className="p-4">
             <div className="text-2xl font-semibold text-vtk-ink">
-              {redemptionTotal._sum.amount ?? 0}
+              {formatVouchers(redemptionTotal._sum.amount ?? 0, nl ? "nl" : "en")}
             </div>
             <div className="text-sm text-[#5c667f]">{nl ? "bonnetjes gebruikt" : "vouchers used"}</div>
           </Card>
@@ -123,7 +124,9 @@ export default async function TheokotPickupPage({ params }: { params: Promise<{ 
                   <td className="px-4 py-3 text-zinc-600">
                     {dayFormatter.format(redemption.order.session.date)}
                   </td>
-                  <td className="px-4 py-3 font-medium">{redemption.amount}</td>
+                  <td className="px-4 py-3 font-medium tabular-nums">
+                    {formatVouchers(redemption.amount, nl ? "nl" : "en")}
+                  </td>
                   <td className="px-4 py-3 text-zinc-600">
                     {redemption.processedBy?.name ?? (nl ? "Verwijderde gebruiker" : "Deleted user")}
                   </td>

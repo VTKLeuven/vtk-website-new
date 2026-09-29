@@ -3,7 +3,11 @@
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { Button, Card, ConfirmDialog, Input, Label } from "@vtk/ui";
 import { formatEuro } from "@/lib/theokot";
-import { PRAESIDIUM_VOUCHERS_MESSAGE } from "@/lib/shift/rewards";
+import {
+  formatVoucherCount,
+  formatVouchers,
+  PRAESIDIUM_VOUCHERS_MESSAGE,
+} from "@/lib/shift/rewards";
 import { shouldRedirectToScanner } from "@/lib/scannerFocus";
 import {
   lookupPickupByCardAction,
@@ -58,6 +62,9 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
   const [voucherOrderId, setVoucherOrderId] = useState<string | null>(null);
   const [voucherError, setVoucherError] = useState<string | null>(null);
   const [voucherCovers, setVoucherCovers] = useState<number | null>(null);
+  // Wat de balie de student zegt dat het broodje kost; de server boekt enkel af
+  // wanneer dat nog klopt.
+  const [voucherCost, setVoucherCost] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   // Voorkomt dubbel zoeken wanneer de scanner én een newline-char én een Enter stuurt.
   const busyRef = useRef(false);
@@ -143,15 +150,18 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
         const res = await fetchResult();
         setResult(res);
         const eligibleOrder =
-          res.ok && !res.vouchersBlocked && res.outstandingBonnetjes >= 2
+          res.ok && !res.vouchersBlocked
             ? res.orders.find(
                 (order) =>
                   (order.status === "RESERVED" || order.status === "NO_SHOW") &&
-                  !order.voucherRedemption,
+                  !order.voucherRedemption &&
+                  order.voucherCost > 0 &&
+                  res.outstandingBonnetjes >= order.voucherCost,
               )
             : null;
         setVoucherOrderId(eligibleOrder?.orderId ?? null);
         setVoucherCovers(eligibleOrder?.voucherCoversCents ?? null);
+        setVoucherCost(eligibleOrder?.voucherCost ?? null);
         setVoucherError(null);
         // Enkel wissen wat er gezocht werd. Hangt een kaartcontrole even, dan
         // tikt de shifter intussen de naam al in; die mag niet verdwijnen.
@@ -200,16 +210,17 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
     setResult(null);
     setVoucherOrderId(null);
     setVoucherCovers(null);
+    setVoucherCost(null);
     setVoucherError(null);
     setValue("");
     requestAnimationFrame(() => inputRef.current?.focus());
   }
 
   function redeemVouchers() {
-    if (!voucherOrderId) return;
+    if (!voucherOrderId || voucherCost === null) return;
     startVoucherTransition(async () => {
       try {
-        const response = await redeemEmployeeVouchersAction(voucherOrderId);
+        const response = await redeemEmployeeVouchersAction(voucherOrderId, voucherCost);
         if (!response.ok) {
           setVoucherError(
             response.code === "PRAESIDIUM"
@@ -364,7 +375,7 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
               <div className="text-lg font-semibold text-vtk-ink">{result.userName}</div>
               <div className="text-sm text-[#5c667f]">{result.rNumber}</div>
               <div className="mt-1 text-xs font-medium text-vtk-blue">
-                {result.outstandingBonnetjes}{" "}
+                {formatVouchers(result.outstandingBonnetjes, nl ? "nl" : "en")}{" "}
                 {nl ? "openstaande medewerkersbonnetjes" : "outstanding staff vouchers"}
               </div>
               {result.vouchersBlocked && (
@@ -397,16 +408,18 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
         title={nl ? "Medewerkersbonnetjes gebruiken?" : "Use staff vouchers?"}
         description={
           <div className="space-y-2">
-            <p>
-              {nl
-                ? "Wilt de student 2 medewerkersbonnetjes gebruiken in ruil voor dit broodje?"
-                : "Does the student want to use 2 staff vouchers for this sandwich?"}
-            </p>
+            {voucherCost !== null && (
+              <p>
+                {nl
+                  ? `Wilt de student ${formatVoucherCount(voucherCost)} gebruiken in ruil voor dit broodje?`
+                  : `Does the student want to use ${formatVoucherCount(voucherCost, "en")} for this sandwich?`}
+              </p>
+            )}
             {voucherCovers !== null && (
               <p>
                 {nl
-                  ? `Twee bonnetjes dekken één broodje: het duurste uit deze bestelling, ${formatEuro(voucherCovers)}. Geen opleg, geen geld terug.`
-                  : `Two vouchers cover one sandwich: the most expensive in this order, ${formatEuro(voucherCovers)}. No surcharge, no change.`}
+                  ? `Bonnetjes betalen één broodje: het duurste uit deze bestelling, ${formatEuro(voucherCovers)}. Geen opleg, geen geld terug.`
+                  : `Vouchers pay for one sandwich: the most expensive in this order, ${formatEuro(voucherCovers)}. No surcharge, no change.`}
               </p>
             )}
             <p>
@@ -425,6 +438,7 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
         onCancel={() => {
           if (voucherPending) return;
           setVoucherOrderId(null);
+          setVoucherCost(null);
           setVoucherError(null);
         }}
       />
@@ -484,7 +498,7 @@ function PickupOrderPanel({
   // Te laat, maar niet verloren: het broodje mag nog over de toog. Enkel de
   // shifter hoort te weten dat de afhaal van die dag al voorbij was.
   const late = status === "NO_SHOW";
-  // Twee bonnetjes zijn exact één broodje: het duurste uit deze bestelling.
+  // Bonnetjes betalen exact één broodje: het duurste uit deze bestelling.
   const stillToPay = order.voucherRedemption
     ? Math.max(0, order.totalCents - order.voucherCoversCents)
     : null;
@@ -530,8 +544,8 @@ function PickupOrderPanel({
           <div className="flex items-center justify-between text-sm text-[#5c667f]">
             <span>
               {nl
-                ? `${order.voucherRedemption.amount} bonnetjes (1 broodje)`
-                : `${order.voucherRedemption.amount} vouchers (1 sandwich)`}
+                ? `${formatVoucherCount(order.voucherRedemption.amount)} (1 broodje)`
+                : `${formatVoucherCount(order.voucherRedemption.amount, "en")} (1 sandwich)`}
             </span>
             <span className="tabular-nums">- {formatEuro(order.voucherCoversCents)}</span>
           </div>

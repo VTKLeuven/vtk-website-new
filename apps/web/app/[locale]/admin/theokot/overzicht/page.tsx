@@ -8,6 +8,7 @@ import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
 import { formatEuro } from "@/lib/theokot";
 import { getTheokotConfig } from "@/lib/theokot-server";
+import { mostExpensiveSandwichCents } from "@/lib/theokot-pickup";
 import {
   purgeFinishedSessionAction,
   unwaiveSessionNoShowsAction,
@@ -51,10 +52,6 @@ const EMPTY_TOTALS: SessionTotals = {
   voucherCents: 0,
 };
 
-/** Wat twee bonnetjes dekken: het duurste broodje van de bestelling (zie `PickupOrder`). */
-function voucherCovers(lines: Array<{ unitPriceCents: number }>): number {
-  return lines.reduce((highest, line) => Math.max(highest, line.unitPriceCents), 0);
-}
 
 export default async function TheokotOverviewPage({
   params,
@@ -155,7 +152,7 @@ export default async function TheokotOverviewPage({
     const row = totalsFor(order.sessionId);
     row.voucherPeople += 1;
     // Enkel wat ook echt over de toog ging, telt mee in het geld.
-    if (order.status === "PICKED_UP") row.voucherCents += voucherCovers(order.lines);
+    if (order.status === "PICKED_UP") row.voucherCents += mostExpensiveSandwichCents(order.lines);
   }
 
   // Zonder gekozen dag: vandaag, anders de laatste die voorbij is, anders de
@@ -337,8 +334,8 @@ export default async function TheokotOverviewPage({
             {caps.manage ? (
               <p className="mt-3 text-sm text-[#5c667f]">
                 {nl
-                  ? `Opbrengst is wat opgehaald werd; niet-opgehaalde broodjes tellen niet mee. Twee bonnetjes dekken één broodje, dus aan de balie is de opbrengst min ${formatEuro(selectedTotals.voucherCents)} aan bonnetjes.`
-                  : `Revenue is what was picked up; sandwiches that were not collected don't count. Two vouchers cover one sandwich, so at the counter is revenue minus ${formatEuro(selectedTotals.voucherCents)} in vouchers.`}
+                  ? `Opbrengst is wat opgehaald werd; niet-opgehaalde broodjes tellen niet mee. Bonnetjes betalen één broodje, dus aan de balie is de opbrengst min ${formatEuro(selectedTotals.voucherCents)} aan bonnetjes.`
+                  : `Revenue is what was picked up; sandwiches that were not collected don't count. Vouchers pay for one sandwich, so at the counter is revenue minus ${formatEuro(selectedTotals.voucherCents)} in vouchers.`}
               </p>
             ) : null}
           </Card>
@@ -536,8 +533,8 @@ export default async function TheokotOverviewPage({
             </h2>
             <p className="mt-1 text-sm text-[#5c667f]">
               {nl
-                ? "Opbrengst is wat opgehaald werd. Met bonnetjes: hoeveel mensen met twee medewerkersbonnetjes betaalden. Aan de balie: de opbrengst min wat de bonnetjes dekten. Klik een dag voor de lijsten."
-                : "Revenue is what was picked up. With vouchers: how many people paid with two staff vouchers. At the counter: revenue minus what the vouchers covered. Click a day for its lists."}
+                ? "Opbrengst is wat opgehaald werd. Met bonnetjes: hoeveel mensen hun broodje met medewerkersbonnetjes betaalden. Aan de balie: de opbrengst min wat de bonnetjes dekten. Klik een dag voor de lijsten."
+                : "Revenue is what was picked up. With vouchers: how many people paid for their sandwich with staff vouchers. At the counter: revenue minus what the vouchers covered. Click a day for its lists."}
             </p>
           </div>
           <Card className="relative overflow-x-auto">

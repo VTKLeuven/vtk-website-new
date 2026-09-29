@@ -109,6 +109,8 @@ describe('afhaalbalie: bonnetjes voor een broodje', () => {
       status: 'RESERVED',
       voucherRedemption: null,
       user: { name: 'Lotte Peeters' },
+      // €2,30: twee bonnetjes aan een half per 60 cent (`sandwichVoucherCost`).
+      lines: [{ unitPriceCents: 230 }],
     });
     mocks.allocate.mockResolvedValue({ allocations: [], available: 6, remaining: 4 });
   });
@@ -116,7 +118,7 @@ describe('afhaalbalie: bonnetjes voor een broodje', () => {
   it('weigert een praesidiumlid, boekt niets af en logt de poging', async () => {
     mocks.membershipFindFirst.mockResolvedValue({ id: 'm1' });
 
-    const result = await redeemEmployeeVouchersAction('order1');
+    const result = await redeemEmployeeVouchersAction('order1', 2);
 
     expect(result).toEqual({
       ok: false,
@@ -138,11 +140,24 @@ describe('afhaalbalie: bonnetjes voor een broodje', () => {
   it('laat wie geen praesidiumlid is gewoon betalen', async () => {
     mocks.membershipFindFirst.mockResolvedValue(null);
 
-    const result = await redeemEmployeeVouchersAction('order1');
+    const result = await redeemEmployeeVouchersAction('order1', 2);
 
     expect(result).toEqual({ ok: true, amount: 2, remainingBonnetjes: 4 });
     expect(mocks.voucherRedemptionCreate).toHaveBeenCalled();
     expect(mocks.logAudit).not.toHaveBeenCalledWith(expect.objectContaining({ action: 'refuse' }));
+  });
+
+  it('boekt niets af wanneer de prijs afwijkt van wat de balie zei', async () => {
+    mocks.membershipFindFirst.mockResolvedValue(null);
+
+    const result = await redeemEmployeeVouchersAction('order1', 2.5);
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Dit broodje kost intussen 2 bonnetjes. Er is niets afgeboekt; zoek de student opnieuw op.',
+    });
+    expect(mocks.allocate).not.toHaveBeenCalled();
+    expect(mocks.voucherRedemptionCreate).not.toHaveBeenCalled();
   });
 });
 

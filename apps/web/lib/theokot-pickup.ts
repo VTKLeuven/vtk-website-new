@@ -3,7 +3,8 @@ import "server-only";
 import { prisma } from "@vtk/db";
 import type { TheokotOrderStatus } from "@prisma/client";
 
-import { brusselsTimeOnDay } from "@/lib/theokot";
+import { brusselsTimeOnDay, sandwichVoucherCost } from "@/lib/theokot";
+import { getTheokotConfig } from "@/lib/theokot-server";
 import { outstandingShiftReward } from "@/lib/shift/rewards";
 import { paysWithVouchersBlocked } from "@/lib/shift/voucherEligibility";
 import { normalizeRNumber, pickupSearchTerms } from "@/lib/theokotPickupQuery";
@@ -34,12 +35,16 @@ export type PickupOrder = {
   pickupEnd: string;
   voucherRedemption: { amount: number } | null;
   /**
-   * Wat twee medewerkersbonnetjes van deze bestelling dekken: de prijs van het
-   * duurste broodje erin. Twee bonnetjes zijn exact één broodje, dus geen opleg
-   * wanneer dat broodje duurder is en geen geld terug wanneer het goedkoper is.
-   * De balie hoeft daardoor niets meer zelf af te trekken.
+   * Wat medewerkersbonnetjes van deze bestelling dekken: de prijs van het
+   * duurste broodje erin. Bonnetjes betalen exact één broodje, dus de balie
+   * hoeft niets meer zelf af te trekken.
    */
   voucherCoversCents: number;
+  /**
+   * Wat dat broodje kost in bonnetjes (`sandwichVoucherCost`), per half. Na een
+   * afboeking staat de werkelijk betaalde prijs in `voucherRedemption.amount`.
+   */
+  voucherCost: number;
   /**
    * De afhaal van deze dag is voorbij en de bestelling stond als niet-opgehaald
    * geboekt. Ze mag nog altijd uitgedeeld worden; de balie hoort enkel te weten
@@ -113,7 +118,7 @@ export async function pickupForUser(
   });
   if (!user) return { ok: false, error: "Deze gebruiker bestaat niet meer." };
 
-  const [orders, shiftBalances, vouchersBlocked] = await Promise.all([
+  const [orders, shiftBalances, vouchersBlocked, config] = await Promise.all([
     prisma.theokotOrder.findMany({
       where: {
         userId: user.id,
@@ -136,6 +141,7 @@ export async function pickupForUser(
       select: { rewardPaid: true, shift: { select: { reward: true } } },
     }),
     paysWithVouchersBlocked(user.id, now),
+    getTheokotConfig(),
   ]);
 
   const outstandingBonnetjes = shiftBalances.reduce(
@@ -162,26 +168,36 @@ export async function pickupForUser(
     rNumber: user.rNumber ?? "",
     outstandingBonnetjes,
     vouchersBlocked,
-    orders: orders.map((order) => ({
-      orderId: order.id,
-      status: order.status,
-      totalCents: order.totalCents,
-      pickupStart: fmt(order.session.pickupStart),
-      pickupEnd: fmt(order.session.pickupEnd),
-      voucherRedemption: order.voucherRedemption,
-      voucherCoversCents: order.lines.reduce(
-        (highest, line) => Math.max(highest, line.unitPriceCents),
-        0,
-      ),
-      isLate: order.status === "NO_SHOW" || order.session.pickupEnd < now,
-      lines: order.lines.map((line) => ({
-        nameNl: line.sessionItem.nameNl,
-        nameEn: line.sessionItem.nameEn,
-        quantity: line.quantity,
-        unitPriceCents: line.unitPriceCents,
-      })),
-    })),
+    orders: orders.map((order) => {
+      const voucherCoversCents = mostExpensiveSandwichCents(order.lines);
+      return {
+        orderId: order.id,
+        status: order.status,
+        totalCents: order.totalCents,
+        pickupStart: fmt(order.session.pickupStart),
+        pickupEnd: fmt(order.session.pickupEnd),
+        voucherRedemption: order.voucherRedemption,
+        voucherCoversCents,
+        voucherCost: sandwichVoucherCost(voucherCoversCents, config.voucherHalfCents),
+        isLate: order.status === "NO_SHOW" || order.session.pickupEnd < now,
+        lines: order.lines.map((line) => ({
+          nameNl: line.sessionItem.nameNl,
+          nameEn: line.sessionItem.nameEn,
+          quantity: line.quantity,
+          unitPriceCents: line.unitPriceCents,
+        })),
+      };
+    }),
   };
+}
+
+/**
+ * Het broodje dat bonnetjes betalen: het duurste uit de bestelling. De balie
+ * (`pickupForUser`) en de afboeking (`redeemEmployeeVouchersAction`) rekenen
+ * allebei hiermee, zodat wat de shifter zegt en wat er afgaat hetzelfde is.
+ */
+export function mostExpensiveSandwichCents(lines: Array<{ unitPriceCents: number }>): number {
+  return lines.reduce((highest, line) => Math.max(highest, line.unitPriceCents), 0);
 }
 
 /**
