@@ -19,6 +19,7 @@ import { readImageField, resolveImageKey, type ImageFieldValue } from "@/lib/ima
 import {
   getTheokotConfig,
   purgeFinishedSession,
+  processSessionNoShows,
   removeOrder,
   removeSession,
   unwaiveSessionNoShows,
@@ -1169,6 +1170,55 @@ export async function purgeFinishedSessionAction(formData: FormData): Promise<Sa
   revalidatePath(`${ADMIN_PATH}/bans`);
   revalidateTheokot();
   return saveOk();
+}
+
+/**
+ * Verwerkt manueel de no-shows van een verkoopdag: markeert openstaande
+ * reservaties als no-show, stuurt waarschuwingsmails en berekent eventuele
+ * bans. Kan meteen uitgevoerd worden zodra de afhaal voorbij is.
+ */
+export async function processSessionNoShowsAction(
+  prevOrFormData: SaveState | FormData,
+  maybeFormData?: FormData,
+): Promise<SaveState> {
+  await requirePermission("theokot.manage");
+  const formData = maybeFormData instanceof FormData ? maybeFormData : (prevOrFormData as FormData);
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const session = await prisma.theokotSession.findUnique({
+    where: { id: sessionId },
+    select: { id: true, date: true, pickupEnd: true, processedAt: true },
+  });
+  if (!session) return saveError("SESSION_NOT_FOUND");
+  if (session.processedAt) return saveOk("Deze verkoopdag was al verwerkt.");
+
+  const now = new Date();
+  if (session.pickupEnd > now) {
+    return saveError("SESSION_NOT_ENDED", "De afhaal voor deze verkoopdag is nog bezig.");
+  }
+
+  const result = await processSessionNoShows(sessionId, now, { force: true });
+  if (!result.success) {
+    return saveError(result.error ?? "PROCESSING_FAILED");
+  }
+
+  await logAudit({
+    action: "update",
+    entity: "theokotSession",
+    entityId: sessionId,
+    target: sessionLabel(session.date),
+    summary: `no-shows manueel verwerkt (${result.noShows} bestelling(en))`,
+  });
+
+  revalidatePath(`${ADMIN_PATH}/overzicht`);
+  revalidatePath(`${ADMIN_PATH}/bans`);
+  revalidatePath(ADMIN_PATH);
+  revalidateTheokot();
+
+  return saveOk(
+    result.noShows > 0
+      ? `${result.noShows} no-show(s) verwerkt.`
+      : "Verkoopdag verwerkt: geen no-shows.",
+  );
 }
 
 // -----------------------------------------------------------------------------

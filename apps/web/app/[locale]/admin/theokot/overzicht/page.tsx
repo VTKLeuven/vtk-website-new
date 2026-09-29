@@ -10,11 +10,13 @@ import { formatEuro } from "@/lib/theokot";
 import { getTheokotConfig } from "@/lib/theokot-server";
 import { mostExpensiveSandwichCents } from "@/lib/theokot-pickup";
 import {
+  processSessionNoShowsAction,
   purgeFinishedSessionAction,
   unwaiveSessionNoShowsAction,
   waiveSessionNoShowsAction,
 } from "@/app/actions/theokot";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
+import { SaveForm } from "@/components/ui/SaveForm";
 import { TheokotAdminNav } from "../TheokotAdminNav";
 import { SaleDayPicker } from "../turflijst/SaleDayPicker";
 
@@ -389,35 +391,77 @@ export default async function TheokotOverviewPage({
             ) : (
               <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-vtk-blue/12 px-4 py-3">
                 <p className="text-sm text-[#5c667f]">
-                  {nl
-                    ? "Liep er iets mis op deze dag (de balie lag plat, een verkeerd afhaaluur)? Dan hoort niemand hier een no-show voor te krijgen."
-                    : "Did something go wrong on this day (the counter was down, a wrong pickup time)? Then nobody should get a no-show for it."}
-                </p>
-                <DeleteButton
-                  action={waiveSessionNoShowsAction}
-                  fields={{ sessionId: selected.id }}
-                  title={nl ? "No-shows van deze dag laten vallen?" : "Drop this day's no-shows?"}
-                  description={
-                    selected.processedAt
+                  {selected.processedAt
+                    ? nl
+                      ? `No-shows van deze dag zijn verwerkt op ${shortDay(selected.processedAt)}. Liep er toch iets mis? Dan kan je ze alsnog laten vallen.`
+                      : `This day's no-shows were processed on ${shortDay(selected.processedAt)}. Did something go wrong? You can still drop them.`
+                    : pickupOver
                       ? nl
-                        ? `De ${noShows.length} no-show(s) van ${dayLabel(selected.date)} tellen niet meer mee voor een ban. Een automatische ban die daardoor onder de drempel zakt, wordt opgeheven; een ban die je zelf uitsprak, blijft. De no-showmails zijn al vertrokken en kunnen niet teruggehaald worden. De bestellingen blijven als niet opgehaald staan.`
-                        : `The ${noShows.length} no-show(s) of ${dayLabel(selected.date)} no longer count towards a ban. An automatic ban that falls below the threshold because of it is lifted; a ban you set yourself stays. The no-show emails have already been sent and cannot be recalled. The orders stay booked as not picked up.`
+                        ? `De afhaal is voorbij (${reserved.length} bestelling(en) nog niet opgehaald). Je kan de no-shows nu meteen verwerken.`
+                        : `Pickup is over (${reserved.length} order(s) not yet picked up). You can process no-shows now.`
                       : nl
-                        ? `Wie op ${dayLabel(selected.date)} niet ophaalt, krijgt geen no-showmail en telt niet mee voor een ban. De bestellingen worden wel als niet opgehaald geboekt, zodat de cijfers kloppen.`
-                        : `Whoever doesn't pick up on ${dayLabel(selected.date)} gets no no-show email and doesn't count towards a ban. The orders are still booked as not picked up, so the figures stay right.`
-                  }
-                  confirmLabel={nl ? "No-shows laten vallen" : "Drop no-shows"}
-                  cancelLabel={nl ? "Annuleren" : "Cancel"}
-                  successMessage={nl ? "De no-shows van deze dag tellen niet meer mee" : "This day's no-shows no longer count"}
-                  errorMessages={
-                    nl
-                      ? { SESSION_NOT_FOUND: "Deze verkoopdag bestaat niet meer." }
-                      : { SESSION_NOT_FOUND: "This sale day no longer exists." }
-                  }
-                  errorFallback={nl ? "De no-shows konden niet weggenomen worden." : "The no-shows could not be dropped."}
-                >
-                  {nl ? "Er liep iets mis" : "Something went wrong"}
-                </DeleteButton>
+                        ? "Liep er iets mis op deze dag (de balie lag plat, een verkeerd afhaaluur)? Dan hoort niemand hier een no-show voor te krijgen."
+                        : "Did something go wrong on this day (the counter was down, a wrong pickup time)? Then nobody should get a no-show for it."}
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {!selected.processedAt && pickupOver ? (
+                    <SaveForm
+                      action={processSessionNoShowsAction}
+                      submitLabel={nl ? "No-shows nu verwerken" : "Process no-shows now"}
+                      submitVariant="secondary"
+                      submitSize="sm"
+                      savingLabel={nl ? "Bezig..." : "Processing..."}
+                      savedMessage={nl ? "No-shows verwerkt" : "No-shows processed"}
+                      confirmSubmit={{
+                        title: nl ? "No-shows nu verwerken?" : "Process no-shows now?",
+                        description: nl
+                          ? `De ${reserved.length} nog niet-opgehaalde bestelling(en) worden geboekt als no-show en die studenten krijgen een waarschuwingsmail.`
+                          : `The ${reserved.length} uncollected order(s) will be booked as no-show and those students will receive a warning email.`,
+                        confirmLabel: nl ? "No-shows verwerken" : "Process no-shows",
+                        cancelLabel: nl ? "Annuleren" : "Cancel",
+                      }}
+                      errorMessages={
+                        nl
+                          ? {
+                              SESSION_NOT_FOUND: "Deze verkoopdag bestaat niet meer.",
+                              SESSION_NOT_ENDED: "De afhaal is nog niet afgelopen.",
+                            }
+                          : {
+                              SESSION_NOT_FOUND: "This sale day no longer exists.",
+                              SESSION_NOT_ENDED: "Pickup has not ended yet.",
+                            }
+                      }
+                      fallbackErrorMessage={nl ? "Verwerken mislukt." : "Processing failed."}
+                    >
+                      <input type="hidden" name="sessionId" value={selected.id} />
+                    </SaveForm>
+                  ) : null}
+                  <DeleteButton
+                    action={waiveSessionNoShowsAction}
+                    fields={{ sessionId: selected.id }}
+                    title={nl ? "No-shows van deze dag laten vallen?" : "Drop this day's no-shows?"}
+                    description={
+                      selected.processedAt
+                        ? nl
+                          ? `De ${noShows.length} no-show(s) van ${dayLabel(selected.date)} tellen niet meer mee voor een ban. Een automatische ban die daardoor onder de drempel zakt, wordt opgeheven; een ban die je zelf uitsprak, blijft. De no-showmails zijn al vertrokken en kunnen niet teruggehaald worden. De bestellingen blijven als niet opgehaald staan.`
+                          : `The ${noShows.length} no-show(s) of ${dayLabel(selected.date)} no longer count towards a ban. An automatic ban that falls below the threshold because of it is lifted; a ban you set yourself stays. The no-show emails have already been sent and cannot be recalled. The orders stay booked as not picked up.`
+                        : nl
+                          ? `Wie op ${dayLabel(selected.date)} niet ophaalt, krijgt geen no-showmail en telt niet mee voor een ban. De bestellingen worden wel als niet opgehaald geboekt, zodat de cijfers kloppen.`
+                          : `Whoever doesn't pick up on ${dayLabel(selected.date)} gets no no-show email and doesn't count towards a ban. The orders are still booked as not picked up, so the figures stay right.`
+                    }
+                    confirmLabel={nl ? "No-shows laten vallen" : "Drop no-shows"}
+                    cancelLabel={nl ? "Annuleren" : "Cancel"}
+                    successMessage={nl ? "De no-shows van deze dag tellen niet meer mee" : "This day's no-shows no longer count"}
+                    errorMessages={
+                      nl
+                        ? { SESSION_NOT_FOUND: "Deze verkoopdag bestaat niet meer." }
+                        : { SESSION_NOT_FOUND: "This sale day no longer exists." }
+                    }
+                    errorFallback={nl ? "De no-shows konden niet weggenomen worden." : "The no-shows could not be dropped."}
+                  >
+                    {nl ? "Er liep iets mis" : "Something went wrong"}
+                  </DeleteButton>
+                </div>
               </div>
             )
           ) : null}
