@@ -5,8 +5,7 @@ import type { TheokotOrderStatus } from "@prisma/client";
 
 import { brusselsTimeOnDay, sandwichVoucherCost } from "@/lib/theokot";
 import { getTheokotConfig } from "@/lib/theokot-server";
-import { outstandingShiftReward } from "@/lib/shift/rewards";
-import { paysWithVouchersBlocked } from "@/lib/shift/voucherEligibility";
+import { voucherBalance } from "@/lib/app-api/vouchers";
 import { normalizeRNumber, pickupSearchTerms } from "@/lib/theokotPickupQuery";
 
 /**
@@ -60,11 +59,6 @@ export type PickupLookupResult =
       userName: string;
       rNumber: string;
       outstandingBonnetjes: number;
-      /**
-       * Praesidiumlid dit werkingsjaar: betaalt niet met bonnetjes. Enkel voor de
-       * balie; de actie weigert het zelf ook.
-       */
-      vouchersBlocked: boolean;
       orders: PickupOrder[];
     }
   | { ok: false; error: string };
@@ -118,7 +112,7 @@ export async function pickupForUser(
   });
   if (!user) return { ok: false, error: "Deze gebruiker bestaat niet meer." };
 
-  const [orders, shiftBalances, vouchersBlocked, config] = await Promise.all([
+  const [orders, outstandingBonnetjes, config] = await Promise.all([
     prisma.theokotOrder.findMany({
       where: {
         userId: user.id,
@@ -136,19 +130,10 @@ export async function pickupForUser(
         },
       },
     }),
-    prisma.shiftParticipant.findMany({
-      where: { userId: user.id, shift: { endTime: { lt: now } } },
-      select: { rewardPaid: true, shift: { select: { reward: true } } },
-    }),
-    paysWithVouchersBlocked(user.id, now),
+    // Hetzelfde saldo als in de app: zonder de shiften uit een praesidiumjaar.
+    voucherBalance(user.id, now),
     getTheokotConfig(),
   ]);
-
-  const outstandingBonnetjes = shiftBalances.reduce(
-    (total, balance) =>
-      total + outstandingShiftReward({ reward: balance.shift.reward, rewardPaid: balance.rewardPaid }),
-    0,
-  );
 
   if (orders.length === 0) {
     return { ok: false, error: `${user.name} heeft geen bestelling voor vandaag.` };
@@ -167,7 +152,6 @@ export async function pickupForUser(
     userName: user.name,
     rNumber: user.rNumber ?? "",
     outstandingBonnetjes,
-    vouchersBlocked,
     orders: orders.map((order) => {
       const voucherCoversCents = mostExpensiveSandwichCents(order.lines);
       return {

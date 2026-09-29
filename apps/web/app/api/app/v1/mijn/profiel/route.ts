@@ -2,6 +2,8 @@ import { prisma } from "@vtk/db";
 import { pick } from "@vtk/i18n";
 
 import { academicYearRange } from "@/lib/shift";
+import { earnedShiftReward } from "@/lib/shift/rewards";
+import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import { corsPreflight } from "@/lib/cors";
 import { requireSession } from "@/lib/session";
 import { appLocaleFrom, type AppProfile } from "@/lib/app-api/contract";
@@ -29,7 +31,7 @@ export async function GET(request: Request) {
     const locale = appLocaleFrom(new URL(request.url).searchParams.get("locale"));
     const now = new Date();
 
-    const [user, participations] = await Promise.all([
+    const [user, participations, praesidium] = await Promise.all([
       prisma.user.findUnique({
         where: { id: session.user.id },
         select: { name: true, email: true, rNumber: true, avatarKey: true, studyProgrammes: true },
@@ -51,12 +53,16 @@ export async function GET(request: Request) {
           },
         },
       }),
+      praesidiumYears([session.user.id]),
     ]);
+    // Een shift uit een praesidiumjaar levert niets op (`earnedShiftReward`).
+    const earned = (shift: { reward: number; startTime: Date }) =>
+      earnedShiftReward({ userId: session.user.id, ...shift }, praesidium);
 
     const { start, end } = academicYearRange();
     let unpaid = 0;
     for (const { rewardPaid, shift } of participations) {
-      if (rewardPaid < shift.reward && shift.endTime >= start && shift.endTime < end) unpaid += 1;
+      if (rewardPaid < earned(shift) && shift.endTime >= start && shift.endTime < end) unpaid += 1;
     }
 
     const payload: AppProfile = {
@@ -82,7 +88,7 @@ export async function GET(request: Request) {
           start: shift.startTime.toISOString(),
           end: shift.endTime.toISOString(),
           post: shift.post,
-          reward: shift.reward,
+          reward: earned(shift),
         }))
         .sort((a, b) => a.start.localeCompare(b.start)),
       unpaidShiftsThisYear: unpaid,

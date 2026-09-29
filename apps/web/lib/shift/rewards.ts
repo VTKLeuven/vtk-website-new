@@ -1,3 +1,5 @@
+import { workingYearOf } from "@vtk/auth";
+
 export type ShiftRewardBalance = {
   shiftId: string;
   reward: number;
@@ -45,6 +47,32 @@ export function formatVoucherCount(amount: number, locale: "nl" | "en" = "nl"): 
   const word =
     locale === "en" ? (amount === 1 ? "voucher" : "vouchers") : amount === 1 ? "bonnetje" : "bonnetjes";
   return `${formatVouchers(amount, locale)} ${word}`;
+}
+
+/**
+ * Per gebruiker de werkingsjaren waarin hij in een praesidiumpost zat
+ * (`praesidiumYears` in `voucherEligibility.ts`).
+ */
+export type PraesidiumYears = ReadonlyMap<string, ReadonlySet<number>>;
+
+/**
+ * Wat een shift deze gebruiker aan bonnetjes oplevert: `Shift.reward`, of nul
+ * wanneer hij in het werkingsjaar van die shift in het praesidium zat. De shift
+ * telt wel gewoon mee (ranglijst, aantal gedane shiften); enkel de bonnetjes
+ * vallen weg. Zie "Praesidium verdient geen bonnetjes" in
+ * `docs/design-decisions.md`.
+ *
+ * Het jaar komt van het begin van de shift (`workingYearOf`, kantelt op 15
+ * juli). Een shift van voor iemand praesidium werd, of van erna, levert dus
+ * gewoon op.
+ */
+export function earnedShiftReward(
+  participation: { userId: string; reward: number; startTime: Date },
+  praesidium: PraesidiumYears,
+): number {
+  const years = praesidium.get(participation.userId);
+  if (!years || years.size === 0) return participation.reward;
+  return years.has(workingYearOf(participation.startTime)) ? 0 : participation.reward;
 }
 
 export function outstandingShiftReward(
@@ -103,13 +131,3 @@ export function allocateShiftReward(
     remaining: available - requestedAmount,
   };
 }
-
-/**
- * De melding wanneer een praesidiumlid in Theokot met bonnetjes wil betalen
- * (`paysWithVouchersBlocked` in `voucherEligibility.ts`). Staat hier en niet
- * daar, omdat de afhaalbalie ze ook in de browser toont.
- */
-export const PRAESIDIUM_VOUCHERS_MESSAGE = {
-  nl: "Praesidiumleden kunnen in Theokot niet met online bonnetjes betalen. Reken dit gewoon af.",
-  en: "Praesidium members cannot pay with online vouchers in Theokot. Please charge this normally.",
-} as const;

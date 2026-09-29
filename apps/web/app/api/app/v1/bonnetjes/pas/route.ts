@@ -61,7 +61,6 @@ export async function POST(request: Request) {
     ]);
 
     const order = pickup && pickup.ok ? pickup.orders.find((row) => row.status === "RESERVED") : null;
-    const vouchersBlocked = pickup?.ok === true && pickup.vouchersBlocked;
 
     const payload: AppPassHolder = {
       userId: user.id,
@@ -79,10 +78,7 @@ export async function POST(request: Request) {
               quantity: line.quantity,
               unitPriceCents: line.unitPriceCents,
             })),
-            // Een praesidiumlid betaalt niet met bonnetjes; de afboeking weigert
-            // het zelf ook, dit zegt het enkel al voor de toog een bedrag intikt.
             canRedeemVouchers:
-              !vouchersBlocked &&
               order.voucherRedemption === null &&
               order.voucherCost > 0 &&
               vouchers >= order.voucherCost,

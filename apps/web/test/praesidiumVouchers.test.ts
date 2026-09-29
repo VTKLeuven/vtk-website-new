@@ -1,40 +1,39 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * Praesidiumleden betalen in Theokot niet met online bonnetjes.
+ * Praesidium verdient geen bonnetjes met zijn shiften, maar de shiften tellen
+ * gewoon mee.
  *
- * Wat hier vastligt: wie telt als praesidiumlid (enkel een PRAESIDIUM-post, enkel
- * het lopende werkingsjaar), dat de afhaalbalie het server-side weigert en in het
- * logboek zet, en dat de app-route een nette 403 met een NL/EN-melding geeft.
- * Dat `redeemVouchers` zelf weigert, staat in `appApiVouchers.test.ts`.
+ * Wat hier vastligt: welke shift niets oplevert (een shift in een werkingsjaar
+ * waarin je in een PRAESIDIUM-post zat, gerekend vanaf het begin van de shift en
+ * kantelend op 15 juli), hoe de lidmaatschappen opgehaald worden, dat een
+ * afboeking zo'n shift overslaat, en dat een praesidiumlid aan de afhaalbalie
+ * gewoon mag betalen met wat hij daarvoor verdiende.
  */
 
 const mocks = vi.hoisted(() => {
-  const membershipFindFirst = vi.fn();
+  const membershipFindMany = vi.fn();
+  const participantFindMany = vi.fn();
+  const participantUpdateMany = vi.fn();
   const orderFindUnique = vi.fn();
   const voucherRedemptionCreate = vi.fn();
   return {
-    membershipFindFirst,
+    membershipFindMany,
+    participantFindMany,
+    participantUpdateMany,
     orderFindUnique,
     voucherRedemptionCreate,
-    // Eén client voor de prisma-singleton en de transactie: de check leest in de
-    // balie-actie via `tx`, buiten een transactie via `prisma`.
+    // Eén client voor de prisma-singleton en de transactie.
     tx: {
-      groupMembership: { findFirst: membershipFindFirst },
+      groupMembership: { findMany: membershipFindMany },
+      shiftParticipant: { findMany: participantFindMany, updateMany: participantUpdateMany },
       theokotOrder: { findUnique: orderFindUnique },
       theokotVoucherRedemption: { create: voucherRedemptionCreate },
     },
     allocate: vi.fn(),
     logAudit: vi.fn(),
     requirePermission: vi.fn(),
-    verifyPassToken: vi.fn(),
-    redeemVouchers: vi.fn(),
     FakeConflict: class FakeConflict extends Error {},
-    FakeVoucherError: class FakeVoucherError extends Error {
-      constructor(readonly code: string) {
-        super(code);
-      }
-    },
   };
 });
 
@@ -48,56 +47,115 @@ vi.mock('@/lib/session', () => ({
 vi.mock('@/lib/ticketing/transactions', () => ({
   withSerializableTransaction: (run: (client: unknown) => unknown) => run(mocks.tx),
 }));
+// De balie-actie krijgt een nep-verdeling; de echte staat hieronder apart
+// (`vi.importActual`), zodat die tegen dezelfde nep-database draait.
 vi.mock('@/lib/shift/rewards.server', () => ({
   allocateUserShiftReward: mocks.allocate,
   ShiftRewardConflictError: mocks.FakeConflict,
 }));
-vi.mock('@/lib/app-api/tokens', () => ({ verifyPassToken: mocks.verifyPassToken }));
-vi.mock('@/lib/app-api/vouchers', () => ({
-  redeemVouchers: mocks.redeemVouchers,
-  VoucherError: mocks.FakeVoucherError,
-}));
 
-import { currentWorkingYear } from '@vtk/auth';
-import { paysWithVouchersBlocked } from '@/lib/shift/voucherEligibility';
-import { PRAESIDIUM_VOUCHERS_MESSAGE } from '@/lib/shift/rewards';
+import { earnedShiftReward } from '@/lib/shift/rewards';
+import { praesidiumYears } from '@/lib/shift/voucherEligibility';
 import { redeemEmployeeVouchersAction } from '@/app/actions/theokot';
-import { POST as redeemRoute } from '@/app/api/app/v1/bonnetjes/inwisselen/route';
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.requirePermission.mockResolvedValue({ user: { id: 'balie', name: 'Balie' } });
 });
 
-describe('paysWithVouchersBlocked', () => {
-  it('zoekt enkel een PRAESIDIUM-post in het lopende werkingsjaar', async () => {
-    mocks.membershipFindFirst.mockResolvedValue({ id: 'm1' });
-    const now = new Date('2026-10-01T10:00:00.000Z');
+/** 1 oktober 2026: werkingsjaar 2026 ("26-27"). */
+const OCT_2026 = new Date('2026-10-01T10:00:00.000Z');
+/** 1 maart 2026: nog werkingsjaar 2025 ("25-26"), van voor er roldata was. */
+const MAR_2026 = new Date('2026-03-01T10:00:00.000Z');
 
-    await expect(paysWithVouchersBlocked('u1', now)).resolves.toBe(true);
-    expect(mocks.membershipFindFirst).toHaveBeenCalledWith({
-      where: { userId: 'u1', year: currentWorkingYear(now), group: { type: 'PRAESIDIUM' } },
-      select: { id: true },
-    });
+describe('earnedShiftReward', () => {
+  const inPraesidium2026 = new Map([['u1', new Set([2026])]]);
+
+  it('geeft de volle beloning aan wie geen praesidiumpost heeft', () => {
+    expect(earnedShiftReward({ userId: 'u2', reward: 3, startTime: OCT_2026 }, inPraesidium2026)).toBe(3);
+  });
+
+  it('geeft niets voor een shift in een praesidiumjaar', () => {
+    expect(earnedShiftReward({ userId: 'u1', reward: 3, startTime: OCT_2026 }, inPraesidium2026)).toBe(0);
   });
 
   /**
-   * Vorig werkingsjaar in het praesidium, nu niet meer: dan betaal je gewoon. De
-   * grens is 15 juli, dus dezelfde persoon wisselt van jaar op die dag.
+   * `currentWorkingYear` klemt alles van voor 15 juli 2026 op 2026. Met die
+   * functie zou een shift van maart 2026 als praesidiumshift tellen voor wie pas
+   * in 26-27 praesidium werd.
    */
-  it('kantelt op 15 juli naar het nieuwe werkingsjaar', async () => {
-    mocks.membershipFindFirst.mockResolvedValue(null);
-
-    await paysWithVouchersBlocked('u1', new Date('2027-07-14T10:00:00.000Z'));
-    await paysWithVouchersBlocked('u1', new Date('2027-07-16T10:00:00.000Z'));
-
-    const years = mocks.membershipFindFirst.mock.calls.map(([args]) => args.where.year);
-    expect(years).toEqual([2026, 2027]);
+  it('laat een shift van voor het praesidiumjaar gewoon opleveren', () => {
+    expect(earnedShiftReward({ userId: 'u1', reward: 3, startTime: MAR_2026 }, inPraesidium2026)).toBe(3);
   });
 
-  it('laat betalen wie geen praesidiumpost heeft', async () => {
-    mocks.membershipFindFirst.mockResolvedValue(null);
-    await expect(paysWithVouchersBlocked('u1')).resolves.toBe(false);
+  it('kantelt op 15 juli, in Brusselse tijd', () => {
+    const inPraesidium2027 = new Map([['u1', new Set([2027])]]);
+    // 14 juli 23:30 in Brussel is nog 26-27; 15 juli 00:30 is 27-28.
+    const lastEvening = new Date('2027-07-14T21:30:00.000Z');
+    const firstMorning = new Date('2027-07-14T22:30:00.000Z');
+    expect(earnedShiftReward({ userId: 'u1', reward: 2, startTime: lastEvening }, inPraesidium2027)).toBe(2);
+    expect(earnedShiftReward({ userId: 'u1', reward: 2, startTime: firstMorning }, inPraesidium2027)).toBe(0);
+  });
+});
+
+describe('praesidiumYears', () => {
+  it('zoekt enkel PRAESIDIUM-posten en groepeert de jaren per gebruiker', async () => {
+    mocks.membershipFindMany.mockResolvedValue([
+      { userId: 'u1', year: 2026 },
+      { userId: 'u1', year: 2027 },
+      { userId: 'u2', year: 2026 },
+    ]);
+
+    const years = await praesidiumYears(['u1', 'u2', 'u1']);
+
+    expect(mocks.membershipFindMany).toHaveBeenCalledWith({
+      where: { group: { type: 'PRAESIDIUM' }, userId: { in: ['u1', 'u2'] } },
+      select: { userId: true, year: true },
+    });
+    expect([...(years.get('u1') ?? [])]).toEqual([2026, 2027]);
+    expect([...(years.get('u2') ?? [])]).toEqual([2026]);
+  });
+
+  it('vraagt niets op voor een lege lijst', async () => {
+    await expect(praesidiumYears([])).resolves.toEqual(new Map());
+    expect(mocks.membershipFindMany).not.toHaveBeenCalled();
+  });
+});
+
+describe('afboeken slaat een praesidiumshift over', () => {
+  async function realAllocate() {
+    const actual = await vi.importActual<typeof import('@/lib/shift/rewards.server')>(
+      '@/lib/shift/rewards.server',
+    );
+    return actual.allocateUserShiftReward;
+  }
+
+  beforeEach(() => {
+    mocks.membershipFindMany.mockResolvedValue([{ userId: 'u1', year: 2026 }]);
+    mocks.participantFindMany.mockResolvedValue([
+      // Van voor het praesidiumjaar: 3 open.
+      { shiftId: 'old', rewardPaid: 0, shift: { reward: 3, startTime: MAR_2026 } },
+      // In het praesidiumjaar: levert niets op, dus ook niets open.
+      { shiftId: 'now', rewardPaid: 0, shift: { reward: 2, startTime: OCT_2026 } },
+    ]);
+    mocks.participantUpdateMany.mockResolvedValue({ count: 1 });
+  });
+
+  it('boekt enkel af van wat hij verdiende', async () => {
+    const allocate = await realAllocate();
+
+    const result = await allocate(mocks.tx as never, { userId: 'u1', amount: 3 });
+
+    expect(result.available).toBe(3);
+    expect(result.allocations.map((a) => a.shiftId)).toEqual(['old']);
+    expect(mocks.participantUpdateMany).toHaveBeenCalledTimes(1);
+  });
+
+  it('weigert meer dan dat, ook al staat de shift van dit jaar nog open', async () => {
+    const allocate = await realAllocate();
+
+    await expect(allocate(mocks.tx as never, { userId: 'u1', amount: 4 })).rejects.toThrow(RangeError);
+    expect(mocks.participantUpdateMany).not.toHaveBeenCalled();
   });
 });
 
@@ -108,37 +166,14 @@ describe('afhaalbalie: bonnetjes voor een broodje', () => {
       userId: 'student',
       status: 'RESERVED',
       voucherRedemption: null,
-      user: { name: 'Lotte Peeters' },
       // €2,30: twee bonnetjes aan een half per 60 cent (`sandwichVoucherCost`).
       lines: [{ unitPriceCents: 230 }],
     });
     mocks.allocate.mockResolvedValue({ allocations: [], available: 6, remaining: 4 });
   });
 
-  it('weigert een praesidiumlid, boekt niets af en logt de poging', async () => {
-    mocks.membershipFindFirst.mockResolvedValue({ id: 'm1' });
-
-    const result = await redeemEmployeeVouchersAction('order1', 2);
-
-    expect(result).toEqual({
-      ok: false,
-      error: PRAESIDIUM_VOUCHERS_MESSAGE.nl,
-      code: 'PRAESIDIUM',
-    });
-    expect(mocks.allocate).not.toHaveBeenCalled();
-    expect(mocks.voucherRedemptionCreate).not.toHaveBeenCalled();
-    expect(mocks.logAudit).toHaveBeenCalledWith(
-      expect.objectContaining({
-        action: 'refuse',
-        entity: 'shiftReward',
-        entityId: 'student',
-        target: 'Lotte Peeters',
-      })
-    );
-  });
-
-  it('laat wie geen praesidiumlid is gewoon betalen', async () => {
-    mocks.membershipFindFirst.mockResolvedValue(null);
+  it('laat een praesidiumlid betalen met wat hij verdiende', async () => {
+    mocks.membershipFindMany.mockResolvedValue([{ userId: 'student', year: 2026 }]);
 
     const result = await redeemEmployeeVouchersAction('order1', 2);
 
@@ -148,8 +183,6 @@ describe('afhaalbalie: bonnetjes voor een broodje', () => {
   });
 
   it('boekt niets af wanneer de prijs afwijkt van wat de balie zei', async () => {
-    mocks.membershipFindFirst.mockResolvedValue(null);
-
     const result = await redeemEmployeeVouchersAction('order1', 2.5);
 
     expect(result).toEqual({
@@ -158,38 +191,5 @@ describe('afhaalbalie: bonnetjes voor een broodje', () => {
     });
     expect(mocks.allocate).not.toHaveBeenCalled();
     expect(mocks.voucherRedemptionCreate).not.toHaveBeenCalled();
-  });
-});
-
-describe('POST /api/app/v1/bonnetjes/inwisselen', () => {
-  function request(locale?: string) {
-    const url = `https://vtk.be/api/app/v1/bonnetjes/inwisselen${locale ? `?locale=${locale}` : ''}`;
-    return new Request(url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ pass: 'pass-token-123', amount: 2, place: 'Toog' }),
-    });
-  }
-
-  beforeEach(() => {
-    mocks.verifyPassToken.mockReturnValue({ ok: true, userId: 'student' });
-    mocks.redeemVouchers.mockRejectedValue(new mocks.FakeVoucherError('PRAESIDIUM'));
-  });
-
-  it('antwoordt 403 met een Nederlandse melding', async () => {
-    const response = await redeemRoute(request());
-
-    expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({
-      error: 'PRAESIDIUM',
-      message: PRAESIDIUM_VOUCHERS_MESSAGE.nl,
-    });
-  });
-
-  it('geeft de melding in het Engels met ?locale=en', async () => {
-    const response = await redeemRoute(request('en'));
-
-    expect(response.status).toBe(403);
-    expect((await response.json()).message).toBe(PRAESIDIUM_VOUCHERS_MESSAGE.en);
   });
 });

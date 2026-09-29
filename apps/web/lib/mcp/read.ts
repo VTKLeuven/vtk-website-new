@@ -5,6 +5,8 @@ import { prisma } from "@vtk/db";
 import { z } from "zod";
 import { listRecipients, MAILING_LISTS } from "@/lib/mailinglists";
 import { McpInputError } from "@/lib/mcp/data";
+import { earnedShiftReward } from "@/lib/shift/rewards";
+import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import {
   hasAnyMcpPermission,
   hasMcpPermission,
@@ -446,10 +448,12 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
           shift: { select: { reward: true, startTime: true } },
         },
       });
+      // Een shift uit een praesidiumjaar telt mee, maar levert niets op.
+      const praesidium = await praesidiumYears(rows.map((row) => row.user.id));
       const totals = new Map<string, { userId: string; name: string; earned: number; paid: number; shifts: number }>();
       for (const row of rows) {
         const current = totals.get(row.user.id) ?? { userId: row.user.id, name: row.user.name, earned: 0, paid: 0, shifts: 0 };
-        current.earned += row.shift.reward;
+        current.earned += earnedShiftReward({ userId: row.user.id, ...row.shift }, praesidium);
         current.paid += row.rewardPaid;
         current.shifts += 1;
         totals.set(row.user.id, current);

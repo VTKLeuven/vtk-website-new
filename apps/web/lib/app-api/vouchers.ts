@@ -4,9 +4,9 @@ import { prisma } from "@vtk/db";
 
 import { logAudit } from "@/lib/audit";
 import { academicYearRange } from "@/lib/shift";
-import { outstandingShiftReward } from "@/lib/shift/rewards";
+import { earnedShiftReward, outstandingShiftReward } from "@/lib/shift/rewards";
 import { allocateUserShiftReward, ShiftRewardConflictError } from "@/lib/shift/rewards.server";
-import { paysWithVouchersBlocked } from "@/lib/shift/voucherEligibility";
+import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import type { AppVoucherEntry } from "./contract";
 
@@ -28,10 +28,13 @@ import type { AppVoucherEntry } from "./contract";
  * `sandwichVoucherCost`). Aan de toog gaan er enkel hele af, net zoals bij het
  * uitbetalen: een half bonnetje bestaat daar niet. Dat half blijft staan voor
  * de afhaalbalie.
+ *
+ * Een shift uit een werkingsjaar waarin je in het praesidium zat, levert niets
+ * op (`earnedShiftReward`): die telt hier dus ook niet mee in het saldo.
  */
 
 export class VoucherError extends Error {
-  constructor(readonly code: "NOT_ENOUGH" | "CONFLICT" | "SELF" | "PRAESIDIUM") {
+  constructor(readonly code: "NOT_ENOUGH" | "CONFLICT" | "SELF") {
     super(code);
     this.name = "VoucherError";
   }
@@ -39,16 +42,22 @@ export class VoucherError extends Error {
 
 /** Wat deze gebruiker nu kan uitgeven. */
 export async function voucherBalance(userId: string, now = new Date()): Promise<number> {
-  const participations = await prisma.shiftParticipant.findMany({
-    where: { userId, shift: { endTime: { lt: now } } },
-    select: { rewardPaid: true, shift: { select: { reward: true } } },
-  });
+  const [participations, praesidium] = await Promise.all([
+    prisma.shiftParticipant.findMany({
+      where: { userId, shift: { endTime: { lt: now } } },
+      select: { rewardPaid: true, shift: { select: { reward: true, startTime: true } } },
+    }),
+    praesidiumYears([userId]),
+  ]);
 
   return participations.reduce(
     (total, participation) =>
       total +
       outstandingShiftReward({
-        reward: participation.shift.reward,
+        reward: earnedShiftReward(
+          { userId, reward: participation.shift.reward, startTime: participation.shift.startTime },
+          praesidium,
+        ),
         rewardPaid: participation.rewardPaid,
       }),
     0,
@@ -66,12 +75,12 @@ export async function voucherBalance(userId: string, now = new Date()): Promise<
 export async function voucherOverview(userId: string, now = new Date()) {
   const { start, end } = academicYearRange(now);
 
-  const [participations, theokotRedemptions, redemptions] = await Promise.all([
+  const [participations, theokotRedemptions, redemptions, praesidium] = await Promise.all([
     prisma.shiftParticipant.findMany({
       where: { userId, shift: { endTime: { lt: now } } },
       select: {
         rewardPaid: true,
-        shift: { select: { id: true, name: true, reward: true, endTime: true } },
+        shift: { select: { id: true, name: true, reward: true, startTime: true, endTime: true } },
       },
       orderBy: { shift: { endTime: "desc" } },
     }),
@@ -87,6 +96,7 @@ export async function voucherOverview(userId: string, now = new Date()) {
       take: 40,
       select: { id: true, amount: true, place: true, createdAt: true },
     }),
+    praesidiumYears([userId]),
   ]);
 
   let balance = 0;
@@ -94,13 +104,19 @@ export async function voucherOverview(userId: string, now = new Date()) {
   const history: AppVoucherEntry[] = [];
 
   for (const { rewardPaid, shift } of participations) {
-    balance += outstandingShiftReward({ reward: shift.reward, rewardPaid });
-    if (shift.endTime >= start && shift.endTime < end) earnedThisYear += shift.reward;
-    if (shift.reward > 0) {
+    // Een shift uit een praesidiumjaar levert niets op en staat dus ook niet als
+    // verdiend in de historiek.
+    const earned = earnedShiftReward(
+      { userId, reward: shift.reward, startTime: shift.startTime },
+      praesidium,
+    );
+    balance += outstandingShiftReward({ reward: earned, rewardPaid });
+    if (shift.endTime >= start && shift.endTime < end) earnedThisYear += earned;
+    if (earned > 0) {
       history.push({
         id: `shift:${shift.id}`,
         kind: "earned",
-        amount: shift.reward,
+        amount: earned,
         label: shift.name,
         at: shift.endTime.toISOString(),
       });
@@ -143,12 +159,6 @@ export async function voucherOverview(userId: string, now = new Date()) {
  * **Je kan niet bij jezelf afboeken.** Dat is geen theoretisch geval: wie mag
  * aanvaarden, heeft zelf ook bonnetjes, en zijn eigen pas scannen is de kortste
  * weg naar een gratis pint zonder dat er iemand meekijkt.
- *
- * **Een praesidiumlid van dit werkingsjaar betaalt niet met online bonnetjes.**
- * De app kent de toog niet (`place` is vrije tekst en de app stuurt altijd
- * "Toog"), en een Theokot-broodje wordt langs deze weg afgerekend, dus de
- * weigering geldt hier voor elke afboeking. De poging komt in het logboek, met
- * de scanner als actor en de student als onderwerp.
  */
 export async function redeemVouchers({
   userId,
@@ -174,17 +184,6 @@ export async function redeemVouchers({
   if (!user) throw new Error("NOT_FOUND");
 
   const trimmedPlace = place?.trim().slice(0, 80) || null;
-
-  if (await paysWithVouchersBlocked(user.id)) {
-    await logAudit({
-      action: "refuse",
-      entity: "shiftReward",
-      entityId: userId,
-      target: user.name,
-      summary: `${amount} bonnetje(s) via de app geweigerd${trimmedPlace ? ` (${trimmedPlace})` : ""}: praesidiumlid`,
-    });
-    throw new VoucherError("PRAESIDIUM");
-  }
 
   let remaining: number;
   try {

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@vtk/db";
 import { requirePermission, authErrorResponse } from "@/lib/session";
-import { outstandingShiftReward } from "@/lib/shift/rewards";
+import { earnedShiftReward, outstandingShiftReward } from "@/lib/shift/rewards";
+import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import {
   allocateUserShiftReward,
   ShiftRewardConflictError,
@@ -20,15 +21,18 @@ export async function GET() {
     return authErrorResponse(error);
   }
 
-  const participations = await prisma.shiftParticipant.findMany({
-    where: { shift: { endTime: { lt: new Date() } } },
-    select: {
-      userId: true,
-      rewardPaid: true,
-      user: { select: { name: true, email: true } },
-      shift: { select: { reward: true } },
-    },
-  });
+  const [participations, praesidium] = await Promise.all([
+    prisma.shiftParticipant.findMany({
+      where: { shift: { endTime: { lt: new Date() } } },
+      select: {
+        userId: true,
+        rewardPaid: true,
+        user: { select: { name: true, email: true } },
+        shift: { select: { reward: true, startTime: true } },
+      },
+    }),
+    praesidiumYears(),
+  ]);
 
   const perUser = new Map<
     string,
@@ -43,7 +47,7 @@ export async function GET() {
 
   for (const { userId, rewardPaid, user, shift } of participations) {
     const outstanding = outstandingShiftReward({
-      reward: shift.reward,
+      reward: earnedShiftReward({ userId, reward: shift.reward, startTime: shift.startTime }, praesidium),
       rewardPaid,
     });
     if (outstanding === 0) continue;

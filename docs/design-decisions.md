@@ -449,24 +449,36 @@ open vragen opleverde (`docs/theokot-broodjes-audit-2026-09-21.md`).
     instelling ook. Wijkt de prijs af van wat de balie de student gezegd heeft,
     dan boekt ze niets af en vraagt ze opnieuw op te zoeken, in plaats van stil
     een ander bedrag.
-- **Praesidium betaalt in Theokot niet met online bonnetjes** (september 2026).
-  Wie in het lopende werkingsjaar in een post met `Group.type = PRAESIDIUM`
-  zit, kan de bonnetjes op zijn account niet uitgeven; werkgroepen tellen niet
-  mee, en wie vorig werkingsjaar in het praesidium zat, betaalt na 15 juli
-  gewoon weer. De check staat één keer, in `paysWithVouchersBlocked`
-  (`lib/shift/voucherEligibility.ts`), en draait aan de serverkant van beide
-  afboekingen:
-  - de afhaalbalie (`redeemEmployeeVouchersAction`), die de bonnetjesvraag voor
-    zo iemand ook niet meer stelt;
-  - de app (`/api/app/v1/bonnetjes/inwisselen`), die 403 `PRAESIDIUM` geeft.
-    Die route geldt voor elke toog en niet enkel Theokot: de app stuurt altijd
-    `place: "Toog"` en betaalt een Theokot-broodje langs precies deze weg, dus
-    de server kan Theokot er niet uit onderscheiden. Wie het enkel voor Theokot
-    wil, moet de app eerst een echte plaats laten meesturen.
-  - Wat blijft: het saldo zelf, papieren bonnetjes en de uitbetaling in geld
-    door een beheerder (`/api/shift/reward`). Elke geweigerde poging komt in het
-    logboek als "Geweigerd", met de scanner als actor en de student als
-    onderwerp.
+- **Praesidium verdient geen bonnetjes met zijn shiften** (september 2026).
+  Een shift levert niets op wanneer je in het werkingsjaar van die shift in een
+  post met `Group.type = PRAESIDIUM` zat; werkgroepen tellen niet mee. De shift
+  telt wel gewoon mee: de ranglijst, het aantal gedane shiften en de
+  inschrijving blijven zoals ze waren, enkel de bonnetjes vallen weg.
+  - **Per shift, niet per persoon.** Het jaar komt van het begin van de shift
+    (`workingYearOf`, kantelt op 15 juli). Wie in 26-27 praesidium is, houdt wat
+    hij in 25-26 verdiende, en verdient in 27-28 gewoon weer. `currentWorkingYear`
+    is daar niet bruikbaar: die klemt alles van voor 15 juli 2026 op 2026, en dan
+    telt een shift van maart 2026 als praesidiumshift.
+  - **Uitgeven mag.** Wat een praesidiumlid verdiende voor hij praesidium werd,
+    mag hij aan de afhaalbalie en aan de toog uitgeven. De eerdere weigering
+    ("Praesidium betaalt in Theokot niet met online bonnetjes", 28 september)
+    is daarmee weg: het verdienen tegenhouden is wat de kring wou, en een
+    blokkade op het uitgeven hield ook bonnetjes vast die hij eerlijk verdiend
+    had.
+  - **Uitgerekend, niet bewaard.** Er is geen kolom: `earnedShiftReward`
+    (`lib/shift/rewards.ts`) rekent het telkens uit de lidmaatschappen
+    (`praesidiumYears` in `lib/shift/voucherEligibility.ts`), overal waar een
+    saldo, een openstaand bedrag of een verdiende beloning getoond of
+    afgeboekt wordt: het saldo in de app, de afhaalbalie, de afboeking
+    (`allocateUserShiftReward`), het beheerscherm Bonnetjes, de shiftlijsten en
+    de herinneringsmail. Wie laat in een post gezet wordt, verliest dus meteen
+    de openstaande bonnetjes van zijn shiften van dat jaar, en wie eruit
+    gehaald wordt, krijgt ze terug. Dat gold bij de invoering ook voor de
+    shiften die dit werkingsjaar al voorbij waren: die bonnetjes vielen weg.
+  - **Wat al gebeurd is, blijft.** Een bonnetje dat al uitbetaald of uitgegeven
+    werd, wordt niet teruggedraaid; in het beheerscherm telt het als toegekend.
+  - Wat blijft tonen wat een shift "waard" is: de publieke shiftkaarten op de
+    homepage. Dat is het aanbod voor iedereen, niet wat één kijker verdient.
 - **Het aanbod van een dag mag onder het aantal dat al besteld is, en er wordt
   niets automatisch geschrapt.** Er valt een plateau of de bakker levert minder,
   en dan moet dat in het systeem kunnen. Wat er dan gebeurt:
