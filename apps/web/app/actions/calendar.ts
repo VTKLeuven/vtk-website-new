@@ -315,9 +315,14 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
         descriptionNl: input.descriptionNl,
         descriptionEn: input.descriptionEn,
         location: input.location,
-        startsAt: start,
-        endsAt: end,
       },
+    });
+    // De uren enkel voor een verkoop die ze volgt: een eerstejaarsuur of een
+    // wave heeft eigen uren (`ownTimes`), en die mag een verschoven event niet
+    // stil gelijkzetten.
+    await prisma.ticketEvent.updateMany({
+      where: { calendarEventId: input.id, ownTimes: false },
+      data: { startsAt: start, endsAt: end },
     });
     // Hetzelfde duwtje als bij het ticketevent hierboven, om dezelfde reden: het
     // logistiek-evenement draagt een kopie van naam, locatie en uren, en zonder

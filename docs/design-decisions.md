@@ -8542,6 +8542,55 @@ werd **de kalenderpagina met tickets per soort** gekozen.
   aan het kiezen bent, duwt de beschrijving weg voor je ze gelezen hebt.
 - **Op een gsm staan de tickets eerst**, daarvoor kwam je.
 
+## Tickets op de eventpagina, en meerdere ticketpagina's per event
+
+`/kalender/<slug>` en `/tickets/<slug>` waren voor een event met tickets bijna
+dezelfde pagina: dezelfde kop, dezelfde affiche, meestal dezelfde tekst, enkel
+het paneel rechts verschilde ("Doe mee" of de tickets). Uit drie richtingen
+(de kassa in de zijbalk, "Doe mee" houden met de tickets in een band eronder,
+en de ticketpagina als hoofdpagina) werd in september 2026 **de kassa in de
+zijbalk** gekozen, met tabs voor meerdere verkopen.
+
+- **Samenvoegen is een keuze per ticketpagina** (`TicketEvent.onEventPage`,
+  "Op de eventpagina" in het ticketbeheer), niet verplicht. Een event zonder
+  tickets en een ticket zonder event blijven exact zoals ze waren; een
+  gekoppelde verkoop zonder het vinkje houdt haar eigen pagina, met een knop op
+  de eventpagina. Bestaande koppelingen stonden bij de invoering uit: er
+  veranderde niets tot iemand het aanzette. Nieuw aangemaakt vanuit een
+  kalenderevent staat het aan.
+- **Samengevoegd is het paneel rechts de shop** en staan "Geïnteresseerd" en
+  "Zet in mijn agenda" klein eronder, omlijnd en niet navy: de ticketknop is de
+  handeling. "Terug naar kalender" valt weg, de kop draagt die link al. Op een
+  gsm volgen interesse en agenda meteen op de tickets, voor de affiche.
+- **Een event kan meerdere ticketpagina's hebben** (`calendarEventId` is niet
+  meer uniek): de volledige 12u naast de losse cantussen, een eerstejaarsuur
+  vooraf, de waves van Galabal. Op de eventpagina staan ze als tabs bovenaan het
+  paneel, chronologisch en bij hetzelfde uur in volgorde van aanmaken.
+  - **Elke tab is een link naar het eigen adres van die verkoop**
+    (`/tickets/<slug>`), en dat adres toont de eventpagina met die tab gekozen.
+    Zo is "de losse cantussen" te delen zonder de volledige 12u erbij, en blijven
+    links op affiches en in mails werken. `/kalender/<slug>` toont de eerste.
+  - **Een bestelling blijft per verkoop.** Een andere tab is een ander mandje;
+    wat je koos, verdwijnt bij het wisselen.
+  - **De titel komt van het event en is voor elke tab dezelfde**, dus een tab
+    heeft een eigen naam (`labelNl`/`labelEn`). Die is verplicht zodra er een
+    tweede verkoop op de pagina staat. Wie een bestaande losse verkoop achteraf
+    koppelt, krijgt haar oude titel als naam, anders was "Cantussen apart"
+    nergens meer te lezen.
+  - **Een verkoop kan eigen uren hebben** (`ownTimes`): een eerstejaarsuur dat
+    een uur vroeger begint, of een wave. Titel, beschrijving en locatie blijven
+    van het event; enkel de uren niet, zodat de bevestigingsmail en het ticket
+    het juiste uur dragen. Het paneel zegt dan "Deze tickets: 19:00 - 00:00".
+    Zonder dat vinkje volgen de uren het event, zoals voordien.
+- **De koppeling kan achteraf gezet of gewijzigd worden** in het ticketbeheer;
+  voordien lag ze vast bij het aanmaken, en een verkoop die al bestond, kon niet
+  meer bij haar event.
+- **De kaart op /kalender en op de homepage en de app** linken naar de eerste
+  gepubliceerde verkoop (`publishedTicketSlug`). Staat die op de eventpagina,
+  dan opent die link net die pagina met de tickets gekozen.
+- De ontwerpen staan in een canvas met de drie richtingen; de keuze is A met de
+  tabs uit de rij "meerdere ticketpagina's".
+
 ## De bestelpagina: je bestelling in het paneel waar je mandje stond
 
 `/tickets/bestelling/[orderId]` was het enige scherm van de ticketreeks zonder

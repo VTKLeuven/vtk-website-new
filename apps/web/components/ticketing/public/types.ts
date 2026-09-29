@@ -44,6 +44,14 @@ export type PublicTicketEvent = {
   id: string;
   slug: string;
   title: string;
+  /** Het kalenderevent waar deze verkoop bij hoort, of null. */
+  calendarEventId?: string | null;
+  /** De tickets staan op de eventpagina; zie `TicketEvent.onEventPage`. */
+  onEventPage?: boolean;
+  /** De naam van deze verkoop op de eventpagina ("Volledige 12u"), of null. */
+  label?: string | null;
+  /** Deze verkoop heeft eigen uren en volgt die van het kalenderevent niet. */
+  ownTimes?: boolean;
   description?: string | null;
   location?: string | null;
   locationAddress?: string | null;

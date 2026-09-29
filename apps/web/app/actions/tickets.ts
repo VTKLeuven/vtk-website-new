@@ -80,7 +80,42 @@ const EXPECTED_EVENT_FORM_ERRORS = new Set([
   "INVALID_CONTACTEMAIL",
   "PRESALE_NEEDS_SALES_START",
   "PRESALE_NEEDS_AUDIENCE",
+  "LABEL_REQUIRED",
+  "INVALID_LABELNL",
+  "INVALID_LABELEN",
 ]);
+
+/**
+ * Hoe een verkoop op haar kalenderevent staat: op de eventpagina of apart, met
+ * welke naam, en of ze eigen uren heeft. Zonder kalenderevent is dat allemaal
+ * uit; zie `TicketEvent.onEventPage`.
+ *
+ * Staan er al andere verkopen van hetzelfde event op de eventpagina, dan is een
+ * naam verplicht: de titel komt van het event en is voor elke tab dezelfde.
+ */
+async function eventPagePlacement(
+  formData: FormData,
+  calendarEventId: string | null,
+  currentEventId: string | null,
+) {
+  if (!calendarEventId) {
+    return { onEventPage: false, ownTimes: false, labelNl: null, labelEn: null };
+  }
+  const onEventPage = checkboxValue(formData, "onEventPage");
+  const labelNl = limitedOptionalValue(formData, "labelNl", 80);
+  const labelEn = limitedOptionalValue(formData, "labelEn", 80);
+  if (onEventPage && !labelNl) {
+    const others = await prisma.ticketEvent.count({
+      where: {
+        calendarEventId,
+        onEventPage: true,
+        ...(currentEventId ? { id: { not: currentEventId } } : {}),
+      },
+    });
+    if (others > 0) throw new Error("LABEL_REQUIRED");
+  }
+  return { onEventPage, ownTimes: checkboxValue(formData, "ownTimes"), labelNl, labelEn };
+}
 
 function value(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
@@ -480,10 +515,18 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
     throw new Error("INVALID_CALENDAR_EVENT");
   }
 
+  const placement = await eventPagePlacement(formData, calendarEventId, null);
   const titleNl = limitedValue(formData, "titleNl", 200) || calendarEvent?.titleNl || "";
   if (!titleNl) throw new Error("TITLE_REQUIRED");
-  const startsAt = dateValue(formData, "startsAt") ?? calendarEvent?.start ?? null;
-  const endsAt = dateValue(formData, "endsAt") ?? calendarEvent?.end ?? null;
+  // Een gekoppelde verkoop volgt de uren van het kalenderevent, tenzij ze eigen
+  // uren heeft (een eerstejaarsuur, een wave).
+  const followsCalendar = calendarEvent !== null && !placement.ownTimes;
+  const startsAt = followsCalendar
+    ? calendarEvent.start
+    : (dateValue(formData, "startsAt") ?? calendarEvent?.start ?? null);
+  const endsAt = followsCalendar
+    ? calendarEvent.end
+    : (dateValue(formData, "endsAt") ?? calendarEvent?.end ?? null);
   if (!startsAt || !endsAt || endsAt <= startsAt) throw new Error("INVALID_EVENT_DATES");
   const capacity = boundedIntegerValue(formData, "capacity", 100, 1, 1_000_000);
   // Naam en prijs van het eerste tickettype. Een prijs van 0 is geldig: gratis
@@ -536,6 +579,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
     const created = await tx.ticketEvent.create({
       data: {
         calendarEventId,
+        ...placement,
         ownerGroupId,
         slug,
         titleNl,
@@ -723,12 +767,32 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
   // Hangt er een kalenderevent aan, dan zijn titel, beschrijving, locatie en
   // datums daarvan; het formulier toont ze dan als overgenomen en stuurt ze niet
   // mee. Zonder deze uitzondering zou opslaan ze op null zetten.
-  const linked = event.calendarEventId
-    ? await prisma.calendarEvent.findUnique({ where: { id: event.calendarEventId } })
+  //
+  // De koppeling kan hier ook gezet of gewijzigd worden: een verkoop die al
+  // bestond voor ze bij een event mocht (de losse cantussen naast de volledige
+  // 12u), moet achteraf aan dat event kunnen hangen.
+  const calendarEventId = formData.has("calendarEventId")
+    ? optionalValue(formData, "calendarEventId")
+    : event.calendarEventId;
+  const linked = calendarEventId
+    ? await prisma.calendarEvent.findUnique({ where: { id: calendarEventId } })
     : null;
+  if (calendarEventId && (!linked || linked.groupId !== event.ownerGroupId)) {
+    throw new Error("INVALID_CALENDAR_EVENT");
+  }
+  const placement = await eventPagePlacement(formData, calendarEventId, eventId);
+  // Nieuw gekoppeld en nog zonder naam: de eigen titel wordt de naam op de
+  // eventpagina. Die titel wordt hieronder door die van het event vervangen, en
+  // anders was "Cantussen apart" nergens meer te lezen.
+  if (linked && !event.calendarEventId && !placement.labelNl && event.titleNl !== linked.titleNl) {
+    placement.labelNl = event.titleNl;
+  }
 
-  const startsAt = linked?.start ?? dateValue(formData, "startsAt") ?? event.startsAt;
-  const endsAt = linked?.end ?? dateValue(formData, "endsAt") ?? event.endsAt;
+  const followsCalendar = linked !== null && !placement.ownTimes;
+  const startsAt = followsCalendar
+    ? linked.start
+    : (dateValue(formData, "startsAt") ?? event.startsAt);
+  const endsAt = followsCalendar ? linked.end : (dateValue(formData, "endsAt") ?? event.endsAt);
   if (endsAt <= startsAt) throw new Error("INVALID_EVENT_DATES");
   const maxTicketsPerOrder = boundedIntegerValue(
     formData,
@@ -771,6 +835,8 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
       where: { id: eventId },
       data: {
         slug: nextSlug,
+        calendarEventId,
+        ...placement,
         titleNl: linked?.titleNl ?? (limitedValue(formData, "titleNl", 200) || event.titleNl),
         titleEn: linked ? linked.titleEn : limitedOptionalValue(formData, "titleEn", 200),
         descriptionNl: linked

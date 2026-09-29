@@ -111,6 +111,12 @@ function publicEventDto(
     id: event.id,
     slug: event.slug,
     title: localized(event.titleNl, event.titleEn, locale),
+    // Staat deze verkoop op de eventpagina, dan toont /tickets/<slug> die
+    // pagina; zie lib/ticketing/eventPage.ts.
+    calendarEventId: event.calendarEventId,
+    onEventPage: event.onEventPage,
+    label: localized(event.labelNl ?? "", event.labelEn, locale) || null,
+    ownTimes: event.ownTimes,
     description: localized(event.descriptionNl ?? "", event.descriptionEn, locale),
     location: event.location,
     locationAddress: event.locationAddress,

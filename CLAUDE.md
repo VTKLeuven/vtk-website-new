@@ -552,6 +552,17 @@ the design language into the application instead of copying mockup content.
     `.ev-card-link::after`, and that area resolves against the nearest positioned
     ancestor; with the body positioned it stopped at the photo and clicking the
     poster did nothing.
+- **An event with tickets on its page is one page, not two.** With
+  `TicketEvent.onEventPage` the event page (`/kalender/<slug>`) carries the
+  ticket shop in its right panel (`components/calendar/EventTicketsPage.tsx`),
+  with interest and "Zet in mijn agenda" quietly below it. An event can have
+  several ticket pages; they become tabs at the top of the panel, and **every
+  tab links to that sale's own `/tickets/<slug>`**, which renders the same event
+  page with that tab selected, so each sale stays shareable on its own. Do not
+  switch tabs client-side without changing the URL, and do not add a second
+  event head: both routes build on `components/calendar/EventPageParts.tsx`.
+  The shop's `<form>` only wraps the details block, because the interest button
+  below the panel carries its own forms. See `docs/design-decisions.md`.
 - Functional pages and modules, including Media and Logistiek, use the same
   visual system as the main website. A separate subdomain or operational flow
   is not a reason to invent another hero, type treatment, palette, container

@@ -723,7 +723,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               const categories = event.categories.map((link) => link.category);
               const theme = categories.find((category) => category.audience === null) ?? null;
               const audiences = categories.filter((category) => category.audience !== null);
-              const ticketSlug = publishedTicketSlug(event.ticketEvent);
+              const ticketSlug = publishedTicketSlug(event.ticketEvents);
               return (
                 // Dezelfde kaart als in het raster van /kalender, uit
                 // `vtk-eventcard.css`. Een kaart met knoppen erin kan geen link

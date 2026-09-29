@@ -461,6 +461,107 @@
   line-height: 1.5;
 }
 
+/* ---------- De eventpagina met tickets ----------
+
+   Staan de tickets op de eventpagina (`TicketEvent.onEventPage`), dan draagt
+   deze shop de kop en de beschrijving van het kalenderevent. Heeft het event
+   meer dan één verkoop, dan staan ze als tabs bovenaan het paneel; elke tab is
+   een link naar het eigen adres van die verkoop. Zie EventTicketsPage.tsx. */
+
+.tshop-choices {
+  display: grid;
+  gap: 10px;
+}
+
+.tshop-choice-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 22px;
+  background: var(--paper);
+}
+
+.tshop-choice {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 6px 14px;
+  border-radius: 18px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.25;
+  text-align: center;
+  text-decoration: none;
+}
+
+.tshop-choice:hover {
+  color: var(--ink);
+}
+
+.tshop-choice:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: 2px;
+}
+
+.tshop-choice[aria-current="page"] {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 700;
+  box-shadow: 0 1px 3px rgba(14, 26, 54, 0.16);
+}
+
+.tshop-choice-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  color: var(--body);
+  font-size: 14px;
+}
+
+.tshop-choice-note svg {
+  flex: none;
+  color: var(--muted);
+}
+
+.tshop-choice-note strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Interesse en "Zet in mijn agenda" naast elkaar onder het paneel, zoals in
+   het gekozen ontwerp: stil, want de ticketknop erboven is de handeling. Wat
+   eronder openklapt (een telregel, het alumniformulier) krijgt de volle rij. */
+/* Dubbele klasse: vtk-event.css zet `.vtk-event-actions` in een kolom, en welk
+   van beide bestanden eerst laadt, hangt af van de pagina waar je vandaan kwam. */
+.vtk-event-actions.tshop-event-actions {
+  flex-direction: row;
+  flex-wrap: wrap;
+  margin: 0;
+}
+
+.vtk-event-actions.tshop-event-actions .btn {
+  flex: 1 1 160px;
+  width: auto;
+}
+
+/* Niet ingelogd is de interesseknop een link met een langere zin ("Log in om
+   je interesse aan te duiden"); in een halve rij liep die over drie regels. */
+.vtk-event-actions.tshop-event-actions a.vtk-interest-toggle,
+.vtk-event-actions.tshop-event-actions .vtk-interest-pill,
+.vtk-event-actions.tshop-event-actions .vtk-interest-error,
+.vtk-event-actions.tshop-event-actions .vtk-interest-expand {
+  flex-basis: 100%;
+}
+
+.tshop-event-when {
+  margin: 0 22px;
+}
+
 /* ---------- Jouw gegevens ---------- */
 
 .tshop-details {
@@ -530,6 +631,14 @@
 
   .tshop-side > .tshop-rail {
     order: 1;
+    margin: 0;
+  }
+
+  /* Op de eventpagina volgen interesse en agenda meteen op de tickets, voor de
+     affiche: het zijn dezelfde soort beslissingen. */
+  .tshop-side > .tshop-event-actions,
+  .tshop-side > .tshop-event-when {
+    order: -1;
     margin: 0;
   }
 }

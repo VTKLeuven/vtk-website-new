@@ -59,8 +59,9 @@ export default async function NewTicketEventPage({
   const calendarEvents = groups.length
     ? await prisma.calendarEvent.findMany({
         where: {
+          // Ook een event dat al tickets heeft: een event kan meerdere
+          // ticketpagina's hebben (een eerstejaarsuur, de waves van Galabal).
           groupId: { in: groups.map((group) => group.id) },
-          ticketEvent: null,
         },
         orderBy: { start: "desc" },
         take: 100,

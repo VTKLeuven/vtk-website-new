@@ -2535,3 +2535,24 @@
 .ticket-stats-picker-actions {
   margin-top: 14px;
 }
+
+/* Hoe een gekoppelde verkoop op haar kalenderevent staat: op de eventpagina,
+   met welke naam als tab, en met of zonder eigen uren. Geen kader: het hoort bij
+   de keuze van het kalenderevent erboven, en een kaart in de kaart van het
+   paneel zou een kaart in een kaart zijn. */
+.ticket-admin-field.ticket-admin-placement {
+  gap: 8px;
+}
+
+.ticket-admin-placement legend {
+  float: left;
+  width: 100%;
+  margin: 0 0 2px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ticket-admin-placement .ticket-admin-form-grid {
+  margin: 4px 0;
+}

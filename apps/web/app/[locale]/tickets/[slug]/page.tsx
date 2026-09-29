@@ -9,6 +9,9 @@ import {
   getPublishedTicketEventBySlug,
   getTicketEventPreviewBySlug,
 } from "@/lib/ticketing/queries";
+import { loadCalendarEvent } from "@/lib/pageQueries";
+import { eventPageTickets, sortEventPageTickets } from "@/lib/ticketing/eventPage";
+import { EventTicketsPage } from "@/components/calendar/EventTicketsPage";
 import { hasLocale } from "@/lib/locale";
 import { MapPinIcon, UsersIcon } from "@/components/ui/icons";
 import { buildMetadata } from "@/lib/seo";
@@ -62,7 +65,9 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   const date = formatTicketDate(event.startsAt, locale);
   const place = event.location ? ` · ${event.location}` : "";
   return buildMetadata({
-    title: event.title,
+    // De naam van de verkoop erbij: een event met meerdere ticketpagina's heeft
+    // anders twee gedeelde links met exact dezelfde titel.
+    title: event.label ? `${event.title} · ${event.label}` : event.title,
     description: `${date}${place}${event.description ? ` · ${event.description}` : ""}`,
     path: `/tickets/${slug}`,
     locale,
@@ -87,28 +92,56 @@ export default async function TicketEventPage({
     : await loadEvent(slug, locale);
   if (!event) notFound();
   const previewText = PREVIEW[locale];
+  const previewBar = preview ? (
+    <div className="ticket-preview-bar">
+      <p>
+        <span className="ticket-preview-tag">
+          <Eye size={14} aria-hidden="true" /> {previewText.label}
+        </span>
+        <strong>{event.status === "PUBLISHED" ? previewText.live : previewText.draft}</strong>
+        <span>{previewText.types}</span>
+      </p>
+      <Link className="ticket-preview-back" href={`${base}/admin/tickets/${event.id}/instellingen`}>
+        <PencilLine size={16} aria-hidden="true" /> {previewText.back}
+      </Link>
+    </div>
+  ) : null;
+
+  // Staat deze verkoop op de eventpagina, dan is dit adres die eventpagina, met
+  // deze verkoop gekozen. Het adres blijft van deze verkoop, zodat ze apart te
+  // delen is. Staat het kalenderevent (nog) niet online, dan blijft het een
+  // losse ticketpagina: anders zou een concept de verkoop verbergen.
+  if (event.onEventPage && event.calendarEventId) {
+    const calendarEvent = await loadCalendarEvent(event.calendarEventId);
+    if (calendarEvent) {
+      let tabs = eventPageTickets(calendarEvent.ticketEvents);
+      // Een voorbeeld van een verkoop die nog niet gepubliceerd is: die hoort
+      // er dan toch als tab bij, anders toont het voorbeeld een andere verkoop.
+      const self = calendarEvent.ticketEvents.find((ticket) => ticket.id === event.id);
+      if (self && !tabs.some((ticket) => ticket.id === self.id)) {
+        tabs = sortEventPageTickets([...tabs, self]);
+      }
+      return (
+        <EventTicketsPage
+          event={calendarEvent}
+          tickets={tabs}
+          allTickets={calendarEvent.ticketEvents}
+          selected={event}
+          locale={locale}
+          preview={preview}
+          returnPath={`${base}/tickets/${event.slug}`}
+          before={previewBar}
+        />
+      );
+    }
+  }
+
   const organiser = event.ownerGroupName ?? "VTK";
   const location = event.location ?? (locale === "nl" ? "Locatie volgt" : "Location to be announced");
 
   return (
     <div className="vtk-page vtk-tickets-page">
-      {preview ? (
-        <div className="ticket-preview-bar">
-          <p>
-            <span className="ticket-preview-tag">
-              <Eye size={14} aria-hidden="true" /> {previewText.label}
-            </span>
-            <strong>{event.status === "PUBLISHED" ? previewText.live : previewText.draft}</strong>
-            <span>{previewText.types}</span>
-          </p>
-          <Link
-            className="ticket-preview-back"
-            href={`${base}/admin/tickets/${event.id}/instellingen`}
-          >
-            <PencilLine size={16} aria-hidden="true" /> {previewText.back}
-          </Link>
-        </div>
-      ) : null}
+      {previewBar}
       {/* Dezelfde kop als een event in de kalender (vtk-event.css): de lange
           beschrijving hoort niet op de donkere band, die staat hieronder. */}
       <header className="vtk-page-head vtk-event-head">
@@ -117,7 +150,12 @@ export default async function TicketEventPage({
             <Link href={`${base}/tickets`} className="vtk-link">Tickets</Link> · {organiser}
           </div>
           <h1 className="vtk-page-title">{event.title}</h1>
-          <p className="vtk-page-subtitle">{formatTicketDate(event.startsAt, locale)}</p>
+          <p className="vtk-page-subtitle">
+            {/* Een event met meerdere ticketpagina's: de titel is die van het
+                event, de naam zegt welke verkoop dit is. */}
+            {event.label ? `${event.label} · ` : null}
+            {formatTicketDate(event.startsAt, locale)}
+          </p>
         </div>
         <div className="vtk-event-meta">
           <div>
