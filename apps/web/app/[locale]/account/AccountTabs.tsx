@@ -23,7 +23,7 @@ export function AccountTabs({
   const [activeTab, setActiveTab] = useState<AccountTab>('vtk');
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const panelsRef = useRef<HTMLDivElement>(null);
-  const pendingScroll = useRef<string | null>(null);
+  const pendingScroll = useRef<{ id: string; tab: AccountTab } | null>(null);
   const tabs: Array<{ id: AccountTab; label: string }> = [
     { id: 'vtk', label: nl ? 'Mijn VTK' : 'My VTK' },
     { id: 'details', label: nl ? 'Mijn gegevens' : 'My details' },
@@ -48,7 +48,7 @@ export function AccountTabs({
       if (panel.hidden) {
         // In een `hidden` paneel heeft het doel geen positie: scrol pas nadat
         // het tabblad open staat (het effect hieronder).
-        pendingScroll.current = id;
+        pendingScroll.current = { id, tab };
         setActiveTab(tab);
       } else {
         target.scrollIntoView({ block: 'start' });
@@ -59,11 +59,19 @@ export function AccountTabs({
     return () => window.removeEventListener('hashchange', openFromHash);
   }, []);
 
+  // Wacht tot het juiste tabblad echt open staat. Bij het laden draait dit
+  // effect meteen na het vorige, nog op het oude tabblad: toen werd het doel
+  // daar al opgebruikt en scrolde een verse /account#study niet.
   useEffect(() => {
-    const id = pendingScroll.current;
-    if (!id) return;
-    pendingScroll.current = null;
-    document.getElementById(id)?.scrollIntoView({ block: 'start' });
+    const pending = pendingScroll.current;
+    if (!pending || pending.tab !== activeTab) return;
+    // Een frame later, zodat het net zichtbare paneel al een layout heeft. Pas
+    // daar leegmaken: Strict Mode annuleert het eerste frame via de cleanup.
+    const frame = requestAnimationFrame(() => {
+      pendingScroll.current = null;
+      document.getElementById(pending.id)?.scrollIntoView({ block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
   }, [activeTab]);
 
   function activateTab(index: number) {
