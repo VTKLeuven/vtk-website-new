@@ -47,6 +47,7 @@ export async function loadTheokotStats(range: { from: Date | null; to: Date }): 
       createdAt: true,
       pickedUpAt: true,
       totalCents: true,
+      grocomeetId: true,
       voucherRedemption: { select: { id: true } },
       lines: { select: { sessionItemId: true, quantity: true, unitPriceCents: true } },
     },
@@ -60,10 +61,11 @@ export async function loadTheokotStats(range: { from: Date | null; to: Date }): 
         meetingCount: _count.meetingReservations,
       })),
     })),
-    orders.map(({ voucherRedemption, ...order }) => ({
+    orders.map(({ voucherRedemption, grocomeetId, ...order }) => ({
       ...order,
       status: order.status as StatsOrderStatus,
       voucher: voucherRedemption !== null,
+      grocomeet: grocomeetId !== null,
     })),
   );
 }

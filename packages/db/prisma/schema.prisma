@@ -3374,10 +3374,20 @@ model TheokotOrder {
   /// shift-herinneringen: eerst de markering zetten in een voorwaardelijke
   /// update, dan pas versturen. Bij twijfel liever geen bericht dan twee.
   pickupPushedAt    DateTime?          @db.Timestamptz(3)
+  /// De grocomeet in wiens doos deze bestelling meegaat. Gezet wanneer wie
+  /// bestelt `grocomeet.reserve` heeft en er die dag een grocomeet is (zie
+  /// `linkGrocomeetOrders`). Zo'n bestelling staat in de GM-kolom van de
+  /// turflijst, wordt niet aan de balie afgehaald of betaald maar via het
+  /// geldoverzicht van de grocomeet, en telt na de afhaal als opgehaald in
+  /// plaats van als no-show. NULL bij elke gewone bestelling.
+  grocomeetId       String?
+  /// Afgerekend bij de grocomeet, zoals `MeetingReservation.paidAt`.
+  grocomeetPaidAt   DateTime?          @db.Timestamptz(3)
 
   session           TheokotSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user              User                      @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
   pickedUpBy        User?                     @relation("TheokotPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+  grocomeet         Meeting?                  @relation(fields: [grocomeetId], references: [id], onDelete: SetNull)
   lines             TheokotOrderLine[]
   voucherRedemption TheokotVoucherRedemption?
 
@@ -3386,6 +3396,7 @@ model TheokotOrder {
   @@index([status])
   @@index([status, noShowProcessedAt])
   @@index([status, pickupPushedAt])
+  @@index([grocomeetId])
 }
 
 /// Auditrij wanneer een student aan de afhaalbalie nog openstaande
@@ -3468,9 +3479,11 @@ model Meeting {
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
-  createdBy    User?                @relation("MeetingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  options      MeetingOption[]
-  reservations MeetingReservation[]
+  createdBy     User?                @relation("MeetingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  options       MeetingOption[]
+  reservations  MeetingReservation[]
+  /// Wat grocos die dag zelf bij Theokot bestelden (enkel bij een GM).
+  theokotOrders TheokotOrder[]
 
   @@index([kind, startsAt])
   @@index([year, semester, kind])

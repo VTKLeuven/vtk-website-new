@@ -18,6 +18,7 @@ import {
 import { currentWorkingYear } from "@/lib/workingYear";
 import {
   getMeetingDrinks,
+  linkGrocomeetOrders,
   offeringForMeeting,
   sessionForMeeting,
   syncMeetingReservations,
@@ -191,7 +192,7 @@ export async function planMeetingsAction(_prev: SaveState, formData: FormData): 
       continue;
     }
 
-    await prisma.meeting.create({
+    const created = await prisma.meeting.create({
       data: {
         kind,
         year,
@@ -203,6 +204,8 @@ export async function planMeetingsAction(_prev: SaveState, formData: FormData): 
         createdById: session.user.id,
       },
     });
+    // Een GM die er pas bijkomt terwijl er die dag al besteld is.
+    await linkGrocomeetOrders(created);
   }
 
   let keptWithReservations = 0;
@@ -273,6 +276,8 @@ export async function createMeetingAction(_prev: SaveState, formData: FormData):
     target: meetingLabel(kind, startsAt),
     summary: location ? `in ${location}` : null,
   });
+
+  await linkGrocomeetOrders(created);
 
   revalidateMeeting(kind);
   return saveOk();
@@ -472,6 +477,37 @@ export async function toggleReservationPaidAction(formData: FormData): Promise<v
   });
 
   revalidatePath(adminPath(reservation.meeting.kind));
+}
+
+/**
+ * Idem voor wat een groco zelf bij Theokot bestelde en in de doos van de GM
+ * meeging: dat wordt niet aan de balie betaald, maar bij de grocomeet.
+ */
+export async function toggleGrocomeetOrderPaidAction(formData: FormData): Promise<void> {
+  await requireMeetingManager("GROCOMEET");
+  const id = String(formData.get("orderId") ?? "");
+  const order = await prisma.theokotOrder.findUnique({
+    where: { id },
+    select: { grocomeetId: true, grocomeetPaidAt: true, user: { select: { name: true } } },
+  });
+  if (!order?.grocomeetId) return;
+
+  await prisma.theokotOrder.update({
+    where: { id },
+    data: { grocomeetPaidAt: order.grocomeetPaidAt ? null : new Date() },
+  });
+
+  await logAudit({
+    action: "update",
+    entity: "theokotOrder",
+    entityId: id,
+    target: order.user.name,
+    summary: order.grocomeetPaidAt
+      ? "Theokot-bestelling voor de grocomeet afgevinkt als niet betaald"
+      : "Theokot-bestelling voor de grocomeet afgevinkt als betaald",
+  });
+
+  revalidatePath(adminPath("GROCOMEET"));
 }
 
 // -----------------------------------------------------------------------------

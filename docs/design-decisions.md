@@ -564,7 +564,8 @@ tabellen met een balkje), zodat de twee één familie zijn. De regels staan in
   dus niet in de cijfers.
 - **Vergaderingen (GM, bureau) spreken het aanbod aan.** Ze tellen mee voor "hoeveel
   van het aanbod raakte besteld" en "uitverkocht", niet voor de opbrengst van de
-  balie.
+  balie. Een bestelling van een groco in de doos van de GM telt als verkocht, maar
+  ook niet als opbrengst en niet als afhaalmoment.
 - **Uitverkocht na** is gemeten vanaf het openen van de bestelronde tot de
   bestelling die de voorraad van die dag bereikte, in de volgorde waarin ze
   binnenkwamen, en gemiddeld over de dagen waarop de soort uitverkocht raakte.
@@ -658,6 +659,7 @@ grocomeet en het bureau hetzelfde.
 - Er kan **één broodje en één drankje** per persoon per vergadering besteld worden,
   allebei optioneel: enkel een drankje (of niets) kan ook, zie hierboven.
 - Het **broodje van de week** staat er nooit bij: dat blijft voor de studenten.
+  Een groco kan het wel gewoon bij Theokot bestellen, zie hieronder.
 - Een reservatie wordt vaak **weken vooraf** gemaakt, terwijl Theokot het aanbod van
   die week pas een week op voorhand vastlegt. Zolang die verkoopdag niet bestaat,
   komen de keuzes uit de **catalogus** (`TheokotProduct`); bestaat ze wel, dan uit het
@@ -674,6 +676,44 @@ grocomeet en het bureau hetzelfde.
   reservatie staan en zegt het beheerscherm dat er geen verkoopdag is. Er draait
   bewust geen wachter op "de dag nadert en er is nog steeds niets": dat zou een tweede
   scheduler vragen voor iets wat het beheer sowieso op zijn scherm ziet.
+
+### Een groco die zelf bij Theokot bestelt
+
+De grocomeet telt 19 mensen en er zijn 20 broodjes van de week. Zet je dat broodje
+in het aanbod van de GM, dan geeft de kring zichzelf voorrang en blijft er voor de
+studenten bijna niets over. Daarom staat het er niet bij. Een groco kan het wel
+bestellen **zoals elke student**: bij Theokot, vanaf hetzelfde moment, met dezelfde
+limieten, en enkel zolang er nog zijn. Sinds september 2026 komt zo'n bestelling
+dan toch mee in de doos van de GM, zodat niemand tussen de vergadering en de balie
+moet kiezen.
+
+- **Wie**: iedereen met `grocomeet.reserve`. Dat is bewust het recht en niet "is
+  ingeschreven voor die GM", ook al zit het recht via de rol `admin` bij elk lid
+  van IT en Groep 5. Die gaan dus ook in de doos wanneer ze op een GM-dag bij
+  Theokot bestellen. Een superadmin enkel wanneer die het recht via een rol heeft.
+- **Wanneer**: enkel op een dag met een grocomeet (`TheokotOrder.grocomeetId`). Op
+  een andere dag is het een gewone bestelling. Het broodje gaat altijd helemaal in
+  de doos: er is geen keuze per bestelling om het toch zelf af te halen.
+- **Vastgelegd bij het bestellen**, en opnieuw bij aanpassen. Komt er een GM bij of
+  verhuist ze naar een andere dag, dan lijnt `linkGrocomeetOrders` de openstaande
+  bestellingen van die dag opnieuw uit. Wat al afgehandeld is, schuift niet meer.
+- **Turflijst**: die broodjes staan in de kolom GM, niet bij de studenten.
+- **Afhalen**: er is niets af te halen. De balie toont zo'n bestelling met de
+  melding dat ze in de doos zit, zonder knop om ze mee te geven of af te rekenen
+  en zonder bonnetjes (dat zou ze twee keer rekenen). Er vertrekt geen pushbericht
+  "je broodje ligt klaar". Na de afhaal zet de no-show-verwerking ze op opgehaald,
+  dus er komt geen no-show-mail en ze telt niet voor een ban.
+- **Geld**: betaald wordt bij de grocomeet, niet aan de balie. Het beheerscherm van
+  de GM toont ze per vergadering onder "Zelf bij Theokot besteld" met een eigen
+  vinkje voor betaald (`grocomeetPaidAt`), en ze tellen mee in het overzicht
+  "Openstaand". In het overzicht per dag van Theokot staan ze apart ("In de
+  GM-doos") en buiten opbrengst en kassa; in de statistieken tellen ze als
+  verkocht maar niet als opbrengst van de balie.
+- Een GM verwijderen laat die bestellingen bestaan, maar haalt ze uit de doos: dan
+  zijn het weer gewone bestellingen, af te halen en te betalen aan de balie. De
+  bevestiging zegt dat.
+- De VTK-app kent de melding nog niet: bestellen via de app legt het broodje wel in
+  de doos, maar de app toont het nog als af te halen aan de balie.
 
 ### Eigen aanbod (bureau zonder Theokot)
 

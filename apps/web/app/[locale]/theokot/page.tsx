@@ -42,7 +42,8 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
 
   // Zelfde lezing als de VTK-app doet (`/api/app/v1/theokot`), zodat het aanbod,
   // de voorraad en de ban niet op twee plaatsen berekend worden.
-  const { config, ban, sessions, used, message: msgValue } = await loadOrderableSessions(userId, now);
+  const { config, ban, sessions, used, grocomeetSessionIds, message: msgValue } =
+    await loadOrderableSessions(userId, now);
 
   const dayFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     timeZone: "Europe/Brussels",
@@ -79,6 +80,7 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
       orderWindowState:
         now < s.orderOpenAt ? "UPCOMING" : now >= s.orderCloseAt ? "CLOSED" : "OPEN",
       canOrder: canOrderNow(s, now),
+      grocomeet: grocomeetSessionIds.has(s.id),
       items: s.items.map((i) => ({
         id: i.id,
         name: pick(i.nameNl, i.nameEn, locale) ?? i.nameNl,
@@ -97,6 +99,7 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
             canCancel: existing.status === "RESERVED" && canCancel(s, now),
             // Aanpassen volgt het bestelvenster, net als bestellen zelf.
             canEdit: existing.status === "RESERVED" && canOrderNow(s, now),
+            grocomeet: existing.grocomeetId !== null,
             lines: existing.lines.map((l) => ({
               sessionItemId: l.sessionItemId,
               name: pick(l.sessionItem.nameNl, l.sessionItem.nameEn, locale) ?? l.sessionItem.nameNl,

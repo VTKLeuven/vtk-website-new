@@ -82,8 +82,8 @@ export default async function AdminGrocomeetPage({
         <h2 className="mb-1 text-lg font-semibold">{nl ? "Openstaand" : "Outstanding"}</h2>
         <p className="mb-4 text-sm text-[#5c667f]">
           {nl
-            ? `Per persoon over ${formatWorkingYear(workingYear)}. Afvinken doe je bij de vergadering zelf, zodat je ziet welke bestelling betaald werd.`
-            : `Per person over ${formatWorkingYear(workingYear)}. Tick off at the meeting itself, so you can see which order was paid.`}
+            ? `Per persoon over ${formatWorkingYear(workingYear)}, met wat grocos zelf bij Theokot bestelden voor in de doos. Afvinken doe je bij de vergadering zelf, zodat je ziet welke bestelling betaald werd.`
+            : `Per person over ${formatWorkingYear(workingYear)}, including what grocos ordered at Theokot themselves for the box. Tick off at the meeting itself, so you can see which order was paid.`}
         </p>
         {debts.length === 0 ? (
           <p className="text-sm text-[#5c667f]">{nl ? "Nog geen bestellingen." : "No orders yet."}</p>

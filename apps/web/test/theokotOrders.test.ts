@@ -22,6 +22,8 @@ const mocks = vi.hoisted(() => ({
   getTheokotConfig: vi.fn(),
   usageForSessionItemsTx: vi.fn(),
   usageForSessionItems: vi.fn(),
+  grocomeetOnDay: vi.fn(),
+  hasLivePermission: vi.fn(),
 }));
 
 vi.mock("@vtk/db", () => ({
@@ -42,7 +44,10 @@ vi.mock("@/lib/theokot-server", () => ({
 vi.mock("@/lib/meetings-server", () => ({
   usageForSessionItems: mocks.usageForSessionItems,
   usageForSessionItemsTx: mocks.usageForSessionItemsTx,
+  grocomeetOnDay: mocks.grocomeetOnDay,
 }));
+
+vi.mock("@/lib/livePermissions", () => ({ hasLivePermission: mocks.hasLivePermission }));
 
 // De transactie voert haar callback gewoon uit; wat we hier testen zijn de
 // beslissingen erbinnen, niet het isolatieniveau van Postgres.
@@ -81,6 +86,7 @@ const CONFIG = {
 function openSession() {
   return {
     id: "sess-1",
+    date: new Date("2026-09-14T22:00:00.000Z"),
     isOpen: true,
     orderOpenAt: new Date("2026-09-13T10:00:00.000Z"),
     orderCloseAt: new Date("2026-09-15T08:30:00.000Z"),
@@ -97,6 +103,8 @@ describe("bestellen bij het Theokot", () => {
     mocks.getTheokotConfig.mockResolvedValue(CONFIG);
     mocks.activeBanFor.mockResolvedValue(null);
     mocks.usageForSessionItemsTx.mockResolvedValue(new Map());
+    mocks.hasLivePermission.mockResolvedValue(false);
+    mocks.grocomeetOnDay.mockResolvedValue(null);
     mocks.findUniqueOrderTx.mockResolvedValue(null);
     mocks.createOrder.mockResolvedValue({ id: "order-1", totalCents: 260 });
     // Het venster staat open: nu ligt tussen open en sluit.
@@ -201,6 +209,70 @@ describe("bestellen bij het Theokot", () => {
           lines: { create: [{ sessionItemId: "item-1", quantity: 3, unitPriceCents: 260 }] },
         }),
       }),
+    );
+  });
+});
+
+/**
+ * Een groco bestelt bij Theokot op dezelfde voet als elke student: dezelfde
+ * voorraad, dezelfde limieten, geen voorrang. Enkel waar het broodje belandt,
+ * verschilt: op een dag met een grocomeet gaat het mee in de doos van de GM.
+ */
+describe("een groco die zelf bij Theokot bestelt", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getTheokotConfig.mockResolvedValue(CONFIG);
+    mocks.activeBanFor.mockResolvedValue(null);
+    mocks.usageForSessionItemsTx.mockResolvedValue(new Map());
+    mocks.findUniqueOrderTx.mockResolvedValue(null);
+    mocks.createOrder.mockResolvedValue({ id: "order-1", totalCents: 300 });
+    mocks.findUniqueSession.mockResolvedValue({
+      ...openSession(),
+      orderCloseAt: new Date("2026-09-15T10:00:00.000Z"),
+    });
+    mocks.grocomeetOnDay.mockResolvedValue("gm-1");
+  });
+
+  it("legt de bestelling in de doos van de grocomeet van die dag", async () => {
+    mocks.hasLivePermission.mockResolvedValue(true);
+
+    await placeOrder("user-1", "sess-1", [{ sessionItemId: "item-2", quantity: 1 }], NOW);
+
+    expect(mocks.hasLivePermission).toHaveBeenCalledWith("user-1", "grocomeet.reserve");
+    expect(mocks.grocomeetOnDay).toHaveBeenCalledWith(openSession().date, expect.anything());
+    expect(mocks.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ grocomeetId: "gm-1" }) }),
+    );
+  });
+
+  it("laat een gewone student erbuiten, ook op een dag met een grocomeet", async () => {
+    mocks.hasLivePermission.mockResolvedValue(false);
+
+    await placeOrder("user-1", "sess-1", [{ sessionItemId: "item-2", quantity: 1 }], NOW);
+
+    expect(mocks.grocomeetOnDay).not.toHaveBeenCalled();
+    expect(mocks.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ grocomeetId: null }) }),
+    );
+  });
+
+  it("houdt zich aan dezelfde limiet op broodjes van de week als een student", async () => {
+    mocks.hasLivePermission.mockResolvedValue(true);
+
+    await expect(
+      placeOrder("user-1", "sess-1", [{ sessionItemId: "item-2", quantity: 2 }], NOW),
+    ).rejects.toBeInstanceOf(TheokotValidationError);
+    expect(mocks.createOrder).not.toHaveBeenCalled();
+  });
+
+  it("zonder grocomeet die dag blijft het een gewone bestelling", async () => {
+    mocks.hasLivePermission.mockResolvedValue(true);
+    mocks.grocomeetOnDay.mockResolvedValue(null);
+
+    await placeOrder("user-1", "sess-1", [{ sessionItemId: "item-1", quantity: 1 }], NOW);
+
+    expect(mocks.createOrder).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ grocomeetId: null }) }),
     );
   });
 });

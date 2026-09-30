@@ -51,6 +51,12 @@ export type PickupOrder = {
    * dat het laattijdig is.
    */
   isLate: boolean;
+  /**
+   * Deze bestelling zit in de doos van de grocomeet (`grocomeetId`): ze ligt
+   * niet aan de balie en wordt daar ook niet betaald. De balie toont ze enkel,
+   * zodat een groco die toch langskomt, weet waar zijn broodje is.
+   */
+  grocomeet: boolean;
 };
 
 export type PickupLookupResult =
@@ -180,6 +186,7 @@ export async function pickupForUser(
         voucherCoversCents,
         voucherCost: sandwichVoucherCost(voucherCoversCents, config.voucherHalfCents),
         isLate: order.status === "NO_SHOW" || order.session.pickupEnd < now,
+        grocomeet: order.grocomeetId !== null,
         lines: order.lines.map((line) => ({
           nameNl: line.sessionItem.nameNl,
           nameEn: line.sessionItem.nameEn,

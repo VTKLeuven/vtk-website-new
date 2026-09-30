@@ -60,7 +60,12 @@ export async function POST(request: Request) {
       mayHandOut ? pickupForUser(user.id) : Promise.resolve(null),
     ]);
 
-    const order = pickup && pickup.ok ? pickup.orders.find((row) => row.status === "RESERVED") : null;
+    // Een bestelling in de doos van de grocomeet ligt niet aan de balie en wordt
+    // daar ook niet betaald; de app kent die melding (nog) niet, dus ze valt weg.
+    const order =
+      pickup && pickup.ok
+        ? pickup.orders.find((row) => row.status === "RESERVED" && !row.grocomeet)
+        : null;
     const vouchersBlocked = pickup?.ok === true && pickup.vouchersBlocked;
 
     const payload: AppPassHolder = {

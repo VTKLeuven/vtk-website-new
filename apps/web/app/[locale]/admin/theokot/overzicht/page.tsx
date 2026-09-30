@@ -42,6 +42,11 @@ type SessionTotals = {
   noShows: number;
   voucherPeople: number;
   voucherCents: number;
+  /**
+   * Bestellingen van grocos in de doos van de grocomeet. Die komen niet langs
+   * de balie en worden er niet betaald, dus ze staan buiten alle andere tellers.
+   */
+  grocomeet: number;
 };
 
 const EMPTY_TOTALS: SessionTotals = {
@@ -52,6 +57,7 @@ const EMPTY_TOTALS: SessionTotals = {
   noShows: 0,
   voucherPeople: 0,
   voucherCents: 0,
+  grocomeet: 0,
 };
 
 
@@ -117,7 +123,7 @@ export default async function TheokotOverviewPage({
       },
     }),
     prisma.theokotOrder.groupBy({
-      by: ["sessionId", "status"],
+      by: ["sessionId", "status", "grocomeetId"],
       _count: { _all: true },
       _sum: { totalCents: true },
     }),
@@ -142,6 +148,10 @@ export default async function TheokotOverviewPage({
   for (const group of grouped) {
     const row = totalsFor(group.sessionId);
     const count = group._count._all;
+    if (group.grocomeetId !== null) {
+      if (group.status !== "CANCELLED") row.grocomeet += count;
+      continue;
+    }
     if (group.status !== "CANCELLED") row.orders += count;
     if (group.status === "PICKED_UP") {
       row.pickedUp += count;
@@ -181,7 +191,9 @@ export default async function TheokotOverviewPage({
       })
     : [];
 
-  const byStatus = (status: TheokotOrderStatus) => orders.filter((order) => order.status === status);
+  const byStatus = (status: TheokotOrderStatus) =>
+    orders.filter((order) => order.status === status && order.grocomeetId === null);
+  const grocomeetOrders = orders.filter((order) => order.grocomeetId !== null);
   const reserved = byStatus("RESERVED");
   const pickedUp = byStatus("PICKED_UP").sort(
     (a, b) => (b.pickedUpAt?.getTime() ?? 0) - (a.pickedUpAt?.getTime() ?? 0),
@@ -221,6 +233,7 @@ export default async function TheokotOverviewPage({
       noShows: sum.noShows + row.noShows,
       voucherPeople: sum.voucherPeople + row.voucherPeople,
       voucherCents: sum.voucherCents + row.voucherCents,
+      grocomeet: sum.grocomeet + row.grocomeet,
     };
   }, EMPTY_TOTALS);
 
@@ -295,6 +308,14 @@ export default async function TheokotOverviewPage({
                   <dd className="text-2xl font-semibold tabular-nums text-vtk-ink">{selectedTotals.noShows}</dd>
                 </div>
               ) : null}
+              {selectedTotals.grocomeet > 0 ? (
+                <div>
+                  <dt className="text-xs font-semibold uppercase tracking-wide text-[#5c667f]">
+                    {nl ? "In de GM-doos" : "In the GM box"}
+                  </dt>
+                  <dd className="text-2xl font-semibold tabular-nums text-vtk-ink">{selectedTotals.grocomeet}</dd>
+                </div>
+              ) : null}
               {caps.manage ? (
                 <>
                   <div>
@@ -336,8 +357,8 @@ export default async function TheokotOverviewPage({
             {caps.manage ? (
               <p className="mt-3 text-sm text-[#5c667f]">
                 {nl
-                  ? `Opbrengst is wat opgehaald werd; niet-opgehaalde broodjes tellen niet mee. Bonnetjes betalen één broodje, dus aan de balie is de opbrengst min ${formatEuro(selectedTotals.voucherCents)} aan bonnetjes.`
-                  : `Revenue is what was picked up; sandwiches that were not collected don't count. Vouchers pay for one sandwich, so at the counter is revenue minus ${formatEuro(selectedTotals.voucherCents)} in vouchers.`}
+                  ? `Opbrengst is wat opgehaald werd; niet-opgehaalde broodjes tellen niet mee. Bonnetjes betalen één broodje, dus aan de balie is de opbrengst min ${formatEuro(selectedTotals.voucherCents)} aan bonnetjes.${selectedTotals.grocomeet > 0 ? " Wat in de GM-doos zit, staat hier niet in: dat wordt bij de grocomeet afgerekend." : ""}`
+                  : `Revenue is what was picked up; sandwiches that were not collected don't count. Vouchers pay for one sandwich, so at the counter is revenue minus ${formatEuro(selectedTotals.voucherCents)} in vouchers.${selectedTotals.grocomeet > 0 ? " What is in the GM box is not included: that is settled at the grocomeet." : ""}`}
               </p>
             ) : null}
           </Card>
@@ -507,6 +528,34 @@ export default async function TheokotOverviewPage({
             extraHeading={nl ? "Om, door" : "At, by"}
             classes={{ th, td, num }}
           />
+
+          {grocomeetOrders.length > 0 ? (
+            <OrderTable
+              title={nl ? "In de doos van de grocomeet" : "In the grocomeet box"}
+              empty=""
+              nl={nl}
+              rows={grocomeetOrders.map((order) => ({
+                id: order.id,
+                name: order.user.name,
+                rNumber: order.user.rNumber,
+                items: itemsLabel(order),
+                total: formatEuro(order.totalCents),
+                extra: (
+                  <span className="text-[#5c667f]">
+                    {order.status === "PICKED_UP"
+                      ? nl
+                        ? "meegegeven"
+                        : "handed over"
+                      : nl
+                        ? "nog te maken"
+                        : "still to make"}
+                  </span>
+                ),
+              }))}
+              extraHeading={nl ? "Status" : "Status"}
+              classes={{ th, td, num }}
+            />
+          ) : null}
 
           {noShows.length > 0 ? (
             <OrderTable
