@@ -32,7 +32,9 @@ import {
   momentsOverlap,
   REQUESTER_TYPE_LABELS,
   toBrusselsDateValue,
+  transportEventChanges,
   transportPriceCents,
+  tripTitle,
   type TripHandoverMode,
   type TripHandoverOutcome,
 } from '@/lib/uitleen';
@@ -63,6 +65,7 @@ function revalidateBeheer() {
   revalidatePath('/beheer');
   revalidatePath('/beheer/aanvragen');
   revalidatePath('/beheer/vervoer');
+  revalidatePath('/beheer/vervoer/week');
   revalidatePath('/beheer/materiaal');
   revalidatePath('/beheer/sjablonen');
   revalidatePath('/beheer/flesserke');
@@ -536,16 +539,28 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
  * Werkt op materiaal-, flesserke- en vervoeraanvragen; bij een heen-en-terugrit
  * of meerdere voertuigen gaat de hele groep mee, want die horen sowieso bij
  * elkaar.
+ *
+ * Bij een rit gaat de naam mee (`eventName`), en dat is het halve werk: tot
+ * september 2026 zette deze actie enkel `eventId`. Na "Loskoppelen" stond de
+ * naam dan nog in de lijst, in de planning en in de agendafeed, en leek de knop
+ * niets te doen. Loskoppelen wist de naam dus altijd, ook wanneer het een naam
+ * is die de aanvrager zelf intikte zonder te koppelen: dat is de "Wissen" bij
+ * zo'n losse naam. De oude waarde staat in de historiek. Zie
+ * docs/design-decisions.md.
  */
 export async function linkToEventAction(
   target: { kind: 'reservation' | 'transport'; id: string },
   eventId: string | null
 ): Promise<ActionResult> {
-  await requireManage();
+  const session = await requireManage();
 
+  let event: { id: string; name: string } | null = null;
   if (eventId) {
-    const exists = await prisma.uitleenEvent.findUnique({ where: { id: eventId }, select: { id: true } });
-    if (!exists) return { ok: false, error: 'Evenement niet gevonden.' };
+    event = await prisma.uitleenEvent.findUnique({
+      where: { id: eventId },
+      select: { id: true, name: true },
+    });
+    if (!event) return { ok: false, error: 'Evenement niet gevonden.' };
   }
 
   if (target.kind === 'reservation') {
@@ -554,21 +569,66 @@ export async function linkToEventAction(
       data: { eventId },
     });
     if (updated.count === 0) return { ok: false, error: 'Aanvraag niet gevonden.' };
-  } else {
-    const booking = await prisma.uitleenTransportBooking.findUnique({
-      where: { id: target.id },
-      select: { tripGroupId: true },
-    });
-    if (!booking) return { ok: false, error: 'Rit niet gevonden.' };
-    await prisma.uitleenTransportBooking.updateMany({
-      where: booking.tripGroupId ? { tripGroupId: booking.tripGroupId } : { id: target.id },
-      data: { eventId },
-    });
+    revalidateBeheer();
+    revalidateEvents();
+    return { ok: true, message: eventId ? 'Aan het evenement gekoppeld.' : 'Losgekoppeld.' };
   }
+
+  const outcome = await setTransportEvent(target.id, event, session.user.id);
+  if (outcome === 'NOT_FOUND') return { ok: false, error: 'Rit niet gevonden.' };
+  if (outcome === 'NO_CHANGES') return { ok: true, message: 'Niets gewijzigd.' };
 
   revalidateBeheer();
   revalidateEvents();
-  return { ok: true, message: eventId ? 'Aan het evenement gekoppeld.' : 'Losgekoppeld.' };
+  return {
+    ok: true,
+    message: event
+      ? 'Aan het evenement gekoppeld.'
+      : outcome === 'CLEARED_NAME'
+        ? 'Naam gewist.'
+        : 'Losgekoppeld.',
+  };
+}
+
+/**
+ * Het evenement van een rit zetten of weghalen, voor beide helften samen.
+ *
+ * De enige plek die `eventId` en `eventName` van een bestaande rit schrijft,
+ * zodat ze niet opnieuw uit elkaar lopen. Eén historiekregel per helft: wie de
+ * terugrit opent, moet ook zien dat ze van evenement veranderde.
+ */
+async function setTransportEvent(
+  bookingId: string,
+  event: { id: string; name: string } | null,
+  actorId: string
+): Promise<'NOT_FOUND' | 'NO_CHANGES' | 'LINKED' | 'UNLINKED' | 'CLEARED_NAME'> {
+  return runSerializable(async (tx) => {
+    const booking = await tx.uitleenTransportBooking.findUnique({
+      where: { id: bookingId },
+      select: { tripGroupId: true },
+    });
+    if (!booking) return 'NOT_FOUND' as const;
+    const legs = await tx.uitleenTransportBooking.findMany({
+      where: booking.tripGroupId ? { tripGroupId: booking.tripGroupId } : { id: bookingId },
+      select: { id: true, eventId: true, eventName: true },
+    });
+    const changes = transportEventChanges(legs, event);
+    if (changes.length === 0) return 'NO_CHANGES' as const;
+
+    for (const change of changes) {
+      await tx.uitleenTransportBooking.update({
+        where: { id: change.id },
+        data: { eventId: event?.id ?? null, eventName: event ? event.name.slice(0, 300) : null },
+      });
+      await writeAudit(tx, { transportBookingId: change.id }, {
+        kind: 'EDITED',
+        note: change.note,
+        actorId,
+      });
+    }
+    if (event) return 'LINKED' as const;
+    return changes.some((change) => change.hadLink) ? ('UNLINKED' as const) : ('CLEARED_NAME' as const);
+  });
 }
 
 /**
@@ -1848,7 +1908,9 @@ async function overlappingBookings(
 }
 
 /**
- * "de rit van Feest op za 12 september 2026, 14:00-18:00", voor in een melding.
+ * `de rit "Tafels naar Alma 3" op za 12 september 2026, 14:00-18:00`, voor in
+ * een melding. Waarvoor de rit dient en niet het evenement (`tripTitle`): twee
+ * ritten die botsen, hangen vaak aan hetzelfde evenement.
  *
  * Het einde als enkel een uur zolang de rit binnen één dag blijft: de datum twee
  * keer voluit maakte er een zin van drie regels van, en dat is precies wat je in
@@ -1860,12 +1922,12 @@ function bookingLabel(booking: {
   startAt: Date;
   endAt: Date;
 }): string {
-  const what = booking.eventName?.trim() || booking.purpose;
+  const what = tripTitle(booking);
   const sameDay = toBrusselsDateValue(booking.startAt) === toBrusselsDateValue(booking.endAt);
   const end = sameDay
     ? formatBrusselsTime(booking.endAt)
     : `tot ${formatDateTime(booking.endAt)}`;
-  return `de rit van ${what} op ${formatDateTime(booking.startAt)}${sameDay ? `-${end}` : ` ${end}`}`;
+  return `de rit "${what}" op ${formatDateTime(booking.startAt)}${sameDay ? `-${end}` : ` ${end}`}`;
 }
 
 /** "de rit van A ... en de rit van B ...", voor een melding over meerdere. */
@@ -2377,7 +2439,10 @@ export async function adminCreateTransportAction(
  *
  * Wat je hier niet doet: goedkeuren, afwijzen, afronden of een chauffeur
  * toewijzen. Die hebben elk hun eigen actie met hun eigen regels; dit gaat over
- * de feiten van de rit.
+ * de feiten van de rit. Ook het evenement staat hier niet (meer): dat zet
+ * `linkToEventAction`, voor beide helften samen en ook op een gereden rit. Tot
+ * september 2026 kon het hier ook, maar dan enkel voor deze helft, en een sleep
+ * in de kalender stuurde de koppeling ongemerkt mee.
  *
  * **Voor wie de rit rijdt, hoort wél bij die feiten** (F4.4). Dat lag tot
  * september 2026 vast bij het aanmaken, terwijl een rit die op de verkeerde post
@@ -2406,13 +2471,6 @@ export async function adminEditTransportAction(
     destination: string;
     adminNote: string;
     /**
-     * Het evenement waar de rit onder hangt (A8). Weglaten laat de koppeling
-     * staan; een lege string haalt ze weg. De naam zoekt de actie zelf op, zodat
-     * een sleep in de kalender (die enkel de uren wijzigt) er geen bij de hand
-     * hoeft te hebben.
-     */
-    eventId?: string;
-    /**
      * Voor wie de rit rijdt (F4.4). Weglaten laat het staan: een sleep in de
      * kalender wijzigt enkel de uren en mag een rit niet stil van post
      * veranderen.
@@ -2438,26 +2496,10 @@ export async function adminEditTransportAction(
     return { ok: false, error: 'Kies uren op het kwartier (bv. 14:00, 14:15).' };
   }
 
-  // Buiten de transactie: het evenement bestaat los van deze rit, en een
+  // Buiten de transactie: de post bestaat los van deze rit, en een
   // Serializable-transactie die er een tweede tabel bij leest, is er een die
-  // vaker opnieuw moet.
-  // `|| null` en niet `?? null`: het formulier stuurt een lege string voor "geen
-  // evenement", en met `??` bleef dat een lege string. Die is niet gelijk aan de
-  // `null` in de database, dus elke sleep in de kalender schreef dan een regel
-  // "Evenement: geen → geen" in de historiek van een rit die niet veranderde.
-  const chosenEventId = input.eventId?.trim() || null;
-  let chosenEvent: { id: string; name: string } | null = null;
-  if (chosenEventId) {
-    chosenEvent = await prisma.uitleenEvent.findUnique({
-      where: { id: chosenEventId },
-      select: { id: true, name: true },
-    });
-    if (!chosenEvent) return { ok: false, error: 'Dat evenement bestaat niet meer; herlaad de pagina.' };
-  }
-
-  // Ook buiten de transactie, en om dezelfde reden: de post bestaat los van deze
-  // rit. `label` is wat er in de historiek komt te staan, in de woorden van de
-  // keuzelijst waarmee je het net veranderde ("Logistiek zelf" en niet "Interne
+  // vaker opnieuw moet. `label` is wat er in de historiek komt te staan, in de
+  // woorden van de keuzelijst waarmee je het net veranderde ("Logistiek zelf" en niet "Interne
   // post"): een historiekregel die iets anders noemt dan de knop, laat je twee
   // keer nadenken over één wijziging.
   let requester:
@@ -2505,8 +2547,6 @@ export async function adminEditTransportAction(
         pickupAddress: true,
         destination: true,
         adminNote: true,
-        eventId: true,
-        eventName: true,
         pricingMode: true,
         rateCents: true,
         requesterType: true,
@@ -2565,15 +2605,6 @@ export async function adminEditTransportAction(
     field('Laadadres', existing.pickupAddress, input.pickupAddress.trim() || null);
     field('Bestemming', existing.destination, input.destination.trim() || null);
     field('Nota van Logistiek', existing.adminNote, input.adminNote.trim() || null);
-    // De koppeling enkel aanraken wanneer het formulier ze meestuurde: een
-    // sleep in de kalender stuurt `eventId` niet mee, en die hoort een rit niet
-    // stil van haar evenement los te maken.
-    const eventChanged = input.eventId !== undefined && chosenEventId !== existing.eventId;
-    if (eventChanged) {
-      changes.push(
-        `Evenement: ${existing.eventName?.trim() || 'geen'} → ${chosenEvent?.name ?? 'geen'}`
-      );
-    }
     // Alle drie de velden vergelijken en niet enkel de post: van werkgroep
     // "Alumni" naar werkgroep "Faculteit" verandert enkel de naam.
     const requesterChanged =
@@ -2600,12 +2631,6 @@ export async function adminEditTransportAction(
         pickupAddress: input.pickupAddress.trim().slice(0, 300) || null,
         destination: input.destination.trim().slice(0, 300) || null,
         adminNote: input.adminNote.trim().slice(0, 1000) || null,
-        // De naam van het evenement is een momentopname naast de koppeling, net
-        // als bij een aanvraag van een lid: verdwijnt het evenement, dan blijft
-        // in de planning staan waarvoor deze rit reed.
-        ...(eventChanged
-          ? { eventId: chosenEvent?.id ?? null, eventName: chosenEvent?.name.slice(0, 300) ?? null }
-          : {}),
         // De drie samen of geen van drie: een type dat wijzigt terwijl de naam
         // blijft staan, levert een rit op die als post én als werkgroep leest.
         ...(requesterChanged && requester

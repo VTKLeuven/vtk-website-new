@@ -37,6 +37,9 @@ import {
   tripWindowFor,
   vanStatusLabel,
   vehiclesToDraw,
+  transportEventChanges,
+  tripEventName,
+  tripTitle,
 } from '@/lib/uitleen';
 
 describe('formatEuro', () => {
@@ -778,5 +781,76 @@ describe('vehiclesToDraw', () => {
 
   it('kan tegen een rit op een voertuig dat niet meer bestaat', () => {
     expect(vehiclesToDraw([kar], [{ vehicleId: 'weg' }])).toEqual([kar]);
+  });
+});
+
+describe('tripTitle', () => {
+  it('is waarvoor de rit dient, ook wanneer er een evenement aan hangt', () => {
+    expect(tripTitle({ purpose: 'Tafels naar Alma 3' })).toBe('Tafels naar Alma 3');
+  });
+
+  it('neemt enkel de eerste regel die iets zegt', () => {
+    expect(tripTitle({ purpose: '\n  Tafels ophalen \nen daarna de tap terug' })).toBe('Tafels ophalen');
+  });
+});
+
+describe('tripEventName', () => {
+  it('geeft de naam, of null wanneer er niets staat', () => {
+    expect(tripEventName({ eventName: ' Galabal ' })).toBe('Galabal');
+    expect(tripEventName({ eventName: '  ' })).toBeNull();
+    expect(tripEventName({ eventName: null })).toBeNull();
+  });
+});
+
+describe('transportEventChanges', () => {
+  const galabal = { id: 'ev-gala', name: 'Galabal' };
+
+  it('koppelt beide helften en zet de naam mee', () => {
+    const changes = transportEventChanges(
+      [
+        { id: 'heen', eventId: null, eventName: null },
+        { id: 'terug', eventId: null, eventName: null },
+      ],
+      galabal
+    );
+    expect(changes.map((change) => change.id)).toEqual(['heen', 'terug']);
+    expect(changes[0].note).toBe('Evenement: geen → Galabal');
+  });
+
+  it('wist bij loskoppelen ook de naam (daar liep het mis)', () => {
+    const [change] = transportEventChanges(
+      [{ id: 'rit', eventId: 'ev-gala', eventName: 'Galabal' }],
+      null
+    );
+    expect(change).toEqual({ id: 'rit', note: 'Evenement: Galabal → geen', hadLink: true });
+  });
+
+  it('wist een naam zonder koppeling, en zegt van wie die kwam', () => {
+    const [change] = transportEventChanges(
+      [{ id: 'rit', eventId: null, eventName: 'Cantus' }],
+      null
+    );
+    expect(change.note).toBe('Evenement: Cantus (door de aanvrager ingevuld) → geen');
+    expect(change.hadLink).toBe(false);
+  });
+
+  it('laat een helft die al klopt weg', () => {
+    expect(
+      transportEventChanges(
+        [
+          { id: 'heen', eventId: 'ev-gala', eventName: 'Galabal' },
+          { id: 'terug', eventId: null, eventName: null },
+        ],
+        galabal
+      ).map((change) => change.id)
+    ).toEqual(['terug']);
+    expect(transportEventChanges([{ id: 'rit', eventId: null, eventName: null }], null)).toEqual([]);
+  });
+
+  it('zet een verouderde naam gelijk met het evenement', () => {
+    // Het evenement werd hernoemd na het koppelen: opnieuw kiezen is een wijziging.
+    expect(
+      transportEventChanges([{ id: 'rit', eventId: 'ev-gala', eventName: 'Gala' }], galabal)
+    ).toHaveLength(1);
   });
 });

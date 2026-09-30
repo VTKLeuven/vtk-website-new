@@ -8,6 +8,8 @@ import {
   formatDateTime,
   parseNotifyEmails,
   requesterLabel,
+  tripEventName,
+  tripTitle,
   type NotifyKind,
   type TripHandoverOutcome,
 } from './uitleen';
@@ -434,7 +436,8 @@ export async function notifyGroupAssignedForTrip(
     if (!booking?.assignedGroup) return { mode: 'MISLUKT' };
 
     const group = booking.assignedGroup;
-    const what = booking.eventName?.trim() || booking.purpose;
+    const what = tripTitle(booking);
+    const event = tripEventName(booking);
     const url = `${logistiekBaseUrl()}/ritten`;
 
     /** De mail zelf, in de taal van wie ze krijgt. */
@@ -447,6 +450,7 @@ export async function notifyGroupAssignedForTrip(
           : `Logistics assigned a trip with ${booking.vehicle.nameNl} to ${group.nameNl}. Your post picks the driver (and any passengers).`,
         [
           `${nl ? 'Rit' : 'Trip'}: ${what}`,
+          event ? `${nl ? 'Evenement' : 'Event'}: ${event}` : null,
           `${nl ? 'Wanneer' : 'When'}: ${formatDateTime(booking.startAt, locale)} - ${formatDateTime(booking.endAt, locale)}`,
           booking.pickupAddress ? `${nl ? 'Laadadres' : 'Loading address'}: ${booking.pickupAddress}` : null,
           booking.destination ? `${nl ? 'Bestemming' : 'Destination'}: ${booking.destination}` : null,
@@ -833,9 +837,15 @@ async function transportSummary(id: string): Promise<{ title: string; text: stri
     : [{ startAt: booking.startAt, endAt: booking.endAt, vehicle: booking.vehicle }];
 
   return {
-    title: booking.eventName?.trim() || booking.purpose,
+    title: tripTitle(booking),
     text: joinBlocks([
-      `Waarvoor: ${booking.purpose}\nVan: ${requesterLabel(booking)} (${booking.user.name})`,
+      [
+        `Waarvoor: ${booking.purpose}`,
+        tripEventName(booking) ? `Evenement: ${tripEventName(booking)}` : null,
+        `Van: ${requesterLabel(booking)} (${booking.user.name})`,
+      ]
+        .filter(Boolean)
+        .join('\n'),
       legs
         .map(
           (leg) =>

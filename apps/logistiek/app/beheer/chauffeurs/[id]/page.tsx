@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { prisma } from '@vtk/db';
 import { requireManage } from '@/lib/session';
-import { formatDateTime, isNightTrip, tripHoursLabel } from '@/lib/uitleen';
+import { formatDateTime, isNightTrip, tripHoursLabel, tripTitle } from '@/lib/uitleen';
 import { tripsForDriver } from '@/lib/uitleen-server';
 
 /**
@@ -53,7 +53,7 @@ export default async function BeheerChauffeurRittenPage({
                 <th className="py-2 pr-3 font-medium">Wanneer</th>
                 <th className="py-2 pr-3 font-medium">Uren</th>
                 <th className="py-2 pr-3 font-medium">Voertuig</th>
-                <th className="py-2 pr-3 font-medium">Evenement</th>
+                <th className="py-2 pr-3 font-medium">Waarvoor</th>
                 <th className="py-2 pr-3 font-medium">Aanvrager</th>
               </tr>
             </thead>
@@ -74,7 +74,7 @@ export default async function BeheerChauffeurRittenPage({
                     ) : null}
                   </td>
                   <td className="py-2 pr-3 text-vtk-body">{trip.vehicle.nameNl}</td>
-                  <td className="py-2 pr-3 text-vtk-body">{trip.eventName ?? trip.purpose}</td>
+                  <td className="py-2 pr-3 text-vtk-body">{tripTitle(trip)}</td>
                   <td className="py-2 pr-3 text-vtk-body">{trip.user.name}</td>
                 </tr>
               ))}

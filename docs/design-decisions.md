@@ -3603,6 +3603,58 @@ intekenformulier, en de wijziging komt in de historiek van de rit.
   `adminEditTransportAction` wijzigt ze enkel wanneer ze die expliciet krijgt. Een
   rit een half uur verschuiven mag nooit een rit van eigenaar veranderen.
 
+### Een rit heet naar waarvoor ze dient, niet naar haar evenement
+
+Overal waar een rit een naam kreeg (het blok in de planning, de titel van het
+paneel, de lijst Ritten, de agendafeed, de mails) stond `eventName || purpose`.
+Hangt een rit aan een evenement, dan heette ze dus naar dat evenement, en
+heetten de vijf ritten voor een galabal allemaal "Galabal". Bij het plannen is
+de vraag net wélke van de vijf de tafels brengt. Sinds september 2026 is de
+titel `tripTitle`: de eerste regel van `purpose`.
+
+- **Het evenement staat ernaast, niet erin.** Als eigen rij in het paneel, klein
+  onder de titel in de lijst Ritten, als tag in de beheerkalender, als regel in
+  de beschrijving van de agendafeed en in de mails. In het blok van de planning
+  enkel als je "Evenement" aanvinkt onder Weergave: standaard uit, want een rit
+  van een kwartier is 24 pixels hoog en de regels die er stonden, blijven staan.
+- **De eerste regel, niet de hele tekst.** `purpose` is vrije tekst tot 1000
+  tekens en een titel staat op één regel. Het kaartje en het detail tonen de
+  volledige tekst wanneer er meer staat dan die eerste regel.
+
+### Het evenement van een rit zet je op één manier, ook vanuit de planning
+
+Een rit hangt aan een evenement met twee velden: `eventId` (de koppeling) en
+`eventName` (de momentopname van de naam, of wat een lid vrij intikte zonder te
+koppelen). Tot september 2026 schreven twee acties ze elk op hun manier, en
+liepen ze uit elkaar:
+
+- "Loskoppelen" op Ritten zette enkel `eventId` op null. De naam bleef staan, in
+  een tweede rij "Evenement", in de titel en in de feed, dus de knop leek niets
+  te doen. Koppelen daar zette omgekeerd geen naam.
+- In de planning stond de keuzelijst onderaan in "Rit aanpassen", enkel voor
+  deze helft van een heen- en terugrit, niet op een gereden rit, en ze verdween
+  helemaal zodra er binnen twee weken van de getoonde periode geen evenement
+  was.
+
+Nu schrijft enkel `linkToEventAction` die twee velden, via
+`transportEventChanges`, en beide schermen tonen dezelfde rij (`EventLink`):
+
+- **Koppeling en naam gaan altijd samen.** Koppelen zet de naam van het
+  evenement, loskoppelen wist ze. Ook een naam die de aanvrager zelf intikte:
+  die staat in de rij als "door de aanvrager ingevuld, niet gekoppeld", met een
+  knop "Wissen" achter een bevestiging. Daarmee ruim je ook de ritten op die
+  vóór deze wijziging "losgekoppeld" werden en hun naam hielden; die zijn in de
+  database niet te onderscheiden van een vrij ingetikte naam, want de oude actie
+  schreef geen historiek.
+- **Beide helften samen**, met een historiekregel per helft.
+- **Ook op een gereden of geannuleerde rit.** De koppeling groepeert enkel en
+  verandert niets aan de afspraak; de uren en de reden blijven wel op slot.
+- **Dezelfde keuzes op beide schermen**: `selectableEvents()`, de evenementen
+  van de voorbije maand en later. Het venster van ±14 dagen blijft enkel voor
+  een nieuwe rit en voor de strook boven het rooster.
+- **Slepen raakt het niet meer.** `adminEditTransportAction` kent het evenement
+  niet meer; een sleep stuurde de koppeling vroeger ongemerkt mee.
+
 ### Een eigen nota bij een rit, en wie ze mag lezen
 
 Een rit droeg al twee nota's: `memberNote` (wat de aanvrager bij het aanvragen
