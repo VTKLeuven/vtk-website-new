@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero 5: Krant</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,opsz,wght@0,5..1200,400..900;1,5..1200,400..900&family=Libre+Franklin:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Methode: voorpagina van een krant. Een kring die al sinds 1920 bestaat,
+   mag eruitzien als een dagblad: kop, lead met initiaal, kolommen, een
+   agenda, zoekertjes (de shiften) en een inhoudstafel (de snelkoppelingen).
+   Geel is enkel markeerstift. Palet: VTK-tokens. */
+:root { --paper: #EFF2F8; --paper-2: #E6ECF5; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --muted: #5C667F; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--paper); color: var(--ink); font-family: "Libre Franklin", sans-serif; min-height: 100dvh; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.serif { font-family: "Playfair Display", serif; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 36px 36px; }
+.mark { background: linear-gradient(transparent 55%, var(--yellow) 55%, var(--yellow) 92%, transparent 92%); padding: 0 .06em; }
+
+.topbar { display: flex; justify-content: space-between; align-items: center; height: 40px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); }
+.topbar .r { display: flex; gap: 18px; align-items: center; }
+.topbar i { font-size: 16px; color: var(--ink); }
+.mast { text-align: center; border-top: 3px solid var(--ink); border-bottom: 1px solid var(--ink); padding: 10px 0 8px; }
+.mast h2 { font-family: "Playfair Display"; font-weight: 900; font-size: 64px; letter-spacing: -0.02em; line-height: 1; font-variation-settings: "opsz" 1200; }
+.mast h2 img { height: 46px; vertical-align: -4px; filter: invert(1) brightness(.1); margin-right: 14px; }
+.dateline { display: flex; justify-content: space-between; border-bottom: 3px double var(--ink); padding: 7px 0; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .1em; }
+.sections { display: flex; justify-content: center; gap: 26px; padding: 10px 0; border-bottom: 1px solid var(--ink); font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.sections a:hover { text-decoration: underline; text-decoration-thickness: 3px; text-decoration-color: var(--yellow); text-underline-offset: 4px; }
+
+.front { display: grid; grid-template-columns: 2.1fr 1fr; gap: 0; margin-top: 22px; }
+.lead { padding-right: 32px; border-right: 1px solid var(--ink); }
+.kicker { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .14em; }
+.kicker span { background: var(--navy); color: var(--paper); padding: 3px 7px; margin-right: 8px; }
+h1 { font-family: "Playfair Display"; font-weight: 800; font-size: 88px; line-height: .95; letter-spacing: -0.03em; margin: 14px 0 18px; font-variation-settings: "opsz" 1200; }
+h1 em { font-weight: 500; }
+.deck { font-family: "Playfair Display"; font-style: italic; font-size: 24px; line-height: 1.3; color: var(--muted); margin-bottom: 18px; max-width: 34em; }
+.cols { columns: 2; column-gap: 28px; column-rule: 1px solid rgb(10 15 31 / .2); font-size: 15px; line-height: 1.6; }
+.cols p::first-letter { font-family: "Playfair Display"; font-weight: 900; float: left; font-size: 66px; line-height: .82; padding: 6px 8px 0 0; }
+.cols p + p::first-letter { all: unset; }
+.cols p + p { margin-top: 10px; }
+.cta { display: flex; gap: 22px; align-items: center; margin-top: 22px; }
+.stamp { display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 24px; background: var(--ink); color: var(--paper); font-weight: 700; font-size: 15px; transition: background .2s, color .2s, transform .2s; }
+.stamp:hover { background: var(--yellow); color: var(--ink); transform: rotate(-1.5deg); }
+.read { font-weight: 700; font-size: 15px; border-bottom: 3px solid var(--yellow); padding-bottom: 2px; }
+.read:hover { background: var(--yellow); }
+
+/* Rechterkolom: agenda en zoekertjes. */
+.side { padding-left: 28px; }
+.side h3 { font-family: "Playfair Display"; font-weight: 800; font-size: 28px; border-bottom: 2px solid var(--ink); padding-bottom: 4px; display: flex; justify-content: space-between; align-items: baseline; }
+.side h3 a { font-family: "Libre Franklin"; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; }
+.side h3 a:hover { text-decoration: underline; }
+.ag-day { font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); margin: 12px 0 2px; }
+.ag-day.today { color: var(--ink); }
+.ag-day.today::after { content: " vandaag"; background: var(--yellow); color: var(--ink); padding: 1px 5px; margin-left: 6px; }
+.ag { display: grid; grid-template-columns: 46px 1fr 20px; gap: 6px; padding: 6px 0; border-bottom: 1px dotted rgb(10 15 31 / .35); align-items: baseline; }
+.ag time { font-weight: 700; font-size: 13px; font-variant-numeric: tabular-nums; }
+.ag a { font-family: "Playfair Display"; font-weight: 700; font-size: 17px; line-height: 1.2; }
+.ag a:hover { text-decoration: underline; }
+.ag small { display: block; font-family: "Libre Franklin"; font-weight: 400; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.ag .star { font-size: 15px; color: var(--muted); }
+.ag .star:hover { color: var(--ink); }
+.classifieds { margin-top: 22px; border: 2px solid var(--ink); padding: 12px 14px; background: var(--surface); position: relative; }
+.classifieds::before { content: "Gezocht"; position: absolute; top: -12px; left: 12px; background: var(--yellow); font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: .14em; padding: 3px 8px; border: 2px solid var(--ink); }
+.ad { display: block; padding: 7px 0; border-bottom: 1px dotted rgb(10 15 31 / .35); font-size: 14px; line-height: 1.35; }
+.ad:last-of-type { border-bottom: 0; }
+.ad b { font-family: "Playfair Display"; font-size: 16px; }
+.ad:hover b { text-decoration: underline; }
+.ad small { color: var(--muted); }
+
+/* Inhoudstafel = snelkoppelingen. */
+.index { margin-top: 28px; border-top: 3px double var(--ink); display: grid; grid-template-columns: repeat(6, 1fr); }
+.ix { position: relative; padding: 16px 16px 14px; border-right: 1px solid rgb(10 15 31 / .25); display: flex; flex-direction: column; gap: 6px; transition: background .15s; }
+.ix:last-child { border-right: 0; }
+.ix i { position: absolute; top: 16px; right: 16px; font-size: 24px; }
+.ix b { font-family: "Playfair Display"; font-weight: 800; font-size: 22px; line-height: 1; padding-right: 30px; }
+.ix small { font-size: 13px; color: var(--muted); }
+.ix .pg { margin-top: auto; font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .14em; border-top: 1px solid var(--ink); padding-top: 6px; margin-top: 4px; display: flex; justify-content: space-between; }
+.ix:hover { background: var(--yellow); }
+.ix:hover small { color: var(--ink); }
+
+@media (max-width: 1050px) { .front { grid-template-columns: 1fr; } .lead { border-right: 0; padding-right: 0; border-bottom: 1px solid var(--ink); padding-bottom: 24px; } .side { padding: 20px 0 0; } .index { grid-template-columns: repeat(3, 1fr); } .ix:nth-child(3) { border-right: 0; } h1 { font-size: 64px; } .sections { flex-wrap: wrap; gap: 8px 18px; } }
+@media (max-width: 600px) { .wrap { padding: 0 14px 24px; } .mast h2 { font-size: 40px; } .mast h2 img { height: 30px; } h1 { font-size: 46px; } .cols { columns: 1; } .index { grid-template-columns: 1fr 1fr; } .dateline span:nth-child(2) { display: none; } .topbar .l { display: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="topbar"><span class="l">Gerund door studenten, sinds 1920</span><div class="r"><i class="ph ph-magnifying-glass"></i><span>NL / EN</span><span>Aangemeld</span><i class="ph ph-user-circle"></i></div></div>
+  <header class="mast"><h2><img src="../../../apps/web/public/vtk-logo.png" alt="">Vlaamse Technische Kring</h2></header>
+  <div class="dateline"><span>Donderdag 1 oktober 2026</span><span>Leuven, Arenberg</span><span>Jaargang 106</span></div>
+  <nav class="sections"><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+
+  <div class="front">
+    <article class="lead">
+      <p class="kicker"><span>Voorpagina</span>KU Leuven</p>
+      <h1>De thuis voor <span class="mark"><em>ingenieurs</em></span> in Leuven.</h1>
+      <p class="deck">Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt.</p>
+      <div class="cols">
+        <p>Al sinds 1920 runnen studenten hier zelf hun kring. Voor wie op Arenberg studeert, regelen we alles van de cursus die je morgen nodig hebt tot het broodje van vanmiddag.</p>
+        <p>Deze week draait de 12 Urencantus, start de PeMe en zoeken drie shiften nog volk. Wie nieuw is, begint best bij de eerstejaarswerking.</p>
+      </div>
+      <div class="cta"><a class="stamp" href="#">Ontdek wat we doen <i class="ph-bold ph-arrow-up-right"></i></a><a class="read" href="#">Eerstejaars? Start hier</a></div>
+    </article>
+
+    <aside class="side">
+      <h3>Agenda <a href="#">Volledige kalender →</a></h3>
+      <div class="ag-day today">Do 1 okt</div>
+      <div class="ag"><time>12:00</time><a href="#">12 Urencantus<small>Waaiberg, Tervuursevest 60</small></a><button class="star" aria-label="Interesse: 12 Urencantus"><i class="ph ph-star"></i></button></div>
+      <div class="ag"><time>20:30</time><a href="#">Looptraining<small>Atletiekpiste Sportkot</small></a><button class="star" aria-label="Interesse: Looptraining"><i class="ph ph-star"></i></button></div>
+      <div class="ag-day">Ma 5 okt</div>
+      <div class="ag"><time>19:00</time><a href="#">PeMe-Startactiviteit<small>Grasveld Alma 3</small></a><button class="star" aria-label="Interesse: PeMe-Startactiviteit"><i class="ph ph-star"></i></button></div>
+      <div class="ag-day">Di 6 okt</div>
+      <div class="ag"><time>18:30</time><a href="#">Sector Night Bouwkunde<small>Quadrivium, en nog 3 die dag</small></a><button class="star" aria-label="Interesse: Sector Night"><i class="ph ph-star"></i></button></div>
+
+      <div class="classifieds">
+        <a class="ad" href="#"><b>Bijrijders voor de afbraak</b> van de 12-urencantus. Morgen 01:00 tot 02:30. <small>Nog 2 plaatsen, 2 munten.</small></a>
+        <a class="ad" href="#"><b>Bijrijden met Stijn.</b> Morgen 11:00 tot 12:00. <small>Nog 1 plaats.</small></a>
+        <a class="ad" href="#"><b>Namiddagshift.</b> Morgen 14:00 tot 16:00. <small>Nog 1 plaats, 2 munten.</small></a>
+      </div>
+    </aside>
+  </div>
+
+  <nav class="index" aria-label="Snel naar">
+    <a class="ix" href="#"><b>Theokot</b><i class="ph ph-bread"></i><small>Bestel je broodje</small><span class="pg">Eten <span>→</span></span></a>
+    <a class="ix" href="#"><b>Cursusdienst</b><i class="ph ph-books"></i><small><span class="mark">Open</span> tot 13:55</small><span class="pg">Boeken <span>→</span></span></a>
+    <a class="ix" href="#"><b>Tweedehands</b><i class="ph ph-recycle"></i><small>Kopen en verkopen</small><span class="pg">Boeken <span>→</span></span></a>
+    <a class="ix" href="#"><b>Tijdslot</b><i class="ph ph-clock-countdown"></i><small>Ophaling Cudi</small><span class="pg">Reserveren <span>→</span></span></a>
+    <a class="ix" href="#"><b>Shiften</b><i class="ph ph-hand-heart"></i><small>Help mee</small><span class="pg">Werk <span>→</span></span></a>
+    <a class="ix" href="#"><b>Kalender</b><i class="ph ph-calendar-dots"></i><small>Alle events</small><span class="pg">Agenda <span>→</span></span></a>
+  </nav>
+</div>
+</body>
+</html>

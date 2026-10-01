@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero 11: VTK OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Methode: klassiek bureaublad (Mac OS 7 / Windows 95). De menubalk is de
+   navigatie, de snelkoppelingen zijn iconen op het bureaublad, welkom,
+   agenda en shiften zijn vensters die je kan verslepen. */
+:root { --paper: #EFF2F8; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --muted: #5C667F; --dim: #B7C0DC; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "IBM Plex Sans", sans-serif; color: var(--ink); min-height: 100dvh; overflow: hidden;
+  background-color: var(--navy);
+  background-image: radial-gradient(rgb(239 242 248 / .1) 1px, transparent 1px); background-size: 6px 6px; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.px { font-family: "Pixelify Sans", monospace; }
+
+.menubar { position: relative; z-index: 100; height: 30px; background: var(--paper); border-bottom: 2px solid var(--ink); display: flex; align-items: center; gap: 2px; padding: 0 10px; font-family: "Pixelify Sans"; font-size: 16px; }
+.menubar img { height: 18px; filter: invert(1) brightness(.1); margin-right: 10px; }
+.menubar a { padding: 2px 9px; }
+.menubar a:hover { background: var(--ink); color: var(--paper); }
+.menubar .r { margin-left: auto; display: flex; gap: 14px; align-items: center; }
+
+.desk { position: relative; height: calc(100dvh - 30px); }
+.icons { position: absolute; right: 22px; top: 22px; display: grid; grid-template-columns: 1fr 1fr; gap: 18px 14px; }
+.icon { width: 96px; display: flex; flex-direction: column; align-items: center; gap: 6px; color: var(--paper); text-align: center; }
+.icon .g { width: 58px; height: 58px; display: grid; place-items: center; font-size: 40px; background: var(--paper); color: var(--navy); border: 2px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+.icon:nth-child(odd) .g { background: var(--yellow); }
+.icon span { font-family: "Pixelify Sans"; font-size: 15px; padding: 1px 4px; line-height: 1.1; }
+.icon small { font-size: 11px; color: var(--dim); margin-top: -4px; }
+.icon:hover span, .icon:focus span { background: var(--yellow); color: var(--ink); }
+
+.win { position: absolute; background: var(--paper); border: 2px solid var(--ink); box-shadow: 6px 6px 0 rgb(10 15 31 / .6); }
+.bar { height: 28px; display: flex; align-items: center; gap: 8px; padding: 0 6px; border-bottom: 2px solid var(--ink); cursor: grab; user-select: none;
+  background: repeating-linear-gradient(var(--paper) 0 2px, var(--ink) 2px 3px); }
+.bar:active { cursor: grabbing; }
+.bar .close { width: 16px; height: 16px; border: 2px solid var(--ink); background: var(--paper); flex: none; }
+.bar .t { margin: 0 auto; background: var(--paper); padding: 0 10px; font-family: "Pixelify Sans"; font-size: 16px; font-weight: 500; }
+.win.active .bar { background: repeating-linear-gradient(var(--yellow) 0 2px, var(--ink) 2px 3px); }
+.win.active .bar .close, .win.active .bar .t { background: var(--yellow); }
+.body { padding: 20px 22px; }
+
+.w-welkom { left: 60px; top: 40px; width: 620px; }
+.w-welkom .k { font-size: 13px; color: var(--muted); }
+.w-welkom h1 { font-family: "Pixelify Sans"; font-weight: 700; font-size: 66px; line-height: .95; margin: 10px 0 14px; }
+.w-welkom h1 span { background: var(--ink); color: var(--yellow); padding: 0 8px; }
+.w-welkom p { font-size: 17px; line-height: 1.5; max-width: 32em; }
+.btns { display: flex; gap: 14px; margin-top: 20px; }
+.ob { height: 40px; padding: 0 18px; display: inline-flex; align-items: center; gap: 8px; border: 2px solid var(--ink); border-radius: 8px; background: var(--surface); font-family: "Pixelify Sans"; font-size: 17px; }
+.ob.def { outline: 3px solid var(--ink); outline-offset: 2px; background: var(--yellow); }
+.ob:active { background: var(--ink); color: var(--paper); }
+
+.w-agenda { left: 730px; top: 90px; width: 440px; }
+.w-agenda .body { padding: 0; }
+.tb { display: grid; grid-template-columns: 70px 60px 1fr 30px; font-size: 14px; }
+.tb > * { padding: 7px 10px; border-bottom: 1px solid rgb(10 15 31 / .15); }
+.tb .h { font-family: "Pixelify Sans"; font-size: 14px; background: var(--surface); border-bottom: 2px solid var(--ink); }
+.tb .today { font-weight: 600; background: rgb(255 210 63 / .35); }
+.tb a:hover { text-decoration: underline; }
+.tb .star { font-size: 16px; color: var(--muted); } .tb .star:hover { color: var(--ink); }
+.status { display: flex; justify-content: space-between; padding: 6px 10px; font-size: 12px; background: var(--surface); }
+.status a { text-decoration: underline; }
+
+.w-shift { left: 560px; top: 470px; width: 400px; }
+.w-shift .body { padding: 14px 16px; }
+.w-shift .alert { display: flex; gap: 12px; align-items: flex-start; }
+.w-shift .alert i { font-size: 38px; color: var(--navy); }
+.w-shift b { font-family: "Pixelify Sans"; font-size: 19px; font-weight: 500; }
+.w-shift ul { list-style: none; margin: 8px 0 12px; font-size: 14px; }
+.w-shift li { padding: 3px 0; }
+.w-shift li a:hover { text-decoration: underline; }
+.w-shift li small { color: var(--muted); }
+
+@media (max-width: 1100px) { body { overflow: auto; } .desk { height: auto; padding: 16px; display: grid; gap: 22px; } .win, .icons { position: static; width: auto; } .icons { grid-template-columns: repeat(3, 1fr); order: 2; } .menubar a.n { display: none; } .w-welkom h1 { font-size: 44px; } }
+</style>
+</head>
+<body>
+<nav class="menubar">
+  <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+  <a class="n" href="#">Info</a><a class="n" href="#">Shiften</a><a class="n" href="#">Career</a><a class="n" href="#">Cursusdienst</a><a class="n" href="#">Eerstejaars</a><a class="n" href="#">Evenementen</a><a class="n" href="#">Studies</a><a class="n" href="#">Media</a><a class="n" href="#">Over VTK</a>
+  <div class="r"><i class="ph-bold ph-magnifying-glass"></i><a href="#">NL</a><a href="#">Maxime</a><span id="clock">13:42</span></div>
+</nav>
+
+<div class="desk">
+  <nav class="icons" aria-label="Snel naar">
+    <a class="icon" href="#"><span class="g"><i class="ph-duotone ph-bread"></i></span><span>Theokot</span><small>broodje</small></a>
+    <a class="icon" href="#"><span class="g"><i class="ph-duotone ph-books"></i></span><span>Cursusdienst</span><small>open tot 13:55</small></a>
+    <a class="icon" href="#"><span class="g"><i class="ph-duotone ph-recycle"></i></span><span>Tweedehands</span><small>boeken</small></a>
+    <a class="icon" href="#"><span class="g"><i class="ph-duotone ph-clock-countdown"></i></span><span>Tijdslot</span><small>Cudi</small></a>
+    <a class="icon" href="#"><span class="g"><i class="ph-duotone ph-hand-heart"></i></span><span>Shiften</span><small>3 open</small></a>
+    <a class="icon" href="#"><span class="g"><i class="ph-duotone ph-calendar-dots"></i></span><span>Kalender</span><small>alle events</small></a>
+  </nav>
+
+  <section class="win w-welkom active">
+    <div class="bar"><span class="close"></span><span class="t">Welkom.txt</span></div>
+    <div class="body">
+      <p class="k">Vlaamse Technische Kring, KU Leuven</p>
+      <h1>De thuis voor <span>ingenieurs</span> in Leuven.</h1>
+      <p>Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+      <div class="btns"><a class="ob def" href="#">Ontdek wat we doen</a><a class="ob" href="#">Eerstejaars? Start hier</a></div>
+    </div>
+  </section>
+
+  <section class="win w-agenda">
+    <div class="bar"><span class="close"></span><span class="t">Agenda: deze week</span></div>
+    <div class="body">
+      <div class="tb">
+        <span class="h">Dag</span><span class="h">Tijd</span><span class="h">Event</span><span class="h"></span>
+        <span class="today">do 1</span><span class="today">12:00</span><a class="today" href="#">12 Urencantus</a><button class="star today" aria-label="Interesse: 12 Urencantus"><i class="ph ph-star"></i></button>
+        <span class="today">do 1</span><span class="today">20:30</span><a class="today" href="#">Looptraining</a><button class="star today" aria-label="Interesse: Looptraining"><i class="ph ph-star"></i></button>
+        <span>ma 5</span><span>19:00</span><a href="#">PeMe-Startactiviteit</a><button class="star" aria-label="Interesse: PeMe"><i class="ph ph-star"></i></button>
+        <span>ma 5</span><span>21:00</span><a href="#">CaraOké</a><button class="star" aria-label="Interesse: CaraOké"><i class="ph ph-star"></i></button>
+        <span>di 6</span><span>18:30</span><a href="#">Sector Night Bouwkunde</a><button class="star" aria-label="Interesse: Sector Night"><i class="ph ph-star"></i></button>
+      </div>
+      <div class="status"><span>5 van 10 events</span><a href="#">Volledige kalender</a></div>
+    </div>
+  </section>
+
+  <section class="win w-shift">
+    <div class="bar"><span class="close"></span><span class="t">Shiften</span></div>
+    <div class="body">
+      <div class="alert"><i class="ph-duotone ph-warning-circle"></i><div><b>3 shiften zoeken nog volk.</b>
+        <ul>
+          <li><a href="#">Bijrijden afbraak</a> <small>morgen 01:00, 2 munten</small></li>
+          <li><a href="#">Bijrijden met Stijn</a> <small>morgen 11:00</small></li>
+          <li><a href="#">Namiddagshift</a> <small>morgen 14:00, 2 munten</small></li>
+        </ul>
+        <a class="ob def" href="#">Alle shiften</a></div></div>
+    </div>
+  </section>
+</div>
+<script>
+let z = 10;
+document.querySelectorAll(".win").forEach(w => {
+  const front = () => { document.querySelectorAll(".win").forEach(x => x.classList.remove("active")); w.classList.add("active"); w.style.zIndex = ++z; };
+  w.addEventListener("pointerdown", front);
+  const bar = w.querySelector(".bar");
+  bar.addEventListener("pointerdown", e => {
+    if (matchMedia("(max-width: 1100px)").matches) return;
+    const sx = e.clientX - w.offsetLeft, sy = e.clientY - w.offsetTop;
+    bar.setPointerCapture(e.pointerId);
+    const move = ev => { w.style.left = (ev.clientX - sx) + "px"; w.style.top = Math.max(0, ev.clientY - sy) + "px"; };
+    const up = () => { bar.removeEventListener("pointermove", move); bar.removeEventListener("pointerup", up); };
+    bar.addEventListener("pointermove", move); bar.addEventListener("pointerup", up);
+  });
+});
+const tick = () => document.getElementById("clock").textContent = new Date().toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" });
+tick(); setInterval(tick, 10000);
+</script>
+</body>
+</html>

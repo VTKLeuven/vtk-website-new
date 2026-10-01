@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero 8: Zwitsers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:ital,wght@0,400..900;1,400..900&display=swap" rel="stylesheet">
+<style>
+/* Methode: International Typographic Style (Müller-Brockmann). Een streng
+   raster van twaalf kolommen, alles links uitgelijnd en rechts rafelig,
+   één geometrische vorm (de gele cirkel) als enige beeld. Geen iconen. */
+:root { --paper: #EFF2F8; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --muted: #5C667F; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--paper); color: var(--ink); font-family: "Schibsted Grotesk", sans-serif; min-height: 100dvh; overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.page { position: relative; max-width: 1360px; margin: 0 auto; padding: 28px 40px 40px; display: grid; grid-template-columns: repeat(12, 1fr); column-gap: 20px; }
+.circle { position: absolute; width: 640px; height: 640px; border-radius: 50%; background: var(--yellow); right: -120px; top: -60px; z-index: 0; }
+.page > *:not(.circle):not(.today) { position: relative; z-index: 1; }
+.s { font-size: 14px; line-height: 1.35; }
+.s b { font-weight: 700; }
+.mut { color: var(--muted); }
+
+.brand { grid-column: 1 / 3; }
+.brand img { height: 28px; filter: invert(1) brightness(.1); }
+.nav1 { grid-column: 3 / 5; }
+.nav2 { grid-column: 5 / 7; }
+.nav1 a, .nav2 a { display: block; }
+.nav1 a:hover, .nav2 a:hover { text-decoration: underline; text-decoration-thickness: 2px; }
+.meta { grid-column: 10 / 13; text-align: left; }
+.meta a:hover { text-decoration: underline; }
+
+h1 { grid-column: 1 / 11; margin-top: 70px; font-size: 128px; line-height: .86; font-weight: 800; letter-spacing: -0.055em; text-transform: lowercase; }
+h1 i { font-style: italic; font-weight: 500; }
+.lead { grid-column: 1 / 5; margin-top: 36px; font-size: 19px; line-height: 1.4; }
+.ctas { grid-column: 5 / 9; margin-top: 36px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.ctas a { font-size: 19px; font-weight: 700; display: inline-flex; gap: 10px; align-items: baseline; }
+.ctas a span { display: inline-block; transition: transform .2s; }
+.ctas a:hover span { transform: translateX(6px); }
+.ctas a.p { background: var(--ink); color: var(--paper); padding: 12px 18px; }
+.ctas a.p:hover { background: var(--navy); }
+.ctas a.g { border-bottom: 2px solid var(--ink); }
+
+/* Vandaag, groot getal in de cirkel. */
+.today { position: absolute; right: 70px; top: 150px; width: 300px; z-index: 1; }
+.today .n { font-size: 200px; font-weight: 800; line-height: .8; letter-spacing: -0.07em; }
+.today .d { font-size: 15px; font-weight: 700; margin: 6px 0 14px; }
+.today a { display: block; font-size: 16px; font-weight: 600; padding: 6px 0; border-top: 2px solid var(--ink); }
+.today a small { display: block; font-weight: 400; font-size: 13px; }
+.today a:hover { text-decoration: underline; }
+
+.rule { grid-column: 1 / 13; height: 2px; background: var(--ink); margin: 44px 0 14px; }
+.col-h { font-size: 14px; font-weight: 800; margin-bottom: 10px; display: flex; justify-content: space-between; }
+.col-h a { font-weight: 500; }
+.col-h a:hover { text-decoration: underline; }
+.week { grid-column: 1 / 6; }
+.wr { display: grid; grid-template-columns: 60px 52px 1fr 22px; padding: 5px 0; font-size: 15px; align-items: baseline; }
+.wr .d, .wr .t { color: var(--muted); font-variant-numeric: tabular-nums; font-size: 14px; }
+.wr a:hover { text-decoration: underline; }
+.star { font-size: 16px; line-height: 1; color: var(--muted); }
+.star:hover, .star[aria-pressed="true"] { color: var(--ink); }
+.shifts { grid-column: 6 / 9; }
+.sr { display: block; padding: 5px 0; font-size: 15px; }
+.sr small { display: block; font-size: 13px; color: var(--muted); }
+.sr:hover b { text-decoration: underline; }
+.sr em { font-style: normal; background: var(--yellow); padding: 0 4px; font-size: 12px; font-weight: 700; margin-left: 4px; }
+.quick { grid-column: 9 / 13; }
+.q { display: grid; grid-template-columns: 30px 1fr auto; padding: 7px 0; border-top: 1px solid rgb(10 15 31 / .2); font-size: 17px; font-weight: 700; align-items: baseline; transition: padding .2s, background .2s; }
+.q:first-of-type { border-top: 2px solid var(--ink); }
+.q .i { font-size: 12px; font-weight: 500; color: var(--muted); }
+.q small { font-size: 13px; font-weight: 400; color: var(--muted); }
+.q:hover { background: var(--yellow); padding-left: 8px; }
+.q:hover .i, .q:hover small { color: var(--ink); }
+
+@media (max-width: 1100px) { h1 { font-size: 92px; } .today { position: static; grid-column: 1 / 13; margin-top: 30px; } .circle { width: 420px; height: 420px; top: -180px; } .week { grid-column: 1 / 13; } .shifts { grid-column: 1 / 7; margin-top: 24px; } .quick { grid-column: 7 / 13; margin-top: 24px; } .lead { grid-column: 1 / 8; } .ctas { grid-column: 8 / 13; } }
+@media (max-width: 640px) { .page { padding: 18px 16px 30px; display: block; } .brand, .nav1, .nav2, .meta { display: inline-block; vertical-align: top; width: 48%; margin-bottom: 10px; } .nav1, .nav2 { display: none; } h1 { font-size: 56px; margin-top: 40px; } .lead, .ctas { margin-top: 20px; } .today .n { font-size: 130px; } .shifts, .quick { margin-top: 24px; } }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="circle" aria-hidden="true"></div>
+  <div class="brand"><img src="../../../apps/web/public/vtk-logo.png" alt="VTK"></div>
+  <nav class="nav1 s"><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a></nav>
+  <nav class="nav2 s"><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a><a href="#">Zoeken</a></nav>
+  <div class="meta s"><b>Vlaamse Technische Kring</b><br>KU Leuven, sinds 1920<br><a href="#"><b>NL</b></a> / <a href="#">EN</a> &nbsp; <a href="#">Account</a></div>
+
+  <div class="today">
+    <div class="n">1</div>
+    <div class="d">Donderdag, vandaag</div>
+    <a href="#">12 Urencantus<small>12:00, Waaiberg</small></a>
+    <a href="#">Looptraining<small>20:30, Atletiekpiste Sportkot</small></a>
+  </div>
+
+  <h1>De thuis voor <i>ingenieurs</i> in Leuven.</h1>
+  <p class="lead">Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten.</p>
+  <div class="ctas"><a class="p" href="#">Ontdek wat we doen <span>→</span></a><a class="g" href="#">Eerstejaars? Start hier <span>→</span></a></div>
+
+  <div class="rule"></div>
+  <section class="week">
+    <div class="col-h">Deze week <a href="#">Volledige kalender →</a></div>
+    <div class="wr"><span class="d">ma 5</span><span class="t">19:00</span><a href="#">PeMe-Startactiviteit</a><button class="star" aria-label="Interesse: PeMe" aria-pressed="false">☆</button></div>
+    <div class="wr"><span class="d"></span><span class="t">21:00</span><a href="#">CaraOké</a><button class="star" aria-label="Interesse: CaraOké" aria-pressed="false">☆</button></div>
+    <div class="wr"><span class="d">di 6</span><span class="t">12:40</span><a href="#">KANWEEK startvergadering</a><button class="star" aria-label="Interesse: KANWEEK" aria-pressed="false">☆</button></div>
+    <div class="wr"><span class="d"></span><span class="t">18:30</span><a href="#">Sector Night Bouwkunde</a><button class="star" aria-label="Interesse: Sector Night" aria-pressed="false">☆</button></div>
+    <div class="wr"><span class="d">wo 7</span><span class="t">20:30</span><a href="#">Looptraining</a><button class="star" aria-label="Interesse: Looptraining" aria-pressed="false">☆</button></div>
+  </section>
+  <section class="shifts">
+    <div class="col-h">Shiften <a href="#">Alle →</a></div>
+    <a class="sr" href="#"><b>Bijrijden afbraak</b><em>2 munten</em><small>Morgen 01:00 tot 02:30, 2 plaatsen</small></a>
+    <a class="sr" href="#"><b>Bijrijden met Stijn</b><small>Morgen 11:00 tot 12:00, 1 plaats</small></a>
+    <a class="sr" href="#"><b>Namiddagshift</b><em>2 munten</em><small>Morgen 14:00 tot 16:00, 1 plaats</small></a>
+  </section>
+  <nav class="quick" aria-label="Snel naar">
+    <div class="col-h">Snel naar</div>
+    <a class="q" href="#"><span class="i">01</span>Theokot<small>broodje</small></a>
+    <a class="q" href="#"><span class="i">02</span>Cursusdienst<small>open tot 13:55</small></a>
+    <a class="q" href="#"><span class="i">03</span>Tweedehands<small>boeken</small></a>
+    <a class="q" href="#"><span class="i">04</span>Tijdslot Cudi<small>reserveer</small></a>
+    <a class="q" href="#"><span class="i">05</span>Shiften<small>3 open</small></a>
+    <a class="q" href="#"><span class="i">06</span>Kalender<small>alle events</small></a>
+  </nav>
+</div>
+<script>
+document.querySelectorAll(".star").forEach(b => b.addEventListener("click", () => { const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); b.textContent = on ? "★" : "☆"; }));
+</script>
+</body>
+</html>

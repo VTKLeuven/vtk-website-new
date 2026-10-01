@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero-varianten</title>
+<style>
+/* Overzicht van alle hero-mockups. Elke kaart is een live miniatuur (iframe
+   op 1440x900, verkleind); klik om de variant te openen. */
+:root { --paper: #EFF2F8; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --muted: #5C667F; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--paper); color: var(--ink); font-family: -apple-system, system-ui, sans-serif; padding: 40px 32px 60px; }
+a { color: inherit; text-decoration: none; }
+header { max-width: 1240px; margin: 0 auto 28px; }
+h1 { font-size: 34px; letter-spacing: -0.02em; }
+header p { color: var(--muted); margin-top: 6px; max-width: 60ch; line-height: 1.5; }
+h2 { max-width: 1240px; margin: 34px auto 14px; font-size: 18px; }
+.grid { max-width: 1240px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 20px; }
+.card { background: var(--surface); border-radius: 16px; overflow: hidden; border: 1px solid rgb(14 26 54 / .1); transition: transform .2s, box-shadow .2s; }
+.card:hover { transform: translateY(-3px); box-shadow: 0 12px 30px rgb(14 26 54 / .15); }
+.thumb { position: relative; aspect-ratio: 16 / 10; overflow: hidden; background: var(--navy); }
+.thumb iframe { position: absolute; top: 0; left: 0; width: 1440px; height: 900px; border: 0; transform-origin: 0 0; pointer-events: none; }
+.meta { padding: 12px 16px 14px; }
+.meta b { display: block; font-size: 16px; }
+.meta small { color: var(--muted); font-size: 13px; }
+.fav { display: inline-block; margin-left: 6px; font-size: 11px; font-weight: 700; background: var(--yellow); padding: 2px 8px; border-radius: 999px; vertical-align: 2px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Hero-varianten</h1>
+  <p>Mockups voor de homepage van vtk.be. Dezelfde inhoud overal: slogan, twee knoppen, weekagenda met ster, open shiften en zes snelkoppelingen. Klik op een kaart om ze te openen.</p>
+</header>
+
+<h2>Rustig, dicht bij de huidige site</h2>
+<div class="grid" data-list='[
+  ["a-rustig.html","A. Rustig","Apple-rustig, foto blijft, tegels als snelkoppelingen",true],
+  ["abc-varianten.html#b","B. Snel naar","Raycast: snelkoppelingen als commandolijst, week als strook"],
+  ["abc-varianten.html#c","C. Tabs","Agenda en shiften in tabs, snelkoppelingen als pillen"]
+]'></div>
+
+<h2>Zot</h2>
+<div class="grid" data-list='[
+  ["zot/01-blauwdruk.html","01. Blauwdruk","Technische tekening, stuklijst en titelblok"],
+  ["zot/02-bento.html","02. Bento","Apple Control Center-raster van tegels"],
+  ["zot/03-vertrekbord.html","03. Vertrekbord","Klapcijfers, personeel gezocht, treintickets"],
+  ["zot/04-terminal.html","04. Terminal","Werkende command palette, tmux-panes"],
+  ["zot/05-krant.html","05. Krant","Voorpagina met agenda, zoekertjes en inhoudstafel"],
+  ["zot/06-apple.html","06. Apple","apple.com: productkop, widgets, tegels"],
+  ["zot/07-beginscherm.html","07. Beginscherm","iPadOS: apps met badges, widgets, dock"],
+  ["zot/08-zwitsers.html","08. Zwitsers","International Typographic Style, gele cirkel"],
+  ["zot/09-brutaal.html","09. Brutaal","Neo-brutalisme, harde schaduwen, stickers"],
+  ["zot/10-kinetisch.html","10. Kinetisch","Marquee, reuzenlijst met foto bij hover"],
+  ["zot/11-vtk-os.html","11. VTK OS","Retro bureaublad met versleepbare vensters"],
+  ["zot/12-affiche.html","12. Affiche","Festivalaffiche, de week als line-up"],
+  ["zot/13-metro.html","13. Metro","Lijnenkaart: lijn S snel naar, lijn W de week"],
+  ["zot/14-chat.html","14. Chat","VTK stuurt je wat er vandaag te doen is"],
+  ["zot/15-spotify.html","15. Playlist","Spotify: de week als playlist, nu bezig onderaan"]
+]'></div>
+
+<script>
+document.querySelectorAll("[data-list]").forEach(grid => {
+  grid.innerHTML = JSON.parse(grid.dataset.list).map(([href, title, sub, fav]) => `
+    <a class="card" href="${href}">
+      <div class="thumb"><iframe src="${href}" loading="lazy" tabindex="-1" title="${title}"></iframe></div>
+      <div class="meta"><b>${title}${fav ? '<span class="fav">Favoriet</span>' : ""}</b><small>${sub}</small></div>
+    </a>`).join("");
+});
+const fit = () => document.querySelectorAll(".thumb").forEach(t => { const f = t.querySelector("iframe"); f.style.transform = `scale(${t.clientWidth / 1440})`; });
+addEventListener("resize", fit); fit();
+</script>
+</body>
+</html>

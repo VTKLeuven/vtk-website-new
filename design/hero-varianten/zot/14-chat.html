@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero 14: Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400..800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Methode: berichten-app (iMessage). VTK stuurt je bij het binnenkomen wat
+   er vandaag te doen is: de agenda en de shiften als kaartjes in de
+   berichten, de snelkoppelingen als snelle antwoorden. */
+:root { --paper: #EFF2F8; --paper-2: #E6ECF5; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --muted: #5C667F; --dim: #B7C0DC; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--paper); color: var(--ink); font-family: "DM Sans", sans-serif; min-height: 100dvh; }
+a { color: inherit; text-decoration: none; }
+button, input { font: inherit; color: inherit; background: none; border: 0; }
+button { cursor: pointer; }
+.wrap { max-width: 1260px; margin: 0 auto; padding: 0 32px; }
+
+.hdr { display: flex; align-items: center; gap: 22px; height: 68px; }
+.hdr img { height: 26px; filter: invert(1) brightness(.12); }
+.hdr nav { display: flex; gap: 18px; font-size: 15px; font-weight: 600; }
+.hdr nav a:hover { color: var(--muted); }
+.hdr-end { margin-left: auto; display: flex; gap: 14px; align-items: center; font-weight: 600; }
+.hdr-end i { font-size: 19px; }
+
+.main { display: grid; grid-template-columns: 1fr 520px; gap: 56px; padding: 30px 0 40px; align-items: start; }
+.left { padding-top: 40px; }
+.left .k { font-size: 15px; color: var(--muted); font-weight: 600; }
+.left h1 { font-size: 76px; line-height: .98; letter-spacing: -0.045em; font-weight: 800; margin: 14px 0 20px; }
+.left h1 span { position: relative; white-space: nowrap; }
+.left h1 span::after { content: ""; position: absolute; left: -2%; right: -2%; bottom: .06em; height: .26em; background: var(--yellow); z-index: -1; border-radius: 4px; }
+.left p { font-size: 19px; line-height: 1.5; color: var(--muted); max-width: 30em; }
+.cta { display: flex; gap: 12px; margin-top: 28px; }
+.btn { height: 52px; padding: 0 24px; border-radius: 999px; display: inline-flex; align-items: center; gap: 10px; font-weight: 700; font-size: 16px; transition: transform .15s; }
+.btn:active { transform: scale(.96); }
+.btn-n { background: var(--navy); color: var(--paper); }
+.btn-n:hover { background: var(--ink); }
+.btn-l { background: var(--surface); }
+.btn-l:hover { background: var(--paper-2); }
+
+/* Het gesprek. */
+.chat { background: var(--surface); border-radius: 32px; box-shadow: 0 30px 60px -20px rgb(14 26 54 / .25); overflow: hidden; display: flex; flex-direction: column; }
+.chat-h { display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-bottom: 1px solid var(--paper-2); }
+.av { width: 40px; height: 40px; border-radius: 50%; background: var(--navy); display: grid; place-items: center; flex: none; }
+.av img { height: 17px; }
+.chat-h b { font-size: 16px; }
+.chat-h small { display: block; font-size: 12px; color: var(--muted); }
+.chat-h .on { margin-left: auto; font-size: 12px; font-weight: 700; background: var(--yellow); padding: 3px 10px; border-radius: 999px; }
+.msgs { padding: 18px 16px 8px; display: flex; flex-direction: column; gap: 8px; min-height: 470px; }
+.m { max-width: 86%; padding: 10px 14px; border-radius: 20px; font-size: 15px; line-height: 1.4; background: var(--paper); border-bottom-left-radius: 6px; }
+.m.me { align-self: flex-end; background: var(--navy); color: var(--paper); border-radius: 20px; border-bottom-right-radius: 6px; }
+.m.card { padding: 6px; background: var(--paper); width: 86%; }
+.m.card .t { display: flex; justify-content: space-between; padding: 6px 10px 4px; font-size: 13px; font-weight: 700; color: var(--muted); }
+.m.card .t a { color: var(--navy); }
+.row { display: grid; grid-template-columns: 52px 1fr 26px; gap: 6px; align-items: center; background: var(--surface); border-radius: 14px; padding: 9px 10px; margin-top: 4px; }
+.row time { font-weight: 700; font-size: 14px; font-variant-numeric: tabular-nums; }
+.row a { font-weight: 600; font-size: 15px; }
+.row a:hover { text-decoration: underline; }
+.row small { display: block; font-size: 12px; color: var(--muted); font-weight: 400; }
+.row .star { font-size: 17px; color: var(--muted); } .row .star:hover { color: var(--navy); }
+.row em { font-style: normal; font-size: 12px; font-weight: 800; background: var(--yellow); border-radius: 999px; padding: 2px 8px; justify-self: end; }
+.row.sh { grid-template-columns: 52px 1fr auto; }
+.typing { display: inline-flex; gap: 4px; padding: 14px; }
+.typing span { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); animation: bob 1s infinite; }
+.typing span:nth-child(2) { animation-delay: .15s; } .typing span:nth-child(3) { animation-delay: .3s; }
+@keyframes bob { 50% { transform: translateY(-4px); opacity: .5; } }
+
+.replies { display: flex; flex-wrap: wrap; gap: 8px; padding: 10px 16px 12px; }
+.qr { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 14px 0 10px; border-radius: 999px; border: 1.5px solid var(--navy); font-weight: 700; font-size: 14px; color: var(--navy); transition: background .15s, color .15s; }
+.qr i { font-size: 18px; }
+.qr small { font-weight: 500; color: var(--muted); }
+.qr:hover { background: var(--navy); color: var(--paper); }
+.qr:hover small { color: var(--dim); }
+.input { display: flex; align-items: center; gap: 10px; margin: 0 12px 12px; padding: 6px 6px 6px 16px; border-radius: 999px; background: var(--paper); }
+.input input { flex: 1; outline: none; font-size: 15px; }
+.input input::placeholder { color: var(--muted); }
+.input button { width: 38px; height: 38px; border-radius: 50%; background: var(--yellow); display: grid; place-items: center; font-size: 18px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .anim { opacity: 0; transform: translateY(10px) scale(.98); animation: pop .4s cubic-bezier(.16,1,.3,1) forwards; animation-delay: calc(var(--i) * 420ms + 300ms); }
+  @keyframes pop { to { opacity: 1; transform: none; } }
+}
+@media (prefers-reduced-motion: reduce) { .typing { display: none; } }
+@media (max-width: 1100px) { .main { grid-template-columns: 1fr; } .left { padding-top: 0; } .hdr nav { display: none; } }
+@media (max-width: 600px) { .wrap { padding: 0 12px; } .left h1 { font-size: 46px; } .cta { flex-wrap: wrap; } .m, .m.card { max-width: 100%; width: 100%; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+    <nav><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+    <div class="hdr-end"><i class="ph-bold ph-magnifying-glass"></i><span>NL / EN</span><i class="ph-bold ph-user-circle"></i></div>
+  </header>
+
+  <div class="main">
+    <section class="left">
+      <p class="k">Vlaamse Technische Kring, KU Leuven</p>
+      <h1>De thuis voor <span>ingenieurs</span> in Leuven.</h1>
+      <p>Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+      <div class="cta"><a class="btn btn-n" href="#">Ontdek wat we doen <i class="ph-bold ph-arrow-up-right"></i></a><a class="btn btn-l" href="#">Eerstejaars? Start hier</a></div>
+    </section>
+
+    <section class="chat" aria-label="Vandaag bij VTK">
+      <div class="chat-h"><span class="av"><img src="../../../apps/web/public/vtk-logo.png" alt=""></span><div><b>VTK</b><small>Donderdag 1 oktober</small></div><span class="on">Vandaag</span></div>
+      <div class="msgs">
+        <div class="m anim" style="--i:0">Dag Maxime. Dit staat er vandaag op het programma:</div>
+        <div class="m card anim" style="--i:1">
+          <div class="t"><span>Vandaag</span><a href="#">Kalender</a></div>
+          <div class="row"><time>12:00</time><a href="#">12 Urencantus<small>Waaiberg</small></a><button class="star" aria-label="Interesse: 12 Urencantus"><i class="ph ph-star"></i></button></div>
+          <div class="row"><time>20:30</time><a href="#">Looptraining<small>Atletiekpiste Sportkot</small></a><button class="star" aria-label="Interesse: Looptraining"><i class="ph ph-star"></i></button></div>
+        </div>
+        <div class="m me anim" style="--i:2">En later deze week?</div>
+        <div class="m card anim" style="--i:3">
+          <div class="t"><span>Volgende week</span><a href="#">Alles</a></div>
+          <div class="row"><time>ma 5</time><a href="#">PeMe-Startactiviteit<small>19:00, Grasveld Alma 3</small></a><button class="star" aria-label="Interesse: PeMe"><i class="ph ph-star"></i></button></div>
+          <div class="row"><time>di 6</time><a href="#">Sector Night Bouwkunde<small>18:30, Quadrivium, en nog 3</small></a><button class="star" aria-label="Interesse: Sector Night"><i class="ph ph-star"></i></button></div>
+        </div>
+        <div class="m anim" style="--i:4">Er zoeken ook nog 3 shiften volk, alle drie morgen:</div>
+        <div class="m card anim" style="--i:5">
+          <div class="row sh"><time>01:00</time><a href="#">Bijrijden afbraak</a><em>2 munten</em></div>
+          <div class="row sh"><time>14:00</time><a href="#">Namiddagshift</a><em>2 munten</em></div>
+          <div class="t"><span></span><a href="#">Alle shiften</a></div>
+        </div>
+      </div>
+      <nav class="replies anim" style="--i:6" aria-label="Snel naar">
+        <a class="qr" href="#"><i class="ph-bold ph-bread"></i>Theokot</a>
+        <a class="qr" href="#"><i class="ph-bold ph-books"></i>Cursusdienst <small>tot 13:55</small></a>
+        <a class="qr" href="#"><i class="ph-bold ph-recycle"></i>Tweedehands</a>
+        <a class="qr" href="#"><i class="ph-bold ph-clock-countdown"></i>Tijdslot Cudi</a>
+        <a class="qr" href="#"><i class="ph-bold ph-hand-heart"></i>Shiften</a>
+        <a class="qr" href="#"><i class="ph-bold ph-calendar-dots"></i>Kalender</a>
+      </nav>
+      <form class="input" role="search" onsubmit="return false"><input placeholder="Zoek op vtk.be" aria-label="Zoek op vtk.be"><button aria-label="Zoeken"><i class="ph-bold ph-arrow-up"></i></button></form>
+    </section>
+  </div>
+</div>
+</body>
+</html>

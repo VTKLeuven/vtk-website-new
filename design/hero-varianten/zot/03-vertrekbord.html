@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero 3: Vertrekbord</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;800;900&family=Big+Shoulders+Text:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Methode: stationssignalisatie. De agenda is een vertrekbord met
+   klapcijfers, de shiften een geel bord "personeel gezocht", de
+   snelkoppelingen zijn treintickets. Palet: VTK-tokens. */
+:root { --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --paper: #EFF2F8; --dim: #B7C0DC; --muted: #5C667F; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--navy); color: var(--paper); font-family: "Big Shoulders Text", sans-serif; min-height: 100dvh; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.disp { font-family: "Big Shoulders Display", sans-serif; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 0 32px 36px; }
+
+.hdr { display: flex; align-items: center; gap: 28px; height: 70px; border-bottom: 3px solid var(--yellow); margin-bottom: 30px; }
+.hdr img { height: 30px; }
+.hdr nav { display: flex; gap: 20px; }
+.hdr nav a { font-family: "Big Shoulders Display"; font-weight: 700; font-size: 19px; letter-spacing: .04em; text-transform: uppercase; }
+.hdr nav a:hover { color: var(--yellow); }
+.hdr-end { margin-left: auto; display: flex; gap: 18px; align-items: center; font-size: 17px; font-weight: 600; }
+.hdr-end i { font-size: 20px; }
+.clock { font-family: "Big Shoulders Display"; font-weight: 800; font-size: 30px; color: var(--yellow); font-variant-numeric: tabular-nums; }
+
+.top { display: grid; grid-template-columns: 1fr 1.25fr; gap: 40px; align-items: start; }
+.k { font-size: 16px; font-weight: 600; color: var(--dim); text-transform: uppercase; letter-spacing: .12em; }
+h1 { font-family: "Big Shoulders Display"; font-weight: 900; font-size: 116px; line-height: .82; text-transform: uppercase; margin: 14px 0 22px; letter-spacing: -0.005em; }
+h1 span { color: var(--yellow); display: block; }
+.sub { font-size: 21px; line-height: 1.35; color: var(--dim); max-width: 26em; }
+.cta { display: flex; gap: 12px; margin-top: 26px; }
+.btn { display: inline-flex; align-items: center; gap: 10px; height: 54px; padding: 0 24px; font-family: "Big Shoulders Display"; font-weight: 800; font-size: 22px; text-transform: uppercase; letter-spacing: .03em; border-radius: 6px; transition: transform .15s; }
+.btn:active { transform: translateY(2px); }
+.btn-y { background: var(--yellow); color: var(--ink); }
+.btn-y:hover { background: var(--paper); }
+.btn-o { border: 2px solid var(--paper); }
+.btn-o:hover { background: var(--paper); color: var(--ink); }
+
+/* Het bord. */
+.board { background: var(--ink); border-radius: 10px; padding: 18px 20px 14px; box-shadow: inset 0 0 0 2px rgb(239 242 248 / .08), 0 30px 60px rgb(10 15 31 / .5); }
+.board-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 10px; }
+.board-head h2 { font-family: "Big Shoulders Display"; font-weight: 800; font-size: 34px; text-transform: uppercase; color: var(--yellow); letter-spacing: .02em; }
+.board-head h2 small { font-size: 18px; color: var(--dim); margin-left: 10px; letter-spacing: .06em; }
+.board-head a { font-size: 17px; font-weight: 600; color: var(--dim); }
+.board-head a:hover { color: var(--paper); }
+.cols, .dep { display: grid; grid-template-columns: 112px 1fr 1fr 76px 30px; gap: 14px; align-items: center; }
+.cols { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); padding: 6px 0; border-bottom: 1px solid rgb(239 242 248 / .1); }
+.dep { padding: 9px 0; border-bottom: 1px solid rgb(239 242 248 / .07); font-size: 21px; font-weight: 600; text-transform: uppercase; letter-spacing: .02em; }
+.dep:hover .what { color: var(--yellow); }
+.dep .via { color: var(--dim); font-size: 18px; font-weight: 400; }
+.dep .when { font-size: 16px; color: var(--dim); }
+.dep .when.now { color: var(--ink); background: var(--yellow); text-align: center; border-radius: 4px; font-weight: 700; animation: blink 1.6s steps(1) infinite; }
+.dep .star { color: var(--muted); font-size: 19px; }
+.dep .star:hover { color: var(--yellow); }
+/* Klapcijfers. */
+.flap { display: inline-flex; gap: 3px; }
+.flap b { position: relative; width: 23px; height: 36px; display: grid; place-items: center; background: rgb(239 242 248 / .08); border-radius: 3px; font-family: "Big Shoulders Display"; font-weight: 800; font-size: 26px; color: var(--paper); overflow: hidden; }
+.flap b::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--ink); }
+.flap i { width: 6px; display: grid; place-items: center; font-style: normal; font-weight: 800; color: var(--dim); }
+@keyframes flip { 0% { transform: rotateX(90deg); } 60% { transform: rotateX(-20deg); } 100% { transform: rotateX(0); } }
+@keyframes blink { 50% { opacity: .55; } }
+
+/* Geel bord: shiften. */
+.wanted { margin-top: 16px; background: var(--yellow); color: var(--ink); border-radius: 10px; padding: 14px 20px; display: grid; grid-template-columns: auto 1fr auto; gap: 20px; align-items: center; }
+.wanted h3 { font-family: "Big Shoulders Display"; font-weight: 900; font-size: 30px; text-transform: uppercase; line-height: .9; }
+.wanted ul { list-style: none; display: grid; gap: 2px; }
+.wanted li a { display: flex; gap: 10px; font-size: 18px; font-weight: 600; }
+.wanted li a:hover { text-decoration: underline; }
+.wanted li span { font-variant-numeric: tabular-nums; min-width: 92px; }
+.wanted li small { font-weight: 400; }
+.wanted .all { font-family: "Big Shoulders Display"; font-weight: 800; font-size: 20px; text-transform: uppercase; border: 2px solid var(--ink); padding: 8px 14px; border-radius: 6px; white-space: nowrap; }
+.wanted .all:hover { background: var(--ink); color: var(--yellow); }
+
+/* Tickets. */
+.tickets { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; margin-top: 34px; }
+.ticket { position: relative; background: var(--paper); color: var(--ink); border-radius: 8px; padding: 16px 16px 14px; display: grid; grid-template-columns: 1fr auto; gap: 4px 8px;
+  -webkit-mask: radial-gradient(circle 9px at 0 62%, transparent 98%, #000) , radial-gradient(circle 9px at 100% 62%, transparent 98%, #000);
+  -webkit-mask-composite: source-in; mask-composite: intersect;
+  transition: transform .2s cubic-bezier(.16,1,.3,1), background .2s; }
+.ticket:hover { transform: translateY(-4px) rotate(-1.2deg); background: var(--yellow); }
+.ticket .from { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); grid-column: 1 / -1; }
+.ticket b { font-family: "Big Shoulders Display"; font-weight: 900; font-size: 30px; text-transform: uppercase; line-height: .95; }
+.ticket i { font-size: 30px; align-self: end; }
+.ticket small { grid-column: 1 / -1; font-size: 15px; border-top: 2px dashed rgb(10 15 31 / .25); padding-top: 9px; margin-top: 8px; font-weight: 600; }
+
+@media (max-width: 1100px) { .top { grid-template-columns: 1fr; } .hdr nav { display: none; } .tickets { grid-template-columns: repeat(3, 1fr); } h1 { font-size: 88px; } }
+@media (max-width: 640px) { .wrap { padding: 0 14px 24px; } h1 { font-size: 64px; } .cols { display: none; } .dep { grid-template-columns: 96px 1fr 30px; } .dep .via, .dep .when { display: none; } .tickets { grid-template-columns: 1fr 1fr; } .wanted { grid-template-columns: 1fr; } .cta { flex-wrap: wrap; } }
+@media (prefers-reduced-motion: no-preference) { .flap b { animation: flip .5s cubic-bezier(.3,1.6,.5,1) both; animation-delay: calc(var(--d) * 45ms); transform-origin: 50% 50%; } }
+@media (prefers-reduced-motion: reduce) { .dep .when.now { animation: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+    <nav><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+    <div class="hdr-end"><i class="ph-bold ph-magnifying-glass"></i><span>NL / EN</span><i class="ph-bold ph-user-circle"></i><span class="clock" id="clock">13:42</span></div>
+  </header>
+
+  <div class="top">
+    <div>
+      <p class="k">Vlaamse Technische Kring, KU Leuven</p>
+      <h1>De thuis voor <span>ingenieurs</span> in Leuven.</h1>
+      <p class="sub">Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+      <div class="cta"><a class="btn btn-y" href="#">Ontdek wat we doen <i class="ph-bold ph-arrow-up-right"></i></a><a class="btn btn-o" href="#">Eerstejaars? Start hier</a></div>
+    </div>
+    <div>
+      <section class="board" aria-label="Agenda deze week">
+        <div class="board-head"><h2>Vertrek <small>deze week</small></h2><a href="#">Volledige kalender →</a></div>
+        <div class="cols"><span>Tijd</span><span>Activiteit</span><span>Waar</span><span>Dag</span><span></span></div>
+        <div id="deps"></div>
+      </section>
+      <section class="wanted">
+        <h3>Personeel<br>gezocht</h3>
+        <ul>
+          <li><a href="#"><span>Morgen 01:00</span>Bijrijden afbraak 12-urencantus <small>2 plaatsen, 2 munten</small></a></li>
+          <li><a href="#"><span>Morgen 11:00</span>Bijrijden met Stijn <small>1 plaats</small></a></li>
+          <li><a href="#"><span>Morgen 14:00</span>Namiddagshift <small>1 plaats, 2 munten</small></a></li>
+        </ul>
+        <a class="all" href="#">Alle shiften</a>
+      </section>
+    </div>
+  </div>
+
+  <nav class="tickets" aria-label="Snel naar">
+    <a class="ticket" href="#"><span class="from">Enkel</span><b>Theokot</b><i class="ph ph-bread"></i><small>Bestel je broodje</small></a>
+    <a class="ticket" href="#"><span class="from">Enkel</span><b>Cudi</b><i class="ph ph-books"></i><small>Open tot 13:55</small></a>
+    <a class="ticket" href="#"><span class="from">Enkel</span><b>Tweede&shy;hands</b><i class="ph ph-recycle"></i><small>Boeken kopen, verkopen</small></a>
+    <a class="ticket" href="#"><span class="from">Reservatie</span><b>Tijdslot</b><i class="ph ph-clock-countdown"></i><small>Ophaling Cudi</small></a>
+    <a class="ticket" href="#"><span class="from">Abonnement</span><b>Shiften</b><i class="ph ph-hand-heart"></i><small>Help mee, verdien munten</small></a>
+    <a class="ticket" href="#"><span class="from">Dienstregeling</span><b>Kalender</b><i class="ph ph-calendar-dots"></i><small>Alle events</small></a>
+  </nav>
+</div>
+<script>
+const deps = [
+  ["12:00", "12 Urencantus", "Waaiberg", "Vandaag", true],
+  ["20:30", "Looptraining", "Sportkot", "Vandaag"],
+  ["19:00", "PeMe-Startactiviteit", "Alma 3", "Ma 5"],
+  ["21:00", "CaraOké", "Theokot", "Ma 5"],
+  ["12:40", "KANWEEK startvergadering", "200K 00.06", "Di 6"],
+  ["18:30", "Sector Night Bouwkunde", "Quadrivium", "Di 6"],
+];
+let n = 0;
+document.getElementById("deps").innerHTML = deps.map(([t, what, via, when, now]) => {
+  const flap = [...t].map(c => c === ":" ? "<i>:</i>" : `<b style="--d:${n++}">${c}</b>`).join("");
+  return `<div class="dep"><span class="flap" aria-label="${t}">${flap}</span><a class="what" href="#">${what}</a><span class="via">${via}</span><span class="when${now ? " now" : ""}">${now ? "Nu bezig" : when}</span><button class="star" aria-label="Interesse: ${what}"><i class="ph ph-star"></i></button></div>`;
+}).join("");
+const tick = () => { const d = new Date(); document.getElementById("clock").textContent = d.toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" }); };
+tick(); setInterval(tick, 10000);
+</script>
+</body>
+</html>
