@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kleur 2: Tijdlijn</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Vandaag op één tijdlijn, van 08:00 tot 03:00: wanneer Theokot en de
+   cursusdienst open zijn, welke events er lopen (in hun categoriekleur) en
+   welke shift er vannacht nog volk zoekt. Een lijn toont waar je nu staat.
+   De rijen zijn tegelijk de snelkoppelingen. */
+:root {
+  --paper: #EFF2F8; --paper-2: #E6ECF5; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36;
+  --yellow: #FFD23F; --muted: #5C667F; --on-dark-muted: #B7C0DC; --line: rgb(14 26 54 / .1);
+  --cat-act: #E5484D; --cat-sport: #30A46C; --cat-onthaal: #F76B15; --cat-bedrijf: #3E63DD;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Geist, system-ui, sans-serif; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; border-radius: 6px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 36px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.band { background: var(--navy); color: var(--paper); padding-bottom: 120px; }
+.hdr { height: 64px; display: flex; align-items: center; gap: 30px; }
+.hdr img { height: 28px; }
+.hdr nav { display: flex; gap: 22px; font-size: 15px; font-weight: 500; color: rgb(239 242 248 / .86); }
+.hdr nav a:hover { color: var(--paper); }
+.hdr-end { margin-left: auto; display: flex; gap: 18px; align-items: center; font-size: 14px; }
+.hdr-end i { font-size: 19px; }
+.intro { display: grid; grid-template-columns: 1.4fr 1fr; gap: 48px; align-items: end; padding-top: 44px; }
+.intro h1 { font-size: 54px; line-height: 1.02; letter-spacing: -0.04em; font-weight: 700; }
+.intro h1 span { color: var(--yellow); }
+.intro p { margin-top: 16px; font-size: 18px; line-height: 1.5; color: var(--on-dark-muted); max-width: 32em; }
+.cta { display: flex; gap: 12px; margin-top: 26px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 20px; border-radius: 999px; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.btn-y { background: var(--yellow); color: var(--ink); }
+.btn-y:hover { background: var(--surface); }
+.btn-l { box-shadow: inset 0 0 0 1px rgb(239 242 248 / .3); }
+.btn-l:hover { background: rgb(239 242 248 / .08); }
+.today { text-align: right; }
+.today .clock { font-size: 64px; font-weight: 600; letter-spacing: -0.04em; line-height: 1; }
+.today small { display: block; font-size: 16px; color: var(--on-dark-muted); margin-top: 6px; }
+
+/* De tijdlijn */
+.tl { position: relative; margin-top: -88px; background: var(--surface); border-radius: 22px; box-shadow: 0 24px 50px -28px rgb(14 26 54 / .45); padding: 18px 24px 20px; }
+.tl-grid { display: grid; grid-template-columns: 200px 1fr; }
+.axis { position: relative; height: 22px; grid-column: 2; }
+.axis span { position: absolute; transform: translateX(-50%); font-size: 12px; color: var(--muted); }
+.row { display: contents; }
+.lab { display: flex; align-items: center; gap: 12px; padding: 10px 12px 10px 0; border-top: 1px solid var(--line); }
+.lab .ic { width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; font-size: 18px; flex: none; }
+.lab b { display: block; font-size: 15px; font-weight: 600; }
+.lab small { display: block; font-size: 12px; color: var(--muted); }
+a.lab:hover b { text-decoration: underline; text-underline-offset: 3px; }
+.track { position: relative; border-top: 1px solid var(--line); background-image: repeating-linear-gradient(90deg, transparent 0, transparent calc(100% / 19 - 1px), var(--line) calc(100% / 19 - 1px), var(--line) calc(100% / 19)); }
+.blk { position: absolute; top: 10px; bottom: 10px; border-radius: 8px; padding: 0 10px; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; transition: transform .15s; }
+a.blk:hover { transform: translateY(-1px); box-shadow: 0 6px 14px -6px rgb(14 26 54 / .5); }
+.blk small { font-weight: 500; opacity: .8; }
+.blk.y { background: var(--yellow); color: var(--ink); }
+.blk.n { background: var(--navy); color: var(--paper); }
+.blk.c { background: color-mix(in srgb, var(--c) 16%, white); color: var(--ink); box-shadow: inset 3px 0 0 var(--c); }
+.blk.s { background: repeating-linear-gradient(-45deg, var(--yellow) 0 8px, color-mix(in srgb, var(--yellow) 55%, white) 8px 16px); color: var(--ink); }
+.blk a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.blk .star { font-size: 14px; color: var(--muted); margin-left: 2px; }
+.blk .star:hover { color: var(--ink); }
+.track.two { min-height: 84px; }
+.track.two .blk { bottom: auto; height: 30px; top: 8px; }
+.track.two .blk.lane2 { top: 44px; }
+.now { position: absolute; top: 22px; bottom: 0; width: 2px; background: var(--ink); pointer-events: none; z-index: 2; }
+.now::before { content: attr(data-t); position: absolute; top: -20px; left: 50%; transform: translateX(-50%); background: var(--ink); color: var(--paper); font-size: 11px; font-weight: 600; padding: 1px 6px; border-radius: 999px; }
+.midnight { position: absolute; top: 22px; bottom: 0; width: 0; border-left: 1.5px dashed rgb(14 26 54 / .3); }
+
+.after { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; padding: 30px 0 56px; }
+.after h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: baseline; }
+.after h2 a { font-size: 14px; font-weight: 600; color: var(--navy); }
+.after h2 a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.li { display: grid; grid-template-columns: 70px 1fr 28px; gap: 8px; align-items: center; padding: 10px 0; border-top: 1px solid var(--line); font-size: 15px; }
+.li .d { font-size: 13px; color: var(--muted); }
+.li a { font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.li a::before { content: ""; width: 8px; height: 8px; border-radius: 2px; background: var(--c); flex: none; }
+.li a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.li .star { color: var(--muted); font-size: 16px; }
+.more-q { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.mq { display: flex; flex-direction: column; gap: 10px; padding: 16px; border-radius: 16px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.mq:hover { box-shadow: inset 0 0 0 1.5px var(--navy); }
+.mq i { font-size: 24px; color: var(--navy); }
+.mq b { font-size: 15px; font-weight: 600; }
+.mq small { font-size: 13px; color: var(--muted); margin-top: -6px; }
+
+@media (max-width: 1100px) { .hdr nav { display: none; } .intro { grid-template-columns: 1fr; } .today { text-align: left; } .tl { overflow-x: auto; } .tl-grid { min-width: 980px; } .after { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .wrap { padding: 0 14px; } .intro h1 { font-size: 38px; } .cta { flex-wrap: wrap; } .today .clock { font-size: 44px; } .more-q { grid-template-columns: 1fr 1fr 1fr; } }
+</style>
+</head>
+<body>
+<div class="band"><div class="wrap">
+  <header class="hdr">
+    <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+    <nav><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+    <div class="hdr-end"><i class="ph ph-magnifying-glass"></i><span><b>NL</b> / EN</span><i class="ph ph-user-circle"></i></div>
+  </header>
+  <section class="intro">
+    <div>
+      <h1>De thuis voor <span>ingenieurs</span> in Leuven.</h1>
+      <p>Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+      <div class="cta"><a class="btn btn-y" href="#">Ontdek wat we doen</a><a class="btn btn-l" href="#">Eerstejaars? Start hier</a></div>
+    </div>
+    <div class="today num"><div class="clock" id="clock">13:42</div><small>Donderdag 1 oktober</small></div>
+  </section>
+</div></div>
+
+<div class="wrap">
+  <section class="tl num" aria-label="Vandaag op de campus">
+    <div class="tl-grid" id="tl">
+      <div></div><div class="axis" id="axis"></div>
+      <div class="row">
+        <a class="lab" href="#"><span class="ic" style="background:var(--yellow)"><i class="ph ph-bread"></i></span><span><b>Theokot</b><small>Bestel je broodje</small></span></a>
+        <div class="track"><a class="blk y" href="#" data-from="11.5" data-to="14">Open</a></div>
+      </div>
+      <div class="row">
+        <a class="lab" href="#"><span class="ic" style="background:var(--navy);color:var(--yellow)"><i class="ph ph-books"></i></span><span><b>Cursusdienst</b><small>Cursussen ophalen</small></span></a>
+        <div class="track"><a class="blk n" href="#" data-from="12.583" data-to="13.917">Open</a><a class="blk n" href="#" data-from="18.083" data-to="19">Open</a></div>
+      </div>
+      <div class="row">
+        <a class="lab" href="#"><span class="ic" style="background:var(--paper-2)"><i class="ph ph-calendar-blank"></i></span><span><b>Events</b><small>2 vandaag</small></span></a>
+        <div class="track two"><div class="blk c" style="--c:var(--cat-act)" data-from="12" data-to="24"><a href="#">12 Urencantus <small>Waaiberg</small></a><button class="star" aria-label="Interesse: 12 Urencantus"><i class="ph ph-star"></i></button></div><a class="blk c lane2" href="#" style="--c:var(--cat-sport)" data-from="20.5" data-to="22">Looptraining</a></div>
+      </div>
+      <div class="row">
+        <a class="lab" href="#"><span class="ic" style="background:var(--yellow)"><i class="ph ph-hand-heart"></i></span><span><b>Shiften</b><small>3 zoeken volk</small></span></a>
+        <div class="track"><a class="blk s" href="#" data-from="25" data-to="26.5">Bijrijden, 2 munten</a></div>
+      </div>
+    </div>
+  </section>
+
+  <div class="after">
+    <section>
+      <h2>Later deze week <a href="#">Volledige kalender</a></h2>
+      <div class="li num"><span class="d">ma 5, 19:00</span><a href="#" style="--c:var(--cat-onthaal)">PeMe-Startactiviteit</a><button class="star" aria-label="Interesse: PeMe"><i class="ph ph-star"></i></button></div>
+      <div class="li num"><span class="d">ma 5, 21:00</span><a href="#" style="--c:var(--cat-act)">CaraOké</a><button class="star" aria-label="Interesse: CaraOké"><i class="ph ph-star"></i></button></div>
+      <div class="li num"><span class="d">di 6, 12:40</span><a href="#" style="--c:var(--cat-onthaal)">KANWEEK startvergadering</a><button class="star" aria-label="Interesse: KANWEEK"><i class="ph ph-star"></i></button></div>
+      <div class="li num"><span class="d">di 6, 18:30</span><a href="#" style="--c:var(--cat-bedrijf)">Sector Night Bouwkunde</a><button class="star" aria-label="Interesse: Sector Night"><i class="ph ph-star"></i></button></div>
+    </section>
+    <nav aria-label="Ook snel naar">
+      <h2>Ook snel naar</h2>
+      <div class="more-q">
+        <a class="mq" href="#"><i class="ph ph-recycle"></i><b>Tweedehands</b><small>Boeken</small></a>
+        <a class="mq" href="#"><i class="ph ph-clock"></i><b>Tijdslot Cudi</b><small>Reserveer</small></a>
+        <a class="mq" href="#"><i class="ph ph-calendar-blank"></i><b>Kalender</b><small>Alle events</small></a>
+      </div>
+    </nav>
+  </div>
+</div>
+<script>
+// Assen en blokken: 08:00 tot 03:00 is negentien uur.
+const START = 8, SPAN = 19, pct = h => ((h - START) / SPAN) * 100;
+const axis = document.getElementById("axis");
+for (let h = 8; h <= 26; h += 2) axis.insertAdjacentHTML("beforeend", `<span style="left:${pct(h)}%">${String(h % 24).padStart(2, "0")}:00</span>`);
+document.querySelectorAll(".blk").forEach(b => { b.style.left = pct(+b.dataset.from) + "%"; b.style.width = `calc(${pct(+b.dataset.to) - pct(+b.dataset.from)}% - 3px)`; });
+const tl = document.getElementById("tl");
+const place = (cls, h, label) => { const el = document.createElement("div"); el.className = cls; el.style.left = `calc(200px + (100% - 200px) * ${pct(h) / 100})`; if (label) el.dataset.t = label; tl.style.position = "relative"; tl.appendChild(el); };
+place("midnight", 24);
+const d = new Date(); let h = d.getHours() + d.getMinutes() / 60; if (h < 3) h += 24;
+const t = d.toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" });
+document.getElementById("clock").textContent = t;
+if (h >= START && h <= START + SPAN) place("now", h, t);
+document.querySelectorAll(".star").forEach(b => b.addEventListener("click", () => { const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); b.querySelector("i").className = on ? "ph-fill ph-star" : "ph ph-star"; }));
+</script>
+</body>
+</html>

@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kleur 8: De Stijl</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Naar De Stijl (Mondriaan, Van Doesburg): één raster met dikke inktlijnen,
+   vlakken in geel, navy en wit. Elk vlak is een functie, en hoe groot het is
+   zegt hoe belangrijk ze is. Geen schaduwen, geen afgeronde hoeken. */
+:root {
+  --paper: #EFF2F8; --paper-2: #E6ECF5; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36;
+  --yellow: #FFD23F; --muted: #5C667F; --on-dark-muted: #B7C0DC;
+  --cat-act: #E5484D; --cat-sport: #30A46C; --cat-onthaal: #F76B15; --cat-bedrijf: #3E63DD;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "Familjen Grotesk", system-ui, sans-serif; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--yellow); outline-offset: -3px; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 32px 40px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.hdr { height: 66px; display: flex; align-items: center; gap: 28px; }
+.hdr img { height: 28px; filter: invert(1) brightness(.12); }
+.hdr nav { display: flex; gap: 22px; font-size: 15px; font-weight: 600; }
+.hdr nav a:hover { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 4px; }
+.hdr-end { margin-left: auto; display: flex; gap: 18px; align-items: center; font-size: 14px; font-weight: 600; }
+.hdr-end i { font-size: 19px; }
+
+.stijl { display: grid; grid-template-columns: repeat(12, 1fr); grid-template-rows: 150px 150px 150px 112px; gap: 7px; background: var(--ink); border: 7px solid var(--ink); }
+.b { background: var(--surface); padding: 20px 22px; position: relative; overflow: hidden; }
+.a { grid-column: 1 / 8; grid-row: 1 / 4; padding: 40px 40px 34px; display: flex; flex-direction: column; }
+.a h1 { font-size: 66px; line-height: .98; letter-spacing: -0.035em; font-weight: 700; color: var(--navy); margin-top: auto; }
+.a p { margin-top: 16px; font-size: 18px; line-height: 1.5; color: #34405E; max-width: 30em; }
+.cta { display: flex; gap: 10px; margin-top: 22px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 22px; font-size: 15px; font-weight: 700; white-space: nowrap; border: 2.5px solid var(--ink); }
+.btn-n { background: var(--navy); color: var(--paper); border-color: var(--navy); }
+.btn-n:hover { background: var(--yellow); color: var(--ink); border-color: var(--ink); }
+.btn-w:hover { background: var(--ink); color: var(--paper); }
+
+.t { grid-column: 8 / 11; grid-row: 1 / 3; background: var(--yellow); display: flex; flex-direction: column; }
+.t .d { font-size: 88px; font-weight: 700; line-height: .8; letter-spacing: -0.05em; }
+.t .d small { display: block; font-size: 15px; letter-spacing: 0; font-weight: 600; margin-top: 10px; }
+.t .evs { margin-top: auto; }
+.e { display: grid; grid-template-columns: 46px 1fr 24px; align-items: baseline; gap: 6px; padding: 6px 0; border-top: 2px solid var(--ink); font-size: 15px; font-weight: 600; }
+.e time { font-size: 13px; font-weight: 500; }
+.e a:hover { text-decoration: underline; }
+.e small { display: block; font-size: 12px; font-weight: 500; }
+.e small::before { content: ""; display: inline-block; width: 8px; height: 8px; background: var(--c); margin-right: 5px; }
+.star { font-size: 16px; }
+.star[aria-pressed="true"] { color: var(--navy); }
+
+.s { grid-column: 11 / 13; grid-row: 1 / 2; background: var(--navy); color: var(--paper); display: flex; flex-direction: column; }
+.s b { font-size: 52px; line-height: .85; color: var(--yellow); font-weight: 700; }
+.s span { font-size: 14px; font-weight: 600; margin-top: auto; }
+.s small { display: block; font-size: 12px; color: var(--on-dark-muted); font-weight: 400; }
+.s:hover { background: var(--ink); }
+
+.w { grid-column: 11 / 13; grid-row: 2 / 4; display: flex; flex-direction: column; }
+.w h2 { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.wr { display: block; padding: 6px 0; border-top: 1.5px solid var(--ink); font-size: 14px; font-weight: 600; line-height: 1.25; }
+.wr small { display: block; font-size: 12px; font-weight: 500; color: var(--muted); }
+.wr small::before { content: ""; display: inline-block; width: 7px; height: 7px; background: var(--c); margin-right: 5px; }
+.wr:hover { text-decoration: underline; }
+.w .all { margin-top: auto; font-size: 13px; font-weight: 700; }
+.w .all:hover { text-decoration: underline; }
+
+/* Snelkoppelingen als vlakken */
+.q { display: flex; flex-direction: column; justify-content: space-between; transition: background .15s, color .15s; }
+.q i.ic { font-size: 30px; }
+.q b { font-size: 19px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+.q b i { font-size: 16px; }
+.q small { font-size: 13px; color: var(--muted); font-weight: 500; }
+.q:hover { background: var(--ink) !important; color: var(--paper) !important; }
+.q:hover small { color: var(--on-dark-muted); }
+.q-kal { grid-column: 8 / 11; grid-row: 3 / 4; background: var(--paper-2); }
+.q-theo { grid-column: 1 / 4; grid-row: 4 / 5; background: var(--yellow); }
+.q-cudi { grid-column: 4 / 7; grid-row: 4 / 5; }
+.q-tw { grid-column: 7 / 9; grid-row: 4 / 5; background: var(--paper); }
+.q-slot { grid-column: 9 / 11; grid-row: 4 / 5; }
+.q-sh { grid-column: 11 / 13; grid-row: 4 / 5; background: var(--navy); color: var(--paper); }
+.q-sh small { color: var(--on-dark-muted); }
+.q-sh i.ic { color: var(--yellow); }
+.row { display: flex; align-items: center; gap: 12px; }
+
+@media (max-width: 1100px) {
+  .hdr nav { display: none; }
+  .stijl { grid-template-columns: repeat(6, 1fr); grid-template-rows: none; grid-auto-rows: minmax(120px, auto); }
+  .stijl > * { grid-column: span 3 !important; grid-row: auto !important; }
+  .a { grid-column: 1 / -1 !important; } .a h1 { font-size: 48px; margin-top: 0; }
+}
+@media (max-width: 600px) { .wrap { padding: 0 12px 24px; } .stijl > * { grid-column: 1 / -1 !important; } .a { padding: 24px 18px; } .a h1 { font-size: 38px; } .cta { flex-wrap: wrap; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+    <nav><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+    <div class="hdr-end"><i class="ph-bold ph-magnifying-glass"></i><span>NL / EN</span><i class="ph-bold ph-user-circle"></i></div>
+  </header>
+
+  <main class="stijl num">
+    <section class="b a">
+      <h1>De thuis voor ingenieurs in Leuven.</h1>
+      <p>Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+      <div class="cta"><a class="btn btn-n" href="#">Ontdek wat we doen</a><a class="btn btn-w" href="#">Eerstejaars? Start hier</a></div>
+    </section>
+    <section class="b t">
+      <div class="d">1<small>Donderdag, vandaag</small></div>
+      <div class="evs">
+        <div class="e"><time>12:00</time><a href="#">12 Urencantus<small style="--c:var(--cat-act)">Waaiberg</small></a><button class="star" aria-label="Interesse: 12 Urencantus"><i class="ph-bold ph-star"></i></button></div>
+        <div class="e"><time>20:30</time><a href="#">Looptraining<small style="--c:var(--cat-sport)">Sportkot</small></a><button class="star" aria-label="Interesse: Looptraining"><i class="ph-bold ph-star"></i></button></div>
+      </div>
+    </section>
+    <a class="b s" href="#"><b>3</b><span>shiften zoeken volk<small>morgen vanaf 01:00</small></span></a>
+    <section class="b w">
+      <h2>Later deze week</h2>
+      <a class="wr" href="#">PeMe-Startactiviteit<small style="--c:var(--cat-onthaal)">ma 5, 19:00</small></a>
+      <a class="wr" href="#">CaraOké<small style="--c:var(--cat-act)">ma 5, 21:00</small></a>
+      <a class="wr" href="#">Sector Night Bouwkunde<small style="--c:var(--cat-bedrijf)">di 6, 18:30</small></a>
+      <a class="all" href="#">Nog 5 events</a>
+    </section>
+    <a class="b q q-kal" href="#"><i class="ph ph-calendar-blank ic"></i><span><b>Kalender <i class="ph-bold ph-arrow-right"></i></b><small>Alle events van deze maand</small></span></a>
+    <a class="b q q-theo" href="#"><span class="row"><i class="ph ph-bread ic"></i><span><b>Theokot</b><small>Bestel je broodje</small></span></span></a>
+    <a class="b q q-cudi" href="#"><span class="row"><i class="ph ph-books ic"></i><span><b>Cursusdienst</b><small>Open tot 13:55</small></span></span></a>
+    <a class="b q q-tw" href="#"><span class="row"><i class="ph ph-recycle ic"></i><span><b>Tweedehands</b><small>Boeken</small></span></span></a>
+    <a class="b q q-slot" href="#"><span class="row"><i class="ph ph-clock ic"></i><span><b>Tijdslot</b><small>Cudi</small></span></span></a>
+    <a class="b q q-sh" href="#"><span class="row"><i class="ph ph-hand-heart ic"></i><span><b>Shiften</b><small>Help mee</small></span></span></a>
+  </main>
+</div>
+<script>document.querySelectorAll(".star").forEach(b => b.addEventListener("click", () => { const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); b.querySelector("i").className = on ? "ph-fill ph-star" : "ph-bold ph-star"; }));</script>
+</body>
+</html>

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kleur 5: Duotoon</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Elke foto in duotoon, navy in de schaduwen en geel in het licht. Zo
+   krijgt de pagina kleur uit beeld in plaats van uit vlakken, en ziet elke
+   foto er als VTK uit, ook een snelle gsm-foto. Ook de snelkoppelingen
+   krijgen elk hun foto. */
+:root {
+  --paper: #EFF2F8; --paper-2: #E6ECF5; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36;
+  --yellow: #FFD23F; --muted: #5C667F; --body: #34405E; --line: rgb(14 26 54 / .1);
+  --cat-act: #E5484D; --cat-sport: #30A46C; --cat-onthaal: #F76B15; --cat-bedrijf: #3E63DD;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "Instrument Sans", system-ui, sans-serif; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; border-radius: 6px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 36px; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* Duotoon: grijze foto vermenigvuldigd op geel, navy erover in "lighten". */
+.duo { position: relative; overflow: hidden; background: var(--yellow); isolation: isolate; }
+.duo img { width: 100%; height: 100%; object-fit: cover; display: block; filter: grayscale(1) contrast(1.15) brightness(1.05); mix-blend-mode: multiply; }
+.duo::after { content: ""; position: absolute; inset: 0; background: var(--navy); mix-blend-mode: lighten; pointer-events: none; }
+.duo.soft { background: var(--paper); }
+
+.hdr { height: 72px; display: flex; align-items: center; gap: 30px; }
+.hdr img { height: 28px; filter: invert(1) brightness(.15); }
+.hdr nav { display: flex; gap: 22px; font-size: 15px; font-weight: 500; }
+.hdr nav a:hover { color: var(--muted); }
+.hdr-end { margin-left: auto; display: flex; gap: 18px; align-items: center; font-size: 14px; }
+.hdr-end i { font-size: 19px; }
+
+.hero { display: grid; grid-template-columns: 1fr 1.25fr; gap: 48px; padding: 24px 0 36px; align-items: stretch; }
+.hero h1 { font-size: 58px; line-height: 1; letter-spacing: -0.035em; font-weight: 700; color: var(--navy); margin-top: 18px; }
+.hero p { margin-top: 18px; font-size: 18px; line-height: 1.55; color: var(--body); max-width: 30em; }
+.cta { display: flex; gap: 12px; margin-top: 26px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 22px; border-radius: 999px; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.btn-n { background: var(--navy); color: var(--paper); }
+.btn-n:hover { background: var(--ink); }
+.btn-y { background: var(--yellow); color: var(--ink); }
+.btn-y:hover { background: color-mix(in srgb, var(--yellow) 80%, white); }
+.today { margin-top: 30px; border-top: 1px solid var(--line); }
+.today h2 { font-size: 14px; font-weight: 600; color: var(--muted); padding: 14px 0 4px; display: flex; justify-content: space-between; }
+.today h2 a { color: var(--navy); }
+.today h2 a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.e { display: grid; grid-template-columns: 56px 1fr 28px; gap: 8px; align-items: center; padding: 8px 0; }
+.e time { font-size: 14px; color: var(--muted); }
+.e a { font-size: 16px; font-weight: 600; }
+.e a small { display: inline-block; margin-left: 8px; font-size: 12px; font-weight: 600; color: var(--c); }
+.e a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.star { color: var(--muted); font-size: 17px; }
+.star:hover, .star[aria-pressed="true"] { color: var(--ink); }
+.shiftline { display: flex; align-items: center; gap: 10px; margin-top: 8px; padding: 12px 14px; border-radius: 14px; background: var(--surface); font-size: 14px; }
+.shiftline b { background: var(--yellow); border-radius: 8px; padding: 2px 8px; }
+.shiftline a { margin-left: auto; font-weight: 600; color: var(--navy); }
+.shiftline a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.photo { border-radius: 26px; min-height: 520px; }
+
+.quick { display: grid; grid-template-columns: repeat(6, 1fr); gap: 14px; padding-bottom: 56px; }
+.q { display: block; }
+.q .duo { aspect-ratio: 4 / 3; border-radius: 16px; }
+.q .duo img { transition: transform .5s cubic-bezier(.16,1,.3,1); }
+.q:hover .duo img { transform: scale(1.06); }
+.q b { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; font-size: 16px; font-weight: 600; }
+.q b i { font-size: 15px; color: var(--muted); transition: transform .2s; }
+.q:hover b i { transform: translateX(3px); color: var(--ink); }
+.q small { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+
+@media (max-width: 1100px) { .hdr nav { display: none; } .hero { grid-template-columns: 1fr; } .photo { min-height: 320px; order: -1; } .quick { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 600px) { .wrap { padding: 0 16px; } .hero h1 { font-size: 40px; } .cta { flex-wrap: wrap; } .quick { grid-template-columns: 1fr 1fr; } }
+@media (prefers-reduced-motion: reduce) { .q .duo img { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+    <nav><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+    <div class="hdr-end"><i class="ph ph-magnifying-glass"></i><span><b>NL</b> / EN</span><i class="ph ph-user-circle"></i></div>
+  </header>
+
+  <section class="hero">
+    <div>
+      <h1>De thuis voor ingenieurs in Leuven.</h1>
+      <p>Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+      <div class="cta"><a class="btn btn-n" href="#">Ontdek wat we doen</a><a class="btn btn-y" href="#">Eerstejaars? Start hier</a></div>
+      <div class="today num">
+        <h2>Vandaag, donderdag 1 oktober <a href="#">Hele week</a></h2>
+        <div class="e"><time>12:00</time><a href="#" style="--c:var(--cat-act)">12 Urencantus<small>Activiteiten</small></a><button class="star" aria-label="Interesse: 12 Urencantus"><i class="ph ph-star"></i></button></div>
+        <div class="e"><time>20:30</time><a href="#" style="--c:var(--cat-sport)">Looptraining<small>Sport</small></a><button class="star" aria-label="Interesse: Looptraining"><i class="ph ph-star"></i></button></div>
+        <div class="shiftline"><b>3</b> shiften zoeken nog volk, morgen vanaf 01:00 <a href="#">Bekijk</a></div>
+      </div>
+    </div>
+    <div class="duo photo"><img src="../../../apps/web/public/hero-arenberg.jpg" alt="Het kasteel van Arenberg"></div>
+  </section>
+
+  <nav class="quick" aria-label="Snel naar">
+    <a class="q" href="#"><div class="duo"><img src="../../../apps/web/public/aanbod/theokot.jpg" alt=""></div><b>Theokot <i class="ph ph-arrow-right"></i></b><small>Bestel je broodje</small></a>
+    <a class="q" href="#"><div class="duo soft"><img src="../../../apps/web/public/aanbod/cursusdienst.jpg" alt=""></div><b>Cursusdienst <i class="ph ph-arrow-up-right"></i></b><small class="num">Open tot 13:55</small></a>
+    <a class="q" href="#"><div class="duo"><img src="../../../apps/web/public/aanbod/onderwijs.jpg" alt=""></div><b>Tweedehands <i class="ph ph-arrow-up-right"></i></b><small>Boeken kopen en verkopen</small></a>
+    <a class="q" href="#"><div class="duo soft"><img src="../../../apps/web/public/aanbod/internationaal.jpg" alt=""></div><b>Tijdslot Cudi <i class="ph ph-arrow-up-right"></i></b><small>Reserveer je ophaling</small></a>
+    <a class="q" href="#"><div class="duo"><img src="../../../apps/web/public/frontpage/urenloop.jpg" alt=""></div><b>Shiften <i class="ph ph-arrow-right"></i></b><small>3 open</small></a>
+    <a class="q" href="#"><div class="duo soft"><img src="../../../apps/web/public/aanbod/sport.jpg" alt=""></div><b>Kalender <i class="ph ph-arrow-right"></i></b><small>Alle events</small></a>
+  </nav>
+</div>
+<script>document.querySelectorAll(".star").forEach(b => b.addEventListener("click", () => { const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); b.querySelector("i").className = on ? "ph-fill ph-star" : "ph ph-star"; }));</script>
+</body>
+</html>

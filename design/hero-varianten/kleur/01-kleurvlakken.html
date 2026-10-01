@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kleur 1: Kleurvlakken</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Twee grote kleurvlakken naast elkaar: geel voor wie VTK is, navy voor wat
+   er deze week gebeurt. Events dragen hun categoriekleur uit de kalender.
+   De snelkoppelingen lopen als één brede balk onder beide vlakken. */
+:root {
+  --paper: #EFF2F8; --paper-2: #E6ECF5; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36;
+  --yellow: #FFD23F; --muted: #5C667F; --on-dark-muted: #B7C0DC;
+  /* Categoriekleuren: in productie komen ze uit /admin/kalender. */
+  --cat-act: #E5484D; --cat-sport: #30A46C; --cat-onthaal: #F76B15; --cat-bedrijf: #3E63DD;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Inter, system-ui, sans-serif; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.hdr { background: var(--navy); color: var(--paper); }
+.hdr-in { height: 64px; display: flex; align-items: center; gap: 30px; padding: 0 48px; }
+.hdr img { height: 28px; }
+.hdr nav { display: flex; gap: 22px; font-size: 15px; font-weight: 500; color: rgb(239 242 248 / .86); }
+.hdr nav a:hover { color: var(--paper); }
+.hdr-end { margin-left: auto; display: flex; gap: 18px; align-items: center; font-size: 14px; }
+.hdr-end i { font-size: 19px; }
+
+.split { display: grid; grid-template-columns: 1fr 1fr; min-height: 600px; }
+.yellow { background: var(--yellow); padding: 64px 64px 40px 48px; display: flex; flex-direction: column; }
+.yellow h1 { font-size: 68px; line-height: 1; letter-spacing: -0.04em; font-weight: 800; color: var(--navy); max-width: 9.5em; }
+.yellow p { margin-top: 22px; font-size: 19px; line-height: 1.5; color: rgb(10 15 31 / .78); max-width: 28em; }
+.cta { display: flex; gap: 12px; margin-top: 30px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 50px; padding: 0 22px; border-radius: 999px; font-size: 15px; font-weight: 600; white-space: nowrap; transition: background .15s, color .15s; }
+.btn-navy { background: var(--navy); color: var(--paper); }
+.btn-navy:hover { background: var(--ink); }
+.btn-ink { box-shadow: inset 0 0 0 1.5px var(--navy); color: var(--navy); }
+.btn-ink:hover { background: var(--navy); color: var(--yellow); }
+.shift { margin-top: auto; display: flex; align-items: center; gap: 14px; padding-top: 22px; border-top: 1.5px solid rgb(10 15 31 / .18); }
+.shift b { font-size: 40px; font-weight: 800; letter-spacing: -0.04em; color: var(--navy); }
+.shift span { font-size: 15px; font-weight: 600; }
+.shift small { display: block; font-weight: 400; font-size: 13px; color: rgb(10 15 31 / .7); }
+.shift a { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 700; color: var(--navy); }
+.shift a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.navy { background: var(--navy); color: var(--paper); padding: 56px 48px 40px 56px; }
+.navy-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 18px; }
+.navy-h h2 { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.navy-h a { font-size: 14px; font-weight: 600; color: var(--yellow); }
+.navy-h a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.d { display: grid; grid-template-columns: 70px 1fr; padding: 12px 0; border-top: 1px solid rgb(239 242 248 / .12); }
+.d-l { font-size: 13px; color: var(--on-dark-muted); }
+.d-l b { display: block; font-size: 22px; font-weight: 700; color: var(--paper); letter-spacing: -0.02em; line-height: 1.1; }
+.d.today .d-l, .d.today .d-l b { color: var(--yellow); }
+.e { position: relative; display: grid; grid-template-columns: 50px 1fr 30px; align-items: start; padding: 5px 0 5px 14px; }
+.e::before { content: ""; position: absolute; left: 0; top: 8px; bottom: 8px; width: 3px; border-radius: 2px; background: var(--c); }
+.e time { font-size: 14px; color: var(--on-dark-muted); }
+.e a { font-size: 15px; font-weight: 600; }
+.e a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.e small { display: block; font-size: 13px; color: var(--on-dark-muted); font-weight: 400; margin-top: 1px; }
+.e small em { font-style: normal; color: var(--c); font-weight: 600; }
+.star { color: var(--on-dark-muted); font-size: 17px; }
+.star:hover, .star[aria-pressed="true"] { color: var(--yellow); }
+.none { font-size: 14px; color: var(--on-dark-muted); padding: 4px 0 0 14px; }
+.more { display: inline-block; font-size: 13px; color: var(--on-dark-muted); padding-left: 64px; margin-top: 2px; }
+.more:hover { color: var(--paper); }
+
+.bar { display: grid; grid-template-columns: repeat(6, 1fr); background: var(--surface); border-bottom: 1px solid rgb(14 26 54 / .1); }
+.q { display: flex; align-items: center; gap: 14px; padding: 22px 24px; border-left: 1px solid rgb(14 26 54 / .1); transition: background .15s; }
+.q:first-child { border-left: 0; padding-left: 48px; }
+.q i { font-size: 26px; color: var(--navy); }
+.q b { display: block; font-size: 15px; font-weight: 700; }
+.q small { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+.q:hover { background: var(--yellow); }
+.q:hover small { color: var(--ink); }
+
+@media (max-width: 1100px) { .hdr nav { display: none; } .split { grid-template-columns: 1fr; } .bar { grid-template-columns: repeat(3, 1fr); } .q:first-child { padding-left: 24px; } .q:nth-child(4) { border-left: 0; } .q { border-top: 1px solid rgb(14 26 54 / .1); } }
+@media (max-width: 600px) { .hdr-in { padding: 0 16px; } .yellow, .navy { padding: 36px 16px 28px; } .yellow h1 { font-size: 42px; } .cta { flex-wrap: wrap; } .bar { grid-template-columns: 1fr 1fr; } .q { padding: 16px; border-left: 0; } }
+</style>
+</head>
+<body>
+<header class="hdr"><div class="hdr-in">
+  <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+  <nav><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+  <div class="hdr-end"><i class="ph ph-magnifying-glass"></i><span><b>NL</b> / EN</span><i class="ph ph-user-circle"></i></div>
+</div></header>
+
+<div class="split">
+  <section class="yellow">
+    <h1>De thuis voor ingenieurs in Leuven.</h1>
+    <p>Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+    <div class="cta"><a class="btn btn-navy" href="#">Ontdek wat we doen <i class="ph ph-arrow-right"></i></a><a class="btn btn-ink" href="#">Eerstejaars? Start hier</a></div>
+    <div class="shift num"><b>3</b><span>shiften zoeken nog volk<small>Alle drie morgen, vanaf 01:00</small></span><a href="#">Schrijf je in <i class="ph ph-arrow-right"></i></a></div>
+  </section>
+  <section class="navy num">
+    <div class="navy-h"><h2>Deze week</h2><a href="#">Volledige kalender</a></div>
+    <div class="d today"><div class="d-l"><b>1</b>vandaag</div><div>
+      <div class="e" style="--c: var(--cat-act)"><time>12:00</time><a href="#">12 Urencantus<small><em>Activiteiten</em>, Waaiberg</small></a><button class="star" aria-label="Interesse: 12 Urencantus"><i class="ph ph-star"></i></button></div>
+      <div class="e" style="--c: var(--cat-sport)"><time>20:30</time><a href="#">Looptraining<small><em>Sport</em>, Atletiekpiste Sportkot</small></a><button class="star" aria-label="Interesse: Looptraining"><i class="ph ph-star"></i></button></div>
+    </div></div>
+    <div class="d"><div class="d-l"><b>2</b>vr</div><p class="none">Niets gepland</p></div>
+    <div class="d"><div class="d-l"><b>5</b>ma</div><div>
+      <div class="e" style="--c: var(--cat-onthaal)"><time>19:00</time><a href="#">PeMe-Startactiviteit<small><em>Onthaal</em>, Grasveld Alma 3</small></a><button class="star" aria-label="Interesse: PeMe-Startactiviteit"><i class="ph ph-star"></i></button></div>
+      <div class="e" style="--c: var(--cat-act)"><time>21:00</time><a href="#">CaraOké<small><em>Theokot</em></small></a><button class="star" aria-label="Interesse: CaraOké"><i class="ph ph-star"></i></button></div>
+    </div></div>
+    <div class="d"><div class="d-l"><b>6</b>di</div><div>
+      <div class="e" style="--c: var(--cat-bedrijf)"><time>18:30</time><a href="#">Sector Night Bouwkunde<small><em>Bedrijfsrelaties</em>, Quadrivium</small></a><button class="star" aria-label="Interesse: Sector Night"><i class="ph ph-star"></i></button></div>
+      <a class="more" href="#">Nog 3 die dag</a>
+    </div></div>
+  </section>
+</div>
+
+<nav class="bar" aria-label="Snel naar">
+  <a class="q" href="#"><i class="ph ph-bread"></i><span><b>Theokot</b><small>Bestel je broodje</small></span></a>
+  <a class="q" href="#"><i class="ph ph-books"></i><span><b>Cursusdienst</b><small class="num">Open tot 13:55</small></span></a>
+  <a class="q" href="#"><i class="ph ph-recycle"></i><span><b>Tweedehands</b><small>Boeken</small></span></a>
+  <a class="q" href="#"><i class="ph ph-clock"></i><span><b>Tijdslot Cudi</b><small>Reserveer</small></span></a>
+  <a class="q" href="#"><i class="ph ph-hand-heart"></i><span><b>Shiften</b><small>Help mee</small></span></a>
+  <a class="q" href="#"><i class="ph ph-calendar-blank"></i><span><b>Kalender</b><small>Alle events</small></span></a>
+</nav>
+<script>document.querySelectorAll(".star").forEach(b => b.addEventListener("click", () => { const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); b.querySelector("i").className = on ? "ph-fill ph-star" : "ph ph-star"; }));</script>
+</body>
+</html>

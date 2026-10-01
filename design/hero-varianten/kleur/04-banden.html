@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kleur 4: Banden</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Een index zoals op een studiosite: onder de hero loopt elke snelkoppeling
+   als een eigen band over de volle breedte, elk in een eigen kleur uit het
+   palet. Zo is "waar wil je naartoe" het grootste element op de pagina. */
+:root {
+  --paper: #EFF2F8; --paper-2: #E6ECF5; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36;
+  --yellow: #FFD23F; --muted: #5C667F; --on-dark-muted: #B7C0DC;
+  --cat-act: #E5484D; --cat-sport: #30A46C; --cat-onthaal: #F76B15; --cat-bedrijf: #3E63DD;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "Inter Tight", system-ui, sans-serif; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--yellow); outline-offset: -2px; }
+.in { max-width: 1240px; margin: 0 auto; padding: 0 36px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.hero { background: var(--navy); color: var(--paper); }
+.hdr { height: 64px; display: flex; align-items: center; gap: 30px; }
+.hdr img { height: 28px; }
+.hdr nav { display: flex; gap: 22px; font-size: 15px; font-weight: 500; color: rgb(239 242 248 / .86); }
+.hdr nav a:hover { color: var(--paper); }
+.hdr-end { margin-left: auto; display: flex; gap: 18px; align-items: center; font-size: 14px; }
+.hdr-end i { font-size: 19px; }
+.hero-g { display: grid; grid-template-columns: 1.15fr 1fr; gap: 64px; padding: 40px 0 44px; }
+.hero h1 { font-size: 60px; line-height: .98; letter-spacing: -0.04em; font-weight: 800; }
+.hero h1 span { color: var(--yellow); }
+.hero p { margin-top: 16px; font-size: 18px; line-height: 1.5; color: var(--on-dark-muted); max-width: 30em; }
+.cta { display: flex; gap: 12px; margin-top: 24px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 20px; border-radius: 999px; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.btn-y { background: var(--yellow); color: var(--ink); }
+.btn-y:hover { background: var(--surface); }
+.btn-l { box-shadow: inset 0 0 0 1px rgb(239 242 248 / .3); }
+.btn-l:hover { background: rgb(239 242 248 / .08); }
+
+.ag-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 8px; }
+.ag-h h2 { font-size: 15px; font-weight: 600; color: var(--on-dark-muted); }
+.ag-h a { font-size: 14px; font-weight: 600; color: var(--yellow); }
+.ag-h a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.e { display: grid; grid-template-columns: 74px 1fr 28px; gap: 10px; align-items: center; padding: 9px 0; border-top: 1px solid rgb(239 242 248 / .12); }
+.e .when { font-size: 13px; color: var(--on-dark-muted); line-height: 1.25; }
+.e .when b { display: block; color: var(--paper); font-weight: 600; }
+.e.today .when b { color: var(--yellow); }
+.e a { font-size: 16px; font-weight: 600; }
+.e a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.e a small { display: block; font-size: 13px; font-weight: 500; color: color-mix(in srgb, var(--c) 62%, white); margin-top: 1px; }
+.star { color: var(--on-dark-muted); font-size: 17px; }
+.star:hover, .star[aria-pressed="true"] { color: var(--yellow); }
+
+/* De banden */
+.band { display: block; transition: padding .25s cubic-bezier(.16,1,.3,1); }
+.band .in { display: grid; grid-template-columns: 52px 280px 1fr auto 40px; align-items: center; gap: 16px; height: 68px; }
+.band i.ic { font-size: 30px; }
+.band b { font-size: 30px; font-weight: 800; letter-spacing: -0.03em; }
+.band small { font-size: 15px; opacity: .78; }
+.band .st { font-size: 14px; font-weight: 600; padding: 5px 12px; border-radius: 999px; }
+.band .go { font-size: 22px; transition: transform .2s; }
+.band:hover .go { transform: translateX(6px); }
+.band:hover .in { height: 76px; }
+.b1 { background: var(--yellow); color: var(--ink); }
+.b1 .st { background: var(--ink); color: var(--yellow); }
+.b2 { background: var(--surface); color: var(--navy); }
+.b2 .st { background: var(--yellow); color: var(--ink); }
+.b3 { background: var(--paper-2); color: var(--navy); }
+.b4 { background: var(--paper); color: var(--navy); box-shadow: inset 0 1px 0 rgb(14 26 54 / .08); }
+.b5 { background: var(--navy); color: var(--paper); box-shadow: inset 0 1px 0 rgb(239 242 248 / .1); }
+.b5 .st { background: var(--yellow); color: var(--ink); }
+.b6 { background: var(--ink); color: var(--paper); }
+.b6 i.ic, .b5 i.ic { color: var(--yellow); }
+.b1 .st:empty, .band .st:empty { display: none; }
+
+@media (max-width: 1100px) { .hdr nav { display: none; } .hero-g { grid-template-columns: 1fr; gap: 32px; } .band .in { grid-template-columns: 40px 1fr auto 28px; } .band small { display: none; } }
+@media (max-width: 600px) { .in { padding: 0 16px; } .hero h1 { font-size: 42px; } .cta { flex-wrap: wrap; } .band b { font-size: 22px; } .band .st { display: none; } }
+@media (prefers-reduced-motion: reduce) { .band, .band .in, .band .go { transition: none; } }
+</style>
+</head>
+<body>
+<section class="hero"><div class="in">
+  <header class="hdr">
+    <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+    <nav><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+    <div class="hdr-end"><i class="ph ph-magnifying-glass"></i><span><b>NL</b> / EN</span><i class="ph ph-user-circle"></i></div>
+  </header>
+  <div class="hero-g">
+    <div>
+      <h1>De thuis voor <span>ingenieurs</span> in Leuven.</h1>
+      <p>Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+      <div class="cta"><a class="btn btn-y" href="#">Ontdek wat we doen</a><a class="btn btn-l" href="#">Eerstejaars? Start hier</a></div>
+    </div>
+    <div class="num">
+      <div class="ag-h"><h2>Deze week</h2><a href="#">Volledige kalender</a></div>
+      <div class="e today"><span class="when"><b>Vandaag</b>12:00</span><a href="#" style="--c:var(--cat-act)">12 Urencantus<small>Activiteiten, Waaiberg</small></a><button class="star" aria-label="Interesse: 12 Urencantus"><i class="ph ph-star"></i></button></div>
+      <div class="e today"><span class="when"><b>Vandaag</b>20:30</span><a href="#" style="--c:var(--cat-sport)">Looptraining<small>Sport, Sportkot</small></a><button class="star" aria-label="Interesse: Looptraining"><i class="ph ph-star"></i></button></div>
+      <div class="e"><span class="when"><b>ma 5</b>19:00</span><a href="#" style="--c:var(--cat-onthaal)">PeMe-Startactiviteit<small>Onthaal, Alma 3</small></a><button class="star" aria-label="Interesse: PeMe"><i class="ph ph-star"></i></button></div>
+      <div class="e"><span class="when"><b>di 6</b>18:30</span><a href="#" style="--c:var(--cat-bedrijf)">Sector Night Bouwkunde<small>Bedrijfsrelaties, Quadrivium</small></a><button class="star" aria-label="Interesse: Sector Night"><i class="ph ph-star"></i></button></div>
+    </div>
+  </div>
+</div></section>
+
+<nav aria-label="Snel naar">
+  <a class="band b1" href="#"><div class="in"><i class="ph ph-bread ic"></i><b>Theokot</b><small>Bestel je broodje voor vandaag</small><span class="st"></span><i class="ph ph-arrow-right go"></i></div></a>
+  <a class="band b2" href="#"><div class="in"><i class="ph ph-books ic"></i><b>Cursusdienst</b><small>Cursussen ophalen</small><span class="st num">Open tot 13:55</span><i class="ph ph-arrow-up-right go"></i></div></a>
+  <a class="band b3" href="#"><div class="in"><i class="ph ph-recycle ic"></i><b>Tweedehands</b><small>Boeken kopen en verkopen</small><span class="st"></span><i class="ph ph-arrow-up-right go"></i></div></a>
+  <a class="band b4" href="#"><div class="in"><i class="ph ph-clock ic"></i><b>Tijdslot Cudi</b><small>Kies wanneer je ophaalt</small><span class="st"></span><i class="ph ph-arrow-up-right go"></i></div></a>
+  <a class="band b5" href="#"><div class="in"><i class="ph ph-hand-heart ic"></i><b>Shiften</b><small>Help mee en verdien munten</small><span class="st">3 open, eerste morgen 01:00</span><i class="ph ph-arrow-right go"></i></div></a>
+  <a class="band b6" href="#"><div class="in"><i class="ph ph-calendar-blank ic"></i><b>Kalender</b><small>Alle events van deze maand</small><span class="st"></span><i class="ph ph-arrow-right go"></i></div></a>
+</nav>
+<script>document.querySelectorAll(".star").forEach(b => b.addEventListener("click", () => { const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); b.querySelector("i").className = on ? "ph-fill ph-star" : "ph ph-star"; }));</script>
+</body>
+</html>
