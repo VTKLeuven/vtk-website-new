@@ -298,6 +298,13 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 - **Waarom expliciete Brussel-tijd:** "12:00" moet 12:00 lokale tijd zijn in zowel
   zomer- als winteruur. Daarom rekent `lib/theokot.ts` met `Europe/Brussels` via
   `Intl` (geen vaste UTC-offset).
+- **Na de deadline toont `/theokot` geen voorraad meer**: geen "nog 3" en geen
+  "uitverkocht" bij een broodje. Na de deadline is dat getal geen voorraad
+  meer: wat niet besteld is, wordt niet gemaakt. Bleef het staan, dan kwam
+  iemand aan de toog met "er zijn er nog 3" of "de site zei dat er nog waren",
+  voor een broodje dat er niet is. Wie te laat is, is te laat. Het aanbod zelf
+  blijft zichtbaar, de eigen reservatie ook. De app toont na de deadline het
+  aanbod helemaal niet, dus daar speelt dit niet.
 
 ### Limieten
 
