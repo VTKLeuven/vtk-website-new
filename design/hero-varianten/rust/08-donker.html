@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rust 8: Donker en precies</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Stroming: donker en precies (vercel.com, technische documentatie). Eén
+   kader met haarlijnen, alles lijnt uit op dezelfde kolommen. De drie
+   snelkoppelingen zijn cellen in de onderste rij van het kader, met een
+   toetscombinatie om er meteen heen te gaan. Mono enkel voor die toetsen. */
+:root { --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --paper: #EFF2F8; --surface: #FFFFFF; --on-dark-muted: #B7C0DC; --hair: rgb(239 242 248 / .12); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Geist, system-ui, sans-serif; background: var(--ink); color: var(--paper); -webkit-font-smoothing: antialiased; min-height: 100dvh; }
+a { color: inherit; text-decoration: none; }
+:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+.mono { font-family: "Geist Mono", monospace; }
+
+.hdr { max-width: 1160px; margin: 0 auto; padding: 0 24px; height: 64px; display: flex; align-items: center; gap: 28px; }
+.hdr img { height: 22px; }
+.hdr nav { display: flex; gap: 22px; font-size: 14px; color: var(--on-dark-muted); }
+.hdr nav a:hover { color: var(--paper); }
+.hdr-end { margin-left: auto; display: flex; gap: 16px; align-items: center; font-size: 14px; color: var(--on-dark-muted); }
+.hdr-end a.in { color: var(--ink); background: var(--paper); padding: 6px 12px; border-radius: 8px; font-weight: 500; }
+
+.frame { max-width: 1112px; margin: 40px auto 0; border: 1px solid var(--hair); }
+.hero { padding: 88px 64px 72px; border-bottom: 1px solid var(--hair); text-align: center; }
+.hero h1 { font-size: 64px; line-height: 1.02; letter-spacing: -0.05em; font-weight: 600; max-width: 12em; margin: 0 auto; }
+.hero p { margin: 18px auto 0; font-size: 18px; line-height: 1.55; color: var(--on-dark-muted); max-width: 32em; }
+.cta { display: flex; gap: 12px; justify-content: center; margin-top: 32px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 20px; border-radius: 10px; font-size: 15px; font-weight: 500; }
+.btn-y { background: var(--yellow); color: var(--ink); }
+.btn-y:hover { background: var(--paper); }
+.btn-o { box-shadow: inset 0 0 0 1px var(--hair); }
+.btn-o:hover { background: rgb(239 242 248 / .06); }
+
+.cells { display: grid; grid-template-columns: repeat(3, 1fr); }
+.cell { display: flex; flex-direction: column; gap: 22px; padding: 26px 28px; border-left: 1px solid var(--hair); transition: background .15s; }
+.cell:first-child { border-left: 0; }
+.cell:hover { background: rgb(239 242 248 / .04); }
+.cell .top { display: flex; justify-content: space-between; align-items: center; }
+.cell .top i { font-size: 22px; color: var(--yellow); }
+.cell kbd { font-family: "Geist Mono", monospace; font-size: 12px; color: var(--on-dark-muted); border: 1px solid var(--hair); border-radius: 6px; padding: 2px 7px; }
+.cell b { display: block; font-size: 18px; font-weight: 600; }
+.cell small { display: block; font-size: 14px; color: var(--on-dark-muted); margin-top: 4px; }
+
+.today { max-width: 1112px; margin: 0 auto; border: 1px solid var(--hair); border-top: 0; display: flex; align-items: center; gap: 20px; padding: 0 28px; height: 52px; font-size: 14px; color: var(--on-dark-muted); }
+.today b { color: var(--paper); font-weight: 500; }
+.today a:hover { color: var(--paper); }
+.today .r { margin-left: auto; }
+.more { max-width: 1112px; margin: 18px auto 48px; display: flex; gap: 20px; font-size: 14px; color: var(--on-dark-muted); padding: 0 4px; }
+.more a { color: var(--paper); }
+.more a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 1160px) { .frame, .today, .more { margin-left: 16px; margin-right: 16px; } }
+@media (max-width: 860px) { .hdr nav { display: none; } .cells { grid-template-columns: 1fr; } .cell { border-left: 0; border-top: 1px solid var(--hair); } .cell:first-child { border-top: 0; } .hero { padding: 56px 22px 44px; } .hero h1 { font-size: 42px; } .today { flex-wrap: wrap; height: auto; padding: 12px 18px; gap: 6px 16px; } .today .r { margin-left: 0; } .cta { flex-wrap: wrap; } }
+</style>
+</head>
+<body>
+<header class="hdr">
+  <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+  <nav><a href="#">Info</a><a href="#">Cursusdienst</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Evenementen</a><a href="#">Eerstejaars</a><a href="#">Studies</a></nav>
+  <div class="hdr-end"><span>NL / EN</span><a class="in" href="#">Aanmelden</a></div>
+</header>
+
+<main class="frame">
+  <section class="hero">
+    <h1>De thuis voor ingenieurs in Leuven.</h1>
+    <p>Cursussen, broodjes, events en career voor burgerlijk en bio-ingenieurs. Gerund door studenten, sinds 1920.</p>
+    <div class="cta"><a class="btn btn-y" href="#">Ontdek wat we doen</a><a class="btn btn-o" href="#">Eerstejaars? Start hier</a></div>
+  </section>
+  <nav class="cells num" aria-label="Snel naar">
+    <a class="cell" href="#" data-key="c"><span class="top"><i class="ph ph-books"></i><kbd>C</kbd></span><span><b>Cursusdienst</b><small>Open tot 13:55, opnieuw om 18:05</small></span></a>
+    <a class="cell" href="#" data-key="t"><span class="top"><i class="ph ph-bread"></i><kbd>T</kbd></span><span><b>Theokot</b><small>Bestel je broodje voor vandaag</small></span></a>
+    <a class="cell" href="#" data-key="s"><span class="top"><i class="ph ph-hand-heart"></i><kbd>S</kbd></span><span><b>Shiften</b><small>3 shiften zoeken nog volk</small></span></a>
+  </nav>
+</main>
+<aside class="today num" aria-label="Vandaag"><b>Vandaag</b><a href="#">12 Urencantus, 12:00</a><a href="#">Looptraining, 20:30</a><a class="r" href="#">Volledige kalender →</a></aside>
+<p class="more">Ook: <a href="#">Tweedehands boeken</a><a href="#">Tijdslot Cudi</a><a href="#">Career</a></p>
+<script>
+// Eén toets brengt je naar een snelkoppeling, zolang je niet aan het typen bent.
+document.addEventListener("keydown", e => {
+  if (e.metaKey || e.ctrlKey || e.altKey || /input|textarea/i.test(document.activeElement.tagName)) return;
+  const cell = document.querySelector(`.cell[data-key="${e.key.toLowerCase()}"]`);
+  if (cell) cell.focus();
+});
+</script>
+</body>
+</html>
