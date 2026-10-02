@@ -10,7 +10,7 @@ import { localDateTimeToUtc } from "@/lib/ticketing/time";
 import { isEditableDestination } from "@/lib/href";
 import { readImageField, resolveImageKey } from "@/lib/imageField";
 import { NEWS_TAG } from "@/lib/news/load";
-import { NEWS_AUTO_SOURCES, isNewsAutoSource } from "@/lib/news/rules";
+import { NEWS_AUTO_SOURCES, isNewsAutoSource, ticketNeedsNewsOptIn } from "@/lib/news/rules";
 import { NEWS_FEATURED_SETTING, NEWS_SETTING, readNewsFeatured } from "@/lib/news/setting";
 
 /**
@@ -317,8 +317,27 @@ async function clearFeaturedPick(
 // ---------------------------------------------------------------------------
 
 /**
- * Haalt één automatisch bericht uit het nieuws, of zet het terug. De bron blijft
+ * Staat dit automatische bericht standaard níét in het nieuws, zodat het er
+ * enkel in komt met een `NewsShown`? Vandaag enkel de verkoop van een werkgroep.
+ * Opgezocht op de server en niet uit het formulier overgenomen: of het bericht
+ * erin staat, hangt aan de bron en niet aan wat de knop meestuurde.
+ */
+async function needsNewsOptIn(source: string, ref: string): Promise<boolean> {
+  if (source !== "tickets") return false;
+  const event = await prisma.ticketEvent.findUnique({
+    where: { id: ref },
+    select: { ownerGroup: { select: { type: true } } },
+  });
+  return event ? ticketNeedsNewsOptIn(event) : false;
+}
+
+/**
+ * Haalt één automatisch bericht uit het nieuws, of zet het erin. De bron blijft
  * ongemoeid: de ticketverkoop loopt door, het album blijft op /media.
+ *
+ * Een bericht dat standaard uit staat (de verkoop van een werkgroep), komt erin
+ * met een `NewsShown`; de rest door zijn `NewsHidden` weg te halen. Verbergen
+ * haalt beide weg en zet een `NewsHidden`, zodat de twee nooit samen bestaan.
  */
 export async function setNewsHiddenAction(formData: FormData): Promise<void> {
   await requirePermission("news.manage");
@@ -328,24 +347,44 @@ export async function setNewsHiddenAction(formData: FormData): Promise<void> {
   if (!isNewsAutoSource(source) || !ref || ref.length > 200) return;
   const hide = formData.get("hidden") === "1";
 
+  const optIn = await needsNewsOptIn(source, ref);
+
   if (hide) {
-    await prisma.newsHidden.upsert({
-      where: { source_ref: { source, ref } },
-      update: {},
-      create: { source, ref },
-    });
+    await prisma.$transaction([
+      prisma.newsShown.deleteMany({ where: { source, ref } }),
+      prisma.newsHidden.upsert({
+        where: { source_ref: { source, ref } },
+        update: {},
+        create: { source, ref },
+      }),
+    ]);
     // Een verborgen bericht kan niet uitgelicht staan; zonder dit zou het na
     // het terugzetten ongevraagd weer de grote kaart innemen.
     await clearFeaturedPick(prisma, source, ref);
   } else {
-    await prisma.newsHidden.deleteMany({ where: { source, ref } });
+    await prisma.$transaction([
+      prisma.newsHidden.deleteMany({ where: { source, ref } }),
+      ...(optIn
+        ? [
+            prisma.newsShown.upsert({
+              where: { source_ref: { source, ref } },
+              update: {},
+              create: { source, ref },
+            }),
+          ]
+        : []),
+    ]);
   }
   await logAudit({
     action: "update",
     entity: "news",
     entityId: `${source}:${ref}`,
     target: title,
-    summary: hide ? "uit het nieuws gehaald" : "terug in het nieuws gezet",
+    summary: hide
+      ? "uit het nieuws gehaald"
+      : optIn
+        ? "in het nieuws gezet (verkoop van een werkgroep, standaard niet)"
+        : "terug in het nieuws gezet",
   });
   revalidate();
 }

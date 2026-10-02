@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "@/components/ui/Link";
 import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
@@ -19,6 +20,7 @@ const FeedbackDialog = dynamic(() => import("./FeedbackDialog").then((m) => m.Fe
 
 export function ProfileMenu({
   name,
+  avatarUrl = null,
   isAdmin,
   tools,
   canReserveGrocomeet,
@@ -30,6 +32,8 @@ export function ProfileMenu({
   previewActive = false,
 }: {
   name: string;
+  /** Profielfoto (`publicUrl(user.avatarKey)`); zonder foto blijft de initiaal staan. */
+  avatarUrl?: string | null;
   isAdmin: boolean;
   /** Beheerschermen van een post op een andere site; leeg voor wie er geen heeft. */
   tools: PostAdminLink[];
@@ -110,6 +114,7 @@ export function ProfileMenu({
   }, []);
 
   const editorial = variant === "editorial";
+  const initial = name.slice(0, 1).toUpperCase();
 
   const triggerClass = editorial
     ? "profile-menu-trigger"
@@ -140,13 +145,24 @@ export function ProfileMenu({
         className={triggerClass}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={editorial ? name : undefined}
+        title={editorial ? name : undefined}
       >
         {editorial ? (
-          name.slice(0, 1).toUpperCase()
+          avatarUrl ? (
+            // De knop is 38px; 76 houdt de foto scherp op een retinascherm.
+            <Image src={avatarUrl} alt="" width={76} height={76} className="profile-menu-avatar" />
+          ) : (
+            initial
+          )
         ) : (
           <>
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-vtk-yellow text-sm font-bold text-vtk-blue shadow-inner">
-              {name.slice(0, 1).toUpperCase()}
+            <span className="grid h-8 w-8 place-items-center overflow-hidden rounded-full bg-vtk-yellow text-sm font-bold text-vtk-blue shadow-inner">
+              {avatarUrl ? (
+                <Image src={avatarUrl} alt="" width={64} height={64} className="h-full w-full object-cover" />
+              ) : (
+                initial
+              )}
             </span>
             <span className="hidden max-w-[120px] truncate font-medium sm:inline">{name}</span>
           </>

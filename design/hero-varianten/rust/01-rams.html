@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rust 1: Rams</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Stroming: functioneel minimalisme (Dieter Rams, "weniger, aber besser").
+   Eén letter, één raster, kleur enkel waar ze iets betekent: het gele lampje
+   zegt "nu open", net zoals op een Braun-toestel. De agenda staat niet in
+   beeld; één regel onderaan zegt wat er vandaag is. */
+:root { --paper: #EFF2F8; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --muted: #5C667F; --line: rgb(14 26 54 / .12); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; }
+body { font-family: Inter, system-ui, sans-serif; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; display: flex; flex-direction: column; }
+a { color: inherit; text-decoration: none; }
+:focus-visible { outline: 2px solid var(--navy); outline-offset: 3px; border-radius: 6px; }
+.wrap { width: 100%; max-width: 1120px; margin: 0 auto; padding: 0 32px; }
+
+.hdr { display: flex; align-items: center; gap: 36px; height: 72px; border-bottom: 1px solid var(--line); }
+.hdr img { height: 24px; filter: invert(1) brightness(.12); }
+.hdr nav { display: flex; gap: 24px; font-size: 14px; color: var(--muted); }
+.hdr nav a:hover { color: var(--ink); }
+.hdr-end { margin-left: auto; display: flex; gap: 20px; font-size: 14px; color: var(--muted); }
+.hdr-end b { color: var(--ink); font-weight: 500; }
+
+main { flex: 1; display: grid; grid-template-columns: 7fr 5fr; gap: 64px; align-items: center; padding: 72px 0; }
+h1 { font-size: 56px; line-height: 1.05; letter-spacing: -0.035em; font-weight: 600; color: var(--navy); }
+.sub { margin-top: 20px; font-size: 18px; line-height: 1.55; color: var(--muted); max-width: 28em; }
+.cta { display: flex; align-items: center; gap: 24px; margin-top: 36px; }
+.btn { display: inline-flex; align-items: center; height: 48px; padding: 0 22px; border-radius: 10px; background: var(--navy); color: var(--paper); font-size: 15px; font-weight: 500; }
+.btn:hover { background: var(--ink); }
+.link { font-size: 15px; font-weight: 500; color: var(--navy); }
+.link:hover { text-decoration: underline; text-underline-offset: 4px; }
+
+.controls { display: grid; gap: 10px; }
+.ctl { display: grid; grid-template-columns: 1fr auto 36px; align-items: center; gap: 14px; padding: 18px 20px; border-radius: 14px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow .15s; }
+.ctl:hover { box-shadow: inset 0 0 0 1.5px var(--navy); }
+.ctl b { display: block; font-size: 16px; font-weight: 600; }
+.ctl small { display: block; font-size: 13px; color: var(--muted); margin-top: 2px; }
+.lamp { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.lamp::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+.lamp.on::before { background: var(--yellow); box-shadow: 0 0 0 3px rgb(255 210 63 / .25); }
+.knob { width: 36px; height: 36px; border-radius: 50%; background: var(--paper); display: grid; place-items: center; font-size: 15px; }
+.ctl:hover .knob { background: var(--navy); color: var(--paper); }
+.more { font-size: 13px; color: var(--muted); padding: 6px 4px 0; }
+.more a { color: var(--ink); margin-right: 14px; }
+.more a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.today { border-top: 1px solid var(--line); }
+.today .wrap { display: flex; align-items: center; gap: 16px; height: 56px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.today b { color: var(--ink); font-weight: 500; }
+.today a.r { margin-left: auto; color: var(--navy); font-weight: 500; }
+.today a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 960px) { .hdr nav { display: none; } main { grid-template-columns: 1fr; gap: 40px; padding: 48px 0; } }
+@media (max-width: 560px) { .wrap { padding: 0 18px; } h1 { font-size: 38px; } .cta { flex-wrap: wrap; gap: 16px; } .today .wrap { height: auto; padding-top: 14px; padding-bottom: 14px; flex-wrap: wrap; gap: 6px 16px; } .today a.r { margin-left: 0; } }
+</style>
+</head>
+<body>
+<header class="wrap hdr">
+  <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+  <nav><a href="#">Info</a><a href="#">Cursusdienst</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Evenementen</a><a href="#">Eerstejaars</a><a href="#">Studies</a><a href="#">Over VTK</a></nav>
+  <div class="hdr-end"><span><b>NL</b> / EN</span><a href="#">Aanmelden</a></div>
+</header>
+
+<main class="wrap">
+  <section>
+    <h1>De thuis voor ingenieurs in Leuven.</h1>
+    <p class="sub">Cursussen, broodjes, events en career. Gerund door studenten, sinds 1920.</p>
+    <div class="cta"><a class="btn" href="#">Ontdek wat we doen</a><a class="link" href="#">Eerstejaars? Start hier</a></div>
+  </section>
+  <nav class="controls" aria-label="Snel naar">
+    <a class="ctl" href="#"><span><b>Cursusdienst</b><small>Cursussen ophalen</small></span><span class="lamp on">Open tot 13:55</span><span class="knob"><i class="ph ph-arrow-up-right"></i></span></a>
+    <a class="ctl" href="#"><span><b>Theokot</b><small>Broodje bestellen</small></span><span class="lamp on">Open</span><span class="knob"><i class="ph ph-arrow-right"></i></span></a>
+    <a class="ctl" href="#"><span><b>Shiften</b><small>Help mee, verdien munten</small></span><span class="lamp on">3 open</span><span class="knob"><i class="ph ph-arrow-right"></i></span></a>
+    <p class="more">Ook: <a href="#">Tweedehands</a><a href="#">Tijdslot Cudi</a><a href="#">Kalender</a></p>
+  </nav>
+</main>
+
+<aside class="today" aria-label="Vandaag">
+  <div class="wrap"><span><b>Vandaag</b></span><a href="#">12 Urencantus, 12:00</a><a href="#">Looptraining, 20:30</a><a class="r" href="#">Hele week</a></div>
+</aside>
+</body>
+</html>

@@ -744,6 +744,63 @@ export function requesterTypeLabel(type: UitleenRequesterType, locale: Logistiek
 }
 
 /**
+ * De titel van een rit: waarvoor ze dient, niet het evenement.
+ *
+ * Tot september 2026 stond hier `eventName || purpose`, en dan heetten alle ritten
+ * onder één evenement hetzelfde ("Galabal", "Galabal", "Galabal") terwijl de
+ * vraag bij het plannen net is wélke rit de tafels brengt. Het evenement staat
+ * ernaast, met {@link tripEventName}. Enkel de eerste regel: `purpose` is vrije
+ * tekst tot 1000 tekens, en een titel staat in een blok, een mailonderwerp of
+ * een agenda-app op één regel. Zie docs/design-decisions.md.
+ */
+export function tripTitle(trip: { purpose: string }): string {
+  const firstLine = trip.purpose
+    .split('\n')
+    .map((line) => line.trim())
+    .find(Boolean);
+  return firstLine ?? '';
+}
+
+/**
+ * Bij welk evenement een rit hoort, of `null`.
+ *
+ * `eventName` en niet de naam van de relatie: het is de momentopname die blijft
+ * staan wanneer het evenement verdwijnt, en bij een rit die een lid aanvroeg
+ * zonder te koppelen de naam die hij zelf intikte.
+ */
+export function tripEventName(trip: { eventName: string | null }): string | null {
+  return trip.eventName?.trim() || null;
+}
+
+/**
+ * Welke helften van een rit veranderen wanneer ze aan `event` gehangen worden
+ * (of losgemaakt, bij `null`), met de regel voor hun historiek.
+ *
+ * Koppeling en naam gaan altijd samen: koppelen zet de naam van het evenement,
+ * loskoppelen wist hem. Dat laatste ook bij een naam zonder koppeling, want dat
+ * is de "Wissen" voor wat een aanvrager zelf intikte. Een helft die al klopt,
+ * valt weg, zodat een tweede klik geen lege historiekregel schrijft.
+ */
+export function transportEventChanges(
+  legs: Array<{ id: string; eventId: string | null; eventName: string | null }>,
+  event: { id: string; name: string } | null
+): Array<{ id: string; note: string; hadLink: boolean }> {
+  const eventId = event?.id ?? null;
+  const eventName = event ? event.name.slice(0, 300) : null;
+  return legs
+    .filter((leg) => leg.eventId !== eventId || (leg.eventName ?? null) !== eventName)
+    .map((leg) => {
+      const name = leg.eventName?.trim();
+      const before = name ? (leg.eventId ? name : `${name} (door de aanvrager ingevuld)`) : 'geen';
+      return {
+        id: leg.id,
+        note: `Evenement: ${before} → ${event?.name ?? 'geen'}`,
+        hadLink: leg.eventId !== null,
+      };
+    });
+}
+
+/**
  * Namens wie een aanvraag gebeurt, als één label: de post bij INTERN, anders de
  * bewaarde naam van de werkgroep of de externe. Gedeeld door de aanvragenlijst
  * en de kalender, zodat beide schermen dezelfde naam tonen.

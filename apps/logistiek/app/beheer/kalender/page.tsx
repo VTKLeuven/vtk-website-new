@@ -8,6 +8,8 @@ import {
   requesterLabel,
   toDateInputValue,
   todayDateOnly,
+  tripEventName,
+  tripTitle,
 } from '@/lib/uitleen';
 import { activeVehicles, adminAgenda } from '@/lib/uitleen-server';
 import { KalenderFilters } from './kalender-filters';
@@ -144,10 +146,17 @@ export default async function BeheerKalenderPage({
   for (const booking of agenda.vanBookings) {
     if (vehicleFilter.length > 0 && !vehicleFilter.includes(booking.vehicleId)) continue;
     const day = new Date(`${dayKeyFormatter.format(booking.startAt)}T00:00:00.000Z`);
+    const event = tripEventName(booking);
     push(day, {
       kind: 'vervoer',
-      tags: [booking.vehicle.nameNl, requesterLabel(booking)],
-      title: booking.eventName ?? booking.purpose,
+      // Het evenement als tag naast voertuig en post: de titel zegt waarvoor de
+      // rit dient (`tripTitle`), en dat is op een drukke dag het onderscheid.
+      tags: [
+        booking.vehicle.nameNl,
+        requesterLabel(booking),
+        ...(event ? [event] : []),
+      ],
+      title: tripTitle(booking),
       detail: `${timeFormatter.format(booking.startAt)}-${timeFormatter.format(booking.endAt)} · ${booking.user.name} · ${
         booking.driver ? `chauffeur: ${booking.driver.name}` : 'nog geen chauffeur'
       }`,

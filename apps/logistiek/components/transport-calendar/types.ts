@@ -18,8 +18,17 @@ export type TripBlock = {
   startAt: string;
   endAt: string;
   status: string;
-  /** Bovenste regel in het blok: het evenement of het doel van de rit. */
+  /**
+   * Bovenste regel in het blok: waarvoor de rit dient (`tripTitle`). Niet het
+   * evenement: onder één evenement rijden vaak vijf ritten, en vijf blokken met
+   * "Galabal" zeggen niet welke de tafels brengt. Zie docs/design-decisions.md.
+   */
   title: string;
+  /**
+   * Het evenement waar de rit bij hoort, als eigen regel die je in "Weergave"
+   * aanvinkt. Enkel gevuld op de planning van het team.
+   */
+  eventName?: string | null;
   /** Tweede regel: de aanvrager, of niets op het publieke overzicht. */
   subtitle: string | null;
   driver: { id: string; name: string } | null;
@@ -70,7 +79,8 @@ export type TripBlock = {
  */
 export const TRIP_BLOCK_FIELDS = [
   { key: 'time', label: 'Uur' },
-  { key: 'title', label: 'Evenement of doel' },
+  { key: 'title', label: 'Waarvoor' },
+  { key: 'event', label: 'Evenement' },
   { key: 'vehicle', label: 'Voertuig' },
   { key: 'driver', label: 'Chauffeur' },
   { key: 'requester', label: 'Post of werkgroep' },
@@ -83,15 +93,19 @@ export type TripBlockField = (typeof TRIP_BLOCK_FIELDS)[number]['key'];
 export type TripFields = Record<TripBlockField, boolean>;
 
 /**
- * Wat er stond voor deze instelling bestond, plus de drie nieuwe velden uit.
+ * Wat er stond voor deze instelling bestond, plus de nieuwe velden uit.
  *
  * De standaard is met opzet de oude weergave: wie niets instelt, hoort niets te
  * merken. Post, bestemming en lading staan uit omdat ze in een blok van een
- * kwartier de vier regels eronder wegduwen die er altijd al stonden.
+ * kwartier de vier regels eronder wegduwen die er altijd al stonden. Het
+ * evenement ook: tot september 2026 was het de titel zelf, en sindsdien staat
+ * daar waarvoor de rit dient; wie het evenement toch in het blok wil, vinkt het
+ * aan.
  */
 export const DEFAULT_TRIP_FIELDS: TripFields = {
   time: true,
   title: true,
+  event: false,
   vehicle: true,
   driver: true,
   requester: false,

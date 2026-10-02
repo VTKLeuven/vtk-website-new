@@ -81,7 +81,9 @@
     "kicker": "VTK · Werkgroepen",
     "title": "Werkgroepen",
     "intro": "De werkgroepen van VTK, elk met hun eigen ploeg.",
-    "member": "Lid",
+    "members": "Leden",
+    "team": "Ploeg van {name}",
+    "year": "Jaar",
     "website": "Website",
     "empty": "Er zijn nog geen werkgroepen.",
     "noMembers": "Nog geen leden voor dit werkingsjaar."

@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero 2: Bento</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400..800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Methode: bento (Apple Control Center). De hele hero is één raster van
+   tegels; elke functie is een tegel, de grootte zegt hoe belangrijk ze is. */
+:root { --paper: #EFF2F8; --paper-2: #E6ECF5; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --muted: #5C667F; --dim: #B7C0DC; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--paper); color: var(--ink); font-family: "Bricolage Grotesque", sans-serif; min-height: 100dvh; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.wrap { max-width: 1320px; margin: 0 auto; padding: 18px 28px 36px; }
+
+.hdr { display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 20px; background: var(--surface); border-radius: 999px; margin-bottom: 14px; box-shadow: 0 1px 0 rgb(14 26 54 / .06); }
+.hdr img { height: 26px; filter: invert(1) brightness(.2); margin-right: 18px; }
+.hdr nav { display: flex; gap: 2px; }
+.hdr nav a { padding: 8px 12px; border-radius: 999px; font-size: 15px; font-weight: 500; }
+.hdr nav a:hover { background: var(--paper); }
+.hdr-end { margin-left: auto; display: flex; gap: 6px; align-items: center; }
+.pill-i { width: 40px; height: 40px; border-radius: 50%; background: var(--paper); display: grid; place-items: center; font-size: 18px; }
+.lang { padding: 0 14px; height: 40px; display: inline-flex; align-items: center; border-radius: 999px; background: var(--paper); font-size: 14px; font-weight: 600; }
+
+.grid { display: grid; grid-template-columns: repeat(12, 1fr); grid-auto-rows: 92px; gap: 14px; }
+.tile { border-radius: 28px; padding: 24px; position: relative; overflow: hidden; transition: transform .3s cubic-bezier(.16,1,.3,1); }
+a.tile:hover, .tile.link:hover { transform: translateY(-4px) rotate(-.4deg); }
+
+/* De grote navy tegel met de slogan. */
+.t-hero { grid-column: 1 / 8; grid-row: 1 / 6; background: var(--navy); color: var(--paper); padding: 40px; display: flex; flex-direction: column; }
+.t-hero .k { font-size: 14px; color: var(--dim); }
+.t-hero h1 { font-size: 76px; line-height: .9; font-weight: 800; letter-spacing: -0.045em; margin-top: auto; }
+.t-hero h1 span { color: var(--yellow); }
+.t-hero p { font-size: 18px; line-height: 1.5; color: var(--dim); max-width: 30em; margin-top: 20px; }
+.t-hero .cta { display: flex; gap: 10px; margin-top: 26px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 50px; padding: 0 24px; border-radius: 999px; font-size: 16px; font-weight: 700; }
+.btn-y { background: var(--yellow); color: var(--ink); }
+.btn-y:hover { background: var(--surface); }
+.btn-o { box-shadow: inset 0 0 0 1.5px rgb(239 242 248 / .35); color: var(--paper); }
+.btn-o:hover { background: rgb(239 242 248 / .1); }
+/* Grote ringen als vorm, geen foto. */
+.t-hero .ring { position: absolute; right: -120px; top: -120px; width: 380px; height: 380px; border-radius: 50%; border: 56px solid rgb(255 210 63 / .14); }
+.t-hero .ring2 { position: absolute; right: 60px; top: 70px; width: 90px; height: 90px; border-radius: 50%; background: var(--yellow); }
+
+/* Vandaag. */
+.t-today { grid-column: 8 / 13; grid-row: 1 / 4; background: var(--yellow); display: flex; flex-direction: column; }
+.t-today .top { display: flex; justify-content: space-between; align-items: flex-start; }
+.t-today .day { font-size: 96px; font-weight: 800; line-height: .8; letter-spacing: -0.05em; }
+.t-today .day small { display: block; font-size: 18px; letter-spacing: 0; font-weight: 600; margin-top: 10px; }
+.t-today .badge { background: var(--ink); color: var(--yellow); font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 999px; }
+.t-today .evs { margin-top: auto; display: grid; gap: 8px; }
+.ev { display: grid; grid-template-columns: 56px 1fr 28px; align-items: center; background: rgb(255 255 255 / .55); border-radius: 16px; padding: 10px 12px; font-size: 16px; font-weight: 600; }
+.ev:hover { background: var(--surface); }
+.ev time { font-size: 14px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.ev small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
+.ev .star { font-size: 18px; }
+
+/* Shiften. */
+.t-shift { grid-column: 8 / 10; grid-row: 4 / 6; background: var(--ink); color: var(--paper); display: flex; flex-direction: column; justify-content: space-between; }
+.t-shift b { font-size: 64px; line-height: .8; font-weight: 800; color: var(--yellow); }
+.t-shift span { font-size: 15px; font-weight: 600; line-height: 1.2; }
+.t-shift small { display: block; font-size: 12px; color: var(--dim); font-weight: 400; margin-top: 4px; }
+.t-shift .coin { position: absolute; top: 20px; right: 20px; font-size: 26px; color: var(--yellow); }
+
+/* De rest van de week. */
+.t-week { grid-column: 10 / 13; grid-row: 4 / 8; background: var(--surface); display: flex; flex-direction: column; }
+.t-week h2 { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; display: flex; justify-content: space-between; align-items: center; }
+.t-week h2 a { font-size: 14px; font-weight: 600; color: var(--muted); }
+.t-week h2 a:hover { color: var(--ink); }
+.wd { margin-top: 14px; }
+.wd h3 { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.wr { display: grid; grid-template-columns: 46px 1fr 20px; gap: 4px; padding: 5px 0; font-size: 15px; font-weight: 500; align-items: baseline; }
+.wr time { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.wr:hover span { text-decoration: underline; text-underline-offset: 3px; }
+.wr .star { color: var(--muted); font-size: 15px; }
+.wr .star:hover { color: var(--ink); }
+.more { font-size: 13px; color: var(--muted); padding-left: 50px; }
+
+/* Snelkoppelingen: elk een eigen tegel. */
+.q { grid-column: span 3; grid-row: span 1; display: flex; align-items: center; gap: 16px; background: var(--surface); padding: 0 22px; }
+.q i.ic { font-size: 34px; flex: none; }
+.q b { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; display: block; }
+.q small { font-size: 13px; color: var(--muted); }
+.q .go { margin-left: auto; flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--paper); display: grid; place-items: center; font-size: 15px; transition: background .2s, transform .2s; }
+.q:hover .go { background: var(--yellow); transform: rotate(45deg); }
+.q-theo { background: var(--paper-2); }
+.q-cudi { background: var(--navy); color: var(--paper); }
+.q-cudi small { color: var(--dim); }
+.q-cudi .go { background: rgb(239 242 248 / .12); }
+.q-cudi .open { color: var(--yellow); font-weight: 700; }
+.q-shift { background: var(--paper-2); }
+.q-kal { background: var(--yellow); }
+.q-kal .go { background: rgb(255 255 255 / .6); }
+
+@media (max-width: 1100px) {
+  .hdr nav { display: none; }
+  .grid { grid-template-columns: repeat(6, 1fr); grid-auto-rows: 84px; }
+  .tile { grid-column: auto !important; grid-row: auto !important; }
+  .t-hero, .t-today { grid-column: span 6 !important; grid-row: span 5 !important; }
+  .t-week { grid-column: span 4 !important; grid-row: span 4 !important; } .t-shift { grid-column: span 2 !important; grid-row: span 4 !important; }
+  .q { grid-column: span 3 !important; }
+  .t-hero h1 { font-size: 60px; }
+}
+@media (max-width: 640px) {
+  .wrap { padding: 12px; }
+  .grid { grid-template-columns: repeat(2, 1fr); grid-auto-rows: auto; }
+  .tile { grid-column: span 2 !important; grid-row: auto !important; min-height: 140px; }
+  .q { grid-column: span 1 !important; }
+  .t-hero h1 { font-size: 46px; } .t-hero { padding: 28px; }
+}
+@media (prefers-reduced-motion: reduce) { .tile { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+    <nav><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+    <div class="hdr-end"><span class="pill-i"><i class="ph ph-magnifying-glass"></i></span><span class="lang">NL</span><span class="pill-i"><i class="ph ph-user"></i></span></div>
+  </header>
+
+  <main class="grid">
+    <section class="tile t-hero">
+      <span class="ring"></span><span class="ring2"></span>
+      <span class="k">Vlaamse Technische Kring, KU Leuven</span>
+      <h1>De thuis voor <span>ingenieurs</span> in Leuven.</h1>
+      <p>Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+      <div class="cta"><a class="btn btn-y" href="#">Ontdek wat we doen <i class="ph-bold ph-arrow-up-right"></i></a><a class="btn btn-o" href="#">Eerstejaars? Start hier</a></div>
+    </section>
+
+    <section class="tile t-today">
+      <div class="top"><div class="day">1 okt<small>Donderdag, vandaag</small></div><span class="badge">2 events</span></div>
+      <div class="evs">
+        <div class="ev"><time>12:00</time><a href="#">12 Urencantus<small>Waaiberg</small></a><button class="star" aria-label="Interesse: 12 Urencantus"><i class="ph ph-star"></i></button></div>
+        <div class="ev"><time>20:30</time><a href="#">Looptraining<small>Atletiekpiste Sportkot</small></a><button class="star" aria-label="Interesse: Looptraining"><i class="ph ph-star"></i></button></div>
+      </div>
+    </section>
+
+    <a class="tile t-shift" href="#"><i class="ph-fill ph-coins coin"></i><b>3</b><span>shiften zoeken volk<small>eerste morgen 01:00</small></span></a>
+
+    <section class="tile t-week">
+      <h2>Deze week <a href="#">Alles →</a></h2>
+      <div class="wd"><h3>Maandag 5</h3>
+        <div class="wr"><time>19:00</time><a href="#">PeMe-Startactiviteit</a><button class="star" aria-label="Interesse: PeMe-Startactiviteit"><i class="ph ph-star"></i></button></div>
+        <div class="wr"><time>21:00</time><a href="#">CaraOké</a><button class="star" aria-label="Interesse: CaraOké"><i class="ph ph-star"></i></button></div>
+      </div>
+      <div class="wd"><h3>Dinsdag 6</h3>
+        <div class="wr"><time>12:40</time><a href="#">KANWEEK startvergadering</a><button class="star" aria-label="Interesse: KANWEEK"><i class="ph ph-star"></i></button></div>
+        <div class="wr"><time>18:30</time><a href="#">Sector Night Bouwkunde</a><button class="star" aria-label="Interesse: Sector Night"><i class="ph ph-star"></i></button></div>
+        <a class="more" href="#">+3 die dag</a>
+      </div>
+    </section>
+
+    <a class="tile q q-theo" href="#"><i class="ph ph-bread ic"></i><span><b>Theokot</b><small>Bestel je broodje</small></span><span class="go"><i class="ph-bold ph-arrow-up-right"></i></span></a>
+    <a class="tile q q-cudi" href="#"><i class="ph ph-books ic"></i><span><b>Cursusdienst</b><small><span class="open">Open</span> tot 13:55</small></span><span class="go"><i class="ph-bold ph-arrow-up-right"></i></span></a>
+    <a class="tile q q-tweede" href="#"><i class="ph ph-recycle ic"></i><span><b>Tweedehands</b><small>Boeken kopen, verkopen</small></span><span class="go"><i class="ph-bold ph-arrow-up-right"></i></span></a>
+    <a class="tile q q-slot" href="#"><i class="ph ph-clock-countdown ic"></i><span><b>Tijdslot Cudi</b><small>Reserveer je ophaling</small></span><span class="go"><i class="ph-bold ph-arrow-up-right"></i></span></a>
+    <a class="tile q q-shift" href="#"><i class="ph ph-hand-heart ic"></i><span><b>Shiften</b><small>Help mee</small></span><span class="go"><i class="ph-bold ph-arrow-up-right"></i></span></a>
+    <a class="tile q q-kal" href="#"><i class="ph ph-calendar-dots ic"></i><span><b>Kalender</b><small>Alle events</small></span><span class="go"><i class="ph-bold ph-arrow-up-right"></i></span></a>
+  </main>
+</div>
+</body>
+</html>

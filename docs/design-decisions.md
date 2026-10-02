@@ -298,6 +298,13 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 - **Waarom expliciete Brussel-tijd:** "12:00" moet 12:00 lokale tijd zijn in zowel
   zomer- als winteruur. Daarom rekent `lib/theokot.ts` met `Europe/Brussels` via
   `Intl` (geen vaste UTC-offset).
+- **Na de deadline toont `/theokot` geen voorraad meer**: geen "nog 3" en geen
+  "uitverkocht" bij een broodje. Na de deadline is dat getal geen voorraad
+  meer: wat niet besteld is, wordt niet gemaakt. Bleef het staan, dan kwam
+  iemand aan de toog met "er zijn er nog 3" of "de site zei dat er nog waren",
+  voor een broodje dat er niet is. Wie te laat is, is te laat. Het aanbod zelf
+  blijft zichtbaar, de eigen reservatie ook. De app toont na de deadline het
+  aanbod helemaal niet, dus daar speelt dit niet.
 
 ### Limieten
 
@@ -576,7 +583,8 @@ tabellen met een balkje), zodat de twee één familie zijn. De regels staan in
   dus niet in de cijfers.
 - **Vergaderingen (GM, bureau) spreken het aanbod aan.** Ze tellen mee voor "hoeveel
   van het aanbod raakte besteld" en "uitverkocht", niet voor de opbrengst van de
-  balie.
+  balie. Een bestelling van een groco in de doos van de GM telt als verkocht, maar
+  ook niet als opbrengst en niet als afhaalmoment.
 - **Uitverkocht na** is gemeten vanaf het openen van de bestelronde tot de
   bestelling die de voorraad van die dag bereikte, in de volgorde waarin ze
   binnenkwamen, en gemiddeld over de dagen waarop de soort uitverkocht raakte.
@@ -670,6 +678,7 @@ grocomeet en het bureau hetzelfde.
 - Er kan **één broodje en één drankje** per persoon per vergadering besteld worden,
   allebei optioneel: enkel een drankje (of niets) kan ook, zie hierboven.
 - Het **broodje van de week** staat er nooit bij: dat blijft voor de studenten.
+  Een groco kan het wel gewoon bij Theokot bestellen, zie hieronder.
 - Een reservatie wordt vaak **weken vooraf** gemaakt, terwijl Theokot het aanbod van
   die week pas een week op voorhand vastlegt. Zolang die verkoopdag niet bestaat,
   komen de keuzes uit de **catalogus** (`TheokotProduct`); bestaat ze wel, dan uit het
@@ -686,6 +695,44 @@ grocomeet en het bureau hetzelfde.
   reservatie staan en zegt het beheerscherm dat er geen verkoopdag is. Er draait
   bewust geen wachter op "de dag nadert en er is nog steeds niets": dat zou een tweede
   scheduler vragen voor iets wat het beheer sowieso op zijn scherm ziet.
+
+### Een groco die zelf bij Theokot bestelt
+
+De grocomeet telt 19 mensen en er zijn 20 broodjes van de week. Zet je dat broodje
+in het aanbod van de GM, dan geeft de kring zichzelf voorrang en blijft er voor de
+studenten bijna niets over. Daarom staat het er niet bij. Een groco kan het wel
+bestellen **zoals elke student**: bij Theokot, vanaf hetzelfde moment, met dezelfde
+limieten, en enkel zolang er nog zijn. Sinds september 2026 komt zo'n bestelling
+dan toch mee in de doos van de GM, zodat niemand tussen de vergadering en de balie
+moet kiezen.
+
+- **Wie**: iedereen met `grocomeet.reserve`. Dat is bewust het recht en niet "is
+  ingeschreven voor die GM", ook al zit het recht via de rol `admin` bij elk lid
+  van IT en Groep 5. Die gaan dus ook in de doos wanneer ze op een GM-dag bij
+  Theokot bestellen. Een superadmin enkel wanneer die het recht via een rol heeft.
+- **Wanneer**: enkel op een dag met een grocomeet (`TheokotOrder.grocomeetId`). Op
+  een andere dag is het een gewone bestelling. Het broodje gaat altijd helemaal in
+  de doos: er is geen keuze per bestelling om het toch zelf af te halen.
+- **Vastgelegd bij het bestellen**, en opnieuw bij aanpassen. Komt er een GM bij of
+  verhuist ze naar een andere dag, dan lijnt `linkGrocomeetOrders` de openstaande
+  bestellingen van die dag opnieuw uit. Wat al afgehandeld is, schuift niet meer.
+- **Turflijst**: die broodjes staan in de kolom GM, niet bij de studenten.
+- **Afhalen**: er is niets af te halen. De balie toont zo'n bestelling met de
+  melding dat ze in de doos zit, zonder knop om ze mee te geven of af te rekenen
+  en zonder bonnetjes (dat zou ze twee keer rekenen). Er vertrekt geen pushbericht
+  "je broodje ligt klaar". Na de afhaal zet de no-show-verwerking ze op opgehaald,
+  dus er komt geen no-show-mail en ze telt niet voor een ban.
+- **Geld**: betaald wordt bij de grocomeet, niet aan de balie. Het beheerscherm van
+  de GM toont ze per vergadering onder "Zelf bij Theokot besteld" met een eigen
+  vinkje voor betaald (`grocomeetPaidAt`), en ze tellen mee in het overzicht
+  "Openstaand". In het overzicht per dag van Theokot staan ze apart ("In de
+  GM-doos") en buiten opbrengst en kassa; in de statistieken tellen ze als
+  verkocht maar niet als opbrengst van de balie.
+- Een GM verwijderen laat die bestellingen bestaan, maar haalt ze uit de doos: dan
+  zijn het weer gewone bestellingen, af te halen en te betalen aan de balie. De
+  bevestiging zegt dat.
+- De VTK-app kent de melding nog niet: bestellen via de app legt het broodje wel in
+  de doos, maar de app toont het nog als af te halen aan de balie.
 
 ### Eigen aanbod (bureau zonder Theokot)
 
@@ -1568,16 +1615,31 @@ terug (`apps/web/lib/brevo/unsubscribe.ts`).
   "Posten" en de shift-postkeuzes filteren op `type = PRAESIDIUM`; werkgroepen
   krijgen hun eigen publieke `/werkgroepen` (zelfde ledenraster + werkingsjaar-
   tabjes als praesidium) en een eigen admin-tab "Werkgroepen".
-- **De verantwoordelijke heet G3 of G4, en dat kiest de werkgroep zelf.** Een
-  werkgroep wordt niet getrokken door een "verantwoordelijke" maar door haar G3
-  of haar G4, en welke van de twee dat is, verschilt per werkgroep. Daarom is het
-  een keuze per werkgroep (`Group.leadLabel`, `G3` | `G4`, default `G3`) en geen
-  vaste tekst: ze staat in de werkgroepinstellingen op `/admin/werkgroepen` en
-  vervangt het woord "Verantwoordelijke" overal waar die lead benoemd wordt (de
-  ledenlijst en het pilletje in het ledenbeheer, de rolkeuze bij lid toevoegen,
-  de kolom "Enkel G3/G4" bij de rol-grants, en de ploeg op de publieke
-  `/werkgroepen`). Een **praesidiumpost** houdt wél "Verantwoordelijke": het veld
-  hangt aan `Group`, maar enkel werkgroepen tonen het.
+- **Hoe de verantwoordelijke heet, kiest de werkgroep zelf.** Een werkgroep
+  wordt niet getrokken door een "verantwoordelijke" maar meestal door haar G3 of
+  haar G4, en welke van de twee dat is, verschilt per werkgroep. Eerst was het
+  een keuze tussen die twee; sinds oktober 2026 is het vrije tekst
+  (`Group.leadLabel`, default `G3`, hoogstens 40 tekens, met G3 en G4 als
+  voorstel in het veld), omdat sommige werkgroepen hun trekkers anders noemen.
+  Het staat in de werkgroepinstellingen op `/admin/werkgroepen` en vervangt het
+  woord "Verantwoordelijke" overal waar die lead benoemd wordt (de ledenlijst en
+  het pilletje in het ledenbeheer, de rolkeuze bij lid toevoegen, de kolom
+  "Enkel G3/G4" bij de rol-grants, en de ploeg op de publieke `/werkgroepen`).
+  Eén veld en niet per taal: "G3" is in beide talen hetzelfde. Een
+  **praesidiumpost** houdt wél "Verantwoordelijke": het veld hangt aan `Group`,
+  maar enkel werkgroepen tonen het.
+- **Op `/werkgroepen` staat de ploeg naast de tekst, niet eronder.** Per
+  werkgroep de infotekst links op leesbreedte en de ploeg rechts in de marge,
+  als register met een haarlijn, zoals de rail van een contentpagina
+  (`vtk-werkgroepen.css`). Bovenaan de kern met een portret en de gele ring, met
+  daaronder op een nieuwe regel de leden, als namen met een klein portret in
+  twee kolommen. Eerst stond iedereen als grote tegel onder de tekst; een
+  werkgroep van zeventien leden zonder profielfoto's werd zo een muur van
+  initialen, met "Lid" zeventien keer herhaald, naast een tekst die maar de
+  linkerhelft vulde. Vier richtingen werden naast elkaar bekeken (de muur van
+  `/praesidium`, portretten met een namenlijst eronder, deze, en een groepsfoto
+  met de namen als bijschrift); deze werd gekozen. Onder 900px schuift de ploeg
+  onder de tekst.
 - **Eigen infotekst + website.** De werkgroep-`description*` is de blurb op
   `/werkgroepen`; `Group.website` is een optionele link (mag zonder schema
   ingevuld worden, wordt genormaliseerd naar `https://`). Beide staan los van de
@@ -3574,6 +3636,58 @@ intekenformulier, en de wijziging komt in de historiek van de rit.
 - **Slepen in de kalender raakt het niet.** Die actie stuurt de post niet mee, en
   `adminEditTransportAction` wijzigt ze enkel wanneer ze die expliciet krijgt. Een
   rit een half uur verschuiven mag nooit een rit van eigenaar veranderen.
+
+### Een rit heet naar waarvoor ze dient, niet naar haar evenement
+
+Overal waar een rit een naam kreeg (het blok in de planning, de titel van het
+paneel, de lijst Ritten, de agendafeed, de mails) stond `eventName || purpose`.
+Hangt een rit aan een evenement, dan heette ze dus naar dat evenement, en
+heetten de vijf ritten voor een galabal allemaal "Galabal". Bij het plannen is
+de vraag net wélke van de vijf de tafels brengt. Sinds september 2026 is de
+titel `tripTitle`: de eerste regel van `purpose`.
+
+- **Het evenement staat ernaast, niet erin.** Als eigen rij in het paneel, klein
+  onder de titel in de lijst Ritten, als tag in de beheerkalender, als regel in
+  de beschrijving van de agendafeed en in de mails. In het blok van de planning
+  enkel als je "Evenement" aanvinkt onder Weergave: standaard uit, want een rit
+  van een kwartier is 24 pixels hoog en de regels die er stonden, blijven staan.
+- **De eerste regel, niet de hele tekst.** `purpose` is vrije tekst tot 1000
+  tekens en een titel staat op één regel. Het kaartje en het detail tonen de
+  volledige tekst wanneer er meer staat dan die eerste regel.
+
+### Het evenement van een rit zet je op één manier, ook vanuit de planning
+
+Een rit hangt aan een evenement met twee velden: `eventId` (de koppeling) en
+`eventName` (de momentopname van de naam, of wat een lid vrij intikte zonder te
+koppelen). Tot september 2026 schreven twee acties ze elk op hun manier, en
+liepen ze uit elkaar:
+
+- "Loskoppelen" op Ritten zette enkel `eventId` op null. De naam bleef staan, in
+  een tweede rij "Evenement", in de titel en in de feed, dus de knop leek niets
+  te doen. Koppelen daar zette omgekeerd geen naam.
+- In de planning stond de keuzelijst onderaan in "Rit aanpassen", enkel voor
+  deze helft van een heen- en terugrit, niet op een gereden rit, en ze verdween
+  helemaal zodra er binnen twee weken van de getoonde periode geen evenement
+  was.
+
+Nu schrijft enkel `linkToEventAction` die twee velden, via
+`transportEventChanges`, en beide schermen tonen dezelfde rij (`EventLink`):
+
+- **Koppeling en naam gaan altijd samen.** Koppelen zet de naam van het
+  evenement, loskoppelen wist ze. Ook een naam die de aanvrager zelf intikte:
+  die staat in de rij als "door de aanvrager ingevuld, niet gekoppeld", met een
+  knop "Wissen" achter een bevestiging. Daarmee ruim je ook de ritten op die
+  vóór deze wijziging "losgekoppeld" werden en hun naam hielden; die zijn in de
+  database niet te onderscheiden van een vrij ingetikte naam, want de oude actie
+  schreef geen historiek.
+- **Beide helften samen**, met een historiekregel per helft.
+- **Ook op een gereden of geannuleerde rit.** De koppeling groepeert enkel en
+  verandert niets aan de afspraak; de uren en de reden blijven wel op slot.
+- **Dezelfde keuzes op beide schermen**: `selectableEvents()`, de evenementen
+  van de voorbije maand en later. Het venster van ±14 dagen blijft enkel voor
+  een nieuwe rit en voor de strook boven het rooster.
+- **Slepen raakt het niet meer.** `adminEditTransportAction` kent het evenement
+  niet meer; een sleep stuurde de koppeling vroeger ongemerkt mee.
 
 ### Een eigen nota bij een rit, en wie ze mag lezen
 
@@ -9421,6 +9535,19 @@ bron, zodat een album dat verdwijnt of een verkoop die sluit vanzelf wegvalt:
 
 Een automatisch bericht kan uit het nieuws gehaald worden zonder aan de bron te
 komen (`NewsHidden`); per bron kan het ook helemaal uit.
+
+**Een ticketverkoop van een werkgroep staat standaard niet in het nieuws.** Een
+werkgroep verkoopt haar tickets via de site, maar wat er op de homepage komt,
+beslist de redactie van de kring. Zo'n verkoop staat in /admin/nieuws dus als
+verborgen, met de uitleg erbij, en wie `news.manage` heeft (de redactie, niet de
+werkgroep zelf) zet ze er met het oog in (`NewsShown`, het omgekeerde van
+`NewsHidden`; de actie houdt de twee exclusief, en verbergen wint). Dat geldt
+voor het gewone bericht en voor de voorverkoop, die dezelfde sleutel dragen. De
+regel staat in `ticketNeedsNewsOptIn` (`lib/news/rules.ts`) en kijkt naar het
+type van de eigenaarsgroep. Een verkoop die al in het nieuws stond toen dit
+erbij kwam, viel eruit tot iemand ze erin zette; dat was de bedoeling. Het
+paneel "Openbaar of privé" van zo'n event belooft daarom ook geen plaats in het
+nieuws.
 
 **Een ticketverkoop en een inschrijving tonen de dag van het evenement.** De
 datumpin en de kopregel stonden op het moment dat de verkoop opende, en "do 24

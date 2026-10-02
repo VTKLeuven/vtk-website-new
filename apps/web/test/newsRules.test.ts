@@ -4,10 +4,12 @@ import {
   composeNews,
   groupNewsByPeriod,
   isFreshNews,
+  isNewsEntryHidden,
   magazinesInNews,
   postInNews,
   signupInNews,
   ticketInNews,
+  ticketNeedsNewsOptIn,
   ticketNewsDate,
   ticketPresaleInNews,
   ticketPresaleNewsDate,
@@ -93,6 +95,24 @@ describe("voorverkoop", () => {
     expect(ticketPresaleInNews({ ...presale, presaleLeadMinutes: null }, now)).toBe(false);
     expect(ticketPresaleInNews({ ...presale, status: "DRAFT" }, now)).toBe(false);
     expect(ticketPresaleInNews({ ...presale, publishedAt: null }, now)).toBe(false);
+  });
+});
+
+describe("verkoop van een werkgroep", () => {
+  it("staat standaard niet in het nieuws, die van een post wel", () => {
+    expect(ticketNeedsNewsOptIn({ ownerGroup: { type: "WERKGROEP" } })).toBe(true);
+    expect(ticketNeedsNewsOptIn({ ownerGroup: { type: "PRAESIDIUM" } })).toBe(false);
+  });
+
+  it("komt erin wanneer de redactie het erin zet", () => {
+    expect(isNewsEntryHidden({ hidden: false, needsOptIn: true, shown: false })).toBe(true);
+    expect(isNewsEntryHidden({ hidden: false, needsOptIn: true, shown: true })).toBe(false);
+  });
+
+  it("verbergen wint, ook van een bericht dat erin gezet werd", () => {
+    expect(isNewsEntryHidden({ hidden: true, needsOptIn: true, shown: true })).toBe(true);
+    expect(isNewsEntryHidden({ hidden: true, needsOptIn: false, shown: false })).toBe(true);
+    expect(isNewsEntryHidden({ hidden: false, needsOptIn: false, shown: false })).toBe(false);
   });
 });
 

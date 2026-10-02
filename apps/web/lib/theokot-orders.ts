@@ -4,7 +4,8 @@ import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
 import { Prisma, type TheokotOrderStatus } from "@prisma/client";
 
-import { usageForSessionItems, usageForSessionItemsTx } from "@/lib/meetings-server";
+import { grocomeetOnDay, usageForSessionItems, usageForSessionItemsTx } from "@/lib/meetings-server";
+import { hasLivePermission } from "@/lib/livePermissions";
 import { activeBanFor, getTheokotConfig } from "@/lib/theokot-server";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import {
@@ -125,7 +126,25 @@ export async function loadOrderableSessions(userId: string, now: Date = new Date
   // voor een grocomeet of bureau opzijgezet zijn. Zelfde voorraad, aparte doos.
   const used = await usageForSessionItems(sessions.flatMap((s) => s.items.map((i) => i.id)));
 
-  return { config, ban, sessions, used, message: messageRow?.value as { bodyNl?: string; bodyEn?: string } | undefined };
+  // De dagen waarop een bestelling van deze persoon in de doos van de grocomeet
+  // zou gaan, zodat het scherm dat zegt vóór er besteld is. Bestellen beslist
+  // het zelf opnieuw; een bestaande bestelling draagt het in `grocomeetId`.
+  const grocomeetSessionIds = new Set<string>();
+  if (sessions.length > 0 && (await hasLivePermission(userId, "grocomeet.reserve"))) {
+    const days = await Promise.all(sessions.map((s) => grocomeetOnDay(s.date)));
+    sessions.forEach((s, i) => {
+      if (days[i]) grocomeetSessionIds.add(s.id);
+    });
+  }
+
+  return {
+    config,
+    ban,
+    sessions,
+    used,
+    grocomeetSessionIds,
+    message: messageRow?.value as { bodyNl?: string; bodyEn?: string } | undefined,
+  };
 }
 
 /** Hoeveel er van een sessie-item nog vrij is, met de gereserveerde stukken eraf. */
@@ -150,6 +169,10 @@ export function remainingFor(
  *
  * Gooit `TheokotOrderError` voor een weigering die de gebruiker aangaat, en
  * `TheokotValidationError` wanneer de lijnen zelf niet kloppen.
+ *
+ * Bestelt een groco op een dag met een grocomeet, dan gaat de bestelling mee in
+ * de doos van de GM (`grocomeetId`). Dezelfde voorraad en dezelfde limieten als
+ * voor elke student: enkel waar het broodje belandt, verschilt.
  */
 export async function placeOrder(
   userId: string,
@@ -161,6 +184,7 @@ export async function placeOrder(
 
   const ban = await activeBanFor(userId, now);
   if (ban) throw new TheokotOrderError("BANNED", ban.endsAt);
+  const groco = await hasLivePermission(userId, "grocomeet.reserve");
 
   const created = await withSerializableTransaction(async (tx) => {
     const sess = await tx.theokotSession.findUnique({
@@ -190,6 +214,7 @@ export async function placeOrder(
         sessionId,
         userId,
         totalCents: normalized.totalCents,
+        grocomeetId: groco ? await grocomeetOnDay(sess.date, tx) : null,
         lines: {
           create: normalized.lines.map((line) => ({
             sessionItemId: line.sessionItemId,
@@ -231,6 +256,7 @@ export async function updateOrder(
 
   const ban = await activeBanFor(userId, now);
   if (ban) throw new TheokotOrderError("BANNED", ban.endsAt);
+  const groco = await hasLivePermission(userId, "grocomeet.reserve");
 
   const updated = await withSerializableTransaction(async (tx) => {
     const order = await tx.theokotOrder.findUnique({
@@ -261,6 +287,7 @@ export async function updateOrder(
       where: { id: orderId },
       data: {
         totalCents: normalized.totalCents,
+        grocomeetId: groco ? await grocomeetOnDay(order.session.date, tx) : null,
         lines: {
           create: normalized.lines.map((line) => ({
             sessionItemId: line.sessionItemId,

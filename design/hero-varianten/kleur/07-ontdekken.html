@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kleur 7: Ontdekken</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Naar airbnb.com (awesome-design-md/airbnb): een zoekbalk in de kop, een
+   rij categorieën die echt filtert, en de events als fotokaarten met een
+   ster rechtsboven. De kleur komt uit de foto's en uit de categorieën. */
+:root {
+  --paper: #EFF2F8; --paper-2: #E6ECF5; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36;
+  --yellow: #FFD23F; --muted: #5C667F; --line: rgb(14 26 54 / .1);
+  --cat-act: #E5484D; --cat-sport: #30A46C; --cat-onthaal: #F76B15; --cat-bedrijf: #3E63DD;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Figtree, system-ui, sans-serif; background: var(--surface); color: var(--ink); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button, input { font: inherit; color: inherit; background: none; border: 0; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; border-radius: 8px; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 40px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.hdr { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; height: 84px; border-bottom: 1px solid var(--line); }
+.hdr img { height: 28px; filter: invert(1) brightness(.15); }
+.search { display: flex; align-items: center; height: 54px; border-radius: 999px; box-shadow: 0 1px 2px rgb(14 26 54 / .08), 0 4px 12px rgb(14 26 54 / .06), inset 0 0 0 1px var(--line); padding: 0 8px 0 4px; }
+.search label { padding: 0 22px; display: flex; flex-direction: column; font-size: 12px; font-weight: 700; }
+.search label + label { border-left: 1px solid var(--line); }
+.search input { outline: none; font-size: 14px; width: 200px; font-weight: 400; }
+.search input::placeholder { color: var(--muted); }
+.search button { width: 40px; height: 40px; border-radius: 50%; background: var(--yellow); display: grid; place-items: center; font-size: 18px; }
+.hdr-end { justify-self: end; display: flex; gap: 8px; align-items: center; font-size: 14px; font-weight: 600; }
+.hdr-end .menu { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 6px 0 14px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--line); }
+.hdr-end .menu .av { width: 32px; height: 32px; border-radius: 50%; background: var(--navy); color: var(--yellow); display: grid; place-items: center; font-size: 14px; font-weight: 700; }
+.mainnav { display: flex; gap: 26px; justify-content: center; padding: 12px 0; font-size: 14px; font-weight: 600; color: var(--muted); }
+.mainnav a:hover { color: var(--ink); }
+
+.cats { display: flex; gap: 30px; padding: 14px 0 0; border-bottom: 1px solid var(--line); }
+.cats button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding-bottom: 12px; font-size: 13px; font-weight: 600; color: var(--muted); border-bottom: 2px solid transparent; }
+.cats button i { font-size: 24px; color: var(--c, var(--ink)); }
+.cats button:hover { color: var(--ink); border-color: var(--line); }
+.cats button[aria-pressed="true"] { color: var(--ink); border-color: var(--ink); }
+
+.intro { display: flex; align-items: end; justify-content: space-between; gap: 30px; padding: 30px 0 18px; }
+.intro h1 { font-size: 40px; line-height: 1.05; letter-spacing: -0.03em; font-weight: 800; color: var(--navy); }
+.intro p { margin-top: 8px; font-size: 17px; color: var(--muted); max-width: 40em; }
+.cta { display: flex; gap: 10px; flex: none; }
+.btn { display: inline-flex; align-items: center; height: 46px; padding: 0 20px; border-radius: 12px; font-size: 15px; font-weight: 700; white-space: nowrap; }
+.btn-n { background: var(--navy); color: var(--paper); }
+.btn-n:hover { background: var(--ink); }
+.btn-l { box-shadow: inset 0 0 0 1px var(--ink); }
+.btn-l:hover { background: var(--paper); }
+
+.quick { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; padding-bottom: 26px; }
+.q { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; background: var(--paper); transition: background .15s; }
+.q:hover { background: var(--paper-2); }
+.q .ic { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center; font-size: 20px; flex: none; }
+.q b { display: block; font-size: 15px; font-weight: 700; }
+.q small { display: block; font-size: 12px; color: var(--muted); }
+
+.cards { display: grid; grid-template-columns: repeat(5, 1fr); gap: 22px; padding-bottom: 56px; }
+.card { position: relative; }
+.card .ph-img { aspect-ratio: 1; border-radius: 16px; background-size: cover; background-position: center; transition: filter .2s; }
+.card:hover .ph-img { filter: brightness(.94); }
+.card .star { position: absolute; top: 10px; right: 10px; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 22px; color: var(--surface); filter: drop-shadow(0 1px 2px rgb(10 15 31 / .5)); }
+.card .star[aria-pressed="true"] { color: var(--yellow); }
+.card .cat { margin-top: 10px; font-size: 13px; font-weight: 700; color: var(--c); }
+.card a.t { display: block; font-size: 16px; font-weight: 700; margin-top: 2px; }
+.card a.t::after { content: ""; position: absolute; inset: 0; }
+.card .star { z-index: 1; }
+.card small { display: block; font-size: 14px; color: var(--muted); margin-top: 2px; }
+.card.today small b { color: var(--ink); }
+.card[hidden] { display: none; }
+.shift { border-radius: 16px; background: var(--yellow); padding: 20px; display: flex; flex-direction: column; aspect-ratio: auto; }
+.shift b { font-size: 56px; font-weight: 800; line-height: 1; color: var(--navy); }
+.shift p { font-size: 16px; font-weight: 700; margin-top: 6px; }
+.shift ul { list-style: none; margin-top: 12px; font-size: 14px; display: grid; gap: 6px; }
+.shift li a:hover { text-decoration: underline; }
+.shift .btn { margin-top: auto; justify-content: center; background: var(--navy); color: var(--paper); }
+
+@media (max-width: 1100px) { .search label:nth-child(2) { display: none; } .search input { width: 150px; } .mainnav { flex-wrap: wrap; gap: 8px 18px; } .cards { grid-template-columns: repeat(3, 1fr); } .quick { grid-template-columns: repeat(3, 1fr); } .intro { flex-direction: column; align-items: flex-start; } }
+@media (max-width: 640px) { .wrap { padding: 0 16px; } .hdr { grid-template-columns: auto 1fr; } .search { display: none; } .cats { overflow-x: auto; } .cards, .quick { grid-template-columns: 1fr 1fr; } .intro h1 { font-size: 32px; } .cta { flex-wrap: wrap; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+    <form class="search" role="search" onsubmit="return false">
+      <label>Wat<input placeholder="Event, cursus of pagina" aria-label="Wat zoek je"></label>
+      <label>Wanneer<input placeholder="Deze week" aria-label="Wanneer"></label>
+      <button aria-label="Zoeken"><i class="ph-bold ph-magnifying-glass"></i></button>
+    </form>
+    <div class="hdr-end"><span>NL / EN</span><span class="menu"><i class="ph-bold ph-list"></i><span class="av">M</span></span></div>
+  </header>
+  <nav class="mainnav"><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+
+  <div class="cats" role="group" aria-label="Filter op categorie">
+    <button aria-pressed="true" data-c="all"><i class="ph ph-squares-four"></i>Alles</button>
+    <button aria-pressed="false" data-c="act" style="--c:var(--cat-act)"><i class="ph-fill ph-confetti"></i>Activiteiten</button>
+    <button aria-pressed="false" data-c="sport" style="--c:var(--cat-sport)"><i class="ph-fill ph-person-simple-run"></i>Sport</button>
+    <button aria-pressed="false" data-c="onthaal" style="--c:var(--cat-onthaal)"><i class="ph-fill ph-hand-waving"></i>Onthaal</button>
+    <button aria-pressed="false" data-c="bedrijf" style="--c:var(--cat-bedrijf)"><i class="ph-fill ph-briefcase"></i>Bedrijfsrelaties</button>
+  </div>
+
+  <section class="intro">
+    <div><h1>De thuis voor ingenieurs in Leuven.</h1><p>Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt.</p></div>
+    <div class="cta"><a class="btn btn-n" href="#">Ontdek wat we doen</a><a class="btn btn-l" href="#">Eerstejaars? Start hier</a></div>
+  </section>
+
+  <nav class="quick" aria-label="Snel naar">
+    <a class="q" href="#"><span class="ic" style="background:var(--yellow)"><i class="ph ph-bread"></i></span><span><b>Theokot</b><small>Broodje bestellen</small></span></a>
+    <a class="q" href="#"><span class="ic" style="background:var(--navy);color:var(--yellow)"><i class="ph ph-books"></i></span><span><b>Cursusdienst</b><small class="num">Open tot 13:55</small></span></a>
+    <a class="q" href="#"><span class="ic" style="background:var(--surface)"><i class="ph ph-recycle"></i></span><span><b>Tweedehands</b><small>Boeken</small></span></a>
+    <a class="q" href="#"><span class="ic" style="background:var(--surface)"><i class="ph ph-clock"></i></span><span><b>Tijdslot Cudi</b><small>Reserveer</small></span></a>
+    <a class="q" href="#"><span class="ic" style="background:var(--yellow)"><i class="ph ph-hand-heart"></i></span><span><b>Shiften</b><small>3 open</small></span></a>
+    <a class="q" href="#"><span class="ic" style="background:var(--navy);color:var(--yellow)"><i class="ph ph-calendar-blank"></i></span><span><b>Kalender</b><small>Alle events</small></span></a>
+  </nav>
+
+  <section class="cards num" aria-label="Deze week">
+    <div class="card today" data-c="act" style="--c:var(--cat-act)"><div class="ph-img" style="background-image:url('../../../apps/web/public/default-event.jpg')"></div><button class="star" aria-label="Interesse: 12 Urencantus" aria-pressed="false"><i class="ph-bold ph-star"></i></button><p class="cat">Activiteiten</p><a class="t" href="#">12 Urencantus</a><small><b>Vandaag</b>, 12:00, Waaiberg</small></div>
+    <div class="card today" data-c="sport" style="--c:var(--cat-sport)"><div class="ph-img" style="background-image:url('../../../apps/web/public/aanbod/sport.jpg')"></div><button class="star" aria-label="Interesse: Looptraining" aria-pressed="false"><i class="ph-bold ph-star"></i></button><p class="cat">Sport</p><a class="t" href="#">Looptraining</a><small><b>Vandaag</b>, 20:30, Sportkot</small></div>
+    <div class="card" data-c="onthaal" style="--c:var(--cat-onthaal)"><div class="ph-img" style="background-image:url('../../../apps/web/public/aanbod/internationaal.jpg')"></div><button class="star" aria-label="Interesse: PeMe" aria-pressed="false"><i class="ph-bold ph-star"></i></button><p class="cat">Onthaal</p><a class="t" href="#">PeMe-Startactiviteit</a><small>ma 5 okt, 19:00, Alma 3</small></div>
+    <div class="card" data-c="bedrijf" style="--c:var(--cat-bedrijf)"><div class="ph-img" style="background-image:url('../../../apps/web/public/career-fair.jpg')"></div><button class="star" aria-label="Interesse: Sector Night" aria-pressed="false"><i class="ph-bold ph-star"></i></button><p class="cat">Bedrijfsrelaties</p><a class="t" href="#">Sector Night Bouwkunde</a><small>di 6 okt, 18:30, Quadrivium</small></div>
+    <div class="shift"><b>3</b><p>shiften zoeken nog volk</p><ul><li><a href="#">Bijrijden afbraak, morgen 01:00</a></li><li><a href="#">Bijrijden met Stijn, 11:00</a></li><li><a href="#">Namiddagshift, 14:00</a></li></ul><a class="btn" href="#">Alle shiften</a></div>
+  </section>
+</div>
+<script>
+document.querySelectorAll(".cats button").forEach(b => b.addEventListener("click", () => {
+  document.querySelectorAll(".cats button").forEach(x => x.setAttribute("aria-pressed", x === b));
+  document.querySelectorAll(".card").forEach(c => c.hidden = b.dataset.c !== "all" && c.dataset.c !== b.dataset.c);
+}));
+document.querySelectorAll(".star").forEach(b => b.addEventListener("click", () => { const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); b.querySelector("i").className = on ? "ph-fill ph-star" : "ph-bold ph-star"; }));
+</script>
+</body>
+</html>

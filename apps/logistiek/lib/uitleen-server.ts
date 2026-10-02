@@ -1239,6 +1239,9 @@ export async function transportRange(from: Date, to: Date, filters?: TransportFi
       cargoNote: true,
       eventId: true,
       eventName: true,
+      // De naam zoals ze nu is, voor de rij "Evenement" in het paneel; `eventName`
+      // is de momentopname die blijft staan als het evenement verdwijnt.
+      event: { select: { id: true, name: true } },
       reservationId: true,
       requesterType: true,
       requesterName: true,

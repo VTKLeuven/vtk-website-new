@@ -69,6 +69,19 @@ export default async function GrocomeetPage({ params }: { params: Promise<{ loca
               ? "Schrijf je in per vergadering, met een broodje en een drankje als je dat wil. Aanpassen kan tot de besteldeadline van Theokot die dag."
               : "Register per meeting, with a sandwich and a drink if you want one. You can change it until Theokot's order deadline that day."}
           </p>
+          {/* Het broodje van de week blijft voor de studenten, maar een groco mag
+              het op dezelfde voet bestellen; dan komt het mee in de doos. */}
+          <p className="vtk-page-subtitle">
+            {nl
+              ? "Het broodje van de week staat hier niet bij. Bestel je het zelf "
+              : "The sandwich of the week is not on this list. If you order it yourself "}
+            <a className="vtk-link" href={`${base}/theokot`}>
+              {nl ? "bij Theokot" : "at Theokot"}
+            </a>
+            {nl
+              ? ", dan gaat het mee in de doos van de GM en betaal je het bij de grocomeet, samen met de rest."
+              : ", it goes in the GM box and you pay for it at the grocomeet, together with the rest."}
+          </p>
         </div>
       </header>
 

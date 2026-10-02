@@ -3,7 +3,7 @@ import 'server-only';
 import { prisma } from '@vtk/db';
 import { currentWorkingYear } from '@vtk/auth';
 import type { Prisma, UitleenFeedScope, UitleenTransportBookingStatus } from '@prisma/client';
-import { requesterLabel, vanStatusLabel } from '../uitleen';
+import { requesterLabel, tripEventName, tripTitle, vanStatusLabel } from '../uitleen';
 import { logistiekBaseUrl } from '../payments';
 import { buildIcs, type IcsEvent } from './ics';
 
@@ -149,11 +149,12 @@ export async function buildTransportFeed(scope: UitleenFeedScope, userId: string
       // regel, en "welke kar" is dan de vraag die je bespaart.
       // "Afgelast" vooraan en niet enkel `STATUS:CANCELLED`: een client die dat
       // veld negeert, toont de rit anders als een gewone afspraak.
-      summary: `${cancelled ? 'Afgelast: ' : ''}${booking.vehicle.nameNl}: ${
-        booking.eventName?.trim() || booking.purpose
-      }`,
+      // Waarvoor de rit dient en niet het evenement: vijf ritten voor hetzelfde
+      // galabal heetten anders vijf keer "Kar: Galabal" in je agenda.
+      summary: `${cancelled ? 'Afgelast: ' : ''}${booking.vehicle.nameNl}: ${tripTitle(booking)}`,
       description: [
         `Waarvoor: ${booking.purpose}`,
+        tripEventName(booking) ? `Evenement: ${tripEventName(booking)}` : null,
         booking.cargoNote ? `Lading: ${booking.cargoNote}` : null,
         `Aanvrager: ${requesterLabel(booking)} (${booking.user.name})`,
         booking.contactPhone ? `Aanvrager bellen: ${booking.contactPhone}` : null,

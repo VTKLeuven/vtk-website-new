@@ -7,7 +7,7 @@
 import "server-only";
 
 import { prisma } from "@vtk/db";
-import type { MeetingKind } from "@prisma/client";
+import type { MeetingKind, TheokotOrderStatus } from "@prisma/client";
 import { pick, type Locale } from "@vtk/i18n";
 
 import type { MeetingAdminView } from "@/components/meetings/MeetingAdminCard";
@@ -29,6 +29,13 @@ function hhmm(date: Date): string {
 function localValue(date: Date): string {
   return `${ymdKey(brusselsYMD(date))}T${hhmm(date)}`;
 }
+
+/**
+ * De Theokot-bestellingen die in de doos van een GM meegaan en dus bij de
+ * grocomeet afgerekend worden: nog open, of daar afgegeven. Een no-show komt
+ * hier niet voor, want de verwerking zet zo'n bestelling op opgehaald.
+ */
+const GROCOMEET_ORDER_STATUSES: TheokotOrderStatus[] = ["RESERVED", "PICKED_UP"];
 
 export type MeetingAdminData = {
   meetings: MeetingAdminView[];
@@ -52,6 +59,16 @@ export async function loadMeetingAdmin(
         reservations: {
           orderBy: { createdAt: "asc" },
           include: { user: { select: { name: true } } },
+        },
+        theokotOrders: {
+          where: { status: { in: GROCOMEET_ORDER_STATUSES } },
+          orderBy: { user: { name: "asc" } },
+          include: {
+            user: { select: { name: true } },
+            lines: {
+              include: { sessionItem: { select: { nameNl: true, nameEn: true, order: true } } },
+            },
+          },
         },
       },
     }),
@@ -103,6 +120,21 @@ export async function loadMeetingAdmin(
       }),
     }));
 
+    const theokotOrders = meeting.theokotOrders.map((order) => ({
+      id: order.id,
+      name: order.user.name,
+      items: [...order.lines]
+        .sort((a, b) => a.sessionItem.order - b.sessionItem.order)
+        .map(
+          (line) =>
+            `${line.quantity}× ${pick(line.sessionItem.nameNl, line.sessionItem.nameEn, locale) ?? line.sessionItem.nameNl}`,
+        )
+        .join(", "),
+      totalCents: order.totalCents,
+      paid: order.grocomeetPaidAt !== null,
+    }));
+    const money = [...reservations, ...theokotOrders];
+
     return {
       id: meeting.id,
       kind: meeting.kind,
@@ -122,11 +154,10 @@ export async function loadMeetingAdmin(
       shareUrl: meeting.kind === "BUREAU" ? `${base}/bureau/${meeting.slug}` : null,
       sessionState: session ? (session.isOpen ? "OPEN" : "CLOSED") : "NONE",
       reservations,
+      theokotOrders,
       orderCount: reservations.filter((row) => row.hasOrder).length,
-      totalCents: reservations.reduce((total, row) => total + row.totalCents, 0),
-      openCents: reservations
-        .filter((row) => !row.paid)
-        .reduce((total, row) => total + row.totalCents, 0),
+      totalCents: money.reduce((total, row) => total + row.totalCents, 0),
+      openCents: money.filter((row) => !row.paid).reduce((total, row) => total + row.totalCents, 0),
       showPaid: kind === "GROCOMEET",
     };
   });
@@ -159,20 +190,27 @@ export type DebtRow = {
  * verschuldigd en hoort niet in een schuldenlijst met nul erachter.
  */
 export async function loadGrocomeetDebts(workingYear: number): Promise<DebtRow[]> {
-  const reservations = await prisma.meetingReservation.findMany({
-    where: { status: "ACTIVE", meeting: { kind: "GROCOMEET", year: workingYear } },
-    include: { user: { select: { id: true, name: true } } },
-  });
+  const [reservations, theokotOrders] = await Promise.all([
+    prisma.meetingReservation.findMany({
+      where: { status: "ACTIVE", meeting: { kind: "GROCOMEET", year: workingYear } },
+      include: { user: { select: { id: true, name: true } } },
+    }),
+    // Wat grocos zelf bij Theokot bestelden en in de doos van de GM meeging: dat
+    // betalen ze hier, niet aan de balie.
+    prisma.theokotOrder.findMany({
+      where: {
+        status: { in: GROCOMEET_ORDER_STATUSES },
+        grocomeet: { kind: "GROCOMEET", year: workingYear },
+      },
+      include: { user: { select: { id: true, name: true } } },
+    }),
+  ]);
 
   const byUser = new Map<string, DebtRow>();
-  for (const reservation of reservations) {
-    if (!hasMeetingOrder({ itemName: reservation.itemNameNl, drinkName: reservation.drinkName })) {
-      continue;
-    }
-    const total = reservation.itemPriceCents + reservation.drinkPriceCents;
-    const row = byUser.get(reservation.userId) ?? {
-      userId: reservation.userId,
-      name: reservation.user.name,
+  const add = (user: { id: string; name: string }, total: number, paid: boolean) => {
+    const row = byUser.get(user.id) ?? {
+      userId: user.id,
+      name: user.name,
       orders: 0,
       totalCents: 0,
       paidCents: 0,
@@ -180,9 +218,23 @@ export async function loadGrocomeetDebts(workingYear: number): Promise<DebtRow[]
     };
     row.orders += 1;
     row.totalCents += total;
-    if (reservation.paidAt) row.paidCents += total;
+    if (paid) row.paidCents += total;
     else row.openCents += total;
-    byUser.set(reservation.userId, row);
+    byUser.set(user.id, row);
+  };
+
+  for (const reservation of reservations) {
+    if (!hasMeetingOrder({ itemName: reservation.itemNameNl, drinkName: reservation.drinkName })) {
+      continue;
+    }
+    add(
+      reservation.user,
+      reservation.itemPriceCents + reservation.drinkPriceCents,
+      reservation.paidAt !== null,
+    );
+  }
+  for (const order of theokotOrders) {
+    add(order.user, order.totalCents, order.grocomeetPaidAt !== null);
   }
 
   return [...byUser.values()].sort((a, b) => b.openCents - a.openCents || a.name.localeCompare(b.name));

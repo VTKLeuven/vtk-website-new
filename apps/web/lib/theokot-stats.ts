@@ -12,7 +12,9 @@
  *   niet opgehaald). Een annulatie wist de bestelling, dus die bestaat hier niet.
  * - **Het aanbod wordt ook aangesproken door vergaderingen** (grocomeet, bureau);
  *   die tellen mee voor "hoeveel bleef er liggen" en "uitverkocht", niet voor de
- *   opbrengst van de balie.
+ *   opbrengst van de balie. Dat geldt ook voor wat een groco zelf bij Theokot
+ *   bestelde voor in de doos van de grocomeet: dat is een bestelling en telt
+ *   als verkocht, maar het kwam niet langs de balie en werd er niet betaald.
  * - **Uitverkocht** is het moment waarop de bestellingen van een broodje, in de
  *   volgorde waarin ze binnenkwamen, de voorraad van die dag bereiken, gerekend
  *   vanaf het openen van de bestelronde.
@@ -51,6 +53,8 @@ export type StatsOrder = {
   pickedUpAt: Date | null;
   totalCents: number;
   voucher: boolean;
+  /** Ging mee in de doos van de grocomeet (`TheokotOrder.grocomeetId`). */
+  grocomeet: boolean;
   lines: Array<{ sessionItemId: string; quantity: number; unitPriceCents: number }>;
 };
 
@@ -260,11 +264,14 @@ export function computeTheokotStats(sessions: StatsSession[], orders: StatsOrder
       pickedUpOrders += 1;
       if (order.voucher) voucherOrders += 1;
       sandwichesPickedUp += count;
-      revenueCents += order.totalCents;
       perDay.pickedUp[index] += count;
-      perDay.revenueCents[index] += order.totalCents;
       weekdayPicked[weekday] += 1;
-      if (order.pickedUpAt) {
+      if (!order.grocomeet) {
+        revenueCents += order.totalCents;
+        perDay.revenueCents[index] += order.totalCents;
+      }
+      // Het tijdstip van de GM-doos is dat van de verwerking, niet van een balie.
+      if (order.pickedUpAt && !order.grocomeet) {
         const at = brusselsParts(order.pickedUpAt);
         const quarter = at.hour * 4 + Math.floor(at.minute / 15);
         quarterCounts.set(quarter, (quarterCounts.get(quarter) ?? 0) + 1);
@@ -299,10 +306,12 @@ export function computeTheokotStats(sessions: StatsSession[], orders: StatsOrder
       linesByItem.set(line.sessionItemId, list);
       if (order.status === "PICKED_UP") {
         pickedByItem.set(line.sessionItemId, (pickedByItem.get(line.sessionItemId) ?? 0) + line.quantity);
-        revenueByItem.set(
-          line.sessionItemId,
-          (revenueByItem.get(line.sessionItemId) ?? 0) + line.quantity * line.unitPriceCents,
-        );
+        if (!order.grocomeet) {
+          revenueByItem.set(
+            line.sessionItemId,
+            (revenueByItem.get(line.sessionItemId) ?? 0) + line.quantity * line.unitPriceCents,
+          );
+        }
       } else if (order.status === "NO_SHOW") {
         noShowByItem.set(line.sessionItemId, (noShowByItem.get(line.sessionItemId) ?? 0) + line.quantity);
       }

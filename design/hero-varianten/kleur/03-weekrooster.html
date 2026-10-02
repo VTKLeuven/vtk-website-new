@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kleur 3: Weekrooster</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* De week als agenda-rooster, zoals in een agenda-app: elk event staat op
+   zijn uur in de kleur van zijn categorie, de shiften staan ertussen als
+   gearceerde gele blokken. Bovenaan titel en snelkoppelingen naast elkaar. */
+:root {
+  --paper: #EFF2F8; --paper-2: #E6ECF5; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36;
+  --yellow: #FFD23F; --muted: #5C667F; --on-dark-muted: #B7C0DC; --line: rgb(14 26 54 / .09);
+  --cat-act: #E5484D; --cat-sport: #30A46C; --cat-onthaal: #F76B15; --cat-bedrijf: #3E63DD;
+  --hour: 30px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Inter, system-ui, sans-serif; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; border-radius: 6px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 36px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.hdr { background: var(--navy); color: var(--paper); }
+.hdr .wrap { height: 64px; display: flex; align-items: center; gap: 30px; }
+.hdr img { height: 28px; }
+.hdr nav { display: flex; gap: 22px; font-size: 15px; font-weight: 500; color: rgb(239 242 248 / .86); }
+.hdr nav a:hover { color: var(--paper); }
+.hdr-end { margin-left: auto; display: flex; gap: 18px; align-items: center; font-size: 14px; }
+.hdr-end i { font-size: 19px; }
+
+.top { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; padding: 40px 0 28px; align-items: center; }
+.top h1 { font-size: 48px; line-height: 1.04; letter-spacing: -0.035em; font-weight: 800; color: var(--navy); }
+.top h1 span { box-shadow: inset 0 -.22em 0 var(--yellow); }
+.top p { margin-top: 14px; font-size: 17px; line-height: 1.55; color: var(--body, #34405E); max-width: 32em; }
+.cta { display: flex; gap: 10px; margin-top: 22px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 18px; border-radius: 999px; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.btn-n { background: var(--navy); color: var(--paper); }
+.btn-n:hover { background: var(--ink); }
+.btn-l { box-shadow: inset 0 0 0 1px rgb(14 26 54 / .25); }
+.btn-l:hover { background: var(--surface); }
+.quick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.q { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 14px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); transition: box-shadow .15s; }
+.q:hover { box-shadow: inset 0 0 0 1.5px var(--navy); }
+.q .ic { width: 38px; height: 38px; flex: none; border-radius: 10px; display: grid; place-items: center; font-size: 19px; }
+.q b { display: block; font-size: 14px; font-weight: 600; }
+.q small { display: block; font-size: 12px; color: var(--muted); }
+
+/* Rooster */
+.cal { background: var(--surface); border-radius: 20px; box-shadow: inset 0 0 0 1px var(--line); margin-bottom: 48px; overflow: hidden; }
+.cal-h { display: flex; align-items: center; gap: 18px; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.cal-h h2 { font-size: 18px; font-weight: 700; letter-spacing: -0.01em; }
+.legend { display: flex; gap: 14px; font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend span::before { content: ""; width: 10px; height: 10px; border-radius: 3px; background: var(--c); }
+.legend .sh::before { background: repeating-linear-gradient(-45deg, var(--yellow) 0 3px, var(--surface) 3px 5px); box-shadow: inset 0 0 0 1px var(--yellow); }
+.cal-h .all { margin-left: auto; font-size: 14px; font-weight: 600; color: var(--navy); }
+.cal-h .all:hover { text-decoration: underline; text-underline-offset: 3px; }
+.grid { display: grid; grid-template-columns: 56px repeat(6, 1fr); }
+.dh { padding: 10px 12px; font-size: 13px; color: var(--muted); border-left: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.dh b { font-size: 20px; font-weight: 700; color: var(--ink); margin-right: 4px; letter-spacing: -0.02em; }
+.dh.today b { background: var(--yellow); border-radius: 8px; padding: 0 6px; }
+.allday { grid-column: 1 / -1; display: grid; grid-template-columns: 56px repeat(6, 1fr); border-bottom: 1px solid var(--line); min-height: 34px; }
+.allday > div { border-left: 1px solid var(--line); padding: 4px 6px; }
+.allday .lbl { border-left: 0; font-size: 11px; color: var(--muted); padding: 10px 0 0 10px; }
+.hours { position: relative; }
+.hours span { display: block; height: var(--hour); font-size: 11px; color: var(--muted); text-align: right; padding-right: 8px; transform: translateY(-6px); }
+.col { position: relative; border-left: 1px solid var(--line); background-image: repeating-linear-gradient(transparent 0 calc(var(--hour) - 1px), var(--line) calc(var(--hour) - 1px) var(--hour)); }
+.ev { position: absolute; left: 4px; right: 4px; border-radius: 8px; padding: 5px 8px; font-size: 12px; line-height: 1.25; overflow: hidden; background: color-mix(in srgb, var(--c) 14%, white); box-shadow: inset 3px 0 0 var(--c); transition: transform .12s; }
+.ev:hover { transform: scale(1.02); z-index: 2; box-shadow: inset 3px 0 0 var(--c), 0 8px 18px -8px rgb(14 26 54 / .4); }
+.ev b { display: block; font-weight: 600; font-size: 12.5px; }
+.ev small { color: var(--muted); }
+.ev .star { position: absolute; top: 4px; right: 4px; font-size: 13px; color: var(--muted); }
+.ev .star:hover, .ev .star[aria-pressed="true"] { color: var(--ink); }
+.ev.half-l { right: 50%; } .ev.half-r { left: 50%; }
+.ev.shift { --c: var(--yellow); background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--yellow) 45%, white) 0 6px, color-mix(in srgb, var(--yellow) 22%, white) 6px 12px); }
+.chip { display: block; font-size: 11.5px; font-weight: 600; border-radius: 6px; padding: 3px 6px; background: repeating-linear-gradient(-45deg, color-mix(in srgb, var(--yellow) 45%, white) 0 6px, color-mix(in srgb, var(--yellow) 22%, white) 6px 12px); }
+.chip:hover { text-decoration: underline; }
+.nowline { position: absolute; left: 0; right: 0; height: 2px; background: var(--ink); z-index: 3; }
+.nowline::before { content: ""; position: absolute; left: -4px; top: -3px; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
+
+@media (max-width: 1100px) { .hdr nav { display: none; } .top { grid-template-columns: 1fr; gap: 24px; } .cal { overflow-x: auto; } .grid, .allday { min-width: 900px; } .legend { display: none; } }
+@media (max-width: 600px) { .wrap { padding: 0 14px; } .top h1 { font-size: 36px; } .quick { grid-template-columns: 1fr 1fr; } .cta { flex-wrap: wrap; } }
+</style>
+</head>
+<body>
+<header class="hdr"><div class="wrap">
+  <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+  <nav><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+  <div class="hdr-end"><i class="ph ph-magnifying-glass"></i><span><b>NL</b> / EN</span><i class="ph ph-user-circle"></i></div>
+</div></header>
+
+<div class="wrap">
+  <section class="top">
+    <div>
+      <h1>De thuis voor <span>ingenieurs</span> in Leuven.</h1>
+      <p>Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+      <div class="cta"><a class="btn btn-n" href="#">Ontdek wat we doen</a><a class="btn btn-l" href="#">Eerstejaars? Start hier</a></div>
+    </div>
+    <nav class="quick" aria-label="Snel naar">
+      <a class="q" href="#"><span class="ic" style="background:var(--yellow)"><i class="ph ph-bread"></i></span><span><b>Theokot</b><small>Broodje bestellen</small></span></a>
+      <a class="q" href="#"><span class="ic" style="background:var(--navy);color:var(--yellow)"><i class="ph ph-books"></i></span><span><b>Cursusdienst</b><small class="num">Open tot 13:55</small></span></a>
+      <a class="q" href="#"><span class="ic" style="background:var(--paper-2)"><i class="ph ph-recycle"></i></span><span><b>Tweedehands</b><small>Boeken</small></span></a>
+      <a class="q" href="#"><span class="ic" style="background:var(--paper-2)"><i class="ph ph-clock"></i></span><span><b>Tijdslot Cudi</b><small>Reserveer</small></span></a>
+      <a class="q" href="#"><span class="ic" style="background:var(--yellow)"><i class="ph ph-hand-heart"></i></span><span><b>Shiften</b><small>3 open</small></span></a>
+      <a class="q" href="#"><span class="ic" style="background:var(--navy);color:var(--yellow)"><i class="ph ph-calendar-blank"></i></span><span><b>Kalender</b><small>Alle events</small></span></a>
+    </nav>
+  </section>
+
+  <section class="cal num" aria-label="Deze week">
+    <div class="cal-h">
+      <h2>Deze week</h2>
+      <div class="legend"><span style="--c:var(--cat-act)">Activiteiten</span><span style="--c:var(--cat-sport)">Sport</span><span style="--c:var(--cat-onthaal)">Onthaal</span><span style="--c:var(--cat-bedrijf)">Bedrijfsrelaties</span><span class="sh">Shift</span></div>
+      <a class="all" href="#">Volledige kalender</a>
+    </div>
+    <div class="grid">
+      <div class="dh" style="border-left:0"></div>
+      <div class="dh today"><b>1</b>do</div><div class="dh"><b>2</b>vr</div><div class="dh"><b>5</b>ma</div><div class="dh"><b>6</b>di</div><div class="dh"><b>7</b>wo</div><div class="dh"><b>8</b>do</div>
+      <div class="allday"><div class="lbl">nacht</div><div></div><div><a class="chip" href="#">01:00 Bijrijden afbraak, 2 munten</a></div><div></div><div></div><div></div><div></div></div>
+      <div class="hours" id="hours"></div>
+      <div class="col" id="c0">
+        <div class="ev half-l" style="--c:var(--cat-act)" data-s="12" data-e="24"><a href="#"><b>12 Urencantus</b><small>12:00, Waaiberg</small></a><button class="star" aria-label="Interesse: 12 Urencantus"><i class="ph ph-star"></i></button></div>
+        <div class="ev half-r" style="--c:var(--cat-sport)" data-s="20.5" data-e="22"><a href="#"><b>Looptraining</b><small>20:30</small></a></div>
+      </div>
+      <div class="col">
+        <div class="ev shift" data-s="11" data-e="12"><a href="#"><b>Bijrijden met Stijn</b><small>shift, 1 plaats</small></a></div>
+        <div class="ev shift" data-s="14" data-e="16"><a href="#"><b>Namiddagshift</b><small>shift, 2 munten</small></a></div>
+      </div>
+      <div class="col">
+        <div class="ev" style="--c:var(--cat-onthaal)" data-s="19" data-e="21"><a href="#"><b>PeMe-Start</b><small>19:00, Alma 3</small></a><button class="star" aria-label="Interesse: PeMe"><i class="ph ph-star"></i></button></div>
+        <div class="ev half-l" style="--c:var(--cat-sport)" data-s="20.5" data-e="22"><a href="#"><b>Looptraining</b></a></div>
+        <div class="ev half-r" style="--c:var(--cat-act)" data-s="21" data-e="24"><a href="#"><b>CaraOké</b><small>Theokot</small></a></div>
+      </div>
+      <div class="col">
+        <div class="ev" style="--c:var(--cat-onthaal)" data-s="12.67" data-e="13.67"><a href="#"><b>KANWEEK</b><small>12:40</small></a></div>
+        <div class="ev" style="--c:var(--cat-onthaal)" data-s="17.5" data-e="18.5"><a href="#"><b>Zelfverdediging</b><small>17:30</small></a></div>
+        <div class="ev" style="--c:var(--cat-bedrijf)" data-s="18.5" data-e="21"><a href="#"><b>Sector Night Bouwkunde</b><small>18:30, Quadrivium</small></a><button class="star" aria-label="Interesse: Sector Night"><i class="ph ph-star"></i></button></div>
+      </div>
+      <div class="col">
+        <div class="ev" style="--c:var(--cat-sport)" data-s="20.5" data-e="22"><a href="#"><b>Looptraining</b><small>20:30</small></a></div>
+      </div>
+      <div class="col"></div>
+    </div>
+  </section>
+</div>
+<script>
+const S = 10, E = 24, H = 30;
+const hours = document.getElementById("hours");
+for (let h = S; h < E; h++) hours.insertAdjacentHTML("beforeend", `<span>${h}:00</span>`);
+document.querySelectorAll(".col").forEach(c => c.style.height = (E - S) * H + "px");
+document.querySelectorAll(".ev").forEach(ev => { const s = +ev.dataset.s, e = +ev.dataset.e; ev.style.top = (s - S) * H + 1 + "px"; ev.style.height = (e - s) * H - 3 + "px"; });
+const d = new Date(), now = d.getHours() + d.getMinutes() / 60;
+if (now >= S && now <= E) { const l = document.createElement("div"); l.className = "nowline"; l.style.top = (now - S) * H + "px"; document.getElementById("c0").appendChild(l); }
+document.querySelectorAll(".star").forEach(b => b.addEventListener("click", () => { const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); b.querySelector("i").className = on ? "ph-fill ph-star" : "ph ph-star"; }));
+</script>
+</body>
+</html>

@@ -11,6 +11,8 @@ import {
   requesterLabel,
   toDatetimeLocalValue,
   transportDeleteDescription,
+  tripEventName,
+  tripTitle,
 } from '@/lib/uitleen';
 import { AuditTimeline } from '@/components/audit-timeline';
 import { PhoneLink } from '@/components/phone-link';
@@ -145,7 +147,7 @@ export default async function BeheerVervoerPage({
           dayKeyFormatter.format(other.startAt) === day
       )
       .sort((a, b) => a.startAt.getTime() - b.startAt.getTime())
-      .map((other) => `${hoursLabel(other)} · ${other.eventName?.trim() || other.purpose}`);
+      .map((other) => `${hoursLabel(other)} · ${tripTitle(other)}`);
   }
   const approved = bookings.filter((booking) => booking.status === 'APPROVED').sort(byChoice);
   const rest = bookings
@@ -226,7 +228,6 @@ export default async function BeheerVervoerPage({
         </Link>,
       ]);
     }
-    if (booking.eventName) lines.push(['Evenement', booking.eventName]);
     // Wat er mee moet, met de link naar de materiaallijst erin aanklikbaar.
     if (booking.cargoNote) {
       lines.push(['Lading', <LinkedText key="cargo" text={booking.cargoNote} />]);
@@ -264,10 +265,10 @@ export default async function BeheerVervoerPage({
     if (booking.memberNote) lines.push(['Nota van het lid', booking.memberNote]);
     if (booking.adminNote) lines.push(['Nota van Logistiek', booking.adminNote]);
     if (booking.kilometers !== null) lines.push(['Gereden', `${booking.kilometers} km`]);
-    // Twee verschillende dingen die allebei "Evenement" heetten: hierboven staat
-    // hoe de aanvrager zijn activiteit noemde, hier onder welke koepel de rit
-    // hangt. Twee rijen met hetzelfde opschrift in dezelfde lijst lezen als een
-    // fout, en React zag er twee kinderen met dezelfde key in.
+    // Eén rij voor het evenement. Er stonden er twee: "Evenement" met de naam
+    // die op de rit stond, en deze met de koppeling. Na "Loskoppelen" bleef de
+    // eerste staan, en daardoor leek de knop niets te doen. Een naam zonder
+    // koppeling (wat een lid vrij intikte) toont deze rij nu zelf, met "Wissen".
     lines.push([
       'Hoort bij evenement',
       <EventLink
@@ -275,6 +276,8 @@ export default async function BeheerVervoerPage({
         target={{ kind: 'transport', id: booking.id }}
         events={eventChoices}
         current={booking.event}
+        looseName={booking.event ? null : booking.eventName}
+        showLabel={false}
       />,
     ]);
     const deleteLegs = deletableGroup(booking);
@@ -304,7 +307,7 @@ export default async function BeheerVervoerPage({
         {deleteLegs ? (
           <TransportDeleteButton
             bookingId={booking.id}
-            title={booking.eventName?.trim() || booking.purpose}
+            title={tripTitle(booking)}
             count={deleteLegs.length}
             description={transportDeleteDescription(deleteLegs)}
           />
@@ -404,9 +407,7 @@ export default async function BeheerVervoerPage({
                     <span className="ml-2 text-sm font-normal text-vtk-muted">{requesterLabel(booking)}</span>
                   </p>
                   <p className="mt-0.5 text-sm text-vtk-muted">{booking.user.name}</p>
-                  {booking.eventName ? (
-                    <p className="mt-0.5 text-xs font-medium text-vtk-navy">{booking.eventName}</p>
-                  ) : null}
+                  <TripWhatLine booking={booking} />
                   <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                     <div><dt className="text-vtk-muted">Wanneer</dt><dd className="text-vtk-body">{dateFormatter.format(booking.startAt)}</dd></div>
                     <div><dt className="text-vtk-muted">Uren</dt><dd className="tabular-nums text-vtk-body">{hoursLabel(booking)}</dd></div>
@@ -430,7 +431,7 @@ export default async function BeheerVervoerPage({
                 <th className={headerClass}>Voertuig</th>
                 <th className={headerClass}>Aanvrager</th>
                 <th className={headerClass}>Chauffeur</th>
-                <th className={headerClass}>Evenement</th>
+                <th className={headerClass}>Waarvoor</th>
                 <th className={headerClass}>Status</th>
                 <th className="py-2 pl-2"></th>
               </tr>
@@ -452,7 +453,9 @@ export default async function BeheerVervoerPage({
                       <span className="block text-xs text-vtk-muted">{booking.user.name}</span>
                     </td>
                     <td className="py-2 pr-3 text-vtk-body">{booking.driver?.name ?? ''}</td>
-                    <td className="py-2 pr-3 text-vtk-body">{booking.eventName ?? ''}</td>
+                    <td className="py-2 pr-3 text-vtk-body">
+                      <TripWhatCell booking={booking} />
+                    </td>
                     <td className="py-2 pr-3">
                       <VanStatusBadge status={booking.status} />
                     </td>
@@ -586,9 +589,7 @@ export default async function BeheerVervoerPage({
                           {requesterLabel(first)}
                           <span className="ml-1">{first.user.name}</span>
                         </p>
-                        {first.eventName ? (
-                          <p className="mt-0.5 text-xs font-medium text-vtk-navy">{first.eventName}</p>
-                        ) : null}
+                        <TripWhatLine booking={first} />
                         <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                           <div><dt className="text-vtk-muted">Wanneer</dt><dd className="text-vtk-body">{dateFormatter.format(first.startAt)}</dd></div>
                           <div><dt className="text-vtk-muted">Uren</dt><dd className="tabular-nums text-vtk-body">{hoursLabel(first)}</dd></div>
@@ -620,7 +621,7 @@ export default async function BeheerVervoerPage({
                     <th className={headerClass}>Uren</th>
                     <th className={headerClass}>Voertuig</th>
                     <th className={headerClass}>Aanvrager</th>
-                    <th className={headerClass}>Evenement</th>
+                    <th className={headerClass}>Waarvoor</th>
                     <th className="py-2 pl-2"></th>
                   </tr>
                 </thead>
@@ -653,7 +654,9 @@ export default async function BeheerVervoerPage({
                             {requesterLabel(first)}
                             <span className="block text-xs text-vtk-muted">{first.user.name}</span>
                           </td>
-                          <td className="py-2 pr-3 text-vtk-body">{first.eventName ?? ''}</td>
+                          <td className="py-2 pr-3 text-vtk-body">
+                            <TripWhatCell booking={first} />
+                          </td>
                         </>
                       }
                       details={<OpenGroupDetails group={group} />}
@@ -697,9 +700,7 @@ export default async function BeheerVervoerPage({
                           <span className="ml-2 text-sm font-normal text-vtk-muted">{requesterLabel(booking)}</span>
                         </p>
                         <p className="mt-0.5 text-sm text-vtk-muted">{booking.user.name}</p>
-                        {booking.eventName ? (
-                          <p className="mt-0.5 text-xs font-medium text-vtk-navy">{booking.eventName}</p>
-                        ) : null}
+                        <TripWhatLine booking={booking} />
                         <dl className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                           <div><dt className="text-vtk-muted">Wanneer</dt><dd className="text-vtk-body">{dateFormatter.format(booking.startAt)}</dd></div>
                           <div><dt className="text-vtk-muted">Uren</dt><dd className="tabular-nums text-vtk-body">{hoursLabel(booking)}</dd></div>
@@ -738,7 +739,7 @@ export default async function BeheerVervoerPage({
                     <th className={headerClass}>Voertuig</th>
                     <th className={headerClass}>Aanvrager</th>
                     <th className={headerClass}>Chauffeur</th>
-                    <th className={headerClass}>Evenement</th>
+                    <th className={headerClass}>Waarvoor</th>
                     <th className="py-2 pl-2"></th>
                   </tr>
                 </thead>
@@ -770,7 +771,9 @@ export default async function BeheerVervoerPage({
                               <span className="text-vtk-muted">niet nodig</span>
                             )}
                           </td>
-                          <td className="py-2 pr-3 text-vtk-body">{booking.eventName ?? ''}</td>
+                          <td className="py-2 pr-3 text-vtk-body">
+                            <TripWhatCell booking={booking} />
+                          </td>
                         </>
                       }
                       details={
@@ -836,5 +839,34 @@ export default async function BeheerVervoerPage({
         )}
       </section>
     </div>
+  );
+}
+
+/**
+ * Waarvoor de rit dient, met het evenement er klein onder.
+ *
+ * Deze kolom heette "Evenement" en toonde enkel de naam van het evenement; bij
+ * vijf ritten voor hetzelfde galabal zei ze dan vijf keer hetzelfde, en wat de
+ * rit deed stond pas in het uitgeklapte detail. Twee regels afgekapt: `purpose`
+ * is vrije tekst, en het volledige verhaal staat in het detail.
+ */
+function TripWhatCell({ booking }: { booking: { purpose: string; eventName: string | null } }) {
+  const event = tripEventName(booking);
+  return (
+    <>
+      <span className="line-clamp-2 max-w-[18rem]">{tripTitle(booking)}</span>
+      {event ? <span className="block text-xs text-vtk-muted">{event}</span> : null}
+    </>
+  );
+}
+
+/** Hetzelfde voor de kaarten op een smal scherm. */
+function TripWhatLine({ booking }: { booking: { purpose: string; eventName: string | null } }) {
+  const event = tripEventName(booking);
+  return (
+    <>
+      <p className="mt-0.5 line-clamp-2 text-sm text-vtk-ink">{tripTitle(booking)}</p>
+      {event ? <p className="mt-0.5 text-xs font-medium text-vtk-navy">{event}</p> : null}
+    </>
   );
 }

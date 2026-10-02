@@ -13,6 +13,7 @@ import {
   deleteMeetingAction,
   saveMeetingAction,
   saveMeetingOptionsAction,
+  toggleGrocomeetOrderPaidAction,
   toggleReservationPaidAction,
 } from "@/app/actions/meetings";
 
@@ -31,6 +32,20 @@ export type MeetingReservationRow = {
   hasOrder: boolean;
 };
 
+/**
+ * Wat een groco zelf bij Theokot bestelde (bv. het broodje van de week) en dus
+ * in de doos van deze GM meegaat. Staat los van de inschrijvingen: wie zo
+ * bestelt, hoeft niet ingeschreven te zijn.
+ */
+export type MeetingTheokotOrderRow = {
+  id: string;
+  name: string;
+  /** "1× Broodje kip curry, 1× Broodje kaas" */
+  items: string;
+  totalCents: number;
+  paid: boolean;
+};
+
 export type MeetingAdminView = {
   id: string;
   kind: MeetingKind;
@@ -47,8 +62,11 @@ export type MeetingAdminView = {
   /** Staat er die dag een Theokot-verkoopdag klaar? */
   sessionState: "NONE" | "OPEN" | "CLOSED";
   reservations: MeetingReservationRow[];
+  /** Enkel bij een GM; bij een bureau altijd leeg. */
+  theokotOrders: MeetingTheokotOrderRow[];
   /** Hoeveel van de inschrijvingen ook echt iets bestelden. */
   orderCount: number;
+  /** Inschrijvingen plus de Theokot-bestellingen in de doos. */
   totalCents: number;
   openCents: number;
   /** Toont de betaalkolom (de GM rekent per persoon af, het bureau niet). */
@@ -73,6 +91,8 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
           <p className="text-sm text-[#5c667f]">
             {meeting.reservations.length} {nl ? "ingeschreven" : "registered"} ·{" "}
             {meeting.orderCount} {nl ? "met bestelling" : "with an order"} ·{" "}
+            {meeting.theokotOrders.length > 0 &&
+              `${meeting.theokotOrders.length} ${nl ? "zelf bij Theokot" : "ordered at Theokot"} · `}
             <span className="tabular-nums">{formatEuro(meeting.totalCents)}</span>
             {meeting.location ? ` · ${meeting.location}` : ""}
           </p>
@@ -86,9 +106,14 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
             srLabel={`${nl ? "Verwijderen" : "Delete"}: ${meeting.dateLabel}`}
             title={nl ? "Vergadering verwijderen" : "Delete meeting"}
             description={
-              nl
+              (nl
                 ? `De vergadering van ${meeting.dateLabel} verdwijnt, samen met ${meeting.reservations.length} inschrijving(en) en hun opmerkingen. De broodjes komen terug vrij voor studenten. Dit kan niet ongedaan gemaakt worden.`
-                : `The meeting of ${meeting.dateLabel} will be removed, together with ${meeting.reservations.length} registration(s) and their comments. The sandwiches become available to students again. This cannot be undone.`
+                : `The meeting of ${meeting.dateLabel} will be removed, together with ${meeting.reservations.length} registration(s) and their comments. The sandwiches become available to students again. This cannot be undone.`) +
+              (meeting.theokotOrders.length > 0
+                ? nl
+                  ? ` De ${meeting.theokotOrders.length} bestelling(en) die grocos zelf bij Theokot plaatsten, blijven bestaan maar gaan niet meer in de doos: die halen ze dan zelf af aan de balie en betalen ze daar.`
+                  : ` The ${meeting.theokotOrders.length} order(s) grocos placed at Theokot themselves remain, but no longer go in the box: they then pick them up and pay at the counter.`
+                : "")
             }
             confirmLabel={nl ? "Verwijderen" : "Delete"}
             cancelLabel={nl ? "Annuleren" : "Cancel"}
@@ -252,7 +277,13 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
                         {/* Zonder bestelling valt er niets af te vinken; een knop van
                             nul euro leest als een openstaande schuld. */}
                         {row.hasOrder ? (
-                          <PaidToggle nl={nl} reservationId={row.id} paid={row.paid} name={row.name} />
+                          <PaidToggle
+                            nl={nl}
+                            action={toggleReservationPaidAction}
+                            fields={{ reservationId: row.id }}
+                            paid={row.paid}
+                            name={row.name}
+                          />
                         ) : (
                           <span className="text-[#5c667f]">—</span>
                         )}
@@ -265,6 +296,51 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
           </div>
         )}
       </details>
+
+      {meeting.theokotOrders.length > 0 && (
+        <details className="group mt-2">
+          <summary className="cursor-pointer text-sm text-vtk-ink/80 hover:text-vtk-ink">
+            {nl
+              ? `Zelf bij Theokot besteld (${meeting.theokotOrders.length})`
+              : `Ordered at Theokot (${meeting.theokotOrders.length})`}
+          </summary>
+          <p className="mt-2 text-sm text-[#5c667f]">
+            {nl
+              ? "Deze grocos bestelden zelf bij Theokot. Hun broodjes gaan mee in de doos en worden hier afgerekend, niet aan de balie."
+              : "These grocos ordered at Theokot themselves. Their sandwiches go in the box and are settled here, not at the counter."}
+          </p>
+          <div className="relative mt-3 overflow-x-auto">
+            <table className="w-full min-w-[32rem] text-sm">
+              <thead>
+                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-[#5c667f]">
+                  <th className="py-1 pr-3">{nl ? "Naam" : "Name"}</th>
+                  <th className="py-1 pr-3">{nl ? "Broodjes" : "Sandwiches"}</th>
+                  <th className="py-1 pr-3 text-right">{nl ? "Bedrag" : "Amount"}</th>
+                  <th className="py-1 text-right">{nl ? "Betaald" : "Paid"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {meeting.theokotOrders.map((row) => (
+                  <tr key={row.id} className="border-t border-vtk-blue/10 align-top">
+                    <td className="py-1.5 pr-3">{row.name}</td>
+                    <td className="py-1.5 pr-3">{row.items}</td>
+                    <td className="py-1.5 pr-3 text-right tabular-nums">{formatEuro(row.totalCents)}</td>
+                    <td className="py-1.5 text-right">
+                      <PaidToggle
+                        nl={nl}
+                        action={toggleGrocomeetOrderPaidAction}
+                        fields={{ orderId: row.id }}
+                        paid={row.paid}
+                        name={row.name}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
     </Card>
   );
 }
@@ -334,12 +410,14 @@ function OptionRows({ nl, initial }: { nl: boolean; initial: MeetingOptionView[]
 /** Betaald of niet, met de uitkomst als toast en in het icoon zelf. */
 function PaidToggle({
   nl,
-  reservationId,
+  action,
+  fields,
   paid,
   name,
 }: {
   nl: boolean;
-  reservationId: string;
+  action: (form: FormData) => Promise<void>;
+  fields: Record<string, string>;
   paid: boolean;
   name: string;
 }) {
@@ -361,9 +439,9 @@ function PaidToggle({
       disabled={pending}
       onClick={() => {
         const form = new FormData();
-        form.append("reservationId", reservationId);
+        for (const [key, value] of Object.entries(fields)) form.append(key, value);
         startTransition(async () => {
-          await toggleReservationPaidAction(form);
+          await action(form);
           showToast({
             message: paid
               ? nl

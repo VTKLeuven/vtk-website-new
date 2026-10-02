@@ -5,6 +5,7 @@ import { currentWorkingYear, FIRST_WORKING_YEAR } from '@vtk/auth';
 import type { Prisma } from '@prisma/client';
 import { driverColorIndex } from './driver-colors';
 import { driverColorOverrides } from './uitleen-server';
+import { tripTitle } from './uitleen';
 
 /**
  * De cijfers achter de transportplanning: wie reed wanneer, hoelang en voor wie.
@@ -200,7 +201,6 @@ const statsSelect = {
   endAt: true,
   status: true,
   purpose: true,
-  eventName: true,
   requesterType: true,
   requesterName: true,
   vehicleId: true,
@@ -374,7 +374,7 @@ export async function transportStats(filters: StatsFilters): Promise<TransportSt
       driverName: booking.driver?.name ?? '',
       groupKey: requester.key,
       groupName: requester.name,
-      purpose: booking.eventName?.trim() || booking.purpose,
+      purpose: tripTitle(booking),
       status: booking.status,
     };
   });

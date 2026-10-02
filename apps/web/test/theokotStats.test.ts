@@ -42,6 +42,7 @@ function order(
     pickedUpAt: null,
     totalCents: lines.reduce((sum, [, quantity, price]) => sum + quantity * price, 0),
     voucher: false,
+    grocomeet: false,
     lines: lines.map(([sessionItemId, quantity, unitPriceCents]) => ({ sessionItemId, quantity, unitPriceCents })),
     ...extra,
   };
@@ -109,5 +110,34 @@ describe("broodjesstatistieken", () => {
     expect(stats.pickupQuarters.keys).toEqual(["12:15", "12:30"]);
     expect(stats.pickupQuarters.values).toEqual([1, 1]);
     expect(stats.avgPickupDelayMinutes).toBe(30);
+  });
+});
+
+/**
+ * Wat een groco zelf bij Theokot bestelde voor in de doos van de grocomeet, is
+ * verkocht, maar het kwam niet langs de balie en werd er niet betaald. De
+ * verwerking zet het op opgehaald met haar eigen tijdstip, en dat mag geen
+ * afhaalmoment worden.
+ */
+describe("een bestelling in de doos van de grocomeet", () => {
+  const withBox = computeTheokotStats(sessions, [
+    ...orders,
+    order("o5", "di", "dirk", "PICKED_UP", "2026-09-21T12:10:00+02:00", [["di-hesp", 2, 300]], {
+      pickedUpAt: at("2026-09-22T16:20:00+02:00"),
+      grocomeet: true,
+    }),
+  ]);
+
+  it("telt als verkocht, niet als opbrengst van de balie", () => {
+    expect(withBox.totals.sandwichesPickedUp).toBe(5);
+    expect(withBox.totals.revenueCents).toBe(260 + 560);
+    const hesp = withBox.products.find((product) => product.key === "hesp")!;
+    expect(hesp.pickedUp).toBe(3);
+    expect(hesp.revenueCents).toBe(300);
+  });
+
+  it("laat de afhaalmomenten aan de balie ongemoeid", () => {
+    expect(withBox.pickupQuarters.keys).toEqual(["12:15", "12:30"]);
+    expect(withBox.avgPickupDelayMinutes).toBe(30);
   });
 });

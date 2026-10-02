@@ -26,6 +26,8 @@ export type ExistingOrder = {
   canCancel: boolean;
   /** Broodjes erbij of eraf: zolang het bestelvenster open is. */
   canEdit: boolean;
+  /** Gaat mee in de doos van de grocomeet en wordt daar afgerekend. */
+  grocomeet: boolean;
   lines: Array<{ sessionItemId: string; name: string; quantity: number; unitPriceCents: number }>;
 };
 
@@ -50,6 +52,12 @@ export type OrderSession = {
   orderCloseShort: string;
   orderWindowState: "UPCOMING" | "OPEN" | "CLOSED";
   canOrder: boolean;
+  /**
+   * Wie hier bestelt is een groco en er is die dag een grocomeet: wat je nu
+   * bestelt of aanpast, gaat mee in de doos van de GM. Voor een bestelling die
+   * er al is, telt `existingOrder.grocomeet`.
+   */
+  grocomeet: boolean;
   items: OrderItem[];
   existingOrder: ExistingOrder | null;
 };
@@ -309,6 +317,10 @@ function ListLayout({ nl, sessions, session, onSelect, order, limits, disabled }
   const regular = order.items.filter((item) => !item.isWeeklySpecial);
   const hasPhotos = order.items.some((item) => item.imageUrl !== null);
   const readOnly = !order.showOffer;
+  // Na de deadline is "nog 3" geen voorraad: wat niet besteld is, wordt niet
+  // gemaakt. Een getal hier stuurt mensen naar de toog voor broodjes die er
+  // niet zijn. Wie te laat is, is te laat.
+  const showStock = session.orderWindowState !== "CLOSED";
   const atMax = order.totals.count >= limits.maxItems;
   const weeklyAtMax = order.totals.weekly >= limits.maxWeeklySpecial;
 
@@ -321,6 +333,7 @@ function ListLayout({ nl, sessions, session, onSelect, order, limits, disabled }
       quantity={order.qty[item.id] ?? 0}
       reserved={readOnly ? (order.reservedQty[item.id] ?? 0) : 0}
       readOnly={readOnly}
+      showStock={showStock}
       atMax={atMax || (item.isWeeklySpecial && weeklyAtMax)}
       onChange={(next) => order.setItemQty(item, next)}
     />
@@ -378,6 +391,7 @@ function ListRow({
   quantity,
   reserved,
   readOnly,
+  showStock,
   atMax,
   onChange,
 }: {
@@ -388,6 +402,8 @@ function ListRow({
   /** Zoveel staan er van dit broodje in je reservatie (enkel zonder stappers). */
   reserved: number;
   readOnly: boolean;
+  /** Na de deadline geen "nog 3" of "uitverkocht": te laat is te laat. */
+  showStock: boolean;
   atMax: boolean;
   onChange: (next: number) => void;
 }) {
@@ -412,7 +428,7 @@ function ListRow({
         </div>
         <div className="th-row-meta">
           <span className="th-tn">{formatEuro(item.priceCents)}</span>
-          <StockPill nl={nl} remaining={item.remaining} />
+          {showStock && <StockPill nl={nl} remaining={item.remaining} />}
         </div>
         {showInfo && item.ingredients && (
           <p id={infoId} className="th-ingredients">
@@ -515,9 +531,13 @@ function Basket({
           ? nl
             ? "Geen broodjes meer nodig? Annuleer dan je reservatie."
             : "No sandwiches needed any more? Cancel your reservation instead."
-          : nl
-            ? `Je betaalt aan de balie bij het afhalen. Aanpassen of annuleren kan tot ${session.orderCloseShort}.`
-            : `You pay at the counter when you pick up. Change or cancel until ${session.orderCloseShort}.`}
+          : session.grocomeet
+            ? nl
+              ? `Dit gaat mee in de doos van de grocomeet en je betaalt het daar. Aanpassen of annuleren kan tot ${session.orderCloseShort}.`
+              : `This goes in the grocomeet box and you pay for it there. Change or cancel until ${session.orderCloseShort}.`
+            : nl
+              ? `Je betaalt aan de balie bij het afhalen. Aanpassen of annuleren kan tot ${session.orderCloseShort}.`
+              : `You pay at the counter when you pick up. Change or cancel until ${session.orderCloseShort}.`}
       </p>
     </div>
   );
@@ -545,6 +565,10 @@ function Meter({ label, value, max, nl }: { label: string; value: number; max: n
 
 function GridLayout({ nl, sessions, session, onSelect, order, limits, disabled }: LayoutProps) {
   const readOnly = !order.showOffer;
+  // Na de deadline is "nog 3" geen voorraad: wat niet besteld is, wordt niet
+  // gemaakt. Een getal hier stuurt mensen naar de toog voor broodjes die er
+  // niet zijn. Wie te laat is, is te laat.
+  const showStock = session.orderWindowState !== "CLOSED";
   const atMax = order.totals.count >= limits.maxItems;
   const weeklyAtMax = order.totals.weekly >= limits.maxWeeklySpecial;
   return (
@@ -579,6 +603,7 @@ function GridLayout({ nl, sessions, session, onSelect, order, limits, disabled }
                 quantity={order.qty[item.id] ?? 0}
                 reserved={readOnly ? (order.reservedQty[item.id] ?? 0) : 0}
                 readOnly={readOnly}
+                showStock={showStock}
                 atMax={atMax || (item.isWeeklySpecial && weeklyAtMax)}
                 onChange={(next) => order.setItemQty(item, next)}
               />
@@ -599,6 +624,7 @@ function GridCard({
   quantity,
   reserved,
   readOnly,
+  showStock,
   atMax,
   onChange,
 }: {
@@ -607,6 +633,8 @@ function GridCard({
   quantity: number;
   reserved: number;
   readOnly: boolean;
+  /** Na de deadline geen "nog 3" of "uitverkocht": te laat is te laat. */
+  showStock: boolean;
   atMax: boolean;
   onChange: (next: number) => void;
 }) {
@@ -650,7 +678,7 @@ function GridCard({
             />
           )}
         </div>
-        <StockPill nl={nl} remaining={item.remaining} />
+        {showStock && <StockPill nl={nl} remaining={item.remaining} />}
         <div className="th-gcard-foot">
           <span className="th-tn th-gcard-price">{formatEuro(item.priceCents)}</span>
           {readOnly ? (
@@ -819,23 +847,40 @@ function DayIntro({
   disabled: boolean;
   hideLimits?: boolean;
 }) {
+  // Voor een groco op een dag met een grocomeet: vooraf zeggen waar het broodje
+  // belandt, niet pas in de reservatie achteraf.
+  const grocomeet = order.showOffer && session.grocomeet && (
+    <p className="th-notice">
+      {nl
+        ? `Er is ${session.weekdayLabel} een grocomeet. Wat je hier bestelt, gaat mee in de doos van de GM en betaal je bij de grocomeet: je hoeft niet naar de balie.`
+        : `There is a grocomeet on ${session.weekdayLabel}. What you order here goes in the GM box and you pay for it at the grocomeet: no need to go to the counter.`}
+    </p>
+  );
   if (order.editing) {
     return (
-      <p className="th-hint">
-        {nl
-          ? "Je past je reservatie aan. Wat je nu kiest, vervangt wat je had."
-          : "You are changing your reservation. What you pick now replaces what you had."}
-      </p>
+      <>
+        <p className="th-hint">
+          {nl
+            ? "Je past je reservatie aan. Wat je nu kiest, vervangt wat je had."
+            : "You are changing your reservation. What you pick now replaces what you had."}
+        </p>
+        {grocomeet}
+      </>
     );
   }
   if (order.existing) return null;
   if (order.showOffer) {
-    return hideLimits ? null : (
-      <p className="th-hint">
-        {nl
-          ? `Maximaal ${limits.maxItems} broodjes, waarvan ${limits.maxWeeklySpecial} broodje van de week.`
-          : `Up to ${limits.maxItems} sandwiches, of which ${limits.maxWeeklySpecial} sandwich of the week.`}
-      </p>
+    return (
+      <>
+        {!hideLimits && (
+          <p className="th-hint">
+            {nl
+              ? `Maximaal ${limits.maxItems} broodjes, waarvan ${limits.maxWeeklySpecial} broodje van de week.`
+              : `Up to ${limits.maxItems} sandwiches, of which ${limits.maxWeeklySpecial} sandwich of the week.`}
+          </p>
+        )}
+        {grocomeet}
+      </>
     );
   }
   if (disabled) return null;
@@ -886,11 +931,19 @@ function Reservation({
 
       <div className="th-pickup">
         <DatePin dow={session.dow} day={session.dayNumber} large />
-        <div className="th-pickup-text">
-          <span className="th-pickup-label">{nl ? "Afhalen" : "Pickup"}</span>
-          <span className="th-pickup-time th-tn">{session.pickupLabel}</span>
-          <span className="th-pickup-where">{nl ? "aan de balie van het Theokot" : "at the Theokot counter"}</span>
-        </div>
+        {existing.grocomeet ? (
+          <div className="th-pickup-text">
+            <span className="th-pickup-label">{nl ? "Grocomeet" : "Grocomeet"}</span>
+            <span className="th-pickup-time">{nl ? "In de doos van de GM" : "In the GM box"}</span>
+            <span className="th-pickup-where">{nl ? "je hoeft niet naar de balie" : "no need to go to the counter"}</span>
+          </div>
+        ) : (
+          <div className="th-pickup-text">
+            <span className="th-pickup-label">{nl ? "Afhalen" : "Pickup"}</span>
+            <span className="th-pickup-time th-tn">{session.pickupLabel}</span>
+            <span className="th-pickup-where">{nl ? "aan de balie van het Theokot" : "at the Theokot counter"}</span>
+          </div>
+        )}
       </div>
 
       <div className="th-reservation-body">
@@ -906,13 +959,17 @@ function Reservation({
         </ul>
         <div className="th-total">
           <span>
-            {existing.status === "RESERVED"
+            {existing.status !== "RESERVED"
               ? nl
-                ? "Te betalen aan de balie"
-                : "To pay at the counter"
-              : nl
                 ? "Totaal"
-                : "Total"}
+                : "Total"
+              : existing.grocomeet
+                ? nl
+                  ? "Te betalen bij de grocomeet"
+                  : "To pay at the grocomeet"
+                : nl
+                  ? "Te betalen aan de balie"
+                  : "To pay at the counter"}
           </span>
           <span className="th-tn">{formatEuro(existing.totalCents)}</span>
         </div>

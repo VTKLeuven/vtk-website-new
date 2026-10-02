@@ -34,11 +34,12 @@ import type { LogistiekLocale } from '@/lib/i18n-shared';
 export type BezettingTrip = {
   id: string;
   /**
-   * Het evenement, of het doel wanneer er geen evenement aan hangt. Hetzelfde
-   * als in het blok, en daarom staat het evenement niet nog eens in het raster
-   * eronder: dat zou de titel letterlijk herhalen.
+   * Waarvoor de rit dient, op één regel (`tripTitle`); hetzelfde als in het
+   * blok. Het evenement staat eronder als eigen regel.
    */
   title: string;
+  /** Bij welk evenement de rit hoort, of `null`. */
+  eventName: string | null;
   /** De post of werkgroep die de rit aanvroeg; bij een externe zijn naam. */
   requester: string;
   /** Het lid dat het formulier indiende, of wie de rit intekende. */
@@ -139,10 +140,20 @@ export function TripCard({
           <dt>{en ? 'Requested by' : 'Aangevraagd door'}</dt>
           <dd>{trip.userName}</dd>
         </div>
-        <div data-span="2">
-          <dt>{en ? 'What for' : 'Waarvoor'}</dt>
-          <dd>{trip.purpose}</dd>
-        </div>
+        {/* Enkel wanneer er meer staat dan de titel: die is de eerste regel van
+            deze tekst, en een korte reden stond anders twee keer onder elkaar. */}
+        {trip.purpose.trim() !== trip.title ? (
+          <div data-span="2">
+            <dt>{en ? 'What for' : 'Waarvoor'}</dt>
+            <dd className="whitespace-pre-line">{trip.purpose}</dd>
+          </div>
+        ) : null}
+        {trip.eventName ? (
+          <div data-span="2">
+            <dt>{en ? 'Event' : 'Evenement'}</dt>
+            <dd>{trip.eventName}</dd>
+          </div>
+        ) : null}
         {trip.cargoNote ? (
           <div data-span="2">
             <dt>{en ? 'Cargo' : 'Wat er mee moet'}</dt>

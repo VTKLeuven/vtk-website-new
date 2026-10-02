@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState, useTransition } from "react";
-import { Input, Label, Select } from "@vtk/ui";
+import { Input, Label } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
 import {
@@ -12,6 +12,7 @@ import {
 } from "@/app/actions/users-groups";
 import { AddMemberForm } from "../groepen/AddMemberForm";
 import { RemoveMemberButton } from "../groepen/RemoveMemberButton";
+import { LEAD_LABEL_MAX, LEAD_LABEL_SUGGESTIONS } from "@/lib/werkgroepen";
 import {
   Avatar,
   Chevron,
@@ -35,8 +36,6 @@ export type Member = {
   title: string | null;
 };
 export type GrantedRole = { roleId: string; code: string; name: string; kind: "DEFAULT" | "LEADER" };
-/** Hoe de verantwoordelijke van een werkgroep heet: de G3 of de G4. */
-export type LeadLabel = "G3" | "G4";
 export type RoleOption = { roleId: string; code: string; name: string };
 
 export type WerkgroepRow = {
@@ -45,7 +44,8 @@ export type WerkgroepRow = {
   name: string;
   nameNl: string;
   nameEn: string;
-  leadLabel: LeadLabel;
+  /** Hoe de verantwoordelijke van deze werkgroep heet, bv. G3 of G4. */
+  leadLabel: string;
   descriptionNl: string;
   descriptionEn: string;
   website: string;
@@ -59,22 +59,33 @@ export type WerkgroepRow = {
 };
 
 /**
- * De keuze G3/G4. Ze staat in twee formulieren (nieuwe werkgroep en de
+ * De titel van de verantwoordelijke: vrije tekst, met G3 en G4 als voorstel.
+ * Het veld staat in twee formulieren (nieuwe werkgroep en de
  * werkgroepinstellingen) en meerdere rijen kunnen tegelijk openstaan, dus het
- * veld krijgt per formulier een eigen id.
+ * krijgt per formulier een eigen id, en zijn voorstellenlijst ook.
  */
-function LeadLabelField({ id, value, nl }: { id: string; value: LeadLabel; nl: boolean }) {
+function LeadLabelField({ id, value, nl }: { id: string; value: string; nl: boolean }) {
   return (
     <div>
       <Label htmlFor={id}>{nl ? "Titel van de verantwoordelijke" : "Title of the lead"}</Label>
-      <Select id={id} name="leadLabel" defaultValue={value}>
-        <option value="G3">G3</option>
-        <option value="G4">G4</option>
-      </Select>
+      <Input
+        id={id}
+        name="leadLabel"
+        defaultValue={value}
+        required
+        maxLength={LEAD_LABEL_MAX}
+        list={`${id}-suggestions`}
+        autoComplete="off"
+      />
+      <datalist id={`${id}-suggestions`}>
+        {LEAD_LABEL_SUGGESTIONS.map((suggestion) => (
+          <option key={suggestion} value={suggestion} />
+        ))}
+      </datalist>
       <p className="mt-1 text-xs text-[#5c667f]">
         {nl
-          ? "Zo heet de verantwoordelijke van deze werkgroep, hier en op /werkgroepen."
-          : "How this werkgroep's lead is named, here and on /werkgroepen."}
+          ? "Zo heet de verantwoordelijke van deze werkgroep, hier en op /werkgroepen. Meestal G3 of G4, maar een eigen naam kan ook."
+          : "How this werkgroep's lead is named, here and on /werkgroepen. Usually G3 or G4, but any name works."}
       </p>
     </div>
   );
@@ -360,8 +371,8 @@ function WerkgroepDetail({
   saveLabels: SaveLabels;
 }) {
   const grants = useMemo(() => new Set(werkgroep.roleGrants.map((g) => `${g.roleId}:${g.kind}`)), [werkgroep.roleGrants]);
-  // De verantwoordelijke van een werkgroep heet bij VTK de G3 of de G4; welke
-  // van de twee staat per werkgroep in de werkgroepinstellingen.
+  // De verantwoordelijke van een werkgroep heet zoals de werkgroep het kiest
+  // (meestal G3 of G4); dat staat in de werkgroepinstellingen.
   const roleLabel = (m: Member) => (m.role === "LEAD" ? werkgroep.leadLabel : nl ? "Lid" : "Member");
 
   return (
@@ -568,7 +579,7 @@ function RoleGrantRow({
   role: RoleOption;
   groupId: string;
   werkgroepName: string;
-  leadLabel: LeadLabel;
+  leadLabel: string;
   defaultOn: boolean;
   leaderOn: boolean;
   nl: boolean;
@@ -597,7 +608,7 @@ function GrantToggle({
   role: RoleOption;
   groupId: string;
   werkgroepName: string;
-  leadLabel: LeadLabel;
+  leadLabel: string;
   kind: "DEFAULT" | "LEADER";
   on: boolean;
   nl: boolean;

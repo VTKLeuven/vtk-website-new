@@ -146,6 +146,7 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
             ? res.orders.find(
                 (order) =>
                   (order.status === "RESERVED" || order.status === "NO_SHOW") &&
+                  !order.grocomeet &&
                   !order.voucherRedemption &&
                   order.voucherCost > 0 &&
                   res.outstandingBonnetjes >= order.voucherCost,
@@ -470,7 +471,7 @@ function PickupOrderPanel({
   }
 
   useEffect(() => {
-    if (!autoMark || autoTried.current || order.status !== "RESERVED") return;
+    if (!autoMark || autoTried.current || order.status !== "RESERVED" || order.grocomeet) return;
     autoTried.current = true;
     mark("auto");
     // `mark` is elke render nieuw; dit hoort enkel te lopen wanneer autoMark aangaat.
@@ -543,7 +544,19 @@ function PickupOrderPanel({
         </>
       ) : null}
       <div className="mt-3">
-        {pickedUp ? (
+        {order.grocomeet ? (
+          // Geen knop: dit broodje ligt niet hier, en betaald wordt het bij de
+          // grocomeet. Meegeven en afrekenen zou het twee keer doen.
+          <div className="rounded-lg bg-vtk-blue-soft px-3 py-2 text-sm font-medium text-vtk-ink">
+            {pickedUp
+              ? nl
+                ? "✓ Meegegeven in de doos van de grocomeet."
+                : "✓ Handed over in the grocomeet box."
+              : nl
+                ? "Zit in de doos van de grocomeet. Niet meegeven en niet afrekenen: dat gebeurt bij de grocomeet."
+                : "This is in the grocomeet box. Do not hand it over or charge for it: that happens at the grocomeet."}
+          </div>
+        ) : pickedUp ? (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800">
             <span>
               ✓ {nl ? "Opgehaald" : "Picked up"}

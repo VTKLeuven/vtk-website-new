@@ -22,6 +22,8 @@ import { AuditTimeline } from '@/components/audit-timeline';
 import { PhoneLink } from '@/components/phone-link';
 import { TripHelpers } from '@/components/trip-helpers';
 import { TripNotes, type TripNoteView } from '@/components/trip-notes';
+import { EventLink } from '@/components/event-link';
+import type { SelectableEvent } from '@/components/event-picker';
 import { VanStatusBadge } from '@/components/status-badge';
 import type { UitleenAuditEntry, DriverOption } from '@/lib/uitleen-server';
 import { TransportControls } from '../transport-controls';
@@ -72,9 +74,13 @@ import type {
 export type PlannerTrip = {
   id: string;
   purpose: string;
+  /** Waarvoor de rit dient, op één regel (`tripTitle`). */
+  title: string;
   cargoNote: string | null;
+  /** De momentopname op de rit; zonder `event` de naam die de aanvrager intikte. */
   eventName: string | null;
-  eventId: string | null;
+  /** Het gekoppelde evenement, met zijn naam zoals ze nu is. */
+  event: { id: string; name: string } | null;
   reservationId: string | null;
   requesterLabel: string;
   userName: string;
@@ -144,6 +150,7 @@ export function TransportPlanner({
   handoverNotify,
   events,
   eventOptions,
+  linkableEvents,
   availability,
   availabilityNotes,
   driverColors,
@@ -171,11 +178,16 @@ export function TransportPlanner({
   /** De evenementen boven het rooster, met wat het paneel nodig heeft (P5). */
   events: PlannerEvent[];
   /**
-   * De evenementen waaraan een rit gehangen kan worden (A8). Ruimer dan de
-   * strook erboven: die toont enkel dit venster en valt weg wanneer de filter
+   * De evenementen waaraan een nieuwe rit gehangen kan worden (A8). Ruimer dan
+   * de strook erboven: die toont enkel dit venster en valt weg wanneer de filter
    * uitstaat, terwijl de keuzelijst altijd moet werken.
    */
   eventOptions: TripEventOption[];
+  /**
+   * Waaraan je een bestaande rit hangt, in de rij "Evenement" van het paneel.
+   * Dezelfde lijst als op Ritten, zodat beide schermen hetzelfde aanbieden.
+   */
+  linkableEvents: SelectableEvent[];
   /** Wanneer de chauffeurs kunnen rijden (V1); leeg wanneer de filter uitstaat. */
   availability: AvailabilityBand[];
   /** Wat ze over de week in het algemeen kwijt wilden (F4.5). */
@@ -488,7 +500,7 @@ export function TransportPlanner({
 
         {trip ? (
           <TripInspector
-            title={trip.eventName?.trim() || trip.purpose}
+            title={trip.title}
             subtitle={
               <>
                 {trip.requesterLabel} · {trip.userName}
@@ -640,19 +652,23 @@ export function TransportPlanner({
                     </dd>
                   </div>
                 ) : null}
-                {trip.eventId ? (
-                  <div>
-                    <dt>Evenement</dt>
-                    <dd>
-                      <Link
-                        href={`/beheer/evenementen#${trip.eventId}`}
-                        className="underline underline-offset-2"
-                      >
-                        {trip.eventName?.trim() || 'evenement'}
-                      </Link>
-                    </dd>
-                  </div>
-                ) : null}
+                {/* Altijd, ook zonder evenement en ook op een gereden rit: de
+                    koppeling groepeert enkel en verandert niets aan de afspraak.
+                    Tot september 2026 was dit een link die je niet kon wijzigen,
+                    en zat de keuzelijst onderaan in "Rit aanpassen", waar ze
+                    verdween zodra er binnen twee weken geen evenement was. */}
+                <div>
+                  <dt>Evenement</dt>
+                  <dd>
+                    <EventLink
+                      target={{ kind: 'transport', id: trip.id }}
+                      events={linkableEvents}
+                      current={trip.event}
+                      looseName={trip.event ? null : trip.eventName}
+                      showLabel={false}
+                    />
+                  </dd>
+                </div>
               </dl>
 
               {/* V2: wie er meerijdt, met een nummer per persoon. Ook hier te
@@ -679,7 +695,6 @@ export function TransportPlanner({
                     initial={trip.edit}
                     groups={groups}
                     currentGroup={trip.requesterGroup}
-                    events={eventOptions}
                     reservationId={trip.reservationId}
                     locked={trip.status !== 'REQUESTED' && trip.status !== 'APPROVED'}
                     onSaved={() => router.refresh()}
@@ -699,8 +714,8 @@ export function TransportPlanner({
               {trip.canDelete ? (
                 <section className="border-t border-vtk-navy/10 pt-4">
                   <ConfirmActionButton
-                    label={`Verwijderen: ${trip.eventName?.trim() || trip.purpose}`}
-                    srLabel={`Rit verwijderen: ${trip.eventName?.trim() || trip.purpose}`}
+                    label={`Verwijderen: ${trip.title}`}
+                    srLabel={`Rit verwijderen: ${trip.title}`}
                     confirmLabel="Verwijderen"
                     variant="danger"
                     destructive

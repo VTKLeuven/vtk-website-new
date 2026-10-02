@@ -1294,6 +1294,14 @@ export async function lookupPickupByPassAction(pass: string): Promise<PickupLook
 }
 
 /**
+ * Wat de balie zegt bij een bestelling in de doos van de grocomeet. Die broodjes
+ * liggen niet aan de balie en worden bij de grocomeet afgerekend; wie ze hier
+ * toch meegeeft of laat betalen, rekent ze twee keer.
+ */
+const GROCOMEET_ORDER_AT_COUNTER =
+  "Deze bestelling zit in de doos van de grocomeet en wordt daar afgerekend, niet aan de balie.";
+
+/**
  * Markeert een bestelling als opgehaald. Faalt als ze al opgehaald/geannuleerd is.
  *
  * Een bestelling die als niet-opgehaald geboekt staat, mag hier ook nog door: de
@@ -1311,6 +1319,7 @@ export async function markPickedUpAction(orderId: string): Promise<ActionResult>
   if (!order) return { ok: false, error: "Bestelling niet gevonden." };
   if (order.status === "PICKED_UP") return { ok: false, error: "Deze bestelling is al opgehaald." };
   if (order.status === "CANCELLED") return { ok: false, error: "Deze bestelling is geannuleerd." };
+  if (order.grocomeetId) return { ok: false, error: GROCOMEET_ORDER_AT_COUNTER };
 
   const late = order.status === "NO_SHOW";
 
@@ -1435,11 +1444,14 @@ export async function redeemEmployeeVouchersAction(
           id: true,
           userId: true,
           status: true,
+          grocomeetId: true,
           voucherRedemption: { select: { id: true } },
           lines: { select: { unitPriceCents: true } },
         },
       });
       if (!order) throw new Error("ORDER_NOT_FOUND");
+      // Wordt bij de grocomeet afgerekend, niet aan de balie.
+      if (order.grocomeetId) throw new Error("GROCOMEET_ORDER");
       // Ook een bestelling die als niet-opgehaald geboekt staat: die mag aan de
       // balie nog uitgedeeld worden, en dan hoort ze ook nog met bonnetjes
       // betaald te kunnen worden. Opgehaald en geannuleerd niet meer.
@@ -1500,6 +1512,9 @@ export async function redeemEmployeeVouchersAction(
       }
       if (error.message === "ALREADY_REDEEMED") {
         return { ok: false, error: "Voor deze bestelling zijn al medewerkersbonnetjes gebruikt." };
+      }
+      if (error.message === "GROCOMEET_ORDER") {
+        return { ok: false, error: GROCOMEET_ORDER_AT_COUNTER };
       }
       if (error.message === "NOTHING_TO_PAY") {
         return { ok: false, error: "Deze bestelling kost niets, dus er valt niets met bonnetjes te betalen." };

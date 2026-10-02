@@ -12,6 +12,9 @@ import { withSerializableTransaction } from './ticketing/transactions';
 /** De notitie waarmee de no-show-verwerking een ban aanmaakt; zo is hij te herkennen. */
 const AUTOMATIC_BAN_NOTE = 'Automatisch aangemaakt door de no-show-verwerking.';
 
+/** De notitie bij een bestelling die in de doos van de grocomeet meeging. */
+const GROCOMEET_PICKUP_NOTE = 'Meegegeven in de doos van de grocomeet.';
+
 /** Leest `theokot.config` uit de Setting-tabel, aangevuld met defaults. */
 export async function getTheokotConfig(): Promise<TheokotConfig> {
   try {
@@ -131,18 +134,6 @@ async function applyBanIfDue(userId: string, config: TheokotConfig): Promise<boo
 }
 
 /**
- * Verwerkt alle vervallen verkoopsessies: markeert nog-gereserveerde bestellingen
- * als no-show, verstuurt waarschuwingsmails en past bans toe. Idempotent via
- * `session.processedAt`: een reeds verwerkte sessie wordt overgeslagen.
- *
- * Staat de verwerking gepauzeerd (`noShowPaused`), of is de dag als "er liep
- * iets mis" aangeduid (`noShowsWaivedAt`), dan wordt de dag wel afgesloten en
- * blijven de bestellingen als niet opgehaald geboekt, maar vertrekt er geen
- * mail, komt er geen ban, en krijgt de bestelling `noShowWaivedAt`, zodat ze
- * ook later niet meetelt. Bewust niet "de dag laten liggen tot de pauze
- * voorbij is": dan vertrokken bij het hervatten alle mails van de hele pauze in
- * één keer, voor dagen die iedereen al vergeten is.
-/**
  * Verwerkt de no-shows van één specifieke verkoopsessie:
  * - Markeert nog-gereserveerde bestellingen als no-show
  * - Verstuurt waarschuwingsmails en past bans toe (tenzij gepauzeerd/waived)
@@ -150,6 +141,9 @@ async function applyBanIfDue(userId: string, config: TheokotConfig): Promise<boo
  *
  * Idempotent via `processedAt` en beschermd tegen gelijktijdige verwerking via
  * `processingStartedAt`.
+ *
+ * Een bestelling die in de doos van de grocomeet zat (`grocomeetId`), staat
+ * daarna op opgehaald: die kwam nooit langs de balie, en dat hoefde ook niet.
  */
 export async function processSessionNoShows(
   sessionId: string,
@@ -186,6 +180,13 @@ export async function processSessionNoShows(
   let noShows = 0;
   try {
     const sessionWithOrders = await prisma.$transaction(async (tx) => {
+      // Wat in de doos van de grocomeet zat, is daar afgegeven: die groco hoefde
+      // niet naar de balie, dus dat is geen no-show en er vertrekt geen mail.
+      // Betaald wordt het bij de grocomeet (`grocomeetPaidAt`), niet hier.
+      await tx.theokotOrder.updateMany({
+        where: { sessionId: session.id, status: 'RESERVED', grocomeetId: { not: null } },
+        data: { status: 'PICKED_UP', pickedUpAt: now, statusNote: GROCOMEET_PICKUP_NOTE },
+      });
       await tx.theokotOrder.updateMany({
         where: { sessionId: session.id, status: 'RESERVED' },
         data: { status: 'NO_SHOW' },

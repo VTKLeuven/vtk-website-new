@@ -11,8 +11,9 @@ type SearchUser = { id: string; name: string; email: string; rNumber: string | n
  * Zoekt actieve gebruikers server-side (naam/e-mail/r-nummer) en post het
  * gekozen lid via {@link addMembershipAction}.
  *
- * `leadLabel` overschrijft hoe de LEAD-rol heet: een werkgroep noemt die haar
- * G3 of G4, een praesidiumpost houdt het bij "Verantwoordelijke".
+ * `leadLabel` overschrijft hoe de LEAD-rol heet: een werkgroep kiest daar zelf
+ * een naam voor (meestal G3 of G4), een praesidiumpost houdt het bij
+ * "Verantwoordelijke".
  */
 export function AddMemberForm({
   groupId,
@@ -122,7 +123,9 @@ export function AddMemberForm({
         <label className="mb-1 block text-xs font-medium text-[#5c667f]">
           {nl ? "Rol" : "Role"}
         </label>
-        <Select name="role" defaultValue="MEMBER" className="w-32">
+        {/* Breedte volgt de langste optie: de titel van de verantwoordelijke van
+            een werkgroep is vrije tekst en kan langer zijn dan "G4". */}
+        <Select name="role" defaultValue="MEMBER" className="w-auto min-w-32 max-w-60">
           <option value="MEMBER">{nl ? "Lid" : "Member"}</option>
           <option value="LEAD">{leadLabel ?? (nl ? "Verantwoordelijke" : "Lead")}</option>
         </Select>
