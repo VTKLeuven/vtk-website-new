@@ -2,6 +2,7 @@ import { DEFAULT_FRONTPAGE_ID } from "@/lib/frontpage/registry";
 import { DefaultFrontpage } from "./DefaultFrontpage";
 import { UrenloopFrontpage } from "./UrenloopFrontpage";
 import { JobfairFrontpage } from "./JobfairFrontpage";
+import { NewFrontpage } from "./NewFrontpage";
 import type { FrontpageProps } from "./context";
 
 /**
@@ -19,6 +20,7 @@ const COMPONENTS: Record<string, (props: FrontpageProps) => React.ReactNode> = {
   [DEFAULT_FRONTPAGE_ID]: DefaultFrontpage,
   urenloop: UrenloopFrontpage,
   jobfair: JobfairFrontpage,
+  nieuw: NewFrontpage,
 };
 
 export function Frontpage({ id, ...props }: FrontpageProps & { id: string }) {

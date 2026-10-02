@@ -131,4 +131,8 @@ describe('pickActiveTakeover', () => {
     expect(pickActiveTakeover([row({ layout: 'default' })], now)).toBeNull();
     expect(pickActiveTakeover([row({ layout: 'weggehaald' })], now)).toBeNull();
   });
+
+  it('selecteert nieuw als die actief is', () => {
+    expect(pickActiveTakeover([row({ layout: 'nieuw', active: true })], now)?.layout).toBe('nieuw');
+  });
 });
