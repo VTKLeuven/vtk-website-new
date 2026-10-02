@@ -64,7 +64,6 @@ export default async function TurflijstPage({
 
   type TurfRow = { id: string; name: string; students: number; grocomeet: number; bureau: number };
   let items: TurfRow[] = [];
-  let totalOrders = 0;
   let sessionDate: Date | null = null;
   const meetingDrinks: Array<{ label: string; drinks: Array<{ name: string; count: number }> }> = [];
 
@@ -73,12 +72,10 @@ export default async function TurflijstPage({
       where: { id: selected.id },
       include: {
         items: { orderBy: { order: "asc" } },
-        _count: { select: { orders: true } },
       },
     });
     if (full) {
       sessionDate = full.date;
-      totalOrders = full._count.orders;
 
       // De broodjes van de grocomeet en het bureau gaan in een aparte doos, dus
       // ze krijgen hun eigen kolom in plaats van in het studentenaantal te
@@ -143,6 +140,10 @@ export default async function TurflijstPage({
 
   const hasGrocomeet = items.some((i) => i.grocomeet > 0);
   const hasBureau = items.some((i) => i.bureau > 0);
+  const totalSandwiches = items.reduce(
+    (sum, i) => sum + i.students + i.grocomeet + i.bureau,
+    0,
+  );
 
   return (
     <div className="space-y-5">
@@ -199,7 +200,14 @@ export default async function TurflijstPage({
               Theokot — {sessionDate ? dayLabel(sessionDate) : ""}
             </div>
             <div style={{ fontSize: 13, color: "#5c667f" }}>
-              {totalOrders} {nl ? "bestellingen" : "orders"}
+              {totalSandwiches}{" "}
+              {nl
+                ? totalSandwiches === 1
+                  ? "broodje"
+                  : "broodjes"
+                : totalSandwiches === 1
+                  ? "sandwich"
+                  : "sandwiches"}
             </div>
           </div>
           {items.length === 0 ? (
