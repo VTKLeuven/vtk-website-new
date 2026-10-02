@@ -26,6 +26,8 @@ import type { PublicOrder } from '@/components/ticketing/public/types';
 import { AccountTabs } from './AccountTabs';
 import { AccountTickets } from './AccountTickets';
 import { AccountShifts } from './AccountShifts';
+import { earnedShiftReward } from '@/lib/shift/rewards';
+import { praesidiumYears } from '@/lib/shift/voucherEligibility';
 import { DoorShortcutTokens } from './DoorShortcutTokens';
 import { CalendarFeedTokens } from './CalendarFeedTokens';
 import { AccountSignature } from './AccountSignature';
@@ -164,7 +166,14 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
           },
         },
       })
-      .then((participations) => participations.map(({ shift }) => shift)),
+      // Een shift uit een praesidiumjaar levert niets op (`earnedShiftReward`).
+      .then(async (participations) => {
+        const praesidium = await praesidiumYears([session.user.id]);
+        return participations.map(({ shift }) => ({
+          ...shift,
+          reward: earnedShiftReward({ userId: session.user.id, ...shift }, praesidium),
+        }));
+      }),
     prisma.calendarFeedToken.findMany({
       where: { userId: session.user.id, revokedAt: null },
       orderBy: { createdAt: 'desc' },

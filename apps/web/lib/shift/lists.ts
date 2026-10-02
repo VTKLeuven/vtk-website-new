@@ -2,6 +2,8 @@ import 'server-only';
 
 import { prisma } from '@vtk/db';
 import { ROSTER_PARTICIPANT_SELECT, toRoster } from '@/lib/shift/roster';
+import { earnedShiftReward } from '@/lib/shift/rewards';
+import { praesidiumYears } from '@/lib/shift/voucherEligibility';
 
 /*
  * De twee lijsten op /shift. Eén bron voor de API-routes (`GET /api/shift` en
@@ -18,20 +20,27 @@ import { ROSTER_PARTICIPANT_SELECT, toRoster } from '@/lib/shift/roster';
  *
  * Per shift gaat `roster` mee: de namen van wie er al ingeschreven is. De
  * `participants` zelf, met hun user-id's, blijven op de server.
+ *
+ * `reward` is wat de shift deze kijker oplevert: nul in een werkingsjaar waarin
+ * hij in het praesidium zit (`earnedShiftReward`).
  */
 export async function availableShifts(viewerId: string) {
   const now = new Date();
-  const shifts = await prisma.shift.findMany({
-    where: { endTime: { gte: now }, manualGrantId: null },
-    orderBy: { startTime: 'asc' },
-    include: { participants: { select: ROSTER_PARTICIPANT_SELECT } },
-  });
+  const [shifts, praesidium] = await Promise.all([
+    prisma.shift.findMany({
+      where: { endTime: { gte: now }, manualGrantId: null },
+      orderBy: { startTime: 'asc' },
+      include: { participants: { select: ROSTER_PARTICIPANT_SELECT } },
+    }),
+    praesidiumYears([viewerId]),
+  ]);
 
   return shifts
     .map(({ participants, ...shift }) => {
       const takenSpots = participants.length;
       return {
         ...shift,
+        reward: earnedShiftReward({ userId: viewerId, ...shift }, praesidium),
         takenSpots,
         availableSpots: Math.max(0, shift.maxParticipants - takenSpots),
         isRegistered: participants.some((p) => p.userId === viewerId),
@@ -43,18 +52,22 @@ export async function availableShifts(viewerId: string) {
 
 /**
  * Alle huidige of toekomstige shiften waarvoor `targetUserId` geregistreerd is,
- * zoals `viewerId` ze ziet (die bepaalt `isSelf` in de roster).
+ * zoals `viewerId` ze ziet (die bepaalt `isSelf` in de roster). `reward` is wat
+ * de shift `targetUserId` oplevert (`earnedShiftReward`).
  */
 export async function registeredShifts(targetUserId: string, viewerId: string) {
   const now = new Date();
-  const shifts = await prisma.shift.findMany({
-    where: {
-      endTime: { gte: now },
-      participants: { some: { userId: targetUserId } },
-    },
-    orderBy: { startTime: 'asc' },
-    include: { participants: { select: { ...ROSTER_PARTICIPANT_SELECT, payedOut: true } } },
-  });
+  const [shifts, praesidium] = await Promise.all([
+    prisma.shift.findMany({
+      where: {
+        endTime: { gte: now },
+        participants: { some: { userId: targetUserId } },
+      },
+      orderBy: { startTime: 'asc' },
+      include: { participants: { select: { ...ROSTER_PARTICIPANT_SELECT, payedOut: true } } },
+    }),
+    praesidiumYears([targetUserId]),
+  ]);
 
   // `registeredAt` van deze user apart meegeven: de tabel bepaalt daarmee of de
   // bedenktijd nog loopt en of de uitschrijfknop dus actief mag zijn. De namen
@@ -66,6 +79,7 @@ export async function registeredShifts(targetUserId: string, viewerId: string) {
     const takenSpots = participants.length;
     return {
       ...shift,
+      reward: earnedShiftReward({ userId: targetUserId, ...shift }, praesidium),
       takenSpots,
       availableSpots: Math.max(0, shift.maxParticipants - takenSpots),
       participants: participants.map(({ userId, payedOut, registeredAt }) => ({

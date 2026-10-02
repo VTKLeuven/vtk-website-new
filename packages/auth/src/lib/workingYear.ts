@@ -73,6 +73,17 @@ export function currentWorkingYear(date: Date = new Date()): number {
 }
 
 /**
+ * Het werkingsjaar waarin een datum valt, **niet** geklemd op
+ * {@link FIRST_WORKING_YEAR}. Voor een datum uit het verleden (een shift van
+ * vorig jaar) wil je het echte jaar: {@link currentWorkingYear} zou alles van
+ * vóór 15 juli 2026 op 2026 zetten, en dan telt een lidmaatschap van 26-27 voor
+ * een shift van 25-26.
+ */
+export function workingYearOf(date: Date): number {
+  return yearAtCutover(date, CUTOVER_MONTH, CUTOVER_DAY);
+}
+
+/**
  * Het lopende academiejaar (default nu): wat er op het scherm staat, waaronder
  * een lidmaatschap bewaard wordt en wat een bevestiging stempelt.
  *

@@ -8,6 +8,7 @@ import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
 import { formatEuro } from "@/lib/theokot";
 import { getTheokotConfig } from "@/lib/theokot-server";
+import { formatVoucherCount, formatVouchers } from "@/lib/shift/rewards";
 import { mostExpensiveSandwichCents } from "@/lib/theokot-pickup";
 import {
   processSessionNoShowsAction,
@@ -40,7 +41,8 @@ type SessionTotals = {
   pickedUpCents: number;
   reserved: number;
   noShows: number;
-  voucherPeople: number;
+  /** Hoeveel bonnetjes er afgeboekt werden, niet hoeveel keer: een broodje kan 2,5 kosten. */
+  vouchers: number;
   voucherCents: number;
   /**
    * Bestellingen van grocos in de doos van de grocomeet. Die komen niet langs
@@ -55,7 +57,7 @@ const EMPTY_TOTALS: SessionTotals = {
   pickedUpCents: 0,
   reserved: 0,
   noShows: 0,
-  voucherPeople: 0,
+  vouchers: 0,
   voucherCents: 0,
   grocomeet: 0,
 };
@@ -130,6 +132,7 @@ export default async function TheokotOverviewPage({
     caps.manage
       ? prisma.theokotVoucherRedemption.findMany({
           select: {
+            amount: true,
             order: {
               select: { sessionId: true, status: true, lines: { select: { unitPriceCents: true } } },
             },
@@ -160,9 +163,9 @@ export default async function TheokotOverviewPage({
     if (group.status === "RESERVED") row.reserved += count;
     if (group.status === "NO_SHOW") row.noShows += count;
   }
-  for (const { order } of redemptions) {
+  for (const { amount, order } of redemptions) {
     const row = totalsFor(order.sessionId);
-    row.voucherPeople += 1;
+    row.vouchers += amount;
     // Enkel wat ook echt over de toog ging, telt mee in het geld.
     if (order.status === "PICKED_UP") row.voucherCents += mostExpensiveSandwichCents(order.lines);
   }
@@ -231,7 +234,7 @@ export default async function TheokotOverviewPage({
       pickedUpCents: sum.pickedUpCents + row.pickedUpCents,
       reserved: sum.reserved + row.reserved,
       noShows: sum.noShows + row.noShows,
-      voucherPeople: sum.voucherPeople + row.voucherPeople,
+      vouchers: sum.vouchers + row.vouchers,
       voucherCents: sum.voucherCents + row.voucherCents,
       grocomeet: sum.grocomeet + row.grocomeet,
     };
@@ -328,19 +331,10 @@ export default async function TheokotOverviewPage({
                   </div>
                   <div>
                     <dt className="text-xs font-semibold uppercase tracking-wide text-[#5c667f]">
-                      {nl ? "Met bonnetjes" : "With vouchers"}
+                      {nl ? "Digitale bonnetjes" : "Digital vouchers"}
                     </dt>
                     <dd className="text-2xl font-semibold tabular-nums text-vtk-ink">
-                      {selectedTotals.voucherPeople}
-                      <span className="ml-1 text-sm font-normal text-[#5c667f]">
-                        {nl
-                          ? selectedTotals.voucherPeople === 1
-                            ? "persoon"
-                            : "personen"
-                          : selectedTotals.voucherPeople === 1
-                            ? "person"
-                            : "people"}
-                      </span>
+                      {formatVouchers(selectedTotals.vouchers, nl ? "nl" : "en")}
                     </dd>
                   </div>
                   <div>
@@ -519,7 +513,7 @@ export default async function TheokotOverviewPage({
                   {order.pickedUpBy ? ` · ${order.pickedUpBy.name}` : ""}
                   {order.voucherRedemption ? (
                     <span className="ml-2 rounded-full bg-vtk-blue-soft px-2 py-0.5 text-xs font-medium text-vtk-ink">
-                      {nl ? "bonnetjes" : "vouchers"}
+                      {formatVoucherCount(order.voucherRedemption.amount, nl ? "nl" : "en")}
                     </span>
                   ) : null}
                 </span>
@@ -626,8 +620,8 @@ export default async function TheokotOverviewPage({
             </h2>
             <p className="mt-1 text-sm text-[#5c667f]">
               {nl
-                ? "Opbrengst is wat opgehaald werd. Met bonnetjes: hoeveel mensen hun broodje met medewerkersbonnetjes betaalden. Aan de balie: de opbrengst min wat de bonnetjes dekten. Klik een dag voor de lijsten."
-                : "Revenue is what was picked up. With vouchers: how many people paid for their sandwich with staff vouchers. At the counter: revenue minus what the vouchers covered. Click a day for its lists."}
+                ? "Opbrengst is wat opgehaald werd. Digitale bonnetjes: hoeveel medewerkersbonnetjes er die dag afgeboekt werden, halve inbegrepen. Aan de balie: de opbrengst min wat de bonnetjes dekten. Klik een dag voor de lijsten."
+                : "Revenue is what was picked up. Digital vouchers: how many staff vouchers were deducted that day, halves included. At the counter: revenue minus what the vouchers covered. Click a day for its lists."}
             </p>
           </div>
           <Card className="relative overflow-x-auto">
@@ -639,7 +633,7 @@ export default async function TheokotOverviewPage({
                   <th className={`${th} !text-right`}>{nl ? "Opgehaald" : "Picked up"}</th>
                   <th className={`${th} !text-right`}>{nl ? "Niet opgehaald" : "Not picked up"}</th>
                   <th className={`${th} !text-right`}>{nl ? "Opbrengst" : "Revenue"}</th>
-                  <th className={`${th} !text-right`}>{nl ? "Met bonnetjes" : "With vouchers"}</th>
+                  <th className={`${th} !text-right`}>{nl ? "Digitale bonnetjes" : "Digital vouchers"}</th>
                   <th className={`${th} !text-right`}>{nl ? "Aan de balie" : "At the counter"}</th>
                 </tr>
               </thead>
@@ -671,7 +665,7 @@ export default async function TheokotOverviewPage({
                       <td className={num}>{row.pickedUp}</td>
                       <td className={num}>{row.reserved + row.noShows}</td>
                       <td className={num}>{formatEuro(row.pickedUpCents)}</td>
-                      <td className={num}>{row.voucherPeople}</td>
+                      <td className={num}>{formatVouchers(row.vouchers, nl ? "nl" : "en")}</td>
                       <td className={num}>{formatEuro(row.pickedUpCents - row.voucherCents)}</td>
                     </tr>
                   );
@@ -684,7 +678,7 @@ export default async function TheokotOverviewPage({
                   <td className={num}>{grand.pickedUp}</td>
                   <td className={num}>{grand.reserved + grand.noShows}</td>
                   <td className={num}>{formatEuro(grand.pickedUpCents)}</td>
-                  <td className={num}>{grand.voucherPeople}</td>
+                  <td className={num}>{formatVouchers(grand.vouchers, nl ? "nl" : "en")}</td>
                   <td className={num}>{formatEuro(grand.pickedUpCents - grand.voucherCents)}</td>
                 </tr>
               </tfoot>

@@ -1,31 +1,45 @@
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
-import { currentWorkingYear } from "@vtk/auth";
 import { prisma } from "@vtk/db";
 
+import type { PraesidiumYears } from "@/lib/shift/rewards";
+
 /**
- * Wie in het lopende werkingsjaar in een praesidiumpost zit, betaalt in Theokot
- * niet met de bonnetjes op zijn account. Zie "Praesidium betaalt niet met online
+ * Wie in een werkingsjaar in een praesidiumpost zit, verdient met zijn shiften
+ * van dat jaar geen bonnetjes. De shiften tellen wel mee; enkel de beloning valt
+ * weg (`earnedShiftReward` in `rewards.ts`). Zie "Praesidium verdient geen
  * bonnetjes" in `docs/design-decisions.md`.
  *
  * - Enkel `Group.type = "PRAESIDIUM"`: een werkgroep telt niet mee.
- * - Enkel het lopende werkingsjaar (`currentWorkingYear`, kantelt op 15 juli):
- *   wie vorig jaar in het praesidium zat en nu niet meer, betaalt gewoon.
- * - Het saldo blijft staan. Het wordt enkel niet uitgegeven aan de toog; een
- *   beheerder kan het nog altijd uitbetalen via `/api/shift/reward`.
+ * - Per werkingsjaar: wie vorig jaar in het praesidium zat, verdient met zijn
+ *   shiften van dit jaar gewoon weer, en omgekeerd blijft wat hij verdiende voor
+ *   hij praesidium werd staan. Uitgeven mag hij dat ook.
  *
- * De check hoort aan de serverkant van elke afboeking. Een knop verbergen is
- * gemak voor de balie, geen blokkade.
+ * Er is geen kolom die dit bewaart: de regel wordt telkens uitgerekend uit de
+ * lidmaatschappen. Wie laat in een post gezet wordt, verliest dus meteen de
+ * openstaande bonnetjes van zijn shiften van dat jaar, en wie eruit gehaald
+ * wordt, krijgt ze terug. Wat al uitbetaald of uitgegeven werd, blijft dat.
+ *
+ * Zonder `userIds` komt iedereen terug (de beheerlijsten over alle gebruikers).
  */
-export async function paysWithVouchersBlocked(
-  userId: string,
-  now: Date = new Date(),
+export async function praesidiumYears(
+  userIds?: readonly string[],
   db: Prisma.TransactionClient = prisma,
-): Promise<boolean> {
-  const membership = await db.groupMembership.findFirst({
-    where: { userId, year: currentWorkingYear(now), group: { type: "PRAESIDIUM" } },
-    select: { id: true },
+): Promise<PraesidiumYears> {
+  if (userIds && userIds.length === 0) return new Map();
+  const rows = await db.groupMembership.findMany({
+    where: {
+      group: { type: "PRAESIDIUM" },
+      ...(userIds ? { userId: { in: [...new Set(userIds)] } } : {}),
+    },
+    select: { userId: true, year: true },
   });
-  return membership !== null;
+  const byUser = new Map<string, Set<number>>();
+  for (const { userId, year } of rows) {
+    const years = byUser.get(userId) ?? new Set<number>();
+    years.add(year);
+    byUser.set(userId, years);
+  }
+  return byUser;
 }

@@ -2,11 +2,10 @@ import { z } from "zod";
 
 import { corsPreflight } from "@/lib/cors";
 import { requirePermission } from "@/lib/session";
-import { appLocaleFrom, type AppVoucherRedeemResult } from "@/lib/app-api/contract";
+import { type AppVoucherRedeemResult } from "@/lib/app-api/contract";
 import { appError, appErrorResponse, appJson, readAppJson } from "@/lib/app-api/respond";
 import { verifyPassToken } from "@/lib/app-api/tokens";
 import { redeemVouchers, VoucherError } from "@/lib/app-api/vouchers";
-import { PRAESIDIUM_VOUCHERS_MESSAGE } from "@/lib/shift/rewards";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,13 +57,6 @@ export async function POST(request: Request) {
     return appJson(request, result satisfies AppVoucherRedeemResult);
   } catch (error) {
     if (error instanceof VoucherError) {
-      // Een praesidiumlid mag dit niet, hoe vaak de toog het ook opnieuw
-      // probeert: 403. De app kent de code niet en toont dan de tekst, in het
-      // Engels met `?locale=en`.
-      if (error.code === "PRAESIDIUM") {
-        const locale = appLocaleFrom(new URL(request.url).searchParams.get("locale"));
-        return appError(request, error.code, 403, { message: PRAESIDIUM_VOUCHERS_MESSAGE[locale] });
-      }
       // Een saldo dat te laag is, is geen serverfout maar het antwoord op de
       // vraag. 409 en niet 400: er is niets mis met de aanvraag, de toestand is
       // gewoon veranderd of ontoereikend.

@@ -4,6 +4,8 @@ import { corsPreflight } from "@/lib/cors";
 import { requireSession } from "@/lib/session";
 import type { AppShift, AppShifts } from "@/lib/app-api/contract";
 import { appErrorResponse, appJson } from "@/lib/app-api/respond";
+import { earnedShiftReward } from "@/lib/shift/rewards";
+import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -39,13 +41,16 @@ export async function GET(request: Request) {
     const session = await requireSession();
     const now = new Date();
 
-    const shifts = await prisma.shift.findMany({
-      where: { endTime: { gte: now }, manualGrantId: null },
-      orderBy: { startTime: "asc" },
-      include: {
-        participants: { select: { userId: true, registeredAt: true } },
-      },
-    });
+    const [shifts, praesidium] = await Promise.all([
+      prisma.shift.findMany({
+        where: { endTime: { gte: now }, manualGrantId: null },
+        orderBy: { startTime: "asc" },
+        include: {
+          participants: { select: { userId: true, registeredAt: true } },
+        },
+      }),
+      praesidiumYears([session.user.id]),
+    ]);
 
     const mine: AppShift[] = [];
     const available: AppShift[] = [];
@@ -68,7 +73,8 @@ export async function GET(request: Request) {
         start: shift.startTime.toISOString(),
         end: shift.endTime.toISOString(),
         post: shift.post,
-        reward: shift.reward,
+        // Wat de shift jou oplevert: nul in een praesidiumjaar.
+        reward: earnedShiftReward({ userId: session.user.id, ...shift }, praesidium),
         maxParticipants: shift.maxParticipants,
         takenSpots: taken,
         openToInternationals: shift.openToInternationals,

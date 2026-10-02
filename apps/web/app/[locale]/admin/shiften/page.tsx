@@ -6,6 +6,8 @@ import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
 import { academicYearRange, academicYearRangeFor, currentAcademicYear } from "@/lib/shift";
+import { earnedShiftReward, type PraesidiumYears } from "@/lib/shift/rewards";
+import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import { ShiftAdmin } from "./ShiftAdmin";
 
 /** `yyyy-MM-dd` → lokale middernacht, of null bij ongeldige invoer. */
@@ -112,7 +114,7 @@ export default async function AdminShifts({
             shiftId: true,
             rewardPaid: true,
             user: { select: { name: true, email: true } },
-            shift: { select: { reward: true } },
+            shift: { select: { reward: true, startTime: true } },
           },
         })
       : Promise.resolve([]),
@@ -193,6 +195,11 @@ export default async function AdminShifts({
       outstandingShiftIds: string[];
     }
   >();
+  // Een shift uit een praesidiumjaar levert niets op (`earnedShiftReward`). Wat
+  // er al van uitbetaald werd, telt wel als toegekend: dat is echt gebeurd.
+  const praesidium: PraesidiumYears = canReward
+    ? await praesidiumYears(rewardsRaw.map((row) => row.userId))
+    : new Map();
   for (const { userId, shiftId, rewardPaid, user, shift } of rewardsRaw) {
     const entry =
       rewardMap.get(userId) ??
@@ -207,7 +214,8 @@ export default async function AdminShifts({
         outstandingShiftIds: [],
       };
     const paid = Math.max(0, Math.min(rewardPaid, shift.reward));
-    const outstanding = Math.max(0, shift.reward - paid);
+    const earned = earnedShiftReward({ userId, reward: shift.reward, startTime: shift.startTime }, praesidium);
+    const outstanding = Math.max(0, earned - paid);
     if (paid > 0) {
       entry.paidShiftCount += 1;
       entry.paidBonnetjes += paid;

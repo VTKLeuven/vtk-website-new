@@ -2,6 +2,8 @@ import { prisma } from '@vtk/db';
 import { sendMail, smtpConfigured } from '@/lib/email';
 import { preferredEmail } from '@/lib/brevo/contacts';
 import { sendShiftReminderPush } from '@/lib/app-api/notifications';
+import { earnedShiftReward } from '@/lib/shift/rewards';
+import { praesidiumYears } from '@/lib/shift/voucherEligibility';
 
 /**
  * Herinneringen voor een shift.
@@ -292,7 +294,14 @@ async function candidatesFor(lead: ReminderLead, now: Date): Promise<Candidate[]
       },
     },
   });
-  return rows as Candidate[];
+  // "Je verdient er 2 bonnetjes mee" is onwaar voor wie in het werkingsjaar van
+  // de shift in het praesidium zit (`earnedShiftReward`): dan zegt de mail niets
+  // over bonnetjes.
+  const praesidium = await praesidiumYears(rows.map((row) => row.userId));
+  return rows.map((row) => ({
+    ...row,
+    shift: { ...row.shift, reward: earnedShiftReward({ userId: row.userId, ...row.shift }, praesidium) },
+  })) as Candidate[];
 }
 
 export type ReminderRun = {

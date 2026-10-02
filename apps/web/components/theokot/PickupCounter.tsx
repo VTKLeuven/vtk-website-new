@@ -3,11 +3,7 @@
 import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { Button, Card, ConfirmDialog, Input, Label } from "@vtk/ui";
 import { formatEuro } from "@/lib/theokot";
-import {
-  formatVoucherCount,
-  formatVouchers,
-  PRAESIDIUM_VOUCHERS_MESSAGE,
-} from "@/lib/shift/rewards";
+import { formatVoucherCount, formatVouchers } from "@/lib/shift/rewards";
 import { shouldRedirectToScanner } from "@/lib/scannerFocus";
 import {
   lookupPickupByCardAction,
@@ -30,10 +26,6 @@ const PASS_PREFIX = "vtkpas1.";
 const SUGGEST_DELAY_MS = 180;
 
 /** Wat een suggestie over de bestelling van vandaag zegt, naast de naam. */
-function praesidiumVouchersNote(nl: boolean): string {
-  return PRAESIDIUM_VOUCHERS_MESSAGE[nl ? "nl" : "en"];
-}
-
 function candidateStatus(candidate: PickupCandidate, nl: boolean): string | null {
   if (candidate.status === "PICKED_UP") return nl ? "al opgehaald" : "already picked up";
   if (candidate.status === "NO_SHOW") return nl ? "niet opgehaald" : "not picked up";
@@ -150,7 +142,7 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
         const res = await fetchResult();
         setResult(res);
         const eligibleOrder =
-          res.ok && !res.vouchersBlocked
+          res.ok
             ? res.orders.find(
                 (order) =>
                   (order.status === "RESERVED" || order.status === "NO_SHOW") &&
@@ -223,11 +215,7 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
       try {
         const response = await redeemEmployeeVouchersAction(voucherOrderId, voucherCost);
         if (!response.ok) {
-          setVoucherError(
-            response.code === "PRAESIDIUM"
-              ? praesidiumVouchersNote(nl)
-              : response.error,
-          );
+          setVoucherError(response.error);
           return;
         }
 
@@ -379,11 +367,6 @@ export function PickupCounter({ nl, autoPickup = false }: { nl: boolean; autoPic
                 {formatVouchers(result.outstandingBonnetjes, nl ? "nl" : "en")}{" "}
                 {nl ? "openstaande medewerkersbonnetjes" : "outstanding staff vouchers"}
               </div>
-              {result.vouchersBlocked && (
-                <div className="mt-1 text-xs font-medium text-[#5c667f]">
-                  {praesidiumVouchersNote(nl)}
-                </div>
-              )}
             </div>
             <Button variant="ghost" size="sm" onClick={reset}>
               {nl ? "Volgende" : "Next"}

@@ -49,11 +49,7 @@ import {
   allocateUserShiftReward,
   ShiftRewardConflictError,
 } from "@/lib/shift/rewards.server";
-import {
-  formatVoucherCount,
-  PRAESIDIUM_VOUCHERS_MESSAGE,
-} from "@/lib/shift/rewards";
-import { paysWithVouchersBlocked } from "@/lib/shift/voucherEligibility";
+import { formatVoucherCount } from "@/lib/shift/rewards";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
@@ -1239,8 +1235,7 @@ export type {
 
 export type VoucherRedemptionResult =
   | { ok: true; amount: number; remainingBonnetjes: number }
-  // `code` enkel waar de balie een eigen, vertaalde melding toont.
-  | { ok: false; error: string; code?: "PRAESIDIUM" };
+  | { ok: false; error: string };
 
 /**
  * Zoekt de bestelling(en) van vandaag voor wat de shifter intikte: een r-nummer,
@@ -1419,16 +1414,6 @@ export async function undoPickupAction(orderId: string): Promise<ActionResult> {
   return { ok: true, message: "Teruggezet naar gereserveerd." };
 }
 
-/** Draagt de student mee uit de transactie, voor de auditrij bij de weigering. */
-class PraesidiumVoucherRefusal extends Error {
-  constructor(
-    readonly userId: string,
-    readonly userName: string,
-  ) {
-    super("PRAESIDIUM");
-  }
-}
-
 /**
  * Betaalt één broodje met nog openstaande medewerkersbonnetjes en schrijft
  * tegelijk een auditrij. De saldo-afboeking en auditregistratie zijn één
@@ -1440,8 +1425,9 @@ class PraesidiumVoucherRefusal extends Error {
  * wat de balie de student gezegd heeft; wijkt dat af, dan boeken we niets af in
  * plaats van stil een ander bedrag.
  *
- * Een praesidiumlid van dit werkingsjaar betaalt hier niet met bonnetjes
- * (`paysWithVouchersBlocked`); de poging komt in het logboek.
+ * Een praesidiumlid mag hier gewoon betalen: zijn shiften uit een praesidiumjaar
+ * leveren niets op en staan dus niet in zijn saldo (`earnedShiftReward`), maar
+ * wat hij daarvoor verdiende, mag hij uitgeven.
  */
 export async function redeemEmployeeVouchersAction(
   orderId: string,
@@ -1460,16 +1446,12 @@ export async function redeemEmployeeVouchersAction(
           status: true,
           grocomeetId: true,
           voucherRedemption: { select: { id: true } },
-          user: { select: { name: true } },
           lines: { select: { unitPriceCents: true } },
         },
       });
       if (!order) throw new Error("ORDER_NOT_FOUND");
       // Wordt bij de grocomeet afgerekend, niet aan de balie.
       if (order.grocomeetId) throw new Error("GROCOMEET_ORDER");
-      if (await paysWithVouchersBlocked(order.userId, new Date(), tx)) {
-        throw new PraesidiumVoucherRefusal(order.userId, order.user.name);
-      }
       // Ook een bestelling die als niet-opgehaald geboekt staat: die mag aan de
       // balie nog uitgedeeld worden, en dan hoort ze ook nog met bonnetjes
       // betaald te kunnen worden. Opgehaald en geannuleerd niet meer.
@@ -1514,16 +1496,6 @@ export async function redeemEmployeeVouchersAction(
     }
     if (error instanceof ShiftRewardConflictError) {
       return { ok: false, error: "Het bonnetjessaldo is gewijzigd. Scan de kaart opnieuw." };
-    }
-    if (error instanceof PraesidiumVoucherRefusal) {
-      await logAudit({
-        action: "refuse",
-        entity: "shiftReward",
-        entityId: error.userId,
-        target: error.userName,
-        summary: `bonnetjes aan de afhaalbalie geweigerd (bestelling ${orderId}): praesidiumlid`,
-      });
-      return { ok: false, error: PRAESIDIUM_VOUCHERS_MESSAGE.nl, code: "PRAESIDIUM" };
     }
     if (error instanceof CostChangedError) {
       return {
