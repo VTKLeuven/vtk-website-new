@@ -1183,7 +1183,15 @@
     "availabilityClosed": "Aanvragen staan even dicht; hieronder staat enkel wat al vastligt.",
     "availabilityListTitle": "Bezet in",
     "availabilityListEmpty": "Geen enkele avond bezet deze maand.",
-    "availabilityLead": "Een aanvraag moet minstens {dagen} dagen op voorhand binnen zijn, dus de eerstkomende dagen staan niet als vrij."
+    "availabilityLead": "Een aanvraag moet minstens {dagen} dagen op voorhand binnen zijn, dus de eerstkomende dagen staan niet als vrij.",
+    "availabilityViewCalendar": "Kalender",
+    "availabilityViewList": "Lijst",
+    "availabilityPickDate": "Kies deze datum",
+    "availabilityFreeDesc": "Deze avond is nog vrij om aan te vragen.",
+    "availabilityBusyDesc": "Deze avond is bezet en kan niet worden aangevraagd.",
+    "availabilitySoonDesc": "Te kort dag om nog aan te vragen.",
+    "availabilityPastDesc": "Deze datum ligt in het verleden.",
+    "availabilityClosedDesc": "Aanvragen zijn momenteel gesloten."
   },
   "register": {
     "kicker": "Alumni & externen",

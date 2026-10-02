@@ -1183,7 +1183,15 @@
     "availabilityClosed": "Requests are closed for now; below is only what is already booked.",
     "availabilityListTitle": "Taken in",
     "availabilityListEmpty": "No evening is taken this month.",
-    "availabilityLead": "A request has to be in at least {dagen} days in advance, so the next few days are not shown as free."
+    "availabilityLead": "A request has to be in at least {dagen} days in advance, so the next few days are not shown as free.",
+    "availabilityViewCalendar": "Calendar",
+    "availabilityViewList": "List",
+    "availabilityPickDate": "Select this date",
+    "availabilityFreeDesc": "This evening is still available to request.",
+    "availabilityBusyDesc": "This evening is booked and cannot be requested.",
+    "availabilitySoonDesc": "Too short notice to request.",
+    "availabilityPastDesc": "This date is in the past.",
+    "availabilityClosedDesc": "Requests are currently closed."
   },
   "register": {
     "kicker": "Alumni & externals",

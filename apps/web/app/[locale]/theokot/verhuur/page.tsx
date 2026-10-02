@@ -149,6 +149,14 @@ export default async function TheokotVerhuurPage({ params }: { params: Params })
                 config.formOpen && config.minLeadDays > 0
                   ? t.availabilityLead.replace("{dagen}", String(config.minLeadDays))
                   : null,
+              viewCalendar: t.availabilityViewCalendar,
+              viewList: t.availabilityViewList,
+              pickDate: t.availabilityPickDate,
+              freeDesc: t.availabilityFreeDesc,
+              busyDesc: t.availabilityBusyDesc,
+              soonDesc: t.availabilitySoonDesc.replace("{dagen}", String(config.minLeadDays)),
+              pastDesc: t.availabilityPastDesc,
+              closedDesc: t.availabilityClosedDesc,
             }}
           />
         </section>
