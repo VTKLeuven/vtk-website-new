@@ -457,6 +457,7 @@
 }
 
 .tv-day {
+  position: relative;
   min-height: 108px;
   padding: 6px;
   display: flex;
@@ -477,6 +478,42 @@
 
 .tv-day[data-today="true"] {
   background: #fffdf2;
+}
+
+.tv-day[data-selected="true"] {
+  box-shadow: inset 0 0 0 2px var(--navy);
+  background: color-mix(in srgb, var(--navy) 4%, white);
+}
+
+.tv-day[data-today="true"][data-selected="true"] {
+  background: #fff8e1;
+}
+
+.tv-cell-tap {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.tv-cell-tap:focus-visible {
+  outline: 2px solid var(--navy);
+  outline-offset: -2px;
+}
+
+.tv-dots {
+  display: none;
+}
+
+.tv-daynum,
+.tv-slot,
+.tv-dots {
+  position: relative;
+  pointer-events: none;
 }
 
 .tv-daynum {
@@ -505,6 +542,8 @@
 /* -------------------------------------------------------------------------- */
 
 .tv-chip {
+  position: relative;
+  z-index: 2;
   appearance: none;
   display: block;
   width: 100%;
@@ -677,10 +716,6 @@
   .tv-def dd {
     margin-bottom: 8px;
   }
-
-  .tv-day {
-    min-height: 76px;
-  }
 }
 
 /* -------------------------------------------------------------------------- */
@@ -815,11 +850,47 @@
   color: var(--muted);
 }
 
-/* Onder de 700px vervangt de lijst het raster. Zeven kolommen van een
-   centimeter zijn daar geen kalender meer, en wie op zijn telefoon kijkt wil
-   toch enkel weten welke avonden weg zijn. */
+.tv-view-switch {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper-2);
+  margin-left: auto;
+}
+
+.tv-view-switch button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 4px 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.tv-view-switch button.on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgb(14 26 54 / 0.12);
+}
+
+.tv-hidden-view {
+  display: none !important;
+}
+
 .tv-avail-list {
   display: none;
+}
+
+.tv-avail-list.tv-view-list-active {
+  display: block;
+  margin-top: 14px;
 }
 
 .tv-avail-list h3 {
@@ -862,14 +933,190 @@
   color: var(--muted);
 }
 
+.tv-day-detail {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tv-day-detail-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.tv-day-detail-date {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.tv-day-detail-desc {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--body);
+}
+
+.tv-day-detail-slots {
+  margin: 4px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tv-day-detail-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border-left: 3px solid var(--navy);
+  background: color-mix(in srgb, var(--navy) 8%, white);
+}
+
+.tv-day-detail-slot .tv-avail-time {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.tv-day-detail-slot .tv-avail-what {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.tv-pick-date-btn {
+  appearance: none;
+  align-self: flex-start;
+  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--navy);
+  background: var(--navy);
+  color: var(--paper);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 120ms ease;
+}
+
+.tv-pick-date-btn:hover {
+  opacity: 0.9;
+}
+
+.tv-admin-day-detail {
+  display: none;
+}
+
 @media (max-width: 700px) {
-  .tv-avail .tv-month,
-  .tv-avail .tv-legend {
+  .tv-month-head > div {
+    padding: 6px 2px;
+    font-size: 10px;
+  }
+
+  .tv-day {
+    min-height: 44px;
+    aspect-ratio: 1;
+    padding: 2px;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+  }
+
+  .tv-daynum {
+    width: 20px;
+    height: 20px;
+    font-size: 11px;
+  }
+
+  /* Op mobiel verdwijnen de grote tekstchips in de maandcellen */
+  .tv-avail .tv-slot,
+  .tv-month-chips {
     display: none;
   }
 
-  .tv-avail-list {
+  /* Het gele hoekstreepje van desktop wordt op mobiel vervangen door .tv-dots */
+  .tv-avail .tv-day[data-state="free"]::after {
+    display: none;
+  }
+
+  .tv-dots {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    justify-content: center;
+    height: 6px;
+    margin-top: 1px;
+  }
+
+  .tv-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 999px;
+    display: inline-block;
+  }
+
+  .tv-dot[data-state="free"] {
+    background: var(--yellow);
+    width: 10px;
+    height: 3px;
+    border-radius: 2px;
+  }
+
+  .tv-dot[data-state="busy"] {
+    background: var(--navy);
+  }
+
+  .tv-avail .tv-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+    margin-top: 10px;
+  }
+
+  .tv-admin-day-detail {
     display: block;
-    margin-top: 14px;
+    margin-top: 16px;
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    background: var(--surface);
+  }
+
+  .tv-admin-day-detail h4 {
+    margin: 0 0 10px;
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .tv-admin-day-chips {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .tv-time {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tv-time-head,
+  .tv-time-body {
+    min-width: 640px;
   }
 }

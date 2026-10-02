@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { RentalMonthGrid, type MonthGridCell } from "./RentalMonthGrid";
 import { groupByDay } from "./rentalGrid";
 import type { PublicRentalSlot } from "./publicRentalSlots";
@@ -43,6 +43,14 @@ export type PublicCalendarCopy = {
   listTitle: string;
   listEmpty: string;
   leadNote: string | null;
+  viewCalendar: string;
+  viewList: string;
+  pickDate: string;
+  freeDesc: string;
+  busyDesc: string;
+  soonDesc: string;
+  pastDesc: string;
+  closedDesc: string;
 };
 
 /** Hoeveel maanden vooruit er te bladeren valt; even ver als de server meegeeft. */
@@ -58,6 +66,18 @@ const STATE_WORD: Record<"past" | "busy" | "soon" | "free", (copy: PublicCalenda
 
 function monthIndex(date: Date): number {
   return date.getFullYear() * 12 + date.getMonth();
+}
+
+function formatSelectedDate(key: string, nl: boolean): string {
+  const [y, m, d] = key.split("-").map(Number);
+  const date = new Date(y!, m! - 1, d!);
+  const fmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+  const text = fmt.format(date);
+  return text.charAt(0).toUpperCase() + text.slice(1);
 }
 
 export function PublicRentalCalendar({
@@ -85,12 +105,20 @@ export function PublicRentalCalendar({
     [year, month],
   );
   const [cursor, setCursor] = useState<Date>(firstOfThisMonth);
+  const [selectedKey, setSelectedKey] = useState<string | null>(todayKey);
+  const [viewMode, setViewMode] = useState<"calendar" | "list">("calendar");
 
   const byDay = useMemo(() => groupByDay(slots), [slots]);
 
   const monthFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     month: "long",
     year: "numeric",
+  });
+
+  const dayFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
   });
 
   const atStart = monthIndex(cursor) <= monthIndex(firstOfThisMonth);
@@ -105,17 +133,106 @@ export function PublicRentalCalendar({
    * een bezette dag is bezet ook al valt ze binnen de wachttijd, en pas wat
    * overblijft is echt vrij.
    */
-  const stateOf = (cell: MonthGridCell): "past" | "busy" | "soon" | "free" | undefined => {
-    if (cell.outside) return undefined;
-    if (cell.key < todayKey) return "past";
-    if (byDay.has(cell.key)) return "busy";
-    if (earliestKey === null) return undefined;
-    if (cell.key < earliestKey) return "soon";
-    return "free";
+  const stateOf = useCallback(
+    (cell: MonthGridCell): "past" | "busy" | "soon" | "free" | undefined => {
+      if (cell.outside) return undefined;
+      if (cell.key < todayKey) return "past";
+      if (byDay.has(cell.key)) return "busy";
+      if (earliestKey === null) return undefined;
+      if (cell.key < earliestKey) return "soon";
+      return "free";
+    },
+    [byDay, earliestKey, todayKey],
+  );
+
+  const stateOfKey = useCallback(
+    (key: string): "past" | "busy" | "soon" | "free" | "closed" => {
+      if (key < todayKey) return "past";
+      if (byDay.has(key)) return "busy";
+      if (earliestKey === null) return "closed";
+      if (key < earliestKey) return "soon";
+      return "free";
+    },
+    [byDay, earliestKey, todayKey],
+  );
+
+  const cellAriaLabel = (cell: MonthGridCell): string => {
+    const [y, m, d] = cell.key.split("-").map(Number);
+    const date = new Date(y!, m! - 1, d!);
+    const dayLabel = dayFmt.format(date);
+    const state = stateOf(cell);
+    const stateLabel = state && state in STATE_WORD ? STATE_WORD[state](copy) : "";
+    const slotsOnDay = byDay.get(cell.key) ?? [];
+    const slotTexts = slotsOnDay.map((s) => `${s.timeLabel}: ${s.title ?? copy.busy}`).join(", ");
+    return [dayLabel, stateLabel, slotTexts].filter(Boolean).join(", ");
   };
 
-  // De lijst onder het raster is wat een telefoon in de plaats van het raster
-  // krijgt: zeven kolommen van een centimeter zijn daar geen kalender meer.
+  const handlePickDate = (key: string) => {
+    const input = document.getElementById("tv-date") as HTMLInputElement | null;
+    if (input) {
+      input.value = key;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+      input.dispatchEvent(new Event("change", { bubbles: true }));
+      input.focus();
+      input.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  };
+
+  const selectedState = selectedKey ? stateOfKey(selectedKey) : null;
+  const selectedSlots = selectedKey ? byDay.get(selectedKey) ?? [] : [];
+
+  const detailTone = (
+    state: "past" | "busy" | "soon" | "free" | "closed",
+  ): "ok" | "waiting" | "no" | "done" => {
+    switch (state) {
+      case "free":
+        return "ok";
+      case "soon":
+        return "waiting";
+      case "busy":
+        return "no";
+      case "past":
+      case "closed":
+        return "done";
+    }
+  };
+
+  const detailBadge = (
+    state: "past" | "busy" | "soon" | "free" | "closed",
+  ): string => {
+    switch (state) {
+      case "free":
+        return copy.free;
+      case "soon":
+        return copy.soon;
+      case "busy":
+        return copy.busy;
+      case "past":
+        return copy.past;
+      case "closed":
+        return copy.closedForRequests;
+    }
+  };
+
+  const detailDesc = (
+    state: "past" | "busy" | "soon" | "free" | "closed",
+  ): string => {
+    switch (state) {
+      case "free":
+        return copy.freeDesc;
+      case "soon":
+        return copy.leadNote ?? copy.soonDesc;
+      case "busy":
+        return copy.busyDesc;
+      case "past":
+        return copy.pastDesc;
+      case "closed":
+        return copy.closedDesc;
+    }
+  };
+
+  // De lijst onder het raster is wat een bezoeker in lijstweergave
+  // krijgt: alle bezette avonden in de actieve maand.
   const monthPrefix = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}`;
   const listSlots = slots.filter(
     (slot) => slot.day.startsWith(monthPrefix) && slot.day >= todayKey,
@@ -152,49 +269,114 @@ export function PublicRentalCalendar({
             {copy.today}
           </button>
         )}
+
+        <div className="tv-view-switch" role="group" aria-label={nl ? "Weergave" : "View"}>
+          <button
+            type="button"
+            className={viewMode === "calendar" ? "on" : ""}
+            onClick={() => setViewMode("calendar")}
+            aria-pressed={viewMode === "calendar"}
+          >
+            {copy.viewCalendar}
+          </button>
+          <button
+            type="button"
+            className={viewMode === "list" ? "on" : ""}
+            onClick={() => setViewMode("list")}
+            aria-pressed={viewMode === "list"}
+          >
+            {copy.viewList}
+          </button>
+        </div>
       </div>
 
-      <p className="tv-legend">
-        {earliestKey !== null && (
+      <div className={viewMode === "calendar" ? "tv-view-calendar" : "tv-view-calendar tv-hidden-view"}>
+        <p className="tv-legend">
+          {earliestKey !== null && (
+            <span>
+              <i data-state="free" />
+              {copy.free}
+            </span>
+          )}
           <span>
-            <i data-state="free" />
-            {copy.free}
+            <i data-state="busy" />
+            {copy.busy}
           </span>
-        )}
-        <span>
-          <i data-state="busy" />
-          {copy.busy}
-        </span>
-        {earliestKey === null && <span>{copy.closedForRequests}</span>}
-      </p>
+          {earliestKey === null && <span>{copy.closedForRequests}</span>}
+        </p>
 
-      <RentalMonthGrid
-        nl={nl}
-        cursor={cursor}
-        todayKey={todayKey}
-        cellState={stateOf}
-        renderCell={(cell) => {
-          const state = stateOf(cell);
-          return (
-            <>
-              {/* Kleur is hier het hele verhaal, en een schermlezer hoort geen
-                  gele streep. Eén woord per dag, onzichtbaar, maakt het raster
-                  ook voorleesbaar: "12, vrij". */}
-              {state && <span className="sr-only">{STATE_WORD[state](copy)}</span>}
-              {(byDay.get(cell.key) ?? []).map((slot) => (
-                <span key={slot.id} className="tv-slot">
-                  <strong>{slot.timeLabel}</strong>
-                  <span>{slot.title ?? copy.busy}</span>
+        <RentalMonthGrid
+          nl={nl}
+          cursor={cursor}
+          todayKey={todayKey}
+          cellState={stateOf}
+          selectedKey={selectedKey}
+          onSelectDate={setSelectedKey}
+          cellAriaLabel={cellAriaLabel}
+          renderCell={(cell) => {
+            const state = stateOf(cell);
+            const cellSlots = byDay.get(cell.key) ?? [];
+            return (
+              <>
+                {/* Kleur is hier het hele verhaal, en een schermlezer hoort geen
+                    gele streep. Eén woord per dag, onzichtbaar, maakt het raster
+                    ook voorleesbaar: "12, vrij". */}
+                {state && state in STATE_WORD && (
+                  <span className="sr-only">{STATE_WORD[state](copy)}</span>
+                )}
+                {cellSlots.map((slot) => (
+                  <span key={slot.id} className="tv-slot">
+                    <strong>{slot.timeLabel}</strong>
+                    <span>{slot.title ?? copy.busy}</span>
+                  </span>
+                ))}
+                <span className="tv-dots" aria-hidden="true">
+                  {state === "busy" && <i className="tv-dot" data-state="busy" />}
+                  {state === "free" && <i className="tv-dot" data-state="free" />}
                 </span>
-              ))}
-            </>
-          );
-        }}
-      />
+              </>
+            );
+          }}
+        />
 
-      {copy.leadNote && <p className="tv-avail-note">{copy.leadNote}</p>}
+        {copy.leadNote && <p className="tv-avail-note">{copy.leadNote}</p>}
 
-      <div className="tv-avail-list">
+        {selectedKey && selectedState && (
+          <div className="tv-day-detail" aria-live="polite">
+            <div className="tv-day-detail-head">
+              <span className="tv-day-detail-date">{formatSelectedDate(selectedKey, nl)}</span>
+              <span className="tv-badge" data-tone={detailTone(selectedState)}>
+                {detailBadge(selectedState)}
+              </span>
+            </div>
+
+            <p className="tv-day-detail-desc">{detailDesc(selectedState)}</p>
+
+            {selectedSlots.length > 0 && (
+              <ul className="tv-day-detail-slots">
+                {selectedSlots.map((slot) => (
+                  <li key={slot.id} className="tv-day-detail-slot">
+                    <span className="tv-avail-time">{slot.timeLabel}</span>
+                    <span className="tv-avail-what">{slot.title ?? copy.busy}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {selectedState === "free" && (
+              <button
+                type="button"
+                className="tv-pick-date-btn"
+                onClick={() => handlePickDate(selectedKey)}
+              >
+                {copy.pickDate}
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      <div className={viewMode === "list" ? "tv-avail-list tv-view-list-active" : "tv-avail-list"}>
         <h3>
           {copy.listTitle} {monthFmt.format(cursor)}
         </h3>

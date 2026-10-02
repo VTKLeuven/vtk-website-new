@@ -120,9 +120,22 @@ export function RentalCalendar({
   });
 
   const today = dayKey(new Date());
+  const [selectedDayKey, setSelectedDayKey] = useState<string | null>(today);
   const dates =
     view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(mondayOf(cursor), i)) : [cursor];
   const dows = weekdayLabels(nl);
+
+  const formatSelectedDate = (key: string, isNl: boolean): string => {
+    const [y, m, d] = key.split("-").map(Number);
+    const date = new Date(y!, m! - 1, d!);
+    const fmt = new Intl.DateTimeFormat(isNl ? "nl-BE" : "en-GB", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+    const text = fmt.format(date);
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  };
 
   return (
     <div>
@@ -208,22 +221,78 @@ export function RentalCalendar({
       </p>
 
       {view === "month" ? (
-        <RentalMonthGrid
-          nl={nl}
-          cursor={cursor}
-          todayKey={today}
-          renderCell={(cell) =>
-            (byDay.get(cell.key) ?? []).map((rental) => (
-              <Chip
-                key={rental.id}
-                nl={nl}
-                rental={rental}
-                selected={rental.id === selectedId}
-                onSelect={onSelect}
-              />
-            ))
-          }
-        />
+        <>
+          <RentalMonthGrid
+            nl={nl}
+            cursor={cursor}
+            todayKey={today}
+            selectedKey={selectedDayKey}
+            onSelectDate={setSelectedDayKey}
+            cellAriaLabel={(cell) => {
+              const rentalsOnDay = byDay.get(cell.key) ?? [];
+              return `${cell.key}, ${rentalsOnDay.length} ${
+                rentalsOnDay.length === 1
+                  ? nl ? "aanvraag" : "request"
+                  : nl ? "aanvragen" : "requests"
+              }`;
+            }}
+            renderCell={(cell) => {
+              const rentalsOnDay = byDay.get(cell.key) ?? [];
+              return (
+                <>
+                  <div className="tv-month-chips">
+                    {rentalsOnDay.map((rental) => (
+                      <Chip
+                        key={rental.id}
+                        nl={nl}
+                        rental={rental}
+                        selected={rental.id === selectedId}
+                        onSelect={onSelect}
+                      />
+                    ))}
+                  </div>
+                  {rentalsOnDay.length > 0 && (
+                    <span className="tv-dots" aria-hidden="true">
+                      {rentalsOnDay.slice(0, 3).map((r) => {
+                        const meta = RENTAL_STATUS_META[r.status];
+                        return (
+                          <i
+                            key={r.id}
+                            className="tv-dot"
+                            style={{ background: TONE_COLOUR[meta.tone] ?? TONE_COLOUR.waiting }}
+                          />
+                        );
+                      })}
+                    </span>
+                  )}
+                </>
+              );
+            }}
+          />
+
+          {selectedDayKey && (
+            <div className="tv-admin-day-detail">
+              <h4>{formatSelectedDate(selectedDayKey, nl)}</h4>
+              {(byDay.get(selectedDayKey) ?? []).length === 0 ? (
+                <p className="tv-avail-note">
+                  {nl ? "Geen verhuren op deze dag." : "No rentals on this day."}
+                </p>
+              ) : (
+                <div className="tv-admin-day-chips">
+                  {(byDay.get(selectedDayKey) ?? []).map((rental) => (
+                    <Chip
+                      key={rental.id}
+                      nl={nl}
+                      rental={rental}
+                      selected={rental.id === selectedId}
+                      onSelect={onSelect}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </>
       ) : (
         <div className="tv-time">
           <div

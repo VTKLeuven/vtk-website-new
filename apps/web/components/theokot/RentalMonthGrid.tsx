@@ -32,6 +32,9 @@ export function RentalMonthGrid({
   todayKey,
   renderCell,
   cellState,
+  selectedKey,
+  onSelectDate,
+  cellAriaLabel,
 }: {
   nl: boolean;
   cursor: Date;
@@ -43,6 +46,12 @@ export function RentalMonthGrid({
    * beheer laat dit weg.
    */
   cellState?: (cell: MonthGridCell) => string | undefined;
+  /** De geselecteerde dag ("YYYY-MM-DD"), bijv. bij aantikken op mobiel. */
+  selectedKey?: string | null;
+  /** Wordt aangeroepen wanneer een cel aangetikt wordt. */
+  onSelectDate?: (key: string) => void;
+  /** Toegankelijk label voor de schermlezer op het aanraakvlak. */
+  cellAriaLabel?: (cell: MonthGridCell) => string | undefined;
 }) {
   return (
     <div className="tv-month">
@@ -66,7 +75,17 @@ export function RentalMonthGrid({
               data-outside={cell.outside}
               data-today={cell.today}
               data-state={cellState?.(cell)}
+              data-selected={selectedKey === cell.key}
             >
+              {onSelectDate ? (
+                <button
+                  type="button"
+                  className="tv-cell-tap"
+                  onClick={() => onSelectDate(cell.key)}
+                  aria-pressed={selectedKey === cell.key}
+                  aria-label={cellAriaLabel?.(cell) ?? cell.key}
+                />
+              ) : null}
               <span className="tv-daynum">{date.getDate()}</span>
               {renderCell(cell)}
             </div>
