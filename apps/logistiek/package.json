@@ -25,7 +25,7 @@
     "@vtk/ui": "*",
     "imapflow": "^1.7.2",
     "mailparser": "^3.9.15",
-    "next": "16.3.6",
+    "next": "16.3.7",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "sharp": "^0.35.3"

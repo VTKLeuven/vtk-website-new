@@ -61,7 +61,7 @@
     },
     {
       "description": "better-auth core and its plugins are released as a set.",
-      "matchPackageNames": ["better-auth", "@better-auth/*", "auth"],
+      "matchPackageNames": ["better-auth", "@better-auth/*"],
       "groupName": "better-auth",
       "vulnerabilityAlerts": {
         "groupName": "better-auth"
