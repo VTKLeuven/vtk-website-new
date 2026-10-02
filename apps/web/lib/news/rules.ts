@@ -108,6 +108,33 @@ export function ticketInNews(
 }
 
 /**
+ * Moet de redactie deze ticketverkoop eerst zelf in het nieuws zetten? Een
+ * werkgroep verkoopt haar tickets via de site, maar wat er op de homepage komt,
+ * beslist de redactie van de kring: een verkoop van een werkgroep staat er dus
+ * standaard niet in, die van een praesidiumpost wel. Wie `news.manage` heeft,
+ * zet ze er in /admin/nieuws toch in (`NewsShown`). Geldt voor het gewone
+ * bericht en voor de voorverkoop, die dezelfde sleutel dragen.
+ */
+export function ticketNeedsNewsOptIn(event: { ownerGroup: { type: string } }): boolean {
+  return event.ownerGroup.type === "WERKGROEP";
+}
+
+/**
+ * Staat een automatisch bericht uit het nieuws? Wanneer de redactie het verborg
+ * (`NewsHidden`), of wanneer het standaard uit staat en niemand het erin zette
+ * (`NewsShown`). Verbergen wint: de actie houdt de twee exclusief, maar een
+ * verborgen bericht hoort nooit per ongeluk terug te komen.
+ */
+export function isNewsEntryHidden(entry: {
+  hidden: boolean;
+  needsOptIn: boolean;
+  shown: boolean;
+}): boolean {
+  if (entry.hidden) return true;
+  return entry.needsOptIn && !entry.shown;
+}
+
+/**
  * Wanneer een voorverkoop nieuws werd, voor wie erin mag: bij haar start, of bij
  * het publiceren wanneer dat later kwam. `null` zonder voorverkoop.
  */

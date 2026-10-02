@@ -15,6 +15,7 @@ import { SaveAsTemplateCard } from "@/components/ticketing/admin/SaveAsTemplateC
 import { PresaleLinkPanel } from "@/components/ticketing/admin/PresaleLinkPanel";
 import { PrivateLinkPanel } from "@/components/ticketing/admin/PrivateLinkPanel";
 import { hasPresale } from "@/lib/ticketing/presale";
+import { ticketNeedsNewsOptIn } from "@/lib/news/rules";
 import { adminShopLink } from "@/lib/ticketing/shopPath";
 import type { AdminLocale } from "@/components/ticketing/admin/format";
 import { readTicketDesignSettings } from "@/lib/ticketing/design";
@@ -58,6 +59,7 @@ export default async function TicketEventSettingsPage({
         orderBy: [{ active: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
       },
       presaleGroups: { select: { groupId: true } },
+      ownerGroup: { select: { type: true } },
     },
   });
   if (!event) notFound();
@@ -168,6 +170,7 @@ export default async function TicketEventSettingsPage({
             token={event.privateToken}
             isDraft={event.status === "DRAFT"}
             hasPresaleLink={Boolean(event.presaleToken) && hasPresale(event)}
+            werkgroepSale={ticketNeedsNewsOptIn(event)}
             locale={locale}
           />
         </SettingsPanel>

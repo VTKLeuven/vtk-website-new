@@ -15,6 +15,7 @@ import { presaleViewerFor } from "@/lib/ticketing/presaleViewer";
 import {
   albumInNews,
   albumNewsDate,
+  isNewsEntryHidden,
   magazinesInNews,
   postInNews,
   signupInNews,
@@ -22,6 +23,7 @@ import {
   ticketInNews,
   ticketNewsDate,
   ticketPresaleInNews,
+  ticketNeedsNewsOptIn,
   ticketPresaleNewsDate,
   type NewsComposable,
   type NewsSource,
@@ -84,8 +86,12 @@ export type NewsEntry = NewsComposable & {
   shownDate?: string;
 };
 
-/** Een bericht zoals het beheer het ziet: ook wat uit het nieuws gehaald is. */
-export type NewsCandidate = NewsEntry & { hidden: boolean };
+/**
+ * Een bericht zoals het beheer het ziet: ook wat uit het nieuws gehaald is.
+ * `needsOptIn` zegt dat het standaard niet in het nieuws staat (de verkoop van
+ * een werkgroep) en er enkel in komt wanneer de redactie het erin zet.
+ */
+export type NewsCandidate = NewsEntry & { hidden: boolean; needsOptIn: boolean };
 
 /** Een pdf van de mediapagina, via dezelfde route als de boekenplank daar. */
 export function publicationHref(id: string): string {
@@ -120,6 +126,8 @@ const TICKET_NEWS_SELECT = {
   salesStartAt: true,
   salesEndAt: true,
   publishedAt: true,
+  // Een verkoop van een werkgroep staat standaard niet in het nieuws.
+  ownerGroup: { select: { type: true } },
   ...ticketPosterSelect,
 } as const;
 
@@ -178,7 +186,7 @@ export async function collectNews(
   const nl = locale === "nl";
   const { sources } = setting;
 
-  const [posts, hiddenRows, featuredRow, tickets, signups, media, gallery] = await Promise.all([
+  const [posts, hiddenRows, shownRows, featuredRow, tickets, signups, media, gallery] = await Promise.all([
     prisma.newsPost.findMany({
       where: {
         active: true,
@@ -188,6 +196,7 @@ export async function collectNews(
       orderBy: { publishedAt: "desc" },
     }),
     prisma.newsHidden.findMany({ select: { source: true, ref: true } }),
+    prisma.newsShown.findMany({ select: { source: true, ref: true } }),
     prisma.setting.findUnique({ where: { key: NEWS_FEATURED_SETTING } }),
     sources.tickets
       ? prisma.ticketEvent.findMany({
@@ -236,6 +245,9 @@ export async function collectNews(
   ]);
 
   const hidden = new Set(hiddenRows.map((row) => `${row.source}:${row.ref}`));
+  const shown = new Set(shownRows.map((row) => `${row.source}:${row.ref}`));
+  // De sleutels van de berichten die standaard niet in het nieuws staan.
+  const optIn = new Set<string>();
   const entries: NewsEntry[] = [];
 
   for (const post of posts) {
@@ -272,7 +284,9 @@ export async function collectNews(
 
   for (const event of tickets) {
     if (!ticketInNews(event, now)) continue;
-    entries.push(ticketEntry(event, ticketNewsDate(event)!, locale, false));
+    const entry = ticketEntry(event, ticketNewsDate(event)!, locale, false);
+    if (ticketNeedsNewsOptIn(event)) optIn.add(entry.key);
+    entries.push(entry);
   }
 
   for (const event of signups) {
@@ -357,11 +371,15 @@ export async function collectNews(
   // een zelfgeschreven bericht draagt dat al zelf.
   const choice = readNewsFeatured(featuredRow?.value);
   const picked = choice ? `${choice.source}:${choice.ref}` : null;
-  return entries.map((entry) => ({
-    ...entry,
-    featured: entry.featured || entry.key === picked,
-    hidden: hidden.has(entry.key),
-  }));
+  return entries.map((entry) => {
+    const needsOptIn = optIn.has(entry.key);
+    return {
+      ...entry,
+      featured: entry.featured || entry.key === picked,
+      hidden: isNewsEntryHidden({ hidden: hidden.has(entry.key), needsOptIn, shown: shown.has(entry.key) }),
+      needsOptIn,
+    };
+  });
 }
 
 export async function readNewsSettingFromDb(): Promise<NewsSetting> {
@@ -465,17 +483,30 @@ export async function getPresaleNews(
   }
   if (allowed.length === 0) return [];
 
-  const [hiddenRows, featuredRow] = await Promise.all([
+  const refs = allowed.map((event) => event.id);
+  const [hiddenRows, shownRows, featuredRow] = await Promise.all([
     prisma.newsHidden.findMany({
-      where: { source: "tickets", ref: { in: allowed.map((event) => event.id) } },
+      where: { source: "tickets", ref: { in: refs } },
+      select: { ref: true },
+    }),
+    prisma.newsShown.findMany({
+      where: { source: "tickets", ref: { in: refs } },
       select: { ref: true },
     }),
     prisma.setting.findUnique({ where: { key: NEWS_FEATURED_SETTING } }),
   ]);
   const hidden = new Set(hiddenRows.map((row) => row.ref));
+  const shown = new Set(shownRows.map((row) => row.ref));
   const choice = readNewsFeatured(featuredRow?.value);
   return allowed
-    .filter((event) => !hidden.has(event.id))
+    .filter(
+      (event) =>
+        !isNewsEntryHidden({
+          hidden: hidden.has(event.id),
+          needsOptIn: ticketNeedsNewsOptIn(event),
+          shown: shown.has(event.id),
+        }),
+    )
     .map((event) => ({
       ...ticketEntry(event, ticketPresaleNewsDate(event)!, locale, true),
       featured: choice?.source === "tickets" && choice.ref === event.id,

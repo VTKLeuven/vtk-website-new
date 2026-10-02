@@ -513,6 +513,13 @@ the design language into the application instead of copying mockup content.
   The sticky rail beside the roster that was there was reviewed and removed. Do
   not reintroduce a card or border around a portrait: only the tile without a
   photo gets an outline, or the initial floats loose on the band.
+- Werkgroepen (`/werkgroepen`): per werkgroep the info text on the left and the
+  team in the right margin as a hairline register (`vtk-werkgroepen.css`), not a
+  grid of big tiles under the text. The leads (named by `Group.leadLabel`,
+  free text, usually G3 or G4) get a portrait with the yellow ring; the members
+  start on a new line below them as names with a small portrait in two columns.
+  The tile grid turned a werkgroep of seventeen into a wall of initials. See
+  `docs/design-decisions.md`.
 - Lists and calendars: favor agenda/list layouts, tabular times, compact day
   labels, and small yellow status pins.
   - **The shift page (`/shift`, `components/shift`) sets every digit in Inter

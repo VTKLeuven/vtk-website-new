@@ -9,6 +9,7 @@ import { Markdown } from "@/components/ui/Markdown";
 import { hasLocale } from "@/lib/locale";
 import { publicUrl } from "@/lib/storage";
 import { formatWorkingYear, parseWorkingYear, workingYearTabs } from "@/lib/workingYear";
+import "@/app/design/vtk-werkgroepen.css";
 
 export async function generateMetadata({
   params,
@@ -57,6 +58,7 @@ export default async function WerkgroepenPage({
   ]);
 
   const tabs = workingYearTabs(distinctYears.map((r) => r.year));
+  type Membership = (typeof werkgroepen)[number]["memberships"][number];
 
   return (
     <div className="vtk-page">
@@ -66,103 +68,145 @@ export default async function WerkgroepenPage({
           <h1 className="vtk-page-title">{t.title}</h1>
         </div>
       </header>
-      <div className="vtk-page-shell space-y-10">
-        {/* Werkingsjaar-tabjes */}
-        <div className="flex flex-wrap gap-2">
-          {tabs.map((y) => {
-            const active = y === year;
-            return (
-              <Link
-                key={y}
-                href={`${base}/werkgroepen?jaar=${y}`}
-                className={
-                  "rounded-full border px-4 py-1.5 text-sm font-medium transition " +
-                  (active
-                    ? "border-vtk-ink bg-vtk-ink text-white"
-                    : "border-vtk-blue/20 bg-white text-vtk-ink hover:bg-vtk-blue-soft/50")
-                }
-              >
-                {formatWorkingYear(y)}
-              </Link>
-            );
-          })}
+      <div className="vtk-page-shell">
+        <div className="vtk-roster-years">
+          <span className="vtk-roster-years-label">{t.year}</span>
+          {tabs.map((y) => (
+            <Link
+              key={y}
+              href={`${base}/werkgroepen?jaar=${y}`}
+              className="vtk-roster-year"
+              aria-current={y === year ? "page" : undefined}
+            >
+              {formatWorkingYear(y)}
+            </Link>
+          ))}
         </div>
 
         {werkgroepen.length === 0 ? (
-          <p className="text-[#5c667f]">{t.empty}</p>
+          <p className="vtk-muted mt-8">{t.empty}</p>
         ) : (
-          <div className="space-y-14">
-            {werkgroepen.map((group) => {
-              const description = pick(group.descriptionNl ?? "", group.descriptionEn ?? "", locale);
-              const sorted = [...group.memberships].sort((a, b) => {
-                if (a.role !== b.role) return a.role === "LEAD" ? -1 : 1;
-                return a.user.name.localeCompare(b.user.name, locale);
-              });
-              return (
-                <section key={group.id}>
-                  <div className="mb-4 flex flex-wrap items-baseline gap-x-4 gap-y-1">
-                    <h2 className="text-2xl font-semibold tracking-tight text-vtk-ink">
-                      {pick(group.nameNl, group.nameEn, locale)}
-                    </h2>
-                    {group.website && (
-                      <a
-                        href={group.website}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium text-vtk-ink underline decoration-vtk-blue/40 underline-offset-4 hover:decoration-vtk-ink"
-                      >
-                        {t.website}
-                      </a>
-                    )}
-                  </div>
-                  {description && (
-                    <div className="prose-vtk mb-6 max-w-[70ch] text-sm">
-                      <Markdown locale={locale}>{description}</Markdown>
+          <>
+            {/* Gewone ankers en geen <Link>: dit springt binnen dezelfde pagina. */}
+            <nav className="vtk-wall-jump vtk-werkgroep-jump" aria-label={t.title}>
+              <span className="vtk-wall-jump-label">{t.title}</span>
+              {werkgroepen.map((group) => (
+                <a key={group.id} href={`#werkgroep-${group.slug}`}>
+                  {pick(group.nameNl, group.nameEn, locale)}
+                </a>
+              ))}
+            </nav>
+
+            <div className="mt-6">
+              {werkgroepen.map((group) => {
+                const name = pick(group.nameNl, group.nameEn, locale);
+                const description = pick(group.descriptionNl ?? "", group.descriptionEn ?? "", locale);
+                const byName = (a: Membership, b: Membership) =>
+                  a.user.name.localeCompare(b.user.name, locale);
+                // De kern en de leden staan elk in hun eigen blok: de leden
+                // beginnen altijd op een nieuwe regel onder de kern.
+                const leads = group.memberships.filter((m) => m.role === "LEAD").sort(byName);
+                const members = group.memberships.filter((m) => m.role !== "LEAD").sort(byName);
+                const headingId = `werkgroep-${group.slug}-naam`;
+                return (
+                  <section
+                    key={group.id}
+                    id={`werkgroep-${group.slug}`}
+                    className="vtk-werkgroep"
+                    aria-labelledby={headingId}
+                  >
+                    <div className="vtk-werkgroep-text">
+                      <div className="vtk-werkgroep-head">
+                        <h2 id={headingId}>{name}</h2>
+                        {group.website && (
+                          <a
+                            href={group.website}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="vtk-werkgroep-site"
+                          >
+                            {t.website}
+                          </a>
+                        )}
+                      </div>
+                      {description && (
+                        <div className="prose-vtk">
+                          <Markdown locale={locale}>{description}</Markdown>
+                        </div>
+                      )}
                     </div>
-                  )}
-                  {sorted.length === 0 ? (
-                    <p className="text-sm text-[#5c667f]">{t.noMembers}</p>
-                  ) : (
-                    <ul className="grid grid-cols-2 gap-5 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
-                      {sorted.map((m) => {
-                        const src = publicUrl(m.user.avatarKey);
-                        return (
-                          <li key={m.id} className="text-center">
-                            <div className="mx-auto h-28 w-28 overflow-hidden rounded-[20px] border border-vtk-blue/10 bg-vtk-blue-soft">
-                              {src ? (
-                                // De tegel is 112x112; een profielfoto uit storage is dat
-                                // zelden, dus laat next/image ze op maat snijden.
-                                <Image
-                                  src={src}
-                                  alt={m.user.name}
-                                  width={112}
-                                  height={112}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <div className="grid h-full w-full place-items-center text-3xl font-semibold text-[#5c667f]">
-                                  {m.user.name.slice(0, 1).toUpperCase()}
-                                </div>
-                              )}
-                            </div>
-                            <div className="mt-2 text-sm font-medium">{m.user.name}</div>
-                            <div className="text-xs text-[#5c667f]">
-                              {/* De verantwoordelijke heet hier de G3 of de G4 van
-                                  deze werkgroep; dat staat per werkgroep in de
-                                  admin. */}
-                              {m.role === "LEAD"
-                                ? group.leadLabel
-                                : pick(m.titleNl ?? "", m.titleEn ?? "", locale) || t.member}
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </section>
-              );
-            })}
-          </div>
+
+                    <aside className="vtk-werkgroep-team" aria-label={t.team.replace("{name}", name)}>
+                      {leads.length === 0 && members.length === 0 && (
+                        <p className="vtk-muted text-sm">{t.noMembers}</p>
+                      )}
+                      {leads.length > 0 && (
+                        <div>
+                          {/* De verantwoordelijke heet zoals de werkgroep het
+                              koos (meestal G3 of G4); dat staat in de admin. */}
+                          <h3 className="vtk-werkgroep-label">
+                            {group.leadLabel} <span>{leads.length}</span>
+                          </h3>
+                          <ul className="vtk-werkgroep-leads">
+                            {leads.map((m) => {
+                              const src = publicUrl(m.user.avatarKey);
+                              const title = pick(m.titleNl ?? "", m.titleEn ?? "", locale);
+                              return (
+                                <li key={m.id}>
+                                  <span className="vtk-werkgroep-face">
+                                    {src ? (
+                                      // 58px op het scherm; next/image snijdt de
+                                      // profielfoto op maat, dubbel voor retina.
+                                      <Image src={src} alt="" width={116} height={116} />
+                                    ) : (
+                                      <span aria-hidden>{m.user.name.slice(0, 1).toUpperCase()}</span>
+                                    )}
+                                  </span>
+                                  <span className="vtk-werkgroep-who">
+                                    <span className="vtk-werkgroep-name">{m.user.name}</span>
+                                    <span className="vtk-werkgroep-role">{group.leadLabel}</span>
+                                    {title && <span className="vtk-werkgroep-role">{title}</span>}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
+                      {members.length > 0 && (
+                        <div>
+                          <h3 className="vtk-werkgroep-label">
+                            {t.members} <span>{members.length}</span>
+                          </h3>
+                          <ul className="vtk-werkgroep-members">
+                            {members.map((m) => {
+                              const src = publicUrl(m.user.avatarKey);
+                              const title = pick(m.titleNl ?? "", m.titleEn ?? "", locale);
+                              return (
+                                <li key={m.id}>
+                                  <span className={"vtk-werkgroep-mini" + (src ? "" : " is-blank")}>
+                                    {src ? (
+                                      <Image src={src} alt="" width={48} height={48} />
+                                    ) : (
+                                      <span aria-hidden>{m.user.name.slice(0, 1).toUpperCase()}</span>
+                                    )}
+                                  </span>
+                                  <span className="vtk-werkgroep-who">
+                                    <span className="vtk-werkgroep-name">{m.user.name}</span>
+                                    {title && <span className="vtk-werkgroep-role">{title}</span>}
+                                  </span>
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </div>
+                      )}
+                    </aside>
+                  </section>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     </div>

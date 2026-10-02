@@ -1,0 +1,247 @@
+/* /werkgroepen: per werkgroep de infotekst links en de ploeg rechts in de
+   marge, als register met een haarlijn, zoals de rail van een contentpagina.
+
+   Gekozen uit vier richtingen (oktober 2026). Het raster van grote tegels dat
+   er stond, werd met een werkgroep van zeventien leden een muur van initialen
+   onder een tekst die maar de linkerhelft vulde. Nu krijgt de kern (de G3 of
+   G4, of hoe de werkgroep ze noemt) een portret en een eigen blok, en beginnen
+   de leden daaronder op een nieuwe regel, als namen in twee kolommen. Zie
+   docs/design-decisions.md. */
+
+.vtk-werkgroep-jump {
+  margin-top: 22px;
+  margin-bottom: 0;
+}
+
+.vtk-werkgroep {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: clamp(32px, 4.5vw, 56px);
+  padding: clamp(32px, 4vw, 44px) 0;
+  border-top: 1px solid var(--line);
+  /* De sticky sitekop, zoals `.vtk-wall-row`. */
+  scroll-margin-top: 96px;
+}
+
+.vtk-werkgroep:first-child {
+  padding-top: 12px;
+  border-top: 0;
+}
+
+.vtk-werkgroep-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 16px;
+  margin-bottom: 16px;
+}
+
+.vtk-werkgroep-head h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 28px;
+  font-weight: 600;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.vtk-werkgroep-site {
+  color: var(--navy);
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--yellow);
+  text-underline-offset: 4px;
+}
+
+.vtk-werkgroep-site:hover {
+  color: var(--ink);
+}
+
+.vtk-werkgroep-text .prose-vtk {
+  max-width: 70ch;
+}
+
+.vtk-werkgroep-text .prose-vtk > :first-child {
+  margin-top: 0;
+}
+
+.vtk-werkgroep-text .prose-vtk > :last-child {
+  margin-bottom: 0;
+}
+
+/* De naam van de werkgroep blijft de grootste kop: de koppen in haar infotekst
+   zakken een trede, anders staat "Wie zijn we?" even groot als "Chemix". */
+.vtk-werkgroep-text .prose-vtk :is(h1, h2) {
+  font-size: 20px;
+  line-height: 1.3;
+}
+
+.vtk-werkgroep-text .prose-vtk h3 {
+  font-size: 17px;
+  line-height: 1.35;
+}
+
+/* De ploeg: een register in de marge, geen kaart. */
+.vtk-werkgroep-team {
+  align-self: start;
+  display: grid;
+  gap: 22px;
+  padding-left: 24px;
+  border-left: 1px solid var(--line-2);
+}
+
+.vtk-werkgroep-label {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 12px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  overflow-wrap: anywhere;
+}
+
+.vtk-werkgroep-label span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-werkgroep-leads,
+.vtk-werkgroep-members {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vtk-werkgroep-leads {
+  display: grid;
+  gap: 12px;
+}
+
+.vtk-werkgroep-leads li,
+.vtk-werkgroep-members li {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.vtk-werkgroep-leads li {
+  gap: 14px;
+}
+
+/* De gele ring staat buiten de foto (`0 0 0 2px`), zoals bij de
+   groepscoördinator op /praesidium: een inset schaduw tekent onder de <img>. */
+.vtk-werkgroep-face {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  overflow: hidden;
+  border-radius: 12px;
+  background: var(--paper-2);
+  box-shadow: 0 0 0 2px var(--yellow);
+  color: var(--muted);
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.vtk-werkgroep-face img,
+.vtk-werkgroep-mini img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.vtk-werkgroep-who {
+  min-width: 0;
+}
+
+.vtk-werkgroep-name {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.25;
+  overflow-wrap: break-word;
+}
+
+.vtk-werkgroep-role {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  overflow-wrap: break-word;
+}
+
+/* De leden lezen alfabetisch van boven naar onder, dus kolommen en geen
+   rij-voor-rij raster. */
+.vtk-werkgroep-members {
+  columns: 2;
+  column-gap: 14px;
+}
+
+.vtk-werkgroep-members li {
+  gap: 8px;
+  margin-bottom: 9px;
+  break-inside: avoid;
+}
+
+.vtk-werkgroep-mini {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--paper-2);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
+/* Zonder foto heeft het vierkantje een lijn nodig, anders zweeft de letter. */
+.vtk-werkgroep-mini.is-blank {
+  box-shadow: inset 0 0 0 1px var(--line-2);
+}
+
+.vtk-werkgroep-members .vtk-werkgroep-name {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.vtk-werkgroep-members .vtk-werkgroep-role {
+  font-size: 11.5px;
+}
+
+/* Te smal voor twee kolommen: de ploeg schuift onder de tekst, en krijgt daar
+   de volle breedte, dus de kern naast elkaar en de leden in meer kolommen. */
+@media (max-width: 900px) {
+  .vtk-werkgroep {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 26px;
+  }
+
+  .vtk-werkgroep-team {
+    padding: 22px 0 0;
+    border-top: 1px solid var(--line-2);
+    border-left: 0;
+  }
+
+  .vtk-werkgroep-leads {
+    grid-template-columns: repeat(auto-fill, minmax(min(240px, 100%), 1fr));
+  }
+
+  .vtk-werkgroep-members {
+    columns: 160px;
+  }
+}

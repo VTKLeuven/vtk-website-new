@@ -53,6 +53,7 @@ export default async function AdminNews({ params }: { params: Promise<{ locale: 
       automatic: entry.source !== "notice" && entry.source !== "praeses",
       picked: entry.featured,
       place: entry.hidden ? "hidden" : featured?.key === entry.key ? "featured" : "band",
+      needsOptIn: entry.needsOptIn,
     }));
 
   const postRows: NewsPostRow[] = posts.map((post) => ({

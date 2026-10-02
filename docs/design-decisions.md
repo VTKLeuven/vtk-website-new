@@ -1603,16 +1603,31 @@ terug (`apps/web/lib/brevo/unsubscribe.ts`).
   "Posten" en de shift-postkeuzes filteren op `type = PRAESIDIUM`; werkgroepen
   krijgen hun eigen publieke `/werkgroepen` (zelfde ledenraster + werkingsjaar-
   tabjes als praesidium) en een eigen admin-tab "Werkgroepen".
-- **De verantwoordelijke heet G3 of G4, en dat kiest de werkgroep zelf.** Een
-  werkgroep wordt niet getrokken door een "verantwoordelijke" maar door haar G3
-  of haar G4, en welke van de twee dat is, verschilt per werkgroep. Daarom is het
-  een keuze per werkgroep (`Group.leadLabel`, `G3` | `G4`, default `G3`) en geen
-  vaste tekst: ze staat in de werkgroepinstellingen op `/admin/werkgroepen` en
-  vervangt het woord "Verantwoordelijke" overal waar die lead benoemd wordt (de
-  ledenlijst en het pilletje in het ledenbeheer, de rolkeuze bij lid toevoegen,
-  de kolom "Enkel G3/G4" bij de rol-grants, en de ploeg op de publieke
-  `/werkgroepen`). Een **praesidiumpost** houdt wél "Verantwoordelijke": het veld
-  hangt aan `Group`, maar enkel werkgroepen tonen het.
+- **Hoe de verantwoordelijke heet, kiest de werkgroep zelf.** Een werkgroep
+  wordt niet getrokken door een "verantwoordelijke" maar meestal door haar G3 of
+  haar G4, en welke van de twee dat is, verschilt per werkgroep. Eerst was het
+  een keuze tussen die twee; sinds oktober 2026 is het vrije tekst
+  (`Group.leadLabel`, default `G3`, hoogstens 40 tekens, met G3 en G4 als
+  voorstel in het veld), omdat sommige werkgroepen hun trekkers anders noemen.
+  Het staat in de werkgroepinstellingen op `/admin/werkgroepen` en vervangt het
+  woord "Verantwoordelijke" overal waar die lead benoemd wordt (de ledenlijst en
+  het pilletje in het ledenbeheer, de rolkeuze bij lid toevoegen, de kolom
+  "Enkel G3/G4" bij de rol-grants, en de ploeg op de publieke `/werkgroepen`).
+  Eén veld en niet per taal: "G3" is in beide talen hetzelfde. Een
+  **praesidiumpost** houdt wél "Verantwoordelijke": het veld hangt aan `Group`,
+  maar enkel werkgroepen tonen het.
+- **Op `/werkgroepen` staat de ploeg naast de tekst, niet eronder.** Per
+  werkgroep de infotekst links op leesbreedte en de ploeg rechts in de marge,
+  als register met een haarlijn, zoals de rail van een contentpagina
+  (`vtk-werkgroepen.css`). Bovenaan de kern met een portret en de gele ring, met
+  daaronder op een nieuwe regel de leden, als namen met een klein portret in
+  twee kolommen. Eerst stond iedereen als grote tegel onder de tekst; een
+  werkgroep van zeventien leden zonder profielfoto's werd zo een muur van
+  initialen, met "Lid" zeventien keer herhaald, naast een tekst die maar de
+  linkerhelft vulde. Vier richtingen werden naast elkaar bekeken (de muur van
+  `/praesidium`, portretten met een namenlijst eronder, deze, en een groepsfoto
+  met de namen als bijschrift); deze werd gekozen. Onder 900px schuift de ploeg
+  onder de tekst.
 - **Eigen infotekst + website.** De werkgroep-`description*` is de blurb op
   `/werkgroepen`; `Group.website` is een optionele link (mag zonder schema
   ingevuld worden, wordt genormaliseerd naar `https://`). Beide staan los van de
@@ -9508,6 +9523,19 @@ bron, zodat een album dat verdwijnt of een verkoop die sluit vanzelf wegvalt:
 
 Een automatisch bericht kan uit het nieuws gehaald worden zonder aan de bron te
 komen (`NewsHidden`); per bron kan het ook helemaal uit.
+
+**Een ticketverkoop van een werkgroep staat standaard niet in het nieuws.** Een
+werkgroep verkoopt haar tickets via de site, maar wat er op de homepage komt,
+beslist de redactie van de kring. Zo'n verkoop staat in /admin/nieuws dus als
+verborgen, met de uitleg erbij, en wie `news.manage` heeft (de redactie, niet de
+werkgroep zelf) zet ze er met het oog in (`NewsShown`, het omgekeerde van
+`NewsHidden`; de actie houdt de twee exclusief, en verbergen wint). Dat geldt
+voor het gewone bericht en voor de voorverkoop, die dezelfde sleutel dragen. De
+regel staat in `ticketNeedsNewsOptIn` (`lib/news/rules.ts`) en kijkt naar het
+type van de eigenaarsgroep. Een verkoop die al in het nieuws stond toen dit
+erbij kwam, viel eruit tot iemand ze erin zette; dat was de bedoeling. Het
+paneel "Openbaar of privé" van zo'n event belooft daarom ook geen plaats in het
+nieuws.
 
 **Een ticketverkoop en een inschrijving tonen de dag van het evenement.** De
 datumpin en de kopregel stonden op het moment dat de verkoop opende, en "do 24

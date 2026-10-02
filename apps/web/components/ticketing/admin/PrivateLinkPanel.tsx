@@ -19,6 +19,8 @@ const T = {
   nl: {
     introPublic:
       "Dit event is openbaar: het staat op /tickets, bij het kalenderevent, in het nieuws en in de app.",
+    introPublicWerkgroep:
+      "Dit event is openbaar: het staat op /tickets, bij het kalenderevent en in de app. In het nieuws op de homepage staat een verkoop van een werkgroep enkel wanneer de redactie het erin zet.",
     introPrivate:
       "Dit event is privé: het staat nergens op de site en /tickets/{slug} geeft een 404. Enkel wie de link hieronder opent, kan het zien en tickets bestellen.",
     makePrivate: "Privé maken",
@@ -38,6 +40,8 @@ const T = {
     publicTitle: "Dit event openbaar maken?",
     publicBody:
       "Het event komt voor iedereen op /tickets, bij het kalenderevent, in het nieuws en in de app. De privélink blijft werken en leidt naar dezelfde pagina.",
+    publicBodyWerkgroep:
+      "Het event komt voor iedereen op /tickets, bij het kalenderevent en in de app; in het nieuws enkel wanneer de redactie het erin zet. De privélink blijft werken en leidt naar dezelfde pagina.",
     renewTitle: "Privélink vernieuwen?",
     renewBody:
       "De huidige link werkt meteen niet meer, ook niet voor wie hem al opende; stuur de nieuwe link opnieuw naar de groep. Wie al besteld heeft, houdt zijn tickets.",
@@ -50,6 +54,8 @@ const T = {
   en: {
     introPublic:
       "This event is public: it is listed on /tickets, with the calendar event, in the news and in the app.",
+    introPublicWerkgroep:
+      "This event is public: it is listed on /tickets, with the calendar event and in the app. A sale by a werkgroep is only in the news on the homepage when the editors put it there.",
     introPrivate:
       "This event is private: it is not listed anywhere on the site and /tickets/{slug} returns a 404. Only people who open the link below can see it and order tickets.",
     makePrivate: "Make private",
@@ -68,6 +74,8 @@ const T = {
     publicTitle: "Make this event public?",
     publicBody:
       "The event appears for everyone on /tickets, with the calendar event, in the news and in the app. The private link keeps working and leads to the same page.",
+    publicBodyWerkgroep:
+      "The event appears for everyone on /tickets, with the calendar event and in the app; in the news only when the editors put it there. The private link keeps working and leads to the same page.",
     renewTitle: "Renew the private link?",
     renewBody:
       "The current link stops working immediately, also for people who already opened it; send the new link to the group again. Anyone who already ordered keeps their tickets.",
@@ -97,6 +105,7 @@ export function PrivateLinkPanel({
   token,
   isDraft,
   hasPresaleLink,
+  werkgroepSale,
   locale,
 }: {
   eventId: string;
@@ -105,6 +114,12 @@ export function PrivateLinkPanel({
   token: string | null;
   isDraft: boolean;
   hasPresaleLink: boolean;
+  /**
+   * Het event is van een werkgroep: dan staat het standaard niet in het nieuws
+   * op de homepage (zie `ticketNeedsNewsOptIn`), en mag dit paneel dat niet
+   * beloven.
+   */
+  werkgroepSale: boolean;
   locale: AdminLocale;
 }) {
   const t = T[locale];
@@ -167,12 +182,20 @@ export function PrivateLinkPanel({
     confirming === "private"
       ? { title: t.privateTitle, body: withSlug(t.privateBody), confirm: t.makePrivate }
       : confirming === "public"
-        ? { title: t.publicTitle, body: t.publicBody, confirm: t.makePublic }
+        ? {
+            title: t.publicTitle,
+            body: werkgroepSale ? t.publicBodyWerkgroep : t.publicBody,
+            confirm: t.makePublic,
+          }
         : { title: t.renewTitle, body: t.renewBody, confirm: t.renew };
 
   return (
     <div className="ticket-admin-form">
-      <p className="ticket-admin-help">{isPrivate ? withSlug(t.introPrivate) : t.introPublic}</p>
+      <p className="ticket-admin-help">{isPrivate
+          ? withSlug(t.introPrivate)
+          : werkgroepSale
+            ? t.introPublicWerkgroep
+            : t.introPublic}</p>
       {url ? (
         <>
           <div className="ticket-admin-field">

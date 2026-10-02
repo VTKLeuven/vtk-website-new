@@ -32,15 +32,6 @@ enum GroupType {
   WERKGROEP
 }
 
-// Hoe de verantwoordelijke (membership.role == LEAD) van een werkgroep heet.
-// Bij VTK is dat de G3 of de G4 van die werkgroep, en welke van de twee het is,
-// verschilt per werkgroep. Enkel zinvol voor type = WERKGROEP; een
-// praesidiumpost houdt het bij "Verantwoordelijke".
-enum GroupLeadLabel {
-  G3
-  G4
-}
-
 // Hoe een post (Group) een rol toekent aan haar leden.
 // DEFAULT: elk lid van de post krijgt de rol. LEADER: enkel de
 // verantwoordelijke (membership.role == LEAD) krijgt de rol, bovenop de
@@ -852,9 +843,12 @@ model Group {
   // maar staat niet op /praesidium; ze krijgt /werkgroepen met haar eigen
   // infotekst (description*, door de leden zelf bewerkbaar) en optionele website.
   type              GroupType      @default(PRAESIDIUM)
-  // Hoe de verantwoordelijke van deze werkgroep heet op /werkgroepen en in het
-  // ledenbeheer: G3 of G4. Wordt genegeerd voor praesidiumposten.
-  leadLabel         GroupLeadLabel @default(G3)
+  // Hoe de verantwoordelijke (membership.role == LEAD) van deze werkgroep heet
+  // op /werkgroepen en in het ledenbeheer. Vrije tekst die de werkgroep zelf
+  // kiest: meestal G3 of G4, maar dat verschilt per werkgroep, en sommige
+  // gebruiken een eigen naam. Wordt genegeerd voor praesidiumposten, die het bij
+  // "Verantwoordelijke" houden.
+  leadLabel         String         @default("G3")
   website           String?
   // Een gedeactiveerde post verdwijnt uit de nieuwe-shift-keuzes en het
   // postenbeheer voor nieuwe jaren, maar de historiek (memberships per jaar)
@@ -1665,6 +1659,21 @@ enum NewsPostKind {
  * `ref` de id binnen die bron.
  */
 model NewsHidden {
+  source    String
+  ref       String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([source, ref])
+}
+
+/**
+ * Een automatisch bericht dat standaard níét in het nieuws staat, maar dat de
+ * redactie er toch in zette. Vandaag enkel de ticketverkoop van een werkgroep
+ * (zie `ticketNeedsNewsOptIn` in apps/web/lib/news/rules.ts). Het omgekeerde
+ * van `NewsHidden`, met dezelfde sleutel; `setNewsHiddenAction` houdt de twee
+ * exclusief.
+ */
+model NewsShown {
   source    String
   ref       String
   createdAt DateTime @default(now()) @db.Timestamptz(3)

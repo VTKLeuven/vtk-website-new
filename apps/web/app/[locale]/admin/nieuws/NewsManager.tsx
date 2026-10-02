@@ -41,6 +41,11 @@ export type NewsCandidateRow = {
   picked: boolean;
   /** Waar het nu staat: uitgelicht, in de band of verborgen. */
   place: "featured" | "band" | "hidden";
+  /**
+   * Staat standaard niet in het nieuws (de verkoop van een werkgroep) en komt er
+   * enkel in wanneer iemand het hier aanzet.
+   */
+  needsOptIn: boolean;
 };
 
 export type NewsPostRow = {
@@ -336,6 +341,17 @@ export function NewsManager({
                       {row.sourceLabel}, {row.dateLabel}
                       {row.automatic ? (nl ? " · automatisch" : " · automatic") : ""}
                     </span>
+                    {row.needsOptIn ? (
+                      <span className="block text-xs text-[#5c667f]">
+                        {row.place === "hidden"
+                          ? nl
+                            ? "Verkoop van een werkgroep: staat standaard niet in het nieuws. Het oog zet ze erin."
+                            : "Sale by a werkgroep: not in the news by default. The eye puts it in."
+                          : nl
+                            ? "Verkoop van een werkgroep, door de redactie in het nieuws gezet."
+                            : "Sale by a werkgroep, put in the news by the editors."}
+                      </span>
+                    ) : null}
                   </span>
                   <div className="ml-auto flex shrink-0 items-center gap-2">
                     {row.place !== "hidden" ? (
@@ -381,18 +397,26 @@ export function NewsManager({
                           type="submit"
                           label={
                             row.place === "hidden"
-                              ? nl
-                                ? "Terug in het nieuws zetten"
-                                : "Put back in the news"
+                              ? row.needsOptIn
+                                ? nl
+                                  ? "In het nieuws zetten"
+                                  : "Put in the news"
+                                : nl
+                                  ? "Terug in het nieuws zetten"
+                                  : "Put back in the news"
                               : nl
                                 ? "Uit het nieuws halen (de bron blijft)"
                                 : "Take out of the news (the source stays)"
                           }
                           srLabel={`${
                             row.place === "hidden"
-                              ? nl
-                                ? "Terug in het nieuws zetten"
-                                : "Put back in the news"
+                              ? row.needsOptIn
+                                ? nl
+                                  ? "In het nieuws zetten"
+                                  : "Put in the news"
+                                : nl
+                                  ? "Terug in het nieuws zetten"
+                                  : "Put back in the news"
                               : nl
                                 ? "Uit het nieuws halen"
                                 : "Take out of the news"
@@ -428,12 +452,14 @@ export function NewsManager({
                   "De tegels staan in de volgorde van hun datum: eerst wat nog komt (het vroegste eerst), dan wat al gebeurde.",
                   "Hoogstens één bericht is uitgelicht als grote kaart, ook een ticketverkoop of een album kan. Zonder keuze is dat het woordje van de praeses, anders het nieuwste.",
                   "Een automatisch bericht uit het nieuws halen, laat de bron gerust: de verkoop loopt door, het album blijft op /media.",
+                  "Een ticketverkoop van een werkgroep staat er standaard niet in. Ze staat hier als verborgen, en het oog zet ze erin.",
                 ]
               : [
                   "Everything here that is not hidden is in the band. The carousel scrolls, so there is no maximum.",
                   "Tiles follow their date: what is still to come first (soonest first), then what already happened.",
                   "At most one post is featured as the large card, a ticket sale or an album included. Without a pick that is the word from the praeses, otherwise the newest.",
                   "Taking an automatic post out of the news leaves its source alone: sales go on, the album stays on /media.",
+                  "A ticket sale by a werkgroep is not in the news by default. It is listed here as hidden, and the eye puts it in.",
                 ]
             ).map((line) => (
               <li key={line}>{line}</li>
