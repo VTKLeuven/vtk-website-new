@@ -11,7 +11,7 @@ import { buildMetadata } from "@/lib/seo";
 import { publicUrl } from "@/lib/storage";
 import { markdownToPlainText } from "@/lib/markdown";
 import { newsSourceLabel } from "@/lib/news/labels";
-import { NewsAuthor, NewsLink } from "@/components/editorial/NewsBand";
+import { NewsLink, newsInitials } from "@/components/editorial/NewsBand";
 
 import "@/app/design/vtk-news.css";
 
@@ -63,6 +63,8 @@ export default async function NewsPostPage({
   const title = pick(post.titleNl, post.titleEn, locale);
   const body = pick(post.bodyNl, post.bodyEn, locale);
   const photo = praeses ? null : publicUrl(post.imageKey);
+  const portrait = praeses ? publicUrl(post.imageKey) : null;
+  const authorRole = pick(post.authorRoleNl ?? "", post.authorRoleEn, locale) || null;
   const ctaLabel = pick(post.ctaLabelNl ?? "", post.ctaLabelEn, locale) || (nl ? "Meer lezen" : "Read more");
   const date = post.publishedAt.toLocaleDateString(nl ? "nl-BE" : "en-GB", {
     timeZone: "Europe/Brussels",
@@ -71,6 +73,14 @@ export default async function NewsPostPage({
     month: "long",
     year: "numeric",
   });
+
+  const cta = post.ctaUrl ? (
+    <div>
+      <NewsLink href={post.ctaUrl} base={base} className="news-go is-primary">
+        {ctaLabel} <ArrowRight size={15} aria-hidden="true" />
+      </NewsLink>
+    </div>
+  ) : null;
 
   return (
     <div className="vtk-page">
@@ -90,34 +100,60 @@ export default async function NewsPostPage({
 
       {/* Niet `vtk-page-narrow`: dat centreert de hele kolom, en dan begint de
           tekst een eind rechts van de titel erboven. De leesbreedte zit op
-          `.news-post` zelf. */}
+          `.news-post` of op de tekstkolom van de brief. */}
       <main className="vtk-page-shell">
-        <article className="vtk-page-content news-post">
-          {photo ? (
-            // Een upload uit de eigen media-route.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img className="news-post-photo" src={photo} alt="" />
-          ) : null}
-          <div className="prose-vtk">
-            <Markdown locale={locale}>{body}</Markdown>
+        {praeses ? (
+          // Het woordje: het portret eerst, zoals een tegel op /praesidium, en
+          // het blijft staan terwijl je leest. Het is een brief van iemand, dus
+          // wie hem schrijft, zie je voor je begint.
+          <div className="news-letter-page">
+            {post.authorName ? (
+              <aside className="news-letter-side" aria-label={nl ? "Afzender" : "From"}>
+                <div className={`vtk-roster-photo${portrait ? "" : " is-blank"}`}>
+                  {portrait ? (
+                    // Een upload uit de eigen media-route, vierkant bijgesneden.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={portrait} alt="" />
+                  ) : (
+                    <span className="vtk-roster-initial" aria-hidden="true">
+                      {newsInitials(post.authorName)}
+                    </span>
+                  )}
+                </div>
+                <div>
+                  <b>{post.authorName}</b>
+                  {authorRole ? <span>{authorRole}</span> : null}
+                </div>
+              </aside>
+            ) : (
+              <span />
+            )}
+            <article className="vtk-page-content">
+              <div className="prose-vtk">
+                <Markdown locale={locale}>{body}</Markdown>
+              </div>
+              {post.authorName ? (
+                <div className="news-sign">
+                  <b>{post.authorName}</b>
+                  {authorRole ? <span>{authorRole}</span> : null}
+                </div>
+              ) : null}
+              {cta}
+            </article>
           </div>
-          {praeses && post.authorName ? (
-            <NewsAuthor
-              author={{
-                name: post.authorName,
-                role: pick(post.authorRoleNl ?? "", post.authorRoleEn, locale) || null,
-                imageUrl: publicUrl(post.imageKey),
-              }}
-            />
-          ) : null}
-          {post.ctaUrl ? (
-            <div>
-              <NewsLink href={post.ctaUrl} base={base} className="news-go is-primary">
-                {ctaLabel} <ArrowRight size={15} aria-hidden="true" />
-              </NewsLink>
+        ) : (
+          <article className="vtk-page-content news-post">
+            {photo ? (
+              // Een upload uit de eigen media-route.
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="news-post-photo" src={photo} alt="" />
+            ) : null}
+            <div className="prose-vtk">
+              <Markdown locale={locale}>{body}</Markdown>
             </div>
-          ) : null}
-        </article>
+            {cta}
+          </article>
+        )}
       </main>
     </div>
   );

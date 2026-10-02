@@ -14,6 +14,7 @@ import { prisma } from "@vtk/db";
 import type { Meeting, MeetingOption, Prisma } from "@prisma/client";
 
 import { brusselsTimeOnDay, brusselsWallClock, brusselsYMD, shiftYMD } from "./brussels";
+import { usersWithLivePermission } from "./livePermissions";
 import { sendMeetingReservationInvalidated } from "./mail";
 import {
   meetingKindLabel,
@@ -211,6 +212,10 @@ export async function syncMeetingReservations(meetingId: string): Promise<SyncRe
   });
   if (!meeting) return { linked: 0, invalidated: 0 };
 
+  // Vóór de vroege return hieronder: ook zonder verkoopdag kan een verzette GM
+  // bestellingen op haar oude dag achterlaten.
+  await linkGrocomeetOrders(meeting);
+
   const session = meeting.useTheokot ? await sessionForMeeting(meeting) : null;
   // Zolang de verkoopdag niet bestaat, valt er niets te controleren: het aanbod
   // van die week is nog niet beslist. De reservatie blijft staan en wordt
@@ -274,13 +279,8 @@ export async function syncMeetingsForSession(sessionId: string): Promise<SyncRes
 
 /** Idem, voor elk moment op deze kalenderdag (Brussel). */
 export async function syncMeetingsOnDay(day: Date): Promise<SyncResult> {
-  const from = brusselsTimeOnDay(day, "00:00");
-  // Niet "plus 24 uur": op de twee dagen dat de klok verspringt, schuift dat
-  // venster een uur en valt een vergadering er net binnen of buiten.
-  const next = shiftYMD(brusselsYMD(day), 1);
-  const to = brusselsWallClock(next.year, next.month, next.day, "00:00");
   const meetings = await prisma.meeting.findMany({
-    where: { startsAt: { gte: from, lt: to } },
+    where: { startsAt: brusselsDay(day) },
     select: { id: true },
   });
 
@@ -291,6 +291,82 @@ export async function syncMeetingsOnDay(day: Date): Promise<SyncResult> {
     total.invalidated += result.invalidated;
   }
   return total;
+}
+
+/**
+ * Van middernacht tot middernacht in Brussel. Niet "plus 24 uur": op de twee
+ * dagen dat de klok verspringt, schuift dat venster een uur en valt een
+ * vergadering er net binnen of buiten.
+ */
+function brusselsDay(day: Date): { gte: Date; lt: Date } {
+  const next = shiftYMD(brusselsYMD(day), 1);
+  return {
+    gte: brusselsTimeOnDay(day, "00:00"),
+    lt: brusselsWallClock(next.year, next.month, next.day, "00:00"),
+  };
+}
+
+// -----------------------------------------------------------------------------
+// Een groco die zelf bij Theokot bestelt
+//
+// Het broodje van de week staat niet in het aanbod van de grocomeet: dat blijft
+// voor de studenten. Een groco kan het wel gewoon bij Theokot bestellen, op
+// dezelfde voet als elke student. Valt er die dag een grocomeet, dan gaat die
+// bestelling mee in de doos van de GM en wordt ze daar afgerekend, zodat
+// niemand tussen de vergadering en de balie moet kiezen. Zie
+// docs/design-decisions.md.
+// -----------------------------------------------------------------------------
+
+/** De grocomeet op deze kalenderdag (Brussel), of null. */
+export async function grocomeetOnDay(
+  day: Date,
+  db: Prisma.TransactionClient = prisma,
+): Promise<string | null> {
+  const meeting = await db.meeting.findFirst({
+    where: { kind: "GROCOMEET", startsAt: brusselsDay(day) },
+    orderBy: { startsAt: "asc" },
+    select: { id: true },
+  });
+  return meeting?.id ?? null;
+}
+
+/**
+ * Legt de openstaande Theokot-bestellingen van grocos in de doos van deze
+ * grocomeet, en haalt er uit wat niet meer op haar dag valt.
+ *
+ * Een bestelling krijgt haar grocomeet al bij het bestellen
+ * (`placeOrder`/`updateOrder`). Dit vangt wat daarna verandert: een GM die er
+ * pas later bijkomt, of die naar een andere dag verzet wordt. Enkel wat nog
+ * `RESERVED` staat, schuift mee; een afgehandelde bestelling is geschiedenis.
+ */
+export async function linkGrocomeetOrders(
+  meeting: Pick<Meeting, "id" | "kind" | "startsAt">,
+): Promise<void> {
+  if (meeting.kind !== "GROCOMEET") return;
+  const day = brusselsTimeOnDay(meeting.startsAt, "00:00");
+
+  await prisma.theokotOrder.updateMany({
+    where: { grocomeetId: meeting.id, status: "RESERVED", session: { date: { not: day } } },
+    data: { grocomeetId: null },
+  });
+
+  const orders = await prisma.theokotOrder.findMany({
+    where: { status: "RESERVED", grocomeetId: null, session: { date: day } },
+    select: { id: true, userId: true },
+  });
+  if (orders.length === 0) return;
+
+  const grocos = await usersWithLivePermission(
+    orders.map((order) => order.userId),
+    "grocomeet.reserve",
+  );
+  const ids = orders.filter((order) => grocos.has(order.userId)).map((order) => order.id);
+  if (ids.length === 0) return;
+
+  await prisma.theokotOrder.updateMany({
+    where: { id: { in: ids }, status: "RESERVED", grocomeetId: null },
+    data: { grocomeetId: meeting.id },
+  });
 }
 
 async function notifyInvalidated(

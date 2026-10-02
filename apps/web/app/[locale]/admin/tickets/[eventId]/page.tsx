@@ -17,6 +17,7 @@ import {
 import { hasLocale } from "@/lib/locale";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
 import { PRESALE_SHIFT_THRESHOLD, presaleStart } from "@/lib/ticketing/presale";
+import { adminShopLink } from "@/lib/ticketing/shopPath";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { StatusBadge } from "@/components/ticketing/admin/StatusBadge";
@@ -97,7 +98,10 @@ export default async function TicketEventDashboard({
   const reserved = pools.reduce((sum, pool) => sum + pool.reservedCount, 0);
   const attendanceRate = ticketCount > 0 ? checkedInCount / ticketCount : 0;
   const base = `${ticketBase(locale)}/admin/tickets/${eventId}`;
-  const shopHref = `${ticketBase(locale)}/tickets/${event.slug}`;
+  // Via de privélink voor een privé-event, anders gaf deze knop de organisator
+  // zelf een 404; zie `adminShopLink`.
+  const shopLink = adminShopLink(event, capabilities.includes("MANAGE_EVENT"));
+  const shopHref = `${ticketBase(locale)}${shopLink.path}`;
   const setupChecks = [
     {
       label: locale === "nl" ? "Tickettype en prijs" : "Ticket type and price",
@@ -174,10 +178,12 @@ export default async function TicketEventDashboard({
             {event.location ? <span><MapPin aria-hidden="true" size={14} />{event.location}</span> : null}
           </div>
           <div className="ticket-admin-actions ticket-admin-section-actions">
-            <Link className="ticket-admin-button" href={shopHref}>
+            {/* Een gewone link: de privélink is een route die een cookie zet en
+                doorstuurt, en dat hoort een volledige navigatie te zijn. */}
+            <a className="ticket-admin-button" href={shopHref}>
               <ExternalLink aria-hidden="true" size={15} />
               {locale === "nl" ? "Ticketshop" : "Ticket shop"}
-            </Link>
+            </a>
             {capabilities.includes("SCAN") ? (
               <Link className="ticket-admin-button" data-variant="primary" href={`/scan/${eventId}`}>
                 <ScanLine aria-hidden="true" size={16} />

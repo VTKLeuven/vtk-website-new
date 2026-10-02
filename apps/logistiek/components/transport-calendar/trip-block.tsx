@@ -109,8 +109,8 @@ export function blockLook({
  * `TRIP_BLOCK_FIELDS`); `fields` weglaten geeft de standaardweergave, wat het
  * publieke overzicht en de maandweergave gebruiken.
  *
- * De volgorde staat vast en is niet instelbaar: uur bovenaan, dan waarvoor, dan
- * waarmee, dan wie. Een blok waarvan de regels per persoon in een andere
+ * De volgorde staat vast en is niet instelbaar: uur bovenaan, dan waarvoor (en
+ * bij welk evenement), dan waarmee, dan wie. Een blok waarvan de regels per persoon in een andere
  * volgorde staan, moet je elke keer opnieuw lezen in plaats van herkennen.
  */
 export function BlockContent({
@@ -152,6 +152,9 @@ export function BlockContent({
         </span>
       ) : null}
       {fields.title ? <span className="block truncate">{block.title}</span> : null}
+      {fields.event && block.eventName ? (
+        <span className="block truncate font-medium text-vtk-navy">{block.eventName}</span>
+      ) : null}
       {/* De post of werkgroep. Standaard uit, en enkel wanneer ze er is: op het
           publieke overzicht staat er geen aanvrager in het blok. */}
       {fields.requester && block.subtitle ? (
@@ -215,6 +218,7 @@ export function blockLabel({
 }): string {
   return [
     block.title,
+    block.eventName ? `evenement ${block.eventName}` : null,
     block.subtitle,
     vehicle?.name,
     `${formatTime(start)} tot ${formatTime(end)}`,

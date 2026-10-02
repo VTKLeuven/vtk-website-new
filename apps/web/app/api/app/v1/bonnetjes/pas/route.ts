@@ -3,7 +3,6 @@ import { z } from "zod";
 
 import { corsPreflight } from "@/lib/cors";
 import { requirePermission } from "@/lib/session";
-import { SANDWICH_VOUCHER_COST } from "@/lib/theokot";
 import { pickupForUser } from "@/lib/theokot-pickup";
 import type { AppPassHolder } from "@/lib/app-api/contract";
 import { absoluteMediaUrl } from "@/lib/app-api/media";
@@ -61,7 +60,12 @@ export async function POST(request: Request) {
       mayHandOut ? pickupForUser(user.id) : Promise.resolve(null),
     ]);
 
-    const order = pickup && pickup.ok ? pickup.orders.find((row) => row.status === "RESERVED") : null;
+    // Een bestelling in de doos van de grocomeet ligt niet aan de balie en wordt
+    // daar ook niet betaald; de app kent die melding (nog) niet, dus ze valt weg.
+    const order =
+      pickup && pickup.ok
+        ? pickup.orders.find((row) => row.status === "RESERVED" && !row.grocomeet)
+        : null;
 
     const payload: AppPassHolder = {
       userId: user.id,
@@ -80,8 +84,10 @@ export async function POST(request: Request) {
               unitPriceCents: line.unitPriceCents,
             })),
             canRedeemVouchers:
-              order.voucherRedemption === null && vouchers >= SANDWICH_VOUCHER_COST,
-            voucherCost: SANDWICH_VOUCHER_COST,
+              order.voucherRedemption === null &&
+              order.voucherCost > 0 &&
+              vouchers >= order.voucherCost,
+            voucherCost: order.voucherCost,
           }
         : null,
     };

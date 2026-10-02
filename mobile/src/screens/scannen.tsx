@@ -17,7 +17,7 @@ import { PageHead } from '../components/PageHead';
 import { QrScanner } from '../components/QrScanner';
 import { Stepper } from '../components/Stepper';
 import { Button, Card, ErrorState, Loading } from '../components/ui';
-import { formatDayShort, formatEuro } from '../format';
+import { formatDayShort, formatEuro, formatVouchers } from '../format';
 import { scanKindOf, UNKNOWN_SCAN_MESSAGE } from '../scanKind';
 import { useApp } from '../state/app';
 import { useTabRouter } from '../navigation';
@@ -277,7 +277,10 @@ function PassResult({
   onClose: () => void;
   onDone: () => void;
 }) {
-  const [amount, setAmount] = useState(Math.min(1, holder.vouchers));
+  // Aan de toog gaan enkel hele bonnetjes af. Een broodje aan de afhaalbalie kost
+  // per half, dus het saldo kan op een half eindigen; dat half blijft staan.
+  const payable = Math.floor(holder.vouchers);
+  const [amount, setAmount] = useState(Math.min(1, payable));
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -285,7 +288,9 @@ function PassResult({
     setBusy(true);
     try {
       const result = await redeemVouchers({ pass, amount, place: 'Toog' });
-      setMessage(`${result.amount} afgeboekt bij ${result.name}. Nog ${result.remaining} over.`);
+      setMessage(
+        `${result.amount} afgeboekt bij ${result.name}. Nog ${formatVouchers(result.remaining)} over.`,
+      );
     } catch (error) {
       setMessage(scanError(error));
     } finally {
@@ -316,7 +321,7 @@ function PassResult({
 
       <View style={styles.balance}>
         <Text style={styles.body}>Openstaande bonnetjes</Text>
-        <Text style={styles.balanceValue}>{holder.vouchers}</Text>
+        <Text style={styles.balanceValue}>{formatVouchers(holder.vouchers)}</Text>
       </View>
 
       {holder.theokotOrder ? (
@@ -330,21 +335,25 @@ function PassResult({
           <Text style={styles.hint}>
             Te betalen: {formatEuro(holder.theokotOrder.totalCents)}
             {holder.theokotOrder.canRedeemVouchers
-              ? `, of ${holder.theokotOrder.voucherCost} bonnetjes`
+              ? `, of ${formatVouchers(holder.theokotOrder.voucherCost)} bonnetjes`
               : ''}
           </Text>
         </View>
       ) : null}
 
-      {holder.vouchers === 0 ? (
-        <Text style={styles.body}>Er staan geen bonnetjes open, dus er valt niets af te boeken.</Text>
+      {payable === 0 ? (
+        <Text style={styles.body}>
+          {holder.vouchers > 0
+            ? 'Er staat enkel een half bonnetje open. Aan de toog gaan er enkel hele af; het half kan aan de afhaalbalie van het Theokot.'
+            : 'Er staan geen bonnetjes open, dus er valt niets af te boeken.'}
+        </Text>
       ) : (
         <>
           <View style={styles.amountRow}>
             <Text style={styles.body}>Af te boeken</Text>
             <Stepper
               value={amount}
-              max={holder.vouchers}
+              max={payable}
               label="bonnetjes"
               onChange={setAmount}
             />

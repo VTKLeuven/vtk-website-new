@@ -447,6 +447,19 @@
   background: rgba(255, 255, 255, 0.22);
 }
 
+/* Met een profielfoto vult de foto de ronde knop; de rand blijft erover liggen. */
+.vtk-site-header .profile-menu-trigger:has(.profile-menu-avatar) {
+  overflow: hidden;
+  padding: 0;
+}
+
+.vtk-site-header .profile-menu-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  object-fit: cover;
+}
+
 /* De zoekknop hangt aan dezelfde grens als de tabs (zie het blok onderaan):
    zolang de tabs staan, is dit de zoekingang, en zodra het uitklapmenu het
    overneemt staat het echte zoekveld daarin. Verschuif je de ene grens, verschuif
@@ -572,7 +585,7 @@
     right: 0;
     z-index: 60;
     display: block;
-    max-height: calc(100dvh - var(--vtk-header-height));
+    max-height: calc(calc(100 * var(--vtk-dvh, 1dvh)) - var(--vtk-header-height));
     overflow-y: auto;
     padding: 8px clamp(16px, 5vw, 28px) 20px;
     background: var(--navy);

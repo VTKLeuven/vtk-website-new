@@ -1,9 +1,11 @@
 "use client";
 
+import Image from "next/image";
 import Link from "@/components/ui/Link";
 import { usePathname } from "next/navigation";
 import { useState, useRef, useEffect } from "react";
 import { logoutAction } from "@/app/actions/auth";
+import { AUTHORIZATION_PREVIEW_STOP_PATH } from "@/lib/authorization-preview-constants";
 import { OUTBOUND_EVENT, outboundHost, umamiEvent } from "@/lib/analytics";
 import type { PostAdminLink } from "@/lib/postAdminLinks";
 import type { Locale } from "@vtk/i18n";
@@ -18,6 +20,7 @@ const FeedbackDialog = dynamic(() => import("./FeedbackDialog").then((m) => m.Fe
 
 export function ProfileMenu({
   name,
+  avatarUrl = null,
   isAdmin,
   tools,
   canReserveGrocomeet,
@@ -26,8 +29,11 @@ export function ProfileMenu({
   base,
   locale,
   variant = "default",
+  previewActive = false,
 }: {
   name: string;
+  /** Profielfoto (`publicUrl(user.avatarKey)`); zonder foto blijft de initiaal staan. */
+  avatarUrl?: string | null;
   isAdmin: boolean;
   /** Beheerschermen van een post op een andere site; leeg voor wie er geen heeft. */
   tools: PostAdminLink[];
@@ -46,6 +52,8 @@ export function ProfileMenu({
   base: string;
   locale: Locale;
   variant?: "default" | "editorial";
+  /** Loopt er een autorisatievoorbeeld? Dan logt de knop uit via de stoproute. */
+  previewActive?: boolean;
 }) {
   const pathname = usePathname() ?? "/";
   const [open, setOpen] = useState(false);
@@ -106,6 +114,7 @@ export function ProfileMenu({
   }, []);
 
   const editorial = variant === "editorial";
+  const initial = name.slice(0, 1).toUpperCase();
 
   const triggerClass = editorial
     ? "profile-menu-trigger"
@@ -136,13 +145,24 @@ export function ProfileMenu({
         className={triggerClass}
         aria-haspopup="menu"
         aria-expanded={open}
+        aria-label={editorial ? name : undefined}
+        title={editorial ? name : undefined}
       >
         {editorial ? (
-          name.slice(0, 1).toUpperCase()
+          avatarUrl ? (
+            // De knop is 38px; 76 houdt de foto scherp op een retinascherm.
+            <Image src={avatarUrl} alt="" width={76} height={76} className="profile-menu-avatar" />
+          ) : (
+            initial
+          )
         ) : (
           <>
-            <span className="grid h-8 w-8 place-items-center rounded-full bg-vtk-yellow text-sm font-bold text-vtk-blue shadow-inner">
-              {name.slice(0, 1).toUpperCase()}
+            <span className="grid h-8 w-8 place-items-center overflow-hidden rounded-full bg-vtk-yellow text-sm font-bold text-vtk-blue shadow-inner">
+              {avatarUrl ? (
+                <Image src={avatarUrl} alt="" width={64} height={64} className="h-full w-full object-cover" />
+              ) : (
+                initial
+              )}
             </span>
             <span className="hidden max-w-[120px] truncate font-medium sm:inline">{name}</span>
           </>
@@ -208,11 +228,23 @@ export function ProfileMenu({
           >
             {labels.feedback}
           </button>
-          <form action={logoutAction}>
-            <button type="submit" className={`${itemClass} text-left`} role="menuitem">
-              {labels.logout}
-            </button>
-          </form>
+          {previewActive ? (
+            // Een gewone POST en geen server action: die laatste blokkeert
+            // proxy.ts tijdens een voorbeeld, en dan crashte de pagina.
+            <form action={AUTHORIZATION_PREVIEW_STOP_PATH} method="post">
+              <input type="hidden" name="locale" value={locale} />
+              <input type="hidden" name="logout" value="1" />
+              <button type="submit" className={`${itemClass} text-left`} role="menuitem">
+                {labels.logout}
+              </button>
+            </form>
+          ) : (
+            <form action={logoutAction}>
+              <button type="submit" className={`${itemClass} text-left`} role="menuitem">
+                {labels.logout}
+              </button>
+            </form>
+          )}
         </div>
       )}
       {/* Buiten het menu: de modal moet blijven staan wanneer het menu sluit,

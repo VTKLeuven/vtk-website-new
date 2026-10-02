@@ -326,13 +326,20 @@ the design language into the application instead of copying mockup content.
   representatives for this visitor), so it never sits between two navy bands:
   were it there, those two would collide the moment it disappears. See
   `docs/design-decisions.md` for the section ordering rationale.
-- News (`components/editorial/NewsBand.tsx`, `lib/news`): one featured card on
-  the left and a hairline register on the right, on `--paper-2`. The kind of a
-  post is its colour (from the ticket palette, mapped once in `vtk-news.css`)
-  and its icon tile, never a pill over a photo. The word from the praeses is
-  Bakske length: it stays clamped to nine lines in the featured card with
-  "Lees de hele brief" to open it in place; do not print it in the register or
-  let the card grow to its full length. See `docs/design-decisions.md`.
+- News (`components/editorial/NewsBand.tsx`, `lib/news`): the featured post on
+  the left (usually the word from the praeses, as a letter) and the rest as the
+  shared event tile (`vtk-eventcard.css`) in a carousel beside it, on
+  `--paper-2`. Only the tiles move: one per click or every 10 seconds, with a
+  pause button, no autoplay under `prefers-reduced-motion`, and every page scroll
+  restarts the 10 seconds so no tile slides away while someone scrolls past it;
+  do not let it rotate without that pause control. The kind of a post is a small-caps word, never a
+  colour or an icon tile (those were reviewed and removed: they appeared nowhere
+  else on the site). The word from the praeses is Bakske length: it stays
+  clamped to nine lines in the featured card with "Lees de hele brief" to open
+  it in place; do not make it a tile or let the card grow to its full length.
+  /nieuws is an agenda per week with the /tickets filter chips and a rail; a
+  word from the praeses opens with the author's square portrait. See
+  `docs/design-decisions.md`.
 - Photography: content cards open with a real photo under a navy scrim, never a
   decorative illustration. Aanbod cards ("Wat we doen") carry a photo header
   (16:9, light 115deg scrim) and are uniform: every card in the grid gets the
@@ -506,6 +513,13 @@ the design language into the application instead of copying mockup content.
   The sticky rail beside the roster that was there was reviewed and removed. Do
   not reintroduce a card or border around a portrait: only the tile without a
   photo gets an outline, or the initial floats loose on the band.
+- Werkgroepen (`/werkgroepen`): per werkgroep the info text on the left and the
+  team in the right margin as a hairline register (`vtk-werkgroepen.css`), not a
+  grid of big tiles under the text. The leads (named by `Group.leadLabel`,
+  free text, usually G3 or G4) get a portrait with the yellow ring; the members
+  start on a new line below them as names with a small portrait in two columns.
+  The tile grid turned a werkgroep of seventeen into a wall of initials. See
+  `docs/design-decisions.md`.
 - Lists and calendars: favor agenda/list layouts, tabular times, compact day
   labels, and small yellow status pins.
   - **The shift page (`/shift`, `components/shift`) sets every digit in Inter
@@ -545,6 +559,17 @@ the design language into the application instead of copying mockup content.
     `.ev-card-link::after`, and that area resolves against the nearest positioned
     ancestor; with the body positioned it stopped at the photo and clicking the
     poster did nothing.
+- **An event with tickets on its page is one page, not two.** With
+  `TicketEvent.onEventPage` the event page (`/kalender/<slug>`) carries the
+  ticket shop in its right panel (`components/calendar/EventTicketsPage.tsx`),
+  with interest and "Zet in mijn agenda" quietly below it. An event can have
+  several ticket pages; they become tabs at the top of the panel, and **every
+  tab links to that sale's own `/tickets/<slug>`**, which renders the same event
+  page with that tab selected, so each sale stays shareable on its own. Do not
+  switch tabs client-side without changing the URL, and do not add a second
+  event head: both routes build on `components/calendar/EventPageParts.tsx`.
+  The shop's `<form>` only wraps the details block, because the interest button
+  below the panel carries its own forms. See `docs/design-decisions.md`.
 - Functional pages and modules, including Media and Logistiek, use the same
   visual system as the main website. A separate subdomain or operational flow
   is not a reason to invent another hero, type treatment, palette, container
@@ -590,6 +615,18 @@ the design language into the application instead of copying mockup content.
     hoogstens één primaire bewerktaak tegelijk open. Open bij een lege dataset
     niet automatisch een lang formulier naast een leeg tweede paneel; toon een
     gerichte empty state met een duidelijke startactie.
+  - **De zijbalk kan ingeklapt worden, maar staat standaard uit.** De knop naast
+    ADMIN (enkel vanaf 860px) maakt er een rail van 60px van met enkel de
+    iconen; een groep opent haar tabs in een kaart ernaast, de naam staat in een
+    tooltip. De rail begint op de hoogte van de paginatitel, de `h1`
+    (`headingTop` in `packages/ui/src/AdminNav.tsx`): haar bovenkant staat
+    gelijk met het woord "Dashboard". Zonder `h1` begint ze bovenaan. Het
+    eerste omkaderde element onder de titel is geprobeerd en teruggedraaid: dan
+    leek de rail weggezakt en stond ze op elke pagina op een andere hoogte. De
+    inhoud schuift tot 20px ervan. Onthouden in een cookie
+    (`lib/adminNavCookie.ts`), zodat de server de juiste stand meteen rendert.
+    Maak inklappen nooit de standaard: wie de admin zelden gebruikt, vindt een
+    tab sneller aan zijn naam dan aan een icoon. Zie `docs/design-decisions.md`.
   - Below 860px the left column collapses into one button naming the tab you are
     on, which opens the full grouped list as a panel underneath
     (`AdminNav` + `vtk-admin.css`). Do not reintroduce the horizontal scroller
@@ -619,9 +656,25 @@ the design language into the application instead of copying mockup content.
     kolommen voor drie bits. Ze zijn nu één `.vtk-expense-track` van drie
     segmenten met het statuswoord erachter. Zoek bij een te brede tabel dus
     eerst naar kolommen die hetzelfde zeggen, voor je kolommen versmalt.
+  - **Een lijst van blokken die samen meer dan één schermhoogte inneemt, klapt
+    dicht.** Gebruik `AdminDisclosure` (`apps/web/components/admin/AdminDisclosure.tsx`):
+    de kop met naam, status en een korte samenvatting blijft zichtbaar, de velden
+    komen pas na een klik. Open waren de frontpages en de slogans een muur van
+    formulieren waarin je het blok dat je zocht niet meer terugvond.
+    - Standaard dicht. Wat je net aanmaakt of wat nog leeg is, staat open: dat
+      wil je net invullen.
+    - Acties die ook dichtgeklapt nodig zijn (aan/uit, verplaatsen,
+      verwijderen), gaan in `actions`, naast de uitklapknop en niet erin.
+    - `variant="row"` voor een item binnen een kaart (geen kaart in een kaart).
+    - Een korte lijst die in één scherm past, klapt niet dicht: elk blok een
+      klik verder wegzetten, helpt daar niemand.
   - **Een rij in een beheertabel opent zijn detail met een klik op de rij zelf**,
-    niet enkel via een `i`-knop ernaast. De cel met de rij-acties stopt de
-    propagatie, en de titelknop in de rij blijft bestaan omdat een toetsenbord
+    niet enkel via een `i`-knop ernaast. Leidt de rij naar een andere pagina,
+    gebruik dan `LinkedRow` (`apps/web/components/ui/LinkedRow.tsx`) en geen
+    `::after` over de rijlink: Safari ankerde dat vlak niet op de `<tr>`, zodat
+    de laatste rij over alle andere lag en de eerste niet meer aan te klikken
+    was. Zet `data-row-action` op een cel of bediening die de klik zelf houdt.
+    De cel met de rij-acties stopt de propagatie, en de titelknop in de rij blijft bestaan omdat een toetsenbord
     en een screenreader een echt focusbaar element nodig hebben. Verwijderen
     hoort dan in de detailmodal en niet meer in de rij: het is de enige
     onomkeerbare actie en het scheelt een icoon per rij.
@@ -660,6 +713,20 @@ the design language into the application instead of copying mockup content.
   in `docs/design-decisions.md`.
 
 ## Implementation Constraints
+
+- **On a laptop up to 14 inch the whole site renders at 90%** (`zoom: 0.9` on
+  `:root` between 1024 and 1600 CSS px with a fine pointer, in `vtk-base.css`),
+  because it looked right after one Ctrl - and too large at 100%. `zoom` does not
+  scale `vw`/`vh`, so **anything that must reach the screen edge or the full
+  height uses the variables, never the bare unit**: `calc(50 * var(--vtk-vw, 1vw))`
+  for a full-bleed band, `calc(100 * var(--vtk-dvh, 1dvh))` for a screen-high
+  block. A bare `50vw` leaves a strip on each side under the zoom. Fluid padding
+  (`clamp(20px, 3vw, 36px)`) may keep the bare unit.
+  - JavaScript that mixes `getBoundingClientRect`/`clientX`/`innerHeight` (visual
+    pixels) with `offsetWidth`/`offsetHeight`/a width from `ResizeObserver`
+    (layout pixels) is off by 10% under the zoom. Compute a ratio of the visible
+    size, or divide by `rect.height / element.offsetHeight`, as `DailyChart`,
+    `AdminNav` and `CookieConsent` do.
 
 - Keep Tailwind v4 source scanning explicit and do not switch to auto-detection.
 - Keep `next dev --webpack` for both apps; do not re-enable Turbopack in dev.

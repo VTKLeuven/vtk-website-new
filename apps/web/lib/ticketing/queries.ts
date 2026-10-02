@@ -9,13 +9,14 @@ import { orderAccessCookieName } from "./access";
 import { isAppleWalletAvailable, isGoogleWalletAvailable } from "./wallet";
 import { ticketTermsPath } from "./terms";
 import {
+  isTargetAudience,
   ticketTypeIsHidden,
   ticketTypeMemberPrice,
   ticketTypeNeedsMembership,
   ticketTypeRequiresLogin,
+  type TicketTargetAudience,
 } from "./audience";
-import { publicUrl } from "@/lib/storage";
-import { focusPosition } from "@/lib/imageFocus";
+import { ticketViewerProfile } from "./viewerProfile";
 import { getTicketEventAccess } from "./authorization";
 import {
   isInPresaleNow,
@@ -24,15 +25,18 @@ import {
   type PresaleViewer,
 } from "./presale";
 import { presaleViewerFor } from "./presaleViewer";
+import { hasPrivateTicketAccess } from "./privateLink";
+import { ticketPoster, ticketPosterSelect } from "./poster";
 import { userIsMember } from "@/lib/membership";
 
 type PublicLocale = "nl" | "en";
 
 const publicEventInclude = {
   ownerGroup: true,
-  // Enkel voor de poster: een ticketevent heeft geen eigen foto, het gekoppelde
-  // kalender-event wel.
-  calendarEvent: { select: { imageKey: true, imageFocusX: true, imageFocusY: true } },
+  // Voor de banner: een themabanner of het gekoppelde kalender-event, wanneer
+  // het ticketevent geen eigen foto heeft. Zie lib/ticketing/poster.ts.
+  imageCategory: ticketPosterSelect.imageCategory,
+  calendarEvent: ticketPosterSelect.calendarEvent,
   presaleGroups: { select: { groupId: true } },
   questions: { where: { active: true }, orderBy: { sortOrder: "asc" } },
   ticketTypes: {
@@ -47,12 +51,12 @@ type PublicEventRecord = Prisma.TicketEventGetPayload<{
 }>;
 
 const orderInclude = {
-  // Dezelfde poster als in de shop: een ticketevent heeft geen eigen foto, het
-  // gekoppelde kalender-event wel. De bestelpagina toont ze bij het event in
-  // het bestelpaneel.
+  // Dezelfde banner als in de shop (lib/ticketing/poster.ts). De bestelpagina
+  // toont ze bij het event in het bestelpaneel.
   event: {
     include: {
-      calendarEvent: { select: { imageKey: true, imageFocusX: true, imageFocusY: true } },
+      imageCategory: ticketPosterSelect.imageCategory,
+      calendarEvent: ticketPosterSelect.calendarEvent,
     },
   },
   items: { include: { ticket: true } },
@@ -71,18 +75,17 @@ function isIssued(item: OrderItemRecord): item is IssuedOrderItem {
 }
 
 /**
- * Is de ingelogde bezoeker erelid? Een DB-lezing, want `SessionPayload` draagt
- * permissies en rollen, geen ledenstatus, en dat uitbreiden zou elke
- * sessielezing op de hele site duurder maken voor iets wat enkel de ticketshop
- * nodig heeft.
+ * De doelgroepen waarvoor dit event een ticket heeft dat een uitgelogde
+ * bezoeker niet ziet. Enkel voor wie niet ingelogd is: een ingelogd lid dat er
+ * niet bij hoort, hoort er ook na inloggen niet bij. Ereleden staan hier bewust
+ * niet tussen; dat ticket bestaat voor de rest van de site niet.
  */
-async function viewerIsHonorary(userId: string | undefined): Promise<boolean> {
-  if (!userId) return false;
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { honoraryMember: true },
-  });
-  return user?.honoraryMember ?? false;
+function audienceLoginHint(
+  types: { audience: string }[],
+  signedIn: boolean,
+): TicketTargetAudience[] {
+  if (signedIn) return [];
+  return [...new Set(types.map((type) => type.audience).filter(isTargetAudience))];
 }
 
 function ticketTypeIsOnSale(
@@ -109,18 +112,18 @@ function publicEventDto(
     id: event.id,
     slug: event.slug,
     title: localized(event.titleNl, event.titleEn, locale),
+    // Staat deze verkoop op de eventpagina, dan toont /tickets/<slug> die
+    // pagina; zie lib/ticketing/eventPage.ts.
+    calendarEventId: event.calendarEventId,
+    onEventPage: event.onEventPage,
+    // Enkel de vlag, nooit het token: alles in deze dto kan in de HTML belanden.
+    isPrivate: event.isPrivate,
+    label: localized(event.labelNl ?? "", event.labelEn, locale) || null,
+    ownTimes: event.ownTimes,
     description: localized(event.descriptionNl ?? "", event.descriptionEn, locale),
     location: event.location,
     locationAddress: event.locationAddress,
-    poster: event.calendarEvent?.imageKey
-      ? {
-          src: publicUrl(event.calendarEvent.imageKey)!,
-          position: focusPosition({
-            x: event.calendarEvent.imageFocusX,
-            y: event.calendarEvent.imageFocusY,
-          }),
-        }
-      : null,
+    poster: ticketPoster(event),
     startsAt: event.startsAt,
     endsAt: event.endsAt,
     currentTime: new Date().toISOString(),
@@ -224,6 +227,9 @@ export async function listPublishedTicketEvents(
     prisma.ticketEvent.findMany({
       where: {
         status: "PUBLISHED",
+        // Een privéverkoop staat in geen enkele lijst, ook niet voor wie de
+        // link al volgde: dit overzicht is wat de hele kring ziet.
+        isPrivate: false,
         endsAt: { gte: now },
         AND: [
           overview
@@ -247,8 +253,8 @@ export async function listPublishedTicketEvents(
     }),
     getSession(await headers()),
   ]);
-  const [isHonorary, isMember, viewer] = await Promise.all([
-    viewerIsHonorary(session?.user.id),
+  const [profile, isMember, viewer] = await Promise.all([
+    ticketViewerProfile(session?.user.id),
     userIsMember(session?.user.id),
     presaleViewerFor(session, events),
   ]);
@@ -256,12 +262,15 @@ export async function listPublishedTicketEvents(
     const dto = publicEventDto(event, locale, viewer);
     const opensLater = Boolean(dto.salesStart && new Date(dto.salesStart) > now);
     if (opensLater && !overview) return [];
-    const selectableTypes = dto.ticketTypes.filter(
-      (type) =>
-        (overview
-          ? !type.salesEnd || new Date(type.salesEnd) > now
-          : ticketTypeIsOnSale(type, now) && type.available >= (type.minPerOrder ?? 1)) &&
-        !ticketTypeIsHidden(type, isHonorary)
+    const windowTypes = dto.ticketTypes.filter((type) =>
+      overview
+        ? !type.salesEnd || new Date(type.salesEnd) > now
+        : ticketTypeIsOnSale(type, now) && type.available >= (type.minPerOrder ?? 1)
+    );
+    const selectableTypes = windowTypes.filter((type) => !ticketTypeIsHidden(type, profile));
+    const loginHint = audienceLoginHint(
+      windowTypes.filter((type) => ticketTypeIsHidden(type, profile)),
+      Boolean(session),
     );
     const ticketTypes = selectableTypes.filter(
       (type) =>
@@ -276,7 +285,8 @@ export async function listPublishedTicketEvents(
       requiresLogin:
         !session &&
         ticketTypes.length === 0 &&
-        selectableTypes.some(ticketTypeRequiresLogin),
+        (selectableTypes.some(ticketTypeRequiresLogin) || loginHint.length > 0),
+      audienceLoginHint: loginHint,
       requiresMembership:
         Boolean(session) &&
         ticketTypes.length === 0 &&
@@ -291,15 +301,22 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
     include: publicEventInclude,
   });
   if (!event || event.status !== "PUBLISHED") return null;
+  // Een privé-event zonder de link is voor deze bezoeker onbestaand: dezelfde
+  // 404 als een verkeerde slug, zodat de pagina niet verraadt dat het bestaat.
+  if (!(await hasPrivateTicketAccess(event))) return null;
 
   const session = await getSession(await headers());
-  const [isHonorary, isMember, viewer] = await Promise.all([
-    viewerIsHonorary(session?.user.id),
+  const [profile, isMember, viewer] = await Promise.all([
+    ticketViewerProfile(session?.user.id),
     userIsMember(session?.user.id),
     presaleViewerFor(session, [event]),
   ]);
   const dto = publicEventDto(event, locale, viewer);
-  const visibleTypes = dto.ticketTypes.filter((type) => !ticketTypeIsHidden(type, isHonorary));
+  const visibleTypes = dto.ticketTypes.filter((type) => !ticketTypeIsHidden(type, profile));
+  const loginHint = audienceLoginHint(
+    dto.ticketTypes.filter((type) => ticketTypeIsHidden(type, profile)),
+    Boolean(session),
+  );
   const ticketTypes = visibleTypes.filter(
     (type) =>
       (Boolean(session) || !ticketTypeRequiresLogin(type)) &&
@@ -312,7 +329,8 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
     requiresLogin:
       !session &&
       ticketTypes.length === 0 &&
-      visibleTypes.some(ticketTypeRequiresLogin),
+      (visibleTypes.some(ticketTypeRequiresLogin) || loginHint.length > 0),
+    audienceLoginHint: loginHint,
     requiresMembership:
       Boolean(session) &&
       ticketTypes.length === 0 &&
@@ -349,6 +367,7 @@ export async function getTicketEventPreviewBySlug(slug: string, locale: PublicLo
   return {
     ...publicEventDto(event, locale, session),
     requiresLogin: false,
+    audienceLoginHint: [] as TicketTargetAudience[],
     viewer: { id: session.user.id, name: session.user.name, email: session.user.email },
   };
 }
@@ -425,15 +444,7 @@ function orderDto(order: OrderRecord, authenticatedOwner: boolean) {
       title: order.locale === "EN" && order.event.titleEn ? order.event.titleEn : order.event.titleNl,
       startsAt: order.event.startsAt,
       location: order.event.location,
-      poster: order.event.calendarEvent?.imageKey
-        ? {
-            src: publicUrl(order.event.calendarEvent.imageKey)!,
-            position: focusPosition({
-              x: order.event.calendarEvent.imageFocusX,
-              y: order.event.calendarEvent.imageFocusY,
-            }),
-          }
-        : null,
+      poster: ticketPoster(order.event),
       confirmationMessage: order.locale === "EN"
         ? order.event.confirmationMessageEn || order.event.confirmationMessageNl
         : order.event.confirmationMessageNl,

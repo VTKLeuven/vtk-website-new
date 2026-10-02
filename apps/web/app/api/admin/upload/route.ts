@@ -5,6 +5,7 @@ import { newStorageKey, putObject } from "@vtk/storage";
 import { publicUrl } from "@/lib/storage";
 import { requireSession } from "@/lib/session";
 import { getFormAccess } from "@/lib/forms/authorization";
+import { getTicketEventAccess } from "@/lib/ticketing/authorization";
 import { hasPermission } from "@vtk/auth";
 import {
   readLimitedFormData,
@@ -55,6 +56,9 @@ export async function POST(request: Request) {
     hasPermission(session, "calendar.create") ||
     hasPermission(session, "calendar.manageAll") ||
     hasPermission(session, "werkgroepen.manage") ||
+    // De banner van een ticketevent, ook al bij het aanmaken.
+    hasPermission(session, "tickets.create") ||
+    hasPermission(session, "tickets.manageAll") ||
     // Theokot beheert de foto per broodje in de eigen aanbod-editor; zonder dit
     // recht ziet een beheerder daar een uploadknop die altijd faalt.
     hasPermission(session, "theokot.manage");
@@ -65,6 +69,15 @@ export async function POST(request: Request) {
   const formManager =
     !canUpload && kind === "image" && formId
       ? (await getFormAccess(formId))?.capabilities.includes("MANAGE_FORM") === true
+      : false;
+
+  // Wie een ticketevent beheert via een grant (en dus niet noodzakelijk
+  // `tickets.create` heeft), mag er een banner voor uploaden. Enkel een
+  // afbeelding, en enkel voor een event dat die gebruiker mag beheren.
+  const ticketEventId = String(form.get("ticketEventId") ?? "").slice(0, 100);
+  const ticketManager =
+    !canUpload && !formManager && kind === "image" && ticketEventId
+      ? (await getTicketEventAccess(ticketEventId))?.capabilities.includes("MANAGE_EVENT") === true
       : false;
 
   // Een gewoon werkgroeplid mag afbeeldingen invoegen in de eigen infotekst.
@@ -96,7 +109,7 @@ export async function POST(request: Request) {
   // plafond, zodat dit geen algemene bestandsdropzone wordt.
   const feedbackUpload = kind === "feedback";
 
-  if (!canUpload && !formManager && !werkgroepMember && !tileUpload && !feedbackUpload) {
+  if (!canUpload && !formManager && !ticketManager && !werkgroepMember && !tileUpload && !feedbackUpload) {
     return NextResponse.json({ error: "forbidden" }, { status: 403 });
   }
 

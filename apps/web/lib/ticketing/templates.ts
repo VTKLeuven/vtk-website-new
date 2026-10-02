@@ -15,9 +15,10 @@
  */
 
 import { ticketColorKey } from "./ticketColors";
+import { TICKET_AUDIENCES, type TicketAudience } from "./audience";
 
-export const TICKET_TEMPLATE_AUDIENCES = ["PUBLIC", "MEMBERS", "HONORARY"] as const;
-export type TicketTemplateAudience = (typeof TICKET_TEMPLATE_AUDIENCES)[number];
+export const TICKET_TEMPLATE_AUDIENCES = TICKET_AUDIENCES;
+export type TicketTemplateAudience = TicketAudience;
 
 export const TICKET_TEMPLATE_QUESTION_TYPES = [
   "SHORT_TEXT",

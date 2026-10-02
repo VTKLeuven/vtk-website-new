@@ -614,7 +614,7 @@
 .tv-time-body {
   display: grid;
   overflow-y: auto;
-  max-height: 62vh;
+  max-height: calc(62 * var(--vtk-vh, 1vh));
 }
 
 .tv-hours {

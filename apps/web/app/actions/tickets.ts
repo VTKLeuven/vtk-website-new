@@ -1,7 +1,7 @@
 "use server";
 
 import { randomBytes } from "node:crypto";
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect, unstable_rethrow } from "next/navigation";
 import { prisma } from "@vtk/db";
 import type { Prisma } from "@prisma/client";
@@ -13,6 +13,8 @@ import {
 } from "@/lib/ticketing/authorization";
 import { parseEuroAmount } from "@/lib/ticketing/money";
 import { newPresaleToken } from "@/lib/ticketing/presaleLink";
+import { newPrivateToken } from "@/lib/ticketing/privateLink";
+import { NEWS_TAG } from "@/lib/news/load";
 import { requestTicketRefund } from "@/lib/ticketing/refunds";
 import { slugify } from "@/lib/ticketing/slug";
 import { ticketColorKey } from "@/lib/ticketing/ticketColors";
@@ -26,9 +28,12 @@ import {
   type TicketDesignDraft,
 } from "@/lib/ticketing/design";
 import { logAudit } from "@/lib/audit";
+import { deleteObject } from "@vtk/storage";
+import { readImageField, resolveImageKey } from "@/lib/imageField";
+import { readImageFocus } from "@/lib/imageFocus";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { TICKET_TERMS_SETTING_KEY } from "@/lib/ticketing/terms";
-import { ticketAudienceFrom, type TicketAudience } from "@/lib/ticketing/audience";
+import { ticketAudienceFrom, ticketAudienceLabel, type TicketAudience } from "@/lib/ticketing/audience";
 import { getTicketEventTemplate } from "@/lib/ticketing/templateStore";
 import {
   applyTicketTemplateType,
@@ -77,17 +82,51 @@ const EXPECTED_EVENT_FORM_ERRORS = new Set([
   "INVALID_CONTACTEMAIL",
   "PRESALE_NEEDS_SALES_START",
   "PRESALE_NEEDS_AUDIENCE",
+  "LABEL_REQUIRED",
+  "INVALID_LABELNL",
+  "INVALID_LABELEN",
 ]);
+
+/**
+ * Hoe een verkoop op haar kalenderevent staat: op de eventpagina of apart, met
+ * welke naam, en of ze eigen uren heeft. Zonder kalenderevent is dat allemaal
+ * uit; zie `TicketEvent.onEventPage`.
+ *
+ * Staan er al andere verkopen van hetzelfde event op de eventpagina, dan is een
+ * naam verplicht: de titel komt van het event en is voor elke tab dezelfde.
+ */
+async function eventPagePlacement(
+  formData: FormData,
+  calendarEventId: string | null,
+  currentEventId: string | null,
+) {
+  if (!calendarEventId) {
+    return { onEventPage: false, ownTimes: false, labelNl: null, labelEn: null };
+  }
+  const onEventPage = checkboxValue(formData, "onEventPage");
+  const labelNl = limitedOptionalValue(formData, "labelNl", 80);
+  const labelEn = limitedOptionalValue(formData, "labelEn", 80);
+  if (onEventPage && !labelNl) {
+    const others = await prisma.ticketEvent.count({
+      where: {
+        calendarEventId,
+        onEventPage: true,
+        ...(currentEventId ? { id: { not: currentEventId } } : {}),
+      },
+    });
+    if (others > 0) throw new Error("LABEL_REQUIRED");
+  }
+  return { onEventPage, ownTimes: checkboxValue(formData, "ownTimes"), labelNl, labelEn };
+}
 
 function value(formData: FormData, key: string): string {
   return String(formData.get(key) ?? "").trim();
 }
 
 /** Het woord dat in de auditlijn staat; de UI vertaalt zelf. */
-function ticketAudienceLabel(audience: TicketAudience): string {
-  if (audience === "MEMBERS") return "alleen leden";
-  if (audience === "HONORARY") return "alleen ereleden";
-  return "publiek";
+function ticketAudienceAuditLabel(audience: TicketAudience): string {
+  if (audience === "PUBLIC") return "publiek";
+  return ticketAudienceLabel(audience, "nl").toLowerCase();
 }
 
 /**
@@ -233,6 +272,58 @@ async function resolveLocationGeo(
     locationLatitude: found?.latitude ?? null,
     locationLongitude: found?.longitude ?? null,
   };
+}
+
+type TicketBanner = {
+  imageKey: string | null;
+  imageFocusX: number;
+  imageFocusY: number;
+  imageCategoryId: string | null;
+};
+
+/**
+ * De banner uit `TicketBannerField`: een eigen foto, de standaardbanner van een
+ * kalenderthema, of geen van beide (dan die van het kalenderevent, zie
+ * lib/ticketing/poster.ts). Hoogstens één van de twee blijft staan. Zonder
+ * `bannerMode` in het formulier verandert er niets.
+ */
+async function readTicketBanner(formData: FormData, existing: TicketBanner): Promise<TicketBanner> {
+  const mode = value(formData, "bannerMode");
+  if (mode === "own") {
+    const image = readImageField(formData);
+    if (image.kind === "invalid") throw new Error("INVALID_BANNER");
+    const imageKey = resolveImageKey(image, existing.imageKey);
+    const focus = readImageFocus(formData);
+    return { imageKey, imageFocusX: focus.x, imageFocusY: focus.y, imageCategoryId: null };
+  }
+  if (mode === "category") {
+    const imageCategoryId = value(formData, "imageCategoryId");
+    // Enkel een thema dat een banner draagt: een doelgroep heeft er geen, en
+    // een thema zonder banner zou een ticketevent zonder foto opleveren terwijl
+    // het scherm een keuze toonde.
+    const category = imageCategoryId
+      ? await prisma.calendarCategory.findFirst({
+          where: { id: imageCategoryId, audience: null, imageKey: { not: null } },
+          select: { id: true },
+        })
+      : null;
+    if (!category) throw new Error("INVALID_BANNER");
+    return { imageKey: null, imageFocusX: 0.5, imageFocusY: 0.5, imageCategoryId: category.id };
+  }
+  if (mode === "inherit") {
+    return { imageKey: null, imageFocusX: 0.5, imageFocusY: 0.5, imageCategoryId: null };
+  }
+  return existing;
+}
+
+/** De vervangen of gewiste eigen foto opruimen; mislukt dat, dan is dat geen opslaanfout. */
+async function removeReplacedBanner(previous: string | null, next: string | null) {
+  if (!previous || previous === next) return;
+  try {
+    await deleteObject(previous);
+  } catch {
+    /* ignore */
+  }
 }
 
 function refreshTicketEvent(locale: "nl" | "en", eventId: string) {
@@ -426,10 +517,18 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
     throw new Error("INVALID_CALENDAR_EVENT");
   }
 
+  const placement = await eventPagePlacement(formData, calendarEventId, null);
   const titleNl = limitedValue(formData, "titleNl", 200) || calendarEvent?.titleNl || "";
   if (!titleNl) throw new Error("TITLE_REQUIRED");
-  const startsAt = dateValue(formData, "startsAt") ?? calendarEvent?.start ?? null;
-  const endsAt = dateValue(formData, "endsAt") ?? calendarEvent?.end ?? null;
+  // Een gekoppelde verkoop volgt de uren van het kalenderevent, tenzij ze eigen
+  // uren heeft (een eerstejaarsuur, een wave).
+  const followsCalendar = calendarEvent !== null && !placement.ownTimes;
+  const startsAt = followsCalendar
+    ? calendarEvent.start
+    : (dateValue(formData, "startsAt") ?? calendarEvent?.start ?? null);
+  const endsAt = followsCalendar
+    ? calendarEvent.end
+    : (dateValue(formData, "endsAt") ?? calendarEvent?.end ?? null);
   if (!startsAt || !endsAt || endsAt <= startsAt) throw new Error("INVALID_EVENT_DATES");
   const capacity = boundedIntegerValue(formData, "capacity", 100, 1, 1_000_000);
   // Naam en prijs van het eerste tickettype. Een prijs van 0 is geldig: gratis
@@ -447,6 +546,12 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
   const slugExists = await prisma.ticketEvent.findUnique({ where: { slug: requestedSlug } });
   const slug = slugExists ? `${requestedSlug}-${randomBytes(3).toString("hex")}` : requestedSlug;
   const createdLocationGeo = await resolveLocationGeo(formData, { locationAddress: null, locationLatitude: null, locationLongitude: null });
+  const createdBanner = await readTicketBanner(formData, {
+    imageKey: null,
+    imageFocusX: 0.5,
+    imageFocusY: 0.5,
+    imageCategoryId: null,
+  });
 
   // Het sjabloon waaruit dit event ontstaat. De tickettypes komen uit het
   // formulier, niet rechtstreeks uit het sjabloon: in het aanmaakscherm zijn ze
@@ -476,6 +581,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
     const created = await tx.ticketEvent.create({
       data: {
         calendarEventId,
+        ...placement,
         ownerGroupId,
         slug,
         titleNl,
@@ -484,6 +590,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         descriptionEn: limitedOptionalValue(formData, "descriptionEn", 20_000) ?? calendarEvent?.descriptionEn,
         location: limitedOptionalValue(formData, "location", 300) ?? calendarEvent?.location,
         ...createdLocationGeo,
+        ...createdBanner,
         startsAt,
         endsAt,
         salesStartAt,
@@ -662,12 +769,32 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
   // Hangt er een kalenderevent aan, dan zijn titel, beschrijving, locatie en
   // datums daarvan; het formulier toont ze dan als overgenomen en stuurt ze niet
   // mee. Zonder deze uitzondering zou opslaan ze op null zetten.
-  const linked = event.calendarEventId
-    ? await prisma.calendarEvent.findUnique({ where: { id: event.calendarEventId } })
+  //
+  // De koppeling kan hier ook gezet of gewijzigd worden: een verkoop die al
+  // bestond voor ze bij een event mocht (de losse cantussen naast de volledige
+  // 12u), moet achteraf aan dat event kunnen hangen.
+  const calendarEventId = formData.has("calendarEventId")
+    ? optionalValue(formData, "calendarEventId")
+    : event.calendarEventId;
+  const linked = calendarEventId
+    ? await prisma.calendarEvent.findUnique({ where: { id: calendarEventId } })
     : null;
+  if (calendarEventId && (!linked || linked.groupId !== event.ownerGroupId)) {
+    throw new Error("INVALID_CALENDAR_EVENT");
+  }
+  const placement = await eventPagePlacement(formData, calendarEventId, eventId);
+  // Nieuw gekoppeld en nog zonder naam: de eigen titel wordt de naam op de
+  // eventpagina. Die titel wordt hieronder door die van het event vervangen, en
+  // anders was "Cantussen apart" nergens meer te lezen.
+  if (linked && !event.calendarEventId && !placement.labelNl && event.titleNl !== linked.titleNl) {
+    placement.labelNl = event.titleNl;
+  }
 
-  const startsAt = linked?.start ?? dateValue(formData, "startsAt") ?? event.startsAt;
-  const endsAt = linked?.end ?? dateValue(formData, "endsAt") ?? event.endsAt;
+  const followsCalendar = linked !== null && !placement.ownTimes;
+  const startsAt = followsCalendar
+    ? linked.start
+    : (dateValue(formData, "startsAt") ?? event.startsAt);
+  const endsAt = followsCalendar ? linked.end : (dateValue(formData, "endsAt") ?? event.endsAt);
   if (endsAt <= startsAt) throw new Error("INVALID_EVENT_DATES");
   const maxTicketsPerOrder = boundedIntegerValue(
     formData,
@@ -703,12 +830,15 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
     }
   }
   const locationGeo = await resolveLocationGeo(formData, event);
+  const banner = await readTicketBanner(formData, event);
 
   await prisma.$transaction(async (tx) => {
     await tx.ticketEvent.update({
       where: { id: eventId },
       data: {
         slug: nextSlug,
+        calendarEventId,
+        ...placement,
         titleNl: linked?.titleNl ?? (limitedValue(formData, "titleNl", 200) || event.titleNl),
         titleEn: linked ? linked.titleEn : limitedOptionalValue(formData, "titleEn", 200),
         descriptionNl: linked
@@ -719,6 +849,7 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
           : limitedOptionalValue(formData, "descriptionEn", 20_000),
         location: linked ? linked.location : limitedOptionalValue(formData, "location", 300),
         ...locationGeo,
+        ...banner,
         startsAt,
         endsAt,
         salesStartAt,
@@ -777,6 +908,7 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
     target: await ticketEventTitle(eventId),
     summary: status === event.status ? "instellingen bewerkt" : `status gezet op ${status}`,
   });
+  await removeReplacedBanner(event.imageKey, banner.imageKey);
   refreshTicketEvent(locale, eventId);
 }
 
@@ -892,6 +1024,7 @@ export async function deleteTicketEventAction(formData: FormData): Promise<Ticke
       target: event.titleNl,
       summary: "ticketevent verwijderd; er stond nog geen enkele bestelling op",
     });
+    await removeReplacedBanner(event.imageKey, null);
     refreshTicketEvent(locale, eventId);
   } catch (error) {
     unstable_rethrow(error);
@@ -1175,7 +1308,7 @@ export async function saveTicketTypeAction(
   ]);
   const changes = [
     color === type.color ? null : `kleur op ${color}`,
-    audience === type.audience ? null : `doelgroep op ${ticketAudienceLabel(audience)}`,
+    audience === type.audience ? null : `doelgroep op ${ticketAudienceAuditLabel(audience)}`,
     nameNl === type.nameNl ? null : `naam op ${nameNl}`,
     unitPriceCents === type.unitPriceCents
       ? null
@@ -1905,4 +2038,128 @@ export async function revokePresaleLinkAction(formData: FormData): Promise<void>
     summary: "private voorverkooplink ingetrokken",
   });
   refreshTicketEvent(locale, eventId);
+}
+
+/**
+ * Na een wissel tussen openbaar en privé: de lijsten waar het event in hoort te
+ * verschijnen of te verdwijnen. Het nieuws leest uit een eigen cache
+ * (`lib/news/load.ts`) die `revalidatePath` niet raakt; zonder `updateTag` bleef
+ * een net privé gezet event nog een minuut in het nieuws staan.
+ */
+function refreshTicketVisibility(locale: "nl" | "en", eventId: string, slug: string) {
+  refreshTicketEvent(locale, eventId);
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/instellingen`));
+  revalidatePath(localePath(locale, `/tickets/${slug}`));
+  updateTag(NEWS_TAG);
+}
+
+/**
+ * Zet een ticketevent privé: het verdwijnt uit /tickets, de kalender, het
+ * nieuws, de homepage en de app, en is enkel nog te openen en te kopen via de
+ * privélink. Zie lib/ticketing/privateLink.ts.
+ *
+ * Een token dat er al stond, blijft: wie het event per ongeluk openbaar zette
+ * en terug privé zet, krijgt dezelfde link terug die al gedeeld was. Enkel
+ * {@link renewPrivateLinkAction} maakt een nieuwe.
+ */
+export async function makeTicketEventPrivateAction(formData: FormData): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const { session, event } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+
+  const privateToken = event.privateToken ?? newPrivateToken();
+  await prisma.$transaction([
+    prisma.ticketEvent.update({ where: { id: eventId }, data: { isPrivate: true, privateToken } }),
+    prisma.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "EVENT_UPDATED",
+        entityType: "TicketEvent",
+        entityId: eventId,
+        metadata: { visibility: "private" },
+      },
+    }),
+  ]);
+  await logAudit({
+    action: "update",
+    entity: "ticketEvent",
+    entityId: eventId,
+    target: event.titleNl,
+    summary: "privé gezet: enkel via de privélink",
+  });
+  refreshTicketVisibility(locale, eventId, event.slug);
+  return saveOk();
+}
+
+/**
+ * Zet een privé-event terug openbaar. Het token blijft bewaard (zie
+ * {@link makeTicketEventPrivateAction}); de link leidt zolang gewoon naar de
+ * openbare pagina.
+ */
+export async function makeTicketEventPublicAction(formData: FormData): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const { session, event } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+
+  await prisma.$transaction([
+    prisma.ticketEvent.update({ where: { id: eventId }, data: { isPrivate: false } }),
+    prisma.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "EVENT_UPDATED",
+        entityType: "TicketEvent",
+        entityId: eventId,
+        metadata: { visibility: "public" },
+      },
+    }),
+  ]);
+  await logAudit({
+    action: "update",
+    entity: "ticketEvent",
+    entityId: eventId,
+    target: event.titleNl,
+    summary: "terug openbaar gezet",
+  });
+  refreshTicketVisibility(locale, eventId, event.slug);
+  return saveOk();
+}
+
+/**
+ * Vervangt de privélink door een nieuwe. De oude werkt meteen niet meer, ook
+ * niet voor wie hem al volgde: de cookie wordt telkens tegen het huidige token
+ * vergeleken. Wie al besteld heeft, houdt zijn tickets en vindt ze in "Mijn
+ * tickets" en in zijn bevestigingsmail.
+ */
+export async function renewPrivateLinkAction(formData: FormData): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const { session, event } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
+
+  await prisma.$transaction([
+    prisma.ticketEvent.update({
+      where: { id: eventId },
+      data: { privateToken: newPrivateToken() },
+    }),
+    prisma.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "EVENT_UPDATED",
+        entityType: "TicketEvent",
+        entityId: eventId,
+        metadata: { privateLink: "regenerated" },
+      },
+    }),
+  ]);
+  await logAudit({
+    action: "update",
+    entity: "ticketEvent",
+    entityId: eventId,
+    target: event.titleNl,
+    summary: "privélink vernieuwd",
+  });
+  refreshTicketVisibility(locale, eventId, event.slug);
+  return saveOk();
 }

@@ -20,7 +20,7 @@
  *   agenda. Zie de constanten hieronder.
  * - **Uitgelicht is wat de redactie kiest, anders het woordje, anders het
  *   nieuwste.** Het woordje van de praeses is geschreven om gelezen te worden
- *   en wordt dus niet tussen de korte regels van het register gedrukt.
+ *   en wordt dus niet als tegel tussen de andere berichten gezet.
  */
 
 import { presaleStart, type PresaleConfig } from "@/lib/ticketing/presale";
@@ -65,11 +65,6 @@ export const MAGAZINE_NEWS_DAYS = 21;
 /** Zo lang na zijn datum draagt een bericht het gele "Nieuw". */
 export const NEWS_FRESH_DAYS = 2;
 
-/** Hoeveel berichten de band toont, uitgelicht inbegrepen. */
-export const NEWS_COUNT_DEFAULT = 6;
-export const NEWS_COUNT_MIN = 3;
-export const NEWS_COUNT_MAX = 8;
-
 /** Hoeveel regels van het woordje in de uitgelichte kaart staan voor "Lees de hele brief". */
 export const NEWS_LETTER_LINES = 9;
 
@@ -110,6 +105,33 @@ export function ticketInNews(
   if (event.salesEndAt && event.salesEndAt <= now) return false;
   const date = ticketNewsDate(event);
   return date !== null && within(date, now, TICKETS_NEWS_DAYS);
+}
+
+/**
+ * Moet de redactie deze ticketverkoop eerst zelf in het nieuws zetten? Een
+ * werkgroep verkoopt haar tickets via de site, maar wat er op de homepage komt,
+ * beslist de redactie van de kring: een verkoop van een werkgroep staat er dus
+ * standaard niet in, die van een praesidiumpost wel. Wie `news.manage` heeft,
+ * zet ze er in /admin/nieuws toch in (`NewsShown`). Geldt voor het gewone
+ * bericht en voor de voorverkoop, die dezelfde sleutel dragen.
+ */
+export function ticketNeedsNewsOptIn(event: { ownerGroup: { type: string } }): boolean {
+  return event.ownerGroup.type === "WERKGROEP";
+}
+
+/**
+ * Staat een automatisch bericht uit het nieuws? Wanneer de redactie het verborg
+ * (`NewsHidden`), of wanneer het standaard uit staat en niemand het erin zette
+ * (`NewsShown`). Verbergen wint: de actie houdt de twee exclusief, maar een
+ * verborgen bericht hoort nooit per ongeluk terug te komen.
+ */
+export function isNewsEntryHidden(entry: {
+  hidden: boolean;
+  needsOptIn: boolean;
+  shown: boolean;
+}): boolean {
+  if (entry.hidden) return true;
+  return entry.needsOptIn && !entry.shown;
 }
 
 /**
@@ -242,29 +264,157 @@ export function isFreshNews(date: string, now: Date): boolean {
 export type NewsComposable = {
   key: string;
   source: NewsSource;
-  /** ISO-datum; waarop gesorteerd wordt. */
+  /** ISO-datum: wanneer het nieuws werd. Bepaalt wat "het nieuwste" is. */
   date: string;
+  /**
+   * ISO-datum die het bericht toont, wanneer dat een andere is dan `date`: de
+   * dag van het evenement bij een ticketverkoop of een inschrijving.
+   */
+  shownDate?: string;
   /** Door de redactie uitgelicht. */
   featured: boolean;
 };
 
 /**
- * Wat de band toont: één uitgelicht bericht en de rest als register, samen
- * hoogstens `count`.
+ * De volgorde van de tegels in de carrousel. Elke tegel draagt een datumpin, en
+ * die moet je van links naar rechts kunnen lezen: eerst wat nog komt, het
+ * vroegste eerst (vanavond voor volgende week), daarna wat al gebeurde, het
+ * recentste eerst. Gesorteerd op wanneer iets nieuws werd, stond een verkoop
+ * die gisteren opende voor een evenement over twee weken vóór het evenement
+ * van morgen, en sprongen de pinnen heen en weer.
+ */
+export function compareNewsTiles(now: Date) {
+  type Dated = Pick<NewsComposable, "date" | "shownDate">;
+  const ahead = (entry: Dated) => entry.shownDate !== undefined && new Date(entry.shownDate) > now;
+  return (a: Dated, b: Dated): number => {
+    const aAhead = ahead(a);
+    const bAhead = ahead(b);
+    if (aAhead !== bAhead) return aAhead ? -1 : 1;
+    if (aAhead) return a.shownDate!.localeCompare(b.shownDate!);
+    return (b.shownDate ?? b.date).localeCompare(a.shownDate ?? a.date);
+  };
+}
+
+/**
+ * Wat de band toont: één uitgelicht bericht en alle andere als tegels in de
+ * carrousel ernaast. Er is geen maximum: de carrousel schuift, dus een bericht
+ * dat in het nieuws hoort, staat erin. Wat te oud is, valt er al uit via de
+ * houdbaarheid hierboven.
  *
  * Uitgelicht is het bericht dat de redactie aanduidde, anders het nieuwste
- * woordje van de praeses, anders gewoon het nieuwste bericht. Het register is de
- * rest, nieuwste eerst.
+ * woordje van de praeses, anders gewoon het nieuwste bericht. De tegels volgen
+ * {@link compareNewsTiles}.
  */
 export function composeNews<T extends NewsComposable>(
   entries: readonly T[],
-  count: number = NEWS_COUNT_DEFAULT,
+  now: Date,
 ): { featured: T | null; rest: T[] } {
-  const sorted = [...entries].sort((a, b) => b.date.localeCompare(a.date));
-  if (sorted.length === 0 || count < 1) return { featured: null, rest: [] };
+  const newest = [...entries].sort((a, b) => b.date.localeCompare(a.date));
+  if (newest.length === 0) return { featured: null, rest: [] };
   const featured =
-    sorted.find((entry) => entry.featured) ??
-    sorted.find((entry) => entry.source === "praeses") ??
-    sorted[0]!;
-  return { featured, rest: sorted.filter((entry) => entry !== featured).slice(0, count - 1) };
+    newest.find((entry) => entry.featured) ??
+    newest.find((entry) => entry.source === "praeses") ??
+    newest[0]!;
+  return {
+    featured,
+    rest: newest.filter((entry) => entry !== featured).sort(compareNewsTiles(now)),
+  };
+}
+
+/** Een kalenderdag in Brussel als `yyyy-mm-dd`, zodat datums als tekst te vergelijken zijn. */
+function brusselsDay(date: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Brussels",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(date);
+}
+
+/** De maandag van de week van `day` (`yyyy-mm-dd`), `weeksBack` weken terug. */
+function mondayOf(day: string, weeksBack: number): string {
+  const noon = new Date(`${day}T12:00:00Z`);
+  const sinceMonday = (noon.getUTCDay() + 6) % 7;
+  noon.setUTCDate(noon.getUTCDate() - sinceMonday - 7 * weeksBack);
+  return noon.toISOString().slice(0, 10);
+}
+
+/** Een groep op /nieuws: een week rond vandaag, of een maand. */
+export type NewsPeriod<T> = {
+  /** Uniek per groep, voor React. */
+  key: string;
+  /** Welke week rond vandaag, of `null` voor een maand. */
+  week: "this" | "next" | "last" | null;
+  /** Maandag van de week (`yyyy-mm-dd`) bij een week, anders `null`. */
+  monday: string | null;
+  /** De maand (`yyyy-mm`) bij een maand, anders `null`. */
+  month: string | null;
+  entries: T[];
+};
+
+/** Een dag `days` dagen na `day` (`yyyy-mm-dd`). */
+function addDays(day: string, days: number): string {
+  const noon = new Date(`${day}T12:00:00Z`);
+  noon.setUTCDate(noon.getUTCDate() + days);
+  return noon.toISOString().slice(0, 10);
+}
+
+/**
+ * De berichten van /nieuws per periode, zoals de agenda van de kalender, op de
+ * datum die een bericht toont (`shownDate`, de dag van het evenement bij een
+ * ticketverkoop of inschrijving, anders `date`). Wanneer de verkoop opende,
+ * zegt een lezer weinig: een cantus van donderdag onder "Vorige week" omdat
+ * de tickets toen te koop gingen, las als een vergissing.
+ *
+ * De volgorde is die van de band ({@link compareNewsTiles}): eerst wat nog
+ * komt (deze week, volgende week, daarna per maand), het vroegste eerst; dan
+ * wat al gebeurde (vorige week, daarvoor per maand), het recentste eerst. Een
+ * week begint op maandag, in Brussel. Binnen deze week staat wat nog komt voor
+ * wat al voorbij is, net als in de band.
+ */
+export function groupNewsByPeriod<T extends { date: string; shownDate?: string }>(
+  entries: readonly T[],
+  now: Date,
+): NewsPeriod<T>[] {
+  const today = brusselsDay(now);
+  const thisMonday = mondayOf(today, 0);
+  const lastMonday = mondayOf(today, 1);
+  const nextMonday = addDays(thisMonday, 7);
+  const afterNextWeek = addDays(thisMonday, 14);
+
+  // Eerst de weken rond vandaag, dan de maanden erna, dan die ervoor. De
+  // rangorde van een groep is dus: 0 deze week, 1 volgende week, 2 later,
+  // 3 vorige week, 4 vroeger.
+  const groups = new Map<string, NewsPeriod<T> & { rank: number }>();
+  for (const entry of [...entries].sort(compareNewsTiles(now))) {
+    const day = brusselsDay(new Date(entry.shownDate ?? entry.date));
+    let group: Omit<NewsPeriod<T>, "entries"> & { rank: number };
+    if (day >= thisMonday && day < nextMonday) {
+      group = { key: "this-week", week: "this", monday: thisMonday, month: null, rank: 0 };
+    } else if (day >= nextMonday && day < afterNextWeek) {
+      group = { key: "next-week", week: "next", monday: nextMonday, month: null, rank: 1 };
+    } else if (day >= afterNextWeek) {
+      group = { key: `later-${day.slice(0, 7)}`, week: null, monday: null, month: day.slice(0, 7), rank: 2 };
+    } else if (day >= lastMonday) {
+      group = { key: "last-week", week: "last", monday: lastMonday, month: null, rank: 3 };
+    } else {
+      group = { key: `earlier-${day.slice(0, 7)}`, week: null, monday: null, month: day.slice(0, 7), rank: 4 };
+    }
+    const existing = groups.get(group.key);
+    if (existing) existing.entries.push(entry);
+    else groups.set(group.key, { ...group, entries: [entry] });
+  }
+  return [...groups.values()]
+    .sort((a, b) => {
+      if (a.rank !== b.rank) return a.rank - b.rank;
+      // Later: de vroegste maand eerst. Vroeger: de recentste maand eerst.
+      return a.rank === 2 ? a.month!.localeCompare(b.month!) : b.month!.localeCompare(a.month!);
+    })
+    .map((group) => ({
+      key: group.key,
+      week: group.week,
+      monday: group.monday,
+      month: group.month,
+      entries: group.entries,
+    }));
 }

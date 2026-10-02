@@ -94,6 +94,10 @@ Dit is de reden dat verschillende keuzes eruitzien zoals ze eruitzien:
 - `antiSpam.ts`: honeypot, limiet per IP, minimale invultijd.
 - `uploadToken.ts`: de ondertekende verwijzing naar een geüpload bestand.
 - `audit.ts`: één plek die naar `FormAuditLog` schrijft.
+- `grouping/`: de groepjesmaker: `algorithm.ts` (puur), `roles.ts` (welke rol
+  bij welk veldtype), `run.ts` (indelen en bewaren), `due.ts` (automatisch
+  sluiten en indelen), `view.ts` (wat het scherm toont), `pdf.ts` (de
+  afdruklijst per groep).
 
 ### Routes - publiek (`apps/web/app/[locale]/formulieren/`)
 - `page.tsx`: de open formulieren (enkel wat `listed` is)
@@ -106,14 +110,16 @@ Daarnaast rendert `components/site/PageView.tsx` het paneel op een contentpagina
 
 ### Routes - admin (`apps/web/app/[locale]/admin/formulieren/`)
 - `page.tsx`, `nieuw/page.tsx`
-- `[formId]/{page,instellingen,velden,inzendingen,toegang}`
+- `[formId]/{page,instellingen,velden,inzendingen,groepjes,toegang}`
 - `[formId]/inzendingen/[entryId]`: detail met opvolging
 
 ### API (`apps/web/app/api/forms/`)
 - `[formId]/uploads`: een bestand uploaden vóór het indienen
 - `[formId]/bestanden/[uploadId]`: één bestand downloaden (grants gecheckt)
-- `[formId]/exports/{entries,pdf,bestanden}`: CSV, PDF, zip
-- `maintenance`: de worker: outbox legen, samenvattingen en herinneringen
+- `[formId]/exports/{entries,pdf,bestanden,groepjes}`: CSV, PDF, zip, groepjes-CSV
+- `[formId]/exports/groepjes/pdf`: de groepjes als afdruklijst, één pagina per groep
+- `maintenance`: de worker: outbox legen, samenvattingen en herinneringen, en
+  de automatische groepjesmaker
 
 ### Componenten (`apps/web/components/forms/`)
 - `FormFieldInput.tsx` + `FormFieldBlock.tsx`: **de** veldrenderer, gedeeld
@@ -141,8 +147,9 @@ Daarnaast rendert `components/site/PageView.tsx` het paneel op een contentpagina
   rol `praesidium`, net als `tickets.create`). Geeft ook volledig beheer over de
   bestaande formulieren waarvan die post eigenaar is.
 - `forms.manageAll`: alles beheren.
-- Per formulier: `VIEWER` (lezen en exporteren), `EDITOR` (ook inzendingen
-  beheren en deelnemers mailen), `MANAGER` (ook het formulier zelf). Een
+- Per formulier: `VIEWER` (lezen en exporteren, ook de groepjes), `EDITOR` (ook
+  inzendingen beheren, deelnemers mailen en de groepjes maken), `MANAGER` (ook
+  het formulier zelf). Een
   postgrant geldt voor alle leden of enkel de leads.
 - De laatste `MANAGER` kan zichzelf niet verwijderen.
 
@@ -245,6 +252,153 @@ In beide gevallen komt de inzending binnen met `waitlisted = true` en claimt ze
   opschuiven met een mail erbij is er bewust niet: dat is een eigen levenscyclus
   met een deadline en een vervaltermijn.
 
+## Groepjesmaker
+
+Onthaal (peter-metergroepen) en internationaal (kwisploegen) laten iedereen een
+publieke form invullen en willen daarna groepjes op basis van de antwoorden. De
+groepjesmaker hangt daarom aan een gewone form: de publieke link, de vragen,
+het sluitmoment en het maximum zijn die van de form zelf.
+
+In het beheer staat hij niet onder Forms maar in de zijbalkgroep **Apps**, de
+plek voor kleine hulpmiddelen die een post af en toe nodig heeft. Elke app is
+een item in die groep. Er komen er nog bij, en een eigen tab per hulpmiddel
+maakt de zijbalk langer voor iets dat de meeste posten nooit openen. De groep
+heeft `keepSingle` in `lib/admin-nav.ts`: een gewone groep met één zichtbaar
+item wordt een losse tab, maar Apps blijft staan, zodat de groepjesmaker niet
+van plaats wisselt zodra er een tweede app bijkomt. Het item volgt de
+zichtbaarheid van Forms (`forms: true`), want het draait op een form.
+
+- `/admin/apps/groepjesmaker`: alle groepjesmakers die je mag zien, en een
+  nieuwe maken op een form die je beheert.
+- `/admin/apps/groepjesmaker/<formId>`: één groepjesmaker, met dezelfde opbouw
+  als de formuliereneditor (`GroupingAdminNav` naast `FormAdminNav`): een kop
+  met de form waaraan hij hangt, en drie tabbladen.
+  - **Groepjes** (de root): de stand van zaken, de waarschuwingen, de knop om in
+    te delen, de laatkomers en de groepen zelf. Dat is waarvoor je het scherm
+    opent, dus het is de eerste tab.
+  - **Vragen**: wat elke vraag doet, met bovenaan welke form de vragen levert en
+    een knop om ze te bewerken.
+  - **Instellingen**: de grenzen per groep, wanneer er ingedeeld wordt, en het
+    uitzetten van de groepjesmaker.
+  De twee laatste tabs vragen `MANAGE_GROUPING` en hebben elk hun eigen
+  opslaan-actie (`saveGroupingSettingsAction`, `saveGroupingRolesAction`), zodat
+  een tabblad bewaart wat erop staat en niets anders.
+
+De kringkeuzes erachter staan in `docs/design-decisions.md`, "De groepjesmaker".
+
+### Uitproberen
+
+`packages/db/prisma/seed.ts` zet een demo klaar (`prisma/seed-groepjesmaker.ts`):
+de form **Peter-metergroepjes** van onthaal met de vragen uit hun verslag (plus
+een gsm-nummer, zodat de afdruklijst iets te tonen heeft), 65 inzendingen die
+samen 83 personen dragen, drie peter-metergroepen die samen
+inschreven (een ervan neemt er niemand meer bij) en vijf groepjes vrienden op
+één inzending. Create-only op de slug `peter-meter-groepjes`: een tweede seed
+voegt niets toe.
+
+Ze staat op "nog niet ingedeeld", met `expectedPeople` op 85. Klik "Nu indelen"
+om het resultaat te zien, of vul het publieke formulier zelf in met twee
+personen: dan sluit de form en deelt de worker in.
+
+### De rol van een vraag
+
+Elke vraag krijgt hoogstens een rol (`FormGroupingField`). Zonder rol is ze
+gewoon een gegeven: ze staat in de export maar telt niet mee.
+
+| Rol | Veldtypes | Wat ze doet |
+| --- | --- | --- |
+| `NAME` | tekst | De naam in het resultaat; ook een partner kan ernaar verwijzen. |
+| `IDENTIFIER` | tekst, e-mail | Nog iets waarmee een partner kan verwijzen (r-nummer, e-mail). |
+| `GROUP_SIZE` | getal | Met hoeveel personen deze inzending telt, de invuller inbegrepen. Hoogstens één. |
+| `GROUP_NAMES` | tekst | De anderen in die inschrijving, met komma's. Leeg aantal = 1 plus deze namen. |
+| `PARTNER` | tekst | Wil samen met; wordt gezocht in `NAME`/`IDENTIFIER`/`GROUP_NAMES` van de anderen. |
+| `ANCHOR` | keuze, ja/nee | De aangevinkte antwoorden maken iemand kern (peter/meter). Hoogstens één. |
+| `ACCEPTS_EXTRA` | keuze, ja/nee | Kern die "nee" antwoordt, krijgt geen andere kern erbij. |
+| `SIMILAR` | keuze, getal, schaal, korte tekst | Gelijk antwoord trekt samen; gewicht 1 tot 5. |
+| `DIVERSE` | idem | Gelijk antwoord duwt uit elkaar (land); gewicht 1 tot 5. |
+
+Welke rol bij welk type mag, staat op één plek (`lib/forms/grouping/roles.ts`)
+en wordt door het scherm en de action allebei gebruikt.
+
+### Het algoritme (`lib/forms/grouping/algorithm.ts`)
+
+Puur en zonder database, dus getest in `test/formsGrouping.test.ts`.
+
+1. **Blokken.** Elke inzending is een blok met als gewicht het aantal personen.
+   Een partnerverwijzing voegt twee blokken samen, tenzij de ene kern is en de
+   andere niet, of ze samen boven het maximum per groep uitkomen (dan een
+   waarschuwing). Een blok wordt nooit gesplitst.
+2. **Aantal groepen.** Uit het aantal gewone leden en het midden van de
+   min/max per groep, begrensd door die min/max, door het min/max aantal groepen
+   en door de kern: een kerngroep (kern met twee of meer personen) krijgt altijd
+   een eigen groep.
+3. **Beginindeling.** Kerngroepen eerst (elk een eigen groep, vast), dan de losse
+   kern naar groepen zonder of met te weinig kern, dan de leden: eerst iedere
+   groep tot het minimum, dan waar ze het best passen.
+4. **Verbeteren.** Blokken verplaatsen en wisselen zolang het beter wordt:
+   eerst minder buiten de grenzen, pas dan een hogere score (per paar in
+   dezelfde groep: `SIMILAR` telt op, `DIVERSE` telt af, maal het gewicht en
+   het aantal personen).
+
+Zes pogingen met een andere volgorde, de beste wint. De seed volgt uit de
+form-id: dezelfde inzendingen geven dezelfde groepen. Wat na afloop buiten de
+grenzen valt, komt als waarschuwing (`FormGrouping.warnings`) op het scherm; de
+indeling faalt nooit op een grens.
+
+### Wanneer er ingedeeld wordt
+
+- Met de knop **Nu indelen** / **Opnieuw indelen**. Opnieuw indelen vervangt
+  alles, ook de handmatige verplaatsingen; de bevestiging noemt hoeveel.
+- Automatisch, als `autoRun` aan staat: de forms-worker (`/api/forms/maintenance`,
+  `lib/forms/grouping/due.ts`) sluit de form en deelt in zodra de form al
+  gesloten is, het sluitmoment voorbij is, het maximum aantal inzendingen bereikt
+  is, of `expectedPeople` personen ingeschreven zijn. **Een keer** (`ranAt` is
+  dan gezet): wie daarna opnieuw wil, doet dat met de knop, zodat een
+  handmatige verplaatsing nooit stil verdwijnt.
+
+Wat meetelt: ingediend, geen test, niet op de wachtlijst. Een inzending die na
+de indeling binnenkomt, staat onder "Nog niet ingedeeld" en kan met de hand in
+een groep gezet worden.
+
+### Meenemen: CSV en PDF
+
+Twee formaten met twee doelen, naast elkaar boven de groepen:
+
+- **CSV** (`exports/groepjes`): één rij per inzending met het groepsnummer, de
+  kern-kolom en alle antwoorden. Daarmee maak je de WhatsApp-groepen of reken je
+  verder in een spreadsheet.
+- **PDF** (`exports/groepjes/pdf`): één pagina per groep, met per persoon een rij
+  om af te vinken: naam (de kern vet), r-nummer, gsm en wie hij meebracht. In de
+  kop staat hoe groot de groep is en wat ze kenmerkt. Welke vragen een kolom
+  krijgen, beslist `isListColumn`: de herkenningsvelden (`IDENTIFIER`) en alles
+  wat een telefoonnummer of e-mailadres is. De keuzevragen komen niet als kolom
+  mee; die staan samengevat in de kop en voluit in de CSV.
+
+### Wie wat mag
+
+Twee capabilities per form, bovenop de rollen hierboven:
+
+- `VIEW_GROUPING` (viewer, editor, manager): het resultaat zien en exporteren.
+- `MANAGE_GROUPING` (editor, manager): instellen, indelen, verplaatsen,
+  uitzetten.
+
+Geen nieuwe permissie in de registry: wie `forms.create` heeft (elke
+praesidiumpost, dus ook onthaal en internationaal) is manager van de forms van
+de eigen post, en `forms.manageAll` van alles. Een andere post of een persoon
+geef je toegang via de tab Toegang van de form, zoals bij de inzendingen zelf.
+
+De groepen zijn enkel voor de beheerders: er gaat geen mail naar de deelnemers
+en de publieke pagina toont niets. Daarom staat er ook niets op
+`/admin/it/flows`.
+
+### Datamodel
+
+`FormGrouping` (een per form: parameters, `autoRun`, `expectedPeople`, laatste
+indeling, waarschuwingen), `FormGroupingField` (rol per vraag),
+`FormGroupingGroup` en `FormGroupingMember` (een rij per inzending, met
+`isAnchor`). Alles cascadet mee met de form, de vraag of de inzending; wie een
+inzending wist (ook via `eraseUserData`), haalt ze dus uit haar groep.
+
 ## Wat er (nog) niet is
 
 - Automatisch opschuiven van de wachtlijst.
@@ -255,7 +409,8 @@ In beide gevallen komt de inzending binnen met `waitlisted = true` en claimt ze
 
 `npm run test --workspace=@vtk/web`, in het bijzonder:
 `formsSchema`, `formsVisibility`, `formsBranching`, `formsValidation`,
-`formsExport`, `formsMail`, `formsPdf`, `formsTranslation` en
-`formsAuthorization`. Voor het paneel op een contentpagina: `pageForm` (waar het
+`formsExport`, `formsMail`, `formsPdf`, `formsTranslation`,
+`formsAuthorization` en `formsGrouping`. De groepjesmaker tegen een database:
+`npm run test:integration -w @vtk/web` (`forms-grouping.integration.ts`). Voor het paneel op een contentpagina: `pageForm` (waar het
 in de tekst komt) en `pageOutline` (waar het in de rail komt, en hoe de rail
 meeloopt met het scrollen).

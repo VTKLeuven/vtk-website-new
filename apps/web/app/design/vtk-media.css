@@ -508,8 +508,8 @@
 }
 
 .vtk-media-document-dialog {
-  width: min(1440px, calc(100vw - 32px));
-  height: min(940px, calc(100dvh - 32px));
+  width: min(1440px, calc(calc(100 * var(--vtk-vw, 1vw)) - 32px));
+  height: min(940px, calc(calc(100 * var(--vtk-dvh, 1dvh)) - 32px));
   max-width: none;
   max-height: none;
   /* De Tailwind-reset zet `margin: 0` op alles; zonder deze regel plakt de
@@ -861,8 +861,8 @@
   }
 
   .vtk-media-document-dialog {
-    width: 100vw;
-    height: 100dvh;
+    width: calc(100 * var(--vtk-vw, 1vw));
+    height: calc(100 * var(--vtk-dvh, 1dvh));
     border-radius: 0;
   }
 

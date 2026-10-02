@@ -1097,7 +1097,9 @@ export function FieldEditor({
   }
 
   return (
-    <div className="ticket-admin-grid" data-columns="2">
+    // Opbouw en voorbeeld onder elkaar, niet naast elkaar: in een halve kolom
+    // van de admin liepen de vraagtitels onder de vijf rijknoppen door.
+    <div className="ticket-admin-grid">
       <section className="ticket-admin-section" aria-labelledby="structure-heading">
         <div className="ticket-admin-section-head">
           <div className="ticket-admin-section-heading">

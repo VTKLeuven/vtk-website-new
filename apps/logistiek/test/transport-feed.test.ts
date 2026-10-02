@@ -97,14 +97,15 @@ describe('buildTransportFeed', () => {
     expect(result).toContain('CLASS:PUBLIC');
   });
 
-  it('zet het voertuig en het evenement in de titel', async () => {
-    // In een agenda-app zie je vaak enkel de eerste regel.
-    expect(await lines([booking()])).toContain('SUMMARY:Kar: Doopcantus');
+  it('zet het voertuig en waarvoor de rit dient in de titel', async () => {
+    // In een agenda-app zie je vaak enkel de eerste regel. Niet het evenement:
+    // vijf ritten voor hetzelfde evenement heetten dan vijf keer hetzelfde.
+    expect(await lines([booking()])).toContain('SUMMARY:Kar: Cantusmateriaal ophalen');
   });
 
-  it('valt in de titel terug op het doel van de rit', async () => {
-    const result = await lines([booking({ eventName: null })]);
-    expect(result).toContain('SUMMARY:Kar: Cantusmateriaal ophalen');
+  it('zet het evenement in de beschrijving, en laat de regel weg zonder', async () => {
+    expect(eventDescription(await lines([booking()]))).toContain('Evenement: Doopcantus');
+    expect(eventDescription(await lines([booking({ eventName: null })]))).not.toContain('Evenement');
   });
 
   it('zet lading, chauffeur en nummers in de beschrijving', async () => {

@@ -6,6 +6,7 @@ import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
 import { PleaseLogin } from "@/components/site/pleaseLogin";
 import { PickupCounter } from "@/components/theokot/PickupCounter";
+import { getTheokotConfig } from "@/lib/theokot-server";
 
 import "@/app/design/vtk-basic.css";
 
@@ -50,6 +51,8 @@ export default async function TheokotBaliePage({ params }: { params: Promise<{ l
     );
   }
 
+  const config = await getTheokotConfig();
+
   return (
     <div className="vtk-page">
       <header className="vtk-page-head">
@@ -58,7 +61,7 @@ export default async function TheokotBaliePage({ params }: { params: Promise<{ l
         </div>
       </header>
       <div className="vtk-page-shell">
-        <PickupCounter nl={nl} />
+        <PickupCounter nl={nl} autoPickup={config.autoPickup} />
       </div>
     </div>
   );

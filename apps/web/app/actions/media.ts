@@ -3,10 +3,11 @@
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@vtk/db";
-import { newStorageKey, putObject } from "@vtk/storage";
+import { deleteObject, newStorageKey, putObject } from "@vtk/storage";
 import { requireAnyPermission, requirePermission } from "@/lib/session";
-import { saveOk, type SaveState } from "@/lib/saveState";
+import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
+import { ensureMagazineCover, renderPdfCover, storeCover } from "@/lib/magazineCover";
 import {
   getMediaContent,
   type MediaPublication,
@@ -114,6 +115,15 @@ export async function saveMagazineAction(
   const storageKey = newStorageKey("publications", file.name || "magazine.pdf");
   const bytes = Buffer.from(await file.arrayBuffer());
   await putObject(storageKey, bytes, "application/pdf");
+  // De kaft voor de tegel in het nieuws, van bladzijde 1 (lib/magazineCover.ts).
+  // Lukt dat niet (een kapotte of beveiligde pdf), dan gaat de editie zonder
+  // kaft op; een editie zonder kaft is nog altijd een editie.
+  let coverKey: string | null = null;
+  try {
+    coverKey = await storeCover(await renderPdfCover(new Uint8Array(bytes)));
+  } catch (error) {
+    console.error(`[media] kaft bij het uploaden van ${id} niet gemaakt:`, error);
+  }
 
   const entry: MediaPublication = {
     id,
@@ -121,6 +131,7 @@ export async function saveMagazineAction(
     titleNl,
     issueNl,
     storageKey,
+    ...(coverKey ? { coverKey } : {}),
     ...(titleEn ? { titleEn } : {}),
     ...(issueEn ? { issueEn } : {}),
     ...(publishedAt ? { publishedAt } : {}),
@@ -135,6 +146,47 @@ export async function saveMagazineAction(
     summary: `${kind === "bakske" ? "'t Bakske" : "Ir-Reëel"} toegevoegd aan de mediapagina`,
   });
   return { ok: true };
+}
+
+/**
+ * De kaft van een editie opnieuw maken van bladzijde 1, bv. nadat de pdf
+ * vervangen werd. Een editie zonder kaft krijgt er ook vanzelf een zodra het
+ * nieuws haar toont (`ensureMagazineCover`); dit is de knop om niet te wachten.
+ */
+export async function setMagazineCoverAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("media.manage");
+  const id = readField(formData, "id", 100);
+  const { publications: current } = await getMediaContent();
+  const target = current.find((p) => p.id === id);
+  if (!target) return saveError("NOT_FOUND");
+  const previous = target.coverKey;
+  // Zonder de oude sleutel maakt ensureMagazineCover er een nieuwe.
+  if (previous) {
+    await savePublications(current.map((p) => (p.id === id ? { ...p, coverKey: undefined } : p)));
+  }
+  const coverKey = await ensureMagazineCover(id, { force: true });
+  if (!coverKey) {
+    if (previous) await savePublications(current);
+    return saveError("INVALID_COVER");
+  }
+  if (previous) {
+    try {
+      await deleteObject(previous);
+    } catch {
+      /* een achtergebleven kaft is geen opslaanfout */
+    }
+  }
+  await logAudit({
+    action: "update",
+    entity: "media",
+    entityId: id,
+    target: `${target.titleNl} ${target.issueNl}`,
+    summary: "kaft gemaakt van bladzijde 1",
+  });
+  revalidatePath("/admin/media");
+  revalidatePath("/media");
+  revalidatePath("/en/media");
+  return saveOk();
 }
 
 export async function deleteMagazineAction(formData: FormData): Promise<void> {

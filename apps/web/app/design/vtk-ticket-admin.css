@@ -231,6 +231,15 @@
   white-space: nowrap;
 }
 
+/* De status met het privélabel ernaast: dicht bij elkaar, want ze zeggen samen
+   waar het event staat, en ze mogen onder elkaar in een smalle tabelcel. */
+.ticket-admin-badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
 .ticket-admin-status-dot {
   width: 6px;
   height: 6px;
@@ -695,6 +704,30 @@
   font-size: 11px;
 }
 
+/* De banner van een ticketevent (TicketBannerField): de keuzes zijn de
+   radiokaarten van hierboven, met eronder de foto die er komt te staan. */
+.ticket-banner-own:not([hidden]) {
+  display: grid;
+  gap: 16px;
+  margin-top: 6px;
+}
+
+.ticket-banner-category {
+  display: grid;
+  gap: 10px;
+  max-width: 360px;
+  margin-top: 6px;
+}
+
+.ticket-banner-preview {
+  width: 240px;
+  max-width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
 /* Adreskiezer: het suggestielijstje hangt onder het invoerveld, dus de
    container is het positioneringsanker. */
 .ticket-address-picker {
@@ -1126,6 +1159,18 @@
   white-space: nowrap;
 }
 
+/* Een tabel met enkel getallen, in een halve kolom of met veel kolommen (de
+   broodjesstatistieken): geen minimumbreedte, en koppen die mogen afbreken.
+   Een kop op twee regels is beter dan een tabel die achter een scrollbalk
+   verdwijnt. */
+.ticket-admin-table[data-compact] {
+  min-width: 0;
+}
+
+.ticket-admin-table[data-compact] th {
+  white-space: normal;
+}
+
 .vtk-admin-main .ticket-admin-table th {
   letter-spacing: 0;
 }
@@ -1141,21 +1186,16 @@
 }
 
 /* Een rij die naar één plek leidt, hoort in haar geheel klikbaar te zijn: op een
-   pijltje van 36px mikken is werk dat de rij zelf kan doen. De link blijft één
-   tabstop en één screenreader-doel; het vlak eronder is enkel een muisdoel. */
+   pijltje van 36px mikken is werk dat de rij zelf kan doen. Dat doet `LinkedRow`
+   met een klik op de rij, niet met een `::after` over de link: Safari ankerde
+   dat vlak niet op de `<tr>` maar op de tabel, en dan lag de laatste rij over
+   alle andere. De link blijft één tabstop en één screenreader-doel. */
 .ticket-admin-linked-row {
-  position: relative;
   cursor: pointer;
 }
 
 .ticket-admin-row-link {
   text-decoration: none;
-}
-
-.ticket-admin-row-link::after {
-  content: "";
-  position: absolute;
-  inset: 0;
 }
 
 .ticket-admin-linked-row:focus-within {
@@ -1166,13 +1206,6 @@
   display: block;
   margin-left: auto;
   color: var(--muted);
-}
-
-/* Bedieningselementen in zo'n rij moeten bóven het kliksvlak liggen, anders
-   vangt de rijlink de klik en navigeer je weg i.p.v. de knop te gebruiken. */
-.ticket-admin-linked-row :is(button, select, a:not(.ticket-admin-row-link), label) {
-  position: relative;
-  z-index: 1;
 }
 
 .ticket-admin-orders-table,
@@ -1617,13 +1650,6 @@
 @media (min-width: 1000px) {
   .ticket-admin-grid[data-columns="2"] {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  /* Naast elkaar staat de tweede kolom niet ónder de eerste, dus scheidt haar
-     lijn niets; gestapeld (smaller dan dit) heeft ze die wel nodig. */
-  .ticket-admin-page > .ticket-admin-grid[data-columns="2"]:first-child > .ticket-admin-section {
-    padding-top: 0;
-    border-top: 0;
   }
 
   .ticket-admin-grid[data-columns="access"] {
@@ -2399,4 +2425,143 @@
 .ticket-admin-clickable-rows tbody tr:hover,
 .ticket-admin-table tbody tr[data-open="true"] {
   background: var(--paper-2);
+}
+
+/* ---------------------------------------------------------------------------
+   Statistieken (/admin/tickets/statistieken en de tab per event). De grafieken
+   zelf zijn `DailyChart` (vtk-admin.css); dit is enkel wat eromheen staat.
+   --------------------------------------------------------------------------- */
+
+/* Twee rijen kerncijfers na elkaar: de tweede sluit aan op de eerste. */
+.ticket-admin-metrics + .ticket-admin-metrics {
+  margin-top: -12px;
+}
+
+.ticket-stats-table th[data-num],
+.ticket-stats-table td[data-num] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.ticket-stats-table {
+  min-width: 560px;
+}
+
+.ticket-stats-muted {
+  color: var(--muted);
+}
+
+/* Een campagne onder haar kanaal: ingesprongen en stiller. */
+.ticket-stats-subrow td {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ticket-stats-subrow td:first-child {
+  padding-left: 28px;
+}
+
+/* Het aandeel als dunne balk onder de naam: zo lees je de verhouding tussen
+   kanalen zonder elk percentage te vergelijken. Het getal staat ernaast. */
+.ticket-stats-bar-label {
+  display: grid;
+  gap: 5px;
+  min-width: 140px;
+}
+
+.ticket-stats-bar {
+  display: block;
+  height: 4px;
+  min-width: 2px;
+  border-radius: 2px;
+  background: var(--chart-1);
+}
+
+.ticket-stats-table tr[data-kind="unknown"] .ticket-stats-bar,
+.ticket-stats-table tr[data-kind="direct"] .ticket-stats-bar {
+  background: var(--chart-context);
+}
+
+.ticket-stats-table tr[data-kind="unknown"] strong {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.ticket-stats-linkbuilder {
+  margin-top: 16px;
+}
+
+.ticket-stats-link-row {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.ticket-stats-link-row input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ticket-stats-picker {
+  margin-top: 4px;
+}
+
+.ticket-stats-picker-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr));
+  gap: 6px 16px;
+  max-height: 360px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  border: 0;
+}
+
+.ticket-stats-picker-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 7px 4px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.ticket-stats-picker-item input {
+  margin-top: 3px;
+  flex: none;
+}
+
+.ticket-stats-picker-item > span {
+  display: grid;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.ticket-stats-picker-item .ticket-admin-row-meta {
+  margin: 0;
+}
+
+.ticket-stats-picker-actions {
+  margin-top: 14px;
+}
+
+/* Hoe een gekoppelde verkoop op haar kalenderevent staat: op de eventpagina,
+   met welke naam als tab, en met of zonder eigen uren. Geen kader: het hoort bij
+   de keuze van het kalenderevent erboven, en een kaart in de kaart van het
+   paneel zou een kaart in een kaart zijn. */
+.ticket-admin-field.ticket-admin-placement {
+  gap: 8px;
+}
+
+.ticket-admin-placement legend {
+  float: left;
+  width: 100%;
+  margin: 0 0 2px;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ticket-admin-placement .ticket-admin-form-grid {
+  margin: 4px 0;
 }

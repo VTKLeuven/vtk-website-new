@@ -32,15 +32,6 @@ enum GroupType {
   WERKGROEP
 }
 
-// Hoe de verantwoordelijke (membership.role == LEAD) van een werkgroep heet.
-// Bij VTK is dat de G3 of de G4 van die werkgroep, en welke van de twee het is,
-// verschilt per werkgroep. Enkel zinvol voor type = WERKGROEP; een
-// praesidiumpost houdt het bij "Verantwoordelijke".
-enum GroupLeadLabel {
-  G3
-  G4
-}
-
 // Hoe een post (Group) een rol toekent aan haar leden.
 // DEFAULT: elk lid van de post krijgt de rol. LEADER: enkel de
 // verantwoordelijke (membership.role == LEAD) krijgt de rol, bovenop de
@@ -88,6 +79,16 @@ enum TicketAudience {
   /// weigert ze. Bedoeld voor wat de kring aan ereleden geeft (bv. gratis
   /// naar een cantus) zonder dat de rest van de site die uitzondering ziet.
   HONORARY
+  /// Doelgroepen uit het studieprofiel, dezelfde vier als de kalender
+  /// (`CalendarAudience`, afgeleid in `lib/calendar/audienceProfile.ts`). Net
+  /// als een erelidticket onzichtbaar voor wie er niet bij hoort; een
+  /// uitgelogde bezoeker krijgt enkel de hint dat inloggen iets kan opleveren.
+  /// Eerste- en laatstejaars tellen enkel met een studiebevestiging van de
+  /// lopende ronde, anders zou vorig jaar zijn profiel nog meetellen.
+  FIRST_YEARS
+  LAST_YEARS
+  INTERNATIONALS
+  ALUMNI
 }
 
 enum TicketQuestionType {
@@ -448,6 +449,9 @@ enum StudyProgramme {
   ENERGY
   ARTIFICIAL_INTELLIGENCE
   MATERIALS
+  // Master Mobility & Supply Chain Engineering: enkel een master, net als
+  // Energie of Cybersecurity.
+  MOBILITY_SUPPLY_CHAIN
   NANO
   URBANISM
   MATHEMATICAL
@@ -794,6 +798,7 @@ model User {
   formGroupGrantsGiven FormGroupGrant[] @relation("FormGroupGrantGrantedBy")
   formEntries          FormEntry[]      @relation("FormEntrySubmittedBy")
   reviewedFormEntries  FormEntry[]      @relation("FormEntryReviewer")
+  formGroupingsRun     FormGrouping[]   @relation("FormGroupingRanBy")
   formAuditLogs        FormAuditLog[]   @relation("FormAuditActor")
 
   //Oauth / SSO fields
@@ -838,9 +843,12 @@ model Group {
   // maar staat niet op /praesidium; ze krijgt /werkgroepen met haar eigen
   // infotekst (description*, door de leden zelf bewerkbaar) en optionele website.
   type              GroupType      @default(PRAESIDIUM)
-  // Hoe de verantwoordelijke van deze werkgroep heet op /werkgroepen en in het
-  // ledenbeheer: G3 of G4. Wordt genegeerd voor praesidiumposten.
-  leadLabel         GroupLeadLabel @default(G3)
+  // Hoe de verantwoordelijke (membership.role == LEAD) van deze werkgroep heet
+  // op /werkgroepen en in het ledenbeheer. Vrije tekst die de werkgroep zelf
+  // kiest: meestal G3 of G4, maar dat verschilt per werkgroep, en sommige
+  // gebruiken een eigen naam. Wordt genegeerd voor praesidiumposten, die het bij
+  // "Verantwoordelijke" houden.
+  leadLabel         String         @default("G3")
   website           String?
   // Een gedeactiveerde post verdwijnt uit de nieuwe-shift-keuzes en het
   // postenbeheer voor nieuwe jaren, maar de historiek (memberships per jaar)
@@ -1659,6 +1667,21 @@ model NewsHidden {
 }
 
 /**
+ * Een automatisch bericht dat standaard níét in het nieuws staat, maar dat de
+ * redactie er toch in zette. Vandaag enkel de ticketverkoop van een werkgroep
+ * (zie `ticketNeedsNewsOptIn` in apps/web/lib/news/rules.ts). Het omgekeerde
+ * van `NewsHidden`, met dezelfde sleutel; `setNewsHiddenAction` houdt de twee
+ * exclusief.
+ */
+model NewsShown {
+  source    String
+  ref       String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([source, ref])
+}
+
+/**
  * One configurable front page: the dark block at the top of the homepage.
  * Which front pages exist is decided in code, not here. Each one is its own
  * component with its own layout, free to look nothing like the others; a
@@ -1912,7 +1935,9 @@ model CalendarEvent {
 
   group          Group                        @relation(fields: [groupId], references: [id], onDelete: Cascade)
   createdBy      User?                        @relation("EventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  ticketEvent    TicketEvent?
+  /// De ticketverkoop(en) van dit evenement; meestal één, soms meer (zie
+  /// `TicketEvent.calendarEventId`).
+  ticketEvents   TicketEvent[]
   form           Form?
   /// Het logistiek-evenement dat bij dit kalenderevenement hoort (E1). Ontstaat
   /// enkel wanneer iemand in de admin "Logistiek nodig" aanvinkt.
@@ -2037,8 +2062,10 @@ model CalendarCategory {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  events    CalendarEventCategory[]
-  followers CalendarCategoryFollow[]
+  events        CalendarEventCategory[]
+  followers     CalendarCategoryFollow[]
+  // Ticketevents die de standaardbanner van dit thema lenen.
+  ticketBanners TicketEvent[]
 
   @@index([order])
 }
@@ -2083,7 +2110,25 @@ model CalendarFeedToken {
 
 model TicketEvent {
   id                    String            @id @default(cuid())
-  calendarEventId       String?           @unique
+  // Het kalenderevent waar deze verkoop bij hoort. Niet uniek: één event kan
+  // meerdere ticketpagina's hebben (de volledige 12u naast de losse cantussen,
+  // een eerstejaarsuur vooraf, de waves van Galabal).
+  calendarEventId       String?
+  // De tickets staan op de eventpagina (`/kalender/<slug>`) in plaats van op een
+  // eigen pagina. `/tickets/<slug>` toont dan diezelfde eventpagina met deze
+  // verkoop gekozen, zodat elke soort zijn eigen deelbare adres houdt. Enkel
+  // van betekenis met een `calendarEventId`. Bestaande koppelingen staan uit: er
+  // verandert niets tot iemand het aanzet. Zie docs/design-decisions.md.
+  onEventPage           Boolean           @default(false)
+  // De naam van deze verkoop op de eventpagina, als tab naast de andere
+  // ("Volledige 12u", "Wave 1"). De titel komt van het kalenderevent en is dus
+  // voor elke verkoop dezelfde; dit is wat ze uit elkaar houdt.
+  labelNl               String?
+  labelEn               String?
+  // Deze verkoop volgt de uren van het kalenderevent niet: een eerstejaarsuur
+  // dat een uur vroeger begint, of een wave. Titel, beschrijving en locatie
+  // blijven overgenomen; enkel `startsAt` en `endsAt` zijn van hier.
+  ownTimes              Boolean           @default(false)
   ownerGroupId          String
   slug                  String            @unique
   titleNl               String
@@ -2123,6 +2168,15 @@ model TicketEvent {
   // met een groep die de site niet kent (de band, de sponsors, de ouders van).
   // `null` = geen link; regenereren maakt de oude meteen waardeloos.
   presaleToken          String?           @unique
+  // Een privéverkoop: het event staat nergens op de site (niet op /tickets, niet
+  // in de kalender, het nieuws of de app) en `/tickets/<slug>` geeft een 404,
+  // behalve voor wie de privélink met `privateToken` volgde. Voor een verkoop
+  // aan een afgebakende groep (een weekend, een sponsordiner, een werkgroep).
+  // Het token blijft staan wanneer het event terug openbaar wordt, zodat het
+  // opnieuw privé zetten dezelfde, al gedeelde link teruggeeft; enkel
+  // "Vernieuwen" maakt een nieuwe. Zie lib/ticketing/privateLink.ts.
+  isPrivate             Boolean           @default(false)
+  privateToken          String?           @unique
   status                TicketEventStatus @default(DRAFT)
   currency              String            @default("EUR")
   maxTicketsPerOrder    Int               @default(8)
@@ -2142,15 +2196,26 @@ model TicketEvent {
   confirmationMessageNl String?
   confirmationMessageEn String?
   settings              Json              @default("{}")
+  // De banner in de shop, op /tickets, in het nieuws en in de bevestigingsmail.
+  // Een eigen foto (`imageKey`, met zijn uitsnede zoals bij CalendarEvent), of
+  // de standaardbanner van een kalenderthema (`imageCategoryId`); hoogstens één
+  // van de twee staat ingevuld. Leeg valt terug op de foto van het gekoppelde
+  // kalenderevent, zodat een ticketevent zonder koppeling ook een banner kan
+  // dragen. Zie lib/ticketing/poster.ts en docs/design-decisions.md.
+  imageKey              String?
+  imageFocusX           Float             @default(0.5)
+  imageFocusY           Float             @default(0.5)
+  imageCategoryId       String?
   createdById           String?
   publishedAt           DateTime?         @db.Timestamptz(3)
   archivedAt            DateTime?         @db.Timestamptz(3)
   createdAt             DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt             DateTime          @updatedAt @db.Timestamptz(3)
 
-  calendarEvent CalendarEvent? @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
-  ownerGroup    Group          @relation("TicketEventOwnerGroup", fields: [ownerGroupId], references: [id], onDelete: Restrict)
-  createdBy     User?          @relation("TicketEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  calendarEvent CalendarEvent?    @relation(fields: [calendarEventId], references: [id], onDelete: SetNull)
+  imageCategory CalendarCategory? @relation(fields: [imageCategoryId], references: [id], onDelete: SetNull)
+  ownerGroup    Group             @relation("TicketEventOwnerGroup", fields: [ownerGroupId], references: [id], onDelete: Restrict)
+  createdBy     User?             @relation("TicketEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
 
   inventoryPools TicketInventoryPool[]
   ticketTypes    TicketType[]
@@ -2167,6 +2232,7 @@ model TicketEvent {
   auditLogs      TicketAuditLog[]
   outboxMessages TicketOutboxMessage[]
 
+  @@index([calendarEventId])
   @@index([ownerGroupId])
   @@index([status, salesStartAt, salesEndAt])
   @@index([startsAt])
@@ -2339,6 +2405,17 @@ model TicketOrder {
   failedAt             DateTime?         @db.Timestamptz(3)
   expiredAt            DateTime?         @db.Timestamptz(3)
   cancelledAt          DateTime?         @db.Timestamptz(3)
+  // Langs waar de koper op de ticketpagina kwam: een vaste sleutel van een
+  // plek op de site (`kalender`, `home-evenementen`, `nieuws`), een kanaal uit
+  // een deelbare link (`?via=facebook`, of `utm_source`) of een afgeleide van
+  // de referrer. `null` = bestelling van voor die meting; de statistieken tonen
+  // dat als "niet gemeten", nooit als "direct". Enkel een label, geen
+  // persoonsgegeven: geen volledige referrer-URL, geen klik-id. Zie
+  // `lib/ticketing/source.ts` en docs/ticketing.md.
+  source               String?
+  // `utm_campaign` of `?c=` uit dezelfde link: om twee posts op hetzelfde
+  // kanaal uit elkaar te houden ("affiche" vs "story").
+  sourceCampaign       String?
   createdAt            DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
 
@@ -3045,8 +3122,13 @@ model ShiftParticipant {
   // `payedOut` blijft de compatibele "volledig uitbetaald"-vlag voor bestaande
   // API-consumers. `rewardPaid` bewaart het exacte aantal toegekende bonnetjes,
   // zodat een shift ook gedeeltelijk kan worden uitbetaald.
+  //
+  // Een kommagetal omdat een broodje aan de afhaalbalie per half bonnetje kost
+  // (`sandwichVoucherCost`). Altijd een veelvoud van een half, nooit fijner: dat
+  // is exact in een double, dus optellen en de vergelijking op gelijkheid in
+  // `allocateUserShiftReward` blijven kloppen.
   payedOut   Boolean
-  rewardPaid Int     @default(0)
+  rewardPaid Float   @default(0)
 
   /// Moment van inschrijven: binnen een korte bedenktijd mag je je nog
   /// uitschrijven, ook wanneer de shift al binnen 24 uur begint.
@@ -3236,6 +3318,9 @@ model TheokotSession {
   pickupEnd            DateTime
   processedAt          DateTime? // wanneer no-shows verwerkt zijn (idempotentie)
   processingStartedAt  DateTime? // lease/claim voor een actieve no-show-worker
+  /// "Er liep iets mis" op deze dag: de no-shows tellen niet mee en de
+  /// verwerking stuurt er geen mails voor. Zie `waiveSessionNoShows`.
+  noShowsWaivedAt      DateTime? @db.Timestamptz(3)
   /// Wanneer het pushbericht "de bestelronde is open" voor deze dag vertrokken
   /// is. Zelfde claim-dan-versturen-aanpak als `TheokotOrder.pickupPushedAt`.
   orderOpenPushedAt    DateTime? @db.Timestamptz(3)
@@ -3288,15 +3373,30 @@ model TheokotOrder {
   pickedUpAt        DateTime?
   pickedUpById      String? // wie aan de balie op "opgehaald" drukte
   noShowProcessedAt DateTime? // mail + eventuele ban voor deze order afgewerkt
+  /// Deze no-show telt niet mee voor een ban: ze viel terwijl de verwerking
+  /// gepauzeerd stond (`theokot.config` `noShowPaused`), of de verkoopdag werd
+  /// als "er liep iets mis" aangeduid (`TheokotSession.noShowsWaivedAt`). Geen
+  /// mail zolang die nog niet vertrokken was. NULL bij elke andere bestelling.
+  noShowWaivedAt    DateTime?          @db.Timestamptz(3)
   /// Wanneer het pushbericht "je broodje ligt klaar" voor deze bestelling
   /// verstuurd is. Dezelfde claim-dan-versturen-aanpak als bij de
   /// shift-herinneringen: eerst de markering zetten in een voorwaardelijke
   /// update, dan pas versturen. Bij twijfel liever geen bericht dan twee.
   pickupPushedAt    DateTime?          @db.Timestamptz(3)
+  /// De grocomeet in wiens doos deze bestelling meegaat. Gezet wanneer wie
+  /// bestelt `grocomeet.reserve` heeft en er die dag een grocomeet is (zie
+  /// `linkGrocomeetOrders`). Zo'n bestelling staat in de GM-kolom van de
+  /// turflijst, wordt niet aan de balie afgehaald of betaald maar via het
+  /// geldoverzicht van de grocomeet, en telt na de afhaal als opgehaald in
+  /// plaats van als no-show. NULL bij elke gewone bestelling.
+  grocomeetId       String?
+  /// Afgerekend bij de grocomeet, zoals `MeetingReservation.paidAt`.
+  grocomeetPaidAt   DateTime?          @db.Timestamptz(3)
 
   session           TheokotSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user              User                      @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
   pickedUpBy        User?                     @relation("TheokotPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
+  grocomeet         Meeting?                  @relation(fields: [grocomeetId], references: [id], onDelete: SetNull)
   lines             TheokotOrderLine[]
   voucherRedemption TheokotVoucherRedemption?
 
@@ -3305,16 +3405,19 @@ model TheokotOrder {
   @@index([status])
   @@index([status, noShowProcessedAt])
   @@index([status, pickupPushedAt])
+  @@index([grocomeetId])
 }
 
-/// Auditrij wanneer een student aan de afhaalbalie twee nog openstaande
+/// Auditrij wanneer een student aan de afhaalbalie nog openstaande
 /// medewerkersbonnetjes gebruikt voor een broodje.
 model TheokotVoucherRedemption {
   id            String   @id @default(cuid())
   orderId       String   @unique
   userId        String
   processedById String?
-  amount        Int      @default(2)
+  /// Wat het broodje kostte, per half bonnetje (`sandwichVoucherCost`). Vóór
+  /// oktober 2026 was dat vast twee; die rijen blijven op 2 staan.
+  amount        Float
   createdAt     DateTime @default(now())
 
   order       TheokotOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
@@ -3330,7 +3433,10 @@ model TheokotOrderLine {
   orderId        String
   sessionItemId  String
   quantity       Int
-  unitPriceCents Int // snapshot van de prijs op besteldatum
+  // Prijs per stuk. Volgt de prijs van het broodje zolang de bestelling niet
+  // betaald is (RESERVED, NO_SHOW: zie `repriceReservedOrders`); vanaf het
+  // ophalen is dit wat er betaald werd en verandert het niet meer.
+  unitPriceCents Int
 
   order       TheokotOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   sessionItem TheokotSessionItem @relation(fields: [sessionItemId], references: [id], onDelete: Cascade)
@@ -3382,9 +3488,11 @@ model Meeting {
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
-  createdBy    User?                @relation("MeetingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  options      MeetingOption[]
-  reservations MeetingReservation[]
+  createdBy     User?                @relation("MeetingCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  options       MeetingOption[]
+  reservations  MeetingReservation[]
+  /// Wat grocos die dag zelf bij Theokot bestelden (enkel bij een GM).
+  theokotOrders TheokotOrder[]
 
   @@index([kind, startsAt])
   @@index([year, semester, kind])
@@ -5796,6 +5904,7 @@ model Form {
   groupGrants    FormGroupGrant[]
   auditLogs      FormAuditLog[]
   outboxMessages FormOutboxMessage[]
+  grouping       FormGrouping?
 
   @@index([ownerGroupId])
   @@index([status, opensAt, closesAt])
@@ -5872,6 +5981,7 @@ model FormField {
   uploads          FormFileUpload[]
   conditions       FormFieldCondition[] @relation("FormFieldConditionTarget")
   conditionSources FormFieldCondition[] @relation("FormFieldConditionSource")
+  groupingRoles    FormGroupingField[]
 
   @@unique([formId, code])
   @@unique([id, formId])
@@ -5981,8 +6091,9 @@ model FormEntry {
   submittedBy User? @relation("FormEntrySubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   reviewer    User? @relation("FormEntryReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
 
-  answers FormAnswer[]
-  uploads FormFileUpload[]
+  answers         FormAnswer[]
+  uploads         FormFileUpload[]
+  groupingMembers FormGroupingMember[]
 
   @@unique([id, formId])
   @@index([formId, status, submittedAt])
@@ -6078,6 +6189,119 @@ model FormGroupGrant {
 
 /// Wie wijzigde welk formulier, wie verwijderde welke inzending. In de stijl van
 /// TicketAuditLog; de retentie wist het IP-adres en de ruwe metadata.
+/// Wat een vraag betekent voor de groepjesmaker. Een veld zonder rol is gewoon
+/// een gegeven (telefoonnummer, allergieën) en telt niet mee in de indeling.
+enum FormGroupingRole {
+  /// Naam van de invuller; zo heet de rij in het resultaat.
+  NAME
+  /// Iets waarmee een ander naar deze inzending kan verwijzen (e-mail,
+  /// r-nummer). Ook de naam telt daarvoor mee.
+  IDENTIFIER
+  /// Met hoeveel personen deze inzending zich inschrijft (inclusief de invuller).
+  GROUP_SIZE
+  /// De namen van de anderen in die inschrijving, met komma's gescheiden.
+  GROUP_NAMES
+  /// Naar wie deze inzending verwijst om samen te zitten; wordt gezocht in de
+  /// NAME- en IDENTIFIER-velden van de andere inzendingen.
+  PARTNER
+  /// Welke optie(s) een inzending tot "kern" van een groep maken (peters en
+  /// meters bij onthaal). Zonder rolveld is iedereen gewoon lid.
+  ANCHOR
+  /// Voor een kerninschrijving: aanvaarden ze nog andere kernleden erbij?
+  ACCEPTS_EXTRA
+  /// Wie hetzelfde antwoordt, zit liefst samen.
+  SIMILAR
+  /// Wie hetzelfde antwoordt, zit liefst apart.
+  DIVERSE
+}
+
+/// De groepjesmaker van één formulier: de parameters, de rol van elke vraag en
+/// het laatste resultaat. Zie docs/forms.md, "Groepjesmaker".
+model FormGrouping {
+  id     String @id @default(cuid())
+  formId String @unique
+
+  /// Grenzen per groep, in personen (een inschrijving van drie telt drie keer).
+  /// Tellen enkel de gewone leden; de kern heeft zijn eigen grenzen.
+  minMembers Int  @default(10)
+  maxMembers Int  @default(15)
+  minGroups  Int?
+  maxGroups  Int?
+  minAnchors Int?
+  maxAnchors Int?
+
+  /// Zelf indelen zodra het formulier dicht is: bij het sluitmoment, wanneer
+  /// het vol zit, of wanneer `expectedPeople` personen ingeschreven zijn.
+  autoRun        Boolean @default(false)
+  /// Hoeveel personen er verwacht worden. Bereikt: het formulier sluit.
+  expectedPeople Int?
+
+  ranAt       DateTime? @db.Timestamptz(3)
+  ranById     String?
+  /// Aantal handmatige verplaatsingen sinds de laatste indeling; opnieuw
+  /// indelen gooit die weg, dus de bevestiging noemt het aantal.
+  manualMoves Int       @default(0)
+  /// Wat de indeling niet kon waarmaken (een partner die niet gevonden werd,
+  /// een groep onder het minimum), als lijst van { code, detail }.
+  warnings    Json      @default("[]")
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  form    Form                 @relation(fields: [formId], references: [id], onDelete: Cascade)
+  ranBy   User?                @relation("FormGroupingRanBy", fields: [ranById], references: [id], onDelete: SetNull)
+  fields  FormGroupingField[]
+  groups  FormGroupingGroup[]
+  members FormGroupingMember[]
+}
+
+model FormGroupingField {
+  id         String           @id @default(cuid())
+  groupingId String
+  fieldId    String
+  role       FormGroupingRole
+  /// Hoe zwaar deze vraag doorweegt bij SIMILAR en DIVERSE (1 tot 5).
+  weight     Int              @default(1)
+  /// Bij ANCHOR en ACCEPTS_EXTRA: de optiecodes die "ja" betekenen, of "true"
+  /// bij een ja/nee-vraag.
+  options    String[]         @default([])
+
+  grouping FormGrouping @relation(fields: [groupingId], references: [id], onDelete: Cascade)
+  field    FormField    @relation(fields: [fieldId], references: [id], onDelete: Cascade)
+
+  @@unique([groupingId, fieldId])
+  @@index([fieldId])
+}
+
+model FormGroupingGroup {
+  id         String @id @default(cuid())
+  groupingId String
+  number     Int
+
+  grouping FormGrouping         @relation(fields: [groupingId], references: [id], onDelete: Cascade)
+  members  FormGroupingMember[]
+
+  @@unique([groupingId, number])
+}
+
+/// Eén inzending in een groep. Een inzending van drie personen is één rij: de
+/// groep blijft samen, ook bij een handmatige verplaatsing.
+model FormGroupingMember {
+  id         String  @id @default(cuid())
+  groupingId String
+  groupId    String
+  entryId    String
+  isAnchor   Boolean @default(false)
+
+  grouping FormGrouping      @relation(fields: [groupingId], references: [id], onDelete: Cascade)
+  group    FormGroupingGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  entry    FormEntry         @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@unique([groupingId, entryId])
+  @@index([groupId])
+  @@index([entryId])
+}
+
 model FormAuditLog {
   id          String   @id @default(cuid())
   formId      String
@@ -6627,7 +6851,7 @@ model AppNotificationPreference {
 /// Eén betaling met openstaande shiftbonnetjes, buiten de Theokot-afhaalbalie om.
 ///
 /// De afhaalbalie heeft haar eigen auditrij (`TheokotVoucherRedemption`) omdat
-/// die aan een bestelling hangt en altijd exact twee bonnetjes kost. Dit is de
+/// die aan een bestelling hangt en de prijs van het broodje volgt. Dit is de
 /// vrije variant: aan de toog van de fakbar tikt iemand een bedrag in. Het saldo
 /// zelf blijft `Shift.reward` min `ShiftParticipant.rewardPaid`; deze tabel is
 /// het logboek, niet de waarheid.

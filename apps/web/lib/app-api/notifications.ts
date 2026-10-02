@@ -46,6 +46,8 @@ export async function sendTheokotPickupPush(now: Date = new Date()): Promise<Not
     where: {
       status: "RESERVED",
       pickupPushedAt: null,
+      // Wat in de doos van de grocomeet zit, ligt niet aan de balie.
+      grocomeetId: null,
       session: {
         pickupStart: { lte: now, gte: new Date(now.getTime() - 6 * 60 * 60 * 1000) },
         pickupEnd: { gte: now },

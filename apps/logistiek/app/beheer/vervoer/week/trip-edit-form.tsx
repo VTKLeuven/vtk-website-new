@@ -5,7 +5,6 @@ import { Button } from '@vtk/ui';
 import { adminEditTransportAction } from '@/app/actions/beheer';
 import { QuarterDateTime } from '@/components/quarter-datetime';
 import { useToast } from '@/components/ui/toast';
-import { TripEventSelect, type TripEventOption } from '@/components/trip-event-select';
 import { materialListHref } from '@/lib/material-list-link';
 import { EXTERN_REQUESTER, OTHER_REQUESTER, requesterFromChoice } from '@/lib/uitleen';
 
@@ -34,8 +33,6 @@ export type TripEditValues = {
   pickupAddress: string;
   destination: string;
   adminNote: string;
-  /** Het evenement waar de rit onder hangt (A8); leeg is geen evenement. */
-  eventId: string;
   /**
    * Voor wie de rit rijdt (F4.4): een post-id, leeg (Logistiek zelf), of een
    * van de twee sentinels hierboven.
@@ -50,7 +47,6 @@ export function TripEditForm({
   initial,
   groups,
   currentGroup,
-  events,
   reservationId,
   locked,
   onSaved,
@@ -68,8 +64,6 @@ export function TripEditForm({
    * post die niemand koos.
    */
   currentGroup: { id: string; name: string } | null;
-  /** De evenementen rond deze periode, om de rit aan te hangen (A8). */
-  events: TripEventOption[];
   /** De materiaalaanvraag waarvan deze rit de levering is, als er een is. */
   reservationId: string | null;
   /** Afgerond of geannuleerd: de rit is geschiedenis en staat enkel nog te lezen. */
@@ -120,10 +114,10 @@ export function TripEditForm({
     }
     const { requesterChoice, requesterOther, ...fields } = values;
     startTransition(async () => {
-      // `eventName` staat hier niet bij: de actie zoekt de naam zelf op bij het
-      // gekozen evenement. Het slepen van een blok in de kalender roept dezelfde
-      // actie aan met deze waarden, en dat gebaar heeft geen lijst evenementen
-      // bij de hand om een naam uit te halen.
+      // Het evenement staat hier niet bij: dat zet de rij "Evenement" bovenaan
+      // het paneel met een eigen actie, voor beide helften en ook op een gereden
+      // rit, en het slepen van een blok (dat deze actie ook aanroept) stuurde
+      // het anders ongemerkt mee.
       const result = await adminEditTransportAction(bookingId, {
         ...fields,
         requester: requesterFromChoice(requesterChoice, requesterOther),
@@ -269,15 +263,6 @@ export function TripEditForm({
         >
           Link naar de materiaallijst invoegen
         </button>
-      ) : null}
-
-      {events.length > 0 ? (
-        <TripEventSelect
-          events={events}
-          value={values.eventId}
-          onChange={(eventId) => set('eventId', eventId)}
-          className={inputClass}
-        />
       ) : null}
 
       <label className="grid gap-1 text-xs font-medium text-vtk-muted">

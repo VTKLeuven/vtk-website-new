@@ -225,6 +225,10 @@ without the key and says which one accepts it.
 ### Routes: public (`apps/web/app/[locale]/...`)
 - `tickets/page.tsx`: public shop list (`/tickets`)
 - `tickets/[slug]/page.tsx`: event + purchase page
+- `tickets/[slug]/voorverkoop/[token]/route.ts`: de private voorverkooplink
+  (cookie, dan door naar de shop)
+- `tickets/[slug]/prive/[token]/route.ts`: de privélink van een privé-event
+  (cookie, dan door naar de shop, die zonder die cookie een 404 geeft)
 - `account/page.tsx`: personal ticket overview in the "Mijn VTK" section
 - `tickets/bestelling/[orderId]`: order + QR
 
@@ -234,6 +238,8 @@ without the key and says which one accepts it.
 - `sjablonen/page.tsx`: beheer van de ticketsjablonen (`tickets.templates`)
 - `[eventId]/{instellingen,toegang,deelnemers,bestellingen}`: settings (ticket
   types), access/grants, attendees, orders
+- `[eventId]/statistieken` en `statistieken/page.tsx`: ticketstatistieken per
+  event en voor een selectie (zie "Statistieken en herkomst")
 
 ### Routes: scanner
 - `apps/web/app/(scanner)/scan/[eventId]/page.tsx`: camera scanner (no locale
@@ -276,7 +282,7 @@ niet bij de toeloop van een galabal, en Web Bluetooth bestaat niet op iOS.
 
 ### Wie mag een tickettype kopen
 
-`TicketType.audience` bepaalt per tickettype wie het ziet en koopt. Drie waarden,
+`TicketType.audience` bepaalt per tickettype wie het ziet en koopt. Zeven waarden,
 en ze zijn **na het aanmaken aanpasbaar** in het bewerkpaneel per rij op
 `/admin/tickets/<id>/instellingen` (dezelfde `MANAGE_INVENTORY`-capability als de
 kleur):
@@ -286,6 +292,12 @@ kleur):
 | `PUBLIC` | "Leden en niet-leden" | iedereen, ook zonder account |
 | `MEMBERS` | "Alleen leden" | het type verdwijnt uit de lijst van een uitgelogde bezoeker; de shop toont hem een inlogscherm |
 | `HONORARY` | "Alleen ereleden" | enkel voor `User.honoraryMember`; voor alle anderen bestaat het type niet |
+| `FIRST_YEARS`, `LAST_YEARS`, `INTERNATIONALS`, `ALUMNI` | "Alleen eerstejaars", ... | enkel voor wie volgens het studieprofiel bij die doelgroep hoort (`ticketAudiencesForProfile`); voor alle anderen bestaat het type niet, een uitgelogde bezoeker krijgt een loginhint (`audienceLoginHint`) |
+
+De doelgroepen zijn die van de kalender, met dezelfde afleiding
+(`lib/calendar/audienceProfile.ts`). Eerste- en laatstejaars tellen enkel met
+een studiebevestiging van de lopende ronde. Het profiel wordt gelezen in
+`lib/ticketing/viewerProfile.ts`, door de shop en door de checkout.
 
 "Lid" betekent hier **iemand met een VTK-account die ingelogd is**. Er is geen
 lidkaart- of lidgeldmodel in de database, dus een fijner onderscheid bestaat niet
@@ -312,6 +324,35 @@ beheerformulier) en stond er eerder twee keer in een eigen vorm;
   alleen bij het afrekenen gelezen, en de bestelregel draagt haar eigen naam- en
   prijskopie; reeds verkochte tickets blijven dus gewoon geldig. Het paneel
   vermeldt hoeveel tickets er al besteld zijn.
+
+### Statistieken en herkomst
+
+`lib/ticketing/statsCompute.ts` telt (puur, getest in `test/ticketStats.test.ts`),
+`lib/ticketing/stats.ts` haalt de rijen op en beslist per event of de omzet
+meetelt. Toegang is `VIEW_REPORTS`; de omzet vraagt `VIEW_FINANCE`. "Verkocht"
+is overal een ticket met status `VALID`, op het moment van betaling, in
+Brusselse tijd. De grafieken zijn `components/admin/DailyChart.tsx`, die naast
+dagen ook weken, uren, weekdagen en kwartieren op de x-as aankan
+(`keyFormat`).
+
+**Herkomst.** Elke bestelling draagt `source` en `sourceCampaign`
+(`lib/ticketing/source.ts`). De shop leidt ze af bij het laden
+(`useLandingSource`): eerst `?via=` of `utm_source`, dan een klik-id als
+`fbclid`, dan de referrer (enkel host of een grove plek op de site). Onze eigen
+links naar een ticketpagina of eventpagina zetten `via` met `withSource`
+(`home-agenda`, `home-evenementen`, `nieuws`, `kalender`, `tickets`,
+`voorverkoop`, `bestelling`); een eventpagina geeft de hare door via
+`TicketShopLink`. Een nieuwe plek die naar tickets linkt, krijgt ook een `via`
+en een naam in `SOURCES`, anders telt ze als "elders op vtk.be" of erft ze de
+referrer van het eerste bezoek (`document.referrer` verandert niet bij een
+navigatie binnen de site).
+
+- `null` = bestelling van voor de meting of van een pagina zonder de nieuwe
+  code; de statistieken tonen dat als "niet gemeten", los van "direct".
+- De parameters gaan na het lezen uit de adresbalk, zodat wie de link
+  doorstuurt de herkomst niet meegeeft. Geen cookie en geen storage.
+- De checkout schoont de waarde opnieuw op (`sanitizeSourceKey`) en weigert
+  nooit een bestelling om een rare herkomst.
 
 ### Kleur per tickettype
 
@@ -491,6 +532,12 @@ webscanner blijft staan als webweg en als vangnet.
   gedeeld door de shoplijst, de eventpagina en `createOrder`. `viewerSalesStart`
   geeft de verkoopstart zoals **deze** bezoeker ze heeft; al de rest rekent
   gewoon met een venster. Zie `docs/design-decisions.md` voor de kringkeuzes
+- `privateLink.ts`: de privéverkoop (`TicketEvent.isPrivate`, `privateToken`).
+  `hasPrivateTicketAccess` is het slot in `getPublishedTicketEventBySlug` en in
+  `createTicketCheckout`; de lijsten (`listPublishedTicketEvents`, het nieuws,
+  `eventPage.ts` voor de kalender, homepage en app) laten een privé-event
+  gewoon weg. `shopPath.ts` bepaalt waar het beheer naartoe linkt. Zie
+  `docs/design-decisions.md`
 - `cardHash.ts`: het hashformaat van de studentenkaart in het offline-manifest;
   draait bewust aan beide kanten
 - `mail.ts`, `outbox.ts`: durable confirmation-mail queue

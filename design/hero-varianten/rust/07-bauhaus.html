@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rust 7: Bauhaus</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jost:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Stroming: Bauhaus. Vorm volgt functie: kleur is een bouwsteen, geen
+   versiering. Links op papier wie we zijn, rechts één volle gele kolom met
+   de drie plekken waar je meestal voor komt. Een geometrische letter
+   (Jost, in de geest van Futura), niets anders. */
+:root { --paper: #EFF2F8; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --muted: #5C667F; --line: rgb(14 26 54 / .12); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Jost, system-ui, sans-serif; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--navy); outline-offset: 3px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.grid { display: grid; grid-template-columns: 2fr 1fr; min-height: 100dvh; }
+.left { display: flex; flex-direction: column; padding: 0 56px 40px; }
+.hdr { display: flex; align-items: center; gap: 26px; height: 80px; }
+.hdr img { height: 26px; filter: invert(1) brightness(.12); }
+.hdr nav { display: flex; gap: 22px; font-size: 16px; font-weight: 500; }
+.hdr nav a:hover { color: var(--muted); }
+.hdr .lang { margin-left: auto; font-size: 15px; color: var(--muted); }
+.body { margin: auto 0; max-width: 680px; }
+h1 { font-size: 72px; line-height: .98; font-weight: 600; letter-spacing: -0.02em; color: var(--navy); }
+.sub { margin-top: 22px; font-size: 20px; line-height: 1.5; color: var(--muted); max-width: 28em; }
+.cta { display: flex; gap: 22px; align-items: center; margin-top: 36px; }
+.btn { display: inline-flex; align-items: center; gap: 10px; height: 54px; padding: 0 28px; background: var(--navy); color: var(--paper); font-size: 17px; font-weight: 500; }
+.btn:hover { background: var(--ink); }
+.link { font-size: 17px; font-weight: 500; border-bottom: 2px solid var(--navy); }
+.link:hover { color: var(--muted); border-color: var(--muted); }
+.shape { display: flex; gap: 10px; margin-top: 64px; align-items: center; font-size: 15px; color: var(--muted); }
+.shape i { width: 14px; height: 14px; background: var(--navy); display: inline-block; }
+.shape i:nth-child(2) { border-radius: 50%; background: var(--yellow); }
+.shape a { color: var(--ink); font-weight: 500; }
+.shape a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.right { background: var(--yellow); display: flex; flex-direction: column; padding: 80px 44px 40px; }
+.right h2 { font-size: 15px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.q { display: block; padding: 22px 0; border-bottom: 2px solid var(--ink); }
+.q:first-of-type { margin-top: 12px; border-top: 2px solid var(--ink); }
+.q b { display: flex; justify-content: space-between; align-items: center; font-size: 34px; font-weight: 600; letter-spacing: -0.01em; }
+.q b i { font-size: 26px; transition: transform .2s; }
+.q:hover b i { transform: translateX(6px); }
+.q small { display: block; font-size: 16px; margin-top: 2px; }
+.others { margin-top: auto; padding-top: 28px; font-size: 16px; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.others a { font-weight: 500; }
+.others a:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.week { padding: 64px 56px 72px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 40px; background: var(--surface); }
+.week h2 { font-size: 32px; font-weight: 600; color: var(--navy); }
+.week h3 { font-size: 15px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); padding-bottom: 8px; border-bottom: 2px solid var(--navy); }
+.e { display: grid; grid-template-columns: 56px 1fr 26px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 17px; align-items: baseline; }
+.e time { font-size: 15px; color: var(--muted); }
+.e a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.star { color: var(--muted); font-size: 16px; } .star[aria-pressed="true"] { color: var(--ink); }
+.week .all { display: inline-block; margin-top: 12px; font-weight: 600; border-bottom: 2px solid var(--navy); }
+
+@media (max-width: 1000px) { .grid { grid-template-columns: 1fr; } .hdr nav { display: none; } .right { padding: 36px 24px; } .left { padding: 0 24px 36px; } .body { padding: 40px 0; } .week { grid-template-columns: 1fr; padding: 44px 24px; } }
+@media (max-width: 560px) { h1 { font-size: 46px; } .cta { flex-wrap: wrap; } .q b { font-size: 26px; } }
+</style>
+</head>
+<body>
+<div class="grid">
+  <div class="left">
+    <header class="hdr">
+      <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+      <nav><a href="#">Info</a><a href="#">Cursusdienst</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Evenementen</a><a href="#">Eerstejaars</a></nav>
+      <span class="lang">NL / EN</span>
+    </header>
+    <section class="body">
+      <h1>De thuis voor ingenieurs in Leuven.</h1>
+      <p class="sub">Cursussen, broodjes, events en career voor burgerlijk en bio-ingenieurs. Gerund door studenten, sinds 1920.</p>
+      <div class="cta"><a class="btn" href="#">Ontdek wat we doen <i class="ph ph-arrow-right"></i></a><a class="link" href="#">Eerstejaars? Start hier</a></div>
+      <p class="shape num"><i></i><i></i>Vandaag: <a href="#">12 Urencantus, 12:00</a> en <a href="#">nog 1 event</a></p>
+    </section>
+  </div>
+  <nav class="right num" aria-label="Snel naar">
+    <h2>Snel naar</h2>
+    <a class="q" href="#"><b>Cursusdienst <i class="ph ph-arrow-right"></i></b><small>Open tot 13:55</small></a>
+    <a class="q" href="#"><b>Theokot <i class="ph ph-arrow-right"></i></b><small>Bestel je broodje</small></a>
+    <a class="q" href="#"><b>Shiften <i class="ph ph-arrow-right"></i></b><small>3 zoeken nog volk</small></a>
+    <div class="others"><a href="#">Tweedehands</a><a href="#">Tijdslot Cudi</a><a href="#">Kalender</a></div>
+  </nav>
+</div>
+
+<section class="week num" aria-label="Deze week">
+  <div><h2>Deze week</h2><a class="all" href="#">Volledige kalender</a></div>
+  <div><h3>Events</h3>
+    <div class="e"><time>do 1</time><a href="#">12 Urencantus</a><button class="star" aria-label="Interesse: 12 Urencantus" aria-pressed="false">☆</button></div>
+    <div class="e"><time>ma 5</time><a href="#">PeMe-Startactiviteit</a><button class="star" aria-label="Interesse: PeMe" aria-pressed="false">☆</button></div>
+    <div class="e"><time>di 6</time><a href="#">Sector Night Bouwkunde</a><button class="star" aria-label="Interesse: Sector Night" aria-pressed="false">☆</button></div>
+  </div>
+  <div><h3>Shiften</h3>
+    <div class="e"><time>01:00</time><a href="#">Bijrijden afbraak</a><span></span></div>
+    <div class="e"><time>11:00</time><a href="#">Bijrijden met Stijn</a><span></span></div>
+    <div class="e"><time>14:00</time><a href="#">Namiddagshift</a><span></span></div>
+  </div>
+</section>
+<script>document.querySelectorAll(".star").forEach(b => b.addEventListener("click", () => { const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); b.textContent = on ? "★" : "☆"; }));</script>
+</body>
+</html>

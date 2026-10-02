@@ -13,6 +13,7 @@ export { isSafeRedirectUrl, sanitizeNextUrl } from './redirect';
 export { PERMISSIONS, isPermission, permissionCodes, type Permission } from './lib/permissions';
 export {
   currentWorkingYear,
+  workingYearOf,
   currentStudyYear,
   studyConfirmationYear,
   needsStudyConfirmation,

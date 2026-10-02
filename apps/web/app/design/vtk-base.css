@@ -59,6 +59,52 @@
   --max: 1240px;
 }
 
+/* Op een laptop tot 14 inch staat de hele site op 90%, zoals na één keer
+   Ctrl - : daar oogde ze op 100% te groot (koppen, knoppen, de hero), en
+   uitgezoomd was ze in balans. Vanaf 15 inch blijft ze op 100%.
+
+   Een fysieke schermgrootte bestaat niet in CSS; de breedte in CSS-pixels komt
+   er het dichtst bij. Een MacBook Air 13" (1470) en een MacBook Pro 14" (1512)
+   vallen binnen 1600, een MacBook Air 15" (1710) en een extern scherm niet.
+   Enkel met een muis of trackpad: een tablet in liggende stand is geen laptop.
+
+   `zoom` schaalt `vw` en `vh` niet mee: een band die met `50vw` tot aan de
+   schermrand loopt, hield dan 5% voor elke rand op. Alles wat de rand of de
+   volle hoogte moet halen, rekent daarom met deze variabelen in plaats van met
+   de eenheid zelf (`calc(50 * var(--vtk-vw, 1vw))`); onder de zoom maken ze de
+   eenheid 1/0,9 groter. Een vloeiende marge (`clamp(20px, 3vw, 36px)`) krimpt
+   wel gewoon mee, zoals bij Ctrl -. Zet je een nieuwe volle-breedteband of een
+   schermhoog blok, gebruik dan ook de variabele. */
+:root {
+  --vtk-zoom: 1;
+  --vtk-vw: 1vw;
+  --vtk-vh: 1vh;
+  --vtk-dvh: 1dvh;
+  --vtk-svh: 1svh;
+}
+
+/* Een Nederlandse kop is soms één woord dat breder is dan een telefoon
+   ("studentenvertegenwoordigers" op 28px). Zonder afbreken duwde dat de pagina
+   zijwaarts. Enkel op een smal scherm: breder breekt een kop op een spatie. */
+@media (max-width: 600px) {
+  :is(.vtk-design, .vtk-page) :is(h1, h2, h3) {
+    min-width: 0;
+    overflow-wrap: break-word;
+    hyphens: auto;
+  }
+}
+
+@media (min-width: 1024px) and (max-width: 1600px) and (hover: hover) and (pointer: fine) {
+  :root {
+    --vtk-zoom: 0.9;
+    --vtk-vw: calc(1vw / 0.9);
+    --vtk-vh: calc(1vh / 0.9);
+    --vtk-dvh: calc(1dvh / 0.9);
+    --vtk-svh: calc(1svh / 0.9);
+    zoom: 0.9;
+  }
+}
+
 .vtk-design,
 .vtk-design * {
   box-sizing: border-box;
@@ -644,10 +690,10 @@
   z-index: 35;
   display: flex;
   flex-direction: column;
-  width: min(384px, calc(100vw - 32px));
+  width: min(384px, calc(calc(100 * var(--vtk-vw, 1vw)) - 32px));
   /* Een lang bericht dat openklapt, scrolt binnen de kaart: kop en knoppen
      blijven staan, en de kaart schuift nooit onder de sitekop. */
-  max-height: calc(100dvh - var(--vtk-header-height, 73px) - var(--vtk-announcement-bottom) - 16px);
+  max-height: calc(calc(100 * var(--vtk-dvh, 1dvh)) - var(--vtk-header-height, 73px) - var(--vtk-announcement-bottom) - 16px);
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -884,7 +930,7 @@
     bottom: auto;
     left: 12px;
     width: auto;
-    max-height: calc(100dvh - var(--vtk-header-height, 65px) - 22px - var(--vtk-cookie-consent-space, 0px));
+    max-height: calc(calc(100 * var(--vtk-dvh, 1dvh)) - var(--vtk-header-height, 65px) - 22px - var(--vtk-cookie-consent-space, 0px));
     animation-name: vtk-announcement-drop;
   }
 }
@@ -940,8 +986,8 @@
   z-index: -2;
   top: 0;
   bottom: 0;
-  left: calc(50% - 50vw);
-  right: calc(50% - 50vw);
+  left: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
+  right: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
   background: var(--navy);
   box-shadow: inset 0 -5px 0 var(--yellow);
 }
@@ -953,8 +999,8 @@
   z-index: -1;
   top: 0;
   bottom: 0;
-  left: calc(50% - 50vw);
-  right: calc(50% - 50vw);
+  left: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
+  right: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
   pointer-events: none;
   background-image: url("/technisch-pattern.svg");
   background-size: 880px 880px;
@@ -1513,8 +1559,8 @@
   z-index: -1;
   top: 0;
   bottom: 0;
-  left: calc(50% - 50vw);
-  right: calc(50% - 50vw);
+  left: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
+  right: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
   background: var(--paper-2);
 }
 
@@ -1593,7 +1639,7 @@
 /* Eén post/POC per rij: de naam links in de marge, de gezichten rechts. */
 .vtk-wall-row {
   display: grid;
-  grid-template-columns: 168px minmax(0, 1fr);
+  grid-template-columns: 160px minmax(0, 1fr);
   gap: clamp(22px, 2.5vw, 32px);
   padding: clamp(28px, 3vw, 36px) 0;
   border-top: 1px solid var(--line-2);
@@ -1643,13 +1689,19 @@
   color: var(--ink);
 }
 
-/* Zeven per rij op een volle kolom, en vanzelf minder naarmate het smaller
+/* Zes per rij op een volle kolom, en vanzelf minder naarmate het smaller
    wordt. Op een telefoon blijven dat er twee, niet één: een lijst van negentig
-   volle-breedte foto's scrolt eindeloos. */
+   volle-breedte foto's scrolt eindeloos.
+
+   De kolomafstand (12px) en de marge voor de postnaam (160px) zijn zo gekozen
+   dat een tegel op een volle kolom net 152px haalt: breed genoeg voor
+   "Eerstejaarsverantwoordelijke" op één regel. Met 16px en 168px was dat 148px
+   en brak de laatste letter af. Vijf per rij loste dat ook op, maar maakte de
+   portretten te groot. */
 .vtk-wall-faces {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(132px, 100%), 1fr));
-  gap: 22px 16px;
+  gap: 22px 12px;
   list-style: none;
   margin: 0;
   padding: 0;

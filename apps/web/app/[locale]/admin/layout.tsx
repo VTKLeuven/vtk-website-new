@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { cookies } from 'next/headers';
 import { prisma } from '@vtk/db';
 import { hasLocale } from '@/lib/locale';
 import { requireSession } from '@/lib/session';
@@ -8,6 +9,7 @@ import { canAccessAnyTicketEvent } from '@/lib/ticketing/authorization';
 import { canAccessAnyForm } from '@/lib/forms/authorization';
 import { isExternalUrl } from '@/lib/href';
 import { getAdminNav, type NavGuard, type NavLeaf } from '@/lib/admin-nav';
+import { ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/adminNavCookie';
 import { AdminNav, type NavItem, type NavNode } from './AdminNav';
 
 import '@/app/design/vtk-admin.css';
@@ -89,10 +91,11 @@ export default async function AdminLayout({
     if ('group' in entry) {
       const items = entry.items.filter(canSee).map(toItem);
       // Een groep waarvan je maar één item mag zien, is een klik om niets: toon
-      // dat item dan gewoon als los item.
-      if (items.length === 1) {
+      // dat item dan gewoon als los item. Behalve bij een groep die bewust
+      // groeit (Apps): die blijft staan, zodat het item niet van plaats wisselt.
+      if (items.length === 1 && !entry.keepSingle) {
         nodes.push({ type: 'item', item: items[0] });
-      } else if (items.length > 1) {
+      } else if (items.length > 0) {
         nodes.push({ type: 'group', key: entry.group, label: adminDict[entry.group], items });
       }
     } else if (canSee(entry)) {
@@ -107,6 +110,8 @@ export default async function AdminLayout({
     orderBy: { order: 'asc' },
     select: { key: true },
   });
+
+  const collapsed = (await cookies()).get(ADMIN_NAV_COLLAPSED_COOKIE)?.value === '1';
 
   return (
     <div className="vtk-admin-surface">
@@ -125,6 +130,8 @@ export default async function AdminLayout({
               unpin: adminDict.unpinTab,
               error: adminDict.pinError,
             }}
+            collapsed={collapsed}
+            collapseLabels={{ collapse: adminDict.collapseNav, expand: adminDict.expandNav }}
           />
         </aside>
         <section className="vtk-admin-main">{children}</section>

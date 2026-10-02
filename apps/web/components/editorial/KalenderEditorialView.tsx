@@ -38,6 +38,7 @@ import {
   startOfWeek,
   type GridDay,
 } from './calendarGrid';
+import { withSource } from '@/lib/ticketing/source';
 
 /**
  * Hoeveel weken de agenda vooruit toont. Zes rijen van 132 pixels waren hoger
@@ -598,8 +599,10 @@ export function KalenderEditorialView({
     setCursor(next);
   }
 
+  // Met `via`, zodat een ticket dat via de eventpagina gekocht wordt voor de
+  // kalender telt (zie lib/ticketing/source.ts).
   function eventHref(e: CalendarApiEvent) {
-    return `${base}/kalender/${e.slug}`;
+    return withSource(`${base}/kalender/${e.slug}`, 'kalender');
   }
 
   function filterHref(slug: string | null): string {
@@ -939,7 +942,7 @@ export function KalenderEditorialView({
               </a>
               {e.extendedProps.ticketSlug ? (
                 <Link
-                  href={`${base}/tickets/${e.extendedProps.ticketSlug}`}
+                  href={withSource(`${base}/tickets/${e.extendedProps.ticketSlug}`, "kalender")}
                   className="ev-card-action"
                   title={buyTickets}
                   aria-label={`${buyTickets}: ${title}`}

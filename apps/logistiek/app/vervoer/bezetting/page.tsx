@@ -16,7 +16,9 @@ import {
   requesterLabel,
   startOfWeek,
   toDateInputValue,
+  tripEventName,
   tripHoursLabel,
+  tripTitle,
   vehiclesToDraw,
 } from '@/lib/uitleen';
 import {
@@ -228,7 +230,8 @@ export default async function VervoerBezettingPage({
    */
   const trips: BezettingTrip[] | undefined = teamBookings?.map((booking) => ({
     id: booking.id,
-    title: booking.eventName?.trim() || booking.purpose,
+    title: tripTitle(booking),
+    eventName: tripEventName(booking),
     requester: requesterLabel(booking),
     userName: booking.user.name,
     status: booking.status,
@@ -256,7 +259,8 @@ export default async function VervoerBezettingPage({
     const own = viewer !== null && ownsTransportBooking(booking, viewer);
     return {
       id: booking.id,
-      title: booking.eventName?.trim() || booking.purpose,
+      title: tripTitle(booking),
+      eventName: tripEventName(booking),
       requester: requesterLabel(booking),
       userName: booking.user.name,
       status: booking.status,
@@ -300,7 +304,8 @@ export default async function VervoerBezettingPage({
       startAt: booking.startAt.toISOString(),
       endAt: booking.endAt.toISOString(),
       status: booking.status,
-      title: booking.eventName?.trim() || booking.purpose,
+      title: tripTitle(booking),
+      eventName: tripEventName(booking),
       // De post staat niet standaard in het blok (een kwartierrit is 24 pixels
       // hoog), maar wel in de tooltip en in het voorleesbare label; het kaartje
       // zegt de rest.
@@ -324,7 +329,8 @@ export default async function VervoerBezettingPage({
       startAt: booking.startAt.toISOString(),
       endAt: booking.endAt.toISOString(),
       status: booking.status,
-      title: booking.eventName?.trim() || booking.purpose,
+      title: tripTitle(booking),
+      eventName: tripEventName(booking),
       subtitle: requesterLabel(booking),
       driver:
         booking.driver && booking.driverId
@@ -341,7 +347,8 @@ export default async function VervoerBezettingPage({
       startAt: booking.startAt.toISOString(),
       endAt: booking.endAt.toISOString(),
       status: booking.status,
-      title: booking.eventName?.trim() || booking.purpose,
+      title: tripTitle(booking),
+      eventName: tripEventName(booking),
       subtitle: null,
       driver:
         booking.driver && booking.driverId

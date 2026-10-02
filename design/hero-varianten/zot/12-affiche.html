@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero 12: Affiche</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Methode: festivalaffiche. De week is de line-up: wat vandaag is staat het
+   grootst, de rest volgt kleiner per dag. De shiften zijn "crew gezocht",
+   de snelkoppelingen de praktische info onderaan een affiche. */
+:root { --paper: #EFF2F8; --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --dim: #B7C0DC; --muted: #5C667F; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--navy); color: var(--paper); font-family: "Work Sans", sans-serif; min-height: 100dvh; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.anton { font-family: Anton, sans-serif; text-transform: uppercase; }
+
+.hdr { display: flex; align-items: center; gap: 24px; height: 60px; padding: 0 32px; font-size: 14px; font-weight: 600; }
+.hdr img { height: 24px; }
+.hdr nav { display: flex; gap: 18px; margin: 0 auto; color: var(--dim); }
+.hdr nav a:hover { color: var(--yellow); }
+.hdr-end { display: flex; gap: 14px; align-items: center; }
+.hdr-end i { font-size: 18px; }
+
+.poster { max-width: 1180px; margin: 6px auto 0; border: 3px solid var(--yellow); padding: 26px 40px 26px; text-align: center; position: relative; }
+.poster::before, .poster::after { content: "✶"; position: absolute; top: 18px; font-size: 30px; color: var(--yellow); }
+.poster::before { left: 22px; } .poster::after { right: 22px; }
+.pres { font-size: 15px; font-weight: 700; letter-spacing: .3em; text-transform: uppercase; color: var(--dim); }
+h1 { font-family: Anton; text-transform: uppercase; font-size: 108px; line-height: .9; margin: 10px 0 6px; letter-spacing: .005em; }
+h1 span { color: var(--yellow); }
+.tag { font-size: 18px; color: var(--dim); max-width: 40em; margin: 0 auto; }
+
+.lineup { margin: 22px 0 10px; border-top: 2px solid rgb(239 242 248 / .2); padding-top: 16px; }
+.day { font-size: 13px; font-weight: 700; letter-spacing: .26em; text-transform: uppercase; color: var(--yellow); margin: 12px 0 2px; }
+.acts { display: flex; flex-wrap: wrap; justify-content: center; align-items: baseline; gap: 4px 18px; }
+.act { font-family: Anton; text-transform: uppercase; line-height: 1.05; display: inline-flex; align-items: baseline; gap: 8px; }
+.act small { font-family: "Work Sans"; font-size: 13px; font-weight: 600; color: var(--dim); letter-spacing: 0; text-transform: none; }
+.act:hover .n { color: var(--yellow); }
+.act .star { font-size: .45em; color: var(--dim); align-self: center; }
+.act .star:hover { color: var(--yellow); }
+.xl { font-size: 58px; } .lg { font-size: 36px; } .md { font-size: 26px; }
+.sep { color: var(--yellow); font-family: Anton; font-size: 22px; }
+.full { display: inline-block; margin-top: 12px; font-size: 14px; font-weight: 700; border-bottom: 2px solid var(--yellow); }
+
+.bottom { display: grid; grid-template-columns: 1fr auto 1fr; gap: 24px; align-items: center; margin-top: 18px; padding-top: 16px; border-top: 2px solid rgb(239 242 248 / .2); text-align: left; }
+.crew b { font-family: Anton; font-size: 26px; text-transform: uppercase; color: var(--yellow); display: block; line-height: 1; }
+.crew a { display: block; font-size: 14px; margin-top: 4px; }
+.crew a:hover { text-decoration: underline; }
+.crew small { color: var(--dim); }
+.tickets { display: flex; gap: 10px; }
+.btn { display: inline-flex; align-items: center; gap: 10px; height: 54px; padding: 0 26px; font-family: Anton; font-size: 22px; text-transform: uppercase; letter-spacing: .02em; transition: transform .2s; }
+.btn:hover { transform: rotate(-2deg) scale(1.03); }
+.btn-y { background: var(--yellow); color: var(--ink); }
+.btn-o { border: 2px solid var(--paper); }
+.sponsors { justify-self: end; text-align: right; font-size: 12px; color: var(--dim); }
+.sponsors b { display: block; color: var(--paper); font-size: 13px; letter-spacing: .2em; text-transform: uppercase; margin-bottom: 4px; }
+
+/* Praktische info: de snelkoppelingen. */
+.info { max-width: 1180px; margin: 14px auto 30px; display: grid; grid-template-columns: repeat(6, 1fr); gap: 0; border: 3px solid var(--yellow); border-top: 0; }
+.inf { padding: 14px 14px 12px; display: flex; align-items: center; gap: 12px; border-left: 2px solid rgb(255 210 63 / .4); transition: background .15s, color .15s; }
+.inf:first-child { border-left: 0; }
+.inf i { font-size: 28px; color: var(--yellow); }
+.inf b { font-family: Anton; font-size: 21px; text-transform: uppercase; display: block; line-height: 1; }
+.inf small { font-size: 12px; color: var(--dim); }
+.inf:hover { background: var(--yellow); color: var(--ink); }
+.inf:hover i, .inf:hover small { color: var(--ink); }
+
+@media (max-width: 1100px) { .hdr nav { display: none; } .hdr-end { margin-left: auto; } h1 { font-size: 72px; } .info { grid-template-columns: repeat(3, 1fr); } .bottom { grid-template-columns: 1fr; text-align: center; } .sponsors { justify-self: center; text-align: center; } .tickets { justify-content: center; } .poster, .info { margin-left: 16px; margin-right: 16px; } }
+@media (max-width: 600px) { h1 { font-size: 48px; } .poster { padding: 22px 16px; } .xl { font-size: 38px; } .lg { font-size: 26px; } .info { grid-template-columns: 1fr 1fr; } .tickets { flex-direction: column; } }
+</style>
+</head>
+<body>
+<header class="hdr">
+  <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+  <nav><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+  <div class="hdr-end"><i class="ph-bold ph-magnifying-glass"></i><span>NL / EN</span><i class="ph-bold ph-user-circle"></i></div>
+</header>
+
+<main class="poster">
+  <p class="pres">Vlaamse Technische Kring presenteert</p>
+  <h1>De thuis voor <span>ingenieurs</span><br>in Leuven</h1>
+  <p class="tag">Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt.</p>
+
+  <section class="lineup" aria-label="Deze week">
+    <p class="day">Vandaag, donderdag 1 oktober</p>
+    <div class="acts">
+      <span class="act xl"><a class="n" href="#">12 Urencantus</a><small>12:00, Waaiberg</small><button class="star" aria-label="Interesse: 12 Urencantus"><i class="ph-bold ph-star"></i></button></span>
+      <span class="sep">✶</span>
+      <span class="act lg"><a class="n" href="#">Looptraining</a><small>20:30</small><button class="star" aria-label="Interesse: Looptraining"><i class="ph-bold ph-star"></i></button></span>
+    </div>
+    <p class="day">Maandag 5</p>
+    <div class="acts">
+      <span class="act lg"><a class="n" href="#">PeMe-Startactiviteit</a><small>19:00</small><button class="star" aria-label="Interesse: PeMe"><i class="ph-bold ph-star"></i></button></span>
+      <span class="sep">✶</span>
+      <span class="act md"><a class="n" href="#">CaraOké</a><small>21:00</small><button class="star" aria-label="Interesse: CaraOké"><i class="ph-bold ph-star"></i></button></span>
+      <span class="sep">✶</span>
+      <span class="act md"><a class="n" href="#">Looptraining</a><small>20:30</small><button class="star" aria-label="Interesse: Looptraining"><i class="ph-bold ph-star"></i></button></span>
+    </div>
+    <p class="day">Dinsdag 6</p>
+    <div class="acts">
+      <span class="act md"><a class="n" href="#">Sector Night Bouwkunde</a><small>18:30</small><button class="star" aria-label="Interesse: Sector Night"><i class="ph-bold ph-star"></i></button></span>
+      <span class="sep">✶</span>
+      <span class="act md"><a class="n" href="#">KANWEEK startvergadering</a><small>12:40</small><button class="star" aria-label="Interesse: KANWEEK"><i class="ph-bold ph-star"></i></button></span>
+      <span class="sep">✶</span>
+      <span class="act md"><a class="n" href="#">Initiatie zelfverdediging</a><small>17:30</small><button class="star" aria-label="Interesse: Zelfverdediging"><i class="ph-bold ph-star"></i></button></span>
+    </div>
+    <a class="full" href="#">En nog meer: volledige kalender</a>
+  </section>
+
+  <div class="bottom">
+    <div class="crew"><b>Crew gezocht</b>
+      <a href="#">Bijrijden afbraak <small>morgen 01:00, 2 munten</small></a>
+      <a href="#">Bijrijden met Stijn <small>morgen 11:00</small></a>
+      <a href="#">Namiddagshift <small>morgen 14:00, 2 munten</small></a>
+    </div>
+    <div class="tickets"><a class="btn btn-y" href="#">Ontdek wat we doen</a><a class="btn btn-o" href="#">Eerstejaars? Start hier</a></div>
+    <div class="sponsors"><b>Gerund door studenten</b>Sinds 1920, KU Leuven<br>Campus Arenberg</div>
+  </div>
+</main>
+
+<nav class="info" aria-label="Snel naar">
+  <a class="inf" href="#"><i class="ph-bold ph-bread"></i><span><b>Theokot</b><small>Broodje bestellen</small></span></a>
+  <a class="inf" href="#"><i class="ph-bold ph-books"></i><span><b>Cursusdienst</b><small>Open tot 13:55</small></span></a>
+  <a class="inf" href="#"><i class="ph-bold ph-recycle"></i><span><b>Tweedehands</b><small>Boeken</small></span></a>
+  <a class="inf" href="#"><i class="ph-bold ph-clock-countdown"></i><span><b>Tijdslot</b><small>Cudi-ophaling</small></span></a>
+  <a class="inf" href="#"><i class="ph-bold ph-hand-heart"></i><span><b>Shiften</b><small>Help mee</small></span></a>
+  <a class="inf" href="#"><i class="ph-bold ph-calendar-dots"></i><span><b>Kalender</b><small>Alle events</small></span></a>
+</nav>
+</body>
+</html>

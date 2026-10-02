@@ -7,6 +7,8 @@ import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
 import { TheokotAdminNav } from "../TheokotAdminNav";
 import { PickupCounter } from "@/components/theokot/PickupCounter";
+import { getTheokotConfig } from "@/lib/theokot-server";
+import { formatVouchers } from "@/lib/shift/rewards";
 
 import "@/app/design/vtk-basic.css";
 
@@ -24,7 +26,7 @@ export default async function TheokotPickupPage({ params }: { params: Promise<{ 
     return <p className="text-sm text-zinc-500">{nl ? "Geen toegang." : "No access."}</p>;
   }
 
-  const [redemptions, redemptionCount, redemptionTotal, redemptionStudents] = await Promise.all([
+  const [redemptions, redemptionCount, redemptionTotal, redemptionStudents, config] = await Promise.all([
     prisma.theokotVoucherRedemption.findMany({
       orderBy: { createdAt: "desc" },
       take: 100,
@@ -37,6 +39,7 @@ export default async function TheokotPickupPage({ params }: { params: Promise<{ 
     prisma.theokotVoucherRedemption.count(),
     prisma.theokotVoucherRedemption.aggregate({ _sum: { amount: true } }),
     prisma.theokotVoucherRedemption.groupBy({ by: ["userId"] }),
+    getTheokotConfig(),
   ]);
   const dateTimeFormatter = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     timeZone: "Europe/Brussels",
@@ -66,7 +69,7 @@ export default async function TheokotPickupPage({ params }: { params: Promise<{ 
           ? "De aparte pagina toont enkel de afhaalbalie (zonder admin-menu) — geef die link aan shifters die enkel broodjes mogen uitdelen."
           : "The separate page shows only the pickup counter (no admin menu) — share it with shifters who may only hand out sandwiches."}
       </p>
-      <PickupCounter nl={nl} />
+      <PickupCounter nl={nl} autoPickup={config.autoPickup} />
 
       <section className="space-y-3" aria-labelledby="voucher-history-heading">
         <div>
@@ -91,7 +94,7 @@ export default async function TheokotPickupPage({ params }: { params: Promise<{ 
           </Card>
           <Card className="p-4">
             <div className="text-2xl font-semibold text-vtk-ink">
-              {redemptionTotal._sum.amount ?? 0}
+              {formatVouchers(redemptionTotal._sum.amount ?? 0, nl ? "nl" : "en")}
             </div>
             <div className="text-sm text-[#5c667f]">{nl ? "bonnetjes gebruikt" : "vouchers used"}</div>
           </Card>
@@ -121,7 +124,9 @@ export default async function TheokotPickupPage({ params }: { params: Promise<{ 
                   <td className="px-4 py-3 text-zinc-600">
                     {dayFormatter.format(redemption.order.session.date)}
                   </td>
-                  <td className="px-4 py-3 font-medium">{redemption.amount}</td>
+                  <td className="px-4 py-3 font-medium tabular-nums">
+                    {formatVouchers(redemption.amount, nl ? "nl" : "en")}
+                  </td>
                   <td className="px-4 py-3 text-zinc-600">
                     {redemption.processedBy?.name ?? (nl ? "Verwijderde gebruiker" : "Deleted user")}
                   </td>

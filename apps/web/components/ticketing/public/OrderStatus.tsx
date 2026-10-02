@@ -26,6 +26,7 @@ import {
   formatTicketPrice,
   type PublicOrder,
 } from "./types";
+import { withSource } from "@/lib/ticketing/source";
 
 type StatusPayload = PublicOrder | { order?: PublicOrder; error?: string; message?: string };
 const TERMINAL = new Set([
@@ -205,7 +206,9 @@ export function OrderStatus({
       : canChoosePayment
         ? t.reservedLead
         : t.processingLead;
-  const orderAgainHref = order.event.slug ? `${base}/tickets/${order.event.slug}` : `${base}/tickets`;
+  const orderAgainHref = order.event.slug
+    ? withSource(`${base}/tickets/${order.event.slug}`, "bestelling")
+    : `${base}/tickets`;
 
   return (
     <>

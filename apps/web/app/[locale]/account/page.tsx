@@ -26,6 +26,8 @@ import type { PublicOrder } from '@/components/ticketing/public/types';
 import { AccountTabs } from './AccountTabs';
 import { AccountTickets } from './AccountTickets';
 import { AccountShifts } from './AccountShifts';
+import { earnedShiftReward } from '@/lib/shift/rewards';
+import { praesidiumYears } from '@/lib/shift/voucherEligibility';
 import { DoorShortcutTokens } from './DoorShortcutTokens';
 import { CalendarFeedTokens } from './CalendarFeedTokens';
 import { AccountSignature } from './AccountSignature';
@@ -164,7 +166,14 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
           },
         },
       })
-      .then((participations) => participations.map(({ shift }) => shift)),
+      // Een shift uit een praesidiumjaar levert niets op (`earnedShiftReward`).
+      .then(async (participations) => {
+        const praesidium = await praesidiumYears([session.user.id]);
+        return participations.map(({ shift }) => ({
+          ...shift,
+          reward: earnedShiftReward({ userId: session.user.id, ...shift }, praesidium),
+        }));
+      }),
     prisma.calendarFeedToken.findMany({
       where: { userId: session.user.id, revokedAt: null },
       orderBy: { createdAt: 'desc' },
@@ -249,20 +258,25 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                 : 'Your tickets, reservations, shifts and connected VTK services.'}
             </p>
 
-            <AccountMembership
-              locale={locale}
-              year={currentStudyYear(now)}
-              firwStudent={profile.firwStudent}
-              membership={membership}
-              canJoin={
-                membershipOffer(profile, membership, membershipConfig).kind !== 'none'
-              }
-            />
+            <div id="membership" className="scroll-mt-28">
+              <AccountMembership
+                locale={locale}
+                year={currentStudyYear(now)}
+                firwStudent={profile.firwStudent}
+                membership={membership}
+                canJoin={
+                  membershipOffer(profile, membership, membershipConfig).kind !== 'none'
+                }
+              />
+            </div>
 
-            <AccountTickets locale={locale} orders={ticketOrders} />
+            {/* `#mijn-vtk-tickets` op de kaart zelf blijft voor oude links en mails. */}
+            <div id="tickets" className="scroll-mt-28">
+              <AccountTickets locale={locale} orders={ticketOrders} />
+            </div>
 
             {meetingReservations.length > 0 && (
-              <Card className="p-6">
+              <Card id="meetings" className="scroll-mt-28 p-6">
                 <h3 className="mb-4 text-lg font-semibold text-vtk-ink">
                   {nl ? 'Vergaderingen' : 'Meetings'}
                 </h3>
@@ -334,7 +348,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
               </Card>
             )}
 
-            <Card className="p-6">
+            <Card id="theokot" className="scroll-mt-28 p-6">
               <h3 className="mb-4 text-lg font-semibold text-vtk-ink">
                 {nl ? 'Gereserveerde broodjes' : 'Reserved sandwiches'}
               </h3>
@@ -414,9 +428,11 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
               )}
             </Card>
 
-            <AccountShifts locale={locale} shifts={registeredShifts} />
+            <div id="shifts" className="scroll-mt-28">
+              <AccountShifts locale={locale} shifts={registeredShifts} />
+            </div>
 
-            <Card className="p-6">
+            <Card id="calendar" className="scroll-mt-28 p-6">
               <CalendarFeedTokens
                 locale={locale}
                 origin={siteBaseUrl()}
@@ -430,7 +446,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
             </Card>
 
             {canUseDoorShortcut ? (
-              <Card className="p-6">
+              <Card id="door" className="scroll-mt-28 p-6">
                 <DoorShortcutTokens
                   locale={locale}
                   tokens={doorShortcutTokens.map((token) => ({
@@ -445,7 +461,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
             ) : null}
 
             {canGenerateSignature ? (
-              <Card className="p-6">
+              <Card id="signature" className="scroll-mt-28 p-6">
                 <AccountSignature
                   locale={locale}
                   user={{
@@ -466,7 +482,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
               </Card>
             ) : null}
 
-            <Card className="p-6">
+            <Card id="apps" className="scroll-mt-28 p-6">
               <h3 className="mb-2 text-lg font-semibold text-vtk-ink">{nl ? 'Verbonden apps' : 'Connected apps'}</h3>
               <p className="mb-4 text-sm text-[#5c667f]">
                 {nl
@@ -490,7 +506,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
                 : 'Your profile, account preferences and privacy rights.'}
             </p>
 
-            <Card className="p-6">
+            <Card id="preferences" className="scroll-mt-28 p-6">
               <h3 className="mb-4 text-lg font-semibold text-vtk-ink">
                 {nl ? 'Accountvoorkeuren' : 'Account preferences'}
               </h3>
@@ -519,21 +535,23 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
             {/* Het migratiepad voor wie via KU Leuven inlogt: dat account
                 verdwijnt na het afstuderen. Staat boven het profielformulier,
                 want daar vult iemand net zijn persoonlijke adres in. */}
-            <PasswordPanel
-              locale={locale}
-              hasPassword={password.hasPassword}
-              resetEmail={password.resetEmail}
-              usesPersonalEmail={password.usesPersonalEmail}
-              loginEmail={session.user.email}
-              urgent={!password.hasPassword && !profile.isStudent}
-            />
+            <div id="password" className="scroll-mt-28">
+              <PasswordPanel
+                locale={locale}
+                hasPassword={password.hasPassword}
+                resetEmail={password.resetEmail}
+                usesPersonalEmail={password.usesPersonalEmail}
+                loginEmail={session.user.email}
+                urgent={!password.hasPassword && !profile.isStudent}
+              />
+            </div>
 
-            <Card className="p-6">
+            <Card id="profile" className="scroll-mt-28 p-6">
               <h3 className="mb-4 text-lg font-semibold text-vtk-ink">{nl ? 'Profiel' : 'Profile'}</h3>
               <ProfileForm locale={locale} user={profile} submitLabel={nl ? 'Gegevens opslaan' : 'Save details'} />
             </Card>
 
-            <Card className="p-6">
+            <Card id="privacy" className="scroll-mt-28 p-6">
               <h3 className="text-lg font-semibold text-vtk-ink">
                 {nl ? 'Jouw privacyrechten' : 'Your privacy rights'}
               </h3>

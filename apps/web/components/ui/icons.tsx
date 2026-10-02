@@ -160,6 +160,28 @@ export function UploadIcon() {
   );
 }
 
+/** Een foto: een kaft of afbeelding maken of vervangen. */
+export function ImageIcon() {
+  return (
+    <Icon>
+      <rect x="3" y="3" width="18" height="18" rx="2" />
+      <circle cx="9" cy="9" r="2" />
+      <path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21" />
+    </Icon>
+  );
+}
+
+/** Pijl naar beneden in een bak: een bestand dat meteen binnenkomt. */
+export function DownloadIcon() {
+  return (
+    <Icon>
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <path d="M7 10l5 5 5-5" />
+      <path d="M12 15V3" />
+    </Icon>
+  );
+}
+
 /**
  * Persoon en sleutel: twee kopieerknoppen naast elkaar met hetzelfde
  * kopieer-icoon zijn een raadsel, dus het icoon zegt wát je kopieert.

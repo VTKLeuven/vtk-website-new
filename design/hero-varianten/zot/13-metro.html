@@ -1,0 +1,156 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero 13: Metro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Overpass:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Methode: lijnenkaart en wegwijzering (Beck, Vignelli). Lijn S brengt je
+   naar de snelkoppelingen, lijn W rijdt door de week, de shiften staan bij
+   de dienstmeldingen. Overpass is een letter uit de Amerikaanse
+   bewegwijzering. */
+:root { --paper: #EFF2F8; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --muted: #5C667F; --dim: #B7C0DC; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--paper); color: var(--ink); font-family: Overpass, sans-serif; min-height: 100dvh; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 0 32px 32px; }
+
+.hdr { background: var(--navy); color: var(--paper); }
+.hdr-in { max-width: 1280px; margin: 0 auto; padding: 0 32px; height: 58px; display: flex; align-items: center; gap: 22px; }
+.hdr img { height: 26px; }
+.hdr nav { display: flex; gap: 4px; }
+.hdr nav a { font-weight: 700; font-size: 14px; padding: 6px 10px; border-radius: 6px; }
+.hdr nav a:hover { background: var(--yellow); color: var(--ink); }
+.hdr-end { margin-left: auto; display: flex; gap: 14px; align-items: center; font-weight: 700; font-size: 14px; }
+.hdr-end i { font-size: 18px; }
+
+.top { display: grid; grid-template-columns: 1.4fr 1fr; gap: 28px; margin-top: 28px; }
+.sign { background: var(--navy); color: var(--paper); border-radius: 14px; padding: 26px 30px 28px; position: relative; }
+.sign .row { display: flex; align-items: center; gap: 12px; font-weight: 700; font-size: 15px; color: var(--dim); }
+.bullet { display: inline-grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; font-weight: 900; font-size: 17px; flex: none; }
+.bullet.s { background: var(--yellow); color: var(--ink); }
+.bullet.w { background: var(--surface); color: var(--navy); border: 3px solid var(--navy); }
+.sign h1 { font-size: 60px; font-weight: 900; line-height: 1; letter-spacing: -0.02em; margin: 18px 0 14px; }
+.sign h1 span { color: var(--yellow); }
+.sign p { font-size: 18px; line-height: 1.45; color: var(--dim); max-width: 34em; }
+.cta { display: flex; gap: 12px; margin-top: 22px; }
+.btn { display: inline-flex; align-items: center; gap: 10px; height: 50px; padding: 0 20px; border-radius: 8px; font-weight: 800; font-size: 16px; }
+.btn-y { background: var(--yellow); color: var(--ink); }
+.btn-y:hover { background: var(--surface); }
+.btn-o { border: 2px solid var(--paper); }
+.btn-o:hover { background: rgb(239 242 248 / .12); }
+
+.notice { background: var(--surface); border-radius: 14px; padding: 20px 22px; border-left: 10px solid var(--yellow); }
+.notice h2 { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 900; }
+.notice h2 i { font-size: 26px; }
+.notice p { font-size: 14px; color: var(--muted); margin: 4px 0 10px; }
+.notice a.s { display: grid; grid-template-columns: 66px 1fr auto; gap: 8px; padding: 8px 0; border-top: 1px solid rgb(10 15 31 / .1); font-size: 15px; font-weight: 600; }
+.notice a.s span { font-weight: 800; font-variant-numeric: tabular-nums; }
+.notice a.s em { font-style: normal; font-size: 12px; font-weight: 800; background: var(--yellow); padding: 2px 8px; border-radius: 999px; align-self: center; }
+.notice a.s:hover { color: var(--navy); text-decoration: underline; }
+.notice .all { display: inline-block; margin-top: 8px; font-weight: 800; font-size: 14px; }
+.notice .all:hover { text-decoration: underline; }
+
+/* De kaart. */
+.map { background: var(--surface); border-radius: 14px; margin-top: 28px; padding: 22px 28px 26px; }
+.line { position: relative; display: grid; grid-template-columns: 170px 1fr; align-items: start; }
+.line + .line { margin-top: 28px; padding-top: 22px; border-top: 1px dashed rgb(10 15 31 / .15); }
+.lname { display: flex; gap: 10px; align-items: center; font-weight: 900; font-size: 17px; padding-top: 2px; }
+.lname small { display: block; font-weight: 600; font-size: 12px; color: var(--muted); }
+.stops { position: relative; display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; }
+.stops::before { content: ""; position: absolute; left: 20px; right: 20px; top: 15px; height: 10px; border-radius: 5px; }
+.ls .stops::before { background: var(--yellow); }
+.lw .stops::before { background: var(--navy); }
+.stop { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; padding: 0 6px; }
+.dot { width: 40px; height: 40px; border-radius: 50%; background: var(--surface); border: 5px solid var(--ink); display: grid; place-items: center; font-size: 15px; transition: transform .2s; z-index: 1; }
+.ls .stop:hover .dot { transform: scale(1.2); background: var(--yellow); }
+.stop b { font-weight: 800; font-size: 16px; margin-top: 4px; }
+.stop small { font-size: 12px; color: var(--muted); }
+.stop .tag { font-size: 11px; font-weight: 800; background: var(--ink); color: var(--yellow); padding: 2px 7px; border-radius: 4px; }
+.lw .dot { font-weight: 900; font-size: 14px; border-color: var(--navy); }
+.lw .stop.here .dot { background: var(--yellow); width: 48px; height: 48px; margin-top: -4px; }
+.here-tag { font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; color: var(--navy); }
+.evs { margin-top: 6px; display: grid; gap: 4px; width: 100%; }
+.ev { display: grid; grid-template-columns: 1fr auto; gap: 4px; align-items: start; text-align: left; font-size: 13px; line-height: 1.25; background: var(--paper); border-radius: 6px; padding: 5px 7px; }
+.ev a { font-weight: 700; }
+.ev a:hover { text-decoration: underline; }
+.ev time { display: block; font-weight: 600; color: var(--muted); font-size: 12px; }
+.ev .star { color: var(--muted); font-size: 14px; } .ev .star:hover { color: var(--ink); }
+.none { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.more { font-size: 12px; font-weight: 800; color: var(--navy); margin-top: 2px; }
+.lw .end { position: absolute; right: 0; top: -2px; font-size: 13px; font-weight: 800; }
+.lw .end:hover { text-decoration: underline; }
+
+@media (max-width: 1100px) { .top { grid-template-columns: 1fr; } .hdr nav { display: none; } .line { grid-template-columns: 1fr; gap: 14px; } .stops { overflow-x: auto; grid-auto-columns: 140px; } .lw .end { position: static; } }
+@media (max-width: 600px) { .wrap, .hdr-in { padding-left: 14px; padding-right: 14px; } .sign h1 { font-size: 40px; } .cta { flex-wrap: wrap; } .map { padding: 18px 14px; } }
+</style>
+</head>
+<body>
+<header class="hdr"><div class="hdr-in">
+  <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+  <nav><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+  <div class="hdr-end"><i class="ph-bold ph-magnifying-glass"></i><span>NL / EN</span><i class="ph-bold ph-user-circle"></i></div>
+</div></header>
+
+<div class="wrap">
+  <div class="top">
+    <section class="sign">
+      <div class="row"><span class="bullet s">S</span><span class="bullet w">W</span>Vlaamse Technische Kring, KU Leuven</div>
+      <h1>De thuis voor <span>ingenieurs</span> in Leuven.</h1>
+      <p>Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+      <div class="cta"><a class="btn btn-y" href="#">Ontdek wat we doen <i class="ph-bold ph-arrow-right"></i></a><a class="btn btn-o" href="#">Eerstejaars? Start hier</a></div>
+    </section>
+    <aside class="notice">
+      <h2><i class="ph-fill ph-warning"></i>Dienstmeldingen</h2>
+      <p>Op deze shiften is nog plaats. Alle drie morgen, vrijdag 2 oktober.</p>
+      <a class="s" href="#"><span>01:00</span>Bijrijden afbraak 12-urencantus<em>2 munten</em></a>
+      <a class="s" href="#"><span>11:00</span>Bijrijden met Stijn<em>1 plaats</em></a>
+      <a class="s" href="#"><span>14:00</span>Namiddagshift<em>2 munten</em></a>
+      <a class="all" href="#">Alle shiften →</a>
+    </aside>
+  </div>
+
+  <section class="map">
+    <nav class="line ls" aria-label="Snel naar">
+      <div class="lname"><span class="bullet s">S</span><span>Lijn S<small>Snel naar</small></span></div>
+      <div class="stops">
+        <a class="stop" href="#"><span class="dot"><i class="ph-bold ph-bread"></i></span><b>Theokot</b><small>broodje</small></a>
+        <a class="stop" href="#"><span class="dot"><i class="ph-bold ph-books"></i></span><b>Cursusdienst</b><span class="tag">open tot 13:55</span></a>
+        <a class="stop" href="#"><span class="dot"><i class="ph-bold ph-recycle"></i></span><b>Tweedehands</b><small>boeken</small></a>
+        <a class="stop" href="#"><span class="dot"><i class="ph-bold ph-clock-countdown"></i></span><b>Tijdslot</b><small>Cudi</small></a>
+        <a class="stop" href="#"><span class="dot"><i class="ph-bold ph-hand-heart"></i></span><b>Shiften</b><small>3 open</small></a>
+        <a class="stop" href="#"><span class="dot"><i class="ph-bold ph-calendar-dots"></i></span><b>Kalender</b><small>alle events</small></a>
+      </div>
+    </nav>
+    <section class="line lw" aria-label="Deze week">
+      <div class="lname"><span class="bullet w">W</span><span>Lijn W<small>Deze week</small></span></div>
+      <div class="stops">
+        <div class="stop here"><span class="dot">1</span><span class="here-tag">U bent hier</span>
+          <div class="evs">
+            <div class="ev"><span><time>12:00</time><a href="#">12 Urencantus</a></span><button class="star" aria-label="Interesse: 12 Urencantus"><i class="ph ph-star"></i></button></div>
+            <div class="ev"><span><time>20:30</time><a href="#">Looptraining</a></span><button class="star" aria-label="Interesse: Looptraining"><i class="ph ph-star"></i></button></div>
+          </div></div>
+        <div class="stop"><span class="dot">2</span><b>vr</b><p class="none">Niets gepland</p></div>
+        <div class="stop"><span class="dot">5</span><b>ma</b>
+          <div class="evs">
+            <div class="ev"><span><time>19:00</time><a href="#">PeMe-Start</a></span><button class="star" aria-label="Interesse: PeMe"><i class="ph ph-star"></i></button></div>
+            <div class="ev"><span><time>21:00</time><a href="#">CaraOké</a></span><button class="star" aria-label="Interesse: CaraOké"><i class="ph ph-star"></i></button></div>
+          </div><a class="more" href="#">+1</a></div>
+        <div class="stop"><span class="dot">6</span><b>di</b>
+          <div class="evs">
+            <div class="ev"><span><time>12:40</time><a href="#">KANWEEK</a></span><button class="star" aria-label="Interesse: KANWEEK"><i class="ph ph-star"></i></button></div>
+            <div class="ev"><span><time>18:30</time><a href="#">Sector Night</a></span><button class="star" aria-label="Interesse: Sector Night"><i class="ph ph-star"></i></button></div>
+          </div><a class="more" href="#">+3</a></div>
+        <div class="stop"><span class="dot">7</span><b>wo</b>
+          <div class="evs"><div class="ev"><span><time>20:30</time><a href="#">Looptraining</a></span><button class="star" aria-label="Interesse: Looptraining"><i class="ph ph-star"></i></button></div></div></div>
+        <div class="stop"><span class="dot">8</span><b>do</b><p class="none">Niets gepland</p></div>
+      </div>
+    </section>
+  </section>
+</div>
+</body>
+</html>

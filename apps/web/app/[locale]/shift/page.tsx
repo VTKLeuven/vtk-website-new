@@ -10,6 +10,8 @@ import { addDays, startOfWeek } from 'date-fns';
 import { academicYearRange, currentAcademicYear, parseShiftArray } from '@/lib/shift';
 import { availableShifts, registeredShifts } from '@/lib/shift/lists';
 import { loadPostNames } from '@/lib/shift/postNames';
+import { earnedShiftReward } from '@/lib/shift/rewards';
+import { praesidiumYears } from '@/lib/shift/voucherEligibility';
 import { ShiftBoard } from '@/components/shift/ShiftBoard';
 import type { ShiftYearStats } from '@/components/shift/MyShiftsRail';
 
@@ -24,24 +26,31 @@ function academicYearLabel(startYear: number): string {
 /**
  * Wat je dit academiejaar al gedaan hebt: enkel voorbije shiften tellen mee,
  * net zoals in de admin-ranglijst. De beloning is het aantal bonnetjes dat de
- * shift waard is, los van wat er al uitbetaald werd.
+ * shift waard is, los van wat er al uitbetaald werd, en nul voor een shift uit
+ * een praesidiumjaar (`earnedShiftReward`). Die shift telt wel mee.
  */
 async function yearStats(userId: string): Promise<ShiftYearStats> {
   const startYear = currentAcademicYear();
   const { start, end } = academicYearRange();
 
-  const done = await prisma.shiftParticipant.findMany({
-    where: {
-      userId,
-      shift: { startTime: { gte: start, lt: end }, endTime: { lt: new Date() } },
-    },
-    select: { shift: { select: { reward: true } } },
-  });
+  const [done, praesidium] = await Promise.all([
+    prisma.shiftParticipant.findMany({
+      where: {
+        userId,
+        shift: { startTime: { gte: start, lt: end }, endTime: { lt: new Date() } },
+      },
+      select: { shift: { select: { reward: true, startTime: true } } },
+    }),
+    praesidiumYears([userId]),
+  ]);
 
   return {
     yearLabel: academicYearLabel(startYear),
     shiftsDone: done.length,
-    vouchers: done.reduce((total, p) => total + p.shift.reward, 0),
+    vouchers: done.reduce(
+      (total, p) => total + earnedShiftReward({ userId, ...p.shift }, praesidium),
+      0,
+    ),
   };
 }
 

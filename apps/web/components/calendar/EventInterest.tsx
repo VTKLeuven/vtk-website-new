@@ -78,6 +78,7 @@ export function EventInterest({
   loginHref,
   labels,
   onChanged,
+  quiet = false,
 }: {
   eventId: string;
   isAlumniEvent: boolean;
@@ -86,6 +87,11 @@ export function EventInterest({
   loginHref: string;
   labels: Labels;
   onChanged?: (viewer: ViewerInterest) => void;
+  /**
+   * Omlijnd in plaats van navy zolang er nog geen interesse is. Voor een pagina
+   * waar een andere knop de handeling is, zoals de tickets op een eventpagina.
+   */
+  quiet?: boolean;
 }) {
   const [current, setCurrent] = useState<ViewerInterest>(viewer);
   const joined = current.kind !== "none";
@@ -145,7 +151,9 @@ export function EventInterest({
           className={
             joined
               ? "btn btn-ghost vtk-interest-toggle ev-preview-go is-active"
-              : "btn btn-primary vtk-interest-toggle ev-preview-go"
+              : quiet
+                ? "btn btn-ghost vtk-interest-toggle ev-preview-go"
+                : "btn btn-primary vtk-interest-toggle ev-preview-go"
           }
           disabled={togglePending}
           aria-pressed={joined}

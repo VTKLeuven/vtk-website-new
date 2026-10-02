@@ -6,7 +6,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * De verdeling zelf (oudste shift eerst) is elders getest; wat hier vastligt is
  * wat er rond die verdeling gebeurt: dat een te laag saldo een antwoord is en
  * geen crash, dat een gelijktijdige tweede scan botst in plaats van dubbel af te
- * boeken, en dat niemand bij zichzelf kan afboeken.
+ * boeken en dat niemand bij zichzelf kan afboeken. Een praesidiumlid betaalt
+ * hier gewoon: zijn shiften uit een praesidiumjaar staan niet in zijn saldo, en
+ * dat zit in `allocateUserShiftReward` (`praesidiumVouchers.test.ts`).
  */
 
 const mocks = vi.hoisted(() => ({

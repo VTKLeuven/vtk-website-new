@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import type { Locale } from "@vtk/i18n";
 import { Button, Card, Input, Label } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
+import { formatVoucherCount, formatVouchers, wholeVouchers } from "@/lib/shift/rewards";
 import type { RewardRow } from "./ShiftAdmin";
 import { YearPicker } from "./YearPicker";
 
@@ -27,6 +28,7 @@ export function ShiftRewards({
   years: number[];
 }) {
   const nl = locale === "nl";
+  const lang = nl ? "nl" : "en";
   const router = useRouter();
   const showToast = useToast();
 
@@ -67,22 +69,21 @@ export function ShiftRewards({
   const arrow = (key: SortKey) =>
     sort.key === key ? (sort.dir === "asc" ? " ↑" : " ↓") : "";
 
+  // Wat je fysiek kan meegeven: enkel hele bonnetjes. Een half (van een broodje
+  // aan de afhaalbalie) bestaat niet op papier en blijft openstaan.
   function amountFor(row: RewardRow): string {
-    return amounts[row.userId] ?? String(row.outstandingBonnetjes);
+    return amounts[row.userId] ?? String(wholeVouchers(row.outstandingBonnetjes));
   }
 
   async function awardBonnetjes(row: RewardRow) {
     const amount = Number(amountFor(row));
-    if (
-      !Number.isInteger(amount) ||
-      amount <= 0 ||
-      amount > row.outstandingBonnetjes
-    ) {
+    const payable = wholeVouchers(row.outstandingBonnetjes);
+    if (!Number.isInteger(amount) || amount <= 0 || amount > payable) {
       showToast({
         variant: "error",
         message: nl
-          ? `Kies een geheel aantal tussen 1 en ${row.outstandingBonnetjes}.`
-          : `Choose a whole number between 1 and ${row.outstandingBonnetjes}.`,
+          ? `Kies een geheel aantal tussen 1 en ${payable}.`
+          : `Choose a whole number between 1 and ${payable}.`,
       });
       return;
     }
@@ -121,8 +122,8 @@ export function ShiftRewards({
       showToast({
         variant: "success",
         message: nl
-          ? `${amount} bonnetjes toegekend. ${remaining} blijven openstaan.`
-          : `${amount} vouchers awarded. ${remaining} remain outstanding.`,
+          ? `${formatVoucherCount(amount)} toegekend, ${formatVouchers(remaining)} blijven openstaan.`
+          : `${formatVoucherCount(amount, "en")} awarded, ${formatVouchers(remaining, "en")} remain outstanding.`,
       });
       router.refresh();
     } catch {
@@ -145,8 +146,8 @@ export function ShiftRewards({
         </h2>
         <p className="mt-1 leading-6">
           {nl
-            ? "Het grote getal is het aantal bonnetjes. De kleinere regel toont over hoeveel shiften dat saldo verdeeld is. Een gedeeltelijk uitbetaalde shift kan daarom zowel bij openstaand als bij toegekend meetellen."
-            : "The large number is the voucher count. The smaller line shows how many shifts make up that balance. A partially paid shift can therefore appear in both outstanding and awarded totals."}
+            ? "Het grote getal is het aantal bonnetjes. De kleinere regel toont over hoeveel shiften dat saldo verdeeld is. Een gedeeltelijk uitbetaalde shift kan daarom zowel bij openstaand als bij toegekend meetellen. Je kent enkel hele bonnetjes toe: een broodje aan de afhaalbalie kost per half bonnetje, en zo'n half bestaat niet op papier. Het blijft openstaan tot de student het aan de balie gebruikt."
+            : "The large number is the voucher count. The smaller line shows how many shifts make up that balance. A partially paid shift can therefore appear in both outstanding and awarded totals. You only award whole vouchers: a sandwich at the pickup counter costs half vouchers, and such a half does not exist on paper. It stays outstanding until the student uses it at the counter."}
         </p>
       </div>
 
@@ -197,10 +198,10 @@ export function ShiftRewards({
           <tbody>
             {rows.map((row) => {
               const amount = Number(amountFor(row));
+              const payable = wholeVouchers(row.outstandingBonnetjes);
               const validAmount =
-                Number.isInteger(amount) &&
-                amount > 0 &&
-                amount <= row.outstandingBonnetjes;
+                Number.isInteger(amount) && amount > 0 && amount <= payable;
+              const halfLeft = row.outstandingBonnetjes - payable;
 
               return (
                 <tr key={row.userId} className="border-t border-vtk-navy/10">
@@ -208,18 +209,24 @@ export function ShiftRewards({
                   <td className="px-4 py-3 text-vtk-muted">{row.email}</td>
                   <td className="px-4 py-3">
                     <strong className="block text-base text-vtk-ink">
-                      {row.outstandingBonnetjes}{" "}
-                      {nl ? "bonnetjes" : "vouchers"}
+                      {formatVoucherCount(row.outstandingBonnetjes, lang)}
                     </strong>
-                    <span className="text-xs text-vtk-muted">
+                    <span className="block text-xs text-vtk-muted">
                       {nl
                         ? `saldo uit ${row.outstandingShiftCount} shiften`
                         : `balance from ${row.outstandingShiftCount} shifts`}
                     </span>
+                    {halfLeft > 0 ? (
+                      <span className="block text-xs text-vtk-muted">
+                        {nl
+                          ? `${formatVouchers(halfLeft)} enkel aan de afhaalbalie`
+                          : `${formatVouchers(halfLeft, "en")} only at the pickup counter`}
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-4 py-3">
                     <strong className="block text-base text-vtk-ink">
-                      {row.paidBonnetjes} {nl ? "bonnetjes" : "vouchers"}
+                      {formatVoucherCount(row.paidBonnetjes, lang)}
                     </strong>
                     <span className="text-xs text-vtk-muted">
                       {nl
@@ -238,7 +245,7 @@ export function ShiftRewards({
                         id={`reward-${row.userId}`}
                         type="number"
                         min={1}
-                        max={row.outstandingBonnetjes}
+                        max={payable}
                         step={1}
                         value={amountFor(row)}
                         onChange={(event) =>
@@ -248,22 +255,15 @@ export function ShiftRewards({
                           }))
                         }
                         className="w-20"
-                        disabled={
-                          busyId !== null ||
-                          row.outstandingBonnetjes === 0
-                        }
+                        disabled={busyId !== null || payable === 0}
                       />
                       <span className="whitespace-nowrap text-xs text-vtk-muted">
-                        {nl ? `van ${row.outstandingBonnetjes}` : `of ${row.outstandingBonnetjes}`}
+                        {nl ? `van ${payable}` : `of ${payable}`}
                       </span>
                       <Button
                         size="sm"
                         variant="secondary"
-                        disabled={
-                          busyId !== null ||
-                          row.outstandingBonnetjes === 0 ||
-                          !validAmount
-                        }
+                        disabled={busyId !== null || payable === 0 || !validAmount}
                         onClick={() => awardBonnetjes(row)}
                       >
                         {busyId === row.userId

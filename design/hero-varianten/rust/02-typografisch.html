@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rust 2: Typografisch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Stroming: typografisch, redactioneel. De titel is het beeld: groot, strak,
+   één familie. Alles eronder is klein en staat op één raster van drie
+   kolommen. Geen foto, geen kaarten. De week staat onder de vouw. */
+:root { --paper: #EFF2F8; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --muted: #5C667F; --line: rgb(14 26 54 / .14); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: "Inter Tight", system-ui, sans-serif; background: var(--surface); color: var(--ink); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--navy); outline-offset: 3px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 40px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.hdr { display: flex; align-items: center; height: 76px; gap: 28px; }
+.hdr img { height: 26px; filter: invert(1) brightness(.12); }
+.hdr nav { margin-left: auto; display: flex; gap: 26px; font-size: 15px; font-weight: 500; }
+.hdr nav a:hover { color: var(--muted); }
+.hdr .lang { font-size: 14px; color: var(--muted); }
+
+.hero { min-height: calc(100dvh - 76px); display: flex; flex-direction: column; justify-content: center; padding: 40px 0 56px; }
+h1 { font-size: clamp(56px, 9.2vw, 132px); line-height: .92; letter-spacing: -0.055em; font-weight: 700; color: var(--navy); }
+.row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; margin-top: 56px; padding-top: 22px; border-top: 2px solid var(--navy); }
+.row p { font-size: 18px; line-height: 1.5; color: var(--muted); }
+.cta { display: flex; flex-direction: column; align-items: flex-start; gap: 14px; }
+.btn { display: inline-flex; align-items: center; gap: 10px; height: 52px; padding: 0 24px; border-radius: 999px; background: var(--yellow); color: var(--ink); font-size: 16px; font-weight: 600; }
+.btn:hover { background: var(--navy); color: var(--yellow); }
+.link { font-size: 16px; font-weight: 500; border-bottom: 1.5px solid currentColor; }
+.link:hover { color: var(--muted); }
+.quick a { display: flex; justify-content: space-between; align-items: baseline; padding: 6px 0; font-size: 20px; font-weight: 600; letter-spacing: -0.01em; border-bottom: 1px solid var(--line); }
+.quick a:first-child { padding-top: 0; }
+.quick a small { font-size: 14px; font-weight: 500; color: var(--muted); letter-spacing: 0; }
+.quick a:hover { color: var(--navy); }
+.quick a:hover small { color: var(--ink); }
+
+.week { background: var(--paper); padding: 56px 0 64px; }
+.week-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 20px; }
+.week h2 { font-size: 28px; font-weight: 700; letter-spacing: -0.03em; color: var(--navy); }
+.week-h a { font-size: 15px; font-weight: 500; border-bottom: 1.5px solid currentColor; }
+.cols { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+.cols h3 { font-size: 14px; font-weight: 600; color: var(--muted); padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+.e { display: grid; grid-template-columns: 52px 1fr 26px; padding: 10px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.e time { font-size: 14px; color: var(--muted); }
+.e a { font-size: 16px; font-weight: 600; }
+.e a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.star { color: var(--muted); font-size: 16px; } .star[aria-pressed="true"] { color: var(--ink); }
+.sh { display: block; padding: 10px 0; border-bottom: 1px solid var(--line); font-size: 16px; font-weight: 600; }
+.sh small { display: block; font-size: 14px; font-weight: 400; color: var(--muted); }
+.sh:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+@media (max-width: 900px) { .hdr nav a:nth-child(n+4) { display: none; } .row, .cols { grid-template-columns: 1fr; gap: 28px; } }
+@media (max-width: 560px) { .wrap { padding: 0 18px; } .hdr nav { display: none; } .hdr .lang { margin-left: auto; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+    <nav><a href="#">Cursusdienst</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Evenementen</a><a href="#">Eerstejaars</a><a href="#">Studies</a><a href="#">Over VTK</a></nav>
+    <span class="lang">NL / EN</span>
+  </header>
+  <section class="hero">
+    <h1>De thuis voor ingenieurs in Leuven.</h1>
+    <div class="row">
+      <p>Cursussen, broodjes, events en career voor elke burgerlijk en bio-ingenieur. Gerund door studenten, sinds 1920.</p>
+      <div class="cta"><a class="btn" href="#">Ontdek wat we doen <i class="ph ph-arrow-right"></i></a><a class="link" href="#">Eerstejaars? Start hier</a></div>
+      <nav class="quick num" aria-label="Snel naar"><a href="#">Cursusdienst <small>open tot 13:55</small></a><a href="#">Theokot <small>broodje bestellen</small></a><a href="#">Shiften <small>3 open</small></a></nav>
+    </div>
+  </section>
+</div>
+
+<section class="week num">
+  <div class="wrap">
+    <div class="week-h"><h2>Deze week</h2><a href="#">Volledige kalender</a></div>
+    <div class="cols">
+      <div><h3>Vandaag</h3>
+        <div class="e"><time>12:00</time><a href="#">12 Urencantus</a><button class="star" aria-label="Interesse: 12 Urencantus" aria-pressed="false">☆</button></div>
+        <div class="e"><time>20:30</time><a href="#">Looptraining</a><button class="star" aria-label="Interesse: Looptraining" aria-pressed="false">☆</button></div>
+      </div>
+      <div><h3>Volgende week</h3>
+        <div class="e"><time>ma 5</time><a href="#">PeMe-Startactiviteit</a><button class="star" aria-label="Interesse: PeMe" aria-pressed="false">☆</button></div>
+        <div class="e"><time>di 6</time><a href="#">Sector Night Bouwkunde</a><button class="star" aria-label="Interesse: Sector Night" aria-pressed="false">☆</button></div>
+      </div>
+      <div><h3>Shiften die volk zoeken</h3>
+        <a class="sh" href="#">Bijrijden afbraak<small>Morgen 01:00, 2 munten</small></a>
+        <a class="sh" href="#">Namiddagshift<small>Morgen 14:00, 2 munten</small></a>
+      </div>
+    </div>
+  </div>
+</section>
+<script>document.querySelectorAll(".star").forEach(b => b.addEventListener("click", () => { const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); b.textContent = on ? "★" : "☆"; }));</script>
+</body>
+</html>

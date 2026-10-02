@@ -11,6 +11,7 @@ import { currentWorkingYear, workingYearStart } from "@/lib/workingYear";
 import { reviewFirstWindow } from "@/lib/reviewFirstPaging";
 import { PagesToolbar } from "./PagesToolbar";
 import { PageRowActions } from "./PageRowActions";
+import { LinkedRow } from "@/components/ui/LinkedRow";
 
 const PAGE_SIZE = 25;
 
@@ -230,7 +231,9 @@ export default async function AdminPages({
               const editedLabel = p.contentEditedAt ? dateFormat.format(p.contentEditedAt) : null;
               const hasEnglish = Boolean(p.contentMdEn ?? p.contentJsonEn);
               return (
-                <tr key={p.id}>
+                // Een klik ergens op de rij opent de pagina; de titel blijft de
+                // link voor toetsenbord en screenreader.
+                <LinkedRow key={p.id} href={`${base}/admin/paginas/${p.id}`} className="cursor-pointer">
                   <td>
                     <div className="flex items-center gap-2">
                       {needsReview && (
@@ -280,7 +283,7 @@ export default async function AdminPages({
                       (editedLabel ?? "—")
                     )}
                   </td>
-                  <td>
+                  <td data-row-action>
                     <PageRowActions
                       host={host}
                       nl={nl}
@@ -293,7 +296,7 @@ export default async function AdminPages({
                       }}
                     />
                   </td>
-                </tr>
+                </LinkedRow>
               );
             })}
             {rows.length === 0 && (

@@ -30,6 +30,7 @@ export function MagazineUploadForm({ locale }: { locale: "nl" | "en" }) {
     setMessage(null);
     setError(null);
     try {
+      // De kaft van bladzijde 1 maakt de server (lib/magazineCover.ts).
       const result = await saveMagazineAction(new FormData(form));
       if (result.ok) {
         form.reset();

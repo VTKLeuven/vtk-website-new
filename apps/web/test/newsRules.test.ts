@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   albumInNews,
   composeNews,
+  groupNewsByPeriod,
   isFreshNews,
+  isNewsEntryHidden,
   magazinesInNews,
   postInNews,
   signupInNews,
   ticketInNews,
+  ticketNeedsNewsOptIn,
   ticketNewsDate,
   ticketPresaleInNews,
   ticketPresaleNewsDate,
@@ -95,6 +98,24 @@ describe("voorverkoop", () => {
   });
 });
 
+describe("verkoop van een werkgroep", () => {
+  it("staat standaard niet in het nieuws, die van een post wel", () => {
+    expect(ticketNeedsNewsOptIn({ ownerGroup: { type: "WERKGROEP" } })).toBe(true);
+    expect(ticketNeedsNewsOptIn({ ownerGroup: { type: "PRAESIDIUM" } })).toBe(false);
+  });
+
+  it("komt erin wanneer de redactie het erin zet", () => {
+    expect(isNewsEntryHidden({ hidden: false, needsOptIn: true, shown: false })).toBe(true);
+    expect(isNewsEntryHidden({ hidden: false, needsOptIn: true, shown: true })).toBe(false);
+  });
+
+  it("verbergen wint, ook van een bericht dat erin gezet werd", () => {
+    expect(isNewsEntryHidden({ hidden: true, needsOptIn: true, shown: true })).toBe(true);
+    expect(isNewsEntryHidden({ hidden: true, needsOptIn: false, shown: false })).toBe(true);
+    expect(isNewsEntryHidden({ hidden: false, needsOptIn: false, shown: false })).toBe(false);
+  });
+});
+
 describe("inschrijvingen", () => {
   const base = {
     url: "https://skireis.be/inschrijven",
@@ -158,10 +179,17 @@ describe("zelfgeschreven berichten", () => {
 });
 
 describe("samenstelling", () => {
-  const entry = (key: string, source: NewsComposable["source"], date: string, featured = false) => ({
+  const entry = (
+    key: string,
+    source: NewsComposable["source"],
+    date: string,
+    featured = false,
+    shownDate?: string,
+  ) => ({
     key,
     source,
     date: at(date).toISOString(),
+    ...(shownDate ? { shownDate: at(shownDate).toISOString() } : {}),
     featured,
   });
   const entries = [
@@ -175,30 +203,50 @@ describe("samenstelling", () => {
   ];
 
   it("licht het woordje van de praeses uit en zet de rest nieuwste eerst", () => {
-    const { featured, rest } = composeNews(entries, 6);
+    const { featured, rest } = composeNews(entries, now);
     expect(featured?.key).toBe("praeses");
-    expect(rest.map((item) => item.key)).toEqual(["bakske", "galabal", "album", "skireis", "fiets"]);
+    expect(rest.map((item) => item.key)).toEqual(["bakske", "galabal", "album", "skireis", "fiets", "irreeel"]);
+  });
+
+  it("toont alles: de carrousel heeft geen maximum", () => {
+    const many = Array.from({ length: 14 }, (_, i) =>
+      entry(`album-${i}`, "album", `2026-09-${String(10 + i).padStart(2, "0")}T12:00:00Z`),
+    );
+    expect(composeNews(many, now).rest).toHaveLength(13);
+  });
+
+  it("zet de tegels in de volgorde van hun pin: eerst wat komt, het vroegste eerst", () => {
+    const events = [
+      entry("zesoktober", "tickets", "2026-09-25T10:00:00Z", false, "2026-10-06T20:00:00Z"),
+      entry("eenoktober", "signup", "2026-09-24T10:00:00Z", false, "2026-10-01T20:00:00Z"),
+      entry("morgen", "tickets", "2026-09-20T10:00:00Z", false, "2026-09-27T20:00:00Z"),
+      entry("album", "album", "2026-09-24T08:00:00Z"),
+      entry("fiets", "notice", "2026-09-25T09:00:00Z"),
+      entry("praeses", "praeses", "2026-09-21T12:00:00Z"),
+    ];
+    const { rest } = composeNews(events, now);
+    expect(rest.map((item) => item.key)).toEqual(["morgen", "eenoktober", "zesoktober", "fiets", "album"]);
   });
 
   it("volgt de keuze van de redactie boven het woordje", () => {
     const pinned = entries.map((item) => (item.key === "fiets" ? { ...item, featured: true } : item));
-    expect(composeNews(pinned, 6).featured?.key).toBe("fiets");
+    expect(composeNews(pinned, now).featured?.key).toBe("fiets");
   });
 
   it("licht een automatisch bericht uit wanneer de redactie het kiest", () => {
     const pinned = entries.map((item) => (item.key === "galabal" ? { ...item, featured: true } : item));
-    const { featured, rest } = composeNews(pinned, 6);
+    const { featured, rest } = composeNews(pinned, now);
     expect(featured?.key).toBe("galabal");
-    expect(rest.map((item) => item.key)).toEqual(["bakske", "album", "skireis", "fiets", "praeses"]);
+    expect(rest.map((item) => item.key)).toEqual(["bakske", "album", "skireis", "fiets", "praeses", "irreeel"]);
   });
 
   it("licht zonder woordje het nieuwste bericht uit", () => {
     const withoutPraeses = entries.filter((item) => item.source !== "praeses");
-    expect(composeNews(withoutPraeses, 6).featured?.key).toBe("bakske");
+    expect(composeNews(withoutPraeses, now).featured?.key).toBe("bakske");
   });
 
   it("toont niets zonder berichten", () => {
-    expect(composeNews([], 6)).toEqual({ featured: null, rest: [] });
+    expect(composeNews([], now)).toEqual({ featured: null, rest: [] });
   });
 });
 
@@ -210,15 +258,14 @@ describe("nieuw", () => {
 });
 
 describe("de instelling", () => {
-  it("staat standaard aan met zes berichten en alle bronnen", () => {
+  it("staat standaard aan met alle bronnen", () => {
     expect(readNewsSetting(undefined)).toEqual(defaultNewsSetting());
-    expect(defaultNewsSetting().count).toBe(6);
   });
 
-  it("houdt een ongeldig aantal binnen de grenzen en vult ontbrekende bronnen aan", () => {
-    const setting = readNewsSetting({ enabled: false, count: 40, sources: { album: false } });
+  it("negeert een oud aantal berichten en vult ontbrekende bronnen aan", () => {
+    const setting = readNewsSetting({ enabled: false, count: 4, sources: { album: false } });
+    expect(setting).not.toHaveProperty("count");
     expect(setting.enabled).toBe(false);
-    expect(setting.count).toBe(8);
     expect(setting.sources.album).toBe(false);
     expect(setting.sources.tickets).toBe(true);
   });
@@ -234,5 +281,59 @@ describe("uitgelicht automatisch bericht", () => {
     expect(readNewsFeatured({ source: "notice", ref: "abc" })).toBeNull();
     expect(readNewsFeatured({ source: "tickets", ref: "" })).toBeNull();
     expect(readNewsFeatured(["tickets", "abc"])).toBeNull();
+  });
+});
+
+describe("/nieuws per periode", () => {
+  // "Nu" is zaterdag 26 september 2026 om 10u: deze week loopt van maandag 21
+  // tot zondag 27 september.
+  const entry = (key: string, date: string, shownDate?: string) => ({
+    key,
+    date: at(date).toISOString(),
+    ...(shownDate ? { shownDate: at(shownDate).toISOString() } : {}),
+  });
+  const shape = (groups: ReturnType<typeof groupNewsByPeriod<ReturnType<typeof entry>>>) =>
+    groups.map((group) => [group.key, group.monday, group.entries.map((e) => e.key)]);
+
+  it("deelt in in deze week, vorige week en daarvoor per maand, recentste eerst", () => {
+    const groups = groupNewsByPeriod(
+      [
+        entry("zaterdag", "2026-09-26T09:00:00+02:00"),
+        entry("maandag", "2026-09-21T00:30:00+02:00"),
+        entry("zondag ervoor", "2026-09-20T23:30:00+02:00"),
+        entry("vorige maandag", "2026-09-14T08:00:00+02:00"),
+        entry("begin september", "2026-09-02T12:00:00+02:00"),
+        entry("augustus", "2026-08-20T12:00:00+02:00"),
+      ],
+      now,
+    );
+    expect(shape(groups)).toEqual([
+      ["this-week", "2026-09-21", ["zaterdag", "maandag"]],
+      ["last-week", "2026-09-14", ["zondag ervoor", "vorige maandag"]],
+      ["earlier-2026-09", null, ["begin september"]],
+      ["earlier-2026-08", null, ["augustus"]],
+    ]);
+  });
+
+  it("zet een ticketverkoop bij de dag van het evenement, niet bij de start van de verkoop", () => {
+    const groups = groupNewsByPeriod(
+      [
+        entry("cantus", "2026-09-18T12:00:00+02:00", "2026-09-27T20:00:00+02:00"),
+        entry("sector night", "2026-09-24T12:00:00+02:00", "2026-10-01T19:00:00+02:00"),
+        entry("galabal", "2026-09-20T12:00:00+02:00", "2026-11-27T21:00:00+01:00"),
+        entry("skireis", "2026-09-22T12:00:00+02:00", "2026-10-20T08:00:00+02:00"),
+        entry("woordje", "2026-09-22T12:00:00+02:00"),
+        entry("bakske", "2026-09-15T12:00:00+02:00"),
+      ],
+      now,
+    );
+    // Eerst wat komt, het vroegste eerst; dan wat voorbij is, het recentste eerst.
+    expect(shape(groups)).toEqual([
+      ["this-week", "2026-09-21", ["cantus", "woordje"]],
+      ["next-week", "2026-09-28", ["sector night"]],
+      ["later-2026-10", null, ["skireis"]],
+      ["later-2026-11", null, ["galabal"]],
+      ["last-week", "2026-09-14", ["bakske"]],
+    ]);
   });
 });

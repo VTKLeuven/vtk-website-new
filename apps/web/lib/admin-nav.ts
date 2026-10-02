@@ -42,14 +42,29 @@ export type NavGuard = {
 };
 
 export type NavLeaf = { key: string; href: string } & NavGuard;
-export type NavEntry = NavLeaf | { group: string; items: NavLeaf[] };
+export type NavGroup = {
+  group: string;
+  items: NavLeaf[];
+  /**
+   * Toon de groep ook wanneer er maar één item in zit (of zichtbaar is). Enkel
+   * voor een groep die bewust zal groeien, zoals Apps: anders verhuist dat ene
+   * item naar een losse tab en springt het terug in de groep zodra er een
+   * tweede bijkomt.
+   */
+  keepSingle?: boolean;
+};
+export type NavEntry = NavLeaf | NavGroup;
 
 const item = (key: string, href: string, guard: NavGuard = {}): NavLeaf => ({
   key,
   href,
   ...guard,
 });
-const group = (key: string, items: NavLeaf[]): NavEntry => ({ group: key, items });
+const group = (key: string, items: NavLeaf[], options: { keepSingle?: boolean } = {}): NavEntry => ({
+  group: key,
+  items,
+  ...options,
+});
 
 /**
  * Zelfde variabele en zelfde regel als de zoekresultaten
@@ -71,6 +86,14 @@ export function logisticsModuleUrl(): string | null {
 export function getAdminNav(): NavEntry[] {
   const logistics = logisticsModuleUrl();
   const loose: NavEntry[] = [
+    // Kleine hulpmiddelen die een post af en toe nodig heeft (de groepjesmaker
+    // van onthaal en internationaal), elk als item onder één groep in plaats
+    // van elk een eigen tab. Er komen er nog bij, dus de groep blijft staan,
+    // ook met één app. De groepjesmaker draait op een form, dus ze volgt de
+    // zichtbaarheid van Forms.
+    group('apps', [item('groupMaker', '/apps/groepjesmaker', { forms: true })], {
+      keepSingle: true,
+    }),
     item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
     ...(logistics ? [item('logistics', logistics)] : []),
     item('expenses', '/rekeningen', {

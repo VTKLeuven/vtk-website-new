@@ -1,4 +1,5 @@
 import { prisma } from "@vtk/db";
+import { publishedTicketSlug, TICKET_LINK_SELECT } from "@/lib/ticketing/eventPage";
 import { pick } from "@vtk/i18n";
 
 import { viewerAudienceFilter } from "@/lib/calendar/audience";
@@ -116,7 +117,7 @@ export async function GET(request: Request) {
       take: 6,
       include: {
         group: { select: { slug: true, nameNl: true, nameEn: true } },
-        ticketEvent: { select: { slug: true, status: true } },
+        ticketEvents: { select: TICKET_LINK_SELECT },
         categories: {
           select: {
             category: {
@@ -211,7 +212,7 @@ export async function GET(request: Request) {
         })),
         interested: interested.has(event.id),
         interestedCount: publicCounts.get(event.id) ?? null,
-        ticketSlug: event.ticketEvent?.status === "PUBLISHED" ? event.ticketEvent.slug : null,
+        ticketSlug: publishedTicketSlug(event.ticketEvents),
       })),
 
       // Enkel echte embeds: een losse mp4 of een onherkenbare link hoort er niet

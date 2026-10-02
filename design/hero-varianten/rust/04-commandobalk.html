@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rust 4: Commandobalk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Stroming: command-first (Linear, Raycast). Wie naar vtk.be komt, weet meestal
+   al waarvoor. Eén zoekbalk midden in beeld brengt je er: typ "cudi" of
+   "shift" en Enter. De drie meest gezochte plekken staan er al als
+   suggestie onder. Voor wie nieuw is, is er één knop. */
+:root { --paper: #EFF2F8; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --muted: #5C667F; --on-dark-muted: #B7C0DC; --hair: rgb(239 242 248 / .12); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Geist, system-ui, sans-serif; background: var(--navy); color: var(--paper); -webkit-font-smoothing: antialiased; min-height: 100dvh; display: flex; flex-direction: column; }
+a { color: inherit; text-decoration: none; }
+button, input { font: inherit; color: inherit; background: none; border: 0; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--yellow); outline-offset: 3px; border-radius: 8px; }
+.num { font-variant-numeric: tabular-nums; }
+.kbd { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border-radius: 6px; border: 1px solid var(--hair); font-size: 12px; color: var(--on-dark-muted); }
+
+.hdr { max-width: 1200px; width: 100%; margin: 0 auto; padding: 0 32px; height: 64px; display: flex; align-items: center; gap: 30px; }
+.hdr img { height: 24px; }
+.hdr nav { display: flex; gap: 22px; font-size: 14px; color: var(--on-dark-muted); }
+.hdr nav a:hover { color: var(--paper); }
+.hdr-end { margin-left: auto; display: flex; gap: 18px; align-items: center; font-size: 14px; color: var(--on-dark-muted); }
+
+main { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 40px 24px 80px; }
+h1 { font-size: 60px; line-height: 1.04; letter-spacing: -0.045em; font-weight: 600; max-width: 13em; }
+.sub { margin-top: 16px; font-size: 18px; color: var(--on-dark-muted); }
+
+.cmd { position: relative; width: min(640px, 100%); margin-top: 40px; text-align: left; }
+.field { display: flex; align-items: center; gap: 12px; height: 60px; padding: 0 12px 0 20px; background: var(--surface); color: var(--ink); border-radius: 16px; box-shadow: 0 0 0 6px rgb(255 210 63 / .14); }
+.field i { font-size: 20px; color: var(--muted); }
+.field input { flex: 1; outline: none; font-size: 17px; }
+.field input::placeholder { color: var(--muted); }
+.field .kbd { border-color: rgb(14 26 54 / .15); color: var(--muted); }
+.list { position: absolute; left: 0; right: 0; top: 68px; background: var(--surface); color: var(--ink); border-radius: 16px; padding: 6px; box-shadow: 0 24px 40px -16px rgb(10 15 31 / .6); display: none; z-index: 5; }
+.cmd.open .list { display: block; }
+.opt { display: grid; grid-template-columns: 34px 1fr auto; gap: 12px; align-items: center; padding: 10px; border-radius: 10px; font-size: 15px; }
+.opt i { font-size: 18px; width: 34px; height: 34px; border-radius: 9px; background: var(--paper); display: grid; place-items: center; }
+.opt small { font-size: 13px; color: var(--muted); }
+.opt[aria-selected="true"] { background: var(--paper); }
+.opt[aria-selected="true"] i { background: var(--yellow); }
+.opt[hidden] { display: none; }
+.chips { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin-top: 16px; }
+.chip { display: inline-flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; border-radius: 999px; box-shadow: inset 0 0 0 1px var(--hair); font-size: 14px; color: var(--paper); }
+.chip small { color: var(--on-dark-muted); font-size: 13px; }
+.chip:hover { background: rgb(239 242 248 / .08); }
+.new { margin-top: 40px; display: flex; gap: 14px; align-items: center; font-size: 15px; color: var(--on-dark-muted); }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 44px; padding: 0 20px; border-radius: 999px; background: var(--yellow); color: var(--ink); font-weight: 600; }
+.btn:hover { background: var(--surface); }
+
+.foot { border-top: 1px solid var(--hair); }
+.foot-in { max-width: 1200px; margin: 0 auto; padding: 0 32px; height: 52px; display: flex; align-items: center; gap: 20px; font-size: 14px; color: var(--on-dark-muted); }
+.foot b { color: var(--paper); font-weight: 500; }
+.foot a:hover { color: var(--paper); text-decoration: underline; text-underline-offset: 3px; }
+.foot .r { margin-left: auto; }
+
+@media (max-width: 900px) { .hdr nav { display: none; } }
+@media (max-width: 560px) { h1 { font-size: 40px; } .new { flex-direction: column; } .foot-in { height: auto; padding: 12px 18px; flex-wrap: wrap; gap: 6px 14px; } .foot .r { margin-left: 0; } .hdr { padding: 0 18px; } }
+</style>
+</head>
+<body>
+<header class="hdr">
+  <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+  <nav><a href="#">Info</a><a href="#">Cursusdienst</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Evenementen</a><a href="#">Eerstejaars</a><a href="#">Studies</a><a href="#">Over VTK</a></nav>
+  <div class="hdr-end"><span>NL / EN</span><a href="#">Aanmelden</a></div>
+</header>
+
+<main>
+  <h1>De thuis voor ingenieurs in Leuven.</h1>
+  <p class="sub">Waar wil je naartoe?</p>
+  <div class="cmd num" id="cmd">
+    <label class="field"><i class="ph ph-magnifying-glass"></i><input id="q" placeholder="Cudi, Theokot, shiften, een event..." aria-label="Zoek op vtk.be" aria-controls="list" autocomplete="off"><span class="kbd">/</span></label>
+    <div class="list" id="list" role="listbox">
+      <a class="opt" role="option" href="#" data-k="cursusdienst cudi boeken cursus"><i class="ph ph-books"></i><span>Cursusdienst</span><small>Open tot 13:55</small></a>
+      <a class="opt" role="option" href="#" data-k="theokot broodje eten"><i class="ph ph-bread"></i><span>Theokot</span><small>Broodje bestellen</small></a>
+      <a class="opt" role="option" href="#" data-k="shiften shift helpen munten"><i class="ph ph-hand-heart"></i><span>Shiften</span><small>3 zoeken volk</small></a>
+      <a class="opt" role="option" href="#" data-k="tweedehands boeken verkopen"><i class="ph ph-recycle"></i><span>Tweedehands boeken</span><small>Cudi</small></a>
+      <a class="opt" role="option" href="#" data-k="tijdslot reserveren cudi"><i class="ph ph-clock"></i><span>Tijdslot Cudi</span><small>Reserveer</small></a>
+      <a class="opt" role="option" href="#" data-k="kalender events agenda"><i class="ph ph-calendar-blank"></i><span>Kalender</span><small>Alle events</small></a>
+      <a class="opt" role="option" href="#" data-k="career jobs bedrijven"><i class="ph ph-briefcase"></i><span>Career</span><small>Jobs en bedrijven</small></a>
+    </div>
+  </div>
+  <nav class="chips num" aria-label="Snel naar">
+    <a class="chip" href="#">Cursusdienst <small>tot 13:55</small></a>
+    <a class="chip" href="#">Theokot</a>
+    <a class="chip" href="#">Shiften <small>3 open</small></a>
+  </nav>
+  <div class="new"><span>Nieuw bij VTK?</span><a class="btn" href="#">Ontdek wat we doen <i class="ph-bold ph-arrow-right"></i></a></div>
+</main>
+
+<aside class="foot num" aria-label="Vandaag"><div class="foot-in"><b>Vandaag</b><a href="#">12 Urencantus, 12:00</a><a href="#">Looptraining, 20:30</a><a class="r" href="#">Volledige kalender</a></div></aside>
+
+<script>
+const cmd = document.getElementById("cmd"), q = document.getElementById("q"), opts = [...document.querySelectorAll(".opt")];
+let sel = 0;
+const vis = () => opts.filter(o => !o.hidden);
+const paint = () => { opts.forEach(o => o.setAttribute("aria-selected", "false")); const v = vis(); if (v[sel]) v[sel].setAttribute("aria-selected", "true"); };
+q.addEventListener("focus", () => { cmd.classList.add("open"); paint(); });
+q.addEventListener("blur", () => setTimeout(() => cmd.classList.remove("open"), 150));
+q.addEventListener("input", () => { const t = q.value.toLowerCase().trim(); opts.forEach(o => o.hidden = !!t && !o.dataset.k.includes(t)); sel = 0; paint(); });
+q.addEventListener("keydown", e => {
+  const n = vis().length; if (!n) return;
+  if (e.key === "ArrowDown") { e.preventDefault(); sel = (sel + 1) % n; paint(); }
+  if (e.key === "ArrowUp") { e.preventDefault(); sel = (sel + n - 1) % n; paint(); }
+  if (e.key === "Enter") { e.preventDefault(); vis()[sel].click(); }
+  if (e.key === "Escape") q.blur();
+});
+document.addEventListener("keydown", e => { if (e.key === "/" && document.activeElement !== q) { e.preventDefault(); q.focus(); } });
+</script>
+</body>
+</html>

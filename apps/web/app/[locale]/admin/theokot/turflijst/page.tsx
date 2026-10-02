@@ -64,7 +64,6 @@ export default async function TurflijstPage({
 
   type TurfRow = { id: string; name: string; students: number; grocomeet: number; bureau: number };
   let items: TurfRow[] = [];
-  let totalOrders = 0;
   let sessionDate: Date | null = null;
   const meetingDrinks: Array<{ label: string; drinks: Array<{ name: string; count: number }> }> = [];
 
@@ -73,12 +72,10 @@ export default async function TurflijstPage({
       where: { id: selected.id },
       include: {
         items: { orderBy: { order: "asc" } },
-        _count: { select: { orders: true } },
       },
     });
     if (full) {
       sessionDate = full.date;
-      totalOrders = full._count.orders;
 
       // De broodjes van de grocomeet en het bureau gaan in een aparte doos, dus
       // ze krijgen hun eigen kolom in plaats van in het studentenaantal te
@@ -88,10 +85,17 @@ export default async function TurflijstPage({
       const dayStart = brusselsTimeOnDay(full.date, "00:00");
       const next = shiftYMD(brusselsYMD(full.date), 1);
       const dayEnd = brusselsWallClock(next.year, next.month, next.day, "00:00");
-      const [used, reservations] = await Promise.all([
+      // Wat een groco zelf bij Theokot bestelde op een dag met een grocomeet,
+      // hoort ook in die doos (`TheokotOrder.grocomeetId`), niet bij de studenten.
+      const [used, grocoOrdered, reservations] = await Promise.all([
         prisma.theokotOrderLine.groupBy({
           by: ["sessionItemId"],
-          where: { sessionItem: { sessionId: full.id } },
+          where: { sessionItem: { sessionId: full.id }, order: { grocomeetId: null } },
+          _sum: { quantity: true },
+        }),
+        prisma.theokotOrderLine.groupBy({
+          by: ["sessionItemId"],
+          where: { sessionItem: { sessionId: full.id }, order: { grocomeetId: { not: null } } },
           _sum: { quantity: true },
         }),
         prisma.meetingReservation.findMany({
@@ -105,6 +109,9 @@ export default async function TurflijstPage({
 
       const usedMap = new Map(used.map((u) => [u.sessionItemId, u._sum.quantity ?? 0]));
       const meetingCounts = new Map<string, { grocomeet: number; bureau: number }>();
+      for (const line of grocoOrdered) {
+        meetingCounts.set(line.sessionItemId, { grocomeet: line._sum.quantity ?? 0, bureau: 0 });
+      }
       for (const reservation of reservations) {
         if (!reservation.sessionItemId) continue;
         const row = meetingCounts.get(reservation.sessionItemId) ?? { grocomeet: 0, bureau: 0 };
@@ -143,6 +150,10 @@ export default async function TurflijstPage({
 
   const hasGrocomeet = items.some((i) => i.grocomeet > 0);
   const hasBureau = items.some((i) => i.bureau > 0);
+  const totalSandwiches = items.reduce(
+    (sum, i) => sum + i.students + i.grocomeet + i.bureau,
+    0,
+  );
 
   return (
     <div className="space-y-5">
@@ -199,7 +210,14 @@ export default async function TurflijstPage({
               Theokot — {sessionDate ? dayLabel(sessionDate) : ""}
             </div>
             <div style={{ fontSize: 13, color: "#5c667f" }}>
-              {totalOrders} {nl ? "bestellingen" : "orders"}
+              {totalSandwiches}{" "}
+              {nl
+                ? totalSandwiches === 1
+                  ? "broodje"
+                  : "broodjes"
+                : totalSandwiches === 1
+                  ? "sandwich"
+                  : "sandwiches"}
             </div>
           </div>
           {items.length === 0 ? (

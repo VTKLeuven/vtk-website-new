@@ -3,6 +3,7 @@ import { requireManage } from '@/lib/session';
 import {
   canDeleteTransport,
   chargesRequester,
+  eventOptions as selectableEventOptions,
   formatDateOnly,
   formatDateRange,
   formatPriceCents,
@@ -17,6 +18,8 @@ import {
   toDatetimeLocalValue,
   todayDateOnly,
   transportDeleteDescription,
+  tripEventName,
+  tripTitle,
   vehiclesToDraw,
 } from '@/lib/uitleen';
 import {
@@ -35,6 +38,7 @@ import {
   driverOptions,
   eventsInRange,
   getLogistiekSettings,
+  selectableEvents,
   transportAuditLogsByBooking,
   tripNotesFor,
   transportRange,
@@ -125,6 +129,7 @@ export default async function VervoerWeekPage({
     availability,
     availabilityNotes,
     settings,
+    linkableEvents,
   ] = await Promise.all([
     transportRange(from, to, filters),
     calendarVehicles(),
@@ -135,7 +140,7 @@ export default async function VervoerWeekPage({
     activeGroups(),
     // De evenementen rond dit venster. Ruimer dan het venster zelf, want ze
     // dienen twee dingen: de strook boven het rooster (P5, enkel wat dit venster
-    // raakt) en de keuzelijst "hoort bij" in het ritformulier. Een rit op
+    // raakt) en de keuzelijst "hoort bij" bij een nieuwe rit. Een rit op
     // vrijdag hoort vaak bij een evenement dat maandag daarna begint, en dat
     // moet je kunnen kiezen zonder eerst een week verder te bladeren.
     eventsInRange(new Date(from.getTime() - EVENT_MARGIN_MS), new Date(to.getTime() + EVENT_MARGIN_MS)),
@@ -150,6 +155,11 @@ export default async function VervoerWeekPage({
     // Enkel voor de zin onder "Post kiest zelf de chauffeur": die moet zeggen
     // wie er dan een mail krijgt, en dat is een instelling (F4.8b).
     getLogistiekSettings(),
+    // Waaraan je een bestaande rit hangt, in de rij "Evenement" van het paneel.
+    // Dezelfde lijst als op Ritten (/beheer/vervoer), en niet het venster
+    // hierboven: een rit van vrijdag zonder evenement binnen twee weken had
+    // daar een lege lijst, en dan verdween het veld helemaal.
+    selectableEvents(),
   ]);
 
   // De strook boven het rooster toont enkel wat dit venster raakt, en enkel
@@ -195,7 +205,8 @@ export default async function VervoerWeekPage({
     startAt: booking.startAt.toISOString(),
     endAt: booking.endAt.toISOString(),
     status: booking.status,
-    title: booking.eventName?.trim() || booking.purpose,
+    title: tripTitle(booking),
+    eventName: tripEventName(booking),
     subtitle: requesterLabel(booking),
     driver:
       booking.driver && booking.driverId
@@ -209,9 +220,9 @@ export default async function VervoerWeekPage({
     conflict: conflicts.has(booking.id),
   }));
 
-  /** "de rit van Feest (14:00-18:00)", om de botsende rit mee te benoemen. */
+  /** "Tafels naar Alma 3 (14:00-18:00)", om de botsende rit mee te benoemen. */
   const tripLabel = (booking: TransportBooking) =>
-    `${booking.eventName?.trim() || booking.purpose} (${timeFormatter.format(booking.startAt)}-${timeFormatter.format(booking.endAt)})`;
+    `${tripTitle(booking)} (${timeFormatter.format(booking.startAt)}-${timeFormatter.format(booking.endAt)})`;
   const bookingById = new Map(bookings.map((booking) => [booking.id, booking]));
 
   // De actieve voertuigen, plus wie in dit venster gereden heeft: een gehuurd
@@ -232,8 +243,9 @@ export default async function VervoerWeekPage({
       id: booking.id,
       purpose: booking.purpose,
       cargoNote: booking.cargoNote,
-      eventName: booking.eventName,
-      eventId: booking.eventId,
+      title: tripTitle(booking),
+      eventName: tripEventName(booking),
+      event: booking.event,
       reservationId: booking.reservationId,
       requesterLabel: requesterLabel(booking),
       userName: booking.user.name,
@@ -256,7 +268,6 @@ export default async function VervoerWeekPage({
         pickupAddress: booking.pickupAddress ?? '',
         destination: booking.destination ?? '',
         adminNote: booking.adminNote ?? '',
-        eventId: booking.eventId ?? '',
         requesterChoice: requesterChoiceOf(booking),
         requesterOther: booking.requesterType === 'INTERN' ? '' : (booking.requesterName ?? ''),
       },
@@ -317,9 +328,7 @@ export default async function VervoerWeekPage({
         )
         .map(
           (other) =>
-            `${timeFormatter.format(other.startAt)}-${timeFormatter.format(other.endAt)} · ${
-              other.eventName?.trim() || other.purpose
-            }`
+            `${timeFormatter.format(other.startAt)}-${timeFormatter.format(other.endAt)} · ${tripTitle(other)}`
         ),
       // Met welke ritten deze botst: het paneel zet ze één klik weg, zodat
       // schuiven het antwoord blijft op een botsing die je bewust maakte.
@@ -404,6 +413,7 @@ export default async function VervoerWeekPage({
           weekStart: note.weekStart.toISOString(),
           text: note.text,
         }))}
+        linkableEvents={selectableEventOptions(linkableEvents)}
         eventOptions={events.map((event) => ({
           id: event.id,
           name: event.name,

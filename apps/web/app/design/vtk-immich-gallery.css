@@ -696,7 +696,7 @@
 .vtk-takedown-panel {
   width: 100%;
   max-width: 460px;
-  max-height: min(88vh, 760px);
+  max-height: min(calc(88 * var(--vtk-vh, 1vh)), 760px);
   overflow-y: auto;
   padding: clamp(18px, 3vw, 26px);
   border: 1px solid var(--line);

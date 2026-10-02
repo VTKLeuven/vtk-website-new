@@ -557,4 +557,6 @@ maken heeft: `apps/web/lib/kul-card.ts` verifieert een gescande studentenkaart
 (Theokot-afhaalbalie, deurscanner) via de KU Leuven idverification-API
 (`account.kuleuven.be`). Die gebruikt **aparte client-credentials**
 (`KUL_CARD_CLIENT_ID`/`KUL_CARD_CLIENT_SECRET`), niet de OIDC-login-credentials
-hierboven. Verwar de twee env-blokken niet.
+hierboven. Verwar de twee env-blokken niet. Waar de server KU Leuven niet rechtstreeks bereikt, gaat de
+kaartcontrole via de relay van de cursusdienst (`KUL_CARD_RELAY_URL` /
+`KUL_CARD_RELAY_SECRET`, zie `docs/design-decisions.md`).

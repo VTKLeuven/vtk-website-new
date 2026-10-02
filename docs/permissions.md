@@ -283,6 +283,12 @@ it as `DEFAULT` because all five of them attend. Whoever holds it sees the "Broo
 in the profile menu; that entry is gated on the permission, not on a hard-coded "is lead of a
 praesidium post" check, so the board can add someone (a co-responsible) without a code change.
 
+`grocomeet.reserve` does one more thing: a Theokot order placed by a holder on a day with a
+grocomeet goes into the GM box instead of the counter (`TheokotOrder.grocomeetId`, see "Een groco
+die zelf bij Theokot bestelt" in `docs/design-decisions.md`). It is checked live with
+`hasLivePermission`, so the `admin` role counts (every member of IT and Groep 5) and a bare super
+admin does not.
+
 The per-post roles (`post-it`, `post-cursusdienst`, ...) are empty containers so you can hang
 post-specific permissions off each werkgroep over time. `werkgroep`/`medewerker` are seeded as
 available roles but not auto-assigned to any post. Your seeded admin account is a member of IT

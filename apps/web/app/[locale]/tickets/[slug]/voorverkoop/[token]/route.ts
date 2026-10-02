@@ -1,12 +1,18 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
+import { withSource } from "@/lib/ticketing/source";
 import {
   presaleCookieExpiry,
   presaleCookieName,
   presaleCookieOptions,
   presaleTokenMatches,
 } from "@/lib/ticketing/presaleLink";
+import {
+  privateCookieExpiry,
+  privateCookieName,
+  privateCookieOptions,
+} from "@/lib/ticketing/privateLink";
 
 export const runtime = "nodejs";
 
@@ -30,7 +36,15 @@ export async function GET(
 
   const event = await prisma.ticketEvent.findUnique({
     where: { slug },
-    select: { id: true, presaleToken: true, salesStartAt: true },
+    select: {
+      id: true,
+      presaleToken: true,
+      salesStartAt: true,
+      salesEndAt: true,
+      endsAt: true,
+      isPrivate: true,
+      privateToken: true,
+    },
   });
   // Een verkeerde of ingetrokken link leidt gewoon naar de ticketpagina: die
   // zegt zelf wel dat de verkoop nog niet open staat. Een foutmelding zou enkel
@@ -47,14 +61,26 @@ export async function GET(
     });
   }
 
+  // Met `via`, zodat wie via de voorverkooplink koopt in de statistieken als
+  // zodanig telt. Enkel bij een geldige link: een foute laat niets na.
   const response = new NextResponse(null, {
     status: 307,
-    headers: { Location: shopPath },
+    headers: { Location: withSource(shopPath, "voorverkoop") },
   });
   response.cookies.set(
     presaleCookieName(event.id),
     token,
     presaleCookieOptions(presaleCookieExpiry(event.salesStartAt)),
   );
+  // Op een privéverkoop opent de voorverkooplink ook de pagina zelf: wie vroeger
+  // mag kopen, hoort het event te kunnen zien. Anders stuurde deze link naar
+  // een 404, en moest het beheer twee links naar dezelfde mensen sturen.
+  if (event.isPrivate && event.privateToken) {
+    response.cookies.set(
+      privateCookieName(event.id),
+      event.privateToken,
+      privateCookieOptions(privateCookieExpiry(event)),
+    );
+  }
   return response;
 }

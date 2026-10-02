@@ -1,29 +1,18 @@
-@import "./vtk-ticket-colors.css";
+/* De Nieuws-band op de homepage, /nieuws en een bericht voluit.
 
-/* De Nieuws-band op de homepage, en dezelfde rijen op /nieuws.
+   De band: links het uitgelichte bericht (meestal het woordje van de praeses
+   als brief), rechts de rest als de eventtegel uit vtk-eventcard.css, in een
+   carrousel. /nieuws: een agenda per week met filterchips (de chips van
+   /tickets, vtk-ticket-catalog.css) en een rail. Zie
+   components/editorial/NewsBand.tsx en docs/design-decisions.md.
 
-   Eén uitgelicht bericht links, een register ernaast. Dezelfde taal als het
-   ticketpaneel: een witte kaart met de gele streep onder de titel, en
-   haarlijnen in plaats van een kaart per rij. Zie components/editorial/NewsBand.tsx
-   en docs/design-decisions.md.
-
-   Elke soort heeft een kleur uit het ticketpalet (vtk-ticket-colors.css), zodat
-   je de soort herkent voor je de regel leest. Hier enkel de toewijzing; de
-   kleuren zelf staan daar.
+   De soort van een bericht is een woord in kleine kapitalen, zoals "TICKETS" op
+   /tickets. Geen kleur en geen icoon per soort: die kwamen nergens anders op de
+   site terug.
 
    Links en knoppen dragen `:is(.vtk-design, .vtk-page)` voor hun klasse: de
    reset in vtk-base.css (`.vtk-design a`, `.vtk-design button`) is anders
    specifieker en wist hun kleur, rand en achtergrond. */
-
-:root {
-  --news-notice: var(--ticket-color-navy);
-  --news-praeses: var(--ticket-color-amber);
-  --news-tickets: var(--ticket-color-blue);
-  --news-signup: var(--ticket-color-green);
-  --news-bakske: var(--ticket-color-violet);
-  --news-irreeel: var(--ticket-color-rose);
-  --news-album: var(--ticket-color-slate);
-}
 
 /* Volle-breedteband in lichtblauw, tussen de donkere zone en de navy
    openingsuren; dezelfde opbouw als .hours-strip (vtk-home.css). */
@@ -41,8 +30,8 @@
   z-index: -1;
   top: 0;
   bottom: 0;
-  left: calc(50% - 50vw);
-  right: calc(50% - 50vw);
+  left: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
+  right: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
   background: var(--paper-2);
 }
 
@@ -50,10 +39,14 @@
   font-weight: 600;
 }
 
+/* De brief is een kolom van 1,25 tegel breed, de carrousel drie tegels. De
+   brief bepaalt zijn eigen hoogte (negen regels) en groeit wanneer iemand hem
+   openklapt; de tegels staan bovenaan en rekken niet mee. */
 .news-grid {
+  --news-gap: 20px;
   display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-  gap: clamp(24px, 3.4vw, 44px);
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 3fr);
+  gap: var(--news-gap);
   align-items: start;
 }
 
@@ -70,15 +63,15 @@
   align-items: center;
   gap: 4px 10px;
   font-size: 12px;
-  font-weight: 700;
   line-height: 1.3;
 }
 
-.news-type {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--news-type);
+.news-kind {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
 }
 
 .news-kick time {
@@ -104,7 +97,7 @@
   display: grid;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 20px;
+  border-radius: 18px;
   background: var(--surface);
 }
 
@@ -118,6 +111,7 @@
 .news-feat-media {
   position: relative;
   aspect-ratio: 16 / 9;
+  background: var(--paper-2);
 }
 
 .news-feat-media img {
@@ -127,47 +121,32 @@
   object-fit: cover;
 }
 
-.news-pin {
-  position: absolute;
-  right: 16px;
-  bottom: -22px;
-  z-index: 1;
-  display: grid;
-  width: 58px;
-  height: 58px;
-  place-items: center;
-  align-content: center;
-  border-radius: 12px;
-  background: var(--yellow);
-  color: var(--ink);
-  line-height: 1;
-  text-align: center;
-  box-shadow: 0 6px 14px -6px rgba(10, 15, 31, 0.35);
-}
-
-.news-pin small {
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
-.news-pin b {
-  margin: 2px 0 1px;
-  font-size: 22px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
-
 .news-feat-body {
   display: grid;
   gap: 12px;
-  padding: 22px 24px 24px;
+  padding: 20px 22px 22px;
   min-width: 0;
 }
 
-.news-quote {
-  color: var(--news-type);
+/* Met foto hangt de pin rechts over de onderrand; de eerste regel houdt er
+   plaats voor vrij, zoals `.ev-card-tags`. */
+.news-feat-media + .news-feat-body > .news-kick {
+  padding-right: 66px;
+  min-height: 21px;
+}
+
+.news-letter-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.news-letter-head time {
+  flex: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
 }
 
 /* De gele streep onder de titel, even breed als de titel. */
@@ -176,10 +155,10 @@
   max-width: 100%;
   margin: 0;
   color: var(--ink);
-  font-size: 25px;
+  font-size: 22px;
   font-weight: 700;
   letter-spacing: -0.02em;
-  line-height: 1.18;
+  line-height: 1.2;
   text-wrap: balance;
 }
 
@@ -193,12 +172,19 @@
   background: var(--yellow);
 }
 
-:is(.vtk-design, .vtk-page) .news-feat-link {
+:is(.vtk-design, .vtk-page) :is(.news-feat-link, .news-title-link) {
   color: inherit;
   text-decoration: none;
 }
 
-/* Het klikvlak over de hele kaart; `.news-feat` is de geplaatste voorouder. */
+:is(.vtk-design, .vtk-page) .news-title-link:hover {
+  text-decoration: underline;
+  text-decoration-color: var(--yellow);
+  text-underline-offset: 4px;
+}
+
+/* Het klikvlak over de hele kaart; `.news-feat` is de geplaatste voorouder.
+   Niet bij de brief: daar staan een knop en links in de tekst. */
 :is(.vtk-design, .vtk-page) .news-feat-link::after {
   content: "";
   position: absolute;
@@ -220,7 +206,7 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   padding-top: 4px;
 }
@@ -229,7 +215,7 @@
    van zijn eigen bestemming. */
 :is(.vtk-design, .vtk-page) .news-go {
   position: relative;
-  z-index: 1;
+  z-index: 2;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -237,6 +223,7 @@
   padding: 0 16px;
   border: 1px solid var(--line-2);
   border-radius: 999px;
+  background: var(--surface);
   color: var(--ink);
   font-size: 14px;
   font-weight: 600;
@@ -257,6 +244,18 @@
 
 :is(.vtk-design, .vtk-page) .news-go.is-primary:hover {
   background: var(--navy);
+}
+
+/* Op een tegel: de "Bekijk" van een ticketkaart. */
+:is(.vtk-design, .vtk-page) .news-go.is-small {
+  min-height: 32px;
+  margin-right: 6px;
+  padding: 0 12px;
+  font-size: 13px;
+}
+
+.vtk-design .ev-card:hover .news-go.is-small {
+  border-color: var(--ink);
 }
 
 /* ---------- Het woordje: ingekort, met "Lees de hele brief" ---------- */
@@ -303,6 +302,7 @@
   font: inherit;
   font-size: 14px;
   font-weight: 650;
+  text-decoration: none;
   cursor: pointer;
 }
 
@@ -318,12 +318,14 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
 .news-who b {
   display: block;
   color: var(--ink);
   font-size: 14.5px;
+  line-height: 1.25;
 }
 
 .news-who span {
@@ -334,34 +336,187 @@
 .news-avatar {
   display: grid;
   flex: none;
-  width: 46px;
-  height: 46px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border: 1px solid var(--line);
   border-radius: 50%;
-  background: repeating-linear-gradient(135deg, var(--paper-2) 0 8px, var(--paper) 8px 16px);
-  color: var(--ink);
+  background: var(--paper-2);
+  color: var(--muted);
   font-size: 14px;
-  font-weight: 800;
+  font-weight: 700;
   object-fit: cover;
 }
 
-/* ---------- Het register ---------- */
+/* ---------- De tegels: carrousel ---------- */
+
+/* Een container, zodat de knoppen hun hoogte uit de breedte van een tegel
+   kunnen halen (`cqw`): het midden van de foto, die 16:9 is. */
+.news-carousel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  container-type: inline-size;
+}
+
+/* Een gewone horizontale scroller met snap-punten, zonder zichtbare balk: de
+   knoppen en swipen doen het werk. `position: relative` om dezelfde reden als
+   `.ticket-admin-table-wrap`: een `sr-only`-kind hoort hier te ankeren en niet
+   op de pagina. De padding geeft de hover-lift en de schaduw van een tegel
+   ruimte; de negatieve marge zet de rand terug op zijn plaats. */
+.news-track {
+  --news-tile-w: calc((100cqw - 2 * var(--news-gap)) / 3);
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: var(--news-tile-w);
+  gap: var(--news-gap);
+  margin: -6px -4px -18px;
+  padding: 6px 4px 18px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: 4px;
+  scrollbar-width: none;
+  list-style: none;
+}
+
+.news-track::-webkit-scrollbar {
+  display: none;
+}
+
+/* 85% van de hoogte van het uitgelichte bericht (`--news-tile-h`, gezet
+   door NewsCarousel); een minimum, zodat een tegel met een lange titel nooit
+   afgekapt wordt. */
+.news-slide {
+  display: flex;
+  min-width: 0;
+  min-height: var(--news-tile-h, 0px);
+  scroll-snap-align: start;
+}
+
+.news-slide > .ev-card {
+  flex: 1;
+  min-width: 0;
+}
+
+/* De extra hoogte gaat naar de foto, niet naar een leeg vlak onder de titel:
+   minstens 16:9 van de tegelbreedte, en verder groeit ze mee. */
+.vtk-design .news-tile .ev-card-shot {
+  flex: 1 0 auto;
+  aspect-ratio: auto;
+  min-height: calc(var(--news-tile-w) * 9 / 16);
+}
+
+.vtk-design .news-tile .ev-card-body {
+  flex: none;
+}
+
+/* Een post, album of Bakske zonder beeld: het streepjesvlak. */
+.vtk-design .news-tile .ev-card-shot.is-blank {
+  background: repeating-linear-gradient(135deg, var(--paper-2) 0 12px, var(--paper) 12px 24px);
+}
+
+/* De tegel van de kalender vult zijn foto met next/image (`fill`); hier komt
+   het beeld als gewone <img> uit de eigen media-routes. */
+.vtk-design .news-tile .ev-card-shot img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* De soortregel staat in `.ev-card-tags`, dat naast de pin plaats vrijhoudt. */
+.vtk-design .news-tile .ev-card-tags .news-kick {
+  gap: 4px 8px;
+}
+
+/* Knoppen links en rechts, half over de rand van de carrousel, op de hoogte
+   van de foto's. */
+:is(.vtk-design, .vtk-page) .news-nav {
+  position: absolute;
+  --news-tile: calc((100cqw - 2 * var(--news-gap)) / 3);
+  /* Het midden van de foto: 16:9 van de tegel, of lager wanneer de tegel naar
+     85% van de uitgelichte kaart gegroeid is (de tekst eronder is zo'n
+     125px). */
+  top: max(
+    calc(var(--news-tile) * 9 / 32 - 20px),
+    calc((var(--news-tile-h, 0px) - 125px) / 2 - 20px)
+  );
+  z-index: 3;
+  display: grid;
+  width: 40px;
+  height: 40px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 8px 20px -12px rgba(14, 26, 54, 0.6);
+  cursor: pointer;
+  transition: border-color 150ms ease, transform 150ms ease;
+}
+
+:is(.vtk-design, .vtk-page) .news-nav:hover {
+  border-color: var(--ink);
+}
+
+:is(.vtk-design, .vtk-page) .news-nav:focus-visible,
+:is(.vtk-design, .vtk-page) .news-pause:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+:is(.vtk-design, .vtk-page) .news-nav.is-prev {
+  left: -20px;
+}
+
+:is(.vtk-design, .vtk-page) .news-nav.is-next {
+  right: -20px;
+}
+
+:is(.vtk-design, .vtk-page) .news-pause {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-end;
+  margin-top: 14px;
+  padding: 4px 2px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+:is(.vtk-design, .vtk-page) .news-pause:hover {
+  color: var(--ink);
+}
+
+/* ---------- Een regel op /nieuws ---------- */
 
 .news-list {
   margin: 0;
   padding: 0;
   list-style: none;
-  border-top: 1px solid var(--line);
+  border-top: 1px solid var(--line-2);
+}
+
+.news-list > li {
+  border-bottom: 1px solid var(--line);
 }
 
 :is(.vtk-design, .vtk-page) .news-row {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) auto;
-  gap: 14px;
+  grid-template-columns: 50px minmax(0, 1fr) 96px;
+  gap: 16px;
   align-items: center;
-  padding: 14px 10px 14px 6px;
-  border-bottom: 1px solid var(--line);
+  padding: 13px 6px;
   color: var(--ink);
   text-decoration: none;
   transition: background 150ms ease;
@@ -376,14 +531,38 @@
   outline-offset: -2px;
 }
 
-.news-ico {
+/* De pin van Theokot en /tickets, in de stroom van de regel. Geel is een dag
+   die nog moet komen, grijs een datum die voorbij is. */
+.news-pin {
   display: grid;
-  width: 44px;
-  height: 44px;
+  width: 50px;
+  height: 54px;
   place-items: center;
-  border-radius: 12px;
-  background: var(--news-type);
-  color: var(--surface);
+  align-content: center;
+  border-radius: 11px;
+  background: var(--yellow);
+  color: var(--ink);
+  line-height: 1;
+  text-align: center;
+}
+
+.news-pin small {
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.news-pin b {
+  margin: 2px 0 1px;
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.news-pin.is-muted {
+  background: var(--paper-2);
+  color: var(--muted);
 }
 
 .news-row-text {
@@ -392,7 +571,7 @@
   min-width: 0;
 }
 
-.news-row-text b {
+.news-row-text > b {
   color: var(--ink);
   font-size: 16px;
   font-weight: 650;
@@ -407,15 +586,294 @@
   white-space: nowrap;
 }
 
-.news-row-arrow {
-  color: var(--muted);
+.news-thumb {
+  position: relative;
+  overflow: hidden;
+  aspect-ratio: 16 / 10;
+  border-radius: 10px;
+  background: var(--paper-2);
 }
 
-@media (max-width: 860px) {
+/* Zonder beeld blijft de kolom staan (de regels blijven uitgelijnd), maar
+   leeg: een kolom streepjesvlakken onder elkaar las als ruis. */
+.news-thumb.is-blank {
+  background: none;
+}
+
+.news-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------- /nieuws ---------- */
+
+.news-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: clamp(28px, 4vw, 56px);
+  align-items: start;
+}
+
+.news-page.is-solo {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 880px;
+}
+
+.news-main {
+  display: grid;
+  gap: 26px;
+  min-width: 0;
+}
+
+.news-main .tcat-filters {
+  margin-bottom: 0;
+}
+
+.news-page-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.news-period h2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 0 0 10px;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.news-period h2 span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/* De rail: een register in de marge, zoals op een contentpagina. */
+.news-rail {
+  display: grid;
+  gap: 22px;
+  padding-left: 24px;
+  border-left: 1px solid var(--line-2);
+}
+
+@media (min-width: 981px) {
+  .news-rail {
+    position: sticky;
+    top: 96px;
+  }
+}
+
+.news-rail section {
+  display: grid;
+  gap: 12px;
+}
+
+.news-rail section + section {
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.news-rail h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.news-rail-title {
+  display: block;
+  color: var(--ink);
+  font-size: 14.5px;
+  line-height: 1.35;
+}
+
+.news-rail p {
+  display: -webkit-box;
+  margin: 0;
+  overflow: hidden;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.6;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 5;
+}
+
+:is(.vtk-design, .vtk-page) .news-mag {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.news-mag + .news-mag {
+  margin-top: 4px;
+}
+
+/* Een geschetste cover: geen echte, want die bestaat niet voor elk nummer. */
+.news-mag-cover {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 5px;
+  background: repeating-linear-gradient(135deg, var(--paper-2) 0 6px, var(--paper) 6px 12px);
+}
+
+.news-mag-cover::before {
+  content: "";
+  position: absolute;
+  inset: 12% 14%;
+  border-radius: 2px;
+  background:
+    linear-gradient(var(--yellow), var(--yellow)) 5px 6px / 45% 3px no-repeat,
+    linear-gradient(var(--line-2), var(--line-2)) 5px 13px / 70% 2px no-repeat,
+    linear-gradient(var(--line-2), var(--line-2)) 5px 18px / 60% 2px no-repeat,
+    var(--surface);
+  box-shadow: 0 6px 12px -8px rgba(14, 26, 54, 0.5);
+}
+
+.news-mag-cover.is-photo {
+  width: 100%;
+  object-fit: cover;
+  object-position: top;
+  border: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.news-mag b {
+  display: block;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+.news-mag span {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+:is(.vtk-design, .vtk-page) .news-mag:hover b {
+  text-decoration: underline;
+  text-decoration-color: var(--yellow);
+  text-underline-offset: 3px;
+}
+
+/* ---------- Een bericht voluit ---------- */
+
+/* Links uitgelijnd onder de titel van de paginakop, zoals een contentpagina, en
+   niet als gecentreerde kolom: anders begint de tekst een eind rechts van de
+   titel erboven. De breedte houdt de regels leesbaar. */
+.news-post {
+  max-width: 780px;
+}
+
+.news-post-photo {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  border-radius: 18px;
+}
+
+/* Het woordje: het portret eerst. Een vierkant zoals op /praesidium
+   (`.vtk-roster-photo`), links naast de brief, dat blijft staan terwijl je
+   leest. */
+.news-letter-page {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: clamp(28px, 4vw, 56px);
+  align-items: start;
+}
+
+.news-letter-side {
+  display: grid;
+  gap: 12px;
+}
+
+@media (min-width: 761px) {
+  .news-letter-side {
+    position: sticky;
+    top: 96px;
+  }
+}
+
+.news-letter-side > div > b {
+  display: block;
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+.news-letter-side > div > span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.news-letter-side .vtk-roster-initial {
+  font-size: 44px;
+}
+
+.news-letter-page .vtk-page-content {
+  max-width: 68ch;
+}
+
+.news-sign {
+  display: grid;
+  gap: 2px;
+  max-width: 340px;
+  padding-top: 18px;
+  border-top: 1px solid var(--line-2);
+}
+
+.news-sign b {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+.news-sign span {
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* ---------- Smaller ---------- */
+
+@media (max-width: 1000px) {
   .news-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .news-track {
+    --news-tile-w: calc((100cqw - var(--news-gap)) / 2);
+  }
+
+  :is(.vtk-design, .vtk-page) .news-nav {
+    --news-tile: calc((100cqw - var(--news-gap)) / 2);
+  }
+
+  .news-page {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .news-rail {
+    padding-top: 22px;
+    padding-left: 0;
+    border-top: 1px solid var(--line-2);
+    border-left: 0;
+  }
+}
+
+@media (max-width: 860px) {
   .vtk-design .news-band {
     padding-top: 40px;
     padding-bottom: 48px;
@@ -426,80 +884,57 @@
   }
 
   .news-title {
-    font-size: 21px;
+    font-size: 20px;
   }
 }
 
-@media (max-width: 460px) {
-  :is(.vtk-design, .vtk-page) .news-row {
-    grid-template-columns: 40px minmax(0, 1fr);
-    gap: 12px;
+@media (max-width: 760px) {
+  .news-letter-page {
+    grid-template-columns: minmax(0, 1fr);
   }
 
-  .news-ico {
-    width: 40px;
-    height: 40px;
+  .news-letter-side {
+    grid-template-columns: 88px minmax(0, 1fr);
+    align-items: center;
+    gap: 16px;
   }
 
-  .news-row-arrow {
+  .news-letter-side .vtk-roster-initial {
+    font-size: 22px;
+  }
+}
+
+/* Op een telefoon: één tegel en een stukje van de volgende, zodat je ziet dat
+   er te swipen valt; de knoppen vallen weg. */
+@media (max-width: 620px) {
+  .news-track {
+    --news-tile-w: 84cqw;
+  }
+
+  :is(.vtk-design, .vtk-page) .news-nav {
     display: none;
   }
 }
 
-/* ---------- /nieuws en een bericht voluit ---------- */
+@media (max-width: 520px) {
+  :is(.vtk-design, .vtk-page) .news-row {
+    grid-template-columns: 46px minmax(0, 1fr);
+    gap: 12px;
+  }
 
-.news-page {
-  display: grid;
-  gap: clamp(36px, 5vw, 56px);
+  .news-pin {
+    width: 46px;
+    height: 50px;
+  }
+
+  .news-thumb {
+    display: none;
+  }
 }
 
-.news-page-empty {
-  margin: 0;
-  color: var(--muted);
-  font-size: 15px;
-}
-
-.news-page-earlier h2 {
-  width: fit-content;
-  margin: 0 0 14px;
-  color: var(--ink);
-  font-size: 22px;
-  font-weight: 650;
-  letter-spacing: -0.015em;
-}
-
-/* Links uitgelijnd onder de titel van de paginakop, zoals een contentpagina, en
-   niet als gecentreerde kolom: anders begint de tekst een eind rechts van de
-   titel erboven. De breedte houdt de regels leesbaar. */
-.news-post {
-  max-width: 780px;
-}
-
-/* Onder een brief staat de afzender voluit: groter dan in de nieuwsband, waar
-   hij een regel naast de tekst is. Hier is hij de ondertekening. */
-.news-post .news-who {
-  gap: 16px;
-  margin-top: 4px;
-}
-
-.news-post .news-who .news-avatar {
-  width: 76px;
-  height: 76px;
-  font-size: 22px;
-}
-
-.news-post .news-who b {
-  font-size: 17px;
-}
-
-.news-post .news-who div span {
-  font-size: 14px;
-}
-
-.news-post-photo {
-  display: block;
-  width: 100%;
-  aspect-ratio: 16 / 9;
-  object-fit: cover;
-  border-radius: 18px;
+@media (prefers-reduced-motion: reduce) {
+  :is(.vtk-design, .vtk-page) .news-nav,
+  :is(.vtk-design, .vtk-page) .news-more svg {
+    transition: none;
+  }
 }

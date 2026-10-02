@@ -4,6 +4,7 @@ import type { SessionPayload } from '@vtk/auth';
 const mocks = vi.hoisted(() => ({
   session: null as SessionPayload | null,
   findMany: vi.fn(),
+  groupMembershipFindMany: vi.fn().mockResolvedValue([]),
 }));
 
 vi.mock('@/lib/session', () => ({
@@ -18,7 +19,10 @@ vi.mock('@/lib/session', () => ({
 }));
 
 vi.mock('@vtk/db', () => ({
-  prisma: { shift: { findMany: mocks.findMany } },
+  prisma: {
+    shift: { findMany: mocks.findMany },
+    groupMembership: { findMany: mocks.groupMembershipFindMany },
+  },
 }));
 
 vi.mock('@/lib/audit', () => ({ logAudit: vi.fn(), describeChanges: vi.fn() }));

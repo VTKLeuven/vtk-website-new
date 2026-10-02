@@ -41,6 +41,7 @@ export function StorageImageField({
   helpText,
   srContext,
   formId,
+  ticketEventId,
   minWidth,
   onChange,
 }: {
@@ -65,6 +66,11 @@ export function StorageImageField({
   srContext?: string;
   /** Formulier waarvoor de upload gebeurt, voor de capability-check van de route. */
   formId?: string;
+  /**
+   * Ticketevent waarvoor de upload gebeurt (de banner). Wie het event mag
+   * beheren, mag er een foto voor uploaden, ook zonder globaal uploadrecht.
+   */
+  ticketEventId?: string;
   /**
    * Breedte die deze foto minstens nodig heeft om scherp te blijven op de plek
    * waar ze terechtkomt. Zonder deze waarde waarschuwt het veld niet; met een
@@ -102,6 +108,7 @@ export function StorageImageField({
       form.append("file", file);
       form.append("kind", "image");
       if (formId) form.append("formId", formId);
+      if (ticketEventId) form.append("ticketEventId", ticketEventId);
       const res = await fetch("/api/admin/upload", { method: "POST", body: form });
       if (!res.ok) {
         setErr(imageUploadError(locale, res.status, "image"));

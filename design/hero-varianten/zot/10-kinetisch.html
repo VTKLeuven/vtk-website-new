@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero 10: Kinetisch</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@500;600;700;800&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Methode: kinetische typografie (Awwwards). Eén marquee met de slogans,
+   de snelkoppelingen als reuzenlijst die bij hover een foto laat zien,
+   de agenda als horizontaal schuivende kaarten. */
+:root { --paper: #EFF2F8; --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --dim: #B7C0DC; --muted: #5C667F; }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--ink); color: var(--paper); font-family: Manrope, sans-serif; min-height: 100dvh; overflow-x: hidden; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.syne { font-family: Syne, sans-serif; }
+
+.hdr { display: flex; align-items: center; gap: 26px; height: 64px; padding: 0 36px; }
+.hdr img { height: 24px; }
+.hdr nav { display: flex; gap: 18px; font-size: 14px; font-weight: 600; color: var(--dim); }
+.hdr nav a:hover { color: var(--yellow); }
+.hdr-end { margin-left: auto; display: flex; gap: 16px; font-size: 14px; font-weight: 700; align-items: center; }
+.hdr-end i { font-size: 18px; }
+
+.marquee { overflow: hidden; border-top: 1px solid rgb(239 242 248 / .12); border-bottom: 1px solid rgb(239 242 248 / .12); padding: 8px 0; position: relative; }
+.track { display: flex; width: max-content; }
+.track span { font-family: Syne; font-weight: 800; font-size: 150px; line-height: 1; text-transform: uppercase; letter-spacing: -0.04em; white-space: nowrap; padding-right: .3em; }
+.track span em { font-style: normal; color: var(--yellow); }
+.track span s { text-decoration: none; -webkit-text-stroke: 2px var(--paper); color: transparent; }
+@media (prefers-reduced-motion: no-preference) { .track { animation: run 38s linear infinite; } .marquee.paused .track { animation-play-state: paused; } }
+@keyframes run { to { transform: translateX(-50%); } }
+.pause { position: absolute; right: 16px; bottom: 12px; width: 40px; height: 40px; border-radius: 50%; background: var(--yellow); color: var(--ink); display: grid; place-items: center; font-size: 18px; }
+
+.mid { display: grid; grid-template-columns: 1fr 1.35fr; gap: 50px; padding: 30px 36px 0; }
+.intro .k { font-size: 13px; font-weight: 700; color: var(--dim); }
+.intro h1 { font-family: Syne; font-size: 34px; font-weight: 700; line-height: 1.12; letter-spacing: -0.02em; margin: 10px 0 14px; }
+.intro h1 em { font-style: normal; color: var(--yellow); }
+.intro p { color: var(--dim); font-size: 16px; line-height: 1.6; max-width: 32em; }
+.cta { display: flex; gap: 10px; margin-top: 22px; }
+.btn { height: 50px; padding: 0 22px; border-radius: 999px; display: inline-flex; align-items: center; gap: 10px; font-weight: 700; transition: transform .25s cubic-bezier(.16,1,.3,1); }
+.btn:hover { transform: scale(1.04); }
+.btn-y { background: var(--yellow); color: var(--ink); }
+.btn-o { box-shadow: inset 0 0 0 1.5px rgb(239 242 248 / .35); }
+.shiftline { margin-top: 26px; display: flex; gap: 14px; align-items: center; padding-top: 18px; border-top: 1px solid rgb(239 242 248 / .12); }
+.shiftline b { font-family: Syne; font-size: 54px; line-height: .8; color: var(--yellow); }
+.shiftline span { font-size: 15px; font-weight: 600; }
+.shiftline small { display: block; color: var(--dim); font-weight: 400; font-size: 13px; }
+.shiftline a { margin-left: auto; font-size: 14px; font-weight: 700; border-bottom: 2px solid var(--yellow); }
+
+/* Reuzenlijst met foto bij hover. */
+.list { position: relative; }
+.li { position: relative; display: flex; align-items: baseline; gap: 18px; padding: 6px 0; border-bottom: 1px solid rgb(239 242 248 / .12); }
+.li b { font-family: Syne; font-weight: 800; font-size: 46px; line-height: 1.05; letter-spacing: -0.03em; text-transform: uppercase; transition: transform .4s cubic-bezier(.16,1,.3,1), color .2s; }
+.li small { font-size: 14px; color: var(--dim); }
+.li i { margin-left: auto; font-size: 26px; transition: transform .3s; }
+.li .pic { position: absolute; right: 70px; top: 50%; width: 220px; aspect-ratio: 4 / 3; border-radius: 12px; background-size: cover; background-position: center; opacity: 0; transform: translateY(-50%) rotate(-6deg) scale(.8); transition: opacity .25s, transform .4s cubic-bezier(.16,1,.3,1); pointer-events: none; z-index: 2; }
+.li:hover b { transform: translateX(16px); color: var(--yellow); }
+.li:hover i { transform: rotate(-45deg); color: var(--yellow); }
+.li:hover .pic { opacity: 1; transform: translateY(-50%) rotate(-3deg) scale(1); }
+.li .live { white-space: nowrap; font-size: 12px; font-weight: 800; color: var(--ink); background: var(--yellow); border-radius: 999px; padding: 2px 8px; }
+
+/* Agenda: horizontaal schuiven. */
+.week { padding: 34px 0 34px 36px; }
+.week-h { display: flex; justify-content: space-between; align-items: baseline; padding-right: 36px; margin-bottom: 14px; }
+.week-h h2 { font-family: Syne; font-size: 22px; font-weight: 700; }
+.week-h a { font-size: 14px; font-weight: 700; border-bottom: 2px solid var(--yellow); }
+.cards { display: flex; gap: 14px; overflow-x: auto; scroll-snap-type: x mandatory; padding-bottom: 8px; padding-right: 36px; scrollbar-width: thin; }
+.card { scroll-snap-align: start; flex: 0 0 250px; border-radius: 18px; padding: 16px 18px; background: var(--navy); display: flex; flex-direction: column; gap: 10px; min-height: 150px; transition: transform .3s cubic-bezier(.16,1,.3,1), background .2s; }
+.card:hover { transform: translateY(-5px); }
+.card.today { background: var(--yellow); color: var(--ink); }
+.card .d { font-family: Syne; font-weight: 800; font-size: 28px; line-height: 1; display: flex; justify-content: space-between; }
+.card .d small { font-family: Manrope; font-size: 12px; font-weight: 700; }
+.card a { font-weight: 700; font-size: 16px; }
+.card a:hover { text-decoration: underline; }
+.card .meta { font-size: 13px; opacity: .75; margin-top: -8px; }
+.card .star { align-self: flex-start; margin-top: auto; font-size: 18px; }
+
+@media (max-width: 1000px) { .mid { grid-template-columns: 1fr; } .hdr nav { display: none; } .track span { font-size: 90px; } .li .pic { display: none; } }
+@media (max-width: 600px) { .hdr, .mid { padding-left: 16px; padding-right: 16px; } .week { padding-left: 16px; } .li b { font-size: 30px; } .track span { font-size: 64px; } .cta { flex-wrap: wrap; } }
+</style>
+</head>
+<body>
+<header class="hdr">
+  <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+  <nav><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+  <div class="hdr-end"><i class="ph-bold ph-magnifying-glass"></i><span>NL / EN</span><i class="ph-bold ph-user-circle"></i></div>
+</header>
+
+<div class="marquee" id="mq" aria-label="De thuis voor ingenieurs in Leuven">
+  <div class="track" aria-hidden="true">
+    <span>De thuis voor <em>ingenieurs</em> <s>in Leuven</s> ✦</span><span>Sinds <em>1920</em> door studenten ✦</span>
+    <span>De thuis voor <em>ingenieurs</em> <s>in Leuven</s> ✦</span><span>Sinds <em>1920</em> door studenten ✦</span>
+  </div>
+  <button class="pause" id="pause" aria-label="Pauzeer de slogans"><i class="ph-fill ph-pause"></i></button>
+</div>
+
+<div class="mid">
+  <div class="intro">
+    <p class="k">Vlaamse Technische Kring, KU Leuven</p>
+    <h1>De thuis voor <em>ingenieurs</em> in Leuven.</h1>
+    <p>Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+    <div class="cta"><a class="btn btn-y" href="#">Ontdek wat we doen <i class="ph-bold ph-arrow-up-right"></i></a><a class="btn btn-o" href="#">Eerstejaars? Start hier</a></div>
+    <div class="shiftline"><b>3</b><span>shiften zoeken nog volk<small>Eerste morgen om 01:00, tot 2 munten</small></span><a href="#">Bekijk</a></div>
+  </div>
+  <nav class="list" aria-label="Snel naar">
+    <a class="li" href="#"><b>Theokot</b><small>broodje bestellen</small><i class="ph-bold ph-arrow-right"></i><span class="pic" style="background-image:url('../../../apps/web/public/aanbod/theokot.jpg')"></span></a>
+    <a class="li" href="#"><b>Cursusdienst</b><span class="live">open tot 13:55</span><i class="ph-bold ph-arrow-right"></i><span class="pic" style="background-image:url('../../../apps/web/public/aanbod/cursusdienst.jpg')"></span></a>
+    <a class="li" href="#"><b>Tweedehands</b><small>boeken</small><i class="ph-bold ph-arrow-right"></i><span class="pic" style="background-image:url('../../../apps/web/public/aanbod/onderwijs.jpg')"></span></a>
+    <a class="li" href="#"><b>Tijdslot</b><small>Cudi-ophaling</small><i class="ph-bold ph-arrow-right"></i><span class="pic" style="background-image:url('../../../apps/web/public/aanbod/internationaal.jpg')"></span></a>
+    <a class="li" href="#"><b>Shiften</b><small>help mee</small><i class="ph-bold ph-arrow-right"></i><span class="pic" style="background-image:url('../../../apps/web/public/frontpage/urenloop.jpg')"></span></a>
+    <a class="li" href="#"><b>Kalender</b><small>alle events</small><i class="ph-bold ph-arrow-right"></i><span class="pic" style="background-image:url('../../../apps/web/public/aanbod/sport.jpg')"></span></a>
+  </nav>
+</div>
+
+<section class="week">
+  <div class="week-h"><h2>De komende dagen</h2><a href="#">Volledige kalender</a></div>
+  <div class="cards">
+    <div class="card today"><div class="d">do 1 <small>vandaag</small></div><a href="#">12 Urencantus</a><span class="meta">12:00, Waaiberg</span><button class="star" aria-label="Interesse: 12 Urencantus"><i class="ph-bold ph-star"></i></button></div>
+    <div class="card today"><div class="d">do 1 <small>vandaag</small></div><a href="#">Looptraining</a><span class="meta">20:30, Sportkot</span><button class="star" aria-label="Interesse: Looptraining"><i class="ph-bold ph-star"></i></button></div>
+    <div class="card"><div class="d">ma 5</div><a href="#">PeMe-Startactiviteit</a><span class="meta">19:00, Grasveld Alma 3</span><button class="star" aria-label="Interesse: PeMe"><i class="ph-bold ph-star"></i></button></div>
+    <div class="card"><div class="d">ma 5</div><a href="#">CaraOké</a><span class="meta">21:00, Theokot</span><button class="star" aria-label="Interesse: CaraOké"><i class="ph-bold ph-star"></i></button></div>
+    <div class="card"><div class="d">di 6</div><a href="#">KANWEEK startvergadering</a><span class="meta">12:40, Aula 200K</span><button class="star" aria-label="Interesse: KANWEEK"><i class="ph-bold ph-star"></i></button></div>
+    <div class="card"><div class="d">di 6</div><a href="#">Sector Night Bouwkunde</a><span class="meta">18:30, Quadrivium</span><button class="star" aria-label="Interesse: Sector Night"><i class="ph-bold ph-star"></i></button></div>
+    <div class="card"><div class="d">wo 7</div><a href="#">Looptraining</a><span class="meta">20:30, Sportkot</span><button class="star" aria-label="Interesse: Looptraining"><i class="ph-bold ph-star"></i></button></div>
+  </div>
+</section>
+<script>
+const mq = document.getElementById("mq"), p = document.getElementById("pause");
+p.addEventListener("click", () => { const on = mq.classList.toggle("paused"); p.innerHTML = on ? '<i class="ph-fill ph-play"></i>' : '<i class="ph-fill ph-pause"></i>'; p.setAttribute("aria-label", on ? "Hervat de slogans" : "Pauzeer de slogans"); });
+</script>
+</body>
+</html>

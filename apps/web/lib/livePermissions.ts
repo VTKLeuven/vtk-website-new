@@ -63,3 +63,40 @@ export const hasLivePermission = cache(async function hasLivePermission(
     m.group.roleGrants.some((grant) => grant.kind === "DEFAULT" || m.role === "LEAD")
   );
 });
+
+/**
+ * Wie van deze gebruikers de permissie heeft, in twee queries in plaats van twee
+ * per persoon. Dezelfde resolutie als {@link hasLivePermission}, dus ook hier
+ * geen uitzondering voor een superadmin: die telt enkel mee via een rol.
+ */
+export async function usersWithLivePermission(
+  userIds: string[],
+  code: string,
+): Promise<Set<string>> {
+  if (userIds.length === 0) return new Set();
+  const year = currentWorkingYear();
+  const grantsPermission = { role: { permissions: { some: { permission: { code } } } } };
+
+  const [direct, memberships] = await Promise.all([
+    prisma.userRole.findMany({
+      where: { userId: { in: userIds }, year, ...grantsPermission },
+      select: { userId: true },
+    }),
+    prisma.groupMembership.findMany({
+      where: { userId: { in: userIds }, year, group: { roleGrants: { some: grantsPermission } } },
+      select: {
+        userId: true,
+        role: true,
+        group: { select: { roleGrants: { where: grantsPermission, select: { kind: true } } } },
+      },
+    }),
+  ]);
+
+  const holders = new Set(direct.map((row) => row.userId));
+  for (const m of memberships) {
+    if (m.group.roleGrants.some((grant) => grant.kind === "DEFAULT" || m.role === "LEAD")) {
+      holders.add(m.userId);
+    }
+  }
+  return holders;
+}

@@ -33,6 +33,9 @@ import {
   type TicketQuestion,
 } from "./types";
 import { trackCheckoutStart } from "@/lib/analytics-client";
+import { audienceLoginHintQuestion } from "@/lib/ticketing/audience";
+import { sourceQuery } from "@/lib/ticketing/source";
+import { useLandingSource } from "./useLandingSource";
 
 export type Attendee = {
   attendeeName: string;
@@ -307,6 +310,7 @@ export function TicketShop({
   preview = false,
   about,
   practical,
+  choices,
 }: {
   paymentChoice: PaymentMethodChoice;
   event: SerializedTicketEvent;
@@ -326,14 +330,26 @@ export function TicketShop({
   /**
    * Het praktische (wanneer, waar, wie), onder het ticketpaneel in de
    * rechterkolom. Naast de beschrijving kneep het die tot een smalle kolom.
+   *
+   * Staat buiten elk formulier: op de eventpagina zitten hier de interesseknop
+   * en zijn gegevens, en dat zijn eigen formulieren.
    */
   practical?: ReactNode;
+  /**
+   * Bovenaan het paneel, onder "Tickets": de keuze tussen de verkopen van één
+   * event (tabs die elk naar hun eigen adres gaan). Zie lib/ticketing/eventPage.ts.
+   */
+  choices?: ReactNode;
 }) {
   const router = useRouter();
   const base = locale === "nl" ? "" : "/en";
-  const loginHref = `${base}/inloggen?next=${encodeURIComponent(`${base}/tickets/${event.slug}`)}`;
+  // Langs waar deze koper kwam; gaat mee met de bestelling en met de
+  // login-link, anders komt wie eerst moet inloggen terug als "direct".
+  const landingSource = useLandingSource();
+  const loginHref = `${base}/inloggen?next=${encodeURIComponent(`${base}/tickets/${event.slug}${sourceQuery(landingSource)}`)}`;
   const membershipHref = `${base}/lidmaatschap`;
-  const detailsRef = useRef<HTMLElement>(null);
+  const audienceHint = audienceLoginHintQuestion(event.audienceLoginHint ?? [], locale);
+  const detailsRef = useRef<HTMLFormElement>(null);
   // Per regel (type × prijs), niet per type: zie `TicketLine`.
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [attendees, setAttendees] = useState<Record<string, Attendee[]>>({});
@@ -455,6 +471,10 @@ export function TicketShop({
           locale,
           termsAccepted: true,
           items,
+          // Een lege string als de pagina nog niet gemount was: dat is
+          // "direct", en geen oude pagina zonder meting.
+          source: landingSource?.source ?? "",
+          sourceCampaign: landingSource?.campaign ?? undefined,
         }),
       });
       const payload = (await response.json().catch(() => ({}))) as CheckoutResponse;
@@ -562,11 +582,20 @@ export function TicketShop({
       : locale === "nl" ? "Verkoop gesloten" : "Sales closed"
     : locale === "nl" ? "Kies eerst een ticket" : "Select tickets first";
 
+  // Het formulier omvat enkel de gegevens: daar staan de verplichte velden en de
+  // betaalknoppen. Het paneel stuurt niets in (de tellers zijn gewone knoppen),
+  // en het praktische eronder kan eigen formulieren dragen, die niet genest
+  // mogen worden.
   return (
-    <form className="tshop" onSubmit={submitCheckout}>
+    <div className="tshop">
       <div className="tshop-main">
         {detailsOpen ? (
-          <section className="tshop-details" ref={detailsRef} aria-labelledby="ticket-details-heading">
+          <form
+            className="tshop-details"
+            ref={detailsRef}
+            onSubmit={submitCheckout}
+            aria-labelledby="ticket-details-heading"
+          >
             <h2 id="ticket-details-heading" className="tshop-heading">
               {locale === "nl" ? "Jouw gegevens" : "Your details"}
             </h2>
@@ -709,7 +738,7 @@ export function TicketShop({
                 {locale === "nl" ? "Lees de privacyverklaring." : "Read the privacy statement."}
               </a>
             </p>
-          </section>
+          </form>
         ) : null}
 
         {about}
@@ -727,6 +756,8 @@ export function TicketShop({
               </small>
             ) : null}
           </div>
+
+          {choices}
 
           {/* Enkel voor wie nu in voorverkoop koopt. Wie er niet in mag, krijgt
               hier niets te zien: dan is het gewoon een verkoop die later start. */}
@@ -789,6 +820,14 @@ export function TicketShop({
                       ? "Er zijn momenteel geen tickettypes beschikbaar voor dit event."
                       : "There are currently no ticket types available for this event."}
               </p>
+              {event.requiresLogin && audienceHint ? (
+                <p>
+                  {audienceHint}{" "}
+                  {locale === "nl"
+                    ? "Er zijn tickets voor jou; log in om ze te zien."
+                    : "There are tickets for you; sign in to see them."}
+                </p>
+              ) : null}
               {event.requiresLogin ? (
                 <Link className="tshop-cta" href={loginHref}>
                   <LogIn size={17} aria-hidden="true" />
@@ -855,6 +894,17 @@ export function TicketShop({
                 </p>
               ) : null}
 
+              {audienceHint ? (
+                <p className="tshop-hint">
+                  {audienceHint}{" "}
+                  <Link href={loginHref}>
+                    {locale === "nl"
+                      ? "Log in, er zijn ook tickets voor jou."
+                      : "Sign in, there are tickets for you too."}
+                  </Link>
+                </p>
+              ) : null}
+
               <div className="tshop-summary">
                 {selectedLines.length > 0 ? (
                   <ul className="tshop-summary-lines">
@@ -898,6 +948,6 @@ export function TicketShop({
         </aside>
         {practical}
       </div>
-    </form>
+    </div>
   );
 }

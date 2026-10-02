@@ -6,6 +6,7 @@ import { PERMISSIONS } from "../src/permissions";
 import { BUILTIN_SHIFT_TEMPLATES } from "../src/shiftTemplates";
 import { BUILTIN_TICKET_EVENT_TEMPLATES } from "../src/ticketEventTemplates";
 import { loadFixtures } from "../src/fixtures";
+import { seedGroupMakerDemo } from "./seed-groepjesmaker";
 import { eventSlugBase } from "../src/slug";
 
 const prisma = new PrismaClient();
@@ -2260,6 +2261,11 @@ async function main() {
       values: {},
     },
   });
+
+  // Demo voor Apps > Groepjesmaker: de peter-meterinschrijving van onthaal met
+  // genoeg inzendingen om een indeling te zien. Create-only op de slug.
+  console.log("Seeding group maker demo...");
+  await seedGroupMakerDemo(prisma);
 
   console.log("Seed complete.");
 }

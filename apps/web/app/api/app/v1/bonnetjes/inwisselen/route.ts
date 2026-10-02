@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { corsPreflight } from "@/lib/cors";
 import { requirePermission } from "@/lib/session";
-import type { AppVoucherRedeemResult } from "@/lib/app-api/contract";
+import { type AppVoucherRedeemResult } from "@/lib/app-api/contract";
 import { appError, appErrorResponse, appJson, readAppJson } from "@/lib/app-api/respond";
 import { verifyPassToken } from "@/lib/app-api/tokens";
 import { redeemVouchers, VoucherError } from "@/lib/app-api/vouchers";

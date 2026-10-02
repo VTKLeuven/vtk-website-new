@@ -9,13 +9,22 @@ import {
   brusselsYMD,
   checkSessionWindows,
   coerceItemLayout,
+  formatEuro,
   planDayOffering,
-  SANDWICH_VOUCHER_COST,
+  sandwichVoucherCost,
   TheokotValidationError,
   type OrderLineInput,
 } from "@/lib/theokot";
 import { readImageField, resolveImageKey, type ImageFieldValue } from "@/lib/imageField";
-import { getTheokotConfig, removeOrder, removeSession } from "@/lib/theokot-server";
+import {
+  getTheokotConfig,
+  purgeFinishedSession,
+  processSessionNoShows,
+  removeOrder,
+  removeSession,
+  unwaiveSessionNoShows,
+  waiveSessionNoShows,
+} from "@/lib/theokot-server";
 import {
   cancelOrder,
   placeOrder,
@@ -24,17 +33,23 @@ import {
   updateOrder,
 } from "@/lib/theokot-orders";
 import { syncMeetingsForSession, syncMeetingsOnDay } from "@/lib/meetings-server";
-import { resolveStudentCard } from "@/lib/student-card";
+import { cardDisplayName, resolveStudentCard } from "@/lib/student-card";
 import {
+  mostExpensiveSandwichCents,
+  pickupByQuery,
   pickupByRNumber,
   pickupForUser,
+  pickupSuggestions,
+  type PickupCandidate,
   type PickupLookupResult,
+  type PickupSearchResult,
 } from "@/lib/theokot-pickup";
 import { verifyPassToken } from "@/lib/app-api/tokens";
 import {
   allocateUserShiftReward,
   ShiftRewardConflictError,
 } from "@/lib/shift/rewards.server";
+import { formatVoucherCount } from "@/lib/shift/rewards";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { logAudit } from "@/lib/audit";
@@ -438,12 +453,15 @@ export async function updateSessionItemsAction(
   const currentKeys = new Map(existing.items.map((i) => [i.id, i.imageKey]));
   const keepIds = new Set<string>();
 
+  // Enkel items van déze verkoopdag. Zonder deze regel is het verborgen id-veld
+  // een manier om het aanbod van een andere dag te herschrijven. Vóór het eerste
+  // schrijven: stond dit in de lus, dan waren de rijen ervoor al opgeslagen
+  // zonder dat de reservaties hieronder hun nieuwe prijs kregen.
+  if (rows.some((row) => row.id && !currentKeys.has(row.id))) return saveError("ITEM_NOT_IN_SESSION");
+
   for (const row of rows) {
     const { id, image, order, ...fields } = row;
     if (id) {
-      // Enkel items van déze verkoopdag. Zonder deze regel is het verborgen
-      // id-veld een manier om het aanbod van een andere dag te herschrijven.
-      if (!currentKeys.has(id)) return saveError("ITEM_NOT_IN_SESSION");
       keepIds.add(id);
       await prisma.theokotSessionItem.update({
         where: { id },
@@ -742,7 +760,13 @@ export async function saveConfigAction(
     noShowThreshold: num("noShowThreshold", 1),
     banDurationDays: num("banDurationDays", 1),
     itemLayout: coerceItemLayout(formData.get("itemLayout")),
+    noShowPaused: formData.get("noShowPaused") === "on",
+    autoPickup: formData.get("autoPickup") === "on",
+    voucherHalfCents: euroToCents(formData.get("voucherHalfEuro")) ?? 0,
   };
+  // Nul zou elk broodje gratis maken voor wie een half bonnetje heeft, en
+  // `parseTheokotConfig` zou het bij het lezen stil door de standaard vervangen.
+  if (value.voucherHalfCents < 1) return saveError("VOUCHER_HALF_INVALID");
   // X > Y, zoals docs/design-decisions.md het stelt: een limiet op broodjes van
   // de week die even hoog ligt als de limiet op de hele bestelling, is geen
   // limiet.
@@ -759,7 +783,9 @@ export async function saveConfigAction(
     action: "update",
     entity: "theokotSettings",
     target: "Theokot-instellingen",
-    summary: `max ${value.maxItemsPerOrder} per bestelling, bestellen opent om ${value.orderOpenTime}, annuleren tot ${value.cancelDeadline}, ban van ${value.banDurationDays} dag(en)`,
+    summary: `max ${value.maxItemsPerOrder} per bestelling, bestellen opent om ${value.orderOpenTime}, annuleren tot ${value.cancelDeadline}, ban van ${value.banDurationDays} dag(en), half bonnetje per ${formatEuro(value.voucherHalfCents)}${
+      value.noShowPaused ? ", no-shows gepauzeerd" : ""
+    }${value.autoPickup ? ", automatisch op afgehaald" : ""}`,
   });
   revalidatePath(`${ADMIN_PATH}/instellingen`);
   revalidateTheokot();
@@ -1060,28 +1086,171 @@ export async function correctOrderStatusAction(
   return saveOk();
 }
 
+/**
+ * "Er liep iets mis" op een verkoopdag: de no-shows van die dag tellen niet
+ * mee en krijgen geen mail meer. Zie {@link waiveSessionNoShows} voor wat er met
+ * al vertrokken mails en lopende bans gebeurt.
+ */
+export async function waiveSessionNoShowsAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("theokot.manage");
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const result = await waiveSessionNoShows(sessionId);
+  if (!result) return saveError("SESSION_NOT_FOUND");
+
+  await logAudit({
+    action: "update",
+    entity: "theokotSession",
+    entityId: sessionId,
+    target: sessionLabel(result.date),
+    summary: `no-shows tellen niet mee (${result.orders} bestelling(en)${
+      result.liftedBans ? `, ${result.liftedBans} ban(s) opgeheven` : ""
+    })`,
+  });
+  revalidatePath(`${ADMIN_PATH}/overzicht`);
+  revalidatePath(`${ADMIN_PATH}/bans`);
+  revalidateTheokot();
+  return saveOk();
+}
+
+/**
+ * "Er liep iets mis" terugdraaien, voor wie het per ongeluk aanduidde. Zie
+ * {@link unwaiveSessionNoShows} voor de mails en bans die dan alsnog volgen.
+ */
+export async function unwaiveSessionNoShowsAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("theokot.manage");
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const result = await unwaiveSessionNoShows(sessionId);
+  if (!result) return saveError("SESSION_NOT_FOUND");
+
+  const extra = [
+    result.mailed ? `${result.mailed} mail(s) alsnog verstuurd` : "",
+    result.restoredBans ? `${result.restoredBans} ban(s) hersteld` : "",
+    result.newBans ? `${result.newBans} nieuwe ban(s)` : "",
+  ].filter(Boolean);
+  await logAudit({
+    action: "update",
+    entity: "theokotSession",
+    entityId: sessionId,
+    target: sessionLabel(result.date),
+    summary: `"er liep iets mis" ongedaan gemaakt: no-shows tellen weer mee (${result.orders} bestelling(en)${
+      extra.length ? `; ${extra.join(", ")}` : ""
+    })`,
+  });
+  revalidatePath(`${ADMIN_PATH}/overzicht`);
+  revalidatePath(`${ADMIN_PATH}/bans`);
+  revalidateTheokot();
+  return saveOk();
+}
+
+/**
+ * Wist een voorbije verkoopdag uit de historiek en de statistieken (een testdag,
+ * of een dag die niet klopt). Zie {@link purgeFinishedSession}.
+ */
+export async function purgeFinishedSessionAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("theokot.manage");
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const result = await purgeFinishedSession(sessionId);
+  if (!result.ok) return saveError(result.code);
+
+  await logAudit({
+    action: "delete",
+    entity: "theokotSession",
+    entityId: sessionId,
+    target: sessionLabel(result.date),
+    summary: `voorbije verkoopdag gewist uit historiek en statistieken (${result.orders} bestelling(en), ${
+      result.pickedUp
+    } opgehaald${result.liftedBans ? `; ${result.liftedBans} ban(s) opgeheven` : ""})`,
+  });
+  revalidatePath(`${ADMIN_PATH}/overzicht`);
+  revalidatePath(`${ADMIN_PATH}/statistieken`);
+  revalidatePath(`${ADMIN_PATH}/bans`);
+  revalidateTheokot();
+  return saveOk();
+}
+
+/**
+ * Verwerkt manueel de no-shows van een verkoopdag: markeert openstaande
+ * reservaties als no-show, stuurt waarschuwingsmails en berekent eventuele
+ * bans. Kan meteen uitgevoerd worden zodra de afhaal voorbij is.
+ */
+export async function processSessionNoShowsAction(
+  prevOrFormData: SaveState | FormData,
+  maybeFormData?: FormData,
+): Promise<SaveState> {
+  await requirePermission("theokot.manage");
+  const formData = maybeFormData instanceof FormData ? maybeFormData : (prevOrFormData as FormData);
+  const sessionId = String(formData.get("sessionId") ?? "");
+  const session = await prisma.theokotSession.findUnique({
+    where: { id: sessionId },
+    select: { id: true, date: true, pickupEnd: true, processedAt: true },
+  });
+  if (!session) return saveError("SESSION_NOT_FOUND");
+  if (session.processedAt) return saveOk("Deze verkoopdag was al verwerkt.");
+
+  const now = new Date();
+  if (session.pickupEnd > now) {
+    return saveError("SESSION_NOT_ENDED", "De afhaal voor deze verkoopdag is nog bezig.");
+  }
+
+  const result = await processSessionNoShows(sessionId, now, { force: true });
+  if (!result.success) {
+    return saveError(result.error ?? "PROCESSING_FAILED");
+  }
+
+  await logAudit({
+    action: "update",
+    entity: "theokotSession",
+    entityId: sessionId,
+    target: sessionLabel(session.date),
+    summary: `no-shows manueel verwerkt (${result.noShows} bestelling(en))`,
+  });
+
+  revalidatePath(`${ADMIN_PATH}/overzicht`);
+  revalidatePath(`${ADMIN_PATH}/bans`);
+  revalidatePath(ADMIN_PATH);
+  revalidateTheokot();
+
+  return saveOk(
+    result.noShows > 0
+      ? `${result.noShows} no-show(s) verwerkt.`
+      : "Verkoopdag verwerkt: geen no-shows.",
+  );
+}
+
 // -----------------------------------------------------------------------------
 // Afhaalbalie (theokot.pickup)
 // -----------------------------------------------------------------------------
 
-// De opzoeking zelf staat in `lib/theokot-pickup.ts`: er zijn drie wegen naar
-// dezelfde vraag (r-nummer, studentenkaart, pas uit de app) en die hoort maar
+// De opzoeking zelf staat in `lib/theokot-pickup.ts`: er zijn vier wegen naar
+// dezelfde vraag (r-nummer, naam, studentenkaart, pas uit de app) en die hoort maar
 // één keer beantwoord te worden. Deze types worden doorgegeven zodat
 // `PickupCounter` ze uit dezelfde plek kan importeren als vroeger.
 export type {
+  PickupCandidate,
   PickupLine,
   PickupOrder,
   PickupLookupResult,
+  PickupSearchResult,
 } from "@/lib/theokot-pickup";
 
 export type VoucherRedemptionResult =
   | { ok: true; amount: number; remainingBonnetjes: number }
   | { ok: false; error: string };
 
-/** Zoekt de bestelling(en) van vandaag voor een handmatig ingegeven r-nummer. */
-export async function lookupPickupByRNumberAction(rNumber: string): Promise<PickupLookupResult> {
+/**
+ * Zoekt de bestelling(en) van vandaag voor wat de shifter intikte: een r-nummer,
+ * of anders een naam. Passen er meerdere mensen, dan komt er een keuzelijst
+ * terug; zie {@link pickupByQuery}.
+ */
+export async function lookupPickupByQueryAction(query: string): Promise<PickupSearchResult> {
   await requirePermission("theokot.pickup");
-  return pickupByRNumber(rNumber);
+  return pickupByQuery(query);
+}
+
+/** De keuze uit die lijst: de bestelling(en) van vandaag voor die ene persoon. */
+export async function lookupPickupByUserAction(userId: string): Promise<PickupLookupResult> {
+  await requirePermission("theokot.pickup");
+  return pickupForUser(userId);
 }
 
 /**
@@ -1093,8 +1262,12 @@ export async function lookupPickupByRNumberAction(rNumber: string): Promise<Pick
 export async function lookupPickupByCardAction(scanned: string): Promise<PickupLookupResult> {
   await requirePermission("theokot.pickup");
   const resolved = await resolveStudentCard(scanned);
-  if (!resolved.ok) return { ok: false, error: resolved.error };
-  return pickupByRNumber(resolved.rNumber);
+  // Werkt de kaartcontrole niet (KU Leuven of de relay ligt eruit), dan kan de
+  // balie gewoon verder op naam of r-nummer: die weg raakt KU Leuven niet aan.
+  if (!resolved.ok) {
+    return { ok: false, error: `${resolved.error} Zoek de student op naam of r-nummer.` };
+  }
+  return pickupByRNumber(resolved.rNumber, { cardName: cardDisplayName(resolved) });
 }
 
 /**
@@ -1121,6 +1294,14 @@ export async function lookupPickupByPassAction(pass: string): Promise<PickupLook
 }
 
 /**
+ * Wat de balie zegt bij een bestelling in de doos van de grocomeet. Die broodjes
+ * liggen niet aan de balie en worden bij de grocomeet afgerekend; wie ze hier
+ * toch meegeeft of laat betalen, rekent ze twee keer.
+ */
+const GROCOMEET_ORDER_AT_COUNTER =
+  "Deze bestelling zit in de doos van de grocomeet en wordt daar afgerekend, niet aan de balie.";
+
+/**
  * Markeert een bestelling als opgehaald. Faalt als ze al opgehaald/geannuleerd is.
  *
  * Een bestelling die als niet-opgehaald geboekt staat, mag hier ook nog door: de
@@ -1138,6 +1319,7 @@ export async function markPickedUpAction(orderId: string): Promise<ActionResult>
   if (!order) return { ok: false, error: "Bestelling niet gevonden." };
   if (order.status === "PICKED_UP") return { ok: false, error: "Deze bestelling is al opgehaald." };
   if (order.status === "CANCELLED") return { ok: false, error: "Deze bestelling is geannuleerd." };
+  if (order.grocomeetId) return { ok: false, error: GROCOMEET_ORDER_AT_COUNTER };
 
   const late = order.status === "NO_SHOW";
 
@@ -1171,15 +1353,88 @@ export async function markPickedUpAction(orderId: string): Promise<ActionResult>
   };
 }
 
+/** Hoe lang een shifter een eigen afhaling nog zelf kan terugdraaien. */
+const UNDO_PICKUP_MINUTES = 15;
+
 /**
- * Gebruikt twee nog openstaande medewerkersbonnetjes voor één broodje en
- * schrijft tegelijk een auditrij. De saldo-afboeking en auditregistratie zijn
- * één serialiseerbare transactie.
+ * Suggesties onder het veld van de afhaalbalie terwijl de shifter tikt: wie
+ * vandaag besteld heeft en op de naam of het r-nummer past.
+ */
+export async function suggestPickupAction(query: string): Promise<PickupCandidate[]> {
+  await requirePermission("theokot.pickup");
+  return pickupSuggestions(query);
+}
+
+/**
+ * Draait een afhaling terug naar gereserveerd. Er voor een foute match wanneer
+ * de balie automatisch op afgehaald zet (`autoPickup`): een shifter die de
+ * verkeerde persoon aanklikte, moet dat meteen zelf kunnen herstellen, zonder
+ * `theokot.manage`.
+ *
+ * Daarom smal: enkel een afhaling die deze shifter zelf registreerde, enkel
+ * binnen een kwartier, en niet meer eens de dag afgesloten is (dan hoort een
+ * correctie bij Bans & no-shows, waar ook de no-show-telling meeloopt).
+ */
+export async function undoPickupAction(orderId: string): Promise<ActionResult> {
+  const admin = await requirePermission("theokot.pickup");
+  const order = await prisma.theokotOrder.findUnique({
+    where: { id: orderId },
+    include: {
+      session: { select: { date: true, processedAt: true } },
+      user: { select: { name: true } },
+    },
+  });
+  if (!order) return { ok: false, error: "Bestelling niet gevonden." };
+  if (order.status !== "PICKED_UP") return { ok: false, error: "Deze bestelling staat niet op opgehaald." };
+  if (order.pickedUpById !== admin.user.id) {
+    return { ok: false, error: "Enkel wie de afhaling registreerde, kan ze terugdraaien." };
+  }
+  const since = order.pickedUpAt ? Date.now() - order.pickedUpAt.getTime() : Infinity;
+  if (since > UNDO_PICKUP_MINUTES * 60_000) {
+    return { ok: false, error: "Dit kan enkel vlak na het ophalen. Corrigeer bij Bans & no-shows." };
+  }
+  if (order.session.processedAt) {
+    return { ok: false, error: "Deze dag is al afgesloten. Corrigeer bij Bans & no-shows." };
+  }
+
+  const { count } = await prisma.theokotOrder.updateMany({
+    where: { id: orderId, status: "PICKED_UP", pickedUpById: admin.user.id },
+    data: { status: "RESERVED", pickedUpAt: null, pickedUpById: null },
+  });
+  if (count === 0) return { ok: false, error: "Deze bestelling is intussen al gewijzigd." };
+
+  await logAudit({
+    action: "update",
+    entity: "theokotOrder",
+    entityId: orderId,
+    target: order.user.name,
+    summary: `afhaling teruggedraaid aan de balie (${sessionLabel(order.session.date)})`,
+  });
+  revalidateTheokot();
+  return { ok: true, message: "Teruggezet naar gereserveerd." };
+}
+
+/**
+ * Betaalt één broodje met nog openstaande medewerkersbonnetjes en schrijft
+ * tegelijk een auditrij. De saldo-afboeking en auditregistratie zijn één
+ * serialiseerbare transactie.
+ *
+ * De prijs in bonnetjes rekent de server hier opnieuw uit (het duurste broodje,
+ * `sandwichVoucherCost`), want tussen opzoeken en bevestigen kan de prijs van
+ * een gereserveerde bestelling nog wijzigen, of de instelling. `expectedCost` is
+ * wat de balie de student gezegd heeft; wijkt dat af, dan boeken we niets af in
+ * plaats van stil een ander bedrag.
+ *
+ * Een praesidiumlid mag hier gewoon betalen: zijn shiften uit een praesidiumjaar
+ * leveren niets op en staan dus niet in zijn saldo (`earnedShiftReward`), maar
+ * wat hij daarvoor verdiende, mag hij uitgeven.
  */
 export async function redeemEmployeeVouchersAction(
   orderId: string,
+  expectedCost: number,
 ): Promise<VoucherRedemptionResult> {
   const admin = await requirePermission("theokot.pickup");
+  const config = await getTheokotConfig();
 
   try {
     const result = await withSerializableTransaction(async (tx) => {
@@ -1189,10 +1444,14 @@ export async function redeemEmployeeVouchersAction(
           id: true,
           userId: true,
           status: true,
+          grocomeetId: true,
           voucherRedemption: { select: { id: true } },
+          lines: { select: { unitPriceCents: true } },
         },
       });
       if (!order) throw new Error("ORDER_NOT_FOUND");
+      // Wordt bij de grocomeet afgerekend, niet aan de balie.
+      if (order.grocomeetId) throw new Error("GROCOMEET_ORDER");
       // Ook een bestelling die als niet-opgehaald geboekt staat: die mag aan de
       // balie nog uitgedeeld worden, en dan hoort ze ook nog met bonnetjes
       // betaald te kunnen worden. Opgehaald en geannuleerd niet meer.
@@ -1201,9 +1460,16 @@ export async function redeemEmployeeVouchersAction(
       }
       if (order.voucherRedemption) throw new Error("ALREADY_REDEEMED");
 
+      const cost = sandwichVoucherCost(
+        mostExpensiveSandwichCents(order.lines),
+        config.voucherHalfCents,
+      );
+      if (cost <= 0) throw new Error("NOTHING_TO_PAY");
+      if (cost !== expectedCost) throw new CostChangedError(cost);
+
       const allocation = await allocateUserShiftReward(tx, {
         userId: order.userId,
-        amount: SANDWICH_VOUCHER_COST,
+        amount: cost,
       });
 
       await tx.theokotVoucherRedemption.create({
@@ -1211,17 +1477,17 @@ export async function redeemEmployeeVouchersAction(
           orderId: order.id,
           userId: order.userId,
           processedById: admin.user.id,
-          amount: SANDWICH_VOUCHER_COST,
+          amount: cost,
         },
       });
 
-      return allocation;
+      return { cost, remaining: allocation.remaining };
     });
 
     revalidateTheokot();
     return {
       ok: true,
-      amount: SANDWICH_VOUCHER_COST,
+      amount: result.cost,
       remainingBonnetjes: result.remaining,
     };
   } catch (error) {
@@ -1230,6 +1496,12 @@ export async function redeemEmployeeVouchersAction(
     }
     if (error instanceof ShiftRewardConflictError) {
       return { ok: false, error: "Het bonnetjessaldo is gewijzigd. Scan de kaart opnieuw." };
+    }
+    if (error instanceof CostChangedError) {
+      return {
+        ok: false,
+        error: `Dit broodje kost intussen ${formatVoucherCount(error.cost)}. Er is niets afgeboekt; zoek de student opnieuw op.`,
+      };
     }
     if (error instanceof Error) {
       if (error.message === "ORDER_NOT_FOUND") {
@@ -1241,11 +1513,24 @@ export async function redeemEmployeeVouchersAction(
       if (error.message === "ALREADY_REDEEMED") {
         return { ok: false, error: "Voor deze bestelling zijn al medewerkersbonnetjes gebruikt." };
       }
+      if (error.message === "GROCOMEET_ORDER") {
+        return { ok: false, error: GROCOMEET_ORDER_AT_COUNTER };
+      }
+      if (error.message === "NOTHING_TO_PAY") {
+        return { ok: false, error: "Deze bestelling kost niets, dus er valt niets met bonnetjes te betalen." };
+      }
     }
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
       return { ok: false, error: "Voor deze bestelling zijn al medewerkersbonnetjes gebruikt." };
     }
     throw error;
+  }
+}
+
+/** De prijs in bonnetjes is veranderd sinds de balie de student opzocht. */
+class CostChangedError extends Error {
+  constructor(readonly cost: number) {
+    super("VOUCHER_COST_CHANGED");
   }
 }
 

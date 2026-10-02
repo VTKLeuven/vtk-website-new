@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kleur 10: Statusbord</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Een statuspagina voor de campus: per dienst zie je meteen of hij nu open
+   is, tot wanneer, en wat de volgende stap is. Groen betekent open, geel
+   vraagt je aandacht, grijs is dicht. De snelkoppelingen zijn de rijen. */
+:root {
+  --paper: #EFF2F8; --paper-2: #E6ECF5; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36;
+  --yellow: #FFD23F; --muted: #5C667F; --body: #34405E; --on-dark-muted: #B7C0DC; --line: rgb(14 26 54 / .1);
+  --cat-act: #E5484D; --cat-sport: #30A46C; --cat-onthaal: #F76B15; --cat-bedrijf: #3E63DD;
+  --open: var(--cat-sport);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Manrope, system-ui, sans-serif; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; border-radius: 8px; }
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 36px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.top { background: var(--navy); color: var(--paper); padding-bottom: 40px; }
+.hdr { height: 64px; display: flex; align-items: center; gap: 30px; }
+.hdr img { height: 28px; }
+.hdr nav { display: flex; gap: 22px; font-size: 15px; font-weight: 600; color: rgb(239 242 248 / .86); }
+.hdr nav a:hover { color: var(--paper); }
+.hdr-end { margin-left: auto; display: flex; gap: 18px; align-items: center; font-size: 14px; }
+.hdr-end i { font-size: 19px; }
+.hero { display: grid; grid-template-columns: 1fr 1.1fr; gap: 56px; padding-top: 40px; align-items: start; }
+.hero h1 { font-size: 56px; line-height: 1.02; letter-spacing: -0.04em; font-weight: 800; }
+.hero h1 span { color: var(--yellow); }
+.hero p { margin-top: 16px; font-size: 18px; line-height: 1.55; color: var(--on-dark-muted); max-width: 30em; }
+.cta { display: flex; gap: 12px; margin-top: 26px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 46px; padding: 0 20px; border-radius: 999px; font-size: 15px; font-weight: 700; white-space: nowrap; }
+.btn-y { background: var(--yellow); color: var(--ink); }
+.btn-y:hover { background: var(--surface); }
+.btn-l { box-shadow: inset 0 0 0 1px rgb(239 242 248 / .3); }
+.btn-l:hover { background: rgb(239 242 248 / .08); }
+
+/* Het bord */
+.board { background: var(--surface); color: var(--ink); border-radius: 22px; overflow: hidden; }
+.board-h { display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.board-h h2 { font-size: 16px; font-weight: 800; }
+.board-h span { font-size: 13px; color: var(--muted); font-weight: 600; }
+.svc { display: grid; grid-template-columns: 40px 1fr auto 18px; gap: 14px; align-items: center; padding: 13px 20px; border-top: 1px solid var(--line); transition: background .15s; }
+.svc:first-of-type { border-top: 0; }
+.svc:hover { background: var(--paper); }
+.svc .ic { width: 40px; height: 40px; border-radius: 12px; background: var(--paper-2); display: grid; place-items: center; font-size: 20px; color: var(--navy); }
+.svc b { display: block; font-size: 15px; font-weight: 700; }
+.svc small { display: block; font-size: 13px; color: var(--muted); }
+.st { display: inline-flex; align-items: center; gap: 7px; height: 28px; padding: 0 11px; border-radius: 999px; font-size: 13px; font-weight: 700; white-space: nowrap; }
+.st::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; }
+.st.open { color: var(--open); background: color-mix(in srgb, var(--open) 12%, white); }
+.st.attn { color: var(--ink); background: var(--yellow); }
+.st.attn::before { background: var(--ink); }
+.st.closed { color: var(--muted); background: var(--paper); }
+.st.info { color: var(--navy); background: var(--paper-2); }
+.st.info::before { display: none; }
+.svc > i { color: var(--muted); font-size: 15px; }
+.svc:hover > i { color: var(--ink); }
+
+/* Onder de vouw: de week */
+.week { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; padding-top: 36px; padding-bottom: 56px; }
+.sec-h { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.sec-h h2 { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+.sec-h a { font-size: 14px; font-weight: 700; color: var(--navy); }
+.sec-h a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.e { display: grid; grid-template-columns: 70px 1fr 30px; gap: 8px; align-items: center; padding: 12px 16px; margin-bottom: 8px; border-radius: 14px; background: var(--surface); box-shadow: inset 4px 0 0 var(--c); }
+.e .w { font-size: 13px; color: var(--muted); line-height: 1.3; }
+.e .w b { display: block; color: var(--ink); font-weight: 700; }
+.e a { font-size: 15px; font-weight: 700; }
+.e a small { display: block; font-size: 12px; font-weight: 700; color: var(--c); margin-top: 1px; }
+.e a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.star { color: var(--muted); font-size: 17px; }
+.star:hover, .star[aria-pressed="true"] { color: var(--ink); }
+
+@media (max-width: 1100px) { .hdr nav { display: none; } .hero { grid-template-columns: 1fr; gap: 30px; } .week { grid-template-columns: 1fr; } }
+@media (max-width: 600px) { .wrap { padding: 0 14px; } .hero h1 { font-size: 40px; } .cta { flex-wrap: wrap; } .svc { grid-template-columns: 36px 1fr 18px; } .svc .st { grid-column: 2; justify-self: start; } .svc > i { grid-row: 1; grid-column: 3; } }
+</style>
+</head>
+<body>
+<div class="top"><div class="wrap">
+  <header class="hdr">
+    <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+    <nav><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+    <div class="hdr-end"><i class="ph ph-magnifying-glass"></i><span><b>NL</b> / EN</span><i class="ph ph-user-circle"></i></div>
+  </header>
+  <section class="hero">
+    <div>
+      <h1>De thuis voor <span>ingenieurs</span> in Leuven.</h1>
+      <p>Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+      <div class="cta"><a class="btn btn-y" href="#">Ontdek wat we doen</a><a class="btn btn-l" href="#">Eerstejaars? Start hier</a></div>
+    </div>
+    <nav class="board num" aria-label="Snel naar">
+      <div class="board-h"><h2>Nu op de campus</h2><span id="now">Donderdag, 13:42</span></div>
+      <a class="svc" href="#"><span class="ic"><i class="ph ph-bread"></i></span><span><b>Theokot</b><small>Bestel je broodje</small></span><span class="st open">Open</span><i class="ph ph-arrow-right"></i></a>
+      <a class="svc" href="#"><span class="ic"><i class="ph ph-books"></i></span><span><b>Cursusdienst</b><small>Weer open 18:05 tot 19:00</small></span><span class="st open">Open tot 13:55</span><i class="ph ph-arrow-up-right"></i></a>
+      <a class="svc" href="#"><span class="ic"><i class="ph ph-recycle"></i></span><span><b>Tweedehands boeken</b><small>Kopen en verkopen</small></span><span class="st info">Online</span><i class="ph ph-arrow-up-right"></i></a>
+      <a class="svc" href="#"><span class="ic"><i class="ph ph-clock"></i></span><span><b>Tijdslot Cudi</b><small>Kies wanneer je ophaalt</small></span><span class="st info">Reserveer</span><i class="ph ph-arrow-up-right"></i></a>
+      <a class="svc" href="#"><span class="ic"><i class="ph ph-hand-heart"></i></span><span><b>Shiften</b><small>Eerste morgen om 01:00</small></span><span class="st attn">3 zoeken volk</span><i class="ph ph-arrow-right"></i></a>
+      <a class="svc" href="#"><span class="ic"><i class="ph ph-calendar-blank"></i></span><span><b>Kalender</b><small>12 Urencantus is bezig</small></span><span class="st open">2 vandaag</span><i class="ph ph-arrow-right"></i></a>
+    </nav>
+  </section>
+</div></div>
+
+<div class="wrap week num">
+  <section>
+    <div class="sec-h"><h2>Vandaag en morgen</h2><a href="#">Volledige kalender</a></div>
+    <div class="e" style="--c:var(--cat-act)"><span class="w"><b>Nu</b>sinds 12:00</span><a href="#">12 Urencantus<small>Activiteiten, Waaiberg</small></a><button class="star" aria-label="Interesse: 12 Urencantus"><i class="ph ph-star"></i></button></div>
+    <div class="e" style="--c:var(--cat-sport)"><span class="w"><b>Vandaag</b>20:30</span><a href="#">Looptraining<small>Sport, Atletiekpiste Sportkot</small></a><button class="star" aria-label="Interesse: Looptraining"><i class="ph ph-star"></i></button></div>
+  </section>
+  <section>
+    <div class="sec-h"><h2>Volgende week</h2><a href="#">Alles</a></div>
+    <div class="e" style="--c:var(--cat-onthaal)"><span class="w"><b>ma 5</b>19:00</span><a href="#">PeMe-Startactiviteit<small>Onthaal, Grasveld Alma 3</small></a><button class="star" aria-label="Interesse: PeMe"><i class="ph ph-star"></i></button></div>
+    <div class="e" style="--c:var(--cat-bedrijf)"><span class="w"><b>di 6</b>18:30</span><a href="#">Sector Night Bouwkunde<small>Bedrijfsrelaties, Quadrivium</small></a><button class="star" aria-label="Interesse: Sector Night"><i class="ph ph-star"></i></button></div>
+  </section>
+</div>
+<script>
+const d = new Date(); document.getElementById("now").textContent = d.toLocaleDateString("nl-BE", { weekday: "long" }).replace(/^./, c => c.toUpperCase()) + ", " + d.toLocaleTimeString("nl-BE", { hour: "2-digit", minute: "2-digit" });
+document.querySelectorAll(".star").forEach(b => b.addEventListener("click", () => { const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); b.querySelector("i").className = on ? "ph-fill ph-star" : "ph ph-star"; }));
+</script>
+</body>
+</html>

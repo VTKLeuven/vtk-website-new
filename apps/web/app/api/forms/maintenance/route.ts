@@ -4,6 +4,7 @@ import {
   enqueueDraftReminders,
   processFormOutbox,
 } from "@/lib/forms/outbox";
+import { runDueGroupings } from "@/lib/forms/grouping/due";
 
 export const runtime = "nodejs";
 
@@ -21,7 +22,9 @@ function secret(): string | null {
 /**
  * Wordt periodiek aangeroepen door de worker uit `infra/docker-compose.yml`:
  * de mailwachtrij leegmaken, de dagelijkse samenvattingen klaarzetten en de
- * herinneringen voor onafgewerkte concepten.
+ * herinneringen voor onafgewerkte concepten. Daarnaast sluit ze de formulieren
+ * met een automatische groepjesmaker waarvan alle antwoorden binnen zijn, en
+ * deelt ze in.
  *
  * Geeft 503 zodra er iets blijft haperen, zodat de healthcheck van de worker
  * het merkt in plaats van stil te blijven draaien.
@@ -35,10 +38,11 @@ export async function POST(request: Request) {
   const digests = await enqueueDailyDigests();
   const reminders = await enqueueDraftReminders();
   const outbox = await processFormOutbox(20);
+  const groupings = await runDueGroupings();
   const dead = await prisma.formOutboxMessage.count({ where: { status: "DEAD" } });
 
   return Response.json(
-    { digests, reminders, outbox, dead },
+    { digests, reminders, outbox, dead, groupings: groupings.length },
     { status: outbox.failed > 0 || dead > 0 ? 503 : 200 }
   );
 }

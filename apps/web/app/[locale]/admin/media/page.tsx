@@ -18,6 +18,8 @@ import {
   type ManageableAlbum,
 } from "@/lib/immich-gallery";
 import { deleteMagazineAction, savePromoVideosAction } from "@/app/actions/media";
+import { MagazineCoverButton } from "./MagazineCoverButton";
+import { publicUrl } from "@/lib/storage";
 import { fakbarUploadEnabled } from "@/lib/fakbar-gallery";
 import { FakbarUploadToggle } from "./FakbarUploadToggle";
 import { MagazineUploadForm } from "./MagazineUploadForm";
@@ -122,6 +124,22 @@ export default async function AdminMedia({
               <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs font-semibold uppercase">
                 {p.kind === "bakske" ? "Bakske" : "Ir.Reëel"}
               </span>
+              {/* De kaft zelf, zodat je ziet welke editie er al een heeft (voor
+                  de tegel in het nieuws); zonder kaft een leeg vakje. */}
+              {p.coverKey ? (
+                // Een kaft van 900 px uit de eigen /api/media-route.
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={publicUrl(p.coverKey) ?? undefined}
+                  alt=""
+                  className="h-10 w-7 shrink-0 rounded-sm border border-zinc-200 object-cover object-top"
+                />
+              ) : (
+                <span
+                  className="h-10 w-7 shrink-0 rounded-sm border border-dashed border-zinc-300"
+                  aria-hidden="true"
+                />
+              )}
               <span className="min-w-0 flex-1 basis-48 text-sm">
                 {nl ? p.titleNl : p.titleEn || p.titleNl} · {nl ? p.issueNl : p.issueEn || p.issueNl}
                 {p.publishedAt ? <span className="text-zinc-500"> · {p.publishedAt}</span> : null}
@@ -135,6 +153,12 @@ export default async function AdminMedia({
                 >
                   PDF
                 </a>
+                <MagazineCoverButton
+                  id={p.id}
+                  hasCover={Boolean(p.coverKey)}
+                  context={`${nl ? p.titleNl : p.titleEn || p.titleNl} ${nl ? p.issueNl : p.issueEn || p.issueNl}`}
+                  locale={locale}
+                />
                 <DeleteIconButton
                   action={deleteMagazineAction}
                   fields={{ id: p.id }}

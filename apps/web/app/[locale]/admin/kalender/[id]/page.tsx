@@ -36,8 +36,16 @@ export default async function EditEventPage({
       // E1: staat er een logistiek-evenement aan dit evenement? Dat bepaalt of
       // het vinkje "Logistiek nodig" aanstaat.
       uitleenEvent: { select: { id: true } },
-      ticketEvent: {
-        select: { id: true, slug: true, status: true, _count: { select: { tickets: true } } },
+      ticketEvents: {
+        select: {
+          id: true,
+          slug: true,
+          status: true,
+          onEventPage: true,
+          labelNl: true,
+          _count: { select: { tickets: true } },
+        },
+        orderBy: [{ startsAt: "asc" }, { createdAt: "asc" }],
       },
     },
   });
@@ -94,16 +102,14 @@ export default async function EditEventPage({
       />
       <EventTicketsPanel
         eventId={event.id}
-        ticketEvent={
-          event.ticketEvent
-            ? {
-                id: event.ticketEvent.id,
-                slug: event.ticketEvent.slug,
-                status: event.ticketEvent.status,
-                ticketsSold: event.ticketEvent._count.tickets,
-              }
-            : null
-        }
+        ticketEvents={event.ticketEvents.map((ticketEvent) => ({
+          id: ticketEvent.id,
+          slug: ticketEvent.slug,
+          status: ticketEvent.status,
+          onEventPage: ticketEvent.onEventPage,
+          label: ticketEvent.labelNl,
+          ticketsSold: ticketEvent._count.tickets,
+        }))}
         canCreateTickets={await canCreateTicketEventForGroup(
           session.user.id,
           event.groupId,

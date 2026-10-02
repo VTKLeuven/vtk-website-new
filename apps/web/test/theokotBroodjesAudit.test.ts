@@ -2,17 +2,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   theokotSessionFindUnique: vi.fn(),
+  theokotSessionFindUniqueOrThrow: vi.fn(),
   theokotSessionDelete: vi.fn(),
   theokotSessionUpdate: vi.fn(),
+  theokotSessionUpdateMany: vi.fn(),
   theokotOrderFindUnique: vi.fn(),
   theokotOrderDelete: vi.fn(),
   theokotOrderUpdate: vi.fn(),
   theokotOrderUpdateMany: vi.fn(),
+  theokotOrderCount: vi.fn(),
   theokotBanFindUnique: vi.fn(),
   theokotBanUpdate: vi.fn(),
   theokotBanUpdateMany: vi.fn(),
   theokotBanFindFirst: vi.fn(),
   theokotBanCreate: vi.fn(),
+  settingFindUnique: vi.fn(),
   userFindUnique: vi.fn(),
   sendMail: vi.fn(),
   logAudit: vi.fn(),
@@ -20,21 +24,43 @@ const mocks = vi.hoisted(() => ({
   revalidatePath: vi.fn(),
 }));
 
+const txPrisma = {
+  theokotSession: {
+    findUniqueOrThrow: mocks.theokotSessionFindUniqueOrThrow,
+    update: mocks.theokotSessionUpdate,
+  },
+  theokotOrder: {
+    updateMany: mocks.theokotOrderUpdateMany,
+    count: mocks.theokotOrderCount,
+  },
+  theokotBan: {
+    findFirst: mocks.theokotBanFindFirst,
+    create: mocks.theokotBanCreate,
+  },
+};
+
 vi.mock("@vtk/db", () => ({
   prisma: {
+    $transaction: vi.fn(async (cb) => (typeof cb === "function" ? cb(txPrisma) : cb)),
+    setting: {
+      findUnique: mocks.settingFindUnique,
+    },
     user: {
       findUnique: mocks.userFindUnique,
     },
     theokotSession: {
       findUnique: mocks.theokotSessionFindUnique,
+      findUniqueOrThrow: mocks.theokotSessionFindUniqueOrThrow,
       delete: mocks.theokotSessionDelete,
       update: mocks.theokotSessionUpdate,
+      updateMany: mocks.theokotSessionUpdateMany,
     },
     theokotOrder: {
       findUnique: mocks.theokotOrderFindUnique,
       delete: mocks.theokotOrderDelete,
       update: mocks.theokotOrderUpdate,
       updateMany: mocks.theokotOrderUpdateMany,
+      count: mocks.theokotOrderCount,
     },
     theokotBan: {
       findUnique: mocks.theokotBanFindUnique,
@@ -44,6 +70,10 @@ vi.mock("@vtk/db", () => ({
       create: mocks.theokotBanCreate,
     },
   },
+}));
+
+vi.mock("@/lib/ticketing/transactions", () => ({
+  withSerializableTransaction: vi.fn((fn) => fn(txPrisma)),
 }));
 
 vi.mock("next/cache", () => ({
@@ -116,6 +146,18 @@ describe("parseTheokotConfig", () => {
     expect(config.maxItemsPerOrder).toBe(5); // default
     expect(config.maxWeeklySpecialPerOrder).toBe(1); // default
     expect(config.orderOpenTime).toBe("12:00"); // default
+  });
+
+  it("zet de pauze en het automatisch afhalen standaard uit, en neemt enkel echte booleans over", () => {
+    expect(parseTheokotConfig({})).toMatchObject({ noShowPaused: false, autoPickup: false });
+    expect(parseTheokotConfig({ noShowPaused: true, autoPickup: true })).toMatchObject({
+      noShowPaused: true,
+      autoPickup: true,
+    });
+    expect(parseTheokotConfig({ noShowPaused: "ja", autoPickup: 1 })).toMatchObject({
+      noShowPaused: false,
+      autoPickup: false,
+    });
   });
 
   it("aanvaardt geldige configuratie", () => {
@@ -256,7 +298,7 @@ describe("removeOrder", () => {
   });
 });
 
-import { correctOrderStatusAction, liftBanAction } from "@/app/actions/theokot";
+import { correctOrderStatusAction, liftBanAction, processSessionNoShowsAction } from "@/app/actions/theokot";
 
 describe("liftBanAction", () => {
   beforeEach(() => {
@@ -338,6 +380,105 @@ describe("correctOrderStatusAction", () => {
       }),
     );
     expect(mocks.theokotBanUpdateMany).toHaveBeenCalled();
+  });
+});
+
+describe("processSessionNoShowsAction", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.requirePermission.mockResolvedValue({ user: { id: "admin-1", name: "Admin" } });
+  });
+
+  it("weigert wanneer de sessie niet bestaat", async () => {
+    mocks.theokotSessionFindUnique.mockResolvedValue(null);
+    const formData = new FormData();
+    formData.append("sessionId", "ses-unknown");
+
+    const result = await processSessionNoShowsAction({ status: "idle" }, formData);
+    expect(result.status).toBe("error");
+    if (result.status === "error") {
+      expect(result.code).toBe("SESSION_NOT_FOUND");
+    }
+  });
+
+  it("weigert wanneer de afhaal nog niet voorbij is", async () => {
+    mocks.theokotSessionFindUnique.mockResolvedValue({
+      id: "ses-1",
+      date: new Date("2026-10-01T00:00:00Z"),
+      pickupEnd: new Date(Date.now() + 3600000), // 1 hour in the future
+      processedAt: null,
+    });
+    const formData = new FormData();
+    formData.append("sessionId", "ses-1");
+
+    const result = await processSessionNoShowsAction({ status: "idle" }, formData);
+    expect(result.status).toBe("error");
+    if (result.status === "error") {
+      expect(result.code).toBe("SESSION_NOT_ENDED");
+    }
+  });
+
+  it("meldt succes wanneer de sessie al verwerkt was", async () => {
+    mocks.theokotSessionFindUnique.mockResolvedValue({
+      id: "ses-1",
+      date: new Date("2026-10-01T00:00:00Z"),
+      pickupEnd: new Date(Date.now() - 3600000),
+      processedAt: new Date(Date.now() - 1800000),
+    });
+    const formData = new FormData();
+    formData.append("sessionId", "ses-1");
+
+    const result = await processSessionNoShowsAction({ status: "idle" }, formData);
+    expect(result.status).toBe("success");
+  });
+
+  it("verwerkt manueel de no-shows wanneer de afhaal voorbij is", async () => {
+    const past = new Date(Date.now() - 60000); // 1 minute ago (within grace period!)
+    mocks.theokotSessionFindUnique.mockResolvedValue({
+      id: "ses-1",
+      date: new Date("2026-10-01T00:00:00Z"),
+      pickupEnd: past,
+      processedAt: null,
+      noShowsWaivedAt: null,
+    });
+    mocks.theokotSessionUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.theokotOrderUpdateMany.mockResolvedValue({ count: 1 });
+    mocks.theokotSessionFindUniqueOrThrow.mockResolvedValue({
+      id: "ses-1",
+      date: new Date("2026-10-01T00:00:00Z"),
+      orders: [
+        {
+          id: "ord-1",
+          userId: "user-1",
+          user: { name: "Bert", email: "bert@vtk.be", locale: "NL" },
+        },
+      ],
+    });
+    mocks.sendMail.mockResolvedValue({ ok: true });
+    mocks.theokotBanFindFirst.mockResolvedValue(null);
+    mocks.theokotOrderCount.mockResolvedValue(0);
+    mocks.theokotSessionUpdate.mockResolvedValue({ id: "ses-1" });
+
+    const formData = new FormData();
+    formData.append("sessionId", "ses-1");
+
+    const result = await processSessionNoShowsAction({ status: "idle" }, formData);
+    expect(result.status).toBe("success");
+    expect(mocks.theokotSessionUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "ses-1" },
+        data: expect.objectContaining({
+          processedAt: expect.any(Date),
+        }),
+      }),
+    );
+    expect(mocks.logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "update",
+        entity: "theokotSession",
+        entityId: "ses-1",
+      }),
+    );
   });
 });
 

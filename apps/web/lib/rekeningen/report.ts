@@ -139,7 +139,6 @@ export async function buildExpenseReportPdf(
       spentOn: expense.spentOn,
       postLabel: expense.postLabel,
       activity: expense.activity,
-      description: expense.description,
       amountCents: expense.amountCents,
     }),
   };

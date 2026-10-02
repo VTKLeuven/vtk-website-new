@@ -5,6 +5,7 @@ import { ChevronDown, ChevronUp, Plus, Trash2 } from "lucide-react";
 import { Button, Card, ConfirmDialog, Input, Label, Select, Textarea } from "@vtk/ui";
 import { getDictionary, type Locale } from "@vtk/i18n";
 import { IconButton } from "@/components/ui/IconButton";
+import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { saveErrorMessages } from "@/lib/saveMessages";
 import { saveSlogansAction } from "@/app/actions/slogans";
@@ -236,9 +237,7 @@ export function SlogansEditor({
               <span>{t("Slogans op de startpagina", "Homepage slogans")}</span>
               <span
                 className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                  enabled
-                    ? "bg-emerald-100 text-emerald-800"
-                    : "bg-zinc-100 text-zinc-700"
+                  enabled ? "bg-emerald-100 text-emerald-800" : "bg-zinc-100 text-zinc-700"
                 }`}
               >
                 {enabled ? t("Actief", "Active") : t("Uitgeschakeld", "Disabled")}
@@ -327,9 +326,7 @@ export function SlogansEditor({
                 type="button"
                 onClick={() => setAsMember(false)}
                 aria-pressed={!asMember}
-                className={`px-3 py-1 font-medium ${
-                  !asMember ? "bg-vtk-ink text-white" : "text-[#5c667f]"
-                }`}
+                className={`px-3 py-1 font-medium ${!asMember ? "bg-vtk-ink text-white" : "text-[#5c667f]"}`}
               >
                 {t("Als bezoeker", "As visitor")}
               </button>
@@ -337,9 +334,7 @@ export function SlogansEditor({
                 type="button"
                 onClick={() => setAsMember(true)}
                 aria-pressed={asMember}
-                className={`px-3 py-1 font-medium ${
-                  asMember ? "bg-vtk-ink text-white" : "text-[#5c667f]"
-                }`}
+                className={`px-3 py-1 font-medium ${asMember ? "bg-vtk-ink text-white" : "text-[#5c667f]"}`}
               >
                 {t("Als lid", "As member")}
               </button>
@@ -402,7 +397,6 @@ export function SlogansEditor({
             return (
               <div
                 key={item.id}
-                className="rounded-xl border border-vtk-blue/15 bg-white p-4"
                 onFocus={() => setFocused(item.id)}
                 onBlur={(event) => {
                   if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
@@ -410,148 +404,178 @@ export function SlogansEditor({
                   }
                 }}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <span className="grid size-6 shrink-0 place-items-center rounded-full bg-vtk-blue-soft text-xs font-semibold text-vtk-blue">
-                      {idx + 1}
-                    </span>
-                    {item.opener ? (
-                      <span className="rounded-md bg-vtk-ink px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
-                        {t("Begroeting", "Greeting")}
+                <AdminDisclosure
+                  variant="row"
+                  // Een nieuwe of lege slogan staat open: die wil je net invullen.
+                  defaultOpen={!item.nl.trim() && !item.en?.trim()}
+                  summary={
+                    <span className="flex flex-wrap items-center gap-2">
+                      <span className="grid size-6 shrink-0 place-items-center rounded-full bg-vtk-blue-soft text-xs font-semibold text-vtk-blue">
+                        {idx + 1}
                       </span>
-                    ) : null}
-                    {item.audience !== "all" ? (
-                      <span className="rounded-md bg-vtk-blue-soft px-1.5 py-0.5 text-[10px] font-semibold text-vtk-blue">
-                        {AUDIENCE_LABELS[item.audience][isNl ? "nl" : "en"]}
-                      </span>
-                    ) : null}
-                    {item.window !== "any" ? (
-                      <span className="rounded-md bg-vtk-blue-soft px-1.5 py-0.5 text-[10px] font-semibold text-vtk-blue">
-                        {WINDOW_LABELS[item.window][isNl ? "nl" : "en"]}
-                      </span>
-                    ) : null}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <IconButton
-                      label={t("Omhoog", "Move up")}
-                      srLabel={`${t("Omhoog", "Move up")}: ${item.nl || item.en || idx + 1}`}
-                      onClick={() => moveItem(idx, -1)}
-                      disabled={idx === 0}
-                    >
-                      <ChevronUp size={16} aria-hidden="true" />
-                    </IconButton>
-                    <IconButton
-                      label={t("Omlaag", "Move down")}
-                      srLabel={`${t("Omlaag", "Move down")}: ${item.nl || item.en || idx + 1}`}
-                      onClick={() => moveItem(idx, 1)}
-                      disabled={idx === items.length - 1}
-                    >
-                      <ChevronDown size={16} aria-hidden="true" />
-                    </IconButton>
-                    <IconButton
-                      label={t("Verwijderen", "Delete")}
-                      srLabel={`${t("Verwijderen", "Delete")}: ${item.nl || item.en || idx + 1}`}
-                      tone="danger"
-                      onClick={() => setConfirmDelete(item)}
-                      disabled={items.length <= 1}
-                    >
-                      <Trash2 size={16} aria-hidden="true" />
-                    </IconButton>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div className="space-y-1">
-                    <Label htmlFor={`${baseId}-nl-${item.id}`}>{t("Nederlands", "Dutch")}</Label>
-                    <Textarea
-                      id={`${baseId}-nl-${item.id}`}
-                      rows={2}
-                      value={item.nl}
-                      onChange={(event) => updateItem(idx, { nl: event.target.value })}
-                      placeholder={t("Ingenieurs zijn *superieur*.", "Ingenieurs zijn *superieur*.")}
-                      className="min-h-0"
-                    />
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor={`${baseId}-en-${item.id}`} className="text-[#5c667f]">
-                      {t("Engels (leeg = Nederlands)", "English (empty = Dutch)")}
-                    </Label>
-                    <Textarea
-                      id={`${baseId}-en-${item.id}`}
-                      rows={2}
-                      value={item.en ?? ""}
-                      onChange={(event) => updateItem(idx, { en: event.target.value })}
-                      placeholder={item.nl}
-                      className="min-h-0"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-3 grid gap-3 border-t border-vtk-blue/10 pt-3 sm:grid-cols-3">
-                  <div className="space-y-1">
-                    <Label htmlFor={`${baseId}-aud-${item.id}`}>{t("Publiek", "Audience")}</Label>
-                    <Select
-                      id={`${baseId}-aud-${item.id}`}
-                      value={item.audience}
-                      onChange={(event) =>
-                        updateItem(idx, { audience: event.target.value as SloganAudience })
-                      }
-                    >
-                      {(Object.keys(AUDIENCE_LABELS) as SloganAudience[]).map((value) => (
-                        <option key={value} value={value}>
-                          {AUDIENCE_LABELS[value][isNl ? "nl" : "en"]}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                  <div className="space-y-1">
-                    <Label htmlFor={`${baseId}-win-${item.id}`}>
-                      {t("Wanneer op de dag", "Time of day")}
-                    </Label>
-                    <Select
-                      id={`${baseId}-win-${item.id}`}
-                      value={item.window}
-                      onChange={(event) =>
-                        updateItem(idx, { window: event.target.value as SloganWindow })
-                      }
-                    >
-                      {(Object.keys(WINDOW_LABELS) as SloganWindow[]).map((value) => (
-                        <option key={value} value={value}>
-                          {WINDOW_LABELS[value][isNl ? "nl" : "en"]}
-                        </option>
-                      ))}
-                    </Select>
-                  </div>
-                  <label className="flex items-start gap-2 pt-6 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={item.opener}
-                      onChange={(event) => updateItem(idx, { opener: event.target.checked })}
-                      className="mt-0.5 size-4 rounded border-zinc-300 text-vtk-blue focus:ring-vtk-blue"
-                    />
-                    <span>
-                      {t("Opent de reeks", "Opens the sequence")}
-                      <span className="block text-xs text-[#5c667f]">
-                        {t("en komt daarna niet terug", "and does not come back")}
+                      {item.opener ? (
+                        <span className="rounded-md bg-vtk-ink px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white">
+                          {t("Begroeting", "Greeting")}
+                        </span>
+                      ) : null}
+                      {item.audience !== "all" ? (
+                        <span className="rounded-md bg-vtk-blue-soft px-1.5 py-0.5 text-[10px] font-semibold text-vtk-blue">
+                          {AUDIENCE_LABELS[item.audience][isNl ? "nl" : "en"]}
+                        </span>
+                      ) : null}
+                      {item.window !== "any" ? (
+                        <span className="rounded-md bg-vtk-blue-soft px-1.5 py-0.5 text-[10px] font-semibold text-vtk-blue">
+                          {WINDOW_LABELS[item.window][isNl ? "nl" : "en"]}
+                        </span>
+                      ) : null}
+                      <span className="min-w-0 basis-full text-sm text-vtk-ink sm:basis-auto sm:flex-1">
+                        {preview.length === 0 ? (
+                          <span className="text-red-600">{t("Nog geen tekst", "No text yet")}</span>
+                        ) : (
+                          preview.map((line, lineIdx) => (
+                            <span key={lineIdx}>
+                              {lineIdx > 0 ? " / " : null}
+                              {line.map((segment, segIdx) =>
+                                segment.accent ? (
+                                  <strong key={segIdx} className="font-semibold">
+                                    {segment.text}
+                                  </strong>
+                                ) : (
+                                  <span key={segIdx}>{segment.text}</span>
+                                ),
+                              )}
+                            </span>
+                          ))
+                        )}
                       </span>
                     </span>
-                  </label>
-                </div>
+                  }
+                  actions={
+                    <>
+                      <IconButton
+                        label={t("Omhoog", "Move up")}
+                        srLabel={`${t("Omhoog", "Move up")}: ${item.nl || item.en || idx + 1}`}
+                        onClick={() => moveItem(idx, -1)}
+                        disabled={idx === 0}
+                      >
+                        <ChevronUp size={16} aria-hidden="true" />
+                      </IconButton>
+                      <IconButton
+                        label={t("Omlaag", "Move down")}
+                        srLabel={`${t("Omlaag", "Move down")}: ${item.nl || item.en || idx + 1}`}
+                        onClick={() => moveItem(idx, 1)}
+                        disabled={idx === items.length - 1}
+                      >
+                        <ChevronDown size={16} aria-hidden="true" />
+                      </IconButton>
+                      <IconButton
+                        label={t("Verwijderen", "Delete")}
+                        srLabel={`${t("Verwijderen", "Delete")}: ${item.nl || item.en || idx + 1}`}
+                        tone="danger"
+                        onClick={() => setConfirmDelete(item)}
+                        disabled={items.length <= 1}
+                      >
+                        <Trash2 size={16} aria-hidden="true" />
+                      </IconButton>
+                    </>
+                  }
+                >
+                  <div className="grid gap-3 md:grid-cols-2">
+                    <div className="space-y-1">
+                      <Label htmlFor={`${baseId}-nl-${item.id}`}>{t("Nederlands", "Dutch")}</Label>
+                      <Textarea
+                        id={`${baseId}-nl-${item.id}`}
+                        rows={2}
+                        value={item.nl}
+                        onChange={(event) => updateItem(idx, { nl: event.target.value })}
+                        placeholder={t(
+                          "Ingenieurs zijn *superieur*.",
+                          "Ingenieurs zijn *superieur*.",
+                        )}
+                        className="min-h-0"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor={`${baseId}-en-${item.id}`} className="text-[#5c667f]">
+                        {t("Engels (leeg = Nederlands)", "English (empty = Dutch)")}
+                      </Label>
+                      <Textarea
+                        id={`${baseId}-en-${item.id}`}
+                        rows={2}
+                        value={item.en ?? ""}
+                        onChange={(event) => updateItem(idx, { en: event.target.value })}
+                        placeholder={item.nl}
+                        className="min-h-0"
+                      />
+                    </div>
+                  </div>
 
-                {item.opener || item.audience === "members" ? (
-                  <p className="mt-2 text-xs text-[#5c667f]">
-                    {t(
-                      "Gebruik {firstName} voor de voornaam of {name} voor de volledige naam.",
-                      "Use {firstName} for the first name or {name} for the full name.",
-                    )}
-                  </p>
-                ) : null}
+                  <div className="mt-3 grid gap-3 border-t border-vtk-blue/10 pt-3 sm:grid-cols-3">
+                    <div className="space-y-1">
+                      <Label htmlFor={`${baseId}-aud-${item.id}`}>{t("Publiek", "Audience")}</Label>
+                      <Select
+                        id={`${baseId}-aud-${item.id}`}
+                        value={item.audience}
+                        onChange={(event) =>
+                          updateItem(idx, { audience: event.target.value as SloganAudience })
+                        }
+                      >
+                        {(Object.keys(AUDIENCE_LABELS) as SloganAudience[]).map((value) => (
+                          <option key={value} value={value}>
+                            {AUDIENCE_LABELS[value][isNl ? "nl" : "en"]}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label htmlFor={`${baseId}-win-${item.id}`}>
+                        {t("Wanneer op de dag", "Time of day")}
+                      </Label>
+                      <Select
+                        id={`${baseId}-win-${item.id}`}
+                        value={item.window}
+                        onChange={(event) =>
+                          updateItem(idx, { window: event.target.value as SloganWindow })
+                        }
+                      >
+                        {(Object.keys(WINDOW_LABELS) as SloganWindow[]).map((value) => (
+                          <option key={value} value={value}>
+                            {WINDOW_LABELS[value][isNl ? "nl" : "en"]}
+                          </option>
+                        ))}
+                      </Select>
+                    </div>
+                    <label className="flex items-start gap-2 pt-6 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={item.opener}
+                        onChange={(event) => updateItem(idx, { opener: event.target.checked })}
+                        className="mt-0.5 size-4 rounded border-zinc-300 text-vtk-blue focus:ring-vtk-blue"
+                      />
+                      <span>
+                        {t("Opent de reeks", "Opens the sequence")}
+                        <span className="block text-xs text-[#5c667f]">
+                          {t("en komt daarna niet terug", "and does not come back")}
+                        </span>
+                      </span>
+                    </label>
+                  </div>
 
-                {preview.length === 0 ? (
-                  <p className="mt-2 text-xs text-red-600">
-                    {t("Deze slogan heeft nog geen tekst.", "This slogan has no text yet.")}
-                  </p>
-                ) : null}
+                  {item.opener || item.audience === "members" ? (
+                    <p className="mt-2 text-xs text-[#5c667f]">
+                      {t(
+                        "Gebruik {firstName} voor de voornaam of {name} voor de volledige naam.",
+                        "Use {firstName} for the first name or {name} for the full name.",
+                      )}
+                    </p>
+                  ) : null}
+
+                  {preview.length === 0 ? (
+                    <p className="mt-2 text-xs text-red-600">
+                      {t("Deze slogan heeft nog geen tekst.", "This slogan has no text yet.")}
+                    </p>
+                  ) : null}
+                </AdminDisclosure>
               </div>
             );
           })}
@@ -569,9 +593,7 @@ export function SlogansEditor({
             )}
           </p>
         </div>
-        <p className="text-sm text-[#5c667f]">
-          {sizeHint}
-        </p>
+        <p className="text-sm text-[#5c667f]">{sizeHint}</p>
         <div className="flex flex-wrap items-center gap-3 border-t border-vtk-blue/10 pt-3">
           <Label htmlFor={`${baseId}-interval`} className="sr-only">
             {t("Wisseltijd in seconden", "Rotation interval in seconds")}

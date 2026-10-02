@@ -37,13 +37,36 @@ describe("GET /[locale]/tickets/[slug]/voorverkoop/[token]", () => {
 
     expect(response.status).toBe(307);
     // Crucial: relative Location prevents leaking internal reverse-proxy origin (e.g. localhost:3000)
-    expect(response.headers.get("location")).toBe("/tickets/cantus");
+    expect(response.headers.get("location")).toBe("/tickets/cantus?via=voorverkoop");
     expect(response.headers.get("location")).not.toContain("localhost:3000");
 
     const cookie = response.headers.get("set-cookie");
     expect(cookie).toBeTruthy();
     expect(cookie).toContain("valid-token-1234");
     expect(cookie).toContain("vtk_presale_");
+  });
+
+  it("also opens a private event, so the presale link does not lead to a 404", async () => {
+    mocks.findUnique.mockResolvedValue({
+      id: "ev-cantus-1",
+      presaleToken: "valid-token-1234",
+      salesStartAt: new Date(Date.now() + 3600_000),
+      salesEndAt: null,
+      endsAt: new Date(Date.now() + 7 * 24 * 3600_000),
+      isPrivate: true,
+      privateToken: "private-token-5678",
+    });
+
+    const request = new Request("https://localhost:3000/tickets/cantus/voorverkoop/valid-token-1234");
+    const response = await GET(request, context("nl", "cantus", "valid-token-1234"));
+
+    const cookies = response.headers.getSetCookie();
+    expect(cookies.some((cookie) => cookie.startsWith("vtk_presale_"))).toBe(true);
+    expect(
+      cookies.some(
+        (cookie) => cookie.startsWith("vtk_private_") && cookie.includes("private-token-5678"),
+      ),
+    ).toBe(true);
   });
 
   it("redirects with language prefix when English is requested", async () => {
@@ -57,7 +80,7 @@ describe("GET /[locale]/tickets/[slug]/voorverkoop/[token]", () => {
     const response = await GET(request, context("en", "cantus", "valid-token-1234"));
 
     expect(response.status).toBe(307);
-    expect(response.headers.get("location")).toBe("/en/tickets/cantus");
+    expect(response.headers.get("location")).toBe("/en/tickets/cantus?via=voorverkoop");
   });
 
   it("redirects to shop without presale cookie if token does not match", async () => {

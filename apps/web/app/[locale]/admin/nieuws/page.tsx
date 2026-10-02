@@ -26,14 +26,12 @@ export default async function AdminNews({ params }: { params: Promise<{ locale: 
     }),
   ]);
 
-  // Waar elk bericht nu staat: uitgelicht, in de band, of erbuiten omdat de band
-  // vol zit. Dezelfde samenstelling als de homepage, zodat het beheer niets
-  // anders belooft dan wat er staat.
-  const { featured, rest } = composeNews(
+  // Waar elk bericht nu staat: uitgelicht of in de band. Dezelfde samenstelling
+  // als de homepage, zodat het beheer niets anders belooft dan wat er staat.
+  const { featured } = composeNews(
     candidates.filter((entry) => !entry.hidden),
-    setting.count,
+    now,
   );
-  const inBand = new Set(rest.map((entry) => entry.key));
 
   const dateFormat = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
     timeZone: "Europe/Brussels",
@@ -54,13 +52,8 @@ export default async function AdminNews({ params }: { params: Promise<{ locale: 
       dateLabel: dateFormat.format(new Date(entry.date)),
       automatic: entry.source !== "notice" && entry.source !== "praeses",
       picked: entry.featured,
-      place: entry.hidden
-        ? "hidden"
-        : featured?.key === entry.key
-          ? "featured"
-          : inBand.has(entry.key)
-            ? "band"
-            : "overflow",
+      place: entry.hidden ? "hidden" : featured?.key === entry.key ? "featured" : "band",
+      needsOptIn: entry.needsOptIn,
     }));
 
   const postRows: NewsPostRow[] = posts.map((post) => ({
@@ -93,22 +86,6 @@ export default async function AdminNews({ params }: { params: Promise<{ locale: 
   }));
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold">{nl ? "Nieuws" : "News"}</h1>
-        <p className="mt-1 text-sm text-zinc-500">
-          {nl
-            ? "De band tussen de snelle links en de openingsuren op de homepage. Ticketverkoop, inschrijvingen, het Bakske, Ir.Reëel en nieuwe fotoalbums komen er vanzelf in; een mededeling of een woordje van de praeses schrijf je hier."
-            : "The band between the quick links and the opening hours on the homepage. Ticket sales, sign-ups, Het Bakske, Ir.Reëel and new photo albums appear by themselves; a notice or a word from the praeses is written here."}
-        </p>
-      </header>
-
-      <NewsManager
-        locale={locale}
-        setting={setting}
-        candidates={candidateRows}
-        posts={postRows}
-      />
-    </div>
+    <NewsManager locale={locale} setting={setting} candidates={candidateRows} posts={postRows} />
   );
 }

@@ -1,10 +1,12 @@
 import "server-only";
 import { unstable_cache } from "next/cache";
+import { after } from "next/server";
 import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { publicUrl } from "@/lib/storage";
 import { markdownToPlainText } from "@/lib/markdown";
 import { getMediaContent } from "@/lib/media-content";
+import { ensureMagazineCover } from "@/lib/magazineCover";
 import { listImmichGalleryAlbums } from "@/lib/immich-gallery";
 import { SITE_CONTENT_TAG } from "@/lib/cachedContent";
 import type { SessionPayload } from "@vtk/auth";
@@ -13,6 +15,7 @@ import { presaleViewerFor } from "@/lib/ticketing/presaleViewer";
 import {
   albumInNews,
   albumNewsDate,
+  isNewsEntryHidden,
   magazinesInNews,
   postInNews,
   signupInNews,
@@ -20,6 +23,7 @@ import {
   ticketInNews,
   ticketNewsDate,
   ticketPresaleInNews,
+  ticketNeedsNewsOptIn,
   ticketPresaleNewsDate,
   type NewsComposable,
   type NewsSource,
@@ -31,6 +35,8 @@ import {
   readNewsSetting,
   type NewsSetting,
 } from "./setting";
+import { withSource } from "@/lib/ticketing/source";
+import { ticketPosterSelect, ticketPosterUrl, type TicketPosterSource } from "@/lib/ticketing/poster";
 
 /**
  * Het nieuws op de homepage lezen: de zelfgeschreven berichten uit `NewsPost`,
@@ -56,23 +62,39 @@ export type NewsEntry = NewsComposable & {
   /** Waar die knop naartoe gaat, als dat iets anders is dan `href`. */
   ctaHref: string | null;
   imageUrl: string | null;
+  /**
+   * `object-position` van de foto, waar het midden niet volstaat: de kaft van
+   * een Bakske is een staande bladzijde, en de kop staat bovenaan.
+   */
+  imagePosition?: string;
   author: { name: string; role: string | null; imageUrl: string | null } | null;
+  /**
+   * Een korte regel onder de titel van een tegel, waar `line` te lang is: de
+   * plaats van een evenement of het aantal foto's van een album. Leeg valt de
+   * tegel terug op `line`.
+   */
+  place?: string | null;
   /**
    * De datum die het bericht toont (pin en kopregel), wanneer dat een andere
    * is dan `date`. Bij een ticketverkoop en een inschrijving is dat de dag van
    * het evenement: wanneer de verkoop of de inschrijving opende, zegt een
    * lezer weinig, en "do 24 sep" boven een uitstap op de 29ste leest als de
-   * dag van de uitstap. `date` blijft wel de volgorde en het label "Nieuw"
-   * bepalen.
+   * dag van de uitstap. `date` blijft wel het label "Nieuw", het uitgelichte
+   * bericht en de volgorde op /nieuws bepalen; de tegels op de homepage volgen
+   * de pin (zie `compareNewsTiles`).
    */
   shownDate?: string;
 };
 
-/** Een bericht zoals het beheer het ziet: ook wat uit het nieuws gehaald is. */
-export type NewsCandidate = NewsEntry & { hidden: boolean };
+/**
+ * Een bericht zoals het beheer het ziet: ook wat uit het nieuws gehaald is.
+ * `needsOptIn` zegt dat het standaard niet in het nieuws staat (de verkoop van
+ * een werkgroep) en er enkel in komt wanneer de redactie het erin zet.
+ */
+export type NewsCandidate = NewsEntry & { hidden: boolean; needsOptIn: boolean };
 
 /** Een pdf van de mediapagina, via dezelfde route als de boekenplank daar. */
-function publicationHref(id: string): string {
+export function publicationHref(id: string): string {
   return `/api/media/publications/${encodeURIComponent(id)}`;
 }
 
@@ -104,17 +126,18 @@ const TICKET_NEWS_SELECT = {
   salesStartAt: true,
   salesEndAt: true,
   publishedAt: true,
-  calendarEvent: { select: { imageKey: true } },
+  // Een verkoop van een werkgroep staat standaard niet in het nieuws.
+  ownerGroup: { select: { type: true } },
+  ...ticketPosterSelect,
 } as const;
 
-type TicketNewsEvent = {
+type TicketNewsEvent = TicketPosterSource & {
   id: string;
   slug: string;
   titleNl: string;
   titleEn: string | null;
   location: string | null;
   startsAt: Date;
-  calendarEvent: { imageKey: string | null } | null;
 };
 
 /**
@@ -142,11 +165,12 @@ function ticketEntry(event: TicketNewsEvent, date: Date, locale: Locale, presale
         ? `Tickets te koop voor ${day}${where}`
         : `Tickets on sale for ${day}${where}`,
     body: null,
-    href: `/tickets/${event.slug}`,
+    href: withSource(`/tickets/${event.slug}`, "nieuws"),
     ctaLabel: nl ? "Tickets kopen" : "Buy tickets",
     ctaHref: null,
-    imageUrl: publicUrl(event.calendarEvent?.imageKey),
+    imageUrl: ticketPosterUrl(event),
     author: null,
+    place: event.location,
   };
 }
 
@@ -162,7 +186,7 @@ export async function collectNews(
   const nl = locale === "nl";
   const { sources } = setting;
 
-  const [posts, hiddenRows, featuredRow, tickets, signups, media, gallery] = await Promise.all([
+  const [posts, hiddenRows, shownRows, featuredRow, tickets, signups, media, gallery] = await Promise.all([
     prisma.newsPost.findMany({
       where: {
         active: true,
@@ -172,11 +196,14 @@ export async function collectNews(
       orderBy: { publishedAt: "desc" },
     }),
     prisma.newsHidden.findMany({ select: { source: true, ref: true } }),
+    prisma.newsShown.findMany({ select: { source: true, ref: true } }),
     prisma.setting.findUnique({ where: { key: NEWS_FEATURED_SETTING } }),
     sources.tickets
       ? prisma.ticketEvent.findMany({
           where: {
             status: "PUBLISHED",
+            // Een privéverkoop is niet voor de hele kring; zie ticketing/privateLink.ts.
+            isPrivate: false,
             startsAt: { gt: now },
             publishedAt: { not: null },
             OR: [{ salesEndAt: null }, { salesEndAt: { gt: now } }],
@@ -218,6 +245,9 @@ export async function collectNews(
   ]);
 
   const hidden = new Set(hiddenRows.map((row) => `${row.source}:${row.ref}`));
+  const shown = new Set(shownRows.map((row) => `${row.source}:${row.ref}`));
+  // De sleutels van de berichten die standaard niet in het nieuws staan.
+  const optIn = new Set<string>();
   const entries: NewsEntry[] = [];
 
   for (const post of posts) {
@@ -254,7 +284,9 @@ export async function collectNews(
 
   for (const event of tickets) {
     if (!ticketInNews(event, now)) continue;
-    entries.push(ticketEntry(event, ticketNewsDate(event)!, locale, false));
+    const entry = ticketEntry(event, ticketNewsDate(event)!, locale, false);
+    if (ticketNeedsNewsOptIn(event)) optIn.add(entry.key);
+    entries.push(entry);
   }
 
   for (const event of signups) {
@@ -273,11 +305,12 @@ export async function collectNews(
         ? `Inschrijven kan tot ${day}${event.location ? `, ${event.location}` : ""}`
         : `Sign up before ${day}${event.location ? `, ${event.location}` : ""}`,
       body: null,
-      href: `/kalender/${event.slug}`,
+      href: withSource(`/kalender/${event.slug}`, "nieuws"),
       ctaLabel: pick(event.urlLabelNl ?? "", event.urlLabelEn, locale) || (nl ? "Inschrijven" : "Sign up"),
       ctaHref: event.url,
       imageUrl: publicUrl(event.imageKey),
       author: null,
+      place: event.location,
     });
   }
 
@@ -303,7 +336,8 @@ export async function collectNews(
       href: publicationHref(item.id),
       ctaLabel: nl ? "Lees het nummer" : "Read the issue",
       ctaHref: null,
-      imageUrl: null,
+      imageUrl: publicUrl(item.coverKey),
+      imagePosition: "50% 0%",
       author: null,
     });
   }
@@ -327,6 +361,9 @@ export async function collectNews(
       ctaHref: null,
       imageUrl: album.coverPhoto?.thumbnailUrl ?? null,
       author: null,
+      place: nl
+        ? `${album.photoCount} ${album.photoCount === 1 ? "foto" : "foto's"}`
+        : `${album.photoCount} ${album.photoCount === 1 ? "photo" : "photos"}`,
     });
   }
 
@@ -334,11 +371,15 @@ export async function collectNews(
   // een zelfgeschreven bericht draagt dat al zelf.
   const choice = readNewsFeatured(featuredRow?.value);
   const picked = choice ? `${choice.source}:${choice.ref}` : null;
-  return entries.map((entry) => ({
-    ...entry,
-    featured: entry.featured || entry.key === picked,
-    hidden: hidden.has(entry.key),
-  }));
+  return entries.map((entry) => {
+    const needsOptIn = optIn.has(entry.key);
+    return {
+      ...entry,
+      featured: entry.featured || entry.key === picked,
+      hidden: isNewsEntryHidden({ hidden: hidden.has(entry.key), needsOptIn, shown: shown.has(entry.key) }),
+      needsOptIn,
+    };
+  });
 }
 
 export async function readNewsSettingFromDb(): Promise<NewsSetting> {
@@ -360,17 +401,34 @@ export const NEWS_TAG = "news";
 const cachedNews = unstable_cache(
   async (locale: Locale) => {
     const setting = await readNewsSettingFromDb();
-    if (!setting.enabled) return { enabled: false, count: setting.count, entries: [] as NewsEntry[] };
+    if (!setting.enabled) return { enabled: false, entries: [] as NewsEntry[] };
     const candidates = await collectNews(locale, new Date(), setting);
     const entries: NewsEntry[] = candidates.flatMap(({ hidden, ...entry }) => (hidden ? [] : [entry]));
-    return { enabled: true, count: setting.count, entries };
+    return { enabled: true, entries };
   },
   ["site", "news"],
   { revalidate: 60, tags: [SITE_CONTENT_TAG, NEWS_TAG] },
 );
 
-export function getCachedNews(locale: Locale) {
-  return cachedNews(locale);
+export async function getCachedNews(locale: Locale) {
+  const news = await cachedNews(locale);
+  // Een Bakske of Ir.Reëel zonder kaft krijgt er een, na het antwoord: deze
+  // bezoeker ziet nog het streepjesvlak, wie na de volgende verversing van de
+  // cache komt (hoogstens een minuut) de eerste bladzijde. Zo hoeft niemand in
+  // /admin/media aan een knop te denken voor een nummer dat al online stond.
+  const missing = news.entries
+    .filter((entry) => (entry.source === "bakske" || entry.source === "irreeel") && !entry.imageUrl)
+    .map((entry) => entry.ref);
+  if (missing.length > 0) {
+    try {
+      after(async () => {
+        for (const id of missing) await ensureMagazineCover(id);
+      });
+    } catch {
+      // Buiten een request (een test, een script) is er geen `after`.
+    }
+  }
+  return news;
 }
 
 /**
@@ -394,6 +452,8 @@ export async function getPresaleNews(
   const candidates = await prisma.ticketEvent.findMany({
     where: {
       status: "PUBLISHED",
+      // Ook niet als voorverkoop: wie erin mag, kreeg de privélink al.
+      isPrivate: false,
       startsAt: { gt: now },
       publishedAt: { not: null },
       salesStartAt: { gt: now },
@@ -423,17 +483,30 @@ export async function getPresaleNews(
   }
   if (allowed.length === 0) return [];
 
-  const [hiddenRows, featuredRow] = await Promise.all([
+  const refs = allowed.map((event) => event.id);
+  const [hiddenRows, shownRows, featuredRow] = await Promise.all([
     prisma.newsHidden.findMany({
-      where: { source: "tickets", ref: { in: allowed.map((event) => event.id) } },
+      where: { source: "tickets", ref: { in: refs } },
+      select: { ref: true },
+    }),
+    prisma.newsShown.findMany({
+      where: { source: "tickets", ref: { in: refs } },
       select: { ref: true },
     }),
     prisma.setting.findUnique({ where: { key: NEWS_FEATURED_SETTING } }),
   ]);
   const hidden = new Set(hiddenRows.map((row) => row.ref));
+  const shown = new Set(shownRows.map((row) => row.ref));
   const choice = readNewsFeatured(featuredRow?.value);
   return allowed
-    .filter((event) => !hidden.has(event.id))
+    .filter(
+      (event) =>
+        !isNewsEntryHidden({
+          hidden: hidden.has(event.id),
+          needsOptIn: ticketNeedsNewsOptIn(event),
+          shown: shown.has(event.id),
+        }),
+    )
     .map((event) => ({
       ...ticketEntry(event, ticketPresaleNewsDate(event)!, locale, true),
       featured: choice?.source === "tickets" && choice.ref === event.id,

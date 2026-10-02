@@ -79,6 +79,7 @@ import {
   outboundHost,
   umamiEvent,
 } from "@/lib/analytics";
+import { withSource } from "@/lib/ticketing/source";
 
 type CareerSetting = {
   titleNl: string;
@@ -183,7 +184,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
     // alle bezoekers. Faalt de lezing, dan valt enkel de band weg.
     getCachedNews(locale).catch((error) => {
       console.error("Nieuws lezen mislukt", error);
-      return { enabled: false, count: 0, entries: [] };
+      return { enabled: false, entries: [] };
     }),
   ]);
 
@@ -562,7 +563,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           helemaal wegvalt zonder berichten of wanneer ze uitstaat in
           /admin/nieuws. Zie lib/news. */}
       {news.enabled ? (
-        <NewsBand entries={newsEntries} count={news.count} locale={locale} base={base} now={now} />
+        <NewsBand entries={newsEntries} locale={locale} base={base} now={now} />
       ) : null}
 
       {(theokot || cursusEntries || cursusUnavailable) && (
@@ -722,7 +723,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
               const categories = event.categories.map((link) => link.category);
               const theme = categories.find((category) => category.audience === null) ?? null;
               const audiences = categories.filter((category) => category.audience !== null);
-              const ticketSlug = publishedTicketSlug(event.ticketEvent);
+              const ticketSlug = publishedTicketSlug(event.ticketEvents);
               return (
                 // Dezelfde kaart als in het raster van /kalender, uit
                 // `vtk-eventcard.css`. Een kaart met knoppen erin kan geen link
@@ -784,7 +785,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                       ))}
                     </div>
                     <h3 className="ev-card-title">
-                      <Link href={`${base}/kalender/${event.slug}`} className="ev-card-link">
+                      <Link href={withSource(`${base}/kalender/${event.slug}`, "home-evenementen")} className="ev-card-link">
                         {title}
                       </Link>
                     </h3>
@@ -836,7 +837,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
                             staat, dezelfde regel als de knop daar. */}
                         {ticketSlug ? (
                           <Link
-                            href={`${base}/tickets/${ticketSlug}`}
+                            href={withSource(`${base}/tickets/${ticketSlug}`, "home-evenementen")}
                             className="ev-card-action"
                             title={nl ? "Tickets kopen" : "Buy tickets"}
                             aria-label={`${nl ? "Tickets kopen" : "Buy tickets"}: ${title}`}

@@ -7,7 +7,9 @@ type Tab = { key: string; href: string; labelNl: string; labelEn: string; cap: k
 const TABS: Tab[] = [
   { key: "sessies", href: "", labelNl: "Sessies", labelEn: "Sessions", cap: "manage" },
   { key: "afhalen", href: "/afhalen", labelNl: "Afhaalbalie", labelEn: "Pickup counter", cap: "pickup" },
+  { key: "overzicht", href: "/overzicht", labelNl: "Overzicht per dag", labelEn: "Daily overview", cap: "pickup" },
   { key: "turflijst", href: "/turflijst", labelNl: "Lijst bestelde broodjes", labelEn: "Ordered sandwiches list", cap: "pickup" },
+  { key: "statistieken", href: "/statistieken", labelNl: "Statistieken", labelEn: "Statistics", cap: "manage" },
   { key: "bans", href: "/bans", labelNl: "Bans & no-shows", labelEn: "Bans & no-shows", cap: "manage" },
   { key: "instellingen", href: "/instellingen", labelNl: "Instellingen", labelEn: "Settings", cap: "manage" },
 ];

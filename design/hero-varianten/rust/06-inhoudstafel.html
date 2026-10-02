@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rust 6: Inhoudstafel</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Stroming: inhoudstafel. Een homepage is vooral een wegwijzer, dus het
+   grootste element is de lijst van plekken waar je heen kan, als regels
+   in een register. De week zit in een lade die je opent met één knop. */
+:root { --paper: #EFF2F8; --surface: #FFFFFF; --ink: #0A0F1F; --navy: #0E1A36; --yellow: #FFD23F; --muted: #5C667F; --on-dark-muted: #B7C0DC; --line: rgb(14 26 54 / .12); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Inter, system-ui, sans-serif; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--navy); outline-offset: 3px; border-radius: 6px; }
+.wrap { max-width: 1160px; margin: 0 auto; padding: 0 32px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.hdr { display: flex; align-items: center; gap: 30px; height: 72px; }
+.hdr img { height: 26px; filter: invert(1) brightness(.12); }
+.hdr nav { display: flex; gap: 22px; font-size: 14px; font-weight: 500; color: var(--muted); }
+.hdr nav a:hover { color: var(--ink); }
+.week-btn { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; height: 40px; padding: 0 16px; border-radius: 999px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); font-size: 14px; font-weight: 600; }
+.week-btn em { font-style: normal; font-size: 12px; font-weight: 700; background: var(--yellow); border-radius: 999px; padding: 1px 8px; }
+.week-btn:hover { box-shadow: inset 0 0 0 1.5px var(--navy); }
+
+.intro { display: grid; grid-template-columns: 1fr auto; gap: 40px; align-items: end; padding: 56px 0 36px; }
+h1 { font-size: 52px; line-height: 1.04; letter-spacing: -0.035em; font-weight: 700; color: var(--navy); }
+.sub { margin-top: 14px; font-size: 18px; color: var(--muted); }
+.cta { display: flex; gap: 12px; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 22px; border-radius: 999px; font-size: 15px; font-weight: 600; white-space: nowrap; }
+.btn-n { background: var(--navy); color: var(--paper); }
+.btn-n:hover { background: var(--ink); }
+.btn-l { box-shadow: inset 0 0 0 1px rgb(14 26 54 / .25); }
+.btn-l:hover { background: var(--surface); }
+
+.index { border-top: 2px solid var(--navy); margin-bottom: 64px; }
+.ix { display: grid; grid-template-columns: 44px 260px 1fr auto 28px; gap: 16px; align-items: center; padding: 20px 8px; border-bottom: 1px solid var(--line); transition: background .15s, padding .2s; }
+.ix i.ic { font-size: 26px; color: var(--navy); }
+.ix b { font-size: 24px; font-weight: 700; letter-spacing: -0.02em; }
+.ix span.d { font-size: 15px; color: var(--muted); }
+.ix .st { font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.ix .st.y { background: var(--yellow); box-shadow: none; }
+.ix i.go { font-size: 20px; color: var(--muted); transition: transform .2s; }
+.ix:hover { background: var(--surface); padding-left: 16px; }
+.ix:hover i.go { transform: translateX(4px); color: var(--ink); }
+.ix.small b { font-size: 18px; } .ix.small { padding-top: 14px; padding-bottom: 14px; }
+
+/* Lade */
+.scrim { position: fixed; inset: 0; background: rgb(10 15 31 / .4); opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 10; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(420px, 100%); background: var(--surface); z-index: 11; transform: translateX(100%); transition: transform .3s cubic-bezier(.16,1,.3,1); display: flex; flex-direction: column; }
+body.open .scrim { opacity: 1; pointer-events: auto; }
+body.open .drawer { transform: none; }
+.dr-h { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; border-bottom: 1px solid var(--line); }
+.dr-h h2 { font-size: 20px; font-weight: 700; }
+.dr-h button { width: 36px; height: 36px; border-radius: 50%; background: var(--paper); display: grid; place-items: center; font-size: 18px; }
+.dr-b { padding: 8px 24px 24px; overflow: auto; }
+.dr-b h3 { font-size: 13px; font-weight: 600; color: var(--muted); margin: 16px 0 4px; }
+.e { display: grid; grid-template-columns: 54px 1fr 28px; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--line); align-items: baseline; }
+.e time { font-size: 14px; color: var(--muted); }
+.e a { font-size: 15px; font-weight: 600; }
+.e a small { display: block; font-size: 13px; font-weight: 400; color: var(--muted); }
+.e a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.star { color: var(--muted); font-size: 17px; } .star[aria-pressed="true"] { color: var(--ink); }
+.dr-f { margin-top: auto; padding: 16px 24px; border-top: 1px solid var(--line); }
+.dr-f .btn { width: 100%; justify-content: center; }
+
+@media (max-width: 960px) { .hdr nav { display: none; } .intro { grid-template-columns: 1fr; } .ix { grid-template-columns: 34px 1fr auto 22px; } .ix span.d { display: none; } }
+@media (max-width: 560px) { .wrap { padding: 0 18px; } h1 { font-size: 36px; } .cta { flex-wrap: wrap; } .ix b { font-size: 19px; } .ix .st { display: none; } .ix { grid-template-columns: 34px 1fr 22px; } }
+@media (prefers-reduced-motion: reduce) { .drawer, .scrim, .ix { transition: none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="hdr">
+    <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+    <nav><a href="#">Info</a><a href="#">Cursusdienst</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Evenementen</a><a href="#">Eerstejaars</a><a href="#">Over VTK</a></nav>
+    <button class="week-btn num" id="open" aria-controls="drawer" aria-expanded="false"><i class="ph ph-calendar-blank"></i>Deze week <em>5 events</em></button>
+  </header>
+
+  <section class="intro">
+    <div><h1>De thuis voor ingenieurs in Leuven.</h1><p class="sub">Cursussen, broodjes, events en career. Gerund door studenten, sinds 1920.</p></div>
+    <div class="cta"><a class="btn btn-n" href="#">Ontdek wat we doen</a><a class="btn btn-l" href="#">Eerstejaars? Start hier</a></div>
+  </section>
+
+  <nav class="index num" aria-label="Snel naar">
+    <a class="ix" href="#"><i class="ph ph-books ic"></i><b>Cursusdienst</b><span class="d">Cursussen ophalen en tweedehands boeken</span><span class="st y">Open tot 13:55</span><i class="ph ph-arrow-up-right go"></i></a>
+    <a class="ix" href="#"><i class="ph ph-bread ic"></i><b>Theokot</b><span class="d">Je broodje voor vandaag bestellen</span><span class="st">Open</span><i class="ph ph-arrow-right go"></i></a>
+    <a class="ix" href="#"><i class="ph ph-hand-heart ic"></i><b>Shiften</b><span class="d">Help mee aan events en verdien munten</span><span class="st y">3 zoeken volk</span><i class="ph ph-arrow-right go"></i></a>
+    <a class="ix small" href="#"><i class="ph ph-briefcase ic"></i><b>Career</b><span class="d">Jobs, stages en bedrijfsevents</span><span></span><i class="ph ph-arrow-right go"></i></a>
+    <a class="ix small" href="#"><i class="ph ph-calendar-blank ic"></i><b>Kalender</b><span class="d">Alle events van deze maand</span><span></span><i class="ph ph-arrow-right go"></i></a>
+  </nav>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<aside class="drawer num" id="drawer" aria-label="Deze week" aria-hidden="true">
+  <div class="dr-h"><h2>Deze week</h2><button id="close" aria-label="Sluiten"><i class="ph ph-x"></i></button></div>
+  <div class="dr-b">
+    <h3>Vandaag, donderdag 1 oktober</h3>
+    <div class="e"><time>12:00</time><a href="#">12 Urencantus<small>Waaiberg</small></a><button class="star" aria-label="Interesse: 12 Urencantus" aria-pressed="false"><i class="ph ph-star"></i></button></div>
+    <div class="e"><time>20:30</time><a href="#">Looptraining<small>Atletiekpiste Sportkot</small></a><button class="star" aria-label="Interesse: Looptraining" aria-pressed="false"><i class="ph ph-star"></i></button></div>
+    <h3>Shiften die volk zoeken</h3>
+    <div class="e"><time>01:00</time><a href="#">Bijrijden afbraak<small>Morgen, 2 munten</small></a><span></span></div>
+    <div class="e"><time>14:00</time><a href="#">Namiddagshift<small>Morgen, 2 munten</small></a><span></span></div>
+    <h3>Volgende week</h3>
+    <div class="e"><time>ma 5</time><a href="#">PeMe-Startactiviteit<small>19:00, Grasveld Alma 3</small></a><button class="star" aria-label="Interesse: PeMe" aria-pressed="false"><i class="ph ph-star"></i></button></div>
+    <div class="e"><time>di 6</time><a href="#">Sector Night Bouwkunde<small>18:30, Quadrivium</small></a><button class="star" aria-label="Interesse: Sector Night" aria-pressed="false"><i class="ph ph-star"></i></button></div>
+  </div>
+  <div class="dr-f"><a class="btn btn-n" href="#">Volledige kalender</a></div>
+</aside>
+<script>
+const openBtn = document.getElementById("open"), drawer = document.getElementById("drawer");
+const set = on => { document.body.classList.toggle("open", on); openBtn.setAttribute("aria-expanded", on); drawer.setAttribute("aria-hidden", !on); if (on) document.getElementById("close").focus(); else openBtn.focus(); };
+openBtn.addEventListener("click", () => set(true));
+document.getElementById("close").addEventListener("click", () => set(false));
+document.getElementById("scrim").addEventListener("click", () => set(false));
+document.addEventListener("keydown", e => { if (e.key === "Escape" && document.body.classList.contains("open")) set(false); });
+document.querySelectorAll(".star").forEach(b => b.addEventListener("click", () => { const on = b.getAttribute("aria-pressed") !== "true"; b.setAttribute("aria-pressed", on); b.querySelector("i").className = on ? "ph-fill ph-star" : "ph ph-star"; }));
+</script>
+</body>
+</html>

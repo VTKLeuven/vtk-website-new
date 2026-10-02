@@ -51,6 +51,25 @@ export type TheokotConfig = {
   banDurationDays: number;
   /** Weergave van het aanbod op de bestelpagina. */
   itemLayout: TheokotItemLayout;
+  /**
+   * De no-show-verwerking staat gepauzeerd: wie niet ophaalt, krijgt geen mail
+   * en telt niet mee voor een ban. De bestelling wordt wel als niet opgehaald
+   * geboekt, zodat de cijfers kloppen. Zie `processDueNoShows`.
+   */
+  noShowPaused: boolean;
+  /**
+   * Aan de afhaalbalie meteen "opgehaald" zetten zodra iemand gevonden is (kaart,
+   * pas, r-nummer, naam of een keuze uit de lijst), in plaats van op de knop te
+   * moeten drukken. Enkel voor een gewone reservatie; een laattijdige blijft een
+   * bewuste klik.
+   */
+  autoPickup: boolean;
+  /**
+   * Wat een half medewerkersbonnetje waard is aan de afhaalbalie, in eurocent.
+   * Een broodje kost `sandwichVoucherCost` bonnetjes: zijn prijs gedeeld door
+   * dit bedrag, afgerond op het dichtste halve bonnetje.
+   */
+  voucherHalfCents: number;
 };
 
 export const DEFAULT_THEOKOT_CONFIG: TheokotConfig = {
@@ -65,6 +84,9 @@ export const DEFAULT_THEOKOT_CONFIG: TheokotConfig = {
   noShowThreshold: 3,
   banDurationDays: 14,
   itemLayout: 'list',
+  noShowPaused: false,
+  autoPickup: false,
+  voucherHalfCents: 60,
 };
 
 const HHMM = /^([01]\d|2[0-3]):([0-5]\d)$/;
@@ -99,6 +121,9 @@ export function parseTheokotConfig(value: unknown): TheokotConfig {
     noShowThreshold: coerceInt(src.noShowThreshold, d.noShowThreshold, 1),
     banDurationDays: coerceInt(src.banDurationDays, d.banDurationDays, 1),
     itemLayout: coerceItemLayout(src.itemLayout, d.itemLayout),
+    noShowPaused: typeof src.noShowPaused === 'boolean' ? src.noShowPaused : d.noShowPaused,
+    autoPickup: typeof src.autoPickup === 'boolean' ? src.autoPickup : d.autoPickup,
+    voucherHalfCents: coerceInt(src.voucherHalfCents, d.voucherHalfCents, 1),
   };
 }
 
@@ -106,16 +131,24 @@ export function parseTheokotConfig(value: unknown): TheokotConfig {
 // Geld
 // -----------------------------------------------------------------------------
 
-/** Eurocent → "€2,60" (Belgische notatie met komma). */
 /**
- * Wat een broodje aan de afhaalbalie kost in medewerkersbonnetjes.
+ * Wat een broodje aan de afhaalbalie kost in medewerkersbonnetjes: een half
+ * bonnetje per `voucherHalfCents` (standaard 60 cent), afgerond op het dichtste
+ * halve. Met 60 cent is een broodje van €2,30 of €2,60 twee bonnetjes en een van
+ * €3,00 tweeënhalf; de grens ligt telkens op de helft, hier bij €2,10 en €2,70.
+ * Een broodje met een prijs kost minstens een half bonnetje, een gratis niets.
  *
  * Staat hier en niet in de action, omdat er intussen twee wegen naar toe leiden:
- * de balie op de site en de scanner in de app. Twee getallen die hetzelfde horen
+ * de balie op de site en de scanner in de app. Twee regels die hetzelfde horen
  * te zijn, zijn er één te veel.
  */
-export const SANDWICH_VOUCHER_COST = 2;
+export function sandwichVoucherCost(priceCents: number, voucherHalfCents: number): number {
+  if (priceCents <= 0) return 0;
+  const halves = Math.max(1, Math.round(priceCents / Math.max(1, voucherHalfCents)));
+  return halves / 2;
+}
 
+/** Eurocent → "€2,60" (Belgische notatie met komma). */
 export function formatEuro(cents: number): string {
   return `€${(cents / 100).toFixed(2).replace('.', ',')}`;
 }

@@ -4,8 +4,9 @@ import { prisma } from "@vtk/db";
 
 import { logAudit } from "@/lib/audit";
 import { academicYearRange } from "@/lib/shift";
-import { outstandingShiftReward } from "@/lib/shift/rewards";
+import { earnedShiftReward, outstandingShiftReward } from "@/lib/shift/rewards";
 import { allocateUserShiftReward, ShiftRewardConflictError } from "@/lib/shift/rewards.server";
+import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import type { AppVoucherEntry } from "./contract";
 
@@ -15,13 +16,21 @@ import type { AppVoucherEntry } from "./contract";
  * **Het saldo is geen kolom.** Het is `Shift.reward` min
  * `ShiftParticipant.rewardPaid`, opgeteld over alle shiften die voorbij zijn.
  * Dat is met opzet zo gebleven: er bestaat al een beheerscherm dat bonnetjes in
- * geld uitbetaalt (`/api/shift/reward`) en een afhaalbalie die er twee afboekt
- * voor een broodje, en die schrijven allemaal in diezelfde kolom. Er een tweede
+ * geld uitbetaalt (`/api/shift/reward`) en een afhaalbalie die er afboekt naar
+ * de prijs van een broodje, en die schrijven allemaal in diezelfde kolom. Er een tweede
  * saldo naast leggen zou betekenen dat de twee uit elkaar kunnen lopen, en dan is
  * geen van beide nog te vertrouwen.
  *
  * Wat hier bijkomt is enkel de derde weg om ze uit te geven: iemand achter een
  * toog scant de pas van een student en tikt een bedrag in.
+ *
+ * Het saldo kan op een half eindigen (een broodje kost per half bonnetje, zie
+ * `sandwichVoucherCost`). Aan de toog gaan er enkel hele af, net zoals bij het
+ * uitbetalen: een half bonnetje bestaat daar niet. Dat half blijft staan voor
+ * de afhaalbalie.
+ *
+ * Een shift uit een werkingsjaar waarin je in het praesidium zat, levert niets
+ * op (`earnedShiftReward`): die telt hier dus ook niet mee in het saldo.
  */
 
 export class VoucherError extends Error {
@@ -33,16 +42,22 @@ export class VoucherError extends Error {
 
 /** Wat deze gebruiker nu kan uitgeven. */
 export async function voucherBalance(userId: string, now = new Date()): Promise<number> {
-  const participations = await prisma.shiftParticipant.findMany({
-    where: { userId, shift: { endTime: { lt: now } } },
-    select: { rewardPaid: true, shift: { select: { reward: true } } },
-  });
+  const [participations, praesidium] = await Promise.all([
+    prisma.shiftParticipant.findMany({
+      where: { userId, shift: { endTime: { lt: now } } },
+      select: { rewardPaid: true, shift: { select: { reward: true, startTime: true } } },
+    }),
+    praesidiumYears([userId]),
+  ]);
 
   return participations.reduce(
     (total, participation) =>
       total +
       outstandingShiftReward({
-        reward: participation.shift.reward,
+        reward: earnedShiftReward(
+          { userId, reward: participation.shift.reward, startTime: participation.shift.startTime },
+          praesidium,
+        ),
         rewardPaid: participation.rewardPaid,
       }),
     0,
@@ -60,12 +75,12 @@ export async function voucherBalance(userId: string, now = new Date()): Promise<
 export async function voucherOverview(userId: string, now = new Date()) {
   const { start, end } = academicYearRange(now);
 
-  const [participations, theokotRedemptions, redemptions] = await Promise.all([
+  const [participations, theokotRedemptions, redemptions, praesidium] = await Promise.all([
     prisma.shiftParticipant.findMany({
       where: { userId, shift: { endTime: { lt: now } } },
       select: {
         rewardPaid: true,
-        shift: { select: { id: true, name: true, reward: true, endTime: true } },
+        shift: { select: { id: true, name: true, reward: true, startTime: true, endTime: true } },
       },
       orderBy: { shift: { endTime: "desc" } },
     }),
@@ -81,6 +96,7 @@ export async function voucherOverview(userId: string, now = new Date()) {
       take: 40,
       select: { id: true, amount: true, place: true, createdAt: true },
     }),
+    praesidiumYears([userId]),
   ]);
 
   let balance = 0;
@@ -88,13 +104,19 @@ export async function voucherOverview(userId: string, now = new Date()) {
   const history: AppVoucherEntry[] = [];
 
   for (const { rewardPaid, shift } of participations) {
-    balance += outstandingShiftReward({ reward: shift.reward, rewardPaid });
-    if (shift.endTime >= start && shift.endTime < end) earnedThisYear += shift.reward;
-    if (shift.reward > 0) {
+    // Een shift uit een praesidiumjaar levert niets op en staat dus ook niet als
+    // verdiend in de historiek.
+    const earned = earnedShiftReward(
+      { userId, reward: shift.reward, startTime: shift.startTime },
+      praesidium,
+    );
+    balance += outstandingShiftReward({ reward: earned, rewardPaid });
+    if (shift.endTime >= start && shift.endTime < end) earnedThisYear += earned;
+    if (earned > 0) {
       history.push({
         id: `shift:${shift.id}`,
         kind: "earned",
-        amount: shift.reward,
+        amount: earned,
         label: shift.name,
         at: shift.endTime.toISOString(),
       });
@@ -149,6 +171,7 @@ export async function redeemVouchers({
   processedById: string;
   place?: string | null;
 }): Promise<{ name: string; amount: number; remaining: number }> {
+  // Enkel hele bonnetjes aan de toog; zie de uitleg bovenaan.
   if (!Number.isInteger(amount) || amount <= 0 || amount > 100) {
     throw new VoucherError("NOT_ENOUGH");
   }

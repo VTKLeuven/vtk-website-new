@@ -4,10 +4,11 @@ import { Search } from 'lucide-react';
 import { getDictionary, pick, type Locale } from '@vtk/i18n';
 import { entryForDate, isClosedHours } from '@/components/editorial/hoursUtils';
 import { getCachedHeaderTabs, getCachedSetting } from '@/lib/cachedContent';
-import { getCurrentSession } from '@/lib/session';
+import { getAuthorizationPreview, getCurrentSession } from '@/lib/session';
 import { hasPermission } from '@vtk/auth';
 import { hasPendingMeetingNotice } from '@/lib/meetings-server';
 import { postAdminLinks } from '@/lib/postAdminLinks';
+import { publicUrl } from '@/lib/storage';
 import { umamiEvent } from '@/lib/analytics';
 import { EditorialNavLinks } from './EditorialNavLinks';
 import { LocaleSwitcher } from './LocaleSwitcher';
@@ -163,6 +164,7 @@ export async function Header({ locale }: { locale: Locale }) {
           {session ? (
             <ProfileMenu
               name={session.user.name}
+              avatarUrl={publicUrl(session.user.avatarKey)}
               isAdmin={session.user.isSuperAdmin || session.permissions.length > 0}
               tools={postAdminLinks(session)}
               canReserveGrocomeet={canReserveGrocomeet}
@@ -178,6 +180,10 @@ export async function Header({ locale }: { locale: Locale }) {
               base={base}
               locale={locale}
               variant="editorial"
+              // Tijdens een autorisatievoorbeeld is elke POST geblokkeerd, ook
+              // de server action van het uitloggen; dan loopt uitloggen via de
+              // stoproute, die het voorbeeld eerst beëindigt.
+              previewActive={Boolean(await getAuthorizationPreview())}
             />
           ) : (
             <Link

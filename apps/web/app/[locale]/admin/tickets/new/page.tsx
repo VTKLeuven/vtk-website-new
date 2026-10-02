@@ -12,6 +12,8 @@ import {
 } from "@/lib/ticketing/authorization";
 import { slugify } from "@/lib/ticketing/slug";
 import { TicketEventCreate } from "@/components/ticketing/admin/TicketEventCreate";
+import { listTicketBannerCategories } from "@/lib/ticketing/bannerCategories";
+import { publicUrl } from "@/lib/storage";
 import { listTicketEventTemplates } from "@/lib/ticketing/templateStore";
 import { utcToLocalDateTime } from "@/lib/ticketing/time";
 import { ticketBase, type AdminLocale } from "@/components/ticketing/admin/format";
@@ -57,8 +59,9 @@ export default async function NewTicketEventPage({
   const calendarEvents = groups.length
     ? await prisma.calendarEvent.findMany({
         where: {
+          // Ook een event dat al tickets heeft: een event kan meerdere
+          // ticketpagina's hebben (een eerstejaarsuur, de waves van Galabal).
           groupId: { in: groups.map((group) => group.id) },
-          ticketEvent: null,
         },
         orderBy: { start: "desc" },
         take: 100,
@@ -72,7 +75,10 @@ export default async function NewTicketEventPage({
     ? (calendarEvents.find((e) => e.id === requestedCalendarEventId) ?? null)
     : null;
   const base = ticketBase(locale);
-  const templates = await listTicketEventTemplates();
+  const [templates, bannerCategories] = await Promise.all([
+    listTicketEventTemplates(),
+    listTicketBannerCategories(),
+  ]);
   const canManageTemplates = hasPermission(session, "tickets.templates");
 
   return (
@@ -112,6 +118,8 @@ export default async function NewTicketEventPage({
           groups={groups}
           calendarEvents={calendarEvents}
           linkedCalendarEvent={linkedCalendarEvent}
+          linkedImageUrl={publicUrl(linkedCalendarEvent?.imageKey)}
+          bannerCategories={bannerCategories}
           baseEvent={
             linkedCalendarEvent
               ? { ownerGroupId: linkedCalendarEvent.groupId, slug: slugify(linkedCalendarEvent.titleNl) }

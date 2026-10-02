@@ -1,6 +1,7 @@
 import { pick } from "@vtk/i18n";
 
 import { prisma } from "@vtk/db";
+import { publishedTicketSlug } from "@/lib/ticketing/eventPage";
 
 import { corsPreflight } from "@/lib/cors";
 import { loadCalendarEvent } from "@/lib/pageQueries";
@@ -103,7 +104,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       description: pick(event.descriptionNl, event.descriptionEn, locale) || null,
       url: event.url,
       urlLabel: event.url ? eventLinkLabel(event, locale) : null,
-      ticketSlug: event.ticketEvent?.status === "PUBLISHED" ? event.ticketEvent.slug : null,
+      ticketSlug: publishedTicketSlug(event.ticketEvents),
       formSlug: formOpen ? (event.form?.slug ?? null) : null,
       interested: interest > 0,
       interestedCount: total >= INTEREST_PUBLIC_THRESHOLD ? total : null,

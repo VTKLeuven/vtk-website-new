@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero A: Rustig</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@1&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Tokens uit apps/web/app/design/vtk-base.css; geen andere kleuren. */
+:root {
+  --paper: #EFF2F8;
+  --paper-2: #E6ECF5;
+  --surface: #FFFFFF;
+  --ink: #0A0F1F;
+  --navy: #0E1A36;
+  --yellow: #FFD23F;
+  --muted: #5C667F;
+  --on-dark-muted: #B7C0DC;
+  --max: 1240px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: Inter, system-ui, sans-serif; background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* Schakelaar tussen de varianten; hoort niet bij het ontwerp. */
+.switch { position: fixed; z-index: 50; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 4px; padding: 4px; background: var(--surface); border-radius: 999px; box-shadow: 0 8px 30px rgb(14 26 54 / .25); }
+.switch button { white-space: nowrap; padding: 8px 16px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--muted); }
+.switch button[aria-pressed="true"] { background: var(--navy); color: var(--paper); }
+.variant { display: none; }
+.variant.on { display: block; }
+
+/* Gedeeld: de donkere zone met foto en scrim, en de kop. */
+.zone { position: relative; color: var(--paper); overflow: hidden; background: var(--navy); }
+.zone-photo { position: absolute; inset: 0; background: url("../../apps/web/public/hero-arenberg.jpg") center 35% / cover; }
+.zone-scrim { position: absolute; inset: 0; background:
+  linear-gradient(100deg, rgb(10 15 31 / .86) 0%, rgb(14 26 54 / .7) 45%, rgb(14 26 54 / .55) 100%),
+  linear-gradient(0deg, rgb(10 15 31 / .75) 0%, transparent 40%); }
+.zone > *:not(.zone-photo):not(.zone-scrim) { position: relative; }
+.wrap { max-width: var(--max); margin: 0 auto; padding: 0 36px; }
+
+.hdr { height: 76px; display: flex; align-items: center; gap: 32px; }
+.hdr img { height: 34px; }
+.hdr nav { display: flex; gap: 22px; font-size: 15px; font-weight: 500; color: rgb(239 242 248 / .88); }
+.hdr nav span { display: inline-flex; align-items: center; gap: 4px; }
+.hdr nav i { font-size: 11px; opacity: .6; }
+.hdr-end { margin-left: auto; display: flex; align-items: center; gap: 16px; font-size: 14px; }
+.hdr-end .search { width: 38px; height: 38px; border-radius: 50%; border: 1px solid rgb(255 255 255 / .2); display: grid; place-items: center; font-size: 17px; }
+.hdr-end .lang b { font-weight: 600; }
+.hdr-end .lang span { color: var(--on-dark-muted); }
+.avatar { width: 38px; height: 38px; border-radius: 50%; background: url("../../apps/web/public/aanbod/sport.jpg") center / cover; border: 2px solid rgb(255 255 255 / .3); }
+
+.kicker { font-size: 14px; color: var(--on-dark-muted); }
+h1 { font-weight: 600; letter-spacing: -0.035em; line-height: 1.02; }
+h1 em { font-family: "Instrument Serif", serif; font-weight: 400; font-style: italic; color: var(--yellow); letter-spacing: -0.01em; padding-right: .04em; }
+.sub { color: rgb(239 242 248 / .82); line-height: 1.55; }
+.btn { display: inline-flex; align-items: center; gap: 8px; height: 48px; padding: 0 22px; border-radius: 999px; font-size: 15px; font-weight: 600; transition: transform .2s cubic-bezier(.16,1,.3,1), background .2s; white-space: nowrap; }
+.btn:active { transform: translateY(1px); }
+.btn-primary { background: var(--surface); color: var(--ink); }
+.btn-primary:hover { background: var(--paper); }
+.btn-ghost { border: 1px solid rgb(255 255 255 / .32); color: var(--paper); }
+.btn-ghost:hover { background: rgb(255 255 255 / .08); }
+.star { color: var(--on-dark-muted); font-size: 17px; }
+.star:hover { color: var(--yellow); }
+.link { font-size: 14px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px; color: var(--paper); }
+.link i { transition: transform .2s; }
+.link:hover i { transform: translateX(3px); }
+
+/* =========================================================
+   A. Rustig (Apple: de foto draagt, één accent, chrome trekt terug)
+   ========================================================= */
+.a-hero { display: grid; grid-template-columns: 1.15fr 1fr; gap: 72px; padding: 56px 0 48px; }
+.a-hero h1 { font-size: 62px; margin: 14px 0 22px; }
+.a-hero .sub { font-size: 18px; max-width: 30em; }
+.a-cta { display: flex; gap: 12px; margin-top: 30px; }
+.a-shift { margin-top: 44px; display: flex; align-items: center; gap: 14px; padding: 14px 18px 14px 14px; border-radius: 16px; background: rgb(255 255 255 / .07); border: 1px solid rgb(255 255 255 / .12); max-width: 470px; transition: background .2s; }
+.a-shift:hover { background: rgb(255 255 255 / .11); }
+.a-shift .ic { width: 40px; height: 40px; border-radius: 12px; background: var(--yellow); color: var(--ink); display: grid; place-items: center; font-size: 21px; flex: none; }
+.a-shift b { display: block; font-size: 15px; font-weight: 600; }
+.a-shift small { font-size: 13px; color: var(--on-dark-muted); }
+.a-shift .ph-arrow-right { margin-left: auto; font-size: 18px; }
+
+.a-agenda-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 14px; }
+.a-agenda-head h2 { font-size: 17px; font-weight: 600; }
+.a-day { display: grid; grid-template-columns: 84px 1fr; padding: 12px 0; border-top: 1px solid rgb(255 255 255 / .12); }
+.a-day:first-of-type { border-top: 0; }
+.a-day-label { font-size: 13px; color: var(--on-dark-muted); padding-top: 3px; }
+.a-day-label b { display: block; font-size: 22px; font-weight: 600; color: var(--paper); line-height: 1; margin-bottom: 2px; }
+.a-day.today .a-day-label b, .a-day.today .a-day-label { color: var(--yellow); }
+.a-ev { display: grid; grid-template-columns: 52px 1fr 24px; align-items: baseline; gap: 4px; padding: 5px 0; font-size: 15px; }
+.a-ev time { font-size: 14px; color: var(--on-dark-muted); }
+.a-ev a { font-weight: 500; }
+.a-ev a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.a-ev small { display: block; font-size: 13px; color: var(--on-dark-muted); font-weight: 400; margin-top: 1px; }
+.a-empty { font-size: 14px; color: var(--on-dark-muted); padding-top: 3px; }
+.a-more { display: inline-block; font-size: 13px; color: var(--on-dark-muted); padding: 2px 0 0 56px; }
+.a-more:hover { color: var(--paper); }
+
+.a-quick { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; padding-bottom: 40px; }
+.a-ql { display: flex; flex-direction: column; gap: 14px; padding: 18px; border-radius: 18px; background: rgb(14 26 54 / .62); border: 1px solid rgb(255 255 255 / .14); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); transition: transform .25s cubic-bezier(.16,1,.3,1), background .2s, border-color .2s; position: relative; }
+.a-ql:hover { transform: translateY(-3px); background: rgb(14 26 54 / .8); border-color: rgb(255 210 63 / .55); }
+.a-ql .ic { width: 42px; height: 42px; border-radius: 12px; background: rgb(255 210 63 / .14); color: var(--yellow); display: grid; place-items: center; font-size: 22px; }
+.a-ql b { font-size: 16px; font-weight: 600; display: block; }
+.a-ql small { font-size: 13px; color: var(--on-dark-muted); display: block; margin-top: 3px; }
+.a-ql .go { position: absolute; top: 18px; right: 18px; font-size: 16px; color: var(--on-dark-muted); transition: color .2s, transform .2s; }
+.a-ql:hover .go { color: var(--yellow); transform: translate(2px, -2px); }
+.open { color: #8BE3A9; }
+
+/* =========================================================
+   B. Snel naar (Raycast: de snelkoppelingen als lijst van commando's)
+   ========================================================= */
+.b-hero { display: grid; grid-template-columns: 1.2fr 1fr; gap: 64px; padding: 52px 0 40px; align-items: start; }
+.b-hero h1 { font-size: 64px; margin: 14px 0 22px; }
+.b-hero .sub { font-size: 18px; max-width: 30em; }
+.b-cta { display: flex; gap: 12px; margin-top: 30px; }
+.b-panel { border-radius: 20px; background: rgb(10 15 31 / .72); border: 1px solid rgb(255 255 255 / .14); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); padding: 8px; }
+.b-panel-head { display: flex; align-items: center; gap: 10px; padding: 12px 14px 10px; font-size: 13px; color: var(--on-dark-muted); border-bottom: 1px solid rgb(255 255 255 / .1); margin-bottom: 6px; }
+.b-panel-head i { font-size: 16px; }
+.b-row { display: grid; grid-template-columns: 40px 1fr auto 18px; align-items: center; gap: 14px; padding: 10px 12px; border-radius: 12px; transition: background .15s; }
+.b-row:hover { background: rgb(255 255 255 / .07); }
+.b-row:hover .ph-caret-right { color: var(--yellow); transform: translateX(2px); }
+.b-row .ic { width: 40px; height: 40px; border-radius: 11px; background: var(--yellow); color: var(--ink); display: grid; place-items: center; font-size: 20px; }
+.b-row b { font-size: 16px; font-weight: 600; }
+.b-row small { display: block; font-size: 13px; color: var(--on-dark-muted); margin-top: 1px; }
+.b-row .state { font-size: 13px; color: var(--on-dark-muted); text-align: right; }
+.b-row .ph-caret-right { color: var(--on-dark-muted); transition: transform .15s, color .15s; }
+
+.b-week { padding: 0 0 44px; }
+.b-week-head { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; }
+.b-week-head h2 { font-size: 17px; font-weight: 600; }
+.b-week-head .chip { display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px 0 10px; border-radius: 999px; background: rgb(255 210 63 / .14); color: var(--yellow); font-size: 13px; font-weight: 600; }
+.b-week-head .chip:hover { background: rgb(255 210 63 / .22); }
+.b-week-head .link { margin-left: auto; }
+.b-days { display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1px solid rgb(255 255 255 / .16); }
+.b-col { padding: 14px 16px 0 0; border-left: 1px solid rgb(255 255 255 / .1); padding-left: 16px; min-height: 168px; }
+.b-col:first-child { border-left: 0; padding-left: 0; }
+.b-col h3 { font-size: 13px; font-weight: 500; color: var(--on-dark-muted); margin-bottom: 12px; }
+.b-col h3 b { font-size: 20px; font-weight: 600; color: var(--paper); margin-right: 6px; }
+.b-col.today h3, .b-col.today h3 b { color: var(--yellow); }
+.b-ev { display: block; margin-bottom: 12px; font-size: 14px; font-weight: 500; line-height: 1.3; }
+.b-ev:hover span { text-decoration: underline; text-underline-offset: 3px; }
+.b-ev time { display: block; font-size: 12px; color: var(--on-dark-muted); font-weight: 400; margin-bottom: 2px; }
+.b-col .none { font-size: 13px; color: rgb(183 192 220 / .6); }
+.b-col .more { font-size: 13px; color: var(--on-dark-muted); }
+.b-col .more:hover { color: var(--paper); }
+
+/* =========================================================
+   C. Tabs (Airbnb: categorieknoppen met icoon; Linear: haarlijnen, één accent)
+   ========================================================= */
+.c-hero { display: grid; grid-template-columns: 1.1fr 1fr; gap: 64px; padding: 56px 0 36px; align-items: start; }
+.c-hero h1 { font-size: 62px; margin: 14px 0 22px; }
+.c-hero .sub { font-size: 18px; max-width: 30em; }
+.c-cta { display: flex; gap: 12px; margin-top: 30px; }
+.c-card { border-radius: 20px; background: rgb(10 15 31 / .7); border: 1px solid rgb(255 255 255 / .14); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); padding: 20px 22px 18px; }
+.c-tabs { display: flex; gap: 4px; padding: 4px; background: rgb(255 255 255 / .07); border-radius: 999px; margin-bottom: 14px; }
+.c-tabs button { flex: 1; height: 36px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--on-dark-muted); display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.c-tabs button[aria-selected="true"] { background: var(--paper); color: var(--ink); }
+.c-tabs .count { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--yellow); color: var(--ink); font-size: 12px; font-weight: 600; display: inline-grid; place-items: center; }
+.c-panel { display: none; min-height: 288px; }
+.c-panel.on { display: block; }
+.c-row { display: grid; grid-template-columns: 76px 1fr 24px; gap: 8px; align-items: baseline; padding: 11px 0; border-bottom: 1px solid rgb(255 255 255 / .09); font-size: 15px; }
+.c-row:last-of-type { border-bottom: 0; }
+.c-row time { font-size: 14px; color: var(--on-dark-muted); }
+.c-row a { font-weight: 500; }
+.c-row a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.c-row small { display: block; font-size: 13px; color: var(--on-dark-muted); margin-top: 2px; }
+.c-row.day { padding: 14px 0 4px; border: 0; font-size: 13px; color: var(--on-dark-muted); grid-template-columns: 1fr; }
+.c-row .coins { font-size: 13px; color: var(--yellow); font-weight: 600; display: inline-flex; gap: 4px; align-items: center; }
+.c-foot { display: flex; justify-content: flex-end; padding-top: 10px; border-top: 1px solid rgb(255 255 255 / .09); margin-top: 4px; }
+.c-quick { display: flex; flex-wrap: wrap; gap: 10px; padding-bottom: 44px; }
+.c-ql { flex: 1 1 auto; justify-content: flex-start; display: inline-flex; align-items: center; gap: 12px; height: 60px; padding: 0 22px 0 10px; border-radius: 999px; background: var(--surface); color: var(--ink); font-size: 15px; font-weight: 600; transition: transform .25s cubic-bezier(.16,1,.3,1), box-shadow .25s; }
+.c-ql:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgb(10 15 31 / .35); }
+.c-ql .ic { width: 40px; height: 40px; border-radius: 50%; background: var(--yellow); display: grid; place-items: center; font-size: 20px; }
+.c-ql small { font-size: 13px; color: var(--muted); font-weight: 400; }
+
+@media (max-width: 1100px) {
+  .hdr nav { display: none; }
+  .a-hero, .b-hero, .c-hero { grid-template-columns: 1fr; gap: 40px; }
+  .a-hero > *, .b-hero > *, .c-hero > * { min-width: 0; }
+  .a-cta, .b-cta, .c-cta { flex-wrap: wrap; }
+  .a-quick { grid-template-columns: repeat(3, 1fr); }
+  .b-days { grid-template-columns: repeat(3, 1fr); row-gap: 20px; }
+}
+@media (max-width: 640px) {
+  .wrap { padding: 0 16px; }
+  .a-hero h1, .b-hero h1, .c-hero h1 { font-size: 44px; }
+  .a-quick { grid-template-columns: repeat(2, 1fr); }
+  .b-days { grid-template-columns: 1fr 1fr; }
+  .c-ql { flex: 1 1 100%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<!-- ============================ A ============================ -->
+<section class="variant on" id="a">
+  <div class="zone">
+    <div class="zone-photo"></div><div class="zone-scrim"></div>
+    <div class="wrap">
+      <header class="hdr" data-hdr></header>
+      <div class="a-hero">
+        <div>
+          <p class="kicker">Vlaamse Technische Kring, KU Leuven</p>
+          <h1>De thuis voor <em>ingenieurs</em><br>in Leuven.</h1>
+          <p class="sub">Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+          <div class="a-cta">
+            <a class="btn btn-primary" href="#">Ontdek wat we doen <i class="ph ph-arrow-up-right"></i></a>
+            <a class="btn btn-ghost" href="#">Eerstejaars? Start hier</a>
+          </div>
+          <a class="a-shift" href="#">
+            <span class="ic"><i class="ph ph-hand-heart"></i></span>
+            <span><b>3 shiften zoeken nog volk</b><small class="tnum">Eerste morgen om 01:00, tot 2 munten</small></span>
+            <i class="ph ph-arrow-right"></i>
+          </a>
+        </div>
+        <div>
+          <div class="a-agenda-head">
+            <h2>Deze week</h2>
+            <a class="link" href="#">Volledige kalender <i class="ph ph-arrow-right"></i></a>
+          </div>
+          <div class="a-day today">
+            <div class="a-day-label tnum"><b>1</b>vandaag</div>
+            <div>
+              <div class="a-ev tnum"><time>12:00</time><a href="#">12 Urencantus<small>Waaiberg</small></a><button class="star" aria-label="Interesse: 12 Urencantus"><i class="ph ph-star"></i></button></div>
+              <div class="a-ev tnum"><time>20:30</time><a href="#">Looptraining<small>Atletiekpiste Sportkot</small></a><button class="star" aria-label="Interesse: Looptraining"><i class="ph ph-star"></i></button></div>
+            </div>
+          </div>
+          <div class="a-day">
+            <div class="a-day-label tnum"><b>2</b>vr</div>
+            <div class="a-empty">Niets gepland</div>
+          </div>
+          <div class="a-day">
+            <div class="a-day-label tnum"><b>5</b>ma</div>
+            <div>
+              <div class="a-ev tnum"><time>19:00</time><a href="#">PeMe-Startactiviteit<small>Grasveld Alma 3</small></a><button class="star" aria-label="Interesse: PeMe-Startactiviteit"><i class="ph ph-star"></i></button></div>
+              <div class="a-ev tnum"><time>21:00</time><a href="#">CaraOké<small>Theokot</small></a><button class="star" aria-label="Interesse: CaraOké"><i class="ph ph-star"></i></button></div>
+              <a class="a-more" href="#">+1 die dag</a>
+            </div>
+          </div>
+          <div class="a-day">
+            <div class="a-day-label tnum"><b>6</b>di</div>
+            <div>
+              <div class="a-ev tnum"><time>12:40</time><a href="#">KANWEEK startvergadering<small>Aula 200K 00.06</small></a><button class="star" aria-label="Interesse: KANWEEK startvergadering"><i class="ph ph-star"></i></button></div>
+              <div class="a-ev tnum"><time>18:30</time><a href="#">Sector Night Bouwkunde<small>Quadrivium</small></a><button class="star" aria-label="Interesse: Sector Night Bouwkunde"><i class="ph ph-star"></i></button></div>
+              <a class="a-more" href="#">+3 die dag</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <nav class="a-quick" aria-label="Snel naar">
+        <a class="a-ql" href="#"><span class="ic"><i class="ph ph-bread"></i></span><span><b>Theokot</b><small>Bestel je broodje</small></span><i class="ph ph-arrow-up-right go"></i></a>
+        <a class="a-ql" href="#"><span class="ic"><i class="ph ph-books"></i></span><span><b>Cursusdienst</b><small class="tnum"><span class="open">Open</span> tot 13:55</small></span><i class="ph ph-arrow-up-right go"></i></a>
+        <a class="a-ql" href="#"><span class="ic"><i class="ph ph-recycle"></i></span><span><b>Tweedehands</b><small>Boeken kopen en verkopen</small></span><i class="ph ph-arrow-up-right go"></i></a>
+        <a class="a-ql" href="#"><span class="ic"><i class="ph ph-clock-countdown"></i></span><span><b>Tijdslot Cudi</b><small>Reserveer je ophaling</small></span><i class="ph ph-arrow-up-right go"></i></a>
+        <a class="a-ql" href="#"><span class="ic"><i class="ph ph-hand-heart"></i></span><span><b>Shiften</b><small>Help mee, verdien munten</small></span><i class="ph ph-arrow-up-right go"></i></a>
+        <a class="a-ql" href="#"><span class="ic"><i class="ph ph-calendar-dots"></i></span><span><b>Kalender</b><small>Alle events</small></span><i class="ph ph-arrow-up-right go"></i></a>
+      </nav>
+    </div>
+  </div>
+</section>
+
+
+
+<script>
+const hdr = `
+  <img src="../../apps/web/public/vtk-logo.png" alt="VTK">
+  <nav>${["Info","Shiften","Career","Cursusdienst","Eerstejaars","Evenementen","Studies"].map(n => `<span>${n} <i class="ph ph-caret-down"></i></span>`).join("")}<span>Media</span><span>Over VTK <i class="ph ph-caret-down"></i></span></nav>
+  <div class="hdr-end"><span class="search"><i class="ph ph-magnifying-glass"></i></span><span class="lang"><b>NL</b> <span>/ EN</span></span><span class="avatar"></span></div>`;
+document.querySelectorAll("[data-hdr]").forEach(h => h.innerHTML = hdr);
+
+
+</script>
+</body>
+</html>

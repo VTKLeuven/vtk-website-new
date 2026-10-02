@@ -292,8 +292,8 @@
   position: absolute;
   z-index: -2;
   inset: 0;
-  left: calc(50% - 50vw);
-  right: calc(50% - 50vw);
+  left: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
+  right: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
 }
 
 .vtk-page-band-inner {
@@ -344,8 +344,8 @@
   position: absolute;
   z-index: -1;
   inset: 0;
-  left: calc(50% - 50vw);
-  right: calc(50% - 50vw);
+  left: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
+  right: calc(50% - calc(50 * var(--vtk-vw, 1vw)));
   pointer-events: none;
   background-image: url("/technisch-pattern.svg");
   background-size: 760px 760px;

@@ -38,15 +38,17 @@ function group(id: string, role: 'MEMBER' | 'LEAD') {
 describe('formulierrollen', () => {
   it('houdt een viewer op lezen en exporteren', () => {
     const capabilities = capabilitiesForFormRoles(['VIEWER']);
-    expect(capabilities).toEqual(['VIEW_FORM', 'VIEW_ENTRIES', 'EXPORT']);
+    expect(capabilities).toEqual(['VIEW_FORM', 'VIEW_ENTRIES', 'EXPORT', 'VIEW_GROUPING']);
     expect(capabilities).not.toContain('MANAGE_ENTRIES');
     expect(capabilities).not.toContain('MAIL_PARTICIPANTS');
+    expect(capabilities).not.toContain('MANAGE_GROUPING');
   });
 
   it('laat een editor inzendingen beheren maar niet het formulier zelf', () => {
     const capabilities = capabilitiesForFormRoles(['EDITOR']);
     expect(capabilities).toContain('MANAGE_ENTRIES');
     expect(capabilities).toContain('MAIL_PARTICIPANTS');
+    expect(capabilities).toContain('MANAGE_GROUPING');
     expect(capabilities).not.toContain('MANAGE_FORM');
     expect(capabilities).not.toContain('MANAGE_ACCESS');
   });

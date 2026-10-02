@@ -7,6 +7,7 @@ import {
   formatTicketPrice,
   type PublicTicketEvent,
 } from "./types";
+import { withSource } from "@/lib/ticketing/source";
 
 /** Onder dit aantal zegt de kaart hoeveel er nog zijn, net als het ticketpaneel. */
 const LOW_STOCK = 20;
@@ -98,7 +99,7 @@ export function TicketEventCard({
         <span className="tcat-owner">{event.ownerGroupName ?? "VTK"}</span>
         {/* De titel draagt de link; `::after` spant ze over de hele kaart. */}
         <h3 className="tcat-title">
-          <Link href={`${base}/tickets/${event.slug}`}>{event.title}</Link>
+          <Link href={withSource(`${base}/tickets/${event.slug}`, "tickets")}>{event.title}</Link>
         </h3>
         <p className="tcat-facts">
           <span>

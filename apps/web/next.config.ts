@@ -50,6 +50,10 @@ const nextConfig: NextConfig = {
     ".prisma/client",
     "@node-rs/argon2",
     "sharp",
+    // De kaft van een Bakske (lib/magazineCover.ts): pdf.js laadt zijn worker
+    // en `@napi-rs/canvas` zelf uit node_modules, dat overleeft de bundler niet.
+    "pdfjs-dist",
+    "@napi-rs/canvas",
     "archiver",
     "nodemailer",
     "@opentelemetry/semantic-conventions",

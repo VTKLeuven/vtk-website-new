@@ -22,6 +22,10 @@ export const FORM_CAPABILITIES = [
   "MAIL_PARTICIPANTS",
   "MANAGE_ACCESS",
   "VIEW_AUDIT",
+  /** Het resultaat van de groepjesmaker bekijken en exporteren. */
+  "VIEW_GROUPING",
+  /** De groepjesmaker instellen, indelen en personen verplaatsen. */
+  "MANAGE_GROUPING",
 ] as const;
 
 export type FormCapability = (typeof FORM_CAPABILITIES)[number];
@@ -29,9 +33,12 @@ export type FormCapability = (typeof FORM_CAPABILITIES)[number];
 /**
  * Viewer leest en exporteert, editor beheert de inzendingen, manager beheert
  * daarbovenop het formulier zelf (velden, instellingen, toegang, verwijderen).
+ *
+ * De groepjes volgen de inzendingen: wie ze mag lezen, mag ook zien in welke
+ * groep iemand zit, en wie ze beheert, mag de groepjes maken en schuiven.
  */
 const ROLE_CAPABILITIES: Record<FormGrantRole, readonly FormCapability[]> = {
-  VIEWER: ["VIEW_FORM", "VIEW_ENTRIES", "EXPORT"],
+  VIEWER: ["VIEW_FORM", "VIEW_ENTRIES", "EXPORT", "VIEW_GROUPING"],
   EDITOR: [
     "VIEW_FORM",
     "VIEW_ENTRIES",
@@ -39,6 +46,8 @@ const ROLE_CAPABILITIES: Record<FormGrantRole, readonly FormCapability[]> = {
     "MANAGE_ENTRIES",
     "MAIL_PARTICIPANTS",
     "VIEW_AUDIT",
+    "VIEW_GROUPING",
+    "MANAGE_GROUPING",
   ],
   MANAGER: FORM_CAPABILITIES,
 };

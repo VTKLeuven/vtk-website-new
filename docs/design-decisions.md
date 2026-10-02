@@ -199,7 +199,12 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   oude bedrag. "Aanbod bewerken" zet daarom elke openstaande reservatie van die
   dag op de nieuwe prijs (`repriceReservedOrders` in `lib/theokot-orders.ts`).
   Een opgehaalde bestelling is betaald en blijft staan. `unitPriceCents` op een
-  bestellijn is dus geen vaste snapshot meer zolang de bestelling `RESERVED` is.
+  bestellijn is dus geen vaste snapshot meer zolang de bestelling niet betaald
+  is: `RESERVED`, en sinds eind september 2026 ook `NO_SHOW`, omdat die aan de
+  balie nog uitgedeeld en dan aan de prijs van het bord betaald wordt. Een
+  reservatie die van voor deze regel nog op de oude prijs stond (2,80 tegen 3,00
+  op het bord), is in migratie `20260928100000_theokot_reprice_open_orders`
+  rechtgezet.
 - **Een verkoopdag aanmaken zet meteen de shiften van die dag neer.** Wie de week
   online zet, vinkt de dagen aan; voor elke dag die daadwerkelijk nieuw is, komen
   ook de drie Theokot-shiften (smeren, middag, namiddag) op `/shift` te staan. Dat
@@ -293,6 +298,13 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 - **Waarom expliciete Brussel-tijd:** "12:00" moet 12:00 lokale tijd zijn in zowel
   zomer- als winteruur. Daarom rekent `lib/theokot.ts` met `Europe/Brussels` via
   `Intl` (geen vaste UTC-offset).
+- **Na de deadline toont `/theokot` geen voorraad meer**: geen "nog 3" en geen
+  "uitverkocht" bij een broodje. Na de deadline is dat getal geen voorraad
+  meer: wat niet besteld is, wordt niet gemaakt. Bleef het staan, dan kwam
+  iemand aan de toog met "er zijn er nog 3" of "de site zei dat er nog waren",
+  voor een broodje dat er niet is. Wie te laat is, is te laat. Het aanbod zelf
+  blijft zichtbaar, de eigen reservatie ook. De app toont na de deadline het
+  aanbod helemaal niet, dus daar speelt dit niet.
 
 ### Limieten
 
@@ -327,7 +339,28 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
 - **Kaartscanner**: de scanner werkt als toetsenbord en tikt `serial;cardAppId` + Enter.
   Eén invoerveld verwerkt beide: bevat de invoer een `;` dan gaat ze naar de KU Leuven
   `idverification`-API (`lib/kul-card.ts`) die een r-nummer teruggeeft; anders wordt de
-  invoer als r-nummer behandeld. Credentials (`KUL_CARD_*`) staan los van de OIDC-login (zie README).
+  invoer als r-nummer of naam behandeld. Credentials (`KUL_CARD_*`) staan los van de OIDC-login (zie README).
+- **Zoeken op naam kan ook, maar enkel onder wie vandaag besteld heeft.** Wat geen
+  kaart en geen pas is en niet op een r-nummer lijkt (`r0123456`, `R0123456` of de
+  zeven cijfers), is een naam (`lib/theokotPickupQuery.ts`). Elk woord moet in de
+  naam of het r-nummer voorkomen. Passen er meerdere mensen, dan kiest de shifter
+  uit een lijst; past er één, dan volgt meteen de bestelling. De beperking tot de
+  bestellingen van vandaag is bewust: aan de balie is dat de enige vraag, het houdt
+  de lijst kort, en een shifter met enkel `theokot.pickup` kan zo niet door het
+  hele ledenbestand bladeren.
+- **De balie werkt zonder KU Leuven.** Naam en r-nummer raken de kaartcontrole
+  niet aan en eindigen op dezelfde opzoeking (`pickupForUser`), met dezelfde
+  prijzen, bonnetjes en "opgehaald"-knop. Ligt de kaartcontrole eruit, dan zegt de
+  foutmelding dat ook, en wat de shifter intikt terwijl een scan nog loopt, blijft
+  staan.
+- **De kaartcontrole kan via de relay van de cursusdienst.** KU Leuven dropt
+  verkeer van ons server-adres naar hun net (hetzelfde blok waarvoor de
+  cursusdienst zijn relay bouwde). `KUL_CARD_RELAY_URL` en `KUL_CARD_RELAY_SECRET`
+  zetten ze aan, met dezelfde waarden als daar: het is dezelfde relay en hetzelfde
+  protocol (relay-secret in `Authorization`, onze KU Leuven-credentials in
+  `X-Kul-Authorization`, dus de relay bewaart ze niet). Leeg is rechtstreeks. Dit
+  geldt voor elke kaartlezer, want de deur, de fakscanner en de ticketscanner gaan
+  langs dezelfde `lib/kul-card.ts`.
 - **Scannen werkt overal op de balie, niet enkel in het veld.** Na een klik op
   "Opgehaald" stond de focus op die knop, en scande de volgende student in het
   niets. Elke gewone toets op de pagina zet nu eerst de focus in het scanveld
@@ -353,6 +386,23 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   ban met een schone lei begint en niet meteen opnieuw geband wordt.
 - Bans en no-show-historiek zijn zichtbaar en **corrigeerbaar** in het admin-paneel
   (`/admin/theokot/bans`). Een correctie kan meteen de actieve ban opheffen.
+- **De verwerking kan gepauzeerd worden** (`noShowPaused` in de instellingen), en
+  een **verkoopdag kan als "er liep iets mis" aangeduid worden** (knop op
+  `/admin/theokot/overzicht`, `TheokotSession.noShowsWaivedAt`). In beide gevallen:
+  - **De bestelling blijft als niet opgehaald geboekt.** De cijfers (opbrengst,
+    wat er overbleef) horen te kloppen, ook op een dag waar iets misliep.
+  - **Geen mail, geen ban, en ook later niet meetellen.** Zo'n no-show krijgt
+    `TheokotOrder.noShowWaivedAt`, en de ban-telling slaat die over. Bewust niet
+    "de verwerking laten liggen tot de pauze voorbij is": dan vertrokken bij het
+    hervatten alle mails van de hele pauze tegelijk, voor dagen die iedereen al
+    vergeten is.
+  - **Achteraf aanduiden kan, maar een mail haal je niet terug.** Was de dag al
+    verwerkt, dan telt de knop elke lopende automatische ban opnieuw zonder die
+    dag; zakt iemand onder de drempel, dan valt de ban weg (einddatum naar nu,
+    zoals bij opheffen). Een ban die de beheerder zelf uitsprak, blijft staan: die
+    had een eigen reden. De bevestiging zegt dat de mails al vertrokken zijn.
+  - Lopende bans blijven lopen tijdens een pauze. Pauzeren is "geen nieuwe
+    gevolgen", niet "vergeven".
 
 ### Afsluiten, verwijderen en te weinig broodjes
 
@@ -382,10 +432,60 @@ open vragen opleverde (`docs/theokot-broodjes-audit-2026-09-21.md`).
   beheerder beslist dat zelf: er staat wel eens iemand een kwartier na sluiting,
   en wat overblijft wordt soms meteen uitgedeeld. Een ban die al uitgesproken
   was, blijft staan; die hef je op bij Bans & no-shows.
-- **Twee medewerkersbonnetjes zijn exact één broodje**: het duurste uit de
-  bestelling. Geen opleg wanneer dat broodje duurder uitvalt, geen geld terug
-  wanneer het goedkoper is. De balie toont daardoor "nog te betalen" en moet zelf
-  niets meer aftrekken. Bonnetjes kunnen ook nog bij een laattijdige afhaling.
+- **Medewerkersbonnetjes betalen exact één broodje**: het duurste uit de
+  bestelling. Geen opleg, geen geld terug. De balie toont daardoor "nog te
+  betalen" en moet zelf niets meer aftrekken. Bonnetjes kunnen ook nog bij een
+  laattijdige afhaling.
+  - **Wat dat broodje kost, volgt zijn prijs: een half bonnetje per 60 cent,**
+    afgerond op het dichtste halve (`sandwichVoucherCost` in `lib/theokot.ts`).
+    €2,30 en €2,60 zijn twee bonnetjes, €3,00 tweeënhalf; de grenzen liggen op
+    €2,10 en €2,70. Tot oktober 2026 was het vast twee, wat een duur broodje
+    goedkoper maakte dan een goedkoop. De 60 cent staat in de Theokot-instellingen
+    (`voucherHalfCents`); een broodje met een prijs kost minstens een half.
+  - **Het saldo kan daardoor op een half eindigen**, en `rewardPaid` en
+    `TheokotVoucherRedemption.amount` zijn kommagetallen. Nooit fijner dan een
+    half: dat is exact in een double, dus de optelling en de voorwaardelijke
+    update op `rewardPaid` blijven kloppen. Afboekingen van voor de wijziging
+    blijven op 2 staan; dat is wat ze toen kostten.
+  - **Fysiek gaan er enkel hele bonnetjes mee.** Een half bestaat niet op
+    papier. Uitbetalen bij de shiften (`/api/shift/reward`) en de toog in de app
+    (`redeemVouchers`) aanvaarden daarom enkel gehele aantallen, tot het hele
+    deel van het saldo; het half blijft openstaan voor de afhaalbalie.
+  - **De server rekent de prijs opnieuw uit bij het afboeken.** De prijs van een
+    gereserveerde bestelling kan nog wijzigen (`repriceReservedOrders`), en de
+    instelling ook. Wijkt de prijs af van wat de balie de student gezegd heeft,
+    dan boekt ze niets af en vraagt ze opnieuw op te zoeken, in plaats van stil
+    een ander bedrag.
+- **Praesidium verdient geen bonnetjes met zijn shiften** (september 2026).
+  Een shift levert niets op wanneer je in het werkingsjaar van die shift in een
+  post met `Group.type = PRAESIDIUM` zat; werkgroepen tellen niet mee. De shift
+  telt wel gewoon mee: de ranglijst, het aantal gedane shiften en de
+  inschrijving blijven zoals ze waren, enkel de bonnetjes vallen weg.
+  - **Per shift, niet per persoon.** Het jaar komt van het begin van de shift
+    (`workingYearOf`, kantelt op 15 juli). Wie in 26-27 praesidium is, houdt wat
+    hij in 25-26 verdiende, en verdient in 27-28 gewoon weer. `currentWorkingYear`
+    is daar niet bruikbaar: die klemt alles van voor 15 juli 2026 op 2026, en dan
+    telt een shift van maart 2026 als praesidiumshift.
+  - **Uitgeven mag.** Wat een praesidiumlid verdiende voor hij praesidium werd,
+    mag hij aan de afhaalbalie en aan de toog uitgeven. De eerdere weigering
+    ("Praesidium betaalt in Theokot niet met online bonnetjes", 28 september)
+    is daarmee weg: het verdienen tegenhouden is wat de kring wou, en een
+    blokkade op het uitgeven hield ook bonnetjes vast die hij eerlijk verdiend
+    had.
+  - **Uitgerekend, niet bewaard.** Er is geen kolom: `earnedShiftReward`
+    (`lib/shift/rewards.ts`) rekent het telkens uit de lidmaatschappen
+    (`praesidiumYears` in `lib/shift/voucherEligibility.ts`), overal waar een
+    saldo, een openstaand bedrag of een verdiende beloning getoond of
+    afgeboekt wordt: het saldo in de app, de afhaalbalie, de afboeking
+    (`allocateUserShiftReward`), het beheerscherm Bonnetjes, de shiftlijsten en
+    de herinneringsmail. Wie laat in een post gezet wordt, verliest dus meteen
+    de openstaande bonnetjes van zijn shiften van dat jaar, en wie eruit
+    gehaald wordt, krijgt ze terug. Dat gold bij de invoering ook voor de
+    shiften die dit werkingsjaar al voorbij waren: die bonnetjes vielen weg.
+  - **Wat al gebeurd is, blijft.** Een bonnetje dat al uitbetaald of uitgegeven
+    werd, wordt niet teruggedraaid; in het beheerscherm telt het als toegekend.
+  - Wat blijft tonen wat een shift "waard" is: de publieke shiftkaarten op de
+    homepage. Dat is het aanbod voor iedereen, niet wat één kijker verdient.
 - **Het aanbod van een dag mag onder het aantal dat al besteld is, en er wordt
   niets automatisch geschrapt.** Er valt een plateau of de bakker levert minder,
   en dan moet dat in het systeem kunnen. Wat er dan gebeurt:
@@ -405,6 +505,97 @@ open vragen opleverde (`docs/theokot-broodjes-audit-2026-09-21.md`).
   dag niets nieuws bestellen. Twee knoppen die "annuleren" heten en iets anders
   doen, is er één te veel. Corrigeren gaat nu over opgehaald, niet opgehaald en
   gereserveerd; een bestelling echt weghalen doe je bij de verkoopdag zelf.
+
+### Een voorbije dag wissen, en "Er liep iets mis" terugdraaien
+
+Twee keuzes uit september 2026, toen testdagen van voor de lancering de
+statistieken scheeftrokken en "Er liep iets mis" per ongeluk aangeduid werd.
+
+- **Een voorbije verkoopdag kan gewist worden, ook met opgehaalde broodjes**
+  ("Verkoopdag wissen" op Overzicht per dag, `purgeFinishedSession`). Dat is iets
+  anders dan "Verkoopdag verwijderen" (een dag die niet doorgaat, met mail):
+  - Enkel wanneer de afhaal voorbij is; een komende dag verwijder je nog altijd
+    op de gewone manier.
+  - Er vertrekt geen mail: niemand staat nog voor een gesloten deur.
+  - Eerst tellen de no-shows van die dag niet meer mee, zoals bij "Er liep iets
+    mis", zodat een automatische ban die op die dag steunde kan wegvallen.
+  - Afgeboekte bonnetjes blijven uitgegeven. Het saldo komt uit de shiften
+    (`rewardPaid`), niet uit `TheokotVoucherRedemption`; enkel de regel in de
+    historiek van de app verdwijnt.
+  - Een vlag "telt niet mee in de statistieken" is overwogen en afgewezen: een
+    testdag hoort ook niet in de historiek, het overzicht en de no-show-telling,
+    en een vlag die elke query moet onthouden, wordt ergens vergeten.
+- **"Er liep iets mis" kan teruggedraaid worden**, alsof de dag nooit aangeduid
+  was (`unwaiveSessionNoShows`):
+  - Een automatische ban die de aanduiding ophief, gaat opnieuw in tot haar
+    oorspronkelijke einddatum (start plus `banDurationDays`).
+  - Wie door de aanduiding geen no-showmail kreeg, krijgt ze alsnog, en wie
+    daardoor de drempel haalt, krijgt een ban. De bevestiging zegt hoeveel
+    mails er vertrekken. Staat de verwerking gepauzeerd, dan blijven die
+    no-shows net als tijdens elke pauze buiten beschouwing.
+  - Een no-show die al vóór de aanduiding niet meetelde, blijft zo: enkel wat de
+    aanduiding zelf wegnam, komt terug.
+
+### Afhaalbalie: suggesties en automatisch op afgehaald
+
+- **Tijdens het tikken verschijnen suggesties**: wie vandaag besteld heeft en op
+  de naam of het r-nummer past, met erbij of die al opgehaald heeft. Dezelfde
+  grens als de naamzoekopdracht (enkel wie vandaag een bestelling heeft), zodat
+  een shifter met enkel `theokot.pickup` niet door het ledenbestand kan
+  bladeren. Wat de kaartlezer of een QR-lezer tikt, krijgt geen suggesties: dat
+  eindigt op een Enter en zoekt zelf.
+- **"Automatisch op afgehaald zetten"** (`autoPickup`, standaard uit): zodra de
+  student gevonden is, langs welke weg ook, staat een gewone reservatie meteen
+  op opgehaald. Aan een drukke balie scheelt dat een klik per broodje.
+  - **Na de bonnetjesvraag, niet ervoor.** Eerst weten of er nog iets te betalen
+    valt, dan pas uitdelen.
+  - **Een laattijdige bestelling blijft een klik.** Die kreeg al een no-show; ze
+    alsnog uitdelen is een bewuste keuze.
+  - **Een foute match is meteen te herstellen**: "Ongedaan maken" zet de
+    bestelling terug op gereserveerd. Smal gehouden, want een shifter heeft geen
+    `theokot.manage`: enkel een afhaling die hij zelf registreerde, binnen een
+    kwartier, en niet meer eens de dag verwerkt is.
+
+### Overzicht per dag en de historiek
+
+`/admin/theokot/overzicht` toont per verkoopdag wie nog moet komen, wie al
+opgehaald heeft (uur en door wie) en wie niet kwam. Aan de balie zie je enkel de
+persoon voor je; hier de hele dag. Een shifter (`theokot.pickup`) ziet de lijsten;
+wie Theokot beheert, ziet ook het geld en de historiek van alle verkoopdagen.
+
+- **Opbrengst is wat opgehaald werd**, niet wat besteld werd: een no-show brengt
+  niets op.
+- **"Met bonnetjes" telt mensen**, niet bonnetjes: hoeveel studenten hun
+  broodje met medewerkersbonnetjes betaalden. **"Aan de balie"** is de opbrengst min wat die
+  bonnetjes dekten (het duurste broodje van elke zulke bestelling, zie hierboven).
+
+### Statistieken van de broodjes
+
+`/admin/theokot/statistieken` (`theokot.manage`) is er om het aanbod en de
+werking bij te sturen: hoeveel van welke soort je bij de bakker bestelt, op welke
+dag minder, en wanneer de balie de meeste handen nodig heeft. Dezelfde
+bouwstenen als de ticketstatistieken (`DailyChart`, de kengetal-tegels, de
+tabellen met een balkje), zodat de twee één familie zijn. De regels staan in
+`lib/theokot-stats.ts`, puur en getest.
+
+- **Verkocht is opgehaald**, zoals op het overzicht per dag. **Besteld** is
+  alles wat nog een bestelling is; een annulatie wist de bestelling en bestaat
+  dus niet in de cijfers.
+- **Vergaderingen (GM, bureau) spreken het aanbod aan.** Ze tellen mee voor "hoeveel
+  van het aanbod raakte besteld" en "uitverkocht", niet voor de opbrengst van de
+  balie. Een bestelling van een groco in de doos van de GM telt als verkocht, maar
+  ook niet als opbrengst en niet als afhaalmoment.
+- **Uitverkocht na** is gemeten vanaf het openen van de bestelronde tot de
+  bestelling die de voorraad van die dag bereikte, in de volgorde waarin ze
+  binnenkwamen, en gemiddeld over de dagen waarop de soort uitverkocht raakte.
+  Een voorraad die achteraf verlaagd werd, telt zoals ze nu staat.
+- **Per weekdag is een gemiddelde per verkoopdag**, geen som: er zijn niet op elke
+  weekdag evenveel verkoopdagen.
+- **Het blok "Opvallend" vergelijkt enkel soorten die geregeld aangeboden werden**
+  (minstens drie dagen en een kwart van de verkoopdagen). Een broodje van de week
+  dat twee dagen bestond, is anders meteen "het traagste".
+- Boven 45 verkoopdagen tekenen de grafieken per week; per dag worden het
+  streepjes.
 
 ### Turf-lijst
 
@@ -487,6 +678,7 @@ grocomeet en het bureau hetzelfde.
 - Er kan **één broodje en één drankje** per persoon per vergadering besteld worden,
   allebei optioneel: enkel een drankje (of niets) kan ook, zie hierboven.
 - Het **broodje van de week** staat er nooit bij: dat blijft voor de studenten.
+  Een groco kan het wel gewoon bij Theokot bestellen, zie hieronder.
 - Een reservatie wordt vaak **weken vooraf** gemaakt, terwijl Theokot het aanbod van
   die week pas een week op voorhand vastlegt. Zolang die verkoopdag niet bestaat,
   komen de keuzes uit de **catalogus** (`TheokotProduct`); bestaat ze wel, dan uit het
@@ -503,6 +695,44 @@ grocomeet en het bureau hetzelfde.
   reservatie staan en zegt het beheerscherm dat er geen verkoopdag is. Er draait
   bewust geen wachter op "de dag nadert en er is nog steeds niets": dat zou een tweede
   scheduler vragen voor iets wat het beheer sowieso op zijn scherm ziet.
+
+### Een groco die zelf bij Theokot bestelt
+
+De grocomeet telt 19 mensen en er zijn 20 broodjes van de week. Zet je dat broodje
+in het aanbod van de GM, dan geeft de kring zichzelf voorrang en blijft er voor de
+studenten bijna niets over. Daarom staat het er niet bij. Een groco kan het wel
+bestellen **zoals elke student**: bij Theokot, vanaf hetzelfde moment, met dezelfde
+limieten, en enkel zolang er nog zijn. Sinds september 2026 komt zo'n bestelling
+dan toch mee in de doos van de GM, zodat niemand tussen de vergadering en de balie
+moet kiezen.
+
+- **Wie**: iedereen met `grocomeet.reserve`. Dat is bewust het recht en niet "is
+  ingeschreven voor die GM", ook al zit het recht via de rol `admin` bij elk lid
+  van IT en Groep 5. Die gaan dus ook in de doos wanneer ze op een GM-dag bij
+  Theokot bestellen. Een superadmin enkel wanneer die het recht via een rol heeft.
+- **Wanneer**: enkel op een dag met een grocomeet (`TheokotOrder.grocomeetId`). Op
+  een andere dag is het een gewone bestelling. Het broodje gaat altijd helemaal in
+  de doos: er is geen keuze per bestelling om het toch zelf af te halen.
+- **Vastgelegd bij het bestellen**, en opnieuw bij aanpassen. Komt er een GM bij of
+  verhuist ze naar een andere dag, dan lijnt `linkGrocomeetOrders` de openstaande
+  bestellingen van die dag opnieuw uit. Wat al afgehandeld is, schuift niet meer.
+- **Turflijst**: die broodjes staan in de kolom GM, niet bij de studenten.
+- **Afhalen**: er is niets af te halen. De balie toont zo'n bestelling met de
+  melding dat ze in de doos zit, zonder knop om ze mee te geven of af te rekenen
+  en zonder bonnetjes (dat zou ze twee keer rekenen). Er vertrekt geen pushbericht
+  "je broodje ligt klaar". Na de afhaal zet de no-show-verwerking ze op opgehaald,
+  dus er komt geen no-show-mail en ze telt niet voor een ban.
+- **Geld**: betaald wordt bij de grocomeet, niet aan de balie. Het beheerscherm van
+  de GM toont ze per vergadering onder "Zelf bij Theokot besteld" met een eigen
+  vinkje voor betaald (`grocomeetPaidAt`), en ze tellen mee in het overzicht
+  "Openstaand". In het overzicht per dag van Theokot staan ze apart ("In de
+  GM-doos") en buiten opbrengst en kassa; in de statistieken tellen ze als
+  verkocht maar niet als opbrengst van de balie.
+- Een GM verwijderen laat die bestellingen bestaan, maar haalt ze uit de doos: dan
+  zijn het weer gewone bestellingen, af te halen en te betalen aan de balie. De
+  bevestiging zegt dat.
+- De VTK-app kent de melding nog niet: bestellen via de app legt het broodje wel in
+  de doos, maar de app toont het nog als af te halen aan de balie.
 
 ### Eigen aanbod (bureau zonder Theokot)
 
@@ -1385,16 +1615,31 @@ terug (`apps/web/lib/brevo/unsubscribe.ts`).
   "Posten" en de shift-postkeuzes filteren op `type = PRAESIDIUM`; werkgroepen
   krijgen hun eigen publieke `/werkgroepen` (zelfde ledenraster + werkingsjaar-
   tabjes als praesidium) en een eigen admin-tab "Werkgroepen".
-- **De verantwoordelijke heet G3 of G4, en dat kiest de werkgroep zelf.** Een
-  werkgroep wordt niet getrokken door een "verantwoordelijke" maar door haar G3
-  of haar G4, en welke van de twee dat is, verschilt per werkgroep. Daarom is het
-  een keuze per werkgroep (`Group.leadLabel`, `G3` | `G4`, default `G3`) en geen
-  vaste tekst: ze staat in de werkgroepinstellingen op `/admin/werkgroepen` en
-  vervangt het woord "Verantwoordelijke" overal waar die lead benoemd wordt (de
-  ledenlijst en het pilletje in het ledenbeheer, de rolkeuze bij lid toevoegen,
-  de kolom "Enkel G3/G4" bij de rol-grants, en de ploeg op de publieke
-  `/werkgroepen`). Een **praesidiumpost** houdt wél "Verantwoordelijke": het veld
-  hangt aan `Group`, maar enkel werkgroepen tonen het.
+- **Hoe de verantwoordelijke heet, kiest de werkgroep zelf.** Een werkgroep
+  wordt niet getrokken door een "verantwoordelijke" maar meestal door haar G3 of
+  haar G4, en welke van de twee dat is, verschilt per werkgroep. Eerst was het
+  een keuze tussen die twee; sinds oktober 2026 is het vrije tekst
+  (`Group.leadLabel`, default `G3`, hoogstens 40 tekens, met G3 en G4 als
+  voorstel in het veld), omdat sommige werkgroepen hun trekkers anders noemen.
+  Het staat in de werkgroepinstellingen op `/admin/werkgroepen` en vervangt het
+  woord "Verantwoordelijke" overal waar die lead benoemd wordt (de ledenlijst en
+  het pilletje in het ledenbeheer, de rolkeuze bij lid toevoegen, de kolom
+  "Enkel G3/G4" bij de rol-grants, en de ploeg op de publieke `/werkgroepen`).
+  Eén veld en niet per taal: "G3" is in beide talen hetzelfde. Een
+  **praesidiumpost** houdt wél "Verantwoordelijke": het veld hangt aan `Group`,
+  maar enkel werkgroepen tonen het.
+- **Op `/werkgroepen` staat de ploeg naast de tekst, niet eronder.** Per
+  werkgroep de infotekst links op leesbreedte en de ploeg rechts in de marge,
+  als register met een haarlijn, zoals de rail van een contentpagina
+  (`vtk-werkgroepen.css`). Bovenaan de kern met een portret en de gele ring, met
+  daaronder op een nieuwe regel de leden, als namen met een klein portret in
+  twee kolommen. Eerst stond iedereen als grote tegel onder de tekst; een
+  werkgroep van zeventien leden zonder profielfoto's werd zo een muur van
+  initialen, met "Lid" zeventien keer herhaald, naast een tekst die maar de
+  linkerhelft vulde. Vier richtingen werden naast elkaar bekeken (de muur van
+  `/praesidium`, portretten met een namenlijst eronder, deze, en een groepsfoto
+  met de namen als bijschrift); deze werd gekozen. Onder 900px schuift de ploeg
+  onder de tekst.
 - **Eigen infotekst + website.** De werkgroep-`description*` is de blurb op
   `/werkgroepen`; `Group.website` is een optionele link (mag zonder schema
   ingevuld worden, wordt genormaliseerd naar `https://`). Beide staan los van de
@@ -3392,6 +3637,58 @@ intekenformulier, en de wijziging komt in de historiek van de rit.
   `adminEditTransportAction` wijzigt ze enkel wanneer ze die expliciet krijgt. Een
   rit een half uur verschuiven mag nooit een rit van eigenaar veranderen.
 
+### Een rit heet naar waarvoor ze dient, niet naar haar evenement
+
+Overal waar een rit een naam kreeg (het blok in de planning, de titel van het
+paneel, de lijst Ritten, de agendafeed, de mails) stond `eventName || purpose`.
+Hangt een rit aan een evenement, dan heette ze dus naar dat evenement, en
+heetten de vijf ritten voor een galabal allemaal "Galabal". Bij het plannen is
+de vraag net wélke van de vijf de tafels brengt. Sinds september 2026 is de
+titel `tripTitle`: de eerste regel van `purpose`.
+
+- **Het evenement staat ernaast, niet erin.** Als eigen rij in het paneel, klein
+  onder de titel in de lijst Ritten, als tag in de beheerkalender, als regel in
+  de beschrijving van de agendafeed en in de mails. In het blok van de planning
+  enkel als je "Evenement" aanvinkt onder Weergave: standaard uit, want een rit
+  van een kwartier is 24 pixels hoog en de regels die er stonden, blijven staan.
+- **De eerste regel, niet de hele tekst.** `purpose` is vrije tekst tot 1000
+  tekens en een titel staat op één regel. Het kaartje en het detail tonen de
+  volledige tekst wanneer er meer staat dan die eerste regel.
+
+### Het evenement van een rit zet je op één manier, ook vanuit de planning
+
+Een rit hangt aan een evenement met twee velden: `eventId` (de koppeling) en
+`eventName` (de momentopname van de naam, of wat een lid vrij intikte zonder te
+koppelen). Tot september 2026 schreven twee acties ze elk op hun manier, en
+liepen ze uit elkaar:
+
+- "Loskoppelen" op Ritten zette enkel `eventId` op null. De naam bleef staan, in
+  een tweede rij "Evenement", in de titel en in de feed, dus de knop leek niets
+  te doen. Koppelen daar zette omgekeerd geen naam.
+- In de planning stond de keuzelijst onderaan in "Rit aanpassen", enkel voor
+  deze helft van een heen- en terugrit, niet op een gereden rit, en ze verdween
+  helemaal zodra er binnen twee weken van de getoonde periode geen evenement
+  was.
+
+Nu schrijft enkel `linkToEventAction` die twee velden, via
+`transportEventChanges`, en beide schermen tonen dezelfde rij (`EventLink`):
+
+- **Koppeling en naam gaan altijd samen.** Koppelen zet de naam van het
+  evenement, loskoppelen wist ze. Ook een naam die de aanvrager zelf intikte:
+  die staat in de rij als "door de aanvrager ingevuld, niet gekoppeld", met een
+  knop "Wissen" achter een bevestiging. Daarmee ruim je ook de ritten op die
+  vóór deze wijziging "losgekoppeld" werden en hun naam hielden; die zijn in de
+  database niet te onderscheiden van een vrij ingetikte naam, want de oude actie
+  schreef geen historiek.
+- **Beide helften samen**, met een historiekregel per helft.
+- **Ook op een gereden of geannuleerde rit.** De koppeling groepeert enkel en
+  verandert niets aan de afspraak; de uren en de reden blijven wel op slot.
+- **Dezelfde keuzes op beide schermen**: `selectableEvents()`, de evenementen
+  van de voorbije maand en later. Het venster van ±14 dagen blijft enkel voor
+  een nieuwe rit en voor de strook boven het rooster.
+- **Slepen raakt het niet meer.** `adminEditTransportAction` kent het evenement
+  niet meer; een sleep stuurde de koppeling vroeger ongemerkt mee.
+
 ### Een eigen nota bij een rit, en wie ze mag lezen
 
 Een rit droeg al twee nota's: `memberNote` (wat de aanvrager bij het aanvragen
@@ -4657,9 +4954,10 @@ centraliseer hem in één helper zodat hij op één plek aanpasbaar is. De rewar
 wordt **verbruikt** in `apps/web/app/api/shift/reward/route.ts`. Per deelname
 houdt `ShiftParticipant.rewardPaid` exact bij hoeveel bonnetjes al toegekend of
 digitaal gebruikt zijn; daardoor kan een beheerder bijvoorbeeld 10 van 12
-openstaande bonnetjes uitbetalen. De afhaalbalie kan twee openstaande bonnetjes
-atomair afboeken voor een broodje en schrijft daarvoor een auditrij in
-`TheokotVoucherRedemption`. Wil je de waardering wijzigen, pas dan de
+openstaande bonnetjes uitbetalen, altijd in hele bonnetjes. De afhaalbalie kan
+openstaande bonnetjes atomair afboeken voor een broodje, per half naar de prijs
+(zie "Afsluiten, verwijderen en te weinig broodjes" bij Theokot), en schrijft
+daarvoor een auditrij in `TheokotVoucherRedemption`. Wil je de waardering wijzigen, pas dan de
 spiegel-helper aan; de saldo- en auditlogica blijft gelijk.
 
 ### Post: "Cursusdienst"
@@ -7133,10 +7431,21 @@ Alles daarvan zit nu in `/admin/rekeningen`. De werkende keuzes:
 
 **De boekhouder wil één vast blad, dus dat blad blijft.** `blad.pdf` staat onder
 `apps/web/public/rekeningen/`, en `lib/rekeningen/report.ts` vult het in op exact
-dezelfde coördinaten als billsheet, met dezelfde bestandsnaam
-(`26-27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf`). De bladen van vóór en na de
-overstap liggen bij de boekhouder in dezelfde map; ze moeten er dus hetzelfde
-uitzien. Een mooiere, zelfgetekende PDF was hier de verkeerde verbetering.
+dezelfde coördinaten als billsheet. De bladen van vóór en na de overstap liggen
+bij de boekhouder in dezelfde map; ze moeten er dus hetzelfde uitzien. Een
+mooiere, zelfgetekende PDF was hier de verkeerde verbetering.
+
+**De bestandsnaam is `JJ_JJ_POST_ACTIVITEIT_BEDRAG`**
+(`26_27_Fakbar_Doopcantus_248.9.pdf`), op vraag van de penning in september
+2026. Billsheet schreef het jaar als `26-27` en zette de omschrijving er nog
+achter; dat streepje is een underscore geworden, zodat elk deel met hetzelfde
+teken gescheiden is, en de omschrijving is eruit. Die is een hele zin, terwijl
+de activiteit ("Doopcantus") al zegt waarvoor de uitgave was. De
+download en de bijlage van de mail naar de boekhouder dragen dezelfde naam
+(`expenseReportFilename`). Een rij in de lijst heeft daarom een vierde knop die
+het blad meteen downloadt, naast "Blad bekijken": wie een reeks rekeningen in een
+map wil zetten, hoeft niet voor elke rekening het voorbeeldvenster te openen.
+Draaien kan enkel in dat venster.
 
 **Het bonnetje kan gedraaid worden voor het vertrekt.** Een kassaticket komt van
 een telefoon en ligt vaak op zijn kant. Het voorbeeldvenster genereert bij elke
@@ -8237,6 +8546,48 @@ openzetten voor iedereen.
 - Een verkeerde of ingetrokken link leidt gewoon naar de ticketpagina in plaats
   van naar een foutmelding: die zou enkel verklappen dat er een link bestaat.
 
+## Privéverkoop: een event dat enkel via een link bestaat
+
+September 2026. Sommige verkopen zijn niet voor de hele kring: een
+praesidiumweekend, een sponsordiner, een activiteit van één werkgroep. Die
+hoorden niet op /tickets te staan, maar een ticketevent was tot nu toe ofwel
+concept (niemand kan kopen) ofwel gepubliceerd (iedereen ziet het).
+
+**Een ticketevent kan daarom privé zijn** (`TicketEvent.isPrivate`), met een
+eigen geheime link (`privateToken`, `/tickets/<slug>/prive/<token>`). Het beheer
+zet dat in het paneel "Openbaar of privé" bij de instellingen, los van
+publiceren: een privé-event is gewoon gepubliceerd, gepauzeerd of gesloten,
+maar staat nergens.
+
+- **Nergens betekent nergens.** Niet op /tickets, niet als tab of knop bij het
+  kalenderevent, niet op de evenementkaarten van de homepage en de kalender,
+  niet in het nieuws (ook niet als voorverkoop) en niet in de app. Ook niet
+  voor wie de link al volgde: een lijst is wat de hele kring ziet.
+- **Zonder de link bestaat de pagina niet.** `/tickets/<slug>` geeft een 404,
+  dezelfde als een verkeerde slug, en het afrekenen weigert met
+  `EVENT_NOT_ON_SALE`. Een slug is geen geheim ("weekend", "cantus"), dus
+  enkel "niet in de lijst zetten" was geen privéverkoop geweest.
+- **De link werkt zoals de voorverkooplink.** Een cookie voor dat ene event,
+  dan door naar de gewone ticketpagina. Het verschil is hoe lang ze leeft: tot
+  de verkoop sluit (of tot het event voorbij is), want hier komt iemand dagen
+  later terug om te bestellen, na overleg met wie meegaat.
+- **Vernieuwen neemt de link terug**, ook van wie hem al opende. Openbaar
+  maken doet dat niet: het token blijft staan, zodat wie per ongeluk op
+  "Openbaar maken" klikte en het terugdraait dezelfde, al gedeelde link
+  terugkrijgt.
+- **Tickettypes en voorverkoop blijven gelden.** De link bepaalt wie het event
+  ziet, niet wie welk ticket mag: een ledenticket op een privé-event is nog
+  steeds enkel voor leden. De voorverkooplink van een privé-event opent de
+  pagina ook, zodat de groep die vroeger mag geen tweede link nodig heeft.
+- **De link hangt aan het event, niet aan een persoon.** Er is bewust geen
+  lijst van wie mag kopen: de vraag was een link om te delen met een groep, en
+  een gastenlijst per naam is een ander stuk werk (en een ander soort
+  beheer). Wordt de link te breed gedeeld, dan is vernieuwen het antwoord.
+- In het beheer opent "Ticketshop" een privé-event via de privélink, maar enkel
+  voor wie het event beheert; een scanner of een lezer van de statistieken
+  krijgt het voorbeeld. De link is de toegang zelf en hoort niet in elke
+  beheerpagina.
+
 ## Lidmaatschap van de kring
 
 VTK houdt per **academiejaar** bij wie lid is (`Membership`, uniek op lid +
@@ -8358,6 +8709,55 @@ werd **de kalenderpagina met tickets per soort** gekozen.
   de vragen per aanwezige niet, en een formulier dat meegroeit terwijl je nog
   aan het kiezen bent, duwt de beschrijving weg voor je ze gelezen hebt.
 - **Op een gsm staan de tickets eerst**, daarvoor kwam je.
+
+## Tickets op de eventpagina, en meerdere ticketpagina's per event
+
+`/kalender/<slug>` en `/tickets/<slug>` waren voor een event met tickets bijna
+dezelfde pagina: dezelfde kop, dezelfde affiche, meestal dezelfde tekst, enkel
+het paneel rechts verschilde ("Doe mee" of de tickets). Uit drie richtingen
+(de kassa in de zijbalk, "Doe mee" houden met de tickets in een band eronder,
+en de ticketpagina als hoofdpagina) werd in september 2026 **de kassa in de
+zijbalk** gekozen, met tabs voor meerdere verkopen.
+
+- **Samenvoegen is een keuze per ticketpagina** (`TicketEvent.onEventPage`,
+  "Op de eventpagina" in het ticketbeheer), niet verplicht. Een event zonder
+  tickets en een ticket zonder event blijven exact zoals ze waren; een
+  gekoppelde verkoop zonder het vinkje houdt haar eigen pagina, met een knop op
+  de eventpagina. Bestaande koppelingen stonden bij de invoering uit: er
+  veranderde niets tot iemand het aanzette. Nieuw aangemaakt vanuit een
+  kalenderevent staat het aan.
+- **Samengevoegd is het paneel rechts de shop** en staan "Geïnteresseerd" en
+  "Zet in mijn agenda" klein eronder, omlijnd en niet navy: de ticketknop is de
+  handeling. "Terug naar kalender" valt weg, de kop draagt die link al. Op een
+  gsm volgen interesse en agenda meteen op de tickets, voor de affiche.
+- **Een event kan meerdere ticketpagina's hebben** (`calendarEventId` is niet
+  meer uniek): de volledige 12u naast de losse cantussen, een eerstejaarsuur
+  vooraf, de waves van Galabal. Op de eventpagina staan ze als tabs bovenaan het
+  paneel, chronologisch en bij hetzelfde uur in volgorde van aanmaken.
+  - **Elke tab is een link naar het eigen adres van die verkoop**
+    (`/tickets/<slug>`), en dat adres toont de eventpagina met die tab gekozen.
+    Zo is "de losse cantussen" te delen zonder de volledige 12u erbij, en blijven
+    links op affiches en in mails werken. `/kalender/<slug>` toont de eerste.
+  - **Een bestelling blijft per verkoop.** Een andere tab is een ander mandje;
+    wat je koos, verdwijnt bij het wisselen.
+  - **De titel komt van het event en is voor elke tab dezelfde**, dus een tab
+    heeft een eigen naam (`labelNl`/`labelEn`). Die is verplicht zodra er een
+    tweede verkoop op de pagina staat. Wie een bestaande losse verkoop achteraf
+    koppelt, krijgt haar oude titel als naam, anders was "Cantussen apart"
+    nergens meer te lezen.
+  - **Een verkoop kan eigen uren hebben** (`ownTimes`): een eerstejaarsuur dat
+    een uur vroeger begint, of een wave. Titel, beschrijving en locatie blijven
+    van het event; enkel de uren niet, zodat de bevestigingsmail en het ticket
+    het juiste uur dragen. Het paneel zegt dan "Deze tickets: 19:00 - 00:00".
+    Zonder dat vinkje volgen de uren het event, zoals voordien.
+- **De koppeling kan achteraf gezet of gewijzigd worden** in het ticketbeheer;
+  voordien lag ze vast bij het aanmaken, en een verkoop die al bestond, kon niet
+  meer bij haar event.
+- **De kaart op /kalender en op de homepage en de app** linken naar de eerste
+  gepubliceerde verkoop (`publishedTicketSlug`). Staat die op de eventpagina,
+  dan opent die link net die pagina met de tickets gekozen.
+- De ontwerpen staan in een canvas met de drie richtingen; de keuze is A met de
+  tabs uit de rij "meerdere ticketpagina's".
 
 ## De bestelpagina: je bestelling in het paneel waar je mandje stond
 
@@ -9047,10 +9447,10 @@ heeft, en over een werkingsjaar is het verschil tussen 14u en 15u vaak ruis. Per
 ## Nieuws tussen de hero en de openingsuren
 
 De homepage heeft een Nieuws-band tussen de snelle links en de openingsuren:
-één uitgelicht bericht links, de rest als register ernaast (soort, titel, één
-regel). Beheer via Admin → Website → Nieuws (`news.manage`), waar de band ook
-helemaal uit kan. Code: `apps/web/lib/news` (regels, instelling, lezen) en
-`components/editorial/NewsBand.tsx`.
+links het uitgelichte bericht, rechts de rest als tegels in een carrousel.
+Beheer via Admin → Website → Nieuws (`news.manage`), waar de band ook helemaal
+uit kan. Code: `apps/web/lib/news` (regels, instelling, lezen),
+`components/editorial/NewsBand.tsx` en `NewsCarousel.tsx`.
 
 **Waarom een band en geen aankondiging.** Een aankondiging is één bericht dat
 je wegklikt. Veel dingen die de kring wil zeggen, passen daar niet in: een
@@ -9058,15 +9458,46 @@ mededeling met veel uitleg, een link naar een pagina die niet in de header
 hoort, of gewoon "de ticketverkoop van het galabal is open". Die horen op een
 vaste plek waar je ze terugvindt.
 
-**Vier richtingen bekeken, deze gekozen.** Naast dit register werden een raster
-van ticketpassen, glaskaarten op de herofoto en de kaarten van /tickets bekeken.
-Het register won: het werkt even goed met en zonder foto's (een Bakske of een
-ticketverkoop heeft er vaak geen), met drie of acht berichten, en een lange
-handgeschreven tekst en een korte automatische regel krijgen elk hun eigen
-vorm. De band is lichtblauw (`--paper-2`), dus de strakke naad onder de donkere
-zone is nu een naad tussen donker en lichtblauw, en de openingsuren sluiten er
-navy op aan. Zonder berichten, of met de band uit, valt hij helemaal weg en
-staat alles zoals voordien.
+**De vorm: de brief links, eventtegels in een carrousel ernaast.** Eerst stond
+er een register naast de uitgelichte kaart, met per soort een gekleurde tegel
+en een icoon (blauw voor tickets, groen voor inschrijvingen, oranje voor het
+woordje). Die kleuren en iconen kwamen nergens anders op de site terug. Nu is
+elk bericht de eventtegel van de kalender en de band "Aankomende evenementen"
+(`vtk-eventcard.css`, dezelfde klassen, geen tweede kaart), met de gele
+datumpin op de foto en de soort als woord in kleine kapitalen, zoals
+"TICKETS" op /tickets. Zonder foto krijgt een tegel het streepjesvlak.
+
+- **De soort is een woord, geen kleur.** `--news-*` en de iconentabel zijn
+  weg; kom er niet op terug zonder dat die kleuren ook elders iets betekenen.
+- **De tegels schuiven, de brief blijft staan.** Drie tegels in beeld (twee
+  op een tablet, één en een stukje op een telefoon), met een knop links en
+  rechts, en om de tien seconden vanzelf één verder; na de laatste begint
+  het weer vooraan. Zo kan de band meer dan vier berichten tonen zonder hoger
+  te worden. Het is een gewone scroller met snap-punten, zodat een telefoon
+  erdoor swipet en een toetsenbord dat naar een tegel buiten beeld tabt, hem
+  vanzelf in beeld haalt.
+- **Wat vanzelf beweegt, is te stoppen.** Er is een pauzeknop, de wekker
+  wacht zolang de muis erop staat, de focus erin zit of het tabblad verborgen
+  is, en bij `prefers-reduced-motion` is er geen autoplay. Passen alle tegels,
+  dan vallen knoppen en wekker weg.
+- **De brief bepaalt zijn eigen hoogte, de tegels zijn 85% daarvan.**
+  Drie varianten werden gemeten waarin de tegels de hoogte bepalen en de brief
+  die ruimte vult (over twee rijen tegels, als strook erboven, of met foto's
+  die meerekken). Gekozen is de eenvoudigste: de brief houdt zijn negen regels.
+  Tegels op hun natuurlijke hoogte voelden daarnaast te klein, dus
+  `NewsCarousel` meet de uitgelichte kaart en maakt elke tegel 85% zo hoog (75%
+  werd geprobeerd en voelde nog te klein); de
+  extra hoogte gaat naar de foto, niet naar een leeg vlak onder de titel. Een
+  opengeklapte brief verandert die maat niet, en waar de kaart boven de tegels
+  staat (smal scherm), geldt ze niet.
+
+Eerder werden naast het register een raster van ticketpassen, glaskaarten op
+de herofoto en de kaarten van /tickets bekeken; het register won toen omdat het
+met en zonder foto's werkte. Het streepjesvlak lost dat nu op binnen de tegel.
+De band is lichtblauw (`--paper-2`), dus de strakke naad onder de donkere zone
+is een naad tussen donker en lichtblauw, en de openingsuren sluiten er navy op
+aan. Zonder berichten, of met de band uit, valt hij helemaal weg en staat alles
+zoals voordien.
 
 **Half automatisch.** Wat iemand zelf schrijft (een mededeling, een woordje van
 de praeses) staat in `NewsPost`. De rest wordt bij het lezen afgeleid uit zijn
@@ -9087,6 +9518,17 @@ bron, zodat een album dat verdwijnt of een verkoop die sluit vanzelf wegvalt:
   vinkje en geen gok op de knoptekst: "Inschrijflink" staat ook bij events waar
   je je al lang niet meer kan inschrijven.
 - **Het Bakske en Ir.Reëel**: per blad het nieuwste nummer, drie weken lang.
+  De tegel toont de bovenkant van bladzijde 1 als foto (`coverKey`). Die kaft
+  wordt één keer gemaakt, op de server (`lib/magazineCover.ts`, pdf.js op
+  `@napi-rs/canvas`), en niet bij elke bezoeker: pdf.js op de homepage zou
+  iedereen een megabyte script en een stuk pdf laten laden voor één tegel.
+  - Eerst gebeurde dit in de browser van wie uploadde, met een knop voor oudere
+    edities. Het nummer dat al online stond, bleef zo zonder kaft tot iemand aan
+    die knop dacht. Nu komt een kaft er vanzelf: bij het uploaden, na het
+    antwoord zodra het nieuws een editie zonder kaft toont, en voor oudere
+    nummers een paar per ronde van de onderhoudstaak.
+  - Zonder kaft (een kapotte pdf, een oude link die niet meer bestaat) blijft
+    het streepjesvlak. Het fotoknopje in /admin/media maakt een kaft opnieuw.
 - **Fotoalbums**: twee weken vanaf de datum van het album. Bewust die datum en
   niet het uploadmoment: Immich geeft dat niet mee, en een album van een
   activiteit van een maand geleden is geen nieuws meer.
@@ -9094,16 +9536,46 @@ bron, zodat een album dat verdwijnt of een verkoop die sluit vanzelf wegvalt:
 Een automatisch bericht kan uit het nieuws gehaald worden zonder aan de bron te
 komen (`NewsHidden`); per bron kan het ook helemaal uit.
 
+**Een ticketverkoop van een werkgroep staat standaard niet in het nieuws.** Een
+werkgroep verkoopt haar tickets via de site, maar wat er op de homepage komt,
+beslist de redactie van de kring. Zo'n verkoop staat in /admin/nieuws dus als
+verborgen, met de uitleg erbij, en wie `news.manage` heeft (de redactie, niet de
+werkgroep zelf) zet ze er met het oog in (`NewsShown`, het omgekeerde van
+`NewsHidden`; de actie houdt de twee exclusief, en verbergen wint). Dat geldt
+voor het gewone bericht en voor de voorverkoop, die dezelfde sleutel dragen. De
+regel staat in `ticketNeedsNewsOptIn` (`lib/news/rules.ts`) en kijkt naar het
+type van de eigenaarsgroep. Een verkoop die al in het nieuws stond toen dit
+erbij kwam, viel eruit tot iemand ze erin zette; dat was de bedoeling. Het
+paneel "Openbaar of privé" van zo'n event belooft daarom ook geen plaats in het
+nieuws.
+
 **Een ticketverkoop en een inschrijving tonen de dag van het evenement.** De
 datumpin en de kopregel stonden op het moment dat de verkoop opende, en "do 24
 sep" boven een uitstap op de 29ste las als de dag van de uitstap. Wanneer de
-verkoop begon, is voor een lezer niet relevant. Dat moment blijft wel de
-volgorde en het label "Nieuw" bepalen (`NewsEntry.shownDate` naast `date`).
+verkoop begon, is voor een lezer niet relevant. Dat moment blijft wel het label
+"Nieuw" en de keuze van het uitgelichte bericht bepalen (`NewsEntry.shownDate`
+naast `date`).
+
+**De tegels volgen hun pin: eerst wat komt, het vroegste eerst.** Gesorteerd op
+wanneer iets nieuws werd, stond een verkoop die gisteren opende voor een cantus
+over twee weken vóór de sector night van morgen, en sprongen de pinnen heen en
+weer (1 okt, 6 okt, 28 sep). Nu staat in de carrousel eerst alles met een dag
+die nog moet komen, het vroegste eerst, en daarna wat al gebeurde (een woordje,
+een album, een Bakske), het recentste eerst (`compareNewsTiles` in
+`lib/news/rules.ts`). Een tijdlijn van oud naar nieuw werd niet gekozen: dan
+opent de band met het oudste album.
+
+**Er is geen maximum aantal berichten.** Er was een instelling van 3 tot 8, en
+wat erbuiten viel, stond in het beheer als "Band vol". Maar de tegels staan in
+een carrousel die schuift, dus er is geen plaats die volloopt; het maximum liet
+enkel berichten vallen die wel in het nieuws hoorden. Wat te oud is, valt er al
+uit via de houdbaarheid hierboven, en wat er niet in hoort, haal je er in het
+beheer uit. Een opgeslagen `count` in `home.news` wordt genegeerd.
 
 **Uitgelicht: de keuze van de redactie, anders het woordje, anders het
 nieuwste.** Het woordje van de praeses is voor het Bakske geschreven, een halve
-A5 met aanhef en groet. Het wordt dus niet tussen de korte regels van het
-register gedrukt, maar staat in de uitgelichte kaart: de eerste negen regels
+A5 met aanhef en groet. Het wordt dus geen tegel tussen de andere berichten,
+maar staat in de uitgelichte kaart: de eerste negen regels
 met een zachte uitloop, en "Lees de hele brief" klapt de rest ter plekke open.
 Zo blijft de band even hoog tot iemand klikt. Een venster en een brief over de
 volle breedte werden ook bekeken; het venster verstopte de tekst achter een
@@ -9111,7 +9583,7 @@ klik te veel, de volle breedte duwde de openingsuren een scherm naar beneden.
 
 **Ook een automatisch bericht kan uitgelicht worden.** Een ticketverkoop die
 een duwtje nodig heeft (het Oktoberfest), hoort in de grote kaart met zijn
-affiche en een knop "Tickets kopen", niet als regel in het register. De ster in
+affiche en een knop "Tickets kopen", niet als een van de tegels. De ster in
 "Nu in het nieuws" werkt daarom voor elk bericht. Een zelfgeschreven bericht
 draagt de keuze in `NewsPost.featured`, een automatisch in de instelling
 `home.news.featured`; de actions houden de twee exclusief. De keuze verlengt de
@@ -9120,8 +9592,33 @@ verdwijnen, en dan neemt de standaard het over. Een bericht dat uit het nieuws
 gehaald wordt, verliest zijn ster.
 
 **/nieuws** toont alles wat nu in het nieuws staat (zonder de grens van de
-band) en de eerdere mededelingen en woordjes. Automatische berichten hebben
-daar geen historiek: hun bron staat nog op zijn eigen plek.
+band) en de eerdere mededelingen en woordjes, als agenda (`groupNewsByPeriod`
+in `lib/news/rules.ts`), op de dag die een bericht toont: bij een ticketverkoop
+of inschrijving de dag van het evenement. Eerst wat komt (deze week, volgende
+week, daarna per maand, het vroegste eerst), dan wat voorbij is (vorige week,
+daarvoor per maand, het recentste eerst), in dezelfde volgorde als de band.
+Eerder telde het moment waarop iets nieuws werd, en stond een cantus van
+donderdag onder "Vorige week" omdat de tickets toen te koop gingen. Bovenaan filterchips per soort met hun
+aantal, dezelfde als op /tickets en in de URL (`?soort=inschrijvingen`), zodat
+je een filter kan doorsturen. Rechts een rail met het laatste woordje van de
+praeses en het laatste nummer van het Bakske en Ir.Reëel: tussen tien
+ticketverkopen zakten die anders weg. Automatische berichten hebben daar geen
+historiek: hun bron staat nog op zijn eigen plek.
+
+- **Op /nieuws is de pin geel voor een dag die nog komt, grijs voor een
+  voorbije.** Een ticketverkoop of inschrijving toont de dag van het event, en
+  die is bijna altijd nog te gaan; een woordje, album of Bakske toont zijn
+  eigen datum, die voorbij is. Zo treedt wat alleen nog te lezen valt terug,
+  zoals een afgelopen event op /kalender. "Nieuw" blijft het gele label.
+
+**Het woordje voluit: het portret eerst.** Op zijn eigen pagina staat de
+afzender links als vierkant portret, zoals een tegel op /praesidium
+(`.vtk-roster-photo`), 200 pixels breed, en het blijft staan terwijl je leest.
+Voordien stond de afzender pas onderaan en bleef de rechterhelft leeg. Bewust
+kleiner dan de 260 pixels van het voorstel: het is een brief met een gezicht,
+geen portretpagina. Een afzender zonder foto krijgt zijn initialen op de zachte
+tint. Er is geen apart veld voor een aanhef; wie er een wil, schrijft die in
+de tekst.
 
 ## De eventpagina: omschrijving onder de foto, een paneel ernaast
 
@@ -9144,3 +9641,231 @@ en de knoppen schoven dan alsnog naar onder. De foto als brede plaat met een
 rail ernaast leest als een artikel, maar een affiche in staand formaat valt in
 een brede strook slecht. De opbouw van de ticketpagina won: lang of kort maakt
 er niet uit, en een event en zijn ticketshop zien er nu uit als één geheel.
+
+## Ticketstatistieken: wat telt, voor wie, en welke events
+
+Onder alf.io had de kring per event een grafiek van de verkoop per dag en per
+tickettype. De nieuwe ticketmodule had enkel tellers. Nu is er een tab
+"Statistieken" per event en een pagina `/admin/tickets/statistieken` voor een
+selectie: een werkingsjaar, een post, alles met "cantus" in de naam, of een
+eigen lijst aangevinkte events. De rekenkant staat in
+`lib/ticketing/statsCompute.ts`, het ophalen en de toegang in `stats.ts`.
+
+- **Verkocht is een geldig ticket.** Terugbetaald en ongeldig gemaakt tellen
+  apart. Het moment van verkoop is de betaling, en een dag of uur is Brusselse
+  tijd. Voor de verkoopsnelheid ("uitverkocht na 4 min") telt wat later
+  terugbetaald werd wel mee: op dat moment was het weg.
+- **Wie statistieken ziet, volgt `VIEW_REPORTS`**: dezelfde grants als het
+  eventoverzicht, niet de standaard scantoegang. De omzet enkel waar ook
+  `VIEW_FINANCE` geldt; in een selectie met gemengde toegang staat erbij over
+  hoeveel events de omzet gaat, in plaats van een getal dat stil een deel mist.
+- **Een concept telt standaard niet mee in een selectie.** Het verkoopt niets,
+  maar zijn capaciteit trok de bezetting van het hele jaar omlaag. Aanvinken
+  kan wel.
+- **Filters en selectie zijn twee formulieren.** In één formulier reisden de
+  vinkjes van het vorige jaar mee wanneer je van jaar wisselde.
+
+## Afgelopen ticketevents staan standaard niet in de lijst
+
+`/admin/tickets` toont standaard enkel wat nog moet komen of nu loopt. Na een
+paar maanden duwden afgelopen events de lopende verkoop onder de vouw. Een
+event is afgelopen zodra het voorbij is (`endsAt`), niet zodra het begint:
+tijdens de cantus staat ze er nog. De lijst zegt hoeveel er verborgen is, met
+een link om ze te tonen, en de periodefilter heeft "Afgelopen" en "Alle
+evenementen".
+
+## De herkomst van een koper: een label op de bestelling, geen tracking
+
+Het bestuur wil weten langs waar kopers binnenkomen: de agenda bovenaan de
+homepage, de band met aankomende evenementen, het nieuws, de kalender, een post
+op Facebook. Dat staat nu als één label op `TicketOrder.source` (plus een
+optionele `sourceCampaign`), afgeleid in `lib/ticketing/source.ts`.
+
+- **Onze eigen links dragen `?via=`.** Een referrer zegt enkel "de homepage",
+  niet welk blok erop. Een eventpagina geeft haar eigen herkomst door aan de
+  ticketknop, zodat wie via de homepage-agenda naar een event klikt en daar
+  koopt, voor de homepage telt.
+- **Een deelbare link uit het beheer** (`?via=instagram&c=story`) vangt wat
+  een referrer niet vangt: Instagram, WhatsApp en mail geven meestal niets mee.
+  Geen opgeslagen campagnes: de link draagt alles zelf.
+- **Geen cookie, geen storage, geen volledige referrer.** De shop leest de
+  herkomst bij het laden, houdt ze in het geheugen, haalt de parameters uit de
+  adresbalk (anders erft wie de link doorstuurt de herkomst mee) en geeft ze
+  mee aan de login-link. Van een externe referrer bewaren we enkel het kanaal of
+  de host. Het label zegt iets over de bestelling, niet over de bezoeker.
+- **Oudere bestellingen zijn "niet gemeten", nooit "direct".** Direct is een
+  meting (er was niets om op af te gaan); niet gemeten is een gat in de meting.
+
+## Tickettypes voor een doelgroep
+
+Een tickettype kan nu voor eerstejaars, laatstejaars, internationals of alumni
+zijn: dezelfde vier doelgroepen als de kalender, afgeleid uit hetzelfde
+studieprofiel (`lib/calendar/audienceProfile.ts`).
+
+- **Onzichtbaar voor wie er niet bij hoort**, zoals een erelidticket en anders
+  dan een ledenticket. Een tweedejaars heeft niets aan een uitgegrijsd
+  eerstejaarsticket, en een event met vier doelgroepprijzen zou vooral tonen
+  wat je niet mag.
+- **Een uitgelogde bezoeker krijgt wel een hint** ("Eerstejaars? Log in, er
+  zijn ook tickets voor jou."): die kan er misschien bij horen. Ereleden blijven
+  daar buiten; dat ticket bestaat voor de rest van de site niet.
+- **Het studiejaar telt enkel na de studiebevestiging van de lopende ronde.**
+  In de kalender is een verouderd profiel onschuldig; bij een ticket is het een
+  goedkopere prijs voor wie vorig jaar eerstejaars was. Internationaal en
+  alumnus zijn geen jaarlijkse gegevens en tellen altijd. Een studiejaar telt
+  ook niet voor wie geen student meer is.
+
+## Het autorisatievoorbeeld: de uitweg staat altijd in beeld
+
+Tijdens een autorisatievoorbeeld blokkeert `proxy.ts` elke POST, behalve de
+stoproute. Twee dingen liepen daardoor vast. De balk met "Voorbeeld stoppen"
+stond in de flow onder de kop, en op de homepage schuift de hero onder de
+transparante kop door: die dekte de balk af en de kop verloor haar donkere
+achtergrond. En uitloggen is een server action, dus een 403 en een crashende
+pagina.
+
+- **De balk zweeft onderaan** (`.vtk-preview-bar`), op elke pagina en bij
+  elke scrollpositie. De cookiekeuze en de onderkant van de pagina schuiven mee
+  omhoog. Bovenaan in de kop was ook een optie, maar dan moest de homepagehero
+  de hoogte van een balk kennen die er meestal niet is.
+- **Uitloggen loopt tijdens een voorbeeld via de stoproute** (`logout=1`): die
+  wist het voorbeeld en logt daarna uit. De proxy blijft zo streng als ze was;
+  er komt geen tweede uitzondering bij.
+
+## De site op 90% op een laptop tot 14 inch
+
+Op een MacBook Air 13" en een MacBook Pro 14" oogde de site op 100% te groot
+(de hero, de koppen, de knoppen), en na één keer Ctrl - net goed. Dat is nu de
+standaard: `zoom: 0.9` op de hele pagina (`vtk-base.css`), vanaf 15 inch blijft
+alles op 100%.
+
+- **Een schermgrootte in inch bestaat niet in CSS.** De breedte in CSS-pixels komt
+  het dichtst bij: 1024 tot 1600 vangt de 13- en 14-inch-laptops (1280 tot 1512),
+  en laat een MacBook Air 15" (1710), een MacBook Pro 16" (1728) en een extern
+  scherm op 100%. Een Windows-laptop van 15,6 inch op 125% schaal (1536) valt er
+  wel binnen; dat is aanvaard.
+- **Enkel met een muis of trackpad** (`hover: hover` en `pointer: fine`): een tablet
+  in liggende stand is geen laptop, en daar is kleiner vooral moeilijker aan te
+  tikken.
+- **Waarom `zoom` en geen kleinere maten.** De site rekent in pixels, niet in rem;
+  alle maten 10% kleiner zetten zou elke component raken. `zoom` doet precies wat
+  Ctrl - doet.
+- **Wat `zoom` niet meeneemt, is opgevangen.** `vw` en `vh` schalen niet mee, dus
+  een volle-breedteband hield 5% voor elke rand op; die maten lopen via
+  `--vtk-vw`/`--vtk-dvh`. Code die muisposities of hoogtes meet, rekent met een
+  verhouding in plaats van met losse pixels (grafiek-hover, de meeschuivende
+  beheerzijbalk, de ruimte onder de cookiebanner).
+
+## De banner van een ticketevent: eigen foto, themabanner of die van de kalender
+
+Een ticketevent kiest zijn banner zelf, in het paneel "Banner" van de
+instellingen (en al bij het aanmaken). Tot dan kwam de foto enkel van het
+gekoppelde kalenderevent, dus een ticketverkoop zonder kalenderevent (een
+losse inschrijving, een verkoop voor iets dat niet in de kalender hoort) had
+nergens een foto: niet in de shop, niet op /tickets en niet in het nieuws.
+
+- **Drie keuzes, hoogstens één actief.** Een eigen foto (met een uitsnede, zoals
+  bij een kalenderevent), de standaardbanner van een kalenderthema (dezelfde
+  foto die een evenement van dat thema zonder affiche krijgt), of geen eigen
+  keuze. Code: `lib/ticketing/poster.ts`, veld `TicketBannerField`.
+- **Een eigen keuze wint van het kalenderevent.** Wie ze maakt, doet dat op het
+  scherm waar het om de ticketverkoop gaat; die keuze stil laten overschrijven
+  door een foto op een ander scherm zou verrassen. Zonder eigen keuze blijft
+  de foto van het kalenderevent staan, zodat bestaande ticketevents niets zien
+  veranderen.
+- **Enkel een thema met een banner is te kiezen.** Een doelgroep draagt er geen
+  (zie `lib/defaultEventImage.ts`), en een thema zonder banner zou een keuze
+  tonen die op de site niets oplevert.
+- **Achteraf aanpasbaar, en de oude foto wordt opgeruimd.** Een vervangen of
+  weggeklikte eigen foto gaat uit de opslag, zoals bij een kalenderevent.
+- Wie een ticketevent beheert via een grant maar geen globaal uploadrecht heeft,
+  mag er toch een banner voor uploaden: de uploadroute kijkt naar `MANAGE_EVENT`
+  op dat ene event.
+
+## De groepjesmaker
+
+Onthaal deelt eerstejaars in peter-metergroepen, internationaal maakt
+kwisploegen. Beide laten iedereen een publieke form invullen en willen daarna
+groepjes op basis van de antwoorden. De technische kant staat in
+`docs/forms.md`, "Groepjesmaker"; hier staat waarom het zo werkt.
+
+**Het hangt aan een gewone form, geen eigen module.** Een inschrijving met een
+publieke link, een sluitmoment, een maximum, een export en toegang per post
+bestaat al; een tweede soort inschrijvingsformulier zou daar na een jaar van
+afwijken. De groepjesmaker hangt dus aan een form, en een vraag krijgt er een
+rol in. In het beheer staat hij wel onder **Apps** en niet onder Forms: er
+komen nog hulpmiddelen bij, en die horen samen op één plek in plaats van elk
+een eigen tab of verstopt in een ander scherm. Elke app is een item in de
+zijbalkgroep Apps; een aparte lijstpagina met de apps werd bekeken en
+vervangen, want dat is een klik extra voor wat de zijbalk al toont.
+
+**Wie samen inschrijft, vult één keer in.** Het verslag van onthaal zegt het
+letterlijk: "als ze samen willen zitten moet 1 persoon ze inschrijven". Die
+persoon geeft aan met hoeveel ze zijn en somt de namen op, met komma's. Die
+inschrijving is één blok dat nooit gesplitst wordt en telt voor iedereen die ze
+meebrengt. Een formulier met herhaalbare velden per persoon was de andere weg,
+maar dat bestaat niet en vraagt de invuller gegevens van anderen die hij niet
+kent.
+
+**Peters en meters zijn de kern van een groep, met eigen grenzen.** Onthaal wil
+groepen van ongeveer 14 à 15 petekinderen met 5 à 6 peters en meters. Dat zijn
+twee soorten grenzen: de min/max per groep gaat over de gewone leden, de
+kerngrenzen apart over de peters en meters. Een groep peters en meters die zich
+samen inschreef, krijgt altijd een eigen groep (ook al is ze groter dan het
+maximum), en wie aangeeft "geen losse peters of meters meer", krijgt er geen
+bij. Losse peters en meters worden over de groepen verdeeld die nog openstaan.
+
+**Internationaal kiest een partner, geen vriendengroep.** Een kwis mengt
+landen; wie één iemand meebrengt, is niet alleen, maar een groep van vijf
+vrienden uit hetzelfde land maakt het mengen zinloos. Daarom is de partner een
+eigen rol naast de groepsinschrijving: een form van internationaal zet enkel
+een partnervraag, die van onthaal het aantal en de namen. De partnervraag zoekt
+de andere inzending op naam, e-mail of r-nummer. Vindt ze niemand, dan deelt de
+site gewoon in en meldt ze het; ze blokkeert niet op een tikfout.
+
+**De grenzen zijn een doel, geen voorwaarde.** Met 61 inschrijvingen lukt
+"precies 15 per groep" niet. De indeling faalt dan niet maar komt zo dicht
+mogelijk, en zegt per groep wat er buiten valt. Een indeling die weigert, laat
+onthaal op de avond zelf zonder groepen.
+
+**Automatisch indelen gebeurt één keer.** "Zodra alle antwoorden er zijn" is het
+sluitmoment, het maximum aantal inzendingen of een verwacht aantal personen,
+wat eerst komt; dan sluit de form en maakt de site de groepjes. Daarna schuift
+een beheerder met de hand, en een worker die elke minuut opnieuw indeelt, zou
+dat werk stil weggooien. Opnieuw indelen kan met de knop, na een bevestiging
+die zegt hoeveel verplaatsingen verloren gaan.
+
+**Dezelfde inschrijvingen geven dezelfde groepen.** Het toeval in de indeling
+hangt aan een vaste seed per form. Anders gaf "opnieuw indelen" om een
+waarschuwing te bekijken telkens andere groepen, en kan je twee versies niet
+vergelijken.
+
+**Enkel de organisatoren zien de groepen.** Het verslag van onthaal: "maar enkel
+naar ons en niet naar die personen zelf". Er gaat geen mail naar de deelnemers
+en de publieke pagina toont niets; de groepen staan in het beheer en in een CSV.
+
+## Admin: de zijbalk inklappen
+
+September 2026. Op een laptop krijgt de inhoud van de admin 900px, en een brede
+beheertabel schuift dan achter een scrollbalk. Drie richtingen zijn als ontwerp
+naast elkaar gelegd: een icoonrail, een rail die over de inhoud openklapt, en
+de zijbalk helemaal weg achter één knop.
+
+- **Standaard verandert er niets.** De zijbalk met namen blijft de standaard;
+  inklappen is een keuze per browser (cookie), met een kleine knop naast ADMIN.
+  Iemand die de admin twee keer per jaar opent, vindt een tab aan zijn naam en
+  niet aan een icoon.
+- **De rail won** (60px, dezelfde kaart en iconen als de zijbalk, de groep waar
+  je bent in het lichtblauw van de actieve rij). Een klik op een groep opent
+  haar tabs in een kaart ernaast; een losse tab is gewoon een link. De rail die
+  bij hover de volledige zijbalk over de inhoud legde, is afgewezen; de variant
+  zonder zijbalk ook, omdat elke wissel dan een extra klik kost.
+- **Een compactere rail (52px, knoppen van 36px) is geprobeerd en teruggedraaid**:
+  die las krap. Wat wel bleef: 20px tussen rail en inhoud in plaats van 48.
+- **De rail begint op de hoogte van de paginatitel**: haar bovenkant staat
+  gelijk met het woord "Dashboard". Eerst begon ze bij het eerste omkaderde
+  element onder de titel (een kaart, tabs, een rij tegels), met het idee dat een
+  smalle rail die boven de inhoud uitsteekt er los naast hangt. In de praktijk
+  leek ze zo onder de titel weggezakt, en stond ze op elke pagina op een andere
+  hoogte (september 2026 teruggedraaid). De titel wordt gemeten, zodat een
+  pagina zonder `h1` de rail gewoon bovenaan houdt.

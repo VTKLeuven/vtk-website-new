@@ -1,6 +1,6 @@
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
-import { Link2, Palette, Trash2 } from "lucide-react";
+import { Link2, Lock, Palette, Trash2 } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
 import { deleteTicketEventAction } from "@/app/actions/tickets";
@@ -13,9 +13,14 @@ import { TicketDesignManager } from "@/components/ticketing/admin/TicketDesignMa
 import { SettingsPanel } from "@/components/ticketing/admin/SettingsPanel";
 import { SaveAsTemplateCard } from "@/components/ticketing/admin/SaveAsTemplateCard";
 import { PresaleLinkPanel } from "@/components/ticketing/admin/PresaleLinkPanel";
+import { PrivateLinkPanel } from "@/components/ticketing/admin/PrivateLinkPanel";
 import { hasPresale } from "@/lib/ticketing/presale";
+import { ticketNeedsNewsOptIn } from "@/lib/news/rules";
+import { adminShopLink } from "@/lib/ticketing/shopPath";
 import type { AdminLocale } from "@/components/ticketing/admin/format";
 import { readTicketDesignSettings } from "@/lib/ticketing/design";
+import { listTicketBannerCategories } from "@/lib/ticketing/bannerCategories";
+import { publicUrl } from "@/lib/storage";
 
 export default async function TicketEventSettingsPage({
   params,
@@ -54,6 +59,7 @@ export default async function TicketEventSettingsPage({
         orderBy: [{ active: "desc" }, { sortOrder: "asc" }, { createdAt: "asc" }],
       },
       presaleGroups: { select: { groupId: true } },
+      ownerGroup: { select: { type: true } },
     },
   });
   if (!event) notFound();
@@ -75,15 +81,17 @@ export default async function TicketEventSettingsPage({
   const calendarEvents = canManageEvent
     ? await prisma.calendarEvent.findMany({
         where: {
+          // Ook een event dat al tickets heeft: een event kan meerdere
+          // ticketpagina's hebben (een eerstejaarsuur, de waves van Galabal).
           groupId: { in: groups.map((group) => group.id) },
-          OR: event.calendarEventId
-            ? [{ ticketEvent: null }, { id: event.calendarEventId }]
-            : [{ ticketEvent: null }],
         },
         orderBy: { start: "desc" },
         take: 100,
       })
     : [];
+  const bannerCategories = canManageEvent ? await listTicketBannerCategories() : [];
+  const linkedCalendarEvent =
+    calendarEvents.find((candidate) => candidate.id === event.calendarEventId) ?? null;
   const ticketDesign = readTicketDesignSettings(event.settings, eventId);
   // Bepaalt of het event nog weg mag of enkel gearchiveerd kan worden. Eén
   // bestelling volstaat om het te bewaren, ook een vervallen: daar hangen een
@@ -108,6 +116,8 @@ export default async function TicketEventSettingsPage({
             eventId={event.id}
             status={event.status}
             slug={event.slug}
+            shopPath={adminShopLink(event, true).path}
+            isPrivate={event.isPrivate}
             hasActiveTicketType={event.ticketTypes.some((ticketType) => ticketType.active)}
             locale={locale}
           />
@@ -119,9 +129,9 @@ export default async function TicketEventSettingsPage({
             groups={groups}
             presaleGroups={presaleGroups}
             calendarEvents={calendarEvents}
-            linkedCalendarEvent={
-              calendarEvents.find((candidate) => candidate.id === event.calendarEventId) ?? null
-            }
+            linkedCalendarEvent={linkedCalendarEvent}
+            linkedImageUrl={publicUrl(linkedCalendarEvent?.imageKey)}
+            bannerCategories={bannerCategories}
             hasActiveTicketType={event.ticketTypes.some((ticketType) => ticketType.active)}
             locale={locale}
           />
@@ -137,6 +147,33 @@ export default async function TicketEventSettingsPage({
             locale={locale}
           />
         </div>
+      ) : null}
+      {canManageEvent ? (
+        <SettingsPanel
+          id="privelink"
+          title={locale === "nl" ? "Openbaar of privé" : "Public or private"}
+          status={
+            event.isPrivate
+              ? locale === "nl"
+                ? "Privé · enkel via de privélink"
+                : "Private · only through the private link"
+              : locale === "nl"
+                ? "Openbaar · staat op /tickets"
+                : "Public · listed on /tickets"
+          }
+          icon={<Lock size={18} aria-hidden="true" />}
+        >
+          <PrivateLinkPanel
+            eventId={eventId}
+            slug={event.slug}
+            isPrivate={event.isPrivate}
+            token={event.privateToken}
+            isDraft={event.status === "DRAFT"}
+            hasPresaleLink={Boolean(event.presaleToken) && hasPresale(event)}
+            werkgroepSale={ticketNeedsNewsOptIn(event)}
+            locale={locale}
+          />
+        </SettingsPanel>
       ) : null}
       {canManageEvent ? (
         <SettingsPanel

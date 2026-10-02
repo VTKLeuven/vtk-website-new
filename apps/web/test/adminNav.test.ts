@@ -16,9 +16,9 @@ describe("admin nav structure", () => {
     for (const leaf of allLeaves) expect(ADMIN_NAV_KEYS.has(leaf.key)).toBe(true);
   });
 
-  it("has no group that is really a single item", () => {
+  it("has no group that is really a single item, unless it is meant to grow", () => {
     for (const entry of getAdminNav()) {
-      if ("group" in entry) expect(entry.items.length).toBeGreaterThan(1);
+      if ("group" in entry && !entry.keepSingle) expect(entry.items.length).toBeGreaterThan(1);
     }
   });
 

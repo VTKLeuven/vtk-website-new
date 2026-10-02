@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hero 1: Blauwdruk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/@phosphor-icons/web@2.1.1"></script>
+<style>
+/* Methode: technische tekening. De pagina is een blad op schaal: raster,
+   maatlijnen, een titelblok en een stuklijst. Palet: VTK-tokens. */
+:root { --navy: #0E1A36; --ink: #0A0F1F; --yellow: #FFD23F; --paper: #EFF2F8; --dim: #B7C0DC; --line: rgb(239 242 248 / .55); --hair: rgb(239 242 248 / .16); }
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: var(--navy); color: var(--paper); font-family: Archivo, sans-serif; font-variation-settings: "wdth" 100; min-height: 100dvh;
+  background-image:
+    linear-gradient(var(--hair) 1px, transparent 1px), linear-gradient(90deg, var(--hair) 1px, transparent 1px),
+    linear-gradient(rgb(239 242 248 / .06) 1px, transparent 1px), linear-gradient(90deg, rgb(239 242 248 / .06) 1px, transparent 1px);
+  background-size: 120px 120px, 120px 120px, 24px 24px, 24px 24px; background-position: -1px -1px; }
+a { color: inherit; text-decoration: none; }
+button { font: inherit; color: inherit; background: none; border: 0; cursor: pointer; }
+.mono { font-family: "Space Mono", monospace; font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); }
+.sheet { max-width: 1320px; margin: 0 auto; padding: 16px 36px 32px; }
+/* De rand van het blad met registratietekens in de hoeken. */
+.frame { position: relative; border: 1.5px solid var(--line); padding: 0; }
+.frame::before, .frame::after { content: ""; position: absolute; width: 18px; height: 18px; border: 1.5px solid var(--yellow); }
+.frame::before { top: -10px; left: -10px; border-right: 0; border-bottom: 0; }
+.frame::after { bottom: -10px; right: -10px; border-left: 0; border-top: 0; }
+
+.hdr { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 28px; padding: 14px 22px; border-bottom: 1.5px solid var(--line); }
+.hdr img { height: 30px; }
+.hdr nav { display: flex; gap: 20px; }
+.hdr nav a { font-family: "Space Mono", monospace; font-size: 12px; letter-spacing: .06em; text-transform: uppercase; }
+.hdr nav a:hover { color: var(--yellow); }
+.hdr-end { display: flex; gap: 16px; align-items: center; font-family: "Space Mono", monospace; font-size: 12px; }
+.hdr-end i { font-size: 18px; }
+
+.body { display: grid; grid-template-columns: 1.25fr 1fr; }
+.left { padding: 30px 40px 28px 40px; border-right: 1.5px solid var(--line); position: relative; }
+/* Maatlijn boven de titel. */
+.dimline { display: flex; align-items: center; gap: 10px; margin-bottom: 18px; }
+.dimline .bar { flex: 1; height: 1px; background: var(--dim); position: relative; }
+.dimline .bar::before, .dimline .bar::after { content: ""; position: absolute; top: -5px; width: 1px; height: 11px; background: var(--dim); }
+.dimline .bar::before { left: 0; } .dimline .bar::after { right: 0; }
+h1 { font-weight: 850; font-variation-settings: "wdth" 125; font-size: 66px; line-height: .92; letter-spacing: -0.02em; text-transform: uppercase; }
+h1 .hl { color: var(--ink); background: var(--yellow); padding: 0 .12em; display: inline-block; transform: rotate(-1.5deg); }
+h1 .out { color: transparent; -webkit-text-stroke: 1.5px var(--paper); }
+.callout { position: absolute; right: 40px; top: 118px; display: flex; align-items: center; gap: 8px; }
+.callout .circle { width: 34px; height: 34px; border: 1.5px solid var(--yellow); border-radius: 50%; display: grid; place-items: center; font-family: "Space Mono"; font-size: 13px; color: var(--yellow); }
+.sub { margin-top: 20px; max-width: 34em; font-size: 17px; line-height: 1.55; color: var(--dim); font-variation-settings: "wdth" 90; }
+.cta { display: flex; gap: 12px; margin-top: 22px; }
+.btn { display: inline-flex; align-items: center; gap: 10px; height: 50px; padding: 0 22px; font-family: "Space Mono", monospace; font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; border: 1.5px solid var(--paper); transition: background .15s, color .15s, transform .15s; }
+.btn:active { transform: translate(1px, 1px); }
+.btn-primary { background: var(--yellow); color: var(--ink); border-color: var(--yellow); box-shadow: 4px 4px 0 var(--paper); }
+.btn-primary:hover { box-shadow: 2px 2px 0 var(--paper); transform: translate(2px, 2px); }
+.btn-ghost:hover { background: var(--paper); color: var(--navy); }
+
+/* Openstaande shiften als revisietabel. */
+.rev { margin-top: 26px; border: 1.5px solid var(--line); }
+.rev-head { display: flex; justify-content: space-between; align-items: center; padding: 8px 12px; border-bottom: 1.5px solid var(--line); background: rgb(255 210 63 / .1); }
+.rev-head b { font-family: "Space Mono"; font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--yellow); }
+.rev-row { display: grid; grid-template-columns: 110px 1fr 70px; padding: 7px 12px; border-top: 1px solid var(--hair); font-size: 15px; align-items: baseline; }
+.rev-row:first-of-type { border-top: 0; }
+.rev-row:hover { background: rgb(239 242 248 / .05); }
+.rev-row .t { font-family: "Space Mono"; font-size: 12px; color: var(--dim); }
+.rev-row small { display: block; font-size: 12px; color: var(--dim); }
+.rev-row .c { text-align: right; font-family: "Space Mono"; font-size: 12px; color: var(--yellow); }
+
+.right { display: grid; grid-template-rows: 1fr auto; }
+/* Stuklijst = de agenda. */
+.bom { padding: 0; }
+.bom-head { display: flex; justify-content: space-between; align-items: baseline; padding: 14px 18px 10px; }
+.bom-head h2 { font-size: 15px; font-weight: 800; font-variation-settings: "wdth" 120; text-transform: uppercase; letter-spacing: .02em; }
+.bom-head a { font-family: "Space Mono"; font-size: 12px; color: var(--yellow); }
+.bom-head a:hover { text-decoration: underline; }
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-family: "Space Mono"; font-size: 10.5px; font-weight: 400; letter-spacing: .08em; text-transform: uppercase; color: var(--dim); padding: 6px 10px; border-top: 1.5px solid var(--line); border-bottom: 1.5px solid var(--line); }
+td { padding: 8px 10px; border-bottom: 1px solid var(--hair); font-size: 14px; vertical-align: top; }
+td.d { font-family: "Space Mono"; font-size: 12px; white-space: nowrap; color: var(--dim); }
+tr.today td.d { color: var(--yellow); }
+td.n a { font-weight: 600; }
+td.n a:hover { color: var(--yellow); }
+td.n small { display: block; font-size: 12px; color: var(--dim); }
+td.s button { color: var(--dim); font-size: 16px; }
+td.s button:hover { color: var(--yellow); }
+tr:hover td { background: rgb(239 242 248 / .04); }
+
+/* Titelblok rechtsonder, zoals op elke tekening. */
+.titleblock { display: grid; grid-template-columns: 1fr 1fr 1fr; border-top: 1.5px solid var(--line); }
+.titleblock div { padding: 8px 12px; border-left: 1px solid var(--hair); }
+.titleblock div:first-child { border-left: 0; }
+.titleblock b { display: block; font-size: 14px; font-weight: 700; margin-top: 2px; }
+
+/* Snelkoppelingen als onderdelen in een kader. */
+.parts { display: grid; grid-template-columns: repeat(6, 1fr); border-top: 1.5px solid var(--line); }
+.part { position: relative; padding: 14px 18px 14px; border-left: 1.5px solid var(--line); display: flex; flex-direction: column; gap: 12px; transition: background .15s, color .15s; }
+.part:first-child { border-left: 0; }
+.part .tag { position: absolute; top: 12px; right: 12px; width: 26px; height: 26px; border: 1.5px solid var(--dim); border-radius: 50%; display: grid; place-items: center; font-family: "Space Mono"; font-size: 11px; color: var(--dim); }
+.part i.ic { font-size: 28px; }
+.part b { font-size: 19px; font-weight: 800; font-variation-settings: "wdth" 115; text-transform: uppercase; line-height: 1; }
+.part small { font-size: 13px; color: var(--dim); }
+.part:hover { background: var(--yellow); color: var(--ink); }
+.part:hover small, .part:hover .tag { color: var(--ink); border-color: var(--ink); }
+
+@media (max-width: 1000px) { .body { grid-template-columns: 1fr; } .left { border-right: 0; border-bottom: 1.5px solid var(--line); } .parts { grid-template-columns: repeat(3, 1fr); } .hdr nav { display: none; } .callout { display: none; } h1 { font-size: 52px; } }
+@media (max-width: 600px) { .sheet { padding: 16px; } .left { padding: 28px 18px; } h1 { font-size: 38px; } .parts { grid-template-columns: repeat(2, 1fr); } .cta { flex-wrap: wrap; } }
+</style>
+</head>
+<body>
+<div class="sheet">
+  <div class="frame">
+    <header class="hdr">
+      <img src="../../../apps/web/public/vtk-logo.png" alt="VTK">
+      <nav><a href="#">Info</a><a href="#">Shiften</a><a href="#">Career</a><a href="#">Cursusdienst</a><a href="#">Eerstejaars</a><a href="#">Evenementen</a><a href="#">Studies</a><a href="#">Media</a><a href="#">Over VTK</a></nav>
+      <div class="hdr-end"><i class="ph ph-magnifying-glass"></i><span>NL / EN</span><i class="ph ph-user-circle"></i></div>
+    </header>
+    <div class="body">
+      <div class="left">
+        <div class="dimline"><span class="mono">Vlaamse Technische Kring, KU Leuven</span><span class="bar"></span><span class="mono">1920 tot 2026</span></div>
+        <h1>De thuis<br>voor <span class="hl">ingenieurs</span><br><span class="out">in Leuven.</span></h1>
+        <p class="sub">Events, cursussen, career, broodjes en alles wat je dag op de campus praktischer maakt. Gerund door studenten, sinds 1920.</p>
+        <div class="cta">
+          <a class="btn btn-primary" href="#">Ontdek wat we doen <i class="ph-bold ph-arrow-up-right"></i></a>
+          <a class="btn btn-ghost" href="#">Eerstejaars? Start hier</a>
+        </div>
+        <div class="rev">
+          <div class="rev-head"><b>Openstaande shiften</b><a class="mono" href="#">Alle shiften →</a></div>
+          <a class="rev-row" href="#"><span class="t">Morgen 01:00</span><span>Bijrijden afbraak 12-urencantus<small>tot 02:30, nog 2 plaatsen</small></span><span class="c">2 munten</span></a>
+          <a class="rev-row" href="#"><span class="t">Morgen 11:00</span><span>Bijrijden met Stijn<small>tot 12:00, nog 1 plaats</small></span><span class="c"></span></a>
+          <a class="rev-row" href="#"><span class="t">Morgen 14:00</span><span>Namiddagshift<small>tot 16:00, nog 1 plaats</small></span><span class="c">2 munten</span></a>
+        </div>
+      </div>
+      <div class="right">
+        <div class="bom">
+          <div class="bom-head"><h2>Stuklijst: deze week</h2><a href="#">Volledige kalender →</a></div>
+          <table>
+            <thead><tr><th>Dag</th><th>Tijd</th><th>Onderdeel</th><th></th></tr></thead>
+            <tbody>
+              <tr class="today"><td class="d">Do 1</td><td class="d">12:00</td><td class="n"><a href="#">12 Urencantus</a><small>Waaiberg</small></td><td class="s"><button aria-label="Interesse: 12 Urencantus"><i class="ph ph-star"></i></button></td></tr>
+              <tr class="today"><td class="d">Do 1</td><td class="d">20:30</td><td class="n"><a href="#">Looptraining</a><small>Atletiekpiste Sportkot</small></td><td class="s"><button aria-label="Interesse: Looptraining"><i class="ph ph-star"></i></button></td></tr>
+              <tr><td class="d">Ma 5</td><td class="d">19:00</td><td class="n"><a href="#">PeMe-Startactiviteit</a><small>Grasveld Alma 3</small></td><td class="s"><button aria-label="Interesse: PeMe-Startactiviteit"><i class="ph ph-star"></i></button></td></tr>
+              <tr><td class="d">Ma 5</td><td class="d">21:00</td><td class="n"><a href="#">CaraOké</a><small>Theokot</small></td><td class="s"><button aria-label="Interesse: CaraOké"><i class="ph ph-star"></i></button></td></tr>
+              <tr><td class="d">Di 6</td><td class="d">12:40</td><td class="n"><a href="#">KANWEEK startvergadering</a><small>Aula 200K 00.06</small></td><td class="s"><button aria-label="Interesse: KANWEEK startvergadering"><i class="ph ph-star"></i></button></td></tr>
+              <tr><td class="d">Di 6</td><td class="d">18:30</td><td class="n"><a href="#">Sector Night Bouwkunde</a><small>Quadrivium</small></td><td class="s"><button aria-label="Interesse: Sector Night Bouwkunde"><i class="ph ph-star"></i></button></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="titleblock">
+          <div><span class="mono">Getekend door</span><b>Studenten</b></div>
+          <div><span class="mono">Schaal</span><b>1:1</b></div>
+          <div><span class="mono">Blad</span><b>Do 1 okt 2026</b></div>
+        </div>
+      </div>
+    </div>
+    <nav class="parts" aria-label="Snel naar">
+      <a class="part" href="#"><span class="tag">1</span><i class="ph ph-bread ic"></i><b>Theokot</b><small>Bestel je broodje</small></a>
+      <a class="part" href="#"><span class="tag">2</span><i class="ph ph-books ic"></i><b>Cursus&shy;dienst</b><small>Open tot 13:55</small></a>
+      <a class="part" href="#"><span class="tag">3</span><i class="ph ph-recycle ic"></i><b>Tweede&shy;hands</b><small>Boeken kopen en verkopen</small></a>
+      <a class="part" href="#"><span class="tag">4</span><i class="ph ph-clock-countdown ic"></i><b>Tijdslot</b><small>Ophaling Cudi reserveren</small></a>
+      <a class="part" href="#"><span class="tag">5</span><i class="ph ph-hand-heart ic"></i><b>Shiften</b><small>Help mee, verdien munten</small></a>
+      <a class="part" href="#"><span class="tag">6</span><i class="ph ph-calendar-dots ic"></i><b>Kalender</b><small>Alle events</small></a>
+    </nav>
+  </div>
+</div>
+</body>
+</html>

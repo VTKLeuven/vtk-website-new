@@ -12,6 +12,7 @@ import { hasPermission, fullName, splitFullName } from "@vtk/auth";
 import { requirePermission, requireSession } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { currentWorkingYear } from "@/lib/workingYear";
+import { LEAD_LABEL_MAX } from "@/lib/werkgroepen";
 import { eraseUserData, StorageUnavailableError } from "@/lib/privacy/account";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { pushMailGroupsForGroup } from "@/lib/google/sync";
@@ -768,9 +769,10 @@ const werkgroepSchema = z.object({
   code: z.string().trim().optional(),
   nameNl: z.string().trim().min(1),
   nameEn: z.string().trim().min(1),
-  // Hoe de verantwoordelijke van deze werkgroep heet: de G3 of de G4. Dat
-  // verschilt per werkgroep, dus het is een keuze en geen vaste tekst.
-  leadLabel: z.enum(["G3", "G4"]).default("G3"),
+  // Hoe de verantwoordelijke van deze werkgroep heet. Meestal de G3 of de G4,
+  // maar dat verschilt per werkgroep en sommige kiezen een eigen naam, dus het
+  // is vrije tekst. Kort gehouden: het staat als vlag op een portret.
+  leadLabel: z.string().trim().min(1).max(LEAD_LABEL_MAX),
   active: z.coerce.boolean().default(true),
 });
 
@@ -789,10 +791,13 @@ export async function saveWerkgroepAction(
     code: (formData.get("code") as string) || undefined,
     nameNl: formData.get("nameNl"),
     nameEn: formData.get("nameEn"),
-    leadLabel: (formData.get("leadLabel") as string) || undefined,
+    leadLabel: formData.get("leadLabel") ?? "",
     active: formData.get("active") === "on",
   });
-  if (!result.success) return saveError("INVALID_INPUT");
+  if (!result.success) {
+    const leadLabelIssue = result.error.issues.some((issue) => issue.path[0] === "leadLabel");
+    return saveError(leadLabelIssue ? "LEAD_LABEL_INVALID" : "INVALID_INPUT");
+  }
   const parsed = result.data;
 
   const data = {
