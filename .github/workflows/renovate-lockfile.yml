@@ -73,6 +73,7 @@ jobs:
       - name: Resolve dependencies again and push the fix
         if: steps.check.outputs.needs_fix == 'true' && env.HAS_BOT_TOKEN == 'true'
         run: |
+          npm install -g npm@latest
           rm -rf node_modules package-lock.json
           npm install --no-audit --no-fund
           npm run verify:lockfile
