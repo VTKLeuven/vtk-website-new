@@ -23,7 +23,11 @@ import { PresaleFields, type PresaleGroupOption } from "./PresaleFields";
 import { SettingsPanel } from "./SettingsPanel";
 import { TicketTemplateTypeRows } from "./TicketTemplateTypeRows";
 import { TicketBannerField } from "./TicketBannerField";
-import type { TicketEventTemplate } from "@/lib/ticketing/templates";
+import {
+  blankTicketTemplateType,
+  type TicketEventTemplate,
+  type TicketTemplateType,
+} from "@/lib/ticketing/templates";
 import type { TicketBannerCategory } from "@/lib/ticketing/bannerCategories";
 import type { AccountingCodeOption } from "@/lib/accounting/codes";
 import { AccountingCodePicker } from "@/components/admin/AccountingCodePicker";
@@ -49,9 +53,16 @@ const formErrorMessages: Record<string, { nl: string; en: string }> = {
   INVALID_BANNER: { nl: "De banner is niet opgeslagen: kies een foto of een thema met een standaardbanner.", en: "The banner was not saved: choose a photo or a theme with a default banner." },
   ACCOUNTING_CODE_REQUIRED: { nl: "Kies een boekhoudcode: ze gaat mee in de betaalinfo bij Mollie en Bancontact.", en: "Choose an accounting code: it goes into the payment details at Mollie and Bancontact." },
   INVALID_ACCOUNTING_CODE: { nl: "Die boekhoudcode bestaat niet meer. Kies een andere.", en: "That accounting code no longer exists. Choose another one." },
+  NO_TICKET_TYPES: { nl: "Vink minstens één ticket aan: zonder ticket valt er niets te verkopen.", en: "Tick at least one ticket: without a ticket there is nothing to sell." },
+  INVALID_TICKET_TYPES: { nl: "Een van de tickets klopt niet. Controleer de naam, of de code uniek is en of de ledenprijs lager ligt dan de gewone prijs.", en: "One of the tickets is not valid. Check the name, whether the code is unique and whether the member price is below the regular price." },
 };
 
-function formErrorMessage(code: string | undefined, locale: AdminLocale): string {
+function formErrorMessage(state: TicketEventFormActionState, locale: AdminLocale): string {
+  // De lezing van de tickets zegt zelf welke rij en wat eraan schort ("Tickettype
+  // 2: de code BIER staat al op een ander ticket."); dat is preciezer dan een
+  // algemene melding. Die zin bestaat enkel in het Nederlands.
+  if (state.detail && locale === "nl") return state.detail;
+  const code = state.code;
   if (code && formErrorMessages[code]) return formErrorMessages[code][locale];
   return locale === "nl"
     ? "Controleer de ingevulde gegevens en probeer opnieuw."
@@ -87,6 +98,7 @@ type TicketEventFormValue = {
   status?: string;
   maxTicketsPerOrder?: number;
   cardCheckIn?: boolean;
+  openScanning?: boolean;
   contactEmail?: string | null;
   confirmationMessageNl?: string | null;
   confirmationMessageEn?: string | null;
@@ -117,6 +129,19 @@ function describeLead(minutes: number, locale: AdminLocale): string {
 }
 
 type GroupOption = { id: string; nameNl: string; nameEn: string };
+
+/**
+ * Het ticket waarmee een leeg formulier opent. Dezelfde rij als die van een
+ * sjabloon, zodat je ook zonder sjabloon meteen een ledenprijs, een tweede
+ * ticket of een ticket enkel voor leden kan zetten.
+ */
+function firstTicketRow(locale: AdminLocale): TicketTemplateType {
+  return {
+    ...blankTicketTemplateType(1),
+    code: "STANDARD",
+    nameNl: locale === "nl" ? "Standaardticket" : "Standard ticket",
+  };
+}
 type CalendarOption = {
   id: string;
   titleNl: string;
@@ -249,7 +274,7 @@ export function TicketEventForm({
 }: {
   event?: TicketEventFormValue;
   groups: GroupOption[];
-  /** De groepen die naast het praesidium in de voorverkoop kunnen; leeg bij aanmaken. */
+  /** De groepen die naast het praesidium in de voorverkoop kunnen. */
   presaleGroups?: PresaleGroupOption[];
   calendarEvents: CalendarOption[];
   hasActiveTicketType?: boolean;
@@ -593,17 +618,15 @@ export function TicketEventForm({
               defaultValue={toDatetimeLocal(event.salesEndAt)}
             />
           </div>
-          {isEdit ? (
-            <PresaleFields
-              salesStartLocal={salesStart}
-              leadMinutes={event.presaleLeadMinutes}
-              praesidium={event.presalePraesidium ?? true}
-              helpers={event.presaleHelpers ?? true}
-              groupIds={event.presaleGroupIds}
-              groups={presaleGroups}
-              locale={locale}
-            />
-          ) : null}
+          <PresaleFields
+            salesStartLocal={salesStart}
+            leadMinutes={event.presaleLeadMinutes}
+            praesidium={event.presalePraesidium ?? true}
+            helpers={event.presaleHelpers ?? true}
+            groupIds={event.presaleGroupIds}
+            groups={presaleGroups}
+            locale={locale}
+          />
           {isEdit ? (
             <div className="ticket-admin-field">
               <label htmlFor="ticket-status">Status</label>
@@ -676,6 +699,30 @@ export function TicketEventForm({
                 : "For a cantus or another event where the queue has to move. The KU Leuven number of the logged-in buyer is stored on their ticket; anyone ordering for several people fills in the rest on the attendees page. The QR keeps working for everyone."}
             </span>
           </div>
+          {/* Enkel bij aanmaken: daarna staat deze keuze bij Toegang, naast de
+              toekenningen waar ze over beslist. Een sjabloon zette ze vroeger
+              stil, en een leeg formulier kon haar niet kiezen; een gastenlijst
+              lag dan open tot iemand eraan dacht. */}
+          {!isEdit ? (
+            <div className="ticket-admin-field" data-span="2">
+              <label className="ticket-admin-check" htmlFor="ticket-open-scanning">
+                <input type="hidden" name="openScanning" value="false" />
+                <input
+                  id="ticket-open-scanning"
+                  type="checkbox"
+                  name="openScanning"
+                  value="true"
+                  defaultChecked={event.openScanning ?? true}
+                />
+                {nl ? "Elke praesidiumpost mag scannen" : "Every praesidium post may scan"}
+              </label>
+              <span className="ticket-admin-help">
+                {nl
+                  ? "Wie kan scannen, ziet de namen van alle deelnemers. Vink uit voor een gastenlijst die niet bij iedereen hoort te liggen; dan scant enkel wie je na het aanmaken toegang geeft bij Toegang."
+                  : "Anyone who can scan sees every attendee's name. Untick for a guest list that should not be widely visible; then only those you grant access under Access after creating can scan."}
+              </span>
+            </div>
+          ) : null}
         </div>
       </SettingsPanel>
 
@@ -721,11 +768,11 @@ export function TicketEventForm({
       </SettingsPanel>
 
       {/* Alleen bij aanmaken. Voorheen vroeg dit formulier enkel een capaciteit,
-          waarmee je een voorraadpot kreeg maar nog geen verkoopbaar ticket; je
-          moest daarna alsnog naar de instellingen om een tickettype met een prijs
-          aan te maken. Nu staat dat eerste ticket hier, en is het event na één
-          keer opslaan te publiceren. Extra types (vroegboek, alumni, ...) voeg je
-          nadien toe. */}
+          waarmee je een voorraadpot kreeg maar nog geen verkoopbaar ticket. Daarna
+          kwam er één ticket bij met een naam en een prijs, en kon je pas na het
+          aanmaken een tweede ticket of een ledenprijs zetten, terwijl een sjabloon
+          dat wel meteen kon. Nu zijn het met en zonder sjabloon dezelfde rijen;
+          het sjabloon vult ze enkel in. */}
       {!isEdit ? (
         <section className="ticket-admin-section">
           <div className="ticket-admin-section-head">
@@ -734,123 +781,83 @@ export function TicketEventForm({
               <div>
                 <h2>
                   {template
-                    ? locale === "nl"
+                    ? nl
                       ? "Tickets uit het sjabloon"
                       : "Tickets from the template"
-                    : locale === "nl"
-                      ? "Eerste ticket"
-                      : "First ticket"}
+                    : "Tickets"}
                 </h2>
                 <p>
                   {template
-                    ? locale === "nl"
+                    ? nl
                       ? "Dit wordt aangemaakt. Pas gerust een naam, een prijs of het aantal aan; wat hier staat, wordt verkocht."
                       : "This is what gets created. Adjust a name, a price or the number; what is here is what will be sold."
-                    : locale === "nl"
-                      ? "Het ticket dat kopers meteen kunnen kiezen. Zonder dit valt er niets te verkopen."
-                      : "The ticket buyers can pick straight away. Without it there is nothing to sell."}
+                    : nl
+                      ? "Wat kopers kunnen kiezen. Zet een ledenprijs, een ticket enkel voor leden of een tweede soort ticket er meteen bij; wat hier staat, wordt verkocht."
+                      : "What buyers can pick. Add a member price, a members-only ticket or a second kind of ticket straight away; what is here is what will be sold."}
                 </p>
               </div>
             </div>
           </div>
-          {template ? (
-            <>
-              <TicketTemplateTypeRows
-                name="templateTypesData"
-                initial={template.types}
-                locale={locale}
+          <TicketTemplateTypeRows
+            name="ticketTypesData"
+            initial={template?.types ?? [firstTicketRow(locale)]}
+            locale={locale}
+          />
+          <div className="ticket-admin-form-grid">
+            <div className="ticket-admin-field">
+              <label htmlFor="ticket-capacity">
+                {nl ? "Aantal beschikbaar" : "Available quantity"}
+              </label>
+              <input
+                id="ticket-capacity"
+                name="capacity"
+                type="number"
+                min="1"
+                defaultValue={template?.capacity ?? 100}
+                required
               />
-              <div className="ticket-admin-form-grid">
-                <div className="ticket-admin-field">
-                  <label htmlFor="ticket-capacity">
-                    {locale === "nl" ? "Aantal beschikbaar" : "Available quantity"}
-                  </label>
-                  <input
-                    id="ticket-capacity"
-                    name="capacity"
-                    type="number"
-                    min="1"
-                    defaultValue={template.capacity}
-                    required
-                  />
-                  <span className="ticket-admin-help">
-                    {locale === "nl"
-                      ? "De totale capaciteit; alle tickets hierboven delen ze."
-                      : "The total capacity; all tickets above share it."}
-                  </span>
-                </div>
-              </div>
-              {template.questions.length > 0 || template.design ? (
-                <p className="ticket-admin-help">
-                  {locale === "nl"
-                    ? `Het sjabloon brengt ook ${[
-                        template.questions.length > 0
-                          ? `${template.questions.length} deelnemersvra${template.questions.length === 1 ? "ag" : "gen"}`
-                          : null,
-                        template.design ? "het ticketontwerp" : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" en ")} mee. Die pas je aan na het aanmaken, in de instellingen.`
-                    : `The template also brings ${[
-                        template.questions.length > 0
-                          ? `${template.questions.length} attendee question(s)`
-                          : null,
-                        template.design ? "the ticket design" : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" and ")}. You adjust those after creating, in the settings.`}
-                </p>
-              ) : null}
-            </>
-          ) : (
-            <div className="ticket-admin-form-grid">
-              <div className="ticket-admin-field">
-                <label htmlFor="ticket-first-name">{locale === "nl" ? "Naam" : "Name"}</label>
-                <input
-                  id="ticket-first-name"
-                  name="firstTicketName"
-                  defaultValue={locale === "nl" ? "Standaardticket" : "Standard ticket"}
-                  required
-                />
-              </div>
-              <div className="ticket-admin-field">
-                <label htmlFor="ticket-first-price">
-                  {locale === "nl" ? "Prijs (EUR)" : "Price (EUR)"}
-                </label>
-                <input
-                  id="ticket-first-price"
-                  name="firstTicketPrice"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  defaultValue="0"
-                  required
-                />
-                <span className="ticket-admin-help">
-                  {locale === "nl" ? "0 voor een gratis ticket." : "0 for a free ticket."}
-                </span>
-              </div>
-              <div className="ticket-admin-field">
-                <label htmlFor="ticket-capacity">
-                  {locale === "nl" ? "Aantal beschikbaar" : "Available quantity"}
-                </label>
-                <input
-                  id="ticket-capacity"
-                  name="capacity"
-                  type="number"
-                  min="1"
-                  defaultValue="100"
-                  required
-                />
-              </div>
+              <span className="ticket-admin-help">
+                {nl
+                  ? "De totale capaciteit; alle tickets hierboven delen ze."
+                  : "The total capacity; all tickets above share it."}
+              </span>
             </div>
-          )}
+          </div>
+          {template && (template.questions.length > 0 || template.design) ? (
+            <p className="ticket-admin-help">
+              {nl
+                ? `Het sjabloon brengt ook ${[
+                    template.questions.length > 0
+                      ? `${template.questions.length} deelnemersvra${template.questions.length === 1 ? "ag" : "gen"}`
+                      : null,
+                    template.design ? "het ticketontwerp" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" en ")} mee. Die pas je aan na het aanmaken, in de instellingen.`
+                : `The template also brings ${[
+                    template.questions.length > 0
+                      ? `${template.questions.length} attendee question(s)`
+                      : null,
+                    template.design ? "the ticket design" : null,
+                  ]
+                    .filter(Boolean)
+                    .join(" and ")}. You adjust those after creating, in the settings.`}
+            </p>
+          ) : null}
         </section>
       ) : null}
 
       <SettingsPanel
         title={locale === "nl" ? "Bevestigingsbericht en voorwaarden" : "Confirmation message and terms"}
-        status={locale === "nl" ? "Optioneel · tekst voor kopers na aankoop" : "Optional · text for buyers after purchase"}
+        status={
+          event.confirmationMessageNl || event.confirmationMessageEn
+            ? nl
+              ? "Er staat een bevestigingsbericht klaar"
+              : "A confirmation message is set"
+            : nl
+              ? "Optioneel · tekst voor kopers na aankoop"
+              : "Optional · text for buyers after purchase"
+        }
       >
         <p className="ticket-admin-help">{locale === "nl" ? "Het bevestigingsbericht is een extra mededeling die kopers te zien krijgen op het scherm zodra hun bestelling betaald is, én die meegestuurd wordt in de bevestigingsmail met hun tickets (bijv. praktische afspraken, wat mee te brengen of richtlijnen voor de ingang). Laat leeg als je niets wilt toevoegen." : "The confirmation message is an additional note shown to buyers on the order screen once paid, and included in the ticket confirmation email (e.g. practical instructions or what to bring). Leave empty if you have nothing to add."}</p>
         <div className="ticket-admin-form-grid">
@@ -865,30 +872,26 @@ export function TicketEventForm({
               </Link>
             </span>
           </div>
-          {isEdit ? (
-            <>
-              <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="ticket-confirmation-nl">{locale === "nl" ? "Bevestigingsbericht na betaling en in e-mail (NL)" : "Confirmation message after payment and in email (NL)"}</label>
-                <textarea
-                  id="ticket-confirmation-nl"
-                  name="confirmationMessageNl"
-                  defaultValue={event.confirmationMessageNl ?? ""}
-                  placeholder={locale === "nl" ? "Bijv. 'Vergeet je studentenkaart en identiteitskaart niet mee te nemen naar de ingang.'" : "E.g. 'Please bring your student card and ID to the entrance.'"}
-                  rows={3}
-                />
-              </div>
-              <div className="ticket-admin-field" data-span="2">
-                <label htmlFor="ticket-confirmation-en">{locale === "nl" ? "Bevestigingsbericht na betaling en in e-mail (EN)" : "Confirmation message after payment and in email (EN)"}</label>
-                <textarea
-                  id="ticket-confirmation-en"
-                  name="confirmationMessageEn"
-                  defaultValue={event.confirmationMessageEn ?? ""}
-                  placeholder={locale === "nl" ? "Bijv. 'Please bring your student ID and identity card to the entrance.'" : "E.g. 'Please bring your student ID and identity card to the entrance.'"}
-                  rows={3}
-                />
-              </div>
-            </>
-          ) : null}
+          <div className="ticket-admin-field" data-span="2">
+            <label htmlFor="ticket-confirmation-nl">{locale === "nl" ? "Bevestigingsbericht na betaling en in e-mail (NL)" : "Confirmation message after payment and in email (NL)"}</label>
+            <textarea
+              id="ticket-confirmation-nl"
+              name="confirmationMessageNl"
+              defaultValue={event.confirmationMessageNl ?? ""}
+              placeholder={locale === "nl" ? "Bijv. 'Vergeet je studentenkaart en identiteitskaart niet mee te nemen naar de ingang.'" : "E.g. 'Please bring your student card and ID to the entrance.'"}
+              rows={3}
+            />
+          </div>
+          <div className="ticket-admin-field" data-span="2">
+            <label htmlFor="ticket-confirmation-en">{locale === "nl" ? "Bevestigingsbericht na betaling en in e-mail (EN)" : "Confirmation message after payment and in email (EN)"}</label>
+            <textarea
+              id="ticket-confirmation-en"
+              name="confirmationMessageEn"
+              defaultValue={event.confirmationMessageEn ?? ""}
+              placeholder={locale === "nl" ? "Bijv. 'Please bring your student ID and identity card to the entrance.'" : "E.g. 'Please bring your student ID and identity card to the entrance.'"}
+              rows={3}
+            />
+          </div>
         </div>
       </SettingsPanel>
 
@@ -896,7 +899,7 @@ export function TicketEventForm({
         <div className="ticket-admin-alert" data-tone="danger" role="alert">
           <AlertTriangle aria-hidden="true" size={17} />
           <span>
-            {formErrorMessage(state.code, locale)}
+            {formErrorMessage(state, locale)}
             {state.code === "TICKET_TYPE_REQUIRED_TO_PUBLISH" && isEdit ? (
               <a className="ticket-admin-alert-link" href="#tickettype-aanmaken">
                 {locale === "nl" ? "Tickettype en prijs instellen" : "Set ticket type and price"}

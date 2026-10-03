@@ -14,8 +14,20 @@ import {
 import type { AdminLocale } from "./format";
 
 /**
- * De tickets die een sjabloon meebrengt, bewerkbaar bij het aanmaken van het
- * event.
+ * Het volgnummer voor de code van een nieuwe rij. Niet zomaar het aantal rijen
+ * plus één: verwijder je de eerste van `TYPE_1` en `TYPE_2`, dan zou de nieuwe
+ * rij opnieuw `TYPE_2` heten en weigert de server ze als dubbele code.
+ */
+function nextRowIndex(rows: TicketTemplateType[]): number {
+  const used = new Set(rows.map((row) => row.code));
+  let index = rows.length + 1;
+  while (used.has(`TYPE_${index}`)) index += 1;
+  return index;
+}
+
+/**
+ * De tickets van een nieuw event, bewerkbaar bij het aanmaken: die van een
+ * sjabloon, of zonder sjabloon één standaardticket om van te vertrekken.
  *
  * Een sjabloon is een vertrekpunt en geen wet: de prijs van een cantusticket
  * verandert, en een editie zonder sangria verkoopt er drie in plaats van vier.
@@ -83,6 +95,7 @@ export function TicketTemplateTypeRows({
                   </label>
                   <input
                     id={`${name}-name-${index}`}
+                    required
                     value={row.nameNl}
                     onChange={(changed) => update(index, { nameNl: changed.target.value })}
                     placeholder={nl ? "Bierticket (Lid)" : "Beer ticket (member)"}
@@ -268,7 +281,7 @@ export function TicketTemplateTypeRows({
           type="button"
           className="ticket-admin-button"
           onClick={() =>
-            setRows((current) => [...current, blankTicketTemplateType(current.length + 1)])
+            setRows((current) => [...current, blankTicketTemplateType(nextRowIndex(current))])
           }
         >
           <Plus aria-hidden="true" size={15} />

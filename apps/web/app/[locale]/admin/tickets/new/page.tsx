@@ -76,10 +76,17 @@ export default async function NewTicketEventPage({
     ? (calendarEvents.find((e) => e.id === requestedCalendarEventId) ?? null)
     : null;
   const base = ticketBase(locale);
-  const [templates, bannerCategories, accountingCodes] = await Promise.all([
+  const [templates, bannerCategories, accountingCodes, presaleGroups] = await Promise.all([
     listTicketEventTemplates(),
     listTicketBannerCategories(),
     listAccountingCodes(),
+    // Zelfde lijst als op de instellingen: elke actieve groep mag in de
+    // voorverkoop, los van wie het event beheert.
+    prisma.group.findMany({
+      where: { active: true },
+      select: { id: true, nameNl: true, nameEn: true, type: true },
+      orderBy: [{ type: "asc" }, { orderInPraesidium: "asc" }, { nameNl: "asc" }],
+    }),
   ]);
   const canManageTemplates = hasPermission(session, "tickets.templates");
 
@@ -118,6 +125,7 @@ export default async function NewTicketEventPage({
           }
           today={utcToLocalDateTime(new Date()).slice(0, 10)}
           groups={groups}
+          presaleGroups={presaleGroups}
           calendarEvents={calendarEvents}
           linkedCalendarEvent={linkedCalendarEvent}
           linkedImageUrl={publicUrl(linkedCalendarEvent?.imageKey)}

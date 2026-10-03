@@ -35,11 +35,7 @@ import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { TICKET_TERMS_SETTING_KEY } from "@/lib/ticketing/terms";
 import { ticketAudienceFrom, ticketAudienceLabel, type TicketAudience } from "@/lib/ticketing/audience";
 import { getTicketEventTemplate } from "@/lib/ticketing/templateStore";
-import {
-  applyTicketTemplateType,
-  parseTemplateTypes,
-  type TicketTemplateType,
-} from "@/lib/ticketing/templates";
+import { applyTicketTemplateType, parseTemplateTypes } from "@/lib/ticketing/templates";
 
 const localeSchema = z.enum(["nl", "en"]);
 
@@ -64,7 +60,16 @@ const statusSchema = z.enum([
 export type TicketEventFormActionState = {
   status: "idle" | "success" | "error";
   code?: string;
+  /** De Nederlandse zin van `parseTemplateTypes`, die zegt welke rij en wat. */
+  detail?: string;
 };
+
+/** Een ticketrij die niet klopt, met de zin die zegt welke en waarom. */
+class InvalidTicketTypesError extends Error {
+  constructor(readonly detail: string) {
+    super("INVALID_TICKET_TYPES");
+  }
+}
 
 const EXPECTED_EVENT_FORM_ERRORS = new Set([
   "NO_TICKET_TYPES",
@@ -241,6 +246,29 @@ function presaleLeadMinutesValue(formData: FormData): number | null {
   // ("100 dagen" i.p.v. "10") uit de database.
   if (minutes > 365 * 1_440) throw new Error("INVALID_PRESALELEADVALUE");
   return minutes;
+}
+
+/**
+ * De voorverkoop zoals het eventformulier ze meestuurt, gecontroleerd tegen de
+ * verkoopstart. Gedeeld door aanmaken en bewerken: een voorverkoop zonder
+ * verkoopstart of zonder iemand die erin mag, is bij allebei even zinloos.
+ */
+function presaleFromForm(formData: FormData, salesStartAt: Date | null) {
+  const presaleLeadMinutes = presaleLeadMinutesValue(formData);
+  const presalePraesidium = checkboxValue(formData, "presalePraesidium");
+  const presaleHelpers = checkboxValue(formData, "presaleHelpers");
+  const presaleGroupIds = [
+    ...new Set(formData.getAll("presaleGroupIds").map((entry) => String(entry)).filter(Boolean)),
+  ];
+  if (presaleLeadMinutes !== null) {
+    // Een voorverkoop is een duur vóór de verkoopstart; zonder die start staat
+    // de verkoop al voor iedereen open en is er niets om vroeger te zetten.
+    if (!salesStartAt) throw new Error("PRESALE_NEEDS_SALES_START");
+    if (!presalePraesidium && !presaleHelpers && presaleGroupIds.length === 0) {
+      throw new Error("PRESALE_NEEDS_AUDIENCE");
+    }
+  }
+  return { presaleLeadMinutes, presalePraesidium, presaleHelpers, presaleGroupIds };
 }
 
 function codeFrom(input: string): string {
@@ -491,6 +519,9 @@ export async function submitTicketEventFormAction(
     return { status: "success" };
   } catch (error) {
     unstable_rethrow(error);
+    if (error instanceof InvalidTicketTypesError) {
+      return { status: "error", code: error.message, detail: error.detail };
+    }
     const code = error instanceof Error ? error.message : "";
     if (EXPECTED_EVENT_FORM_ERRORS.has(code) || code.startsWith("INVALID_")) {
       return { status: "error", code };
@@ -550,17 +581,13 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
     : (dateValue(formData, "endsAt") ?? calendarEvent?.end ?? null);
   if (!startsAt || !endsAt || endsAt <= startsAt) throw new Error("INVALID_EVENT_DATES");
   const capacity = boundedIntegerValue(formData, "capacity", 100, 1, 1_000_000);
-  // Naam en prijs van het eerste tickettype. Een prijs van 0 is geldig: gratis
-  // tickets bestaan (inschrijvingen, ledenactiviteiten).
-  const firstTicketName =
-    limitedValue(formData, "firstTicketName", 160) || (locale === "nl" ? "Standaardticket" : "Standard ticket");
-  const firstTicketPriceCents = parseEuroAmount(formData.get("firstTicketPrice") ?? "0");
-  if (firstTicketPriceCents > 99_999_999) throw new Error("INVALID_AMOUNT");
   const salesStartAt = dateValue(formData, "salesStartAt");
   const salesEndAt = dateValue(formData, "salesEndAt");
   if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
     throw new Error("INVALID_SALES_DATES");
   }
+  const { presaleLeadMinutes, presalePraesidium, presaleHelpers, presaleGroupIds } =
+    presaleFromForm(formData, salesStartAt);
   const requestedSlug = slugify(value(formData, "slug") || titleNl) || `event-${randomBytes(4).toString("hex")}`;
   const slugExists = await prisma.ticketEvent.findUnique({ where: { slug: requestedSlug } });
   const slug = slugExists ? `${requestedSlug}-${randomBytes(3).toString("hex")}` : requestedSlug;
@@ -572,27 +599,26 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
     imageCategoryId: null,
   });
 
-  // Het sjabloon waaruit dit event ontstaat. De tickettypes komen uit het
-  // formulier, niet rechtstreeks uit het sjabloon: in het aanmaakscherm zijn ze
-  // nog aanpasbaar, en wat daar staat is wat er verkocht wordt. Het sjabloon
-  // levert wat het scherm niet vraagt: de vragen, het ticketontwerp, het
-  // bevestigingsbericht en de voorverkoop.
+  // De tickettypes komen altijd uit de rijen van het formulier, met of zonder
+  // sjabloon: wat daar staat is wat er verkocht wordt. Een event zonder
+  // tickettype is niet publiceerbaar en verkoopt niets, dus dat is geen
+  // zinvolle tussenstand.
+  let ticketTypesPayload: unknown;
+  try {
+    ticketTypesPayload = JSON.parse(value(formData, "ticketTypesData"));
+  } catch {
+    throw new Error("INVALID_TICKET_TYPES");
+  }
+  const parsedTicketTypes = parseTemplateTypes(ticketTypesPayload);
+  if (typeof parsedTicketTypes === "string") throw new InvalidTicketTypesError(parsedTicketTypes);
+  const ticketTypes = parsedTicketTypes.filter((type) => type.enabled);
+  if (ticketTypes.length === 0) throw new Error("NO_TICKET_TYPES");
+
+  // Het sjabloon waaruit dit event ontstaat. Het levert wat het scherm niet
+  // vraagt: de deelnemersvragen en het ticketontwerp. De rest heeft het
+  // formulier al voorgevuld, en wat daar staat, wint.
   const templateSlug = optionalValue(formData, "templateSlug");
   const template = templateSlug ? await getTicketEventTemplate(templateSlug) : null;
-  let templateTypes: TicketTemplateType[] = [];
-  const rawTemplateTypes = optionalValue(formData, "templateTypesData");
-  if (rawTemplateTypes) {
-    let payload: unknown;
-    try {
-      payload = JSON.parse(rawTemplateTypes);
-    } catch {
-      throw new Error("INVALID_TICKET_TYPES");
-    }
-    const parsed = parseTemplateTypes(payload);
-    if (typeof parsed === "string") throw new Error("INVALID_TICKET_TYPES");
-    templateTypes = parsed.filter((type) => type.enabled);
-    if (templateTypes.length === 0) throw new Error("NO_TICKET_TYPES");
-  }
   const templateQuestions = template?.questions ?? [];
   const templateSettings = templateDesignSettings(template?.design);
 
@@ -617,16 +643,13 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         salesEndAt,
         maxTicketsPerOrder: boundedIntegerValue(formData, "maxTicketsPerOrder", 8, 1, 50),
         cardCheckIn: checkboxValue(formData, "cardCheckIn"),
+        openScanning: checkboxValue(formData, "openScanning"),
         contactEmail: emailValue(formData, "contactEmail"),
-        // Uit het sjabloon, niet uit het formulier: het aanmaakscherm vraagt ze
-        // niet, en ze na het aanmaken opnieuw moeten intikken is precies wat een
-        // sjabloon moest wegnemen. Wat het scherm wél vraagt, wint.
-        confirmationMessageNl: template?.confirmationMessageNl || undefined,
-        confirmationMessageEn: template?.confirmationMessageEn || undefined,
-        presaleLeadMinutes: template?.presaleLeadMinutes ?? undefined,
-        presalePraesidium: template?.presalePraesidium ?? undefined,
-        presaleHelpers: template?.presaleHelpers ?? undefined,
-        openScanning: template?.openScanning ?? undefined,
+        confirmationMessageNl: limitedOptionalValue(formData, "confirmationMessageNl", 5_000),
+        confirmationMessageEn: limitedOptionalValue(formData, "confirmationMessageEn", 5_000),
+        presaleLeadMinutes,
+        presalePraesidium,
+        presaleHelpers,
         ...(templateSettings ? { settings: templateSettings } : {}),
         createdById: session.user.id,
       },
@@ -640,56 +663,47 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         capacity,
       },
     });
-    // Het eerste tickettype hoort bij het aanmaken, niet bij een tweede ronde in
-    // de instellingen: een event met een voorraadpot maar zonder tickettype is
-    // niet publiceerbaar en verkoopt niets, dus dat is geen zinvolle tussenstand.
-    //
-    // Komt het event uit een sjabloon, dan zijn dat de (in het scherm nog
-    // aangepaste) tickets van dat sjabloon; anders het ene ticket uit het
-    // formulier.
-    if (templateTypes.length > 0) {
-      for (let index = 0; index < templateTypes.length; index += 1) {
-        const type = templateTypes[index];
-        const window = applyTicketTemplateType(type, startsAt);
-        await tx.ticketType.create({
-          data: {
-            eventId: created.id,
-            inventoryPoolId: pool.id,
-            code: type.code,
-            nameNl: type.nameNl,
-            nameEn: type.nameEn || null,
-            descriptionNl: type.descriptionNl || null,
-            descriptionEn: type.descriptionEn || null,
-            unitPriceCents: type.unitPriceCents,
-            // De ledenprijs enkel wanneer ze nog klopt tegen de prijs die in het
-            // aanmaakscherm kan zijn bijgesteld: een sjabloon van 17 euro met 14
-            // voor leden, hier verlaagd naar 12, zou anders een "korting" van 14
-            // op 12 opleveren. `parseTemplateTypes` bewaakt dezelfde regel.
-            memberPriceCents:
-              type.audience === "PUBLIC" &&
-              type.memberPriceCents !== null &&
-              type.memberPriceCents < type.unitPriceCents
-                ? type.memberPriceCents
-                : null,
-            audience: type.audience,
-            color: type.color,
-            minPerOrder: type.minPerOrder,
-            maxPerOrder: type.maxPerOrder,
-            salesStartAt: window.salesStartAt,
-            salesEndAt: window.salesEndAt,
-            sortOrder: index,
-          },
-        });
-      }
-    } else {
+    // De groepen die naast het praesidium in de voorverkoop mogen, zoals bij
+    // bewerken: zonder voorverkoop blijft er niets staan.
+    if (presaleLeadMinutes !== null && presaleGroupIds.length > 0) {
+      const existing = await tx.group.findMany({
+        where: { id: { in: presaleGroupIds } },
+        select: { id: true },
+      });
+      await tx.ticketEventPresaleGroup.createMany({
+        data: existing.map((group) => ({ eventId: created.id, groupId: group.id })),
+      });
+    }
+    for (let index = 0; index < ticketTypes.length; index += 1) {
+      const type = ticketTypes[index];
+      const window = applyTicketTemplateType(type, startsAt);
       await tx.ticketType.create({
         data: {
           eventId: created.id,
           inventoryPoolId: pool.id,
-          code: "STANDARD",
-          nameNl: firstTicketName,
-          unitPriceCents: firstTicketPriceCents,
-          maxPerOrder: boundedIntegerValue(formData, "maxTicketsPerOrder", 8, 1, 50),
+          code: type.code,
+          nameNl: type.nameNl,
+          nameEn: type.nameEn || null,
+          descriptionNl: type.descriptionNl || null,
+          descriptionEn: type.descriptionEn || null,
+          unitPriceCents: type.unitPriceCents,
+          // De ledenprijs enkel wanneer ze nog klopt tegen de prijs die in het
+          // aanmaakscherm kan zijn bijgesteld: een sjabloon van 17 euro met 14
+          // voor leden, hier verlaagd naar 12, zou anders een "korting" van 14
+          // op 12 opleveren. `parseTemplateTypes` bewaakt dezelfde regel.
+          memberPriceCents:
+            type.audience === "PUBLIC" &&
+            type.memberPriceCents !== null &&
+            type.memberPriceCents < type.unitPriceCents
+              ? type.memberPriceCents
+              : null,
+          audience: type.audience,
+          color: type.color,
+          minPerOrder: type.minPerOrder,
+          maxPerOrder: type.maxPerOrder,
+          salesStartAt: window.salesStartAt,
+          salesEndAt: window.salesEndAt,
+          sortOrder: index,
         },
       });
     }
@@ -759,24 +773,19 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
     entityId: event.id,
     target: titleNl,
     summary: [
-      template
-        ? `sjabloon "${template.label}", capaciteit ${capacity}, ${templateTypes.length} tickettype(s)`
-        : `capaciteit ${capacity}, eerste tickettype "${firstTicketName}"`,
+      template ? `sjabloon "${template.label}"` : null,
+      `capaciteit ${capacity}`,
+      `${ticketTypes.length} tickettype(s)`,
       `boekhoudcode ${accountingCode.code}`,
-    ].join(", "),
+    ]
+      .filter(Boolean)
+      .join(", "),
   });
 
   refreshTicketEvent(locale, event.id);
-  // Kwam het event uit een sjabloon, dan staan de tickets er al en hoeft het
-  // scherm niet op "tickettype toevoegen" open te springen.
-  redirect(
-    localePath(
-      locale,
-      templateTypes.length > 0
-        ? `/admin/tickets/${event.id}/instellingen`
-        : `/admin/tickets/${event.id}/instellingen#tickettype-aanmaken`
-    )
-  );
+  // De tickets staan er al, dus het scherm hoeft niet op "tickettype toevoegen"
+  // open te springen.
+  redirect(localePath(locale, `/admin/tickets/${event.id}/instellingen`));
 }
 
 export async function updateTicketEventAction(formData: FormData): Promise<void> {
@@ -845,20 +854,8 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
   if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
     throw new Error("INVALID_SALES_DATES");
   }
-  const presaleLeadMinutes = presaleLeadMinutesValue(formData);
-  const presalePraesidium = checkboxValue(formData, "presalePraesidium");
-  const presaleHelpers = checkboxValue(formData, "presaleHelpers");
-  const presaleGroupIds = [
-    ...new Set(formData.getAll("presaleGroupIds").map((entry) => String(entry)).filter(Boolean)),
-  ];
-  if (presaleLeadMinutes !== null) {
-    // Een voorverkoop is een duur vóór de verkoopstart; zonder die start staat
-    // de verkoop al voor iedereen open en is er niets om vroeger te zetten.
-    if (!salesStartAt) throw new Error("PRESALE_NEEDS_SALES_START");
-    if (!presalePraesidium && !presaleHelpers && presaleGroupIds.length === 0) {
-      throw new Error("PRESALE_NEEDS_AUDIENCE");
-    }
-  }
+  const { presaleLeadMinutes, presalePraesidium, presaleHelpers, presaleGroupIds } =
+    presaleFromForm(formData, salesStartAt);
   const locationGeo = await resolveLocationGeo(formData, event);
   const banner = await readTicketBanner(formData, event);
 

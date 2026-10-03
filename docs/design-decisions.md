@@ -8338,11 +8338,24 @@ opnieuw op: half overschrijven levert een scherm op waar de titel van het ene
 sjabloon boven de prijzen van het andere staat. Zit er al werk in, dan gaat er
 eerst een bevestiging over.
 
-**Wat het scherm niet vraagt, komt toch mee: de deelnemersvragen, het
-bevestigingsbericht, de voorverkoop en het ticketontwerp.** Die vier stonden bij
-het aanmaken niet eens in beeld en werden dus in de praktijk nooit ingevuld. De
-status komt bewust *niet* mee: een nieuw event blijft DRAFT, want publiceren is
-de ene handeling waar je niet per ongeluk in wil rollen.
+**Wat het scherm niet vraagt, komt toch mee: de deelnemersvragen en het
+ticketontwerp.** Die stonden bij het aanmaken niet eens in beeld en werden dus in
+de praktijk nooit ingevuld. De status komt bewust *niet* mee: een nieuw event
+blijft DRAFT, want publiceren is de ene handeling waar je niet per ongeluk in
+wil rollen.
+
+**Een leeg formulier kan bij het aanmaken alles wat een sjabloon kan
+invullen.** Eerst kreeg je zonder sjabloon één ticket met een naam en een prijs,
+terwijl het cantussjabloon meteen vier tickets met ledenprijzen neerzette; een
+tweede ticket of een ledenprijs kon je pas na het aanmaken toevoegen. Hetzelfde
+gold voor het bevestigingsbericht, de voorverkoop en wie mag scannen: het
+sjabloon zette ze stil, buiten het formulier om, en zonder sjabloon waren ze bij
+het aanmaken niet te kiezen. Nu zijn de ticketrijen met en zonder sjabloon
+dezelfde (`TicketTemplateTypeRows`), en staan die drie instellingen in het
+aanmaakformulier, voorgevuld uit het sjabloon. Een sjabloon is dus enkel nog
+een vertrekpunt voor wat je ziet, plus de vragen en het ontwerp hierboven.
+"Wie mag scannen" staat enkel bij het aanmaken in het formulier; daarna hoort het
+bij Toegang, naast de toekenningen waar het over beslist.
 
 **Het ontwerp reist zonder afbeeldingen.** Artwork en logo's staan per event in
 object storage onder `ticket-design/<eventId>/` en worden bij het uitlezen tegen

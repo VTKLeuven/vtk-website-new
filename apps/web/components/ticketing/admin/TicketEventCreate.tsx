@@ -12,6 +12,7 @@ import {
 } from "@/lib/ticketing/templates";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
 import { TicketEventForm, type LinkedCalendarEvent } from "./TicketEventForm";
+import type { PresaleGroupOption } from "./PresaleFields";
 import type { TicketBannerCategory } from "@/lib/ticketing/bannerCategories";
 import type { AccountingCodeOption } from "@/lib/accounting/codes";
 import { SettingsPanel } from "./SettingsPanel";
@@ -37,6 +38,7 @@ export function TicketEventCreate({
   initialTemplateSlug,
   today,
   groups,
+  presaleGroups,
   calendarEvents,
   linkedCalendarEvent,
   linkedImageUrl = null,
@@ -51,6 +53,8 @@ export function TicketEventCreate({
   /** Vandaag als "YYYY-MM-DD" in Brussel; het datumveld opent hierop. */
   today: string;
   groups: { id: string; nameNl: string; nameEn: string }[];
+  /** De groepen die naast het praesidium in de voorverkoop kunnen. */
+  presaleGroups: PresaleGroupOption[];
   calendarEvents: { id: string; titleNl: string; titleEn: string | null; start: Date }[];
   linkedCalendarEvent?: LinkedCalendarEvent | null;
   linkedImageUrl?: string | null;
@@ -114,7 +118,16 @@ export function TicketEventCreate({
         locationLongitude: template.locationLongitude,
         maxTicketsPerOrder: template.maxTicketsPerOrder,
         cardCheckIn: template.cardCheckIn,
+        openScanning: template.openScanning,
         contactEmail: template.contactEmail,
+        // Voorheen zette de server deze drie stil uit het sjabloon, buiten het
+        // formulier om: wat je niet zag, kon je ook niet bijstellen, en zonder
+        // sjabloon kon je ze bij het aanmaken helemaal niet kiezen.
+        confirmationMessageNl: template.confirmationMessageNl,
+        confirmationMessageEn: template.confirmationMessageEn,
+        presaleLeadMinutes: template.presaleLeadMinutes,
+        presalePraesidium: template.presalePraesidium,
+        presaleHelpers: template.presaleHelpers,
         startsAt: schedule?.startsAt,
         endsAt: schedule?.endsAt,
         salesStartAt: schedule?.salesStartAt ?? undefined,
@@ -210,6 +223,7 @@ export function TicketEventCreate({
         <TicketEventForm
           key={`${slug}:${day}`}
           groups={groups}
+          presaleGroups={presaleGroups}
           calendarEvents={calendarEvents}
           linkedCalendarEvent={linkedCalendarEvent}
           linkedImageUrl={linkedImageUrl}
