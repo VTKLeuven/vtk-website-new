@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  filterAccountingCodeGroups,
+  groupAccountingCodes,
   orderAccountingCodes,
   parseMainCode,
   parseSubSuffix,
@@ -48,5 +50,55 @@ describe("orderAccountingCodes", () => {
   it("keeps a sub code whose main account is missing instead of dropping it", () => {
     const ordered = orderAccountingCodes([{ id: "x", code: "70010010001", name: "Cantussen", parentId: "gone" }]);
     expect(ordered).toEqual([{ id: "x", code: "70010010001", name: "Cantussen", parentId: "gone", depth: 0 }]);
+  });
+});
+
+describe("searching accounting codes", () => {
+  const groups = groupAccountingCodes([
+    { id: "act", code: "700100", name: "Activiteiten opbrengsten", parentId: null },
+    { id: "act-cantus", code: "70010010001", name: "Cantussen", parentId: "act" },
+    { id: "act-td", code: "70010010002", name: "TD's", parentId: "act" },
+    { id: "int", code: "700120", name: "Internationaal opbrengsten", parentId: null },
+    { id: "int-od", code: "70012012001", name: "Orientation Days", parentId: "int" },
+    { id: "int-cantus", code: "70012012002", name: "Cantussen", parentId: "int" },
+    { id: "fin", code: "757000", name: "Financiële opbrengsten", parentId: null },
+  ]);
+  const shown = (query: string) =>
+    filterAccountingCodeGroups(groups, query).map((group) => [
+      group.main.code,
+      group.children.map((child) => child.code),
+    ]);
+
+  it("groups each main account with its sub codes", () => {
+    expect(groups.map((group) => [group.main.code, group.children.length])).toEqual([
+      ["700100", 2],
+      ["700120", 2],
+      ["757000", 0],
+    ]);
+  });
+
+  it("shows a whole category when its main account matches", () => {
+    expect(shown("internationaal")).toEqual([["700120", ["70012012001", "70012012002"]]]);
+  });
+
+  it("shows matching sub codes under their own main account", () => {
+    expect(shown("cantus")).toEqual([
+      ["700100", ["70010010001"]],
+      ["700120", ["70012012002"]],
+    ]);
+  });
+
+  it("narrows with every extra word, across main account and sub code", () => {
+    expect(shown("internationaal cantus")).toEqual([["700120", ["70012012002"]]]);
+  });
+
+  it("finds a code by its digits and ignores accents", () => {
+    expect(shown("12001")).toEqual([["700120", ["70012012001"]]]);
+    expect(shown("financiele")).toEqual([["757000", []]]);
+  });
+
+  it("returns everything for an empty search and nothing for a miss", () => {
+    expect(shown("  ")).toHaveLength(3);
+    expect(shown("zeilkamp")).toEqual([]);
   });
 });

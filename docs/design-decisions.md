@@ -9681,6 +9681,16 @@ en bestanden: `docs/ticketing.md`, "Boekhoudcodes".
   wordt 70010010002. Zo staat ze in de betaalinfo en zo kent de boekhouder ze.
 - **De code is verplicht**, bij het aanmaken en bij publiceren. Een event van
   voor de codes blijft verkopen, met een waarschuwing tot iemand er een kiest.
+- **Kiezen gebeurt met een zoekveld, per hoofdrekening.** Een gewone keuzelijst
+  van zeventig codes was enkel te doorscrollen. Nu tik je "internationaal" en
+  zie je die categorie met haar subcodes, of "cantus" en zie je de Cantussen van
+  elke post onder hun eigen kop. Een subcode toont enkel haar eigen vijf cijfers
+  onder haar hoofdrekening; de volledige code van elf cijfers herhalen maakte de
+  lijst onleesbaar.
+- **Wat er per code verkocht is, staat bij de statistieken**, niet naast het
+  veld in de basisinformatie. Daar ging het om wat de verkoop is, niet om wat ze
+  opbracht; een tabel met bedragen tussen de URL-naam en het kalenderevent was
+  daar misplaatst.
 - **Wat verkocht is, verandert nooit mee.** Een bestelling bewaart de code die in
   haar betaalinfo stond. Bleek de code fout, dan pas je ze aan voor wat nog komt,
   en de statistieken tonen per code hoeveel tickets en hoeveel geld eronder

@@ -88,3 +88,59 @@ export function orderAccountingCodes(rows: readonly AccountingCodeRow[]): Accoun
     ...(children.get(root.id) ?? []).sort(byCode).map((child) => ({ ...child, depth: 1 as const })),
   ]);
 }
+
+/** Een hoofdrekening met haar subcodes, zoals de keuzelijst ze toont. */
+export type AccountingCodeGroup = {
+  main: AccountingCodeOption;
+  children: AccountingCodeOption[];
+};
+
+/** De codes per hoofdrekening, in de volgorde van het rekeningstelsel. */
+export function groupAccountingCodes(codes: readonly AccountingCodeRow[]): AccountingCodeGroup[] {
+  const groups: AccountingCodeGroup[] = [];
+  for (const code of orderAccountingCodes(codes)) {
+    if (code.depth === 0) groups.push({ main: code, children: [] });
+    else groups.at(-1)?.children.push(code);
+  }
+  return groups;
+}
+
+/** Kleine letters, zonder accenten: "Financiële" vind je ook met "financiele". */
+function searchable(value: string): string {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLocaleLowerCase("nl-BE");
+}
+
+/**
+ * Wat er van de lijst overblijft bij een zoekterm. Elk woord moet ergens
+ * voorkomen (naam of code), zodat "internationaal cantus" enkel de Cantussen
+ * van Internationaal geeft.
+ *
+ * Past een hoofdrekening zelf, dan blijft ze staan met al haar subcodes: wie
+ * "internationaal" zoekt, wil de hele categorie zien. Anders blijven enkel de
+ * subcodes die passen, met hun hoofdrekening erboven als kop, want een subcode
+ * zonder haar hoofdrekening zegt niet waar ze bij hoort.
+ */
+export function filterAccountingCodeGroups(
+  groups: readonly AccountingCodeGroup[],
+  query: string,
+): AccountingCodeGroup[] {
+  const tokens = searchable(query).split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return [...groups];
+  const matches = (haystack: string) => tokens.every((token) => haystack.includes(token));
+  const result: AccountingCodeGroup[] = [];
+  for (const group of groups) {
+    const mainHaystack = searchable(`${group.main.code} ${group.main.name}`);
+    if (matches(mainHaystack)) {
+      result.push(group);
+      continue;
+    }
+    const children = group.children.filter((child) =>
+      matches(`${mainHaystack} ${searchable(`${child.code} ${child.name}`)}`),
+    );
+    if (children.length > 0) result.push({ main: group.main, children });
+  }
+  return result;
+}

@@ -13,7 +13,8 @@ import { PresaleFields } from "@/components/ticketing/admin/PresaleFields";
 import { SettingsPanel } from "@/components/ticketing/admin/SettingsPanel";
 import { TicketTemplateTypeRows } from "@/components/ticketing/admin/TicketTemplateTypeRows";
 import { formatMoney, type AdminLocale } from "@/components/ticketing/admin/format";
-import { accountingCodeLabel, type AccountingCodeOption } from "@/lib/accounting/codes";
+import type { AccountingCodeOption } from "@/lib/accounting/codes";
+import { AccountingCodePicker } from "@/components/admin/AccountingCodePicker";
 import {
   blankTicketTemplate,
   formatMinutesBefore,
@@ -381,23 +382,14 @@ function TemplateEditor({
             </div>
             <div className="ticket-admin-field" data-span="2">
               <label htmlFor={field("accountingCode")}>{nl ? "Boekhoudcode" : "Accounting code"}</label>
-              <select
+              <AccountingCodePicker
                 id={field("accountingCode")}
                 name="accountingCodeId"
-                defaultValue={
-                  accountingCodes.some((code) => code.id === template.accountingCodeId)
-                    ? (template.accountingCodeId ?? "")
-                    : ""
-                }
-              >
-                <option value="">{nl ? "Geen: wie het event maakt, kiest ze" : "None: whoever creates the event picks it"}</option>
-                {accountingCodes.map((code) => (
-                  <option key={code.id} value={code.id}>
-                    {code.depth === 1 ? "\u2003" : ""}
-                    {accountingCodeLabel(code)}
-                  </option>
-                ))}
-              </select>
+                codes={accountingCodes}
+                defaultValue={template.accountingCodeId}
+                noneLabel={nl ? "Geen: wie het event maakt, kiest ze" : "None: whoever creates the event picks it"}
+                locale={locale}
+              />
               <span className="ticket-admin-help">
                 {nl
                   ? "Staat voorgevuld bij een event uit dit sjabloon en gaat mee in de betaalinfo. Wie het event maakt, kan ze nog aanpassen."

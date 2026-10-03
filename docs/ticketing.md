@@ -247,7 +247,8 @@ betaalinfo").
 | Concern | Location |
 | --- | --- |
 | Table, sub codes (parent code + five digits) | `AccountingCode` in `schema.prisma` |
-| Parsing, ordering, labels (pure) | `apps/web/lib/accounting/codes.ts` |
+| Parsing, ordering, grouping, search (pure) | `apps/web/lib/accounting/codes.ts` |
+| The picker in the event form, templates and membership | `apps/web/components/admin/AccountingCodePicker.tsx` |
 | Queries, membership fallback to 730000 | `apps/web/lib/accounting/server.ts` |
 | Create, edit, delete | `apps/web/app/actions/accountingCodes.ts` |
 | What Mollie gets: `"<code> <event>"`, order number in metadata | `mollieDescription()` in `packages/payments/src/mollie.ts` |
@@ -266,7 +267,17 @@ betaalinfo").
   boekhoudcode". Nothing is backfilled: their payment details carried no code.
 - **The event form requires a code, and so does publishing.** An event from
   before the codes keeps selling; its settings show a warning until someone
-  picks one.
+  picks one. What was sold under which code is in the event's statistics, not
+  next to the field.
+- **The picker is a search field, not a native select.** Seventy codes in a
+  plain list meant scrolling. Codes are grouped per main account with a line
+  between groups; a sub code shows only its own five digits under its main
+  account. Typing "internationaal" leaves that main account with all its sub
+  codes; "cantus" leaves the Cantussen of every main account that has one, each
+  under its own heading; every extra word narrows further
+  (`filterAccountingCodeGroups`). The value is a real form field, so the server
+  actions read the same FormData; it is not `readOnly`, because a read-only
+  field skips `required`.
 - **A template can suggest a code** (`TicketEventTemplate.accountingCodeId`,
   optional). An event from that template gets it pre-filled and can still
   change it; "Bewaar als sjabloon" copies the event's code. The built-in cantus

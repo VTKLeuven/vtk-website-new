@@ -2150,3 +2150,225 @@ a.vtk-shortcut-tile:hover {
     font-size: 16px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Keuze van een boekhoudcode (components/admin/AccountingCodePicker.tsx).
+
+   Een knop in de vorm van de andere velden, en bij openen een zoekveld met de
+   codes per hoofdrekening eronder: een lijn tussen twee hoofdrekeningen, de
+   subcodes ingesprongen met enkel hun eigen vijf cijfers. Staat in de
+   eventinstellingen, de ticketsjablonen en het lidmaatschap; daarom hier en
+   niet in vtk-ticket-admin.css.
+
+   Het zoekveld zit binnen `.ticket-admin-field` en `.vtk-admin-main`, die elk
+   veld een kader, achtergrond en focusrand met `!important` geven. De selector
+   hieronder is daarom een klasse zwaarder dan die van hen; anders staat er een
+   kader in een kader.
+   --------------------------------------------------------------------------- */
+
+.vtk-code-picker {
+  position: relative;
+  width: 100%;
+}
+
+/* Het echte formulierveld: in FormData en in de browservalidatie, maar buiten
+   beeld afgesneden, ook wanneer een veldregel het 100% breed maakt. */
+.vtk-code-picker-value {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.vtk-code-picker-trigger {
+  width: 100%;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vtk-code-picker-trigger:focus-visible,
+.vtk-code-picker[data-open='true'] .vtk-code-picker-trigger {
+  border-color: var(--ink);
+  outline: 3px solid color-mix(in srgb, var(--ink) 9%, transparent);
+  outline-offset: 0;
+}
+
+.vtk-code-picker[data-invalid='true'] .vtk-code-picker-trigger {
+  border-color: var(--danger-ink);
+}
+
+.vtk-code-picker-trigger > svg {
+  flex: none;
+  color: var(--muted);
+  transition: transform 150ms ease;
+}
+
+.vtk-code-picker[data-open='true'] .vtk-code-picker-trigger > svg {
+  transform: rotate(180deg);
+}
+
+.vtk-code-picker-current {
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 8px;
+}
+
+.vtk-code-picker-current .vtk-code-picker-code {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.vtk-code-picker-parent,
+.vtk-code-picker-placeholder {
+  color: var(--muted);
+}
+
+.vtk-code-picker-parent {
+  font-size: 12.5px;
+}
+
+.vtk-code-picker-code {
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-code-picker-error {
+  display: block;
+  margin-top: 6px;
+  color: var(--danger-ink);
+  font-size: 12px;
+}
+
+.vtk-code-picker-popover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 14px 32px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+.vtk-code-picker-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.vtk-admin-main .vtk-code-picker .vtk-code-picker-search input[type='search'],
+.vtk-admin-main .vtk-code-picker .vtk-code-picker-search input[type='search']:focus {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  min-height: 0;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  outline: none !important;
+  color: var(--ink) !important;
+  font: inherit;
+  font-size: 14px;
+}
+
+/* `position: relative`, zodat `offsetTop` van een optie binnen deze lijst
+   telt; het scrollen in de component rekent daarmee. */
+.vtk-code-picker-list {
+  position: relative;
+  max-height: min(360px, calc(60 * var(--vtk-dvh, 1dvh)));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 5px;
+}
+
+.vtk-code-picker-group + .vtk-code-picker-group,
+.vtk-code-picker-none + .vtk-code-picker-group {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-code-picker-list button {
+  width: 100%;
+  min-height: 34px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vtk-code-picker-list button > svg {
+  flex: none;
+  align-self: center;
+  margin-left: auto;
+}
+
+.vtk-code-picker-list button:is(:hover, [data-highlighted='true']) {
+  background: var(--paper-2);
+}
+
+/* De gekozen code: de gele rail, zoals een uitgelichte kaart. */
+.vtk-code-picker-list button[aria-selected='true'] {
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+/* Via de lijst, want `.vtk-code-picker-list button` zet met `font: inherit`
+   ook de dikte terug en weegt zwaarder dan een losse klasse. */
+.vtk-code-picker-list .vtk-code-picker-none {
+  color: var(--muted);
+}
+
+.vtk-code-picker-list .vtk-code-picker-main {
+  font-weight: 650;
+}
+
+.vtk-code-picker-main .vtk-code-picker-code {
+  min-width: 6ch;
+}
+
+.vtk-code-picker-list .vtk-code-picker-sub {
+  padding-left: 22px;
+}
+
+.vtk-code-picker-sub .vtk-code-picker-code {
+  min-width: 5ch;
+  color: var(--muted);
+}
+
+.vtk-admin-main .vtk-code-picker-empty {
+  margin: 0;
+  padding: 14px 10px;
+  font-size: 13px;
+}

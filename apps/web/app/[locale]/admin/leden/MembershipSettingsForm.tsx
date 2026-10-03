@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, Input, Label, Select } from "@vtk/ui";
+import { Card, Input, Label } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { saveMembershipConfigAction } from "@/app/actions/membership";
 import type { MembershipConfig } from "@/lib/membership/config";
@@ -9,6 +9,7 @@ import {
   MEMBERSHIP_DEFAULT_ACCOUNTING_CODE,
   type AccountingCodeOption,
 } from "@/lib/accounting/codes";
+import { AccountingCodePicker } from "@/components/admin/AccountingCodePicker";
 
 /**
  * De prijs van een niet-facultair lidmaatschap, en of de twee wegen naar een
@@ -87,24 +88,14 @@ export function MembershipSettingsForm({
         </div>
         <div className="max-w-md">
           <Label htmlFor="membership-accounting-code">{t.code}</Label>
-          <Select
+          <AccountingCodePicker
             id="membership-accounting-code"
             name="accountingCodeId"
-            defaultValue={
-              config.accountingCodeId &&
-              accountingCodes.some((code) => code.id === config.accountingCodeId)
-                ? config.accountingCodeId
-                : ""
-            }
-          >
-            <option value="">{t.codeDefault}</option>
-            {accountingCodes.map((code) => (
-              <option key={code.id} value={code.id}>
-                {code.depth === 1 ? "\u2003" : ""}
-                {accountingCodeLabel(code)}
-              </option>
-            ))}
-          </Select>
+            codes={accountingCodes}
+            defaultValue={config.accountingCodeId}
+            noneLabel={t.codeDefault}
+            locale={nl ? "nl" : "en"}
+          />
           <p className="mt-1 text-xs text-[#5c667f]">{t.codeHint}</p>
         </div>
         <label className="flex items-center gap-2 text-sm text-vtk-ink">
