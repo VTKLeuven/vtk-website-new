@@ -117,6 +117,28 @@ describe('places for members and non-members', () => {
   });
 });
 
+describe('the free ticket for honorary members', () => {
+  it('puts a free line first, before the member and the regular price', () => {
+    const beer = { ...ticketType('beer', 'general', 10), memberPriceCents: 800, honoraryFree: true };
+    expect(ticketLinesForType(beer).map((line) => [line.key, line.priceCents])).toEqual([
+      ['beer:honorary', 0],
+      ['beer:member', 800],
+      ['beer', 1_000],
+    ]);
+  });
+
+  it('allows one free ticket across all types of the event', () => {
+    const beer = { ...ticketType('beer', 'general', 10), honoraryFree: true };
+    const water = { ...ticketType('water', 'general', 10), honoraryFree: true };
+    const lines = [...ticketLinesForType(beer), ...ticketLinesForType(water)];
+    const freeWater = lines.find((line) => line.key === 'water:honorary')!;
+    expect(maximumSelectableForLine({ line: freeWater, lines, quantities: {}, maxTicketsPerOrder: 8 })).toBe(1);
+    expect(
+      maximumSelectableForLine({ line: freeWater, lines, quantities: { 'beer:honorary': 1 }, maxTicketsPerOrder: 8 })
+    ).toBe(0);
+  });
+});
+
 describe('the order limit in the shop head', () => {
   it('says what the tickets together allow, not just the event maximum', () => {
     const one = { ...ticketType('standard', 'general', 50), maxPerOrder: 1 };

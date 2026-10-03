@@ -156,6 +156,7 @@ type TicketType = {
   nameEn: string | null;
   unitPriceCents: number;
   memberPriceCents: number | null;
+  honoraryFree: boolean;
   currency: string;
   audience: string;
   color: string;
@@ -214,6 +215,36 @@ function MemberPriceField({
           : locale === "nl"
             ? "Enkel bij “leden en niet-leden”: dit ticket heeft maar één doelgroep."
             : "Only with “members and non-members”: this ticket has a single audience."}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * "Gratis voor ereleden": één ticket van dit type gratis per erelid, per event.
+ * Standaard uit; de hidden input stuurt "uit" mee wanneer het vinkje leeg is.
+ */
+function HonoraryFreeField({
+  id,
+  defaultChecked = false,
+  locale,
+}: {
+  id: string;
+  defaultChecked?: boolean;
+  locale: AdminLocale;
+}) {
+  const nl = locale === "nl";
+  return (
+    <div className="ticket-admin-field" data-span="2">
+      <label className="ticket-admin-check" htmlFor={id}>
+        <input type="hidden" name="honoraryFree" value="false" />
+        <input id={id} type="checkbox" name="honoraryFree" value="true" defaultChecked={defaultChecked} />
+        {nl ? "Gratis voor ereleden" : "Free for honorary members"}
+      </label>
+      <span className="ticket-admin-help">
+        {nl
+          ? "Een erelid ziet dit ticket dan ook gratis, naast de gewone prijs. Hoogstens één gratis ticket per erelid voor dit event, over al zijn bestellingen heen."
+          : "An honorary member then also sees this ticket for free, next to the regular price. At most one free ticket per honorary member for this event, across all their orders."}
       </span>
     </div>
   );
@@ -475,6 +506,11 @@ function TicketTypeEditPanel({
               ) : null}
             </div>
           ) : null}
+          <HonoraryFreeField
+            id={`ticket-type-${ticketType.id}-honorary`}
+            defaultChecked={ticketType.honoraryFree}
+            locale={locale}
+          />
           <TicketColorChoice
             idPrefix={`ticket-type-${ticketType.id}`}
             value={ticketType.color}
@@ -999,6 +1035,7 @@ export function TicketTypeManager({
                   <div className="ticket-admin-field" data-span="2">
                     <TicketColorChoice idPrefix="ticket-type-new" locale={locale} />
                   </div>
+                  <HonoraryFreeField id="ticket-type-new-honorary" locale={locale} />
                   <div className="ticket-admin-field">
                     <label htmlFor="ticket-type-min">{locale === "nl" ? "Minimum per bestelling" : "Minimum per order"}</label>
                     <input id="ticket-type-min" name="minPerOrder" type="number" min="1" defaultValue="1" required />

@@ -44,6 +44,8 @@ export type TicketTemplateType = {
    * stil op nul.
    */
   memberPriceCents: number | null;
+  /** Een erelid krijgt één ticket van dit type gratis; zie `TicketType.honoraryFree`. */
+  honoraryFree: boolean;
   audience: TicketTemplateAudience;
   color: string;
   minPerOrder: number;
@@ -318,6 +320,7 @@ export function parseTemplateTypes(raw: unknown): TicketTemplateType[] | string 
       descriptionEn: text(row.descriptionEn, 2_000),
       unitPriceCents: price,
       memberPriceCents,
+      honoraryFree: bool(row.honoraryFree, false),
       audience,
       color: ticketColorKey(row.color),
       minPerOrder,
@@ -546,6 +549,7 @@ export function blankTicketTemplateType(index: number): TicketTemplateType {
     descriptionEn: "",
     unitPriceCents: 0,
     memberPriceCents: null,
+    honoraryFree: false,
     audience: "PUBLIC",
     color: "navy",
     minPerOrder: 1,

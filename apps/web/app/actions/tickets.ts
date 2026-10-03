@@ -722,6 +722,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
             type.memberPriceCents < type.unitPriceCents
               ? type.memberPriceCents
               : null,
+          honoraryFree: type.honoraryFree,
           audience: type.audience,
           color: type.color,
           minPerOrder: type.minPerOrder,
@@ -1384,6 +1385,7 @@ export async function createTicketTypeAction(
         descriptionEn: limitedOptionalValue(formData, "descriptionEn", 5_000),
         unitPriceCents,
         memberPriceCents: memberPrice.cents,
+        honoraryFree: checkboxValue(formData, "honoraryFree"),
         currency: event.currency,
         audience,
         color: ticketColorKey(formData.get("color")),
@@ -1519,9 +1521,14 @@ export async function saveTicketTypeAction(
     if (!pool) return saveError("POOL_NOT_FOUND");
   }
   const inventoryPoolId = requestedPoolId;
+  // Een formulier zonder het veld (een oudere pagina) laat de keuze staan.
+  const honoraryFree = formData.has("honoraryFree")
+    ? checkboxValue(formData, "honoraryFree")
+    : type.honoraryFree;
 
   const data = {
     inventoryPoolId,
+    honoraryFree,
     color,
     audience,
     nameNl,
@@ -1537,6 +1544,7 @@ export async function saveTicketTypeAction(
   };
   const unchanged =
     inventoryPoolId === type.inventoryPoolId &&
+    honoraryFree === type.honoraryFree &&
     color === type.color &&
     audience === type.audience &&
     nameNl === type.nameNl &&
@@ -1566,6 +1574,11 @@ export async function saveTicketTypeAction(
   ]);
   const changes = [
     inventoryPoolId === type.inventoryPoolId ? null : "andere plaatsen gekozen",
+    honoraryFree === type.honoraryFree
+      ? null
+      : honoraryFree
+        ? "gratis voor ereleden aangezet"
+        : "gratis voor ereleden uitgezet",
     color === type.color ? null : `kleur op ${color}`,
     audience === type.audience ? null : `doelgroep op ${ticketAudienceAuditLabel(audience)}`,
     nameNl === type.nameNl ? null : `naam op ${nameNl}`,

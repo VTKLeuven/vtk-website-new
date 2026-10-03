@@ -32,6 +32,12 @@ export type PublicTicketType = {
    */
   memberPriceCents?: number | null;
   /**
+   * Deze bezoeker is erelid en mag één ticket van dit type gratis nemen (zie
+   * `TicketType.honoraryFree`). Enkel gevuld voor wie dat nog kan; voor de rest
+   * false.
+   */
+  honoraryFree?: boolean;
+  /**
    * Wat de regel aan de gewone prijs nog kan nemen: de vrije plaatsen in de pot,
    * of minder wanneer het plafond voor deze bezoeker eerder vol zit.
    */
@@ -108,6 +114,8 @@ export type PublicTicketEvent = {
    * ingelogd is (misschien is hij al lid), "join" wanneer hij het niet is.
    */
   memberPriceHint?: "login" | "join" | null;
+  /** Dit erelid heeft zijn gratis ticket voor dit event al; de shop zegt dat erbij. */
+  honoraryFreeUsed?: boolean;
   /**
    * Doelgroepen (eerstejaars, alumni, ...) met een ticket dat deze uitgelogde
    * bezoeker niet ziet. Leeg voor wie ingelogd is: wie er dan niet bij hoort,
@@ -238,36 +246,49 @@ export function formatTicketMoment(value: string | Date, locale: "nl" | "en"): s
 
 /**
  * Eén regel in de shop: een tickettype aan één prijs. Een type met een
- * ledenprijs geeft er twee, de ledenprijs eerst; elk ander type één.
+ * ledenprijs geeft er twee, de ledenprijs eerst; elk ander type één. Voor een
+ * erelid komt het gratis erelidticket er nog vooraan bij.
  */
 export type TicketLine = {
   key: string;
   type: PublicTicketType;
   memberPrice: boolean;
+  /** Het gratis ticket van een erelid; altijd 0 euro, hoogstens één per event. */
+  honorary?: boolean;
   priceCents: number;
 };
 
-export function ticketLineKey(ticketTypeId: string, memberPrice: boolean): string {
+export function ticketLineKey(ticketTypeId: string, memberPrice: boolean, honorary = false): string {
+  if (honorary) return `${ticketTypeId}:honorary`;
   return memberPrice ? `${ticketTypeId}:member` : ticketTypeId;
 }
 
 export function ticketLinesForType(type: PublicTicketType): TicketLine[] {
-  const standard: TicketLine = {
-    key: ticketLineKey(type.id, false),
-    type,
-    memberPrice: false,
-    priceCents: type.priceCents,
-  };
-  if (type.memberPriceCents == null) return [standard];
-  return [
-    {
+  const lines: TicketLine[] = [];
+  if (type.honoraryFree) {
+    lines.push({
+      key: ticketLineKey(type.id, false, true),
+      type,
+      memberPrice: false,
+      honorary: true,
+      priceCents: 0,
+    });
+  }
+  if (type.memberPriceCents != null) {
+    lines.push({
       key: ticketLineKey(type.id, true),
       type,
       memberPrice: true,
       priceCents: type.memberPriceCents,
-    },
-    standard,
-  ];
+    });
+  }
+  lines.push({
+    key: ticketLineKey(type.id, false),
+    type,
+    memberPrice: false,
+    priceCents: type.priceCents,
+  });
+  return lines;
 }
 
 /** Aantallen per regel opgeteld per tickettype, zoals de voorraad en de limieten tellen. */
@@ -288,7 +309,10 @@ function inventoryKey(type: PublicTicketType): string {
 
 /** Wat één regel nog kan nemen, los van wat er al gekozen is: de ledenprijs heeft haar eigen plafond. */
 export function ticketLineRemaining(line: TicketLine): number {
-  return line.memberPrice ? (line.type.memberAvailable ?? line.type.available) : line.type.available;
+  // Het erelidticket neemt een ledenplaats, net als de ledenprijs.
+  return line.memberPrice || line.honorary
+    ? (line.type.memberAvailable ?? line.type.available)
+    : line.type.available;
 }
 
 /** Wat een type over zijn prijzen heen nog kan nemen, voor "Nog 12" en "Uitverkocht". */
@@ -298,7 +322,8 @@ export function ticketTypeRemaining(type: PublicTicketType): number {
 
 /** De pot en de soort plaats van een regel: regels met dezelfde sleutel delen een plafond. */
 function seatKey(line: TicketLine): string {
-  return `${inventoryKey(line.type)}:${line.memberPrice ? "MEMBER" : (line.type.seat ?? "NON_MEMBER")}`;
+  const seat = line.memberPrice || line.honorary ? "MEMBER" : (line.type.seat ?? "NON_MEMBER");
+  return `${inventoryKey(line.type)}:${seat}`;
 }
 
 /**
@@ -336,6 +361,8 @@ export function maximumSelectableForLine({
       (line.type.poolAvailable ?? line.type.available) - taken((candidate) => inventoryKey(candidate.type) === pool),
       (line.type.maxPerOrder ?? maxTicketsPerOrder) - taken((candidate) => candidate.type.id === line.type.id),
       maxTicketsPerOrder - taken(() => true),
+      // Eén gratis erelidticket per event, over alle types heen.
+      line.honorary ? 1 - taken((candidate) => Boolean(candidate.honorary)) : Number.POSITIVE_INFINITY,
     ),
   );
 }

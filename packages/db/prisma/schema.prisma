@@ -2350,6 +2350,11 @@ model TicketType {
   // tweede tickettype: voorraad, verkoopvenster, vragen en scannerkleur zijn
   // dezelfde, en twee types die dat elk apart dragen lopen uit de pas.
   memberPriceCents Int?
+  // Een erelid krijgt één ticket van dit type gratis, als extra regel naast de
+  // gewone prijs(zen). Hoogstens één gratis erelidticket per erelid per
+  // ticketevent, over al zijn bestellingen heen (`TicketOrderItem.honoraryFree`).
+  // Standaard uit. Zie docs/design-decisions.md, "Ereleden gratis".
+  honoraryFree     Boolean        @default(false)
   currency         String         @default("EUR")
   audience         TicketAudience @default(PUBLIC)
   // Key uit het palet in `apps/web/lib/ticketing/ticketColors.ts`, geen vrije
@@ -2534,6 +2539,9 @@ model TicketOrderItem {
   // vastgelegd, zodat vrijgeven en terugbetalen dezelfde teller raken. Zie
   // `lib/ticketing/seats.ts`.
   memberSeat      Boolean  @default(false)
+  // Het gratis ticket van een erelid (`TicketType.honoraryFree`). Hierop telt
+  // de checkout hoeveel gratis erelidtickets een koper voor dit event al heeft.
+  honoraryFree    Boolean  @default(false)
   discountCents   Int      @default(0)
   totalCents      Int
   attendeeName    String
@@ -2932,6 +2940,8 @@ model TicketEventTemplateType {
   /// Optionele ledenprijs, enkel bij doelgroep PUBLIC en lager dan de gewone
   /// prijs: dan is dit één ticket met twee prijzen, zoals `TicketType`.
   memberPriceCents Int?
+  /// Een erelid krijgt één ticket van dit type gratis; zie `TicketType.honoraryFree`.
+  honoraryFree     Boolean        @default(false)
   audience         TicketAudience @default(PUBLIC)
   /// Sleutel uit `lib/ticketing/ticketColors.ts`, geen vrije hex.
   color            String         @default("navy")

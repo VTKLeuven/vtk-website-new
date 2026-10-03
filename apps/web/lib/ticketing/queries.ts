@@ -149,6 +149,8 @@ function publicEventDto(
       priceCents: type.unitPriceCents,
       // Ongefilterd: wie geen lid is, verliest deze prijs in `forViewer`.
       memberPriceCents: ticketTypeMemberPrice(type),
+      // Idem: enkel een erelid dat het zijne nog niet gebruikte, houdt dit.
+      honoraryFree: type.honoraryFree,
       // Wat de gewone prijs nog kan nemen, gerekend als niet-ledenplaats;
       // `forViewer` stelt dat bij voor een lid. Een uitgeschakelde pot verkoopt
       // niets meer, ook al staan er nog plaatsen open.
@@ -209,15 +211,44 @@ type PublicTicketTypeDto = ReturnType<typeof publicEventDto>["ticketTypes"][numb
  * ledenprijs koopt, neemt een ledenplaats (`isMemberSeat`), dus voor hem telt
  * het ledenplafond en niet dat van de niet-leden.
  */
-function forViewer(types: PublicTicketTypeDto[], isMember: boolean): PublicTicketTypeDto[] {
-  if (!isMember) {
-    return types.map((type) => ({ ...type, memberPriceCents: null, memberAvailable: null }));
-  }
-  return types.map((type) =>
-    type.memberPriceCents === null
-      ? { ...type, available: regularAvailable(type, true), seat: "MEMBER" as SeatKind }
-      : type
-  );
+function forViewer(
+  types: PublicTicketTypeDto[],
+  isMember: boolean,
+  /** Een erelid dat zijn gratis ticket voor dit event nog niet gebruikte. */
+  honoraryFree: boolean,
+): PublicTicketTypeDto[] {
+  const viewerTypes = isMember
+    ? types.map((type) =>
+        type.memberPriceCents === null
+          ? { ...type, available: regularAvailable(type, true), seat: "MEMBER" as SeatKind }
+          : type
+      )
+    : types.map((type) => ({ ...type, memberPriceCents: null }));
+  return viewerTypes.map((type) => ({
+    ...type,
+    honoraryFree: honoraryFree && type.honoraryFree,
+    // De ledenplaatsen blijven nodig voor het erelidticket, ook bij een niet-lid:
+    // dat neemt een ledenplaats.
+    memberAvailable:
+      isMember || (honoraryFree && type.honoraryFree) ? type.memberAvailable : null,
+  }));
+}
+
+/**
+ * Heeft dit erelid zijn gratis ticket voor dit event al? Dezelfde telling als
+ * de checkout (`createTicketCheckout`): een vervallen of terugbetaald ticket telt
+ * niet meer.
+ */
+async function honoraryFreeUsed(eventId: string, userId: string): Promise<boolean> {
+  const used = await prisma.ticketOrderItem.count({
+    where: {
+      eventId,
+      honoraryFree: true,
+      order: { buyerUserId: userId, status: { in: ["PENDING_PAYMENT", "PAID", "PARTIALLY_REFUNDED"] } },
+      OR: [{ ticket: null }, { ticket: { status: { not: "REFUNDED" } } }],
+    },
+  });
+  return used > 0;
 }
 
 /** Wat de gewone prijs van een type nog kan nemen voor deze bezoeker. */
@@ -315,7 +346,7 @@ export async function listPublishedTicketEvents(
     );
     return [{
       ...dto,
-      ticketTypes: forViewer(ticketTypes, isMember),
+      ticketTypes: forViewer(ticketTypes, isMember, profile.honorary),
       salesOpensAt: opensLater ? dto.salesStart : null,
       memberPriceHint: memberPriceHint(ticketTypes, Boolean(session), isMember),
       requiresLogin:
@@ -358,9 +389,15 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
       (Boolean(session) || !ticketTypeRequiresLogin(type)) &&
       !ticketTypeNeedsMembership(type, isMember)
   );
+  const freeUsed =
+    session && profile.honorary && ticketTypes.some((type) => type.honoraryFree)
+      ? await honoraryFreeUsed(event.id, session.user.id)
+      : false;
   return {
     ...dto,
-    ticketTypes: forViewer(ticketTypes, isMember),
+    ticketTypes: forViewer(ticketTypes, isMember, profile.honorary && !freeUsed),
+    // Enkel om het te kunnen zeggen; voor wie geen erelid is, altijd false.
+    honoraryFreeUsed: freeUsed,
     memberPriceHint: memberPriceHint(ticketTypes, Boolean(session), isMember),
     requiresLogin:
       !session &&

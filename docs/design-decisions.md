@@ -8459,6 +8459,34 @@ eraan. Elk ticket is een kaart met gelabelde velden in plaats van een tabelrij
 de plaatsen en het maximum per bestelling staan er meteen onder in plaats van
 verspreid over "Planning en verkoop".
 
+## Ereleden gratis: één ticket per erelid per event
+
+Wat de kring aan haar ereleden geeft, kon enkel met een apart tickettype met
+doelgroep "Alleen ereleden" aan 0 euro. Dat werkte, maar elk erelid kon er in
+een tweede bestelling opnieuw een nemen, en het was een type naast het echte
+ticket met een eigen kleur en een eigen naam aan de deur.
+
+**Nu is het een vinkje per tickettype, "Gratis voor ereleden", standaard uit**
+(`TicketType.honoraryFree`). Een erelid ziet bij dat type een extra regel
+"Erelid, 1 gratis" naast de gewone prijs(zen); voor iedereen anders bestaat de
+optie niet, ook niet in de paginabron.
+
+- **Hoogstens één gratis ticket per erelid per ticketevent**, over alle types
+  en al zijn bestellingen heen. De checkout telt de bestelregels met
+  `honoraryFree` van deze koper voor dit event, binnen hetzelfde slot op de koper
+  als de rest van de checkout, zodat twee gelijktijdige bestellingen er samen
+  geen twee krijgen. Een vervallen bestelling of een terugbetaald ticket telt
+  niet meer. Per ticketevent en niet per kalenderevent: een event met twee
+  ticketpagina's (de volledige 12u en de losse cantussen) geeft er dus één per
+  pagina.
+- **De rest van de bestelling betaalt gewoon.** Een erelid kan zijn gratis
+  ticket nemen en in dezelfde bestelling betalende tickets voor vrienden.
+- **Het gratis ticket neemt een ledenplaats**: een erelid hoort bij de kring.
+  Zit het ledenplafond van de pot vol, dan is er ook geen gratis erelidticket
+  meer (zie "Plaatsen: potten met een plafond voor leden").
+- De bestelregel heet "Bierticket (erelid)", zodat de mail, de pdf en de scanner
+  het zonder eigen logica tonen.
+
 ## De e-mailhandtekening is een recht, geen ledenfunctie
 
 De handtekeninggenerator op `/account` bouwt een mailhandtekening met het

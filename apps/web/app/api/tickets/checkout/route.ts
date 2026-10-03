@@ -49,7 +49,9 @@ export async function POST(request: Request) {
     if (error instanceof TicketCheckoutError) {
       const status = error.code === "TOO_MANY_RESERVATIONS"
         ? 429
-        : error.code === "SOLD_OUT" || error.code === "FREE_TICKET_LIMIT"
+        : error.code === "SOLD_OUT" ||
+            error.code === "FREE_TICKET_LIMIT" ||
+            error.code === "HONORARY_FREE_USED"
           ? 409
           : 400;
       return Response.json({ error: error.code, field: error.field }, { status });

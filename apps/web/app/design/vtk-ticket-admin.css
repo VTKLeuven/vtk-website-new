@@ -2319,6 +2319,7 @@
 
 .ticket-setup-fields > [data-area="name"],
 .ticket-setup-fields > [data-area="audience"],
+.ticket-setup-fields > [data-area="honorary"],
 .ticket-setup-fields > [data-area="pool"],
 .ticket-setup-fields > [data-area="offset"] {
   grid-column: 1 / -1;
@@ -2343,6 +2344,10 @@
 
   .ticket-setup-fields > :is([data-area="pool"], [data-area="offset"]) {
     grid-column: span 2;
+  }
+
+  .ticket-setup-fields > [data-area="honorary"] {
+    grid-column: 1 / -1;
   }
 }
 

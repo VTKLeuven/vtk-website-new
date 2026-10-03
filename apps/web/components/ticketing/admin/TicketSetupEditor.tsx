@@ -452,6 +452,17 @@ export function TicketSetupEditor({
                     />
                   </div>
                 ) : null}
+                <label className="ticket-setup-toggle" data-area="honorary" htmlFor={field(`${row.uid}-honorary`)}>
+                  <input
+                    id={field(`${row.uid}-honorary`)}
+                    type="checkbox"
+                    checked={type.honoraryFree}
+                    onChange={(changed) => updateRow(row.uid, { honoraryFree: changed.target.checked })}
+                  />
+                  {nl
+                    ? "Gratis voor ereleden (1 per erelid voor dit event)"
+                    : "Free for honorary members (1 per honorary member for this event)"}
+                </label>
                 {templateMode ? (
                   <div className="ticket-admin-field" data-area="offset">
                     <label htmlFor={field(`${row.uid}-opens`)}>

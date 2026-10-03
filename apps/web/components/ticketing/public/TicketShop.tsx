@@ -109,6 +109,7 @@ function checkoutErrorMessage(
     TOO_MANY_RESERVATIONS: { nl: "Er staan al meerdere reservaties open. Probeer later opnieuw.", en: "Several reservations are already pending. Try again later." },
     FREE_TICKET_LIMIT: { nl: "Je hebt het maximum aantal gratis tickets voor dit event bereikt.", en: "You have reached the free-ticket limit for this event." },
     SOLD_OUT: { nl: "Deze tickets zijn net uitverkocht.", en: "These tickets have just sold out." },
+    HONORARY_FREE_USED: { nl: "Je gratis erelidticket voor dit event heb je al. Kies de gewone prijs.", en: "You already have your free honorary ticket for this event. Choose the regular price." },
     PAYMENT_UNAVAILABLE: { nl: "De betaalpagina is tijdelijk niet bereikbaar. Probeer straks opnieuw.", en: "The payment page is temporarily unavailable. Try again shortly." },
     REQUEST_BODY_TOO_LARGE: { nl: "De bestelling bevat te veel gegevens.", en: "The order contains too much data." },
   };
@@ -319,9 +320,20 @@ function TicketStepper({
  * lib/ticketing/orders.ts): bij een soort met ledenprijs staat erbij welke prijs.
  */
 function lineLabel(line: TicketLine, locale: "nl" | "en"): string {
+  if (line.honorary) return `${line.type.name} (${locale === "nl" ? "erelid" : "honorary member"})`;
   if (line.type.memberPriceCents == null) return line.type.name;
   if (line.memberPrice) return `${line.type.name} (${locale === "nl" ? "lid" : "member"})`;
   return `${line.type.name} (${locale === "nl" ? "niet-lid" : "non-member"})`;
+}
+
+/** Wie een regel bedoeld is, naast de prijs, wanneer een type meer dan één regel heeft. */
+function lineAudience(line: TicketLine, locale: "nl" | "en"): string {
+  const nl = locale === "nl";
+  if (line.honorary) return nl ? "Erelid, 1 gratis" : "Honorary, 1 free";
+  if (line.memberPrice) return nl ? "Lid" : "Member";
+  // Zonder ledenprijs is de gewone prijs voor iedereen, niet enkel voor niet-leden.
+  if (line.type.memberPriceCents == null) return nl ? "Gewone prijs" : "Regular price";
+  return nl ? "Niet-lid" : "Non-member";
 }
 
 export function TicketShop({
@@ -477,6 +489,7 @@ export function TicketShop({
       (attendees[line.key] ?? []).map((attendee) => ({
         ticketTypeId: line.type.id,
         memberPrice: line.memberPrice,
+        honoraryFree: Boolean(line.honorary),
         attendeeName: attendee.attendeeName.trim(),
         attendeeEmail: attendee.attendeeEmail.trim(),
         answers: attendee.answers,
@@ -550,7 +563,9 @@ export function TicketShop({
     return (
       <>
         <span className="tshop-price" data-unavailable={unavailable || undefined}>
-          {formatTicketPrice(line.priceCents, event.currency, locale)}
+          {line.honorary
+            ? locale === "nl" ? "Gratis" : "Free"
+            : formatTicketPrice(line.priceCents, event.currency, locale)}
         </span>
         {soldOut ? (
           <span className="tshop-pill" data-tone="out">{locale === "nl" ? "Uitverkocht" : "Sold out"}</span>
@@ -896,11 +911,7 @@ export function TicketShop({
                           {renderTypeNotes(type)}
                           {typeLines.map((line) => (
                             <div className="tshop-line" key={line.key}>
-                              <span className="tshop-audience">
-                                {line.memberPrice
-                                  ? locale === "nl" ? "Lid" : "Member"
-                                  : locale === "nl" ? "Niet-lid" : "Non-member"}
-                              </span>
+                              <span className="tshop-audience">{lineAudience(line, locale)}</span>
                               {renderLineControl(line)}
                             </div>
                           ))}
@@ -918,6 +929,14 @@ export function TicketShop({
                   );
                 })}
               </ul>
+
+              {event.honoraryFreeUsed ? (
+                <p className="tshop-hint">
+                  {locale === "nl"
+                    ? "Je gratis erelidticket voor dit event heb je al."
+                    : "You already have your free honorary ticket for this event."}
+                </p>
+              ) : null}
 
               {event.memberPriceHint ? (
                 <p className="tshop-hint">
