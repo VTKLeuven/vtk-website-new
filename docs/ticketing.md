@@ -240,17 +240,19 @@ so does the membership fee (`leden.config`, default 730000). The code goes into
 the payment details, so the treasurer can split a Bancontact credit or a Mollie
 payout per code without looking up orders. The list lives in
 `/admin/boekhoudcodes` (`accounting.manage`); the migration
-`20261003120000_accounting_codes` seeds the chart of accounts of the kring. The
-kring choices behind it are in `docs/design-decisions.md` ("Boekhoudcodes in de
-betaalinfo").
+`20261003120000_accounting_codes` seeds the chart of accounts of the kring, and
+`20261003190000_accounting_codes_analytic` corrected it after the accountant
+answered (see below). The kring choices behind it are in
+`docs/design-decisions.md` ("Boekhoudcodes in de betaalinfo").
 
 | Concern | Location |
 | --- | --- |
-| Table, sub codes (parent code + five digits) | `AccountingCode` in `schema.prisma` |
+| Table, sub codes (parent code, space, five digits), list order | `AccountingCode` in `schema.prisma` |
 | Parsing, ordering, grouping, search (pure) | `apps/web/lib/accounting/codes.ts` |
 | The picker in the event form, templates and membership | `apps/web/components/admin/AccountingCodePicker.tsx` |
 | Queries, membership fallback to 730000 | `apps/web/lib/accounting/server.ts` |
-| Create, edit, delete | `apps/web/app/actions/accountingCodes.ts` |
+| Create, edit, delete, reorder | `apps/web/app/actions/accountingCodes.ts` |
+| The register in the admin (search, drag, edit in place) | `apps/web/app/[locale]/admin/boekhoudcodes/AccountingCodesEditor.tsx` |
 | What Mollie gets: `"<code> <event>"`, order number in metadata | `mollieDescription()` in `packages/payments/src/mollie.ts` |
 | What Bancontact gets: code as `reference` and `bulkId`, event first in `description` | `paymentReference()` / `paymentBulkId()` / `paymentDescription()` in `packages/payments/src/bancontact.ts` |
 | Copy on the order at checkout | `createTicketCheckout()` in `lib/ticketing/orders.ts` |
@@ -281,8 +283,27 @@ betaalinfo").
 - **A template can suggest a code** (`TicketEventTemplate.accountingCodeId`,
   optional). An event from that template gets it pre-filled and can still
   change it; "Bewaar als sjabloon" copies the event's code. The built-in cantus
-  template names its code by the code itself (`accountingCode: "70010010001"`),
+  template names its code by the code itself (`accountingCode: "700100 10001"`),
   since an id differs per database.
+- **A sub code is written `"<main> <analytic>"`, with a space**: `"700120 12002"`.
+  The five digits are an analytic code that the accountant enters in a separate
+  field, not an extension of the account number; written together
+  (`"70012012002"`, the first version) they had to be split again by hand.
+  `subCode()` composes it, `subSuffix()` takes the five digits back off. The
+  search also finds the old spelling without the space.
+- **The list has its own order** (`AccountingCode.sortOrder`), dragged in the
+  admin; the picker follows it. A new code lands before the first sibling with a
+  higher code. Dragging a sub code into another main account changes its code,
+  so the admin asks first and names the new code
+  (`reorderAccountingCodesAction`); a main account never becomes a sub code by
+  dragging.
+- **The correction of `20261003190000`** fixed two ranges that were still on
+  their old numbers (Onthaal 700101 is 10101-10103, Bedrijvenrelaties 704100 is
+  41001-41009) and moved every sub code to the spaced form. It also rewrote the
+  copy on orders and membership payments already made: an exception to "what was
+  sold never moves", because the old strings were our mistake and not a choice
+  of the treasurer, and the statistics would otherwise count one account twice.
+  The bank statement and Mollie still show the old string for those payments.
 - **Bancontact bundles per code.** The code also goes as `bulkId`: when bundling
   is on for the payment profile, Bancontact pays out one transfer per bundle, so
   each code gets its own transfer instead of one deposit mixing ten events. When

@@ -32,6 +32,7 @@ export default async function AdminAccountingCodes({
         code: true,
         name: true,
         parentId: true,
+        sortOrder: true,
         _count: { select: { ticketEvents: true, eventTemplates: true } },
       },
     }),
@@ -53,8 +54,8 @@ export default async function AdminAccountingCodes({
         <h1 className="text-2xl font-semibold">{nl ? "Boekhoudcodes" : "Accounting codes"}</h1>
         <p className="mt-1 max-w-3xl text-sm text-[#5c667f]">
           {nl
-            ? "De codes waaruit een ticketverkoop en het lidmaatschap kiezen. De gekozen code staat vooraan in de betaalinfo bij Mollie en Bancontact, zodat je een betaling of een uitbetaling per code kan opsplitsen. Wat al verkocht is, houdt de code waaronder het betaald werd, ook als je die hier aanpast of verwijdert."
-            : "The codes a ticket sale and the membership choose from. The chosen code leads the payment details at Mollie and Bancontact, so you can split a payment or a payout per code. What has been sold keeps the code it was paid under, even if you change or delete it here."}
+            ? "De codes waaruit een ticketverkoop en het lidmaatschap kiezen. Een subcode is de analytische code onder haar hoofdrekening en staat er met een spatie achter (700120 12002), zo komt ze vooraan in de betaalinfo bij Mollie en Bancontact. Klik op een rij om ze te bewerken; sleep aan de greep om de lijst te ordenen."
+            : "The codes a ticket sale and the membership choose from. A sub code is the analytic code under its main account and follows it after a space (700120 12002); that is how it leads the payment details at Mollie and Bancontact. Click a row to edit it; drag the handle to order the list."}
         </p>
       </header>
 

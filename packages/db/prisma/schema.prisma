@@ -2119,9 +2119,12 @@ model CalendarFeedToken {
 /// elke bestelling op te zoeken. Een ticketverkoop kiest er één
 /// (`TicketEvent.accountingCodeId`); het lidmaatschap ook (`leden.config`).
 ///
-/// Een subcode is de code van haar hoofdrekening met vijf cijfers erachter:
-/// "700100" + "10002" = "70010010002". `code` bewaart altijd de volledige code,
-/// want dat is wat er in de betaalinfo staat en waarop gezocht wordt.
+/// Een subcode is een analytische code van vijf cijfers onder een
+/// hoofdrekening, en staat er met een spatie achter: "700120 12002". De
+/// boekhouder vult de twee in aparte vakjes in, dus aaneengeschreven
+/// ("70012012002") was één getal dat hij eerst moest splitsen. `code` bewaart
+/// altijd de volledige code, want dat is wat er in de betaalinfo staat en
+/// waarop gezocht wordt.
 ///
 /// Bestellingen bewaren hun eigen kopie van code en naam
 /// (`TicketOrder.accountingCode`), dus een code hernoemen, wijzigen of
@@ -2133,6 +2136,11 @@ model AccountingCode {
   /// De hoofdrekening, voor een subcode. Verwijder je de hoofdrekening, dan
   /// gaan haar subcodes mee: los van hun hoofdrekening betekenen ze niets.
   parentId  String?
+  /// De plaats tussen de codes met dezelfde hoofdrekening (of tussen de
+  /// hoofdrekeningen), zoals de penning ze in /admin/boekhoudcodes sleept. Het
+  /// rekeningstelsel van de kring is een lijst die iemand ordent, niet enkel
+  /// een getallenreeks.
+  sortOrder Int      @default(0)
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 

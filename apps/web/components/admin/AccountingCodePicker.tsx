@@ -332,7 +332,7 @@ export function AccountingCodePicker({
                     onPointerDown={keepFocus}
                     onClick={() => choose(child.id)}
                   >
-                    <span className="vtk-code-picker-code">{subSuffix(child.code, group.main.code)}</span>
+                    <span className="vtk-code-picker-code">{subSuffix(child.code)}</span>
                     <span className="vtk-code-picker-name">{child.name}</span>
                     {value === child.id ? <Check aria-hidden="true" size={16} /> : null}
                   </button>

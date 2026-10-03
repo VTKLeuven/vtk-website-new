@@ -267,3 +267,26 @@ export function ListCheckIcon() {
     </Icon>
   );
 }
+
+export function PlusIcon() {
+  return (
+    <Icon>
+      <path d="M12 5v14" />
+      <path d="M5 12h14" />
+    </Icon>
+  );
+}
+
+/** De greep van een rij die je kan slepen. */
+export function GripIcon() {
+  return (
+    <Icon fill="currentColor">
+      <circle cx="9" cy="6" r="1" />
+      <circle cx="15" cy="6" r="1" />
+      <circle cx="9" cy="12" r="1" />
+      <circle cx="15" cy="12" r="1" />
+      <circle cx="9" cy="18" r="1" />
+      <circle cx="15" cy="18" r="1" />
+    </Icon>
+  );
+}

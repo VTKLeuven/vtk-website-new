@@ -98,7 +98,7 @@ function fromMollieValue(value: string): number {
  * op zijn uittreksel ziet, en wat de penning per betaling terugvindt in het
  * overzicht van een Mollie-uitbetaling.
  *
- * Met een boekhoudcode is dat "70010010001 Cantus der Cantussen": de code
+ * Met een boekhoudcode is dat "700100 10001 Cantus der Cantussen": de code
  * vooraan, op een vaste plek, zodat een uitbetaling die tickets van tien events
  * en het lidgeld bundelt per code op te splitsen is. Het ordernummer valt dan
  * weg; het staat in de metadata (`vtk_order_number`). Zonder code (de

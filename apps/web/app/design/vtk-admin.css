@@ -2372,3 +2372,367 @@ a.vtk-shortcut-tile:hover {
   padding: 14px 10px;
   font-size: 13px;
 }
+
+/* ---------------------------------------------------------------------------
+   Het rekeningstelsel (/admin/boekhoudcodes, AccountingCodesEditor.tsx).
+
+   Een register zoals het rekenblad van de penning: elke hoofdrekening een kop
+   op `--paper-2`, haar subcodes ingesprongen eronder, één regel per code. De
+   eerste versie was een gewone beheertabel met rijen van 70 px en twee
+   icoonknoppen per code; met zeventig codes was dat een muur zonder
+   hiërarchie. Bewerken gebeurt met een klik op de rij, verwijderen in die
+   bewerkrij, zodat er per regel geen knoppen meer nodig zijn.
+
+   Elke regel hier gaat via `.vtk-admin-main`, want die zet op elke tabel, elke
+   cel en elk veld al een eigen opvulling en hoogte.
+   -------------------------------------------------------------------------- */
+
+.vtk-codes {
+  display: grid;
+  gap: 10px;
+}
+
+.vtk-codes-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+.vtk-codes-search {
+  position: relative;
+  flex: 1 1 320px;
+  display: flex;
+  align-items: center;
+  color: var(--muted);
+}
+
+.vtk-codes-search > svg {
+  position: absolute;
+  left: 13px;
+  pointer-events: none;
+}
+
+.vtk-admin-main .vtk-codes-search input[type='search'] {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 14px 9px 38px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px !important;
+  background: var(--surface) !important;
+  font-size: 14px;
+}
+
+.vtk-codes-count {
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vtk-admin-main p.vtk-codes-hint {
+  margin: -2px 0 0;
+  font-size: 12.5px;
+}
+
+.vtk-codes-table-wrap {
+  position: relative;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+.vtk-admin-main .vtk-codes-table {
+  table-layout: fixed;
+  font-size: 13.5px;
+}
+
+/* De breedtes staan op de kopcellen en niet op een `<colgroup>`: op een smal
+   scherm valt de gebruikskolom weg, en een `<col>` die blijft staan, zou de
+   cellen erna een kolom laten opschuiven. */
+.vtk-codes-table th.vtk-codes-col-grip {
+  width: 34px;
+}
+
+.vtk-codes-table th.vtk-codes-col-code {
+  width: 118px;
+}
+
+.vtk-codes-table th.vtk-codes-col-usage {
+  width: 190px;
+}
+
+.vtk-codes-table th.vtk-codes-col-actions {
+  width: 46px;
+}
+
+.vtk-admin-main .vtk-codes-table thead th {
+  padding: 9px 10px;
+  font-size: 10.5px;
+}
+
+.vtk-admin-main .vtk-codes-table tbody tr {
+  border-bottom: 0;
+}
+
+.vtk-admin-main .vtk-codes-table tbody td {
+  padding: 6px 10px;
+  vertical-align: middle;
+  line-height: 1.35;
+}
+
+/* Elke groep begint met een haarlijn; de kop zelf draagt de lichtblauwe grond,
+   zoals de vette regels in het rekenblad. */
+.vtk-admin-main .vtk-codes-group + .vtk-codes-group,
+.vtk-admin-main .vtk-codes-table thead + tbody {
+  border-top: 1px solid var(--line);
+}
+
+.vtk-admin-main .vtk-codes-table tr.vtk-codes-main {
+  background: var(--paper-2);
+  cursor: pointer;
+}
+
+.vtk-admin-main .vtk-codes-table tr.vtk-codes-sub {
+  cursor: pointer;
+}
+
+.vtk-admin-main .vtk-codes-table tr.vtk-codes-main:hover {
+  background: color-mix(in srgb, var(--yellow) 16%, var(--paper-2));
+}
+
+.vtk-admin-main .vtk-codes-table tr.vtk-codes-sub:hover {
+  background: rgba(255, 210, 63, 0.1);
+}
+
+.vtk-codes-code {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.vtk-codes-main .vtk-codes-code,
+.vtk-codes-main .vtk-codes-name-button {
+  font-weight: 650;
+}
+
+/* De inspringing: code en naam van een subcode schuiven allebei op, met een
+   lijn links die de groep bijeenhoudt. */
+.vtk-admin-main .vtk-codes-table tr.vtk-codes-sub td.vtk-codes-code {
+  position: relative;
+  padding-left: 30px;
+  color: var(--body);
+}
+
+.vtk-codes-sub td.vtk-codes-code::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 14px;
+  border-left: 1px solid var(--line-2);
+}
+
+.vtk-admin-main .vtk-codes-table tr.vtk-codes-sub td.vtk-codes-name {
+  padding-left: 22px;
+}
+
+.vtk-codes-name {
+  min-width: 0;
+}
+
+.vtk-admin-main .vtk-codes-name-button {
+  display: inline;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vtk-codes-name-button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.vtk-codes-usage {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* Op een smal scherm valt de kolom weg en komt het gebruik onder de naam. */
+.vtk-codes-usage-inline {
+  display: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.vtk-codes-actions .grid {
+  width: 28px;
+  height: 28px;
+}
+
+/* De greep: altijd te zien, maar stil tot je eroverheen gaat. */
+.vtk-admin-main .vtk-codes-grip {
+  padding-right: 0;
+}
+
+.vtk-codes-grip button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: color-mix(in srgb, var(--muted) 55%, transparent);
+  cursor: grab;
+}
+
+.vtk-codes-table tr:hover .vtk-codes-grip button,
+.vtk-codes-grip button:focus-visible {
+  color: var(--ink);
+}
+
+.vtk-codes-grip button:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 0;
+}
+
+.vtk-codes-table tr[data-dragging='true'],
+.vtk-codes-group[data-dragging='true'] > tr {
+  opacity: 0.4;
+}
+
+/* Waar de rij landt: een gele lijn boven of onder. */
+.vtk-codes-table tr[data-drop='before'] > td {
+  box-shadow: inset 0 3px 0 var(--yellow);
+}
+
+.vtk-codes-table tr[data-drop='after'] > td {
+  box-shadow: inset 0 -3px 0 var(--yellow);
+}
+
+.vtk-codes-group[data-drop='before'] > tr:first-child > td {
+  box-shadow: inset 0 3px 0 var(--yellow);
+}
+
+.vtk-codes-group[data-drop='after'] > tr:last-child > td {
+  box-shadow: inset 0 -3px 0 var(--yellow);
+}
+
+.vtk-admin-main .vtk-codes-empty td {
+  padding: 18px 14px;
+  color: var(--muted);
+}
+
+/* Bewerken en toevoegen gebeuren in de lijst zelf, op de plaats van de rij. */
+.vtk-admin-main .vtk-codes-table tr.vtk-codes-form-row {
+  background: color-mix(in srgb, var(--yellow) 9%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-admin-main .vtk-codes-table tr.vtk-codes-form-row > td {
+  padding: 12px 14px;
+}
+
+.vtk-codes-form-row[data-sub='true'] > td {
+  padding-left: 30px;
+}
+
+.vtk-codes-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.vtk-codes-form > form {
+  flex: 1 1 520px;
+  display: grid;
+  gap: 10px;
+}
+
+.vtk-codes-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.vtk-codes-field {
+  display: grid;
+  gap: 4px;
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.vtk-codes-field[data-narrow='true'] {
+  flex: 0 0 120px;
+}
+
+.vtk-codes-field[data-grow='true'] {
+  flex: 2 1 240px;
+}
+
+.vtk-codes-field label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vtk-admin-main .vtk-codes-field :is(input, select) {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-2);
+  font-size: 14px;
+}
+
+.vtk-codes-field input[name='code'] {
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-admin-main p.vtk-codes-full,
+.vtk-admin-main p.vtk-codes-form-hint {
+  flex-basis: 100%;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.vtk-codes-full strong {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-codes-form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+@media (max-width: 639px) {
+  .vtk-codes-table .vtk-codes-usage {
+    display: none;
+  }
+
+  .vtk-codes-usage-inline {
+    display: block;
+  }
+
+  .vtk-codes-table th.vtk-codes-col-code {
+    width: 96px;
+  }
+
+  .vtk-codes-form-row[data-sub='true'] > td {
+    padding-left: 14px;
+  }
+}

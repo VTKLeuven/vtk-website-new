@@ -164,15 +164,15 @@ describe("BancontactPaymentGateway.createCheckout", () => {
       _links: { deeplink: { href: "https://pay.bancontact.net/pay/2/code" } },
     });
 
-    await gateway().createCheckout({ ...CHECKOUT_INPUT, accountingCode: "70010010001" });
+    await gateway().createCheckout({ ...CHECKOUT_INPUT, accountingCode: "700100 10001" });
 
     // De reference staat op het uittreksel vóór de omschrijving: code en
     // eventnaam samen zijn wat de penning nodig heeft om de betaling te boeken.
     const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
-    expect(body.reference).toBe("70010010001");
+    expect(body.reference).toBe("700100 10001");
     expect(body.description).toBe("Galabal - 3 tickets");
     // Elke code haar eigen bundel, wanneer het profiel bundelt.
-    expect(body.bulkId).toBe("70010010001");
+    expect(body.bulkId).toBe("700100 10001");
   });
 
   it("leaves the bulk to the profile when there is no accounting code", async () => {

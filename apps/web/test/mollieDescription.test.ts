@@ -9,9 +9,9 @@ describe("mollieDescription", () => {
       mollieDescription({
         eventName: "12 Urencantus",
         orderNumber: "VTK-26-687BFA5B7C",
-        accountingCode: "70010010001",
+        accountingCode: "700100 10001",
       }),
-    ).toBe("70010010001 12 Urencantus");
+    ).toBe("700100 10001 12 Urencantus");
   });
 
   it("keeps the order number when there is no code, because then it is the only trace", () => {

@@ -248,7 +248,7 @@ function sepaSafe(value: string): string {
  *
  * Wat er op het uittreksel staat, is één regel van hoogstens 140 tekens die de
  * bank en Bancontact samenstellen, bv. `txufk... 01a0f756... PQ q1doZ9
- * 70010010001 12 Urencantus 2e cantus`. De eerste drie blokken (een kenmerk
+ * 700100 10001 12 Urencantus 2e cantus`. De eerste drie blokken (een kenmerk
  * van de overschrijving, de betaal-ID van Bancontact en de betaalcode na "PQ")
  * zetten zij erbij; daar kunnen wij niets aan veranderen. Daarna komen onze
  * `reference` en deze omschrijving, en wat over de 140 gaat, valt weg.

@@ -41,7 +41,7 @@ function ticket(overrides: Partial<StatsTicketInput> = {}): StatsTicketInput {
     signedIn: true,
     source: "kalender",
     campaign: null,
-    accountingCode: "70010010001",
+    accountingCode: "700100 10001",
     accountingCodeName: "Cantussen",
     provider: "bancontact",
     ...overrides,
@@ -188,11 +188,11 @@ describe("ticket stats per accounting code", () => {
     );
     expect(stats.accountingCodes.map((row) => [row.code, row.sold, row.netCents])).toEqual([
       ["700100", 1, 1000],
-      ["70010010001", 2, 2000],
+      ["700100 10001", 2, 2000],
       // Zonder code onderaan: dat is geen code maar een gat.
       [null, 1, 1000],
     ]);
-    const cantussen = stats.accountingCodes.find((row) => row.code === "70010010001")!;
+    const cantussen = stats.accountingCodes.find((row) => row.code === "700100 10001")!;
     expect(cantussen.providers.map((row) => [row.provider, row.sold, row.netCents])).toEqual([
       ["bancontact", 1, 1000],
       ["mollie", 1, 1000],

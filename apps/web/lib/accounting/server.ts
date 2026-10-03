@@ -10,7 +10,7 @@ import {
 /** Alle codes, in de volgorde van het rekeningstelsel. */
 export async function listAccountingCodes(): Promise<AccountingCodeOption[]> {
   const rows = await prisma.accountingCode.findMany({
-    select: { id: true, code: true, name: true, parentId: true },
+    select: { id: true, code: true, name: true, parentId: true, sortOrder: true },
   });
   return orderAccountingCodes(rows);
 }

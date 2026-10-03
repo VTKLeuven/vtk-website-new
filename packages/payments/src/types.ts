@@ -11,7 +11,7 @@ export type CreateCheckoutInput = {
   buyerEmail: string;
   eventName: string;
   /**
-   * De boekhoudcode van de verkoop ("70010010001"), of null zonder code. Staat
+   * De boekhoudcode van de verkoop ("700100 10001"), of null zonder code. Staat
    * ze er, dan opent de betaalinfo ermee en neemt ze de plaats van het
    * ordernummer in: met code en eventnaam kan de penning een betaling boeken,
    * en het ordernummer was voor de koper enkel een reeks willekeurige tekens.

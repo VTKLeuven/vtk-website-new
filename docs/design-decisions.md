@@ -9690,16 +9690,40 @@ en bestanden: `docs/ticketing.md`, "Boekhoudcodes".
 - **Eén code per verkoop, niet per tickettype.** Een bestelling is één betaling,
   en één betaling heeft één mededeling. Een verkoop die onder twee codes hoort,
   zijn twee verkopen.
-- **Een subcode is de hoofdrekening met vijf cijfers erachter**: 700100 en 10002
-  wordt 70010010002. Zo staat ze in de betaalinfo en zo kent de boekhouder ze.
+- **Een subcode staat met een spatie achter haar hoofdrekening**: 700120 en 12002
+  wordt "700120 12002". De eerste versie schreef ze aaneen (70012012002), tot de
+  boekhouder liet weten dat de vijf cijfers een analytische code zijn die hij in
+  een apart vakje invult, geen verlengstuk van het rekeningnummer. Aaneen moest
+  hij ze dus eerst weer splitsen. Een post zonder eigen subcode boekt gewoon op
+  de hoofdrekening; het analytische vakje blijft dan leeg.
+- **De lijst die we eerst kregen, was op twee plaatsen fout**: Onthaal (700101)
+  is 10101 tot 10103 en Bedrijvenrelaties (704100) 41001 tot 41009. Een migratie
+  zette dat bij de volgende deploy recht, samen met de spatie, en paste ook de
+  kopie op bestellingen die al betaald waren aan. Dat is bewust een uitzondering
+  op "wat verkocht is, verandert niet mee" hieronder: daar gaat het om een keuze
+  van de penning, hier om onze fout. Bleef de oude schrijfwijze staan, dan
+  telden de statistieken dezelfde rekening twee keer, en voor Onthaal en
+  Bedrijvenrelaties een code die in de boekhouding niet bestaat.
+- **Het beheer is een register zoals het rekenblad van de penning.** Elke
+  hoofdrekening een kop, haar subcodes ingesprongen eronder, één regel per code,
+  een zoekveld bovenaan, en een klik op een rij bewerkt ze ter plaatse. De
+  eerste versie was een gewone beheertabel met hoge rijen en twee knoppen per
+  code, zonder zichtbaar verschil tussen hoofdrekening en subcode; naast het
+  rekenblad dat ze al gebruikten, was dat de slechtere keuze.
+- **De volgorde is die van de penning, niet die van het getal.** De lijst is te
+  slepen (`AccountingCode.sortOrder`), en de keuzelijst bij een ticketverkoop
+  volgt diezelfde volgorde. Een subcode in een andere hoofdrekening neerzetten
+  verandert haar code, en dus wat er in de betaalinfo komt; dat gebeurt pas na
+  een bevestiging die de nieuwe code noemt. Een hoofdrekening wordt door slepen
+  nooit een subcode.
 - **De code is verplicht**, bij het aanmaken en bij publiceren. Een event van
   voor de codes blijft verkopen, met een waarschuwing tot iemand er een kiest.
 - **Kiezen gebeurt met een zoekveld, per hoofdrekening.** Een gewone keuzelijst
   van zeventig codes was enkel te doorscrollen. Nu tik je "internationaal" en
   zie je die categorie met haar subcodes, of "cantus" en zie je de Cantussen van
   elke post onder hun eigen kop. Een subcode toont enkel haar eigen vijf cijfers
-  onder haar hoofdrekening; de volledige code van elf cijfers herhalen maakte de
-  lijst onleesbaar.
+  onder haar hoofdrekening; de volledige code telkens herhalen maakte de lijst
+  onleesbaar.
 - **Wat er per code verkocht is, staat bij de statistieken**, niet naast het
   veld in de basisinformatie. Daar ging het om wat de verkoop is, niet om wat ze
   opbracht; een tabel met bedragen tussen de URL-naam en het kalenderevent was
