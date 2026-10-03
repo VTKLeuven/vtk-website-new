@@ -292,7 +292,12 @@ export async function careerStats(now: Date = new Date()): Promise<CareerStats> 
     }),
   ]);
 
-  const bySource: CareerStats["bySource"] = { ONBOARDING: 0, ACCOUNT: 0, STUDY_CONFIRMATION: 0 };
+  const bySource: CareerStats["bySource"] = {
+    ONBOARDING: 0,
+    ACCOUNT: 0,
+    STUDY_CONFIRMATION: 0,
+    DEFAULT: 0,
+  };
   for (const row of grouped) {
     bySource[row.careerOptInSource ?? "ONBOARDING"] += row._count._all;
   }
@@ -471,6 +476,8 @@ async function careerCharts(input: {
   // Opt-ins per dag: een vast venster, zodat de staven niet dunner worden
   // naarmate de site ouder wordt.
   const recent = dayRange(daysBefore(today, RECENT_DAYS - 1), today);
+  // Zonder DEFAULT: dat is één dag (de omschakeling van oktober 2026) die elke
+  // andere staaf plat zou drukken, en geen scherm dat de lijst vult.
   const sources: CareerSource[] = ["ONBOARDING", "STUDY_CONFIRMATION", "ACCOUNT"];
   const optInsPerDay: DailySeries = {
     days: recent,

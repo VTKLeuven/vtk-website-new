@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { staticMetadata } from "@/lib/pageMetadata";
+import { CAREER_CATEGORY } from "@/lib/careerOptIn";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { Card, Button } from "@vtk/ui";
@@ -110,7 +111,14 @@ export default async function OnboardingPage({
       <Card className="p-6">
         <ProfileForm
           locale={locale}
-          user={user}
+          user={
+            // Career staat bij een nieuw account standaard aangevinkt; wie het
+            // uitvinkt, komt niet op de lijst. Wie hier staat, heeft de
+            // onboarding nog niet afgerond (anders de redirect hierboven).
+            user.mailCategories.includes(CAREER_CATEGORY)
+              ? user
+              : { ...user, mailCategories: [...user.mailCategories, CAREER_CATEGORY] }
+          }
           next={home}
           submitLabel={t.submit}
           showCalendarPreference={false}

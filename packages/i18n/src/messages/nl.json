@@ -549,6 +549,8 @@
     "careerSourceOnboarding": "Onboarding",
     "careerSourceAccount": "Accountpagina",
     "careerSourceConfirmation": "Jaarlijkse studiebevestiging",
+    "careerSourceDefault": "Standaard aangezet",
+    "careerSourceDefaultHint": "Accounts waarbij Career bij de omschakeling van oktober 2026 aangezet werd. Wie het nadien zelf uitzette, telt niet meer mee.",
     "careerTotalOptIns": "Totaal met Career aan",
     "careerAwaitingHint": "{count} met Career wachten nog op hun bevestiging voor {year}",
     "careerSectionTitle": "Career",

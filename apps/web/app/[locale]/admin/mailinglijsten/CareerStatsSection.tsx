@@ -244,6 +244,12 @@ export function CareerStatsSection({ stats, locale }: { stats: CareerStats; loca
             value={n(bySource.STUDY_CONFIRMATION)}
             share={share(bySource.STUDY_CONFIRMATION, list.total)}
           />
+          <Row
+            label={t.careerSourceDefault}
+            hint={t.careerSourceDefaultHint}
+            value={n(bySource.DEFAULT)}
+            share={share(bySource.DEFAULT, list.total)}
+          />
           <Row kind="result" label={t.careerTotalOptIns} value={n(list.total)} />
         </Rows>
 

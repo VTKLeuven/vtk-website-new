@@ -412,6 +412,8 @@ enum CareerOptInSource {
   ONBOARDING
   ACCOUNT
   STUDY_CONFIRMATION
+  /// Aangezet door de eenmalige omschakeling van oktober 2026, zonder scherm.
+  DEFAULT
 }
 
 enum MailCategory {

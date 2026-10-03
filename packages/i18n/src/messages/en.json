@@ -549,6 +549,8 @@
     "careerSourceOnboarding": "Onboarding",
     "careerSourceAccount": "Account page",
     "careerSourceConfirmation": "Yearly study confirmation",
+    "careerSourceDefault": "Turned on by default",
+    "careerSourceDefaultHint": "Accounts that had Career turned on at the switch of October 2026. Anyone who turned it off themselves afterwards is no longer counted.",
     "careerTotalOptIns": "Total with Career on",
     "careerAwaitingHint": "{count} with Career are still waiting on their confirmation for {year}",
     "careerSectionTitle": "Career",

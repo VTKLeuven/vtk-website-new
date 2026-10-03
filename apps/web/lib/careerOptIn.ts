@@ -39,7 +39,7 @@ export const CAREER_OPT_IN_SHOWN_FIELD = "careerOptInShown";
  * Waar een lopende opt-in vandaan komt. Spiegelt `CareerOptInSource` in de
  * Prisma-schema; de admin telt erop (zie `lib/careerStats.ts`).
  */
-export const CAREER_OPT_IN_SOURCES = ["ONBOARDING", "ACCOUNT", "STUDY_CONFIRMATION"] as const;
+export const CAREER_OPT_IN_SOURCES = ["ONBOARDING", "ACCOUNT", "STUDY_CONFIRMATION", "DEFAULT"] as const;
 export type CareerOptInSourceValue = (typeof CAREER_OPT_IN_SOURCES)[number];
 
 /** De studievelden waar de vraag van afhangt; precies wat stap 1 van de bevestiging vraagt. */
