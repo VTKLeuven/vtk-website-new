@@ -1,4 +1,5 @@
 import type { TicketTargetAudience } from "@/lib/ticketing/audience";
+import type { SeatKind } from "@/lib/ticketing/seats";
 
 export type TicketQuestion = {
   id: string;
@@ -30,7 +31,21 @@ export type PublicTicketType = {
    * voorbeeld voor de beheerder); een niet-lid krijgt hier null.
    */
   memberPriceCents?: number | null;
+  /**
+   * Wat de regel aan de gewone prijs nog kan nemen: de vrije plaatsen in de pot,
+   * of minder wanneer het plafond voor deze bezoeker eerder vol zit.
+   */
   available: number;
+  /** Idem voor de regel aan de ledenprijs; enkel samen met `memberPriceCents`. */
+  memberAvailable?: number | null;
+  /** De vrije plaatsen in de pot, los van wie ze neemt. Ontbreekt = `available`. */
+  poolAvailable?: number;
+  /**
+   * Of de gewone prijs voor deze bezoeker een leden- of een niet-ledenplaats
+   * neemt (zie `lib/ticketing/seats.ts`). De ledenprijs is altijd een
+   * ledenplaats. Ontbreekt = niet-lid.
+   */
+  seat?: SeatKind;
   active: boolean;
   maxPerOrder?: number | null;
   minPerOrder?: number | null;
@@ -267,10 +282,36 @@ export function quantitiesByTicketType(
   return byType;
 }
 
+function inventoryKey(type: PublicTicketType): string {
+  return type.inventoryPoolId ?? `ticket-type:${type.id}`;
+}
+
+/** Wat één regel nog kan nemen, los van wat er al gekozen is: de ledenprijs heeft haar eigen plafond. */
+export function ticketLineRemaining(line: TicketLine): number {
+  return line.memberPrice ? (line.type.memberAvailable ?? line.type.available) : line.type.available;
+}
+
+/** Wat een type over zijn prijzen heen nog kan nemen, voor "Nog 12" en "Uitverkocht". */
+export function ticketTypeRemaining(type: PublicTicketType): number {
+  return Math.max(0, ...ticketLinesForType(type).map(ticketLineRemaining));
+}
+
+/** De pot en de soort plaats van een regel: regels met dezelfde sleutel delen een plafond. */
+function seatKey(line: TicketLine): string {
+  return `${inventoryKey(line.type)}:${line.memberPrice ? "MEMBER" : (line.type.seat ?? "NON_MEMBER")}`;
+}
+
 /**
- * Het maximum voor één regel. De ledenprijs en de gewone prijs van een type
- * delen voorraad en "maximum per bestelling", dus wat de andere regel van
- * hetzelfde type al vastheeft, gaat eraf.
+ * Het maximum voor één regel, als het kleinste van vier grenzen, telkens min
+ * wat de andere regels er al van vasthebben:
+ *
+ * - de plaatsen voor haar soort (lid of niet-lid) in haar pot;
+ * - de vrije plaatsen in de pot zelf, die regels van elke soort delen;
+ * - het maximum per bestelling van haar type, over beide prijzen samen;
+ * - het maximum per bestelling van het event.
+ *
+ * De eerste twee samen zijn exact: zit het plafond van haar soort niet krap,
+ * dan is `ticketLineRemaining` gelijk aan de pot en wint de tweede grens vanzelf.
  */
 export function maximumSelectableForLine({
   line,
@@ -283,34 +324,56 @@ export function maximumSelectableForLine({
   quantities: Record<string, number>;
   maxTicketsPerOrder: number;
 }): number {
-  const byType = quantitiesByTicketType(lines, quantities);
-  const ticketTypes = [...new Map(lines.map((candidate) => [candidate.type.id, candidate.type])).values()];
-  const typeMaximum = maximumSelectableForType({
-    type: line.type,
-    ticketTypes,
-    quantities: byType,
-    maxTicketsPerOrder,
-  });
-  const onOtherLines = (byType[line.type.id] ?? 0) - (quantities[line.key] ?? 0);
-  return Math.max(0, typeMaximum - onOtherLines);
+  const others = lines.filter((candidate) => candidate.key !== line.key);
+  const taken = (matches: (candidate: TicketLine) => boolean) =>
+    others.reduce((sum, candidate) => (matches(candidate) ? sum + (quantities[candidate.key] ?? 0) : sum), 0);
+  const key = seatKey(line);
+  const pool = inventoryKey(line.type);
+  return Math.max(
+    0,
+    Math.min(
+      ticketLineRemaining(line) - taken((candidate) => seatKey(candidate) === key),
+      (line.type.poolAvailable ?? line.type.available) - taken((candidate) => inventoryKey(candidate.type) === pool),
+      (line.type.maxPerOrder ?? maxTicketsPerOrder) - taken((candidate) => candidate.type.id === line.type.id),
+      maxTicketsPerOrder - taken(() => true),
+    ),
+  );
 }
 
-function inventoryKey(type: PublicTicketType): string {
-  return type.inventoryPoolId ?? `ticket-type:${type.id}`;
-}
-
+/**
+ * Hoeveel tickets er nog te koop zijn, voor de pil op /tickets. Per pot het
+ * kleinste van wat de pot nog heeft en wat de regels erin samen nog kunnen
+ * nemen; een pot die twee types delen, telt zo maar één keer.
+ */
 export function availableTicketCount(ticketTypes: PublicTicketType[]): number {
-  const remainingByPool = new Map<string, number>();
+  const poolRemaining = new Map<string, number>();
+  const seatRemaining = new Map<string, { pool: string; remaining: number }>();
   for (const type of ticketTypes) {
     if (!type.active) continue;
-    const key = inventoryKey(type);
-    const remaining = Math.max(0, type.available);
-    const current = remainingByPool.get(key);
-    remainingByPool.set(key, current === undefined ? remaining : Math.min(current, remaining));
+    const pool = inventoryKey(type);
+    const inPool = Math.max(0, type.poolAvailable ?? type.available);
+    const current = poolRemaining.get(pool);
+    poolRemaining.set(pool, current === undefined ? inPool : Math.min(current, inPool));
+    for (const line of ticketLinesForType(type)) {
+      const key = seatKey(line);
+      const remaining = Math.max(0, ticketLineRemaining(line));
+      seatRemaining.set(key, { pool, remaining: Math.max(seatRemaining.get(key)?.remaining ?? 0, remaining) });
+    }
   }
-  return [...remainingByPool.values()].reduce((sum, remaining) => sum + remaining, 0);
+  let total = 0;
+  for (const [pool, remaining] of poolRemaining) {
+    const bySeat = [...seatRemaining.values()]
+      .filter((seat) => seat.pool === pool)
+      .reduce((sum, seat) => sum + seat.remaining, 0);
+    total += Math.min(remaining, bySeat);
+  }
+  return total;
 }
 
+/**
+ * Het maximum voor een type met één prijs; `quantities` per type-id. Een dunne
+ * schil rond `maximumSelectableForLine` voor wie geen regels kent.
+ */
 export function maximumSelectableForType({
   type,
   ticketTypes,
@@ -322,21 +385,33 @@ export function maximumSelectableForType({
   quantities: Record<string, number>;
   maxTicketsPerOrder: number;
 }): number {
-  const current = quantities[type.id] ?? 0;
-  const selectedCount = Object.values(quantities).reduce((sum, quantity) => sum + quantity, 0);
-  const selectedFromSamePool = ticketTypes.reduce(
-    (sum, candidate) =>
-      inventoryKey(candidate) === inventoryKey(type)
-        ? sum + (quantities[candidate.id] ?? 0)
-        : sum,
+  const lines = ticketTypes.map((candidate) => ({
+    key: candidate.id,
+    type: candidate,
+    memberPrice: false,
+    priceCents: candidate.priceCents,
+  }));
+  const line = lines.find((candidate) => candidate.type.id === type.id) ?? {
+    key: type.id,
+    type,
+    memberPrice: false,
+    priceCents: type.priceCents,
+  };
+  return maximumSelectableForLine({ line, lines, quantities, maxTicketsPerOrder });
+}
+
+/**
+ * Hoeveel tickets één bestelling hier hoogstens kan tellen: het maximum van
+ * het event, of minder wanneer de types samen niet zoveel toelaten. Een event
+ * met "max. 8" en twee tickets van elk hoogstens 1 laat er 2 toe; de kop van de
+ * shop zei vroeger 8, en dat klopte niet.
+ */
+export function orderLimit(ticketTypes: PublicTicketType[], maxTicketsPerOrder: number): number {
+  const perType = ticketTypes.reduce(
+    (sum, type) => sum + Math.min(type.maxPerOrder ?? maxTicketsPerOrder, maxTicketsPerOrder),
     0,
   );
-  const availableInPool = Math.max(0, type.available - (selectedFromSamePool - current));
-  const availableInOrder = Math.max(0, maxTicketsPerOrder - (selectedCount - current));
-  return Math.max(
-    0,
-    Math.min(availableInPool, type.maxPerOrder ?? maxTicketsPerOrder, availableInOrder),
-  );
+  return Math.max(1, Math.min(maxTicketsPerOrder, perType));
 }
 
 export function nextTicketQuantity({

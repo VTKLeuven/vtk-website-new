@@ -2294,6 +2294,11 @@ model TicketEvent {
   @@index([startsAt])
 }
 
+// De plaatsen van een event. Elk tickettype hangt aan precies één pot, en
+// alle types in dezelfde pot delen haar plaatsen ("160 plaatsen, of dat water-
+// of biertickets zijn maakt niet uit"). Een event kan meerdere potten hebben
+// voor tickets met een eigen aantal (100 voor studenten, 50 voor proffen).
+// Zie docs/design-decisions.md, "Plaatsen: potten met een plafond voor leden".
 model TicketInventoryPool {
   id            String   @id @default(cuid())
   eventId       String
@@ -2303,6 +2308,18 @@ model TicketInventoryPool {
   capacity      Int
   reservedCount Int      @default(0)
   soldCount     Int      @default(0)
+  // Optionele plafonds binnen `capacity`: hoeveel van deze plaatsen hoogstens
+  // naar leden en hoeveel hoogstens naar niet-leden gaan. `null` = geen eigen
+  // plafond; dan geldt enkel de capaciteit. "80 leden en 20 niet-leden" is 80
+  // en 20; "hoogstens 20 niet-leden, de rest mag naar leden" is enkel 20 bij
+  // niet-leden. Wat als ledenticket telt, staat bij `TicketOrderItem.memberSeat`.
+  memberCapacity      Int?
+  nonMemberCapacity   Int?
+  // Het deel van `reservedCount` en `soldCount` dat ledenplaatsen zijn; de
+  // niet-leden zijn het verschil. Altijd bijgehouden, ook zonder plafond: zo
+  // klopt een plafond dat pas na de start van de verkoop gezet wordt meteen.
+  memberReservedCount Int @default(0)
+  memberSoldCount     Int @default(0)
   version       Int      @default(0)
   active        Boolean  @default(true)
   createdAt     DateTime @default(now()) @db.Timestamptz(3)
@@ -2511,6 +2528,12 @@ model TicketOrderItem {
   // Gekocht aan de ledenprijs van het tickettype. De koper was toen lid; de
   // deelnemer hoeft dat niet te zijn.
   memberPrice     Boolean  @default(false)
+  // Telt deze plaats als ledenplaats voor `TicketInventoryPool.memberCapacity`?
+  // Ja wanneer een lid het ticket kocht, behalve aan de gewone prijs van een
+  // soort met ledenprijs: dat ticket is voor een niet-lid. Bij het bestellen
+  // vastgelegd, zodat vrijgeven en terugbetalen dezelfde teller raken. Zie
+  // `lib/ticketing/seats.ts`.
+  memberSeat      Boolean  @default(false)
   discountCents   Int      @default(0)
   totalCents      Int
   attendeeName    String
@@ -2861,8 +2884,14 @@ model TicketEventTemplate {
   /// sjabloon later aanpassen raakt geen bestaand event.
   accountingCodeId String?
 
-  /// Capaciteit van de voorraadpot `GENERAL`.
+  /// Capaciteit van de voorraadpot `GENERAL`. Bij een sjabloon met `pools` de
+  /// som van die potten, enkel voor het overzicht.
   capacity Int   @default(100)
+  /// De potten met plaatsen, als `[{ code, nameNl, nameEn, capacity,
+  /// memberCapacity, nonMemberCapacity }]` (zie `TicketTemplatePool` in
+  /// `apps/web/lib/ticketing/templates.ts`). `null` = één pot `GENERAL` met
+  /// `capacity`, zoals elk sjabloon van voor de potten.
+  pools    Json?
   /// Ticketontwerp, dezelfde vorm als `TicketEvent.settings.ticketDesign.draft`.
   design   Json?
 
@@ -2908,6 +2937,9 @@ model TicketEventTemplateType {
   color            String         @default("navy")
   minPerOrder      Int            @default(1)
   maxPerOrder      Int            @default(8)
+  /// De pot uit `TicketEventTemplate.pools` waar dit ticket van afgaat, op
+  /// code. `null` = de eerste pot.
+  poolCode         String?
 
   /// Eigen verkoopvenster in minuten vóór de start; NULL = volgt het event.
   salesOpensMinutesBefore  Int?

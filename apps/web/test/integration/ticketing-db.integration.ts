@@ -4,7 +4,13 @@ import { getSession } from "@vtk/auth/server";
 import { prisma } from "@vtk/db";
 import { POST as processMollieWebhook } from "@/app/api/tickets/mollie/webhook/route";
 import { createOrderAccessToken, secureTokenHash } from "@/lib/ticketing/crypto";
-import { reserveInventory } from "@/lib/ticketing/inventory";
+import {
+  commitReservedInventory,
+  quantitiesByPool,
+  releaseReservedInventory,
+  reserveInventory,
+  TicketInventoryError,
+} from "@/lib/ticketing/inventory";
 import {
   createTicketCheckout,
   expirePendingOrder,
@@ -144,14 +150,56 @@ describe.sequential("ticketing database invariants", () => {
 
   it("never reserves the final inventory unit twice", async () => {
     const attempts = await Promise.allSettled([
-      prisma.$transaction((tx) => reserveInventory(tx, ids.event, new Map([[ids.pool, 1]]))),
-      prisma.$transaction((tx) => reserveInventory(tx, ids.event, new Map([[ids.pool, 1]]))),
+      prisma.$transaction((tx) => reserveInventory(tx, ids.event, quantitiesByPool([{ inventoryPoolId: ids.pool }]))),
+      prisma.$transaction((tx) => reserveInventory(tx, ids.event, quantitiesByPool([{ inventoryPoolId: ids.pool }]))),
     ]);
     expect(attempts.filter((attempt) => attempt.status === "fulfilled")).toHaveLength(1);
     expect(attempts.filter((attempt) => attempt.status === "rejected")).toHaveLength(1);
     expect(await prisma.ticketInventoryPool.findUnique({ where: { id: ids.pool } })).toMatchObject({
       reservedCount: 1,
       soldCount: 0,
+    });
+  });
+
+  it("holds the member and non-member caps of a pool under concurrent checkouts", async () => {
+    // Tien plaatsen, waarvan hoogstens 2 voor leden en 1 voor niet-leden.
+    const capped = await prisma.ticketInventoryPool.create({
+      data: {
+        eventId: ids.event,
+        code: `CAPPED_${randomUUID().slice(0, 6)}`,
+        nameNl: "Met plafond",
+        capacity: 10,
+        memberCapacity: 2,
+        nonMemberCapacity: 1,
+      },
+    });
+    const members = (count: number) =>
+      quantitiesByPool(Array.from({ length: count }, () => ({ inventoryPoolId: capped.id, memberSeat: true })));
+    const nonMember = quantitiesByPool([{ inventoryPoolId: capped.id, memberSeat: false }]);
+
+    const memberAttempts = await Promise.allSettled([
+      prisma.$transaction((tx) => reserveInventory(tx, ids.event, members(2))),
+      prisma.$transaction((tx) => reserveInventory(tx, ids.event, members(2))),
+    ]);
+    expect(memberAttempts.filter((attempt) => attempt.status === "fulfilled")).toHaveLength(1);
+    const rejected = memberAttempts.find((attempt) => attempt.status === "rejected");
+    expect((rejected as PromiseRejectedResult).reason).toBeInstanceOf(TicketInventoryError);
+    expect((rejected as PromiseRejectedResult).reason.shortage).toBe("MEMBER_SEATS");
+
+    // Het ledenplafond zit vol; een niet-lid kan nog, maar maar één keer.
+    await prisma.$transaction((tx) => reserveInventory(tx, ids.event, nonMember));
+    await expect(
+      prisma.$transaction((tx) => reserveInventory(tx, ids.event, nonMember))
+    ).rejects.toMatchObject({ shortage: "NON_MEMBER_SEATS" });
+
+    // Betaald en vervallen schuiven de ledenteller mee.
+    await prisma.$transaction((tx) => commitReservedInventory(tx, ids.event, members(2)));
+    await prisma.$transaction((tx) => releaseReservedInventory(tx, ids.event, nonMember));
+    expect(await prisma.ticketInventoryPool.findUniqueOrThrow({ where: { id: capped.id } })).toMatchObject({
+      reservedCount: 0,
+      soldCount: 2,
+      memberReservedCount: 0,
+      memberSoldCount: 2,
     });
   });
 
@@ -424,7 +472,7 @@ describe.sequential("ticketing database invariants", () => {
     const accessExpiresAt = new Date("2027-06-20T00:00:00.000Z");
     const access = createOrderAccessToken(ids.mollieOrder, accessExpiresAt);
     await prisma.$transaction(async (tx) => {
-      await reserveInventory(tx, ids.rateEvent, new Map([[ids.ratePool, 1]]));
+      await reserveInventory(tx, ids.rateEvent, quantitiesByPool([{ inventoryPoolId: ids.ratePool }]));
       await tx.ticketOrder.create({
         data: {
           id: ids.mollieOrder,
@@ -555,7 +603,7 @@ describe.sequential("ticketing database invariants", () => {
     const access = createOrderAccessToken(raceOrderId, accessExpiresAt);
     const poolBefore = await prisma.ticketInventoryPool.findUniqueOrThrow({ where: { id: ids.ratePool } });
     await prisma.$transaction(async (tx) => {
-      await reserveInventory(tx, ids.rateEvent, new Map([[ids.ratePool, 1]]));
+      await reserveInventory(tx, ids.rateEvent, quantitiesByPool([{ inventoryPoolId: ids.ratePool }]));
       await tx.ticketOrder.create({
         data: {
           id: raceOrderId,

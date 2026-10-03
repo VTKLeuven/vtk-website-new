@@ -5,6 +5,7 @@ import {
   availableTicketCount,
   formatTicketMoment,
   formatTicketPrice,
+  ticketTypeRemaining,
   type PublicTicketEvent,
 } from "./types";
 import { withSource } from "@/lib/ticketing/source";
@@ -120,8 +121,9 @@ export function TicketEventCard({
           {shownTypes.length > 0 ? (
             <ul className="tcat-prices">
               {shownTypes.map((type) => {
-                const typeSoldOut = type.available < 1;
-                const low = !typeSoldOut && type.available <= LOW_STOCK;
+                const remaining = ticketTypeRemaining(type);
+                const typeSoldOut = remaining < 1;
+                const low = !typeSoldOut && remaining <= LOW_STOCK;
                 const hasMemberPrice = type.memberPriceCents != null;
                 const price = hasMemberPrice ? type.memberPriceCents! : type.priceCents;
                 const notes = [
@@ -129,7 +131,7 @@ export function TicketEventCard({
                     ? `${nl ? "Lid · niet-lid" : "Member · non-member"} ${formatTicketPrice(type.priceCents, event.currency, locale)}`
                     : null,
                   typeSoldOut ? (nl ? "Uitverkocht" : "Sold out") : null,
-                  low ? (nl ? `Nog ${type.available}` : `${type.available} left`) : null,
+                  low ? (nl ? `Nog ${remaining}` : `${remaining} left`) : null,
                 ].filter(Boolean);
                 return (
                   <li key={type.id} data-sold-out={typeSoldOut || undefined}>

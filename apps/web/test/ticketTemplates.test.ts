@@ -5,9 +5,13 @@ import {
   blankTicketTemplateType,
   formatMinutesBefore,
   minutesBeforeFromDate,
+  defaultTicketPool,
+  parseTemplatePools,
   parseTemplateQuestions,
   parseTemplateTypes,
+  parseTicketSetup,
   templateCode,
+  templatePoolsFrom,
   templateDesign,
   templateTimeOfDay,
   type TicketTemplateType,
@@ -208,5 +212,64 @@ describe("het ticketontwerp in een sjabloon", () => {
   it("geeft niets terug voor een leeg ontwerp", () => {
     expect(templateDesign(null)).toBeNull();
     expect(templateDesign({})).toBeNull();
+  });
+});
+
+describe("de plaatsen lezen die een scherm terugstuurt", () => {
+  it("geeft één pot zonder naam de naam van vroeger", () => {
+    const parsed = parseTemplatePools([{ code: "GENERAL", nameNl: "", capacity: 160 }]);
+    if (typeof parsed === "string") throw new Error(parsed);
+    expect(parsed).toEqual([{ ...defaultTicketPool(160) }]);
+  });
+
+  it("eist een naam zodra er meerdere potten zijn", () => {
+    expect(
+      parseTemplatePools([
+        { code: "GENERAL", nameNl: "Studenten", capacity: 100 },
+        { code: "PROFFEN", nameNl: "", capacity: 50 },
+      ])
+    ).toMatch(/Plaatsen 2: geef deze plaatsen een naam/);
+  });
+
+  it("houdt een plafond voor leden en niet-leden, en leeg is geen plafond", () => {
+    const parsed = parseTemplatePools([
+      { code: "GENERAL", nameNl: "", capacity: 100, memberCapacity: 80, nonMemberCapacity: "" },
+    ]);
+    if (typeof parsed === "string") throw new Error(parsed);
+    expect(parsed[0]).toMatchObject({ capacity: 100, memberCapacity: 80, nonMemberCapacity: null });
+  });
+
+  it("weigert een plafond boven het aantal plaatsen", () => {
+    expect(
+      parseTemplatePools([{ code: "GENERAL", nameNl: "", capacity: 100, nonMemberCapacity: 120 }])
+    ).toMatch(/niet-leden ligt tussen 0 en 100/);
+  });
+
+  it("valt voor een sjabloon van voor de potten terug op één pot", () => {
+    expect(templatePoolsFrom(null, 90)).toEqual([defaultTicketPool(90)]);
+  });
+});
+
+describe("tickets en plaatsen samen", () => {
+  const pools = [
+    { code: "STUDENTEN", nameNl: "Studenten", capacity: 100 },
+    { code: "PROFFEN", nameNl: "Proffen", capacity: 50 },
+  ];
+
+  it("hangt een ticket zonder pot aan de eerste", () => {
+    const parsed = parseTicketSetup(
+      [row({ code: "STUDENT", poolCode: null }), row({ code: "PROF", poolCode: "PROFFEN" })],
+      pools
+    );
+    if (typeof parsed === "string") throw new Error(parsed);
+    expect(parsed.types.map((type) => type.poolCode)).toEqual([null, "PROFFEN"]);
+  });
+
+  it("weigert een ticket dat naar onbestaande plaatsen wijst", () => {
+    expect(parseTicketSetup([row({ poolCode: "VIP" })], pools)).toMatch(/Tickettype 1: de gekozen plaatsen/);
+  });
+
+  it("weigert plaatsen zonder ticket wanneer er meerdere zijn", () => {
+    expect(parseTicketSetup([row({ poolCode: "STUDENTEN" })], pools)).toMatch(/"Proffen" hebben geen ticket/);
   });
 });

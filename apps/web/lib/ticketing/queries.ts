@@ -28,6 +28,7 @@ import { presaleViewerFor } from "./presaleViewer";
 import { hasPrivateTicketAccess } from "./privateLink";
 import { ticketPoster, ticketPosterSelect } from "./poster";
 import { userIsMember } from "@/lib/membership";
+import { poolRemaining, type PoolRemaining, type SeatKind } from "./seats";
 
 type PublicLocale = "nl" | "en";
 
@@ -148,12 +149,10 @@ function publicEventDto(
       priceCents: type.unitPriceCents,
       // Ongefilterd: wie geen lid is, verliest deze prijs in `forViewer`.
       memberPriceCents: ticketTypeMemberPrice(type),
-      available: Math.max(
-        0,
-        type.inventoryPool.capacity -
-          type.inventoryPool.reservedCount -
-          type.inventoryPool.soldCount
-      ),
+      // Wat de gewone prijs nog kan nemen, gerekend als niet-ledenplaats;
+      // `forViewer` stelt dat bij voor een lid. Een uitgeschakelde pot verkoopt
+      // niets meer, ook al staan er nog plaatsen open.
+      ...seatAvailability(type.inventoryPool),
       active: type.active,
       audience: type.audience,
       minPerOrder: type.minPerOrder,
@@ -180,15 +179,52 @@ function publicEventDto(
   };
 }
 
+/**
+ * Wat er in een pot nog vrij is, zoals de shop het nodig heeft: per regel en
+ * voor de pot als geheel (zie `lib/ticketing/seats.ts`). Standaard gerekend
+ * voor een niet-lid; `forViewer` zet het om voor een lid.
+ */
+function seatAvailability(pool: PublicEventRecord["ticketTypes"][number]["inventoryPool"]) {
+  const remaining: PoolRemaining = pool.active
+    ? poolRemaining(pool)
+    : { total: 0, member: 0, nonMember: 0 };
+  return {
+    available: remaining.nonMember,
+    memberAvailable: remaining.member as number | null,
+    poolAvailable: remaining.total,
+    seat: "NON_MEMBER" as SeatKind,
+  };
+}
+
 type PublicTicketTypeDto = ReturnType<typeof publicEventDto>["ticketTypes"][number];
 
 /**
+ * De tickets zoals deze bezoeker ze ziet.
+ *
  * De ledenprijs bestaat enkel voor een lid. Een niet-lid krijgt het ticket aan
  * de gewone prijs, en hoort de lagere prijs ook niet in de paginabron terug te
  * vinden.
+ *
+ * En wat er nog over is, hangt af van wie koopt: een lid dat een ticket zonder
+ * ledenprijs koopt, neemt een ledenplaats (`isMemberSeat`), dus voor hem telt
+ * het ledenplafond en niet dat van de niet-leden.
  */
-function withMemberPrices(types: PublicTicketTypeDto[], isMember: boolean): PublicTicketTypeDto[] {
-  return isMember ? types : types.map((type) => ({ ...type, memberPriceCents: null }));
+function forViewer(types: PublicTicketTypeDto[], isMember: boolean): PublicTicketTypeDto[] {
+  if (!isMember) {
+    return types.map((type) => ({ ...type, memberPriceCents: null, memberAvailable: null }));
+  }
+  return types.map((type) =>
+    type.memberPriceCents === null
+      ? { ...type, available: regularAvailable(type, true), seat: "MEMBER" as SeatKind }
+      : type
+  );
+}
+
+/** Wat de gewone prijs van een type nog kan nemen voor deze bezoeker. */
+function regularAvailable(type: PublicTicketTypeDto, isMember: boolean): number {
+  return isMember && type.memberPriceCents === null
+    ? (type.memberAvailable ?? type.available)
+    : type.available;
 }
 
 /**
@@ -265,7 +301,7 @@ export async function listPublishedTicketEvents(
     const windowTypes = dto.ticketTypes.filter((type) =>
       overview
         ? !type.salesEnd || new Date(type.salesEnd) > now
-        : ticketTypeIsOnSale(type, now) && type.available >= (type.minPerOrder ?? 1)
+        : ticketTypeIsOnSale(type, now) && regularAvailable(type, isMember) >= (type.minPerOrder ?? 1)
     );
     const selectableTypes = windowTypes.filter((type) => !ticketTypeIsHidden(type, profile));
     const loginHint = audienceLoginHint(
@@ -279,7 +315,7 @@ export async function listPublishedTicketEvents(
     );
     return [{
       ...dto,
-      ticketTypes: withMemberPrices(ticketTypes, isMember),
+      ticketTypes: forViewer(ticketTypes, isMember),
       salesOpensAt: opensLater ? dto.salesStart : null,
       memberPriceHint: memberPriceHint(ticketTypes, Boolean(session), isMember),
       requiresLogin:
@@ -324,7 +360,7 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
   );
   return {
     ...dto,
-    ticketTypes: withMemberPrices(ticketTypes, isMember),
+    ticketTypes: forViewer(ticketTypes, isMember),
     memberPriceHint: memberPriceHint(ticketTypes, Boolean(session), isMember),
     requiresLogin:
       !session &&

@@ -5,7 +5,7 @@ import {
   BUILTIN_TICKET_EVENT_TEMPLATES,
   type BuiltinTicketTemplate,
 } from "@vtk/db/ticketEventTemplates";
-import type { TicketEventTemplate } from "./templates";
+import { defaultTicketPool, templatePoolsFrom, type TicketEventTemplate } from "./templates";
 
 /**
  * Lezen van de ticketsjablonen uit de databank.
@@ -55,6 +55,7 @@ function fromBuiltin(
     confirmationMessageNl: template.confirmationMessageNl ?? "",
     confirmationMessageEn: template.confirmationMessageEn ?? "",
     capacity: template.capacity ?? 100,
+    pools: [defaultTicketPool(template.capacity ?? 100)],
     design: null,
     builtIn: true,
     types: template.types.map((type) => ({
@@ -69,6 +70,7 @@ function fromBuiltin(
       color: type.color ?? "navy",
       minPerOrder: type.minPerOrder ?? 1,
       maxPerOrder: type.maxPerOrder ?? 8,
+      poolCode: null,
       salesOpensMinutesBefore: type.salesOpensMinutesBefore ?? null,
       salesClosesMinutesBefore: type.salesClosesMinutesBefore ?? null,
       enabled: type.enabled ?? true,
@@ -146,6 +148,7 @@ function toTemplate(row: Row): TicketEventTemplate {
     confirmationMessageNl: row.confirmationMessageNl,
     confirmationMessageEn: row.confirmationMessageEn,
     capacity: row.capacity,
+    pools: templatePoolsFrom(row.pools, row.capacity),
     design: row.design ?? null,
     builtIn: row.builtIn,
     types: row.types.map((type) => ({
@@ -160,6 +163,7 @@ function toTemplate(row: Row): TicketEventTemplate {
       color: type.color,
       minPerOrder: type.minPerOrder,
       maxPerOrder: type.maxPerOrder,
+      poolCode: type.poolCode,
       salesOpensMinutesBefore: type.salesOpensMinutesBefore,
       salesClosesMinutesBefore: type.salesClosesMinutesBefore,
       enabled: type.enabled,

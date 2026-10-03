@@ -8351,7 +8351,7 @@ tweede ticket of een ledenprijs kon je pas na het aanmaken toevoegen. Hetzelfde
 gold voor het bevestigingsbericht, de voorverkoop en wie mag scannen: het
 sjabloon zette ze stil, buiten het formulier om, en zonder sjabloon waren ze bij
 het aanmaken niet te kiezen. Nu zijn de ticketrijen met en zonder sjabloon
-dezelfde (`TicketTemplateTypeRows`), en staan die drie instellingen in het
+dezelfde (`TicketSetupEditor`), en staan die drie instellingen in het
 aanmaakformulier, voorgevuld uit het sjabloon. Een sjabloon is dus enkel nog
 een vertrekpunt voor wat je ziet, plus de vragen en het ontwerp hierboven.
 "Wie mag scannen" staat enkel bij het aanmaken in het formulier; daarna hoort het
@@ -8390,6 +8390,74 @@ enthousiaste opkuis altijd één werkend vertrekpunt staat. En wat je aan een
 sjabloon wijzigt, raakt geen enkel bestaand ticketevent: die staan los, met hun
 bestellingen. Dat staat met zoveel woorden in de verwijderdialoog, want de
 omgekeerde vrees is precies waarom iemand van een opkuis afziet.
+
+## Plaatsen: potten met een plafond voor leden
+
+Een event had één getal plaatsen dat alle tickets deelden: "160 plaatsen, of dat
+water- of biertickets zijn maakt niet uit". Dat volstond niet voor wat de kring
+in de praktijk wil zeggen: "hoogstens 80 leden en 20 niet-leden", "hoogstens 20
+niet-leden, maar alle 100 mogen naar leden", of "100 tickets voor studenten en 50
+voor proffen".
+
+**Twee dingen, die samen elk van die zinnen dekken.**
+
+- **Meerdere potten per event** (`TicketInventoryPool`, die bestond al maar het
+  scherm maakte er altijd één). Elk ticket gaat af van precies één pot; tickets
+  in dezelfde pot delen haar plaatsen. Studenten en proffen zijn twee potten.
+- **Per pot een optioneel plafond voor leden en een voor niet-leden**
+  (`memberCapacity`, `nonMemberCapacity`), binnen de capaciteit van die pot.
+  "80 leden en 20 niet-leden" zet beide; "hoogstens 20 niet-leden" zet enkel
+  het tweede, en dan mogen leden tot alle plaatsen. Leeg is geen plafond.
+
+Bewust geen plafond per ticketsoort: "80 leden" gaat over bier- en watertickets
+samen, en een plafond per soort zou de kring dwingen het aantal leden over de
+soorten te verdelen.
+
+**Wat telt als ledenplaats** (`isMemberSeat` in `lib/ticketing/seats.ts`): een
+ticket dat een lid koopt, behalve aan de gewone prijs van een soort met
+ledenprijs. Dat laatste kiest een lid bewust voor een vriend die geen lid is
+(zie "Ledenprijs: één ticket met twee prijzen"). Bij een soort zonder ledenprijs
+weten we van de deelnemers niets meer dan van de koper, dus telt elk ticket dat
+een lid daar koopt als lid. Een niet-lid neemt altijd een niet-ledenplaats.
+
+**De soort plaats ligt vast bij het bestellen** (`TicketOrderItem.memberSeat`),
+net als de pot (`inventoryPoolId`). Vrijgeven, betalen en terugbetalen raken
+daardoor dezelfde teller als het reserveren, ook als de koper intussen geen lid
+meer is of een beheerder het ticket naar een andere pot verhuisde. De pot houdt
+naast `reservedCount`/`soldCount` het ledendeel ervan bij
+(`memberReservedCount`/`memberSoldCount`), altijd, ook zonder plafond: een
+plafond dat pas na de start van de verkoop gezet wordt, klopt zo meteen.
+Bestaande bestellingen zijn bij de migratie enkel als lid geteld wanneer dat
+zeker was (ledenprijs of een ticket alleen voor leden); of een koper toen lid
+was, is niet bewaard.
+
+**De controle zit in de UPDATE zelf** (`reserveInventory`), net als die op de
+capaciteit, zodat twee gelijktijdige bestellingen samen nooit over een plafond
+gaan. Een plafond houdt enkel tegen wat eronder valt: verlaagt een beheerder het
+ledenplafond onder wat al verkocht is, dan stopt de verkoop aan leden en kan een
+niet-lid nog gewoon kopen.
+
+**De shop rekent per bezoeker.** Wat een regel nog kan nemen, hangt af van wie
+kijkt (`forViewer` in `lib/ticketing/queries.ts`). Zit enkel het plafond van zijn
+soort vol, dan zegt de shop "De plaatsen voor niet-leden zijn op" in plaats van
+enkel "Uitverkocht", en een geweigerde bestelling krijgt `SOLD_OUT` met
+`field: NON_MEMBER_SEATS` (of `MEMBER_SEATS`). De code blijft `SOLD_OUT`, zodat
+de app er niets nieuws voor moet kennen.
+
+**Het maximum in de kop van de shop is wat je echt kan kopen.** Daar stond het
+maximum van het event (standaard 8), ook wanneer elk ticket er hoogstens 1
+toeliet; dat leek op een rekenfout. Nu staat er het kleinste van het
+eventmaximum en de som van de maxima per ticket, en een ticket dat strenger is,
+zegt zijn eigen maximum onder zijn naam (`orderLimit` in
+`components/ticketing/public/types.ts`).
+
+**Het aanmaakscherm vraagt geen code meer.** `STANDARD` of `TYPE_2` intikken
+diende nergens voor wie een event maakt: de code volgt nu uit de naam, en een
+ticket uit een sjabloon houdt de zijne, want de vragen van het sjabloon hangen
+eraan. Elk ticket is een kaart met gelabelde velden in plaats van een tabelrij
+(prijs en ledenprijs naast elkaar), met de eigen keuzelijsten van de site, en
+de plaatsen en het maximum per bestelling staan er meteen onder in plaats van
+verspreid over "Planning en verkoop".
 
 ## De e-mailhandtekening is een recht, geen ledenfunctie
 

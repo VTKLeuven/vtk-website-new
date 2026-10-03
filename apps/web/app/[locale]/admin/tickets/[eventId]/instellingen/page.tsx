@@ -43,7 +43,12 @@ export default async function TicketEventSettingsPage({
   const event = await prisma.ticketEvent.findUnique({
     where: { id: eventId },
     include: {
-      inventoryPools: { orderBy: { createdAt: "asc" } },
+      inventoryPools: {
+        orderBy: { createdAt: "asc" },
+        // Of de pot nog weg mag: zolang er geen ticket aan hangt en er nooit
+        // uit besteld is (ook een vervallen bestelling wijst ernaar).
+        include: { _count: { select: { ticketTypes: true, orderItems: true } } },
+      },
       ticketTypes: {
         include: {
           inventoryPool: true,

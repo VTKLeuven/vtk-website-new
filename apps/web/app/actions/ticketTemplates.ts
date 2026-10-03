@@ -13,9 +13,10 @@ import { readTicketDesignSettings } from "@/lib/ticketing/design";
 import {
   minutesBeforeFromDate,
   parseTemplateQuestions,
-  parseTemplateTypes,
+  parseTicketSetup,
   templateCode,
   templateDesign,
+  type TicketTemplatePool,
   type TicketTemplateQuestion,
   type TicketTemplateType,
 } from "@/lib/ticketing/templates";
@@ -108,10 +109,17 @@ const typeRows = (types: TicketTemplateType[]) =>
     color: type.color,
     minPerOrder: type.minPerOrder,
     maxPerOrder: type.maxPerOrder,
+    poolCode: type.poolCode,
     salesOpensMinutesBefore: type.salesOpensMinutesBefore,
     salesClosesMinutesBefore: type.salesClosesMinutesBefore,
     enabled: type.enabled,
   }));
+
+/** De potten zoals de JSON-kolom ze bewaart, en hun som voor het overzicht. */
+const poolColumns = (pools: TicketTemplatePool[]) => ({
+  pools: pools as unknown as Prisma.InputJsonValue,
+  capacity: pools.reduce((sum, pool) => sum + pool.capacity, 0),
+});
 
 const questionRows = (questions: TicketTemplateQuestion[]) =>
   questions.map((question, order) => ({
@@ -138,16 +146,19 @@ export async function saveTicketTemplateAction(
   if (label === "") return saveError("LABEL_REQUIRED");
 
   let typesPayload: unknown;
+  let poolsPayload: unknown;
   let questionsPayload: unknown;
   try {
     typesPayload = JSON.parse(text(formData.get("typesData")) || "null");
+    poolsPayload = JSON.parse(text(formData.get("poolsData")) || "null");
     questionsPayload = JSON.parse(text(formData.get("questionsData")) || "null");
   } catch {
     return saveError("INVALID_INPUT");
   }
 
-  const types = parseTemplateTypes(typesPayload);
-  if (typeof types === "string") return saveError("INVALID_TICKET_TYPE", `Niet opgeslagen. ${types}`);
+  const setup = parseTicketSetup(typesPayload, poolsPayload);
+  if (typeof setup === "string") return saveError("INVALID_TICKET_TYPE", `Niet opgeslagen. ${setup}`);
+  const { types, pools } = setup;
   // Een sjabloon zonder tickettype maakt een event dat niets verkoopt en niet
   // gepubliceerd kan worden; dat is geen zinvol vertrekpunt.
   if (types.length === 0) return saveError("NO_TICKET_TYPES");
@@ -199,7 +210,7 @@ export async function saveTicketTemplateAction(
     presaleHelpers: checkbox(formData.get("presaleHelpers")),
     confirmationMessageNl: text(formData.get("confirmationMessageNl")).slice(0, 5_000),
     confirmationMessageEn: text(formData.get("confirmationMessageEn")).slice(0, 5_000),
-    capacity: boundedInt(formData.get("capacity"), 100, 1, 1_000_000),
+    ...poolColumns(pools),
   };
 
   if (templateId) {
@@ -317,6 +328,22 @@ export async function saveTicketTemplateFromEventAction(
 
   const activeTypes = event.ticketTypes.filter((type) => type.active);
   if (activeTypes.length === 0) return saveError("NO_TICKET_TYPES");
+  // Enkel de potten waar een actief ticket aan hangt: een pot zonder ticket
+  // maakt in een nieuw event enkel plaatsen die niemand kan kopen.
+  const usedPools = event.inventoryPools.filter((pool) =>
+    activeTypes.some((type) => type.inventoryPoolId === pool.id)
+  );
+  const poolCodeById = new Map(
+    usedPools.map((pool, index) => [pool.id, templateCode(pool.code, `POOL_${index + 1}`)])
+  );
+  const templatePools: TicketTemplatePool[] = usedPools.map((pool) => ({
+    code: poolCodeById.get(pool.id)!,
+    nameNl: pool.nameNl,
+    nameEn: pool.nameEn ?? "",
+    capacity: pool.capacity,
+    memberCapacity: pool.memberCapacity,
+    nonMemberCapacity: pool.nonMemberCapacity,
+  }));
 
   const typeById = new Map(event.ticketTypes.map((type) => [type.id, type]));
   const design = templateDesign(readTicketDesignSettings(event.settings, event.id).draft);
@@ -361,7 +388,7 @@ export async function saveTicketTemplateFromEventAction(
       presaleHelpers: event.presaleHelpers,
       confirmationMessageNl: event.confirmationMessageNl ?? "",
       confirmationMessageEn: event.confirmationMessageEn ?? "",
-      capacity: event.inventoryPools[0]?.capacity ?? 100,
+      ...poolColumns(templatePools),
       design: (design ?? undefined) as Prisma.InputJsonValue | undefined,
       builtIn: false,
       order: await prisma.ticketEventTemplate.count(),
@@ -380,6 +407,7 @@ export async function saveTicketTemplateFromEventAction(
           color: type.color,
           minPerOrder: type.minPerOrder,
           maxPerOrder: type.maxPerOrder,
+          poolCode: poolCodeById.get(type.inventoryPoolId) ?? null,
           salesOpensMinutesBefore: minutesBeforeFromDate(startsAt, type.salesStartAt),
           salesClosesMinutesBefore: minutesBeforeFromDate(startsAt, type.salesEndAt),
           enabled: true,

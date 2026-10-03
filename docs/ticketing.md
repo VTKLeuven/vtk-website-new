@@ -612,7 +612,12 @@ webscanner blijft staan als webweg en als vangnet.
 ### Domain logic (`apps/web/lib/ticketing/`)
 - `orders.ts`: `createTicketCheckout`, `fulfillPaidOrder`, `expirePendingOrder`,
   `releaseExpiredOrders` (order lifecycle + gateway orchestration)
-- `inventory.ts`: capacity reservation (race-safe)
+- `inventory.ts`: capacity reservation (race-safe), including the caps for
+  members and non-members per pool
+- `seats.ts`: pure; what counts as a member seat (`isMemberSeat`) and what a
+  pool still has for members and non-members (`poolRemaining`). Shared by the
+  checkout, the shop queries and the admin. See "Plaatsen: potten met een
+  plafond voor leden" in `docs/design-decisions.md`
 - `refunds.ts`: `requestTicketRefund`, `completeTicketRefund`, `failTicketRefund`
 - `reconciliation.ts`: polls PENDING payments/refunds against the provider
 - `scanner.ts`: scan authorization + validation
@@ -645,7 +650,9 @@ webscanner blijft staan als webweg en als vangnet.
 - `public/TicketShop.tsx`: buyer checkout UI (quantity steppers, attendee form)
 - `public/TicketPass.tsx`: renders the QR from the ticket credential
 - `public/OrderStatus.tsx`, `TicketEventCard.tsx`, `AccessExchange.tsx`
-- `admin/TicketEventForm.tsx`, `TicketTypeManager.tsx`, `TicketQuestionManager.tsx`,
+- `admin/TicketEventForm.tsx`, `TicketSetupEditor.tsx` (tickets en plaatsen bij
+  het aanmaken en in sjablonen), `TicketTypeManager.tsx` (plaatsen en
+  tickettypes van een bestaand event), `TicketQuestionManager.tsx`,
   `RefundOrderForm.tsx`, `EventAdminNav.tsx`, `StatusBadge.tsx`, `AdminMetric.tsx`
 - `scanner/ScannerApp.tsx`: `@zxing/browser` camera scanner (rear camera)
 
@@ -672,14 +679,19 @@ die offsets om zodra er een dag gekozen is.
   `packages/db/src/ticketEventTemplates.ts` en wordt create-only geseed op zijn
   `slug`; `builtIn` maakt het bewerkbaar maar niet verwijderbaar.
 - Pure laag: `lib/ticketing/templates.ts` (types, offsets, `parseTemplateTypes`,
-  `parseTemplateQuestions`) — client én server. Lezen:
+  `parseTemplatePools`, `parseTicketSetup`, `parseTemplateQuestions`), client én
+  server. De potten van een sjabloon staan als JSON in
+  `TicketEventTemplate.pools` (leeg = één pot met `capacity`), en elk ticket
+  wijst er met `poolCode` naar. Lezen:
   `lib/ticketing/templateStore.ts` (server-only, met terugval op de meegeleverde
   sjablonen zolang de tabel leeg is).
 - Toepassen: `components/ticketing/admin/TicketEventCreate.tsx` op
   /admin/tickets/new. Je kiest een sjabloon en een **dag**; het formulier
   eronder wordt daarmee voorgevuld en blijft volledig aanpasbaar. De tickets
-  staan er als bewerkbare rijen (`TicketTemplateTypeRows`) en reizen als JSON in
-  één verborgen veld naar `createTicketEventAction`, zoals de shiftsjablonen.
+  en de plaatsen staan in `TicketSetupEditor` en reizen als JSON in twee
+  verborgen velden (`ticketTypesData`, `poolsData`) naar
+  `createTicketEventAction`, zoals de shiftsjablonen. Het sjabloonbeheer
+  gebruikt hetzelfde scherm.
   Wisselen van sjabloon of dag herbouwt het formulier (remount op `key`), met
   een bevestiging zodra er al iets ingevuld is.
 - De boekhoudcode van het sjabloon staat voorgevuld in het formulier, net als
@@ -695,9 +707,10 @@ die offsets om zodra er een dag gekozen is.
   `templateDesign()` houdt enkel de sjabloonkeuze, de kleuren en de footer over.
 - Beheren: /admin/tickets/sjablonen (`tickets.templates`), plus "Bewaar als
   sjabloon" op de instellingen van een bestaand event
-  (`saveTicketTemplateFromEventAction`): dat neemt de tickettypes, capaciteit,
-  vragen, teksten en instellingen over en rekent de datums terug naar offsets.
-- Tests: `apps/web/test/ticketTemplates.test.ts`, puur op `lib/ticketing/templates.ts`.
+  (`saveTicketTemplateFromEventAction`): dat neemt de tickettypes, de potten
+  met hun plafonds, vragen, teksten en instellingen over en rekent de datums terug naar offsets.
+- Tests: `apps/web/test/ticketTemplates.test.ts`, puur op `lib/ticketing/templates.ts`;
+  `ticketSeats.test.ts` voor de plaatsen per soort.
 
 ## Permissions
 

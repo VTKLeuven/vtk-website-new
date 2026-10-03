@@ -11,7 +11,7 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { PresaleFields } from "@/components/ticketing/admin/PresaleFields";
 import { SettingsPanel } from "@/components/ticketing/admin/SettingsPanel";
-import { TicketTemplateTypeRows } from "@/components/ticketing/admin/TicketTemplateTypeRows";
+import { TicketSetupEditor } from "@/components/ticketing/admin/TicketSetupEditor";
 import { formatMoney, type AdminLocale } from "@/components/ticketing/admin/format";
 import type { AccountingCodeOption } from "@/lib/accounting/codes";
 import { AccountingCodePicker } from "@/components/admin/AccountingCodePicker";
@@ -488,34 +488,6 @@ function TemplateEditor({
               value={template.salesClosesMinutesBefore}
               locale={locale}
             />
-            <div className="ticket-admin-field">
-              <label htmlFor={field("capacity")}>{nl ? "Capaciteit" : "Capacity"}</label>
-              <input
-                id={field("capacity")}
-                name="capacity"
-                type="number"
-                min="1"
-                defaultValue={template.capacity}
-              />
-              <span className="ticket-admin-help">
-                {nl
-                  ? "De totale capaciteit; alle tickets hieronder delen ze."
-                  : "The total capacity; all tickets below share it."}
-              </span>
-            </div>
-            <div className="ticket-admin-field">
-              <label htmlFor={field("max")}>
-                {nl ? "Maximum tickets per bestelling" : "Maximum tickets per order"}
-              </label>
-              <input
-                id={field("max")}
-                name="maxTicketsPerOrder"
-                type="number"
-                min="1"
-                max="50"
-                defaultValue={template.maxTicketsPerOrder}
-              />
-            </div>
             {/* Dezelfde regel als op het event zelf, met één verschil: daar
                 rekent ze de voorverkoop om naar een klokuur, en hier bestaat
                 de verkoopstart nog niet als datum. Vandaar `salesStartLocal`
@@ -560,7 +532,7 @@ function TemplateEditor({
         </SettingsPanel>
 
         <SettingsPanel
-          title={nl ? "Tickets" : "Tickets"}
+          title={nl ? "Tickets en plaatsen" : "Tickets and places"}
           status={`${activeTypes.length} ticket${activeTypes.length === 1 ? "" : "s"}`}
           icon={<Ticket aria-hidden="true" size={17} />}
           defaultOpen
@@ -570,11 +542,14 @@ function TemplateEditor({
               ? "Deze rijen worden de tickettypes van een nieuw event; daar blijft alles aanpasbaar."
               : "These rows become the ticket types of a new event, where everything stays editable."}
           </p>
-          <TicketTemplateTypeRows
-            name="typesData"
-            initial={template.types}
+          <TicketSetupEditor
+            typesName="typesData"
+            poolsName="poolsData"
+            initialTypes={template.types}
+            initialPools={template.pools}
+            orderMax={{ name: "maxTicketsPerOrder", defaultValue: template.maxTicketsPerOrder }}
+            mode="template"
             locale={locale}
-            showOffsets
           />
           <input type="hidden" name="questionsData" value={JSON.stringify(template.questions)} />
           {template.questions.length > 0 ? (

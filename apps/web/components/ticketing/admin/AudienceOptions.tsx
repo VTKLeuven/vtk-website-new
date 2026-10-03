@@ -2,6 +2,7 @@ import {
   TICKET_TARGET_AUDIENCES,
   ticketAudienceLabel,
 } from "@/lib/ticketing/audience";
+import type { ThemedSelectOption } from "@/components/ui/ThemedSelect";
 
 /**
  * De keuzes voor "wie mag dit ticket kopen?", gedeeld door het ticketformulier,
@@ -33,4 +34,25 @@ export function AudienceOptions({
       </optgroup>
     </>
   );
+}
+
+/**
+ * Dezelfde keuzes voor `ThemedSelect`, met de doelgroepen onder hun eigen kop.
+ */
+export function audienceSelectOptions(
+  locale: "nl" | "en",
+  publicLabel?: string,
+): ThemedSelectOption[] {
+  const nl = locale === "nl";
+  const group = nl ? "Doelgroep (uit het profiel)" : "Target group (from the profile)";
+  return [
+    { value: "PUBLIC", label: publicLabel ?? ticketAudienceLabel("PUBLIC", locale) },
+    { value: "MEMBERS", label: ticketAudienceLabel("MEMBERS", locale) },
+    { value: "HONORARY", label: ticketAudienceLabel("HONORARY", locale) },
+    ...TICKET_TARGET_AUDIENCES.map((audience) => ({
+      value: audience,
+      label: ticketAudienceLabel(audience, locale),
+      group,
+    })),
+  ];
 }

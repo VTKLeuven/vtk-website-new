@@ -26,8 +26,11 @@ import {
   formatTicketPrice,
   maximumSelectableForLine,
   nextTicketQuantity,
+  orderLimit,
   quantitiesByTicketType,
+  ticketLineRemaining,
   ticketLinesForType,
+  ticketTypeRemaining,
   type SerializedTicketEvent,
   type TicketLine,
   type TicketQuestion,
@@ -49,6 +52,8 @@ type CheckoutResponse = {
   url?: string;
   checkout?: { url?: string };
   error?: string;
+  /** Bij SOLD_OUT: `MEMBER_SEATS` of `NON_MEMBER_SEATS` wanneer enkel dat plafond vol zit. */
+  field?: string;
   message?: string;
 };
 
@@ -78,7 +83,22 @@ export function attendeesForQuantity(
   });
 }
 
-function checkoutErrorMessage(code: string | undefined, locale: "nl" | "en"): string {
+function checkoutErrorMessage(
+  code: string | undefined,
+  locale: "nl" | "en",
+  field?: string,
+): string {
+  // Het event zit niet vol, enkel de plaatsen voor leden of voor niet-leden.
+  if (code === "SOLD_OUT" && field === "MEMBER_SEATS") {
+    return locale === "nl"
+      ? "De plaatsen voor leden zijn net op. Er zijn enkel nog tickets voor niet-leden."
+      : "The places for members have just run out. Only tickets for non-members are left.";
+  }
+  if (code === "SOLD_OUT" && field === "NON_MEMBER_SEATS") {
+    return locale === "nl"
+      ? "De plaatsen voor niet-leden zijn net op. Er zijn enkel nog tickets voor leden."
+      : "The places for non-members have just run out. Only tickets for members are left.";
+  }
   const messages: Record<string, { nl: string; en: string }> = {
     EVENT_NOT_ON_SALE: { nl: "De ticketverkoop is niet geopend.", en: "Ticket sales are not open." },
     INVALID_TICKET_TYPE: { nl: "Een gekozen tickettype is niet meer beschikbaar.", en: "A selected ticket type is no longer available." },
@@ -251,6 +271,7 @@ function QuestionField({
 /** Onder dit aantal zegt de shop hoeveel er nog zijn; daarboven helpt het getal niemand kiezen. */
 const LOW_STOCK = 20;
 
+
 function TicketStepper({
   label,
   quantity,
@@ -377,6 +398,9 @@ export function TicketShop({
     [event.ticketTypes],
   );
   const lines = useMemo(() => activeTypes.flatMap(ticketLinesForType), [activeTypes]);
+  // Wat één bestelling hier echt kan tellen: het maximum van het event, of
+  // minder wanneer de tickets elk een lager maximum hebben.
+  const limit = orderLimit(activeTypes, event.maxTicketsPerOrder);
   const selectedCount = useMemo(
     () => Object.values(quantities).reduce((sum, quantity) => sum + quantity, 0),
     [quantities],
@@ -479,7 +503,7 @@ export function TicketShop({
       });
       const payload = (await response.json().catch(() => ({}))) as CheckoutResponse;
       if (!response.ok) {
-        throw new Error(payload.message ?? checkoutErrorMessage(payload.error, locale));
+        throw new Error(payload.message ?? checkoutErrorMessage(payload.error, locale, payload.field));
       }
 
       const checkoutUrl = payload.checkoutUrl ?? payload.url ?? payload.checkout?.url;
@@ -509,7 +533,7 @@ export function TicketShop({
   function renderLineControl(line: TicketLine) {
     const { type } = line;
     const quantity = quantities[line.key] ?? 0;
-    const soldOut = type.available < 1;
+    const soldOut = ticketLineRemaining(line) < 1;
     const typeBeforeSales = type.salesStart ? new Date(type.salesStart).getTime() > now : false;
     const typeAfterSales = type.salesEnd ? new Date(type.salesEnd).getTime() <= now : false;
     const typeSalesOpen = preview || (salesOpen && !typeBeforeSales && !typeAfterSales);
@@ -551,7 +575,8 @@ export function TicketShop({
     const typeAfterSales = type.salesEnd ? new Date(type.salesEnd).getTime() <= now : false;
     // Is de verkoop van het hele event nog dicht, dan zegt de melding bovenaan
     // dat al één keer; hier enkel wat voor dit type anders is.
-    const note = !salesOpen || type.available < 1
+    const remaining = ticketTypeRemaining(type);
+    const note = !salesOpen || remaining < 1
       ? null
       : typeBeforeSales && !preview
         ? locale === "nl"
@@ -560,16 +585,34 @@ export function TicketShop({
         : typeAfterSales && !preview
           ? locale === "nl" ? "Verkoop gesloten" : "Sales closed"
           : null;
-    const low = type.available > 0 && type.available <= LOW_STOCK;
+    const low = remaining > 0 && remaining <= LOW_STOCK;
+    // Enkel wanneer dit ticket strenger is dan de kop: die zegt al hoeveel er
+    // samen in één bestelling passen.
+    const typeLimit = type.maxPerOrder ?? event.maxTicketsPerOrder;
+    const maximum = typeLimit < limit
+      ? locale === "nl"
+        ? `Max. ${typeLimit} per bestelling`
+        : `Max. ${typeLimit} per order`
+      : null;
+    // Uitverkocht voor deze bezoeker, terwijl de pot nog plaatsen heeft: dan
+    // zit het plafond van zijn soort vol, en "uitverkocht" alleen zou liegen
+    // tegen wie de andere soort is.
+    const seatsGone = salesOpen && remaining < 1 && (type.poolAvailable ?? 0) > 0
+      ? type.seat === "MEMBER"
+        ? locale === "nl" ? "De plaatsen voor leden zijn op." : "The places for members are gone."
+        : locale === "nl" ? "De plaatsen voor niet-leden zijn op." : "The places for non-members are gone."
+      : null;
 
-    if (!type.description && !note && !low) return null;
+    if (!type.description && !note && !low && !maximum && !seatsGone) return null;
     return (
       <p className="tshop-type-note">
         {type.description ? <span>{type.description}</span> : null}
         {note ? <span>{note}</span> : null}
+        {seatsGone ? <span>{seatsGone}</span> : null}
+        {maximum ? <span>{maximum}</span> : null}
         {low ? (
           <span className="tshop-pill" data-tone="low">
-            {locale === "nl" ? `Nog ${type.available}` : `${type.available} left`}
+            {locale === "nl" ? `Nog ${remaining}` : `${remaining} left`}
           </span>
         ) : null}
       </p>
@@ -751,8 +794,8 @@ export function TicketShop({
             {lines.length > 0 ? (
               <small>
                 {locale === "nl"
-                  ? `Max. ${event.maxTicketsPerOrder} per bestelling`
-                  : `Max. ${event.maxTicketsPerOrder} per order`}
+                  ? `Max. ${limit} per bestelling`
+                  : `Max. ${limit} per order`}
               </small>
             ) : null}
           </div>

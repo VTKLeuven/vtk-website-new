@@ -1,6 +1,8 @@
 "use client";
 
-import { AudienceOptions } from "./AudienceOptions";
+import { audienceSelectOptions } from "./AudienceOptions";
+import { ThemedSelect } from "@/components/ui/ThemedSelect";
+import { poolSellableCapacity, poolTaken } from "@/lib/ticketing/seats";
 import {
   ticketAudienceFrom,
   ticketAudienceHelp,
@@ -10,7 +12,9 @@ import {
 import { useRef, useState, useTransition } from "react";
 import {
   archiveTicketTypeAction,
+  createInventoryPoolAction,
   createTicketTypeAction,
+  deleteInventoryPoolAction,
   deleteTicketTypeAction,
   reorderTicketTypesAction,
   saveTicketTypeAction,
@@ -20,7 +24,6 @@ import {
   Archive,
   Package,
   Plus,
-  Save,
   Ticket,
   Trash2,
   TriangleAlert,
@@ -41,8 +44,110 @@ type InventoryPool = {
   capacity: number;
   reservedCount: number;
   soldCount: number;
+  memberCapacity: number | null;
+  nonMemberCapacity: number | null;
+  memberReservedCount: number;
+  memberSoldCount: number;
   active: boolean;
+  _count?: { ticketTypes: number; orderItems: number };
 };
+
+const poolErrorMessages = (nl: boolean): Record<string, string> => ({
+  NAME_REQUIRED: nl ? "Niet opgeslagen: geef deze plaatsen een naam." : "Not saved: give these places a name.",
+  INVALID_CAPACITY: nl
+    ? "Niet opgeslagen: het aantal plaatsen moet een geheel getal zijn."
+    : "Not saved: the number of places must be a whole number.",
+  CAPACITY_BELOW_ALLOCATED: nl
+    ? "Niet opgeslagen: er zijn al meer plaatsen verkocht of gereserveerd dan dat aantal."
+    : "Not saved: more places have already been sold or reserved than that number.",
+  INVALID_SEAT_CAPS: nl
+    ? "Niet opgeslagen: het maximum voor leden of niet-leden ligt tussen 0 en het aantal plaatsen."
+    : "Not saved: the maximum for members or non-members lies between 0 and the number of places.",
+  POOL_NOT_FOUND: nl ? "Niet opgeslagen: deze plaatsen bestaan niet meer." : "Not saved: these places no longer exist.",
+});
+
+/**
+ * Het vinkje "apart maximum voor leden en niet-leden" met de twee velden die
+ * het opent. Uit stuurt de server "geen plafond", ook als er nog een getal
+ * stond: wat je niet ziet, hoort niet mee te tellen.
+ */
+function SeatCapsFields({
+  idPrefix,
+  pool,
+  locale,
+}: {
+  idPrefix: string;
+  pool?: Pick<InventoryPool, "capacity" | "memberCapacity" | "nonMemberCapacity">;
+  locale: AdminLocale;
+}) {
+  const nl = locale === "nl";
+  const [open, setOpen] = useState(
+    pool ? pool.memberCapacity !== null || pool.nonMemberCapacity !== null : false
+  );
+  return (
+    <>
+      <label className="ticket-admin-check" htmlFor={`${idPrefix}-caps`} data-span="2">
+        <input type="hidden" name="seatCaps" value="false" />
+        <input
+          id={`${idPrefix}-caps`}
+          type="checkbox"
+          name="seatCaps"
+          value="true"
+          checked={open}
+          onChange={(changed) => setOpen(changed.target.checked)}
+        />
+        {nl ? "Apart maximum voor leden en niet-leden" : "Separate maximum for members and non-members"}
+      </label>
+      {open ? (
+        <>
+          <div className="ticket-admin-field">
+            <label htmlFor={`${idPrefix}-members`}>{nl ? "Hoogstens voor leden" : "At most for members"}</label>
+            <input
+              id={`${idPrefix}-members`}
+              name="memberCapacity"
+              type="number"
+              min="0"
+              defaultValue={pool?.memberCapacity ?? ""}
+              placeholder={nl ? "geen grens" : "no limit"}
+            />
+          </div>
+          <div className="ticket-admin-field">
+            <label htmlFor={`${idPrefix}-nonmembers`}>
+              {nl ? "Hoogstens voor niet-leden" : "At most for non-members"}
+            </label>
+            <input
+              id={`${idPrefix}-nonmembers`}
+              name="nonMemberCapacity"
+              type="number"
+              min="0"
+              defaultValue={pool?.nonMemberCapacity ?? ""}
+              placeholder={nl ? "geen grens" : "no limit"}
+            />
+          </div>
+          <span className="ticket-admin-help" data-span="2">
+            {nl
+              ? "Leeg is geen eigen grens. Een ticket telt voor leden wanneer een lid het koopt, behalve aan de gewone prijs van een ticket met ledenprijs: dat is voor een niet-lid. Een grens onder wat al verkocht is, stopt enkel de verdere verkoop aan die groep."
+              : "Empty means no separate limit. A ticket counts for members when a member buys it, except at the regular price of a ticket with a member price: that one is for a non-member. A limit below what has been sold only stops further sales to that group."}
+          </span>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+/** "32 leden · 8 niet-leden (hoogstens 20)", voor onder de voortgangsbalk. */
+function seatSplit(pool: InventoryPool, locale: AdminLocale): string | null {
+  const nl = locale === "nl";
+  const taken = poolTaken(pool);
+  const hasCaps = pool.memberCapacity !== null || pool.nonMemberCapacity !== null;
+  if (!hasCaps) return null;
+  const part = (count: number, cap: number | null, word: string) =>
+    `${count} ${word}${cap === null ? "" : ` ${nl ? "van hoogstens" : "of at most"} ${cap}`}`;
+  return [
+    part(taken.member, pool.memberCapacity, nl ? "leden" : "members"),
+    part(taken.nonMember, pool.nonMemberCapacity, nl ? "niet-leden" : "non-members"),
+  ].join(" · ");
+}
 
 type TicketType = {
   id: string;
@@ -144,11 +249,13 @@ function guestCanBuy(ticketType: TicketType): boolean {
 function TicketTypeEditPanel({
   eventId,
   ticketType,
+  pools,
   guestBuyableElsewhere,
   locale,
 }: {
   eventId: string;
   ticketType: TicketType;
+  pools: InventoryPool[];
   guestBuyableElsewhere: boolean;
   locale: AdminLocale;
 }) {
@@ -195,6 +302,10 @@ function TicketTypeEditPanel({
               locale === "nl"
                 ? "Niet opgeslagen: de ledenprijs moet lager zijn dan de gewone prijs."
                 : "Not saved: the member price must be lower than the regular price.",
+            POOL_NOT_FOUND:
+              locale === "nl"
+                ? "Niet opgeslagen: de gekozen plaatsen bestaan niet meer."
+                : "Not saved: the chosen places no longer exist.",
           }}
           fallbackErrorMessage={
             locale === "nl" ? "Tickettype niet opgeslagen." : "Ticket type was not saved."
@@ -311,14 +422,13 @@ function TicketTypeEditPanel({
             <label htmlFor={`ticket-type-${ticketType.id}-audience`}>
               {locale === "nl" ? "Wie mag dit ticket kopen?" : "Who may buy this ticket?"}
             </label>
-            <select
+            <ThemedSelect
               id={`ticket-type-${ticketType.id}-audience`}
               name="audience"
+              options={audienceSelectOptions(locale)}
               value={audience}
-              onChange={(event) => setAudience(event.target.value as TicketAudience)}
-            >
-              <AudienceOptions locale={locale} />
-            </select>
+              onChange={(value) => setAudience(value as TicketAudience)}
+            />
             <span className="ticket-admin-help">{ticketAudienceHelp(audience, locale)}</span>
             {freeAndPublic || closesShopForGuests ? (
               <div className="ticket-admin-alert">
@@ -342,6 +452,29 @@ function TicketTypeEditPanel({
               </span>
             ) : null}
           </div>
+          {pools.length > 1 ? (
+            <div className="ticket-admin-field">
+              <label htmlFor={`ticket-type-${ticketType.id}-pool`}>
+                {locale === "nl" ? "Gaat af van de plaatsen" : "Takes from the places"}
+              </label>
+              <ThemedSelect
+                id={`ticket-type-${ticketType.id}-pool`}
+                name="inventoryPoolId"
+                options={pools.map((pool) => ({
+                  value: pool.id,
+                  label: locale === "en" && pool.nameEn ? pool.nameEn : pool.nameNl,
+                }))}
+                defaultValue={ticketType.inventoryPool.id}
+              />
+              {orderedTickets > 0 ? (
+                <span className="ticket-admin-help">
+                  {locale === "nl"
+                    ? "Wat al besteld is, blijft tellen bij de plaatsen waar het van afging."
+                    : "What has been ordered keeps counting against the places it came from."}
+                </span>
+              ) : null}
+            </div>
+          ) : null}
           <TicketColorChoice
             idPrefix={`ticket-type-${ticketType.id}`}
             value={ticketType.color}
@@ -407,8 +540,8 @@ export function TicketTypeManager({
     : capacity === 1 ? "place" : "places";
   const inventoryStatus =
     pools.length === 0
-      ? nl ? "Geen voorraadpool" : "No inventory pool"
-      : `${capacity} ${places} · ${taken} ${nl ? "bezet" : "taken"}`;
+      ? nl ? "Nog geen plaatsen" : "No places yet"
+      : `${capacity} ${places}${pools.length > 1 ? ` ${nl ? "in" : "in"} ${pools.length} ${nl ? "delen" : "parts"}` : ""} · ${taken} ${nl ? "bezet" : "taken"}`;
   const activeCount = items.filter((ticketType) => ticketType.active).length;
   const typesStatus = nl
     ? `${activeCount} actief${items.length > activeCount ? ` · ${items.length - activeCount} gearchiveerd` : ""}`
@@ -438,29 +571,58 @@ export function TicketTypeManager({
   return (
     <>
       <SettingsPanel
-        title={locale === "nl" ? "Voorraad" : "Inventory"}
+        title={nl ? "Plaatsen" : "Places"}
         status={inventoryStatus}
         icon={<Package aria-hidden="true" size={17} />}
       >
+        <p className="ticket-admin-help">
+          {pools.length > 1
+            ? nl
+              ? "Elk ticket gaat af van de plaatsen die erbij gekozen zijn (bij Tickettypes)."
+              : "Each ticket takes from the places chosen for it (under Ticket types)."
+            : nl
+              ? "Alle tickets delen deze plaatsen. Heb je een apart aantal nodig voor bepaalde tickets (bv. proffen naast studenten), voeg dan plaatsen toe en kies ze bij dat ticket."
+              : "All tickets share these places. Need a separate number for some tickets (e.g. professors next to students)? Add places and pick them on that ticket."}
+        </p>
         {pools.length === 0 ? (
           <div className="ticket-admin-alert">
-            {locale === "nl"
-              ? "Er is nog geen voorraadpool. Maak het event opnieuw aan of laat een beheerder de initiële pool toevoegen."
-              : "There is no inventory pool yet. Recreate the event or ask an administrator to add the initial pool."}
+            {nl
+              ? "Er zijn nog geen plaatsen. Voeg ze hieronder toe."
+              : "There are no places yet. Add them below."}
           </div>
         ) : (
           <ul className="ticket-admin-list">
             {pools.map((pool) => {
               const occupied = Math.min(pool.capacity, pool.soldCount + pool.reservedCount);
               const percentage = pool.capacity > 0 ? Math.round((occupied / pool.capacity) * 100) : 0;
+              const split = seatSplit(pool, locale);
+              const sellable = poolSellableCapacity(pool);
+              const poolName = locale === "en" && pool.nameEn ? pool.nameEn : pool.nameNl;
+              const typesInPool = items.filter((ticketType) => ticketType.inventoryPool.id === pool.id);
+              const deletable =
+                (pool._count?.ticketTypes ?? typesInPool.length) === 0 &&
+                (pool._count?.orderItems ?? 1) === 0;
               return (
                 <li key={pool.id}>
                   <div className="ticket-admin-row-head">
                     <div>
                       <p className="ticket-admin-row-title">
-                        {locale === "en" && pool.nameEn ? pool.nameEn : pool.nameNl}
+                        {poolName}
+                        {!pool.active ? (
+                          <span className="ticket-admin-status" data-tone="neutral">
+                            {nl ? "Uit" : "Off"}
+                          </span>
+                        ) : null}
                       </p>
-                      <p className="ticket-admin-row-meta ticket-admin-code">{pool.code}</p>
+                      <p className="ticket-admin-row-meta">
+                        {typesInPool.length === 0
+                          ? nl ? "Nog geen ticket" : "No ticket yet"
+                          : typesInPool
+                              .map((ticketType) =>
+                                locale === "en" && ticketType.nameEn ? ticketType.nameEn : ticketType.nameNl
+                              )
+                              .join(", ")}
+                      </p>
                     </div>
                     <strong>
                       {pool.soldCount} / {pool.capacity}
@@ -470,53 +632,137 @@ export function TicketTypeManager({
                     <span style={{ width: `${percentage}%` }} />
                   </div>
                   <p className="ticket-admin-row-meta">
-                    {pool.reservedCount} {locale === "nl" ? "tijdelijk gereserveerd" : "temporarily reserved"}
+                    {pool.reservedCount} {nl ? "tijdelijk gereserveerd" : "temporarily reserved"}
+                    {split ? ` · ${split}` : ""}
+                    {sellable < pool.capacity
+                      ? nl
+                        ? ` · samen maar ${sellable} te verkopen`
+                        : ` · only ${sellable} sellable together`
+                      : ""}
                   </p>
-                  <details className="ticket-admin-details">
-                    <summary className="ticket-admin-pill-summary">{locale === "nl" ? "Capaciteit aanpassen" : "Edit capacity"}</summary>
-                    <div className="ticket-admin-details-body">
-                      <form action={updateInventoryPoolAction} className="ticket-admin-form">
-                        <input type="hidden" name="locale" value={locale} />
-                        <input type="hidden" name="eventId" value={eventId} />
-                        <input type="hidden" name="poolId" value={pool.id} />
-                        <div className="ticket-admin-form-grid">
-                          <div className="ticket-admin-field">
-                            <label htmlFor={`pool-name-nl-${pool.id}`}>Naam (NL)</label>
-                            <input id={`pool-name-nl-${pool.id}`} name="nameNl" defaultValue={pool.nameNl} required />
+                  <div className="ticket-admin-row-actions">
+                    <details className="ticket-admin-details">
+                      <summary className="ticket-admin-pill-summary">
+                        {nl ? "Plaatsen aanpassen" : "Edit places"}
+                      </summary>
+                      <div className="ticket-admin-details-body">
+                        <SaveForm
+                          action={updateInventoryPoolAction}
+                          className="ticket-admin-form"
+                          resetOnSuccess={false}
+                          submitLabel={nl ? "Plaatsen opslaan" : "Save places"}
+                          savingLabel={nl ? "Opslaan" : "Saving"}
+                          savedMessage={nl ? "Plaatsen opgeslagen." : "Places saved."}
+                          errorMessages={poolErrorMessages(nl)}
+                          fallbackErrorMessage={nl ? "Plaatsen niet opgeslagen." : "Places were not saved."}
+                        >
+                          <input type="hidden" name="locale" value={locale} />
+                          <input type="hidden" name="eventId" value={eventId} />
+                          <input type="hidden" name="poolId" value={pool.id} />
+                          <div className="ticket-admin-form-grid">
+                            <div className="ticket-admin-field">
+                              <label htmlFor={`pool-name-nl-${pool.id}`}>Naam (NL)</label>
+                              <input id={`pool-name-nl-${pool.id}`} name="nameNl" defaultValue={pool.nameNl} required />
+                            </div>
+                            <div className="ticket-admin-field">
+                              <label htmlFor={`pool-name-en-${pool.id}`}>Naam (EN)</label>
+                              <input id={`pool-name-en-${pool.id}`} name="nameEn" defaultValue={pool.nameEn ?? ""} />
+                            </div>
+                            <div className="ticket-admin-field">
+                              <label htmlFor={`pool-capacity-${pool.id}`}>{nl ? "Aantal plaatsen" : "Number of places"}</label>
+                              <input
+                                id={`pool-capacity-${pool.id}`}
+                                name="capacity"
+                                type="number"
+                                min={pool.soldCount + pool.reservedCount}
+                                defaultValue={pool.capacity}
+                                required
+                              />
+                            </div>
+                            <SeatCapsFields idPrefix={`pool-${pool.id}`} pool={pool} locale={locale} />
                           </div>
-                          <div className="ticket-admin-field">
-                            <label htmlFor={`pool-name-en-${pool.id}`}>Naam (EN)</label>
-                            <input id={`pool-name-en-${pool.id}`} name="nameEn" defaultValue={pool.nameEn ?? ""} />
-                          </div>
-                          <div className="ticket-admin-field">
-                            <label htmlFor={`pool-capacity-${pool.id}`}>{locale === "nl" ? "Capaciteit" : "Capacity"}</label>
-                            <input
-                              id={`pool-capacity-${pool.id}`}
-                              name="capacity"
-                              type="number"
-                              min={pool.soldCount + pool.reservedCount}
-                              defaultValue={pool.capacity}
-                              required
-                            />
-                          </div>
-                        </div>
-                        <label className="ticket-admin-check">
-                          <input type="checkbox" name="active" value="true" defaultChecked={pool.active} />
-                          <input type="hidden" name="active" value="false" />
-                          {locale === "nl" ? "Pool actief" : "Pool active"}
-                        </label>
-                        <button className="ticket-admin-button" type="submit">
-                          <Save aria-hidden="true" size={15} />
-                          {locale === "nl" ? "Voorraad opslaan" : "Save inventory"}
-                        </button>
-                      </form>
-                    </div>
-                  </details>
+                          <label className="ticket-admin-check">
+                            <input type="hidden" name="active" value="false" />
+                            <input type="checkbox" name="active" value="true" defaultChecked={pool.active} />
+                            {nl ? "Plaatsen actief" : "Places active"}
+                          </label>
+                        </SaveForm>
+                      </div>
+                    </details>
+                    {deletable ? (
+                      <DangerActionButton
+                        action={deleteInventoryPoolAction}
+                        fields={{ locale, eventId, poolId: pool.id }}
+                        label={nl ? "Verwijderen" : "Delete"}
+                        icon={<Trash2 aria-hidden="true" size={15} />}
+                        title={nl ? "Plaatsen verwijderen?" : "Delete places?"}
+                        description={
+                          nl
+                            ? `"${poolName}" (${pool.capacity} plaatsen) verdwijnt uit dit event. Er hangt geen ticket aan en er is nooit uit besteld, dus er gaat niets verloren. De andere plaatsen en tickets blijven staan.`
+                            : `"${poolName}" (${pool.capacity} places) is removed from this event. No ticket uses it and nothing was ever ordered from it, so nothing is lost. The other places and tickets stay.`
+                        }
+                        confirmLabel={nl ? "Verwijderen" : "Delete"}
+                        cancelLabel={nl ? "Annuleren" : "Cancel"}
+                        successMessage={nl ? "Plaatsen verwijderd." : "Places deleted."}
+                        errorMessages={{
+                          POOL_HAS_TICKET_TYPES: nl
+                            ? "Niet verwijderd: er hangt intussen een ticket aan. Kies bij dat ticket eerst andere plaatsen."
+                            : "Not deleted: a ticket uses these places now. Pick other places on that ticket first.",
+                          POOL_HAS_ORDERS: nl
+                            ? "Niet verwijderd: er is al uit deze plaatsen besteld."
+                            : "Not deleted: tickets have been ordered from these places.",
+                          POOL_NOT_FOUND: nl ? "Deze plaatsen bestaan niet meer." : "These places no longer exist.",
+                        }}
+                        fallbackErrorMessage={nl ? "Plaatsen niet verwijderd." : "Places were not deleted."}
+                      />
+                    ) : null}
+                  </div>
                 </li>
               );
             })}
           </ul>
         )}
+
+        <div className="ticket-admin-add-type-wrap">
+          <details className="ticket-admin-details" open={pools.length === 0}>
+            <summary className="ticket-admin-pill-summary">
+              {nl ? "Plaatsen toevoegen" : "Add places"}
+            </summary>
+            <div className="ticket-admin-details-body">
+              <SaveForm
+                action={createInventoryPoolAction}
+                className="ticket-admin-form"
+                submitLabel={nl ? "Plaatsen toevoegen" : "Add places"}
+                savingLabel={nl ? "Toevoegen" : "Adding"}
+                savedMessage={
+                  nl
+                    ? "Plaatsen toegevoegd. Kies ze bij een ticket onder Tickettypes."
+                    : "Places added. Pick them on a ticket under Ticket types."
+                }
+                errorMessages={poolErrorMessages(nl)}
+                fallbackErrorMessage={nl ? "Plaatsen niet toegevoegd." : "Places were not added."}
+              >
+                <input type="hidden" name="locale" value={locale} />
+                <input type="hidden" name="eventId" value={eventId} />
+                <div className="ticket-admin-form-grid">
+                  <div className="ticket-admin-field">
+                    <label htmlFor="pool-new-name-nl">Naam (NL)</label>
+                    <input id="pool-new-name-nl" name="nameNl" placeholder={nl ? "Proffen" : "Professors"} required />
+                  </div>
+                  <div className="ticket-admin-field">
+                    <label htmlFor="pool-new-name-en">Naam (EN)</label>
+                    <input id="pool-new-name-en" name="nameEn" />
+                  </div>
+                  <div className="ticket-admin-field">
+                    <label htmlFor="pool-new-capacity">{nl ? "Aantal plaatsen" : "Number of places"}</label>
+                    <input id="pool-new-capacity" name="capacity" type="number" min="1" required />
+                  </div>
+                  <SeatCapsFields idPrefix="pool-new" locale={locale} />
+                </div>
+              </SaveForm>
+            </div>
+          </details>
+        </div>
       </SettingsPanel>
 
       <SettingsPanel
@@ -583,7 +829,7 @@ export function TicketTypeManager({
                         {ticketType.audience === "PUBLIC" && ticketType.memberPriceCents != null
                           ? ` (${locale === "nl" ? "leden" : "members"} ${formatMoney(ticketType.memberPriceCents, ticketType.currency, locale)})`
                           : ""}{" "}
-                        · {ticketType.inventoryPool.nameNl} · {audienceLabel(ticketType.audience, locale)}
+                        {pools.length > 1 ? ` · ${ticketType.inventoryPool.nameNl}` : ""} · {audienceLabel(ticketType.audience, locale)}
                       </p>
                       <p className="ticket-admin-row-meta ticket-admin-inline-meta">
                         <UsersRound aria-hidden="true" size={13} />
@@ -642,6 +888,7 @@ export function TicketTypeManager({
                 <TicketTypeEditPanel
                   eventId={eventId}
                   ticketType={ticketType}
+                  pools={pools}
                   guestBuyableElsewhere={items.some(
                     (other) => other.id !== ticketType.id && guestCanBuy(other)
                   )}
@@ -662,8 +909,8 @@ export function TicketTypeManager({
             {activePools.length === 0 ? (
               <div className="ticket-admin-alert">
                 {locale === "nl"
-                  ? "Activeer eerst een voorraadpool."
-                  : "Activate an inventory pool first."}
+                  ? "Zet eerst plaatsen aan, of voeg ze toe onder Plaatsen."
+                  : "Turn on places first, or add them under Places."}
               </div>
             ) : (
               <SaveForm
@@ -706,20 +953,23 @@ export function TicketTypeManager({
                     <label htmlFor="ticket-type-name-en">Naam (EN)</label>
                     <input id="ticket-type-name-en" name="nameEn" />
                   </div>
-                  <div className="ticket-admin-field">
-                    <label htmlFor="ticket-type-code">Code</label>
-                    <input id="ticket-type-code" name="code" placeholder="STANDARD" required />
-                  </div>
-                  <div className="ticket-admin-field">
-                    <label htmlFor="ticket-type-pool">{locale === "nl" ? "Voorraadpool" : "Inventory pool"}</label>
-                    <select id="ticket-type-pool" name="inventoryPoolId" defaultValue={activePools[0]?.id} required>
-                      {activePools.map((pool) => (
-                        <option key={pool.id} value={pool.id}>
-                          {locale === "en" && pool.nameEn ? pool.nameEn : pool.nameNl}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
+                  {activePools.length > 1 ? (
+                    <div className="ticket-admin-field">
+                      <label htmlFor="ticket-type-pool">{nl ? "Gaat af van de plaatsen" : "Takes from the places"}</label>
+                      <ThemedSelect
+                        id="ticket-type-pool"
+                        name="inventoryPoolId"
+                        options={activePools.map((pool) => ({
+                          value: pool.id,
+                          label: locale === "en" && pool.nameEn ? pool.nameEn : pool.nameNl,
+                        }))}
+                        defaultValue={activePools.at(-1)?.id}
+                        required
+                      />
+                    </div>
+                  ) : (
+                    <input type="hidden" name="inventoryPoolId" value={activePools[0]?.id ?? ""} />
+                  )}
                   <div className="ticket-admin-field">
                     <label htmlFor="ticket-type-price">
                       {locale === "nl" ? `Prijs per ticket (${currency})` : `Price per ticket (${currency})`}
@@ -737,14 +987,13 @@ export function TicketTypeManager({
                   />
                   <div className="ticket-admin-field" data-span="2">
                     <label htmlFor="ticket-type-audience">{locale === "nl" ? "Wie mag dit ticket kopen?" : "Who may buy this ticket?"}</label>
-                    <select
+                    <ThemedSelect
                       id="ticket-type-audience"
                       name="audience"
+                      options={audienceSelectOptions(locale)}
                       value={newAudience}
-                      onChange={(event) => setNewAudience(event.target.value as TicketAudience)}
-                    >
-                      <AudienceOptions locale={locale} />
-                    </select>
+                      onChange={(value) => setNewAudience(value as TicketAudience)}
+                    />
                     <span className="ticket-admin-help">{ticketAudienceHelp(newAudience, locale)}</span>
                   </div>
                   <div className="ticket-admin-field" data-span="2">

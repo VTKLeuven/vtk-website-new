@@ -48,12 +48,44 @@ export type TicketTemplateType = {
   color: string;
   minPerOrder: number;
   maxPerOrder: number;
+  /** De pot waar dit ticket van afgaat, op code; null = de eerste pot. */
+  poolCode: string | null;
   /** Minuten vóór de start van het event; null = volgt het verkoopvenster van het event. */
   salesOpensMinutesBefore: number | null;
   salesClosesMinutesBefore: number | null;
   /** false = staat in het aanmaakscherm uitgevinkt. */
   enabled: boolean;
 };
+
+/**
+ * Een pot met plaatsen: een aantal dat de tickets erin delen, met optioneel een
+ * plafond voor leden en een voor niet-leden. Dezelfde vorm als
+ * `TicketInventoryPool`, maar met een code in plaats van een id, want het event
+ * bestaat nog niet. Zie `lib/ticketing/seats.ts`.
+ */
+export type TicketTemplatePool = {
+  code: string;
+  nameNl: string;
+  nameEn: string;
+  capacity: number;
+  memberCapacity: number | null;
+  nonMemberCapacity: number | null;
+};
+
+/** De code van de eerste pot van een event, zoals hij altijd geheten heeft. */
+export const DEFAULT_POOL_CODE = "GENERAL";
+
+/** De pot van een event met één aantal plaatsen voor alle tickets. */
+export function defaultTicketPool(capacity: number): TicketTemplatePool {
+  return {
+    code: DEFAULT_POOL_CODE,
+    nameNl: "Algemene capaciteit",
+    nameEn: "General capacity",
+    capacity,
+    memberCapacity: null,
+    nonMemberCapacity: null,
+  };
+}
 
 /** Eén deelnemersvraag binnen een sjabloon. */
 export type TicketTemplateQuestion = {
@@ -101,7 +133,10 @@ export type TicketEventTemplate = {
   presaleHelpers: boolean;
   confirmationMessageNl: string;
   confirmationMessageEn: string;
+  /** De som van de potten, voor het overzicht. */
   capacity: number;
+  /** Minstens één pot; een sjabloon van voor de potten heeft er één met `capacity`. */
+  pools: TicketTemplatePool[];
   /** Ticketontwerp, dezelfde vorm als `settings.ticketDesign.draft`; null = geen. */
   design: unknown;
   builtIn: boolean;
@@ -273,6 +308,8 @@ export function parseTemplateTypes(raw: unknown): TicketTemplateType[] | string 
       memberPriceCents = member;
     }
 
+    const poolCode = text(row.poolCode, 40);
+
     result.push({
       code,
       nameNl,
@@ -285,6 +322,7 @@ export function parseTemplateTypes(raw: unknown): TicketTemplateType[] | string 
       color: ticketColorKey(row.color),
       minPerOrder,
       maxPerOrder,
+      poolCode: poolCode === "" ? null : templateCode(poolCode, poolCode),
       salesOpensMinutesBefore: opens,
       salesClosesMinutesBefore: closes,
       enabled: bool(row.enabled, true),
@@ -292,6 +330,103 @@ export function parseTemplateTypes(raw: unknown): TicketTemplateType[] | string 
   }
 
   return result;
+}
+
+/** Een getal of leeg; leeg is `null` ("geen plafond"). */
+function optionalCount(value: unknown, max: number): number | null | "invalid" {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = typeof value === "number" ? value : Number.parseInt(String(value), 10);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > max) return "invalid";
+  return Math.round(parsed);
+}
+
+/**
+ * De potten zoals een scherm ze meestuurt, met dezelfde vorm van antwoord als
+ * `parseTemplateTypes`: de lijst, of een zin voor de toast.
+ */
+export function parseTemplatePools(raw: unknown): TicketTemplatePool[] | string {
+  if (!Array.isArray(raw) || raw.length === 0) return "Er kwamen geen plaatsen mee.";
+  const several = raw.length > 1;
+  const seen = new Set<string>();
+  const result: TicketTemplatePool[] = [];
+
+  for (let index = 0; index < raw.length; index += 1) {
+    const row = asRecord(raw[index]);
+    const label = several ? `Plaatsen ${index + 1}` : "Plaatsen";
+    if (!row) return `${label}: onleesbare gegevens.`;
+
+    // Bij één pot vraagt het scherm geen naam: die heet zoals elke pot van
+    // voor er meerdere konden zijn. Bij meerdere staat de naam op de tickets
+    // in het beheer, en dan moet ze er zijn.
+    const nameNl = text(row.nameNl, 120) || (several ? "" : defaultTicketPool(0).nameNl);
+    if (nameNl === "") return `${label}: geef deze plaatsen een naam, bv. "Studenten".`;
+
+    const code = templateCode(row.code, index === 0 ? DEFAULT_POOL_CODE : `POOL_${index + 1}`);
+    if (seen.has(code)) return `${label}: de code ${code} staat al op andere plaatsen.`;
+    seen.add(code);
+
+    const capacity = integer(row.capacity, Number.NaN, 1, 1_000_000);
+    if (!Number.isFinite(capacity)) return `${label}: vul een aantal plaatsen in.`;
+
+    const memberCapacity = optionalCount(row.memberCapacity, capacity);
+    const nonMemberCapacity = optionalCount(row.nonMemberCapacity, capacity);
+    if (memberCapacity === "invalid") {
+      return `${label}: het maximum voor leden ligt tussen 0 en ${capacity}.`;
+    }
+    if (nonMemberCapacity === "invalid") {
+      return `${label}: het maximum voor niet-leden ligt tussen 0 en ${capacity}.`;
+    }
+
+    result.push({
+      code,
+      nameNl,
+      nameEn: text(row.nameEn, 120) || (several ? "" : defaultTicketPool(0).nameEn),
+      capacity,
+      memberCapacity,
+      nonMemberCapacity,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Tickets en potten samen, met de koppeling ertussen nagekeken: elk ticket
+ * wijst naar een pot die bestaat (leeg = de eerste), en elke pot heeft minstens
+ * één ticket. Een lege pot is geen fout in de verkoop, maar wel bijna altijd in
+ * het formulier: iemand voegde plaatsen toe en vergat er een ticket aan te hangen.
+ */
+export function parseTicketSetup(
+  typesRaw: unknown,
+  poolsRaw: unknown
+): { types: TicketTemplateType[]; pools: TicketTemplatePool[] } | string {
+  const types = parseTemplateTypes(typesRaw);
+  if (typeof types === "string") return types;
+  const pools = parseTemplatePools(poolsRaw);
+  if (typeof pools === "string") return pools;
+
+  const codes = new Set(pools.map((pool) => pool.code));
+  const resolved = types.map((type) => ({
+    ...type,
+    poolCode: type.poolCode && codes.has(type.poolCode) ? type.poolCode : null,
+  }));
+  const unknown = types.findIndex((type) => type.poolCode && !codes.has(type.poolCode));
+  if (unknown !== -1) {
+    return `Tickettype ${unknown + 1}: de gekozen plaatsen bestaan niet meer.`;
+  }
+  if (pools.length > 1) {
+    const enabled = resolved.filter((type) => type.enabled);
+    const empty = pools.find(
+      (pool) => !enabled.some((type) => ticketPoolCode(type, pools) === pool.code)
+    );
+    if (empty) return `De plaatsen "${empty.nameNl}" hebben geen ticket. Kies ze bij een ticket, of verwijder ze.`;
+  }
+  return { types: resolved, pools };
+}
+
+/** De pot van een ticket, met de terugval op de eerste. */
+export function ticketPoolCode(type: Pick<TicketTemplateType, "poolCode">, pools: TicketTemplatePool[]): string {
+  return type.poolCode ?? pools[0]?.code ?? DEFAULT_POOL_CODE;
 }
 
 /** Idem voor de deelnemersvragen. */
@@ -393,6 +528,7 @@ export function blankTicketTemplate(): TicketEventTemplate {
     confirmationMessageNl: "",
     confirmationMessageEn: "",
     capacity: 100,
+    pools: [defaultTicketPool(100)],
     design: null,
     builtIn: false,
     types: [blankTicketTemplateType(1)],
@@ -414,10 +550,21 @@ export function blankTicketTemplateType(index: number): TicketTemplateType {
     color: "navy",
     minPerOrder: 1,
     maxPerOrder: 8,
+    poolCode: null,
     salesOpensMinutesBefore: null,
     salesClosesMinutesBefore: null,
     enabled: true,
   };
+}
+
+/**
+ * De potten zoals een sjabloon ze bewaart (`TicketEventTemplate.pools`, JSON),
+ * met de terugval voor een sjabloon van voor de potten: één pot met de
+ * capaciteit.
+ */
+export function templatePoolsFrom(raw: unknown, capacity: number): TicketTemplatePool[] {
+  const parsed = raw == null ? null : parseTemplatePools(raw);
+  return Array.isArray(parsed) ? parsed : [defaultTicketPool(capacity)];
 }
 
 /** Prijs in cent naar het formulierformaat "14.00" en terug. */

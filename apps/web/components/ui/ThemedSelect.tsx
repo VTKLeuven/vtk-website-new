@@ -1,13 +1,26 @@
 "use client";
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
+import { Fragment, useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { Check, ChevronDown } from "lucide-react";
 
 export type ThemedSelectOption = {
   value: string;
   label: string;
   disabled?: boolean;
+  /**
+   * Kop boven een groep opties, zoals een `<optgroup>`. Een opeenvolgende reeks
+   * met dezelfde waarde staat onder één kop; zonder waarde geen kop.
+   */
+  group?: string;
+  /** Een CSS-kleur voor een bolletje voor het label, bv. de scannerkleur van een ticket. */
+  swatch?: string;
 };
+
+function Swatch({ color }: { color?: string }) {
+  return color ? (
+    <span className="vtk-themed-select-swatch" style={{ background: color }} aria-hidden="true" />
+  ) : null;
+}
 
 /**
  * Toegankelijke keuzelijst met de eigen site-opmaak.
@@ -166,27 +179,42 @@ export function ThemedSelect({
         }}
         onKeyDown={handleKeyDown}
       >
-        <span>{selected?.label ?? ""}</span>
+        <span className="vtk-themed-select-label">
+          <Swatch color={selected?.swatch} />
+          {selected?.label ?? ""}
+        </span>
         <ChevronDown aria-hidden="true" size={17} />
       </button>
       {open ? (
         <div id={listId} className="vtk-themed-select-options" role="listbox">
-          {options.map((option, index) => (
-            <button
-              id={`${listId}-${index}`}
-              key={option.value}
-              type="button"
-              role="option"
-              aria-selected={option.value === selectedValue}
-              data-highlighted={index === highlighted || undefined}
-              disabled={option.disabled}
-              onPointerMove={() => setHighlighted(index)}
-              onClick={() => choose(option.value)}
-            >
-              <span>{option.label}</span>
-              {option.value === selectedValue ? <Check aria-hidden="true" size={16} /> : null}
-            </button>
-          ))}
+          {options.map((option, index) => {
+            const startsGroup = option.group && option.group !== options[index - 1]?.group;
+            return (
+              <Fragment key={option.value}>
+                {startsGroup ? (
+                  <div className="vtk-themed-select-group" role="presentation">
+                    {option.group}
+                  </div>
+                ) : null}
+                <button
+                  id={`${listId}-${index}`}
+                  type="button"
+                  role="option"
+                  aria-selected={option.value === selectedValue}
+                  data-highlighted={index === highlighted || undefined}
+                  disabled={option.disabled}
+                  onPointerMove={() => setHighlighted(index)}
+                  onClick={() => choose(option.value)}
+                >
+                  <span className="vtk-themed-select-label">
+                    <Swatch color={option.swatch} />
+                    {option.label}
+                  </span>
+                  {option.value === selectedValue ? <Check aria-hidden="true" size={16} /> : null}
+                </button>
+              </Fragment>
+            );
+          })}
         </div>
       ) : null}
     </div>

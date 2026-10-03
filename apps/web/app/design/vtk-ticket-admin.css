@@ -615,7 +615,8 @@
   border: 0;
 }
 
-.ticket-admin-field[data-span="2"] {
+.ticket-admin-field[data-span="2"],
+.ticket-admin-form-grid > [data-span="2"] {
   grid-column: 1 / -1;
 }
 
@@ -2276,88 +2277,216 @@
    Sjablonen
    -------------------------------------------------------------------------- */
 
-/* De tickets van een sjabloon, als bewerkbare rijen. Een tabel en geen reeks
-   kaarten: het gaat om vier varianten van hetzelfde ticket, en die vergelijk je
-   per kolom (prijs naast prijs), niet per blok. */
-.ticket-admin-template-rows {
+/* De tickets en plaatsen van een nieuw event of sjabloon (`TicketSetupEditor`).
+   Elk ticket is een kaart met gelabelde velden op twee regels: wat het is (naam,
+   wie, kleur) en wat het kost en hoeveel (prijs, ledenprijs, maximum, plaatsen).
+   De tabel die hier stond, had zeven kolommen in 900 px en moest daardoor de
+   ledenprijs onder de prijs schuiven. */
+.ticket-setup {
+  display: grid;
+  gap: 14px;
+}
+
+.ticket-setup-list,
+.ticket-setup-pools {
   display: grid;
   gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-/* De rijen zijn breder dan de 900px contentkolom van de admin; ze scrollen dus
-   horizontaal in hun eigen wrapper, met kolombreedtes die leesbaar blijven.
-   Zonder minimumbreedtes kruipt de code-input in de prijskolom. */
-.ticket-admin-template-rows .ticket-admin-table {
-  min-width: 840px;
+.ticket-setup-row,
+.ticket-setup-pool {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
 }
 
-.ticket-admin-template-rows td {
-  vertical-align: top;
-  white-space: normal;
+.ticket-setup-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
 }
 
-.ticket-admin-template-rows td :is(input:not([type="checkbox"]), select) {
-  width: 100%;
-  min-width: 0;
-  min-height: 36px;
-  padding: 7px 9px;
-  border: 1px solid var(--line-2);
-  border-radius: 9px;
-  background: #fff;
+.ticket-setup-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.ticket-setup-fields > [data-area="name"],
+.ticket-setup-fields > [data-area="audience"],
+.ticket-setup-fields > [data-area="pool"],
+.ticket-setup-fields > [data-area="offset"] {
+  grid-column: 1 / -1;
+}
+
+@media (min-width: 720px) {
+  .ticket-setup-fields {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+
+  .ticket-setup-fields > [data-area="name"] {
+    grid-column: span 3;
+  }
+
+  .ticket-setup-fields > [data-area="audience"] {
+    grid-column: span 2;
+  }
+
+  .ticket-setup-fields > :is([data-area="color"], [data-area="price"], [data-area="member"], [data-area="max"]) {
+    grid-column: span 1;
+  }
+
+  .ticket-setup-fields > :is([data-area="pool"], [data-area="offset"]) {
+    grid-column: span 2;
+  }
+}
+
+/* Een uitgevinkt sjabloonticket wordt niet aangemaakt; dat hoort te zien te zijn
+   zonder dat je het vinkje zoekt. */
+.ticket-setup-row[data-enabled="false"] .ticket-setup-fields {
+  opacity: 0.5;
+}
+
+.ticket-setup-actions {
+  display: grid;
+  justify-items: end;
+  gap: 10px;
+  padding-top: 22px;
+}
+
+.ticket-setup-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   color: var(--ink);
-  font: inherit;
   font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
-.ticket-admin-template-rows td:nth-child(1) {
-  min-width: 190px;
-}
-
-.ticket-admin-template-rows td:nth-child(2),
-.ticket-admin-template-rows td:nth-child(4) {
-  min-width: 90px;
-}
-
-.ticket-admin-template-rows td:nth-child(3),
-.ticket-admin-template-rows td:nth-child(5) {
-  min-width: 120px;
-}
-
-.ticket-admin-template-rows td input[type="checkbox"] {
+.ticket-setup-toggle input {
   width: 16px;
   height: 16px;
+  margin: 0;
   accent-color: var(--ink);
 }
 
-/* Een uitgevinkte rij wordt niet aangemaakt; dat hoort te zien te zijn zonder
-   dat je het vinkje zoekt. */
-.ticket-admin-template-rows tr[data-enabled="false"] :is(input, select) {
-  opacity: 0.55;
+/* Een bedrag met het euroteken in het veld zelf, zodat "12,00" niet los staat. */
+.ticket-setup-money {
+  position: relative;
 }
 
-.ticket-admin-template-code {
-  margin-top: 4px;
-  font-family: var(--mono, ui-monospace, monospace);
-  font-size: 12px;
-  text-transform: uppercase;
-}
-
-/* Het label boven de ledenprijs, onder de gewone prijs in dezelfde cel. Klein
-   en gedempt: het hoort bij het veld erboven en is geen tweede kolomkop. */
-.ticket-admin-template-subfield-label {
-  display: block;
-  margin-top: 6px;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
+.ticket-setup-money > span {
+  position: absolute;
+  top: 50%;
+  left: 11px;
+  transform: translateY(-50%);
   color: var(--muted);
+  font-size: 14px;
+  pointer-events: none;
 }
 
-.ticket-admin-template-rows-foot {
+/* Zo specifiek als de algemene veldregel (`.ticket-admin-field :is(input:not(...))`),
+   anders wint haar padding en staat het euroteken over het eerste cijfer. */
+.ticket-admin-field .ticket-setup-money input:not([type="checkbox"]):not([type="radio"]) {
+  padding-left: 26px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* De eigen keuzelijst ziet eruit als de invoervelden ernaast: in de admin zijn
+   die `--paper` met een ronding van 12px (vtk-admin.css), de keuzelijst zelf is
+   wit voor de publieke formulieren. */
+.vtk-admin-main .ticket-admin-field .vtk-themed-select-trigger {
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.ticket-setup-foot {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 14px;
+}
+
+/* De plaatsen: een eigen blok onder de tickets, gescheiden door een haarlijn
+   en niet door nog een kaart eromheen. */
+.ticket-setup-places {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+  margin-top: 6px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.ticket-setup-places > * {
+  justify-self: stretch;
+}
+
+.ticket-setup-places > .ticket-admin-button {
+  justify-self: start;
+}
+
+.ticket-setup-places-head h3 {
+  margin: 0 0 4px;
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ticket-setup-pool-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: end;
+  gap: 12px;
+}
+
+@media (min-width: 720px) {
+  .ticket-setup-pool-fields {
+    grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto auto;
+  }
+
+  .ticket-setup-pool-fields:not(:has([data-area="name"])) {
+    grid-template-columns: minmax(0, 180px) auto;
+  }
+}
+
+.ticket-setup-pool-fields .ticket-setup-toggle {
+  min-height: 40px;
+}
+
+.ticket-setup-caps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.ticket-setup-caps > [data-span="2"] {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.ticket-setup-pool-tickets {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.ticket-setup-pool-tickets[data-empty] {
+  color: var(--ticket-red, var(--ink));
+}
+
+.ticket-setup-order-max {
+  max-width: 340px;
 }
 
 /* Een getal met zijn eenheid ernaast ("3 dagen"), als één regel. */

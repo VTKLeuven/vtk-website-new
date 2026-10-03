@@ -35,7 +35,12 @@ import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { TICKET_TERMS_SETTING_KEY } from "@/lib/ticketing/terms";
 import { ticketAudienceFrom, ticketAudienceLabel, type TicketAudience } from "@/lib/ticketing/audience";
 import { getTicketEventTemplate } from "@/lib/ticketing/templateStore";
-import { applyTicketTemplateType, parseTemplateTypes } from "@/lib/ticketing/templates";
+import {
+  applyTicketTemplateType,
+  defaultTicketPool,
+  parseTicketSetup,
+  ticketPoolCode,
+} from "@/lib/ticketing/templates";
 
 const localeSchema = z.enum(["nl", "en"]);
 
@@ -60,7 +65,7 @@ const statusSchema = z.enum([
 export type TicketEventFormActionState = {
   status: "idle" | "success" | "error";
   code?: string;
-  /** De Nederlandse zin van `parseTemplateTypes`, die zegt welke rij en wat. */
+  /** De Nederlandse zin van `parseTicketSetup`, die zegt welke rij en wat. */
   detail?: string;
 };
 
@@ -375,6 +380,7 @@ async function removeReplacedBanner(previous: string | null, next: string | null
 function refreshTicketEvent(locale: "nl" | "en", eventId: string) {
   revalidatePath(localePath(locale, "/admin/tickets"));
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}`));
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/instellingen`));
   revalidatePath(localePath(locale, "/tickets"));
 }
 
@@ -580,7 +586,6 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
     ? calendarEvent.end
     : (dateValue(formData, "endsAt") ?? calendarEvent?.end ?? null);
   if (!startsAt || !endsAt || endsAt <= startsAt) throw new Error("INVALID_EVENT_DATES");
-  const capacity = boundedIntegerValue(formData, "capacity", 100, 1, 1_000_000);
   const salesStartAt = dateValue(formData, "salesStartAt");
   const salesEndAt = dateValue(formData, "salesEndAt");
   if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
@@ -603,16 +608,30 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
   // sjabloon: wat daar staat is wat er verkocht wordt. Een event zonder
   // tickettype is niet publiceerbaar en verkoopt niets, dus dat is geen
   // zinvolle tussenstand.
+  //
+  // De plaatsen reizen mee als potten: één met alle tickets erin, of meerdere
+  // wanneer tickets een eigen aantal hebben (studenten en proffen). Een
+  // formulier van voor de potten stuurt enkel `capacity`; dat is één pot.
   let ticketTypesPayload: unknown;
+  let poolsPayload: unknown;
   try {
     ticketTypesPayload = JSON.parse(value(formData, "ticketTypesData"));
-  } catch {
+    poolsPayload = formData.has("poolsData")
+      ? JSON.parse(value(formData, "poolsData"))
+      : [defaultTicketPool(boundedIntegerValue(formData, "capacity", 100, 1, 1_000_000))];
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith("INVALID_")) throw error;
     throw new Error("INVALID_TICKET_TYPES");
   }
-  const parsedTicketTypes = parseTemplateTypes(ticketTypesPayload);
-  if (typeof parsedTicketTypes === "string") throw new InvalidTicketTypesError(parsedTicketTypes);
-  const ticketTypes = parsedTicketTypes.filter((type) => type.enabled);
+  const setup = parseTicketSetup(ticketTypesPayload, poolsPayload);
+  if (typeof setup === "string") throw new InvalidTicketTypesError(setup);
+  const ticketTypes = setup.types.filter((type) => type.enabled);
   if (ticketTypes.length === 0) throw new Error("NO_TICKET_TYPES");
+  // Enkel de potten met een ticket dat aangemaakt wordt: een uitgevinkt
+  // sjabloonticket laat anders een pot achter die niemand kan kopen.
+  const pools = setup.pools.filter((pool) =>
+    ticketTypes.some((type) => ticketPoolCode(type, setup.pools) === pool.code)
+  );
 
   // Het sjabloon waaruit dit event ontstaat. Het levert wat het scherm niet
   // vraagt: de deelnemersvragen en het ticketontwerp. De rest heeft het
@@ -654,15 +673,21 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         createdById: session.user.id,
       },
     });
-    const pool = await tx.ticketInventoryPool.create({
-      data: {
-        eventId: created.id,
-        code: "GENERAL",
-        nameNl: "Algemene capaciteit",
-        nameEn: "General capacity",
-        capacity,
-      },
-    });
+    const poolIds = new Map<string, string>();
+    for (const pool of pools) {
+      const row = await tx.ticketInventoryPool.create({
+        data: {
+          eventId: created.id,
+          code: pool.code,
+          nameNl: pool.nameNl,
+          nameEn: pool.nameEn || null,
+          capacity: pool.capacity,
+          memberCapacity: pool.memberCapacity,
+          nonMemberCapacity: pool.nonMemberCapacity,
+        },
+      });
+      poolIds.set(pool.code, row.id);
+    }
     // De groepen die naast het praesidium in de voorverkoop mogen, zoals bij
     // bewerken: zonder voorverkoop blijft er niets staan.
     if (presaleLeadMinutes !== null && presaleGroupIds.length > 0) {
@@ -680,7 +705,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
       await tx.ticketType.create({
         data: {
           eventId: created.id,
-          inventoryPoolId: pool.id,
+          inventoryPoolId: poolIds.get(ticketPoolCode(type, setup.pools))!,
           code: type.code,
           nameNl: type.nameNl,
           nameEn: type.nameEn || null,
@@ -774,7 +799,9 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
     target: titleNl,
     summary: [
       template ? `sjabloon "${template.label}"` : null,
-      `capaciteit ${capacity}`,
+      pools.length === 1
+        ? `capaciteit ${pools[0].capacity}`
+        : `${pools.length} delen plaatsen (${pools.map((pool) => `${pool.nameNl} ${pool.capacity}`).join(", ")})`,
       `${ticketTypes.length} tickettype(s)`,
       `boekhoudcode ${accountingCode.code}`,
     ]
@@ -1087,15 +1114,66 @@ export async function deleteTicketEventAction(formData: FormData): Promise<Ticke
   redirect(localePath(locale, "/admin/tickets"));
 }
 
-export async function updateInventoryPoolAction(formData: FormData): Promise<void> {
+/**
+ * De plafonds voor leden en niet-leden uit een formulier. Leeg is geen plafond;
+ * een plafond boven de capaciteit zegt niets en wijst bijna altijd op een
+ * tikfout, dus dat wordt geweigerd.
+ */
+function seatCapsFromForm(
+  formData: FormData,
+  capacity: number
+):
+  | { ok: true; memberCapacity: number | null; nonMemberCapacity: number | null }
+  | { ok: false; code: string } {
+  const read = (key: string) => {
+    const raw = value(formData, key);
+    if (raw === "") return null;
+    const parsed = Number(raw);
+    return Number.isSafeInteger(parsed) && parsed >= 0 && parsed <= capacity ? parsed : Number.NaN;
+  };
+  // Het vinkje "apart maximum voor leden en niet-leden" uit: beide weg, ook
+  // als er nog een getal in een verborgen veld stond.
+  if (formData.has("seatCaps") && !checkboxValue(formData, "seatCaps")) {
+    return { ok: true, memberCapacity: null, nonMemberCapacity: null };
+  }
+  const memberCapacity = read("memberCapacity");
+  const nonMemberCapacity = read("nonMemberCapacity");
+  if (Number.isNaN(memberCapacity) || Number.isNaN(nonMemberCapacity)) {
+    return { ok: false, code: "INVALID_SEAT_CAPS" };
+  }
+  return { ok: true, memberCapacity, nonMemberCapacity };
+}
+
+/** "80 leden, 20 niet-leden" voor de audit; leeg zonder plafonds. */
+function seatCapsSummary(memberCapacity: number | null, nonMemberCapacity: number | null): string {
+  return [
+    memberCapacity === null ? null : `hoogstens ${memberCapacity} leden`,
+    nonMemberCapacity === null ? null : `hoogstens ${nonMemberCapacity} niet-leden`,
+  ]
+    .filter(Boolean)
+    .join(", ");
+}
+
+export async function updateInventoryPoolAction(
+  _previousState: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
   const eventId = value(formData, "eventId");
   const poolId = value(formData, "poolId");
   const locale = localeSchema.parse(value(formData, "locale") || "nl");
   const { session } = await requireTicketEventCapability(eventId, "MANAGE_INVENTORY");
   const pool = await prisma.ticketInventoryPool.findFirst({ where: { id: poolId, eventId } });
-  if (!pool) throw new Error("POOL_NOT_FOUND");
-  const capacity = boundedIntegerValue(formData, "capacity", pool.capacity, 0, 1_000_000);
-  if (capacity < pool.soldCount + pool.reservedCount) throw new Error("CAPACITY_BELOW_ALLOCATED");
+  if (!pool) return saveError("POOL_NOT_FOUND");
+  const rawCapacity = Number(value(formData, "capacity") || pool.capacity);
+  if (!Number.isSafeInteger(rawCapacity) || rawCapacity < 0 || rawCapacity > 1_000_000) {
+    return saveError("INVALID_CAPACITY");
+  }
+  const capacity = rawCapacity;
+  if (capacity < pool.soldCount + pool.reservedCount) return saveError("CAPACITY_BELOW_ALLOCATED");
+  const caps = seatCapsFromForm(formData, capacity);
+  if (!caps.ok) return saveError(caps.code);
+  // Een plafond onder wat al verkocht is, mag: dan stopt enkel de verkoop aan
+  // die soort, en dat is net wat iemand bedoelt die het verlaagt.
   await prisma.$transaction([
     prisma.ticketInventoryPool.update({
       where: { id: pool.id },
@@ -1103,7 +1181,11 @@ export async function updateInventoryPoolAction(formData: FormData): Promise<voi
         nameNl: limitedValue(formData, "nameNl", 160) || pool.nameNl,
         nameEn: limitedOptionalValue(formData, "nameEn", 160),
         capacity,
-        active: formData.getAll("active").some((entry) => entry === "on" || entry === "true"),
+        memberCapacity: caps.memberCapacity,
+        nonMemberCapacity: caps.nonMemberCapacity,
+        active: formData.has("active")
+          ? formData.getAll("active").some((entry) => entry === "on" || entry === "true")
+          : pool.active,
       },
     }),
     prisma.ticketAuditLog.create({
@@ -1113,18 +1195,131 @@ export async function updateInventoryPoolAction(formData: FormData): Promise<voi
         action: "INVENTORY_UPDATED",
         entityType: "TicketInventoryPool",
         entityId: pool.id,
-        metadata: { capacity },
+        metadata: {
+          capacity,
+          memberCapacity: caps.memberCapacity,
+          nonMemberCapacity: caps.nonMemberCapacity,
+        },
       },
     }),
   ]);
+  const capsSummary = seatCapsSummary(caps.memberCapacity, caps.nonMemberCapacity);
   await logAudit({
     action: "update",
     entity: "ticketEvent",
     entityId: eventId,
     target: await ticketEventTitle(eventId),
-    summary: `voorraadpot "${pool.nameNl}" op capaciteit ${capacity}`,
+    summary: `plaatsen "${pool.nameNl}" op ${capacity}${capsSummary ? ` (${capsSummary})` : ""}`,
   });
   refreshTicketEvent(locale, eventId);
+  return saveOk();
+}
+
+/**
+ * Een extra pot plaatsen bij een bestaand event, voor tickets die een eigen
+ * aantal krijgen (proffen naast studenten). Het ticket kies je daarna bij dat
+ * ticket zelf, of bij een nieuw ticket.
+ */
+export async function createInventoryPoolAction(
+  _previousState: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const { session } = await requireTicketEventCapability(eventId, "MANAGE_INVENTORY");
+  const nameNl = limitedValue(formData, "nameNl", 160);
+  if (!nameNl) return saveError("NAME_REQUIRED");
+  const capacity = Number(value(formData, "capacity"));
+  if (!Number.isSafeInteger(capacity) || capacity < 1 || capacity > 1_000_000) {
+    return saveError("INVALID_CAPACITY");
+  }
+  const caps = seatCapsFromForm(formData, capacity);
+  if (!caps.ok) return saveError(caps.code);
+
+  const created = await prisma.$transaction(async (tx) => {
+    const pool = await tx.ticketInventoryPool.create({
+      data: {
+        eventId,
+        code: `${codeFrom(nameNl)}_${randomBytes(2).toString("hex").toUpperCase()}`,
+        nameNl,
+        nameEn: limitedOptionalValue(formData, "nameEn", 160),
+        capacity,
+        memberCapacity: caps.memberCapacity,
+        nonMemberCapacity: caps.nonMemberCapacity,
+      },
+    });
+    await tx.ticketAuditLog.create({
+      data: {
+        eventId,
+        actorUserId: session.user.id,
+        action: "INVENTORY_CREATED",
+        entityType: "TicketInventoryPool",
+        entityId: pool.id,
+        metadata: { capacity, memberCapacity: caps.memberCapacity, nonMemberCapacity: caps.nonMemberCapacity },
+      },
+    });
+    return pool;
+  });
+  await logAudit({
+    action: "create",
+    entity: "ticketEvent",
+    entityId: eventId,
+    target: await ticketEventTitle(eventId),
+    summary: `plaatsen "${created.nameNl}" toegevoegd (${capacity})`,
+  });
+  refreshTicketEvent(locale, eventId);
+  return saveOk();
+}
+
+/**
+ * Een pot weghalen. Enkel zolang er geen ticket aan hangt en er nooit uit
+ * besteld is: een bestelregel blijft naar haar pot wijzen, ook na een
+ * terugbetaling.
+ */
+export async function deleteInventoryPoolAction(formData: FormData): Promise<TicketDeleteResult> {
+  const eventId = value(formData, "eventId");
+  const poolId = value(formData, "poolId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  try {
+    const { session } = await requireTicketEventCapability(eventId, "MANAGE_INVENTORY");
+    const pool = await prisma.ticketInventoryPool.findFirst({ where: { id: poolId, eventId } });
+    if (!pool) return { ok: false, error: "POOL_NOT_FOUND" };
+    const result = await prisma.$transaction(async (tx) => {
+      const [types, ordered] = await Promise.all([
+        tx.ticketType.count({ where: { eventId, inventoryPoolId: pool.id } }),
+        tx.ticketOrderItem.count({ where: { eventId, inventoryPoolId: pool.id } }),
+      ]);
+      if (types > 0) return "POOL_HAS_TICKET_TYPES";
+      if (ordered > 0) return "POOL_HAS_ORDERS";
+      await tx.ticketInventoryPool.delete({ where: { id: pool.id } });
+      await tx.ticketAuditLog.create({
+        data: {
+          eventId,
+          actorUserId: session.user.id,
+          action: "INVENTORY_DELETED",
+          entityType: "TicketInventoryPool",
+          entityId: pool.id,
+          metadata: { nameNl: pool.nameNl, capacity: pool.capacity },
+        },
+      });
+      return null;
+    });
+    if (result) return { ok: false, error: result };
+    await logAudit({
+      action: "delete",
+      entity: "ticketEvent",
+      entityId: eventId,
+      target: await ticketEventTitle(eventId),
+      summary: `plaatsen "${pool.nameNl}" verwijderd`,
+    });
+    refreshTicketEvent(locale, eventId);
+    return { ok: true };
+  } catch (error) {
+    unstable_rethrow(error);
+    const code = error instanceof Error ? error.message : "";
+    if (code === "FORBIDDEN") return { ok: false, error: code };
+    throw error;
+  }
 }
 
 export async function createTicketTypeAction(
@@ -1312,8 +1507,21 @@ export async function saveTicketTypeAction(
   if (salesStartAt && salesEndAt && salesEndAt <= salesStartAt) {
     return saveError("INVALID_SALES_DATES");
   }
+  // Naar andere plaatsen verhuizen mag ook na de eerste verkoop: elke
+  // bestelregel onthoudt zelf uit welke pot ze kwam (`inventoryPoolId`), dus
+  // wat verkocht is, blijft in de oude pot tellen en komt daar ook terug.
+  const requestedPoolId = value(formData, "inventoryPoolId") || type.inventoryPoolId;
+  if (requestedPoolId !== type.inventoryPoolId) {
+    const pool = await prisma.ticketInventoryPool.findFirst({
+      where: { id: requestedPoolId, eventId },
+      select: { id: true },
+    });
+    if (!pool) return saveError("POOL_NOT_FOUND");
+  }
+  const inventoryPoolId = requestedPoolId;
 
   const data = {
+    inventoryPoolId,
     color,
     audience,
     nameNl,
@@ -1328,6 +1536,7 @@ export async function saveTicketTypeAction(
     salesEndAt,
   };
   const unchanged =
+    inventoryPoolId === type.inventoryPoolId &&
     color === type.color &&
     audience === type.audience &&
     nameNl === type.nameNl &&
@@ -1356,6 +1565,7 @@ export async function saveTicketTypeAction(
     }),
   ]);
   const changes = [
+    inventoryPoolId === type.inventoryPoolId ? null : "andere plaatsen gekozen",
     color === type.color ? null : `kleur op ${color}`,
     audience === type.audience ? null : `doelgroep op ${ticketAudienceAuditLabel(audience)}`,
     nameNl === type.nameNl ? null : `naam op ${nameNl}`,

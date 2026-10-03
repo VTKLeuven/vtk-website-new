@@ -21,10 +21,11 @@ import { toDatetimeLocal, type AdminLocale } from "./format";
 import { AddressPicker } from "./AddressPicker";
 import { PresaleFields, type PresaleGroupOption } from "./PresaleFields";
 import { SettingsPanel } from "./SettingsPanel";
-import { TicketTemplateTypeRows } from "./TicketTemplateTypeRows";
+import { TicketSetupEditor } from "./TicketSetupEditor";
 import { TicketBannerField } from "./TicketBannerField";
 import {
   blankTicketTemplateType,
+  defaultTicketPool,
   type TicketEventTemplate,
   type TicketTemplateType,
 } from "@/lib/ticketing/templates";
@@ -54,7 +55,8 @@ const formErrorMessages: Record<string, { nl: string; en: string }> = {
   ACCOUNTING_CODE_REQUIRED: { nl: "Kies een boekhoudcode: ze gaat mee in de betaalinfo bij Mollie en Bancontact.", en: "Choose an accounting code: it goes into the payment details at Mollie and Bancontact." },
   INVALID_ACCOUNTING_CODE: { nl: "Die boekhoudcode bestaat niet meer. Kies een andere.", en: "That accounting code no longer exists. Choose another one." },
   NO_TICKET_TYPES: { nl: "Vink minstens één ticket aan: zonder ticket valt er niets te verkopen.", en: "Tick at least one ticket: without a ticket there is nothing to sell." },
-  INVALID_TICKET_TYPES: { nl: "Een van de tickets klopt niet. Controleer de naam, of de code uniek is en of de ledenprijs lager ligt dan de gewone prijs.", en: "One of the tickets is not valid. Check the name, whether the code is unique and whether the member price is below the regular price." },
+  INVALID_TICKET_TYPES: { nl: "Een van de tickets klopt niet. Controleer de naam en of de ledenprijs lager ligt dan de gewone prijs.", en: "One of the tickets is not valid. Check the name and whether the member price is below the regular price." },
+  INVALID_MAXTICKETSPERORDER: { nl: "Het maximum per bestelling ligt tussen 1 en 50.", en: "The maximum per order is between 1 and 50." },
 };
 
 function formErrorMessage(state: TicketEventFormActionState, locale: AdminLocale): string {
@@ -665,20 +667,32 @@ export function TicketEventForm({
               <span className="ticket-admin-readonly">{locale === "nl" ? "Concept" : "Draft"}</span>
             </div>
           )}
-          <div className="ticket-admin-field">
-            <label htmlFor="ticket-max-order">
-              {locale === "nl" ? "Maximum tickets per bestelling" : "Maximum tickets per order"}
-            </label>
-            <input
-              id="ticket-max-order"
-              name="maxTicketsPerOrder"
-              type="number"
-              min="1"
-              max="50"
-              defaultValue={event.maxTicketsPerOrder ?? 8}
-              required
-            />
-          </div>
+          {/* Bij aanmaken staat dit bij de tickets, naast het maximum per ticket
+              waar het mee samenwerkt. Daarna hier, want de tickets van een
+              bestaand event staan in een eigen blok. */}
+          {isEdit ? (
+            <div className="ticket-admin-field">
+              <label htmlFor="ticket-max-order">
+                {locale === "nl"
+                  ? "Max. tickets per bestelling, alle tickets samen"
+                  : "Max. tickets per order, all tickets together"}
+              </label>
+              <input
+                id="ticket-max-order"
+                name="maxTicketsPerOrder"
+                type="number"
+                min="1"
+                max="50"
+                defaultValue={event.maxTicketsPerOrder ?? 8}
+                required
+              />
+              <span className="ticket-admin-help">
+                {locale === "nl"
+                  ? "Bovenop het maximum van elk ticket (bij Tickettypes). De shop toont het kleinste van de twee."
+                  : "On top of each ticket's own maximum (under Ticket types). The shop shows whichever is lower."}
+              </span>
+            </div>
+          ) : null}
           <div className="ticket-admin-field" data-span="2">
             <label className="ticket-admin-check" htmlFor="ticket-card-checkin">
               <input type="hidden" name="cardCheckIn" value="false" />
@@ -782,9 +796,11 @@ export function TicketEventForm({
                 <h2>
                   {template
                     ? nl
-                      ? "Tickets uit het sjabloon"
-                      : "Tickets from the template"
-                    : "Tickets"}
+                      ? "Tickets en plaatsen uit het sjabloon"
+                      : "Tickets and places from the template"
+                    : nl
+                      ? "Tickets en plaatsen"
+                      : "Tickets and places"}
                 </h2>
                 <p>
                   {template
@@ -792,37 +808,21 @@ export function TicketEventForm({
                       ? "Dit wordt aangemaakt. Pas gerust een naam, een prijs of het aantal aan; wat hier staat, wordt verkocht."
                       : "This is what gets created. Adjust a name, a price or the number; what is here is what will be sold."
                     : nl
-                      ? "Wat kopers kunnen kiezen. Zet een ledenprijs, een ticket enkel voor leden of een tweede soort ticket er meteen bij; wat hier staat, wordt verkocht."
-                      : "What buyers can pick. Add a member price, a members-only ticket or a second kind of ticket straight away; what is here is what will be sold."}
+                      ? "Wat kopers kunnen kiezen, en hoeveel er zijn. Alles blijft na het aanmaken aanpasbaar."
+                      : "What buyers can pick, and how many there are. Everything stays editable after creating."}
                 </p>
               </div>
             </div>
           </div>
-          <TicketTemplateTypeRows
-            name="ticketTypesData"
-            initial={template?.types ?? [firstTicketRow(locale)]}
+          <TicketSetupEditor
+            typesName="ticketTypesData"
+            poolsName="poolsData"
+            initialTypes={template?.types ?? [firstTicketRow(locale)]}
+            initialPools={template?.pools ?? [defaultTicketPool(100)]}
+            orderMax={{ name: "maxTicketsPerOrder", defaultValue: event.maxTicketsPerOrder ?? 8 }}
+            fromTemplate={Boolean(template)}
             locale={locale}
           />
-          <div className="ticket-admin-form-grid">
-            <div className="ticket-admin-field">
-              <label htmlFor="ticket-capacity">
-                {nl ? "Aantal beschikbaar" : "Available quantity"}
-              </label>
-              <input
-                id="ticket-capacity"
-                name="capacity"
-                type="number"
-                min="1"
-                defaultValue={template?.capacity ?? 100}
-                required
-              />
-              <span className="ticket-admin-help">
-                {nl
-                  ? "De totale capaciteit; alle tickets hierboven delen ze."
-                  : "The total capacity; all tickets above share it."}
-              </span>
-            </div>
-          </div>
           {template && (template.questions.length > 0 || template.design) ? (
             <p className="ticket-admin-help">
               {nl

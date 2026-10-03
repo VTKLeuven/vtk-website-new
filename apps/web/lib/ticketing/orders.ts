@@ -24,7 +24,9 @@ import {
   quantitiesByPool,
   releaseReservedInventory,
   reserveInventory,
+  TicketInventoryError,
 } from "./inventory";
+import { isMemberSeat } from "./seats";
 import {
   paymentGatewayFor,
   type CheckoutLine,
@@ -308,6 +310,13 @@ export async function createTicketCheckout(
       eventId: event.id,
       ticketTypeId: type.id,
       inventoryPoolId: type.inventoryPoolId,
+      // Vastgelegd bij het bestellen: wie de plaats teruggeeft of terugbetaalt,
+      // raakt zo dezelfde teller, ook als de koper intussen geen lid meer is.
+      memberSeat: isMemberSeat({
+        buyerIsMember: isMember,
+        memberPrice: item.memberPrice,
+        typeHasMemberPrice: memberPriceCents !== null,
+      }),
       ticketTypeCode: type.code,
       ticketTypeName: ticketLineName(
         input.locale === "en" && type.nameEn ? type.nameEn : type.nameNl,
@@ -434,6 +443,7 @@ export async function createTicketCheckout(
               create: normalizedItems.map((item, index) => ({
                 ticketTypeId: item.ticketTypeId,
                 inventoryPoolId: item.inventoryPoolId,
+                memberSeat: item.memberSeat,
                 ticketTypeCode: item.ticketTypeCode,
                 ticketTypeName: item.ticketTypeName,
                 unitPriceCents: item.unitPriceCents,
@@ -461,6 +471,14 @@ export async function createTicketCheckout(
       }
     );
   } catch (error) {
+    // `field` zegt of de pot vol zit of enkel de plaatsen voor leden of voor
+    // niet-leden; de code blijft SOLD_OUT, zodat de app er niets voor moet kennen.
+    if (error instanceof TicketInventoryError && error.code === "SOLD_OUT") {
+      throw new TicketCheckoutError(
+        "SOLD_OUT",
+        error.shortage === "POOL" ? undefined : error.shortage
+      );
+    }
     if (error instanceof Error && "code" in error && error.code === "SOLD_OUT") {
       throw new TicketCheckoutError("SOLD_OUT");
     }
