@@ -450,6 +450,16 @@ const icons: Record<string, ReactNode> = {
       <path d="M9 12.2h3.6" />
     </Svg>
   ),
+  // accountingCodes: grootboek met een kolom codes naast de regels
+  accountingCodes: (
+    <Svg>
+      <path d="M4 4.5A1.5 1.5 0 0 1 5.5 3H19v18H5.5A1.5 1.5 0 0 1 4 19.5Z" />
+      <path d="M8 3v18" />
+      <path d="M11 8h5" />
+      <path d="M11 12h5" />
+      <path d="M11 16h3" />
+    </Svg>
+  ),
   // shift: shiften -> klok
   shift: (
     <Svg>

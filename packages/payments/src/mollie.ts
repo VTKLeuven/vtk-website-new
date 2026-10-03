@@ -93,6 +93,27 @@ function fromMollieValue(value: string): number {
   return Math.round(Number.parseFloat(value) * 100);
 }
 
+/**
+ * De omschrijving van een Mollie-betaling: wat de koper op de betaalpagina en
+ * op zijn uittreksel ziet, en wat de penning per betaling terugvindt in het
+ * overzicht van een Mollie-uitbetaling.
+ *
+ * Met een boekhoudcode is dat "70010010001 Cantus der Cantussen": de code
+ * vooraan, op een vaste plek, zodat een uitbetaling die tickets van tien events
+ * en het lidgeld bundelt per code op te splitsen is. Het ordernummer valt dan
+ * weg; het staat in de metadata (`vtk_order_number`). Zonder code (de
+ * uitleendienst, of een event van voor de codes) blijft het "Eventnaam -
+ * ordernummer", want dan is het ordernummer het enige spoor.
+ */
+export function mollieDescription(
+  input: Pick<CreateCheckoutInput, "eventName" | "orderNumber" | "accountingCode">
+): string {
+  const text = input.accountingCode
+    ? `${input.accountingCode} ${input.eventName}`
+    : `${input.eventName} - ${input.orderNumber}`;
+  return text.slice(0, 255);
+}
+
 export function mapPaymentStatus(status: string): CheckoutStatusResult["status"] {
   switch (status) {
     case "paid":
@@ -167,7 +188,7 @@ export class MolliePaymentGateway implements PaymentGateway {
       (sum, line) => sum + line.unitAmountCents * line.quantity,
       0
     );
-    const description = `${input.eventName} - ${input.orderNumber}`.slice(0, 255);
+    const description = mollieDescription(input);
     const webhookUrl = this.config.webhookUrl();
 
     const payment = await this.request<MolliePayment>("/payments", {
@@ -183,6 +204,7 @@ export class MolliePaymentGateway implements PaymentGateway {
         metadata: {
           vtk_order_id: input.orderId,
           vtk_order_number: input.orderNumber,
+          ...(input.accountingCode ? { vtk_accounting_code: input.accountingCode } : {}),
         },
       },
     });

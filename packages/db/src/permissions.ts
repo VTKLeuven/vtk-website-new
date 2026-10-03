@@ -196,6 +196,11 @@ export const PERMISSIONS = [
   { code: "expenses.managePost", labelNl: "Rekeningen van de eigen post beheren", labelEn: "Manage own post's expenses", category: "expenses" },
   { code: "expenses.manage", labelNl: "Alle rekeningen beheren (terugbetalen, inboeken, doorsturen)", labelEn: "Manage all expenses (reimburse, book, forward)", category: "expenses" },
 
+  // Boekhoudcodes: de lijst waaruit een ticketverkoop en het lidmaatschap hun
+  // code kiezen. Kiezen mag iedereen die een event maakt; de lijst zelf
+  // aanpassen is het werk van de penning. Zie docs/ticketing.md.
+  { code: "accounting.manage", labelNl: "Boekhoudcodes beheren", labelEn: "Manage accounting codes", category: "accounting" },
+
   // Adminlogboek (wie deed wat in de admin)
   { code: "audit.view", labelNl: "Adminlogboek bekijken", labelEn: "View the admin audit log", category: "it" },
   { code: "urenloopApp.manage", labelNl: "24UL-app: downloadlijst beheren", labelEn: "24UL app: manage the download list", category: "it" },

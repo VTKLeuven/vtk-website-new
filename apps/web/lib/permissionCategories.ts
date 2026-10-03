@@ -25,6 +25,7 @@ const CATEGORY_LABELS: Record<string, { nl: string; en: string }> = {
   door: { nl: "Deurtoegang", en: "Door access" },
   vault: { nl: "Wachtwoordkluis", en: "Password vault" },
   expenses: { nl: "Rekeningen", en: "Expenses" },
+  accounting: { nl: "Boekhouding", en: "Accounting" },
   google: { nl: "Google Workspace", en: "Google Workspace" },
   modules: { nl: "Moduletoegang", en: "Module access" },
   external: { nl: "Externe apps", en: "External apps" },

@@ -412,6 +412,15 @@ Terugbetalen en inboeken zitten bewust **niet** in `expenses.managePost`: dat is
 geld en boekhouding, en een postverantwoordelijke die zijn eigen uitgaven op
 "betaald" kan zetten is precies het gat dat billsheet had.
 
+## Boekhoudcodes
+
+`accounting.manage` beheert de lijst in `/admin/boekhoudcodes`: codes toevoegen,
+hernoemen, hernummeren en verwijderen. Een code **kiezen** vraagt geen recht: wie
+een ticketevent mag maken of beheren, kiest de code in het eventformulier, en wie
+`leden.manage` heeft, die van het lidgeld. Het recht zit in de systeemrol `admin`
+(IT en Groep 5); geef het de penning via een rol in `/admin/roles`. MCP krijgt er
+niets van, ook niet lezend.
+
 ## Wie doet wat
 
 Het register van `/admin/wie-doet-wat` (keuzes in `docs/design-decisions.md`,

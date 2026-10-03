@@ -21,6 +21,8 @@ import type { AdminLocale } from "@/components/ticketing/admin/format";
 import { readTicketDesignSettings } from "@/lib/ticketing/design";
 import { listTicketBannerCategories } from "@/lib/ticketing/bannerCategories";
 import { publicUrl } from "@/lib/storage";
+import { listAccountingCodes } from "@/lib/accounting/server";
+import { accountingCodeRows } from "@/lib/ticketing/statsCompute";
 
 export default async function TicketEventSettingsPage({
   params,
@@ -97,6 +99,42 @@ export default async function TicketEventSettingsPage({
   // bestelling volstaat om het te bewaren, ook een vervallen: daar hangen een
   // betaalpoging en een bezoeker aan.
   const orderCount = canManageEvent ? await prisma.ticketOrder.count({ where: { eventId } }) : 0;
+  const accountingCodes = canManageEvent ? await listAccountingCodes() : [];
+  // Wat er al onder welke code verkocht is, naast de keuze van de code: wie ze
+  // aanpast, ziet dan dat het verkochte onder de oude blijft staan. Hetzelfde
+  // rekenwerk als de statistieken; het bedrag enkel met VIEW_FINANCE.
+  const accountingSummary = canManageEvent
+    ? accountingCodeRows(
+        (
+          await prisma.ticket.findMany({
+            where: { eventId },
+            select: {
+              status: true,
+              issuedAt: true,
+              orderItem: {
+                select: {
+                  totalCents: true,
+                  refundItems: { select: { amountCents: true, refund: { select: { status: true } } } },
+                  order: { select: { paidAt: true, accountingCode: true, accountingCodeName: true } },
+                },
+              },
+            },
+          })
+        ).map((ticket) => ({
+          eventId,
+          status: ticket.status,
+          soldAt: ticket.orderItem.order.paidAt ?? ticket.issuedAt,
+          totalCents: ticket.orderItem.totalCents,
+          refundedCents: ticket.orderItem.refundItems
+            .filter((item) => item.refund.status === "SUCCEEDED")
+            .reduce((sum, item) => sum + item.amountCents, 0),
+          accountingCode: ticket.orderItem.order.accountingCode,
+          accountingCodeName: ticket.orderItem.order.accountingCodeName,
+          provider: null,
+        })),
+        new Set(capabilities.includes("VIEW_FINANCE") ? [eventId] : []),
+      )
+    : [];
 
   return (
     <div className="ticket-admin-page">
@@ -119,6 +157,7 @@ export default async function TicketEventSettingsPage({
             shopPath={adminShopLink(event, true).path}
             isPrivate={event.isPrivate}
             hasActiveTicketType={event.ticketTypes.some((ticketType) => ticketType.active)}
+            hasAccountingCode={event.accountingCodeId !== null}
             locale={locale}
           />
           <TicketEventForm
@@ -132,6 +171,8 @@ export default async function TicketEventSettingsPage({
             linkedCalendarEvent={linkedCalendarEvent}
             linkedImageUrl={publicUrl(linkedCalendarEvent?.imageKey)}
             bannerCategories={bannerCategories}
+            accountingCodes={accountingCodes}
+            accountingSummary={accountingSummary}
             hasActiveTicketType={event.ticketTypes.some((ticketType) => ticketType.active)}
             locale={locale}
           />

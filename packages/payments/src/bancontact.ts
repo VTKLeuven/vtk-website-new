@@ -242,22 +242,44 @@ function sepaSafe(value: string): string {
 }
 
 /**
- * De mededeling die de koper in zijn betaalapp ziet, en die daarna op zijn
- * rekeninguittreksel belandt.
+ * De mededeling die de koper in zijn betaalapp ziet, en die daarna op beide
+ * rekeninguittreksels belandt.
  *
- * De app zet er zelf al een betaalcode en onze bestelreferentie voor
- * (`PQ DqWk7u VTK-26-327079785D ...`), dus wat hier staat moet zeggen **wat** er
- * gekocht wordt. Enkel de eerste 35 tekens halen de mededeling op het
- * uittreksel, en daarom staat het aantal vooraan: "2 tickets Galabal van de
- * Ingenieur" past daar nog net volledig in en zegt maanden later nog iets, waar
- * de kale eventnaam dat niet doet.
+ * Wat er op het uittreksel staat, is één regel van hoogstens 140 tekens die de
+ * bank en Bancontact samenstellen, bv. `txufk... 01a0f756... PQ q1doZ9
+ * 70010010001 12 Urencantus 2e cantus`. De eerste drie blokken (een kenmerk
+ * van de overschrijving, de betaal-ID van Bancontact en de betaalcode na "PQ")
+ * zetten zij erbij; daar kunnen wij niets aan veranderen. Daarna komen onze
+ * `reference` en deze omschrijving, en wat over de 140 gaat, valt weg.
+ *
+ * Daarom staat de eventnaam vooraan en het aantal achteraan: volgens de
+ * provider halen enkel de eerste 35 tekens van de omschrijving zeker het
+ * uittreksel, en de naam van het event is wat de penning nodig heeft om de
+ * betaling te boeken. Het aantal is voor de koper in zijn app; valt het weg op
+ * het uittreksel, dan zegt het bedrag ernaast hetzelfde.
  *
  * Het woord "tickets" werkt in beide talen, dus deze tekst heeft de taal van de
  * koper niet nodig; de eventnaam is al vertaald door de aanroeper.
  */
-function paymentDescription(eventName: string, ticketCount: number): string {
+export function paymentDescription(eventName: string, ticketCount: number): string {
   const count = ticketCount === 1 ? "1 ticket" : `${ticketCount} tickets`;
-  return truncate(sepaSafe(`${count} ${eventName}`), MAX_DESCRIPTION);
+  return truncate(sepaSafe(`${eventName} - ${count}`), MAX_DESCRIPTION);
+}
+
+/**
+ * Onze `reference`, die op het uittreksel vóór de omschrijving staat.
+ *
+ * De boekhoudcode wanneer de verkoop er een heeft: het veld is bedoeld als
+ * "verwijzing naar de betaling in het systeem van de handelaar", en voor de
+ * boekhouding is de code precies dat. Het ordernummer stond hier vroeger, en
+ * voor een student was dat een tweede reeks willekeurige tekens naast die van
+ * de bank. Wie een betaling van het uittreksel terug wil vinden, zoekt in de
+ * bestellingen op de betaal-ID van Bancontact (het tweede blok); die bewaren we
+ * per betaling. Zonder code blijft het ordernummer staan, want dan is er niets
+ * anders.
+ */
+export function paymentReference(input: Pick<CreateCheckoutInput, "orderNumber" | "accountingCode">): string {
+  return truncate(sepaSafe(input.accountingCode || input.orderNumber), MAX_REFERENCE);
 }
 
 export function mapBancontactStatus(status: string): CheckoutStatusResult["status"] {
@@ -371,7 +393,7 @@ export class BancontactPaymentGateway implements PaymentGateway {
           amount: totalCents,
           currency,
           description: paymentDescription(input.eventName, ticketCount),
-          reference: truncate(input.orderNumber, MAX_REFERENCE),
+          reference: paymentReference(input),
           ...(returnUrl ? { returnUrl } : {}),
           ...(callbackUrl ? { callbackUrl } : {}),
         },

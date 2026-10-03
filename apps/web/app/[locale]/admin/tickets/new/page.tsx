@@ -15,6 +15,7 @@ import { TicketEventCreate } from "@/components/ticketing/admin/TicketEventCreat
 import { listTicketBannerCategories } from "@/lib/ticketing/bannerCategories";
 import { publicUrl } from "@/lib/storage";
 import { listTicketEventTemplates } from "@/lib/ticketing/templateStore";
+import { listAccountingCodes } from "@/lib/accounting/server";
 import { utcToLocalDateTime } from "@/lib/ticketing/time";
 import { ticketBase, type AdminLocale } from "@/components/ticketing/admin/format";
 
@@ -75,9 +76,10 @@ export default async function NewTicketEventPage({
     ? (calendarEvents.find((e) => e.id === requestedCalendarEventId) ?? null)
     : null;
   const base = ticketBase(locale);
-  const [templates, bannerCategories] = await Promise.all([
+  const [templates, bannerCategories, accountingCodes] = await Promise.all([
     listTicketEventTemplates(),
     listTicketBannerCategories(),
+    listAccountingCodes(),
   ]);
   const canManageTemplates = hasPermission(session, "tickets.templates");
 
@@ -120,6 +122,7 @@ export default async function NewTicketEventPage({
           linkedCalendarEvent={linkedCalendarEvent}
           linkedImageUrl={publicUrl(linkedCalendarEvent?.imageKey)}
           bannerCategories={bannerCategories}
+          accountingCodes={accountingCodes}
           baseEvent={
             linkedCalendarEvent
               ? { ownerGroupId: linkedCalendarEvent.groupId, slug: slugify(linkedCalendarEvent.titleNl) }

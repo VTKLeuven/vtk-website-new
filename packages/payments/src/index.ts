@@ -3,6 +3,7 @@ export {
   MolliePaymentGateway,
   mapPaymentStatus,
   mapRefundStatus,
+  mollieDescription,
   publicWebhookUrl,
   type MollieGatewayConfig,
   type MolliePayment,

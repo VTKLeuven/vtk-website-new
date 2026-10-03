@@ -19,6 +19,10 @@ const T = {
     previewHint: "Bekijk de ticketpagina zoals een bezoeker ze krijgt, voor je publiceert.",
     needsType:
       "Voeg eerst een actief tickettype toe; zonder ticket valt er niets te verkopen.",
+    needsCode:
+      "Kies eerst een boekhoudcode bij Basisinformatie en sla op; ze gaat mee in de betaalinfo.",
+    liveWithoutCode:
+      "Dit event heeft nog geen boekhoudcode: betalingen gaan zonder code naar Mollie en Bancontact. Kies er een bij Basisinformatie en sla op.",
     forbidden: "Je hebt geen rechten om dit event te publiceren.",
     failed: "Publiceren is mislukt. Probeer het opnieuw.",
     otherStatus: "Status:",
@@ -35,6 +39,9 @@ const T = {
     preview: "Preview",
     previewHint: "See the ticket page the way a visitor gets it, before you publish.",
     needsType: "Add an active ticket type first; without a ticket there is nothing to sell.",
+    needsCode: "Choose an accounting code under Basic information and save first; it goes into the payment details.",
+    liveWithoutCode:
+      "This event has no accounting code yet: payments go to Mollie and Bancontact without one. Choose one under Basic information and save.",
     forbidden: "You do not have permission to publish this event.",
     failed: "Publishing failed. Please try again.",
     otherStatus: "Status:",
@@ -55,6 +62,7 @@ export function TicketPublishBar({
   shopPath,
   isPrivate,
   hasActiveTicketType,
+  hasAccountingCode,
   locale,
 }: {
   eventId: string;
@@ -64,6 +72,8 @@ export function TicketPublishBar({
   shopPath: string;
   isPrivate: boolean;
   hasActiveTicketType: boolean;
+  /** Zonder boekhoudcode gaat er niets live: zie `TicketEvent.accountingCodeId`. */
+  hasAccountingCode: boolean;
   locale: AdminLocale;
 }) {
   const t = T[locale];
@@ -80,7 +90,13 @@ export function TicketPublishBar({
       try {
         const result = await publishTicketEventAction(form);
         if (!result.ok) {
-          setError(result.error === "FORBIDDEN" ? t.forbidden : t.needsType);
+          setError(
+            result.error === "FORBIDDEN"
+              ? t.forbidden
+              : result.error === "ACCOUNTING_CODE_REQUIRED"
+                ? t.needsCode
+                : t.needsType,
+          );
         }
       } catch {
         setError(t.failed);
@@ -98,28 +114,43 @@ export function TicketPublishBar({
     </a>
   );
 
+  // Een event van voor de boekhoudcodes verkoopt gewoon verder; dit zegt dat
+  // die betalingen zonder code binnenkomen, tot iemand er een kiest.
+  const codeWarning = hasAccountingCode ? null : (
+    <div className="ticket-admin-alert" data-tone="warning" role="status">
+      <AlertTriangle aria-hidden="true" size={17} />
+      <span>{t.liveWithoutCode}</span>
+    </div>
+  );
+
   if (status === "PUBLISHED") {
     return (
-      <div className="ticket-admin-alert" data-tone="success" role="status">
-        <CheckCircle2 aria-hidden="true" size={17} />
-        <span>
-          {isPrivate ? t.publishedPrivate : t.published}{" "}
-          <a className="ticket-admin-alert-link" href={`${base}${shopPath}`}>
-            {isPrivate ? t.viewPrivate : t.view}
-          </a>{" "}
-          &middot; {previewLink}
-        </span>
-      </div>
+      <>
+        <div className="ticket-admin-alert" data-tone="success" role="status">
+          <CheckCircle2 aria-hidden="true" size={17} />
+          <span>
+            {isPrivate ? t.publishedPrivate : t.published}{" "}
+            <a className="ticket-admin-alert-link" href={`${base}${shopPath}`}>
+              {isPrivate ? t.viewPrivate : t.view}
+            </a>{" "}
+            &middot; {previewLink}
+          </span>
+        </div>
+        {codeWarning}
+      </>
     );
   }
 
   if (status !== "DRAFT") {
     return (
-      <div className="ticket-admin-alert" data-tone="info" role="status">
-        <span>
-          {t.otherStatus} {status} {previewLink}
-        </span>
-      </div>
+      <>
+        <div className="ticket-admin-alert" data-tone="info" role="status">
+          <span>
+            {t.otherStatus} {status} {previewLink}
+          </span>
+        </div>
+        {codeWarning}
+      </>
     );
   }
 
@@ -129,6 +160,7 @@ export function TicketPublishBar({
         <strong>{t.draft}</strong>
         {/* De blokkade staat er vóór je klikt, niet als foutmelding erna. */}
         {!hasActiveTicketType ? <span>{t.needsType}</span> : null}
+        {!hasAccountingCode ? <span>{t.needsCode}</span> : null}
         {error ? (
           <span className="ticket-admin-publish-error" role="alert">
             <AlertTriangle aria-hidden="true" size={14} />
@@ -152,8 +184,8 @@ export function TicketPublishBar({
           className="ticket-admin-button"
           data-variant="primary"
           onClick={publish}
-          disabled={pending || !hasActiveTicketType}
-          title={hasActiveTicketType ? undefined : t.needsType}
+          disabled={pending || !hasActiveTicketType || !hasAccountingCode}
+          title={!hasActiveTicketType ? t.needsType : !hasAccountingCode ? t.needsCode : undefined}
         >
           {pending ? (
             <LoaderCircle className="is-spinning" aria-hidden="true" size={16} />

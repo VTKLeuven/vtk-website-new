@@ -19,6 +19,7 @@ import { MAX_MEMBERSHIP_PRICE_CENTS } from "@/lib/membership/config";
 /** Foutcodes die het beheerscherm zelf vertaalt. */
 export type MembershipErrorCode =
   | "INVALID_PRICE"
+  | "INVALID_ACCOUNTING_CODE"
   | "INVALID_USER"
   | "ALREADY_MEMBER"
   | "ALREADY_HONORARY"
@@ -55,10 +56,24 @@ export async function saveMembershipConfigAction(
   const parsed = priceSchema.safeParse(String(formData.get("externalPrice") ?? ""));
   if (!parsed.success) return saveError("INVALID_PRICE" satisfies MembershipErrorCode);
 
+  // Leeg = de standaardcode (730000). Een id die niet (meer) bestaat, is een
+  // pagina die ouder is dan de codelijst: liever een melding dan stil terugvallen.
+  const accountingCodeId = String(formData.get("accountingCodeId") ?? "").trim() || null;
+  const accountingCode = accountingCodeId
+    ? await prisma.accountingCode.findUnique({
+        where: { id: accountingCodeId },
+        select: { code: true },
+      })
+    : null;
+  if (accountingCodeId && !accountingCode) {
+    return saveError("INVALID_ACCOUNTING_CODE" satisfies MembershipErrorCode);
+  }
+
   const config = {
     externalPriceCents: parsed.data,
     facultyOpen: formData.get("facultyOpen") === "on",
     externalOpen: formData.get("externalOpen") === "on",
+    accountingCodeId,
   };
   const previous = await getMembershipConfig();
   await saveMembershipConfig(config);
@@ -71,7 +86,8 @@ export async function saveMembershipConfigAction(
       `prijs ${(previous.externalPriceCents / 100).toFixed(2)} -> ` +
       `${(config.externalPriceCents / 100).toFixed(2)} euro, ` +
       `gratis ${config.facultyOpen ? "open" : "dicht"}, ` +
-      `betalend ${config.externalOpen ? "open" : "dicht"}`,
+      `betalend ${config.externalOpen ? "open" : "dicht"}, ` +
+      `boekhoudcode ${accountingCode?.code ?? "standaard"}`,
   });
   revalidate();
   return saveOk();

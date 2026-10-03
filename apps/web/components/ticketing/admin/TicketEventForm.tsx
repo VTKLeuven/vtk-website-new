@@ -17,7 +17,7 @@ import {
   Ticket,
 } from "lucide-react";
 import { useActionState, useState } from "react";
-import { toDatetimeLocal, type AdminLocale } from "./format";
+import { formatMoney, toDatetimeLocal, type AdminLocale } from "./format";
 import { AddressPicker } from "./AddressPicker";
 import { PresaleFields, type PresaleGroupOption } from "./PresaleFields";
 import { SettingsPanel } from "./SettingsPanel";
@@ -25,6 +25,8 @@ import { TicketTemplateTypeRows } from "./TicketTemplateTypeRows";
 import { TicketBannerField } from "./TicketBannerField";
 import type { TicketEventTemplate } from "@/lib/ticketing/templates";
 import type { TicketBannerCategory } from "@/lib/ticketing/bannerCategories";
+import { accountingCodeLabel, type AccountingCodeOption } from "@/lib/accounting/codes";
+import type { AccountingCodeRow } from "@/lib/ticketing/statsCompute";
 
 const initialState: TicketEventFormActionState = { status: "idle" };
 
@@ -45,6 +47,8 @@ const formErrorMessages: Record<string, { nl: string; en: string }> = {
   INVALID_LABELNL: { nl: "De naam op de eventpagina mag hoogstens 80 tekens lang zijn.", en: "The name on the event page can be at most 80 characters." },
   INVALID_LABELEN: { nl: "De Engelse naam op de eventpagina mag hoogstens 80 tekens lang zijn.", en: "The English name on the event page can be at most 80 characters." },
   INVALID_BANNER: { nl: "De banner is niet opgeslagen: kies een foto of een thema met een standaardbanner.", en: "The banner was not saved: choose a photo or a theme with a default banner." },
+  ACCOUNTING_CODE_REQUIRED: { nl: "Kies een boekhoudcode: ze gaat mee in de betaalinfo bij Mollie en Bancontact.", en: "Choose an accounting code: it goes into the payment details at Mollie and Bancontact." },
+  INVALID_ACCOUNTING_CODE: { nl: "Die boekhoudcode bestaat niet meer. Kies een andere.", en: "That accounting code no longer exists. Choose another one." },
 };
 
 function formErrorMessage(code: string | undefined, locale: AdminLocale): string {
@@ -62,6 +66,7 @@ type TicketEventFormValue = {
   labelEn?: string | null;
   ownTimes?: boolean;
   ownerGroupId?: string;
+  accountingCodeId?: string | null;
   slug?: string;
   titleNl?: string;
   titleEn?: string | null;
@@ -188,6 +193,93 @@ function InheritedFromCalendar({
   );
 }
 
+/**
+ * De boekhoudcode van de verkoop. Verplicht: ze gaat vooraan in de betaalinfo
+ * bij Mollie en Bancontact, en zonder code moet de penning elke betaling
+ * opzoeken. Een event van voor de boekhoudcodes staat op "Kies een
+ * boekhoudcode", zodat opslaan er een vraagt.
+ */
+function AccountingCodeField({
+  codes,
+  value,
+  summary,
+  statsHref,
+  locale,
+}: {
+  codes: AccountingCodeOption[];
+  value: string | null;
+  summary: AccountingCodeRow[];
+  statsHref: string | null;
+  locale: AdminLocale;
+}) {
+  const nl = locale === "nl";
+  const current = codes.find((code) => code.id === value) ?? null;
+  const sold = summary.filter((row) => row.sold > 0 || (row.netCents ?? 0) !== 0);
+  const showMoney = sold.some((row) => row.netCents !== null);
+  return (
+    <div className="ticket-admin-field" data-span="2">
+      <label htmlFor="ticket-accounting-code">{nl ? "Boekhoudcode" : "Accounting code"}</label>
+      <select id="ticket-accounting-code" name="accountingCodeId" defaultValue={current?.id ?? ""} required>
+        <option value="" disabled>
+          {nl ? "Kies een boekhoudcode" : "Choose an accounting code"}
+        </option>
+        {codes.map((code) => (
+          <option key={code.id} value={code.id}>
+            {code.depth === 1 ? "\u2003" : ""}
+            {accountingCodeLabel(code)}
+          </option>
+        ))}
+      </select>
+      <span className="ticket-admin-help">
+        {codes.length === 0
+          ? nl
+            ? "Er zijn nog geen boekhoudcodes. Vraag de penning er een aan te maken bij Boekhoudcodes."
+            : "There are no accounting codes yet. Ask the treasurer to add one under Accounting codes."
+          : nl
+            ? "Staat samen met de naam van het event vooraan in de betaalinfo bij Mollie en Bancontact, zodat de penning elke betaling kan boeken. Wijzig je de code later, dan geldt de nieuwe voor nieuwe bestellingen; wat al verkocht is, blijft onder de oude staan."
+            : "Goes with the event name at the start of the payment details at Mollie and Bancontact, so the treasurer can book every payment. If you change the code later, the new one applies to new orders; what has been sold stays under the old one."}
+      </span>
+      {sold.length > 0 ? (
+        <div className="ticket-admin-table-wrap">
+          <table className="ticket-admin-table ticket-stats-table">
+            <caption className="sr-only">{nl ? "Tot nu toe verkocht per boekhoudcode" : "Sold so far per accounting code"}</caption>
+            <thead>
+              <tr>
+                <th>{nl ? "Tot nu toe verkocht onder" : "Sold so far under"}</th>
+                <th data-num>Tickets</th>
+                {showMoney ? <th data-num>{nl ? "Netto" : "Net"}</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {sold.map((row) => (
+                <tr key={row.code ?? "none"}>
+                  <td data-wrap="true">
+                    {row.code ? `${row.code} ${row.name ?? ""}`.trim() : nl ? "Zonder boekhoudcode" : "No accounting code"}
+                    {row.code && row.code === current?.code ? (
+                      <div className="ticket-admin-row-meta">{nl ? "De huidige code" : "The current code"}</div>
+                    ) : null}
+                  </td>
+                  <td data-num>{row.sold}</td>
+                  {showMoney ? (
+                    <td data-num>{row.netCents === null ? "–" : formatMoney(row.netCents, "EUR", locale)}</td>
+                  ) : null}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : null}
+      {sold.length > 0 && statsHref ? (
+        <span className="ticket-admin-help">
+          <Link href={statsHref}>
+            {nl ? "Per betaalwijze en per periode in de statistieken" : "Per payment method and period in the statistics"}
+          </Link>
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 export function TicketEventForm({
   event = {},
   groups,
@@ -198,6 +290,8 @@ export function TicketEventForm({
   linkedCalendarEvent,
   bannerCategories = [],
   linkedImageUrl = null,
+  accountingCodes,
+  accountingSummary = [],
   locale,
 }: {
   event?: TicketEventFormValue;
@@ -221,6 +315,14 @@ export function TicketEventForm({
   bannerCategories?: TicketBannerCategory[];
   /** De foto van het gekoppelde kalenderevent, als die er is. */
   linkedImageUrl?: string | null;
+  /** De keuzelijst van /admin/boekhoudcodes. */
+  accountingCodes: AccountingCodeOption[];
+  /**
+   * Wat er tot nu toe onder welke code verkocht is; enkel bij bewerken. Staat
+   * naast de keuze, zodat wie de code aanpast meteen ziet dat het al verkochte
+   * onder de oude blijft staan. `netCents` is null zonder `VIEW_FINANCE`.
+   */
+  accountingSummary?: AccountingCodeRow[];
   locale: AdminLocale;
 }) {
   const isEdit = Boolean(event.id);
@@ -345,6 +447,13 @@ export function TicketEventForm({
               ))}
             </select>
           </div>
+          <AccountingCodeField
+            codes={accountingCodes}
+            value={event.accountingCodeId ?? null}
+            summary={accountingSummary}
+            statsHref={event.id ? `${nl ? "" : "/en"}/admin/tickets/${event.id}/statistieken` : null}
+            locale={locale}
+          />
           {/* Ook bij bewerken te kiezen: een verkoop die al bestond voor ze
               bij een event mocht, moet er achteraf aan kunnen hangen. Een event
               kan meerdere ticketpagina's hebben. */}

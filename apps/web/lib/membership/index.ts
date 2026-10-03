@@ -203,11 +203,17 @@ export type MembershipTotals = {
   pending: number;
   byKind: Record<MembershipKind, number>;
   revenueCents: number;
+  /**
+   * Wat er online binnenkwam, per boekhoudcode die in de betaalinfo meeging.
+   * `code: null` = betalingen van voor de boekhoudcodes. Een handmatig
+   * toegekend lidmaatschap heeft geen betaling en staat hier dus niet in.
+   */
+  byAccountingCode: { code: string | null; name: string | null; payments: number; cents: number }[];
 };
 
 /** Het globale ledenaantal van een academiejaar, uitgesplitst per herkomst. */
 export async function membershipTotals(year: number): Promise<MembershipTotals> {
-  const [grouped, pending] = await Promise.all([
+  const [grouped, pending, paid] = await Promise.all([
     prisma.membership.groupBy({
       by: ["kind"],
       where: { year, activatedAt: { not: null } },
@@ -215,6 +221,12 @@ export async function membershipTotals(year: number): Promise<MembershipTotals> 
       _sum: { priceCents: true },
     }),
     prisma.membership.count({ where: { year, activatedAt: null } }),
+    prisma.membershipPayment.groupBy({
+      by: ["accountingCode", "accountingCodeName"],
+      where: { status: "SUCCEEDED", membership: { year } },
+      _count: { _all: true },
+      _sum: { amountCents: true },
+    }),
   ]);
 
   const byKind: Record<MembershipKind, number> = { FACULTY: 0, EXTERNAL: 0, MANUAL: 0 };
@@ -225,7 +237,25 @@ export async function membershipTotals(year: number): Promise<MembershipTotals> 
     active += row._count._all;
     revenueCents += row._sum.priceCents ?? 0;
   }
-  return { active, pending, byKind, revenueCents };
+  // Eén rij per code, ook wanneer dezelfde code onder twee namen meeging (de
+  // code werd tussendoor hernoemd): de penning boekt op de code.
+  const byCode = new Map<string, MembershipTotals["byAccountingCode"][number]>();
+  for (const row of paid) {
+    const key = row.accountingCode ?? "";
+    const entry = byCode.get(key) ?? {
+      code: row.accountingCode,
+      name: row.accountingCodeName,
+      payments: 0,
+      cents: 0,
+    };
+    entry.payments += row._count._all;
+    entry.cents += row._sum.amountCents ?? 0;
+    byCode.set(key, entry);
+  }
+  const byAccountingCode = [...byCode.values()].sort((a, b) =>
+    a.code === null ? 1 : b.code === null ? -1 : a.code.localeCompare(b.code),
+  );
+  return { active, pending, byKind, revenueCents, byAccountingCode };
 }
 
 /** De academiejaren waarvoor er lidmaatschappen bestaan, nieuwste eerst. */

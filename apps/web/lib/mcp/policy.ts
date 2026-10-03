@@ -131,6 +131,9 @@ export const MCP_PERMISSION_POLICY = {
   "signature.generate": { reads: [], creates: [], blocked: ["generate an email signature"] },
   "expenses.managePost": { reads: [], creates: [], blocked: ["read or edit expenses"] },
   "expenses.manage": { reads: [], creates: [], blocked: ["read or edit expenses, mark reimbursements or forward to the accountant"] },
+  // De codelijst stuurt wat er in de betaalinfo van elke verkoop staat; een
+  // agent hoort die niet aan te passen, en er is geen create-kind.
+  "accounting.manage": { reads: [], creates: [], blocked: ["create, edit or delete accounting codes"] },
   "audit.view": { reads: ["audit_log"], creates: [], blocked: [] },
   "urenloopApp.manage": { reads: ["urenloop_app"], creates: [], blocked: ["grant download access, issue codes or revoke devices"] },
   // Websitefeedback is vrije tekst van leden over de site, soms anoniem

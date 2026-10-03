@@ -9665,6 +9665,38 @@ eigen lijst aangevinkte events. De rekenkant staat in
 - **Filters en selectie zijn twee formulieren.** In één formulier reisden de
   vinkjes van het vorige jaar mee wanneer je van jaar wisselde.
 
+## Boekhoudcodes in de betaalinfo
+
+Een betaling die binnenkwam via Bancontact of Mollie was voor de penning niet aan
+een evenement te koppelen. Bij Mollie het ergst: één uitbetaling bundelt alles,
+en kaartbetalingen komen pas in een latere uitbetaling. Nu kiest elke
+ticketverkoop een boekhoudcode uit het rekeningstelsel van de kring, en die staat
+samen met de eventnaam in de betaalinfo. Het lidgeld gaat onder 730000. Techniek
+en bestanden: `docs/ticketing.md`, "Boekhoudcodes".
+
+- **Eén code per verkoop, niet per tickettype.** Een bestelling is één betaling,
+  en één betaling heeft één mededeling. Een verkoop die onder twee codes hoort,
+  zijn twee verkopen.
+- **Een subcode is de hoofdrekening met vijf cijfers erachter**: 700100 en 10002
+  wordt 70010010002. Zo staat ze in de betaalinfo en zo kent de boekhouder ze.
+- **De code is verplicht**, bij het aanmaken en bij publiceren. Een event van
+  voor de codes blijft verkopen, met een waarschuwing tot iemand er een kiest.
+- **Wat verkocht is, verandert nooit mee.** Een bestelling bewaart de code die in
+  haar betaalinfo stond. Bleek de code fout, dan pas je ze aan voor wat nog komt,
+  en de statistieken tonen per code hoeveel tickets en hoeveel geld eronder
+  binnenkwam, per betaalwijze en met de periode erbij. Een bestaande bestelling
+  van code wisselen kan bewust niet: dan klopt ze niet meer met het uittreksel.
+- **Het ordernummer gaat uit de betaalinfo zodra er een code is.** Voor een
+  student was het een tweede reeks willekeurige tekens naast die van de bank. Bij
+  Bancontact neemt de code zijn plaats in, bij Mollie blijft het in de metadata.
+  Wie een betaling van het uittreksel terugzoekt, zoekt in de bestellingen op de
+  betaal-ID van de provider.
+- **Wat niet in code kan:** de naam van de begunstigde ("Ticketsysteem test")
+  is de naam van het betaalprofiel bij Bancontact, en de naam bovenaan de
+  Mollie-betaalpagina die van het websiteprofiel bij Mollie. Beide pas je aan in
+  het dashboard van de provider. De kenmerken die Bancontact en de bank vóór onze
+  tekst zetten (`txufk...`, `01a0f...`, `PQ ...`) zijn niet weg te krijgen.
+
 ## Afgelopen ticketevents staan standaard niet in de lijst
 
 `/admin/tickets` toont standaard enkel wat nog moet komen of nu loopt. Na een

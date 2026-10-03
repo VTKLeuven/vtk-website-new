@@ -1,9 +1,14 @@
 "use client";
 
-import { Card, Input, Label } from "@vtk/ui";
+import { Card, Input, Label, Select } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { saveMembershipConfigAction } from "@/app/actions/membership";
 import type { MembershipConfig } from "@/lib/membership/config";
+import {
+  accountingCodeLabel,
+  MEMBERSHIP_DEFAULT_ACCOUNTING_CODE,
+  type AccountingCodeOption,
+} from "@/lib/accounting/codes";
 
 /**
  * De prijs van een niet-facultair lidmaatschap, en of de twee wegen naar een
@@ -16,10 +21,13 @@ import type { MembershipConfig } from "@/lib/membership/config";
 export function MembershipSettingsForm({
   nl,
   config,
+  accountingCodes,
 }: {
   nl: boolean;
   config: MembershipConfig;
+  accountingCodes: AccountingCodeOption[];
 }) {
+  const fallback = accountingCodes.find((code) => code.code === MEMBERSHIP_DEFAULT_ACCOUNTING_CODE);
   const t = nl
     ? {
         heading: "Instellingen",
@@ -27,6 +35,10 @@ export function MembershipSettingsForm({
         price: "Prijs niet-facultair lid (EUR)",
         faculty: "Studenten van de faculteit kunnen zich gratis aanmelden",
         external: "Niet-facultaire leden kunnen zich aanmelden en betalen",
+        code: "Boekhoudcode",
+        codeDefault: fallback ? `Standaard: ${accountingCodeLabel(fallback)}` : "Geen code",
+        codeHint: "Staat vooraan in de betaalinfo bij Mollie, zodat het lidgeld in een uitbetaling herkenbaar is.",
+        invalidCode: "Die boekhoudcode bestaat niet meer. Kies een andere.",
         submit: "Opslaan",
         saving: "Opslaan...",
         saved: "Instellingen opgeslagen.",
@@ -39,6 +51,10 @@ export function MembershipSettingsForm({
         price: "Price for a non-faculty member (EUR)",
         faculty: "Faculty students can sign up for free",
         external: "Non-faculty members can sign up and pay",
+        code: "Accounting code",
+        codeDefault: fallback ? `Default: ${accountingCodeLabel(fallback)}` : "No code",
+        codeHint: "Leads the payment details at Mollie, so the fee is recognisable in a payout.",
+        invalidCode: "That accounting code no longer exists. Choose another one.",
         submit: "Save",
         saving: "Saving...",
         saved: "Settings saved.",
@@ -56,7 +72,7 @@ export function MembershipSettingsForm({
         savingLabel={t.saving}
         savedMessage={t.saved}
         resetOnSuccess={false}
-        errorMessages={{ INVALID_PRICE: t.invalid }}
+        errorMessages={{ INVALID_PRICE: t.invalid, INVALID_ACCOUNTING_CODE: t.invalidCode }}
         fallbackErrorMessage={t.failed}
         className="space-y-4"
       >
@@ -68,6 +84,28 @@ export function MembershipSettingsForm({
             inputMode="decimal"
             defaultValue={(config.externalPriceCents / 100).toFixed(2).replace(".", ",")}
           />
+        </div>
+        <div className="max-w-md">
+          <Label htmlFor="membership-accounting-code">{t.code}</Label>
+          <Select
+            id="membership-accounting-code"
+            name="accountingCodeId"
+            defaultValue={
+              config.accountingCodeId &&
+              accountingCodes.some((code) => code.id === config.accountingCodeId)
+                ? config.accountingCodeId
+                : ""
+            }
+          >
+            <option value="">{t.codeDefault}</option>
+            {accountingCodes.map((code) => (
+              <option key={code.id} value={code.id}>
+                {code.depth === 1 ? "\u2003" : ""}
+                {accountingCodeLabel(code)}
+              </option>
+            ))}
+          </Select>
+          <p className="mt-1 text-xs text-[#5c667f]">{t.codeHint}</p>
         </div>
         <label className="flex items-center gap-2 text-sm text-vtk-ink">
           <input

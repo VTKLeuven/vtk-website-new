@@ -215,6 +215,7 @@ export async function createTicketCheckout(
       },
       questions: { where: { active: true }, orderBy: { sortOrder: "asc" } },
       presaleGroups: { select: { groupId: true } },
+      accountingCode: { select: { code: true, name: true } },
     },
   });
 
@@ -424,6 +425,11 @@ export async function createTicketCheckout(
             // niet gemeten, en dat is iets anders dan "direct".
             source: input.source === undefined ? null : (sanitizeSourceKey(input.source) ?? "direct"),
             sourceCampaign: sanitizeSourceKey(input.sourceCampaign),
+            // Een kopie, geen verwijzing: dit is de code die in de betaalinfo
+            // meegaat, en die blijft staan wanneer het event later een andere
+            // krijgt. Zie `TicketOrder.accountingCode`.
+            accountingCode: event.accountingCode?.code ?? null,
+            accountingCodeName: event.accountingCode?.name ?? null,
             items: {
               create: normalizedItems.map((item, index) => ({
                 ticketTypeId: item.ticketTypeId,
@@ -512,6 +518,7 @@ export async function createTicketCheckout(
     orderNumber,
     buyerEmail: input.buyerEmail,
     eventName: input.locale === "en" && event.titleEn ? event.titleEn : event.titleNl,
+    accountingCode: event.accountingCode?.code ?? null,
     currency: event.currency,
     // Per type én prijs: een lid dat een ledenticket en een gewoon ticket van
     // hetzelfde type koopt, heeft twee regels met elk hun eigen bedrag.
@@ -573,6 +580,8 @@ type CheckoutContext = {
   orderNumber: string;
   buyerEmail: string;
   eventName: string;
+  /** De code van de bestelling zelf, niet die van het event: zie `TicketOrder.accountingCode`. */
+  accountingCode: string | null;
   currency: string;
   lines: CheckoutLine[];
   expiresAt: Date;
@@ -629,6 +638,7 @@ async function createAndPersistCheckout(
     orderNumber: context.orderNumber,
     buyerEmail: context.buyerEmail,
     eventName: context.eventName,
+    accountingCode: context.accountingCode,
     currency: context.currency,
     lines: context.lines,
     expiresAt: context.expiresAt,
@@ -1102,6 +1112,9 @@ export async function startOrderPayment(input: {
     buyerEmail: order.buyerEmail,
     eventName:
       input.locale === "en" && order.event.titleEn ? order.event.titleEn : order.event.titleNl,
+    // Die van de bestelling, ook als het event intussen een andere code kreeg:
+    // de statistieken tellen deze bestelling onder haar eigen code.
+    accountingCode: order.accountingCode,
     currency: order.currency,
     lines: [...lineByKey.values()],
     expiresAt: order.reservationExpiresAt,

@@ -41,6 +41,9 @@ function ticket(overrides: Partial<StatsTicketInput> = {}): StatsTicketInput {
     signedIn: true,
     source: "kalender",
     campaign: null,
+    accountingCode: "70010010001",
+    accountingCodeName: "Cantussen",
+    provider: "bancontact",
     ...overrides,
   };
 }
@@ -166,5 +169,67 @@ describe("ticket stats", () => {
     expect(stats.perBucket.series.map((series) => series.key)).toEqual(["a", "b", "c", "other"]);
     expect(stats.perBucket.series[3].values[0]).toBe(2);
     expect(stats.totals.occupancy).toBeNull();
+  });
+});
+
+describe("ticket stats per accounting code", () => {
+  it("counts a ticket under the code of its order, so a switched event shows both codes", () => {
+    const stats = computeTicketStats(
+      [event()],
+      [
+        ticket({ accountingCode: "700100", accountingCodeName: "Activiteiten opbrengsten" }),
+        ticket(),
+        ticket({ provider: "mollie" }),
+        ticket({ accountingCode: null, accountingCodeName: null }),
+      ],
+      [],
+      [],
+      { now: NOW },
+    );
+    expect(stats.accountingCodes.map((row) => [row.code, row.sold, row.netCents])).toEqual([
+      ["700100", 1, 1000],
+      ["70010010001", 2, 2000],
+      // Zonder code onderaan: dat is geen code maar een gat.
+      [null, 1, 1000],
+    ]);
+    const cantussen = stats.accountingCodes.find((row) => row.code === "70010010001")!;
+    expect(cantussen.providers.map((row) => [row.provider, row.sold, row.netCents])).toEqual([
+      ["bancontact", 1, 1000],
+      ["mollie", 1, 1000],
+    ]);
+  });
+
+  it("takes the newest name when a code was renamed between two orders", () => {
+    const stats = computeTicketStats(
+      [event()],
+      [
+        ticket({ accountingCodeName: "Cantus", soldAt: new Date("2026-09-20T18:00:00Z") }),
+        ticket({ accountingCodeName: "Cantussen", soldAt: new Date("2026-09-21T18:00:00Z") }),
+      ],
+      [],
+      [],
+      { now: NOW },
+    );
+    expect(stats.accountingCodes).toHaveLength(1);
+    expect(stats.accountingCodes[0].name).toBe("Cantussen");
+  });
+
+  it("keeps the money of a refunded ticket out and of events without finance hidden", () => {
+    const stats = computeTicketStats(
+      [event(), event({ id: "e2", finance: false })],
+      [
+        ticket(),
+        ticket({ status: "REFUNDED", refundedCents: 1000 }),
+        ticket({ eventId: "e2" }),
+      ],
+      [],
+      [],
+      { now: NOW },
+    );
+    const row = stats.accountingCodes[0];
+    expect(row.sold).toBe(2);
+    expect(row.refunded).toBe(1);
+    expect(row.netCents).toBe(1000);
+    expect(row.hiddenFinance).toBe(1);
   });
 });

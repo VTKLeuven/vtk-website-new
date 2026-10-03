@@ -71,6 +71,9 @@ export default async function TicketOrdersPage({
             { buyerEmail: { contains: query, mode: "insensitive" } },
             { items: { some: { attendeeName: { contains: query, mode: "insensitive" } } } },
             { items: { some: { attendeeEmail: { contains: query, mode: "insensitive" } } } },
+            // De betaal-ID van Bancontact of Mollie: die staat op het
+            // rekeninguittreksel en in de uitbetaling, het ordernummer niet.
+            { payments: { some: { providerPaymentId: { contains: query, mode: "insensitive" } } } },
           ],
         }
       : {}),
@@ -155,7 +158,7 @@ export default async function TicketOrdersPage({
                 name="q"
                 type="search"
                 defaultValue={query}
-                placeholder={locale === "nl" ? "Referentie, naam of e-mail" : "Reference, name or email"}
+                placeholder={locale === "nl" ? "Referentie, naam, e-mail of betaal-ID" : "Reference, name, email or payment ID"}
               />
             </div>
           </div>

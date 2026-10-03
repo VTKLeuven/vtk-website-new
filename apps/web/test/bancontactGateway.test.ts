@@ -92,7 +92,7 @@ describe("BancontactPaymentGateway.createCheckout", () => {
     expect(result.status).toBe("PENDING");
   });
 
-  it("puts the ticket count and the event in the description the buyer sees", async () => {
+  it("puts the event and the ticket count in the description the buyer sees", async () => {
     const spy = mockFetch(201, {
       paymentId: "pay_9",
       status: "PENDING",
@@ -101,10 +101,10 @@ describe("BancontactPaymentGateway.createCheckout", () => {
 
     await gateway().createCheckout(CHECKOUT_INPUT);
 
-    // 2 + 1 uit CHECKOUT_INPUT. Het aantal staat vooraan omdat enkel de eerste
-    // 35 tekens de mededeling op het rekeninguittreksel halen.
+    // 2 + 1 uit CHECKOUT_INPUT. De eventnaam staat vooraan omdat enkel de
+    // eerste 35 tekens zeker de mededeling op het rekeninguittreksel halen.
     const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
-    expect(body.description).toBe("3 tickets Galabal");
+    expect(body.description).toBe("Galabal - 3 tickets");
   });
 
   it("says ticket in the singular for one ticket", async () => {
@@ -119,7 +119,7 @@ describe("BancontactPaymentGateway.createCheckout", () => {
       lines: [{ name: "Standaard", quantity: 1, unitAmountCents: 1500 }],
     });
 
-    expect(JSON.parse(String(spy.mock.calls[0]?.[1]?.body)).description).toBe("1 ticket Galabal");
+    expect(JSON.parse(String(spy.mock.calls[0]?.[1]?.body)).description).toBe("Galabal - 1 ticket");
   });
 
   it("drops characters the SEPA character set does not carry", async () => {
@@ -134,7 +134,7 @@ describe("BancontactPaymentGateway.createCheckout", () => {
     await gateway().createCheckout({ ...CHECKOUT_INPUT, eventName: "Cantus \u{1F37A} & vrienden" });
 
     const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
-    expect(body.description).toBe("3 tickets Cantus vrienden");
+    expect(body.description).toBe("Cantus vrienden - 3 tickets");
   });
 
   it("truncates the description and the reference to their own limits", async () => {
@@ -153,8 +153,24 @@ describe("BancontactPaymentGateway.createCheckout", () => {
     const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
     // Twee verschillende grenzen: de omschrijving mag 140, de referentie 35.
     expect(body.description).toHaveLength(140);
-    expect(body.description.startsWith("3 tickets EEE")).toBe(true);
+    expect(body.description).toBe("E".repeat(140));
     expect(body.reference).toHaveLength(35);
+  });
+
+  it("puts the accounting code in the reference instead of the order number", async () => {
+    const spy = mockFetch(201, {
+      paymentId: "pay_12",
+      status: "PENDING",
+      _links: { deeplink: { href: "https://pay.bancontact.net/pay/2/code" } },
+    });
+
+    await gateway().createCheckout({ ...CHECKOUT_INPUT, accountingCode: "70010010001" });
+
+    // De reference staat op het uittreksel vóór de omschrijving: code en
+    // eventnaam samen zijn wat de penning nodig heeft om de betaling te boeken.
+    const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
+    expect(body.reference).toBe("70010010001");
+    expect(body.description).toBe("Galabal - 3 tickets");
   });
 
   it("leaves out the http addresses instead of failing the whole payment", async () => {

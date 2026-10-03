@@ -46,6 +46,7 @@ export async function GET(
               { buyerEmail: { contains: query, mode: "insensitive" } },
               { items: { some: { attendeeName: { contains: query, mode: "insensitive" } } } },
               { items: { some: { attendeeEmail: { contains: query, mode: "insensitive" } } } },
+              { payments: { some: { providerPaymentId: { contains: query, mode: "insensitive" } } } },
             ],
           }
         : {}),
@@ -54,7 +55,7 @@ export async function GET(
       where,
       include: {
         items: { select: { id: true } },
-        payments: { orderBy: { createdAt: "desc" }, take: 1 },
+        payments: { orderBy: { createdAt: "desc" } },
       },
       orderBy: { createdAt: "desc" },
       take: MAX_EXPORT_ROWS + 1,
@@ -64,10 +65,13 @@ export async function GET(
     }
 
     const headers = locale === "nl"
-      ? ["Referentie", "Koper", "E-mail koper", "Status", "Tickets", "Totaal (cent)", "Terugbetaald (cent)", "Netto (cent)", "Munt", "Betaalprovider", "Betaalstatus", "Betaald op", "Aangemaakt op"]
-      : ["Reference", "Buyer", "Buyer email", "Status", "Tickets", "Total (cents)", "Refunded (cents)", "Net (cents)", "Currency", "Payment provider", "Payment status", "Paid at", "Created at"];
+      ? ["Referentie", "Koper", "E-mail koper", "Status", "Tickets", "Totaal (cent)", "Terugbetaald (cent)", "Netto (cent)", "Munt", "Boekhoudcode", "Naam boekhoudcode", "Betaalprovider", "Betaal-ID provider", "Betaalstatus", "Betaald op", "Aangemaakt op"]
+      : ["Reference", "Buyer", "Buyer email", "Status", "Tickets", "Total (cents)", "Refunded (cents)", "Net (cents)", "Currency", "Accounting code", "Accounting code name", "Payment provider", "Provider payment ID", "Payment status", "Paid at", "Created at"];
     const rows: CsvValue[][] = orders.map((order) => {
-      const payment = order.payments[0];
+      // De betaling die slaagde, anders de laatste poging. Met de betaal-ID
+      // legt de penning deze rij naast een lijn van een Mollie-uitbetaling of
+      // een Bancontact-storting.
+      const payment = order.payments.find((candidate) => candidate.status === "SUCCEEDED") ?? order.payments[0];
       return [
         order.reference,
         order.buyerName,
@@ -78,7 +82,10 @@ export async function GET(
         order.refundedCents,
         order.totalCents - order.refundedCents,
         order.currency,
+        order.accountingCode,
+        order.accountingCodeName,
         payment?.provider,
+        payment?.providerPaymentId,
         payment?.status,
         order.paidAt,
         order.createdAt,

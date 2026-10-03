@@ -85,7 +85,25 @@ const EXPECTED_EVENT_FORM_ERRORS = new Set([
   "LABEL_REQUIRED",
   "INVALID_LABELNL",
   "INVALID_LABELEN",
+  "ACCOUNTING_CODE_REQUIRED",
+  "INVALID_ACCOUNTING_CODE",
 ]);
+
+/**
+ * De boekhoudcode uit het eventformulier. Verplicht: ze gaat vooraan in de
+ * betaalinfo bij Mollie en Bancontact (zie `TicketOrder.accountingCode`). Een
+ * id die niet meer bestaat, is een pagina die ouder is dan de codelijst.
+ */
+async function accountingCodeFromForm(formData: FormData) {
+  const id = optionalValue(formData, "accountingCodeId");
+  if (!id) throw new Error("ACCOUNTING_CODE_REQUIRED");
+  const code = await prisma.accountingCode.findUnique({
+    where: { id },
+    select: { id: true, code: true, name: true },
+  });
+  if (!code) throw new Error("INVALID_ACCOUNTING_CODE");
+  return code;
+}
 
 /**
  * Hoe een verkoop op haar kalenderevent staat: op de eventpagina of apart, met
@@ -518,6 +536,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
   }
 
   const placement = await eventPagePlacement(formData, calendarEventId, null);
+  const accountingCode = await accountingCodeFromForm(formData);
   const titleNl = limitedValue(formData, "titleNl", 200) || calendarEvent?.titleNl || "";
   if (!titleNl) throw new Error("TITLE_REQUIRED");
   // Een gekoppelde verkoop volgt de uren van het kalenderevent, tenzij ze eigen
@@ -583,6 +602,7 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
         calendarEventId,
         ...placement,
         ownerGroupId,
+        accountingCodeId: accountingCode.id,
         slug,
         titleNl,
         titleEn: limitedOptionalValue(formData, "titleEn", 200) ?? calendarEvent?.titleEn,
@@ -738,9 +758,12 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
     entity: "ticketEvent",
     entityId: event.id,
     target: titleNl,
-    summary: template
-      ? `sjabloon "${template.label}", capaciteit ${capacity}, ${templateTypes.length} tickettype(s)`
-      : `capaciteit ${capacity}, eerste tickettype "${firstTicketName}"`,
+    summary: [
+      template
+        ? `sjabloon "${template.label}", capaciteit ${capacity}, ${templateTypes.length} tickettype(s)`
+        : `capaciteit ${capacity}, eerste tickettype "${firstTicketName}"`,
+      `boekhoudcode ${accountingCode.code}`,
+    ].join(", "),
   });
 
   refreshTicketEvent(locale, event.id);
@@ -783,6 +806,13 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
     throw new Error("INVALID_CALENDAR_EVENT");
   }
   const placement = await eventPagePlacement(formData, calendarEventId, eventId);
+  const accountingCode = await accountingCodeFromForm(formData);
+  const previousAccountingCode = event.accountingCodeId
+    ? await prisma.accountingCode.findUnique({
+        where: { id: event.accountingCodeId },
+        select: { code: true },
+      })
+    : null;
   // Nieuw gekoppeld en nog zonder naam: de eigen titel wordt de naam op de
   // eventpagina. Die titel wordt hieronder door die van het event vervangen, en
   // anders was "Cantussen apart" nergens meer te lezen.
@@ -839,6 +869,9 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
         slug: nextSlug,
         calendarEventId,
         ...placement,
+        // Geldt vanaf de volgende bestelling; wat al verkocht is, draagt zijn
+        // eigen kopie (`TicketOrder.accountingCode`).
+        accountingCodeId: accountingCode.id,
         titleNl: linked?.titleNl ?? (limitedValue(formData, "titleNl", 200) || event.titleNl),
         titleEn: linked ? linked.titleEn : limitedOptionalValue(formData, "titleEn", 200),
         descriptionNl: linked
@@ -897,16 +930,32 @@ export async function updateTicketEventAction(formData: FormData): Promise<void>
         action: "EVENT_UPDATED",
         entityType: "TicketEvent",
         entityId: eventId,
-        metadata: { status },
+        metadata: {
+          status,
+          ...(accountingCode.id !== event.accountingCodeId
+            ? { accountingCode: { from: previousAccountingCode?.code ?? null, to: accountingCode.code } }
+            : {}),
+        },
       },
     });
   });
+  // Een codewissel apart vermeld: de penning wil achteraf kunnen nagaan
+  // wanneer een verkoop van code veranderde en door wie.
+  const codeChange =
+    accountingCode.id !== event.accountingCodeId
+      ? `boekhoudcode ${previousAccountingCode?.code ?? "geen"} -> ${accountingCode.code}`
+      : null;
   await logAudit({
     action: "update",
     entity: "ticketEvent",
     entityId: eventId,
     target: await ticketEventTitle(eventId),
-    summary: status === event.status ? "instellingen bewerkt" : `status gezet op ${status}`,
+    summary: [
+      status === event.status ? "instellingen bewerkt" : `status gezet op ${status}`,
+      codeChange,
+    ]
+      .filter(Boolean)
+      .join(", "),
   });
   await removeReplacedBanner(event.imageKey, banner.imageKey);
   refreshTicketEvent(locale, eventId);
@@ -931,6 +980,9 @@ export async function publishTicketEventAction(
     const { session, event } = await requireTicketEventCapability(eventId, "MANAGE_EVENT");
     const activeTypes = await prisma.ticketType.count({ where: { eventId, active: true } });
     if (activeTypes === 0) return { ok: false, error: "TICKET_TYPE_REQUIRED_TO_PUBLISH" };
+    // Zonder code gaat de betaalinfo zonder code naar de provider; een nieuw
+    // event hoort dat niet te kunnen. Zie `TicketEvent.accountingCodeId`.
+    if (!event.accountingCodeId) return { ok: false, error: "ACCOUNTING_CODE_REQUIRED" };
 
     await prisma.$transaction(async (tx) => {
       await tx.ticketEvent.update({

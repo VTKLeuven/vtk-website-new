@@ -13,7 +13,8 @@ import {
 } from "@vtk/payments";
 import { ticketingBaseUrl } from "@/lib/ticketing/config";
 import { formatWorkingYear } from "@/lib/workingYear";
-import { activateMembership } from ".";
+import { membershipAccountingCode } from "@/lib/accounting/server";
+import { activateMembership, getMembershipConfig } from ".";
 
 /**
  * Het betaalspoor van een niet-facultair lidmaatschap.
@@ -95,6 +96,11 @@ export async function startMembershipCheckout(input: {
   const provider = membershipPaymentProvider();
   const attempt = membership.payments.length + 1;
   const expiresAt = new Date(now.getTime() + CHECKOUT_MINUTES * 60 * 1000);
+  // De code van het lidgeld, vooraan in de betaalinfo: zo herkent de penning
+  // het lidgeld tussen de ticketverkoop in één Mollie-uitbetaling.
+  const accountingCode = await membershipAccountingCode(
+    (await getMembershipConfig()).accountingCodeId,
+  );
   const payment = await prisma.membershipPayment.create({
     data: {
       membershipId: membership.id,
@@ -103,6 +109,8 @@ export async function startMembershipCheckout(input: {
       status: "CREATED",
       amountCents: membership.priceCents,
       currency: "EUR",
+      accountingCode: accountingCode?.code ?? null,
+      accountingCodeName: accountingCode?.name ?? null,
       expiresAt,
     },
   });
@@ -123,6 +131,7 @@ export async function startMembershipCheckout(input: {
       orderNumber: membership.id.slice(-8).toUpperCase(),
       buyerEmail: input.userEmail,
       eventName: label,
+      accountingCode: accountingCode?.code ?? null,
       currency: "EUR",
       lines: [{ name: label, quantity: 1, unitAmountCents: membership.priceCents }],
       expiresAt,

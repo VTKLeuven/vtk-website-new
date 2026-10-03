@@ -17,6 +17,7 @@ import { revokeMembershipAction } from "@/app/actions/membership";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { GrantMembershipForm } from "./GrantMembershipForm";
 import { MembershipSettingsForm } from "./MembershipSettingsForm";
+import { listAccountingCodes } from "@/lib/accounting/server";
 import { HonoraryList } from "./HonoraryList";
 
 /**
@@ -100,11 +101,12 @@ export default async function AdminLeden({
     );
   }
 
-  const [years, totals, rows, config] = await Promise.all([
+  const [years, totals, rows, config, accountingCodes] = await Promise.all([
     membershipYears(),
     membershipTotals(year),
     listMembers(year, { pending }),
     getMembershipConfig(),
+    listAccountingCodes(),
   ]);
 
   const dateFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
@@ -143,6 +145,17 @@ export default async function AdminLeden({
             <p className="text-2xl font-semibold tabular-nums text-vtk-ink">
               {formatEuro(totals.revenueCents, nl ? "nl" : "en")}
             </p>
+            {/* Zoals het in de Mollie-uitbetalingen staat: per boekhoudcode. */}
+            {totals.byAccountingCode.map((row) => (
+              <p key={row.code ?? ""} className="mt-1 text-sm tabular-nums text-[#5c667f]">
+                {formatEuro(row.cents, nl ? "nl" : "en")}{" "}
+                {row.code
+                  ? `${nl ? "onder" : "under"} ${row.code} ${row.name ?? ""}`.trim()
+                  : nl
+                    ? "zonder boekhoudcode"
+                    : "without accounting code"}
+              </p>
+            ))}
             {totals.pending > 0 ? (
               <p className="mt-1 text-sm text-[#5c667f]">
                 {nl
@@ -176,7 +189,7 @@ export default async function AdminLeden({
         </div>
       </Card>
 
-      <MembershipSettingsForm nl={nl} config={config} />
+      <MembershipSettingsForm nl={nl} config={config} accountingCodes={accountingCodes} />
 
       <Card className="p-5">
         <h2 className="mb-1 font-medium text-vtk-ink">

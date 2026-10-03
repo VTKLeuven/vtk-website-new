@@ -17,12 +17,20 @@ export type MembershipConfig = {
   facultyOpen: boolean;
   /** Staat de betalende weg open voor wie niet aan de faculteit studeert? */
   externalOpen: boolean;
+  /**
+   * De boekhoudcode die met het lidgeld meegaat in de betaalinfo. Null = de
+   * standaard, 730000 Lidgelden (`MEMBERSHIP_DEFAULT_ACCOUNTING_CODE`). Een id
+   * en geen code, zodat hernoemen of hernummeren in /admin/boekhoudcodes de
+   * keuze niet breekt.
+   */
+  accountingCodeId: string | null;
 };
 
 export const DEFAULT_MEMBERSHIP_CONFIG: MembershipConfig = {
   externalPriceCents: 2500,
   facultyOpen: true,
   externalOpen: true,
+  accountingCodeId: null,
 };
 
 /** Bovengrens op de prijs: een typfout van een nul mag geen €250 worden. */
@@ -49,6 +57,10 @@ export function parseMembershipConfig(raw: unknown): MembershipConfig {
         : DEFAULT_MEMBERSHIP_CONFIG.externalPriceCents,
     facultyOpen: boolean(value.facultyOpen, DEFAULT_MEMBERSHIP_CONFIG.facultyOpen),
     externalOpen: boolean(value.externalOpen, DEFAULT_MEMBERSHIP_CONFIG.externalOpen),
+    accountingCodeId:
+      typeof value.accountingCodeId === "string" && value.accountingCodeId
+        ? value.accountingCodeId
+        : null,
   };
 }
 

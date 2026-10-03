@@ -168,7 +168,10 @@ without the key and says which one accepts it.
   ticket QR, so the page does not depend on an external image host.
 - **`POST /v3/payments`** takes `amount` (the only mandatory one), `currency`,
   `description`, `reference`, `bulkId`, `callbackUrl`, `identifyCallbackUrl` and
-  `returnUrl`. We send the first six. `returnUrl` exists but only matters for the
+  `returnUrl`. We send all but `bulkId` and `identifyCallbackUrl`. There is **no
+  field for the payee name**: the "Ticketsysteem test" a buyer saw on their
+  statement is the name of the payment profile at Bancontact, and changes there,
+  not in code (`shopName` exists, but only on `/v3/payments/pos`). `returnUrl` exists but only matters for the
   provider's own checkout page (`_links.checkout`); a buyer paying in the app
   never passes it, which is why our page polls the order status.
 - Amounts are **integer cents**, unlike Mollie's decimal strings. There is
@@ -176,8 +179,17 @@ without the key and says which one accepts it.
   cents, but this API accepts more (measured with a EUR 10 000 payment, then
   cancelled), and a hard-coded cap would block an order the provider would take.
   `description` is capped at 140 characters and `reference` at 35; only the first
-  35 of the description reach the bank statement, which is where the mistaken
-  single 35 for both came from.
+  35 of the description are guaranteed to reach the bank statement, which is
+  where the mistaken single 35 for both came from.
+- **What the statement shows** is one line of at most 140 characters, e.g.
+  `txufk... 01a0f756... PQ q1doZ9 70010010001 12 Urencantus - 1 ticket`. The
+  first three blocks (a transfer id, the Bancontact payment id, the payment code
+  after "PQ") are added by the bank and Bancontact and cannot be removed; then
+  come our `reference` and `description`, and whatever passes 140 is cut. So
+  `reference` is the accounting code (the order number when there is none) and
+  the description puts the event name before the ticket count. To find an order
+  from a statement line, search the orders for the Bancontact payment id (the
+  second block); it is stored as `TicketPayment.providerPaymentId`.
 - **Every URL in the request must be `https`.** An `http` address is not a
   half-working callback but a 400 on the whole payment
   (`FIELD_IS_INVALID: Field returnUrl is invalid`), so the gateway drops both
@@ -219,6 +231,46 @@ without the key and says which one accepts it.
 - **Verify against your own contract before going live**: endpoint version, field
   names and status values depend on the product in the merchant contract.
   Everything provider-specific sits in `packages/payments/src/bancontact.ts`.
+
+## Boekhoudcodes
+
+Every ticket sale picks an accounting code (`TicketEvent.accountingCodeId`), and
+so does the membership fee (`leden.config`, default 730000). The code goes into
+the payment details, so the treasurer can split a Bancontact credit or a Mollie
+payout per code without looking up orders. The list lives in
+`/admin/boekhoudcodes` (`accounting.manage`); the migration
+`20261003120000_accounting_codes` seeds the chart of accounts of the kring. The
+kring choices behind it are in `docs/design-decisions.md` ("Boekhoudcodes in de
+betaalinfo").
+
+| Concern | Location |
+| --- | --- |
+| Table, sub codes (parent code + five digits) | `AccountingCode` in `schema.prisma` |
+| Parsing, ordering, labels (pure) | `apps/web/lib/accounting/codes.ts` |
+| Queries, membership fallback to 730000 | `apps/web/lib/accounting/server.ts` |
+| Create, edit, delete | `apps/web/app/actions/accountingCodes.ts` |
+| What Mollie gets: `"<code> <event>"`, order number in metadata | `mollieDescription()` in `packages/payments/src/mollie.ts` |
+| What Bancontact gets: code as `reference`, event first in `description` | `paymentReference()` / `paymentDescription()` in `packages/payments/src/bancontact.ts` |
+| Copy on the order at checkout | `createTicketCheckout()` in `lib/ticketing/orders.ts` |
+| Per code and per payment method | `accountingCodeRows()` in `lib/ticketing/statsCompute.ts` |
+
+- **An order copies the code and its name** (`TicketOrder.accountingCode`,
+  `accountingCodeName`; `MembershipPayment` the same). Changing the event's code,
+  renaming or deleting a code never moves what was sold: the statistics count
+  an order under the code its payment details carried, so an event that
+  switched halfway shows both, each with its tickets, money and period. A second
+  payment attempt on the same order (`startOrderPayment`) uses the order's code,
+  not the event's.
+- **Orders from before the codes have `NULL`** and show as "Zonder
+  boekhoudcode". Nothing is backfilled: their payment details carried no code.
+- **The event form requires a code, and so does publishing.** An event from
+  before the codes keeps selling; its settings show a warning until someone
+  picks one.
+- **Without a code nothing changes for the provider**: Mollie keeps
+  `"<event> - <order number>"`, Bancontact the order number as reference. The
+  equipment rental (`apps/logistiek`) does not send a code yet.
+- The orders search and CSV export match the provider payment id, and the export
+  carries the code and that id, to lay an order next to a line of a Mollie payout.
 
 ## File map
 

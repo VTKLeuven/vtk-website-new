@@ -1124,6 +1124,10 @@ model MembershipPayment {
   currency           String                  @default("EUR")
   checkoutUrl        String?
   providerStatus     String?
+  /// De boekhoudcode die in de betaalinfo meeging, met haar naam. Een kopie,
+  /// net als bij `TicketOrder.accountingCode`.
+  accountingCode     String?
+  accountingCodeName String?
   expiresAt          DateTime?               @db.Timestamptz(3)
   succeededAt        DateTime?               @db.Timestamptz(3)
   failedAt           DateTime?               @db.Timestamptz(3)
@@ -2105,6 +2109,41 @@ model CalendarFeedToken {
 }
 
 // -----------------------------------------------------------------------------
+// Boekhoudcodes
+// -----------------------------------------------------------------------------
+
+/// Een boekhoudcode (opbrengstenrekening) waaronder een verkoop geboekt wordt.
+///
+/// Ze staat vooraan in de betaalinfo bij Mollie en Bancontact, zodat de penning
+/// een binnenkomende betaling of een Mollie-uitbetaling kan opsplitsen zonder
+/// elke bestelling op te zoeken. Een ticketverkoop kiest er één
+/// (`TicketEvent.accountingCodeId`); het lidmaatschap ook (`leden.config`).
+///
+/// Een subcode is de code van haar hoofdrekening met vijf cijfers erachter:
+/// "700100" + "10002" = "70010010002". `code` bewaart altijd de volledige code,
+/// want dat is wat er in de betaalinfo staat en waarop gezocht wordt.
+///
+/// Bestellingen bewaren hun eigen kopie van code en naam
+/// (`TicketOrder.accountingCode`), dus een code hernoemen, wijzigen of
+/// verwijderen verandert niets aan wat al verkocht is. Zie docs/ticketing.md.
+model AccountingCode {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  /// De hoofdrekening, voor een subcode. Verwijder je de hoofdrekening, dan
+  /// gaan haar subcodes mee: los van hun hoofdrekening betekenen ze niets.
+  parentId  String?
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  parent       AccountingCode?  @relation("AccountingCodeChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children     AccountingCode[] @relation("AccountingCodeChildren")
+  ticketEvents TicketEvent[]
+
+  @@index([parentId])
+}
+
+// -----------------------------------------------------------------------------
 // Integrated ticketing
 // -----------------------------------------------------------------------------
 
@@ -2130,6 +2169,12 @@ model TicketEvent {
   // blijven overgenomen; enkel `startsAt` en `endsAt` zijn van hier.
   ownTimes              Boolean           @default(false)
   ownerGroupId          String
+  // De boekhoudcode waaronder deze verkoop geboekt wordt. Geldt voor elke
+  // bestelling vanaf nu: een bestelling kopieert de code bij het aanmaken
+  // (`TicketOrder.accountingCode`), dus een wijziging hier verschuift niets
+  // van wat al verkocht is. Leeg bij events van voor de boekhoudcodes, of
+  // wanneer de code verwijderd werd; publiceren vraagt er dan een.
+  accountingCodeId      String?
   slug                  String            @unique
   titleNl               String
   titleEn               String?
@@ -2216,6 +2261,7 @@ model TicketEvent {
   imageCategory CalendarCategory? @relation(fields: [imageCategoryId], references: [id], onDelete: SetNull)
   ownerGroup    Group             @relation("TicketEventOwnerGroup", fields: [ownerGroupId], references: [id], onDelete: Restrict)
   createdBy     User?             @relation("TicketEventCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  accountingCode AccountingCode?  @relation(fields: [accountingCodeId], references: [id], onDelete: SetNull)
 
   inventoryPools TicketInventoryPool[]
   ticketTypes    TicketType[]
@@ -2234,6 +2280,7 @@ model TicketEvent {
 
   @@index([calendarEventId])
   @@index([ownerGroupId])
+  @@index([accountingCodeId])
   @@index([status, salesStartAt, salesEndAt])
   @@index([startsAt])
 }
@@ -2416,6 +2463,14 @@ model TicketOrder {
   // `utm_campaign` of `?c=` uit dezelfde link: om twee posts op hetzelfde
   // kanaal uit elkaar te houden ("affiche" vs "story").
   sourceCampaign       String?
+  // De boekhoudcode van het event op het moment van bestellen, met haar naam.
+  // Een kopie en geen relatie: dit is wat er in de betaalinfo bij de provider
+  // stond, en dat verandert niet meer wanneer iemand achteraf de code van het
+  // event aanpast of de code hernoemt. Zo tonen de statistieken hoeveel er
+  // onder de ene en hoeveel onder de andere code verkocht is. `null` =
+  // bestelling zonder code (van voor de boekhoudcodes, of een event zonder).
+  accountingCode       String?
+  accountingCodeName   String?
   createdAt            DateTime          @default(now()) @db.Timestamptz(3)
   updatedAt            DateTime          @updatedAt @db.Timestamptz(3)
 

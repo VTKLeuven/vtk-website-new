@@ -135,6 +135,16 @@ export async function loadTicketStats(
                 buyerEmail: true,
                 source: true,
                 sourceCampaign: true,
+                accountingCode: true,
+                accountingCodeName: true,
+                // De betaling die het geld bracht; hoogstens één slaagt per
+                // bestelling, de andere pogingen zijn vervallen.
+                payments: {
+                  where: { status: "SUCCEEDED" },
+                  select: { provider: true },
+                  orderBy: { succeededAt: "asc" },
+                  take: 1,
+                },
               },
             },
           },
@@ -187,6 +197,9 @@ export async function loadTicketStats(
       signedIn: item.order.buyerUserId !== null,
       source: item.order.source,
       campaign: item.order.sourceCampaign,
+      accountingCode: item.order.accountingCode,
+      accountingCodeName: item.order.accountingCodeName,
+      provider: item.order.payments[0]?.provider ?? null,
     };
   });
 

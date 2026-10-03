@@ -47,6 +47,15 @@ export type StatsTicketInput = {
   signedIn: boolean;
   source: string | null;
   campaign: string | null;
+  /**
+   * De boekhoudcode van de bestelling, zoals ze in de betaalinfo meeging
+   * (`TicketOrder.accountingCode`), en haar naam op dat moment. Null = zonder
+   * code.
+   */
+  accountingCode: string | null;
+  accountingCodeName: string | null;
+  /** Langs welke weg het geld binnenkwam: "bancontact", "mollie", "free", of null. */
+  provider: string | null;
 };
 
 export type StatsOrderInput = {
@@ -179,6 +188,35 @@ export type SourceRow = {
   campaigns: { key: string; orders: number; tickets: number }[];
 };
 
+/** Eén betaalwijze binnen een boekhoudcode. */
+export type AccountingProviderRow = {
+  provider: string | null;
+  sold: number;
+  netCents: number | null;
+};
+
+/**
+ * Wat er onder één boekhoudcode verkocht is. Zo ziet de penning hoeveel er
+ * onder de ene en hoeveel onder de andere code binnenkwam wanneer een event
+ * halverwege van code wisselde, en per betaalwijze, want Bancontact stort per
+ * betaling en Mollie in één uitbetaling.
+ */
+export type AccountingCodeRow = {
+  /** Null = bestellingen zonder boekhoudcode. */
+  code: string | null;
+  /** De naam zoals ze met de laatste bestelling meeging. */
+  name: string | null;
+  sold: number;
+  refunded: number;
+  /** Netto (min wat teruggestort is), enkel over events met `finance`. */
+  netCents: number | null;
+  /** Hoeveel van deze tickets uit events zonder `finance` komen: hun geld telt niet mee. */
+  hiddenFinance: number;
+  providers: AccountingProviderRow[];
+  firstSoldAt: Date | null;
+  lastSoldAt: Date | null;
+};
+
 export type TicketStats = {
   totals: {
     events: number;
@@ -222,6 +260,7 @@ export type TicketStats = {
   types: TypeRow[];
   groups: GroupRow[];
   sources: SourceRow[];
+  accountingCodes: AccountingCodeRow[];
 };
 
 /**
@@ -573,5 +612,92 @@ export function computeTicketStats(
     types: typeList,
     groups: groupList,
     sources: sourceList,
+    accountingCodes: accountingCodeRows(tickets, financeIds),
   };
+}
+
+/** De volgorde van de betaalwijzen in een rij: zoals ze op het uittreksel binnenkomen. */
+const PROVIDER_ORDER = ["bancontact", "mollie", "free"];
+
+/**
+ * Tel per boekhoudcode. Een ticket telt onder de code van zijn bestelling, niet
+ * onder die van het event nu: een event dat van code wisselde, staat dus op
+ * twee rijen. Verkocht = geldig, net als overal in de statistieken; het geld is
+ * netto en telt ook wat later terugbetaald of ongeldig gemaakt werd mee, zoals
+ * de omzet per event.
+ */
+export function accountingCodeRows(
+  tickets: readonly Pick<
+    StatsTicketInput,
+    "eventId" | "status" | "soldAt" | "totalCents" | "refundedCents" | "accountingCode" | "accountingCodeName" | "provider"
+  >[],
+  financeIds: ReadonlySet<string>,
+): AccountingCodeRow[] {
+  type Working = AccountingCodeRow & { lastNameAt: number; providerMap: Map<string, AccountingProviderRow> };
+  const rows = new Map<string, Working>();
+  for (const ticket of tickets) {
+    const key = ticket.accountingCode ?? "";
+    let row = rows.get(key);
+    if (!row) {
+      row = {
+        code: ticket.accountingCode,
+        name: ticket.accountingCodeName,
+        sold: 0,
+        refunded: 0,
+        netCents: null,
+        hiddenFinance: 0,
+        providers: [],
+        firstSoldAt: null,
+        lastSoldAt: null,
+        lastNameAt: -Infinity,
+        providerMap: new Map(),
+      };
+      rows.set(key, row);
+    }
+    const soldAt = ticket.soldAt.getTime();
+    // Werd de code tussendoor hernoemd, dan toont de rij de jongste naam.
+    if (ticket.accountingCodeName && soldAt >= row.lastNameAt) {
+      row.name = ticket.accountingCodeName;
+      row.lastNameAt = soldAt;
+    }
+    if (!row.firstSoldAt || soldAt < row.firstSoldAt.getTime()) row.firstSoldAt = ticket.soldAt;
+    if (!row.lastSoldAt || soldAt > row.lastSoldAt.getTime()) row.lastSoldAt = ticket.soldAt;
+
+    const providerKey = ticket.provider ?? "";
+    const provider = row.providerMap.get(providerKey) ?? { provider: ticket.provider, sold: 0, netCents: null };
+    row.providerMap.set(providerKey, provider);
+
+    const finance = financeIds.has(ticket.eventId);
+    if (finance) {
+      const net = ticket.totalCents - ticket.refundedCents;
+      row.netCents = (row.netCents ?? 0) + net;
+      provider.netCents = (provider.netCents ?? 0) + net;
+    }
+    if (ticket.status === "REFUNDED") row.refunded += 1;
+    if (ticket.status !== "VALID") continue;
+    row.sold += 1;
+    provider.sold += 1;
+    if (!finance) row.hiddenFinance += 1;
+  }
+  const providerRank = (provider: string | null) => {
+    const index = provider ? PROVIDER_ORDER.indexOf(provider) : -1;
+    return index === -1 ? PROVIDER_ORDER.length : index;
+  };
+  return [...rows.values()]
+    .map((row): AccountingCodeRow => ({
+      code: row.code,
+      name: row.name,
+      sold: row.sold,
+      refunded: row.refunded,
+      netCents: row.netCents,
+      hiddenFinance: row.hiddenFinance,
+      providers: [...row.providerMap.values()].sort(
+        (a, b) => providerRank(a.provider) - providerRank(b.provider),
+      ),
+      firstSoldAt: row.firstSoldAt,
+      lastSoldAt: row.lastSoldAt,
+    }))
+    // Op code, zoals in het rekeningstelsel; zonder code onderaan, want dat is
+    // geen code maar een gat.
+    .sort((a, b) => (a.code === null ? 1 : b.code === null ? -1 : a.code.localeCompare(b.code)));
 }

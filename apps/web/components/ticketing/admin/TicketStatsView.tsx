@@ -1,6 +1,7 @@
 import Link from "@/components/ui/Link";
 import {
   BarChart3,
+  BookText,
   CircleDollarSign,
   Clock3,
   Compass,
@@ -32,6 +33,25 @@ import {
 /** Drie kleuren in vaste volgorde (gevalideerd in vtk-base.css), daarna grijs. */
 const SERIES_COLORS = ["var(--chart-1)", "var(--chart-2)", "var(--chart-3)"];
 const seriesColor = (index: number) => SERIES_COLORS[index] ?? "var(--chart-context)";
+
+/** De betaalwijze zoals de penning ze op een uittreksel of in een uitbetaling terugziet. */
+function providerLabel(provider: string | null, locale: AdminLocale): string {
+  const nl = locale === "nl";
+  switch (provider) {
+    case "bancontact":
+      return "Bancontact";
+    case "mollie":
+      return "Mollie";
+    case "free":
+      return nl ? "Gratis" : "Free";
+    case "mock":
+      return nl ? "Testbetaling" : "Test payment";
+    case null:
+      return nl ? "Onbekend" : "Unknown";
+    default:
+      return provider;
+  }
+}
 
 function SectionHead({
   id,
@@ -519,6 +539,10 @@ export function TicketStatsView({
         </section>
       ) : null}
 
+      {stats.accountingCodes.length > 0 ? (
+        <AccountingCodeSection stats={stats} locale={locale} single={single} money={money} n={n} />
+      ) : null}
+
       {stats.types.length > 0 ? (
         <section className="ticket-admin-section" aria-labelledby="stats-types">
           <SectionHead
@@ -599,5 +623,131 @@ export function TicketStatsView({
         </dl>
       </section>
     </>
+  );
+}
+
+/**
+ * Per boekhoudcode, en daarbinnen per betaalwijze. Een bestelling telt onder de
+ * code die in haar betaalinfo stond: wisselde een event van code, dan staan
+ * beide hier, elk met wat eronder verkocht is en wanneer.
+ */
+function AccountingCodeSection({
+  stats,
+  locale,
+  single,
+  money,
+  n,
+}: {
+  stats: TicketStats;
+  locale: AdminLocale;
+  single: boolean;
+  money: (cents: number | null) => string;
+  n: (value: number) => string;
+}) {
+  const nl = locale === "nl";
+  const rows = stats.accountingCodes;
+  const showMoney = stats.totals.financeEvents > 0;
+  // Enkel de betaalwijzen die er echt zijn: een kolom "Gratis" bij een event
+  // zonder gratis tickets is ruis.
+  const providers = [
+    ...new Map(
+      rows.flatMap((row) => row.providers.map((entry) => [entry.provider ?? "", entry.provider] as const)),
+    ).values(),
+  ];
+  const period = (first: Date | null, last: Date | null) => {
+    if (!first || !last) return "–";
+    const from = formatDate(first, locale);
+    const to = formatDate(last, locale);
+    return from === to ? from : `${from} ${nl ? "tot" : "to"} ${to}`;
+  };
+  const hidden = rows.reduce((sum, row) => sum + row.hiddenFinance, 0);
+
+  return (
+    <section className="ticket-admin-section" aria-labelledby="stats-accounting">
+      <SectionHead
+        id="stats-accounting"
+        icon={BookText}
+        title={nl ? "Per boekhoudcode" : "Per accounting code"}
+        intro={
+          single
+            ? nl
+              ? "Onder welke code de tickets betaald zijn, zoals ze in de betaalinfo bij Mollie en Bancontact stond. Kreeg dit event een andere code, dan staat wat ervoor en erna verkocht is elk op een eigen rij."
+              : "The code the tickets were paid under, as it appeared in the payment details at Mollie and Bancontact. If this event switched codes, what was sold before and after each has its own row."
+            : nl
+              ? "Over alle gekozen evenementen. Een bestelling telt onder de code die in haar betaalinfo stond, niet onder de code die het event nu heeft."
+              : "Across all selected events. An order counts under the code in its payment details, not the code the event has now."
+        }
+      />
+      <div className="ticket-admin-table-wrap">
+        <table className="ticket-admin-table ticket-stats-table">
+          <thead>
+            <tr>
+              <th>{nl ? "Boekhoudcode" : "Accounting code"}</th>
+              <th data-num>{nl ? "Verkocht" : "Sold"}</th>
+              {providers.map((provider) => (
+                <th key={provider ?? "unknown"} data-num>
+                  {providerLabel(provider, locale)}
+                </th>
+              ))}
+              {showMoney ? <th data-num>{nl ? "Netto" : "Net"}</th> : null}
+              <th>{nl ? "Periode" : "Period"}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.code ?? "none"}>
+                <td data-wrap="true">
+                  {row.code ? (
+                    <>
+                      <strong className="tabular-nums">{row.code}</strong>
+                      {row.name ? <div className="ticket-admin-row-meta">{row.name}</div> : null}
+                    </>
+                  ) : (
+                    <>
+                      <strong>{nl ? "Zonder boekhoudcode" : "No accounting code"}</strong>
+                      <div className="ticket-admin-row-meta">
+                        {nl
+                          ? "Betaald voor er een code gekozen was"
+                          : "Paid before a code was chosen"}
+                      </div>
+                    </>
+                  )}
+                </td>
+                <td data-num>
+                  {n(row.sold)}
+                  {row.refunded > 0 ? (
+                    <span className="ticket-stats-muted">
+                      {" "}
+                      ({n(row.refunded)} {nl ? "terugbetaald" : "refunded"})
+                    </span>
+                  ) : null}
+                </td>
+                {providers.map((provider) => {
+                  const entry = row.providers.find((candidate) => candidate.provider === provider);
+                  return (
+                    <td key={provider ?? "unknown"} data-num>
+                      {!entry
+                        ? "–"
+                        : showMoney && entry.netCents !== null
+                          ? money(entry.netCents)
+                          : `${n(entry.sold)} ${nl ? "tickets" : "tickets"}`}
+                    </td>
+                  );
+                })}
+                {showMoney ? <td data-num>{money(row.netCents)}</td> : null}
+                <td>{period(row.firstSoldAt, row.lastSoldAt)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {showMoney && hidden > 0 ? (
+        <p className="ticket-admin-help">
+          {nl
+            ? `${n(hidden)} tickets komen uit evenementen waarvan je de omzet niet mag zien; hun geld telt hier niet mee.`
+            : `${n(hidden)} tickets come from events whose revenue you cannot see; their money is not counted here.`}
+        </p>
+      ) : null}
+    </section>
   );
 }

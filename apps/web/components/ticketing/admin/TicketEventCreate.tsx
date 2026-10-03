@@ -13,6 +13,7 @@ import {
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
 import { TicketEventForm, type LinkedCalendarEvent } from "./TicketEventForm";
 import type { TicketBannerCategory } from "@/lib/ticketing/bannerCategories";
+import type { AccountingCodeOption } from "@/lib/accounting/codes";
 import { SettingsPanel } from "./SettingsPanel";
 import { ticketBase, type AdminLocale } from "./format";
 
@@ -40,6 +41,7 @@ export function TicketEventCreate({
   linkedCalendarEvent,
   linkedImageUrl = null,
   bannerCategories = [],
+  accountingCodes,
   baseEvent,
   canManageTemplates,
   locale,
@@ -53,6 +55,7 @@ export function TicketEventCreate({
   linkedCalendarEvent?: LinkedCalendarEvent | null;
   linkedImageUrl?: string | null;
   bannerCategories?: TicketBannerCategory[];
+  accountingCodes: AccountingCodeOption[];
   /** Wat het formulier zonder sjabloon al meekreeg (een gekoppeld kalenderevent). */
   baseEvent?: { ownerGroupId?: string; slug?: string };
   canManageTemplates: boolean;
@@ -210,6 +213,7 @@ export function TicketEventCreate({
           linkedCalendarEvent={linkedCalendarEvent}
           linkedImageUrl={linkedImageUrl}
           bannerCategories={bannerCategories}
+          accountingCodes={accountingCodes}
           template={template}
           event={prefill}
           locale={locale}
