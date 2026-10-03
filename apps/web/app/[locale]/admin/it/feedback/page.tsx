@@ -5,6 +5,7 @@ import type { Locale } from "@vtk/i18n";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import {
+  DOPL_ORIGIN,
   FEEDBACK_KINDS,
   FEEDBACK_STATUSES,
   feedbackKindLabel,
@@ -142,9 +143,25 @@ export default async function AdminWebsiteFeedbackPage({
       <header className="vtk-admin-page-head">
         <h1>{nl ? "Feedback Website" : "Website feedback"}</h1>
         <p>
-          {nl
-            ? "Wat leden via het accountmenu over de site melden: bugs, fouten in de inhoud, iets aan het ontwerp of een idee. Een melding kan anoniem zijn; dan is er niemand om iets aan terug te vragen."
-            : "What members report about the site through the account menu: bugs, mistakes in the content, something about the design, or an idea. A report can be anonymous; then there is nobody to ask a follow-up question."}
+          {nl ? (
+            <>
+              Nieuwe feedback uit het accountmenu komt binnen in{" "}
+              <a href={DOPL_ORIGIN} target="_blank" rel="noopener noreferrer">
+                Dopl
+              </a>
+              , bij de intake van het project Website. Hier staan de meldingen die de site zelf bewaarde, tot ze
+              afgehandeld zijn. Een melding kan anoniem zijn; dan is er niemand om iets aan terug te vragen.
+            </>
+          ) : (
+            <>
+              New feedback from the account menu arrives in{" "}
+              <a href={DOPL_ORIGIN} target="_blank" rel="noopener noreferrer">
+                Dopl
+              </a>
+              , in the intake of the Website project. These are the reports the site stored itself, until they are
+              handled. A report can be anonymous; then there is nobody to ask a follow-up question.
+            </>
+          )}
         </p>
       </header>
 
@@ -210,8 +227,8 @@ export default async function AdminWebsiteFeedbackPage({
             <FeedbackRow
               key={item.id}
               labels={labels}
-              // Het pad komt uit een formulier; `normaliseFeedbackPath` liet
-              // enkel een pad op deze site door, dus dit blijft intern.
+              // Het pad kwam uit het oude formulier, dat bij het bewaren enkel
+              // een pad op deze site doorliet; dit blijft dus intern.
               pathHref={item.path}
               item={{
                 id: item.id,

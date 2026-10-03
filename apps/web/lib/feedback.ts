@@ -3,16 +3,34 @@ import type { Locale } from "@vtk/i18n";
 /**
  * Websitefeedback: wat een lid via het accountmenu over de site zelf meldt.
  *
- * Hier staan enkel de gedeelde afspraken (grenzen, categorieën, labels), zodat
- * het formulier, de server action en het beheerscherm dezelfde lijst gebruiken.
- * Het I/O-werk staat in `app/actions/feedback.ts`.
+ * Sinds oktober 2026 landt die feedback in Dopl, het platform waar IT al zijn
+ * werk bijhoudt; de site toont enkel dat formulier (`FeedbackDialog`). De rest
+ * van dit bestand (categorieën, statussen, labels) dient nog voor het beheer van
+ * de meldingen die de site zelf bewaarde, op /admin/it/feedback.
  */
 
+/** Waar Dopl draait; enkel berichten van deze oorsprong worden gelezen. */
+export const DOPL_ORIGIN = "https://dopl.vtk.be";
+
+/** Het publieke formulier "Feedback Nieuwe Website" in Dopl. */
+export const DOPL_FEEDBACK_FORM_SLUG = "website-feedback-nieuwe-website";
+
+/** Het formulier als gewone pagina, voor wie het in een nieuw tabblad opent. */
+export const DOPL_FEEDBACK_FORM_URL = `${DOPL_ORIGIN}/f/${DOPL_FEEDBACK_FORM_SLUG}`;
+
+/**
+ * Het formulier zoals `embed.js` van Dopl het in zijn modal laadt: zonder de
+ * paginarand, met zijn eigen sluitknop, en met de site als `origin`. Dopl
+ * aanvaardt een inzending enkel van een oorsprong die het formulier toelaat
+ * (`allowedEmbedOrigins`), en leest die uit deze parameter wanneer de browser
+ * `ancestorOrigins` niet kent.
+ */
+export function doplFeedbackEmbedUrl(hostOrigin: string): string {
+  return `${DOPL_FEEDBACK_FORM_URL}?embed=modal&origin=${encodeURIComponent(hostOrigin)}`;
+}
+
 export const FEEDBACK_LIMITS = {
-  message: 4000,
   note: 1000,
-  path: 300,
-  userAgent: 400,
 } as const;
 
 /** Waarover de melding gaat; volgt de enum `WebsiteFeedbackKind`. */
@@ -30,24 +48,13 @@ export function isFeedbackStatus(value: unknown): value is FeedbackStatus {
   return typeof value === "string" && (FEEDBACK_STATUSES as readonly string[]).includes(value);
 }
 
-/**
- * De categorie in één woord, plus de zin eronder in het formulier. Twee talen,
- * want dit staat zowel op de publieke site als in het beheer.
- */
+/** De categorie in één woord, in beide talen van het beheer. */
 export const FEEDBACK_KIND_LABELS: Record<FeedbackKind, { nl: string; en: string }> = {
   BUG: { nl: "Bug", en: "Bug" },
   CONTENT: { nl: "Inhoud", en: "Content" },
   DESIGN: { nl: "Design", en: "Design" },
   FEATURE: { nl: "Idee", en: "Idea" },
   OTHER: { nl: "Iets anders", en: "Something else" },
-};
-
-export const FEEDBACK_KIND_HINTS: Record<FeedbackKind, { nl: string; en: string }> = {
-  BUG: { nl: "Iets werkt niet", en: "Something is broken" },
-  CONTENT: { nl: "Tekst of info klopt niet", en: "Text or info is wrong" },
-  DESIGN: { nl: "Ziet er raar uit", en: "Looks off" },
-  FEATURE: { nl: "Voorstel voor iets nieuws", en: "A suggestion for something new" },
-  OTHER: { nl: "Past nergens bij", en: "Fits nowhere else" },
 };
 
 export const FEEDBACK_STATUS_LABELS: Record<FeedbackStatus, { nl: string; en: string }> = {
@@ -63,18 +70,4 @@ export function feedbackKindLabel(kind: FeedbackKind, locale: Locale): string {
 
 export function feedbackStatusLabel(status: FeedbackStatus, locale: Locale): string {
   return locale === "nl" ? FEEDBACK_STATUS_LABELS[status].nl : FEEDBACK_STATUS_LABELS[status].en;
-}
-
-/**
- * Het pad waar de melder stond, zoals we het bewaren: enkel een pad op deze
- * site, met querystring maar zonder domein. Een volledige URL uit een
- * gemanipuleerd formulier zou van het beheerscherm een doorverwijzing naar om
- * het even welke site maken.
- */
-export function normaliseFeedbackPath(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const raw = value.trim();
-  // `//evil.example` is voor een browser een protocol-relatieve URL, geen pad.
-  if (!raw.startsWith("/") || raw.startsWith("//")) return null;
-  return raw.slice(0, FEEDBACK_LIMITS.path);
 }
