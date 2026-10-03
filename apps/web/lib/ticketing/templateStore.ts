@@ -20,13 +20,19 @@ import type { TicketEventTemplate } from "./templates";
  * die nog niet geseed is). Zonder dit staat de keuzelijst bij het aanmaken er
  * leeg bij en lijkt de functie stuk.
  */
-function fromBuiltin(template: BuiltinTicketTemplate): TicketEventTemplate {
+function fromBuiltin(
+  template: BuiltinTicketTemplate,
+  accountingCodeIds: ReadonlyMap<string, string>,
+): TicketEventTemplate {
   return {
     id: `builtin:${template.slug}`,
     slug: template.slug,
     label: template.label,
     note: template.note ?? null,
     ownerGroupId: null,
+    accountingCodeId: template.accountingCode
+      ? (accountingCodeIds.get(template.accountingCode) ?? null)
+      : null,
     titleNl: template.titleNl ?? "",
     titleEn: template.titleEn ?? "",
     descriptionNl: template.descriptionNl ?? "",
@@ -81,6 +87,23 @@ function fromBuiltin(template: BuiltinTicketTemplate): TicketEventTemplate {
   };
 }
 
+/**
+ * De ids van de boekhoudcodes die de meegeleverde sjablonen noemen. Een
+ * meegeleverd sjabloon kent enkel de code zelf, want een id verschilt per
+ * databank.
+ */
+async function builtinAccountingCodeIds(
+  templates: readonly BuiltinTicketTemplate[],
+): Promise<Map<string, string>> {
+  const codes = [...new Set(templates.flatMap((template) => template.accountingCode ?? []))];
+  if (codes.length === 0) return new Map();
+  const rows = await prisma.accountingCode.findMany({
+    where: { code: { in: codes } },
+    select: { id: true, code: true },
+  });
+  return new Map(rows.map((row) => [row.code, row.id]));
+}
+
 // Chronologisch binnen het sjabloon: `order` wordt bij elke opslag opnieuw
 // gezet, en `code` vangt een rij op die daarbuiten ontstond (de seed).
 const include = {
@@ -100,6 +123,7 @@ function toTemplate(row: Row): TicketEventTemplate {
     label: row.label,
     note: row.note,
     ownerGroupId: row.ownerGroupId,
+    accountingCodeId: row.accountingCodeId,
     titleNl: row.titleNl,
     titleEn: row.titleEn,
     descriptionNl: row.descriptionNl,
@@ -162,7 +186,10 @@ export async function listTicketEventTemplates(): Promise<TicketEventTemplate[]>
     orderBy: [{ order: "asc" }, { label: "asc" }],
     include,
   });
-  if (rows.length === 0) return BUILTIN_TICKET_EVENT_TEMPLATES.map(fromBuiltin);
+  if (rows.length === 0) {
+    const codeIds = await builtinAccountingCodeIds(BUILTIN_TICKET_EVENT_TEMPLATES);
+    return BUILTIN_TICKET_EVENT_TEMPLATES.map((template) => fromBuiltin(template, codeIds));
+  }
   return rows.map((row) => toTemplate(row as Row));
 }
 
@@ -171,7 +198,7 @@ export async function getTicketEventTemplate(slug: string): Promise<TicketEventT
   const row = await prisma.ticketEventTemplate.findUnique({ where: { slug }, include });
   if (row) return toTemplate(row as Row);
   const builtin = BUILTIN_TICKET_EVENT_TEMPLATES.find((template) => template.slug === slug);
-  return builtin ? fromBuiltin(builtin) : null;
+  return builtin ? fromBuiltin(builtin, await builtinAccountingCodeIds([builtin])) : null;
 }
 
 /** Idem op id, voor het beheerscherm. */

@@ -9686,6 +9686,13 @@ en bestanden: `docs/ticketing.md`, "Boekhoudcodes".
   en de statistieken tonen per code hoeveel tickets en hoeveel geld eronder
   binnenkwam, per betaalwijze en met de periode erbij. Een bestaande bestelling
   van code wisselen kan bewust niet: dan klopt ze niet meer met het uittreksel.
+- **Een sjabloon stelt een code voor, maar dwingt ze niet af.** Een cantus
+  hoort elke keer onder Cantussen, dus het sjabloon vult ze voor; wie het event
+  maakt, kan ze aanpassen. Een sjabloon zonder code laat de keuze aan de maker.
+- **Bancontact bundelt per code.** De code gaat ook mee als `bulkId`. Bundelt
+  het betaalprofiel de uitbetalingen, dan krijgt elke code haar eigen storting
+  in plaats van één bedrag voor tien events; bundelt het niet, dan negeert
+  Bancontact het veld.
 - **Het ordernummer gaat uit de betaalinfo zodra er een code is.** Voor een
   student was het een tweede reeks willekeurige tekens naast die van de bank. Bij
   Bancontact neemt de code zijn plaats in, bij Mollie blijft het in de metadata.

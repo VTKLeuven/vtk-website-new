@@ -2188,6 +2188,13 @@ async function main() {
     const group = template.groupCode
       ? await prisma.group.findUnique({ where: { code: template.groupCode }, select: { id: true } })
       : null;
+    // Idem voor de boekhoudcode: ontbreekt ze, dan kiest de maker ze zelf.
+    const accountingCode = template.accountingCode
+      ? await prisma.accountingCode.findUnique({
+          where: { code: template.accountingCode },
+          select: { id: true },
+        })
+      : null;
 
     await prisma.ticketEventTemplate.create({
       data: {
@@ -2195,6 +2202,7 @@ async function main() {
         label: template.label,
         note: template.note ?? null,
         ownerGroupId: group?.id ?? null,
+        accountingCodeId: accountingCode?.id ?? null,
         titleNl: template.titleNl ?? "",
         titleEn: template.titleEn ?? "",
         descriptionNl: template.descriptionNl ?? "",

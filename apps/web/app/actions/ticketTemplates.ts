@@ -160,6 +160,15 @@ export async function saveTicketTemplateAction(
     const group = await prisma.group.findUnique({ where: { id: ownerGroupId }, select: { id: true } });
     if (!group) return saveError("INVALID_INPUT");
   }
+  // Optioneel: zonder code kiest wie het event maakt ze zelf.
+  const accountingCodeId = text(formData.get("accountingCodeId")) || null;
+  if (accountingCodeId) {
+    const code = await prisma.accountingCode.findUnique({
+      where: { id: accountingCodeId },
+      select: { id: true },
+    });
+    if (!code) return saveError("INVALID_ACCOUNTING_CODE");
+  }
 
   const salesOpens = optionalOffset(formData.get("salesOpensMinutesBefore"));
   const salesCloses = optionalOffset(formData.get("salesClosesMinutesBefore"));
@@ -171,6 +180,7 @@ export async function saveTicketTemplateAction(
     label,
     note: text(formData.get("note")) || null,
     ownerGroupId,
+    accountingCodeId,
     titleNl: text(formData.get("titleNl")).slice(0, 200),
     titleEn: text(formData.get("titleEn")).slice(0, 200),
     descriptionNl: text(formData.get("descriptionNl")).slice(0, 20_000),
@@ -325,6 +335,8 @@ export async function saveTicketTemplateFromEventAction(
       label,
       note: text(formData.get("note")) || null,
       ownerGroupId: event.ownerGroupId,
+      // De volgende cantus hoort onder dezelfde code als deze.
+      accountingCodeId: event.accountingCodeId,
       titleNl: event.titleNl,
       titleEn: event.titleEn ?? "",
       descriptionNl: event.descriptionNl ?? "",

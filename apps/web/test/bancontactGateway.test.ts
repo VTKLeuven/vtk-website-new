@@ -171,6 +171,22 @@ describe("BancontactPaymentGateway.createCheckout", () => {
     const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
     expect(body.reference).toBe("70010010001");
     expect(body.description).toBe("Galabal - 3 tickets");
+    // Elke code haar eigen bundel, wanneer het profiel bundelt.
+    expect(body.bulkId).toBe("70010010001");
+  });
+
+  it("leaves the bulk to the profile when there is no accounting code", async () => {
+    const spy = mockFetch(201, {
+      paymentId: "pay_13",
+      status: "PENDING",
+      _links: { deeplink: { href: "https://pay.bancontact.net/pay/2/nocode" } },
+    });
+
+    await gateway().createCheckout(CHECKOUT_INPUT);
+
+    const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
+    expect(body).not.toHaveProperty("bulkId");
+    expect(body.reference).toBe("VTK-0001");
   });
 
   it("leaves out the http addresses instead of failing the whole payment", async () => {

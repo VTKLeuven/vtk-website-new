@@ -60,6 +60,11 @@ export type BuiltinTicketTemplate = {
   note?: string;
   /** Code van de post waarvoor dit sjabloon typisch dient; enkel een label. */
   groupCode?: string;
+  /**
+   * De boekhoudcode die een event uit dit sjabloon voorgesteld krijgt, op de
+   * code zelf ("70010010001") en niet op een id: die verschilt per databank.
+   */
+  accountingCode?: string;
   titleNl?: string;
   titleEn?: string;
   descriptionNl?: string;
@@ -93,6 +98,7 @@ export const BUILTIN_TICKET_EVENT_TEMPLATES: BuiltinTicketTemplate[] = [
     label: "Cantus",
     note: "Vier tickets (bier en water, lid en niet-lid), één ticket per persoon, verkoop drie dagen vooraf.",
     groupCode: "ACTIVITEITEN",
+    accountingCode: "70010010001",
     titleNl: "Cantus",
     titleEn: "Cantus",
     location: "De Waaiberg",

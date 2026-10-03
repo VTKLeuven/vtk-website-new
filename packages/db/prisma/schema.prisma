@@ -2136,9 +2136,10 @@ model AccountingCode {
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
-  parent       AccountingCode?  @relation("AccountingCodeChildren", fields: [parentId], references: [id], onDelete: Cascade)
-  children     AccountingCode[] @relation("AccountingCodeChildren")
-  ticketEvents TicketEvent[]
+  parent         AccountingCode?       @relation("AccountingCodeChildren", fields: [parentId], references: [id], onDelete: Cascade)
+  children       AccountingCode[]      @relation("AccountingCodeChildren")
+  ticketEvents   TicketEvent[]
+  eventTemplates TicketEventTemplate[]
 
   @@index([parentId])
 }
@@ -2847,6 +2848,11 @@ model TicketEventTemplate {
   confirmationMessageNl String  @default("")
   confirmationMessageEn String  @default("")
 
+  /// De boekhoudcode die een event uit dit sjabloon voorgesteld krijgt. Leeg =
+  /// de maker kiest ze zelf. Het event bewaart zijn eigen keuze, dus het
+  /// sjabloon later aanpassen raakt geen bestaand event.
+  accountingCodeId String?
+
   /// Capaciteit van de voorraadpot `GENERAL`.
   capacity Int   @default(100)
   /// Ticketontwerp, dezelfde vorm als `TicketEvent.settings.ticketDesign.draft`.
@@ -2861,12 +2867,14 @@ model TicketEventTemplate {
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
   updatedAt   DateTime @updatedAt @db.Timestamptz(3)
 
-  group     Group?                        @relation(fields: [ownerGroupId], references: [id], onDelete: SetNull)
-  createdBy User?                         @relation("TicketTemplateCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
-  types     TicketEventTemplateType[]
-  questions TicketEventTemplateQuestion[]
+  group          Group?                        @relation(fields: [ownerGroupId], references: [id], onDelete: SetNull)
+  createdBy      User?                         @relation("TicketTemplateCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  accountingCode AccountingCode?               @relation(fields: [accountingCodeId], references: [id], onDelete: SetNull)
+  types          TicketEventTemplateType[]
+  questions      TicketEventTemplateQuestion[]
 
   @@index([order])
+  @@index([accountingCodeId])
 }
 
 /// Eén tickettype binnen een sjabloon. Prijzen staan hier wél absoluut: een

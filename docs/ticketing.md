@@ -168,7 +168,8 @@ without the key and says which one accepts it.
   ticket QR, so the page does not depend on an external image host.
 - **`POST /v3/payments`** takes `amount` (the only mandatory one), `currency`,
   `description`, `reference`, `bulkId`, `callbackUrl`, `identifyCallbackUrl` and
-  `returnUrl`. We send all but `bulkId` and `identifyCallbackUrl`. There is **no
+  `returnUrl`. We send all but `identifyCallbackUrl`, and `bulkId` only when the
+  sale has an accounting code (see "Boekhoudcodes"). There is **no
   field for the payee name**: the "Ticketsysteem test" a buyer saw on their
   statement is the name of the payment profile at Bancontact, and changes there,
   not in code (`shopName` exists, but only on `/v3/payments/pos`). `returnUrl` exists but only matters for the
@@ -250,7 +251,7 @@ betaalinfo").
 | Queries, membership fallback to 730000 | `apps/web/lib/accounting/server.ts` |
 | Create, edit, delete | `apps/web/app/actions/accountingCodes.ts` |
 | What Mollie gets: `"<code> <event>"`, order number in metadata | `mollieDescription()` in `packages/payments/src/mollie.ts` |
-| What Bancontact gets: code as `reference`, event first in `description` | `paymentReference()` / `paymentDescription()` in `packages/payments/src/bancontact.ts` |
+| What Bancontact gets: code as `reference` and `bulkId`, event first in `description` | `paymentReference()` / `paymentBulkId()` / `paymentDescription()` in `packages/payments/src/bancontact.ts` |
 | Copy on the order at checkout | `createTicketCheckout()` in `lib/ticketing/orders.ts` |
 | Per code and per payment method | `accountingCodeRows()` in `lib/ticketing/statsCompute.ts` |
 
@@ -266,6 +267,16 @@ betaalinfo").
 - **The event form requires a code, and so does publishing.** An event from
   before the codes keeps selling; its settings show a warning until someone
   picks one.
+- **A template can suggest a code** (`TicketEventTemplate.accountingCodeId`,
+  optional). An event from that template gets it pre-filled and can still
+  change it; "Bewaar als sjabloon" copies the event's code. The built-in cantus
+  template names its code by the code itself (`accountingCode: "70010010001"`),
+  since an id differs per database.
+- **Bancontact bundles per code.** The code also goes as `bulkId`: when bundling
+  is on for the payment profile, Bancontact pays out one transfer per bundle, so
+  each code gets its own transfer instead of one deposit mixing ten events. When
+  bundling is off, the provider ignores the field. Without a code it stays out,
+  so the profile's own setting applies.
 - **Without a code nothing changes for the provider**: Mollie keeps
   `"<event> - <order number>"`, Bancontact the order number as reference. The
   equipment rental (`apps/logistiek`) does not send a code yet.
@@ -639,6 +650,8 @@ die offsets om zodra er een dag gekozen is.
   één verborgen veld naar `createTicketEventAction`, zoals de shiftsjablonen.
   Wisselen van sjabloon of dag herbouwt het formulier (remount op `key`), met
   een bevestiging zodra er al iets ingevuld is.
+- De boekhoudcode van het sjabloon staat voorgevuld in het formulier, net als
+  de post; leeg betekent dat de maker ze zelf kiest (zie "Boekhoudcodes").
 - Wat het scherm níét vraagt, komt rechtstreeks uit het sjabloon: de
   deelnemersvragen, het bevestigingsbericht, de voorverkoop en het
   ticketontwerp. `status` blijft DRAFT: publiceren blijft een bewuste tweede

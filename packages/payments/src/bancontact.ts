@@ -80,6 +80,7 @@ const DEFAULT_API_BASE = "https://merchant.api.bancontact.net";
  */
 const MAX_DESCRIPTION = 140;
 const MAX_REFERENCE = 35;
+const MAX_BULK_ID = 35;
 const MIN_AMOUNT_CENTS = 1;
 
 export class BancontactApiError extends Error {
@@ -282,6 +283,24 @@ export function paymentReference(input: Pick<CreateCheckoutInput, "orderNumber" 
   return truncate(sepaSafe(input.accountingCode || input.orderNumber), MAX_REFERENCE);
 }
 
+/**
+ * De `bulkId`: in welke bundel Bancontact deze betaling uitbetaalt.
+ *
+ * Staat bundelen aan op het betaalprofiel, dan komen betalingen niet elk apart
+ * maar samen in één overschrijving per bundel, en zonder `bulkId` zit alles in
+ * de bundel van het profiel: dan is één storting de ticketverkoop van tien
+ * events en weet de penning niet wat bij wat hoort. Met de boekhoudcode als
+ * `bulkId` krijgt elke code haar eigen storting. Staat bundelen uit, dan negeert
+ * de provider het veld.
+ *
+ * Zonder code laten we het weg, zodat de instelling van het profiel geldt; een
+ * eigen bundel "zonder code" zou niemand helpen.
+ */
+export function paymentBulkId(input: Pick<CreateCheckoutInput, "accountingCode">): string | null {
+  const bulkId = input.accountingCode ? truncate(sepaSafe(input.accountingCode), MAX_BULK_ID) : "";
+  return bulkId || null;
+}
+
 export function mapBancontactStatus(status: string): CheckoutStatusResult["status"] {
   switch (status.toUpperCase()) {
     case "SUCCEEDED":
@@ -384,6 +403,7 @@ export class BancontactPaymentGateway implements PaymentGateway {
       });
     }
     const returnUrl = httpsOnly(input.successUrl);
+    const bulkId = paymentBulkId(input);
 
     let payment: BancontactPayment;
     try {
@@ -394,6 +414,7 @@ export class BancontactPaymentGateway implements PaymentGateway {
           currency,
           description: paymentDescription(input.eventName, ticketCount),
           reference: paymentReference(input),
+          ...(bulkId ? { bulkId } : {}),
           ...(returnUrl ? { returnUrl } : {}),
           ...(callbackUrl ? { callbackUrl } : {}),
         },

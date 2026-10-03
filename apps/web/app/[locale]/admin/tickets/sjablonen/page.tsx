@@ -5,6 +5,7 @@ import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { listTicketEventTemplates } from "@/lib/ticketing/templateStore";
+import { listAccountingCodes } from "@/lib/accounting/server";
 import { TicketTemplateManager } from "./TicketTemplateManager";
 import { ticketBase, type AdminLocale } from "@/components/ticketing/admin/format";
 
@@ -23,13 +24,14 @@ export default async function TicketTemplatesPage({
   const locale: AdminLocale = localeParam;
   await requirePermission("tickets.templates");
 
-  const [templates, groups] = await Promise.all([
+  const [templates, groups, accountingCodes] = await Promise.all([
     listTicketEventTemplates(),
     prisma.group.findMany({
       where: { active: true },
       orderBy: { orderInPraesidium: "asc" },
       select: { id: true, nameNl: true, nameEn: true },
     }),
+    listAccountingCodes(),
   ]);
 
   const base = ticketBase(locale);
@@ -40,7 +42,12 @@ export default async function TicketTemplatesPage({
         <ArrowLeft aria-hidden="true" size={14} />
         {locale === "nl" ? "Ticketbeheer" : "Ticket management"}
       </Link>
-      <TicketTemplateManager templates={templates} groups={groups} locale={locale} />
+      <TicketTemplateManager
+        templates={templates}
+        groups={groups}
+        accountingCodes={accountingCodes}
+        locale={locale}
+      />
     </>
   );
 }

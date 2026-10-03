@@ -76,6 +76,8 @@ export type TicketEventTemplate = {
   label: string;
   note: string | null;
   ownerGroupId: string | null;
+  /** De boekhoudcode die een event uit dit sjabloon voorgesteld krijgt; null = zelf kiezen. */
+  accountingCodeId: string | null;
   titleNl: string;
   titleEn: string;
   descriptionNl: string;
@@ -368,6 +370,7 @@ export function blankTicketTemplate(): TicketEventTemplate {
     label: "",
     note: null,
     ownerGroupId: null,
+    accountingCodeId: null,
     titleNl: "",
     titleEn: "",
     descriptionNl: "",

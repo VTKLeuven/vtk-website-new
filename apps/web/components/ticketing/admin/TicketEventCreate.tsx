@@ -103,6 +103,7 @@ export function TicketEventCreate({
     ? {
         ...baseEvent,
         ownerGroupId: baseEvent?.ownerGroupId ?? template.ownerGroupId ?? undefined,
+        accountingCodeId: template.accountingCodeId,
         titleNl: template.titleNl,
         titleEn: template.titleEn,
         descriptionNl: template.descriptionNl,

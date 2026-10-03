@@ -23,6 +23,8 @@ import {
 export type AccountingCodeUsageRow = AccountingCodeOption & {
   /** Ticketverkopen die deze code nu gekozen hebben. */
   ticketEvents: number;
+  /** Ticketsjablonen die deze code voorstellen. */
+  templates: number;
   /** Gaat deze code mee met het lidgeld? */
   membership: boolean;
 };
@@ -58,6 +60,10 @@ function copy(locale: Locale) {
     deleteConfirm: nl ? "Verwijderen" : "Delete",
     deleted: nl ? "Code verwijderd." : "Code deleted.",
     membership: nl ? "Lidgeld" : "Membership fee",
+    templates: (count: number) =>
+      nl
+        ? `${count} ${count === 1 ? "sjabloon" : "sjablonen"}`
+        : `${count} ${count === 1 ? "template" : "templates"}`,
     unused: nl ? "Niet in gebruik" : "Not in use",
     sales: (count: number) =>
       nl
@@ -90,6 +96,7 @@ function deleteDescription(row: AccountingCodeUsageRow, children: AccountingCode
   const nl = locale === "nl";
   const events = row.ticketEvents + children.reduce((sum, child) => sum + child.ticketEvents, 0);
   const membership = row.membership || children.some((child) => child.membership);
+  const templates = row.templates + children.reduce((sum, child) => sum + child.templates, 0);
   const parts = [
     nl
       ? `${row.code} ${row.name} verdwijnt uit de keuzelijst.`
@@ -103,6 +110,11 @@ function deleteDescription(row: AccountingCodeUsageRow, children: AccountingCode
       ? nl
         ? `${events} ${events === 1 ? "ticketverkoop staat" : "ticketverkopen staan"} op ${children.length > 0 ? "deze codes" : "deze code"}: nieuwe bestellingen daarvan gaan zonder code naar Mollie en Bancontact tot iemand een andere kiest, en opnieuw publiceren vraagt er een.`
         : `${events} ticket ${events === 1 ? "sale uses" : "sales use"} ${children.length > 0 ? "these codes" : "this code"}: their new orders go to Mollie and Bancontact without a code until someone picks another, and publishing again asks for one.`
+      : null,
+    templates > 0
+      ? nl
+        ? `${templates} ${templates === 1 ? "sjabloon stelt" : "sjablonen stellen"} ze voor; die staan daarna zonder code.`
+        : `${templates} ${templates === 1 ? "template suggests" : "templates suggest"} it; they are left without a code.`
       : null,
     membership
       ? nl
@@ -313,6 +325,7 @@ export function AccountingCodesEditor({
                   }
                   const usage = [
                     row.ticketEvents > 0 ? t.sales(row.ticketEvents) : null,
+                    row.templates > 0 ? t.templates(row.templates) : null,
                     row.membership ? t.membership : null,
                   ].filter(Boolean);
                   return (

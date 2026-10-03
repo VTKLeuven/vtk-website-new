@@ -13,6 +13,7 @@ import { PresaleFields } from "@/components/ticketing/admin/PresaleFields";
 import { SettingsPanel } from "@/components/ticketing/admin/SettingsPanel";
 import { TicketTemplateTypeRows } from "@/components/ticketing/admin/TicketTemplateTypeRows";
 import { formatMoney, type AdminLocale } from "@/components/ticketing/admin/format";
+import { accountingCodeLabel, type AccountingCodeOption } from "@/lib/accounting/codes";
 import {
   blankTicketTemplate,
   formatMinutesBefore,
@@ -44,15 +45,20 @@ const errorMessages = (nl: boolean): Record<string, string> => ({
     ? "Dit sjabloon bestaat niet meer; iemand verwijderde het intussen."
     : "This template no longer exists; someone deleted it in the meantime.",
   INVALID_INPUT: nl ? "Controleer de ingevulde gegevens." : "Check the entered data.",
+  INVALID_ACCOUNTING_CODE: nl
+    ? "Die boekhoudcode bestaat niet meer. Kies een andere."
+    : "That accounting code no longer exists. Choose another one.",
 });
 
 export function TicketTemplateManager({
   templates,
   groups,
+  accountingCodes,
   locale,
 }: {
   templates: TicketEventTemplate[];
   groups: { id: string; nameNl: string; nameEn: string }[];
+  accountingCodes: AccountingCodeOption[];
   locale: AdminLocale;
 }) {
   const nl = locale === "nl";
@@ -176,6 +182,7 @@ export function TicketTemplateManager({
           key="new"
           template={blankTicketTemplate()}
           groups={groups}
+          accountingCodes={accountingCodes}
           locale={locale}
           onClose={() => setCreating(false)}
         />
@@ -185,6 +192,7 @@ export function TicketTemplateManager({
           key={open.id}
           template={open}
           groups={groups}
+          accountingCodes={accountingCodes}
           locale={locale}
           onClose={() => setOpenId(null)}
         />
@@ -261,11 +269,13 @@ function OffsetField({
 function TemplateEditor({
   template,
   groups,
+  accountingCodes,
   locale,
   onClose,
 }: {
   template: TicketEventTemplate;
   groups: { id: string; nameNl: string; nameEn: string }[];
+  accountingCodes: AccountingCodeOption[];
   locale: AdminLocale;
   onClose: () => void;
 }) {
@@ -367,6 +377,31 @@ function TemplateEditor({
                 {nl
                   ? "Enkel een toelichting in de lijst; het sjabloon blijft voor iedereen bruikbaar."
                   : "Only a hint in the list; the template stays usable by everyone."}
+              </span>
+            </div>
+            <div className="ticket-admin-field" data-span="2">
+              <label htmlFor={field("accountingCode")}>{nl ? "Boekhoudcode" : "Accounting code"}</label>
+              <select
+                id={field("accountingCode")}
+                name="accountingCodeId"
+                defaultValue={
+                  accountingCodes.some((code) => code.id === template.accountingCodeId)
+                    ? (template.accountingCodeId ?? "")
+                    : ""
+                }
+              >
+                <option value="">{nl ? "Geen: wie het event maakt, kiest ze" : "None: whoever creates the event picks it"}</option>
+                {accountingCodes.map((code) => (
+                  <option key={code.id} value={code.id}>
+                    {code.depth === 1 ? "\u2003" : ""}
+                    {accountingCodeLabel(code)}
+                  </option>
+                ))}
+              </select>
+              <span className="ticket-admin-help">
+                {nl
+                  ? "Staat voorgevuld bij een event uit dit sjabloon en gaat mee in de betaalinfo. Wie het event maakt, kan ze nog aanpassen."
+                  : "Pre-filled on an event from this template and goes into the payment details. Whoever creates the event can still change it."}
               </span>
             </div>
             <div className="ticket-admin-field" data-span="2">

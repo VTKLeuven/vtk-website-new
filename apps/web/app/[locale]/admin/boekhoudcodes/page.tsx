@@ -32,17 +32,18 @@ export default async function AdminAccountingCodes({
         code: true,
         name: true,
         parentId: true,
-        _count: { select: { ticketEvents: true } },
+        _count: { select: { ticketEvents: true, eventTemplates: true } },
       },
     }),
     getMembershipConfig(),
   ]);
   const membershipCode = await membershipAccountingCode(membershipConfig.accountingCodeId);
 
-  const eventsById = new Map(rows.map((row) => [row.id, row._count.ticketEvents]));
+  const countsById = new Map(rows.map((row) => [row.id, row._count]));
   const codes: AccountingCodeUsageRow[] = orderAccountingCodes(rows).map((row) => ({
     ...row,
-    ticketEvents: eventsById.get(row.id) ?? 0,
+    ticketEvents: countsById.get(row.id)?.ticketEvents ?? 0,
+    templates: countsById.get(row.id)?.eventTemplates ?? 0,
     membership: membershipCode?.code === row.code,
   }));
 
