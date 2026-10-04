@@ -19,8 +19,11 @@
  * bestellingen, no-shows en een ban aan op naam van verzonnen studenten.
  */
 
+import fs from "node:fs";
+import path from "node:path";
 import { PrismaClient } from "@prisma/client";
 import { currentStudyYear } from "@vtk/auth";
+import { putObject } from "@vtk/storage";
 import { brusselsWallClock, brusselsYMD, shiftYMD } from "../apps/web/lib/brussels";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
@@ -83,12 +86,88 @@ const STUDENTS = [
 
 type StudentKey = (typeof STUDENTS)[number]["key"];
 
-/** Het aanbod dat elke demodag krijgt. */
+/** Het aanbod dat elke demodag krijgt met badges. */
 const OFFERING = [
-  { nameNl: "Broodje kaas", nameEn: "Cheese sandwich", priceCents: 260, quantity: 20, isWeeklySpecial: false },
-  { nameNl: "Broodje hesp", nameEn: "Ham sandwich", priceCents: 260, quantity: 20, isWeeklySpecial: false },
-  { nameNl: "Broodje gezond", nameEn: "Healthy sandwich", priceCents: 300, quantity: 12, isWeeklySpecial: false },
-  { nameNl: "Broodje kip curry", nameEn: "Chicken curry sandwich", priceCents: 320, quantity: 8, isWeeklySpecial: true },
+  {
+    nameNl: "Broodje kaas",
+    nameEn: "Cheese sandwich",
+    priceCents: 260,
+    quantity: 20,
+    isWeeklySpecial: false,
+    badgeImageKey: "theokot/badges/kaas.png",
+  },
+  {
+    nameNl: "Broodje hesp",
+    nameEn: "Ham sandwich",
+    priceCents: 260,
+    quantity: 20,
+    isWeeklySpecial: false,
+    badgeImageKey: "theokot/badges/hesp.png",
+  },
+  {
+    nameNl: "Broodje gezond",
+    nameEn: "Healthy sandwich",
+    priceCents: 300,
+    quantity: 12,
+    isWeeklySpecial: false,
+    badgeImageKey: "theokot/badges/hummus.png",
+  },
+  {
+    nameNl: "Broodje kip curry",
+    nameEn: "Chicken curry sandwich",
+    priceCents: 320,
+    quantity: 8,
+    isWeeklySpecial: true,
+    badgeImageKey: "theokot/badges/kip-curry.png",
+  },
+  {
+    nameNl: "Broodje kaas & hesp",
+    nameEn: "Cheese & ham sandwich",
+    priceCents: 290,
+    quantity: 15,
+    isWeeklySpecial: false,
+    badgeImageKey: "theokot/badges/kaas-hesp.png",
+  },
+  {
+    nameNl: "Broodje brie honing",
+    nameEn: "Brie honey sandwich",
+    priceCents: 340,
+    quantity: 10,
+    isWeeklySpecial: false,
+    badgeImageKey: "theokot/badges/brie-honing.png",
+  },
+  {
+    nameNl: "Broodje tomaat mozarella",
+    nameEn: "Tomato mozzarella sandwich",
+    priceCents: 320,
+    quantity: 10,
+    isWeeklySpecial: false,
+    badgeImageKey: "theokot/badges/tomaat-mozarella.png",
+  },
+  {
+    nameNl: "Broodje gehaktbal",
+    nameEn: "Meatball sandwich",
+    priceCents: 340,
+    quantity: 8,
+    isWeeklySpecial: false,
+    badgeImageKey: "theokot/badges/gehaktbal.png",
+  },
+  {
+    nameNl: "Broodje italiaans",
+    nameEn: "Italian sandwich",
+    priceCents: 340,
+    quantity: 8,
+    isWeeklySpecial: false,
+    badgeImageKey: "theokot/badges/italiaans.png",
+  },
+  {
+    nameNl: "Broodje van de week",
+    nameEn: "Sandwich of the week",
+    priceCents: 350,
+    quantity: 10,
+    isWeeklySpecial: true,
+    badgeImageKey: "theokot/badges/bvdw.png",
+  },
 ];
 
 type Mark = {
@@ -105,15 +184,36 @@ async function cleanUp(prisma: PrismaClient): Promise<Mark> {
   const mark = { ...EMPTY_MARK, ...((row?.value as Partial<Mark>) ?? {}) };
 
   // Vergaderingen eerst: hun reservaties wijzen naar de aanbod-items hieronder.
-  if (mark.meetingIds.length > 0) {
-    await prisma.meeting.deleteMany({ where: { id: { in: mark.meetingIds } } });
-  }
-  if (mark.sessionIds.length > 0) {
-    await prisma.theokotSession.deleteMany({ where: { id: { in: mark.sessionIds } } });
-  }
-  if (mark.shiftIds.length > 0) {
-    await prisma.shift.deleteMany({ where: { id: { in: mark.shiftIds } } });
-  }
+  const demoOffsets = [-1, 0, 1, 2, 5];
+  const demoDates = demoOffsets.map((offset) => midnight(offset));
+
+  await prisma.meeting.deleteMany({
+    where: {
+      OR: [
+        { id: { in: mark.meetingIds } },
+        { slug: { startsWith: "demo-grocomeet-" } },
+      ],
+    },
+  });
+
+  await prisma.theokotSession.deleteMany({
+    where: {
+      OR: [
+        { id: { in: mark.sessionIds } },
+        { date: { in: demoDates } },
+      ],
+    },
+  });
+
+  await prisma.shift.deleteMany({
+    where: {
+      OR: [
+        { id: { in: mark.shiftIds } },
+        { name: "Theokot middag (demo)" },
+      ],
+    },
+  });
+
   // De studenten op hun beurt: bans, bestellingen en deelnames hangen er met
   // cascade aan. Op het demodomein en niet op de onthouden ids, zodat een
   // half afgebroken vorige beurt ook opgeruimd raakt.
@@ -286,15 +386,32 @@ async function main() {
       });
     }
 
+    // -- Badges uploaden naar object storage ---------------------------------
+    const fixturesBadgesDir = path.resolve(__dirname, "../packages/db/prisma/fixtures/theokot-badges");
+    if (fs.existsSync(fixturesBadgesDir)) {
+      const badgeFiles = fs.readdirSync(fixturesBadgesDir).filter((f) => f.endsWith(".png"));
+      for (const file of badgeFiles) {
+        const key = `theokot/badges/${file}`;
+        const filePath = path.join(fixturesBadgesDir, file);
+        try {
+          const buf = fs.readFileSync(filePath);
+          await putObject(key, buf, "image/png");
+        } catch (err) {
+          console.warn(`[storage] kon ${key} niet uploaden naar S3 (fallback naar public/ blijft actief):`, err);
+        }
+      }
+    }
+
     // Gisteren: een opgehaalde en twee niet-opgehaalde bestellingen.
     await order(-1, "joris", 0, 1, "PICKED_UP");
     await order(-1, "lies", 1, 2, "NO_SHOW");
     await order(-1, "tuur", 2, 1, "NO_SHOW");
 
-    // Vandaag: alles wat de balie moet kunnen tonen.
+    // Vandaag: alles wat de balie moet kunnen tonen (met ronde stickerbadges).
     await order(0, "wannes", 0, 2, "RESERVED");
     await order(0, "fien", 1, 1, "PICKED_UP");
     await order(0, "joris", 3, 1, "NO_SHOW");
+    await order(0, "tuur", 4, 1, "RESERVED");
 
     // Morgen: niets opgehaald, dus deze dag is nog te verwijderen.
     await order(1, "wannes", 0, 1, "RESERVED");
@@ -360,26 +477,28 @@ async function main() {
     });
 
     console.log(`\nDemo klaar op ${host}.`);
-    console.log(`  ${days.length} verkoopdagen, ${STUDENTS.length} studenten, 10 bestellingen, 1 ban, 1 grocomeet.\n`);
+    console.log(`  ${days.length} verkoopdagen, ${STUDENTS.length} studenten, 11 bestellingen, 1 ban, 1 grocomeet.\n`);
     console.log("  Verkoopdagen");
     for (const day of days) {
       console.log(`    ${dayLabel(day.offset).padEnd(6)} ${day.note}`);
     }
     console.log("\n  Studenten (r-nummer om aan de balie op te zoeken)");
-    console.log("    r9000001  Wannes  bestelling van vandaag, nog niet opgehaald");
-    console.log("    r9000002  Fien    bestelling van vandaag, al opgehaald");
-    console.log("    r9000003  Joris   niet opgehaald vandaag + 2 openstaande bonnetjes");
-    console.log("    r9000004  Lies    geband tot over 10 dagen, met grocomeet-broodje");
-    console.log("    r9000005  Tuur    bestellingen op morgen en overmorgen");
+    console.log("    r9000001  Wannes  bestelling vandaag: Kaas x2 (gele badge), nog niet opgehaald");
+    console.log("    r9000002  Fien    bestelling vandaag: Hesp x1 (roze badge), al opgehaald");
+    console.log("    r9000003  Joris   bestelling vandaag: Kip curry x1 (oranje badge, no-show) + 2 openstaande bonnetjes");
+    console.log("    r9000004  Lies    geband tot over 10 dagen, met grocomeet-broodje (Hesp)");
+    console.log("    r9000005  Tuur    bestelling vandaag: Kaas & hesp x1 (tweekleurige badge), en bestellingen morgen/overmorgen");
     console.log("\n  Uit te proberen");
-    console.log("    Balie        /theokot/balie          r9000003: laattijdig uitdelen + bonnetjesvenster");
+    console.log("    Balie        /theokot/balie          zoek r9000001 of r9000005 om de ronde badges te zien bij het afhalen");
+    console.log("                                         r9000003: laattijdig uitdelen + bonnetjesvenster");
+    console.log("    Aanbod       /admin/theokot          ronde stickerbadges uploaden/wijzigen per broodje");
     console.log("    Beheer       /admin/theokot          afhaalronde afsluiten (vandaag), verwijderen (morgen)");
     console.log("    Aanbod       /admin/theokot          overmorgen: 4 besteld, 2 in het aanbod");
     console.log("    Bestellingen /admin/theokot          uitklap onder een verkoopdag, schrappen met mail");
     console.log("    Turflijst    /admin/theokot/turflijst  vandaag: GM-kolom en drankje");
     console.log("    Bans         /admin/theokot/bans     de ban van Lies en de no-show-historiek");
     console.log("    Mails        /admin/it/flows         de annulatiemail en de no-show-waarschuwing");
-    console.log("    Student      /theokot                log in als een demostudent bestaat niet; gebruik je eigen account\n");
+    console.log("    Student      /theokot                broodjes bestellen met badge-weergave; gebruik je eigen account\n");
   } finally {
     await prisma.$disconnect();
   }

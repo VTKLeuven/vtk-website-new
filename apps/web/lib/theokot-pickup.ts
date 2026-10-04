@@ -7,6 +7,7 @@ import { brusselsTimeOnDay, sandwichVoucherCost } from "@/lib/theokot";
 import { getTheokotConfig } from "@/lib/theokot-server";
 import { voucherBalance } from "@/lib/app-api/vouchers";
 import { normalizeRNumber, pickupSearchTerms } from "@/lib/theokotPickupQuery";
+import { publicUrl } from "@/lib/storage";
 
 /**
  * De afhaalbalie, los van de weg waarlangs iemand herkend werd.
@@ -23,6 +24,7 @@ export type PickupLine = {
   nameEn: string | null;
   quantity: number;
   unitPriceCents: number;
+  badgeImageUrl: string | null;
 };
 
 export type PickupOrder = {
@@ -131,7 +133,7 @@ export async function pickupForUser(
         // bonnetjes dekken.
         voucherRedemption: { select: { amount: true } },
         lines: {
-          include: { sessionItem: { select: { nameNl: true, nameEn: true } } },
+          include: { sessionItem: { select: { nameNl: true, nameEn: true, badgeImageKey: true } } },
           orderBy: { sessionItem: { order: "asc" } },
         },
       },
@@ -176,6 +178,7 @@ export async function pickupForUser(
           nameEn: line.sessionItem.nameEn,
           quantity: line.quantity,
           unitPriceCents: line.unitPriceCents,
+          badgeImageUrl: line.sessionItem.badgeImageKey ? publicUrl(line.sessionItem.badgeImageKey) : null,
         })),
       };
     }),

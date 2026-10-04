@@ -39,6 +39,7 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
     quantity: p.defaultQuantity,
     isWeeklySpecial: p.isWeeklySpecialSlot,
     imageKey: p.imageKey,
+    badgeImageKey: p.badgeImageKey,
     ingredientsNl: p.ingredientsNl ?? "",
     ingredientsEn: p.ingredientsEn ?? "",
     hasLines: false,

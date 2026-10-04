@@ -501,11 +501,21 @@ function PickupOrderPanel({
       )}
       <ul className="text-sm text-[#34405e]">
         {order.lines.map((l, i) => (
-          <li key={i} className="flex justify-between py-0.5">
-            <span>
-              {l.quantity}× {nl ? l.nameNl : l.nameEn ?? l.nameNl}
-            </span>
-            <span className="tabular-nums">{formatEuro(l.quantity * l.unitPriceCents)}</span>
+          <li key={i} className="flex items-center justify-between gap-3 py-1.5 border-b border-vtk-blue/5 last:border-b-0">
+            <div className="flex items-center gap-3 min-w-0">
+              {l.badgeImageUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={l.badgeImageUrl}
+                  alt=""
+                  className="h-10 w-10 shrink-0 rounded-full object-cover shadow-sm ring-1 ring-black/10"
+                />
+              )}
+              <span className="font-medium text-vtk-ink">
+                {l.quantity}× {nl ? l.nameNl : l.nameEn ?? l.nameNl}
+              </span>
+            </div>
+            <span className="shrink-0 tabular-nums font-medium text-vtk-ink">{formatEuro(l.quantity * l.unitPriceCents)}</span>
           </li>
         ))}
       </ul>
