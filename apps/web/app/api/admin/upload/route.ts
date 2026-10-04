@@ -51,6 +51,8 @@ export async function POST(request: Request) {
     hasPermission(session, "pages.manage") ||
     hasPermission(session, "photos.upload") ||
     hasPermission(session, "home.edit") ||
+    // De foto of het portret bij een nieuwsbericht (/admin/nieuws).
+    hasPermission(session, "news.manage") ||
     hasPermission(session, "partners.manage") ||
     hasPermission(session, "calendar.create") ||
     hasPermission(session, "calendar.manageAll") ||
