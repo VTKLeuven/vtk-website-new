@@ -33,6 +33,7 @@ export function StorageImageField({
   defaultKey,
   locale,
   name = "imageKey",
+  kind = "image",
   label,
   fallbackUrl,
   fallbackPosition = "center",
@@ -48,6 +49,7 @@ export function StorageImageField({
   defaultKey?: string | null;
   locale: "nl" | "en";
   name?: string;
+  kind?: "image" | "logo" | "tile" | "badge";
   label?: string;
   /** De foto die verschijnt zolang er geen upload is, bv. `/aanbod/theokot.jpg`. */
   fallbackUrl?: string;
@@ -98,7 +100,7 @@ export function StorageImageField({
   useReportFormBusy(uploading);
 
   async function onFile(file: File) {
-    const sizeError = imageUploadSizeError(file, locale, "image");
+    const sizeError = imageUploadSizeError(file, locale, kind === "badge" ? "badge" : "image");
     setErr(sizeError);
     setWarning(null);
     if (sizeError) return;
@@ -106,12 +108,12 @@ export function StorageImageField({
     try {
       const form = new FormData();
       form.append("file", file);
-      form.append("kind", "image");
+      form.append("kind", kind);
       if (formId) form.append("formId", formId);
       if (ticketEventId) form.append("ticketEventId", ticketEventId);
       const res = await fetch("/api/admin/upload", { method: "POST", body: form });
       if (!res.ok) {
-        setErr(imageUploadError(locale, res.status, "image"));
+        setErr(imageUploadError(locale, res.status, kind === "badge" ? "badge" : "image"));
         return;
       }
       const data = (await res.json()) as {

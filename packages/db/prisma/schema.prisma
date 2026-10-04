@@ -3422,6 +3422,7 @@ model TheokotProduct {
   defaultQuantity     Int      @default(0)
   isWeeklySpecialSlot Boolean  @default(false) // "broodje van de week"-slot
   imageKey            String? // optionele foto; NULL = gestreept patroon
+  badgeImageKey       String? // optionele ronde sticker/badge (PNG); getoond aan de afhaalbalie
   ingredientsNl       String? // optionele ingrediëntenlijst (info-icoontje)
   ingredientsEn       String?
   order               Int      @default(0)
@@ -3473,6 +3474,7 @@ model TheokotSessionItem {
   quantity        Int // beschikbare voorraad voor deze sessie
   isWeeklySpecial Boolean @default(false)
   imageKey        String? // meegekopieerd uit de catalogus, per dag aanpasbaar
+  badgeImageKey   String? // optionele ronde sticker/badge, per dag aanpasbaar
   ingredientsNl   String?
   ingredientsEn   String?
   order           Int     @default(0)

@@ -15,6 +15,8 @@ export type OrderItem = {
   isWeeklySpecial: boolean;
   /** Optionele foto; zonder foto verschijnt het gestreepte patroon. */
   imageUrl: string | null;
+  /** Optionele ronde sticker/badge. */
+  badgeImageUrl: string | null;
   /** Optionele ingrediënten; enkel dan staat er een info-icoontje bij. */
   ingredients: string | null;
 };
@@ -28,7 +30,13 @@ export type ExistingOrder = {
   canEdit: boolean;
   /** Gaat mee in de doos van de grocomeet en wordt daar afgerekend. */
   grocomeet: boolean;
-  lines: Array<{ sessionItemId: string; name: string; quantity: number; unitPriceCents: number }>;
+  lines: Array<{
+    sessionItemId: string;
+    name: string;
+    quantity: number;
+    unitPriceCents: number;
+    badgeImageUrl?: string | null;
+  }>;
 };
 
 export type OrderSession = {
@@ -950,7 +958,15 @@ function Reservation({
         <ul className="th-lines">
           {existing.lines.map((line) => (
             <li key={line.sessionItemId}>
-              <span>
+              <span className="inline-flex items-center gap-2">
+                {line.badgeImageUrl && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={line.badgeImageUrl}
+                    alt=""
+                    className="h-5 w-5 shrink-0 rounded-full object-cover"
+                  />
+                )}
                 {line.quantity}× {line.name}
               </span>
               <span className="th-tn">{formatEuro(line.quantity * line.unitPriceCents)}</span>
@@ -1194,11 +1210,22 @@ function DatePin({ dow, day, large = false }: { dow: string; day: string; large?
   );
 }
 
-/** De foto van een broodje; zonder foto het gestreepte patroon van de site. */
+/** De foto van een broodje; met stickerfoto de ronde sticker, anders het gestreepte patroon. */
 function Thumb({ item, className, sizes }: { item: OrderItem; className: string; sizes: string }) {
   return (
     <div className={`th-photo ${className}`}>
-      {item.imageUrl && <Image src={item.imageUrl} alt="" fill sizes={sizes} className="object-cover" />}
+      {item.imageUrl ? (
+        <Image src={item.imageUrl} alt="" fill sizes={sizes} className="object-cover" />
+      ) : item.badgeImageUrl ? (
+        <div className="flex h-full w-full items-center justify-center p-2">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={item.badgeImageUrl}
+            alt=""
+            className="h-full max-h-16 w-auto object-contain rounded-full shadow-sm"
+          />
+        </div>
+      ) : null}
     </div>
   );
 }

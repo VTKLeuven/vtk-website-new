@@ -13,6 +13,7 @@ export type OfferingRow = {
   quantity: number;
   isWeeklySpecial: boolean;
   imageKey: string | null;
+  badgeImageKey: string | null;
   ingredientsNl: string;
   ingredientsEn: string;
   /** Heeft dit item al bestellingen? Dan blijft het bij opslaan behouden. */
@@ -37,6 +38,7 @@ export function emptyOfferingRow(): OfferingRow {
     quantity: 10,
     isWeeklySpecial: false,
     imageKey: null,
+    badgeImageKey: null,
     ingredientsNl: "",
     ingredientsEn: "",
     hasLines: false,
@@ -201,23 +203,39 @@ export function OfferingRows({
 
           <details className="mt-2 border-t border-vtk-blue/10 pt-2">
             <summary className="cursor-pointer text-sm text-vtk-ink/80 hover:text-vtk-ink">
-              {nl ? "Foto & ingrediënten" : "Photo & ingredients"}
+              {nl ? "Foto, sticker & ingrediënten" : "Photo, sticker & ingredients"}
               <span className="ml-2 text-xs text-[#5c667f]">{summary(nl, row)}</span>
             </summary>
             <div className="mt-3 grid gap-4 sm:grid-cols-2">
-              <StorageImageField
-                name={`${prefix}-${i}-imageKey`}
-                defaultKey={row.imageKey}
-                locale={locale}
-                label={nl ? "Foto" : "Photo"}
-                srContext={row.nameNl || undefined}
-                helpText={
-                  nl
-                    ? "Optioneel. Zonder foto toont de bestelpagina het gestreepte patroon."
-                    : "Optional. Without a photo the order page shows the striped pattern."
-                }
-                onChange={(key) => update(row.uid, { imageKey: key || null })}
-              />
+              <div className="grid content-start gap-4">
+                <StorageImageField
+                  name={`${prefix}-${i}-imageKey`}
+                  defaultKey={row.imageKey}
+                  locale={locale}
+                  label={nl ? "Foto" : "Photo"}
+                  srContext={row.nameNl || undefined}
+                  helpText={
+                    nl
+                      ? "Optioneel. Zonder foto toont de bestelpagina het gestreepte patroon."
+                      : "Optional. Without a photo the order page shows the striped pattern."
+                  }
+                  onChange={(key) => update(row.uid, { imageKey: key || null })}
+                />
+                <StorageImageField
+                  name={`${prefix}-${i}-badgeImageKey`}
+                  defaultKey={row.badgeImageKey}
+                  locale={locale}
+                  kind="badge"
+                  label={nl ? "Ronde sticker / badge" : "Round sticker / badge"}
+                  srContext={row.nameNl || undefined}
+                  helpText={
+                    nl
+                      ? "Optioneel (PNG met transparantie). Wordt getoond aan de afhaalbalie ter herkenning."
+                      : "Optional (PNG with transparency). Shown at pickup counter for recognition."
+                  }
+                  onChange={(key) => update(row.uid, { badgeImageKey: key || null })}
+                />
+              </div>
               <div className="grid content-start gap-3">
                 <div>
                   <Label>{nl ? "Ingrediënten (NL)" : "Ingredients (NL)"}</Label>
@@ -259,10 +277,11 @@ export function OfferingRows({
 function summary(nl: boolean, row: OfferingRow): string {
   const parts: string[] = [];
   if (row.imageKey) parts.push(nl ? "foto" : "photo");
+  if (row.badgeImageKey) parts.push(nl ? "sticker" : "sticker");
   if (row.ingredientsNl.trim() || row.ingredientsEn.trim()) {
     parts.push(nl ? "ingrediënten" : "ingredients");
   }
-  if (parts.length === 0) return nl ? "· nog geen foto of ingrediënten" : "· no photo or ingredients yet";
+  if (parts.length === 0) return nl ? "· nog geen foto, sticker of ingrediënten" : "· no photo, sticker or ingredients yet";
   return `· ${parts.join(" + ")}`;
 }
 

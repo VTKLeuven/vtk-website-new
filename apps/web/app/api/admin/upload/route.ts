@@ -17,6 +17,7 @@ const MAX_BYTES_BY_KIND = {
   image: 45 * 1024 * 1024,
   logo: 10 * 1024 * 1024,
   tile: 2 * 1024 * 1024,
+  badge: 10 * 1024 * 1024,
   pdf: 40 * 1024 * 1024,
   file: 40 * 1024 * 1024,
 } as const;
@@ -180,6 +181,21 @@ export async function POST(request: Request) {
         .toBuffer();
       contentType = "image/png";
       outputName = "tile.png";
+    } catch {
+      return NextResponse.json({ error: "invalid_image" }, { status: 415 });
+    }
+  } else if (kind === "badge") {
+    // Ronde broodjesstickers/badges behouden transparantie buiten de cirkel.
+    // 512px is ruim voldoende voor zowel de afhaalbalie als prints/stickervellen.
+    prefix = "badges";
+    try {
+      body = await sharp(bytes, { failOn: "error", limitInputPixels: 20_000_000 })
+        .rotate()
+        .resize({ width: 512, height: 512, fit: "inside", withoutEnlargement: true })
+        .png()
+        .toBuffer();
+      contentType = "image/png";
+      outputName = "badge.png";
     } catch {
       return NextResponse.json({ error: "invalid_image" }, { status: 415 });
     }
