@@ -5,8 +5,15 @@ import { hasLocale } from "@/lib/locale";
 import type { Locale } from "@vtk/i18n";
 import { pick } from "@vtk/i18n";
 import { updateExpenseAction } from "@/app/actions/expenses";
-import { canEdit, canView, expenseAccess } from "@/lib/rekeningen/server";
-import { formatAmount, formatEuro, toDateInputValue } from "@/lib/rekeningen/expenses";
+import { canEdit, canView, expenseAccess, getExpenseConfig } from "@/lib/rekeningen/server";
+import {
+  expensePostSplit,
+  formatAmount,
+  formatEuro,
+  postOptions,
+  postOptionValue,
+  toDateInputValue,
+} from "@/lib/rekeningen/expenses";
 import { ExpenseForm } from "../../ExpenseForm";
 import { expenseErrorMessages } from "../../messages";
 
@@ -59,16 +66,32 @@ export default async function RekeningBewerken({
   }
 
   const ownGroupIds = access.session.groups.map((group) => group.id);
-  const groups = await prisma.group.findMany({
-    where: {
-      OR: [
-        { active: true },
-        { id: { in: [...ownGroupIds, expense.groupId].filter((value): value is string => Boolean(value)) } },
-      ],
-    },
-    orderBy: [{ type: "asc" }, { orderInPraesidium: "asc" }, { nameNl: "asc" }],
-    select: { id: true, nameNl: true, nameEn: true },
-  });
+  const [groups, config] = await Promise.all([
+    prisma.group.findMany({
+      where: {
+        OR: [
+          { active: true },
+          { id: { in: [...ownGroupIds, expense.groupId].filter((value): value is string => Boolean(value)) } },
+        ],
+      },
+      orderBy: [{ type: "asc" }, { orderInPraesidium: "asc" }, { nameNl: "asc" }],
+      select: { id: true, code: true, nameNl: true, nameEn: true },
+    }),
+    getExpenseConfig(),
+  ]);
+
+  // Bij een opgesplitste post staat de deelpost in `postLabel`. Een oude
+  // rekening op "Groep 5" heeft er nog geen: dan staat de keuze leeg en kies je
+  // bij het opslaan een deelpost.
+  const currentGroup = groups.find((group) => group.id === expense.groupId);
+  const split = expensePostSplit(currentGroup?.code);
+  const currentPost = expense.groupId
+    ? split
+      ? split.includes(expense.postLabel)
+        ? postOptionValue(expense.groupId, expense.postLabel)
+        : ""
+      : expense.groupId
+    : "";
 
   return (
     <div className="space-y-5">
@@ -91,16 +114,20 @@ export default async function RekeningBewerken({
         <ExpenseForm
           locale={nl ? "nl" : "en"}
           action={updateExpenseAction}
-          posts={groups.map((group) => ({
-            id: group.id,
-            name: pick(group.nameNl, group.nameEn, locale),
-          }))}
+          maxWords={config.maxWords}
+          posts={groups.flatMap((group) =>
+            postOptions(group, pick(group.nameNl, group.nameEn, locale)).map((option) => ({
+              id: option.value,
+              name: option.name,
+            })),
+          )}
           values={{
             id: expense.id,
-            groupId: expense.groupId ?? "",
+            groupId: currentPost,
             payerName: expense.payerName,
             activity: expense.activity,
             description: expense.description,
+            comment: expense.comment ?? "",
             spentOn: toDateInputValue(expense.spentOn),
             amount: formatAmount(expense.amountCents, locale),
             paymentMethod: expense.paymentMethod,
@@ -121,7 +148,7 @@ export default async function RekeningBewerken({
             savingLabel: nl ? "Opslaan..." : "Saving...",
             savedMessage: nl ? "Rekening bijgewerkt." : "Expense updated.",
             fallbackErrorMessage: nl ? "Opslaan mislukt." : "Could not save.",
-            errorMessages: expenseErrorMessages(locale),
+            errorMessages: expenseErrorMessages(locale, config.maxWords),
           }}
         />
       </div>

@@ -6,7 +6,13 @@ import { pick } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
 import { submitExpenseAction } from "@/app/actions/expenses";
 import { expenseAccess, getExpenseConfig } from "@/lib/rekeningen/server";
-import { formatIban, toDateInputValue } from "@/lib/rekeningen/expenses";
+import {
+  expensePostSplit,
+  formatIban,
+  postOptions,
+  postOptionValue,
+  toDateInputValue,
+} from "@/lib/rekeningen/expenses";
 import { RekeningenNav } from "../RekeningenNav";
 import { ExpenseForm } from "../ExpenseForm";
 import { expenseErrorMessages } from "../messages";
@@ -39,12 +45,12 @@ export default async function RekeningIndienen({
     prisma.group.findMany({
       where: { OR: [{ active: true }, { id: { in: ownGroupIds } }] },
       orderBy: [{ type: "asc" }, { orderInPraesidium: "asc" }, { nameNl: "asc" }],
-      select: { id: true, nameNl: true, nameEn: true },
+      select: { id: true, code: true, nameNl: true, nameEn: true },
     }),
     prisma.expense.findFirst({
       where: { submittedById: access.session.user.id, paymentMethod: "PERSONAL" },
       orderBy: { createdAt: "desc" },
-      select: { groupId: true },
+      select: { groupId: true, postLabel: true, group: { select: { code: true } } },
     }),
     prisma.user.findUniqueOrThrow({
       where: { id: access.session.user.id },
@@ -58,6 +64,26 @@ export default async function RekeningIndienen({
   const name = (group: { nameNl: string; nameEn: string }) => pick(group.nameNl, group.nameEn, locale);
 
   const guidelines = nl ? config.guidelinesNl : config.guidelinesEn || config.guidelinesNl;
+
+  // Een opgesplitste post (Groep 5) staat er als haar deelposten; de post zelf
+  // is dan geen keuze meer. Zie `EXPENSE_POST_SPLITS`.
+  const options = (group: (typeof groups)[number], suffix = "") =>
+    postOptions(group, name(group)).map((option) => ({
+      id: option.value,
+      name: `${option.name}${suffix}`,
+    }));
+
+  // Vooraf de post van je vorige rekening; bij een opgesplitste post enkel als
+  // die rekening al een deelpost had, anders de eerste eigen post.
+  const previousSplit = expensePostSplit(previous?.group?.code);
+  const previousValue = previous?.groupId
+    ? previousSplit
+      ? previousSplit.includes(previous.postLabel)
+        ? postOptionValue(previous.groupId, previous.postLabel)
+        : ""
+      : previous.groupId
+    : "";
+  const firstOwn = own[0] ? (options(own[0])[0]?.id ?? "") : "";
 
   return (
     <div className="space-y-5">
@@ -92,15 +118,17 @@ export default async function RekeningIndienen({
           locale={nl ? "nl" : "en"}
           action={submitExpenseAction}
           defaultIbanHref={`${base}/admin/rekeningen/mijn#standaard-iban`}
+          maxWords={config.maxWords}
           posts={[
-            ...own.map((group) => ({ id: group.id, name: `${name(group)} ${nl ? "(jouw post)" : "(your post)"}` })),
-            ...others.map((group) => ({ id: group.id, name: name(group) })),
+            ...own.flatMap((group) => options(group, nl ? " (jouw post)" : " (your post)")),
+            ...others.flatMap((group) => options(group)),
           ]}
           values={{
-            groupId: previous?.groupId ?? own[0]?.id ?? "",
+            groupId: previousValue || firstOwn,
             payerName: access.session.user.name,
             activity: "",
             description: "",
+            comment: "",
             spentOn: toDateInputValue(new Date()),
             amount: "",
             paymentMethod: "VTK_CARD",
@@ -113,7 +141,7 @@ export default async function RekeningIndienen({
               ? "Rekening ingediend. Ze staat nu bij Mijn rekeningen."
               : "Expense submitted. You will find it under My expenses.",
             fallbackErrorMessage: nl ? "Indienen mislukt." : "Could not submit.",
-            errorMessages: expenseErrorMessages(locale),
+            errorMessages: expenseErrorMessages(locale, config.maxWords),
           }}
         />
       </div>

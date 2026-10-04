@@ -7,7 +7,7 @@ import { smtpConfigured } from "@vtk/mail";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { MarkdownEditorField } from "@/components/editor/MarkdownEditor";
 import { saveExpenseSettingsAction } from "@/app/actions/expenses";
-import { expenseAccess, getExpenseConfig } from "@/lib/rekeningen/server";
+import { expenseAccess, getExpenseConfig, MAX_WORDS_RANGE } from "@/lib/rekeningen/server";
 import { formatBytes } from "@/lib/rekeningen/expenses";
 import { RekeningenNav } from "../RekeningenNav";
 import { expenseErrorMessages } from "../messages";
@@ -40,8 +40,8 @@ export default async function RekeningenInstellingen({
         <h1 className="text-2xl font-semibold">{nl ? "Instellingen" : "Settings"}</h1>
         <p className="mt-1 max-w-5xl text-sm text-[#5c667f]">
           {nl
-            ? "Waar de bladen naartoe gaan, en wat een indiener te lezen krijgt voor hij het formulier invult."
-            : "Where the sheets go, and what a submitter reads before filling in the form."}
+            ? "Waar de bladen naartoe gaan, hoe kort activiteit en omschrijving zijn, en wat een indiener te lezen krijgt voor hij het formulier invult."
+            : "Where the sheets go, how short activity and description are, and what a submitter reads before filling in the form."}
         </p>
       </header>
 
@@ -95,6 +95,27 @@ export default async function RekeningenInstellingen({
                   : "Leave empty to use the site's default sender."}
               </p>
             </div>
+          </div>
+
+          <div className="sm:max-w-xs">
+            <Label htmlFor="maxWords">
+              {nl ? "Woorden in activiteit en omschrijving" : "Words in activity and description"}
+            </Label>
+            <Input
+              id="maxWords"
+              name="maxWords"
+              type="number"
+              required
+              min={MAX_WORDS_RANGE.min}
+              max={MAX_WORDS_RANGE.max}
+              step={1}
+              defaultValue={config.maxWords}
+            />
+            <p className="mt-1 text-xs text-[#5c667f]">
+              {nl
+                ? "Het maximum per veld. Beide staan in de bestandsnaam van het blad; langere uitleg gaat in de opmerking. Bestaande rekeningen houden hun tekst."
+                : "The maximum per field. Both go in the file name of the sheet; longer explanations go in the comment. Existing expenses keep their text."}
+            </p>
           </div>
 
           <div className="space-y-4">

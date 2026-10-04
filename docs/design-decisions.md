@@ -7435,17 +7435,59 @@ dezelfde coördinaten als billsheet. De bladen van vóór en na de overstap ligg
 bij de boekhouder in dezelfde map; ze moeten er dus hetzelfde uitzien. Een
 mooiere, zelfgetekende PDF was hier de verkeerde verbetering.
 
-**De bestandsnaam is `JJ_JJ_POST_ACTIVITEIT_BEDRAG`**
-(`26_27_Fakbar_Doopcantus_248.9.pdf`), op vraag van de penning in september
-2026. Billsheet schreef het jaar als `26-27` en zette de omschrijving er nog
-achter; dat streepje is een underscore geworden, zodat elk deel met hetzelfde
-teken gescheiden is, en de omschrijving is eruit. Die is een hele zin, terwijl
-de activiteit ("Doopcantus") al zegt waarvoor de uitgave was. De
-download en de bijlage van de mail naar de boekhouder dragen dezelfde naam
-(`expenseReportFilename`). Een rij in de lijst heeft daarom een vierde knop die
-het blad meteen downloadt, naast "Blad bekijken": wie een reeks rekeningen in een
-map wil zetten, hoeft niet voor elke rekening het voorbeeldvenster te openen.
-Draaien kan enkel in dat venster.
+**De bestandsnaam is `JJ-JJ_POST_ACTIVITEIT_OMSCHRIJVING_BEDRAG`**
+(`26-27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf`), op vraag van Beheer in
+oktober 2026. In september stond er nog `26_27` en geen omschrijving, omdat die
+toen een hele zin was ("Een kleine vuilbak voor secri aangekocht in de action").
+Sindsdien zijn activiteit en omschrijving kort (zie hieronder), en dan zegt de
+omschrijving wél iets in een map vol bladen. Het jaar staat er weer als `26-27`,
+zoals op het blad zelf. De download en de bijlage van de mail naar de boekhouder
+dragen dezelfde naam (`expenseReportFilename`). Een rij in de lijst heeft daarom
+een vierde knop die het blad meteen downloadt, naast "Blad bekijken": wie een
+reeks rekeningen in een map wil zetten, hoeft niet voor elke rekening het
+voorbeeldvenster te openen. Draaien kan enkel in dat venster.
+
+**Activiteit en omschrijving zijn een paar woorden; uitleg gaat in de
+opmerking.** Standaard drie woorden per veld, in te stellen onder Rekeningen →
+Instellingen (`maxWords` in `expenses.config`). Ze staan in de bestandsnaam, en
+een naam van tachtig tekens leest niemand meer in een verkenner. Wat er verder te
+zeggen valt (waarvoor precies, voor wie, waarom dit bedrag) gaat in
+`Expense.comment`, een vrij veld dat niet op het blad en niet in de bestandsnaam
+komt. Een rekening van voor die grens houdt haar lange omschrijving: de grens
+geldt pas wanneer iemand het veld wijzigt, in het formulier en in de action.
+
+**Groep 5 valt bij de rekeningen uiteen in praeses, vice, secretaris en beheer.**
+Op de site is het één post, maar die vier houden elk een eigen budget bij en de
+boekhouder wil ze apart. De rekening blijft aan Groep 5 hangen (`groupId`), zodat
+de toegang van de post niet verandert; de deelpost staat in `postLabel`, en dus
+op het blad en in de bestandsnaam. Groep 5 zelf is geen keuze meer. Een oude
+rekening op "Groep 5" toont bij bewerken een lege postkeuze, zodat je er een
+deelpost aan geeft. De lijst staat in `EXPENSE_POST_SPLITS`, op de code van de
+post; een andere post opsplitsen is daar één regel.
+
+**Wie geen Beheer is, ziet enkel of er terugbetaald is.** "Door te sturen", "In
+te boeken" en "Afgehandeld" zijn het werk van Beheer en de boekhouder. Een lid
+dat iets voorschoot, heeft één vraag: heb ik mijn geld al terug? Indieners en
+postbeheerders zien dus "Terug te betalen", "Terugbetaald" of "Kaart VTK"
+(`reimbursementState`), ook in de tabs en de cijfers bovenaan. Dat kijkt naar
+`paidAt` en niet naar de workflowstatus: een rekening die ingeboekt is voor ze
+terugbetaald werd, is voor het lid nog open. De datums van doorsturen en
+inboeken gaan in die weergave ook niet mee naar de browser.
+
+**De mededeling van een terugbetaling staat klaar om te kopiëren.** Beheer schreef
+voor elke overschrijving "Terugbetaling Voornaam Achternaam - Activiteit" over in
+de bankapp. Bij een rekening met een persoonlijke kaart staat die tekst nu in het
+detail met een kopieerknop, net als het IBAN. Enkel voor wie terugbetaalt.
+
+**De lijst staat op indiendatum, en wat je nog niet opende, staat gearceerd.** Op
+de datum van de uitgave zakte een bonnetje van een maand geleden dat vandaag
+binnenkwam meteen onder de vouw, en zag niemand het. Sorteren op die datum kan
+nog met één klik (`?sorteer=datum`); de datumkolom toont dan die datum vooraan
+en de andere eronder. "Gezien" is per gebruiker (`ExpenseView`), want elk lid van
+Beheer moet zelf zien wat er voor hem nieuw is, en het is pas gezien wanneer je
+de rekening opent. Je eigen rekeningen en die van voor de invoering
+(`EXPENSE_VIEWS_SINCE`) gelden als gezien; anders stond de hele historiek
+gearceerd.
 
 **Het bonnetje kan gedraaid worden voor het vertrekt.** Een kassaticket komt van
 een telefoon en ligt vaak op zijn kant. Het voorbeeldvenster genereert bij elke

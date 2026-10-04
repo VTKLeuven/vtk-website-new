@@ -135,11 +135,6 @@ export async function buildExpenseReportPdf(
 
   return {
     bytes: await doc.save(),
-    filename: expenseReportFilename({
-      spentOn: expense.spentOn,
-      postLabel: expense.postLabel,
-      activity: expense.activity,
-      amountCents: expense.amountCents,
-    }),
+    filename: expenseReportFilename(expense),
   };
 }

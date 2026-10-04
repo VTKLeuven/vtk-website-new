@@ -14,19 +14,29 @@ import {
 } from "@/lib/rekeningen/server";
 import {
   EXPENSE_STATUSES,
+  EXPENSE_VIEWS_SINCE,
   expenseStatusLabel,
   formatBytes,
   formatEuro,
+  parsePostOptionValue,
+  postOptions,
+  REIMBURSEMENT_STATES,
+  reimbursementLabel,
 } from "@/lib/rekeningen/expenses";
 import { RekeningenNav } from "./RekeningenNav";
 import { ExpenseWorkbench } from "./ExpenseWorkbench";
 import { expenseInclude, toDetail, toRow } from "./rows";
 import {
   activeFilterChips,
+  expenseOrderBy,
   filterWhere,
   readFilters,
+  reimbursementWhere,
+  REIMBURSEMENT_SLUGS,
+  SPENT_SORT_SLUG,
   statusWhere,
   STATUS_SLUGS,
+  type ExpenseFilters,
   type ExpenseSearchParams,
 } from "./filters";
 
@@ -61,8 +71,12 @@ export default async function RekeningenOverzicht({
   if (!access.canSeeOverview) redirect(`${base}/admin/rekeningen/mijn`);
 
   const sp = await searchParams;
-  const filters = readFilters(sp, currentWorkingYear());
+  // Volledig beheer ziet de hele workflow; een postbeheerder enkel of er
+  // terugbetaald is (zie `reimbursementState`).
+  const full = access.canManageAll;
+  const filters = readFilters(sp, currentWorkingYear(), full);
   const visibility = visibilityWhere(access);
+  const userId = access.session.user.id;
 
   const scoped = (extra: object = {}) => ({
     AND: [visibility ?? {}, filterWhere(filters), extra],
@@ -75,6 +89,12 @@ export default async function RekeningenOverzicht({
       filters.year === "all" ? {} : { workingYear: filters.year },
     ],
   };
+
+  // De tabs: de vier workflowstappen, of de drie terugbetaalstanden.
+  const tabWheres = full
+    ? EXPENSE_STATUSES.map((status) => statusWhere(status))
+    : REIMBURSEMENT_STATES.map((state) => reimbursementWhere(state));
+  const listWhere = scoped(selectedTabWhere(filters));
 
   const [
     posts,
@@ -91,7 +111,7 @@ export default async function RekeningenOverzicht({
     prisma.group.findMany({
       where: access.canManageAll ? {} : { id: { in: access.postScope } },
       orderBy: [{ type: "asc" }, { orderInPraesidium: "asc" }, { nameNl: "asc" }],
-      select: { id: true, nameNl: true, nameEn: true, active: true },
+      select: { id: true, code: true, nameNl: true, nameEn: true, active: true },
     }),
     prisma.expense.findMany({
       where: visibility,
@@ -100,27 +120,20 @@ export default async function RekeningenOverzicht({
       orderBy: { workingYear: "desc" },
     }),
     getExpenseConfig(),
-    Promise.all(
-      EXPENSE_STATUSES.map((status) =>
-        prisma.expense.count({ where: scoped(statusWhere(status)) }),
-      ),
-    ),
-    prisma.expense.count({
-      where: scoped(filters.status === "all" ? {} : statusWhere(filters.status)),
-    }),
-    prisma.expense.aggregate({
-      where: scoped(filters.status === "all" ? {} : statusWhere(filters.status)),
-      _sum: { amountCents: true },
-    }),
+    Promise.all(tabWheres.map((where) => prisma.expense.count({ where: scoped(where) }))),
+    prisma.expense.count({ where: listWhere }),
+    prisma.expense.aggregate({ where: listWhere, _sum: { amountCents: true } }),
     prisma.expense.findMany({
-      where: scoped(filters.status === "all" ? {} : statusWhere(filters.status)),
-      orderBy: [{ spentOn: "desc" }, { createdAt: "desc" }],
+      where: listWhere,
+      orderBy: expenseOrderBy(filters.sort),
       take: PAGE_SIZE,
       skip: (filters.page - 1) * PAGE_SIZE,
       include: expenseInclude,
     }),
     prisma.expense.aggregate({
-      where: { AND: [yearScope, statusWhere("TO_REIMBURSE")] },
+      where: {
+        AND: [yearScope, full ? statusWhere("TO_REIMBURSE") : reimbursementWhere("OPEN")],
+      },
       _sum: { amountCents: true },
       _count: true,
     }),
@@ -139,8 +152,38 @@ export default async function RekeningenOverzicht({
     : null;
   const selected = selectedRaw && canView(access, selectedRaw) ? selectedRaw : null;
 
-  const postLabel = (id: string) =>
-    posts.find((post) => post.id === id)?.[nl ? "nameNl" : "nameEn"] ?? id;
+  // Opengeklikt = gezien. Rekeningen die je zelf indiende of die er al waren
+  // voor dit bijgehouden werd, gelden altijd als gezien.
+  const [, views] = await Promise.all([
+    selected
+      ? prisma.expenseView.createMany({
+          data: [{ userId, expenseId: selected.id }],
+          skipDuplicates: true,
+        })
+      : null,
+    prisma.expenseView.findMany({
+      where: { userId, expenseId: { in: rowsRaw.map((expense) => expense.id) } },
+      select: { expenseId: true },
+    }),
+  ]);
+  const seen = new Set(views.map((view) => view.expenseId));
+  if (selected) seen.add(selected.id);
+  const isUnseen = (expense: (typeof rowsRaw)[number]) =>
+    !seen.has(expense.id) &&
+    expense.submittedById !== userId &&
+    expense.createdAt >= EXPENSE_VIEWS_SINCE;
+
+  const postFilterOptions = posts.flatMap((post) =>
+    postOptions(post, nl ? post.nameNl : post.nameEn, true),
+  );
+  const postLabel = (value: string) => {
+    const option = postFilterOptions.find((candidate) => candidate.value === value);
+    if (option) return option.name;
+    const { groupId, sub } = parsePostOptionValue(value);
+    const post = posts.find((candidate) => candidate.id === groupId);
+    const name = post ? (nl ? post.nameNl : post.nameEn) : groupId;
+    return sub ? `${name} · ${sub}` : name;
+  };
 
   // Eén plek waar links gebouwd worden, zodat elke knop dezelfde filters
   // meedraagt en enkel verandert wat hij zelf bedoelt.
@@ -150,7 +193,8 @@ export default async function RekeningenOverzicht({
       if (value) query.set(key, value);
     };
     set("jaar", filters.year === "all" ? "alles" : String(filters.year));
-    set("status", filters.status === "all" ? "" : STATUS_SLUGS[filters.status]);
+    set("status", statusSlug(filters));
+    set("sorteer", filters.sort === "spent" ? SPENT_SORT_SLUG : "");
     set("q", filters.q);
     set("post", filters.groupId);
     set("van", filters.from);
@@ -217,16 +261,20 @@ export default async function RekeningenOverzicht({
               : `${toReimburse._count} ${toReimburse._count === 1 ? "expense" : "expenses"}`
           }
         />
-        <Stat
-          label={nl ? "Nog door te sturen" : "Still to forward"}
-          value={String(counts[1])}
-          note={nl ? "naar de boekhouder" : "to the accountant"}
-        />
-        <Stat
-          label={nl ? "Nog in te boeken" : "Still to book"}
-          value={String(counts[2])}
-          note={nl ? "wacht op bevestiging" : "awaiting confirmation"}
-        />
+        {full && (
+          <>
+            <Stat
+              label={nl ? "Nog door te sturen" : "Still to forward"}
+              value={String(counts[1])}
+              note={nl ? "naar de boekhouder" : "to the accountant"}
+            />
+            <Stat
+              label={nl ? "Nog in te boeken" : "Still to book"}
+              value={String(counts[2])}
+              note={nl ? "wacht op bevestiging" : "awaiting confirmation"}
+            />
+          </>
+        )}
         <Stat
           label={
             filters.year === "all"
@@ -280,26 +328,37 @@ export default async function RekeningenOverzicht({
       {/* De workflow als tabs: "wat moet ik nog doen" is een knop, geen
           filtercombinatie die je zelf moet samenstellen. */}
       <nav className="flex flex-wrap gap-2" aria-label={nl ? "Status" : "Status"}>
-        {EXPENSE_STATUSES.map((status, index) => (
+        {(full
+          ? EXPENSE_STATUSES.map((status) => ({
+              slug: STATUS_SLUGS[status],
+              label: expenseStatusLabel(status, nl),
+              active: filters.status === status,
+            }))
+          : REIMBURSEMENT_STATES.map((state) => ({
+              slug: REIMBURSEMENT_SLUGS[state],
+              label: reimbursementLabel(state, nl),
+              active: filters.reimbursement === state,
+            }))
+        ).map((tab, index) => (
           <Link
-            key={status}
-            href={hrefWith({ status: STATUS_SLUGS[status], p: "", sel: "" })}
-            aria-current={filters.status === status ? "page" : undefined}
+            key={tab.slug}
+            href={hrefWith({ status: tab.slug, p: "", sel: "" })}
+            aria-current={tab.active ? "page" : undefined}
             className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
-              filters.status === status
+              tab.active
                 ? "border-vtk-ink bg-vtk-ink text-vtk-surface"
                 : "border-vtk-blue/15 bg-white text-[#34405e] hover:bg-vtk-blue-soft/60"
             }`}
           >
-            {expenseStatusLabel(status, nl)}
+            {tab.label}
             <span className="tabular-nums font-semibold">{counts[index]}</span>
           </Link>
         ))}
         <Link
           href={hrefWith({ status: "", p: "", sel: "" })}
-          aria-current={filters.status === "all" ? "page" : undefined}
+          aria-current={statusSlug(filters) === "" ? "page" : undefined}
           className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm ${
-            filters.status === "all"
+            statusSlug(filters) === ""
               ? "border-vtk-ink bg-vtk-ink text-vtk-surface"
               : "border-vtk-blue/15 bg-white text-[#34405e] hover:bg-vtk-blue-soft/60"
           }`}
@@ -316,9 +375,8 @@ export default async function RekeningenOverzicht({
       <form method="get" className="space-y-3 rounded-2xl border border-vtk-blue/12 bg-white p-4">
         {filters.year !== "all" && <input type="hidden" name="jaar" value={filters.year} />}
         {filters.year === "all" && <input type="hidden" name="jaar" value="alles" />}
-        {filters.status !== "all" && (
-          <input type="hidden" name="status" value={STATUS_SLUGS[filters.status]} />
-        )}
+        {statusSlug(filters) && <input type="hidden" name="status" value={statusSlug(filters)} />}
+        {filters.sort === "spent" && <input type="hidden" name="sorteer" value={SPENT_SORT_SLUG} />}
 
         <div className="flex flex-wrap items-end gap-3">
           <div className="min-w-[220px] flex-1">
@@ -339,9 +397,9 @@ export default async function RekeningenOverzicht({
             <Label htmlFor="post">{nl ? "Post" : "Post"}</Label>
             <Select id="post" name="post" defaultValue={filters.groupId}>
               <option value="">{nl ? "Alle posten" : "All posts"}</option>
-              {posts.map((post) => (
-                <option key={post.id} value={post.id}>
-                  {nl ? post.nameNl : post.nameEn}
+              {postFilterOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.name}
                 </option>
               ))}
             </Select>
@@ -400,10 +458,39 @@ export default async function RekeningenOverzicht({
         )}
       </form>
 
+      {/* Standaard op indiendatum: een rekening van een maand geleden die vandaag
+          binnenkwam, staat dan bovenaan in plaats van onder de vouw. */}
+      <nav className="flex flex-wrap items-center gap-2" aria-label={nl ? "Sorteren" : "Sort"}>
+        <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[#5c667f]">
+          {nl ? "Sorteren op" : "Sort by"}
+        </span>
+        {(
+          [
+            { sort: "submitted", slug: "", label: nl ? "Indiendatum" : "Date submitted" },
+            { sort: "spent", slug: SPENT_SORT_SLUG, label: nl ? "Datum uitgave" : "Date of expense" },
+          ] as const
+        ).map((option) => (
+          <Link
+            key={option.sort}
+            href={hrefWith({ sorteer: option.slug, p: "", sel: "" })}
+            aria-current={filters.sort === option.sort ? "page" : undefined}
+            className={`rounded-full border px-2.5 py-1 text-xs ${
+              filters.sort === option.sort
+                ? "border-vtk-ink bg-vtk-ink text-vtk-surface"
+                : "border-vtk-blue/15 text-[#34405e] hover:bg-vtk-blue-soft/60"
+            }`}
+          >
+            {option.label}
+          </Link>
+        ))}
+      </nav>
+
       <ExpenseWorkbench
         locale={locale}
+        sort={filters.sort}
         rows={rowsRaw.map((expense) => ({
           ...toRow(expense, locale, access),
+          unseen: isUnseen(expense),
           detailHref: hrefWith({ sel: expense.id }),
           editHref: `${base}/admin/rekeningen/bewerken/${expense.id}`,
         }))}
@@ -441,6 +528,20 @@ export default async function RekeningenOverzicht({
       />
     </div>
   );
+}
+
+/** De `where` van de gekozen tab, in de weergave die bij de gebruiker hoort. */
+function selectedTabWhere(filters: ExpenseFilters) {
+  if (filters.status !== "all") return statusWhere(filters.status);
+  if (filters.reimbursement !== "all") return reimbursementWhere(filters.reimbursement);
+  return {};
+}
+
+/** `?status=` voor de gekozen tab; leeg bij "Alles". */
+function statusSlug(filters: ExpenseFilters): string {
+  if (filters.status !== "all") return STATUS_SLUGS[filters.status];
+  if (filters.reimbursement !== "all") return REIMBURSEMENT_SLUGS[filters.reimbursement];
+  return "";
 }
 
 function Stat({

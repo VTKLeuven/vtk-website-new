@@ -14,16 +14,20 @@ import {
   canView,
   EXPENSE_CONFIG_KEY,
   getExpenseConfig,
+  MAX_WORDS_RANGE,
   requireExpenseAccess,
 } from "@/lib/rekeningen/server";
 import { buildExpenseReportPdf } from "@/lib/rekeningen/report";
 import {
+  countWords,
   expenseMailDraft,
+  expensePostSplit,
   formatEuro,
   isValidIban,
   normaliseIban,
   parseAmountToCents,
   parseDateInput,
+  parsePostOptionValue,
   RECEIPT_PREFIX,
   workingYearOf,
 } from "@/lib/rekeningen/expenses";
@@ -86,11 +90,29 @@ type ParsedFields = {
   payerName: string;
   activity: string;
   description: string;
+  comment: string | null;
   spentOn: Date;
   amountCents: number;
   paymentMethod: "VTK_CARD" | "PERSONAL";
   iban: string | null;
 };
+
+/**
+ * Activiteit en omschrijving mogen maar `maxWords` woorden tellen. Bij bewerken
+ * enkel als het veld veranderde: een rekening van voor die grens mag haar
+ * langere omschrijving houden zolang niemand eraan komt.
+ */
+function wordLimitError(
+  fields: { activity: string; description: string },
+  maxWords: number,
+  existing?: { activity: string; description: string },
+): SaveState | null {
+  const over = (name: "activity" | "description") =>
+    countWords(fields[name]) > maxWords && fields[name] !== existing?.[name]?.trim();
+  if (over("activity")) return saveError("TOO_MANY_WORDS_ACTIVITY");
+  if (over("description")) return saveError("TOO_MANY_WORDS_DESCRIPTION");
+  return null;
+}
 
 /**
  * Valideert de velden die indienen en bewerken delen.
@@ -99,14 +121,22 @@ type ParsedFields = {
  * verkeerd IBAN of een leeg bedrag is een verwachte fout en hoort een rode toast
  * te geven, geen error boundary (zie CLAUDE.md).
  */
-async function parseFields(formData: FormData): Promise<ParsedFields | SaveState> {
-  const groupId = text(formData, "groupId", 40) || null;
+async function parseFields(
+  formData: FormData,
+  maxWords: number,
+  existing?: { activity: string; description: string },
+): Promise<ParsedFields | SaveState> {
+  const post = parsePostOptionValue(text(formData, "groupId", 80));
+  const groupId = post.groupId || null;
   const payerName = text(formData, "payerName", 120);
   const activity = text(formData, "activity", 160);
   const description = text(formData, "description", 200);
+  const comment = text(formData, "comment", 4000) || null;
   const paymentMethodRaw = text(formData, "paymentMethod", 20);
 
   if (!payerName || !activity || !description) return saveError("MISSING_FIELD");
+  const wordError = wordLimitError({ activity, description }, maxWords, existing);
+  if (wordError) return wordError;
   if (paymentMethodRaw !== "VTK_CARD" && paymentMethodRaw !== "PERSONAL") {
     return saveError("MISSING_FIELD");
   }
@@ -129,15 +159,24 @@ async function parseFields(formData: FormData): Promise<ParsedFields | SaveState
   }
 
   // De postnaam wordt vastgeklikt zoals ze nu heet: ze gaat mee op het blad naar
-  // de boekhouder, en die map mag niet veranderen als de post hernoemt.
+  // de boekhouder, en die map mag niet veranderen als de post hernoemt. Bij een
+  // opgesplitste post (Groep 5) is dat de deelpost, en dan moet er één gekozen
+  // zijn: de post zelf staat niet meer in de lijst.
   let postLabel = "";
   if (groupId) {
     const group = await prisma.group.findUnique({
       where: { id: groupId },
-      select: { nameNl: true },
+      select: { code: true, nameNl: true },
     });
     if (!group) return saveError("BAD_POST");
-    postLabel = group.nameNl;
+    const split = expensePostSplit(group.code);
+    if (split) {
+      if (!post.sub || !split.includes(post.sub)) return saveError("BAD_POST");
+      postLabel = post.sub;
+    } else {
+      if (post.sub) return saveError("BAD_POST");
+      postLabel = group.nameNl;
+    }
   } else {
     postLabel = text(formData, "postLabel", 80);
     if (!postLabel) return saveError("BAD_POST");
@@ -149,6 +188,7 @@ async function parseFields(formData: FormData): Promise<ParsedFields | SaveState
     payerName,
     activity,
     description,
+    comment,
     spentOn,
     amountCents,
     paymentMethod,
@@ -164,7 +204,8 @@ export async function submitExpenseAction(
   const access = await requireExpenseAccess();
   if (!access.canSubmit) return saveError("FORBIDDEN");
 
-  const parsed = await parseFields(formData);
+  const config = await getExpenseConfig();
+  const parsed = await parseFields(formData, config.maxWords);
   if ("status" in parsed) return parsed;
 
   const receiptKey = text(formData, "receiptKey", 200);
@@ -219,7 +260,8 @@ export async function updateExpenseAction(
   if (!existing) return saveError("NOT_FOUND");
   if (!canEdit(access, existing)) return saveError("LOCKED");
 
-  const parsed = await parseFields(formData);
+  const config = await getExpenseConfig();
+  const parsed = await parseFields(formData, config.maxWords, existing);
   if ("status" in parsed) return parsed;
 
   // Een nieuw bonnetje is optioneel: leeg betekent "laat staan wat er stond",
@@ -262,6 +304,7 @@ export async function updateExpenseAction(
         payerName: "wie betaalde",
         activity: "activiteit",
         description: "omschrijving",
+        comment: "opmerking",
         spentOn: "datum",
         amountCents: "bedrag",
         paymentMethod: "betaalwijze",
@@ -434,11 +477,17 @@ export async function saveExpenseSettingsAction(
   const fromAddress = fromEmail.match(/<([^>]+)>/)?.[1] ?? fromEmail;
   if (fromEmail && !isEmail(fromAddress)) return saveError("BAD_EMAIL");
 
+  const maxWords = Number(text(formData, "maxWords", 5));
+  if (!Number.isInteger(maxWords) || maxWords < MAX_WORDS_RANGE.min || maxWords > MAX_WORDS_RANGE.max) {
+    return saveError("BAD_MAX_WORDS");
+  }
+
   const value = {
     accountantEmail,
     fromEmail,
     guidelinesNl: text(formData, "guidelinesNl", 4000),
     guidelinesEn: text(formData, "guidelinesEn", 4000),
+    maxWords,
   };
 
   await prisma.setting.upsert({
@@ -451,7 +500,7 @@ export async function saveExpenseSettingsAction(
     action: "update",
     entity: "expense",
     target: "Instellingen rekeningen",
-    summary: accountantEmail ? `boekhouder: ${accountantEmail}` : "geen boekhoudadres",
+    summary: `${accountantEmail ? `boekhouder: ${accountantEmail}` : "geen boekhoudadres"} · max. ${maxWords} woorden`,
   });
 
   revalidateExpenses();

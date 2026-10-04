@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   academicYearTag,
+  countWords,
   expenseReportFilename,
   expenseStatus,
   formatBytes,
@@ -11,6 +12,10 @@ import {
   normaliseIban,
   parseAmountToCents,
   parseDateInput,
+  parsePostOptionValue,
+  postOptions,
+  reimbursementReference,
+  reimbursementState,
   workingYearOf,
 } from "@/lib/rekeningen/expenses";
 
@@ -104,15 +109,16 @@ describe("datum uit een date-input", () => {
 });
 
 describe("bestandsnaam van het blad", () => {
-  it("zet jaar, post, activiteit en bedrag achter elkaar met underscores", () => {
+  it("zet jaar, post, activiteit, omschrijving en bedrag achter elkaar met underscores", () => {
     expect(
       expenseReportFilename({
         spentOn: new Date(Date.UTC(2026, 8, 18)),
         postLabel: "Fakbar",
         activity: "Doopcantus",
+        description: "Bierbestelling",
         amountCents: 24890,
       }),
-    ).toBe("26_27_Fakbar_Doopcantus_248.9.pdf");
+    ).toBe("26-27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf");
   });
 
   it("gooit tekens weg die niet in een bestandsnaam horen", () => {
@@ -121,9 +127,83 @@ describe("bestandsnaam van het blad", () => {
         spentOn: new Date(Date.UTC(2026, 8, 18)),
         postLabel: "Cultuur",
         activity: "Expo & Kunst/Verf",
+        description: "Verf",
         amountCents: 3115,
       }),
-    ).toBe("26_27_Cultuur_Expo  KunstVerf_31.15.pdf");
+    ).toBe("26-27_Cultuur_Expo  KunstVerf_Verf_31.15.pdf");
+  });
+
+  it("gebruikt de deelpost van Groep 5 als post", () => {
+    expect(
+      expenseReportFilename({
+        spentOn: new Date(Date.UTC(2026, 9, 3)),
+        postLabel: "Beheer",
+        activity: "Kantoormateriaal",
+        description: "9V batterij",
+        amountCents: 329,
+      }),
+    ).toBe("26-27_Beheer_Kantoormateriaal_9V batterij_3.29.pdf");
+  });
+});
+
+describe("korte velden", () => {
+  it("telt woorden over alle soorten witruimte heen", () => {
+    expect(countWords("")).toBe(0);
+    expect(countWords("   ")).toBe(0);
+    expect(countWords("Doopcantus")).toBe(1);
+    expect(countWords("  Gender  Switch\tparty ")).toBe(3);
+    expect(countWords("Aankoop 9V batterij voor kluis")).toBe(5);
+  });
+});
+
+describe("terugbetaling voor wie geen Beheer is", () => {
+  const at = new Date("2026-09-19T10:00:00Z");
+
+  it("zegt enkel of voorgeschoten geld al terug is", () => {
+    expect(reimbursementState({ paymentMethod: "PERSONAL", paidAt: null })).toBe("OPEN");
+    expect(reimbursementState({ paymentMethod: "PERSONAL", paidAt: at })).toBe("PAID");
+    expect(reimbursementState({ paymentMethod: "VTK_CARD", paidAt: at })).toBe("CARD");
+  });
+
+  it("blijft open zolang er niet terugbetaald is, ook als de boekhouder al inboekte", () => {
+    // `expenseStatus` zegt dan "Afgehandeld", maar het lid heeft zijn geld nog niet.
+    expect(expenseStatus({ paidAt: null, sentAt: null, bookedAt: at })).toBe("DONE");
+    expect(reimbursementState({ paymentMethod: "PERSONAL", paidAt: null })).toBe("OPEN");
+  });
+
+  it("stelt de mededeling voor de overschrijving op", () => {
+    expect(
+      reimbursementReference({ payerName: "Tiddo Nees ", activity: " Kantoormateriaal" }),
+    ).toBe("Terugbetaling Tiddo Nees - Kantoormateriaal");
+  });
+});
+
+describe("opgesplitste posten", () => {
+  it("vervangt Groep 5 door haar vier deelposten", () => {
+    expect(postOptions({ id: "g5", code: "GROEP5" }, "Groep 5").map((option) => option.value)).toEqual([
+      "g5:Secretaris",
+      "g5:Vice",
+      "g5:Praeses",
+      "g5:Beheer",
+    ]);
+  });
+
+  it("zet de volledige post erboven in een filter", () => {
+    const options = postOptions({ id: "g5", code: "GROEP5" }, "Groep 5", true);
+    expect(options[0]).toEqual({ value: "g5", name: "Groep 5" });
+    expect(options[1]).toEqual({ value: "g5:Secretaris", name: "Groep 5 · Secretaris" });
+  });
+
+  it("laat een gewone post ongemoeid", () => {
+    expect(postOptions({ id: "fak", code: "FAKBAR" }, "Fakbar", true)).toEqual([
+      { value: "fak", name: "Fakbar" },
+    ]);
+  });
+
+  it("leest een keuze terug als post en deelpost", () => {
+    expect(parsePostOptionValue("g5:Praeses")).toEqual({ groupId: "g5", sub: "Praeses" });
+    expect(parsePostOptionValue("fak")).toEqual({ groupId: "fak", sub: null });
+    expect(parsePostOptionValue("g5:")).toEqual({ groupId: "g5", sub: null });
   });
 });
 
@@ -160,5 +240,24 @@ describe("filter parsing", () => {
     expect(readFilters({ jaar: "   " }, 2026).year).toBe(2026);
     expect(readFilters({ jaar: "alles" }, 2026).year).toBe("all");
     expect(readFilters({ jaar: "2025" }, 2026).year).toBe(2025);
+  });
+
+  it("sorteert standaard op indiendatum", async () => {
+    const { readFilters } = await import("@/app/[locale]/admin/rekeningen/filters");
+    expect(readFilters({}, 2026).sort).toBe("submitted");
+    expect(readFilters({ sorteer: "datum" }, 2026).sort).toBe("spent");
+    expect(readFilters({ sorteer: "iets" }, 2026).sort).toBe("submitted");
+  });
+
+  it("leest ?status= als terugbetaalfilter voor wie geen Beheer is", async () => {
+    const { readFilters } = await import("@/app/[locale]/admin/rekeningen/filters");
+    expect(readFilters({ status: "doorsturen" }, 2026, true).status).toBe("TO_SEND");
+    // Een gedeelde link uit de volledige weergave filtert niet op een stap die
+    // een lid niet te zien krijgt.
+    const simple = readFilters({ status: "doorsturen" }, 2026, false);
+    expect(simple.status).toBe("all");
+    expect(simple.reimbursement).toBe("all");
+    expect(readFilters({ status: "terugbetaald" }, 2026, false).reimbursement).toBe("PAID");
+    expect(readFilters({ status: "terugbetalen" }, 2026, false).reimbursement).toBe("OPEN");
   });
 });

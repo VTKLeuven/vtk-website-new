@@ -4,7 +4,9 @@ import type { Prisma } from "@prisma/client";
 import {
   normaliseIban,
   parseDateInput,
+  parsePostOptionValue,
   type ExpenseStatus,
+  type ReimbursementState,
 } from "@/lib/rekeningen/expenses";
 
 /**
@@ -16,9 +18,20 @@ import {
  * op en filterde ze in de browser met Fuse.js; dat werkt tot het niet meer werkt.
  */
 
+/**
+ * Op indiendatum (de standaard) of op de datum van de uitgave. Op die laatste
+ * zakte een rekening van een maand geleden die vandaag binnenkwam meteen onder
+ * de vouw, en zag niemand ze.
+ */
+export type ExpenseSort = "submitted" | "spent";
+
 export type ExpenseFilters = {
   year: number | "all";
+  /** De workflowstap; enkel in de volledige weergave van Beheer. */
   status: ExpenseStatus | "all";
+  /** Terugbetaald of niet; de weergave voor wie geen Beheer is. */
+  reimbursement: ReimbursementState | "all";
+  sort: ExpenseSort;
   q: string;
   groupId: string;
   from: string;
@@ -51,9 +64,30 @@ export const STATUS_SLUGS: Record<ExpenseStatus, string> = {
   DONE: "klaar",
 };
 
+const REIMBURSEMENT_BY_SLUG: Record<string, ReimbursementState> = {
+  terugbetalen: "OPEN",
+  terugbetaald: "PAID",
+  kaart: "CARD",
+};
+
+export const REIMBURSEMENT_SLUGS: Record<ReimbursementState, string> = {
+  OPEN: "terugbetalen",
+  PAID: "terugbetaald",
+  CARD: "kaart",
+};
+
+/** `?sorteer=datum` sorteert op de uitgave; zonder parameter op indiendatum. */
+export const SPENT_SORT_SLUG = "datum";
+
+/**
+ * `full` is de volledige workflow van Beheer. Zonder geldt `?status=` als
+ * terugbetaalfilter, zodat een gedeelde link uit de volledige weergave een lid
+ * niet alsnog op "In te boeken" laat filteren.
+ */
 export function readFilters(
   params: ExpenseSearchParams,
   fallbackYear: number,
+  full = true,
 ): ExpenseFilters {
   const rawYear = one(params, "jaar");
   let year: number | "all" = fallbackYear;
@@ -65,13 +99,17 @@ export function readFilters(
       year = parsedYear;
     }
   }
-  const status = STATUS_BY_SLUG[one(params, "status")] ?? "all";
+  const statusSlug = one(params, "status");
+  const status = full ? (STATUS_BY_SLUG[statusSlug] ?? "all") : "all";
+  const reimbursement = full ? "all" : (REIMBURSEMENT_BY_SLUG[statusSlug] ?? "all");
 
   return {
     year,
     status,
+    reimbursement,
+    sort: one(params, "sorteer") === SPENT_SORT_SLUG ? "spent" : "submitted",
     q: one(params, "q").slice(0, 120),
-    groupId: one(params, "post").slice(0, 40),
+    groupId: one(params, "post").slice(0, 80),
     from: one(params, "van").slice(0, 10),
     to: one(params, "tot").slice(0, 10),
     min: one(params, "min").slice(0, 20),
@@ -96,7 +134,12 @@ export function filterWhere(filters: ExpenseFilters): Prisma.ExpenseWhereInput {
   const and: Prisma.ExpenseWhereInput[] = [];
 
   if (filters.year !== "all") and.push({ workingYear: filters.year });
-  if (filters.groupId) and.push({ groupId: filters.groupId });
+  if (filters.groupId) {
+    // `id:Praeses` is een deelpost van een opgesplitste post (Groep 5); de
+    // deelpost staat in `postLabel`.
+    const { groupId, sub } = parsePostOptionValue(filters.groupId);
+    and.push(sub ? { groupId, postLabel: sub } : { groupId });
+  }
   if (filters.payer) {
     and.push({ payerName: { contains: filters.payer, mode: "insensitive" } });
   }
@@ -123,6 +166,7 @@ export function filterWhere(filters: ExpenseFilters): Prisma.ExpenseWhereInput {
     const or: Prisma.ExpenseWhereInput[] = [
       { description: { contains: filters.q, mode: "insensitive" } },
       { activity: { contains: filters.q, mode: "insensitive" } },
+      { comment: { contains: filters.q, mode: "insensitive" } },
       { payerName: { contains: filters.q, mode: "insensitive" } },
       { postLabel: { contains: filters.q, mode: "insensitive" } },
       { iban: { contains: normaliseIban(filters.q), mode: "insensitive" } },
@@ -147,6 +191,25 @@ export function statusWhere(status: ExpenseStatus): Prisma.ExpenseWhereInput {
     case "DONE":
       return { bookedAt: { not: null } };
   }
+}
+
+/** De `where` van een terugbetaalstand. Zie `reimbursementState`. */
+export function reimbursementWhere(state: ReimbursementState): Prisma.ExpenseWhereInput {
+  switch (state) {
+    case "OPEN":
+      return { paymentMethod: "PERSONAL", paidAt: null };
+    case "PAID":
+      return { paymentMethod: "PERSONAL", paidAt: { not: null } };
+    case "CARD":
+      return { paymentMethod: "VTK_CARD" };
+  }
+}
+
+/** De sortering van de lijst; de id als laatste sleutel houdt de paginering stabiel. */
+export function expenseOrderBy(sort: ExpenseSort): Prisma.ExpenseOrderByWithRelationInput[] {
+  return sort === "spent"
+    ? [{ spentOn: "desc" }, { createdAt: "desc" }, { id: "desc" }]
+    : [{ createdAt: "desc" }, { id: "desc" }];
 }
 
 /** Welke filters staan er aan, met de link die er één uitzet. */

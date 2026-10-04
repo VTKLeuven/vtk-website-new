@@ -17,7 +17,7 @@ import { RekeningenNav } from "../RekeningenNav";
 import { ExpenseWorkbench } from "../ExpenseWorkbench";
 import { expenseErrorMessages } from "../messages";
 import { expenseInclude, toDetail, toRow } from "../rows";
-import { statusWhere, type ExpenseSearchParams } from "../filters";
+import { expenseOrderBy, reimbursementWhere, type ExpenseSearchParams } from "../filters";
 
 const PAGE_SIZE = 25;
 
@@ -66,13 +66,15 @@ export default async function MijnRekeningen({
     prisma.expense.aggregate({ where, _sum: { amountCents: true } }),
     prisma.expense.findMany({
       where,
-      orderBy: [{ spentOn: "desc" }, { createdAt: "desc" }],
+      orderBy: expenseOrderBy("submitted"),
       take: PAGE_SIZE,
       skip: (page - 1) * PAGE_SIZE,
       include: expenseInclude,
     }),
     prisma.expense.aggregate({
-      where: { AND: [where, statusWhere("TO_REIMBURSE")] },
+      // Wat er nog naar jou moet: voorgeschoten en nog niet terugbetaald. Los
+      // van doorsturen of inboeken; dat is het werk van Beheer.
+      where: { AND: [where, reimbursementWhere("OPEN")] },
       _sum: { amountCents: true },
       _count: true,
     }),

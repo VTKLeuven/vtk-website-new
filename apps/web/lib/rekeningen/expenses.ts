@@ -63,6 +63,116 @@ export function expenseStatusLabel(status: ExpenseStatus, nl: boolean): string {
 /** De volgorde waarin de statustabs staan: de workflow van links naar rechts. */
 export const EXPENSE_STATUSES: ExpenseStatus[] = ["TO_REIMBURSE", "TO_SEND", "TO_BOOK", "DONE"];
 
+/**
+ * Wat een indiener of postbeheerder van de workflow te zien krijgt: enkel of er
+ * nog geld naar het lid moet. Doorsturen en inboeken zijn het werk van Beheer
+ * en de boekhouder; "In te boeken" of "Afgehandeld" zegt een lid niets over de
+ * vraag die hij heeft, namelijk of hij zijn geld al terug heeft.
+ *
+ * Kijkt naar `paidAt` en niet naar `expenseStatus`: een rekening kan ingeboekt
+ * zijn voor ze terugbetaald is, en dan is ze voor het lid nog altijd open.
+ */
+export type ReimbursementState = "OPEN" | "PAID" | "CARD";
+
+export function reimbursementState(expense: {
+  paymentMethod: "VTK_CARD" | "PERSONAL";
+  paidAt: Date | string | null;
+}): ReimbursementState {
+  if (expense.paymentMethod === "VTK_CARD") return "CARD";
+  return expense.paidAt ? "PAID" : "OPEN";
+}
+
+export function reimbursementLabel(state: ReimbursementState, nl: boolean): string {
+  if (nl) {
+    return { OPEN: "Terug te betalen", PAID: "Terugbetaald", CARD: "Kaart VTK" }[state];
+  }
+  return { OPEN: "To reimburse", PAID: "Reimbursed", CARD: "VTK card" }[state];
+}
+
+export const REIMBURSEMENT_STATES: ReimbursementState[] = ["OPEN", "PAID", "CARD"];
+
+/**
+ * De mededeling bij de overschrijving: "Terugbetaling Jan Peeters - Doopcantus".
+ * Beheer tikte die vroeger voor elke terugbetaling zelf over in de bankapp.
+ */
+export function reimbursementReference(expense: { payerName: string; activity: string }): string {
+  return `Terugbetaling ${expense.payerName.trim()} - ${expense.activity.trim()}`;
+}
+
+// -----------------------------------------------------------------------------
+// Posten
+// -----------------------------------------------------------------------------
+
+/**
+ * Posten die bij de rekeningen in deelposten uiteenvallen. Groep 5 is één post
+ * op de site, maar praeses, vice, secretaris en beheer houden elk hun eigen
+ * budget bij, en de boekhouder wil die vier apart in zijn map.
+ *
+ * Sleutel is `Group.code`. De rekening houdt `groupId` op Groep 5 (zodat de
+ * toegang van de post gewoon blijft werken) en zet de deelpost in `postLabel`,
+ * de naam die op het blad en in de bestandsnaam komt.
+ */
+export const EXPENSE_POST_SPLITS: Record<string, readonly string[]> = {
+  GROEP5: ["Secretaris", "Vice", "Praeses", "Beheer"],
+};
+
+export function expensePostSplit(code: string | null | undefined): readonly string[] | null {
+  return (code && EXPENSE_POST_SPLITS[code]) || null;
+}
+
+/**
+ * Een post in een keuzelijst: `groupId`, of `groupId:Deelpost` voor een
+ * deelpost. Een cuid bevat geen dubbelepunt, dus dat scheidt eenduidig.
+ */
+export function postOptionValue(groupId: string, sub?: string | null): string {
+  return sub ? `${groupId}:${sub}` : groupId;
+}
+
+export function parsePostOptionValue(raw: string): { groupId: string; sub: string | null } {
+  const index = raw.indexOf(":");
+  if (index === -1) return { groupId: raw, sub: null };
+  return { groupId: raw.slice(0, index), sub: raw.slice(index + 1) || null };
+}
+
+/**
+ * De keuzes voor één post: de post zelf, of haar deelposten als ze opgesplitst
+ * is. `withWhole` zet de volledige post er nog boven, voor een filter dat de
+ * vier deelposten samen wil kunnen tonen.
+ */
+export function postOptions(
+  group: { id: string; code: string },
+  name: string,
+  withWhole = false,
+): Array<{ value: string; name: string }> {
+  const split = expensePostSplit(group.code);
+  if (!split) return [{ value: group.id, name }];
+  return [
+    ...(withWhole ? [{ value: group.id, name }] : []),
+    ...split.map((sub) => ({ value: postOptionValue(group.id, sub), name: `${name} · ${sub}` })),
+  ];
+}
+
+// -----------------------------------------------------------------------------
+// Korte velden
+// -----------------------------------------------------------------------------
+
+/**
+ * Activiteit en omschrijving staan in de bestandsnaam van het blad, dus ze zijn
+ * kort: standaard drie woorden, in te stellen bij de rekeningen. Wat er meer te
+ * zeggen valt, gaat in de opmerking.
+ */
+export const DEFAULT_MAX_WORDS = 3;
+
+export function countWords(value: string): number {
+  return value.trim().split(/\s+/).filter(Boolean).length;
+}
+
+/**
+ * Rekeningen van voor het bijhouden van "gezien" gelden als gezien. Zonder deze
+ * grens stond na de invoering de hele historiek gearceerd, voor iedereen.
+ */
+export const EXPENSE_VIEWS_SINCE = new Date("2026-10-04T00:00:00Z");
+
 // -----------------------------------------------------------------------------
 // Geld
 // -----------------------------------------------------------------------------
@@ -194,6 +304,32 @@ export function formatSpentOn(date: Date, locale: "nl" | "en" = "nl"): string {
   }).format(date);
 }
 
+/** "03/10/2026" voor een tijdstip (indienen), in Belgische tijd. */
+export function formatSubmittedOn(date: Date, locale: "nl" | "en" = "nl"): string {
+  return new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  }).format(date);
+}
+
+/**
+ * "29/09" voor de tweede datum in de lijst. `timeZone` is "UTC" voor een kale
+ * uitgavedatum en "Europe/Brussels" voor een tijdstip zoals het indienen.
+ */
+export function formatDayMonth(
+  date: Date,
+  timeZone: "UTC" | "Europe/Brussels",
+  locale: "nl" | "en" = "nl",
+): string {
+  return new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
+    timeZone,
+    day: "2-digit",
+    month: "2-digit",
+  }).format(date);
+}
+
 /** "19 sep 2026 om 21:04" voor de inspector. */
 export function formatMoment(date: Date, locale: "nl" | "en" = "nl"): string {
   const formatted = new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
@@ -230,23 +366,27 @@ function replaceBadCharacters(value: string): string {
 }
 
 /**
- * "26_27_Fakbar_Doopcantus_248.9.pdf": jaar, post, activiteit en bedrag, met een
- * underscore ertussen. De omschrijving staat er bewust niet in: die is een zin
- * ("Een kleine vuilbak voor secri aangekocht in de action") en de activiteit zegt
- * al waarvoor het was. Het jaar staat hier als "26_27", niet als het "26-27" van
- * `academicYearTag`: zo vraagt de penning het. Download en mailbijlage gebruiken
- * allebei deze naam.
+ * "26-27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf": jaar, post, activiteit,
+ * omschrijving en bedrag, met een underscore ertussen. Het jaar staat er als
+ * "26-27", zoals `academicYearTag` het schrijft. De omschrijving kan erin sinds
+ * ze kort is (zie `DEFAULT_MAX_WORDS`); de opmerking komt er nooit in. Download
+ * en mailbijlage gebruiken allebei deze naam.
  */
 export function expenseReportFilename(expense: {
   spentOn: Date;
   postLabel: string;
   activity: string;
+  description: string;
   amountCents: number;
 }): string {
   return replaceBadCharacters(
-    `${academicYearTag(expense.spentOn).replace("-", "_")}_${expense.postLabel}_${expense.activity}_${
-      expense.amountCents / 100
-    }.pdf`,
+    [
+      academicYearTag(expense.spentOn),
+      expense.postLabel,
+      expense.activity,
+      expense.description,
+      expense.amountCents / 100,
+    ].join("_") + ".pdf",
   );
 }
 

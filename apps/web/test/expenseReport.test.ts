@@ -45,7 +45,7 @@ describe("blad voor de boekhouder", () => {
       receiptMime: "image/jpeg",
     });
 
-    expect(filename).toBe("26_27_Fakbar_Doopcantus_248.9.pdf");
+    expect(filename).toBe("26-27_Fakbar_Doopcantus_Bierbestelling_248.9.pdf");
     expect(Buffer.from(bytes).subarray(0, 5).toString()).toBe("%PDF-");
     const doc = await PDFDocument.load(bytes);
     expect(doc.getPageCount()).toBe(1);

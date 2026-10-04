@@ -3,11 +3,16 @@
 import Link from "@/components/ui/Link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { Input, Label, Select } from "@vtk/ui";
+import { Input, Label, Select, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import type { SaveAction } from "@/lib/saveState";
+import { countWords } from "@/lib/rekeningen/expenses";
 import { ReceiptField } from "./ReceiptField";
 
+/**
+ * Eén keuze in de postlijst. `id` is de waarde van de optie: een `groupId`, of
+ * `groupId:Deelpost` voor een opgesplitste post (zie `postOptionValue`).
+ */
 export type PostOption = { id: string; name: string };
 
 export type ExpenseFormValues = {
@@ -16,6 +21,7 @@ export type ExpenseFormValues = {
   payerName: string;
   activity: string;
   description: string;
+  comment: string;
   spentOn: string;
   amount: string;
   paymentMethod: "VTK_CARD" | "PERSONAL";
@@ -46,6 +52,7 @@ export function ExpenseForm({
   existingReceipt,
   redirectAfter,
   defaultIbanHref,
+  maxWords,
 }: {
   locale: "nl" | "en";
   action: SaveAction;
@@ -63,6 +70,8 @@ export function ExpenseForm({
   redirectAfter?: string;
   /** Waar de indiener zijn eigen standaard-IBAN aanpast: onder Mijn rekeningen. */
   defaultIbanHref?: string;
+  /** Hoeveel woorden activiteit en omschrijving elk mogen tellen. */
+  maxWords: number;
 }) {
   const nl = locale === "nl";
   const router = useRouter();
@@ -142,29 +151,46 @@ export function ExpenseForm({
             defaultValue={values.spentOn}
           />
         </div>
-        <div>
-          <Label htmlFor="activity">{nl ? "Activiteit" : "Activity"}</Label>
-          <Input
-            id="activity"
-            name="activity"
-            required
-            maxLength={160}
-            defaultValue={values.activity}
-            placeholder={nl ? "bv. Doopcantus" : "e.g. Initiation cantus"}
-          />
-        </div>
+        <WordLimitedField
+          id="activity"
+          label={nl ? "Activiteit" : "Activity"}
+          locale={locale}
+          maxWords={maxWords}
+          maxLength={160}
+          defaultValue={values.activity}
+          placeholder={nl ? "bv. Doopcantus" : "e.g. Initiation cantus"}
+        />
       </div>
 
+      <WordLimitedField
+        id="description"
+        label={nl ? "Omschrijving" : "Description"}
+        locale={locale}
+        maxWords={maxWords}
+        maxLength={200}
+        defaultValue={values.description}
+        placeholder={nl ? "bv. Bierbestelling" : "e.g. Beer order"}
+      />
+
       <div>
-        <Label htmlFor="description">{nl ? "Omschrijving" : "Description"}</Label>
-        <Input
-          id="description"
-          name="description"
-          required
-          maxLength={200}
-          defaultValue={values.description}
-          placeholder={nl ? "bv. Bierbestelling" : "e.g. Beer order"}
+        <Label htmlFor="comment">{nl ? "Opmerking (optioneel)" : "Comment (optional)"}</Label>
+        <Textarea
+          id="comment"
+          name="comment"
+          rows={3}
+          maxLength={4000}
+          defaultValue={values.comment}
+          placeholder={
+            nl
+              ? "Wat er verder te weten valt: waarvoor precies, voor wie, waarom dit bedrag."
+              : "Anything else worth knowing: what exactly, for whom, why this amount."
+          }
         />
+        <p className="mt-1 text-xs text-[#5c667f]">
+          {nl
+            ? "Komt niet op het blad en niet in de bestandsnaam, maar Beheer ziet ze bij de rekening."
+            : "Does not go on the sheet or in the file name, but Administration sees it with the expense."}
+        </p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -225,5 +251,86 @@ export function ExpenseForm({
 
       <ReceiptField locale={locale} existing={existingReceipt} />
     </SaveForm>
+  );
+}
+
+/**
+ * Een kort tekstveld met een woordenteller. Activiteit en omschrijving staan in
+ * de bestandsnaam van het blad, dus ze zijn beperkt tot een paar woorden.
+ *
+ * Een rekening van voor die grens mag haar langere tekst houden: de grens geldt
+ * pas wanneer je het veld wijzigt, net zoals de server het toetst.
+ */
+function WordLimitedField({
+  id,
+  label,
+  locale,
+  maxWords,
+  maxLength,
+  defaultValue,
+  placeholder,
+}: {
+  id: string;
+  label: string;
+  locale: "nl" | "en";
+  maxWords: number;
+  maxLength: number;
+  defaultValue: string;
+  placeholder: string;
+}) {
+  const nl = locale === "nl";
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [value, setValue] = useState(defaultValue);
+  const words = countWords(value);
+  const tooLong = words > maxWords && value.trim() !== defaultValue.trim();
+
+  // Na een geslaagde indiening zet `SaveForm` het formulier terug; de teller
+  // moet dan mee terug naar nul.
+  useEffect(() => {
+    const input = inputRef.current;
+    const form = input?.form;
+    if (!input || !form) return;
+    const onReset = () => setValue(input.defaultValue);
+    form.addEventListener("reset", onReset);
+    return () => form.removeEventListener("reset", onReset);
+  }, []);
+
+  const message = nl
+    ? `Maximaal ${maxWords} ${maxWords === 1 ? "woord" : "woorden"}; meer uitleg kan in de opmerking.`
+    : `At most ${maxWords} ${maxWords === 1 ? "word" : "words"}; more detail goes in the comment.`;
+
+  // De browser houdt het formulier dan zelf tegen, met deze melding bij het
+  // veld, nog voor er iets naar de server gaat.
+  useEffect(() => {
+    inputRef.current?.setCustomValidity(tooLong ? message : "");
+  }, [tooLong, message]);
+
+  return (
+    <div>
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        ref={inputRef}
+        id={id}
+        name={id}
+        required
+        maxLength={maxLength}
+        defaultValue={defaultValue}
+        placeholder={placeholder}
+        aria-invalid={tooLong || undefined}
+        aria-describedby={`${id}-words`}
+        onChange={(event) => setValue(event.target.value)}
+      />
+      {/* Een div en geen p: vtk-admin.css kleurt elke p in de admin grijs met
+          !important, en dan zag je niet dat je over de grens ging. */}
+      <div
+        id={`${id}-words`}
+        className={`mt-1 flex justify-between gap-3 text-xs ${tooLong ? "font-medium text-red-700" : "text-[#5c667f]"}`}
+      >
+        <span>{message}</span>
+        <span className="shrink-0 tabular-nums">
+          {words}/{maxWords}
+        </span>
+      </div>
+    </div>
   );
 }

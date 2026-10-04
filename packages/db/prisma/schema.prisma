@@ -821,6 +821,7 @@ model User {
   expensesSubmitted Expense[] @relation("ExpenseSubmittedBy")
   expensesPaid      Expense[] @relation("ExpensePaidBy")
   expensesBooked    Expense[] @relation("ExpenseBookedBy")
+  expenseViews      ExpenseView[]
 
   createdLesbezoeken             Lesbezoek[]              @relation("LesbezoekCreatedBy")
   reviewedLesbezoeken            Lesbezoek[]              @relation("LesbezoekReviewedBy")
@@ -7134,8 +7135,14 @@ model Expense {
   /// een medelid indienen, en dan hoort diens naam op het blad.
   payerName     String
 
+  /// Activiteit en omschrijving zijn kort (standaard max. drie woorden, in te
+  /// stellen bij de rekeningen): ze staan in de bestandsnaam van het blad. Oude
+  /// rekeningen van voor die grens houden hun langere tekst.
   activity    String
   description String
+  /// Vrije uitleg bij de rekening, zo lang als nodig. Staat niet op het blad en
+  /// niet in de bestandsnaam. NULL bij rekeningen van voor dit veld bestond.
+  comment     String?
   /// Datum van de uitgave (de datum op het bonnetje), niet van het indienen.
   spentOn     DateTime @db.Date
   amountCents Int
@@ -7173,6 +7180,7 @@ model Expense {
   submittedBy User?  @relation("ExpenseSubmittedBy", fields: [submittedById], references: [id], onDelete: SetNull)
   paidBy      User?  @relation("ExpensePaidBy", fields: [paidById], references: [id], onDelete: SetNull)
   bookedBy    User?  @relation("ExpenseBookedBy", fields: [bookedById], references: [id], onDelete: SetNull)
+  views       ExpenseView[]
 
   @@index([workingYear])
   @@index([groupId])
@@ -7180,6 +7188,21 @@ model Expense {
   @@index([spentOn])
   @@index([paidAt])
   @@index([createdAt])
+}
+
+/// Wie welke rekening al opende in het overzicht. Per gebruiker, want elk lid
+/// van Beheer moet zelf zien wat er voor hem nieuw is. Een rekening zonder rij
+/// voor jou staat gearceerd in de lijst tot je ze opent.
+model ExpenseView {
+  userId    String
+  expenseId String
+  viewedAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expense Expense @relation(fields: [expenseId], references: [id], onDelete: Cascade)
+
+  @@id([userId, expenseId])
+  @@index([expenseId])
 }
 
 // -----------------------------------------------------------------------------

@@ -1098,8 +1098,51 @@ a.vtk-shortcut-tile:hover {
   color: var(--track-done-ink);
 }
 
-.vtk-expense-status[data-status='TO_REIMBURSE'] {
+.vtk-expense-status[data-status='TO_REIMBURSE'],
+.vtk-expense-status[data-reimbursement='OPEN'] {
   color: var(--track-open-ink);
+}
+
+/* De weergave voor wie geen Beheer is: enkel of het geld terug is. Geen
+   segmenten ervoor, want er is maar één stap die het lid aanbelangt. */
+.vtk-expense-status[data-reimbursement] {
+  margin-left: 0;
+}
+
+.vtk-expense-status[data-reimbursement='PAID'] {
+  color: var(--track-done-ink);
+}
+
+.vtk-expense-status[data-reimbursement='CARD'] {
+  font-weight: 500;
+  color: var(--muted);
+}
+
+/* Een rekening die je nog niet opende, staat gearceerd tot je erop klikt. Als
+   achtergrondafbeelding, zodat de hover- en selectiekleur eronder blijven
+   werken. Een gele rail links erbij, want arcering alleen valt op een rij
+   met veel tekst minder op dan je zou denken. De selector draagt
+   `.vtk-admin-main tbody tr` mee: die regel zet `background` als shorthand en
+   wist anders de arcering. */
+.vtk-admin-main tbody tr.vtk-expense-unseen,
+.vtk-expense-unseen-sample {
+  background-image: repeating-linear-gradient(
+    135deg,
+    color-mix(in srgb, var(--yellow) 28%, transparent) 0 6px,
+    transparent 6px 12px
+  );
+}
+
+.vtk-expense-unseen > td:first-child {
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.vtk-expense-unseen-sample {
+  display: inline-block;
+  width: 22px;
+  height: 12px;
+  border-radius: 3px;
+  box-shadow: inset 3px 0 0 var(--yellow), inset 0 0 0 1px var(--line);
 }
 
 /* De legende onder de kolomkoppen: drie segmenten zijn compact maar niet

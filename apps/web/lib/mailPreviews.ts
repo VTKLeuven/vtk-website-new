@@ -499,7 +499,7 @@ function notificationPreviews(): MailPreview[] {
   const expense = expenseMailDraft({
     postLabel: "Onthaal",
     payerName: "Wannes Voorbeeld",
-    description: "Drank voor de openingsreceptie",
+    description: "Drank openingsreceptie",
     amountCents: 8450,
   });
   return [

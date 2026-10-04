@@ -24,6 +24,7 @@ export function ExpenseStateToggles({
   sentAt,
   sentTo,
   readOnly,
+  simple = false,
   labels,
 }: {
   expenseId: string;
@@ -37,6 +38,11 @@ export function ExpenseStateToggles({
   sentTo: string | null;
   /** Kijken mag, wijzigen niet (post-beheer en de indiener zelf). */
   readOnly: boolean;
+  /**
+   * Enkel "Terugbetaald", voor wie geen Beheer is: doorsturen en inboeken zijn
+   * het werk van Beheer en de boekhouder, niet van het lid.
+   */
+  simple?: boolean;
   labels: {
     savedMessage: string;
     fallbackErrorMessage: string;
@@ -57,32 +63,36 @@ export function ExpenseStateToggles({
         readOnly={readOnly}
         labels={labels}
       />
-      <Toggle
-        expenseId={expenseId}
-        action={action}
-        field="booked"
-        checked={bookedAt !== null}
-        label={nl ? "Ingeboekt" : "Booked"}
-        detail={bookedAt ? [bookedAt, bookedBy].filter(Boolean).join(" · ") : "—"}
-        readOnly={readOnly}
-        labels={labels}
-      />
-      {/* Doorgestuurd is geen vinkje: het wordt gezet door de mail effectief te
-          versturen, en niet door te beweren dat je dat deed. */}
-      <div className="flex items-center gap-2.5 text-sm">
-        <span
-          aria-hidden
-          className={`grid size-4 shrink-0 place-items-center rounded border ${
-            sentAt ? "border-vtk-ink bg-vtk-ink text-white" : "border-zinc-400 bg-white"
-          }`}
-        >
-          {sentAt ? <CheckMark /> : null}
-        </span>
-        <span className="text-vtk-ink">{nl ? "Doorgestuurd" : "Forwarded"}</span>
-        <span className="ml-auto truncate text-xs text-[#5c667f]">
-          {sentAt ? [sentAt, sentTo].filter(Boolean).join(" · ") : "—"}
-        </span>
-      </div>
+      {!simple && (
+        <>
+          <Toggle
+            expenseId={expenseId}
+            action={action}
+            field="booked"
+            checked={bookedAt !== null}
+            label={nl ? "Ingeboekt" : "Booked"}
+            detail={bookedAt ? [bookedAt, bookedBy].filter(Boolean).join(" · ") : "—"}
+            readOnly={readOnly}
+            labels={labels}
+          />
+          {/* Doorgestuurd is geen vinkje: het wordt gezet door de mail effectief te
+              versturen, en niet door te beweren dat je dat deed. */}
+          <div className="flex items-center gap-2.5 text-sm">
+            <span
+              aria-hidden
+              className={`grid size-4 shrink-0 place-items-center rounded border ${
+                sentAt ? "border-vtk-ink bg-vtk-ink text-white" : "border-zinc-400 bg-white"
+              }`}
+            >
+              {sentAt ? <CheckMark /> : null}
+            </span>
+            <span className="text-vtk-ink">{nl ? "Doorgestuurd" : "Forwarded"}</span>
+            <span className="ml-auto truncate text-xs text-[#5c667f]">
+              {sentAt ? [sentAt, sentTo].filter(Boolean).join(" · ") : "—"}
+            </span>
+          </div>
+        </>
+      )}
     </div>
   );
 }

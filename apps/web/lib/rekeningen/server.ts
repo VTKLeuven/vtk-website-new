@@ -5,6 +5,7 @@ import { defaultMailFrom } from "@vtk/mail";
 import type { Expense } from "@prisma/client";
 import type { SessionPayload } from "@vtk/auth";
 import { getCurrentSession, requireSession } from "@/lib/session";
+import { DEFAULT_MAX_WORDS } from "@/lib/rekeningen/expenses";
 
 /**
  * Toegang en configuratie voor de rekeningen. De permissies zelf staan in
@@ -161,6 +162,11 @@ export type ExpenseConfig = {
   /** Regels die de indiener boven het formulier te zien krijgt. Markdown. */
   guidelinesNl: string;
   guidelinesEn: string;
+  /**
+   * Hoeveel woorden activiteit en omschrijving elk mogen tellen. Ze staan in de
+   * bestandsnaam van het blad; uitleg hoort in de opmerking.
+   */
+  maxWords: number;
 };
 
 export const DEFAULT_EXPENSE_CONFIG: ExpenseConfig = {
@@ -168,10 +174,20 @@ export const DEFAULT_EXPENSE_CONFIG: ExpenseConfig = {
   fromEmail: "",
   guidelinesNl: "",
   guidelinesEn: "",
+  maxWords: DEFAULT_MAX_WORDS,
 };
+
+/** Grenzen voor `maxWords`, ook gebruikt door het instellingenformulier. */
+export const MAX_WORDS_RANGE = { min: 1, max: 20 } as const;
 
 function str(value: unknown, fallback: string): string {
   return typeof value === "string" ? value : fallback;
+}
+
+function wordLimit(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isInteger(parsed)) return DEFAULT_EXPENSE_CONFIG.maxWords;
+  return Math.min(MAX_WORDS_RANGE.max, Math.max(MAX_WORDS_RANGE.min, parsed));
 }
 
 export function parseExpenseConfig(raw: unknown): ExpenseConfig {
@@ -182,6 +198,7 @@ export function parseExpenseConfig(raw: unknown): ExpenseConfig {
     fromEmail: str(value.fromEmail, DEFAULT_EXPENSE_CONFIG.fromEmail).trim(),
     guidelinesNl: str(value.guidelinesNl, DEFAULT_EXPENSE_CONFIG.guidelinesNl),
     guidelinesEn: str(value.guidelinesEn, DEFAULT_EXPENSE_CONFIG.guidelinesEn),
+    maxWords: value.maxWords === undefined ? DEFAULT_EXPENSE_CONFIG.maxWords : wordLimit(value.maxWords),
   };
 }
 
