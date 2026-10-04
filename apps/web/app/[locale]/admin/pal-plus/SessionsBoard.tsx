@@ -24,6 +24,8 @@ export type PalPlusSessionView = {
   state: PalPlusSessionState;
   roomLabel: string | null;
   tutors: (Person & { rewardLabel: string })[];
+  /** Wat de tutors samen al uitgaven van de bonnetjes van deze sessie. */
+  spentVouchers: number;
   attendees: AttendanceEntry[];
   attendeeCount: number;
   maxParticipants: number | null;
@@ -300,8 +302,16 @@ function SessionDetail({
               title: nl ? "Sessie annuleren?" : "Cancel session?",
               description: started
                 ? nl
-                  ? `Deze sessie telt dan niet mee en de tutors krijgen er geen bonnetjes voor. De hulpvragen die ze beantwoordde, staan weer open. Dit kan je niet ongedaan maken.`
-                  : `The session then does not count and the tutors get no vouchers for it. The help requests it answered are open again. This cannot be undone.`
+                  ? `Deze sessie telt dan niet mee en de tutors krijgen er geen bonnetjes voor.${
+                      session.spentVouchers > 0
+                        ? ` Er ${session.spentVouchers === 1 ? "werd al 1 bonnetje" : `werden al ${session.spentVouchers.toLocaleString("nl-BE")} bonnetjes`} van uitgegeven: dat komt uit de andere openstaande bonnetjes van de tutor, en wat daar niet in past, vervalt.`
+                        : ""
+                    } De hulpvragen die ze beantwoordde, staan weer open. Dit kan je niet ongedaan maken.`
+                  : `The session then does not count and the tutors get no vouchers for it.${
+                      session.spentVouchers > 0
+                        ? ` ${session.spentVouchers === 1 ? "1 voucher was" : `${session.spentVouchers.toLocaleString("en-GB")} vouchers were`} already spent: that comes out of the tutor's other outstanding vouchers, and whatever does not fit is written off.`
+                        : ""
+                    } The help requests it answered are open again. This cannot be undone.`
                 : `${
                     session.attendeeCount === 0
                       ? nl
@@ -321,6 +331,7 @@ function SessionDetail({
             className="space-y-3"
           >
             <input type="hidden" name="id" value={session.id} />
+            <input type="hidden" name="locale" value={nl ? "nl" : "en"} />
             <div>
               <Label htmlFor={`pp-cancel-${session.id}`}>{nl ? "Reden" : "Reason"}</Label>
               <Textarea

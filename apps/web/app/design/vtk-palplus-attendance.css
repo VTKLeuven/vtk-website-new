@@ -67,7 +67,3 @@
   color: var(--paper);
   font-weight: 600;
 }
-
-.pp-attendance-choice button:disabled {
-  cursor: progress;
-}

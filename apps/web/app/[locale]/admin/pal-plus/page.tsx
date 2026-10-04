@@ -338,7 +338,7 @@ async function loadSessions(locale: Locale): Promise<{ upcoming: PalPlusSessionV
     room: { select: { code: true, name: true, building: { select: { shortCode: true } } } },
     tutors: {
       orderBy: { createdAt: "asc" },
-      select: { reward: true, user: { select: { id: true, name: true } } },
+      select: { reward: true, rewardPaid: true, user: { select: { id: true, name: true } } },
     },
     attendees: {
       orderBy: { createdAt: "asc" },
@@ -361,6 +361,11 @@ async function loadSessions(locale: Locale): Promise<{ upcoming: PalPlusSessionV
       take: PAST_SESSIONS,
       select,
     }),
+  ]);
+  // Een praesidiumlid verdient geen bonnetjes; dat staat er dan bij in plaats
+  // van een beloning die nooit in het saldo komt.
+  const praesidium = await praesidiumYears([
+    ...new Set([...upcomingRows, ...pastRows].flatMap((row) => row.tutors.map((tutor) => tutor.user.id))),
   ]);
 
   const dayFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
@@ -389,11 +394,19 @@ async function loadSessions(locale: Locale): Promise<{ upcoming: PalPlusSessionV
       whenLabel: `${dayFmt.format(row.startsAt)}, ${timeFmt.format(row.startsAt)} - ${timeFmt.format(row.endsAt)}`,
       state: palPlusSessionState(row, now),
       roomLabel: palPlusRoomLabel(row.room, row.roomText),
-      tutors: row.tutors.map((tutor) => ({
-        id: tutor.user.id,
-        name: tutor.user.name,
-        rewardLabel: vouchers(tutor.reward),
-      })),
+      tutors: row.tutors.map((tutor) => {
+        const earned = earnedPalPlusReward(
+          { userId: tutor.user.id, reward: tutor.reward, startsAt: row.startsAt, cancelledAt: null },
+          praesidium,
+        );
+        return {
+          id: tutor.user.id,
+          name: tutor.user.name,
+          rewardLabel:
+            earned === 0 && tutor.reward > 0 ? (nl ? "praesidium, geen bonnetjes" : "praesidium, no vouchers") : vouchers(earned),
+        };
+      }),
+      spentVouchers: row.tutors.reduce((total, tutor) => total + tutor.rewardPaid, 0),
       attendees: row.attendees.map((attendee) => ({
         userId: attendee.userId,
         name: attendee.user.name,

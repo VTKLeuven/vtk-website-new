@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useOptimistic, useTransition } from "react";
 import { setPalPlusAttendanceAction } from "@/app/actions/palPlus";
 import { useToast } from "@/components/ui/toast";
 
@@ -24,6 +24,10 @@ export type AttendanceCopy = {
  * gekozen knop zet hem terug op "niet aangeduid". Dat verschil telt: leeg
  * betekent "nog niet aangeduid", niet "niet gekomen". De gekozen toestand staat
  * in de knop zelf (`aria-pressed`); een toast komt er enkel bij een fout.
+ *
+ * Een klik toont meteen zijn keuze en blokkeert de andere rijen niet: wie een
+ * lijst snel afloopt, mag geen klik verliezen omdat de vorige nog bewaard
+ * werd. Mislukt het bewaren, dan springt de rij terug en blijft de fout staan.
  */
 export function AttendanceList({
   sessionId,
@@ -34,10 +38,15 @@ export function AttendanceList({
   attendees: AttendanceEntry[];
   copy: AttendanceCopy;
 }) {
-  const [pending, startTransition] = useTransition();
+  const [, startTransition] = useTransition();
+  const [shown, showChoice] = useOptimistic(
+    attendees,
+    (current, change: { userId: string; attended: boolean | null }) =>
+      current.map((attendee) => (attendee.userId === change.userId ? { ...attendee, attended: change.attended } : attendee)),
+  );
   const showToast = useToast();
-  const came = attendees.filter((attendee) => attendee.attended === true).length;
-  const open = attendees.filter((attendee) => attendee.attended === null).length;
+  const came = shown.filter((attendee) => attendee.attended === true).length;
+  const open = shown.filter((attendee) => attendee.attended === null).length;
 
   function mark(userId: string, value: boolean | null) {
     const data = new FormData();
@@ -45,6 +54,7 @@ export function AttendanceList({
     data.set("userId", userId);
     data.set("attended", value === true ? "yes" : value === false ? "no" : "");
     startTransition(async () => {
+      showChoice({ userId, attended: value });
       const result = await setPalPlusAttendanceAction(data);
       if (result.status === "error") {
         showToast({
@@ -59,18 +69,17 @@ export function AttendanceList({
   return (
     <div className="pp-attendance">
       <p className="pp-attendance-summary">
-        {copy.summary.replace("{came}", String(came)).replace("{total}", String(attendees.length))}
+        {copy.summary.replace("{came}", String(came)).replace("{total}", String(shown.length))}
         {open > 0 && ` ${copy.notMarked.replace("{count}", String(open))}`}
       </p>
       <ul>
-        {attendees.map((attendee) => (
+        {shown.map((attendee) => (
           <li key={attendee.userId}>
             <span className="pp-attendance-name">{attendee.name}</span>
             <span className="pp-attendance-choice">
               <button
                 type="button"
                 aria-pressed={attendee.attended === true}
-                disabled={pending}
                 onClick={() => mark(attendee.userId, attendee.attended === true ? null : true)}
               >
                 {copy.came}
@@ -78,7 +87,6 @@ export function AttendanceList({
               <button
                 type="button"
                 aria-pressed={attendee.attended === false}
-                disabled={pending}
                 onClick={() => mark(attendee.userId, attendee.attended === false ? null : false)}
               >
                 {copy.didNotCome}

@@ -1030,7 +1030,7 @@ code voor.
 
 Onderwijs houdt een korte lijst bij met de OPO-code (`PalPlusCourse`). Een lijst en geen
 vrij veld, omdat "Analyse I", "analyse 1" en "Wiskundige analyse" anders drie vragen
-worden. Wie zijn vak niet vindt, tikt het zelf in; een sessie hangt wel altijd aan een
+worden. Wie het vak niet vindt, tikt het zelf in; een sessie hangt wel altijd aan een
 vak uit de lijst, zodat "hoeveel sessies per vak" te tellen blijft. Onderwijs zet dat
 vak dan in de lijst, of hangt de aanvraag aan een vak dat er al in staat (iemand tikte
 "Analyse" terwijl "Analyse I" bestaat). Een vak zonder
@@ -1040,7 +1040,7 @@ vak waar iets aan hangt, wordt niet verwijderd maar uitgezet.
 ### Sessies
 
 - Een sessie staat **niet in de gewone kalender**, maar in een eigen agenda op de
-  PAL+-pagina en in het beheer. Wie ze in zijn eigen agenda wil, abonneert op
+  PAL+-pagina en in het beheer. Wie ze in de eigen agenda wil, abonneert op
   `/api/pal-plus/agenda.ics` (publiek en zonder geheim: er staat niets in wat niet ook
   op de pagina staat) of zet één sessie erin met "Zet in mijn agenda". Een geannuleerde
   sessie blijft een maand in de feed met `STATUS:CANCELLED`, zodat een geabonneerde
@@ -1054,7 +1054,7 @@ vak waar iets aan hangt, wordt niet verwijderd maar uitgezet.
   invoeren, zodat de tutor ze toch telt.
 - Tutors kiest Onderwijs met een eigen zoekveld achter `pal.manage`, niet met
   `/api/users/search`: wie PAL+ beheert, hoeft daarvoor geen `users.search` te krijgen.
-- Een tutor schrijft zich niet in voor zijn eigen sessie. Ziet wel, op de PAL+-pagina,
+- Een tutor schrijft zich niet in voor de eigen sessie, maar ziet op de PAL+-pagina wel
   wie er komt.
 - **Inschrijven en uitschrijven kan tot de sessie begint.** Het maximum wordt geteld,
   niet vergrendeld: twee mensen op dezelfde seconde kunnen er samen één over gaan. Bij
@@ -1112,6 +1112,17 @@ zijn. In de plaats daarvan:
 - Ging een sessie niet door, dan annuleert Onderwijs ze, ook achteraf. Dan telt ze niet
   mee en levert ze niets op. Een correctie van het bedrag is voor de gevallen ertussen
   (een tutor die er niet was, een sessie die veel korter duurde).
+- Annuleren verrekent op dezelfde manier. Werd er al van de sessie uitgegeven, dan zegt
+  de bevestiging dat vooraf, en de toast achteraf hoeveel er uit andere bonnetjes kwam en
+  hoeveel verviel. Wat kwijtgescholden werd, staat in de auditlog; in het saldo zelf
+  blijft er geen spoor van, want een geannuleerde sessie telt nergens meer mee.
+- **Een correctie vraagt altijd een reden.** Die staat in de tutorlijst bij de sessie,
+  met wie corrigeerde en wanneer: wie er later naar kijkt, moet niet raden waarom een
+  tutor minder kreeg.
+- Uitgeven gaat over shiften en sessies samen, **oudste eerst** (`loadVoucherSources` is
+  de enige plek die het saldo samenstelt). Uitbetalen in het beheer gebeurt op het
+  bestaande scherm Bonnetjes onder /admin/shiften, dat de PAL+-sessies naast de shiften
+  toont; er is geen tweede uitbetaalscherm.
 
 ### Wat Onderwijs ziet
 
@@ -1120,6 +1131,25 @@ en wie er kwam. **Vijf sessies is een volwaardig PAL-lid**; dat is voorlopig enk
 markering in die lijst en ontgrendelt niets op de site. De aanwezigheid is informatie
 voor Onderwijs om te beslissen of een correctie nodig is; ze raakt de bonnetjes niet
 vanzelf.
+
+- **Gegeven is voorbij en niet geannuleerd.** Wat nog komt, staat ernaast als "gepland";
+  een geannuleerde sessie telt nergens. Het werkingsjaar begint op 15 juli, net als de
+  posten.
+- Een praesidiumlid staat in de lijst met sessies en uren, maar met "praesidium" in
+  plaats van bonnetjes, ook in het detail van een sessie. Een beloning tonen die nooit in
+  het saldo komt, zou Onderwijs doen denken dat er iets misliep.
+
+### Aanwezigheid
+
+- **Wie er kwam, duidt een tutor van de sessie aan, of Onderwijs**, zodra de sessie
+  begonnen is. De tutor doet dat op de PAL+-pagina onder "Sessies die je gaf" (de
+  voorbije maand), Onderwijs in het detail van de sessie. De tutor zit erbij en weet het;
+  Onderwijs kan het rechtzetten.
+- **Leeg betekent "niet aangeduid", niet "niet gekomen".** Daarom drie toestanden en een
+  tweede klik die de keuze weer leegmaakt; een vinkje alleen kan dat verschil niet tonen.
+- Een klik toont meteen zijn keuze en bewaart op de achtergrond, zonder de andere rijen
+  te blokkeren: wie twintig namen afloopt, mag geen klik verliezen omdat de vorige nog
+  onderweg was.
 
 De lijst staat in het beheer en is voor niemand anders zichtbaar. Het recht is
 `pal.manage`, gedragen door de rol `pal-plus` die naar Onderwijs gaat.

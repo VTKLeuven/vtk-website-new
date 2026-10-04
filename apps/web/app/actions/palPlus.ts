@@ -595,7 +595,7 @@ export async function savePalPlusSessionAction(
         if (timesChanged) {
           // De beloning volgt het nieuwe moment, behalve na een correctie met
           // de hand. Zakt ze onder wat een tutor al uitgaf (een ingekorte
-          // sessie), dan komt het verschil uit zijn andere bonnetjes.
+          // sessie), dan komt het verschil uit de andere bonnetjes van die tutor.
           const followers = await tx.palPlusSessionTutor.findMany({
             where: { sessionId: id, rewardCorrectedAt: null },
             select: { userId: true },
@@ -666,6 +666,7 @@ export async function cancelPalPlusSessionAction(
 ): Promise<SaveState> {
   await requirePermission("pal.manage");
   const id = toSingleLine(formData.get("id"));
+  const nl = formData.get("locale") !== "en";
   const reason = toMessageText(formData.get("reason"));
   if (!reason) return saveError("CANCEL_REASON_REQUIRED");
   if (reason.length > PAL_PLUS_LIMITS.cancelReason) return saveError("CANCEL_REASON_TOO_LONG");
@@ -682,9 +683,9 @@ export async function cancelPalPlusSessionAction(
   if (!existing) return saveError("SESSION_GONE");
   if (existing.cancelledAt) return saveError("SESSION_CANCELLED");
 
-  let forgiven = 0;
+  let settled = { moved: 0, forgiven: 0 };
   try {
-    forgiven = await withSerializableTransaction(async (tx) => {
+    settled = await withSerializableTransaction(async (tx) => {
       await tx.palPlusSession.update({
         where: { id },
         data: { cancelledAt: new Date(), cancelReason: reason },
@@ -694,14 +695,16 @@ export async function cancelPalPlusSessionAction(
         data: { status: "OPEN", sessionId: null },
       });
       // Ging de sessie achteraf niet door, dan levert ze niets op. Wat een tutor
-      // er al van uitgaf, komt uit zijn andere openstaande bonnetjes; wat daar
-      // niet in past, vervalt.
-      let lost = 0;
+      // er al van uitgaf, komt uit de andere openstaande bonnetjes van die
+      // tutor; wat daar niet in past, vervalt.
+      const total = { moved: 0, forgiven: 0 };
       for (const tutor of existing.tutors) {
         if (tutor.rewardPaid <= 0) continue;
-        lost += (await settlePalPlusOverspend(tx, { sessionId: id, userId: tutor.userId, ceiling: 0 })).forgiven;
+        const result = await settlePalPlusOverspend(tx, { sessionId: id, userId: tutor.userId, ceiling: 0 });
+        total.moved += result.moved;
+        total.forgiven += result.forgiven;
       }
-      return lost;
+      return total;
     });
   } catch (err) {
     if (err instanceof ShiftRewardConflictError) return saveError("REWARD_CONFLICT");
@@ -713,10 +716,16 @@ export async function cancelPalPlusSessionAction(
     entity: "palPlusSession",
     entityId: id,
     target: sessionAuditTarget(existing.course, existing.startsAt),
-    summary: forgiven > 0 ? `${reason} (${forgiven} uitgegeven bonnetje(s) kwijtgescholden)` : reason,
+    summary: [
+      reason,
+      settled.moved > 0 ? `${settled.moved} uitgegeven bonnetje(s) uit andere bonnetjes` : null,
+      settled.forgiven > 0 ? `${settled.forgiven} uitgegeven bonnetje(s) kwijtgescholden` : null,
+    ]
+      .filter(Boolean)
+      .join("; "),
   });
   revalidatePalPlusEverywhere();
-  return saveOk();
+  return saveOk(settlementDetail(nl, nl ? "Sessie geannuleerd." : "Session cancelled.", settled));
 }
 
 // -----------------------------------------------------------------------------
@@ -792,21 +801,36 @@ export async function correctPalPlusRewardAction(
   });
   revalidatePalPlusEverywhere();
 
-  if (result.moved === 0 && result.forgiven === 0) return saveOk();
+  return saveOk(settlementDetail(nl, nl ? "Beloning aangepast." : "Reward corrected.", result));
+}
+
+/**
+ * De toast na een correctie of annulering die al uitgegeven bonnetjes raakte:
+ * wat er uit andere bonnetjes kwam en wat er verviel. Zonder verrekening blijft
+ * de vaste melding van het formulier staan.
+ */
+function settlementDetail(
+  nl: boolean,
+  lead: string,
+  { moved, forgiven }: { moved: number; forgiven: number },
+): string | undefined {
+  if (moved === 0 && forgiven === 0) return undefined;
   const vouchers = (value: number) =>
-    nl ? `${value.toLocaleString("nl-BE")} ${value === 1 ? "bonnetje" : "bonnetjes"}` : `${value.toLocaleString("en-GB")} ${value === 1 ? "voucher" : "vouchers"}`;
+    nl
+      ? `${value.toLocaleString("nl-BE")} ${value === 1 ? "bonnetje" : "bonnetjes"}`
+      : `${value.toLocaleString("en-GB")} ${value === 1 ? "voucher" : "vouchers"}`;
   const parts = nl
     ? [
-        "Beloning aangepast.",
-        result.moved > 0 ? `${vouchers(result.moved)} kwam uit andere openstaande bonnetjes.` : null,
-        result.forgiven > 0 ? `${vouchers(result.forgiven)} was al uitgegeven en vervalt; het saldo staat op nul.` : null,
+        lead,
+        moved > 0 ? `${vouchers(moved)} kwam uit andere openstaande bonnetjes.` : null,
+        forgiven > 0 ? `${vouchers(forgiven)} was al uitgegeven en vervalt; het saldo staat op nul.` : null,
       ]
     : [
-        "Reward corrected.",
-        result.moved > 0 ? `${vouchers(result.moved)} came out of other outstanding vouchers.` : null,
-        result.forgiven > 0 ? `${vouchers(result.forgiven)} was already spent and is written off; the balance is at zero.` : null,
+        lead,
+        moved > 0 ? `${vouchers(moved)} came out of other outstanding vouchers.` : null,
+        forgiven > 0 ? `${vouchers(forgiven)} was already spent and is written off; the balance is at zero.` : null,
       ];
-  return saveOk(parts.filter(Boolean).join(" "));
+  return parts.filter(Boolean).join(" ");
 }
 
 // -----------------------------------------------------------------------------

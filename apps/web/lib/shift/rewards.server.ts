@@ -18,9 +18,10 @@ export class ShiftRewardConflictError extends Error {
 }
 
 /**
- * Eén bron van bonnetjes van één gebruiker: een shift waaraan hij meedeed, of
- * een PAL+-sessie die hij gaf. `reward` is wat ze echt oplevert (nul in een
- * praesidiumjaar, nul voor een geannuleerde sessie), niet de kale beloning.
+ * Eén bron van bonnetjes van één gebruiker: een shift waaraan de gebruiker
+ * meedeed, of een PAL+-sessie waarop de gebruiker tutor was. `reward` is wat ze
+ * echt oplevert (nul in een praesidiumjaar, nul voor een geannuleerde sessie),
+ * niet de kale beloning.
  */
 export type VoucherSource = {
   key: string;
@@ -139,9 +140,9 @@ export function outstandingVouchers(sources: VoucherSource[]): number {
 }
 
 /**
- * Boekt `amount` bonnetjes af van één gebruiker, oudste bron eerst, over zijn
- * shiften en de PAL+-sessies die hij gaf. Gebruikt door de afhaalbalie, de toog
- * en het uitbetalen in het beheer.
+ * Boekt `amount` bonnetjes af van één gebruiker, oudste bron eerst, over de
+ * shiften en de PAL+-sessies van die gebruiker. Gebruikt door de afhaalbalie,
+ * de toog en het uitbetalen in het beheer.
  *
  * Elke rij wordt voorwaardelijk bijgewerkt (op de oude `rewardPaid`): twee
  * afboekingen op hetzelfde moment botsen dan in plaats van samen meer uit te
@@ -189,9 +190,9 @@ export async function allocateUserShiftReward(
 
 /**
  * Zet wat een tutor van één PAL+-sessie al uitgaf terug onder `ceiling` (de
- * nieuwe beloning, of nul bij een annulering). Het verschil komt uit zijn andere
- * openstaande bonnetjes; wat daar niet in past, vervalt. Een saldo gaat nooit
- * onder nul.
+ * nieuwe beloning, of nul bij een annulering). Het verschil komt uit de andere
+ * openstaande bonnetjes van die tutor; wat daar niet in past, vervalt. Een
+ * saldo gaat nooit onder nul.
  *
  * Werk de beloning zelf eerst bij en roep dit daarna aan, in dezelfde
  * (serialiseerbare) transactie.

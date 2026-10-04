@@ -183,8 +183,8 @@ export default async function PalPlusPage({
   const teachingIds = userId
     ? sessionRows.filter((row) => row.tutors.some((tutor) => tutor.userId === userId)).map((row) => row.id)
     : [];
-  // Wat een tutor de voorbije maand gaf: daar duidt hij aan wie er kwam en ziet
-  // hij wat het opleverde. De agenda hierboven toont enkel wat nog komt.
+  // Wat een tutor de voorbije maand gaf: daar duidt de tutor aan wie er kwam en
+  // staat wat het opleverde. De agenda hierboven toont enkel wat nog komt.
   const tutoredRows = userId
     ? await prisma.palPlusSession.findMany({
         where: {
