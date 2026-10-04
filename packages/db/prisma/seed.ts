@@ -388,6 +388,20 @@ async function main() {
   await setRolePermissions(bureauRole.id, ["bureau.manage"]);
   await grantRoleToGroup("ONDERWIJS", bureauRole.id, "DEFAULT");
 
+  // pal-plus: PAL+ beheren, door Onderwijs. Een eigen rol en niet bij `bureau`,
+  // zodat een PAL+-verantwoordelijke buiten de post (een medewerker) ze los kan
+  // krijgen zonder de bureaus erbij.
+  const palPlusRole = await upsertRole(
+    "pal-plus",
+    "PAL+",
+    "PAL+",
+    9,
+    "PAL+ beheren: aanvragen beoordelen, sessies plannen, de vakkenlijst bijhouden en de bonnetjes van tutors opvolgen.",
+    "Manage PAL+: review requests, plan sessions, keep the course list and follow up tutor vouchers.",
+  );
+  await setRolePermissions(palPlusRole.id, ["pal.manage"]);
+  await grantRoleToGroup("ONDERWIJS", palPlusRole.id, "DEFAULT");
+
   // logistiek: de uitleendienst op logistiek.vtk.be beheren.
   const logistiekRole = await upsertRole(
     "logistiek",

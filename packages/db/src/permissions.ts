@@ -135,6 +135,12 @@ export const PERMISSIONS = [
   { code: "lesbezoeken.view", labelNl: "Lesbezoekenkalender bekijken", labelEn: "View the classroom-visit calendar", category: "lesbezoeken" },
   { code: "lesbezoeken.manage", labelNl: "Lesbezoeken goedkeuren, inplannen en organisaties beheren", labelEn: "Approve and schedule classroom visits, manage organisations", category: "lesbezoeken" },
 
+  // PAL+ (peer assisted learning op aanvraag; PAL zelf is een infopagina en
+  // heeft geen recht nodig). Eén recht voor het hele beheer: wie de aanvragen
+  // beoordeelt, plant ook de sessies, houdt de vakkenlijst bij en corrigeert de
+  // bonnetjes van de tutors. Zie docs/design-decisions.md ("PAL+").
+  { code: "pal.manage", labelNl: "PAL+ beheren (aanvragen, sessies, vakken, tutors)", labelEn: "Manage PAL+ (requests, sessions, courses, tutors)", category: "pal" },
+
   // Piano (reservaties voor het lokaal in het kasteel)
   { code: "piano.manage", labelNl: "Piano beheren (uren, sluitingsdagen, reservaties)", labelEn: "Manage the piano (hours, closures, reservations)", category: "piano" },
 

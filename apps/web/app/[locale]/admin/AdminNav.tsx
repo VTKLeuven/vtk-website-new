@@ -221,6 +221,15 @@ const icons: Record<string, ReactNode> = {
       <path d="M9 22a3 3 0 0 1 6 0" />
     </Svg>
   ),
+  // palPlus: twee studenten naast elkaar, de ene legt de andere iets uit
+  palPlus: (
+    <Svg>
+      <circle cx="8" cy="7" r="3" />
+      <circle cx="17" cy="9" r="2.5" />
+      <path d="M2 21v-1a6 6 0 0 1 12 0v1" />
+      <path d="M14.5 15.5A4.5 4.5 0 0 1 22 19v2" />
+    </Svg>
+  ),
   pocs: (
     <Svg>
       <path d="M22 10 12 5 2 10l10 5 10-5Z" />

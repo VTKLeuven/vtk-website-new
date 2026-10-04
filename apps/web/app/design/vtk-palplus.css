@@ -1,0 +1,110 @@
+/* PAL+: het beheer door VTK Onderwijs (/admin/pal-plus).
+   De tabel zelf (kop, randen, opvulling) komt uit vtk-admin.css; hier staat
+   enkel wat deze lijst eigen heeft: de vaknaam als rijkop, een rij die opent
+   met een klik, en op een smal scherm de kolomkop als label per waarde. */
+
+.vtk-palplus-table .is-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-palplus-table tbody th[scope='row'] {
+  padding: 12px 14px;
+  text-align: left;
+  font-weight: 400;
+  vertical-align: top;
+}
+
+.vtk-palplus-row {
+  cursor: pointer;
+}
+
+.vtk-palplus-row[data-inactive='true'] .vtk-palplus-rowtitle {
+  color: var(--muted);
+}
+
+.vtk-palplus-rowtitle {
+  font-weight: 600;
+  color: var(--ink);
+  text-align: left;
+}
+
+.vtk-palplus-rowtitle:hover,
+.vtk-palplus-row[data-open='true'] .vtk-palplus-rowtitle {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.vtk-palplus-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* "Uit" is een toestand, geen kleur: grijs en klein, zodat de lijst van wat
+   nog te kiezen is rustig blijft. */
+.vtk-palplus-off {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  vertical-align: 1px;
+}
+
+.vtk-admin-main tbody tr.vtk-palplus-editor,
+.vtk-admin-main tbody tr.vtk-palplus-editor:hover {
+  background: var(--paper);
+}
+
+.vtk-admin-main tbody tr.vtk-palplus-editor > td {
+  padding: 16px 14px 18px;
+}
+
+@media (max-width: 640px) {
+  .vtk-palplus-table thead {
+    display: none;
+  }
+
+  .vtk-palplus-table,
+  .vtk-palplus-table tbody,
+  .vtk-palplus-table tr,
+  .vtk-palplus-table th,
+  .vtk-palplus-table td {
+    display: block;
+    width: 100%;
+  }
+
+  /* De naam over de volle breedte, de drie getallen eronder naast elkaar. */
+  .vtk-palplus-table tr.vtk-palplus-row {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 6px 12px;
+    padding: 10px 14px;
+  }
+
+  .vtk-palplus-table tr.vtk-palplus-row > th[scope='row'] {
+    grid-column: 1 / -1;
+    padding: 0;
+  }
+
+  .vtk-admin-main .vtk-palplus-table tr.vtk-palplus-row > td {
+    padding: 0;
+    text-align: left;
+  }
+
+  .vtk-palplus-table tr.vtk-palplus-row > td::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 2px;
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+}

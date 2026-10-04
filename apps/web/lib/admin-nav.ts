@@ -188,13 +188,14 @@ export function getAdminNav(): NavEntry[] {
     ]),
     // Wat VTK Onderwijs beheert hangt samen: de POC's zijn de studenten die de
     // opleiding vertegenwoordigen, het bureau is hun vergadering, en de
-    // lesbezoeken lopen via dezelfde post.
+    // lesbezoeken en PAL+ lopen via dezelfde post.
     group('onderwijs', [
       item('pocs', '/pocs', { perm: 'pocs.manage' }),
       item('bureau', '/bureau', { perm: 'bureau.manage' }),
       item('lesbezoeken', '/lesbezoeken', {
         anyPerm: ['lesbezoeken.view', 'lesbezoeken.manage'],
       }),
+      item('palPlus', '/pal-plus', { perm: 'pal.manage' }),
     ]),
 
     // ---------------------------------------------------------------------------

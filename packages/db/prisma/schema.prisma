@@ -827,6 +827,16 @@ model User {
   reviewedLesbezoeken            Lesbezoek[]              @relation("LesbezoekReviewedBy")
   createdLesbezoekScheduledMails LesbezoekScheduledMail[] @relation("LesbezoekScheduledMailCreatedBy")
 
+  // PAL+: wat iemand indiende, steunde, gaf of volgde, en wat iemand van
+  // Onderwijs beoordeelde of corrigeerde.
+  palPlusRequests         PalPlusRequest[]         @relation("PalPlusRequestUser")
+  reviewedPalPlusRequests PalPlusRequest[]         @relation("PalPlusRequestReviewedBy")
+  palPlusBackings         PalPlusRequestBacker[]
+  createdPalPlusSessions  PalPlusSession[]         @relation("PalPlusSessionCreatedBy")
+  palPlusTutorings        PalPlusSessionTutor[]    @relation("PalPlusTutor")
+  correctedPalPlusRewards PalPlusSessionTutor[]    @relation("PalPlusRewardCorrectedBy")
+  palPlusAttendances      PalPlusSessionAttendee[]
+
   @@index([deletedAt])
 }
 
@@ -6732,6 +6742,279 @@ model LesbezoekPeculiarity {
 }
 
 // -----------------------------------------------------------------------------
+// PAL+ (peer assisted learning op aanvraag)
+//
+// Los van PAL zelf, dat een infopagina is. Bij PAL+ biedt een lid aan een
+// sessie te geven, of vraagt het hulp bij een vak, en VTK Onderwijs maakt er
+// sessies van:
+//
+//   aanbod om te geven (GIVE)  -> PENDING   Onderwijs screent de tutor
+//                                 -> PLANNED   er is een sessie van gemaakt
+//                                 -> CLOSED    niet aanvaard, met reden
+//   vraag om hulp (FOLLOW)     -> OPEN      meteen publiek, zonder naam; andere
+//                                           leden kunnen ze steunen
+//                                 -> PLANNED   een sessie beantwoordt de vraag
+//                                 -> CLOSED    niemand gevonden, of verouderd
+//   (beide)                    -> WITHDRAWN de indiener trok ze zelf in
+//
+// Een sessie is een moment met een vak, een of meer tutors, een lokaal (of nog
+// niet) en deelnemers die zich zelf inschrijven. Tutors krijgen na afloop
+// bonnetjes, maar geen shift: een sessie telt niet mee voor de ranglijst of de
+// medewerkersstatus. Zie docs/design-decisions.md ("PAL+").
+// -----------------------------------------------------------------------------
+
+enum PalPlusRequestKind {
+  /// "Ik wil een sessie geven."
+  GIVE
+  /// "Ik zoek hulp bij een vak."
+  FOLLOW
+}
+
+enum PalPlusRequestStatus {
+  /// Een aanbod dat Onderwijs nog moet beoordelen. Enkel bij GIVE.
+  PENDING
+  /// Een vraag om hulp die publiek staat en een tutor zoekt. Enkel bij FOLLOW.
+  OPEN
+  /// Er hangt een sessie aan (`sessionId`).
+  PLANNED
+  /// Onderwijs sloot ze zonder sessie: een aanbod dat niet aanvaard werd, of een
+  /// vraag waarvoor niemand gevonden werd. De reden staat in `reviewNote`.
+  CLOSED
+  /// De indiener trok ze zelf in, voor er een sessie van kwam.
+  WITHDRAWN
+}
+
+/// Een vak waarover PAL+-sessies kunnen gaan. VTK Onderwijs houdt de lijst bij
+/// in het beheer; het OPO-aanbod van de faculteit staat nergens anders in deze
+/// database.
+///
+/// Een lijst en geen vrij tekstveld, omdat "Analyse I", "analyse 1" en
+/// "Wiskundige analyse" anders drie vragen worden en Onderwijs niet ziet hoeveel
+/// mensen hulp zoeken bij hetzelfde vak. Wie zijn vak niet vindt, vult in de
+/// aanvraag `courseOther` in.
+model PalPlusCourse {
+  id     String  @id @default(cuid())
+  /// De OPO-code van de KU Leuven, bv. "H01A0B". Uniek wanneer ingevuld. Leeg
+  /// voor iets wat geen vak is maar waar wel sessies over komen (Matlab, LaTeX).
+  code   String? @unique
+  nameNl String
+  /// Leeg = de Engelse site toont de Nederlandse naam.
+  nameEn String?
+  /// Uit = niet meer te kiezen in een nieuwe aanvraag. Wat al bestaat, blijft
+  /// aan het vak hangen; daarom verwijder je een gebruikt vak niet maar zet je
+  /// het uit.
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  requests PalPlusRequest[]
+  sessions PalPlusSession[]
+
+  @@index([active, nameNl])
+}
+
+/// Een aanbod om een sessie te geven, of een vraag om hulp bij een vak. Eén
+/// tabel voor beide: ze hebben dezelfde vorm (wie, welk vak, wat voor sessie) en
+/// komen in hetzelfde werkbakje van Onderwijs terecht.
+model PalPlusRequest {
+  id     String               @id @default(cuid())
+  kind   PalPlusRequestKind
+  /// Geen standaardwaarde: een aanbod begint als PENDING, een vraag als OPEN.
+  status PalPlusRequestStatus
+
+  /// Wie indiende. Iedereen die kan inloggen mag dat, ook zonder lidmaatschap.
+  userId String
+
+  /// Het vak uit de lijst, of `courseOther` wanneer het er niet in staat. Eén
+  /// van beide is ingevuld. Onderwijs kan een vrij ingevuld vak later aan een
+  /// vak uit de lijst hangen.
+  courseId    String?
+  courseOther String?
+
+  /// Wat voor sessie: oefeningen, theorie, examenvoorbereiding, een hoofdstuk.
+  /// Een open veld, omdat sessies over hetzelfde vak heel verschillend kunnen
+  /// zijn. Bij een vraag staat deze tekst publiek, zonder de naam erbij.
+  description String
+
+  /// Het moment dat de tutor voorstelt. Enkel bij GIVE, en daar verplicht;
+  /// Onderwijs kan het nog verzetten wanneer het de sessie aanmaakt. Het
+  /// aanbod zelf blijft tonen wat er voorgesteld werd.
+  proposedStartsAt DateTime? @db.Timestamptz(3)
+  proposedEndsAt   DateTime? @db.Timestamptz(3)
+  /// Wanneer de hulp nodig is, in eigen woorden ("voor het examen in januari").
+  /// Enkel bij FOLLOW.
+  preferredPeriod  String?
+
+  /// Een aanbod dat antwoordt op een openstaande vraag ("ik kan dit geven").
+  respondsToId String?
+
+  /// De sessie die van deze aanvraag kwam, of die haar beantwoordt. Meerdere
+  /// aanvragen kunnen naar dezelfde sessie wijzen: het aanbod van de tutor en de
+  /// vragen die ze oplost.
+  sessionId String?
+
+  /// Waarom gesloten. Gaat mee in de mail naar de indiener, dus schrijf hier een
+  /// zin en geen code.
+  reviewNote   String?
+  reviewedById String?
+  reviewedAt   DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  user       User                   @relation("PalPlusRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  course     PalPlusCourse?         @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  respondsTo PalPlusRequest?        @relation("PalPlusRequestResponse", fields: [respondsToId], references: [id], onDelete: SetNull)
+  responses  PalPlusRequest[]       @relation("PalPlusRequestResponse")
+  session    PalPlusSession?        @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  reviewedBy User?                  @relation("PalPlusRequestReviewedBy", fields: [reviewedById], references: [id], onDelete: SetNull)
+  backers    PalPlusRequestBacker[]
+
+  @@index([kind, status, createdAt])
+  @@index([userId])
+  @@index([courseId, status])
+  @@index([sessionId])
+  @@index([respondsToId])
+}
+
+/// Een lid dat een openstaande vraag steunt ("ik zoek dit ook"). Zo ziet
+/// Onderwijs welke vragen het waard zijn om een tutor voor te zoeken, en het
+/// werkt tegen dubbele vragen. Het aantal staat publiek, de namen niet. De
+/// indiener zelf staat hier niet in: wie de vraag stelde, telt er al bij.
+model PalPlusRequestBacker {
+  requestId String
+  userId    String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  request PalPlusRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([requestId, userId])
+  @@index([userId])
+}
+
+/// Eén PAL+-sessie: een moment, een vak, tutors, een lokaal en deelnemers.
+///
+/// Een sessie heeft geen status. Ze is gepland, of geannuleerd (`cancelledAt`),
+/// en ze is voorbij zodra `endsAt` verstreken is, net zoals een shift. Ging een
+/// sessie niet door, dan annuleert Onderwijs ze, ook achteraf: dan telt ze niet
+/// mee bij de tutors en levert ze geen bonnetjes op.
+///
+/// Ze staat bewust niet in de gewone kalender (`CalendarEvent`), maar in een
+/// eigen agenda op de PAL+-pagina en in het beheer.
+model PalPlusSession {
+  id String @id @default(cuid())
+
+  /// Altijd een vak uit de lijst. Kwam de aanvraag binnen met een vrij ingevuld
+  /// vak, dan zet Onderwijs het eerst in de lijst; zo blijft "hoeveel sessies per
+  /// vak" te tellen.
+  courseId    String
+  /// Wat er in de sessie aan bod komt. Overgenomen uit de aanvraag en daarna
+  /// door Onderwijs aan te passen.
+  description String @default("")
+
+  /// Het geplande moment. De bonnetjes van de tutors volgen hieruit (1 per uur,
+  /// afgerond op een half), niet uit hoe lang het in werkelijkheid duurde.
+  startsAt DateTime @db.Timestamptz(3)
+  endsAt   DateTime @db.Timestamptz(3)
+
+  /// Leeg = geen maximum. Iedereen die kan inloggen mag zich inschrijven.
+  maxParticipants Int?
+
+  /// Het lokaal uit de lokalenlijst (kaart en wegbeschrijving in de app), of
+  /// vrije tekst voor een lokaal dat daar niet in staat: die lijst bevat enkel de
+  /// lokalen die KULag screende. Beide leeg = het lokaal volgt nog; dat is een
+  /// gewone toestand, geen fout.
+  roomId   String?
+  roomText String?
+
+  /// Geannuleerd, met de reden voor de mail naar wie ingeschreven was.
+  cancelledAt  DateTime? @db.Timestamptz(3)
+  cancelReason String?
+
+  createdById String?
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  course    PalPlusCourse            @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  room      Room?                    @relation(fields: [roomId], references: [id], onDelete: SetNull)
+  createdBy User?                    @relation("PalPlusSessionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  tutors    PalPlusSessionTutor[]
+  attendees PalPlusSessionAttendee[]
+  requests  PalPlusRequest[]
+
+  @@index([startsAt])
+  @@index([courseId, startsAt])
+}
+
+/// Wie een sessie geeft. Elke tutor krijgt de volle beloning, ook wanneer ze
+/// met twee zijn.
+///
+/// De bonnetjes zitten bij de bonnetjes van de shiften: één saldo, op dezelfde
+/// plaatsen uit te geven. Een sessie is wel geen shift en telt dus niet mee
+/// voor de ranglijst of de grens van vijftien shiften.
+model PalPlusSessionTutor {
+  sessionId String
+  userId    String
+
+  /// Bonnetjes voor deze tutor: een momentopname van de regel (1 per gepland
+  /// uur, afgerond op een half), zodat een latere regelwijziging geen enkele
+  /// voorbije sessie herrekent. Wordt bijgewerkt wanneer het moment van de
+  /// sessie verschuift, behalve na een correctie met de hand
+  /// (`rewardCorrectedAt`).
+  ///
+  /// Verdiend zodra de sessie voorbij is en niet geannuleerd. Zoals bij een
+  /// shift levert ze niets op wanneer de tutor in dat werkingsjaar in het
+  /// praesidium zat; dat wordt uitgerekend, niet bewaard.
+  ///
+  /// Kommagetallen zoals `ShiftParticipant.rewardPaid`: altijd een veelvoud van
+  /// een half, en dat is exact in een double.
+  reward     Float
+  /// Hoeveel ervan al uitbetaald of uitgegeven is, op dezelfde manier als bij
+  /// een shift verdeeld (de oudste openstaande bonnetjes eerst).
+  rewardPaid Float @default(0)
+
+  /// Een correctie van Onderwijs. Zakt de beloning onder wat er al uitgegeven
+  /// is, dan komt het verschil uit de andere openstaande bonnetjes van de tutor,
+  /// en wat daar niet in past, vervalt: een saldo gaat nooit onder nul.
+  rewardCorrectedAt   DateTime? @db.Timestamptz(3)
+  rewardCorrectedById String?
+  rewardNote          String?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  session           PalPlusSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user              User           @relation("PalPlusTutor", fields: [userId], references: [id], onDelete: Cascade)
+  rewardCorrectedBy User?          @relation("PalPlusRewardCorrectedBy", fields: [rewardCorrectedById], references: [id], onDelete: SetNull)
+
+  @@id([sessionId, userId])
+  @@index([userId])
+}
+
+/// Wie zich voor een sessie inschreef. Uitschrijven haalt de rij weg.
+///
+/// Wie er staat, zien enkel Onderwijs en de tutors van de sessie; publiek staat
+/// enkel het aantal.
+model PalPlusSessionAttendee {
+  sessionId String
+  userId    String
+
+  /// Of iemand echt kwam, aangeduid door een tutor of door Onderwijs. Leeg
+  /// betekent "nog niet aangeduid", niet "niet gekomen". Puur informatie voor
+  /// Onderwijs: het raakt de bonnetjes van de tutor niet.
+  attended Boolean?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  session PalPlusSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([sessionId, userId])
+  @@index([userId])
+}
+
+// -----------------------------------------------------------------------------
 // VTK-app (Expo, iOS + Android)
 // -----------------------------------------------------------------------------
 
@@ -7657,6 +7940,11 @@ model Room {
   aliases String[] @default([])
 
   building Building @relation(fields: [buildingId], references: [id], onDelete: Cascade)
+
+  /// PAL+-sessies in dit lokaal. De import verwijdert nooit een lokaal; gebeurt
+  /// het toch met de hand, dan valt de sessie terug op "lokaal volgt" in plaats
+  /// van mee te verdwijnen.
+  palPlusSessions PalPlusSession[]
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
   updatedAt DateTime @updatedAt @db.Timestamptz(3)

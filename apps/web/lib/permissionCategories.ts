@@ -20,6 +20,7 @@ const CATEGORY_LABELS: Record<string, { nl: string; en: string }> = {
   fakbar: { nl: "Fakbar", en: "Fakbar" },
   meetings: { nl: "Grocomeet & Bureau", en: "Grocomeet & Bureau" },
   lesbezoeken: { nl: "Lesbezoeken", en: "Classroom visits" },
+  pal: { nl: "PAL+", en: "PAL+" },
   piano: { nl: "Piano", en: "Piano" },
   logistiek: { nl: "Logistiek", en: "Logistics" },
   door: { nl: "Deurtoegang", en: "Door access" },

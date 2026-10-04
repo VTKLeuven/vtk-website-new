@@ -967,6 +967,113 @@ feed: de URL draagt geen geheim, en er staan namen van professoren in.
 
 ---
 
+## PAL+
+
+PAL+ is peer assisted learning op aanvraag, afgesproken met VTK Onderwijs in oktober
+2026. **Het is iets anders dan PAL zelf**, dat een infopagina onder Studies is. Hoe de
+twee pagina's zich tot elkaar verhouden, ligt nog open bij Onderwijs; de naam en het
+adres zijn makkelijk te veranderen.
+
+### Twee wegen naar een sessie
+
+- **Een lid biedt aan een sessie te geven.** Het kiest een vak, beschrijft wat voor
+  sessie (oefeningen, theorie, een hoofdstuk) en stelt een moment voor. Onderwijs
+  screent de persoon zelf en maakt er een sessie van, of sluit het aanbod met een reden.
+  Het voorgestelde moment mag Onderwijs daarbij verzetten. Een LettuceMeet-achtige
+  beschikbaarheidspeiling is gevraagd en **bewust niet gebouwd**: te ingewikkeld voor
+  een eerste versie, en "de tutor stelt voor, Onderwijs past aan" volstaat.
+- **Een lid vraagt hulp bij een vak.** De vraag staat **meteen publiek** op de
+  PAL+-pagina, zonder naam, zodat een mogelijke tutor ze ziet en kan zeggen "ik kan dit
+  geven". Andere leden kunnen een vraag steunen ("ik zoek dit ook"); dat aantal staat
+  publiek, de namen niet. Zo ziet Onderwijs welke vragen het waard zijn om een tutor
+  voor te zoeken, en het werkt tegen dubbele vragen. Een vraag eerst laten nakijken voor
+  ze publiek staat, is overwogen: het vertraagt precies het steunen, en wie iets indient
+  is ingelogd en dus aanspreekbaar. Onderwijs kan een vraag altijd sluiten. Publiek
+  betekent niet aanvaard: een vraag blijft een vraag tot Onderwijs er een sessie voor
+  plant.
+
+Beide vormen zijn één tabel (`PalPlusRequest` met een `kind`), want ze hebben dezelfde
+vorm en komen in hetzelfde werkbakje terecht.
+
+### Wie mag meedoen
+
+**Iedereen die kan inloggen**, ook zonder lidmaatschap van de kring: aanbieden, hulp
+vragen, steunen en inschrijven. Onderwijs screent de tutors zelf; daar is geen regel in
+code voor.
+
+### Vakken
+
+Onderwijs houdt een korte lijst bij met de OPO-code (`PalPlusCourse`). Een lijst en geen
+vrij veld, omdat "Analyse I", "analyse 1" en "Wiskundige analyse" anders drie vragen
+worden. Wie zijn vak niet vindt, tikt het zelf in; een sessie hangt wel altijd aan een
+vak uit de lijst, zodat "hoeveel sessies per vak" te tellen blijft. Onderwijs zet dat
+vak dan in de lijst, of hangt de aanvraag aan een vak dat er al in staat (iemand tikte
+"Analyse" terwijl "Analyse I" bestaat). Een vak zonder
+OPO-code mag, voor iets wat geen vak is maar waar wel sessies over komen (Matlab). Een
+vak waar iets aan hangt, wordt niet verwijderd maar uitgezet.
+
+### Sessies
+
+- Een sessie staat **niet in de gewone kalender**, maar in een eigen agenda op de
+  PAL+-pagina en in het beheer.
+- Iedereen mag zich inschrijven; een maximum kan, maar hoeft niet.
+- Het lokaal komt uit de lokalenlijst (dan krijgt de sessie de kaart en de
+  wegbeschrijving uit de app) of is vrije tekst. **"Lokaal volgt" is een gewone
+  toestand**: Onderwijs reserveert het lokaal via de KU Leuven, en dat kan na de
+  aanvaarding komen. De site reserveert zelf niets.
+- Online sessies bestaan in deze eerste versie niet.
+- Wie ingeschreven is, zien enkel Onderwijs en de tutors van die sessie. Publiek staan
+  het aantal ingeschrevenen en de naam van de tutor.
+
+### Bonnetjes, geen shift
+
+- **Eén bonnetje per gepland uur, per tutor**, afgerond op het dichtste halve bonnetje
+  (`palPlusReward`). Anderhalf uur is anderhalf bonnetje. Het geplande moment telt, niet
+  hoe lang het echt duurde. Zijn er twee tutors, dan krijgen ze het allebei.
+- **Automatisch zodra de sessie voorbij is**, net als een shift, ook wanneer er niemand
+  kwam opdagen: de tutor was er en had voorbereid. Onderwijs kan achteraf corrigeren.
+- **Praesidium verdient er niets mee**, dezelfde regel als bij shiften (zie hierboven).
+- **Een sessie is geen shift.** Ze telt niet mee voor de ranglijst en niet voor de grens
+  van vijftien shiften (medewerkersstatus, voorrang in de voorverkoop). Het saldo is wel
+  één saldo: de bonnetjes van een sessie zijn op dezelfde plaatsen uit te geven.
+- Een momentopname per tutor (`PalPlusSessionTutor.reward`), zodat een latere
+  regelwijziging geen voorbije sessie herrekent.
+
+#### Een correctie gaat nooit onder nul
+
+Omdat de bonnetjes automatisch komen, kan een tutor ze al uitgegeven hebben voor
+Onderwijs merkt dat de sessie niet doorging. Een negatief saldo is overwogen en
+afgewezen: het saldo wordt op een tiental plaatsen per shift uitgerekend en elke plek
+gaat ervan uit dat het niet onder nul kan, dus een "schuld" zou overal een nieuw begrip
+zijn. In de plaats daarvan:
+
+- Zakt een correctie onder wat al uitgegeven is, dan komt het verschil uit de andere
+  openstaande bonnetjes van de tutor, en wat daar niet in past, vervalt. Had de tutor
+  nog één bonnetje en worden er twee teruggenomen, dan staat het saldo op nul en is dat
+  tweede kwijtgescholden.
+- Dat is strenger dan de praesidiumregel, die een uitgegeven bonnetje nooit aanraakt.
+  Bewust: daar ging de shift wel echt door, hier zegt de correctie dat de sessie dat
+  niet deed.
+- Ging een sessie niet door, dan annuleert Onderwijs ze, ook achteraf. Dan telt ze niet
+  mee en levert ze niets op. Een correctie van het bedrag is voor de gevallen ertussen
+  (een tutor die er niet was, een sessie die veel korter duurde).
+
+### Wat Onderwijs ziet
+
+Per werkingsjaar een lijst van wie sessies gaf: hoeveel, hoeveel uur, hoeveel bonnetjes
+en wie er kwam. **Vijf sessies is een volwaardig PAL-lid**; dat is voorlopig enkel een
+markering in die lijst en ontgrendelt niets op de site. De aanwezigheid is informatie
+voor Onderwijs om te beslissen of een correctie nodig is; ze raakt de bonnetjes niet
+vanzelf.
+
+De lijst staat in het beheer en is voor niemand anders zichtbaar. Het recht is
+`pal.manage`, gedragen door de rol `pal-plus` die naar Onderwijs gaat.
+
+PAL+ zit voorlopig enkel op de website, niet in de app. Het saldo in de app komt van de
+server, dus de bonnetjes van een sessie verschijnen daar wel.
+
+---
+
 ## Piano (lokaal 01.52 in het kasteel)
 
 VTK heeft een eigen piano in lokaal 01.52 van het kasteel, naast de promotiezaal.

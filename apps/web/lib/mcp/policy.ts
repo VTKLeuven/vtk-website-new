@@ -102,6 +102,11 @@ export const MCP_PERMISSION_POLICY = {
   "bureau.manage": { reads: ["meetings"], creates: ["app_create:meeting(BUREAU)"], blocked: ["reserve products or alter stock"] },
   "lesbezoeken.view": { reads: ["lesbezoek_calendar"], creates: [], blocked: [] },
   "lesbezoeken.manage": { reads: ["lesbezoeken"], creates: ["app_create:lesbezoek_organisation", "app_create:lesbezoek", "app_create:lesbezoek_peculiarity"], blocked: ["approve, reject or send email"] },
+  // Wie hulp vraagt bij welk vak, en wie er naar een sessie kwam, ziet enkel
+  // Onderwijs; de bonnetjes van de tutors zijn geld. Een agent leest hier dus
+  // niets en maakt niets aan, ook geen vak: de lijst is klein en Onderwijs
+  // houdt ze zelf bij.
+  "pal.manage": { reads: [], creates: [], blocked: ["read or decide PAL+ requests, plan sessions, mark attendance or change tutor rewards"] },
   "piano.manage": { reads: ["piano"], creates: ["app_create:piano_window"], blocked: ["create closures, reserve or cancel slots"] },
   "logistiek.manage": { reads: ["logistiek"], creates: ["app_create:uitleen_category", "app_create:uitleen_item", "app_create:uitleen_event"], blocked: ["reserve stock, approve requests, move money or plan transport"] },
   "logistiek.helpers": { reads: [], creates: [], blocked: ["add or remove trip passengers"] },
