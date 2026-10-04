@@ -995,6 +995,31 @@ adres zijn makkelijk te veranderen.
 Beide vormen zijn één tabel (`PalPlusRequest` met een `kind`), want ze hebben dezelfde
 vorm en komen in hetzelfde werkbakje terecht.
 
+### De pagina en het werkbakje
+
+- **`/pal-plus` opent op de twee keuzes**, daaronder je eigen aanvragen en de open
+  vragen. Het staat in `BUILTIN_ROUTES`, dus een redacteur hangt het onder Studies via
+  /admin/inhoud; er staat bewust geen link in de code.
+- **Het formulier staat in de URL** (`?formulier=hulp|geven`, met `&vraag=<id>` bij "ik
+  kan dit geven"). Zo is antwoorden op een vraag een gewone link, en brengt een gedeelde
+  link wie niet ingelogd is eerst naar de login en dan terug naar het formulier.
+- **Kies je bij een hulpvraag een vak waar al een vraag voor openstaat, dan toont het
+  formulier die vraag met de steunknop.** Eén vraag met vijf steunen zegt Onderwijs meer
+  dan vijf losse vragen.
+- **De open vragen staan op hoeveel mensen ze zoeken**, de meest gezochte eerst: daar is
+  een tutor het meest waard.
+- **Je eigen aanvragen staan met hun status en, als Onderwijs sloot, met de reden.**
+  Zolang Onderwijs er niets mee deed, kan je intrekken; daarna niet meer, want dan is er
+  iemand mee bezig. Wat je introk, verdwijnt uit je lijst.
+- **Hoogstens tien aanvragen tegelijk open per persoon**
+  (`PAL_PLUS_MAX_ACTIVE_REQUESTS`): ruim voor wie bij vijf vakken hulp zoekt, maar één
+  account vult de lijst van open vragen niet.
+- **Sluiten vraagt altijd een reden**, want de indiener ziet die zin bij de aanvraag.
+  Een gesloten aanvraag kan terug open; een vergissing hoeft geen nieuwe aanvraag te
+  kosten.
+- Onderwijs hangt een aanvraag aan een vak uit de lijst, ook om een verkeerd gekozen vak
+  recht te zetten. Wat de indiener intikte, blijft als uitleg staan.
+
 ### Wie mag meedoen
 
 **Iedereen die kan inloggen**, ook zonder lidmaatschap van de kring: aanbieden, hulp

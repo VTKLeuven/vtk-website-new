@@ -1042,6 +1042,10 @@
       "title": "Request a class visit",
       "description": "Request a class visit through VTK Education: we coordinate every request with the Faculty of Engineering Science."
     },
+    "palPlus": {
+      "title": "PAL+: students helping students",
+      "description": "Ask for a PAL+ session on a course, or give one yourself. VTK Onderwijs plans the sessions and books a room."
+    },
     "theokotVerhuur": {
       "title": "Rent Theokot",
       "description": "Request Theokot for your activity: VTK's own room at the Arenberg castle."
@@ -1148,6 +1152,81 @@
     "contactBody": "Mail us at",
     "errors": {
       "fallback": "Something went wrong. Please try again."
+    }
+  },
+  "palPlus": {
+    "title": "PAL+",
+    "subtitle": "Students helping students: ask for a session on a course, or give one yourself.",
+    "askTitle": "I need help with a course",
+    "askBody": "Your request appears on this page without your name, so a fellow student can pick it up. VTK Onderwijs helps look for someone to give the session.",
+    "askButton": "Ask for help",
+    "giveTitle": "I want to give a session",
+    "giveBody": "Pick a course and propose a moment. VTK Onderwijs reviews your offer, plans the session and books a room. You get one voucher for every hour you teach.",
+    "giveButton": "Offer a session",
+    "loginButton": "Log in to take part",
+    "loginNote": "Anyone with an account can take part, also without a VTK membership.",
+    "form": {
+      "askTitle": "Ask for help with a course",
+      "giveTitle": "Offer a session",
+      "respondingTo": "You are answering this request",
+      "courseLabel": "Course",
+      "coursePlaceholder": "Pick a course",
+      "courseOtherOption": "My course is not on the list",
+      "courseOtherLabel": "Which course?",
+      "courseOtherHelp": "VTK Onderwijs adds it to the list, or links it to a course that is already on it.",
+      "askDescriptionLabel": "What do you need help with?",
+      "askDescriptionPlaceholder": "The exercises of chapter 3, last year's exam questions, …",
+      "giveDescriptionLabel": "What do you want to cover?",
+      "giveDescriptionPlaceholder": "The exercise sessions of weeks 4 to 6, with the solutions",
+      "periodLabel": "When do you need it? (optional)",
+      "periodPlaceholder": "before the January exam",
+      "dateLabel": "Date",
+      "startLabel": "From",
+      "endLabel": "Until",
+      "momentHelp": "A proposal: Onderwijs can still move it when planning the session.",
+      "askPrivacy": "Your request is on this page without your name. Only VTK Onderwijs sees who asked.",
+      "givePrivacy": "Your offer goes to VTK Onderwijs. Your name only appears once the session is planned.",
+      "duplicateTitle": "There is already a request for this course",
+      "duplicateBody": "Back that one instead, so Onderwijs sees that more people need help with the same thing.",
+      "askSubmit": "Post request",
+      "giveSubmit": "Send offer",
+      "submitting": "Sending…",
+      "askSent": "Your request is online.",
+      "giveSent": "Your offer was sent to VTK Onderwijs.",
+      "cancel": "Cancel",
+      "fallbackError": "Not sent. Please try again."
+    },
+    "open": {
+      "title": "Open requests",
+      "intro": "Can you explain one of these courses? Offer a session.",
+      "empty": "There are no open requests right now.",
+      "askersOne": "1 student needs this",
+      "askersMany": "{count} students need this",
+      "period": "When",
+      "back": "I need this too",
+      "backed": "You need this too",
+      "backedToast": "You are backing this request.",
+      "unbackedToast": "Your backing was withdrawn.",
+      "canGive": "I can give this",
+      "mine": "Your request",
+      "backError": "That did not work. Please try again."
+    },
+    "mine": {
+      "title": "Your requests",
+      "kindGive": "Offer",
+      "kindAsk": "Help request",
+      "proposed": "Proposed moment",
+      "period": "When needed",
+      "submitted": "Submitted",
+      "askers": "Need this",
+      "reason": "Reason from Onderwijs",
+      "withdraw": "Withdraw",
+      "withdrawTitle": "Withdraw request?",
+      "withdrawGive": "Onderwijs will no longer plan your offer. You can always make a new one.",
+      "withdrawAsk": "Your request disappears from this page, also for those who backed it. You can always post a new one.",
+      "withdrawYes": "Withdraw",
+      "withdrawNo": "Cancel",
+      "withdrawn": "Request withdrawn."
     }
   },
   "theokotVerhuur": {

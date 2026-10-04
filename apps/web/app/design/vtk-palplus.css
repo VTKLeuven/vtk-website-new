@@ -108,3 +108,100 @@
     text-transform: uppercase;
   }
 }
+
+/* --------------------------------------------------------------------------
+   Het werkbakje: status, en het detail van een aanvraag in de modal
+   -------------------------------------------------------------------------- */
+
+.vtk-palplus-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.vtk-palplus-status[data-status='PENDING'],
+.vtk-palplus-status[data-status='OPEN'] {
+  border-color: var(--yellow);
+  background: var(--yellow);
+}
+
+.vtk-palplus-status[data-status='PLANNED'] {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+}
+
+.vtk-palplus-status[data-status='CLOSED'],
+.vtk-palplus-status[data-status='WITHDRAWN'] {
+  color: var(--muted);
+}
+
+.vtk-palplus-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.vtk-palplus-facts {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px 20px;
+}
+
+.vtk-palplus-facts dt,
+.vtk-palplus-label {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.vtk-palplus-facts dd {
+  margin: 3px 0 0;
+  font-size: 14px;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* Een <div> en geen <p>: elke <p> in de admin wordt grijs (vtk-admin.css), en
+   de tekst van een aanvraag is geen voetnoot maar waar het om draait. */
+.vtk-palplus-text {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--ink);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.vtk-palplus-names {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+  line-height: 1.7;
+  color: var(--ink);
+}
+
+/* Een actie per blok, met een haarlijn ertussen: geen kaart in een kaart. */
+.vtk-palplus-action {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-palplus-action h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+}

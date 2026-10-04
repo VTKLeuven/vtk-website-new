@@ -87,6 +87,13 @@ export const BUILTIN_ROUTES: BuiltinRoute[] = [
     descriptionEn: "Request VTK's own room for your activity.",
   },
   {
+    path: "/pal-plus",
+    labelNl: "PAL+",
+    labelEn: "PAL+",
+    descriptionNl: "Vraag een sessie aan bij een vak, of geef er zelf een.",
+    descriptionEn: "Ask for a session on a course, or give one yourself.",
+  },
+  {
     path: "/lesbezoeken",
     labelNl: "Lesbezoeken",
     labelEn: "Class visits",

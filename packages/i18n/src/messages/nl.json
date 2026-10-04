@@ -1042,6 +1042,10 @@
       "title": "Lesbezoek aanvragen",
       "description": "Vraag een lesbezoek aan bij VTK Onderwijs: wij coördineren de aanvragen met de faculteit Ingenieurswetenschappen."
     },
+    "palPlus": {
+      "title": "PAL+: studenten helpen studenten",
+      "description": "Vraag een PAL+-sessie aan bij een vak, of geef er zelf een. VTK Onderwijs plant de sessies en reserveert een lokaal."
+    },
     "theokotVerhuur": {
       "title": "Theokot huren",
       "description": "Vraag het Theokot aan voor je activiteit: de zaal van VTK aan het kasteel van Arenberg."
@@ -1148,6 +1152,81 @@
     "contactBody": "Mail naar",
     "errors": {
       "fallback": "Er ging iets mis. Probeer het opnieuw."
+    }
+  },
+  "palPlus": {
+    "title": "PAL+",
+    "subtitle": "Studenten helpen studenten: vraag een sessie aan bij een vak, of geef er zelf een.",
+    "askTitle": "Ik zoek hulp bij een vak",
+    "askBody": "Je vraag komt op deze pagina, zonder je naam, zodat een medestudent ze kan oppikken. VTK Onderwijs zoekt mee naar iemand die de sessie geeft.",
+    "askButton": "Hulp vragen",
+    "giveTitle": "Ik wil een sessie geven",
+    "giveBody": "Kies een vak en stel een moment voor. VTK Onderwijs bekijkt je aanbod, plant de sessie en reserveert een lokaal. Per uur dat je geeft, krijg je een bonnetje.",
+    "giveButton": "Sessie aanbieden",
+    "loginButton": "Inloggen om mee te doen",
+    "loginNote": "Iedereen met een account kan meedoen, ook zonder lidmaatschap van VTK.",
+    "form": {
+      "askTitle": "Hulp vragen bij een vak",
+      "giveTitle": "Een sessie aanbieden",
+      "respondingTo": "Je antwoordt op deze vraag",
+      "courseLabel": "Vak",
+      "coursePlaceholder": "Kies een vak",
+      "courseOtherOption": "Mijn vak staat er niet tussen",
+      "courseOtherLabel": "Welk vak?",
+      "courseOtherHelp": "VTK Onderwijs zet het in de lijst, of koppelt het aan een vak dat er al in staat.",
+      "askDescriptionLabel": "Waarmee wil je hulp?",
+      "askDescriptionPlaceholder": "De oefeningen van hoofdstuk 3, de examenvragen van vorig jaar, …",
+      "giveDescriptionLabel": "Wat wil je behandelen?",
+      "giveDescriptionPlaceholder": "De oefenzittingen van week 4 tot 6, met de oplossingen erbij",
+      "periodLabel": "Wanneer heb je het nodig? (optioneel)",
+      "periodPlaceholder": "voor het examen in januari",
+      "dateLabel": "Datum",
+      "startLabel": "Van",
+      "endLabel": "Tot",
+      "momentHelp": "Een voorstel: Onderwijs kan het moment nog verzetten wanneer het de sessie plant.",
+      "askPrivacy": "Je vraag staat zonder je naam op deze pagina. Enkel VTK Onderwijs ziet wie ze stelde.",
+      "givePrivacy": "Je aanbod gaat naar VTK Onderwijs. Pas wanneer de sessie gepland is, staat je naam erbij.",
+      "duplicateTitle": "Er staat al een vraag voor dit vak",
+      "duplicateBody": "Steun die liever, dan ziet Onderwijs dat meer mensen hulp zoeken bij hetzelfde.",
+      "askSubmit": "Vraag plaatsen",
+      "giveSubmit": "Aanbod versturen",
+      "submitting": "Versturen…",
+      "askSent": "Je vraag staat online.",
+      "giveSent": "Je aanbod is verstuurd naar VTK Onderwijs.",
+      "cancel": "Annuleren",
+      "fallbackError": "Niet verstuurd. Probeer het opnieuw."
+    },
+    "open": {
+      "title": "Open vragen",
+      "intro": "Kan je een van deze vakken uitleggen? Bied een sessie aan.",
+      "empty": "Er staan nu geen open vragen.",
+      "askersOne": "1 student zoekt dit",
+      "askersMany": "{count} studenten zoeken dit",
+      "period": "Wanneer",
+      "back": "Ik zoek dit ook",
+      "backed": "Je zoekt dit ook",
+      "backedToast": "Je steunt deze vraag.",
+      "unbackedToast": "Je steun is ingetrokken.",
+      "canGive": "Ik kan dit geven",
+      "mine": "Jouw vraag",
+      "backError": "Niet gelukt. Probeer het opnieuw."
+    },
+    "mine": {
+      "title": "Jouw aanvragen",
+      "kindGive": "Aanbod",
+      "kindAsk": "Hulpvraag",
+      "proposed": "Voorgesteld moment",
+      "period": "Wanneer nodig",
+      "submitted": "Ingediend",
+      "askers": "Zoeken dit",
+      "reason": "Reden van Onderwijs",
+      "withdraw": "Intrekken",
+      "withdrawTitle": "Aanvraag intrekken?",
+      "withdrawGive": "Onderwijs plant je aanbod dan niet meer in. Je kan altijd een nieuw aanbod doen.",
+      "withdrawAsk": "Je vraag verdwijnt van deze pagina, ook voor wie ze steunde. Je kan altijd een nieuwe vraag stellen.",
+      "withdrawYes": "Intrekken",
+      "withdrawNo": "Annuleren",
+      "withdrawn": "Aanvraag ingetrokken."
     }
   },
   "theokotVerhuur": {
