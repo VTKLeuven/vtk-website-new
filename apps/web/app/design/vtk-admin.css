@@ -156,6 +156,21 @@
   vertical-align: top;
 }
 
+/* Een tussenkop in een tabel, zoals de titels in de shiftranglijst
+   (`lib/shift/tiers.ts`): de rijen eronder horen samen. Zelfde padding als een
+   cel, zodat de tekst op de kolom eronder lijnt. */
+.vtk-admin-main tbody tr.vtk-table-group,
+.vtk-admin-main tbody tr.vtk-table-group:hover {
+  border-top: 2px solid var(--line-2);
+  background: var(--paper);
+}
+
+.vtk-admin-main tbody tr.vtk-table-group th {
+  padding: 10px 14px;
+  font-weight: 400;
+  text-align: left;
+}
+
 .vtk-admin-main :is(input:not([type='checkbox']):not([type='radio']), select, textarea) {
   border-radius: 12px !important;
   border-color: var(--line-2) !important;

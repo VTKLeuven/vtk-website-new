@@ -8507,6 +8507,34 @@ haalt dus enkel het sjabloon weg. Dat staat met zoveel woorden in de
 bevestigingsdialoog, want de omgekeerde vrees ("verlies ik de inschrijvingen van
 vorige maand?") is precies de reden waarom iemand van een opkuis afziet.
 
+## Titels voor shiften
+
+Wie genoeg shiften doet, krijgt een titel. De drempels zijn die van de kring
+(oktober 2026), op het aantal voltooide shiften in een academiejaar:
+
+| Shiften | Titel |
+| --- | --- |
+| 3 | Medewerker |
+| 10 | Bronze |
+| 15 | Vaste medewerker |
+| 20 | Silver |
+| 30 | Gold |
+| 50 | Platinum |
+
+Ze staan één keer, in `apps/web/lib/shift/tiers.ts`; de ranglijst in
+/admin/shiften zet bij elke drempel een tussenkop boven de rijen die die titel
+halen, en een laatste groep "Nog geen titel" voor wie onder de 3 blijft. Een
+titel waar niemand in valt, krijgt geen kop.
+
+- **Enkel in de totaalweergave.** Kies je één post, dan telt de ranglijst enkel
+  de shiften van die post, en een kop "Silver" boven iemand met 20 shiften bij
+  die ene post zou een titel suggereren die over alle shiften samen gaat. Daar
+  blijft het één lijst.
+- **Op de site is het een indeling van de ranglijst.** Er hangt geen recht of
+  melding aan, en de titel wordt nergens bewaard: hij volgt telkens uit het
+  aantal. Een shift die later geschrapt wordt, kan iemand dus terug onder een
+  drempel zetten.
+
 ## Ticketsjablonen: een cantus is elke keer dezelfde verkoop op een andere dag
 
 Drie cantussen die binnen twee dagen na elkaar aangemaakt werden, verschilden op
