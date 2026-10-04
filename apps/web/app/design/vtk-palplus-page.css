@@ -447,3 +447,208 @@
   display: flex;
   justify-content: flex-end;
 }
+
+/* -------------------------------------------------------------------------- */
+/* De agenda: per dag, met per sessie het uur, wat en waar, en inschrijven     */
+/* -------------------------------------------------------------------------- */
+
+.pp-section-head-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px 20px;
+}
+
+.pp-subscribe,
+.pp-calendar-link,
+.pp-map {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.pp-agenda {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.pp-day-label {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.pp-sessions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pp-session {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px 22px;
+  padding: 18px 20px;
+}
+
+@media (min-width: 760px) {
+  .pp-session {
+    grid-template-columns: 112px minmax(0, 1fr) auto;
+    align-items: start;
+  }
+}
+
+.pp-session-time {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  font-weight: 600;
+  font-size: 15px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-session-flag {
+  display: inline-flex;
+  padding: 1px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.pp-session[data-state='running'] .pp-session-flag {
+  border-color: var(--yellow);
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.pp-session-main {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pp-session[data-state='cancelled'] .pp-course,
+.pp-session[data-state='cancelled'] .pp-session-time {
+  color: var(--muted);
+}
+
+.pp-session[data-state='cancelled'] .pp-course {
+  text-decoration: line-through;
+}
+
+.pp-pending {
+  display: inline-flex;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-size: 12.5px;
+  color: var(--body);
+}
+
+.pp-attendees {
+  margin-top: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--paper);
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.pp-attendees ul {
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  columns: 2;
+  column-gap: 20px;
+  line-height: 1.7;
+}
+
+.pp-attendees .pp-empty {
+  margin: 0;
+  font-size: 14px;
+}
+
+.pp-session-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+}
+
+@media (min-width: 760px) {
+  .pp-session-actions {
+    flex-direction: column;
+    align-items: flex-end;
+    text-align: right;
+  }
+}
+
+.pp-signup {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (min-width: 760px) {
+  .pp-signup {
+    flex-direction: column;
+    align-items: flex-end;
+  }
+}
+
+/* Ingeschreven is een actieve toestand: geel, met een vinkje erbij. */
+.pp-signed {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: var(--yellow);
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.pp-leave {
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.pp-leave:hover {
+  color: var(--ink);
+}
+
+.pp-join:disabled,
+.pp-leave:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.pp-full {
+  display: inline-flex;
+  padding: 6px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--muted);
+}

@@ -1196,6 +1196,33 @@
       "cancel": "Annuleren",
       "fallbackError": "Niet verstuurd. Probeer het opnieuw."
     },
+    "sessions": {
+      "title": "Komende sessies",
+      "intro": "Schrijf je in, dan weet de tutor hoeveel mensen er komen.",
+      "empty": "Er staan nog geen sessies gepland.",
+      "subscribe": "Abonneer op de PAL+-agenda",
+      "room": "Lokaal",
+      "roomPending": "Lokaal volgt",
+      "map": "Kaart",
+      "tutors": "Gegeven door",
+      "attendance": "Ingeschreven",
+      "countOpen": "{count} ingeschreven",
+      "countMax": "{count} van {max} plaatsen",
+      "signUp": "Inschrijven",
+      "leave": "Uitschrijven",
+      "signedUp": "Je bent ingeschreven",
+      "full": "Volzet",
+      "youTeach": "Jij geeft deze sessie",
+      "cancelled": "Geannuleerd",
+      "running": "Bezig",
+      "loginToSignUp": "Inloggen om in te schrijven",
+      "addToCalendar": "Zet in mijn agenda",
+      "attendeesTitle": "Wie komt",
+      "noAttendees": "Nog niemand ingeschreven.",
+      "signedUpToast": "Je bent ingeschreven.",
+      "leftToast": "Je bent uitgeschreven.",
+      "error": "Niet gelukt. Probeer het opnieuw."
+    },
     "open": {
       "title": "Open vragen",
       "intro": "Kan je een van deze vakken uitleggen? Bied een sessie aan.",
@@ -1226,7 +1253,10 @@
       "withdrawAsk": "Je vraag verdwijnt van deze pagina, ook voor wie ze steunde. Je kan altijd een nieuwe vraag stellen.",
       "withdrawYes": "Intrekken",
       "withdrawNo": "Annuleren",
-      "withdrawn": "Aanvraag ingetrokken."
+      "withdrawn": "Aanvraag ingetrokken.",
+      "session": "Sessie",
+      "sessionCancelled": "De sessie werd geannuleerd.",
+      "sessionCancelledBadge": "Sessie geannuleerd"
     }
   },
   "theokotVerhuur": {

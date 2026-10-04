@@ -18,6 +18,13 @@ import {
   type PalPlusRequestStatusCode,
 } from "@/lib/palPlus";
 import { palPlusAdminErrors } from "@/lib/palPlusMessages";
+import {
+  SessionForm,
+  type LinkableRequest,
+  type Person,
+  type RoomGroup,
+  type SessionCourseOption,
+} from "./SessionForm";
 
 export type PalPlusRequestView = {
   id: string;
@@ -29,20 +36,32 @@ export type PalPlusRequestView = {
   /** Wat de indiener zelf intikte, als dat zo was. */
   courseTyped: string | null;
   description: string;
+  submitterId: string;
   submitterName: string;
   submitterEmail: string;
   submittedLabel: string;
   momentLabel: string | null;
+  /** Het voorgestelde moment als formuliervelden (Brusselse wandklok), voor het plannen. */
+  proposed: { date: string; startTime: string; endTime: string } | null;
   preferredPeriod: string | null;
   askers: number;
   backerNames: string[];
-  respondsTo: { courseLabel: string; description: string } | null;
-  responses: { id: string; name: string; status: PalPlusRequestStatusCode; submittedLabel: string }[];
+  respondsTo: { id: string; status: PalPlusRequestStatusCode; courseLabel: string; description: string } | null;
+  responses: {
+    id: string;
+    userId: string;
+    name: string;
+    status: PalPlusRequestStatusCode;
+    submittedLabel: string;
+  }[];
   reviewNote: string | null;
   reviewedLabel: string | null;
 };
 
 export type AssignableCourse = { id: string; label: string; active: boolean };
+
+/** Een open hulpvraag die een geplande sessie kan meenemen. */
+export type OpenFollowRequest = { id: string; courseId: string | null; label: string };
 
 /**
  * Het werkbakje van Onderwijs: wat nog beslist moet worden (`queue`), of wat al
@@ -55,12 +74,16 @@ export function RequestsBoard({
   mode,
   requests,
   courses,
+  rooms,
+  openFollow,
 }: {
   nl: boolean;
   base: string;
   mode: "queue" | "processed";
   requests: PalPlusRequestView[];
   courses: AssignableCourse[];
+  rooms: RoomGroup[];
+  openFollow: OpenFollowRequest[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = requests.find((request) => request.id === selectedId) ?? null;
@@ -153,6 +176,8 @@ export function RequestsBoard({
             base={base}
             request={selected}
             courses={courses}
+            rooms={rooms}
+            openFollow={openFollow}
             onDone={() => setSelectedId(null)}
           />
         </Modal>
@@ -166,17 +191,36 @@ function RequestDetail({
   base,
   request,
   courses,
+  rooms,
+  openFollow,
   onDone,
 }: {
   nl: boolean;
   base: string;
   request: PalPlusRequestView;
   courses: AssignableCourse[];
+  rooms: RoomGroup[];
+  openFollow: OpenFollowRequest[];
   onDone: () => void;
 }) {
   const errors = palPlusAdminErrors(nl);
   const active = isActivePalPlusStatus(request.status);
   const give = request.kind === "GIVE";
+  const [planning, setPlanning] = useState(false);
+
+  if (planning) {
+    return (
+      <PlanFromRequest
+        nl={nl}
+        request={request}
+        courses={courses}
+        rooms={rooms}
+        openFollow={openFollow}
+        onBack={() => setPlanning(false)}
+        onDone={onDone}
+      />
+    );
+  }
 
   return (
     <div className="vtk-palplus-detail">
@@ -267,6 +311,24 @@ function RequestDetail({
             ))}
           </ul>
         </div>
+      )}
+
+      {active && (
+        <section className="vtk-palplus-action">
+          <h3>{give ? (nl ? "Aanbod aanvaarden" : "Accept the offer") : nl ? "Een sessie plannen" : "Plan a session"}</h3>
+          <p className="mb-3 text-sm text-vtk-muted">
+            {give
+              ? nl
+                ? "Plan de sessie met deze tutor. Het moment, het vak en de omschrijving staan al ingevuld; je kan ze nog aanpassen."
+                : "Plan the session with this tutor. The moment, course and description are filled in; you can still change them."
+              : nl
+                ? "Kies een tutor (of een van de aanbiedingen) en een moment. Wie de vraag stelde, ziet daarna de sessie bij de aanvraag."
+                : "Pick a tutor (or one of the offers) and a moment. Whoever asked then sees the session with the request."}
+          </p>
+          <Button type="button" size="sm" onClick={() => setPlanning(true)}>
+            {nl ? "Sessie plannen" : "Plan session"}
+          </Button>
+        </section>
       )}
 
       {active && (
@@ -433,5 +495,105 @@ function ReopenButton({ nl, id, onDone }: { nl: boolean; id: string; onDone: () 
     >
       {nl ? "Heropenen" : "Reopen"}
     </Button>
+  );
+}
+
+/**
+ * Het sessieformulier, voorgevuld vanuit een aanvraag: een aanbod brengt zijn
+ * tutor, moment en omschrijving mee; een hulpvraag de mensen die erop aanboden.
+ * De aanvraag zelf staat aangevinkt bij "deze sessie beantwoordt", samen met de
+ * andere open vragen over hetzelfde vak die er mee in kunnen.
+ */
+function PlanFromRequest({
+  nl,
+  request,
+  courses,
+  rooms,
+  openFollow,
+  onBack,
+  onDone,
+}: {
+  nl: boolean;
+  request: PalPlusRequestView;
+  courses: SessionCourseOption[];
+  rooms: RoomGroup[];
+  openFollow: OpenFollowRequest[];
+  onBack: () => void;
+  onDone: () => void;
+}) {
+  const give = request.kind === "GIVE";
+  const linkable: LinkableRequest[] = [
+    {
+      id: request.id,
+      label: `${give ? (nl ? "Aanbod van" : "Offer from") : nl ? "Hulpvraag van" : "Help request from"} ${request.submitterName}: ${request.courseLabel}`,
+      checked: true,
+    },
+  ];
+  if (give && request.respondsTo && request.respondsTo.status === "OPEN") {
+    linkable.push({
+      id: request.respondsTo.id,
+      label: `${nl ? "De vraag waarop dit aanbod antwoordt" : "The request this offer answers"}: ${request.respondsTo.courseLabel}`,
+      checked: true,
+    });
+  }
+  if (!give) {
+    for (const response of request.responses) {
+      if (!isActivePalPlusStatus(response.status)) continue;
+      linkable.push({
+        id: response.id,
+        label: `${nl ? "Aanbod van" : "Offer from"} ${response.name}`,
+        checked: false,
+      });
+    }
+  }
+  if (request.courseId) {
+    for (const other of openFollow) {
+      if (other.courseId !== request.courseId || linkable.some((item) => item.id === other.id)) continue;
+      linkable.push({ id: other.id, label: other.label, checked: false });
+    }
+  }
+
+  const tutors: Person[] = give ? [{ id: request.submitterId, name: request.submitterName }] : [];
+  const suggestions: Person[] = give
+    ? []
+    : request.responses
+        .filter((response) => isActivePalPlusStatus(response.status))
+        .map((response) => ({ id: response.userId, name: response.name }));
+
+  return (
+    <div className="vtk-palplus-detail">
+      <div>
+        <Button type="button" size="sm" variant="ghost" onClick={onBack}>
+          {nl ? "Terug naar de aanvraag" : "Back to the request"}
+        </Button>
+      </div>
+      {!request.courseId && (
+        <p className="text-sm text-vtk-muted">
+          {nl
+            ? `De indiener tikte "${request.courseTyped ?? ""}" in. Kies hieronder het vak uit de lijst, of zet het eerst in de lijst onder Vakken.`
+            : `The submitter typed "${request.courseTyped ?? ""}". Pick the course from the list below, or add it under Courses first.`}
+        </p>
+      )}
+      <SessionForm
+        nl={nl}
+        initial={{
+          id: null,
+          courseId: request.courseId ?? "",
+          description: request.description,
+          date: request.proposed?.date ?? "",
+          startTime: request.proposed?.startTime ?? "",
+          endTime: request.proposed?.endTime ?? "",
+          maxParticipants: "",
+          roomId: "",
+          roomText: "",
+          tutors,
+        }}
+        courses={courses}
+        rooms={rooms}
+        linkable={linkable}
+        tutorSuggestions={suggestions}
+        onDone={onDone}
+      />
+    </div>
   );
 }

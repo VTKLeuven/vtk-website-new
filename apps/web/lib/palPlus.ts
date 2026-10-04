@@ -9,7 +9,7 @@
  * Bevat geen server-only imports: de formulieren gebruiken dezelfde limieten.
  */
 
-import { brusselsWallClockMinutes } from "@/lib/brussels";
+import { brusselsMinutesOfDay, brusselsWallClockMinutes, brusselsYMD, ymdKey } from "@/lib/brussels";
 import { parseDateTimeFields } from "@/lib/lesbezoeken";
 
 // -----------------------------------------------------------------------------
@@ -46,6 +46,10 @@ export const PAL_PLUS_LIMITS = {
   description: 1000,
   preferredPeriod: 120,
   reviewNote: 500,
+  roomText: 120,
+  cancelReason: 500,
+  maxParticipants: 500,
+  tutors: 5,
 } as const;
 
 export type PalPlusCourseErrorCode =
@@ -217,17 +221,9 @@ export function parsePalPlusRequest(
     };
   }
 
-  if (!raw.date || !raw.startTime || !raw.endTime) return { ok: false, error: "MOMENT_REQUIRED" };
-  const start = parseDateTimeFields(raw.date, raw.startTime);
-  const end = parseDateTimeFields(raw.date, raw.endTime);
-  if (!start || !end) return { ok: false, error: "MOMENT_INVALID" };
-  if (end.minutes <= start.minutes) return { ok: false, error: "MOMENT_ORDER" };
-  if (end.minutes - start.minutes > PAL_PLUS_MAX_SESSION_MINUTES) {
-    return { ok: false, error: "MOMENT_TOO_LONG" };
-  }
-
-  const proposedStartsAt = brusselsWallClockMinutes(start, start.minutes);
-  const proposedEndsAt = brusselsWallClockMinutes(end, end.minutes);
+  const moment = parsePalPlusMoment(raw.date, raw.startTime, raw.endTime);
+  if (!moment.ok) return moment;
+  const { startsAt: proposedStartsAt, endsAt: proposedEndsAt } = moment;
   if (proposedStartsAt.getTime() <= now.getTime()) return { ok: false, error: "MOMENT_PAST" };
   if (proposedStartsAt.getTime() - now.getTime() > PAL_PLUS_MAX_LEAD_DAYS * 86_400_000) {
     return { ok: false, error: "MOMENT_TOO_FAR" };
@@ -236,6 +232,32 @@ export function parsePalPlusRequest(
   return {
     ok: true,
     request: { kind, ...course, description, proposedStartsAt, proposedEndsAt },
+  };
+}
+
+type MomentErrorCode = "MOMENT_REQUIRED" | "MOMENT_INVALID" | "MOMENT_ORDER" | "MOMENT_TOO_LONG";
+
+/**
+ * Een datum met een begin- en einduur, als Brusselse wandklok. Een sessie valt
+ * altijd binnen één dag; een einde na middernacht is bijna zeker een tikfout.
+ */
+export function parsePalPlusMoment(
+  date: string,
+  startTime: string,
+  endTime: string,
+): { ok: true; startsAt: Date; endsAt: Date } | { ok: false; error: MomentErrorCode } {
+  if (!date || !startTime || !endTime) return { ok: false, error: "MOMENT_REQUIRED" };
+  const start = parseDateTimeFields(date, startTime);
+  const end = parseDateTimeFields(date, endTime);
+  if (!start || !end) return { ok: false, error: "MOMENT_INVALID" };
+  if (end.minutes <= start.minutes) return { ok: false, error: "MOMENT_ORDER" };
+  if (end.minutes - start.minutes > PAL_PLUS_MAX_SESSION_MINUTES) {
+    return { ok: false, error: "MOMENT_TOO_LONG" };
+  }
+  return {
+    ok: true,
+    startsAt: brusselsWallClockMinutes(start, start.minutes),
+    endsAt: brusselsWallClockMinutes(end, end.minutes),
   };
 }
 
@@ -281,4 +303,156 @@ export function palPlusRequestCourseLabel(
 ): string {
   if (request.course) return palPlusCourseLabel(request.course, locale);
   return request.courseOther ?? "";
+}
+
+// -----------------------------------------------------------------------------
+// Sessies
+// -----------------------------------------------------------------------------
+
+export type PalPlusSessionErrorCode =
+  | "COURSE_REQUIRED"
+  | "COURSE_UNKNOWN"
+  | "DESCRIPTION_TOO_LONG"
+  | MomentErrorCode
+  | "MAX_INVALID"
+  | "MAX_BELOW_SIGNUPS"
+  | "ROOM_TEXT_TOO_LONG"
+  | "ROOM_UNKNOWN"
+  | "TUTOR_REQUIRED"
+  | "TUTORS_TOO_MANY"
+  | "TUTOR_UNKNOWN"
+  | "SESSION_GONE"
+  | "SESSION_CANCELLED";
+
+export type RawPalPlusSession = {
+  courseId: string;
+  description: string;
+  date: string;
+  startTime: string;
+  endTime: string;
+  maxParticipants: string;
+  roomId: string;
+  roomText: string;
+  tutorIds: string[];
+};
+
+export type ParsedPalPlusSession = {
+  courseId: string;
+  description: string;
+  startsAt: Date;
+  endsAt: Date;
+  maxParticipants: number | null;
+  roomId: string | null;
+  roomText: string | null;
+  tutorIds: string[];
+};
+
+/**
+ * Valideert het sessieformulier van Onderwijs. Of het vak, het lokaal en de
+ * tutors bestaan, weet enkel de databank; dat controleert de action erna.
+ *
+ * Een moment in het verleden mag hier wel: Onderwijs kan een sessie die al
+ * doorging achteraf invoeren, zodat de tutor ze toch telt.
+ */
+export function parsePalPlusSession(
+  raw: RawPalPlusSession,
+): { ok: true; session: ParsedPalPlusSession } | { ok: false; error: PalPlusSessionErrorCode } {
+  if (!raw.courseId) return { ok: false, error: "COURSE_REQUIRED" };
+
+  const description = raw.description.trim();
+  if (description.length > PAL_PLUS_LIMITS.description) return { ok: false, error: "DESCRIPTION_TOO_LONG" };
+
+  const moment = parsePalPlusMoment(raw.date, raw.startTime, raw.endTime);
+  if (!moment.ok) return moment;
+
+  let maxParticipants: number | null = null;
+  const rawMax = raw.maxParticipants.trim();
+  if (rawMax) {
+    const value = Number(rawMax);
+    if (!Number.isInteger(value) || value < 1 || value > PAL_PLUS_LIMITS.maxParticipants) {
+      return { ok: false, error: "MAX_INVALID" };
+    }
+    maxParticipants = value;
+  }
+
+  // Een lokaal uit de lijst wint van vrije tekst; beide leeg = het lokaal volgt.
+  const roomId = raw.roomId.trim() || null;
+  const roomText = roomId ? null : raw.roomText.trim() || null;
+  if (roomText && roomText.length > PAL_PLUS_LIMITS.roomText) return { ok: false, error: "ROOM_TEXT_TOO_LONG" };
+
+  const tutorIds = [...new Set(raw.tutorIds.map((id) => id.trim()).filter(Boolean))];
+  if (tutorIds.length === 0) return { ok: false, error: "TUTOR_REQUIRED" };
+  if (tutorIds.length > PAL_PLUS_LIMITS.tutors) return { ok: false, error: "TUTORS_TOO_MANY" };
+
+  return {
+    ok: true,
+    session: {
+      courseId: raw.courseId,
+      description,
+      startsAt: moment.startsAt,
+      endsAt: moment.endsAt,
+      maxParticipants,
+      roomId,
+      roomText,
+      tutorIds,
+    },
+  };
+}
+
+export type PalPlusSessionState = "cancelled" | "upcoming" | "running" | "past";
+
+/** Een sessie heeft geen statusveld: ze is geannuleerd, of het uur beslist. */
+export function palPlusSessionState(
+  session: { startsAt: Date; endsAt: Date; cancelledAt: Date | null },
+  now: Date,
+): PalPlusSessionState {
+  if (session.cancelledAt) return "cancelled";
+  if (now.getTime() < session.startsAt.getTime()) return "upcoming";
+  if (now.getTime() < session.endsAt.getTime()) return "running";
+  return "past";
+}
+
+export type PalPlusSignupBlock = "CANCELLED" | "STARTED" | "FULL" | "IS_TUTOR";
+
+/**
+ * Waarom iemand zich niet (meer) kan inschrijven, of `null` als het kan.
+ * Uitschrijven kan zolang de sessie niet begonnen is; daarvoor geldt enkel
+ * `CANCELLED` en `STARTED`.
+ */
+export function palPlusSignupBlock(
+  session: { startsAt: Date; endsAt: Date; cancelledAt: Date | null; maxParticipants: number | null },
+  context: { attendeeCount: number; isTutor: boolean; now: Date },
+): PalPlusSignupBlock | null {
+  const state = palPlusSessionState(session, context.now);
+  if (state === "cancelled") return "CANCELLED";
+  if (state !== "upcoming") return "STARTED";
+  if (context.isTutor) return "IS_TUTOR";
+  if (session.maxParticipants !== null && context.attendeeCount >= session.maxParticipants) return "FULL";
+  return null;
+}
+
+/**
+ * Het lokaal van een sessie zoals studenten het in hun uurrooster zien
+ * ("200K 00.06"), met de naam erachter; vrije tekst als het niet in de lijst
+ * staat; `null` als het nog volgt.
+ */
+export function palPlusRoomLabel(
+  room: { code: string | null; name: string; building: { shortCode: string | null } } | null,
+  roomText: string | null,
+): string | null {
+  if (room) {
+    const code = [room.building.shortCode, room.code].filter(Boolean).join(" ");
+    return code ? `${code} (${room.name})` : room.name;
+  }
+  return roomText;
+}
+
+/**
+ * Een opgeslagen moment terug naar de velden van een formulier: datum en uur in
+ * Brusselse wandklok, zoals iemand ze intikte.
+ */
+export function palPlusWallClockFields(date: Date): { date: string; time: string } {
+  const minutes = brusselsMinutesOfDay(date);
+  const time = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  return { date: ymdKey(brusselsYMD(date)), time };
 }

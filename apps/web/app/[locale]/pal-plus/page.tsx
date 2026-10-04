@@ -8,16 +8,21 @@ import { hasLocale } from "@/lib/locale";
 import { staticMetadata } from "@/lib/pageMetadata";
 import { getCurrentSession } from "@/lib/session";
 import { withdrawPalPlusRequestAction } from "@/app/actions/palPlus";
+import { brusselsYMD, ymdKey } from "@/lib/brussels";
 import {
   isActivePalPlusStatus,
   palPlusAskerCount,
   palPlusCourseLabel,
   palPlusRequestCourseLabel,
+  palPlusRoomLabel,
+  palPlusSessionState,
+  palPlusSignupBlock,
   PAL_PLUS_STATUS_LABELS,
 } from "@/lib/palPlus";
 import { palPlusMemberErrors } from "@/lib/palPlusMessages";
 import { PalPlusRequestForm, type OpenRequestHint } from "./PalPlusRequestForm";
 import { BackingButton, type BackingCopy } from "./BackingButton";
+import { SignupButton, type SignupCopy } from "./SignupButton";
 
 import "@/app/design/vtk-base.css";
 import "@/app/design/vtk-palplus-page.css";
@@ -75,8 +80,14 @@ export default async function PalPlusPage({
   }
 
   const courseSelect = { code: true, nameNl: true, nameEn: true } as const;
+  const roomSelect = {
+    code: true,
+    name: true,
+    building: { select: { shortCode: true, lat: true, lng: true } },
+  } as const;
+  const now = new Date();
 
-  const [courseRows, openRows, mineRows, respondsToRow] = await Promise.all([
+  const [courseRows, openRows, mineRows, respondsToRow, sessionRows] = await Promise.all([
     prisma.palPlusCourse.findMany({
       where: { active: true },
       orderBy: { nameNl: "asc" },
@@ -116,6 +127,15 @@ export default async function PalPlusPage({
             createdAt: true,
             course: { select: courseSelect },
             _count: { select: { backers: true } },
+            session: {
+              select: {
+                startsAt: true,
+                endsAt: true,
+                cancelledAt: true,
+                roomText: true,
+                room: { select: roomSelect },
+              },
+            },
           },
         })
       : Promise.resolve([]),
@@ -125,7 +145,49 @@ export default async function PalPlusPage({
           select: { id: true, courseId: true, courseOther: true, description: true, course: { select: courseSelect } },
         })
       : Promise.resolve(null),
+    // Wat nog komt of bezig is. Een geannuleerde sessie blijft staan tot haar
+    // begin, zodat wie ingeschreven was het hier ook ziet.
+    prisma.palPlusSession.findMany({
+      where: {
+        endsAt: { gt: now },
+        OR: [{ cancelledAt: null }, { startsAt: { gt: now } }],
+      },
+      orderBy: { startsAt: "asc" },
+      select: {
+        id: true,
+        description: true,
+        startsAt: true,
+        endsAt: true,
+        maxParticipants: true,
+        cancelledAt: true,
+        cancelReason: true,
+        roomText: true,
+        room: { select: roomSelect },
+        course: { select: courseSelect },
+        tutors: { orderBy: { createdAt: "asc" }, select: { userId: true, user: { select: { name: true } } } },
+        _count: { select: { attendees: true } },
+        // Enkel je eigen inschrijving; wie er verder komt, ziet enkel een tutor.
+        attendees: userId ? { where: { userId }, select: { userId: true } } : false,
+      },
+    }),
   ]);
+
+  // Wie ingeschreven is, zien enkel de tutors van die sessie (en Onderwijs, in
+  // het beheer). Die namen komen er dus enkel bij voor je eigen sessies.
+  const teachingIds = userId
+    ? sessionRows.filter((row) => row.tutors.some((tutor) => tutor.userId === userId)).map((row) => row.id)
+    : [];
+  const attendeeNames = new Map<string, string[]>();
+  if (teachingIds.length > 0) {
+    const rows = await prisma.palPlusSessionAttendee.findMany({
+      where: { sessionId: { in: teachingIds } },
+      orderBy: { createdAt: "asc" },
+      select: { sessionId: true, user: { select: { name: true } } },
+    });
+    for (const row of rows) {
+      attendeeNames.set(row.sessionId, [...(attendeeNames.get(row.sessionId) ?? []), row.user.name]);
+    }
+  }
 
   const askersLabel = (count: number) =>
     count === 1 ? t.open.askersOne : t.open.askersMany.replace("{count}", String(count));
@@ -156,6 +218,16 @@ export default async function PalPlusPage({
     });
   }
 
+  const signupCopy: SignupCopy = {
+    signUp: t.sessions.signUp,
+    leave: t.sessions.leave,
+    signedUp: t.sessions.signedUp,
+    signedUpToast: t.sessions.signedUpToast,
+    leftToast: t.sessions.leftToast,
+    errors: palPlusMemberErrors(nl),
+    fallbackError: t.sessions.error,
+  };
+
   const backingCopy: BackingCopy = {
     back: t.open.back,
     backed: t.open.backed,
@@ -184,6 +256,27 @@ export default async function PalPlusPage({
   });
   const moment = (start: Date, end: Date) =>
     `${dayFmt.format(start)}, ${timeFmt.format(start)} - ${timeFmt.format(end)}`;
+  const longDayFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    timeZone: "Europe/Brussels",
+  });
+
+  // De agenda per dag, in Brusselse tijd.
+  const days: { key: string; label: string; sessions: typeof sessionRows }[] = [];
+  for (const row of sessionRows) {
+    const key = ymdKey(brusselsYMD(row.startsAt));
+    const last = days[days.length - 1];
+    if (last && last.key === key) last.sessions.push(row);
+    else days.push({ key, label: longDayFmt.format(row.startsAt), sessions: [row] });
+  }
+
+  /** Een link naar het gebouw op de kaart, wanneer we zijn ligging kennen. */
+  const mapHref = (room: { building: { lat: number | null; lng: number | null } } | null) =>
+    room?.building.lat != null && room.building.lng != null
+      ? `https://www.google.com/maps/search/?api=1&query=${room.building.lat},${room.building.lng}`
+      : null;
 
   return (
     <div className="vtk-page pp-page">
@@ -246,6 +339,138 @@ export default async function PalPlusPage({
           </>
         )}
 
+        <section className="pp-section" aria-labelledby="pp-sessions-title">
+          <div className="pp-section-head pp-section-head-row">
+            <div>
+              <h2 id="pp-sessions-title" className="pp-section-title">
+                {t.sessions.title}
+              </h2>
+              {sessionRows.length > 0 && <p>{t.sessions.intro}</p>}
+            </div>
+            <a href={`/api/pal-plus/agenda.ics${nl ? "" : "?lang=en"}`} className="pp-subscribe">
+              {t.sessions.subscribe}
+            </a>
+          </div>
+          {days.length === 0 ? (
+            <p className="pp-empty">{t.sessions.empty}</p>
+          ) : (
+            <div className="pp-agenda">
+              {days.map((day) => (
+                <section key={day.key} className="pp-day" aria-label={day.label}>
+                  <h3 className="pp-day-label">{day.label}</h3>
+                  <ul className="pp-sessions">
+                    {day.sessions.map((row) => {
+                      const state = palPlusSessionState(row, now);
+                      const isTutor = userId !== null && row.tutors.some((tutor) => tutor.userId === userId);
+                      const signedUp = Array.isArray(row.attendees) && row.attendees.length > 0;
+                      const block = palPlusSignupBlock(row, {
+                        attendeeCount: row._count.attendees,
+                        isTutor,
+                        now,
+                      });
+                      const room = palPlusRoomLabel(row.room, row.roomText);
+                      const map = mapHref(row.room);
+                      const names = attendeeNames.get(row.id) ?? [];
+                      return (
+                        <li key={row.id} className="vtk-panel pp-session" data-state={state}>
+                          <div className="pp-session-time">
+                            {timeFmt.format(row.startsAt)} - {timeFmt.format(row.endsAt)}
+                            {state === "cancelled" && <span className="pp-session-flag">{t.sessions.cancelled}</span>}
+                            {state === "running" && <span className="pp-session-flag">{t.sessions.running}</span>}
+                          </div>
+                          <div className="pp-session-main">
+                            <p className="pp-course">{palPlusCourseLabel(row.course, locale)}</p>
+                            {row.description && <p className="pp-text">{row.description}</p>}
+                            <dl className="pp-facts">
+                              <div>
+                                <dt>{t.sessions.room}</dt>
+                                <dd>
+                                  {room ?? <span className="pp-pending">{t.sessions.roomPending}</span>}
+                                  {room && map && (
+                                    <>
+                                      {" "}
+                                      <a href={map} className="pp-map" target="_blank" rel="noreferrer">
+                                        {t.sessions.map}
+                                      </a>
+                                    </>
+                                  )}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt>{t.sessions.tutors}</dt>
+                                <dd>{row.tutors.map((tutor) => tutor.user.name).join(", ")}</dd>
+                              </div>
+                              <div>
+                                <dt>{t.sessions.attendance}</dt>
+                                <dd className="pp-num">
+                                  {row.maxParticipants !== null
+                                    ? t.sessions.countMax
+                                        .replace("{count}", String(row._count.attendees))
+                                        .replace("{max}", String(row.maxParticipants))
+                                    : t.sessions.countOpen.replace("{count}", String(row._count.attendees))}
+                                </dd>
+                              </div>
+                            </dl>
+                            {state === "cancelled" && row.cancelReason && (
+                              <div className="pp-reason">
+                                <p className="pp-reason-label">{t.sessions.cancelled}</p>
+                                <p>{row.cancelReason}</p>
+                              </div>
+                            )}
+                            {isTutor && state !== "cancelled" && (
+                              <div className="pp-attendees">
+                                <p className="pp-reason-label">{t.sessions.attendeesTitle}</p>
+                                {names.length === 0 ? (
+                                  <p className="pp-empty">{t.sessions.noAttendees}</p>
+                                ) : (
+                                  <ul>
+                                    {names.map((name, index) => (
+                                      <li key={`${name}-${index}`}>{name}</li>
+                                    ))}
+                                  </ul>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                          {state !== "cancelled" && (
+                            <div className="pp-session-actions">
+                              {isTutor ? (
+                                <span className="pp-signed">{t.sessions.youTeach}</span>
+                              ) : !userId ? (
+                                state === "upcoming" && (
+                                  <Link href={loginHref(`${base}/pal-plus`)} className="pp-give-link">
+                                    {t.sessions.loginToSignUp}
+                                  </Link>
+                                )
+                              ) : signedUp && state === "upcoming" ? (
+                                <SignupButton sessionId={row.id} signedUp copy={signupCopy} />
+                              ) : signedUp ? (
+                                <span className="pp-signed">
+                                  <span aria-hidden="true">✓</span> {t.sessions.signedUp}
+                                </span>
+                              ) : block === "FULL" ? (
+                                <span className="pp-full">{t.sessions.full}</span>
+                              ) : block === null ? (
+                                <SignupButton sessionId={row.id} signedUp={false} copy={signupCopy} />
+                              ) : null}
+                              <a
+                                href={`/api/pal-plus/sessie/${row.id}${nl ? "" : "?lang=en"}`}
+                                className="pp-calendar-link"
+                              >
+                                {t.sessions.addToCalendar}
+                              </a>
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          )}
+        </section>
+
         {mineRows.length > 0 && (
           <section className="pp-section" id="jouw-aanvragen" aria-labelledby="pp-mine-title">
             <h2 id="pp-mine-title" className="pp-section-title">
@@ -260,9 +485,15 @@ export default async function PalPlusPage({
                       <span className="pp-kind">
                         {request.kind === "GIVE" ? t.mine.kindGive : t.mine.kindAsk}
                       </span>
-                      <span className="pp-status" data-status={request.status}>
-                        {PAL_PLUS_STATUS_LABELS[request.status][nl ? "nl" : "en"]}
-                      </span>
+                      {request.status === "PLANNED" && request.session?.cancelledAt ? (
+                        <span className="pp-status" data-status="CLOSED">
+                          {t.mine.sessionCancelledBadge}
+                        </span>
+                      ) : (
+                        <span className="pp-status" data-status={request.status}>
+                          {PAL_PLUS_STATUS_LABELS[request.status][nl ? "nl" : "en"]}
+                        </span>
+                      )}
                     </div>
                     <p className="pp-course">{courseLabel}</p>
                     <p className="pp-text">{request.description}</p>
@@ -279,6 +510,17 @@ export default async function PalPlusPage({
                           <dd>{request.preferredPeriod}</dd>
                         </div>
                       )}
+                      {request.status === "PLANNED" && request.session && !request.session.cancelledAt && (
+                        <div>
+                          <dt>{t.mine.session}</dt>
+                          <dd>
+                            {moment(request.session.startsAt, request.session.endsAt)}
+                            <br />
+                            {palPlusRoomLabel(request.session.room, request.session.roomText) ??
+                              t.sessions.roomPending}
+                          </dd>
+                        </div>
+                      )}
                       {request.kind === "FOLLOW" && (
                         <div>
                           <dt>{t.mine.askers}</dt>
@@ -290,6 +532,11 @@ export default async function PalPlusPage({
                         <dd>{dateFmt.format(request.createdAt)}</dd>
                       </div>
                     </dl>
+                    {request.status === "PLANNED" && request.session?.cancelledAt && (
+                      <div className="pp-reason">
+                        <p>{t.mine.sessionCancelled}</p>
+                      </div>
+                    )}
                     {request.status === "CLOSED" && request.reviewNote && (
                       <div className="pp-reason">
                         <p className="pp-reason-label">{t.mine.reason}</p>

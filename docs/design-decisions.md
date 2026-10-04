@@ -1040,7 +1040,34 @@ vak waar iets aan hangt, wordt niet verwijderd maar uitgezet.
 ### Sessies
 
 - Een sessie staat **niet in de gewone kalender**, maar in een eigen agenda op de
-  PAL+-pagina en in het beheer.
+  PAL+-pagina en in het beheer. Wie ze in zijn eigen agenda wil, abonneert op
+  `/api/pal-plus/agenda.ics` (publiek en zonder geheim: er staat niets in wat niet ook
+  op de pagina staat) of zet één sessie erin met "Zet in mijn agenda". Een geannuleerde
+  sessie blijft een maand in de feed met `STATUS:CANCELLED`, zodat een geabonneerde
+  agenda ze schrapt.
+- **Plannen vertrekt meestal uit een aanvraag.** Een aanbod brengt zijn tutor, moment en
+  omschrijving mee; een hulpvraag de mensen die erop aanboden, als voorstel. De aanvraag
+  staat aangevinkt bij "deze sessie beantwoordt", samen met de vraag waarop het aanbod
+  antwoordde en de andere open vragen over hetzelfde vak die erbij kunnen. Wat
+  aangevinkt is, gaat naar "Sessie gepland". Een sessie kan ook zonder aanvraag.
+- Een sessie in het verleden mag: Onderwijs kan een sessie die al doorging achteraf
+  invoeren, zodat de tutor ze toch telt.
+- Tutors kiest Onderwijs met een eigen zoekveld achter `pal.manage`, niet met
+  `/api/users/search`: wie PAL+ beheert, hoeft daarvoor geen `users.search` te krijgen.
+- Een tutor schrijft zich niet in voor zijn eigen sessie. Ziet wel, op de PAL+-pagina,
+  wie er komt.
+- **Inschrijven en uitschrijven kan tot de sessie begint.** Het maximum wordt geteld,
+  niet vergrendeld: twee mensen op dezelfde seconde kunnen er samen één over gaan. Bij
+  PAL+ is het maximum een richtlijn voor de grootte van het lokaal, geen verkochte
+  plaats. Onderwijs kan het maximum niet onder het aantal ingeschrevenen zetten; dat
+  zou mensen stil uitschrijven.
+- **Annuleren vraagt een reden en is niet ongedaan te maken**; een nieuwe sessie plannen
+  kan altijd. De hulpvragen die de sessie beantwoordde, staan daarna weer open, want de
+  vraag is er nog. Het aanbod van de tutor blijft aan de sessie hangen als historiek en
+  toont "Sessie geannuleerd". Een geannuleerde sessie blijft op de pagina staan tot haar
+  begin, met de reden, zodat wie ingeschreven was het ook daar ziet.
+- Het lokaal komt met een kaartlink (de ligging van het gebouw uit de lokalenlijst),
+  zodat wie het gebouw niet kent erheen kan.
 - Iedereen mag zich inschrijven; een maximum kan, maar hoeft niet.
 - Het lokaal komt uit de lokalenlijst (dan krijgt de sessie de kaart en de
   wegbeschrijving uit de app) of is vrije tekst. **"Lokaal volgt" is een gewone
@@ -1062,7 +1089,10 @@ vak waar iets aan hangt, wordt niet verwijderd maar uitgezet.
   van vijftien shiften (medewerkersstatus, voorrang in de voorverkoop). Het saldo is wel
   één saldo: de bonnetjes van een sessie zijn op dezelfde plaatsen uit te geven.
 - Een momentopname per tutor (`PalPlusSessionTutor.reward`), zodat een latere
-  regelwijziging geen voorbije sessie herrekent.
+  regelwijziging geen voorbije sessie herrekent. Verzet Onderwijs het moment, dan schuift
+  de beloning mee, behalve bij een tutor wiens beloning met de hand gecorrigeerd werd.
+  Het sessieformulier toont meteen wat elke tutor krijgt, zodat je het effect van een
+  ander uur ziet op het moment dat je het verzet.
 
 #### Een correctie gaat nooit onder nul
 

@@ -9,10 +9,16 @@ import {
   palPlusReward,
   parsePalPlusCourse,
   parsePalPlusRequest,
+  parsePalPlusSession,
+  palPlusRoomLabel,
+  palPlusSessionState,
+  palPlusSignupBlock,
+  palPlusWallClockFields,
   reopenedPalPlusStatus,
   PAL_PLUS_LIMITS,
   PAL_PLUS_OTHER_COURSE,
   type RawPalPlusRequest,
+  type RawPalPlusSession,
 } from "@/lib/palPlus";
 
 const at = (hhmm: string) => new Date(`2026-10-12T${hhmm}:00+02:00`);
@@ -286,5 +292,132 @@ describe("statussen", () => {
     const course = { code: "H01A0B", nameNl: "Analyse I", nameEn: null };
     expect(palPlusRequestCourseLabel({ course, courseOther: "analyse" }, "nl")).toBe("Analyse I (H01A0B)");
     expect(palPlusRequestCourseLabel({ course: null, courseOther: "Thermo" }, "nl")).toBe("Thermo");
+  });
+});
+
+describe("parsePalPlusSession", () => {
+  const raw: RawPalPlusSession = {
+    courseId: "course-1",
+    description: " Oefeningen hoofdstuk 3 ",
+    date: "2026-10-12",
+    startTime: "14:00",
+    endTime: "16:00",
+    maxParticipants: "",
+    roomId: "",
+    roomText: "",
+    tutorIds: ["user-1"],
+  };
+
+  it("aanvaardt een sessie zonder lokaal en zonder maximum", () => {
+    const result = parsePalPlusSession(raw);
+    if (!result.ok) throw new Error(result.error);
+    expect(result.session).toMatchObject({
+      courseId: "course-1",
+      description: "Oefeningen hoofdstuk 3",
+      maxParticipants: null,
+      roomId: null,
+      roomText: null,
+      tutorIds: ["user-1"],
+    });
+    expect(result.session.startsAt.toISOString()).toBe("2026-10-12T12:00:00.000Z");
+  });
+
+  it("laat een lokaal uit de lijst winnen van vrije tekst", () => {
+    const result = parsePalPlusSession({ ...raw, roomId: "room-1", roomText: "achteraan" });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.session.roomId).toBe("room-1");
+    expect(result.session.roomText).toBeNull();
+  });
+
+  it("neemt vrije tekst over wanneer er geen lokaal gekozen is", () => {
+    const result = parsePalPlusSession({ ...raw, roomText: " Bib, studiezaal 2 " });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.session.roomText).toBe("Bib, studiezaal 2");
+  });
+
+  it("aanvaardt een moment in het verleden, voor een sessie die al doorging", () => {
+    expect(parsePalPlusSession({ ...raw, date: "2025-01-10" }).ok).toBe(true);
+  });
+
+  it("dedupliceert tutors en vraagt er minstens een, hoogstens vijf", () => {
+    const result = parsePalPlusSession({ ...raw, tutorIds: ["a", "b", "a", " "] });
+    if (!result.ok) throw new Error(result.error);
+    expect(result.session.tutorIds).toEqual(["a", "b"]);
+    expect(parsePalPlusSession({ ...raw, tutorIds: [] })).toEqual({ ok: false, error: "TUTOR_REQUIRED" });
+    expect(parsePalPlusSession({ ...raw, tutorIds: ["1", "2", "3", "4", "5", "6"] })).toEqual({
+      ok: false,
+      error: "TUTORS_TOO_MANY",
+    });
+  });
+
+  it("vraagt een vak en een geldig moment", () => {
+    expect(parsePalPlusSession({ ...raw, courseId: "" })).toEqual({ ok: false, error: "COURSE_REQUIRED" });
+    expect(parsePalPlusSession({ ...raw, endTime: "13:00" })).toEqual({ ok: false, error: "MOMENT_ORDER" });
+    expect(parsePalPlusSession({ ...raw, date: "" })).toEqual({ ok: false, error: "MOMENT_REQUIRED" });
+  });
+
+  it("aanvaardt enkel een positief, geheel maximum", () => {
+    expect(parsePalPlusSession({ ...raw, maxParticipants: "20" }).ok).toBe(true);
+    for (const value of ["0", "-3", "2.5", "veel", String(PAL_PLUS_LIMITS.maxParticipants + 1)]) {
+      expect(parsePalPlusSession({ ...raw, maxParticipants: value })).toEqual({ ok: false, error: "MAX_INVALID" });
+    }
+  });
+
+  it("weigert een te lange lokaaltekst", () => {
+    expect(parsePalPlusSession({ ...raw, roomText: "a".repeat(PAL_PLUS_LIMITS.roomText + 1) })).toEqual({
+      ok: false,
+      error: "ROOM_TEXT_TOO_LONG",
+    });
+  });
+});
+
+describe("sessies: toestand en inschrijven", () => {
+  const session = {
+    startsAt: new Date("2026-10-12T12:00:00Z"),
+    endsAt: new Date("2026-10-12T14:00:00Z"),
+    cancelledAt: null as Date | null,
+    maxParticipants: 2 as number | null,
+  };
+  const before = new Date("2026-10-12T11:00:00Z");
+  const during = new Date("2026-10-12T13:00:00Z");
+  const after = new Date("2026-10-12T15:00:00Z");
+
+  it("leidt de toestand af uit het uur en de annulering", () => {
+    expect(palPlusSessionState(session, before)).toBe("upcoming");
+    expect(palPlusSessionState(session, during)).toBe("running");
+    expect(palPlusSessionState(session, after)).toBe("past");
+    expect(palPlusSessionState({ ...session, cancelledAt: before }, before)).toBe("cancelled");
+  });
+
+  it("laat inschrijven zolang de sessie niet begon, niet vol is en je geen tutor bent", () => {
+    const ctx = { attendeeCount: 1, isTutor: false, now: before };
+    expect(palPlusSignupBlock(session, ctx)).toBeNull();
+    expect(palPlusSignupBlock(session, { ...ctx, attendeeCount: 2 })).toBe("FULL");
+    expect(palPlusSignupBlock({ ...session, maxParticipants: null }, { ...ctx, attendeeCount: 200 })).toBeNull();
+    expect(palPlusSignupBlock(session, { ...ctx, isTutor: true })).toBe("IS_TUTOR");
+    expect(palPlusSignupBlock(session, { ...ctx, now: during })).toBe("STARTED");
+    expect(palPlusSignupBlock({ ...session, cancelledAt: before }, ctx)).toBe("CANCELLED");
+  });
+});
+
+describe("palPlusRoomLabel", () => {
+  const room = { code: "00.06", name: "Aula Rosalind Franklin", building: { shortCode: "200K" } };
+
+  it("toont het lokaal zoals in het uurrooster, met de naam erachter", () => {
+    expect(palPlusRoomLabel(room, null)).toBe("200K 00.06 (Aula Rosalind Franklin)");
+  });
+
+  it("valt terug op de naam, de vrije tekst, of niets", () => {
+    expect(palPlusRoomLabel({ ...room, code: null, building: { shortCode: null } }, null)).toBe("Aula Rosalind Franklin");
+    expect(palPlusRoomLabel(null, "Bib, studiezaal 2")).toBe("Bib, studiezaal 2");
+    expect(palPlusRoomLabel(null, null)).toBeNull();
+  });
+});
+
+describe("palPlusWallClockFields", () => {
+  it("geeft datum en uur in Brusselse tijd terug, ook rond de overgang naar wintertijd", () => {
+    expect(palPlusWallClockFields(new Date("2026-10-12T12:00:00Z"))).toEqual({ date: "2026-10-12", time: "14:00" });
+    expect(palPlusWallClockFields(new Date("2026-11-09T13:30:00Z"))).toEqual({ date: "2026-11-09", time: "14:30" });
+    expect(palPlusWallClockFields(new Date("2026-10-12T22:30:00Z"))).toEqual({ date: "2026-10-13", time: "00:30" });
   });
 });

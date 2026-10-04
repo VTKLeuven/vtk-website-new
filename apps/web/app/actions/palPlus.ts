@@ -11,8 +11,13 @@ import {
   initialPalPlusStatus,
   palPlusCourseLabel,
   palPlusRequestCourseLabel,
+  palPlusReward,
+  palPlusSessionState,
+  palPlusSignupBlock,
+  palPlusWallClockFields,
   parsePalPlusCourse,
   parsePalPlusRequest,
+  parsePalPlusSession,
   reopenedPalPlusStatus,
   PAL_PLUS_LIMITS,
   PAL_PLUS_MAX_ACTIVE_REQUESTS,
@@ -384,5 +389,298 @@ export async function deletePalPlusCourseAction(formData: FormData): Promise<Sav
     target: palPlusCourseLabel(course, "nl"),
   });
   revalidatePalPlusAdmin();
+  return saveOk();
+}
+
+// -----------------------------------------------------------------------------
+// Leden: inschrijven voor een sessie
+// -----------------------------------------------------------------------------
+
+/**
+ * Inschrijven voor een sessie. Iedereen die kan inloggen mag dat, tot de
+ * sessie begint, zolang ze niet vol is.
+ *
+ * Het maximum wordt hier geteld en niet vergrendeld: twee mensen die op
+ * dezelfde seconde de laatste plaats nemen, kunnen er samen één over gaan. Dat
+ * is aanvaard; het maximum is bij PAL+ een richtlijn voor de grootte van het
+ * lokaal, geen verkochte plaats.
+ */
+export async function signUpPalPlusSessionAction(formData: FormData): Promise<SaveState> {
+  const session = await getCurrentSession();
+  if (!session) return saveError("LOGIN_REQUIRED");
+  const userId = session.user.id;
+  const sessionId = toSingleLine(formData.get("sessionId"));
+
+  const row = await prisma.palPlusSession.findUnique({
+    where: { id: sessionId },
+    select: {
+      startsAt: true,
+      endsAt: true,
+      cancelledAt: true,
+      maxParticipants: true,
+      tutors: { where: { userId }, select: { userId: true } },
+      attendees: { where: { userId }, select: { userId: true } },
+      _count: { select: { attendees: true } },
+    },
+  });
+  if (!row) return saveError("SESSION_GONE");
+  // Al ingeschreven (een dubbele klik): dat is wat er gevraagd werd.
+  if (row.attendees.length > 0) return saveOk();
+
+  const block = palPlusSignupBlock(row, {
+    attendeeCount: row._count.attendees,
+    isTutor: row.tutors.length > 0,
+    now: new Date(),
+  });
+  if (block) return saveError(block);
+
+  try {
+    await prisma.palPlusSessionAttendee.create({ data: { sessionId, userId } });
+  } catch (err) {
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) throw err;
+  }
+
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
+/** Uitschrijven, tot de sessie begint. */
+export async function leavePalPlusSessionAction(formData: FormData): Promise<SaveState> {
+  const session = await getCurrentSession();
+  if (!session) return saveError("LOGIN_REQUIRED");
+  const sessionId = toSingleLine(formData.get("sessionId"));
+
+  const row = await prisma.palPlusSession.findUnique({
+    where: { id: sessionId },
+    select: { startsAt: true, endsAt: true, cancelledAt: true },
+  });
+  if (!row) return saveError("SESSION_GONE");
+  const state = palPlusSessionState(row, new Date());
+  if (state === "running" || state === "past") return saveError("STARTED");
+
+  await prisma.palPlusSessionAttendee.deleteMany({ where: { sessionId, userId: session.user.id } });
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
+// -----------------------------------------------------------------------------
+// Beheer: sessies
+// -----------------------------------------------------------------------------
+
+/**
+ * Iemand zoeken om als tutor op een sessie te zetten, op naam, e-mail of
+ * r-nummer. Een eigen zoekactie achter `pal.manage`, zodat wie PAL+ beheert
+ * daarvoor niet ook `users.search` nodig heeft.
+ */
+export async function searchPalPlusPeopleAction(
+  query: string,
+): Promise<{ id: string; name: string; email: string }[]> {
+  await requirePermission("pal.manage");
+  const needle = query.trim().slice(0, 80);
+  if (needle.length < 2) return [];
+  return prisma.user.findMany({
+    where: {
+      deletedAt: null,
+      OR: [
+        { name: { contains: needle, mode: "insensitive" } },
+        { email: { contains: needle, mode: "insensitive" } },
+        { rNumber: { contains: needle, mode: "insensitive" } },
+      ],
+    },
+    orderBy: { name: "asc" },
+    take: 8,
+    select: { id: true, name: true, email: true },
+  });
+}
+
+function sessionAuditTarget(
+  course: { code: string | null; nameNl: string; nameEn: string | null },
+  startsAt: Date,
+): string {
+  const { date, time } = palPlusWallClockFields(startsAt);
+  return `${palPlusCourseLabel(course, "nl")} op ${date} ${time}`;
+}
+
+/**
+ * Een sessie plannen of aanpassen. Bij het plannen vanuit een aanvraag gaan de
+ * aangevinkte aanvragen mee naar "Sessie gepland".
+ *
+ * De bonnetjes van een tutor zijn een momentopname van het geplande moment.
+ * Verschuift het moment, dan schuift de beloning mee, behalve bij een tutor
+ * wiens beloning Onderwijs met de hand corrigeerde.
+ */
+export async function savePalPlusSessionAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const actor = await requirePermission("pal.manage");
+
+  const parsed = parsePalPlusSession({
+    courseId: toSingleLine(formData.get("courseId")),
+    description: toMessageText(formData.get("description")),
+    date: toSingleLine(formData.get("date")),
+    startTime: toSingleLine(formData.get("startTime")),
+    endTime: toSingleLine(formData.get("endTime")),
+    maxParticipants: toSingleLine(formData.get("maxParticipants")),
+    roomId: toSingleLine(formData.get("roomId")),
+    roomText: toSingleLine(formData.get("roomText")),
+    tutorIds: formData.getAll("tutorId").map((value) => toSingleLine(value)),
+  });
+  if (!parsed.ok) return saveError(parsed.error);
+  const data = parsed.session;
+  const id = toSingleLine(formData.get("id"));
+  const requestIds = formData
+    .getAll("requestId")
+    .map((value) => toSingleLine(value))
+    .filter(Boolean);
+
+  const [course, room, tutorCount] = await Promise.all([
+    prisma.palPlusCourse.findUnique({
+      where: { id: data.courseId },
+      select: { code: true, nameNl: true, nameEn: true },
+    }),
+    data.roomId ? prisma.room.findUnique({ where: { id: data.roomId }, select: { id: true } }) : null,
+    prisma.user.count({ where: { id: { in: data.tutorIds } } }),
+  ]);
+  if (!course) return saveError("COURSE_UNKNOWN");
+  if (data.roomId && !room) return saveError("ROOM_UNKNOWN");
+  if (tutorCount !== data.tutorIds.length) return saveError("TUTOR_UNKNOWN");
+
+  const reward = palPlusReward(data.startsAt, data.endsAt);
+  const fields = {
+    courseId: data.courseId,
+    description: data.description,
+    startsAt: data.startsAt,
+    endsAt: data.endsAt,
+    maxParticipants: data.maxParticipants,
+    roomId: data.roomId,
+    roomText: data.roomText,
+  };
+  const linkRequests = (sessionId: string) =>
+    prisma.palPlusRequest.updateMany({
+      where: { id: { in: requestIds }, status: { in: [...ACTIVE_STATUSES] } },
+      data: { status: "PLANNED", sessionId },
+    });
+
+  if (id) {
+    const existing = await prisma.palPlusSession.findUnique({
+      where: { id },
+      select: {
+        startsAt: true,
+        endsAt: true,
+        cancelledAt: true,
+        tutors: { select: { userId: true, rewardPaid: true } },
+        _count: { select: { attendees: true } },
+      },
+    });
+    if (!existing) return saveError("SESSION_GONE");
+    if (existing.cancelledAt) return saveError("SESSION_CANCELLED");
+    if (data.maxParticipants !== null && data.maxParticipants < existing._count.attendees) {
+      return saveError("MAX_BELOW_SIGNUPS");
+    }
+    const removed = existing.tutors.filter((tutor) => !data.tutorIds.includes(tutor.userId));
+    if (removed.some((tutor) => tutor.rewardPaid > 0)) return saveError("TUTOR_HAS_PAID");
+    const current = new Set(existing.tutors.map((tutor) => tutor.userId));
+    const timesChanged =
+      existing.startsAt.getTime() !== data.startsAt.getTime() ||
+      existing.endsAt.getTime() !== data.endsAt.getTime();
+
+    await prisma.$transaction([
+      prisma.palPlusSession.update({ where: { id }, data: fields }),
+      prisma.palPlusSessionTutor.deleteMany({
+        where: { sessionId: id, userId: { in: removed.map((tutor) => tutor.userId) } },
+      }),
+      ...data.tutorIds
+        .filter((userId) => !current.has(userId))
+        .map((userId) => prisma.palPlusSessionTutor.create({ data: { sessionId: id, userId, reward } })),
+      ...(timesChanged
+        ? [
+            prisma.palPlusSessionTutor.updateMany({
+              where: { sessionId: id, rewardCorrectedAt: null },
+              data: { reward },
+            }),
+          ]
+        : []),
+      linkRequests(id),
+    ]);
+    await logAudit({
+      action: "update",
+      entity: "palPlusSession",
+      entityId: id,
+      target: sessionAuditTarget(course, data.startsAt),
+    });
+  } else {
+    const created = await prisma.$transaction(async (tx) => {
+      const session = await tx.palPlusSession.create({
+        data: {
+          ...fields,
+          createdById: actor.user.id,
+          tutors: { create: data.tutorIds.map((userId) => ({ userId, reward })) },
+        },
+        select: { id: true },
+      });
+      await tx.palPlusRequest.updateMany({
+        where: { id: { in: requestIds }, status: { in: [...ACTIVE_STATUSES] } },
+        data: { status: "PLANNED", sessionId: session.id },
+      });
+      return session;
+    });
+    await logAudit({
+      action: "create",
+      entity: "palPlusSession",
+      entityId: created.id,
+      target: sessionAuditTarget(course, data.startsAt),
+    });
+  }
+
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
+/**
+ * Een sessie annuleren, ook achteraf wanneer ze niet doorging: dan telt ze
+ * niet mee en levert ze niets op.
+ *
+ * De hulpvragen die ze beantwoordde, staan daarna weer open: de vraag is er
+ * nog. Het aanbod van de tutor blijft aan de sessie hangen, als historiek van
+ * wie aanbood. Een annulering is niet ongedaan te maken; een nieuwe sessie
+ * plannen kan altijd.
+ */
+export async function cancelPalPlusSessionAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("pal.manage");
+  const id = toSingleLine(formData.get("id"));
+  const reason = toMessageText(formData.get("reason"));
+  if (!reason) return saveError("CANCEL_REASON_REQUIRED");
+  if (reason.length > PAL_PLUS_LIMITS.cancelReason) return saveError("CANCEL_REASON_TOO_LONG");
+
+  const existing = await prisma.palPlusSession.findUnique({
+    where: { id },
+    select: { cancelledAt: true, startsAt: true, course: { select: { code: true, nameNl: true, nameEn: true } } },
+  });
+  if (!existing) return saveError("SESSION_GONE");
+  if (existing.cancelledAt) return saveError("SESSION_CANCELLED");
+
+  await prisma.$transaction([
+    prisma.palPlusSession.update({
+      where: { id },
+      data: { cancelledAt: new Date(), cancelReason: reason },
+    }),
+    prisma.palPlusRequest.updateMany({
+      where: { sessionId: id, kind: "FOLLOW", status: "PLANNED" },
+      data: { status: "OPEN", sessionId: null },
+    }),
+  ]);
+
+  await logAudit({
+    action: "cancel",
+    entity: "palPlusSession",
+    entityId: id,
+    target: sessionAuditTarget(existing.course, existing.startsAt),
+    summary: reason,
+  });
+  revalidatePalPlusEverywhere();
   return saveOk();
 }

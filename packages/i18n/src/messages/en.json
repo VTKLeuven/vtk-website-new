@@ -1196,6 +1196,33 @@
       "cancel": "Cancel",
       "fallbackError": "Not sent. Please try again."
     },
+    "sessions": {
+      "title": "Upcoming sessions",
+      "intro": "Sign up so the tutor knows how many people are coming.",
+      "empty": "No sessions are planned yet.",
+      "subscribe": "Subscribe to the PAL+ calendar",
+      "room": "Room",
+      "roomPending": "Room to follow",
+      "map": "Map",
+      "tutors": "Given by",
+      "attendance": "Signed up",
+      "countOpen": "{count} signed up",
+      "countMax": "{count} of {max} places",
+      "signUp": "Sign up",
+      "leave": "Leave",
+      "signedUp": "You are signed up",
+      "full": "Full",
+      "youTeach": "You are giving this session",
+      "cancelled": "Cancelled",
+      "running": "In progress",
+      "loginToSignUp": "Log in to sign up",
+      "addToCalendar": "Add to my calendar",
+      "attendeesTitle": "Who is coming",
+      "noAttendees": "Nobody signed up yet.",
+      "signedUpToast": "You are signed up.",
+      "leftToast": "You left the session.",
+      "error": "That did not work. Please try again."
+    },
     "open": {
       "title": "Open requests",
       "intro": "Can you explain one of these courses? Offer a session.",
@@ -1226,7 +1253,10 @@
       "withdrawAsk": "Your request disappears from this page, also for those who backed it. You can always post a new one.",
       "withdrawYes": "Withdraw",
       "withdrawNo": "Cancel",
-      "withdrawn": "Request withdrawn."
+      "withdrawn": "Request withdrawn.",
+      "session": "Session",
+      "sessionCancelled": "The session was cancelled.",
+      "sessionCancelledBadge": "Session cancelled"
     }
   },
   "theokotVerhuur": {

@@ -205,3 +205,170 @@
   font-weight: 600;
   color: var(--ink);
 }
+
+/* --------------------------------------------------------------------------
+   Sessies: het formulier en de lijst
+   -------------------------------------------------------------------------- */
+
+.vtk-palplus-sessionform {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.vtk-palplus-moment {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+
+@media (min-width: 560px) {
+  .vtk-palplus-moment {
+    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
+  }
+}
+
+/* Wat elke tutor krijgt, meteen onder het moment. Een <div> en geen <p>: dit
+   is de terugkoppeling op wat je net verzette, geen voetnoot. */
+.vtk-palplus-reward {
+  margin-top: 8px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--paper);
+  box-shadow: inset 3px 0 0 var(--yellow);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.vtk-palplus-linkable {
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vtk-palplus-linkable legend {
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.vtk-palplus-chips {
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.vtk-palplus-chips li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.vtk-palplus-chips button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+}
+
+.vtk-palplus-chips button:hover {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.vtk-palplus-suggest {
+  margin-bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.vtk-palplus-suggest button {
+  padding: 3px 10px;
+  border: 1px dashed var(--line-2);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.vtk-palplus-suggest button:hover {
+  border-style: solid;
+  border-color: var(--ink);
+}
+
+.vtk-palplus-results {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px rgba(10, 15, 31, 0.1);
+  font-size: 14px;
+}
+
+.vtk-palplus-results li {
+  padding: 6px 10px;
+}
+
+.vtk-palplus-results li:has(button) {
+  padding: 0;
+}
+
+.vtk-palplus-results button {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 8px;
+  text-align: left;
+  color: var(--ink);
+}
+
+.vtk-palplus-results button:hover,
+.vtk-palplus-results button:focus-visible {
+  background: var(--paper-2);
+}
+
+/* Een sessie zonder lokaal is werk dat nog te doen is: dat mag opvallen. */
+.vtk-palplus-pending {
+  display: inline-flex;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--yellow);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.vtk-palplus-names-cols {
+  columns: 2;
+  column-gap: 24px;
+}
