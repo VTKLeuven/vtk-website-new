@@ -2,6 +2,7 @@ import {
   PAL_PLUS_LIMITS,
   PAL_PLUS_MAX_ACTIVE_REQUESTS,
   PAL_PLUS_MAX_LEAD_DAYS,
+  PAL_PLUS_MAX_REWARD,
   PAL_PLUS_MAX_SESSION_MINUTES,
   type PalPlusCourseErrorCode,
   type PalPlusRequestErrorCode,
@@ -41,7 +42,9 @@ export type PalPlusMemberErrorCode =
   | "REQUEST_NOT_OPEN"
   | "OWN_REQUEST"
   | "NOT_WITHDRAWABLE"
-  | "SESSION_GONE";
+  | "SESSION_GONE"
+  | "NOT_STARTED"
+  | "NOT_ALLOWED";
 
 export function palPlusMemberErrors(nl: boolean): Record<PalPlusMemberErrorCode, string> {
   const hours = PAL_PLUS_MAX_SESSION_MINUTES / 60;
@@ -71,6 +74,8 @@ export function palPlusMemberErrors(nl: boolean): Record<PalPlusMemberErrorCode,
         FULL: "Niet ingeschreven: de sessie is volzet.",
         IS_TUTOR: "Je geeft deze sessie zelf; inschrijven hoeft niet.",
         SESSION_GONE: "Die sessie bestaat niet meer. Herlaad de pagina.",
+        NOT_STARTED: "De sessie is nog niet begonnen; wie kwam, duid je aan zodra ze bezig is.",
+        NOT_ALLOWED: "Enkel een tutor van deze sessie of Onderwijs duidt aan wie er kwam.",
       }
     : {
         LOGIN_REQUIRED: "Not sent: your session expired. Log in again and try once more.",
@@ -96,6 +101,8 @@ export function palPlusMemberErrors(nl: boolean): Record<PalPlusMemberErrorCode,
         FULL: "Not signed up: the session is full.",
         IS_TUTOR: "You are giving this session yourself; no need to sign up.",
         SESSION_GONE: "That session no longer exists. Reload the page.",
+        NOT_STARTED: "The session has not started yet; mark who came once it is under way.",
+        NOT_ALLOWED: "Only a tutor of this session or Onderwijs marks who came.",
       };
 }
 
@@ -128,7 +135,12 @@ export type PalPlusSessionAdminErrorCode =
   | PalPlusSessionErrorCode
   | "CANCEL_REASON_REQUIRED"
   | "CANCEL_REASON_TOO_LONG"
-  | "TUTOR_HAS_PAID";
+  | "TUTOR_HAS_PAID"
+  | "REWARD_CONFLICT"
+  | "AMOUNT_INVALID"
+  | "NOTE_REQUIRED"
+  | "NOTE_TOO_LONG"
+  | "TUTOR_GONE";
 
 export function palPlusSessionErrors(nl: boolean): Record<PalPlusSessionAdminErrorCode, string> {
   const hours = PAL_PLUS_MAX_SESSION_MINUTES / 60;
@@ -154,6 +166,12 @@ export function palPlusSessionErrors(nl: boolean): Record<PalPlusSessionAdminErr
         SESSION_CANCELLED: "Niet opgeslagen: deze sessie is geannuleerd.",
         CANCEL_REASON_REQUIRED: "Niet geannuleerd: schrijf een reden. Wie ingeschreven is, ziet die.",
         CANCEL_REASON_TOO_LONG: `Niet geannuleerd: de reden mag hoogstens ${PAL_PLUS_LIMITS.cancelReason} tekens zijn.`,
+        REWARD_CONFLICT:
+          "Niet opgeslagen: het bonnetjessaldo van een tutor veranderde net (iemand betaalde ermee). Probeer het opnieuw.",
+        AMOUNT_INVALID: `Niet opgeslagen: een beloning is een veelvoud van een half bonnetje, van 0 tot ${PAL_PLUS_MAX_REWARD}.`,
+        NOTE_REQUIRED: "Niet opgeslagen: schrijf waarom je de beloning aanpast. Dat staat in het logboek.",
+        NOTE_TOO_LONG: `Niet opgeslagen: de uitleg mag hoogstens ${PAL_PLUS_LIMITS.reviewNote} tekens zijn.`,
+        TUTOR_GONE: "Niet opgeslagen: die tutor staat niet meer op de sessie. Herlaad de pagina.",
       }
     : {
         COURSE_REQUIRED: "Not saved: pick a course from the list.",
@@ -176,5 +194,11 @@ export function palPlusSessionErrors(nl: boolean): Record<PalPlusSessionAdminErr
         SESSION_CANCELLED: "Not saved: this session was cancelled.",
         CANCEL_REASON_REQUIRED: "Not cancelled: write a reason. Everyone who signed up sees it.",
         CANCEL_REASON_TOO_LONG: `Not cancelled: the reason can be at most ${PAL_PLUS_LIMITS.cancelReason} characters.`,
+        REWARD_CONFLICT:
+          "Not saved: a tutor's voucher balance just changed (someone paid with it). Please try again.",
+        AMOUNT_INVALID: `Not saved: a reward is a multiple of half a voucher, from 0 to ${PAL_PLUS_MAX_REWARD}.`,
+        NOTE_REQUIRED: "Not saved: write why you are changing the reward. It goes in the audit log.",
+        NOTE_TOO_LONG: `Not saved: the explanation can be at most ${PAL_PLUS_LIMITS.reviewNote} characters.`,
+        TUTOR_GONE: "Not saved: that tutor is no longer on the session. Reload the page.",
       };
 }

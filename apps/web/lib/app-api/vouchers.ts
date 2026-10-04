@@ -4,17 +4,21 @@ import { prisma } from "@vtk/db";
 
 import { logAudit } from "@/lib/audit";
 import { academicYearRange } from "@/lib/shift";
-import { earnedShiftReward, outstandingShiftReward } from "@/lib/shift/rewards";
-import { allocateUserShiftReward, ShiftRewardConflictError } from "@/lib/shift/rewards.server";
-import { praesidiumYears } from "@/lib/shift/voucherEligibility";
+import {
+  allocateUserShiftReward,
+  loadVoucherSources,
+  outstandingVouchers,
+  ShiftRewardConflictError,
+} from "@/lib/shift/rewards.server";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import type { AppVoucherEntry } from "./contract";
 
 /**
- * Bonnetjes: verdiend met shiften, uitgegeven aan een toog.
+ * Bonnetjes: verdiend met shiften en met PAL+-sessies, uitgegeven aan een toog.
  *
- * **Het saldo is geen kolom.** Het is `Shift.reward` min
- * `ShiftParticipant.rewardPaid`, opgeteld over alle shiften die voorbij zijn.
+ * **Het saldo is geen kolom.** Het is de beloning min wat er al van af is,
+ * opgeteld over alle shiften en gegeven PAL+-sessies die voorbij zijn
+ * (`loadVoucherSources`).
  * Dat is met opzet zo gebleven: er bestaat al een beheerscherm dat bonnetjes in
  * geld uitbetaalt (`/api/shift/reward`) en een afhaalbalie die er afboekt naar
  * de prijs van een broodje, en die schrijven allemaal in diezelfde kolom. Er een tweede
@@ -40,28 +44,9 @@ export class VoucherError extends Error {
   }
 }
 
-/** Wat deze gebruiker nu kan uitgeven. */
+/** Wat deze gebruiker nu kan uitgeven: shiften en PAL+-sessies samen. */
 export async function voucherBalance(userId: string, now = new Date()): Promise<number> {
-  const [participations, praesidium] = await Promise.all([
-    prisma.shiftParticipant.findMany({
-      where: { userId, shift: { endTime: { lt: now } } },
-      select: { rewardPaid: true, shift: { select: { reward: true, startTime: true } } },
-    }),
-    praesidiumYears([userId]),
-  ]);
-
-  return participations.reduce(
-    (total, participation) =>
-      total +
-      outstandingShiftReward({
-        reward: earnedShiftReward(
-          { userId, reward: participation.shift.reward, startTime: participation.shift.startTime },
-          praesidium,
-        ),
-        rewardPaid: participation.rewardPaid,
-      }),
-    0,
-  );
+  return outstandingVouchers(await loadVoucherSources(prisma, { userId, completedBefore: now }));
 }
 
 /**
@@ -71,19 +56,15 @@ export async function voucherBalance(userId: string, now = new Date()): Promise<
  * een beheerder die bonnetjes in geld uitbetaalt, verhoogt enkel `rewardPaid` en
  * laat hier niets achter. Dat staat er in de app ook bij, want een lijst die niet
  * optelt naar het getal erboven, is anders gewoon verwarrend.
+ *
+ * Een PAL+-sessie die je gaf, staat er als "verdiend" bij, met het vak als
+ * naam: dezelfde bonnetjes, een andere bron.
  */
 export async function voucherOverview(userId: string, now = new Date()) {
   const { start, end } = academicYearRange(now);
 
-  const [participations, theokotRedemptions, redemptions, praesidium] = await Promise.all([
-    prisma.shiftParticipant.findMany({
-      where: { userId, shift: { endTime: { lt: now } } },
-      select: {
-        rewardPaid: true,
-        shift: { select: { id: true, name: true, reward: true, startTime: true, endTime: true } },
-      },
-      orderBy: { shift: { endTime: "desc" } },
-    }),
+  const [sources, theokotRedemptions, redemptions] = await Promise.all([
+    loadVoucherSources(prisma, { userId, completedBefore: now }),
     prisma.theokotVoucherRedemption.findMany({
       where: { userId },
       orderBy: { createdAt: "desc" },
@@ -96,29 +77,22 @@ export async function voucherOverview(userId: string, now = new Date()) {
       take: 40,
       select: { id: true, amount: true, place: true, createdAt: true },
     }),
-    praesidiumYears([userId]),
   ]);
 
-  let balance = 0;
+  const balance = outstandingVouchers(sources);
   let earnedThisYear = 0;
   const history: AppVoucherEntry[] = [];
 
-  for (const { rewardPaid, shift } of participations) {
-    // Een shift uit een praesidiumjaar levert niets op en staat dus ook niet als
-    // verdiend in de historiek.
-    const earned = earnedShiftReward(
-      { userId, reward: shift.reward, startTime: shift.startTime },
-      praesidium,
-    );
-    balance += outstandingShiftReward({ reward: earned, rewardPaid });
-    if (shift.endTime >= start && shift.endTime < end) earnedThisYear += earned;
-    if (earned > 0) {
+  for (const source of sources) {
+    if (source.endsAt >= start && source.endsAt < end) earnedThisYear += source.reward;
+    // Wat niets opleverde (een praesidiumjaar), staat ook niet als verdiend.
+    if (source.reward > 0) {
       history.push({
-        id: `shift:${shift.id}`,
+        id: source.key,
         kind: "earned",
-        amount: earned,
-        label: shift.name,
-        at: shift.endTime.toISOString(),
+        amount: source.reward,
+        label: source.label,
+        at: source.endsAt.toISOString(),
       });
     }
   }

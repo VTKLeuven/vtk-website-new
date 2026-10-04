@@ -102,3 +102,43 @@ describe("shift reward allocation", () => {
     ).toBe(0);
   });
 });
+
+describe("PAL+ in hetzelfde saldo", () => {
+  it("geeft een tutor de beloning, behalve bij een geannuleerde sessie of in een praesidiumjaar", async () => {
+    const { earnedPalPlusReward } = await import("@/lib/shift/rewards");
+    const october = new Date("2026-10-12T12:00:00Z");
+    const none = new Map<string, Set<number>>();
+    const praesidium = new Map([["u1", new Set([2026])]]);
+    expect(earnedPalPlusReward({ userId: "u1", reward: 2, startsAt: october, cancelledAt: null }, none)).toBe(2);
+    expect(earnedPalPlusReward({ userId: "u1", reward: 2, startsAt: october, cancelledAt: october }, none)).toBe(0);
+    expect(earnedPalPlusReward({ userId: "u1", reward: 2, startsAt: october, cancelledAt: null }, praesidium)).toBe(0);
+  });
+
+  it("verdeelt over shiften en PAL+-sessies samen, oudste eerst", async () => {
+    const { allocateVoucherBalances } = await import("@/lib/shift/rewards");
+    const result = allocateVoucherBalances(
+      [
+        { key: "shift:a", reward: 1, rewardPaid: 0 },
+        { key: "pal:s1", reward: 1.5, rewardPaid: 0 },
+        { key: "shift:b", reward: 2, rewardPaid: 0 },
+      ],
+      2,
+    );
+    expect(result.allocations).toEqual([
+      { key: "shift:a", amount: 1, rewardPaid: 1, fullyPaid: true },
+      { key: "pal:s1", amount: 1, rewardPaid: 1, fullyPaid: false },
+    ]);
+    expect(result.remaining).toBe(2.5);
+  });
+
+  it("haalt een te veel uitgegeven correctie uit wat nog openstaat, en laat de rest vallen", async () => {
+    const { settleOverspend } = await import("@/lib/shift/rewards");
+    // Twee teruggenomen, er staat er nog één open: één verschoven, één kwijtgescholden.
+    expect(settleOverspend(2, 1)).toEqual({ moved: 1, forgiven: 1 });
+    // Genoeg open: alles verschoven, niets vervalt.
+    expect(settleOverspend(1.5, 4)).toEqual({ moved: 1.5, forgiven: 0 });
+    // Niets open: alles vervalt, het saldo blijft op nul.
+    expect(settleOverspend(2, 0)).toEqual({ moved: 0, forgiven: 2 });
+    expect(settleOverspend(0, 3)).toEqual({ moved: 0, forgiven: 0 });
+  });
+});

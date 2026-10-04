@@ -456,3 +456,34 @@ export function palPlusWallClockFields(date: Date): { date: string; time: string
   const time = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
   return { date: ymdKey(brusselsYMD(date)), time };
 }
+
+// -----------------------------------------------------------------------------
+// Tutors: de lijst van Onderwijs en de correcties
+// -----------------------------------------------------------------------------
+
+/**
+ * Vanaf zoveel gegeven sessies in een werkingsjaar is iemand een volwaardig
+ * PAL-lid. Voorlopig enkel een markering in de lijst van Onderwijs; het
+ * ontgrendelt niets op de site.
+ */
+export const PAL_PLUS_FULL_MEMBER_SESSIONS = 5;
+
+/** Hoogstens zoveel bonnetjes voor één tutor van één sessie; meer is een tikfout. */
+export const PAL_PLUS_MAX_REWARD = 24;
+
+/**
+ * Een gecorrigeerde beloning zoals Onderwijs ze intikt: "1,5" of "1.5", een
+ * veelvoud van een half, van nul tot `PAL_PLUS_MAX_REWARD`. `null` als het dat
+ * niet is.
+ */
+export function parsePalPlusRewardAmount(raw: string): number | null {
+  const value = Number(raw.trim().replace(",", "."));
+  if (!raw.trim() || !Number.isFinite(value)) return null;
+  if (value < 0 || value > PAL_PLUS_MAX_REWARD) return null;
+  return Number.isInteger(value * 2) ? value : null;
+}
+
+/** Of een tutor met zoveel gegeven sessies een volwaardig PAL-lid is. */
+export function isPalPlusFullMember(sessionsGiven: number): boolean {
+  return sessionsGiven >= PAL_PLUS_FULL_MEMBER_SESSIONS;
+}

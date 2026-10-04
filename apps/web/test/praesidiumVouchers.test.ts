@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => {
   const participantUpdateMany = vi.fn();
   const orderFindUnique = vi.fn();
   const voucherRedemptionCreate = vi.fn();
+  const tutorFindMany = vi.fn();
   return {
     membershipFindMany,
     participantFindMany,
@@ -27,6 +28,8 @@ const mocks = vi.hoisted(() => {
     tx: {
       groupMembership: { findMany: membershipFindMany },
       shiftParticipant: { findMany: participantFindMany, updateMany: participantUpdateMany },
+      // Het saldo telt ook de PAL+-sessies die iemand gaf; hier zijn er geen.
+      palPlusSessionTutor: { findMany: tutorFindMany },
       theokotOrder: { findUnique: orderFindUnique },
       theokotVoucherRedemption: { create: voucherRedemptionCreate },
     },
@@ -132,11 +135,12 @@ describe('afboeken slaat een praesidiumshift over', () => {
 
   beforeEach(() => {
     mocks.membershipFindMany.mockResolvedValue([{ userId: 'u1', year: 2026 }]);
+    mocks.tx.palPlusSessionTutor.findMany.mockResolvedValue([]);
     mocks.participantFindMany.mockResolvedValue([
       // Van voor het praesidiumjaar: 3 open.
-      { shiftId: 'old', rewardPaid: 0, shift: { reward: 3, startTime: MAR_2026 } },
+      { shiftId: 'old', rewardPaid: 0, shift: { reward: 3, startTime: MAR_2026, endTime: MAR_2026, name: 'Oud' } },
       // In het praesidiumjaar: levert niets op, dus ook niets open.
-      { shiftId: 'now', rewardPaid: 0, shift: { reward: 2, startTime: OCT_2026 } },
+      { shiftId: 'now', rewardPaid: 0, shift: { reward: 2, startTime: OCT_2026, endTime: OCT_2026, name: 'Nu' } },
     ]);
     mocks.participantUpdateMany.mockResolvedValue({ count: 1 });
   });
@@ -147,7 +151,7 @@ describe('afboeken slaat een praesidiumshift over', () => {
     const result = await allocate(mocks.tx as never, { userId: 'u1', amount: 3 });
 
     expect(result.available).toBe(3);
-    expect(result.allocations.map((a) => a.shiftId)).toEqual(['old']);
+    expect(result.allocations.map((a) => a.key)).toEqual(['shift:old']);
     expect(mocks.participantUpdateMany).toHaveBeenCalledTimes(1);
   });
 

@@ -14,6 +14,8 @@ import {
   palPlusSessionState,
   palPlusSignupBlock,
   palPlusWallClockFields,
+  parsePalPlusRewardAmount,
+  isPalPlusFullMember,
   reopenedPalPlusStatus,
   PAL_PLUS_LIMITS,
   PAL_PLUS_OTHER_COURSE,
@@ -419,5 +421,26 @@ describe("palPlusWallClockFields", () => {
     expect(palPlusWallClockFields(new Date("2026-10-12T12:00:00Z"))).toEqual({ date: "2026-10-12", time: "14:00" });
     expect(palPlusWallClockFields(new Date("2026-11-09T13:30:00Z"))).toEqual({ date: "2026-11-09", time: "14:30" });
     expect(palPlusWallClockFields(new Date("2026-10-12T22:30:00Z"))).toEqual({ date: "2026-10-13", time: "00:30" });
+  });
+});
+
+describe("tutors: correcties en de markering", () => {
+  it("leest een beloning met komma of punt, in halve bonnetjes", () => {
+    expect(parsePalPlusRewardAmount("1,5")).toBe(1.5);
+    expect(parsePalPlusRewardAmount("2.5")).toBe(2.5);
+    expect(parsePalPlusRewardAmount("0")).toBe(0);
+    expect(parsePalPlusRewardAmount(" 3 ")).toBe(3);
+  });
+
+  it("weigert wat geen halve bonnetjes zijn, negatief is, te groot of leeg", () => {
+    for (const raw of ["1,25", "-1", "25", "", "  ", "veel", "1,5,0"]) {
+      expect(parsePalPlusRewardAmount(raw)).toBeNull();
+    }
+  });
+
+  it("noemt vijf gegeven sessies een volwaardig PAL-lid", () => {
+    expect(isPalPlusFullMember(4)).toBe(false);
+    expect(isPalPlusFullMember(5)).toBe(true);
+    expect(isPalPlusFullMember(9)).toBe(true);
   });
 });

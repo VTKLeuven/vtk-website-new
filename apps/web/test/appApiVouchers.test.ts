@@ -28,6 +28,8 @@ vi.mock("@vtk/db", () => ({
 
 vi.mock("@/lib/shift/rewards.server", () => ({
   allocateUserShiftReward: mocks.allocate,
+  loadVoucherSources: vi.fn(),
+  outstandingVouchers: vi.fn(),
   ShiftRewardConflictError: mocks.FakeConflict,
 }));
 

@@ -5,6 +5,7 @@ import { earnedShiftReward, outstandingShiftReward } from "@/lib/shift/rewards";
 import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import {
   allocateUserShiftReward,
+  loadPalPlusRewardRows,
   ShiftRewardConflictError,
 } from "@/lib/shift/rewards.server";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
@@ -12,7 +13,8 @@ import { logAudit } from "@/lib/audit";
 
 /**
  * Geeft per gebruiker het aantal nog niet toegekende bonnetjes voor voltooide
- * shiften terug. Enkel beschikbaar voor beheerders met `shift.reward`.
+ * shiften en gegeven PAL+-sessies terug: één saldo. Enkel beschikbaar voor
+ * beheerders met `shift.reward`.
  */
 export async function GET() {
   try {
@@ -21,7 +23,8 @@ export async function GET() {
     return authErrorResponse(error);
   }
 
-  const [participations, praesidium] = await Promise.all([
+  const now = new Date();
+  const [participations, praesidium, palRows] = await Promise.all([
     prisma.shiftParticipant.findMany({
       where: { shift: { endTime: { lt: new Date() } } },
       select: {
@@ -32,6 +35,7 @@ export async function GET() {
       },
     }),
     praesidiumYears(),
+    loadPalPlusRewardRows(prisma, { endedBefore: now }),
   ]);
 
   const perUser = new Map<
@@ -41,6 +45,7 @@ export async function GET() {
       name: string;
       email: string;
       unpaidShifts: number;
+      unpaidPalSessions: number;
       totalReward: number;
     }
   >();
@@ -57,11 +62,28 @@ export async function GET() {
       name: user.name,
       email: user.email,
       unpaidShifts: 0,
+      unpaidPalSessions: 0,
       totalReward: 0,
     };
     entry.unpaidShifts += 1;
     entry.totalReward += outstanding;
     perUser.set(userId, entry);
+  }
+
+  for (const row of palRows) {
+    const outstanding = outstandingShiftReward({ reward: row.earned, rewardPaid: row.rewardPaid });
+    if (outstanding === 0) continue;
+    const entry = perUser.get(row.userId) ?? {
+      userId: row.userId,
+      name: row.name,
+      email: row.email,
+      unpaidShifts: 0,
+      unpaidPalSessions: 0,
+      totalReward: 0,
+    };
+    entry.unpaidPalSessions += 1;
+    entry.totalReward += outstanding;
+    perUser.set(row.userId, entry);
   }
 
   return NextResponse.json([...perUser.values()]);
@@ -70,8 +92,9 @@ export async function GET() {
 /**
  * Kent een gekozen aantal bonnetjes toe aan één gebruiker.
  *
- * Body: `{ shiftIds: string[], userId: string, amount: number }`. De toekenning
- * wordt oudste shift eerst verdeeld en mag een shift gedeeltelijk uitbetalen.
+ * Body: `{ shiftIds: string[], palSessionIds?: string[], userId: string, amount: number }`.
+ * De toekenning wordt oudste bron eerst verdeeld, over de gekozen shiften en
+ * PAL+-sessies samen, en mag er één gedeeltelijk uitbetalen.
  */
 export async function POST(request: Request) {
   try {
@@ -88,15 +111,19 @@ export async function POST(request: Request) {
   }
 
   const src = (body ?? {}) as Record<string, unknown>;
-  const { shiftIds, userId, amount } = src;
+  const { shiftIds, palSessionIds, userId, amount } = src;
+  const isStringArray = (value: unknown): value is string[] =>
+    Array.isArray(value) && value.every((item) => typeof item === "string");
 
-  if (
-    !Array.isArray(shiftIds) ||
-    shiftIds.length === 0 ||
-    !shiftIds.every((shiftId) => typeof shiftId === "string")
-  ) {
+  if (!isStringArray(shiftIds) || (palSessionIds !== undefined && !isStringArray(palSessionIds))) {
     return NextResponse.json(
-      { error: "shiftIds must be a non-empty array of strings" },
+      { error: "shiftIds and palSessionIds must be arrays of strings" },
+      { status: 400 },
+    );
+  }
+  if (shiftIds.length === 0 && (palSessionIds?.length ?? 0) === 0) {
+    return NextResponse.json(
+      { error: "pass at least one shiftId or palSessionId" },
       { status: 400 },
     );
   }
@@ -121,7 +148,8 @@ export async function POST(request: Request) {
       allocateUserShiftReward(tx, {
         userId,
         amount,
-        shiftIds: shiftIds as string[],
+        shiftIds,
+        palSessionIds: palSessionIds ?? [],
       }),
     );
 
@@ -134,7 +162,7 @@ export async function POST(request: Request) {
       entity: "shiftReward",
       entityId: userId,
       target: recipient?.name ?? userId,
-      summary: `${amount} bonnetje(s) toegekend over ${result.allocations.length} shift(en)`,
+      summary: `${amount} bonnetje(s) toegekend over ${result.allocations.length} shift(en) of PAL+-sessie(s)`,
     });
 
     return NextResponse.json({

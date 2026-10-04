@@ -8,6 +8,7 @@ import type { Locale } from "@vtk/i18n";
 import { academicYearRange, academicYearRangeFor, currentAcademicYear } from "@/lib/shift";
 import { earnedShiftReward, type PraesidiumYears } from "@/lib/shift/rewards";
 import { praesidiumYears } from "@/lib/shift/voucherEligibility";
+import { loadPalPlusRewardRows } from "@/lib/shift/rewards.server";
 import { ShiftAdmin } from "./ShiftAdmin";
 
 /** `yyyy-MM-dd` → lokale middernacht, of null bij ongeldige invoer. */
@@ -193,6 +194,9 @@ export default async function AdminShifts({
       outstandingShiftCount: number;
       outstandingBonnetjes: number;
       outstandingShiftIds: string[];
+      paidPalCount: number;
+      outstandingPalCount: number;
+      outstandingPalSessionIds: string[];
     }
   >();
   // Een shift uit een praesidiumjaar levert niets op (`earnedShiftReward`). Wat
@@ -212,6 +216,9 @@ export default async function AdminShifts({
         outstandingShiftCount: 0,
         outstandingBonnetjes: 0,
         outstandingShiftIds: [],
+        paidPalCount: 0,
+        outstandingPalCount: 0,
+        outstandingPalSessionIds: [],
       };
     const paid = Math.max(0, Math.min(rewardPaid, shift.reward));
     const earned = earnedShiftReward({ userId, reward: shift.reward, startTime: shift.startTime }, praesidium);
@@ -226,6 +233,40 @@ export default async function AdminShifts({
       entry.outstandingShiftIds.push(shiftId);
     }
     rewardMap.set(userId, entry);
+  }
+  // PAL+-sessies die iemand gaf, tellen in hetzelfde saldo: dezelfde
+  // bonnetjes, op dezelfde manier uit te betalen.
+  const palRewardRows = canReward
+    ? await loadPalPlusRewardRows(prisma, { endedAfter: ay.start, endedBefore: completedBefore })
+    : [];
+  for (const row of palRewardRows) {
+    const entry =
+      rewardMap.get(row.userId) ??
+      {
+        userId: row.userId,
+        name: row.name,
+        email: row.email,
+        paidShiftCount: 0,
+        paidBonnetjes: 0,
+        outstandingShiftCount: 0,
+        outstandingBonnetjes: 0,
+        outstandingShiftIds: [],
+        paidPalCount: 0,
+        outstandingPalCount: 0,
+        outstandingPalSessionIds: [],
+      };
+    const paid = Math.max(0, Math.min(row.rewardPaid, row.reward));
+    const outstanding = Math.max(0, row.earned - paid);
+    if (paid > 0) {
+      entry.paidPalCount += 1;
+      entry.paidBonnetjes += paid;
+    }
+    if (outstanding > 0) {
+      entry.outstandingPalCount += 1;
+      entry.outstandingBonnetjes += outstanding;
+      entry.outstandingPalSessionIds.push(row.sessionId);
+    }
+    rewardMap.set(row.userId, entry);
   }
   const rewards = [...rewardMap.values()];
 

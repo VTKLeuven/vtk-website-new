@@ -372,3 +372,95 @@
   columns: 2;
   column-gap: 24px;
 }
+
+/* --------------------------------------------------------------------------
+   Tutors: de lijst per werkingsjaar en het detail met de correcties
+   -------------------------------------------------------------------------- */
+
+/* Vijf gegeven sessies: een markering, geen beloning. Geel omdat het een
+   toestand is die Onderwijs wil zien, niet omdat er iets te doen is. */
+.vtk-palplus-full {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--yellow);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--ink);
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+
+.vtk-palplus-sessions {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.vtk-palplus-sessions > li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-palplus-sessions > li[data-state='cancelled'] .vtk-palplus-session-title {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.vtk-palplus-session-head {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 6px 16px;
+}
+
+.vtk-palplus-session-title {
+  margin: 0;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vtk-palplus-session-reward {
+  text-align: right;
+  font-size: 14px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-palplus-correction-note {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--paper);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.vtk-palplus-correction-note span:first-child {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.vtk-palplus-correction {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}

@@ -82,18 +82,27 @@ export function outstandingShiftReward(
 }
 
 /**
+ * Eén bron van bonnetjes in een afboeking. Het saldo komt uit twee soorten
+ * bronnen: shiften (`ShiftParticipant`) en PAL+-sessies die je gaf
+ * (`PalPlusSessionTutor`). `key` onderscheidt ze ("shift:<id>", "pal:<sessie>");
+ * de verdeling zelf kijkt enkel naar beloning en wat er al van af is.
+ */
+export type VoucherBalance = { key: string; reward: number; rewardPaid: number };
+export type VoucherAllocation = { key: string; amount: number; rewardPaid: number; fullyPaid: boolean };
+
+/**
  * Verdeelt een uitbetaling in de aangeleverde volgorde. De caller sorteert de
- * deelnames dus eerst op shift-datum, zodat de oudste openstaande bonnetjes
- * als eerste worden toegekend.
+ * bronnen dus eerst op datum, zodat de oudste openstaande bonnetjes als eerste
+ * worden toegekend, of ze nu van een shift of van een PAL+-sessie komen.
  *
  * Aanvaardt halve bonnetjes, want dat is wat een broodje kan kosten. Dat enkel
  * hele bonnetjes fysiek meegegeven worden, is een regel van het uitbetalen en
  * van de toog, en staat daar (`/api/shift/reward`, `redeemVouchers`).
  */
-export function allocateShiftReward(
-  balances: ShiftRewardBalance[],
+export function allocateVoucherBalances(
+  balances: VoucherBalance[],
   requestedAmount: number,
-): { allocations: ShiftRewardAllocation[]; available: number; remaining: number } {
+): { allocations: VoucherAllocation[]; available: number; remaining: number } {
   const available = balances.reduce(
     (total, balance) => total + outstandingShiftReward(balance),
     0,
@@ -107,7 +116,7 @@ export function allocateShiftReward(
   }
 
   let toAllocate = requestedAmount;
-  const allocations: ShiftRewardAllocation[] = [];
+  const allocations: VoucherAllocation[] = [];
 
   for (const balance of balances) {
     if (toAllocate === 0) break;
@@ -117,7 +126,7 @@ export function allocateShiftReward(
     const amount = Math.min(outstanding, toAllocate);
     const rewardPaid = balance.rewardPaid + amount;
     allocations.push({
-      shiftId: balance.shiftId,
+      key: balance.key,
       amount,
       rewardPaid,
       fullyPaid: rewardPaid >= balance.reward,
@@ -130,4 +139,44 @@ export function allocateShiftReward(
     available,
     remaining: available - requestedAmount,
   };
+}
+
+/** `allocateVoucherBalances` voor enkel shiften, met de shift-id als sleutel. */
+export function allocateShiftReward(
+  balances: ShiftRewardBalance[],
+  requestedAmount: number,
+): { allocations: ShiftRewardAllocation[]; available: number; remaining: number } {
+  const result = allocateVoucherBalances(
+    balances.map((balance) => ({ key: balance.shiftId, reward: balance.reward, rewardPaid: balance.rewardPaid })),
+    requestedAmount,
+  );
+  return {
+    ...result,
+    allocations: result.allocations.map(({ key, ...rest }) => ({ shiftId: key, ...rest })),
+  };
+}
+
+/**
+ * Wat een PAL+-sessie een tutor oplevert: de momentopname `reward`, nul voor
+ * een geannuleerde sessie (die ging niet door), en nul in een praesidiumjaar,
+ * dezelfde regel als bij een shift (`earnedShiftReward`).
+ */
+export function earnedPalPlusReward(
+  tutor: { userId: string; reward: number; startsAt: Date; cancelledAt: Date | null },
+  praesidium: PraesidiumYears,
+): number {
+  if (tutor.cancelledAt) return 0;
+  return earnedShiftReward({ userId: tutor.userId, reward: tutor.reward, startTime: tutor.startsAt }, praesidium);
+}
+
+/**
+ * Een correctie of annulering die onder wat al uitgegeven is zakt: het verschil
+ * (`excess`) komt uit de andere openstaande bonnetjes (`available`), en wat daar
+ * niet in past, vervalt. Een saldo gaat nooit onder nul. Zie "Een correctie gaat
+ * nooit onder nul" in docs/design-decisions.md.
+ */
+export function settleOverspend(excess: number, available: number): { moved: number; forgiven: number } {
+  const owed = Math.max(0, excess);
+  const moved = Math.min(owed, Math.max(0, available));
+  return { moved, forgiven: owed - moved };
 }

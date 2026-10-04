@@ -23,6 +23,9 @@ import { palPlusMemberErrors } from "@/lib/palPlusMessages";
 import { PalPlusRequestForm, type OpenRequestHint } from "./PalPlusRequestForm";
 import { BackingButton, type BackingCopy } from "./BackingButton";
 import { SignupButton, type SignupCopy } from "./SignupButton";
+import { AttendanceList, type AttendanceCopy, type AttendanceEntry } from "@/components/palPlus/AttendanceList";
+import { earnedPalPlusReward } from "@/lib/shift/rewards";
+import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 
 import "@/app/design/vtk-base.css";
 import "@/app/design/vtk-palplus-page.css";
@@ -41,6 +44,9 @@ import "@/app/design/vtk-palplus-page.css";
  */
 
 type Params = Promise<{ locale: string }>;
+
+/** Hoe lang een gegeven sessie onder "Sessies die je gaf" blijft staan. */
+const TUTORED_DAYS = 30;
 type SearchParams = Promise<{ formulier?: string; vraag?: string }>;
 
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
@@ -177,17 +183,54 @@ export default async function PalPlusPage({
   const teachingIds = userId
     ? sessionRows.filter((row) => row.tutors.some((tutor) => tutor.userId === userId)).map((row) => row.id)
     : [];
-  const attendeeNames = new Map<string, string[]>();
-  if (teachingIds.length > 0) {
+  // Wat een tutor de voorbije maand gaf: daar duidt hij aan wie er kwam en ziet
+  // hij wat het opleverde. De agenda hierboven toont enkel wat nog komt.
+  const tutoredRows = userId
+    ? await prisma.palPlusSession.findMany({
+        where: {
+          tutors: { some: { userId } },
+          cancelledAt: null,
+          endsAt: { lte: now, gt: new Date(now.getTime() - TUTORED_DAYS * 86_400_000) },
+        },
+        orderBy: { startsAt: "desc" },
+        select: {
+          id: true,
+          startsAt: true,
+          endsAt: true,
+          cancelledAt: true,
+          course: { select: courseSelect },
+          tutors: { where: { userId }, select: { reward: true } },
+        },
+      })
+    : [];
+  const praesidium = tutoredRows.length > 0 && userId ? await praesidiumYears([userId]) : new Map();
+
+  const attendeesBySession = new Map<string, AttendanceEntry[]>();
+  const attendeeSessionIds = [...teachingIds, ...tutoredRows.map((row) => row.id)];
+  if (attendeeSessionIds.length > 0) {
     const rows = await prisma.palPlusSessionAttendee.findMany({
-      where: { sessionId: { in: teachingIds } },
+      where: { sessionId: { in: attendeeSessionIds } },
       orderBy: { createdAt: "asc" },
-      select: { sessionId: true, user: { select: { name: true } } },
+      select: { sessionId: true, userId: true, attended: true, user: { select: { name: true } } },
     });
     for (const row of rows) {
-      attendeeNames.set(row.sessionId, [...(attendeeNames.get(row.sessionId) ?? []), row.user.name]);
+      attendeesBySession.set(row.sessionId, [
+        ...(attendeesBySession.get(row.sessionId) ?? []),
+        { userId: row.userId, name: row.user.name, attended: row.attended },
+      ]);
     }
   }
+  const attendeeNames = new Map(
+    [...attendeesBySession].map(([sessionId, entries]) => [sessionId, entries.map((entry) => entry.name)]),
+  );
+  const attendanceCopy: AttendanceCopy = {
+    came: t.sessions.came,
+    didNotCome: t.sessions.didNotCome,
+    summary: t.sessions.summary,
+    notMarked: t.sessions.notMarked,
+    errors: palPlusMemberErrors(nl),
+    fallbackError: t.sessions.attendanceError,
+  };
 
   const askersLabel = (count: number) =>
     count === 1 ? t.open.askersOne : t.open.askersMany.replace("{count}", String(count));
@@ -422,6 +465,12 @@ export default async function PalPlusPage({
                                 <p className="pp-reason-label">{t.sessions.attendeesTitle}</p>
                                 {names.length === 0 ? (
                                   <p className="pp-empty">{t.sessions.noAttendees}</p>
+                                ) : state === "running" ? (
+                                  <AttendanceList
+                                    sessionId={row.id}
+                                    attendees={attendeesBySession.get(row.id) ?? []}
+                                    copy={attendanceCopy}
+                                  />
                                 ) : (
                                   <ul>
                                     {names.map((name, index) => (
@@ -470,6 +519,53 @@ export default async function PalPlusPage({
             </div>
           )}
         </section>
+
+        {tutoredRows.length > 0 && (
+          <section className="pp-section" aria-labelledby="pp-tutored-title">
+            <div className="pp-section-head">
+              <h2 id="pp-tutored-title" className="pp-section-title">
+                {t.sessions.tutoredTitle}
+              </h2>
+              <p>{t.sessions.tutoredIntro}</p>
+            </div>
+            <ul className="pp-mine">
+              {tutoredRows.map((row) => {
+                const earned = userId
+                  ? earnedPalPlusReward(
+                      {
+                        userId,
+                        reward: row.tutors[0]?.reward ?? 0,
+                        startsAt: row.startsAt,
+                        cancelledAt: row.cancelledAt,
+                      },
+                      praesidium,
+                    )
+                  : 0;
+                const attendees = attendeesBySession.get(row.id) ?? [];
+                return (
+                  <li key={row.id} className="vtk-panel pp-mine-item">
+                    <div className="pp-mine-head">
+                      <span className="pp-kind">{moment(row.startsAt, row.endsAt)}</span>
+                      <span className="pp-status" data-status={earned > 0 ? "PLANNED" : "CLOSED"}>
+                        {earned === 0
+                          ? t.sessions.rewardNone
+                          : earned === 1
+                            ? t.sessions.rewardOne
+                            : t.sessions.rewardMany.replace("{amount}", earned.toLocaleString(nl ? "nl-BE" : "en-GB"))}
+                      </span>
+                    </div>
+                    <p className="pp-course">{palPlusCourseLabel(row.course, locale)}</p>
+                    {attendees.length === 0 ? (
+                      <p className="pp-empty">{t.sessions.nobody}</p>
+                    ) : (
+                      <AttendanceList sessionId={row.id} attendees={attendees} copy={attendanceCopy} />
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+          </section>
+        )}
 
         {mineRows.length > 0 && (
           <section className="pp-section" id="jouw-aanvragen" aria-labelledby="pp-mine-title">

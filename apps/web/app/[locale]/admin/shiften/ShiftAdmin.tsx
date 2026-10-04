@@ -39,6 +39,10 @@ export type RewardRow = {
   outstandingShiftCount: number;
   outstandingBonnetjes: number;
   outstandingShiftIds: string[];
+  /** PAL+-sessies die deze persoon gaf: dezelfde bonnetjes, een andere bron. */
+  paidPalCount: number;
+  outstandingPalCount: number;
+  outstandingPalSessionIds: string[];
 };
 export type Capabilities = {
   canEdit: boolean;

@@ -1221,7 +1221,18 @@
       "noAttendees": "Nog niemand ingeschreven.",
       "signedUpToast": "Je bent ingeschreven.",
       "leftToast": "Je bent uitgeschreven.",
-      "error": "Niet gelukt. Probeer het opnieuw."
+      "error": "Niet gelukt. Probeer het opnieuw.",
+      "came": "Kwam",
+      "didNotCome": "Kwam niet",
+      "summary": "{came} van {total} kwamen.",
+      "notMarked": "{count} nog niet aangeduid.",
+      "tutoredTitle": "Sessies die je gaf",
+      "tutoredIntro": "Duid aan wie er kwam. Dat helpt Onderwijs; het verandert niets aan je bonnetjes.",
+      "rewardOne": "1 bonnetje",
+      "rewardMany": "{amount} bonnetjes",
+      "rewardNone": "Geen bonnetjes (praesidiumjaar)",
+      "nobody": "Niemand schreef zich in.",
+      "attendanceError": "Niet opgeslagen. Probeer het opnieuw."
     },
     "open": {
       "title": "Open vragen",

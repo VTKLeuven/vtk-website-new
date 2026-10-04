@@ -3,7 +3,10 @@
 import { revalidatePath } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
+import { hasPermission } from "@vtk/auth";
 import { getCurrentSession, requirePermission } from "@/lib/session";
+import { withSerializableTransaction } from "@/lib/ticketing/transactions";
+import { settlePalPlusOverspend, ShiftRewardConflictError } from "@/lib/shift/rewards.server";
 import { toMessageText, toSingleLine } from "@/lib/contactForm";
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
@@ -17,6 +20,7 @@ import {
   palPlusWallClockFields,
   parsePalPlusCourse,
   parsePalPlusRequest,
+  parsePalPlusRewardAmount,
   parsePalPlusSession,
   reopenedPalPlusStatus,
   PAL_PLUS_LIMITS,
@@ -556,12 +560,6 @@ export async function savePalPlusSessionAction(
     roomId: data.roomId,
     roomText: data.roomText,
   };
-  const linkRequests = (sessionId: string) =>
-    prisma.palPlusRequest.updateMany({
-      where: { id: { in: requestIds }, status: { in: [...ACTIVE_STATUSES] } },
-      data: { status: "PLANNED", sessionId },
-    });
-
   if (id) {
     const existing = await prisma.palPlusSession.findUnique({
       where: { id },
@@ -585,24 +583,40 @@ export async function savePalPlusSessionAction(
       existing.startsAt.getTime() !== data.startsAt.getTime() ||
       existing.endsAt.getTime() !== data.endsAt.getTime();
 
-    await prisma.$transaction([
-      prisma.palPlusSession.update({ where: { id }, data: fields }),
-      prisma.palPlusSessionTutor.deleteMany({
-        where: { sessionId: id, userId: { in: removed.map((tutor) => tutor.userId) } },
-      }),
-      ...data.tutorIds
-        .filter((userId) => !current.has(userId))
-        .map((userId) => prisma.palPlusSessionTutor.create({ data: { sessionId: id, userId, reward } })),
-      ...(timesChanged
-        ? [
-            prisma.palPlusSessionTutor.updateMany({
-              where: { sessionId: id, rewardCorrectedAt: null },
-              data: { reward },
-            }),
-          ]
-        : []),
-      linkRequests(id),
-    ]);
+    try {
+      await withSerializableTransaction(async (tx) => {
+        await tx.palPlusSession.update({ where: { id }, data: fields });
+        await tx.palPlusSessionTutor.deleteMany({
+          where: { sessionId: id, userId: { in: removed.map((tutor) => tutor.userId) } },
+        });
+        for (const userId of data.tutorIds.filter((tutorId) => !current.has(tutorId))) {
+          await tx.palPlusSessionTutor.create({ data: { sessionId: id, userId, reward } });
+        }
+        if (timesChanged) {
+          // De beloning volgt het nieuwe moment, behalve na een correctie met
+          // de hand. Zakt ze onder wat een tutor al uitgaf (een ingekorte
+          // sessie), dan komt het verschil uit zijn andere bonnetjes.
+          const followers = await tx.palPlusSessionTutor.findMany({
+            where: { sessionId: id, rewardCorrectedAt: null },
+            select: { userId: true },
+          });
+          await tx.palPlusSessionTutor.updateMany({
+            where: { sessionId: id, rewardCorrectedAt: null },
+            data: { reward },
+          });
+          for (const follower of followers) {
+            await settlePalPlusOverspend(tx, { sessionId: id, userId: follower.userId, ceiling: reward });
+          }
+        }
+        await tx.palPlusRequest.updateMany({
+          where: { id: { in: requestIds }, status: { in: [...ACTIVE_STATUSES] } },
+          data: { status: "PLANNED", sessionId: id },
+        });
+      });
+    } catch (err) {
+      if (err instanceof ShiftRewardConflictError) return saveError("REWARD_CONFLICT");
+      throw err;
+    }
     await logAudit({
       action: "update",
       entity: "palPlusSession",
@@ -658,29 +672,181 @@ export async function cancelPalPlusSessionAction(
 
   const existing = await prisma.palPlusSession.findUnique({
     where: { id },
-    select: { cancelledAt: true, startsAt: true, course: { select: { code: true, nameNl: true, nameEn: true } } },
+    select: {
+      cancelledAt: true,
+      startsAt: true,
+      course: { select: { code: true, nameNl: true, nameEn: true } },
+      tutors: { select: { userId: true, rewardPaid: true } },
+    },
   });
   if (!existing) return saveError("SESSION_GONE");
   if (existing.cancelledAt) return saveError("SESSION_CANCELLED");
 
-  await prisma.$transaction([
-    prisma.palPlusSession.update({
-      where: { id },
-      data: { cancelledAt: new Date(), cancelReason: reason },
-    }),
-    prisma.palPlusRequest.updateMany({
-      where: { sessionId: id, kind: "FOLLOW", status: "PLANNED" },
-      data: { status: "OPEN", sessionId: null },
-    }),
-  ]);
+  let forgiven = 0;
+  try {
+    forgiven = await withSerializableTransaction(async (tx) => {
+      await tx.palPlusSession.update({
+        where: { id },
+        data: { cancelledAt: new Date(), cancelReason: reason },
+      });
+      await tx.palPlusRequest.updateMany({
+        where: { sessionId: id, kind: "FOLLOW", status: "PLANNED" },
+        data: { status: "OPEN", sessionId: null },
+      });
+      // Ging de sessie achteraf niet door, dan levert ze niets op. Wat een tutor
+      // er al van uitgaf, komt uit zijn andere openstaande bonnetjes; wat daar
+      // niet in past, vervalt.
+      let lost = 0;
+      for (const tutor of existing.tutors) {
+        if (tutor.rewardPaid <= 0) continue;
+        lost += (await settlePalPlusOverspend(tx, { sessionId: id, userId: tutor.userId, ceiling: 0 })).forgiven;
+      }
+      return lost;
+    });
+  } catch (err) {
+    if (err instanceof ShiftRewardConflictError) return saveError("REWARD_CONFLICT");
+    throw err;
+  }
 
   await logAudit({
     action: "cancel",
     entity: "palPlusSession",
     entityId: id,
     target: sessionAuditTarget(existing.course, existing.startsAt),
-    summary: reason,
+    summary: forgiven > 0 ? `${reason} (${forgiven} uitgegeven bonnetje(s) kwijtgescholden)` : reason,
   });
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
+// -----------------------------------------------------------------------------
+// Beheer: beloning corrigeren
+// -----------------------------------------------------------------------------
+
+/**
+ * De beloning van één tutor voor één sessie met de hand aanpassen (een tutor die
+ * er niet was, een sessie die veel korter duurde). Ging een sessie helemaal niet
+ * door, dan annuleer je ze; dat is iets anders.
+ *
+ * Zakt de beloning onder wat de tutor al uitgaf, dan komt het verschil uit zijn
+ * andere openstaande bonnetjes en vervalt wat daar niet in past: een saldo gaat
+ * nooit onder nul. De melding zegt wat er gebeurde.
+ */
+export async function correctPalPlusRewardAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const actor = await requirePermission("pal.manage");
+  const sessionId = toSingleLine(formData.get("sessionId"));
+  const userId = toSingleLine(formData.get("userId"));
+  const nl = formData.get("locale") !== "en";
+  const amount = parsePalPlusRewardAmount(toSingleLine(formData.get("amount")));
+  if (amount === null) return saveError("AMOUNT_INVALID");
+  const note = toMessageText(formData.get("note"));
+  if (!note) return saveError("NOTE_REQUIRED");
+  if (note.length > PAL_PLUS_LIMITS.reviewNote) return saveError("NOTE_TOO_LONG");
+
+  const row = await prisma.palPlusSessionTutor.findUnique({
+    where: { sessionId_userId: { sessionId, userId } },
+    select: {
+      reward: true,
+      user: { select: { name: true } },
+      session: { select: { startsAt: true, course: { select: { code: true, nameNl: true, nameEn: true } } } },
+    },
+  });
+  if (!row) return saveError("TUTOR_GONE");
+
+  let result: { moved: number; forgiven: number };
+  try {
+    result = await withSerializableTransaction(async (tx) => {
+      await tx.palPlusSessionTutor.update({
+        where: { sessionId_userId: { sessionId, userId } },
+        data: {
+          reward: amount,
+          rewardCorrectedAt: new Date(),
+          rewardCorrectedById: actor.user.id,
+          rewardNote: note,
+        },
+      });
+      return settlePalPlusOverspend(tx, { sessionId, userId, ceiling: amount });
+    });
+  } catch (err) {
+    if (err instanceof ShiftRewardConflictError) return saveError("REWARD_CONFLICT");
+    throw err;
+  }
+
+  const summary = [
+    `beloning ${row.user.name}: ${row.reward} -> ${amount}`,
+    result.moved > 0 ? `${result.moved} uit andere bonnetjes` : null,
+    result.forgiven > 0 ? `${result.forgiven} kwijtgescholden` : null,
+    note,
+  ]
+    .filter(Boolean)
+    .join("; ");
+  await logAudit({
+    action: "update",
+    entity: "palPlusSession",
+    entityId: sessionId,
+    target: sessionAuditTarget(row.session.course, row.session.startsAt),
+    summary,
+  });
+  revalidatePalPlusEverywhere();
+
+  if (result.moved === 0 && result.forgiven === 0) return saveOk();
+  const vouchers = (value: number) =>
+    nl ? `${value.toLocaleString("nl-BE")} ${value === 1 ? "bonnetje" : "bonnetjes"}` : `${value.toLocaleString("en-GB")} ${value === 1 ? "voucher" : "vouchers"}`;
+  const parts = nl
+    ? [
+        "Beloning aangepast.",
+        result.moved > 0 ? `${vouchers(result.moved)} kwam uit andere openstaande bonnetjes.` : null,
+        result.forgiven > 0 ? `${vouchers(result.forgiven)} was al uitgegeven en vervalt; het saldo staat op nul.` : null,
+      ]
+    : [
+        "Reward corrected.",
+        result.moved > 0 ? `${vouchers(result.moved)} came out of other outstanding vouchers.` : null,
+        result.forgiven > 0 ? `${vouchers(result.forgiven)} was already spent and is written off; the balance is at zero.` : null,
+      ];
+  return saveOk(parts.filter(Boolean).join(" "));
+}
+
+// -----------------------------------------------------------------------------
+// Aanwezigheid
+// -----------------------------------------------------------------------------
+
+/**
+ * Aanduiden of iemand echt kwam: door een tutor van die sessie of door
+ * Onderwijs, zodra de sessie begonnen is. Puur informatie voor Onderwijs; het
+ * raakt de bonnetjes van de tutor niet.
+ */
+export async function setPalPlusAttendanceAction(formData: FormData): Promise<SaveState> {
+  const session = await getCurrentSession();
+  if (!session) return saveError("LOGIN_REQUIRED");
+  const sessionId = toSingleLine(formData.get("sessionId"));
+  const attendeeId = toSingleLine(formData.get("userId"));
+  const raw = toSingleLine(formData.get("attended"));
+  const attended = raw === "yes" ? true : raw === "no" ? false : null;
+
+  const row = await prisma.palPlusSession.findUnique({
+    where: { id: sessionId },
+    select: {
+      startsAt: true,
+      endsAt: true,
+      cancelledAt: true,
+      tutors: { where: { userId: session.user.id }, select: { userId: true } },
+    },
+  });
+  if (!row) return saveError("SESSION_GONE");
+  if (row.tutors.length === 0 && !hasPermission(session, "pal.manage")) return saveError("NOT_ALLOWED");
+  const state = palPlusSessionState(row, new Date());
+  if (state === "cancelled") return saveError("CANCELLED");
+  if (state === "upcoming") return saveError("NOT_STARTED");
+
+  const updated = await prisma.palPlusSessionAttendee.updateMany({
+    where: { sessionId, userId: attendeeId },
+    data: { attended },
+  });
+  if (updated.count === 0) return saveError("SESSION_GONE");
+
   revalidatePalPlusEverywhere();
   return saveOk();
 }

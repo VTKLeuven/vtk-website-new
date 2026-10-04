@@ -1,0 +1,73 @@
+/* PAL+: wie er kwam (components/palPlus/AttendanceList.tsx).
+   Gedeeld door het beheer en door de tutor op /pal-plus, en daarom een eigen
+   bestand: zo laadt de publieke pagina geen beheerstijl en omgekeerd. */
+
+.pp-attendance {
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.pp-attendance-summary {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.pp-attendance ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.pp-attendance li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+}
+
+.pp-attendance-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pp-attendance-choice {
+  display: inline-flex;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.pp-attendance-choice button {
+  padding: 3px 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--ink);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.pp-attendance-choice button + button {
+  border-left: 1px solid var(--line-2);
+}
+
+/* De gekozen toestand: geel voor "kwam", een donkere vulling voor "kwam niet",
+   zodat de twee ook zonder kleurzicht te onderscheiden zijn. */
+.pp-attendance-choice button[aria-pressed='true']:first-child {
+  background: var(--yellow);
+  font-weight: 600;
+}
+
+.pp-attendance-choice button[aria-pressed='true']:last-child {
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+}
+
+.pp-attendance-choice button:disabled {
+  cursor: progress;
+}

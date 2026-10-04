@@ -6,7 +6,8 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { Modal } from "../admin-table";
 import { cancelPalPlusSessionAction } from "@/app/actions/palPlus";
 import { PAL_PLUS_LIMITS, type PalPlusSessionState } from "@/lib/palPlus";
-import { palPlusSessionErrors } from "@/lib/palPlusMessages";
+import { palPlusMemberErrors, palPlusSessionErrors } from "@/lib/palPlusMessages";
+import { AttendanceList, type AttendanceEntry } from "@/components/palPlus/AttendanceList";
 import {
   SessionForm,
   type Person,
@@ -23,7 +24,7 @@ export type PalPlusSessionView = {
   state: PalPlusSessionState;
   roomLabel: string | null;
   tutors: (Person & { rewardLabel: string })[];
-  attendees: string[];
+  attendees: AttendanceEntry[];
   attendeeCount: number;
   maxParticipants: number | null;
   cancelReason: string | null;
@@ -260,10 +261,23 @@ function SessionDetail({
         </h3>
         {session.attendees.length === 0 ? (
           <p className="text-sm text-vtk-muted">{nl ? "Nog niemand." : "Nobody yet."}</p>
+        ) : started && !cancelled ? (
+          <AttendanceList
+            sessionId={session.id}
+            attendees={session.attendees}
+            copy={{
+              came: nl ? "Kwam" : "Came",
+              didNotCome: nl ? "Kwam niet" : "Did not come",
+              summary: nl ? "{came} van {total} kwamen." : "{came} of {total} came.",
+              notMarked: nl ? "{count} nog niet aangeduid." : "{count} not marked yet.",
+              errors: palPlusMemberErrors(nl),
+              fallbackError: nl ? "Niet opgeslagen." : "Not saved.",
+            }}
+          />
         ) : (
           <ul className="vtk-palplus-names vtk-palplus-names-cols">
-            {session.attendees.map((name, index) => (
-              <li key={`${name}-${index}`}>{name}</li>
+            {session.attendees.map((attendee) => (
+              <li key={attendee.userId}>{attendee.name}</li>
             ))}
           </ul>
         )}

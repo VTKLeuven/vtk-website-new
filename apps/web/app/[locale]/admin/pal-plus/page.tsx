@@ -16,6 +16,17 @@ import {
 import { CoursesCard, type PalPlusCourseView } from "./CoursesCard";
 import { RequestsBoard, type OpenFollowRequest, type PalPlusRequestView } from "./RequestsBoard";
 import { SessionsBoard, type PalPlusSessionView } from "./SessionsBoard";
+import { TutorsBoard, type TutorView } from "./TutorsBoard";
+import { workingYearOf } from "@vtk/auth";
+import { earnedPalPlusReward } from "@/lib/shift/rewards";
+import { praesidiumYears } from "@/lib/shift/voucherEligibility";
+import {
+  currentWorkingYear,
+  formatWorkingYear,
+  parseWorkingYear,
+  workingYearStart,
+  workingYearTabs,
+} from "@/lib/workingYear";
 import type { RoomGroup } from "./SessionForm";
 
 import "@/app/design/vtk-palplus.css";
@@ -26,12 +37,13 @@ import "@/app/design/vtk-palplus.css";
  * komen er als tab bij. Zie docs/design-decisions.md ("PAL+").
  */
 
-const TABS = ["aanvragen", "sessies", "verwerkt", "vakken"] as const;
+const TABS = ["aanvragen", "sessies", "tutors", "verwerkt", "vakken"] as const;
 type Tab = (typeof TABS)[number];
 
 const TAB_LABELS: Record<Tab, { nl: string; en: string }> = {
   aanvragen: { nl: "Aanvragen", en: "Requests" },
   sessies: { nl: "Sessies", en: "Sessions" },
+  tutors: { nl: "Tutors", en: "Tutors" },
   verwerkt: { nl: "Verwerkt", en: "Processed" },
   vakken: { nl: "Vakken", en: "Courses" },
 };
@@ -44,7 +56,7 @@ export default async function AdminPalPlusPage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ tab?: string }>;
+  searchParams: Promise<{ tab?: string; jaar?: string }>;
 }) {
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
@@ -54,7 +66,7 @@ export default async function AdminPalPlusPage({
 
   await requirePermission("pal.manage");
 
-  const { tab: tabParam } = await searchParams;
+  const { tab: tabParam, jaar } = await searchParams;
   const tab: Tab = (TABS as readonly string[]).includes(tabParam ?? "") ? (tabParam as Tab) : "aanvragen";
 
   const [courseRows, queueCount, roomPendingCount] = await Promise.all([
@@ -111,7 +123,9 @@ export default async function AdminPalPlusPage({
         ))}
       </nav>
 
-      {tab === "sessies" ? (
+      {tab === "tutors" ? (
+        <TutorsTab nl={nl} base={base} locale={locale} year={parseWorkingYear(jaar)} />
+      ) : tab === "sessies" ? (
         <SessionsBoard nl={nl} {...await loadSessions(locale)} courses={sessionCourses} rooms={await loadRooms()} />
       ) : tab === "vakken" ? (
         <CoursesCard
@@ -326,7 +340,10 @@ async function loadSessions(locale: Locale): Promise<{ upcoming: PalPlusSessionV
       orderBy: { createdAt: "asc" },
       select: { reward: true, user: { select: { id: true, name: true } } },
     },
-    attendees: { orderBy: { createdAt: "asc" }, select: { user: { select: { name: true } } } },
+    attendees: {
+      orderBy: { createdAt: "asc" },
+      select: { userId: true, attended: true, user: { select: { name: true } } },
+    },
     requests: {
       select: { kind: true, status: true, user: { select: { name: true } } },
     },
@@ -377,7 +394,11 @@ async function loadSessions(locale: Locale): Promise<{ upcoming: PalPlusSessionV
         name: tutor.user.name,
         rewardLabel: vouchers(tutor.reward),
       })),
-      attendees: row.attendees.map((attendee) => attendee.user.name),
+      attendees: row.attendees.map((attendee) => ({
+        userId: attendee.userId,
+        name: attendee.user.name,
+        attended: attendee.attended,
+      })),
       attendeeCount: row.attendees.length,
       maxParticipants: row.maxParticipants,
       cancelReason: row.cancelReason,
@@ -401,4 +422,165 @@ async function loadSessions(locale: Locale): Promise<{ upcoming: PalPlusSessionV
   };
 
   return { upcoming: upcomingRows.map(toView), past: pastRows.map(toView) };
+}
+
+/** De tab Tutors: de werkingsjaren als knoppen, en de lijst van het gekozen jaar. */
+async function TutorsTab({
+  nl,
+  base,
+  locale,
+  year,
+}: {
+  nl: boolean;
+  base: string;
+  locale: Locale;
+  year: number;
+}) {
+  const [tutors, sessionStarts] = await Promise.all([
+    loadTutors(year, locale),
+    prisma.palPlusSession.findMany({ select: { startsAt: true } }),
+  ]);
+  const years = workingYearTabs([...new Set(sessionStarts.map((row) => workingYearOf(row.startsAt)))]);
+
+  return (
+    <div className="space-y-4">
+      {years.length > 1 && (
+        <nav className="flex flex-wrap gap-2" aria-label={nl ? "Werkingsjaar" : "Working year"}>
+          {years.map((value) => (
+            <Link
+              key={value}
+              href={`${base}/admin/pal-plus?tab=tutors${value === currentWorkingYear() ? "" : `&jaar=${value}`}`}
+              aria-current={value === year ? "page" : undefined}
+              className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                value === year
+                  ? "border-vtk-ink bg-vtk-blue-soft text-vtk-ink"
+                  : "border-vtk-blue/15 text-vtk-muted hover:bg-vtk-blue-soft/60"
+              }`}
+            >
+              {formatWorkingYear(value)}
+            </Link>
+          ))}
+        </nav>
+      )}
+      <TutorsBoard nl={nl} tutors={tutors} />
+    </div>
+  );
+}
+
+/**
+ * Wie in één werkingsjaar (15 juli tot 15 juli) sessies gaf, met per sessie de
+ * beloning volgens dezelfde regels als het saldo (`earnedPalPlusReward`).
+ */
+async function loadTutors(year: number, locale: Locale): Promise<TutorView[]> {
+  const nl = locale === "nl";
+  const now = new Date();
+  const rows = await prisma.palPlusSessionTutor.findMany({
+    where: { session: { startsAt: { gte: workingYearStart(year), lt: workingYearStart(year + 1) } } },
+    orderBy: { session: { startsAt: "asc" } },
+    select: {
+      userId: true,
+      reward: true,
+      rewardPaid: true,
+      rewardCorrectedAt: true,
+      rewardNote: true,
+      rewardCorrectedBy: { select: { name: true } },
+      user: { select: { name: true, email: true } },
+      session: {
+        select: {
+          id: true,
+          startsAt: true,
+          endsAt: true,
+          cancelledAt: true,
+          course: { select: { code: true, nameNl: true, nameEn: true } },
+          attendees: { select: { attended: true } },
+        },
+      },
+    },
+  });
+  const praesidium = await praesidiumYears([...new Set(rows.map((row) => row.userId))]);
+
+  const dayFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+    timeZone: "Europe/Brussels",
+  });
+  const timeFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: "Europe/Brussels",
+  });
+  const dateFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+    day: "numeric",
+    month: "short",
+    timeZone: "Europe/Brussels",
+  });
+
+  const byUser = new Map<string, TutorView>();
+  for (const row of rows) {
+    const session = row.session;
+    const state = palPlusSessionState(session, now);
+    const earned = earnedPalPlusReward(
+      { userId: row.userId, reward: row.reward, startsAt: session.startsAt, cancelledAt: session.cancelledAt },
+      praesidium,
+    );
+    const hours = (session.endsAt.getTime() - session.startsAt.getTime()) / 3_600_000;
+    const attendance = {
+      came: session.attendees.filter((attendee) => attendee.attended === true).length,
+      notCame: session.attendees.filter((attendee) => attendee.attended === false).length,
+      open: session.attendees.filter((attendee) => attendee.attended === null).length,
+      total: session.attendees.length,
+    };
+
+    const tutor =
+      byUser.get(row.userId) ??
+      ({
+        userId: row.userId,
+        name: row.user.name,
+        email: row.user.email,
+        given: 0,
+        upcoming: 0,
+        hours: 0,
+        earned: 0,
+        paid: 0,
+        praesidium: false,
+        attendance: { came: 0, open: 0, total: 0 },
+        sessions: [],
+      } satisfies TutorView);
+
+    if (state === "past") {
+      tutor.given += 1;
+      tutor.hours += hours;
+      tutor.earned += earned;
+      tutor.attendance.came += attendance.came;
+      tutor.attendance.open += attendance.open;
+      tutor.attendance.total += attendance.total;
+      if (earned === 0 && row.reward > 0) tutor.praesidium = true;
+    } else if (state !== "cancelled") {
+      tutor.upcoming += 1;
+    }
+    tutor.paid += row.rewardPaid;
+    tutor.sessions.push({
+      sessionId: session.id,
+      courseLabel: palPlusCourseLabel(session.course, locale),
+      whenLabel: `${dayFmt.format(session.startsAt)}, ${timeFmt.format(session.startsAt)} - ${timeFmt.format(session.endsAt)}`,
+      state,
+      hours,
+      reward: row.reward,
+      earned: state === "cancelled" ? 0 : earned,
+      rewardPaid: row.rewardPaid,
+      correction: row.rewardCorrectedAt
+        ? {
+            note: row.rewardNote,
+            label: nl
+              ? `Gecorrigeerd${row.rewardCorrectedBy ? ` door ${row.rewardCorrectedBy.name}` : ""} op ${dateFmt.format(row.rewardCorrectedAt)}`
+              : `Corrected${row.rewardCorrectedBy ? ` by ${row.rewardCorrectedBy.name}` : ""} on ${dateFmt.format(row.rewardCorrectedAt)}`,
+          }
+        : null,
+      attendance,
+    });
+    byUser.set(row.userId, tutor);
+  }
+
+  return [...byUser.values()].sort((a, b) => b.given - a.given || a.name.localeCompare(b.name, nl ? "nl" : "en"));
 }

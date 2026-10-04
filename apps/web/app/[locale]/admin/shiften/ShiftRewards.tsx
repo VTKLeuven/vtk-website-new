@@ -96,6 +96,7 @@ export function ShiftRewards({
         body: JSON.stringify({
           userId: row.userId,
           shiftIds: row.outstandingShiftIds,
+          palSessionIds: row.outstandingPalSessionIds,
           amount,
         }),
       });
@@ -212,9 +213,7 @@ export function ShiftRewards({
                       {formatVoucherCount(row.outstandingBonnetjes, lang)}
                     </strong>
                     <span className="block text-xs text-vtk-muted">
-                      {nl
-                        ? `saldo uit ${row.outstandingShiftCount} shiften`
-                        : `balance from ${row.outstandingShiftCount} shifts`}
+                      {sourceSummary(nl, "balance", row.outstandingShiftCount, row.outstandingPalCount)}
                     </span>
                     {halfLeft > 0 ? (
                       <span className="block text-xs text-vtk-muted">
@@ -229,9 +228,7 @@ export function ShiftRewards({
                       {formatVoucherCount(row.paidBonnetjes, lang)}
                     </strong>
                     <span className="text-xs text-vtk-muted">
-                      {nl
-                        ? `toegekend over ${row.paidShiftCount} shiften`
-                        : `awarded across ${row.paidShiftCount} shifts`}
+                      {sourceSummary(nl, "awarded", row.paidShiftCount, row.paidPalCount)}
                     </span>
                   </td>
                   <td className="px-4 py-3">
@@ -296,4 +293,16 @@ export function ShiftRewards({
       </Card>
     </div>
   );
+}
+
+/**
+ * "saldo uit 3 shiften en 1 PAL+-sessie": waar een saldo vandaan komt. De
+ * PAL+-sessies staan er enkel bij wanneer er zijn, zodat de lijst voor wie
+ * enkel shiften doet niet verandert.
+ */
+function sourceSummary(nl: boolean, kind: "balance" | "awarded", shifts: number, pal: number): string {
+  const shiftPart = nl ? `${shifts} ${shifts === 1 ? "shift" : "shiften"}` : `${shifts} ${shifts === 1 ? "shift" : "shifts"}`;
+  const palPart = pal > 0 ? (nl ? ` en ${pal} PAL+-${pal === 1 ? "sessie" : "sessies"}` : ` and ${pal} PAL+ ${pal === 1 ? "session" : "sessions"}`) : "";
+  if (kind === "balance") return nl ? `saldo uit ${shiftPart}${palPart}` : `balance from ${shiftPart}${palPart}`;
+  return nl ? `toegekend over ${shiftPart}${palPart}` : `awarded across ${shiftPart}${palPart}`;
 }
