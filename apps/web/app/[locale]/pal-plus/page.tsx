@@ -617,7 +617,8 @@ export default async function PalPlusPage({
                           </dd>
                         </div>
                       )}
-                      {request.kind === "FOLLOW" && (
+                      {/* Steunen kan pas wanneer de vraag online staat. */}
+                      {request.kind === "FOLLOW" && request.status !== "PENDING" && (
                         <div>
                           <dt>{t.mine.askers}</dt>
                           <dd className="pp-num">{palPlusAskerCount(request._count.backers)}</dd>

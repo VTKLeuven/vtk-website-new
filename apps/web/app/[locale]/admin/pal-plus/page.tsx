@@ -254,11 +254,13 @@ async function loadRequests(mode: "queue" | "processed", locale: Locale): Promis
       submittedLabel: dateFmt.format(response.createdAt),
     })),
     reviewNote: row.reviewNote,
+    // Bij een gesloten aanvraag: wie sloot. Bij een vraag die online staat of
+    // gepland is: wie ze nakeek en online zette.
     reviewedLabel:
       row.reviewedAt && row.reviewedBy
         ? nl
-          ? `Door ${row.reviewedBy.name} op ${dateFmt.format(row.reviewedAt)}`
-          : `By ${row.reviewedBy.name} on ${dateFmt.format(row.reviewedAt)}`
+          ? `${row.status === "CLOSED" ? "Door" : "Online gezet door"} ${row.reviewedBy.name} op ${dateFmt.format(row.reviewedAt)}`
+          : `${row.status === "CLOSED" ? "By" : "Published by"} ${row.reviewedBy.name} on ${dateFmt.format(row.reviewedAt)}`
         : null,
   }));
 }
@@ -287,13 +289,18 @@ async function loadRooms(): Promise<RoomGroup[]> {
   }));
 }
 
-/** De open hulpvragen, om bij het plannen mee te nemen in dezelfde sessie. */
+/**
+ * De hulpvragen die nog op een sessie wachten, om bij het plannen mee te nemen
+ * in dezelfde sessie. Ook een vraag die nog niet nagekeken is: een sessie voor
+ * die vraag plannen is een sterkere beslissing dan ze online zetten.
+ */
 async function loadOpenFollow(locale: Locale): Promise<OpenFollowRequest[]> {
   const rows = await prisma.palPlusRequest.findMany({
-    where: { kind: "FOLLOW", status: "OPEN" },
+    where: { kind: "FOLLOW", status: { in: ["PENDING", "OPEN"] } },
     orderBy: { createdAt: "asc" },
     select: {
       id: true,
+      status: true,
       courseId: true,
       courseOther: true,
       description: true,
@@ -310,8 +317,8 @@ async function loadOpenFollow(locale: Locale): Promise<OpenFollowRequest[]> {
       id: row.id,
       courseId: row.courseId,
       label: nl
-        ? `Hulpvraag van ${row.user.name} (${askers} ${askers === 1 ? "zoekt" : "zoeken"} dit): ${short}`
-        : `Help request from ${row.user.name} (${askers} need this): ${short}`,
+        ? `Hulpvraag van ${row.user.name} (${row.status === "PENDING" ? "nog niet online" : `${askers} ${askers === 1 ? "zoekt" : "zoeken"} dit`}): ${short}`
+        : `Help request from ${row.user.name} (${row.status === "PENDING" ? "not online yet" : `${askers} need this`}): ${short}`,
     };
   });
 }

@@ -982,15 +982,27 @@ adres zijn makkelijk te veranderen.
   Het voorgestelde moment mag Onderwijs daarbij verzetten. Een LettuceMeet-achtige
   beschikbaarheidspeiling is gevraagd en **bewust niet gebouwd**: te ingewikkeld voor
   een eerste versie, en "de tutor stelt voor, Onderwijs past aan" volstaat.
-- **Een lid vraagt hulp bij een vak.** De vraag staat **meteen publiek** op de
-  PAL+-pagina, zonder naam, zodat een mogelijke tutor ze ziet en kan zeggen "ik kan dit
-  geven". Andere leden kunnen een vraag steunen ("ik zoek dit ook"); dat aantal staat
-  publiek, de namen niet. Zo ziet Onderwijs welke vragen het waard zijn om een tutor
-  voor te zoeken, en het werkt tegen dubbele vragen. Een vraag eerst laten nakijken voor
-  ze publiek staat, is overwogen: het vertraagt precies het steunen, en wie iets indient
-  is ingelogd en dus aanspreekbaar. Onderwijs kan een vraag altijd sluiten. Publiek
-  betekent niet aanvaard: een vraag blijft een vraag tot Onderwijs er een sessie voor
-  plant.
+- **Een lid vraagt hulp bij een vak.** **Onderwijs kijkt de vraag eerst na** en zet ze
+  dan online: pas dan staat ze op de PAL+-pagina, zonder naam, zodat een mogelijke tutor
+  ze ziet en kan zeggen "ik kan dit geven". Andere leden kunnen een vraag steunen ("ik
+  zoek dit ook"); dat aantal staat publiek, de namen niet. Zo ziet Onderwijs welke
+  vragen het waard zijn om een tutor voor te zoeken, en het werkt tegen dubbele vragen.
+  Online betekent niet aanvaard: een vraag blijft een vraag tot Onderwijs er een sessie
+  voor plant.
+  - Eerst stond een vraag meteen publiek, met als argument dat nakijken net het steunen
+    vertraagt. Onderwijs koos in oktober 2026 toch voor nakijken: de tekst is vrij, en
+    wat op de pagina staat, staat er namens de kring.
+  - Wat niet online mag, sluit Onderwijs met een reden; de indiener ziet die zin. Een
+    sessie plannen voor een vraag die nog niet nagekeken is, mag ook: dat is een
+    sterkere beslissing dan ze online zetten.
+  - Online zetten bewaart wie nakeek en wanneer (`reviewedAt`, hetzelfde veld als bij
+    sluiten). Daaraan ziet een annulering waar een geplande vraag naartoe gaat: terug
+    online als ze er al stond, terug naar het werkbakje als ze meteen gepland werd.
+    Anders zou annuleren een vraag ongezien publiek zetten.
+  - Heropenen zet een gesloten vraag terug bij "na te kijken", ook als ze al eens online
+    stond: of ze weer op de pagina mag, beslist Onderwijs opnieuw.
+  - Ook een vraag die nog wacht, telt mee voor de tien open aanvragen per persoon en
+    kan de indiener intrekken.
 
 Beide vormen zijn één tabel (`PalPlusRequest` met een `kind`), want ze hebben dezelfde
 vorm en komen in hetzelfde werkbakje terecht.
@@ -1005,18 +1017,19 @@ vorm en komen in hetzelfde werkbakje terecht.
   link wie niet ingelogd is eerst naar de login en dan terug naar het formulier.
 - **Kies je bij een hulpvraag een vak waar al een vraag voor openstaat, dan toont het
   formulier die vraag met de steunknop.** Eén vraag met vijf steunen zegt Onderwijs meer
-  dan vijf losse vragen.
+  dan vijf losse vragen. Enkel een vraag die online staat: wat nog nagekeken moet worden,
+  is niet publiek, dus twee gelijke vragen kunnen dan allebei in het werkbakje komen.
 - **De open vragen staan op hoeveel mensen ze zoeken**, de meest gezochte eerst: daar is
   een tutor het meest waard.
 - **Je eigen aanvragen staan met hun status en, als Onderwijs sloot, met de reden.**
-  Zolang Onderwijs er niets mee deed, kan je intrekken; daarna niet meer, want dan is er
-  iemand mee bezig. Wat je introk, verdwijnt uit je lijst.
+  Zolang er geen sessie van kwam en Onderwijs ze niet sloot, kan je intrekken; daarna
+  niet meer. Wat je introk, verdwijnt uit je lijst.
 - **Hoogstens tien aanvragen tegelijk open per persoon**
   (`PAL_PLUS_MAX_ACTIVE_REQUESTS`): ruim voor wie bij vijf vakken hulp zoekt, maar één
   account vult de lijst van open vragen niet.
 - **Sluiten vraagt altijd een reden**, want de indiener ziet die zin bij de aanvraag.
-  Een gesloten aanvraag kan terug open; een vergissing hoeft geen nieuwe aanvraag te
-  kosten.
+  Een gesloten aanvraag kan terug in het werkbakje; een vergissing hoeft geen nieuwe
+  aanvraag te kosten.
 - Onderwijs hangt een aanvraag aan een vak uit de lijst, ook om een verkeerd gekozen vak
   recht te zetten. Wat de indiener intikte, blijft als uitleg staan.
 

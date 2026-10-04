@@ -110,7 +110,7 @@ export async function submitPalPlusRequestAction(
   await prisma.palPlusRequest.create({
     data: {
       kind: request.kind,
-      status: initialPalPlusStatus(request.kind),
+      status: initialPalPlusStatus(),
       userId,
       courseId: request.courseId,
       courseOther: request.courseOther,
@@ -204,6 +204,37 @@ async function requestForAudit(id: string) {
   };
 }
 
+/**
+ * Onderwijs keek een hulpvraag na en zet ze online: vanaf nu staat ze zonder
+ * naam op de PAL+-pagina, kunnen anderen ze steunen en kan een tutor erop
+ * aanbieden. Wat niet online mag, sluit Onderwijs met een reden.
+ */
+export async function publishPalPlusRequestAction(formData: FormData): Promise<SaveState> {
+  const session = await requirePermission("pal.manage");
+  const id = toSingleLine(formData.get("id"));
+
+  // Voorwaardelijk op de status: een vraag die ondertussen ingetrokken of
+  // gesloten werd, komt niet alsnog online.
+  const result = await prisma.palPlusRequest.updateMany({
+    where: { id, kind: "FOLLOW", status: "PENDING" },
+    data: { status: "OPEN", reviewedById: session.user.id, reviewedAt: new Date() },
+  });
+  if (result.count === 0) return saveError("NOT_PUBLISHABLE");
+
+  const audit = await requestForAudit(id);
+  if (audit) {
+    await logAudit({
+      action: "update",
+      entity: "palPlusRequest",
+      entityId: id,
+      target: audit.target,
+      summary: "nagekeken en online gezet",
+    });
+  }
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
 /** Onderwijs sluit een aanvraag zonder sessie, met een reden voor de indiener. */
 export async function closePalPlusRequestAction(
   _prev: SaveState,
@@ -240,21 +271,24 @@ export async function closePalPlusRequestAction(
   return saveOk();
 }
 
-/** Een per vergissing gesloten aanvraag terug open zetten. */
+/**
+ * Een per vergissing gesloten aanvraag terug in het werkbakje zetten. Een vraag
+ * komt daarmee niet vanzelf weer online: Onderwijs zet ze opnieuw online.
+ */
 export async function reopenPalPlusRequestAction(formData: FormData): Promise<SaveState> {
   await requirePermission("pal.manage");
   const id = toSingleLine(formData.get("id"));
 
   const request = await prisma.palPlusRequest.findUnique({
     where: { id },
-    select: { kind: true, status: true },
+    select: { status: true },
   });
   if (!request || request.status !== "CLOSED") return saveError("NOT_CLOSED");
 
   await prisma.palPlusRequest.update({
     where: { id },
     data: {
-      status: reopenedPalPlusStatus(request.kind),
+      status: reopenedPalPlusStatus(),
       reviewNote: null,
       reviewedById: null,
       reviewedAt: null,
@@ -690,9 +724,16 @@ export async function cancelPalPlusSessionAction(
         where: { id },
         data: { cancelledAt: new Date(), cancelReason: reason },
       });
+      // De vraag is er nog. Een vraag die al online stond, komt terug online;
+      // een die meteen gepland werd zonder nakijken, gaat terug naar het
+      // werkbakje, want anders zou annuleren ze ongezien publiek zetten.
       await tx.palPlusRequest.updateMany({
-        where: { sessionId: id, kind: "FOLLOW", status: "PLANNED" },
+        where: { sessionId: id, kind: "FOLLOW", status: "PLANNED", reviewedAt: { not: null } },
         data: { status: "OPEN", sessionId: null },
+      });
+      await tx.palPlusRequest.updateMany({
+        where: { sessionId: id, kind: "FOLLOW", status: "PLANNED", reviewedAt: null },
+        data: { status: "PENDING", sessionId: null },
       });
       // Ging de sessie achteraf niet door, dan levert ze niets op. Wat een tutor
       // er al van uitgaf, komt uit de andere openstaande bonnetjes van die

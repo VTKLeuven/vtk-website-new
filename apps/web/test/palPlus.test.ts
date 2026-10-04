@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  canPublishPalPlusRequest,
   initialPalPlusStatus,
   isActivePalPlusStatus,
   normalizeCourseCode,
@@ -270,11 +271,16 @@ describe("parsePalPlusRequest", () => {
 });
 
 describe("statussen", () => {
-  it("laat een aanbod wachten en een vraag meteen openstaan", () => {
-    expect(initialPalPlusStatus("GIVE")).toBe("PENDING");
-    expect(initialPalPlusStatus("FOLLOW")).toBe("OPEN");
-    expect(reopenedPalPlusStatus("GIVE")).toBe("PENDING");
-    expect(reopenedPalPlusStatus("FOLLOW")).toBe("OPEN");
+  it("laat een aanbod en een vraag allebei eerst wachten op Onderwijs", () => {
+    expect(initialPalPlusStatus()).toBe("PENDING");
+    expect(reopenedPalPlusStatus()).toBe("PENDING");
+  });
+
+  it("zet enkel een wachtende vraag online", () => {
+    expect(canPublishPalPlusRequest({ kind: "FOLLOW", status: "PENDING" })).toBe(true);
+    expect(canPublishPalPlusRequest({ kind: "FOLLOW", status: "OPEN" })).toBe(false);
+    expect(canPublishPalPlusRequest({ kind: "FOLLOW", status: "CLOSED" })).toBe(false);
+    expect(canPublishPalPlusRequest({ kind: "GIVE", status: "PENDING" })).toBe(false);
   });
 
   it("noemt enkel wachtend en open nog actief", () => {

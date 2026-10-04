@@ -6820,7 +6820,8 @@ model PalPlusCourse {
 model PalPlusRequest {
   id     String               @id @default(cuid())
   kind   PalPlusRequestKind
-  /// Geen standaardwaarde: een aanbod begint als PENDING, een vraag als OPEN.
+  /// Geen standaardwaarde. Allebei beginnen ze als PENDING: een vraag komt pas
+  /// op de publieke pagina (OPEN) wanneer Onderwijs ze nakeek en online zette.
   status PalPlusRequestStatus
 
   /// Wie indiende. Iedereen die kan inloggen mag dat, ook zonder lidmaatschap.
@@ -6857,6 +6858,10 @@ model PalPlusRequest {
   /// Waarom gesloten. Gaat mee in de mail naar de indiener, dus schrijf hier een
   /// zin en geen code.
   reviewNote   String?
+  /// Wie de aanvraag nakeek en wanneer: bij sluiten, en bij een vraag ook bij
+  /// het online zetten. Een geplande vraag waarvan de sessie geannuleerd wordt,
+  /// gaat enkel terug online (OPEN) als ze al eens nagekeken was; anders terug
+  /// naar PENDING. Heropenen maakt dit leeg.
   reviewedById String?
   reviewedAt   DateTime? @db.Timestamptz(3)
 

@@ -261,9 +261,21 @@ export function parsePalPlusMoment(
   };
 }
 
-/** Waar een nieuwe aanvraag begint: een aanbod wacht op Onderwijs, een vraag staat meteen open. */
-export function initialPalPlusStatus(kind: PalPlusRequestKindCode): PalPlusRequestStatusCode {
-  return kind === "GIVE" ? "PENDING" : "OPEN";
+/**
+ * Waar een nieuwe aanvraag begint: allebei bij Onderwijs. Een aanbod wacht tot
+ * er een sessie van komt; een vraag tot Onderwijs ze nakeek en online zette
+ * (`canPublishPalPlusRequest`), want pas dan staat ze op de publieke pagina.
+ */
+export function initialPalPlusStatus(): PalPlusRequestStatusCode {
+  return "PENDING";
+}
+
+/** Een vraag die nog nagekeken moet worden, kan Onderwijs online zetten. Een aanbod niet: dat wordt een sessie. */
+export function canPublishPalPlusRequest(request: {
+  kind: PalPlusRequestKindCode;
+  status: PalPlusRequestStatusCode;
+}): boolean {
+  return request.kind === "FOLLOW" && request.status === "PENDING";
 }
 
 /** Nog niet afgehandeld: de indiener kan intrekken, Onderwijs kan sluiten. */
@@ -271,9 +283,13 @@ export function isActivePalPlusStatus(status: PalPlusRequestStatusCode): boolean
   return status === "PENDING" || status === "OPEN";
 }
 
-/** Waar een gesloten aanvraag naar terugkeert wanneer Onderwijs ze heropent. */
-export function reopenedPalPlusStatus(kind: PalPlusRequestKindCode): PalPlusRequestStatusCode {
-  return initialPalPlusStatus(kind);
+/**
+ * Waar een gesloten aanvraag naar terugkeert wanneer Onderwijs ze heropent:
+ * terug in het werkbakje, ook een vraag die al eens online stond. Of ze weer op
+ * de pagina mag, beslist Onderwijs opnieuw.
+ */
+export function reopenedPalPlusStatus(): PalPlusRequestStatusCode {
+  return initialPalPlusStatus();
 }
 
 /**

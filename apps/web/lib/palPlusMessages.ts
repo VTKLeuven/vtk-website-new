@@ -111,7 +111,8 @@ export type PalPlusAdminErrorCode =
   | "REASON_TOO_LONG"
   | "NOT_ACTIVE"
   | "NOT_CLOSED"
-  | "COURSE_UNKNOWN";
+  | "COURSE_UNKNOWN"
+  | "NOT_PUBLISHABLE";
 
 export function palPlusAdminErrors(nl: boolean): Record<PalPlusAdminErrorCode, string> {
   return nl
@@ -121,6 +122,7 @@ export function palPlusAdminErrors(nl: boolean): Record<PalPlusAdminErrorCode, s
         NOT_ACTIVE: "Niet gesloten: de aanvraag is ondertussen al afgehandeld of ingetrokken. Herlaad de pagina.",
         NOT_CLOSED: "Niet heropend: enkel een gesloten aanvraag kan terug open.",
         COURSE_UNKNOWN: "Niet opgeslagen: dat vak bestaat niet meer. Herlaad de pagina.",
+        NOT_PUBLISHABLE: "Niet online gezet: de vraag is ondertussen al nagekeken, gesloten of ingetrokken. Herlaad de pagina.",
       }
     : {
         REASON_REQUIRED: "Not closed: write a reason. The submitter sees it with the request.",
@@ -128,6 +130,7 @@ export function palPlusAdminErrors(nl: boolean): Record<PalPlusAdminErrorCode, s
         NOT_ACTIVE: "Not closed: the request was handled or withdrawn in the meantime. Reload the page.",
         NOT_CLOSED: "Not reopened: only a closed request can be reopened.",
         COURSE_UNKNOWN: "Not saved: that course no longer exists. Reload the page.",
+        NOT_PUBLISHABLE: "Not published: the request was reviewed, closed or withdrawn in the meantime. Reload the page.",
       };
 }
 
