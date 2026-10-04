@@ -865,8 +865,14 @@
   mask-image: linear-gradient(to bottom, #000 55%, transparent);
 }
 
+/* Uitgeklapt ook `overflow: visible`, niet enkel geen maximum. Met `hidden` is
+   het blok een scroll container, en die mag in het grid van
+   `.vtk-announcement-body` krimpen tot 0: werd de kaart te hoog, dan kreeg de
+   tekst enkel de rij die overbleef en viel de rest stil weg, met "Minder" er
+   meteen onder, in plaats van dat het tekstblok ging scrollen. */
 .vtk-announcement-text[data-state="open"] {
   max-height: none;
+  overflow: visible;
 }
 
 /* Met `.vtk-announcement` ervoor: het blok draagt ook `.prose-vtk`
