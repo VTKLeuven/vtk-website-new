@@ -16,7 +16,7 @@ export function ShiftManage({
   shifts,
   postOptions,
   userPostCodes = [],
-  isSuperAdmin = false,
+  manageAllPosts = false,
   from,
   to,
 }: {
@@ -24,7 +24,7 @@ export function ShiftManage({
   shifts: AdminShift[];
   postOptions: string[];
   userPostCodes?: string[];
-  isSuperAdmin?: boolean;
+  manageAllPosts?: boolean;
   from: string;
   to: string;
 }) {
@@ -85,7 +85,7 @@ export function ShiftManage({
    * niet: het venster is een bewerkvenster, niet een leesvenster.
    */
   const canManage = (s: AdminShift) =>
-    isSuperAdmin ||
+    manageAllPosts ||
     (s.post !== null && userPostCodes.some((code) => code.toLowerCase() === s.post?.toLowerCase()));
 
   const toggleSort = (key: SortKey) =>
@@ -235,7 +235,7 @@ export function ShiftManage({
           shift={editing}
           postOptions={postOptions}
           userPostCodes={userPostCodes}
-          isSuperAdmin={isSuperAdmin}
+          manageAllPosts={manageAllPosts}
           onDelete={editing ? () => setDeleting(editing) : undefined}
           onClose={() => {
             setCreating(false);

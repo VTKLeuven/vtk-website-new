@@ -2,6 +2,7 @@ import { prisma } from '@vtk/db';
 import { notFound } from 'next/navigation';
 import { hasLocale } from '@/lib/locale';
 import { requirePermission } from '@/lib/session';
+import { canManageAllShifts } from '@/lib/shift/authorization';
 import { listShiftTemplates } from '@/lib/shift/templateStore';
 import type { Locale } from '@vtk/i18n';
 import { ShiftTemplateNav } from '../ShiftTemplateNav';
@@ -40,7 +41,7 @@ export default async function AdminShiftTemplateManage({ params }: { params: Pro
   const own = new Set(session.groups.filter((g) => g.type === 'PRAESIDIUM').map((g) => g.code));
   const postOptions = activeGroups
     .map((g) => g.code)
-    .filter((code) => session.user.isSuperAdmin || own.has(code) || inUse.has(code));
+    .filter((code) => canManageAllShifts(session) || own.has(code) || inUse.has(code));
 
   return (
     <div className="space-y-5">

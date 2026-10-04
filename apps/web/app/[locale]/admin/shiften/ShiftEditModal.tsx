@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { Locale } from "@vtk/i18n";
 import { Button, Card, FormError, Input, Label, Select, Textarea } from "@vtk/ui";
+import { IconButton } from "@/components/ui/IconButton";
+import { TrashIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { MarkdownEditor } from "@/components/editor/MarkdownEditor";
 import { utcToLocalDateTime } from "@/lib/ticketing/time";
@@ -22,7 +24,7 @@ export function ShiftEditModal({
   shift,
   postOptions,
   userPostCodes = [],
-  isSuperAdmin = false,
+  manageAllPosts = false,
   onClose,
   onSaved,
   onDelete,
@@ -31,7 +33,7 @@ export function ShiftEditModal({
   shift: AdminShift | null;
   postOptions: string[];
   userPostCodes?: string[];
-  isSuperAdmin?: boolean;
+  manageAllPosts?: boolean;
   onClose: () => void;
   onSaved: () => void;
   /** Opent de bevestiging om deze shift te verwijderen; enkel bij bewerken. */
@@ -42,11 +44,11 @@ export function ShiftEditModal({
   const isEdit = shift !== null;
 
   const selectablePosts = useMemo(() => {
-    if (isSuperAdmin) return postOptions;
+    if (manageAllPosts) return postOptions;
     return postOptions.filter((p) =>
       userPostCodes.some((code) => code.toLowerCase() === p.toLowerCase()),
     );
-  }, [isSuperAdmin, postOptions, userPostCodes]);
+  }, [manageAllPosts, postOptions, userPostCodes]);
 
   const now = new Date();
   const [name, setName] = useState(shift?.name ?? "");
@@ -59,7 +61,7 @@ export function ShiftEditModal({
   const [maxParticipants, setMaxParticipants] = useState(String(shift?.maxParticipants ?? 1));
   const [reward, setReward] = useState(String(shift?.reward ?? 0));
   const [post, setPost] = useState(
-    shift?.post ?? (isSuperAdmin ? "" : (selectablePosts[0] ?? "")),
+    shift?.post ?? (manageAllPosts ? "" : (selectablePosts[0] ?? "")),
   );
   const [openToInternationals, setOpenToInternationals] = useState(
     shift?.openToInternationals ?? false,
@@ -217,7 +219,7 @@ export function ShiftEditModal({
           <div>
             <Label>Post</Label>
             <Select value={post} onChange={(e) => setPost(e.target.value)}>
-              {isSuperAdmin && <option value="">{nl ? "Geen" : "None"}</option>}
+              {manageAllPosts && <option value="">{nl ? "Geen" : "None"}</option>}
               {selectablePosts.map((p) => (
                 <option key={p} value={p}>
                   {p}
@@ -338,15 +340,17 @@ export function ShiftEditModal({
                           )}
                         </td>
                         <td className="px-3 py-2 text-right">
-                          <button
-                            type="button"
-                            className="text-vtk-muted hover:text-vtk-danger"
+                          {/* Geen bevestiging: uitschrijven gebeurt pas bij
+                              Opslaan, en Annuleren draait het terug. */}
+                          <IconButton
+                            label={nl ? "Uitschrijven" : "Remove"}
+                            srLabel={`${nl ? "Uitschrijven" : "Remove"}: ${p.name}`}
+                            tone="danger"
+                            className="ml-auto"
                             onClick={() => removeParticipant(p.userId)}
-                            title={nl ? "Uitschrijven" : "Remove"}
-                            aria-label={`${nl ? "Uitschrijven" : "Remove"}: ${p.name}`}
                           >
-                            ✕
-                          </button>
+                            <TrashIcon />
+                          </IconButton>
                         </td>
                       </tr>
                     ))}

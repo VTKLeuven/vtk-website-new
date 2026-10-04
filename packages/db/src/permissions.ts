@@ -100,6 +100,12 @@ export const PERMISSIONS = [
 
   // Shifts
   { code: "shift.edit", labelNl: "Shiften beheren", labelEn: "Manage shifts", category: "shift" },
+  // `shift.edit` geldt enkel voor de shiften van je eigen praesidiumposten. Dit
+  // haalt die grens weg (elke post, ook een shift zonder post) en houdt
+  // `shift.edit` zelf in, zoals `pages.editAll` bij de pagina's. Zonder dit kon
+  // de rol `admin` (IT, Groep 5) de shiften van andere posten niet openen: enkel
+  // `User.isSuperAdmin` mocht dat, en die hangt aan geen rol.
+  { code: "shift.editAll", labelNl: "Shiften van alle posten beheren", labelEn: "Manage shifts of every post", category: "shift" },
   { code: "shift.reward", labelNl: "Shiftbonnetjes beheren", labelEn: "Manage shift vouchers", category: "shift" },
   // Bonnetjes aanvaarden als betaling, met de app: de student toont zijn pas,
   // een praesidiumlid scant en tikt een bedrag in. Bewust een eigen recht en

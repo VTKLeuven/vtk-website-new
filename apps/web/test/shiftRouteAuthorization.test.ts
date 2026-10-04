@@ -22,6 +22,13 @@ vi.mock('@/lib/session', () => ({
     }
     return mocks.session;
   }),
+  requireAnyPermission: vi.fn(async (perms: string[]) => {
+    if (!mocks.session) throw new Error('UNAUTHENTICATED');
+    if (!mocks.session.user.isSuperAdmin && !perms.some((p) => mocks.session!.permissions.includes(p))) {
+      throw new Error('FORBIDDEN');
+    }
+    return mocks.session;
+  }),
   authErrorResponse: vi.fn((err: unknown) => {
     const message = err instanceof Error ? err.message : 'UNAUTHENTICATED';
     const status = message === 'FORBIDDEN' ? 403 : 401;
@@ -163,6 +170,27 @@ describe('/api/shift authorization', () => {
       expect(response.status).toBe(200);
       expect(mocks.delete).toHaveBeenCalledWith({ where: { id: 'shift_2' } });
     });
+
+    it('allows shift.editAll (the admin role) to delete a shift of another post', async () => {
+      mocks.session = makeSession({ permissions: ['shift.editAll'] });
+      mocks.findUnique.mockResolvedValue({
+        id: 'shift_2',
+        name: 'Theokotshift',
+        post: 'theokot',
+      });
+      const request = new Request('https://vtk.be/api/shift?id=shift_2', { method: 'DELETE' });
+      const response = await DELETE(request);
+      expect(response.status).toBe(200);
+      expect(mocks.delete).toHaveBeenCalledWith({ where: { id: 'shift_2' } });
+    });
+
+    it('rejects a session without shift.edit or shift.editAll', async () => {
+      mocks.session = makeSession({ permissions: ['shift.reward'] });
+      const request = new Request('https://vtk.be/api/shift?id=shift_1', { method: 'DELETE' });
+      const response = await DELETE(request);
+      expect(response.status).toBe(403);
+      expect(mocks.delete).not.toHaveBeenCalled();
+    });
   });
 
   describe('PATCH /api/shift', () => {
@@ -189,6 +217,23 @@ describe('/api/shift authorization', () => {
       });
       const response = await PATCH(request);
       expect(response.status).toBe(403);
+    });
+
+    it('allows shift.editAll to modify a shift of another post and move it', async () => {
+      mocks.session = makeSession({ permissions: ['shift.editAll'] });
+      mocks.findUnique.mockResolvedValue({
+        id: 'shift_2',
+        name: 'Theokotshift',
+        post: 'theokot',
+        startTime: new Date('2027-01-01T10:00:00Z'),
+        endTime: new Date('2027-01-01T12:00:00Z'),
+      });
+      const request = new Request('https://vtk.be/api/shift?id=shift_2', {
+        method: 'PATCH',
+        body: JSON.stringify({ name: 'Nieuwe naam', post: 'sociaal' }),
+      });
+      const response = await PATCH(request);
+      expect(response.status).toBe(200);
     });
 
     it('rejects changing the post to a post the user does not belong to', async () => {
@@ -238,6 +283,28 @@ describe('/api/shift authorization', () => {
       });
       const response = await POST(request);
       expect(response.status).toBe(403);
+    });
+
+    it('allows shift.editAll to create a shift for any post or without a post', async () => {
+      mocks.session = makeSession({ permissions: ['shift.editAll'] });
+      for (const post of ['theokot', null]) {
+        const request = new Request('https://vtk.be/api/shift', {
+          method: 'POST',
+          body: JSON.stringify({
+            name: 'Nieuwe shift',
+            startTime: '2027-01-01T10:00',
+            endTime: '2027-01-01T12:00',
+            location: 'Hal',
+            description: 'Desc',
+            maxParticipants: 2,
+            reward: 1,
+            post,
+            openToInternationals: false,
+          }),
+        });
+        const response = await POST(request);
+        expect(response.status).toBe(201);
+      }
     });
 
     it('rejects creating a shift without a post for non-superadmins', async () => {

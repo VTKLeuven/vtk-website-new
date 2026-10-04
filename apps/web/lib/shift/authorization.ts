@@ -20,18 +20,38 @@ export function isUserInShiftPost(
 }
 
 /**
+ * Mag deze gebruiker shiften beheren, voor minstens één post? Het recht achter
+ * /admin/shiften en `/api/shift`; welke shiften precies, zegt `canManageShift`.
+ */
+export function canEditShifts(session: SessionPayload): boolean {
+  return (
+    session.user.isSuperAdmin ||
+    session.permissions.includes("shift.edit") ||
+    session.permissions.includes("shift.editAll")
+  );
+}
+
+/**
+ * Mag deze gebruiker de shiften van elke post beheren, en een shift zonder
+ * post? Superadmin of `shift.editAll` (de rol `admin` draagt dat).
+ */
+export function canManageAllShifts(session: SessionPayload): boolean {
+  return session.user.isSuperAdmin || session.permissions.includes("shift.editAll");
+}
+
+/**
  * Mag deze gebruiker deze shift aanpassen of verwijderen?
  *
- * - Superadmin: mag alle shiften bewerken/verwijderen;
- * - Zonder `shift.edit`: mag geen shiften bewerken/verwijderen;
- * - Met `shift.edit`: mag enkel shiften van de eigen post(en) bewerken/verwijderen.
- *   Een shift zonder post kan enkel door een superadmin worden beheerd.
+ * - Superadmin of `shift.editAll`: alle shiften, ook die zonder post;
+ * - Met `shift.edit`: enkel shiften van de eigen post(en). Een shift zonder post
+ *   valt daar buiten;
+ * - Zonder een van beide: geen enkele.
  */
 export function canManageShift(
   session: SessionPayload,
   shift: { post: string | null },
 ): boolean {
-  if (session.user.isSuperAdmin) return true;
+  if (canManageAllShifts(session)) return true;
   if (!session.permissions.includes("shift.edit")) return false;
   return isUserInShiftPost(session, shift.post);
 }

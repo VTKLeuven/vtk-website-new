@@ -139,7 +139,7 @@ export function getAdminNav(): NavEntry[] {
       item('shortlinks', '/links', { perm: 'shortlinks.manage' }),
       item('forms', '/formulieren', { forms: true }),
       item('shift', '/shiften', {
-        anyPerm: ['shift.edit', 'shift.reward', 'shift.ranking', 'shift.templates', 'shift.manual'],
+        anyPerm: ['shift.edit', 'shift.editAll', 'shift.reward', 'shift.ranking', 'shift.templates', 'shift.manual'],
       }),
       item('piano', '/piano', { perm: 'piano.manage' }),
     ]),

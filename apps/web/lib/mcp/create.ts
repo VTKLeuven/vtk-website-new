@@ -79,7 +79,7 @@ const CREATE_PERMISSIONS = {
   role: ["roles.manage"],
   dashboard_tile: ["dashboard.manage", "dashboard.manageOwn"],
   short_link: ["shortlinks.manage"],
-  shift: ["shift.edit"],
+  shift: ["shift.edit", "shift.editAll"],
   theokot_product: ["theokot.manage"],
   theokot_session: ["theokot.manage"],
   meeting: ["grocomeet.manage", "bureau.manage"],

@@ -339,6 +339,22 @@ databank zet je dit vinkje één keer zelf.
 scherm /admin/shiften/sjablonen gebruiken: dat is een sneltoets op hetzelfde
 formulier, die per shift `POST /api/shift` aanroept.
 
+**`shift.edit` geldt enkel voor de shiften van je eigen praesidiumposten.** Een
+shift van een andere post, of een zonder post, kan je in /admin/shiften niet
+openen. **`shift.editAll`** haalt die grens weg en houdt `shift.edit` zelf in,
+zoals `pages.editAll` bij de pagina's. De checks staan in
+`apps/web/lib/shift/authorization.ts`: `canEditShifts` (mag je het scherm en
+`/api/shift` gebruiken), `canManageAllShifts` (elke post, ook geen) en
+`canManageShift` (deze ene shift).
+
+Die permissie bestaat omdat enkel `User.isSuperAdmin` de grens vroeger ophief,
+en die vlag hangt aan geen rol. De rol `admin` (IT, Groep 5) draagt elke
+permissie, maar wie geen superadmin was, kon in Groep 5 enkel de shiften van
+Groep 5 openen. In het autorisatievoorbeeld zag zelfs IT hetzelfde, omdat het
+voorbeeld `isSuperAdmin` op `false` zet. De config-sync koppelt `shift.editAll`
+bij de volgende start vanzelf aan `admin`; wil je het een andere rol geven,
+dan vink je het aan in /admin/roles.
+
 **De sjablonen zelf bewerken is een eigen recht: `shift.templates`**
 (/admin/shiften/sjablonen/beheer). Los van `shift.edit` omdat het een andere
 orde is: `shift.edit` gaat over één avond, `shift.templates` over de reeks die
@@ -356,8 +372,8 @@ niemand ze aanpaste. Het is een vertrekpunt, geen wet: afnemen doe je per rol in
 moet je dit vinkje één keer zelf zetten.
 
 Geen van beide rechten is werkingsjaar- of postgebonden, maar de **keuzelijst met
-posten** is dat wel: wie geen superadmin is, ziet zijn eigen posten, plus de
-posten die de sjablonen nu al gebruiken. Dat laatste is nodig omdat wie de
+posten** is dat wel: wie geen superadmin is en geen `shift.editAll` heeft,
+ziet zijn eigen posten, plus de posten die de sjablonen nu al gebruiken. Dat laatste is nodig omdat wie de
 cantusreeks komt bijstellen anders de post ACTIVITEITEN stilletjes zou leegmaken.
 
 ## Groepsadressen (Google Workspace)

@@ -7,6 +7,7 @@ import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
 import { academicYearRange, academicYearRangeFor, currentAcademicYear } from "@/lib/shift";
 import { earnedShiftReward, type PraesidiumYears } from "@/lib/shift/rewards";
+import { canEditShifts, canManageAllShifts } from "@/lib/shift/authorization";
 import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import { loadPalPlusRewardRows } from "@/lib/shift/rewards.server";
 import { ShiftAdmin } from "./ShiftAdmin";
@@ -33,7 +34,7 @@ export default async function AdminShifts({
   const session = await requireSession();
 
   const has = (perm: string) => session.user.isSuperAdmin || session.permissions.includes(perm);
-  const canEdit = has("shift.edit");
+  const canEdit = canEditShifts(session);
   const canReward = has("shift.reward");
   const canRanking = has("shift.ranking");
   const canTemplates = has("shift.templates");
@@ -295,7 +296,8 @@ export default async function AdminShifts({
     select: { code: true },
   });
   const postOptions = activeGroups.map((g) => g.code);
-  const userPostCodes = session.user.isSuperAdmin
+  const manageAllPosts = canManageAllShifts(session);
+  const userPostCodes = manageAllPosts
     ? postOptions
     : session.groups.filter((g) => g.type === "PRAESIDIUM").map((g) => g.code);
 
@@ -311,7 +313,7 @@ export default async function AdminShifts({
         manualGrants={manualGrants}
         postOptions={postOptions}
         userPostCodes={userPostCodes}
-        isSuperAdmin={session.user.isSuperAdmin}
+        manageAllPosts={manageAllPosts}
         from={format(rangeStart, "yyyy-MM-dd")}
         to={format(rangeToDay, "yyyy-MM-dd")}
         year={selectedYear}

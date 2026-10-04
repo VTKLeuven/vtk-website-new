@@ -78,6 +78,7 @@ export const MCP_PERMISSION_POLICY = {
   "dashboard.manageOwn": { reads: ["dashboard"], creates: ["app_create:dashboard_tile(GROUP)"], blocked: ["update or delete dashboard tiles"] },
   "shortlinks.manage": { reads: ["shortlinks"], creates: ["app_create:short_link"], blocked: ["enable, update or delete short links"] },
   "shift.edit": { reads: ["shifts"], creates: ["app_create:shift"], blocked: ["update shifts or enrol participants"] },
+  "shift.editAll": { reads: ["shifts"], creates: ["app_create:shift"], blocked: ["update shifts or enrol participants"] },
   "shift.reward": { reads: ["shifts"], creates: [], blocked: ["pay shift rewards"] },
   // Bonnetjes afboeken is geld afboeken en is niet terug te draaien; dat is een
   // operationeel neveneffect en geen `create`. MCP mag het onder geen beding.

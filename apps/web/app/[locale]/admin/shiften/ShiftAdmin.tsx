@@ -62,7 +62,7 @@ export function ShiftAdmin({
   manualGrants = [],
   postOptions,
   userPostCodes = [],
-  isSuperAdmin = false,
+  manageAllPosts = false,
   from,
   to,
   year,
@@ -76,7 +76,8 @@ export function ShiftAdmin({
   manualGrants?: ManualGrantRow[];
   postOptions: string[];
   userPostCodes?: string[];
-  isSuperAdmin?: boolean;
+  /** Superadmin of `shift.editAll`: elke shift openen, elke post kiezen. */
+  manageAllPosts?: boolean;
   from: string;
   to: string;
   year: number;
@@ -117,7 +118,7 @@ export function ShiftAdmin({
           shifts={shifts}
           postOptions={postOptions}
           userPostCodes={userPostCodes}
-          isSuperAdmin={isSuperAdmin}
+          manageAllPosts={manageAllPosts}
           from={from}
           to={to}
         />
