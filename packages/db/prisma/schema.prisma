@@ -6987,6 +6987,12 @@ model PalPlusSessionTutor {
   rewardCorrectedById String?
   rewardNote          String?
 
+  /// Wanneer de herinnering van de dag vooraf vertrok, of afgehandeld werd
+  /// omdat ze niet meer zinvol was (tutor toegevoegd binnen 24 uur voor de
+  /// start: die kreeg net de mail "je geeft een sessie"). Verschuift het
+  /// moment, dan gaat dit terug leeg. Zie `processDuePalPlusReminders`.
+  reminderSentAt DateTime? @db.Timestamptz(3)
+
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 
   session           PalPlusSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
@@ -7009,6 +7015,10 @@ model PalPlusSessionAttendee {
   /// betekent "nog niet aangeduid", niet "niet gekomen". Puur informatie voor
   /// Onderwijs: het raakt de bonnetjes van de tutor niet.
   attended Boolean?
+
+  /// Zoals bij de tutor: de herinnering van de dag vooraf, of afgehandeld
+  /// omdat iemand zich pas binnen 24 uur voor de start inschreef.
+  reminderSentAt DateTime? @db.Timestamptz(3)
 
   createdAt DateTime @default(now()) @db.Timestamptz(3)
 

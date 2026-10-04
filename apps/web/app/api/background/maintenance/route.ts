@@ -4,6 +4,7 @@ import { processDueLesbezoekScheduledMails } from "@/lib/lesbezoeken-server";
 import { recordMailingListCounts } from "@/lib/mailingListHistory";
 import { processDueNoShows } from "@/lib/theokot-server";
 import { backfillMagazineCovers } from "@/lib/magazineCover";
+import { processDuePalPlusReminders } from "@/lib/palPlusNotify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -45,7 +46,7 @@ export async function POST(request: Request) {
   }
 
   const now = new Date();
-  const [theokot, lesbezoeken, kalender, mailinglijsten, kaften] = await Promise.allSettled([
+  const [theokot, lesbezoeken, kalender, mailinglijsten, kaften, palPlus] = await Promise.allSettled([
     processDueNoShows(now),
     processDueLesbezoekScheduledMails(now),
     processDueHeroWeekNotices(now),
@@ -54,12 +55,16 @@ export async function POST(request: Request) {
     recordMailingListCounts(now),
     // Kaften van Bakske en Ir.Reëel die er nog geen hebben; zie lib/magazineCover.ts.
     backfillMagazineCovers(),
+    // De herinnering van de dag voor een PAL+-sessie; zie lib/palPlusNotify.ts.
+    // Hier en niet in de shift-worker: het is één query per ronde, en een eigen
+    // worker zou een eigen secret op de server vragen.
+    processDuePalPlusReminders(now),
   ]);
 
   // 502 zodra een van de taken viel: de healthcheck van de worker ziet dan dat
   // er iets scheelt in plaats van stil niets te doen. De andere taken zijn wel
   // gedraaid, en alle zijn idempotent, dus de volgende ronde haalt het in.
-  const failed = [theokot, lesbezoeken, kalender, mailinglijsten, kaften].some(
+  const failed = [theokot, lesbezoeken, kalender, mailinglijsten, kaften, palPlus].some(
     (task) => task.status === "rejected",
   );
   if (failed) {
@@ -69,6 +74,7 @@ export async function POST(request: Request) {
       kalender: describe(kalender),
       mailinglijsten: describe(mailinglijsten),
       kaften: describe(kaften),
+      palPlus: describe(palPlus),
     });
   }
 
@@ -79,6 +85,7 @@ export async function POST(request: Request) {
       kalender: describe(kalender),
       mailinglijsten: describe(mailinglijsten),
       kaften: describe(kaften),
+      palPlus: describe(palPlus),
     },
     { status: failed ? 502 : 200, headers: { "Cache-Control": "no-store" } },
   );

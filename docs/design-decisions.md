@@ -1152,6 +1152,9 @@ vanzelf.
   plaats van bonnetjes, ook in het detail van een sessie. Een beloning tonen die nooit in
   het saldo komt, zou Onderwijs doen denken dat er iets misliep.
 
+De lijst staat in het beheer en is voor niemand anders zichtbaar. Het recht is
+`pal.manage`, gedragen door de rol `pal-plus` die naar Onderwijs gaat.
+
 ### Aanwezigheid
 
 - **Wie er kwam, duidt een tutor van de sessie aan, of Onderwijs**, zodra de sessie
@@ -1164,8 +1167,51 @@ vanzelf.
   te blokkeren: wie twintig namen afloopt, mag geen klik verliezen omdat de vorige nog
   onderweg was.
 
-De lijst staat in het beheer en is voor niemand anders zichtbaar. Het recht is
-`pal.manage`, gedragen door de rol `pal-plus` die naar Onderwijs gaat.
+### Mails
+
+Elke stap waar iemand op wacht, krijgt een mail; wat niemand iets vertelt, niet. De
+teksten staan in `lib/palPlusMail.ts`, wie wat krijgt in `lib/palPlusNotify.ts`, en
+alle negen staan als voorvertoning op /admin/it/flows.
+
+| Wanneer | Naar wie |
+| --- | --- |
+| Aanvraag ingediend | De indiener (bevestiging), en Onderwijs (melding) |
+| Hulpvraag online gezet | Wie ze stelde |
+| Aanvraag gesloten | De indiener, met de reden |
+| Sessie gepland of tutor toegevoegd | De nieuwe tutor |
+| Sessie gepland voor een hulpvraag | Wie de vraag stelde en wie ze steunde |
+| Moment of lokaal veranderd | De tutors en de ingeschrevenen |
+| Een dag voor de sessie | De tutors en de ingeschrevenen |
+| Sessie geannuleerd | De tutors en de ingeschrevenen, met de reden |
+
+- **De afzender is VTK Onderwijs en antwoorden gaat naar de post Onderwijs** (het
+  lijstadres uit Mailinglijsten, anders `onderwijs@vtk.be`). "Kan je toch niet? Antwoord
+  op deze mail" komt dus bij wie er iets aan kan doen. De melding van een nieuwe aanvraag
+  is de omgekeerde richting: daar gaat antwoorden naar de indiener.
+- **Onderwijs krijgt een mail per nieuwe aanvraag**, geen dagoverzicht. Bij de verwachte
+  aantallen is één mail per aanvraag het snelste signaal; wordt dat te veel, dan is een
+  overzicht de volgende stap.
+- **Geen mail over een sessie die al begonnen is.** Een sessie die achteraf ingevoerd
+  wordt, geeft geen "je geeft een sessie", en een die achteraf geannuleerd wordt omdat ze
+  niet doorging, geen "deze sessie gaat niet door" aan wie gisteren ingeschreven was.
+- Wie een vraag stelde of steunde, krijgt "er is een sessie" maar wordt niet vanzelf
+  ingeschreven: de mail vraagt om in te schrijven, zodat het aantal op de pagina zegt wie
+  echt komt. Wie al tutor of ingeschreven is, krijgt die mail niet, en wie twee
+  gekoppelde vragen steunde, krijgt ze één keer.
+- Het aanbod van een tutor die Onderwijs uiteindelijk niet koos, krijgt geen aparte mail;
+  het staat op "Sessie gepland" bij de indiener. Een tutor die van een sessie gehaald
+  wordt, krijgt evenmin een mail. Allebei bewust weggelaten in deze eerste versie.
+- **De herinnering vertrekt per persoon één keer per moment** (`reminderSentAt` op de
+  tutor en de ingeschrevene), via de background-worker. Wie zich pas binnen 24 uur voor
+  de start inschrijft of tutor wordt, krijgt ze niet meer: een mail die met "morgen"
+  begint voor iets van straks klopt niet, en een tutor kreeg net al een mail. Verschuift
+  het moment, dan gaat de markering terug leeg en komt er een herinnering voor het nieuwe
+  moment. Ze is, anders dan bij de shiften, niet uit te zetten: er is er maar één.
+- Een andere omschrijving of een ander maximum geeft geen mail; enkel wat bepaalt waar en
+  wanneer je moet zijn.
+- De mails vertrekken na het antwoord van de actie (`after()`), zodat een annulering met
+  dertig ingeschrevenen niet wacht op de mailserver. Een mislukte mail laat de actie dus
+  niet mislukken; ze staat in het maillogboek met herkomst PAL+.
 
 PAL+ zit voorlopig enkel op de website, niet in de app. Het saldo in de app komt van de
 server, dus de bonnetjes van een sessie verschijnen daar wel.

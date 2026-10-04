@@ -503,3 +503,24 @@ export function parsePalPlusRewardAmount(raw: string): number | null {
 export function isPalPlusFullMember(sessionsGiven: number): boolean {
   return sessionsGiven >= PAL_PLUS_FULL_MEMBER_SESSIONS;
 }
+
+// -----------------------------------------------------------------------------
+// Herinnering
+// -----------------------------------------------------------------------------
+
+/** De herinnering vertrekt een dag voor de start. */
+export const PAL_PLUS_REMINDER_LEAD_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Wat `reminderSentAt` wordt voor wie er nu bij komt (inschrijven, als tutor
+ * toegevoegd) of wanneer het moment verschuift: `now` als de sessie al binnen
+ * het venster begint, anders leeg.
+ *
+ * Wie zich drie uur voor de start inschrijft, hoort geen mail te krijgen die
+ * met "morgen" begint, en wie net "je geeft een sessie" kreeg, geen tweede mail
+ * vijf minuten later. Ligt het (nieuwe) moment verder dan een dag weg, dan komt
+ * de herinnering gewoon op tijd.
+ */
+export function palPlusReminderHandledAt(startsAt: Date, now: Date): Date | null {
+  return startsAt.getTime() - now.getTime() <= PAL_PLUS_REMINDER_LEAD_MS ? now : null;
+}
