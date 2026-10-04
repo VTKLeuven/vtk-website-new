@@ -5,10 +5,12 @@ import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import type { Locale } from "@vtk/i18n";
 import { Button, Card, ConfirmDialog, Input } from "@vtk/ui";
+import { IconButton } from "@/components/ui/IconButton";
+import { TrashIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import { deleteManualShiftGrantAction } from "@/app/actions/manualShifts";
 import { YearPicker } from "./YearPicker";
-import { ShiftManualGrantModal } from "./ShiftManualGrantModal";
+import { ShiftManualGrantModal, type ManualGrantMode } from "./ShiftManualGrantModal";
 
 export type ManualGrantRow = {
   id: string;
@@ -17,6 +19,7 @@ export type ManualGrantRow = {
   userName: string;
   userEmail: string;
   userRNumber: string | null;
+  /** Negatief bij een afname: -1 is één shift afgenomen. */
   count: number;
   post: string | null;
   reason: string;
@@ -43,7 +46,7 @@ export function ShiftManual({
   const router = useRouter();
   const showToast = useToast();
 
-  const [modalOpen, setModalOpen] = useState(false);
+  const [modal, setModal] = useState<ManualGrantMode | null>(null);
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState<ManualGrantRow | null>(null);
   const [busyDelete, setBusyDelete] = useState(false);
@@ -70,7 +73,14 @@ export function ShiftManual({
 
     if (res.success) {
       showToast({
-        message: nl ? "Toekenning ingetrokken" : "Grant revoked",
+        message:
+          deleting.count < 0
+            ? nl
+              ? "Afname ingetrokken"
+              : "Deduction revoked"
+            : nl
+              ? "Toekenning ingetrokken"
+              : "Grant revoked",
         variant: "success",
       });
       setDeleting(null);
@@ -97,9 +107,14 @@ export function ShiftManual({
           />
         </div>
 
-        <Button type="button" onClick={() => setModalOpen(true)}>
-          {nl ? "+ Extra shiften toekennen" : "+ Grant extra shifts"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="button" variant="ghost" onClick={() => setModal("deduct")}>
+            {nl ? "Shiften afnemen" : "Deduct shifts"}
+          </Button>
+          <Button type="button" onClick={() => setModal("grant")}>
+            {nl ? "+ Extra shiften toekennen" : "+ Grant extra shifts"}
+          </Button>
+        </div>
       </div>
 
       <Card className="overflow-x-auto">
@@ -112,8 +127,10 @@ export function ShiftManual({
               <th className="px-4 py-2">{nl ? "Post" : "Group"}</th>
               <th className="px-4 py-2">{nl ? "Reden / toelichting" : "Reason"}</th>
               <th className="px-4 py-2">{nl ? "Bonnetjes" : "Vouchers"}</th>
-              <th className="px-4 py-2">{nl ? "Toegekend door" : "Granted by"}</th>
-              <th className="w-20 px-4 py-2 text-right">{nl ? "Acties" : "Actions"}</th>
+              <th className="px-4 py-2">{nl ? "Door" : "By"}</th>
+              <th className="w-16 px-4 py-2 text-right">
+                <span className="sr-only">{nl ? "Acties" : "Actions"}</span>
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -129,25 +146,43 @@ export function ShiftManual({
                     {g.userRNumber ? ` • ${g.userRNumber}` : ""}
                   </div>
                 </td>
-                <td className="px-4 py-2 font-semibold text-vtk-blue whitespace-nowrap">
-                  +{g.count} {nl ? (g.count === 1 ? "shift" : "shiften") : g.count === 1 ? "shift" : "shifts"}
+                <td
+                  className={`px-4 py-2 font-semibold whitespace-nowrap tabular-nums ${
+                    g.count < 0 ? "text-vtk-danger" : "text-vtk-blue"
+                  }`}
+                >
+                  {g.count < 0 ? "\u2212" : "+"}
+                  {Math.abs(g.count)}{" "}
+                  {nl
+                    ? Math.abs(g.count) === 1
+                      ? "shift"
+                      : "shiften"
+                    : Math.abs(g.count) === 1
+                      ? "shift"
+                      : "shifts"}
                 </td>
                 <td className="px-4 py-2 text-vtk-body">{g.post ?? "—"}</td>
                 <td className="px-4 py-2 text-vtk-body">{g.reason}</td>
                 <td className="px-4 py-2 text-xs text-vtk-body whitespace-nowrap">
-                  {g.reward > 0
-                    ? `${g.reward} pp ${g.payedOut ? (nl ? "(uitbetaald)" : "(paid)") : nl ? "(openstaand)" : "(unpaid)"}`
-                    : "0"}
+                  {g.count < 0
+                    ? nl
+                      ? "n.v.t."
+                      : "n/a"
+                    : g.reward > 0
+                      ? `${g.reward} pp ${g.payedOut ? (nl ? "(uitbetaald)" : "(paid)") : nl ? "(openstaand)" : "(unpaid)"}`
+                      : "0"}
                 </td>
                 <td className="px-4 py-2 text-xs text-vtk-muted">{g.createdByName ?? "—"}</td>
-                <td className="px-4 py-2 text-right">
-                  <button
-                    type="button"
+                <td className="px-4 py-2">
+                  <IconButton
+                    label={nl ? "Intrekken" : "Revoke"}
+                    srLabel={`${nl ? "Intrekken" : "Revoke"}: ${g.userName}, ${g.count > 0 ? "+" : "\u2212"}${Math.abs(g.count)}`}
+                    tone="danger"
+                    className="ml-auto"
                     onClick={() => setDeleting(g)}
-                    className="text-xs font-medium text-vtk-danger hover:text-vtk-danger hover:underline"
                   >
-                    {nl ? "Intrekken" : "Revoke"}
-                  </button>
+                    <TrashIcon />
+                  </IconButton>
                 </td>
               </tr>
             ))}
@@ -155,8 +190,8 @@ export function ShiftManual({
               <tr>
                 <td colSpan={8} className="px-4 py-8 text-center text-vtk-muted">
                   {nl
-                    ? "Geen manueel toegekende shiften voor dit academiejaar."
-                    : "No manually granted shifts for this academic year."}
+                    ? "Geen manueel toegekende of afgenomen shiften voor dit academiejaar."
+                    : "No manually granted or deducted shifts for this academic year."}
                 </td>
               </tr>
             )}
@@ -164,15 +199,16 @@ export function ShiftManual({
         </table>
       </Card>
 
-      {modalOpen && (
+      {modal && (
         <ShiftManualGrantModal
           locale={locale}
+          mode={modal}
           postOptions={postOptions}
           selectedYear={year}
           availableYears={years}
-          onClose={() => setModalOpen(false)}
+          onClose={() => setModal(null)}
           onSaved={() => {
-            setModalOpen(false);
+            setModal(null);
             router.refresh();
           }}
         />
@@ -180,11 +216,23 @@ export function ShiftManual({
 
       <ConfirmDialog
         open={deleting !== null}
-        title={nl ? "Manuele toekenning intrekken?" : "Revoke manual grant?"}
+        title={
+          deleting && deleting.count < 0
+            ? nl
+              ? "Afname intrekken?"
+              : "Revoke deduction?"
+            : nl
+              ? "Manuele toekenning intrekken?"
+              : "Revoke manual grant?"
+        }
         description={
-          nl
-            ? `Weet je zeker dat je de ${deleting?.count} extra shift(en) van ${deleting?.userName} wil intrekken? De gekoppelde shiften worden permanent verwijderd uit de ranglijst en historiek.`
-            : `Are you sure you want to revoke the ${deleting?.count} extra shift(s) for ${deleting?.userName}? Linked shifts will be permanently removed from rankings and history.`
+          deleting && deleting.count < 0
+            ? nl
+              ? `De afname van ${-deleting.count} shift(en) bij ${deleting.userName} vervalt: die shiften tellen weer mee in de ranglijst en de shiftgeschiedenis. Het adminlogboek houdt bij dat de afname er was.`
+              : `The deduction of ${-deleting.count} shift(s) for ${deleting.userName} is lifted: those shifts count again in the ranking and the shift history. The admin audit log keeps a record of the deduction.`
+            : nl
+              ? `De ${deleting?.count} extra shift(en) van ${deleting?.userName} verdwijnen uit de ranglijst en de shiftgeschiedenis, met hun bonnetjes. De andere shiften van ${deleting?.userName} blijven staan.`
+              : `The ${deleting?.count} extra shift(s) of ${deleting?.userName} disappear from the ranking and the shift history, with their vouchers. ${deleting?.userName}'s other shifts stay.`
         }
         confirmLabel={nl ? "Intrekken" : "Revoke"}
         cancelLabel={nl ? "Annuleren" : "Cancel"}

@@ -74,14 +74,20 @@ function defaultReferenceDate(ay: { start: Date; end: Date }, now: Date): Date {
 }
 
 /**
- * Kent manueel extra shiften toe aan een lid (bv. overdracht van de vorige website).
+ * Kent manueel extra shiften toe aan een lid (bv. overdracht van de vorige
+ * website), of neemt er af met een negatief `count` (bv. niet komen opdagen).
  *
- * Maakt één `ManualShiftGrant`-rij aan en genereert per shift een gekoppelde
- * `Shift` + `ShiftParticipant`-rij met `sourceSystem = "manual"` en `manualGrantId`.
- * Hierdoor tellen deze shiften automatisch mee in álle bestaande queries:
+ * Een toekenning maakt één `ManualShiftGrant`-rij aan en genereert per shift een
+ * gekoppelde `Shift` + `ShiftParticipant`-rij met `sourceSystem = "manual"` en
+ * `manualGrantId`. Hierdoor tellen deze shiften automatisch mee in álle
+ * bestaande queries:
  * - Ranglijst (/admin/shiften, /api/shift/ranking)
  * - Vaste medewerker / voorrang voorverkoop (15 shiften)
  * - Persoonlijke shiftenoverzichten (/shift, /shift/history, app)
+ *
+ * Een afname maakt enkel de `ManualShiftGrant`-rij aan, zonder shiften en zonder
+ * bonnetjes; de tellingen trekken ze er zelf af (`lib/shift/deductions.ts`).
+ * De reden is dan verplicht: er is geen standaardreden voor een afname.
  */
 export async function grantManualShifts(input: GrantManualShiftsInput) {
   const errors: string[] = [];
@@ -92,9 +98,10 @@ export async function grantManualShifts(input: GrantManualShiftsInput) {
   }
 
   const count = Number(input.count);
-  if (!Number.isInteger(count) || count < 1 || count > 100) {
-    errors.push("Aantal shiften moet een geheel getal zijn tussen 1 en 100");
+  if (!Number.isInteger(count) || count === 0 || Math.abs(count) > 100) {
+    errors.push("Aantal shiften moet een geheel getal zijn tussen 1 en 100 (of -1 en -100 om af te nemen)");
   }
+  const deduction = count < 0;
 
   const user = userId
     ? await prisma.user.findUnique({ where: { id: userId }, select: { id: true, name: true } })
@@ -108,13 +115,14 @@ export async function grantManualShifts(input: GrantManualShiftsInput) {
     errors.push("Ongeldig academiejaar");
   }
 
-  const reward = input.reward !== undefined ? Number(input.reward) : 0;
+  // Een afname raakt de bonnetjes niet; wat er meegestuurd wordt, telt niet.
+  const reward = deduction ? 0 : input.reward !== undefined ? Number(input.reward) : 0;
   if (!Number.isInteger(reward) || reward < 0) {
     errors.push("Aantal bonnetjes moet een niet-negatief geheel getal zijn");
   }
 
-  const payedOut = input.payedOut ?? true;
-  const reason = (input.reason ?? "Overdracht vorige website").trim();
+  const payedOut = deduction ? true : (input.payedOut ?? true);
+  const reason = (input.reason ?? (deduction ? "" : "Overdracht vorige website")).trim();
   if (!reason) {
     errors.push("Reden / toelichting is verplicht");
   }
@@ -141,7 +149,8 @@ export async function grantManualShifts(input: GrantManualShiftsInput) {
       },
     });
 
-    for (let i = 0; i < count; i++) {
+    // Een afname heeft geen shiften: de tellingen trekken haar zelf af.
+    for (let i = 0; i < (deduction ? 0 : count); i++) {
       // Milliseconden verschoven zodat elke shift een uniek tijdstip en sourceId heeft
       const sStart = new Date(startTime.getTime() + i * 1000);
       const sEnd = new Date(endTime.getTime() + i * 1000);
@@ -180,16 +189,17 @@ export async function grantManualShifts(input: GrantManualShiftsInput) {
     entity: "shiftManual",
     entityId: grant.id,
     target: user?.name ?? userId,
-    summary: `${count} extra shift(en) toegekend (${post ? `post: ${post}, ` : ""}academiejaar: ${academicYear}-${academicYear + 1}, reden: ${reason})`,
+    summary: `${deduction ? `${-count} shift(en) afgenomen` : `${count} extra shift(en) toegekend`} (${post ? `post: ${post}, ` : ""}academiejaar: ${academicYear}-${academicYear + 1}, reden: ${reason})`,
   });
 
   return grant;
 }
 
 /**
- * Verwijdert een manuele shifttoekenning.
+ * Verwijdert een manuele shifttoekenning of -afname.
  * Dankzij de `onDelete: Cascade` op `Shift.manualGrant` worden alle gekoppelde
- * `Shift`- en `ShiftParticipant`-rijen automatisch mee opgeruimd.
+ * `Shift`- en `ShiftParticipant`-rijen automatisch mee opgeruimd. Een afname
+ * heeft er geen: wie ze intrekt, krijgt die shiften gewoon terug.
  */
 export async function deleteManualShiftGrant(id: string) {
   const grant = await prisma.manualShiftGrant.findUnique({
@@ -210,7 +220,7 @@ export async function deleteManualShiftGrant(id: string) {
     entity: "shiftManual",
     entityId: grant.id,
     target: grant.user.name,
-    summary: `${grant.count} extra shift(en) ingetrokken (${grant.post ? `post: ${grant.post}, ` : ""}academiejaar: ${grant.academicYear}-${grant.academicYear + 1})`,
+    summary: `${grant.count < 0 ? `afname van ${-grant.count} shift(en) ingetrokken` : `${grant.count} extra shift(en) ingetrokken`} (${grant.post ? `post: ${grant.post}, ` : ""}academiejaar: ${grant.academicYear}-${grant.academicYear + 1}, reden: ${grant.reason})`,
   });
 
   return grant;

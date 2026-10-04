@@ -4,6 +4,7 @@ import { cache } from "react";
 import { cookies } from "next/headers";
 import { prisma } from "@vtk/db";
 import type { SessionPayload } from "@vtk/auth";
+import { deductedShifts, netShiftCount, shiftDeductions } from "@/lib/shift/deductions";
 import { currentWorkingYear, workingYearStart } from "@/lib/workingYear";
 import { hasPresale, type PresaleConfig, type PresaleViewer } from "./presale";
 import { presaleCookieName, presaleTokenMatches } from "./presaleLink";
@@ -22,18 +23,26 @@ import { presaleCookieName, presaleTokenMatches } from "./presaleLink";
  * in de ranglijst (`/api/shift/ranking`): de shift is voorbij. Wie voor volgende
  * week ingeschreven staat, heeft ze nog niet gedaan.
  *
+ * Afgenomen shiften van dit werkingsjaar gaan eraf (`lib/shift/deductions.ts`):
+ * wie niet kwam opdagen, haalt de vijftien er niet mee.
+ *
  * Request-gedeeld via React `cache`: de ticketlijst roept dit één keer aan voor
  * een pagina vol events.
  */
 export const completedShiftsThisWorkingYear = cache(async (userId: string): Promise<number> => {
-  return prisma.shiftParticipant.count({
-    where: {
-      userId,
-      shift: {
-        endTime: { gte: workingYearStart(currentWorkingYear()), lt: new Date() },
+  const year = currentWorkingYear();
+  const [done, deductions] = await Promise.all([
+    prisma.shiftParticipant.count({
+      where: {
+        userId,
+        shift: {
+          endTime: { gte: workingYearStart(year), lt: new Date() },
+        },
       },
-    },
-  });
+    }),
+    shiftDeductions({ userIds: [userId], academicYear: year }),
+  ]);
+  return netShiftCount(done, deductedShifts(deductions));
 });
 
 type PresaleEvent = PresaleConfig & {

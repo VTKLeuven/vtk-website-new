@@ -826,6 +826,7 @@
       "post": "Group",
       "count": "Count",
       "noPost": "No group",
+      "deducted": "Deducted by the board",
       "empty": "You have not done any shifts yet."
     }
   },

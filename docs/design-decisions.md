@@ -8532,8 +8532,43 @@ titel waar niemand in valt, krijgt geen kop.
   blijft het één lijst.
 - **Op de site is het een indeling van de ranglijst.** Er hangt geen recht of
   melding aan, en de titel wordt nergens bewaard: hij volgt telkens uit het
-  aantal. Een shift die later geschrapt wordt, kan iemand dus terug onder een
-  drempel zetten.
+  aantal. Een shift die later geschrapt wordt, of een afname (hieronder), kan
+  iemand dus terug onder een drempel zetten.
+
+## Shiften afnemen
+
+Op /admin/shiften, tab Extra shiften, kan wie `shift.manual` heeft naast
+shiften toekennen ook shiften **afnemen**, met een verplichte reden: iemand kwam
+niet opdagen, of er is een andere reden (oktober 2026). Het is dezelfde tabel
+(`ManualShiftGrant`), met een negatief aantal.
+
+- **Een afname is geen negatieve shift.** Een toekenning maakt echte shiften aan
+  en telt daardoor overal vanzelf mee. Een afname heeft geen shiften: anders
+  stond er een shift van min één in iemands lijst, zijn agenda en zijn
+  bonnetjes. Elke plek die shiften *telt*, trekt de afnames er zelf af
+  (`lib/shift/deductions.ts`): de ranglijst en zijn titels, de voorverkoop voor
+  vaste medewerkers (15 shiften), /shift, de shiftgeschiedenis, het profiel in de
+  app en de MCP. Een lijst van shiften raakt ze niet.
+- **Ze raakt de bonnetjes niet.** Bonnetjes hangen aan een shift, en een afname
+  heeft er geen. Kwam iemand niet opdagen en moet ook het bonnetje van die shift
+  weg, dan schrijf je hem uit bij die shift (Beheer): dan valt de shift met haar
+  bonnetjes weg. Een afname daarbovenop is een straf. Het venster zegt dit, zodat
+  niemand denkt dat een afname de bonnetjes al regelt.
+- **Per academiejaar en optioneel per post**, net als een toekenning. Met een
+  post gaat ze in de ranglijst per post van die post af; zonder post van "Geen
+  post".
+- **Nooit onder nul voor het lid, wel voor het beheer.** Wat een lid ziet (/shift,
+  de geschiedenis, de app) en de voorverkoopregel stoppen op nul. De afname
+  blijft wel lopen: wie op nul staat met één shift afgenomen, staat na zijn
+  volgende shift nog op nul. De ranglijst in de admin toont het echte saldo, ook
+  onder nul, zodat het beheer ziet dat er nog een afname openstaat.
+- **Het lid ziet hoeveel, niet waarom.** De shiftgeschiedenis toont een regel
+  "Afgenomen door het beheer" met het aantal. De reden staat in de lijst op de
+  tab en in het adminlogboek, en is voor het beheer: er kan een interne
+  opmerking in staan.
+- **Gelogd, ook na het intrekken.** Afnemen en intrekken komen allebei in het
+  adminlogboek (`shiftManual`), met de reden. Wie een afname intrekt, haalt ze
+  uit de tellingen, maar het logboek houdt bij dat ze er was.
 
 ## Ticketsjablonen: een cantus is elke keer dezelfde verkoop op een andere dag
 

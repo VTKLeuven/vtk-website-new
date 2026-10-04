@@ -3,6 +3,7 @@ import { pick } from "@vtk/i18n";
 
 import { academicYearRange } from "@/lib/shift";
 import { earnedShiftReward } from "@/lib/shift/rewards";
+import { deductedShifts, netShiftCount, shiftDeductions } from "@/lib/shift/deductions";
 import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import { corsPreflight } from "@/lib/cors";
 import { requireSession } from "@/lib/session";
@@ -31,7 +32,7 @@ export async function GET(request: Request) {
     const locale = appLocaleFrom(new URL(request.url).searchParams.get("locale"));
     const now = new Date();
 
-    const [user, participations, praesidium] = await Promise.all([
+    const [user, participations, praesidium, deductions] = await Promise.all([
       prisma.user.findUnique({
         where: { id: session.user.id },
         select: { name: true, email: true, rNumber: true, avatarKey: true, studyProgrammes: true },
@@ -54,6 +55,7 @@ export async function GET(request: Request) {
         },
       }),
       praesidiumYears([session.user.id]),
+      shiftDeductions({ userIds: [session.user.id] }),
     ]);
     // Een shift uit een praesidiumjaar levert niets op (`earnedShiftReward`).
     const earned = (shift: { reward: number; startTime: Date }) =>
@@ -92,7 +94,8 @@ export async function GET(request: Request) {
         }))
         .sort((a, b) => a.start.localeCompare(b.start)),
       unpaidShiftsThisYear: unpaid,
-      totalShifts: participations.length,
+      // Afgenomen shiften gaan eraf (`lib/shift/deductions.ts`), nooit onder nul.
+      totalShifts: netShiftCount(participations.length, deductedShifts(deductions)),
     };
 
     return appJson(request, payload);

@@ -147,6 +147,54 @@ describe("grantManualShifts", () => {
     await expect(
       grantManualShifts({ userId: "user_123", count: 101 }),
     ).rejects.toThrow(ManualShiftValidationError);
+
+    await expect(
+      grantManualShifts({ userId: "user_123", count: -101, reason: "Niet komen opdagen" }),
+    ).rejects.toThrow(ManualShiftValidationError);
+  });
+
+  it("afnemen: maakt enkel de rij aan, zonder shiften en zonder bonnetjes", async () => {
+    mocks.tx.manualShiftGrant.create.mockResolvedValue({ id: "grant_2", count: -2 });
+
+    await grantManualShifts({
+      userId: "user_123",
+      count: -2,
+      post: "BAR",
+      academicYear: 2026,
+      reason: "Niet komen opdagen",
+      // Wat er voor bonnetjes meekomt, telt bij een afname niet.
+      reward: 3,
+      payedOut: false,
+      actorId: "admin_1",
+    });
+
+    expect(mocks.tx.manualShiftGrant.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: "user_123",
+        count: -2,
+        post: "BAR",
+        reason: "Niet komen opdagen",
+        academicYear: 2026,
+        reward: 0,
+        payedOut: true,
+        createdById: "admin_1",
+      }),
+    });
+    expect(mocks.tx.shift.create).not.toHaveBeenCalled();
+    expect(mocks.logAudit).toHaveBeenCalledWith({
+      action: "create",
+      entity: "shiftManual",
+      entityId: "grant_2",
+      target: "Jef Vermassen",
+      summary: expect.stringMatching(/^2 shift\(en\) afgenomen .*reden: Niet komen opdagen/),
+    });
+  });
+
+  it("afnemen: vraagt een reden, er is geen standaardreden", async () => {
+    await expect(
+      grantManualShifts({ userId: "user_123", count: -1 }),
+    ).rejects.toThrow(ManualShiftValidationError);
+    expect(mocks.tx.manualShiftGrant.create).not.toHaveBeenCalled();
   });
 
   it("valideert invoer: gooit fout als gebruiker niet bestaat", async () => {
@@ -240,6 +288,26 @@ describe("deleteManualShiftGrant", () => {
       target: "Jef Vermassen",
       summary: expect.stringContaining("5 extra shift(en) ingetrokken"),
     });
+  });
+
+  it("logt het intrekken van een afname als afname", async () => {
+    mocks.manualShiftGrantFindUnique.mockResolvedValue({
+      id: "grant_2",
+      count: -1,
+      post: null,
+      reason: "Niet komen opdagen",
+      academicYear: 2026,
+      user: { id: "user_123", name: "Jef Vermassen" },
+    });
+
+    await deleteManualShiftGrant("grant_2");
+
+    expect(mocks.logAudit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: "delete",
+        summary: expect.stringContaining("afname van 1 shift(en) ingetrokken"),
+      }),
+    );
   });
 
   it("geeft null terug als toekenning niet bestaat", async () => {
