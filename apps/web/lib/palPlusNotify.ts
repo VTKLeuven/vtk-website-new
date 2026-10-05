@@ -7,14 +7,18 @@ import { preferredEmail } from "@/lib/brevo/contacts";
 import { derivedGroupMailAddress, groupMailAddress } from "@/lib/groupMail";
 import { siteBaseUrl } from "@/lib/calendar/feeds";
 import {
+  palPlusAvailabilityLines,
   palPlusCourseLabel,
   palPlusRequestCourseLabel,
   palPlusRoomLabel,
+  readPalPlusAvailability,
   PAL_PLUS_REMINDER_LEAD_MS,
 } from "@/lib/palPlus";
 import { earnedPalPlusReward } from "@/lib/shift/rewards";
 import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import {
+  palPlusCoTutorAnsweredMail,
+  palPlusCoTutorInvitationMail,
   palPlusNewRequestNotificationMail,
   palPlusRequestClosedMail,
   palPlusRequestPublishedMail,
@@ -25,6 +29,7 @@ import {
   palPlusSessionReminderMail,
   palPlusTutorAssignedMail,
   type PalPlusMail,
+  type PalPlusMailAvailability,
   type PalPlusMailLocale,
   type PalPlusMailRole,
   type PalPlusMailSession,
@@ -196,21 +201,30 @@ const requestSelect = {
   status: true,
   description: true,
   courseOther: true,
-  proposedStartsAt: true,
-  proposedEndsAt: true,
+  tags: true,
+  availability: true,
+  availabilityNote: true,
   preferredPeriod: true,
   reviewNote: true,
+  coTutorStatus: true,
   course: { select: { code: true, nameNl: true, nameEn: true } },
   user: { select: recipientSelect },
+  coTutor: { select: recipientSelect },
   respondsTo: {
     select: { courseOther: true, course: { select: { code: true, nameNl: true, nameEn: true } } },
   },
 } as const;
 
-function proposedOf(request: { proposedStartsAt: Date | null; proposedEndsAt: Date | null }) {
-  return request.proposedStartsAt && request.proposedEndsAt
-    ? { startsAt: request.proposedStartsAt, endsAt: request.proposedEndsAt }
-    : null;
+/** Het rooster en de opmerking van een aanbod, in de taal van de ontvanger; `null` bij een vraag. */
+function availabilityOf(
+  request: { kind: "GIVE" | "FOLLOW"; availability: unknown; availabilityNote: string | null },
+  locale: PalPlusMailLocale,
+): PalPlusMailAvailability | null {
+  if (request.kind !== "GIVE") return null;
+  return {
+    lines: palPlusAvailabilityLines(readPalPlusAvailability(request.availability), locale),
+    note: request.availabilityNote,
+  };
 }
 
 /** Na het indienen: een bevestiging naar de indiener, een melding naar Onderwijs. */
@@ -232,7 +246,9 @@ export function notifyPalPlusRequestSubmitted(requestId: string): Promise<void> 
           kind: request.kind,
           courseLabel: palPlusRequestCourseLabel(request, locale),
           description: request.description,
-          proposed: proposedOf(request),
+          tags: request.tags,
+          availability: availabilityOf(request, locale),
+          coTutorName: request.coTutor?.name ?? null,
           pageUrl: pageUrl(locale),
         }),
         { replyTo: onderwijs },
@@ -248,7 +264,9 @@ export function notifyPalPlusRequestSubmitted(requestId: string): Promise<void> 
         courseLabel: palPlusRequestCourseLabel(request, "nl"),
         courseTyped: !request.course,
         description: request.description,
-        proposed: proposedOf(request),
+        tags: request.tags,
+        availability: availabilityOf(request, "nl"),
+        coTutorName: request.coTutor?.name ?? null,
         preferredPeriod: request.preferredPeriod,
         respondsToLabel: request.respondsTo ? palPlusRequestCourseLabel(request.respondsTo, "nl") : null,
         adminUrl: `${siteBaseUrl()}/admin/pal-plus`,
@@ -298,6 +316,55 @@ export function notifyPalPlusRequestClosed(requestId: string, wasOnline: boolean
         wasOnline,
         courseLabel: palPlusRequestCourseLabel(request, locale),
         reason: request.reviewNote,
+        pageUrl: pageUrl(locale),
+      }),
+      { replyTo: await onderwijsAddress() },
+    );
+  });
+}
+
+/** De tweede tutor van een nieuw aanbod: een uitnodiging om te bevestigen. */
+export function notifyPalPlusCoTutorInvited(requestId: string): Promise<void> {
+  return safely("uitnodiging voor de tweede tutor", async () => {
+    const request = await prisma.palPlusRequest.findUnique({ where: { id: requestId }, select: requestSelect });
+    if (!request?.coTutor || request.coTutorStatus !== "PENDING") return;
+    const coTutor = request.coTutor as Recipient;
+    if (coTutor.deletedAt !== null) return;
+    const locale = mailLocale(coTutor);
+    await deliver(
+      preferredEmail(coTutor),
+      palPlusCoTutorInvitationMail({
+        locale,
+        name: greetingName(coTutor),
+        inviterName: request.user.name,
+        courseLabel: palPlusRequestCourseLabel(request, locale),
+        description: request.description,
+        tags: request.tags,
+        availability: availabilityOf(request, locale),
+        pageUrl: pageUrl(locale),
+      }),
+      // Een vraag over het aanbod hoort bij wie het indiende, niet bij Onderwijs.
+      { replyTo: preferredEmail(request.user as Recipient) },
+    );
+  });
+}
+
+/** De tweede tutor antwoordde: bericht aan wie het aanbod indiende. */
+export function notifyPalPlusCoTutorAnswered(requestId: string): Promise<void> {
+  return safely("antwoord van de tweede tutor", async () => {
+    const request = await prisma.palPlusRequest.findUnique({ where: { id: requestId }, select: requestSelect });
+    if (!request?.coTutor || (request.coTutorStatus !== "ACCEPTED" && request.coTutorStatus !== "DECLINED")) return;
+    const user = request.user as Recipient;
+    if (user.deletedAt !== null) return;
+    const locale = mailLocale(user);
+    await deliver(
+      preferredEmail(user),
+      palPlusCoTutorAnsweredMail({
+        locale,
+        name: greetingName(user),
+        coTutorName: request.coTutor.name,
+        accepted: request.coTutorStatus === "ACCEPTED",
+        courseLabel: palPlusRequestCourseLabel(request, locale),
         pageUrl: pageUrl(locale),
       }),
       { replyTo: await onderwijsAddress() },

@@ -4,9 +4,12 @@ import type { Locale } from "@vtk/i18n";
 import Link from "@/components/ui/Link";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
+import { brusselsYMD, ymdKey } from "@/lib/brussels";
 import {
   palPlusAskerCount,
+  palPlusAvailabilityGrid,
   palPlusCourseLabel,
+  readPalPlusAvailability,
   palPlusRequestCourseLabel,
   palPlusRoomLabel,
   palPlusSessionState,
@@ -14,6 +17,7 @@ import {
   PAL_PLUS_STATUS_LABELS,
 } from "@/lib/palPlus";
 import { CoursesCard, type PalPlusCourseView } from "./CoursesCard";
+import { DaypartsCard, TagsCard } from "./ListsCards";
 import { RequestsBoard, type OpenFollowRequest, type PalPlusRequestView } from "./RequestsBoard";
 import { SessionsBoard, type PalPlusSessionView } from "./SessionsBoard";
 import { TutorsBoard, type TutorView } from "./TutorsBoard";
@@ -30,11 +34,15 @@ import {
 import type { RoomGroup } from "./SessionForm";
 
 import "@/app/design/vtk-palplus.css";
+// Het maandraster van de agenda is dat van de Theokot-verhuur
+// (`components/theokot/RentalMonthGrid`), met zijn stijl.
+import "@/app/design/vtk-theokot-verhuur.css";
 
 /**
  * Beheer van PAL+ door VTK Onderwijs: het werkbakje met wat nog beslist moet
- * worden, de sessies, wat al afgehandeld is, en de vakkenlijst. De tutors
- * komen er als tab bij. Zie docs/design-decisions.md ("PAL+").
+ * worden, de sessies, de tutors, wat al afgehandeld is, en de lijsten die
+ * Onderwijs bijhoudt (vakken, snelle tags, dagdelen). Zie
+ * docs/design-decisions.md ("PAL+").
  */
 
 const TABS = ["aanvragen", "sessies", "tutors", "verwerkt", "vakken"] as const;
@@ -45,7 +53,7 @@ const TAB_LABELS: Record<Tab, { nl: string; en: string }> = {
   sessies: { nl: "Sessies", en: "Sessions" },
   tutors: { nl: "Tutors", en: "Tutors" },
   verwerkt: { nl: "Verwerkt", en: "Processed" },
-  vakken: { nl: "Vakken", en: "Courses" },
+  vakken: { nl: "Lijsten", en: "Lists" },
 };
 
 /** Hoe ver terug de tab Sessies kijkt; ouder zit in de tutorlijst per werkingsjaar. */
@@ -126,16 +134,39 @@ export default async function AdminPalPlusPage({
       {tab === "tutors" ? (
         <TutorsTab nl={nl} base={base} locale={locale} year={parseWorkingYear(jaar)} />
       ) : tab === "sessies" ? (
-        <SessionsBoard nl={nl} {...await loadSessions(locale)} courses={sessionCourses} rooms={await loadRooms()} />
-      ) : tab === "vakken" ? (
-        <CoursesCard
+        <SessionsBoard
           nl={nl}
-          courses={courseRows.map(({ _count, ...course }): PalPlusCourseView => ({
-            ...course,
-            requestCount: _count.requests,
-            sessionCount: _count.sessions,
-          }))}
+          todayKey={ymdKey(brusselsYMD(new Date()))}
+          {...await loadSessions(locale)}
+          courses={sessionCourses}
+          rooms={await loadRooms()}
+          tags={await loadTagSuggestions()}
         />
+      ) : tab === "vakken" ? (
+        <div className="space-y-5">
+          <CoursesCard
+            nl={nl}
+            courses={courseRows.map(({ _count, ...course }): PalPlusCourseView => ({
+              ...course,
+              requestCount: _count.requests,
+              sessionCount: _count.sessions,
+            }))}
+          />
+          <TagsCard
+            nl={nl}
+            tags={await prisma.palPlusTag.findMany({
+              orderBy: [{ active: "desc" }, { createdAt: "asc" }],
+              select: { id: true, label: true, active: true },
+            })}
+          />
+          <DaypartsCard
+            nl={nl}
+            dayparts={await prisma.palPlusDaypart.findMany({
+              orderBy: [{ active: "desc" }, { startMinutes: "asc" }],
+              select: { id: true, labelNl: true, labelEn: true, startMinutes: true, endMinutes: true, active: true },
+            })}
+          />
+        </div>
       ) : (
         <RequestsBoard
           nl={nl}
@@ -145,6 +176,7 @@ export default async function AdminPalPlusPage({
           courses={sessionCourses}
           rooms={tab === "aanvragen" ? await loadRooms() : []}
           openFollow={tab === "aanvragen" ? await loadOpenFollow(locale) : []}
+          tags={tab === "aanvragen" ? await loadTagSuggestions() : { presets: [], byCourse: {} }}
         />
       )}
     </div>
@@ -174,14 +206,17 @@ async function loadRequests(mode: "queue" | "processed", locale: Locale): Promis
       courseId: true,
       courseOther: true,
       description: true,
-      proposedStartsAt: true,
-      proposedEndsAt: true,
+      tags: true,
+      availability: true,
+      availabilityNote: true,
       preferredPeriod: true,
       reviewNote: true,
       reviewedAt: true,
       createdAt: true,
+      coTutorStatus: true,
       course: { select: courseSelect },
       user: { select: { id: true, name: true, email: true } },
+      coTutor: { select: { id: true, name: true } },
       reviewedBy: { select: { name: true } },
       respondsTo: {
         select: { id: true, status: true, courseOther: true, description: true, course: { select: courseSelect } },
@@ -199,18 +234,6 @@ async function loadRequests(mode: "queue" | "processed", locale: Locale): Promis
     month: "short",
     timeZone: "Europe/Brussels",
   });
-  const dayFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    timeZone: "Europe/Brussels",
-  });
-  const timeFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Europe/Brussels",
-  });
-
   return rows.map((row) => ({
     id: row.id,
     kind: row.kind,
@@ -223,17 +246,12 @@ async function loadRequests(mode: "queue" | "processed", locale: Locale): Promis
     submitterName: row.user.name,
     submitterEmail: row.user.email,
     submittedLabel: dateFmt.format(row.createdAt),
-    momentLabel:
-      row.proposedStartsAt && row.proposedEndsAt
-        ? `${dayFmt.format(row.proposedStartsAt)}, ${timeFmt.format(row.proposedStartsAt)} - ${timeFmt.format(row.proposedEndsAt)}`
-        : null,
-    proposed:
-      row.proposedStartsAt && row.proposedEndsAt
-        ? {
-            date: palPlusWallClockFields(row.proposedStartsAt).date,
-            startTime: palPlusWallClockFields(row.proposedStartsAt).time,
-            endTime: palPlusWallClockFields(row.proposedEndsAt).time,
-          }
+    tags: row.tags,
+    availability: palPlusAvailabilityGrid(readPalPlusAvailability(row.availability)),
+    availabilityNote: row.availabilityNote,
+    coTutor:
+      row.coTutor && row.coTutorStatus
+        ? { id: row.coTutor.id, name: row.coTutor.name, status: row.coTutorStatus }
         : null,
     preferredPeriod: row.preferredPeriod,
     askers: palPlusAskerCount(row.backers.length),
@@ -263,6 +281,42 @@ async function loadRequests(mode: "queue" | "processed", locale: Locale): Promis
           : `${row.status === "CLOSED" ? "By" : "Published by"} ${row.reviewedBy.name} on ${dateFmt.format(row.reviewedAt)}`
         : null,
   }));
+}
+
+/**
+ * De tags voor het sessieformulier: de snelle tags, en per vak de tags die er al
+ * gebruikt werden, de meest gebruikte eerst. In het beheer mogen ook die van
+ * aanvragen die nog niet nagekeken zijn mee: enkel Onderwijs ziet ze.
+ */
+async function loadTagSuggestions(): Promise<{ presets: string[]; byCourse: Record<string, string[]> }> {
+  const [presets, requests, sessions] = await Promise.all([
+    prisma.palPlusTag.findMany({ where: { active: true }, orderBy: { createdAt: "asc" }, select: { label: true } }),
+    prisma.palPlusRequest.findMany({
+      where: { courseId: { not: null }, NOT: { tags: { isEmpty: true } } },
+      select: { courseId: true, tags: true },
+      take: 1000,
+    }),
+    prisma.palPlusSession.findMany({
+      where: { NOT: { tags: { isEmpty: true } } },
+      select: { courseId: true, tags: true },
+      take: 1000,
+    }),
+  ]);
+  const counts = new Map<string, Map<string, number>>();
+  for (const row of [...requests, ...sessions]) {
+    if (!row.courseId) continue;
+    const perCourse = counts.get(row.courseId) ?? new Map<string, number>();
+    for (const tag of row.tags) perCourse.set(tag, (perCourse.get(tag) ?? 0) + 1);
+    counts.set(row.courseId, perCourse);
+  }
+  const byCourse: Record<string, string[]> = {};
+  for (const [courseId, perCourse] of counts) {
+    byCourse[courseId] = [...perCourse.entries()]
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, 10)
+      .map(([tag]) => tag);
+  }
+  return { presets: presets.map((preset) => preset.label), byCourse };
 }
 
 /**
@@ -334,6 +388,7 @@ async function loadSessions(locale: Locale): Promise<{ upcoming: PalPlusSessionV
     id: true,
     courseId: true,
     description: true,
+    tags: true,
     startsAt: true,
     endsAt: true,
     maxParticipants: true,
@@ -398,6 +453,9 @@ async function loadSessions(locale: Locale): Promise<{ upcoming: PalPlusSessionV
       id: row.id,
       courseLabel: palPlusCourseLabel(row.course, locale),
       description: row.description,
+      tags: row.tags,
+      dayKey: ymdKey(brusselsYMD(row.startsAt)),
+      timeLabel: timeFmt.format(row.startsAt),
       whenLabel: `${dayFmt.format(row.startsAt)}, ${timeFmt.format(row.startsAt)} - ${timeFmt.format(row.endsAt)}`,
       state: palPlusSessionState(row, now),
       roomLabel: palPlusRoomLabel(row.room, row.roomText),
@@ -430,6 +488,7 @@ async function loadSessions(locale: Locale): Promise<{ upcoming: PalPlusSessionV
         id: row.id,
         courseId: row.courseId,
         description: row.description,
+        tags: row.tags,
         date: start.date,
         startTime: start.time,
         endTime: end.time,

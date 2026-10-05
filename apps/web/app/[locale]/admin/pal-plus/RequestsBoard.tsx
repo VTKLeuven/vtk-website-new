@@ -17,8 +17,11 @@ import {
   isActivePalPlusStatus,
   PAL_PLUS_LIMITS,
   PAL_PLUS_STATUS_LABELS,
+  type PalPlusAvailabilityGridView,
+  type PalPlusCoTutorStatusCode,
   type PalPlusRequestStatusCode,
 } from "@/lib/palPlus";
+import { AvailabilityView } from "@/components/palPlus/AvailabilityGrid";
 import { palPlusAdminErrors } from "@/lib/palPlusMessages";
 import type { SaveState } from "@/lib/saveState";
 import {
@@ -27,6 +30,7 @@ import {
   type Person,
   type RoomGroup,
   type SessionCourseOption,
+  type TagSuggestions,
 } from "./SessionForm";
 
 export type PalPlusRequestView = {
@@ -43,9 +47,12 @@ export type PalPlusRequestView = {
   submitterName: string;
   submitterEmail: string;
   submittedLabel: string;
-  momentLabel: string | null;
-  /** Het voorgestelde moment als formuliervelden (Brusselse wandklok), voor het plannen. */
-  proposed: { date: string; startTime: string; endTime: string } | null;
+  tags: string[];
+  /** Enkel bij een aanbod: wanneer de tutor(s) meestal kunnen. */
+  availability: PalPlusAvailabilityGridView;
+  availabilityNote: string | null;
+  /** De tweede tutor van een aanbod, met of die al bevestigde. */
+  coTutor: { id: string; name: string; status: PalPlusCoTutorStatusCode } | null;
   preferredPeriod: string | null;
   askers: number;
   backerNames: string[];
@@ -79,6 +86,7 @@ export function RequestsBoard({
   courses,
   rooms,
   openFollow,
+  tags,
 }: {
   nl: boolean;
   base: string;
@@ -87,6 +95,7 @@ export function RequestsBoard({
   courses: AssignableCourse[];
   rooms: RoomGroup[];
   openFollow: OpenFollowRequest[];
+  tags: TagSuggestions;
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = requests.find((request) => request.id === selectedId) ?? null;
@@ -153,7 +162,15 @@ export function RequestsBoard({
                       <span className="vtk-palplus-sub">{nl ? "Nog na te kijken" : "Still to review"}</span>
                     )}
                   </td>
-                  <td data-label={nl ? "Wie" : "Who"}>{request.submitterName}</td>
+                  <td data-label={nl ? "Wie" : "Who"}>
+                    {request.submitterName}
+                    {request.coTutor && request.coTutor.status !== "DECLINED" && (
+                      <span className="vtk-palplus-sub">
+                        {nl ? "met" : "with"} {request.coTutor.name}
+                        {request.coTutor.status === "PENDING" ? (nl ? " (wacht)" : " (waiting)") : ""}
+                      </span>
+                    )}
+                  </td>
                   {mode === "queue" ? (
                     <td data-label={nl ? "Zoeken dit" : "Need this"} className="is-num">
                       {request.kind === "FOLLOW" ? request.askers : <span className="text-vtk-muted">-</span>}
@@ -186,6 +203,7 @@ export function RequestsBoard({
             courses={courses}
             rooms={rooms}
             openFollow={openFollow}
+            tags={tags}
             onDone={() => setSelectedId(null)}
           />
         </Modal>
@@ -201,6 +219,7 @@ function RequestDetail({
   courses,
   rooms,
   openFollow,
+  tags,
   onDone,
 }: {
   nl: boolean;
@@ -209,6 +228,7 @@ function RequestDetail({
   courses: AssignableCourse[];
   rooms: RoomGroup[];
   openFollow: OpenFollowRequest[];
+  tags: TagSuggestions;
   onDone: () => void;
 }) {
   const errors = palPlusAdminErrors(nl);
@@ -225,6 +245,7 @@ function RequestDetail({
         courses={courses}
         rooms={rooms}
         openFollow={openFollow}
+        tags={tags}
         onBack={() => setPlanning(false)}
         onDone={onDone}
       />
@@ -257,10 +278,13 @@ function RequestDetail({
           <dt>{nl ? "Ingediend op" : "Submitted on"}</dt>
           <dd>{request.submittedLabel}</dd>
         </div>
-        {give && request.momentLabel && (
+        {give && request.coTutor && (
           <div>
-            <dt>{nl ? "Voorgesteld moment" : "Proposed moment"}</dt>
-            <dd>{request.momentLabel}</dd>
+            <dt>{nl ? "Samen met" : "Together with"}</dt>
+            <dd>
+              {request.coTutor.name}{" "}
+              <span className="text-vtk-muted">({coTutorStatusLabel(request.coTutor.status, nl)})</span>
+            </dd>
           </div>
         )}
         {!give && (
@@ -280,7 +304,22 @@ function RequestDetail({
       <div>
         <p className="vtk-palplus-label">{give ? (nl ? "Wat de tutor wil behandelen" : "What the tutor wants to cover") : nl ? "Waarmee ze hulp zoeken" : "What they need help with"}</p>
         <div className="vtk-palplus-text">{request.description}</div>
+        {request.tags.length > 0 && (
+          <ul className="pp-taglist">
+            {request.tags.map((tag) => (
+              <li key={tag}>{tag}</li>
+            ))}
+          </ul>
+        )}
       </div>
+
+      {give && (request.availability.rows.length > 0 || request.availabilityNote) && (
+        <div>
+          <p className="vtk-palplus-label">{nl ? "Kan meestal" : "Usually available"}</p>
+          <AvailabilityView grid={request.availability} nl={nl} />
+          {request.availabilityNote && <div className="vtk-palplus-text mt-2">{request.availabilityNote}</div>}
+        </div>
+      )}
 
       {give && request.respondsTo && (
         <div>
@@ -352,8 +391,8 @@ function RequestDetail({
           <p className="mb-3 text-sm text-vtk-muted">
             {give
               ? nl
-                ? "Plan de sessie met deze tutor. Het moment, het vak en de omschrijving staan al ingevuld; je kan ze nog aanpassen."
-                : "Plan the session with this tutor. The moment, course and description are filled in; you can still change them."
+                ? "Plan de sessie: de tutors, het vak, de omschrijving en de tags staan al ingevuld. Kies een moment dat in het rooster van de tutor past."
+                : "Plan the session: the tutors, course, description and tags are filled in. Pick a moment that fits the tutor's availability."
               : nl
                 ? "Kies een tutor (of een van de aanbiedingen) en een moment. Wie de vraag stelde, ziet daarna de sessie bij de aanvraag."
                 : "Pick a tutor (or one of the offers) and a moment. Whoever asked then sees the session with the request."}
@@ -416,8 +455,8 @@ function RequestDetail({
                       ? "Koos de indiener het verkeerde vak, zet het hier recht."
                       : "If the submitter picked the wrong course, correct it here."
                     : nl
-                      ? "Staat het vak er niet bij, zet het dan eerst in de lijst onder Vakken. Een sessie hangt altijd aan een vak uit de lijst."
-                      : "If the course is not there, add it under Courses first. A session always belongs to a course from the list."}
+                      ? "Staat het vak er niet bij, zet het dan eerst in de vakkenlijst onder Lijsten. Een sessie hangt altijd aan een vak uit de lijst."
+                      : "If the course is not there, add it to the course list under Lists first. A session always belongs to a course from the list."}
                 </p>
               </div>
             </SaveForm>
@@ -599,6 +638,7 @@ function PlanFromRequest({
   courses,
   rooms,
   openFollow,
+  tags,
   onBack,
   onDone,
 }: {
@@ -607,6 +647,7 @@ function PlanFromRequest({
   courses: SessionCourseOption[];
   rooms: RoomGroup[];
   openFollow: OpenFollowRequest[];
+  tags: TagSuggestions;
   onBack: () => void;
   onDone: () => void;
 }) {
@@ -642,7 +683,14 @@ function PlanFromRequest({
     }
   }
 
-  const tutors: Person[] = give ? [{ id: request.submitterId, name: request.submitterName }] : [];
+  // De tweede tutor enkel als die bevestigde: wie nog niet antwoordde, staat er
+  // niet ongevraagd op.
+  const tutors: Person[] = give
+    ? [
+        { id: request.submitterId, name: request.submitterName },
+        ...(request.coTutor?.status === "ACCEPTED" ? [{ id: request.coTutor.id, name: request.coTutor.name }] : []),
+      ]
+    : [];
   const suggestions: Person[] = give
     ? []
     : request.responses
@@ -656,11 +704,25 @@ function PlanFromRequest({
           {nl ? "Terug naar de aanvraag" : "Back to the request"}
         </Button>
       </div>
+      {give && (request.availability.rows.length > 0 || request.availabilityNote) && (
+        <div>
+          <p className="vtk-palplus-label">{nl ? "Kan meestal" : "Usually available"}</p>
+          <AvailabilityView grid={request.availability} nl={nl} />
+          {request.availabilityNote && <div className="vtk-palplus-text mt-2">{request.availabilityNote}</div>}
+        </div>
+      )}
+      {give && request.coTutor?.status === "PENDING" && (
+        <p className="text-sm text-vtk-muted">
+          {nl
+            ? `${request.coTutor.name} bevestigde nog niet en staat dus niet bij de tutors. Plan je nu, dan kan je die later nog toevoegen.`
+            : `${request.coTutor.name} has not confirmed yet, so is not among the tutors. If you plan now, you can still add them later.`}
+        </p>
+      )}
       {!request.courseId && (
         <p className="text-sm text-vtk-muted">
           {nl
-            ? `De indiener tikte "${request.courseTyped ?? ""}" in. Kies hieronder het vak uit de lijst, of zet het eerst in de lijst onder Vakken.`
-            : `The submitter typed "${request.courseTyped ?? ""}". Pick the course from the list below, or add it under Courses first.`}
+            ? `De indiener tikte "${request.courseTyped ?? ""}" in. Kies hieronder het vak uit de lijst, of zet het eerst in de vakkenlijst onder Lijsten.`
+            : `The submitter typed "${request.courseTyped ?? ""}". Pick the course from the list below, or add it to the course list under Lists first.`}
         </p>
       )}
       <SessionForm
@@ -669,9 +731,10 @@ function PlanFromRequest({
           id: null,
           courseId: request.courseId ?? "",
           description: request.description,
-          date: request.proposed?.date ?? "",
-          startTime: request.proposed?.startTime ?? "",
-          endTime: request.proposed?.endTime ?? "",
+          tags: request.tags,
+          date: "",
+          startTime: "",
+          endTime: "",
           maxParticipants: "",
           roomId: "",
           roomText: "",
@@ -681,8 +744,23 @@ function PlanFromRequest({
         rooms={rooms}
         linkable={linkable}
         tutorSuggestions={suggestions}
+        tags={tags}
         onDone={onDone}
       />
     </div>
   );
+}
+
+function coTutorStatusLabel(status: PalPlusCoTutorStatusCode, nl: boolean): string {
+  return status === "ACCEPTED"
+    ? nl
+      ? "bevestigd"
+      : "confirmed"
+    : status === "DECLINED"
+      ? nl
+        ? "zei nee"
+        : "declined"
+      : nl
+        ? "moet nog bevestigen"
+        : "still has to confirm";
 }

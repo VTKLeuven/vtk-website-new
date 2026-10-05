@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  palPlusCoTutorAnsweredMail,
+  palPlusCoTutorInvitationMail,
   palPlusMailMoment,
   palPlusNewRequestNotificationMail,
   palPlusRequestClosedMail,
@@ -35,18 +37,23 @@ describe("palPlusMailMoment", () => {
 });
 
 describe("bevestiging na het indienen", () => {
-  it("noemt bij een aanbod het voorgestelde moment", () => {
+  it("noemt bij een aanbod het rooster, de opmerking en de medetutor", () => {
     const mail = palPlusRequestReceivedMail({
       locale: "nl",
       name: "Fien",
       kind: "GIVE",
       courseLabel: "Thermodynamica",
       description: "Oefeningen",
-      proposed: { startsAt: START, endsAt: END },
+      tags: ["Oefeningen"],
+      availability: { lines: ["Maandag: Avond (18:00-22:00)"], note: "Niet op 12 oktober." },
+      coTutorName: "Lien",
       pageUrl: PAGE,
     });
     expect(mail.subject).toBe("Je PAL+-aanbod is binnen: Thermodynamica");
-    expect(mail.text).toContain("Voorgesteld moment: donderdag 22 oktober, 14:00 - 16:00");
+    expect(mail.text).toContain("Tags: Oefeningen");
+    expect(mail.text).toContain("Maandag: Avond (18:00-22:00)");
+    expect(mail.text).toContain("Opmerking: Niet op 12 oktober.");
+    expect(mail.text).toContain("Lien kreeg een mail om te bevestigen");
     expect(mail.text).toContain(`${PAGE}#jouw-aanvragen`);
   });
 
@@ -57,11 +64,13 @@ describe("bevestiging na het indienen", () => {
       kind: "FOLLOW",
       courseLabel: "Statics",
       description: "Free body diagrams",
-      proposed: null,
+      tags: [],
+      availability: null,
+      coTutorName: null,
       pageUrl: PAGE,
     });
     expect(mail.text).toContain("reviews your request");
-    expect(mail.text).not.toContain("Proposed moment");
+    expect(mail.text).not.toContain("When you are available");
   });
 
   it("escapet wat de indiener intikte in de html", () => {
@@ -71,7 +80,9 @@ describe("bevestiging na het indienen", () => {
       kind: "FOLLOW",
       courseLabel: "Vak",
       description: '<script>alert("x")</script>',
-      proposed: null,
+      tags: [],
+      availability: null,
+      coTutorName: null,
       pageUrl: PAGE,
     });
     expect(mail.html).not.toContain("<script>");
@@ -203,7 +214,9 @@ describe("melding aan Onderwijs", () => {
       courseLabel: "Statica",
       courseTyped: true,
       description: "Vrijlichaamsdiagrammen",
-      proposed: null,
+      tags: ["Oefeningen"],
+      availability: null,
+      coTutorName: null,
       preferredPeriod: "januari",
       respondsToLabel: null,
       adminUrl: "https://vtk.be/admin/pal-plus",
@@ -211,6 +224,7 @@ describe("melding aan Onderwijs", () => {
     expect(mail.subject).toBe("[PAL+] Nieuwe hulpvraag: Statica (Fien)");
     expect(mail.text).toContain("Vak: Statica (zelf ingetikt, nog geen vak uit de lijst)");
     expect(mail.text).toContain("Wanneer nodig: januari");
+    expect(mail.text).toContain("Tags: Oefeningen");
     expect(mail.text).toContain("pas op de PAL+-pagina wanneer je ze nakijkt");
   });
 });
@@ -225,5 +239,31 @@ describe("palPlusReminderHandledAt", () => {
   it("handelt ze af voor een sessie binnen het venster, of al voorbij", () => {
     expect(palPlusReminderHandledAt(new Date(now.getTime() + 3 * 60 * 60 * 1000), now)).toBe(now);
     expect(palPlusReminderHandledAt(new Date(now.getTime() - 60_000), now)).toBe(now);
+  });
+});
+
+describe("tweede tutor", () => {
+  it("nodigt uit met het aanbod en een knop naar de uitnodigingen", () => {
+    const mail = palPlusCoTutorInvitationMail({
+      locale: "nl",
+      name: "Lien",
+      inviterName: "Fien",
+      courseLabel: "Statica",
+      description: "Scharnieren",
+      tags: ["Oefeningen"],
+      availability: { lines: ["Dinsdag: Avond (18:00-22:00)"], note: null },
+      pageUrl: PAGE,
+    });
+    expect(mail.subject).toBe("Fien wil samen met jou PAL+ geven: Statica");
+    expect(mail.text).toContain("Dinsdag: Avond (18:00-22:00)");
+    expect(mail.text).toContain(`${PAGE}#uitnodigingen`);
+  });
+
+  it("meldt een ja en een nee elk op hun manier", () => {
+    const base = { locale: "nl" as const, name: "Fien", coTutorName: "Lien", courseLabel: "Statica", pageUrl: PAGE };
+    expect(palPlusCoTutorAnsweredMail({ ...base, accepted: true }).subject).toBe("Lien geeft PAL+ mee: Statica");
+    const declined = palPlusCoTutorAnsweredMail({ ...base, accepted: false });
+    expect(declined.subject).toBe("Lien geeft PAL+ niet mee: Statica");
+    expect(declined.text).toContain("met jou als enige tutor");
   });
 });

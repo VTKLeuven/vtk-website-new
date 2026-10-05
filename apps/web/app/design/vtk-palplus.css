@@ -464,3 +464,13 @@
   border: 1px solid var(--line);
   border-radius: 12px;
 }
+
+/* De agenda in de tab Sessies: een sessie zonder lokaal krijgt een streepjesrand,
+   zoals een verhuuraanvraag die nog niet beslist is (`.tv-chip[data-status]` in
+   vtk-theokot-verhuur.css): er staat iets, maar het ligt nog niet vast. */
+.tv-chip[data-room='pending'] {
+  border-left-style: dashed;
+  outline: 1px dashed color-mix(in srgb, var(--tone, var(--navy)) 55%, white);
+  outline-offset: -1px;
+  background: color-mix(in srgb, var(--tone, var(--navy)) 8%, white);
+}

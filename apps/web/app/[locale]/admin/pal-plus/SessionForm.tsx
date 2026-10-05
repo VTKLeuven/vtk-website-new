@@ -6,6 +6,7 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { savePalPlusSessionAction, searchPalPlusPeopleAction } from "@/app/actions/palPlus";
 import { PAL_PLUS_LIMITS, palPlusReward, parsePalPlusMoment } from "@/lib/palPlus";
 import { palPlusSessionErrors } from "@/lib/palPlusMessages";
+import { TagInput } from "@/components/palPlus/TagInput";
 
 export type Person = { id: string; name: string };
 export type RoomGroup = { building: string; rooms: { id: string; label: string }[] };
@@ -15,6 +16,7 @@ export type SessionFormInitial = {
   id: string | null;
   courseId: string;
   description: string;
+  tags: string[];
   date: string;
   startTime: string;
   endTime: string;
@@ -23,6 +25,9 @@ export type SessionFormInitial = {
   roomText: string;
   tutors: Person[];
 };
+
+/** De snelle tags, en per vak de tags die er al gebruikt werden. */
+export type TagSuggestions = { presets: string[]; byCourse: Record<string, string[]> };
 
 /** Een aanvraag die deze sessie kan beantwoorden; aangevinkt gaat ze naar "Sessie gepland". */
 export type LinkableRequest = { id: string; label: string; checked: boolean };
@@ -44,6 +49,7 @@ export function SessionForm({
   rooms,
   linkable = [],
   tutorSuggestions = [],
+  tags,
   onDone,
 }: {
   nl: boolean;
@@ -52,8 +58,10 @@ export function SessionForm({
   rooms: RoomGroup[];
   linkable?: LinkableRequest[];
   tutorSuggestions?: Person[];
+  tags: TagSuggestions;
   onDone: () => void;
 }) {
+  const [courseId, setCourseId] = useState(initial.courseId);
   const [date, setDate] = useState(initial.date);
   const [startTime, setStartTime] = useState(initial.startTime);
   const [endTime, setEndTime] = useState(initial.endTime);
@@ -90,7 +98,13 @@ export function SessionForm({
 
       <div>
         <Label htmlFor={`pp-s-course-${prefix}`}>{nl ? "Vak" : "Course"}</Label>
-        <Select id={`pp-s-course-${prefix}`} name="courseId" defaultValue={initial.courseId} required>
+        <Select
+          id={`pp-s-course-${prefix}`}
+          name="courseId"
+          value={courseId}
+          onChange={(event) => setCourseId(event.target.value)}
+          required
+        >
           <option value="" disabled>
             {nl ? "Kies een vak uit de lijst" : "Pick a course from the list"}
           </option>
@@ -116,6 +130,22 @@ export function SessionForm({
           {nl ? "Staat publiek bij de sessie." : "Shown publicly with the session."}
         </p>
       </div>
+
+      <TagInput
+        presets={tags.presets}
+        suggestions={courseId ? (tags.byCourse[courseId] ?? []) : []}
+        initial={initial.tags}
+        copy={{
+          label: nl ? "Tags" : "Tags",
+          help: nl
+            ? "Staan publiek bij de sessie, en de zoekbalk op de PAL+-pagina zoekt erin. Overgenomen uit de aanvraag."
+            : "Shown publicly with the session, and the search on the PAL+ page looks at them. Copied from the request.",
+          placeholder: nl ? "Eigen tag, bv. Hoofdstuk 3" : "Your own tag, e.g. Chapter 3",
+          presets: nl ? "Snel kiezen" : "Quick picks",
+          remove: nl ? "Tag weghalen" : "Remove tag",
+          full: nl ? "Al {max} tags" : "Already {max} tags",
+        }}
+      />
 
       <div>
         <div className="vtk-palplus-moment">
@@ -348,6 +378,14 @@ function TutorPicker({
             </button>
           ))}
         </div>
+      )}
+
+      {full && (
+        <p className="text-xs text-vtk-muted">
+          {nl
+            ? `Een sessie heeft hoogstens ${PAL_PLUS_LIMITS.tutors} tutors. Haal er een weg om iemand anders te kiezen.`
+            : `A session has at most ${PAL_PLUS_LIMITS.tutors} tutors. Remove one to pick someone else.`}
+        </p>
       )}
 
       {!full && (

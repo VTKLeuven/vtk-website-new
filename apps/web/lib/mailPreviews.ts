@@ -13,6 +13,8 @@ import { confirmationMail, notificationMail } from "@/lib/forms/mail";
 import { meetingReservationInvalidatedMail, noShowWarningMail, orderCancelledMail } from "@/lib/mail";
 import { pianoConfirmationMail } from "@/lib/piano-reservations";
 import {
+  palPlusCoTutorAnsweredMail,
+  palPlusCoTutorInvitationMail,
   palPlusNewRequestNotificationMail,
   palPlusRequestClosedMail,
   palPlusRequestPublishedMail,
@@ -328,6 +330,11 @@ function palPlusPreviews(): MailPreview[] {
     tutorNames: ["Robbe"],
   };
   const common = { source: "palPlus" as const, file: "lib/palPlusMail.ts" };
+  const availability = {
+    lines: ["Maandag: Avond (18:00-22:00)", "Woensdag: Namiddag (13:00-18:00), Avond (18:00-22:00)"],
+    note: "Niet in de week van 12 oktober.",
+  };
+  const tags = ["Oefeningen", "Hoofdstuk 3"];
   const replyNote = "Afzender VTK Onderwijs (`MAIL_FROM_PAL_PLUS`); antwoorden gaat naar het adres van de post Onderwijs.";
 
   return [
@@ -343,13 +350,53 @@ function palPlusPreviews(): MailPreview[] {
         kind: "GIVE",
         courseLabel: session.courseLabel,
         description: session.description,
-        proposed: { startsAt: session.startsAt, endsAt: session.endsAt },
+        tags,
+        availability,
+        coTutorName: "Lien",
         pageUrl: PAGE,
       }),
       notes: [
-        "Bij een hulpvraag zegt de mail dat Onderwijs de vraag eerst nakijkt en dat er een mail volgt zodra ze online staat.",
+        "Bij een hulpvraag zegt de mail dat Onderwijs de vraag eerst nakijkt en dat er een mail volgt zodra ze online staat; het rooster valt dan weg.",
+        "De zin over de medetutor staat er enkel wanneer er een r-nummer opgegeven werd.",
         replyNote,
       ],
+    },
+    {
+      id: "pal-plus-cotutor-invite",
+      title: "Geef je mee een PAL+-sessie?",
+      when: "Meteen na een aanbod met een r-nummer in \"Samen met\".",
+      to: "De opgegeven medetutor",
+      ...common,
+      ...palPlusCoTutorInvitationMail({
+        locale: "nl",
+        name: "Lien",
+        inviterName: "Fien",
+        courseLabel: session.courseLabel,
+        description: session.description,
+        tags,
+        availability,
+        pageUrl: PAGE,
+      }),
+      notes: [
+        "Antwoorden op deze mail gaat naar wie het aanbod indiende.",
+        "Bevestigen of weigeren kan zolang het aanbod bij Onderwijs wacht; daarna vervalt de uitnodiging.",
+      ],
+    },
+    {
+      id: "pal-plus-cotutor-answer",
+      title: "Jullie geven de sessie samen",
+      when: "Zodra de medetutor bevestigt of weigert.",
+      to: "Wie het aanbod indiende",
+      ...common,
+      ...palPlusCoTutorAnsweredMail({
+        locale: "nl",
+        name: "Fien",
+        coTutorName: "Lien",
+        accepted: true,
+        courseLabel: session.courseLabel,
+        pageUrl: PAGE,
+      }),
+      notes: ["Bij een weigering zegt de mail dat het aanbod blijft staan met één tutor."],
     },
     {
       id: "pal-plus-notify-onderwijs",
@@ -364,7 +411,9 @@ function palPlusPreviews(): MailPreview[] {
         courseLabel: "Statica",
         courseTyped: true,
         description: "Ik snap de vrijlichaamsdiagrammen niet, vooral met de scharnieren.",
-        proposed: null,
+        tags: ["Oefeningen", "Scharnieren"],
+        availability: null,
+        coTutorName: null,
         preferredPeriod: "voor het examen in januari",
         respondsToLabel: null,
         adminUrl: "https://vtk.be/admin/pal-plus",

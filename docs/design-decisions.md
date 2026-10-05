@@ -977,11 +977,11 @@ adres zijn makkelijk te veranderen.
 ### Twee wegen naar een sessie
 
 - **Een lid biedt aan een sessie te geven.** Het kiest een vak, beschrijft wat voor
-  sessie (oefeningen, theorie, een hoofdstuk) en stelt een moment voor. Onderwijs
-  screent de persoon zelf en maakt er een sessie van, of sluit het aanbod met een reden.
-  Het voorgestelde moment mag Onderwijs daarbij verzetten. Een LettuceMeet-achtige
-  beschikbaarheidspeiling is gevraagd en **bewust niet gebouwd**: te ingewikkeld voor
-  een eerste versie, en "de tutor stelt voor, Onderwijs past aan" volstaat.
+  sessie (oefeningen, theorie, een hoofdstuk), en duidt in een rooster aan wanneer het
+  meestal kan (zie "Wanneer kan je?" hieronder). Wie met twee wil geven, vult het
+  r-nummer van de tweede tutor in. Onderwijs screent de persoon zelf en maakt er een
+  sessie van, of sluit het aanbod met een reden. Een LettuceMeet-achtige peiling is
+  gevraagd en **bewust niet gebouwd**: te ingewikkeld voor een eerste versie.
 - **Een lid vraagt hulp bij een vak.** **Onderwijs kijkt de vraag eerst na** en zet ze
   dan online: pas dan staat ze op de PAL+-pagina, zonder naam, zodat een mogelijke tutor
   ze ziet en kan zeggen "ik kan dit geven". Andere leden kunnen een vraag steunen ("ik
@@ -1039,6 +1039,12 @@ vorm en komen in hetzelfde werkbakje terecht.
 vragen, steunen en inschrijven. Onderwijs screent de tutors zelf; daar is geen regel in
 code voor.
 
+### Lijsten die Onderwijs bijhoudt
+
+In het beheer staan onder Lijsten drie korte lijsten: de vakken, de snelle tags en de
+dagdelen van het rooster. Geen ervan zit vast in de code; de migratie zet enkel een
+vertrekpunt klaar, want de seed draait niet bij een deploy.
+
 ### Vakken
 
 Onderwijs houdt een korte lijst bij met de OPO-code (`PalPlusCourse`). Een lijst en geen
@@ -1050,6 +1056,70 @@ vak dan in de lijst, of hangt de aanvraag aan een vak dat er al in staat (iemand
 OPO-code mag, voor iets wat geen vak is maar waar wel sessies over komen (Matlab). Een
 vak waar iets aan hangt, wordt niet verwijderd maar uitgezet.
 
+### Tags
+
+Een aanvraag (en een sessie) krijgt hoogstens vijf korte tags: wat voor hulp, en welk
+deel van de cursus. In de lijst van Onderwijs gevraagd als "welke delen van de cursus";
+een apart veld daarvoor naast de omschrijving was het alternatief.
+
+- **Snelle tags met één tik** (Theorie, Oefeningen, Examenvoorbereiding, Labo of
+  project): een lijst die Onderwijs bijhoudt (`PalPlusTag`), dus niet in de code.
+- **Eigen tags intikken kan altijd** ("Hoofdstuk 3"). Om te voorkomen dat dezelfde tag
+  in vijf vormen rondgaat ("H3", "hfst 3"), stelt het formulier de tags voor die al bij
+  hetzelfde vak gebruikt werden, de meest gebruikte eerst, en neemt een getikte tag de
+  schrijfwijze over van een snelle tag die er al is. Op de publieke pagina komen die
+  voorstellen enkel uit wat al publiek staat (open vragen en sessies): een tag uit een
+  vraag die Onderwijs nog niet nakeek, hoort niet bij een ander als voorstel te staan.
+- Een aanvraag bewaart de tekst van haar tags, geen verwijzing: een snelle tag
+  hernoemen of weghalen verandert niets aan wat al ingediend werd. Bij het plannen gaan
+  de tags mee naar de sessie, waar Onderwijs ze kan aanpassen.
+
+### Wanneer kan je? Het rooster
+
+Een aanbod had eerst één voorgesteld moment (een datum met een uur). In de lijst van
+Onderwijs kwam "een veld waar ze momenten invullen dat ze kunnen", meervoud. Dat is nu
+een rooster: de dagen van maandag tot zondag onder elkaar, de dagdelen als kolommen,
+één tik per vakje, plus een vrije opmerking ("niet in de week van 12 oktober").
+
+- **Waarom een rooster en geen lijst van exacte momenten**: drie velden per moment is
+  traag en mist nog altijd momenten. Een tutor weet meestal "dinsdagavond kan ik", en
+  Onderwijs kiest bij het plannen een echte datum die erin past. Het rooster staat
+  daarom boven het sessieformulier wanneer Onderwijs vanuit een aanbod plant.
+- **Minstens een vakje of een opmerking**: wie enkel op één datum kan, zegt dat in de
+  opmerking.
+- **De dagdelen zijn niet vast** (`PalPlusDaypart`, standaard voormiddag 8-12, namiddag
+  13-18, avond 18-22). Een aanbod bewaart de aangeduide vakjes als momentopname, met
+  naam en uren van toen (`PalPlusRequest.availability`): een dagdeel later verschuiven
+  of weghalen verandert dus niet wat een tutor ooit aanduidde. De weekdagen staan wel
+  vast in de code; een week verandert niet.
+- Gewone checkboxen, geen JavaScript nodig, en op een telefoon past het rooster (zeven
+  rijen, drie kolommen) op het scherm.
+
+### Samen met een tweede tutor
+
+- **Hoogstens twee tutors per sessie**, ook in het beheer (`PAL_PLUS_LIMITS.tutors`).
+- Wie het formulier invult, geeft de tweede tutor op met een **r-nummer** (zoals in de
+  lijst van Onderwijs gevraagd). Die moet een account hebben, want die **bevestigt
+  zelf**: een mail met de vraag, en op /pal-plus een uitnodiging met "Ik geef mee" en
+  "Nee, bedankt". Zo belandt niemand op een sessie zonder het te weten. Wie indiende,
+  krijgt het antwoord per mail.
+- Onderwijs ziet het aanbod meteen, met "wacht op bevestiging". Bij het plannen staat de
+  tweede tutor enkel bij de tutors als die bevestigde. Zegt die nee, dan gaat het aanbod
+  verder met één tutor.
+- Antwoorden kan zolang het aanbod bij Onderwijs wacht. Is er al een sessie van gekomen,
+  dan vervalt de uitnodiging; wie toch mee wil, regelt dat met Onderwijs.
+- Een r-nummer intikken vertelt of er een account bij hoort. Dat is aanvaard: het is de
+  vraag van Onderwijs, het formulier vraagt een login, en één account kan hoogstens tien
+  aanvragen tegelijk open hebben.
+
+### Zoeken
+
+Op /pal-plus filtert één zoekveld de agenda en de open vragen terwijl je typt, op vak,
+OPO-code, tags en omschrijving. Een **filter op hoofdrichting** stond in de lijst van
+Onderwijs en is **bewust uitgesteld**: de vakken hebben nog geen richting, en zoeken
+dekt het voorlopig. De richtingen bestaan al op de site (`StudyProgramme`, en de
+richting van elk lid in het profiel), dus de vakken een richting geven is de volgende stap.
+
 ### Sessies
 
 - Een sessie staat **niet in de gewone kalender**, maar in een eigen agenda op de
@@ -1058,8 +1128,13 @@ vak waar iets aan hangt, wordt niet verwijderd maar uitgezet.
   op de pagina staat) of zet één sessie erin met "Zet in mijn agenda". Een geannuleerde
   sessie blijft een maand in de feed met `STATUS:CANCELLED`, zodat een geabonneerde
   agenda ze schrapt.
-- **Plannen vertrekt meestal uit een aanvraag.** Een aanbod brengt zijn tutor, moment en
-  omschrijving mee; een hulpvraag de mensen die erop aanboden, als voorstel. De aanvraag
+- **In het beheer is de tab Sessies een maandagenda**, op het raster van de
+  Theokot-verhuur (`RentalMonthGrid`): zonder lokaal een streepjesrand, geannuleerd
+  doorstreept, voorbij grijs, op een telefoon stippen met de sessies van de aangetikte
+  dag eronder. De lijst blijft beschikbaar.
+- **Plannen vertrekt meestal uit een aanvraag.** Een aanbod brengt zijn tutor(s),
+  omschrijving en tags mee, met het rooster erboven om een moment te kiezen; een
+  hulpvraag de mensen die erop aanboden, als voorstel. De aanvraag
   staat aangevinkt bij "deze sessie beantwoordt", samen met de vraag waarop het aanbod
   antwoordde en de andere open vragen over hetzelfde vak die erbij kunnen. Wat
   aangevinkt is, gaat naar "Sessie gepland". Een sessie kan ook zonder aanvraag.
@@ -1171,11 +1246,13 @@ De lijst staat in het beheer en is voor niemand anders zichtbaar. Het recht is
 
 Elke stap waar iemand op wacht, krijgt een mail; wat niemand iets vertelt, niet. De
 teksten staan in `lib/palPlusMail.ts`, wie wat krijgt in `lib/palPlusNotify.ts`, en
-alle negen staan als voorvertoning op /admin/it/flows.
+alle elf staan als voorvertoning op /admin/it/flows.
 
 | Wanneer | Naar wie |
 | --- | --- |
 | Aanvraag ingediend | De indiener (bevestiging), en Onderwijs (melding) |
+| Aanbod met een tweede tutor | De tweede tutor (uitnodiging om te bevestigen) |
+| Tweede tutor antwoordt | Wie het aanbod indiende |
 | Hulpvraag online gezet | Wie ze stelde |
 | Aanvraag gesloten | De indiener, met de reden |
 | Sessie gepland of tutor toegevoegd | De nieuwe tutor |

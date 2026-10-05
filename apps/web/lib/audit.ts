@@ -123,6 +123,8 @@ export const AUDIT_ENTITIES = {
   lesbezoekScheduledMail: { nl: "Geplande lesbezoekmail", en: "Scheduled classroom-visit email", group: "lesbezoeken" },
   lesbezoekSettings: { nl: "Lesbezoekeninstelling", en: "Classroom-visit setting", group: "lesbezoeken" },
   palPlusCourse: { nl: "PAL+-vak", en: "PAL+ course", group: "palPlus" },
+  palPlusTag: { nl: "PAL+-tag", en: "PAL+ tag", group: "palPlus" },
+  palPlusDaypart: { nl: "PAL+-dagdeel", en: "PAL+ part of day", group: "palPlus" },
   palPlusRequest: { nl: "PAL+-aanvraag", en: "PAL+ request", group: "palPlus" },
   palPlusSession: { nl: "PAL+-sessie", en: "PAL+ session", group: "palPlus" },
   piano: { nl: "Piano", en: "Piano", group: "piano" },

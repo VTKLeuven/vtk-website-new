@@ -9,6 +9,8 @@ import { submitPalPlusRequestAction } from "@/app/actions/palPlus";
 import { PAL_PLUS_LIMITS, PAL_PLUS_OTHER_COURSE } from "@/lib/palPlus";
 import { palPlusMemberErrors } from "@/lib/palPlusMessages";
 import { BackingButton, type BackingCopy } from "./BackingButton";
+import { TagInput, type TagInputCopy } from "@/components/palPlus/TagInput";
+import { AvailabilityGrid, type AvailabilityColumn } from "@/components/palPlus/AvailabilityGrid";
 
 export type PalPlusFormCopy = {
   askTitle: string;
@@ -25,10 +27,14 @@ export type PalPlusFormCopy = {
   giveDescriptionPlaceholder: string;
   periodLabel: string;
   periodPlaceholder: string;
-  dateLabel: string;
-  startLabel: string;
-  endLabel: string;
-  momentHelp: string;
+  tags: TagInputCopy;
+  availabilityLabel: string;
+  availabilityHelp: string;
+  availabilityNoteLabel: string;
+  availabilityNotePlaceholder: string;
+  coTutorLabel: string;
+  coTutorPlaceholder: string;
+  coTutorHelp: string;
   askPrivacy: string;
   givePrivacy: string;
   duplicateTitle: string;
@@ -69,6 +75,9 @@ export function PalPlusRequestForm({
   courses,
   openByCourse,
   respondsTo,
+  tagPresets,
+  tagSuggestionsByCourse,
+  dayparts,
 }: {
   kind: "GIVE" | "FOLLOW";
   nl: boolean;
@@ -77,7 +86,16 @@ export function PalPlusRequestForm({
   backingCopy: BackingCopy;
   courses: CourseOption[];
   openByCourse: Record<string, OpenRequestHint[]>;
-  respondsTo: { id: string; courseId: string | null; courseLabel: string; description: string } | null;
+  respondsTo: {
+    id: string;
+    courseId: string | null;
+    courseLabel: string;
+    description: string;
+    tags: string[];
+  } | null;
+  tagPresets: string[];
+  tagSuggestionsByCourse: Record<string, string[]>;
+  dayparts: AvailabilityColumn[];
 }) {
   const router = useRouter();
   const give = kind === "GIVE";
@@ -202,24 +220,46 @@ export function PalPlusRequestForm({
           />
         </div>
 
+        <TagInput
+          presets={tagPresets}
+          suggestions={courseId ? (tagSuggestionsByCourse[courseId] ?? []) : []}
+          initial={respondsTo?.tags ?? []}
+          copy={copy.tags}
+        />
+
         {give ? (
-          <fieldset className="pp-moment">
-            <div className="pp-moment-row">
-              <div>
-                <Label htmlFor="pp-date">{copy.dateLabel}</Label>
-                <Input id="pp-date" name="date" type="date" required />
+          <>
+            <fieldset className="pp-moment">
+              <legend className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-vtk-muted">
+                {copy.availabilityLabel}
+              </legend>
+              {dayparts.length > 0 && <AvailabilityGrid columns={dayparts} nl={nl} legend={copy.availabilityLabel} />}
+              <p className="pp-help">{copy.availabilityHelp}</p>
+              <div className="mt-3">
+                <Label htmlFor="pp-availability-note">{copy.availabilityNoteLabel}</Label>
+                <Textarea
+                  id="pp-availability-note"
+                  name="availabilityNote"
+                  rows={2}
+                  maxLength={PAL_PLUS_LIMITS.availabilityNote}
+                  placeholder={copy.availabilityNotePlaceholder}
+                />
               </div>
-              <div>
-                <Label htmlFor="pp-start">{copy.startLabel}</Label>
-                <Input id="pp-start" name="startTime" type="time" step={900} required />
-              </div>
-              <div>
-                <Label htmlFor="pp-end">{copy.endLabel}</Label>
-                <Input id="pp-end" name="endTime" type="time" step={900} required />
-              </div>
+            </fieldset>
+            <div>
+              <Label htmlFor="pp-cotutor">{copy.coTutorLabel}</Label>
+              <Input
+                id="pp-cotutor"
+                name="coTutor"
+                className="sm:max-w-56"
+                placeholder={copy.coTutorPlaceholder}
+                autoComplete="off"
+                spellCheck={false}
+                maxLength={12}
+              />
+              <p className="pp-help">{copy.coTutorHelp}</p>
             </div>
-            <p className="pp-help">{copy.momentHelp}</p>
-          </fieldset>
+          </>
         ) : (
           <div>
             <Label htmlFor="pp-period">{copy.periodLabel}</Label>

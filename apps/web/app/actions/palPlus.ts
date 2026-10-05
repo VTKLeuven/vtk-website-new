@@ -12,6 +12,8 @@ import { toMessageText, toSingleLine } from "@/lib/contactForm";
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import {
+  notifyPalPlusCoTutorAnswered,
+  notifyPalPlusCoTutorInvited,
   notifyPalPlusRequestClosed,
   notifyPalPlusRequestPublished,
   notifyPalPlusRequestSubmitted,
@@ -20,9 +22,15 @@ import {
   notifyPalPlusSessionPlanned,
 } from "@/lib/palPlusNotify";
 import type { PalPlusSessionChange } from "@/lib/palPlusMail";
+import type { PalPlusAvailabilitySlot } from "@/lib/palPlus";
 import {
+  canAnswerPalPlusCoTutor,
+  canonicalPalPlusTags,
   initialPalPlusStatus,
+  palPlusAvailabilitySnapshot,
   palPlusCourseLabel,
+  parsePalPlusDaypart,
+  parsePalPlusTagLabel,
   palPlusRequestCourseLabel,
   palPlusReward,
   palPlusSessionState,
@@ -78,21 +86,42 @@ export async function submitPalPlusRequestAction(
   if (!session) return saveError("LOGIN_REQUIRED");
   const userId = session.user.id;
 
-  const parsed = parsePalPlusRequest(
-    {
-      kind: toSingleLine(formData.get("kind")),
-      courseId: toSingleLine(formData.get("courseId")),
-      courseOther: toSingleLine(formData.get("courseOther")),
-      description: toMessageText(formData.get("description")),
-      date: toSingleLine(formData.get("date")),
-      startTime: toSingleLine(formData.get("startTime")),
-      endTime: toSingleLine(formData.get("endTime")),
-      preferredPeriod: toSingleLine(formData.get("preferredPeriod")),
-    },
-    new Date(),
-  );
+  const parsed = parsePalPlusRequest({
+    kind: toSingleLine(formData.get("kind")),
+    courseId: toSingleLine(formData.get("courseId")),
+    courseOther: toSingleLine(formData.get("courseOther")),
+    description: toMessageText(formData.get("description")),
+    tags: formData.getAll("tag").map((value) => toSingleLine(value)),
+    availability: formData.getAll("availability").map((value) => toSingleLine(value)),
+    availabilityNote: toMessageText(formData.get("availabilityNote")),
+    coTutor: toSingleLine(formData.get("coTutor")),
+    preferredPeriod: toSingleLine(formData.get("preferredPeriod")),
+  });
   if (!parsed.ok) return saveError(parsed.error);
   const { request } = parsed;
+  const tags = await canonicalTags(request.tags);
+
+  // Het rooster wordt bewaard zoals de dagdelen nu zijn; de tweede tutor moet een
+  // account hebben, want die bevestigt zelf.
+  let availability: PalPlusAvailabilitySlot[] | null = null;
+  let coTutorId: string | null = null;
+  if (request.kind === "GIVE") {
+    const dayparts = await prisma.palPlusDaypart.findMany({
+      where: { active: true },
+      select: { id: true, labelNl: true, labelEn: true, startMinutes: true, endMinutes: true },
+    });
+    availability = palPlusAvailabilitySnapshot(request.availability, dayparts);
+    if (!availability) return saveError("AVAILABILITY_INVALID");
+    if (request.coTutorRNumber) {
+      const coTutor = await prisma.user.findFirst({
+        where: { rNumber: { equals: request.coTutorRNumber, mode: "insensitive" }, deletedAt: null },
+        select: { id: true },
+      });
+      if (!coTutor) return saveError("COTUTOR_UNKNOWN");
+      if (coTutor.id === userId) return saveError("COTUTOR_SELF");
+      coTutorId = coTutor.id;
+    }
+  }
 
   if (request.courseId) {
     const course = await prisma.palPlusCourse.findFirst({
@@ -129,17 +158,22 @@ export async function submitPalPlusRequestAction(
       courseId: request.courseId,
       courseOther: request.courseOther,
       description: request.description,
+      tags,
       ...(request.kind === "GIVE"
         ? {
-            proposedStartsAt: request.proposedStartsAt,
-            proposedEndsAt: request.proposedEndsAt,
+            availability: availability ?? [],
+            availabilityNote: request.availabilityNote,
             respondsToId,
+            ...(coTutorId ? { coTutorId, coTutorStatus: "PENDING" as const } : {}),
           }
         : { preferredPeriod: request.preferredPeriod }),
     },
   });
 
-  after(() => notifyPalPlusRequestSubmitted(created.id));
+  after(async () => {
+    await notifyPalPlusRequestSubmitted(created.id);
+    if (coTutorId) await notifyPalPlusCoTutorInvited(created.id);
+  });
   revalidatePalPlusEverywhere();
   return saveOk();
 }
@@ -156,6 +190,35 @@ export async function withdrawPalPlusRequestAction(formData: FormData): Promise<
   });
   if (result.count === 0) return saveError("NOT_WITHDRAWABLE");
 
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
+/**
+ * De uitgenodigde tweede tutor zegt ja of nee. Kan zolang het aanbod bij
+ * Onderwijs wacht (`canAnswerPalPlusCoTutor`); wie het formulier invulde,
+ * krijgt het antwoord per mail.
+ */
+export async function answerPalPlusCoTutorAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const session = await getCurrentSession();
+  if (!session) return saveError("LOGIN_REQUIRED");
+  const id = toSingleLine(formData.get("id"));
+  const accept = formData.get("answer") === "accept";
+
+  const request = await prisma.palPlusRequest.findUnique({
+    where: { id },
+    select: { kind: true, status: true, coTutorId: true, coTutorStatus: true },
+  });
+  if (!request || request.coTutorId !== session.user.id) return saveError("NOT_INVITED");
+  if (!canAnswerPalPlusCoTutor(request)) return saveError("INVITATION_GONE");
+
+  const updated = await prisma.palPlusRequest.updateMany({
+    where: { id, coTutorId: session.user.id, coTutorStatus: "PENDING", status: "PENDING" },
+    data: { coTutorStatus: accept ? "ACCEPTED" : "DECLINED", coTutorRespondedAt: new Date() },
+  });
+  if (updated.count === 0) return saveError("INVITATION_GONE");
+
+  after(() => notifyPalPlusCoTutorAnswered(id));
   revalidatePalPlusEverywhere();
   return saveOk();
 }
@@ -452,6 +515,93 @@ export async function deletePalPlusCourseAction(formData: FormData): Promise<Sav
 }
 
 // -----------------------------------------------------------------------------
+// Beheer: snelle tags en dagdelen
+// -----------------------------------------------------------------------------
+
+/**
+ * Tags in de schrijfwijze van een snelle tag wanneer die bestaat, ook een
+ * uitgezette: wie "oefeningen" intikt, krijgt "Oefeningen".
+ */
+async function canonicalTags(tags: string[]): Promise<string[]> {
+  if (tags.length === 0) return tags;
+  const presets = await prisma.palPlusTag.findMany({ select: { label: true } });
+  return canonicalPalPlusTags(tags, presets.map((preset) => preset.label));
+}
+
+export async function savePalPlusTagAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requirePermission("pal.manage");
+  const parsed = parsePalPlusTagLabel(toSingleLine(formData.get("label")));
+  if (!parsed.ok) return saveError(parsed.error);
+  const id = toSingleLine(formData.get("id"));
+  const data = { label: parsed.label, active: formData.get("active") === "on" };
+
+  try {
+    if (id) {
+      await prisma.palPlusTag.update({ where: { id }, data });
+      await logAudit({ action: "update", entity: "palPlusTag", entityId: id, target: data.label });
+    } else {
+      const created = await prisma.palPlusTag.create({ data, select: { id: true } });
+      await logAudit({ action: "create", entity: "palPlusTag", entityId: created.id, target: data.label });
+    }
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return saveError("TAG_TAKEN");
+    throw err;
+  }
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
+/**
+ * Een snelle tag weghalen. Kan altijd: een aanvraag bewaart de tekst van haar
+ * tags, dus wat al ingediend werd, houdt de tag.
+ */
+export async function deletePalPlusTagAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("pal.manage");
+  const id = toSingleLine(formData.get("id"));
+  const tag = id ? await prisma.palPlusTag.findUnique({ where: { id }, select: { label: true } }) : null;
+  if (!tag) return saveOk();
+  await prisma.palPlusTag.delete({ where: { id } });
+  await logAudit({ action: "delete", entity: "palPlusTag", entityId: id, target: tag.label });
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
+export async function savePalPlusDaypartAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requirePermission("pal.manage");
+  const parsed = parsePalPlusDaypart({
+    labelNl: toSingleLine(formData.get("labelNl")),
+    labelEn: toSingleLine(formData.get("labelEn")),
+    start: toSingleLine(formData.get("start")),
+    end: toSingleLine(formData.get("end")),
+  });
+  if (!parsed.ok) return saveError(parsed.error);
+  const id = toSingleLine(formData.get("id"));
+  const data = { ...parsed.daypart, active: formData.get("active") === "on" };
+
+  if (id) {
+    await prisma.palPlusDaypart.update({ where: { id }, data });
+    await logAudit({ action: "update", entity: "palPlusDaypart", entityId: id, target: data.labelNl });
+  } else {
+    const created = await prisma.palPlusDaypart.create({ data, select: { id: true } });
+    await logAudit({ action: "create", entity: "palPlusDaypart", entityId: created.id, target: data.labelNl });
+  }
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
+/** Een dagdeel weghalen. Een aanbod bewaart zijn rooster als momentopname, dus dat verandert niet. */
+export async function deletePalPlusDaypartAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("pal.manage");
+  const id = toSingleLine(formData.get("id"));
+  const daypart = id ? await prisma.palPlusDaypart.findUnique({ where: { id }, select: { labelNl: true } }) : null;
+  if (!daypart) return saveOk();
+  await prisma.palPlusDaypart.delete({ where: { id } });
+  await logAudit({ action: "delete", entity: "palPlusDaypart", entityId: id, target: daypart.labelNl });
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
+// -----------------------------------------------------------------------------
 // Leden: inschrijven voor een sessie
 // -----------------------------------------------------------------------------
 
@@ -580,6 +730,7 @@ export async function savePalPlusSessionAction(
   const parsed = parsePalPlusSession({
     courseId: toSingleLine(formData.get("courseId")),
     description: toMessageText(formData.get("description")),
+    tags: formData.getAll("tag").map((value) => toSingleLine(value)),
     date: toSingleLine(formData.get("date")),
     startTime: toSingleLine(formData.get("startTime")),
     endTime: toSingleLine(formData.get("endTime")),
@@ -631,6 +782,7 @@ export async function savePalPlusSessionAction(
   const fields = {
     courseId: data.courseId,
     description: data.description,
+    tags: await canonicalTags(data.tags),
     startsAt: data.startsAt,
     endsAt: data.endsAt,
     maxParticipants: data.maxParticipants,

@@ -830,6 +830,7 @@ model User {
   // PAL+: wat iemand indiende, steunde, gaf of volgde, en wat iemand van
   // Onderwijs beoordeelde of corrigeerde.
   palPlusRequests         PalPlusRequest[]         @relation("PalPlusRequestUser")
+  palPlusCoTutorRequests  PalPlusRequest[]         @relation("PalPlusRequestCoTutor")
   reviewedPalPlusRequests PalPlusRequest[]         @relation("PalPlusRequestReviewedBy")
   palPlusBackings         PalPlusRequestBacker[]
   createdPalPlusSessions  PalPlusSession[]         @relation("PalPlusSessionCreatedBy")
@@ -6771,7 +6772,8 @@ enum PalPlusRequestKind {
 }
 
 enum PalPlusRequestStatus {
-  /// Een aanbod dat Onderwijs nog moet beoordelen. Enkel bij GIVE.
+  /// Wacht op Onderwijs: een aanbod tot er een sessie van komt, een vraag tot
+  /// Onderwijs ze nakeek en online zette.
   PENDING
   /// Een vraag om hulp die publiek staat en een tutor zoekt. Enkel bij FOLLOW.
   OPEN
@@ -6814,6 +6816,53 @@ model PalPlusCourse {
   @@index([active, nameNl])
 }
 
+/// Of de tweede tutor van een aanbod ("samen met") meedoet. Wie het formulier
+/// invult, nodigt uit; de andere bevestigt zelf, zodat niemand op een sessie
+/// belandt zonder het te weten.
+enum PalPlusCoTutorStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+/// Een tag die Onderwijs klaarzet, om in een aanvraag met één tik te kiezen
+/// (Theorie, Oefeningen, Examenvoorbereiding). Daarnaast kan iedereen eigen tags
+/// intikken ("Hoofdstuk 3"); die staan niet in deze tabel, maar enkel op de
+/// aanvraag of de sessie zelf (`tags`).
+///
+/// Een aanvraag bewaart de tekst van de tag, geen verwijzing: een tag hernoemen
+/// of uitzetten verandert niets aan wat er al ingediend werd.
+model PalPlusTag {
+  id     String  @id @default(cuid())
+  label  String  @unique
+  /// Uit = niet meer bij de snelle keuzes in het formulier.
+  active Boolean @default(true)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
+/// Een dagdeel in het rooster "wanneer kan je?" van een aanbod (voormiddag,
+/// namiddag, avond). Onderwijs houdt de lijst bij; de kolommen van het rooster
+/// zijn de actieve dagdelen, op volgorde van hun begin.
+///
+/// Een aanbod bewaart de dagdelen die aangeduid werden als momentopname, met
+/// naam en uren (`PalPlusRequest.availability`). Een dagdeel later verschuiven
+/// of schrappen verandert dus niet wat een tutor ooit aanduidde.
+model PalPlusDaypart {
+  id           String  @id @default(cuid())
+  labelNl      String
+  /// Leeg = de Engelse site toont de Nederlandse naam.
+  labelEn      String?
+  /// Minuten sinds middernacht, Brusselse tijd.
+  startMinutes Int
+  endMinutes   Int
+  active       Boolean @default(true)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+}
+
 /// Een aanbod om een sessie te geven, of een vraag om hulp bij een vak. Eén
 /// tabel voor beide: ze hebben dezelfde vorm (wie, welk vak, wat voor sessie) en
 /// komen in hetzelfde werkbakje van Onderwijs terecht.
@@ -6838,14 +6887,28 @@ model PalPlusRequest {
   /// zijn. Bij een vraag staat deze tekst publiek, zonder de naam erbij.
   description String
 
-  /// Het moment dat de tutor voorstelt. Enkel bij GIVE, en daar verplicht;
-  /// Onderwijs kan het nog verzetten wanneer het de sessie aanmaakt. Het
-  /// aanbod zelf blijft tonen wat er voorgesteld werd.
-  proposedStartsAt DateTime? @db.Timestamptz(3)
-  proposedEndsAt   DateTime? @db.Timestamptz(3)
+  /// Korte tags: wat voor hulp (de snelle keuzes uit `PalPlusTag`) en welk deel
+  /// van de cursus (vrij ingetikt). Hoogstens vijf; staan publiek bij een vraag
+  /// die online staat, en de zoekbalk op /pal-plus zoekt erin.
+  tags String[] @default([])
+
+  /// Wanneer de tutor(s) meestal kunnen, enkel bij GIVE: de aangeduide vakjes
+  /// van het rooster als `[{ day, start, end, label }]` (day 1 = maandag, uren
+  /// in minuten sinds middernacht). Een momentopname: zie `PalPlusDaypart`.
+  /// Onderwijs kiest bij het plannen een echte datum die erin past.
+  availability     Json?
+  /// Wat het rooster niet kan zeggen: "niet in de week van 12 oktober", "liefst
+  /// voor de tussentoets". Enkel bij GIVE.
+  availabilityNote String?
   /// Wanneer de hulp nodig is, in eigen woorden ("voor het examen in januari").
   /// Enkel bij FOLLOW.
   preferredPeriod  String?
+
+  /// De tweede tutor van een aanbod, hoogstens één: een sessie heeft er nooit
+  /// meer dan twee. Opgegeven met een r-nummer; die persoon bevestigt zelf.
+  coTutorId          String?
+  coTutorStatus      PalPlusCoTutorStatus?
+  coTutorRespondedAt DateTime?             @db.Timestamptz(3)
 
   /// Een aanbod dat antwoordt op een openstaande vraag ("ik kan dit geven").
   respondsToId String?
@@ -6869,6 +6932,7 @@ model PalPlusRequest {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 
   user       User                   @relation("PalPlusRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  coTutor    User?                  @relation("PalPlusRequestCoTutor", fields: [coTutorId], references: [id], onDelete: SetNull)
   course     PalPlusCourse?         @relation(fields: [courseId], references: [id], onDelete: Restrict)
   respondsTo PalPlusRequest?        @relation("PalPlusRequestResponse", fields: [respondsToId], references: [id], onDelete: SetNull)
   responses  PalPlusRequest[]       @relation("PalPlusRequestResponse")
@@ -6881,6 +6945,7 @@ model PalPlusRequest {
   @@index([courseId, status])
   @@index([sessionId])
   @@index([respondsToId])
+  @@index([coTutorId])
 }
 
 /// Een lid dat een openstaande vraag steunt ("ik zoek dit ook"). Zo ziet
@@ -6918,6 +6983,8 @@ model PalPlusSession {
   /// Wat er in de sessie aan bod komt. Overgenomen uit de aanvraag en daarna
   /// door Onderwijs aan te passen.
   description String @default("")
+  /// Zoals bij een aanvraag; overgenomen bij het plannen en aan te passen.
+  tags        String[] @default([])
 
   /// Het geplande moment. De bonnetjes van de tutors volgen hieruit (1 per uur,
   /// afgerond op een half), niet uit hoe lang het in werkelijkheid duurde.
