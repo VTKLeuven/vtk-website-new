@@ -5194,14 +5194,22 @@ openstaande bonnetjes atomair afboeken voor een broodje, per half naar de prijs
 daarvoor een auditrij in `TheokotVoucherRedemption`. Wil je de waardering wijzigen, pas dan de
 spiegel-helper aan; de saldo- en auditlogica blijft gelijk.
 
-### Post: "Cursusdienst"
+### Post: de groepscode `CURSUSDIENST`
 
-Gemirrorde shiften krijgen `Shift.post = "Cursusdienst"`, zodat ze als een aparte
-post in de ranking verschijnen. De post wordt **gezet bij het spiegelen** (zelfde
-producer/helper als de reward) en **verbruikt** in
-`apps/web/app/api/shift/ranking/route.ts` (groepeert per `shift.post`; leeg valt
-onder `GEEN`). Eén constante voor het post-label, zodat hernoemen op één plek
-gebeurt.
+Gemirrorde shiften krijgen `Shift.post = "CURSUSDIENST"`: dezelfde groepscode als
+de cursusdienstshiften die op de main site zelf aangemaakt worden, zodat ze samen
+onder één post vallen, op `/shift` en in de ranking. De post wordt **gezet bij het
+spiegelen** (zelfde producer/helper als de reward, `CURSUSDIENST_SHIFT_POST`) en
+**verbruikt** in `apps/web/app/api/shift/ranking/route.ts` (groepeert per
+`shift.post`; leeg valt onder `GEEN`). De naam die je ziet, komt uit
+`lib/shift/postNames.ts`.
+
+Tot 2026-10-06 stond hier de naam `"Cursusdienst"` in plaats van de code. Sinds
+`/shift` codes omzet naar namen, toonde de pagina daardoor twee posten
+"Cursusdienst" naast elkaar (de code, vertaald, en de naam, onvertaald), en telde de
+ranking ze apart. Migratie `20261006120000_cudi_shift_post_code` zet de voorbije
+gespiegelde shiften om; de komende zet de eerstvolgende sync van cudi recht, omdat
+de upsert `post` telkens opnieuw schrijft.
 
 ### Inschrijven blokkeert bij een cudi-storing (bewust)
 

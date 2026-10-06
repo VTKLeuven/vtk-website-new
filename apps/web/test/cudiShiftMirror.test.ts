@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  CURSUSDIENST_SHIFT_POST,
   bonnetjesForShift,
   mapCudiShift,
   parseCudiShiftSync,
@@ -41,7 +40,8 @@ describe("mapCudiShift", () => {
       description: "",
       maxParticipants: 3,
       reward: 2, // 1u30 → 2
-      post: CURSUSDIENST_SHIFT_POST,
+      // De groepscode, zoals de shiften die op de main site zelf gemaakt worden.
+      post: "CURSUSDIENST",
       sourceSystem: "cudi",
       sourceId: "cudi-1",
     });
