@@ -5389,6 +5389,50 @@ model FakTally {
   @@index([year, points])
 }
 
+// Een periode waarin de scanner anders telt, voor een groot evenement van de
+// fakbar: geen check-in per bardag maar één per tijdvak (standaard elk uur),
+// enkel binnen een dagelijks venster (bv. 22:00-10:00, zodat wie overdag in de
+// bar werkt geen scans bijspaart), met een eigen teller en een eigen pintregel.
+//
+// **Zolang een periode loopt, staat de gewone werking stil**: een scan telt dan
+// enkel in `FakPeriodTally` en niet in `FakTally`. Na `endsAt` telt alles weer
+// zoals altijd. Periodes mogen niet overlappen; dat bewaakt de actie die ze
+// opslaat, niet de database.
+model FakPeriod {
+  id              String   @id @default(cuid())
+  name            String
+  startsAt        DateTime
+  endsAt          DateTime // exclusief
+  // Dagelijks venster op de Brusselse wandklok ("HH:mm"), mag over middernacht.
+  // Beide null = de hele periode door.
+  windowStart     String?
+  windowEnd       String?
+  intervalMinutes Int      @default(60)
+  rewardEnabled   Boolean  @default(true)
+  rewardEvery     Int      @default(10)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tallies FakPeriodTally[]
+
+  @@index([startsAt, endsAt])
+}
+
+// Eén rij per r-nummer per periode, om dezelfde reden als `FakTally`: de stand
+// en de laatste scan, geen lijst van wanneer iemand er was. `lastCheckinAt` is
+// meteen de "al gescand in dit tijdvak"-check.
+model FakPeriodTally {
+  periodId      String
+  rNumber       String
+  checkins      Int      @default(0)
+  lastCheckinAt DateTime
+
+  period FakPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@id([periodId, rNumber])
+  @@index([periodId, checkins])
+}
+
 // Waar een mislukte scan aan lag.
 enum FakScanResult {
   CARD_ERROR // onleesbare kaart, of KU Leuven weigerde/antwoordde niet

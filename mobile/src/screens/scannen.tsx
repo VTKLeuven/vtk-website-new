@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { ApiError } from '../api/client';
-import type { AppPassHolder } from '../api/contract';
+import type { AppFakCheckin, AppPassHolder } from '../api/contract';
 import {
   fakCheckin,
   fetchScanEvents,
@@ -100,9 +100,7 @@ export default function ScannenScreen() {
             setResult({
               kind: 'fakbar',
               text: checkin.counted ? 'Ingecheckt' : 'Al ingecheckt',
-              detail: checkin.freeBeer
-                ? `${checkin.total} punten. Je hebt een gratis pint verdiend.`
-                : `${checkin.total} punten. Nog ${checkin.toNextBeer} tot een gratis pint.`,
+              detail: fakCheckinDetail(checkin),
             }),
           )
           .catch((error) => setResult({ kind: 'error', message: scanError(error) }));
@@ -377,6 +375,26 @@ function PassResult({
  * zodat die hier in het Nederlands van de app staat; enkel bij een onbekende code
  * valt hij terug op de melding van de server.
  */
+/**
+ * De stand onder een check-in aan de bar. Tijdens een periode (een groot
+ * evenement met een check-in per uur) is dat de stand van die periode, en zegt
+ * een scan die niet telde vanaf wanneer de volgende wel telt. Geeft de periode
+ * geen pinten, dan zeggen we niets over pinten.
+ */
+function fakCheckinDetail(checkin: AppFakCheckin): string {
+  const stand = checkin.period
+    ? `${checkin.total} check-ins tijdens ${checkin.period}.`
+    : `${checkin.total} punten.`;
+  // `!== false`: een server van voor de periodes stuurt dit veld nog niet.
+  const beer = checkin.freeBeer
+    ? ' Je hebt een gratis pint verdiend.'
+    : checkin.freeBeers !== false
+      ? ` Nog ${checkin.toNextBeer} tot een gratis pint.`
+      : '';
+  const next = !checkin.counted && checkin.period && checkin.message ? `${checkin.message} ` : '';
+  return `${next}${stand}${beer}`;
+}
+
 function scanError(error: unknown): string {
   if (!(error instanceof ApiError)) {
     return 'Geen verbinding. Aan een deur zonder netwerk werkt scannen niet; probeer het opnieuw.';

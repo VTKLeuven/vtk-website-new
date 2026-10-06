@@ -1115,16 +1115,26 @@ export type AppFakCheckin = {
   points: number;
   double: boolean;
   freeBeer: boolean;
+  /** Punten tot de volgende pint; 0 wanneer `freeBeers` uit staat. */
   toNextBeer: number;
   message: string | null;
+  /**
+   * De naam van de periode die nu loopt (een groot evenement van de fakbar, met
+   * een check-in per uur), of null bij de gewone werking. Tijdens een periode is
+   * `total` de stand van die periode, los van de jaarstand.
+   */
+  period: string | null;
+  /** False wanneer de lopende periode geen gratis pinten geeft. */
+  freeBeers: boolean;
 };
 
 /**
  * `BAR_CLOSED` is de belangrijkste: een opgehangen QR kan gefotografeerd worden,
  * dus een scan telt enkel wanneer 't ElixIr op dat moment ook echt open gemeten
- * wordt. Zie `docs/design-decisions.md`.
+ * wordt. Zie `docs/design-decisions.md`. `OUTSIDE_WINDOW`: er loopt een periode
+ * en het is buiten haar dagelijkse venster, dus de scan telt niet.
  */
-export type AppFakErrorCode = "BAR_CLOSED" | "INVALID_CODE" | "NO_RNUMBER";
+export type AppFakErrorCode = "BAR_CLOSED" | "INVALID_CODE" | "NO_RNUMBER" | "OUTSIDE_WINDOW";
 
 // -----------------------------------------------------------------------------
 // Wat de app zelf mag

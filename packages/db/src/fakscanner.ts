@@ -67,3 +67,87 @@ export function parseFakscannerConfig(value: unknown): FakscannerConfig {
 }
 
 
+
+// ── Periodes ────────────────────────────────────────────────────────────────
+
+/**
+ * De regels van een periode (`FakPeriod`). Tijdens een groot evenement telt de
+ * scanner niet één keer per bardag maar één keer per tijdvak (standaard elk uur),
+ * enkel binnen een dagelijks venster, in een eigen teller met een eigen pintregel.
+ * Zolang een periode loopt, staat de gewone werking stil.
+ *
+ * Ook hier geen klok: welk tijdvak het nu is, rekent `apps/web/lib/fakscanner.ts`
+ * uit. Zie docs/design-decisions.md ("Periodes voor een groot evenement").
+ */
+export type FakPeriodRules = {
+  startsAt: Date;
+  /** Exclusief: om dit moment telt alles weer zoals altijd. */
+  endsAt: Date;
+  /** Begin van het dagelijkse venster, "HH:mm" Brusselse wandklok; null = de hele periode door. */
+  windowStart: string | null;
+  /** Einde van het venster (exclusief), "HH:mm". Mag over middernacht. */
+  windowEnd: string | null;
+  /** Eén check-in per zoveel minuten. De tijdvakken beginnen op het begin van het venster. */
+  intervalMinutes: number;
+  /** Uit = tijdens deze periode geen gratis pinten. */
+  rewardEnabled: boolean;
+  /** Check-ins in deze periode per gratis pint. */
+  rewardEvery: number;
+};
+
+export const FAK_PERIOD_INTERVAL_MIN = 5;
+export const FAK_PERIOD_INTERVAL_MAX = 1440;
+
+/**
+ * Wat een nieuwe periode voorstelt: de nacht door, elk uur, zodat wie overdag in
+ * de bar werkt er geen check-ins bij spaart.
+ */
+export const DEFAULT_FAK_PERIOD_RULES = {
+  windowStart: "22:00",
+  windowEnd: "10:00",
+  intervalMinutes: 60,
+  rewardEnabled: true,
+  rewardEvery: DEFAULT_FAKSCANNER_CONFIG.rewardEvery,
+} as const;
+
+export type FakPeriodError =
+  | "missing_name"
+  | "bad_range"
+  | "bad_time"
+  | "empty_window"
+  | "bad_interval"
+  | "bad_reward";
+
+/**
+ * Controleert een periode en geeft de eerste fout terug, of null. Overlap met een
+ * andere periode ziet ze niet, want daar zijn de andere periodes voor nodig; dat
+ * controleert de actie die opslaat.
+ */
+export function validateFakPeriod(input: FakPeriodRules & { name: string }): FakPeriodError | null {
+  if (!input.name.trim()) return "missing_name";
+  if (
+    Number.isNaN(input.startsAt.getTime()) ||
+    Number.isNaN(input.endsAt.getTime()) ||
+    input.endsAt <= input.startsAt
+  ) {
+    return "bad_range";
+  }
+  if ((input.windowStart === null) !== (input.windowEnd === null)) return "bad_time";
+  if (input.windowStart !== null && input.windowEnd !== null) {
+    if (!HHMM.test(input.windowStart) || !HHMM.test(input.windowEnd)) return "bad_time";
+    // Zelfde dubbelzinnigheid als bij het dubbeltelvenster: "de klok rond" of
+    // "nooit"? Wie de klok rond wil, zet het venster uit.
+    if (input.windowStart === input.windowEnd) return "empty_window";
+  }
+  if (
+    !Number.isInteger(input.intervalMinutes) ||
+    input.intervalMinutes < FAK_PERIOD_INTERVAL_MIN ||
+    input.intervalMinutes > FAK_PERIOD_INTERVAL_MAX
+  ) {
+    return "bad_interval";
+  }
+  if (!Number.isInteger(input.rewardEvery) || input.rewardEvery < 1 || input.rewardEvery > 1000) {
+    return "bad_reward";
+  }
+  return null;
+}

@@ -1,7 +1,11 @@
 import { prisma } from "@vtk/db";
 import { cardDisplayName, resolveStudentCard } from "@/lib/student-card";
-import { isFakscannerRequest, logFakScan, registerCheckin } from "@/lib/fakscanner-server";
-import { rewardProgress } from "@/lib/fakscanner";
+import {
+  isFakscannerRequest,
+  logFakScan,
+  registerCheckin,
+  type CheckinOutcome,
+} from "@/lib/fakscanner-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,6 +23,12 @@ export const dynamic = "force-dynamic";
  * Enkel **mislukte** scans gaan naar `FakScanLog`; een log van elke geslaagde
  * check-in zou een aanwezigheidslijst zijn (zie docs/design-decisions.md).
  *
+ * **De vorm van dit antwoord ligt vast**: de Pi aan de bar (`scripts/fakscanner`)
+ * leest `ok`, `error`, `name`, `rNumber`, `counted`, `message`, `total`, `double`
+ * en `freeBeer`, en die code verandert niet mee. Tijdens een periode
+ * (`FakPeriod`) is `total` dus de stand van die periode en zegt `message` waarom
+ * een scan niet telde; er komen geen velden bij die de Pi zou moeten kennen.
+ *
  * Antwoord (200): `{ ok, counted, rNumber, name, total, points, double, freeBeer,
  * toNextBeer, message }`. Bij een fout: `{ ok: false, error }` met een korte,
  * tonbare zin; het schermpje op de Pi is twee regels van zestien tekens breed.
@@ -31,6 +41,25 @@ const MESSAGES = {
   alreadyToday: "Al ingecheckt",
   serverError: "Serverfout",
 } as const;
+
+/**
+ * Waarom een scan niets opleverde, in zestien tekens: de Pi zet `message`
+ * gecentreerd op de bovenste regel en de stand eronder.
+ */
+function skippedMessage(outcome: CheckinOutcome): string | null {
+  switch (outcome.skipped) {
+    case null:
+      return null;
+    case "window":
+      // "Pas vanaf 22:00": buiten het venster van de periode, dus overdag.
+      return outcome.nextAt ? `Pas vanaf ${outcome.nextAt}` : "Buiten de uren";
+    case "slot":
+      // "Terug om 23:00": al gescand in dit tijdvak.
+      return outcome.nextAt ? `Terug om ${outcome.nextAt}` : MESSAGES.alreadyToday;
+    case "day":
+      return MESSAGES.alreadyToday;
+  }
+}
 
 export async function POST(request: Request) {
   if (!isFakscannerRequest(request)) {
@@ -77,7 +106,6 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, rNumber, name, error: MESSAGES.serverError });
   }
 
-  const { toNext } = rewardProgress(outcome.config, outcome.total);
   return Response.json({
     ok: true,
     counted: outcome.counted,
@@ -87,8 +115,11 @@ export async function POST(request: Request) {
     points: outcome.points,
     double: outcome.double,
     freeBeer: outcome.reward,
-    /** Hoeveel punten nog tot de volgende pint; de Pi mag dit tonen. */
-    toNextBeer: toNext,
-    message: outcome.counted ? null : MESSAGES.alreadyToday,
+    /**
+     * Hoeveel punten nog tot de volgende pint; de Pi mag dit tonen. Een periode
+     * zonder pinten geeft 0 en geen null, zodat het veld een getal blijft.
+     */
+    toNextBeer: outcome.toNextBeer ?? 0,
+    message: skippedMessage(outcome),
   });
 }

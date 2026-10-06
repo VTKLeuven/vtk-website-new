@@ -1404,6 +1404,41 @@ kunnen zien is of de lezer of KU Leuven het laat afweten: zonder die rijen is ee
 stille storing aan de bar pas zichtbaar wanneer iemand komt klagen dat zijn punten
 ontbreken.
 
+### Periodes voor een groot evenement
+
+Voor een groot evenement wil de fakbar dat wie er is, elk uur kan inchecken in
+plaats van één keer per avond. Dat is een **periode** (`FakPeriod`), aangemaakt in
+/admin/fakscanner/periodes met een begin, een einde en eigen regels. Website-kant:
+`registerCheckin` in `apps/web/lib/fakscanner-server.ts` en `fakPeriodSlot` in
+`apps/web/lib/fakscanner.ts`.
+
+- **Een periode vervangt de gewone werking, ze loopt er niet naast.** Tussen begin
+  en einde telt een scan enkel in `FakPeriodTally`; de jaarstand en het
+  dubbeltelvenster staan stil. Na het einde telt alles weer per bardag. Zo blijven
+  de check-ins van het evenement apart en loopt de jaarstand niet op met
+  twaalf scans per nacht.
+- **Een dagelijks venster** (standaard 22:00 tot 10:00) bepaalt wanneer een scan
+  telt. Wie overdag in de bar werkt, bv. het praesidium dat opbouwt of
+  opruimt, spaart zo geen check-ins bij. Buiten het venster zegt de lezer vanaf
+  wanneer het weer kan ("Pas vanaf 22:00"). Zonder venster telt het de klok rond.
+- **De tijdvakken liggen vast op de klok, niet op je vorige scan.** Met een uur per
+  tijdvak en een venster vanaf 22:00 zijn dat 22:00, 23:00, 00:00 en zo verder.
+  Wie om 22:50 scant, mag om 23:00 opnieuw. Een glijdend uur sinds je laatste scan
+  zou iedereen elk uur een paar minuten later laten scannen, en de lezer kan dan
+  geen eenvoudig "Terug om 23:00" tonen. De tijdvakken tellen in echte minuten
+  vanaf de opening, dus de nacht van de uurwissel heeft er een meer of minder.
+- **Pinten per periode.** Een periode kan gratis pinten uitzetten of een eigen
+  aantal check-ins per pint hebben; dat telt op de stand van de periode.
+- **Periodes overlappen niet.** Twee tegelijk zou betekenen dat de volgorde in de
+  databank bepaalt welke regels gelden. De actie die opslaat weigert het.
+- **Historiek zonder aanwezigheidslijst.** Een afgelopen periode blijft staan met
+  haar stand, maar net als bij de jaarstand is dat per persoon één rij: het aantal
+  check-ins en de laatste scan, niet welke uren iemand er was.
+- **De Pi verandert niet.** De lezer aan de bar leest `total`, `counted`,
+  `message`, `double` en `freeBeer`; tijdens een periode is `total` de stand van de
+  periode en zegt `message` in zestien tekens waarom een scan niet telde. Er komen
+  geen velden bij die de Pi zou moeten kennen.
+
 ---
 
 ## Ledenregistratie & onboarding (KUL SSO)

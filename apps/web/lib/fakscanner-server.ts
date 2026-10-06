@@ -1,17 +1,20 @@
 import "server-only";
 import { timingSafeEqual } from "node:crypto";
 import { Prisma } from "@prisma/client";
-import type { FakScanResult } from "@prisma/client";
+import type { FakPeriod, FakScanResult } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { FAKSCANNER_SETTING_KEY } from "@vtk/db/fakscanner";
 import { currentWorkingYear } from "@vtk/auth";
 import {
+  brusselsClockTime,
   DEFAULT_FAKSCANNER_CONFIG,
   earnedReward,
   fakDayStart,
+  fakPeriodSlot,
   isDoublePeriod,
   parseFakscannerConfig,
   pointsForScan,
+  rewardProgress,
   type FakscannerConfig,
 } from "./fakscanner";
 
@@ -82,20 +85,60 @@ export async function logFakScan(entry: {
 }
 
 export type CheckinOutcome = {
-  /** False wanneer dit lid vandaag al gescand had; de stand blijft dan staan. */
+  /** False wanneer deze scan niets opleverde; de stand blijft dan staan. */
   counted: boolean;
   /** Punten die deze scan opleverde (0 wanneer er niets geteld werd). */
   points: number;
   double: boolean;
+  /** De stand na deze scan: de jaarstand, of tijdens een periode die van de periode. */
   total: number;
   /** Maakte deze scan een gratis pint vol? */
   reward: boolean;
-  config: FakscannerConfig;
+  /** Punten tot de volgende gratis pint; null wanneer de lopende periode geen pinten geeft. */
+  toNextBeer: number | null;
+  /**
+   * Waarom er niets geteld werd: `day` al gescand deze bardag (gewone werking),
+   * `slot` al gescand in dit tijdvak, `window` buiten het dagelijkse venster van
+   * de periode. Null wanneer de scan telde.
+   */
+  skipped: "day" | "slot" | "window" | null;
+  /** "HH:mm" (Brussel) waarop een scan weer telt, zolang dat binnen de periode valt. */
+  nextAt: string | null;
+  /** De periode die nu loopt, of null bij de gewone werking. */
+  period: { id: string; name: string } | null;
 };
 
 /**
- * Telt één check-in bij de stand van een r-nummer, of stelt vast dat er vandaag al
- * één was.
+ * De periode die op `at` loopt, of null. Periodes overlappen niet (de actie die
+ * ze opslaat weigert dat), dus er is er hoogstens één.
+ */
+export async function getActiveFakPeriod(at: Date = new Date()): Promise<FakPeriod | null> {
+  return prisma.fakPeriod.findFirst({
+    where: { startsAt: { lte: at }, endsAt: { gt: at } },
+    orderBy: { startsAt: "desc" },
+  });
+}
+
+/**
+ * Telt één check-in bij de stand van een r-nummer, of stelt vast dat er niets bij
+ * komt.
+ *
+ * Loopt er een periode (`FakPeriod`), dan telt de scan **enkel** daar, volgens de
+ * regels van die periode; de jaarstand blijft dan staan. Anders is het de gewone
+ * check-in per bardag. De lezer en de app roepen allebei deze functie, zodat ze
+ * niet uit elkaar kunnen lopen.
+ */
+export async function registerCheckin(
+  rNumber: string,
+  at: Date = new Date(),
+): Promise<CheckinOutcome> {
+  const period = await getActiveFakPeriod(at);
+  if (period) return registerPeriodCheckin(period, rNumber, at);
+  return registerDailyCheckin(rNumber, at);
+}
+
+/**
+ * De gewone werking: één check-in per bardag in `FakTally`.
  *
  * Er is geen rij per dag om de dubbele scan tegen te houden, dus doet de
  * voorwaarde in de `UPDATE` dat werk: enkel een rij waarvan `lastCheckinAt` vóór
@@ -105,10 +148,7 @@ export type CheckinOutcome = {
  * van het jaar en maken we ze aan; botst dat op de primaire sleutel, dan was een
  * gelijktijdige scan ons net voor en is het dus ook "al gescand".
  */
-export async function registerCheckin(
-  rNumber: string,
-  at: Date = new Date(),
-): Promise<CheckinOutcome> {
+async function registerDailyCheckin(rNumber: string, at: Date): Promise<CheckinOutcome> {
   const config = await getFakscannerConfig();
   const dayStart = fakDayStart(config, at);
   // Het werkingsjaar hoort bij de bardag: een avond die over de 15-julicutover
@@ -116,6 +156,17 @@ export async function registerCheckin(
   const year = currentWorkingYear(dayStart);
   const double = isDoublePeriod(config, at);
   const points = pointsForScan(config, at);
+  const result = (counted: boolean, total: number, previous: number): CheckinOutcome => ({
+    counted,
+    points: counted ? points : 0,
+    double,
+    total,
+    reward: counted && earnedReward(config, previous, total),
+    toNextBeer: rewardProgress(config, total).toNext,
+    skipped: counted ? null : "day",
+    nextAt: null,
+    period: null,
+  });
 
   const updated = await prisma.fakTally.updateMany({
     where: { rNumber, year, lastCheckinAt: { lt: dayStart } },
@@ -132,7 +183,7 @@ export async function registerCheckin(
       select: { points: true },
     });
     const total = row?.points ?? points;
-    return { counted: true, points, double, total, reward: earnedReward(config, total - points, total), config };
+    return result(true, total, total - points);
   }
 
   try {
@@ -140,14 +191,7 @@ export async function registerCheckin(
       data: { rNumber, year, points, checkins: 1, lastCheckinAt: at },
       select: { points: true },
     });
-    return {
-      counted: true,
-      points,
-      double,
-      total: created.points,
-      reward: earnedReward(config, 0, created.points),
-      config,
-    };
+    return result(true, created.points, 0);
   } catch (err) {
     if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) throw err;
   }
@@ -156,7 +200,61 @@ export async function registerCheckin(
     where: { rNumber_year: { rNumber, year } },
     select: { points: true },
   });
-  return { counted: false, points: 0, double, total: existing?.points ?? 0, reward: false, config };
+  const total = existing?.points ?? 0;
+  return result(false, total, total);
+}
+
+/**
+ * Een check-in tijdens een periode: één per tijdvak, enkel binnen het venster, in
+ * `FakPeriodTally`. Zelfde racevrije aanpak als de bardag hierboven, met het
+ * begin van het tijdvak als grens in plaats van het begin van de bardag. Een
+ * scan telt hier altijd voor één; het dubbeltelvenster hoort bij de gewone
+ * werking.
+ */
+async function registerPeriodCheckin(
+  period: FakPeriod,
+  rNumber: string,
+  at: Date,
+): Promise<CheckinOutcome> {
+  const slot = fakPeriodSlot(period, at);
+  const key = { periodId_rNumber: { periodId: period.id, rNumber } };
+  const result = (
+    counted: boolean,
+    total: number,
+    skipped: CheckinOutcome["skipped"] = null,
+  ): CheckinOutcome => ({
+    counted,
+    points: counted ? 1 : 0,
+    double: false,
+    total,
+    reward: counted && period.rewardEnabled && earnedReward(period, total - 1, total),
+    toNextBeer: period.rewardEnabled ? rewardProgress(period, total).toNext : null,
+    skipped,
+    nextAt: slot.nextAt ? brusselsClockTime(slot.nextAt) : null,
+    period: { id: period.id, name: period.name },
+  });
+  const currentTotal = async () =>
+    (await prisma.fakPeriodTally.findUnique({ where: key, select: { checkins: true } }))?.checkins ?? 0;
+
+  if (!slot.open) return result(false, await currentTotal(), "window");
+
+  const updated = await prisma.fakPeriodTally.updateMany({
+    where: { periodId: period.id, rNumber, lastCheckinAt: { lt: slot.slotStart } },
+    data: { checkins: { increment: 1 }, lastCheckinAt: at },
+  });
+  if (updated.count === 1) return result(true, await currentTotal());
+
+  try {
+    const created = await prisma.fakPeriodTally.create({
+      data: { periodId: period.id, rNumber, checkins: 1, lastCheckinAt: at },
+      select: { checkins: true },
+    });
+    return result(true, created.checkins);
+  } catch (err) {
+    if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) throw err;
+  }
+
+  return result(false, await currentTotal(), "slot");
 }
 
 export type FakRankingRow = {

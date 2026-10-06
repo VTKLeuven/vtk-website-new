@@ -4,7 +4,12 @@ import { CheckinQrPanel } from '@/components/fakscanner/checkin-qr-panel';
 import { FakscannerSettingsForm } from '@/components/fakscanner/settings-form';
 import { createFakCheckinToken } from '@/lib/fak-checkin-token';
 import {
+  describePeriodInterval,
+  describePeriodWindow,
+  fakPeriodStatus,
+  formatPeriodMoment,
   formatWorkingYear,
+  getCurrentOrNextFakPeriod,
   getFakRanking,
   getFakScanLog,
   getFakYearsWithData,
@@ -45,12 +50,14 @@ export default async function FakscannerAdminPage({
 
   const config = await getFakscannerConfig();
 
-  const [ranking, yearsWithData, log, qrCode] = await Promise.all([
+  const [ranking, yearsWithData, log, qrCode, period] = await Promise.all([
     getFakRanking(year, config.rewardEvery, (rankPage - 1) * RANK_PAGE_SIZE, RANK_PAGE_SIZE),
     getFakYearsWithData(),
     getFakScanLog(year, (logPage - 1) * LOG_PAGE_SIZE, LOG_PAGE_SIZE),
     Promise.resolve(createFakCheckinToken()),
+    getCurrentOrNextFakPeriod(),
   ]);
+  const periodActive = period ? fakPeriodStatus(period) === 'active' : false;
 
   const years = workingYearTabs(yearsWithData);
   const rankPages = Math.max(1, Math.ceil(ranking.total / RANK_PAGE_SIZE));
@@ -118,6 +125,25 @@ export default async function FakscannerAdminPage({
           gratis pint. We bewaren per persoon enkel de stand, geen lijst van avonden.
         </p>
       </div>
+
+      {/* Een periode die loopt of eraan komt: dan staat deze stand stil. */}
+      {period ? (
+        <Link
+          href={`/admin/fakscanner/periodes/${period.id}`}
+          className="fakbar-card fakbar-card-accent block text-sm text-[var(--body)] hover:border-[var(--line-2)]"
+        >
+          <span className="font-semibold text-[var(--ink)]">
+            {periodActive ? `Nu loopt ${period.name}.` : `Gepland: ${period.name}.`}
+          </span>{' '}
+          {periodActive
+            ? `Tot ${formatPeriodMoment(period.endsAt)} telt de scanner volgens die periode (${describePeriodInterval(
+                period.intervalMinutes,
+              ).toLowerCase()}, ${describePeriodWindow(period).toLowerCase()}) en staat de jaarstand hieronder stil.`
+            : `Van ${formatPeriodMoment(period.startsAt)} tot ${formatPeriodMoment(
+                period.endsAt,
+              )} telt de scanner volgens die periode en staat de jaarstand stil.`}
+        </Link>
+      ) : null}
 
       {/* Werkingsjaar */}
       <div className="flex flex-wrap items-center gap-2">

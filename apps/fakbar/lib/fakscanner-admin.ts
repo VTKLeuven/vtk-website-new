@@ -11,7 +11,7 @@ import { currentWorkingYear, FIRST_WORKING_YEAR } from '@vtk/auth';
 
 /**
  * Wat het beheerscherm van de fakscanner leest: de instellingen, de ranglijst van
- * een werkingsjaar en de log van mislukte scans.
+ * een werkingsjaar, de log van mislukte scans en de periodes.
  *
  * De kaartlezer zelf blijft op vtk.be: de Pi post naar `/api/fakscanner/scan`
  * daar, en `apps/web/lib/fakscanner-server.ts` telt de check-in bij. Deze app
@@ -167,4 +167,166 @@ export async function getFakScanLog(year: number, skip = 0, take = LOG_PAGE_SIZE
     prisma.fakScanLog.findMany({ where, orderBy: { at: 'desc' }, skip, take }),
   ]);
   return { total, rows };
+}
+
+// ── Periodes ─────────────────────────────────────────────────────────────────
+//
+// Een periode (`FakPeriod`) is een groot evenement waarin de scanner elk uur
+// telt in plaats van één keer per bardag, in een eigen teller. Het tellen zelf
+// gebeurt op vtk.be (`registerCheckin` in apps/web/lib/fakscanner-server.ts);
+// dit scherm maakt ze aan en toont hun stand. Zie docs/design-decisions.md
+// ("Periodes voor een groot evenement").
+
+export type FakPeriodStatus = 'upcoming' | 'active' | 'ended';
+
+export function fakPeriodStatus(
+  period: { startsAt: Date; endsAt: Date },
+  now: Date = new Date(),
+): FakPeriodStatus {
+  if (now < period.startsAt) return 'upcoming';
+  if (now < period.endsAt) return 'active';
+  return 'ended';
+}
+
+export const FAK_PERIOD_STATUS_LABEL: Record<FakPeriodStatus, string> = {
+  upcoming: 'Gepland',
+  active: 'Loopt nu',
+  ended: 'Afgelopen',
+};
+
+const periodFields = {
+  id: true,
+  name: true,
+  startsAt: true,
+  endsAt: true,
+  windowStart: true,
+  windowEnd: true,
+  intervalMinutes: true,
+  rewardEnabled: true,
+  rewardEvery: true,
+} as const;
+
+export type FakPeriodRow = {
+  id: string;
+  name: string;
+  startsAt: Date;
+  endsAt: Date;
+  windowStart: string | null;
+  windowEnd: string | null;
+  intervalMinutes: number;
+  rewardEnabled: boolean;
+  rewardEvery: number;
+};
+
+export type FakPeriodListRow = FakPeriodRow & {
+  /** Aantal mensen dat in deze periode minstens één keer telde. */
+  people: number;
+  /** Alle check-ins van deze periode samen. */
+  checkins: number;
+};
+
+/** Alle periodes, de laatste bovenaan, met hoeveel mensen en check-ins erin zitten. */
+export async function getFakPeriods(): Promise<FakPeriodListRow[]> {
+  const [periods, sums] = await Promise.all([
+    prisma.fakPeriod.findMany({ select: periodFields, orderBy: { startsAt: 'desc' } }),
+    prisma.fakPeriodTally.groupBy({ by: ['periodId'], _count: { _all: true }, _sum: { checkins: true } }),
+  ]);
+  const byPeriod = new Map(sums.map((row) => [row.periodId, row]));
+  return periods.map((period) => ({
+    ...period,
+    people: byPeriod.get(period.id)?._count._all ?? 0,
+    checkins: byPeriod.get(period.id)?._sum.checkins ?? 0,
+  }));
+}
+
+export async function getFakPeriod(id: string): Promise<FakPeriodRow | null> {
+  return prisma.fakPeriod.findUnique({ where: { id }, select: periodFields });
+}
+
+/** De periode die nu loopt of als eerste begint, voor de melding op de jaarstand. */
+export async function getCurrentOrNextFakPeriod(now: Date = new Date()): Promise<FakPeriodRow | null> {
+  return prisma.fakPeriod.findFirst({
+    where: { endsAt: { gt: now } },
+    orderBy: { startsAt: 'asc' },
+    select: periodFields,
+  });
+}
+
+export type FakPeriodRankingRow = {
+  rNumber: string;
+  name: string | null;
+  checkins: number;
+  lastCheckinAt: Date;
+};
+
+/**
+ * Een pagina uit de ranglijst van een periode, van veel naar weinig check-ins.
+ * Per persoon één rij met de stand en de laatste scan, net als de jaarstand:
+ * welke uren iemand er was, bewaren we niet.
+ */
+export async function getFakPeriodRanking(
+  periodId: string,
+  skip = 0,
+  take = RANK_PAGE_SIZE,
+): Promise<{ rows: FakPeriodRankingRow[]; total: number }> {
+  const [total, tallies] = await Promise.all([
+    prisma.fakPeriodTally.count({ where: { periodId } }),
+    prisma.fakPeriodTally.findMany({
+      where: { periodId },
+      orderBy: [{ checkins: 'desc' }, { lastCheckinAt: 'asc' }, { rNumber: 'asc' }],
+      skip,
+      take,
+    }),
+  ]);
+  if (tallies.length === 0) return { rows: [], total };
+
+  const users = await prisma.user.findMany({
+    where: { rNumber: { in: tallies.map((tally) => tally.rNumber) } },
+    select: { rNumber: true, name: true },
+  });
+  const nameByRNumber = new Map(users.map((user) => [user.rNumber, user.name]));
+
+  return {
+    total,
+    rows: tallies.map((tally) => ({
+      rNumber: tally.rNumber,
+      name: nameByRNumber.get(tally.rNumber) ?? null,
+      checkins: tally.checkins,
+      lastCheckinAt: tally.lastCheckinAt,
+    })),
+  };
+}
+
+const periodMomentFmt = new Intl.DateTimeFormat('nl-BE', {
+  timeZone: 'Europe/Brussels',
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+/** "di 20 okt. 2026 18:00": begin of einde van een periode. */
+export function formatPeriodMoment(date: Date): string {
+  return periodMomentFmt.format(date);
+}
+
+/** "Elk uur", "Elke 2 uur", "Elke 30 min". */
+export function describePeriodInterval(minutes: number): string {
+  if (minutes === 60) return 'Elk uur';
+  if (minutes % 60 === 0) return `Elke ${minutes / 60} uur`;
+  return `Elke ${minutes} min`;
+}
+
+/** "22:00 tot 10:00", of "de klok rond" zonder venster. */
+export function describePeriodWindow(period: Pick<FakPeriodRow, 'windowStart' | 'windowEnd'>): string {
+  return period.windowStart && period.windowEnd
+    ? `${period.windowStart} tot ${period.windowEnd}`
+    : 'De klok rond';
+}
+
+/** "Per 10 check-ins", of "Geen" wanneer de periode geen pinten geeft. */
+export function describePeriodReward(period: Pick<FakPeriodRow, 'rewardEnabled' | 'rewardEvery'>): string {
+  return period.rewardEnabled ? `Per ${period.rewardEvery} check-ins` : 'Geen';
 }

@@ -3,8 +3,7 @@ import { z } from "zod";
 
 import { corsPreflight } from "@/lib/cors";
 import { readBarStatus } from "@/lib/elixir/status";
-import { rewardProgress } from "@/lib/fakscanner";
-import { registerCheckin } from "@/lib/fakscanner-server";
+import { registerCheckin, type CheckinOutcome } from "@/lib/fakscanner-server";
 import { requireSession } from "@/lib/session";
 import type { AppFakCheckin } from "@/lib/app-api/contract";
 import { appError, appErrorResponse, appJson, readAppJson } from "@/lib/app-api/respond";
@@ -37,9 +36,29 @@ export const dynamic = "force-dynamic";
  * Wie de code doorstuurt naar iemand die niet in de bar staat, geeft die persoon
  * dus hoogstens een check-in op een avond dat de bar toch openstaat. Dat is een
  * bewuste afweging en ze staat in `docs/design-decisions.md`.
+ *
+ * Tijdens een periode (`FakPeriod`) gelden haar regels ook hier: één check-in per
+ * tijdvak en enkel binnen het dagelijkse venster. Buiten dat venster komt er een
+ * fout `OUTSIDE_WINDOW` terug in plaats van `counted: false`, zodat ook een
+ * oudere app zegt waarom de scan niet telde en niet enkel "Al ingecheckt".
  */
 
 const schema = z.object({ code: z.string().min(8).max(512) });
+
+/** Waarom een scan niet telde, voor wie het in de app leest; null wanneer hij telde. */
+function skippedMessage(outcome: CheckinOutcome): string | null {
+  switch (outcome.skipped) {
+    case null:
+      return null;
+    case "day":
+      return "Je was vanavond al ingecheckt.";
+    case "slot":
+    case "window":
+      return outcome.nextAt
+        ? `Je volgende check-in telt vanaf ${outcome.nextAt}.`
+        : `Tijdens ${outcome.period?.name ?? "deze periode"} telt er geen check-in meer bij.`;
+  }
+}
 
 export async function POST(request: Request) {
   try {
@@ -72,7 +91,13 @@ export async function POST(request: Request) {
     }
 
     const outcome = await registerCheckin(user.rNumber, now);
-    const { toNext } = rewardProgress(outcome.config, outcome.total);
+    if (outcome.skipped === "window") {
+      return appError(request, "OUTSIDE_WINDOW", 409, {
+        message: outcome.nextAt
+          ? `Tijdens ${outcome.period?.name ?? "deze periode"} tellen check-ins pas vanaf ${outcome.nextAt}.`
+          : skippedMessage(outcome) ?? undefined,
+      });
+    }
 
     const payload: AppFakCheckin = {
       counted: outcome.counted,
@@ -81,8 +106,10 @@ export async function POST(request: Request) {
       points: outcome.points,
       double: outcome.double,
       freeBeer: outcome.reward,
-      toNextBeer: toNext,
-      message: outcome.counted ? null : "Je was vanavond al ingecheckt.",
+      toNextBeer: outcome.toNextBeer ?? 0,
+      message: skippedMessage(outcome),
+      period: outcome.period?.name ?? null,
+      freeBeers: outcome.toNextBeer !== null,
     };
 
     return appJson(request, payload);
