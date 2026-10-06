@@ -14,10 +14,13 @@ export const CUDI_SHIFT_SOURCE = "cudi";
 
 /**
  * Post waaronder cursusdienst-shiften meetellen in de shift-ranking
- * (`app/api/shift/ranking/route.ts` groepeert per `Shift.post`). Wijzig hier om
- * ze onder een andere post te laten vallen.
+ * (`app/api/shift/ranking/route.ts` groepeert per `Shift.post`). Dit is de
+ * groepscode (`Group.code`), niet de naam: `/shift` zet de code om naar
+ * "Cursusdienst" via `lib/shift/postNames.ts`. Met de naam erin stonden de
+ * gespiegelde shiften onder een tweede post "Cursusdienst" naast die van de
+ * shiften die hier zelf aangemaakt worden, en telden ze apart in de ranking.
  */
-export const CURSUSDIENST_SHIFT_POST = "Cursusdienst";
+export const CURSUSDIENST_SHIFT_POST = "CURSUSDIENST";
 
 /**
  * Reward van een cursusdienst-shift: 1 bonnetje per begonnen uur.
