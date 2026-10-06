@@ -3608,6 +3608,13 @@ model Meeting {
   /// raakt de Theokot-voorraad en de turflijst niet.
   useTheokot Boolean @default(true)
 
+  /// Big bureau: Theokot levert enkel de eerste zoveel broodjes, in volgorde van
+  /// inschrijven; de rest bestelt Onderwijs zelf bij een externe zaak
+  /// (`MeetingReservation.external`). Leeg = geen big bureau, alles komt van
+  /// Theokot. Enkel bij een bureau met `useTheokot`. Mag ook aangezet worden
+  /// wanneer er al besteld is: `rebalanceMeetingSupply` verdeelt dan opnieuw.
+  theokotLimit Int?
+
   /// Vrije toelichting boven het reservatieformulier.
   noteNl String?
   noteEn String?
@@ -3662,6 +3669,11 @@ model MeetingReservation {
   /// Het aanbod-item van die verkoopdag, zodra het gekoppeld kon worden. Dit is
   /// wat de voorraad afroomt en op de turflijst verschijnt.
   sessionItemId  String?
+  /// Big bureau: dit broodje komt niet uit de Theokot-voorraad maar wordt apart
+  /// bij een externe zaak besteld. `sessionItemId` is dan leeg, dus het gaat
+  /// niet van de voorraad af en staat niet op de turflijst. Enkel true zolang
+  /// `Meeting.theokotLimit` gezet is.
+  external       Boolean @default(false)
 
   /// Leeg = geen drankje.
   drinkName       String?

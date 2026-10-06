@@ -742,6 +742,43 @@ je zet dan zelf de keuzes met hun prijs (lasagne, broodjes van een bakker). Zo'n
 vergadering raakt de Theokot-voorraad niet en krijgt geen kolom op de turflijst. Een GM
 kan dat ook; het is dezelfde knop.
 
+### Big bureau: Theokot levert enkel de eerste broodjes
+
+Soms komt er naar een bureau veel meer volk dan verwacht. Dan kan het bureau niet de
+hele Theokot-voorraad opeisen: de studenten bestellen daar ook. Per bureau staat
+daarom een vinkje **Big bureau** met een aantal (`Meeting.theokotLimit`): Theokot
+levert de eerste zoveel broodjes, **in volgorde van inschrijven**, en de rest wordt
+bewaard en door Onderwijs zelf bij een externe zaak besteld
+(`MeetingReservation.external`).
+
+- **Het moet onverwacht aan kunnen, ook wanneer er al besteld is.** Een bureau wordt
+  soms pas populair nadat de link rondging. Aanzetten verdeelt de bestaande
+  inschrijvingen meteen opnieuw (`rebalanceMeetingSupply`): de eersten blijven bij
+  Theokot, wat boven het aantal valt, wordt extern en komt in dezelfde beweging terug
+  vrij voor studenten.
+- **De volgorde is die van de inschrijving** (`createdAt`), niet die van het laatste
+  aanpassen: je broodje wijzigen kost je plaats niet. Wie annuleert, maakt plaats voor
+  de eerstvolgende die extern stond.
+- **Bij een big bureau is er voor de student nooit iets uitverkocht.** Heeft Theokot
+  een broodje niet meer, dan gaat het naar de externe bestelling, ook onder het
+  aantal; die plaats bij Theokot gaat dan naar de volgende. De student ziet niet of
+  zijn broodje van Theokot of extern komt: het belandt hoe dan ook op het bureau.
+- **Het aanbod blijft dat van Theokot.** Extern betekent enkel wie het broodje maakt.
+  Een broodje dat die dag niet op het aanbod van Theokot staat, wordt ongeldig zoals
+  altijd, ook wanneer het extern besteld zou worden.
+- **De turflijst kent enkel de Theokot-broodjes**; de extern bestelde staan er niet
+  op. Het beheerscherm toont per bureau "Extern te bestellen" met een aantal per
+  broodje, en bij "Wie komt" staat per persoon of het broodje extern is. De drankjes
+  veranderen niet: die blijven allemaal op de turflijst.
+- **Geld**: een extern broodje zit niet in het bedrag van het bureau, want die
+  rekening komt van de externe zaak, aan een prijs die de site niet kent. De totalen
+  tonen het aantal apart in een kolom "Extern".
+- **Uitzetten kan enkel wanneer Theokot alles kan overnemen.** Anders zou het bureau
+  stil meer van de voorraad nemen dan er is. Dan blijft big bureau aan en zegt de
+  melding dat je het aantal hoger zet of Theokot eerst om meer broodjes vraagt.
+- Na de deadline kan het nog, maar dan werkt Theokot misschien al met de turflijst:
+  het beheerscherm zegt dat je Theokot dan zelf verwittigt.
+
 ### Deadline
 
 Aanpassen of annuleren kan tot **dezelfde deadline als voor studenten**: het moment

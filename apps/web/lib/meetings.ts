@@ -251,12 +251,96 @@ export function hasMeetingOrder(reservation: {
   return Boolean(reservation.itemName) || Boolean(reservation.drinkName);
 }
 
-export type ReservationAmounts = { itemPriceCents: number; drinkPriceCents: number };
+export type ReservationAmounts = {
+  itemPriceCents: number;
+  drinkPriceCents: number;
+  /** Big bureau: het broodje wordt extern besteld. */
+  external?: boolean;
+};
 
+/**
+ * Wat een inschrijving kost. Een extern besteld broodje (big bureau) telt niet
+ * mee: daar komt een aparte rekening voor, aan een prijs die de site niet kent.
+ * De prijs op de reservatie is die van Theokot en zou de totalen enkel
+ * vertekenen.
+ */
 export function reservationTotalCents(reservation: ReservationAmounts): number {
-  return reservation.itemPriceCents + reservation.drinkPriceCents;
+  return (reservation.external ? 0 : reservation.itemPriceCents) + reservation.drinkPriceCents;
 }
 
 export function sumReservationTotals(reservations: ReservationAmounts[]): number {
   return reservations.reduce((total, r) => total + reservationTotalCents(r), 0);
+}
+
+// -----------------------------------------------------------------------------
+// Big bureau
+//
+// Komt er veel meer volk dan Theokot kan dragen, dan levert Theokot enkel de
+// eerste zoveel broodjes; de rest wordt bewaard en apart bij een externe zaak
+// besteld. Zie docs/design-decisions.md.
+// -----------------------------------------------------------------------------
+
+export type BigBureauInput = { kind: MeetingKind; useTheokot: boolean; theokotLimit: number | null };
+
+/** Levert Theokot voor dit moment maar een deel van de broodjes? */
+export function isBigBureau(meeting: BigBureauInput): boolean {
+  return meeting.kind === 'BUREAU' && meeting.useTheokot && meeting.theokotLimit !== null;
+}
+
+/** Waar het broodje van één reservatie vandaan komt. */
+export type SupplyAssignment = { external: boolean; sessionItemId: string | null };
+
+/** Het aanbod-item van die dag en hoeveel er buiten dit moment nog van vrij is. */
+export type SupplyStock = ReadonlyMap<string, { sessionItemId: string; available: number }>;
+
+/**
+ * Verdeelt de broodjes van een big bureau over Theokot en de externe zaak.
+ *
+ * In volgorde van inschrijven krijgt elke reservatie haar broodje van Theokot
+ * zolang de limiet niet bereikt is en Theokot van dat broodje nog heeft; anders
+ * wordt ze extern besteld. Er is dus nooit iets uitverkocht: wat Theokot niet
+ * kan leveren, gaat naar de externe bestelling.
+ *
+ * - `reservations`: enkel de actieve reservaties met een broodje, al in volgorde
+ *   van inschrijven, met de naamsleutel van dat broodje ({@link offeringNameKey}).
+ * - `limit`: null = geen limiet (big bureau uitzetten; enkel de voorraad telt).
+ * - `stock`: per naamsleutel, met studenten en andere vergaderingen al
+ *   afgetrokken. Null zolang Theokot de verkoopdag niet aanmaakte: dan telt enkel
+ *   de limiet en blijft het broodje nog ongekoppeld.
+ *
+ * Een broodje dat niet op het aanbod van die dag staat, krijgt geen toewijzing:
+ * dat is een ongeldige reservatie (zie `syncMeetingReservations`), geen externe.
+ */
+export function planMeetingSupply(
+  reservations: ReadonlyArray<{ id: string; itemKey: string }>,
+  limit: number | null,
+  stock: SupplyStock | null,
+): Map<string, SupplyAssignment> {
+  const plan = new Map<string, SupplyAssignment>();
+  const left = new Map<string, number>();
+  if (stock) for (const [key, item] of stock) left.set(key, item.available);
+  let fromTheokot = 0;
+
+  for (const reservation of reservations) {
+    const underLimit = limit === null || fromTheokot < limit;
+
+    if (!stock) {
+      plan.set(reservation.id, { external: !underLimit, sessionItemId: null });
+      if (underLimit) fromTheokot += 1;
+      continue;
+    }
+
+    const item = stock.get(reservation.itemKey);
+    if (!item) continue;
+    const available = left.get(reservation.itemKey) ?? 0;
+    if (underLimit && available > 0) {
+      plan.set(reservation.id, { external: false, sessionItemId: item.sessionItemId });
+      left.set(reservation.itemKey, available - 1);
+      fromTheokot += 1;
+    } else {
+      plan.set(reservation.id, { external: true, sessionItemId: null });
+    }
+  }
+
+  return plan;
 }

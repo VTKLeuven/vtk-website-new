@@ -9,6 +9,7 @@ import { logAudit } from "@/lib/audit";
 import { brusselsTimeOnDay, ymdKey } from "@/lib/brussels";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import {
+  isBigBureau,
   meetingCloseAt,
   meetingWindowState,
   parseDayValue,
@@ -20,6 +21,7 @@ import {
   getMeetingDrinks,
   linkGrocomeetOrders,
   offeringForMeeting,
+  rebalanceMeetingSupply,
   sessionForMeeting,
   syncMeetingReservations,
   usageForSessionItemsTx,
@@ -283,49 +285,128 @@ export async function createMeetingAction(_prev: SaveState, formData: FormData):
   return saveOk();
 }
 
-/** Uur, plaats, opening, toelichting en de aanbodbron van één moment. */
+/** Theokot kan de extern bestelde broodjes niet terugnemen (big bureau uitzetten). */
+class ExternalLeftError extends Error {
+  constructor() {
+    super("EXTERNAL_LEFT");
+  }
+}
+
+/**
+ * Uur, plaats, opening, toelichting, de aanbodbron en big bureau van één moment.
+ *
+ * Big bureau mag op elk moment aan, ook wanneer er al besteld is: dan verdeelt
+ * `syncMeetingReservations` de bestaande broodjes opnieuw en komt wat boven de
+ * limiet valt meteen terug vrij voor studenten. Uitzetten kan enkel wanneer
+ * Theokot alle extern bestelde broodjes nog kan leveren; anders zou dat
+ * stilletjes meer van de voorraad nemen dan er is.
+ */
 export async function saveMeetingAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const id = String(formData.get("meetingId") ?? "");
   const meeting = await prisma.meeting.findUnique({ where: { id } });
   if (!meeting) return saveError("NOT_FOUND");
   await requireMeetingManager(meeting.kind);
+  const nl = formData.get("locale") !== "en";
 
   const startsAt = parseLocalDateTime(String(formData.get("startsAt") ?? ""));
   if (!startsAt) return saveError("INVALID_DATE");
   const opensAt = parseLocalDateTime(String(formData.get("opensAt") ?? ""));
   const useTheokot = formData.get("useTheokot") === "on";
 
-  await prisma.meeting.update({
-    where: { id },
-    data: {
-      startsAt,
-      year: currentWorkingYear(startsAt),
-      semester: semesterForDate(startsAt),
-      location: String(formData.get("location") ?? "").trim() || null,
-      opensAt,
-      useTheokot,
-      noteNl: String(formData.get("noteNl") ?? "").trim() || null,
-      noteEn: String(formData.get("noteEn") ?? "").trim() || null,
-    },
-  });
+  let theokotLimit: number | null = null;
+  if (meeting.kind === "BUREAU" && useTheokot && formData.get("bigBureau") === "on") {
+    const raw = String(formData.get("theokotLimit") ?? "").trim();
+    const limit = Number(raw);
+    if (raw === "" || !Number.isInteger(limit) || limit < 0) return saveError("INVALID_LIMIT");
+    theokotLimit = limit;
+  }
+  const wasBig = isBigBureau(meeting);
+  const isBig = isBigBureau({ kind: meeting.kind, useTheokot, theokotLimit });
+  // Een eigen aanbod maakt elk Theokot-broodje sowieso ongeldig; dan valt er
+  // niets terug te geven.
+  const releasing = wasBig && !isBig && useTheokot;
 
+  try {
+    await withSerializableTransaction(async (tx) => {
+      await tx.meeting.update({
+        where: { id },
+        data: {
+          startsAt,
+          year: currentWorkingYear(startsAt),
+          semester: semesterForDate(startsAt),
+          location: String(formData.get("location") ?? "").trim() || null,
+          opensAt,
+          useTheokot,
+          theokotLimit,
+          noteNl: String(formData.get("noteNl") ?? "").trim() || null,
+          noteEn: String(formData.get("noteEn") ?? "").trim() || null,
+        },
+      });
+      if (releasing) {
+        const { external } = await rebalanceMeetingSupply(tx, id, { limit: null });
+        if (external > 0) throw new ExternalLeftError();
+      }
+    });
+  } catch (error) {
+    if (error instanceof ExternalLeftError) return saveError("EXTERNAL_LEFT");
+    throw error;
+  }
+
+  const changes = [
+    meeting.startsAt.getTime() === startsAt.getTime()
+      ? "plaats, opening of toelichting gewijzigd"
+      : `verplaatst vanaf ${meetingLabel(meeting.kind, meeting.startsAt)}`,
+  ];
+  if (meeting.theokotLimit !== theokotLimit) {
+    changes.push(
+      theokotLimit === null
+        ? "big bureau uitgezet: alle broodjes weer van Theokot"
+        : `big bureau: Theokot levert de eerste ${theokotLimit} broodje(s)`,
+    );
+  }
   await logAudit({
     action: "update",
     entity: "meeting",
     entityId: id,
     target: meetingLabel(meeting.kind, startsAt),
-    summary:
-      meeting.startsAt.getTime() === startsAt.getTime()
-        ? "plaats, opening of toelichting gewijzigd"
-        : `verplaatst vanaf ${meetingLabel(meeting.kind, meeting.startsAt)}`,
+    summary: changes.join("; "),
   });
 
   // Een ander uur betekent een andere verkoopdag, en een omgeschakeld aanbod
   // betekent een ander lijstje broodjes: allebei kunnen bestaande reservaties
-  // onmogelijk maken.
+  // onmogelijk maken. Bij een big bureau verdeelt dit ook de broodjes opnieuw.
   await syncMeetingReservations(id);
   revalidateMeeting(meeting.kind, meeting.slug);
-  return saveOk();
+
+  // Met een eigen aanbod is er niets van Theokot meer om over te zeggen.
+  if (meeting.theokotLimit === theokotLimit || !useTheokot) return saveOk();
+  // Wie big bureau aanzet terwijl er al besteld is, moet meteen zien wat dat deed.
+  if (!isBig) {
+    return saveOk(
+      nl
+        ? "Big bureau staat uit: alle broodjes komen weer van Theokot."
+        : "Big bureau is off: all sandwiches come from Theokot again.",
+    );
+  }
+  const split = await supplySplit(id);
+  return saveOk(
+    nl
+      ? `Big bureau staat aan: ${split.theokot} broodje(s) van Theokot, ${split.external} extern te bestellen.`
+      : `Big bureau is on: ${split.theokot} sandwich(es) from Theokot, ${split.external} to order externally.`,
+  );
+}
+
+/** Hoeveel broodjes van een moment van Theokot komen en hoeveel extern. */
+async function supplySplit(meetingId: string): Promise<{ theokot: number; external: number }> {
+  const rows = await prisma.meetingReservation.groupBy({
+    by: ["external"],
+    where: { meetingId, status: "ACTIVE", itemNameNl: { not: null } },
+    _count: { _all: true },
+  });
+  return {
+    theokot: rows.find((row) => !row.external)?._count._all ?? 0,
+    external: rows.find((row) => row.external)?._count._all ?? 0,
+  };
 }
 
 /** Void, zodat `DeleteIconButton` deze rechtstreeks kan aanroepen. */
@@ -555,6 +636,10 @@ export async function saveMeetingReservationAction(
   const choice = choiceKey ? offering.find((option) => option.key === choiceKey) : undefined;
   if (choiceKey && !choice) return saveError("UNKNOWN_CHOICE");
 
+  // Bij een big bureau is er nooit iets uitverkocht: de volgorde van inschrijven
+  // beslist of het broodje van Theokot komt of extern besteld wordt.
+  const bigBureau = isBigBureau(meeting);
+
   // Niets besteld is geen lege bestelling maar een inschrijving: wie komt zonder
   // broodje of drankje hoort even goed op de aanwezigheidslijst, en zijn
   // opmerking hoort bij het beheer te raken. Uitschrijven gebeurt met "Inschrijving
@@ -563,7 +648,7 @@ export async function saveMeetingReservationAction(
 
   try {
     await withSerializableTransaction(async (tx) => {
-      if (choice?.sessionItemId && theokotSession) {
+      if (!bigBureau && choice?.sessionItemId && theokotSession) {
         const used = await usageForSessionItemsTx(tx, theokotSession.id);
         const item = theokotSession.items.find((row) => row.id === choice.sessionItemId);
         const existing = await tx.meetingReservation.findUnique({
@@ -586,7 +671,10 @@ export async function saveMeetingReservationAction(
         itemPriceCents: choice?.priceCents ?? 0,
         productId: choice?.productId ?? null,
         optionId: choice?.optionId ?? null,
-        sessionItemId: choice?.sessionItemId ?? null,
+        // Bij een big bureau zet de verdeling hieronder dit broodje bij Theokot
+        // of bij de externe bestelling.
+        sessionItemId: bigBureau ? null : choice?.sessionItemId ?? null,
+        external: false,
         drinkName: drinkName || null,
         drinkPriceCents: drinkName ? drinks.priceCents : 0,
         comment,
@@ -599,6 +687,7 @@ export async function saveMeetingReservationAction(
         update: data,
         create: { ...data, meetingId, userId },
       });
+      if (bigBureau) await rebalanceMeetingSupply(tx, meetingId);
     });
   } catch (error) {
     if (error instanceof Error && error.message === "SOLD_OUT") return saveError("SOLD_OUT");
@@ -621,6 +710,14 @@ export async function cancelMeetingReservationAction(formData: FormData): Promis
   const theokotSession = await sessionForMeeting(meeting);
   if (new Date() >= meetingCloseAt(meeting, theokotSession)) return;
 
-  await prisma.meetingReservation.deleteMany({ where: { meetingId, userId: session.user.id } });
+  if (isBigBureau(meeting)) {
+    // Een vrijgekomen Theokot-broodje gaat naar de eerstvolgende die extern stond.
+    await withSerializableTransaction(async (tx) => {
+      await tx.meetingReservation.deleteMany({ where: { meetingId, userId: session.user.id } });
+      await rebalanceMeetingSupply(tx, meetingId);
+    });
+  } else {
+    await prisma.meetingReservation.deleteMany({ where: { meetingId, userId: session.user.id } });
+  }
   revalidateMeeting(meeting.kind, meeting.slug);
 }
