@@ -42,7 +42,7 @@ import {
   ticketTypeNeedsMembership,
   ticketTypeRequiresLogin,
 } from "./audience";
-import { viewerSalesStart, viewerTypeSalesStart } from "./presale";
+import { nonMemberTypeSalesStart, viewerSalesStart, viewerTypeSalesStart } from "./presale";
 import { presaleViewerFor } from "./presaleViewer";
 import { hasPrivateTicketAccess } from "./privateLink";
 import { userIsMember } from "@/lib/membership";
@@ -72,7 +72,12 @@ export const checkoutRequestSchema = z.object({
         ticketTypeId: z.string().min(1),
         // Aan de ledenprijs van dit type. Enkel voor een lid; zie hieronder.
         memberPrice: z.boolean().default(false),
-        // Het gratis ticket van een erelid (`TicketType.honoraryFree`).
+        // Het ticket van een erelid aan de ereledenprijs
+        // (`TicketType.honoraryPriceCents`).
+        honoraryPrice: z.boolean().default(false),
+        // Dezelfde vlag onder haar oude naam, van een shop die nog openstond
+        // toen de ereledenprijs het vinkje "Gratis voor ereleden" verving.
+        // Zonder deze regel viel ze weg en betaalde dat erelid de gewone prijs.
         honoraryFree: z.boolean().default(false),
         attendeeName: z.string().trim().min(2).max(160),
         attendeeEmail: z
@@ -100,7 +105,7 @@ export class TicketCheckoutError extends Error {
       | "TOO_MANY_RESERVATIONS"
       | "FREE_TICKET_LIMIT"
       | "SOLD_OUT"
-      | "HONORARY_FREE_USED"
+      | "HONORARY_PRICE_USED"
       | "PAYMENT_UNAVAILABLE",
     public readonly field?: string
   ) {
@@ -174,9 +179,9 @@ function ticketLineName(
   hasMemberPrice: boolean,
   memberPrice: boolean,
   locale: "nl" | "en",
-  honoraryFree = false,
+  honoraryPrice = false,
 ): string {
-  if (honoraryFree) return `${name} (${locale === "en" ? "honorary member" : "erelid"})`;
+  if (honoraryPrice) return `${name} (${locale === "en" ? "honorary member" : "erelid"})`;
   if (!hasMemberPrice) return name;
   if (memberPrice) return `${name} (${locale === "en" ? "member" : "lid"})`;
   return `${name} (${locale === "en" ? "non-member" : "niet-lid"})`;
@@ -289,23 +294,43 @@ export async function createTicketCheckout(
     if (item.memberPrice && !isMember) {
       throw new TicketCheckoutError("MEMBERSHIP_REQUIRED", item.ticketTypeId);
     }
-    // Het gratis erelidticket staat bij niemand anders in de shop; wie het toch
+    // Het erelidticket staat bij niemand anders in de shop; wie het toch
     // meestuurt, krijgt hetzelfde antwoord als bij een onbestaand type, zodat
     // het niet verraadt dat de optie bestaat.
-    if (item.honoraryFree && (!type.honoraryFree || item.memberPrice)) {
+    const honorary = item.honoraryPrice || item.honoraryFree;
+    if (honorary && (type.honoraryPriceCents === null || item.memberPrice)) {
       throw new TicketCheckoutError("INVALID_TICKET_TYPE", item.ticketTypeId);
     }
-    if (item.honoraryFree && !session) {
+    if (honorary && !session) {
       throw new TicketCheckoutError("LOGIN_REQUIRED", item.ticketTypeId);
     }
-    if (item.honoraryFree && !viewerProfile.honorary) {
+    if (honorary && !viewerProfile.honorary) {
       throw new TicketCheckoutError("INVALID_TICKET_TYPE", item.ticketTypeId);
     }
-    const unitPriceCents = item.honoraryFree
-      ? 0
+    const unitPriceCents = honorary
+      ? type.honoraryPriceCents!
       : item.memberPrice
         ? memberPriceCents!
         : type.unitPriceCents;
+    // Vastgelegd bij het bestellen: wie de plaats teruggeeft of terugbetaalt,
+    // raakt zo dezelfde teller, ook als de koper intussen geen lid meer is.
+    // Een erelid hoort bij de kring: zijn erelidticket neemt een ledenplaats.
+    const memberSeat =
+      honorary ||
+      isMemberSeat({
+        buyerIsMember: isMember,
+        memberPrice: item.memberPrice,
+        typeHasMemberPrice: memberPriceCents !== null,
+      });
+    // Een niet-ledenplaats kan later te koop gaan dan de rest van het type
+    // (`nonMemberDelayMinutes`); de shop toont die regel dan nog dicht, en dit
+    // is het slot erachter.
+    if (
+      !memberSeat &&
+      !isWithinWindow(now, nonMemberTypeSalesStart(event, type, presaleBuyer), type.salesEndAt)
+    ) {
+      throw new TicketCheckoutError("INVALID_TICKET_TYPE", item.ticketTypeId);
+    }
     countByType.set(type.id, (countByType.get(type.id) ?? 0) + 1);
 
     const questions = event.questions.filter(
@@ -331,24 +356,15 @@ export async function createTicketCheckout(
       eventId: event.id,
       ticketTypeId: type.id,
       inventoryPoolId: type.inventoryPoolId,
-      // Vastgelegd bij het bestellen: wie de plaats teruggeeft of terugbetaalt,
-      // raakt zo dezelfde teller, ook als de koper intussen geen lid meer is.
-      // Een erelid hoort bij de kring: zijn gratis ticket neemt een ledenplaats.
-      memberSeat:
-        item.honoraryFree ||
-        isMemberSeat({
-          buyerIsMember: isMember,
-          memberPrice: item.memberPrice,
-          typeHasMemberPrice: memberPriceCents !== null,
-        }),
-      honoraryFree: item.honoraryFree,
+      memberSeat,
+      honoraryPrice: honorary,
       ticketTypeCode: type.code,
       ticketTypeName: ticketLineName(
         input.locale === "en" && type.nameEn ? type.nameEn : type.nameNl,
         memberPriceCents !== null,
         item.memberPrice,
         input.locale,
-        item.honoraryFree,
+        honorary,
       ),
       memberPrice: item.memberPrice,
       unitPriceCents,
@@ -366,9 +382,9 @@ export async function createTicketCheckout(
       throw new TicketCheckoutError("INVALID_QUANTITY", typeId);
     }
   }
-  // Hoogstens één gratis erelidticket per event, ook binnen één bestelling.
-  const honoraryFreeCount = normalizedItems.filter((item) => item.honoraryFree).length;
-  if (honoraryFreeCount > 1) throw new TicketCheckoutError("HONORARY_FREE_USED");
+  // Hoogstens één erelidticket per event, ook binnen één bestelling.
+  const honoraryCount = normalizedItems.filter((item) => item.honoraryPrice).length;
+  if (honoraryCount > 1) throw new TicketCheckoutError("HONORARY_PRICE_USED");
 
   // Enkel de eerste bestelregel draagt het r-nummer: het is dat van de koper, en
   // een r-nummer kan per event maar aan één ticket hangen.
@@ -425,11 +441,11 @@ export async function createTicketCheckout(
         // En over de bestellingen heen: binnen het slot op deze koper, zodat
         // twee gelijktijdige bestellingen er samen niet twee krijgen. Een
         // terugbetaald of vervallen erelidticket telt niet meer.
-        if (honoraryFreeCount > 0 && session) {
+        if (honoraryCount > 0 && session) {
           const used = await tx.ticketOrderItem.count({
             where: {
               eventId: event.id,
-              honoraryFree: true,
+              honoraryPrice: true,
               order: {
                 buyerUserId: session.user.id,
                 status: { in: ["PENDING_PAYMENT", "PAID", "PARTIALLY_REFUNDED"] },
@@ -437,7 +453,7 @@ export async function createTicketCheckout(
               OR: [{ ticket: null }, { ticket: { status: { not: "REFUNDED" } } }],
             },
           });
-          if (used > 0) throw new TicketCheckoutError("HONORARY_FREE_USED");
+          if (used > 0) throw new TicketCheckoutError("HONORARY_PRICE_USED");
         }
         if (totalCents === 0 && session) {
           const validFreeTickets = await tx.ticket.count({
@@ -490,7 +506,7 @@ export async function createTicketCheckout(
                 ticketTypeId: item.ticketTypeId,
                 inventoryPoolId: item.inventoryPoolId,
                 memberSeat: item.memberSeat,
-                honoraryFree: item.honoraryFree,
+                honoraryPrice: item.honoraryPrice,
                 ticketTypeCode: item.ticketTypeCode,
                 ticketTypeName: item.ticketTypeName,
                 unitPriceCents: item.unitPriceCents,
@@ -590,7 +606,7 @@ export async function createTicketCheckout(
     lines: [
       ...normalizedItems
         .reduce((lines, item) => {
-          const key = `${item.ticketTypeId}:${item.memberPrice}:${item.honoraryFree}`;
+          const key = `${item.ticketTypeId}:${item.memberPrice}:${item.honoraryPrice}`;
           const existing = lines.get(key);
           if (existing) existing.quantity += 1;
           else {

@@ -156,6 +156,41 @@ describe("de tickettypes lezen die een scherm terugstuurt", () => {
     expect(parsed[0].memberPriceCents).toBeNull();
   });
 
+  it("houdt een ereledenprijs, ook gratis", () => {
+    const parsed = parseTemplateTypes([
+      { nameNl: "Bier", unitPriceCents: 1700, honoraryPriceCents: 0 },
+      { nameNl: "Water", unitPriceCents: 500, honoraryPriceCents: 250, audience: "MEMBERS" },
+    ]);
+    if (typeof parsed === "string") throw new Error(parsed);
+    expect(parsed.map((type) => type.honoraryPriceCents)).toEqual([0, 250]);
+  });
+
+  it("weigert een ereledenprijs boven de gewone prijs, maar laat een gelijke toe", () => {
+    expect(
+      parseTemplateTypes([{ nameNl: "Bier", unitPriceCents: 1400, honoraryPriceCents: 1500 }])
+    ).toBe("Tickettype 1: de ereledenprijs mag niet hoger liggen dan de gewone prijs.");
+    const free = parseTemplateTypes([{ nameNl: "Inschrijving", unitPriceCents: 0, honoraryPriceCents: 0 }]);
+    if (typeof free === "string") throw new Error(free);
+    expect(free[0].honoraryPriceCents).toBe(0);
+  });
+
+  // Een scherm dat nog openstond toen de ereledenprijs het vinkje verving.
+  it("leest het oude vinkje 'gratis voor ereleden' als een ereledenprijs van 0", () => {
+    const parsed = parseTemplateTypes([{ nameNl: "Bier", unitPriceCents: 1700, honoraryFree: true }]);
+    if (typeof parsed === "string") throw new Error(parsed);
+    expect(parsed[0].honoraryPriceCents).toBe(0);
+  });
+
+  it("houdt de wachttijd voor niet-leden enkel bij leden en niet-leden", () => {
+    const parsed = parseTemplateTypes([
+      { nameNl: "Bier", unitPriceCents: 1700, nonMemberDelayMinutes: 150 },
+      { nameNl: "Bier (lid)", unitPriceCents: 1400, nonMemberDelayMinutes: 150, audience: "MEMBERS" },
+      { nameNl: "Water", unitPriceCents: 500, nonMemberDelayMinutes: 0 },
+    ]);
+    if (typeof parsed === "string") throw new Error(parsed);
+    expect(parsed.map((type) => type.nonMemberDelayMinutes)).toEqual([150, null, null]);
+  });
+
   it("overleeft de rondrit door het verborgen JSON-veld", () => {
     const original = [
       row({ code: "BIERLID", unitPriceCents: 1400, audience: "MEMBERS", maxPerOrder: 1 }),

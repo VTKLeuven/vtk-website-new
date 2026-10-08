@@ -468,6 +468,126 @@ describe.sequential("ticketing database invariants", () => {
     }
   });
 
+  it("keeps the non-member seats closed until their own start", async () => {
+    const order = (email: string, items: Array<{ memberPrice?: boolean }>) =>
+      createTicketCheckout(
+        {
+          eventId: ids.rateEvent,
+          buyerName: "Delay Buyer",
+          buyerEmail: email,
+          locale: "nl",
+          termsAccepted: true,
+          paymentProvider: "mock",
+          items: items.map((item, index) => ({
+            ticketTypeId: ids.rateType,
+            memberPrice: item.memberPrice ?? false,
+            attendeeName: `Delay Attendee ${index + 1}`,
+            attendeeEmail: "",
+          })),
+        },
+        `non-member-delay-${email}`
+      );
+
+    // De verkoop loopt al een uur; niet-leden mogen pas na twee uur.
+    await prisma.ticketEvent.update({
+      where: { id: ids.rateEvent },
+      data: { salesStartAt: new Date(Date.now() - 60 * 60_000) },
+    });
+    await prisma.ticketType.update({
+      where: { id: ids.rateType },
+      data: { memberPriceCents: 60, nonMemberDelayMinutes: 120 },
+    });
+    try {
+      await expect(order("delay-guest@example.test", [{}])).rejects.toMatchObject({
+        code: "INVALID_TICKET_TYPE",
+      });
+
+      vi.mocked(getSession).mockResolvedValue({
+        user: { id: ids.user, name: "Integration Admin", email: `${ids.user}@example.test`, isSuperAdmin: false },
+      } as never);
+      await prisma.user.update({ where: { id: ids.user }, data: { firwStudent: true } });
+      // Een lid koopt al aan de ledenprijs, maar het ticket voor een vriend
+      // (de gewone prijs, een niet-ledenplaats) wacht mee.
+      await expect(
+        order("delay-member-friend@example.test", [{ memberPrice: true }, {}])
+      ).rejects.toMatchObject({ code: "INVALID_TICKET_TYPE" });
+      const checkout = await order("delay-member@example.test", [{ memberPrice: true }]);
+      const created = await prisma.ticketOrder.findUniqueOrThrow({
+        where: { id: checkout.orderId },
+        include: { items: true },
+      });
+      expect(created.items.map((item) => [item.unitPriceCents, item.memberSeat])).toEqual([[60, true]]);
+
+      // Zonder ledenprijs neemt een lid een ledenplaats en wacht het niet.
+      await prisma.ticketType.update({ where: { id: ids.rateType }, data: { memberPriceCents: null } });
+      await expect(order("delay-member-plain@example.test", [{}])).resolves.toMatchObject({
+        orderId: expect.any(String),
+      });
+    } finally {
+      vi.mocked(getSession).mockResolvedValue(null);
+      await prisma.user.update({ where: { id: ids.user }, data: { firwStudent: false } });
+      await prisma.ticketEvent.update({ where: { id: ids.rateEvent }, data: { salesStartAt: null } });
+      await prisma.ticketType.update({
+        where: { id: ids.rateType },
+        data: { memberPriceCents: null, nonMemberDelayMinutes: null },
+      });
+    }
+  });
+
+  it("sells one ticket at the honorary price per honorary member", async () => {
+    const honoraryOrder = (email: string, flag: "honoraryPrice" | "honoraryFree") =>
+      createTicketCheckout(
+        {
+          eventId: ids.rateEvent,
+          buyerName: "Honorary Buyer",
+          buyerEmail: email,
+          locale: "nl",
+          termsAccepted: true,
+          paymentProvider: "mock",
+          items: [
+            { ticketTypeId: ids.rateType, [flag]: true, attendeeName: "Honorary Attendee", attendeeEmail: "" },
+            { ticketTypeId: ids.rateType, attendeeName: "Friend Attendee", attendeeEmail: "" },
+          ],
+        },
+        `honorary-price-${email}`
+      );
+
+    await prisma.ticketType.update({ where: { id: ids.rateType }, data: { honoraryPriceCents: 40 } });
+    vi.mocked(getSession).mockResolvedValue({
+      user: { id: ids.user, name: "Integration Admin", email: `${ids.user}@example.test`, isSuperAdmin: false },
+    } as never);
+    try {
+      // Geen erelid: de prijs bestaat voor hem niet.
+      await expect(honoraryOrder("honorary-nobody@example.test", "honoraryPrice")).rejects.toMatchObject({
+        code: "INVALID_TICKET_TYPE",
+      });
+
+      await prisma.user.update({ where: { id: ids.user }, data: { honoraryMember: true } });
+      const checkout = await honoraryOrder("honorary-first@example.test", "honoraryPrice");
+      const order = await prisma.ticketOrder.findUniqueOrThrow({
+        where: { id: checkout.orderId },
+        include: { items: { orderBy: { unitPriceCents: "asc" } } },
+      });
+      expect(order.totalCents).toBe(140);
+      expect(order.items.map((item) => [item.ticketTypeName, item.unitPriceCents, item.honoraryPrice, item.memberSeat])).toEqual([
+        ["Limiettest (erelid)", 40, true, true],
+        ["Limiettest", 100, false, false],
+      ]);
+
+      // Eén per erelid per event, ook onder de oude naam van een shop die nog openstond.
+      await expect(honoraryOrder("honorary-second@example.test", "honoraryPrice")).rejects.toMatchObject({
+        code: "HONORARY_PRICE_USED",
+      });
+      await expect(honoraryOrder("honorary-legacy@example.test", "honoraryFree")).rejects.toMatchObject({
+        code: "HONORARY_PRICE_USED",
+      });
+    } finally {
+      vi.mocked(getSession).mockResolvedValue(null);
+      await prisma.user.update({ where: { id: ids.user }, data: { honoraryMember: false } });
+      await prisma.ticketType.update({ where: { id: ids.rateType }, data: { honoraryPriceCents: null } });
+    }
+  });
+
   it("fulfills a Mollie webhook once and deduplicates its retry", async () => {
     const accessExpiresAt = new Date("2027-06-20T00:00:00.000Z");
     const access = createOrderAccessToken(ids.mollieOrder, accessExpiresAt);

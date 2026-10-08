@@ -290,6 +290,14 @@
   color: var(--muted);
 }
 
+/* Nog niet, maar wel straks: de plaatsen voor niet-leden die na de leden
+   opengaan. Dezelfde rustige vulling als uitverkocht, met inkt in plaats van
+   grijs, want hier valt nog iets te halen. */
+.tshop-pill[data-tone="soon"] {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
 .tshop-stepper {
   display: inline-grid;
   grid-template-columns: 38px 32px 38px;

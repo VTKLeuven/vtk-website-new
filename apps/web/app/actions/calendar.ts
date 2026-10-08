@@ -8,7 +8,7 @@ import { hasPermission } from "@vtk/auth";
 import { deleteObject } from "@vtk/storage";
 import { requireSession } from "@/lib/session";
 import { readImageField, resolveImageKey } from "@/lib/imageField";
-import { readImageFocus } from "@/lib/imageFocus";
+import { readImageFocus, readMobileCrop } from "@/lib/imageFocus";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { localDateTimeToUtc } from "@/lib/ticketing/time";
@@ -135,6 +135,10 @@ const EVENT_FIELD_LABELS: Record<string, string> = {
   imageKey: "afbeelding",
   imageFocusX: "uitsnede van de afbeelding",
   imageFocusY: "uitsnede van de afbeelding",
+  imageFocusMobileX: "uitsnede op een telefoon",
+  imageFocusMobileY: "uitsnede op een telefoon",
+  imageZoomMobile: "zoom op een telefoon",
+  imageRatioMobile: "zoom op een telefoon",
   publishedAt: "publicatiestatus",
   heroWeek: "weekoverzicht op de homepage",
   moments: "momenten",
@@ -173,6 +177,9 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
   // Waar de uitsnede rond draait. Geen validatiepad: het veld stuurt altijd een
   // punt mee en alles wat geen bruikbaar getal is, wordt het midden.
   const focus = readImageFocus(formData);
+  // De eigen uitsnede op een telefoon; uit (of een ouder formulier) wist ze, en
+  // dan volgt de telefoon de gewone uitsnede.
+  const mobileCrop = readMobileCrop(formData);
   if (!parsed.success || image.kind === "invalid") return saveError("INVALID_INPUT");
   const input = parsed.data;
   const categoryIds = formData.getAll("categoryIds").map(String).filter(Boolean);
@@ -250,6 +257,10 @@ export async function saveEventAction(_prev: SaveState, formData: FormData): Pro
     urlLabelEn: input.urlLabelEn || null,
     imageFocusX: focus.x,
     imageFocusY: focus.y,
+    imageFocusMobileX: mobileCrop?.focus.x ?? null,
+    imageFocusMobileY: mobileCrop?.focus.y ?? null,
+    imageZoomMobile: mobileCrop?.zoom ?? null,
+    imageRatioMobile: mobileCrop?.ratio ?? null,
     createdById: session.user.id,
     ...(canHeroWeek ? { heroWeek: input.heroWeek } : {}),
   };

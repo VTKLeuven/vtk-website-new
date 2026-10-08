@@ -20,6 +20,7 @@ import { ticketViewerProfile } from "./viewerProfile";
 import { getTicketEventAccess } from "./authorization";
 import {
   isInPresaleNow,
+  nonMemberTypeSalesStart,
   viewerSalesStart,
   viewerTypeSalesStart,
   type PresaleViewer,
@@ -150,7 +151,7 @@ function publicEventDto(
       // Ongefilterd: wie geen lid is, verliest deze prijs in `forViewer`.
       memberPriceCents: ticketTypeMemberPrice(type),
       // Idem: enkel een erelid dat het zijne nog niet gebruikte, houdt dit.
-      honoraryFree: type.honoraryFree,
+      honoraryPriceCents: type.honoraryPriceCents,
       // Wat de gewone prijs nog kan nemen, gerekend als niet-ledenplaats;
       // `forViewer` stelt dat bij voor een lid. Een uitgeschakelde pot verkoopt
       // niets meer, ook al staan er nog plaatsen open.
@@ -163,6 +164,9 @@ function publicEventDto(
       // die samenvalt met de publieke verkoopstart houdt de voorverkoop niet
       // tegen (zie `viewerTypeSalesStart`).
       salesStart: viewerTypeSalesStart(event, type, viewer),
+      // De niet-ledenplaatsen, eventueel later dan de leden. Ook presale-bewust:
+      // wie in de voorverkoop zit, wacht niet (zie `nonMemberTypeSalesStart`).
+      nonMemberSalesStart: nonMemberTypeSalesStart(event, type, viewer),
       salesEnd: type.salesEndAt,
       questions: event.questions
         .filter((question) => question.ticketTypeId == null || question.ticketTypeId === type.id)
@@ -214,8 +218,8 @@ type PublicTicketTypeDto = ReturnType<typeof publicEventDto>["ticketTypes"][numb
 function forViewer(
   types: PublicTicketTypeDto[],
   isMember: boolean,
-  /** Een erelid dat zijn gratis ticket voor dit event nog niet gebruikte. */
-  honoraryFree: boolean,
+  /** Een erelid dat zijn erelidticket voor dit event nog niet gebruikte. */
+  honorary: boolean,
 ): PublicTicketTypeDto[] {
   const viewerTypes = isMember
     ? types.map((type) =>
@@ -224,31 +228,49 @@ function forViewer(
           : type
       )
     : types.map((type) => ({ ...type, memberPriceCents: null }));
-  return viewerTypes.map((type) => ({
-    ...type,
-    honoraryFree: honoraryFree && type.honoraryFree,
-    // De ledenplaatsen blijven nodig voor het erelidticket, ook bij een niet-lid:
-    // dat neemt een ledenplaats.
-    memberAvailable:
-      isMember || (honoraryFree && type.honoraryFree) ? type.memberAvailable : null,
-  }));
+  return viewerTypes.map((type) => {
+    const honoraryPriceCents = honorary ? type.honoraryPriceCents : null;
+    return {
+      ...type,
+      honoraryPriceCents,
+      // De ledenplaatsen blijven nodig voor het erelidticket, ook bij een
+      // niet-lid: dat neemt een ledenplaats.
+      memberAvailable: isMember || honoraryPriceCents !== null ? type.memberAvailable : null,
+    };
+  });
 }
 
 /**
- * Heeft dit erelid zijn gratis ticket voor dit event al? Dezelfde telling als
+ * Heeft dit erelid zijn erelidticket voor dit event al? Dezelfde telling als
  * de checkout (`createTicketCheckout`): een vervallen of terugbetaald ticket telt
  * niet meer.
  */
-async function honoraryFreeUsed(eventId: string, userId: string): Promise<boolean> {
+async function honoraryPriceUsed(eventId: string, userId: string): Promise<boolean> {
   const used = await prisma.ticketOrderItem.count({
     where: {
       eventId,
-      honoraryFree: true,
+      honoraryPrice: true,
       order: { buyerUserId: userId, status: { in: ["PENDING_PAYMENT", "PAID", "PARTIALLY_REFUNDED"] } },
       OR: [{ ticket: null }, { ticket: { status: { not: "REFUNDED" } } }],
     },
   });
   return used > 0;
+}
+
+/**
+ * Kan deze bezoeker van dit type nu iets kopen? De start voor niet-leden geldt
+ * voor wie enkel een niet-ledenplaats kan nemen; een lid of een erelid met een
+ * ereledenprijs heeft een regel die met de leden opengaat.
+ */
+function onSaleForViewer(
+  type: PublicTicketTypeDto,
+  now: Date,
+  takesMemberSeat: boolean,
+): boolean {
+  return ticketTypeIsOnSale(
+    { salesStart: takesMemberSeat ? type.salesStart : type.nonMemberSalesStart, salesEnd: type.salesEnd },
+    now,
+  );
 }
 
 /** Wat de gewone prijs van een type nog kan nemen voor deze bezoeker. */
@@ -270,6 +292,21 @@ function memberPriceHint(
 ): "login" | "join" | null {
   if (isMember || !types.some((type) => type.memberPriceCents !== null)) return null;
   return signedIn ? "join" : "login";
+}
+
+/**
+ * Het vroegste moment dat nog moet komen, of null wanneer er één al voorbij is
+ * of ontbreekt: dan kan er nu al iets gekocht worden.
+ */
+function earliestFuture(moments: (Date | string | null | undefined)[], now: Date): Date | null {
+  let earliest: Date | null = null;
+  for (const moment of moments) {
+    if (!moment) return null;
+    const date = new Date(moment);
+    if (date <= now) return null;
+    if (!earliest || date < earliest) earliest = date;
+  }
+  return earliest;
 }
 
 /**
@@ -329,10 +366,13 @@ export async function listPublishedTicketEvents(
     const dto = publicEventDto(event, locale, viewer);
     const opensLater = Boolean(dto.salesStart && new Date(dto.salesStart) > now);
     if (opensLater && !overview) return [];
+    const takesMemberSeat = (type: PublicTicketTypeDto) =>
+      isMember || (profile.honorary && type.honoraryPriceCents !== null);
     const windowTypes = dto.ticketTypes.filter((type) =>
       overview
         ? !type.salesEnd || new Date(type.salesEnd) > now
-        : ticketTypeIsOnSale(type, now) && regularAvailable(type, isMember) >= (type.minPerOrder ?? 1)
+        : onSaleForViewer(type, now, takesMemberSeat(type)) &&
+          regularAvailable(type, isMember) >= (type.minPerOrder ?? 1)
     );
     const selectableTypes = windowTypes.filter((type) => !ticketTypeIsHidden(type, profile));
     const loginHint = audienceLoginHint(
@@ -344,10 +384,23 @@ export async function listPublishedTicketEvents(
         (Boolean(session) || !ticketTypeRequiresLogin(type)) &&
         !ticketTypeNeedsMembership(type, isMember)
     );
+    // De verkoop van het event kan al lopen terwijl er voor deze bezoeker nog
+    // niets te koop is: een niet-lid wiens plaatsen op de leden wachten
+    // (`nonMemberDelayMinutes`), of tickets die elk later starten. Dan zegt de
+    // kaart wanneer het voor hem opent, en niet "Te koop".
+    const typesOpenAt =
+      !opensLater && ticketTypes.length > 0
+        ? earliestFuture(
+            ticketTypes.map((type) =>
+              takesMemberSeat(type) ? type.salesStart : type.nonMemberSalesStart
+            ),
+            now,
+          )
+        : null;
     return [{
       ...dto,
       ticketTypes: forViewer(ticketTypes, isMember, profile.honorary),
-      salesOpensAt: opensLater ? dto.salesStart : null,
+      salesOpensAt: opensLater ? dto.salesStart : typesOpenAt,
       memberPriceHint: memberPriceHint(ticketTypes, Boolean(session), isMember),
       requiresLogin:
         !session &&
@@ -389,15 +442,15 @@ export async function getPublishedTicketEventBySlug(slug: string, locale: Public
       (Boolean(session) || !ticketTypeRequiresLogin(type)) &&
       !ticketTypeNeedsMembership(type, isMember)
   );
-  const freeUsed =
-    session && profile.honorary && ticketTypes.some((type) => type.honoraryFree)
-      ? await honoraryFreeUsed(event.id, session.user.id)
+  const honoraryUsed =
+    session && profile.honorary && ticketTypes.some((type) => type.honoraryPriceCents !== null)
+      ? await honoraryPriceUsed(event.id, session.user.id)
       : false;
   return {
     ...dto,
-    ticketTypes: forViewer(ticketTypes, isMember, profile.honorary && !freeUsed),
+    ticketTypes: forViewer(ticketTypes, isMember, profile.honorary && !honoraryUsed),
     // Enkel om het te kunnen zeggen; voor wie geen erelid is, altijd false.
-    honoraryFreeUsed: freeUsed,
+    honoraryPriceUsed: honoraryUsed,
     memberPriceHint: memberPriceHint(ticketTypes, Boolean(session), isMember),
     requiresLogin:
       !session &&

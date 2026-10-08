@@ -1,5 +1,4 @@
 import Link from "@/components/ui/Link";
-import Image from "next/image";
 import { pick, type Locale } from "@vtk/i18n";
 import { Markdown } from "@/components/ui/Markdown";
 import { MapPinIcon, UsersIcon } from "@/components/ui/icons";
@@ -8,7 +7,8 @@ import { EVENT_MOMENTS_VISIBLE, momentsSummary } from "@/lib/calendar/moments";
 import { publicUrl } from "@/lib/storage";
 import { defaultEventImageFor, eventCategorySlugs } from "@/lib/defaultEventImage";
 import { loadCalendarEvent, loadDefaultEventImages } from "@/lib/pageQueries";
-import { focusPosition } from "@/lib/imageFocus";
+import { mobileCropFrom } from "@/lib/imageFocus";
+import { EventPhoto } from "@/components/calendar/EventPhoto";
 import { getCurrentSession } from "@/lib/session";
 import {
   attendeeList,
@@ -210,26 +210,28 @@ export async function EventPhotoAndAbout({
   const imageSrc =
     eventPhoto ??
     defaultEventImageFor(await loadDefaultEventImages(), eventCategorySlugs(event.categories));
-  // De uitsnede hoort bij de foto die de redactie zelf koos; de standaardfoto
-  // valt terug op het midden, want dat punt is voor elk evenement hetzelfde.
-  const imagePosition = eventPhoto
-    ? focusPosition({ x: event.imageFocusX, y: event.imageFocusY })
-    : undefined;
+  // De uitsnede hoort bij de foto die de redactie zelf koos, net als die voor
+  // een telefoon; de standaardfoto valt terug op het midden, want dat punt is
+  // voor elk evenement hetzelfde.
 
   return (
     <>
-      <figure className="vtk-event-photo">
-        <Image
-          src={imageSrc}
-          alt=""
-          fill
-          sizes={sizes}
-          quality={90}
-          className="vtk-event-photo-img"
-          style={imagePosition ? { objectPosition: imagePosition } : undefined}
-          priority
-        />
-      </figure>
+      <EventPhoto
+        src={imageSrc}
+        sizes={sizes}
+        quality={90}
+        focus={eventPhoto ? { x: event.imageFocusX, y: event.imageFocusY } : null}
+        mobile={
+          eventPhoto
+            ? mobileCropFrom(
+                event.imageFocusMobileX,
+                event.imageFocusMobileY,
+                event.imageZoomMobile,
+                event.imageRatioMobile,
+              )
+            : null
+        }
+      />
 
       <section className="vtk-event-about">
         <h2>{locale === "nl" ? "Over dit event" : "About this event"}</h2>

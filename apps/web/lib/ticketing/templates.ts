@@ -16,6 +16,7 @@
 
 import { ticketColorKey } from "./ticketColors";
 import { TICKET_AUDIENCES, type TicketAudience } from "./audience";
+import { MAX_NON_MEMBER_DELAY_MINUTES } from "./presale";
 
 export const TICKET_TEMPLATE_AUDIENCES = TICKET_AUDIENCES;
 export type TicketTemplateAudience = TicketAudience;
@@ -44,8 +45,16 @@ export type TicketTemplateType = {
    * stil op nul.
    */
   memberPriceCents: number | null;
-  /** Een erelid krijgt één ticket van dit type gratis; zie `TicketType.honoraryFree`. */
-  honoraryFree: boolean;
+  /**
+   * Optionele ereledenprijs, 0 is gratis, niet hoger dan de gewone prijs; zie
+   * `TicketType.honoraryPriceCents`.
+   */
+  honoraryPriceCents: number | null;
+  /**
+   * Niet-leden pas zoveel minuten na de leden; null = tegelijk. Enkel bij
+   * doelgroep PUBLIC; zie `TicketType.nonMemberDelayMinutes`.
+   */
+  nonMemberDelayMinutes: number | null;
   audience: TicketTemplateAudience;
   color: string;
   minPerOrder: number;
@@ -310,6 +319,26 @@ export function parseTemplateTypes(raw: unknown): TicketTemplateType[] | string 
       memberPriceCents = member;
     }
 
+    // Ook de ereledenprijs, bij elke doelgroep: 0 is gratis, en hoger dan de
+    // gewone prijs mag ze niet.
+    let honoraryPriceCents: number | null = null;
+    if (row.honoraryPriceCents !== null && row.honoraryPriceCents !== undefined) {
+      const honorary = integer(row.honoraryPriceCents, Number.NaN, 0, 99_999_999);
+      if (!Number.isFinite(honorary)) return `${label}: de ereledenprijs is geen geldig bedrag.`;
+      if (honorary > price) return `${label}: de ereledenprijs mag niet hoger liggen dan de gewone prijs.`;
+      honoraryPriceCents = honorary;
+    } else if (row.honoraryFree === true) {
+      // Een scherm van voor de ereledenprijs stuurde enkel het vinkje.
+      honoraryPriceCents = 0;
+    }
+
+    let nonMemberDelayMinutes: number | null = null;
+    if (row.nonMemberDelayMinutes !== null && row.nonMemberDelayMinutes !== undefined && audience === "PUBLIC") {
+      const delay = integer(row.nonMemberDelayMinutes, Number.NaN, 0, MAX_NON_MEMBER_DELAY_MINUTES);
+      if (!Number.isFinite(delay)) return `${label}: de wachttijd voor niet-leden is geen geldige duur.`;
+      nonMemberDelayMinutes = delay > 0 ? delay : null;
+    }
+
     const poolCode = text(row.poolCode, 40);
 
     result.push({
@@ -320,7 +349,8 @@ export function parseTemplateTypes(raw: unknown): TicketTemplateType[] | string 
       descriptionEn: text(row.descriptionEn, 2_000),
       unitPriceCents: price,
       memberPriceCents,
-      honoraryFree: bool(row.honoraryFree, false),
+      honoraryPriceCents,
+      nonMemberDelayMinutes,
       audience,
       color: ticketColorKey(row.color),
       minPerOrder,
@@ -549,7 +579,8 @@ export function blankTicketTemplateType(index: number): TicketTemplateType {
     descriptionEn: "",
     unitPriceCents: 0,
     memberPriceCents: null,
-    honoraryFree: false,
+    honoraryPriceCents: null,
+    nonMemberDelayMinutes: null,
     audience: "PUBLIC",
     color: "navy",
     minPerOrder: 1,

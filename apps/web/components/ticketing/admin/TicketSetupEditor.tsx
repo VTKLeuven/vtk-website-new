@@ -15,6 +15,7 @@ import {
 } from "@/lib/ticketing/templates";
 import { audienceSelectOptions } from "./AudienceOptions";
 import type { AdminLocale } from "./format";
+import { NonMemberDelayInput } from "./NonMemberDelayInput";
 
 /**
  * De tickets en de plaatsen van een nieuw event, of van een sjabloon.
@@ -388,6 +389,7 @@ export function TicketSetupEditor({
                       updateRow(row.uid, {
                         audience: audience as TicketTemplateType["audience"],
                         memberPriceCents: audience === "PUBLIC" ? type.memberPriceCents : null,
+                        nonMemberDelayMinutes: audience === "PUBLIC" ? type.nonMemberDelayMinutes : null,
                       })
                     }
                   />
@@ -452,17 +454,54 @@ export function TicketSetupEditor({
                     />
                   </div>
                 ) : null}
-                <label className="ticket-setup-toggle" data-area="honorary" htmlFor={field(`${row.uid}-honorary`)}>
-                  <input
-                    id={field(`${row.uid}-honorary`)}
-                    type="checkbox"
-                    checked={type.honoraryFree}
-                    onChange={(changed) => updateRow(row.uid, { honoraryFree: changed.target.checked })}
-                  />
-                  {nl
-                    ? "Gratis voor ereleden (1 per erelid voor dit event)"
-                    : "Free for honorary members (1 per honorary member for this event)"}
-                </label>
+                <div className="ticket-admin-field" data-area="honorary">
+                  {/* Een vinkje, standaard uit; aangevinkt begint de prijs op
+                      0 (gratis) en kan ze hoger. */}
+                  <label className="ticket-setup-toggle" htmlFor={field(`${row.uid}-honorary-on`)}>
+                    <input
+                      id={field(`${row.uid}-honorary-on`)}
+                      type="checkbox"
+                      checked={type.honoraryPriceCents !== null}
+                      onChange={(changed) =>
+                        updateRow(row.uid, { honoraryPriceCents: changed.target.checked ? 0 : null })
+                      }
+                    />
+                    {nl ? "Ereledenprijs" : "Honorary price"}
+                  </label>
+                  {type.honoraryPriceCents !== null ? (
+                    <AmountInput
+                      id={field(`${row.uid}-honorary`)}
+                      cents={type.honoraryPriceCents}
+                      onChange={(cents) => updateRow(row.uid, { honoraryPriceCents: cents ?? 0 })}
+                      locale={locale}
+                    />
+                  ) : null}
+                  <span className="ticket-admin-help">
+                    {nl ? "Standaard gratis; 1 per erelid" : "Free by default; 1 per honorary member"}
+                  </span>
+                </div>
+                {type.audience === "PUBLIC" ? (
+                  <div className="ticket-admin-field" data-area="delay">
+                    <label htmlFor={field(`${row.uid}-delay-hours`)}>
+                      {nl ? "Verkoop voor niet-leden" : "Sales for non-members"}
+                    </label>
+                    <NonMemberDelayInput
+                      idPrefix={field(`${row.uid}-delay`)}
+                      minutes={type.nonMemberDelayMinutes}
+                      onChange={(minutes) => updateRow(row.uid, { nonMemberDelayMinutes: minutes })}
+                      locale={locale}
+                    />
+                    <span className="ticket-admin-help">
+                      {type.nonMemberDelayMinutes
+                        ? nl
+                          ? "Gerekend vanaf de verkoopstart; wie in de voorverkoop zit, wacht niet."
+                          : "Counted from the sales start; whoever is in the presale does not wait."
+                        : nl
+                          ? "Leeg: leden en niet-leden tegelijk."
+                          : "Empty: members and non-members at the same time."}
+                    </span>
+                  </div>
+                ) : null}
                 {templateMode ? (
                   <div className="ticket-admin-field" data-area="offset">
                     <label htmlFor={field(`${row.uid}-opens`)}>

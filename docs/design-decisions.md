@@ -8214,6 +8214,33 @@ pas na het opslaan wat de homepage ervan maakt. Om dezelfde reden volgt de
 duimnagel van de upload erboven hetzelfde punt; twee kadertjes van dezelfde foto
 die elkaar tegenspreken zijn erger dan één.
 
+### Een eigen uitsnede op een telefoon, met zoom
+
+Op een telefoon is het kader op de eventpagina 4/3, en een liggende affiche
+verliest daar links en rechts het meest; net daar staan vaak de logo's van de
+partners. Eén punt voor alle formaten volstond dan niet: verleggen haalt er
+hoogstens één terug.
+
+**Daarom kan een evenement een eigen telefoonuitsnede krijgen**, standaard uit:
+een eigen punt en een zoom (`CalendarEvent.imageFocusMobileX/Y`,
+`imageZoomMobile`). Zoom 1 is het kader net gevuld; kleiner zoomt uit. "Hele
+foto in beeld" kiest de zoom waarbij de hele affiche past.
+
+- **Uitgezoomd vult een vervaagde kopie van dezelfde foto de rest van het
+  kader**, geen effen band: een lege strook boven en onder leest als een foto
+  die niet laadde. Dezelfde `src`, dus de browser haalt de foto maar één keer.
+- **De pagina rekent de maat van de foto zelf uit**, uit haar verhouding
+  (`imageRatioMobile`, gemeten in het beheer) en met containereenheden in CSS.
+  De eerste versie zette een `transform: scale()` op de foto, maar `object-fit:
+  cover` snijdt in een kader altijd hetzelfde deel weg, dus dat verkleinde enkel
+  wat er al overbleef: de logo's bleven weg. Zonder verhouding draait de
+  telefoon enkel rond het eigen punt.
+- **Het aanduidvlak tekent een kader rond wat de telefoon toont**, en de
+  telefoonvoorvertoning staat bij die uitsnede in plaats van bij de gewone.
+- Enkel de eventpagina (en de ticketpagina die diens foto overneemt) heeft een
+  ander kader op een telefoon. De kaarten op de homepage en /kalender zijn overal
+  16/9 en volgen de gewone uitsnede.
+
 ## Een te kleine eventfoto: waarschuwen, niet weigeren
 
 De klacht was "de foto van een event is soms potato kwaliteit", met als
@@ -8835,31 +8862,47 @@ eraan. Elk ticket is een kaart met gelabelde velden in plaats van een tabelrij
 de plaatsen en het maximum per bestelling staan er meteen onder in plaats van
 verspreid over "Planning en verkoop".
 
-## Ereleden gratis: één ticket per erelid per event
+## Ereledenprijs: één ticket per erelid per event, gratis of niet
 
 Wat de kring aan haar ereleden geeft, kon enkel met een apart tickettype met
 doelgroep "Alleen ereleden" aan 0 euro. Dat werkte, maar elk erelid kon er in
 een tweede bestelling opnieuw een nemen, en het was een type naast het echte
 ticket met een eigen kleur en een eigen naam aan de deur.
 
-**Nu is het een vinkje per tickettype, "Gratis voor ereleden", standaard uit**
-(`TicketType.honoraryFree`). Een erelid ziet bij dat type een extra regel
-"Erelid, 1 gratis" naast de gewone prijs(zen); voor iedereen anders bestaat de
-optie niet, ook niet in de paginabron.
+Daarna werd het een vinkje per tickettype, "Gratis voor ereleden". Dat dekte
+enkel gratis; een erelid dat een korting krijgt maar wel iets betaalt, kon niet.
 
-- **Hoogstens één gratis ticket per erelid per ticketevent**, over alle types
-  en al zijn bestellingen heen. De checkout telt de bestelregels met
-  `honoraryFree` van deze koper voor dit event, binnen hetzelfde slot op de koper
+**Nu is het een ereledenprijs per tickettype** (`TicketType.honoraryPriceCents`),
+naast de ledenprijs. In het beheer blijft het een vinkje "Ereledenprijs",
+standaard uit; **aangevinkt staat de prijs op 0 (gratis)**, en die kan je
+verhogen. `null` is geen ereledenprijs. De migratie zette elk aangevinkt
+"Gratis voor ereleden" om naar een ereledenprijs van 0, dus voor wie het al
+gebruikte, verandert er niets. Een erelid ziet bij dat type een extra regel ("Erelid, 1
+gratis", of "Erelid, max. 1" met de prijs ernaast) naast de gewone prijs(zen);
+voor iedereen anders bestaat de prijs niet, ook niet in de paginabron.
+
+- **Ze mag niet hoger liggen dan de gewone prijs**: anders koopt een erelid
+  per ongeluk duurder dan zijn vrienden. Gelijk mag wel (anders dan bij de
+  ledenprijs), zodat ook een gratis ticket een gratis erelidticket kan hebben.
+  Lager dan de ledenprijs hoeft niet; dat is aan de organisator.
+- **Hoogstens één ticket aan de ereledenprijs per erelid per ticketevent**, ook
+  wanneer het niet gratis is: het blijft een voorrecht van het erelid zelf, en
+  de rest van zijn bestelling (voor vrienden) gaat aan de gewone prijs. De
+  grens geldt over alle types en al zijn bestellingen heen. De checkout telt de
+  bestelregels met `honoraryPrice` van deze koper voor dit event, binnen hetzelfde slot op de koper
   als de rest van de checkout, zodat twee gelijktijdige bestellingen er samen
   geen twee krijgen. Een vervallen bestelling of een terugbetaald ticket telt
   niet meer. Per ticketevent en niet per kalenderevent: een event met twee
   ticketpagina's (de volledige 12u en de losse cantussen) geeft er dus één per
   pagina.
-- **De rest van de bestelling betaalt gewoon.** Een erelid kan zijn gratis
-  ticket nemen en in dezelfde bestelling betalende tickets voor vrienden.
-- **Het gratis ticket neemt een ledenplaats**: een erelid hoort bij de kring.
-  Zit het ledenplafond van de pot vol, dan is er ook geen gratis erelidticket
-  meer (zie "Plaatsen: potten met een plafond voor leden").
+- **De rest van de bestelling betaalt gewoon.** Een erelid kan zijn
+  erelidticket nemen en in dezelfde bestelling tickets aan de gewone prijs voor
+  vrienden.
+- **Het erelidticket neemt een ledenplaats**: een erelid hoort bij de kring.
+  Zit het ledenplafond van de pot vol, dan is er ook geen erelidticket meer
+  (zie "Plaatsen: potten met een plafond voor leden"). Om dezelfde reden gaat
+  het open met de leden, ook wanneer niet-leden later mogen beginnen (zie
+  "Niet-leden na de leden").
 - De bestelregel heet "Bierticket (erelid)", zodat de mail, de pdf en de scanner
   het zonder eigen logica tonen.
 
@@ -9167,6 +9210,46 @@ iemand maar één van de twee aanpaste).
 De bestaande losse types ("Waterticket (Lid)") blijven werken zoals ze waren;
 omzetten doet de beheerder door één type een ledenprijs te geven en het andere
 te archiveren.
+
+## Niet-leden na de leden: een duur na de verkoopstart
+
+Bij een event voor leden en niet-leden wil de kring soms dat haar leden eerst
+kunnen kopen: een galabal of een reis met te weinig plaatsen. **Per tickettype
+kan de verkoop voor niet-leden zoveel uur en minuten na die voor de leden
+starten** (`TicketType.nonMemberDelayMinutes`, in het beheer als "Niet-leden 2
+uur 30 min na de leden").
+
+- **Een duur, geen tweede datum**, om dezelfde reden als de voorverkoop: schuift
+  de verkoopstart, dan schuift de start voor niet-leden mee. Ze telt van de
+  verkoopstart van het type, of van het event wanneer het type er geen eigen
+  heeft. Zonder verkoopstart staat de verkoop al open en is er niets om na te
+  tellen; het formulier weigert die combinatie in plaats van ze stil te negeren.
+- **Enkel bij doelgroep "leden en niet-leden".** Een ticket voor leden alleen
+  heeft geen niet-leden om te laten wachten.
+- **Wat wacht, is de niet-ledenplaats** (zie "Plaatsen: potten met een plafond
+  voor leden"): wat een niet-lid of een uitgelogde bezoeker koopt, en bij een
+  ticket met ledenprijs ook de gewone prijs die een lid voor een vriend neemt.
+  Anders haalt een lid in het ledenuur de tickets van zijn vrienden al binnen,
+  en zijn de plaatsen weg voor de niet-leden er zijn. De ledenprijs en het
+  erelidticket gaan met de leden open.
+- **Wie in de voorverkoop zit, wacht niet**, ook niet voor een niet-ledenplaats.
+  De voorverkoop is "jij mag vóór iedereen", en de private voorverkooplink is er
+  net voor een groep die de site niet kent (de band, de sponsors); die zijn
+  meestal geen lid en zouden anders achter de niet-leden aansluiten. Een type
+  met een eigen, latere start valt buiten de voorverkoop, en daar wacht dus
+  iedereen die geen lid is.
+- **De shop toont de regel, met wanneer ze opengaat** ("Vanaf do 9 okt,
+  21:30"), in plaats van haar te verbergen: een niet-lid ziet zo dat er een
+  ticket voor hem komt. Een uitgelogde bezoeker krijgt "Lid van VTK? Log in,
+  dan kan je nu al bestellen", een ingelogd niet-lid "Leden kunnen nu al
+  bestellen. Word lid." Op /tickets zegt de kaart "Te koop vanaf ..." tot er
+  voor die bezoeker iets te koop is.
+- **De checkout toetst het opnieuw**: een niet-ledenplaats vóór haar start
+  meesturen geeft `INVALID_TICKET_TYPE`, zoals elk type buiten zijn venster.
+
+De regel staat puur in `nonMemberTypeSalesStart` in
+`apps/web/lib/ticketing/presale.ts`, naast de voorverkoop, en wordt gelezen
+door de shoplijst, de eventpagina en het slot bij het afrekenen.
 
 ## De ticketpagina van één event
 

@@ -12,6 +12,7 @@ import {
   requireTicketEventCapability,
 } from "@/lib/ticketing/authorization";
 import { parseEuroAmount } from "@/lib/ticketing/money";
+import { MAX_NON_MEMBER_DELAY_MINUTES } from "@/lib/ticketing/presale";
 import { newPresaleToken } from "@/lib/ticketing/presaleLink";
 import { newPrivateToken } from "@/lib/ticketing/privateLink";
 import { NEWS_TAG } from "@/lib/news/load";
@@ -178,6 +179,53 @@ function memberPriceFromForm(
   }
   if (cents >= unitPriceCents) return { ok: false, code: "MEMBER_PRICE_NOT_LOWER" };
   return { ok: true, cents };
+}
+
+/**
+ * De ereledenprijs uit het formulier: uitgevinkt is geen ereledenprijs,
+ * aangevinkt standaard 0 (gratis). Ze mag niet hoger liggen dan de gewone
+ * prijs: anders koopt een erelid per ongeluk duurder dan zijn vrienden. Gelijk
+ * mag wel, zodat een gratis ticket ook een gratis erelidticket kan hebben.
+ */
+function honoraryPriceFromForm(
+  formData: FormData,
+  unitPriceCents: number,
+): { ok: true; cents: number | null } | { ok: false; code: "INVALID_AMOUNT" | "HONORARY_PRICE_TOO_HIGH" } {
+  if (formData.get("honoraryPriceOn") !== "true") return { ok: true, cents: null };
+  const raw = String(formData.get("honoraryPrice") ?? "").trim();
+  if (raw === "") return { ok: true, cents: 0 };
+  let cents: number;
+  try {
+    cents = parseEuroAmount(raw);
+  } catch {
+    return { ok: false, code: "INVALID_AMOUNT" };
+  }
+  if (cents > unitPriceCents) return { ok: false, code: "HONORARY_PRICE_TOO_HIGH" };
+  return { ok: true, cents };
+}
+
+/**
+ * Hoe lang niet-leden na de leden wachten, in minuten (het formulier rekent
+ * uren en minuten al om). Enkel bij "leden en niet-leden", en enkel met een
+ * verkoopstart om van af te tellen: zonder start staat de verkoop al voor
+ * iedereen open, en een wachttijd die stil niets doet is erger dan een melding.
+ */
+function nonMemberDelayFromForm(
+  formData: FormData,
+  audience: TicketAudience,
+  salesStart: Date | null,
+):
+  | { ok: true; minutes: number | null }
+  | { ok: false; code: "INVALID_NON_MEMBER_DELAY" | "NON_MEMBER_DELAY_NEEDS_START" } {
+  const raw = String(formData.get("nonMemberDelayMinutes") ?? "").trim();
+  if (audience !== "PUBLIC" || raw === "") return { ok: true, minutes: null };
+  const minutes = Number(raw);
+  if (!Number.isSafeInteger(minutes) || minutes < 0 || minutes > MAX_NON_MEMBER_DELAY_MINUTES) {
+    return { ok: false, code: "INVALID_NON_MEMBER_DELAY" };
+  }
+  if (minutes === 0) return { ok: true, minutes: null };
+  if (!salesStart) return { ok: false, code: "NON_MEMBER_DELAY_NEEDS_START" };
+  return { ok: true, minutes };
 }
 
 function optionalValue(formData: FormData, key: string): string | null {
@@ -627,6 +675,19 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
   if (typeof setup === "string") throw new InvalidTicketTypesError(setup);
   const ticketTypes = setup.types.filter((type) => type.enabled);
   if (ticketTypes.length === 0) throw new Error("NO_TICKET_TYPES");
+  // Een wachttijd voor niet-leden telt af van een verkoopstart; zonder start
+  // zou ze stil niets doen, en dat is erger dan een melding.
+  const delayWithoutStart = ticketTypes.find(
+    (type) =>
+      type.nonMemberDelayMinutes !== null &&
+      !applyTicketTemplateType(type, startsAt).salesStartAt &&
+      !salesStartAt,
+  );
+  if (delayWithoutStart) {
+    throw new InvalidTicketTypesError(
+      `${delayWithoutStart.nameNl}: niet-leden later laten kopen vraagt een verkoopstart. Vul de start van de verkoop in, of maak de wachttijd leeg.`,
+    );
+  }
   // Enkel de potten met een ticket dat aangemaakt wordt: een uitgevinkt
   // sjabloonticket laat anders een pot achter die niemand kan kopen.
   const pools = setup.pools.filter((pool) =>
@@ -722,7 +783,13 @@ export async function createTicketEventAction(formData: FormData): Promise<void>
             type.memberPriceCents < type.unitPriceCents
               ? type.memberPriceCents
               : null,
-          honoraryFree: type.honoraryFree,
+          // Dezelfde regel voor de ereledenprijs: niet hoger dan de gewone prijs.
+          honoraryPriceCents:
+            type.honoraryPriceCents !== null && type.honoraryPriceCents <= type.unitPriceCents
+              ? type.honoraryPriceCents
+              : null,
+          // Gecontroleerd hierboven: er is een verkoopstart om van af te tellen.
+          nonMemberDelayMinutes: type.audience === "PUBLIC" ? type.nonMemberDelayMinutes : null,
           audience: type.audience,
           color: type.color,
           minPerOrder: type.minPerOrder,
@@ -1356,6 +1423,10 @@ export async function createTicketTypeAction(
   const audience = ticketAudienceFrom(value(formData, "audience"));
   const memberPrice = memberPriceFromForm(formData, audience, unitPriceCents);
   if (!memberPrice.ok) return saveError(memberPrice.code);
+  const honoraryPrice = honoraryPriceFromForm(formData, unitPriceCents);
+  if (!honoraryPrice.ok) return saveError(honoraryPrice.code);
+  const nonMemberDelay = nonMemberDelayFromForm(formData, audience, salesStartAt ?? event.salesStartAt);
+  if (!nonMemberDelay.ok) return saveError(nonMemberDelay.code);
   let inventoryPoolId = value(formData, "inventoryPoolId") || value(formData, "poolId");
 
   await prisma.$transaction(async (tx) => {
@@ -1385,7 +1456,8 @@ export async function createTicketTypeAction(
         descriptionEn: limitedOptionalValue(formData, "descriptionEn", 5_000),
         unitPriceCents,
         memberPriceCents: memberPrice.cents,
-        honoraryFree: checkboxValue(formData, "honoraryFree"),
+        honoraryPriceCents: honoraryPrice.cents,
+        nonMemberDelayMinutes: nonMemberDelay.minutes,
         currency: event.currency,
         audience,
         color: ticketColorKey(formData.get("color")),
@@ -1469,7 +1541,7 @@ export async function saveTicketTypeAction(
   const eventId = value(formData, "eventId");
   const ticketTypeId = value(formData, "ticketTypeId");
   const locale = localeSchema.parse(value(formData, "locale") || "nl");
-  const { session } = await requireTicketEventCapability(eventId, "MANAGE_INVENTORY");
+  const { session, event } = await requireTicketEventCapability(eventId, "MANAGE_INVENTORY");
   const type = await prisma.ticketType.findFirst({ where: { id: ticketTypeId, eventId } });
   if (!type) return saveError("TICKET_TYPE_NOT_FOUND");
 
@@ -1521,14 +1593,25 @@ export async function saveTicketTypeAction(
     if (!pool) return saveError("POOL_NOT_FOUND");
   }
   const inventoryPoolId = requestedPoolId;
-  // Een formulier zonder het veld (een oudere pagina) laat de keuze staan.
-  const honoraryFree = formData.has("honoraryFree")
-    ? checkboxValue(formData, "honoraryFree")
-    : type.honoraryFree;
+  // Een formulier zonder het veld (een oudere pagina) laat de ereledenprijs staan.
+  const honoraryPrice = formData.has("honoraryPriceOn")
+    ? honoraryPriceFromForm(formData, unitPriceCents)
+    : ({ ok: true, cents: type.honoraryPriceCents } as const);
+  if (!honoraryPrice.ok) return saveError(honoraryPrice.code);
+  const honoraryPriceCents = honoraryPrice.cents;
+  // Idem voor de wachttijd voor niet-leden. Het veld ontbreekt ook wanneer de
+  // doelgroep geen "leden en niet-leden" is; dan valt ze sowieso weg.
+  const nonMemberDelay =
+    formData.has("nonMemberDelayMinutes") || audience !== "PUBLIC"
+      ? nonMemberDelayFromForm(formData, audience, salesStartAt ?? event.salesStartAt)
+      : ({ ok: true, minutes: type.nonMemberDelayMinutes } as const);
+  if (!nonMemberDelay.ok) return saveError(nonMemberDelay.code);
+  const nonMemberDelayMinutes = nonMemberDelay.minutes;
 
   const data = {
     inventoryPoolId,
-    honoraryFree,
+    honoraryPriceCents,
+    nonMemberDelayMinutes,
     color,
     audience,
     nameNl,
@@ -1544,7 +1627,8 @@ export async function saveTicketTypeAction(
   };
   const unchanged =
     inventoryPoolId === type.inventoryPoolId &&
-    honoraryFree === type.honoraryFree &&
+    honoraryPriceCents === type.honoraryPriceCents &&
+    nonMemberDelayMinutes === type.nonMemberDelayMinutes &&
     color === type.color &&
     audience === type.audience &&
     nameNl === type.nameNl &&
@@ -1568,17 +1652,31 @@ export async function saveTicketTypeAction(
         action: "TICKET_TYPE_UPDATED",
         entityType: "TicketType",
         entityId: type.id,
-        metadata: { color, audience, unitPriceCents, memberPriceCents, minPerOrder, maxPerOrder },
+        metadata: {
+          color,
+          audience,
+          unitPriceCents,
+          memberPriceCents,
+          honoraryPriceCents,
+          nonMemberDelayMinutes,
+          minPerOrder,
+          maxPerOrder,
+        },
       },
     }),
   ]);
   const changes = [
     inventoryPoolId === type.inventoryPoolId ? null : "andere plaatsen gekozen",
-    honoraryFree === type.honoraryFree
+    honoraryPriceCents === type.honoraryPriceCents
       ? null
-      : honoraryFree
-        ? "gratis voor ereleden aangezet"
-        : "gratis voor ereleden uitgezet",
+      : honoraryPriceCents === null
+        ? "ereledenprijs verwijderd"
+        : `ereledenprijs op ${honoraryPriceCents === 0 ? "gratis" : `${(honoraryPriceCents / 100).toFixed(2)} euro`}`,
+    nonMemberDelayMinutes === type.nonMemberDelayMinutes
+      ? null
+      : nonMemberDelayMinutes === null
+        ? "niet-leden weer tegelijk met de leden"
+        : `niet-leden ${nonMemberDelayMinutes} minuten na de leden`,
     color === type.color ? null : `kleur op ${color}`,
     audience === type.audience ? null : `doelgroep op ${ticketAudienceAuditLabel(audience)}`,
     nameNl === type.nameNl ? null : `naam op ${nameNl}`,

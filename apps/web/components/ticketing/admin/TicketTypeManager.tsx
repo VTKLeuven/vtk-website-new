@@ -35,6 +35,7 @@ import { ticketColorKey, ticketColorLabel } from "@/lib/ticketing/ticketColors";
 import { TicketColorChoice } from "./TicketColorChoice";
 import { formatMoney, toDatetimeLocal, type AdminLocale } from "./format";
 import { SettingsPanel } from "./SettingsPanel";
+import { formatNonMemberDelay, NonMemberDelayInput } from "./NonMemberDelayInput";
 
 type InventoryPool = {
   id: string;
@@ -156,7 +157,8 @@ type TicketType = {
   nameEn: string | null;
   unitPriceCents: number;
   memberPriceCents: number | null;
-  honoraryFree: boolean;
+  honoraryPriceCents: number | null;
+  nonMemberDelayMinutes: number | null;
   currency: string;
   audience: string;
   color: string;
@@ -168,6 +170,40 @@ type TicketType = {
   inventoryPool: InventoryPool;
   _count?: { orderItems: number; questions: number };
 };
+
+/** De meldingen voor de wachttijd voor niet-leden en de ereledenprijs, bij aanmaken en bewerken. */
+function delayAndHonoraryErrors(locale: AdminLocale, prefixNl: string, prefixEn: string) {
+  const nl = locale === "nl";
+  return {
+    HONORARY_PRICE_TOO_HIGH: nl
+      ? `${prefixNl}: de ereledenprijs mag niet hoger zijn dan de gewone prijs.`
+      : `${prefixEn}: the honorary member price cannot be higher than the regular price.`,
+    INVALID_NON_MEMBER_DELAY: nl
+      ? `${prefixNl}: de wachttijd voor niet-leden is hoogstens 30 dagen, in hele uren en minuten.`
+      : `${prefixEn}: the wait for non-members is at most 30 days, in whole hours and minutes.`,
+    NON_MEMBER_DELAY_NEEDS_START: nl
+      ? `${prefixNl}: niet-leden later laten kopen vraagt een verkoopstart, bij dit ticket of bij het event.`
+      : `${prefixEn}: letting non-members buy later needs a sales start, on this ticket or on the event.`,
+  };
+}
+
+/** " (leden € 14,00, ereleden gratis)", of niets voor een ticket met één prijs. */
+function otherPrices(ticketType: TicketType, locale: AdminLocale): string {
+  const nl = locale === "nl";
+  const parts = [
+    ticketType.audience === "PUBLIC" && ticketType.memberPriceCents != null
+      ? `${nl ? "leden" : "members"} ${formatMoney(ticketType.memberPriceCents, ticketType.currency, locale)}`
+      : null,
+    ticketType.honoraryPriceCents != null
+      ? `${nl ? "ereleden" : "honorary"} ${
+          ticketType.honoraryPriceCents === 0
+            ? nl ? "gratis" : "free"
+            : formatMoney(ticketType.honoraryPriceCents, ticketType.currency, locale)
+        }`
+      : null,
+  ].filter(Boolean);
+  return parts.length > 0 ? ` (${parts.join(", ")})` : "";
+}
 
 function audienceLabel(audience: string, locale: AdminLocale): string {
   if (audience === "PUBLIC") return locale === "nl" ? "Publiek" : "Public";
@@ -221,30 +257,136 @@ function MemberPriceField({
 }
 
 /**
- * "Gratis voor ereleden": één ticket van dit type gratis per erelid, per event.
- * Standaard uit; de hidden input stuurt "uit" mee wanneer het vinkje leeg is.
+ * De ereledenprijs: een vinkje, standaard uit, zoals het "Gratis voor ereleden"
+ * dat ze vervangt. Aangevinkt staat de prijs op 0 (gratis), en die kan hoger.
+ * De hidden input stuurt "uit" mee wanneer het vinkje leeg is, en dan wist de
+ * server de prijs.
  */
-function HonoraryFreeField({
+function HonoraryPriceField({
   id,
-  defaultChecked = false,
+  defaultCents,
+  currency,
   locale,
 }: {
   id: string;
-  defaultChecked?: boolean;
+  defaultCents?: number | null;
+  currency: string;
   locale: AdminLocale;
 }) {
   const nl = locale === "nl";
+  const [on, setOn] = useState(defaultCents != null);
   return (
     <div className="ticket-admin-field" data-span="2">
-      <label className="ticket-admin-check" htmlFor={id}>
-        <input type="hidden" name="honoraryFree" value="false" />
-        <input id={id} type="checkbox" name="honoraryFree" value="true" defaultChecked={defaultChecked} />
-        {nl ? "Gratis voor ereleden" : "Free for honorary members"}
+      <label className="ticket-admin-check" htmlFor={`${id}-on`}>
+        <input type="hidden" name="honoraryPriceOn" value={on ? "true" : "false"} />
+        <input
+          id={`${id}-on`}
+          type="checkbox"
+          checked={on}
+          onChange={(changed) => setOn(changed.target.checked)}
+        />
+        {nl ? "Ereledenprijs" : "Honorary member price"}
       </label>
+      {on ? (
+        <>
+          <label htmlFor={id}>{nl ? `Prijs voor een erelid (${currency})` : `Price for an honorary member (${currency})`}</label>
+          <input
+            id={id}
+            className="ticket-admin-honorary-price"
+            name="honoraryPrice"
+            type="number"
+            min="0"
+            step="0.01"
+            required
+            defaultValue={((defaultCents ?? 0) / 100).toFixed(2)}
+          />
+        </>
+      ) : null}
       <span className="ticket-admin-help">
         {nl
-          ? "Een erelid ziet dit ticket dan ook gratis, naast de gewone prijs. Hoogstens één gratis ticket per erelid voor dit event, over al zijn bestellingen heen."
-          : "An honorary member then also sees this ticket for free, next to the regular price. At most one free ticket per honorary member for this event, across all their orders."}
+          ? "Een erelid ziet dit ticket dan ook aan deze prijs, naast de gewone prijs: standaard gratis, maar je kan ze verhogen tot de gewone prijs. Hoogstens één per erelid voor dit event, over al zijn bestellingen heen; voor iedereen anders bestaat de prijs niet."
+          : "An honorary member then also sees this ticket at this price, next to the regular price: free by default, but you can raise it up to the regular price. At most one per honorary member for this event, across all their orders; for everyone else the price does not exist."}
+      </span>
+    </div>
+  );
+}
+
+/** "di 14 okt. 20:00" uit een `datetime-local`-waarde of een datum, of null. */
+function formatLocalMoment(value: string | Date | null, locale: AdminLocale): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+/**
+ * Niet-leden pas later: hoeveel na de verkoopstart van dit ticket de plaatsen
+ * voor niet-leden te koop gaan. Enkel bij "leden en niet-leden"; uitgezet
+ * stuurt het veld niets mee en wist de server de wachttijd.
+ *
+ * Onder de vakjes staat de uitkomst in klokuren, net als bij de voorverkoop:
+ * "2 uur na de leden" zegt niets zolang je zelf moet optellen, en net in dat
+ * getal blijft een misklik zitten.
+ */
+function NonMemberDelayField({
+  idPrefix,
+  audience,
+  defaultMinutes,
+  salesStartLocal,
+  eventSalesStartAt,
+  locale,
+}: {
+  idPrefix: string;
+  audience: TicketAudience;
+  defaultMinutes?: number | null;
+  /** Wat er nu in "Verkoop start" van dit ticket staat; leeg volgt het event. */
+  salesStartLocal: string;
+  eventSalesStartAt: Date | null;
+  locale: AdminLocale;
+}) {
+  const nl = locale === "nl";
+  const applies = audience === "PUBLIC";
+  const [minutes, setMinutes] = useState<number | null>(defaultMinutes ?? null);
+  const start = salesStartLocal ? new Date(salesStartLocal) : eventSalesStartAt;
+  const memberMoment = formatLocalMoment(start, locale);
+  const nonMemberMoment =
+    start && minutes ? formatLocalMoment(new Date(start.getTime() + minutes * 60_000), locale) : null;
+
+  return (
+    <div className="ticket-admin-field" data-span="2">
+      <label htmlFor={`${idPrefix}-hours`}>
+        {nl ? "Verkoop voor niet-leden (optioneel)" : "Sales for non-members (optional)"}
+      </label>
+      {applies ? <input type="hidden" name="nonMemberDelayMinutes" value={minutes ?? ""} /> : null}
+      <NonMemberDelayInput
+        idPrefix={idPrefix}
+        minutes={defaultMinutes}
+        onChange={setMinutes}
+        disabled={!applies}
+        locale={locale}
+      />
+      <span className="ticket-admin-help">
+        {!applies
+          ? nl
+            ? "Enkel bij “leden en niet-leden”: dit ticket heeft maar één doelgroep."
+            : "Only with “members and non-members”: this ticket has a single audience."
+          : !minutes
+            ? nl
+              ? "Leeg: leden en niet-leden kunnen tegelijk kopen."
+              : "Empty: members and non-members can buy at the same time."
+            : !start
+              ? nl
+                ? "Vul een verkoopstart in, bij dit ticket of bij het event: zonder start staat de verkoop al voor iedereen open."
+                : "Set a sales start, on this ticket or on the event: without one, sales are already open to everyone."
+              : nl
+                ? `Leden kopen vanaf ${memberMoment}, niet-leden vanaf ${nonMemberMoment}. Wie in de voorverkoop zit, wacht niet. Bij een ledenprijs wacht ook de gewone prijs, die een lid voor een vriend koopt.`
+                : `Members buy from ${memberMoment}, non-members from ${nonMemberMoment}. Whoever is in the presale does not wait. With a member price, the regular price a member buys for a friend waits too.`}
       </span>
     </div>
   );
@@ -282,15 +424,18 @@ function TicketTypeEditPanel({
   ticketType,
   pools,
   guestBuyableElsewhere,
+  eventSalesStartAt,
   locale,
 }: {
   eventId: string;
   ticketType: TicketType;
   pools: InventoryPool[];
   guestBuyableElsewhere: boolean;
+  eventSalesStartAt: Date | null;
   locale: AdminLocale;
 }) {
   const [audience, setAudience] = useState<TicketAudience>(ticketAudienceFrom(ticketType.audience));
+  const [salesStartLocal, setSalesStartLocal] = useState(toDatetimeLocal(ticketType.salesStartAt));
   const orderedTickets = ticketType._count?.orderItems ?? 0;
   const closesShopForGuests = audience !== "PUBLIC" && !guestBuyableElsewhere;
   const freeAndPublic = audience === "PUBLIC" && ticketType.unitPriceCents === 0;
@@ -333,6 +478,7 @@ function TicketTypeEditPanel({
               locale === "nl"
                 ? "Niet opgeslagen: de ledenprijs moet lager zijn dan de gewone prijs."
                 : "Not saved: the member price must be lower than the regular price.",
+            ...delayAndHonoraryErrors(locale, "Niet opgeslagen", "Not saved"),
             POOL_NOT_FOUND:
               locale === "nl"
                 ? "Niet opgeslagen: de gekozen plaatsen bestaan niet meer."
@@ -429,7 +575,8 @@ function TicketTypeEditPanel({
                 id={`ticket-type-${ticketType.id}-sales-start`}
                 name="salesStartAt"
                 type="datetime-local"
-                defaultValue={toDatetimeLocal(ticketType.salesStartAt)}
+                value={salesStartLocal}
+                onChange={(changed) => setSalesStartLocal(changed.target.value)}
               />
               <span className="ticket-admin-help">
                 {locale === "nl"
@@ -506,11 +653,22 @@ function TicketTypeEditPanel({
               ) : null}
             </div>
           ) : null}
-          <HonoraryFreeField
-            id={`ticket-type-${ticketType.id}-honorary`}
-            defaultChecked={ticketType.honoraryFree}
-            locale={locale}
-          />
+          <div className="ticket-admin-form-grid">
+            <NonMemberDelayField
+              idPrefix={`ticket-type-${ticketType.id}-delay`}
+              audience={audience}
+              defaultMinutes={ticketType.nonMemberDelayMinutes}
+              salesStartLocal={salesStartLocal}
+              eventSalesStartAt={eventSalesStartAt}
+              locale={locale}
+            />
+            <HonoraryPriceField
+              id={`ticket-type-${ticketType.id}-honorary`}
+              defaultCents={ticketType.honoraryPriceCents}
+              currency={ticketType.currency}
+              locale={locale}
+            />
+          </div>
           <TicketColorChoice
             idPrefix={`ticket-type-${ticketType.id}`}
             value={ticketType.color}
@@ -548,15 +706,19 @@ export function TicketTypeManager({
   pools,
   ticketTypes,
   currency,
+  eventSalesStartAt,
   locale,
 }: {
   eventId: string;
   pools: InventoryPool[];
   ticketTypes: TicketType[];
   currency: string;
+  /** De verkoopstart van het event: daar telt de wachttijd voor niet-leden van af. */
+  eventSalesStartAt: Date | null;
   locale: AdminLocale;
 }) {
   const activePools = pools.filter((pool) => pool.active);
+  const [newSalesStartLocal, setNewSalesStartLocal] = useState("");
   const [prevTicketTypes, setPrevTicketTypes] = useState<TicketType[]>(ticketTypes);
   const [items, setItems] = useState<TicketType[]>(ticketTypes);
   const [, startTransition] = useTransition();
@@ -862,10 +1024,11 @@ export function TicketTypeManager({
                       </p>
                       <p className="ticket-admin-row-meta">
                         {formatMoney(ticketType.unitPriceCents, ticketType.currency, locale)}
-                        {ticketType.audience === "PUBLIC" && ticketType.memberPriceCents != null
-                          ? ` (${locale === "nl" ? "leden" : "members"} ${formatMoney(ticketType.memberPriceCents, ticketType.currency, locale)})`
-                          : ""}{" "}
+                        {otherPrices(ticketType, locale)}{" "}
                         {pools.length > 1 ? ` · ${ticketType.inventoryPool.nameNl}` : ""} · {audienceLabel(ticketType.audience, locale)}
+                        {ticketType.audience === "PUBLIC" && ticketType.nonMemberDelayMinutes
+                          ? ` · ${locale === "nl" ? "niet-leden" : "non-members"} ${formatNonMemberDelay(ticketType.nonMemberDelayMinutes, locale)} later`
+                          : ""}
                       </p>
                       <p className="ticket-admin-row-meta ticket-admin-inline-meta">
                         <UsersRound aria-hidden="true" size={13} />
@@ -928,6 +1091,7 @@ export function TicketTypeManager({
                   guestBuyableElsewhere={items.some(
                     (other) => other.id !== ticketType.id && guestCanBuy(other)
                   )}
+                  eventSalesStartAt={eventSalesStartAt}
                   locale={locale}
                 />
               </li>
@@ -955,7 +1119,10 @@ export function TicketTypeManager({
                 submitLabel={locale === "nl" ? "Tickettype toevoegen" : "Add ticket type"}
                 savingLabel={locale === "nl" ? "Toevoegen" : "Adding"}
                 savedMessage={locale === "nl" ? "Tickettype toegevoegd." : "Ticket type added."}
-                onSuccess={() => setNewAudience("PUBLIC")}
+                onSuccess={() => {
+                  setNewAudience("PUBLIC");
+                  setNewSalesStartLocal("");
+                }}
                 errorMessages={{
                   NAME_REQUIRED:
                     locale === "nl" ? "Niet toegevoegd: vul een naam in." : "Not added: enter a name.",
@@ -973,6 +1140,7 @@ export function TicketTypeManager({
                     locale === "nl"
                       ? "Niet toegevoegd: de ledenprijs moet lager zijn dan de gewone prijs."
                       : "Not added: the member price must be lower than the regular price.",
+                  ...delayAndHonoraryErrors(locale, "Niet toegevoegd", "Not added"),
                 }}
                 fallbackErrorMessage={
                   locale === "nl" ? "Tickettype niet toegevoegd." : "Ticket type was not added."
@@ -1035,7 +1203,14 @@ export function TicketTypeManager({
                   <div className="ticket-admin-field" data-span="2">
                     <TicketColorChoice idPrefix="ticket-type-new" locale={locale} />
                   </div>
-                  <HonoraryFreeField id="ticket-type-new-honorary" locale={locale} />
+                  <NonMemberDelayField
+                    idPrefix="ticket-type-new-delay"
+                    audience={newAudience}
+                    salesStartLocal={newSalesStartLocal}
+                    eventSalesStartAt={eventSalesStartAt}
+                    locale={locale}
+                  />
+                  <HonoraryPriceField id="ticket-type-new-honorary" currency={currency} locale={locale} />
                   <div className="ticket-admin-field">
                     <label htmlFor="ticket-type-min">{locale === "nl" ? "Minimum per bestelling" : "Minimum per order"}</label>
                     <input id="ticket-type-min" name="minPerOrder" type="number" min="1" defaultValue="1" required />
@@ -1046,7 +1221,13 @@ export function TicketTypeManager({
                   </div>
                   <div className="ticket-admin-field">
                     <label htmlFor="ticket-type-sales-start">{locale === "nl" ? "Verkoop start" : "Sales start"}</label>
-                    <input id="ticket-type-sales-start" name="salesStartAt" type="datetime-local" />
+                    <input
+                      id="ticket-type-sales-start"
+                      name="salesStartAt"
+                      type="datetime-local"
+                      value={newSalesStartLocal}
+                      onChange={(changed) => setNewSalesStartLocal(changed.target.value)}
+                    />
                   </div>
                   <div className="ticket-admin-field">
                     <label htmlFor="ticket-type-sales-end">{locale === "nl" ? "Verkoop einde" : "Sales end"}</label>

@@ -1,5 +1,6 @@
 import type { TicketTargetAudience } from "@/lib/ticketing/audience";
 import type { SeatKind } from "@/lib/ticketing/seats";
+import type { ImageCrop, ImageFocus } from "@/lib/imageFocus";
 
 export type TicketQuestion = {
   id: string;
@@ -32,11 +33,11 @@ export type PublicTicketType = {
    */
   memberPriceCents?: number | null;
   /**
-   * Deze bezoeker is erelid en mag één ticket van dit type gratis nemen (zie
-   * `TicketType.honoraryFree`). Enkel gevuld voor wie dat nog kan; voor de rest
-   * false.
+   * Deze bezoeker is erelid en mag één ticket van dit type aan deze prijs nemen
+   * (zie `TicketType.honoraryPriceCents`; 0 is gratis). Enkel gevuld voor wie
+   * dat nog kan; voor de rest null.
    */
-  honoraryFree?: boolean;
+  honoraryPriceCents?: number | null;
   /**
    * Wat de regel aan de gewone prijs nog kan nemen: de vrije plaatsen in de pot,
    * of minder wanneer het plafond voor deze bezoeker eerder vol zit.
@@ -56,6 +57,12 @@ export type PublicTicketType = {
   maxPerOrder?: number | null;
   minPerOrder?: number | null;
   salesStart?: string | Date | null;
+  /**
+   * Wanneer de plaatsen voor niet-leden te koop gaan, voor deze bezoeker (zie
+   * `nonMemberTypeSalesStart` in lib/ticketing/presale.ts). Ontbreekt of gelijk
+   * aan `salesStart` = samen met de leden.
+   */
+  nonMemberSalesStart?: string | Date | null;
   salesEnd?: string | Date | null;
   audience?: string;
   questions?: TicketQuestion[];
@@ -81,8 +88,11 @@ export type PublicTicketEvent = {
   description?: string | null;
   location?: string | null;
   locationAddress?: string | null;
-  /** De foto van het gekoppelde kalender-event, met zijn uitsnede. */
-  poster?: { src: string; position: string } | null;
+  /**
+   * De banner, met haar uitsnede. `mobile` is de telefoonuitsnede van het
+   * kalenderevent, wanneer de banner diens foto is (zie lib/ticketing/poster.ts).
+   */
+  poster?: { src: string; position: string; focus?: ImageFocus; mobile?: ImageCrop | null } | null;
   startsAt: string | Date;
   endsAt: string | Date;
   currentTime: string;
@@ -114,8 +124,8 @@ export type PublicTicketEvent = {
    * ingelogd is (misschien is hij al lid), "join" wanneer hij het niet is.
    */
   memberPriceHint?: "login" | "join" | null;
-  /** Dit erelid heeft zijn gratis ticket voor dit event al; de shop zegt dat erbij. */
-  honoraryFreeUsed?: boolean;
+  /** Dit erelid heeft zijn erelidticket voor dit event al; de shop zegt dat erbij. */
+  honoraryPriceUsed?: boolean;
   /**
    * Doelgroepen (eerstejaars, alumni, ...) met een ticket dat deze uitgelogde
    * bezoeker niet ziet. Leeg voor wie ingelogd is: wie er dan niet bij hoort,
@@ -247,13 +257,13 @@ export function formatTicketMoment(value: string | Date, locale: "nl" | "en"): s
 /**
  * Eén regel in de shop: een tickettype aan één prijs. Een type met een
  * ledenprijs geeft er twee, de ledenprijs eerst; elk ander type één. Voor een
- * erelid komt het gratis erelidticket er nog vooraan bij.
+ * erelid komt het erelidticket er nog vooraan bij.
  */
 export type TicketLine = {
   key: string;
   type: PublicTicketType;
   memberPrice: boolean;
-  /** Het gratis ticket van een erelid; altijd 0 euro, hoogstens één per event. */
+  /** Het ticket van een erelid aan de ereledenprijs; hoogstens één per event. */
   honorary?: boolean;
   priceCents: number;
 };
@@ -265,13 +275,13 @@ export function ticketLineKey(ticketTypeId: string, memberPrice: boolean, honora
 
 export function ticketLinesForType(type: PublicTicketType): TicketLine[] {
   const lines: TicketLine[] = [];
-  if (type.honoraryFree) {
+  if (type.honoraryPriceCents != null) {
     lines.push({
       key: ticketLineKey(type.id, false, true),
       type,
       memberPrice: false,
       honorary: true,
-      priceCents: 0,
+      priceCents: type.honoraryPriceCents,
     });
   }
   if (type.memberPriceCents != null) {
@@ -320,10 +330,44 @@ export function ticketTypeRemaining(type: PublicTicketType): number {
   return Math.max(0, ...ticketLinesForType(type).map(ticketLineRemaining));
 }
 
+/**
+ * De soort plaats die een regel neemt (zie `lib/ticketing/seats.ts`): de
+ * ledenprijs en het erelidticket altijd een ledenplaats, de gewone prijs wat de
+ * server voor deze bezoeker uitrekende.
+ */
+export function ticketLineSeat(line: TicketLine): SeatKind {
+  return line.memberPrice || line.honorary ? "MEMBER" : (line.type.seat ?? "NON_MEMBER");
+}
+
+/**
+ * Wanneer een regel te koop gaat: een regel die een niet-ledenplaats neemt,
+ * wacht op de start voor niet-leden (`nonMemberSalesStart`), de rest op de
+ * gewone start van het type.
+ */
+export function ticketLineSalesStart(line: TicketLine): string | Date | null {
+  if (ticketLineSeat(line) === "NON_MEMBER" && line.type.nonMemberSalesStart) {
+    return line.type.nonMemberSalesStart;
+  }
+  return line.type.salesStart ?? null;
+}
+
+/**
+ * Wacht deze regel enkel nog op de start voor niet-leden, terwijl de leden al
+ * kunnen kopen? Dan zegt de shop dat erbij, in plaats van een gewone
+ * "verkoop start op".
+ */
+export function ticketLineWaitsForMembers(line: TicketLine, now: number): boolean {
+  if (ticketLineSeat(line) !== "NON_MEMBER" || !line.type.nonMemberSalesStart) return false;
+  const memberStart = line.type.salesStart ? new Date(line.type.salesStart).getTime() : null;
+  return (
+    new Date(line.type.nonMemberSalesStart).getTime() > now &&
+    (memberStart === null || memberStart <= now)
+  );
+}
+
 /** De pot en de soort plaats van een regel: regels met dezelfde sleutel delen een plafond. */
 function seatKey(line: TicketLine): string {
-  const seat = line.memberPrice || line.honorary ? "MEMBER" : (line.type.seat ?? "NON_MEMBER");
-  return `${inventoryKey(line.type)}:${seat}`;
+  return `${inventoryKey(line.type)}:${ticketLineSeat(line)}`;
 }
 
 /**
@@ -361,7 +405,7 @@ export function maximumSelectableForLine({
       (line.type.poolAvailable ?? line.type.available) - taken((candidate) => inventoryKey(candidate.type) === pool),
       (line.type.maxPerOrder ?? maxTicketsPerOrder) - taken((candidate) => candidate.type.id === line.type.id),
       maxTicketsPerOrder - taken(() => true),
-      // Eén gratis erelidticket per event, over alle types heen.
+      // Eén erelidticket per event, over alle types heen.
       line.honorary ? 1 - taken((candidate) => Boolean(candidate.honorary)) : Number.POSITIVE_INFINITY,
     ),
   );

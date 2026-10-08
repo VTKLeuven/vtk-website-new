@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { cache } from "react";
 import Link from "@/components/ui/Link";
-import Image from "next/image";
+import { EventPhoto } from "@/components/calendar/EventPhoto";
 import { notFound } from "next/navigation";
 import { Eye, PencilLine } from "lucide-react";
 import type { Locale } from "@vtk/i18n";
@@ -226,17 +226,13 @@ function TicketEventAbout({ event, locale }: { event: PublicTicketEvent; locale:
   return (
     <>
       {event.poster ? (
-        <figure className="vtk-event-photo tshop-poster">
-          <Image
-            src={event.poster.src}
-            alt=""
-            fill
-            sizes="(max-width: 960px) 100vw, 760px"
-            className="vtk-event-photo-img"
-            style={{ objectPosition: event.poster.position }}
-            priority
-          />
-        </figure>
+        <EventPhoto
+          className="tshop-poster"
+          src={event.poster.src}
+          sizes="(max-width: 960px) 100vw, 760px"
+          focus={event.poster.focus ?? null}
+          mobile={event.poster.mobile}
+        />
       ) : null}
       {paragraphs.length > 0 ? (
         <section className="tshop-about">

@@ -82,8 +82,25 @@
   background: var(--paper-2);
 }
 
+/* Het punt dat in beeld blijft (`--photo-focus`, zie lib/imageFocus.ts) staat
+   als variabele op het kader, zodat een telefoon er een eigen punt en zoom voor
+   kan krijgen zonder tweede foto (zie onderaan). */
 .vtk-event-photo-img {
   object-fit: cover;
+  object-position: var(--photo-focus, 50% 50%);
+}
+
+/* De laag rond de foto: het hele kader, behalve op een telefoon met een eigen
+   zoom (zie onderaan). */
+.vtk-event-photo-crop {
+  position: absolute;
+  inset: 0;
+}
+
+/* De vervaagde kopie achter een uitgezoomde foto. Enkel op een telefoon nodig:
+   op een groot scherm vult de foto haar kader altijd. */
+.vtk-event-photo-fill {
+  display: none;
 }
 
 /* De omschrijving leest als gewone tekst onder de foto, zonder kaart eromheen:
@@ -338,9 +355,45 @@
     grid-template-columns: 1fr;
   }
 
+  /* Een container, zodat de telefoonuitsnede hieronder met de maat van het
+     kader kan rekenen (`cqw`, `cqh`). */
   .vtk-event-photo {
     min-height: 220px;
     aspect-ratio: 4 / 3;
+    container-type: size;
+  }
+
+  /* De telefoonuitsnede van de redactie (`imageFocusMobileX/Y`), en anders
+     gewoon die van een groot scherm. */
+
+  .vtk-event-photo-img {
+    object-position: var(--photo-focus-m, var(--photo-focus, 50% 50%));
+  }
+
+  /* Met een zoom erbij volstaat `object-fit: cover` niet: dat snijdt in dit
+     kader altijd hetzelfde deel weg, en een `transform` verkleint enkel wat er
+     al overbleef. Hier krijgt de laag rond de foto dus de maat van de foto
+     zelf, uit haar verhouding (`--photo-ratio`): de cover-maat maal de zoom,
+     rond het gekozen punt. De foto vult die laag precies. Dezelfde rekensom
+     als `cropBox` in lib/imageFocus.ts. */
+  .vtk-event-photo-crop[data-mobile-crop] {
+    --crop-w: calc(var(--photo-zoom-m) * max(100cqw, 100cqh * var(--photo-ratio)));
+    --crop-h: calc(var(--photo-zoom-m) * max(100cqh, 100cqw / var(--photo-ratio)));
+    inset: auto;
+    left: calc(var(--photo-fx-m) * (100cqw - var(--crop-w)));
+    top: calc(var(--photo-fy-m) * (100cqh - var(--crop-h)));
+    width: var(--crop-w);
+    height: var(--crop-h);
+  }
+
+  /* Uitgezoomd past de foto niet meer van rand tot rand. Wat overblijft, vult
+     dezelfde foto, vervaagd: een effen band erboven en eronder leest als een
+     foto die niet laadde. */
+  .vtk-event-photo-fill {
+    display: block;
+    object-fit: cover;
+    filter: blur(22px) saturate(1.1);
+    transform: scale(1.2);
   }
 }
 

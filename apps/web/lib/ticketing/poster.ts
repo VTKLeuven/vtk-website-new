@@ -1,5 +1,11 @@
 import { publicUrl } from "@/lib/storage";
-import { CENTER_FOCUS, focusPosition, type ImageFocus } from "@/lib/imageFocus";
+import {
+  CENTER_FOCUS,
+  focusPosition,
+  mobileCropFrom,
+  type ImageCrop,
+  type ImageFocus,
+} from "@/lib/imageFocus";
 
 /**
  * De banner van een ticketevent: in de shop, op /tickets, op de bestelpagina,
@@ -25,7 +31,17 @@ export const ticketPosterSelect = {
   imageFocusX: true,
   imageFocusY: true,
   imageCategory: { select: { imageKey: true } },
-  calendarEvent: { select: { imageKey: true, imageFocusX: true, imageFocusY: true } },
+  calendarEvent: {
+    select: {
+      imageKey: true,
+      imageFocusX: true,
+      imageFocusY: true,
+      imageFocusMobileX: true,
+      imageFocusMobileY: true,
+      imageZoomMobile: true,
+      imageRatioMobile: true,
+    },
+  },
 } as const;
 
 export type TicketPosterSource = {
@@ -33,13 +49,25 @@ export type TicketPosterSource = {
   imageFocusX: number;
   imageFocusY: number;
   imageCategory: { imageKey: string | null } | null;
-  calendarEvent: { imageKey: string | null; imageFocusX: number; imageFocusY: number } | null;
+  calendarEvent: {
+    imageKey: string | null;
+    imageFocusX: number;
+    imageFocusY: number;
+    imageFocusMobileX?: number | null;
+    imageFocusMobileY?: number | null;
+    imageZoomMobile?: number | null;
+    imageRatioMobile?: number | null;
+  } | null;
 };
 
-/** De storage-key en de uitsnede van de banner, of `null` zonder banner. */
+/**
+ * De storage-key en de uitsnede van de banner, of `null` zonder banner. De
+ * foto van het kalenderevent brengt haar telefoonuitsnede mee (`mobile`); een
+ * eigen foto of een themabanner heeft er geen.
+ */
 export function ticketPosterImage(
   event: TicketPosterSource,
-): { key: string; focus: ImageFocus } | null {
+): { key: string; focus: ImageFocus; mobile?: ImageCrop | null } | null {
   if (event.imageKey) {
     return { key: event.imageKey, focus: { x: event.imageFocusX, y: event.imageFocusY } };
   }
@@ -50,16 +78,26 @@ export function ticketPosterImage(
     return {
       key: event.calendarEvent.imageKey,
       focus: { x: event.calendarEvent.imageFocusX, y: event.calendarEvent.imageFocusY },
+      mobile: mobileCropFrom(
+        event.calendarEvent.imageFocusMobileX,
+        event.calendarEvent.imageFocusMobileY,
+        event.calendarEvent.imageZoomMobile,
+        event.calendarEvent.imageRatioMobile,
+      ),
     };
   }
   return null;
 }
 
 /** De banner zoals de publieke schermen hem tekenen. */
-export function ticketPoster(event: TicketPosterSource): { src: string; position: string } | null {
+export function ticketPoster(
+  event: TicketPosterSource,
+): { src: string; position: string; focus: ImageFocus; mobile: ImageCrop | null } | null {
   const image = ticketPosterImage(event);
   const src = image ? publicUrl(image.key) : null;
-  return image && src ? { src, position: focusPosition(image.focus) } : null;
+  return image && src
+    ? { src, position: focusPosition(image.focus), focus: image.focus, mobile: image.mobile ?? null }
+    : null;
 }
 
 /** Enkel de URL, voor een plek die geen uitsnede kan meegeven (mail, nieuws). */
