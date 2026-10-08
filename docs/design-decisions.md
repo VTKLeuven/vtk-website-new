@@ -779,6 +779,42 @@ bewaard en door Onderwijs zelf bij een externe zaak besteld
 - Na de deadline kan het nog, maar dan werkt Theokot misschien al met de turflijst:
   het beheerscherm zegt dat je Theokot dan zelf verwittigt.
 
+### Bureauvoorraad: Theokot maakt voor elk bureau een paar broodjes extra
+
+Een gewoon bureau put uit dezelfde voorraad als de studenten. Zijn die er sneller
+bij, dan stond elk broodje voor het bureau op "uitverkocht", terwijl Theokot voor
+het bureau gerust een paar extra kan maken. Daarom maakt Theokot voor **elk** bureau
+een vast aantal broodjes bovenop het aanbod van die dag: de **bureauvoorraad**
+(setting `theokot.bureauStock`, op /admin/theokot/instellingen onder het
+standaardaanbod).
+
+- **Theokot beslist het aantal, niet Onderwijs.** Theokot moet ze maken. Het is één
+  getal voor elk bureau, geen veld per verkoopdag of per bureau: het bureau is om de
+  twee weken en het aantal verandert zelden. Wie voor één bureau veel meer volk
+  verwacht, gebruikt big bureau.
+- **Eerst de gewone voorraad, dan de bureauvoorraad** (`chooseBureauSupply`). Zolang
+  Theokot het broodje nog heeft, hoeft het niet extra gemaakt te worden. Wie een
+  broodje uit de bureauvoorraad kreeg, staat als `MeetingReservation.extra`.
+- **De bureauvoorraad is niet per broodje.** Theokot maakt het broodje dat gekozen
+  werd, dus elk broodje van het aanbod kan eruit komen. Het broodje van de week blijft
+  zoals altijd voor de studenten.
+- **Studenten merken er niets van.** Een broodje uit de bureauvoorraad gaat niet van
+  hun voorraad af (`usageForSessionItems` telt het niet), maar het hangt wel aan het
+  aanbod-item, dus het staat in de kolom Bureau van de turflijst. Dat is de lijst waar
+  Theokot mee maakt.
+- **Een lager getal schrapt niemand.** Wie al een broodje uit de bureauvoorraad heeft,
+  houdt het; enkel nieuwe inschrijvingen krijgen er geen meer.
+- **Niet bij een big bureau.** Daar gaat wat Theokot niet heeft al naar de externe
+  bestelling; de verdeling van big bureau zet `extra` terug op false.
+- **Big bureau uitzetten gebruikt de bureauvoorraad wel** (`releaseBigBureau`). Eerst
+  neemt de gewone voorraad terug wat ze kan, daarna komt wat nog extern staat uit de
+  bureauvoorraad, in volgorde van inschrijven. Een gewoon bureau zou die broodjes ook
+  daaruit krijgen. Pas wanneer ook de bureauvoorraad op is, weigert het opslaan.
+- Komt er later een gewoon broodje vrij (een student annuleert), dan blijft een
+  broodje uit de bureauvoorraad toch een extra broodje, en gaat het vrijgekomen
+  broodje terug naar de studenten. Dat is bewust: het bureau kreeg zijn broodje al,
+  en een student die nog wil bestellen, heeft er dan een.
+
 ### Deadline
 
 Aanpassen of annuleren kan tot **dezelfde deadline als voor studenten**: het moment

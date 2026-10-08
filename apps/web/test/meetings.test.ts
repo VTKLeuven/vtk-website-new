@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  bureauStockFor,
+  chooseBureauSupply,
   DEFAULT_DRINK_PRICE_CENTS,
   DEFAULT_MEETING_DRINKS,
   hasMeetingOrder,
@@ -11,7 +13,9 @@ import {
   meetingWindowState,
   monthDays,
   offeringNameKey,
+  parseBureauStock,
   parseMeetingDrinks,
+  planBureauStockTakeover,
   planMeetingSupply,
   reservationTotalCents,
   semesterForDate,
@@ -267,5 +271,58 @@ describe("inschrijving zonder bestelling", () => {
     // Zo komt het uit een formulier dat op "geen" blijft staan.
     expect(hasMeetingOrder({ itemName: "", drinkName: "" })).toBe(false);
     expect(hasMeetingOrder({})).toBe(false);
+  });
+});
+
+describe("bureauvoorraad", () => {
+  it("neemt eerst de gewone voorraad, dan de bureauvoorraad", () => {
+    expect(chooseBureauSupply({ stockLeft: 1, extraTaken: 0, extraSandwiches: 5 })).toBe("STOCK");
+    expect(chooseBureauSupply({ stockLeft: 0, extraTaken: 0, extraSandwiches: 5 })).toBe("EXTRA");
+    expect(chooseBureauSupply({ stockLeft: 0, extraTaken: 4, extraSandwiches: 5 })).toBe("EXTRA");
+  });
+
+  it("is uitverkocht wanneer allebei op zijn", () => {
+    expect(chooseBureauSupply({ stockLeft: 0, extraTaken: 5, extraSandwiches: 5 })).toBe("SOLD_OUT");
+    expect(chooseBureauSupply({ stockLeft: 0, extraTaken: 0, extraSandwiches: 0 })).toBe("SOLD_OUT");
+    // Meer vergeven dan er nu nog is (Theokot zette het getal lager): niemand meer erbij.
+    expect(chooseBureauSupply({ stockLeft: -2, extraTaken: 7, extraSandwiches: 5 })).toBe("SOLD_OUT");
+  });
+
+  it("geldt enkel voor een gewoon bureau met Theokot-broodjes", () => {
+    expect(bureauStockFor({ kind: "BUREAU", useTheokot: true, theokotLimit: null }, 10)).toBe(10);
+    expect(bureauStockFor({ kind: "BUREAU", useTheokot: true, theokotLimit: 40 }, 10)).toBe(0);
+    expect(bureauStockFor({ kind: "BUREAU", useTheokot: false, theokotLimit: null }, 10)).toBe(0);
+    expect(bureauStockFor({ kind: "GROCOMEET", useTheokot: true, theokotLimit: null }, 10)).toBe(0);
+  });
+
+  it("neemt bij het uitzetten van big bureau de vroegste inschrijvingen eerst", () => {
+    const offering = new Map([
+      ["kaas", "item-kaas"],
+      ["kip", "item-kip"],
+    ]);
+    const waiting = [
+      { id: "r1", itemKey: "kip" },
+      { id: "r2", itemKey: "tonijn" },
+      { id: "r3", itemKey: "kaas" },
+      { id: "r4", itemKey: "kip" },
+    ];
+    // Niet per broodje: kip en kaas delen de twee plaatsen. Tonijn staat niet op
+    // het aanbod, dus dat kan Theokot ook extra niet maken.
+    expect(planBureauStockTakeover(waiting, offering, 2)).toEqual(
+      new Map([
+        ["r1", "item-kip"],
+        ["r3", "item-kaas"],
+      ]),
+    );
+    expect(planBureauStockTakeover(waiting, offering, 0).size).toBe(0);
+    expect(planBureauStockTakeover(waiting, offering, 10).size).toBe(3);
+  });
+
+  it("leest een ontbrekende of ongeldige setting als geen bureauvoorraad", () => {
+    expect(parseBureauStock(undefined)).toBe(0);
+    expect(parseBureauStock({ extraSandwiches: 12 })).toBe(12);
+    expect(parseBureauStock({ extraSandwiches: "8" })).toBe(8);
+    expect(parseBureauStock({ extraSandwiches: -3 })).toBe(0);
+    expect(parseBureauStock({ extraSandwiches: 2.5 })).toBe(0);
   });
 });

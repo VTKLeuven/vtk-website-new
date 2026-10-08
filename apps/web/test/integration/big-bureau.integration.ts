@@ -4,6 +4,7 @@ import { prisma } from "@vtk/db";
 import { brusselsWallClock } from "@/lib/brussels";
 import {
   rebalanceMeetingSupply,
+  releaseBigBureau,
   syncMeetingReservations,
   usageForSessionItems,
 } from "@/lib/meetings-server";
@@ -24,6 +25,8 @@ describe.sequential("big bureau", () => {
   let meetingId = "";
   const items = { kaas: "", kip: "" };
   const reservations: string[] = [];
+  // De bureauvoorraad is een globale setting: wat er stond, zet afterAll terug.
+  let bureauStockBefore: { value: unknown } | null = null;
 
   async function makeUser(label: string) {
     const user = await prisma.user.create({
@@ -54,6 +57,7 @@ describe.sequential("big bureau", () => {
   }
 
   beforeAll(async () => {
+    bureauStockBefore = await prisma.setting.findUnique({ where: { key: "theokot.bureauStock" } });
     await prisma.theokotSession.deleteMany({ where: { date: day } });
     const session = await prisma.theokotSession.create({
       data: {
@@ -113,6 +117,14 @@ describe.sequential("big bureau", () => {
   });
 
   afterAll(async () => {
+    if (bureauStockBefore) {
+      await prisma.setting.update({
+        where: { key: "theokot.bureauStock" },
+        data: { value: bureauStockBefore.value as object },
+      });
+    } else {
+      await prisma.setting.deleteMany({ where: { key: "theokot.bureauStock" } });
+    }
     if (meetingId) await prisma.meeting.deleteMany({ where: { id: meetingId } });
     if (sessionId) await prisma.theokotSession.deleteMany({ where: { id: sessionId } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
@@ -176,5 +188,41 @@ describe.sequential("big bureau", () => {
     // De kip van de geannuleerde gaat naar de vroegste kip die extern stond.
     expect(rows.map((row) => row.external)).toEqual([false, false, false, false, true]);
     expect(rows[3].sessionItemId).toBe(items.kip);
+  });
+
+  it("uitzetten neemt wat de gewone voorraad niet kan uit de bureauvoorraad", async () => {
+    async function setBureauStock(extraSandwiches: number) {
+      await prisma.setting.upsert({
+        where: { key: "theokot.bureauStock" },
+        update: { value: { extraSandwiches } },
+        create: { key: "theokot.bureauStock", value: { extraSandwiches } },
+      });
+    }
+    // Zoals `saveMeetingAction`: eerst de limiet weg, dan vrijgeven, en terugrollen
+    // wanneer er iets extern blijft.
+    const release = () =>
+      prisma.$transaction(async (tx) => {
+        await tx.meeting.update({ where: { id: meetingId }, data: { theokotLimit: null } });
+        const left = await releaseBigBureau(tx, meetingId);
+        if (left > 0) throw new Error(`EXTERNAL_LEFT:${left}`);
+      });
+
+    // Nog één kip extern, en kip is op voor studenten.
+    const before = await split();
+    expect(before.map((row) => row.external)).toEqual([false, false, false, false, true]);
+
+    await setBureauStock(0);
+    await expect(release()).rejects.toThrow("EXTERNAL_LEFT:1");
+    expect(await split()).toEqual(before);
+
+    await setBureauStock(1);
+    await release();
+    const last = await prisma.meetingReservation.findUniqueOrThrow({
+      where: { id: reservations[4] },
+      select: { external: true, extra: true, sessionItemId: true },
+    });
+    expect(last).toEqual({ external: false, extra: true, sessionItemId: items.kip });
+    // Een broodje uit de bureauvoorraad gaat niet van de voorraad voor studenten af.
+    expect((await usageForSessionItems([items.kip])).get(items.kip)).toBe(5);
   });
 });

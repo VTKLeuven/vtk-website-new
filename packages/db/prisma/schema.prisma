@@ -3674,6 +3674,11 @@ model MeetingReservation {
   /// niet van de voorraad af en staat niet op de turflijst. Enkel true zolang
   /// `Meeting.theokotLimit` gezet is.
   external       Boolean @default(false)
+  /// Bureauvoorraad: Theokot maakt dit broodje bovenop het aanbod (setting
+  /// `theokot.bureauStock`). Het hangt wel aan `sessionItemId`, dus het staat in
+  /// de bureaukolom van de turflijst, maar het gaat niet van de voorraad voor
+  /// studenten af.
+  extra          Boolean @default(false)
 
   /// Leeg = geen drankje.
   drinkName       String?

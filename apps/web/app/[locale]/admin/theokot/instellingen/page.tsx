@@ -6,7 +6,8 @@ import type { Locale } from "@vtk/i18n";
 import { Card, Input, Label, Textarea } from "@vtk/ui";
 import { formatEuro, parseTheokotConfig, sandwichVoucherCost } from "@/lib/theokot";
 import { formatVouchers } from "@/lib/shift/rewards";
-import { saveConfigAction, saveOrderMessageAction } from "@/app/actions/theokot";
+import { saveBureauStockAction, saveConfigAction, saveOrderMessageAction } from "@/app/actions/theokot";
+import { parseBureauStock } from "@/lib/meetings";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { ThemedSelect } from "@/components/ui/ThemedSelect";
 import { TheokotAdminNav } from "../TheokotAdminNav";
@@ -24,12 +25,14 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
   const caps = { manage: has("theokot.manage"), pickup: has("theokot.pickup") };
   if (!caps.manage) return <p className="text-sm text-zinc-500">{nl ? "Geen toegang." : "No access."}</p>;
 
-  const [configRow, messageRow, products] = await Promise.all([
+  const [configRow, messageRow, bureauStockRow, products] = await Promise.all([
     prisma.setting.findUnique({ where: { key: "theokot.config" } }),
     prisma.setting.findUnique({ where: { key: "theokot.orderMessage" } }),
+    prisma.setting.findUnique({ where: { key: "theokot.bureauStock" } }),
     prisma.theokotProduct.findMany({ where: { active: true }, orderBy: { order: "asc" } }),
   ]);
   const config = parseTheokotConfig(configRow?.value);
+  const bureauStock = parseBureauStock(bureauStockRow?.value);
   const message = (messageRow?.value as { bodyNl?: string; bodyEn?: string }) ?? {};
   const catalog: OfferingRow[] = products.map((p) => ({
     id: p.id,
@@ -226,6 +229,36 @@ export default async function TheokotSettingsPage({ params }: { params: Promise<
             : "The default names, prices, quantities, photos and ingredients shown as a starting point when creating a sale week. You can still deviate per week afterwards; changes here don't affect existing weeks."}
         </p>
         <ProductCatalogManager nl={nl} initial={catalog} />
+      </Card>
+
+      {/* Bureauvoorraad: hoort bij het standaardaanbod, want het is wat Theokot
+          voor elk bureau extra maakt. */}
+      <Card className="p-5" id="bureauvoorraad">
+        <h2 className="mb-1 text-lg font-semibold">{nl ? "Bureauvoorraad" : "Bureau stock"}</h2>
+        <p className="mb-4 text-sm text-[#5c667f]">
+          {nl
+            ? "Zoveel broodjes maakt Theokot voor elk VTK Bureau extra, bovenop het aanbod van die dag. Het bureau neemt eerst van de gewone voorraad; is een broodje voor studenten op, dan kan het bureau het nog uit deze voorraad krijgen. Studenten zien deze broodjes nooit. Ze staan in de kolom Bureau van de lijst bestelde broodjes. Een lager getal schrapt niemand: wie al een broodje uit de bureauvoorraad heeft, houdt het. 0 = geen bureauvoorraad."
+            : "This many sandwiches Theokot makes extra for every VTK Bureau, on top of that day's offering. The bureau takes from the normal stock first; once a sandwich is gone for students, the bureau can still get it from this stock. Students never see these sandwiches. They are in the Bureau column of the ordered sandwiches list. A lower number drops nobody: whoever already has a sandwich from the bureau stock keeps it. 0 = no bureau stock."}
+        </p>
+        <SaveForm
+          action={saveBureauStockAction}
+          className="flex flex-wrap items-end gap-3"
+          resetOnSuccess={false}
+          submitLabel={nl ? "Opslaan" : "Save"}
+          savingLabel={nl ? "Bezig met opslaan..." : "Saving..."}
+          savedMessage={nl ? "Bureauvoorraad opgeslagen" : "Bureau stock saved"}
+          fallbackErrorMessage={nl ? "Opslaan van de bureauvoorraad mislukt." : "Saving the bureau stock failed."}
+          errorMessages={{
+            INVALID_NUMBER: nl
+              ? "Geef een geheel aantal broodjes in, 0 of meer."
+              : "Enter a whole number of sandwiches, 0 or more.",
+          }}
+        >
+          <div className="w-44">
+            <Label htmlFor="extraSandwiches">{nl ? "Extra broodjes per bureau" : "Extra sandwiches per bureau"}</Label>
+            <Input id="extraSandwiches" name="extraSandwiches" type="number" min={0} step={1} defaultValue={bureauStock} />
+          </div>
+        </SaveForm>
       </Card>
 
       {/* Custom bericht */}
