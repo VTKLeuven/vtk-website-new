@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { readLimitedText, RequestBodyTooLargeError } from "@/lib/ticketing/http";
-import { expirePendingOrder, fulfillPaidOrder } from "@/lib/ticketing/orders";
+import { closeFailedPaymentAttempt, fulfillPaidOrder } from "@/lib/ticketing/orders";
 import {
   fetchBancontactPayment,
   mapBancontactStatus,
@@ -129,27 +129,14 @@ export async function POST(request: Request) {
         currency: local.currency,
       });
     } else if (status === "EXPIRED" || status === "FAILED") {
-      // De bestelling blijft niet hangen, maar ze valt ook niet weg zolang de
-      // reservatie loopt: `expirePendingOrder` raakt enkel een bestelling die
-      // nog op betaling wacht, en de koper kan intussen de andere betaalwijze
-      // gekozen hebben.
-      const stillOpen = await prisma.ticketPayment.findFirst({
-        where: {
-          orderId: local.orderId,
-          status: { in: ["CREATED", "PENDING"] },
-          NOT: { provider: PROVIDER, providerCheckoutId: payment.paymentId },
-        },
-        select: { id: true },
+      // Enkel deze poging valt af. De bestelling blijft staan tot haar
+      // reservatie afloopt, zodat de koper een nieuwe QR kan vragen; zie
+      // `closeFailedPaymentAttempt`.
+      await closeFailedPaymentAttempt({
+        provider: PROVIDER,
+        providerCheckoutId: payment.paymentId,
+        status,
       });
-      await prisma.ticketPayment.updateMany({
-        where: {
-          provider: PROVIDER,
-          providerCheckoutId: payment.paymentId,
-          status: { in: ["CREATED", "PENDING"] },
-        },
-        data: { status: status === "EXPIRED" ? "EXPIRED" : "FAILED", failedAt: new Date() },
-      });
-      if (!stillOpen) await expirePendingOrder(local.orderId);
     }
 
     await prisma.ticketPaymentWebhook.update({

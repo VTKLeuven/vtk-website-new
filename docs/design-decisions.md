@@ -5466,6 +5466,42 @@ gebruikt zien; het werkt alleen niet voor wie geen Belgische bankapp heeft.
     moet doen, en de melding komt pas wanneer er echt iets te doen is.
   - De tekst zegt er expliciet bij dat de tickets nog klaarstaan. Zonder die zin
     leest een vervallen QR als een mislukte bestelling, en dat is ze niet.
+  - **Die belofte klopt nu ook.** Tot oktober 2026 liet de webhook de hele
+    bestelling vallen zodra de QR verliep, en was de plaats na twee minuten weg.
+    Een mislukte of vervallen poging sluit nu enkel die poging; de bestelling
+    houdt haar plaatsen tot de reservatie afloopt.
+  - **Het gevolg: wie afhaakt, houdt zijn plaats tot het einde van de
+    reservatie bezet**, niet twee minuten. Bij een verkoop die in minuten
+    uitverkoopt, komen die plaatsen dus pas later terug in de verkoop. Dat is
+    bewust: wie traag bevestigt, mag zijn plaats niet verliezen aan wie sneller
+    klikt. Wil je dat voor een rush korter, verkort dan de reservatie
+    (`TICKETING_RESERVATION_MINUTES`), niet de levensduur van een bestelling na
+    één mislukte QR.
+- **Een betaling die de koper al geopend heeft, annuleren we nooit.** Heeft hij
+  de QR gescand of staat zijn bank te bevestigen, en kiest hij intussen op de
+  bestelpagina opnieuw een betaalwijze, dan krijgt hij de vraag om die betaling
+  eerst af te ronden of te laten vervallen (hoogstens twee minuten). Annuleren
+  gaf hem in zijn app "betaling mislukt". De bestelpagina toont een lopende QR
+  bovendien eerst ("Terug naar je QR-code"), met de keuze eronder: wie daar
+  landt, zoekt meestal de betaling die hij al bezig was.
+
+## Een betaling na het vervallen van de bestelling
+
+Een koper kan bevestigen in zijn app net nadat zijn reservatie afliep. Dan
+geven we de tickets **alsnog uit zolang er plaats is**: hij betaalde voor een
+plaats die hem een halfuur beloofd was, en de enige reden om te weigeren is dat
+die plaats intussen weg is.
+
+- **Geen plaats meer, of het event is voorbij of geannuleerd: terugbetalen, met
+  de hand.** De betaling wordt gemarkeerd (`providerStatus` `needs_refund`), het
+  auditlog krijgt `PAYMENT_NEEDS_REFUND`, en Sentry slaat alarm. Er wordt niets
+  automatisch terugbetaald: Bancontact heeft standaard geen refund-API, en een
+  organisator kan zo'n koper ook nog een plaats geven in plaats van zijn geld.
+- **Een tweede geslaagde betaling voor een bestelling die al betaald is**, gaat
+  dezelfde weg: één set tickets, de tweede betaling gemarkeerd om terug te
+  betalen.
+- Voorheen werd zo'n betaling bij elke poging geweigerd en wist niemand het. Zo
+  betaalde iemand op 8 oktober 2026 voor de Eersteplaatscantus zonder ticket.
 
 ## Eén centrale pagina met ticketvoorwaarden
 
@@ -5511,6 +5547,12 @@ PDF. Code in `apps/web/lib/ticketing/wallet/`.
   Google) klaar, dan wint die per platform altijd van walletwallet.dev
   (`apps/web/lib/ticketing/wallet/index.ts`): vol eigenaarschap gaat voor wanneer het
   er is.
+- **Op het gratis plan van walletwallet.dev gaan enkel gratis velden mee.**
+  Kleur, logo, strip en locatie zijn Pro, en het gratis plan negeert zo'n veld
+  niet maar weigert de hele pas. In oktober 2026 ging zo elke wallet-pas
+  verloren, omdat de kleur altijd meeging. Die velden gaan enkel mee met
+  `WALLET_WALLETWALLET_PRO=true`. Let ook op het quotum van 1000 passes per
+  maand: één uitverkochte cantus is er al 240.
 - **Elke knop verschijnt pas als de bijhorende config compleet is** (zie
   `.env.example`). Geen halfwerkende "Voeg toe aan Wallet"-knop die daarna een
   foutmelding geeft: ontbreekt de configuratie, dan bestaat de knop gewoon niet, net

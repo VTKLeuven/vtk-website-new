@@ -8,6 +8,7 @@ import {
   trustedClientIp,
 } from "@/lib/ticketing/http";
 import { createTicketCheckout, TicketCheckoutError } from "@/lib/ticketing/orders";
+import { isTransientDatabaseError } from "@/lib/ticketing/transactions";
 
 export const runtime = "nodejs";
 
@@ -55,6 +56,12 @@ export async function POST(request: Request) {
           ? 409
           : 400;
       return Response.json({ error: error.code, field: error.field }, { status });
+    }
+    if (isTransientDatabaseError(error)) {
+      // Geen fout van de koper en geen kapotte bestelling: het was te druk.
+      // Zeg dat, zodat hij meteen opnieuw klikt in plaats van op te geven.
+      console.warn("Ticket checkout too busy", error);
+      return Response.json({ error: "BUSY" }, { status: 503, headers: { "Retry-After": "1" } });
     }
     console.error("Ticket checkout failed", error);
     return Response.json({ error: "CHECKOUT_FAILED" }, { status: 500 });

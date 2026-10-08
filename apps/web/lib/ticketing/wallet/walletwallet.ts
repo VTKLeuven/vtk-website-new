@@ -23,6 +23,36 @@ type CacheEntry = WalletWalletResult & { expiresAt: number };
 // on redeploy; that's fine, it's a rate-limit smoothing cache, not storage.
 const cache = new Map<string, CacheEntry>();
 
+/**
+ * Wat enkel een Pro-account mag sturen: de echte kleur, het logo, de strip en
+ * de locatie. Het gratis plan negeert zo'n veld niet maar weigert de hele pas
+ * ("Custom color is a Pro-only feature"). In oktober 2026 ging zo elke
+ * wallet-pas verloren, omdat `color` altijd meeging. Het logo wordt bij het
+ * aanmaken opgehaald en een onbereikbaar adres weigert de pas evengoed, dus het
+ * blijft weg wanneer er geen publiek adres is.
+ */
+function proFields(
+  input: WalletTicketInput,
+  color: string,
+  logoURL: string | null,
+  stripURL: string | null
+) {
+  return {
+    color,
+    ...(logoURL ? { logoURL } : {}),
+    ...(stripURL ? { stripURL } : {}),
+    ...(typeof input.event.latitude === "number" && typeof input.event.longitude === "number"
+      ? {
+          locations: [{
+            latitude: input.event.latitude,
+            longitude: input.event.longitude,
+            relevantText: input.event.location ? `${input.event.title} · ${input.event.location}` : input.event.title,
+          }],
+        }
+      : {}),
+  };
+}
+
 export function isWalletWalletConfigured(): boolean {
   return walletWalletConfig() !== null;
 }
@@ -71,24 +101,9 @@ export async function generateViaWalletWallet(input: WalletTicketInput): Promise
         ...(footer ? [{ label: "INFO", value: footer }] : []),
       ],
       // Free tier only accepts a preset; "dark" is the closest match to
-      // VTK's default navy theme. `color`/`logoURL` are Pro-only extras: sent
-      // best-effort so an upgraded account picks up real VTK branding
-      // without a code change. The API fetches logoURL synchronously and
-      // rejects the whole pass if it can't, so it's omitted rather than sent
-      // as a dead localhost link.
+      // VTK's default navy theme.
       colorPreset: "dark",
-      color: design.textColor,
-      ...(logoURL ? { logoURL } : {}),
-      ...(stripURL ? { stripURL } : {}),
-      ...(typeof input.event.latitude === "number" && typeof input.event.longitude === "number"
-        ? {
-            locations: [{
-              latitude: input.event.latitude,
-              longitude: input.event.longitude,
-              relevantText: input.event.location ? `${input.event.title} · ${input.event.location}` : input.event.title,
-            }],
-          }
-        : {}),
+      ...(config.pro ? proFields(input, design.textColor, logoURL, stripURL) : {}),
       expirationDays,
     }),
   });

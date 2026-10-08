@@ -68,6 +68,12 @@ export type RefundResult = {
 
 export type CheckoutStatusResult = {
   status: "PENDING" | "SUCCEEDED" | "FAILED" | "EXPIRED";
+  /**
+   * Bij `PENDING`: de koper heeft deze betaling al geopend (de QR gescand, de
+   * bank bevestigt) en is ze aan het afronden. Zo'n betaling annuleren geeft
+   * hem in zijn app "betaling mislukt"; zie `closeLivePayments`.
+   */
+  inProgress?: boolean;
   checkoutId: string;
   paymentId?: string | null;
   orderId?: string | null;

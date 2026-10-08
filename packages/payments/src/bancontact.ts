@@ -317,6 +317,15 @@ export function mapBancontactStatus(status: string): CheckoutStatusResult["statu
   }
 }
 
+/**
+ * De koper heeft de betaling geopend: `IDENTIFIED` na het scannen van de QR of
+ * het openen van de deeplink, `AUTHORIZED` terwijl de bank bevestigt.
+ */
+export function bancontactPaymentInProgress(status: string): boolean {
+  const upper = status.toUpperCase();
+  return upper === "IDENTIFIED" || upper === "AUTHORIZED";
+}
+
 export class BancontactPaymentGateway implements PaymentGateway {
   readonly name = "bancontact";
   private readonly config: BancontactGatewayConfig;
@@ -482,6 +491,7 @@ export class BancontactPaymentGateway implements PaymentGateway {
     const payment = await this.fetchPayment(checkoutId);
     return {
       status: mapBancontactStatus(payment.status),
+      inProgress: bancontactPaymentInProgress(payment.status),
       checkoutId: payment.paymentId,
       paymentId: payment.paymentId,
       // De provider draagt onze eigen order-id niet; `reference` is het

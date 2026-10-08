@@ -237,6 +237,9 @@ export class MolliePaymentGateway implements PaymentGateway {
     const payment = await this.fetchPayment(checkoutId);
     return {
       status: mapPaymentStatus(payment.status),
+      // `open` is nog niet begonnen; `pending` wil zeggen dat de koper bij zijn
+      // bank zit en de betaling afrondt.
+      inProgress: payment.status === "pending",
       checkoutId: payment.id,
       paymentId: payment.id,
       orderId: payment.metadata?.vtk_order_id ?? null,

@@ -45,6 +45,10 @@ const ERRORS: Record<string, { nl: string; en: string }> = {
     nl: "Er staat nog een betaling open. Wacht even en probeer opnieuw.",
     en: "A payment is still open. Wait a moment and try again.",
   },
+  PAYMENT_IN_PROGRESS: {
+    nl: "Je betaling staat nog open in je bank-app. Rond ze daar af, of wacht tot ze vervalt (hoogstens twee minuten) en probeer dan opnieuw.",
+    en: "Your payment is still open in your banking app. Finish it there, or wait until it expires (two minutes at most) and try again.",
+  },
   PAYMENT_UNAVAILABLE: {
     nl: "Deze betaalmethode werkt nu niet. Probeer de andere.",
     en: "This payment method is not working right now. Try the other one.",

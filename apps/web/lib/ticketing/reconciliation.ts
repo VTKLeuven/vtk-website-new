@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@vtk/db";
-import { expirePendingOrder, fulfillPaidOrder } from "./orders";
+import { closeFailedPaymentAttempt, fulfillPaidOrder } from "./orders";
 import { paymentGatewayFor, type RefundStatusResult } from "./payments";
 import { completeTicketRefund, failTicketRefund } from "./refunds";
 
@@ -66,27 +66,13 @@ export async function reconcileTicketPayments(limit = 50) {
         });
         succeeded += 1;
       } else if (status.status === "EXPIRED" || status.status === "FAILED") {
-        // Dezelfde voorzichtigheid als in de Bancontact-webhook: deze poging
-        // valt af, maar de bestelling enkel wanneer er geen andere betaling meer
-        // openstaat. Sinds een koper tussen twee betaalwijzen kan kiezen, is een
-        // mislukte poging niet meer hetzelfde als een mislukte bestelling, en
-        // `expirePendingOrder` sluit élke openstaande betaling van de bestelling.
-        await prisma.ticketPayment.updateMany({
-          where: { id: payment.id, status: { in: ["CREATED", "PENDING"] } },
-          data: {
-            status: status.status === "EXPIRED" ? "EXPIRED" : "FAILED",
-            failedAt: new Date(),
-          },
+        // Zoals in de webhooks: enkel deze poging valt af, de bestelling
+        // blijft tot haar reservatie afloopt (`closeFailedPaymentAttempt`).
+        await closeFailedPaymentAttempt({
+          provider: payment.provider,
+          providerCheckoutId: payment.providerCheckoutId!,
+          status: status.status,
         });
-        const stillOpen = await prisma.ticketPayment.findFirst({
-          where: {
-            orderId: payment.orderId,
-            status: { in: ["CREATED", "PENDING"] },
-            NOT: { id: payment.id },
-          },
-          select: { id: true },
-        });
-        if (!stillOpen) await expirePendingOrder(payment.orderId);
         expired += 1;
       }
     } catch (error) {

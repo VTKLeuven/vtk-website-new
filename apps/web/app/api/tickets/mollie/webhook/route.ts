@@ -1,7 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { readLimitedText, RequestBodyTooLargeError } from "@/lib/ticketing/http";
-import { expirePendingOrder, fulfillPaidOrder } from "@/lib/ticketing/orders";
+import { closeFailedPaymentAttempt, fulfillPaidOrder } from "@/lib/ticketing/orders";
 import {
   fetchMolliePayment,
   mapPaymentStatus,
@@ -141,6 +141,10 @@ export async function POST(request: Request) {
         currency: payment.amount.currency.toUpperCase(),
       });
     } else if (status === "EXPIRED" || status === "FAILED") {
+      // Enkel deze poging valt af, net als bij Bancontact. Dit liet eerder de
+      // hele bestelling vervallen, ook wanneer `closeLivePayments` deze
+      // checkout net zelf annuleerde omdat de koper naar Bancontact
+      // overstapte: de QR die hij dan kreeg, hoorde bij een dode bestelling.
       const orderId = payment.metadata?.vtk_order_id;
       if (orderId) {
         const matchingPayment = await prisma.ticketPayment.findFirst({
@@ -148,7 +152,11 @@ export async function POST(request: Request) {
           select: { id: true },
         });
         if (!matchingPayment) throw new Error("MOLLIE_CHECKOUT_ORDER_MISMATCH");
-        await expirePendingOrder(orderId);
+        await closeFailedPaymentAttempt({
+          provider: PROVIDER,
+          providerCheckoutId: payment.id,
+          status,
+        });
       }
     }
 
