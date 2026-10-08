@@ -1,7 +1,7 @@
 import "server-only";
 
 import { prisma } from "@vtk/db";
-import { closeFailedPaymentAttempt, fulfillPaidOrder } from "./orders";
+import { closeFailedPaymentAttempt, fulfillPaidOrder, succeededCheckoutMatches } from "./orders";
 import { paymentGatewayFor, type RefundStatusResult } from "./payments";
 import { completeTicketRefund, failTicketRefund } from "./refunds";
 
@@ -40,20 +40,9 @@ export async function reconcileTicketPayments(limit = 50) {
         payment.providerCheckoutId!
       );
       if (status.status === "SUCCEEDED") {
-        // Niet elke provider draagt onze order-id mee: Bancontact geeft enkel
-        // een referentie terug. We controleren dus wat er wél terugkomt tegen
-        // onze eigen payment-rij, die per provider uniek is op
-        // `providerCheckoutId`. Bedrag en munt horen daar altijd bij, ook als de
-        // order-id ontbreekt; anders zou een betaling van het verkeerde bedrag
-        // hier tickets uitgeven.
-        if (
-          (status.orderId != null && status.orderId !== payment.orderId) ||
-          status.amountCents == null ||
-          status.amountCents !== payment.amountCents ||
-          !status.currency ||
-          status.currency.toUpperCase() !== payment.currency.toUpperCase() ||
-          !status.paymentId
-        ) {
+        // Getoetst tegen onze eigen payment-rij, die per provider uniek is op
+        // `providerCheckoutId`; zie `succeededCheckoutMatches`.
+        if (!succeededCheckoutMatches(status, payment)) {
           throw new Error("RECONCILIATION_DATA_MISMATCH");
         }
         await fulfillPaidOrder({

@@ -63,6 +63,12 @@ const orderInclude = {
     },
   },
   items: { include: { ticket: true } },
+  // Of er nog een betaling loopt bij de provider: zie `paymentOpen`.
+  payments: {
+    where: { status: { in: ["CREATED", "PENDING"] }, providerCheckoutId: { not: null } },
+    select: { id: true },
+    take: 1,
+  },
 } satisfies Prisma.TicketOrderInclude;
 
 type OrderRecord = Prisma.TicketOrderGetPayload<{ include: typeof orderInclude }>;
@@ -569,6 +575,7 @@ function orderDto(order: OrderRecord, authenticatedOwner: boolean) {
     refundedCents: order.refundedCents,
     currency: order.currency,
     reservationExpiresAt: order.reservationExpiresAt,
+    paymentOpen: order.payments.length > 0,
     authenticatedOwner,
     event: {
       id: order.event.id,

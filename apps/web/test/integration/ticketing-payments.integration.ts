@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { Prisma } from "@prisma/client";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { prisma } from "@vtk/db";
 import { POST as bancontactWebhook } from "@/app/api/tickets/bancontact/webhook/route";
@@ -6,13 +7,13 @@ import { POST as mollieWebhook } from "@/app/api/tickets/mollie/webhook/route";
 import { createOrderAccessToken, secureTokenHash } from "@/lib/ticketing/crypto";
 import { quantitiesByPool, reserveInventory } from "@/lib/ticketing/inventory";
 import {
+  createTicketCheckout,
   expirePendingOrder,
   fulfillPaidOrder,
   markPaymentRefundedManually,
   releaseExpiredOrders,
   startOrderPayment,
 } from "@/lib/ticketing/orders";
-import { PAYMENT_NEEDS_REFUND, PAYMENT_REFUNDED_MANUALLY } from "@/lib/ticketing/paymentFlags";
 import { requestTicketRefund } from "@/lib/ticketing/refunds";
 
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
@@ -23,7 +24,7 @@ vi.mock("@vtk/auth/server", () => ({ getSession: vi.fn(async () => null) }));
  * heeft, en zien welke betalingen de site annuleerde.
  */
 const bancontact = {
-  payments: new Map<string, { status: string; amount: number }>(),
+  payments: new Map<string, { status: string; amount: number | null }>(),
   cancelled: [] as string[],
   reset() {
     this.payments.clear();
@@ -43,7 +44,8 @@ function bancontactPayload(id: string) {
   return {
     paymentId: id,
     status: payment.status,
-    amount: payment.amount,
+    // Het bedrag is optioneel in het antwoord van de provider.
+    ...(payment.amount == null ? {} : { amount: payment.amount }),
     currency: "EUR",
     expiresAt: new Date(Date.now() + 120_000).toISOString(),
     _links: { deeplink: { href: `https://pay.example.test/${id}` } },
@@ -117,6 +119,15 @@ describe.sequential("ticket payments", () => {
     type: randomUUID(),
   };
   const CAPACITY = 100;
+  // Altijd in de toekomst: een betaling na het vervallen levert enkel tickets
+  // op voor een event dat nog niet voorbij is, en met een vaste datum faalden
+  // die tests vanzelf zodra die datum passeerde.
+  const startsAt = new Date(Date.now() + 30 * 24 * 60 * 60_000);
+  const endsAt = new Date(startsAt.getTime() + 7 * 60 * 60_000);
+  const accessExpiresAt = new Date(endsAt.getTime() + 24 * 60 * 60_000);
+  // Ver voor elke andere bestelling, zodat `releaseExpiredOrders` deze als
+  // eerste ziet. De opruiming hieronder laat er geen achter voor een volgende run.
+  const longExpired = new Date("2000-01-01T00:00:00.000Z");
 
   beforeAll(async () => {
     vi.stubEnv("TICKETING_PAYMENT_PROVIDER", "bancontact");
@@ -143,8 +154,8 @@ describe.sequential("ticket payments", () => {
         ownerGroupId: ids.group,
         slug: `payments-${ids.event}`,
         titleNl: "Betaalcantus",
-        startsAt: new Date("2027-10-12T16:00:00.000Z"),
-        endsAt: new Date("2027-10-12T23:00:00.000Z"),
+        startsAt,
+        endsAt,
         status: "PUBLISHED",
         createdById: ids.user,
       },
@@ -170,17 +181,34 @@ describe.sequential("ticket payments", () => {
   afterAll(async () => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
-    // De bevestigingsmails van deze bestellingen blijven anders in de outbox
+    // Alles van dit event weg. De bevestigingsmails bleven anders in de outbox
     // liggen, en `ticketing-db` verwerkt de outbox van de hele database met een
-    // limiet: liep dit bestand eerst, dan kwam zijn eigen mail niet aan de beurt.
+    // limiet: liep dit bestand eerst, dan kwam zijn eigen mail niet aan de
+    // beurt. En een bestelling die hier op betaling bleef wachten (met een
+    // betaling die de nagebootste API daarna vergat), stond bij elke volgende
+    // run vooraan in `releaseExpiredOrders` en drong de bestellingen van die run
+    // uit de eerste honderd.
+    const orderIds = (
+      await prisma.ticketOrder.findMany({ where: { eventId: ids.event }, select: { id: true } })
+    ).map((order) => order.id);
     await prisma.ticketOutboxMessage.deleteMany({ where: { eventId: ids.event } });
+    await prisma.ticketRefundItem.deleteMany({ where: { orderId: { in: orderIds } } });
+    await prisma.ticketRefund.deleteMany({ where: { orderId: { in: orderIds } } });
+    await prisma.ticket.deleteMany({ where: { eventId: ids.event } });
+    await prisma.ticketPayment.deleteMany({ where: { orderId: { in: orderIds } } });
+    await prisma.ticketOrderItem.deleteMany({ where: { eventId: ids.event } });
+    await prisma.ticketOrder.deleteMany({ where: { eventId: ids.event } });
+    // Het auditlog laat zich pas wissen wanneer het event geen bestellingen meer heeft.
+    await prisma.ticketAuditLog.deleteMany({ where: { eventId: ids.event } });
+    await prisma.ticketEvent.deleteMany({ where: { id: ids.event } });
+    await prisma.group.deleteMany({ where: { id: ids.group } });
+    await prisma.user.deleteMany({ where: { id: ids.user } });
     await prisma.$disconnect();
   });
 
   /** Een bestelling van één ticket met een gereserveerde plaats, zoals na een checkout. */
   async function pendingOrder(options: { reservationExpiresAt?: Date } = {}) {
     const orderId = randomUUID();
-    const accessExpiresAt = new Date("2027-10-13T00:00:00.000Z");
     await prisma.$transaction(async (tx) => {
       await reserveInventory(tx, ids.event, quantitiesByPool([{ inventoryPoolId: ids.pool }]));
       await tx.ticketOrder.create({
@@ -214,9 +242,14 @@ describe.sequential("ticket payments", () => {
   }
 
   /** Een Bancontact-poging op die bestelling, bij de provider én bij ons. */
-  async function bancontactAttempt(orderId: string, status = "PENDING", attempt = 1) {
+  async function bancontactAttempt(
+    orderId: string,
+    status = "PENDING",
+    attempt = 1,
+    providerAmount: number | null = 1400
+  ) {
     const providerId = `tx${randomUUID().replace(/-/g, "").slice(0, 22)}`;
-    bancontact.payments.set(providerId, { status, amount: 1400 });
+    bancontact.payments.set(providerId, { status, amount: providerAmount });
     await prisma.ticketPayment.create({
       data: {
         orderId,
@@ -351,8 +384,7 @@ describe.sequential("ticket payments", () => {
   });
 
   it("closes a live QR at Bancontact before the reservation timer expires the order", async () => {
-    // Ver in het verleden, zodat deze bestelling bij de eerste honderd zit.
-    const orderId = await pendingOrder({ reservationExpiresAt: new Date("2020-01-01T00:00:00.000Z") });
+    const orderId = await pendingOrder({ reservationExpiresAt: longExpired });
     const live = await bancontactAttempt(orderId);
     const before = await pool();
 
@@ -366,7 +398,7 @@ describe.sequential("ticket payments", () => {
   });
 
   it("waits with expiring while the buyer is confirming in their app", async () => {
-    const orderId = await pendingOrder({ reservationExpiresAt: new Date("2020-01-01T00:00:00.000Z") });
+    const orderId = await pendingOrder({ reservationExpiresAt: longExpired });
     const live = await bancontactAttempt(orderId, "AUTHORIZED");
 
     await releaseExpiredOrders(100);
@@ -431,7 +463,7 @@ describe.sequential("ticket payments", () => {
     expect(await ticketsOf(orderId)).toBe(0);
     expect(
       await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: live } })
-    ).toMatchObject({ status: "SUCCEEDED", providerStatus: PAYMENT_NEEDS_REFUND });
+    ).toMatchObject({ status: "SUCCEEDED", setAside: "NEEDS_REFUND" });
     expect(
       await prisma.ticketAuditLog.count({ where: { action: "PAYMENT_NEEDS_REFUND", eventId: ids.event } })
     ).toBe(1);
@@ -470,7 +502,7 @@ describe.sequential("ticket payments", () => {
     expect((await mollieCallback({ id: mollieId, status: "paid", orderId })).status).toBe(200);
     expect(
       await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: mollieId } })
-    ).toMatchObject({ status: "SUCCEEDED", providerStatus: PAYMENT_NEEDS_REFUND });
+    ).toMatchObject({ status: "SUCCEEDED", setAside: "NEEDS_REFUND" });
 
     // Intussen komt er een plaats vrij, en de organisator betaalt in het
     // dashboard van Mollie terug. Mollie meldt dat met status `paid`.
@@ -489,7 +521,7 @@ describe.sequential("ticket payments", () => {
     expect(await ticketsOf(orderId)).toBe(0);
     expect(
       await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: mollieId } })
-    ).toMatchObject({ status: "SUCCEEDED", providerStatus: PAYMENT_NEEDS_REFUND });
+    ).toMatchObject({ status: "SUCCEEDED", setAside: "NEEDS_REFUND" });
     expect(await pool()).toMatchObject({ soldCount: before.soldCount, reservedCount: before.reservedCount });
     expect(
       await prisma.ticketOutboxMessage.count({ where: { dedupeKey: `order-confirmation:${orderId}` } })
@@ -509,10 +541,10 @@ describe.sequential("ticket payments", () => {
     expect(await ticketsOf(orderId)).toBe(1);
     expect(
       await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: second } })
-    ).toMatchObject({ status: "SUCCEEDED", providerStatus: PAYMENT_NEEDS_REFUND });
+    ).toMatchObject({ status: "SUCCEEDED", setAside: "NEEDS_REFUND" });
     expect(
       await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: first } })
-    ).toMatchObject({ status: "SUCCEEDED", providerStatus: "paid" });
+    ).toMatchObject({ status: "SUCCEEDED", providerStatus: "paid", setAside: null });
 
     // Een ticket terugbetalen gaat van de betaling die het ticket betaalde,
     // niet van de jongere die apart staat.
@@ -534,16 +566,16 @@ describe.sequential("ticket payments", () => {
     const flagged = await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: second } });
     expect(
       await markPaymentRefundedManually({ eventId: randomUUID(), paymentId: flagged.id, actorUserId: ids.user })
-    ).toBe(false);
+    ).toBeNull();
     expect(
       await markPaymentRefundedManually({ eventId: ids.event, paymentId: flagged.id, actorUserId: ids.user })
-    ).toBe(true);
+    ).toEqual({ orderId });
     expect(
       await markPaymentRefundedManually({ eventId: ids.event, paymentId: flagged.id, actorUserId: ids.user })
-    ).toBe(false);
+    ).toBeNull();
     expect(
       await prisma.ticketPayment.findUniqueOrThrow({ where: { id: flagged.id } })
-    ).toMatchObject({ status: "SUCCEEDED", providerStatus: PAYMENT_REFUNDED_MANUALLY });
+    ).toMatchObject({ status: "SUCCEEDED", setAside: "REFUNDED_MANUALLY" });
     expect(
       await prisma.ticketAuditLog.count({
         where: { action: "PAYMENT_REFUNDED_MANUALLY", entityId: flagged.id },
@@ -615,6 +647,100 @@ describe.sequential("ticket payments", () => {
       await prisma.ticketAuditLog.count({ where: { action: "PAYMENT_NEEDS_REFUND", entityId: payment.id } })
     ).toBe(0);
 
+  });
+
+  it("never issues tickets at expiry for a payment whose amount the provider did not report", async () => {
+    const orderId = await pendingOrder({ reservationExpiresAt: longExpired });
+    const live = await bancontactAttempt(orderId, "SUCCEEDED", 1, null);
+
+    // Geslaagd volgens de provider, maar zonder bedrag: niemand weet wat er
+    // betaald is. De bestelling blijft staan in plaats van tickets te krijgen.
+    await releaseExpiredOrders(100);
+    expect(await prisma.ticketOrder.findUniqueOrThrow({ where: { id: orderId } })).toMatchObject({
+      status: "PENDING_PAYMENT",
+    });
+    expect(await ticketsOf(orderId)).toBe(0);
+
+    // Met het juiste bedrag gaat het wel.
+    bancontact.payments.get(live)!.amount = 1400;
+    await releaseExpiredOrders(100);
+    expect(await prisma.ticketOrder.findUniqueOrThrow({ where: { id: orderId } })).toMatchObject({
+      status: "PAID",
+    });
+    expect(await ticketsOf(orderId)).toBe(1);
+  });
+
+  it("flags a second payment on a paid order also when its checkout was never saved", async () => {
+    const orderId = await pendingOrder();
+    const first = await bancontactAttempt(orderId, "PENDING", 1);
+    // De koper stapte over naar Mollie; Mollie maakte de checkout, maar wij
+    // konden hem niet bewaren. De rij heeft dus geen checkout-id.
+    const unsaved = await prisma.ticketPayment.create({
+      data: {
+        orderId,
+        provider: "mollie",
+        idempotencyKey: `${orderId}:2`,
+        status: "CREATED",
+        amountCents: 1400,
+        currency: "EUR",
+      },
+    });
+
+    bancontact.payments.get(first)!.status = "SUCCEEDED";
+    expect((await bancontactCallback(first)).status).toBe(200);
+    const mollieId = `tr_${randomUUID().replace(/-/g, "").slice(0, 10)}`;
+    expect((await mollieCallback({ id: mollieId, status: "paid", orderId })).status).toBe(200);
+
+    expect(await ticketsOf(orderId)).toBe(1);
+    expect(await prisma.ticketPayment.findUniqueOrThrow({ where: { id: unsaved.id } })).toMatchObject({
+      status: "SUCCEEDED",
+      setAside: "NEEDS_REFUND",
+      providerPaymentId: mollieId,
+    });
+    expect(
+      await prisma.ticketAuditLog.count({ where: { action: "PAYMENT_NEEDS_REFUND", entityId: unsaved.id } })
+    ).toBe(1);
+  });
+
+  it("sends the buyer to their order when the database is too busy right after the reservation", async () => {
+    vi.stubEnv("TICKETING_PAYMENT_METHODS", "bancontact");
+    const busy = new Prisma.PrismaClientKnownRequestError("Timed out fetching a new connection", {
+      code: "P2024",
+      clientVersion: "test",
+    });
+    const create = vi.spyOn(prisma.ticketPayment, "create").mockRejectedValueOnce(busy);
+    try {
+      const checkout = await createTicketCheckout(
+        {
+          eventId: ids.event,
+          buyerName: "Koper",
+          buyerEmail: `busy-${randomUUID()}@example.test`,
+          locale: "nl",
+          termsAccepted: true,
+          paymentProvider: "bancontact",
+          items: [{ ticketTypeId: ids.type, attendeeName: "Koper", attendeeEmail: "" }],
+        },
+        null
+      );
+
+      // De bestelling staat er en de koper krijgt ze te zien, met de cookie
+      // erbij; geen "probeer opnieuw" terwijl zijn plaats vastgehouden wordt.
+      expect(checkout.checkoutUrl).toMatch(new RegExp(`/tickets/bestelling/${checkout.orderId}$`));
+      expect(checkout.access).toBeTruthy();
+      expect(
+        await prisma.ticketOrder.findUniqueOrThrow({ where: { id: checkout.orderId } })
+      ).toMatchObject({ status: "PENDING_PAYMENT" });
+      expect(await prisma.ticketPayment.count({ where: { orderId: checkout.orderId } })).toBe(0);
+
+      // Daar start hij de betaling opnieuw.
+      create.mockRestore();
+      expect(
+        await startOrderPayment({ orderId: checkout.orderId, provider: "bancontact", locale: "nl" })
+      ).toMatchObject({ ok: true });
+    } finally {
+      create.mockRestore();
+      vi.stubEnv("TICKETING_PAYMENT_METHODS", "bancontact,mollie");
+    }
   });
 
   it("ends a payment racing an expiry the same way every time: paid, one ticket, counters intact", async () => {

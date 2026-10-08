@@ -1,38 +1,32 @@
-/**
- * `TicketPayment.providerStatus` van een betaling die binnenkwam zonder dat er
- * een ticket tegenover kon staan, en van zo'n betaling nadat iemand ze met de
- * hand terugbetaalde. Een eigen waarde in een bestaand vrij tekstveld, geen
- * nieuwe kolom: het is een markering voor het beheer, geen toestand van de
- * betaling bij de provider.
- *
- * Een eigen bestand en niet in `orders.ts`, zodat de terugbetalingen en het
- * beheer deze markering kunnen lezen zonder de hele checkout mee te laden.
- */
-export const PAYMENT_NEEDS_REFUND = "needs_refund";
-export const PAYMENT_REFUNDED_MANUALLY = "refunded_manually";
+import type { TicketPaymentSetAside } from "@prisma/client";
 
-const SET_ASIDE = [PAYMENT_NEEDS_REFUND, PAYMENT_REFUNDED_MANUALLY];
+/**
+ * Een betaling die binnenkwam zonder dat er een ticket tegenover kon staan, en
+ * zo'n betaling nadat iemand ze met de hand terugbetaalde:
+ * `TicketPayment.setAside`. Een eigen kolom en niet `providerStatus`: dat veld
+ * zegt wat de provider meldde, en een betaling die apart staat, mag nooit
+ * tickets opleveren omdat iemand dat veld overschreef.
+ *
+ * Een eigen bestand en niet in `orders.ts`, zodat de terugbetalingen, de export
+ * en het beheer deze markering kunnen lezen zonder de hele checkout mee te laden.
+ */
 
 /**
  * Een geslaagde betaling die apart staat: het geld kwam binnen, maar er hoort
  * geen ticket bij. Ze wacht op een terugbetaling of is al met de hand
  * terugbetaald; in beide gevallen levert ze nooit meer tickets op.
  */
-export function isPaymentSetAside(payment: { status: string; providerStatus: string | null }) {
-  return payment.status === "SUCCEEDED" && SET_ASIDE.includes(payment.providerStatus ?? "");
+export function isPaymentSetAside<T extends { setAside: TicketPaymentSetAside | null }>(
+  payment: T
+): payment is T & { setAside: TicketPaymentSetAside } {
+  return payment.setAside != null;
 }
 
 /** Prisma-filter op de betalingen die nog met de hand terugbetaald moeten worden. */
 export const awaitingManualRefund = {
   status: "SUCCEEDED",
-  providerStatus: PAYMENT_NEEDS_REFUND,
+  setAside: "NEEDS_REFUND",
 } as const;
 
-/**
- * Prisma-filter op de betalingen die géén aparte markering dragen. `notIn`
- * alleen volstaat niet: in SQL is `NULL NOT IN (...)` onbekend, en dan viel
- * net de gewone betaling (zonder `providerStatus`) uit de selectie.
- */
-export const notSetAside = {
-  OR: [{ providerStatus: null }, { providerStatus: { notIn: SET_ASIDE } }],
-};
+/** Prisma-filter op de betalingen die géén aparte markering dragen. */
+export const notSetAside = { setAside: null };

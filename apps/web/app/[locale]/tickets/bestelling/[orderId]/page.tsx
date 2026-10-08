@@ -36,7 +36,7 @@ export default async function TicketOrderPage({ params }: { params: Params }) {
     order.status === "PENDING_PAYMENT" ? await liveBancontactPayment(orderId) : null;
   const openBancontact =
     bancontact?.providerDeeplink && (!bancontact.expiresAt || bancontact.expiresAt > new Date())
-      ? { expiresAt: bancontact.expiresAt?.toISOString() ?? null }
+      ? { paymentId: bancontact.id, expiresAt: bancontact.expiresAt?.toISOString() ?? null }
       : null;
 
   // Dezelfde schil als /tickets en /tickets/[slug]: de kop en de kolommen zitten

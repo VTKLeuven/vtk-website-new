@@ -5477,10 +5477,18 @@ gebruikt zien; het werkt alleen niet voor wie geen Belgische bankapp heeft.
     klikt. Wil je dat voor een rush korter, verkort dan de reservatie
     (`TICKETING_RESERVATION_MINUTES`), niet de levensduur van een bestelling na
     één mislukte QR.
+  - **Met maar één betaalwijze staat er dan een knop om opnieuw te betalen.**
+    Zolang er een betaling loopt, wacht de bestelpagina op de provider; loopt
+    er geen meer, dan staat die ene betaalwijze er als knop. Zonder die knop
+    bleef wie op de betaalpagina van Mollie annuleerde een halfuur op "We
+    verwerken je betaling" staan, met zijn plaatsen vast, en moest hij opnieuw
+    bestellen; na drie open bestellingen mag dat niet meer.
 - **Een betaling die de koper al geopend heeft, annuleren we nooit.** Heeft hij
   de QR gescand of staat zijn bank te bevestigen, en kiest hij intussen op de
   bestelpagina opnieuw een betaalwijze, dan krijgt hij de vraag om die betaling
-  eerst af te ronden of te laten vervallen (hoogstens twee minuten). Annuleren
+  eerst af te ronden of te laten vervallen (bij Bancontact na twee minuten; een
+  Mollie-betaling die bij de bank ligt, kan langer openstaan, en daar beloven we
+  dus geen duur). Annuleren
   gaf hem in zijn app "betaling mislukt". De bestelpagina toont een lopende QR
   bovendien eerst ("Terug naar je QR-code"), met de keuze eronder: wie daar
   landt, zoekt meestal de betaling die hij al bezig was.
@@ -5493,7 +5501,7 @@ plaats die hem een halfuur beloofd was, en de enige reden om te weigeren is dat
 die plaats intussen weg is.
 
 - **Geen plaats meer, of het event is voorbij of geannuleerd: terugbetalen, met
-  de hand.** De betaling wordt gemarkeerd (`providerStatus` `needs_refund`), het
+  de hand.** De betaling wordt apart gezet (`setAside` `NEEDS_REFUND`), het
   auditlog krijgt `PAYMENT_NEEDS_REFUND`, en Sentry slaat alarm. Er wordt niets
   automatisch terugbetaald: Bancontact heeft standaard geen refund-API, en een
   organisator kan zo'n koper ook nog een plaats geven in plaats van zijn geld.

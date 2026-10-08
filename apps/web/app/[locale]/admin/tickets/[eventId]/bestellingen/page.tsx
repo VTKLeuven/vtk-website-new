@@ -22,8 +22,9 @@ import {
   resendTicketOrderConfirmationAction,
 } from "@/app/actions/tickets";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
-import { awaitingManualRefund, PAYMENT_NEEDS_REFUND } from "@/lib/ticketing/paymentFlags";
-import { SaveForm } from "@/components/ui/SaveForm";
+import { awaitingManualRefund, notSetAside } from "@/lib/ticketing/paymentFlags";
+import { ConfirmIconButton } from "@/components/ui/DeleteIconButton";
+import { CheckIcon } from "@/components/ui/icons";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { RefundOrderForm } from "@/components/ticketing/admin/RefundOrderForm";
@@ -94,7 +95,7 @@ export default async function TicketOrdersPage({
       : {}),
   };
 
-  const [orders, totalOrders, paidOrders, pendingOrders, refundedOrders, totals, awaitingRefund] = await Promise.all([
+  const [orders, totalOrders, paidOrders, pendingOrders, refundedOrders, totals, flaggedPayments] = await Promise.all([
     prisma.ticketOrder.findMany({
       where,
       include: {
@@ -108,9 +109,9 @@ export default async function TicketOrdersPage({
           },
           orderBy: { createdAt: "asc" },
         },
-        // Alle pogingen en niet enkel de laatste: een betaling die op een
-        // terugbetaling wacht, is niet altijd de jongste.
-        payments: { orderBy: { createdAt: "desc" } },
+        // De betaling die telt: de jongste poging die niet apart staat. Een
+        // betaling die op een terugbetaling wacht, komt apart hieronder.
+        payments: { where: notSetAside, orderBy: { createdAt: "desc" }, take: 1 },
         refunds: {
           include: { _count: { select: { items: true } } },
           orderBy: { createdAt: "desc" },
@@ -133,8 +134,28 @@ export default async function TicketOrdersPage({
           _sum: { totalCents: true, refundedCents: true },
         })
       : Promise.resolve(null),
-    prisma.ticketPayment.count({ where: { ...awaitingManualRefund, order: { eventId } } }),
+    // Alle betalingen van dit event die nog terug moeten: zelden meer dan een
+    // handvol, en zo telt de melding bovenaan ze ook wanneer hun bestelling
+    // buiten de filter van de lijst valt.
+    prisma.ticketPayment.findMany({
+      where: { ...awaitingManualRefund, order: { eventId } },
+      select: {
+        id: true,
+        orderId: true,
+        provider: true,
+        providerPaymentId: true,
+        amountCents: true,
+        currency: true,
+        succeededAt: true,
+      },
+      orderBy: { succeededAt: "asc" },
+    }),
   ]);
+  const awaitingRefund = flaggedPayments.length;
+  const flaggedByOrder = new Map<string, typeof flaggedPayments>();
+  for (const flagged of flaggedPayments) {
+    flaggedByOrder.set(flagged.orderId, [...(flaggedByOrder.get(flagged.orderId) ?? []), flagged]);
+  }
   const net = totals ? (totals._sum.totalCents ?? 0) - (totals._sum.refundedCents ?? 0) : 0;
 
   return (
@@ -244,10 +265,7 @@ export default async function TicketOrdersPage({
               <tbody>
                 {orders.map((order) => {
                   const payment = order.payments[0];
-                  const toRefund = order.payments.filter(
-                    (candidate) =>
-                      candidate.status === "SUCCEEDED" && candidate.providerStatus === PAYMENT_NEEDS_REFUND
-                  );
+                  const toRefund = flaggedByOrder.get(order.id) ?? [];
                   const canResendConfirmation =
                     canManageOrders &&
                     ["PAID", "PARTIALLY_REFUNDED", "REFUNDED"].includes(order.status);
@@ -316,55 +334,49 @@ export default async function TicketOrdersPage({
                                     : "This payment came in without a ticket to go with it: the reservation had expired and the seat was gone, the event was over, or the order was already paid. Refund it by hand at the provider or through the bank."}
                                 </p>
                                 <ul className="ticket-admin-list">
-                                  {toRefund.map((flagged) => (
-                                    <li key={flagged.id}>
-                                      <div className="ticket-admin-row-head">
-                                        <div>
-                                          <p className="ticket-admin-row-title">
-                                            {canViewFinance ? `${formatMoney(flagged.amountCents, flagged.currency, locale)} · ` : ""}
-                                            {flagged.provider}
-                                          </p>
-                                          <p className="ticket-admin-row-meta">
-                                            {flagged.providerPaymentId ? (
-                                              <span className="ticket-admin-code">{flagged.providerPaymentId} · </span>
-                                            ) : null}
-                                            {formatDateTime(flagged.succeededAt, locale)}
-                                          </p>
+                                  {toRefund.map((flagged) => {
+                                    const amount = formatMoney(flagged.amountCents, flagged.currency, locale);
+                                    const paymentLabel = flagged.providerPaymentId ?? flagged.id;
+                                    return (
+                                      <li key={flagged.id}>
+                                        <div className="ticket-admin-row-head">
+                                          <p className="ticket-admin-row-title ticket-admin-code">{paymentLabel}</p>
+                                          {canRefund ? (
+                                            <ConfirmIconButton
+                                              icon={<CheckIcon />}
+                                              label={locale === "nl" ? "Markeer als terugbetaald" : "Mark as refunded"}
+                                              srLabel={`${locale === "nl" ? "Markeer als terugbetaald" : "Mark as refunded"}: ${paymentLabel}`}
+                                              action={markTicketPaymentRefundedAction}
+                                              fields={{ locale, eventId, paymentId: flagged.id }}
+                                              title={locale === "nl" ? "Markeren als terugbetaald?" : "Mark as refunded?"}
+                                              description={
+                                                locale === "nl"
+                                                  ? `Dit betaalt niets terug: het vinkt enkel af dat de ${canViewFinance ? amount : "betaling"} van ${order.reference} al met de hand teruggegeven is. De melding bovenaan verdwijnt; de bestelling en haar tickets blijven zoals ze zijn.`
+                                                  : `This does not refund anything: it only records that the ${canViewFinance ? amount : "payment"} for ${order.reference} was already returned by hand. The notice at the top goes away; the order and its tickets stay as they are.`
+                                              }
+                                              confirmLabel={locale === "nl" ? "Markeer als terugbetaald" : "Mark as refunded"}
+                                              cancelLabel={locale === "nl" ? "Annuleren" : "Cancel"}
+                                              successMessage={locale === "nl" ? "Betaling gemarkeerd als terugbetaald." : "Payment marked as refunded."}
+                                              errorMessages={{
+                                                PAYMENT_NOT_AWAITING_REFUND:
+                                                  locale === "nl"
+                                                    ? "Niet gemarkeerd: deze betaling wacht niet meer op een terugbetaling. Misschien vinkte iemand anders ze net af."
+                                                    : "Not marked: this payment is no longer awaiting a refund. Someone else may have just marked it.",
+                                              }}
+                                              errorFallback={locale === "nl" ? "Betaling niet gemarkeerd." : "Payment was not marked."}
+                                            />
+                                          ) : null}
                                         </div>
-                                      </div>
-                                      {canRefund ? (
-                                        <SaveForm
-                                          action={markTicketPaymentRefundedAction}
-                                          className="ticket-admin-detail-actions"
-                                          submitLabel={locale === "nl" ? "Markeer als terugbetaald" : "Mark as refunded"}
-                                          submitVariant="ghost"
-                                          submitSize="sm"
-                                          savingLabel={locale === "nl" ? "Bezig" : "Saving"}
-                                          savedMessage={locale === "nl" ? "Betaling gemarkeerd als terugbetaald." : "Payment marked as refunded."}
-                                          confirmSubmit={{
-                                            title: locale === "nl" ? "Markeren als terugbetaald?" : "Mark as refunded?",
-                                            description:
-                                              locale === "nl"
-                                                ? `Dit betaalt niets terug: het vinkt enkel af dat de ${canViewFinance ? formatMoney(flagged.amountCents, flagged.currency, locale) : "betaling"} van ${order.reference} al met de hand teruggegeven is. De melding bovenaan verdwijnt; de bestelling en haar tickets blijven zoals ze zijn.`
-                                                : `This does not refund anything: it only records that the ${canViewFinance ? formatMoney(flagged.amountCents, flagged.currency, locale) : "payment"} for ${order.reference} was already returned by hand. The notice at the top goes away; the order and its tickets stay as they are.`,
-                                            confirmLabel: locale === "nl" ? "Markeer als terugbetaald" : "Mark as refunded",
-                                            cancelLabel: locale === "nl" ? "Annuleren" : "Cancel",
-                                          }}
-                                          errorMessages={{
-                                            PAYMENT_NOT_AWAITING_REFUND:
-                                              locale === "nl"
-                                                ? "Niet gemarkeerd: deze betaling wacht niet meer op een terugbetaling. Misschien vinkte iemand anders ze net af."
-                                                : "Not marked: this payment is no longer awaiting a refund. Someone else may have just marked it.",
-                                          }}
-                                          fallbackErrorMessage={locale === "nl" ? "Betaling niet gemarkeerd." : "Payment was not marked."}
-                                        >
-                                          <input type="hidden" name="locale" value={locale} />
-                                          <input type="hidden" name="eventId" value={eventId} />
-                                          <input type="hidden" name="paymentId" value={flagged.id} />
-                                        </SaveForm>
-                                      ) : null}
-                                    </li>
-                                  ))}
+                                        <dl className="ticket-admin-spec">
+                                          {canViewFinance ? (
+                                            <div><dt>{locale === "nl" ? "Bedrag" : "Amount"}</dt><dd>{amount}</dd></div>
+                                          ) : null}
+                                          <div><dt>Provider</dt><dd>{flagged.provider}</dd></div>
+                                          <div><dt>{locale === "nl" ? "Betaald op" : "Paid at"}</dt><dd>{formatDateTime(flagged.succeededAt, locale)}</dd></div>
+                                        </dl>
+                                      </li>
+                                    );
+                                  })}
                                 </ul>
                               </div>
                             ) : null}

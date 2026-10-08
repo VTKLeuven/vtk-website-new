@@ -445,6 +445,11 @@
   padding-bottom: 0;
 }
 
+/* Een rij met haar gegevens eronder, zoals een betaling die terug moet. */
+.ticket-admin-list > li > .ticket-admin-row-head + .ticket-admin-spec {
+  margin-top: 10px;
+}
+
 .ticket-admin-row-title {
   margin: 0;
   color: var(--ink);

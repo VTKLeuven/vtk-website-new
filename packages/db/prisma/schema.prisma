@@ -131,6 +131,13 @@ enum TicketPaymentStatus {
   EXPIRED
 }
 
+/// Waarom een geslaagde betaling geen tickets oplevert: ze wacht op een
+/// terugbetaling met de hand, of is al met de hand terugbetaald.
+enum TicketPaymentSetAside {
+  NEEDS_REFUND
+  REFUNDED_MANUALLY
+}
+
 enum TicketRefundStatus {
   PENDING
   SUCCEEDED
@@ -2641,7 +2648,15 @@ model TicketPayment {
   /// Door de provider gehoste QR-afbeelding. Optioneel: valt die weg, dan
   /// tekenen we de QR zelf uit de deeplink.
   providerQrCodeUrl  String?
+  /// Wat de provider over deze betaling zei. Enkel informatief: geen enkele
+  /// beslissing hangt eraan, en een provider mag het overschrijven.
   providerStatus     String?
+  /// Een geslaagde betaling zonder ticket ertegenover, apart gezet om met de
+  /// hand terug te betalen (`lib/ticketing/paymentFlags.ts`). Null voor elke
+  /// gewone betaling. Een eigen kolom en niet `providerStatus`: die gaat over
+  /// wat de provider meldt, en een betaling die apart staat, mag nooit tickets
+  /// opleveren omdat iets dat veld overschreef.
+  setAside           TicketPaymentSetAside?
   expiresAt          DateTime?           @db.Timestamptz(3)
   succeededAt        DateTime?           @db.Timestamptz(3)
   failedAt           DateTime?           @db.Timestamptz(3)
@@ -2658,6 +2673,7 @@ model TicketPayment {
   @@unique([id, orderId])
   @@index([orderId, status])
   @@index([status, expiresAt])
+  @@index([setAside])
 }
 
 model TicketPaymentWebhook {

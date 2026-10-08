@@ -140,22 +140,30 @@ export function OrderStatus({
    * Een Bancontact-betaling van deze bestelling die nog leeft, met wanneer haar
    * QR vervalt. De server geeft ze enkel mee zolang dat nog niet gebeurd is.
    */
-  openBancontact?: { expiresAt: string | null } | null;
+  openBancontact?: { paymentId: string; expiresAt: string | null } | null;
 }) {
   const base = locale === "nl" ? "" : "/en";
   const t = TEXT[locale];
   const [order, setOrder] = useState(initialOrder);
   const [pollError, setPollError] = useState(false);
-  const [bancontactExpired, setBancontactExpired] = useState(false);
+  // Welke betaling vervallen is, en niet enkel dát er een verviel: komt er
+  // zonder herladen een nieuwe QR binnen, dan hoort de weg ernaartoe er weer
+  // te staan. Zoals in `BancontactPayment`.
+  const [expiredBancontactId, setExpiredBancontactId] = useState<string | null>(null);
+  const openBancontactId = openBancontact?.paymentId ?? null;
+  const openBancontactExpiresAt = openBancontact?.expiresAt ?? null;
 
   // De QR vervalt terwijl de pagina openstaat: dan valt de weg terug ernaar weg.
   useEffect(() => {
-    if (!openBancontact?.expiresAt) return;
-    const remaining = new Date(openBancontact.expiresAt).getTime() - Date.now();
+    if (!openBancontactId || !openBancontactExpiresAt) return;
+    const remaining = new Date(openBancontactExpiresAt).getTime() - Date.now();
     if (Number.isNaN(remaining)) return;
-    const timer = setTimeout(() => setBancontactExpired(true), Math.max(remaining, 0));
+    const timer = setTimeout(
+      () => setExpiredBancontactId(openBancontactId),
+      Math.max(remaining, 0)
+    );
     return () => clearTimeout(timer);
-  }, [openBancontact?.expiresAt]);
+  }, [openBancontactId, openBancontactExpiresAt]);
 
   useEffect(() => {
     if (TERMINAL.has(order.status)) return;
@@ -199,14 +207,20 @@ export function OrderStatus({
   const failed = ["PAYMENT_FAILED", "CANCELLED", "EXPIRED", "REFUNDED"].includes(order.status);
   // Zolang de bestelling op betaling wacht, mag de koper (opnieuw) kiezen: een
   // afgebroken betaling laat de bestelling staan, en dan is dit de weg terug.
+  // Met maar één betaalwijze enkel wanneer er geen betaling meer loopt: zolang
+  // er wel een loopt, wacht deze pagina op de provider. Zonder die
+  // uitzondering bleef wie zijn enige betaalwijze afbrak een halfuur op "We
+  // verwerken je betaling" staan, met zijn plaatsen vast en zonder knop.
   const canChoosePayment =
     order.status === "PENDING_PAYMENT" &&
     paymentChoice != null &&
-    paymentChoice.variant !== "single" &&
-    paymentChoice.options.length > 0;
+    paymentChoice.options.length > 0 &&
+    (paymentChoice.variant !== "single" || !order.paymentOpen);
   const tone = paid ? "ok" : failed ? "bad" : "wait";
   const showOpenBancontact =
-    order.status === "PENDING_PAYMENT" && openBancontact != null && !bancontactExpired;
+    order.status === "PENDING_PAYMENT" &&
+    openBancontactId != null &&
+    expiredBancontactId !== openBancontactId;
   const trackedRef = useRef(false);
 
   useEffect(() => {

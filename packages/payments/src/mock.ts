@@ -15,6 +15,14 @@ export type MockGatewayConfig = {
   completePath: string;
 };
 
+/**
+ * De checkouts die `expireCheckout` afsloot. Op moduleniveau en niet op de
+ * instantie: de site maakt per aanvraag een nieuwe gateway aan. Een herstart
+ * vergeet ze, en dat geeft niet: wie een checkout afsluit, vraagt meteen daarna
+ * de status op, zoals `closeLivePayments` doet.
+ */
+const expiredCheckouts = new Set<string>();
+
 export class MockPaymentGateway implements PaymentGateway {
   readonly name = "mock";
   private readonly config: MockGatewayConfig;
@@ -39,11 +47,18 @@ export class MockPaymentGateway implements PaymentGateway {
     };
   }
 
-  async expireCheckout(): Promise<void> {}
+  /**
+   * Zoals een echte provider: na het afsluiten is de checkout vervallen. Zonder
+   * dat bleef een lokale betaling voorgoed "pending", verviel een lokale
+   * bestelling nooit en kon je lokaal nooit van betaalwijze wisselen.
+   */
+  async expireCheckout(checkoutId: string): Promise<void> {
+    expiredCheckouts.add(checkoutId);
+  }
 
   async getCheckoutStatus(checkoutId: string): Promise<CheckoutStatusResult> {
     if (process.env.NODE_ENV === "production") throw new Error("Mock payments are disabled");
-    return { status: "PENDING", checkoutId };
+    return { status: expiredCheckouts.has(checkoutId) ? "EXPIRED" : "PENDING", checkoutId };
   }
 
   async refund(input: RefundInput): Promise<RefundResult> {

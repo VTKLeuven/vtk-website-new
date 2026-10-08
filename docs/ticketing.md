@@ -89,6 +89,13 @@ Mollie, expire it unconditionally). Two things went wrong with that:
 The trade-off is that an abandoned order holds its seats for the full
 reservation window instead of two minutes. See `docs/design-decisions.md`.
 
+The order page is the way back to a new attempt. With more than one payment
+method it always shows the choice; with a single method (`variant: "single"`)
+it shows that one method as a button once no attempt is open any more
+(`paymentOpen` on the order, polled with the status). Without that exception a
+Mollie-only buyer who cancelled on the Mollie page sat on "We verwerken je
+betaling" for half an hour, seats held and no button.
+
 ### Expiring an order closes the provider side first
 
 `releaseExpiredOrders` runs every open payment of an expired reservation
@@ -96,7 +103,15 @@ through `closeLivePayments` (ask the provider, cancel what is still open,
 fulfil what turned out to be paid) and only then calls `expirePendingOrder`.
 `expirePendingOrder` only closes our own rows; called first, it would leave a
 QR or a Mollie checkout payable for an order that no longer exists. When a
-buyer is confirming in their app at that moment, the order waits a round.
+buyer is confirming in their app at that moment, the order waits a round; a
+Mollie payment on `pending` can keep it waiting longer than a Bancontact QR.
+
+A checkout the provider calls paid is only fulfilled when the provider also
+reports an amount and a currency that match the order
+(`succeededCheckoutMatches`, the same check `reconcileTicketPayments` uses).
+Otherwise the order stays as it is and the mismatch is logged. Passing the
+order total as the paid amount would make the amount check in
+`fulfillPaidOrder` compare the order with itself.
 
 ### A payment that lands after the order expired
 
@@ -105,22 +120,30 @@ buyer is confirming in their app at that moment, the order waits a round.
 UPDATE as a checkout and issues the tickets. When there is no room (or the
 event is over or cancelled, or the order was already paid by another attempt),
 the transaction rolls back and the payment is recorded apart: `SUCCEEDED` with
-`providerStatus` `needs_refund`, a `PAYMENT_NEEDS_REFUND` audit row, and a
-Sentry alert. The refund itself is manual. Before this, such a payment failed
+`setAside` `NEEDS_REFUND`, a `PAYMENT_NEEDS_REFUND` audit row, and a Sentry
+alert. `setAside` is its own column on purpose: `providerStatus` keeps saying
+what the provider reported (`paid`), and nothing that writes that field can
+make a set-aside payment yield tickets again. The refund itself is manual. Before this, such a payment failed
 with `ORDER_NOT_PAYABLE` on every retry and nobody knew.
 
 - The orders page of the event (`/admin/tickets/<id>/bestellingen`) shows a
   notice at the top while such a payment waits, a "Terug te betalen" badge on
   the order and a filter with the same name. After refunding by hand, someone
-  with the `REFUND` capability marks it there: `providerStatus` becomes
-  `refunded_manually` and the audit log gets `PAYMENT_REFUNDED_MANUALLY`.
-- A payment that is set aside (`needs_refund` or `refunded_manually`, see
+  with the `REFUND` capability marks it there: `setAside` becomes
+  `REFUNDED_MANUALLY` and the audit log gets `PAYMENT_REFUNDED_MANUALLY`.
+- A payment that is set aside (`setAside` is not null, see
   `lib/ticketing/paymentFlags.ts`) never yields tickets again. Mollie reports a
   refund with the payment status still `paid`, so without that check the
   refund itself re-ran the fulfilment and issued tickets once a seat had freed
   up.
 - `requestTicketRefund` refunds from the payment that paid for the tickets and
-  skips a payment that is set aside, even though that one succeeded later.
+  skips a payment that is set aside, even though that one succeeded later. The
+  order export does the same for its payment columns and lists set-aside
+  payments in a column of their own, so every line of a payout still has a row.
+- A second payment on a paid order finds its attempt the same way a normal
+  payment does, including an attempt whose checkout id we never managed to
+  save. When that attempt already carries another successful payment, the new
+  one is not written over it but raises the same Sentry alert.
 
 ### Checkout and order transitions do not run SERIALIZABLE
 
@@ -148,6 +171,12 @@ failed with them.
   That covers a pool timeout outside the transaction too (`P2024`, on the
   event or buyer lookup before it), not only inside it (`P2028`). The web shop
   and the app both show that message for `BUSY`.
+- **Only until the reservation commits.** After that the order exists and holds
+  seats, so "your order did not go through" would be false. A busy database
+  while creating the payment sends the buyer to their order page instead, with
+  the access cookie, where they start the payment again. A free order has no
+  payment to finish later; it is released straight away and then does answer
+  `BUSY`.
 - `test/integration/ticketing-rush.integration.ts` fires 300 checkouts at 240
   seats: exactly 240 sell and 60 get `SOLD_OUT`. On the SERIALIZABLE version,
   227 of the 300 failed. `ticketing-payments.integration.ts` covers the payment

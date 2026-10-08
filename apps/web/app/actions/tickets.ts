@@ -2346,13 +2346,10 @@ export async function refundTicketsAction(formData: FormData): Promise<void> {
 }
 
 /**
- * Een betaling die apart stond om terug te betalen (`needs_refund`), afvinken
+ * Een betaling die apart stond om terug te betalen (`NEEDS_REFUND`), afvinken
  * nadat iemand het geld met de hand teruggaf. Zelf betaalt dit niets terug.
  */
-export async function markTicketPaymentRefundedAction(
-  _previousState: SaveState,
-  formData: FormData,
-): Promise<SaveState> {
+export async function markTicketPaymentRefundedAction(formData: FormData): Promise<SaveState> {
   const eventId = value(formData, "eventId");
   const paymentId = value(formData, "paymentId");
   const locale = localeSchema.parse(value(formData, "locale") || "nl");
@@ -2363,10 +2360,12 @@ export async function markTicketPaymentRefundedAction(
     actorUserId: session.user.id,
   });
   if (!marked) return saveError("PAYMENT_NOT_AWAITING_REFUND");
+  // Op de bestelling, net als de andere regels over bestellingen: de betaling
+  // zelf staat in het auditlog van het ticketsysteem (`PAYMENT_REFUNDED_MANUALLY`).
   await logAudit({
     action: "refund",
     entity: "ticketOrder",
-    entityId: paymentId,
+    entityId: marked.orderId,
     target: await ticketEventTitle(eventId),
     summary: "betaling zonder ticket met de hand terugbetaald",
   });
