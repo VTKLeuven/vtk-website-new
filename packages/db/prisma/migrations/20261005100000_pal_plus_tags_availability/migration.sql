@@ -2,24 +2,45 @@
 -- bevestigt. Het ene voorgestelde moment van een aanbod verdwijnt: het rooster
 -- en een opmerking vervangen het.
 --
--- Wat er met bestaande rijen gebeurt: niets dat telt. PAL+ komt in dezelfde
--- release als deze migratie, dus er staan nog geen aanvragen in productie. Het
--- voorgestelde moment wordt daarom weggegooid in plaats van omgezet. Tags
--- starten leeg; de tweede tutor en het rooster zijn nullable en blijven leeg.
+-- Wat er met bestaande rijen gebeurt (PAL+ staat sinds 4 oktober 2026 op
+-- dev.vtk.be, dus er kunnen al aanvragen zijn):
+-- - Een aanbod met een voorgesteld moment houdt dat moment als opmerking
+--   ("Voorgesteld moment: ..."), in Brusselse tijd, voor de kolommen weggaan.
+--   Het rooster blijft leeg: welke andere momenten de tutor paste, weet niemand.
+-- - Een hulpvraag die al bestond, stond meteen publiek (het nakijken kwam pas
+--   later). Ze krijgt `reviewedAt` = het moment van indienen, zodat een
+--   geannuleerde sessie ze terug online zet zoals vroeger, en niet in het
+--   werkbakje. `reviewedById` blijft leeg: niemand keek ze echt na.
+-- - Tags starten leeg; de tweede tutor is nullable en blijft leeg.
 
 -- CreateEnum
 CREATE TYPE "PalPlusCoTutorStatus" AS ENUM ('PENDING', 'ACCEPTED', 'DECLINED');
 
 -- AlterTable
-ALTER TABLE "PalPlusRequest" DROP CONSTRAINT IF EXISTS "PalPlusRequest_proposed_check";
-ALTER TABLE "PalPlusRequest" DROP COLUMN "proposedEndsAt",
-DROP COLUMN "proposedStartsAt",
+ALTER TABLE "PalPlusRequest"
 ADD COLUMN     "availability" JSONB,
 ADD COLUMN     "availabilityNote" TEXT,
 ADD COLUMN     "coTutorId" TEXT,
 ADD COLUMN     "coTutorRespondedAt" TIMESTAMPTZ(3),
 ADD COLUMN     "coTutorStatus" "PalPlusCoTutorStatus",
 ADD COLUMN     "tags" TEXT[] DEFAULT ARRAY[]::TEXT[];
+
+-- Backfill: het voorgestelde moment van een bestaand aanbod als opmerking.
+UPDATE "PalPlusRequest"
+SET "availabilityNote" = 'Voorgesteld moment: '
+    || to_char("proposedStartsAt" AT TIME ZONE 'Europe/Brussels', 'DD/MM/YYYY HH24:MI')
+    || ' - '
+    || to_char("proposedEndsAt" AT TIME ZONE 'Europe/Brussels', 'HH24:MI')
+WHERE "kind" = 'GIVE' AND "proposedStartsAt" IS NOT NULL AND "proposedEndsAt" IS NOT NULL;
+
+-- Backfill: een bestaande hulpvraag stond al online.
+UPDATE "PalPlusRequest"
+SET "reviewedAt" = "createdAt"
+WHERE "kind" = 'FOLLOW' AND "status" IN ('OPEN', 'PLANNED') AND "reviewedAt" IS NULL;
+
+ALTER TABLE "PalPlusRequest" DROP CONSTRAINT IF EXISTS "PalPlusRequest_proposed_check";
+ALTER TABLE "PalPlusRequest" DROP COLUMN "proposedEndsAt",
+DROP COLUMN "proposedStartsAt";
 
 -- AlterTable
 ALTER TABLE "PalPlusSession" ADD COLUMN     "tags" TEXT[] DEFAULT ARRAY[]::TEXT[];
