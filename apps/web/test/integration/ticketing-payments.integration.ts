@@ -170,6 +170,10 @@ describe.sequential("ticket payments", () => {
   afterAll(async () => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    // De bevestigingsmails van deze bestellingen blijven anders in de outbox
+    // liggen, en `ticketing-db` verwerkt de outbox van de hele database met een
+    // limiet: liep dit bestand eerst, dan kwam zijn eigen mail niet aan de beurt.
+    await prisma.ticketOutboxMessage.deleteMany({ where: { eventId: ids.event } });
     await prisma.$disconnect();
   });
 
@@ -545,6 +549,72 @@ describe.sequential("ticket payments", () => {
         where: { action: "PAYMENT_REFUNDED_MANUALLY", entityId: flagged.id },
       })
     ).toBe(1);
+  });
+
+  it("books the payment on the attempt that was paid, not on an earlier one without a checkout", async () => {
+    const orderId = await pendingOrder();
+    // Een eerste poging die de provider weigerde: geen checkout-id.
+    const refused = await prisma.ticketPayment.create({
+      data: {
+        orderId,
+        provider: "bancontact",
+        idempotencyKey: `${orderId}:1`,
+        status: "FAILED",
+        failedAt: new Date(),
+        amountCents: 1400,
+        currency: "EUR",
+      },
+    });
+    const paid = await bancontactAttempt(orderId, "PENDING", 2);
+
+    bancontact.payments.get(paid)!.status = "SUCCEEDED";
+    expect((await bancontactCallback(paid)).status).toBe(200);
+
+    expect(await prisma.ticketOrder.findUniqueOrThrow({ where: { id: orderId } })).toMatchObject({
+      status: "PAID",
+    });
+    expect(await ticketsOf(orderId)).toBe(1);
+    expect(
+      await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: paid } })
+    ).toMatchObject({ status: "SUCCEEDED", providerStatus: "paid" });
+    expect(await prisma.ticketPayment.findUniqueOrThrow({ where: { id: refused.id } })).toMatchObject({
+      status: "FAILED",
+      providerPaymentId: null,
+    });
+  });
+
+  it("never flags a payment for a refund once it has succeeded", async () => {
+    // Staat in voor twee gelijktijdige meldingen van dezelfde betaling: de ene
+    // vindt geen plaats, de andere geeft net daarna de tickets uit. De eerste
+    // legt de betaling pas daarna apart, in een eigen transactie, en mag dan
+    // een betaling met tickets niet meer als terug te betalen markeren.
+    const orderId = await pendingOrder();
+    const live = await bancontactAttempt(orderId);
+    bancontact.payments.get(live)!.status = "SUCCEEDED";
+    expect((await bancontactCallback(live)).status).toBe(200);
+    expect(await ticketsOf(orderId)).toBe(1);
+
+    // De bestelling is intussen afgesloten, zodat een nieuwe melding van
+    // dezelfde betaling de weg naar "apart zetten" neemt.
+    await prisma.ticketOrder.update({ where: { id: orderId }, data: { status: "CANCELLED" } });
+    const payment = await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: live } });
+    await fulfillPaidOrder({
+      orderId,
+      provider: "bancontact",
+      providerPaymentId: live,
+      providerCheckoutId: live,
+      amountCents: 1400,
+      currency: "EUR",
+    });
+
+    expect(await prisma.ticketPayment.findUniqueOrThrow({ where: { id: payment.id } })).toMatchObject({
+      status: "SUCCEEDED",
+      providerStatus: "paid",
+    });
+    expect(
+      await prisma.ticketAuditLog.count({ where: { action: "PAYMENT_NEEDS_REFUND", entityId: payment.id } })
+    ).toBe(0);
+
   });
 
   it("ends a payment racing an expiry the same way every time: paid, one ticket, counters intact", async () => {

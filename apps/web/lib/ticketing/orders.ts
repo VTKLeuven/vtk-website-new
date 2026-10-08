@@ -883,7 +883,9 @@ async function fulfillPaidOrderWithTx(
     where: { id: input.orderId },
     include: {
       items: { include: { ticket: true } },
-      payments: true,
+      // Jongste eerst: valt de betaling hieronder terug op een rij zonder
+      // checkout-id, dan is de laatste poging degene die de koper betaalde.
+      payments: { orderBy: { createdAt: "desc" } },
       event: { select: { status: true, endsAt: true } },
     },
   });
@@ -926,13 +928,25 @@ async function fulfillPaidOrderWithTx(
     throw new Error("PAYMENT_AMOUNT_MISMATCH");
   }
 
-  const payment = order.payments.find(
-    (candidate) =>
-      candidate.provider === input.provider &&
-      (candidate.providerCheckoutId === input.providerCheckoutId ||
-        candidate.providerCheckoutId == null ||
-        !input.providerCheckoutId)
-  );
+  // Eerst de poging met precies deze checkout. Pas zonder die poging een rij
+  // zonder checkout-id (een gratis bestelling, of een checkout die de provider
+  // aanmaakte maar die wij niet konden bewaren). Andersom nam dit een eerdere,
+  // mislukte poging zonder checkout-id: die kreeg dan de betaal-ID van de
+  // geslaagde poging, de unieke index weigerde dat bij elke herpoging, en de
+  // koper betaalde zonder ticket.
+  const payment =
+    (input.providerCheckoutId
+      ? order.payments.find(
+          (candidate) =>
+            candidate.provider === input.provider &&
+            candidate.providerCheckoutId === input.providerCheckoutId
+        )
+      : undefined) ??
+    order.payments.find(
+      (candidate) =>
+        candidate.provider === input.provider &&
+        (candidate.providerCheckoutId == null || !input.providerCheckoutId)
+    );
   if (!payment) throw new Error("PAYMENT_NOT_FOUND");
 
   const quantities = quantitiesByPool(order.items);
@@ -1055,7 +1069,12 @@ async function recordPaymentNeedingRefund(
     const payment = await tx.ticketPayment.findUnique({ where: { id: error.paymentId } });
     if (!payment || payment.orderId !== input.orderId) throw new Error("PAYMENT_NOT_FOUND");
     const order = await tx.ticketOrder.findUniqueOrThrow({ where: { id: input.orderId } });
-    if (isPaymentSetAside(payment)) return { order, newlyFlagged: false };
+    // Dit loopt in een eigen transactie, na de rollback. Is de betaling
+    // intussen geslaagd, dan deed iemand anders al wat nodig was: ze staat al
+    // apart, of een tweede, gelijktijdige melding van dezelfde betaling gaf de
+    // tickets uit omdat er net een plaats vrijkwam. Die laatste markeren als
+    // terug te betalen zou iemand met geldige tickets zijn geld teruggeven.
+    if (payment.status === "SUCCEEDED") return { order, newlyFlagged: false };
     await tx.ticketPayment.update({
       where: { id: payment.id },
       data: {
