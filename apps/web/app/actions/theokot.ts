@@ -141,19 +141,24 @@ type OfferingRow = {
   ingredientsEn: string | null;
   /** Wat het foto-veld wil: bewaren, vervangen of wissen (zie `readImageField`). */
   image: Exclude<ImageFieldValue, { kind: "invalid" }>;
+  /** Wat het badge-veld wil: bewaren, vervangen of wissen. */
+  badgeImage: Exclude<ImageFieldValue, { kind: "invalid" }>;
   order: number;
 };
 
-/** Eén aanbod-item zoals het in een nieuwe sessie terechtkomt (foto al opgelost). */
-type OfferingSnapshot = Omit<OfferingRow, "id" | "image"> & { imageKey: string | null };
+/** Eén aanbod-item zoals het in een nieuwe sessie terechtkomt (foto en badge al opgelost). */
+type OfferingSnapshot = Omit<OfferingRow, "id" | "image" | "badgeImage"> & {
+  imageKey: string | null;
+  badgeImageKey: string | null;
+};
 
 /**
  * Leest de geïndexeerde aanbodvelden
- * (`<prefix>-<i>-{id,nameNl,nameEn,price,quantity,weekly,ingredientsNl,ingredientsEn,imageKey}`)
+ * (`<prefix>-<i>-{id,nameNl,nameEn,price,quantity,weekly,ingredientsNl,ingredientsEn,imageKey,badgeImageKey}`)
  * uit één van de twee editors: `item-` voor een sessie-aanbod, `product-` voor de
  * catalogus. Rijen zonder Nederlandse naam vallen weg; ze zijn leeg gelaten.
  *
- * Geeft `null` terug wanneer een foto-key niet uit de upload-route komt: dat is
+ * Geeft `null` terug wanneer een foto- of badge-key niet uit de upload-route komt: dat is
  * geknoei met het verborgen veld en geen invoerfout die we stilzwijgend negeren.
  */
 function parseOfferingRows(
@@ -168,6 +173,8 @@ function parseOfferingRows(
     if (!nameNl) continue;
     const image = readImageField(formData, `${prefix}-${i}-imageKey`);
     if (image.kind === "invalid") return null;
+    const badgeImage = readImageField(formData, `${prefix}-${i}-badgeImageKey`);
+    if (badgeImage.kind === "invalid") return null;
     rows.push({
       id: (formData.get(`${prefix}-${i}-id`) as string) || "",
       nameNl,
@@ -178,6 +185,7 @@ function parseOfferingRows(
       ingredientsNl: ((formData.get(`${prefix}-${i}-ingredientsNl`) as string) || "").trim() || null,
       ingredientsEn: ((formData.get(`${prefix}-${i}-ingredientsEn`) as string) || "").trim() || null,
       image,
+      badgeImage,
       order: rows.length,
     });
   }
@@ -225,6 +233,7 @@ export async function createWeekSessionsAction(
     ingredientsNl: row.ingredientsNl,
     ingredientsEn: row.ingredientsEn,
     imageKey: resolveImageKey(row.image, null),
+    badgeImageKey: resolveImageKey(row.badgeImage, null),
     order: row.order,
   }));
   if (offering.length === 0) {
@@ -238,6 +247,7 @@ export async function createWeekSessionsAction(
       ingredientsNl: p.ingredientsNl,
       ingredientsEn: p.ingredientsEn,
       imageKey: p.imageKey,
+      badgeImageKey: p.badgeImageKey,
       order: i,
     }));
   }
@@ -298,6 +308,7 @@ export async function createWeekSessionsAction(
             ingredientsNl: it.ingredientsNl,
             ingredientsEn: it.ingredientsEn,
             imageKey: it.imageKey,
+            badgeImageKey: it.badgeImageKey,
             order: it.order,
           })),
         },
@@ -451,6 +462,7 @@ export async function updateSessionItemsAction(
   if (!rows) return saveError("INVALID_IMAGE");
 
   const currentKeys = new Map(existing.items.map((i) => [i.id, i.imageKey]));
+  const currentBadgeKeys = new Map(existing.items.map((i) => [i.id, i.badgeImageKey]));
   const keepIds = new Set<string>();
 
   // Enkel items van déze verkoopdag. Zonder deze regel is het verborgen id-veld
@@ -460,16 +472,27 @@ export async function updateSessionItemsAction(
   if (rows.some((row) => row.id && !currentKeys.has(row.id))) return saveError("ITEM_NOT_IN_SESSION");
 
   for (const row of rows) {
-    const { id, image, order, ...fields } = row;
+    const { id, image, badgeImage, order, ...fields } = row;
     if (id) {
       keepIds.add(id);
       await prisma.theokotSessionItem.update({
         where: { id },
-        data: { ...fields, imageKey: resolveImageKey(image, currentKeys.get(id) ?? null), order },
+        data: {
+          ...fields,
+          imageKey: resolveImageKey(image, currentKeys.get(id) ?? null),
+          badgeImageKey: resolveImageKey(badgeImage, currentBadgeKeys.get(id) ?? null),
+          order,
+        },
       });
     } else {
       await prisma.theokotSessionItem.create({
-        data: { sessionId, ...fields, imageKey: resolveImageKey(image, null), order },
+        data: {
+          sessionId,
+          ...fields,
+          imageKey: resolveImageKey(image, null),
+          badgeImageKey: resolveImageKey(badgeImage, null),
+          order,
+        },
       });
     }
   }
@@ -529,7 +552,10 @@ export async function updateWeekItemsAction(
 
   const template = await prisma.theokotSession.findUnique({
     where: { id: templateId },
-    select: { id: true, items: { select: { id: true, productId: true, nameNl: true, imageKey: true } } },
+    select: {
+      id: true,
+      items: { select: { id: true, productId: true, nameNl: true, imageKey: true, badgeImageKey: true } },
+    },
   });
   if (!template) return saveError("SESSION_NOT_FOUND");
 
@@ -537,6 +563,7 @@ export async function updateWeekItemsAction(
   if (!rows) return saveError("INVALID_IMAGE");
   const templateIds = new Set(template.items.map((item) => item.id));
   const templateImages = new Map(template.items.map((item) => [item.id, item.imageKey]));
+  const templateBadgeImages = new Map(template.items.map((item) => [item.id, item.badgeImageKey]));
   if (rows.some((row) => row.id && !templateIds.has(row.id))) return saveError("ITEM_NOT_IN_SESSION");
 
   const now = new Date();
@@ -555,31 +582,55 @@ export async function updateWeekItemsAction(
       rows.map((row) => ({ sourceId: row.id || null })),
     );
     const currentKeys = new Map(day.items.map((item) => [item.id, item.imageKey]));
+    const currentBadgeKeys = new Map(day.items.map((item) => [item.id, item.badgeImageKey]));
     // `id` hoort bij de voorbeelddag en gaat dus niet mee naar de andere dagen.
     const fieldsOf = (index: number) => {
-      const { image, order, nameNl, nameEn, priceCents, quantity, isWeeklySpecial, ingredientsNl, ingredientsEn } =
-        rows[index]!;
+      const {
+        image,
+        badgeImage,
+        order,
+        nameNl,
+        nameEn,
+        priceCents,
+        quantity,
+        isWeeklySpecial,
+        ingredientsNl,
+        ingredientsEn,
+      } = rows[index]!;
       return {
         image,
+        badgeImage,
         order,
         fields: { nameNl, nameEn, priceCents, quantity, isWeeklySpecial, ingredientsNl, ingredientsEn },
       };
     };
     for (const { row: index, targetId } of plan.update) {
-      const { image, order, fields } = fieldsOf(index);
+      const { image, badgeImage, order, fields } = fieldsOf(index);
       await prisma.theokotSessionItem.update({
         where: { id: targetId },
-        data: { ...fields, imageKey: resolveImageKey(image, currentKeys.get(targetId) ?? null), order },
+        data: {
+          ...fields,
+          imageKey: resolveImageKey(image, currentKeys.get(targetId) ?? null),
+          badgeImageKey: resolveImageKey(badgeImage, currentBadgeKeys.get(targetId) ?? null),
+          order,
+        },
       });
     }
     for (const index of plan.create) {
-      const { image, order, fields } = fieldsOf(index);
+      const { image, badgeImage, order, fields } = fieldsOf(index);
       // Een nieuwe rij zonder eigen upload neemt de foto van het broodje op de
       // voorbeelddag over, als dat er een had.
       const sourceId = rows[index]!.id;
       const sourceKey = sourceId ? (templateImages.get(sourceId) ?? null) : null;
+      const sourceBadgeKey = sourceId ? (templateBadgeImages.get(sourceId) ?? null) : null;
       await prisma.theokotSessionItem.create({
-        data: { sessionId: day.id, ...fields, imageKey: resolveImageKey(image, sourceKey), order },
+        data: {
+          sessionId: day.id,
+          ...fields,
+          imageKey: resolveImageKey(image, sourceKey),
+          badgeImageKey: resolveImageKey(badgeImage, sourceBadgeKey),
+          order,
+        },
       });
     }
     for (const id of plan.remove) {
@@ -814,9 +865,10 @@ export async function saveProductCatalogAction(
 
   const active = await prisma.theokotProduct.findMany({
     where: { active: true },
-    select: { id: true, imageKey: true },
+    select: { id: true, imageKey: true, badgeImageKey: true },
   });
   const currentKeys = new Map(active.map((p) => [p.id, p.imageKey]));
+  const currentBadgeKeys = new Map(active.map((p) => [p.id, p.badgeImageKey]));
   const keepIds = new Set<string>();
 
   for (const row of rows) {
@@ -836,11 +888,19 @@ export async function saveProductCatalogAction(
       keepIds.add(row.id);
       await prisma.theokotProduct.update({
         where: { id: row.id },
-        data: { ...data, imageKey: resolveImageKey(row.image, currentKeys.get(row.id) ?? null) },
+        data: {
+          ...data,
+          imageKey: resolveImageKey(row.image, currentKeys.get(row.id) ?? null),
+          badgeImageKey: resolveImageKey(row.badgeImage, currentBadgeKeys.get(row.id) ?? null),
+        },
       });
     } else {
       const created = await prisma.theokotProduct.create({
-        data: { ...data, imageKey: resolveImageKey(row.image, null) },
+        data: {
+          ...data,
+          imageKey: resolveImageKey(row.image, null),
+          badgeImageKey: resolveImageKey(row.badgeImage, null),
+        },
       });
       keepIds.add(created.id);
     }

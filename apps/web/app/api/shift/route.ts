@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { requirePermission, requireSession } from '@/lib/session';
+import { requireAnyPermission, requireSession } from '@/lib/session';
 import { prisma } from '@vtk/db';
 import {
   parseShift,
@@ -7,6 +7,7 @@ import {
   isRecordNotFound,
   isForeignKeyViolation,
   ShiftValidationError,
+  canManageAllShifts,
   canManageShift,
   isUserInShiftPost,
 } from '@/lib/shift';
@@ -40,7 +41,7 @@ export async function GET() {
 async function postHandler(request: Request) {
   let session;
   try {
-    session = await requirePermission('shift.edit');
+    session = await requireAnyPermission(['shift.edit', 'shift.editAll']);
   } catch (err) {
     return authErrorResponse(err);
   }
@@ -65,7 +66,7 @@ async function postHandler(request: Request) {
     throw err;
   }
 
-  if (!session.user.isSuperAdmin && !isUserInShiftPost(session, data.post)) {
+  if (!canManageAllShifts(session) && !isUserInShiftPost(session, data.post)) {
     return NextResponse.json(
       { error: 'Validation failed', details: ['post must be one of your own praesidium posts'] },
       { status: 403 }
@@ -85,7 +86,7 @@ async function postHandler(request: Request) {
 async function deleteHandler(request: Request) {
   let session;
   try {
-    session = await requirePermission('shift.edit');
+    session = await requireAnyPermission(['shift.edit', 'shift.editAll']);
   } catch (err) {
     return authErrorResponse(err);
   }
@@ -154,7 +155,7 @@ const isStringArray = (value: unknown): value is string[] =>
 async function patchHandler(request: Request) {
   let session;
   try {
-    session = await requirePermission('shift.edit');
+    session = await requireAnyPermission(['shift.edit', 'shift.editAll']);
   } catch (err) {
     return authErrorResponse(err);
   }
@@ -218,7 +219,7 @@ async function patchHandler(request: Request) {
     return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
 
-  if (!session.user.isSuperAdmin && patch.post !== undefined && patch.post !== existing.post) {
+  if (!canManageAllShifts(session) && patch.post !== undefined && patch.post !== existing.post) {
     if (!isUserInShiftPost(session, patch.post)) {
       return NextResponse.json(
         { error: 'Validation failed', details: ['post must be one of your own praesidium posts'] },

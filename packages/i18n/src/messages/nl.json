@@ -826,6 +826,7 @@
       "post": "Post",
       "count": "Aantal",
       "noPost": "Geen post",
+      "deducted": "Afgenomen door het beheer",
       "empty": "Je hebt nog geen shiften gedaan."
     }
   },

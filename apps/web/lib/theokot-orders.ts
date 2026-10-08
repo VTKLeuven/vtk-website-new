@@ -115,7 +115,7 @@ export async function loadOrderableSessions(userId: string, now: Date = new Date
         items: { orderBy: { order: "asc" } },
         orders: {
           where: { userId },
-          include: { lines: { include: { sessionItem: { select: { nameNl: true, nameEn: true } } } } },
+          include: { lines: { include: { sessionItem: { select: { nameNl: true, nameEn: true, badgeImageKey: true } } } } },
         },
       },
     }),

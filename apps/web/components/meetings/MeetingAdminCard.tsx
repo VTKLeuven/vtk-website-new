@@ -28,6 +28,8 @@ export type MeetingReservationRow = {
   totalCents: number;
   paid: boolean;
   invalid: boolean;
+  /** Big bureau: het broodje wordt extern besteld, niet bij Theokot. */
+  external: boolean;
   /** Er is een broodje of een drankje besteld; anders komt die persoon enkel. */
   hasOrder: boolean;
 };
@@ -56,6 +58,15 @@ export type MeetingAdminView = {
   noteNl: string;
   noteEn: string;
   useTheokot: boolean;
+  /** Levert Theokot maar de eerste `theokotLimit` broodjes? */
+  bigBureau: boolean;
+  theokotLimit: number | null;
+  /** Broodjes die van Theokot komen (geldige, met een broodje). */
+  theokotCount: number;
+  /** Wat extern besteld moet worden, per broodje. Leeg zonder big bureau. */
+  externalItems: Array<{ name: string; count: number }>;
+  /** De bestelling is dicht; Theokot werkt misschien al met de turflijst. */
+  deadlinePassed: boolean;
   options: MeetingOptionView[];
   /** Volledige link naar het bestelformulier (enkel voor een bureau). */
   shareUrl: string | null;
@@ -81,7 +92,9 @@ export type MeetingAdminView = {
  */
 export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: MeetingAdminView }) {
   const [useTheokot, setUseTheokot] = useState(meeting.useTheokot);
+  const [bigBureau, setBigBureau] = useState(meeting.bigBureau);
   const invalidCount = meeting.reservations.filter((row) => row.invalid).length;
+  const externalCount = meeting.externalItems.reduce((total, row) => total + row.count, 0);
 
   return (
     <Card className="p-5">
@@ -91,6 +104,10 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
           <p className="text-sm text-[#5c667f]">
             {meeting.reservations.length} {nl ? "ingeschreven" : "registered"} ·{" "}
             {meeting.orderCount} {nl ? "met bestelling" : "with an order"} ·{" "}
+            {(meeting.bigBureau || externalCount > 0) &&
+              (nl
+                ? `${meeting.theokotCount} van Theokot · ${externalCount} extern · `
+                : `${meeting.theokotCount} from Theokot · ${externalCount} external · `)}
             {meeting.theokotOrders.length > 0 &&
               `${meeting.theokotOrders.length} ${nl ? "zelf bij Theokot" : "ordered at Theokot"} · `}
             <span className="tabular-nums">{formatEuro(meeting.totalCents)}</span>
@@ -151,12 +168,25 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
           savedMessage={nl ? "Vergadering opgeslagen" : "Meeting saved"}
           errorMessages={
             nl
-              ? { INVALID_DATE: "Geef een geldig moment op.", NOT_FOUND: "Deze vergadering bestaat niet meer." }
-              : { INVALID_DATE: "Enter a valid moment.", NOT_FOUND: "This meeting no longer exists." }
+              ? {
+                  INVALID_DATE: "Geef een geldig moment op.",
+                  NOT_FOUND: "Deze vergadering bestaat niet meer.",
+                  INVALID_LIMIT: "Geef bij big bureau op hoeveel broodjes Theokot levert (0 of meer).",
+                  EXTERNAL_LEFT:
+                    "Big bureau staat nog aan: Theokot heeft niet genoeg voorraad meer om de extern bestelde broodjes over te nemen. Zet het aantal voor Theokot hoger, of vraag Theokot eerst om meer broodjes.",
+                }
+              : {
+                  INVALID_DATE: "Enter a valid moment.",
+                  NOT_FOUND: "This meeting no longer exists.",
+                  INVALID_LIMIT: "Enter how many sandwiches Theokot provides for a big bureau (0 or more).",
+                  EXTERNAL_LEFT:
+                    "Big bureau is still on: Theokot no longer has enough stock to take over the externally ordered sandwiches. Raise the number for Theokot, or ask Theokot for more sandwiches first.",
+                }
           }
           fallbackErrorMessage={nl ? "Opslaan mislukt." : "Saving failed."}
         >
           <input type="hidden" name="meetingId" value={meeting.id} />
+          <input type="hidden" name="locale" value={nl ? "nl" : "en"} />
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <Label>{nl ? "Wanneer" : "When"}</Label>
@@ -191,6 +221,51 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
               </span>
             </span>
           </label>
+
+          {meeting.kind === "BUREAU" && useTheokot && (
+            <div className="space-y-2">
+              <label className="flex items-start gap-2 text-sm text-[#34405e]">
+                <input
+                  type="checkbox"
+                  name="bigBureau"
+                  checked={bigBureau}
+                  onChange={(event) => setBigBureau(event.target.checked)}
+                  className="mt-1"
+                />
+                <span>
+                  Big bureau
+                  <span className="block text-xs text-[#5c667f]">
+                    {nl
+                      ? "Theokot levert enkel de eerste broodjes, in volgorde van inschrijven. De rest blijft bewaard en bestel je zelf extern; die gaan niet van de Theokot-voorraad af en staan niet op de turflijst. Kan ook wanneer er al besteld is: wat boven het aantal valt, komt meteen terug vrij voor studenten."
+                      : "Theokot only provides the first sandwiches, in order of registration. The rest is kept and you order it externally yourself; those do not come out of Theokot's stock and are not on the tally sheet. Works even when orders exist: whatever exceeds the number is released to students right away."}
+                  </span>
+                </span>
+              </label>
+              {bigBureau && (
+                <div className="max-w-[14rem] pl-6">
+                  <Label htmlFor={`theokot-limit-${meeting.id}`}>
+                    {nl ? "Broodjes van Theokot" : "Sandwiches from Theokot"}
+                  </Label>
+                  <Input
+                    id={`theokot-limit-${meeting.id}`}
+                    type="number"
+                    name="theokotLimit"
+                    min={0}
+                    step={1}
+                    defaultValue={meeting.theokotLimit ?? ""}
+                    required
+                  />
+                </div>
+              )}
+              {meeting.deadlinePassed && (
+                <p className="pl-6 text-xs text-[#5c667f]">
+                  {nl
+                    ? "De deadline is voorbij: Theokot werkt misschien al met de turflijst. Wijzig je dit nu nog, verwittig Theokot dan zelf."
+                    : "The deadline has passed: Theokot may already be working from the tally sheet. If you change this now, let Theokot know yourself."}
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
@@ -258,6 +333,9 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
                     </td>
                     <td className="py-1.5 pr-3">
                       {row.item ?? <span className="text-[#5c667f]">—</span>}
+                      {row.external && (
+                        <span className="ml-1 text-xs text-[#5c667f]">{nl ? "(extern)" : "(external)"}</span>
+                      )}
                       {row.invalid && (
                         <span className="ml-1 text-xs text-red-600">
                           {nl ? "(ongeldig)" : "(invalid)"}
@@ -296,6 +374,37 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
           </div>
         )}
       </details>
+
+      {meeting.externalItems.length > 0 && (
+        <details className="group mt-2">
+          <summary className="cursor-pointer text-sm text-vtk-ink/80 hover:text-vtk-ink">
+            {nl ? `Extern te bestellen (${externalCount})` : `To order externally (${externalCount})`}
+          </summary>
+          <p className="mt-2 text-sm text-[#5c667f]">
+            {nl
+              ? "Deze broodjes levert Theokot niet: bestel ze zelf bij een externe zaak. Wie welk broodje krijgt, staat bij “Wie komt”. Ze zitten niet in het bedrag hierboven, want die rekening komt van die zaak."
+              : "Theokot does not provide these sandwiches: order them yourself from an external vendor. Who gets which is listed under “Who is coming”. They are not in the amount above, since that bill comes from the vendor."}
+          </p>
+          <div className="relative mt-3 overflow-x-auto">
+            <table className="w-full min-w-[20rem] text-sm">
+              <thead>
+                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-[#5c667f]">
+                  <th className="py-1 pr-3">{nl ? "Broodje" : "Sandwich"}</th>
+                  <th className="py-1 text-right">{nl ? "Aantal" : "Count"}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {meeting.externalItems.map((row) => (
+                  <tr key={row.name} className="border-t border-vtk-blue/10">
+                    <td className="py-1.5 pr-3">{row.name}</td>
+                    <td className="py-1.5 text-right tabular-nums">{row.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </details>
+      )}
 
       {meeting.theokotOrders.length > 0 && (
         <details className="group mt-2">

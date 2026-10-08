@@ -17,12 +17,16 @@ import { brusselsTimeOnDay, brusselsWallClock, brusselsYMD, shiftYMD } from "./b
 import { usersWithLivePermission } from "./livePermissions";
 import { sendMeetingReservationInvalidated } from "./mail";
 import {
+  isBigBureau,
   meetingKindLabel,
   meetingPath,
   offeringNameKey,
   parseMeetingDrinks,
+  planMeetingSupply,
   type MeetingDrinks,
+  type SupplyAssignment,
 } from "./meetings";
+import { withSerializableTransaction } from "./ticketing/transactions";
 
 /** De drankkeuze en -prijs die voor alle momenten gelden. */
 export async function getMeetingDrinks(): Promise<MeetingDrinks> {
@@ -31,8 +35,11 @@ export async function getMeetingDrinks(): Promise<MeetingDrinks> {
 }
 
 /** De Theokot-verkoopdag op de kalenderdag van dit moment, indien die bestaat. */
-export async function sessionForMeeting(meeting: { startsAt: Date }) {
-  return prisma.theokotSession.findUnique({
+export async function sessionForMeeting(
+  meeting: { startsAt: Date },
+  db: Prisma.TransactionClient = prisma,
+) {
+  return db.theokotSession.findUnique({
     where: { date: brusselsTimeOnDay(meeting.startsAt, "00:00") },
     include: { items: { orderBy: { order: "asc" } } },
   });
@@ -157,10 +164,15 @@ export async function usageForSessionItems(itemIds: string[]): Promise<Map<strin
  * Dezelfde telling binnen een lopende transactie (bestellen van een student).
  * Bewust na elkaar en niet met `Promise.all`: queries van één interactieve
  * transactie horen op één verbinding, in volgorde.
+ *
+ * `exceptMeetingId` laat de broodjes van één vergadering buiten de telling: wat
+ * er nog vrij is voor dat moment, wanneer het zijn eigen broodjes opnieuw
+ * verdeelt (big bureau).
  */
 export async function usageForSessionItemsTx(
   tx: Prisma.TransactionClient,
   sessionId: string,
+  options: { exceptMeetingId?: string } = {},
 ): Promise<Map<string, number>> {
   const lines = await tx.theokotOrderLine.groupBy({
     by: ["sessionItemId"],
@@ -169,7 +181,11 @@ export async function usageForSessionItemsTx(
   });
   const reservations = await tx.meetingReservation.groupBy({
     by: ["sessionItemId"],
-    where: { sessionItem: { sessionId }, status: "ACTIVE" },
+    where: {
+      sessionItem: { sessionId },
+      status: "ACTIVE",
+      ...(options.exceptMeetingId ? { meetingId: { not: options.exceptMeetingId } } : {}),
+    },
     _count: { _all: true },
   });
 
@@ -190,6 +206,97 @@ export async function usageForSessionItemsTx(
 // -----------------------------------------------------------------------------
 
 export type SyncResult = { linked: number; invalidated: number };
+
+// -----------------------------------------------------------------------------
+// Big bureau
+// -----------------------------------------------------------------------------
+
+/** Hoeveel broodjes van een moment van Theokot komen en hoeveel extern. */
+export type SupplySplit = { theokot: number; external: number };
+
+/**
+ * Verdeelt de broodjes van een big bureau opnieuw over Theokot en de externe
+ * bestelling ({@link planMeetingSupply}) en schrijft enkel wat verandert.
+ *
+ * Draait binnen de serialiseerbare transactie van wie het oproept, zodat een
+ * student die tegelijk bestelt nooit een broodje krijgt dat het bureau net
+ * terugneemt. Na elke wijziging die de verdeling raakt: inschrijven, aanpassen,
+ * annuleren, de limiet wijzigen en het aanbod van die dag. Daarom mag big
+ * bureau ook aangezet worden wanneer er al besteld is: wat boven de limiet valt,
+ * gaat meteen terug naar de voorraad voor studenten.
+ *
+ * `limit` overschrijft de limiet van het moment; `null` is "geen limiet" en
+ * dient om big bureau uit te zetten (wat Theokot niet meer kan leveren, blijft
+ * dan extern staan en wordt geteld).
+ */
+export async function rebalanceMeetingSupply(
+  tx: Prisma.TransactionClient,
+  meetingId: string,
+  options: { limit?: number | null } = {},
+): Promise<SupplySplit> {
+  const split: SupplySplit = { theokot: 0, external: 0 };
+  const meeting = await tx.meeting.findUnique({
+    where: { id: meetingId },
+    select: { startsAt: true, useTheokot: true, theokotLimit: true },
+  });
+  if (!meeting?.useTheokot) return split;
+  const limit = options.limit === undefined ? meeting.theokotLimit : options.limit;
+
+  const session = await sessionForMeeting(meeting, tx);
+  const reservations = await tx.meetingReservation.findMany({
+    where: { meetingId, status: "ACTIVE", itemNameNl: { not: null } },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: { id: true, itemNameNl: true, external: true, sessionItemId: true },
+  });
+
+  let stock: Map<string, { sessionItemId: string; available: number }> | null = null;
+  if (session) {
+    const used = await usageForSessionItemsTx(tx, session.id, { exceptMeetingId: meetingId });
+    stock = new Map();
+    // Zelfde aanbod als het formulier: zonder het broodje van de week.
+    for (const item of session.items) {
+      if (item.isWeeklySpecial) continue;
+      stock.set(offeringNameKey(item.nameNl), {
+        sessionItemId: item.id,
+        available: Math.max(0, item.quantity - (used.get(item.id) ?? 0)),
+      });
+    }
+  }
+
+  const plan = planMeetingSupply(
+    reservations.map((reservation) => ({
+      id: reservation.id,
+      itemKey: offeringNameKey(reservation.itemNameNl ?? ""),
+    })),
+    limit,
+    stock,
+  );
+
+  // Gebundeld per bestemming: big bureau aanzetten verschuift er al snel honderd.
+  const changes = new Map<string, { data: SupplyAssignment; ids: string[] }>();
+  for (const reservation of reservations) {
+    const next = plan.get(reservation.id);
+    if (!next) continue;
+    split[next.external ? "external" : "theokot"] += 1;
+    if (next.external === reservation.external && next.sessionItemId === reservation.sessionItemId) {
+      continue;
+    }
+    const key = next.external ? "external" : (next.sessionItemId ?? "unlinked");
+    const group = changes.get(key) ?? { data: next, ids: [] };
+    group.ids.push(reservation.id);
+    changes.set(key, group);
+  }
+  for (const { data, ids } of changes.values()) {
+    await tx.meetingReservation.updateMany({ where: { id: { in: ids } }, data });
+  }
+
+  return split;
+}
+
+/** {@link rebalanceMeetingSupply} in een eigen transactie, voor wie er geen open heeft. */
+export async function rebalanceMeetingSupplyNow(meetingId: string): Promise<SupplySplit> {
+  return withSerializableTransaction((tx) => rebalanceMeetingSupply(tx, meetingId));
+}
 
 /**
  * Legt de reservaties van een moment naast het aanbod van die dag.
@@ -216,11 +323,18 @@ export async function syncMeetingReservations(meetingId: string): Promise<SyncRe
   // bestellingen op haar oude dag achterlaten.
   await linkGrocomeetOrders(meeting);
 
+  // Bij een big bureau koppelt de verdeling over Theokot en de externe zaak,
+  // niet de lus hieronder: die zou elk broodje aan de voorraad hangen.
+  const bigBureau = isBigBureau(meeting);
+
   const session = meeting.useTheokot ? await sessionForMeeting(meeting) : null;
   // Zolang de verkoopdag niet bestaat, valt er niets te controleren: het aanbod
   // van die week is nog niet beslist. De reservatie blijft staan en wordt
   // gekoppeld zodra Theokot de week aanmaakt.
-  if (meeting.useTheokot && !session) return { linked: 0, invalidated: 0 };
+  if (meeting.useTheokot && !session) {
+    if (bigBureau) await rebalanceMeetingSupplyNow(meeting.id);
+    return { linked: 0, invalidated: 0 };
+  }
 
   const byKey = new Map<string, MeetingChoice>();
   for (const choice of await offeringForMeeting(meeting, session)) byKey.set(choice.key, choice);
@@ -248,6 +362,7 @@ export async function syncMeetingReservations(meetingId: string): Promise<SyncRe
           invalidatedAt: new Date(),
           invalidatedReason: reason,
           sessionItemId: null,
+          external: false,
         },
       });
       invalidated += 1;
@@ -255,6 +370,7 @@ export async function syncMeetingReservations(meetingId: string): Promise<SyncRe
       continue;
     }
 
+    if (bigBureau) continue;
     if (reservation.sessionItemId !== choice.sessionItemId) {
       await prisma.meetingReservation.update({
         where: { id: reservation.id },
@@ -263,6 +379,8 @@ export async function syncMeetingReservations(meetingId: string): Promise<SyncRe
       linked += 1;
     }
   }
+
+  if (bigBureau) await rebalanceMeetingSupplyNow(meeting.id);
 
   return { linked, invalidated };
 }

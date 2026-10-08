@@ -6,6 +6,7 @@ import { z } from "zod";
 import { listRecipients, MAILING_LISTS } from "@/lib/mailinglists";
 import { McpInputError } from "@/lib/mcp/data";
 import { earnedShiftReward } from "@/lib/shift/rewards";
+import { shiftDeductions } from "@/lib/shift/deductions";
 import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import {
   hasAnyMcpPermission,
@@ -75,8 +76,8 @@ const RESOURCE_PERMISSIONS = {
   editorial_settings: ["home.edit", "openingHours.manageOwn", "media.manage"],
   dashboard: ["dashboard.manage", "dashboard.manageOwn"],
   shortlinks: ["shortlinks.manage"],
-  shifts: ["shift.edit", "shift.reward"],
-  shift_ranking: ["shift.ranking", "shift.edit", "shift.reward"],
+  shifts: ["shift.edit", "shift.editAll", "shift.reward"],
+  shift_ranking: ["shift.ranking", "shift.edit", "shift.editAll", "shift.reward"],
   theokot: ["theokot.manage", "theokot.pickup"],
   meetings: ["grocomeet.manage", "bureau.manage"],
   meeting_schedule: ["grocomeet.reserve", "grocomeet.manage", "bureau.manage"],
@@ -449,7 +450,8 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
         },
       });
       // Een shift uit een praesidiumjaar telt mee, maar levert niets op.
-      const praesidium = await praesidiumYears(rows.map((row) => row.user.id));
+      const userIds = rows.map((row) => row.user.id);
+      const [praesidium, deductions] = await Promise.all([praesidiumYears(userIds), shiftDeductions({ userIds })]);
       const totals = new Map<string, { userId: string; name: string; earned: number; paid: number; shifts: number }>();
       for (const row of rows) {
         const current = totals.get(row.user.id) ?? { userId: row.user.id, name: row.user.name, earned: 0, paid: 0, shifts: 0 };
@@ -457,6 +459,11 @@ export async function adminRead(principal: McpPrincipal, raw: McpAdminReadInput)
         current.paid += row.rewardPaid;
         current.shifts += 1;
         totals.set(row.user.id, current);
+      }
+      // Afgenomen shiften gaan van het aantal af, niet van de bonnetjes.
+      for (const deduction of deductions) {
+        const current = totals.get(deduction.userId);
+        if (current) current.shifts += deduction.count;
       }
       return { ...page([...totals.values()].sort((a, b) => b.earned - a.earned), input), partialAggregation: true };
     }

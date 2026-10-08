@@ -3423,6 +3423,7 @@ model TheokotProduct {
   defaultQuantity     Int      @default(0)
   isWeeklySpecialSlot Boolean  @default(false) // "broodje van de week"-slot
   imageKey            String? // optionele foto; NULL = gestreept patroon
+  badgeImageKey       String? // optionele ronde sticker/badge (PNG); getoond aan de afhaalbalie
   ingredientsNl       String? // optionele ingrediëntenlijst (info-icoontje)
   ingredientsEn       String?
   order               Int      @default(0)
@@ -3474,6 +3475,7 @@ model TheokotSessionItem {
   quantity        Int // beschikbare voorraad voor deze sessie
   isWeeklySpecial Boolean @default(false)
   imageKey        String? // meegekopieerd uit de catalogus, per dag aanpasbaar
+  badgeImageKey   String? // optionele ronde sticker/badge, per dag aanpasbaar
   ingredientsNl   String?
   ingredientsEn   String?
   order           Int     @default(0)
@@ -3607,6 +3609,13 @@ model Meeting {
   /// raakt de Theokot-voorraad en de turflijst niet.
   useTheokot Boolean @default(true)
 
+  /// Big bureau: Theokot levert enkel de eerste zoveel broodjes, in volgorde van
+  /// inschrijven; de rest bestelt Onderwijs zelf bij een externe zaak
+  /// (`MeetingReservation.external`). Leeg = geen big bureau, alles komt van
+  /// Theokot. Enkel bij een bureau met `useTheokot`. Mag ook aangezet worden
+  /// wanneer er al besteld is: `rebalanceMeetingSupply` verdeelt dan opnieuw.
+  theokotLimit Int?
+
   /// Vrije toelichting boven het reservatieformulier.
   noteNl String?
   noteEn String?
@@ -3661,6 +3670,11 @@ model MeetingReservation {
   /// Het aanbod-item van die verkoopdag, zodra het gekoppeld kon worden. Dit is
   /// wat de voorraad afroomt en op de turflijst verschijnt.
   sessionItemId  String?
+  /// Big bureau: dit broodje komt niet uit de Theokot-voorraad maar wordt apart
+  /// bij een externe zaak besteld. `sessionItemId` is dan leeg, dus het gaat
+  /// niet van de voorraad af en staat niet op de turflijst. Enkel true zolang
+  /// `Meeting.theokotLimit` gezet is.
+  external       Boolean @default(false)
 
   /// Leeg = geen drankje.
   drinkName       String?
@@ -5374,6 +5388,50 @@ model FakTally {
 
   @@id([rNumber, year])
   @@index([year, points])
+}
+
+// Een periode waarin de scanner anders telt, voor een groot evenement van de
+// fakbar: geen check-in per bardag maar één per tijdvak (standaard elk uur),
+// enkel binnen een dagelijks venster (bv. 22:00-10:00, zodat wie overdag in de
+// bar werkt geen scans bijspaart), met een eigen teller en een eigen pintregel.
+//
+// **Zolang een periode loopt, staat de gewone werking stil**: een scan telt dan
+// enkel in `FakPeriodTally` en niet in `FakTally`. Na `endsAt` telt alles weer
+// zoals altijd. Periodes mogen niet overlappen; dat bewaakt de actie die ze
+// opslaat, niet de database.
+model FakPeriod {
+  id              String   @id @default(cuid())
+  name            String
+  startsAt        DateTime
+  endsAt          DateTime // exclusief
+  // Dagelijks venster op de Brusselse wandklok ("HH:mm"), mag over middernacht.
+  // Beide null = de hele periode door.
+  windowStart     String?
+  windowEnd       String?
+  intervalMinutes Int      @default(60)
+  rewardEnabled   Boolean  @default(true)
+  rewardEvery     Int      @default(10)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tallies FakPeriodTally[]
+
+  @@index([startsAt, endsAt])
+}
+
+// Eén rij per r-nummer per periode, om dezelfde reden als `FakTally`: de stand
+// en de laatste scan, geen lijst van wanneer iemand er was. `lastCheckinAt` is
+// meteen de "al gescand in dit tijdvak"-check.
+model FakPeriodTally {
+  periodId      String
+  rNumber       String
+  checkins      Int      @default(0)
+  lastCheckinAt DateTime
+
+  period FakPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+
+  @@id([periodId, rNumber])
+  @@index([periodId, checkins])
 }
 
 // Waar een mislukte scan aan lag.

@@ -4,13 +4,16 @@ import { prisma } from '@vtk/db';
 import { academicYearRange } from '@/lib/shift';
 import { authErrorResponse } from '@/lib/session';
 import { earnedShiftReward } from '@/lib/shift/rewards';
+import { deductedShifts, netShiftCount, shiftDeductions } from '@/lib/shift/deductions';
 import { praesidiumYears } from '@/lib/shift/voucherEligibility';
 
 /**
  * Get het totaal aantal shifts per post van de user die de request maakt, en het aantal onbetaalde shifts voor het huidige academiejaar
  *
- * Response: `{ perPost: { <post>: <aantal> }, total, unpaidCurrentYear }`.
- * Shiften zonder post worden onder de sleutel `GEEN` geteld.
+ * Response: `{ perPost: { <post>: <aantal> }, deducted, total, unpaidCurrentYear }`.
+ * Shiften zonder post worden onder de sleutel `GEEN` geteld. `deducted` is het
+ * aantal afgenomen shiften (`lib/shift/deductions.ts`); `total` is wat er na die
+ * afname overblijft, nooit onder nul. `perPost` telt enkel de echte shiften.
  */
 export async function GET() {
   let session;
@@ -21,7 +24,7 @@ export async function GET() {
   }
 
   const userId = session.user.id;
-  const [participations, praesidium] = await Promise.all([
+  const [participations, praesidium, deductions] = await Promise.all([
     prisma.shiftParticipant.findMany({
       where: {
         userId,
@@ -33,6 +36,7 @@ export async function GET() {
       },
     }),
     praesidiumYears([userId]),
+    shiftDeductions({ userIds: [userId] }),
   ]);
 
   const { start, end } = academicYearRange();
@@ -52,5 +56,11 @@ export async function GET() {
     }
   }
 
-  return NextResponse.json({ perPost, total, unpaidCurrentYear });
+  const deducted = deductedShifts(deductions);
+  return NextResponse.json({
+    perPost,
+    deducted,
+    total: netShiftCount(total, deducted),
+    unpaidCurrentYear,
+  });
 }

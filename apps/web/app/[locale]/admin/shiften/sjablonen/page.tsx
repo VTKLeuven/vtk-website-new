@@ -1,7 +1,8 @@
 import { prisma } from '@vtk/db';
 import { notFound } from 'next/navigation';
 import { hasLocale } from '@/lib/locale';
-import { requirePermission } from '@/lib/session';
+import { requireAnyPermission } from '@/lib/session';
+import { canManageAllShifts } from '@/lib/shift/authorization';
 import { listShiftTemplates } from '@/lib/shift/templateStore';
 import { utcToLocalDateTime } from '@/lib/ticketing/time';
 import type { Locale } from '@vtk/i18n';
@@ -12,7 +13,7 @@ export default async function AdminShiftTemplates({ params }: { params: Promise<
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
-  const session = await requirePermission('shift.edit');
+  const session = await requireAnyPermission(['shift.edit', 'shift.editAll']);
 
   const nl = locale === 'nl';
   const canManage = session.user.isSuperAdmin || session.permissions.includes('shift.templates');
@@ -27,8 +28,9 @@ export default async function AdminShiftTemplates({ params }: { params: Promise<
     }),
   ]);
 
+  const manageAllPosts = canManageAllShifts(session);
   const userPostCodes = session.groups.filter((g) => g.type === 'PRAESIDIUM').map((g) => g.code);
-  const postOptions = session.user.isSuperAdmin
+  const postOptions = manageAllPosts
     ? activeGroups.map((g) => g.code)
     : activeGroups.map((g) => g.code).filter((code) => userPostCodes.includes(code));
 
@@ -53,7 +55,7 @@ export default async function AdminShiftTemplates({ params }: { params: Promise<
         templates={templates}
         today={utcToLocalDateTime(new Date()).slice(0, 10)}
         postOptions={postOptions}
-        allowNoPost={session.user.isSuperAdmin}
+        allowNoPost={manageAllPosts}
       />
     </div>
   );

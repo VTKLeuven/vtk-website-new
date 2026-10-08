@@ -13,8 +13,15 @@ type SearchUser = {
   rNumber: string | null;
 };
 
+/**
+ * Toekennen maakt echte shiften aan; afnemen zet een negatief aantal zonder
+ * shiften, dat de tellingen er zelf aftrekken (`lib/shift/deductions.ts`).
+ */
+export type ManualGrantMode = "grant" | "deduct";
+
 export function ShiftManualGrantModal({
   locale,
+  mode,
   postOptions,
   selectedYear,
   availableYears,
@@ -22,6 +29,7 @@ export function ShiftManualGrantModal({
   onSaved,
 }: {
   locale: Locale;
+  mode: ManualGrantMode;
   postOptions: string[];
   selectedYear: number;
   availableYears: number[];
@@ -30,6 +38,7 @@ export function ShiftManualGrantModal({
 }) {
   const nl = locale === "nl";
   const showToast = useToast();
+  const deduct = mode === "deduct";
 
   const [selectedUser, setSelectedUser] = useState<SearchUser | null>(null);
   const [search, setSearch] = useState("");
@@ -37,7 +46,15 @@ export function ShiftManualGrantModal({
   const [count, setCount] = useState("1");
   const [post, setPost] = useState("");
   const [year, setYear] = useState(String(selectedYear));
-  const [reason, setReason] = useState(nl ? "Overdracht vorige website" : "Transfer from previous website");
+  const [reason, setReason] = useState(
+    deduct
+      ? nl
+        ? "Niet komen opdagen"
+        : "Did not show up"
+      : nl
+        ? "Overdracht vorige website"
+        : "Transfer from previous website",
+  );
   const [reward, setReward] = useState("0");
   const [payedOut, setPayedOut] = useState(true);
 
@@ -84,7 +101,7 @@ export function ShiftManualGrantModal({
       return;
     }
 
-    const parsedReward = parseInt(reward, 10);
+    const parsedReward = deduct ? 0 : parseInt(reward, 10);
     if (Number.isNaN(parsedReward) || parsedReward < 0) {
       setError(nl ? "Bonnetjes moet een getal >= 0 zijn." : "Vouchers must be >= 0.");
       return;
@@ -100,19 +117,25 @@ export function ShiftManualGrantModal({
 
     const res = await grantManualShiftsAction({
       userId: selectedUser.id,
-      count: parsedCount,
+      count: deduct ? -parsedCount : parsedCount,
       post: post === "" ? null : post,
       academicYear: parseInt(year, 10),
       reason: reason.trim(),
       reward: parsedReward,
-      payedOut,
+      payedOut: deduct ? true : payedOut,
     });
 
     setBusy(false);
 
     if (res.success) {
       showToast({
-        message: nl ? "Extra shiften toegekend" : "Extra shifts granted",
+        message: deduct
+          ? nl
+            ? "Shiften afgenomen"
+            : "Shifts deducted"
+          : nl
+            ? "Extra shiften toegekend"
+            : "Extra shifts granted",
         variant: "success",
       });
       onSaved();
@@ -135,7 +158,13 @@ export function ShiftManualGrantModal({
       >
         <div className="flex items-center justify-between border-b border-vtk-navy/5 pb-3">
           <h2 id="grant-modal-title" className="text-lg font-semibold text-vtk-ink">
-            {nl ? "Extra shiften manueel toekennen" : "Manually grant extra shifts"}
+            {deduct
+              ? nl
+                ? "Shiften afnemen"
+                : "Deduct shifts"
+              : nl
+                ? "Extra shiften manueel toekennen"
+                : "Manually grant extra shifts"}
           </h2>
           <button
             type="button"
@@ -211,7 +240,15 @@ export function ShiftManualGrantModal({
           <div className="grid grid-cols-2 gap-3">
             {/* Aantal shiften */}
             <div>
-              <Label>{nl ? "Aantal shiften *" : "Number of shifts *"}</Label>
+              <Label>
+                {deduct
+                  ? nl
+                    ? "Aantal af te nemen shiften *"
+                    : "Shifts to deduct *"
+                  : nl
+                    ? "Aantal shiften *"
+                    : "Number of shifts *"}
+              </Label>
               <Input
                 type="number"
                 min="1"
@@ -249,20 +286,30 @@ export function ShiftManualGrantModal({
               </Select>
             </div>
 
-            {/* Bonnetjes per shift */}
-            <div>
-              <Label>{nl ? "Bonnetjes per shift" : "Vouchers per shift"}</Label>
-              <Input
-                type="number"
-                min="0"
-                value={reward}
-                onChange={(e) => setReward(e.target.value)}
-              />
-            </div>
+            {/* Bonnetjes per shift; een afname raakt de bonnetjes niet */}
+            {!deduct && (
+              <div>
+                <Label>{nl ? "Bonnetjes per shift" : "Vouchers per shift"}</Label>
+                <Input
+                  type="number"
+                  min="0"
+                  value={reward}
+                  onChange={(e) => setReward(e.target.value)}
+                />
+              </div>
+            )}
           </div>
 
+          {deduct && (
+            <p className="rounded-lg bg-vtk-blue-muted p-3 text-xs text-vtk-body">
+              {nl
+                ? "Afnemen verlaagt enkel het aantal shiften: de ranglijst, de titels en de voorverkoop voor vaste medewerkers. De bonnetjes blijven staan. Wil je ook de bonnetjes van een shift afnemen, schrijf het lid dan uit bij die shift in Beheer; dan telt die shift ook niet meer mee."
+                : "Deducting only lowers the number of shifts: the ranking, the titles and the presale for regular volunteers. Vouchers stay as they are. To take away the vouchers of a shift too, remove the member from that shift under Manage; that shift then no longer counts either."}
+            </p>
+          )}
+
           {/* Reeds uitbetaald optie als reward > 0 */}
-          {parseInt(reward, 10) > 0 && (
+          {!deduct && parseInt(reward, 10) > 0 && (
             <div className="flex items-center gap-2 rounded-lg bg-vtk-blue-muted p-2 text-sm text-vtk-body">
               <input
                 type="checkbox"
@@ -286,13 +333,25 @@ export function ShiftManualGrantModal({
               type="text"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder={nl ? "bv. Overdracht vorige website" : "e.g. Migration previous website"}
+              placeholder={
+                deduct
+                  ? nl
+                    ? "bv. Niet komen opdagen"
+                    : "e.g. Did not show up"
+                  : nl
+                    ? "bv. Overdracht vorige website"
+                    : "e.g. Migration previous website"
+              }
               required
             />
             <p className="mt-1 text-xs text-vtk-muted">
-              {nl
-                ? "Wordt opgenomen in het adminlogboek en getoond in de shifthistoriek."
-                : "Will be recorded in the admin audit log and shown in shift history."}
+              {deduct
+                ? nl
+                  ? "Komt in het adminlogboek en in de lijst op deze tab. Het lid ziet in zijn shiftgeschiedenis hoeveel shiften er afgenomen zijn, niet waarom."
+                  : "Recorded in the admin audit log and in the list on this tab. The member sees in their shift history how many shifts were deducted, not why."
+                : nl
+                  ? "Wordt opgenomen in het adminlogboek en getoond in de shifthistoriek."
+                  : "Will be recorded in the admin audit log and shown in shift history."}
             </p>
           </div>
 
@@ -302,12 +361,20 @@ export function ShiftManualGrantModal({
             </Button>
             <Button type="submit" disabled={busy || !selectedUser}>
               {busy
-                ? nl
-                  ? "Toekennen..."
-                  : "Granting..."
-                : nl
-                  ? "Shiften toekennen"
-                  : "Grant shifts"}
+                ? deduct
+                  ? nl
+                    ? "Afnemen..."
+                    : "Deducting..."
+                  : nl
+                    ? "Toekennen..."
+                    : "Granting..."
+                : deduct
+                  ? nl
+                    ? "Shiften afnemen"
+                    : "Deduct shifts"
+                  : nl
+                    ? "Shiften toekennen"
+                    : "Grant shifts"}
             </Button>
           </div>
         </form>

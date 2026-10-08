@@ -13,7 +13,13 @@ import { pick, type Locale } from "@vtk/i18n";
 import type { MeetingAdminView } from "@/components/meetings/MeetingAdminCard";
 import type { PlannedDay } from "@/components/meetings/MeetingPlanner";
 import { brusselsTimeOnDay, brusselsYMD, ymdKey } from "./brussels";
-import { hasMeetingOrder, type Semester } from "./meetings";
+import {
+  hasMeetingOrder,
+  isBigBureau,
+  meetingCloseAt,
+  reservationTotalCents,
+  type Semester,
+} from "./meetings";
 import { siteUrl } from "./seo";
 
 function hhmm(date: Date): string {
@@ -85,7 +91,7 @@ export async function loadMeetingAdmin(
     meetingDays.length > 0
       ? await prisma.theokotSession.findMany({
           where: { date: { in: meetingDays } },
-          select: { date: true, isOpen: true },
+          select: { date: true, isOpen: true, orderCloseAt: true },
         })
       : [];
   const sessionByDay = new Map(sessions.map((session) => [ymdKey(brusselsYMD(session.date)), session]));
@@ -99,6 +105,7 @@ export async function loadMeetingAdmin(
     minute: "2-digit",
   });
   const base = siteUrl();
+  const now = new Date();
 
   const views: MeetingAdminView[] = meetings.map((meeting) => {
     const session = sessionByDay.get(ymdKey(brusselsYMD(meeting.startsAt)));
@@ -110,9 +117,10 @@ export async function loadMeetingAdmin(
         : null,
       drink: reservation.drinkName,
       comment: reservation.comment,
-      totalCents: reservation.itemPriceCents + reservation.drinkPriceCents,
+      totalCents: reservationTotalCents(reservation),
       paid: reservation.paidAt !== null,
       invalid: reservation.status === "INVALIDATED",
+      external: reservation.status === "ACTIVE" && reservation.external,
       // Wie komt zonder broodje en zonder drankje staat even goed ingeschreven.
       hasOrder: hasMeetingOrder({
         itemName: reservation.itemNameNl,
@@ -135,6 +143,15 @@ export async function loadMeetingAdmin(
     }));
     const money = [...reservations, ...theokotOrders];
 
+    // Wat Onderwijs zelf bij de externe zaak moet bestellen, per broodje.
+    const externalItems = new Map<string, number>();
+    let theokotCount = 0;
+    for (const row of reservations) {
+      if (!row.item || row.invalid) continue;
+      if (row.external) externalItems.set(row.item, (externalItems.get(row.item) ?? 0) + 1);
+      else theokotCount += 1;
+    }
+
     return {
       id: meeting.id,
       kind: meeting.kind,
@@ -145,6 +162,14 @@ export async function loadMeetingAdmin(
       noteNl: meeting.noteNl ?? "",
       noteEn: meeting.noteEn ?? "",
       useTheokot: meeting.useTheokot,
+      bigBureau: isBigBureau(meeting),
+      theokotLimit: meeting.theokotLimit,
+      theokotCount,
+      externalItems: [...externalItems.entries()]
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+      // Na de deadline werkt Theokot misschien al met de turflijst.
+      deadlinePassed: now >= meetingCloseAt(meeting, session ?? null),
       options: meeting.options.map((option) => ({
         id: option.id,
         nameNl: option.nameNl,
@@ -248,6 +273,8 @@ export type BureauTotals = {
     attendees: number;
     /** Enkel wie een broodje of een drankje bestelde; dat is wat geld kost. */
     orders: number;
+    /** Big bureau: broodjes die extern besteld worden en niet in het bedrag zitten. */
+    external: number;
     totalCents: number;
   }>;
   yearCents: number;
@@ -264,15 +291,20 @@ export async function loadBureauTotals(
   locale: Locale,
 ): Promise<BureauTotals> {
   const nl = locale === "nl";
-  const [meetings, allTime] = await Promise.all([
+  const [meetings, allTimeItems, allTimeDrinks] = await Promise.all([
     prisma.meeting.findMany({
       where: { kind: "BUREAU", year: workingYear },
       orderBy: { startsAt: "asc" },
       include: { reservations: { where: { status: "ACTIVE" } } },
     }),
+    // Een extern besteld broodje komt niet op deze rekening (`reservationTotalCents`).
+    prisma.meetingReservation.aggregate({
+      where: { status: "ACTIVE", external: false, meeting: { kind: "BUREAU" } },
+      _sum: { itemPriceCents: true },
+    }),
     prisma.meetingReservation.aggregate({
       where: { status: "ACTIVE", meeting: { kind: "BUREAU" } },
-      _sum: { itemPriceCents: true, drinkPriceCents: true },
+      _sum: { drinkPriceCents: true },
     }),
   ]);
 
@@ -290,8 +322,9 @@ export async function loadBureauTotals(
     orders: meeting.reservations.filter((reservation) =>
       hasMeetingOrder({ itemName: reservation.itemNameNl, drinkName: reservation.drinkName }),
     ).length,
+    external: meeting.reservations.filter((reservation) => reservation.external).length,
     totalCents: meeting.reservations.reduce(
-      (total, reservation) => total + reservation.itemPriceCents + reservation.drinkPriceCents,
+      (total, reservation) => total + reservationTotalCents(reservation),
       0,
     ),
   }));
@@ -299,6 +332,6 @@ export async function loadBureauTotals(
   return {
     perMeeting,
     yearCents: perMeeting.reduce((total, row) => total + row.totalCents, 0),
-    allTimeCents: (allTime._sum.itemPriceCents ?? 0) + (allTime._sum.drinkPriceCents ?? 0),
+    allTimeCents: (allTimeItems._sum.itemPriceCents ?? 0) + (allTimeDrinks._sum.drinkPriceCents ?? 0),
   };
 }

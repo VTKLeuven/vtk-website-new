@@ -1,8 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import { validateFakPeriod, type FakPeriodRules } from '@vtk/db/fakscanner';
 import {
+  brusselsClockTime,
   DEFAULT_FAKSCANNER_CONFIG,
   earnedReward,
   fakDayStart,
+  fakPeriodSlot,
   isDoublePeriod,
   parseFakscannerConfig,
   pointsForScan,
@@ -184,5 +187,116 @@ describe('het lezen van de instellingen', () => {
       doubleEnd: '00:30',
       dayRolloverTime: '04:00',
     });
+  });
+});
+
+describe('een periode voor een groot evenement', () => {
+  // Een week lang, elke nacht van 22:00 tot 10:00, een check-in per uur.
+  const week: FakPeriodRules = {
+    startsAt: new Date('2026-10-19T18:00:00+02:00'),
+    endsAt: new Date('2026-10-26T12:00:00+01:00'),
+    windowStart: '22:00',
+    windowEnd: '10:00',
+    intervalMinutes: 60,
+    rewardEnabled: true,
+    rewardEvery: 10,
+  };
+
+  /** Het tijdvak als "begin -> volgende" op de Brusselse klok, of "dicht -> volgende". */
+  function slotAt(rules: FakPeriodRules, iso: string): string {
+    const slot = fakPeriodSlot(rules, new Date(iso));
+    const next = slot.nextAt ? brusselsClock(slot.nextAt) : 'geen';
+    return slot.open ? `${brusselsClock(slot.slotStart)} -> ${next}` : `dicht -> ${next}`;
+  }
+
+  it('legt de tijdvakken op de klok, vanaf het begin van het venster', () => {
+    expect(slotAt(week, '2026-10-20T22:00:00+02:00')).toBe('20/10/2026, 22:00 -> 20/10/2026, 23:00');
+    expect(slotAt(week, '2026-10-20T22:50:00+02:00')).toBe('20/10/2026, 22:00 -> 20/10/2026, 23:00');
+    expect(slotAt(week, '2026-10-20T23:05:00+02:00')).toBe('20/10/2026, 23:00 -> 21/10/2026, 00:00');
+  });
+
+  it('houdt een nacht over middernacht bij het venster dat de avond ervoor opende', () => {
+    expect(slotAt(week, '2026-10-21T03:15:00+02:00')).toBe('21/10/2026, 03:00 -> 21/10/2026, 04:00');
+  });
+
+  it('telt overdag niet, en zegt wanneer het venster weer opent', () => {
+    // Wie overdag in de bar werkt, spaart niets bij.
+    expect(slotAt(week, '2026-10-21T10:00:00+02:00')).toBe('dicht -> 21/10/2026, 22:00');
+    expect(slotAt(week, '2026-10-21T14:00:00+02:00')).toBe('dicht -> 21/10/2026, 22:00');
+    // Op de eerste dag, na het begin van de periode maar voor het venster.
+    expect(slotAt(week, '2026-10-19T19:00:00+02:00')).toBe('dicht -> 19/10/2026, 22:00');
+  });
+
+  it('stuurt het laatste tijdvak van de nacht door naar de volgende avond', () => {
+    expect(slotAt(week, '2026-10-21T09:30:00+02:00')).toBe('21/10/2026, 09:00 -> 21/10/2026, 22:00');
+  });
+
+  it('noemt geen volgende scan meer na het einde van de periode', () => {
+    const kort = { ...week, endsAt: new Date('2026-10-20T23:00:00+02:00') };
+    expect(slotAt(kort, '2026-10-20T22:30:00+02:00')).toBe('20/10/2026, 22:00 -> geen');
+    const overdagGedaan = { ...week, endsAt: new Date('2026-10-21T12:00:00+02:00') };
+    expect(slotAt(overdagGedaan, '2026-10-21T10:30:00+02:00')).toBe('dicht -> geen');
+  });
+
+  it('telt zonder venster de klok rond, vanaf het begin van de periode', () => {
+    const rond = { ...week, windowStart: null, windowEnd: null, intervalMinutes: 30 };
+    expect(slotAt(rond, '2026-10-19T18:10:00+02:00')).toBe('19/10/2026, 18:00 -> 19/10/2026, 18:30');
+    expect(slotAt(rond, '2026-10-21T14:45:00+02:00')).toBe('21/10/2026, 14:30 -> 21/10/2026, 15:00');
+  });
+
+  it('werkt ook met een venster overdag', () => {
+    const dag = { ...week, windowStart: '10:00', windowEnd: '18:00' };
+    expect(slotAt(dag, '2026-10-21T17:20:00+02:00')).toBe('21/10/2026, 17:00 -> 22/10/2026, 10:00');
+    expect(slotAt(dag, '2026-10-21T20:00:00+02:00')).toBe('dicht -> 22/10/2026, 10:00');
+    expect(slotAt(dag, '2026-10-21T08:00:00+02:00')).toBe('dicht -> 21/10/2026, 10:00');
+  });
+
+  it('geeft de nacht van de uurwissel een tijdvak extra', () => {
+    // 2026-10-25: om 03:00 springt de klok terug naar 02:00. Die nacht duurt een
+    // uur langer, en 02:00-03:00 is twee aparte tijdvakken.
+    const eerste = fakPeriodSlot(week, new Date('2026-10-25T02:30:00+02:00'));
+    const tweede = fakPeriodSlot(week, new Date('2026-10-25T02:30:00+01:00'));
+    expect(eerste.open && tweede.open).toBe(true);
+    if (!eerste.open || !tweede.open) return;
+    expect(tweede.slotStart.getTime() - eerste.slotStart.getTime()).toBe(60 * 60_000);
+    expect(brusselsClock(eerste.slotStart)).toBe('25/10/2026, 02:00');
+    expect(brusselsClock(tweede.slotStart)).toBe('25/10/2026, 02:00');
+    // En om 03:00 op de klok begint gewoon het volgende.
+    expect(slotAt(week, '2026-10-25T03:10:00+01:00')).toBe('25/10/2026, 03:00 -> 25/10/2026, 04:00');
+  });
+
+  it('schrijft het uur zoals de lezer het toont', () => {
+    expect(brusselsClockTime(new Date('2026-10-20T23:00:00+02:00'))).toBe('23:00');
+    expect(brusselsClockTime(new Date('2026-10-25T22:00:00+01:00'))).toBe('22:00');
+    expect(brusselsClockTime(new Date('2026-10-21T00:05:00+02:00'))).toBe('00:05');
+  });
+});
+
+describe('het controleren van een periode', () => {
+  const geldig = {
+    name: 'Fakweek',
+    startsAt: new Date('2026-10-19T18:00:00+02:00'),
+    endsAt: new Date('2026-10-26T12:00:00+01:00'),
+    windowStart: '22:00',
+    windowEnd: '10:00',
+    intervalMinutes: 60,
+    rewardEnabled: false,
+    rewardEvery: 10,
+  };
+
+  it('aanvaardt een gewone periode, met of zonder venster', () => {
+    expect(validateFakPeriod(geldig)).toBeNull();
+    expect(validateFakPeriod({ ...geldig, windowStart: null, windowEnd: null })).toBeNull();
+  });
+
+  it('weigert wat de lezer niet eenduidig kan volgen', () => {
+    expect(validateFakPeriod({ ...geldig, name: '  ' })).toBe('missing_name');
+    expect(validateFakPeriod({ ...geldig, endsAt: geldig.startsAt })).toBe('bad_range');
+    expect(validateFakPeriod({ ...geldig, windowStart: '25:00' })).toBe('bad_time');
+    expect(validateFakPeriod({ ...geldig, windowEnd: null })).toBe('bad_time');
+    expect(validateFakPeriod({ ...geldig, windowEnd: '22:00' })).toBe('empty_window');
+    expect(validateFakPeriod({ ...geldig, intervalMinutes: 2 })).toBe('bad_interval');
+    expect(validateFakPeriod({ ...geldig, intervalMinutes: Number.NaN })).toBe('bad_interval');
+    expect(validateFakPeriod({ ...geldig, rewardEvery: 0 })).toBe('bad_reward');
   });
 });

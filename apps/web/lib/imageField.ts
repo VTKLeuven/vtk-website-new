@@ -20,9 +20,14 @@ export function readImageField(formData: FormData, name = "imageKey"): ImageFiel
   const cleared = formData.get(`${name}__cleared`) === "1";
 
   if (typeof raw === "string" && raw) {
-    // De upload-route legt afbeeldingen altijd onder `images/`; een key van
-    // elders is geknoei met het verborgen veld.
-    if (!raw.startsWith("images/")) return { kind: "invalid" };
+    // Afbeeldingen komen uit `images/` (foto's), `badges/` (stickers) of `theokot/` (seed/standaard).
+    if (
+      !raw.startsWith("images/") &&
+      !raw.startsWith("badges/") &&
+      !raw.startsWith("theokot/")
+    ) {
+      return { kind: "invalid" };
+    }
     return { kind: "set", key: raw };
   }
 

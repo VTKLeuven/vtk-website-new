@@ -247,6 +247,14 @@ maar in de check-in: ze telt enkel wanneer 't ElixIr op dat moment ook **open
 gemeten** wordt (`readBarStatus`, niet stale), en nog steeds maar één keer per
 bardag. Zie `docs/design-decisions.md`.
 
+Loopt er een periode voor een groot evenement (`FakPeriod`, beheerd in
+/admin/fakscanner/periodes), dan gelden haar regels ook hier: één check-in per
+tijdvak, enkel binnen het dagelijkse venster. Buiten dat venster komt er
+`OUTSIDE_WINDOW` (409) met een leesbare `message` terug in plaats van
+`counted: false`, zodat ook een oudere app zegt waarom de scan niet telde.
+`period` (naam of null) en `freeBeers` vertellen de app dat `total` dan de stand
+van die periode is, en of er pinten bij horen.
+
 ### `GET /api/app/v1/theokot` en `POST`/`DELETE /api/app/v1/theokot/order`
 
 Broodjes bij het Theokot. **De logica staat in `lib/theokot-orders.ts` en wordt

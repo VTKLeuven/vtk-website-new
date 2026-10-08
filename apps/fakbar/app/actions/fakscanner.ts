@@ -1,8 +1,11 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { prisma } from '@vtk/db';
-import { FAKSCANNER_SETTING_KEY } from '@vtk/db/fakscanner';
+import { FAKSCANNER_SETTING_KEY, validateFakPeriod } from '@vtk/db/fakscanner';
+import type { ActionResult } from '@/app/actions/fakbar';
+import { parseBrusselsDateTime } from '@/lib/brussels-datetime';
 import { canManageFakbar, getSession } from '@/lib/session';
 import { saveError, saveOk, type SaveState } from '@/lib/saveState';
 
@@ -66,4 +69,95 @@ export async function saveFakscannerConfigAction(
 
   revalidatePath('/admin/fakscanner');
   return saveOk();
+}
+
+// ── Periodes ─────────────────────────────────────────────────────────────────
+
+const periodDateFmt = new Intl.DateTimeFormat('nl-BE', {
+  timeZone: 'Europe/Brussels',
+  weekday: 'short',
+  day: 'numeric',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+function revalidatePeriods(id?: string): void {
+  revalidatePath('/admin/fakscanner');
+  revalidatePath('/admin/fakscanner/periodes');
+  if (id) revalidatePath(`/admin/fakscanner/periodes/${id}`);
+}
+
+/**
+ * Maakt een periode aan of werkt er een bij (met een `id` in het formulier).
+ *
+ * Periodes mogen niet overlappen: de scanner kijkt op elk moment naar hoogstens
+ * één periode, en twee tegelijk zou betekenen dat het van de volgorde in de
+ * databank afhangt welke regels gelden. Een nieuwe periode gaat na het opslaan
+ * naar haar eigen pagina; die navigatie is de bevestiging.
+ */
+export async function saveFakPeriodAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requireFakbar();
+
+  const text = (key: string) => String(formData.get(key) ?? '').trim();
+  const id = text('id') || null;
+  const startsAt = parseBrusselsDateTime(text('startsAt'));
+  const endsAt = parseBrusselsDateTime(text('endsAt'));
+  if (!startsAt || !endsAt) return saveError('bad_range');
+
+  const windowEnabled = formData.get('windowEnabled') === 'on';
+  const data = {
+    name: text('name'),
+    startsAt,
+    endsAt,
+    windowStart: windowEnabled ? text('windowStart') : null,
+    windowEnd: windowEnabled ? text('windowEnd') : null,
+    intervalMinutes: Number(formData.get('intervalMinutes')),
+    rewardEnabled: formData.get('rewardEnabled') === 'on',
+    rewardEvery: Number(formData.get('rewardEvery')),
+  };
+
+  const invalid = validateFakPeriod(data);
+  if (invalid) return saveError(invalid);
+
+  const clash = await prisma.fakPeriod.findFirst({
+    where: {
+      ...(id ? { id: { not: id } } : {}),
+      startsAt: { lt: endsAt },
+      endsAt: { gt: startsAt },
+    },
+    select: { name: true, startsAt: true, endsAt: true },
+  });
+  if (clash) {
+    return saveError(
+      'overlap',
+      `Deze periode overlapt met "${clash.name}" (${periodDateFmt.format(clash.startsAt)} tot ` +
+        `${periodDateFmt.format(clash.endsAt)}). Er kan maar één periode tegelijk lopen.`,
+    );
+  }
+
+  if (id) {
+    const updated = await prisma.fakPeriod.updateMany({ where: { id }, data });
+    if (updated.count === 0) return saveError('not_found');
+    revalidatePeriods(id);
+    return saveOk();
+  }
+
+  const created = await prisma.fakPeriod.create({ data, select: { id: true } });
+  revalidatePeriods(created.id);
+  // Buiten elke try/catch: `redirect()` werkt via een throw.
+  redirect(`/admin/fakscanner/periodes/${created.id}`);
+}
+
+/**
+ * Verwijdert een periode en de stand van iedereen erin. De jaarstand blijft
+ * staan; liep de periode nog, dan telt de scanner meteen weer zoals altijd.
+ */
+export async function deleteFakPeriodAction(id: string): Promise<ActionResult> {
+  await requireFakbar();
+  const deleted = await prisma.fakPeriod.deleteMany({ where: { id } });
+  revalidatePeriods(id);
+  return deleted.count === 1
+    ? { ok: true }
+    : { ok: false, error: 'Deze periode bestond al niet meer. Ververs de pagina.' };
 }

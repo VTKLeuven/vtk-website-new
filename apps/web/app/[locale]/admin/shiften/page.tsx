@@ -7,6 +7,8 @@ import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
 import { academicYearRange, academicYearRangeFor, currentAcademicYear } from "@/lib/shift";
 import { earnedShiftReward, type PraesidiumYears } from "@/lib/shift/rewards";
+import { canEditShifts, canManageAllShifts } from "@/lib/shift/authorization";
+import { shiftDeductions } from "@/lib/shift/deductions";
 import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 import { loadPalPlusRewardRows } from "@/lib/shift/rewards.server";
 import { ShiftAdmin } from "./ShiftAdmin";
@@ -33,7 +35,7 @@ export default async function AdminShifts({
   const session = await requireSession();
 
   const has = (perm: string) => session.user.isSuperAdmin || session.permissions.includes(perm);
-  const canEdit = has("shift.edit");
+  const canEdit = canEditShifts(session);
   const canReward = has("shift.reward");
   const canRanking = has("shift.ranking");
   const canTemplates = has("shift.templates");
@@ -83,7 +85,7 @@ export default async function AdminShifts({
   // `to` is inclusief: tel er een dag bij op voor de exclusieve bovengrens.
   const rangeEnd = new Date(rangeToDay.getFullYear(), rangeToDay.getMonth(), rangeToDay.getDate() + 1);
 
-  const [shiftsRaw, rankingRaw, rewardsRaw, shiftBounds, manualGrantsRaw, grantYears] = await Promise.all([
+  const [shiftsRaw, rankingRaw, rewardsRaw, shiftBounds, manualGrantsRaw, grantYears, deductions] = await Promise.all([
     canEdit
       ? prisma.shift.findMany({
           where: { startTime: { gte: rangeStart, lt: rangeEnd }, manualGrantId: null },
@@ -138,6 +140,7 @@ export default async function AdminShifts({
           distinct: ["academicYear"],
         })
       : Promise.resolve([]),
+    canRanking ? shiftDeductions({ academicYear: selectedYear }) : Promise.resolve([]),
   ]);
 
   // Beschikbare academiejaren voor de jaarkiezer: van het vroegste tot het laatste
@@ -179,6 +182,15 @@ export default async function AdminShifts({
     const entry = rankingMap.get(key);
     if (entry) entry.count += 1;
     else rankingMap.set(key, { userId, name: user.name, post, count: 1 });
+  }
+  // Afgenomen shiften (`lib/shift/deductions.ts`) gaan eraf bij hun post. Het
+  // beheer ziet het echte saldo, ook onder nul: dat is een afname die nog loopt.
+  for (const { userId, name, post: deductionPost, count } of deductions) {
+    const post = deductionPost ?? "GEEN";
+    const key = `${userId}::${post}`;
+    const entry = rankingMap.get(key);
+    if (entry) entry.count += count;
+    else rankingMap.set(key, { userId, name, post, count });
   }
   const ranking = [...rankingMap.values()];
 
@@ -295,7 +307,8 @@ export default async function AdminShifts({
     select: { code: true },
   });
   const postOptions = activeGroups.map((g) => g.code);
-  const userPostCodes = session.user.isSuperAdmin
+  const manageAllPosts = canManageAllShifts(session);
+  const userPostCodes = manageAllPosts
     ? postOptions
     : session.groups.filter((g) => g.type === "PRAESIDIUM").map((g) => g.code);
 
@@ -311,7 +324,7 @@ export default async function AdminShifts({
         manualGrants={manualGrants}
         postOptions={postOptions}
         userPostCodes={userPostCodes}
-        isSuperAdmin={session.user.isSuperAdmin}
+        manageAllPosts={manageAllPosts}
         from={format(rangeStart, "yyyy-MM-dd")}
         to={format(rangeToDay, "yyyy-MM-dd")}
         year={selectedYear}

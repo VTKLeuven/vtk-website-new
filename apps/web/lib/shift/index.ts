@@ -526,6 +526,8 @@ export const isUniqueViolation = (err: unknown): boolean => prismaErrorCode(err)
 export const isForeignKeyViolation = (err: unknown): boolean => prismaErrorCode(err) === 'P2003';
 
 export {
+  canEditShifts,
+  canManageAllShifts,
   canManageShift,
   isUserInShiftPost,
   userShiftPostCodes,

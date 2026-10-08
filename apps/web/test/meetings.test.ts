@@ -3,6 +3,7 @@ import {
   DEFAULT_DRINK_PRICE_CENTS,
   DEFAULT_MEETING_DRINKS,
   hasMeetingOrder,
+  isBigBureau,
   isoWeekNumber,
   meetingCloseAt,
   meetingPath,
@@ -11,6 +12,7 @@ import {
   monthDays,
   offeringNameKey,
   parseMeetingDrinks,
+  planMeetingSupply,
   reservationTotalCents,
   semesterForDate,
   semesterMonths,
@@ -168,6 +170,71 @@ describe("naamsleutel en bedragen", () => {
         { itemPriceCents: 0, drinkPriceCents: 100 },
       ]),
     ).toBe(460);
+  });
+
+  it("laat een extern besteld broodje uit het bedrag, het drankje niet", () => {
+    expect(reservationTotalCents({ itemPriceCents: 260, drinkPriceCents: 100, external: true })).toBe(100);
+    expect(reservationTotalCents({ itemPriceCents: 260, drinkPriceCents: 100, external: false })).toBe(360);
+  });
+});
+
+describe("big bureau", () => {
+  const reservations = (...keys: string[]) => keys.map((itemKey, i) => ({ id: `r${i + 1}`, itemKey }));
+  const stock = (entries: Record<string, number>) =>
+    new Map(Object.entries(entries).map(([key, available]) => [key, { sessionItemId: `item-${key}`, available }]));
+  const external = (plan: Map<string, { external: boolean }>) =>
+    [...plan.entries()].filter(([, a]) => a.external).map(([id]) => id);
+
+  it("is enkel een bureau met Theokot-broodjes en een limiet", () => {
+    expect(isBigBureau({ kind: "BUREAU", useTheokot: true, theokotLimit: 40 })).toBe(true);
+    expect(isBigBureau({ kind: "BUREAU", useTheokot: true, theokotLimit: 0 })).toBe(true);
+    expect(isBigBureau({ kind: "BUREAU", useTheokot: true, theokotLimit: null })).toBe(false);
+    expect(isBigBureau({ kind: "BUREAU", useTheokot: false, theokotLimit: 40 })).toBe(false);
+    expect(isBigBureau({ kind: "GROCOMEET", useTheokot: true, theokotLimit: 40 })).toBe(false);
+  });
+
+  it("geeft de eerste inschrijvingen aan Theokot en de rest extern", () => {
+    const plan = planMeetingSupply(reservations("kaas", "kaas", "kip", "kaas"), 2, stock({ kaas: 10, kip: 10 }));
+    expect(plan.get("r1")).toEqual({ external: false, sessionItemId: "item-kaas" });
+    expect(plan.get("r2")).toEqual({ external: false, sessionItemId: "item-kaas" });
+    expect(external(plan)).toEqual(["r3", "r4"]);
+  });
+
+  it("stuurt een broodje waar Theokot geen voorraad meer van heeft naar extern, en houdt de plaats vrij", () => {
+    // r1 wil kip, maar die is op: extern. r2 en r3 krijgen dan nog de twee plaatsen.
+    const plan = planMeetingSupply(reservations("kip", "kaas", "kaas", "kaas"), 2, stock({ kaas: 10, kip: 0 }));
+    expect(external(plan)).toEqual(["r1", "r4"]);
+    expect(plan.get("r2")?.sessionItemId).toBe("item-kaas");
+    expect(plan.get("r3")?.sessionItemId).toBe("item-kaas");
+  });
+
+  it("neemt nooit meer dan de vrije voorraad, ook onder de limiet", () => {
+    const plan = planMeetingSupply(reservations("kaas", "kaas", "kaas"), 10, stock({ kaas: 2 }));
+    expect(external(plan)).toEqual(["r3"]);
+  });
+
+  it("zonder limiet telt enkel de voorraad (big bureau uitzetten)", () => {
+    const plan = planMeetingSupply(reservations("kaas", "kaas", "kaas"), null, stock({ kaas: 3 }));
+    expect(external(plan)).toEqual([]);
+    expect(external(planMeetingSupply(reservations("kaas", "kaas"), null, stock({ kaas: 1 })))).toEqual(["r2"]);
+  });
+
+  it("met limiet nul gaat alles extern", () => {
+    const plan = planMeetingSupply(reservations("kaas", "kip"), 0, stock({ kaas: 5, kip: 5 }));
+    expect(external(plan)).toEqual(["r1", "r2"]);
+  });
+
+  it("telt zonder verkoopdag enkel de limiet en koppelt nog niets", () => {
+    const plan = planMeetingSupply(reservations("kaas", "kip", "kaas"), 2, null);
+    expect(plan.get("r1")).toEqual({ external: false, sessionItemId: null });
+    expect(plan.get("r2")).toEqual({ external: false, sessionItemId: null });
+    expect(plan.get("r3")).toEqual({ external: true, sessionItemId: null });
+  });
+
+  it("wijst een broodje dat niet op het aanbod staat niets toe: dat wordt ongeldig, niet extern", () => {
+    const plan = planMeetingSupply(reservations("lasagne", "kaas"), 1, stock({ kaas: 5 }));
+    expect(plan.has("r1")).toBe(false);
+    expect(plan.get("r2")).toEqual({ external: false, sessionItemId: "item-kaas" });
   });
 });
 

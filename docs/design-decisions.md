@@ -742,6 +742,43 @@ je zet dan zelf de keuzes met hun prijs (lasagne, broodjes van een bakker). Zo'n
 vergadering raakt de Theokot-voorraad niet en krijgt geen kolom op de turflijst. Een GM
 kan dat ook; het is dezelfde knop.
 
+### Big bureau: Theokot levert enkel de eerste broodjes
+
+Soms komt er naar een bureau veel meer volk dan verwacht. Dan kan het bureau niet de
+hele Theokot-voorraad opeisen: de studenten bestellen daar ook. Per bureau staat
+daarom een vinkje **Big bureau** met een aantal (`Meeting.theokotLimit`): Theokot
+levert de eerste zoveel broodjes, **in volgorde van inschrijven**, en de rest wordt
+bewaard en door Onderwijs zelf bij een externe zaak besteld
+(`MeetingReservation.external`).
+
+- **Het moet onverwacht aan kunnen, ook wanneer er al besteld is.** Een bureau wordt
+  soms pas populair nadat de link rondging. Aanzetten verdeelt de bestaande
+  inschrijvingen meteen opnieuw (`rebalanceMeetingSupply`): de eersten blijven bij
+  Theokot, wat boven het aantal valt, wordt extern en komt in dezelfde beweging terug
+  vrij voor studenten.
+- **De volgorde is die van de inschrijving** (`createdAt`), niet die van het laatste
+  aanpassen: je broodje wijzigen kost je plaats niet. Wie annuleert, maakt plaats voor
+  de eerstvolgende die extern stond.
+- **Bij een big bureau is er voor de student nooit iets uitverkocht.** Heeft Theokot
+  een broodje niet meer, dan gaat het naar de externe bestelling, ook onder het
+  aantal; die plaats bij Theokot gaat dan naar de volgende. De student ziet niet of
+  zijn broodje van Theokot of extern komt: het belandt hoe dan ook op het bureau.
+- **Het aanbod blijft dat van Theokot.** Extern betekent enkel wie het broodje maakt.
+  Een broodje dat die dag niet op het aanbod van Theokot staat, wordt ongeldig zoals
+  altijd, ook wanneer het extern besteld zou worden.
+- **De turflijst kent enkel de Theokot-broodjes**; de extern bestelde staan er niet
+  op. Het beheerscherm toont per bureau "Extern te bestellen" met een aantal per
+  broodje, en bij "Wie komt" staat per persoon of het broodje extern is. De drankjes
+  veranderen niet: die blijven allemaal op de turflijst.
+- **Geld**: een extern broodje zit niet in het bedrag van het bureau, want die
+  rekening komt van de externe zaak, aan een prijs die de site niet kent. De totalen
+  tonen het aantal apart in een kolom "Extern".
+- **Uitzetten kan enkel wanneer Theokot alles kan overnemen.** Anders zou het bureau
+  stil meer van de voorraad nemen dan er is. Dan blijft big bureau aan en zegt de
+  melding dat je het aantal hoger zet of Theokot eerst om meer broodjes vraagt.
+- Na de deadline kan het nog, maar dan werkt Theokot misschien al met de turflijst:
+  het beheerscherm zegt dat je Theokot dan zelf verwittigt.
+
 ### Deadline
 
 Aanpassen of annuleren kan tot **dezelfde deadline als voor studenten**: het moment
@@ -1532,6 +1569,41 @@ aanwezigheidslijst zijn die `FakTally` hierboven vermijdt. Wat de beheerder wél
 kunnen zien is of de lezer of KU Leuven het laat afweten: zonder die rijen is een
 stille storing aan de bar pas zichtbaar wanneer iemand komt klagen dat zijn punten
 ontbreken.
+
+### Periodes voor een groot evenement
+
+Voor een groot evenement wil de fakbar dat wie er is, elk uur kan inchecken in
+plaats van één keer per avond. Dat is een **periode** (`FakPeriod`), aangemaakt in
+/admin/fakscanner/periodes met een begin, een einde en eigen regels. Website-kant:
+`registerCheckin` in `apps/web/lib/fakscanner-server.ts` en `fakPeriodSlot` in
+`apps/web/lib/fakscanner.ts`.
+
+- **Een periode vervangt de gewone werking, ze loopt er niet naast.** Tussen begin
+  en einde telt een scan enkel in `FakPeriodTally`; de jaarstand en het
+  dubbeltelvenster staan stil. Na het einde telt alles weer per bardag. Zo blijven
+  de check-ins van het evenement apart en loopt de jaarstand niet op met
+  twaalf scans per nacht.
+- **Een dagelijks venster** (standaard 22:00 tot 10:00) bepaalt wanneer een scan
+  telt. Wie overdag in de bar werkt, bv. het praesidium dat opbouwt of
+  opruimt, spaart zo geen check-ins bij. Buiten het venster zegt de lezer vanaf
+  wanneer het weer kan ("Pas vanaf 22:00"). Zonder venster telt het de klok rond.
+- **De tijdvakken liggen vast op de klok, niet op je vorige scan.** Met een uur per
+  tijdvak en een venster vanaf 22:00 zijn dat 22:00, 23:00, 00:00 en zo verder.
+  Wie om 22:50 scant, mag om 23:00 opnieuw. Een glijdend uur sinds je laatste scan
+  zou iedereen elk uur een paar minuten later laten scannen, en de lezer kan dan
+  geen eenvoudig "Terug om 23:00" tonen. De tijdvakken tellen in echte minuten
+  vanaf de opening, dus de nacht van de uurwissel heeft er een meer of minder.
+- **Pinten per periode.** Een periode kan gratis pinten uitzetten of een eigen
+  aantal check-ins per pint hebben; dat telt op de stand van de periode.
+- **Periodes overlappen niet.** Twee tegelijk zou betekenen dat de volgorde in de
+  databank bepaalt welke regels gelden. De actie die opslaat weigert het.
+- **Historiek zonder aanwezigheidslijst.** Een afgelopen periode blijft staan met
+  haar stand, maar net als bij de jaarstand is dat per persoon één rij: het aantal
+  check-ins en de laatste scan, niet welke uren iemand er was.
+- **De Pi verandert niet.** De lezer aan de bar leest `total`, `counted`,
+  `message`, `double` en `freeBeer`; tijdens een periode is `total` de stand van de
+  periode en zegt `message` in zestien tekens waarom een scan niet telde. Er komen
+  geen velden bij die de Pi zou moeten kennen.
 
 ---
 
@@ -5288,14 +5360,22 @@ openstaande bonnetjes atomair afboeken voor een broodje, per half naar de prijs
 daarvoor een auditrij in `TheokotVoucherRedemption`. Wil je de waardering wijzigen, pas dan de
 spiegel-helper aan; de saldo- en auditlogica blijft gelijk.
 
-### Post: "Cursusdienst"
+### Post: de groepscode `CURSUSDIENST`
 
-Gemirrorde shiften krijgen `Shift.post = "Cursusdienst"`, zodat ze als een aparte
-post in de ranking verschijnen. De post wordt **gezet bij het spiegelen** (zelfde
-producer/helper als de reward) en **verbruikt** in
-`apps/web/app/api/shift/ranking/route.ts` (groepeert per `shift.post`; leeg valt
-onder `GEEN`). Eén constante voor het post-label, zodat hernoemen op één plek
-gebeurt.
+Gemirrorde shiften krijgen `Shift.post = "CURSUSDIENST"`: dezelfde groepscode als
+de cursusdienstshiften die op de main site zelf aangemaakt worden, zodat ze samen
+onder één post vallen, op `/shift` en in de ranking. De post wordt **gezet bij het
+spiegelen** (zelfde producer/helper als de reward, `CURSUSDIENST_SHIFT_POST`) en
+**verbruikt** in `apps/web/app/api/shift/ranking/route.ts` (groepeert per
+`shift.post`; leeg valt onder `GEEN`). De naam die je ziet, komt uit
+`lib/shift/postNames.ts`.
+
+Tot 2026-10-06 stond hier de naam `"Cursusdienst"` in plaats van de code. Sinds
+`/shift` codes omzet naar namen, toonde de pagina daardoor twee posten
+"Cursusdienst" naast elkaar (de code, vertaald, en de naam, onvertaald), en telde de
+ranking ze apart. Migratie `20261006120000_cudi_shift_post_code` zet de voorbije
+gespiegelde shiften om; de komende zet de eerstvolgende sync van cudi recht, omdat
+de upsert `post` telkens opnieuw schrijft.
 
 ### Inschrijven blokkeert bij een cudi-storing (bewust)
 
@@ -8672,6 +8752,69 @@ staat, staat los in `Shift`, met zijn inschrijvingen. Een sjabloon verwijderen
 haalt dus enkel het sjabloon weg. Dat staat met zoveel woorden in de
 bevestigingsdialoog, want de omgekeerde vrees ("verlies ik de inschrijvingen van
 vorige maand?") is precies de reden waarom iemand van een opkuis afziet.
+
+## Titels voor shiften
+
+Wie genoeg shiften doet, krijgt een titel. De drempels zijn die van de kring
+(oktober 2026), op het aantal voltooide shiften in een academiejaar:
+
+| Shiften | Titel |
+| --- | --- |
+| 3 | Medewerker |
+| 10 | Bronze |
+| 15 | Vaste medewerker |
+| 20 | Silver |
+| 30 | Gold |
+| 50 | Platinum |
+
+Ze staan één keer, in `apps/web/lib/shift/tiers.ts`; de ranglijst in
+/admin/shiften zet bij elke drempel een tussenkop boven de rijen die die titel
+halen, en een laatste groep "Nog geen titel" voor wie onder de 3 blijft. Een
+titel waar niemand in valt, krijgt geen kop.
+
+- **Enkel in de totaalweergave.** Kies je één post, dan telt de ranglijst enkel
+  de shiften van die post, en een kop "Silver" boven iemand met 20 shiften bij
+  die ene post zou een titel suggereren die over alle shiften samen gaat. Daar
+  blijft het één lijst.
+- **Op de site is het een indeling van de ranglijst.** Er hangt geen recht of
+  melding aan, en de titel wordt nergens bewaard: hij volgt telkens uit het
+  aantal. Een shift die later geschrapt wordt, of een afname (hieronder), kan
+  iemand dus terug onder een drempel zetten.
+
+## Shiften afnemen
+
+Op /admin/shiften, tab Extra shiften, kan wie `shift.manual` heeft naast
+shiften toekennen ook shiften **afnemen**, met een verplichte reden: iemand kwam
+niet opdagen, of er is een andere reden (oktober 2026). Het is dezelfde tabel
+(`ManualShiftGrant`), met een negatief aantal.
+
+- **Een afname is geen negatieve shift.** Een toekenning maakt echte shiften aan
+  en telt daardoor overal vanzelf mee. Een afname heeft geen shiften: anders
+  stond er een shift van min één in iemands lijst, zijn agenda en zijn
+  bonnetjes. Elke plek die shiften *telt*, trekt de afnames er zelf af
+  (`lib/shift/deductions.ts`): de ranglijst en zijn titels, de voorverkoop voor
+  vaste medewerkers (15 shiften), /shift, de shiftgeschiedenis, het profiel in de
+  app en de MCP. Een lijst van shiften raakt ze niet.
+- **Ze raakt de bonnetjes niet.** Bonnetjes hangen aan een shift, en een afname
+  heeft er geen. Kwam iemand niet opdagen en moet ook het bonnetje van die shift
+  weg, dan schrijf je hem uit bij die shift (Beheer): dan valt de shift met haar
+  bonnetjes weg. Een afname daarbovenop is een straf. Het venster zegt dit, zodat
+  niemand denkt dat een afname de bonnetjes al regelt.
+- **Per academiejaar en optioneel per post**, net als een toekenning. Met een
+  post gaat ze in de ranglijst per post van die post af; zonder post van "Geen
+  post".
+- **Nooit onder nul voor het lid, wel voor het beheer.** Wat een lid ziet (/shift,
+  de geschiedenis, de app) en de voorverkoopregel stoppen op nul. De afname
+  blijft wel lopen: wie op nul staat met één shift afgenomen, staat na zijn
+  volgende shift nog op nul. De ranglijst in de admin toont het echte saldo, ook
+  onder nul, zodat het beheer ziet dat er nog een afname openstaat.
+- **Het lid ziet hoeveel, niet waarom.** De shiftgeschiedenis toont een regel
+  "Afgenomen door het beheer" met het aantal. De reden staat in de lijst op de
+  tab en in het adminlogboek, en is voor het beheer: er kan een interne
+  opmerking in staan.
+- **Gelogd, ook na het intrekken.** Afnemen en intrekken komen allebei in het
+  adminlogboek (`shiftManual`), met de reden. Wie een afname intrekt, haalt ze
+  uit de tellingen, maar het logboek houdt bij dat ze er was.
 
 ## Ticketsjablonen: een cantus is elke keer dezelfde verkoop op een andere dag
 

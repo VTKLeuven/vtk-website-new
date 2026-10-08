@@ -17,6 +17,7 @@
 import {
   DEFAULT_FAKSCANNER_CONFIG,
   parseFakscannerConfig,
+  type FakPeriodRules,
   type FakscannerConfig,
 } from '@vtk/db/fakscanner';
 import {
@@ -81,7 +82,7 @@ export function pointsForScan(config: FakscannerConfig, at: Date): number {
  * naar 11 springen en die pint hoort niet verloren te gaan.
  */
 export function earnedReward(
-  config: FakscannerConfig,
+  config: Pick<FakscannerConfig, 'rewardEvery'>,
   previousTotal: number,
   newTotal: number,
 ): boolean {
@@ -92,9 +93,100 @@ export function earnedReward(
 
 /** Hoeveel pinten iemand met deze stand verdiend heeft, en hoeveel punten tot de volgende. */
 export function rewardProgress(
-  config: FakscannerConfig,
+  config: Pick<FakscannerConfig, 'rewardEvery'>,
   total: number,
 ): { beers: number; toNext: number } {
   const beers = Math.floor(total / config.rewardEvery);
   return { beers, toNext: (beers + 1) * config.rewardEvery - total };
+}
+
+// ── Periodes ────────────────────────────────────────────────────────────────
+
+/**
+ * Waar een scan valt tijdens een periode (`FakPeriod`).
+ *
+ * - `open`: binnen het dagelijkse venster. `slotStart` is het begin van het
+ *   tijdvak waarin de scan valt; een rij waarvan `lastCheckinAt` daarvoor ligt,
+ *   mag nog een check-in bij krijgen.
+ * - niet `open`: buiten het venster, dus telt er niets.
+ *
+ * `nextAt` is het moment waarop een scan weer iets oplevert (het volgende tijdvak,
+ * of de volgende opening van het venster), of null wanneer dat pas na het einde
+ * van de periode is.
+ */
+export type FakPeriodSlot =
+  | { open: true; slotStart: Date; nextAt: Date | null }
+  | { open: false; nextAt: Date | null };
+
+type PeriodWindow = { start: number; end: number };
+
+function periodWindow(rules: FakPeriodRules): PeriodWindow | null {
+  if (!rules.windowStart || !rules.windowEnd || rules.windowStart === rules.windowEnd) return null;
+  return { start: minutesOf(rules.windowStart), end: minutesOf(rules.windowEnd) };
+}
+
+/**
+ * De opening van het venster waarin `at` valt, of null wanneer `at` erbuiten
+ * valt. Een venster over middernacht (22:00-10:00) dat om 03:00 nog loopt, ging
+ * gisteren open.
+ */
+function windowOpening(daily: PeriodWindow, at: Date): Date | null {
+  const now = brusselsMinutesOfDay(at);
+  const ymd = brusselsYMD(at);
+  if (daily.start < daily.end) {
+    return now >= daily.start && now < daily.end ? brusselsWallClockMinutes(ymd, daily.start) : null;
+  }
+  if (now >= daily.start) return brusselsWallClockMinutes(ymd, daily.start);
+  if (now < daily.end) return brusselsWallClockMinutes(shiftYMD(ymd, -1), daily.start);
+  return null;
+}
+
+/** De eerste opening van het venster strikt na `after`. */
+function nextWindowOpening(daily: PeriodWindow, after: Date): Date {
+  const ymd = brusselsYMD(after);
+  const today = brusselsWallClockMinutes(ymd, daily.start);
+  return today > after ? today : brusselsWallClockMinutes(shiftYMD(ymd, 1), daily.start);
+}
+
+/**
+ * Het tijdvak van een scan op `at`, binnen een periode die op dat moment loopt.
+ *
+ * De tijdvakken liggen vast op de klok en niet op je vorige scan: met een venster
+ * vanaf 22:00 en een uur per tijdvak zijn dat 22:00, 23:00, 00:00 ... Zo kan de
+ * lezer zeggen vanaf wanneer je terug mag ("Terug om 23:00"), en schuift niemand
+ * elk uur een paar minuten op. Ze tellen in echte minuten vanaf de opening, zodat
+ * de nacht van de uurwissel er een tijdvak bij krijgt of verliest, net zoals die
+ * nacht een uur langer of korter duurt. Zonder venster begint het eerste tijdvak
+ * bij het begin van de periode.
+ */
+export function fakPeriodSlot(rules: FakPeriodRules, at: Date): FakPeriodSlot {
+  const daily = periodWindow(rules);
+  const inPeriod = (moment: Date) => (moment < rules.endsAt ? moment : null);
+
+  let anchor = rules.startsAt;
+  if (daily) {
+    const opening = windowOpening(daily, at);
+    if (!opening) return { open: false, nextAt: inPeriod(nextWindowOpening(daily, at)) };
+    anchor = opening;
+  }
+
+  const interval = rules.intervalMinutes * 60_000;
+  const elapsed = Math.max(0, at.getTime() - anchor.getTime());
+  const slotStart = new Date(anchor.getTime() + Math.floor(elapsed / interval) * interval);
+  const following = new Date(slotStart.getTime() + interval);
+
+  // Valt het volgende tijdvak niet meer in dit venster, dan telt de volgende scan
+  // pas bij de volgende opening (een scan om 09:30 bij een venster tot 10:00).
+  const nextAt =
+    !daily || windowOpening(daily, following)?.getTime() === anchor.getTime()
+      ? following
+      : nextWindowOpening(daily, anchor);
+
+  return { open: true, slotStart, nextAt: inPeriod(nextAt) };
+}
+
+/** "HH:mm" op de Brusselse klok, voor de lezer en de app. */
+export function brusselsClockTime(at: Date): string {
+  const minutes = brusselsMinutesOfDay(at);
+  return `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
 }

@@ -88,6 +88,7 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
         remaining: remainingFor(i, used),
         isWeeklySpecial: i.isWeeklySpecial,
         imageUrl: publicUrl(i.imageKey),
+        badgeImageUrl: i.badgeImageKey ? publicUrl(i.badgeImageKey) : null,
         // Beide talen leeg = geen ingrediënten, dus ook geen info-icoontje.
         ingredients: pick(i.ingredientsNl, i.ingredientsEn, locale)?.trim() || null,
       })),
@@ -105,6 +106,7 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
               name: pick(l.sessionItem.nameNl, l.sessionItem.nameEn, locale) ?? l.sessionItem.nameNl,
               quantity: l.quantity,
               unitPriceCents: l.unitPriceCents,
+              badgeImageUrl: l.sessionItem.badgeImageKey ? publicUrl(l.sessionItem.badgeImageKey) : null,
             })),
           }
         : null,

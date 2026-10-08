@@ -7,6 +7,7 @@ import { notFound } from 'next/navigation';
 import { requireSession } from '@/lib/session';
 import { PleaseLogin } from '@/components/site/pleaseLogin';
 import { prisma } from '@vtk/db';
+import { deductedShifts, netShiftCount, shiftDeductions } from '@/lib/shift/deductions';
 import { loadPostNames } from '@/lib/shift/postNames';
 
 import '@/app/design/vtk-basic.css';
@@ -40,7 +41,9 @@ export default async function ShiftHistoryPage({
   }
 
   // Alle voorbije shiften waarvoor de user ingeschreven was, per post geteld.
-  const [participations, postNames] = await Promise.all([
+  // Afgenomen shiften staan als eigen regel onderaan, zonder reden: die is voor
+  // het beheer (`lib/shift/deductions.ts`).
+  const [participations, postNames, deductions] = await Promise.all([
     prisma.shiftParticipant.findMany({
       where: {
         userId: session.user.id,
@@ -49,6 +52,7 @@ export default async function ShiftHistoryPage({
       select: { shift: { select: { post: true } } },
     }),
     loadPostNames(locale),
+    shiftDeductions({ userIds: [session.user.id] }),
   ]);
 
   const perPost = new Map<string, number>();
@@ -56,7 +60,8 @@ export default async function ShiftHistoryPage({
     const key = p.shift.post ?? 'GEEN';
     perPost.set(key, (perPost.get(key) ?? 0) + 1);
   }
-  const total = participations.length;
+  const deducted = deductedShifts(deductions);
+  const total = netShiftCount(participations.length, deducted);
   const rows = [...perPost.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
   return (
@@ -86,21 +91,29 @@ export default async function ShiftHistoryPage({
                 </tr>
               </thead>
               <tbody>
-                {rows.length === 0 ? (
+                {rows.length === 0 && deducted === 0 ? (
                   <tr>
                     <td colSpan={2} className="vtk-basic-table-empty">
                       {t.history.empty}
                     </td>
                   </tr>
                 ) : (
-                  rows.map(([post, count]) => (
-                    <tr key={post}>
-                      <td data-label={t.history.post}>
-                        {post === 'GEEN' ? t.history.noPost : (postNames[post] ?? post)}
-                      </td>
-                      <td data-label={t.history.count}>{count}</td>
-                    </tr>
-                  ))
+                  <>
+                    {rows.map(([post, count]) => (
+                      <tr key={post}>
+                        <td data-label={t.history.post}>
+                          {post === 'GEEN' ? t.history.noPost : (postNames[post] ?? post)}
+                        </td>
+                        <td data-label={t.history.count}>{count}</td>
+                      </tr>
+                    ))}
+                    {deducted > 0 && (
+                      <tr>
+                        <td data-label={t.history.post}>{t.history.deducted}</td>
+                        <td data-label={t.history.count}>&minus;{deducted}</td>
+                      </tr>
+                    )}
+                  </>
                 )}
               </tbody>
             </table>

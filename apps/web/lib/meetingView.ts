@@ -12,6 +12,7 @@ import { pick, type Locale } from "@vtk/i18n";
 
 import type { MeetingCardView } from "@/components/meetings/MeetingReservationCard";
 import {
+  isBigBureau,
   meetingCloseAt,
   meetingPricesVisible,
   meetingWindowState,
@@ -44,6 +45,10 @@ export async function buildMeetingCard(
     minute: "2-digit",
   });
 
+  // Bij een big bureau is er voor de student nooit iets uitverkocht: wat Theokot
+  // niet levert, wordt extern besteld.
+  const bigBureau = isBigBureau(meeting);
+
   const choiceKey = reservation?.optionId ?? (reservation?.itemNameNl ? offeringNameKey(reservation.itemNameNl) : null);
 
   return {
@@ -58,7 +63,7 @@ export async function buildMeetingCard(
       key: choice.key,
       label: pick(choice.nameNl, choice.nameEn, locale) ?? choice.nameNl,
       priceCents: choice.priceCents,
-      remaining: choice.remaining,
+      remaining: bigBureau ? null : choice.remaining,
     })),
     drinks,
     askComment: meeting.kind === "BUREAU",

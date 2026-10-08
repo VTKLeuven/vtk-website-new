@@ -6,6 +6,7 @@ import { slugify } from "@vtk/db/slug";
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { requirePermission } from "@/lib/session";
+import { canManageAllShifts } from "@/lib/shift/authorization";
 import { parseTemplateEntries } from "@/lib/shift/templates";
 
 /**
@@ -33,7 +34,7 @@ async function allowedPosts(
     orderBy: { orderInPraesidium: "asc" },
     select: { code: true },
   });
-  if (session.user.isSuperAdmin) return active.map((g) => g.code);
+  if (canManageAllShifts(session)) return active.map((g) => g.code);
 
   const own = new Set(session.groups.filter((g) => g.type === "PRAESIDIUM").map((g) => g.code));
 
