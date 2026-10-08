@@ -4,6 +4,7 @@ import {
   hasPresale,
   inPresaleAudience,
   isInPresaleNow,
+  nonMemberTypeSalesStart,
   presaleStart,
   viewerSalesStart,
   viewerTypeSalesStart,
@@ -112,5 +113,40 @@ describe('ticket presale', () => {
     expect(viewerTypeSalesStart(event, { salesStartAt }, null)?.toISOString()).toBe(
       salesStartAt.toISOString(),
     );
+  });
+});
+
+describe('non-members after members', () => {
+  const type = { audience: 'PUBLIC', nonMemberDelayMinutes: 150 };
+
+  it('starts the non-member seats the delay after the sales start', () => {
+    expect(nonMemberTypeSalesStart(event, type, null)?.toISOString()).toBe('2026-12-01T21:30:00.000Z');
+  });
+
+  it('counts from the own start of a ticket type that starts later', () => {
+    const later = { ...type, salesStartAt: new Date('2026-12-05T19:00:00.000Z') };
+    expect(nonMemberTypeSalesStart(event, later, null)?.toISOString()).toBe('2026-12-05T21:30:00.000Z');
+  });
+
+  it('is nothing without a sales start: the sale is already open for everyone', () => {
+    expect(nonMemberTypeSalesStart({ salesStartAt: null }, type, null)).toBeNull();
+  });
+
+  it('is nothing without a delay, or for an audience that has no non-members', () => {
+    expect(nonMemberTypeSalesStart(event, { audience: 'PUBLIC', nonMemberDelayMinutes: null }, null)).toEqual(salesStartAt);
+    expect(nonMemberTypeSalesStart(event, { audience: 'PUBLIC', nonMemberDelayMinutes: 0 }, null)).toEqual(salesStartAt);
+    expect(nonMemberTypeSalesStart(event, { audience: 'MEMBERS', nonMemberDelayMinutes: 150 }, null)).toEqual(salesStartAt);
+  });
+
+  it('lets whoever is in the presale buy every seat, without waiting', () => {
+    expect(nonMemberTypeSalesStart(event, type, praesidiumMember)?.toISOString()).toBe('2026-11-29T19:00:00.000Z');
+    expect(nonMemberTypeSalesStart(event, type, { groups: [], hasPresaleLink: true })?.toISOString()).toBe(
+      '2026-11-29T19:00:00.000Z',
+    );
+  });
+
+  it('makes the presale wait too on a ticket type the presale does not reach', () => {
+    const later = { ...type, salesStartAt: new Date('2026-12-05T19:00:00.000Z') };
+    expect(nonMemberTypeSalesStart(event, later, praesidiumMember)?.toISOString()).toBe('2026-12-05T21:30:00.000Z');
   });
 });

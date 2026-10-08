@@ -23,13 +23,16 @@ import {
 } from "lucide-react";
 import {
   formatTicketDate,
+  formatTicketMoment,
   formatTicketPrice,
   maximumSelectableForLine,
   nextTicketQuantity,
   orderLimit,
   quantitiesByTicketType,
   ticketLineRemaining,
+  ticketLineSalesStart,
   ticketLinesForType,
+  ticketLineWaitsForMembers,
   ticketTypeRemaining,
   type SerializedTicketEvent,
   type TicketLine,
@@ -109,7 +112,7 @@ function checkoutErrorMessage(
     TOO_MANY_RESERVATIONS: { nl: "Er staan al meerdere reservaties open. Probeer later opnieuw.", en: "Several reservations are already pending. Try again later." },
     FREE_TICKET_LIMIT: { nl: "Je hebt het maximum aantal gratis tickets voor dit event bereikt.", en: "You have reached the free-ticket limit for this event." },
     SOLD_OUT: { nl: "Deze tickets zijn net uitverkocht.", en: "These tickets have just sold out." },
-    HONORARY_FREE_USED: { nl: "Je gratis erelidticket voor dit event heb je al. Kies de gewone prijs.", en: "You already have your free honorary ticket for this event. Choose the regular price." },
+    HONORARY_PRICE_USED: { nl: "Je erelidticket voor dit event heb je al. Kies de gewone prijs.", en: "You already have your honorary ticket for this event. Choose the regular price." },
     PAYMENT_UNAVAILABLE: { nl: "De betaalpagina is tijdelijk niet bereikbaar. Probeer straks opnieuw.", en: "The payment page is temporarily unavailable. Try again shortly." },
     REQUEST_BODY_TOO_LARGE: { nl: "De bestelling bevat te veel gegevens.", en: "The order contains too much data." },
   };
@@ -329,7 +332,10 @@ function lineLabel(line: TicketLine, locale: "nl" | "en"): string {
 /** Wie een regel bedoeld is, naast de prijs, wanneer een type meer dan één regel heeft. */
 function lineAudience(line: TicketLine, locale: "nl" | "en"): string {
   const nl = locale === "nl";
-  if (line.honorary) return nl ? "Erelid, 1 gratis" : "Honorary, 1 free";
+  if (line.honorary) {
+    if (line.priceCents === 0) return nl ? "Erelid, 1 gratis" : "Honorary, 1 free";
+    return nl ? "Erelid, max. 1" : "Honorary, max. 1";
+  }
   if (line.memberPrice) return nl ? "Lid" : "Member";
   // Zonder ledenprijs is de gewone prijs voor iedereen, niet enkel voor niet-leden.
   if (line.type.memberPriceCents == null) return nl ? "Gewone prijs" : "Regular price";
@@ -428,6 +434,13 @@ export function TicketShop({
   const beforeSales = event.salesStart ? new Date(event.salesStart).getTime() > now : false;
   const afterSales = event.salesEnd ? new Date(event.salesEnd).getTime() <= now : false;
   const salesOpen = preview || (event.status === "PUBLISHED" && !beforeSales && !afterSales);
+  // Een regel zonder ledenprijs die op de niet-leden wacht, is er een van een
+  // bezoeker die geen lid is (of niet ingelogd): bij een lid neemt zo'n regel
+  // een ledenplaats en gaat ze met de leden open.
+  const viewerWaitsForMembers =
+    !preview &&
+    salesOpen &&
+    lines.some((line) => line.type.memberPriceCents == null && ticketLineWaitsForMembers(line, now));
 
   function setQuantity(line: TicketLine, direction: "decrease" | "increase") {
     const current = quantities[line.key] ?? 0;
@@ -489,7 +502,7 @@ export function TicketShop({
       (attendees[line.key] ?? []).map((attendee) => ({
         ticketTypeId: line.type.id,
         memberPrice: line.memberPrice,
-        honoraryFree: Boolean(line.honorary),
+        honoraryPrice: Boolean(line.honorary),
         attendeeName: attendee.attendeeName.trim(),
         attendeeEmail: attendee.attendeeEmail.trim(),
         answers: attendee.answers,
@@ -547,9 +560,13 @@ export function TicketShop({
     const { type } = line;
     const quantity = quantities[line.key] ?? 0;
     const soldOut = ticketLineRemaining(line) < 1;
-    const typeBeforeSales = type.salesStart ? new Date(type.salesStart).getTime() > now : false;
+    // Per regel: de plaatsen voor niet-leden kunnen later opengaan dan die voor
+    // leden (`nonMemberSalesStart`).
+    const lineStart = ticketLineSalesStart(line);
+    const lineBeforeSales = lineStart ? new Date(lineStart).getTime() > now : false;
     const typeAfterSales = type.salesEnd ? new Date(type.salesEnd).getTime() <= now : false;
-    const typeSalesOpen = preview || (salesOpen && !typeBeforeSales && !typeAfterSales);
+    const typeSalesOpen = preview || (salesOpen && !lineBeforeSales && !typeAfterSales);
+    const waitsForMembers = !preview && salesOpen && ticketLineWaitsForMembers(line, now);
     const maximum = maximumSelectableForLine({
       line,
       lines,
@@ -563,12 +580,16 @@ export function TicketShop({
     return (
       <>
         <span className="tshop-price" data-unavailable={unavailable || undefined}>
-          {line.honorary
+          {line.honorary && line.priceCents === 0
             ? locale === "nl" ? "Gratis" : "Free"
             : formatTicketPrice(line.priceCents, event.currency, locale)}
         </span>
         {soldOut ? (
           <span className="tshop-pill" data-tone="out">{locale === "nl" ? "Uitverkocht" : "Sold out"}</span>
+        ) : waitsForMembers ? (
+          <span className="tshop-pill" data-tone="soon">
+            {locale === "nl" ? "Vanaf" : "From"} {formatTicketMoment(lineStart!, locale)}
+          </span>
         ) : typeSalesOpen ? (
           <TicketStepper
             label={lineLabel(line, locale)}
@@ -586,6 +607,21 @@ export function TicketShop({
 
   /** Wat er onder de naam van een type staat: beschrijving en beschikbaarheid. */
   function renderTypeNotes(type: SerializedTicketEvent["ticketTypes"][number]) {
+    // Enkel in het voorbeeld: daar staat elke regel open, dus ontbreekt de pil
+    // "Vanaf ..." die een bezoeker bij de niet-ledenregel ziet, terwijl de
+    // organisator net dat moment wil nakijken.
+    const time = (value: string | Date | null | undefined) =>
+      value ? new Date(value).getTime() : null;
+    const waitingLine = preview
+      ? ticketLinesForType(type).find(
+          (line) => time(ticketLineSalesStart(line)) !== time(type.salesStart),
+        )
+      : undefined;
+    const nonMembersLater = waitingLine
+      ? locale === "nl"
+        ? `Voor niet-leden start de verkoop op ${formatTicketDate(ticketLineSalesStart(waitingLine)!, locale)}.`
+        : `Sales for non-members start on ${formatTicketDate(ticketLineSalesStart(waitingLine)!, locale)}.`
+      : null;
     const typeBeforeSales = type.salesStart ? new Date(type.salesStart).getTime() > now : false;
     const typeAfterSales = type.salesEnd ? new Date(type.salesEnd).getTime() <= now : false;
     // Is de verkoop van het hele event nog dicht, dan zegt de melding bovenaan
@@ -618,11 +654,12 @@ export function TicketShop({
         : locale === "nl" ? "De plaatsen voor niet-leden zijn op." : "The places for non-members are gone."
       : null;
 
-    if (!type.description && !note && !low && !maximum && !seatsGone) return null;
+    if (!type.description && !note && !nonMembersLater && !low && !maximum && !seatsGone) return null;
     return (
       <p className="tshop-type-note">
         {type.description ? <span>{type.description}</span> : null}
         {note ? <span>{note}</span> : null}
+        {nonMembersLater ? <span>{nonMembersLater}</span> : null}
         {seatsGone ? <span>{seatsGone}</span> : null}
         {maximum ? <span>{maximum}</span> : null}
         {low ? (
@@ -930,15 +967,35 @@ export function TicketShop({
                 })}
               </ul>
 
-              {event.honoraryFreeUsed ? (
+              {event.honoraryPriceUsed ? (
                 <p className="tshop-hint">
                   {locale === "nl"
-                    ? "Je gratis erelidticket voor dit event heb je al."
-                    : "You already have your free honorary ticket for this event."}
+                    ? "Je erelidticket voor dit event heb je al."
+                    : "You already have your honorary ticket for this event."}
                 </p>
               ) : null}
 
-              {event.memberPriceHint ? (
+              {/* Deze bezoeker wacht op de start voor niet-leden. Hij is geen lid,
+                  of nog niet ingelogd; dat laatste zegt hem hoe het sneller kan.
+                  Het neemt de plaats in van de hint over de ledenprijs, anders
+                  staan er twee bijna dezelfde regels onder elkaar. */}
+              {viewerWaitsForMembers ? (
+                <p className="tshop-hint">
+                  {event.viewer ? (
+                    <>
+                      {locale === "nl" ? "Leden kunnen nu al bestellen. " : "Members can already order. "}
+                      <Link href={membershipHref}>{locale === "nl" ? "Word lid." : "Become a member."}</Link>
+                    </>
+                  ) : (
+                    <>
+                      {locale === "nl" ? "Lid van VTK? " : "VTK member? "}
+                      <Link href={loginHref}>
+                        {locale === "nl" ? "Log in, dan kan je nu al bestellen." : "Sign in to order right away."}
+                      </Link>
+                    </>
+                  )}
+                </p>
+              ) : event.memberPriceHint ? (
                 <p className="tshop-hint">
                   {event.memberPriceHint === "login" ? (
                     <>

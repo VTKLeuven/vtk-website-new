@@ -6,7 +6,9 @@ import {
   maximumSelectableForType,
   nextTicketQuantity,
   orderLimit,
+  ticketLineSalesStart,
   ticketLinesForType,
+  ticketLineWaitsForMembers,
   type PublicTicketType,
 } from '@/components/ticketing/public/types';
 
@@ -117,9 +119,9 @@ describe('places for members and non-members', () => {
   });
 });
 
-describe('the free ticket for honorary members', () => {
-  it('puts a free line first, before the member and the regular price', () => {
-    const beer = { ...ticketType('beer', 'general', 10), memberPriceCents: 800, honoraryFree: true };
+describe('the honorary member price', () => {
+  it('puts the honorary line first, before the member and the regular price', () => {
+    const beer = { ...ticketType('beer', 'general', 10), memberPriceCents: 800, honoraryPriceCents: 0 };
     expect(ticketLinesForType(beer).map((line) => [line.key, line.priceCents])).toEqual([
       ['beer:honorary', 0],
       ['beer:member', 800],
@@ -127,15 +129,71 @@ describe('the free ticket for honorary members', () => {
     ]);
   });
 
-  it('allows one free ticket across all types of the event', () => {
-    const beer = { ...ticketType('beer', 'general', 10), honoraryFree: true };
-    const water = { ...ticketType('water', 'general', 10), honoraryFree: true };
+  it('charges the honorary price when it is not free', () => {
+    const beer = { ...ticketType('beer', 'general', 10), honoraryPriceCents: 500 };
+    expect(ticketLinesForType(beer).map((line) => [line.key, line.priceCents])).toEqual([
+      ['beer:honorary', 500],
+      ['beer', 1_000],
+    ]);
+  });
+
+  it('has no honorary line without an honorary price', () => {
+    const beer = { ...ticketType('beer', 'general', 10), honoraryPriceCents: null };
+    expect(ticketLinesForType(beer).map((line) => line.key)).toEqual(['beer']);
+  });
+
+  it('allows one honorary ticket across all types of the event', () => {
+    const beer = { ...ticketType('beer', 'general', 10), honoraryPriceCents: 0 };
+    const water = { ...ticketType('water', 'general', 10), honoraryPriceCents: 300 };
     const lines = [...ticketLinesForType(beer), ...ticketLinesForType(water)];
-    const freeWater = lines.find((line) => line.key === 'water:honorary')!;
-    expect(maximumSelectableForLine({ line: freeWater, lines, quantities: {}, maxTicketsPerOrder: 8 })).toBe(1);
+    const honoraryWater = lines.find((line) => line.key === 'water:honorary')!;
+    expect(maximumSelectableForLine({ line: honoraryWater, lines, quantities: {}, maxTicketsPerOrder: 8 })).toBe(1);
     expect(
-      maximumSelectableForLine({ line: freeWater, lines, quantities: { 'beer:honorary': 1 }, maxTicketsPerOrder: 8 })
+      maximumSelectableForLine({ line: honoraryWater, lines, quantities: { 'beer:honorary': 1 }, maxTicketsPerOrder: 8 })
     ).toBe(0);
+  });
+});
+
+describe('non-members after members', () => {
+  const memberStart = new Date('2026-12-01T19:00:00.000Z');
+  const nonMemberStart = new Date('2026-12-01T21:30:00.000Z');
+  const between = new Date('2026-12-01T20:00:00.000Z').getTime();
+  const beer = {
+    ...ticketType('beer', 'general', 10),
+    memberPriceCents: 800,
+    salesStart: memberStart,
+    nonMemberSalesStart: nonMemberStart,
+  };
+
+  it('opens the member price with the members and the regular price later', () => {
+    const [member, regular] = ticketLinesForType(beer);
+    expect(ticketLineSalesStart(member)).toBe(memberStart);
+    expect(ticketLineSalesStart(regular)).toBe(nonMemberStart);
+    expect(ticketLineWaitsForMembers(member, between)).toBe(false);
+    expect(ticketLineWaitsForMembers(regular, between)).toBe(true);
+  });
+
+  it('lets a member buy a ticket without member price, which takes a member seat', () => {
+    const [line] = ticketLinesForType({ ...beer, memberPriceCents: null, seat: 'MEMBER' });
+    expect(ticketLineSalesStart(line)).toBe(memberStart);
+    expect(ticketLineWaitsForMembers(line, between)).toBe(false);
+  });
+
+  it('keeps a non-member waiting on the same ticket', () => {
+    const [line] = ticketLinesForType({ ...beer, memberPriceCents: null });
+    expect(ticketLineWaitsForMembers(line, between)).toBe(true);
+    expect(ticketLineWaitsForMembers(line, nonMemberStart.getTime())).toBe(false);
+  });
+
+  it('does not say "after the members" while the members cannot buy either', () => {
+    const [, regular] = ticketLinesForType(beer);
+    expect(ticketLineWaitsForMembers(regular, memberStart.getTime() - 60_000)).toBe(false);
+  });
+
+  it('lets the honorary line open with the members: it takes a member seat', () => {
+    const [honorary] = ticketLinesForType({ ...beer, honoraryPriceCents: 0 });
+    expect(honorary.honorary).toBe(true);
+    expect(ticketLineSalesStart(honorary)).toBe(memberStart);
   });
 });
 

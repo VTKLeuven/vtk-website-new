@@ -4,7 +4,7 @@ import { useState } from "react";
 import { StorageImageField } from "@/components/admin/StorageImageField";
 import { ImageFocusField } from "@/components/admin/ImageFocusField";
 import { storageKeyPath } from "@/lib/storageKeyPath";
-import { CENTER_FOCUS, focusPosition, type ImageFocus } from "@/lib/imageFocus";
+import { CENTER_FOCUS, focusPosition, type ImageCrop, type ImageFocus } from "@/lib/imageFocus";
 
 /**
  * Optionele cover-afbeelding voor een evenement; zonder afbeelding valt de
@@ -22,6 +22,12 @@ import { CENTER_FOCUS, focusPosition, type ImageFocus } from "@/lib/imageFocus";
  * bij een evenement dat al een foto heeft, staat het er van bij het openen en is
  * de uitsnede dus achteraf nog recht te zetten zonder opnieuw te uploaden.
  *
+ * Daaronder kan de telefoon een eigen uitsnede krijgen: een eigen punt en een
+ * zoom (`imageFocusMobileX/Y`, `imageZoomMobile`). De eventpagina toont de foto
+ * daar in 4/3, en een liggende affiche verliest dan links en rechts net de
+ * logo's; een punt verleggen haalt er hoogstens één terug, uitzoomen beide.
+ * Standaard uit: dan volgt de telefoon de gewone uitsnede, zoals voordien.
+ *
  * `fallbackUrl` is de foto die dit evenement zónder upload krijgt: de
  * standaardbanner van zijn thema, en anders de sitebrede. Ze verandert dus mee
  * met de aangevinkte thema's; de preview toont dan wat er echt komt te staan in
@@ -30,12 +36,15 @@ import { CENTER_FOCUS, focusPosition, type ImageFocus } from "@/lib/imageFocus";
 export function EventImageField({
   defaultKey,
   defaultFocus,
+  defaultMobileCrop,
   locale,
   fallbackUrl,
   fallbackHint,
 }: {
   defaultKey?: string | null;
   defaultFocus?: ImageFocus | null;
+  /** De telefoonuitsnede, of `null` wanneer de telefoon de gewone volgt. */
+  defaultMobileCrop?: ImageCrop | null;
   locale: "nl" | "en";
   fallbackUrl: string;
   /** Waar die foto vandaan komt ("Standaardfoto Cantus"), als label op de preview. */
@@ -47,6 +56,9 @@ export function EventImageField({
   // eronder; anders staan er twee kadertjes van dezelfde foto die elkaar
   // tegenspreken.
   const [focus, setFocus] = useState<ImageFocus>(defaultFocus ?? CENTER_FOCUS);
+  const [ownMobileCrop, setOwnMobileCrop] = useState(Boolean(defaultMobileCrop));
+  const imageUrl = key ? `/api/media/${storageKeyPath(key)}` : null;
+  const phonePreview = { label: nl ? "Telefoon" : "Phone", ratio: "4 / 3" };
 
   return (
     <div className="space-y-4">
@@ -65,7 +77,7 @@ export function EventImageField({
         previewPosition={focusPosition(focus)}
       />
       <ImageFocusField
-        imageUrl={key ? `/api/media/${storageKeyPath(key)}` : null}
+        imageUrl={imageUrl}
         defaultFocus={defaultFocus}
         locale={locale}
         label={nl ? "Deel van de foto dat in beeld blijft" : "Part of the photo that stays in view"}
@@ -77,10 +89,54 @@ export function EventImageField({
         previews={[
           { label: nl ? "Homepagekaart" : "Home page card", ratio: "16 / 9" },
           { label: nl ? "Eventpagina" : "Event page", ratio: "16 / 10" },
-          { label: nl ? "Telefoon" : "Phone", ratio: "4 / 3" },
+          // Met een eigen telefoonuitsnede staat de telefoon hieronder, bij
+          // die uitsnede; hier zou ze tonen wat er niet meer komt te staan.
+          ...(ownMobileCrop ? [] : [phonePreview]),
         ]}
         onChange={setFocus}
       />
+
+      {/* Zonder foto valt er niets bij te snijden; uit wist de telefoonuitsnede. */}
+      <input
+        type="hidden"
+        name="imageFocusMobileOn"
+        value={imageUrl && ownMobileCrop ? "true" : "false"}
+      />
+      {imageUrl ? (
+        <label className="vtk-ef-check">
+          <input
+            type="checkbox"
+            checked={ownMobileCrop}
+            onChange={(changed) => setOwnMobileCrop(changed.target.checked)}
+          />
+          <span>
+            <b>{nl ? "Andere uitsnede op een telefoon" : "Different crop on a phone"}</b>
+            <small>
+              {nl
+                ? "Op een telefoon toont de eventpagina de foto in 4/3, en valt er links en rechts meer weg. Kies er een eigen middelpunt en zoom voor, bijvoorbeeld om de logo's aan de rand van een affiche in beeld te houden."
+                : "On a phone the event page shows the photo in 4/3, and more falls off on the left and right. Pick its own centre and zoom, for instance to keep the logos at the edge of a poster in view."}
+            </small>
+          </span>
+        </label>
+      ) : null}
+      {imageUrl && ownMobileCrop ? (
+        <ImageFocusField
+          name="imageFocusMobile"
+          withZoom
+          imageUrl={imageUrl}
+          // Wie het aanzet, begint van de uitsnede die er nu staat.
+          defaultFocus={defaultMobileCrop?.focus ?? focus}
+          defaultZoom={defaultMobileCrop?.zoom ?? 1}
+          locale={locale}
+          label={nl ? "Uitsnede op een telefoon" : "Crop on a phone"}
+          helpText={
+            nl
+              ? "Het kader op de foto is wat een telefoon toont. Zoom uit om meer van de randen te tonen; wat de foto dan niet vult, vult de site met een vervaagde kopie."
+              : "The frame on the photo is what a phone shows. Zoom out to show more of the edges; whatever the photo then leaves empty, the site fills with a blurred copy."
+          }
+          previews={[phonePreview]}
+        />
+      ) : null}
     </div>
   );
 }

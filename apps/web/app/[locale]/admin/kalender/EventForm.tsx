@@ -8,7 +8,7 @@ import { DEFAULT_EVENT_LINK_LABEL, EVENT_LINK_LABEL_MAX } from '@/lib/calendar/e
 import { MarkdownEditorField } from '@/components/editor/MarkdownEditor';
 import { SaveForm } from '@/components/ui/SaveForm';
 import { saveErrorMessages } from '@/lib/saveMessages';
-import { toImageFocus } from '@/lib/imageFocus';
+import { mobileCropFrom, toImageFocus } from '@/lib/imageFocus';
 import { ORGANISER_PRESETS } from '@/lib/calendar/organiser';
 import { EventImageField } from './EventImageField';
 import { EventWhenField, type MomentValue } from './EventWhenField';
@@ -46,6 +46,11 @@ type Event = {
   /** Waar de uitsnede van die foto rond draait; zie lib/imageFocus.ts. */
   imageFocusX?: number | null;
   imageFocusY?: number | null;
+  /** De eigen uitsnede op een telefoon; alle drie leeg = volgt de gewone. */
+  imageFocusMobileX?: number | null;
+  imageFocusMobileY?: number | null;
+  imageZoomMobile?: number | null;
+  imageRatioMobile?: number | null;
   publishedAt?: Date | null;
   categoryIds?: string[];
   /** Hangt er al een logistiek-evenement aan? Zie `UitleenEvent.calendarEventId`. */
@@ -679,6 +684,12 @@ export function EventForm({
         <EventImageField
           defaultKey={event.imageKey}
           defaultFocus={toImageFocus(event.imageFocusX, event.imageFocusY)}
+          defaultMobileCrop={mobileCropFrom(
+            event.imageFocusMobileX,
+            event.imageFocusMobileY,
+            event.imageZoomMobile,
+            event.imageRatioMobile,
+          )}
           locale={locale}
           fallbackUrl={fallbackTheme?.bannerUrl ?? siteDefaultImage}
           fallbackHint={

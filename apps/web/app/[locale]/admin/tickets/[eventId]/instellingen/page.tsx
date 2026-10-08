@@ -153,6 +153,7 @@ export default async function TicketEventSettingsPage({
             pools={event.inventoryPools}
             ticketTypes={event.ticketTypes}
             currency={event.currency}
+            eventSalesStartAt={event.salesStartAt}
             locale={locale}
           />
         </div>

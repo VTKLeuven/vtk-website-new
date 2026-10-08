@@ -30,6 +30,13 @@
  */
 export const PRESALE_SHIFT_THRESHOLD = 15;
 
+/**
+ * Hoe lang niet-leden hoogstens na de leden kunnen moeten wachten
+ * (`TicketType.nonMemberDelayMinutes`): dertig dagen. Ruim genoeg voor elke
+ * ledenvoorrang, en een typfout ("300 uur" i.p.v. "3") blijft uit de database.
+ */
+export const MAX_NON_MEMBER_DELAY_MINUTES = 30 * 1_440;
+
 export type PresaleConfig = {
   presaleLeadMinutes?: number | null;
   presalePraesidium?: boolean;
@@ -140,6 +147,45 @@ export function viewerTypeSalesStart(
   const publicStart = event.salesStartAt ? new Date(event.salesStartAt) : null;
   if (publicStart && typeStart <= publicStart) return eventStart;
   return typeStart;
+}
+
+/**
+ * De verkoopstart van de plaatsen voor **niet-leden** van één tickettype, zoals
+ * deze bezoeker ze ervaart: `nonMemberDelayMinutes` na de start voor de leden.
+ *
+ * Welke plaats een ticket neemt, staat in `seats.ts`: een niet-lid neemt altijd
+ * een niet-ledenplaats, en een lid enkel aan de gewone prijs van een soort met
+ * ledenprijs (het ticket voor een vriend). Dat laatste wacht dus ook, want net
+ * die plaatsen moeten de leden eerst laten.
+ *
+ * Twee gevallen zonder wachttijd:
+ *
+ * - **Zonder verkoopstart.** Dan staat de verkoop al voor iedereen open, en is
+ *   er geen moment om een duur na te tellen; net zoals er dan geen voorverkoop
+ *   bestaat.
+ * - **In de voorverkoop.** Wie erin zit (het praesidium, de vaste medewerkers,
+ *   wie de private link kreeg), koopt vroeger dan iedereen, voor alle plaatsen.
+ *   De private link is er net voor een groep die de site niet kent, en die zou
+ *   anders achter de niet-leden aansluiten.
+ *
+ * Een doelgroep die geen "leden en niet-leden" is, heeft geen niet-leden om te
+ * laten wachten; daar geldt gewoon de start van het type.
+ */
+export function nonMemberTypeSalesStart(
+  event: PresaleConfig & { salesStartAt?: Date | string | null },
+  type: {
+    salesStartAt?: Date | string | null;
+    audience?: string;
+    nonMemberDelayMinutes?: number | null;
+  },
+  viewer: PresaleViewer
+): Date | null {
+  const start = viewerTypeSalesStart(event, type, viewer);
+  const delay = type.nonMemberDelayMinutes ?? 0;
+  if (!start || delay <= 0 || (type.audience ?? "PUBLIC") !== "PUBLIC") return start;
+  const publicStart = viewerTypeSalesStart(event, type, null);
+  if (publicStart && start < publicStart) return start;
+  return new Date(start.getTime() + delay * 60_000);
 }
 
 /** Koopt deze bezoeker nu in voorverkoop? Enkel om het hem te kunnen zeggen. */

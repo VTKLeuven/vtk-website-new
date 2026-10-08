@@ -631,7 +631,10 @@ webscanner blijft staan als webweg en als vangnet.
   `presalePraesidium`, `TicketEventPresaleGroup`); puur, en net als `audience.ts`
   gedeeld door de shoplijst, de eventpagina en `createOrder`. `viewerSalesStart`
   geeft de verkoopstart zoals **deze** bezoeker ze heeft; al de rest rekent
-  gewoon met een venster. Zie `docs/design-decisions.md` voor de kringkeuzes
+  gewoon met een venster. `nonMemberTypeSalesStart` doet hetzelfde voor de
+  niet-ledenplaatsen van een type met `TicketType.nonMemberDelayMinutes`
+  (niet-leden zoveel na de leden). Zie `docs/design-decisions.md` voor de
+  kringkeuzes
 - `privateLink.ts`: de privéverkoop (`TicketEvent.isPrivate`, `privateToken`).
   `hasPrivateTicketAccess` is het slot in `getPublishedTicketEventBySlug` en in
   `createTicketCheckout`; de lijsten (`listPublishedTicketEvents`, het nieuws,
