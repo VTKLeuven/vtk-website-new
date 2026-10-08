@@ -35,6 +35,12 @@ import {
 } from "./payments";
 import { orderAccessExpiry } from "./access";
 import { withOrderLock, withReservationTransaction } from "./transactions";
+import {
+  awaitingManualRefund,
+  isPaymentSetAside,
+  PAYMENT_NEEDS_REFUND,
+  PAYMENT_REFUNDED_MANUALLY,
+} from "./paymentFlags";
 import { publishedTicketDesign } from "./design";
 import { getTicketTerms } from "./terms";
 import {
@@ -830,16 +836,6 @@ type FulfillPaidOrderInput = {
 };
 
 /**
- * `TicketPayment.providerStatus` van een betaling die binnenkwam zonder dat er
- * een ticket tegenover kon staan, en van zo'n betaling nadat iemand ze met de
- * hand terugbetaalde. Een eigen waarde in een bestaand vrij tekstveld, geen
- * nieuwe kolom: het is een markering voor het beheer, geen toestand van de
- * betaling bij de provider.
- */
-export const PAYMENT_NEEDS_REFUND = "needs_refund";
-export const PAYMENT_REFUNDED_MANUALLY = "refunded_manually";
-
-/**
  * Waarom een geslaagde betaling geen tickets opleverde:
  *
  * - `SOLD_OUT`: de bestelling was al vervallen, en haar plaatsen zijn intussen
@@ -893,6 +889,18 @@ async function fulfillPaidOrderWithTx(
   });
   if (!order) throw new Error("ORDER_NOT_FOUND");
 
+  // Een betaling die al apart staat om terug te betalen, blijft daar, ook als
+  // de provider ze opnieuw meldt. Mollie meldt een terugbetaling met dezelfde
+  // status `paid`; zonder deze regel gaf die melding alsnog tickets uit zodra
+  // er intussen een plaats vrijkwam, aan een koper die zijn geld al terugkreeg.
+  const setAside = order.payments.some(
+    (candidate) =>
+      candidate.provider === input.provider &&
+      candidate.providerPaymentId === input.providerPaymentId &&
+      isPaymentSetAside(candidate)
+  );
+  if (setAside) return order;
+
   if (PAID_ORDER_STATUSES.has(order.status)) {
     // Dezelfde betaling die opnieuw gemeld wordt (een herhaalde webhook, of
     // Mollie die een terugbetaling meldt) is geen nieuws. Een ándere poging
@@ -934,6 +942,11 @@ async function fulfillPaidOrderWithTx(
     // er dus opnieuw uit. Dezelfde voorwaardelijke UPDATE als bij een
     // checkout: zit de pot intussen vol, dan krijgt deze koper zijn geld terug
     // en niet een plaats die er niet is.
+    //
+    // De grenzen per koper (één erelidticket, het maximum gratis tickets)
+    // worden hier niet opnieuw getoetst: ze golden bij het bestellen, en wie
+    // intussen opnieuw bestelde én deze oude poging toch nog betaalde, heeft
+    // twee keer betaald. Dat is zeldzaam genoeg om te aanvaarden.
     const eventClosed =
       order.event.status === "CANCELLED" ||
       order.event.status === "ARCHIVED" ||
@@ -1028,10 +1041,11 @@ async function fulfillPaidOrderWithTx(
 /**
  * Legt een geslaagde betaling vast die geen tickets kon opleveren: de betaling
  * staat op `SUCCEEDED` (het geld is binnen) met `providerStatus`
- * `needs_refund`, zodat ze bovenaan de bestellingen van het event verschijnt,
- * en Sentry slaat alarm. Terugbetalen gebeurt met de hand: Bancontact heeft
- * standaard geen refund-API, en wie wil kan zo'n koper ook nog een plaats
- * geven.
+ * `needs_refund`, en Sentry slaat alarm. De bestellingen van het event tonen
+ * dan bovenaan een melding en bij de bestelling een badge, met een filter
+ * "Terug te betalen". Terugbetalen gebeurt met de hand (Bancontact heeft
+ * standaard geen refund-API); daarna zet het beheer de betaling op
+ * `refunded_manually` met `markPaymentRefundedManually`.
  */
 async function recordPaymentNeedingRefund(
   input: FulfillPaidOrderInput,
@@ -1041,13 +1055,7 @@ async function recordPaymentNeedingRefund(
     const payment = await tx.ticketPayment.findUnique({ where: { id: error.paymentId } });
     if (!payment || payment.orderId !== input.orderId) throw new Error("PAYMENT_NOT_FOUND");
     const order = await tx.ticketOrder.findUniqueOrThrow({ where: { id: input.orderId } });
-    if (
-      payment.status === "SUCCEEDED" &&
-      (payment.providerStatus === PAYMENT_NEEDS_REFUND ||
-        payment.providerStatus === PAYMENT_REFUNDED_MANUALLY)
-    ) {
-      return { order, newlyFlagged: false };
-    }
+    if (isPaymentSetAside(payment)) return { order, newlyFlagged: false };
     await tx.ticketPayment.update({
       where: { id: payment.id },
       data: {
@@ -1103,6 +1111,47 @@ export async function fulfillPaidOrder(input: FulfillPaidOrderInput) {
     if (error instanceof PaymentNeedsRefundError) return recordPaymentNeedingRefund(input, error);
     throw error;
   }
+}
+
+/**
+ * Zet een betaling die op een terugbetaling wachtte op "met de hand
+ * terugbetaald", nadat iemand het geld bij de provider of via de bank
+ * teruggaf. Er verandert niets aan de bestelling of de tickets; enkel de
+ * markering, zodat de melding in het beheer verdwijnt en het auditlog zegt wie
+ * het afhandelde.
+ *
+ * Geeft `false` wanneer de betaling niet (meer) op een terugbetaling wacht,
+ * bijvoorbeeld omdat een collega ze net afvinkte.
+ */
+export async function markPaymentRefundedManually(input: {
+  eventId: string;
+  paymentId: string;
+  actorUserId: string;
+}): Promise<boolean> {
+  const payment = await prisma.ticketPayment.findFirst({
+    where: { id: input.paymentId, order: { eventId: input.eventId }, ...awaitingManualRefund },
+    select: { id: true, orderId: true, amountCents: true },
+  });
+  if (!payment) return false;
+
+  return withOrderLock(payment.orderId, async (tx) => {
+    const changed = await tx.ticketPayment.updateMany({
+      where: { id: payment.id, ...awaitingManualRefund },
+      data: { providerStatus: PAYMENT_REFUNDED_MANUALLY },
+    });
+    if (changed.count !== 1) return false;
+    await tx.ticketAuditLog.create({
+      data: {
+        eventId: input.eventId,
+        actorUserId: input.actorUserId,
+        action: "PAYMENT_REFUNDED_MANUALLY",
+        entityType: "TicketPayment",
+        entityId: payment.id,
+        metadata: { orderId: payment.orderId, amountCents: payment.amountCents },
+      },
+    });
+    return true;
+  });
 }
 
 /**

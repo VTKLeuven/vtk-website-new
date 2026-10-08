@@ -109,6 +109,19 @@ the transaction rolls back and the payment is recorded apart: `SUCCEEDED` with
 Sentry alert. The refund itself is manual. Before this, such a payment failed
 with `ORDER_NOT_PAYABLE` on every retry and nobody knew.
 
+- The orders page of the event (`/admin/tickets/<id>/bestellingen`) shows a
+  notice at the top while such a payment waits, a "Terug te betalen" badge on
+  the order and a filter with the same name. After refunding by hand, someone
+  with the `REFUND` capability marks it there: `providerStatus` becomes
+  `refunded_manually` and the audit log gets `PAYMENT_REFUNDED_MANUALLY`.
+- A payment that is set aside (`needs_refund` or `refunded_manually`, see
+  `lib/ticketing/paymentFlags.ts`) never yields tickets again. Mollie reports a
+  refund with the payment status still `paid`, so without that check the
+  refund itself re-ran the fulfilment and issued tickets once a seat had freed
+  up.
+- `requestTicketRefund` refunds from the payment that paid for the tickets and
+  skips a payment that is set aside, even though that one succeeded later.
+
 ### Checkout and order transitions do not run SERIALIZABLE
 
 Every checkout of an event updates the same row (the pool counter). Under

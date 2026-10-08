@@ -3,6 +3,7 @@ import "server-only";
 import { randomUUID } from "node:crypto";
 import { prisma } from "@vtk/db";
 import { quantitiesByPool, returnSoldInventory } from "./inventory";
+import { notSetAside } from "./paymentFlags";
 import { paymentGatewayFor } from "./payments";
 import { withSerializableTransaction } from "./transactions";
 
@@ -22,8 +23,12 @@ export async function requestTicketRefund(input: {
         where: { id: input.orderId },
         include: {
           items: { include: { ticket: true } },
+          // De betaling die de tickets betaalde. Een tweede geslaagde betaling
+          // die apart staat om terug te betalen, is jonger en kwam anders
+          // eerst: dan ging de terugbetaling van een ticket naar de verkeerde
+          // betaling.
           payments: {
-            where: { status: "SUCCEEDED" },
+            where: { status: "SUCCEEDED", ...notSetAside },
             orderBy: { succeededAt: "desc" },
           },
         },

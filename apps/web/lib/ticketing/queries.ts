@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
+import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { getSession } from "@vtk/auth/server";
 import { prisma } from "@vtk/db";
@@ -498,7 +499,12 @@ export async function getTicketEventPreviewBySlug(slug: string, locale: PublicLo
   };
 }
 
-export async function getOrderForViewer(orderId: string) {
+/**
+ * Per request gecachet: de bestelpagina en `liveBancontactPayment` vragen
+ * dezelfde bestelling op, en anders liep de toegangscontrole met sessie en
+ * query twee keer per paginabezoek.
+ */
+export const getOrderForViewer = cache(async function getOrderForViewer(orderId: string) {
   const [session, cookieStore] = await Promise.all([getSession(await headers()), cookies()]);
   const order = await prisma.ticketOrder.findUnique({
     where: { id: orderId },
@@ -517,7 +523,7 @@ export async function getOrderForViewer(orderId: string) {
   if (!validAccess && !ownsOrder && !session?.user.isSuperAdmin) return null;
 
   return orderDto(order, session?.user.id === order.buyerUserId);
-}
+});
 
 /**
  * De bestelregels: per tickettype en prijs één regel met een aantal erbij.

@@ -8,10 +8,12 @@ import { quantitiesByPool, reserveInventory } from "@/lib/ticketing/inventory";
 import {
   expirePendingOrder,
   fulfillPaidOrder,
-  PAYMENT_NEEDS_REFUND,
+  markPaymentRefundedManually,
   releaseExpiredOrders,
   startOrderPayment,
 } from "@/lib/ticketing/orders";
+import { PAYMENT_NEEDS_REFUND, PAYMENT_REFUNDED_MANUALLY } from "@/lib/ticketing/paymentFlags";
+import { requestTicketRefund } from "@/lib/ticketing/refunds";
 
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@vtk/auth/server", () => ({ getSession: vi.fn(async () => null) }));
@@ -77,6 +79,31 @@ function bancontactCallback(paymentId: string) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ paymentId }),
+    })
+  );
+}
+
+/** Een melding van Mollie, met de betaling zoals Mollie ze op dat moment teruggeeft. */
+function mollieCallback(payment: {
+  id: string;
+  status: string;
+  orderId: string;
+  amountRefunded?: string;
+}) {
+  vi.mocked(globalThis.fetch).mockImplementationOnce(async () =>
+    json({
+      id: payment.id,
+      status: payment.status,
+      amount: { currency: "EUR", value: "14.00" },
+      amountRefunded: { currency: "EUR", value: payment.amountRefunded ?? "0.00" },
+      metadata: { vtk_order_id: payment.orderId, vtk_order_number: payment.orderId },
+    })
+  );
+  return mollieWebhook(
+    new Request("http://localhost/api/tickets/mollie/webhook", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ id: payment.id }).toString(),
     })
   );
 }
@@ -413,6 +440,58 @@ describe.sequential("ticket payments", () => {
     });
   });
 
+  it("never issues tickets for a flagged payment, also not when Mollie reports its refund", async () => {
+    const orderId = await pendingOrder();
+    const mollieId = `tr_${randomUUID().replace(/-/g, "").slice(0, 10)}`;
+    await prisma.ticketPayment.create({
+      data: {
+        orderId,
+        provider: "mollie",
+        providerCheckoutId: mollieId,
+        idempotencyKey: `${orderId}:1`,
+        status: "PENDING",
+        amountCents: 1400,
+        currency: "EUR",
+      },
+    });
+    expect(await expirePendingOrder(orderId)).toBe(true);
+
+    // Vol op het moment dat de betaling binnenkomt: ze komt apart te staan.
+    const current = await pool();
+    const free = current.capacity - current.reservedCount - current.soldCount;
+    await prisma.ticketInventoryPool.update({
+      where: { id: ids.pool },
+      data: { soldCount: { increment: free } },
+    });
+    expect((await mollieCallback({ id: mollieId, status: "paid", orderId })).status).toBe(200);
+    expect(
+      await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: mollieId } })
+    ).toMatchObject({ status: "SUCCEEDED", providerStatus: PAYMENT_NEEDS_REFUND });
+
+    // Intussen komt er een plaats vrij, en de organisator betaalt in het
+    // dashboard van Mollie terug. Mollie meldt dat met status `paid`.
+    await prisma.ticketInventoryPool.update({
+      where: { id: ids.pool },
+      data: { soldCount: { decrement: free } },
+    });
+    const before = await pool();
+    expect(
+      (await mollieCallback({ id: mollieId, status: "paid", orderId, amountRefunded: "14.00" })).status
+    ).toBe(200);
+
+    expect(await prisma.ticketOrder.findUniqueOrThrow({ where: { id: orderId } })).toMatchObject({
+      status: "EXPIRED",
+    });
+    expect(await ticketsOf(orderId)).toBe(0);
+    expect(
+      await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: mollieId } })
+    ).toMatchObject({ status: "SUCCEEDED", providerStatus: PAYMENT_NEEDS_REFUND });
+    expect(await pool()).toMatchObject({ soldCount: before.soldCount, reservedCount: before.reservedCount });
+    expect(
+      await prisma.ticketOutboxMessage.count({ where: { dedupeKey: `order-confirmation:${orderId}` } })
+    ).toBe(0);
+  });
+
   it("flags a second successful payment on an order that was already paid", async () => {
     const orderId = await pendingOrder();
     const first = await bancontactAttempt(orderId, "PENDING", 1);
@@ -430,6 +509,42 @@ describe.sequential("ticket payments", () => {
     expect(
       await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: first } })
     ).toMatchObject({ status: "SUCCEEDED", providerStatus: "paid" });
+
+    // Een ticket terugbetalen gaat van de betaling die het ticket betaalde,
+    // niet van de jongere die apart staat.
+    const item = await prisma.ticketOrderItem.findFirstOrThrow({ where: { orderId } });
+    // Bancontact betaalt hier niet terug; de terugbetaling is dan al voorbereid.
+    await requestTicketRefund({
+      eventId: ids.event,
+      orderId,
+      orderItemIds: [item.id],
+      requestedById: ids.user,
+    }).catch(() => undefined);
+    const refund = await prisma.ticketRefund.findFirstOrThrow({
+      where: { orderId },
+      include: { payment: { select: { providerCheckoutId: true } } },
+    });
+    expect(refund.payment.providerCheckoutId).toBe(first);
+
+    // Afvinken na de terugbetaling met de hand: één keer, en enkel op dit event.
+    const flagged = await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: second } });
+    expect(
+      await markPaymentRefundedManually({ eventId: randomUUID(), paymentId: flagged.id, actorUserId: ids.user })
+    ).toBe(false);
+    expect(
+      await markPaymentRefundedManually({ eventId: ids.event, paymentId: flagged.id, actorUserId: ids.user })
+    ).toBe(true);
+    expect(
+      await markPaymentRefundedManually({ eventId: ids.event, paymentId: flagged.id, actorUserId: ids.user })
+    ).toBe(false);
+    expect(
+      await prisma.ticketPayment.findUniqueOrThrow({ where: { id: flagged.id } })
+    ).toMatchObject({ status: "SUCCEEDED", providerStatus: PAYMENT_REFUNDED_MANUALLY });
+    expect(
+      await prisma.ticketAuditLog.count({
+        where: { action: "PAYMENT_REFUNDED_MANUALLY", entityId: flagged.id },
+      })
+    ).toBe(1);
   });
 
   it("ends a payment racing an expiry the same way every time: paid, one ticket, counters intact", async () => {

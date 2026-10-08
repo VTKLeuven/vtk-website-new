@@ -5497,6 +5497,12 @@ die plaats intussen weg is.
   auditlog krijgt `PAYMENT_NEEDS_REFUND`, en Sentry slaat alarm. Er wordt niets
   automatisch terugbetaald: Bancontact heeft standaard geen refund-API, en een
   organisator kan zo'n koper ook nog een plaats geven in plaats van zijn geld.
+- **Het beheer ziet het, niet enkel Sentry.** De bestellingen van het event
+  tonen bovenaan een melding zolang er zo'n betaling wacht, met een badge bij de
+  bestelling en een filter "Terug te betalen". Wie terugbetaalde, vinkt het daar
+  af ("Markeer als terugbetaald"); dat betaalt zelf niets terug. Een betaling
+  die apart staat, levert daarna nooit meer tickets op, ook niet wanneer de
+  provider ze opnieuw meldt.
 - **Een tweede geslaagde betaling voor een bestelling die al betaald is**, gaat
   dezelfde weg: één set tickets, de tweede betaling gemarkeerd om terug te
   betalen.
