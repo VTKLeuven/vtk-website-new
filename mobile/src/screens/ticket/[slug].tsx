@@ -364,6 +364,10 @@ function checkoutErrorText(error: unknown): string {
       return 'Een van de antwoorden is niet geldig. Kijk de vragen nog eens na.';
     case 'PAYMENT_UNAVAILABLE':
       return 'De betaaldienst is even niet bereikbaar. Probeer het straks opnieuw.';
+    case 'BUSY':
+      // Een 503 van de checkout bij een rush: er is niets besteld en meteen
+      // opnieuw proberen kan lukken, dus niet "straks".
+      return 'Het is heel druk. Je bestelling is niet doorgegaan; probeer meteen opnieuw.';
     default:
       return error.message;
   }

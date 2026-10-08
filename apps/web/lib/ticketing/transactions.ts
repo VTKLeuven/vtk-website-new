@@ -15,10 +15,18 @@ function retryableTransactionError(error: unknown): boolean {
  * Een fout die enkel zegt dat het druk was: een conflict dat ook na de
  * herpogingen bleef, of geen vrije databaseverbinding binnen de wachttijd.
  * Aan de bestelling zelf is dan niets mis; meteen opnieuw proberen kan lukken.
+ *
+ * Die wachttijd heeft twee codes. `P2028` komt uit een transactie die geen
+ * verbinding kreeg binnen `maxWait`; `P2024` uit een gewone query die op de
+ * pool wachtte. Een checkout doet er een paar vóór haar transactie (het event,
+ * de koper), en bij een rush lopen die evengoed vast.
  */
 export function isTransientDatabaseError(error: unknown): boolean {
   if (retryableTransactionError(error)) return true;
-  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2028";
+  return (
+    error instanceof Prisma.PrismaClientKnownRequestError &&
+    (error.code === "P2028" || error.code === "P2024")
+  );
 }
 
 /**

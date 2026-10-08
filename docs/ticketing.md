@@ -145,6 +145,9 @@ failed with them.
 - Both wait up to 10 s for a connection and may run 15 s, instead of Prisma's
   2 s and 5 s. A checkout that still fails on contention answers `503 BUSY`
   ("het is heel druk, probeer meteen opnieuw") instead of a generic failure.
+  That covers a pool timeout outside the transaction too (`P2024`, on the
+  event or buyer lookup before it), not only inside it (`P2028`). The web shop
+  and the app both show that message for `BUSY`.
 - `test/integration/ticketing-rush.integration.ts` fires 300 checkouts at 240
   seats: exactly 240 sell and 60 get `SOLD_OUT`. On the SERIALIZABLE version,
   227 of the 300 failed. `ticketing-payments.integration.ts` covers the payment
