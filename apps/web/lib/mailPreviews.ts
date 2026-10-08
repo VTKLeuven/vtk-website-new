@@ -313,6 +313,7 @@ function theokotPreviews(): MailPreview[] {
     },
   );
   const noShow = noShowWarningMail({ name: "Wannes", locale: "NL" }, "dinsdag 6 oktober");
+  const releasedNoShow = noShowWarningMail({ name: "Wannes", locale: "NL" }, "dinsdag 6 oktober", "released");
   const cancelled = orderCancelledMail(
     { name: "Wannes", locale: "NL" },
     {
@@ -328,6 +329,7 @@ function theokotPreviews(): MailPreview[] {
       dateLabel: "dinsdag 6 oktober",
       itemLabel: "Broodje voorbeeld",
       remaining: 1,
+      canTakeBack: true,
       url: "https://vtk.be/theokot",
     },
   );
@@ -371,6 +373,19 @@ function theokotPreviews(): MailPreview[] {
       source: "theokot",
       file: "lib/mail.ts",
       ...noShow,
+    },
+    {
+      id: "theokot-no-show-released",
+      title: "Je vrijgegeven broodjes werden niet overgenomen",
+      when: "Na het sluiten van de afhaal, voor wie na de deadline broodjes vrijgaf die niemand overnam. Via de background-worker, in plaats van de gewone no-showmail.",
+      to: "Wie de broodjes vrijgaf",
+      source: "theokot",
+      file: "lib/mail.ts",
+      ...releasedNoShow,
+      notes: [
+        "Voor wie zijn eigen deel wel ophaalde, en voor wie alles vrijgaf. Liet iemand ook zijn eigen broodjes liggen, dan krijgt die de gewone no-showmail.",
+        "Telt voor een ban zoals elke no-show (`NO_SHOW_WHERE`).",
+      ],
     },
     {
       id: "theokot-order-cancelled",

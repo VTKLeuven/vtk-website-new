@@ -501,8 +501,8 @@ function PickupOrderPanel({
               ? `Alles vrijgegeven na de deadline (${order.released}). Niets meegeven: deze broodjes staan online vrij voor overname, ook voor deze student zelf.`
               : `Everything released after the deadline (${order.released}). Hand nothing over: these sandwiches are up for takeover online, for this student too.`
             : nl
-              ? `Nog ${order.released} vrijgegeven na de deadline. Die staan hieronder niet en gaan niet mee: ze zijn online vrij voor overname.`
-              : `${order.released} more released after the deadline. They are not listed below and do not go along: they are up for takeover online.`}
+              ? `Nog ${order.released} vrijgegeven na de deadline. Die staan hieronder niet en gaan niet mee: ze zijn online vrij voor overname. Zeg het even: na het afhalen kan de student ze niet meer terugnemen, en wat niemand overneemt, telt als no-show.`
+              : `${order.released} more released after the deadline. They are not listed below and do not go along: they are up for takeover online. Mention it: after pickup the student can no longer take them back, and whatever nobody takes over counts as a no-show.`}
         </div>
       )}
       {late && (

@@ -3545,12 +3545,18 @@ model TheokotOrder {
   grocomeetId       String?
   /// Afgerekend bij de grocomeet, zoals `MeetingReservation.paidAt`.
   grocomeetPaidAt   DateTime?          @db.Timestamptz(3)
-  /// Gezet bij het sluiten van de afhaal wanneer deze bestelling opgehaald is
-  /// maar er nog vrijgegeven broodjes van haar overbleven (`releases`). Dat telt
-  /// als een no-show, net als de status `NO_SHOW`: wie haar eigen deel ophaalde,
-  /// liet het vrijgegeven deel toch liggen. Wie niets ophaalde, krijgt gewoon de
-  /// status `NO_SHOW`; dan blijft dit NULL. Zie `noShowWhere`.
+  /// Gezet bij het sluiten van de afhaal wanneer er nog vrijgegeven broodjes van
+  /// deze bestelling overbleven (`releases`). Dat telt als een no-show, net als
+  /// de status `NO_SHOW`: wie haar eigen deel ophaalde, liet het vrijgegeven
+  /// deel toch liggen. Wie alles vrijgaf en niets ophaalde, krijgt de
+  /// status `NO_SHOW` en ook dit, zodat de no-showmail zegt dat het om
+  /// vrijgegeven broodjes gaat. Wie zelf ook niets van het zijne ophaalde, krijgt
+  /// enkel `NO_SHOW`. Zie `NO_SHOW_WHERE` en `settleLeftoverReleases`.
   releaseNoShowAt   DateTime?          @db.Timestamptz(3)
+  /// Wanneer deze bestelling na de deadline een overgenomen broodje kreeg
+  /// (`takeOverSandwich`). Zo'n bestelling blijft aan de balie: de doos van de
+  /// grocomeet is dan al ingepakt, dus `linkGrocomeetOrders` laat ze liggen.
+  takenOverAt       DateTime?          @db.Timestamptz(3)
 
   session           TheokotSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user              User                      @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)

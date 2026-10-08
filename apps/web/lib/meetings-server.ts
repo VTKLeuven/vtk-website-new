@@ -472,6 +472,8 @@ export async function grocomeetOnDay(
  * (`placeOrder`/`updateOrder`). Dit vangt wat daarna verandert: een GM die er
  * pas later bijkomt, of die naar een andere dag verzet wordt. Enkel wat nog
  * `RESERVED` staat, schuift mee; een afgehandelde bestelling is geschiedenis.
+ * Een bestelling met een broodje dat na de deadline overgenomen of vrijgegeven
+ * is, schuift ook niet mee: die broodjes liggen aan de balie.
  */
 export async function linkGrocomeetOrders(
   meeting: Pick<Meeting, "id" | "kind" | "startsAt">,
@@ -485,7 +487,15 @@ export async function linkGrocomeetOrders(
   });
 
   const orders = await prisma.theokotOrder.findMany({
-    where: { status: "RESERVED", grocomeetId: null, session: { date: day } },
+    where: {
+      status: "RESERVED",
+      grocomeetId: null,
+      session: { date: day },
+      // Na de deadline overgenomen of vrijgegeven: de doos is dan al ingepakt,
+      // en dat broodje ligt aan de balie. Zie `TheokotOrder.takenOverAt`.
+      takenOverAt: null,
+      releases: { none: {} },
+    },
     select: { id: true, userId: true },
   });
   if (orders.length === 0) return;

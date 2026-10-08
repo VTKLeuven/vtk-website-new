@@ -92,12 +92,21 @@ export async function sendMeetingReservationInvalidated(
 
 type NoShowMailUser = MailUser;
 
-/** Waarschuwingsmail wanneer iemand zijn broodje(s) niet is komen ophalen. */
+/**
+ * Waarschuwingsmail wanneer iemand zijn broodje(s) niet is komen ophalen.
+ *
+ * `released`: de no-show komt van broodjes die na de deadline vrijgegeven zijn
+ * en die niemand overnam (`TheokotOrder.releaseNoShowAt`). Wie zijn eigen deel
+ * wel ophaalde of alles annuleerde, kwam niet "niet opdagen"; die mail zegt
+ * waarom het toch telt, zodat er niets te betwisten valt.
+ */
 export function noShowWarningMail(
   user: Pick<NoShowMailUser, 'name' | 'locale'>,
   sessionDateLabel: string,
+  kind: 'order' | 'released' = 'order',
 ): TheokotMail {
   const nl = user.locale !== 'EN';
+  if (kind === 'released') return releasedNoShowMail(user, sessionDateLabel);
   const subject = nl
     ? 'Theokot: je bestelling werd niet opgehaald'
     : 'Theokot: your order was not picked up';
@@ -133,15 +142,50 @@ export function noShowWarningMail(
   return { subject, text, html };
 }
 
+function releasedNoShowMail(user: Pick<NoShowMailUser, 'name' | 'locale'>, sessionDateLabel: string): TheokotMail {
+  const nl = user.locale !== 'EN';
+  const subject = nl
+    ? 'Theokot: je vrijgegeven broodjes werden niet overgenomen'
+    : 'Theokot: your released sandwiches were not taken over';
+  const intro = nl
+    ? `Je annuleerde na de deadline broodjes voor ${sessionDateLabel}. Die waren toen al gemaakt en stonden vrij voor overname, maar niet alles werd overgenomen. Zoals bij het annuleren gemeld, telt wat bleef liggen als een no-show.`
+    : `You cancelled sandwiches for ${sessionDateLabel} after the deadline. They had already been made and were up for takeover, but not all of them were taken over. As stated when you cancelled, whatever was left counts as a no-show.`;
+  const notice = nl
+    ? 'Annuleer je voor de deadline, dan wordt je broodje niet gemaakt en telt er niets. Herhaaldelijke no-shows kunnen leiden tot een tijdelijke schorsing van het reservatiesysteem.'
+    : 'If you cancel before the deadline, your sandwich is not made and nothing counts. Repeated no-shows can lead to a temporary suspension from the reservation system.';
+
+  const text = nl
+    ? `Dag ${user.name},\n\n${intro}\n\n${notice}\n\nGroeten,\nTheokot VTK`
+    : `Hi ${user.name},\n\n${intro}\n\n${notice}\n\nRegards,\nTheokot VTK`;
+
+  const html = mailDocument({
+    lang: nl ? 'nl' : 'en',
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: 'Theokot' })}${mailContentRow(
+      `${mailHeading(nl ? 'Niet overgenomen' : 'Not taken over')}${mailParagraph(
+        nl ? `Dag ${user.name},` : `Hi ${user.name},`,
+      )}${mailParagraph(intro)}${mailNoticeBox(notice, nl ? 'Belangrijk' : 'Important')}${mailParagraph(
+        nl
+          ? 'Heb je vragen over je reservatie of liep er iets mis? Laat het gerust weten aan het Theokot-team.'
+          : 'If you have questions about your reservation or if something went wrong, please reach out to the Theokot team.',
+        { muted: true },
+      )}`,
+    )}${mailFooterRow('Theokot VTK · vtk.be/theokot')}`,
+  });
+
+  return { subject, text, html };
+}
+
 export async function sendNoShowWarning(
   user: NoShowMailUser,
   sessionDateLabel: string,
   orderId: string,
+  kind: 'order' | 'released' = 'order',
 ): Promise<void> {
   await sendMail(
     {
       to: user.email,
-      ...noShowWarningMail(user, sessionDateLabel),
+      ...noShowWarningMail(user, sessionDateLabel, kind),
       messageId: `<theokot-no-show-${orderId}@vtk.be>`,
     },
     { throwOnError: true, source: 'theokot' },
@@ -227,7 +271,14 @@ export async function sendOrderCancelled(
  */
 export function orderTakenOverMail(
   user: Pick<MailUser, 'name' | 'locale'>,
-  order: { dateLabel: string; itemLabel: string; remaining: number; url: string },
+  order: {
+    dateLabel: string;
+    itemLabel: string;
+    remaining: number;
+    /** Nog niet opgehaald: dan kan je een vrijgegeven broodje zelf terugnemen. */
+    canTakeBack: boolean;
+    url: string;
+  },
 ): TheokotMail {
   const nl = user.locale !== 'EN';
   const done = order.remaining === 0;
@@ -237,11 +288,21 @@ export function orderTakenOverMail(
 
   const status = done
     ? nl
-      ? 'Al je vrijgegeven broodjes zijn overgenomen. Dit telt niet als no-show.'
-      : 'All your released sandwiches have been taken over. This does not count as a no-show.'
-    : nl
-      ? `Er ${order.remaining === 1 ? 'staat' : 'staan'} nog ${order.remaining} ${order.remaining === 1 ? 'broodje' : 'broodjes'} van jou vrij. Wat bij het sluiten van de afhaal niet overgenomen is, telt als no-show. Wil je er toch een, neem het dan zelf over op de site.`
-      : `${order.remaining} ${order.remaining === 1 ? 'sandwich' : 'sandwiches'} of yours ${order.remaining === 1 ? 'is' : 'are'} still released. Whatever is not taken over when pickup closes counts as a no-show. If you want one after all, take it over yourself on the website.`;
+      ? 'Al je vrijgegeven broodjes zijn overgenomen: daarvoor volgt geen no-show.'
+      : 'All your released sandwiches have been taken over: they will not count as a no-show.'
+    : `${
+        nl
+          ? `Er ${order.remaining === 1 ? 'staat' : 'staan'} nog ${order.remaining} ${order.remaining === 1 ? 'broodje' : 'broodjes'} van jou vrij. Wat bij het sluiten van de afhaal niet overgenomen is, telt als no-show.`
+          : `${order.remaining} ${order.remaining === 1 ? 'sandwich' : 'sandwiches'} of yours ${order.remaining === 1 ? 'is' : 'are'} still released. Whatever is not taken over when pickup closes counts as a no-show.`
+      }${
+        // Na het ophalen kan je niets meer bij je bestelling zetten, dus ook
+        // niets terugnemen: dan zegt de mail dat niet.
+        order.canTakeBack
+          ? nl
+            ? ' Wil je er toch een, neem het dan zelf over op de site.'
+            : ' If you want one after all, take it over yourself on the website.'
+          : ''
+      }`;
 
   const text = nl
     ? `Dag ${user.name},\n\nIemand heeft je ${order.itemLabel} van ${order.dateLabel} overgenomen.\n\n${status}\n\n${order.url}\n\nGroeten,\nTheokot VTK`
@@ -258,7 +319,7 @@ export function orderTakenOverMail(
           ? `Iemand heeft je ${order.itemLabel} van ${order.dateLabel} overgenomen.`
           : `Someone took over your ${order.itemLabel} for ${order.dateLabel}.`,
       )}${done ? mailParagraph(status) : mailNoticeBox(status, nl ? 'Nog open' : 'Still open')}${
-        done
+        done || !order.canTakeBack
           ? ''
           : `<div style="margin:22px 0">${mailButton(order.url, nl ? 'Naar je reservatie' : 'To your reservation')}</div>`
       }`,
@@ -270,7 +331,7 @@ export function orderTakenOverMail(
 
 export async function sendOrderTakenOver(
   user: MailUser,
-  order: { dateLabel: string; itemLabel: string; remaining: number },
+  order: { dateLabel: string; itemLabel: string; remaining: number; canTakeBack: boolean },
 ): Promise<void> {
   const base = (
     process.env.TICKETING_PUBLIC_URL?.trim() ||

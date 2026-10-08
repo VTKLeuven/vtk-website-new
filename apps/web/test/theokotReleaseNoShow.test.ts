@@ -16,7 +16,7 @@ const NOW = new Date("2026-09-15T12:20:00.000Z");
 
 const tx = {
   theokotOrderRelease: { findMany: vi.fn(), delete: vi.fn() },
-  theokotOrderLine: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn(), findMany: vi.fn() },
+  theokotOrderLine: { findFirst: vi.fn(), update: vi.fn(), create: vi.fn(), findMany: vi.fn(), groupBy: vi.fn() },
   theokotOrder: { update: vi.fn(), updateMany: vi.fn() },
 };
 
@@ -37,9 +37,10 @@ describe("vrijgegeven broodjes bij het sluiten van de afhaal", () => {
     vi.clearAllMocks();
     tx.theokotOrderLine.findFirst.mockResolvedValue(null);
     tx.theokotOrderLine.findMany.mockResolvedValue([{ quantity: 2, unitPriceCents: 260 }]);
+    tx.theokotOrderLine.groupBy.mockResolvedValue([]);
   });
 
-  it("zet ze terug op de lijnen van wie niets ophaalde, zodat de bestelling een gewone no-show wordt", async () => {
+  it("zet ze terug op de lijnen van wie alles vrijgaf, met de markering voor de juiste mail", async () => {
     tx.theokotOrderRelease.findMany.mockResolvedValue([release("RESERVED")]);
 
     await settleLeftoverReleases(tx as never, "sess-1", NOW);
@@ -48,8 +49,20 @@ describe("vrijgegeven broodjes bij het sluiten van de afhaal", () => {
       data: { orderId: "order-a", sessionItemId: "kaas", quantity: 2, unitPriceCents: 260 },
     });
     expect(tx.theokotOrderRelease.delete).toHaveBeenCalledWith({ where: { id: "rel-1" } });
-    expect(tx.theokotOrder.update).toHaveBeenCalledWith({ where: { id: "order-a" }, data: { totalCents: 520 } });
+    expect(tx.theokotOrder.update).toHaveBeenCalledWith({
+      where: { id: "order-a" },
+      data: { totalCents: 520, releaseNoShowAt: NOW },
+    });
     expect(tx.theokotOrder.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("is een gewone no-show voor wie ook zijn eigen broodjes liet liggen", async () => {
+    tx.theokotOrderRelease.findMany.mockResolvedValue([release("RESERVED")]);
+    tx.theokotOrderLine.groupBy.mockResolvedValue([{ orderId: "order-a", _count: { _all: 1 } }]);
+
+    await settleLeftoverReleases(tx as never, "sess-1", NOW);
+
+    expect(tx.theokotOrder.update).toHaveBeenCalledWith({ where: { id: "order-a" }, data: { totalCents: 520 } });
   });
 
   it("telt bij wie zijn eigen deel ophaalde, met de rijen als verslag", async () => {

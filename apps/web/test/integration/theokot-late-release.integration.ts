@@ -18,7 +18,8 @@ import { processSessionNoShows } from "@/lib/theokot-server";
  * Laat annuleren tegen een echte database: de transacties, de unieke sleutels
  * en de no-show bij het sluiten. Anna bestelt twee kaas en een hesp en
  * annuleert na de deadline; Bram neemt een kaas over, Anna zelf de andere. De
- * hesp neemt niemand.
+ * hesp neemt niemand. Carl geeft enkel zijn hesp vrij en komt niets halen; Dirk
+ * geeft alles vrij en niemand neemt het.
  */
 describe.sequential("laat annuleren bij het Theokot", () => {
   const tag = randomUUID().slice(0, 8);
@@ -34,6 +35,8 @@ describe.sequential("laat annuleren bij het Theokot", () => {
   let anna = "";
   let bram = "";
   let annaOrder = "";
+  let carlOrder = "";
+  let dirkOrder = "";
 
   async function makeUser(label: string) {
     const user = await prisma.user.create({
@@ -81,6 +84,24 @@ describe.sequential("laat annuleren bij het Theokot", () => {
       },
     });
     annaOrder = order.id;
+    const twoItems = async (label: string) =>
+      (
+        await prisma.theokotOrder.create({
+          data: {
+            sessionId,
+            userId: await makeUser(label),
+            totalCents: 260 + 280,
+            lines: {
+              create: [
+                { sessionItemId: items.kaas, quantity: 1, unitPriceCents: 260 },
+                { sessionItemId: items.hesp, quantity: 1, unitPriceCents: 280 },
+              ],
+            },
+          },
+        })
+      ).id;
+    carlOrder = await twoItems("carl");
+    dirkOrder = await twoItems("dirk");
   });
 
   afterAll(async () => {
@@ -141,6 +162,21 @@ describe.sequential("laat annuleren bij het Theokot", () => {
     await expect(takeOverSandwich(bram, items.kaas, during)).rejects.toMatchObject({ code: "NOTHING_RELEASED" });
   });
 
+  it("geeft een deel vrij: Carl houdt zijn kaas", async () => {
+    const carl = (await prisma.theokotOrder.findUniqueOrThrow({ where: { id: carlOrder } })).userId;
+    await releaseOrder(carl, carlOrder, during, [{ sessionItemId: items.hesp, quantity: 1 }]);
+    const dirk = (await prisma.theokotOrder.findUniqueOrThrow({ where: { id: dirkOrder } })).userId;
+    await releaseOrder(dirk, dirkOrder, during);
+
+    const order = await prisma.theokotOrder.findUniqueOrThrow({
+      where: { id: carlOrder },
+      include: { lines: true, releases: true },
+    });
+    expect(order.lines.map((l) => [l.sessionItemId, l.quantity])).toEqual([[items.kaas, 1]]);
+    expect(order.totalCents).toBe(260);
+    expect(order.releases.map((r) => [r.sessionItemId, r.quantity])).toEqual([[items.hesp, 1]]);
+  });
+
   it("geeft Anna een no-show voor de hesp, ook al haalde ze haar kaas op", async () => {
     await prisma.theokotOrder.update({
       where: { id: annaOrder },
@@ -152,7 +188,8 @@ describe.sequential("laat annuleren bij het Theokot", () => {
     });
 
     const result = await processSessionNoShows(sessionId, new Date(pickupEnd.getTime() + 3 * 3600000));
-    expect(result).toMatchObject({ success: true, noShows: 1 });
+    // Anna (opgehaald, hesp bleef liggen), Carl (niets gehaald), Dirk (alles vrijgegeven).
+    expect(result).toMatchObject({ success: true, noShows: 3 });
 
     const order = await prisma.theokotOrder.findUniqueOrThrow({
       where: { id: annaOrder },
@@ -169,5 +206,26 @@ describe.sequential("laat annuleren bij het Theokot", () => {
       where: { sessionId_userId: { sessionId, userId: bram } },
     });
     expect(bramOrder.releaseNoShowAt).toBeNull();
+
+    // Carl liet ook zijn eigen kaas liggen: een gewone no-show, met alles terug
+    // op de lijnen.
+    const carl = await prisma.theokotOrder.findUniqueOrThrow({
+      where: { id: carlOrder },
+      include: { lines: true, releases: true },
+    });
+    expect(carl.status).toBe("NO_SHOW");
+    expect(carl.releaseNoShowAt).toBeNull();
+    expect(carl.releases).toHaveLength(0);
+    expect(carl.totalCents).toBe(540);
+
+    // Dirk annuleerde alles: no-show met de markering, voor de eigen mail.
+    const dirk = await prisma.theokotOrder.findUniqueOrThrow({
+      where: { id: dirkOrder },
+      include: { lines: true, releases: true },
+    });
+    expect(dirk.status).toBe("NO_SHOW");
+    expect(dirk.releaseNoShowAt).not.toBeNull();
+    expect(dirk.lines).toHaveLength(2);
+    expect(dirk.releases).toHaveLength(0);
   });
 });

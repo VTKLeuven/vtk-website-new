@@ -1400,16 +1400,24 @@ export async function markPickedUpAction(orderId: string): Promise<ActionResult>
 
   // Voorwaardelijk, zodat twee shifters die tegelijk op de knop duwen niet
   // allebei denken dat zij het geregistreerd hebben.
+  // Ook "er staat nog iets op": een overname tussen het lezen hierboven en deze
+  // update kan de laatste lijn niet weghalen (die raakt enkel vrijgegeven
+  // broodjes), maar een vrijgave door de student zelf wel.
   const { count } = await prisma.theokotOrder.updateMany({
-    where: { id: orderId, status: order.status },
+    where: { id: orderId, status: order.status, lines: { some: {} } },
     data: {
       status: "PICKED_UP",
       pickedUpAt: new Date(),
       pickedUpById: admin.user.id,
-      ...(late ? { statusNote: "Laattijdig afgehaald aan de balie." } : {}),
+      // Laattijdig opgehaald telt niet meer als no-show, ook niet als die van
+      // vrijgegeven broodjes kwam: wat bleef liggen, ging alsnog over de toog.
+      ...(late ? { statusNote: "Laattijdig afgehaald aan de balie.", releaseNoShowAt: null } : {}),
     },
   });
-  if (count === 0) return { ok: false, error: "Deze bestelling is intussen al afgehandeld." };
+  if (count === 0) {
+    const lines = await prisma.theokotOrderLine.count({ where: { orderId } });
+    return { ok: false, error: lines === 0 ? RELEASED_ORDER_AT_COUNTER : "Deze bestelling is intussen al afgehandeld." };
+  }
 
   if (late) {
     await logAudit({
@@ -1725,7 +1733,10 @@ export async function cancelOrderAction(orderId: string): Promise<ActionResult> 
  * overname. Wat bij het sluiten van de afhaal niet overgenomen is, telt als
  * no-show. Zie `releaseOrder`.
  */
-export async function releaseOrderAction(orderId: string): Promise<ActionResult> {
+export async function releaseOrderAction(
+  orderId: string,
+  selection?: Array<{ sessionItemId: string; quantity: number }>,
+): Promise<ActionResult> {
   let session;
   try {
     session = await requireSession();
@@ -1734,14 +1745,14 @@ export async function releaseOrderAction(orderId: string): Promise<ActionResult>
   }
 
   try {
-    await releaseOrder(session.user.id, orderId);
+    await releaseOrder(session.user.id, orderId, new Date(), selection);
   } catch (err) {
     if (err instanceof TheokotOrderError) return { ok: false, error: orderErrorMessage(err) };
     console.error("[theokot] releaseOrder mislukt:", err);
     return { ok: false, error: "Er ging iets mis bij het vrijgeven van je bestelling." };
   }
 
-  return { ok: true, message: "Je broodjes staan vrij voor overname." };
+  return { ok: true, message: "Vrijgegeven voor overname." };
 }
 
 /** Neemt één vrijgegeven broodje over; een eigen vrijgegeven broodje eerst. */

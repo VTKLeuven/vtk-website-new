@@ -7,9 +7,13 @@
 -- Bestaande bestellingen: geen rijen in de nieuwe tabel en `releaseNoShowAt`
 -- NULL, dus niets vrijgegeven en niets verandert aan hun no-shows. Dat klopt:
 -- vrijgeven bestond nog niet.
+--
+-- `takenOverAt` is NULL voor elke bestaande bestelling: niets werd ooit
+-- overgenomen, dus `linkGrocomeetOrders` behandelt ze zoals voorheen.
 
 -- AlterTable
-ALTER TABLE "TheokotOrder" ADD COLUMN     "releaseNoShowAt" TIMESTAMPTZ(3);
+ALTER TABLE "TheokotOrder" ADD COLUMN     "releaseNoShowAt" TIMESTAMPTZ(3),
+ADD COLUMN     "takenOverAt" TIMESTAMPTZ(3);
 
 -- CreateTable
 CREATE TABLE "TheokotOrderRelease" (

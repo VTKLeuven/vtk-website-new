@@ -56,6 +56,12 @@ export type StatsOrder = {
   /** Ging mee in de doos van de grocomeet (`TheokotOrder.grocomeetId`). */
   grocomeet: boolean;
   lines: Array<{ sessionItemId: string; quantity: number; unitPriceCents: number }>;
+  /**
+   * Opgehaald, maar vrijgegeven broodjes van deze bestelling bleven liggen
+   * (`TheokotOrder.releaseNoShowAt`): besteld en niet opgehaald, en de
+   * bestelling telt als no-show. Leeg (of afwezig) bij elke andere bestelling.
+   */
+  leftover?: Array<{ sessionItemId: string; quantity: number }>;
 };
 
 export type ProductStats = {
@@ -241,10 +247,11 @@ export function computeTheokotStats(sessions: StatsSession[], orders: StatsOrder
   for (const order of live) {
     const session = sessionById.get(order.sessionId)!;
     const count = sandwiches(order);
+    const left = (order.leftover ?? []).reduce((sum, line) => sum + line.quantity, 0);
     const index = sessionDay(session);
     const weekday = brusselsParts(session.date).weekday;
-    sandwichesOrdered += count;
-    perDay.ordered[index] += count;
+    sandwichesOrdered += count + left;
+    perDay.ordered[index] += count + left;
     weekdayOrdered[weekday] += count;
     orderSizes[Math.min(Math.max(count, 1), MAX_ORDER_SIZE) - 1] += 1;
 
@@ -282,6 +289,12 @@ export function computeTheokotStats(sessions: StatsSession[], orders: StatsOrder
           pickupDelayCount += 1;
         }
       }
+      if (left > 0) {
+        noShowOrders += 1;
+        sandwichesNoShow += left;
+        weekdayNoShow[weekday] += 1;
+        perDay.notPickedUp[index] += left;
+      }
     } else {
       perDay.notPickedUp[index] += count;
       if (order.status === "NO_SHOW") {
@@ -315,6 +328,12 @@ export function computeTheokotStats(sessions: StatsSession[], orders: StatsOrder
       } else if (order.status === "NO_SHOW") {
         noShowByItem.set(line.sessionItemId, (noShowByItem.get(line.sessionItemId) ?? 0) + line.quantity);
       }
+    }
+    for (const line of order.leftover ?? []) {
+      const list = linesByItem.get(line.sessionItemId) ?? [];
+      list.push({ at: order.createdAt.getTime(), quantity: line.quantity });
+      linesByItem.set(line.sessionItemId, list);
+      noShowByItem.set(line.sessionItemId, (noShowByItem.get(line.sessionItemId) ?? 0) + line.quantity);
     }
   }
 

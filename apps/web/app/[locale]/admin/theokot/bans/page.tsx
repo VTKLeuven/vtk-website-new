@@ -79,7 +79,7 @@ export default async function TheokotBansPage({ params }: { params: Promise<{ lo
     dateLabel: dateFmt.format(o.session.date),
     // Opgehaald, maar vrijgegeven broodjes bleven liggen: wat er lag, niet wat
     // er betaald werd.
-    releasedLeftover: o.status !== "NO_SHOW",
+    releasedLeftover: o.releaseNoShowAt !== null,
     totalLabel: formatEuro(
       o.status === "NO_SHOW"
         ? o.totalCents

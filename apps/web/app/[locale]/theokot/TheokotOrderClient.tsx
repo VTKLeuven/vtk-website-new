@@ -313,10 +313,10 @@ function useDayOrder(session: OrderSession, disabled: boolean) {
     });
   }
 
-  function release(onDone: () => void) {
+  function release(selection: Array<{ sessionItemId: string; quantity: number }>, onDone: () => void) {
     if (!existing) return;
     startTransition(async () => {
-      const res = await releaseOrderAction(existing.orderId);
+      const res = await releaseOrderAction(existing.orderId, selection);
       setError(res.ok ? null : res.error);
       onDone();
     });
@@ -979,6 +979,9 @@ function Reservation({
 }) {
   const [confirming, setConfirming] = useState(false);
   const [confirmingRelease, setConfirmingRelease] = useState(false);
+  // Hoeveel van elk broodje je vrijgeeft; bij het openen alles, want dat is wat
+  // "annuleren" meestal betekent. Wie er een wil houden, zet dat lager.
+  const [releaseCounts, setReleaseCounts] = useState<Record<string, number>>({});
   const existing = order.existing;
   if (!existing) return null;
   const status = fullyReleased(existing) ? RELEASED_LABEL : STATUS_LABELS[existing.status];
@@ -1051,9 +1054,15 @@ function Reservation({
       {existing.releasedCount > 0 && (
         <div className="th-reservation-actions">
           <p className="th-notice">
-            {nl
-              ? `Je annuleerde na de deadline. ${existing.releasedCount} ${existing.releasedCount === 1 ? "broodje staat" : "broodjes staan"} vrij voor overname en ${existing.releasedCount === 1 ? "is" : "zijn"} niet meer van jou: wil je er toch een, neem het dan over bij de vrijgekomen broodjes, zoals iedereen. Wat om ${session.pickupEndLabel} niet overgenomen is, telt als no-show. Je krijgt een mail telkens iemand een broodje overneemt.`
-              : `You cancelled after the deadline. ${existing.releasedCount} ${existing.releasedCount === 1 ? "sandwich is" : "sandwiches are"} up for takeover and no longer yours: if you want one after all, take it over from the released sandwiches, like anyone else. Whatever has not been taken over at ${session.pickupEndLabel} counts as a no-show. You get an email each time someone takes one over.`}
+            {existing.status === "RESERVED"
+              ? nl
+                ? `Je annuleerde na de deadline. ${existing.releasedCount} ${existing.releasedCount === 1 ? "broodje staat" : "broodjes staan"} vrij voor overname en ${existing.releasedCount === 1 ? "is" : "zijn"} niet meer van jou: wil je er toch een, neem het dan over bij de vrijgekomen broodjes, zoals iedereen. Dat kan tot je je bestelling ophaalt. Wat om ${session.pickupEndLabel} niet overgenomen is, telt als no-show. Je krijgt een mail telkens iemand een broodje overneemt.`
+                : `You cancelled after the deadline. ${existing.releasedCount} ${existing.releasedCount === 1 ? "sandwich is" : "sandwiches are"} up for takeover and no longer yours: if you want one after all, take it over from the released sandwiches, like anyone else, until you pick up your order. Whatever has not been taken over at ${session.pickupEndLabel} counts as a no-show. You get an email each time someone takes one over.`
+              : // Na het ophalen kan er niets meer bij je bestelling: terugnemen is
+                // voorbij, en dat moet hier staan in plaats van de uitnodiging.
+                nl
+                ? `Je haalde je bestelling op. Nog ${existing.releasedCount} ${existing.releasedCount === 1 ? "vrijgegeven broodje staat" : "vrijgegeven broodjes staan"} open; terugnemen kan niet meer. Wat om ${session.pickupEndLabel} niet overgenomen is, telt als no-show.`
+                : `You picked up your order. ${existing.releasedCount} released ${existing.releasedCount === 1 ? "sandwich is" : "sandwiches are"} still open; taking them back is no longer possible. Whatever has not been taken over at ${session.pickupEndLabel} counts as a no-show.`}
           </p>
         </div>
       )}
@@ -1064,7 +1073,10 @@ function Reservation({
             <button
               type="button"
               className="th-btn th-btn-ghost"
-              onClick={() => setConfirmingRelease(true)}
+              onClick={() => {
+                setReleaseCounts(Object.fromEntries(existing.lines.map((line) => [line.sessionItemId, line.quantity])));
+                setConfirmingRelease(true);
+              }}
               disabled={order.pending}
             >
               {nl ? "Annuleren" : "Cancel"}
@@ -1127,14 +1139,60 @@ function Reservation({
         open={confirmingRelease}
         title={nl ? "Annuleren na de deadline?" : "Cancel after the deadline?"}
         description={
-          nl
-            ? `De deadline van ${session.orderCloseShort} is verstreken en je broodje wordt al gemaakt. Als je nu annuleert, wordt je broodje vrijgegeven voor overname. Neemt iemand anders je broodje over, dan vervalt je bestelling zonder gevolgen. Blijft het broodje om ${session.pickupEndLabel} over, dan telt dit als een no-show.`
-            : `The ${session.orderCloseShort} deadline has passed and your sandwich is already being made. If you cancel now, your sandwich will be released for someone else to take over. If someone takes it over, your order is cancelled without penalty. If it is still left at ${session.pickupEndLabel}, this counts as a no-show.`
+          <>
+            <p>
+              {nl
+                ? `De deadline van ${session.orderCloseShort} is verstreken en je broodjes worden al gemaakt. Wat je nu annuleert, wordt vrijgegeven voor overname. Neemt iemand anders het over, dan vervalt het zonder gevolgen. Blijft het om ${session.pickupEndLabel} over, dan telt dit als een no-show.`
+                : `The ${session.orderCloseShort} deadline has passed and your sandwiches are already being made. Whatever you cancel now is released for someone else to take over. If someone takes it over, it is cancelled without penalty. If it is still left at ${session.pickupEndLabel}, this counts as a no-show.`}
+            </p>
+            {existing.lines.length > 1 || (existing.lines[0]?.quantity ?? 0) > 1 ? (
+              <>
+                <p className="mt-3 font-medium text-vtk-ink">{nl ? "Wat geef je vrij?" : "What do you release?"}</p>
+                <ul className="th-lines mt-1">
+                  {existing.lines.map((line) => {
+                    const item = order.items.find((i) => i.id === line.sessionItemId);
+                    const count = releaseCounts[line.sessionItemId] ?? 0;
+                    return (
+                      <li key={line.sessionItemId}>
+                        <span>{line.name}</span>
+                        {item ? (
+                          <Stepper
+                            nl={nl}
+                            item={{ ...item, name: line.name, remaining: line.quantity }}
+                            quantity={count}
+                            atMax={false}
+                            onChange={(next) =>
+                              setReleaseCounts((prev) => ({
+                                ...prev,
+                                [line.sessionItemId]: Math.max(0, Math.min(line.quantity, next)),
+                              }))
+                            }
+                          />
+                        ) : (
+                          <span className="th-tn">{count}×</span>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+                <p className="mt-2">
+                  {nl
+                    ? "Wat je houdt, haal je gewoon af aan de balie."
+                    : "Whatever you keep, you pick up at the counter as usual."}
+                </p>
+              </>
+            ) : null}
+          </>
         }
         confirmLabel={nl ? "Vrijgeven voor overname" : "Release for takeover"}
         cancelLabel={nl ? "Behouden" : "Keep it"}
-        pending={order.pending}
-        onConfirm={() => order.release(() => setConfirmingRelease(false))}
+        pending={order.pending || Object.values(releaseCounts).every((n) => n === 0)}
+        onConfirm={() =>
+          order.release(
+            Object.entries(releaseCounts).map(([sessionItemId, quantity]) => ({ sessionItemId, quantity })),
+            () => setConfirmingRelease(false),
+          )
+        }
         onCancel={() => setConfirmingRelease(false)}
       />
     </div>
@@ -1142,11 +1200,12 @@ function Reservation({
 }
 
 /**
- * Broodjes die anderen na de deadline vrijgaven en die je kan overnemen.
+ * Broodjes die na de deadline vrijgegeven zijn en die je kan overnemen.
  *
- * Eén per klik, want elk stuk verlost iemand anders van een no-show en komt bij
- * jou als een gewone reservatie terecht: afhalen en betalen aan de balie, met
- * dezelfde limieten als bij bestellen. Wat je zelf vrijgaf, staat hier niet.
+ * Eén per klik, want elk stuk verlost iemand van een no-show en komt bij jou
+ * als een gewone reservatie terecht: afhalen en betalen aan de balie, met
+ * dezelfde limieten als bij bestellen. Wat je zelf vrijgaf, staat hier ook: wie
+ * zijn broodje toch wil, neemt het over zoals iedereen (en krijgt dan het zijne).
  */
 function TakeoverPanel({
   nl,
@@ -1194,8 +1253,8 @@ function TakeoverPanel({
         <div className="th-card-title">{nl ? "Vrijgekomen broodjes" : "Released sandwiches"}</div>
         <div className="th-card-sub">
           {nl
-            ? `Iemand annuleerde na de deadline. Neem je een broodje over, dan haal je het af en betaal je aan de balie, tot ${session.pickupEndLabel}.`
-            : `Someone cancelled after the deadline. If you take one over, you pick it up and pay at the counter, until ${session.pickupEndLabel}.`}
+            ? `Na de deadline geannuleerd en al gemaakt. Neem je een broodje over, dan haal je het af en betaal je aan de balie, tot ${session.pickupEndLabel}.`
+            : `Cancelled after the deadline and already made. If you take one over, you pick it up and pay at the counter, until ${session.pickupEndLabel}.`}
         </div>
       </div>
       {blocked && <p className="th-hint">{blocked}</p>}

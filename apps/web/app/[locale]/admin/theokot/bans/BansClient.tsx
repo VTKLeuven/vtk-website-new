@@ -32,8 +32,8 @@ export type NoShowRow = {
   /** Viel tijdens een pauze van de no-show-verwerking: geen mail, telt niet mee. */
   paused: boolean;
   /**
-   * Opgehaald, maar na de deadline vrijgegeven broodjes bleven liggen
-   * (`releaseNoShowAt`). Het bedrag is dan wat er lag, niet wat er betaald werd.
+   * Na de deadline vrijgegeven broodjes bleven liggen (`releaseNoShowAt`). Bij
+   * een opgehaalde bestelling is het bedrag wat er lag, niet wat er betaald werd.
    */
   releasedLeftover: boolean;
 };

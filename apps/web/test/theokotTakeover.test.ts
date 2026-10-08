@@ -17,6 +17,9 @@ const mocks = vi.hoisted(() => ({
   orderDelete: vi.fn(),
   lineDeleteMany: vi.fn(),
   lineCount: vi.fn(),
+  lineDelete: vi.fn(),
+  lineUpdate: vi.fn(),
+  lineFindMany: vi.fn(),
   releaseUpsert: vi.fn(),
   releaseFindUnique: vi.fn(),
   releaseFindFirst: vi.fn(),
@@ -60,7 +63,13 @@ vi.mock("@/lib/ticketing/transactions", () => ({
         create: mocks.orderCreate,
         delete: mocks.orderDelete,
       },
-      theokotOrderLine: { deleteMany: mocks.lineDeleteMany, count: mocks.lineCount },
+      theokotOrderLine: {
+        deleteMany: mocks.lineDeleteMany,
+        count: mocks.lineCount,
+        delete: mocks.lineDelete,
+        update: mocks.lineUpdate,
+        findMany: mocks.lineFindMany,
+      },
       theokotOrderRelease: {
         upsert: mocks.releaseUpsert,
         findUnique: mocks.releaseFindUnique,
@@ -110,8 +119,8 @@ describe("laat annuleren", () => {
       voucherRedemption: null,
       session: SESSION,
       lines: [
-        { sessionItemId: "kaas", quantity: 2, unitPriceCents: 260 },
-        { sessionItemId: "hesp", quantity: 1, unitPriceCents: 280 },
+        { id: "line-kaas", sessionItemId: "kaas", quantity: 2, unitPriceCents: 260 },
+        { id: "line-hesp", sessionItemId: "hesp", quantity: 1, unitPriceCents: 280 },
       ],
       ...overrides,
     };
@@ -123,6 +132,7 @@ describe("laat annuleren", () => {
 
   it("verhuist na de deadline elke lijn naar de vrijgegeven broodjes en wist de bestelling niet", async () => {
     mocks.orderFindUnique.mockResolvedValue(reserved());
+    mocks.lineFindMany.mockResolvedValue([]);
 
     await releaseOrder("user-a", "order-a", AFTER_DEADLINE);
 
@@ -134,9 +144,36 @@ describe("laat annuleren", () => {
       }),
     );
     expect(mocks.releaseUpsert).toHaveBeenCalledTimes(2);
-    expect(mocks.lineDeleteMany).toHaveBeenCalledWith({ where: { orderId: "order-a" } });
+    expect(mocks.lineDelete).toHaveBeenCalledWith({ where: { id: "line-kaas" } });
+    expect(mocks.lineDelete).toHaveBeenCalledWith({ where: { id: "line-hesp" } });
     expect(mocks.orderUpdate).toHaveBeenCalledWith({ where: { id: "order-a" }, data: { totalCents: 0 } });
     expect(mocks.orderDelete).not.toHaveBeenCalled();
+  });
+
+  it("geeft een deel vrij: de rest blijft van jou en haal je gewoon op", async () => {
+    mocks.orderFindUnique.mockResolvedValue(reserved());
+    mocks.lineFindMany.mockResolvedValue([
+      { quantity: 1, unitPriceCents: 260 },
+      { quantity: 1, unitPriceCents: 280 },
+    ]);
+
+    await releaseOrder("user-a", "order-a", AFTER_DEADLINE, [{ sessionItemId: "kaas", quantity: 1 }]);
+
+    expect(mocks.releaseUpsert).toHaveBeenCalledTimes(1);
+    expect(mocks.releaseUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: expect.objectContaining({ sessionItemId: "kaas", quantity: 1 }) }),
+    );
+    expect(mocks.lineUpdate).toHaveBeenCalledWith({ where: { id: "line-kaas" }, data: { quantity: { decrement: 1 } } });
+    expect(mocks.lineDelete).not.toHaveBeenCalled();
+    expect(mocks.orderUpdate).toHaveBeenCalledWith({ where: { id: "order-a" }, data: { totalCents: 540 } });
+  });
+
+  it("weigert meer vrij te geven dan je hebt", async () => {
+    mocks.orderFindUnique.mockResolvedValue(reserved());
+    await expect(
+      releaseOrder("user-a", "order-a", AFTER_DEADLINE, [{ sessionItemId: "hesp", quantity: 2 }]),
+    ).rejects.toMatchObject({ code: "RELEASE_NOT_POSSIBLE" });
+    expect(mocks.releaseUpsert).not.toHaveBeenCalled();
   });
 
   it("weigert voor de deadline: dan is gewoon annuleren de weg", async () => {
@@ -240,8 +277,10 @@ describe("een broodje overnemen", () => {
     expect(mocks.orderDelete).not.toHaveBeenCalled();
     expect(mocks.sendOrderTakenOver).toHaveBeenCalledWith(
       expect.objectContaining({ email: "anna@example.test" }),
-      expect.objectContaining({ itemLabel: "Smos kaas", remaining: 1 }),
+      expect.objectContaining({ itemLabel: "Smos kaas", remaining: 1, canTakeBack: true }),
     );
+    // Een overgenomen broodje blijft aan de balie, nooit in de doos van de GM.
+    expect(mocks.orderCreate.mock.calls[0][0].data.takenOverAt).toEqual(AFTER_DEADLINE);
   });
 
   it("neemt van de oudste vrijgave, ook van wie zijn eigen deel al ophaalde", async () => {
@@ -286,6 +325,11 @@ describe("een broodje overnemen", () => {
 
     expect(mocks.lineCount).not.toHaveBeenCalled();
     expect(mocks.orderDelete).not.toHaveBeenCalled();
+    // Na het ophalen kan wie vrijgaf niets meer terugnemen: de mail zegt dat niet.
+    expect(mocks.sendOrderTakenOver).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ canTakeBack: false }),
+    );
   });
 
   it("neemt eerst je eigen vrijgegeven broodje terug, zonder mail", async () => {
@@ -309,6 +353,8 @@ describe("een broodje overnemen", () => {
       }),
     );
     expect(mocks.sendOrderTakenOver).not.toHaveBeenCalled();
+    // Je eigen broodje terug is geen overname: geen markering.
+    expect(mocks.orderUpdate.mock.calls[0][0].data.takenOverAt).toBeUndefined();
   });
 
   it("neemt van een ander wanneer je zelf iets anders vrijgaf", async () => {

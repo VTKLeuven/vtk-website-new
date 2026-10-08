@@ -111,7 +111,7 @@ export default async function TheokotOverviewPage({
   const time = (d: Date) =>
     new Intl.DateTimeFormat(tag, { timeZone: "Europe/Brussels", hour: "2-digit", minute: "2-digit" }).format(d);
 
-  const [sessions, grouped, redemptions, config] = await Promise.all([
+  const [sessions, grouped, releasedNoShows, redemptions, config] = await Promise.all([
     prisma.theokotSession.findMany({
       orderBy: { date: "desc" },
       select: {
@@ -126,8 +126,18 @@ export default async function TheokotOverviewPage({
     }),
     prisma.theokotOrder.groupBy({
       by: ["sessionId", "status", "grocomeetId"],
+      // Helemaal vrijgegeven na de deadline: niets meer om op te halen of te
+      // betalen, dus ook geen bestelling die nog wacht.
+      where: { NOT: { status: "RESERVED", lines: { none: {} } } },
       _count: { _all: true },
       _sum: { totalCents: true },
+    }),
+    // Opgehaald, maar vrijgegeven broodjes bleven liggen: ook een no-show
+    // (`NO_SHOW_WHERE`). Een `NO_SHOW` met die markering telt hierboven al.
+    prisma.theokotOrder.groupBy({
+      by: ["sessionId"],
+      where: { status: "PICKED_UP", releaseNoShowAt: { not: null } },
+      _count: { _all: true },
     }),
     caps.manage
       ? prisma.theokotVoucherRedemption.findMany({
@@ -163,6 +173,7 @@ export default async function TheokotOverviewPage({
     if (group.status === "RESERVED") row.reserved += count;
     if (group.status === "NO_SHOW") row.noShows += count;
   }
+  for (const group of releasedNoShows) totalsFor(group.sessionId).noShows += group._count._all;
   for (const { amount, order } of redemptions) {
     const row = totalsFor(order.sessionId);
     row.vouchers += amount;
@@ -189,6 +200,9 @@ export default async function TheokotOverviewPage({
           lines: {
             include: { sessionItem: { select: { nameNl: true, nameEn: true, order: true } } },
           },
+          releases: {
+            include: { sessionItem: { select: { nameNl: true, nameEn: true, order: true } } },
+          },
         },
         orderBy: { user: { name: "asc" } },
       })
@@ -197,11 +211,19 @@ export default async function TheokotOverviewPage({
   const byStatus = (status: TheokotOrderStatus) =>
     orders.filter((order) => order.status === status && order.grocomeetId === null);
   const grocomeetOrders = orders.filter((order) => order.grocomeetId !== null);
-  const reserved = byStatus("RESERVED");
+  // Helemaal vrijgegeven: er ligt niets meer op deze naam.
+  const reserved = byStatus("RESERVED").filter((order) => order.lines.length > 0);
   const pickedUp = byStatus("PICKED_UP").sort(
     (a, b) => (b.pickedUpAt?.getTime() ?? 0) - (a.pickedUpAt?.getTime() ?? 0),
   );
-  const noShows = byStatus("NO_SHOW");
+  // Dezelfde no-shows als `NO_SHOW_WHERE`: ook wie zijn eigen deel ophaalde maar
+  // vrijgegeven broodjes liet liggen.
+  const noShows = orders.filter(
+    (order) => order.grocomeetId === null && (order.status === "NO_SHOW" || order.releaseNoShowAt !== null),
+  );
+  // Opgehaald met overschot: in de no-showlijst staat wat bleef liggen, niet wat
+  // over de toog ging.
+  const leftover = (order: (typeof orders)[number]) => order.status === "PICKED_UP" && order.releaseNoShowAt !== null;
   // Wat "Er liep iets mis" terugdraaien teweegbrengt: welke no-shows weer
   // meetellen en wie daardoor alsnog een mail krijgt (verwerkt terwijl de dag
   // aangeduid stond). Dezelfde grenzen als `unwaiveSessionNoShows`.
@@ -216,8 +238,8 @@ export default async function TheokotOverviewPage({
   const pickupOver = selected ? selected.pickupEnd <= now : false;
   const started = selected ? selected.pickupStart <= now : false;
 
-  const itemsLabel = (order: (typeof orders)[number]) =>
-    [...order.lines]
+  const itemsLabel = (order: (typeof orders)[number], source: "lines" | "releases" = "lines") =>
+    [...(source === "lines" ? order.lines : order.releases)]
       .sort((a, b) => a.sessionItem.order - b.sessionItem.order)
       .map((line) => `${line.quantity}× ${nl ? line.sessionItem.nameNl : line.sessionItem.nameEn ?? line.sessionItem.nameNl}`)
       .join(", ");
@@ -560,13 +582,27 @@ export default async function TheokotOverviewPage({
                 id: order.id,
                 name: order.user.name,
                 rNumber: order.user.rNumber,
-                items: itemsLabel(order),
-                total: formatEuro(order.totalCents),
-                extra: order.noShowWaivedAt ? (
-                  <span className="rounded-full bg-vtk-blue-soft px-2 py-0.5 text-xs font-medium text-vtk-ink">
-                    {nl ? "telt niet mee" : "not counted"}
-                  </span>
-                ) : null,
+                items: itemsLabel(order, leftover(order) ? "releases" : "lines"),
+                total: formatEuro(
+                  leftover(order)
+                    ? order.releases.reduce((sum, r) => sum + r.quantity * r.unitPriceCents, 0)
+                    : order.totalCents,
+                ),
+                extra:
+                  order.noShowWaivedAt || order.releaseNoShowAt ? (
+                    <span className="flex flex-wrap gap-1">
+                      {order.releaseNoShowAt ? (
+                        <span className="rounded-full bg-vtk-blue-soft px-2 py-0.5 text-xs font-medium text-vtk-ink">
+                          {nl ? "vrijgegeven, niet overgenomen" : "released, not taken over"}
+                        </span>
+                      ) : null}
+                      {order.noShowWaivedAt ? (
+                        <span className="rounded-full bg-vtk-blue-soft px-2 py-0.5 text-xs font-medium text-vtk-ink">
+                          {nl ? "telt niet mee" : "not counted"}
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null,
               }))}
               extraHeading=""
               classes={{ th, td, num }}

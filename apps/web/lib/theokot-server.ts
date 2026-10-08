@@ -59,7 +59,12 @@ function sessionDateLabel(date: Date, locale: 'NL' | 'EN'): string {
  * drempel bereikt is en er nog geen actieve ban loopt, een ban aanmaken.
  */
 async function applyNoShowConsequences(
-  order: { id: string; userId: string; user: { name: string; email: string; locale: 'NL' | 'EN' } },
+  order: {
+    id: string;
+    userId: string;
+    releaseNoShowAt: Date | null;
+    user: { name: string; email: string; locale: 'NL' | 'EN' };
+  },
   sessionDate: Date,
   config: TheokotConfig,
 ): Promise<void> {
@@ -69,7 +74,7 @@ async function applyNoShowConsequences(
 
 /** De no-showmail van één bestelling; een mislukte verzending houdt niets tegen. */
 async function sendNoShowMail(
-  order: { id: string; user: { name: string; email: string; locale: 'NL' | 'EN' } },
+  order: { id: string; releaseNoShowAt: Date | null; user: { name: string; email: string; locale: 'NL' | 'EN' } },
   sessionDate: Date,
 ): Promise<void> {
   // Een waarschuwing die niet vertrekt, hoort de rest niet tegen te houden. Bij
@@ -81,6 +86,9 @@ async function sendNoShowMail(
       order.user,
       sessionDateLabel(sessionDate, order.user.locale),
       order.id,
+      // Van vrijgegeven broodjes die niemand overnam: een eigen mail, want wie
+      // die kreeg, kwam wel of annuleerde, en "niet opgehaald" klopt dan niet.
+      order.releaseNoShowAt ? 'released' : 'order',
     );
   } catch (error) {
     console.error(`[theokot] waarschuwingsmail voor bestelling ${order.id} mislukt:`, error);
@@ -155,7 +163,9 @@ async function applyBanIfDue(userId: string, config: TheokotConfig): Promise<boo
  * - Haalde hij niets op (de bestelling staat nog op `RESERVED`), dan gaan de
  *   vrijgegeven broodjes terug op zijn lijnen en wordt de bestelling hierna een
  *   gewone `NO_SHOW`: de lijnen zeggen dan wat er bleef liggen, zoals bij elke
- *   no-show.
+ *   no-show. Had hij alles vrijgegeven, dan krijgt ze ook `releaseNoShowAt`:
+ *   hij annuleerde, dus de mail zegt dat het om vrijgegeven broodjes gaat. Liet
+ *   hij ook zijn eigen broodjes liggen, dan is het een gewone no-show.
  * - Haalde hij zijn eigen deel wel op, dan kan de bestelling niet ook nog
  *   `NO_SHOW` worden: wat hij betaalde, blijft opgehaald. Ze krijgt
  *   `releaseNoShowAt`, en de vrijgegeven rijen blijven staan als verslag van
@@ -171,6 +181,19 @@ export async function settleLeftoverReleases(
     include: { order: { select: { id: true, status: true } } },
   });
   const reserved = new Set<string>();
+  // Vóór er iets terug op de lijnen komt: wie had er niets meer van zichzelf.
+  const reservedIds = [...new Set(releases.filter((r) => r.order.status === 'RESERVED').map((r) => r.orderId))];
+  const withOwnLines = new Set(
+    reservedIds.length === 0
+      ? []
+      : (
+          await tx.theokotOrderLine.groupBy({
+            by: ['orderId'],
+            where: { orderId: { in: reservedIds } },
+            _count: { _all: true },
+          })
+        ).map((row) => row.orderId),
+  );
   for (const release of releases) {
     if (release.order.status === 'RESERVED') {
       const line = await tx.theokotOrderLine.findFirst({
@@ -208,7 +231,10 @@ export async function settleLeftoverReleases(
     });
     await tx.theokotOrder.update({
       where: { id: orderId },
-      data: { totalCents: lines.reduce((sum, line) => sum + line.quantity * line.unitPriceCents, 0) },
+      data: {
+        totalCents: lines.reduce((sum, line) => sum + line.quantity * line.unitPriceCents, 0),
+        ...(withOwnLines.has(orderId) ? {} : { releaseNoShowAt: now }),
+      },
     });
   }
 }
