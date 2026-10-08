@@ -135,8 +135,15 @@ export async function offeringForMeeting(
  */
 export async function usageForSessionItems(itemIds: string[]): Promise<Map<string, number>> {
   if (itemIds.length === 0) return new Map();
-  const [lines, reservations] = await Promise.all([
+  const [lines, released, reservations] = await Promise.all([
     prisma.theokotOrderLine.groupBy({
+      by: ["sessionItemId"],
+      where: { sessionItemId: { in: itemIds } },
+      _sum: { quantity: true },
+    }),
+    // Vrijgegeven broodjes zijn al gemaakt: ze wachten op wie ze overneemt en
+    // zijn dus niet opnieuw te bestellen.
+    prisma.theokotOrderRelease.groupBy({
       by: ["sessionItemId"],
       where: { sessionItemId: { in: itemIds } },
       _sum: { quantity: true },
@@ -149,7 +156,9 @@ export async function usageForSessionItems(itemIds: string[]): Promise<Map<strin
   ]);
 
   const used = new Map<string, number>();
-  for (const line of lines) used.set(line.sessionItemId, line._sum.quantity ?? 0);
+  for (const line of [...lines, ...released]) {
+    used.set(line.sessionItemId, (used.get(line.sessionItemId) ?? 0) + (line._sum.quantity ?? 0));
+  }
   for (const reservation of reservations) {
     if (!reservation.sessionItemId) continue;
     used.set(
@@ -179,6 +188,11 @@ export async function usageForSessionItemsTx(
     where: { sessionItem: { sessionId } },
     _sum: { quantity: true },
   });
+  const released = await tx.theokotOrderRelease.groupBy({
+    by: ["sessionItemId"],
+    where: { sessionItem: { sessionId } },
+    _sum: { quantity: true },
+  });
   const reservations = await tx.meetingReservation.groupBy({
     by: ["sessionItemId"],
     where: {
@@ -190,7 +204,9 @@ export async function usageForSessionItemsTx(
   });
 
   const used = new Map<string, number>();
-  for (const line of lines) used.set(line.sessionItemId, line._sum.quantity ?? 0);
+  for (const line of [...lines, ...released]) {
+    used.set(line.sessionItemId, (used.get(line.sessionItemId) ?? 0) + (line._sum.quantity ?? 0));
+  }
   for (const reservation of reservations) {
     if (!reservation.sessionItemId) continue;
     used.set(

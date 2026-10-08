@@ -10,7 +10,6 @@ import {
   placeOrderAction,
   releaseOrderAction,
   takeOverSandwichAction,
-  unreleaseOrderAction,
   updateOrderAction,
 } from "@/app/actions/theokot";
 
@@ -20,8 +19,8 @@ export type OrderItem = {
   priceCents: number;
   remaining: number;
   /**
-   * Zoveel stuks gaven anderen na de deadline vrij en kan je nu overnemen. Enkel
-   * in het overnamevenster, anders 0.
+   * Zoveel stuks zijn na de deadline vrijgegeven en kan je nu overnemen, ook
+   * wat je zelf vrijgaf. Enkel in het overnamevenster, anders 0.
    */
   released: number;
   isWeeklySpecial: boolean;
@@ -45,12 +44,11 @@ export type ExistingOrder = {
    * ze te wissen, want ze worden al gemaakt.
    */
   canRelease: boolean;
-  /** Laat geannuleerd: de broodjes staan vrij voor overname. */
-  released: boolean;
-  /** Zoveel vrijgegeven broodjes zijn nog niet overgenomen. */
+  /**
+   * Zoveel broodjes gaf je na de deadline vrij en nam nog niemand over. Ze
+   * staan niet in `lines`: ze zijn niet meer van jou.
+   */
   releasedCount: number;
-  /** Toch zelf ophalen: zolang de afhaal loopt. */
-  canUnrelease: boolean;
   /** Gaat mee in de doos van de grocomeet en wordt daar afgerekend. */
   grocomeet: boolean;
   lines: Array<{
@@ -114,6 +112,11 @@ const STATUS_LABELS: Record<TheokotOrderStatus, { nl: string; en: string; tone: 
 
 /** Een reservatie die laat geannuleerd is en vrij staat voor overname. */
 const RELEASED_LABEL = { nl: "Vrijgegeven", en: "Released", tone: "muted" };
+
+/** Alles vrijgegeven: er staat niets meer op je naam. */
+function fullyReleased(existing: ExistingOrder): boolean {
+  return existing.status === "RESERVED" && existing.lines.length === 0 && existing.releasedCount > 0;
+}
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -319,14 +322,6 @@ function useDayOrder(session: OrderSession, disabled: boolean) {
     });
   }
 
-  function unrelease() {
-    if (!existing) return;
-    startTransition(async () => {
-      const res = await unreleaseOrderAction(existing.orderId);
-      setError(res.ok ? null : res.error);
-    });
-  }
-
   function takeOver(sessionItemId: string, onDone: () => void) {
     startTransition(async () => {
       const res = await takeOverSandwichAction(sessionItemId);
@@ -351,7 +346,6 @@ function useDayOrder(session: OrderSession, disabled: boolean) {
     stopEditing,
     cancel,
     release,
-    unrelease,
     takeOver,
   };
 }
@@ -873,7 +867,7 @@ function DayTabs({
 function DayState({ nl, session }: { nl: boolean; session: OrderSession }) {
   const existing = session.existingOrder;
   if (existing) {
-    const label = existing.released ? RELEASED_LABEL : STATUS_LABELS[existing.status];
+    const label = fullyReleased(existing) ? RELEASED_LABEL : STATUS_LABELS[existing.status];
     return (
       <span className="th-daystate">
         {existing.status === "RESERVED" && <span className="th-dot" aria-hidden="true" />}
@@ -987,7 +981,7 @@ function Reservation({
   const [confirmingRelease, setConfirmingRelease] = useState(false);
   const existing = order.existing;
   if (!existing) return null;
-  const status = existing.released ? RELEASED_LABEL : STATUS_LABELS[existing.status];
+  const status = fullyReleased(existing) ? RELEASED_LABEL : STATUS_LABELS[existing.status];
   const canEdit = existing.canEdit && !disabled;
   const count = existing.lines.reduce((sum, line) => sum + line.quantity, 0);
 
@@ -1015,57 +1009,52 @@ function Reservation({
         )}
       </div>
 
-      <div className="th-reservation-body">
-        <ul className="th-lines">
-          {existing.lines.map((line) => (
-            <li key={line.sessionItemId}>
-              <span className="inline-flex items-center gap-2">
-                {line.badgeImageUrl && (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={line.badgeImageUrl}
-                    alt=""
-                    className="h-5 w-5 shrink-0 rounded-full object-cover"
-                  />
-                )}
-                {line.quantity}× {line.name}
-              </span>
-              <span className="th-tn">{formatEuro(line.quantity * line.unitPriceCents)}</span>
-            </li>
-          ))}
-        </ul>
-        <div className="th-total">
-          <span>
-            {existing.status !== "RESERVED"
-              ? nl
-                ? "Totaal"
-                : "Total"
-              : existing.grocomeet
+      {existing.lines.length > 0 && (
+        <div className="th-reservation-body">
+          <ul className="th-lines">
+            {existing.lines.map((line) => (
+              <li key={line.sessionItemId}>
+                <span className="inline-flex items-center gap-2">
+                  {line.badgeImageUrl && (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={line.badgeImageUrl}
+                      alt=""
+                      className="h-5 w-5 shrink-0 rounded-full object-cover"
+                    />
+                  )}
+                  {line.quantity}× {line.name}
+                </span>
+                <span className="th-tn">{formatEuro(line.quantity * line.unitPriceCents)}</span>
+              </li>
+            ))}
+          </ul>
+          <div className="th-total">
+            <span>
+              {existing.status !== "RESERVED"
                 ? nl
-                  ? "Te betalen bij de grocomeet"
-                  : "To pay at the grocomeet"
-                : nl
-                  ? "Te betalen aan de balie"
-                  : "To pay at the counter"}
-          </span>
-          <span className="th-tn">{formatEuro(existing.totalCents)}</span>
+                  ? "Totaal"
+                  : "Total"
+                : existing.grocomeet
+                  ? nl
+                    ? "Te betalen bij de grocomeet"
+                    : "To pay at the grocomeet"
+                  : nl
+                    ? "Te betalen aan de balie"
+                    : "To pay at the counter"}
+            </span>
+            <span className="th-tn">{formatEuro(existing.totalCents)}</span>
+          </div>
         </div>
-      </div>
+      )}
 
-      {existing.released && (
+      {existing.releasedCount > 0 && (
         <div className="th-reservation-actions">
           <p className="th-notice">
             {nl
-              ? `Je annuleerde na de deadline. ${existing.releasedCount} ${existing.releasedCount === 1 ? "broodje staat" : "broodjes staan"} vrij voor overname. Wat om ${session.pickupEndLabel} niet overgenomen is, telt als no-show. Je krijgt een mail telkens iemand een broodje overneemt.`
-              : `You cancelled after the deadline. ${existing.releasedCount} ${existing.releasedCount === 1 ? "sandwich is" : "sandwiches are"} up for takeover. Whatever has not been taken over at ${session.pickupEndLabel} counts as a no-show. You get an email each time someone takes one over.`}
+              ? `Je annuleerde na de deadline. ${existing.releasedCount} ${existing.releasedCount === 1 ? "broodje staat" : "broodjes staan"} vrij voor overname en ${existing.releasedCount === 1 ? "is" : "zijn"} niet meer van jou: wil je er toch een, neem het dan over bij de vrijgekomen broodjes, zoals iedereen. Wat om ${session.pickupEndLabel} niet overgenomen is, telt als no-show. Je krijgt een mail telkens iemand een broodje overneemt.`
+              : `You cancelled after the deadline. ${existing.releasedCount} ${existing.releasedCount === 1 ? "sandwich is" : "sandwiches are"} up for takeover and no longer yours: if you want one after all, take it over from the released sandwiches, like anyone else. Whatever has not been taken over at ${session.pickupEndLabel} counts as a no-show. You get an email each time someone takes one over.`}
           </p>
-          {existing.canUnrelease && (
-            <div className="th-reservation-buttons">
-              <button type="button" className="th-btn th-btn-primary" onClick={order.unrelease} disabled={order.pending}>
-                {nl ? "Toch zelf ophalen" : "Pick it up after all"}
-              </button>
-            </div>
-          )}
         </div>
       )}
 
@@ -1196,11 +1185,7 @@ function TakeoverPanel({
         ? nl
           ? "Je bestelling van deze dag zit in de doos van de grocomeet."
           : "Your order for this day is in the grocomeet box."
-        : existing.released
-          ? nl
-            ? "Je gaf je eigen bestelling vrij. Haal ze eerst toch zelf op als je iets wil overnemen."
-            : "You released your own order. Pick it up after all first if you want to take something over."
-          : null;
+        : null;
   const confirming = offered.find((item) => item.id === confirmingId) ?? null;
 
   return (

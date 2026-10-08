@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Laat annuleren en overnemen bij het Theokot (`releaseOrder`,
- * `unreleaseOrder`, `takeOverSandwich` in `lib/theokot-orders.ts`).
+ * Laat annuleren en overnemen bij het Theokot (`releaseOrder` en
+ * `takeOverSandwich` in `lib/theokot-orders.ts`).
  *
- * Wat hier vastligt: na de deadline wist annuleren niets meer maar geeft het
- * vrij; een overname schuift precies één stuk van de oudste vrijgave naar wie
- * overneemt; en de laatste overname laat de vrijgegeven bestelling verdwijnen,
- * zodat er geen no-show overblijft.
+ * Wat hier vastligt: na de deadline wist annuleren niets meer maar verhuizen je
+ * broodjes naar de vrijgegeven voorraad; iedereen neemt er per stuk een over,
+ * jijzelf ook en dan eerst het jouwe; en de laatste overname laat een lege
+ * bestelling verdwijnen, zodat er geen no-show overblijft.
  */
 
 const mocks = vi.hoisted(() => ({
@@ -15,12 +15,14 @@ const mocks = vi.hoisted(() => ({
   orderUpdate: vi.fn(),
   orderCreate: vi.fn(),
   orderDelete: vi.fn(),
-  lineUpdate: vi.fn(),
-  lineUpdateMany: vi.fn(),
-  lineDelete: vi.fn(),
   lineDeleteMany: vi.fn(),
-  lineFindFirst: vi.fn(),
-  lineFindMany: vi.fn(),
+  lineCount: vi.fn(),
+  releaseUpsert: vi.fn(),
+  releaseFindUnique: vi.fn(),
+  releaseFindFirst: vi.fn(),
+  releaseUpdate: vi.fn(),
+  releaseDelete: vi.fn(),
+  releaseAggregate: vi.fn(),
   itemFindUnique: vi.fn(),
   userFindUnique: vi.fn(),
   activeBanFor: vi.fn(),
@@ -58,19 +60,20 @@ vi.mock("@/lib/ticketing/transactions", () => ({
         create: mocks.orderCreate,
         delete: mocks.orderDelete,
       },
-      theokotOrderLine: {
-        update: mocks.lineUpdate,
-        updateMany: mocks.lineUpdateMany,
-        delete: mocks.lineDelete,
-        deleteMany: mocks.lineDeleteMany,
-        findFirst: mocks.lineFindFirst,
-        findMany: mocks.lineFindMany,
+      theokotOrderLine: { deleteMany: mocks.lineDeleteMany, count: mocks.lineCount },
+      theokotOrderRelease: {
+        upsert: mocks.releaseUpsert,
+        findUnique: mocks.releaseFindUnique,
+        findFirst: mocks.releaseFindFirst,
+        update: mocks.releaseUpdate,
+        delete: mocks.releaseDelete,
+        aggregate: mocks.releaseAggregate,
       },
       theokotSessionItem: { findUnique: mocks.itemFindUnique },
     }),
 }));
 
-import { releaseOrder, takeOverSandwich, unreleaseOrder } from "@/lib/theokot-orders";
+import { releaseOrder, takeOverSandwich } from "@/lib/theokot-orders";
 import { inTakeoverWindow } from "@/lib/theokot";
 
 // Deadline 10:30, afhaal tot 14:00 (Brussel, zomeruur).
@@ -104,12 +107,11 @@ describe("laat annuleren", () => {
       userId: "user-a",
       status: "RESERVED",
       grocomeetId: null,
-      releasedAt: null,
       voucherRedemption: null,
       session: SESSION,
       lines: [
-        { id: "line-1", quantity: 2 },
-        { id: "line-2", quantity: 1 },
+        { sessionItemId: "kaas", quantity: 2, unitPriceCents: 260 },
+        { sessionItemId: "hesp", quantity: 1, unitPriceCents: 280 },
       ],
       ...overrides,
     };
@@ -119,14 +121,21 @@ describe("laat annuleren", () => {
     vi.clearAllMocks();
   });
 
-  it("geeft na de deadline elke lijn volledig vrij en wist niets", async () => {
+  it("verhuist na de deadline elke lijn naar de vrijgegeven broodjes en wist de bestelling niet", async () => {
     mocks.orderFindUnique.mockResolvedValue(reserved());
 
     await releaseOrder("user-a", "order-a", AFTER_DEADLINE);
 
-    expect(mocks.orderUpdate).toHaveBeenCalledWith({ where: { id: "order-a" }, data: { releasedAt: AFTER_DEADLINE } });
-    expect(mocks.lineUpdate).toHaveBeenCalledWith({ where: { id: "line-1" }, data: { releasedQuantity: 2 } });
-    expect(mocks.lineUpdate).toHaveBeenCalledWith({ where: { id: "line-2" }, data: { releasedQuantity: 1 } });
+    expect(mocks.releaseUpsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { orderId_sessionItemId: { orderId: "order-a", sessionItemId: "kaas" } },
+        create: expect.objectContaining({ quantity: 2, unitPriceCents: 260, releasedAt: AFTER_DEADLINE }),
+        update: { quantity: { increment: 2 } },
+      }),
+    );
+    expect(mocks.releaseUpsert).toHaveBeenCalledTimes(2);
+    expect(mocks.lineDeleteMany).toHaveBeenCalledWith({ where: { orderId: "order-a" } });
+    expect(mocks.orderUpdate).toHaveBeenCalledWith({ where: { id: "order-a" }, data: { totalCents: 0 } });
     expect(mocks.orderDelete).not.toHaveBeenCalled();
   });
 
@@ -154,26 +163,11 @@ describe("laat annuleren", () => {
     await expect(releaseOrder("user-a", "order-a", AFTER_DEADLINE)).rejects.toMatchObject({ code: "ORDER_NOT_FOUND" });
   });
 
-  it("is idempotent", async () => {
-    mocks.orderFindUnique.mockResolvedValue(reserved({ releasedAt: AFTER_DEADLINE }));
+  it("is idempotent: wie alles al vrijgaf, heeft niets meer om vrij te geven", async () => {
+    mocks.orderFindUnique.mockResolvedValue(reserved({ lines: [] }));
     await releaseOrder("user-a", "order-a", AFTER_DEADLINE);
+    expect(mocks.releaseUpsert).not.toHaveBeenCalled();
     expect(mocks.orderUpdate).not.toHaveBeenCalled();
-  });
-
-  it("toch zelf ophalen zet alles terug op je naam", async () => {
-    mocks.orderFindUnique.mockResolvedValue(reserved({ releasedAt: AFTER_DEADLINE }));
-
-    await unreleaseOrder("user-a", "order-a", AFTER_DEADLINE);
-
-    expect(mocks.orderUpdate).toHaveBeenCalledWith({ where: { id: "order-a" }, data: { releasedAt: null } });
-    expect(mocks.lineUpdateMany).toHaveBeenCalledWith({ where: { orderId: "order-a" }, data: { releasedQuantity: 0 } });
-  });
-
-  it("toch zelf ophalen kan niet meer na de afhaal", async () => {
-    mocks.orderFindUnique.mockResolvedValue(reserved({ releasedAt: AFTER_DEADLINE }));
-    await expect(unreleaseOrder("user-a", "order-a", AFTER_PICKUP)).rejects.toMatchObject({
-      code: "TAKEOVER_CLOSED",
-    });
   });
 });
 
@@ -183,14 +177,27 @@ describe("een broodje overnemen", () => {
     { id: "special", priceCents: 300, quantity: 4, isWeeklySpecial: true },
   ];
 
-  function donorLine(overrides: Record<string, unknown> = {}) {
+  function release(overrides: Record<string, unknown> = {}) {
     return {
-      id: "line-a",
+      id: "rel-a",
+      orderId: "order-a",
       sessionItemId: "kaas",
       quantity: 2,
-      releasedQuantity: 2,
       unitPriceCents: 260,
-      order: { id: "order-a", userId: "user-a" },
+      releasedAt: AFTER_DEADLINE,
+      order: { id: "order-a", userId: "user-a", status: "RESERVED" },
+      ...overrides,
+    };
+  }
+
+  function myOrder(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "order-b",
+      userId: "user-b",
+      status: "RESERVED",
+      grocomeetId: null,
+      voucherRedemption: null,
+      lines: [],
       ...overrides,
     };
   }
@@ -206,9 +213,12 @@ describe("een broodje overnemen", () => {
       session: { id: "sess-1", date: new Date("2026-09-14T22:00:00.000Z"), ...SESSION, items },
     });
     mocks.orderFindUnique.mockResolvedValue(null);
-    mocks.lineFindFirst.mockResolvedValue(donorLine());
-    mocks.lineFindMany.mockResolvedValue([{ quantity: 1, unitPriceCents: 260, releasedQuantity: 1 }]);
+    mocks.releaseFindUnique.mockResolvedValue(null);
+    mocks.releaseFindFirst.mockResolvedValue(release());
+    mocks.releaseAggregate.mockResolvedValue({ _sum: { quantity: 1 } });
+    mocks.lineCount.mockResolvedValue(0);
     mocks.orderCreate.mockResolvedValue({ id: "order-b", totalCents: 260 });
+    mocks.orderUpdate.mockResolvedValue({ id: "order-b", totalCents: 260 });
     mocks.userFindUnique.mockResolvedValue({ name: "Anna", email: "anna@example.test", locale: "NL" });
   });
 
@@ -216,11 +226,7 @@ describe("een broodje overnemen", () => {
     const result = await takeOverSandwich("user-b", "kaas", AFTER_DEADLINE);
 
     expect(result).toEqual({ orderId: "order-b", totalCents: 260 });
-    expect(mocks.lineUpdate).toHaveBeenCalledWith({
-      where: { id: "line-a" },
-      data: { quantity: { decrement: 1 }, releasedQuantity: { decrement: 1 } },
-    });
-    expect(mocks.orderUpdate).toHaveBeenCalledWith({ where: { id: "order-a" }, data: { totalCents: 260 } });
+    expect(mocks.releaseUpdate).toHaveBeenCalledWith({ where: { id: "rel-a" }, data: { quantity: { decrement: 1 } } });
     expect(mocks.orderCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
@@ -230,32 +236,29 @@ describe("een broodje overnemen", () => {
         }),
       }),
     );
+    // Wie vrijgaf, houdt nog een broodje vrij staan: zijn bestelling blijft.
+    expect(mocks.orderDelete).not.toHaveBeenCalled();
     expect(mocks.sendOrderTakenOver).toHaveBeenCalledWith(
       expect.objectContaining({ email: "anna@example.test" }),
       expect.objectContaining({ itemLabel: "Smos kaas", remaining: 1 }),
     );
   });
 
-  it("neemt van de oudste vrijgave en nooit van jezelf", async () => {
+  it("neemt van de oudste vrijgave, ook van wie zijn eigen deel al ophaalde", async () => {
     await takeOverSandwich("user-b", "kaas", AFTER_DEADLINE);
 
-    const query = mocks.lineFindFirst.mock.calls[0][0];
-    expect(query.orderBy[0]).toEqual({ order: { releasedAt: "asc" } });
-    expect(query.where.order).toMatchObject({
-      status: "RESERVED",
-      releasedAt: { not: null },
-      userId: { not: "user-b" },
-      grocomeetId: null,
-    });
+    const query = mocks.releaseFindFirst.mock.calls[0][0];
+    expect(query.orderBy[0]).toEqual({ releasedAt: "asc" });
+    expect(query.where.order).toEqual({ status: { in: ["RESERVED", "PICKED_UP"] } });
   });
 
-  it("laat de vrijgegeven bestelling verdwijnen bij het laatste stuk: geen no-show", async () => {
-    mocks.lineFindFirst.mockResolvedValue(donorLine({ quantity: 1, releasedQuantity: 1 }));
-    mocks.lineFindMany.mockResolvedValue([]);
+  it("laat een lege bestelling verdwijnen bij het laatste stuk: geen no-show", async () => {
+    mocks.releaseFindFirst.mockResolvedValue(release({ quantity: 1 }));
+    mocks.releaseAggregate.mockResolvedValue({ _sum: { quantity: null } });
 
     await takeOverSandwich("user-b", "kaas", AFTER_DEADLINE);
 
-    expect(mocks.lineDelete).toHaveBeenCalledWith({ where: { id: "line-a" } });
+    expect(mocks.releaseDelete).toHaveBeenCalledWith({ where: { id: "rel-a" } });
     expect(mocks.orderDelete).toHaveBeenCalledWith({ where: { id: "order-a" } });
     expect(mocks.sendOrderTakenOver).toHaveBeenCalledWith(
       expect.anything(),
@@ -263,16 +266,65 @@ describe("een broodje overnemen", () => {
     );
   });
 
+  it("laat de bestelling staan wanneer er nog iets van hem op staat", async () => {
+    mocks.releaseFindFirst.mockResolvedValue(release({ quantity: 1 }));
+    mocks.releaseAggregate.mockResolvedValue({ _sum: { quantity: null } });
+    mocks.lineCount.mockResolvedValue(1);
+
+    await takeOverSandwich("user-b", "kaas", AFTER_DEADLINE);
+
+    expect(mocks.orderDelete).not.toHaveBeenCalled();
+  });
+
+  it("laat een opgehaalde bestelling staan: die is betaald", async () => {
+    mocks.releaseFindFirst.mockResolvedValue(
+      release({ quantity: 1, order: { id: "order-a", userId: "user-a", status: "PICKED_UP" } }),
+    );
+    mocks.releaseAggregate.mockResolvedValue({ _sum: { quantity: null } });
+
+    await takeOverSandwich("user-b", "kaas", AFTER_DEADLINE);
+
+    expect(mocks.lineCount).not.toHaveBeenCalled();
+    expect(mocks.orderDelete).not.toHaveBeenCalled();
+  });
+
+  it("neemt eerst je eigen vrijgegeven broodje terug, zonder mail", async () => {
+    mocks.orderFindUnique.mockResolvedValue(myOrder());
+    mocks.releaseFindUnique.mockResolvedValue(
+      release({ id: "rel-b", orderId: "order-b", quantity: 1, order: { id: "order-b", userId: "user-b", status: "RESERVED" } }),
+    );
+
+    await takeOverSandwich("user-b", "kaas", AFTER_DEADLINE);
+
+    expect(mocks.releaseFindFirst).not.toHaveBeenCalled();
+    expect(mocks.releaseDelete).toHaveBeenCalledWith({ where: { id: "rel-b" } });
+    expect(mocks.orderDelete).not.toHaveBeenCalled();
+    expect(mocks.orderUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "order-b" },
+        data: expect.objectContaining({
+          totalCents: 260,
+          lines: { create: [{ sessionItemId: "kaas", quantity: 1, unitPriceCents: 260 }] },
+        }),
+      }),
+    );
+    expect(mocks.sendOrderTakenOver).not.toHaveBeenCalled();
+  });
+
+  it("neemt van een ander wanneer je zelf iets anders vrijgaf", async () => {
+    mocks.orderFindUnique.mockResolvedValue(myOrder());
+
+    await takeOverSandwich("user-b", "kaas", AFTER_DEADLINE);
+
+    expect(mocks.releaseFindUnique).toHaveBeenCalledWith(
+      expect.objectContaining({ where: { orderId_sessionItemId: { orderId: "order-b", sessionItemId: "kaas" } } }),
+    );
+    expect(mocks.releaseUpdate).toHaveBeenCalledWith({ where: { id: "rel-a" }, data: { quantity: { decrement: 1 } } });
+    expect(mocks.sendOrderTakenOver).toHaveBeenCalled();
+  });
+
   it("voegt het stuk toe aan je bestaande reservatie", async () => {
-    mocks.orderFindUnique.mockResolvedValue({
-      id: "order-b",
-      userId: "user-b",
-      status: "RESERVED",
-      grocomeetId: null,
-      releasedAt: null,
-      voucherRedemption: null,
-      lines: [{ sessionItemId: "special", quantity: 1 }],
-    });
+    mocks.orderFindUnique.mockResolvedValue(myOrder({ lines: [{ sessionItemId: "special", quantity: 1 }] }));
     mocks.orderUpdate.mockResolvedValue({ id: "order-b", totalCents: 560 });
 
     await takeOverSandwich("user-b", "kaas", AFTER_DEADLINE);
@@ -287,40 +339,24 @@ describe("een broodje overnemen", () => {
   });
 
   it("houdt zich aan het maximum per dag", async () => {
-    mocks.orderFindUnique.mockResolvedValue({
-      id: "order-b",
-      userId: "user-b",
-      status: "RESERVED",
-      grocomeetId: null,
-      releasedAt: null,
-      voucherRedemption: null,
-      lines: [{ sessionItemId: "kaas", quantity: 3 }],
-    });
+    mocks.orderFindUnique.mockResolvedValue(myOrder({ lines: [{ sessionItemId: "kaas", quantity: 3 }] }));
 
     await expect(takeOverSandwich("user-b", "kaas", AFTER_DEADLINE)).rejects.toMatchObject({
       name: "TheokotValidationError",
     });
-    expect(mocks.lineUpdate).not.toHaveBeenCalled();
-    expect(mocks.lineDelete).not.toHaveBeenCalled();
+    expect(mocks.releaseUpdate).not.toHaveBeenCalled();
+    expect(mocks.releaseDelete).not.toHaveBeenCalled();
   });
 
-  it("weigert wie zelf zijn bestelling vrijgaf", async () => {
-    mocks.orderFindUnique.mockResolvedValue({
-      id: "order-b",
-      userId: "user-b",
-      status: "RESERVED",
-      grocomeetId: null,
-      releasedAt: AFTER_DEADLINE,
-      voucherRedemption: null,
-      lines: [{ sessionItemId: "kaas", quantity: 1 }],
-    });
+  it("weigert wie zijn bestelling van die dag al ophaalde", async () => {
+    mocks.orderFindUnique.mockResolvedValue(myOrder({ status: "PICKED_UP" }));
     await expect(takeOverSandwich("user-b", "kaas", AFTER_DEADLINE)).rejects.toMatchObject({
       code: "TAKEOVER_UNAVAILABLE",
     });
   });
 
   it("weigert wanneer iemand anders het net nam", async () => {
-    mocks.lineFindFirst.mockResolvedValue(null);
+    mocks.releaseFindFirst.mockResolvedValue(null);
     await expect(takeOverSandwich("user-b", "kaas", AFTER_DEADLINE)).rejects.toMatchObject({
       code: "NOTHING_RELEASED",
     });

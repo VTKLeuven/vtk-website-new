@@ -237,11 +237,11 @@ export function orderTakenOverMail(
 
   const status = done
     ? nl
-      ? 'Al je vrijgegeven broodjes zijn overgenomen. Je bestelling vervalt en dit telt niet als no-show.'
-      : 'All your released sandwiches have been taken over. Your order is gone and this does not count as a no-show.'
+      ? 'Al je vrijgegeven broodjes zijn overgenomen. Dit telt niet als no-show.'
+      : 'All your released sandwiches have been taken over. This does not count as a no-show.'
     : nl
-      ? `Er ${order.remaining === 1 ? 'staat' : 'staan'} nog ${order.remaining} ${order.remaining === 1 ? 'broodje' : 'broodjes'} van jou vrij. Wat bij het sluiten van de afhaal niet overgenomen is, telt als no-show; je kan het ook nog zelf ophalen.`
-      : `${order.remaining} ${order.remaining === 1 ? 'sandwich' : 'sandwiches'} of yours ${order.remaining === 1 ? 'is' : 'are'} still released. Whatever is not taken over when pickup closes counts as a no-show; you can still pick it up yourself.`;
+      ? `Er ${order.remaining === 1 ? 'staat' : 'staan'} nog ${order.remaining} ${order.remaining === 1 ? 'broodje' : 'broodjes'} van jou vrij. Wat bij het sluiten van de afhaal niet overgenomen is, telt als no-show. Wil je er toch een, neem het dan zelf over op de site.`
+      : `${order.remaining} ${order.remaining === 1 ? 'sandwich' : 'sandwiches'} of yours ${order.remaining === 1 ? 'is' : 'are'} still released. Whatever is not taken over when pickup closes counts as a no-show. If you want one after all, take it over yourself on the website.`;
 
   const text = nl
     ? `Dag ${user.name},\n\nIemand heeft je ${order.itemLabel} van ${order.dateLabel} overgenomen.\n\n${status}\n\n${order.url}\n\nGroeten,\nTheokot VTK`

@@ -5,7 +5,7 @@ import { requireSession } from "@/lib/session";
 import type { Locale } from "@vtk/i18n";
 import Link from "@/components/ui/Link";
 import { formatEuro } from "@/lib/theokot";
-import { getTheokotConfig } from "@/lib/theokot-server";
+import { getTheokotConfig, NO_SHOW_WHERE } from "@/lib/theokot-server";
 import { TheokotAdminNav } from "../TheokotAdminNav";
 import { BansClient, type BanRow, type NoShowRow } from "./BansClient";
 
@@ -30,12 +30,14 @@ export default async function TheokotBansPage({ params }: { params: Promise<{ lo
       include: { user: { select: { name: true, rNumber: true } } },
     }),
     prisma.theokotOrder.findMany({
-      where: { status: "NO_SHOW" },
+      // Ook wie wel ophaalde maar vrijgegeven broodjes liet liggen.
+      where: NO_SHOW_WHERE,
       orderBy: { updatedAt: "desc" },
       take: 200,
       include: {
         user: { select: { name: true, rNumber: true } },
         session: { select: { date: true } },
+        releases: { select: { quantity: true, unitPriceCents: true } },
       },
     }),
     getTheokotConfig(),
@@ -75,7 +77,14 @@ export default async function TheokotBansPage({ params }: { params: Promise<{ lo
     userName: o.user.name,
     rNumber: o.user.rNumber ?? "",
     dateLabel: dateFmt.format(o.session.date),
-    totalLabel: formatEuro(o.totalCents),
+    // Opgehaald, maar vrijgegeven broodjes bleven liggen: wat er lag, niet wat
+    // er betaald werd.
+    releasedLeftover: o.status !== "NO_SHOW",
+    totalLabel: formatEuro(
+      o.status === "NO_SHOW"
+        ? o.totalCents
+        : o.releases.reduce((sum, r) => sum + r.quantity * r.unitPriceCents, 0),
+    ),
     note: o.statusNote ?? "",
     paused: o.noShowWaivedAt !== null,
   }));

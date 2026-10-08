@@ -68,10 +68,9 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
     // Na de deadline en tot het einde van de afhaal: laat annuleren geeft je
     // broodjes vrij, en wat anderen vrijgaven kan je overnemen.
     const takeover = inTakeoverWindow(s, now);
-    const releasedOwn =
-      existing?.status === "RESERVED" && existing.releasedAt !== null
-        ? existing.lines.reduce((sum, l) => sum + l.releasedQuantity, 0)
-        : 0;
+    // Wat je zelf vrijgaf en nog niemand overnam. Niet meer van jou: wil je het
+    // toch, dan neem je het over bij de vrijgekomen broodjes, zoals iedereen.
+    const releasedOwn = existing?.releases.reduce((sum, r) => sum + r.quantity, 0) ?? 0;
     return {
       id: s.id,
       dateLabel: dayFmt.format(s.date),
@@ -115,11 +114,9 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
             canRelease:
               existing.status === "RESERVED" &&
               existing.grocomeetId === null &&
-              existing.releasedAt === null &&
+              existing.lines.length > 0 &&
               takeover,
-            released: existing.status === "RESERVED" && existing.releasedAt !== null,
             releasedCount: releasedOwn,
-            canUnrelease: releasedOwn > 0 && now < s.pickupEnd,
             grocomeet: existing.grocomeetId !== null,
             lines: existing.lines.map((l) => ({
               sessionItemId: l.sessionItemId,

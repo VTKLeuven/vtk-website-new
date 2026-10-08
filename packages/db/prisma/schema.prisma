@@ -3505,6 +3505,7 @@ model TheokotSessionItem {
 
   session             TheokotSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   lines               TheokotOrderLine[]
+  releases            TheokotOrderRelease[]
   /// Broodjes die voor een vergadering (GM/Bureau) op dit item gereserveerd zijn.
   /// Ze gaan van dezelfde voorraad af en staan apart op de turflijst.
   meetingReservations MeetingReservation[]
@@ -3544,18 +3545,20 @@ model TheokotOrder {
   grocomeetId       String?
   /// Afgerekend bij de grocomeet, zoals `MeetingReservation.paidAt`.
   grocomeetPaidAt   DateTime?          @db.Timestamptz(3)
-  /// Laat geannuleerd: na de deadline vrijgegeven voor overname. De broodjes
-  /// worden al gemaakt, dus de bestelling blijft staan; wat een ander overneemt
-  /// (`TheokotOrderLine.releasedQuantity`), gaat van deze bestelling af. Wat er
-  /// bij het sluiten van de afhaal nog op staat, wordt een gewone no-show. NULL
-  /// zolang de bestelling niet vrijgegeven is. Zie `releaseOrder`.
-  releasedAt        DateTime?          @db.Timestamptz(3)
+  /// Gezet bij het sluiten van de afhaal wanneer deze bestelling opgehaald is
+  /// maar er nog vrijgegeven broodjes van haar overbleven (`releases`). Dat telt
+  /// als een no-show, net als de status `NO_SHOW`: wie haar eigen deel ophaalde,
+  /// liet het vrijgegeven deel toch liggen. Wie niets ophaalde, krijgt gewoon de
+  /// status `NO_SHOW`; dan blijft dit NULL. Zie `noShowWhere`.
+  releaseNoShowAt   DateTime?          @db.Timestamptz(3)
 
   session           TheokotSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user              User                      @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
   pickedUpBy        User?                     @relation("TheokotPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
   grocomeet         Meeting?                  @relation(fields: [grocomeetId], references: [id], onDelete: SetNull)
   lines             TheokotOrderLine[]
+  /// Broodjes die na de deadline vrijgegeven zijn en nog niet overgenomen.
+  releases          TheokotOrderRelease[]
   voucherRedemption TheokotVoucherRedemption?
 
   @@unique([sessionId, userId])
@@ -3595,17 +3598,38 @@ model TheokotOrderLine {
   // betaald is (RESERVED, NO_SHOW: zie `repriceReservedOrders`); vanaf het
   // ophalen is dit wat er betaald werd en verandert het niet meer.
   unitPriceCents Int
-  /// Hoeveel stuks van deze lijn na een late annulatie nog vrij staan voor
-  /// overname (`TheokotOrder.releasedAt`). Altijd ≤ `quantity`; 0 bij een
-  /// gewone bestelling. Neemt iemand er een over, dan zakken `quantity` en dit
-  /// getal samen met één.
-  releasedQuantity Int @default(0)
 
   order       TheokotOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   sessionItem TheokotSessionItem @relation(fields: [sessionItemId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([sessionItemId])
+}
+
+/// Vrijgegeven broodjes: na de deadline geannuleerd, maar al gemaakt.
+///
+/// Twee voorraden, zoals in de koelkast: de lijnen van een bestelling
+/// (`TheokotOrderLine`) zijn wat van de student is, deze rijen zijn wat hij
+/// vrijgaf en wat iedereen (hijzelf ook) kan overnemen. Ze hangen aan zijn
+/// bestelling enkel om te weten bij wie de no-show hoort als niemand ze neemt.
+/// Een overname haalt één stuk van hier en zet het als lijn bij wie overneemt.
+/// Zie `releaseOrder` en `takeOverSandwich` in `lib/theokot-orders.ts`.
+model TheokotOrderRelease {
+  id             String   @id @default(cuid())
+  orderId        String
+  sessionItemId  String
+  /// Hoeveel er van dit broodje nog vrij staat. Bij 0 verdwijnt de rij.
+  quantity       Int
+  /// De prijs van de lijn waar het vandaan kwam; terug op de lijn bij een no-show.
+  unitPriceCents Int
+  /// Wie het eerst vrijgaf, wordt het eerst verlost.
+  releasedAt     DateTime @db.Timestamptz(3)
+
+  order       TheokotOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sessionItem TheokotSessionItem @relation(fields: [sessionItemId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, sessionItemId])
+  @@index([sessionItemId, releasedAt])
 }
 
 // -----------------------------------------------------------------------------

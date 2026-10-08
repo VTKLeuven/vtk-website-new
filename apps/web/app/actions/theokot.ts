@@ -32,7 +32,6 @@ import {
   repriceReservedOrders,
   takeOverSandwich,
   TheokotOrderError,
-  unreleaseOrder,
   updateOrder,
 } from "@/lib/theokot-orders";
 import { syncMeetingsForSession, syncMeetingsOnDay } from "@/lib/meetings-server";
@@ -1112,6 +1111,9 @@ export async function correctOrderStatusAction(
       status,
       statusNote: note,
       pickedUpAt: status === "PICKED_UP" ? new Date() : null,
+      // Wie corrigeert naar opgehaald of gereserveerd, zegt dat er geen no-show
+      // is, ook niet voor vrijgegeven broodjes die bleven liggen.
+      ...(status === "NO_SHOW" ? {} : { releaseNoShowAt: null }),
     },
   });
 
@@ -1364,6 +1366,9 @@ export async function lookupPickupByPassAction(pass: string): Promise<PickupLook
 const GROCOMEET_ORDER_AT_COUNTER =
   "Deze bestelling zit in de doos van de grocomeet en wordt daar afgerekend, niet aan de balie.";
 
+const RELEASED_ORDER_AT_COUNTER =
+  "Deze bestelling is na de deadline helemaal vrijgegeven: er staat niets meer op deze naam. Wie er toch een broodje van wil, neemt het online over op /theokot, zoals iedereen.";
+
 /**
  * Markeert een bestelling als opgehaald. Faalt als ze al opgehaald/geannuleerd is.
  *
@@ -1377,12 +1382,19 @@ export async function markPickedUpAction(orderId: string): Promise<ActionResult>
   const admin = await requirePermission("theokot.pickup");
   const order = await prisma.theokotOrder.findUnique({
     where: { id: orderId },
-    include: { session: { select: { date: true } }, user: { select: { name: true } } },
+    include: {
+      session: { select: { date: true } },
+      user: { select: { name: true } },
+      _count: { select: { lines: true } },
+    },
   });
   if (!order) return { ok: false, error: "Bestelling niet gevonden." };
   if (order.status === "PICKED_UP") return { ok: false, error: "Deze bestelling is al opgehaald." };
   if (order.status === "CANCELLED") return { ok: false, error: "Deze bestelling is geannuleerd." };
   if (order.grocomeetId) return { ok: false, error: GROCOMEET_ORDER_AT_COUNTER };
+  // Alles vrijgegeven: er staat niets op naam van deze student. Wil hij toch
+  // een broodje, dan neemt hij het online over, zoals iedereen.
+  if (order._count.lines === 0) return { ok: false, error: RELEASED_ORDER_AT_COUNTER };
 
   const late = order.status === "NO_SHOW";
 
@@ -1394,16 +1406,10 @@ export async function markPickedUpAction(orderId: string): Promise<ActionResult>
       status: "PICKED_UP",
       pickedUpAt: new Date(),
       pickedUpById: admin.user.id,
-      // Wie laat annuleerde en toch aan de balie staat, krijgt zijn broodje: dan
-      // staat er niets meer vrij om over te nemen.
-      releasedAt: null,
       ...(late ? { statusNote: "Laattijdig afgehaald aan de balie." } : {}),
     },
   });
   if (count === 0) return { ok: false, error: "Deze bestelling is intussen al afgehandeld." };
-  if (order.releasedAt) {
-    await prisma.theokotOrderLine.updateMany({ where: { orderId }, data: { releasedQuantity: 0 } });
-  }
 
   if (late) {
     await logAudit({
@@ -1637,7 +1643,7 @@ function orderErrorMessage(error: TheokotOrderError): string {
     case "NOTHING_RELEASED":
       return "Dat broodje is intussen al door iemand anders overgenomen.";
     case "TAKEOVER_UNAVAILABLE":
-      return "Je kan geen broodje overnemen bij je bestelling van deze dag.";
+      return "Je kan geen broodje overnemen bij je bestelling van deze dag: ze is al opgehaald, zit in de doos van de grocomeet of er zijn al bonnetjes op afgeboekt.";
   }
 }
 
@@ -1738,32 +1744,7 @@ export async function releaseOrderAction(orderId: string): Promise<ActionResult>
   return { ok: true, message: "Je broodjes staan vrij voor overname." };
 }
 
-/** Draait een late annulatie terug: de student haalt wat er nog over is zelf op. */
-export async function unreleaseOrderAction(orderId: string): Promise<ActionResult> {
-  let session;
-  try {
-    session = await requireSession();
-  } catch {
-    return { ok: false, error: "Je moet ingelogd zijn." };
-  }
-
-  try {
-    await unreleaseOrder(session.user.id, orderId);
-  } catch (err) {
-    if (err instanceof TheokotOrderError) {
-      if (err.code === "ORDER_NOT_FOUND") {
-        return { ok: false, error: "Je broodjes zijn intussen allemaal overgenomen; er is niets meer om op te halen." };
-      }
-      return { ok: false, error: orderErrorMessage(err) };
-    }
-    console.error("[theokot] unreleaseOrder mislukt:", err);
-    return { ok: false, error: "Er ging iets mis bij het terugnemen van je bestelling." };
-  }
-
-  return { ok: true, message: "Je haalt je broodjes toch zelf op." };
-}
-
-/** Neemt één broodje over dat iemand anders na de deadline vrijgaf. */
+/** Neemt één vrijgegeven broodje over; een eigen vrijgegeven broodje eerst. */
 export async function takeOverSandwichAction(sessionItemId: string): Promise<ActionResult> {
   let session;
   try {

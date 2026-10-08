@@ -395,7 +395,8 @@ function theokotPreviews(): MailPreview[] {
       ...takenOver,
       notes: [
         "Zegt hoeveel broodjes er nog vrij staan: wat bij het sluiten van de afhaal overblijft, telt als no-show.",
-        "Is het laatste broodje overgenomen, dan vervalt de bestelling zonder gevolgen en valt de knop weg.",
+        "Is het laatste vrijgegeven broodje overgenomen, dan zegt ze dat er geen no-show volgt en valt de knop weg.",
+        "Niet wanneer je je eigen vrijgegeven broodje terugneemt: dat is geen overname door iemand anders.",
       ],
     },
     {

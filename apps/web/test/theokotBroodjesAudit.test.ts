@@ -37,6 +37,9 @@ const txPrisma = {
     findFirst: mocks.theokotBanFindFirst,
     create: mocks.theokotBanCreate,
   },
+  // Geen vrijgegeven broodjes in deze tests; `theokotReleaseNoShow.test.ts`
+  // test wat er met de overschot gebeurt.
+  theokotOrderRelease: { findMany: vi.fn(async () => []) },
 };
 
 vi.mock("@vtk/db", () => ({

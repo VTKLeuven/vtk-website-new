@@ -447,6 +447,8 @@ function PickupOrderPanel({
   const [markedHere, setMarkedHere] = useState<"auto" | "manual" | null>(null);
   // Eén keer per bestelling: na "Ongedaan maken" niet opnieuw automatisch.
   const autoTried = useRef(false);
+  // Alles na de deadline vrijgegeven: niets op deze naam om mee te geven.
+  const nothingHere = order.lines.length === 0;
 
   function mark(how: "auto" | "manual" = "manual") {
     startTransition(async () => {
@@ -471,7 +473,7 @@ function PickupOrderPanel({
   }
 
   useEffect(() => {
-    if (!autoMark || autoTried.current || order.status !== "RESERVED" || order.grocomeet) return;
+    if (!autoMark || autoTried.current || order.status !== "RESERVED" || order.grocomeet || nothingHere) return;
     autoTried.current = true;
     mark("auto");
     // `mark` is elke render nieuw; dit hoort enkel te lopen wanneer autoMark aangaat.
@@ -492,11 +494,15 @@ function PickupOrderPanel({
       <div className="mb-2 text-sm text-[#5c667f]">
         {nl ? "Afhalen" : "Pickup"}: {order.pickupStart} – {order.pickupEnd}
       </div>
-      {order.released > 0 && !pickedUp && (
+      {order.released > 0 && (
         <div className="mb-3 rounded-lg bg-sky-100 px-3 py-2 text-sm font-medium text-sky-900">
-          {nl
-            ? "De student annuleerde na de deadline: deze broodjes staan online vrij voor overname. Geef je ze toch mee, dan vervalt die vrijgave."
-            : "The student cancelled after the deadline: these sandwiches are up for takeover online. If you hand them over anyway, the release ends."}
+          {nothingHere
+            ? nl
+              ? `Alles vrijgegeven na de deadline (${order.released}). Niets meegeven: deze broodjes staan online vrij voor overname, ook voor deze student zelf.`
+              : `Everything released after the deadline (${order.released}). Hand nothing over: these sandwiches are up for takeover online, for this student too.`
+            : nl
+              ? `Nog ${order.released} vrijgegeven na de deadline. Die staan hieronder niet en gaan niet mee: ze zijn online vrij voor overname.`
+              : `${order.released} more released after the deadline. They are not listed below and do not go along: they are up for takeover online.`}
         </div>
       )}
       {late && (
@@ -573,7 +579,7 @@ function PickupOrderPanel({
                 ? "Zit in de doos van de grocomeet. Niet meegeven en niet afrekenen: dat gebeurt bij de grocomeet."
                 : "This is in the grocomeet box. Do not hand it over or charge for it: that happens at the grocomeet."}
           </div>
-        ) : pickedUp ? (
+        ) : nothingHere && !pickedUp ? null : pickedUp ? (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg bg-emerald-100 px-3 py-2 text-sm font-medium text-emerald-800">
             <span>
               ✓ {nl ? "Opgehaald" : "Picked up"}

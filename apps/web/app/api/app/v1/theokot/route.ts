@@ -39,7 +39,10 @@ export async function GET(request: Request) {
       message: (pick(message?.bodyNl ?? "", message?.bodyEn ?? "", locale) ?? "").trim(),
       ban: ban ? { until: ban.endsAt.toISOString() } : null,
       sessions: sessions.map((sess) => {
-        const existing = sess.orders[0];
+        // Na de deadline helemaal vrijgegeven: er staat niets meer op je naam, dus
+        // de app toont geen reservatie. Vrijgeven en overnemen kan enkel op de
+        // website; de app kent die broodjes niet.
+        const existing = sess.orders[0]?.lines.length ? sess.orders[0] : undefined;
         // "Broodje van de week" is het aanbod-item dat zo gemarkeerd staat; de
         // naam ervan is wat het die week concreet is.
         const special = sess.items.find((item) => item.isWeeklySpecial);

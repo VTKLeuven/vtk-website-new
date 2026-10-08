@@ -64,8 +64,11 @@ export default async function AdminTheokot({ params }: { params: Promise<{ local
             status: true,
             totalCents: true,
             createdAt: true,
-            releasedAt: true,
             user: { select: { name: true, rNumber: true } },
+            releases: {
+              orderBy: { sessionItem: { order: "asc" } },
+              select: { quantity: true, sessionItem: { select: { nameNl: true, nameEn: true } } },
+            },
             lines: {
               orderBy: { sessionItem: { order: "asc" } },
               select: { quantity: true, sessionItem: { select: { nameNl: true, nameEn: true } } },
@@ -148,8 +151,11 @@ export default async function AdminTheokot({ params }: { params: Promise<{ local
       userName: o.user.name,
       rNumber: o.user.rNumber ?? "",
       status: o.status,
-      // Laat geannuleerd en nog niet (helemaal) overgenomen.
-      released: o.status === "RESERVED" && o.releasedAt !== null,
+      // Na de deadline vrijgegeven en nog niet overgenomen: niet van deze
+      // persoon, wel nog aan hem gekoppeld voor de no-show.
+      releasedLabel: o.releases
+        .map((r) => `${r.quantity}\u00d7 ${nl ? r.sessionItem.nameNl : r.sessionItem.nameEn ?? r.sessionItem.nameNl}`)
+        .join(", "),
       totalLabel: formatEuro(o.totalCents),
       itemsLabel: o.lines
         .map((l) => `${l.quantity}\u00d7 ${nl ? l.sessionItem.nameNl : l.sessionItem.nameEn ?? l.sessionItem.nameNl}`)
