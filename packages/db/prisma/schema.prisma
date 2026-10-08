@@ -3520,6 +3520,12 @@ model TheokotOrder {
   grocomeetId       String?
   /// Afgerekend bij de grocomeet, zoals `MeetingReservation.paidAt`.
   grocomeetPaidAt   DateTime?          @db.Timestamptz(3)
+  /// Laat geannuleerd: na de deadline vrijgegeven voor overname. De broodjes
+  /// worden al gemaakt, dus de bestelling blijft staan; wat een ander overneemt
+  /// (`TheokotOrderLine.releasedQuantity`), gaat van deze bestelling af. Wat er
+  /// bij het sluiten van de afhaal nog op staat, wordt een gewone no-show. NULL
+  /// zolang de bestelling niet vrijgegeven is. Zie `releaseOrder`.
+  releasedAt        DateTime?          @db.Timestamptz(3)
 
   session           TheokotSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user              User                      @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
@@ -3565,6 +3571,11 @@ model TheokotOrderLine {
   // betaald is (RESERVED, NO_SHOW: zie `repriceReservedOrders`); vanaf het
   // ophalen is dit wat er betaald werd en verandert het niet meer.
   unitPriceCents Int
+  /// Hoeveel stuks van deze lijn na een late annulatie nog vrij staan voor
+  /// overname (`TheokotOrder.releasedAt`). Altijd ≤ `quantity`; 0 bij een
+  /// gewone bestelling. Neemt iemand er een over, dan zakken `quantity` en dit
+  /// getal samen met één.
+  releasedQuantity Int @default(0)
 
   order       TheokotOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
   sessionItem TheokotSessionItem @relation(fields: [sessionItemId], references: [id], onDelete: Cascade)

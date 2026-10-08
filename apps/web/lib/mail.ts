@@ -216,3 +216,71 @@ export async function sendOrderCancelled(
     { source: 'theokot' },
   );
 }
+
+/**
+ * Bericht dat iemand een vrijgegeven broodje overnam.
+ *
+ * Wie na de deadline annuleert, weet dat het een no-show wordt als niemand zijn
+ * broodjes overneemt. Deze mail is het verlossende antwoord, per overgenomen
+ * broodje: wat er weg is en hoeveel er nog openstaat. Staat er niets meer open,
+ * dan is de bestelling weg en is er geen no-show.
+ */
+export function orderTakenOverMail(
+  user: Pick<MailUser, 'name' | 'locale'>,
+  order: { dateLabel: string; itemLabel: string; remaining: number; url: string },
+): TheokotMail {
+  const nl = user.locale !== 'EN';
+  const done = order.remaining === 0;
+  const subject = nl
+    ? `Theokot: je ${order.itemLabel} van ${order.dateLabel} is overgenomen`
+    : `Theokot: your ${order.itemLabel} for ${order.dateLabel} has been taken over`;
+
+  const status = done
+    ? nl
+      ? 'Al je vrijgegeven broodjes zijn overgenomen. Je bestelling vervalt en dit telt niet als no-show.'
+      : 'All your released sandwiches have been taken over. Your order is gone and this does not count as a no-show.'
+    : nl
+      ? `Er ${order.remaining === 1 ? 'staat' : 'staan'} nog ${order.remaining} ${order.remaining === 1 ? 'broodje' : 'broodjes'} van jou vrij. Wat bij het sluiten van de afhaal niet overgenomen is, telt als no-show; je kan het ook nog zelf ophalen.`
+      : `${order.remaining} ${order.remaining === 1 ? 'sandwich' : 'sandwiches'} of yours ${order.remaining === 1 ? 'is' : 'are'} still released. Whatever is not taken over when pickup closes counts as a no-show; you can still pick it up yourself.`;
+
+  const text = nl
+    ? `Dag ${user.name},\n\nIemand heeft je ${order.itemLabel} van ${order.dateLabel} overgenomen.\n\n${status}\n\n${order.url}\n\nGroeten,\nTheokot VTK`
+    : `Hi ${user.name},\n\nSomeone took over your ${order.itemLabel} for ${order.dateLabel}.\n\n${status}\n\n${order.url}\n\nRegards,\nTheokot VTK`;
+
+  const html = mailDocument({
+    lang: nl ? 'nl' : 'en',
+    title: subject,
+    rows: `${mailHeaderRow({ kicker: 'Theokot' })}${mailContentRow(
+      `${mailHeading(nl ? 'Broodje overgenomen' : 'Sandwich taken over')}${mailParagraph(
+        nl ? `Dag ${user.name},` : `Hi ${user.name},`,
+      )}${mailParagraph(
+        nl
+          ? `Iemand heeft je ${order.itemLabel} van ${order.dateLabel} overgenomen.`
+          : `Someone took over your ${order.itemLabel} for ${order.dateLabel}.`,
+      )}${done ? mailParagraph(status) : mailNoticeBox(status, nl ? 'Nog open' : 'Still open')}${
+        done
+          ? ''
+          : `<div style="margin:22px 0">${mailButton(order.url, nl ? 'Naar je reservatie' : 'To your reservation')}</div>`
+      }`,
+    )}${mailFooterRow('Theokot VTK · vtk.be/theokot')}`,
+  });
+
+  return { subject, text, html };
+}
+
+export async function sendOrderTakenOver(
+  user: MailUser,
+  order: { dateLabel: string; itemLabel: string; remaining: number },
+): Promise<void> {
+  const base = (
+    process.env.TICKETING_PUBLIC_URL?.trim() ||
+    process.env.VTK_MAIN_URL?.trim() ||
+    'https://vtk.be'
+  ).replace(/\/$/, '');
+  await sendMail(
+    { to: user.email, ...orderTakenOverMail(user, { ...order, url: `${base}/theokot` }) },
+    // De overname is dan al gebeurd; een mail die niet vertrekt, draait die niet
+    // terug. De mislukking staat in `EmailLog`.
+    { source: 'theokot' },
+  );
+}

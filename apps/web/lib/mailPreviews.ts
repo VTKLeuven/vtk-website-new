@@ -10,7 +10,12 @@ import { heroWeekNoticeMail } from "@/lib/calendar/heroWeekNoticeMail";
 import { contactMailBody } from "@/lib/contactForm";
 import type { EmailSource } from "@/lib/email";
 import { confirmationMail, notificationMail } from "@/lib/forms/mail";
-import { meetingReservationInvalidatedMail, noShowWarningMail, orderCancelledMail } from "@/lib/mail";
+import {
+  meetingReservationInvalidatedMail,
+  noShowWarningMail,
+  orderCancelledMail,
+  orderTakenOverMail,
+} from "@/lib/mail";
 import { pianoConfirmationMail } from "@/lib/piano-reservations";
 import { expenseMailDraft } from "@/lib/rekeningen/expenses";
 import { shiftReminderMail } from "@/lib/shift/reminders";
@@ -317,6 +322,15 @@ function theokotPreviews(): MailPreview[] {
       url: "https://vtk.be/theokot",
     },
   );
+  const takenOver = orderTakenOverMail(
+    { name: "Wannes", locale: "NL" },
+    {
+      dateLabel: "dinsdag 6 oktober",
+      itemLabel: "Broodje voorbeeld",
+      remaining: 1,
+      url: "https://vtk.be/theokot",
+    },
+  );
   const rental = newRentalNotificationMail({
     rental: {
       id: "voorbeeld",
@@ -369,6 +383,19 @@ function theokotPreviews(): MailPreview[] {
       notes: [
         "Bij het verlagen van het aanbod sneuvelen de laatst geplaatste bestellingen eerst: wie het eerst reserveerde, houdt zijn broodje.",
         "Deze mail houdt de verwerking niet tegen wanneer ze niet vertrekt; de bestelling is dan al geschrapt en de mislukking staat in het maillogboek.",
+      ],
+    },
+    {
+      id: "theokot-taken-over",
+      title: "Je broodje is overgenomen",
+      when: "Wanneer iemand na de deadline een broodje overneemt dat een ander laat annuleerde. Eén mail per overgenomen broodje.",
+      to: "Wie het broodje laat annuleerde",
+      source: "theokot",
+      file: "lib/mail.ts",
+      ...takenOver,
+      notes: [
+        "Zegt hoeveel broodjes er nog vrij staan: wat bij het sluiten van de afhaal overblijft, telt als no-show.",
+        "Is het laatste broodje overgenomen, dan vervalt de bestelling zonder gevolgen en valt de knop weg.",
       ],
     },
     {

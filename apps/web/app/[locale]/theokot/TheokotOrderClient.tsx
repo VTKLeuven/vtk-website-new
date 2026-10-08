@@ -5,13 +5,25 @@ import { useEffect, useId, useMemo, useRef, useState, useTransition } from "reac
 import { ConfirmDialog } from "@vtk/ui";
 import type { TheokotOrderStatus } from "@prisma/client";
 import { formatEuro, type TheokotItemLayout } from "@/lib/theokot";
-import { cancelOrderAction, placeOrderAction, updateOrderAction } from "@/app/actions/theokot";
+import {
+  cancelOrderAction,
+  placeOrderAction,
+  releaseOrderAction,
+  takeOverSandwichAction,
+  unreleaseOrderAction,
+  updateOrderAction,
+} from "@/app/actions/theokot";
 
 export type OrderItem = {
   id: string;
   name: string;
   priceCents: number;
   remaining: number;
+  /**
+   * Zoveel stuks gaven anderen na de deadline vrij en kan je nu overnemen. Enkel
+   * in het overnamevenster, anders 0.
+   */
+  released: number;
   isWeeklySpecial: boolean;
   /** Optionele foto; zonder foto verschijnt het gestreepte patroon. */
   imageUrl: string | null;
@@ -28,6 +40,17 @@ export type ExistingOrder = {
   canCancel: boolean;
   /** Broodjes erbij of eraf: zolang het bestelvenster open is. */
   canEdit: boolean;
+  /**
+   * Na de deadline: annuleren geeft de broodjes vrij voor overname in plaats van
+   * ze te wissen, want ze worden al gemaakt.
+   */
+  canRelease: boolean;
+  /** Laat geannuleerd: de broodjes staan vrij voor overname. */
+  released: boolean;
+  /** Zoveel vrijgegeven broodjes zijn nog niet overgenomen. */
+  releasedCount: number;
+  /** Toch zelf ophalen: zolang de afhaal loopt. */
+  canUnrelease: boolean;
   /** Gaat mee in de doos van de grocomeet en wordt daar afgerekend. */
   grocomeet: boolean;
   lines: Array<{
@@ -52,6 +75,8 @@ export type OrderSession = {
   /** "28" */
   dayNumber: string;
   pickupLabel: string;
+  /** "14:00": tot dan kan er overgenomen worden. */
+  pickupEndLabel: string;
   orderOpenLabel: string;
   orderCloseLabel: string;
   /** "zo 12:00" */
@@ -60,6 +85,8 @@ export type OrderSession = {
   orderCloseShort: string;
   orderWindowState: "UPCOMING" | "OPEN" | "CLOSED";
   canOrder: boolean;
+  /** Na de deadline en voor het einde van de afhaal: vrijgeven en overnemen. */
+  canTakeOver: boolean;
   /**
    * Wie hier bestelt is een groco en er is die dag een grocomeet: wat je nu
    * bestelt of aanpast, gaat mee in de doos van de GM. Voor een bestelling die
@@ -84,6 +111,9 @@ const STATUS_LABELS: Record<TheokotOrderStatus, { nl: string; en: string; tone: 
   NO_SHOW: { nl: "Niet opgehaald", en: "Not picked up", tone: "danger" },
   CANCELLED: { nl: "Geannuleerd", en: "Cancelled", tone: "muted" },
 };
+
+/** Een reservatie die laat geannuleerd is en vrij staat voor overname. */
+const RELEASED_LABEL = { nl: "Vrijgegeven", en: "Released", tone: "muted" };
 
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
@@ -280,6 +310,31 @@ function useDayOrder(session: OrderSession, disabled: boolean) {
     });
   }
 
+  function release(onDone: () => void) {
+    if (!existing) return;
+    startTransition(async () => {
+      const res = await releaseOrderAction(existing.orderId);
+      setError(res.ok ? null : res.error);
+      onDone();
+    });
+  }
+
+  function unrelease() {
+    if (!existing) return;
+    startTransition(async () => {
+      const res = await unreleaseOrderAction(existing.orderId);
+      setError(res.ok ? null : res.error);
+    });
+  }
+
+  function takeOver(sessionItemId: string, onDone: () => void) {
+    startTransition(async () => {
+      const res = await takeOverSandwichAction(sessionItemId);
+      setError(res.ok ? null : res.error);
+      onDone();
+    });
+  }
+
   return {
     existing,
     editing,
@@ -295,6 +350,9 @@ function useDayOrder(session: OrderSession, disabled: boolean) {
     startEditing,
     stopEditing,
     cancel,
+    release,
+    unrelease,
+    takeOver,
   };
 }
 
@@ -359,6 +417,7 @@ function ListLayout({ nl, sessions, session, onSelect, order, limits, disabled }
             </span>
           </div>
           <DayIntro nl={nl} session={session} order={order} limits={limits} disabled={disabled} />
+          <TakeoverPanel nl={nl} session={session} order={order} limits={limits} disabled={disabled} />
 
           {specials.length > 0 && <ul className="th-rows is-special">{specials.map(row)}</ul>}
           {regular.length > 0 && (
@@ -602,6 +661,7 @@ function GridLayout({ nl, sessions, session, onSelect, order, limits, disabled }
             </span>
           </div>
           <DayIntro nl={nl} session={session} order={order} limits={limits} disabled={disabled} hideLimits />
+          <TakeoverPanel nl={nl} session={session} order={order} limits={limits} disabled={disabled} />
           <ul className="th-cards">
             {order.items.map((item) => (
               <GridCard
@@ -813,7 +873,7 @@ function DayTabs({
 function DayState({ nl, session }: { nl: boolean; session: OrderSession }) {
   const existing = session.existingOrder;
   if (existing) {
-    const label = STATUS_LABELS[existing.status];
+    const label = existing.released ? RELEASED_LABEL : STATUS_LABELS[existing.status];
     return (
       <span className="th-daystate">
         {existing.status === "RESERVED" && <span className="th-dot" aria-hidden="true" />}
@@ -924,9 +984,10 @@ function Reservation({
   wide?: boolean;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const [confirmingRelease, setConfirmingRelease] = useState(false);
   const existing = order.existing;
   if (!existing) return null;
-  const status = STATUS_LABELS[existing.status];
+  const status = existing.released ? RELEASED_LABEL : STATUS_LABELS[existing.status];
   const canEdit = existing.canEdit && !disabled;
   const count = existing.lines.reduce((sum, line) => sum + line.quantity, 0);
 
@@ -991,6 +1052,43 @@ function Reservation({
         </div>
       </div>
 
+      {existing.released && (
+        <div className="th-reservation-actions">
+          <p className="th-notice">
+            {nl
+              ? `Je annuleerde na de deadline. ${existing.releasedCount} ${existing.releasedCount === 1 ? "broodje staat" : "broodjes staan"} vrij voor overname. Wat om ${session.pickupEndLabel} niet overgenomen is, telt als no-show. Je krijgt een mail telkens iemand een broodje overneemt.`
+              : `You cancelled after the deadline. ${existing.releasedCount} ${existing.releasedCount === 1 ? "sandwich is" : "sandwiches are"} up for takeover. Whatever has not been taken over at ${session.pickupEndLabel} counts as a no-show. You get an email each time someone takes one over.`}
+          </p>
+          {existing.canUnrelease && (
+            <div className="th-reservation-buttons">
+              <button type="button" className="th-btn th-btn-primary" onClick={order.unrelease} disabled={order.pending}>
+                {nl ? "Toch zelf ophalen" : "Pick it up after all"}
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {existing.canRelease && !disabled && (
+        <div className="th-reservation-actions">
+          <div className="th-reservation-buttons">
+            <button
+              type="button"
+              className="th-btn th-btn-ghost"
+              onClick={() => setConfirmingRelease(true)}
+              disabled={order.pending}
+            >
+              {nl ? "Annuleren" : "Cancel"}
+            </button>
+          </div>
+          <p className="th-fine">
+            {nl
+              ? `De deadline van ${session.orderCloseShort} is voorbij: je broodje wordt al gemaakt.`
+              : `The ${session.orderCloseShort} deadline has passed: your sandwich is already being made.`}
+          </p>
+        </div>
+      )}
+
       {(existing.canCancel || canEdit) && (
         <div className="th-reservation-actions">
           <div className="th-reservation-buttons">
@@ -1034,6 +1132,134 @@ function Reservation({
         pending={order.pending}
         onConfirm={() => order.cancel(() => setConfirming(false))}
         onCancel={() => setConfirming(false)}
+      />
+
+      <ConfirmDialog
+        open={confirmingRelease}
+        title={nl ? "Annuleren na de deadline?" : "Cancel after the deadline?"}
+        description={
+          nl
+            ? `De deadline van ${session.orderCloseShort} is verstreken en je broodje wordt al gemaakt. Als je nu annuleert, wordt je broodje vrijgegeven voor overname. Neemt iemand anders je broodje over, dan vervalt je bestelling zonder gevolgen. Blijft het broodje om ${session.pickupEndLabel} over, dan telt dit als een no-show.`
+            : `The ${session.orderCloseShort} deadline has passed and your sandwich is already being made. If you cancel now, your sandwich will be released for someone else to take over. If someone takes it over, your order is cancelled without penalty. If it is still left at ${session.pickupEndLabel}, this counts as a no-show.`
+        }
+        confirmLabel={nl ? "Vrijgeven voor overname" : "Release for takeover"}
+        cancelLabel={nl ? "Behouden" : "Keep it"}
+        pending={order.pending}
+        onConfirm={() => order.release(() => setConfirmingRelease(false))}
+        onCancel={() => setConfirmingRelease(false)}
+      />
+    </div>
+  );
+}
+
+/**
+ * Broodjes die anderen na de deadline vrijgaven en die je kan overnemen.
+ *
+ * Eén per klik, want elk stuk verlost iemand anders van een no-show en komt bij
+ * jou als een gewone reservatie terecht: afhalen en betalen aan de balie, met
+ * dezelfde limieten als bij bestellen. Wat je zelf vrijgaf, staat hier niet.
+ */
+function TakeoverPanel({
+  nl,
+  session,
+  order,
+  limits,
+  disabled,
+}: {
+  nl: boolean;
+  session: OrderSession;
+  order: DayOrder;
+  limits: Limits;
+  disabled: boolean;
+}) {
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const offered = order.items.filter((item) => item.released > 0);
+  if (!session.canTakeOver || offered.length === 0 || disabled) return null;
+
+  const existing = order.existing;
+  const ownCount = existing?.lines.reduce((sum, line) => sum + line.quantity, 0) ?? 0;
+  const ownWeekly = existing
+    ? existing.lines.reduce(
+        (sum, line) =>
+          sum + (order.items.find((item) => item.id === line.sessionItemId)?.isWeeklySpecial ? line.quantity : 0),
+        0,
+      )
+    : 0;
+  // Dezelfde redenen waarom de server zou weigeren, vooraf in woorden.
+  const blocked = !existing
+    ? null
+    : existing.status !== "RESERVED"
+      ? nl
+        ? "Je bestelling van deze dag is al afgehandeld."
+        : "Your order for this day has already been handled."
+      : existing.grocomeet
+        ? nl
+          ? "Je bestelling van deze dag zit in de doos van de grocomeet."
+          : "Your order for this day is in the grocomeet box."
+        : existing.released
+          ? nl
+            ? "Je gaf je eigen bestelling vrij. Haal ze eerst toch zelf op als je iets wil overnemen."
+            : "You released your own order. Pick it up after all first if you want to take something over."
+          : null;
+  const confirming = offered.find((item) => item.id === confirmingId) ?? null;
+
+  return (
+    <div className="th-card th-takeover">
+      <div>
+        <div className="th-card-title">{nl ? "Vrijgekomen broodjes" : "Released sandwiches"}</div>
+        <div className="th-card-sub">
+          {nl
+            ? `Iemand annuleerde na de deadline. Neem je een broodje over, dan haal je het af en betaal je aan de balie, tot ${session.pickupEndLabel}.`
+            : `Someone cancelled after the deadline. If you take one over, you pick it up and pay at the counter, until ${session.pickupEndLabel}.`}
+        </div>
+      </div>
+      {blocked && <p className="th-hint">{blocked}</p>}
+      <ul className="th-lines">
+        {offered.map((item) => {
+          const full = ownCount + 1 > limits.maxItems || (item.isWeeklySpecial && ownWeekly + 1 > limits.maxWeeklySpecial);
+          return (
+            <li key={item.id}>
+              <span>
+                {item.name} <span className="th-tn">· {formatEuro(item.priceCents)}</span>{" "}
+                <span className="th-stock">{nl ? `${item.released} vrij` : `${item.released} available`}</span>
+              </span>
+              {!blocked && (
+                <button
+                  type="button"
+                  className="th-btn th-btn-primary"
+                  onClick={() => setConfirmingId(item.id)}
+                  disabled={order.pending || full}
+                  title={full ? (nl ? "Je zit aan het maximum per dag." : "You have reached the daily maximum.") : undefined}
+                >
+                  {nl ? "Overnemen" : "Take over"}
+                </button>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+      {order.error && !existing && (
+        <p className="th-error" role="alert">
+          {order.error}
+        </p>
+      )}
+
+      <ConfirmDialog
+        open={confirming !== null}
+        destructive={false}
+        title={nl ? "Broodje overnemen?" : "Take over this sandwich?"}
+        description={
+          confirming
+            ? nl
+              ? `Je neemt 1× ${confirming.name} over voor ${formatEuro(confirming.priceCents)}. Je haalt het af en betaalt aan de balie, tot ${session.pickupEndLabel}. Haal je het niet op, dan telt dat als een no-show.`
+              : `You take over 1× ${confirming.name} for ${formatEuro(confirming.priceCents)}. You pick it up and pay at the counter, until ${session.pickupEndLabel}. If you don't pick it up, it counts as a no-show.`
+            : ""
+        }
+        confirmLabel={nl ? "Overnemen" : "Take over"}
+        cancelLabel={nl ? "Toch niet" : "Never mind"}
+        pending={order.pending}
+        onConfirm={() => confirming && order.takeOver(confirming.id, () => setConfirmingId(null))}
+        onCancel={() => setConfirmingId(null)}
       />
     </div>
   );

@@ -6,11 +6,13 @@ import { Prisma, type TheokotOrderStatus } from "@prisma/client";
 
 import { grocomeetOnDay, usageForSessionItems, usageForSessionItemsTx } from "@/lib/meetings-server";
 import { hasLivePermission } from "@/lib/livePermissions";
+import { sendOrderTakenOver } from "@/lib/mail";
 import { activeBanFor, getTheokotConfig } from "@/lib/theokot-server";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import {
   canCancel,
   canOrderNow,
+  inTakeoverWindow,
   repriceOrder,
   validateOrderLines,
   TheokotValidationError,
@@ -41,7 +43,13 @@ export type TheokotOrderErrorCode =
   | "ALREADY_ORDERED"
   | "ORDER_NOT_FOUND"
   | "NOT_CANCELABLE"
-  | "CANCEL_DEADLINE_PASSED";
+  | "CANCEL_DEADLINE_PASSED"
+  // Laat annuleren en overnemen. Enkel de website roept die wegen voorlopig
+  // aan; de app kent ze nog niet (zie `AppTheokotErrorCode`).
+  | "TAKEOVER_CLOSED"
+  | "RELEASE_NOT_POSSIBLE"
+  | "NOTHING_RELEASED"
+  | "TAKEOVER_UNAVAILABLE";
 
 /**
  * Een verwachte weigering, met een code in plaats van een zin.
@@ -142,8 +150,43 @@ export async function loadOrderableSessions(userId: string, now: Date = new Date
     ban,
     sessions,
     used,
+    released: await releasedForSessions(sessions.map((s) => s.id), userId),
     grocomeetSessionIds,
     message: messageRow?.value as { bodyNl?: string; bodyEn?: string } | undefined,
+  };
+}
+
+/**
+ * Wat er per sessie-item vrijgegeven is en nog overgenomen kan worden, zonder
+ * wat de lezer zelf vrijgaf: je eigen broodje terugnemen is "toch zelf
+ * ophalen" (`unreleaseOrder`), geen overname.
+ *
+ * Dezelfde voorwaarden als `takeOverSandwich` bij het kiezen van een bestelling
+ * om van over te nemen, zodat het scherm niets aanbiedt wat de overname dan
+ * weigert.
+ */
+async function releasedForSessions(sessionIds: string[], userId: string): Promise<Map<string, number>> {
+  if (sessionIds.length === 0) return new Map();
+  const rows = await prisma.theokotOrderLine.groupBy({
+    by: ["sessionItemId"],
+    where: {
+      releasedQuantity: { gt: 0 },
+      sessionItem: { sessionId: { in: sessionIds } },
+      order: takeoverDonorWhere(userId),
+    },
+    _sum: { releasedQuantity: true },
+  });
+  return new Map(rows.map((row) => [row.sessionItemId, row._sum.releasedQuantity ?? 0]));
+}
+
+/** Een bestelling waarvan `userId` een broodje mag overnemen. */
+function takeoverDonorWhere(userId: string): Prisma.TheokotOrderWhereInput {
+  return {
+    status: "RESERVED",
+    releasedAt: { not: null },
+    userId: { not: userId },
+    grocomeetId: null,
+    voucherRedemption: { is: null },
   };
 }
 
@@ -391,6 +434,237 @@ export async function cancelOrder(
   }
 
   revalidateTheokotOrders();
+}
+
+// -----------------------------------------------------------------------------
+// Laat annuleren en overnemen
+// -----------------------------------------------------------------------------
+//
+// Na de deadline (`orderCloseAt`) worden de broodjes al gemaakt. Annuleren wist
+// dan niets meer, want de turflijst is de lijst van wat er gesmeerd wordt: wie
+// dan annuleert, geeft zijn broodjes vrij. Tot het einde van de afhaal kan een
+// ander ze per stuk overnemen; wat dan nog vrij staat, wordt bij het sluiten een
+// gewone no-show (`processSession` zet alles wat nog RESERVED is op NO_SHOW).
+//
+// De voorraad verandert daarbij nooit: een overname schuift één stuk van de ene
+// bestelling naar de andere, dus `usageForSessionItems` en de turflijst blijven
+// hetzelfde getal tonen.
+
+/**
+ * Geeft de eigen bestelling na de deadline vrij voor overname.
+ *
+ * Niet voor een bestelling in de doos van de grocomeet (die ligt niet aan de
+ * balie en wordt daar ook niet afgerekend) en niet wanneer er al bonnetjes op
+ * afgeboekt zijn. Voor de deadline is gewoon annuleren (`cancelOrder`) de weg.
+ */
+export async function releaseOrder(userId: string, orderId: string, now: Date = new Date()): Promise<void> {
+  await withSerializableTransaction(async (tx) => {
+    const order = await tx.theokotOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        lines: { select: { id: true, quantity: true } },
+        session: { select: { isOpen: true, orderCloseAt: true, pickupEnd: true } },
+        voucherRedemption: { select: { id: true } },
+      },
+    });
+    if (!order || order.userId !== userId) throw new TheokotOrderError("ORDER_NOT_FOUND");
+    if (order.status !== "RESERVED") throw new TheokotOrderError("NOT_CANCELABLE");
+    if (canCancel(order.session, now)) throw new TheokotOrderError("RELEASE_NOT_POSSIBLE");
+    if (!inTakeoverWindow(order.session, now)) throw new TheokotOrderError("TAKEOVER_CLOSED");
+    if (order.grocomeetId || order.voucherRedemption) throw new TheokotOrderError("RELEASE_NOT_POSSIBLE");
+    // Twee keer op de knop is één vrijgave.
+    if (order.releasedAt) return;
+
+    await tx.theokotOrder.update({ where: { id: orderId }, data: { releasedAt: now } });
+    // Per lijn, want een kolom op de waarde van een andere kolom zetten kan
+    // `updateMany` niet. Het zijn er hooguit `maxItemsPerOrder`.
+    for (const line of order.lines) {
+      await tx.theokotOrderLine.update({ where: { id: line.id }, data: { releasedQuantity: line.quantity } });
+    }
+  });
+
+  revalidateTheokotOrders();
+}
+
+/**
+ * Draait een vrijgave terug: je haalt wat er nog van je over is toch zelf op.
+ *
+ * Wat intussen overgenomen is, is weg en komt niet terug; enkel de rest staat
+ * weer gewoon op je naam. Kan tot het einde van de afhaal.
+ */
+export async function unreleaseOrder(userId: string, orderId: string, now: Date = new Date()): Promise<void> {
+  await withSerializableTransaction(async (tx) => {
+    const order = await tx.theokotOrder.findUnique({
+      where: { id: orderId },
+      include: { session: { select: { pickupEnd: true } } },
+    });
+    // Alles overgenomen betekent dat de bestelling weg is: dan is er ook niets
+    // meer om terug te nemen, en zegt dezelfde code dat.
+    if (!order || order.userId !== userId) throw new TheokotOrderError("ORDER_NOT_FOUND");
+    if (order.status !== "RESERVED") throw new TheokotOrderError("NOT_CANCELABLE");
+    if (now >= order.session.pickupEnd) throw new TheokotOrderError("TAKEOVER_CLOSED");
+    if (!order.releasedAt) return;
+
+    await tx.theokotOrder.update({ where: { id: orderId }, data: { releasedAt: null } });
+    await tx.theokotOrderLine.updateMany({ where: { orderId }, data: { releasedQuantity: 0 } });
+  });
+
+  revalidateTheokotOrders();
+}
+
+/**
+ * Neemt één vrijgegeven broodje over.
+ *
+ * Het stuk komt van de bestelling die het langst vrijgegeven staat: wie het
+ * eerst annuleerde, is het eerst verlost. Het gaat bij je eigen bestelling van
+ * die dag, of wordt er een als je er nog geen had; dezelfde limieten als bij
+ * bestellen, aan de prijs van nu. Een ban houdt overnemen ook tegen.
+ *
+ * Valt de laatste lijn van de andere bestelling weg, dan verdwijnt die
+ * bestelling: er is niets meer om niet op te halen, dus ook geen no-show.
+ */
+export async function takeOverSandwich(
+  userId: string,
+  sessionItemId: string,
+  now: Date = new Date(),
+): Promise<{ orderId: string; totalCents: number }> {
+  const config = await getTheokotConfig();
+
+  const ban = await activeBanFor(userId, now);
+  if (ban) throw new TheokotOrderError("BANNED", ban.endsAt);
+
+  const result = await withSerializableTransaction(async (tx) => {
+    const item = await tx.theokotSessionItem.findUnique({
+      where: { id: sessionItemId },
+      include: { session: { include: { items: true } } },
+    });
+    if (!item) throw new TheokotOrderError("SESSION_NOT_FOUND");
+    const sess = item.session;
+    if (!inTakeoverWindow(sess, now)) throw new TheokotOrderError("TAKEOVER_CLOSED");
+
+    const mine = await tx.theokotOrder.findUnique({
+      where: { sessionId_userId: { sessionId: sess.id, userId } },
+      include: { lines: true, voucherRedemption: { select: { id: true } } },
+    });
+    // Je eigen bestelling moet het broodje kunnen dragen: niet al opgehaald,
+    // niet in de doos van de grocomeet (die is al ingepakt), niet zelf
+    // vrijgegeven (dan neem je je eigen broodjes eerst terug).
+    if (mine && (mine.status !== "RESERVED" || mine.grocomeetId || mine.releasedAt || mine.voucherRedemption)) {
+      throw new TheokotOrderError("TAKEOVER_UNAVAILABLE");
+    }
+
+    const donorLine = await tx.theokotOrderLine.findFirst({
+      where: { sessionItemId, releasedQuantity: { gt: 0 }, order: takeoverDonorWhere(userId) },
+      orderBy: [{ order: { releasedAt: "asc" } }, { id: "asc" }],
+      include: { order: { select: { id: true, userId: true } } },
+    });
+    if (!donorLine) throw new TheokotOrderError("NOTHING_RELEASED");
+
+    // Je nieuwe bestelling: wat je had, plus dit ene broodje. De "voorraad" per
+    // broodje is hier precies dat aantal, zodat `validateOrderLines` enkel de
+    // limieten toetst; dat het stuk bestaat, zegt `donorLine`.
+    const wanted = new Map<string, number>();
+    for (const line of mine?.lines ?? []) {
+      wanted.set(line.sessionItemId, (wanted.get(line.sessionItemId) ?? 0) + line.quantity);
+    }
+    wanted.set(sessionItemId, (wanted.get(sessionItemId) ?? 0) + 1);
+    const normalized = validateOrderLines(
+      [...wanted].map(([id, quantity]) => ({ sessionItemId: id, quantity })),
+      sess.items.map((i) => ({
+        id: i.id,
+        priceCents: i.priceCents,
+        quantity: wanted.get(i.id) ?? 0,
+        isWeeklySpecial: i.isWeeklySpecial,
+      })),
+      config,
+    );
+
+    // Het stuk gaat van de andere bestelling af.
+    if (donorLine.quantity <= 1) {
+      await tx.theokotOrderLine.delete({ where: { id: donorLine.id } });
+    } else {
+      await tx.theokotOrderLine.update({
+        where: { id: donorLine.id },
+        data: { quantity: { decrement: 1 }, releasedQuantity: { decrement: 1 } },
+      });
+    }
+    const rest = await tx.theokotOrderLine.findMany({
+      where: { orderId: donorLine.order.id },
+      select: { quantity: true, unitPriceCents: true, releasedQuantity: true },
+    });
+    if (rest.length === 0) {
+      await tx.theokotOrder.delete({ where: { id: donorLine.order.id } });
+    } else {
+      await tx.theokotOrder.update({
+        where: { id: donorLine.order.id },
+        data: { totalCents: rest.reduce((sum, line) => sum + line.quantity * line.unitPriceCents, 0) },
+      });
+    }
+
+    const lines = {
+      create: normalized.lines.map((line) => ({
+        sessionItemId: line.sessionItemId,
+        quantity: line.quantity,
+        unitPriceCents: line.unitPriceCents,
+      })),
+    };
+    let saved: { id: string; totalCents: number };
+    if (mine) {
+      await tx.theokotOrderLine.deleteMany({ where: { orderId: mine.id } });
+      saved = await tx.theokotOrder.update({
+        where: { id: mine.id },
+        data: { totalCents: normalized.totalCents, lines },
+        select: { id: true, totalCents: true },
+      });
+    } else {
+      saved = await tx.theokotOrder.create({
+        data: { sessionId: sess.id, userId, totalCents: normalized.totalCents, lines },
+        select: { id: true, totalCents: true },
+      });
+    }
+
+    return {
+      saved,
+      donor: {
+        userId: donorLine.order.userId,
+        remaining: rest.reduce((sum, line) => sum + line.releasedQuantity, 0),
+      },
+      item: { nameNl: item.nameNl, nameEn: item.nameEn },
+      sessionDate: sess.date,
+    };
+  });
+
+  revalidateTheokotOrders();
+  await notifyTakenOver(result.donor, result.item, result.sessionDate);
+  return { orderId: result.saved.id, totalCents: result.saved.totalCents };
+}
+
+/** De mail aan wie het broodje vrijgaf; een mislukte mail draait niets terug. */
+async function notifyTakenOver(
+  donor: { userId: string; remaining: number },
+  item: { nameNl: string; nameEn: string | null },
+  sessionDate: Date,
+): Promise<void> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: donor.userId },
+      select: { name: true, email: true, locale: true },
+    });
+    if (!user) return;
+    const en = user.locale === "EN";
+    await sendOrderTakenOver(user, {
+      dateLabel: new Intl.DateTimeFormat(en ? "en-GB" : "nl-BE", {
+        timeZone: "Europe/Brussels",
+        weekday: "long",
+        day: "numeric",
+        month: "long",
+      }).format(sessionDate),
+      itemLabel: en ? (item.nameEn ?? item.nameNl) : item.nameNl,
+      remaining: donor.remaining,
+    });
+  } catch (error) {
+    console.error("[theokot] overname-mail mislukt:", error);
+  }
 }
 
 export { TheokotValidationError };

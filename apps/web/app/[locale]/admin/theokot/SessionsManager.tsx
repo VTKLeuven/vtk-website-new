@@ -61,6 +61,8 @@ export type AdminOrder = {
   rNumber: string;
   status: string;
   itemsLabel: string;
+  /** Laat geannuleerd: de broodjes staan vrij voor overname. */
+  released: boolean;
   totalLabel: string;
   /** Opgehaald of met bonnetjes betaald: dan blijft ze staan. */
   canRemove: boolean;
@@ -723,6 +725,9 @@ function SessionEditor({ nl, session }: { nl: boolean; session: AdminSession }) 
                 <span className="text-[#34405e]">{order.itemsLabel}</span>
                 <span className="tabular-nums text-[#5c667f]">{order.totalLabel}</span>
                 <span className="ml-auto flex items-center gap-2">
+                  {order.released && (
+                    <span className="text-xs text-amber-800">{nl ? "vrijgegeven" : "released"}</span>
+                  )}
                   {order.status !== "RESERVED" && (
                     <span className="text-xs text-[#5c667f]">
                       {order.status === "PICKED_UP"

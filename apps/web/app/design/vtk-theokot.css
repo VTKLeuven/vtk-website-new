@@ -546,6 +546,16 @@
   padding-block: 16px 20px;
 }
 
+/* Vrijgekomen broodjes: na de deadline, tussen de dagkop en het aanbod. */
+.th-takeover {
+  margin-block: 4px 16px;
+  border-color: var(--low-ink);
+}
+
+.th-takeover .th-lines li {
+  align-items: center;
+}
+
 .th-reservation-actions {
   display: flex;
   flex-direction: column;

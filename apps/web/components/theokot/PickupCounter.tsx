@@ -492,6 +492,13 @@ function PickupOrderPanel({
       <div className="mb-2 text-sm text-[#5c667f]">
         {nl ? "Afhalen" : "Pickup"}: {order.pickupStart} – {order.pickupEnd}
       </div>
+      {order.released > 0 && !pickedUp && (
+        <div className="mb-3 rounded-lg bg-sky-100 px-3 py-2 text-sm font-medium text-sky-900">
+          {nl
+            ? "De student annuleerde na de deadline: deze broodjes staan online vrij voor overname. Geef je ze toch mee, dan vervalt die vrijgave."
+            : "The student cancelled after the deadline: these sandwiches are up for takeover online. If you hand them over anyway, the release ends."}
+        </div>
+      )}
       {late && (
         <div className="mb-3 rounded-lg bg-amber-100 px-3 py-2 text-sm font-medium text-amber-900">
           {nl

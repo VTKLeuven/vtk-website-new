@@ -35,6 +35,7 @@ vi.mock("@vtk/db", () => ({
 }));
 
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }));
+vi.mock("@/lib/mail", () => ({ sendOrderTakenOver: vi.fn() }));
 
 vi.mock("@/lib/theokot-server", () => ({
   activeBanFor: mocks.activeBanFor,

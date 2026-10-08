@@ -28,8 +28,11 @@ import {
 import {
   cancelOrder,
   placeOrder,
+  releaseOrder,
   repriceReservedOrders,
+  takeOverSandwich,
   TheokotOrderError,
+  unreleaseOrder,
   updateOrder,
 } from "@/lib/theokot-orders";
 import { syncMeetingsForSession, syncMeetingsOnDay } from "@/lib/meetings-server";
@@ -1391,10 +1394,16 @@ export async function markPickedUpAction(orderId: string): Promise<ActionResult>
       status: "PICKED_UP",
       pickedUpAt: new Date(),
       pickedUpById: admin.user.id,
+      // Wie laat annuleerde en toch aan de balie staat, krijgt zijn broodje: dan
+      // staat er niets meer vrij om over te nemen.
+      releasedAt: null,
       ...(late ? { statusNote: "Laattijdig afgehaald aan de balie." } : {}),
     },
   });
   if (count === 0) return { ok: false, error: "Deze bestelling is intussen al afgehandeld." };
+  if (order.releasedAt) {
+    await prisma.theokotOrderLine.updateMany({ where: { orderId }, data: { releasedQuantity: 0 } });
+  }
 
   if (late) {
     await logAudit({
@@ -1620,7 +1629,15 @@ function orderErrorMessage(error: TheokotOrderError): string {
     case "NOT_CANCELABLE":
       return "Deze bestelling kan niet meer geannuleerd worden.";
     case "CANCEL_DEADLINE_PASSED":
-      return "De annulatiedeadline is verstreken.";
+      return "De deadline is net verstreken en je broodje wordt al gemaakt. Herlaad de pagina: je kan het nog vrijgeven voor overname.";
+    case "TAKEOVER_CLOSED":
+      return "De afhaal van deze dag is voorbij: er valt niets meer vrij te geven of over te nemen.";
+    case "RELEASE_NOT_POSSIBLE":
+      return "Deze bestelling kan niet vrijgegeven worden.";
+    case "NOTHING_RELEASED":
+      return "Dat broodje is intussen al door iemand anders overgenomen.";
+    case "TAKEOVER_UNAVAILABLE":
+      return "Je kan geen broodje overnemen bij je bestelling van deze dag.";
   }
 }
 
@@ -1695,4 +1712,74 @@ export async function cancelOrderAction(orderId: string): Promise<ActionResult> 
   }
 
   return { ok: true, message: "Je bestelling is geannuleerd." };
+}
+
+/**
+ * Laat annuleren: na de deadline geeft de student zijn broodjes vrij voor
+ * overname. Wat bij het sluiten van de afhaal niet overgenomen is, telt als
+ * no-show. Zie `releaseOrder`.
+ */
+export async function releaseOrderAction(orderId: string): Promise<ActionResult> {
+  let session;
+  try {
+    session = await requireSession();
+  } catch {
+    return { ok: false, error: "Je moet ingelogd zijn." };
+  }
+
+  try {
+    await releaseOrder(session.user.id, orderId);
+  } catch (err) {
+    if (err instanceof TheokotOrderError) return { ok: false, error: orderErrorMessage(err) };
+    console.error("[theokot] releaseOrder mislukt:", err);
+    return { ok: false, error: "Er ging iets mis bij het vrijgeven van je bestelling." };
+  }
+
+  return { ok: true, message: "Je broodjes staan vrij voor overname." };
+}
+
+/** Draait een late annulatie terug: de student haalt wat er nog over is zelf op. */
+export async function unreleaseOrderAction(orderId: string): Promise<ActionResult> {
+  let session;
+  try {
+    session = await requireSession();
+  } catch {
+    return { ok: false, error: "Je moet ingelogd zijn." };
+  }
+
+  try {
+    await unreleaseOrder(session.user.id, orderId);
+  } catch (err) {
+    if (err instanceof TheokotOrderError) {
+      if (err.code === "ORDER_NOT_FOUND") {
+        return { ok: false, error: "Je broodjes zijn intussen allemaal overgenomen; er is niets meer om op te halen." };
+      }
+      return { ok: false, error: orderErrorMessage(err) };
+    }
+    console.error("[theokot] unreleaseOrder mislukt:", err);
+    return { ok: false, error: "Er ging iets mis bij het terugnemen van je bestelling." };
+  }
+
+  return { ok: true, message: "Je haalt je broodjes toch zelf op." };
+}
+
+/** Neemt één broodje over dat iemand anders na de deadline vrijgaf. */
+export async function takeOverSandwichAction(sessionItemId: string): Promise<ActionResult> {
+  let session;
+  try {
+    session = await requireSession();
+  } catch {
+    return { ok: false, error: "Je moet ingelogd zijn." };
+  }
+
+  try {
+    await takeOverSandwich(session.user.id, sessionItemId);
+  } catch (err) {
+    if (err instanceof TheokotOrderError) return { ok: false, error: orderErrorMessage(err) };
+    if (err instanceof TheokotValidationError) return { ok: false, error: err.details.join(" ") };
+    console.error("[theokot] takeOverSandwich mislukt:", err);
+    return { ok: false, error: "Er ging iets mis bij het overnemen van het broodje." };
+  }
+
+  return { ok: true, message: "Het broodje staat op je naam. Haal het af aan de balie." };
 }

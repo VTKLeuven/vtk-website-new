@@ -58,6 +58,13 @@ export type PickupOrder = {
    * zodat een groco die toch langskomt, weet waar zijn broodje is.
    */
   grocomeet: boolean;
+  /**
+   * Zoveel broodjes van deze bestelling staan na een late annulatie nog vrij
+   * voor overname (`releaseOrder`). Staat de student toch aan de balie, dan mag
+   * het gewoon mee: wie afhaalt, beëindigt de vrijgave. 0 bij een gewone
+   * bestelling.
+   */
+  released: number;
 };
 
 export type PickupLookupResult =
@@ -173,6 +180,10 @@ export async function pickupForUser(
         voucherCost: sandwichVoucherCost(voucherCoversCents, config.voucherHalfCents),
         isLate: order.status === "NO_SHOW" || order.session.pickupEnd < now,
         grocomeet: order.grocomeetId !== null,
+        released:
+          order.status === "RESERVED" && order.releasedAt
+            ? order.lines.reduce((sum, line) => sum + line.releasedQuantity, 0)
+            : 0,
         lines: order.lines.map((line) => ({
           nameNl: line.sessionItem.nameNl,
           nameEn: line.sessionItem.nameEn,

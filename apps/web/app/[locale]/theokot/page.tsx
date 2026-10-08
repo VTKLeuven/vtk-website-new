@@ -5,7 +5,7 @@ import { hasLocale } from "@/lib/locale";
 import { requireSession } from "@/lib/session";
 import { pick, type Locale } from "@vtk/i18n";
 import { PleaseLogin } from "@/components/site/pleaseLogin";
-import { canCancel, canOrderNow } from "@/lib/theokot";
+import { canCancel, canOrderNow, inTakeoverWindow } from "@/lib/theokot";
 import { loadOrderableSessions, remainingFor } from "@/lib/theokot-orders";
 import { publicUrl } from "@/lib/storage";
 import { TheokotOrderClient, type OrderSession, type OrderMessage } from "./TheokotOrderClient";
@@ -42,7 +42,7 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
 
   // Zelfde lezing als de VTK-app doet (`/api/app/v1/theokot`), zodat het aanbod,
   // de voorraad en de ban niet op twee plaatsen berekend worden.
-  const { config, ban, sessions, used, grocomeetSessionIds, message: msgValue } =
+  const { config, ban, sessions, used, released, grocomeetSessionIds, message: msgValue } =
     await loadOrderableSessions(userId, now);
 
   const dayFmt = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
@@ -65,6 +65,13 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
 
   const orderSessions: OrderSession[] = sessions.map((s) => {
     const existing = s.orders[0];
+    // Na de deadline en tot het einde van de afhaal: laat annuleren geeft je
+    // broodjes vrij, en wat anderen vrijgaven kan je overnemen.
+    const takeover = inTakeoverWindow(s, now);
+    const releasedOwn =
+      existing?.status === "RESERVED" && existing.releasedAt !== null
+        ? existing.lines.reduce((sum, l) => sum + l.releasedQuantity, 0)
+        : 0;
     return {
       id: s.id,
       dateLabel: dayFmt.format(s.date),
@@ -75,17 +82,20 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
       orderOpenShort: shortMoment(s.orderOpenAt),
       orderCloseShort: shortMoment(s.orderCloseAt),
       pickupLabel: `${timeFmt.format(s.pickupStart)} – ${timeFmt.format(s.pickupEnd)}`,
+      pickupEndLabel: timeFmt.format(s.pickupEnd),
       orderOpenLabel: `${dayFmt.format(s.orderOpenAt)}, ${timeFmt.format(s.orderOpenAt)}`,
       orderCloseLabel: `${dayFmt.format(s.orderCloseAt)}, ${timeFmt.format(s.orderCloseAt)}`,
       orderWindowState:
         now < s.orderOpenAt ? "UPCOMING" : now >= s.orderCloseAt ? "CLOSED" : "OPEN",
       canOrder: canOrderNow(s, now),
+      canTakeOver: takeover,
       grocomeet: grocomeetSessionIds.has(s.id),
       items: s.items.map((i) => ({
         id: i.id,
         name: pick(i.nameNl, i.nameEn, locale) ?? i.nameNl,
         priceCents: i.priceCents,
         remaining: remainingFor(i, used),
+        released: takeover ? (released.get(i.id) ?? 0) : 0,
         isWeeklySpecial: i.isWeeklySpecial,
         imageUrl: publicUrl(i.imageKey),
         badgeImageUrl: i.badgeImageKey ? publicUrl(i.badgeImageKey) : null,
@@ -100,6 +110,16 @@ export default async function TheokotOrderPage({ params }: { params: Promise<{ l
             canCancel: existing.status === "RESERVED" && canCancel(s, now),
             // Aanpassen volgt het bestelvenster, net als bestellen zelf.
             canEdit: existing.status === "RESERVED" && canOrderNow(s, now),
+            // Na de deadline: annuleren wordt vrijgeven voor overname. Niet voor
+            // de doos van de grocomeet, die ligt niet aan de balie.
+            canRelease:
+              existing.status === "RESERVED" &&
+              existing.grocomeetId === null &&
+              existing.releasedAt === null &&
+              takeover,
+            released: existing.status === "RESERVED" && existing.releasedAt !== null,
+            releasedCount: releasedOwn,
+            canUnrelease: releasedOwn > 0 && now < s.pickupEnd,
             grocomeet: existing.grocomeetId !== null,
             lines: existing.lines.map((l) => ({
               sessionItemId: l.sessionItemId,

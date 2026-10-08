@@ -253,8 +253,12 @@ export type AppTheokotOrderInput = {
 };
 
 /**
- * De weigeringen die de app zelf een zin bij maakt. Gelijk aan
+ * De weigeringen die de app zelf een zin bij maakt. Komt uit
  * `TheokotOrderErrorCode` in `lib/theokot-orders.ts`; die lijst is het origineel.
+ * Enkel wat bestellen en annuleren voor de deadline kan geven, staat hier: laat
+ * annuleren en overnemen (`TAKEOVER_CLOSED`, `RELEASE_NOT_POSSIBLE`,
+ * `NOTHING_RELEASED`, `TAKEOVER_UNAVAILABLE`) bestaan enkel op de website, dus
+ * de app krijgt die codes nooit. Voegt de app die wegen toe, zet ze dan hier.
  * `INVALID_ORDER` komt van de lijncontrole en draagt de details mee in `fields`.
  */
 export type AppTheokotErrorCode =

@@ -213,6 +213,22 @@ export function canCancel(session: Pick<OrderableSession, 'orderCloseAt'>, now: 
   return now < session.orderCloseAt;
 }
 
+/**
+ * Het overnamevenster: na de deadline en vóór het einde van de afhaal.
+ *
+ * Na de deadline worden de broodjes al gemaakt, dus annuleren wist niets meer:
+ * wie dan annuleert, geeft zijn broodjes vrij (`releaseOrder`) en een ander kan
+ * ze overnemen (`takeOverSandwich`). Beide gelden in hetzelfde venster. Na de
+ * afhaal is er niets meer over te nemen: wat er dan nog vrij staat, wordt een
+ * no-show voor wie het vrijgaf.
+ */
+export function inTakeoverWindow(
+  session: Pick<OrderableSession, 'isOpen' | 'orderCloseAt'> & { pickupEnd: Date },
+  now: Date = new Date(),
+): boolean {
+  return session.isOpen && now >= session.orderCloseAt && now < session.pickupEnd;
+}
+
 // -----------------------------------------------------------------------------
 // Order-validatie
 // -----------------------------------------------------------------------------
