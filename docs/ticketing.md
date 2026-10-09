@@ -105,6 +105,9 @@ fulfil what turned out to be paid) and only then calls `expirePendingOrder`.
 QR or a Mollie checkout payable for an order that no longer exists. When a
 buyer is confirming in their app at that moment, the order waits a round; a
 Mollie payment on `pending` can keep it waiting longer than a Bancontact QR.
+The payments are read again per order right before closing, not taken from the
+batch query: a hundred orders with a few provider calls each make that list
+seconds old, and a payment started just before the deadline would be missing.
 
 A checkout the provider calls paid is only fulfilled when the provider also
 reports an amount and a currency that match the order
@@ -161,6 +164,11 @@ failed with them.
   free tickets per buyer) sit behind a per-buyer advisory lock. The pool UPDATE
   is the last statement before the commit, so the row is held as briefly as
   possible.
+- **Free tickets per buyer count order lines, not tickets.** A free order gets
+  its tickets in a second transaction, after the per-buyer lock is released.
+  Counting tickets let a second concurrent free order of the same buyer
+  through: three simultaneous orders of two tickets against a maximum of two
+  issued four.
 - **Order transitions** (fulfil, expire, fail; `withOrderLock`) run READ
   COMMITTED with `SELECT ... FOR UPDATE` on the order as their first statement:
   two transitions of one order never interleave, and the second reads the
@@ -170,7 +178,10 @@ failed with them.
   ("het is heel druk, probeer meteen opnieuw") instead of a generic failure.
   That covers a pool timeout outside the transaction too (`P2024`, on the
   event or buyer lookup before it), not only inside it (`P2028`). The web shop
-  and the app both show that message for `BUSY`.
+  and the app both show that message for `BUSY`. Starting a payment on an
+  existing order (`/api/tickets/orders/<id>/pay`) answers `BUSY` too, instead
+  of "deze betaalmethode werkt nu niet", which sent buyers to the other method
+  while both worked.
 - **Only until the reservation commits.** After that the order exists and holds
   seats, so "your order did not go through" would be false. A busy database
   while creating the payment sends the buyer to their order page instead, with

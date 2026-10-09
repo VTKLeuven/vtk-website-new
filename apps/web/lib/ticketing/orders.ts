@@ -463,16 +463,19 @@ export async function createTicketCheckout(
           if (used > 0) throw new TicketCheckoutError("HONORARY_PRICE_USED");
         }
         if (totalCents === 0 && session) {
-          const validFreeTickets = await tx.ticket.count({
+          // Bestelregels en geen tickets: een gratis bestelling krijgt haar
+          // tickets pas in een tweede transactie, na dit slot. Telden we
+          // tickets, dan zag een tweede gelijktijdige bestelling van dezelfde
+          // koper er nog geen en kwam ze over het maximum.
+          const validFreeTickets = await tx.ticketOrderItem.count({
             where: {
               eventId: event.id,
-              status: "VALID",
-              orderItem: {
-                order: {
-                  buyerUserId: session.user.id,
-                  totalCents: 0,
-                },
+              order: {
+                buyerUserId: session.user.id,
+                totalCents: 0,
+                status: { in: ["PENDING_PAYMENT", "PAID", "PARTIALLY_REFUNDED"] },
               },
+              OR: [{ ticket: null }, { ticket: { status: "VALID" } }],
             },
           });
           if (validFreeTickets + normalizedItems.length > event.maxTicketsPerOrder) {
@@ -1344,25 +1347,24 @@ export async function expirePendingOrder(orderId: string): Promise<boolean> {
 export async function releaseExpiredOrders(limit = 100): Promise<number> {
   const orders = await prisma.ticketOrder.findMany({
     where: { status: "PENDING_PAYMENT", reservationExpiresAt: { lte: new Date() } },
-    select: {
-      id: true,
-      totalCents: true,
-      currency: true,
-      // Enkel de pogingen die nog leven; `closeLivePayments` slaat de rest
-      // toch over.
-      payments: {
-        where: { status: { in: ["CREATED", "PENDING"] } },
-        select: { id: true, provider: true, providerCheckoutId: true, status: true },
-        orderBy: { createdAt: "asc" },
-      },
-    },
+    select: { id: true, totalCents: true, currency: true },
     take: limit,
     orderBy: { reservationExpiresAt: "asc" },
   });
 
   let released = 0;
   for (const order of orders) {
-    const closed = await closeLivePayments(order);
+    // De betalingen vers per bestelling, niet uit de lijst hierboven: die is
+    // na honderd bestellingen met elk een paar providercalls al seconden oud,
+    // en een koper die vlak voor het einde van zijn reservatie nog een
+    // betaling startte, zou er dan niet in staan.
+    // Enkel de pogingen die nog leven; `closeLivePayments` slaat de rest toch over.
+    const payments = await prisma.ticketPayment.findMany({
+      where: { orderId: order.id, status: { in: ["CREATED", "PENDING"] } },
+      select: { id: true, provider: true, providerCheckoutId: true, status: true },
+      orderBy: { createdAt: "asc" },
+    });
+    const closed = await closeLivePayments({ ...order, payments });
     if (closed !== "CLOSED") continue;
     if (await expirePendingOrder(order.id)) released += 1;
   }

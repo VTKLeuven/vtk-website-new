@@ -27,3 +27,18 @@ export async function liveBancontactPayment(orderId: string) {
     select: { id: true, providerDeeplink: true, expiresAt: true },
   });
 }
+
+/**
+ * Of de bestelpagina terug moet wijzen naar een lopende Bancontact-QR, en hoe
+ * lang die nog geldt. Dat "hoe lang" meten we op de klok van de server: met
+ * een absoluut tijdstip zou een telefoon waarvan de klok voorloopt, het blok
+ * meteen verbergen.
+ */
+export async function openBancontactForOrderPage(
+  orderId: string
+): Promise<{ paymentId: string; expiresInMs: number | null } | null> {
+  const payment = await liveBancontactPayment(orderId);
+  if (!payment?.providerDeeplink) return null;
+  const expiresInMs = payment.expiresAt ? payment.expiresAt.getTime() - Date.now() : null;
+  return expiresInMs == null || expiresInMs > 0 ? { paymentId: payment.id, expiresInMs } : null;
+}
