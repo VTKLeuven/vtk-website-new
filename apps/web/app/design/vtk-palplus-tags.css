@@ -1,0 +1,277 @@
+/* PAL+: tags kiezen en het rooster "wanneer kan je?". Gedeeld door het publieke
+   formulier en het beheer, daarom een eigen bestand. */
+
+/* -------------------------------------------------------------------------- */
+/* Tags                                                                        */
+/* -------------------------------------------------------------------------- */
+
+.pp-tags-presets,
+.pp-tags-chosen,
+.pp-tags-suggest {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-tags-presets button {
+  padding: 5px 12px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.pp-tags-presets button:hover:not(:disabled) {
+  border-color: var(--ink);
+}
+
+/* Gekozen: geel, zoals elke actieve toestand op de site. */
+.pp-tags-presets button[aria-pressed='true'] {
+  border-color: var(--yellow);
+  background: var(--yellow);
+  font-weight: 600;
+}
+
+.pp-tags-presets button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.pp-tags-chosen li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: var(--yellow);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.pp-tags-chosen button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--ink);
+}
+
+.pp-tags-chosen button:hover {
+  background: rgba(10, 15, 31, 0.1);
+}
+
+.pp-tags-suggest {
+  margin: 8px 0 0;
+}
+
+.pp-tags-suggest button {
+  padding: 3px 10px;
+  border: 1px dashed var(--line-2);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.pp-tags-suggest button:hover {
+  border-style: solid;
+  border-color: var(--ink);
+}
+
+.pp-tags-help {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Tags bij een vraag of een sessie: klein, licht, onder de tekst. */
+.pp-taglist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pp-taglist li {
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--body);
+}
+
+/* -------------------------------------------------------------------------- */
+/* Het rooster                                                                 */
+/* -------------------------------------------------------------------------- */
+
+.pp-avail-wrap {
+  position: relative;
+  max-width: 520px;
+}
+
+.pp-avail {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 4px;
+  table-layout: fixed;
+}
+
+.pp-avail thead th {
+  padding: 0 0 2px;
+  text-align: center;
+  font-weight: 600;
+  vertical-align: bottom;
+}
+
+.pp-avail-col {
+  display: block;
+  font-size: 12.5px;
+  color: var(--ink);
+}
+
+.pp-avail-hours {
+  display: block;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pp-avail-corner {
+  width: 7.5em;
+}
+
+.pp-avail tbody th {
+  padding-right: 6px;
+  text-align: left;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.pp-avail-day-short {
+  display: none;
+}
+
+.pp-avail td {
+  padding: 0;
+}
+
+.pp-avail-cell {
+  position: relative;
+  display: block;
+  cursor: pointer;
+}
+
+.pp-avail-cell input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  margin: 0;
+  cursor: pointer;
+}
+
+/* Het vakje zelf: wit, met een haarlijn; aangeduid wordt het geel met een vinkje. */
+.pp-avail-cell input + span,
+.pp-avail-mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 38px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--surface);
+  transition: background-color 0.12s ease, border-color 0.12s ease;
+}
+
+.pp-avail-cell:hover input + span {
+  border-color: var(--ink);
+}
+
+.pp-avail-cell input:checked + span,
+.pp-avail-mark[data-on='true'] {
+  border-color: var(--yellow);
+  background: var(--yellow);
+}
+
+.pp-avail-cell input:checked + span::after,
+.pp-avail-mark[data-on='true']::after {
+  content: '✓';
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.pp-avail-cell input:focus-visible + span {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* Om te lezen: een raster met tabelrollen (zie AvailabilityView), kleiner, en
+   een leeg vakje valt weg in de achtergrond. */
+.pp-avail-read {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+}
+
+.pp-avail-read-row {
+  display: grid;
+  align-items: center;
+  gap: 4px;
+}
+
+.pp-avail-read-head {
+  text-align: center;
+  font-weight: 600;
+}
+
+.pp-avail-read-day {
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ink);
+}
+
+.pp-avail-read .pp-avail-mark {
+  position: relative;
+  height: 28px;
+  border-color: var(--line);
+  background: transparent;
+}
+
+@media (max-width: 480px) {
+  .pp-avail-corner {
+    width: 2.4em;
+  }
+
+  .pp-avail-col {
+    font-size: 11.5px;
+    overflow-wrap: anywhere;
+  }
+
+  .pp-avail-hours {
+    font-size: 10px;
+  }
+
+  .pp-avail-day {
+    display: none;
+  }
+
+  .pp-avail-day-short {
+    display: inline;
+  }
+}
+

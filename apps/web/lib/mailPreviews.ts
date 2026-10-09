@@ -17,6 +17,20 @@ import {
   orderTakenOverMail,
 } from "@/lib/mail";
 import { pianoConfirmationMail } from "@/lib/piano-reservations";
+import {
+  palPlusCoTutorAnsweredMail,
+  palPlusCoTutorInvitationMail,
+  palPlusNewRequestNotificationMail,
+  palPlusRequestClosedMail,
+  palPlusRequestPublishedMail,
+  palPlusRequestReceivedMail,
+  palPlusSessionCancelledMail,
+  palPlusSessionChangedMail,
+  palPlusSessionForRequestMail,
+  palPlusSessionReminderMail,
+  palPlusTutorAssignedMail,
+  type PalPlusMailSession,
+} from "@/lib/palPlusMail";
 import { expenseMailDraft } from "@/lib/rekeningen/expenses";
 import { shiftReminderMail } from "@/lib/shift/reminders";
 import { newLesbezoekNotificationMail } from "@/lib/lesbezoeken-server";
@@ -100,6 +114,13 @@ export function mailPreviewGroups(): MailPreviewGroup[] {
       title: "Shiften",
       description: "Twee herinneringen per shift, elk met een eigen venster.",
       mails: shiftPreviews(),
+    },
+    {
+      id: "pal-plus",
+      title: "PAL+",
+      description:
+        "Van aanvraag tot sessie: naar wie indiende, naar de tutors en de ingeschrevenen, en een melding naar VTK Onderwijs. Elke mail behalve de herinnering vertrekt meteen na de actie in het beheer of op /pal-plus.",
+      mails: palPlusPreviews(),
     },
     {
       id: "theokot",
@@ -298,6 +319,245 @@ function shiftPreviews(): MailPreview[] {
       source: "shifts",
       file: "lib/shift/reminders.ts",
       ...soon,
+    },
+  ];
+}
+
+function palPlusPreviews(): MailPreview[] {
+  const PAGE = "https://vtk.be/pal-plus";
+  const CALENDAR = "https://vtk.be/api/pal-plus/sessie/voorbeeld";
+  const session: PalPlusMailSession = {
+    courseLabel: "Voorbeeldvak (H00X0A)",
+    description: "De oefeningen van hoofdstuk 3, met de examenvraag van vorig jaar.",
+    startsAt: SAMPLE_START,
+    endsAt: new Date(SAMPLE_START.getTime() + 2 * 60 * 60 * 1000),
+    roomLabel: "200K 00.06 (Aula)",
+    tutorNames: ["Robbe"],
+  };
+  const common = { source: "palPlus" as const, file: "lib/palPlusMail.ts" };
+  const availability = {
+    lines: ["Maandag: Avond (18:00-22:00)", "Woensdag: Namiddag (13:00-18:00), Avond (18:00-22:00)"],
+    note: "Niet in de week van 12 oktober.",
+  };
+  const tags = ["Oefeningen", "Hoofdstuk 3"];
+  const replyNote = "Afzender VTK Onderwijs (`MAIL_FROM_PAL_PLUS`); antwoorden gaat naar het adres van de post Onderwijs.";
+
+  return [
+    {
+      id: "pal-plus-received",
+      title: "Je aanbod is binnen",
+      when: "Meteen na het indienen op /pal-plus, van een aanbod of van een hulpvraag.",
+      to: "Wie indiende",
+      ...common,
+      ...palPlusRequestReceivedMail({
+        locale: "nl",
+        name: "Fien",
+        kind: "GIVE",
+        courseLabel: session.courseLabel,
+        description: session.description,
+        tags,
+        availability,
+        coTutorName: "Lien",
+        pageUrl: PAGE,
+      }),
+      notes: [
+        "Bij een hulpvraag zegt de mail dat Onderwijs de vraag eerst nakijkt en dat er een mail volgt zodra ze online staat; het rooster valt dan weg.",
+        "De zin over de medetutor staat er enkel wanneer er een r-nummer opgegeven werd.",
+        replyNote,
+      ],
+    },
+    {
+      id: "pal-plus-cotutor-invite",
+      title: "Geef je mee een PAL+-sessie?",
+      when: "Meteen na een aanbod met een r-nummer in \"Samen met\".",
+      to: "De opgegeven medetutor",
+      ...common,
+      ...palPlusCoTutorInvitationMail({
+        locale: "nl",
+        name: "Lien",
+        inviterName: "Fien",
+        courseLabel: session.courseLabel,
+        description: session.description,
+        tags,
+        availability,
+        pageUrl: PAGE,
+      }),
+      notes: [
+        "Antwoorden op deze mail gaat naar wie het aanbod indiende.",
+        "Bevestigen of weigeren kan zolang het aanbod bij Onderwijs wacht; daarna vervalt de uitnodiging.",
+      ],
+    },
+    {
+      id: "pal-plus-cotutor-answer",
+      title: "Jullie geven de sessie samen",
+      when: "Zodra de medetutor bevestigt of weigert.",
+      to: "Wie het aanbod indiende",
+      ...common,
+      ...palPlusCoTutorAnsweredMail({
+        locale: "nl",
+        name: "Fien",
+        coTutorName: "Lien",
+        accepted: true,
+        courseLabel: session.courseLabel,
+        pageUrl: PAGE,
+      }),
+      notes: ["Bij een weigering zegt de mail dat het aanbod blijft staan met één tutor."],
+    },
+    {
+      id: "pal-plus-notify-onderwijs",
+      title: "Nieuwe aanvraag (naar Onderwijs)",
+      when: "Meteen na het indienen, samen met de bevestiging hierboven.",
+      to: "Het adres van de post Onderwijs: het lijstadres uit Mailinglijsten, anders onderwijs@vtk.be",
+      ...common,
+      ...palPlusNewRequestNotificationMail({
+        kind: "FOLLOW",
+        submitterName: "Fien",
+        submitterEmail: "fien@voorbeeld.test",
+        courseLabel: "Statica",
+        courseTyped: true,
+        description: "Ik snap de vrijlichaamsdiagrammen niet, vooral met de scharnieren.",
+        tags: ["Oefeningen", "Scharnieren"],
+        availability: null,
+        coTutorName: null,
+        preferredPeriod: "voor het examen in januari",
+        respondsToLabel: null,
+        adminUrl: "https://vtk.be/admin/pal-plus",
+      }),
+      notes: ["Antwoorden op deze mail gaat naar de indiener, niet naar Onderwijs zelf.", "Altijd in het Nederlands: het is interne post."],
+    },
+    {
+      id: "pal-plus-published",
+      title: "Je vraag staat online",
+      when: "Zodra Onderwijs een hulpvraag nakijkt en online zet.",
+      to: "Wie de vraag stelde",
+      ...common,
+      ...palPlusRequestPublishedMail({
+        locale: "nl",
+        name: "Fien",
+        courseLabel: session.courseLabel,
+        description: session.description,
+        pageUrl: PAGE,
+      }),
+    },
+    {
+      id: "pal-plus-closed",
+      title: "Je vraag komt niet online",
+      when: "Zodra Onderwijs een aanvraag sluit; de reden is verplicht en staat erin.",
+      to: "Wie indiende",
+      ...common,
+      ...palPlusRequestClosedMail({
+        locale: "nl",
+        name: "Fien",
+        kind: "FOLLOW",
+        wasOnline: false,
+        courseLabel: "Statica",
+        reason: "Dit vak valt buiten wat PAL+ aanbiedt. Probeer het oefenzittingsforum van het vak.",
+        pageUrl: PAGE,
+      }),
+      notes: [
+        "Drie varianten: een aanbod dat niet ingepland wordt, een vraag die bij het nakijken gesloten wordt (hierboven), en een vraag die al online stond.",
+      ],
+    },
+    {
+      id: "pal-plus-tutor",
+      title: "Je geeft een PAL+-sessie",
+      when: "Zodra iemand tutor wordt van een sessie die nog moet beginnen: bij het plannen, of later toegevoegd.",
+      to: "De nieuwe tutor",
+      ...common,
+      ...palPlusTutorAssignedMail({
+        locale: "nl",
+        name: "Robbe",
+        session,
+        fromOffer: true,
+        reward: 2,
+        coTutorNames: [],
+        pageUrl: PAGE,
+        calendarUrl: CALENDAR,
+      }),
+      notes: [
+        "De pil met bonnetjes valt weg voor een praesidiumlid, dat er geen verdient.",
+        "Kwam de sessie uit het aanbod van deze tutor, dan zegt de eerste zin dat het aanbod aanvaard is.",
+        "Een achteraf ingevoerde sessie (al voorbij) geeft geen mail.",
+      ],
+    },
+    {
+      id: "pal-plus-for-request",
+      title: "Er is een sessie voor je vraag",
+      when: "Zodra Onderwijs een sessie plant of aanpast die een hulpvraag beantwoordt.",
+      to: "Wie de vraag stelde en wie ze steunde, behalve wie al tutor of ingeschreven is",
+      ...common,
+      ...palPlusSessionForRequestMail({
+        locale: "nl",
+        name: "Fien",
+        role: "asker",
+        session,
+        pageUrl: PAGE,
+        calendarUrl: CALENDAR,
+      }),
+      notes: ["Wie de vraag steunde, krijgt dezelfde mail met een eigen aanhef.", "Wie twee gekoppelde vragen steunde, krijgt ze één keer."],
+    },
+    {
+      id: "pal-plus-changed",
+      title: "Je PAL+-sessie is verplaatst",
+      when: "Zodra Onderwijs het moment of het lokaal van een geplande sessie verandert.",
+      to: "De tutors en de ingeschrevenen",
+      ...common,
+      ...palPlusSessionChangedMail({
+        locale: "nl",
+        name: "Fien",
+        role: "attendee",
+        session,
+        change: {
+          previousMoment: {
+            startsAt: new Date(SAMPLE_START.getTime() - 24 * 60 * 60 * 1000),
+            endsAt: new Date(SAMPLE_START.getTime() - 22 * 60 * 60 * 1000),
+          },
+          previousRoom: { label: null },
+        },
+        pageUrl: PAGE,
+        calendarUrl: CALENDAR,
+      }),
+      notes: [
+        'Verandert enkel het lokaal, dan heet de mail "Lokaal bekend" (eerst lag het nog niet vast) of "Ander lokaal".',
+        "Een andere omschrijving of een ander maximum geeft geen mail.",
+      ],
+    },
+    {
+      id: "pal-plus-reminder",
+      title: "Morgen geef je PAL+",
+      when: "24 uur voor de start, via de background-worker (elke vijf minuten).",
+      to: "Elke tutor en elke ingeschrevene, één keer per moment",
+      ...common,
+      ...palPlusSessionReminderMail({
+        locale: "nl",
+        name: "Robbe",
+        role: "tutor",
+        session,
+        attendeeCount: 7,
+        pageUrl: PAGE,
+        calendarUrl: CALENDAR,
+      }),
+      notes: [
+        "Wie zich pas binnen 24 uur voor de start inschrijft of tutor wordt, krijgt ze niet meer.",
+        "Verschuift het moment, dan komt er een nieuwe herinnering voor het nieuwe moment.",
+        "De ingeschrevenen krijgen een eigen versie, met de vraag zich uit te schrijven als ze toch niet kunnen.",
+      ],
+    },
+    {
+      id: "pal-plus-cancelled",
+      title: "Deze PAL+-sessie gaat niet door",
+      when: "Zodra Onderwijs een sessie annuleert die nog moest beginnen.",
+      to: "De tutors en de ingeschrevenen",
+      ...common,
+      ...palPlusSessionCancelledMail({
+        locale: "nl",
+        name: "Fien",
+        role: "attendee",
+        session,
+        reason: "De tutor is ziek. We plannen een nieuwe datum.",
+        pageUrl: PAGE,
+      }),
+      notes: ["Een sessie die achteraf geannuleerd wordt omdat ze niet doorging, geeft geen mail."],
     },
   ];
 }

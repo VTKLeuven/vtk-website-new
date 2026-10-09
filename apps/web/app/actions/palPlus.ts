@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { hasPermission } from "@vtk/auth";
@@ -11,8 +12,25 @@ import { toMessageText, toSingleLine } from "@/lib/contactForm";
 import { logAudit } from "@/lib/audit";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import {
+  notifyPalPlusCoTutorAnswered,
+  notifyPalPlusCoTutorInvited,
+  notifyPalPlusRequestClosed,
+  notifyPalPlusRequestPublished,
+  notifyPalPlusRequestSubmitted,
+  notifyPalPlusSessionCancelled,
+  notifyPalPlusSessionChanged,
+  notifyPalPlusSessionPlanned,
+} from "@/lib/palPlusNotify";
+import type { PalPlusSessionChange } from "@/lib/palPlusMail";
+import type { PalPlusAvailabilitySlot } from "@/lib/palPlus";
+import {
+  canAnswerPalPlusCoTutor,
+  canonicalPalPlusTags,
   initialPalPlusStatus,
+  palPlusAvailabilitySnapshot,
   palPlusCourseLabel,
+  parsePalPlusDaypart,
+  parsePalPlusTagLabel,
   palPlusRequestCourseLabel,
   palPlusReward,
   palPlusSessionState,
@@ -22,6 +40,8 @@ import {
   parsePalPlusRequest,
   parsePalPlusRewardAmount,
   parsePalPlusSession,
+  palPlusReminderHandledAt,
+  palPlusRoomLabel,
   reopenedPalPlusStatus,
   PAL_PLUS_LIMITS,
   PAL_PLUS_MAX_ACTIVE_REQUESTS,
@@ -54,8 +74,9 @@ const ACTIVE_STATUSES = ["PENDING", "OPEN"] as const;
 
 /**
  * "Ik wil een sessie geven" of "ik zoek hulp". Iedereen die kan inloggen mag
- * dat, ook zonder lidmaatschap. Een aanbod wacht op Onderwijs; een vraag staat
- * meteen publiek, zonder naam.
+ * dat, ook zonder lidmaatschap. Allebei wachten ze op Onderwijs: een aanbod tot
+ * er een sessie van komt, een vraag tot Onderwijs ze nakeek en online zette.
+ * De indiener krijgt een bevestiging, Onderwijs een melding.
  */
 export async function submitPalPlusRequestAction(
   _prev: SaveState,
@@ -65,21 +86,42 @@ export async function submitPalPlusRequestAction(
   if (!session) return saveError("LOGIN_REQUIRED");
   const userId = session.user.id;
 
-  const parsed = parsePalPlusRequest(
-    {
-      kind: toSingleLine(formData.get("kind")),
-      courseId: toSingleLine(formData.get("courseId")),
-      courseOther: toSingleLine(formData.get("courseOther")),
-      description: toMessageText(formData.get("description")),
-      date: toSingleLine(formData.get("date")),
-      startTime: toSingleLine(formData.get("startTime")),
-      endTime: toSingleLine(formData.get("endTime")),
-      preferredPeriod: toSingleLine(formData.get("preferredPeriod")),
-    },
-    new Date(),
-  );
+  const parsed = parsePalPlusRequest({
+    kind: toSingleLine(formData.get("kind")),
+    courseId: toSingleLine(formData.get("courseId")),
+    courseOther: toSingleLine(formData.get("courseOther")),
+    description: toMessageText(formData.get("description")),
+    tags: formData.getAll("tag").map((value) => toSingleLine(value)),
+    availability: formData.getAll("availability").map((value) => toSingleLine(value)),
+    availabilityNote: toMessageText(formData.get("availabilityNote")),
+    coTutor: toSingleLine(formData.get("coTutor")),
+    preferredPeriod: toSingleLine(formData.get("preferredPeriod")),
+  });
   if (!parsed.ok) return saveError(parsed.error);
   const { request } = parsed;
+  const tags = await canonicalTags(request.tags);
+
+  // Het rooster wordt bewaard zoals de dagdelen nu zijn; de tweede tutor moet een
+  // account hebben, want die bevestigt zelf.
+  let availability: PalPlusAvailabilitySlot[] | null = null;
+  let coTutorId: string | null = null;
+  if (request.kind === "GIVE") {
+    const dayparts = await prisma.palPlusDaypart.findMany({
+      where: { active: true },
+      select: { id: true, labelNl: true, labelEn: true, startMinutes: true, endMinutes: true },
+    });
+    availability = palPlusAvailabilitySnapshot(request.availability, dayparts);
+    if (!availability) return saveError("AVAILABILITY_INVALID");
+    if (request.coTutorRNumber) {
+      const coTutor = await prisma.user.findFirst({
+        where: { rNumber: { equals: request.coTutorRNumber, mode: "insensitive" }, deletedAt: null },
+        select: { id: true },
+      });
+      if (!coTutor) return saveError("COTUTOR_UNKNOWN");
+      if (coTutor.id === userId) return saveError("COTUTOR_SELF");
+      coTutorId = coTutor.id;
+    }
+  }
 
   if (request.courseId) {
     const course = await prisma.palPlusCourse.findFirst({
@@ -107,24 +149,31 @@ export async function submitPalPlusRequestAction(
   });
   if (active >= PAL_PLUS_MAX_ACTIVE_REQUESTS) return saveError("TOO_MANY_ACTIVE");
 
-  await prisma.palPlusRequest.create({
+  const created = await prisma.palPlusRequest.create({
+    select: { id: true },
     data: {
       kind: request.kind,
-      status: initialPalPlusStatus(request.kind),
+      status: initialPalPlusStatus(),
       userId,
       courseId: request.courseId,
       courseOther: request.courseOther,
       description: request.description,
+      tags,
       ...(request.kind === "GIVE"
         ? {
-            proposedStartsAt: request.proposedStartsAt,
-            proposedEndsAt: request.proposedEndsAt,
+            availability: availability ?? [],
+            availabilityNote: request.availabilityNote,
             respondsToId,
+            ...(coTutorId ? { coTutorId, coTutorStatus: "PENDING" as const } : {}),
           }
         : { preferredPeriod: request.preferredPeriod }),
     },
   });
 
+  after(async () => {
+    await notifyPalPlusRequestSubmitted(created.id);
+    if (coTutorId) await notifyPalPlusCoTutorInvited(created.id);
+  });
   revalidatePalPlusEverywhere();
   return saveOk();
 }
@@ -141,6 +190,35 @@ export async function withdrawPalPlusRequestAction(formData: FormData): Promise<
   });
   if (result.count === 0) return saveError("NOT_WITHDRAWABLE");
 
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
+/**
+ * De uitgenodigde tweede tutor zegt ja of nee. Kan zolang het aanbod bij
+ * Onderwijs wacht (`canAnswerPalPlusCoTutor`); wie het formulier invulde,
+ * krijgt het antwoord per mail.
+ */
+export async function answerPalPlusCoTutorAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const session = await getCurrentSession();
+  if (!session) return saveError("LOGIN_REQUIRED");
+  const id = toSingleLine(formData.get("id"));
+  const accept = formData.get("answer") === "accept";
+
+  const request = await prisma.palPlusRequest.findUnique({
+    where: { id },
+    select: { kind: true, status: true, coTutorId: true, coTutorStatus: true },
+  });
+  if (!request || request.coTutorId !== session.user.id) return saveError("NOT_INVITED");
+  if (!canAnswerPalPlusCoTutor(request)) return saveError("INVITATION_GONE");
+
+  const updated = await prisma.palPlusRequest.updateMany({
+    where: { id, coTutorId: session.user.id, coTutorStatus: "PENDING", status: "PENDING" },
+    data: { coTutorStatus: accept ? "ACCEPTED" : "DECLINED", coTutorRespondedAt: new Date() },
+  });
+  if (updated.count === 0) return saveError("INVITATION_GONE");
+
+  after(() => notifyPalPlusCoTutorAnswered(id));
   revalidatePalPlusEverywhere();
   return saveOk();
 }
@@ -204,6 +282,38 @@ async function requestForAudit(id: string) {
   };
 }
 
+/**
+ * Onderwijs keek een hulpvraag na en zet ze online: vanaf nu staat ze zonder
+ * naam op de PAL+-pagina, kunnen anderen ze steunen en kan een tutor erop
+ * aanbieden. Wat niet online mag, sluit Onderwijs met een reden.
+ */
+export async function publishPalPlusRequestAction(formData: FormData): Promise<SaveState> {
+  const session = await requirePermission("pal.manage");
+  const id = toSingleLine(formData.get("id"));
+
+  // Voorwaardelijk op de status: een vraag die ondertussen ingetrokken of
+  // gesloten werd, komt niet alsnog online.
+  const result = await prisma.palPlusRequest.updateMany({
+    where: { id, kind: "FOLLOW", status: "PENDING" },
+    data: { status: "OPEN", reviewedById: session.user.id, reviewedAt: new Date() },
+  });
+  if (result.count === 0) return saveError("NOT_PUBLISHABLE");
+
+  const audit = await requestForAudit(id);
+  if (audit) {
+    await logAudit({
+      action: "update",
+      entity: "palPlusRequest",
+      entityId: id,
+      target: audit.target,
+      summary: "nagekeken en online gezet",
+    });
+  }
+  after(() => notifyPalPlusRequestPublished(id));
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
 /** Onderwijs sluit een aanvraag zonder sessie, met een reden voor de indiener. */
 export async function closePalPlusRequestAction(
   _prev: SaveState,
@@ -215,6 +325,9 @@ export async function closePalPlusRequestAction(
   if (!reason) return saveError("REASON_REQUIRED");
   if (reason.length > PAL_PLUS_LIMITS.reviewNote) return saveError("REASON_TOO_LONG");
 
+  // Voor de mail: een vraag die online stond, "is gesloten"; een die bij het
+  // nakijken gesloten wordt, "komt niet online".
+  const before = await prisma.palPlusRequest.findUnique({ where: { id }, select: { status: true } });
   const result = await prisma.palPlusRequest.updateMany({
     where: { id, status: { in: [...ACTIVE_STATUSES] } },
     data: {
@@ -236,25 +349,30 @@ export async function closePalPlusRequestAction(
       summary: `gesloten: ${reason}`,
     });
   }
+  const wasOnline = before?.status === "OPEN";
+  after(() => notifyPalPlusRequestClosed(id, wasOnline));
   revalidatePalPlusEverywhere();
   return saveOk();
 }
 
-/** Een per vergissing gesloten aanvraag terug open zetten. */
+/**
+ * Een per vergissing gesloten aanvraag terug in het werkbakje zetten. Een vraag
+ * komt daarmee niet vanzelf weer online: Onderwijs zet ze opnieuw online.
+ */
 export async function reopenPalPlusRequestAction(formData: FormData): Promise<SaveState> {
   await requirePermission("pal.manage");
   const id = toSingleLine(formData.get("id"));
 
   const request = await prisma.palPlusRequest.findUnique({
     where: { id },
-    select: { kind: true, status: true },
+    select: { status: true },
   });
   if (!request || request.status !== "CLOSED") return saveError("NOT_CLOSED");
 
   await prisma.palPlusRequest.update({
     where: { id },
     data: {
-      status: reopenedPalPlusStatus(request.kind),
+      status: reopenedPalPlusStatus(),
       reviewNote: null,
       reviewedById: null,
       reviewedAt: null,
@@ -397,6 +515,93 @@ export async function deletePalPlusCourseAction(formData: FormData): Promise<Sav
 }
 
 // -----------------------------------------------------------------------------
+// Beheer: snelle tags en dagdelen
+// -----------------------------------------------------------------------------
+
+/**
+ * Tags in de schrijfwijze van een snelle tag wanneer die bestaat, ook een
+ * uitgezette: wie "oefeningen" intikt, krijgt "Oefeningen".
+ */
+async function canonicalTags(tags: string[]): Promise<string[]> {
+  if (tags.length === 0) return tags;
+  const presets = await prisma.palPlusTag.findMany({ select: { label: true } });
+  return canonicalPalPlusTags(tags, presets.map((preset) => preset.label));
+}
+
+export async function savePalPlusTagAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requirePermission("pal.manage");
+  const parsed = parsePalPlusTagLabel(toSingleLine(formData.get("label")));
+  if (!parsed.ok) return saveError(parsed.error);
+  const id = toSingleLine(formData.get("id"));
+  const data = { label: parsed.label, active: formData.get("active") === "on" };
+
+  try {
+    if (id) {
+      await prisma.palPlusTag.update({ where: { id }, data });
+      await logAudit({ action: "update", entity: "palPlusTag", entityId: id, target: data.label });
+    } else {
+      const created = await prisma.palPlusTag.create({ data, select: { id: true } });
+      await logAudit({ action: "create", entity: "palPlusTag", entityId: created.id, target: data.label });
+    }
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") return saveError("TAG_TAKEN");
+    throw err;
+  }
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
+/**
+ * Een snelle tag weghalen. Kan altijd: een aanvraag bewaart de tekst van haar
+ * tags, dus wat al ingediend werd, houdt de tag.
+ */
+export async function deletePalPlusTagAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("pal.manage");
+  const id = toSingleLine(formData.get("id"));
+  const tag = id ? await prisma.palPlusTag.findUnique({ where: { id }, select: { label: true } }) : null;
+  if (!tag) return saveOk();
+  await prisma.palPlusTag.delete({ where: { id } });
+  await logAudit({ action: "delete", entity: "palPlusTag", entityId: id, target: tag.label });
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
+export async function savePalPlusDaypartAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  await requirePermission("pal.manage");
+  const parsed = parsePalPlusDaypart({
+    labelNl: toSingleLine(formData.get("labelNl")),
+    labelEn: toSingleLine(formData.get("labelEn")),
+    start: toSingleLine(formData.get("start")),
+    end: toSingleLine(formData.get("end")),
+  });
+  if (!parsed.ok) return saveError(parsed.error);
+  const id = toSingleLine(formData.get("id"));
+  const data = { ...parsed.daypart, active: formData.get("active") === "on" };
+
+  if (id) {
+    await prisma.palPlusDaypart.update({ where: { id }, data });
+    await logAudit({ action: "update", entity: "palPlusDaypart", entityId: id, target: data.labelNl });
+  } else {
+    const created = await prisma.palPlusDaypart.create({ data, select: { id: true } });
+    await logAudit({ action: "create", entity: "palPlusDaypart", entityId: created.id, target: data.labelNl });
+  }
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
+/** Een dagdeel weghalen. Een aanbod bewaart zijn rooster als momentopname, dus dat verandert niet. */
+export async function deletePalPlusDaypartAction(formData: FormData): Promise<SaveState> {
+  await requirePermission("pal.manage");
+  const id = toSingleLine(formData.get("id"));
+  const daypart = id ? await prisma.palPlusDaypart.findUnique({ where: { id }, select: { labelNl: true } }) : null;
+  if (!daypart) return saveOk();
+  await prisma.palPlusDaypart.delete({ where: { id } });
+  await logAudit({ action: "delete", entity: "palPlusDaypart", entityId: id, target: daypart.labelNl });
+  revalidatePalPlusEverywhere();
+  return saveOk();
+}
+
+// -----------------------------------------------------------------------------
 // Leden: inschrijven voor een sessie
 // -----------------------------------------------------------------------------
 
@@ -438,8 +643,11 @@ export async function signUpPalPlusSessionAction(formData: FormData): Promise<Sa
   });
   if (block) return saveError(block);
 
+  const now = new Date();
   try {
-    await prisma.palPlusSessionAttendee.create({ data: { sessionId, userId } });
+    await prisma.palPlusSessionAttendee.create({
+      data: { sessionId, userId, reminderSentAt: palPlusReminderHandledAt(row.startsAt, now) },
+    });
   } catch (err) {
     if (!(err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002")) throw err;
   }
@@ -522,6 +730,7 @@ export async function savePalPlusSessionAction(
   const parsed = parsePalPlusSession({
     courseId: toSingleLine(formData.get("courseId")),
     description: toMessageText(formData.get("description")),
+    tags: formData.getAll("tag").map((value) => toSingleLine(value)),
     date: toSingleLine(formData.get("date")),
     startTime: toSingleLine(formData.get("startTime")),
     endTime: toSingleLine(formData.get("endTime")),
@@ -543,7 +752,12 @@ export async function savePalPlusSessionAction(
       where: { id: data.courseId },
       select: { code: true, nameNl: true, nameEn: true },
     }),
-    data.roomId ? prisma.room.findUnique({ where: { id: data.roomId }, select: { id: true } }) : null,
+    data.roomId
+      ? prisma.room.findUnique({
+          where: { id: data.roomId },
+          select: { id: true, code: true, name: true, building: { select: { shortCode: true } } },
+        })
+      : null,
     prisma.user.count({ where: { id: { in: data.tutorIds } } }),
   ]);
   if (!course) return saveError("COURSE_UNKNOWN");
@@ -551,9 +765,24 @@ export async function savePalPlusSessionAction(
   if (tutorCount !== data.tutorIds.length) return saveError("TUTOR_UNKNOWN");
 
   const reward = palPlusReward(data.startsAt, data.endsAt);
+  // Wie er nu bij komt of wiens moment verschuift, krijgt geen herinnering meer
+  // als de sessie al binnen het venster begint (`palPlusReminderHandledAt`).
+  const reminderSentAt = palPlusReminderHandledAt(data.startsAt, new Date());
+  // De aanvragen die met deze sessie echt naar "Sessie gepland" gaan, voor de
+  // mail "er is een sessie voor je vraag". Wat al gekoppeld was, kreeg die al.
+  const linkedRequestIds =
+    requestIds.length > 0
+      ? (
+          await prisma.palPlusRequest.findMany({
+            where: { id: { in: requestIds }, status: { in: [...ACTIVE_STATUSES] } },
+            select: { id: true },
+          })
+        ).map((request) => request.id)
+      : [];
   const fields = {
     courseId: data.courseId,
     description: data.description,
+    tags: await canonicalTags(data.tags),
     startsAt: data.startsAt,
     endsAt: data.endsAt,
     maxParticipants: data.maxParticipants,
@@ -567,6 +796,8 @@ export async function savePalPlusSessionAction(
         startsAt: true,
         endsAt: true,
         cancelledAt: true,
+        roomText: true,
+        room: { select: { code: true, name: true, building: { select: { shortCode: true } } } },
         tutors: { select: { userId: true, rewardPaid: true } },
         _count: { select: { attendees: true } },
       },
@@ -590,12 +821,16 @@ export async function savePalPlusSessionAction(
           where: { sessionId: id, userId: { in: removed.map((tutor) => tutor.userId) } },
         });
         for (const userId of data.tutorIds.filter((tutorId) => !current.has(tutorId))) {
-          await tx.palPlusSessionTutor.create({ data: { sessionId: id, userId, reward } });
+          await tx.palPlusSessionTutor.create({ data: { sessionId: id, userId, reward, reminderSentAt } });
         }
         if (timesChanged) {
+          // Een nieuw moment, een nieuwe herinnering: de vorige ging over een
+          // andere dag.
+          await tx.palPlusSessionTutor.updateMany({ where: { sessionId: id }, data: { reminderSentAt } });
+          await tx.palPlusSessionAttendee.updateMany({ where: { sessionId: id }, data: { reminderSentAt } });
           // De beloning volgt het nieuwe moment, behalve na een correctie met
           // de hand. Zakt ze onder wat een tutor al uitgaf (een ingekorte
-          // sessie), dan komt het verschil uit zijn andere bonnetjes.
+          // sessie), dan komt het verschil uit de andere bonnetjes van die tutor.
           const followers = await tx.palPlusSessionTutor.findMany({
             where: { sessionId: id, rewardCorrectedAt: null },
             select: { userId: true },
@@ -623,13 +858,24 @@ export async function savePalPlusSessionAction(
       entityId: id,
       target: sessionAuditTarget(course, data.startsAt),
     });
+
+    const previousRoom = palPlusRoomLabel(existing.room, existing.roomText);
+    const change: PalPlusSessionChange = {
+      ...(timesChanged ? { previousMoment: { startsAt: existing.startsAt, endsAt: existing.endsAt } } : {}),
+      ...(previousRoom !== palPlusRoomLabel(room, data.roomText) ? { previousRoom: { label: previousRoom } } : {}),
+    };
+    const newTutorIds = data.tutorIds.filter((tutorId) => !current.has(tutorId));
+    after(async () => {
+      await notifyPalPlusSessionPlanned({ sessionId: id, newTutorIds, linkedRequestIds });
+      await notifyPalPlusSessionChanged({ sessionId: id, change, skipUserIds: newTutorIds });
+    });
   } else {
     const created = await prisma.$transaction(async (tx) => {
       const session = await tx.palPlusSession.create({
         data: {
           ...fields,
           createdById: actor.user.id,
-          tutors: { create: data.tutorIds.map((userId) => ({ userId, reward })) },
+          tutors: { create: data.tutorIds.map((userId) => ({ userId, reward, reminderSentAt })) },
         },
         select: { id: true },
       });
@@ -645,6 +891,9 @@ export async function savePalPlusSessionAction(
       entityId: created.id,
       target: sessionAuditTarget(course, data.startsAt),
     });
+    after(() =>
+      notifyPalPlusSessionPlanned({ sessionId: created.id, newTutorIds: data.tutorIds, linkedRequestIds }),
+    );
   }
 
   revalidatePalPlusEverywhere();
@@ -666,6 +915,7 @@ export async function cancelPalPlusSessionAction(
 ): Promise<SaveState> {
   await requirePermission("pal.manage");
   const id = toSingleLine(formData.get("id"));
+  const nl = formData.get("locale") !== "en";
   const reason = toMessageText(formData.get("reason"));
   if (!reason) return saveError("CANCEL_REASON_REQUIRED");
   if (reason.length > PAL_PLUS_LIMITS.cancelReason) return saveError("CANCEL_REASON_TOO_LONG");
@@ -682,26 +932,35 @@ export async function cancelPalPlusSessionAction(
   if (!existing) return saveError("SESSION_GONE");
   if (existing.cancelledAt) return saveError("SESSION_CANCELLED");
 
-  let forgiven = 0;
+  let settled = { moved: 0, forgiven: 0 };
   try {
-    forgiven = await withSerializableTransaction(async (tx) => {
+    settled = await withSerializableTransaction(async (tx) => {
       await tx.palPlusSession.update({
         where: { id },
         data: { cancelledAt: new Date(), cancelReason: reason },
       });
+      // De vraag is er nog. Een vraag die al online stond, komt terug online;
+      // een die meteen gepland werd zonder nakijken, gaat terug naar het
+      // werkbakje, want anders zou annuleren ze ongezien publiek zetten.
       await tx.palPlusRequest.updateMany({
-        where: { sessionId: id, kind: "FOLLOW", status: "PLANNED" },
+        where: { sessionId: id, kind: "FOLLOW", status: "PLANNED", reviewedAt: { not: null } },
         data: { status: "OPEN", sessionId: null },
       });
+      await tx.palPlusRequest.updateMany({
+        where: { sessionId: id, kind: "FOLLOW", status: "PLANNED", reviewedAt: null },
+        data: { status: "PENDING", sessionId: null },
+      });
       // Ging de sessie achteraf niet door, dan levert ze niets op. Wat een tutor
-      // er al van uitgaf, komt uit zijn andere openstaande bonnetjes; wat daar
-      // niet in past, vervalt.
-      let lost = 0;
+      // er al van uitgaf, komt uit de andere openstaande bonnetjes van die
+      // tutor; wat daar niet in past, vervalt.
+      const total = { moved: 0, forgiven: 0 };
       for (const tutor of existing.tutors) {
         if (tutor.rewardPaid <= 0) continue;
-        lost += (await settlePalPlusOverspend(tx, { sessionId: id, userId: tutor.userId, ceiling: 0 })).forgiven;
+        const result = await settlePalPlusOverspend(tx, { sessionId: id, userId: tutor.userId, ceiling: 0 });
+        total.moved += result.moved;
+        total.forgiven += result.forgiven;
       }
-      return lost;
+      return total;
     });
   } catch (err) {
     if (err instanceof ShiftRewardConflictError) return saveError("REWARD_CONFLICT");
@@ -713,10 +972,17 @@ export async function cancelPalPlusSessionAction(
     entity: "palPlusSession",
     entityId: id,
     target: sessionAuditTarget(existing.course, existing.startsAt),
-    summary: forgiven > 0 ? `${reason} (${forgiven} uitgegeven bonnetje(s) kwijtgescholden)` : reason,
+    summary: [
+      reason,
+      settled.moved > 0 ? `${settled.moved} uitgegeven bonnetje(s) uit andere bonnetjes` : null,
+      settled.forgiven > 0 ? `${settled.forgiven} uitgegeven bonnetje(s) kwijtgescholden` : null,
+    ]
+      .filter(Boolean)
+      .join("; "),
   });
+  after(() => notifyPalPlusSessionCancelled(id));
   revalidatePalPlusEverywhere();
-  return saveOk();
+  return saveOk(settlementDetail(nl, nl ? "Sessie geannuleerd." : "Session cancelled.", settled));
 }
 
 // -----------------------------------------------------------------------------
@@ -792,21 +1058,36 @@ export async function correctPalPlusRewardAction(
   });
   revalidatePalPlusEverywhere();
 
-  if (result.moved === 0 && result.forgiven === 0) return saveOk();
+  return saveOk(settlementDetail(nl, nl ? "Beloning aangepast." : "Reward corrected.", result));
+}
+
+/**
+ * De toast na een correctie of annulering die al uitgegeven bonnetjes raakte:
+ * wat er uit andere bonnetjes kwam en wat er verviel. Zonder verrekening blijft
+ * de vaste melding van het formulier staan.
+ */
+function settlementDetail(
+  nl: boolean,
+  lead: string,
+  { moved, forgiven }: { moved: number; forgiven: number },
+): string | undefined {
+  if (moved === 0 && forgiven === 0) return undefined;
   const vouchers = (value: number) =>
-    nl ? `${value.toLocaleString("nl-BE")} ${value === 1 ? "bonnetje" : "bonnetjes"}` : `${value.toLocaleString("en-GB")} ${value === 1 ? "voucher" : "vouchers"}`;
+    nl
+      ? `${value.toLocaleString("nl-BE")} ${value === 1 ? "bonnetje" : "bonnetjes"}`
+      : `${value.toLocaleString("en-GB")} ${value === 1 ? "voucher" : "vouchers"}`;
   const parts = nl
     ? [
-        "Beloning aangepast.",
-        result.moved > 0 ? `${vouchers(result.moved)} kwam uit andere openstaande bonnetjes.` : null,
-        result.forgiven > 0 ? `${vouchers(result.forgiven)} was al uitgegeven en vervalt; het saldo staat op nul.` : null,
+        lead,
+        moved > 0 ? `${vouchers(moved)} kwam uit andere openstaande bonnetjes.` : null,
+        forgiven > 0 ? `${vouchers(forgiven)} was al uitgegeven en vervalt; het saldo staat op nul.` : null,
       ]
     : [
-        "Reward corrected.",
-        result.moved > 0 ? `${vouchers(result.moved)} came out of other outstanding vouchers.` : null,
-        result.forgiven > 0 ? `${vouchers(result.forgiven)} was already spent and is written off; the balance is at zero.` : null,
+        lead,
+        moved > 0 ? `${vouchers(moved)} came out of other outstanding vouchers.` : null,
+        forgiven > 0 ? `${vouchers(forgiven)} was already spent and is written off; the balance is at zero.` : null,
       ];
-  return saveOk(parts.filter(Boolean).join(" "));
+  return parts.filter(Boolean).join(" ");
 }
 
 // -----------------------------------------------------------------------------

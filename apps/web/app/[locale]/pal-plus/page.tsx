@@ -10,9 +10,14 @@ import { getCurrentSession } from "@/lib/session";
 import { withdrawPalPlusRequestAction } from "@/app/actions/palPlus";
 import { brusselsYMD, ymdKey } from "@/lib/brussels";
 import {
+  canAnswerPalPlusCoTutor,
   isActivePalPlusStatus,
   palPlusAskerCount,
+  palPlusAvailabilityLines,
   palPlusCourseLabel,
+  palPlusDaypartLabel,
+  palPlusMinutesLabel,
+  readPalPlusAvailability,
   palPlusRequestCourseLabel,
   palPlusRoomLabel,
   palPlusSessionState,
@@ -23,12 +28,15 @@ import { palPlusMemberErrors } from "@/lib/palPlusMessages";
 import { PalPlusRequestForm, type OpenRequestHint } from "./PalPlusRequestForm";
 import { BackingButton, type BackingCopy } from "./BackingButton";
 import { SignupButton, type SignupCopy } from "./SignupButton";
+import { CoTutorAnswer } from "./CoTutorAnswer";
+import { PalPlusSearch } from "./PalPlusSearch";
 import { AttendanceList, type AttendanceCopy, type AttendanceEntry } from "@/components/palPlus/AttendanceList";
 import { earnedPalPlusReward } from "@/lib/shift/rewards";
 import { praesidiumYears } from "@/lib/shift/voucherEligibility";
 
 import "@/app/design/vtk-base.css";
 import "@/app/design/vtk-palplus-page.css";
+import "@/app/design/vtk-palplus-tags.css";
 
 /**
  * `/pal-plus`: peer assisted learning op aanvraag.
@@ -93,7 +101,7 @@ export default async function PalPlusPage({
   } as const;
   const now = new Date();
 
-  const [courseRows, openRows, mineRows, respondsToRow, sessionRows] = await Promise.all([
+  const [courseRows, openRows, mineRows, respondsToRow, sessionRows, coTutorRows] = await Promise.all([
     prisma.palPlusCourse.findMany({
       where: { active: true },
       orderBy: { nameNl: "asc" },
@@ -109,6 +117,7 @@ export default async function PalPlusPage({
         courseOther: true,
         description: true,
         preferredPeriod: true,
+        tags: true,
         course: { select: courseSelect },
         _count: { select: { backers: true } },
         backers: userId ? { where: { userId }, select: { userId: true } } : false,
@@ -126,11 +135,14 @@ export default async function PalPlusPage({
             status: true,
             courseOther: true,
             description: true,
-            proposedStartsAt: true,
-            proposedEndsAt: true,
+            tags: true,
+            availability: true,
+            availabilityNote: true,
             preferredPeriod: true,
             reviewNote: true,
             createdAt: true,
+            coTutorStatus: true,
+            coTutor: { select: { name: true } },
             course: { select: courseSelect },
             _count: { select: { backers: true } },
             session: {
@@ -148,7 +160,14 @@ export default async function PalPlusPage({
     formKind === "GIVE" && vraag
       ? prisma.palPlusRequest.findFirst({
           where: { id: vraag, kind: "FOLLOW" },
-          select: { id: true, courseId: true, courseOther: true, description: true, course: { select: courseSelect } },
+          select: {
+            id: true,
+            courseId: true,
+            courseOther: true,
+            description: true,
+            tags: true,
+            course: { select: courseSelect },
+          },
         })
       : Promise.resolve(null),
     // Wat nog komt of bezig is. Een geannuleerde sessie blijft staan tot haar
@@ -162,6 +181,7 @@ export default async function PalPlusPage({
       select: {
         id: true,
         description: true,
+        tags: true,
         startsAt: true,
         endsAt: true,
         maxParticipants: true,
@@ -176,15 +196,83 @@ export default async function PalPlusPage({
         attendees: userId ? { where: { userId }, select: { userId: true } } : false,
       },
     }),
+    // Aanbiedingen waarin iemand jou opgaf als tweede tutor: een uitnodiging
+    // zolang je niet antwoordde, daarna bij je eigen aanvragen.
+    userId
+      ? prisma.palPlusRequest.findMany({
+          where: { coTutorId: userId, kind: "GIVE", status: { not: "WITHDRAWN" }, coTutorStatus: { not: "DECLINED" } },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+          select: {
+            id: true,
+            kind: true,
+            status: true,
+            coTutorStatus: true,
+            courseOther: true,
+            description: true,
+            tags: true,
+            availability: true,
+            availabilityNote: true,
+            createdAt: true,
+            course: { select: courseSelect },
+            user: { select: { name: true } },
+          },
+        })
+      : Promise.resolve([]),
   ]);
+
+  // Enkel voor het formulier: de snelle tags, de dagdelen van het rooster, en
+  // per vak de tags die er al gebruikt werden. Die voorstellen komen enkel uit
+  // wat al publiek staat (open vragen en sessies): een tag uit een aanvraag die
+  // Onderwijs nog niet nakeek, hoort niet bij een ander als voorstel te staan.
+  const formLists =
+    formKind && userId
+      ? await Promise.all([
+          prisma.palPlusTag.findMany({ where: { active: true }, orderBy: { createdAt: "asc" }, select: { label: true } }),
+          prisma.palPlusDaypart.findMany({
+            where: { active: true },
+            orderBy: { startMinutes: "asc" },
+            select: { id: true, labelNl: true, labelEn: true, startMinutes: true, endMinutes: true },
+          }),
+          prisma.palPlusRequest.findMany({
+            where: { kind: "FOLLOW", status: "OPEN", courseId: { not: null }, NOT: { tags: { isEmpty: true } } },
+            select: { courseId: true, tags: true },
+            take: 500,
+          }),
+          prisma.palPlusSession.findMany({
+            where: { NOT: { tags: { isEmpty: true } } },
+            orderBy: { startsAt: "desc" },
+            select: { courseId: true, tags: true },
+            take: 500,
+          }),
+        ])
+      : null;
+  const tagSuggestionsByCourse: Record<string, string[]> = {};
+  if (formLists) {
+    const counts = new Map<string, Map<string, number>>();
+    for (const row of [...formLists[2], ...formLists[3]]) {
+      if (!row.courseId) continue;
+      const perCourse = counts.get(row.courseId) ?? new Map<string, number>();
+      for (const tag of row.tags) perCourse.set(tag, (perCourse.get(tag) ?? 0) + 1);
+      counts.set(row.courseId, perCourse);
+    }
+    for (const [courseId, perCourse] of counts) {
+      tagSuggestionsByCourse[courseId] = [...perCourse.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+        .slice(0, 10)
+        .map(([tag]) => tag);
+    }
+  }
+  const invitations = coTutorRows.filter((row) => canAnswerPalPlusCoTutor(row));
+  const coTutorAccepted = coTutorRows.filter((row) => row.coTutorStatus === "ACCEPTED");
 
   // Wie ingeschreven is, zien enkel de tutors van die sessie (en Onderwijs, in
   // het beheer). Die namen komen er dus enkel bij voor je eigen sessies.
   const teachingIds = userId
     ? sessionRows.filter((row) => row.tutors.some((tutor) => tutor.userId === userId)).map((row) => row.id)
     : [];
-  // Wat een tutor de voorbije maand gaf: daar duidt hij aan wie er kwam en ziet
-  // hij wat het opleverde. De agenda hierboven toont enkel wat nog komt.
+  // Wat een tutor de voorbije maand gaf: daar duidt de tutor aan wie er kwam en
+  // staat wat het opleverde. De agenda hierboven toont enkel wat nog komt.
   const tutoredRows = userId
     ? await prisma.palPlusSession.findMany({
         where: {
@@ -243,6 +331,10 @@ export default async function PalPlusPage({
       courseLabel: palPlusRequestCourseLabel(row, locale),
       description: row.description,
       preferredPeriod: row.preferredPeriod,
+      tags: row.tags,
+      searchText: [palPlusRequestCourseLabel(row, locale), row.course?.nameNl, row.course?.nameEn, ...row.tags, row.description]
+        .filter(Boolean)
+        .join(" "),
       askers: palPlusAskerCount(row._count.backers),
       backedByMe: Array.isArray(row.backers) && row.backers.length > 0,
       mine: userId !== null && row.userId === userId,
@@ -350,9 +442,17 @@ export default async function PalPlusPage({
                     courseId: respondsToRow.courseId,
                     courseLabel: palPlusRequestCourseLabel(respondsToRow, locale),
                     description: respondsToRow.description,
+                    tags: respondsToRow.tags,
                   }
                 : null
             }
+            tagPresets={formLists?.[0].map((tag) => tag.label) ?? []}
+            tagSuggestionsByCourse={tagSuggestionsByCourse}
+            dayparts={(formLists?.[1] ?? []).map((daypart) => ({
+              id: daypart.id,
+              label: palPlusDaypartLabel(daypart, locale),
+              hours: `${palPlusMinutesLabel(daypart.startMinutes)}-${palPlusMinutesLabel(daypart.endMinutes)}`,
+            }))}
           />
         ) : (
           <>
@@ -382,6 +482,38 @@ export default async function PalPlusPage({
           </>
         )}
 
+        {invitations.length > 0 && (
+          <section className="pp-section" id="uitnodigingen" aria-labelledby="pp-invite-title">
+            <div className="pp-section-head">
+              <h2 id="pp-invite-title" className="pp-section-title">
+                {t.invitations.title}
+              </h2>
+              <p>{t.invitations.intro}</p>
+            </div>
+            <ul className="pp-mine">
+              {invitations.map((row) => (
+                <li key={row.id} className="vtk-panel pp-mine-item pp-invite">
+                  <div className="pp-mine-head">
+                    <span className="pp-kind">{t.invitations.from.replace("{name}", row.user.name)}</span>
+                  </div>
+                  <p className="pp-course">{palPlusRequestCourseLabel(row, locale)}</p>
+                  <p className="pp-text">{row.description}</p>
+                  <TagList tags={row.tags} />
+                  <AvailabilitySummary
+                    lines={palPlusAvailabilityLines(readPalPlusAvailability(row.availability), locale)}
+                    note={row.availabilityNote}
+                    label={t.mine.availability}
+                    noteLabel={t.mine.availabilityNote}
+                  />
+                  <CoTutorAnswer requestId={row.id} inviterName={row.user.name} nl={nl} copy={t.invitations} />
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        {(sessionRows.length > 0 || open.length > 0) && <PalPlusSearch copy={t.search} />}
+
         <section className="pp-section" aria-labelledby="pp-sessions-title">
           <div className="pp-section-head pp-section-head-row">
             <div>
@@ -397,9 +529,10 @@ export default async function PalPlusPage({
           {days.length === 0 ? (
             <p className="pp-empty">{t.sessions.empty}</p>
           ) : (
-            <div className="pp-agenda">
+            <div className="pp-agenda" data-pp-searchable>
+              <p className="pp-empty" data-pp-noresults hidden />
               {days.map((day) => (
-                <section key={day.key} className="pp-day" aria-label={day.label}>
+                <section key={day.key} className="pp-day" aria-label={day.label} data-pp-group>
                   <h3 className="pp-day-label">{day.label}</h3>
                   <ul className="pp-sessions">
                     {day.sessions.map((row) => {
@@ -415,7 +548,21 @@ export default async function PalPlusPage({
                       const map = mapHref(row.room);
                       const names = attendeeNames.get(row.id) ?? [];
                       return (
-                        <li key={row.id} className="vtk-panel pp-session" data-state={state}>
+                        <li
+                          key={row.id}
+                          className="vtk-panel pp-session"
+                          data-state={state}
+                          data-pp-search={[
+                            palPlusCourseLabel(row.course, locale),
+                            row.course.nameNl,
+                            row.course.nameEn,
+                            ...row.tags,
+                            row.description,
+                            ...row.tutors.map((tutor) => tutor.user.name),
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                        >
                           <div className="pp-session-time">
                             {timeFmt.format(row.startsAt)} - {timeFmt.format(row.endsAt)}
                             {state === "cancelled" && <span className="pp-session-flag">{t.sessions.cancelled}</span>}
@@ -424,6 +571,7 @@ export default async function PalPlusPage({
                           <div className="pp-session-main">
                             <p className="pp-course">{palPlusCourseLabel(row.course, locale)}</p>
                             {row.description && <p className="pp-text">{row.description}</p>}
+                            <TagList tags={row.tags} />
                             <dl className="pp-facts">
                               <div>
                                 <dt>{t.sessions.room}</dt>
@@ -567,7 +715,7 @@ export default async function PalPlusPage({
           </section>
         )}
 
-        {mineRows.length > 0 && (
+        {(mineRows.length > 0 || coTutorAccepted.length > 0) && (
           <section className="pp-section" id="jouw-aanvragen" aria-labelledby="pp-mine-title">
             <h2 id="pp-mine-title" className="pp-section-title">
               {t.mine.title}
@@ -593,11 +741,22 @@ export default async function PalPlusPage({
                     </div>
                     <p className="pp-course">{courseLabel}</p>
                     <p className="pp-text">{request.description}</p>
+                    <TagList tags={request.tags} />
+                    {request.kind === "GIVE" && (
+                      <AvailabilitySummary
+                        lines={palPlusAvailabilityLines(readPalPlusAvailability(request.availability), locale)}
+                        note={request.availabilityNote}
+                        label={t.mine.availability}
+                        noteLabel={t.mine.availabilityNote}
+                      />
+                    )}
                     <dl className="pp-facts">
-                      {request.kind === "GIVE" && request.proposedStartsAt && request.proposedEndsAt && (
+                      {request.coTutor && request.coTutorStatus && (
                         <div>
-                          <dt>{t.mine.proposed}</dt>
-                          <dd>{moment(request.proposedStartsAt, request.proposedEndsAt)}</dd>
+                          <dt>{t.mine.withCoTutor}</dt>
+                          <dd>
+                            {request.coTutor.name} ({t.mine[`coTutor${request.coTutorStatus}`]})
+                          </dd>
                         </div>
                       )}
                       {request.kind === "FOLLOW" && request.preferredPeriod && (
@@ -617,7 +776,8 @@ export default async function PalPlusPage({
                           </dd>
                         </div>
                       )}
-                      {request.kind === "FOLLOW" && (
+                      {/* Steunen kan pas wanneer de vraag online staat. */}
+                      {request.kind === "FOLLOW" && request.status !== "PENDING" && (
                         <div>
                           <dt>{t.mine.askers}</dt>
                           <dd className="pp-num">{palPlusAskerCount(request._count.backers)}</dd>
@@ -661,6 +821,19 @@ export default async function PalPlusPage({
                   </li>
                 );
               })}
+              {coTutorAccepted.map((row) => (
+                <li key={row.id} className="vtk-panel pp-mine-item">
+                  <div className="pp-mine-head">
+                    <span className="pp-kind">{t.mine.coTutorOffer.replace("{name}", row.user.name)}</span>
+                    <span className="pp-status" data-status={row.status}>
+                      {PAL_PLUS_STATUS_LABELS[row.status][nl ? "nl" : "en"]}
+                    </span>
+                  </div>
+                  <p className="pp-course">{palPlusRequestCourseLabel(row, locale)}</p>
+                  <p className="pp-text">{row.description}</p>
+                  <TagList tags={row.tags} />
+                </li>
+              ))}
             </ul>
           </section>
         )}
@@ -675,11 +848,13 @@ export default async function PalPlusPage({
           {open.length === 0 ? (
             <p className="pp-empty">{t.open.empty}</p>
           ) : (
-            <ul className="pp-open">
+            <ul className="pp-open" data-pp-searchable>
+              <li className="pp-empty" data-pp-noresults hidden />
               {open.map((request) => (
-                <li key={request.id} className="vtk-panel pp-open-item">
+                <li key={request.id} className="vtk-panel pp-open-item" data-pp-search={request.searchText}>
                   <p className="pp-course">{request.courseLabel}</p>
                   <p className="pp-text">{request.description}</p>
+                  <TagList tags={request.tags} />
                   {request.preferredPeriod && (
                     <dl className="pp-facts">
                       <div>
@@ -720,5 +895,54 @@ export default async function PalPlusPage({
         </section>
       </div>
     </div>
+  );
+}
+
+/** De tags van een vraag of een sessie, klein onder de tekst. */
+function TagList({ tags }: { tags: string[] }) {
+  if (tags.length === 0) return null;
+  return (
+    <ul className="pp-taglist">
+      {tags.map((tag) => (
+        <li key={tag}>{tag}</li>
+      ))}
+    </ul>
+  );
+}
+
+/** Wanneer een tutor kan, als tekst: een regel per dag, en de opmerking. */
+function AvailabilitySummary({
+  lines,
+  note,
+  label,
+  noteLabel,
+}: {
+  lines: string[];
+  note: string | null;
+  label: string;
+  noteLabel: string;
+}) {
+  if (lines.length === 0 && !note) return null;
+  return (
+    <dl className="pp-facts">
+      {lines.length > 0 && (
+        <div>
+          <dt>{label}</dt>
+          <dd>
+            {lines.map((line) => (
+              <span key={line} className="block">
+                {line}
+              </span>
+            ))}
+          </dd>
+        </div>
+      )}
+      {note && (
+        <div>
+          <dt>{noteLabel}</dt>
+          <dd>{note}</dd>
+        </div>
+      )}
+    </dl>
   );
 }

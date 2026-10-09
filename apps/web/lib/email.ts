@@ -27,6 +27,7 @@ export const EMAIL_SOURCES = {
   expenses: { nl: "Rekeningen", en: "Expenses" },
   forms: { nl: "Formulieren", en: "Forms" },
   lesbezoeken: { nl: "Lesbezoeken", en: "Classroom visits" },
+  palPlus: { nl: "PAL+", en: "PAL+" },
   shifts: { nl: "Shiften", en: "Shifts" },
   takedowns: { nl: "Verwijderverzoeken", en: "Takedown requests" },
   theokot: { nl: "Theokot", en: "Theokot" },

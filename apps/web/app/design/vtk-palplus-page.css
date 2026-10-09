@@ -652,3 +652,74 @@
   font-weight: 600;
   color: var(--muted);
 }
+
+/* -------------------------------------------------------------------------- */
+/* Uitnodigingen als tweede tutor                                              */
+/* -------------------------------------------------------------------------- */
+
+/* Een uitnodiging wacht op jou: uitgelicht met de gele rail. */
+.pp-invite {
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.pp-invite-actions {
+  margin-top: 14px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pp-invite-actions form {
+  display: contents;
+}
+
+/* -------------------------------------------------------------------------- */
+/* Zoeken                                                                      */
+/* -------------------------------------------------------------------------- */
+
+.pp-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 460px;
+  margin-top: clamp(22px, 3vw, 32px);
+}
+
+.pp-search input {
+  flex: 1;
+  min-width: 0;
+  height: 44px;
+  padding: 0 16px 0 40px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%235C667F' stroke-width='2' stroke-linecap='round' viewBox='0 0 24 24'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E")
+    no-repeat 15px center;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.pp-search input:focus {
+  outline: none;
+  border-color: var(--ink);
+}
+
+.pp-search button {
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.pp-search button:hover {
+  background: var(--paper-2);
+}
+
+[data-pp-search][hidden],
+[data-pp-group][hidden],
+[data-pp-noresults][hidden] {
+  display: none !important;
+}

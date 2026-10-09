@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
+  canAnswerPalPlusCoTutor,
+  canonicalPalPlusTags,
+  canPublishPalPlusRequest,
+  palPlusAvailabilityGrid,
+  palPlusAvailabilityLines,
+  palPlusAvailabilitySnapshot,
+  parsePalPlusDaypart,
+  parsePalPlusTags,
+  readPalPlusAvailability,
   initialPalPlusStatus,
   isActivePalPlusStatus,
   normalizeCourseCode,
@@ -143,138 +152,247 @@ describe("palPlusCourseLabel", () => {
 });
 
 describe("parsePalPlusRequest", () => {
-  // Maandag 5 oktober 2026, 10:00 in Brussel (zomertijd, UTC+2).
-  const now = new Date("2026-10-05T10:00:00+02:00");
   const give: RawPalPlusRequest = {
     kind: "GIVE",
     courseId: "course-1",
     courseOther: "",
     description: "Oefeningen hoofdstuk 3",
-    date: "2026-10-12",
-    startTime: "14:00",
-    endTime: "15:30",
+    tags: ["Oefeningen", " Hoofdstuk  3 "],
+    availability: ["1:avond", "3:namiddag"],
+    availabilityNote: "",
+    coTutor: "",
     preferredPeriod: "",
   };
   const follow: RawPalPlusRequest = {
     ...give,
     kind: "FOLLOW",
-    date: "",
-    startTime: "",
-    endTime: "",
+    availability: [],
     preferredPeriod: "voor het examen in januari",
   };
 
-  it("aanvaardt een aanbod en rekent het moment in Brusselse tijd", () => {
-    const result = parsePalPlusRequest(give, now);
-    expect(result.ok).toBe(true);
+  it("aanvaardt een aanbod met tags en aangevinkte vakjes", () => {
+    const result = parsePalPlusRequest(give);
     if (!result.ok || result.request.kind !== "GIVE") throw new Error("verwacht een aanbod");
     expect(result.request.courseId).toBe("course-1");
     expect(result.request.courseOther).toBeNull();
-    expect(result.request.proposedStartsAt.toISOString()).toBe("2026-10-12T12:00:00.000Z");
-    expect(result.request.proposedEndsAt.toISOString()).toBe("2026-10-12T13:30:00.000Z");
+    expect(result.request.tags).toEqual(["Oefeningen", "Hoofdstuk 3"]);
+    expect(result.request.availability).toEqual([
+      { day: 1, daypartId: "avond" },
+      { day: 3, daypartId: "namiddag" },
+    ]);
+    expect(result.request.availabilityNote).toBeNull();
+    expect(result.request.coTutorRNumber).toBeNull();
   });
 
-  it("rekent een moment na de overgang naar wintertijd met UTC+1", () => {
-    const result = parsePalPlusRequest({ ...give, date: "2026-11-09" }, now);
-    if (!result.ok || result.request.kind !== "GIVE") throw new Error("verwacht een aanbod");
-    expect(result.request.proposedStartsAt.toISOString()).toBe("2026-11-09T13:00:00.000Z");
-  });
-
-  it("aanvaardt een vraag zonder moment, met een periode in eigen woorden", () => {
-    expect(parsePalPlusRequest(follow, now)).toEqual({
+  it("aanvaardt een vraag met een periode in eigen woorden, zonder rooster", () => {
+    expect(parsePalPlusRequest(follow)).toEqual({
       ok: true,
       request: {
         kind: "FOLLOW",
         courseId: "course-1",
         courseOther: null,
         description: "Oefeningen hoofdstuk 3",
+        tags: ["Oefeningen", "Hoofdstuk 3"],
         preferredPeriod: "voor het examen in januari",
       },
     });
   });
 
   it("maakt van een lege periode null", () => {
-    const result = parsePalPlusRequest({ ...follow, preferredPeriod: "  " }, now);
+    const result = parsePalPlusRequest({ ...follow, preferredPeriod: "  " });
     if (!result.ok || result.request.kind !== "FOLLOW") throw new Error("verwacht een vraag");
     expect(result.request.preferredPeriod).toBeNull();
   });
 
   it("neemt een zelf ingetikt vak over wanneer het niet in de lijst staat", () => {
-    const result = parsePalPlusRequest(
-      { ...follow, courseId: PAL_PLUS_OTHER_COURSE, courseOther: " Thermodynamica " },
-      now,
-    );
+    const result = parsePalPlusRequest({ ...follow, courseId: PAL_PLUS_OTHER_COURSE, courseOther: " Thermodynamica " });
     if (!result.ok) throw new Error("verwacht ok");
     expect(result.request.courseId).toBeNull();
     expect(result.request.courseOther).toBe("Thermodynamica");
   });
 
   it("vraagt een vak", () => {
-    expect(parsePalPlusRequest({ ...follow, courseId: "" }, now)).toEqual({ ok: false, error: "COURSE_REQUIRED" });
-    expect(parsePalPlusRequest({ ...follow, courseId: PAL_PLUS_OTHER_COURSE }, now)).toEqual({
+    expect(parsePalPlusRequest({ ...follow, courseId: "" })).toEqual({ ok: false, error: "COURSE_REQUIRED" });
+    expect(parsePalPlusRequest({ ...follow, courseId: PAL_PLUS_OTHER_COURSE })).toEqual({
       ok: false,
       error: "COURSE_REQUIRED",
     });
     expect(
-      parsePalPlusRequest(
-        { ...follow, courseId: PAL_PLUS_OTHER_COURSE, courseOther: "a".repeat(PAL_PLUS_LIMITS.courseOther + 1) },
-        now,
-      ),
+      parsePalPlusRequest({
+        ...follow,
+        courseId: PAL_PLUS_OTHER_COURSE,
+        courseOther: "a".repeat(PAL_PLUS_LIMITS.courseOther + 1),
+      }),
     ).toEqual({ ok: false, error: "COURSE_OTHER_TOO_LONG" });
   });
 
   it("vraagt een omschrijving van de sessie", () => {
-    expect(parsePalPlusRequest({ ...follow, description: " " }, now)).toEqual({
+    expect(parsePalPlusRequest({ ...follow, description: " " })).toEqual({ ok: false, error: "DESCRIPTION_REQUIRED" });
+    expect(parsePalPlusRequest({ ...follow, description: "a".repeat(PAL_PLUS_LIMITS.description + 1) })).toEqual({
       ok: false,
-      error: "DESCRIPTION_REQUIRED",
+      error: "DESCRIPTION_TOO_LONG",
     });
-    expect(
-      parsePalPlusRequest({ ...follow, description: "a".repeat(PAL_PLUS_LIMITS.description + 1) }, now),
-    ).toEqual({ ok: false, error: "DESCRIPTION_TOO_LONG" });
   });
 
   it("weigert een te lange periode", () => {
+    expect(parsePalPlusRequest({ ...follow, preferredPeriod: "a".repeat(PAL_PLUS_LIMITS.preferredPeriod + 1) })).toEqual({
+      ok: false,
+      error: "PERIOD_TOO_LONG",
+    });
+  });
+
+  it("vraagt bij een aanbod minstens een vakje of een opmerking", () => {
+    expect(parsePalPlusRequest({ ...give, availability: [] })).toEqual({ ok: false, error: "AVAILABILITY_REQUIRED" });
+    const noteOnly = parsePalPlusRequest({ ...give, availability: [], availabilityNote: " enkel op 14 oktober " });
+    if (!noteOnly.ok || noteOnly.request.kind !== "GIVE") throw new Error("verwacht een aanbod");
+    expect(noteOnly.request.availabilityNote).toBe("enkel op 14 oktober");
+  });
+
+  it("weigert een vakje dat er niet als een vakje uitziet, en een te lange opmerking", () => {
+    expect(parsePalPlusRequest({ ...give, availability: ["8:avond"] })).toEqual({ ok: false, error: "AVAILABILITY_INVALID" });
+    expect(parsePalPlusRequest({ ...give, availability: ["maandag"] })).toEqual({ ok: false, error: "AVAILABILITY_INVALID" });
     expect(
-      parsePalPlusRequest({ ...follow, preferredPeriod: "a".repeat(PAL_PLUS_LIMITS.preferredPeriod + 1) }, now),
-    ).toEqual({ ok: false, error: "PERIOD_TOO_LONG" });
+      parsePalPlusRequest({ ...give, availabilityNote: "a".repeat(PAL_PLUS_LIMITS.availabilityNote + 1) }),
+    ).toEqual({ ok: false, error: "AVAILABILITY_NOTE_TOO_LONG" });
   });
 
-  it("vraagt bij een aanbod een volledig en geldig moment", () => {
-    expect(parsePalPlusRequest({ ...give, date: "" }, now)).toEqual({ ok: false, error: "MOMENT_REQUIRED" });
-    expect(parsePalPlusRequest({ ...give, endTime: "" }, now)).toEqual({ ok: false, error: "MOMENT_REQUIRED" });
-    expect(parsePalPlusRequest({ ...give, date: "2026-02-31" }, now)).toEqual({ ok: false, error: "MOMENT_INVALID" });
-    expect(parsePalPlusRequest({ ...give, startTime: "25:00" }, now)).toEqual({ ok: false, error: "MOMENT_INVALID" });
+  it("leest het r-nummer van de medetutor zoals iemand het intikt", () => {
+    for (const typed of ["r0123456", "R0123456", "0123456", " r 0123456 "]) {
+      const result = parsePalPlusRequest({ ...give, coTutor: typed });
+      if (!result.ok || result.request.kind !== "GIVE") throw new Error("verwacht een aanbod");
+      expect(result.request.coTutorRNumber).toBe("r0123456");
+    }
+    expect(parsePalPlusRequest({ ...give, coTutor: "r12" })).toEqual({ ok: false, error: "COTUTOR_INVALID" });
   });
 
-  it("weigert een einde voor het begin of een sessie van meer dan zes uur", () => {
-    expect(parsePalPlusRequest({ ...give, endTime: "13:00" }, now)).toEqual({ ok: false, error: "MOMENT_ORDER" });
-    expect(parsePalPlusRequest({ ...give, endTime: "14:00" }, now)).toEqual({ ok: false, error: "MOMENT_ORDER" });
-    expect(parsePalPlusRequest({ ...give, startTime: "09:00", endTime: "15:01" }, now)).toEqual({
-      ok: false,
-      error: "MOMENT_TOO_LONG",
+  it("negeert het rooster en de medetutor bij een vraag", () => {
+    expect(parsePalPlusRequest({ ...follow, availability: ["x"], coTutor: "nee" }).ok).toBe(true);
+  });
+});
+
+describe("tags", () => {
+  it("ruimt op, haalt dubbels weg ongeacht hoofdletters en houdt de eerste schrijfwijze", () => {
+    expect(parsePalPlusTags(["  Theorie ", "theorie", "", "Hoofdstuk   3"])).toEqual({
+      ok: true,
+      tags: ["Theorie", "Hoofdstuk 3"],
     });
-    expect(parsePalPlusRequest({ ...give, startTime: "09:00", endTime: "15:00" }, now).ok).toBe(true);
   });
 
-  it("weigert een moment dat voorbij is of meer dan een jaar vooruit ligt", () => {
-    expect(parsePalPlusRequest({ ...give, date: "2026-10-05", startTime: "09:00", endTime: "10:00" }, now)).toEqual({
-      ok: false,
-      error: "MOMENT_PAST",
+  it("weigert een te lange tag of te veel tags in plaats van stil in te korten", () => {
+    expect(parsePalPlusTags(["a".repeat(PAL_PLUS_LIMITS.tag + 1)])).toEqual({ ok: false, error: "TAG_TOO_LONG" });
+    expect(parsePalPlusTags(["a", "b", "c", "d", "e", "f"])).toEqual({ ok: false, error: "TOO_MANY_TAGS" });
+  });
+
+  it("zet een tag op de schrijfwijze van een snelle tag", () => {
+    expect(canonicalPalPlusTags(["oefeningen", "Hoofdstuk 3"], ["Oefeningen", "Theorie"])).toEqual([
+      "Oefeningen",
+      "Hoofdstuk 3",
+    ]);
+  });
+});
+
+describe("beschikbaarheid", () => {
+  const dayparts = [
+    { id: "avond", labelNl: "Avond", labelEn: "Evening", startMinutes: 1080, endMinutes: 1320 },
+    { id: "namiddag", labelNl: "Namiddag", labelEn: "Afternoon", startMinutes: 780, endMinutes: 1080 },
+  ];
+
+  it("bewaart de aangevinkte vakjes met de naam en de uren van nu, gesorteerd", () => {
+    expect(
+      palPlusAvailabilitySnapshot(
+        [
+          { day: 3, daypartId: "avond" },
+          { day: 1, daypartId: "avond" },
+          { day: 3, daypartId: "namiddag" },
+        ],
+        dayparts,
+      ),
+    ).toEqual([
+      { day: 1, start: 1080, end: 1320, label: "Avond" },
+      { day: 3, start: 780, end: 1080, label: "Namiddag" },
+      { day: 3, start: 1080, end: 1320, label: "Avond" },
+    ]);
+  });
+
+  it("weigert een vakje met een dagdeel dat er niet (meer) is", () => {
+    expect(palPlusAvailabilitySnapshot([{ day: 1, daypartId: "nacht" }], dayparts)).toBeNull();
+  });
+
+  it("leest een bewaarde momentopname terug en laat rommel vallen", () => {
+    expect(
+      readPalPlusAvailability([{ day: 2, start: 480, end: 720, label: "Voormiddag" }, { day: 9 }, "x", null]),
+    ).toEqual([{ day: 2, start: 480, end: 720, label: "Voormiddag" }]);
+    expect(readPalPlusAvailability(null)).toEqual([]);
+  });
+
+  it("toont het rooster met enkel de dagen en dagdelen die erin voorkomen", () => {
+    const grid = palPlusAvailabilityGrid([
+      { day: 3, start: 1080, end: 1320, label: "Avond" },
+      { day: 1, start: 1080, end: 1320, label: "Avond" },
+      { day: 1, start: 780, end: 1080, label: "Namiddag" },
+    ]);
+    expect(grid.columns.map((column) => `${column.label} ${column.hours}`)).toEqual([
+      "Namiddag 13:00-18:00",
+      "Avond 18:00-22:00",
+    ]);
+    expect(grid.rows.map((row) => [row.day, row.keys.length])).toEqual([
+      [1, 2],
+      [3, 1],
+    ]);
+  });
+
+  it("schrijft het rooster als tekst, een regel per dag", () => {
+    expect(
+      palPlusAvailabilityLines(
+        [
+          { day: 1, start: 1080, end: 1320, label: "Avond" },
+          { day: 1, start: 780, end: 1080, label: "Namiddag" },
+        ],
+        "nl",
+      ),
+    ).toEqual(["Maandag: Namiddag (13:00-18:00), Avond (18:00-22:00)"]);
+  });
+
+  it("leest een dagdeel uit het beheer", () => {
+    expect(parsePalPlusDaypart({ labelNl: " Avond ", labelEn: "", start: "18:00", end: "22:00" })).toEqual({
+      ok: true,
+      daypart: { labelNl: "Avond", labelEn: null, startMinutes: 1080, endMinutes: 1320 },
     });
-    expect(parsePalPlusRequest({ ...give, date: "2027-10-12" }, now)).toEqual({ ok: false, error: "MOMENT_TOO_FAR" });
+    expect(parsePalPlusDaypart({ labelNl: "", labelEn: "", start: "18:00", end: "22:00" })).toEqual({
+      ok: false,
+      error: "DAYPART_LABEL_REQUIRED",
+    });
+    expect(parsePalPlusDaypart({ labelNl: "Avond", labelEn: "", start: "18", end: "22:00" })).toEqual({
+      ok: false,
+      error: "DAYPART_TIME_INVALID",
+    });
+    expect(parsePalPlusDaypart({ labelNl: "Avond", labelEn: "", start: "22:00", end: "18:00" })).toEqual({
+      ok: false,
+      error: "DAYPART_TIME_ORDER",
+    });
   });
+});
 
-  it("negeert de momentvelden bij een vraag", () => {
-    expect(parsePalPlusRequest({ ...follow, date: "2026-02-31", startTime: "x" }, now).ok).toBe(true);
+describe("tweede tutor", () => {
+  it("kan antwoorden zolang het aanbod bij Onderwijs wacht", () => {
+    expect(canAnswerPalPlusCoTutor({ kind: "GIVE", status: "PENDING", coTutorStatus: "PENDING" })).toBe(true);
+    expect(canAnswerPalPlusCoTutor({ kind: "GIVE", status: "PLANNED", coTutorStatus: "PENDING" })).toBe(false);
+    expect(canAnswerPalPlusCoTutor({ kind: "GIVE", status: "PENDING", coTutorStatus: "ACCEPTED" })).toBe(false);
+    expect(canAnswerPalPlusCoTutor({ kind: "FOLLOW", status: "PENDING", coTutorStatus: "PENDING" })).toBe(false);
   });
 });
 
 describe("statussen", () => {
-  it("laat een aanbod wachten en een vraag meteen openstaan", () => {
-    expect(initialPalPlusStatus("GIVE")).toBe("PENDING");
-    expect(initialPalPlusStatus("FOLLOW")).toBe("OPEN");
-    expect(reopenedPalPlusStatus("GIVE")).toBe("PENDING");
-    expect(reopenedPalPlusStatus("FOLLOW")).toBe("OPEN");
+  it("laat een aanbod en een vraag allebei eerst wachten op Onderwijs", () => {
+    expect(initialPalPlusStatus()).toBe("PENDING");
+    expect(reopenedPalPlusStatus()).toBe("PENDING");
+  });
+
+  it("zet enkel een wachtende vraag online", () => {
+    expect(canPublishPalPlusRequest({ kind: "FOLLOW", status: "PENDING" })).toBe(true);
+    expect(canPublishPalPlusRequest({ kind: "FOLLOW", status: "OPEN" })).toBe(false);
+    expect(canPublishPalPlusRequest({ kind: "FOLLOW", status: "CLOSED" })).toBe(false);
+    expect(canPublishPalPlusRequest({ kind: "GIVE", status: "PENDING" })).toBe(false);
   });
 
   it("noemt enkel wachtend en open nog actief", () => {
@@ -300,6 +418,7 @@ describe("statussen", () => {
 describe("parsePalPlusSession", () => {
   const raw: RawPalPlusSession = {
     courseId: "course-1",
+    tags: [],
     description: " Oefeningen hoofdstuk 3 ",
     date: "2026-10-12",
     startTime: "14:00",

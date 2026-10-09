@@ -1140,20 +1140,32 @@ adres zijn makkelijk te veranderen.
 ### Twee wegen naar een sessie
 
 - **Een lid biedt aan een sessie te geven.** Het kiest een vak, beschrijft wat voor
-  sessie (oefeningen, theorie, een hoofdstuk) en stelt een moment voor. Onderwijs
-  screent de persoon zelf en maakt er een sessie van, of sluit het aanbod met een reden.
-  Het voorgestelde moment mag Onderwijs daarbij verzetten. Een LettuceMeet-achtige
-  beschikbaarheidspeiling is gevraagd en **bewust niet gebouwd**: te ingewikkeld voor
-  een eerste versie, en "de tutor stelt voor, Onderwijs past aan" volstaat.
-- **Een lid vraagt hulp bij een vak.** De vraag staat **meteen publiek** op de
-  PAL+-pagina, zonder naam, zodat een mogelijke tutor ze ziet en kan zeggen "ik kan dit
-  geven". Andere leden kunnen een vraag steunen ("ik zoek dit ook"); dat aantal staat
-  publiek, de namen niet. Zo ziet Onderwijs welke vragen het waard zijn om een tutor
-  voor te zoeken, en het werkt tegen dubbele vragen. Een vraag eerst laten nakijken voor
-  ze publiek staat, is overwogen: het vertraagt precies het steunen, en wie iets indient
-  is ingelogd en dus aanspreekbaar. Onderwijs kan een vraag altijd sluiten. Publiek
-  betekent niet aanvaard: een vraag blijft een vraag tot Onderwijs er een sessie voor
-  plant.
+  sessie (oefeningen, theorie, een hoofdstuk), en duidt in een rooster aan wanneer het
+  meestal kan (zie "Wanneer kan je?" hieronder). Wie met twee wil geven, vult het
+  r-nummer van de tweede tutor in. Onderwijs screent de persoon zelf en maakt er een
+  sessie van, of sluit het aanbod met een reden. Een LettuceMeet-achtige peiling is
+  gevraagd en **bewust niet gebouwd**: te ingewikkeld voor een eerste versie.
+- **Een lid vraagt hulp bij een vak.** **Onderwijs kijkt de vraag eerst na** en zet ze
+  dan online: pas dan staat ze op de PAL+-pagina, zonder naam, zodat een mogelijke tutor
+  ze ziet en kan zeggen "ik kan dit geven". Andere leden kunnen een vraag steunen ("ik
+  zoek dit ook"); dat aantal staat publiek, de namen niet. Zo ziet Onderwijs welke
+  vragen het waard zijn om een tutor voor te zoeken, en het werkt tegen dubbele vragen.
+  Online betekent niet aanvaard: een vraag blijft een vraag tot Onderwijs er een sessie
+  voor plant.
+  - Eerst stond een vraag meteen publiek, met als argument dat nakijken net het steunen
+    vertraagt. Onderwijs koos in oktober 2026 toch voor nakijken: de tekst is vrij, en
+    wat op de pagina staat, staat er namens de kring.
+  - Wat niet online mag, sluit Onderwijs met een reden; de indiener ziet die zin. Een
+    sessie plannen voor een vraag die nog niet nagekeken is, mag ook: dat is een
+    sterkere beslissing dan ze online zetten.
+  - Online zetten bewaart wie nakeek en wanneer (`reviewedAt`, hetzelfde veld als bij
+    sluiten). Daaraan ziet een annulering waar een geplande vraag naartoe gaat: terug
+    online als ze er al stond, terug naar het werkbakje als ze meteen gepland werd.
+    Anders zou annuleren een vraag ongezien publiek zetten.
+  - Heropenen zet een gesloten vraag terug bij "na te kijken", ook als ze al eens online
+    stond: of ze weer op de pagina mag, beslist Onderwijs opnieuw.
+  - Ook een vraag die nog wacht, telt mee voor de tien open aanvragen per persoon en
+    kan de indiener intrekken.
 
 Beide vormen zijn één tabel (`PalPlusRequest` met een `kind`), want ze hebben dezelfde
 vorm en komen in hetzelfde werkbakje terecht.
@@ -1168,18 +1180,19 @@ vorm en komen in hetzelfde werkbakje terecht.
   link wie niet ingelogd is eerst naar de login en dan terug naar het formulier.
 - **Kies je bij een hulpvraag een vak waar al een vraag voor openstaat, dan toont het
   formulier die vraag met de steunknop.** Eén vraag met vijf steunen zegt Onderwijs meer
-  dan vijf losse vragen.
+  dan vijf losse vragen. Enkel een vraag die online staat: wat nog nagekeken moet worden,
+  is niet publiek, dus twee gelijke vragen kunnen dan allebei in het werkbakje komen.
 - **De open vragen staan op hoeveel mensen ze zoeken**, de meest gezochte eerst: daar is
   een tutor het meest waard.
 - **Je eigen aanvragen staan met hun status en, als Onderwijs sloot, met de reden.**
-  Zolang Onderwijs er niets mee deed, kan je intrekken; daarna niet meer, want dan is er
-  iemand mee bezig. Wat je introk, verdwijnt uit je lijst.
+  Zolang er geen sessie van kwam en Onderwijs ze niet sloot, kan je intrekken; daarna
+  niet meer. Wat je introk, verdwijnt uit je lijst.
 - **Hoogstens tien aanvragen tegelijk open per persoon**
   (`PAL_PLUS_MAX_ACTIVE_REQUESTS`): ruim voor wie bij vijf vakken hulp zoekt, maar één
   account vult de lijst van open vragen niet.
 - **Sluiten vraagt altijd een reden**, want de indiener ziet die zin bij de aanvraag.
-  Een gesloten aanvraag kan terug open; een vergissing hoeft geen nieuwe aanvraag te
-  kosten.
+  Een gesloten aanvraag kan terug in het werkbakje; een vergissing hoeft geen nieuwe
+  aanvraag te kosten.
 - Onderwijs hangt een aanvraag aan een vak uit de lijst, ook om een verkeerd gekozen vak
   recht te zetten. Wat de indiener intikte, blijft als uitleg staan.
 
@@ -1189,27 +1202,102 @@ vorm en komen in hetzelfde werkbakje terecht.
 vragen, steunen en inschrijven. Onderwijs screent de tutors zelf; daar is geen regel in
 code voor.
 
+### Lijsten die Onderwijs bijhoudt
+
+In het beheer staan onder Lijsten drie korte lijsten: de vakken, de snelle tags en de
+dagdelen van het rooster. Geen ervan zit vast in de code; de migratie zet enkel een
+vertrekpunt klaar, want de seed draait niet bij een deploy.
+
 ### Vakken
 
 Onderwijs houdt een korte lijst bij met de OPO-code (`PalPlusCourse`). Een lijst en geen
 vrij veld, omdat "Analyse I", "analyse 1" en "Wiskundige analyse" anders drie vragen
-worden. Wie zijn vak niet vindt, tikt het zelf in; een sessie hangt wel altijd aan een
+worden. Wie het vak niet vindt, tikt het zelf in; een sessie hangt wel altijd aan een
 vak uit de lijst, zodat "hoeveel sessies per vak" te tellen blijft. Onderwijs zet dat
 vak dan in de lijst, of hangt de aanvraag aan een vak dat er al in staat (iemand tikte
 "Analyse" terwijl "Analyse I" bestaat). Een vak zonder
 OPO-code mag, voor iets wat geen vak is maar waar wel sessies over komen (Matlab). Een
 vak waar iets aan hangt, wordt niet verwijderd maar uitgezet.
 
+### Tags
+
+Een aanvraag (en een sessie) krijgt hoogstens vijf korte tags: wat voor hulp, en welk
+deel van de cursus. In de lijst van Onderwijs gevraagd als "welke delen van de cursus";
+een apart veld daarvoor naast de omschrijving was het alternatief.
+
+- **Snelle tags met één tik** (Theorie, Oefeningen, Examenvoorbereiding, Labo of
+  project): een lijst die Onderwijs bijhoudt (`PalPlusTag`), dus niet in de code.
+- **Eigen tags intikken kan altijd** ("Hoofdstuk 3"). Om te voorkomen dat dezelfde tag
+  in vijf vormen rondgaat ("H3", "hfst 3"), stelt het formulier de tags voor die al bij
+  hetzelfde vak gebruikt werden, de meest gebruikte eerst, en neemt een getikte tag de
+  schrijfwijze over van een snelle tag die er al is. Op de publieke pagina komen die
+  voorstellen enkel uit wat al publiek staat (open vragen en sessies): een tag uit een
+  vraag die Onderwijs nog niet nakeek, hoort niet bij een ander als voorstel te staan.
+- Een aanvraag bewaart de tekst van haar tags, geen verwijzing: een snelle tag
+  hernoemen of weghalen verandert niets aan wat al ingediend werd. Bij het plannen gaan
+  de tags mee naar de sessie, waar Onderwijs ze kan aanpassen.
+
+### Wanneer kan je? Het rooster
+
+Een aanbod had eerst één voorgesteld moment (een datum met een uur). In de lijst van
+Onderwijs kwam "een veld waar ze momenten invullen dat ze kunnen", meervoud. Dat is nu
+een rooster: de dagen van maandag tot zondag onder elkaar, de dagdelen als kolommen,
+één tik per vakje, plus een vrije opmerking ("niet in de week van 12 oktober").
+
+- **Waarom een rooster en geen lijst van exacte momenten**: drie velden per moment is
+  traag en mist nog altijd momenten. Een tutor weet meestal "dinsdagavond kan ik", en
+  Onderwijs kiest bij het plannen een echte datum die erin past. Het rooster staat
+  daarom boven het sessieformulier wanneer Onderwijs vanuit een aanbod plant.
+- **Minstens een vakje of een opmerking**: wie enkel op één datum kan, zegt dat in de
+  opmerking.
+- **De dagdelen zijn niet vast** (`PalPlusDaypart`, standaard voormiddag 8-12, namiddag
+  13-18, avond 18-22). Een aanbod bewaart de aangeduide vakjes als momentopname, met
+  naam en uren van toen (`PalPlusRequest.availability`): een dagdeel later verschuiven
+  of weghalen verandert dus niet wat een tutor ooit aanduidde. De weekdagen staan wel
+  vast in de code; een week verandert niet.
+- Gewone checkboxen, geen JavaScript nodig, en op een telefoon past het rooster (zeven
+  rijen, drie kolommen) op het scherm.
+
+### Samen met een tweede tutor
+
+- **Hoogstens twee tutors per sessie**, ook in het beheer (`PAL_PLUS_LIMITS.tutors`).
+- Wie het formulier invult, geeft de tweede tutor op met een **r-nummer** (zoals in de
+  lijst van Onderwijs gevraagd). Die moet een account hebben, want die **bevestigt
+  zelf**: een mail met de vraag, en op /pal-plus een uitnodiging met "Ik geef mee" en
+  "Nee, bedankt". Zo belandt niemand op een sessie zonder het te weten. Wie indiende,
+  krijgt het antwoord per mail.
+- Onderwijs ziet het aanbod meteen, met "wacht op bevestiging". Bij het plannen staat de
+  tweede tutor enkel bij de tutors als die bevestigde. Zegt die nee, dan gaat het aanbod
+  verder met één tutor.
+- Antwoorden kan zolang het aanbod bij Onderwijs wacht. Is er al een sessie van gekomen,
+  dan vervalt de uitnodiging; wie toch mee wil, regelt dat met Onderwijs.
+- Een r-nummer intikken vertelt of er een account bij hoort. Dat is aanvaard: het is de
+  vraag van Onderwijs, het formulier vraagt een login, en één account kan hoogstens tien
+  aanvragen tegelijk open hebben.
+
+### Zoeken
+
+Op /pal-plus filtert één zoekveld de agenda en de open vragen terwijl je typt, op vak,
+OPO-code, tags en omschrijving. Een **filter op hoofdrichting** stond in de lijst van
+Onderwijs en is **bewust uitgesteld**: de vakken hebben nog geen richting, en zoeken
+dekt het voorlopig. De richtingen bestaan al op de site (`StudyProgramme`, en de
+richting van elk lid in het profiel), dus de vakken een richting geven is de volgende stap.
+
 ### Sessies
 
 - Een sessie staat **niet in de gewone kalender**, maar in een eigen agenda op de
-  PAL+-pagina en in het beheer. Wie ze in zijn eigen agenda wil, abonneert op
+  PAL+-pagina en in het beheer. Wie ze in de eigen agenda wil, abonneert op
   `/api/pal-plus/agenda.ics` (publiek en zonder geheim: er staat niets in wat niet ook
   op de pagina staat) of zet één sessie erin met "Zet in mijn agenda". Een geannuleerde
   sessie blijft een maand in de feed met `STATUS:CANCELLED`, zodat een geabonneerde
   agenda ze schrapt.
-- **Plannen vertrekt meestal uit een aanvraag.** Een aanbod brengt zijn tutor, moment en
-  omschrijving mee; een hulpvraag de mensen die erop aanboden, als voorstel. De aanvraag
+- **In het beheer is de tab Sessies een maandagenda**, op het raster van de
+  Theokot-verhuur (`RentalMonthGrid`): zonder lokaal een streepjesrand, geannuleerd
+  doorstreept, voorbij grijs, op een telefoon stippen met de sessies van de aangetikte
+  dag eronder. De lijst blijft beschikbaar.
+- **Plannen vertrekt meestal uit een aanvraag.** Een aanbod brengt zijn tutor(s),
+  omschrijving en tags mee, met het rooster erboven om een moment te kiezen; een
+  hulpvraag de mensen die erop aanboden, als voorstel. De aanvraag
   staat aangevinkt bij "deze sessie beantwoordt", samen met de vraag waarop het aanbod
   antwoordde en de andere open vragen over hetzelfde vak die erbij kunnen. Wat
   aangevinkt is, gaat naar "Sessie gepland". Een sessie kan ook zonder aanvraag.
@@ -1217,7 +1305,7 @@ vak waar iets aan hangt, wordt niet verwijderd maar uitgezet.
   invoeren, zodat de tutor ze toch telt.
 - Tutors kiest Onderwijs met een eigen zoekveld achter `pal.manage`, niet met
   `/api/users/search`: wie PAL+ beheert, hoeft daarvoor geen `users.search` te krijgen.
-- Een tutor schrijft zich niet in voor zijn eigen sessie. Ziet wel, op de PAL+-pagina,
+- Een tutor schrijft zich niet in voor de eigen sessie, maar ziet op de PAL+-pagina wel
   wie er komt.
 - **Inschrijven en uitschrijven kan tot de sessie begint.** Het maximum wordt geteld,
   niet vergrendeld: twee mensen op dezelfde seconde kunnen er samen één over gaan. Bij
@@ -1275,6 +1363,17 @@ zijn. In de plaats daarvan:
 - Ging een sessie niet door, dan annuleert Onderwijs ze, ook achteraf. Dan telt ze niet
   mee en levert ze niets op. Een correctie van het bedrag is voor de gevallen ertussen
   (een tutor die er niet was, een sessie die veel korter duurde).
+- Annuleren verrekent op dezelfde manier. Werd er al van de sessie uitgegeven, dan zegt
+  de bevestiging dat vooraf, en de toast achteraf hoeveel er uit andere bonnetjes kwam en
+  hoeveel verviel. Wat kwijtgescholden werd, staat in de auditlog; in het saldo zelf
+  blijft er geen spoor van, want een geannuleerde sessie telt nergens meer mee.
+- **Een correctie vraagt altijd een reden.** Die staat in de tutorlijst bij de sessie,
+  met wie corrigeerde en wanneer: wie er later naar kijkt, moet niet raden waarom een
+  tutor minder kreeg.
+- Uitgeven gaat over shiften en sessies samen, **oudste eerst** (`loadVoucherSources` is
+  de enige plek die het saldo samenstelt). Uitbetalen in het beheer gebeurt op het
+  bestaande scherm Bonnetjes onder /admin/shiften, dat de PAL+-sessies naast de shiften
+  toont; er is geen tweede uitbetaalscherm.
 
 ### Wat Onderwijs ziet
 
@@ -1284,8 +1383,75 @@ markering in die lijst en ontgrendelt niets op de site. De aanwezigheid is infor
 voor Onderwijs om te beslissen of een correctie nodig is; ze raakt de bonnetjes niet
 vanzelf.
 
+- **Gegeven is voorbij en niet geannuleerd.** Wat nog komt, staat ernaast als "gepland";
+  een geannuleerde sessie telt nergens. Het werkingsjaar begint op 15 juli, net als de
+  posten.
+- Een praesidiumlid staat in de lijst met sessies en uren, maar met "praesidium" in
+  plaats van bonnetjes, ook in het detail van een sessie. Een beloning tonen die nooit in
+  het saldo komt, zou Onderwijs doen denken dat er iets misliep.
+
 De lijst staat in het beheer en is voor niemand anders zichtbaar. Het recht is
 `pal.manage`, gedragen door de rol `pal-plus` die naar Onderwijs gaat.
+
+### Aanwezigheid
+
+- **Wie er kwam, duidt een tutor van de sessie aan, of Onderwijs**, zodra de sessie
+  begonnen is. De tutor doet dat op de PAL+-pagina onder "Sessies die je gaf" (de
+  voorbije maand), Onderwijs in het detail van de sessie. De tutor zit erbij en weet het;
+  Onderwijs kan het rechtzetten.
+- **Leeg betekent "niet aangeduid", niet "niet gekomen".** Daarom drie toestanden en een
+  tweede klik die de keuze weer leegmaakt; een vinkje alleen kan dat verschil niet tonen.
+- Een klik toont meteen zijn keuze en bewaart op de achtergrond, zonder de andere rijen
+  te blokkeren: wie twintig namen afloopt, mag geen klik verliezen omdat de vorige nog
+  onderweg was.
+
+### Mails
+
+Elke stap waar iemand op wacht, krijgt een mail; wat niemand iets vertelt, niet. De
+teksten staan in `lib/palPlusMail.ts`, wie wat krijgt in `lib/palPlusNotify.ts`, en
+alle elf staan als voorvertoning op /admin/it/flows.
+
+| Wanneer | Naar wie |
+| --- | --- |
+| Aanvraag ingediend | De indiener (bevestiging), en Onderwijs (melding) |
+| Aanbod met een tweede tutor | De tweede tutor (uitnodiging om te bevestigen) |
+| Tweede tutor antwoordt | Wie het aanbod indiende |
+| Hulpvraag online gezet | Wie ze stelde |
+| Aanvraag gesloten | De indiener, met de reden |
+| Sessie gepland of tutor toegevoegd | De nieuwe tutor |
+| Sessie gepland voor een hulpvraag | Wie de vraag stelde en wie ze steunde |
+| Moment of lokaal veranderd | De tutors en de ingeschrevenen |
+| Een dag voor de sessie | De tutors en de ingeschrevenen |
+| Sessie geannuleerd | De tutors en de ingeschrevenen, met de reden |
+
+- **De afzender is VTK Onderwijs en antwoorden gaat naar de post Onderwijs** (het
+  lijstadres uit Mailinglijsten, anders `onderwijs@vtk.be`). "Kan je toch niet? Antwoord
+  op deze mail" komt dus bij wie er iets aan kan doen. De melding van een nieuwe aanvraag
+  is de omgekeerde richting: daar gaat antwoorden naar de indiener.
+- **Onderwijs krijgt een mail per nieuwe aanvraag**, geen dagoverzicht. Bij de verwachte
+  aantallen is één mail per aanvraag het snelste signaal; wordt dat te veel, dan is een
+  overzicht de volgende stap.
+- **Geen mail over een sessie die al begonnen is.** Een sessie die achteraf ingevoerd
+  wordt, geeft geen "je geeft een sessie", en een die achteraf geannuleerd wordt omdat ze
+  niet doorging, geen "deze sessie gaat niet door" aan wie gisteren ingeschreven was.
+- Wie een vraag stelde of steunde, krijgt "er is een sessie" maar wordt niet vanzelf
+  ingeschreven: de mail vraagt om in te schrijven, zodat het aantal op de pagina zegt wie
+  echt komt. Wie al tutor of ingeschreven is, krijgt die mail niet, en wie twee
+  gekoppelde vragen steunde, krijgt ze één keer.
+- Het aanbod van een tutor die Onderwijs uiteindelijk niet koos, krijgt geen aparte mail;
+  het staat op "Sessie gepland" bij de indiener. Een tutor die van een sessie gehaald
+  wordt, krijgt evenmin een mail. Allebei bewust weggelaten in deze eerste versie.
+- **De herinnering vertrekt per persoon één keer per moment** (`reminderSentAt` op de
+  tutor en de ingeschrevene), via de background-worker. Wie zich pas binnen 24 uur voor
+  de start inschrijft of tutor wordt, krijgt ze niet meer: een mail die met "morgen"
+  begint voor iets van straks klopt niet, en een tutor kreeg net al een mail. Verschuift
+  het moment, dan gaat de markering terug leeg en komt er een herinnering voor het nieuwe
+  moment. Ze is, anders dan bij de shiften, niet uit te zetten: er is er maar één.
+- Een andere omschrijving of een ander maximum geeft geen mail; enkel wat bepaalt waar en
+  wanneer je moet zijn.
+- De mails vertrekken na het antwoord van de actie (`after()`), zodat een annulering met
+  dertig ingeschrevenen niet wacht op de mailserver. Een mislukte mail laat de actie dus
+  niet mislukken; ze staat in het maillogboek met herkomst PAL+.
 
 PAL+ zit voorlopig enkel op de website, niet in de app. Het saldo in de app komt van de
 server, dus de bonnetjes van een sessie verschijnen daar wel.

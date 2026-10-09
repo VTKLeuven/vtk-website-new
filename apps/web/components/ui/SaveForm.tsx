@@ -13,7 +13,7 @@ import {
 import { Button, ConfirmDialog } from "@vtk/ui";
 import { useToast } from "@/components/ui/toast";
 import { FormBusyProvider, useFormBusy } from "@/components/ui/formBusy";
-import { SAVE_IDLE, type SaveAction } from "@/lib/saveState";
+import { SAVE_IDLE, type SaveAction, type SaveState } from "@/lib/saveState";
 
 type SecondarySubmit = {
   name: string;
@@ -132,13 +132,35 @@ export function SaveForm({
   className?: string;
   children?: ReactNode;
 }) {
-  const [state, formAction, pending] = useActionState(action, SAVE_IDLE);
   const showToast = useToast();
+  /**
+   * De toast vertrekt zodra de action antwoordt, niet pas in een effect na het
+   * hertekenen. Een formulier dat door zijn eigen succes verdwijnt (een aanvraag
+   * sluiten haalt ze uit de lijst, een sessie annuleren haalt het
+   * annuleerformulier weg), is dan al weg wanneer dat effect zou lopen, en de
+   * toast ging stil verloren. De toastprovider staat hoger en blijft.
+   */
+  async function actionWithToast(previous: SaveState, data: FormData): Promise<SaveState> {
+    const result = await action(previous, data);
+    if (result.status === "success") {
+      showToast({ message: result.detail ?? savedMessage, variant: "success" });
+    } else if (result.status === "error") {
+      // Blijft staan tot het lid ze wegklikt: een foutmelding die na vier
+      // seconden verdwijnt kan je net missen.
+      showToast({
+        message: errorMessages?.[result.code] ?? result.detail ?? fallbackErrorMessage,
+        variant: "error",
+        duration: 0,
+      });
+    }
+    return result;
+  }
+  const [state, formAction, pending] = useActionState(actionWithToast, SAVE_IDLE);
   // Een veld kan nog bezig zijn (een upload die pas achteraf zijn key kent).
   // Verzenden zou dan een lege waarde bewaren onder een groene toast.
   const { busy, register } = useFormBusy();
-  // Per submit exact één toast, ook als de component om een andere reden
-  // hertekent met dezelfde state.
+  // Per submit één keer resetten en `onSuccess`, ook als de component om een
+  // andere reden hertekent met dezelfde state.
   const handled = useRef<number | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const secondarySubmits = secondarySubmit
@@ -196,32 +218,16 @@ export function SaveForm({
     startTransition(() => formAction(data));
   }
 
+  // De toast staat al in `actionWithToast`; hier enkel wat het formulier zelf
+  // nog moet doen, en dat kan enkel zolang het er is.
   useEffect(() => {
     if (state.status === "idle" || handled.current === state.nonce) return;
     handled.current = state.nonce;
-
     if (state.status === "success") {
       if (resetOnSuccess) formRef.current?.reset();
-      showToast({ message: state.detail ?? savedMessage, variant: "success" });
       onSuccess?.();
-    } else {
-      // Blijft staan tot het lid ze wegklikt: een foutmelding die na vier
-      // seconden verdwijnt kan je net missen.
-      showToast({
-        message: errorMessages?.[state.code] ?? state.detail ?? fallbackErrorMessage,
-        variant: "error",
-        duration: 0,
-      });
     }
-  }, [
-    state,
-    showToast,
-    savedMessage,
-    errorMessages,
-    fallbackErrorMessage,
-    onSuccess,
-    resetOnSuccess,
-  ]);
+  }, [state, onSuccess, resetOnSuccess]);
 
   /** Verstuurt het formulier zoals het staat, zonder extra name/value. */
   function submitPlain() {
