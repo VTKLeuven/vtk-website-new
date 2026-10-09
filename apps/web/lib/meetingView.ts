@@ -12,6 +12,7 @@ import { pick, type Locale } from "@vtk/i18n";
 
 import type { MeetingCardView } from "@/components/meetings/MeetingReservationCard";
 import {
+  bureauStockFor,
   isBigBureau,
   meetingCloseAt,
   meetingPricesVisible,
@@ -19,7 +20,12 @@ import {
   offeringNameKey,
   type MeetingDrinks,
 } from "./meetings";
-import { offeringForMeeting, sessionForMeeting } from "./meetings-server";
+import {
+  extraSandwichesTaken,
+  getBureauStock,
+  offeringForMeeting,
+  sessionForMeeting,
+} from "./meetings-server";
 
 type MeetingWithOptions = Meeting & { options: MeetingOption[] };
 
@@ -48,6 +54,18 @@ export async function buildMeetingCard(
   // Bij een big bureau is er voor de student nooit iets uitverkocht: wat Theokot
   // niet levert, wordt extern besteld.
   const bigBureau = isBigBureau(meeting);
+  // Wat er nog in de bureauvoorraad zit, kan van elk broodje komen: dat telt bij
+  // de vrije voorraad van elk broodje op. De eigen reservatie geeft haar plaats
+  // terug wanneer ze wijzigt, dus die telt hier niet mee.
+  const extraSandwiches = bureauStockFor(meeting, await getBureauStock());
+  const extraLeft =
+    extraSandwiches > 0
+      ? Math.max(
+          0,
+          extraSandwiches -
+            (await extraSandwichesTaken(meeting.id, { exceptUserId: reservation?.userId })),
+        )
+      : 0;
 
   const choiceKey = reservation?.optionId ?? (reservation?.itemNameNl ? offeringNameKey(reservation.itemNameNl) : null);
 
@@ -63,7 +81,7 @@ export async function buildMeetingCard(
       key: choice.key,
       label: pick(choice.nameNl, choice.nameEn, locale) ?? choice.nameNl,
       priceCents: choice.priceCents,
-      remaining: bigBureau ? null : choice.remaining,
+      remaining: bigBureau || choice.remaining === null ? null : choice.remaining + extraLeft,
     })),
     drinks,
     askComment: meeting.kind === "BUREAU",

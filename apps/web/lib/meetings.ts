@@ -344,3 +344,77 @@ export function planMeetingSupply(
 
   return plan;
 }
+
+// -----------------------------------------------------------------------------
+// Bureauvoorraad
+//
+// Theokot maakt voor elk bureau een aantal broodjes bovenop het aanbod van die
+// dag (setting `theokot.bureauStock`). Zijn de broodjes voor studenten op, dan
+// krijgt het bureau er nog een uit die voorraad. Zie docs/design-decisions.md.
+// -----------------------------------------------------------------------------
+
+/** Leest de (mogelijk ontbrekende) `theokot.bureauStock`-setting uit. */
+export function parseBureauStock(value: unknown): number {
+  const src = (value && typeof value === 'object' ? value : {}) as Record<string, unknown>;
+  const n = typeof src.extraSandwiches === 'number' ? src.extraSandwiches : Number(src.extraSandwiches);
+  return Number.isInteger(n) && n > 0 ? n : 0;
+}
+
+/**
+ * Hoeveel broodjes dit moment uit de bureauvoorraad mag halen. Enkel een bureau
+ * met Theokot-broodjes; een big bureau niet, want daar gaat wat Theokot niet
+ * heeft naar de externe bestelling.
+ */
+export function bureauStockFor(meeting: BigBureauInput, bureauStock: number): number {
+  return meeting.kind === 'BUREAU' && meeting.useTheokot && !isBigBureau(meeting) ? bureauStock : 0;
+}
+
+/** Waar het broodje van een nieuwe of gewijzigde reservatie vandaan komt. */
+export type BureauSupply = 'STOCK' | 'EXTRA' | 'SOLD_OUT';
+
+/**
+ * Eerst de gewone voorraad, pas daarna de bureauvoorraad: zolang Theokot het
+ * broodje nog heeft, hoeft het niet extra gemaakt te worden.
+ *
+ * - `stockLeft`: wat er van dat broodje nog vrij is, zonder de eigen reservatie.
+ * - `extraTaken`: hoeveel broodjes van de bureauvoorraad andere inschrijvingen
+ *   van dit bureau al hebben.
+ * - `extraSandwiches`: de bureauvoorraad van dit moment ({@link bureauStockFor}).
+ */
+export function chooseBureauSupply(input: {
+  stockLeft: number;
+  extraTaken: number;
+  extraSandwiches: number;
+}): BureauSupply {
+  if (input.stockLeft > 0) return 'STOCK';
+  if (input.extraTaken < input.extraSandwiches) return 'EXTRA';
+  return 'SOLD_OUT';
+}
+
+/**
+ * Big bureau uitzetten: welke broodjes die nog extern stonden, uit de
+ * bureauvoorraad komen. In volgorde van inschrijven, tot er geen `room` meer is.
+ * De bureauvoorraad is niet per broodje, dus elk broodje van het aanbod mag;
+ * een broodje dat niet op het aanbod staat, kan Theokot ook extra niet maken.
+ *
+ * - `offering`: naamsleutel ({@link offeringNameKey}) naar het aanbod-item.
+ * - `room`: wat er van de bureauvoorraad nog vrij is.
+ *
+ * Geeft per reservatie-id het aanbod-item terug.
+ */
+export function planBureauStockTakeover(
+  reservations: ReadonlyArray<{ id: string; itemKey: string }>,
+  offering: ReadonlyMap<string, string>,
+  room: number,
+): Map<string, string> {
+  const plan = new Map<string, string>();
+  let left = room;
+  for (const reservation of reservations) {
+    if (left <= 0) break;
+    const sessionItemId = offering.get(reservation.itemKey);
+    if (!sessionItemId) continue;
+    plan.set(reservation.id, sessionItemId);
+    left -= 1;
+  }
+  return plan;
+}

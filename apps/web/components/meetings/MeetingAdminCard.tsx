@@ -30,6 +30,8 @@ export type MeetingReservationRow = {
   invalid: boolean;
   /** Big bureau: het broodje wordt extern besteld, niet bij Theokot. */
   external: boolean;
+  /** Theokot maakt dit broodje bovenop het aanbod (bureauvoorraad). */
+  extra: boolean;
   /** Er is een broodje of een drankje besteld; anders komt die persoon enkel. */
   hasOrder: boolean;
 };
@@ -63,6 +65,8 @@ export type MeetingAdminView = {
   theokotLimit: number | null;
   /** Broodjes die van Theokot komen (geldige, met een broodje). */
   theokotCount: number;
+  /** Broodjes uit de bureauvoorraad: Theokot maakt ze bovenop het aanbod. */
+  extraCount: number;
   /** Wat extern besteld moet worden, per broodje. Leeg zonder big bureau. */
   externalItems: Array<{ name: string; count: number }>;
   /** De bestelling is dicht; Theokot werkt misschien al met de turflijst. */
@@ -108,6 +112,8 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
               (nl
                 ? `${meeting.theokotCount} van Theokot · ${externalCount} extern · `
                 : `${meeting.theokotCount} from Theokot · ${externalCount} external · `)}
+            {meeting.extraCount > 0 &&
+              `${meeting.extraCount} ${nl ? "uit de bureauvoorraad" : "from the bureau stock"} · `}
             {meeting.theokotOrders.length > 0 &&
               `${meeting.theokotOrders.length} ${nl ? "zelf bij Theokot" : "ordered at Theokot"} · `}
             <span className="tabular-nums">{formatEuro(meeting.totalCents)}</span>
@@ -173,14 +179,14 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
                   NOT_FOUND: "Deze vergadering bestaat niet meer.",
                   INVALID_LIMIT: "Geef bij big bureau op hoeveel broodjes Theokot levert (0 of meer).",
                   EXTERNAL_LEFT:
-                    "Big bureau staat nog aan: Theokot heeft niet genoeg voorraad meer om de extern bestelde broodjes over te nemen. Zet het aantal voor Theokot hoger, of vraag Theokot eerst om meer broodjes.",
+                    "Big bureau staat nog aan: Theokot heeft niet genoeg voorraad meer om de extern bestelde broodjes over te nemen, ook niet met de bureauvoorraad. Zet het aantal voor Theokot hoger, of vraag Theokot eerst om meer broodjes.",
                 }
               : {
                   INVALID_DATE: "Enter a valid moment.",
                   NOT_FOUND: "This meeting no longer exists.",
                   INVALID_LIMIT: "Enter how many sandwiches Theokot provides for a big bureau (0 or more).",
                   EXTERNAL_LEFT:
-                    "Big bureau is still on: Theokot no longer has enough stock to take over the externally ordered sandwiches. Raise the number for Theokot, or ask Theokot for more sandwiches first.",
+                    "Big bureau is still on: Theokot no longer has enough stock to take over the externally ordered sandwiches, not even with the bureau stock. Raise the number for Theokot, or ask Theokot for more sandwiches first.",
                 }
           }
           fallbackErrorMessage={nl ? "Opslaan mislukt." : "Saving failed."}
@@ -335,6 +341,11 @@ export function MeetingAdminCard({ nl, meeting }: { nl: boolean; meeting: Meetin
                       {row.item ?? <span className="text-[#5c667f]">—</span>}
                       {row.external && (
                         <span className="ml-1 text-xs text-[#5c667f]">{nl ? "(extern)" : "(external)"}</span>
+                      )}
+                      {row.extra && (
+                        <span className="ml-1 text-xs text-[#5c667f]">
+                          {nl ? "(bureauvoorraad)" : "(bureau stock)"}
+                        </span>
                       )}
                       {row.invalid && (
                         <span className="ml-1 text-xs text-red-600">

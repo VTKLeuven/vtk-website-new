@@ -121,6 +121,7 @@ export async function loadMeetingAdmin(
       paid: reservation.paidAt !== null,
       invalid: reservation.status === "INVALIDATED",
       external: reservation.status === "ACTIVE" && reservation.external,
+      extra: reservation.status === "ACTIVE" && reservation.extra,
       // Wie komt zonder broodje en zonder drankje staat even goed ingeschreven.
       hasOrder: hasMeetingOrder({
         itemName: reservation.itemNameNl,
@@ -165,6 +166,7 @@ export async function loadMeetingAdmin(
       bigBureau: isBigBureau(meeting),
       theokotLimit: meeting.theokotLimit,
       theokotCount,
+      extraCount: reservations.filter((row) => row.extra && !row.invalid).length,
       externalItems: [...externalItems.entries()]
         .map(([name, count]) => ({ name, count }))
         .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),

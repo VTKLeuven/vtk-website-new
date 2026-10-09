@@ -956,6 +956,44 @@ export async function saveOrderMessageAction(
   return saveOk();
 }
 
+/**
+ * Hoeveel broodjes Theokot voor elk bureau bovenop het aanbod maakt
+ * (`theokot.bureauStock`). Zijn de broodjes voor studenten op, dan kan het
+ * bureau er nog uit deze voorraad krijgen. Theokot beslist dit, niet Onderwijs:
+ * Theokot moet ze maken. Een lager getal schrapt niemand; wie al een broodje uit
+ * de bureauvoorraad heeft, houdt het.
+ */
+export async function saveBureauStockAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("theokot.manage");
+  const raw = String(formData.get("extraSandwiches") ?? "").trim();
+  const extraSandwiches = raw === "" ? 0 : Number(raw);
+  if (!Number.isInteger(extraSandwiches) || extraSandwiches < 0) return saveError("INVALID_NUMBER");
+
+  const value = { extraSandwiches };
+  await prisma.setting.upsert({
+    where: { key: "theokot.bureauStock" },
+    update: { value },
+    create: { key: "theokot.bureauStock", value },
+  });
+  await logAudit({
+    action: "update",
+    entity: "theokotSettings",
+    target: "Bureauvoorraad",
+    summary:
+      extraSandwiches === 0
+        ? "geen bureauvoorraad meer"
+        : `${extraSandwiches} broodje(s) extra voor elk bureau`,
+  });
+  revalidatePath(`${ADMIN_PATH}/instellingen`);
+  revalidateTheokot();
+  revalidatePath("/bureau", "layout");
+  revalidatePath("/en/bureau", "layout");
+  return saveOk();
+}
+
 // -----------------------------------------------------------------------------
 // Beheer: bans + no-show-correcties
 // -----------------------------------------------------------------------------

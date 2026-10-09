@@ -9,6 +9,8 @@ import { logAudit } from "@/lib/audit";
 import { brusselsTimeOnDay, ymdKey } from "@/lib/brussels";
 import { withSerializableTransaction } from "@/lib/ticketing/transactions";
 import {
+  bureauStockFor,
+  chooseBureauSupply,
   isBigBureau,
   meetingCloseAt,
   meetingWindowState,
@@ -18,10 +20,13 @@ import {
 } from "@/lib/meetings";
 import { currentWorkingYear } from "@/lib/workingYear";
 import {
+  extraSandwichesTaken,
+  getBureauStock,
   getMeetingDrinks,
   linkGrocomeetOrders,
   offeringForMeeting,
   rebalanceMeetingSupply,
+  releaseBigBureau,
   sessionForMeeting,
   syncMeetingReservations,
   usageForSessionItemsTx,
@@ -285,7 +290,10 @@ export async function createMeetingAction(_prev: SaveState, formData: FormData):
   return saveOk();
 }
 
-/** Theokot kan de extern bestelde broodjes niet terugnemen (big bureau uitzetten). */
+/**
+ * Theokot kan de extern bestelde broodjes niet terugnemen, ook niet met de
+ * bureauvoorraad (big bureau uitzetten).
+ */
 class ExternalLeftError extends Error {
   constructor() {
     super("EXTERNAL_LEFT");
@@ -298,8 +306,9 @@ class ExternalLeftError extends Error {
  * Big bureau mag op elk moment aan, ook wanneer er al besteld is: dan verdeelt
  * `syncMeetingReservations` de bestaande broodjes opnieuw en komt wat boven de
  * limiet valt meteen terug vrij voor studenten. Uitzetten kan enkel wanneer
- * Theokot alle extern bestelde broodjes nog kan leveren; anders zou dat
- * stilletjes meer van de voorraad nemen dan er is.
+ * Theokot alle extern bestelde broodjes nog kan leveren, uit de gewone voorraad
+ * of de bureauvoorraad; anders zou dat stilletjes meer van de voorraad nemen dan
+ * er is.
  */
 export async function saveMeetingAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const id = String(formData.get("meetingId") ?? "");
@@ -342,10 +351,7 @@ export async function saveMeetingAction(_prev: SaveState, formData: FormData): P
           noteEn: String(formData.get("noteEn") ?? "").trim() || null,
         },
       });
-      if (releasing) {
-        const { external } = await rebalanceMeetingSupply(tx, id, { limit: null });
-        if (external > 0) throw new ExternalLeftError();
-      }
+      if (releasing && (await releaseBigBureau(tx, id)) > 0) throw new ExternalLeftError();
     });
   } catch (error) {
     if (error instanceof ExternalLeftError) return saveError("EXTERNAL_LEFT");
@@ -639,6 +645,9 @@ export async function saveMeetingReservationAction(
   // Bij een big bureau is er nooit iets uitverkocht: de volgorde van inschrijven
   // beslist of het broodje van Theokot komt of extern besteld wordt.
   const bigBureau = isBigBureau(meeting);
+  // Is het broodje voor studenten op, dan kan een bureau nog uit de
+  // bureauvoorraad putten: Theokot maakt die bovenop het aanbod.
+  const extraSandwiches = bureauStockFor(meeting, await getBureauStock());
 
   // Niets besteld is geen lege bestelling maar een inschrijving: wie komt zonder
   // broodje of drankje hoort even goed op de aanwezigheidslijst, en zijn
@@ -648,20 +657,34 @@ export async function saveMeetingReservationAction(
 
   try {
     await withSerializableTransaction(async (tx) => {
+      let extra = false;
       if (!bigBureau && choice?.sessionItemId && theokotSession) {
         const used = await usageForSessionItemsTx(tx, theokotSession.id);
         const item = theokotSession.items.find((row) => row.id === choice.sessionItemId);
         const existing = await tx.meetingReservation.findUnique({
           where: { meetingId_userId: { meetingId, userId } },
-          select: { sessionItemId: true, status: true },
+          select: { sessionItemId: true, status: true, extra: true },
         });
         // De eigen, nog actieve reservatie op ditzelfde broodje telt al mee in
         // `used`; anders kan niemand zijn eigen keuze bevestigen bij het laatste
-        // exemplaar.
+        // exemplaar. Een eigen broodje uit de bureauvoorraad zit niet in `used`.
         const ownAlreadyCounted =
-          existing?.status === "ACTIVE" && existing.sessionItemId === choice.sessionItemId ? 1 : 0;
+          existing?.status === "ACTIVE" && existing.sessionItemId === choice.sessionItemId && !existing.extra
+            ? 1
+            : 0;
         const taken = (used.get(choice.sessionItemId) ?? 0) - ownAlreadyCounted;
-        if (item && taken >= item.quantity) throw new Error("SOLD_OUT");
+        if (item) {
+          const supply = chooseBureauSupply({
+            stockLeft: item.quantity - taken,
+            extraTaken:
+              extraSandwiches > 0
+                ? await extraSandwichesTaken(meetingId, { exceptUserId: userId, db: tx })
+                : 0,
+            extraSandwiches,
+          });
+          if (supply === "SOLD_OUT") throw new Error("SOLD_OUT");
+          extra = supply === "EXTRA";
+        }
       }
 
       const data = {
@@ -675,6 +698,7 @@ export async function saveMeetingReservationAction(
         // of bij de externe bestelling.
         sessionItemId: bigBureau ? null : choice?.sessionItemId ?? null,
         external: false,
+        extra,
         drinkName: drinkName || null,
         drinkPriceCents: drinkName ? drinks.priceCents : 0,
         comment,

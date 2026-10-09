@@ -17,11 +17,14 @@ import { brusselsTimeOnDay, brusselsWallClock, brusselsYMD, shiftYMD } from "./b
 import { usersWithLivePermission } from "./livePermissions";
 import { sendMeetingReservationInvalidated } from "./mail";
 import {
+  bureauStockFor,
   isBigBureau,
   meetingKindLabel,
   meetingPath,
   offeringNameKey,
+  parseBureauStock,
   parseMeetingDrinks,
+  planBureauStockTakeover,
   planMeetingSupply,
   type MeetingDrinks,
   type SupplyAssignment,
@@ -32,6 +35,12 @@ import { withSerializableTransaction } from "./ticketing/transactions";
 export async function getMeetingDrinks(): Promise<MeetingDrinks> {
   const row = await prisma.setting.findUnique({ where: { key: "meetings.drinks" } });
   return parseMeetingDrinks(row?.value);
+}
+
+/** Hoeveel broodjes Theokot voor elk bureau bovenop het aanbod maakt. */
+export async function getBureauStock(db: Prisma.TransactionClient = prisma): Promise<number> {
+  const row = await db.setting.findUnique({ where: { key: "theokot.bureauStock" } });
+  return parseBureauStock(row?.value);
 }
 
 /** De Theokot-verkoopdag op de kalenderdag van dit moment, indien die bestaat. */
@@ -131,7 +140,8 @@ export async function offeringForMeeting(
  * Hoeveel er van elk aanbod-item al weg is: bestellingen van studenten plus de
  * broodjes die voor een vergadering opzijgezet zijn. Beide komen uit dezelfde
  * voorraad, dus wie enkel de bestellijnen telt, verkoopt de GM-broodjes een
- * tweede keer.
+ * tweede keer. Een broodje uit de bureauvoorraad (`extra`) telt niet mee: dat
+ * maakt Theokot bovenop het aanbod.
  */
 export async function usageForSessionItems(itemIds: string[]): Promise<Map<string, number>> {
   if (itemIds.length === 0) return new Map();
@@ -150,7 +160,7 @@ export async function usageForSessionItems(itemIds: string[]): Promise<Map<strin
     }),
     prisma.meetingReservation.groupBy({
       by: ["sessionItemId"],
-      where: { sessionItemId: { in: itemIds }, status: "ACTIVE" },
+      where: { sessionItemId: { in: itemIds }, status: "ACTIVE", extra: false },
       _count: { _all: true },
     }),
   ]);
@@ -198,6 +208,7 @@ export async function usageForSessionItemsTx(
     where: {
       sessionItem: { sessionId },
       status: "ACTIVE",
+      extra: false,
       ...(options.exceptMeetingId ? { meetingId: { not: options.exceptMeetingId } } : {}),
     },
     _count: { _all: true },
@@ -262,7 +273,7 @@ export async function rebalanceMeetingSupply(
   const reservations = await tx.meetingReservation.findMany({
     where: { meetingId, status: "ACTIVE", itemNameNl: { not: null } },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-    select: { id: true, itemNameNl: true, external: true, sessionItemId: true },
+    select: { id: true, itemNameNl: true, external: true, extra: true, sessionItemId: true },
   });
 
   let stock: Map<string, { sessionItemId: string; available: number }> | null = null;
@@ -294,7 +305,11 @@ export async function rebalanceMeetingSupply(
     const next = plan.get(reservation.id);
     if (!next) continue;
     split[next.external ? "external" : "theokot"] += 1;
-    if (next.external === reservation.external && next.sessionItemId === reservation.sessionItemId) {
+    if (
+      next.external === reservation.external &&
+      next.sessionItemId === reservation.sessionItemId &&
+      !reservation.extra
+    ) {
       continue;
     }
     const key = next.external ? "external" : (next.sessionItemId ?? "unlinked");
@@ -302,11 +317,88 @@ export async function rebalanceMeetingSupply(
     group.ids.push(reservation.id);
     changes.set(key, group);
   }
+  // Een big bureau kent geen bureauvoorraad: wat Theokot niet heeft, gaat extern.
   for (const { data, ids } of changes.values()) {
-    await tx.meetingReservation.updateMany({ where: { id: { in: ids } }, data });
+    await tx.meetingReservation.updateMany({ where: { id: { in: ids } }, data: { ...data, extra: false } });
   }
 
   return split;
+}
+
+// -----------------------------------------------------------------------------
+// Bureauvoorraad
+// -----------------------------------------------------------------------------
+
+/**
+ * Hoeveel broodjes van de bureauvoorraad dit bureau al vergeven heeft.
+ * `exceptUserId` laat de eigen reservatie buiten de telling: wie zijn broodje
+ * wijzigt, geeft zijn plaats eerst terug.
+ */
+export async function extraSandwichesTaken(
+  meetingId: string,
+  options: { exceptUserId?: string; db?: Prisma.TransactionClient } = {},
+): Promise<number> {
+  const db = options.db ?? prisma;
+  return db.meetingReservation.count({
+    where: {
+      meetingId,
+      status: "ACTIVE",
+      extra: true,
+      ...(options.exceptUserId ? { userId: { not: options.exceptUserId } } : {}),
+    },
+  });
+}
+
+/**
+ * Big bureau uitzetten. Eerst neemt de gewone voorraad terug wat ze kan
+ * ({@link rebalanceMeetingSupply} zonder limiet); wat dan nog extern staat, komt
+ * uit de bureauvoorraad, want een gewoon bureau zou die broodjes ook daaruit
+ * krijgen. Geeft terug hoeveel broodjes daarna nog extern staan: is dat meer dan
+ * nul, dan rolt de beller de transactie terug.
+ *
+ * Verwacht dat `Meeting.theokotLimit` in deze transactie al op null staat, anders
+ * geeft {@link bureauStockFor} nul.
+ */
+export async function releaseBigBureau(tx: Prisma.TransactionClient, meetingId: string): Promise<number> {
+  const { external } = await rebalanceMeetingSupply(tx, meetingId, { limit: null });
+  if (external === 0) return 0;
+
+  const meeting = await tx.meeting.findUnique({
+    where: { id: meetingId },
+    select: { kind: true, startsAt: true, useTheokot: true, theokotLimit: true },
+  });
+  const session = meeting ? await sessionForMeeting(meeting, tx) : null;
+  if (!meeting || !session) return external;
+
+  const room =
+    bureauStockFor(meeting, await getBureauStock(tx)) - (await extraSandwichesTaken(meetingId, { db: tx }));
+  if (room <= 0) return external;
+
+  // Zelfde aanbod als het formulier en de verdeling: zonder het broodje van de week.
+  const offering = new Map<string, string>();
+  for (const item of session.items) {
+    if (!item.isWeeklySpecial) offering.set(offeringNameKey(item.nameNl), item.id);
+  }
+  const waiting = await tx.meetingReservation.findMany({
+    where: { meetingId, status: "ACTIVE", external: true, itemNameNl: { not: null } },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+    select: { id: true, itemNameNl: true },
+  });
+  const plan = planBureauStockTakeover(
+    waiting.map((reservation) => ({
+      id: reservation.id,
+      itemKey: offeringNameKey(reservation.itemNameNl ?? ""),
+    })),
+    offering,
+    room,
+  );
+  for (const [id, sessionItemId] of plan) {
+    await tx.meetingReservation.update({
+      where: { id },
+      data: { external: false, extra: true, sessionItemId },
+    });
+  }
+  return external - plan.size;
 }
 
 /** {@link rebalanceMeetingSupply} in een eigen transactie, voor wie er geen open heeft. */
@@ -379,6 +471,7 @@ export async function syncMeetingReservations(meetingId: string): Promise<SyncRe
           invalidatedReason: reason,
           sessionItemId: null,
           external: false,
+          extra: false,
         },
       });
       invalidated += 1;
