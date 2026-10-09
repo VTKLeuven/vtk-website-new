@@ -205,13 +205,16 @@ const profileSchema = z
   .superRefine(validateStudy)
   .and(addressSchema);
 
-const MAX_AVATAR_BYTES = 8 * 1024 * 1024; // 8 MiB before re-encode
+export const MAX_AVATAR_BYTES = 8 * 1024 * 1024; // 8 MiB before re-encode
 
 /**
  * Store an uploaded avatar: re-encode to a square-ish JPEG, upload to S3 and
  * return the new storage key. Returns `null` when no (valid) file was sent.
+ * Gedeeld door het eigen profiel (/account, onboarding) en het
+ * gebruikersbeheer in de admin (WEBSITE-50), zodat beide dezelfde
+ * uitsnede- en opslagregels volgen.
  */
-async function storeAvatar(file: File | null): Promise<string | null> {
+export async function storeAvatar(file: File | null): Promise<string | null> {
   if (!file || file.size === 0) return null;
   if (file.size > MAX_AVATAR_BYTES) throw new Error("AVATAR_TOO_LARGE");
 

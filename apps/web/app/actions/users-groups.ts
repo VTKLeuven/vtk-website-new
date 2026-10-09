@@ -12,6 +12,8 @@ import { hasPermission, fullName, splitFullName } from "@vtk/auth";
 import { requirePermission, requireSession } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { currentWorkingYear } from "@/lib/workingYear";
+import { deleteObject } from "@vtk/storage";
+import { storeAvatar, MAX_AVATAR_BYTES } from "@/app/actions/onboarding";
 import { LEAD_LABEL_MAX } from "@/lib/werkgroepen";
 import { eraseUserData, StorageUnavailableError } from "@/lib/privacy/account";
 import { describeChanges, logAudit } from "@/lib/audit";
@@ -168,6 +170,133 @@ export async function saveUserAction(_prev: SaveState, formData: FormData): Prom
   if (parsed.id) revalidatePath(`/admin/gebruikers/${parsed.id}`);
   // Geen redirect: het formulier staat op de lijstpagina (nieuw) of op de
   // detailpagina (bewerken); in beide gevallen blijf je waar je bent.
+  return saveOk();
+}
+
+export type UserAvatarErrorCode =
+  | "INVALID_INPUT"
+  | "ACCOUNT_NOT_FOUND"
+  | "FORBIDDEN"
+  | "AVATAR_REQUIRED"
+  | "AVATAR_TOO_LARGE"
+  | "AVATAR_FAILED"
+  | "STORAGE_UNAVAILABLE";
+
+/**
+ * De foto van dit lid verschijnt op tientallen pagina's; ververs allebei de
+ * adminweergaven en de publieke pagina's die een avatar tonen.
+ */
+function revalidateAvatarPaths(userId: string): void {
+  revalidatePath("/admin/gebruikers");
+  revalidatePath(`/admin/gebruikers/${userId}`);
+  revalidatePath("/praesidium");
+  revalidatePath("/pocs");
+  revalidatePath("/werkgroepen");
+}
+
+/**
+ * Vervangt de profielfoto van een gebruiker door een door een beheerder
+ * geüpload foto (WEBSITE-50: bvb een ongepaste foto vervangen). Zelfde
+ * pipeline als het eigen profiel: vierkante uitsnede, 512x512 JPEG, nieuwe
+ * storage key, en het oude object wordt daarna best-effort opgeruimd.
+ */
+export async function updateUserAvatarAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const session = await requirePermission("users.edit");
+  const id = formData.get("id");
+  if (typeof id !== "string" || !id) {
+    return saveError("INVALID_INPUT" satisfies UserAvatarErrorCode);
+  }
+  const user = await prisma.user.findFirst({
+    where: { id, deletedAt: null },
+    select: { id: true, name: true, avatarKey: true, isSuperAdmin: true },
+  });
+  if (!user) return saveError("ACCOUNT_NOT_FOUND" satisfies UserAvatarErrorCode);
+  // Zelfde regel als bij de andere gebruikersacties: het account van een
+  // superadmin mag alleen door een superadmin worden aangepast.
+  if (user.isSuperAdmin && !session.user.isSuperAdmin) {
+    return saveError("FORBIDDEN" satisfies UserAvatarErrorCode);
+  }
+
+  const file = formData.get("photo");
+  if (!(file instanceof File) || file.size === 0) {
+    return saveError("AVATAR_REQUIRED" satisfies UserAvatarErrorCode);
+  }
+  if (file.size > MAX_AVATAR_BYTES) {
+    return saveError("AVATAR_TOO_LARGE" satisfies UserAvatarErrorCode);
+  }
+  let newKey: string | null = null;
+  try {
+    newKey = await storeAvatar(file);
+  } catch (err) {
+    // Te groot is een invoerfout; een kapotte upload of onbereikbare S3 valt
+    // hier ook binnen en mag de beheerder niet op een crashpagina zetten.
+    const tooLarge = err instanceof Error && err.message === "AVATAR_TOO_LARGE";
+    return saveError(
+      (tooLarge ? "AVATAR_TOO_LARGE" : "AVATAR_FAILED") satisfies UserAvatarErrorCode,
+    );
+  }
+  if (!newKey) return saveError("AVATAR_FAILED" satisfies UserAvatarErrorCode);
+
+  await prisma.user.update({ where: { id }, data: { avatarKey: newKey } });
+  // Het oude object opschonen (best-effort, zoals bij het eigen profiel):
+  // faalt het, dan blijft er een onbewoonde foto op S3 liggen, geen fout.
+  if (user.avatarKey && user.avatarKey !== newKey) {
+    await deleteObject(user.avatarKey).catch(() => null);
+  }
+
+  await logAudit({
+    action: "update",
+    entity: "user",
+    entityId: id,
+    target: user.name,
+    summary: "profielfoto door een beheerder vervangen",
+  });
+  revalidateAvatarPaths(id);
+  return saveOk();
+}
+
+/**
+ * Verwijdert de profielfoto van een gebruiker. Het object gaat weg vóór de
+ * kolom leeggezet wordt, zodat een mislukte verwijdering nooit een dode key
+ * achterlaat; een onbereikbare opslag is dan de reden die de beheerder terug
+ * krijgt in plaats van een lege crashpagina.
+ */
+export async function removeUserAvatarAction(formData: FormData): Promise<SaveState> {
+  const session = await requirePermission("users.edit");
+  const id = formData.get("id");
+  if (typeof id !== "string" || !id) {
+    return saveError("INVALID_INPUT" satisfies UserAvatarErrorCode);
+  }
+  const user = await prisma.user.findFirst({
+    where: { id, deletedAt: null },
+    select: { id: true, name: true, avatarKey: true, isSuperAdmin: true },
+  });
+  if (!user) return saveError("ACCOUNT_NOT_FOUND" satisfies UserAvatarErrorCode);
+  if (user.isSuperAdmin && !session.user.isSuperAdmin) {
+    return saveError("FORBIDDEN" satisfies UserAvatarErrorCode);
+  }
+  if (!user.avatarKey) return saveOk(); // Niets te verwijderen.
+
+  try {
+    await deleteObject(user.avatarKey);
+  } catch (err) {
+    Sentry.captureException(err, { tags: { action: "removeUserAvatar" }, extra: { targetUserId: id } });
+    console.error("[gebruikers] profielfoto verwijderen mislukt", { targetUserId: id, key: user.avatarKey }, err);
+    return saveError("STORAGE_UNAVAILABLE" satisfies UserAvatarErrorCode);
+  }
+  await prisma.user.update({ where: { id }, data: { avatarKey: null } });
+
+  await logAudit({
+    action: "update",
+    entity: "user",
+    entityId: id,
+    target: user.name,
+    summary: "profielfoto door een beheerder verwijderd",
+  });
+  revalidateAvatarPaths(id);
   return saveOk();
 }
 
