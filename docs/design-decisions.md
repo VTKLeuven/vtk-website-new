@@ -4987,34 +4987,41 @@ item; daarom twee velden met elk hun eigen label.
 
 ---
 
-## Shiftpagina: week is de standaard, lijst is de tweede weergave
+## Shiftpagina: alle shiften onder elkaar, per week een kop
 
-`/shift` toont **één week tegelijk** (maandag tot zondag), in twee weergaven die
-naar diezelfde week en dezelfde postfilter kijken:
+`/shift` toont **alle shiften vanaf vandaag tot de laatste geplande**, per week
+onder elkaar (oktober 2026). Er is geen weekkiezer meer en geen weekrooster.
 
-- **Weekrooster (standaard).** Een shift is in de eerste plaats een blok in je
-  agenda: je wil zien of ze botst met je les of met een andere shift, en dat leest
-  een raster meteen. Het rooster gebruikt een 24-uurs verticale tijdgrid
-  (standaard gefocust op de daguren). Overlappende shiften worden per dag
-  geclusterd en naast elkaar in evenredige kolommen geplaatst (`left` en `width` op
-  basis van het aantal overlappende banen), zodat overlappingen onmiddellijk
-  visueel duidelijk zijn. Wanneer een shift overlapt met een shift waarvoor je al
-  bent ingeschreven, toont een waarschuwingsbadge ("Overlapt met je shift") de
-  botsing direct in het overzicht.
-- **Lijst (Kalenderblad).** Dezelfde week per dag onder elkaar, met 58px gele
-  datum-pins (`.vtk-shift-pin`), een doorlopende verticale haarlijn door de zeven
-  dagen van de week en de details uitklapbaar. Lege dagen krijgen een rustige
-  weergave (`.vtk-shift-pin-quiet`) zodat het weekritme voelbaar blijft zonder
-  lege ruis. Beter wanneer de namen lang zijn of het scherm smal is, want daar
-  wordt een raster onleesbaar.
+- **Waarom geen weekkiezer.** Wie een shift zoekt, wil de komende weken overzien
+  en kiezen wat in zijn agenda past. Met pijltjes per week zag je één week
+  tegelijk, en een week zonder shiften was een doodlopende straat met een knop
+  "Ga naar ...". Het weekrooster (zeven dagkolommen met een tijdsas) ging mee: een
+  rooster kan niet zonder weekkiezer. Een botsing met je eigen shift staat nog
+  altijd in de rij zelf ("Overlapt met je shift").
+- **Elke week opent met een kop**: "Deze week", "Volgende week", daarna het
+  weeknummer, met de datums eronder en rechts hoeveel shiften er zijn en bij
+  hoeveel nog plaats is. Een haarlijn erboven scheidt de weken, en de haarlijn
+  tussen de datumpins stopt aan het einde van elke week.
+- **Deze week begint vandaag.** De dagen ervoor zijn voorbij; enkel een shift die
+  gisteren begon en nog loopt, haalt haar dag terug (`groupShiftWeeks` in
+  `components/shift/shiftWeeks.ts`).
+- **Een week zonder shiften blijft staan** als stille regel ("Geen shiften in
+  deze week."): een gat in de planning hoort zichtbaar te zijn. Met een
+  postfilter valt ze weg, want daar zegt een lege week niets.
+- **De weken staan als register bovenaan de rail**, met een gele markering op de
+  week die je leest (dezelfde scroll-spy als de inhoudsopgave van een
+  contentpagina) en één regel per week. Twee regels per week duwden in een druk
+  semester "Mijn shiften" onder de rand van het scherm. Onder 980px, waar de rail
+  boven de lijst staat, valt het register weg: de weekkoppen zeggen het al.
+- Vier richtingen zijn naast elkaar bekeken (weekkop in de tijdlijn, de week in
+  de marge zoals /praesidium, afwisselende weekbanden, een plakkende weekstrook
+  met een stip per shift). De weekkop won: het kleinste verschil met de agenda die
+  er al stond.
 
 Verder vastgelegd:
 
-- **Paginakop met technische balk en weekgereedschap.** De donkerblauwe kop
-  draagt het technische ruitpatroon, de titel en direct rechts het
-  weekgereedschap: ronde weeknavigatieknoppen, het ISO-weeknummer met het aantal
-  shiften en resterende vrije plaatsen, een compacte weergaveschakelaar
-  (Week/Lijst) en een snelknop naar vandaag.
+- **De paginakop draagt enkel titel en ondertitel.** De weeknavigatie, de
+  weergaveschakelaar (Week/Lijst) en de knop naar vandaag zijn weg.
 - **Je eigen shiften staan in een rail náást het overzicht**, als een kantlijn-register.
   Bovenaan toont een gele attentiekaart de eerstvolgende geplande shift (of een
   rustige status wanneer er niets gepland staat). Een haarlijn met gele actieve
@@ -5024,27 +5031,23 @@ Verder vastgelegd:
   niet onder andermans shiften te liggen.
 - **Je eigen shiften staan óók in het overzicht zelf** (geel randje,
   "Ingeschreven"). De rail is je persoonlijke lijstje, het overzicht is de
-  volledige week; een week met een gat waar jouw shift hoort te staan, klopt niet.
+  volledige planning; een week met een gat waar jouw shift hoort te staan, klopt
+  niet.
 - **De rail toont de stand van het academiejaar** (voltooide shiften + bonnetjes
   als 28px Geist Mono cijfers, zelfde telling als de admin-ranglijst: enkel shiften
   die al voorbij zijn). Dat geeft de shiftranking een prominente plek op de
   publieke pagina en maakt van `/shift/history` een logische doorklik.
-- **Een lege week is een boodschap met een volgende stap**, niet een lege tabel:
-  ze noemt de eerstvolgende geplande shift en heeft een knop die naar die week
-  springt. In het rooster blijft het raster staan onder de boodschap, zodat een
-  rustige week er niet uitziet als een stuk pagina.
-- **De postfilter zijn chips met tellers**, en enkel voor posten die deze week
+- **De postfilter zijn chips met tellers**, en enkel voor posten die in de lijst
   effectief voorkomen. De actieve filter kleurt VTK-geel. De oude `<select>` +
-  datumveld + sorteerknop zijn weg: de weeknavigatie vertelt al waar je zit, en
-  chronologisch is de enige zinnige volgorde voor een week.
+  datumveld + sorteerknop zijn weg: de weekkoppen vertellen al waar je zit, en
+  chronologisch is de enige zinnige volgorde.
 - **Plaatsen lezen als "Nog 1 plaats" of "Vol"**, niet als `5/6`. De exacte
   verhouding blijft in de tooltip en in het detailvenster staan.
 
 ### Klikken op een shift opent een detailvenster
 
-Een klik op een blok in het rooster, op een rij in de lijst of op een kaart in de
-rail opent hetzelfde venster met alles over die shift, mét de knop Schrijf in /
-Uitschrijven erin. Inschrijven kost dus twee klikken. Dat is bewust: sinds een
+Een klik op een rij in de lijst of op een shift in de rail opent hetzelfde
+venster met alles over die shift, mét de knop Schrijf in / Uitschrijven erin. Inschrijven kost dus twee klikken. Dat is bewust: sinds een
 shift een langere uitleg kan dragen (zie hieronder) valt er iets te lezen vóór je
 intekent, en een blok dat je met één misklik inschrijft is daar te gevoelig voor.
 Het venster sluit enkel wanneer de actie lukte; faalt ze (vol, overlap), dan blijft

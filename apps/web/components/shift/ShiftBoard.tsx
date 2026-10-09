@@ -1,35 +1,25 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { addDays, getISOWeek, startOfWeek } from 'date-fns';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import type { ShiftResponse } from '@/lib/shift';
-import {
-  fill,
-  freeSpots,
-  postLabel,
-  useShiftList,
-  type MergedShift,
-  type PostNames,
-} from './shiftData';
+import { postLabel, useShiftList, type MergedShift, type PostNames } from './shiftData';
+import { groupShiftWeeks } from './shiftWeeks';
 import { ShiftAgenda } from './ShiftAgenda';
-import { ShiftWeekView } from './WeekView';
+import { ShiftWeekOutline } from './ShiftWeekOutline';
 import { ShiftDialog } from './ShiftDialog';
 import { MyShiftsRail, type ShiftYearStats } from './MyShiftsRail';
 import './shift-board.css';
 
-type View = 'week' | 'list';
-
 const ALL_POSTS = 'ALL';
 
-/** Maandag van de week waarin `date` valt. */
-function mondayOf(date: Date): Date {
-  return startOfWeek(date, { weekStartsOn: 1 });
-}
-
 /**
- * De shiftpagina volgens Richting A (Kalenderblad):
- * de donkere kop draagt weeknavigatie, weergavekeuze en vandaag-knop,
- * daaronder het raster met postfilter, weekrooster/lijst en rail.
+ * De shiftpagina: de donkere kop, daaronder de postfilter, alle shiften vanaf
+ * vandaag per week onder elkaar, en de rail met de weken, je eigen shiften en de
+ * stand van het academiejaar.
+ *
+ * Er was een weekkiezer met een weekrooster ernaast. Die is weg: wie een shift
+ * zoekt, wil de komende weken overzien en niet per week klikken, en een rooster
+ * van zeven dagkolommen kan niet zonder weekkiezer. Zie docs/design-decisions.md.
  *
  * `postNames` zet de groepscode van een shift om naar de naam van de post: de
  * pagina toonde `CURSUSDIENST` waar "Cursusdienst" hoort.
@@ -39,7 +29,6 @@ export function ShiftBoard({
   historyHref,
   stats,
   postNames,
-  initialWeekStart,
   initialAvailable,
   initialRegistered,
 }: {
@@ -47,7 +36,6 @@ export function ShiftBoard({
   historyHref: string;
   stats: ShiftYearStats;
   postNames: PostNames;
-  initialWeekStart?: Date | string;
   /** Wat `/api/shift` nu zou geven, al op de server opgehaald. */
   initialAvailable?: ShiftResponse[];
   /** Wat `/api/shift/register` nu zou geven, al op de server opgehaald. */
@@ -58,14 +46,9 @@ export function ShiftBoard({
   const available = useShiftList('/api/shift', initialAvailable);
   const registered = useShiftList('/api/shift/register', initialRegistered);
 
-  const [view, setView] = useState<View>('list');
-  const [weekStart, setWeekStart] = useState(() =>
-    initialWeekStart ? mondayOf(new Date(initialWeekStart)) : mondayOf(new Date())
-  );
+  const [now] = useState(() => new Date());
   const [postFilter, setPostFilter] = useState<string>(ALL_POSTS);
   const [opened, setOpened] = useState<MergedShift | null>(null);
-
-  const weekEnd = addDays(weekStart, 7);
 
   const merged = useMemo<MergedShift[]>(
     () => [
@@ -75,145 +58,38 @@ export function ShiftBoard({
     [available, registered]
   );
 
-  const weekShifts = useMemo(
-    () => merged.filter((m) => m.shift.endTime > weekStart && m.shift.startTime < weekEnd),
-    [merged, weekStart, weekEnd]
-  );
-
   const postCounts = useMemo(() => {
     const counts = new Map<string, number>();
-    for (const { shift } of weekShifts) {
+    for (const { shift } of merged) {
       if (!shift.post) continue;
       counts.set(shift.post, (counts.get(shift.post) ?? 0) + 1);
     }
     return [...counts.entries()].sort((a, b) =>
       postLabel(a[0], postNames).localeCompare(postLabel(b[0], postNames))
     );
-  }, [weekShifts, postNames]);
+  }, [merged, postNames]);
 
-  const visible = useMemo(
-    () =>
+  const weeks = useMemo(() => {
+    const visible =
       postFilter === ALL_POSTS
-        ? weekShifts
-        : weekShifts.filter((m) => (m.shift.post ?? '') === postFilter),
-    [weekShifts, postFilter]
-  );
-
-  const nextShift = useMemo<ShiftResponse | null>(() => {
-    const later = merged
-      .filter((m) => m.shift.startTime >= weekEnd)
-      .filter((m) => postFilter === ALL_POSTS || (m.shift.post ?? '') === postFilter)
-      .sort((a, b) => a.shift.startTime.getTime() - b.shift.startTime.getTime());
-    return later[0]?.shift ?? null;
-  }, [merged, weekEnd, postFilter]);
-
-  const intl = locale === 'nl' ? 'nl-BE' : 'en-GB';
-  const dayMonthFmt = new Intl.DateTimeFormat(intl, { day: 'numeric', month: 'long' });
-  const dayFmt = new Intl.DateTimeFormat(intl, { day: 'numeric' });
-  const lastDay = addDays(weekStart, 6);
-  const weekLabel = fill(t.week.range, {
-    from:
-      weekStart.getMonth() === lastDay.getMonth()
-        ? dayFmt.format(weekStart)
-        : dayMonthFmt.format(weekStart),
-    to: dayMonthFmt.format(lastDay),
-  });
-
-  const isoWeek = getISOWeek(weekStart);
-  const openCount = weekShifts.filter((m) => !m.registered && freeSpots(m.shift) > 0).length;
-  const weekSub =
-    weekShifts.length > 0
-      ? fill(t.week.summary, {
-          week: isoWeek,
-          total: weekShifts.length,
-          open: openCount,
-        })
-      : fill(t.week.summaryEmpty, { week: isoWeek });
-
-  const jumpLabel = nextShift
-    ? new Intl.DateTimeFormat(intl, { day: 'numeric', month: 'short' }).format(nextShift.startTime)
-    : '';
+        ? merged
+        : merged.filter((m) => (m.shift.post ?? '') === postFilter);
+    return groupShiftWeeks(visible, now, { keepEmpty: postFilter === ALL_POSTS });
+  }, [merged, postFilter, now]);
 
   const emptyState = (
     <div className="vtk-shift-empty">
-      <p className="vtk-shift-empty-title">{t.empty.week}</p>
-      {nextShift ? (
-        <>
-          <p className="vtk-shift-empty-text">
-            {fill(t.empty.next, { name: nextShift.name, date: jumpLabel })}
-          </p>
-          <button
-            type="button"
-            className="vtk-shift-btn"
-            onClick={() => setWeekStart(mondayOf(nextShift.startTime))}
-          >
-            {fill(t.empty.jump, { date: jumpLabel })}
-          </button>
-        </>
-      ) : (
-        <p className="vtk-shift-empty-text">{t.empty.none}</p>
-      )}
+      <p className="vtk-shift-empty-title">{t.empty.title}</p>
+      <p className="vtk-shift-empty-text">{t.empty.none}</p>
     </div>
   );
 
   return (
     <>
-      <header className="vtk-page-head vtk-shift-page-head">
+      <header className="vtk-page-head">
         <div className="vtk-shift-head-intro">
           <h1 className="vtk-page-title">{t.shifts}</h1>
           <p className="vtk-page-subtitle">{t.subtitle}</p>
-        </div>
-
-        <div className="vtk-shift-tools" role="region" aria-label={t.shifts}>
-          <div className="vtk-shift-weeknav">
-            <button
-              type="button"
-              className="vtk-shift-round"
-              aria-label={t.week.prev}
-              title={t.week.prev}
-              onClick={() => setWeekStart((d) => addDays(d, -7))}
-            >
-              ←
-            </button>
-            <div className="vtk-shift-week-label">
-              <span>{weekLabel}</span>
-              <small>{weekSub}</small>
-            </div>
-            <button
-              type="button"
-              className="vtk-shift-round"
-              aria-label={t.week.next}
-              title={t.week.next}
-              onClick={() => setWeekStart((d) => addDays(d, 7))}
-            >
-              →
-            </button>
-          </div>
-
-          <div className="vtk-shift-view-switch" role="group" aria-label={t.view.label}>
-            <button
-              type="button"
-              aria-pressed={view === 'week'}
-              onClick={() => setView('week')}
-            >
-              {t.view.week}
-            </button>
-            <button
-              type="button"
-              aria-pressed={view === 'list'}
-              onClick={() => setView('list')}
-            >
-              {t.view.list}
-            </button>
-          </div>
-
-          <button
-            type="button"
-            className="vtk-shift-today-btn"
-            onClick={() => setWeekStart(mondayOf(new Date()))}
-          >
-            {t.week.today}
-          </button>
         </div>
       </header>
 
@@ -229,7 +105,7 @@ export function ShiftBoard({
                   onClick={() => setPostFilter(ALL_POSTS)}
                 >
                   {t.filter.allPosts}
-                  <span className="vtk-shift-chip-count">{weekShifts.length}</span>
+                  <span className="vtk-shift-chip-count">{merged.length}</span>
                 </button>
                 {postCounts.map(([post, count]) => (
                   <button
@@ -246,29 +122,18 @@ export function ShiftBoard({
               </div>
             ) : null}
 
-            {view === 'week' ? (
-              <ShiftWeekView
-                locale={locale}
-                weekStart={weekStart}
-                shifts={visible}
-                registeredShifts={registered}
-                emptyState={emptyState}
-                onOpen={setOpened}
-              />
-            ) : (
-              <ShiftAgenda
-                locale={locale}
-                weekStart={weekStart}
-                shifts={visible}
-                registeredShifts={registered}
-                postNames={postNames}
-                emptyState={emptyState}
-                onOpen={setOpened}
-              />
-            )}
+            <ShiftAgenda
+              locale={locale}
+              weeks={weeks}
+              registeredShifts={registered}
+              postNames={postNames}
+              emptyState={emptyState}
+              onOpen={setOpened}
+            />
           </div>
 
           <aside className="vtk-shift-rail" aria-label={t.registered}>
+            {weeks.length > 1 ? <ShiftWeekOutline locale={locale} weeks={weeks} /> : null}
             <MyShiftsRail
               locale={locale}
               shifts={registered}

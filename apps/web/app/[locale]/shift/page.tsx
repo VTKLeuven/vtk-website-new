@@ -6,7 +6,6 @@ import { notFound } from 'next/navigation';
 import { requireSession } from '@/lib/session';
 import { PleaseLogin } from '@/components/site/pleaseLogin';
 import { prisma } from '@vtk/db';
-import { addDays, startOfWeek } from 'date-fns';
 import { academicYearRange, currentAcademicYear, parseShiftArray } from '@/lib/shift';
 import { availableShifts, registeredShifts } from '@/lib/shift/lists';
 import { loadPostNames } from '@/lib/shift/postNames';
@@ -81,39 +80,12 @@ export default async function ShiftPage({ params }: { params: Promise<{ locale: 
     return <PleaseLogin locale={locale} nextPath={`${base}/shift`} className="vtk-page-shell" />;
   }
 
-  const now = new Date();
-  const currentWeekStart = startOfWeek(now, { weekStartsOn: 1 });
-  const currentWeekEnd = addDays(currentWeekStart, 7);
-
-  const [stats, postNames, available, registered, shiftThisWeek] = await Promise.all([
+  const [stats, postNames, available, registered] = await Promise.all([
     yearStats(session.user.id),
     loadPostNames(locale),
     availableShifts(session.user.id),
     registeredShifts(session.user.id, session.user.id),
-    prisma.shift.findFirst({
-      where: {
-        endTime: { gte: now },
-        startTime: { lt: currentWeekEnd },
-        manualGrantId: null,
-      },
-      select: { id: true },
-    }),
   ]);
-
-  let initialWeekStart = currentWeekStart;
-  if (!shiftThisWeek) {
-    const nextShift = await prisma.shift.findFirst({
-      where: {
-        endTime: { gte: now },
-        manualGrantId: null,
-      },
-      orderBy: { startTime: 'asc' },
-      select: { startTime: true },
-    });
-    if (nextShift) {
-      initialWeekStart = startOfWeek(nextShift.startTime, { weekStartsOn: 1 });
-    }
-  }
 
   return (
     <div className="vtk-page">
@@ -122,7 +94,6 @@ export default async function ShiftPage({ params }: { params: Promise<{ locale: 
         historyHref={`${base}/shift/history`}
         stats={stats}
         postNames={postNames}
-        initialWeekStart={initialWeekStart.toISOString()}
         initialAvailable={parseShiftArray(available)}
         initialRegistered={parseShiftArray(registered)}
       />

@@ -1,6 +1,6 @@
 'use client';
-import { Fragment, useMemo, useState } from 'react';
-import { addDays, isSameDay } from 'date-fns';
+import { Fragment, useState } from 'react';
+import { getISOWeek } from 'date-fns';
 import { AlertTriangle, MapPin } from 'lucide-react';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { canUnregister, type ShiftResponse } from '@/lib/shift';
@@ -24,6 +24,7 @@ import {
   type PostNames,
   type ShiftDict,
 } from './shiftData';
+import { weekAnchor, type ShiftDay, type ShiftWeek } from './shiftWeeks';
 
 const DOW_SHORT: Record<Locale, string[]> = {
   nl: ['zo', 'ma', 'di', 'wo', 'do', 'vr', 'za'],
@@ -35,23 +36,40 @@ const MONTH_SHORT: Record<Locale, string[]> = {
   en: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
 };
 
-type DayData = {
-  date: Date;
-  isToday: boolean;
-  items: MergedShift[];
-};
-
 /** Een dag met shiften, of een reeks opeenvolgende dagen zonder. */
-type Segment = { kind: 'day'; day: DayData } | { kind: 'quiet'; days: DayData[] };
+type Segment = { kind: 'day'; day: ShiftDay } | { kind: 'quiet'; days: ShiftDay[] };
+
+/** "Deze week", "Volgende week", daarna het weeknummer. */
+export function weekName(week: ShiftWeek, t: ShiftDict): string {
+  if (week.offset === 0) return t.week.this;
+  if (week.offset === 1) return t.week.next;
+  return fill(t.week.number, { week: getISOWeek(week.monday) });
+}
+
+/** "12 tot 18 oktober", of "26 oktober tot 1 november" over een maandgrens. */
+export function weekRange(week: ShiftWeek, locale: Locale, t: ShiftDict): string {
+  const intl = locale === 'nl' ? 'nl-BE' : 'en-GB';
+  const dayMonthFmt = new Intl.DateTimeFormat(intl, { day: 'numeric', month: 'long' });
+  const dayFmt = new Intl.DateTimeFormat(intl, { day: 'numeric' });
+  const sunday = new Date(week.monday);
+  sunday.setDate(sunday.getDate() + 6);
+  return fill(t.week.range, {
+    from:
+      week.monday.getMonth() === sunday.getMonth()
+        ? dayFmt.format(week.monday)
+        : dayMonthFmt.format(week.monday),
+    to: dayMonthFmt.format(sunday),
+  });
+}
 
 /**
  * Lege dagen die op elkaar volgen, worden samen één regel. Elk een eigen rij met
  * datumpin kostte in een gewone week twee schermhoogtes aan "geen shiften"
  * voor de eerste shift in beeld kwam.
  */
-function segmentsOf(days: DayData[]): Segment[] {
+function segmentsOf(days: ShiftDay[]): Segment[] {
   const segments: Segment[] = [];
-  let quiet: DayData[] = [];
+  let quiet: ShiftDay[] = [];
   for (const day of days) {
     if (day.items.length === 0) {
       quiet.push(day);
@@ -68,7 +86,7 @@ function segmentsOf(days: DayData[]): Segment[] {
 }
 
 /** "Maandag 14 en dinsdag 15: geen shiften", met het vandaag-label bij de juiste dag. */
-function QuietDays({ days, locale, t }: { days: DayData[]; locale: Locale; t: ShiftDict }) {
+function QuietDays({ days, locale, t }: { days: ShiftDay[]; locale: Locale; t: ShiftDict }) {
   const intl = locale === 'nl' ? 'nl-BE' : 'en-GB';
   const dayFmt = new Intl.DateTimeFormat(intl, { weekday: 'long', day: 'numeric' });
   const parts = new Intl.ListFormat(intl, { type: 'conjunction' }).formatToParts(
@@ -101,48 +119,108 @@ function QuietDays({ days, locale, t }: { days: DayData[]; locale: Locale; t: Sh
 }
 
 /**
- * Lijstweergave: elke dag hangt aan de gele datumpin van de evenementenkaart, de
- * haarlijn verbindt de pins over de week, en de shiften liggen per dag gebundeld
- * in een kaart. Op een telefoon vallen de haarlijn en de pinkolom weg en schuift
- * de pin naast de dagnaam, zodat de kaart de volle breedte krijgt.
+ * Alle shiften vanaf vandaag, per week onder elkaar. Elke week opent met een kop
+ * ("Deze week", "Volgende week", "Week 43") en een haarlijn erboven; er is geen
+ * weekkiezer meer, want wie een shift zoekt, wil de komende weken naast elkaar
+ * zien en niet per week klikken. De rail draagt dezelfde weken als register
+ * (`ShiftWeekOutline`).
  */
 export function ShiftAgenda({
   locale,
-  weekStart,
-  shifts,
+  weeks,
   registeredShifts = [],
   postNames,
   emptyState,
   onOpen,
 }: {
   locale: Locale;
-  weekStart: Date;
-  shifts: MergedShift[];
+  weeks: ShiftWeek[];
   registeredShifts?: ShiftResponse[];
   postNames: PostNames;
   emptyState: React.ReactNode;
   onOpen: (entry: MergedShift) => void;
 }) {
   const t = getDictionary(locale).shift;
-  const showToast = useToast();
   const [now] = useState(() => Date.now());
 
-  const days: DayData[] = useMemo(() => {
-    const nowDate = new Date(now);
-    return Array.from({ length: 7 }, (_, i) => {
-      const date = addDays(weekStart, i);
-      const items = shifts
-        .filter((entry) => isSameDay(entry.shift.startTime, date))
-        .sort((a, b) => a.shift.startTime.getTime() - b.shift.startTime.getTime());
-      return { date, isToday: isSameDay(date, nowDate), items };
-    });
-  }, [shifts, weekStart, now]);
+  if (weeks.length === 0) return <>{emptyState}</>;
+
+  return (
+    <div className="vtk-shift-weeks">
+      {weeks.map((week) => {
+        const id = weekAnchor(week);
+        const n = week.shifts.length;
+        return (
+          <section key={id} id={id} className="vtk-shift-week" aria-labelledby={`${id}-title`}>
+            <header className="vtk-shift-week-head">
+              <div>
+                <h2 className="vtk-shift-week-name" id={`${id}-title`}>
+                  {weekName(week, t)}
+                </h2>
+                <p className="vtk-shift-week-range">{weekRange(week, locale, t)}</p>
+              </div>
+              {n > 0 ? (
+                <p className="vtk-shift-week-count">
+                  {fill(n === 1 ? t.week.summaryOne : t.week.summary, {
+                    total: n,
+                    open: week.open,
+                  })}
+                </p>
+              ) : null}
+            </header>
+
+            {n > 0 ? (
+              <WeekDays
+                locale={locale}
+                days={week.days}
+                registeredShifts={registeredShifts}
+                postNames={postNames}
+                now={now}
+                onOpen={onOpen}
+              />
+            ) : (
+              <p className="vtk-shift-week-empty">
+                <span className="vtk-shift-ring" aria-hidden="true" />
+                <span className="vtk-shift-quiet">{t.week.none}</span>
+              </p>
+            )}
+          </section>
+        );
+      })}
+
+      <p className="vtk-shift-weeks-end">{t.week.end}</p>
+    </div>
+  );
+}
+
+/**
+ * De dagen van één week: elke dag hangt aan de gele datumpin van de
+ * evenementenkaart, de haarlijn verbindt de pins binnen de week, en de shiften
+ * liggen per dag gebundeld in een kaart. Op een telefoon vallen de haarlijn en
+ * de pinkolom weg en schuift de pin naast de dagnaam, zodat de kaart de volle
+ * breedte krijgt.
+ */
+function WeekDays({
+  locale,
+  days,
+  registeredShifts,
+  postNames,
+  now,
+  onOpen,
+}: {
+  locale: Locale;
+  days: ShiftDay[];
+  registeredShifts: ShiftResponse[];
+  postNames: PostNames;
+  now: number;
+  onOpen: (entry: MergedShift) => void;
+}) {
+  const t = getDictionary(locale).shift;
+  const showToast = useToast();
 
   const weekdayFmt = new Intl.DateTimeFormat(locale === 'nl' ? 'nl-BE' : 'en-GB', {
     weekday: 'long',
   });
-
-  if (shifts.length === 0) return <>{emptyState}</>;
 
   return (
     <ol className="vtk-shift-days">

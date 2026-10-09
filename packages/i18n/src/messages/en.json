@@ -717,18 +717,18 @@
     "subtitle": "Lend a hand behind the bar or at an event. Every shift earns vouchers.",
     "available": "Available shifts",
     "registered": "My shifts",
-    "view": {
-      "label": "View",
-      "week": "Week",
-      "list": "List"
-    },
     "week": {
-      "prev": "Previous week",
-      "next": "Next week",
       "today": "Today",
       "range": "{from} to {to}",
-      "summary": "Week {week}: {total} shifts, {open} with spots",
-      "summaryEmpty": "Week {week}: no shifts"
+      "this": "This week",
+      "next": "Next week",
+      "number": "Week {week}",
+      "summary": "{total} shifts, {open} with spots",
+      "summaryOne": "1 shift, {open} with spots",
+      "none": "No shifts this week.",
+      "end": "No further shifts are scheduled yet.",
+      "outline": "Weeks",
+      "open": "{n} with spots"
     },
     "day": {
       "noShifts": "no shifts",
@@ -738,8 +738,6 @@
     },
     "clash": "Overlaps with your shift",
     "clashWarning": "Overlaps with {name}",
-    "earlierShifts": "Earlier shifts",
-    "laterShifts": "Later shifts",
     "filter": {
       "post": "Group",
       "allPosts": "All groups"
@@ -781,9 +779,7 @@
       "inDays": "In {n} days"
     },
     "empty": {
-      "week": "No shifts this week",
-      "next": "The next shift is {name} on {date}.",
-      "jump": "Go to {date}",
+      "title": "No shifts",
       "none": "No shifts are scheduled at the moment."
     },
     "rail": {

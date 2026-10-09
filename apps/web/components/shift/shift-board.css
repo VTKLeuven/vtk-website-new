@@ -1,132 +1,17 @@
 /* ==========================================================================
    Shiftpagina · Richting A (Kalenderblad)
    Gele datumpins, donkere kop met technisch patroon, rail als register in
-   de marge, en een tijdsas-weekrooster met expliciete overlap-kolommen.
+   de marge, en alle shiften vanaf vandaag per week onder elkaar.
    Tokens komen uit vtk-base.css.
    ========================================================================== */
 
-/* --- Paginakop: donkere band met patroon en gereedschappen --- */
+/* --- Paginakop: donkere band met patroon --- */
 
-.vtk-shift-page-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 20px 32px;
-}
-
+/* Geen weekgereedschap meer in de kop: de lijst loopt van vandaag tot de laatste
+   shift, en de weken staan als register in de rail. */
 .vtk-shift-head-intro {
   display: grid;
   gap: 10px;
-}
-
-.vtk-shift-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px 16px;
-}
-
-.vtk-shift-weeknav {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-.vtk-shift-round {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  width: 36px;
-  height: 36px;
-  border: 1px solid rgba(183, 192, 220, 0.34);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--paper);
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  transition:
-    border-color 140ms ease,
-    background-color 140ms ease,
-    color 140ms ease;
-}
-
-.vtk-shift-round:hover {
-  border-color: var(--paper);
-  background: var(--paper);
-  color: var(--ink);
-}
-
-.vtk-shift-week-label {
-  min-width: 10.5em;
-  color: var(--paper);
-  font-size: clamp(18px, 1.9vw, 23px);
-  font-weight: 600;
-  letter-spacing: -0.02em;
-  line-height: 1.15;
-  font-variant-numeric: tabular-nums;
-}
-
-.vtk-shift-week-label small {
-  display: block;
-  margin-top: 3px;
-  color: var(--on-dark-muted);
-  font-size: 13px;
-  font-weight: 400;
-  letter-spacing: 0;
-}
-
-/* Losse pillen, zoals de weergavekeuze op /kalender. */
-.vtk-shift-view-switch {
-  display: inline-flex;
-  flex: none;
-  gap: 6px;
-}
-
-.vtk-shift-view-switch button {
-  padding: 8px 16px;
-  border: 1px solid rgba(183, 192, 220, 0.34);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--on-dark-muted);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.15;
-  cursor: pointer;
-  transition:
-    background-color 140ms ease,
-    color 140ms ease;
-}
-
-.vtk-shift-view-switch button[aria-pressed='true'] {
-  border-color: var(--paper);
-  background: var(--paper);
-  color: var(--ink);
-}
-
-.vtk-shift-today-btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 34px;
-  padding: 6px 14px;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--paper);
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  transition:
-    border-color 140ms ease,
-    background-color 140ms ease;
-}
-
-.vtk-shift-today-btn:hover {
-  border-color: var(--yellow);
-  background: rgba(255, 255, 255, 0.08);
 }
 
 /* --- Hoofdindeling (Grid & Rail) --- */
@@ -169,6 +54,13 @@
   .vtk-shift-rail .vtk-shift-rail-box + .vtk-shift-rail-box {
     padding-top: 0;
     border-top: 0;
+  }
+
+  /* De rail staat hier boven de lijst; een register van de weken zou de eerste
+     shift een scherm naar beneden duwen, en de weekkoppen zeggen het al. Met de
+     rail ervoor, want `.vtk-shift-rail-box` staat verderop en zet `flex`. */
+  .vtk-shift-rail .vtk-shift-rail-weeks {
+    display: none;
   }
 }
 
@@ -258,7 +150,80 @@
   line-height: 1.2;
 }
 
-/* --- Lijstweergave (Richting A: aDays) --- */
+/* --- Weken --- */
+
+/* Alle shiften vanaf vandaag staan onder elkaar, en elke week opent met een kop
+   en een haarlijn erboven. De lijn tussen de datumpins stopt aan het einde van
+   de week (`:last-child`), zodat de scheiding ook in de tijdlijn zelf leest. */
+.vtk-shift-weeks {
+  display: grid;
+}
+
+.vtk-shift-week {
+  /* Net onder de sticky sitekop, zoals de rail. */
+  scroll-margin-top: 96px;
+}
+
+.vtk-shift-week + .vtk-shift-week,
+.vtk-shift-weeks-end {
+  margin-top: 8px;
+  padding-top: 26px;
+  border-top: 1px solid var(--line-2);
+}
+
+.vtk-shift-week-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 4px 20px;
+  margin-bottom: 20px;
+}
+
+.vtk-shift-week-name {
+  margin: 0;
+  color: var(--ink);
+  font-size: 24px;
+  font-weight: 600;
+  letter-spacing: -0.022em;
+  line-height: 1.15;
+}
+
+.vtk-shift-week-range {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-shift-week-count {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Een week zonder shiften blijft staan, als stille regel op de plaats van de
+   dagen: een gat in de planning hoort zichtbaar te zijn. */
+.vtk-shift-week-empty {
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  gap: 18px;
+  align-items: center;
+  margin: 0 0 22px;
+}
+
+.vtk-shift-week-empty .vtk-shift-ring {
+  margin-top: 0;
+}
+
+.vtk-shift-weeks-end {
+  margin-bottom: 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+/* --- Dagen binnen een week --- */
 
 .vtk-shift-days {
   display: grid;
@@ -997,6 +962,18 @@
   background: var(--yellow);
 }
 
+/* De weken: één regel per week, het aantal met plaats rechts. Een link en geen
+   knop, dus zonder onderlijn. */
+.vtk-shift-rail-week {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  text-decoration: none;
+}
+
 .vtk-shift-rail-item small {
   color: var(--muted);
   font-size: 12px;
@@ -1047,330 +1024,7 @@
   margin-left: 13px;
 }
 
-/* --- Weekrooster met expliciete tijdsas en overlap-kolommen --- */
-
-.vtk-week {
-  display: grid;
-  gap: 12px;
-}
-
-.vtk-week-scroll {
-  position: relative;
-  overflow: auto;
-  max-height: calc(12 * 48px + 45px);
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: var(--surface);
-}
-
-.vtk-week-grid {
-  display: grid;
-  /* `--week-days` zet WeekView: vijf, zes of zeven, want zaterdag en zondag
-     staan er enkel wanneer er die dag een shift is. */
-  grid-template-columns: 56px repeat(var(--week-days, 7), minmax(110px, 1fr));
-  min-width: 800px;
-  padding-bottom: 8px;
-  background: var(--surface);
-}
-
-.vtk-week-corner {
-  position: sticky;
-  top: 0;
-  left: 0;
-  z-index: 15;
-  border-bottom: 1px solid var(--line);
-  background: var(--paper-2);
-}
-
-.vtk-week-head {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 6px;
-  padding: 11px 4px;
-  border-bottom: 1px solid var(--line);
-  border-left: 1px solid var(--line);
-  background: var(--paper-2);
-}
-
-.vtk-week-dow {
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1;
-}
-
-.vtk-week-head[data-today='true'] .vtk-week-dow {
-  color: var(--ink);
-}
-
-.vtk-week-date-num {
-  font-size: 17px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.02em;
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-
-.vtk-week-head[data-today='true'] .vtk-week-date-num {
-  background: var(--yellow);
-  padding: 2px 6px;
-  border-radius: 6px;
-}
-
-.vtk-week-month {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1;
-}
-
-.vtk-week-gutter {
-  position: sticky;
-  left: 0;
-  z-index: 5;
-  background: var(--surface);
-  border-right: 1px solid var(--line);
-}
-
-.vtk-week-hour {
-  position: absolute;
-  right: 7px;
-  transform: translateY(-7px);
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-}
-
-.vtk-week-daycol {
-  position: relative;
-  border-left: 1px solid var(--line);
-}
-
-.vtk-week-daycol[data-today='true'] {
-  background-color: rgba(14, 26, 54, 0.02);
-}
-
-.vtk-week-now {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 1.5px;
-  background: var(--navy);
-  z-index: 6;
-}
-
-.vtk-week-now::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: -3px;
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: var(--yellow);
-  box-shadow: 0 0 0 1.5px var(--navy);
-}
-
-/* Shiftblokken in het rooster */
-.vtk-week-block {
-  position: absolute;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: 6px 8px;
-  border: 1px solid var(--line);
-  border-left-width: 3px;
-  border-radius: 9px;
-  overflow: hidden;
-  text-align: left;
-  font: inherit;
-  font-size: 11.5px;
-  line-height: 1.25;
-  cursor: pointer;
-  transition:
-    transform 140ms ease,
-    box-shadow 140ms ease;
-  z-index: 2;
-}
-
-.vtk-week-block:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 16px -8px rgba(14, 26, 54, 0.6);
-  z-index: 4;
-}
-
-.vtk-week-block[data-state='mine'] {
-  border-left-color: var(--yellow);
-  background: color-mix(in srgb, var(--yellow) 14%, var(--surface));
-}
-
-.vtk-week-block[data-state='open'] {
-  border-left-color: var(--navy);
-  background: var(--surface);
-}
-
-.vtk-week-block[data-state='full'] {
-  border-left-color: var(--line-2);
-  background: var(--paper);
-  color: var(--muted);
-}
-
-/* Overlappende shiften: subtiele schaduw */
-.vtk-week-block[data-overlap='true'] {
-  box-shadow: 0 1px 4px rgba(14, 26, 54, 0.08);
-}
-
-.vtk-week-block[data-clash='true'] {
-  border-color: var(--low-ink);
-}
-
-.vtk-week-block-time {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 11px;
-  line-height: 1.2;
-  font-variant-numeric: tabular-nums;
-  color: var(--muted);
-}
-
-.vtk-week-block-time b {
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.vtk-week-block-globe {
-  width: 11px;
-  height: 11px;
-  color: var(--muted);
-}
-
-.vtk-week-block-name {
-  font-size: 12px;
-  font-weight: 600;
-  line-height: 1.2;
-  color: var(--ink);
-}
-
-.vtk-week-block[data-state='full'] .vtk-week-block-name {
-  color: var(--body);
-}
-
-.vtk-week-block-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10.5px;
-  font-variant-numeric: tabular-nums;
-}
-
-.vtk-week-pill-mine {
-  color: var(--ink);
-  font-weight: 600;
-}
-
-.vtk-week-pill-mine::before {
-  content: '●';
-  color: var(--yellow);
-  margin-right: 3px;
-}
-
-.vtk-week-pill-open {
-  color: var(--ok-ink);
-  font-weight: 500;
-}
-
-.vtk-week-pill-full {
-  color: var(--muted);
-}
-
-.vtk-week-clash-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--low-ink);
-  background: var(--low-bg);
-  padding: 1px 5px;
-  border-radius: 4px;
-  width: fit-content;
-}
-
-.vtk-week-clash-badge svg {
-  width: 10px;
-  height: 10px;
-}
-
-.vtk-week-block-loc {
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  font-size: 10.5px;
-  color: var(--muted);
-  margin-top: auto;
-}
-
-.vtk-week-block-loc svg {
-  width: 11px;
-  height: 11px;
-}
-
-.vtk-week-indicator {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 8;
-  display: inline-flex;
-  align-items: center;
-  gap: 3px;
-  padding: 2px 7px;
-  border: 1px solid var(--line-2);
-  border-radius: 999px;
-  background: var(--surface);
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: 600;
-  line-height: 1;
-  font-variant-numeric: tabular-nums;
-  box-shadow: 0 2px 8px rgba(14, 26, 54, 0.12);
-  cursor: pointer;
-  transition:
-    background-color 120ms ease,
-    transform 120ms ease;
-}
-
-.vtk-week-indicator:hover {
-  background: var(--paper-2);
-  transform: translateX(-50%) translateY(-1px);
-}
-
-.vtk-week-indicator-chevron {
-  width: 11px;
-  height: 11px;
-  stroke-width: 2.5;
-  color: var(--muted);
-}
-
-.vtk-week-empty {
-  position: absolute;
-  left: 0;
-  right: 0;
-  display: grid;
-  place-items: center;
-  pointer-events: none;
-}
-
-.vtk-week-empty > * {
-  pointer-events: auto;
-}
-
-/* --- Lege week weergave --- */
+/* --- Nog geen enkele shift gepland --- */
 
 .vtk-shift-empty {
   display: grid;
@@ -1711,18 +1365,12 @@
 /* --- Responsieve aanpassingen voor smalle schermen --- */
 
 @media (max-width: 640px) {
-  .vtk-shift-page-head {
-    gap: 16px;
+  .vtk-shift-week-name {
+    font-size: 21px;
   }
 
-  .vtk-shift-tools {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .vtk-shift-weeknav {
-    flex: 1 1 100%;
-    justify-content: space-between;
+  .vtk-shift-week-empty {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   /* Geen haarlijn en geen pinkolom op een telefoon: die kolom kostte elke kaart

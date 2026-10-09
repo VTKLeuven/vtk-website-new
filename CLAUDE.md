@@ -531,6 +531,12 @@ the design language into the application instead of copying mockup content.
     so the day card gets the full width (the pin moves beside the day name).
     Three directions were reviewed; this cleaned-up agenda won over a table and
     over event-style tiles.
+  - **/shift has no week selector and no week grid.** The agenda runs from today
+    to the last planned shift, and every week opens with its own heading ("Deze
+    week", "Volgende week", "Week 43") under a hairline, with the day timeline
+    stopping at the end of each week. The weeks also sit at the top of the rail
+    as a one-line-per-week register with a scroll-spy. Do not bring back the
+    arrows or the Week/Lijst switch; see `docs/design-decisions.md`.
   - **De verhuurkalender bestaat twee keer en het raster maar één keer.** Het
     beheer (`/admin/theokot/verhuur`) en de publieke beschikbaarheidskalender op
     `/theokot/verhuur` delen `components/theokot/RentalMonthGrid.tsx` en

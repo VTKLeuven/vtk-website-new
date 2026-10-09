@@ -717,18 +717,18 @@
     "subtitle": "Help mee achter de toog of op een evenement. Elke shift levert bonnetjes op.",
     "available": "Beschikbare shiften",
     "registered": "Mijn shiften",
-    "view": {
-      "label": "Weergave",
-      "week": "Week",
-      "list": "Lijst"
-    },
     "week": {
-      "prev": "Vorige week",
-      "next": "Volgende week",
       "today": "Vandaag",
       "range": "{from} tot {to}",
-      "summary": "Week {week}: {total} shiften, {open} met plaats",
-      "summaryEmpty": "Week {week}: geen shiften"
+      "this": "Deze week",
+      "next": "Volgende week",
+      "number": "Week {week}",
+      "summary": "{total} shiften, {open} met plaats",
+      "summaryOne": "1 shift, {open} met plaats",
+      "none": "Geen shiften in deze week.",
+      "end": "Verder staan er nog geen shiften gepland.",
+      "outline": "Weken",
+      "open": "{n} met plaats"
     },
     "day": {
       "noShifts": "geen shiften",
@@ -738,8 +738,6 @@
     },
     "clash": "Overlapt met je shift",
     "clashWarning": "Overlapt met {name}",
-    "earlierShifts": "Vroegere shiften",
-    "laterShifts": "Latere shiften",
     "filter": {
       "post": "Post",
       "allPosts": "Alle posten"
@@ -781,9 +779,7 @@
       "inDays": "Over {n} dagen"
     },
     "empty": {
-      "week": "Geen shiften deze week",
-      "next": "De eerstvolgende shift is {name} op {date}.",
-      "jump": "Ga naar {date}",
+      "title": "Geen shiften",
       "none": "Er staan voorlopig geen shiften gepland."
     },
     "rail": {
