@@ -45,6 +45,17 @@ describe("GET /api/shortlinks/[slug]/qr", () => {
     expect(Buffer.from(await response.arrayBuffer()).toString()).toBe("png-bytes");
   });
 
+  it("encodes the public host behind the proxy, not the internal one", async () => {
+    await GET(
+      new Request("http://localhost:3000/api/shortlinks/test/qr", {
+        headers: { host: "localhost:3000", "x-forwarded-host": "vtk.be" },
+      }),
+      context(),
+    );
+
+    expect(mocks.createPng).toHaveBeenCalledWith("https://on.vtk.be/test");
+  });
+
   it("serves the same PNG as a download", async () => {
     const response = await GET(request("?download=1"), context());
 

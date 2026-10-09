@@ -1,5 +1,6 @@
 import { prisma } from "@vtk/db";
 import { createStyledShortlinkQrPng } from "@/lib/shortlink-qr";
+import { publicRequestHost } from "@/lib/requestHost";
 import { shortlinkPublicUrl } from "@/lib/shortlinks";
 
 export const runtime = "nodejs";
@@ -22,7 +23,7 @@ export async function GET(
   });
   if (!link) return Response.json({ error: "NOT_FOUND" }, { status: 404 });
 
-  const host = request.headers.get("host") ?? "vtk.be";
+  const host = publicRequestHost(request.headers, "vtk.be");
   const publicUrl = shortlinkPublicUrl(host, link.slug);
   const png = await createStyledShortlinkQrPng(publicUrl);
   const download = new URL(request.url).searchParams.get("download") === "1";

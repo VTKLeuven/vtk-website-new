@@ -5,6 +5,7 @@ import { cookies, headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { AUTH_BASE_PATH } from '@vtk/auth';
 import { ensureFlowTestClient, FLOW_TEST_CLIENT_ID } from '@vtk/auth/server';
+import { publicRequestHost } from '@/lib/requestHost';
 
 /**
  * De PKCE-verifier en de state moeten de omleiding overleven zonder dat de
@@ -20,7 +21,7 @@ function base64url(buffer: Buffer): string {
 /** Waar deze omgeving bereikbaar is, zodat de redirect-URI altijd klopt. */
 async function origin(): Promise<string> {
   const requestHeaders = await headers();
-  const host = requestHeaders.get('host') ?? 'localhost:3000';
+  const host = publicRequestHost(requestHeaders, 'localhost:3000');
   const proto = host.startsWith('localhost') || host.startsWith('127.') ? 'http' : 'https';
   return `${proto}://${host}`;
 }

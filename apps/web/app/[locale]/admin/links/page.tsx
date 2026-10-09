@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
+import { publicRequestHost } from "@/lib/requestHost";
 import { shortlinkDisplayHost } from "@/lib/shortlinks";
 import type { Locale } from "@vtk/i18n";
 import { ShortLinksManager, type LinkRow } from "./ShortLinksManager";
@@ -17,7 +18,7 @@ export default async function AdminShortLinks({
   const locale: Locale = localeParam;
   await requirePermission("shortlinks.manage");
 
-  const host = (await headers()).get("host") ?? "on.vtk.be";
+  const host = publicRequestHost(await headers(), "on.vtk.be");
   const SHORTLINK_HOST = shortlinkDisplayHost(host);
   const links = await prisma.shortLink.findMany({
     orderBy: { createdAt: "desc" },

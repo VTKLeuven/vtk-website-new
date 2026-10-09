@@ -10,6 +10,7 @@ import { canSessionCreateFormForGroup } from "@/lib/forms/authorization";
 import { linkableForms } from "@/lib/forms/pageLink";
 import { tiptapToMarkdown } from "@/lib/tiptap-to-markdown";
 import { publicUrl } from "@/lib/storage";
+import { publicRequestHost } from "@/lib/requestHost";
 import { PageContentEditor } from "./PageContentEditor";
 
 /**
@@ -27,7 +28,7 @@ export default async function AdminPageEditor({
   const locale: Locale = localeParam;
 
   const session = await requireAnyPermission(["pages.edit", "pages.editAll"]);
-  const host = (await headers()).get("host") ?? "vtk.be";
+  const host = publicRequestHost(await headers(), "vtk.be");
 
   const [page, roles] = await Promise.all([
     prisma.page.findUnique({

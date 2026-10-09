@@ -12,6 +12,7 @@ import { reviewFirstWindow } from "@/lib/reviewFirstPaging";
 import { PagesToolbar } from "./PagesToolbar";
 import { PageRowActions } from "./PageRowActions";
 import { LinkedRow } from "@/components/ui/LinkedRow";
+import { publicRequestHost } from "@/lib/requestHost";
 
 const PAGE_SIZE = 25;
 
@@ -45,7 +46,7 @@ export default async function AdminPages({
 
   const session = await requireAnyPermission(["pages.edit", "pages.editAll"]);
   const canEditAll = hasPermission(session, "pages.editAll");
-  const host = (await headers()).get("host") ?? "vtk.be";
+  const host = publicRequestHost(await headers(), "vtk.be");
 
   const q = (sp.q ?? "").trim();
   const sortKey: SortKey = SORT_KEYS.includes(sp.sort as SortKey) ? (sp.sort as SortKey) : "review";
