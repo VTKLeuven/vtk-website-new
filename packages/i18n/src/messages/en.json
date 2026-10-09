@@ -772,7 +772,8 @@
     },
     "reward": {
       "one": "1 voucher",
-      "many": "{n} vouchers"
+      "many": "{n} vouchers",
+      "withheld": "{reward}, but as a praesidium member you don't earn them"
     },
     "rel": {
       "today": "Today",

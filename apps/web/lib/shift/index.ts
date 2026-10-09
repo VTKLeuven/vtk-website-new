@@ -174,6 +174,12 @@ export type ShiftResponse = Shift & {
   registeredAt?: string | null;
   /** Wie er al ingeschreven is, voor het detailvenster op /shift. */
   roster?: ShiftRosterEntry[];
+  /**
+   * Op /shift is `reward` wat de shift de kijker oplevert. Dit is wat ze anderen
+   * wel oplevert maar hem niet, omdat hij dat werkingsjaar in het praesidium zit
+   * (`viewerReward` in `lib/shift/lists.ts`). Nul of ontbrekend: niets ingehouden.
+   */
+  withheldReward?: number;
 };
 
 /**

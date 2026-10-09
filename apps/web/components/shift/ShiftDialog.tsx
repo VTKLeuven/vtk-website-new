@@ -19,12 +19,12 @@ import {
   freeSpots,
   postLabel,
   registerShift,
-  rewardLabel,
   spotsLabel,
   spotsSpoken,
   spotsVariant,
   takenSpots,
   unregisterShift,
+  viewerRewardLabel,
   type MergedShift,
   type PostNames,
 } from './shiftData';
@@ -209,7 +209,7 @@ export function ShiftDialog({
           <dl className="vtk-shift-facts">
             <Detail k={t.detail.location} v={shift.location} />
             {shift.post ? <Detail k={t.detail.post} v={postLabel(shift.post, postNames)} /> : null}
-            <Detail k={t.detail.reward} v={rewardLabel(shift.reward, t)} />
+            <Detail k={t.detail.reward} v={viewerRewardLabel(shift, t)} />
             <Detail
               k={t.detail.spots}
               v={fill(t.spots.taken, { taken, max: shift.maxParticipants })}

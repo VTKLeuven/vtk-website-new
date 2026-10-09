@@ -772,7 +772,8 @@
     },
     "reward": {
       "one": "1 bonnetje",
-      "many": "{n} bonnetjes"
+      "many": "{n} bonnetjes",
+      "withheld": "{reward}, maar als praesidiumlid verdien je er geen"
     },
     "rel": {
       "today": "Vandaag",

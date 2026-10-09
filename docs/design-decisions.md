@@ -486,6 +486,14 @@ open vragen opleverde (`docs/theokot-broodjes-audit-2026-09-21.md`).
     werd, wordt niet teruggedraaid; in het beheerscherm telt het als toegekend.
   - Wat blijft tonen wat een shift "waard" is: de publieke shiftkaarten op de
     homepage. Dat is het aanbod voor iedereen, niet wat één kijker verdient.
+  - **Op /shift staan ze grijs, niet weg** (oktober 2026). De agenda en het
+    detailvenster tonen wat de shift de kijker oplevert. Voor een praesidiumlid
+    verdwenen de bonnetjes daar gewoon en stond er "0 bonnetjes", terwijl
+    /admin/shiften de beloning van de shift toont. De verantwoordelijke van
+    Cursusdienst las dat als "cudi-shiften leveren niemand bonnetjes op". Nu
+    staat de waarde er grijs bij, met "maar als praesidiumlid verdien je er
+    geen" in de tooltip en het detailvenster (`withheldReward` uit
+    `lib/shift/lists.ts`). De regel zelf verandert niet.
 - **Het aanbod van een dag mag onder het aantal dat al besteld is, en er wordt
   niets automatisch geschrapt.** Er valt een plateau of de bakker levert minder,
   en dan moet dat in het systeem kunnen. Wat er dan gebeurt:

@@ -91,6 +91,19 @@ export function rewardLabel(reward: number, t: ShiftDict): string {
   return reward === 1 ? t.reward.one : fill(t.reward.many, { n: reward });
 }
 
+/**
+ * De beloning zoals deze kijker ze krijgt. Levert de shift hem niets op omdat hij
+ * in het praesidium zit, dan staat er wat ze waard is en waarom hij ze niet
+ * krijgt, in plaats van "0 bonnetjes".
+ */
+export function viewerRewardLabel(shift: ShiftResponse, t: ShiftDict): string {
+  const withheld = shift.withheldReward ?? 0;
+  if (shift.reward === 0 && withheld > 0) {
+    return fill(t.reward.withheld, { reward: rewardLabel(withheld, t) });
+  }
+  return rewardLabel(shift.reward, t);
+}
+
 type ErrorBody = { error?: string; conflictShift?: { id: string; name: string } };
 
 /** Leest JSON uit een response, of `null` als de body geen (geldige) JSON is. */

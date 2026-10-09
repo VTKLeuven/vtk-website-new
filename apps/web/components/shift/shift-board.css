@@ -568,6 +568,18 @@
   box-shadow: 0 1px 2px rgba(14, 26, 54, 0.18);
 }
 
+/* Bonnen die de shift waard is, maar die deze kijker niet verdient: hij zit dat
+   werkingsjaar in het praesidium. Grijs in plaats van weg, anders lijkt het alsof
+   de shift niemand iets oplevert. De uitleg staat in de tooltip en de dialoog. */
+.vtk-reward[data-withheld] {
+  color: var(--muted);
+}
+
+.vtk-reward[data-withheld] .vtk-reward-coins {
+  filter: grayscale(1);
+  opacity: 0.5;
+}
+
 .vtk-shift-post {
   display: inline-flex;
   align-items: center;

@@ -2,7 +2,7 @@ import 'server-only';
 
 import { prisma } from '@vtk/db';
 import { ROSTER_PARTICIPANT_SELECT, toRoster } from '@/lib/shift/roster';
-import { earnedShiftReward } from '@/lib/shift/rewards';
+import { earnedShiftReward, type PraesidiumYears } from '@/lib/shift/rewards';
 import { praesidiumYears } from '@/lib/shift/voucherEligibility';
 
 /*
@@ -11,6 +11,23 @@ import { praesidiumYears } from '@/lib/shift/voucherEligibility';
  * anders rendert /shift eerst een lege week en springt ze open zodra de fetch
  * binnenkomt.
  */
+
+/**
+ * De beloning zoals deze gebruiker ze ziet: `reward` is wat de shift hem
+ * oplevert (`earnedShiftReward`), `withheldReward` wat ze anderen wel oplevert
+ * maar hem niet, omdat hij dat werkingsjaar in het praesidium zit.
+ *
+ * Zonder dat tweede getal verdwenen de bonnetjes op /shift voor een
+ * praesidiumlid gewoon, terwijl /admin/shiften ze wel toont. Een
+ * verantwoordelijke las dat als "deze shift levert niemand bonnetjes op".
+ */
+function viewerReward(
+  participation: { userId: string; reward: number; startTime: Date },
+  praesidium: PraesidiumYears,
+) {
+  const reward = earnedShiftReward(participation, praesidium);
+  return { reward, withheldReward: participation.reward - reward };
+}
 
 /**
  * De huidige shiften waarvoor `viewerId` zich kan registreren.
@@ -22,7 +39,8 @@ import { praesidiumYears } from '@/lib/shift/voucherEligibility';
  * `participants` zelf, met hun user-id's, blijven op de server.
  *
  * `reward` is wat de shift deze kijker oplevert: nul in een werkingsjaar waarin
- * hij in het praesidium zit (`earnedShiftReward`).
+ * hij in het praesidium zit (`earnedShiftReward`). Wat hij daardoor misloopt,
+ * staat in `withheldReward` (`viewerReward`).
  */
 export async function availableShifts(viewerId: string) {
   const now = new Date();
@@ -40,7 +58,7 @@ export async function availableShifts(viewerId: string) {
       const takenSpots = participants.length;
       return {
         ...shift,
-        reward: earnedShiftReward({ userId: viewerId, ...shift }, praesidium),
+        ...viewerReward({ userId: viewerId, ...shift }, praesidium),
         takenSpots,
         availableSpots: Math.max(0, shift.maxParticipants - takenSpots),
         isRegistered: participants.some((p) => p.userId === viewerId),
@@ -79,7 +97,7 @@ export async function registeredShifts(targetUserId: string, viewerId: string) {
     const takenSpots = participants.length;
     return {
       ...shift,
-      reward: earnedShiftReward({ userId: targetUserId, ...shift }, praesidium),
+      ...viewerReward({ userId: targetUserId, ...shift }, praesidium),
       takenSpots,
       availableSpots: Math.max(0, shift.maxParticipants - takenSpots),
       participants: participants.map(({ userId, payedOut, registeredAt }) => ({

@@ -19,6 +19,7 @@ import {
   spotsVariant,
   takenSpots,
   unregisterShift,
+  viewerRewardLabel,
   type MergedShift,
   type PostNames,
   type ShiftDict,
@@ -185,6 +186,7 @@ export function ShiftAgenda({
                   const { shift, registered } = entry;
                   const isFull = !registered && freeSpots(shift) <= 0;
                   const locked = registered && !canUnregister(shift, now);
+                  const withheldReward = shift.withheldReward ?? 0;
 
                   // Detecteer clash met eigen inschrijving
                   const conflict = !registered
@@ -253,6 +255,13 @@ export function ShiftAgenda({
                                 amount={shift.reward}
                                 label={rewardLabel(shift.reward, t)}
                                 size="sm"
+                              />
+                            ) : withheldReward > 0 ? (
+                              <RewardCoins
+                                amount={withheldReward}
+                                label={viewerRewardLabel(shift, t)}
+                                size="sm"
+                                withheld
                               />
                             ) : null}
                             {conflict ? (
