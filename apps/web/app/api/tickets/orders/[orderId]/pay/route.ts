@@ -2,6 +2,7 @@ import { z } from "zod";
 import { startOrderPayment } from "@/lib/ticketing/orders";
 import { getOrderForViewer } from "@/lib/ticketing/queries";
 import { readLimitedJson, RequestBodyTooLargeError } from "@/lib/ticketing/http";
+import { isTransientDatabaseError } from "@/lib/ticketing/transactions";
 
 export const runtime = "nodejs";
 
@@ -45,6 +46,12 @@ export async function POST(
     }
     if (error instanceof z.ZodError) {
       return Response.json({ error: "INVALID_REQUEST" }, { status: 400 });
+    }
+    if (isTransientDatabaseError(error)) {
+      // Zoals bij de checkout: druk, niet stuk. "Deze betaalmethode werkt nu
+      // niet" zou de koper naar de andere sturen terwijl beide gewoon werken.
+      console.warn("Starting a ticket payment too busy", { orderId, error });
+      return Response.json({ error: "BUSY" }, { status: 503, headers: { "Retry-After": "1" } });
     }
     console.error("Starting a ticket payment failed", { orderId, error });
     return Response.json({ error: "PAYMENT_UNAVAILABLE" }, { status: 500 });

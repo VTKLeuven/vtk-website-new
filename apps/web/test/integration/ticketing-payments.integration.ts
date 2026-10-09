@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { getSession } from "@vtk/auth/server";
 import { prisma } from "@vtk/db";
 import { POST as bancontactWebhook } from "@/app/api/tickets/bancontact/webhook/route";
 import { POST as mollieWebhook } from "@/app/api/tickets/mollie/webhook/route";
@@ -188,19 +189,23 @@ describe.sequential("ticket payments", () => {
     // betaling die de nagebootste API daarna vergat), stond bij elke volgende
     // run vooraan in `releaseExpiredOrders` en drong de bestellingen van die run
     // uit de eerste honderd.
+    // Elk event van deze groep, ook dat van de test met gratis tickets.
+    const eventIds = (
+      await prisma.ticketEvent.findMany({ where: { ownerGroupId: ids.group }, select: { id: true } })
+    ).map((event) => event.id);
     const orderIds = (
-      await prisma.ticketOrder.findMany({ where: { eventId: ids.event }, select: { id: true } })
+      await prisma.ticketOrder.findMany({ where: { eventId: { in: eventIds } }, select: { id: true } })
     ).map((order) => order.id);
-    await prisma.ticketOutboxMessage.deleteMany({ where: { eventId: ids.event } });
+    await prisma.ticketOutboxMessage.deleteMany({ where: { eventId: { in: eventIds } } });
     await prisma.ticketRefundItem.deleteMany({ where: { orderId: { in: orderIds } } });
     await prisma.ticketRefund.deleteMany({ where: { orderId: { in: orderIds } } });
-    await prisma.ticket.deleteMany({ where: { eventId: ids.event } });
+    await prisma.ticket.deleteMany({ where: { eventId: { in: eventIds } } });
     await prisma.ticketPayment.deleteMany({ where: { orderId: { in: orderIds } } });
-    await prisma.ticketOrderItem.deleteMany({ where: { eventId: ids.event } });
-    await prisma.ticketOrder.deleteMany({ where: { eventId: ids.event } });
+    await prisma.ticketOrderItem.deleteMany({ where: { eventId: { in: eventIds } } });
+    await prisma.ticketOrder.deleteMany({ where: { eventId: { in: eventIds } } });
     // Het auditlog laat zich pas wissen wanneer het event geen bestellingen meer heeft.
-    await prisma.ticketAuditLog.deleteMany({ where: { eventId: ids.event } });
-    await prisma.ticketEvent.deleteMany({ where: { id: ids.event } });
+    await prisma.ticketAuditLog.deleteMany({ where: { eventId: { in: eventIds } } });
+    await prisma.ticketEvent.deleteMany({ where: { id: { in: eventIds } } });
     await prisma.group.deleteMany({ where: { id: ids.group } });
     await prisma.user.deleteMany({ where: { id: ids.user } });
     await prisma.$disconnect();
@@ -740,6 +745,74 @@ describe.sequential("ticket payments", () => {
     } finally {
       create.mockRestore();
       vi.stubEnv("TICKETING_PAYMENT_METHODS", "bancontact,mollie");
+    }
+  });
+
+  it("holds the free-ticket limit when one buyer sends two free orders at once", async () => {
+    const freeEvent = randomUUID();
+    const freePool = randomUUID();
+    const freeType = randomUUID();
+    await prisma.ticketEvent.create({
+      data: {
+        id: freeEvent,
+        ownerGroupId: ids.group,
+        slug: `payments-free-${freeEvent}`,
+        titleNl: "Gratis infosessie",
+        startsAt: new Date("2027-10-20T16:00:00.000Z"),
+        endsAt: new Date("2027-10-20T18:00:00.000Z"),
+        status: "PUBLISHED",
+        maxTicketsPerOrder: 2,
+        createdById: ids.user,
+      },
+    });
+    await prisma.ticketInventoryPool.create({
+      data: { id: freePool, eventId: freeEvent, code: "GENERAL", nameNl: "Algemeen", capacity: 50 },
+    });
+    await prisma.ticketType.create({
+      data: {
+        id: freeType,
+        eventId: freeEvent,
+        inventoryPoolId: freePool,
+        code: "GRATIS",
+        nameNl: "Gratis",
+        unitPriceCents: 0,
+        maxPerOrder: 2,
+      },
+    });
+    vi.mocked(getSession).mockResolvedValue({
+      user: { id: ids.user, name: "Payments Admin", email: `${ids.user}@example.test`, isSuperAdmin: false },
+    } as never);
+    try {
+      // Drie keer tegelijk twee gratis tickets, met een maximum van twee: de
+      // tickets van de eerste bestaan nog niet wanneer de tweede telt, want
+      // een gratis bestelling krijgt ze pas in een tweede transactie.
+      const attempts = await Promise.allSettled(
+        Array.from({ length: 3 }, (_, index) =>
+          createTicketCheckout(
+            {
+              eventId: freeEvent,
+              buyerName: "Gratis Koper",
+              buyerEmail: `${ids.user}@example.test`,
+              locale: "nl",
+              termsAccepted: true,
+              items: [0, 1].map((n) => ({
+                ticketTypeId: freeType,
+                attendeeName: `Gast ${index}-${n}`,
+                attendeeEmail: "",
+              })),
+            },
+            `free-race-${index}`
+          )
+        )
+      );
+      expect(attempts.filter((attempt) => attempt.status === "fulfilled")).toHaveLength(1);
+      const refusals = attempts
+        .filter((attempt): attempt is PromiseRejectedResult => attempt.status === "rejected")
+        .map((attempt) => (attempt.reason as { code?: string }).code);
+      expect(refusals).toEqual(["FREE_TICKET_LIMIT", "FREE_TICKET_LIMIT"]);
+      expect(await prisma.ticket.count({ where: { eventId: freeEvent, status: "VALID" } })).toBe(2);
+    } finally {
+      vi.mocked(getSession).mockResolvedValue(null);
     }
   });
 

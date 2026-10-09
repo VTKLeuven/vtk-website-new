@@ -137,10 +137,11 @@ export function OrderStatus({
   /** Ontbreekt of `single`: er valt niets te kiezen en er komt geen keuzeblok. */
   paymentChoice?: PaymentMethodChoice;
   /**
-   * Een Bancontact-betaling van deze bestelling die nog leeft, met wanneer haar
-   * QR vervalt. De server geeft ze enkel mee zolang dat nog niet gebeurd is.
+   * Een Bancontact-betaling van deze bestelling die nog leeft, met hoe lang
+   * haar QR nog geldt (null: onbekend). De server geeft ze enkel mee zolang ze
+   * niet vervallen is.
    */
-  openBancontact?: { paymentId: string; expiresAt: string | null } | null;
+  openBancontact?: { paymentId: string; expiresInMs: number | null } | null;
 }) {
   const base = locale === "nl" ? "" : "/en";
   const t = TEXT[locale];
@@ -151,19 +152,20 @@ export function OrderStatus({
   // te staan. Zoals in `BancontactPayment`.
   const [expiredBancontactId, setExpiredBancontactId] = useState<string | null>(null);
   const openBancontactId = openBancontact?.paymentId ?? null;
-  const openBancontactExpiresAt = openBancontact?.expiresAt ?? null;
+  // Hoe lang de QR nog geldt, gemeten op de klok van de server: met een
+  // absoluut tijdstip verborg een telefoon waarvan de klok voorloopt dit blok
+  // meteen.
+  const openBancontactExpiresInMs = openBancontact?.expiresInMs ?? null;
 
   // De QR vervalt terwijl de pagina openstaat: dan valt de weg terug ernaar weg.
   useEffect(() => {
-    if (!openBancontactId || !openBancontactExpiresAt) return;
-    const remaining = new Date(openBancontactExpiresAt).getTime() - Date.now();
-    if (Number.isNaN(remaining)) return;
+    if (!openBancontactId || openBancontactExpiresInMs == null) return;
     const timer = setTimeout(
       () => setExpiredBancontactId(openBancontactId),
-      Math.max(remaining, 0)
+      Math.max(openBancontactExpiresInMs, 0)
     );
     return () => clearTimeout(timer);
-  }, [openBancontactId, openBancontactExpiresAt]);
+  }, [openBancontactId, openBancontactExpiresInMs]);
 
   useEffect(() => {
     if (TERMINAL.has(order.status)) return;

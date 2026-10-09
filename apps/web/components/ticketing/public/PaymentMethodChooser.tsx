@@ -45,6 +45,10 @@ const ERRORS: Record<string, { nl: string; en: string }> = {
     nl: "Er staat nog een betaling open. Wacht even en probeer opnieuw.",
     en: "A payment is still open. Wait a moment and try again.",
   },
+  BUSY: {
+    nl: "Het is heel druk. Probeer meteen opnieuw.",
+    en: "It is very busy. Try again straight away.",
+  },
   // Geen belofte over hoe lang: een Bancontact-betaling vervalt na twee
   // minuten, maar een Mollie-betaling die bij de bank ligt, kan veel langer
   // openstaan.

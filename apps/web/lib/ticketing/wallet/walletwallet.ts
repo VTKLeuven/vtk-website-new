@@ -118,6 +118,12 @@ export async function generateViaWalletWallet(input: WalletTicketInput): Promise
     googleSaveUrl: data.googleSaveUrl,
     expiresAt: Date.now() + CACHE_TTL_MS,
   };
+  // Vervallen passen eruit voor er een bij komt: zonder dat bleef elke pas
+  // (tientallen kB) in het geheugen tot de volgende deploy.
+  const now = Date.now();
+  for (const [key, entry] of cache) {
+    if (entry.expiresAt <= now) cache.delete(key);
+  }
   cache.set(cacheKey, result);
   return result;
 }
