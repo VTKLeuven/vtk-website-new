@@ -76,6 +76,7 @@ export default async function ConfirmStudyPage({
       notStudying: true,
       academicStaffRole: true,
       internationalStudent: true,
+      sideEntrant: true,
       alumni: true,
       graduationYear: true,
       wasInVtk: true,
@@ -164,6 +165,7 @@ export default async function ConfirmStudyPage({
                 notStudying={user.notStudying}
                 academicStaffRole={user.academicStaffRole}
                 internationalStudent={user.internationalStudent}
+                sideEntrant={user.sideEntrant}
                 alumni={user.alumni}
                 graduationYear={user.graduationYear}
                 wasInVtk={user.wasInVtk}

@@ -18,17 +18,23 @@ describe.sequential("kalender-doelgroepen", () => {
     lastYearsCat: randomUUID(),
     alumniCat: randomUUID(),
     themeCat: randomUUID(),
+    customCat: randomUUID(),
+    sideEntrantCat: randomUUID(),
     plainEvent: randomUUID(),
     firstYearEvent: randomUUID(),
     intlEvent: randomUUID(),
     lastYearsEvent: randomUUID(),
     alumniEvent: randomUUID(),
     bothEvent: randomUUID(),
+    customEvent: randomUUID(),
+    firstYearAndCustomEvent: randomUUID(),
+    sideEntrantEvent: randomUUID(),
     firstYearUser: randomUUID(),
     masterUser: randomUUID(),
     intlUser: randomUUID(),
     finalMasterUser: randomUUID(),
     alumniUser: randomUUID(),
+    sideEntrantUser: randomUUID(),
   };
 
   const start = new Date("2027-03-01T18:00:00.000Z");
@@ -94,6 +100,20 @@ describe.sequential("kalender-doelgroepen", () => {
           nameEn: "Theme",
           audience: null,
         },
+        {
+          id: ids.customCat,
+          slug: `cu-${ids.customCat}`,
+          nameNl: "Masterstudenten Architectuur",
+          nameEn: "Architecture master's students",
+          audience: "CUSTOM",
+        },
+        {
+          id: ids.sideEntrantCat,
+          slug: `zi-${ids.sideEntrantCat}`,
+          nameNl: "Zij-instromers",
+          nameEn: "Lateral entrants",
+          audience: "SIDE_ENTRANTS",
+        },
       ],
     });
 
@@ -106,6 +126,9 @@ describe.sequential("kalender-doelgroepen", () => {
       [ids.lastYearsEvent, [ids.lastYearsCat]],
       [ids.alumniEvent, [ids.alumniCat]],
       [ids.bothEvent, [ids.firstYearCat, ids.intlCat]],
+      [ids.customEvent, [ids.customCat]],
+      [ids.firstYearAndCustomEvent, [ids.firstYearCat, ids.customCat]],
+      [ids.sideEntrantEvent, [ids.sideEntrantCat]],
     ] as const) {
       await prisma.calendarEvent.create({
         data: {
@@ -126,6 +149,7 @@ describe.sequential("kalender-doelgroepen", () => {
     await makeUser(ids.intlUser, { studyYears: ["MASTER_1"], internationalStudent: true });
     await makeUser(ids.finalMasterUser, { studyYears: ["MASTER_2"] });
     await makeUser(ids.alumniUser, { alumni: true });
+    await makeUser(ids.sideEntrantUser, { studyYears: ["MASTER_1"], sideEntrant: true });
   });
 
   afterAll(async () => {
@@ -139,13 +163,26 @@ describe.sequential("kalender-doelgroepen", () => {
             ids.lastYearsEvent,
             ids.alumniEvent,
             ids.bothEvent,
+            ids.customEvent,
+            ids.firstYearAndCustomEvent,
+            ids.sideEntrantEvent,
           ],
         },
       },
     });
     await prisma.calendarCategory.deleteMany({
       where: {
-        id: { in: [ids.firstYearCat, ids.intlCat, ids.lastYearsCat, ids.alumniCat, ids.themeCat] },
+        id: {
+          in: [
+            ids.firstYearCat,
+            ids.intlCat,
+            ids.lastYearsCat,
+            ids.alumniCat,
+            ids.themeCat,
+            ids.customCat,
+            ids.sideEntrantCat,
+          ],
+        },
       },
     });
     await prisma.group.delete({ where: { id: ids.group } });
@@ -158,6 +195,7 @@ describe.sequential("kalender-doelgroepen", () => {
             ids.intlUser,
             ids.finalMasterUser,
             ids.alumniUser,
+            ids.sideEntrantUser,
           ],
         },
       },
@@ -176,6 +214,9 @@ describe.sequential("kalender-doelgroepen", () => {
             ids.lastYearsEvent,
             ids.alumniEvent,
             ids.bothEvent,
+            ids.customEvent,
+            ids.firstYearAndCustomEvent,
+            ids.sideEntrantEvent,
           ],
         },
         ...audienceFilter(audiences),
@@ -191,40 +232,84 @@ describe.sequential("kalender-doelgroepen", () => {
     expect(await audiencesForUser(ids.intlUser)).toEqual(["INTERNATIONALS"]);
     expect(await audiencesForUser(ids.finalMasterUser)).toEqual(["LAST_YEARS"]);
     expect(await audiencesForUser(ids.alumniUser)).toEqual(["ALUMNI"]);
+    expect(await audiencesForUser(ids.sideEntrantUser)).toEqual(["SIDE_ENTRANTS"]);
   });
 
-  it("toont zonder doelgroep enkel evenementen zonder doelgroep", async () => {
+  it("toont zonder doelgroep enkel evenementen zonder profielgebonden doelgroep", async () => {
     const seen = await visible([]);
-    expect(seen).toEqual(new Set([ids.plainEvent]));
+    // Een doelgroep zonder profielregel (`CUSTOM`) valt niet na te gaan en
+    // blijft dus staan, ook naast een doelgroep die wel aan het profiel hangt.
+    expect(seen).toEqual(
+      new Set([ids.plainEvent, ids.customEvent, ids.firstYearAndCustomEvent]),
+    );
   });
 
   it("voegt bij een eerstejaars zijn eigen evenementen toe", async () => {
     const seen = await visible(["FIRST_YEARS"]);
     // Het event met twee doelgroepen telt mee: één match volstaat.
-    expect(seen).toEqual(new Set([ids.plainEvent, ids.firstYearEvent, ids.bothEvent]));
+    expect(seen).toEqual(
+      new Set([
+        ids.plainEvent,
+        ids.firstYearEvent,
+        ids.bothEvent,
+        ids.customEvent,
+        ids.firstYearAndCustomEvent,
+      ]),
+    );
     expect(seen.has(ids.intlEvent)).toBe(false);
   });
 
   it("houdt de doelgroepen uit elkaar", async () => {
     const seen = await visible(["INTERNATIONALS"]);
-    expect(seen).toEqual(new Set([ids.plainEvent, ids.intlEvent, ids.bothEvent]));
+    expect(seen).toEqual(
+      new Set([
+        ids.plainEvent,
+        ids.intlEvent,
+        ids.bothEvent,
+        ids.customEvent,
+        ids.firstYearAndCustomEvent,
+      ]),
+    );
     expect(seen.has(ids.firstYearEvent)).toBe(false);
   });
 
   it("toont laatstejaarsevents enkel aan laatstejaars", async () => {
     const seen = await visible(["LAST_YEARS"]);
-    expect(seen).toEqual(new Set([ids.plainEvent, ids.lastYearsEvent]));
+    expect(seen).toEqual(
+      new Set([ids.plainEvent, ids.lastYearsEvent, ids.customEvent, ids.firstYearAndCustomEvent]),
+    );
   });
 
   it("toont alumnievenementen in het alumni-profiel", async () => {
     const seen = await visible(["ALUMNI"]);
-    expect(seen).toEqual(new Set([ids.plainEvent, ids.alumniEvent]));
+    expect(seen).toEqual(
+      new Set([ids.plainEvent, ids.alumniEvent, ids.customEvent, ids.firstYearAndCustomEvent]),
+    );
+  });
+
+  it("toont zij-instromersevents enkel aan zij-instromers", async () => {
+    const seen = await visible(["SIDE_ENTRANTS"]);
+    expect(seen).toEqual(
+      new Set([
+        ids.plainEvent,
+        ids.sideEntrantEvent,
+        ids.customEvent,
+        ids.firstYearAndCustomEvent,
+      ]),
+    );
   });
 
   it("toont alles aan wie bij beide doelgroepen hoort", async () => {
     const seen = await visible(["FIRST_YEARS", "INTERNATIONALS"]);
     expect(seen).toEqual(
-      new Set([ids.plainEvent, ids.firstYearEvent, ids.intlEvent, ids.bothEvent]),
+      new Set([
+        ids.plainEvent,
+        ids.firstYearEvent,
+        ids.intlEvent,
+        ids.bothEvent,
+        ids.customEvent,
+        ids.firstYearAndCustomEvent,
+      ]),
     );
   });
 
@@ -237,6 +322,9 @@ describe.sequential("kalender-doelgroepen", () => {
       ids.lastYearsEvent,
       ids.alumniEvent,
       ids.bothEvent,
+      ids.customEvent,
+      ids.firstYearAndCustomEvent,
+      ids.sideEntrantEvent,
     ]) {
       expect(feed).toContain(`SUMMARY:${eventId}`);
     }

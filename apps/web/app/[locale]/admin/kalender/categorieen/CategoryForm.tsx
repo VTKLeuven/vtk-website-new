@@ -15,7 +15,14 @@ export type CategoryRow = {
   colour: string;
   order: number;
   showOnCalendarPage: boolean;
-  audience: "FIRST_YEARS" | "INTERNATIONALS" | "LAST_YEARS" | "ALUMNI" | null;
+  audience:
+    | "FIRST_YEARS"
+    | "INTERNATIONALS"
+    | "LAST_YEARS"
+    | "ALUMNI"
+    | "SIDE_ENTRANTS"
+    | "CUSTOM"
+    | null;
   /** De standaardbanner van deze categorie; enkel een thema draagt er een. */
   imageKey: string | null;
   eventCount: number;
@@ -113,13 +120,18 @@ export function CategoryForm({
           />
         </div>
         {kind === "audience" ? (
+          // Een nieuwe doelgroep is meestal een eigen groep: die met een
+          // profielregel bestaan al. Daarom staat "niet gekoppeld" bovenaan en is
+          // het de standaard.
           <div>
-            <Label>{nl ? "Doelgroep" : "Audience"}</Label>
-            <Select name="audience" defaultValue={category?.audience ?? "FIRST_YEARS"} required>
+            <Label>{nl ? "Gekoppeld aan profiel" : "Linked to profile"}</Label>
+            <Select name="audience" defaultValue={category?.audience ?? "CUSTOM"} required>
+              <option value="CUSTOM">{nl ? "Niet gekoppeld" : "Not linked"}</option>
               <option value="FIRST_YEARS">{nl ? "Eerstejaars" : "First years"}</option>
               <option value="INTERNATIONALS">Internationals</option>
               <option value="LAST_YEARS">{nl ? "Laatstejaars" : "Last years"}</option>
               <option value="ALUMNI">Alumni</option>
+              <option value="SIDE_ENTRANTS">{nl ? "Zij-instromers" : "Lateral entrants"}</option>
             </Select>
           </div>
         ) : (
@@ -133,6 +145,14 @@ export function CategoryForm({
           </label>
         )}
       </div>
+      {/* Net als bij de banner staat de uitleg één keer, bij het toevoegblok. */}
+      {kind === "audience" && !category && (
+        <p className="max-w-3xl text-sm text-vtk-blue-muted">
+          {nl
+            ? "Koppel je een doelgroep aan het profiel, dan weet de site wie erbij hoort: wie de kalender op het eigen profiel afstemt, ziet die evenementen enkel bij een passend profiel. Een doelgroep zonder koppeling, bijvoorbeeld de masterstudenten van één richting, staat als label op het evenement en wordt voor niemand weggefilterd."
+            : "Link an audience to the profile and the site knows who belongs to it: visitors who tailor the calendar to their profile only see those events when their profile matches. An audience without a link, for example the master's students of one programme, shows as a label on the event and is never filtered out."}
+        </p>
+      )}
       {/* Enkel een thema draagt een standaardbanner: een doelgroep zegt voor wie
           het evenement is, niet hoe het eruitziet. */}
       {kind === "category" && (

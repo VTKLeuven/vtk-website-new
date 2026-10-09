@@ -346,6 +346,8 @@
     "notAtFacultyHint": "Duid dit aan als je geen ingenieursopleiding aan de faculteit volgt.",
     "internationalStudent": "Ik ben een internationale of uitwisselingsstudent",
     "internationalStudentHint": "Duid dit aan als je via een uitwisseling of als internationale student aan de faculteit zit. Evenementen voor internationals verschijnen dan vanzelf in je kalender.",
+    "sideEntrant": "Ik ben zij-instromer",
+    "sideEntrantHint": "Duid dit aan als je aan de faculteit begon na een opleiding elders, bijvoorbeeld via een schakel- of voorbereidingsprogramma. Zo kan je de kalender afstemmen op de activiteiten voor zij-instromers.",
     "alumni": "Ik ben alumnus van de faculteit",
     "alumniHint": "Duid dit aan als je aan de faculteit bent afgestudeerd. Zo kan je de kalender op jouw alumni-evenementen afstemmen.",
     "notStudying": "Ik studeer niet (meer)",

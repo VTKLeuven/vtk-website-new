@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@vtk/db";
 
 import { audiencesForStudyProfile } from "@/lib/calendar/audience";
+import { STUDY_PROFILE_SELECT, type ProfileAudience } from "@/lib/calendar/audienceProfile";
 
 import { usersWantingTopic } from "./notificationPrefs";
 import { dayStart, isLive } from "./study";
@@ -233,12 +234,18 @@ export async function sendCalendarFollowPush(now: Date = new Date()): Promise<No
         ),
       ),
     ];
-    const audiences = event.categories
-      .map(({ category }) => category.audience)
-      .filter((audience): audience is NonNullable<typeof audience> => audience !== null);
+    const audiences = event.categories.map(({ category }) => category.audience);
+    const profileAudiences = audiences.filter(
+      (audience): audience is ProfileAudience => audience !== null && audience !== "CUSTOM",
+    );
 
+    // Een doelgroep zonder profielregel (`CUSTOM`) valt niet na te gaan, dus
+    // dan krijgt elke volger het bericht: wie zo'n categorie volgt, mag niet
+    // stil uit de boot vallen omdat het profiel er niets over zegt.
     const eligible =
-      audiences.length === 0 ? followers : await withinAudience(followers, audiences);
+      profileAudiences.length === 0 || audiences.includes("CUSTOM")
+        ? followers
+        : await withinAudience(followers, profileAudiences);
     const wanting = await usersWantingTopic(eligible, "calendar.follow");
     if (wanting.length === 0) continue;
 
@@ -330,19 +337,17 @@ export async function sendInterestReminderPush(now: Date = new Date()): Promise<
  */
 async function withinAudience(
   userIds: string[],
-  audiences: ("FIRST_YEARS" | "INTERNATIONALS" | "LAST_YEARS" | "ALUMNI")[],
+  audiences: ProfileAudience[],
 ): Promise<string[]> {
   if (userIds.length === 0) return [];
   const users = await prisma.user.findMany({
     where: { id: { in: userIds } },
-    select: { id: true, studyYears: true, internationalStudent: true, alumni: true },
+    select: { id: true, ...STUDY_PROFILE_SELECT },
   });
 
   return users
     .filter((user) =>
-      audiencesForStudyProfile(user.studyYears, user.internationalStudent, user.alumni).some(
-        (audience) => audiences.includes(audience),
-      ),
+      audiencesForStudyProfile(user).some((audience) => audiences.includes(audience)),
     )
     .map((user) => user.id);
 }

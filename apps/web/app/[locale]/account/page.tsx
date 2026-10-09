@@ -119,6 +119,7 @@ export default async function AccountPage({ params }: { params: Promise<{ locale
         notStudying: true,
         academicStaffRole: true,
         internationalStudent: true,
+        sideEntrant: true,
         alumni: true,
         graduationYear: true,
         wasInVtk: true,

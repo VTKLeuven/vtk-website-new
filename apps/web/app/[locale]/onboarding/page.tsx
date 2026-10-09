@@ -82,6 +82,7 @@ export default async function OnboardingPage({
       notStudying: true,
       academicStaffRole: true,
       internationalStudent: true,
+      sideEntrant: true,
       alumni: true,
       graduationYear: true,
       wasInVtk: true,

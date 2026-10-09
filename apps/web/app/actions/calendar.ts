@@ -519,10 +519,11 @@ const categorySchema = z.object({
     .regex(/^#[0-9a-fA-F]{6}$/),
   showOnCalendarPage: z.coerce.boolean().default(false),
   // Bij elke doelgroepwaarde hoort code die bepaalt wie erbij hoort
-  // (lib/calendar/audience.ts), dus dit is een gesloten lijst.
+  // (lib/calendar/audienceProfile.ts), dus dit is een gesloten lijst. `CUSTOM`
+  // is een doelgroep zonder zo'n regel: enkel een label.
   kind: z.enum(["category", "audience"]),
   audience: z
-    .enum(["FIRST_YEARS", "INTERNATIONALS", "LAST_YEARS", "ALUMNI"])
+    .enum(["FIRST_YEARS", "INTERNATIONALS", "LAST_YEARS", "ALUMNI", "SIDE_ENTRANTS", "CUSTOM"])
     .nullable()
     .default(null),
 });

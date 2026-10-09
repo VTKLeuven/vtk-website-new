@@ -34,6 +34,14 @@ describe("calendar category management UI", () => {
     expect(formSource).toContain('<option value="ALUMNI">');
   });
 
+  it("does not force a new audience onto a profile rule", () => {
+    // Een doelgroep waar het profiel niets over zegt, moet aan te maken zijn
+    // zonder eerstejaars of alumni te kiezen.
+    expect(formSource).toContain('<option value="CUSTOM">');
+    expect(formSource).toContain('<option value="SIDE_ENTRANTS">');
+    expect(formSource).toContain('defaultValue={category?.audience ?? "CUSTOM"}');
+  });
+
   it("carries a default banner on themes only, with the site-wide photo as preview", () => {
     // Een doelgroep zegt voor wie het evenement is, niet hoe het eruitziet; die
     // hoort dus geen bannerveld te krijgen. Zie docs/design-decisions.md.

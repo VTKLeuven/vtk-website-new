@@ -13,7 +13,8 @@ import { audiencesForStudyProfile } from "@/lib/calendar/audienceProfile";
 
 /**
  * De doelgroepen uit het studieprofiel, in de volgorde van het beheerformulier.
- * Dezelfde vier als de kalender (`CalendarAudience`), met dezelfde afleiding.
+ * Vier van de kalenderdoelgroepen met een profielregel (`ProfileAudience`),
+ * met dezelfde afleiding; zij-instromers horen er niet bij.
  */
 export const TICKET_TARGET_AUDIENCES = [
   "FIRST_YEARS",
@@ -81,11 +82,14 @@ export function ticketAudiencesForProfile(
 ): TicketTargetAudience[] {
   const confirmed =
     user.isStudent && (user.studyConfirmedYear ?? -1) >= studyConfirmationYear(now);
-  return audiencesForStudyProfile(
-    confirmed ? user.studyYears : [],
-    user.internationalStudent,
-    user.alumni,
-  );
+  // Zij-instromers zijn een kalenderdoelgroep, geen ticketdoelgroep: er bestaat
+  // geen ticketsoort "enkel zij-instromers" (`TicketAudience`).
+  return audiencesForStudyProfile({
+    studyYears: confirmed ? user.studyYears : [],
+    internationalStudent: user.internationalStudent,
+    alumni: user.alumni,
+    sideEntrant: false,
+  }).filter(isTargetAudience);
 }
 
 /**

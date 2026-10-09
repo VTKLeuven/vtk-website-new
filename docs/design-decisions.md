@@ -2295,8 +2295,9 @@ gewoon thema:
 De doelgroep is een enum en geen vrij veld, omdat er bij elke waarde code hoort
 die bepaalt wie erbij hoort (`lib/calendar/audience.ts`): eerstejaars zijn leden
 met `BACHELOR_1` in `studyYears`, internationals leden met
-`User.internationalStudent`. Een doelgroep toevoegen is dus bewust geen
-GUI-actie.
+`User.internationalStudent`. Een doelgroep mét zo'n regel toevoegen is dus
+bewust geen GUI-actie; een doelgroep zonder regel wel, zie "Zij-instromers, en
+een doelgroep zonder profielregel" verderop.
 
 **`internationalStudent` is een eigen profielveld**, gevraagd in de onboarding en
 te wijzigen op `/account`. De sitetaal (`locale`) leek een gratis alternatief,
@@ -7513,6 +7514,46 @@ aanzetten. Er is bewust geen tweede, kalender-eigen voorkeur: het vinkje op
 /kalender en dat op /account zouden anders uit elkaar lopen. Het gevolg is dat
 de chip ook de homepage, de zoekresultaten, de app en de persoonlijke agendafeed
 mee omzet. Zonder account wordt er niets bewaard.
+
+### Zij-instromers, en een doelgroep zonder profielregel
+
+Tot oktober 2026 moest elke doelgroep op /admin/kalender/categorieen aan één van
+de vier profielregels hangen (eerstejaars, internationals, laatstejaars,
+alumni). Een doelgroep "Zij-instromers" was daardoor niet aan te maken zonder te
+liegen: ze zou als eerstejaars of alumni gefilterd worden. Dat is op twee
+manieren opgelost.
+
+**Zij-instromer is nu een vraag in het studieprofiel** (`User.sideEntrant`),
+naast internationale student, en een doelgroep met een eigen regel
+(`CalendarAudience.SIDE_ENTRANTS`). Net als `internationalStudent` valt het uit
+geen ander veld af te leiden: een zij-instromer zit in een gewoon masterjaar.
+Bestaande leden staan op `false`, wat "niet aangeduid" betekent; ze vinken het
+aan op /account of bij de jaarlijkse studiebevestiging. Het is enkel een
+kalenderdoelgroep: er is geen ticketsoort "enkel zij-instromers"
+(`TicketAudience`), dus de ticketshop negeert het veld.
+
+**Daarnaast kan een doelgroep niet gekoppeld zijn** (`CalendarAudience.CUSTOM`),
+voor een groep waar het profiel niets over zegt (bv. de masterstudenten van één
+richting). Dat is de standaard op het toevoegformulier: die met een regel
+bestaan al, dus een nieuwe is bijna altijd een eigen groep. Zo'n doelgroep
+gedraagt zich als elke andere (eigen rij met doelgroepfilters, eigen pagina en
+feed, opvallend label op het evenement, geen standaardbanner), met twee
+verschillen:
+
+- **De profielfilter verbergt ze voor niemand.** Het profiel zegt niet wie erbij
+  hoort. Wegfilteren zou het evenement dus net verbergen voor wie het bedoeld is
+  en de kalender op het eigen profiel afstemt, en een label mag geen slot
+  worden. Dat geldt ook naast een gekoppelde doelgroep: een evenement voor
+  "eerstejaars en de masterstudenten Architectuur" blijft bij iedereen staan
+  (`audienceFilter` in `lib/calendar/audience.ts`).
+- **Wie de categorie volgt, krijgt de pushmelding**, zonder profielcontrole.
+  Bij een gekoppelde doelgroep krijgt een volger ze enkel bij een passend
+  profiel; hier valt dat niet na te gaan.
+
+Het label op de eventpagina is bij een niet-gekoppelde doelgroep de naam van de
+categorie en geen zin als "Voor eerstejaars": die zinnen zijn per vaste
+doelgroep geschreven, omdat "Voor " plus een vrije naam geen Nederlands
+oplevert.
 
 ### Er is geen ledenexclusief evenement meer
 

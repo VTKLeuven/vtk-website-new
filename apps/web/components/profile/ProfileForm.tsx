@@ -111,6 +111,7 @@ export function ProfileForm({
     | "notStudying"
     | "academicStaffRole"
     | "internationalStudent"
+    | "sideEntrant"
     | "alumni"
     | "graduationYear"
     | "wasInVtk"
@@ -392,6 +393,7 @@ export function ProfileForm({
           notStudying={user.notStudying}
           academicStaffRole={user.academicStaffRole}
           internationalStudent={user.internationalStudent}
+          sideEntrant={user.sideEntrant}
           alumni={user.alumni}
           graduationYear={user.graduationYear}
           wasInVtk={user.wasInVtk}

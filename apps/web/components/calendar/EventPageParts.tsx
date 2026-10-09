@@ -39,16 +39,22 @@ type EventMomentRow = { start: Date; end: Date; label: string | null };
 /**
  * De zin op het doelgroeplabel. Bewust afgeleid van de doelgroep en niet van de
  * categorienaam: "Voor " + naam levert "Voor internationaal" op, wat geen
- * Nederlands is.
+ * Nederlands is. Een doelgroep die een redacteur zelf aanmaakte (`CUSTOM`) heeft
+ * geen vaste zin, dus die draagt gewoon haar naam.
  */
-function audienceLabel(audience: string | null, locale: Locale): string {
+function audienceLabel(
+  category: { audience: string | null; nameNl: string; nameEn: string },
+  locale: Locale,
+): string {
   const nl = locale === "nl";
+  const { audience } = category;
   if (audience === "FIRST_YEARS") return nl ? "Voor eerstejaars" : "For first years";
   if (audience === "LAST_YEARS") return nl ? "Voor laatstejaars" : "For last years";
   if (audience === "INTERNATIONALS")
     return nl ? "Voor internationals" : "For international students";
   if (audience === "ALUMNI") return nl ? "Voor alumni" : "For alumni";
-  return nl ? "Voor een specifieke doelgroep" : "For a specific audience";
+  if (audience === "SIDE_ENTRANTS") return nl ? "Voor zij-instromers" : "For lateral entrants";
+  return pick(category.nameNl, category.nameEn, locale);
 }
 
 export function dayLabel(date: Date, locale: Locale, style: "long" | "short" = "long") {
@@ -155,7 +161,7 @@ export function EventHead({ event, locale }: { event: CalendarEventPageData; loc
                 className="vtk-event-tag audience"
                 style={{ background: c.colour, borderColor: c.colour }}
               >
-                {audienceLabel(c.audience, locale)}
+                {audienceLabel(c, locale)}
               </Link>
             ))}
             {themes.map((c) => (

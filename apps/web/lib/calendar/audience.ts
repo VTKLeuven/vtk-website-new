@@ -4,7 +4,7 @@ import { cache } from "react";
 import type { CalendarAudience, Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { getCurrentSession } from "@/lib/session";
-import { audiencesForStudyProfile } from "./audienceProfile";
+import { STUDY_PROFILE_SELECT, audiencesForStudyProfile } from "./audienceProfile";
 
 export { audiencesForStudyProfile };
 
@@ -30,16 +30,11 @@ export const viewerAudienceFilter = cache(
     if (!session) return {};
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: {
-        calendarOnlyMyAudiences: true,
-        studyYears: true,
-        internationalStudent: true,
-        alumni: true,
-      },
+      select: { calendarOnlyMyAudiences: true, ...STUDY_PROFILE_SELECT },
     });
     if (!user?.calendarOnlyMyAudiences) return {};
     return audienceFilter(
-      audiencesForStudyProfile(user.studyYears, user.internationalStudent, user.alumni),
+      audiencesForStudyProfile(user),
     );
   },
 );
@@ -80,11 +75,11 @@ export const viewerAudiences = cache(async (): Promise<CalendarAudience[]> => {
 export async function audiencesForUser(userId: string): Promise<CalendarAudience[]> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { studyYears: true, internationalStudent: true, alumni: true },
+    select: STUDY_PROFILE_SELECT,
   });
   if (!user) return [];
 
-  return audiencesForStudyProfile(user.studyYears, user.internationalStudent, user.alumni);
+  return audiencesForStudyProfile(user);
 }
 
 /**
@@ -97,16 +92,11 @@ export async function audienceFilterForUser(
 ): Promise<Prisma.CalendarEventWhereInput> {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: {
-      calendarOnlyMyAudiences: true,
-      studyYears: true,
-      internationalStudent: true,
-      alumni: true,
-    },
+    select: { calendarOnlyMyAudiences: true, ...STUDY_PROFILE_SELECT },
   });
   if (!user?.calendarOnlyMyAudiences) return {};
   return audienceFilter(
-    audiencesForStudyProfile(user.studyYears, user.internationalStudent, user.alumni),
+    audiencesForStudyProfile(user),
   );
 }
 
@@ -117,14 +107,16 @@ export async function audienceFilterForUser(
  * een, dan hoort het bij die doelgroep en verschijnt het enkel bij wie erbij
  * hoort. Een evenement met twee doelgroepen (eerstejaars én internationaal)
  * volstaat aan één match.
+ *
+ * Een doelgroep zonder profielregel (`CUSTOM`) telt altijd als match. Het
+ * profiel zegt niet wie erbij hoort, dus wegfilteren zou het evenement net
+ * verbergen voor wie het bedoeld is.
  */
 export function audienceFilter(audiences: CalendarAudience[]): Prisma.CalendarEventWhereInput {
   return {
     OR: [
       { categories: { none: { category: { audience: { not: null } } } } },
-      ...(audiences.length > 0
-        ? [{ categories: { some: { category: { audience: { in: audiences } } } } }]
-        : []),
+      { categories: { some: { category: { audience: { in: [...audiences, "CUSTOM"] } } } } },
     ],
   };
 }

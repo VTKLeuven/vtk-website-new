@@ -20,6 +20,8 @@ type Labels = {
   notAtFacultyHint: string;
   internationalStudent: string;
   internationalStudentHint: string;
+  sideEntrant: string;
+  sideEntrantHint: string;
   alumniDetailsHint: string;
   graduationYear: string;
   graduationYearHint: string;
@@ -50,6 +52,7 @@ export function StudyStatusFields({
   notAtFaculty,
   notStudying: initialNotStudying,
   internationalStudent,
+  sideEntrant,
   alumni: initialAlumni,
   graduationYear,
   wasInVtk,
@@ -66,6 +69,7 @@ export function StudyStatusFields({
   notAtFaculty: boolean;
   notStudying: boolean;
   internationalStudent: boolean;
+  sideEntrant: boolean;
   alumni: boolean;
   graduationYear: number | null;
   wasInVtk: boolean;
@@ -207,6 +211,16 @@ export function StudyStatusFields({
               label={labels.internationalStudent}
             />
             <p className="mt-1 text-xs text-[#5c667f]">{labels.internationalStudentHint}</p>
+          </div>
+
+          <div>
+            <CheckboxChip
+              name="sideEntrant"
+              value="on"
+              defaultChecked={sideEntrant}
+              label={labels.sideEntrant}
+            />
+            <p className="mt-1 text-xs text-[#5c667f]">{labels.sideEntrantHint}</p>
           </div>
         </div>
       ) : null}

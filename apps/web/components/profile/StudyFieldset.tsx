@@ -18,6 +18,7 @@ export function StudyFieldset({
   notStudying,
   academicStaffRole,
   internationalStudent,
+  sideEntrant,
   alumni,
   graduationYear,
   wasInVtk,
@@ -31,6 +32,7 @@ export function StudyFieldset({
   notStudying: boolean;
   academicStaffRole: AcademicStaffRole | null;
   internationalStudent: boolean;
+  sideEntrant: boolean;
   alumni: boolean;
   graduationYear: number | null;
   wasInVtk: boolean;
@@ -49,6 +51,7 @@ export function StudyFieldset({
       notAtFaculty={notAtFaculty}
       notStudying={notStudying}
       internationalStudent={internationalStudent}
+      sideEntrant={sideEntrant}
       alumni={alumni}
       graduationYear={graduationYear}
       wasInVtk={wasInVtk}
@@ -72,6 +75,8 @@ export function StudyFieldset({
         notAtFacultyHint: t.notAtFacultyHint,
         internationalStudent: t.internationalStudent,
         internationalStudentHint: t.internationalStudentHint,
+        sideEntrant: t.sideEntrant,
+        sideEntrantHint: t.sideEntrantHint,
         alumniDetailsHint: t.alumniHint,
         graduationYear: t.graduationYear,
         graduationYearHint: t.graduationYearHint,

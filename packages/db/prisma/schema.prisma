@@ -658,6 +658,11 @@ model User {
   // omvat ook wie stopte zonder af te studeren en is dus geen betrouwbare
   // alumni-indicator. Stuurt de expliciete alumni-doelgroep in de kalender.
   alumni                  Boolean             @default(false)
+  // Zij-instromer: begon aan de faculteit na een opleiding elders (bv. via een
+  // schakel- of voorbereidingsprogramma). Net als `internationalStudent` een
+  // eigen vraag in het studieprofiel, want het valt uit geen enkel ander veld af
+  // te leiden. Stuurt de doelgroep zij-instromers in de kalender.
+  sideEntrant             Boolean             @default(false)
   // Het jaar waarin het lid afstudeerde. Enkel zinvol bij `alumni`, maar bewust
   // geen aparte tabel: het is één getal dat bij de persoon hoort. Wordt getoond
   // in de aanwezigheidslijst van een alumni-evenement wanneer het lid dat zelf
@@ -2062,13 +2067,21 @@ enum HeroWeekPlacement {
 // is een expliciete voorkeur van de bezoeker.
 //
 // De waarde is een enum en geen vrij veld, want bij elke waarde hoort code die
-// bepaalt of een lid erbij hoort (zie lib/calendar/audience.ts). Een nieuwe
-// doelgroep toevoegen is dus bewust geen GUI-actie.
+// bepaalt of een lid erbij hoort (zie lib/calendar/audienceProfile.ts). Een
+// nieuwe doelgroep mét zo'n regel toevoegen is dus bewust geen GUI-actie.
+//
+// `CUSTOM` is de uitzondering: een doelgroep die een redacteur zelf aanmaakt
+// (bv. masterstudenten van één richting) en waar het profiel niets over zegt.
+// Ze is enkel een label; de profielfilter verbergt ze voor niemand, want de site
+// kan niet weten wie erbij hoort. Zie docs/design-decisions.md.
 enum CalendarAudience {
   FIRST_YEARS
   INTERNATIONALS
   LAST_YEARS
   ALUMNI
+  // Leden met `User.sideEntrant`.
+  SIDE_ENTRANTS
+  CUSTOM
 }
 
 model CalendarCategory {

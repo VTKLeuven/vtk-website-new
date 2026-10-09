@@ -67,6 +67,7 @@ const studyFieldsSchema = {
     .union([z.enum(ACADEMIC_STAFF_ROLES), z.literal("")])
     .default(""),
   internationalStudent: z.boolean().default(false),
+  sideEntrant: z.boolean().default(false),
   alumni: z.boolean().default(false),
   // Het afstudeerjaar komt als tekst binnen en mag leeg blijven; de grenzen en
   // hun reden staan bij `isValidGraduationYear`.
@@ -130,6 +131,7 @@ function studyFields(formData: FormData) {
     academicStaff: formData.get("academicStaff") === "on",
     academicStaffRole: String(formData.get("academicStaffRole") ?? ""),
     internationalStudent: formData.get("internationalStudent") === "on",
+    sideEntrant: formData.get("sideEntrant") === "on",
     alumni: formData.get("alumni") === "on",
     graduationYear: String(formData.get("graduationYear") ?? ""),
     wasInVtk: formData.get("wasInVtk") === "on",
@@ -156,6 +158,7 @@ function studyUpdate(data: StudyInput) {
     academicStaffRole:
       data.academicStaff && data.academicStaffRole ? data.academicStaffRole : null,
     internationalStudent: data.isStudent ? data.internationalStudent : false,
+    sideEntrant: data.isStudent ? data.sideEntrant : false,
     alumni: data.alumni,
     graduationYear: data.alumni && data.graduationYear ? Number(data.graduationYear) : null,
     wasInVtk: data.alumni ? data.wasInVtk : false,
