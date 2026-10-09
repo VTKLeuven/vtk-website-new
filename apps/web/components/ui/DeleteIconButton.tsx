@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type ReactNode } from "react";
 import { Button, ConfirmDialog } from "@vtk/ui";
-import { IconButton } from "@/components/ui/IconButton";
+import { IconButton, type IconTone } from "@/components/ui/IconButton";
 import { TrashIcon } from "@/components/ui/icons";
 import { useToast } from "@/components/ui/toast";
 import type { SaveState } from "@/lib/saveState";
@@ -34,8 +34,8 @@ type Common = {
   errorFallback?: string;
 };
 
-/** Bevestigen, uitvoeren en melden; gedeeld door beide varianten. */
-function useDeleteFlow({
+/** Bevestigen, uitvoeren en melden; gedeeld door alle varianten. */
+function useConfirmFlow({
   action,
   fields,
   successMessage,
@@ -76,16 +76,27 @@ function useDeleteFlow({
  * Verwijder-rij-actie: icoon met tooltip, bevestigingsdialoog en toast achteraf.
  * Bundelt de conventies uit CLAUDE.md zodat elke lijst dit niet apart bouwt.
  */
-export function DeleteIconButton({
+export function DeleteIconButton(props: Common & { label: string; srLabel?: string }) {
+  return <ConfirmIconButton {...props} icon={<TrashIcon />} tone="danger" />;
+}
+
+/**
+ * Dezelfde flow voor een rij-actie die niets verwijdert maar wel eerst moet
+ * zeggen wat ze doet: iets afvinken dat je niet ongedaan maakt. Eigen icoon,
+ * standaard in de neutrale toon.
+ */
+export function ConfirmIconButton({
   label,
   srLabel,
+  icon,
+  tone = "neutral",
   ...common
-}: Common & { label: string; srLabel?: string }) {
-  const { confirming, setConfirming, pending, onConfirm } = useDeleteFlow(common);
+}: Common & { label: string; srLabel?: string; icon: ReactNode; tone?: IconTone }) {
+  const { confirming, setConfirming, pending, onConfirm } = useConfirmFlow(common);
   return (
     <>
-      <IconButton label={label} srLabel={srLabel} tone="danger" onClick={() => setConfirming(true)}>
-        <TrashIcon />
+      <IconButton label={label} srLabel={srLabel} tone={tone} onClick={() => setConfirming(true)}>
+        {icon}
       </IconButton>
       <Dialog {...common} open={confirming} pending={pending} onConfirm={onConfirm} onCancel={() => setConfirming(false)} />
     </>
@@ -97,7 +108,7 @@ export function DeleteIconButton({
  * ("POC verwijderen") die geen compacte rij-actie zijn.
  */
 export function DeleteButton({ children, ...common }: Common & { children: ReactNode }) {
-  const { confirming, setConfirming, pending, onConfirm } = useDeleteFlow(common);
+  const { confirming, setConfirming, pending, onConfirm } = useConfirmFlow(common);
   return (
     <>
       <Button variant="ghost" size="sm" type="button" onClick={() => setConfirming(true)}>

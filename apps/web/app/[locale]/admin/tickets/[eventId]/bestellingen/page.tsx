@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import type { Prisma, TicketOrderStatus } from "@prisma/client";
 import {
+  AlertTriangle,
   ChevronDown,
   CircleDollarSign,
   Download,
@@ -16,8 +17,14 @@ import {
   Timer,
 } from "lucide-react";
 import { hasLocale } from "@/lib/locale";
-import { resendTicketOrderConfirmationAction } from "@/app/actions/tickets";
+import {
+  markTicketPaymentRefundedAction,
+  resendTicketOrderConfirmationAction,
+} from "@/app/actions/tickets";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
+import { awaitingManualRefund, notSetAside } from "@/lib/ticketing/paymentFlags";
+import { ConfirmIconButton } from "@/components/ui/DeleteIconButton";
+import { CheckIcon } from "@/components/ui/icons";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
 import { RefundOrderForm } from "@/components/ticketing/admin/RefundOrderForm";
@@ -40,6 +47,13 @@ const ORDER_STATUSES: TicketOrderStatus[] = [
   "REFUNDED",
 ];
 
+/**
+ * Geen status van een bestelling maar een filter in dezelfde keuzelijst: de
+ * bestellingen met een geslaagde betaling die met de hand terugbetaald moet
+ * worden (zie `recordPaymentNeedingRefund`).
+ */
+const NEEDS_REFUND_FILTER = "NEEDS_REFUND";
+
 export default async function TicketOrdersPage({
   params,
   searchParams,
@@ -59,10 +73,12 @@ export default async function TicketOrdersPage({
   const status = ORDER_STATUSES.includes(filters.status as TicketOrderStatus)
     ? (filters.status as TicketOrderStatus)
     : undefined;
+  const needsRefundOnly = filters.status === NEEDS_REFUND_FILTER;
 
   const where: Prisma.TicketOrderWhereInput = {
     eventId,
     ...(status ? { status } : {}),
+    ...(needsRefundOnly ? { payments: { some: awaitingManualRefund } } : {}),
     ...(query
       ? {
           OR: [
@@ -79,7 +95,7 @@ export default async function TicketOrdersPage({
       : {}),
   };
 
-  const [orders, totalOrders, paidOrders, pendingOrders, refundedOrders, totals] = await Promise.all([
+  const [orders, totalOrders, paidOrders, pendingOrders, refundedOrders, totals, flaggedPayments] = await Promise.all([
     prisma.ticketOrder.findMany({
       where,
       include: {
@@ -93,7 +109,9 @@ export default async function TicketOrdersPage({
           },
           orderBy: { createdAt: "asc" },
         },
-        payments: { orderBy: { createdAt: "desc" }, take: 1 },
+        // De betaling die telt: de jongste poging die niet apart staat. Een
+        // betaling die op een terugbetaling wacht, komt apart hieronder.
+        payments: { where: notSetAside, orderBy: { createdAt: "desc" }, take: 1 },
         refunds: {
           include: { _count: { select: { items: true } } },
           orderBy: { createdAt: "desc" },
@@ -116,7 +134,28 @@ export default async function TicketOrdersPage({
           _sum: { totalCents: true, refundedCents: true },
         })
       : Promise.resolve(null),
+    // Alle betalingen van dit event die nog terug moeten: zelden meer dan een
+    // handvol, en zo telt de melding bovenaan ze ook wanneer hun bestelling
+    // buiten de filter van de lijst valt.
+    prisma.ticketPayment.findMany({
+      where: { ...awaitingManualRefund, order: { eventId } },
+      select: {
+        id: true,
+        orderId: true,
+        provider: true,
+        providerPaymentId: true,
+        amountCents: true,
+        currency: true,
+        succeededAt: true,
+      },
+      orderBy: { succeededAt: "asc" },
+    }),
   ]);
+  const awaitingRefund = flaggedPayments.length;
+  const flaggedByOrder = new Map<string, typeof flaggedPayments>();
+  for (const flagged of flaggedPayments) {
+    flaggedByOrder.set(flagged.orderId, [...(flaggedByOrder.get(flagged.orderId) ?? []), flagged]);
+  }
   const net = totals ? (totals._sum.totalCents ?? 0) - (totals._sum.refundedCents ?? 0) : 0;
 
   return (
@@ -147,6 +186,22 @@ export default async function TicketOrdersPage({
         />
       </div>
 
+      {awaitingRefund > 0 ? (
+        <div className="ticket-admin-alert" data-tone="danger" role="status">
+          <AlertTriangle aria-hidden="true" size={18} />
+          <span>
+            {locale === "nl"
+              ? `${formatNumber(awaitingRefund, locale)} ${awaitingRefund === 1 ? "betaling kwam" : "betalingen kwamen"} binnen zonder ticket. Betaal ze met de hand terug en vink ze daarna af bij de bestelling.`
+              : `${formatNumber(awaitingRefund, locale)} ${awaitingRefund === 1 ? "payment" : "payments"} came in without a ticket. Refund them by hand, then mark them as refunded on the order.`}
+            {needsRefundOnly ? null : (
+              <a className="ticket-admin-alert-link" href={`?status=${NEEDS_REFUND_FILTER}`}>
+                {locale === "nl" ? "Toon die bestellingen" : "Show those orders"}
+              </a>
+            )}
+          </span>
+        </div>
+      ) : null}
+
       <section className="ticket-admin-section" aria-labelledby="orders-heading">
         <form className="ticket-admin-filterbar" method="get">
           <div className="ticket-admin-field ticket-admin-filter-search">
@@ -164,11 +219,16 @@ export default async function TicketOrdersPage({
           </div>
           <div className="ticket-admin-field">
             <label htmlFor="order-status">Status</label>
-            <select id="order-status" name="status" defaultValue={status ?? ""}>
+            <select
+              id="order-status"
+              name="status"
+              defaultValue={status ?? (needsRefundOnly ? NEEDS_REFUND_FILTER : "")}
+            >
               <option value="">{locale === "nl" ? "Alle statussen" : "All statuses"}</option>
               {ORDER_STATUSES.map((option) => (
                 <option key={option} value={option}>{statusLabel(option, locale)}</option>
               ))}
+              <option value={NEEDS_REFUND_FILTER}>{locale === "nl" ? "Terug te betalen" : "To refund"}</option>
             </select>
           </div>
           <button className="ticket-admin-button" type="submit">
@@ -205,6 +265,7 @@ export default async function TicketOrdersPage({
               <tbody>
                 {orders.map((order) => {
                   const payment = order.payments[0];
+                  const toRefund = flaggedByOrder.get(order.id) ?? [];
                   const canResendConfirmation =
                     canManageOrders &&
                     ["PAID", "PARTIALLY_REFUNDED", "REFUNDED"].includes(order.status);
@@ -215,7 +276,17 @@ export default async function TicketOrdersPage({
                         <strong>{order.buyerName}</strong>
                         <div className="ticket-admin-row-meta">{order.buyerEmail}</div>
                       </td>
-                      <td><StatusBadge status={order.status} locale={locale} /></td>
+                      <td>
+                        <StatusBadge status={order.status} locale={locale} />
+                        {toRefund.length > 0 ? (
+                          <div className="ticket-admin-row-meta">
+                            <span className="ticket-admin-status" data-tone="danger">
+                              <span className="ticket-admin-status-dot" aria-hidden="true" />
+                              {locale === "nl" ? "Terug te betalen" : "To refund"}
+                            </span>
+                          </div>
+                        ) : null}
+                      </td>
                       <td data-priority="low">{formatNumber(order.items.length, locale)}</td>
                       <td>
                         {canViewFinance ? formatMoney(order.totalCents, order.currency, locale) : "—"}
@@ -253,6 +324,62 @@ export default async function TicketOrdersPage({
                                 </dl>
                               </div>
                             </div>
+
+                            {toRefund.length > 0 ? (
+                              <div className="ticket-admin-detail-section">
+                                <h3>{locale === "nl" ? "Terug te betalen" : "To refund"}</h3>
+                                <p className="ticket-admin-help">
+                                  {locale === "nl"
+                                    ? "Deze betaling kwam binnen zonder dat er een ticket tegenover stond: de reservatie was verlopen en de plaats weg, het event voorbij, of de bestelling was al betaald. Betaal ze met de hand terug bij de provider of via de bank."
+                                    : "This payment came in without a ticket to go with it: the reservation had expired and the seat was gone, the event was over, or the order was already paid. Refund it by hand at the provider or through the bank."}
+                                </p>
+                                <ul className="ticket-admin-list">
+                                  {toRefund.map((flagged) => {
+                                    const amount = formatMoney(flagged.amountCents, flagged.currency, locale);
+                                    const paymentLabel = flagged.providerPaymentId ?? flagged.id;
+                                    return (
+                                      <li key={flagged.id}>
+                                        <div className="ticket-admin-row-head">
+                                          <p className="ticket-admin-row-title ticket-admin-code">{paymentLabel}</p>
+                                          {canRefund ? (
+                                            <ConfirmIconButton
+                                              icon={<CheckIcon />}
+                                              label={locale === "nl" ? "Markeer als terugbetaald" : "Mark as refunded"}
+                                              srLabel={`${locale === "nl" ? "Markeer als terugbetaald" : "Mark as refunded"}: ${paymentLabel}`}
+                                              action={markTicketPaymentRefundedAction}
+                                              fields={{ locale, eventId, paymentId: flagged.id }}
+                                              title={locale === "nl" ? "Markeren als terugbetaald?" : "Mark as refunded?"}
+                                              description={
+                                                locale === "nl"
+                                                  ? `Dit betaalt niets terug: het vinkt enkel af dat de ${canViewFinance ? amount : "betaling"} van ${order.reference} al met de hand teruggegeven is. De melding bovenaan verdwijnt; de bestelling en haar tickets blijven zoals ze zijn.`
+                                                  : `This does not refund anything: it only records that the ${canViewFinance ? amount : "payment"} for ${order.reference} was already returned by hand. The notice at the top goes away; the order and its tickets stay as they are.`
+                                              }
+                                              confirmLabel={locale === "nl" ? "Markeer als terugbetaald" : "Mark as refunded"}
+                                              cancelLabel={locale === "nl" ? "Annuleren" : "Cancel"}
+                                              successMessage={locale === "nl" ? "Betaling gemarkeerd als terugbetaald." : "Payment marked as refunded."}
+                                              errorMessages={{
+                                                PAYMENT_NOT_AWAITING_REFUND:
+                                                  locale === "nl"
+                                                    ? "Niet gemarkeerd: deze betaling wacht niet meer op een terugbetaling. Misschien vinkte iemand anders ze net af."
+                                                    : "Not marked: this payment is no longer awaiting a refund. Someone else may have just marked it.",
+                                              }}
+                                              errorFallback={locale === "nl" ? "Betaling niet gemarkeerd." : "Payment was not marked."}
+                                            />
+                                          ) : null}
+                                        </div>
+                                        <dl className="ticket-admin-spec">
+                                          {canViewFinance ? (
+                                            <div><dt>{locale === "nl" ? "Bedrag" : "Amount"}</dt><dd>{amount}</dd></div>
+                                          ) : null}
+                                          <div><dt>Provider</dt><dd>{flagged.provider}</dd></div>
+                                          <div><dt>{locale === "nl" ? "Betaald op" : "Paid at"}</dt><dd>{formatDateTime(flagged.succeededAt, locale)}</dd></div>
+                                        </dl>
+                                      </li>
+                                    );
+                                  })}
+                                </ul>
+                              </div>
+                            ) : null}
 
                             {canResendConfirmation ? (
                               <div className="ticket-admin-detail-actions">

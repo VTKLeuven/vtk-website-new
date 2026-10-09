@@ -45,6 +45,13 @@ const ERRORS: Record<string, { nl: string; en: string }> = {
     nl: "Er staat nog een betaling open. Wacht even en probeer opnieuw.",
     en: "A payment is still open. Wait a moment and try again.",
   },
+  // Geen belofte over hoe lang: een Bancontact-betaling vervalt na twee
+  // minuten, maar een Mollie-betaling die bij de bank ligt, kan veel langer
+  // openstaan.
+  PAYMENT_IN_PROGRESS: {
+    nl: "Je betaling staat nog open bij je bank. Rond ze daar af, dan verschijnen je tickets hier. Lukt dat niet, wacht dan tot ze vervalt (bij Bancontact na twee minuten) en probeer opnieuw.",
+    en: "Your payment is still open at your bank. Finish it there and your tickets will appear here. If that does not work, wait until it expires (two minutes for Bancontact) and try again.",
+  },
   PAYMENT_UNAVAILABLE: {
     nl: "Deze betaalmethode werkt nu niet. Probeer de andere.",
     en: "This payment method is not working right now. Try the other one.",

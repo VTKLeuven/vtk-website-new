@@ -16,6 +16,7 @@ import { MAX_NON_MEMBER_DELAY_MINUTES } from "@/lib/ticketing/presale";
 import { newPresaleToken } from "@/lib/ticketing/presaleLink";
 import { newPrivateToken } from "@/lib/ticketing/privateLink";
 import { NEWS_TAG } from "@/lib/news/load";
+import { markPaymentRefundedManually } from "@/lib/ticketing/orders";
 import { requestTicketRefund } from "@/lib/ticketing/refunds";
 import { slugify } from "@/lib/ticketing/slug";
 import { ticketColorKey } from "@/lib/ticketing/ticketColors";
@@ -2342,6 +2343,34 @@ export async function refundTicketsAction(formData: FormData): Promise<void> {
   });
   refreshTicketEvent(locale, eventId);
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}/bestellingen`));
+}
+
+/**
+ * Een betaling die apart stond om terug te betalen (`NEEDS_REFUND`), afvinken
+ * nadat iemand het geld met de hand teruggaf. Zelf betaalt dit niets terug.
+ */
+export async function markTicketPaymentRefundedAction(formData: FormData): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const paymentId = value(formData, "paymentId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const { session } = await requireTicketEventCapability(eventId, "REFUND");
+  const marked = await markPaymentRefundedManually({
+    eventId,
+    paymentId,
+    actorUserId: session.user.id,
+  });
+  if (!marked) return saveError("PAYMENT_NOT_AWAITING_REFUND");
+  // Op de bestelling, net als de andere regels over bestellingen: de betaling
+  // zelf staat in het auditlog van het ticketsysteem (`PAYMENT_REFUNDED_MANUALLY`).
+  await logAudit({
+    action: "refund",
+    entity: "ticketOrder",
+    entityId: marked.orderId,
+    target: await ticketEventTitle(eventId),
+    summary: "betaling zonder ticket met de hand terugbetaald",
+  });
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/bestellingen`));
+  return saveOk();
 }
 
 /**

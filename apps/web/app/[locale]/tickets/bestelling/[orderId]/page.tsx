@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getOrderForViewer } from "@/lib/ticketing/queries";
+import { liveBancontactPayment } from "@/lib/ticketing/bancontactPayment";
 import { paymentMethodChoice } from "@/lib/ticketing/paymentMethods";
 import { hasLocale } from "@/lib/locale";
 import { staticMetadata } from "@/lib/pageMetadata";
@@ -28,6 +29,15 @@ export default async function TicketOrderPage({ params }: { params: Params }) {
   if (!hasLocale(localeParam)) notFound();
   const order = (await getOrderForViewer(orderId)) as PublicOrder | null;
   if (!order) notFound();
+  // Een Bancontact-QR die nog leeft: wie hier belandt (via "Andere
+  // betaalmethode", of terug uit de app voor de betaling bevestigd is), moet
+  // eerst terug naar die QR kunnen, niet enkel een nieuwe betaling starten.
+  const bancontact =
+    order.status === "PENDING_PAYMENT" ? await liveBancontactPayment(orderId) : null;
+  const openBancontact =
+    bancontact?.providerDeeplink && (!bancontact.expiresAt || bancontact.expiresAt > new Date())
+      ? { paymentId: bancontact.id, expiresAt: bancontact.expiresAt?.toISOString() ?? null }
+      : null;
 
   // Dezelfde schil als /tickets en /tickets/[slug]: de kop en de kolommen zitten
   // in OrderStatus, want ze veranderen mee met de status van de bestelling.
@@ -37,6 +47,7 @@ export default async function TicketOrderPage({ params }: { params: Params }) {
         initialOrder={order}
         locale={localeParam}
         paymentChoice={paymentMethodChoice(localeParam)}
+        openBancontact={openBancontact}
       />
     </div>
   );

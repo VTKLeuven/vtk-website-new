@@ -392,6 +392,35 @@
   color: var(--ticket-amber);
 }
 
+/* Een Bancontact-QR die nog leeft. Het gele accent van een uitgelichte kaart:
+   dit is de handeling die de koper hoogstwaarschijnlijk zoekt, en een nieuwe
+   betaling starten (de keuze eronder) is de uitzondering. */
+.torder-open-payment {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  box-shadow: inset 3px 0 0 var(--yellow);
+  background: var(--surface);
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.torder-open-payment strong {
+  color: var(--ink);
+}
+
+.torder-open-payment p {
+  margin: 4px 0 0;
+}
+
+.torder-open-payment .ticket-primary-button {
+  justify-self: start;
+}
+
 /* Wachten op de betaling, of de mededeling dat er niets uitgegeven is. Een
    gestippelde omtrek in plaats van een kaart: er staat nog niets in. */
 .torder-wait {

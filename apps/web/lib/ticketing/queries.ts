@@ -1,6 +1,7 @@
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
+import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { getSession } from "@vtk/auth/server";
 import { prisma } from "@vtk/db";
@@ -62,6 +63,12 @@ const orderInclude = {
     },
   },
   items: { include: { ticket: true } },
+  // Of er nog een betaling loopt bij de provider: zie `paymentOpen`.
+  payments: {
+    where: { status: { in: ["CREATED", "PENDING"] }, providerCheckoutId: { not: null } },
+    select: { id: true },
+    take: 1,
+  },
 } satisfies Prisma.TicketOrderInclude;
 
 type OrderRecord = Prisma.TicketOrderGetPayload<{ include: typeof orderInclude }>;
@@ -498,7 +505,12 @@ export async function getTicketEventPreviewBySlug(slug: string, locale: PublicLo
   };
 }
 
-export async function getOrderForViewer(orderId: string) {
+/**
+ * Per request gecachet: de bestelpagina en `liveBancontactPayment` vragen
+ * dezelfde bestelling op, en anders liep de toegangscontrole met sessie en
+ * query twee keer per paginabezoek.
+ */
+export const getOrderForViewer = cache(async function getOrderForViewer(orderId: string) {
   const [session, cookieStore] = await Promise.all([getSession(await headers()), cookies()]);
   const order = await prisma.ticketOrder.findUnique({
     where: { id: orderId },
@@ -517,7 +529,7 @@ export async function getOrderForViewer(orderId: string) {
   if (!validAccess && !ownsOrder && !session?.user.isSuperAdmin) return null;
 
   return orderDto(order, session?.user.id === order.buyerUserId);
-}
+});
 
 /**
  * De bestelregels: per tickettype en prijs één regel met een aantal erbij.
@@ -563,6 +575,7 @@ function orderDto(order: OrderRecord, authenticatedOwner: boolean) {
     refundedCents: order.refundedCents,
     currency: order.currency,
     reservationExpiresAt: order.reservationExpiresAt,
+    paymentOpen: order.payments.length > 0,
     authenticatedOwner,
     event: {
       id: order.event.id,

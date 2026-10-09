@@ -53,7 +53,15 @@ export function googleWalletConfig(): GoogleWalletConfig | null {
   return { issuerId, serviceAccountEmail, privateKey };
 }
 
-export type WalletWalletConfig = { apiKey: string };
+export type WalletWalletConfig = {
+  apiKey: string;
+  /**
+   * Of het account Pro is. Enkel dan sturen we de Pro-velden mee (kleur, logo,
+   * strip, locatie): het gratis plan weigert de hele pas zodra het er één ziet,
+   * in plaats van het veld te negeren.
+   */
+  pro: boolean;
+};
 
 /** Third-party fallback (walletwallet.dev): issues both Apple and Google
  * passes through their own already-Apple-registered signing identity, so VTK
@@ -65,5 +73,8 @@ export type WalletWalletConfig = { apiKey: string };
 export function walletWalletConfig(): WalletWalletConfig | null {
   const apiKey = process.env.WALLET_WALLETWALLET_API_KEY?.trim();
   if (!apiKey) return null;
-  return { apiKey };
+  return {
+    apiKey,
+    pro: process.env.WALLET_WALLETWALLET_PRO?.trim().toLowerCase() === "true",
+  };
 }

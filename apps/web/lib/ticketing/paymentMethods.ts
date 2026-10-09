@@ -44,7 +44,9 @@ function methodLogo(provider: PaymentProviderName): string | null {
 export type PaymentMethodChoice = {
   /**
    * - `single`: geen keuze tonen, meteen doorsturen. Dat is de situatie zolang
-   *   er maar één betaalwijze geconfigureerd is.
+   *   er maar één betaalwijze geconfigureerd is. Enkel op de bestelpagina staat
+   *   die ene betaalwijze er als knop, wanneer een betaling afbrak en er geen
+   *   meer loopt: dat is dan de weg naar een nieuwe poging.
    * - `collapsed`: enkel de eerste betaalwijze staat er; de rest komt pas na een
    *   klik op "meer betaalmethodes".
    * - `equal`: alle betaalwijzen staan er tegelijk, even zwaar.

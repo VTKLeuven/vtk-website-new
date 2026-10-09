@@ -174,6 +174,11 @@ export type PublicOrder = {
   buyerEmail: string;
   totalCents: number;
   currency: string;
+  /**
+   * Er loopt nog een betaalpoging bij de provider. Zonder zo'n poging kan een
+   * bestelling die op betaling wacht enkel nog verder met een nieuwe poging.
+   */
+  paymentOpen?: boolean;
   event: {
     id?: string;
     slug?: string;

@@ -2,6 +2,7 @@ import "server-only";
 
 import { randomUUID } from "node:crypto";
 import type { Prisma, TicketQuestion as TicketQuestionModel } from "@prisma/client";
+import * as Sentry from "@sentry/nextjs";
 import { headers } from "next/headers";
 import { getSession } from "@vtk/auth/server";
 import { prisma } from "@vtk/db";
@@ -31,9 +32,15 @@ import {
   paymentGatewayFor,
   type CheckoutLine,
   type CheckoutResult,
+  type CheckoutStatusResult,
 } from "./payments";
 import { orderAccessExpiry } from "./access";
-import { withSerializableTransaction } from "./transactions";
+import {
+  isTransientDatabaseError,
+  withOrderLock,
+  withReservationTransaction,
+} from "./transactions";
+import { awaitingManualRefund, isPaymentSetAside } from "./paymentFlags";
 import { publishedTicketDesign } from "./design";
 import { getTicketTerms } from "./terms";
 import {
@@ -407,7 +414,7 @@ export async function createTicketCheckout(
   const poolQuantities = quantitiesByPool(normalizedItems);
 
   try {
-    await withSerializableTransaction(
+    await withReservationTransaction(
       async (tx) => {
         const lockKeys = [
           `ticket-checkout:email:${event.id}:${input.buyerEmail}`,
@@ -473,7 +480,6 @@ export async function createTicketCheckout(
           }
         }
 
-        await reserveInventory(tx, event.id, poolQuantities);
         await tx.ticketOrder.create({
           data: {
             id: orderId,
@@ -531,6 +537,11 @@ export async function createTicketCheckout(
             metadata: { orderNumber, ticketCount: normalizedItems.length },
           },
         });
+        // Als laatste, vlak voor de commit: de rij van de pot is de enige die
+        // elke koper van dit event raakt, en vanaf deze UPDATE wacht de
+        // volgende koper op ons. Hoe korter dat duurt, hoe sneller de rij
+        // doorschuift. Zit de pot vol, dan rolt de bestelling hierboven mee terug.
+        await reserveInventory(tx, event.id, poolQuantities);
       }
     );
   } catch (error) {
@@ -548,50 +559,67 @@ export async function createTicketCheckout(
     throw error;
   }
 
+  // Vanaf hier staat de reservatie vast. Een fout die enkel zegt dat het druk
+  // was (`isTransientDatabaseError`), mag de koper dus nooit "je bestelling is
+  // niet doorgegaan" laten lezen: dan houdt een bestelling die hij niet kan
+  // bereiken zijn plaatsen een halfuur vast, en maakt elke nieuwe poging er nog
+  // een. Zie de twee gevallen hieronder.
+  const toOrderPage = {
+    orderId,
+    orderNumber,
+    access,
+    accessExpiresAt,
+    checkoutUrl: localOrderUrl(input.locale, orderId),
+  };
+
   const paymentId = randomUUID();
   if (totalCents === 0) {
-    await withSerializableTransaction(
-      async (tx) => {
-        await tx.ticketPayment.create({
-          data: {
-            id: paymentId,
+    try {
+      await withOrderLock(
+        orderId,
+        async (tx) => {
+          await tx.ticketPayment.create({
+            data: {
+              id: paymentId,
+              orderId,
+              provider: "free",
+              idempotencyKey: `${orderId}:1`,
+              status: "CREATED",
+              amountCents: 0,
+              currency: event.currency,
+              expiresAt,
+            },
+          });
+          await fulfillPaidOrderWithTx(tx, {
             orderId,
             provider: "free",
-            idempotencyKey: `${orderId}:1`,
-            status: "CREATED",
+            providerPaymentId: `free_${orderId}`,
             amountCents: 0,
             currency: event.currency,
-            expiresAt,
-          },
-        });
-        await fulfillPaidOrderWithTx(tx, {
+          });
+        }
+      );
+    } catch (error) {
+      if (!isTransientDatabaseError(error)) throw error;
+      // Een gratis bestelling heeft geen betaling om later af te ronden: de
+      // bestelpagina kan er niets mee. Ze valt dus meteen, en dan klopt "probeer
+      // meteen opnieuw" wél. Lukt ook dat niet, dan ruimt `releaseExpiredOrders`
+      // ze op wanneer de reservatie afloopt.
+      await failPendingOrder(orderId).catch((releaseError) => {
+        console.error("Unable to release a free order after a busy database", {
           orderId,
-          provider: "free",
-          providerPaymentId: `free_${orderId}`,
-          amountCents: 0,
-          currency: event.currency,
+          error: releaseError,
         });
-      }
-    );
-    return {
-      orderId,
-      orderNumber,
-      access,
-      accessExpiresAt,
-      checkoutUrl: localOrderUrl(input.locale, orderId),
-    };
+      });
+      throw error;
+    }
+    return toOrderPage;
   }
 
   // The shop sends its selected provider. Older clients without a choice can
   // still select one on the order page when multiple providers are enabled.
   if (!input.paymentProvider && methods.length > 1) {
-    return {
-      orderId,
-      orderNumber,
-      access,
-      accessExpiresAt,
-      checkoutUrl: localOrderUrl(input.locale, orderId),
-    };
+    return toOrderPage;
   }
 
   const context: CheckoutContext = {
@@ -632,8 +660,28 @@ export async function createTicketCheckout(
     checkout = await createAndPersistCheckout(context, input.paymentProvider ?? methods[0]!, 1, paymentId);
   } catch (error) {
     if (error instanceof CheckoutCreationError) {
-      if (error.definitive) await failPendingOrder(orderId, paymentId);
+      if (error.definitive) {
+        // Lukt het niet om de bestelling meteen te laten vallen (te druk), dan
+        // ruimt `releaseExpiredOrders` ze op wanneer de reservatie afloopt. De
+        // koper hoort hoe dan ook dat deze betaalwijze niet werkt.
+        await failPendingOrder(orderId, paymentId).catch((releaseError) => {
+          console.error("Unable to release an order after its checkout was refused", {
+            orderId,
+            error: releaseError,
+          });
+        });
+      }
       throw new TicketCheckoutError("PAYMENT_UNAVAILABLE");
+    }
+    if (isTransientDatabaseError(error)) {
+      // De bestelling staat er, maar er kwam geen betaling bij. Stuur de koper
+      // naar zijn bestelling: daar start hij de betaling opnieuw, en hij krijgt
+      // de cookie mee die hem er toegang toe geeft.
+      console.warn("Ticket checkout too busy after the reservation; sending the buyer to the order", {
+        orderId,
+        error,
+      });
+      return toOrderPage;
     }
     throw error;
   }
@@ -823,144 +871,476 @@ type FulfillPaidOrderInput = {
   currency: string;
 };
 
+/**
+ * Waarom een geslaagde betaling geen tickets opleverde:
+ *
+ * - `SOLD_OUT`: de bestelling was al vervallen, en haar plaatsen zijn intussen
+ *   aan iemand anders gegaan.
+ * - `EVENT_CLOSED`: de bestelling was vervallen en het event is afgelopen of
+ *   geannuleerd; een ticket heeft dan geen zin meer.
+ * - `ORDER_CLOSED`: de bestelling is op een andere manier afgesloten
+ *   (geannuleerd door het beheer).
+ * - `ALREADY_PAID`: de bestelling was al betaald met een andere poging; dit is
+ *   een tweede betaling voor dezelfde tickets.
+ */
+export type PaymentNeedsRefundReason = "SOLD_OUT" | "EVENT_CLOSED" | "ORDER_CLOSED" | "ALREADY_PAID";
+
+class PaymentNeedsRefundError extends Error {
+  constructor(
+    readonly reason: PaymentNeedsRefundReason,
+    readonly paymentId: string
+  ) {
+    super(`PAYMENT_NEEDS_REFUND_${reason}`);
+    this.name = "PaymentNeedsRefundError";
+  }
+}
+
+const PAID_ORDER_STATUSES = new Set(["PAID", "PARTIALLY_REFUNDED", "REFUNDED"]);
+
+/**
+ * De poging waar een gemelde betaling bij hoort.
+ *
+ * Eerst de poging met precies deze checkout. Pas zonder die poging een rij
+ * zonder checkout-id (een gratis bestelling, of een checkout die de provider
+ * aanmaakte maar die wij niet konden bewaren). Andersom nam dit een eerdere,
+ * mislukte poging zonder checkout-id: die kreeg dan de betaal-ID van de
+ * geslaagde poging, de unieke index weigerde dat bij elke herpoging, en de
+ * koper betaalde zonder ticket.
+ */
+function paymentAttemptFor<T extends { provider: string; providerCheckoutId: string | null }>(
+  payments: T[],
+  input: FulfillPaidOrderInput
+): T | undefined {
+  return (
+    (input.providerCheckoutId
+      ? payments.find(
+          (candidate) =>
+            candidate.provider === input.provider &&
+            candidate.providerCheckoutId === input.providerCheckoutId
+        )
+      : undefined) ??
+    payments.find(
+      (candidate) =>
+        candidate.provider === input.provider &&
+        (candidate.providerCheckoutId == null || !input.providerCheckoutId)
+    )
+  );
+}
+
+/**
+ * Vervult een bestelling waarvoor de provider een geslaagde betaling meldt.
+ *
+ * Een betaling kan ook binnenkomen voor een bestelling die al vervallen is: de
+ * koper bevestigt in zijn app net nadat de reservatie afliep. Dan geven we de
+ * tickets alsnog uit zolang er plaats is. Is die er niet meer, dan gooien we
+ * `PaymentNeedsRefundError`: de hele transactie rolt terug (ook een half
+ * gelukte reservatie over meerdere potten) en `fulfillPaidOrder` legt de
+ * betaling apart vast om terug te betalen.
+ *
+ * Voorheen weigerde deze functie zo'n betaling met `ORDER_NOT_PAYABLE`, en dat
+ * was het einde: de koper had betaald, kreeg geen ticket, en niemand wist het
+ * (bestelling VTK-26-DCE77A9579, 8 oktober 2026).
+ */
 async function fulfillPaidOrderWithTx(
   tx: Prisma.TransactionClient,
   input: FulfillPaidOrderInput
 ) {
-      const order = await tx.ticketOrder.findUnique({
-        where: { id: input.orderId },
-        include: { items: { include: { ticket: true } }, payments: true },
-      });
-      if (!order) throw new Error("ORDER_NOT_FOUND");
-      if (order.status === "PAID" || order.status === "PARTIALLY_REFUNDED" || order.status === "REFUNDED") {
-        return order;
-      }
-      if (order.status !== "PENDING_PAYMENT") throw new Error("ORDER_NOT_PAYABLE");
-      if (order.totalCents !== input.amountCents || order.currency !== input.currency.toUpperCase()) {
-        throw new Error("PAYMENT_AMOUNT_MISMATCH");
-      }
+  const order = await tx.ticketOrder.findUnique({
+    where: { id: input.orderId },
+    include: {
+      items: { include: { ticket: true } },
+      // Jongste eerst: valt de betaling hieronder terug op een rij zonder
+      // checkout-id, dan is de laatste poging degene die de koper betaalde.
+      payments: { orderBy: { createdAt: "desc" } },
+      event: { select: { status: true, endsAt: true } },
+    },
+  });
+  if (!order) throw new Error("ORDER_NOT_FOUND");
 
-      const payment = order.payments.find(
-        (candidate) =>
-          candidate.provider === input.provider &&
-          (candidate.providerCheckoutId === input.providerCheckoutId ||
-            candidate.providerCheckoutId == null ||
-            !input.providerCheckoutId)
-      );
-      if (!payment) throw new Error("PAYMENT_NOT_FOUND");
+  // Een betaling die al apart staat om terug te betalen, blijft daar, ook als
+  // de provider ze opnieuw meldt. Mollie meldt een terugbetaling met dezelfde
+  // status `paid`; zonder deze regel gaf die melding alsnog tickets uit zodra
+  // er intussen een plaats vrijkwam, aan een koper die zijn geld al terugkreeg.
+  const setAside = order.payments.some(
+    (candidate) =>
+      candidate.provider === input.provider &&
+      candidate.providerPaymentId === input.providerPaymentId &&
+      isPaymentSetAside(candidate)
+  );
+  if (setAside) return order;
 
-      await commitReservedInventory(tx, order.eventId, quantitiesByPool(order.items));
-      // Resolve once inside the fulfilment transaction. Every ticket in this
-      // order gets the same immutable published layout, even if an admin edits
-      // the next draft while payment is being processed.
-      const eventDesign = await tx.ticketEvent.findUnique({
-        where: { id: order.eventId },
-        select: { settings: true },
-      });
-      if (!eventDesign) throw new Error("EVENT_NOT_FOUND");
-      const designSnapshot = publishedTicketDesign(eventDesign.settings, order.eventId);
-      for (const item of order.items) {
-        if (item.ticket) continue;
-        const publicCode = createPublicTicketId();
-        const credential = createTicketCredential(publicCode, 1);
-        await tx.ticket.create({
-          data: {
-            eventId: order.eventId,
-            orderItemId: item.id,
-            publicCode,
-            credentialHash: secureTokenHash(credential),
-            credentialVersion: 1,
-            designSnapshot,
-          },
-        });
+  if (PAID_ORDER_STATUSES.has(order.status)) {
+    // Dezelfde betaling die opnieuw gemeld wordt (een herhaalde webhook, of
+    // Mollie die een terugbetaling meldt) is geen nieuws.
+    const recorded = order.payments.some(
+      (candidate) =>
+        candidate.status === "SUCCEEDED" &&
+        candidate.provider === input.provider &&
+        candidate.providerPaymentId === input.providerPaymentId
+    );
+    if (recorded) return order;
+
+    // Een ándere poging die óók slaagde, is een tweede betaling voor dezelfde
+    // tickets. Ze zoekt haar poging zoals een gewone betaling dat doet, ook
+    // via een rij zonder checkout-id: anders verdween net de betaling op een
+    // checkout die we niet konden bewaren, zonder markering en zonder alarm.
+    const attempt = paymentAttemptFor(order.payments, input);
+    if (!attempt) throw new Error("PAYMENT_NOT_FOUND");
+    if (attempt.status !== "SUCCEEDED") {
+      throw new PaymentNeedsRefundError("ALREADY_PAID", attempt.id);
+    }
+    // Die poging draagt al een andere geslaagde betaling. Deze erbovenop
+    // schrijven zou de betaling die de tickets betaalde uitwissen; ze blijft dus
+    // waar ze is, maar niet ongemerkt.
+    const details = {
+      orderId: order.id,
+      orderNumber: order.reference,
+      provider: input.provider,
+      providerPaymentId: input.providerPaymentId,
+      amountCents: input.amountCents,
+    };
+    console.error("Second ticket payment could not be attached to an attempt", details);
+    Sentry.captureMessage("Tweede ticketbetaling zonder eigen poging: terugbetalen", {
+      level: "error",
+      tags: { area: "ticketing", reason: "ALREADY_PAID", provider: input.provider },
+      extra: details,
+    });
+    return order;
+  }
+
+  if (order.totalCents !== input.amountCents || order.currency !== input.currency.toUpperCase()) {
+    throw new Error("PAYMENT_AMOUNT_MISMATCH");
+  }
+
+  const payment = paymentAttemptFor(order.payments, input);
+  if (!payment) throw new Error("PAYMENT_NOT_FOUND");
+
+  const quantities = quantitiesByPool(order.items);
+  const late = order.status === "EXPIRED" || order.status === "PAYMENT_FAILED";
+  if (late) {
+    // Haar plaatsen zijn bij het vervallen teruggegaan naar de pot; ze moeten
+    // er dus opnieuw uit. Dezelfde voorwaardelijke UPDATE als bij een
+    // checkout: zit de pot intussen vol, dan krijgt deze koper zijn geld terug
+    // en niet een plaats die er niet is.
+    //
+    // De grenzen per koper (één erelidticket, het maximum gratis tickets)
+    // worden hier niet opnieuw getoetst: ze golden bij het bestellen, en wie
+    // intussen opnieuw bestelde én deze oude poging toch nog betaalde, heeft
+    // twee keer betaald. Dat is zeldzaam genoeg om te aanvaarden.
+    const eventClosed =
+      order.event.status === "CANCELLED" ||
+      order.event.status === "ARCHIVED" ||
+      order.event.endsAt <= new Date();
+    if (eventClosed) throw new PaymentNeedsRefundError("EVENT_CLOSED", payment.id);
+    try {
+      await reserveInventory(tx, order.eventId, quantities);
+    } catch (error) {
+      if (error instanceof TicketInventoryError && error.code === "SOLD_OUT") {
+        throw new PaymentNeedsRefundError("SOLD_OUT", payment.id);
       }
-      await tx.ticketPayment.update({
-        where: { id: payment.id },
-        data: {
-          providerPaymentId: input.providerPaymentId,
-          providerCheckoutId: input.providerCheckoutId ?? payment.providerCheckoutId,
-          status: "SUCCEEDED",
-          succeededAt: new Date(),
-          providerStatus: "paid",
-        },
-      });
-      const updated = await tx.ticketOrder.update({
-        where: { id: order.id },
-        data: { status: "PAID", paidAt: new Date(), reservationExpiresAt: null },
-      });
-      await tx.ticketOutboxMessage.upsert({
-        where: { dedupeKey: `order-confirmation:${order.id}` },
-        update: {},
-        create: {
-          eventId: order.eventId,
+      throw error;
+    }
+  } else if (order.status !== "PENDING_PAYMENT") {
+    throw new PaymentNeedsRefundError("ORDER_CLOSED", payment.id);
+  }
+
+  await commitReservedInventory(tx, order.eventId, quantities);
+  // Resolve once inside the fulfilment transaction. Every ticket in this
+  // order gets the same immutable published layout, even if an admin edits
+  // the next draft while payment is being processed.
+  const eventDesign = await tx.ticketEvent.findUnique({
+    where: { id: order.eventId },
+    select: { settings: true },
+  });
+  if (!eventDesign) throw new Error("EVENT_NOT_FOUND");
+  const designSnapshot = publishedTicketDesign(eventDesign.settings, order.eventId);
+  for (const item of order.items) {
+    if (item.ticket) continue;
+    const publicCode = createPublicTicketId();
+    const credential = createTicketCredential(publicCode, 1);
+    await tx.ticket.create({
+      data: {
+        eventId: order.eventId,
+        orderItemId: item.id,
+        publicCode,
+        credentialHash: secureTokenHash(credential),
+        credentialVersion: 1,
+        designSnapshot,
+      },
+    });
+  }
+  await tx.ticketPayment.update({
+    where: { id: payment.id },
+    data: {
+      providerPaymentId: input.providerPaymentId,
+      providerCheckoutId: input.providerCheckoutId ?? payment.providerCheckoutId,
+      status: "SUCCEEDED",
+      succeededAt: new Date(),
+      providerStatus: "paid",
+    },
+  });
+  const updated = await tx.ticketOrder.update({
+    where: { id: order.id },
+    data: {
+      status: "PAID",
+      paidAt: new Date(),
+      reservationExpiresAt: null,
+      // Een laattijdige betaling haalt de bestelling terug: dat ze ooit
+      // vervallen was, staat in het auditlog en niet meer op de bestelling.
+      ...(late ? { expiredAt: null, failedAt: null } : {}),
+    },
+  });
+  await tx.ticketOutboxMessage.upsert({
+    where: { dedupeKey: `order-confirmation:${order.id}` },
+    update: {},
+    create: {
+      eventId: order.eventId,
+      orderId: order.id,
+      type: "ORDER_CONFIRMATION",
+      dedupeKey: `order-confirmation:${order.id}`,
+      recipient: order.buyerEmail,
+      payload: { orderId: order.id },
+    },
+  });
+  await tx.ticketAuditLog.create({
+    data: {
+      eventId: order.eventId,
+      action: "ORDER_PAID",
+      entityType: "TicketOrder",
+      entityId: order.id,
+      metadata: {
+        provider: input.provider,
+        amountCents: input.amountCents,
+        ...(late ? { late: true, previousStatus: order.status } : {}),
+      },
+    },
+  });
+  return updated;
+}
+
+/**
+ * Legt een geslaagde betaling vast die geen tickets kon opleveren: de betaling
+ * staat op `SUCCEEDED` (het geld is binnen) met `setAside` `NEEDS_REFUND`, en
+ * Sentry slaat alarm. De bestellingen van het event tonen dan bovenaan een
+ * melding en bij de bestelling een badge, met een filter "Terug te betalen".
+ * Terugbetalen gebeurt met de hand (Bancontact heeft standaard geen
+ * refund-API); daarna zet het beheer de betaling op `REFUNDED_MANUALLY` met
+ * `markPaymentRefundedManually`.
+ */
+async function recordPaymentNeedingRefund(
+  input: FulfillPaidOrderInput,
+  error: PaymentNeedsRefundError
+) {
+  const result = await withOrderLock(input.orderId, async (tx) => {
+    const payment = await tx.ticketPayment.findUnique({ where: { id: error.paymentId } });
+    if (!payment || payment.orderId !== input.orderId) throw new Error("PAYMENT_NOT_FOUND");
+    const order = await tx.ticketOrder.findUniqueOrThrow({ where: { id: input.orderId } });
+    // Dit loopt in een eigen transactie, na de rollback. Is de betaling
+    // intussen geslaagd, dan deed iemand anders al wat nodig was: ze staat al
+    // apart, of een tweede, gelijktijdige melding van dezelfde betaling gaf de
+    // tickets uit omdat er net een plaats vrijkwam. Die laatste markeren als
+    // terug te betalen zou iemand met geldige tickets zijn geld teruggeven.
+    if (payment.status === "SUCCEEDED") return { order, newlyFlagged: false };
+    await tx.ticketPayment.update({
+      where: { id: payment.id },
+      data: {
+        status: "SUCCEEDED",
+        succeededAt: payment.succeededAt ?? new Date(),
+        providerPaymentId: input.providerPaymentId,
+        providerCheckoutId: input.providerCheckoutId ?? payment.providerCheckoutId,
+        // Wat de provider meldde: geslaagd. Dat de betaling apart staat, is
+        // onze beslissing en staat in een eigen kolom.
+        providerStatus: "paid",
+        setAside: "NEEDS_REFUND",
+      },
+    });
+    await tx.ticketAuditLog.create({
+      data: {
+        eventId: order.eventId,
+        action: "PAYMENT_NEEDS_REFUND",
+        entityType: "TicketPayment",
+        entityId: payment.id,
+        metadata: {
           orderId: order.id,
-          type: "ORDER_CONFIRMATION",
-          dedupeKey: `order-confirmation:${order.id}`,
-          recipient: order.buyerEmail,
-          payload: { orderId: order.id },
+          orderNumber: order.reference,
+          reason: error.reason,
+          provider: input.provider,
+          providerPaymentId: input.providerPaymentId,
+          amountCents: input.amountCents,
         },
-      });
-      await tx.ticketAuditLog.create({
-        data: {
-          eventId: order.eventId,
-          action: "ORDER_PAID",
-          entityType: "TicketOrder",
-          entityId: order.id,
-          metadata: { provider: input.provider, amountCents: input.amountCents },
-        },
-      });
-      return updated;
+      },
+    });
+    return { order, newlyFlagged: true };
+  });
+
+  if (result.newlyFlagged) {
+    const details = {
+      orderId: result.order.id,
+      orderNumber: result.order.reference,
+      reason: error.reason,
+      provider: input.provider,
+      providerPaymentId: input.providerPaymentId,
+      amountCents: input.amountCents,
+    };
+    console.error("Ticket payment succeeded without tickets; refund needed", details);
+    Sentry.captureMessage("Ticketbetaling zonder ticket: terugbetalen", {
+      level: "error",
+      tags: { area: "ticketing", reason: error.reason, provider: input.provider },
+      extra: details,
+    });
+  }
+  return result.order;
 }
 
 export async function fulfillPaidOrder(input: FulfillPaidOrderInput) {
-  return withSerializableTransaction((tx) => fulfillPaidOrderWithTx(tx, input));
+  try {
+    return await withOrderLock(input.orderId, (tx) => fulfillPaidOrderWithTx(tx, input));
+  } catch (error) {
+    if (error instanceof PaymentNeedsRefundError) return recordPaymentNeedingRefund(input, error);
+    throw error;
+  }
 }
 
-async function failPendingOrder(orderId: string, paymentId: string) {
-  await withSerializableTransaction(
-    async (tx) => {
-      const order = await tx.ticketOrder.findUnique({ where: { id: orderId }, include: { items: true } });
-      if (!order || order.status !== "PENDING_PAYMENT") return;
-      await releaseReservedInventory(tx, order.eventId, quantitiesByPool(order.items));
-      await tx.ticketOrder.update({
-        where: { id: order.id },
-        data: { status: "PAYMENT_FAILED", failedAt: new Date(), reservationExpiresAt: null },
-      });
-      await tx.ticketPayment.update({
-        where: { id: paymentId },
+/**
+ * Zet een betaling die op een terugbetaling wachtte op "met de hand
+ * terugbetaald", nadat iemand het geld bij de provider of via de bank
+ * teruggaf. Er verandert niets aan de bestelling of de tickets; enkel de
+ * markering, zodat de melding in het beheer verdwijnt en het auditlog zegt wie
+ * het afhandelde.
+ *
+ * Geeft de bestelling van die betaling terug, of `null` wanneer de betaling
+ * niet (meer) op een terugbetaling wacht, bijvoorbeeld omdat een collega ze net
+ * afvinkte.
+ */
+export async function markPaymentRefundedManually(input: {
+  eventId: string;
+  paymentId: string;
+  actorUserId: string;
+}): Promise<{ orderId: string } | null> {
+  const payment = await prisma.ticketPayment.findFirst({
+    where: { id: input.paymentId, order: { eventId: input.eventId }, ...awaitingManualRefund },
+    select: { id: true, orderId: true, amountCents: true },
+  });
+  if (!payment) return null;
+
+  return withOrderLock(payment.orderId, async (tx) => {
+    const changed = await tx.ticketPayment.updateMany({
+      where: { id: payment.id, ...awaitingManualRefund },
+      data: { setAside: "REFUNDED_MANUALLY" },
+    });
+    if (changed.count !== 1) return null;
+    await tx.ticketAuditLog.create({
+      data: {
+        eventId: input.eventId,
+        actorUserId: input.actorUserId,
+        action: "PAYMENT_REFUNDED_MANUALLY",
+        entityType: "TicketPayment",
+        entityId: payment.id,
+        metadata: { orderId: payment.orderId, amountCents: payment.amountCents },
+      },
+    });
+    return { orderId: payment.orderId };
+  });
+}
+
+/**
+ * Een betaalpoging die bij de provider afliep zonder te slagen: vervallen,
+ * geweigerd door de bank, of geannuleerd.
+ *
+ * **Enkel deze poging valt af, nooit de bestelling.** De reservatie loopt door
+ * tot `reservationExpiresAt`, en `releaseExpiredOrders` ruimt ze daarna op. Een
+ * Bancontact-QR leeft twee minuten, de reservatie een half uur: wie zijn
+ * telefoon niet snel genoeg vond, vraagt een nieuwe QR en betaalt alsnog. Dat
+ * beloofde de betaalpagina altijd al ("Je tickets staan nog voor je klaar"),
+ * maar de webhooks lieten de bestelling vallen zodra de QR verliep: 146 keer in
+ * september en oktober 2026.
+ *
+ * En een melding over een óude poging kon een bestelling laten vallen terwijl
+ * de koper net een nieuwe begon. Die nieuwe QR bleef bij de provider gewoon
+ * betaalbaar, en zo betaalde iemand voor een bestelling die er niet meer was.
+ */
+export async function closeFailedPaymentAttempt(input: {
+  provider: string;
+  providerCheckoutId: string;
+  status: "EXPIRED" | "FAILED";
+}) {
+  await prisma.ticketPayment.updateMany({
+    where: {
+      provider: input.provider,
+      providerCheckoutId: input.providerCheckoutId,
+      status: { in: ["CREATED", "PENDING"] },
+    },
+    data: { status: input.status, failedAt: new Date() },
+  });
+}
+
+/**
+ * Laat een bestelling vallen die nog geen betaling kan krijgen. `paymentId` is
+ * de poging die daarbij mislukte; ze kan ontbreken (een gratis bestelling
+ * waarvan de transactie terugrolde), en dan is er geen rij om af te sluiten.
+ */
+async function failPendingOrder(orderId: string, paymentId?: string) {
+  await withOrderLock(orderId, async (tx) => {
+    const order = await tx.ticketOrder.findUnique({ where: { id: orderId }, include: { items: true } });
+    if (!order || order.status !== "PENDING_PAYMENT") return;
+    await releaseReservedInventory(tx, order.eventId, quantitiesByPool(order.items));
+    await tx.ticketOrder.update({
+      where: { id: order.id },
+      data: { status: "PAYMENT_FAILED", failedAt: new Date(), reservationExpiresAt: null },
+    });
+    if (paymentId) {
+      await tx.ticketPayment.updateMany({
+        where: { id: paymentId, orderId: order.id },
         data: { status: "FAILED", failedAt: new Date() },
       });
     }
-  );
+  });
 }
 
+/**
+ * Laat een bestelling vervallen en geeft haar plaatsen terug.
+ *
+ * Dit sluit enkel onze eigen rijen; een checkout die bij de provider nog leeft,
+ * blijft daar betaalbaar. Roep dit daarom pas aan nadat `closeLivePayments`
+ * elke lopende betaling bij de provider afsloot, zoals `releaseExpiredOrders`
+ * doet. Komt er toch nog een betaling binnen, dan vangt `fulfillPaidOrder` ze op.
+ */
 export async function expirePendingOrder(orderId: string): Promise<boolean> {
-  return withSerializableTransaction(
-    async (tx) => {
-      const order = await tx.ticketOrder.findUnique({ where: { id: orderId }, include: { items: true } });
-      if (!order || order.status !== "PENDING_PAYMENT") return false;
-      await releaseReservedInventory(tx, order.eventId, quantitiesByPool(order.items));
-      await tx.ticketOrder.update({
-        where: { id: order.id },
-        data: { status: "EXPIRED", expiredAt: new Date(), reservationExpiresAt: null },
-      });
-      await tx.ticketPayment.updateMany({
-        where: { orderId: order.id, status: { in: ["CREATED", "PENDING"] } },
-        data: { status: "EXPIRED" },
-      });
-      await tx.ticketAuditLog.create({
-        data: {
-          eventId: order.eventId,
-          action: "ORDER_EXPIRED",
-          entityType: "TicketOrder",
-          entityId: order.id,
-        },
-      });
-      return true;
-    }
-  );
+  return withOrderLock(orderId, async (tx) => {
+    const order = await tx.ticketOrder.findUnique({ where: { id: orderId }, include: { items: true } });
+    if (!order || order.status !== "PENDING_PAYMENT") return false;
+    await releaseReservedInventory(tx, order.eventId, quantitiesByPool(order.items));
+    await tx.ticketOrder.update({
+      where: { id: order.id },
+      data: { status: "EXPIRED", expiredAt: new Date(), reservationExpiresAt: null },
+    });
+    await tx.ticketPayment.updateMany({
+      where: { orderId: order.id, status: { in: ["CREATED", "PENDING"] } },
+      data: { status: "EXPIRED" },
+    });
+    await tx.ticketAuditLog.create({
+      data: {
+        eventId: order.eventId,
+        action: "ORDER_EXPIRED",
+        entityType: "TicketOrder",
+        entityId: order.id,
+      },
+    });
+    return true;
+  });
 }
 
+/**
+ * Ruimt bestellingen op waarvan de reservatie verlopen is.
+ *
+ * Eerst gaat elke lopende betaling bij de provider dicht (`closeLivePayments`),
+ * pas daarna vervalt de bestelling. Andersom blijft er een QR of een
+ * Mollie-checkout betaalbaar voor een bestelling die er niet meer is. Staat er
+ * iemand op dat moment te bevestigen in zijn app, dan wacht de bestelling een
+ * ronde: de provider laat die betaling zelf slagen of vervallen. Bij Bancontact
+ * duurt dat hoogstens enkele minuten; een Mollie-betaling op `pending` kan langer
+ * blijven staan, en zolang wacht de bestelling mee, want het geld kan nog komen.
+ */
 export async function releaseExpiredOrders(limit = 100): Promise<number> {
   const orders = await prisma.ticketOrder.findMany({
     where: { status: "PENDING_PAYMENT", reservationExpiresAt: { lte: new Date() } },
@@ -968,11 +1348,12 @@ export async function releaseExpiredOrders(limit = 100): Promise<number> {
       id: true,
       totalCents: true,
       currency: true,
+      // Enkel de pogingen die nog leven; `closeLivePayments` slaat de rest
+      // toch over.
       payments: {
         where: { status: { in: ["CREATED", "PENDING"] } },
-        orderBy: { createdAt: "desc" },
-        take: 1,
-        select: { provider: true, providerCheckoutId: true },
+        select: { id: true, provider: true, providerCheckoutId: true, status: true },
+        orderBy: { createdAt: "asc" },
       },
     },
     take: limit,
@@ -981,45 +1362,8 @@ export async function releaseExpiredOrders(limit = 100): Promise<number> {
 
   let released = 0;
   for (const order of orders) {
-    const payment = order.payments[0];
-    const checkoutId = payment?.providerCheckoutId;
-    if (checkoutId && payment.provider !== "mock") {
-      try {
-        const gateway = paymentGatewayFor(payment.provider);
-        let status = await gateway.getCheckoutStatus(checkoutId);
-        if (status.status === "PENDING") {
-          try {
-            await gateway.expireCheckout(checkoutId);
-          } catch {
-            // A payment can complete between the status check and expiry request.
-          }
-          status = await gateway.getCheckoutStatus(checkoutId);
-        }
-        if (status.status === "SUCCEEDED") {
-          if (
-            status.orderId !== order.id ||
-            status.amountCents !== order.totalCents ||
-            status.currency !== order.currency ||
-            !status.paymentId
-          ) {
-            throw new Error("EXPIRY_RECONCILIATION_MISMATCH");
-          }
-          await fulfillPaidOrder({
-            orderId: order.id,
-            provider: payment.provider,
-            providerPaymentId: status.paymentId,
-            providerCheckoutId: status.checkoutId,
-            amountCents: status.amountCents,
-            currency: status.currency,
-          });
-          continue;
-        }
-        if (status.status === "PENDING") continue;
-      } catch (error) {
-        console.error("Unable to safely expire checkout session", { orderId: order.id, error });
-        continue;
-      }
-    }
+    const closed = await closeLivePayments(order);
+    if (closed !== "CLOSED") continue;
     if (await expirePendingOrder(order.id)) released += 1;
   }
   return released;
@@ -1032,11 +1376,37 @@ export type StartPaymentCode =
   | "RESERVATION_EXPIRED"
   | "METHOD_UNAVAILABLE"
   | "PAYMENT_PENDING_ELSEWHERE"
+  | "PAYMENT_IN_PROGRESS"
   | "PAYMENT_UNAVAILABLE";
 
 export type StartPaymentResult =
   | { ok: true; provider: PaymentProviderName; checkoutUrl: string }
   | { ok: false; code: StartPaymentCode };
+
+/**
+ * Of een checkout die de provider geslaagd noemt, echt deze betaling is:
+ * hetzelfde bedrag in dezelfde munt, met een betaal-ID, en dezelfde bestelling
+ * wanneer de provider die meedraagt.
+ *
+ * Bedrag en munt zijn verplicht. Wie ze laat ontbreken, geeft tickets uit voor
+ * een bedrag dat niemand gezien heeft: `fulfillPaidOrder` krijgt dan het totaal
+ * van de bestelling mee en vergelijkt dat met zichzelf. `orderId` komt niet bij
+ * elke provider terug (Bancontact draagt enkel een referentie), dus die telt
+ * enkel wanneer hij er is.
+ */
+export function succeededCheckoutMatches(
+  status: CheckoutStatusResult,
+  expected: { orderId: string; amountCents: number; currency: string }
+): status is CheckoutStatusResult & { paymentId: string; amountCents: number; currency: string } {
+  return (
+    (status.orderId == null || status.orderId === expected.orderId) &&
+    status.amountCents != null &&
+    status.amountCents === expected.amountCents &&
+    status.currency != null &&
+    status.currency.toUpperCase() === expected.currency.toUpperCase() &&
+    Boolean(status.paymentId)
+  );
+}
 
 /**
  * Sluit elke nog levende checkout van deze bestelling af.
@@ -1050,13 +1420,20 @@ export type StartPaymentResult =
  * tweede betaling. Blijft ze na een annuleerpoging toch "pending", dan geven we
  * op in plaats van te gokken; een tweede checkout ernaast is precies wat we
  * proberen te vermijden.
+ *
+ * **Een betaling die de koper al geopend heeft, annuleren we nooit**
+ * (`IN_PROGRESS`): hij heeft de QR gescand en staat in zijn app te bevestigen.
+ * Annuleren gaf hem daar "betaling mislukt" (61 keer in september en oktober
+ * 2026). Wie dan een andere betaalwijze kiest, krijgt de vraag om die betaling
+ * eerst af te ronden of te laten vervallen; bij Bancontact is dat hoogstens
+ * twee minuten.
  */
 async function closeLivePayments(order: {
   id: string;
   totalCents: number;
   currency: string;
   payments: { id: string; provider: string; providerCheckoutId: string | null; status: string }[];
-}): Promise<"CLOSED" | "PAID" | "UNSAFE"> {
+}): Promise<"CLOSED" | "PAID" | "IN_PROGRESS" | "UNSAFE"> {
   for (const payment of order.payments) {
     if (payment.status !== "CREATED" && payment.status !== "PENDING") continue;
 
@@ -1071,20 +1448,18 @@ async function closeLivePayments(order: {
     try {
       const gateway = paymentGatewayFor(payment.provider);
       let status = await gateway.getCheckoutStatus(payment.providerCheckoutId);
+      if (status.status === "PENDING" && status.inProgress) return "IN_PROGRESS";
       if (status.status === "PENDING") {
         await gateway.expireCheckout(payment.providerCheckoutId);
         status = await gateway.getCheckoutStatus(payment.providerCheckoutId);
       }
 
       if (status.status === "SUCCEEDED") {
-        // Bedrag en munt moeten kloppen voor we tickets uitgeven. `orderId` komt
-        // niet bij elke provider terug (Bancontact draagt enkel een referentie),
-        // dus die controleren we enkel wanneer hij er is.
-        if (
-          (status.orderId != null && status.orderId !== order.id) ||
-          (status.amountCents != null && status.amountCents !== order.totalCents) ||
-          (status.currency != null && status.currency.toUpperCase() !== order.currency.toUpperCase())
-        ) {
+        // Dezelfde controle als de verzoening, en de bedragen die we doorgeven
+        // zijn die van de provider: `fulfillPaidOrder` toetst ze dan nog eens
+        // tegen de bestelling, in plaats van het totaal met zichzelf.
+        const expected = { orderId: order.id, amountCents: order.totalCents, currency: order.currency };
+        if (!succeededCheckoutMatches(status, expected)) {
           console.error("Live checkout succeeded but did not match the order", {
             orderId: order.id,
             paymentId: payment.id,
@@ -1094,15 +1469,15 @@ async function closeLivePayments(order: {
         await fulfillPaidOrder({
           orderId: order.id,
           provider: payment.provider,
-          providerPaymentId: status.paymentId ?? status.checkoutId,
+          providerPaymentId: status.paymentId,
           providerCheckoutId: status.checkoutId,
-          amountCents: order.totalCents,
-          currency: order.currency,
+          amountCents: status.amountCents,
+          currency: status.currency,
         });
         return "PAID";
       }
 
-      if (status.status === "PENDING") return "UNSAFE";
+      if (status.status === "PENDING") return status.inProgress ? "IN_PROGRESS" : "UNSAFE";
 
       await prisma.ticketPayment.updateMany({
         where: { id: payment.id, status: { in: ["CREATED", "PENDING"] } },
@@ -1167,6 +1542,7 @@ export async function startOrderPayment(input: {
 
   const closed = await closeLivePayments(order);
   if (closed === "PAID") return { ok: false, code: "ALREADY_PAID" };
+  if (closed === "IN_PROGRESS") return { ok: false, code: "PAYMENT_IN_PROGRESS" };
   if (closed === "UNSAFE") return { ok: false, code: "PAYMENT_PENDING_ELSEWHERE" };
 
   // De regels van de checkout komen uit de bestelling zelf, niet uit het

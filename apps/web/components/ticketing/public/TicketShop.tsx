@@ -115,6 +115,7 @@ function checkoutErrorMessage(
     HONORARY_PRICE_USED: { nl: "Je erelidticket voor dit event heb je al. Kies de gewone prijs.", en: "You already have your honorary ticket for this event. Choose the regular price." },
     PAYMENT_UNAVAILABLE: { nl: "De betaalpagina is tijdelijk niet bereikbaar. Probeer straks opnieuw.", en: "The payment page is temporarily unavailable. Try again shortly." },
     REQUEST_BODY_TOO_LARGE: { nl: "De bestelling bevat te veel gegevens.", en: "The order contains too much data." },
+    BUSY: { nl: "Het is heel druk. Je bestelling is niet doorgegaan; probeer meteen opnieuw.", en: "It is very busy. Your order did not go through; try again straight away." },
   };
   const fallback = locale === "nl" ? "Bestellen is mislukt. Probeer opnieuw." : "Checkout failed. Please try again.";
   return code ? messages[code]?.[locale] ?? fallback : fallback;

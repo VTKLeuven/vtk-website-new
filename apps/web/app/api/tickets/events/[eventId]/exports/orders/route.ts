@@ -2,6 +2,7 @@ import type { Prisma, TicketOrderStatus } from "@prisma/client";
 import { prisma } from "@vtk/db";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
 import { createCsv, type CsvValue } from "@/lib/ticketing/csv";
+import { isPaymentSetAside } from "@/lib/ticketing/paymentFlags";
 
 const ORDER_STATUSES: TicketOrderStatus[] = [
   "PENDING_PAYMENT",
@@ -65,13 +66,27 @@ export async function GET(
     }
 
     const headers = locale === "nl"
-      ? ["Referentie", "Koper", "E-mail koper", "Status", "Tickets", "Totaal (cent)", "Terugbetaald (cent)", "Netto (cent)", "Munt", "Boekhoudcode", "Naam boekhoudcode", "Betaalprovider", "Betaal-ID provider", "Betaalstatus", "Betaald op", "Aangemaakt op"]
-      : ["Reference", "Buyer", "Buyer email", "Status", "Tickets", "Total (cents)", "Refunded (cents)", "Net (cents)", "Currency", "Accounting code", "Accounting code name", "Payment provider", "Provider payment ID", "Payment status", "Paid at", "Created at"];
+      ? ["Referentie", "Koper", "E-mail koper", "Status", "Tickets", "Totaal (cent)", "Terugbetaald (cent)", "Netto (cent)", "Munt", "Boekhoudcode", "Naam boekhoudcode", "Betaalprovider", "Betaal-ID provider", "Betaalstatus", "Betaald op", "Aangemaakt op", "Betalingen zonder ticket"]
+      : ["Reference", "Buyer", "Buyer email", "Status", "Tickets", "Total (cents)", "Refunded (cents)", "Net (cents)", "Currency", "Accounting code", "Accounting code name", "Payment provider", "Provider payment ID", "Payment status", "Paid at", "Created at", "Payments without a ticket"];
+    const setAsideLabel = {
+      NEEDS_REFUND: locale === "nl" ? "terug te betalen" : "to refund",
+      REFUNDED_MANUALLY: locale === "nl" ? "met de hand terugbetaald" : "refunded by hand",
+    } as const;
     const rows: CsvValue[][] = orders.map((order) => {
-      // De betaling die slaagde, anders de laatste poging. Met de betaal-ID
-      // legt de penning deze rij naast een lijn van een Mollie-uitbetaling of
-      // een Bancontact-storting.
-      const payment = order.payments.find((candidate) => candidate.status === "SUCCEEDED") ?? order.payments[0];
+      // De betaling die de tickets betaalde, anders de laatste poging. Met de
+      // betaal-ID legt de penning deze rij naast een lijn van een
+      // Mollie-uitbetaling of een Bancontact-storting. Een betaling die apart
+      // staat, komt hier nooit: bij een dubbel betaalde bestelling is dat de
+      // jongste, en dan stond de terug te betalen betaling op de plaats van de
+      // betaling die telt.
+      const counted = order.payments.filter((candidate) => !isPaymentSetAside(candidate));
+      const payment = counted.find((candidate) => candidate.status === "SUCCEEDED") ?? counted[0];
+      // Die apart gezette betalingen staan wel in de uitbetaling van de
+      // provider; zonder deze kolom vond de penning er geen rij voor.
+      const setAside = order.payments
+        .filter(isPaymentSetAside)
+        .map((candidate) => `${candidate.providerPaymentId ?? candidate.id} (${setAsideLabel[candidate.setAside]})`)
+        .join("; ");
       return [
         order.reference,
         order.buyerName,
@@ -89,6 +104,7 @@ export async function GET(
         payment?.status,
         order.paidAt,
         order.createdAt,
+        setAside,
       ];
     });
 

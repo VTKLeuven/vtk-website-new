@@ -67,11 +67,120 @@ provider, so leaving it empty keeps the old single-provider behaviour exactly.
 
 ### A failed payment is not a failed order
 
-Since a buyer can pick between two methods, one attempt failing no longer means
-the order failed. The webhook and `reconcileTicketPayments` both mark **that
-attempt** failed and only call `expirePendingOrder` when no other attempt is
-still open; `expirePendingOrder` expires every open payment of the order, so
-without that check a stale Bancontact attempt would close a live Mollie checkout.
+One attempt failing (expired, refused by the bank, cancelled) never ends the
+order. Both webhooks and `reconcileTicketPayments` call
+`closeFailedPaymentAttempt`, which marks **that attempt** and nothing else. The
+order keeps its seats until `reservationExpiresAt`, and only
+`releaseExpiredOrders` expires it.
+
+This used to be "expire the order when no other attempt is still open" (and on
+Mollie, expire it unconditionally). Two things went wrong with that:
+
+- A Bancontact QR lives two minutes, the reservation thirty-one. Every buyer
+  who did not confirm within two minutes lost the whole order and their seat,
+  while the payment page promised "je tickets staan nog voor je klaar" and
+  offered a new QR. 146 orders died that way in September and October 2026;
+  not one buyer ever got a new QR.
+- The callback for an **old** attempt could arrive while the buyer was starting
+  a new one, before its row existed. The webhook saw no open attempt and expired
+  the order; the new QR stayed payable at the provider, the buyer paid it, and
+  got no ticket (order VTK-26-DCE77A9579, 8 October 2026).
+
+The trade-off is that an abandoned order holds its seats for the full
+reservation window instead of two minutes. See `docs/design-decisions.md`.
+
+The order page is the way back to a new attempt. With more than one payment
+method it always shows the choice; with a single method (`variant: "single"`)
+it shows that one method as a button once no attempt is open any more
+(`paymentOpen` on the order, polled with the status). Without that exception a
+Mollie-only buyer who cancelled on the Mollie page sat on "We verwerken je
+betaling" for half an hour, seats held and no button.
+
+### Expiring an order closes the provider side first
+
+`releaseExpiredOrders` runs every open payment of an expired reservation
+through `closeLivePayments` (ask the provider, cancel what is still open,
+fulfil what turned out to be paid) and only then calls `expirePendingOrder`.
+`expirePendingOrder` only closes our own rows; called first, it would leave a
+QR or a Mollie checkout payable for an order that no longer exists. When a
+buyer is confirming in their app at that moment, the order waits a round; a
+Mollie payment on `pending` can keep it waiting longer than a Bancontact QR.
+
+A checkout the provider calls paid is only fulfilled when the provider also
+reports an amount and a currency that match the order
+(`succeededCheckoutMatches`, the same check `reconcileTicketPayments` uses).
+Otherwise the order stays as it is and the mismatch is logged. Passing the
+order total as the paid amount would make the amount check in
+`fulfillPaidOrder` compare the order with itself.
+
+### A payment that lands after the order expired
+
+`fulfillPaidOrder` no longer refuses a payment for an `EXPIRED` or
+`PAYMENT_FAILED` order. It takes the seats again with the same conditional
+UPDATE as a checkout and issues the tickets. When there is no room (or the
+event is over or cancelled, or the order was already paid by another attempt),
+the transaction rolls back and the payment is recorded apart: `SUCCEEDED` with
+`setAside` `NEEDS_REFUND`, a `PAYMENT_NEEDS_REFUND` audit row, and a Sentry
+alert. `setAside` is its own column on purpose: `providerStatus` keeps saying
+what the provider reported (`paid`), and nothing that writes that field can
+make a set-aside payment yield tickets again. The refund itself is manual. Before this, such a payment failed
+with `ORDER_NOT_PAYABLE` on every retry and nobody knew.
+
+- The orders page of the event (`/admin/tickets/<id>/bestellingen`) shows a
+  notice at the top while such a payment waits, a "Terug te betalen" badge on
+  the order and a filter with the same name. After refunding by hand, someone
+  with the `REFUND` capability marks it there: `setAside` becomes
+  `REFUNDED_MANUALLY` and the audit log gets `PAYMENT_REFUNDED_MANUALLY`.
+- A payment that is set aside (`setAside` is not null, see
+  `lib/ticketing/paymentFlags.ts`) never yields tickets again. Mollie reports a
+  refund with the payment status still `paid`, so without that check the
+  refund itself re-ran the fulfilment and issued tickets once a seat had freed
+  up.
+- `requestTicketRefund` refunds from the payment that paid for the tickets and
+  skips a payment that is set aside, even though that one succeeded later. The
+  order export does the same for its payment columns and lists set-aside
+  payments in a column of their own, so every line of a payout still has a row.
+- A second payment on a paid order finds its attempt the same way a normal
+  payment does, including an attempt whose checkout id we never managed to
+  save. When that attempt already carries another successful payment, the new
+  one is not written over it but raises the same Sentry alert.
+
+### Checkout and order transitions do not run SERIALIZABLE
+
+Every checkout of an event updates the same row (the pool counter). Under
+SERIALIZABLE only one of two concurrent buyers may change it; the other gets
+`could not serialize access due to concurrent update`. At the opening of the
+Eersteplaatscantus (8 October 2026, 240 seats) about 1,200 checkouts failed
+that way in five minutes while seats were left, and payment confirmations
+failed with them.
+
+- **Checkout** (`withReservationTransaction`) runs READ COMMITTED. The
+  conditional UPDATE in `reserveInventory` is the guard against overselling:
+  the second buyer waits for the row and Postgres re-evaluates the WHERE
+  against the new counts. The other checks (open reservations, honorary ticket,
+  free tickets per buyer) sit behind a per-buyer advisory lock. The pool UPDATE
+  is the last statement before the commit, so the row is held as briefly as
+  possible.
+- **Order transitions** (fulfil, expire, fail; `withOrderLock`) run READ
+  COMMITTED with `SELECT ... FOR UPDATE` on the order as their first statement:
+  two transitions of one order never interleave, and the second reads the
+  status the first left behind.
+- Both wait up to 10 s for a connection and may run 15 s, instead of Prisma's
+  2 s and 5 s. A checkout that still fails on contention answers `503 BUSY`
+  ("het is heel druk, probeer meteen opnieuw") instead of a generic failure.
+  That covers a pool timeout outside the transaction too (`P2024`, on the
+  event or buyer lookup before it), not only inside it (`P2028`). The web shop
+  and the app both show that message for `BUSY`.
+- **Only until the reservation commits.** After that the order exists and holds
+  seats, so "your order did not go through" would be false. A busy database
+  while creating the payment sends the buyer to their order page instead, with
+  the access cookie, where they start the payment again. A free order has no
+  payment to finish later; it is released straight away and then does answer
+  `BUSY`.
+- `test/integration/ticketing-rush.integration.ts` fires 300 checkouts at 240
+  seats: exactly 240 sell and 60 get `SOLD_OUT`. On the SERIALIZABLE version,
+  227 of the 300 failed. `ticketing-payments.integration.ts` covers the payment
+  side, including a replay of VTK-26-DCE77A9579 and fulfil racing expiry.
 
 ### Nothing fails silently
 
@@ -90,6 +199,12 @@ close reveals the order was just paid, it fulfils and refuses to start a second
 payment; if the provider still reports `PENDING` after a cancel attempt, it gives
 up rather than guessing. Without this, a buyer who opens Bancontact, returns, and
 then picks Mollie can pay twice.
+
+It never cancels a payment the buyer already opened (`inProgress` on the
+gateway status: Bancontact `IDENTIFIED` or `AUTHORIZED`, Mollie `pending`).
+Cancelling that one showed the buyer "payment failed" in their app; it happened
+61 times in September and October 2026. `startOrderPayment` answers
+`PAYMENT_IN_PROGRESS` instead, and the order page leads back to the open QR.
 
 Each attempt gets its own number (`TicketPayment` count + 1), which feeds both the
 idempotency key (`<orderId>:<attempt>`) and the gateway's `attempt`. A fixed key
@@ -208,8 +323,8 @@ without the key and says which one accepts it.
   re-fetched. Two differences: the provider does **not** carry our order id (only
   a reference), so the order is resolved through our own `TicketPayment` row by
   `providerCheckoutId`, and amount plus currency are checked against that row
-  before anything is issued. A failure only expires the order when no other
-  payment attempt is still open.
+  before anything is issued. A failure only closes that attempt, never the
+  order (see "A failed payment is not a failed order").
 - **Refunds are off by default.** `BANCONTACT_REFUNDS_ENABLED=true` enables the
   API path; otherwise `refund()` throws `BancontactRefundUnsupportedError` without
   sending a request, and the refund is handled manually by bank transfer. Refund

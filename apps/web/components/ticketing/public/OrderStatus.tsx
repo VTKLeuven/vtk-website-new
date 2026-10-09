@@ -15,6 +15,7 @@ import {
   MapPin,
   RefreshCw,
   RotateCcw,
+  Smartphone,
   TicketCheck,
   XCircle,
 } from "lucide-react";
@@ -71,6 +72,10 @@ const TEXT = {
     refresh: "Vernieuwen",
     myTickets: "Mijn tickets",
     allEvents: "Naar alle events",
+    openBancontactTitle: "Je Bancontact-betaling staat nog open",
+    openBancontactLead:
+      "Al betaald in de app? Dan verschijnen je tickets hier vanzelf. Anders ga je verder waar je was.",
+    openBancontactAction: "Terug naar je QR-code",
   },
   en: {
     tickets: "Tickets",
@@ -102,6 +107,10 @@ const TEXT = {
     refresh: "Refresh",
     myTickets: "My tickets",
     allEvents: "All events",
+    openBancontactTitle: "Your Bancontact payment is still open",
+    openBancontactLead:
+      "Already paid in the app? Your tickets will show up here on their own. Otherwise, continue where you left off.",
+    openBancontactAction: "Back to your QR code",
   },
 } as const;
 
@@ -121,16 +130,40 @@ export function OrderStatus({
   initialOrder,
   locale,
   paymentChoice,
+  openBancontact,
 }: {
   initialOrder: PublicOrder;
   locale: "nl" | "en";
   /** Ontbreekt of `single`: er valt niets te kiezen en er komt geen keuzeblok. */
   paymentChoice?: PaymentMethodChoice;
+  /**
+   * Een Bancontact-betaling van deze bestelling die nog leeft, met wanneer haar
+   * QR vervalt. De server geeft ze enkel mee zolang dat nog niet gebeurd is.
+   */
+  openBancontact?: { paymentId: string; expiresAt: string | null } | null;
 }) {
   const base = locale === "nl" ? "" : "/en";
   const t = TEXT[locale];
   const [order, setOrder] = useState(initialOrder);
   const [pollError, setPollError] = useState(false);
+  // Welke betaling vervallen is, en niet enkel dát er een verviel: komt er
+  // zonder herladen een nieuwe QR binnen, dan hoort de weg ernaartoe er weer
+  // te staan. Zoals in `BancontactPayment`.
+  const [expiredBancontactId, setExpiredBancontactId] = useState<string | null>(null);
+  const openBancontactId = openBancontact?.paymentId ?? null;
+  const openBancontactExpiresAt = openBancontact?.expiresAt ?? null;
+
+  // De QR vervalt terwijl de pagina openstaat: dan valt de weg terug ernaar weg.
+  useEffect(() => {
+    if (!openBancontactId || !openBancontactExpiresAt) return;
+    const remaining = new Date(openBancontactExpiresAt).getTime() - Date.now();
+    if (Number.isNaN(remaining)) return;
+    const timer = setTimeout(
+      () => setExpiredBancontactId(openBancontactId),
+      Math.max(remaining, 0)
+    );
+    return () => clearTimeout(timer);
+  }, [openBancontactId, openBancontactExpiresAt]);
 
   useEffect(() => {
     if (TERMINAL.has(order.status)) return;
@@ -174,12 +207,20 @@ export function OrderStatus({
   const failed = ["PAYMENT_FAILED", "CANCELLED", "EXPIRED", "REFUNDED"].includes(order.status);
   // Zolang de bestelling op betaling wacht, mag de koper (opnieuw) kiezen: een
   // afgebroken betaling laat de bestelling staan, en dan is dit de weg terug.
+  // Met maar één betaalwijze enkel wanneer er geen betaling meer loopt: zolang
+  // er wel een loopt, wacht deze pagina op de provider. Zonder die
+  // uitzondering bleef wie zijn enige betaalwijze afbrak een halfuur op "We
+  // verwerken je betaling" staan, met zijn plaatsen vast en zonder knop.
   const canChoosePayment =
     order.status === "PENDING_PAYMENT" &&
     paymentChoice != null &&
-    paymentChoice.variant !== "single" &&
-    paymentChoice.options.length > 0;
+    paymentChoice.options.length > 0 &&
+    (paymentChoice.variant !== "single" || !order.paymentOpen);
   const tone = paid ? "ok" : failed ? "bad" : "wait";
+  const showOpenBancontact =
+    order.status === "PENDING_PAYMENT" &&
+    openBancontactId != null &&
+    expiredBancontactId !== openBancontactId;
   const trackedRef = useRef(false);
 
   useEffect(() => {
@@ -405,6 +446,22 @@ export function OrderStatus({
                 </dd>
               </div>
             </dl>
+
+            {showOpenBancontact ? (
+              <div className="torder-open-payment">
+                <div>
+                  <strong>{t.openBancontactTitle}</strong>
+                  <p>{t.openBancontactLead}</p>
+                </div>
+                <Link
+                  className="ticket-primary-button"
+                  href={`${base}/tickets/bestelling/${order.id}/bancontact`}
+                >
+                  <Smartphone size={17} aria-hidden="true" />
+                  {t.openBancontactAction}
+                </Link>
+              </div>
+            ) : null}
 
             {canChoosePayment ? (
               <PaymentMethodChooser orderId={order.id} locale={locale} choice={paymentChoice} />
