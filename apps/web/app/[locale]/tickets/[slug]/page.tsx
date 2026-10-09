@@ -210,6 +210,20 @@ function formatTicketTime(value: string | Date, locale: Locale): string {
   }).format(new Date(value));
 }
 
+/** De dag van een moment, zonder uur: dat staat er apart onder. */
+function formatTicketDay(value: string | Date, locale: Locale): string {
+  return new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-BE", {
+    timeZone: "Europe/Brussels",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date(value));
+}
+
+/** Zoveel momenten staan er in het praktische blok; de rest vat één regel samen. */
+const PRACTICAL_MOMENTS_VISIBLE = 7;
+
 /**
  * Poster en beschrijving, onder de gegevens in de linkerkolom.
  *
@@ -267,6 +281,11 @@ function TicketEventPractical({
   // event van meer dan een dag krijgt de volledige einddatum.
   const sameNight =
     new Date(event.endsAt).getTime() - new Date(event.startsAt).getTime() < 24 * 60 * 60 * 1000;
+  // Een event met losse momenten (twee avonden, een loopweek) loopt niet door van
+  // het eerste tot het laatste: "tot donderdag 21:00" las als één lange zit.
+  const moments = event.moments ?? [];
+  const shownMoments = moments.slice(0, PRACTICAL_MOMENTS_VISIBLE);
+  const restMoments = moments.length - shownMoments.length;
 
   return (
     <aside className="tshop-rail" aria-labelledby="ticket-practical-heading">
@@ -274,20 +293,41 @@ function TicketEventPractical({
       <dl>
         <div>
           <dt>{locale === "nl" ? "Wanneer" : "When"}</dt>
-          <dd>
-            {formatTicketDate(event.startsAt, locale)}
-            {sameNight ? (
-              <span>
-                {locale === "nl" ? "tot " : "until "}
-                {formatTicketTime(event.endsAt, locale)}
-              </span>
-            ) : (
-              <span>
-                {locale === "nl" ? "tot " : "until "}
-                {formatTicketDate(event.endsAt, locale)}
-              </span>
-            )}
-          </dd>
+          {moments.length > 0 ? (
+            <dd className="tshop-rail-moments">
+              {shownMoments.map((moment) => (
+                <div key={new Date(moment.start).toISOString()}>
+                  {formatTicketDay(moment.start, locale)}
+                  <span>
+                    {formatTicketTime(moment.start, locale)} - {formatTicketTime(moment.end, locale)}
+                    {moment.label ? ` · ${moment.label}` : null}
+                  </span>
+                </div>
+              ))}
+              {restMoments > 0 ? (
+                <span>
+                  {locale === "nl"
+                    ? `en nog ${restMoments} ${restMoments === 1 ? "moment" : "momenten"}, tot ${formatTicketDay(moments[moments.length - 1]!.start, locale)}`
+                    : `and ${restMoments} more, until ${formatTicketDay(moments[moments.length - 1]!.start, locale)}`}
+                </span>
+              ) : null}
+            </dd>
+          ) : (
+            <dd>
+              {formatTicketDate(event.startsAt, locale)}
+              {sameNight ? (
+                <span>
+                  {locale === "nl" ? "tot " : "until "}
+                  {formatTicketTime(event.endsAt, locale)}
+                </span>
+              ) : (
+                <span>
+                  {locale === "nl" ? "tot " : "until "}
+                  {formatTicketDate(event.endsAt, locale)}
+                </span>
+              )}
+            </dd>
+          )}
         </div>
         <div>
           <dt>{locale === "nl" ? "Locatie" : "Location"}</dt>

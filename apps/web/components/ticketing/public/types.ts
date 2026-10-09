@@ -85,6 +85,13 @@ export type PublicTicketEvent = {
   label?: string | null;
   /** Deze verkoop heeft eigen uren en volgt die van het kalenderevent niet. */
   ownTimes?: boolean;
+  /**
+   * De losse momenten van het kalenderevent, chronologisch (twee avonden, een
+   * loopweek). `startsAt` tot `endsAt` loopt dan van het begin van het eerste
+   * tot het einde van het laatste moment, en dat is geen doorlopende tijd. Leeg
+   * zonder momenten, en bij een verkoop met eigen uren.
+   */
+  moments?: Array<{ start: string | Date; end: string | Date; label: string | null }>;
   description?: string | null;
   location?: string | null;
   locationAddress?: string | null;
@@ -195,10 +202,11 @@ export type PublicOrder = {
 
 export type SerializedTicketEvent = Omit<
   PublicTicketEvent,
-  "startsAt" | "endsAt" | "salesStart" | "salesEnd" | "presale"
+  "startsAt" | "endsAt" | "salesStart" | "salesEnd" | "presale" | "moments"
 > & {
   startsAt: string;
   endsAt: string;
+  moments?: Array<{ start: string; end: string; label: string | null }>;
   salesStart: string | null;
   salesEnd: string | null;
   presale: { publicStart: string } | null;
@@ -209,6 +217,11 @@ export function serializeTicketEvent(event: PublicTicketEvent): SerializedTicket
     ...event,
     startsAt: new Date(event.startsAt).toISOString(),
     endsAt: new Date(event.endsAt).toISOString(),
+    moments: event.moments?.map((moment) => ({
+      ...moment,
+      start: new Date(moment.start).toISOString(),
+      end: new Date(moment.end).toISOString(),
+    })),
     salesStart: event.salesStart ? new Date(event.salesStart).toISOString() : null,
     salesEnd: event.salesEnd ? new Date(event.salesEnd).toISOString() : null,
     presale: event.presale

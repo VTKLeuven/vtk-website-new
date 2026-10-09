@@ -39,7 +39,14 @@ const publicEventInclude = {
   // Voor de banner: een themabanner of het gekoppelde kalender-event, wanneer
   // het ticketevent geen eigen foto heeft. Zie lib/ticketing/poster.ts.
   imageCategory: ticketPosterSelect.imageCategory,
-  calendarEvent: ticketPosterSelect.calendarEvent,
+  calendarEvent: {
+    select: {
+      ...ticketPosterSelect.calendarEvent.select,
+      // Voor "Wanneer" op de ticketpagina: een event met losse momenten loopt
+      // niet door van het eerste tot het laatste.
+      moments: { select: { start: true, end: true, label: true }, orderBy: { start: "asc" } },
+    },
+  },
   presaleGroups: { select: { groupId: true } },
   questions: { where: { active: true }, orderBy: { sortOrder: "asc" } },
   ticketTypes: {
@@ -129,6 +136,9 @@ function publicEventDto(
     isPrivate: event.isPrivate,
     label: localized(event.labelNl ?? "", event.labelEn, locale) || null,
     ownTimes: event.ownTimes,
+    // Met eigen uren gelden de momenten van het kalenderevent niet voor deze
+    // verkoop; zie `PublicTicketEvent.moments`.
+    moments: event.ownTimes ? [] : (event.calendarEvent?.moments ?? []),
     description: localized(event.descriptionNl ?? "", event.descriptionEn, locale),
     location: event.location,
     locationAddress: event.locationAddress,

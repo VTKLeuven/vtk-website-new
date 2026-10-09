@@ -119,6 +119,13 @@
   font-weight: 400;
 }
 
+/* Een event met losse momenten: elke dag met zijn uur eronder, en wat lucht
+   tussen de dagen zodat twee avonden niet als één lange zit lezen. */
+.tshop-rail-moments {
+  display: grid;
+  gap: 8px;
+}
+
 .tshop-rail a {
   color: var(--ink);
   text-decoration: underline;
