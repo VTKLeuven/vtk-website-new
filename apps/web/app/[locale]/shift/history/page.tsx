@@ -7,10 +7,12 @@ import { notFound } from 'next/navigation';
 import { requireSession } from '@/lib/session';
 import { PleaseLogin } from '@/components/site/pleaseLogin';
 import { prisma } from '@vtk/db';
-import { deductedShifts, netShiftCount, shiftDeductions } from '@/lib/shift/deductions';
+import { currentWorkingYear } from '@/lib/workingYear';
+import { shiftDeductions } from '@/lib/shift/deductions';
+import { buildShiftHistory } from '@/lib/shift/history';
 import { loadPostNames } from '@/lib/shift/postNames';
-
-import '@/app/design/vtk-basic.css';
+import { praesidiumYears } from '@/lib/shift/voucherEligibility';
+import { ShiftHistory } from '@/components/shift/ShiftHistory';
 
 export async function generateMetadata({
   params,
@@ -24,14 +26,16 @@ export async function generateMetadata({
 
 export default async function ShiftHistoryPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const { locale: localeParam } = await params;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const base = locale === 'nl' ? '' : '/en';
-  const t = getDictionary(locale).shift;
+  const t = getDictionary(locale).shift.history;
 
   let session;
   try {
@@ -40,85 +44,57 @@ export default async function ShiftHistoryPage({
     return <PleaseLogin locale={locale} nextPath={`${base}/shift/history`} className="vtk-page-shell" />;
   }
 
-  // Alle voorbije shiften waarvoor de user ingeschreven was, per post geteld.
-  // Afgenomen shiften staan als eigen regel onderaan, zonder reden: die is voor
-  // het beheer (`lib/shift/deductions.ts`).
-  const [participations, postNames, deductions] = await Promise.all([
+  // Alle voorbije shiften waarvoor de user ingeschreven was. Afgenomen shiften
+  // tellen per jaar mee in het aantal, zonder reden: die is voor het beheer
+  // (`lib/shift/deductions.ts`).
+  const userId = session.user.id;
+  const [participations, postNames, deductions, praesidium] = await Promise.all([
     prisma.shiftParticipant.findMany({
-      where: {
-        userId: session.user.id,
-        shift: { endTime: { lt: new Date() } },
+      where: { userId, shift: { endTime: { lt: new Date() } } },
+      select: {
+        shift: {
+          select: { id: true, name: true, startTime: true, endTime: true, location: true, post: true, reward: true },
+        },
       },
-      select: { shift: { select: { post: true } } },
     }),
     loadPostNames(locale),
-    shiftDeductions({ userIds: [session.user.id] }),
+    shiftDeductions({ userIds: [userId] }),
+    praesidiumYears([userId]),
   ]);
 
-  const perPost = new Map<string, number>();
-  for (const p of participations) {
-    const key = p.shift.post ?? 'GEEN';
-    perPost.set(key, (perPost.get(key) ?? 0) + 1);
-  }
-  const deducted = deductedShifts(deductions);
-  const total = netShiftCount(participations.length, deducted);
-  const rows = [...perPost.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const currentYear = currentWorkingYear();
+  const years = buildShiftHistory({
+    userId,
+    shifts: participations.map((p) => p.shift),
+    deductions,
+    praesidium,
+    currentYear,
+  });
+  const requested = Number((await searchParams).jaar);
+  const selected = years.find((year) => year.year === requested) ?? years.find((year) => year.year === currentYear)!;
 
   return (
     <div className="vtk-page">
       <header className="vtk-page-head">
         <div>
-          <h1 className="vtk-page-title">{t.history.title}</h1>
+          <h1 className="vtk-page-title">{t.title}</h1>
+          <p className="vtk-page-subtitle">{t.subtitle}</p>
         </div>
+        <Link href={`${base}/shift`} className="vtk-button vtk-button-ghost">
+          ← {t.back}
+        </Link>
       </header>
 
       <div className="vtk-page-shell">
-        <div className="vtk-basic-table-section">
-          <Link href={`${base}/shift`} className="vtk-basic-badge" style={{ width: 'fit-content' }}>
-            ← {t.history.back}
-          </Link>
-
-          <h2 className="vtk-basic-table-title">
-            {t.history.total}: {total}
-          </h2>
-
-          <div className="vtk-basic-table-wrap">
-            <table className="vtk-basic-table vtk-shift-table">
-              <thead>
-                <tr>
-                  <th>{t.history.post}</th>
-                  <th>{t.history.count}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.length === 0 && deducted === 0 ? (
-                  <tr>
-                    <td colSpan={2} className="vtk-basic-table-empty">
-                      {t.history.empty}
-                    </td>
-                  </tr>
-                ) : (
-                  <>
-                    {rows.map(([post, count]) => (
-                      <tr key={post}>
-                        <td data-label={t.history.post}>
-                          {post === 'GEEN' ? t.history.noPost : (postNames[post] ?? post)}
-                        </td>
-                        <td data-label={t.history.count}>{count}</td>
-                      </tr>
-                    ))}
-                    {deducted > 0 && (
-                      <tr>
-                        <td data-label={t.history.post}>{t.history.deducted}</td>
-                        <td data-label={t.history.count}>&minus;{deducted}</td>
-                      </tr>
-                    )}
-                  </>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <ShiftHistory
+          locale={locale}
+          base={base}
+          years={years}
+          selected={selected}
+          currentYear={currentYear}
+          inPraesidiumNow={session.groups.some((group) => group.type === 'PRAESIDIUM')}
+          postNames={postNames}
+        />
       </div>
     </div>
   );

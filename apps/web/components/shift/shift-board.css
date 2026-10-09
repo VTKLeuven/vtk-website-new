@@ -512,6 +512,14 @@
   font-size: 13px;
 }
 
+.vtk-reward[data-size='lg'] {
+  --coin: 34px;
+  gap: 12px;
+  font-size: 44px;
+  font-weight: 650;
+  letter-spacing: -0.03em;
+}
+
 .vtk-reward-coins {
   display: inline-flex;
   align-items: center;

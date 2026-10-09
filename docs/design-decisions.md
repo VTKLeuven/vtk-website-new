@@ -8710,6 +8710,43 @@ titel waar niemand in valt, krijgt geen kop.
   melding aan, en de titel wordt nergens bewaard: hij volgt telkens uit het
   aantal. Een shift die later geschrapt wordt, of een afname (hieronder), kan
   iemand dus terug onder een drempel zetten.
+- **Het lid ziet zijn eigen titel** op /shift/history, sinds oktober 2026 (zie
+  "Mijn shiftgeschiedenis" hieronder). Enkel de eigen: de ranglijst met de
+  titels van anderen blijft in het beheer.
+
+## Mijn shiftgeschiedenis
+
+/shift/history was een tabel met per post een aantal en één totaal over alle
+jaren heen. Dat klopte, maar zei een lid niets over waar het stond, en op een
+telefoon viel ze leeg (de waarden stonden buiten beeld, zie `vtk-basic.css`).
+In oktober 2026 zijn vier richtingen naast elkaar gezet, elk in de volledige
+pagina: een logboek zoals /shift (elke shift per dag, het jaar in de marge),
+een **titelladder**, een jaarkalender met een geel vakje per shift, en een
+bonnetjesafschrift met wat je verdiende en uitgaf. Gekozen werd de ladder.
+
+- **De titel staat vooraan, en groot.** Daaronder de zes titels van 3 tot 50
+  shiften (`SHIFT_TIERS`) als ladder, met waar je staat en hoeveel er nog
+  ontbreekt tot de volgende. Bij 15 staat dat je dan in de voorverkoop van
+  tickets zit (`PRESALE_SHIFT_THRESHOLD`): dat is het enige wat een titel ook
+  echt oplevert, en het is precies wat iemand met 12 shiften wil weten.
+- **De titels staan gelijk verdeeld, niet op schaal.** Op schaal lagen 3 en 10
+  tegen elkaar en was de helft van de ladder de lege strook van 30 naar 50
+  (`shiftLadderPosition`). Op een telefoon staat de ladder verticaal.
+- **Per academiejaar, met elk jaar in een tabel ernaast.** Een titel geldt per
+  jaar, dus een totaal over alle jaren zegt niets meer. Een ander jaar is een
+  link (`?jaar=`), zodat de pagina geen client-JS nodig heeft.
+- **De shiften zelf zitten in een uitklapblok onderaan: open voor het lopende
+  jaar, dicht voor een voorbij jaar.** Wat je dit jaar deed, wil je zien zonder
+  te klikken; een jaar dat voorbij is, is enkel nog een getal in de tabel tot je
+  het opent.
+- **Zelfde telling als de rest.** Een shift telt zodra ze voorbij is, in het
+  werkingsjaar waarin ze begon; een afname gaat van het aantal en dus van de
+  titel af, niet van de bonnetjes; een praesidiumjaar telt mee maar levert geen
+  bonnetjes op (`lib/shift/history.ts`). Wie nu in een praesidiumpost zit, leest
+  dat hij al in de voorverkoop zit in plaats van "nog 3 tot".
+- Het bonnetjesafschrift viel af omdat het een andere pagina is (hoeveel heb ik
+  nog?) en de uitgaven aan de toog en bij Theokot nog nergens voor het lid
+  staan. Wil de kring dat ooit, dan hoort het naast deze pagina, niet erin.
 
 ## Shiften afnemen
 

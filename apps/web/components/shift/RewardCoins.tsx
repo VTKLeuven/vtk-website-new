@@ -10,6 +10,7 @@ import './shift-board.css';
  *
  * `size="sm"` is de maat voor een metaregel, waar de bonnen tussen tekst van
  * 12,5 px staan in plaats van naast het uur van een kaartje.
+ * `size="lg"` is het totaal bovenaan /shift/history, naast de titel.
  */
 export function RewardCoins({
   amount,
@@ -18,7 +19,7 @@ export function RewardCoins({
 }: {
   amount: number;
   label: string;
-  size?: 'sm';
+  size?: 'sm' | 'lg';
 }) {
   return (
     <span className="vtk-reward" data-size={size} role="img" title={label} aria-label={label}>

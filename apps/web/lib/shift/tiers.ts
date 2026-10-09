@@ -21,6 +21,30 @@ export function shiftTierFor(count: number): ShiftTier | null {
   return SHIFT_TIERS.find((tier) => count >= tier.min) ?? null;
 }
 
+/** De eerstvolgende titel die je nog niet haalt, of `null` bij de hoogste. */
+export function nextShiftTier(count: number): ShiftTier | null {
+  return [...SHIFT_TIERS].reverse().find((tier) => tier.min > count) ?? null;
+}
+
+/**
+ * Waar je op de titelladder van /shift/history staat, in procent van de breedte.
+ *
+ * De titels staan gelijk verdeeld en niet op schaal: op schaal zaten 3 en 10 op
+ * een kluitje links en lag er een lege halve ladder tussen 30 en 50. Elke titel
+ * staat in het midden van zijn kolom; tussen twee titels schuift de markering
+ * evenredig op, en onder de laagste vertrekt ze van de linkerrand.
+ */
+export function shiftLadderPosition(count: number): number {
+  const ascending = [...SHIFT_TIERS].reverse();
+  const center = (index: number) => ((index + 0.5) / ascending.length) * 100;
+  const next = ascending.findIndex((tier) => tier.min > count);
+  if (next === -1) return center(ascending.length - 1);
+  const fromMin = next === 0 ? 0 : ascending[next - 1].min;
+  const fromPos = next === 0 ? 0 : center(next - 1);
+  const share = (Math.max(0, count) - fromMin) / (ascending[next].min - fromMin);
+  return fromPos + share * (center(next) - fromPos);
+}
+
 /**
  * "20 tot 29 shiften", "50 of meer shiften", "minder dan 3 shiften": het bereik
  * van een titel, of van de groep zonder titel wanneer `tier` null is.
