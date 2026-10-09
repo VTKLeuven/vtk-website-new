@@ -7792,6 +7792,19 @@ post), `expenses.manage` in de rol `admin` (dus IT en Groep 5), en
 `expenses.managePost` is er voor een postverantwoordelijke die de rekeningen van
 zijn eigen post wil opvolgen.
 
+**Een werkgroep die zelf terugbetaalt, vinkt dat ook zelf af.** Sommige
+werkgroepen betalen hun leden terug van hun eigen rekening, en Beheer moest dan
+op hun woord het vinkje zetten. Daar is sinds oktober 2026 een eigen recht voor,
+`expenses.reimbursePost`, dat je via een rol aan de verantwoordelijke van een
+werkgroep geeft (LEADER-grant). Het is bewust smal: enkel het vinkje
+"terugbetaald", enkel bij rekeningen van de eigen post of werkgroep die met
+eigen kaart betaald werden, en enkel zolang Beheer ze nog niet doorstuurde of
+inboekte. Daarna ligt het bedrag bij de boekhouder en hoort rechtzetten bij
+Beheer. Bewerken en verwijderen zitten er niet in, en het recht hangt niet aan
+`expenses.managePost`: dan kreeg elke postbeheerder het erbij, en dat is precies
+het gat dat billsheet had. Wie het vinkje zette, staat bij de rekening en in het
+adminlogboek.
+
 **Wat billsheet fout deed en hier niet meer kan.** `requireAdmin` liet een
 post-beheerder door voor `setPaid`, `setBooked`, `updateBill` én `deleteBill`
 zónder ooit te toetsen of de rekening bij zijn post hoorde; enkel de *lijst* werd

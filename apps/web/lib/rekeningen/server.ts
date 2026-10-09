@@ -27,7 +27,15 @@ export type ExpenseAccess = {
   canManageAll: boolean;
   /** Beheert de rekeningen van de eigen post(en): bekijken, bewerken, wissen. */
   canManagePost: boolean;
-  /** De post-id's waarvoor `canManagePost` geldt (leeg bij `canManageAll`). */
+  /**
+   * Zet de rekeningen van de eigen post(en) op terugbetaald: een werkgroep die
+   * haar leden zelf terugbetaalt. Bekijken hoort erbij, bewerken en wissen niet.
+   */
+  canReimbursePost: boolean;
+  /**
+   * De post-id's waarvoor `canManagePost` en `canReimbursePost` gelden (leeg
+   * bij `canManageAll`).
+   */
   postScope: string[];
   /** Ziet het beheeroverzicht (alle posten of enkel de eigen). */
   canSeeOverview: boolean;
@@ -47,22 +55,25 @@ export async function expenseAccess(redirectTo: string): Promise<ExpenseAccess> 
   return accessFor(await requireSession(redirectTo));
 }
 
-function accessFor(session: SessionPayload): ExpenseAccess {
+export function accessFor(session: SessionPayload): ExpenseAccess {
   const has = (code: string) =>
     session.user.isSuperAdmin || session.permissions.includes(code);
 
   const canManageAll = has("expenses.manage");
   const canManagePost = !canManageAll && has("expenses.managePost");
+  const canReimbursePost = !canManageAll && has("expenses.reimbursePost");
+  const scoped = canManagePost || canReimbursePost;
 
   return {
     session,
     // Wie mag beheren mag per definitie ook indienen; anders staat een
     // penningmeester met een bonnetje in de hand voor een gesloten formulier.
-    canSubmit: has("expenses.submit") || canManageAll || canManagePost,
+    canSubmit: has("expenses.submit") || canManageAll || scoped,
     canManageAll,
     canManagePost,
-    postScope: canManagePost ? session.groups.map((group) => group.id) : [],
-    canSeeOverview: canManageAll || canManagePost,
+    canReimbursePost,
+    postScope: scoped ? session.groups.map((group) => group.id) : [],
+    canSeeOverview: canManageAll || scoped,
   };
 }
 
@@ -84,7 +95,7 @@ export async function requireExpenseAccess(): Promise<ExpenseAccess> {
  */
 export function visibilityWhere(access: ExpenseAccess) {
   if (access.canManageAll) return undefined;
-  if (access.canManagePost) {
+  if (access.canManagePost || access.canReimbursePost) {
     // Eigen posten plus wat je zelf indiende: anders verdwijnt je eigen rekening
     // uit beeld zodra je ze op naam van een andere post zet.
     return {
@@ -102,6 +113,10 @@ type ExpenseGate = Pick<
   "groupId" | "submittedById" | "paidAt" | "sentAt" | "bookedAt" | "paymentMethod"
 >;
 
+function inPostScope(access: ExpenseAccess, expense: Pick<Expense, "groupId">): boolean {
+  return expense.groupId !== null && access.postScope.includes(expense.groupId);
+}
+
 /** Mag deze gebruiker deze rekening openen (bonnetje, blad, detail)? */
 export function canView(
   access: ExpenseAccess,
@@ -109,7 +124,7 @@ export function canView(
 ): boolean {
   if (access.canManageAll) return true;
   if (expense.submittedById === access.session.user.id) return true;
-  return access.canManagePost && expense.groupId !== null && access.postScope.includes(expense.groupId);
+  return (access.canManagePost || access.canReimbursePost) && inPostScope(access, expense);
 }
 
 /**
@@ -125,7 +140,7 @@ export function canEdit(access: ExpenseAccess, expense: ExpenseGate): boolean {
   if (access.canManageAll) return true;
   if (expense.sentAt) return false;
   if (expense.submittedById === access.session.user.id) return true;
-  return access.canManagePost && expense.groupId !== null && access.postScope.includes(expense.groupId);
+  return access.canManagePost && inPostScope(access, expense);
 }
 
 /**
@@ -140,12 +155,32 @@ export function canDelete(access: ExpenseAccess, expense: ExpenseGate): boolean 
   if (expense.bookedAt || expense.sentAt) return false;
   if (expense.paymentMethod === "PERSONAL" && expense.paidAt) return false;
   if (expense.submittedById === access.session.user.id) return true;
-  return access.canManagePost && expense.groupId !== null && access.postScope.includes(expense.groupId);
+  return access.canManagePost && inPostScope(access, expense);
 }
 
-/** Terugbetalen, inboeken en doorsturen: enkel volledig beheer. */
+/** Inboeken en doorsturen: enkel volledig beheer. */
 export function canManageState(access: ExpenseAccess): boolean {
   return access.canManageAll;
+}
+
+/**
+ * Mag deze gebruiker het vinkje "terugbetaald" van deze rekening zetten of
+ * weghalen?
+ *
+ * Volledig beheer altijd. Met `expenses.reimbursePost` enkel een rekening van de
+ * eigen post die met eigen kaart betaald werd (bij de VTK-kaart staat het
+ * vinkje vanzelf), en enkel zolang Beheer ze niet doorstuurde of inboekte:
+ * vanaf dan staat het bedrag bij de boekhouder, en hoort rechtzetten bij hen.
+ */
+export function canReimburse(
+  access: ExpenseAccess,
+  expense: Pick<Expense, "groupId" | "paymentMethod" | "sentAt" | "bookedAt">,
+): boolean {
+  if (access.canManageAll) return true;
+  if (!access.canReimbursePost) return false;
+  if (expense.paymentMethod !== "PERSONAL") return false;
+  if (expense.sentAt || expense.bookedAt) return false;
+  return inPostScope(access, expense);
 }
 
 // -----------------------------------------------------------------------------

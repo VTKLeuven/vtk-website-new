@@ -237,7 +237,7 @@ table whose rows expand into per-category editors, with create/import in modals.
 | `/admin/deur` (door access) | `door.manage` | Usage stats (1/7/30 d), temporary access grants (`DoorAccessGrant`, user typeahead + window), and the full access log (`DoorAccessLog`, incl. denied/unknown scans). |
 | `/admin/it/logboek` (admin audit log) | `audit.view` | Every changing admin action in one table (`AdminAuditLog`, written by `logAudit` in `apps/web/lib/audit.ts`), with filters on person, section, kind of action and date, plus a search over subject and detail. Kept for 30 days. Sits under the IT group but is a plain permission, not superadmin-only, so it can be handed to a role. Rationale and what is *not* logged: `docs/design-decisions.md` ("Adminlogboek"). |
 | `/admin/it/feedback` (websitefeedback) | `feedback.manage` | Wat leden via "Feedback Website" in het accountmenu melden over de site zelf (`WebsiteFeedback`): categorie, bericht, optionele screenshot, het pad waar ze stonden en hun browser. Filters op status en categorie staan in de URL. Een melding kan anoniem zijn; dan is er geen `authorId` en dus niemand om iets aan terug te vragen. Afgehandelde meldingen worden na een jaar losgekoppeld van hun melder (`PRIVACY_FEEDBACK_DAYS`). Zie `docs/design-decisions.md` ("Feedback over de website"). |
-| `/admin/rekeningen` (rekeningen / het oude billsheet) | `expenses.submit` (indienen + eigen lijst), `expenses.managePost` (eigen post), `expenses.manage` (alles) | Werkbank per werkingsjaar: statustabs (terug te betalen / door te sturen / in te boeken / afgehandeld) als afgeleide van `paidAt`/`sentAt`/`bookedAt`, filters in de URL, en de geopende rekening in `?sel=` met het bonnetje ernaast. Terugbetalen, inboeken, doorsturen en de instellingen zitten enkel in `expenses.manage`. Toegang wordt per rekening getoetst in `lib/rekeningen/server.ts`, niet per scherm. Zie `docs/design-decisions.md` ("Rekeningen"). |
+| `/admin/rekeningen` (rekeningen / het oude billsheet) | `expenses.submit` (indienen + eigen lijst), `expenses.managePost` (eigen post), `expenses.reimbursePost` (eigen post op terugbetaald zetten), `expenses.manage` (alles) | Werkbank per werkingsjaar: statustabs (terug te betalen / door te sturen / in te boeken / afgehandeld) als afgeleide van `paidAt`/`sentAt`/`bookedAt`, filters in de URL, en de geopende rekening in `?sel=` met het bonnetje ernaast. Inboeken, doorsturen en de instellingen zitten enkel in `expenses.manage`; terugbetalen ook, behalve voor de eigen post met `expenses.reimbursePost`. Toegang wordt per rekening getoetst in `lib/rekeningen/server.ts`, niet per scherm. Zie `docs/design-decisions.md` ("Rekeningen"). |
 | `/admin/fakscanner` (bar check-ins) | `fakscanner.manage` | Per working year (`?jaar=`): the points ranking (`FakTally`, 30 per page via `?rang=`), the settings (double-count window, points per free beer, bar-day rollover) and the log of **failed** scans only (`FakScanLog`). Rows are keyed on r-number, so people without a VTK account appear too, by r-number rather than name. |
 
 User pickers everywhere use the server-side typeahead `GET /api/users/search` (capped results), not
@@ -411,7 +411,7 @@ aangaan; dan lijkt de toegang geregeld terwijl niemand binnen raakt.
 
 ## Rekeningen
 
-De rekeningen (`docs/design-decisions.md`, "Rekeningen") voegen drie permissies
+De rekeningen (`docs/design-decisions.md`, "Rekeningen") voegen vier permissies
 toe:
 
 - `expenses.submit` — een rekening indienen en je eigen lijst zien. Zit in de
@@ -422,13 +422,29 @@ toe:
   corrigeren en verwijderen zolang er niets verwerkt is. De post-scope komt uit
   `session.groups` van het huidige werkingsjaar; er is dus geen `allowed_posts`
   meer zoals in billsheet.
+- `expenses.reimbursePost`: het vinkje "terugbetaald" zetten en weghalen bij
+  de rekeningen van de eigen post(en) of werkgroep(en), voor een werkgroep die
+  haar leden zelf terugbetaalt. Bekijken hoort erbij (het overzicht met de tabs
+  terug te betalen / terugbetaald), bewerken en verwijderen niet. Enkel bij een
+  rekening met eigen kaart, en enkel zolang Beheer ze niet doorstuurde of
+  inboekte (`canReimburse` in `lib/rekeningen/server.ts`). Zit in geen geseede
+  rol.
 - `expenses.manage` — alles: alle posten, terugbetalen, inboeken, doorsturen naar
   de boekhouder en de instellingen. Zit in de systeemrol `admin`, en die wordt
   toegekend aan IT en Groep 5.
 
 Terugbetalen en inboeken zitten bewust **niet** in `expenses.managePost`: dat is
 geld en boekhouding, en een postverantwoordelijke die zijn eigen uitgaven op
-"betaald" kan zetten is precies het gat dat billsheet had.
+"betaald" kan zetten is precies het gat dat billsheet had. Terugbetalen is
+daarom een eigen recht dat je bewust uitdeelt, niet iets wat elke postbeheerder
+erbij krijgt.
+
+**Een werkgroepverantwoordelijke laten terugbetalen:** maak in `/admin/roles` een
+rol (bv. "Werkgroep terugbetalen") met `expenses.reimbursePost`, en hang die in
+`/admin/werkgroepen` aan de werkgroep als **verantwoordelijke** (LEADER-grant),
+niet aan elk lid. Wie geen praesidiumlid is, kan met dit recht ook zelf
+indienen; anders staat hij met een bonnetje in de hand voor een gesloten
+formulier. Zoals elke rol reset dit op 15 juli met het lidmaatschap.
 
 ## Boekhoudcodes
 

@@ -11,6 +11,7 @@ import {
   canDelete,
   canEdit,
   canManageState,
+  canReimburse,
   canView,
   EXPENSE_CONFIG_KEY,
   getExpenseConfig,
@@ -348,15 +349,17 @@ export async function deleteExpenseAction(formData: FormData): Promise<void> {
 type StateField = "paid" | "booked";
 
 /**
- * Zet één van de twee vinkjes aan of uit. Enkel volledig beheer: dit gaat over
- * geld dat vertrok en over wat de boekhouder bevestigde.
+ * Zet één van de twee vinkjes aan of uit. Inboeken is enkel volledig beheer: dat
+ * is wat de boekhouder bevestigde. Terugbetaald mag ook een werkgroep die haar
+ * leden zelf terugbetaalt (`expenses.reimbursePost`), maar enkel voor haar eigen
+ * rekeningen; dat wordt hier per rekening getoetst, niet op het scherm.
  */
 export async function setExpenseStateAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
   const access = await requireExpenseAccess();
-  if (!canManageState(access)) return saveError("FORBIDDEN");
+  if (!canManageState(access) && !access.canReimbursePost) return saveError("FORBIDDEN");
 
   const id = text(formData, "id", 40);
   const field = text(formData, "field", 10) as StateField;
@@ -365,6 +368,16 @@ export async function setExpenseStateAction(
 
   const existing = await prisma.expense.findUnique({ where: { id } });
   if (!existing) return saveError("NOT_FOUND");
+
+  if (field === "booked" ? !canManageState(access) : !canReimburse(access, existing)) {
+    // Een werkgroep botst hier op haar eigen rekening enkel wanneer Beheer ze
+    // intussen doorstuurde of inboekte; zeg dat dan ook.
+    const processed =
+      field === "paid" &&
+      canView(access, existing) &&
+      Boolean(existing.sentAt || existing.bookedAt);
+    return saveError(processed ? "PROCESSED" : "FORBIDDEN");
+  }
 
   const now = new Date();
   const userId = access.session.user.id;

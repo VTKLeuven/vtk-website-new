@@ -32,6 +32,8 @@ export function expenseErrorMessages(locale: Locale, maxWords?: number): Record<
       LOCKED:
         "Niet opgeslagen: deze rekening is al terugbetaald, doorgestuurd of ingeboekt. Haal eerst het vinkje weg.",
       FORBIDDEN: "Daar heb je geen rechten voor.",
+      PROCESSED:
+        "Niet opgeslagen: Beheer heeft deze rekening al doorgestuurd of ingeboekt. Vraag hen om het vinkje aan te passen.",
       NO_SMTP:
         "Niet verstuurd: er is geen mailserver ingesteld op deze omgeving. Download het blad en stuur het zelf door.",
       SEND_FAILED: "Niet verstuurd: de mailserver weigerde het bericht. Probeer opnieuw.",
@@ -58,6 +60,8 @@ export function expenseErrorMessages(locale: Locale, maxWords?: number): Record<
     LOCKED:
       "Not saved: this expense is already reimbursed, forwarded or booked. Clear that first.",
     FORBIDDEN: "You do not have the rights for that.",
+    PROCESSED:
+      "Not saved: Administration has already forwarded or booked this expense. Ask them to change the tick.",
     NO_SMTP:
       "Not sent: no mail server is configured on this environment. Download the sheet and forward it yourself.",
     SEND_FAILED: "Not sent: the mail server refused the message. Try again.",

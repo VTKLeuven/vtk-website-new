@@ -13,7 +13,7 @@ import {
   reimbursementReference,
   reimbursementState,
 } from "@/lib/rekeningen/expenses";
-import { canDelete, canEdit, type ExpenseAccess } from "@/lib/rekeningen/server";
+import { canDelete, canEdit, canReimburse, type ExpenseAccess } from "@/lib/rekeningen/server";
 import type { ExpenseDetail, ExpenseRow } from "./ExpenseWorkbench";
 
 /** Wat de lijst en de inspector aan relaties nodig hebben. */
@@ -64,6 +64,7 @@ export function toRow(
     sentTo: full ? expense.sentTo : null,
     canEdit: access ? canEdit(access, expense) : false,
     canDelete: access ? canDelete(access, expense) : false,
+    canReimburse: access ? canReimburse(access, expense) : false,
     receiptName: expense.receiptName,
     receiptMime: expense.receiptMime,
     unseen: false,
@@ -85,7 +86,7 @@ export function toDetail(
     iban: expense.iban,
     // Enkel voor wie terugbetaalt: het is de tekst voor de overschrijving.
     reimbursementReference:
-      access.canManageAll && expense.paymentMethod === "PERSONAL"
+      canReimburse(access, expense) && expense.paymentMethod === "PERSONAL"
         ? reimbursementReference(expense)
         : null,
     submittedByName: expense.submittedBy?.name ?? null,

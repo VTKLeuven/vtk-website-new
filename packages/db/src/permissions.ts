@@ -206,6 +206,12 @@ export const PERMISSIONS = [
   // corrigeert. Terugbetalen, inboeken en doorsturen zitten er bewust niet in:
   // dat is geld en boekhouding, en dat is `expenses.manage`.
   { code: "expenses.managePost", labelNl: "Rekeningen van de eigen post beheren", labelEn: "Manage own post's expenses", category: "expenses" },
+  // Een werkgroep die haar leden zelf terugbetaalt, vinkt dat zelf af. Enkel het
+  // vinkje "terugbetaald" en enkel voor de eigen post(en); doorsturen en inboeken
+  // blijven `expenses.manage`. Los van `managePost` zodat je het de
+  // verantwoordelijke kan geven (LEADER-grant) zonder dat elke postbeheerder het
+  // krijgt.
+  { code: "expenses.reimbursePost", labelNl: "Rekeningen van de eigen post of werkgroep op terugbetaald zetten", labelEn: "Mark own post's or werkgroep's expenses as reimbursed", category: "expenses" },
   { code: "expenses.manage", labelNl: "Alle rekeningen beheren (terugbetalen, inboeken, doorsturen)", labelEn: "Manage all expenses (reimburse, book, forward)", category: "expenses" },
 
   // Boekhoudcodes: de lijst waaruit een ticketverkoop en het lidmaatschap hun

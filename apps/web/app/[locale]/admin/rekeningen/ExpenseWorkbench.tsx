@@ -59,6 +59,11 @@ export type ExpenseRow = {
   sentTo: string | null;
   canEdit: boolean;
   canDelete: boolean;
+  /**
+   * Mag het vinkje "terugbetaald" zetten: volledig beheer, of een werkgroep met
+   * `expenses.reimbursePost` voor haar eigen, nog niet verwerkte rekening.
+   */
+  canReimburse: boolean;
   receiptName: string;
   receiptMime: string;
   /** Nog niet geopend door wie kijkt: de rij staat gearceerd. */
@@ -563,7 +568,7 @@ function ExpenseDetailModal({
             bookedBy={expense.bookedByName}
             sentAt={expense.sentAtLabel}
             sentTo={expense.sentTo}
-            readOnly={!canManageState}
+            readOnly={!canManageState && !expense.canReimburse}
             labels={{
               savedMessage: nl ? "Opgeslagen." : "Saved.",
               fallbackErrorMessage: nl ? "Opslaan mislukt." : "Could not save.",

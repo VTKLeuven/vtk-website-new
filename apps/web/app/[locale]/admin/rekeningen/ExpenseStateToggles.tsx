@@ -36,7 +36,11 @@ export function ExpenseStateToggles({
   bookedBy: string | null;
   sentAt: string | null;
   sentTo: string | null;
-  /** Kijken mag, wijzigen niet (post-beheer en de indiener zelf). */
+  /**
+   * Kijken mag, wijzigen niet (post-beheer en de indiener zelf). Een werkgroep
+   * met `expenses.reimbursePost` krijgt hier `false` voor haar eigen rekening,
+   * en ziet dan in de eenvoudige weergave enkel "Terugbetaald".
+   */
   readOnly: boolean;
   /**
    * Enkel "Terugbetaald", voor wie geen Beheer is: doorsturen en inboeken zijn

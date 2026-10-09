@@ -97,7 +97,7 @@ export function getAdminNav(): NavEntry[] {
     item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
     ...(logistics ? [item('logistics', logistics)] : []),
     item('expenses', '/rekeningen', {
-      anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.manage'],
+      anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.reimbursePost', 'expenses.manage'],
     }),
     // Naast Rekeningen: allebei het werk van de penning. De codes zelf kiest
     // wie een ticketverkoop maakt, in het eventformulier; hier wordt enkel de

@@ -136,6 +136,7 @@ export const MCP_PERMISSION_POLICY = {
   // catalogusresource, geen create-kind.
   "signature.generate": { reads: [], creates: [], blocked: ["generate an email signature"] },
   "expenses.managePost": { reads: [], creates: [], blocked: ["read or edit expenses"] },
+  "expenses.reimbursePost": { reads: [], creates: [], blocked: ["read expenses or mark reimbursements"] },
   "expenses.manage": { reads: [], creates: [], blocked: ["read or edit expenses, mark reimbursements or forward to the accountant"] },
   // De codelijst stuurt wat er in de betaalinfo van elke verkoop staat; een
   // agent hoort die niet aan te passen, en er is geen create-kind.

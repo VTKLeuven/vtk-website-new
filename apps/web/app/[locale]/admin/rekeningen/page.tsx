@@ -226,9 +226,13 @@ export default async function RekeningenOverzicht({
               ? nl
                 ? "Alles wat er voor VTK betaald werd, met het bonnetje erbij. Vink af wat terugbetaald is en stuur het blad door naar de boekhouding."
                 : "Everything paid for VTK, receipt included. Tick off what has been reimbursed and forward the sheet to the accountant."
-              : nl
-                ? "De rekeningen van je eigen post. Terugbetalen en inboeken gebeurt door Beheer."
-                : "Your own post's expenses. Reimbursing and booking is done by Administration."}
+              : access.canReimbursePost
+                ? nl
+                  ? "De rekeningen van je eigen post. Open een rekening en vink af wat je terugbetaalde; doorsturen en inboeken gebeurt door Beheer."
+                  : "Your own post's expenses. Open an expense and tick off what you reimbursed; forwarding and booking is done by Administration."
+                : nl
+                  ? "De rekeningen van je eigen post. Terugbetalen en inboeken gebeurt door Beheer."
+                  : "Your own post's expenses. Reimbursing and booking is done by Administration."}
           </p>
         </div>
         <Link
