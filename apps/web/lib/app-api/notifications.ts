@@ -49,6 +49,8 @@ export async function sendTheokotPickupPush(now: Date = new Date()): Promise<Not
       pickupPushedAt: null,
       // Wat in de doos van de grocomeet zit, ligt niet aan de balie.
       grocomeetId: null,
+      // Helemaal vrijgegeven na de deadline: er ligt niets meer op je naam.
+      lines: { some: {} },
       session: {
         pickupStart: { lte: now, gte: new Date(now.getTime() - 6 * 60 * 60 * 1000) },
         pickupEnd: { gte: now },

@@ -5,6 +5,7 @@
  */
 
 import { prisma } from '@vtk/db';
+import type { Prisma } from '@prisma/client';
 import { DEFAULT_THEOKOT_CONFIG, parseTheokotConfig, type TheokotConfig } from './theokot';
 import { sendNoShowWarning, sendOrderCancelled } from './mail';
 import { withSerializableTransaction } from './ticketing/transactions';
@@ -14,6 +15,16 @@ const AUTOMATIC_BAN_NOTE = 'Automatisch aangemaakt door de no-show-verwerking.';
 
 /** De notitie bij een bestelling die in de doos van de grocomeet meeging. */
 const GROCOMEET_PICKUP_NOTE = 'Meegegeven in de doos van de grocomeet.';
+
+/**
+ * Een bestelling die als no-show telt: niet opgehaald (`NO_SHOW`), of wel
+ * opgehaald maar met vrijgegeven broodjes die niemand overnam
+ * (`releaseNoShowAt`). Elke telling voor een ban, elke mail en elke "er liep
+ * iets mis" gaat hierover, zodat de twee soorten nooit uiteenlopen.
+ */
+export const NO_SHOW_WHERE = {
+  OR: [{ status: 'NO_SHOW' }, { releaseNoShowAt: { not: null } }],
+} satisfies Prisma.TheokotOrderWhereInput;
 
 /** Leest `theokot.config` uit de Setting-tabel, aangevuld met defaults. */
 export async function getTheokotConfig(): Promise<TheokotConfig> {
@@ -48,7 +59,12 @@ function sessionDateLabel(date: Date, locale: 'NL' | 'EN'): string {
  * drempel bereikt is en er nog geen actieve ban loopt, een ban aanmaken.
  */
 async function applyNoShowConsequences(
-  order: { id: string; userId: string; user: { name: string; email: string; locale: 'NL' | 'EN' } },
+  order: {
+    id: string;
+    userId: string;
+    releaseNoShowAt: Date | null;
+    user: { name: string; email: string; locale: 'NL' | 'EN' };
+  },
   sessionDate: Date,
   config: TheokotConfig,
 ): Promise<void> {
@@ -58,7 +74,7 @@ async function applyNoShowConsequences(
 
 /** De no-showmail van één bestelling; een mislukte verzending houdt niets tegen. */
 async function sendNoShowMail(
-  order: { id: string; user: { name: string; email: string; locale: 'NL' | 'EN' } },
+  order: { id: string; releaseNoShowAt: Date | null; user: { name: string; email: string; locale: 'NL' | 'EN' } },
   sessionDate: Date,
 ): Promise<void> {
   // Een waarschuwing die niet vertrekt, hoort de rest niet tegen te houden. Bij
@@ -70,6 +86,9 @@ async function sendNoShowMail(
       order.user,
       sessionDateLabel(sessionDate, order.user.locale),
       order.id,
+      // Van vrijgegeven broodjes die niemand overnam: een eigen mail, want wie
+      // die kreeg, kwam wel of annuleerde, en "niet opgehaald" klopt dan niet.
+      order.releaseNoShowAt ? 'released' : 'order',
     );
   } catch (error) {
     console.error(`[theokot] waarschuwingsmail voor bestelling ${order.id} mislukt:`, error);
@@ -101,17 +120,21 @@ async function applyBanIfDue(userId: string, config: TheokotConfig): Promise<boo
     const noShowCount = await tx.theokotOrder.count({
       where: {
         userId,
-        status: 'NO_SHOW',
         // Wat tijdens een pauze viel, telt ook achteraf niet mee.
         noShowWaivedAt: null,
-        // `noShowProcessedAt` is wanneer de no-show verwerkt is en blijft daarna
-        // staan; `updatedAt` schuift mee met elke latere wijziging, dus een oude
-        // no-show die nog een notitie kreeg, telde opnieuw mee. Wie nog niet
-        // verwerkt is (deze bestelling, of een handmatige correctie), valt terug
-        // op `updatedAt`.
-        OR: [
-          { noShowProcessedAt: { gt: since } },
-          { noShowProcessedAt: null, updatedAt: { gt: since } },
+        AND: [
+          NO_SHOW_WHERE,
+          // `noShowProcessedAt` is wanneer de no-show verwerkt is en blijft daarna
+          // staan; `updatedAt` schuift mee met elke latere wijziging, dus een oude
+          // no-show die nog een notitie kreeg, telde opnieuw mee. Wie nog niet
+          // verwerkt is (deze bestelling, of een handmatige correctie), valt terug
+          // op `updatedAt`.
+          {
+            OR: [
+              { noShowProcessedAt: { gt: since } },
+              { noShowProcessedAt: null, updatedAt: { gt: since } },
+            ],
+          },
         ],
       },
     });
@@ -131,6 +154,89 @@ async function applyBanIfDue(userId: string, config: TheokotConfig): Promise<boo
     });
     return true;
   });
+}
+
+/**
+ * Wat bij het sluiten van de afhaal nog vrijgegeven staat, hoort bij wie het
+ * vrijgaf en telt als zijn no-show.
+ *
+ * - Haalde hij niets op (de bestelling staat nog op `RESERVED`), dan gaan de
+ *   vrijgegeven broodjes terug op zijn lijnen en wordt de bestelling hierna een
+ *   gewone `NO_SHOW`: de lijnen zeggen dan wat er bleef liggen, zoals bij elke
+ *   no-show. Had hij alles vrijgegeven, dan krijgt ze ook `releaseNoShowAt`:
+ *   hij annuleerde, dus de mail zegt dat het om vrijgegeven broodjes gaat. Liet
+ *   hij ook zijn eigen broodjes liggen, dan is het een gewone no-show.
+ * - Haalde hij zijn eigen deel wel op, dan kan de bestelling niet ook nog
+ *   `NO_SHOW` worden: wat hij betaalde, blijft opgehaald. Ze krijgt
+ *   `releaseNoShowAt`, en de vrijgegeven rijen blijven staan als verslag van
+ *   wat er lag.
+ */
+export async function settleLeftoverReleases(
+  tx: Prisma.TransactionClient,
+  sessionId: string,
+  now: Date,
+): Promise<void> {
+  const releases = await tx.theokotOrderRelease.findMany({
+    where: { order: { sessionId } },
+    include: { order: { select: { id: true, status: true } } },
+  });
+  const reserved = new Set<string>();
+  // Vóór er iets terug op de lijnen komt: wie had er niets meer van zichzelf.
+  const reservedIds = [...new Set(releases.filter((r) => r.order.status === 'RESERVED').map((r) => r.orderId))];
+  const withOwnLines = new Set(
+    reservedIds.length === 0
+      ? []
+      : (
+          await tx.theokotOrderLine.groupBy({
+            by: ['orderId'],
+            where: { orderId: { in: reservedIds } },
+            _count: { _all: true },
+          })
+        ).map((row) => row.orderId),
+  );
+  for (const release of releases) {
+    if (release.order.status === 'RESERVED') {
+      const line = await tx.theokotOrderLine.findFirst({
+        where: { orderId: release.orderId, sessionItemId: release.sessionItemId },
+        select: { id: true },
+      });
+      if (line) {
+        await tx.theokotOrderLine.update({
+          where: { id: line.id },
+          data: { quantity: { increment: release.quantity } },
+        });
+      } else {
+        await tx.theokotOrderLine.create({
+          data: {
+            orderId: release.orderId,
+            sessionItemId: release.sessionItemId,
+            quantity: release.quantity,
+            unitPriceCents: release.unitPriceCents,
+          },
+        });
+      }
+      await tx.theokotOrderRelease.delete({ where: { id: release.id } });
+      reserved.add(release.orderId);
+    } else if (release.order.status === 'PICKED_UP') {
+      await tx.theokotOrder.updateMany({
+        where: { id: release.orderId, releaseNoShowAt: null },
+        data: { releaseNoShowAt: now },
+      });
+    }
+  }
+  for (const orderId of reserved) {
+    const lines = await tx.theokotOrderLine.findMany({
+      where: { orderId },
+      select: { quantity: true, unitPriceCents: true },
+    });
+    await tx.theokotOrder.update({
+      where: { id: orderId },
+      data: {
+        totalCents: lines.reduce((sum, line) => sum + line.quantity * line.unitPriceCents, 0),
+        ...(withOwnLines.has(orderId) ? {} : { releaseNoShowAt: now }),
+      },
+    });
+  }
 }
 
 /**
@@ -187,6 +293,7 @@ export async function processSessionNoShows(
         where: { sessionId: session.id, status: 'RESERVED', grocomeetId: { not: null } },
         data: { status: 'PICKED_UP', pickedUpAt: now, statusNote: GROCOMEET_PICKUP_NOTE },
       });
+      await settleLeftoverReleases(tx, session.id, now);
       await tx.theokotOrder.updateMany({
         where: { sessionId: session.id, status: 'RESERVED' },
         data: { status: 'NO_SHOW' },
@@ -195,7 +302,7 @@ export async function processSessionNoShows(
         where: { id: session.id },
         include: {
           orders: {
-            where: { status: 'NO_SHOW', noShowProcessedAt: null },
+            where: { ...NO_SHOW_WHERE, noShowProcessedAt: null },
             include: { user: { select: { name: true, email: true, locale: true } } },
           },
         },
@@ -220,7 +327,7 @@ export async function processSessionNoShows(
     }
 
     const remaining = await prisma.theokotOrder.count({
-      where: { sessionId: session.id, status: 'NO_SHOW', noShowProcessedAt: null },
+      where: { sessionId: session.id, ...NO_SHOW_WHERE, noShowProcessedAt: null },
     });
     if (remaining === 0) {
       await prisma.theokotSession.update({
@@ -310,7 +417,7 @@ export async function waiveSessionNoShows(
     await prisma.theokotSession.update({ where: { id: session.id }, data: { noShowsWaivedAt: now } });
   }
   const affected = await prisma.theokotOrder.findMany({
-    where: { sessionId: session.id, status: 'NO_SHOW', noShowWaivedAt: null },
+    where: { sessionId: session.id, ...NO_SHOW_WHERE, noShowWaivedAt: null },
     select: { id: true, userId: true, noShowProcessedAt: true },
   });
   if (affected.length > 0) {
@@ -338,11 +445,15 @@ export async function waiveSessionNoShows(
     const count = await prisma.theokotOrder.count({
       where: {
         userId,
-        status: 'NO_SHOW',
         noShowWaivedAt: null,
-        OR: [
-          { noShowProcessedAt: { gt: since } },
-          { noShowProcessedAt: null, updatedAt: { gt: since } },
+        AND: [
+          NO_SHOW_WHERE,
+          {
+            OR: [
+              { noShowProcessedAt: { gt: since } },
+              { noShowProcessedAt: null, updatedAt: { gt: since } },
+            ],
+          },
         ],
       },
     });
@@ -389,7 +500,7 @@ export async function unwaiveSessionNoShows(
 
   const config = await getTheokotConfig();
   const waived = await prisma.theokotOrder.findMany({
-    where: { sessionId: session.id, status: 'NO_SHOW', noShowWaivedAt: { gte: waivedAt } },
+    where: { sessionId: session.id, ...NO_SHOW_WHERE, noShowWaivedAt: { gte: waivedAt } },
     include: { user: { select: { name: true, email: true, locale: true } } },
   });
   // Verwerkt terwijl de dag aangeduid stond: die kregen geen mail.

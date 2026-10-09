@@ -58,6 +58,13 @@ export type PickupOrder = {
    * zodat een groco die toch langskomt, weet waar zijn broodje is.
    */
   grocomeet: boolean;
+  /**
+   * Zoveel broodjes gaf deze student na de deadline vrij en zijn nog niet
+   * overgenomen (`releaseOrder`). Ze staan niet in `lines` en zijn niet van
+   * hem: de balie geeft ze niet mee en rekent ze niet aan. Wil hij er toch een,
+   * dan neemt hij het online over. 0 bij een gewone bestelling.
+   */
+  released: number;
 };
 
 export type PickupLookupResult =
@@ -132,6 +139,7 @@ export async function pickupForUser(
         // volgorde hieronder hangt hieraan: de duurste lijn bepaalt wat de
         // bonnetjes dekken.
         voucherRedemption: { select: { amount: true } },
+        releases: { select: { quantity: true } },
         lines: {
           include: { sessionItem: { select: { nameNl: true, nameEn: true, badgeImageKey: true } } },
           orderBy: { sessionItem: { order: "asc" } },
@@ -173,6 +181,7 @@ export async function pickupForUser(
         voucherCost: sandwichVoucherCost(voucherCoversCents, config.voucherHalfCents),
         isLate: order.status === "NO_SHOW" || order.session.pickupEnd < now,
         grocomeet: order.grocomeetId !== null,
+        released: order.releases.reduce((sum, release) => sum + release.quantity, 0),
         lines: order.lines.map((line) => ({
           nameNl: line.sessionItem.nameNl,
           nameEn: line.sessionItem.nameEn,

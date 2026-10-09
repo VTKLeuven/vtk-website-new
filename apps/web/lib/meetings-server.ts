@@ -135,8 +135,15 @@ export async function offeringForMeeting(
  */
 export async function usageForSessionItems(itemIds: string[]): Promise<Map<string, number>> {
   if (itemIds.length === 0) return new Map();
-  const [lines, reservations] = await Promise.all([
+  const [lines, released, reservations] = await Promise.all([
     prisma.theokotOrderLine.groupBy({
+      by: ["sessionItemId"],
+      where: { sessionItemId: { in: itemIds } },
+      _sum: { quantity: true },
+    }),
+    // Vrijgegeven broodjes zijn al gemaakt: ze wachten op wie ze overneemt en
+    // zijn dus niet opnieuw te bestellen.
+    prisma.theokotOrderRelease.groupBy({
       by: ["sessionItemId"],
       where: { sessionItemId: { in: itemIds } },
       _sum: { quantity: true },
@@ -149,7 +156,9 @@ export async function usageForSessionItems(itemIds: string[]): Promise<Map<strin
   ]);
 
   const used = new Map<string, number>();
-  for (const line of lines) used.set(line.sessionItemId, line._sum.quantity ?? 0);
+  for (const line of [...lines, ...released]) {
+    used.set(line.sessionItemId, (used.get(line.sessionItemId) ?? 0) + (line._sum.quantity ?? 0));
+  }
   for (const reservation of reservations) {
     if (!reservation.sessionItemId) continue;
     used.set(
@@ -179,6 +188,11 @@ export async function usageForSessionItemsTx(
     where: { sessionItem: { sessionId } },
     _sum: { quantity: true },
   });
+  const released = await tx.theokotOrderRelease.groupBy({
+    by: ["sessionItemId"],
+    where: { sessionItem: { sessionId } },
+    _sum: { quantity: true },
+  });
   const reservations = await tx.meetingReservation.groupBy({
     by: ["sessionItemId"],
     where: {
@@ -190,7 +204,9 @@ export async function usageForSessionItemsTx(
   });
 
   const used = new Map<string, number>();
-  for (const line of lines) used.set(line.sessionItemId, line._sum.quantity ?? 0);
+  for (const line of [...lines, ...released]) {
+    used.set(line.sessionItemId, (used.get(line.sessionItemId) ?? 0) + (line._sum.quantity ?? 0));
+  }
   for (const reservation of reservations) {
     if (!reservation.sessionItemId) continue;
     used.set(
@@ -456,6 +472,8 @@ export async function grocomeetOnDay(
  * (`placeOrder`/`updateOrder`). Dit vangt wat daarna verandert: een GM die er
  * pas later bijkomt, of die naar een andere dag verzet wordt. Enkel wat nog
  * `RESERVED` staat, schuift mee; een afgehandelde bestelling is geschiedenis.
+ * Een bestelling met een broodje dat na de deadline overgenomen of vrijgegeven
+ * is, schuift ook niet mee: die broodjes liggen aan de balie.
  */
 export async function linkGrocomeetOrders(
   meeting: Pick<Meeting, "id" | "kind" | "startsAt">,
@@ -469,7 +487,15 @@ export async function linkGrocomeetOrders(
   });
 
   const orders = await prisma.theokotOrder.findMany({
-    where: { status: "RESERVED", grocomeetId: null, session: { date: day } },
+    where: {
+      status: "RESERVED",
+      grocomeetId: null,
+      session: { date: day },
+      // Na de deadline overgenomen of vrijgegeven: de doos is dan al ingepakt,
+      // en dat broodje ligt aan de balie. Zie `TheokotOrder.takenOverAt`.
+      takenOverAt: null,
+      releases: { none: {} },
+    },
     select: { id: true, userId: true },
   });
   if (orders.length === 0) return;

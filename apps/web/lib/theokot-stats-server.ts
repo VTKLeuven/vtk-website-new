@@ -50,6 +50,8 @@ export async function loadTheokotStats(range: { from: Date | null; to: Date }): 
       grocomeetId: true,
       voucherRedemption: { select: { id: true } },
       lines: { select: { sessionItemId: true, quantity: true, unitPriceCents: true } },
+      releaseNoShowAt: true,
+      releases: { select: { sessionItemId: true, quantity: true } },
     },
   });
 
@@ -61,8 +63,11 @@ export async function loadTheokotStats(range: { from: Date | null; to: Date }): 
         meetingCount: _count.meetingReservations,
       })),
     })),
-    orders.map(({ voucherRedemption, grocomeetId, ...order }) => ({
+    orders.map(({ voucherRedemption, grocomeetId, releaseNoShowAt, releases, ...order }) => ({
       ...order,
+      // Enkel bij een opgehaalde bestelling: bij een `NO_SHOW` staat wat bleef
+      // liggen al op de lijnen (`settleLeftoverReleases`).
+      leftover: order.status === "PICKED_UP" && releaseNoShowAt ? releases : [],
       status: order.status as StatsOrderStatus,
       voucher: voucherRedemption !== null,
       grocomeet: grocomeetId !== null,

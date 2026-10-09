@@ -98,7 +98,7 @@ describe("unwaiveSessionNoShows", () => {
       data: { active: true, endsAt: new Date(startsAt.getTime() + 14 * 86400000) },
     });
     expect(mocks.sendNoShowWarning).toHaveBeenCalledTimes(1);
-    expect(mocks.sendNoShowWarning).toHaveBeenCalledWith(user, expect.any(String), "o1");
+    expect(mocks.sendNoShowWarning).toHaveBeenCalledWith(user, expect.any(String), "o1", "order");
     expect(res).toEqual({ date: DAY, orders: 2, mailed: 1, restoredBans: 1, newBans: 0 });
   });
 

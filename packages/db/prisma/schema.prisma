@@ -3534,6 +3534,7 @@ model TheokotSessionItem {
 
   session             TheokotSession       @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   lines               TheokotOrderLine[]
+  releases            TheokotOrderRelease[]
   /// Broodjes die voor een vergadering (GM/Bureau) op dit item gereserveerd zijn.
   /// Ze gaan van dezelfde voorraad af en staan apart op de turflijst.
   meetingReservations MeetingReservation[]
@@ -3573,12 +3574,26 @@ model TheokotOrder {
   grocomeetId       String?
   /// Afgerekend bij de grocomeet, zoals `MeetingReservation.paidAt`.
   grocomeetPaidAt   DateTime?          @db.Timestamptz(3)
+  /// Gezet bij het sluiten van de afhaal wanneer er nog vrijgegeven broodjes van
+  /// deze bestelling overbleven (`releases`). Dat telt als een no-show, net als
+  /// de status `NO_SHOW`: wie haar eigen deel ophaalde, liet het vrijgegeven
+  /// deel toch liggen. Wie alles vrijgaf en niets ophaalde, krijgt de
+  /// status `NO_SHOW` en ook dit, zodat de no-showmail zegt dat het om
+  /// vrijgegeven broodjes gaat. Wie zelf ook niets van het zijne ophaalde, krijgt
+  /// enkel `NO_SHOW`. Zie `NO_SHOW_WHERE` en `settleLeftoverReleases`.
+  releaseNoShowAt   DateTime?          @db.Timestamptz(3)
+  /// Wanneer deze bestelling na de deadline een overgenomen broodje kreeg
+  /// (`takeOverSandwich`). Zo'n bestelling blijft aan de balie: de doos van de
+  /// grocomeet is dan al ingepakt, dus `linkGrocomeetOrders` laat ze liggen.
+  takenOverAt       DateTime?          @db.Timestamptz(3)
 
   session           TheokotSession            @relation(fields: [sessionId], references: [id], onDelete: Cascade)
   user              User                      @relation("TheokotOrderUser", fields: [userId], references: [id], onDelete: Cascade)
   pickedUpBy        User?                     @relation("TheokotPickedUpBy", fields: [pickedUpById], references: [id], onDelete: SetNull)
   grocomeet         Meeting?                  @relation(fields: [grocomeetId], references: [id], onDelete: SetNull)
   lines             TheokotOrderLine[]
+  /// Broodjes die na de deadline vrijgegeven zijn en nog niet overgenomen.
+  releases          TheokotOrderRelease[]
   voucherRedemption TheokotVoucherRedemption?
 
   @@unique([sessionId, userId])
@@ -3624,6 +3639,32 @@ model TheokotOrderLine {
 
   @@index([orderId])
   @@index([sessionItemId])
+}
+
+/// Vrijgegeven broodjes: na de deadline geannuleerd, maar al gemaakt.
+///
+/// Twee voorraden, zoals in de koelkast: de lijnen van een bestelling
+/// (`TheokotOrderLine`) zijn wat van de student is, deze rijen zijn wat hij
+/// vrijgaf en wat iedereen (hijzelf ook) kan overnemen. Ze hangen aan zijn
+/// bestelling enkel om te weten bij wie de no-show hoort als niemand ze neemt.
+/// Een overname haalt één stuk van hier en zet het als lijn bij wie overneemt.
+/// Zie `releaseOrder` en `takeOverSandwich` in `lib/theokot-orders.ts`.
+model TheokotOrderRelease {
+  id             String   @id @default(cuid())
+  orderId        String
+  sessionItemId  String
+  /// Hoeveel er van dit broodje nog vrij staat. Bij 0 verdwijnt de rij.
+  quantity       Int
+  /// De prijs van de lijn waar het vandaan kwam; terug op de lijn bij een no-show.
+  unitPriceCents Int
+  /// Wie het eerst vrijgaf, wordt het eerst verlost.
+  releasedAt     DateTime @db.Timestamptz(3)
+
+  order       TheokotOrder       @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sessionItem TheokotSessionItem @relation(fields: [sessionItemId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, sessionItemId])
+  @@index([sessionItemId, releasedAt])
 }
 
 // -----------------------------------------------------------------------------

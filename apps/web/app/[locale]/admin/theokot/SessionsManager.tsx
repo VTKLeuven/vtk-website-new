@@ -61,6 +61,12 @@ export type AdminOrder = {
   rNumber: string;
   status: string;
   itemsLabel: string;
+  /**
+   * Na de deadline vrijgegeven en nog niet overgenomen, bv. "1× Smos kaas"; leeg
+   * bij een gewone bestelling. Staat niet in `itemsLabel`: het is niet meer van
+   * deze persoon.
+   */
+  releasedLabel: string;
   totalLabel: string;
   /** Opgehaald of met bonnetjes betaald: dan blijft ze staan. */
   canRemove: boolean;
@@ -723,6 +729,11 @@ function SessionEditor({ nl, session }: { nl: boolean; session: AdminSession }) 
                 <span className="text-[#34405e]">{order.itemsLabel}</span>
                 <span className="tabular-nums text-[#5c667f]">{order.totalLabel}</span>
                 <span className="ml-auto flex items-center gap-2">
+                  {order.releasedLabel && (
+                    <span className="text-xs text-amber-800">
+                      {nl ? "vrijgegeven" : "released"}: {order.releasedLabel}
+                    </span>
+                  )}
                   {order.status !== "RESERVED" && (
                     <span className="text-xs text-[#5c667f]">
                       {order.status === "PICKED_UP"

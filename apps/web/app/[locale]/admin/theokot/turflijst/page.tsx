@@ -87,10 +87,17 @@ export default async function TurflijstPage({
       const dayEnd = brusselsWallClock(next.year, next.month, next.day, "00:00");
       // Wat een groco zelf bij Theokot bestelde op een dag met een grocomeet,
       // hoort ook in die doos (`TheokotOrder.grocomeetId`), niet bij de studenten.
-      const [used, grocoOrdered, reservations] = await Promise.all([
+      const [used, released, grocoOrdered, reservations] = await Promise.all([
         prisma.theokotOrderLine.groupBy({
           by: ["sessionItemId"],
           where: { sessionItem: { sessionId: full.id }, order: { grocomeetId: null } },
+          _sum: { quantity: true },
+        }),
+        // Na de deadline vrijgegeven: al gemaakt, en wie het overneemt, haalt het
+        // aan dezelfde balie. Een herdruk na een vrijgave toont dus hetzelfde.
+        prisma.theokotOrderRelease.groupBy({
+          by: ["sessionItemId"],
+          where: { sessionItem: { sessionId: full.id } },
           _sum: { quantity: true },
         }),
         prisma.theokotOrderLine.groupBy({
@@ -107,7 +114,10 @@ export default async function TurflijstPage({
         }),
       ]);
 
-      const usedMap = new Map(used.map((u) => [u.sessionItemId, u._sum.quantity ?? 0]));
+      const usedMap = new Map<string, number>();
+      for (const u of [...used, ...released]) {
+        usedMap.set(u.sessionItemId, (usedMap.get(u.sessionItemId) ?? 0) + (u._sum.quantity ?? 0));
+      }
       const meetingCounts = new Map<string, { grocomeet: number; bureau: number }>();
       for (const line of grocoOrdered) {
         meetingCounts.set(line.sessionItemId, { grocomeet: line._sum.quantity ?? 0, bureau: 0 });

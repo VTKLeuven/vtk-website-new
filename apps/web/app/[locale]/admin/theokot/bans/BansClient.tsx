@@ -31,6 +31,11 @@ export type NoShowRow = {
   note: string;
   /** Viel tijdens een pauze van de no-show-verwerking: geen mail, telt niet mee. */
   paused: boolean;
+  /**
+   * Na de deadline vrijgegeven broodjes bleven liggen (`releaseNoShowAt`). Bij
+   * een opgehaalde bestelling is het bedrag wat er lag, niet wat er betaald werd.
+   */
+  releasedLeftover: boolean;
 };
 
 export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[]; noShows: NoShowRow[] }) {
@@ -180,6 +185,11 @@ export function BansClient({ nl, bans, noShows }: { nl: boolean; bans: BanRow[];
                     {o.paused ? (
                       <span className="rounded-full bg-vtk-blue-soft px-2 py-0.5 font-medium text-vtk-ink">
                         {nl ? "Tijdens pauze, telt niet mee" : "During a pause, not counted"}
+                      </span>
+                    ) : null}
+                    {o.releasedLeftover ? (
+                      <span className="rounded-full bg-vtk-blue-soft px-2 py-0.5 font-medium text-vtk-ink">
+                        {nl ? "Vrijgegeven, niet overgenomen" : "Released, not taken over"}
                       </span>
                     ) : null}
                     <span>

@@ -249,6 +249,8 @@ async function tasksFor(
       where: {
         userId,
         status: "RESERVED",
+        // Helemaal vrijgegeven na de deadline: niets meer om op te halen.
+        lines: { some: {} },
         session: { pickupEnd: { gte: now }, pickupStart: { lte: horizon } },
       },
       select: {

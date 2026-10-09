@@ -323,6 +323,88 @@ halen ze af aan de balie en betalen daar. Post **Theokot** beheert het systeem.
   bestelling (geeft voorraad + het uniek-slot vrij, zodat opnieuw bestellen kan vóór
   de deadline). Er wordt dus geen annulatie-historiek bijgehouden: enkel no-shows.
 
+### Laat annuleren: vrijgeven voor overname (oktober 2026)
+
+- **Na de deadline wist annuleren niets meer, het geeft vrij.** Om 10:30 wordt de
+  turflijst gemaakt en worden de broodjes gesmeerd; een broodje dat dan nog
+  verdwijnt, ligt toch in de koelkast. Wie na de deadline op "Annuleren" drukt,
+  krijgt daarom eerst de waarschuwing: *"De deadline is verstreken en je broodje
+  wordt al gemaakt. Als je nu annuleert, wordt je broodje vrijgegeven voor
+  overname. Neemt iemand anders je broodje over, dan vervalt je bestelling
+  zonder gevolgen. Blijft het broodje aan het einde van de afhaal over, dan telt
+  dit als een no-show."* (`releaseOrder`).
+- **Vrijgeven gaat per broodje.** In die dialoog kies je hoeveel van elk broodje
+  je vrijgeeft; standaard alles. Wie er een van twee niet meer wil, houdt het
+  andere gewoon en haalt het op, in plaats van alles vrij te geven en er een
+  terug te nemen.
+- **Twee voorraden, zoals in de koelkast.** De lijnen van een bestelling zijn wat
+  van de student is; vrijgegeven broodjes staan apart (`TheokotOrderRelease`) en
+  zijn van niemand. Ze hangen enkel aan de bestelling van wie ze vrijgaf, om te
+  weten bij wie de no-show hoort. Een aparte tabel en geen teller op de lijn,
+  omdat de balie, de bonnetjes, de statistieken, de app en het account allemaal
+  "de lijnen" lezen als "wat van deze persoon is"; zo hoeven enkel de voorraad
+  (`usageForSessionItems`) en de turflijst te weten dat er nog vrijgegeven
+  broodjes liggen.
+- **Overnemen kan iedereen, ook wie vrijgaf, en enkel online, per broodje**, tot
+  het einde van de afhaal (`inTakeoverWindow`). Op `/theokot` verschijnt een
+  kaart "Vrijgekomen broodjes"; één klik neemt één stuk over
+  (`takeOverSandwich`). Er is bewust **geen aparte knop "toch zelf ophalen"**:
+  wie zijn broodje terug wil, neemt het over zoals iedereen, en dan eerst het
+  zijne. Anders komt het stuk van de **oudste vrijgave** (wie het eerst
+  annuleerde, is het eerst verlost). Het gaat bij de eigen reservatie van die
+  dag of wordt er een, aan de prijs van nu en binnen dezelfde limieten. Een ban
+  houdt overnemen tegen. Bewust geen losse verkoop aan de balie: dat zou een
+  tweede kassaweg naast de bestellingen vragen.
+- **De balie geeft enkel mee wat op je naam staat.** Vrijgegeven broodjes staan
+  aan de balie vermeld maar gaan niet mee en worden niet aangerekend; een
+  bestelling die helemaal vrijgegeven is, kan niet als opgehaald gemarkeerd
+  worden. Daardoor kan wat de balie toont niet meer veranderen terwijl de
+  student er staat: een overname raakt enkel de vrijgegeven broodjes.
+- **Terugnemen kan tot je ophaalt.** Na het ophalen kan er niets meer bij je
+  bestelling, dus ook geen eigen vrijgegeven broodje. Wat dan nog vrij staat,
+  blijft voor anderen beschikbaar en wordt anders een no-show. Bewust zo: een
+  opgehaalde bestelling is betaald en verandert niet meer. Het scherm, de
+  overnamemail en de balie zeggen dat ook, zodat niemand erin loopt.
+- **Een overgenomen broodje gaat nooit in de doos van de grocomeet.** Die is na
+  de deadline al ingepakt; het broodje ligt aan de balie. Een bestelling die
+  na de deadline een broodje kreeg (`takenOverAt`) of iets vrijgaf, laat
+  `linkGrocomeetOrders` daarom liggen.
+- **De voorraad verandert nooit.** Een overname schuift één stuk van de
+  vrijgave naar een bestelling. De turflijst en `usageForSessionItems` tellen
+  vrijgegeven broodjes mee en tonen dus hetzelfde getal; de keuken merkt er
+  niets van.
+- **No-show of niet.** Is het laatste vrijgegeven stuk overgenomen en staat er
+  niets anders meer op de bestelling, dan verdwijnt ze en is er niets meer om
+  niet op te halen. Wat bij het sluiten van de afhaal nog vrij staat, is een
+  no-show voor wie het vrijgaf (`settleLeftoverReleases`):
+  - Haalde die niets op, dan gaan de broodjes terug op de lijnen en wordt de
+    bestelling een gewone `NO_SHOW`, met mail en tellend voor een ban.
+  - Haalde die zijn eigen deel wel op (bv. één broodje teruggenomen), dan blijft
+    de bestelling opgehaald, want dat deel is betaald, en krijgt ze
+    `releaseNoShowAt`. Dat telt overal mee als no-show (`NO_SHOW_WHERE`): de
+    ban, de mail, de lijst bij Bans & no-shows en "er liep iets mis". Corrigeren
+    naar opgehaald wist die markering.
+  - **De no-showmail zegt waarom.** Wie alles vrijgaf, of zijn eigen deel wel
+    ophaalde, krijgt "je vrijgegeven broodjes werden niet overgenomen" en niet
+    "je bestelling werd niet opgehaald": die kwam wel of annuleerde, en de
+    gewone mail zou betwist worden. Wie ook zijn eigen broodjes liet liggen,
+    krijgt de gewone. Beide staan op /admin/it/flows.
+  - Een vrijgegeven broodje dat bleef liggen bij een opgehaalde bestelling, kan
+    na het sluiten niet meer als laattijdig opgehaald geboekt worden. Een
+    no-show die helemaal uit vrijgegeven broodjes bestond, wel: dan telt ze
+    niet meer, zoals elke laattijdige afhaling.
+  - Het overzicht en de statistieken tellen beide soorten als no-show; een
+    helemaal vrijgegeven bestelling staat niet bij "nog op te halen".
+- Wie vrijgaf, krijgt per broodje dat een ander overnam een mail met wat er nog
+  openstaat (`orderTakenOverMail`); niet wanneer hij er zelf een terugneemt.
+- Niet voor een bestelling in de doos van de grocomeet: die ligt niet aan de
+  balie en is al ingepakt. Ook niet wanneer er al bonnetjes op afgeboekt zijn.
+- **De VTK-app kent dit nog niet.** Na de deadline toont de app geen
+  annuleerknop (zoals voorheen) en geen vrijgekomen broodjes. Een bestelling
+  die helemaal vrijgegeven is, toont de app niet meer, en er vertrekt geen
+  pushbericht "je broodje ligt klaar" voor; de foutcodes staan niet in
+  `AppTheokotErrorCode`.
+
 ### Afhalen
 
 - **Afhaalpagina** (recht `theokot.pickup`): baliemedewerker geeft het **r-nummer** in of
