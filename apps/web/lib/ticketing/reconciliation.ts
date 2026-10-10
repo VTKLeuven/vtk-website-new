@@ -3,6 +3,7 @@ import "server-only";
 import { prisma } from "@vtk/db";
 import { closeFailedPaymentAttempt, fulfillPaidOrder, succeededCheckoutMatches } from "./orders";
 import { paymentGatewayFor, type RefundStatusResult } from "./payments";
+import { rememberBancontactRefundAccount } from "./refundAccount";
 import { completeTicketRefund, failTicketRefund } from "./refunds";
 
 /**
@@ -53,6 +54,9 @@ export async function reconcileTicketPayments(limit = 50) {
           amountCents: payment.amountCents,
           currency: payment.currency,
         });
+        if (payment.provider === "bancontact" && status.paymentId) {
+          await rememberBancontactRefundAccount(status.paymentId);
+        }
         succeeded += 1;
       } else if (status.status === "EXPIRED" || status.status === "FAILED") {
         // Zoals in de webhooks: enkel deze poging valt af, de bestelling

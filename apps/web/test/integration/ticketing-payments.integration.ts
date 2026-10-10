@@ -18,6 +18,18 @@ import {
 import { requestTicketRefund } from "@/lib/ticketing/refunds";
 
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
+/**
+ * `after()` werkt enkel binnen een request van Next. De webhook roept de route
+ * hier rechtstreeks aan, dus vangen we het werk op en laten de test beslissen
+ * wanneer het loopt.
+ */
+const afterTasks = vi.hoisted(() => [] as Array<() => unknown>);
+vi.mock("next/server", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("next/server")>()),
+  after: (task: () => unknown) => {
+    afterTasks.push(task);
+  },
+}));
 vi.mock("@vtk/auth/server", () => ({ getSession: vi.fn(async () => null) }));
 
 /**
@@ -49,6 +61,7 @@ function bancontactPayload(id: string) {
     ...(payment.amount == null ? {} : { amount: payment.amount }),
     currency: "EUR",
     expiresAt: new Date(Date.now() + 120_000).toISOString(),
+    debtor: { name: "Jan Peeters", iban: "*************7034" },
     _links: { deeplink: { href: `https://pay.example.test/${id}` } },
   };
 }
@@ -56,6 +69,12 @@ function bancontactPayload(id: string) {
 async function fakeBancontactApi(input: RequestInfo | URL, init?: RequestInit) {
   const url = new URL(typeof input === "string" ? input : input instanceof URL ? input : input.url);
   const method = init?.method ?? "GET";
+  const debtor = url.pathname.match(/^\/v3\/payments\/([^/]+)\/debtor\/refundIban$/);
+  if (debtor) {
+    const payment = bancontact.payments.get(decodeURIComponent(debtor[1]!));
+    if (!payment || payment.status !== "SUCCEEDED") return json({ code: "PAYMENT_NOT_FOUND" }, 404);
+    return json({ iban: "BE68539007547034" });
+  }
   const match = url.pathname.match(/^\/v3\/payments\/?([^/]*)$/);
   if (!match) return json({ code: "NOT_FOUND" }, 404);
   const id = decodeURIComponent(match[1] ?? "");
@@ -177,7 +196,10 @@ describe.sequential("ticket payments", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(fakeBancontactApi);
   });
 
-  afterEach(() => bancontact.reset());
+  afterEach(() => {
+    bancontact.reset();
+    afterTasks.length = 0;
+  });
 
   afterAll(async () => {
     vi.restoreAllMocks();
@@ -551,21 +573,44 @@ describe.sequential("ticket payments", () => {
       await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: first } })
     ).toMatchObject({ status: "SUCCEEDED", providerStatus: "paid", setAside: null });
 
+    // Na het antwoord bewaart de webhook de rekening om op terug te storten.
+    await Promise.all(afterTasks.splice(0).map((task) => task()));
+    expect(
+      await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: first } })
+    ).toMatchObject({ refundIban: "BE68539007547034", refundAccountName: "Jan Peeters" });
+
     // Een ticket terugbetalen gaat van de betaling die het ticket betaalde,
     // niet van de jongere die apart staat.
     const item = await prisma.ticketOrderItem.findFirstOrThrow({ where: { orderId } });
-    // Bancontact betaalt hier niet terug; de terugbetaling is dan al voorbereid.
-    await requestTicketRefund({
-      eventId: ids.event,
-      orderId,
-      orderItemIds: [item.id],
-      requestedById: ids.user,
-    }).catch(() => undefined);
+    // Bancontact betaalt niet terug via de API: zonder `manual` wordt er niets
+    // voorbereid en blijft het ticket geldig.
+    await expect(
+      requestTicketRefund({
+        eventId: ids.event,
+        orderId,
+        orderItemIds: [item.id],
+        requestedById: ids.user,
+      })
+    ).rejects.toThrow("REFUND_MANUAL_ONLY");
+    expect(await prisma.ticketRefund.count({ where: { orderId } })).toBe(0);
+    await expect(
+      requestTicketRefund({
+        eventId: ids.event,
+        orderId,
+        orderItemIds: [item.id],
+        requestedById: ids.user,
+        manual: true,
+      })
+    ).resolves.toMatchObject({ status: "SUCCEEDED" });
     const refund = await prisma.ticketRefund.findFirstOrThrow({
       where: { orderId },
       include: { payment: { select: { providerCheckoutId: true } } },
     });
     expect(refund.payment.providerCheckoutId).toBe(first);
+    expect(refund.status).toBe("SUCCEEDED");
+    expect(await prisma.ticket.findFirstOrThrow({ where: { orderItemId: item.id } })).toMatchObject({
+      status: "REFUNDED",
+    });
 
     // Afvinken na de terugbetaling met de hand: één keer, en enkel op dit event.
     const flagged = await prisma.ticketPayment.findFirstOrThrow({ where: { providerCheckoutId: second } });

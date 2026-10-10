@@ -7,13 +7,31 @@ import { notSetAside } from "./paymentFlags";
 import { paymentGatewayFor } from "./payments";
 import { withSerializableTransaction } from "./transactions";
 
+/**
+ * Providers die niet via de API terugbetalen. Bancontact Pro kent voor ons
+ * contract geen refund-product: de penning stort het geld met de hand terug op
+ * de rekening uit `lib/ticketing/refundAccount.ts`, en vinkt het daarna hier af
+ * met `manual: true`. Mollie betaalt zelf terug en kan dus niet met de hand.
+ */
+const MANUAL_REFUND_PROVIDERS = new Set(["bancontact"]);
+
+export function refundsManually(provider: string): boolean {
+  return MANUAL_REFUND_PROVIDERS.has(provider);
+}
+
 export async function requestTicketRefund(input: {
   eventId: string;
   orderId: string;
   orderItemIds: string[];
   requestedById: string;
   reason?: string | null;
+  /**
+   * Het geld is al met de hand teruggestort: niets naar de provider sturen,
+   * enkel de tickets intrekken en de terugbetaling als geslaagd boeken.
+   */
+  manual?: boolean;
 }) {
+  const manual = input.manual === true;
   const selectedIds = new Set(input.orderItemIds);
   const refundId = randomUUID();
   const prepared = await withSerializableTransaction(
@@ -56,7 +74,13 @@ export async function requestTicketRefund(input: {
       if (existingRefund > 0) throw new Error("REFUND_ALREADY_REQUESTED");
 
       const amountCents = items.reduce((sum, item) => sum + item.totalCents, 0);
-      if (!payment.providerPaymentId && amountCents > 0) {
+      // Een gratis bestelling heeft niets terug te storten en loopt hoe dan
+      // ook langs de gewone weg; anders bepaalt de provider welke weg het is.
+      if (amountCents > 0 && payment.provider !== "free") {
+        if (manual && !refundsManually(payment.provider)) throw new Error("REFUND_NOT_MANUAL");
+        if (!manual && refundsManually(payment.provider)) throw new Error("REFUND_MANUAL_ONLY");
+      }
+      if (!manual && !payment.providerPaymentId && amountCents > 0) {
         throw new Error("PAYMENT_REFERENCE_MISSING");
       }
       for (const item of items) {
@@ -96,7 +120,12 @@ export async function requestTicketRefund(input: {
           action: "REFUND_REQUESTED",
           entityType: "TicketRefund",
           entityId: refundId,
-          metadata: { orderId: order.id, amountCents, ticketCount: items.length },
+          metadata: {
+            orderId: order.id,
+            amountCents,
+            ticketCount: items.length,
+            ...(manual ? { manual: true } : {}),
+          },
         },
       });
       return {
@@ -111,6 +140,10 @@ export async function requestTicketRefund(input: {
 
   if (prepared.amountCents === 0 || prepared.provider === "free") {
     await completeTicketRefund(refundId, `free_refund_${refundId}`);
+    return { refundId, status: "SUCCEEDED" as const };
+  }
+  if (manual) {
+    await completeTicketRefund(refundId, `manual_refund_${refundId}`);
     return { refundId, status: "SUCCEEDED" as const };
   }
 

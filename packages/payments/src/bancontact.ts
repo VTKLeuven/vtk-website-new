@@ -157,6 +157,8 @@ export type BancontactPayment = {
   reference?: string | null;
   description?: string | null;
   expiresAt?: string | null;
+  /** Wie betaalde. De IBAN hier is gemaskeerd; de volle staat achter `fetchRefundIban`. */
+  debtor?: { name?: string | null; iban?: string | null } | null;
   _links?: {
     deeplink?: BancontactLink;
     qrcode?: BancontactLink;
@@ -376,6 +378,25 @@ export class BancontactPaymentGateway implements PaymentGateway {
 
   async fetchPayment(id: string): Promise<BancontactPayment> {
     return this.request<BancontactPayment>(`/v3/payments/${encodeURIComponent(id)}`);
+  }
+
+  /**
+   * De volledige IBAN van de koper, om met de hand terug te storten.
+   *
+   * Dit is de weg die Bancontact zelf voorschrijft wanneer je geen refunds via
+   * de API doet: er gaat geen geld langs de provider, je krijgt enkel de
+   * rekening. Werkt enkel op een `SUCCEEDED`-betaling, en de sleutel moet de
+   * authority `MERCHANT_REFUND` dragen (zonder activatie aan hun kant). Mist
+   * die, dan antwoordt de API 401 of 403.
+   */
+  async fetchRefundIban(paymentId: string): Promise<string> {
+    const result = await this.request<{ iban?: unknown }>(
+      `/v3/payments/${encodeURIComponent(paymentId)}/debtor/refundIban`
+    );
+    if (typeof result.iban !== "string" || !result.iban.trim()) {
+      throw new Error("Bancontact did not return a refund IBAN");
+    }
+    return result.iban.replace(/\s+/g, "").toUpperCase();
   }
 
   async createCheckout(input: CreateCheckoutInput): Promise<CheckoutResult> {

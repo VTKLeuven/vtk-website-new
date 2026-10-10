@@ -419,6 +419,13 @@ export async function eraseUserData(userId: string) {
           },
           data: { attendeeName: "Deleted attendee", attendeeEmail: null },
         });
+        // De rekening om een Bancontact-betaling met de hand op terug te
+        // storten. Een terugbetaling die nog openstond, moet dan opnieuw via
+        // "Rekeningnummer ophalen".
+        await tx.ticketPayment.updateMany({
+          where: { orderId: { in: orderIds } },
+          data: { refundIban: null, refundAccountName: null },
+        });
         await tx.ticketOutboxMessage.updateMany({
           where: { orderId: { in: orderIds } },
           data: { recipient: null, payload: { purged: true }, lastError: null },

@@ -2671,6 +2671,15 @@ model TicketPayment {
   /// wat de provider meldt, en een betaling die apart staat, mag nooit tickets
   /// opleveren omdat iets dat veld overschreef.
   setAside           TicketPaymentSetAside?
+  /// Rekening waarop de koper betaalde, om met de hand terug te storten.
+  /// Enkel bij Bancontact: die provider kent geen refund-API voor ons
+  /// contract, dus terugbetalen is een overschrijving door de penning
+  /// (`lib/ticketing/refundAccount.ts`). Null bij Mollie en bij elke
+  /// Bancontact-betaling waar de provider het (nog) niet gaf.
+  refundIban         String?
+  /// Naam van de rekeninghouder zoals Bancontact ze meldt; kan verschillen
+  /// van de koper (een ouder die betaalt).
+  refundAccountName  String?
   expiresAt          DateTime?           @db.Timestamptz(3)
   succeededAt        DateTime?           @db.Timestamptz(3)
   failedAt           DateTime?           @db.Timestamptz(3)

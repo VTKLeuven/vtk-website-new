@@ -113,3 +113,8 @@ export function formatDuration(ms: number, locale: AdminLocale) {
   const days = Math.round(hours / 24);
   return `${days} ${nl ? "dagen" : "days"}`;
 }
+
+/** Een IBAN in blokken van vier, zoals ze op een uittreksel en in een bankapp staat. */
+export function formatIban(iban: string) {
+  return iban.replace(/\s+/g, "").replace(/(.{4})(?=.)/g, "$1 ");
+}

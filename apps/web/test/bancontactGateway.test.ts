@@ -367,3 +367,32 @@ describe("BancontactPaymentGateway error handling", () => {
     expect(spy).not.toHaveBeenCalled();
   });
 });
+
+describe("BancontactPaymentGateway.fetchRefundIban", () => {
+  it("asks the debtor endpoint for the full IBAN and normalises it", async () => {
+    const spy = mockFetch(200, { iban: "be68 5390 0754 7034" });
+    await expect(gateway().fetchRefundIban("pay_1")).resolves.toBe("BE68539007547034");
+    expect(String(spy.mock.calls[0][0])).toBe("https://api.test.local/v3/payments/pay_1/debtor/refundIban");
+    expect(spy.mock.calls[0][1]?.method).toBe("GET");
+  });
+
+  it("works without the refund contract, because no money moves through the provider", async () => {
+    mockFetch(200, { iban: "BE68539007547034" });
+    await expect(gateway({ refundsEnabled: false }).fetchRefundIban("pay_1")).resolves.toBe(
+      "BE68539007547034"
+    );
+  });
+
+  it("passes a refused key on as a provider error", async () => {
+    mockFetch(403, { code: "ACCESS_DENIED", message: "Missing authority" });
+    await expect(gateway().fetchRefundIban("pay_1")).rejects.toMatchObject({
+      name: "BancontactApiError",
+      status: 403,
+    });
+  });
+
+  it("refuses an answer without an IBAN instead of storing an empty account", async () => {
+    mockFetch(200, {});
+    await expect(gateway().fetchRefundIban("pay_1")).rejects.toThrow(/refund IBAN/);
+  });
+});

@@ -5725,11 +5725,28 @@ gebruikt zien; het werkt alleen niet voor wie geen Belgische bankapp heeft.
   checkout maar een deeplink, dus tonen we zelf een QR en een app-knop op
   `/tickets/bestelling/<id>/bancontact`. QR en knop staan er allebei, altijd:
   betalen op een laptop met de app op je telefoon is hier het normale geval.
-- **Terugbetalen kan er (nog) niet automatisch bij.** Het refund-product zit niet
-  standaard in het merchantcontract. Staat `BANCONTACT_REFUNDS_ENABLED` niet aan,
-  dan weigert een terugbetaling met een duidelijke fout in plaats van stil te
-  mislukken, en gebeurt ze met de hand via overschrijving. Dit is bewust luidruchtig:
-  een half werkende terugbetaling is erger dan een die zegt dat ze niet kan.
+- **Terugbetalen gebeurt met de hand, met een overschrijving.** Het refund-product
+  zit niet in ons merchantcontract. Het beheer toont bij een Bancontact-bestelling
+  daarom geen knop "Terugbetaling starten" (die bestaat enkel voor Mollie) maar
+  "Met de hand terugbetalen": het rekeningnummer en de rekeninghouder van de
+  koper, een kopieerknop, en daaronder "Markeer als terugbetaald". Dat laatste
+  stort niets terug; het trekt de gekozen tickets in, geeft hun plaatsen vrij en
+  boekt de terugbetaling als geslaagd (`requestTicketRefund` met `manual: true`).
+  De server weigert het andersom ook: een API-terugbetaling op een
+  Bancontact-betaling geeft `REFUND_MANUAL_ONLY`, ook als
+  `BANCONTACT_REFUNDS_ENABLED` aan staat, en een manuele op een Mollie-betaling
+  `REFUND_NOT_MANUAL`.
+  - **Het rekeningnummer komt van Bancontact zelf**
+    (`GET /v3/payments/{id}/debtor/refundIban`), niet van de koper: dat is de
+    rekening waarvan echt betaald werd, en niemand moet het achteraf vragen. De
+    webhook haalt het na elke geslaagde betaling op (na het antwoord, met
+    `after()`) en bewaart het op `TicketPayment.refundIban`. Voor oudere
+    betalingen, of wanneer dat mislukte, staat er een knop "Rekeningnummer
+    ophalen".
+  - **De API-sleutel moet de bevoegdheid `MERCHANT_REFUND` dragen.** Zonder die
+    bevoegdheid antwoordt Bancontact 401/403 en zegt de toast precies dat. Er hoeft
+    aan hun kant niets geactiveerd te worden: er gaat geen geld langs hen.
+  - Wie zijn account wist, verliest ook dat rekeningnummer op zijn betalingen.
 - **De mededeling zegt hoeveel tickets, en dan waarvoor.** Wat de koper in zijn
   app leest, is `PQ <betaalcode> <onze bestelreferentie> <onze omschrijving>`.
   De code en de referentie zijn ruis voor hem, dus de omschrijving is de enige

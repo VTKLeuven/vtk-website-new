@@ -17,6 +17,7 @@ import { newPresaleToken } from "@/lib/ticketing/presaleLink";
 import { newPrivateToken } from "@/lib/ticketing/privateLink";
 import { NEWS_TAG } from "@/lib/news/load";
 import { markPaymentRefundedManually } from "@/lib/ticketing/orders";
+import { fetchBancontactRefundAccount } from "@/lib/ticketing/refundAccount";
 import { requestTicketRefund } from "@/lib/ticketing/refunds";
 import { slugify } from "@/lib/ticketing/slug";
 import { ticketColorKey } from "@/lib/ticketing/ticketColors";
@@ -2343,6 +2344,83 @@ export async function refundTicketsAction(formData: FormData): Promise<void> {
   });
   refreshTicketEvent(locale, eventId);
   revalidatePath(localePath(locale, `/admin/tickets/${eventId}/bestellingen`));
+}
+
+/** Wat `requestTicketRefund` gooit en het beheer zelf kan uitleggen. */
+const EXPECTED_REFUND_ERRORS = new Set([
+  "INVALID_REFUND_ITEMS",
+  "TICKET_NOT_REFUNDABLE",
+  "TICKET_ALREADY_CHECKED_IN",
+  "REFUND_ALREADY_REQUESTED",
+  "REFUND_NOT_MANUAL",
+  "PAYMENT_NOT_FOUND",
+]);
+
+/**
+ * Tickets van een Bancontact-bestelling als terugbetaald boeken, nadat de
+ * penning het geld met de hand teruggestort heeft. Er gaat niets naar de
+ * provider: Bancontact betaalt voor ons niet terug via de API. De tickets
+ * vervallen en hun plaatsen komen vrij, net als bij een terugbetaling via
+ * Mollie.
+ */
+export async function refundTicketsManuallyAction(
+  _previous: SaveState,
+  formData: FormData
+): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const orderId = value(formData, "orderId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  const { session } = await requireTicketEventCapability(eventId, "REFUND");
+  const orderItemIds = formData.getAll("orderItemId").map(String).filter(Boolean);
+  if (orderItemIds.length === 0) return saveError("INVALID_REFUND_ITEMS");
+  const reason = limitedOptionalValue(formData, "reason", 1_000);
+  if (!reason) return saveError("REASON_REQUIRED");
+  try {
+    await requestTicketRefund({
+      eventId,
+      orderId,
+      orderItemIds,
+      requestedById: session.user.id,
+      reason,
+      manual: true,
+    });
+  } catch (error) {
+    if (error instanceof Error && EXPECTED_REFUND_ERRORS.has(error.message)) {
+      return saveError(error.message);
+    }
+    throw error;
+  }
+  await logAudit({
+    action: "refund",
+    entity: "ticketOrder",
+    entityId: orderId,
+    target: await ticketEventTitle(eventId),
+    summary: `${orderItemIds.length} ticket(s) met de hand terugbetaald (Bancontact)`,
+  });
+  refreshTicketEvent(locale, eventId);
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/bestellingen`));
+  return saveOk();
+}
+
+/**
+ * Haalt bij Bancontact de rekening op waarop een koper betaalde, voor een
+ * betaling waar ze nog niet bij staat (van voor deze kolom bestond, of omdat de
+ * eerste poging na de betaling mislukte).
+ */
+export async function fetchTicketRefundAccountAction(formData: FormData): Promise<SaveState> {
+  const eventId = value(formData, "eventId");
+  const paymentId = value(formData, "paymentId");
+  const locale = localeSchema.parse(value(formData, "locale") || "nl");
+  await requireTicketEventCapability(eventId, "REFUND");
+  const payment = await prisma.ticketPayment.findFirst({
+    where: { id: paymentId, order: { eventId } },
+    select: { id: true },
+  });
+  if (!payment) return saveError("REFUND_IBAN_UNAVAILABLE");
+  const result = await fetchBancontactRefundAccount(payment.id);
+  if (result.status === "error") return saveError(result.code);
+  revalidatePath(localePath(locale, `/admin/tickets/${eventId}/bestellingen`));
+  return saveOk();
 }
 
 /**

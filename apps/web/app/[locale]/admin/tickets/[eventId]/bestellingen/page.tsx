@@ -23,10 +23,12 @@ import {
 } from "@/app/actions/tickets";
 import { requireTicketEventCapability } from "@/lib/ticketing/authorization";
 import { awaitingManualRefund, notSetAside } from "@/lib/ticketing/paymentFlags";
+import { refundsManually } from "@/lib/ticketing/refunds";
 import { ConfirmIconButton } from "@/components/ui/DeleteIconButton";
 import { CheckIcon } from "@/components/ui/icons";
 import { AdminEmptyState } from "@/components/ticketing/admin/AdminEmptyState";
 import { AdminMetric } from "@/components/ticketing/admin/AdminMetric";
+import { RefundAccount } from "@/components/ticketing/admin/RefundAccount";
 import { RefundOrderForm } from "@/components/ticketing/admin/RefundOrderForm";
 import { StatusBadge } from "@/components/ticketing/admin/StatusBadge";
 import {
@@ -109,9 +111,10 @@ export default async function TicketOrdersPage({
           },
           orderBy: { createdAt: "asc" },
         },
-        // De betaling die telt: de jongste poging die niet apart staat. Een
-        // betaling die op een terugbetaling wacht, komt apart hieronder.
-        payments: { where: notSetAside, orderBy: { createdAt: "desc" }, take: 1 },
+        // De pogingen die niet apart staan, jongste eerst: de jongste toont de
+        // betaalstatus, de geslaagde bepaalt langs welke weg je terugbetaalt.
+        // Een betaling die op een terugbetaling wacht, komt apart hieronder.
+        payments: { where: notSetAside, orderBy: { createdAt: "desc" } },
         refunds: {
           include: { _count: { select: { items: true } } },
           orderBy: { createdAt: "desc" },
@@ -147,6 +150,8 @@ export default async function TicketOrdersPage({
         amountCents: true,
         currency: true,
         succeededAt: true,
+        refundIban: true,
+        refundAccountName: true,
       },
       orderBy: { succeededAt: "asc" },
     }),
@@ -265,6 +270,10 @@ export default async function TicketOrdersPage({
               <tbody>
                 {orders.map((order) => {
                   const payment = order.payments[0];
+                  const paidPayment = order.payments.find((attempt) => attempt.status === "SUCCEEDED");
+                  // Bancontact betaalt niet terug via de API: daar stort het
+                  // beheer zelf terug en vinkt het af. Mollie doet het zelf.
+                  const manualRefund = paidPayment ? refundsManually(paidPayment.provider) : false;
                   const toRefund = flaggedByOrder.get(order.id) ?? [];
                   const canResendConfirmation =
                     canManageOrders &&
@@ -374,6 +383,15 @@ export default async function TicketOrdersPage({
                                           <div><dt>Provider</dt><dd>{flagged.provider}</dd></div>
                                           <div><dt>{locale === "nl" ? "Betaald op" : "Paid at"}</dt><dd>{formatDateTime(flagged.succeededAt, locale)}</dd></div>
                                         </dl>
+                                        {canRefund && refundsManually(flagged.provider) ? (
+                                          <RefundAccount
+                                            eventId={eventId}
+                                            paymentId={flagged.id}
+                                            iban={flagged.refundIban}
+                                            accountName={flagged.refundAccountName}
+                                            locale={locale}
+                                          />
+                                        ) : null}
                                       </li>
                                     );
                                   })}
@@ -431,7 +449,33 @@ export default async function TicketOrdersPage({
                               </div>
                             ) : null}
 
-                            {canRefund ? (
+                            {canRefund && manualRefund && paidPayment ? (
+                              <details className="ticket-admin-details ticket-admin-refund-details">
+                                <summary><RotateCcw aria-hidden="true" size={15} />{locale === "nl" ? "Met de hand terugbetalen" : "Refund by hand"}</summary>
+                                <div className="ticket-admin-details-body">
+                                  <p className="ticket-admin-help">
+                                    {locale === "nl"
+                                      ? "Betaald met Bancontact: dat kan niet automatisch terugbetaald worden. Schrijf het bedrag over naar de rekening hieronder en markeer de tickets daarna als terugbetaald."
+                                      : "Paid with Bancontact, which cannot be refunded automatically. Transfer the amount to the account below, then mark the tickets as refunded."}
+                                  </p>
+                                  <RefundAccount
+                                    eventId={eventId}
+                                    paymentId={paidPayment.id}
+                                    iban={paidPayment.refundIban}
+                                    accountName={paidPayment.refundAccountName}
+                                    locale={locale}
+                                  />
+                                  <RefundOrderForm
+                                    eventId={eventId}
+                                    orderId={order.id}
+                                    items={order.items}
+                                    currency={order.currency}
+                                    locale={locale}
+                                    manual
+                                  />
+                                </div>
+                              </details>
+                            ) : canRefund ? (
                               <details className="ticket-admin-details ticket-admin-refund-details">
                                 <summary><RotateCcw aria-hidden="true" size={15} />{locale === "nl" ? "Tickets terugbetalen" : "Refund tickets"}</summary>
                                 <div className="ticket-admin-details-body">

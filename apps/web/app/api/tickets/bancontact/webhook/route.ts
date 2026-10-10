@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { after } from "next/server";
 import { prisma } from "@vtk/db";
 import { readLimitedText, RequestBodyTooLargeError } from "@/lib/ticketing/http";
 import { closeFailedPaymentAttempt, fulfillPaidOrder } from "@/lib/ticketing/orders";
@@ -7,6 +8,7 @@ import {
   mapBancontactStatus,
   type BancontactPayment,
 } from "@/lib/ticketing/payments/bancontact";
+import { rememberBancontactRefundAccount } from "@/lib/ticketing/refundAccount";
 
 export const runtime = "nodejs";
 
@@ -128,6 +130,11 @@ export async function POST(request: Request) {
         amountCents: local.amountCents,
         currency: local.currency,
       });
+      // De rekening voor een eventuele terugbetaling met de hand: na het
+      // antwoord, want dat zijn twee extra calls naar de provider waar de
+      // callback niet op hoeft te wachten.
+      const paidId = payment.paymentId;
+      after(() => rememberBancontactRefundAccount(paidId));
     } else if (status === "EXPIRED" || status === "FAILED") {
       // Enkel deze poging valt af. De bestelling blijft staan tot haar
       // reservatie afloopt, zodat de koper een nieuwe QR kan vragen; zie
