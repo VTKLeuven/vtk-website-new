@@ -131,7 +131,11 @@ export default async function AdminLayout({
               error: adminDict.pinError,
             }}
             collapsed={collapsed}
-            collapseLabels={{ collapse: adminDict.collapseNav, expand: adminDict.expandNav }}
+            collapseLabels={{
+              collapse: adminDict.collapseNav,
+              expand: adminDict.expandNav,
+              shortcut: adminDict.collapseNavShortcut,
+            }}
           />
         </aside>
         <section className="vtk-admin-main">{children}</section>

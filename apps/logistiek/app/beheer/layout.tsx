@@ -1,10 +1,10 @@
+import { cookies } from 'next/headers';
 import { LoginGate } from '@/components/login-gate';
 import { ToastProvider } from '@/components/ui/toast';
+import { ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/admin-nav-cookie';
 import { canManage, getSession } from '@/lib/session';
 import { BeheerNav } from './beheer-nav';
 import { copy, getLocale } from '@/lib/i18n';
-
-import { BeheerLayoutClient } from './beheer-layout-client';
 
 export default async function BeheerLayout({ children }: { children: React.ReactNode }) {
   const [session, locale] = await Promise.all([getSession(), getLocale()]);
@@ -26,15 +26,35 @@ export default async function BeheerLayout({ children }: { children: React.React
     );
   }
 
+  const collapsed = (await cookies()).get(ADMIN_NAV_COLLAPSED_COOKIE)?.value === '1';
+
   return (
     <ToastProvider>
-      <BeheerLayoutClient
-        kicker={t.manageKicker}
-        title={t.manageTitle}
-        nav={<BeheerNav />}
-      >
-        {children}
-      </BeheerLayoutClient>
+      {/* Geen maximumbreedte (F4.6, D1): de hele uitleendienst gebruikt het
+          venster dat ze krijgt. Het inklappen van de zijbalk wint enkel de
+          breedte van die zijbalk; op het scherm waar dit om begonnen was, de
+          weekplanning, is dat precies de winst die telt. */}
+      <main className="logistics-gutter flex-1 py-8">
+        <div data-print="hide" className="border-b border-vtk-navy/10 pb-5">
+          <p className="flex items-center gap-2 text-sm text-vtk-muted">
+            <span className="h-1.5 w-1.5 rounded-full bg-vtk-yellow" aria-hidden />
+            {t.manageKicker}
+          </p>
+          <h1 className="mt-1 text-2xl font-semibold tracking-[-0.03em] text-vtk-ink">{t.manageTitle}</h1>
+        </div>
+
+        {/* Sticky, de rail en de sneltoets zitten in AdminNav; het 860px-breekpunt
+            van de kolommen staat bij `.logistics-admin-layout` in globals.css. */}
+        <div className="logistics-admin-layout mt-8">
+          <aside data-print="hide">
+            <BeheerNav
+              collapsed={collapsed}
+              collapseLabels={{ collapse: t.collapseNav, expand: t.expandNav, shortcut: t.collapseNavShortcut }}
+            />
+          </aside>
+          <div className="min-w-0">{children}</div>
+        </div>
+      </main>
     </ToastProvider>
   );
 }

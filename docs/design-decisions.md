@@ -10938,6 +10938,18 @@ de zijbalk helemaal weg achter één knop.
   leek ze zo onder de titel weggezakt, en stond ze op elke pagina op een andere
   hoogte (september 2026 teruggedraaid). De titel wordt gemeten, zodat een
   pagina zonder `h1` de rail gewoon bovenaan houdt.
+- **Het beheer van de uitleendienst doet hetzelfde** (oktober 2026). Logistiek
+  had sinds september een eigen versie die de zijbalk helemaal weghaalde: een
+  knop "Zijbalk inklappen" rechtsboven, een tweede "Inklappen" boven BEHEER, en
+  ingeklapt "Tabs tonen" rechtsboven plus een zwevende knop "Tabs" links. Drie
+  knoppen voor één actie, en de zwevende schoof bij het scrollen over de uren
+  van de weekplanning. Nu is het de rail van `AdminNav`, met een eigen cookie
+  (`lib/admin-nav-cookie.ts`). Dat kost de planning ingeklapt 80px tegenover
+  helemaal weg, ongeveer 11px per dag op 1440px; de knop om terug te komen staat
+  daarvoor altijd op dezelfde plek en ligt nergens over.
+- **De sneltoets `[` of Ctrl/Cmd+B** kwam uit die logistiekversie en zit nu in
+  `AdminNav`, dus ook in de admin van vtk.be. Hij doet niets terwijl je typt
+  (daar is Ctrl+B vet) en niets onder 860px, waar er geen rail is.
 
 ## Shiftenoverzicht praesidium
 

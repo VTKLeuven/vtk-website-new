@@ -1376,17 +1376,33 @@ body {
     transition: grid-template-columns 200ms ease, gap 200ms ease;
   }
 
-  .logistics-admin-layout.is-collapsed {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0;
+  /* Ingeklapt (AdminNav zet `data-collapsed`): een rail van 60px, en de inhoud
+     schuift tot 20px ervan, net als in de admin van vtk.be (vtk-admin.css).
+     De rail blijft staan in plaats van helemaal te verdwijnen: verdwenen, had
+     ze een zwevende knop nodig om terug te komen, en die schoof over de uren
+     van de planning. */
+  .logistics-admin-layout:has(> aside [data-collapsed='true']) {
+    grid-template-columns: 60px minmax(0, 1fr);
+    gap: 20px;
+  }
+
+  /* De kaart van een groep en de tooltips steken over de inhoud. Op vtk.be
+     volstaat de 20 uit admin-nav.css, maar hier ligt de urenkolom van de
+     planning op z-20 (en de dagkop op 30, het filtermenu op 40), later in de
+     pagina, en die won: de kaart van Overig viel achter de uren. Onder de
+     sitekop (50) en volledig scherm (70). */
+  .logistics-admin-layout > aside .vtk-admin-nav-sticky[data-collapsed='true'] {
+    z-index: 45;
   }
 
   .logistics-admin-layout > aside {
     align-self: stretch;
   }
+}
 
-  .logistics-admin-layout.is-collapsed > aside {
-    display: none;
+@media (prefers-reduced-motion: reduce) {
+  .logistics-admin-layout {
+    transition: none;
   }
 }
 

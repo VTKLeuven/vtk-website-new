@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useId, useRef, useState, useTransition, type ReactNode } from 'react';
+import { useEffect, useEffectEvent, useId, useRef, useState, useTransition, type ReactNode } from 'react';
 
 import './admin-nav.css';
 
@@ -40,11 +40,13 @@ export type AdminNavPins = {
 
 /**
  * Inklappen is optioneel, net als vastpinnen: zonder deze prop is er geen knop
- * en blijft de zijbalk altijd uitgeklapt (Logistiek en de Fakbar).
+ * en blijft de zijbalk altijd uitgeklapt (de Fakbar).
  *
  * Ingeklapt wordt de zijbalk een rail met enkel de iconen, vanaf 860px; smaller
  * blijft het de gewone uitklapknop. Onthouden doet de app (`onChange`), zodat
  * de server de juiste toestand meteen rendert en er niets verspringt.
+ *
+ * Met deze prop werkt ook de sneltoets (`[` of Ctrl/Cmd+B, zie `isShortcut`).
  */
 export type AdminNavCollapse = {
   initial: boolean;
@@ -52,6 +54,8 @@ export type AdminNavCollapse = {
   labels: {
     collapse: string;
     expand: string;
+    /** De sneltoets zoals hij in de tooltip staat, bv. "[ of Ctrl+B". */
+    shortcut?: string;
   };
 };
 
@@ -86,6 +90,28 @@ function headingTop(content: Element): number | null {
   if (!heading) return null;
   const rect = heading.getBoundingClientRect();
   return rect.height > 0 ? rect.top : null;
+}
+
+/**
+ * In- of uitklappen vanaf het toetsenbord: `[` of Ctrl/Cmd+B, zoals in een
+ * editor. Nooit terwijl iemand typt, want daar is Ctrl+B vet en `[` een teken.
+ */
+function isShortcut(event: KeyboardEvent): boolean {
+  if (event.defaultPrevented || event.altKey || event.shiftKey) return false;
+  const target = event.target;
+  if (
+    target instanceof HTMLElement &&
+    (target.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName))
+  ) {
+    return false;
+  }
+  const modifier = event.ctrlKey || event.metaKey;
+  return modifier ? event.key.toLowerCase() === 'b' : event.key === '[';
+}
+
+/** Het label met de sneltoets erachter, voor een tooltip. */
+function withShortcut(label: string, shortcut: string | undefined): string {
+  return shortcut ? `${label} (${shortcut})` : label;
 }
 
 function matches(pathname: string, item: AdminNavItem): boolean {
@@ -268,6 +294,21 @@ export function AdminNav({ title, nodes, icons = {}, pins, collapse }: AdminNavP
     collapse?.onChange(next);
   };
 
+  // Een effect-event, zodat de luisteraar één keer hangt en toch de huidige
+  // stand leest. Enkel vanaf 860px: smaller is er geen rail, en dan zou de
+  // sneltoets een stand onthouden die je pas op een breder scherm ziet.
+  const onShortcut = useEffectEvent((event: KeyboardEvent) => {
+    if (!collapse || !isShortcut(event) || !window.matchMedia(TWO_COLUMN).matches) return;
+    event.preventDefault();
+    toggleCollapsed(!collapsed);
+  });
+  const hasCollapse = Boolean(collapse);
+  useEffect(() => {
+    if (!hasCollapse) return;
+    window.addEventListener('keydown', onShortcut);
+    return () => window.removeEventListener('keydown', onShortcut);
+  }, [hasCollapse]);
+
   const pinState = usePins(pins);
   // Eén context voor elke rij, zodat de rijen zelf niets over de prop hoeven te
   // weten: null betekent gewoon "geen speldjes".
@@ -281,8 +322,9 @@ export function AdminNav({ title, nodes, icons = {}, pins, collapse }: AdminNavP
           <button
             type="button"
             className="vtk-admin-nav-collapse"
-            title={collapse.labels.collapse}
+            title={withShortcut(collapse.labels.collapse, collapse.labels.shortcut)}
             aria-label={collapse.labels.collapse}
+            aria-keyshortcuts="[ Control+B"
             onClick={() => toggleCollapsed(true)}
           >
             <PanelIcon expand={false} />
@@ -297,6 +339,7 @@ export function AdminNav({ title, nodes, icons = {}, pins, collapse }: AdminNavP
           activeHref={activeHref}
           pinnedKeys={pinCtx?.state.keys ?? []}
           expandLabel={collapse.labels.expand}
+          expandTip={withShortcut(collapse.labels.expand, collapse.labels.shortcut)}
           onExpand={() => toggleCollapsed(false)}
         />
       )}
@@ -535,6 +578,7 @@ function AdminRail({
   activeHref,
   pinnedKeys,
   expandLabel,
+  expandTip,
   onExpand,
 }: {
   title: string;
@@ -543,6 +587,8 @@ function AdminRail({
   activeHref: string | null;
   pinnedKeys: string[];
   expandLabel: string;
+  /** De tooltip: het label, met de sneltoets erachter wanneer de app die geeft. */
+  expandTip: string;
   onExpand: () => void;
 }) {
   const pathname = usePathname();
@@ -579,11 +625,17 @@ function AdminRail({
     <div className="vtk-admin-rail" ref={railRef}>
       <nav className="vtk-admin-rail-card" aria-label={title}>
         <div className="vtk-admin-rail-slot">
-          <button type="button" className="vtk-admin-rail-btn" aria-label={expandLabel} onClick={onExpand}>
+          <button
+            type="button"
+            className="vtk-admin-rail-btn"
+            aria-label={expandLabel}
+            aria-keyshortcuts="[ Control+B"
+            onClick={onExpand}
+          >
             <PanelIcon expand />
           </button>
           <span className="vtk-admin-rail-tip" aria-hidden>
-            {expandLabel}
+            {expandTip}
           </span>
         </div>
         <span className="vtk-admin-rail-sep" aria-hidden />

@@ -494,6 +494,7 @@
     "pinError": "Could not pin this tab. Please try again.",
     "collapseNav": "Collapse sidebar",
     "expandNav": "Expand sidebar",
+    "collapseNavShortcut": "[ or Ctrl+B",
     "takedowns": "Takedown requests",
     "feedback": "Website feedback"
   },

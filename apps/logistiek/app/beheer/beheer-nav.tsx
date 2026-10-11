@@ -2,6 +2,7 @@
 
 import { AdminNav, type AdminNavNode } from '@vtk/ui';
 import { LogisticsIcon } from '@/components/logistics-icon';
+import { ADMIN_NAV_COLLAPSED_COOKIE } from '@/lib/admin-nav-cookie';
 
 const nodes: AdminNavNode[] = [
   {
@@ -81,6 +82,32 @@ const icons = {
   settings: <LogisticsIcon name="settings" className="h-4 w-4 shrink-0" />,
 };
 
-export function BeheerNav() {
-  return <AdminNav title="Beheer" nodes={nodes} icons={icons} />;
+/** Onthoudt de keuze voor de volgende pagina; zie `lib/admin-nav-cookie.ts`. */
+function rememberCollapsed(collapsed: boolean) {
+  document.cookie = collapsed
+    ? `${ADMIN_NAV_COLLAPSED_COOKIE}=1; path=/; max-age=31536000; samesite=lax`
+    : `${ADMIN_NAV_COLLAPSED_COOKIE}=; path=/; max-age=0; samesite=lax`;
+}
+
+/**
+ * Inklappen loopt via `AdminNav`, net als in de admin van vtk.be: één knop naast
+ * de titel, en ingeklapt een rail met de iconen. Logistiek had eerst een eigen
+ * versie, met drie knoppen voor hetzelfde en een zwevende knop die over de uren
+ * van de planning schoof (zie `docs/design-decisions.md`).
+ */
+export function BeheerNav({
+  collapsed,
+  collapseLabels,
+}: {
+  collapsed: boolean;
+  collapseLabels: { collapse: string; expand: string; shortcut: string };
+}) {
+  return (
+    <AdminNav
+      title="Beheer"
+      nodes={nodes}
+      icons={icons}
+      collapse={{ initial: collapsed, onChange: rememberCollapsed, labels: collapseLabels }}
+    />
+  );
 }

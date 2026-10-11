@@ -385,8 +385,12 @@
   z-index: 2;
   padding: 6px 10px;
   border-radius: 8px;
-  background: var(--navy, #0e1a36);
-  color: var(--paper, #eff2f8);
+  /* `--chrome` en `--on-chrome` waar de app ze heeft (logistiek): die blijven in
+     de donkere modus donker en licht. `--paper` wordt daar zelf donker, en dan
+     stond er donkere tekst op navy. vtk.be heeft geen `--chrome` en houdt dus
+     `--navy` en `--paper`. */
+  background: var(--chrome, var(--navy, #0e1a36));
+  color: var(--on-chrome, var(--paper, #eff2f8));
   font-size: 12px;
   font-weight: 500;
   line-height: 1.2;

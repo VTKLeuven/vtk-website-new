@@ -633,6 +633,10 @@ the design language into the application instead of copying mockup content.
     (`lib/adminNavCookie.ts`), zodat de server de juiste stand meteen rendert.
     Maak inklappen nooit de standaard: wie de admin zelden gebruikt, vindt een
     tab sneller aan zijn naam dan aan een icoon. Zie `docs/design-decisions.md`.
+    Het beheer van de uitleendienst gebruikt dezelfde rail (eigen cookie in
+    `apps/logistiek/lib/admin-nav-cookie.ts`); bouw daar geen eigen inklapknop
+    of zwevende "Tabs"-knop meer naast. De sneltoets `[` of Ctrl/Cmd+B zit in
+    `AdminNav` zelf.
   - Below 860px the left column collapses into one button naming the tab you are
     on, which opens the full grouped list as a panel underneath
     (`AdminNav` + `vtk-admin.css`). Do not reintroduce the horizontal scroller

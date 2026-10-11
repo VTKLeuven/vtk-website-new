@@ -494,6 +494,7 @@
     "pinError": "Vastpinnen is niet gelukt. Probeer het opnieuw.",
     "collapseNav": "Zijbalk inklappen",
     "expandNav": "Zijbalk uitklappen",
+    "collapseNavShortcut": "[ of Ctrl+B",
     "takedowns": "Verwijderverzoeken",
     "feedback": "Feedback Website"
   },

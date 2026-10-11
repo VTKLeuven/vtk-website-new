@@ -37,7 +37,7 @@ export function AdminNav({
   pinnedKeys: string[];
   pinLabels: PinLabels;
   collapsed: boolean;
-  collapseLabels: { collapse: string; expand: string };
+  collapseLabels: { collapse: string; expand: string; shortcut: string };
 }) {
   const showToast = useToast();
   const { error, ...labels } = pinLabels;
