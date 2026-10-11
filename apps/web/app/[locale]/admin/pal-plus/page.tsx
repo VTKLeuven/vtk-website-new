@@ -7,17 +7,18 @@ import { requirePermission } from "@/lib/session";
 import { brusselsYMD, ymdKey } from "@/lib/brussels";
 import {
   palPlusAskerCount,
-  palPlusAvailabilityGrid,
   palPlusCourseLabel,
-  readPalPlusAvailability,
+  palPlusMomentLabel,
+  readPalPlusProposedMoments,
   palPlusRequestCourseLabel,
   palPlusRoomLabel,
   palPlusSessionState,
   palPlusWallClockFields,
+  PAL_PLUS_ACTIVE_STATUSES,
   PAL_PLUS_STATUS_LABELS,
 } from "@/lib/palPlus";
 import { CoursesCard, type PalPlusCourseView } from "./CoursesCard";
-import { DaypartsCard, TagsCard } from "./ListsCards";
+import { TagsCard } from "./ListsCards";
 import { RequestsBoard, type OpenFollowRequest, type PalPlusRequestView } from "./RequestsBoard";
 import { SessionsBoard, type PalPlusSessionView } from "./SessionsBoard";
 import { TutorsBoard, type TutorView } from "./TutorsBoard";
@@ -41,7 +42,7 @@ import "@/app/design/vtk-theokot-verhuur.css";
 /**
  * Beheer van PAL+ door VTK Onderwijs: het werkbakje met wat nog beslist moet
  * worden, de sessies, de tutors, wat al afgehandeld is, en de lijsten die
- * Onderwijs bijhoudt (vakken, snelle tags, dagdelen). Zie
+ * Onderwijs bijhoudt (vakken, snelle tags). Zie
  * docs/design-decisions.md ("PAL+").
  */
 
@@ -90,7 +91,7 @@ export default async function AdminPalPlusPage({
         _count: { select: { requests: true, sessions: true } },
       },
     }),
-    prisma.palPlusRequest.count({ where: { status: { in: ["PENDING", "OPEN"] } } }),
+    prisma.palPlusRequest.count({ where: { status: { in: [...PAL_PLUS_ACTIVE_STATUSES] } } }),
     prisma.palPlusSession.count({
       where: { cancelledAt: null, startsAt: { gt: new Date() }, roomId: null, roomText: null },
     }),
@@ -159,13 +160,6 @@ export default async function AdminPalPlusPage({
               select: { id: true, label: true, active: true },
             })}
           />
-          <DaypartsCard
-            nl={nl}
-            dayparts={await prisma.palPlusDaypart.findMany({
-              orderBy: [{ active: "desc" }, { startMinutes: "asc" }],
-              select: { id: true, labelNl: true, labelEn: true, startMinutes: true, endMinutes: true, active: true },
-            })}
-          />
         </div>
       ) : (
         <RequestsBoard
@@ -187,14 +181,18 @@ export default async function AdminPalPlusPage({
  * De aanvragen van één tab, klaar voor de client: datums al opgemaakt in
  * Brusselse tijd, zodat de browser van de beheerder er niets aan herrekent.
  */
+/** Zo lang duurt een sessie die Onderwijs met één klik uit een venster kiest. */
+const PAL_PLUS_PICK_MS = 2 * 60 * 60 * 1000;
+
 async function loadRequests(mode: "queue" | "processed", locale: Locale): Promise<PalPlusRequestView[]> {
   const nl = locale === "nl";
+  const now = new Date();
   const courseSelect = { code: true, nameNl: true, nameEn: true } as const;
 
   const rows = await prisma.palPlusRequest.findMany({
     where:
       mode === "queue"
-        ? { status: { in: ["PENDING", "OPEN"] } }
+        ? { status: { in: [...PAL_PLUS_ACTIVE_STATUSES] } }
         : { status: { in: ["PLANNED", "CLOSED", "WITHDRAWN"] } },
     // Open werk: wat het langst wacht bovenaan. Verwerkt: het recentste eerst.
     orderBy: { createdAt: mode === "queue" ? "asc" : "desc" },
@@ -207,7 +205,7 @@ async function loadRequests(mode: "queue" | "processed", locale: Locale): Promis
       courseOther: true,
       description: true,
       tags: true,
-      availability: true,
+      proposedMoments: true,
       availabilityNote: true,
       preferredPeriod: true,
       reviewNote: true,
@@ -247,7 +245,20 @@ async function loadRequests(mode: "queue" | "processed", locale: Locale): Promis
     submitterEmail: row.user.email,
     submittedLabel: dateFmt.format(row.createdAt),
     tags: row.tags,
-    availability: palPlusAvailabilityGrid(readPalPlusAvailability(row.availability)),
+    moments: readPalPlusProposedMoments(row.proposedMoments).map((moment) => {
+      const start = palPlusWallClockFields(moment.startsAt);
+      // Een venster kan een hele namiddag zijn; een klik vult het begin ervan
+      // in, voor een sessie van hoogstens twee uur. Het uur verschuiven binnen
+      // het venster doet Onderwijs zelf.
+      const end = new Date(Math.min(moment.endsAt.getTime(), moment.startsAt.getTime() + PAL_PLUS_PICK_MS));
+      return {
+        label: palPlusMomentLabel(moment, locale),
+        date: start.date,
+        startTime: start.time,
+        endTime: palPlusWallClockFields(end).time,
+        past: moment.startsAt <= now,
+      };
+    }),
     availabilityNote: row.availabilityNote,
     coTutor:
       row.coTutor && row.coTutorStatus
@@ -273,12 +284,13 @@ async function loadRequests(mode: "queue" | "processed", locale: Locale): Promis
     })),
     reviewNote: row.reviewNote,
     // Bij een gesloten aanvraag: wie sloot. Bij een vraag die online staat of
-    // gepland is: wie ze nakeek en online zette.
+    // gepland is: wie ze nakeek en online zette. Bij een aanbod: wie het
+    // aanvaardde.
     reviewedLabel:
       row.reviewedAt && row.reviewedBy
         ? nl
-          ? `${row.status === "CLOSED" ? "Door" : "Online gezet door"} ${row.reviewedBy.name} op ${dateFmt.format(row.reviewedAt)}`
-          : `${row.status === "CLOSED" ? "By" : "Published by"} ${row.reviewedBy.name} on ${dateFmt.format(row.reviewedAt)}`
+          ? `${row.status === "CLOSED" ? "Door" : row.kind === "GIVE" ? "Aanvaard door" : "Online gezet door"} ${row.reviewedBy.name} op ${dateFmt.format(row.reviewedAt)}`
+          : `${row.status === "CLOSED" ? "By" : row.kind === "GIVE" ? "Accepted by" : "Published by"} ${row.reviewedBy.name} on ${dateFmt.format(row.reviewedAt)}`
         : null,
   }));
 }

@@ -8,21 +8,21 @@ import { hasLocale } from "@/lib/locale";
 import { staticMetadata } from "@/lib/pageMetadata";
 import { getCurrentSession } from "@/lib/session";
 import { withdrawPalPlusRequestAction } from "@/app/actions/palPlus";
-import { brusselsYMD, ymdKey } from "@/lib/brussels";
+import { brusselsMinutesOfDay, brusselsYMD, ymdKey } from "@/lib/brussels";
 import {
   canAnswerPalPlusCoTutor,
   isActivePalPlusStatus,
   palPlusAskerCount,
-  palPlusAvailabilityLines,
   palPlusCourseLabel,
-  palPlusDaypartLabel,
-  palPlusMinutesLabel,
-  readPalPlusAvailability,
+  palPlusGridDays,
+  palPlusMomentLabel,
+  readPalPlusProposedMoments,
   palPlusRequestCourseLabel,
   palPlusRoomLabel,
   palPlusSessionState,
   palPlusSignupBlock,
   PAL_PLUS_STATUS_LABELS,
+  type PalPlusProposedMoment,
 } from "@/lib/palPlus";
 import { palPlusMemberErrors } from "@/lib/palPlusMessages";
 import { PalPlusRequestForm, type OpenRequestHint } from "./PalPlusRequestForm";
@@ -136,7 +136,7 @@ export default async function PalPlusPage({
             courseOther: true,
             description: true,
             tags: true,
-            availability: true,
+            proposedMoments: true,
             availabilityNote: true,
             preferredPeriod: true,
             reviewNote: true,
@@ -211,7 +211,7 @@ export default async function PalPlusPage({
             courseOther: true,
             description: true,
             tags: true,
-            availability: true,
+            proposedMoments: true,
             availabilityNote: true,
             createdAt: true,
             course: { select: courseSelect },
@@ -221,19 +221,14 @@ export default async function PalPlusPage({
       : Promise.resolve([]),
   ]);
 
-  // Enkel voor het formulier: de snelle tags, de dagdelen van het rooster, en
-  // per vak de tags die er al gebruikt werden. Die voorstellen komen enkel uit
-  // wat al publiek staat (open vragen en sessies): een tag uit een aanvraag die
-  // Onderwijs nog niet nakeek, hoort niet bij een ander als voorstel te staan.
+  // Enkel voor het formulier: de snelle tags, en per vak de tags die er al
+  // gebruikt werden. Die voorstellen komen enkel uit wat al publiek staat (open
+  // vragen en sessies): een tag uit een aanvraag die Onderwijs nog niet nakeek,
+  // hoort niet bij een ander als voorstel te staan.
   const formLists =
     formKind && userId
       ? await Promise.all([
           prisma.palPlusTag.findMany({ where: { active: true }, orderBy: { createdAt: "asc" }, select: { label: true } }),
-          prisma.palPlusDaypart.findMany({
-            where: { active: true },
-            orderBy: { startMinutes: "asc" },
-            select: { id: true, labelNl: true, labelEn: true, startMinutes: true, endMinutes: true },
-          }),
           prisma.palPlusRequest.findMany({
             where: { kind: "FOLLOW", status: "OPEN", courseId: { not: null }, NOT: { tags: { isEmpty: true } } },
             select: { courseId: true, tags: true },
@@ -250,7 +245,7 @@ export default async function PalPlusPage({
   const tagSuggestionsByCourse: Record<string, string[]> = {};
   if (formLists) {
     const counts = new Map<string, Map<string, number>>();
-    for (const row of [...formLists[2], ...formLists[3]]) {
+    for (const row of [...formLists[1], ...formLists[2]]) {
       if (!row.courseId) continue;
       const perCourse = counts.get(row.courseId) ?? new Map<string, number>();
       for (const tag of row.tags) perCourse.set(tag, (perCourse.get(tag) ?? 0) + 1);
@@ -449,11 +444,22 @@ export default async function PalPlusPage({
             }
             tagPresets={formLists?.[0].map((tag) => tag.label) ?? []}
             tagSuggestionsByCourse={tagSuggestionsByCourse}
-            dayparts={(formLists?.[1] ?? []).map((daypart) => ({
-              id: daypart.id,
-              label: palPlusDaypartLabel(daypart, locale),
-              hours: `${palPlusMinutesLabel(daypart.startMinutes)}-${palPlusMinutesLabel(daypart.endMinutes)}`,
-            }))}
+            grid={{
+              days: palPlusGridDays(now).map((date) => {
+                const at = new Date(`${date}T12:00:00Z`);
+                const format = (options: Intl.DateTimeFormatOptions) =>
+                  new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", { timeZone: "UTC", ...options }).format(at);
+                return {
+                  date,
+                  weekday: format({ weekday: "short" }).replace(".", ""),
+                  day: String(Number(date.slice(8, 10))),
+                  month: String(Number(date.slice(5, 7))),
+                  long: format({ weekday: "long", day: "numeric", month: "long" }),
+                };
+              }),
+              today: ymdKey(brusselsYMD(now)),
+              nowMinutes: brusselsMinutesOfDay(now),
+            }}
           />
         ) : (
           <>
@@ -500,10 +506,12 @@ export default async function PalPlusPage({
                   <p className="pp-course">{palPlusRequestCourseLabel(row, locale)}</p>
                   <p className="pp-text">{row.description}</p>
                   <TagList tags={row.tags} />
-                  <AvailabilitySummary
-                    lines={palPlusAvailabilityLines(readPalPlusAvailability(row.availability), locale)}
+                  <MomentsSummary
+                    moments={readPalPlusProposedMoments(row.proposedMoments)}
                     note={row.availabilityNote}
-                    label={t.mine.availability}
+                    now={now}
+                    locale={locale}
+                    label={t.mine.moments}
                     noteLabel={t.mine.availabilityNote}
                   />
                   <CoTutorAnswer requestId={row.id} inviterName={row.user.name} nl={nl} copy={t.invitations} />
@@ -744,10 +752,12 @@ export default async function PalPlusPage({
                     <p className="pp-text">{request.description}</p>
                     <TagList tags={request.tags} />
                     {request.kind === "GIVE" && (
-                      <AvailabilitySummary
-                        lines={palPlusAvailabilityLines(readPalPlusAvailability(request.availability), locale)}
+                      <MomentsSummary
+                        moments={readPalPlusProposedMoments(request.proposedMoments)}
                         note={request.availabilityNote}
-                        label={t.mine.availability}
+                        now={now}
+                        locale={locale}
+                        label={t.mine.moments}
                         noteLabel={t.mine.availabilityNote}
                       />
                     )}
@@ -911,37 +921,50 @@ function TagList({ tags }: { tags: string[] }) {
   );
 }
 
-/** Wanneer een tutor kan, als tekst: een regel per dag, en de opmerking. */
-function AvailabilitySummary({
-  lines,
+/**
+ * De momenten die een tutor voorstelde, een per regel, en de opmerking. Een
+ * moment dat al voorbij is, staat doorstreept: Onderwijs kan het niet meer
+ * kiezen, maar het hoort wel bij wat je indiende.
+ */
+function MomentsSummary({
+  moments,
   note,
+  now,
+  locale,
   label,
   noteLabel,
 }: {
-  lines: string[];
+  moments: PalPlusProposedMoment[];
   note: string | null;
+  now: Date;
+  locale: Locale;
   label: string;
   noteLabel: string;
 }) {
-  if (lines.length === 0 && !note) return null;
+  if (moments.length === 0 && !note) return null;
   return (
     <dl className="pp-facts">
-      {lines.length > 0 && (
+      {moments.length > 0 && (
         <div>
           <dt>{label}</dt>
           <dd>
-            {lines.map((line) => (
-              <span key={line} className="block">
-                {line}
-              </span>
-            ))}
+            <ul className="pp-moments-read">
+              {moments.map((moment) => (
+                <li
+                  key={moment.startsAt.toISOString()}
+                  data-past={moment.startsAt <= now ? "true" : undefined}
+                >
+                  {palPlusMomentLabel(moment, locale)}
+                </li>
+              ))}
+            </ul>
           </dd>
         </div>
       )}
       {note && (
         <div>
           <dt>{noteLabel}</dt>
-          <dd>{note}</dd>
+          <dd className="whitespace-pre-line">{note}</dd>
         </div>
       )}
     </dl>

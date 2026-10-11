@@ -1,14 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
+  canAcceptPalPlusRequest,
   canAnswerPalPlusCoTutor,
   canonicalPalPlusTags,
   canPublishPalPlusRequest,
-  palPlusAvailabilityGrid,
-  palPlusAvailabilityLines,
-  palPlusAvailabilitySnapshot,
-  parsePalPlusDaypart,
+  palPlusGridDays,
+  palPlusGridSlots,
+  palPlusMomentLabel,
+  palPlusProposedMomentsJson,
+  palPlusSlotIsPast,
+  palPlusSlotsToMoments,
+  parsePalPlusProposedMoments,
   parsePalPlusTags,
-  readPalPlusAvailability,
+  readPalPlusProposedMoments,
   initialPalPlusStatus,
   isActivePalPlusStatus,
   normalizeCourseCode,
@@ -227,14 +231,21 @@ describe("palPlusCourseLabel", () => {
   });
 });
 
+/** Een zondagavond voor de momenten in de tests. */
+const NOW = new Date("2026-10-11T20:00:00+02:00");
+
 describe("parsePalPlusRequest", () => {
+  const parseRequest = (raw: RawPalPlusRequest) => parsePalPlusRequest(raw, NOW);
   const give: RawPalPlusRequest = {
     kind: "GIVE",
     courseId: "course-1",
     courseOther: "",
     description: "Oefeningen hoofdstuk 3",
     tags: ["Oefeningen", " Hoofdstuk  3 "],
-    availability: ["1:avond", "3:namiddag"],
+    moments: [
+      { date: "2026-10-15", startTime: "19:00", endTime: "21:00" },
+      { date: "2026-10-13", startTime: "14:00", endTime: "16:00" },
+    ],
     availabilityNote: "",
     coTutor: "",
     preferredPeriod: "",
@@ -242,26 +253,26 @@ describe("parsePalPlusRequest", () => {
   const follow: RawPalPlusRequest = {
     ...give,
     kind: "FOLLOW",
-    availability: [],
+    moments: [],
     preferredPeriod: "voor het examen in januari",
   };
 
-  it("aanvaardt een aanbod met tags en aangevinkte vakjes", () => {
-    const result = parsePalPlusRequest(give);
+  it("aanvaardt een aanbod met tags en momenten, de vroegste eerst", () => {
+    const result = parseRequest(give);
     if (!result.ok || result.request.kind !== "GIVE") throw new Error("verwacht een aanbod");
     expect(result.request.courseId).toBe("course-1");
     expect(result.request.courseOther).toBeNull();
     expect(result.request.tags).toEqual(["Oefeningen", "Hoofdstuk 3"]);
-    expect(result.request.availability).toEqual([
-      { day: 1, daypartId: "avond" },
-      { day: 3, daypartId: "namiddag" },
+    expect(result.request.moments).toEqual([
+      { startsAt: new Date("2026-10-13T14:00:00+02:00"), endsAt: new Date("2026-10-13T16:00:00+02:00") },
+      { startsAt: new Date("2026-10-15T19:00:00+02:00"), endsAt: new Date("2026-10-15T21:00:00+02:00") },
     ]);
     expect(result.request.availabilityNote).toBeNull();
     expect(result.request.coTutorRNumber).toBeNull();
   });
 
-  it("aanvaardt een vraag met een periode in eigen woorden, zonder rooster", () => {
-    expect(parsePalPlusRequest(follow)).toEqual({
+  it("aanvaardt een vraag met een periode in eigen woorden, zonder momenten", () => {
+    expect(parseRequest(follow)).toEqual({
       ok: true,
       request: {
         kind: "FOLLOW",
@@ -275,26 +286,26 @@ describe("parsePalPlusRequest", () => {
   });
 
   it("maakt van een lege periode null", () => {
-    const result = parsePalPlusRequest({ ...follow, preferredPeriod: "  " });
+    const result = parseRequest({ ...follow, preferredPeriod: "  " });
     if (!result.ok || result.request.kind !== "FOLLOW") throw new Error("verwacht een vraag");
     expect(result.request.preferredPeriod).toBeNull();
   });
 
   it("neemt een zelf ingetikt vak over wanneer het niet in de lijst staat", () => {
-    const result = parsePalPlusRequest({ ...follow, courseId: PAL_PLUS_OTHER_COURSE, courseOther: " Thermodynamica " });
+    const result = parseRequest({ ...follow, courseId: PAL_PLUS_OTHER_COURSE, courseOther: " Thermodynamica " });
     if (!result.ok) throw new Error("verwacht ok");
     expect(result.request.courseId).toBeNull();
     expect(result.request.courseOther).toBe("Thermodynamica");
   });
 
   it("vraagt een vak", () => {
-    expect(parsePalPlusRequest({ ...follow, courseId: "" })).toEqual({ ok: false, error: "COURSE_REQUIRED" });
-    expect(parsePalPlusRequest({ ...follow, courseId: PAL_PLUS_OTHER_COURSE })).toEqual({
+    expect(parseRequest({ ...follow, courseId: "" })).toEqual({ ok: false, error: "COURSE_REQUIRED" });
+    expect(parseRequest({ ...follow, courseId: PAL_PLUS_OTHER_COURSE })).toEqual({
       ok: false,
       error: "COURSE_REQUIRED",
     });
     expect(
-      parsePalPlusRequest({
+      parseRequest({
         ...follow,
         courseId: PAL_PLUS_OTHER_COURSE,
         courseOther: "a".repeat(PAL_PLUS_LIMITS.courseOther + 1),
@@ -303,46 +314,49 @@ describe("parsePalPlusRequest", () => {
   });
 
   it("vraagt een omschrijving van de sessie", () => {
-    expect(parsePalPlusRequest({ ...follow, description: " " })).toEqual({ ok: false, error: "DESCRIPTION_REQUIRED" });
-    expect(parsePalPlusRequest({ ...follow, description: "a".repeat(PAL_PLUS_LIMITS.description + 1) })).toEqual({
+    expect(parseRequest({ ...follow, description: " " })).toEqual({ ok: false, error: "DESCRIPTION_REQUIRED" });
+    expect(parseRequest({ ...follow, description: "a".repeat(PAL_PLUS_LIMITS.description + 1) })).toEqual({
       ok: false,
       error: "DESCRIPTION_TOO_LONG",
     });
   });
 
   it("weigert een te lange periode", () => {
-    expect(parsePalPlusRequest({ ...follow, preferredPeriod: "a".repeat(PAL_PLUS_LIMITS.preferredPeriod + 1) })).toEqual({
+    expect(parseRequest({ ...follow, preferredPeriod: "a".repeat(PAL_PLUS_LIMITS.preferredPeriod + 1) })).toEqual({
       ok: false,
       error: "PERIOD_TOO_LONG",
     });
   });
 
-  it("vraagt bij een aanbod minstens een vakje of een opmerking", () => {
-    expect(parsePalPlusRequest({ ...give, availability: [] })).toEqual({ ok: false, error: "AVAILABILITY_REQUIRED" });
-    const noteOnly = parsePalPlusRequest({ ...give, availability: [], availabilityNote: " enkel op 14 oktober " });
-    if (!noteOnly.ok || noteOnly.request.kind !== "GIVE") throw new Error("verwacht een aanbod");
-    expect(noteOnly.request.availabilityNote).toBe("enkel op 14 oktober");
+  it("vraagt bij een aanbod minstens één moment; een opmerking alleen volstaat niet", () => {
+    expect(parseRequest({ ...give, moments: [] })).toEqual({ ok: false, error: "MOMENTS_REQUIRED" });
+    expect(
+      parseRequest({ ...give, moments: [{ date: "", startTime: "", endTime: "" }], availabilityNote: "dinsdagavond" }),
+    ).toEqual({ ok: false, error: "MOMENTS_REQUIRED" });
   });
 
-  it("weigert een vakje dat er niet als een vakje uitziet, en een te lange opmerking", () => {
-    expect(parsePalPlusRequest({ ...give, availability: ["8:avond"] })).toEqual({ ok: false, error: "AVAILABILITY_INVALID" });
-    expect(parsePalPlusRequest({ ...give, availability: ["maandag"] })).toEqual({ ok: false, error: "AVAILABILITY_INVALID" });
+  it("bewaart de opmerking bij de momenten, en weigert een te lange", () => {
+    const withNote = parseRequest({ ...give, availabilityNote: " liefst voor de tussentoets " });
+    if (!withNote.ok || withNote.request.kind !== "GIVE") throw new Error("verwacht een aanbod");
+    expect(withNote.request.availabilityNote).toBe("liefst voor de tussentoets");
     expect(
-      parsePalPlusRequest({ ...give, availabilityNote: "a".repeat(PAL_PLUS_LIMITS.availabilityNote + 1) }),
+      parseRequest({ ...give, availabilityNote: "a".repeat(PAL_PLUS_LIMITS.availabilityNote + 1) }),
     ).toEqual({ ok: false, error: "AVAILABILITY_NOTE_TOO_LONG" });
   });
 
   it("leest het r-nummer van de medetutor zoals iemand het intikt", () => {
     for (const typed of ["r0123456", "R0123456", "0123456", " r 0123456 "]) {
-      const result = parsePalPlusRequest({ ...give, coTutor: typed });
+      const result = parseRequest({ ...give, coTutor: typed });
       if (!result.ok || result.request.kind !== "GIVE") throw new Error("verwacht een aanbod");
       expect(result.request.coTutorRNumber).toBe("r0123456");
     }
-    expect(parsePalPlusRequest({ ...give, coTutor: "r12" })).toEqual({ ok: false, error: "COTUTOR_INVALID" });
+    expect(parseRequest({ ...give, coTutor: "r12" })).toEqual({ ok: false, error: "COTUTOR_INVALID" });
   });
 
-  it("negeert het rooster en de medetutor bij een vraag", () => {
-    expect(parsePalPlusRequest({ ...follow, availability: ["x"], coTutor: "nee" }).ok).toBe(true);
+  it("negeert de momenten en de medetutor bij een vraag", () => {
+    expect(parseRequest({ ...follow, moments: [{ date: "gisteren", startTime: "", endTime: "" }], coTutor: "nee" }).ok).toBe(
+      true,
+    );
   });
 });
 
@@ -367,91 +381,145 @@ describe("tags", () => {
   });
 });
 
-describe("beschikbaarheid", () => {
-  const dayparts = [
-    { id: "avond", labelNl: "Avond", labelEn: "Evening", startMinutes: 1080, endMinutes: 1320 },
-    { id: "namiddag", labelNl: "Namiddag", labelEn: "Afternoon", startMinutes: 780, endMinutes: 1080 },
-  ];
+describe("voorgestelde momenten", () => {
+  const row = (date: string, startTime: string, endTime: string) => ({ date, startTime, endTime });
 
-  it("bewaart de aangevinkte vakjes met de naam en de uren van nu, gesorteerd", () => {
+  it("laat lege rijen vallen, haalt dubbels weg en zet de vroegste eerst", () => {
     expect(
-      palPlusAvailabilitySnapshot(
+      parsePalPlusProposedMoments(
         [
-          { day: 3, daypartId: "avond" },
-          { day: 1, daypartId: "avond" },
-          { day: 3, daypartId: "namiddag" },
+          row("2026-10-15", "19:00", "21:00"),
+          row("", "", ""),
+          row("2026-10-13", "14:00", "16:00"),
+          row("2026-10-15", "19:00", "21:00"),
         ],
-        dayparts,
+        NOW,
       ),
-    ).toEqual([
-      { day: 1, start: 1080, end: 1320, label: "Avond" },
-      { day: 3, start: 780, end: 1080, label: "Namiddag" },
-      { day: 3, start: 1080, end: 1320, label: "Avond" },
-    ]);
-  });
-
-  it("weigert een vakje met een dagdeel dat er niet (meer) is", () => {
-    expect(palPlusAvailabilitySnapshot([{ day: 1, daypartId: "nacht" }], dayparts)).toBeNull();
-  });
-
-  it("leest een bewaarde momentopname terug en laat rommel vallen", () => {
-    expect(
-      readPalPlusAvailability([{ day: 2, start: 480, end: 720, label: "Voormiddag" }, { day: 9 }, "x", null]),
-    ).toEqual([{ day: 2, start: 480, end: 720, label: "Voormiddag" }]);
-    expect(readPalPlusAvailability(null)).toEqual([]);
-  });
-
-  it("toont het rooster met enkel de dagen en dagdelen die erin voorkomen", () => {
-    const grid = palPlusAvailabilityGrid([
-      { day: 3, start: 1080, end: 1320, label: "Avond" },
-      { day: 1, start: 1080, end: 1320, label: "Avond" },
-      { day: 1, start: 780, end: 1080, label: "Namiddag" },
-    ]);
-    expect(grid.columns.map((column) => `${column.label} ${column.hours}`)).toEqual([
-      "Namiddag 13:00-18:00",
-      "Avond 18:00-22:00",
-    ]);
-    expect(grid.rows.map((row) => [row.day, row.keys.length])).toEqual([
-      [1, 2],
-      [3, 1],
-    ]);
-  });
-
-  it("schrijft het rooster als tekst, een regel per dag", () => {
-    expect(
-      palPlusAvailabilityLines(
-        [
-          { day: 1, start: 1080, end: 1320, label: "Avond" },
-          { day: 1, start: 780, end: 1080, label: "Namiddag" },
-        ],
-        "nl",
-      ),
-    ).toEqual(["Maandag: Namiddag (13:00-18:00), Avond (18:00-22:00)"]);
-  });
-
-  it("leest een dagdeel uit het beheer", () => {
-    expect(parsePalPlusDaypart({ labelNl: " Avond ", labelEn: "", start: "18:00", end: "22:00" })).toEqual({
+    ).toEqual({
       ok: true,
-      daypart: { labelNl: "Avond", labelEn: null, startMinutes: 1080, endMinutes: 1320 },
+      moments: [
+        { startsAt: new Date("2026-10-13T14:00:00+02:00"), endsAt: new Date("2026-10-13T16:00:00+02:00") },
+        { startsAt: new Date("2026-10-15T19:00:00+02:00"), endsAt: new Date("2026-10-15T21:00:00+02:00") },
+      ],
     });
-    expect(parsePalPlusDaypart({ labelNl: "", labelEn: "", start: "18:00", end: "22:00" })).toEqual({
+  });
+
+  it("leest de uren als Brusselse wandklok, ook na de overgang naar wintertijd", () => {
+    const result = parsePalPlusProposedMoments([row("2026-11-03", "19:00", "21:00")], NOW);
+    if (!result.ok) throw new Error("verwacht ok");
+    expect(result.moments[0]!.startsAt.toISOString()).toBe("2026-11-03T18:00:00.000Z");
+  });
+
+  it("weigert een half ingevulde rij in plaats van ze stil te laten vallen", () => {
+    expect(parsePalPlusProposedMoments([row("2026-10-15", "19:00", "")], NOW)).toEqual({
       ok: false,
-      error: "DAYPART_LABEL_REQUIRED",
+      error: "MOMENT_REQUIRED",
     });
-    expect(parsePalPlusDaypart({ labelNl: "Avond", labelEn: "", start: "18", end: "22:00" })).toEqual({
+  });
+
+  it("aanvaardt een venster langer dan een sessie, maar geen einde voor het begin of een onbestaande datum", () => {
+    expect(parsePalPlusProposedMoments([row("2026-10-15", "08:00", "20:00")], NOW).ok).toBe(true);
+    expect(parsePalPlusProposedMoments([row("2026-10-15", "21:00", "19:00")], NOW)).toEqual({
       ok: false,
-      error: "DAYPART_TIME_INVALID",
+      error: "MOMENT_ORDER",
     });
-    expect(parsePalPlusDaypart({ labelNl: "Avond", labelEn: "", start: "22:00", end: "18:00" })).toEqual({
+    expect(parsePalPlusProposedMoments([row("2026-02-30", "19:00", "21:00")], NOW)).toEqual({
       ok: false,
-      error: "DAYPART_TIME_ORDER",
+      error: "MOMENT_INVALID",
     });
+  });
+
+  it("weigert een moment dat al voorbij is of nu begint", () => {
+    expect(parsePalPlusProposedMoments([row("2026-10-11", "14:00", "16:00")], NOW)).toEqual({
+      ok: false,
+      error: "MOMENT_PAST",
+    });
+    expect(parsePalPlusProposedMoments([row("2026-10-11", "20:00", "21:00")], NOW)).toEqual({
+      ok: false,
+      error: "MOMENT_PAST",
+    });
+  });
+
+  it("weigert meer momenten dan het maximum", () => {
+    const many = Array.from({ length: PAL_PLUS_LIMITS.moments + 1 }, (_, index) => {
+      const hour = String(8 + (index % 7) * 2).padStart(2, "0");
+      return row(`2026-10-${13 + Math.floor(index / 7)}`, `${hour}:00`, `${hour}:30`);
+    });
+    expect(parsePalPlusProposedMoments(many, NOW)).toEqual({ ok: false, error: "TOO_MANY_MOMENTS" });
+  });
+
+  it("bewaart als ISO en leest terug, rommel en een oud weekrooster vallen weg", () => {
+    const moments = [
+      { startsAt: new Date("2026-10-15T19:00:00+02:00"), endsAt: new Date("2026-10-15T21:00:00+02:00") },
+      { startsAt: new Date("2026-10-13T14:00:00+02:00"), endsAt: new Date("2026-10-13T16:00:00+02:00") },
+    ];
+    const json = palPlusProposedMomentsJson(moments);
+    expect(json[0]).toEqual({ startsAt: "2026-10-15T17:00:00.000Z", endsAt: "2026-10-15T19:00:00.000Z" });
+    expect(readPalPlusProposedMoments([...json, { day: 2, start: 480, end: 720, label: "Voormiddag" }, "x", null])).toEqual([
+      moments[1],
+      moments[0],
+    ]);
+    expect(readPalPlusProposedMoments(null)).toEqual([]);
+  });
+
+  it("schrijft een moment als dag, datum en uren in Brusselse tijd", () => {
+    const moment = { startsAt: new Date("2026-10-13T19:00:00+02:00"), endsAt: new Date("2026-10-13T21:30:00+02:00") };
+    expect(palPlusMomentLabel(moment, "nl")).toBe("Dinsdag 13 oktober, 19:00-21:30");
+    expect(palPlusMomentLabel(moment, "en")).toBe("Tuesday 13 October, 19:00-21:30");
+  });
+});
+
+describe("het rooster", () => {
+  it("toont de komende zeven werkdagen, vandaag inbegrepen als het een werkdag is", () => {
+    // Zondag: het rooster begint maandag en springt over het weekend.
+    expect(palPlusGridDays(NOW)).toEqual([
+      "2026-10-12",
+      "2026-10-13",
+      "2026-10-14",
+      "2026-10-15",
+      "2026-10-16",
+      "2026-10-19",
+      "2026-10-20",
+    ]);
+    // Woensdagavond 23:30 in Brussel is in UTC al donderdag; het rooster telt in Brussel.
+    expect(palPlusGridDays(new Date("2026-10-14T23:30:00+02:00"))[0]).toBe("2026-10-14");
+  });
+
+  it("deelt de dag op in halve uren van 8 tot 22 uur", () => {
+    const slots = palPlusGridSlots();
+    expect(slots[0]).toBe(8 * 60);
+    expect(slots.at(-1)).toBe(21 * 60 + 30);
+    expect(slots).toHaveLength(28);
+  });
+
+  it("zet een halfuur dat al begon uit, en alles van gisteren", () => {
+    expect(palPlusSlotIsPast("2026-10-12", 600, "2026-10-12", 610)).toBe(true);
+    expect(palPlusSlotIsPast("2026-10-12", 630, "2026-10-12", 610)).toBe(false);
+    expect(palPlusSlotIsPast("2026-10-11", 1200, "2026-10-12", 0)).toBe(true);
+  });
+
+  it("voegt aaneensluitende halve uren samen tot een blok per stuk, de vroegste eerst", () => {
+    expect(
+      palPlusSlotsToMoments([
+        "2026-10-15|1140",
+        "2026-10-13|840",
+        "2026-10-15|1170",
+        "2026-10-13|870",
+        "2026-10-13|960",
+        "rommel",
+      ]),
+    ).toEqual([
+      { date: "2026-10-13", startTime: "14:00", endTime: "15:00" },
+      { date: "2026-10-13", startTime: "16:00", endTime: "16:30" },
+      { date: "2026-10-15", startTime: "19:00", endTime: "20:00" },
+    ]);
   });
 });
 
 describe("tweede tutor", () => {
-  it("kan antwoorden zolang het aanbod bij Onderwijs wacht", () => {
+  it("kan antwoorden zolang er geen sessie van het aanbod kwam", () => {
     expect(canAnswerPalPlusCoTutor({ kind: "GIVE", status: "PENDING", coTutorStatus: "PENDING" })).toBe(true);
+    expect(canAnswerPalPlusCoTutor({ kind: "GIVE", status: "ACCEPTED", coTutorStatus: "PENDING" })).toBe(true);
     expect(canAnswerPalPlusCoTutor({ kind: "GIVE", status: "PLANNED", coTutorStatus: "PENDING" })).toBe(false);
     expect(canAnswerPalPlusCoTutor({ kind: "GIVE", status: "PENDING", coTutorStatus: "ACCEPTED" })).toBe(false);
     expect(canAnswerPalPlusCoTutor({ kind: "FOLLOW", status: "PENDING", coTutorStatus: "PENDING" })).toBe(false);
@@ -471,9 +539,17 @@ describe("statussen", () => {
     expect(canPublishPalPlusRequest({ kind: "GIVE", status: "PENDING" })).toBe(false);
   });
 
-  it("noemt enkel wachtend en open nog actief", () => {
+  it("aanvaardt enkel een wachtend aanbod zonder moment", () => {
+    expect(canAcceptPalPlusRequest({ kind: "GIVE", status: "PENDING" })).toBe(true);
+    expect(canAcceptPalPlusRequest({ kind: "GIVE", status: "ACCEPTED" })).toBe(false);
+    expect(canAcceptPalPlusRequest({ kind: "GIVE", status: "PLANNED" })).toBe(false);
+    expect(canAcceptPalPlusRequest({ kind: "FOLLOW", status: "PENDING" })).toBe(false);
+  });
+
+  it("noemt wachtend, open en aanvaard nog actief: er hangt nog geen sessie aan", () => {
     expect(isActivePalPlusStatus("PENDING")).toBe(true);
     expect(isActivePalPlusStatus("OPEN")).toBe(true);
+    expect(isActivePalPlusStatus("ACCEPTED")).toBe(true);
     expect(isActivePalPlusStatus("PLANNED")).toBe(false);
     expect(isActivePalPlusStatus("CLOSED")).toBe(false);
     expect(isActivePalPlusStatus("WITHDRAWN")).toBe(false);

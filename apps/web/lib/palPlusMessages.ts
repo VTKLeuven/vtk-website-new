@@ -6,7 +6,6 @@ import {
   PAL_PLUS_MAX_SESSION_MINUTES,
   type PalPlusCourseErrorCode,
   type PalPlusCourseListErrorCode,
-  type PalPlusDaypartErrorCode,
   type PalPlusRequestErrorCode,
   type PalPlusSessionErrorCode,
   type PalPlusSignupBlock,
@@ -119,10 +118,14 @@ export function palPlusMemberErrors(nl: boolean): Record<PalPlusMemberErrorCode,
         PERIOD_TOO_LONG: `Niet verstuurd: wanneer je het nodig hebt, mag hoogstens ${PAL_PLUS_LIMITS.preferredPeriod} tekens zijn.`,
         TAG_TOO_LONG: `Niet verstuurd: een tag mag hoogstens ${PAL_PLUS_LIMITS.tag} tekens zijn. Zet de uitleg liever in de omschrijving.`,
         TOO_MANY_TAGS: `Niet verstuurd: hoogstens ${PAL_PLUS_LIMITS.tags} tags. Haal er een paar weg.`,
-        AVAILABILITY_REQUIRED: "Niet verstuurd: duid aan wanneer je meestal kan, of schrijf het in de opmerking.",
-        AVAILABILITY_INVALID:
-          "Niet verstuurd: de dagdelen van het rooster veranderden net. Herlaad de pagina en duid opnieuw aan.",
-        AVAILABILITY_NOTE_TOO_LONG: `Niet verstuurd: de opmerking bij wanneer je kan, mag hoogstens ${PAL_PLUS_LIMITS.availabilityNote} tekens zijn.`,
+        MOMENTS_REQUIRED: "Niet verstuurd: duid in het rooster minstens één halfuur aan waarop je de sessie kan geven.",
+        TOO_MANY_MOMENTS: `Niet verstuurd: hoogstens ${PAL_PLUS_LIMITS.moments} losse blokken. Duid liever aaneensluitende uren aan.`,
+        MOMENT_REQUIRED: "Niet verstuurd: vul bij elk moment een datum, een beginuur en een einduur in.",
+        MOMENT_INVALID: "Niet verstuurd: een datum of een uur van een moment klopt niet.",
+        MOMENT_ORDER: "Niet verstuurd: bij een moment ligt het einduur niet na het beginuur. Een sessie valt binnen één dag.",
+        MOMENT_TOO_LONG: `Niet verstuurd: een moment duurt hoogstens ${PAL_PLUS_MAX_SESSION_MINUTES / 60} uur. Kijk het einduur na.`,
+        MOMENT_PAST: "Niet verstuurd: een van de momenten is al voorbij. Kies een moment dat nog komt.",
+        AVAILABILITY_NOTE_TOO_LONG: `Niet verstuurd: de opmerking bij de momenten mag hoogstens ${PAL_PLUS_LIMITS.availabilityNote} tekens zijn.`,
         COTUTOR_INVALID: "Niet verstuurd: een r-nummer is een r gevolgd door zeven cijfers, zoals r0123456.",
         COTUTOR_UNKNOWN:
           "Niet verstuurd: er is geen account met dat r-nummer. Vraag je medetutor eerst eens in te loggen op vtk.be.",
@@ -153,9 +156,14 @@ export function palPlusMemberErrors(nl: boolean): Record<PalPlusMemberErrorCode,
         PERIOD_TOO_LONG: `Not sent: when you need it can be at most ${PAL_PLUS_LIMITS.preferredPeriod} characters.`,
         TAG_TOO_LONG: `Not sent: a tag can be at most ${PAL_PLUS_LIMITS.tag} characters. Put the explanation in the description instead.`,
         TOO_MANY_TAGS: `Not sent: at most ${PAL_PLUS_LIMITS.tags} tags. Remove a few.`,
-        AVAILABILITY_REQUIRED: "Not sent: mark when you are usually available, or write it in the note.",
-        AVAILABILITY_INVALID: "Not sent: the parts of the day just changed. Reload the page and mark them again.",
-        AVAILABILITY_NOTE_TOO_LONG: `Not sent: the note on when you are available can be at most ${PAL_PLUS_LIMITS.availabilityNote} characters.`,
+        MOMENTS_REQUIRED: "Not sent: mark at least one half hour in the grid when you can give the session.",
+        TOO_MANY_MOMENTS: `Not sent: at most ${PAL_PLUS_LIMITS.moments} separate blocks. Mark consecutive hours instead.`,
+        MOMENT_REQUIRED: "Not sent: fill in a date, a start time and an end time for every moment.",
+        MOMENT_INVALID: "Not sent: a date or time of one of the moments is not valid.",
+        MOMENT_ORDER: "Not sent: one moment ends before it starts. A session falls within one day.",
+        MOMENT_TOO_LONG: `Not sent: a moment lasts at most ${PAL_PLUS_MAX_SESSION_MINUTES / 60} hours. Check the end time.`,
+        MOMENT_PAST: "Not sent: one of the moments has already passed. Pick a moment that is still to come.",
+        AVAILABILITY_NOTE_TOO_LONG: `Not sent: the note on the moments can be at most ${PAL_PLUS_LIMITS.availabilityNote} characters.`,
         COTUTOR_INVALID: "Not sent: an r-number is an r followed by seven digits, like r0123456.",
         COTUTOR_UNKNOWN: "Not sent: there is no account with that r-number. Ask your co-tutor to log in on vtk.be once first.",
         COTUTOR_SELF: "Not sent: that is your own r-number. Fill in your co-tutor's, or leave the field empty.",
@@ -183,7 +191,8 @@ export type PalPlusAdminErrorCode =
   | "NOT_ACTIVE"
   | "NOT_CLOSED"
   | "COURSE_UNKNOWN"
-  | "NOT_PUBLISHABLE";
+  | "NOT_PUBLISHABLE"
+  | "NOT_ACCEPTABLE";
 
 export function palPlusAdminErrors(nl: boolean): Record<PalPlusAdminErrorCode, string> {
   return nl
@@ -194,6 +203,7 @@ export function palPlusAdminErrors(nl: boolean): Record<PalPlusAdminErrorCode, s
         NOT_CLOSED: "Niet heropend: enkel een gesloten aanvraag kan terug open.",
         COURSE_UNKNOWN: "Niet opgeslagen: dat vak bestaat niet meer. Herlaad de pagina.",
         NOT_PUBLISHABLE: "Niet online gezet: de vraag is ondertussen al nagekeken, gesloten of ingetrokken. Herlaad de pagina.",
+        NOT_ACCEPTABLE: "Niet aanvaard: het aanbod is ondertussen al aanvaard, gepland, gesloten of ingetrokken. Herlaad de pagina.",
       }
     : {
         REASON_REQUIRED: "Not closed: write a reason. The submitter sees it with the request.",
@@ -202,6 +212,7 @@ export function palPlusAdminErrors(nl: boolean): Record<PalPlusAdminErrorCode, s
         NOT_CLOSED: "Not reopened: only a closed request can be reopened.",
         COURSE_UNKNOWN: "Not saved: that course no longer exists. Reload the page.",
         NOT_PUBLISHABLE: "Not published: the request was reviewed, closed or withdrawn in the meantime. Reload the page.",
+        NOT_ACCEPTABLE: "Not accepted: the offer was accepted, planned, closed or withdrawn in the meantime. Reload the page.",
       };
 }
 
@@ -281,8 +292,8 @@ export function palPlusSessionErrors(nl: boolean): Record<PalPlusSessionAdminErr
       };
 }
 
-/** De snelle tags en de dagdelen in het beheer. */
-export type PalPlusListErrorCode = "TAG_REQUIRED" | "TAG_TOO_LONG" | "TAG_TAKEN" | PalPlusDaypartErrorCode;
+/** De snelle tags in het beheer. */
+export type PalPlusListErrorCode = "TAG_REQUIRED" | "TAG_TOO_LONG" | "TAG_TAKEN";
 
 export function palPlusListErrors(nl: boolean): Record<PalPlusListErrorCode, string> {
   return nl
@@ -290,18 +301,10 @@ export function palPlusListErrors(nl: boolean): Record<PalPlusListErrorCode, str
         TAG_REQUIRED: "Niet opgeslagen: geef de tag een naam.",
         TAG_TOO_LONG: `Niet opgeslagen: een tag mag hoogstens ${PAL_PLUS_LIMITS.tag} tekens zijn.`,
         TAG_TAKEN: "Niet opgeslagen: die tag staat al in de lijst.",
-        DAYPART_LABEL_REQUIRED: "Niet opgeslagen: geef het dagdeel een naam.",
-        DAYPART_LABEL_TOO_LONG: `Niet opgeslagen: de naam mag hoogstens ${PAL_PLUS_LIMITS.daypartLabel} tekens zijn.`,
-        DAYPART_TIME_INVALID: "Niet opgeslagen: vul een begin- en einduur in, zoals 18:00.",
-        DAYPART_TIME_ORDER: "Niet opgeslagen: het einduur moet na het beginuur liggen, op dezelfde dag.",
       }
     : {
         TAG_REQUIRED: "Not saved: give the tag a name.",
         TAG_TOO_LONG: `Not saved: a tag can be at most ${PAL_PLUS_LIMITS.tag} characters.`,
         TAG_TAKEN: "Not saved: that tag is already on the list.",
-        DAYPART_LABEL_REQUIRED: "Not saved: give the part of the day a name.",
-        DAYPART_LABEL_TOO_LONG: `Not saved: the name can be at most ${PAL_PLUS_LIMITS.daypartLabel} characters.`,
-        DAYPART_TIME_INVALID: "Not saved: fill in a start and end time, like 18:00.",
-        DAYPART_TIME_ORDER: "Not saved: the end time has to be after the start time, on the same day.",
       };
 }

@@ -7,26 +7,27 @@ import { SaveForm } from "@/components/ui/SaveForm";
 import { useToast } from "@/components/ui/toast";
 import { Modal } from "../admin-table";
 import {
+  acceptPalPlusRequestAction,
   assignPalPlusRequestCourseAction,
   closePalPlusRequestAction,
   publishPalPlusRequestAction,
   reopenPalPlusRequestAction,
 } from "@/app/actions/palPlus";
 import {
+  canAcceptPalPlusRequest,
   canPublishPalPlusRequest,
   isActivePalPlusStatus,
   PAL_PLUS_LIMITS,
   PAL_PLUS_STATUS_LABELS,
-  type PalPlusAvailabilityGridView,
   type PalPlusCoTutorStatusCode,
   type PalPlusRequestStatusCode,
 } from "@/lib/palPlus";
-import { AvailabilityView } from "@/components/palPlus/AvailabilityGrid";
 import { palPlusAdminErrors } from "@/lib/palPlusMessages";
 import type { SaveState } from "@/lib/saveState";
 import {
   SessionForm,
   type LinkableRequest,
+  type MomentChoice,
   type Person,
   type RoomGroup,
   type SessionCourseOption,
@@ -48,8 +49,8 @@ export type PalPlusRequestView = {
   submitterEmail: string;
   submittedLabel: string;
   tags: string[];
-  /** Enkel bij een aanbod: wanneer de tutor(s) meestal kunnen. */
-  availability: PalPlusAvailabilityGridView;
+  /** Enkel bij een aanbod: de momenten waarop de tutor(s) de sessie kunnen geven. */
+  moments: MomentChoice[];
   availabilityNote: string | null;
   /** De tweede tutor van een aanbod, met of die al bevestigde. */
   coTutor: { id: string; name: string; status: PalPlusCoTutorStatusCode } | null;
@@ -99,96 +100,22 @@ export function RequestsBoard({
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const selected = requests.find((request) => request.id === selectedId) ?? null;
-  const kindLabel = (kind: "GIVE" | "FOLLOW") =>
-    kind === "GIVE" ? (nl ? "Aanbod" : "Offer") : nl ? "Hulpvraag" : "Help request";
+  const kindLabel = (kind: "GIVE" | "FOLLOW") => palPlusKindLabel(kind, nl);
+  const offers = requests.filter((request) => request.kind === "GIVE");
+  const asks = requests.filter((request) => request.kind === "FOLLOW");
 
   return (
-    <Card className="p-5">
-      {requests.length === 0 ? (
-        <p className="text-sm text-vtk-muted">
-          {mode === "queue"
-            ? nl
-              ? "Niets te doen: er wacht geen aanbod of vraag op Onderwijs en er staat geen vraag open."
-              : "Nothing to do: no offer or request is waiting for Onderwijs and no request is open."
-            : nl
-              ? "Nog niets afgehandeld."
-              : "Nothing handled yet."}
-        </p>
-      ) : (
-        <div className="relative overflow-x-auto">
-          <table className="vtk-palplus-table">
-            <thead>
-              <tr>
-                <th scope="col">{nl ? "Vak" : "Course"}</th>
-                <th scope="col">{nl ? "Soort" : "Kind"}</th>
-                <th scope="col">{nl ? "Wie" : "Who"}</th>
-                {mode === "queue" ? (
-                  <th scope="col" className="is-num">
-                    {nl ? "Zoeken dit" : "Need this"}
-                  </th>
-                ) : (
-                  <th scope="col">{nl ? "Status" : "Status"}</th>
-                )}
-                <th scope="col">{nl ? "Ingediend" : "Submitted"}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {requests.map((request) => (
-                <tr
-                  key={request.id}
-                  className="vtk-palplus-row"
-                  onClick={() => setSelectedId(request.id)}
-                >
-                  <th scope="row">
-                    <button
-                      type="button"
-                      className="vtk-palplus-rowtitle"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        setSelectedId(request.id);
-                      }}
-                    >
-                      {request.courseLabel}
-                    </button>
-                    {request.courseTyped && !request.courseId && (
-                      <span className="vtk-palplus-sub">
-                        {nl ? "Zelf ingetikt, nog geen vak uit de lijst" : "Typed in, no course from the list yet"}
-                      </span>
-                    )}
-                  </th>
-                  <td data-label={nl ? "Soort" : "Kind"}>
-                    {kindLabel(request.kind)}
-                    {canPublishPalPlusRequest(request) && (
-                      <span className="vtk-palplus-sub">{nl ? "Nog na te kijken" : "Still to review"}</span>
-                    )}
-                  </td>
-                  <td data-label={nl ? "Wie" : "Who"}>
-                    {request.submitterName}
-                    {request.coTutor && request.coTutor.status !== "DECLINED" && (
-                      <span className="vtk-palplus-sub">
-                        {nl ? "met" : "with"} {request.coTutor.name}
-                        {request.coTutor.status === "PENDING" ? (nl ? " (wacht)" : " (waiting)") : ""}
-                      </span>
-                    )}
-                  </td>
-                  {mode === "queue" ? (
-                    <td data-label={nl ? "Zoeken dit" : "Need this"} className="is-num">
-                      {request.kind === "FOLLOW" ? request.askers : <span className="text-vtk-muted">-</span>}
-                    </td>
-                  ) : (
-                    <td data-label={nl ? "Status" : "Status"}>
-                      <span className="vtk-palplus-status" data-status={request.status}>
-                        {PAL_PLUS_STATUS_LABELS[request.status][nl ? "nl" : "en"]}
-                      </span>
-                    </td>
-                  )}
-                  <td data-label={nl ? "Ingediend" : "Submitted"}>{request.submittedLabel}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+    <div className="space-y-5">
+      {(["GIVE", "FOLLOW"] as const).map((kind) => (
+        <RequestTable
+          key={kind}
+          nl={nl}
+          mode={mode}
+          kind={kind}
+          requests={kind === "GIVE" ? offers : asks}
+          onSelect={setSelectedId}
+        />
+      ))}
 
       {selected && (
         <Modal
@@ -207,6 +134,168 @@ export function RequestsBoard({
             onDone={() => setSelectedId(null)}
           />
         </Modal>
+      )}
+    </div>
+  );
+}
+
+function palPlusKindLabel(kind: "GIVE" | "FOLLOW", nl: boolean): string {
+  return kind === "GIVE" ? (nl ? "Aanbod" : "Offer") : nl ? "Hulpvraag" : "Help request";
+}
+
+/** Wat een soort betekent, in een zin: boven de tabel en bovenaan de aanvraag. */
+function palPlusKindLead(kind: "GIVE" | "FOLLOW", nl: boolean): string {
+  return kind === "GIVE"
+    ? nl
+      ? "Iemand wil een sessie geven"
+      : "Someone wants to give a session"
+    : nl
+      ? "Iemand zoekt hulp bij een vak"
+      : "Someone needs help with a course";
+}
+
+/**
+ * De aanvragen van één soort, in hun eigen kaart. Een aanbod en een hulpvraag
+ * vragen elk iets anders van Onderwijs (een sessie plannen tegenover nakijken
+ * en een tutor zoeken), dus staan ze niet door elkaar in één lijst. De kaart
+ * draagt de soort met een rail aan de linkerkant: geel voor een aanbod, inkt
+ * voor een vraag, zodat je ook halverwege een lange lijst ziet waar je zit.
+ */
+function RequestTable({
+  nl,
+  mode,
+  kind,
+  requests,
+  onSelect,
+}: {
+  nl: boolean;
+  mode: "queue" | "processed";
+  kind: "GIVE" | "FOLLOW";
+  requests: PalPlusRequestView[];
+  onSelect: (id: string) => void;
+}) {
+  const give = kind === "GIVE";
+  const headingId = `pp-requests-${kind.toLowerCase()}`;
+  return (
+    <Card className="vtk-palplus-kindcard p-5" data-kind={kind}>
+      <div className="vtk-palplus-kindhead">
+        <h2 id={headingId}>
+          {give ? (nl ? "Aanbiedingen" : "Offers") : nl ? "Hulpvragen" : "Help requests"}
+          <span className="vtk-palplus-kindcount">{requests.length}</span>
+        </h2>
+        <p>{palPlusKindLead(kind, nl)}</p>
+      </div>
+      {requests.length === 0 ? (
+        <p className="text-sm text-vtk-muted">
+          {mode === "queue"
+            ? give
+              ? nl
+                ? "Geen aanbod dat op Onderwijs wacht."
+                : "No offer waiting for Onderwijs."
+              : nl
+                ? "Geen vraag om na te kijken en geen open vraag."
+                : "No request to review and no open request."
+            : nl
+              ? "Nog niets afgehandeld."
+              : "Nothing handled yet."}
+        </p>
+      ) : (
+        <div className="relative overflow-x-auto">
+          <table className="vtk-palplus-table">
+            <thead>
+              <tr>
+                <th scope="col">{nl ? "Vak" : "Course"}</th>
+                <th scope="col">{give ? (nl ? "Tutor" : "Tutor") : nl ? "Wie" : "Who"}</th>
+                {give ? (
+                  <th scope="col">{nl ? "Kan op" : "Can do"}</th>
+                ) : (
+                  mode === "queue" && (
+                    <th scope="col" className="is-num">
+                      {nl ? "Zoeken dit" : "Need this"}
+                    </th>
+                  )
+                )}
+                <th scope="col">{nl ? "Status" : "Status"}</th>
+                <th scope="col">{nl ? "Ingediend" : "Submitted"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {requests.map((request) => {
+                const upcoming = request.moments.filter((moment) => !moment.past);
+                return (
+                  <tr key={request.id} className="vtk-palplus-row" onClick={() => onSelect(request.id)}>
+                    <th scope="row">
+                      <button
+                        type="button"
+                        className="vtk-palplus-rowtitle"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onSelect(request.id);
+                        }}
+                      >
+                        {request.courseLabel}
+                      </button>
+                      {request.courseTyped && !request.courseId && (
+                        <span className="vtk-palplus-sub">
+                          {nl ? "Zelf ingetikt, nog geen vak uit de lijst" : "Typed in, no course from the list yet"}
+                        </span>
+                      )}
+                    </th>
+                    <td data-label={give ? (nl ? "Tutor" : "Tutor") : nl ? "Wie" : "Who"}>
+                      {request.submitterName}
+                      {request.coTutor && request.coTutor.status !== "DECLINED" && (
+                        <span className="vtk-palplus-sub">
+                          {nl ? "met" : "with"} {request.coTutor.name}
+                          {request.coTutor.status === "PENDING" ? (nl ? " (wacht)" : " (waiting)") : ""}
+                        </span>
+                      )}
+                    </td>
+                    {give ? (
+                      <td data-label={nl ? "Kan op" : "Can do"}>
+                        {upcoming[0] ? (
+                          <>
+                            {upcoming[0].label}
+                            {upcoming.length > 1 && (
+                              <span className="vtk-palplus-sub">
+                                {nl ? `of nog ${upcoming.length - 1} andere` : `or ${upcoming.length - 1} more`}
+                              </span>
+                            )}
+                          </>
+                        ) : (
+                          <span className="text-vtk-muted">
+                            {request.moments.length > 0
+                              ? nl
+                                ? "alle momenten voorbij"
+                                : "all moments passed"
+                              : nl
+                                ? "zie opmerking"
+                                : "see note"}
+                          </span>
+                        )}
+                      </td>
+                    ) : (
+                      mode === "queue" && (
+                        <td data-label={nl ? "Zoeken dit" : "Need this"} className="is-num">
+                          {request.askers}
+                        </td>
+                      )
+                    )}
+                    <td data-label={nl ? "Status" : "Status"}>
+                      <span className="vtk-palplus-status" data-status={request.status}>
+                        {canPublishPalPlusRequest(request)
+                          ? nl
+                            ? "Nog na te kijken"
+                            : "Still to review"
+                          : PAL_PLUS_STATUS_LABELS[request.status][nl ? "nl" : "en"]}
+                      </span>
+                    </td>
+                    <td data-label={nl ? "Ingediend" : "Submitted"}>{request.submittedLabel}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
       )}
     </Card>
   );
@@ -254,11 +343,15 @@ function RequestDetail({
 
   return (
     <div className="vtk-palplus-detail">
+      <div className="vtk-palplus-kindtag" data-kind={request.kind}>
+        <strong>{palPlusKindLabel(request.kind, nl)}</strong>
+        <span>{palPlusKindLead(request.kind, nl)}</span>
+      </div>
       <div className="flex flex-wrap items-center gap-2">
         <span className="vtk-palplus-status" data-status={request.status}>
           {PAL_PLUS_STATUS_LABELS[request.status][nl ? "nl" : "en"]}
         </span>
-        {!give && request.status !== "CLOSED" && request.reviewedLabel && (
+        {request.status !== "CLOSED" && request.reviewedLabel && (
           <span className="text-xs text-vtk-muted">{request.reviewedLabel}</span>
         )}
       </div>
@@ -313,13 +406,7 @@ function RequestDetail({
         )}
       </div>
 
-      {give && (request.availability.rows.length > 0 || request.availabilityNote) && (
-        <div>
-          <p className="vtk-palplus-label">{nl ? "Kan meestal" : "Usually available"}</p>
-          <AvailabilityView grid={request.availability} nl={nl} />
-          {request.availabilityNote && <div className="vtk-palplus-text mt-2">{request.availabilityNote}</div>}
-        </div>
-      )}
+      {give && <ProposedMomentsView nl={nl} request={request} />}
 
       {give && request.respondsTo && (
         <div>
@@ -385,19 +472,45 @@ function RequestDetail({
         </section>
       )}
 
+      {canAcceptPalPlusRequest(request) && (
+        <section className="vtk-palplus-action">
+          <h3>{nl ? "Aanbod aanvaarden" : "Accept the offer"}</h3>
+          <p className="mb-3 text-sm text-vtk-muted">
+            {nl
+              ? "Ligt het moment of het lokaal nog niet vast, aanvaard het aanbod dan al: de tutor krijgt een mail dat de sessie doorgaat en ziet \"Aanvaard, moment volgt\". Plannen doe je later vanuit deze aanvraag. Weet je het moment al, plan dan meteen hieronder."
+              : "If the time or room is not fixed yet, accept the offer already: the tutor gets an email that the session is going ahead and sees \"Accepted, time to follow\". You plan it later from this request. If you already know the time, plan it right away below."}
+          </p>
+          <RequestStatusButton
+            nl={nl}
+            id={request.id}
+            action={acceptPalPlusRequestAction}
+            label={nl ? "Aanvaarden, moment volgt" : "Accept, time to follow"}
+            variant="primary"
+            successMessage={nl ? "Aanbod aanvaard. De tutor kreeg een mail." : "Offer accepted. The tutor got an email."}
+            fallbackError={nl ? "Niet aanvaard." : "Not accepted."}
+            onDone={onDone}
+          />
+        </section>
+      )}
+
       {active && (
         <section className="vtk-palplus-action">
-          <h3>{give ? (nl ? "Aanbod aanvaarden" : "Accept the offer") : nl ? "Een sessie plannen" : "Plan a session"}</h3>
+          <h3>{nl ? "Sessie plannen" : "Plan the session"}</h3>
           <p className="mb-3 text-sm text-vtk-muted">
             {give
               ? nl
-                ? "Plan de sessie: de tutors, het vak, de omschrijving en de tags staan al ingevuld. Kies een moment dat in het rooster van de tutor past."
-                : "Plan the session: the tutors, course, description and tags are filled in. Pick a moment that fits the tutor's availability."
+                ? "De tutors, het vak, de omschrijving en de tags staan al ingevuld, en de momenten van de tutor staan klaar om met één klik te kiezen."
+                : "The tutors, course, description and tags are filled in, and the tutor's moments are ready to pick with one click."
               : nl
                 ? "Kies een tutor (of een van de aanbiedingen) en een moment. Wie de vraag stelde, ziet daarna de sessie bij de aanvraag."
                 : "Pick a tutor (or one of the offers) and a moment. Whoever asked then sees the session with the request."}
           </p>
-          <Button type="button" size="sm" onClick={() => setPlanning(true)}>
+          <Button
+            type="button"
+            size="sm"
+            variant={canAcceptPalPlusRequest(request) ? "ghost" : "primary"}
+            onClick={() => setPlanning(true)}
+          >
             {nl ? "Sessie plannen" : "Plan session"}
           </Button>
         </section>
@@ -691,6 +804,10 @@ function PlanFromRequest({
         ...(request.coTutor?.status === "ACCEPTED" ? [{ id: request.coTutor.id, name: request.coTutor.name }] : []),
       ]
     : [];
+  // De momenten van de tutor als keuze boven het sessieformulier, het eerste
+  // dat nog komt al ingevuld.
+  const upcomingMoments = give ? request.moments.filter((moment) => !moment.past) : [];
+  const firstMoment = upcomingMoments[0] ?? null;
   const suggestions: Person[] = give
     ? []
     : request.responses
@@ -704,11 +821,10 @@ function PlanFromRequest({
           {nl ? "Terug naar de aanvraag" : "Back to the request"}
         </Button>
       </div>
-      {give && (request.availability.rows.length > 0 || request.availabilityNote) && (
+      {give && request.availabilityNote && (
         <div>
-          <p className="vtk-palplus-label">{nl ? "Kan meestal" : "Usually available"}</p>
-          <AvailabilityView grid={request.availability} nl={nl} />
-          {request.availabilityNote && <div className="vtk-palplus-text mt-2">{request.availabilityNote}</div>}
+          <p className="vtk-palplus-label">{nl ? "Opmerking bij de momenten" : "Note on the moments"}</p>
+          <div className="vtk-palplus-text">{request.availabilityNote}</div>
         </div>
       )}
       {give && request.coTutor?.status === "PENDING" && (
@@ -732,9 +848,9 @@ function PlanFromRequest({
           courseId: request.courseId ?? "",
           description: request.description,
           tags: request.tags,
-          date: "",
-          startTime: "",
-          endTime: "",
+          date: firstMoment?.date ?? "",
+          startTime: firstMoment?.startTime ?? "",
+          endTime: firstMoment?.endTime ?? "",
           maxParticipants: "",
           roomId: "",
           roomText: "",
@@ -744,9 +860,38 @@ function PlanFromRequest({
         rooms={rooms}
         linkable={linkable}
         tutorSuggestions={suggestions}
+        momentChoices={upcomingMoments}
         tags={tags}
         onDone={onDone}
       />
+    </div>
+  );
+}
+
+/**
+ * De momenten die de tutor voorstelde, met de opmerking eronder. Een voorbij
+ * moment staat doorstreept: het hoorde bij het aanbod, maar plannen kan niet
+ * meer. Een aanbod van voor de momenten heeft er geen; daar staat het oude
+ * weekrooster als tekst in de opmerking.
+ */
+function ProposedMomentsView({ nl, request }: { nl: boolean; request: PalPlusRequestView }) {
+  if (request.moments.length === 0 && !request.availabilityNote) return null;
+  return (
+    <div>
+      <p className="vtk-palplus-label">{nl ? "Kan de sessie geven op" : "Can give the session on"}</p>
+      {request.moments.length > 0 && (
+        <ul className="pp-moments-read vtk-palplus-text">
+          {request.moments.map((moment) => (
+            <li key={`${moment.date}-${moment.startTime}-${moment.endTime}`} data-past={moment.past ? "true" : undefined}>
+              {moment.label}
+              {moment.past && <span className="sr-only">{nl ? " (voorbij)" : " (passed)"}</span>}
+            </li>
+          ))}
+        </ul>
+      )}
+      {request.availabilityNote && (
+        <div className="vtk-palplus-text mt-2 whitespace-pre-line">{request.availabilityNote}</div>
+      )}
     </div>
   );
 }

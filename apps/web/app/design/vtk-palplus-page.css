@@ -171,18 +171,6 @@
   min-width: 0;
 }
 
-.pp-moment-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 14px;
-}
-
-@media (min-width: 560px) {
-  .pp-moment-row {
-    grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 1fr);
-  }
-}
-
 /* De vraag waarop je antwoordt: uitgelicht met de gele rail, zoals elke
    uitgelichte kaart op een licht vlak. Ze staat in de rail en schuift dus mee
    terwijl je je aanbod schrijft. */
@@ -482,6 +470,11 @@
 
 .pp-status[data-status='CLOSED'] {
   color: var(--muted);
+}
+
+/* Aanvaard, moment volgt: tussen wachten (geel) en gepland (inkt) in. */
+.pp-status[data-status='ACCEPTED'] {
+  border-color: var(--ink);
 }
 
 .pp-reason {

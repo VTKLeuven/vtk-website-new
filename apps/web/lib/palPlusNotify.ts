@@ -7,11 +7,11 @@ import { preferredEmail } from "@/lib/brevo/contacts";
 import { derivedGroupMailAddress, groupMailAddress } from "@/lib/groupMail";
 import { siteBaseUrl } from "@/lib/calendar/feeds";
 import {
-  palPlusAvailabilityLines,
   palPlusCourseLabel,
+  palPlusMomentLines,
   palPlusRequestCourseLabel,
   palPlusRoomLabel,
-  readPalPlusAvailability,
+  readPalPlusProposedMoments,
   PAL_PLUS_REMINDER_LEAD_MS,
 } from "@/lib/palPlus";
 import { earnedPalPlusReward } from "@/lib/shift/rewards";
@@ -20,6 +20,7 @@ import {
   palPlusCoTutorAnsweredMail,
   palPlusCoTutorInvitationMail,
   palPlusNewRequestNotificationMail,
+  palPlusRequestAcceptedMail,
   palPlusRequestClosedMail,
   palPlusRequestPublishedMail,
   palPlusRequestReceivedMail,
@@ -29,7 +30,7 @@ import {
   palPlusSessionReminderMail,
   palPlusTutorAssignedMail,
   type PalPlusMail,
-  type PalPlusMailAvailability,
+  type PalPlusMailMoments,
   type PalPlusMailLocale,
   type PalPlusMailRole,
   type PalPlusMailSession,
@@ -202,7 +203,7 @@ const requestSelect = {
   description: true,
   courseOther: true,
   tags: true,
-  availability: true,
+  proposedMoments: true,
   availabilityNote: true,
   preferredPeriod: true,
   reviewNote: true,
@@ -215,14 +216,14 @@ const requestSelect = {
   },
 } as const;
 
-/** Het rooster en de opmerking van een aanbod, in de taal van de ontvanger; `null` bij een vraag. */
-function availabilityOf(
-  request: { kind: "GIVE" | "FOLLOW"; availability: unknown; availabilityNote: string | null },
+/** De momenten en de opmerking van een aanbod, in de taal van de ontvanger; `null` bij een vraag. */
+function momentsOf(
+  request: { kind: "GIVE" | "FOLLOW"; proposedMoments: unknown; availabilityNote: string | null },
   locale: PalPlusMailLocale,
-): PalPlusMailAvailability | null {
+): PalPlusMailMoments | null {
   if (request.kind !== "GIVE") return null;
   return {
-    lines: palPlusAvailabilityLines(readPalPlusAvailability(request.availability), locale),
+    lines: palPlusMomentLines(readPalPlusProposedMoments(request.proposedMoments), locale),
     note: request.availabilityNote,
   };
 }
@@ -247,7 +248,7 @@ export function notifyPalPlusRequestSubmitted(requestId: string): Promise<void> 
           courseLabel: palPlusRequestCourseLabel(request, locale),
           description: request.description,
           tags: request.tags,
-          availability: availabilityOf(request, locale),
+          moments: momentsOf(request, locale),
           coTutorName: request.coTutor?.name ?? null,
           pageUrl: pageUrl(locale),
         }),
@@ -265,7 +266,7 @@ export function notifyPalPlusRequestSubmitted(requestId: string): Promise<void> 
         courseTyped: !request.course,
         description: request.description,
         tags: request.tags,
-        availability: availabilityOf(request, "nl"),
+        moments: momentsOf(request, "nl"),
         coTutorName: request.coTutor?.name ?? null,
         preferredPeriod: request.preferredPeriod,
         respondsToLabel: request.respondsTo ? palPlusRequestCourseLabel(request.respondsTo, "nl") : null,
@@ -296,6 +297,35 @@ export function notifyPalPlusRequestPublished(requestId: string): Promise<void> 
       }),
       { replyTo: await onderwijsAddress() },
     );
+  });
+}
+
+/**
+ * Onderwijs aanvaardde een aanbod; het moment volgt. Naar wie het indiende, en
+ * naar de tweede tutor als die al bevestigde: die geeft de sessie ook.
+ */
+export function notifyPalPlusRequestAccepted(requestId: string): Promise<void> {
+  return safely("mail na het aanvaarden", async () => {
+    const request = await prisma.palPlusRequest.findUnique({ where: { id: requestId }, select: requestSelect });
+    if (!request || request.status !== "ACCEPTED") return;
+    const recipients = [request.user as Recipient];
+    if (request.coTutor && request.coTutorStatus === "ACCEPTED") recipients.push(request.coTutor as Recipient);
+    const onderwijs = await onderwijsAddress();
+    for (const recipient of recipients) {
+      if (recipient.deletedAt !== null) continue;
+      const locale = mailLocale(recipient);
+      await deliver(
+        preferredEmail(recipient),
+        palPlusRequestAcceptedMail({
+          locale,
+          name: greetingName(recipient),
+          courseLabel: palPlusRequestCourseLabel(request, locale),
+          moments: momentsOf(request, locale),
+          pageUrl: pageUrl(locale),
+        }),
+        { replyTo: onderwijs },
+      );
+    }
   });
 }
 
@@ -340,7 +370,7 @@ export function notifyPalPlusCoTutorInvited(requestId: string): Promise<void> {
         courseLabel: palPlusRequestCourseLabel(request, locale),
         description: request.description,
         tags: request.tags,
-        availability: availabilityOf(request, locale),
+        moments: momentsOf(request, locale),
         pageUrl: pageUrl(locale),
       }),
       // Een vraag over het aanbod hoort bij wie het indiende, niet bij Onderwijs.
