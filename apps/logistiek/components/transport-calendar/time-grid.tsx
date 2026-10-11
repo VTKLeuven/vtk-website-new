@@ -6,11 +6,11 @@ import { driverColorVar, type DriverColorOverrides } from '@/lib/driver-colors';
 import { minutesOfDay, placeForDay, startOfBrusselsDay, type Placed } from '@/lib/week-lanes';
 import { BlockContent, blockLabel, blockLook, formatTime } from './trip-block';
 import {
-  BLOCK_GUTTER_PX,
   DAY_HOURS,
   DEFAULT_TRIP_FIELDS,
   ZOOM_MIN,
   hourPxFor,
+  laneBox,
   type AvailabilityBand,
   type CalendarVehicle,
   type TripBlock,
@@ -818,7 +818,6 @@ function TimeBlock({
 }) {
   const top = ((block.from - firstHour * 60) / 60) * hourPx;
   const rawHeight = ((block.to - block.from) / 60) * hourPx;
-  const laneWidth = 100 / block.lanes;
   const look = blockLook({ block, vehicle, showDriver, driverColors, selected });
 
   const style: React.CSSProperties = {
@@ -826,10 +825,10 @@ function TimeBlock({
     top: Math.max(0, top),
     // Minimaal 24px: een kwartierrit moet aanklikbaar blijven, ook uitgezoomd.
     height: Math.max(24, rawHeight - 2),
-    left: `${block.lane * laneWidth}%`,
-    // Min de strook rechts: zie `BLOCK_GUTTER_PX`. Zonder die aftrek is er op
-    // het uur van een rit geen lege plek meer om een tweede rit op te tekenen.
-    width: `calc(${laneWidth}% - ${BLOCK_GUTTER_PX}px)`,
+    // Met de strook rechts van de kolom vrij: zie `BLOCK_GUTTER_PX`. Zonder die
+    // strook is er op het uur van een rit geen lege plek meer om een tweede rit
+    // op te tekenen.
+    ...laneBox(block.lane, block.lanes),
     opacity: dimmed ? 0.4 : look.style.opacity,
   };
 

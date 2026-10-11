@@ -3808,7 +3808,13 @@ lucht om de lucht: een blok liep over de volle breedte van zijn baan, en bij é�
 rit is dat de hele dagkolom. Slepen om een nieuwe rit te tekenen start enkel op
 de kolom zelf, dus over de hele hoogte van een bestaande rit viel er niets meer
 in te tekenen; een tweede rit op datzelfde uur moest via de knop in de werkbalk.
-Dezelfde strook geeft bij overlap meteen ook ruimte tussen de banen.
+
+Die strook staat één keer per dagkolom, rechts van de laatste baan, en niet
+rechts van elk blok. Ze hing eerst aan elk blok, en bij twee ritten naast elkaar
+stond er dan ook een gat van veertien pixels tussen de linker en de rechter. Dat
+las als een vergeten plek en er viel niets in te tekenen dat niet al rechts kon.
+Tussen twee banen zit nu een naad van twee pixels (`LANE_GAP_PX`), even smal als
+die tussen twee ritten onder elkaar.
 
 Om dezelfde reden zijn de uurlijnen en de nu-lijn `pointer-events: none`. Het
 zijn absolute elementen met een rand van één pixel, en zonder die regel is zo'n

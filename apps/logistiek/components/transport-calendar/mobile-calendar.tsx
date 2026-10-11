@@ -9,8 +9,8 @@ import { LogisticsIcon } from '@/components/logistics-icon';
 import type { CalendarEventBar } from './event-bars';
 import { BlockContent, blockLabel, blockLook } from './trip-block';
 import {
-  BLOCK_GUTTER_PX,
   DEFAULT_TRIP_FIELDS,
+  laneBox,
   type AvailabilityBand,
   type CalendarVehicle,
   type TripBlock,
@@ -560,8 +560,7 @@ export function MobileCalendar({
                     // een touchscreen is verticaal vegen scrollen, dus dat gaat
                     // via de +-knop). Het is enkel zodat de twee weergaven er
                     // hetzelfde uitzien en blokken niet tegen de rand plakken.
-                    left: `${(block.lane / block.lanes) * 100}%`,
-                    width: `calc(${(1 / block.lanes) * 100}% - ${BLOCK_GUTTER_PX}px)`,
+                    ...laneBox(block.lane, block.lanes),
                   }}
                 >
                   <BlockContent

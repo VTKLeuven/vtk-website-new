@@ -216,15 +216,39 @@ export const DAY_HOURS = 24;
  * hele hoogte van die rit viel er niets meer in te tekenen: je klikte altijd het
  * blok aan, en een tweede rit op dat uur moest via de knop in de werkbalk.
  *
- * Elke agenda-app houdt daarom die strook vrij. Ze doet meteen dubbel werk: bij
- * overlap staat er ook lucht tussen de banen in plaats van twee blokken die
- * tegen elkaar plakken.
+ * Elke agenda-app houdt daarom die strook vrij, maar één keer per dagkolom: aan
+ * de rechterrand, na de laatste baan. Ze hing eerst aan elk blok, en dan stond
+ * er bij twee ritten naast elkaar ook een gat van veertien pixels tussen de
+ * linker en de rechter, waar niets in te tekenen valt dat niet al op die
+ * rechterrand kan. Tussen de banen zit nu enkel `LANE_GAP_PX`.
  *
  * Gedeeld met de telefoonweergave, waar er niet in getekend wordt (verticaal
  * vegen is daar scrollen): daar is het enkel zodat de twee weergaven er
  * hetzelfde uitzien.
  */
 export const BLOCK_GUTTER_PX = 14;
+
+/**
+ * De naad tussen twee ritten die naast elkaar staan, in pixels. Even smal als
+ * die tussen twee ritten onder elkaar (de hoogte min 2 in `TimeGrid`): genoeg om
+ * twee blokken van dezelfde kleur uit elkaar te houden, te weinig om als lege
+ * plek te lezen.
+ */
+export const LANE_GAP_PX = 2;
+
+/**
+ * Waar een blok staat en hoe breed het is, binnen een dagkolom met `lanes`
+ * banen. De strook rechts (`BLOCK_GUTTER_PX`) gaat eerst van de kolom af, de
+ * rest wordt verdeeld; enkel de laatste baan raakt die strook.
+ */
+export function laneBox(lane: number, lanes: number): { left: string; width: string } {
+  const share = `(100% - ${BLOCK_GUTTER_PX}px) / ${lanes}`;
+  const last = lane === lanes - 1;
+  return {
+    left: `calc(${share} * ${lane})`,
+    width: last ? `calc(${share})` : `calc(${share} - ${LANE_GAP_PX}px)`,
+  };
+}
 
 /**
  * De uurhoogte die bij deze pane-hoogte en deze zoom hoort.
