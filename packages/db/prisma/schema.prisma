@@ -736,6 +736,8 @@ model User {
   praesidiumShiftAliasEdits PraesidiumShiftAlias[]     @relation("PraesidiumShiftAliasUpdatedBy")
   praesidiumShiftContacts   PraesidiumShiftContact[]   @relation("PraesidiumShiftContactUser")
   praesidiumShiftMarks      PraesidiumShiftNecessity[] @relation("PraesidiumShiftNecessityMarkedBy")
+  praesidiumShiftSkips      PraesidiumShiftExemption[] @relation("PraesidiumShiftExemptionUser")
+  praesidiumShiftSkipsSet   PraesidiumShiftExemption[] @relation("PraesidiumShiftExemptionCreatedBy")
 
   createdShortLinks        ShortLink[]             @relation("ShortLinkCreatedBy")
   alumniContacts           AlumniContact[]         @relation("AlumniContactCreatedBy")
@@ -3551,6 +3553,7 @@ model PraesidiumShiftList {
   entries  PraesidiumShiftEntry[]
   names    PraesidiumShiftListName[]
   contacts PraesidiumShiftContact[]
+  skips    PraesidiumShiftExemption[]
 
   @@index([year, kind])
 }
@@ -3637,6 +3640,28 @@ model PraesidiumShiftContact {
   user    User?   @relation("PraesidiumShiftContactUser", fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([listId])
+  @@index([userId])
+}
+
+/// Iemand die op één lijst wordt overgeslagen, ook al staat hij erop:
+/// logistiek die op 24UL als logistiek werkt, krijgt daar geen praesidiumshiften
+/// voor. Zijn vakjes op die lijst tellen niet, en hij telt ook niet mee in het
+/// gemiddelde, de richtlijn en de bellijst van die lijst: wie de hele dag als
+/// logistiek werkt, kan geen praesidiumshiften doen en hoort dus niet als
+/// "ondergemiddeld" opgebeld te worden.
+model PraesidiumShiftExemption {
+  listId String
+  list   PraesidiumShiftList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  userId String
+  user   User                @relation("PraesidiumShiftExemptionUser", fields: [userId], references: [id], onDelete: Cascade)
+  /// Waarom, kort ("Logistiek"). Leeg = geen reden opgegeven.
+  reason String?
+
+  createdById String?
+  createdBy   User?    @relation("PraesidiumShiftExemptionCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([listId, userId])
   @@index([userId])
 }
 

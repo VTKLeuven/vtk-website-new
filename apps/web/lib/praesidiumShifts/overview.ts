@@ -10,13 +10,12 @@ import {
   type RosterMember,
 } from "@/lib/praesidiumShifts/server";
 import {
-  averages,
   detectedOpenSlots,
   entryCounts,
   entryUser,
   entryWeight,
-  memberTotals,
   nameIndex,
+  standings,
   summarizeList,
   type Averages,
   type SlotStat,
@@ -43,8 +42,11 @@ export type OverviewListRow = {
   openSlots: number | null;
   /** Gemiddelde per praesidiumlid op deze lijst. */
   average: number;
-  /** Hoeveel praesidiumleden de richtlijn haalden. */
+  /** Hoeveel praesidiumleden de richtlijn haalden (van wie meetelt). */
   metTarget: number | null;
+  /** Hoeveel praesidiumleden op deze lijst overgeslagen worden, en hoeveel er meetellen. */
+  skipped: number;
+  participants: number;
 };
 
 export type OverviewEntry = {
@@ -55,6 +57,8 @@ export type OverviewEntry = {
   date: string | null;
   weight: number;
   label: string;
+  /** Op deze lijst wordt dit lid overgeslagen: het vakje telt niet. */
+  skipped: boolean;
 };
 
 export type OverviewSiteShift = {
@@ -80,6 +84,12 @@ export type OverviewMember = {
   total: number;
   weeklyPast: number;
   weeklyUpcoming: number;
+  /** Lijsten waarop dit lid overgeslagen wordt. */
+  skippedLists: string[];
+  /** Waarmee dit lid vergeleken wordt: het gemiddelde zonder de overgeslagen lijsten. */
+  expectedLists: number;
+  expectedTotal: number;
+  expectedWeekly: number;
   entries: OverviewEntry[];
   siteShifts: OverviewSiteShift[];
   weekly: OverviewEntry[];
@@ -99,7 +109,7 @@ function isoDay(date: Date | null): string | null {
 }
 
 export async function buildOverview(year: number, locale: "nl" | "en", now = new Date()): Promise<Overview> {
-  const [roster, { lists, entries, names }] = await Promise.all([loadRoster(year, locale), loadYearLists(year)]);
+  const [roster, { lists, entries, names, exemptions }] = await Promise.all([loadRoster(year, locale), loadYearLists(year)]);
   const memberIds = roster.map((m) => m.userId);
   const [participations, phones, postNames] = await Promise.all([
     loadSiteParticipations(year, memberIds),
@@ -113,7 +123,7 @@ export async function buildOverview(year: number, locale: "nl" | "en", now = new
   const activeWeekly = statsLists.filter((l) => l.kind === "WEEKLY" && active.some((a) => a.id === l.id));
   const statsNames: StatsName[] = names;
 
-  const totals = memberTotals({
+  const { rows: totals, averages, listAverages } = standings({
     memberIds,
     eventLists: activeEvent,
     weeklyLists: activeWeekly,
@@ -124,8 +134,10 @@ export async function buildOverview(year: number, locale: "nl" | "en", now = new
       userId: p.userId,
       necessary: Boolean(p.praesidiumNecessity),
     })),
+    exemptions,
     now,
   });
+  const skippedPairs = new Set(exemptions.map((e) => `${e.listId}\u0000${e.userId}`));
 
   // Per lid de vakjes en shiften, voor het detailvenster.
   const index = nameIndex(statsNames);
@@ -146,6 +158,7 @@ export async function buildOverview(year: number, locale: "nl" | "en", now = new
       date: isoDay(entry.date),
       weight: entryWeight(list, entry),
       label: labels.get(`${entry.listId}\u0000${entry.nameKey}`) ?? entry.rawName,
+      skipped: skippedPairs.has(`${entry.listId}\u0000${userId}`),
     };
     const target = list.kind === "EVENT" ? entriesByUser : weeklyByUser;
     const bucket = target.get(userId) ?? [];
@@ -184,6 +197,10 @@ export async function buildOverview(year: number, locale: "nl" | "en", now = new
       total: total.total,
       weeklyPast: total.weeklyPast,
       weeklyUpcoming: total.weeklyUpcoming,
+      skippedLists: total.skippedLists,
+      expectedLists: total.expectedLists,
+      expectedTotal: total.expectedTotal,
+      expectedWeekly: total.expectedWeekly,
       entries: (entriesByUser.get(member.userId) ?? []).sort(byDate),
       siteShifts: siteByUser.get(member.userId) ?? [],
       weekly: (weeklyByUser.get(member.userId) ?? []).sort(byDate),
@@ -192,9 +209,11 @@ export async function buildOverview(year: number, locale: "nl" | "en", now = new
 
   const listRow = (list: (typeof lists)[number]): OverviewListRow => {
     const stats = byId.get(list.id)!;
-    const summary = summarizeList(stats, entries, statsNames);
-    const perMember = roster.map((m) => summary.perUser.get(m.userId) ?? 0);
-    const average = perMember.length ? perMember.reduce((s, v) => s + v, 0) / perMember.length : 0;
+    const skippedHere = new Set(exemptions.filter((e) => e.listId === list.id).map((e) => e.userId));
+    const summary = summarizeList(stats, entries, statsNames, skippedHere);
+    const counted = roster.filter((m) => !skippedHere.has(m.userId));
+    const perMember = counted.map((m) => summary.perUser.get(m.userId) ?? 0);
+    const average = listAverages.get(list.id)?.average ?? (perMember.length ? perMember.reduce((s, v) => s + v, 0) / perMember.length : 0);
     return {
       id: list.id,
       kind: list.kind,
@@ -207,6 +226,8 @@ export async function buildOverview(year: number, locale: "nl" | "en", now = new
       others: summary.others,
       unresolvedNames: summary.unresolvedNames,
       unresolvedShifts: summary.unresolvedShifts,
+      skipped: skippedHere.size,
+      participants: counted.length,
       openSlots: list.openSlots ?? detectedOpenSlots(stats, (list.slots ?? []) as SlotStat[]),
       average,
       metTarget:
@@ -220,7 +241,7 @@ export async function buildOverview(year: number, locale: "nl" | "en", now = new
     year,
     roster,
     members,
-    averages: averages(totals),
+    averages,
     eventLists: lists.filter((l) => l.kind === "EVENT").map(listRow),
     weeklyLists: lists.filter((l) => l.kind === "WEEKLY").map(listRow),
   };

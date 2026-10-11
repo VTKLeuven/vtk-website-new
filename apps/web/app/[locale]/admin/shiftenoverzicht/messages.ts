@@ -30,6 +30,7 @@ export function overviewErrorMessages(locale: Locale): Record<string, string> {
     LIST_NOT_FOUND: nl
       ? "Deze lijst bestaat niet meer; iemand anders heeft ze net verwijderd."
       : "This list no longer exists; someone else just deleted it.",
+    GROUP_REQUIRED: nl ? "Niet opgeslagen: kies een post." : "Not saved: choose a post.",
     ALIAS_NOT_FOUND: nl ? "Deze bijnaam bestaat niet meer." : "This nickname no longer exists.",
     SHIFT_NOT_FOUND: nl
       ? "Niet opgeslagen: deze shift of inschrijving bestaat niet meer."

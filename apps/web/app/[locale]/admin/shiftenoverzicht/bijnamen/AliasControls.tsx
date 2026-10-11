@@ -1,25 +1,28 @@
 "use client";
 
 import { useTransition } from "react";
-import { Input, Label, Select } from "@vtk/ui";
+import { Input, Label } from "@vtk/ui";
+import { SearchPicker, type SearchPickerOption } from "@/components/admin/SearchPicker";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { useToast } from "@/components/ui/toast";
 import { SAVE_IDLE } from "@/lib/saveState";
 import { savePraesidiumShiftAliasAction } from "@/app/actions/praesidiumShifts";
 
-export type AliasOption = { userId: string; label: string };
+export type AliasOption = { userId: string; name: string; hint?: string };
 
-function Options({ options, nl }: { options: AliasOption[]; nl: boolean }) {
-  return (
-    <>
-      {options.map((o) => (
-        <option key={o.userId} value={o.userId}>
-          {o.label}
-        </option>
-      ))}
-      <option value="ignore">{nl ? "Geen praesidium (negeren)" : "Not praesidium (ignore)"}</option>
-    </>
-  );
+function pickerOptions(options: AliasOption[], nl: boolean): SearchPickerOption[] {
+  return [
+    ...options.map((o) => ({ value: o.userId, label: o.name, hint: o.hint, group: nl ? "Praesidium" : "Praesidium" })),
+    { value: "ignore", label: nl ? "Geen praesidium (negeren)" : "Not praesidium (ignore)", group: nl ? "Anders" : "Other", muted: true },
+  ];
+}
+
+function pickerText(nl: boolean, label: string) {
+  return {
+    searchPlaceholder: nl ? "Typ een naam of post" : "Type a name or post",
+    ariaLabel: nl ? `Wie is ${label}?` : `Who is ${label}?`,
+    emptyText: (q: string) => (nl ? `Niemand in het praesidium past bij "${q}".` : `Nobody in the praesidium matches "${q}".`),
+  };
 }
 
 /**
@@ -65,15 +68,14 @@ export function AliasTargetSelect({
   }
 
   return (
-    <select
+    <SearchPicker
       defaultValue={value}
       disabled={pending}
-      onChange={(e) => change(e.currentTarget.value)}
-      aria-label={nl ? `Wie is ${label}?` : `Who is ${label}?`}
-      className="w-full min-w-48 rounded-xl border border-vtk-blue/15 bg-white px-2.5 py-1.5 text-sm disabled:opacity-60"
-    >
-      <Options options={options} nl={nl} />
-    </select>
+      onChange={change}
+      options={pickerOptions(options, nl)}
+      placeholder={nl ? "Kies wie dit is" : "Choose who this is"}
+      {...pickerText(nl, label)}
+    />
   );
 }
 
@@ -104,12 +106,13 @@ export function NewAliasForm({
       </div>
       <div className="w-72">
         <Label htmlFor="alias-target">{nl ? "Is" : "Is"}</Label>
-        <Select id="alias-target" name="target" required defaultValue="">
-          <option value="" disabled>
-            {nl ? "Kies een praesidiumlid" : "Choose a praesidium member"}
-          </option>
-          <Options options={options} nl={nl} />
-        </Select>
+        <SearchPicker
+          id="alias-target"
+          name="target"
+          options={pickerOptions(options, nl)}
+          placeholder={nl ? "Kies een praesidiumlid" : "Choose a praesidium member"}
+          {...pickerText(nl, nl ? "deze bijnaam" : "this nickname")}
+        />
       </div>
     </SaveForm>
   );

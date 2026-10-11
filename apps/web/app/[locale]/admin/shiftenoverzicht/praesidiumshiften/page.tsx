@@ -57,6 +57,7 @@ export default async function PraesidiumWeeklyShifts({
       phone: m.phone,
       past: m.weeklyPast,
       upcoming: m.weeklyUpcoming,
+      expected: m.expectedWeekly,
       next: next ? { date: next.date!, role: next.role } : null,
       perTask,
     };

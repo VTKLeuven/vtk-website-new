@@ -13,6 +13,8 @@ export type WeeklyMember = {
   phone: string | null;
   past: number;
   upcoming: number;
+  /** Het gemiddelde van de roosters waarop dit lid niet overgeslagen wordt. */
+  expected: number;
   /** Volgende praesidiumshift: datum en taak. */
   next: { date: string; role: string | null } | null;
   /** Per taak hoeveel keer, voor de tooltip. */
@@ -44,11 +46,11 @@ export function WeeklyTable({ locale, members, average }: { locale: "nl" | "en";
     const filtered = members.filter((m) => {
       const total = m.past + m.upcoming;
       if (filter === "none") return total === 0;
-      if (filter === "below") return total < average;
+      if (filter === "below") return total < m.expected;
       return true;
     });
     return filtered.sort((a, b) => a.past + a.upcoming - (b.past + b.upcoming) || a.name.localeCompare(b.name, "nl"));
-  }, [members, filter, average]);
+  }, [members, filter]);
   const withPhone = rows.filter((m) => m.phone);
   const none = members.filter((m) => m.past + m.upcoming === 0).length;
 

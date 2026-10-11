@@ -19,6 +19,7 @@ import {
   saveAlias,
   saveNameChoices,
   setNecessity,
+  setExemption,
   LIST_SELECT,
   toStatsList,
 } from "@/lib/praesidiumShifts/server";
@@ -362,4 +363,75 @@ export async function setPraesidiumShiftNecessityAction(formData: FormData): Pro
   });
   revalidateOverview();
   return saveOk();
+}
+
+// ---------------------------------------------------------------------------
+// Iemand overslaan op een lijst
+// ---------------------------------------------------------------------------
+
+/** Eén of meer praesidiumleden op een lijst overslaan of weer laten meetellen. */
+export async function setPraesidiumShiftSkipAction(formData: FormData): Promise<SaveState> {
+  const session = await requirePermission("shift.praesidium");
+  const list = await listOrNull(String(formData.get("listId") ?? ""));
+  if (!list) return saveError("LIST_NOT_FOUND");
+  const userIds = String(formData.get("userIds") ?? "")
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+  if (userIds.length === 0) return saveError("INVALID_INPUT");
+  const skip = formData.get("skip") === "1";
+  const reason = String(formData.get("reason") ?? "").trim().slice(0, 80) || null;
+  const count = await setExemption({ listId: list.id, year: list.year, userIds, skip, reason, actorId: session.user.id });
+  await logAudit({
+    action: "update",
+    entity: "praesidiumShiftList",
+    entityId: list.id,
+    target: list.name,
+    summary: `${count} ${skip ? "overgeslagen" : "telt weer mee"}${reason ? ` (${reason})` : ""}`,
+  });
+  revalidateOverview();
+  return saveOk();
+}
+
+/**
+ * Iedereen van een post op een lijst overslaan ("Logistiek" op 24UL). De
+ * postnaam wordt de reden, zodat de lijst toont waarom.
+ */
+export async function skipPraesidiumShiftPostAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
+  const session = await requirePermission("shift.praesidium");
+  const list = await listOrNull(String(formData.get("listId") ?? ""));
+  if (!list) return saveError("LIST_NOT_FOUND");
+  const groupId = String(formData.get("groupId") ?? "");
+  if (!groupId) return saveError("GROUP_REQUIRED");
+  const group = await prisma.group.findFirst({
+    where: { id: groupId, type: "PRAESIDIUM" },
+    select: { nameNl: true, nameEn: true, memberships: { where: { year: list.year }, select: { userId: true } } },
+  });
+  if (!group) return saveError("GROUP_REQUIRED");
+  const nl = formData.get("locale") !== "en";
+  const reason = (nl ? group.nameNl : group.nameEn).slice(0, 80);
+  const count = await setExemption({
+    listId: list.id,
+    year: list.year,
+    userIds: group.memberships.map((m) => m.userId),
+    skip: true,
+    reason,
+    actorId: session.user.id,
+  });
+  await logAudit({
+    action: "update",
+    entity: "praesidiumShiftList",
+    entityId: list.id,
+    target: list.name,
+    summary: `${reason} overgeslagen (${count})`,
+  });
+  revalidateOverview();
+  if (count === 0) {
+    return saveOk(nl ? `Niemand bijgekomen: wie van ${reason} in het praesidium zit, werd al overgeslagen.` : `Nobody added: everyone from ${reason} was already skipped.`);
+  }
+  return saveOk(
+    nl
+      ? `${count} ${count === 1 ? "lid" : "leden"} van ${reason} ${count === 1 ? "wordt" : "worden"} overgeslagen op ${list.name}.`
+      : `${count} members of ${reason} are skipped on ${list.name}.`,
+  );
 }

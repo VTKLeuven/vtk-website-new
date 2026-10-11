@@ -17,6 +17,7 @@ import {
   detectedOpenSlots,
   entryWeight,
   memberTotals,
+  standings,
   summarizeList,
   type StatsList,
 } from "@/lib/praesidiumShifts/stats";
@@ -350,6 +351,65 @@ describe("tellen", () => {
     });
     expect(rows.find((r) => r.userId === "u-jarne-p")).toMatchObject({ lists: 1.5, siteVoluntary: 1, total: 2.5 });
     expect(rows.find((r) => r.userId === "u-kato")).toMatchObject({ lists: 0, siteNecessary: 1, siteVoluntary: 1, total: 2 });
+  });
+
+  it("slaat iemand over op een lijst: zijn vakjes tellen niet en hij valt uit het gemiddelde van die lijst", () => {
+    const perName: StatsList = { ...list, countMode: "PER_NAME", sheets: [{ name: "Di", kind: "SHIFTS", names: 0, date: null, counted: true }], colors: [] };
+    const cantus: StatsList = { ...perName, id: "l2", name: "Cantus" };
+    const cell = (listId: string, nameKey: string) => ({ listId, nameKey, sheet: "Di", color: null, hours: 2, excluded: false });
+    const rows = [
+      ...Array.from({ length: 6 }, () => cell("l1", "logi")),
+      ...Array.from({ length: 4 }, () => cell("l1", "bram")),
+      ...Array.from({ length: 2 }, () => cell("l1", "lea")),
+      cell("l2", "logi"),
+      cell("l2", "bram"),
+      cell("l2", "bram"),
+    ];
+    const linked = [
+      { listId: "l1", nameKey: "logi", status: "MATCHED" as const, userId: "u-logi" },
+      { listId: "l1", nameKey: "bram", status: "MATCHED" as const, userId: "u-bram" },
+      { listId: "l1", nameKey: "lea", status: "MATCHED" as const, userId: "u-lea" },
+      { listId: "l2", nameKey: "logi", status: "MATCHED" as const, userId: "u-logi" },
+      { listId: "l2", nameKey: "bram", status: "MATCHED" as const, userId: "u-bram" },
+    ];
+
+    const summary = summarizeList(perName, rows, linked, new Set(["u-logi"]));
+    expect(summary).toMatchObject({ praesidium: 6, skipped: 6, counted: 12 });
+    expect(summary.perUser.has("u-logi")).toBe(false);
+
+    const result = standings({
+      memberIds: ["u-logi", "u-bram", "u-lea"],
+      eventLists: [perName, cantus],
+      weeklyLists: [],
+      entries: rows,
+      names: linked,
+      siteShifts: [],
+      exemptions: [{ listId: "l1", userId: "u-logi" }],
+      now: new Date("2026-10-11T12:00:00Z"),
+    });
+    // 24UL: enkel Bram en Lea tellen mee, gemiddeld 3. De cantus: iedereen, gemiddeld 1.
+    expect(result.listAverages.get("l1")).toEqual({ average: 3, participants: 2 });
+    expect(result.listAverages.get("l2")?.average).toBe(1);
+    expect(result.averages.lists).toBe(4);
+    const logi = result.rows.find((r) => r.userId === "u-logi")!;
+    expect(logi).toMatchObject({ lists: 1, skippedLists: ["l1"], expectedLists: 1 });
+    expect(result.rows.find((r) => r.userId === "u-lea")).toMatchObject({ lists: 2, expectedLists: 4 });
+  });
+
+  it("vergelijkt zonder overgeslagen lijsten precies met het gewone gemiddelde", () => {
+    const result = standings({
+      memberIds: ["u-jarne-p", "u-kato"],
+      eventLists: [list],
+      weeklyLists: [],
+      entries,
+      names,
+      siteShifts: [{ shiftId: "s1", userId: "u-kato", necessary: true }],
+      now: new Date("2026-10-11T12:00:00Z"),
+    });
+    const mean = result.rows.reduce((sum, r) => sum + r.lists, 0) / result.rows.length;
+    expect(result.averages.lists).toBe(mean);
+    for (const row of result.rows) expect(row.expectedLists).toBe(mean);
+    expect(result.averages.total).toBe(mean + 0.5);
   });
 
   it("noemt de lege vakjes pas 'open voor VTK' wanneer er een kleur gekozen is", () => {

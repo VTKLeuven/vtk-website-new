@@ -487,7 +487,7 @@ export async function loadYearLists(year: number, kind?: ListKind) {
     select: LIST_SELECT,
   });
   const ids = lists.map((l) => l.id);
-  const [entries, names] = await Promise.all([
+  const [entries, names, exemptions] = await Promise.all([
     prisma.praesidiumShiftEntry.findMany({
       where: { listId: { in: ids } },
       select: {
@@ -509,8 +509,40 @@ export async function loadYearLists(year: number, kind?: ListKind) {
       where: { listId: { in: ids } },
       select: { listId: true, nameKey: true, label: true, status: true, source: true, userId: true },
     }),
+    prisma.praesidiumShiftExemption.findMany({
+      where: { listId: { in: ids } },
+      select: { listId: true, userId: true, reason: true },
+    }),
   ]);
-  return { lists, entries, names };
+  return { lists, entries, names, exemptions };
+}
+
+/**
+ * Iemand op één lijst overslaan, of weer laten meetellen. Enkel wie in het
+ * werkingsjaar van de lijst in het praesidium zit; een ander id wordt stil
+ * genegeerd (de keuzelijst biedt het niet aan).
+ */
+export async function setExemption(input: {
+  listId: string;
+  year: number;
+  userIds: string[];
+  skip: boolean;
+  reason: string | null;
+  actorId: string;
+}): Promise<number> {
+  if (!input.skip) {
+    const { count } = await prisma.praesidiumShiftExemption.deleteMany({
+      where: { listId: input.listId, userId: { in: input.userIds } },
+    });
+    return count;
+  }
+  const roster = new Set((await loadRoster(input.year)).map((m) => m.userId));
+  const userIds = input.userIds.filter((id) => roster.has(id));
+  const { count } = await prisma.praesidiumShiftExemption.createMany({
+    data: userIds.map((userId) => ({ listId: input.listId, userId, reason: input.reason, createdById: input.actorId })),
+    skipDuplicates: true,
+  });
+  return count;
 }
 
 /** Een nummer uit het overzicht van een lijst, voor wie er op zijn profiel geen heeft. */

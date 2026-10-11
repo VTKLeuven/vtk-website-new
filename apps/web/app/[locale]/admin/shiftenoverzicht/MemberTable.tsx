@@ -81,7 +81,7 @@ function DistributionBar({
       </div>
       <span
         className="absolute -top-0.5 -bottom-0.5 w-[2px] rounded-full bg-vtk-ink"
-        style={{ left: `calc(${pct(average)} - 1px)` }}
+        style={{ left: `calc(${pct(Math.min(average, max))} - 1px)` }}
         title={nl ? "Gemiddelde" : "Average"}
       />
     </div>
@@ -165,8 +165,11 @@ export function MemberTable({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const avg = basis === "lists" ? averages.lists : averages.total;
   const valueOf = (m: OverviewMember) => (basis === "lists" ? m.lists : m.total);
+  // Waarmee iemand vergeleken wordt: het gemiddelde zonder de lijsten waarop
+  // hij overgeslagen wordt. Zonder overgeslagen lijsten is dat het gewone
+  // gemiddelde (`averages.lists` of `averages.total`).
+  const expectedOf = (m: OverviewMember) => (basis === "lists" ? m.expectedLists : m.expectedTotal);
   const maxTotal = Math.max(0, ...members.map((m) => m.total));
 
   const rows = useMemo(() => {
@@ -174,8 +177,9 @@ export function MemberTable({
     const filtered = members.filter((m) => {
       if (q && !m.name.toLowerCase().includes(q) && !m.posts.some((p) => p.toLowerCase().includes(q))) return false;
       const value = basis === "lists" ? m.lists : m.total;
-      if (filter === "below") return value < avg;
-      if (filter === "above") return value > avg;
+      const expected = basis === "lists" ? m.expectedLists : m.expectedTotal;
+      if (filter === "below") return value < expected;
+      if (filter === "above") return value > expected;
       return true;
     });
     const key = (m: OverviewMember): number | string => {
@@ -183,7 +187,7 @@ export function MemberTable({
         case "name":
           return m.name.toLowerCase();
         case "delta":
-          return (basis === "lists" ? m.lists : m.total) - avg;
+          return (basis === "lists" ? m.lists - m.expectedLists : m.total - m.expectedTotal);
         default:
           return m[sort.key];
       }
@@ -194,7 +198,7 @@ export function MemberTable({
       const cmp = typeof ka === "string" ? ka.localeCompare(String(kb), "nl") : ka - (kb as number);
       return cmp * sort.dir || a.name.localeCompare(b.name, "nl");
     });
-  }, [members, query, filter, basis, avg, sort]);
+  }, [members, query, filter, basis, sort]);
 
   const selected = members.find((m) => m.userId === selectedId) ?? null;
   const withPhone = rows.filter((m) => m.phone);
@@ -231,10 +235,25 @@ export function MemberTable({
   );
 
   const delta = (m: OverviewMember) => {
-    const d = valueOf(m) - avg;
+    const d = valueOf(m) - expectedOf(m);
     const tone =
       d <= -1 ? "text-vtk-danger" : d >= 1 ? "text-[var(--ok-ink)]" : "text-vtk-muted";
-    return <span className={`font-medium tabular-nums ${tone}`}>{signed(d, locale)}</span>;
+    const skippedNames = m.skippedLists.map((id) => lists.find((l) => l.id === id)?.name).filter(Boolean);
+    return (
+      <span
+        className={`font-medium tabular-nums ${tone}`}
+        title={
+          skippedNames.length
+            ? nl
+              ? `Vergeleken zonder ${skippedNames.join(", ")} (overgeslagen): ${formatCount(expectedOf(m), locale)}`
+              : `Compared without ${skippedNames.join(", ")} (skipped): ${formatCount(expectedOf(m), locale)}`
+            : undefined
+        }
+      >
+        {signed(d, locale)}
+        {skippedNames.length > 0 && <span aria-hidden>*</span>}
+      </span>
+    );
   };
 
   const sum = (pick: (m: OverviewMember) => number) => members.reduce((s, m) => s + pick(m), 0);
@@ -378,7 +397,7 @@ export function MemberTable({
                     <td className="px-2 py-2 text-right font-semibold tabular-nums">{formatCount(m.total, locale)}</td>
                     <td className="px-2 py-2 text-right">{delta(m)}</td>
                     <td className="px-4 py-2">
-                      <DistributionBar member={m} max={maxTotal} average={avg} nl={nl} />
+                      <DistributionBar member={m} max={maxTotal} average={expectedOf(m)} nl={nl} />
                     </td>
                   </tr>
                 ))}
@@ -418,6 +437,13 @@ export function MemberTable({
               </tfoot>
             </table>
           </div>
+          {members.some((m) => m.skippedLists.length > 0) && (
+            <p className="text-xs text-vtk-muted">
+              {nl
+                ? "* Overgeslagen op een lijst (bv. logistiek op 24UL): vergeleken met het gemiddelde zonder die lijst."
+                : "* Skipped on a list (e.g. logistics at 24UL): compared with the average without that list."}
+            </p>
+          )}
         </>
       ) : (
         <div className="relative overflow-x-auto rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated">
@@ -452,6 +478,17 @@ export function MemberTable({
                     </button>
                   </td>
                   {lists.map((list) => {
+                    if (m.skippedLists.includes(list.id)) {
+                      return (
+                        <td
+                          key={list.id}
+                          className="px-2 py-2 text-right text-xs text-vtk-muted"
+                          title={nl ? "Overgeslagen op deze lijst" : "Skipped on this list"}
+                        >
+                          {nl ? "overgeslagen" : "skipped"}
+                        </td>
+                      );
+                    }
                     const value = m.perList[list.id] ?? 0;
                     const short = list.expectedPerMember !== null && value < list.expectedPerMember;
                     return (
@@ -523,7 +560,7 @@ function MemberDetail({
   const nl = locale === "nl";
   const listName = (id: string) => lists.find((l) => l.id === id)?.name ?? "";
   const listIds = [...new Set(member.entries.map((e) => e.listId))];
-  const missing = lists.filter((l) => !(member.perList[l.id] > 0));
+  const missing = lists.filter((l) => !(member.perList[l.id] > 0) && !member.skippedLists.includes(l.id));
 
   return (
     <Modal title={member.name} onClose={onClose} size="lg">
@@ -572,11 +609,19 @@ function MemberDetail({
           {listIds.map((listId) => {
             const list = lists.find((l) => l.id === listId);
             const entries = member.entries.filter((e) => e.listId === listId);
+            const skipped = member.skippedLists.includes(listId);
             const count = member.perList[listId] ?? 0;
             return (
               <div key={listId} className="rounded-xl border border-vtk-blue/10">
                 <div className="flex items-baseline justify-between gap-3 border-b border-vtk-blue/5 px-3 py-2">
-                  <span className="font-medium">{listName(listId)}</span>
+                  <span className="font-medium">
+                    {listName(listId)}
+                    {skipped && (
+                      <span className="ml-2 text-xs font-normal text-vtk-muted">
+                        {nl ? "overgeslagen: telt niet mee" : "skipped: does not count"}
+                      </span>
+                    )}
+                  </span>
                   <span className="tabular-nums">
                     <strong>{formatCount(count, locale)}</strong>
                     {list?.expectedPerMember !== null && list?.expectedPerMember !== undefined && (
@@ -586,7 +631,7 @@ function MemberDetail({
                     )}
                   </span>
                 </div>
-                <ul className="divide-y divide-vtk-blue/5">
+                <ul className={`divide-y divide-vtk-blue/5 ${skipped ? "opacity-60" : ""}`}>
                   {entries.map((entry, i) => (
                     <li key={i} className="grid grid-cols-[7rem_7rem_1fr_auto] gap-2 px-3 py-1.5 text-xs text-vtk-body max-sm:grid-cols-2">
                       <span>{shortDate(entry.date, locale) || entry.sheet}</span>

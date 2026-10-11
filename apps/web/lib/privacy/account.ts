@@ -352,6 +352,7 @@ export async function eraseUserData(userId: string) {
       // ze in de spreadsheet stond, maar niet meer gekoppeld aan het account.
       await tx.praesidiumShiftAlias.deleteMany({ where: { userId } });
       await tx.praesidiumShiftContact.deleteMany({ where: { userId } });
+      await tx.praesidiumShiftExemption.deleteMany({ where: { userId } });
       await tx.praesidiumShiftListName.updateMany({
         where: { userId },
         data: { userId: null, status: "IGNORED", source: "MANUAL" },

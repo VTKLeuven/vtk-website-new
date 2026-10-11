@@ -60,7 +60,7 @@ export default async function PraesidiumShiftListPage({
   });
   if (!list) notFound();
 
-  const [entries, names, contacts, roster, aliases] = await Promise.all([
+  const [entries, names, contacts, roster, aliases, skips, posts] = await Promise.all([
     prisma.praesidiumShiftEntry.findMany({
       where: { listId: id },
       orderBy: [{ date: "asc" }, { sheet: "asc" }],
@@ -74,11 +74,20 @@ export default async function PraesidiumShiftListPage({
     prisma.praesidiumShiftContact.findMany({ where: { listId: id }, select: { nameKey: true, kring: true } }),
     loadRoster(list.year, locale),
     loadAliasMap(),
+    prisma.praesidiumShiftExemption.findMany({ where: { listId: id }, select: { userId: true, reason: true } }),
+    prisma.group.findMany({
+      where: { type: "PRAESIDIUM", memberships: { some: { year: list.year } } },
+      orderBy: { orderInPraesidium: "asc" },
+      select: { id: true, nameNl: true, nameEn: true, _count: { select: { memberships: { where: { year: list.year } } } } },
+    }),
   ]);
+  const skipReason = new Map(skips.map((s) => [s.userId, s.reason]));
+  const skippedUsers = new Set(skipReason.keys());
   const phones = await listPhones(roster.filter((m) => !m.phone).map((m) => m.userId));
 
   const stats = toStatsList(list);
-  const summary = summarizeList(stats, entries, names);
+  const summary = summarizeList(stats, entries, names, skippedUsers);
+  const allCounts = summarizeList(stats, entries, names).perUser;
   const messages = overviewErrorMessages(locale);
   const draft = list.status === "DRAFT";
   const tabHref = `${base}/admin/shiftenoverzicht${list.kind === "WEEKLY" ? "/praesidiumshiften" : ""}?jaar=${list.year}`;
@@ -118,16 +127,21 @@ export default async function PraesidiumShiftListPage({
     name: member.name,
     posts: member.posts,
     phone: member.phone ?? phones.get(member.userId) ?? null,
-    count: summary.perUser.get(member.userId) ?? 0,
+    count: allCounts.get(member.userId) ?? 0,
     slots: entries
       .filter((e) => nameUser.get(e.nameKey) === member.userId && entryCounts(stats, e))
       .map((e) => where(e)),
+    skipped: skippedUsers.has(member.userId),
+    skipReason: skipReason.get(member.userId) ?? null,
   }));
-  const average = roster.length ? resultMembers.reduce((s, m) => s + m.count, 0) / roster.length : 0;
+  const countedMembers = resultMembers.filter((m) => !m.skipped);
+  const average = countedMembers.length
+    ? countedMembers.reduce((s, m) => s + m.count, 0) / countedMembers.length
+    : 0;
   const detectedOpen = detectedOpenSlots(stats, (list.slots ?? []) as SlotStat[]);
   const openSlots = list.openSlots ?? detectedOpen;
   const metTarget =
-    list.expectedPerMember !== null ? resultMembers.filter((m) => m.count >= (list.expectedPerMember ?? 0)).length : null;
+    list.expectedPerMember !== null ? countedMembers.filter((m) => m.count >= (list.expectedPerMember ?? 0)).length : null;
   const excludedCount = entries.filter((e) => e.excluded).length;
 
   const settings = (
@@ -171,19 +185,28 @@ export default async function PraesidiumShiftListPage({
       hint: nl ? "werkgroepen, andere kringen" : "werkgroepen, other associations",
     },
     { label: nl ? "Zonder keuze" : "Without a choice", value: formatCount(summary.unresolvedShifts, locale) },
+    ...(summary.skipped > 0 || skippedUsers.size > 0
+      ? [
+          {
+            label: nl ? "Overgeslagen" : "Skipped",
+            value: formatCount(summary.skipped, locale),
+            hint: nl ? `${skippedUsers.size} ${skippedUsers.size === 1 ? "lid" : "leden"}` : `${skippedUsers.size} members`,
+          },
+        ]
+      : []),
     { label: nl ? "Gemiddeld per lid" : "Average per member", value: formatCount(average, locale) },
   ];
   if (list.kind === "EVENT") {
     facts.push({
       label: nl ? "Richtlijn gehaald" : "Target reached",
-      value: metTarget !== null ? `${metTarget}/${roster.length}` : nl ? "geen richtlijn" : "no target",
+      value: metTarget !== null ? `${metTarget}/${countedMembers.length}` : nl ? "geen richtlijn" : "no target",
     });
     facts.push({ label: nl ? "Nog open voor VTK" : "Still open for VTK", value: openSlots !== null ? String(openSlots) : "?" });
   }
 
   const result = (
     <Section title={nl ? "Resultaat" : "Result"}>
-      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-[18px] border border-vtk-blue/10 bg-vtk-blue/10 sm:grid-cols-4 lg:grid-cols-7">
+      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-[18px] border border-vtk-blue/10 bg-vtk-blue/10 sm:grid-cols-4 lg:grid-cols-4">
         {facts.map((fact) => (
           <div key={fact.label} className="bg-vtk-surface-elevated px-3 py-2.5">
             <dt className="text-xs text-vtk-muted">{fact.label}</dt>
@@ -200,7 +223,15 @@ export default async function PraesidiumShiftListPage({
         </p>
       )}
       {roster.length > 0 ? (
-        <ListResult locale={locale} members={resultMembers} expected={list.expectedPerMember} average={average} />
+        <ListResult
+          locale={locale}
+          listId={list.id}
+          members={resultMembers}
+          expected={list.expectedPerMember}
+          average={average}
+          posts={posts.map((p) => ({ id: p.id, name: nl ? p.nameNl : p.nameEn, members: p._count.memberships }))}
+          errorMessages={messages}
+        />
       ) : (
         <p className="text-sm text-vtk-muted">
           {nl

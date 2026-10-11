@@ -82,6 +82,13 @@ export function entryUser(index: Map<string, StatsName>, entry: Pick<StatsEntry,
   return name && name.status === "MATCHED" && name.userId ? name.userId : null;
 }
 
+/** Iemand die op één lijst overgeslagen wordt (logistiek die als logistiek werkt). */
+export type StatsExemption = { listId: string; userId: string };
+
+function pairKey(listId: string, userId: string): string {
+  return `${listId}\u0000${userId}`;
+}
+
 export type ListSummary = {
   /** Shiften die meetellen op deze lijst (alle namen, ook van wie geen praesidium is). */
   counted: number;
@@ -89,20 +96,29 @@ export type ListSummary = {
   praesidium: number;
   /** Door iemand die bewust geen praesidium is (werkgroep, andere kring, genegeerd). */
   others: number;
+  /** Door een praesidiumlid dat op deze lijst overgeslagen wordt. */
+  skipped: number;
   /** Namen die nog op een keuze wachten, en hoeveel shiften daaraan hangen. */
   unresolvedNames: number;
   unresolvedShifts: number;
-  /** Per praesidiumlid. */
+  /** Per praesidiumlid dat meetelt. */
   perUser: Map<string, number>;
 };
 
-export function summarizeList(list: StatsList, entries: StatsEntry[], names: StatsName[]): ListSummary {
+export function summarizeList(
+  list: StatsList,
+  entries: StatsEntry[],
+  names: StatsName[],
+  /** Wie op deze lijst overgeslagen wordt. */
+  skippedUsers: ReadonlySet<string> = new Set(),
+): ListSummary {
   const index = nameIndex(names);
   const perUser = new Map<string, number>();
   const unresolved = new Set<string>();
   let counted = 0;
   let praesidium = 0;
   let others = 0;
+  let skipped = 0;
   let unresolvedShifts = 0;
   for (const entry of entries) {
     if (entry.listId !== list.id || !entryCounts(list, entry)) continue;
@@ -110,7 +126,9 @@ export function summarizeList(list: StatsList, entries: StatsEntry[], names: Sta
     counted += weight;
     const name = index.get(`${entry.listId}\u0000${entry.nameKey}`);
     const userId = entryUser(index, entry);
-    if (userId) {
+    if (userId && skippedUsers.has(userId)) {
+      skipped += weight;
+    } else if (userId) {
       praesidium += weight;
       perUser.set(userId, (perUser.get(userId) ?? 0) + weight);
     } else if (!name || name.status === "UNRESOLVED" || (name.status === "MATCHED" && !name.userId)) {
@@ -120,7 +138,7 @@ export function summarizeList(list: StatsList, entries: StatsEntry[], names: Sta
       others += weight;
     }
   }
-  return { counted, praesidium, others, unresolvedNames: unresolved.size, unresolvedShifts, perUser };
+  return { counted, praesidium, others, skipped, unresolvedNames: unresolved.size, unresolvedShifts, perUser };
 }
 
 export function average(values: number[]): number {
@@ -132,6 +150,7 @@ export type MemberTotals = {
   userId: string;
   /** Som over de shiftenlijsten van evenementen. */
   lists: number;
+  /** Per lijst (evenementen en roosters). */
   perList: Map<string, number>;
   siteNecessary: number;
   siteVoluntary: number;
@@ -141,21 +160,60 @@ export type MemberTotals = {
   /** Wekelijkse praesidiumshiften: al voorbij en nog te komen. */
   weeklyPast: number;
   weeklyUpcoming: number;
+  /** Lijsten waarop dit lid overgeslagen wordt. */
+  skippedLists: string[];
+  /**
+   * Wat het gemiddelde lid deed op de lijsten waar dit lid meetelt. Zonder
+   * overgeslagen lijsten is dat gewoon het gemiddelde; wie op 24UL als
+   * logistiek werkte, wordt vergeleken zonder 24UL.
+   */
+  expectedLists: number;
+  expectedTotal: number;
+  expectedWeekly: number;
+};
+
+export type ListAverage = {
+  /** Gemiddelde over wie op deze lijst meetelt. */
+  average: number;
+  /** Hoeveel praesidiumleden op deze lijst meetellen. */
+  participants: number;
+};
+
+export type Averages = {
+  /**
+   * Shiftenlijsten: de som van het gemiddelde per lijst. Zolang niemand
+   * overgeslagen wordt, is dat precies het gemiddelde van ieders totaal.
+   */
+  lists: number;
+  siteNecessary: number;
+  siteVoluntary: number;
+  site: number;
+  total: number;
+  weekly: number;
+};
+
+export type Standings = {
+  rows: MemberTotals[];
+  averages: Averages;
+  listAverages: Map<string, ListAverage>;
 };
 
 /**
  * De stand per praesidiumlid. Iedereen uit `memberIds` krijgt een rij, ook wie
- * nergens op staat: een nul is precies wat de vice zoekt.
+ * nergens op staat: een nul is precies wat de vice zoekt. Wie op een lijst
+ * overgeslagen wordt, krijgt daar niets en telt daar niet mee in het
+ * gemiddelde.
  */
-export function memberTotals(input: {
+export function standings(input: {
   memberIds: string[];
   eventLists: StatsList[];
   weeklyLists: StatsList[];
   entries: (StatsEntry & { date?: Date | null })[];
   names: StatsName[];
   siteShifts: StatsSiteShift[];
+  exemptions?: StatsExemption[];
   now: Date;
-}): MemberTotals[] {
+}): Standings {
   const rows = new Map<string, MemberTotals>();
   for (const userId of input.memberIds) {
     rows.set(userId, {
@@ -168,11 +226,22 @@ export function memberTotals(input: {
       total: 0,
       weeklyPast: 0,
       weeklyUpcoming: 0,
+      skippedLists: [],
+      expectedLists: 0,
+      expectedTotal: 0,
+      expectedWeekly: 0,
     });
   }
   const index = nameIndex(input.names);
   const lists = new Map<string, StatsList>();
   for (const list of [...input.eventLists, ...input.weeklyLists]) lists.set(list.id, list);
+  const skipped = new Set<string>();
+  for (const { listId, userId } of input.exemptions ?? []) {
+    const row = rows.get(userId);
+    if (!row || !lists.has(listId)) continue;
+    skipped.add(pairKey(listId, userId));
+    row.skippedLists.push(listId);
+  }
   const today = new Date(Date.UTC(input.now.getUTCFullYear(), input.now.getUTCMonth(), input.now.getUTCDate()));
 
   for (const entry of input.entries) {
@@ -180,11 +249,11 @@ export function memberTotals(input: {
     if (!list || !entryCounts(list, entry)) continue;
     const userId = entryUser(index, entry);
     const row = userId ? rows.get(userId) : undefined;
-    if (!row) continue;
+    if (!row || skipped.has(pairKey(list.id, row.userId))) continue;
     const weight = entryWeight(list, entry);
+    row.perList.set(list.id, (row.perList.get(list.id) ?? 0) + weight);
     if (list.kind === "EVENT") {
       row.lists += weight;
-      row.perList.set(list.id, (row.perList.get(list.id) ?? 0) + weight);
     } else if (entry.date && entry.date >= today) {
       row.weeklyUpcoming += weight;
     } else {
@@ -199,31 +268,47 @@ export function memberTotals(input: {
     else row.siteVoluntary += 1;
   }
 
-  for (const row of rows.values()) {
+  const listAverages = new Map<string, ListAverage>();
+  for (const list of lists.values()) {
+    const counted = [...rows.values()].filter((row) => !skipped.has(pairKey(list.id, row.userId)));
+    listAverages.set(list.id, {
+      average: average(counted.map((row) => row.perList.get(list.id) ?? 0)),
+      participants: counted.length,
+    });
+  }
+  const sumOf = (kind: ListKind, userId?: string) =>
+    [...lists.values()]
+      .filter((list) => list.kind === kind && (!userId || !skipped.has(pairKey(list.id, userId))))
+      .reduce((sum, list) => sum + (listAverages.get(list.id)?.average ?? 0), 0);
+
+  const all = [...rows.values()];
+  const siteAverage = average(all.map((row) => row.siteNecessary + row.siteVoluntary));
+  for (const row of all) {
     row.site = row.siteNecessary + row.siteVoluntary;
     row.total = row.lists + row.site;
+    row.expectedLists = sumOf("EVENT", row.userId);
+    row.expectedWeekly = sumOf("WEEKLY", row.userId);
+    row.expectedTotal = row.expectedLists + siteAverage;
   }
-  return [...rows.values()];
+
+  const listsAverage = sumOf("EVENT");
+  return {
+    rows: all,
+    listAverages,
+    averages: {
+      lists: listsAverage,
+      siteNecessary: average(all.map((row) => row.siteNecessary)),
+      siteVoluntary: average(all.map((row) => row.siteVoluntary)),
+      site: siteAverage,
+      total: listsAverage + siteAverage,
+      weekly: sumOf("WEEKLY"),
+    },
+  };
 }
 
-export type Averages = {
-  lists: number;
-  siteNecessary: number;
-  siteVoluntary: number;
-  site: number;
-  total: number;
-  weekly: number;
-};
-
-export function averages(rows: MemberTotals[]): Averages {
-  return {
-    lists: average(rows.map((r) => r.lists)),
-    siteNecessary: average(rows.map((r) => r.siteNecessary)),
-    siteVoluntary: average(rows.map((r) => r.siteVoluntary)),
-    site: average(rows.map((r) => r.site)),
-    total: average(rows.map((r) => r.total)),
-    weekly: average(rows.map((r) => r.weeklyPast + r.weeklyUpcoming)),
-  };
+/** De rijen van `standings`, voor wie de gemiddelden niet nodig heeft. */
+export function memberTotals(input: Parameters<typeof standings>[0]): MemberTotals[] {
+  return standings(input).rows;
 }
 
 /** Lege vakjes in een kleur en op een tabblad die meetellen: de suggestie voor "nog open". */

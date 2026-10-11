@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { SaveForm } from "@/components/ui/SaveForm";
+import { SearchPicker, type SearchPickerOption } from "@/components/admin/SearchPicker";
 import { formatCount } from "@/lib/praesidiumShifts/stats";
 import { savePraesidiumShiftNamesAction } from "@/app/actions/praesidiumShifts";
 
@@ -79,64 +80,64 @@ function SourceBadge({ row, nl, roster }: { row: NameRowData; nl: boolean; roste
   );
 }
 
+function pickerOptions(row: NameRowData, roster: RosterOption[], nl: boolean): SearchPickerOption[] {
+  const likely = roster.filter((r) => row.candidates.includes(r.userId));
+  const rest = roster.filter((r) => !row.candidates.includes(r.userId));
+  const person = (r: RosterOption, group: string): SearchPickerOption => ({
+    value: r.userId,
+    label: r.name,
+    hint: r.posts.join(", ") || undefined,
+    group,
+  });
+  return [
+    { value: "", label: nl ? "Nog niet gekozen" : "Not chosen yet", muted: true },
+    ...likely.map((r) => person(r, nl ? "Waarschijnlijk" : "Likely")),
+    ...rest.map((r) => person(r, nl ? "Praesidium" : "Praesidium")),
+    {
+      value: "ignore",
+      label: nl ? "Geen praesidium (niet meetellen)" : "Not praesidium (do not count)",
+      group: nl ? "Anders" : "Other",
+      muted: true,
+    },
+  ];
+}
+
+const GRID = "grid gap-x-4 gap-y-2 sm:grid-cols-[minmax(0,1.2fr)_minmax(0,1.5fr)_8.5rem_5.5rem] sm:items-center";
+
 function Row({ row, nl, roster }: { row: NameRowData; nl: boolean; roster: RosterOption[] }) {
   const value = row.status === "MATCHED" ? row.userId ?? "" : row.status === "IGNORED" ? "ignore" : "";
-  const candidates = roster.filter((r) => row.candidates.includes(r.userId));
-  const rest = roster.filter((r) => !row.candidates.includes(r.userId));
   return (
-    <tr className="border-b border-vtk-blue/5 last:border-0 align-top">
-      <td className="px-4 py-2.5">
+    <li className={`${GRID} border-b border-vtk-blue/5 px-4 py-3 last:border-0`}>
+      <div className="min-w-0">
         <input type="hidden" name="nameKey" value={row.nameKey} />
         <div className="font-medium text-vtk-ink">{row.label}</div>
-        <div className="text-xs text-vtk-muted">
+        <div className="truncate text-xs text-vtk-muted" title={row.where}>
           {nl
             ? `${formatCount(row.shifts)} ${row.shifts === 1 ? "shift" : "shiften"}`
             : `${formatCount(row.shifts, "en")} ${row.shifts === 1 ? "shift" : "shifts"}`}
           {row.where ? ` · ${row.where}` : ""}
         </div>
-      </td>
-      <td className="px-2 py-2.5">
-        <select
-          name={`choice:${row.nameKey}`}
-          defaultValue={value}
-          aria-label={nl ? `Wie is ${row.label}?` : `Who is ${row.label}?`}
-          className={`w-full min-w-48 rounded-xl border bg-white px-2.5 py-1.5 text-sm ${
-            row.status === "UNRESOLVED" ? "border-vtk-yellow-dark" : "border-vtk-blue/15"
-          }`}
-        >
-          <option value="">{nl ? "Kies wie dit is" : "Choose who this is"}</option>
-          {candidates.length > 0 && (
-            <optgroup label={nl ? "Waarschijnlijk" : "Likely"}>
-              {candidates.map((r) => (
-                <option key={r.userId} value={r.userId}>
-                  {r.name}
-                  {r.posts.length ? ` (${r.posts.join(", ")})` : ""}
-                </option>
-              ))}
-            </optgroup>
-          )}
-          <optgroup label={nl ? "Praesidium" : "Praesidium"}>
-            {rest.map((r) => (
-              <option key={r.userId} value={r.userId}>
-                {r.name}
-                {r.posts.length ? ` (${r.posts.join(", ")})` : ""}
-              </option>
-            ))}
-          </optgroup>
-          <option value="ignore">{nl ? "Geen praesidium (niet meetellen)" : "Not praesidium (do not count)"}</option>
-        </select>
-      </td>
-      <td className="px-2 py-2.5">
+      </div>
+      <SearchPicker
+        name={`choice:${row.nameKey}`}
+        defaultValue={value}
+        options={pickerOptions(row, roster, nl)}
+        placeholder={nl ? "Kies wie dit is" : "Choose who this is"}
+        searchPlaceholder={nl ? "Typ een naam of post" : "Type a name or post"}
+        ariaLabel={nl ? `Wie is ${row.label}?` : `Who is ${row.label}?`}
+        emptyText={(q) => (nl ? `Niemand in het praesidium past bij "${q}".` : `Nobody in the praesidium matches "${q}".`)}
+        attention={row.status === "UNRESOLVED"}
+      />
+      <div>
         <SourceBadge row={row} nl={nl} roster={roster} />
-      </td>
-      <td className="px-4 py-2.5 text-center">
+      </div>
+      <label className="flex items-center gap-2 text-xs text-vtk-muted sm:justify-center">
         <input
           type="checkbox"
           name="remember"
           value={row.nameKey}
           defaultChecked={row.hasAlias || !row.ambiguous}
           className="size-4 accent-vtk-ink"
-          aria-label={nl ? `${row.label} onthouden als bijnaam` : `Remember ${row.label} as a nickname`}
           title={
             row.ambiguous
               ? nl
@@ -147,35 +148,37 @@ function Row({ row, nl, roster }: { row: NameRowData; nl: boolean; roster: Roste
                 : "If you change the choice, it also applies to the next lists."
           }
         />
-      </td>
-    </tr>
+        <span className="sm:sr-only">{nl ? "Onthouden" : "Remember"}</span>
+      </label>
+    </li>
   );
 }
 
 function Group({ title, rows, nl, roster, children }: { title: string; rows: NameRowData[]; nl: boolean; roster: RosterOption[]; children?: ReactNode }) {
   if (rows.length === 0) return null;
   return (
-    <div className="relative overflow-x-auto rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated">
-      <table className="w-full min-w-[640px] text-sm">
-        <caption className="px-4 pt-3 text-left text-sm font-semibold text-vtk-ink">
+    <section className="rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated">
+      <div className="px-4 pt-3 pb-2">
+        <h3 className="text-sm font-semibold text-vtk-ink">
           {title} <span className="font-normal text-vtk-muted">({rows.length})</span>
-          {children}
-        </caption>
-        <thead className="border-b border-vtk-blue/10 text-left text-xs font-semibold text-vtk-muted">
-          <tr>
-            <th className="px-4 py-2">{nl ? "Op de lijst" : "On the list"}</th>
-            <th className="px-2 py-2">{nl ? "Is" : "Is"}</th>
-            <th className="px-2 py-2">{nl ? "Herkend als" : "Recognised as"}</th>
-            <th className="px-4 py-2 text-center">{nl ? "Onthouden" : "Remember"}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <Row key={row.nameKey} row={row} nl={nl} roster={roster} />
-          ))}
-        </tbody>
-      </table>
-    </div>
+        </h3>
+        {children}
+      </div>
+      <div
+        className={`${GRID} hidden border-y border-vtk-blue/10 bg-[var(--paper-2)] px-4 py-2 text-[11px] font-bold uppercase tracking-[0.08em] text-vtk-muted sm:grid`}
+        aria-hidden
+      >
+        <span>{nl ? "Op de lijst" : "On the list"}</span>
+        <span>{nl ? "Is" : "Is"}</span>
+        <span>{nl ? "Herkend als" : "Recognised as"}</span>
+        <span className="text-center">{nl ? "Onthouden" : "Remember"}</span>
+      </div>
+      <ul>
+        {rows.map((row) => (
+          <Row key={row.nameKey} row={row} nl={nl} roster={roster} />
+        ))}
+      </ul>
+    </section>
   );
 }
 
