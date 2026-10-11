@@ -64,10 +64,74 @@
 /* Het formulier                                                               */
 /* -------------------------------------------------------------------------- */
 
-.pp-form-panel {
-  max-width: 760px;
-  padding: clamp(22px, 3vw, 32px);
+/* Het formulier vervangt de twee keuzekaarten en neemt dus hun volle breedte
+   in, zoals een contentpagina: het paneel als tekstkolom, met een rail in de
+   marge. Een smal paneel links liet rechts een leeg vlak van 480 pixels staan;
+   een gecentreerd paneel zweefde los van de titel en de secties eronder, die
+   allebei op de linkerrand van de pagina staan. */
+.pp-form-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: clamp(24px, 3vw, 34px);
   scroll-margin-top: 96px;
+}
+
+@media (min-width: 980px) {
+  .pp-form-layout {
+    grid-template-columns: minmax(0, 1fr) 280px;
+    gap: clamp(32px, 4vw, 56px);
+    align-items: start;
+  }
+}
+
+.pp-form-panel {
+  min-width: 0;
+  padding: clamp(22px, 3vw, 32px);
+}
+
+/* Smal scherm: de rail staat boven het formulier. De uitleg en de vraag
+   waarop je antwoordt, lees je voor je begint te typen, niet erna. */
+.pp-form-rail {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+
+@media (max-width: 979px) {
+  .pp-form-rail {
+    order: -1;
+  }
+}
+
+@media (min-width: 980px) {
+  .pp-form-rail {
+    position: sticky;
+    top: 96px;
+  }
+}
+
+/* Een register in de marge, zoals de rail van een contentpagina: een haarlijn
+   als geleider en een uppercase label, geen tweede kaart naast het paneel. */
+.pp-form-how {
+  padding-left: 13px;
+  border-left: 1px solid var(--line-2);
+}
+
+.pp-form-how h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.pp-form-how p {
+  margin: 10px 0 0;
+  color: var(--body);
+  font-size: 14px;
+  line-height: 1.6;
 }
 
 .pp-form-title {
@@ -108,12 +172,13 @@
 }
 
 /* De vraag waarop je antwoordt: uitgelicht met de gele rail, zoals elke
-   uitgelichte kaart op een licht vlak. */
+   uitgelichte kaart op een licht vlak. Ze staat in de rail en schuift dus mee
+   terwijl je je aanbod schrijft. */
 .pp-responding {
-  margin-top: 18px;
   padding: 14px 16px;
+  border: 1px solid var(--line);
   border-radius: 14px;
-  background: var(--paper);
+  background: var(--surface);
   box-shadow: inset 3px 0 0 var(--yellow);
 }
 
