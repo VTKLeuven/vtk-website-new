@@ -158,6 +158,9 @@ export function getAdminNav(): NavEntry[] {
       // Direct onder Posten: dezelfde posten, maar gelezen als "bij wie moet ik
       // zijn voor X". Zichtbaar voor elk praesidiumlid, niet enkel voor beheer.
       item('tasks', '/wie-doet-wat', { anyPerm: ['tasks.view', 'tasks.manageOwn', 'tasks.manage'] }),
+      // Ook over het praesidium zelf: wie hoeveel shiften opnam op de lijsten
+      // van de grote evenementen en op /shift. Werk van de vice.
+      item('praesidiumShifts', '/shiftenoverzicht', { perm: 'shift.praesidium' }),
       item('werkgroepen', '/werkgroepen', { werkgroep: true }),
       item('roles', '/roles', { perm: 'roles.manage' }),
       // Alumni is een adresboek per lichting, geen opt-in mailinglijst: een

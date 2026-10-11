@@ -18,7 +18,7 @@
   --body: #34405e;
   /* Muted text on a navy/ink ground (intentional dark bands only). */
   --on-dark-muted: #b7c0dc;
-  /* Grafieken (/admin/mailinglijsten). Drie categorische kleuren in vaste
+  /* Grafieken (/admin/mailinglijsten, /admin/shiftenoverzicht). Drie categorische kleuren in vaste
      volgorde, samen gevalideerd tegen --surface op kleurenblindheid (elk paar
      dE >= 11,9) en op onderscheid bij gewoon zicht; hertune ze enkel met die
      controle erbij. Het amber haalt geen 3:1 op wit, dus elke grafiek met deze

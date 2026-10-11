@@ -346,6 +346,16 @@ export async function eraseUserData(userId: string) {
       await tx.userDashboardTilePref.deleteMany({ where: { userId } });
       await tx.dashboardTile.deleteMany({ where: { userId } });
       await tx.shiftParticipant.deleteMany({ where: { userId } });
+      // Shiftenoverzicht praesidium: een bijnaam en een nummer uit het
+      // overzicht van een shiftenlijst zijn persoonsgegevens die enkel via
+      // deze persoon bestaan. Op de lijsten zelf blijft de naam staan zoals
+      // ze in de spreadsheet stond, maar niet meer gekoppeld aan het account.
+      await tx.praesidiumShiftAlias.deleteMany({ where: { userId } });
+      await tx.praesidiumShiftContact.deleteMany({ where: { userId } });
+      await tx.praesidiumShiftListName.updateMany({
+        where: { userId },
+        data: { userId: null, status: "IGNORED", source: "MANUAL" },
+      });
       await tx.ticketEventUserGrant.deleteMany({ where: { userId } });
       await tx.formUserGrant.deleteMany({ where: { userId } });
 

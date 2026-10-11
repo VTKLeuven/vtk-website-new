@@ -91,6 +91,9 @@ export const MCP_PERMISSION_POLICY = {
   // zet, zet die stil op elke toekomstige editie.
   "shift.templates": { reads: [], creates: [], blocked: ["create or edit shift templates"] },
   "shift.manual": { reads: [], creates: [], blocked: ["manually grant or revoke extra shifts"] },
+  // Telefoonnummers en een oordeel over wie in het praesidium te weinig doet:
+  // niets ervan gaat naar een agent, ook niet lezend.
+  "shift.praesidium": { reads: [], creates: [], blocked: ["read or change the praesidium shift overview"] },
   "theokot.manage": { reads: ["theokot"], creates: ["app_create:theokot_product", "app_create:theokot_session"], blocked: ["open sessions, ban users or alter orders"] },
   "theokot.pickup": { reads: ["theokot"], creates: [], blocked: ["mark orders picked up or redeem vouchers"] },
   // Een verhuuraanvraag is één student met zijn naam, telefoonnummer en adres,

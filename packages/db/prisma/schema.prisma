@@ -728,6 +728,15 @@ model User {
   participatingShifts      ShiftParticipant[]
   manualShiftGrants        ManualShiftGrant[]      @relation("UserManualShiftGrants")
   createdManualShiftGrants ManualShiftGrant[]      @relation("CreatedManualShiftGrants")
+
+  // Shiftenoverzicht praesidium (/admin/shiftenoverzicht)
+  praesidiumShiftUploads    PraesidiumShiftList[]      @relation("PraesidiumShiftListUploadedBy")
+  praesidiumShiftNames      PraesidiumShiftListName[]  @relation("PraesidiumShiftListNameUser")
+  praesidiumShiftAliases    PraesidiumShiftAlias[]     @relation("PraesidiumShiftAliasUser")
+  praesidiumShiftAliasEdits PraesidiumShiftAlias[]     @relation("PraesidiumShiftAliasUpdatedBy")
+  praesidiumShiftContacts   PraesidiumShiftContact[]   @relation("PraesidiumShiftContactUser")
+  praesidiumShiftMarks      PraesidiumShiftNecessity[] @relation("PraesidiumShiftNecessityMarkedBy")
+
   createdShortLinks        ShortLink[]             @relation("ShortLinkCreatedBy")
   alumniContacts           AlumniContact[]         @relation("AlumniContactCreatedBy")
   accountEmailTokens       AccountEmailToken[]     @relation("AccountEmailTokenUser")
@@ -3330,6 +3339,10 @@ model ShiftParticipant {
   reminderDayBeforeAt DateTime?
   reminderSoonAt      DateTime?
 
+  /// Gezet in het shiftenoverzicht van het praesidium: deze inschrijving was
+  /// uit noodzaak (zie `PraesidiumShiftNecessity`).
+  praesidiumNecessity PraesidiumShiftNecessity?
+
   @@id([shiftId, userId])
 }
 
@@ -3446,6 +3459,201 @@ model ShiftTemplateEntry {
   enabled              Boolean @default(true)
 
   @@index([templateId, order])
+}
+
+// -----------------------------------------------------------------------------
+// Shiftenoverzicht praesidium (/admin/shiftenoverzicht)
+// -----------------------------------------------------------------------------
+// Naast de shiften op /shift staan er shiftenlijsten die enkel het praesidium
+// invult: de grote evenementen (24UL, Studentenwelkom, een cantus) en de
+// wekelijkse praesidiumshiften. Die leven in Google Sheets. De vice laadt de
+// export hier op, en het beheer telt per praesidiumlid wat het opnam. Zie
+// docs/design-decisions.md, "Shiftenoverzicht praesidium".
+
+enum PraesidiumShiftListKind {
+  /// De shiftenlijst van één evenement.
+  EVENT
+  /// Het rooster van de wekelijkse praesidiumshiften (fak kuisen, containerpark).
+  WEEKLY
+}
+
+enum PraesidiumShiftListStatus {
+  /// Opgeladen, nog niet nagekeken: telt nog niet mee.
+  DRAFT
+  ACTIVE
+}
+
+enum PraesidiumShiftCountMode {
+  /// Elke naam in een vakje is één shift.
+  PER_NAME
+  /// Naar duur: een vakje telt voor zijn uren gedeeld door `hoursPerShift`
+  /// (24UL: een shift is twee uur, een vakje van een uur een halve).
+  BY_DURATION
+}
+
+enum PraesidiumShiftNameStatus {
+  MATCHED
+  IGNORED
+  UNRESOLVED
+}
+
+/// Waarom een naam aan iemand gekoppeld (of genegeerd) is. Enkel om in het
+/// beheer te tonen hoe zeker die koppeling is; tellen doet enkel `status`.
+enum PraesidiumShiftNameSource {
+  ALIAS
+  FULL_NAME
+  FIRST_NAME
+  INITIAL
+  FUZZY
+  MANUAL
+  OTHER_KRING
+  NOT_PRAESIDIUM
+  NONE
+}
+
+/// Eén opgeladen spreadsheet. Een nieuwe export van dezelfde lijst vervangt
+/// de inhoud (`entries`, `contacts`), maar houdt de instellingen en de
+/// beslissingen per naam.
+model PraesidiumShiftList {
+  id     String                    @id @default(cuid())
+  kind   PraesidiumShiftListKind   @default(EVENT)
+  status PraesidiumShiftListStatus @default(DRAFT)
+  /// Werkingsjaar (startjaar): bepaalt wie "het praesidium" is voor deze lijst.
+  year   Int
+  name   String
+
+  /// Datum van het evenement (de eerste dag), voor de volgorde.
+  eventDate         DateTime?                @db.Date
+  /// Richtlijn: hoeveel shiften elk praesidiumlid op deze lijst hoort op te
+  /// nemen ("iedereen doet 6 shiften"). Leeg = geen richtlijn gegeven.
+  expectedPerMember Float?
+  countMode         PraesidiumShiftCountMode @default(PER_NAME)
+  hoursPerShift     Float                    @default(2)
+  /// Hoeveel VTK-shiften er nog open staan, zoals de vice het invult of
+  /// overneemt van de lege vakjes. Leeg = onbekend.
+  openSlots         Int?
+
+  fileName String
+  /// Tabbladen: `[{ name, kind, names, date, counted }]`. `counted` is de keuze
+  /// van de vice; de rest komt uit de analyse.
+  sheets   Json
+  /// Vulkleuren van de namen: `[{ color, names, samples, counted }]`. Op een
+  /// lijst met meerdere kringen telt enkel de kleur van VTK.
+  colors   Json
+  /// Lege vakjes per tabblad en kleur: `[{ sheet, color, empty }]`.
+  slots    Json
+
+  uploadedById String?
+  uploadedBy   User?    @relation("PraesidiumShiftListUploadedBy", fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(3)
+
+  entries  PraesidiumShiftEntry[]
+  names    PraesidiumShiftListName[]
+  contacts PraesidiumShiftContact[]
+
+  @@index([year, kind])
+}
+
+/// Eén naam in één vakje van een opgeladen lijst. Wie het is, staat niet hier
+/// maar in `PraesidiumShiftListName` (per lijst, per schrijfwijze), zodat één
+/// keuze voor "Mekkie" al zijn vakjes tegelijk koppelt.
+model PraesidiumShiftEntry {
+  id     String              @id @default(cuid())
+  listId String
+  list   PraesidiumShiftList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  sheet    String
+  cell     String
+  /// Zoals het in het vakje stond.
+  rawName  String
+  /// Genormaliseerd (`nameKey` in lib/praesidiumShifts/names.ts).
+  nameKey  String
+  color    String?
+  /// Rij- en bloklabel ("Steward", "Opbouw · Praesidium") of de taak.
+  role     String?
+  /// Het uur zoals in de kop ("20u00-20u30").
+  slot     String?
+  date     DateTime? @db.Date
+  hours    Float?
+  note     String?
+  /// Wekelijkse rooster: de "Done?"-kolom van die dag, als die er is.
+  done     Boolean?
+  /// De lijst zegt zelf dat dit niet meetelt ("telt niet mee in de counter").
+  excluded Boolean   @default(false)
+
+  @@index([listId, nameKey])
+}
+
+/// De beslissing voor één schrijfwijze op één lijst: wie het is, of dat het
+/// geen praesidium is.
+model PraesidiumShiftListName {
+  listId String
+  list   PraesidiumShiftList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  nameKey String
+  /// De eerste schrijfwijze zoals ze op de lijst stond, om te tonen.
+  label   String
+  status  PraesidiumShiftNameStatus
+  source  PraesidiumShiftNameSource
+  userId  String?
+  user    User?                     @relation("PraesidiumShiftListNameUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@id([listId, nameKey])
+  @@index([userId])
+}
+
+/// Een onthouden bijnaam: geldt voor elke lijst die erna komt, en voor elke
+/// lijst waar deze schrijfwijze nog niet met de hand gekozen was.
+model PraesidiumShiftAlias {
+  nameKey String  @id
+  label   String
+  /// Leeg = negeren: deze schrijfwijze is nooit een praesidiumlid.
+  userId  String?
+  user    User?   @relation("PraesidiumShiftAliasUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  updatedById String?
+  updatedBy   User?    @relation("PraesidiumShiftAliasUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  @@index([userId])
+}
+
+/// Een rij uit het overzichtstabblad van een lijst: naam, kring, nummer.
+/// De kring houdt namen van andere kringen uit de koppeling; het nummer is
+/// de terugval wanneer iemand er op zijn profiel geen heeft.
+model PraesidiumShiftContact {
+  id     String              @id @default(cuid())
+  listId String
+  list   PraesidiumShiftList @relation(fields: [listId], references: [id], onDelete: Cascade)
+
+  name    String
+  nameKey String
+  kring   String?
+  phone   String?
+  email   String?
+  userId  String?
+  user    User?   @relation("PraesidiumShiftContactUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([listId])
+  @@index([userId])
+}
+
+/// Een shift op /shift die een praesidiumlid uit noodzaak opnam: de shift
+/// raakte niet vol en het praesidium werd gevraagd ze te vullen. Zonder rij is
+/// het een shift uit vrije wil. Hangt aan de inschrijving zelf, zodat ze
+/// meeverdwijnt wanneer iemand zich uitschrijft.
+model PraesidiumShiftNecessity {
+  shiftId     String
+  userId      String
+  participant ShiftParticipant @relation(fields: [shiftId, userId], references: [shiftId, userId], onDelete: Cascade)
+
+  markedById String?
+  markedBy   User?    @relation("PraesidiumShiftNecessityMarkedBy", fields: [markedById], references: [id], onDelete: SetNull)
+  createdAt  DateTime @default(now()) @db.Timestamptz(3)
+
+  @@id([shiftId, userId])
 }
 
 // -----------------------------------------------------------------------------

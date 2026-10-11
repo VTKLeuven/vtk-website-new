@@ -293,6 +293,16 @@ const icons: Record<string, ReactNode> = {
       <path d="M14 16h2" />
     </Svg>
   ),
+  // praesidiumShifts: turfstreepjes, wie hoeveel shiften opnam
+  praesidiumShifts: (
+    <Svg>
+      <path d="M5 5v14" />
+      <path d="M9 5v14" />
+      <path d="M13 5v14" />
+      <path d="M17 5v14" />
+      <path d="m3 16 18-8" />
+    </Svg>
+  ),
   // mailGroups: groepsmailadressen (@vtk.be)
   mailGroups: (
     <Svg>

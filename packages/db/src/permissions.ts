@@ -121,6 +121,12 @@ export const PERMISSIONS = [
   // Manueel extra shiften toekennen (bv. overdracht van de vorige website).
   // Bewust een eigen recht dat enkel admin-users standaard dragen.
   { code: "shift.manual", labelNl: "Manueel extra shiften toekennen", labelEn: "Manually grant extra shifts", category: "shift" },
+  // Het shiftenoverzicht van het praesidium (/admin/shiftenoverzicht): de
+  // shiftenlijsten van de grote evenementen opladen, per praesidiumlid tellen
+  // wat het opnam, en zien wie onder het gemiddelde zit, mét gsm-nummer. Werk
+  // van de vice; los van `shift.ranking`, want dit toont telefoonnummers en
+  // oordeelt over het eigen praesidium.
+  { code: "shift.praesidium", labelNl: "Shiftenoverzicht praesidium beheren", labelEn: "Manage the praesidium shift overview", category: "shift" },
 
   // Theokot (cafetaria / broodjesbar)
   { code: "theokot.manage", labelNl: "Theokot beheren (sessies, aanbod, bans, instellingen)", labelEn: "Manage Theokot (sessions, offering, bans, settings)", category: "theokot" },

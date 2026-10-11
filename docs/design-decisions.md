@@ -10932,3 +10932,72 @@ de zijbalk helemaal weg achter één knop.
   leek ze zo onder de titel weggezakt, en stond ze op elke pagina op een andere
   hoogte (september 2026 teruggedraaid). De titel wordt gemeten, zodat een
   pagina zonder `h1` de rail gewoon bovenaan houdt.
+
+## Shiftenoverzicht praesidium
+
+Oktober 2026. Naast de shiften op /shift vult het praesidium shiftenlijsten in
+Google Sheets: die van de grote evenementen (24UL, Studentenwelkom, een cantus)
+en het rooster van de wekelijkse praesidiumshiften (fak kuisen, stewarden,
+containerpark, bekers afwassen). De vice hield met de hand bij wie op welk
+evenement hoeveel deed, om wie onder het gemiddelde zat op te bellen wanneer
+er nog shiften open stonden. Dat doet /admin/shiftenoverzicht nu, achter het
+recht `shift.praesidium` (de rol `admin`, dus Groep 5 en IT, heeft het vanzelf).
+
+- **Twee tabbladen.** "Shiftenlijsten" (standaard) telt per praesidiumlid de
+  lijsten van de evenementen en de shiften op /shift; "Praesidiumshiften" telt
+  het wekelijkse rooster apart. Die laatste tellen bewust niet mee in "Alles":
+  dat is een vaste beurtrol, geen keuze om meer te doen. In het detail van een
+  lid staan ze wel.
+- **De vice laadt een export op (xlsx), de site koppelt niets live aan Google.**
+  De lijsten veranderen tot vlak voor het evenement; een nieuwe export van
+  dezelfde lijst vervangt de vakjes maar houdt de instellingen en de keuzes per
+  naam, zodat enkel de nieuwe namen nagekeken moeten worden. Een opgeladen lijst
+  staat eerst als concept en telt pas mee nadat de vice ze bevestigt.
+- **Een naam is een vakje onder een uur.** De lijsten hebben geen vaste vorm,
+  maar boven elke kolom met namen staat een uur ("13u00-14u30", "8:00 - 10:00",
+  "21h-23h"). Labels links, opmerkingen rechts en tellers bovenaan vallen zo
+  vanzelf weg. Een tabblad zonder uren maar met kolommen "Chauffeur" of
+  "Bijrijder" (het transport van 24UL) wordt als tabel gelezen. Een
+  overzichtstabblad met telefoonnummers wordt herkend en telt nooit als shift.
+- **Wat er telt, kiest de vice per lijst**: welke tabbladen (zegt een tabblad
+  bovenaan zelf "telt niet mee", dan staat het uit; een rij met die woorden
+  ernaast telt nooit), welke vulkleur, en of een vakje één shift is of telt naar
+  duur ("een shift is twee uur": een vakje van een uur is dan een halve, zoals
+  24UL het zelf rekent). Plus een richtlijn per lid ("iedereen doet 6 shiften",
+  die de site uit de lijst zelf voorstelt).
+- **Meerdere kringen: de kleur, of de kolom Kring.** Op een gedeelde lijst heeft
+  elke kring zijn kleur, en enkel die van VTK telt. In de export van
+  Studentenwelkom zit die kleur echter niet (de vakjes zijn allemaal hetzelfde
+  rood, de groene kleur is voorwaardelijke opmaak voor "gevuld"); daar zegt het
+  overzichtstabblad met de kolom Kring wie bij een andere kring hoort, en die
+  namen worden niet gekoppeld.
+- **Bijnamen worden onthouden, over de lijsten heen.** Een naam wordt
+  voorgesteld in deze volgorde: een onthouden bijnaam, een andere kring volgens
+  het overzicht, de volledige naam (ook met een tikfout), een voornaam die maar
+  één praesidiumlid heeft, voornaam plus het begin van de achternaam ("Jarne
+  P"). Een volledige naam die bij niemand past, is geen praesidium (werkgroep,
+  andere kring); één los woord dat bij niemand past ("Mekkie") wacht op de vice.
+  Wat hij kiest met "Onthouden" aan, wordt een bijnaam die ook geldt op elke
+  lijst waar die naam niet met de hand gekozen was, ook oudere. Een voornaam
+  van twee praesidiumleden ("Jarne") onthoudt standaard niet: de volgende lijst
+  kan de andere bedoelen. Een fout rechtzetten kan op de lijst zelf of op
+  /admin/shiftenoverzicht/bijnamen; de lijsten volgen meteen.
+- **Wie "het praesidium" is, komt uit /admin/groepen**: de leden van een
+  praesidiumpost in het werkingsjaar van de lijst. Staat iemand daar niet, dan
+  telt hij niet en lijkt zijn volledige naam "geen praesidium".
+- **Shiften op /shift: vrije wil, tenzij de vice zegt dat het noodzaak was.**
+  Raakt een shift niet vol en wordt het praesidium gevraagd ze te vullen, dan
+  duidt de vice die inschrijving aan als noodzakelijk. Dat hangt aan de
+  inschrijving zelf en verdwijnt dus mee wanneer iemand zich uitschrijft. Het
+  overzicht toont de twee apart, want een noodzakelijke shift weegt zwaarder; er
+  is bewust geen gewogen score, de vice leest de kolommen zelf. Wie zich minder
+  dan twee dagen op voorhand inschreef, staat in het oranje: dat is vaak zo'n
+  oproep. Manuele toekenningen (overdracht van de vorige site) tellen niet mee.
+- **Gemiddelden zijn over iedereen van het praesidium**, ook wie nergens op
+  staat: een nul is precies wat de vice zoekt. Er zijn twee gemiddelden, één
+  voor de shiftenlijsten en één voor alles samen, en de tabel vergelijkt met
+  het gekozen gemiddelde.
+- **Telefoonnummers**: dat van het profiel, en anders het nummer uit het
+  overzichtstabblad van een lijst (gemarkeerd als "lijst"), enkel wanneer dat
+  overzicht de volledige naam of een bijnaam gaf. Een nummer van een lijst
+  wordt nooit naar het profiel geschreven.
