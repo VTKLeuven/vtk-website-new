@@ -21,6 +21,8 @@ import {
   palPlusRequestCourseLabel,
   palPlusReward,
   parsePalPlusCourse,
+  planPalPlusCourseList,
+  PAL_PLUS_COURSE_LIST_MAX,
   parsePalPlusRequest,
   parsePalPlusSession,
   palPlusRoomLabel,
@@ -95,6 +97,80 @@ describe("normalizeCourseCode", () => {
     expect(normalizeCourseCode("H01A0B (6 stp)")).toBeUndefined();
     expect(normalizeCourseCode("H01-A0B")).toBeUndefined();
     expect(normalizeCourseCode("X".repeat(PAL_PLUS_LIMITS.courseCode + 1))).toBeUndefined();
+  });
+});
+
+describe("planPalPlusCourseList", () => {
+  const plan = (text: string, existing: { code: string | null; nameNl: string }[] = []) =>
+    planPalPlusCourseList(text, existing);
+
+  it("leest een code met de naam erachter, en een naam zonder code", () => {
+    expect(plan("H01A0B Analyse, deel 1\nMatlab").rows).toEqual([
+      {
+        line: 1,
+        course: { code: "H01A0B", nameNl: "Analyse, deel 1", nameEn: null, active: true },
+        status: "new",
+      },
+      { line: 2, course: { code: null, nameNl: "Matlab", nameEn: null, active: true }, status: "new" },
+    ]);
+  });
+
+  it("neemt een eerste woord dat geen code is als deel van de naam", () => {
+    const rows = plan("Analyse 2\n5G-netwerken in de praktijk\nLaTeX voor beginners").rows;
+    expect(rows.map((row) => row.course.code)).toEqual([null, null, null]);
+    expect(rows.map((row) => row.course.nameNl)).toEqual([
+      "Analyse 2",
+      "5G-netwerken in de praktijk",
+      "LaTeX voor beginners",
+    ]);
+  });
+
+  it("leest kolommen met tabs en puntkomma's", () => {
+    const { rows } = plan(
+      "H01A4B\tToegepaste algebra\tApplied Algebra\textra\n;Matlab;Matlab EN\nB-KUL-H01B2B; Algemene natuurkunde",
+    );
+    expect(rows.map((row) => row.course)).toEqual([
+      { code: "H01A4B", nameNl: "Toegepaste algebra", nameEn: "Applied Algebra", active: true },
+      { code: null, nameNl: "Matlab", nameEn: "Matlab EN", active: true },
+      { code: "H01B2B", nameNl: "Algemene natuurkunde", nameEn: null, active: true },
+    ]);
+  });
+
+  it("leest twee kolommen zonder code als Nederlandse en Engelse naam", () => {
+    expect(plan("Analyse, deel 1; Analysis, part 1").rows[0]?.course).toEqual({
+      code: null,
+      nameNl: "Analyse, deel 1",
+      nameEn: "Analysis, part 1",
+      active: true,
+    });
+  });
+
+  it("slaat lege regels en commentaar over en houdt de regelnummers", () => {
+    const { rows } = plan("# uit de studiegids\n\nH01A0B Analyse, deel 1\r\n");
+    expect(rows.map((row) => row.line)).toEqual([3]);
+  });
+
+  it("markeert wat al bestaat en wat twee keer geplakt is", () => {
+    const { rows } = plan("H01A0B Analyse\nh01a0b Analyse bis\nmatlab\nH01A2B Analyse, deel 2", [
+      { code: "H01A0B", nameNl: "Analyse I" },
+      { code: null, nameNl: "Matlab" },
+    ]);
+    expect(rows.map((row) => row.status)).toEqual(["exists", "repeat", "exists", "new"]);
+  });
+
+  it("geeft regels die geen vak zijn terug met hun nummer", () => {
+    const { rows, errors } = plan("H01A0B Analyse\nH01-A0B; Analyse; Analysis\nH01A2B;");
+    expect(rows).toHaveLength(1);
+    expect(errors).toEqual([
+      { line: 2, error: "COURSE_CODE_INVALID", text: "H01-A0B; Analyse; Analysis" },
+      { line: 3, error: "COURSE_NAME_REQUIRED", text: "H01A2B;" },
+    ]);
+  });
+
+  it("zegt wanneer de lijst te lang is", () => {
+    const text = Array.from({ length: PAL_PLUS_COURSE_LIST_MAX + 1 }, (_, i) => `Vak ${i}`).join("\n");
+    expect(plan(text).tooMany).toBe(true);
+    expect(plan("Vak 1").tooMany).toBe(false);
   });
 });
 

@@ -1,9 +1,11 @@
 import {
+  PAL_PLUS_COURSE_LIST_MAX,
   PAL_PLUS_LIMITS,
   PAL_PLUS_MAX_ACTIVE_REQUESTS,
   PAL_PLUS_MAX_REWARD,
   PAL_PLUS_MAX_SESSION_MINUTES,
   type PalPlusCourseErrorCode,
+  type PalPlusCourseListErrorCode,
   type PalPlusRequestErrorCode,
   type PalPlusSessionErrorCode,
   type PalPlusSignupBlock,
@@ -32,6 +34,62 @@ export function palPlusCourseErrors(nl: boolean): Record<PalPlusCourseErrorCode,
         COURSE_IN_USE:
           "Not deleted: requests or sessions are already attached to this course. Switch it off instead; it leaves the request form and its history stays.",
       };
+}
+
+/**
+ * Meldingen voor een geplakte vakkenlijst. `COURSE_LIST_LINE` staat er bewust
+ * niet in: die melding noemt de regel en komt als `detail` van de server.
+ */
+export function palPlusCourseListErrors(
+  nl: boolean,
+): Record<Exclude<PalPlusCourseListErrorCode, "COURSE_LIST_LINE">, string> {
+  return {
+    ...palPlusCourseErrors(nl),
+    ...(nl
+      ? {
+          COURSE_LIST_EMPTY: "Niets toegevoegd: plak minstens één vak, één per regel.",
+          COURSE_LIST_TOO_LONG: `Niets toegevoegd: plak hoogstens ${PAL_PLUS_COURSE_LIST_MAX} vakken in één keer.`,
+        }
+      : {
+          COURSE_LIST_EMPTY: "Nothing added: paste at least one course, one per line.",
+          COURSE_LIST_TOO_LONG: `Nothing added: paste at most ${PAL_PLUS_COURSE_LIST_MAX} courses at once.`,
+        }),
+  };
+}
+
+/** Wat er mis is met één geplakte regel, te tonen achter "Regel 4:". */
+export function palPlusCourseLineProblem(nl: boolean, error: PalPlusCourseErrorCode): string {
+  switch (error) {
+    case "COURSE_NAME_REQUIRED":
+      return nl ? "geen naam" : "no name";
+    case "COURSE_NAME_TOO_LONG":
+      return nl
+        ? `naam langer dan ${PAL_PLUS_LIMITS.courseName} tekens`
+        : `name longer than ${PAL_PLUS_LIMITS.courseName} characters`;
+    case "COURSE_CODE_INVALID":
+      return nl
+        ? "de eerste kolom is geen OPO-code (enkel letters en cijfers, zoals H01A0B)"
+        : "the first column is not a course code (letters and digits only, like H01A0B)";
+    default:
+      return nl ? "geen vak" : "not a course";
+  }
+}
+
+/** De foutmelding van de server wanneer een geplakte lijst regels bevat die geen vak zijn. */
+export function palPlusCourseLineErrorDetail(
+  nl: boolean,
+  errors: { line: number; error: PalPlusCourseErrorCode }[],
+): string {
+  const [first] = errors;
+  if (!first) return nl ? "Niets toegevoegd." : "Nothing added.";
+  const more = errors.length - 1;
+  const problem = palPlusCourseLineProblem(nl, first.error);
+  if (nl) {
+    const rest = more > 0 ? ` En nog ${more} ${more === 1 ? "andere regel" : "andere regels"}.` : "";
+    return `Niets toegevoegd. Regel ${first.line}: ${problem}.${rest} Verbeter of schrap die regels en probeer opnieuw.`;
+  }
+  const rest = more > 0 ? ` And ${more} more ${more === 1 ? "line" : "lines"}.` : "";
+  return `Nothing added. Line ${first.line}: ${problem}.${rest} Fix or remove those lines and try again.`;
 }
 
 /** Wat de indiener kan tegenkomen: het formulier, steunen en intrekken. */

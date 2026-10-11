@@ -121,6 +121,119 @@ export function palPlusCourseLabel(
   return course.code ? `${name} (${course.code})` : name;
 }
 
+/** Hoeveel vakken er in één keer geplakt mogen worden; een fase van de bachelor is er een dertigtal. */
+export const PAL_PLUS_COURSE_LIST_MAX = 300;
+
+export type PalPlusCourseListErrorCode =
+  | PalPlusCourseErrorCode
+  | "COURSE_LIST_EMPTY"
+  | "COURSE_LIST_TOO_LONG"
+  | "COURSE_LIST_LINE";
+
+export type PalPlusCourseListRow = {
+  /** Het regelnummer in wat er geplakt werd, zodat een melding naar de regel kan wijzen. */
+  line: number;
+  course: PalPlusCourseInput;
+  /**
+   * `new` wordt toegevoegd. `exists` staat al in de lijst en blijft zoals het
+   * is: een geplakte lijst overschrijft nooit wat iemand met de hand verbeterde.
+   * `repeat` staat hoger in dezelfde plak al eens.
+   */
+  status: "new" | "exists" | "repeat";
+};
+
+export type PalPlusCourseListPlan = {
+  rows: PalPlusCourseListRow[];
+  errors: { line: number; error: PalPlusCourseErrorCode; text: string }[];
+  tooMany: boolean;
+};
+
+/** Een kolomscheiding: een tab (uit een rekenblad of het importscript) of een puntkomma (met de hand). */
+const COURSE_LIST_COLUMNS = /\t|;/;
+
+/**
+ * Of het eerste woord van een regel een OPO-code is. Strenger dan
+ * `normalizeCourseCode`, omdat het hier ook gewoon het eerste woord van een
+ * vaknaam kan zijn: een code begint met een letter, heeft minstens vijf tekens
+ * en bevat een cijfer (H01A0B, G0Q35A). "Matlab" en "5G-netwerken" zijn dus
+ * geen code.
+ */
+function leadingCourseCode(token: string): string | null {
+  const code = normalizeCourseCode(token);
+  if (!code || code.length < 5) return null;
+  return /^[A-Z]/.test(code) && /[0-9]/.test(code) ? code : null;
+}
+
+/**
+ * Leest een geplakte vakkenlijst, één vak per regel. Lege regels en regels die
+ * met `#` beginnen tellen niet mee. Een regel kan zijn:
+ *
+ * - `H01A0B Analyse, deel 1`: de code en daarna de naam;
+ * - `Matlab`: enkel een naam, voor iets wat geen vak is;
+ * - kolommen gescheiden door een tab of een puntkomma, zoals een rekenblad of
+ *   het importscript ze geeft: `code; Nederlandse naam; Engelse naam`. Met drie
+ *   kolommen is de eerste altijd de code (leeg mag); met twee is de eerste de
+ *   code wanneer ze er een is, en anders de Nederlandse naam met de Engelse
+ *   erachter. Kolommen na de derde worden genegeerd.
+ *
+ * `existing` is de huidige lijst. Een vak telt als bestaand bij dezelfde code,
+ * of, zonder code, bij dezelfde naam (hoofdletters tellen niet).
+ */
+export function planPalPlusCourseList(
+  text: string,
+  existing: { code: string | null; nameNl: string }[],
+  active = true,
+): PalPlusCourseListPlan {
+  const codes = new Set(existing.flatMap((course) => (course.code ? [course.code] : [])));
+  const names = new Set(existing.map((course) => course.nameNl.trim().toLowerCase()));
+  const seen = new Set<string>();
+
+  const plan: PalPlusCourseListPlan = { rows: [], errors: [], tooMany: false };
+  const lines = text.replace(/\r\n?/g, "\n").split("\n");
+
+  lines.forEach((raw, index) => {
+    const line = index + 1;
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith("#")) return;
+
+    const columns = raw.split(COURSE_LIST_COLUMNS).map((column) => column.trim());
+    const first = columns[0] ?? "";
+    let code = "";
+    let nameNl = first;
+    let nameEn = columns[1] ?? "";
+    if (columns.length >= 3 || (columns.length === 2 && (!first || leadingCourseCode(first)))) {
+      code = first;
+      nameNl = columns[1] ?? "";
+      nameEn = columns[2] ?? "";
+    } else {
+      const match = /^(\S+)\s+(.+)$/.exec(first);
+      const leading = match ? leadingCourseCode(match[1] ?? "") : null;
+      if (match && leading) {
+        code = leading;
+        nameNl = match[2] ?? "";
+      }
+    }
+
+    const parsed = parsePalPlusCourse({ code, nameNl, nameEn, active });
+    if (!parsed.ok) {
+      plan.errors.push({ line, error: parsed.error, text: trimmed });
+      return;
+    }
+
+    const { course } = parsed;
+    const name = course.nameNl.toLowerCase();
+    const key = course.code ? `code:${course.code}` : `name:${name}`;
+    let status: PalPlusCourseListRow["status"] = "new";
+    if (seen.has(key)) status = "repeat";
+    else if (course.code ? codes.has(course.code) : names.has(name)) status = "exists";
+    seen.add(key);
+    plan.rows.push({ line, course, status });
+  });
+
+  plan.tooMany = plan.rows.length + plan.errors.length > PAL_PLUS_COURSE_LIST_MAX;
+  return plan;
+}
+
 // -----------------------------------------------------------------------------
 // Aanvragen: een aanbod om te geven, of een vraag om hulp
 // -----------------------------------------------------------------------------

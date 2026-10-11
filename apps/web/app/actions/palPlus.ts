@@ -23,6 +23,7 @@ import {
   notifyPalPlusSessionPlanned,
 } from "@/lib/palPlusNotify";
 import type { PalPlusSessionChange } from "@/lib/palPlusMail";
+import { palPlusCourseLineErrorDetail } from "@/lib/palPlusMessages";
 import {
   canAnswerPalPlusCoTutor,
   canonicalPalPlusTags,
@@ -36,6 +37,7 @@ import {
   palPlusSignupBlock,
   palPlusWallClockFields,
   parsePalPlusCourse,
+  planPalPlusCourseList,
   parsePalPlusRequest,
   parsePalPlusRewardAmount,
   parsePalPlusSession,
@@ -502,6 +504,76 @@ export async function savePalPlusCourseAction(
 
   revalidatePalPlusAdmin();
   return saveOk();
+}
+
+/**
+ * Voegt een geplakte lijst vakken in één keer toe, één per regel (zie
+ * `planPalPlusCourseList` voor wat een regel mag zijn). Wat al in de lijst
+ * staat, blijft zoals het is en wordt overgeslagen. Eén regel die geen vak is,
+ * houdt de hele lijst tegen: half toevoegen laat iemand zoeken welke regels er
+ * nu wel in zitten.
+ */
+export async function importPalPlusCoursesAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requirePermission("pal.manage");
+
+  const nl = toSingleLine(formData.get("locale")) !== "en";
+  const existing = await prisma.palPlusCourse.findMany({ select: { code: true, nameNl: true } });
+  const plan = planPalPlusCourseList(
+    toMessageText(formData.get("list")),
+    existing,
+    formData.get("active") === "on",
+  );
+
+  if (plan.errors.length > 0) {
+    return saveError("COURSE_LIST_LINE", palPlusCourseLineErrorDetail(nl, plan.errors));
+  }
+  if (plan.rows.length === 0) return saveError("COURSE_LIST_EMPTY");
+  if (plan.tooMany) return saveError("COURSE_LIST_TOO_LONG");
+
+  const fresh = plan.rows.filter((row) => row.status === "new").map((row) => row.course);
+  const known = plan.rows.filter((row) => row.status === "exists").length;
+  // Tussen het lezen en het schrijven kan iemand anders hetzelfde vak toevoegen;
+  // `skipDuplicates` laat de unieke code dat dan stil opvangen.
+  const { count } = fresh.length
+    ? await prisma.palPlusCourse.createMany({ data: fresh, skipDuplicates: true })
+    : { count: 0 };
+  const skipped = known + (fresh.length - count);
+
+  if (count > 0) {
+    await logAudit({
+      action: "create",
+      entity: "palPlusCourse",
+      target: fresh.map((course) => palPlusCourseLabel(course, "nl")).join(", "),
+      summary: `${count} ${count === 1 ? "vak" : "vakken"} in één keer toegevoegd`,
+    });
+    revalidatePalPlusAdmin();
+  }
+
+  return saveOk(palPlusCourseImportSummary(nl, count, skipped));
+}
+
+function palPlusCourseImportSummary(nl: boolean, added: number, skipped: number): string {
+  if (nl) {
+    if (added === 0) {
+      return skipped === 1
+        ? "Niets toegevoegd: dat vak stond al in de lijst."
+        : `Niets toegevoegd: alle ${skipped} vakken stonden al in de lijst.`;
+    }
+    const addedText = `${added} ${added === 1 ? "vak" : "vakken"} toegevoegd`;
+    if (skipped === 0) return `${addedText}.`;
+    return `${addedText}; ${skipped} ${skipped === 1 ? "stond" : "stonden"} al in de lijst.`;
+  }
+  if (added === 0) {
+    return skipped === 1
+      ? "Nothing added: that course was already on the list."
+      : `Nothing added: all ${skipped} courses were already on the list.`;
+  }
+  const addedText = `${added} ${added === 1 ? "course" : "courses"} added`;
+  if (skipped === 0) return `${addedText}.`;
+  return `${addedText}; ${skipped} ${skipped === 1 ? "was" : "were"} already on the list.`;
 }
 
 /**
