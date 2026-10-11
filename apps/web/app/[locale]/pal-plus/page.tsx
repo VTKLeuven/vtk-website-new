@@ -429,6 +429,7 @@ export default async function PalPlusPage({
             nl={nl}
             base={base}
             copy={t.form}
+            intro={formKind === "GIVE" ? t.giveBody : t.askBody}
             backingCopy={backingCopy}
             courses={courseRows.map((course) => ({
               id: course.id,

@@ -1178,6 +1178,13 @@ vorm en komen in hetzelfde werkbakje terecht.
 - **Het formulier staat in de URL** (`?formulier=hulp|geven`, met `&vraag=<id>` bij "ik
   kan dit geven"). Zo is antwoorden op een vraag een gewone link, en brengt een gedeelde
   link wie niet ingelogd is eerst naar de login en dan terug naar het formulier.
+- **Het formulier neemt de volle breedte van de twee keuzekaarten in**, als een
+  contentpagina: het paneel links, een rail in de marge rechts met de vraag waarop je
+  antwoordt en "Hoe het werkt" (de uitleg van de kaart waarop je klikte, die anders
+  met die kaart verdween). Op een smal scherm staat de rail boven het formulier. Een
+  paneel van 760 pixels links liet rechts een leeg vlak staan; een gecentreerd paneel
+  is afgewogen en niet gekozen, omdat het los zweefde van de titel en de secties
+  eronder, die allebei op de linkerrand staan.
 - **Kies je bij een hulpvraag een vak waar al een vraag voor openstaat, dan toont het
   formulier die vraag met de steunknop.** Eén vraag met vijf steunen zegt Onderwijs meer
   dan vijf losse vragen. Enkel een vraag die online staat: wat nog nagekeken moet worden,

@@ -1194,6 +1194,7 @@
     "form": {
       "askTitle": "Ask for help with a course",
       "giveTitle": "Offer a session",
+      "howTitle": "How it works",
       "respondingTo": "You are answering this request",
       "courseLabel": "Course",
       "coursePlaceholder": "Pick a course",
