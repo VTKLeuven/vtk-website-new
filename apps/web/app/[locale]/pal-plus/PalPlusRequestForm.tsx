@@ -10,7 +10,7 @@ import { PAL_PLUS_LIMITS, PAL_PLUS_OTHER_COURSE } from "@/lib/palPlus";
 import { palPlusMemberErrors } from "@/lib/palPlusMessages";
 import { BackingButton, type BackingCopy } from "./BackingButton";
 import { TagInput, type TagInputCopy } from "@/components/palPlus/TagInput";
-import { AvailabilityGrid, type AvailabilityColumn } from "@/components/palPlus/AvailabilityGrid";
+import { MomentGrid, type MomentGridCopy, type MomentGridDay } from "@/components/palPlus/MomentGrid";
 
 export type PalPlusFormCopy = {
   askTitle: string;
@@ -28,8 +28,9 @@ export type PalPlusFormCopy = {
   periodLabel: string;
   periodPlaceholder: string;
   tags: TagInputCopy;
-  availabilityLabel: string;
-  availabilityHelp: string;
+  momentsLabel: string;
+  momentsHelp: string;
+  grid: MomentGridCopy;
   availabilityNoteLabel: string;
   availabilityNotePlaceholder: string;
   coTutorLabel: string;
@@ -77,7 +78,7 @@ export function PalPlusRequestForm({
   respondsTo,
   tagPresets,
   tagSuggestionsByCourse,
-  dayparts,
+  grid,
 }: {
   kind: "GIVE" | "FOLLOW";
   nl: boolean;
@@ -95,7 +96,8 @@ export function PalPlusRequestForm({
   } | null;
   tagPresets: string[];
   tagSuggestionsByCourse: Record<string, string[]>;
-  dayparts: AvailabilityColumn[];
+  /** De dagen van het rooster en hoe laat het nu is in Brussel, van de server. */
+  grid: { days: MomentGridDay[]; today: string; nowMinutes: number };
 }) {
   const router = useRouter();
   const give = kind === "GIVE";
@@ -231,10 +233,16 @@ export function PalPlusRequestForm({
           <>
             <fieldset className="pp-moment">
               <legend className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.08em] text-vtk-muted">
-                {copy.availabilityLabel}
+                {copy.momentsLabel}
               </legend>
-              {dayparts.length > 0 && <AvailabilityGrid columns={dayparts} nl={nl} legend={copy.availabilityLabel} />}
-              <p className="pp-help">{copy.availabilityHelp}</p>
+              <p className="pp-help pp-moments-help">{copy.momentsHelp}</p>
+              <MomentGrid
+                days={grid.days}
+                today={grid.today}
+                nowMinutes={grid.nowMinutes}
+                locale={nl ? "nl" : "en"}
+                copy={copy.grid}
+              />
               <div className="mt-3">
                 <Label htmlFor="pp-availability-note">{copy.availabilityNoteLabel}</Label>
                 <Textarea

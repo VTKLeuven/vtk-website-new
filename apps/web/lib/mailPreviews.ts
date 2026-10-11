@@ -16,11 +16,13 @@ import {
   orderCancelledMail,
   orderTakenOverMail,
 } from "@/lib/mail";
+import { palPlusMomentLines } from "@/lib/palPlus";
 import { pianoConfirmationMail } from "@/lib/piano-reservations";
 import {
   palPlusCoTutorAnsweredMail,
   palPlusCoTutorInvitationMail,
   palPlusNewRequestNotificationMail,
+  palPlusRequestAcceptedMail,
   palPlusRequestClosedMail,
   palPlusRequestPublishedMail,
   palPlusRequestReceivedMail,
@@ -335,9 +337,16 @@ function palPlusPreviews(): MailPreview[] {
     tutorNames: ["Robbe"],
   };
   const common = { source: "palPlus" as const, file: "lib/palPlusMail.ts" };
-  const availability = {
-    lines: ["Maandag: Avond (18:00-22:00)", "Woensdag: Namiddag (13:00-18:00), Avond (18:00-22:00)"],
-    note: "Niet in de week van 12 oktober.",
+  const HOUR = 60 * 60 * 1000;
+  const moments = {
+    lines: palPlusMomentLines(
+      [
+        { startsAt: SAMPLE_START, endsAt: new Date(SAMPLE_START.getTime() + 2 * HOUR) },
+        { startsAt: new Date(SAMPLE_START.getTime() + 47 * HOUR), endsAt: new Date(SAMPLE_START.getTime() + 49 * HOUR) },
+      ],
+      "nl",
+    ),
+    note: "Liefst voor de tussentoets.",
   };
   const tags = ["Oefeningen", "Hoofdstuk 3"];
   const replyNote = "Afzender VTK Onderwijs (`MAIL_FROM_PAL_PLUS`); antwoorden gaat naar het adres van de post Onderwijs.";
@@ -356,12 +365,12 @@ function palPlusPreviews(): MailPreview[] {
         courseLabel: session.courseLabel,
         description: session.description,
         tags,
-        availability,
+        moments,
         coTutorName: "Lien",
         pageUrl: PAGE,
       }),
       notes: [
-        "Bij een hulpvraag zegt de mail dat Onderwijs de vraag eerst nakijkt en dat er een mail volgt zodra ze online staat; het rooster valt dan weg.",
+        "Bij een hulpvraag zegt de mail dat Onderwijs de vraag eerst nakijkt en dat er een mail volgt zodra ze online staat; de momenten vallen dan weg.",
         "De zin over de medetutor staat er enkel wanneer er een r-nummer opgegeven werd.",
         replyNote,
       ],
@@ -379,7 +388,7 @@ function palPlusPreviews(): MailPreview[] {
         courseLabel: session.courseLabel,
         description: session.description,
         tags,
-        availability,
+        moments,
         pageUrl: PAGE,
       }),
       notes: [
@@ -417,7 +426,7 @@ function palPlusPreviews(): MailPreview[] {
         courseTyped: true,
         description: "Ik snap de vrijlichaamsdiagrammen niet, vooral met de scharnieren.",
         tags: ["Oefeningen", "Scharnieren"],
-        availability: null,
+        moments: null,
         coTutorName: null,
         preferredPeriod: "voor het examen in januari",
         respondsToLabel: null,
@@ -438,6 +447,25 @@ function palPlusPreviews(): MailPreview[] {
         description: session.description,
         pageUrl: PAGE,
       }),
+    },
+    {
+      id: "pal-plus-accepted",
+      title: "Je aanbod is aanvaard",
+      when: "Zodra Onderwijs een aanbod aanvaardt zonder al een moment te kiezen (\"Aanvaard, moment volgt\").",
+      to: "Wie het aanbod indiende, en de medetutor als die al bevestigde",
+      ...common,
+      ...palPlusRequestAcceptedMail({
+        locale: "nl",
+        name: "Fien",
+        courseLabel: session.courseLabel,
+        moments,
+        pageUrl: PAGE,
+      }),
+      notes: [
+        "Plant Onderwijs het aanbod meteen, dan komt deze mail niet: dan volgt enkel \"Je geeft een PAL+-sessie\".",
+        "Bij een oud aanbod zonder momenten zegt de mail dat Onderwijs een moment met de tutor afspreekt.",
+        replyNote,
+      ],
     },
     {
       id: "pal-plus-closed",

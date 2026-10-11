@@ -4,32 +4,17 @@ import { useState, type ReactNode } from "react";
 import { Button, Card, Input, Label } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
-import {
-  deletePalPlusDaypartAction,
-  deletePalPlusTagAction,
-  savePalPlusDaypartAction,
-  savePalPlusTagAction,
-} from "@/app/actions/palPlus";
-import { PAL_PLUS_LIMITS, palPlusMinutesLabel } from "@/lib/palPlus";
+import { deletePalPlusTagAction, savePalPlusTagAction } from "@/app/actions/palPlus";
+import { PAL_PLUS_LIMITS } from "@/lib/palPlus";
 import { palPlusListErrors } from "@/lib/palPlusMessages";
 
 export type PalPlusTagView = { id: string; label: string; active: boolean };
-export type PalPlusDaypartView = {
-  id: string;
-  labelNl: string;
-  labelEn: string | null;
-  startMinutes: number;
-  endMinutes: number;
-  active: boolean;
-};
-
 /**
- * De twee korte lijsten die Onderwijs naast de vakken bijhoudt: de snelle tags
- * in het aanvraagformulier en de dagdelen van het rooster "wanneer kan je?".
+ * De korte lijst die Onderwijs naast de vakken bijhoudt: de snelle tags in het
+ * aanvraagformulier.
  *
- * Allebei mogen ze altijd verwijderd worden: een aanvraag bewaart de tekst van
- * haar tags en een momentopname van haar rooster, dus wat al ingediend werd,
- * verandert niet mee.
+ * Een tag mag altijd verwijderd worden: een aanvraag bewaart de tekst van haar
+ * tags, dus wat al ingediend werd, verandert niet mee.
  */
 export function TagsCard({ nl, tags }: { nl: boolean; tags: PalPlusTagView[] }) {
   return (
@@ -71,57 +56,6 @@ export function TagsCard({ nl, tags }: { nl: boolean; tags: PalPlusTagView[] }) 
         ),
       }))}
       newEditor={(done) => <TagForm nl={nl} tag={null} onDone={done} />}
-    />
-  );
-}
-
-export function DaypartsCard({ nl, dayparts }: { nl: boolean; dayparts: PalPlusDaypartView[] }) {
-  return (
-    <ListCard
-      nl={nl}
-      title={nl ? "Dagdelen" : "Parts of the day"}
-      intro={
-        nl
-          ? "De kolommen van het rooster waarin een tutor aanduidt wanneer die meestal kan. Een aanbod bewaart de dagdelen zoals ze waren toen het ingediend werd, dus een dagdeel verschuiven of weghalen verandert geen bestaand aanbod."
-          : "The columns of the grid where a tutor marks when they are usually available. An offer keeps the parts of the day as they were when it was submitted, so moving or removing one does not change an existing offer."
-      }
-      addLabel={nl ? "Dagdeel toevoegen" : "Add part of the day"}
-      empty={
-        nl
-          ? "Nog geen dagdelen: het formulier toont dan enkel de opmerking over wanneer iemand kan."
-          : "No parts of the day yet: the form then only shows the note on when someone is available."
-      }
-      columns={[nl ? "Dagdeel" : "Part of the day", nl ? "Uren" : "Hours"]}
-      items={dayparts.map((daypart) => {
-        const label = nl || !daypart.labelEn ? daypart.labelNl : daypart.labelEn;
-        return {
-          id: daypart.id,
-          active: daypart.active,
-          title: label,
-          cells: [label, `${palPlusMinutesLabel(daypart.startMinutes)} - ${palPlusMinutesLabel(daypart.endMinutes)}`],
-          editor: (done) => <DaypartForm nl={nl} daypart={daypart} onDone={done} />,
-          remove: (
-            <DeleteButton
-              action={deletePalPlusDaypartAction}
-              fields={{ id: daypart.id }}
-              title={nl ? "Dagdeel verwijderen?" : "Delete part of the day?"}
-              description={
-                nl
-                  ? `"${label}" verdwijnt uit het rooster van het formulier. Wat tutors al aanduidden, blijft bij hun aanbod staan.`
-                  : `"${label}" leaves the grid in the form. What tutors already marked stays with their offer.`
-              }
-              confirmLabel={nl ? "Verwijderen" : "Delete"}
-              cancelLabel={nl ? "Annuleren" : "Cancel"}
-              successMessage={nl ? "Dagdeel verwijderd." : "Part of the day deleted."}
-              errorMessages={palPlusListErrors(nl)}
-              errorFallback={nl ? "Niet verwijderd." : "Not deleted."}
-            >
-              {nl ? "Dagdeel verwijderen" : "Delete part of the day"}
-            </DeleteButton>
-          ),
-        };
-      })}
-      newEditor={(done) => <DaypartForm nl={nl} daypart={null} onDone={done} />}
     />
   );
 }
@@ -285,86 +219,6 @@ function TagForm({ nl, tag, onDone }: { nl: boolean; tag: PalPlusTagView | null;
       <label className="flex items-center gap-2 text-sm text-vtk-ink">
         <input type="checkbox" name="active" defaultChecked={tag?.active ?? true} />
         <span>{nl ? "Bij de snelle keuzes in het formulier" : "Among the quick choices in the form"}</span>
-      </label>
-    </SaveForm>
-  );
-}
-
-function DaypartForm({
-  nl,
-  daypart,
-  onDone,
-}: {
-  nl: boolean;
-  daypart: PalPlusDaypartView | null;
-  onDone: () => void;
-}) {
-  const prefix = daypart?.id ?? "new";
-  return (
-    <SaveForm
-      action={savePalPlusDaypartAction}
-      submitLabel={daypart ? (nl ? "Opslaan" : "Save") : nl ? "Toevoegen" : "Add"}
-      savingLabel={nl ? "Opslaan…" : "Saving…"}
-      savedMessage={
-        daypart ? (nl ? "Dagdeel opgeslagen." : "Part of the day saved.") : nl ? "Dagdeel toegevoegd." : "Part of the day added."
-      }
-      errorMessages={palPlusListErrors(nl)}
-      fallbackErrorMessage={nl ? "Niet opgeslagen." : "Not saved."}
-      resetOnSuccess={daypart === null}
-      onSuccess={onDone}
-      className="space-y-3"
-    >
-      {daypart && <input type="hidden" name="id" value={daypart.id} />}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div>
-          <Label htmlFor={`pal-daypart-nl-${prefix}`}>{nl ? "Naam (Nederlands)" : "Name (Dutch)"}</Label>
-          <Input
-            id={`pal-daypart-nl-${prefix}`}
-            name="labelNl"
-            defaultValue={daypart?.labelNl ?? ""}
-            maxLength={PAL_PLUS_LIMITS.daypartLabel}
-            placeholder="Avond"
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor={`pal-daypart-en-${prefix}`}>{nl ? "Naam (Engels)" : "Name (English)"}</Label>
-          <Input
-            id={`pal-daypart-en-${prefix}`}
-            name="labelEn"
-            defaultValue={daypart?.labelEn ?? ""}
-            maxLength={PAL_PLUS_LIMITS.daypartLabel}
-            placeholder="Evening"
-          />
-        </div>
-      </div>
-      <div className="grid max-w-80 grid-cols-2 gap-3">
-        <div>
-          <Label htmlFor={`pal-daypart-start-${prefix}`}>{nl ? "Van" : "From"}</Label>
-          <Input
-            id={`pal-daypart-start-${prefix}`}
-            name="start"
-            type="time"
-            step={900}
-            defaultValue={daypart ? palPlusMinutesLabel(daypart.startMinutes) : ""}
-            required
-          />
-        </div>
-        <div>
-          <Label htmlFor={`pal-daypart-end-${prefix}`}>{nl ? "Tot" : "Until"}</Label>
-          <Input
-            id={`pal-daypart-end-${prefix}`}
-            name="end"
-            type="time"
-            step={900}
-            defaultValue={daypart ? palPlusMinutesLabel(daypart.endMinutes) : ""}
-            required
-          />
-        </div>
-      </div>
-      <label className="flex items-center gap-2 text-sm text-vtk-ink">
-        <input type="checkbox" name="active" defaultChecked={daypart?.active ?? true} />
-        <span>{nl ? "In het rooster van het formulier" : "In the grid of the form"}</span>
       </label>
     </SaveForm>
   );

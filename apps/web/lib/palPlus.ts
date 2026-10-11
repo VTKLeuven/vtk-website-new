@@ -9,7 +9,7 @@
  * Bevat geen server-only imports: de formulieren gebruiken dezelfde limieten.
  */
 
-import { brusselsMinutesOfDay, brusselsWallClockMinutes, brusselsYMD, ymdKey } from "@/lib/brussels";
+import { brusselsMinutesOfDay, brusselsWallClockMinutes, brusselsYMD, isoWeekday, shiftYMD, ymdKey } from "@/lib/brussels";
 import { parseDateTimeFields } from "@/lib/lesbezoeken";
 import { normalizeRNumber } from "@/lib/theokotPickupQuery";
 
@@ -55,7 +55,11 @@ export const PAL_PLUS_LIMITS = {
   tags: 5,
   tag: 30,
   availabilityNote: 300,
-  daypartLabel: 40,
+  /**
+   * Zoveel losse blokken mag het rooster hoogstens opleveren. Aaneensluitende
+   * vakjes worden één blok, dus dit raakt enkel wie een dambord aanduidt.
+   */
+  moments: 20,
 } as const;
 
 export type PalPlusCourseErrorCode =
@@ -122,7 +126,7 @@ export function palPlusCourseLabel(
 // -----------------------------------------------------------------------------
 
 export type PalPlusRequestKindCode = "GIVE" | "FOLLOW";
-export type PalPlusRequestStatusCode = "PENDING" | "OPEN" | "PLANNED" | "CLOSED" | "WITHDRAWN";
+export type PalPlusRequestStatusCode = "PENDING" | "OPEN" | "ACCEPTED" | "PLANNED" | "CLOSED" | "WITHDRAWN";
 
 /** De waarde van "mijn vak staat er niet tussen" in de keuzelijst. */
 export const PAL_PLUS_OTHER_COURSE = "__other__";
@@ -147,8 +151,7 @@ export type PalPlusRequestErrorCode =
   | "PERIOD_TOO_LONG"
   | "TAG_TOO_LONG"
   | "TOO_MANY_TAGS"
-  | "AVAILABILITY_REQUIRED"
-  | "AVAILABILITY_INVALID"
+  | PalPlusProposedMomentsErrorCode
   | "AVAILABILITY_NOTE_TOO_LONG"
   | "COTUTOR_INVALID"
   | "COTUTOR_UNKNOWN"
@@ -161,8 +164,8 @@ export type RawPalPlusRequest = {
   courseOther: string;
   description: string;
   tags: string[];
-  /** Aangevinkte vakjes van het rooster, als `"<dag>:<dagdeel-id>"`. */
-  availability: string[];
+  /** De voorgestelde momenten van een aanbod, zoals ingetikt; lege rijen vallen weg. */
+  moments: RawPalPlusMoment[];
   availabilityNote: string;
   /** Het r-nummer van wie mee geeft, zoals ingetikt. */
   coTutor: string;
@@ -176,8 +179,7 @@ export type ParsedPalPlusRequest =
       kind: "GIVE";
       description: string;
       tags: string[];
-      /** Nog te toetsen aan de dagdelen in de databank (`palPlusAvailabilitySnapshot`). */
-      availability: PalPlusAvailabilityChoice[];
+      moments: PalPlusProposedMoment[];
       availabilityNote: string | null;
       coTutorRNumber: string | null;
     })
@@ -190,14 +192,15 @@ export type ParsedPalPlusRequest =
 
 /**
  * Valideert het formulier "ik wil een sessie geven" of "ik zoek hulp". Of het
- * gekozen vak, de dagdelen en de tweede tutor echt bestaan, weet enkel de
- * databank; dat controleert de action erna.
+ * gekozen vak en de tweede tutor echt bestaan, weet enkel de databank; dat
+ * controleert de action erna.
  *
- * Een aanbod zegt wanneer de tutor meestal kan: minstens één vakje van het
- * rooster, of een opmerking ("enkel op 14 oktober 's avonds").
+ * Een aanbod zegt op welke concrete momenten die ene sessie kan doorgaan:
+ * minstens één, allemaal na `now` (zie `parsePalPlusProposedMoments`).
  */
 export function parsePalPlusRequest(
   raw: RawPalPlusRequest,
+  now: Date,
 ): { ok: true; request: ParsedPalPlusRequest } | { ok: false; error: PalPlusRequestErrorCode } {
   const kind: PalPlusRequestKindCode = raw.kind === "GIVE" ? "GIVE" : "FOLLOW";
 
@@ -235,13 +238,12 @@ export function parsePalPlusRequest(
     };
   }
 
-  const availability = parsePalPlusAvailabilityChoices(raw.availability);
-  if (!availability) return { ok: false, error: "AVAILABILITY_INVALID" };
+  const moments = parsePalPlusProposedMoments(raw.moments, now);
+  if (!moments.ok) return moments;
   const availabilityNote = raw.availabilityNote.trim();
   if (availabilityNote.length > PAL_PLUS_LIMITS.availabilityNote) {
     return { ok: false, error: "AVAILABILITY_NOTE_TOO_LONG" };
   }
-  if (availability.length === 0 && !availabilityNote) return { ok: false, error: "AVAILABILITY_REQUIRED" };
 
   let coTutorRNumber: string | null = null;
   if (raw.coTutor.trim()) {
@@ -256,7 +258,7 @@ export function parsePalPlusRequest(
       ...course,
       description,
       tags: tags.tags,
-      availability,
+      moments: moments.moments,
       availabilityNote: availabilityNote || null,
       coTutorRNumber,
     },
@@ -311,194 +313,183 @@ export function parsePalPlusTagLabel(
 }
 
 // -----------------------------------------------------------------------------
-// Beschikbaarheid: het rooster "wanneer kan je?"
+// Wanneer de sessie kan doorgaan: de voorgestelde momenten van een aanbod
 // -----------------------------------------------------------------------------
 
-/** De dagen van het rooster, maandag eerst. Vast: een week verandert niet. */
-export const PAL_PLUS_WEEKDAYS = [
-  { day: 1, nl: "Maandag", en: "Monday", shortNl: "ma", shortEn: "Mon" },
-  { day: 2, nl: "Dinsdag", en: "Tuesday", shortNl: "di", shortEn: "Tue" },
-  { day: 3, nl: "Woensdag", en: "Wednesday", shortNl: "wo", shortEn: "Wed" },
-  { day: 4, nl: "Donderdag", en: "Thursday", shortNl: "do", shortEn: "Thu" },
-  { day: 5, nl: "Vrijdag", en: "Friday", shortNl: "vr", shortEn: "Fri" },
-  { day: 6, nl: "Zaterdag", en: "Saturday", shortNl: "za", shortEn: "Sat" },
-  { day: 7, nl: "Zondag", en: "Sunday", shortNl: "zo", shortEn: "Sun" },
-] as const;
+/** Eén blok: een datum met een begin- en einduur, zoals het formulier het meestuurt. */
+export type RawPalPlusMoment = { date: string; startTime: string; endTime: string };
 
-/** Een aangevinkt vakje: een dag en een dagdeel uit de databank. */
-export type PalPlusAvailabilityChoice = { day: number; daypartId: string };
+/**
+ * Een venster waarin de tutor de sessie kan geven: "dinsdag 13 oktober, 13:00
+ * tot 18:00". Langer dan de sessie zelf mag; Onderwijs kiest er het uur in.
+ */
+export type PalPlusProposedMoment = { startsAt: Date; endsAt: Date };
 
-/** Een vakje zoals het bewaard wordt: met de naam en de uren van toen. */
-export type PalPlusAvailabilitySlot = { day: number; start: number; end: number; label: string };
+/**
+ * Het rooster waarin een tutor aanduidt wanneer de sessie kan: de komende
+ * werkdagen als kolommen, de halve uren als rijen. Een vakje is een halfuur
+ * op een echte datum, dus wat aangeduid is, is meteen een concreet moment.
+ */
+export const PAL_PLUS_GRID = {
+  /** Zoveel werkdagen vanaf vandaag; zaterdag en zondag vallen weg. */
+  days: 7,
+  startMinutes: 8 * 60,
+  endMinutes: 22 * 60,
+  slotMinutes: 30,
+} as const;
 
-export type PalPlusDaypartDef = {
-  id: string;
-  labelNl: string;
-  labelEn: string | null;
-  startMinutes: number;
-  endMinutes: number;
-};
-
-/** De waarde van een vakje in het formulier. */
-export function palPlusAvailabilityValue(day: number, daypartId: string): string {
-  return `${day}:${daypartId}`;
+/**
+ * De datums van het rooster (`YYYY-MM-DD`, Brusselse kalender): de komende
+ * `PAL_PLUS_GRID.days` werkdagen, vandaag inbegrepen als het een werkdag is.
+ * Wat vandaag al voorbij is, zet het rooster zelf uit (`palPlusSlotIsPast`).
+ */
+export function palPlusGridDays(now: Date): string[] {
+  const days: string[] = [];
+  let day = brusselsYMD(now);
+  while (days.length < PAL_PLUS_GRID.days) {
+    if (isoWeekday(day) <= 5) days.push(ymdKey(day));
+    day = shiftYMD(day, 1);
+  }
+  return days;
 }
 
-/** Leest de aangevinkte vakjes; `null` als er iets tussen zit dat geen vakje kan zijn. */
-export function parsePalPlusAvailabilityChoices(raw: string[]): PalPlusAvailabilityChoice[] | null {
-  const choices: PalPlusAvailabilityChoice[] = [];
-  const seen = new Set<string>();
-  for (const value of raw) {
-    const match = /^([1-7]):([A-Za-z0-9_-]{1,64})$/.exec(value.trim());
-    if (!match) return null;
-    const key = `${match[1]}:${match[2]}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    choices.push({ day: Number(match[1]), daypartId: match[2] });
+/** Het begin van elk halfuur van het rooster, in minuten sinds middernacht. */
+export function palPlusGridSlots(): number[] {
+  const slots: number[] = [];
+  for (let minutes = PAL_PLUS_GRID.startMinutes; minutes < PAL_PLUS_GRID.endMinutes; minutes += PAL_PLUS_GRID.slotMinutes) {
+    slots.push(minutes);
   }
-  return choices;
+  return slots;
+}
+
+/** Een halfuur dat al begonnen is, kan niet meer: dat vakje staat uit. */
+export function palPlusSlotIsPast(date: string, minutes: number, today: string, nowMinutes: number): boolean {
+  return date < today || (date === today && minutes < nowMinutes);
+}
+
+/** De sleutel van een vakje in het rooster: `"2026-10-13|1140"`. */
+export function palPlusSlotKey(date: string, minutes: number): string {
+  return `${date}|${minutes}`;
 }
 
 /**
- * Maakt van de aangevinkte vakjes de momentopname die bewaard wordt, met de
- * dagdelen zoals ze nu zijn. `null` wanneer een vakje naar een dagdeel wijst
- * dat er (niet meer) is: dan veranderde de lijst terwijl het formulier openstond.
+ * Maakt van aangeduide vakjes de blokken die meegaan: aaneensluitende halve
+ * uren op dezelfde dag worden één blok, de vroegste eerst. Wat er niet als een
+ * vakje uitziet, valt weg.
  */
-export function palPlusAvailabilitySnapshot(
-  choices: PalPlusAvailabilityChoice[],
-  dayparts: PalPlusDaypartDef[],
-): PalPlusAvailabilitySlot[] | null {
-  const byId = new Map(dayparts.map((daypart) => [daypart.id, daypart]));
-  const slots: PalPlusAvailabilitySlot[] = [];
-  for (const choice of choices) {
-    const daypart = byId.get(choice.daypartId);
-    if (!daypart) return null;
-    slots.push({ day: choice.day, start: daypart.startMinutes, end: daypart.endMinutes, label: daypart.labelNl });
+export function palPlusSlotsToMoments(keys: Iterable<string>): RawPalPlusMoment[] {
+  const byDay = new Map<string, number[]>();
+  for (const key of keys) {
+    const match = /^(\d{4}-\d{2}-\d{2})\|(\d{1,4})$/.exec(key);
+    if (!match) continue;
+    const list = byDay.get(match[1]!) ?? [];
+    list.push(Number(match[2]));
+    byDay.set(match[1]!, list);
   }
-  return sortAvailability(slots);
-}
-
-function sortAvailability(slots: PalPlusAvailabilitySlot[]): PalPlusAvailabilitySlot[] {
-  return [...slots].sort((a, b) => a.day - b.day || a.start - b.start);
-}
-
-/** Leest een bewaarde momentopname terug; wat er niet uitziet als een vakje, valt weg. */
-export function readPalPlusAvailability(json: unknown): PalPlusAvailabilitySlot[] {
-  if (!Array.isArray(json)) return [];
-  const slots: PalPlusAvailabilitySlot[] = [];
-  for (const item of json) {
-    if (!item || typeof item !== "object") continue;
-    const { day, start, end, label } = item as Record<string, unknown>;
-    if (
-      typeof day === "number" &&
-      day >= 1 &&
-      day <= 7 &&
-      typeof start === "number" &&
-      typeof end === "number" &&
-      typeof label === "string"
-    ) {
-      slots.push({ day, start, end, label });
+  const moments: RawPalPlusMoment[] = [];
+  for (const date of [...byDay.keys()].sort()) {
+    const starts = [...new Set(byDay.get(date))].sort((a, b) => a - b);
+    let blockStart = starts[0]!;
+    let blockEnd = blockStart + PAL_PLUS_GRID.slotMinutes;
+    for (const start of starts.slice(1)) {
+      if (start === blockEnd) {
+        blockEnd += PAL_PLUS_GRID.slotMinutes;
+        continue;
+      }
+      moments.push({ date, startTime: palPlusClock(blockStart), endTime: palPlusClock(blockEnd) });
+      blockStart = start;
+      blockEnd = start + PAL_PLUS_GRID.slotMinutes;
     }
+    moments.push({ date, startTime: palPlusClock(blockStart), endTime: palPlusClock(blockEnd) });
   }
-  return sortAvailability(slots);
+  return moments;
 }
 
-export function palPlusMinutesLabel(minutes: number): string {
+/** 1140 wordt "19:00". */
+export function palPlusClock(minutes: number): string {
   return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
 }
 
-/** "Avond (18:00-22:00)" */
-export function palPlusSlotLabel(slot: { label: string; start: number; end: number }): string {
-  return `${slot.label} (${palPlusMinutesLabel(slot.start)}-${palPlusMinutesLabel(slot.end)})`;
-}
-
-export type PalPlusAvailabilityGridView = {
-  columns: { key: string; label: string; hours: string }[];
-  rows: { day: number; keys: string[] }[];
-};
+export type PalPlusProposedMomentsErrorCode =
+  | "MOMENTS_REQUIRED"
+  | "TOO_MANY_MOMENTS"
+  | "MOMENT_PAST"
+  | MomentErrorCode;
 
 /**
- * Het rooster van een aanbod om te tonen: de kolommen zijn de dagdelen die erin
- * voorkomen (zoals ze toen heetten), de rijen enkel de dagen met iets aangeduid.
- * Gewone arrays, zodat het van de server naar een clientcomponent kan.
+ * De vensters die een tutor aanduidde voor die ene sessie. Een blok dat
+ * helemaal leeg is, valt weg; een half ingevuld blok is een fout. Minstens één
+ * en hoogstens `PAL_PLUS_LIMITS.moments`, allemaal na `now`: een moment dat al
+ * voorbij is, kan Onderwijs niet meer plannen. Een venster mag langer zijn dan
+ * een sessie ("de hele namiddag"), maar valt binnen één dag. Dubbels vallen
+ * weg, de vroegste eerst.
  */
-export function palPlusAvailabilityGrid(slots: PalPlusAvailabilitySlot[]): PalPlusAvailabilityGridView {
-  const columnMap = new Map<string, { key: string; label: string; start: number; end: number }>();
-  const rowMap = new Map<number, string[]>();
-  for (const slot of sortAvailability(slots)) {
-    const key = `${slot.start}-${slot.end}-${slot.label}`;
-    if (!columnMap.has(key)) columnMap.set(key, { key, label: slot.label, start: slot.start, end: slot.end });
-    if (!rowMap.has(slot.day)) rowMap.set(slot.day, []);
-    rowMap.get(slot.day)!.push(key);
+export function parsePalPlusProposedMoments(
+  raw: RawPalPlusMoment[],
+  now: Date,
+): { ok: true; moments: PalPlusProposedMoment[] } | { ok: false; error: PalPlusProposedMomentsErrorCode } {
+  const filled = raw.filter((row) => row.date.trim() || row.startTime.trim() || row.endTime.trim());
+  if (filled.length === 0) return { ok: false, error: "MOMENTS_REQUIRED" };
+  if (filled.length > PAL_PLUS_LIMITS.moments) return { ok: false, error: "TOO_MANY_MOMENTS" };
+
+  const moments: PalPlusProposedMoment[] = [];
+  const seen = new Set<string>();
+  for (const row of filled) {
+    const moment = parsePalPlusMoment(row.date.trim(), row.startTime.trim(), row.endTime.trim(), 24 * 60);
+    if (!moment.ok) return moment;
+    if (moment.startsAt.getTime() <= now.getTime()) return { ok: false, error: "MOMENT_PAST" };
+    const key = `${moment.startsAt.getTime()}-${moment.endsAt.getTime()}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    moments.push({ startsAt: moment.startsAt, endsAt: moment.endsAt });
   }
-  return {
-    columns: [...columnMap.values()]
-      .sort((a, b) => a.start - b.start)
-      .map(({ key, label, start, end }) => ({
-        key,
-        label,
-        hours: `${palPlusMinutesLabel(start)}-${palPlusMinutesLabel(end)}`,
-      })),
-    rows: [...rowMap.entries()].sort((a, b) => a[0] - b[0]).map(([day, keys]) => ({ day, keys })),
-  };
+  return { ok: true, moments: sortMoments(moments) };
+}
+
+function sortMoments(moments: PalPlusProposedMoment[]): PalPlusProposedMoment[] {
+  return [...moments].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+}
+
+/** Zoals de momenten in `PalPlusRequest.proposedMoments` staan. */
+export function palPlusProposedMomentsJson(moments: PalPlusProposedMoment[]): { startsAt: string; endsAt: string }[] {
+  return moments.map((moment) => ({ startsAt: moment.startsAt.toISOString(), endsAt: moment.endsAt.toISOString() }));
 }
 
 /**
- * Het rooster als tekst, een regel per dag: "Maandag: Namiddag (13:00-18:00),
- * Avond (18:00-22:00)". Voor de mails en het maillogboek.
+ * Leest de bewaarde momenten terug, de vroegste eerst. Wat er niet uitziet als
+ * een moment, valt weg; een aanbod van voor de momenten (`null`) geeft niets.
  */
-export function palPlusAvailabilityLines(slots: PalPlusAvailabilitySlot[], locale: "nl" | "en"): string[] {
-  const byDay = new Map<number, PalPlusAvailabilitySlot[]>();
-  for (const slot of sortAvailability(slots)) {
-    if (!byDay.has(slot.day)) byDay.set(slot.day, []);
-    byDay.get(slot.day)!.push(slot);
+export function readPalPlusProposedMoments(json: unknown): PalPlusProposedMoment[] {
+  if (!Array.isArray(json)) return [];
+  const moments: PalPlusProposedMoment[] = [];
+  for (const item of json) {
+    if (!item || typeof item !== "object") continue;
+    const { startsAt, endsAt } = item as Record<string, unknown>;
+    if (typeof startsAt !== "string" || typeof endsAt !== "string") continue;
+    const start = new Date(startsAt);
+    const end = new Date(endsAt);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end <= start) continue;
+    moments.push({ startsAt: start, endsAt: end });
   }
-  return [...byDay.entries()].map(([day, daySlots]) => {
-    const weekday = PAL_PLUS_WEEKDAYS.find((entry) => entry.day === day)!;
-    return `${locale === "nl" ? weekday.nl : weekday.en}: ${daySlots.map(palPlusSlotLabel).join(", ")}`;
-  });
+  return sortMoments(moments);
 }
 
-export type PalPlusDaypartErrorCode =
-  | "DAYPART_LABEL_REQUIRED"
-  | "DAYPART_LABEL_TOO_LONG"
-  | "DAYPART_TIME_INVALID"
-  | "DAYPART_TIME_ORDER";
-
-function parseClock(raw: string): number | null {
-  const match = /^(\d{1,2}):(\d{2})$/.exec(raw.trim());
-  if (!match) return null;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  if (hours > 24 || minutes > 59 || (hours === 24 && minutes > 0)) return null;
-  return hours * 60 + minutes;
+/** "Dinsdag 14 oktober, 19:00-21:00", in Brusselse tijd. */
+export function palPlusMomentLabel(moment: PalPlusProposedMoment, locale: "nl" | "en"): string {
+  const day = new Intl.DateTimeFormat(locale === "nl" ? "nl-BE" : "en-GB", {
+    timeZone: "Europe/Brussels",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(moment.startsAt);
+  const start = palPlusWallClockFields(moment.startsAt).time;
+  const end = palPlusWallClockFields(moment.endsAt).time;
+  return `${day.charAt(0).toUpperCase()}${day.slice(1)}, ${start}-${end}`;
 }
 
-/** Een dagdeel uit het beheer: een naam en een begin- en einduur op dezelfde dag. */
-export function parsePalPlusDaypart(raw: {
-  labelNl: string;
-  labelEn: string;
-  start: string;
-  end: string;
-}):
-  | { ok: true; daypart: { labelNl: string; labelEn: string | null; startMinutes: number; endMinutes: number } }
-  | { ok: false; error: PalPlusDaypartErrorCode } {
-  const labelNl = raw.labelNl.trim();
-  const labelEn = raw.labelEn.trim();
-  if (!labelNl) return { ok: false, error: "DAYPART_LABEL_REQUIRED" };
-  if (labelNl.length > PAL_PLUS_LIMITS.daypartLabel || labelEn.length > PAL_PLUS_LIMITS.daypartLabel) {
-    return { ok: false, error: "DAYPART_LABEL_TOO_LONG" };
-  }
-  const startMinutes = parseClock(raw.start);
-  const endMinutes = parseClock(raw.end);
-  if (startMinutes === null || endMinutes === null) return { ok: false, error: "DAYPART_TIME_INVALID" };
-  if (endMinutes <= startMinutes) return { ok: false, error: "DAYPART_TIME_ORDER" };
-  return { ok: true, daypart: { labelNl, labelEn: labelEn || null, startMinutes, endMinutes } };
-}
-
-/** De naam van een dagdeel in de taal van de lezer. */
-export function palPlusDaypartLabel(daypart: { labelNl: string; labelEn: string | null }, locale: "nl" | "en"): string {
-  return locale === "en" && daypart.labelEn ? daypart.labelEn : daypart.labelNl;
+/** De momenten als tekst, een regel per moment. Voor de mails en de pagina. */
+export function palPlusMomentLines(moments: PalPlusProposedMoment[], locale: "nl" | "en"): string[] {
+  return moments.map((moment) => palPlusMomentLabel(moment, locale));
 }
 
 // -----------------------------------------------------------------------------
@@ -508,19 +499,24 @@ export function palPlusDaypartLabel(daypart: { labelNl: string; labelEn: string 
 export type PalPlusCoTutorStatusCode = "PENDING" | "ACCEPTED" | "DECLINED";
 
 /**
- * Of de uitgenodigde tweede tutor nog kan antwoorden: zolang het aanbod bij
- * Onderwijs wacht. Is er al een sessie van gekomen (of is het gesloten), dan
- * vervalt de uitnodiging; wie toch mee wil, regelt dat met Onderwijs.
+ * Of de uitgenodigde tweede tutor nog kan antwoorden: zolang er geen sessie
+ * van het aanbod kwam, ook als Onderwijs het al aanvaardde. Is er al een
+ * sessie (of is het gesloten), dan vervalt de uitnodiging; wie toch mee wil,
+ * regelt dat met Onderwijs.
  */
 export function canAnswerPalPlusCoTutor(request: {
   kind: PalPlusRequestKindCode;
   status: PalPlusRequestStatusCode;
   coTutorStatus: PalPlusCoTutorStatusCode | null;
 }): boolean {
-  return request.kind === "GIVE" && request.status === "PENDING" && request.coTutorStatus === "PENDING";
+  return (
+    request.kind === "GIVE" &&
+    (request.status === "PENDING" || request.status === "ACCEPTED") &&
+    request.coTutorStatus === "PENDING"
+  );
 }
 
-type MomentErrorCode = "MOMENT_REQUIRED" | "MOMENT_INVALID" | "MOMENT_ORDER" | "MOMENT_TOO_LONG";
+export type MomentErrorCode = "MOMENT_REQUIRED" | "MOMENT_INVALID" | "MOMENT_ORDER" | "MOMENT_TOO_LONG";
 
 /**
  * Een datum met een begin- en einduur, als Brusselse wandklok. Een sessie valt
@@ -530,13 +526,15 @@ export function parsePalPlusMoment(
   date: string,
   startTime: string,
   endTime: string,
+  /** Langer is een tikfout. Een sessie: zes uur; een venster van een tutor: de hele dag. */
+  maxMinutes: number = PAL_PLUS_MAX_SESSION_MINUTES,
 ): { ok: true; startsAt: Date; endsAt: Date } | { ok: false; error: MomentErrorCode } {
   if (!date || !startTime || !endTime) return { ok: false, error: "MOMENT_REQUIRED" };
   const start = parseDateTimeFields(date, startTime);
   const end = parseDateTimeFields(date, endTime);
   if (!start || !end) return { ok: false, error: "MOMENT_INVALID" };
   if (end.minutes <= start.minutes) return { ok: false, error: "MOMENT_ORDER" };
-  if (end.minutes - start.minutes > PAL_PLUS_MAX_SESSION_MINUTES) {
+  if (end.minutes - start.minutes > maxMinutes) {
     return { ok: false, error: "MOMENT_TOO_LONG" };
   }
   return {
@@ -563,9 +561,28 @@ export function canPublishPalPlusRequest(request: {
   return request.kind === "FOLLOW" && request.status === "PENDING";
 }
 
-/** Nog niet afgehandeld: de indiener kan intrekken, Onderwijs kan sluiten. */
+/**
+ * Een aanbod dat nog wacht, kan Onderwijs aanvaarden zonder al een moment te
+ * kiezen: de tutor weet dan dat het doorgaat, het moment en het lokaal volgen.
+ * Een vraag niet: die gaat online, of krijgt meteen een sessie.
+ */
+export function canAcceptPalPlusRequest(request: {
+  kind: PalPlusRequestKindCode;
+  status: PalPlusRequestStatusCode;
+}): boolean {
+  return request.kind === "GIVE" && request.status === "PENDING";
+}
+
+/**
+ * De statussen waarin een aanvraag nog niet afgehandeld is: er hangt nog geen
+ * sessie aan en niemand sloot ze. Een aanvaard aanbod hoort daarbij, want het
+ * moment ligt nog niet vast.
+ */
+export const PAL_PLUS_ACTIVE_STATUSES = ["PENDING", "OPEN", "ACCEPTED"] as const satisfies readonly PalPlusRequestStatusCode[];
+
+/** Nog niet afgehandeld: de indiener kan intrekken, Onderwijs kan sluiten of plannen. */
 export function isActivePalPlusStatus(status: PalPlusRequestStatusCode): boolean {
-  return status === "PENDING" || status === "OPEN";
+  return (PAL_PLUS_ACTIVE_STATUSES as readonly PalPlusRequestStatusCode[]).includes(status);
 }
 
 /**
@@ -589,6 +606,7 @@ export function palPlusAskerCount(backerCount: number): number {
 export const PAL_PLUS_STATUS_LABELS: Record<PalPlusRequestStatusCode, { nl: string; en: string }> = {
   PENDING: { nl: "Wacht op Onderwijs", en: "Waiting for Onderwijs" },
   OPEN: { nl: "Zoekt een tutor", en: "Looking for a tutor" },
+  ACCEPTED: { nl: "Aanvaard, moment volgt", en: "Accepted, time to follow" },
   PLANNED: { nl: "Sessie gepland", en: "Session planned" },
   CLOSED: { nl: "Gesloten", en: "Closed" },
   WITHDRAWN: { nl: "Ingetrokken", en: "Withdrawn" },

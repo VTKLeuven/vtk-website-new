@@ -216,14 +216,17 @@ function composeMail(input: ComposeInput): PalPlusMail {
 // Naar wie iets indiende
 // -----------------------------------------------------------------------------
 
-/** Wanneer een tutor kan, zoals het in een mail staat: het rooster per dag en de opmerking. */
-export type PalPlusMailAvailability = { lines: string[]; note: string | null };
+/**
+ * Wanneer de tutor de sessie kan geven, zoals het in een mail staat: een regel
+ * per voorgesteld moment ("Dinsdag 14 oktober, 19:00-21:00") en de opmerking.
+ */
+export type PalPlusMailMoments = { lines: string[]; note: string | null };
 
-function availabilityText(availability: PalPlusMailAvailability, locale: PalPlusMailLocale): string {
+function momentsText(moments: PalPlusMailMoments, locale: PalPlusMailLocale): string {
   const nl = locale === "nl";
   return [
-    ...availability.lines,
-    ...(availability.note ? [`${nl ? "Opmerking" : "Note"}: ${availability.note}`] : []),
+    ...moments.lines,
+    ...(moments.note ? [`${nl ? "Opmerking" : "Note"}: ${moments.note}`] : []),
   ].join("\n");
 }
 
@@ -236,7 +239,7 @@ export function palPlusRequestReceivedMail(input: {
   description: string;
   tags: string[];
   /** Enkel bij een aanbod. */
-  availability: PalPlusMailAvailability | null;
+  moments: PalPlusMailMoments | null;
   /** Enkel bij een aanbod met een tweede tutor: diens naam. */
   coTutorName: string | null;
   pageUrl: string;
@@ -248,8 +251,8 @@ export function palPlusRequestReceivedMail(input: {
     ...(input.tags.length > 0 ? [`Tags: ${input.tags.join(", ")}`] : []),
     "",
     input.description,
-    ...(give && input.availability
-      ? ["", nl ? "Wanneer je kan:" : "When you are available:", availabilityText(input.availability, input.locale)]
+    ...(give && input.moments
+      ? ["", nl ? "Wanneer je de sessie kan geven:" : "When you can give the session:", momentsText(input.moments, input.locale)]
       : []),
   ].join("\n");
   return composeMail({
@@ -266,8 +269,8 @@ export function palPlusRequestReceivedMail(input: {
     intro: give
       ? [
           nl
-            ? "Bedankt om een PAL+-sessie te willen geven. VTK Onderwijs bekijkt je aanbod, plant de sessie en reserveert een lokaal. Het voorgestelde moment kan daarbij nog verschuiven."
-            : "Thank you for offering to give a PAL+ session. VTK Onderwijs reviews your offer, plans the session and books a room. The proposed moment may still change.",
+            ? "Bedankt om een PAL+-sessie te willen geven. VTK Onderwijs bekijkt je aanbod, kiest een van je momenten en reserveert een lokaal."
+            : "Thank you for offering to give a PAL+ session. VTK Onderwijs reviews your offer, picks one of your moments and books a room.",
           nl
             ? "Je krijgt een mail zodra de sessie gepland is, of als het er niet van komt."
             : "You get an email once the session is planned, or if it does not go ahead.",
@@ -327,6 +330,57 @@ export function palPlusRequestPublishedMail(input: {
     footer: nl
       ? "Je krijgt deze mail omdat je via de PAL+-pagina op vtk.be hulp vroeg."
       : "You received this email because you asked for help on the PAL+ page on vtk.be.",
+  });
+}
+
+/**
+ * Onderwijs aanvaardde een aanbod, maar het moment ligt nog niet vast. Naar wie
+ * het indiende, en naar de tweede tutor als die al bevestigde.
+ */
+export function palPlusRequestAcceptedMail(input: {
+  locale: PalPlusMailLocale;
+  name: string;
+  courseLabel: string;
+  /** De momenten die de tutor voorstelde; Onderwijs kiest er een uit. */
+  moments: PalPlusMailMoments | null;
+  pageUrl: string;
+}): PalPlusMail {
+  const nl = input.locale === "nl";
+  const hasMoments = (input.moments?.lines.length ?? 0) > 0;
+  return composeMail({
+    locale: input.locale,
+    subject: nl ? `Je PAL+-aanbod is aanvaard: ${input.courseLabel}` : `Your PAL+ offer was accepted: ${input.courseLabel}`,
+    heading: nl ? "Je sessie gaat door" : "Your session is going ahead",
+    greetingName: input.name,
+    intro: [
+      nl
+        ? `VTK Onderwijs aanvaardde je aanbod om een PAL+-sessie te geven over ${input.courseLabel}. Het moment en het lokaal liggen nog niet vast.`
+        : `VTK Onderwijs accepted your offer to give a PAL+ session on ${input.courseLabel}. The time and room are not fixed yet.`,
+      hasMoments
+        ? nl
+          ? "Onderwijs kiest een van de momenten hieronder en reserveert een lokaal. Je krijgt een mail zodra de sessie vastligt."
+          : "Onderwijs picks one of the moments below and books a room. You get an email once the session is fixed."
+        : nl
+          ? "Onderwijs spreekt een moment met je af en reserveert een lokaal. Je krijgt een mail zodra de sessie vastligt."
+          : "Onderwijs agrees on a time with you and books a room. You get an email once the session is fixed.",
+    ],
+    ...(input.moments && (hasMoments || input.moments.note)
+      ? {
+          box: {
+            label: nl ? "Je voorgestelde momenten" : "Your proposed moments",
+            text: momentsText(input.moments, input.locale),
+          },
+        }
+      : {}),
+    outro: [
+      nl
+        ? "Kan je op een van die momenten toch niet meer? Antwoord op deze mail, dan houdt Onderwijs er rekening mee."
+        : "Can you no longer make one of those moments? Reply to this email so Onderwijs can take it into account.",
+    ],
+    buttons: [{ url: `${input.pageUrl}#jouw-aanvragen`, label: nl ? "Naar je aanvragen" : "Go to your requests" }],
+    footer: nl
+      ? "Je krijgt deze mail omdat je via de PAL+-pagina op vtk.be aanbood een sessie te geven."
+      : "You received this email because you offered to give a session on the PAL+ page on vtk.be.",
   });
 }
 
@@ -757,7 +811,7 @@ export function palPlusNewRequestNotificationMail(input: {
   courseTyped: boolean;
   description: string;
   tags: string[];
-  availability: PalPlusMailAvailability | null;
+  moments: PalPlusMailMoments | null;
   coTutorName: string | null;
   preferredPeriod: string | null;
   /** Bij "ik kan dit geven": de vraag waarop het aanbod antwoordt. */
@@ -782,7 +836,7 @@ export function palPlusNewRequestNotificationMail(input: {
       { label: "E-mail", value: input.submitterEmail },
       ...(input.coTutorName ? [{ label: "Samen met", value: `${input.coTutorName} (moet nog bevestigen)` }] : []),
       ...(input.tags.length > 0 ? [{ label: "Tags", value: input.tags.join(", ") }] : []),
-      ...(give && input.availability ? [{ label: "Kan meestal", value: availabilityText(input.availability, "nl") }] : []),
+      ...(give && input.moments ? [{ label: "Kan op", value: momentsText(input.moments, "nl") }] : []),
       ...(!give && input.preferredPeriod ? [{ label: "Wanneer nodig", value: input.preferredPeriod }] : []),
       ...(input.respondsToLabel ? [{ label: "Antwoord op", value: input.respondsToLabel }] : []),
     ],
@@ -805,7 +859,7 @@ export function palPlusCoTutorInvitationMail(input: {
   courseLabel: string;
   description: string;
   tags: string[];
-  availability: PalPlusMailAvailability | null;
+  moments: PalPlusMailMoments | null;
   pageUrl: string;
 }): PalPlusMail {
   const nl = input.locale === "nl";
@@ -828,8 +882,8 @@ export function palPlusCoTutorInvitationMail(input: {
         ...(input.tags.length > 0 ? [`Tags: ${input.tags.join(", ")}`] : []),
         "",
         input.description,
-        ...(input.availability
-          ? ["", nl ? "Wanneer jullie kunnen:" : "When you are available:", availabilityText(input.availability, input.locale)]
+        ...(input.moments
+          ? ["", nl ? "Wanneer jullie de sessie kunnen geven:" : "When you can give the session:", momentsText(input.moments, input.locale)]
           : []),
       ].join("\n"),
     },

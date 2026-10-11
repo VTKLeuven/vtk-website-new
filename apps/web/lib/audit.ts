@@ -127,6 +127,7 @@ export const AUDIT_ENTITIES = {
   lesbezoekSettings: { nl: "Lesbezoekeninstelling", en: "Classroom-visit setting", group: "lesbezoeken" },
   palPlusCourse: { nl: "PAL+-vak", en: "PAL+ course", group: "palPlus" },
   palPlusTag: { nl: "PAL+-tag", en: "PAL+ tag", group: "palPlus" },
+  // De dagdelen bestaan niet meer (oktober 2026); de naam blijft voor de oude regels in de auditlog.
   palPlusDaypart: { nl: "PAL+-dagdeel", en: "PAL+ part of day", group: "palPlus" },
   palPlusRequest: { nl: "PAL+-aanvraag", en: "PAL+ request", group: "palPlus" },
   palPlusSession: { nl: "PAL+-sessie", en: "PAL+ session", group: "palPlus" },

@@ -7124,6 +7124,7 @@ model LesbezoekPeculiarity {
 // sessies van:
 //
 //   aanbod om te geven (GIVE)  -> PENDING   Onderwijs screent de tutor
+//                                 -> ACCEPTED  aanvaard, moment en lokaal volgen
 //                                 -> PLANNED   er is een sessie van gemaakt
 //                                 -> CLOSED    niet aanvaard, met reden
 //   vraag om hulp (FOLLOW)     -> OPEN      meteen publiek, zonder naam; andere
@@ -7151,6 +7152,10 @@ enum PalPlusRequestStatus {
   PENDING
   /// Een vraag om hulp die publiek staat en een tutor zoekt. Enkel bij FOLLOW.
   OPEN
+  /// Een aanbod dat Onderwijs aanvaardde: het gaat door, maar het moment en
+  /// het lokaal liggen nog niet vast. Enkel bij GIVE; wordt PLANNED zodra er
+  /// een sessie van komt.
+  ACCEPTED
   /// Er hangt een sessie aan (`sessionId`).
   PLANNED
   /// Onderwijs sloot ze zonder sessie: een aanbod dat niet aanvaard werd, of een
@@ -7216,27 +7221,6 @@ model PalPlusTag {
   updatedAt DateTime @updatedAt @db.Timestamptz(3)
 }
 
-/// Een dagdeel in het rooster "wanneer kan je?" van een aanbod (voormiddag,
-/// namiddag, avond). Onderwijs houdt de lijst bij; de kolommen van het rooster
-/// zijn de actieve dagdelen, op volgorde van hun begin.
-///
-/// Een aanbod bewaart de dagdelen die aangeduid werden als momentopname, met
-/// naam en uren (`PalPlusRequest.availability`). Een dagdeel later verschuiven
-/// of schrappen verandert dus niet wat een tutor ooit aanduidde.
-model PalPlusDaypart {
-  id           String  @id @default(cuid())
-  labelNl      String
-  /// Leeg = de Engelse site toont de Nederlandse naam.
-  labelEn      String?
-  /// Minuten sinds middernacht, Brusselse tijd.
-  startMinutes Int
-  endMinutes   Int
-  active       Boolean @default(true)
-
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-  updatedAt DateTime @updatedAt @db.Timestamptz(3)
-}
-
 /// Een aanbod om een sessie te geven, of een vraag om hulp bij een vak. Eén
 /// tabel voor beide: ze hebben dezelfde vorm (wie, welk vak, wat voor sessie) en
 /// komen in hetzelfde werkbakje van Onderwijs terecht.
@@ -7266,13 +7250,14 @@ model PalPlusRequest {
   /// die online staat, en de zoekbalk op /pal-plus zoekt erin.
   tags String[] @default([])
 
-  /// Wanneer de tutor(s) meestal kunnen, enkel bij GIVE: de aangeduide vakjes
-  /// van het rooster als `[{ day, start, end, label }]` (day 1 = maandag, uren
-  /// in minuten sinds middernacht). Een momentopname: zie `PalPlusDaypart`.
-  /// Onderwijs kiest bij het plannen een echte datum die erin past.
-  availability     Json?
-  /// Wat het rooster niet kan zeggen: "niet in de week van 12 oktober", "liefst
-  /// voor de tussentoets". Enkel bij GIVE.
+  /// Wanneer de tutor(s) deze ene sessie kunnen geven, enkel bij GIVE: een
+  /// handvol concrete momenten als `[{ startsAt, endsAt }]` (ISO-tijdstippen).
+  /// Onderwijs kiest er bij het plannen een uit. Leeg bij een aanbod van voor
+  /// oktober 2026: dat had een weekrooster, dat als tekst in
+  /// `availabilityNote` staat.
+  proposedMoments  Json?
+  /// Wat de momenten niet zeggen: "liefst voor de tussentoets", "het uur kan
+  /// schuiven". Enkel bij GIVE.
   availabilityNote String?
   /// Wanneer de hulp nodig is, in eigen woorden ("voor het examen in januari").
   /// Enkel bij FOLLOW.

@@ -1140,11 +1140,13 @@ adres zijn makkelijk te veranderen.
 ### Twee wegen naar een sessie
 
 - **Een lid biedt aan een sessie te geven.** Het kiest een vak, beschrijft wat voor
-  sessie (oefeningen, theorie, een hoofdstuk), en duidt in een rooster aan wanneer het
-  meestal kan (zie "Wanneer kan je?" hieronder). Wie met twee wil geven, vult het
-  r-nummer van de tweede tutor in. Onderwijs screent de persoon zelf en maakt er een
-  sessie van, of sluit het aanbod met een reden. Een LettuceMeet-achtige peiling is
-  gevraagd en **bewust niet gebouwd**: te ingewikkeld voor een eerste versie.
+  sessie (oefeningen, theorie, een hoofdstuk), en duidt in een rooster van de komende
+  werkdagen aan wanneer die sessie kan (zie "Wanneer kan de sessie doorgaan?" hieronder).
+  Wie met twee wil geven, vult het r-nummer van de tweede tutor in. Onderwijs screent
+  de persoon zelf en aanvaardt het aanbod, plant er meteen een sessie van, of sluit het
+  met een reden. Een volledige LettuceMeet-peiling, waarin ook wie hulp zoekt uren
+  aanduidt, is gevraagd en **bewust niet gebouwd**: te ingewikkeld voor een eerste
+  versie. Het rooster van de tutor lijkt er wel op.
 - **Een lid vraagt hulp bij een vak.** **Onderwijs kijkt de vraag eerst na** en zet ze
   dan online: pas dan staat ze op de PAL+-pagina, zonder naam, zodat een mogelijke tutor
   ze ziet en kan zeggen "ik kan dit geven". Andere leden kunnen een vraag steunen ("ik
@@ -1168,7 +1170,30 @@ adres zijn makkelijk te veranderen.
     kan de indiener intrekken.
 
 Beide vormen zijn één tabel (`PalPlusRequest` met een `kind`), want ze hebben dezelfde
-vorm en komen in hetzelfde werkbakje terecht.
+vorm en komen in hetzelfde werkbakje terecht. **In het werkbakje staan ze wel elk in
+een eigen kaart**, met een rail links (geel voor een aanbod, inkt voor een vraag) en
+bovenaan een aanvraag de soort in een zin. Eerst stonden ze door elkaar in één tabel
+met een kolom "Soort", en Onderwijs zag niet in een oogopslag wat wat was: ze vragen
+iets anders (een sessie plannen tegenover nakijken en een tutor zoeken), dus lezen ze
+ook beter apart.
+
+### Aanvaard, moment volgt
+
+Tussen "Wacht op Onderwijs" en "Sessie gepland" zit voor een aanbod een eigen stap:
+**aanvaard, moment volgt** (`ACCEPTED`). Onderwijs weet vaak al dat een aanbod doorgaat
+voor het lokaal bij de KU Leuven gereserveerd is; zonder die stap hoorde de tutor
+dagen niets.
+
+- Aanvaarden stuurt de tutor een mail (en de tweede tutor, als die al bevestigde):
+  de sessie gaat door, Onderwijs kiest een van de momenten en reserveert een lokaal.
+  Op /pal-plus staat het aanbod dan op "Aanvaard, moment volgt".
+- Plannen kan vanuit beide toestanden; aanvaarden is geen verplichte tussenstap. Wie
+  het moment al weet, plant meteen, en dan komt enkel de mail "je geeft een sessie".
+- Een aanvaard aanbod telt nog als lopend: de tutor kan het intrekken, Onderwijs kan
+  het sluiten, en de tweede tutor kan nog antwoorden. Er hangt immers nog geen sessie
+  aan.
+- Enkel bij een aanbod. Een hulpvraag heeft al haar eigen tussenstap (online, "zoekt
+  een tutor").
 
 ### De pagina en het werkbakje
 
@@ -1204,9 +1229,9 @@ code voor.
 
 ### Lijsten die Onderwijs bijhoudt
 
-In het beheer staan onder Lijsten drie korte lijsten: de vakken, de snelle tags en de
-dagdelen van het rooster. Geen ervan zit vast in de code; de migratie zet enkel een
-vertrekpunt klaar, want de seed draait niet bij een deploy.
+In het beheer staan onder Lijsten twee korte lijsten: de vakken en de snelle tags. Geen
+van beide zit vast in de code; de migratie zet enkel een vertrekpunt klaar, want de
+seed draait niet bij een deploy.
 
 ### Vakken
 
@@ -1237,26 +1262,46 @@ een apart veld daarvoor naast de omschrijving was het alternatief.
   hernoemen of weghalen verandert niets aan wat al ingediend werd. Bij het plannen gaan
   de tags mee naar de sessie, waar Onderwijs ze kan aanpassen.
 
-### Wanneer kan je? Het rooster
+### Wanneer kan de sessie doorgaan? Een rooster op echte datums
 
-Een aanbod had eerst één voorgesteld moment (een datum met een uur). In de lijst van
-Onderwijs kwam "een veld waar ze momenten invullen dat ze kunnen", meervoud. Dat is nu
-een rooster: de dagen van maandag tot zondag onder elkaar, de dagdelen als kolommen,
-één tik per vakje, plus een vrije opmerking ("niet in de week van 12 oktober").
+Een aanbod gaat over één sessie, dus de tutor duidt aan wanneer **die** sessie kan:
+een rooster met de **komende zeven werkdagen** als kolommen (vandaag inbegrepen,
+zaterdag en zondag overgeslagen) en de **halve uren van 8 tot 22 uur** als rijen
+(`PAL_PLUS_GRID`). Slepen duidt een blok aan, zoals in When2meet; wie op een geel vakje
+begint, haalt weg. Wat al voorbij is, staat uit. Daaronder een vrije opmerking
+("liefst voor de tussentoets").
 
-- **Waarom een rooster en geen lijst van exacte momenten**: drie velden per moment is
-  traag en mist nog altijd momenten. Een tutor weet meestal "dinsdagavond kan ik", en
-  Onderwijs kiest bij het plannen een echte datum die erin past. Het rooster staat
-  daarom boven het sessieformulier wanneer Onderwijs vanuit een aanbod plant.
-- **Minstens een vakje of een opmerking**: wie enkel op één datum kan, zegt dat in de
-  opmerking.
-- **De dagdelen zijn niet vast** (`PalPlusDaypart`, standaard voormiddag 8-12, namiddag
-  13-18, avond 18-22). Een aanbod bewaart de aangeduide vakjes als momentopname, met
-  naam en uren van toen (`PalPlusRequest.availability`): een dagdeel later verschuiven
-  of weghalen verandert dus niet wat een tutor ooit aanduidde. De weekdagen staan wel
-  vast in de code; een week verandert niet.
-- Gewone checkboxen, geen JavaScript nodig, en op een telefoon past het rooster (zeven
-  rijen, drie kolommen) op het scherm.
+- **Hoe we hier kwamen.** Eerst één voorgesteld moment, toen een weekrooster
+  ("wanneer kan je meestal?", maandag tot zondag met dagdelen), toen een lijstje
+  momenten met elk een datum en twee uren. Het weekrooster zei iets over de tutor en
+  niet over de sessie: Onderwijs moest er nog een datum bij zoeken en navragen. Het
+  lijstje was concreet maar traag in te vullen. Dit rooster is allebei: één sleep per
+  blok, en elk vakje is een echte datum.
+- **Uren en geen dagdelen.** Een dagdeel ("avond") is te grof om een lokaal op te
+  reserveren. Halve uren, omdat sessies vaak om half beginnen.
+- **Dagen als kolommen, uren als rijen**: zeven kolommen passen op een telefoon,
+  achtentwintig niet. Op een smal scherm valt de maand weg onder de dag. Slepen over
+  de vakjes duidt aan in plaats van te scrollen (`touch-action: none`); scrollen gaat
+  over de uren links of naast het rooster.
+- **Zelf gebouwd, geen library.** De bekende When2meet-kloon voor React
+  (`react-schedule-selector`) kreeg sinds 2023 geen release, vraagt styled-components
+  en brengt Emotion mee: een tweede stijlsysteem naast de tokens. Het rooster is
+  `components/palPlus/MomentGrid.tsx`, met de rekenregels puur in `lib/palPlus.ts`.
+- **Wat bewaard wordt, zijn vensters, geen vakjes.** Aaneensluitende halve uren worden
+  één blok ("dinsdag 13 oktober, 13:00-18:00") in `PalPlusRequest.proposedMoments`.
+  Zo lezen het beheer, de mails en /pal-plus gewoon een lijst momenten. Een venster
+  mag langer zijn dan een sessie; hoogstens twintig losse blokken.
+- **Minstens één halfuur.** Een opmerking alleen volstaat niet: dat was de uitweg van
+  het weekrooster, en net wat Onderwijs liet navragen.
+- Bij het plannen staan de vensters die nog komen als knoppen boven het
+  sessieformulier. Een klik vult het begin van het venster in, voor hoogstens twee uur;
+  het uur verschuiven binnen het venster doet Onderwijs zelf. Het eerste venster staat
+  al ingevuld. Een voorbij venster staat doorstreept bij de aanvraag.
+- Een aanbod van voor deze wijziging (oktober 2026) heeft geen vensters; zijn
+  weekrooster staat als tekst in de opmerking ("Kon meestal: di avond
+  (18:00-22:00)"). De dagdelen zelf zijn weg, ook uit de lijsten van Onderwijs.
+- Een peiling waarin ook de mensen die hulp zoeken hun uren aanduiden, is nog altijd
+  **bewust niet gebouwd**: het rooster is enkel voor de tutor.
 
 ### Samen met een tweede tutor
 
@@ -1296,7 +1341,7 @@ richting van elk lid in het profiel), dus de vakken een richting geven is de vol
   doorstreept, voorbij grijs, op een telefoon stippen met de sessies van de aangetikte
   dag eronder. De lijst blijft beschikbaar.
 - **Plannen vertrekt meestal uit een aanvraag.** Een aanbod brengt zijn tutor(s),
-  omschrijving en tags mee, met het rooster erboven om een moment te kiezen; een
+  omschrijving en tags mee, met zijn momenten als knoppen om er een te kiezen; een
   hulpvraag de mensen die erop aanboden, als voorstel. De aanvraag
   staat aangevinkt bij "deze sessie beantwoordt", samen met de vraag waarop het aanbod
   antwoordde en de andere open vragen over hetzelfde vak die erbij kunnen. Wat
@@ -1409,7 +1454,7 @@ De lijst staat in het beheer en is voor niemand anders zichtbaar. Het recht is
 
 Elke stap waar iemand op wacht, krijgt een mail; wat niemand iets vertelt, niet. De
 teksten staan in `lib/palPlusMail.ts`, wie wat krijgt in `lib/palPlusNotify.ts`, en
-alle elf staan als voorvertoning op /admin/it/flows.
+alle twaalf staan als voorvertoning op /admin/it/flows.
 
 | Wanneer | Naar wie |
 | --- | --- |
@@ -1417,6 +1462,7 @@ alle elf staan als voorvertoning op /admin/it/flows.
 | Aanbod met een tweede tutor | De tweede tutor (uitnodiging om te bevestigen) |
 | Tweede tutor antwoordt | Wie het aanbod indiende |
 | Hulpvraag online gezet | Wie ze stelde |
+| Aanbod aanvaard, moment volgt | Wie het indiende, en de tweede tutor als die bevestigde |
 | Aanvraag gesloten | De indiener, met de reden |
 | Sessie gepland of tutor toegevoegd | De nieuwe tutor |
 | Sessie gepland voor een hulpvraag | Wie de vraag stelde en wie ze steunde |

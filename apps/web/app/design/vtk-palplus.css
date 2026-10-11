@@ -143,6 +143,105 @@
   color: var(--muted);
 }
 
+/* Aanvaard, moment volgt: tussen wachten (geel) en gepland (inkt) in, dus een
+   inkten rand op wit. */
+.vtk-palplus-status[data-status='ACCEPTED'] {
+  border-color: var(--ink);
+}
+
+/* -------------------------------------------------------------------------- */
+/* De soort: een aanbod en een hulpvraag staan elk in hun eigen kaart          */
+/* -------------------------------------------------------------------------- */
+
+/* De rail links draagt de soort, ook halverwege een lange lijst: geel voor een
+   aanbod (iemand wil geven), inkt voor een hulpvraag (iemand zoekt hulp).
+   Op de kaart een pseudo-element en geen inset-schaduw: vtk-admin.css zet de
+   schaduw van elke beheerkaart met !important, en daar hoort geen tweede
+   !important tegenover. */
+.vtk-palplus-kindcard {
+  position: relative;
+  overflow: hidden;
+}
+
+.vtk-palplus-kindcard::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+}
+
+.vtk-palplus-kindcard[data-kind='GIVE']::before {
+  background: var(--yellow);
+}
+
+.vtk-palplus-kindcard[data-kind='FOLLOW']::before {
+  background: var(--ink);
+}
+
+.vtk-palplus-kindtag[data-kind='GIVE'] {
+  box-shadow: inset 4px 0 0 var(--yellow);
+}
+
+.vtk-palplus-kindtag[data-kind='FOLLOW'] {
+  box-shadow: inset 4px 0 0 var(--ink);
+}
+
+.vtk-palplus-kindhead {
+  margin-bottom: 14px;
+}
+
+.vtk-palplus-kindhead h2 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.vtk-palplus-kindhead p {
+  margin: 2px 0 0;
+  font-size: 13px;
+}
+
+.vtk-palplus-kindcount {
+  display: inline-grid;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 7px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--paper-2);
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Bovenaan een aanvraag: de soort als kop met een zin, op dezelfde rail. */
+.vtk-palplus-kindtag {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  padding: 10px 14px 10px 18px;
+  border-radius: 12px;
+  background: var(--paper);
+}
+
+.vtk-palplus-kindtag strong {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.vtk-palplus-kindtag span {
+  font-size: 14px;
+  color: var(--body);
+}
+
 .vtk-palplus-detail {
   display: flex;
   flex-direction: column;

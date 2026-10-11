@@ -29,6 +29,9 @@ export type SessionFormInitial = {
 /** De snelle tags, en per vak de tags die er al gebruikt werden. */
 export type TagSuggestions = { presets: string[]; byCourse: Record<string, string[]> };
 
+/** Een moment dat een tutor voorstelde, klaar om in het formulier te zetten. */
+export type MomentChoice = { label: string; date: string; startTime: string; endTime: string; past: boolean };
+
 /** Een aanvraag die deze sessie kan beantwoorden; aangevinkt gaat ze naar "Sessie gepland". */
 export type LinkableRequest = { id: string; label: string; checked: boolean };
 
@@ -49,6 +52,7 @@ export function SessionForm({
   rooms,
   linkable = [],
   tutorSuggestions = [],
+  momentChoices = [],
   tags,
   onDone,
 }: {
@@ -58,6 +62,8 @@ export function SessionForm({
   rooms: RoomGroup[];
   linkable?: LinkableRequest[];
   tutorSuggestions?: Person[];
+  /** De momenten uit het aanbod: een klik zet datum en uren goed. */
+  momentChoices?: MomentChoice[];
   tags: TagSuggestions;
   onDone: () => void;
 }) {
@@ -148,6 +154,34 @@ export function SessionForm({
       />
 
       <div>
+        {momentChoices.length > 0 && (
+          <div className="mb-3">
+            <p className="vtk-palplus-label">{nl ? "Momenten van de tutor" : "The tutor's moments"}</p>
+            <div className="pp-tags-presets" role="group" aria-label={nl ? "Momenten van de tutor" : "The tutor's moments"}>
+              {momentChoices.map((choice) => (
+                <button
+                  key={`${choice.date}-${choice.startTime}-${choice.endTime}`}
+                  type="button"
+                  aria-pressed={
+                    choice.date === date && choice.startTime === startTime && choice.endTime === endTime
+                  }
+                  onClick={() => {
+                    setDate(choice.date);
+                    setStartTime(choice.startTime);
+                    setEndTime(choice.endTime);
+                  }}
+                >
+                  {choice.label}
+                </button>
+              ))}
+            </div>
+            <p className="text-xs text-vtk-muted">
+              {nl
+                ? "Een klik vult het begin van het venster in, voor twee uur. Verschuif het uur binnen het venster, of vul zelf een ander moment in als je met de tutor iets anders afsprak."
+                : "A click fills in the start of the window, for two hours. Move the time within the window, or fill in another moment if you agreed on something else with the tutor."}
+            </p>
+          </div>
+        )}
         <div className="vtk-palplus-moment">
           <div>
             <Label htmlFor={`pp-s-date-${prefix}`}>{nl ? "Datum" : "Date"}</Label>
