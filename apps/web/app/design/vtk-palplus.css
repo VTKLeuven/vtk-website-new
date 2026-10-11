@@ -56,6 +56,77 @@
   vertical-align: 1px;
 }
 
+/* Wat een geplakte vakkenlijst wordt, terwijl je plakt. Een register met
+   haarlijnen, geen tabel: het is een controle, geen tweede beheerlijst. Wat
+   overgeslagen wordt, staat grijs; een regel die niet klopt, rood. */
+.vtk-palplus-paste {
+  display: grid;
+  gap: 8px;
+}
+
+.vtk-palplus-paste-list {
+  max-height: 320px;
+  overflow-y: auto;
+  border-top: 1px solid var(--line);
+}
+
+.vtk-palplus-paste-list li {
+  display: grid;
+  grid-template-columns: 7.5em minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: baseline;
+  padding: 6px 10px 6px 2px;
+  border-bottom: 1px solid var(--line);
+  font-size: 13px;
+  color: var(--ink);
+}
+
+.vtk-palplus-paste-code {
+  font-variant-numeric: tabular-nums;
+  color: var(--body);
+}
+
+.vtk-palplus-paste-status {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.vtk-palplus-paste-list li[data-status='exists'],
+.vtk-palplus-paste-list li[data-status='repeat'] {
+  color: var(--muted);
+}
+
+.vtk-palplus-paste-list li[data-status='new'] .vtk-palplus-paste-status {
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.vtk-palplus-paste-list li[data-status='error'] {
+  grid-template-columns: 7.5em minmax(0, 1fr);
+  padding-inline: 8px;
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+}
+
+.vtk-palplus-paste-list li[data-status='error'] .vtk-palplus-paste-code,
+.vtk-palplus-paste-list li[data-status='error'] .vtk-palplus-sub {
+  color: var(--danger-ink);
+}
+
+/* Smal: de status onder de naam in plaats van ernaast, waar ze tegen de
+   scrollbalk van de lijst aan kwam. */
+@media (max-width: 640px) {
+  .vtk-palplus-paste-list li,
+  .vtk-palplus-paste-list li[data-status='error'] {
+    grid-template-columns: 5.5em minmax(0, 1fr);
+    gap: 2px 10px;
+  }
+
+  .vtk-palplus-paste-status {
+    grid-column: 2;
+  }
+}
+
 .vtk-admin-main tbody tr.vtk-palplus-editor,
 .vtk-admin-main tbody tr.vtk-palplus-editor:hover {
   background: var(--paper);

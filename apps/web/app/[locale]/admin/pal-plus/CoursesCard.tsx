@@ -1,12 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import { Button, Card, Input, Label } from "@vtk/ui";
+import { useMemo, useState } from "react";
+import { Button, Card, Input, Label, Textarea } from "@vtk/ui";
 import { SaveForm } from "@/components/ui/SaveForm";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
-import { deletePalPlusCourseAction, savePalPlusCourseAction } from "@/app/actions/palPlus";
-import { PAL_PLUS_LIMITS, palPlusCourseLabel } from "@/lib/palPlus";
-import { palPlusCourseErrors } from "@/lib/palPlusMessages";
+import {
+  deletePalPlusCourseAction,
+  importPalPlusCoursesAction,
+  savePalPlusCourseAction,
+} from "@/app/actions/palPlus";
+import {
+  PAL_PLUS_COURSE_LIST_MAX,
+  PAL_PLUS_LIMITS,
+  palPlusCourseLabel,
+  planPalPlusCourseList,
+} from "@/lib/palPlus";
+import {
+  palPlusCourseErrors,
+  palPlusCourseLineProblem,
+  palPlusCourseListErrors,
+} from "@/lib/palPlusMessages";
 
 export type PalPlusCourseView = {
   id: string;
@@ -24,12 +37,14 @@ export type PalPlusCourseView = {
  *
  * Een klik op de rij opent het vak om te bewerken, en verwijderen staat daarin:
  * het is de enige onomkeerbare actie, en enkel mogelijk zolang er niets aan het
- * vak hangt.
+ * vak hangt. "Meerdere toevoegen" neemt een geplakte lijst, één vak per regel,
+ * voor het begin van een semester of een lijst uit de studiegids.
  */
 export function CoursesCard({ nl, courses }: { nl: boolean; courses: PalPlusCourseView[] }) {
   const [expanded, setExpanded] = useState<string | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState<"one" | "many" | null>(null);
   const errors = palPlusCourseErrors(nl);
+  const toggleAdding = (mode: "one" | "many") => setAdding((prev) => (prev === mode ? null : mode));
 
   const toggle = (id: string) => setExpanded((prev) => (prev === id ? null : id));
 
@@ -38,9 +53,14 @@ export function CoursesCard({ nl, courses }: { nl: boolean; courses: PalPlusCour
       <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">{nl ? "Vakken" : "Courses"}</h2>
         {courses.length > 0 && (
-          <Button type="button" size="sm" onClick={() => setAdding((prev) => !prev)}>
-            {adding ? (nl ? "Annuleren" : "Cancel") : nl ? "Vak toevoegen" : "Add course"}
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" size="sm" variant="ghost" onClick={() => toggleAdding("many")}>
+              {adding === "many" ? (nl ? "Annuleren" : "Cancel") : nl ? "Meerdere toevoegen" : "Add several"}
+            </Button>
+            <Button type="button" size="sm" onClick={() => toggleAdding("one")}>
+              {adding === "one" ? (nl ? "Annuleren" : "Cancel") : nl ? "Vak toevoegen" : "Add course"}
+            </Button>
+          </div>
         )}
       </div>
       <p className="mb-4 text-sm text-vtk-muted">
@@ -49,9 +69,14 @@ export function CoursesCard({ nl, courses }: { nl: boolean; courses: PalPlusCour
           : "What a member picks from when offering a session or asking for help. A course with requests or sessions attached is not deleted but switched off: it leaves the form and its history stays."}
       </p>
 
-      {adding && (
+      {adding === "one" && (
         <div className="mb-4 rounded-2xl border border-vtk-blue/15 p-4">
-          <CourseForm nl={nl} errors={errors} course={null} onDone={() => setAdding(false)} />
+          <CourseForm nl={nl} errors={errors} course={null} onDone={() => setAdding(null)} />
+        </div>
+      )}
+      {adding === "many" && (
+        <div className="mb-4 rounded-2xl border border-vtk-blue/15 p-4">
+          <CourseListForm nl={nl} courses={courses} onDone={() => setAdding(null)} />
         </div>
       )}
 
@@ -63,9 +88,14 @@ export function CoursesCard({ nl, courses }: { nl: boolean; courses: PalPlusCour
                 ? "Nog geen vakken. Zolang de lijst leeg is, kan niemand een vak kiezen in een aanvraag."
                 : "No courses yet. While the list is empty, nobody can pick a course in a request."}
             </p>
-            <Button type="button" size="sm" onClick={() => setAdding(true)}>
-              {nl ? "Eerste vak toevoegen" : "Add the first course"}
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" size="sm" onClick={() => setAdding("one")}>
+                {nl ? "Eerste vak toevoegen" : "Add the first course"}
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setAdding("many")}>
+                {nl ? "Een lijst plakken" : "Paste a list"}
+              </Button>
+            </div>
           </div>
         )
       ) : (
@@ -277,6 +307,141 @@ function CourseForm({
         <input type="checkbox" name="active" defaultChecked={course?.active ?? true} />
         <span>{nl ? "Kiesbaar in het aanvraagformulier" : "Selectable in the request form"}</span>
       </label>
+    </SaveForm>
+  );
+}
+
+const COURSE_LIST_EXAMPLE = [
+  "H01A0B Analyse, deel 1",
+  "H01A4B; Toegepaste algebra; Applied Algebra",
+  "Matlab",
+].join("\n");
+
+const STATUS_LABELS = {
+  new: { nl: "nieuw", en: "new" },
+  exists: { nl: "staat er al", en: "already listed" },
+  repeat: { nl: "dubbel geplakt", en: "pasted twice" },
+} as const;
+
+/**
+ * Een geplakte lijst, één vak per regel. Wat er van de lijst wordt, staat er
+ * meteen onder terwijl je plakt: welke vakken nieuw zijn, welke al bestaan en
+ * welke regel niet klopt. Zo zie je voor het toevoegen of de kolommen goed
+ * gelezen worden, in plaats van achteraf honderd vakken te moeten nakijken.
+ */
+function CourseListForm({
+  nl,
+  courses,
+  onDone,
+}: {
+  nl: boolean;
+  courses: PalPlusCourseView[];
+  onDone: () => void;
+}) {
+  const [text, setText] = useState("");
+  const plan = useMemo(() => planPalPlusCourseList(text, courses), [text, courses]);
+  const fresh = plan.rows.filter((row) => row.status === "new").length;
+  const known = plan.rows.length - fresh;
+  const blocked = plan.errors.length > 0 || plan.tooMany || fresh === 0;
+
+  return (
+    <SaveForm
+      action={importPalPlusCoursesAction}
+      submitLabel={
+        fresh > 0
+          ? nl
+            ? `${fresh} ${fresh === 1 ? "vak" : "vakken"} toevoegen`
+            : `Add ${fresh} ${fresh === 1 ? "course" : "courses"}`
+          : nl
+            ? "Toevoegen"
+            : "Add"
+      }
+      savingLabel={nl ? "Toevoegen…" : "Adding…"}
+      savedMessage={nl ? "Vakken toegevoegd." : "Courses added."}
+      errorMessages={palPlusCourseListErrors(nl)}
+      fallbackErrorMessage={nl ? "Niets toegevoegd." : "Nothing added."}
+      submitDisabled={blocked}
+      onSuccess={() => {
+        setText("");
+        onDone();
+      }}
+      className="space-y-3"
+    >
+      <input type="hidden" name="locale" value={nl ? "nl" : "en"} />
+      <div>
+        <Label htmlFor="pal-course-list">{nl ? "Vakken, één per regel" : "Courses, one per line"}</Label>
+        <Textarea
+          id="pal-course-list"
+          name="list"
+          value={text}
+          onChange={(event) => setText(event.target.value)}
+          rows={8}
+          placeholder={COURSE_LIST_EXAMPLE}
+          spellCheck={false}
+          className="font-mono text-xs"
+        />
+        <p className="mt-1 text-xs text-vtk-muted">
+          {nl
+            ? "De OPO-code en daarna de naam, of enkel een naam voor iets wat geen vak is. Een Engelse naam zet je erachter met een puntkomma: code; Nederlandse naam; Engelse naam. Kolommen uit een rekenblad (gescheiden door tabs) werken ook. Wat al in de lijst staat, wordt overgeslagen en niet overschreven."
+            : "The course code followed by the name, or just a name for something that is not a course. Add an English name after a semicolon: code; Dutch name; English name. Columns pasted from a spreadsheet (separated by tabs) work too. Courses already on the list are skipped, not overwritten."}
+        </p>
+      </div>
+
+      <label className="flex items-center gap-2 text-sm text-vtk-ink">
+        <input type="checkbox" name="active" defaultChecked />
+        <span>{nl ? "Meteen kiesbaar in het aanvraagformulier" : "Selectable in the request form right away"}</span>
+      </label>
+
+      {(plan.rows.length > 0 || plan.errors.length > 0) && (
+        <div className="vtk-palplus-paste" aria-live="polite">
+          <p className="text-sm text-vtk-body">
+            {nl
+              ? `${fresh} ${fresh === 1 ? "nieuw vak" : "nieuwe vakken"}` +
+                (known > 0 ? `, ${known} ${known === 1 ? "wordt" : "worden"} overgeslagen` : "") +
+                (plan.errors.length > 0
+                  ? `, ${plan.errors.length} ${plan.errors.length === 1 ? "regel klopt" : "regels kloppen"} niet`
+                  : "") +
+                "."
+              : `${fresh} new ${fresh === 1 ? "course" : "courses"}` +
+                (known > 0 ? `, ${known} skipped` : "") +
+                (plan.errors.length > 0
+                  ? `, ${plan.errors.length} ${plan.errors.length === 1 ? "line does" : "lines do"} not work`
+                  : "") +
+                "."}
+          </p>
+          {plan.tooMany && (
+            // Geen <p>: de admin kleurt elke paragraaf grijs en dit moet rood zijn.
+            <div className="text-sm text-vtk-danger">
+              {nl
+                ? `Plak hoogstens ${PAL_PLUS_COURSE_LIST_MAX} vakken in één keer.`
+                : `Paste at most ${PAL_PLUS_COURSE_LIST_MAX} courses at once.`}
+            </div>
+          )}
+          <ul className="vtk-palplus-paste-list">
+            {plan.errors.map((error) => (
+              <li key={`e${error.line}`} data-status="error">
+                <span className="vtk-palplus-paste-code">{nl ? `regel ${error.line}` : `line ${error.line}`}</span>
+                <span className="vtk-palplus-paste-name">
+                  {error.text}
+                  <span className="vtk-palplus-sub">{palPlusCourseLineProblem(nl, error.error)}</span>
+                </span>
+              </li>
+            ))}
+            {plan.rows.map((row) => (
+              <li key={`r${row.line}`} data-status={row.status}>
+                <span className="vtk-palplus-paste-code">
+                  {row.course.code ?? <span className="text-vtk-muted">{nl ? "geen" : "none"}</span>}
+                </span>
+                <span className="vtk-palplus-paste-name">
+                  {row.course.nameNl}
+                  {row.course.nameEn && <span className="vtk-palplus-sub">{row.course.nameEn}</span>}
+                </span>
+                <span className="vtk-palplus-paste-status">{STATUS_LABELS[row.status][nl ? "nl" : "en"]}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </SaveForm>
   );
 }
