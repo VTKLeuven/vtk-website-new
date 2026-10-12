@@ -14,9 +14,11 @@ import {
   type RosterPerson,
 } from "@/lib/praesidiumShifts/names";
 import {
+  attachOverrides,
   detectedOpenSlots,
   entryWeight,
   memberTotals,
+  reanchorOverrides,
   standings,
   summarizeList,
   type StatsList,
@@ -410,6 +412,100 @@ describe("tellen", () => {
     expect(result.averages.lists).toBe(mean);
     for (const row of result.rows) expect(row.expectedLists).toBe(mean);
     expect(result.averages.total).toBe(mean + 0.5);
+  });
+
+  it("laat één vakje voor niemand of voor iemand anders tellen, los van de naam", () => {
+    const perName: StatsList = { ...list, countMode: "PER_NAME", sheets: [{ name: "Di", kind: "SHIFTS", names: 0, date: null, counted: true }], colors: [] };
+    const at = (cell: string, nameKey: string) => ({ listId: "l1", nameKey, sheet: "Di", cell, color: null, hours: 2, excluded: false });
+    // "Jarne" is op deze lijst Jarne P, behalve bij de foto's (C3, C4): die zijn van Jarne N.
+    // De driver shift (B2) ging niet door, en "Mekkie" (D2) is met de hand aan Kato gegeven.
+    const cells = [at("B2", "jarne"), at("B3", "jarne"), at("C3", "jarne"), at("C4", "jarne"), at("D2", "mekkie")];
+    const linked = [
+      { listId: "l1", nameKey: "jarne", status: "MATCHED" as const, userId: "u-jarne-p" },
+      { listId: "l1", nameKey: "mekkie", status: "UNRESOLVED" as const, userId: null },
+    ];
+    const rows = attachOverrides(cells, [
+      { listId: "l1", sheet: "Di", cell: "B2", nameKey: "jarne", userId: null },
+      { listId: "l1", sheet: "Di", cell: "C3", nameKey: "jarne", userId: "u-jarne-n" },
+      { listId: "l1", sheet: "Di", cell: "C4", nameKey: "jarne", userId: "u-jarne-n" },
+      { listId: "l1", sheet: "Di", cell: "D2", nameKey: "mekkie", userId: "u-kato" },
+      // Een keuze voor een vakje dat er niet (meer) is, raakt niets.
+      { listId: "l1", sheet: "Di", cell: "Z9", nameKey: "jarne", userId: null },
+    ]);
+
+    const summary = summarizeList(perName, rows, linked);
+    expect(summary.counted).toBe(4);
+    expect(summary.unresolvedNames).toBe(0);
+    expect(summary.perUser.get("u-jarne-p")).toBe(1);
+    expect(summary.perUser.get("u-jarne-n")).toBe(2);
+    expect(summary.perUser.get("u-kato")).toBe(1);
+
+    const result = standings({
+      memberIds: ["u-jarne-p", "u-jarne-n", "u-kato"],
+      eventLists: [perName],
+      weeklyLists: [],
+      entries: rows,
+      names: linked,
+      siteShifts: [],
+      now: new Date("2026-10-11T12:00:00Z"),
+    });
+    expect(result.rows.map((r) => [r.userId, r.lists])).toEqual([
+      ["u-jarne-p", 1],
+      ["u-jarne-n", 2],
+      ["u-kato", 1],
+    ]);
+    expect(result.averages.lists).toBe(4 / 3);
+  });
+
+  it("telt een post of taak in plaats van een naam nergens mee, tenzij een vakje met de hand aan iemand gegeven is", () => {
+    const perName: StatsList = { ...list, countMode: "PER_NAME", sheets: [{ name: "Di", kind: "SHIFTS", names: 0, date: null, counted: true }], colors: [] };
+    const at = (cell: string, nameKey: string) => ({ listId: "l1", nameKey, sheet: "Di", cell, color: null, hours: 2, excluded: false });
+    const rows = attachOverrides(
+      [at("B2", "iedereen"), at("B3", "cultuur"), at("B4", "cultuur"), at("B5", "laute"), at("B6", "kato")],
+      [{ listId: "l1", sheet: "Di", cell: "B4", nameKey: "cultuur", userId: "u-kato" }],
+    );
+    const summary = summarizeList(perName, rows, [
+      { listId: "l1", nameKey: "iedereen", status: "NOT_A_NAME", userId: null },
+      { listId: "l1", nameKey: "cultuur", status: "NOT_A_NAME", userId: null },
+      { listId: "l1", nameKey: "laute", status: "IGNORED", userId: null },
+      { listId: "l1", nameKey: "kato", status: "MATCHED", userId: "u-kato" },
+    ]);
+    expect(summary).toMatchObject({ counted: 3, praesidium: 2, others: 1, notNames: 2, unresolvedNames: 0 });
+    expect(summary.perUser.get("u-kato")).toBe(2);
+  });
+
+  it("onthoudt 'geen naam' als bijnaam, los van 'geen praesidium'", () => {
+    const aliases = new Map([
+      ["iedereen", { userId: null, notAName: true }],
+      ["laute", { userId: null }],
+    ]);
+    expect(proposeMatch("iedereen", roster, aliases)).toMatchObject({ status: "NOT_A_NAME", source: "ALIAS" });
+    expect(proposeMatch("laute", roster, aliases)).toMatchObject({ status: "IGNORED", source: "ALIAS" });
+  });
+
+  it("vindt een keuze per vakje terug in een nieuwe export, ook als er een rij bijkwam", () => {
+    const day = new Date(Date.UTC(2026, 9, 20));
+    const ref = (cell: string, nameKey: string, role: string, slot: string) => ({ sheet: "Di", cell, nameKey, role, slot, date: day });
+    const overrides = [
+      { ...ref("C3", "jarne", "Foto's", "17:00-19:00"), userId: "u-jarne-n" },
+      { ...ref("C4", "jarne", "Foto's", "19:00-21:00"), userId: "u-jarne-n" },
+      { ...ref("B9", "jarne", "Bekers wassen", "21u00-01:00"), userId: null },
+      { ...ref("E2", "lien", "Driver", "10:00-11:30"), userId: null },
+    ];
+    const next = [
+      // C3 staat er nog, met dezelfde taak en hetzelfde uur.
+      ref("C3", "jarne", "Foto's", "17:00-19:00"),
+      // Er kwam een rij bij: het vakje van 19 uur staat nu in C5, en in C4 staat iets anders.
+      ref("C4", "jarne", "IT'er on duty", "19:00-21:00"),
+      ref("C5", "jarne", "Foto's", "19:00-21:00"),
+      // De bekers wassen staat er twee keer met dezelfde taak en hetzelfde uur: niet te kiezen.
+      ref("B10", "jarne", "Bekers wassen", "21u00-01:00"),
+      ref("B11", "jarne", "Bekers wassen", "21u00-01:00"),
+      // De driver shift is van de lijst gehaald.
+    ];
+    const { kept, lost } = reanchorOverrides(overrides, next);
+    expect(kept.map((o) => o.cell)).toEqual(["C3", "C5"]);
+    expect(lost.map((o) => o.role)).toEqual(["Bekers wassen", "Driver"]);
   });
 
   it("noemt de lege vakjes pas 'open voor VTK' wanneer er een kleur gekozen is", () => {

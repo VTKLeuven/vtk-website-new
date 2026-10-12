@@ -10,7 +10,7 @@ import { savePraesidiumShiftNamesAction } from "@/app/actions/praesidiumShifts";
 export type NameRowData = {
   nameKey: string;
   label: string;
-  status: "MATCHED" | "IGNORED" | "UNRESOLVED";
+  status: "MATCHED" | "IGNORED" | "UNRESOLVED" | "NOT_A_NAME";
   source: string;
   userId: string | null;
   /** Shiften die aan deze schrijfwijze hangen, op meetellende tabbladen en kleuren. */
@@ -91,9 +91,32 @@ function pickerOptions(row: NameRowData, roster: RosterOption[], nl: boolean): S
     { value: "", label: nl ? "Nog niet gekozen" : "Not chosen yet", muted: true },
     ...likely.map((r) => person(r, nl ? "Waarschijnlijk" : "Likely")),
     ...rest.map((r) => person(r, nl ? "Praesidium" : "Praesidium")),
-    { value: "ignore", label: nl ? "Geen praesidium (niet meetellen)" : "Not praesidium (do not count)", group: nl ? "Anders" : "Other", muted: true },
+    {
+      value: "ignore",
+      label: nl ? "Geen praesidium" : "Not praesidium",
+      hint: nl ? "werkgroep, andere kring" : "werkgroep, other association",
+      group: nl ? "Anders" : "Other",
+      muted: true,
+    },
+    {
+      value: "noname",
+      label: nl ? "Geen naam" : "Not a name",
+      hint: nl ? "een post, taak of opmerking" : "a post, task or note",
+      group: nl ? "Anders" : "Other",
+      muted: true,
+    },
   ];
 }
+
+const CHOICE_OF: Record<NameRowData["status"], (row: NameRowData) => string> = {
+  MATCHED: (row) => row.userId ?? "",
+  IGNORED: () => "ignore",
+  NOT_A_NAME: () => "noname",
+  UNRESOLVED: () => "",
+};
+
+const chip =
+  "rounded-full border border-vtk-navy/20 bg-white px-2.5 py-0.5 text-xs text-vtk-muted hover:border-vtk-navy/40 hover:text-vtk-ink";
 
 /**
  * Eén schrijfwijze: wie het is, met de waarschijnlijke kandidaten als knopjes
@@ -118,7 +141,7 @@ function NameRow({
   const nl = locale === "nl";
   const showToast = useToast();
   const [pending, startTransition] = useTransition();
-  const initial = row.status === "MATCHED" ? row.userId ?? "" : row.status === "IGNORED" ? "ignore" : "";
+  const initial = CHOICE_OF[row.status](row);
   const [value, setValue] = useState(initial);
   const [remember, setRemember] = useState(row.hasAlias || !row.ambiguous);
   const candidates = roster.filter((r) => row.candidates.includes(r.userId));
@@ -199,9 +222,27 @@ function NameRow({
               type="button"
               onClick={() => choose("ignore")}
               disabled={pending}
-              className="rounded-full border border-vtk-navy/20 bg-white px-2.5 py-0.5 text-xs text-vtk-muted hover:border-vtk-navy/40 hover:text-vtk-ink"
+              title={
+                nl
+                  ? "Een persoon, maar niet van het praesidium (werkgroep, andere kring). Telt als shift door anderen."
+                  : "A person, but not from the praesidium (werkgroep, other association). Counts as a shift by others."
+              }
+              className={chip}
             >
               {nl ? "Geen praesidium" : "Not praesidium"}
+            </button>
+            <button
+              type="button"
+              onClick={() => choose("noname")}
+              disabled={pending}
+              title={
+                nl
+                  ? "Geen persoon maar een post, taak of opmerking (\"Cultuur\", \"Iedereen\"). Telt voor niemand en niet mee in de totalen."
+                  : "Not a person but a post, task or note (\"Culture\", \"Everyone\"). Counts for nobody and not in the totals."
+              }
+              className={chip}
+            >
+              {nl ? "Geen naam" : "Not a name"}
             </button>
           </div>
         )}
@@ -266,7 +307,8 @@ const CHECK_FIRST = ["FUZZY"];
 
 /**
  * De namen van een lijst: eerst wat op een keuze wacht, daaronder dichtgeklapt
- * wat al gekoppeld is en wat geen praesidium is. Een keuze slaat meteen op.
+ * wat al gekoppeld is, wat geen praesidium is en wat geen naam is. Een keuze
+ * slaat meteen op.
  */
 export function NamesPanel({
   locale,
@@ -280,7 +322,7 @@ export function NamesPanel({
   listId: string;
   rows: NameRowData[];
   roster: RosterOption[];
-  /** Namen op tabbladen of in kleuren die niet meetellen: die staan hier niet. */
+  /** Namen op tabbladen of in kleuren die niet meetellen, of enkel in vakjes die met de hand geregeld zijn: die staan hier niet. */
   hiddenNames: number;
   errorMessages: Record<string, string>;
 }) {
@@ -293,6 +335,7 @@ export function NamesPanel({
         Number(CHECK_FIRST.includes(b.source)) - Number(CHECK_FIRST.includes(a.source)) || a.label.localeCompare(b.label, "nl"),
     );
   const ignored = rows.filter((r) => r.status === "IGNORED");
+  const notNames = rows.filter((r) => r.status === "NOT_A_NAME");
   const fuzzy = matched.filter((r) => CHECK_FIRST.includes(r.source)).length;
   const rowProps = { roster, listId, locale, errorMessages };
 
@@ -351,11 +394,22 @@ export function NamesPanel({
         ))}
       </Collapsed>
 
+      <Collapsed
+        nl={nl}
+        rows={notNames.length}
+        title={nl ? `${notNames.length} geen naam` : `${notNames.length} not a name`}
+        hint={nl ? "posten, taken en opmerkingen: tellen niet mee" : "posts, tasks and notes: they do not count"}
+      >
+        {notNames.map((row) => (
+          <NameRow key={row.nameKey} row={row} showBadge {...rowProps} />
+        ))}
+      </Collapsed>
+
       {hiddenNames > 0 && (
         <p className="text-xs text-vtk-muted">
           {nl
-            ? `${hiddenNames} ${hiddenNames === 1 ? "naam staat" : "namen staan"} enkel op tabbladen of in kleuren die niet meetellen en ${hiddenNames === 1 ? "staat" : "staan"} hier niet.`
-            : `${hiddenNames} names only appear on tabs or in colours that do not count and are not shown.`}
+            ? `${hiddenNames} ${hiddenNames === 1 ? "naam staat" : "namen staan"} enkel op tabbladen of in kleuren die niet meetellen, of enkel in vakjes die met de hand geregeld zijn, en ${hiddenNames === 1 ? "staat" : "staan"} hier niet.`
+            : `${hiddenNames} names only appear on tabs or in colours that do not count, or only in cells set by hand, and are not shown.`}
         </p>
       )}
     </div>

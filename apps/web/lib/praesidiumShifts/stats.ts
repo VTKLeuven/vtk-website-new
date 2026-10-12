@@ -30,12 +30,17 @@ export type StatsEntry = {
   color: string | null;
   hours: number | null;
   excluded: boolean;
+  /**
+   * Een keuze voor dit ene vakje (`attachOverrides`), die de naam overstemt:
+   * voor wie het telt, of `null` voor niemand. Zonder keuze volgt het de naam.
+   */
+  override?: { userId: string | null };
 };
 
 export type StatsName = {
   listId: string;
   nameKey: string;
-  status: "MATCHED" | "IGNORED" | "UNRESOLVED";
+  status: "MATCHED" | "IGNORED" | "UNRESOLVED" | "NOT_A_NAME";
   userId: string | null;
 };
 
@@ -47,8 +52,16 @@ export type StatsSiteShift = {
 
 export type StatsWeeklyEntry = StatsEntry & { date: Date | null };
 
-/** Een vakje telt als zijn tabblad en zijn kleur meetellen en de lijst het niet uitsluit. */
+/**
+ * Een vakje telt als zijn tabblad en zijn kleur meetellen, de lijst het niet
+ * uitsluit en niemand het met de hand op "telt niet mee" zette.
+ */
 export function entryCounts(list: StatsList, entry: StatsEntry): boolean {
+  return entryOnCountedPart(list, entry) && entry.override?.userId !== null;
+}
+
+/** Zoals `entryCounts`, maar zonder de keuze per vakje: staat het op een deel van de lijst dat meetelt? */
+export function entryOnCountedPart(list: StatsList, entry: StatsEntry): boolean {
   if (entry.excluded) return false;
   const sheet = list.sheets.find((s) => s.name === entry.sheet);
   if (sheet && !sheet.counted) return false;
@@ -76,10 +89,100 @@ export function nameIndex(names: StatsName[]): Map<string, StatsName> {
   return index;
 }
 
-/** Wie een vakje is, of null als het (nog) niemand van het praesidium is. */
-export function entryUser(index: Map<string, StatsName>, entry: Pick<StatsEntry, "listId" | "nameKey">): string | null {
+/** Voor wie een vakje telt, of null als het (nog) niemand van het praesidium is. */
+export function entryUser(
+  index: Map<string, StatsName>,
+  entry: Pick<StatsEntry, "listId" | "nameKey" | "override">,
+): string | null {
+  if (entry.override) return entry.override.userId;
+  return nameUser(index, entry);
+}
+
+/** Wie de naam in een vakje is volgens de keuze per naam, zonder de keuze per vakje. */
+export function nameUser(index: Map<string, StatsName>, entry: Pick<StatsEntry, "listId" | "nameKey">): string | null {
   const name = index.get(`${entry.listId}\u0000${entry.nameKey}`);
   return name && name.status === "MATCHED" && name.userId ? name.userId : null;
+}
+
+/** Een keuze voor één vakje, zoals ze in de database staat. */
+export type StatsOverride = {
+  listId: string;
+  sheet: string;
+  cell: string;
+  nameKey: string;
+  userId: string | null;
+};
+
+function overrideKey(cell: { listId: string; sheet: string; cell: string; nameKey: string }): string {
+  return [cell.listId, cell.sheet, cell.cell, cell.nameKey].join("\u0000");
+}
+
+/** Hangt de keuzes per vakje aan de vakjes waar ze over gaan. */
+export function attachOverrides<T extends StatsEntry & { cell: string }>(
+  entries: T[],
+  overrides: StatsOverride[],
+): (T & Pick<StatsEntry, "override">)[] {
+  if (overrides.length === 0) return entries;
+  const byCell = new Map(overrides.map((o) => [overrideKey(o), o]));
+  return entries.map((entry) => {
+    const override = byCell.get(overrideKey(entry));
+    return override ? { ...entry, override: { userId: override.userId } } : entry;
+  });
+}
+
+/** Wat een keuze per vakje van haar vakje onthoudt, om het in een nieuwe export terug te vinden. */
+export type CellRef = {
+  sheet: string;
+  cell: string;
+  nameKey: string;
+  role: string | null;
+  slot: string | null;
+  date: Date | null;
+};
+
+function sameShift(a: CellRef, b: CellRef): boolean {
+  return (
+    a.sheet === b.sheet &&
+    a.nameKey === b.nameKey &&
+    (a.role ?? "") === (b.role ?? "") &&
+    (a.slot ?? "") === (b.slot ?? "") &&
+    // Per dag: de kolom is een `@db.Date`, de analyse kan een uur meegeven.
+    (a.date?.toISOString().slice(0, 10) ?? null) === (b.date?.toISOString().slice(0, 10) ?? null)
+  );
+}
+
+/**
+ * De keuzes per vakje na een nieuwe export. Staat dezelfde naam met dezelfde
+ * taak en hetzelfde uur nog in hetzelfde vakje, dan blijft de keuze. Zijn er
+ * rijen of kolommen bijgekomen, dan schuift ze mee naar het enige vakje met die
+ * naam, taak en dat uur. Anders vervalt ze: liever een keuze kwijt dan een
+ * keuze op een vakje waar ze nooit over ging.
+ */
+export function reanchorOverrides<T extends CellRef>(overrides: T[], entries: CellRef[]): { kept: T[]; lost: T[] } {
+  const kept: T[] = [];
+  const lost: T[] = [];
+  const taken = new Set<string>();
+  const key = (ref: CellRef) => `${ref.sheet}\u0000${ref.cell}\u0000${ref.nameKey}`;
+  const moving: T[] = [];
+  for (const override of overrides) {
+    if (entries.some((entry) => entry.cell === override.cell && sameShift(entry, override))) {
+      kept.push(override);
+      taken.add(key(override));
+    } else {
+      moving.push(override);
+    }
+  }
+  for (const override of moving) {
+    const candidates = entries.filter((entry) => sameShift(entry, override) && !taken.has(key(entry)));
+    const unique = [...new Map(candidates.map((entry) => [key(entry), entry])).values()];
+    if (unique.length === 1) {
+      kept.push({ ...override, cell: unique[0].cell });
+      taken.add(key(unique[0]));
+    } else {
+      lost.push(override);
+    }
+  }
+  return { kept, lost };
 }
 
 /** Iemand die op één lijst overgeslagen wordt (logistiek die als logistiek werkt). */
@@ -96,6 +199,8 @@ export type ListSummary = {
   praesidium: number;
   /** Door iemand die bewust geen praesidium is (werkgroep, andere kring, genegeerd). */
   others: number;
+  /** Vakjes met een post, taak of opmerking in plaats van een naam: tellen nergens mee. */
+  notNames: number;
   /** Door een praesidiumlid dat op deze lijst overgeslagen wordt. */
   skipped: number;
   /** Namen die nog op een keuze wachten, en hoeveel shiften daaraan hangen. */
@@ -119,12 +224,20 @@ export function summarizeList(
   let praesidium = 0;
   let others = 0;
   let skipped = 0;
+  let notNames = 0;
   let unresolvedShifts = 0;
   for (const entry of entries) {
     if (entry.listId !== list.id || !entryCounts(list, entry)) continue;
     const weight = entryWeight(list, entry);
-    counted += weight;
     const name = index.get(`${entry.listId}\u0000${entry.nameKey}`);
+    // "Cultuur" of "Iedereen" in een vakje is geen shift van iemand: niet
+    // tellen, ook niet als VTK-shift. Wie het vakje toch met de hand aan een
+    // lid gaf, krijgt het wel.
+    if (name?.status === "NOT_A_NAME" && !entry.override) {
+      notNames += weight;
+      continue;
+    }
+    counted += weight;
     const userId = entryUser(index, entry);
     if (userId && skippedUsers.has(userId)) {
       skipped += weight;
@@ -138,7 +251,7 @@ export function summarizeList(
       others += weight;
     }
   }
-  return { counted, praesidium, others, skipped, unresolvedNames: unresolved.size, unresolvedShifts, perUser };
+  return { counted, praesidium, others, skipped, notNames, unresolvedNames: unresolved.size, unresolvedShifts, perUser };
 }
 
 export function average(values: number[]): number {

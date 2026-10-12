@@ -35,5 +35,11 @@ export function overviewErrorMessages(locale: Locale): Record<string, string> {
     SHIFT_NOT_FOUND: nl
       ? "Niet opgeslagen: deze shift of inschrijving bestaat niet meer."
       : "Not saved: this shift or registration no longer exists.",
+    CELL_NOT_FOUND: nl
+      ? "Niet opgeslagen: dit vakje staat niet meer op de lijst. Er is intussen een nieuwe versie opgeladen; herlaad de pagina."
+      : "Not saved: this cell is no longer on the list. A new version was uploaded in the meantime; reload the page.",
+    NOT_MEMBER: nl
+      ? "Niet opgeslagen: die persoon zit dat werkingsjaar niet in het praesidium."
+      : "Not saved: that person is not on the praesidium that working year.",
   };
 }

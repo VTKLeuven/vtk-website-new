@@ -730,14 +730,16 @@ model User {
   createdManualShiftGrants ManualShiftGrant[]      @relation("CreatedManualShiftGrants")
 
   // Shiftenoverzicht praesidium (/admin/shiftenoverzicht)
-  praesidiumShiftUploads    PraesidiumShiftList[]      @relation("PraesidiumShiftListUploadedBy")
-  praesidiumShiftNames      PraesidiumShiftListName[]  @relation("PraesidiumShiftListNameUser")
-  praesidiumShiftAliases    PraesidiumShiftAlias[]     @relation("PraesidiumShiftAliasUser")
-  praesidiumShiftAliasEdits PraesidiumShiftAlias[]     @relation("PraesidiumShiftAliasUpdatedBy")
-  praesidiumShiftContacts   PraesidiumShiftContact[]   @relation("PraesidiumShiftContactUser")
-  praesidiumShiftMarks      PraesidiumShiftNecessity[] @relation("PraesidiumShiftNecessityMarkedBy")
-  praesidiumShiftSkips      PraesidiumShiftExemption[] @relation("PraesidiumShiftExemptionUser")
-  praesidiumShiftSkipsSet   PraesidiumShiftExemption[] @relation("PraesidiumShiftExemptionCreatedBy")
+  praesidiumShiftUploads    PraesidiumShiftList[]         @relation("PraesidiumShiftListUploadedBy")
+  praesidiumShiftNames      PraesidiumShiftListName[]     @relation("PraesidiumShiftListNameUser")
+  praesidiumShiftAliases    PraesidiumShiftAlias[]        @relation("PraesidiumShiftAliasUser")
+  praesidiumShiftAliasEdits PraesidiumShiftAlias[]        @relation("PraesidiumShiftAliasUpdatedBy")
+  praesidiumShiftContacts   PraesidiumShiftContact[]      @relation("PraesidiumShiftContactUser")
+  praesidiumShiftMarks      PraesidiumShiftNecessity[]    @relation("PraesidiumShiftNecessityMarkedBy")
+  praesidiumShiftSkips      PraesidiumShiftExemption[]    @relation("PraesidiumShiftExemptionUser")
+  praesidiumShiftSkipsSet   PraesidiumShiftExemption[]    @relation("PraesidiumShiftExemptionCreatedBy")
+  praesidiumShiftCells      PraesidiumShiftCellOverride[] @relation("PraesidiumShiftCellOverrideUser")
+  praesidiumShiftCellsSet   PraesidiumShiftCellOverride[] @relation("PraesidiumShiftCellOverrideUpdatedBy")
 
   createdShortLinks        ShortLink[]             @relation("ShortLinkCreatedBy")
   alumniContacts           AlumniContact[]         @relation("AlumniContactCreatedBy")
@@ -3495,8 +3497,13 @@ enum PraesidiumShiftCountMode {
 
 enum PraesidiumShiftNameStatus {
   MATCHED
+  /// Een persoon, maar geen praesidium (werkgroep, andere kring): zijn shift
+  /// telt mee als "door anderen".
   IGNORED
   UNRESOLVED
+  /// Geen persoon: een post, taak of opmerking in een vakje ("Cultuur",
+  /// "Iedereen", "Karchauffeur"). Telt voor niemand en niet mee in de totalen.
+  NOT_A_NAME
 }
 
 /// Waarom een naam aan iemand gekoppeld (of genegeerd) is. Enkel om in het
@@ -3554,6 +3561,7 @@ model PraesidiumShiftList {
   names    PraesidiumShiftListName[]
   contacts PraesidiumShiftContact[]
   skips    PraesidiumShiftExemption[]
+  cells    PraesidiumShiftCellOverride[]
 
   @@index([year, kind])
 }
@@ -3609,11 +3617,14 @@ model PraesidiumShiftListName {
 /// Een onthouden bijnaam: geldt voor elke lijst die erna komt, en voor elke
 /// lijst waar deze schrijfwijze nog niet met de hand gekozen was.
 model PraesidiumShiftAlias {
-  nameKey String  @id
-  label   String
+  nameKey  String  @id
+  label    String
   /// Leeg = negeren: deze schrijfwijze is nooit een praesidiumlid.
-  userId  String?
-  user    User?   @relation("PraesidiumShiftAliasUser", fields: [userId], references: [id], onDelete: Cascade)
+  userId   String?
+  user     User?   @relation("PraesidiumShiftAliasUser", fields: [userId], references: [id], onDelete: Cascade)
+  /// Met een lege `userId`: deze schrijfwijze is geen persoon maar een post of
+  /// taak (`NOT_A_NAME`), in plaats van iemand buiten het praesidium.
+  notAName Boolean @default(false)
 
   updatedById String?
   updatedBy   User?    @relation("PraesidiumShiftAliasUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
@@ -3662,6 +3673,38 @@ model PraesidiumShiftExemption {
   createdAt   DateTime @default(now()) @db.Timestamptz(3)
 
   @@id([listId, userId])
+  @@index([userId])
+}
+
+/// Een keuze voor één vakje die de koppeling van zijn naam overstemt. De
+/// shift ging niet door of hoort niet bij deze lijst (de bekers wassen op
+/// 24UL is een praesidiumshift), of de naam bedoelt hier iemand anders dan op
+/// de rest van de lijst ("Jarne" is Jarne P bij IT, maar Jarne N bij de foto's).
+/// Een nieuwe export vindt het vakje terug via `role`, `slot` en `date` wanneer
+/// er rijen bijkwamen (`reanchorOverrides` in lib/praesidiumShifts/stats.ts).
+model PraesidiumShiftCellOverride {
+  listId  String
+  list    PraesidiumShiftList @relation(fields: [listId], references: [id], onDelete: Cascade)
+  sheet   String
+  cell    String
+  nameKey String
+  /// Voor wie dit vakje telt. Leeg = voor niemand. Verdwijnt die persoon, dan
+  /// telt het vakje voor niemand, niet opnieuw voor de naam: die wees net naar
+  /// iemand anders.
+  userId  String?
+  user    User?               @relation("PraesidiumShiftCellOverrideUser", fields: [userId], references: [id], onDelete: SetNull)
+
+  /// Wat het vakje was toen de keuze gemaakt werd.
+  role String?
+  slot String?
+  date DateTime? @db.Date
+
+  updatedById String?
+  updatedBy   User?    @relation("PraesidiumShiftCellOverrideUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt   DateTime @updatedAt @db.Timestamptz(3)
+
+  @@id([listId, sheet, cell, nameKey])
   @@index([userId])
 }
 

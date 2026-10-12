@@ -18,13 +18,15 @@ import {
   type MatchStatus,
   type RosterPerson,
 } from "@/lib/praesidiumShifts/names";
-import type {
-  ColorSetting,
-  CountMode,
-  ListKind,
-  SheetSetting,
-  SlotStat,
-  StatsList,
+import {
+  attachOverrides,
+  reanchorOverrides,
+  type ColorSetting,
+  type CountMode,
+  type ListKind,
+  type SheetSetting,
+  type SlotStat,
+  type StatsList,
 } from "@/lib/praesidiumShifts/stats";
 
 /*
@@ -85,8 +87,8 @@ export async function loadRoster(year: number, locale: "nl" | "en" = "nl"): Prom
 }
 
 export async function loadAliasMap(): Promise<Map<string, AliasTarget>> {
-  const aliases = await prisma.praesidiumShiftAlias.findMany({ select: { nameKey: true, userId: true } });
-  return new Map(aliases.map((a) => [a.nameKey, { userId: a.userId }]));
+  const aliases = await prisma.praesidiumShiftAlias.findMany({ select: { nameKey: true, userId: true, notAName: true } });
+  return new Map(aliases.map((a) => [a.nameKey, { userId: a.userId, notAName: a.notAName }]));
 }
 
 /** Werkingsjaren waarin er lijsten of praesidiumposten zijn, voor de jaarkiezer. */
@@ -259,32 +261,60 @@ export async function createList(input: {
 
 /**
  * Een nieuwe export van dezelfde lijst. De vakjes en contacten worden
- * vervangen; de instellingen en de keuzes per naam blijven, zodat de vice enkel
- * de namen moet nakijken die er sinds de vorige keer bijkwamen.
+ * vervangen; de instellingen, de keuzes per naam en de keuzes per vakje
+ * blijven, zodat de vice enkel de namen moet nakijken die er sinds de vorige
+ * keer bijkwamen. Een keuze per vakje waarvan het vakje niet meer terug te
+ * vinden is, vervalt (`lostCells`).
  */
 export async function replaceListFile(input: {
   listId: string;
   fileName: string;
   buffer: Buffer;
-}): Promise<{ added: number; unresolved: number }> {
+}): Promise<{ added: number; unresolved: number; lostCells: number }> {
   const list = await prisma.praesidiumShiftList.findUniqueOrThrow({
     where: { id: input.listId },
-    select: { kind: true, year: true, sheets: true, colors: true, eventDate: true, names: { select: { nameKey: true } } },
+    select: {
+      kind: true,
+      year: true,
+      sheets: true,
+      colors: true,
+      eventDate: true,
+      names: { select: { nameKey: true } },
+      cells: {
+        select: {
+          sheet: true,
+          cell: true,
+          nameKey: true,
+          userId: true,
+          role: true,
+          slot: true,
+          date: true,
+          updatedById: true,
+          createdAt: true,
+        },
+      },
+    },
   });
   const analysis = analyze(list.kind, input.buffer);
   const [roster, aliases] = await Promise.all([loadRoster(list.year), loadAliasMap()]);
   const known = new Set(list.names.map((n) => n.nameKey));
   const present = new Set(analysis.entries.map((e) => e.nameKey));
   const added = proposeNames(analysis, roster, aliases, known);
+  const newEntries = entryRows(analysis);
+  const cells = reanchorOverrides(list.cells, newEntries);
 
   await prisma.$transaction([
+    prisma.praesidiumShiftCellOverride.deleteMany({ where: { listId: input.listId } }),
     prisma.praesidiumShiftEntry.deleteMany({ where: { listId: input.listId } }),
     prisma.praesidiumShiftContact.deleteMany({ where: { listId: input.listId } }),
     prisma.praesidiumShiftListName.deleteMany({
       where: { listId: input.listId, nameKey: { notIn: [...present] } },
     }),
     prisma.praesidiumShiftEntry.createMany({
-      data: entryRows(analysis).map((row) => ({ ...row, listId: input.listId })),
+      data: newEntries.map((row) => ({ ...row, listId: input.listId })),
+    }),
+    prisma.praesidiumShiftCellOverride.createMany({
+      data: cells.kept.map((cell) => ({ ...cell, listId: input.listId })),
     }),
     prisma.praesidiumShiftContact.createMany({
       data: contactRows(analysis, roster, aliases).map((row) => ({ ...row, listId: input.listId })),
@@ -303,19 +333,33 @@ export async function replaceListFile(input: {
       },
     }),
   ]);
-  return { added: added.length, unresolved: added.filter((n) => n.status === "UNRESOLVED").length };
+  return {
+    added: added.length,
+    unresolved: added.filter((n) => n.status === "UNRESOLVED").length,
+    lostCells: cells.lost.length,
+  };
 }
 
 // ---------------------------------------------------------------------------
 // Keuzes per naam en bijnamen
 // ---------------------------------------------------------------------------
 
-export type NameChoice = "" | "ignore" | string;
+/** Leeg: nog niet gekozen. `ignore`: geen praesidium. `noname`: geen persoon. Anders een id. */
+export type NameChoice = "" | "ignore" | "noname" | string;
 
 function choiceState(choice: NameChoice): { status: MatchStatus; userId: string | null } {
   if (choice === "") return { status: "UNRESOLVED", userId: null };
   if (choice === "ignore") return { status: "IGNORED", userId: null };
+  if (choice === "noname") return { status: "NOT_A_NAME", userId: null };
   return { status: "MATCHED", userId: choice };
+}
+
+/** De keuze die een rij nu heeft, in de woorden van `NameChoice`. */
+function currentChoice(row: { status: MatchStatus; userId: string | null }): NameChoice {
+  if (row.status === "MATCHED") return row.userId ?? "";
+  if (row.status === "IGNORED") return "ignore";
+  if (row.status === "NOT_A_NAME") return "noname";
+  return "";
 }
 
 /**
@@ -323,10 +367,19 @@ function choiceState(choice: NameChoice): { status: MatchStatus; userId: string 
  * gekozen is. Zo koppelt "Mekkie" ook op een oudere lijst waar hij nog open
  * stond, of waar de voornaam toevallig naar iemand anders wees.
  */
-async function propagateAlias(tx: Prisma.TransactionClient, nameKey: string, userId: string | null, exceptListId?: string) {
+async function propagateAlias(
+  tx: Prisma.TransactionClient,
+  nameKey: string,
+  target: { userId: string | null; notAName: boolean },
+  exceptListId?: string,
+) {
   await tx.praesidiumShiftListName.updateMany({
     where: { nameKey, source: { not: "MANUAL" }, ...(exceptListId ? { listId: { not: exceptListId } } : {}) },
-    data: { status: userId ? "MATCHED" : "IGNORED", userId, source: "ALIAS" },
+    data: {
+      status: target.userId ? "MATCHED" : target.notAName ? "NOT_A_NAME" : "IGNORED",
+      userId: target.userId,
+      source: "ALIAS",
+    },
   });
 }
 
@@ -354,24 +407,24 @@ export async function saveNameChoices(input: {
     for (const { nameKey, choice, remember } of input.choices) {
       const row = byKey.get(nameKey);
       if (!row) continue;
-      if (choice !== "" && choice !== "ignore" && !input.allowedUserIds.has(choice)) continue;
+      if (choice !== "" && choice !== "ignore" && choice !== "noname" && !input.allowedUserIds.has(choice)) continue;
       const next = choiceState(choice);
-      const before = row.status === "MATCHED" ? row.userId ?? "" : row.status === "IGNORED" ? "ignore" : "";
-      if (before === choice) continue;
+      if (currentChoice(row) === choice) continue;
       changed += 1;
 
       if (remember && next.status !== "UNRESOLVED") {
         remembered += 1;
+        const notAName = next.status === "NOT_A_NAME";
         await tx.praesidiumShiftAlias.upsert({
           where: { nameKey },
-          create: { nameKey, label: row.label, userId: next.userId, updatedById: input.actorId },
-          update: { userId: next.userId, updatedById: input.actorId },
+          create: { nameKey, label: row.label, userId: next.userId, notAName, updatedById: input.actorId },
+          update: { userId: next.userId, notAName, updatedById: input.actorId },
         });
         await tx.praesidiumShiftListName.update({
           where: { listId_nameKey: { listId: input.listId, nameKey } },
           data: { ...next, source: "ALIAS" },
         });
-        await propagateAlias(tx, nameKey, next.userId, input.listId);
+        await propagateAlias(tx, nameKey, { userId: next.userId, notAName }, input.listId);
       } else {
         await tx.praesidiumShiftListName.update({
           where: { listId_nameKey: { listId: input.listId, nameKey } },
@@ -384,14 +437,22 @@ export async function saveNameChoices(input: {
 }
 
 /** Bijnaam toevoegen of wijzigen vanuit het bijnamenscherm. */
-export async function saveAlias(input: { nameKey: string; label: string; userId: string | null; actorId: string }) {
+export async function saveAlias(input: {
+  nameKey: string;
+  label: string;
+  userId: string | null;
+  /** Met een lege `userId`: geen persoon (post, taak) in plaats van geen praesidium. */
+  notAName: boolean;
+  actorId: string;
+}) {
+  const notAName = !input.userId && input.notAName;
   await prisma.$transaction(async (tx) => {
     await tx.praesidiumShiftAlias.upsert({
       where: { nameKey: input.nameKey },
-      create: { nameKey: input.nameKey, label: input.label, userId: input.userId, updatedById: input.actorId },
-      update: { userId: input.userId, updatedById: input.actorId },
+      create: { nameKey: input.nameKey, label: input.label, userId: input.userId, notAName, updatedById: input.actorId },
+      update: { userId: input.userId, notAName, updatedById: input.actorId },
     });
-    await propagateAlias(tx, input.nameKey, input.userId);
+    await propagateAlias(tx, input.nameKey, { userId: input.userId, notAName });
   });
 }
 
@@ -487,7 +548,7 @@ export async function loadYearLists(year: number, kind?: ListKind) {
     select: LIST_SELECT,
   });
   const ids = lists.map((l) => l.id);
-  const [entries, names, exemptions] = await Promise.all([
+  const [entries, names, exemptions, cells] = await Promise.all([
     prisma.praesidiumShiftEntry.findMany({
       where: { listId: { in: ids } },
       select: {
@@ -513,8 +574,62 @@ export async function loadYearLists(year: number, kind?: ListKind) {
       where: { listId: { in: ids } },
       select: { listId: true, userId: true, reason: true },
     }),
+    loadCellOverrides(ids),
   ]);
-  return { lists, entries, names, exemptions };
+  return { lists, entries: attachOverrides(entries, cells), names, exemptions };
+}
+
+/** De keuzes per vakje van een of meer lijsten, om met `attachOverrides` aan de vakjes te hangen. */
+export async function loadCellOverrides(listIds: string[]) {
+  if (listIds.length === 0) return [];
+  return prisma.praesidiumShiftCellOverride.findMany({
+    where: { listId: { in: listIds } },
+    select: { listId: true, sheet: true, cell: true, nameKey: true, userId: true },
+  });
+}
+
+/**
+ * Eén vakje met de hand regelen: `null` telt voor niemand, een id telt voor
+ * dat praesidiumlid, `"follow"` volgt weer de naam. Een keuze die gelijk is aan
+ * wat de naam al zegt, wordt niet bewaard: dan zou ze een latere correctie van
+ * de naam stil tegenhouden.
+ */
+export async function setCellOverride(input: {
+  listId: string;
+  year: number;
+  sheet: string;
+  cell: string;
+  nameKey: string;
+  target: string | null | "follow";
+  actorId: string;
+}): Promise<"saved" | "cleared" | "not-found" | "not-member"> {
+  const where = { listId: input.listId, sheet: input.sheet, cell: input.cell, nameKey: input.nameKey };
+  const entry = await prisma.praesidiumShiftEntry.findFirst({
+    where,
+    select: { role: true, slot: true, date: true },
+  });
+  if (!entry) return "not-found";
+  const id = { listId_sheet_cell_nameKey: where };
+
+  if (input.target !== null && input.target !== "follow") {
+    const roster = await loadRoster(input.year);
+    if (!roster.some((m) => m.userId === input.target)) return "not-member";
+    const name = await prisma.praesidiumShiftListName.findUnique({
+      where: { listId_nameKey: { listId: input.listId, nameKey: input.nameKey } },
+      select: { status: true, userId: true },
+    });
+    if (name?.status === "MATCHED" && name.userId === input.target) input = { ...input, target: "follow" };
+  }
+  if (input.target === "follow") {
+    await prisma.praesidiumShiftCellOverride.deleteMany({ where });
+    return "cleared";
+  }
+  await prisma.praesidiumShiftCellOverride.upsert({
+    where: id,
+    create: { ...where, ...entry, userId: input.target, updatedById: input.actorId },
+    update: { ...entry, userId: input.target, updatedById: input.actorId },
+  });
+  return "saved";
 }
 
 /**

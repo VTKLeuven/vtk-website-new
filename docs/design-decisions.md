@@ -11083,6 +11083,33 @@ recht `shift.praesidium` (de rol `admin`, dus Groep 5 en IT, heeft het vanzelf).
   de som van het gemiddelde per lijst: zolang niemand overgeslagen wordt, is dat
   precies het gemiddelde van ieders totaal, en met overgeslagen mensen blijft
   het vergelijkbaar.
+- **"Geen praesidium" of "geen naam"** (oktober 2026). In een vakje staat niet
+  altijd een persoon: "Cultuur", "Onthaal", "Iedereen", "Preasidium",
+  "Karchauffeur" zijn een post, een taak of een opmerking. Die wachtten als
+  "niet herkend" op een keuze en hielden de waarschuwing op het overzicht open.
+  Ze als "geen praesidium" aanduiden klopte niet: dat is voor een persoon buiten
+  het praesidium (werkgroep, andere kring), en zo'n shift telt mee als "door
+  anderen" en als VTK-shift. "Geen naam" telt daarom voor niemand en ook niet
+  mee in de totalen van de lijst; de stand zegt hoeveel vakjes zo wegvielen. Net
+  als de andere keuzes kan ze onthouden worden voor de volgende lijsten. Een
+  post automatisch herkennen (de naam van een praesidiumpost) is bewust niet
+  gedaan: een vakje "Cultuur" kan ook betekenen dat iemand van Cultuur het moet
+  vullen, en de vice ziet dat beter dan de parser.
+- **Eén vakje met de hand regelen** (oktober 2026). Een lijst zegt niet alles:
+  de driver shift op Studentenwelkom ging niet door, de bekers wassen op 24UL
+  is eigenlijk een praesidiumshift, en "Jarne" is op dezelfde lijst Jarne P bij
+  IT maar Jarne N bij de foto's. In de lade van een lid krijgt daarom elk vakje
+  een potlood: het telt dan voor niemand, of voor een ander praesidiumlid. Dat
+  is bewust per vakje en niet per naam: de keuze per naam blijft gelden voor
+  alle andere vakjes, en een bijnaam onthouden zou de volgende lijst fout
+  koppelen. Een vakje dat met de hand geregeld is, blijft ook zichtbaar bij wie
+  de naam volgens de lijst is ("naar Jarne N", "telt niet mee"), zodat de vice
+  ziet waarom diegene er minder heeft en het kan terugzetten. Er is geen reden
+  bij te vullen: het auditlog zegt wie het deed. Een nieuwe export houdt de
+  keuze wanneer dezelfde naam met dezelfde taak en hetzelfde uur er nog staat,
+  ook als er rijen bijkwamen; is dat vakje niet meer eenduidig terug te
+  vinden, dan vervalt de keuze en zegt de toast het, liever dan dat ze op een
+  vakje belandt waar ze nooit over ging.
 - **Het scherm is een rustig register** (oktober 2026). De eerste versie
   volgde de gewone beheertabel en las als onaf: een lange tabel met kleine
   balkjes, losse meldingen en een lijstpagina die één lange rol formulieren

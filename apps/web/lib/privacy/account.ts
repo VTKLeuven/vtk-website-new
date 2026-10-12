@@ -357,6 +357,9 @@ export async function eraseUserData(userId: string) {
         where: { userId },
         data: { userId: null, status: "IGNORED", source: "MANUAL" },
       });
+      // Een vakje dat met de hand aan deze persoon gegeven was, telt voor
+      // niemand: de naam erin wees net naar iemand anders.
+      await tx.praesidiumShiftCellOverride.updateMany({ where: { userId }, data: { userId: null } });
       await tx.ticketEventUserGrant.deleteMany({ where: { userId } });
       await tx.formUserGrant.deleteMany({ where: { userId } });
 

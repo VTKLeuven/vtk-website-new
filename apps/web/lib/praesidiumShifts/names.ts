@@ -204,7 +204,7 @@ export type MatchSource =
   | "NOT_PRAESIDIUM"
   | "NONE";
 
-export type MatchStatus = "MATCHED" | "IGNORED" | "UNRESOLVED";
+export type MatchStatus = "MATCHED" | "IGNORED" | "UNRESOLVED" | "NOT_A_NAME";
 
 export type Proposal = {
   status: MatchStatus;
@@ -216,13 +216,14 @@ export type Proposal = {
   detail?: string;
 };
 
-export type AliasTarget = { userId: string | null };
+/** `userId` leeg: geen praesidium, of met `notAName` geen persoon maar een post of taak. */
+export type AliasTarget = { userId: string | null; notAName?: boolean };
 
 /**
  * Stelt een koppeling voor op basis van de bijnamen, het overzichtstabblad en
  * de namen van wie dit werkingsjaar in het praesidium zit. In deze volgorde:
  *
- * 1. een onthouden bijnaam wint altijd, ook "negeren";
+ * 1. een onthouden bijnaam wint altijd, ook "negeren" en "geen naam";
  * 2. staat de naam in het overzicht bij een andere kring, dan is het geen VTK;
  * 3. voluit en exact (ook achternaam eerst, of met een tikfout);
  * 4. enkel een voornaam: telt alleen als er één praesidiumlid zo heet;
@@ -238,9 +239,8 @@ export function proposeMatch(
 ): Proposal {
   const alias = aliases.get(key);
   if (alias) {
-    return alias.userId
-      ? { status: "MATCHED", source: "ALIAS", userId: alias.userId, candidates: [] }
-      : { status: "IGNORED", source: "ALIAS", userId: null, candidates: [] };
+    if (alias.userId) return { status: "MATCHED", source: "ALIAS", userId: alias.userId, candidates: [] };
+    return { status: alias.notAName ? "NOT_A_NAME" : "IGNORED", source: "ALIAS", userId: null, candidates: [] };
   }
   const kring = otherKring.get(key);
   if (kring) return { status: "IGNORED", source: "OTHER_KRING", userId: null, candidates: [], detail: kring };

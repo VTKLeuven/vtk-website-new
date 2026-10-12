@@ -7,12 +7,22 @@ import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { formatWorkingYear } from "@/lib/workingYear";
 import { isAmbiguousFirstName, proposeMatch } from "@/lib/praesidiumShifts/names";
-import { LIST_SELECT, listPhones, loadAliasMap, loadRoster, toStatsList } from "@/lib/praesidiumShifts/server";
 import {
+  LIST_SELECT,
+  listPhones,
+  loadAliasMap,
+  loadCellOverrides,
+  loadRoster,
+  toStatsList,
+} from "@/lib/praesidiumShifts/server";
+import {
+  attachOverrides,
   detectedOpenSlots,
   entryCounts,
+  entryUser,
   entryWeight,
   formatCount,
+  nameIndex,
   summarizeList,
   type SlotStat,
 } from "@/lib/praesidiumShifts/stats";
@@ -53,11 +63,22 @@ export default async function PraesidiumShiftListPage({
   });
   if (!list) notFound();
 
-  const [entries, names, contacts, roster, aliases, skips, posts] = await Promise.all([
+  const [rawEntries, names, contacts, roster, aliases, skips, posts, cells] = await Promise.all([
     prisma.praesidiumShiftEntry.findMany({
       where: { listId: id },
       orderBy: [{ date: "asc" }, { sheet: "asc" }],
-      select: { listId: true, nameKey: true, sheet: true, color: true, hours: true, excluded: true, date: true, slot: true, role: true },
+      select: {
+        listId: true,
+        nameKey: true,
+        sheet: true,
+        cell: true,
+        color: true,
+        hours: true,
+        excluded: true,
+        date: true,
+        slot: true,
+        role: true,
+      },
     }),
     prisma.praesidiumShiftListName.findMany({
       where: { listId: id },
@@ -73,7 +94,9 @@ export default async function PraesidiumShiftListPage({
       orderBy: { orderInPraesidium: "asc" },
       select: { id: true, nameNl: true, nameEn: true, _count: { select: { memberships: { where: { year: list.year } } } } },
     }),
+    loadCellOverrides([id]),
   ]);
+  const entries = attachOverrides(rawEntries, cells);
   const skipReason = new Map(skips.map((s) => [s.userId, s.reason]));
   const skippedUsers = new Set(skipReason.keys());
   const phones = await listPhones(roster.filter((m) => !m.phone).map((m) => m.userId));
@@ -88,11 +111,13 @@ export default async function PraesidiumShiftListPage({
   const where = (entry: (typeof entries)[number]) =>
     [entry.date ? shortDay(entry.date, locale) : entry.sheet, entry.slot].filter(Boolean).join(" ");
 
-  // De namen: enkel wie op een meetellend tabblad en in een meetellende kleur staat.
+  // De namen: enkel wie op een meetellend tabblad en in een meetellende kleur
+  // staat. Een vakje dat met de hand geregeld is, volgt de naam niet meer en
+  // telt hier dus niet mee.
   let hiddenNames = 0;
   const nameRows: NameRowData[] = [];
   for (const name of names) {
-    const own = entries.filter((e) => e.nameKey === name.nameKey && entryCounts(stats, e));
+    const own = entries.filter((e) => e.nameKey === name.nameKey && !e.override && entryCounts(stats, e));
     if (own.length === 0) {
       hiddenNames += 1;
       continue;
@@ -114,7 +139,7 @@ export default async function PraesidiumShiftListPage({
   }
   const unresolved = nameRows.filter((r) => r.status === "UNRESOLVED").length;
 
-  const nameUser = new Map(names.filter((n) => n.status === "MATCHED" && n.userId).map((n) => [n.nameKey, n.userId!]));
+  const index = nameIndex(names);
   const resultMembers: ListResultMember[] = roster.map((member) => ({
     userId: member.userId,
     name: member.name,
@@ -122,7 +147,7 @@ export default async function PraesidiumShiftListPage({
     phone: member.phone ?? phones.get(member.userId) ?? null,
     count: allCounts.get(member.userId) ?? 0,
     slots: entries
-      .filter((e) => nameUser.get(e.nameKey) === member.userId && entryCounts(stats, e))
+      .filter((e) => entryCounts(stats, e) && entryUser(index, e) === member.userId)
       .map((e) => where(e)),
     skipped: skippedUsers.has(member.userId),
     skipReason: skipReason.get(member.userId) ?? null,
@@ -136,6 +161,8 @@ export default async function PraesidiumShiftListPage({
   const metTarget =
     list.expectedPerMember !== null ? countedMembers.filter((m) => m.count >= (list.expectedPerMember ?? 0)).length : null;
   const excludedCount = entries.filter((e) => e.excluded).length;
+  const handExcluded = entries.filter((e) => e.override && e.override.userId === null && !e.excluded).length;
+  const handGiven = entries.filter((e) => e.override?.userId).length;
 
   const tab: Tab = TABS.includes(tabParam as Tab)
     ? (tabParam as Tab)
@@ -306,6 +333,30 @@ export default async function PraesidiumShiftListPage({
               {nl
                 ? `${excludedCount} ${excludedCount === 1 ? "vakje telt" : "vakjes tellen"} niet mee omdat de lijst er zelf "telt niet mee" naast zet.`
                 : `${excludedCount} cells do not count because the list itself marks them "does not count".`}
+            </p>
+          )}
+          {summary.notNames > 0 && (
+            <p className="text-xs text-vtk-muted">
+              {nl
+                ? `${formatCount(summary.notNames, locale)} ${summary.notNames === 1 ? "vakje" : "vakjes"} met een post, taak of opmerking in plaats van een naam ${summary.notNames === 1 ? "telt" : "tellen"} niet mee.`
+                : `${formatCount(summary.notNames, "en")} cells with a post, task or note instead of a name do not count.`}
+            </p>
+          )}
+          {handExcluded + handGiven > 0 && (
+            <p className="text-xs text-vtk-muted">
+              {nl
+                ? `Met de hand geregeld: ${[
+                    handExcluded ? `${handExcluded} ${handExcluded === 1 ? "vakje telt" : "vakjes tellen"} niet mee` : null,
+                    handGiven ? `${handGiven} ${handGiven === 1 ? "vakje telt" : "vakjes tellen"} voor iemand anders dan de naam` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}. Terugzetten kan in het overzicht, bij het lid.`
+                : `Set by hand: ${[
+                    handExcluded ? `${handExcluded} cells do not count` : null,
+                    handGiven ? `${handGiven} cells count for someone other than the name` : null,
+                  ]
+                    .filter(Boolean)
+                    .join(", ")}. Undo in the overview, at the member.`}
             </p>
           )}
           {roster.length > 0 ? (

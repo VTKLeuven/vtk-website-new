@@ -9,6 +9,7 @@ import { formatCount } from "@/lib/praesidiumShifts/stats";
 import type { OverviewListRow, OverviewMember } from "@/lib/praesidiumShifts/overview";
 import type { Averages } from "@/lib/praesidiumShifts/stats";
 import { NecessityToggle } from "./NecessityToggle";
+import { EntryRow } from "./EntryRow";
 
 type View = "total" | "lists" | "perList";
 
@@ -75,12 +76,14 @@ export function MemberTable({
   members,
   averages,
   lists,
+  errorMessages,
 }: {
   locale: "nl" | "en";
   members: OverviewMember[];
   averages: Averages;
   /** Bevestigde shiftenlijsten van dit jaar, in volgorde, voor de weergave per lijst. */
   lists: OverviewListRow[];
+  errorMessages: Record<string, string>;
 }) {
   const nl = locale === "nl";
   const showToast = useToast();
@@ -352,8 +355,10 @@ export function MemberTable({
         <MemberDrawer
           locale={locale}
           member={selected}
+          members={members}
           averages={averages}
           lists={lists}
+          errorMessages={errorMessages}
           onClose={() => setSelectedId(null)}
         />
       )}
@@ -364,14 +369,19 @@ export function MemberTable({
 function MemberDrawer({
   locale,
   member,
+  members,
   averages,
   lists,
+  errorMessages,
   onClose,
 }: {
   locale: "nl" | "en";
   member: OverviewMember;
+  /** Iedereen van het praesidium, om een vakje aan iemand anders te geven. */
+  members: OverviewMember[];
   averages: Averages;
   lists: OverviewListRow[];
+  errorMessages: Record<string, string>;
   onClose: () => void;
 }) {
   const nl = locale === "nl";
@@ -392,6 +402,8 @@ function MemberDrawer({
   );
   const missing = lists.filter((list) => !shownLists.includes(list));
   const heading = "mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-vtk-muted";
+  const people = members.map((m) => ({ userId: m.userId, name: m.name, posts: m.posts }));
+  const self = { userId: member.userId, name: member.name, posts: member.posts };
 
   return (
     <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label={member.name}>
@@ -508,17 +520,17 @@ function MemberDrawer({
                       )}
                     </span>
                   </summary>
-                  <ul className={`mt-2 space-y-1 text-xs text-vtk-body ${skipped ? "opacity-60" : ""}`}>
+                  <ul className={`mt-2 space-y-0.5 text-xs text-vtk-body ${skipped ? "opacity-60" : ""}`}>
                     {entries.map((entry, i) => (
-                      <li key={i} className="grid grid-cols-[5.5rem_6.5rem_1fr] gap-2">
-                        <span>{shortDate(entry.date, locale) || entry.sheet}</span>
-                        <span className="tabular-nums">{entry.slot ?? ""}</span>
-                        <span className="truncate" title={entry.role ?? ""}>
-                          {entry.role ?? ""}
-                          {entry.label !== member.name && <span className="text-vtk-muted"> · {entry.label}</span>}
-                          {entry.weight !== 1 && <span className="text-vtk-muted"> · {formatCount(entry.weight, locale)}</span>}
-                        </span>
-                      </li>
+                      <EntryRow
+                        key={`${entry.sheet}\u0000${entry.cell}\u0000${entry.nameKey}\u0000${entry.state}\u0000${i}`}
+                        locale={locale}
+                        entry={entry}
+                        when={shortDate(entry.date, locale) || entry.sheet}
+                        member={self}
+                        people={people}
+                        errorMessages={errorMessages}
+                      />
                     ))}
                   </ul>
                 </details>

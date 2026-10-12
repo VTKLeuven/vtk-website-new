@@ -34,6 +34,7 @@ export default async function PraesidiumShiftAliases({
         nameKey: true,
         label: true,
         userId: true,
+        notAName: true,
         updatedAt: true,
         user: { select: { name: true } },
         updatedBy: { select: { name: true } },
@@ -68,8 +69,8 @@ export default async function PraesidiumShiftAliases({
         <h1 className="text-2xl font-semibold">{nl ? "Bijnamen op shiftenlijsten" : "Nicknames on shift lists"}</h1>
         <p className="max-w-3xl text-sm text-vtk-muted">
           {nl
-            ? "Een bijnaam koppelt een schrijfwijze (\"Mekkie\", \"Jarne P\") aan een praesidiumlid, of zegt dat ze nooit iemand van het praesidium is. Ze geldt voor elke lijst die je oplaadt, en voor elke lijst waar die naam niet met de hand gekozen is. Klopt er een niet meer, kies hier iemand anders: de lijsten volgen meteen."
-            : "A nickname links a spelling (\"Mekkie\", \"Jarne P\") to a praesidium member, or says it is never anyone from the praesidium. It applies to every list you upload, and to every list where that name was not chosen by hand. If one is wrong, pick someone else here: the lists follow at once."}
+            ? "Een bijnaam koppelt een schrijfwijze (\"Mekkie\", \"Jarne P\") aan een praesidiumlid, of zegt dat ze nooit iemand van het praesidium is, of dat ze geen persoon is maar een post of taak (\"Iedereen\", \"Cultuur\"). Ze geldt voor elke lijst die je oplaadt, en voor elke lijst waar die naam niet met de hand gekozen is. Klopt er een niet meer, kies hier iemand anders: de lijsten volgen meteen."
+            : "A nickname links a spelling (\"Mekkie\", \"Jarne P\") to a praesidium member, or says it is never anyone from the praesidium, or that it is not a person but a post or task (\"Everyone\", \"Culture\"). It applies to every list you upload, and to every list where that name was not chosen by hand. If one is wrong, pick someone else here: the lists follow at once."}
         </p>
       </div>
 
@@ -105,7 +106,7 @@ export default async function PraesidiumShiftAliases({
                   <AliasTargetSelect
                     locale={locale}
                     label={alias.label}
-                    value={alias.userId ?? "ignore"}
+                    value={alias.userId ?? (alias.notAName ? "noname" : "ignore")}
                     options={optionsFor(alias.userId, alias.user?.name)}
                     errorMessages={messages}
                   />

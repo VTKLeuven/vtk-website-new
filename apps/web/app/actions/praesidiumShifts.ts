@@ -18,12 +18,14 @@ import {
   replaceListFile,
   saveAlias,
   saveNameChoices,
+  setCellOverride,
   setNecessity,
   setExemption,
   LIST_SELECT,
+  loadCellOverrides,
   toStatsList,
 } from "@/lib/praesidiumShifts/server";
-import { summarizeList, type ColorSetting, type SheetSetting } from "@/lib/praesidiumShifts/stats";
+import { attachOverrides, summarizeList, type ColorSetting, type SheetSetting } from "@/lib/praesidiumShifts/stats";
 
 /*
  * Acties van het shiftenoverzicht van het praesidium. Elk ervan vraagt
@@ -53,18 +55,19 @@ function inputError(err: unknown): SaveState {
 
 /** Namen op meetellende tabbladen en kleuren die nog op een keuze wachten. */
 async function openNameCount(listId: string): Promise<number> {
-  const [list, entries, names] = await Promise.all([
+  const [list, entries, names, cells] = await Promise.all([
     prisma.praesidiumShiftList.findUniqueOrThrow({ where: { id: listId }, select: LIST_SELECT }),
     prisma.praesidiumShiftEntry.findMany({
       where: { listId },
-      select: { listId: true, nameKey: true, sheet: true, color: true, hours: true, excluded: true },
+      select: { listId: true, nameKey: true, sheet: true, cell: true, color: true, hours: true, excluded: true },
     }),
     prisma.praesidiumShiftListName.findMany({
       where: { listId },
       select: { listId: true, nameKey: true, status: true, userId: true },
     }),
+    loadCellOverrides([listId]),
   ]);
-  return summarizeList(toStatsList(list), entries, names).unresolvedNames;
+  return summarizeList(toStatsList(list), attachOverrides(entries, cells), names).unresolvedNames;
 }
 
 async function listOrNull(id: string) {
@@ -138,17 +141,26 @@ export async function replacePraesidiumShiftListFileAction(_prev: SaveState, for
     entity: "praesidiumShiftList",
     entityId: list.id,
     target: list.name,
-    summary: `nieuwe versie, ${result.added} nieuwe namen`,
+    summary: `nieuwe versie, ${result.added} nieuwe namen${result.lostCells ? `, ${result.lostCells} keuzes per vakje vervallen` : ""}`,
   });
   revalidateOverview();
   const nl = formData.get("locale") !== "en";
+  // Een keuze per vakje die vervalt, telt weer zoals de naam zegt: dat moet de
+  // vice weten, anders staat de bekers wassen stil terug in de telling.
+  const lost = result.lostCells
+    ? nl
+      ? ` ${result.lostCells} ${result.lostCells === 1 ? "vakje dat je met de hand regelde, staat" : "vakjes die je met de hand regelde, staan"} niet meer op de lijst; ${result.lostCells === 1 ? "die keuze is" : "die keuzes zijn"} vervallen.`
+      : ` ${result.lostCells} cells you set by hand are no longer on the list; those choices were dropped.`
+    : "";
   if (result.added === 0) {
-    return saveOk(nl ? "Nieuwe versie ingelezen; er kwamen geen nieuwe namen bij." : "New version read; no new names.");
+    return saveOk(`${nl ? "Nieuwe versie ingelezen; er kwamen geen nieuwe namen bij." : "New version read; no new names."}${lost}`);
   }
   return saveOk(
-    nl
-      ? `Nieuwe versie ingelezen: ${result.added} nieuwe ${result.added === 1 ? "naam" : "namen"}, waarvan ${result.unresolved} op een keuze ${result.unresolved === 1 ? "wacht" : "wachten"}.`
-      : `New version read: ${result.added} new names, ${result.unresolved} waiting for a choice.`,
+    `${
+      nl
+        ? `Nieuwe versie ingelezen: ${result.added} nieuwe ${result.added === 1 ? "naam" : "namen"}, waarvan ${result.unresolved} op een keuze ${result.unresolved === 1 ? "wacht" : "wachten"}.`
+        : `New version read: ${result.added} new names, ${result.unresolved} waiting for a choice.`
+    }${lost}`,
   );
 }
 
@@ -304,18 +316,18 @@ export async function savePraesidiumShiftAliasAction(_prev: SaveState, formData:
   const target = String(formData.get("target") ?? "");
   if (!target) return saveError("TARGET_REQUIRED");
   let userId: string | null = null;
-  if (target !== "ignore") {
+  if (target !== "ignore" && target !== "noname") {
     const user = await prisma.user.findFirst({ where: { id: target, deletedAt: null }, select: { id: true } });
     if (!user) return saveError("TARGET_REQUIRED");
     userId = user.id;
   }
-  await saveAlias({ nameKey: key, label, userId, actorId: session.user.id });
+  await saveAlias({ nameKey: key, label, userId, notAName: target === "noname", actorId: session.user.id });
   await logAudit({
     action: "update",
     entity: "praesidiumShiftAlias",
     entityId: key,
     target: label,
-    summary: userId ? "gekoppeld" : "negeren",
+    summary: userId ? "gekoppeld" : target === "noname" ? "geen naam" : "negeren",
   });
   revalidateOverview();
   return saveOk();
@@ -434,4 +446,53 @@ export async function skipPraesidiumShiftPostAction(_prev: SaveState, formData: 
       ? `${count} ${count === 1 ? "lid" : "leden"} van ${reason} ${count === 1 ? "wordt" : "worden"} overgeslagen op ${list.name}.`
       : `${count} members of ${reason} are skipped on ${list.name}.`,
   );
+}
+
+// ---------------------------------------------------------------------------
+// Eén vakje met de hand regelen
+// ---------------------------------------------------------------------------
+
+/**
+ * Eén vakje laten tellen voor iemand anders dan de naam zegt, voor niemand
+ * ("telt niet mee": de shift ging niet door, of hoort niet bij deze lijst), of
+ * weer zoals de naam. `target` is een id, `none` of `follow`.
+ */
+export async function setPraesidiumShiftCellAction(formData: FormData): Promise<SaveState> {
+  const session = await requirePermission("shift.praesidium");
+  const list = await listOrNull(String(formData.get("listId") ?? ""));
+  if (!list) return saveError("LIST_NOT_FOUND");
+  const sheet = String(formData.get("sheet") ?? "");
+  const cell = String(formData.get("cell") ?? "");
+  const nameKey = String(formData.get("nameKey") ?? "");
+  const raw = String(formData.get("target") ?? "");
+  if (!sheet || !cell || !nameKey || !raw) return saveError("INVALID_INPUT");
+  const target = raw === "none" ? null : raw;
+
+  const result = await setCellOverride({
+    listId: list.id,
+    year: list.year,
+    sheet,
+    cell,
+    nameKey,
+    target,
+    actorId: session.user.id,
+  });
+  if (result === "not-found") return saveError("CELL_NOT_FOUND");
+  if (result === "not-member") return saveError("NOT_MEMBER");
+
+  let summary = "volgt weer de naam";
+  if (result === "saved" && target === null) summary = "telt niet mee";
+  if (result === "saved" && target) {
+    const user = await prisma.user.findUnique({ where: { id: target }, select: { name: true } });
+    summary = `telt voor ${user?.name ?? target}`;
+  }
+  await logAudit({
+    action: "update",
+    entity: "praesidiumShiftList",
+    entityId: list.id,
+    target: list.name,
+    summary: `vakje ${sheet}!${cell} (${nameKey}): ${summary}`,
+  });
+  revalidateOverview();
+  return saveOk();
 }

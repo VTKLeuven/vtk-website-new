@@ -12,9 +12,11 @@ import {
 import {
   detectedOpenSlots,
   entryCounts,
+  entryOnCountedPart,
   entryUser,
   entryWeight,
   nameIndex,
+  nameUser,
   standings,
   summarizeList,
   type Averages,
@@ -52,6 +54,9 @@ export type OverviewListRow = {
 export type OverviewEntry = {
   listId: string;
   sheet: string;
+  /** Met `sheet` en `nameKey` het adres van het vakje, voor een keuze per vakje. */
+  cell: string;
+  nameKey: string;
   slot: string | null;
   role: string | null;
   date: string | null;
@@ -59,6 +64,14 @@ export type OverviewEntry = {
   label: string;
   /** Op deze lijst wordt dit lid overgeslagen: het vakje telt niet. */
   skipped: boolean;
+  /**
+   * `counts`: telt voor dit lid, zoals de naam zegt. `given`: met de hand aan
+   * dit lid gegeven. `excluded`: met de hand op "telt niet mee" gezet.
+   * `away`: met de hand aan iemand anders gegeven; telt niet voor dit lid.
+   */
+  state: "counts" | "given" | "excluded" | "away";
+  /** Bij `given` van wie het volgens de naam was (of de naam zelf), bij `away` aan wie. */
+  other: string | null;
 };
 
 export type OverviewSiteShift = {
@@ -139,31 +152,55 @@ export async function buildOverview(year: number, locale: "nl" | "en", now = new
   });
   const skippedPairs = new Set(exemptions.map((e) => `${e.listId}\u0000${e.userId}`));
 
-  // Per lid de vakjes en shiften, voor het detailvenster.
+  // Per lid de vakjes en shiften, voor het detailvenster. Een vakje dat met de
+  // hand geregeld is, staat ook bij wie de naam volgens de lijst is: zo ziet de
+  // vice waarom die minder heeft, en kan hij het terugzetten.
   const index = nameIndex(statsNames);
   const byId = new Map(statsLists.map((l) => [l.id, l]));
   const labels = new Map(names.map((n) => [`${n.listId}\u0000${n.nameKey}`, n.label]));
+  const memberName = new Map(roster.map((m) => [m.userId, m.name]));
   const entriesByUser = new Map<string, OverviewEntry[]>();
   const weeklyByUser = new Map<string, OverviewEntry[]>();
+  const push = (target: Map<string, OverviewEntry[]>, userId: string, row: OverviewEntry) => {
+    const bucket = target.get(userId) ?? [];
+    bucket.push(row);
+    target.set(userId, bucket);
+  };
   for (const entry of entries) {
     const list = byId.get(entry.listId);
-    if (!list || !active.some((a) => a.id === list.id) || !entryCounts(list, entry)) continue;
-    const userId = entryUser(index, entry);
-    if (!userId) continue;
-    const row: OverviewEntry = {
+    if (!list || !active.some((a) => a.id === list.id) || !entryOnCountedPart(list, entry)) continue;
+    const owner = entryCounts(list, entry) ? entryUser(index, entry) : null;
+    const named = nameUser(index, entry);
+    const label = labels.get(`${entry.listId}\u0000${entry.nameKey}`) ?? entry.rawName;
+    const row = (userId: string, state: OverviewEntry["state"], other: string | null): OverviewEntry => ({
       listId: entry.listId,
       sheet: entry.sheet,
+      cell: entry.cell,
+      nameKey: entry.nameKey,
       slot: entry.slot,
       role: entry.role,
       date: isoDay(entry.date),
       weight: entryWeight(list, entry),
-      label: labels.get(`${entry.listId}\u0000${entry.nameKey}`) ?? entry.rawName,
+      label,
       skipped: skippedPairs.has(`${entry.listId}\u0000${userId}`),
-    };
-    const target = list.kind === "EVENT" ? entriesByUser : weeklyByUser;
-    const bucket = target.get(userId) ?? [];
-    bucket.push(row);
-    target.set(userId, bucket);
+      state,
+      other,
+    });
+    // De wekelijkse roosters tonen enkel wat telt; het detail toont ze als één zin.
+    if (list.kind === "WEEKLY") {
+      if (owner) push(weeklyByUser, owner, row(owner, "counts", null));
+      continue;
+    }
+    if (!entry.override) {
+      if (owner) push(entriesByUser, owner, row(owner, "counts", null));
+    } else if (!owner) {
+      if (named) push(entriesByUser, named, row(named, "excluded", null));
+    } else if (owner === named) {
+      push(entriesByUser, owner, row(owner, "counts", null));
+    } else {
+      push(entriesByUser, owner, row(owner, "given", named ? memberName.get(named) ?? label : label));
+      if (named) push(entriesByUser, named, row(named, "away", memberName.get(owner) ?? null));
+    }
   }
   const siteByUser = new Map<string, OverviewSiteShift[]>();
   for (const p of participations) {

@@ -90,7 +90,13 @@ export default async function PraesidiumShiftOverview({
               {nl ? "Shiften op /shift aanduiden" : "Mark shifts on /shift"}
             </Link>
           </div>
-          <MemberTable locale={locale} members={overview.members} averages={overview.averages} lists={confirmed} />
+          <MemberTable
+            locale={locale}
+            members={overview.members}
+            averages={overview.averages}
+            lists={confirmed}
+            errorMessages={overviewErrorMessages(locale)}
+          />
         </section>
       )}
     </div>

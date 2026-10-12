@@ -63,6 +63,7 @@ export function SearchPicker({
   emptyText,
   disabled = false,
   attention = false,
+  autoOpen = false,
 }: {
   options: readonly SearchPickerOption[];
   name?: string;
@@ -79,15 +80,23 @@ export function SearchPicker({
   disabled?: boolean;
   /** Vraagt aandacht (een open keuze): een gele rand op de knop. */
   attention?: boolean;
+  /**
+   * Staat open zodra hij verschijnt, met de focus in het zoekveld: voor een
+   * kiezer die pas na een klik op een andere knop verschijnt, zodat dat niet
+   * nog een tweede klik vraagt.
+   */
+  autoOpen?: boolean;
 }) {
   const generatedId = useId();
   const triggerId = id ?? generatedId;
   const listId = `${triggerId}-list`;
   const [internal, setInternal] = useState(defaultValue);
   const value = controlledValue ?? internal;
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(autoOpen);
   const [query, setQuery] = useState("");
-  const [highlighted, setHighlighted] = useState(0);
+  const [highlighted, setHighlighted] = useState(() =>
+    autoOpen ? Math.max(0, options.findIndex((option) => option.value === value)) : 0,
+  );
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
@@ -102,6 +111,16 @@ export function SearchPicker({
     });
   }, [options, query]);
   const selected = options.find((option) => option.value === value) ?? null;
+
+  useEffect(() => {
+    if (!autoOpen) return;
+    searchRef.current?.focus();
+    scrollWithin(
+      listRef.current,
+      listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]') ?? null,
+      "center",
+    );
+  }, [autoOpen]);
 
   useEffect(() => {
     if (!open) return;

@@ -13,7 +13,20 @@ export type AliasOption = { userId: string; name: string; hint?: string };
 function pickerOptions(options: AliasOption[], nl: boolean): SearchPickerOption[] {
   return [
     ...options.map((o) => ({ value: o.userId, label: o.name, hint: o.hint, group: nl ? "Praesidium" : "Praesidium" })),
-    { value: "ignore", label: nl ? "Geen praesidium (negeren)" : "Not praesidium (ignore)", group: nl ? "Anders" : "Other", muted: true },
+    {
+      value: "ignore",
+      label: nl ? "Geen praesidium" : "Not praesidium",
+      hint: nl ? "werkgroep, andere kring" : "werkgroep, other association",
+      group: nl ? "Anders" : "Other",
+      muted: true,
+    },
+    {
+      value: "noname",
+      label: nl ? "Geen naam" : "Not a name",
+      hint: nl ? "een post, taak of opmerking" : "a post, task or note",
+      group: nl ? "Anders" : "Other",
+      muted: true,
+    },
   ];
 }
 
