@@ -13,7 +13,7 @@ import { requirePermission, requireSession } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { currentWorkingYear } from "@/lib/workingYear";
 import { deleteObject } from "@vtk/storage";
-import { storeAvatar, MAX_AVATAR_BYTES } from "@/app/actions/onboarding";
+import { storeAvatar, MAX_AVATAR_BYTES } from "@/lib/avatar";
 import { LEAD_LABEL_MAX } from "@/lib/werkgroepen";
 import { eraseUserData, StorageUnavailableError } from "@/lib/privacy/account";
 import { describeChanges, logAudit } from "@/lib/audit";

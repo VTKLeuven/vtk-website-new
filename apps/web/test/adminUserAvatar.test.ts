@@ -25,7 +25,7 @@ vi.mock("@vtk/storage", () => ({
   deleteObject: mocks.deleteObject,
   newStorageKey: (prefix: string) => "avatars/" + prefix + "-test",
 }));
-vi.mock("@/app/actions/onboarding", () => ({
+vi.mock("@/lib/avatar", () => ({
   MAX_AVATAR_BYTES: 8 * 1024 * 1024,
   // De echte storeAvatar draait sharp en S3; hier alleen de upload simuleren.
   storeAvatar: vi.fn(async (file: File | null) => {
@@ -134,7 +134,7 @@ describe("updateUserAvatarAction", () => {
   });
 
   it("meld AVATAR_FAILED wanneer de verwerking mislukt", async () => {
-    const { storeAvatar } = await import("@/app/actions/onboarding");
+    const { storeAvatar } = await import("@/lib/avatar");
     vi.mocked(storeAvatar).mockRejectedValueOnce(new Error("kapot"));
     const form = new FormData();
     form.set("id", "lid");
