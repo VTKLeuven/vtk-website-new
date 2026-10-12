@@ -17,16 +17,37 @@ export function UploadListForm({
   kind,
   year,
   errorMessages,
+  variant = "button",
 }: {
   locale: "nl" | "en";
   kind: "EVENT" | "WEEKLY";
   year: number;
   errorMessages: Record<string, string>;
+  /**
+   * `card` is de gestippelde kaart achteraan de rij evenementen; open neemt het
+   * formulier de volle breedte van die rij.
+   */
+  variant?: "button" | "card";
 }) {
   const nl = locale === "nl";
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [touched, setTouched] = useState(false);
+
+  if (!open && variant === "card") {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="grid min-h-[132px] place-content-center gap-1 rounded-[18px] border-[1.5px] border-dashed border-vtk-navy/20 p-4 text-center text-vtk-body transition-colors hover:border-vtk-navy/40 hover:bg-vtk-surface-elevated"
+      >
+        <span className="font-semibold text-vtk-ink">
+          {kind === "WEEKLY" ? (nl ? "+ Rooster opladen" : "+ Upload schedule") : nl ? "+ Lijst opladen" : "+ Upload list"}
+        </span>
+        <span className="text-xs text-vtk-muted">{nl ? "xlsx-export van Google Sheets" : "xlsx export from Google Sheets"}</span>
+      </button>
+    );
+  }
 
   if (!open) {
     return (
@@ -43,7 +64,7 @@ export function UploadListForm({
   }
 
   return (
-    <div className="w-full rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated p-5 shadow-[inset_3px_0_0_var(--color-vtk-yellow)]">
+    <div className="col-span-full w-full rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated p-5 shadow-[inset_3px_0_0_var(--color-vtk-yellow)]">
       <SaveForm
         action={uploadPraesidiumShiftListAction}
         submitLabel={nl ? "Opladen en nakijken" : "Upload and review"}

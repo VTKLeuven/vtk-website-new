@@ -116,3 +116,51 @@ export function SkipPostForm({
     </SaveForm>
   );
 }
+
+/** Iemand uit het praesidium kiezen om over te slaan; slaat meteen op. */
+export function SkipPersonPicker({
+  locale,
+  listId,
+  people,
+}: {
+  locale: "nl" | "en";
+  listId: string;
+  people: { userId: string; name: string; posts: string[] }[];
+}) {
+  const nl = locale === "nl";
+  const showToast = useToast();
+  const [pending, startTransition] = useTransition();
+
+  function skip(userId: string) {
+    if (!userId) return;
+    const person = people.find((p) => p.userId === userId);
+    startTransition(async () => {
+      const data = new FormData();
+      data.set("listId", listId);
+      data.set("userIds", userId);
+      data.set("skip", "1");
+      const result = await setPraesidiumShiftSkipAction(data);
+      showToast(
+        result.status === "error"
+          ? { message: nl ? "Niet opgeslagen: deze lijst bestaat niet meer." : "Not saved: this list no longer exists.", variant: "error", duration: 0 }
+          : { message: nl ? `${person?.name ?? "Lid"} wordt overgeslagen op deze lijst.` : `${person?.name ?? "Member"} is skipped on this list.`, variant: "success" },
+      );
+    });
+  }
+
+  return (
+    <div className="w-64">
+      <SearchPicker
+        key={people.length}
+        value=""
+        onChange={skip}
+        disabled={pending}
+        options={people.map((p) => ({ value: p.userId, label: p.name, hint: p.posts.join(", ") || undefined }))}
+        placeholder={nl ? "Iemand overslaan..." : "Skip someone..."}
+        searchPlaceholder={nl ? "Typ een naam of post" : "Type a name or post"}
+        ariaLabel={nl ? "Wie overslaan?" : "Who to skip?"}
+        emptyText={(q) => (nl ? `Niemand past bij "${q}".` : `Nobody matches "${q}".`)}
+      />
+    </div>
+  );
+}

@@ -1,17 +1,15 @@
 import { notFound } from "next/navigation";
 import type { Locale } from "@vtk/i18n";
-import Link from "@/components/ui/Link";
-import { LinkedRow } from "@/components/ui/LinkedRow";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
 import { brusselsYMD, shiftYMD, ymdKey } from "@/lib/brussels";
 import { parseWorkingYear, workingYearTabs } from "@/lib/workingYear";
 import { buildOverview } from "@/lib/praesidiumShifts/overview";
 import { loadYearLists, toStatsList, yearsWithData } from "@/lib/praesidiumShifts/server";
-import { entryCounts, entryUser, formatCount, nameIndex } from "@/lib/praesidiumShifts/stats";
+import { entryCounts, entryUser, nameIndex } from "@/lib/praesidiumShifts/stats";
 import { OverviewHeader } from "../OverviewHeader";
 import { UploadListForm } from "../UploadListForm";
-import { ListStatus } from "../ListStatus";
+import { ListCards, TodoCard, listTodos } from "../OverviewBlocks";
 import { overviewErrorMessages } from "../messages";
 import { WeeklyTable, type WeeklyMember } from "./WeeklyTable";
 
@@ -91,10 +89,9 @@ export default async function PraesidiumWeeklyShifts({
     if (entry.note) dayNotes.set(key, entry.note);
   }
   const upcomingDays = [...days.entries()].sort(([a], [b]) => a.localeCompare(b));
-  const pending = overview.weeklyLists.filter((l) => l.status === "DRAFT" || l.unresolvedNames > 0);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-7">
       <OverviewHeader
         nl={nl}
         active="praesidiumshiften"
@@ -107,33 +104,7 @@ export default async function PraesidiumWeeklyShifts({
         }
       />
 
-      {pending.length > 0 && (
-        <ul className="space-y-2">
-          {pending.map((list) => (
-            <li
-              key={list.id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated px-4 py-3 text-sm shadow-[inset_3px_0_0_var(--color-vtk-yellow)]"
-            >
-              <span>
-                <strong className="font-semibold">{list.name}</strong>{" "}
-                {list.status === "DRAFT"
-                  ? nl
-                    ? "is opgeladen maar nog niet bevestigd; het telt nog niet mee."
-                    : "is uploaded but not confirmed yet; it does not count yet."
-                  : nl
-                    ? `heeft ${list.unresolvedNames} ${list.unresolvedNames === 1 ? "naam" : "namen"} zonder keuze.`
-                    : `has ${list.unresolvedNames} names without a choice.`}
-              </span>
-              <Link
-                href={`${base}/admin/shiftenoverzicht/lijst/${list.id}`}
-                className="rounded-full border border-vtk-blue/15 px-3 py-1 text-xs font-medium hover:bg-vtk-blue-soft/60"
-              >
-                {list.status === "DRAFT" ? (nl ? "Nakijken" : "Review") : nl ? "Namen kiezen" : "Choose names"}
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      <TodoCard items={listTodos(overview.weeklyLists, base, nl)} nl={nl} />
 
       {active.length > 0 && (
         <section className="space-y-3">
@@ -182,50 +153,20 @@ export default async function PraesidiumWeeklyShifts({
       )}
 
       <section className="space-y-3">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">{nl ? "Roosters" : "Schedules"}</h2>
-          <UploadListForm locale={locale} kind="WEEKLY" year={year} errorMessages={overviewErrorMessages(locale)} />
-        </div>
-        {overview.weeklyLists.length === 0 ? (
-          <p className="rounded-[18px] border border-dashed border-vtk-blue/20 p-6 text-sm text-vtk-muted">
+        <h2 className="text-lg font-semibold">{nl ? "Roosters" : "Schedules"}</h2>
+        {overview.weeklyLists.length === 0 && (
+          <p className="text-sm text-vtk-muted">
             {nl
-              ? "Nog geen rooster voor dit werkingsjaar. Laad de export van de Google Sheet met de praesidiumshiften op; per semester één rooster werkt het best, en een nieuwe export van hetzelfde rooster laad je op bij dat rooster zelf."
-              : "No schedule for this working year yet. Upload the export of the Google Sheet with the praesidium shifts; one schedule per semester works best, and a new export of the same schedule goes onto that schedule itself."}
+              ? "Nog geen rooster voor dit werkingsjaar. Eén rooster per semester werkt het best; een nieuwe export van hetzelfde rooster laad je op bij dat rooster zelf."
+              : "No schedule for this working year yet. One schedule per semester works best; a new export of the same schedule goes onto that schedule itself."}
           </p>
-        ) : (
-          <div className="relative overflow-x-auto rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated">
-            <table className="w-full min-w-[560px] text-sm">
-              <thead className="border-b border-vtk-blue/10 text-left text-xs font-semibold text-vtk-muted">
-                <tr>
-                  <th className="px-4 py-2.5">{nl ? "Rooster" : "Schedule"}</th>
-                  <th className="px-2 py-2.5 text-right!">{nl ? "Shiften" : "Shifts"}</th>
-                  <th className="px-2 py-2.5 text-right!">{nl ? "Gem. per lid" : "Avg. per member"}</th>
-                  <th className="px-4 py-2.5">{nl ? "Status" : "Status"}</th>
-                </tr>
-              </thead>
-              <tbody>
-                {overview.weeklyLists.map((list) => (
-                  <LinkedRow
-                    key={list.id}
-                    href={`${base}/admin/shiftenoverzicht/lijst/${list.id}`}
-                    className="cursor-pointer border-b border-vtk-blue/5 last:border-0 hover:bg-vtk-blue-soft/30"
-                  >
-                    <td className="px-4 py-2.5">
-                      <Link href={`${base}/admin/shiftenoverzicht/lijst/${list.id}`} className="font-medium hover:underline">
-                        {list.name}
-                      </Link>
-                    </td>
-                    <td className="px-2 py-2.5 text-right tabular-nums">{formatCount(list.counted, locale)}</td>
-                    <td className="px-2 py-2.5 text-right tabular-nums">{formatCount(list.average, locale)}</td>
-                    <td className="px-4 py-2.5">
-                      <ListStatus list={list} nl={nl} />
-                    </td>
-                  </LinkedRow>
-                ))}
-              </tbody>
-            </table>
-          </div>
         )}
+        <ListCards
+          lists={[...overview.weeklyLists].reverse()}
+          base={base}
+          nl={nl}
+          upload={<UploadListForm locale={locale} kind="WEEKLY" year={year} errorMessages={overviewErrorMessages(locale)} variant="card" />}
+        />
       </section>
     </div>
   );

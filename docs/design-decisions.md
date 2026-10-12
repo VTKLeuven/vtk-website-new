@@ -11072,3 +11072,30 @@ recht `shift.praesidium` (de rol `admin`, dus Groep 5 en IT, heeft het vanzelf).
   overzichtstabblad van een lijst (gemarkeerd als "lijst"), enkel wanneer dat
   overzicht de volledige naam of een bijnaam gaf. Een nummer van een lijst
   wordt nooit naar het profiel geschreven.
+- **Iemand overslaan op een lijst** (één persoon of een hele post). Logistiek
+  werkt op 24UL als logistiek en krijgt daar geen praesidiumshiften voor. Wie
+  overgeslagen wordt, telt op die lijst helemaal niet mee: de vakjes niet, en
+  ook niet in het gemiddelde, de richtlijn of de bellijst van die lijst, want
+  wie de hele dag als logistiek werkt, kan geen praesidiumshiften doen en hoort
+  niet als "ondergemiddeld" opgebeld te worden. In het overzicht wordt zo
+  iemand vergeleken met het gemiddelde van de lijsten waar hij wel meetelt
+  (gemarkeerd met een sterretje). Daarom is het gemiddelde op de shiftenlijsten
+  de som van het gemiddelde per lijst: zolang niemand overgeslagen wordt, is dat
+  precies het gemiddelde van ieders totaal, en met overgeslagen mensen blijft
+  het vergelijkbaar.
+- **Het scherm is een rustig register** (oktober 2026). De eerste versie
+  volgde de gewone beheertabel en las als onaf: een lange tabel met kleine
+  balkjes, losse meldingen en een lijstpagina die één lange rol formulieren
+  was. Op een bord met vier richtingen (een register, een bellijst met
+  belstatus, een muur van tegels per post zoals /praesidium, en het rekenblad
+  van de vice) koos de vice het register: wat aandacht vraagt in één kaart
+  bovenaan, de lijsten als kaarten met hun gemiddelde tegen de richtlijn, en de
+  stand als één regel per persoon, al gesplitst in "onder het gemiddelde" en
+  "rond of boven", met het verschil als pil. Een regel opent een lade met alles
+  van die persoon. Een lijst heeft tabbladen (Namen, Wat telt, Stand,
+  Overslaan, Bestand) in plaats van één lange pagina, en een naam kiezen slaat
+  meteen op. Bord: https://claude.ai/artifact/Rs89WJ6Pf4b2Kecjkk8Pbs
+- **Namen kies je in een keuzelijst waarin je typt** (`SearchPicker`, dezelfde
+  vorm als de boekhoudcodekiezer): met tachtig praesidiumleden is de keuzelijst
+  van de browser niet te doen. De waarschijnlijke kandidaten ("Jarne" bij twee
+  Jarnes) staan als knopjes onder het veld.

@@ -1,8 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Input } from "@vtk/ui";
-import { Modal } from "../admin-table";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Search, X } from "lucide-react";
 import { CheckIcon, CopyIcon } from "@/components/ui/icons";
 import { IconButton } from "@/components/ui/IconButton";
 import { useToast } from "@/components/ui/toast";
@@ -11,16 +10,30 @@ import type { OverviewListRow, OverviewMember } from "@/lib/praesidiumShifts/ove
 import type { Averages } from "@/lib/praesidiumShifts/stats";
 import { NecessityToggle } from "./NecessityToggle";
 
-type Basis = "lists" | "total";
-type Filter = "all" | "below" | "above";
-type View = "totals" | "perList";
-type SortKey = "name" | "lists" | "site" | "siteNecessary" | "siteVoluntary" | "total" | "delta";
+type View = "total" | "lists" | "perList";
 
-/** Een kommagetal zoals de vice het schrijft, met een teken ervoor. */
+/** Een kommagetal met een teken ervoor, zoals in de pil. */
 function signed(value: number, locale: "nl" | "en"): string {
   const rounded = Math.round(value * 10) / 10;
-  if (rounded === 0) return "0";
+  if (Math.abs(rounded) < 0.05) return "0";
   return `${rounded > 0 ? "+" : "−"}${formatCount(Math.abs(rounded), locale)}`;
+}
+
+/** Eronder telt pas vanaf een halve shift: een kwartje verschil is ruis. */
+const BELOW = -0.5;
+
+function DiffPill({ value, locale, title }: { value: number; locale: "nl" | "en"; title?: string }) {
+  const tone = value <= -1 ? "down" : value >= 1 ? "up" : "even";
+  return (
+    <span className="vtk-psl-diff" data-tone={tone} title={title}>
+      {signed(value, locale)}
+    </span>
+  );
+}
+
+function initials(name: string): string {
+  const parts = name.split(" ").filter(Boolean);
+  return `${parts[0]?.[0] ?? ""}${parts.length > 1 ? parts[parts.length - 1][0] : ""}`.toUpperCase();
 }
 
 function shortDate(iso: string | null, locale: "nl" | "en"): string {
@@ -43,106 +56,20 @@ function shiftMoment(iso: string, locale: "nl" | "en"): string {
   });
 }
 
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /**
- * Hoe iemands shiften verdeeld zijn: shiftenlijsten, noodzakelijke en
- * vrijwillige shiften op /shift, naast elkaar op dezelfde schaal voor iedereen.
- * Het streepje is het gemiddelde van wat je vergelijkt: bij "Shiftenlijsten"
- * vergelijk je het einde van het blauwe deel, bij "Alles" het einde van de balk.
+ * De stand per praesidiumlid als rustig register: één regel per persoon, al
+ * gesplitst in wie onder het gemiddelde zit en wie erop of erboven. Een klik op
+ * een regel opent de lade met alles van die persoon.
  */
-function DistributionBar({
-  member,
-  max,
-  average,
-  nl,
-}: {
-  member: OverviewMember;
-  max: number;
-  average: number;
-  nl: boolean;
-}) {
-  if (max <= 0) return null;
-  const pct = (value: number) => `${(value / max) * 100}%`;
-  const parts = [
-    { value: member.lists, color: "var(--chart-1)", label: nl ? "Shiftenlijsten" : "Shift lists" },
-    { value: member.siteNecessary, color: "var(--chart-2)", label: nl ? "Noodzakelijk op /shift" : "Necessary on /shift" },
-    { value: member.siteVoluntary, color: "var(--chart-3)", label: nl ? "Vrije wil op /shift" : "Voluntary on /shift" },
-  ].filter((part) => part.value > 0);
-  return (
-    <div className="relative h-3 w-full min-w-24" aria-hidden>
-      <div className="absolute inset-y-0 left-0 flex gap-[2px]" style={{ width: pct(member.total) }}>
-        {parts.map((part) => (
-          <span
-            key={part.label}
-            title={`${part.label}: ${formatCount(part.value, nl ? "nl" : "en")}`}
-            className="h-full first:rounded-l-[4px] last:rounded-r-[4px]"
-            style={{ width: `${(part.value / member.total) * 100}%`, background: part.color }}
-          />
-        ))}
-      </div>
-      <span
-        className="absolute -top-0.5 -bottom-0.5 w-[2px] rounded-full bg-vtk-ink"
-        style={{ left: `calc(${pct(Math.min(average, max))} - 1px)` }}
-        title={nl ? "Gemiddelde" : "Average"}
-      />
-    </div>
-  );
-}
-
-function Legend({ nl }: { nl: boolean }) {
-  const items = [
-    { color: "var(--chart-1)", label: nl ? "Shiftenlijsten" : "Shift lists" },
-    { color: "var(--chart-2)", label: nl ? "Noodzakelijk op /shift" : "Necessary on /shift" },
-    { color: "var(--chart-3)", label: nl ? "Vrije wil op /shift" : "Voluntary on /shift" },
-  ];
-  return (
-    <ul className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-vtk-muted">
-      {items.map((item) => (
-        <li key={item.label} className="flex items-center gap-1.5">
-          <span aria-hidden className="inline-block size-2.5 rounded-[3px]" style={{ background: item.color }} />
-          {item.label}
-        </li>
-      ))}
-      <li className="flex items-center gap-1.5">
-        <span aria-hidden className="inline-block h-3 w-[2px] rounded-full bg-vtk-ink" />
-        {nl ? "Gemiddelde" : "Average"}
-      </li>
-    </ul>
-  );
-}
-
-function Segmented<T extends string>({
-  label,
-  value,
-  options,
-  onChange,
-}: {
-  label: string;
-  value: T;
-  options: { value: T; label: string }[];
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="flex items-center gap-2">
-      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-vtk-muted">{label}</span>
-      <div className="inline-flex rounded-full border border-vtk-blue/15 bg-white p-0.5" role="group" aria-label={label}>
-        {options.map((option) => (
-          <button
-            key={option.value}
-            type="button"
-            aria-pressed={value === option.value}
-            onClick={() => onChange(option.value)}
-            className={`rounded-full px-3 py-1 text-xs font-medium ${
-              value === option.value ? "bg-vtk-ink text-white" : "text-vtk-ink hover:bg-vtk-blue-soft/60"
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export function MemberTable({
   locale,
   members,
@@ -157,334 +84,238 @@ export function MemberTable({
 }) {
   const nl = locale === "nl";
   const showToast = useToast();
-  const [basis, setBasis] = useState<Basis>("lists");
-  const [filter, setFilter] = useState<Filter>("all");
-  const [view, setView] = useState<View>("totals");
+  const [view, setView] = useState<View>("total");
   const [query, setQuery] = useState("");
-  const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "delta", dir: 1 });
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const valueOf = (m: OverviewMember) => (basis === "lists" ? m.lists : m.total);
+  const basisLists = view !== "total";
+  const valueOf = (m: OverviewMember) => (basisLists ? m.lists : m.total);
   // Waarmee iemand vergeleken wordt: het gemiddelde zonder de lijsten waarop
-  // hij overgeslagen wordt. Zonder overgeslagen lijsten is dat het gewone
-  // gemiddelde (`averages.lists` of `averages.total`).
-  const expectedOf = (m: OverviewMember) => (basis === "lists" ? m.expectedLists : m.expectedTotal);
-  const maxTotal = Math.max(0, ...members.map((m) => m.total));
+  // hij overgeslagen wordt. Zonder overgeslagen lijsten is dat gewoon het
+  // gemiddelde.
+  const expectedOf = (m: OverviewMember) => (basisLists ? m.expectedLists : m.expectedTotal);
+  const diffOf = (m: OverviewMember) => valueOf(m) - expectedOf(m);
 
-  const rows = useMemo(() => {
+  const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const filtered = members.filter((m) => {
-      if (q && !m.name.toLowerCase().includes(q) && !m.posts.some((p) => p.toLowerCase().includes(q))) return false;
-      const value = basis === "lists" ? m.lists : m.total;
-      const expected = basis === "lists" ? m.expectedLists : m.expectedTotal;
-      if (filter === "below") return value < expected;
-      if (filter === "above") return value > expected;
-      return true;
-    });
-    const key = (m: OverviewMember): number | string => {
-      switch (sort.key) {
-        case "name":
-          return m.name.toLowerCase();
-        case "delta":
-          return (basis === "lists" ? m.lists - m.expectedLists : m.total - m.expectedTotal);
-        default:
-          return m[sort.key];
-      }
-    };
-    return [...filtered].sort((a, b) => {
-      const ka = key(a);
-      const kb = key(b);
-      const cmp = typeof ka === "string" ? ka.localeCompare(String(kb), "nl") : ka - (kb as number);
-      return cmp * sort.dir || a.name.localeCompare(b.name, "nl");
-    });
-  }, [members, query, filter, basis, sort]);
-
+    if (!q) return members;
+    return members.filter((m) => m.name.toLowerCase().includes(q) || m.posts.some((p) => p.toLowerCase().includes(q)));
+  }, [members, query]);
+  const sorted = [...filtered].sort((a, b) => diffOf(a) - diffOf(b) || a.name.localeCompare(b.name, "nl"));
+  const below = sorted.filter((m) => diffOf(m) <= BELOW);
+  const rest = sorted.filter((m) => diffOf(m) > BELOW);
   const selected = members.find((m) => m.userId === selectedId) ?? null;
-  const withPhone = rows.filter((m) => m.phone);
+  const belowWithPhone = below.filter((m) => m.phone);
+  const anySkipped = members.some((m) => m.skippedLists.length > 0);
 
-  async function copyPhones() {
-    const text = withPhone.map((m) => `${m.name}: ${m.phone}`).join("\n");
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-      showToast({
-        message: nl ? `${withPhone.length} nummers gekopieerd.` : `${withPhone.length} numbers copied.`,
-        variant: "success",
-      });
-    } catch {
+  async function copyBelow() {
+    const ok = await copyText(belowWithPhone.map((m) => `${m.name}: ${m.phone}`).join("\n"));
+    if (!ok) {
       showToast({
         message: nl ? "Kopiëren lukte niet; je browser liet het klembord niet toe." : "Copy failed; your browser blocked the clipboard.",
         variant: "error",
         duration: 0,
       });
+      return;
     }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    showToast({
+      message: nl
+        ? `${belowWithPhone.length} nummers gekopieerd van wie onder het gemiddelde zit.`
+        : `${belowWithPhone.length} numbers copied of who is below average.`,
+      variant: "success",
+    });
   }
 
-  const sortButton = (key: SortKey, label: string, align: "left" | "right" = "right") => (
-    <button
-      type="button"
-      onClick={() => setSort((s) => ({ key, dir: s.key === key ? (s.dir === 1 ? -1 : 1) : key === "name" ? 1 : -1 }))}
-      className={`inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-[0.08em] hover:text-vtk-ink ${align === "right" ? "w-full justify-end" : ""}`}
-      aria-label={`${label}: ${nl ? "sorteren" : "sort"}`}
-    >
-      {label}
-      {sort.key === key && <span aria-hidden>{sort.dir === 1 ? "↑" : "↓"}</span>}
-    </button>
-  );
-
-  const delta = (m: OverviewMember) => {
-    const d = valueOf(m) - expectedOf(m);
-    const tone =
-      d <= -1 ? "text-vtk-danger" : d >= 1 ? "text-[var(--ok-ink)]" : "text-vtk-muted";
-    const skippedNames = m.skippedLists.map((id) => lists.find((l) => l.id === id)?.name).filter(Boolean);
-    return (
-      <span
-        className={`font-medium tabular-nums ${tone}`}
-        title={
-          skippedNames.length
-            ? nl
-              ? `Vergeleken zonder ${skippedNames.join(", ")} (overgeslagen): ${formatCount(expectedOf(m), locale)}`
-              : `Compared without ${skippedNames.join(", ")} (skipped): ${formatCount(expectedOf(m), locale)}`
-            : undefined
-        }
-      >
-        {signed(d, locale)}
-        {skippedNames.length > 0 && <span aria-hidden>*</span>}
-      </span>
-    );
+  const skippedNote = (m: OverviewMember) => {
+    const names = m.skippedLists.map((id) => lists.find((l) => l.id === id)?.name).filter(Boolean);
+    return names.length
+      ? nl
+        ? `Overgeslagen op ${names.join(", ")}: vergeleken met ${formatCount(expectedOf(m), locale)} in plaats van het gemiddelde`
+        : `Skipped on ${names.join(", ")}: compared with ${formatCount(expectedOf(m), locale)} instead of the average`
+      : undefined;
   };
 
-  const sum = (pick: (m: OverviewMember) => number) => members.reduce((s, m) => s + pick(m), 0);
+  const row = (m: OverviewMember) => (
+    <tr
+      key={m.userId}
+      data-selected={m.userId === selectedId || undefined}
+      onClick={(event) => {
+        if ((event.target as Element).closest("a, button")) return;
+        setSelectedId(m.userId);
+      }}
+      className="cursor-pointer"
+    >
+      <td>
+        <button type="button" onClick={() => setSelectedId(m.userId)} className="text-left">
+          <span className="font-semibold text-vtk-ink">{m.name}</span>{" "}
+          <span className="text-xs text-vtk-muted">{m.posts.join(", ")}</span>
+        </button>
+      </td>
+      <td className="whitespace-nowrap text-vtk-muted tabular-nums">
+        {m.phone ?? <span className="text-xs">{nl ? "geen nummer" : "no number"}</span>}
+      </td>
+      <td className="text-right tabular-nums">
+        {formatCount(m.lists, locale)}
+        {m.skippedLists.length > 0 && (
+          <sup className="text-vtk-muted" title={skippedNote(m)}>
+            *
+          </sup>
+        )}
+      </td>
+      <td className="text-right tabular-nums">
+        {m.site ? `${m.siteNecessary} · ${m.siteVoluntary}` : <span className="text-vtk-muted">0</span>}
+      </td>
+      <td className="text-right font-semibold tabular-nums">{formatCount(m.total, locale)}</td>
+      <td className="text-right">
+        <DiffPill value={diffOf(m)} locale={locale} title={skippedNote(m)} />
+      </td>
+    </tr>
+  );
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
-          <Segmented
-            label={nl ? "Vergelijk" : "Compare"}
-            value={basis}
-            onChange={setBasis}
-            options={[
-              { value: "lists", label: nl ? "Shiftenlijsten" : "Shift lists" },
-              { value: "total", label: nl ? "Alles" : "Everything" },
-            ]}
-          />
-          <Segmented
-            label={nl ? "Toon" : "Show"}
-            value={filter}
-            onChange={setFilter}
-            options={[
-              { value: "all", label: nl ? "Iedereen" : "Everyone" },
-              { value: "below", label: nl ? "Onder gemiddeld" : "Below average" },
-              { value: "above", label: nl ? "Boven gemiddeld" : "Above average" },
-            ]}
-          />
-          {lists.length > 0 && (
-            <Segmented
-              label={nl ? "Weergave" : "View"}
-              value={view}
-              onChange={setView}
-              options={[
-                { value: "totals", label: nl ? "Totalen" : "Totals" },
-                { value: "perList", label: nl ? "Per lijst" : "Per list" },
-              ]}
-            />
-          )}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label={nl ? "Weergave" : "View"}>
+          {(
+            [
+              ["total", nl ? "Alles samen" : "Everything"],
+              ["lists", nl ? "Enkel lijsten" : "Lists only"],
+              ...(lists.length > 0 ? [["perList", nl ? "Per lijst" : "Per list"]] : []),
+            ] as [View, string][]
+          ).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              aria-pressed={view === key}
+              onClick={() => setView(key)}
+              className={`rounded-full border px-3.5 py-1.5 text-sm ${
+                view === key ? "border-vtk-ink bg-vtk-ink text-white" : "border-vtk-navy/20 text-vtk-ink hover:bg-vtk-blue-soft/60"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
         </div>
         <div className="flex items-center gap-2">
-          <Input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.currentTarget.value)}
-            placeholder={nl ? "Zoek op naam of post" : "Search name or post"}
-            className="h-9 w-56"
-            aria-label={nl ? "Zoek op naam of post" : "Search name or post"}
-          />
+          <label className="flex h-9 w-56 items-center gap-2 rounded-xl border border-vtk-navy/20 bg-[var(--paper)] px-3 text-sm text-vtk-muted">
+            <Search size={15} aria-hidden />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.currentTarget.value)}
+              placeholder={nl ? "Zoek naam of post" : "Search name or post"}
+              aria-label={nl ? "Zoek naam of post" : "Search name or post"}
+              className="min-w-0 flex-1 border-0! bg-transparent! p-0! text-vtk-ink shadow-none! outline-none!"
+            />
+          </label>
           <IconButton
             label={
-              withPhone.length
+              belowWithPhone.length
                 ? nl
-                  ? `Kopieer de nummers van wie je nu ziet (${withPhone.length})`
-                  : `Copy the numbers of who you see (${withPhone.length})`
+                  ? `Kopieer de nummers van wie onder het gemiddelde zit (${belowWithPhone.length})`
+                  : `Copy the numbers of who is below average (${belowWithPhone.length})`
                 : nl
-                  ? "Niemand hierboven heeft een nummer"
-                  : "Nobody shown has a number"
+                  ? "Niemand onder het gemiddelde heeft een nummer"
+                  : "Nobody below average has a number"
             }
-            onClick={copyPhones}
-            disabled={withPhone.length === 0}
+            onClick={copyBelow}
+            disabled={belowWithPhone.length === 0}
           >
             {copied ? <CheckIcon /> : <CopyIcon />}
           </IconButton>
         </div>
       </div>
 
-      <p className="text-sm text-vtk-body">
-        {nl ? "Gemiddeld per praesidiumlid: " : "Average per praesidium member: "}
-        <strong className="font-semibold tabular-nums">{formatCount(averages.lists, locale)}</strong>
-        {nl ? " op de shiftenlijsten, " : " on the shift lists, "}
-        <strong className="font-semibold tabular-nums">{formatCount(averages.total, locale)}</strong>
-        {nl ? " met de shiften op /shift erbij (waarvan " : " including the shifts on /shift (of which "}
-        <span className="tabular-nums">{formatCount(averages.siteNecessary, locale)}</span>
-        {nl ? " noodzakelijk)." : " necessary)."}
-        {filter !== "all" && (
-          <span className="text-vtk-muted">
-            {" "}
-            {nl ? `${rows.length} van de ${members.length} getoond.` : `${rows.length} of ${members.length} shown.`}
-          </span>
+      <p className="text-sm text-vtk-muted">
+        {view === "total" ? (
+          <>
+            {nl ? "Gemiddeld " : "On average "}
+            <strong className="font-semibold text-vtk-ink tabular-nums">{formatCount(averages.total, locale)}</strong>
+            {nl
+              ? ` shiften per lid: ${formatCount(averages.lists, locale)} op de lijsten en ${formatCount(averages.site, locale)} op /shift, waarvan ${formatCount(averages.siteNecessary, locale)} noodzakelijk.`
+              : ` shifts per member: ${formatCount(averages.lists, locale)} on the lists and ${formatCount(averages.site, locale)} on /shift, ${formatCount(averages.siteNecessary, locale)} of which necessary.`}
+          </>
+        ) : (
+          <>
+            {nl ? "Gemiddeld " : "On average "}
+            <strong className="font-semibold text-vtk-ink tabular-nums">{formatCount(averages.lists, locale)}</strong>
+            {nl ? " shiften per lid op de shiftenlijsten." : " shifts per member on the shift lists."}
+          </>
         )}
       </p>
 
-      {view === "totals" ? (
-        <>
-          <Legend nl={nl} />
-          <div className="relative overflow-x-auto rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated">
-            <table className="w-full min-w-[760px] text-sm">
-              <thead className="border-b border-vtk-blue/10 text-left text-xs text-vtk-muted">
-                <tr>
-                  <th className="px-4 py-2.5">{sortButton("name", nl ? "Naam" : "Name", "left")}</th>
-                  <th className="px-2 py-2.5 font-semibold">{nl ? "Telefoon" : "Phone"}</th>
-                  <th className="px-2 py-2.5 text-right!">{sortButton("lists", nl ? "Lijsten" : "Lists")}</th>
-                  <th className="px-2 py-2.5 text-right!">{sortButton("site", nl ? "Site" : "Site")}</th>
-                  <th className="px-2 py-2.5 text-right!">{sortButton("siteNecessary", nl ? "Nood." : "Nec.")}</th>
-                  <th className="px-2 py-2.5 text-right!">{sortButton("siteVoluntary", nl ? "Vrij" : "Vol.")}</th>
-                  <th className="px-2 py-2.5 text-right!">{sortButton("total", nl ? "Alles" : "All")}</th>
-                  <th className="px-2 py-2.5 text-right!">{sortButton("delta", nl ? "t.o.v. gem." : "vs avg.")}</th>
-                  <th className="w-36 px-4 py-2.5 font-semibold">
-                    <span className="sr-only">{nl ? "Verdeling" : "Distribution"}</span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((m) => (
-                  <tr
-                    key={m.userId}
-                    onClick={(event) => {
-                      if ((event.target as Element).closest("a, button")) return;
-                      setSelectedId(m.userId);
-                    }}
-                    className="cursor-pointer border-b border-vtk-blue/5 last:border-0 hover:bg-vtk-blue-soft/30"
-                  >
-                    <td className="px-4 py-2">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedId(m.userId)}
-                        className="text-left font-medium text-vtk-ink hover:underline"
-                      >
-                        {m.name}
-                      </button>
-                      <div className="text-xs text-vtk-muted">{m.posts.join(", ")}</div>
-                    </td>
-                    <td className="whitespace-nowrap px-2 py-2 text-vtk-body">
-                      {m.phone ? (
-                        <a href={`tel:${m.phone.replace(/\s/g, "")}`} className="tabular-nums hover:underline">
-                          {m.phone}
-                        </a>
-                      ) : (
-                        <span className="text-xs text-vtk-muted">{nl ? "geen nummer" : "no number"}</span>
-                      )}
-                      {m.phoneFromList && (
-                        <span className="ml-1 text-[11px] text-vtk-muted" title={nl ? "Uit het overzicht van een shiftenlijst; niet op het profiel." : "From a shift list overview; not on the profile."}>
-                          {nl ? "(lijst)" : "(list)"}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-2 py-2 text-right tabular-nums">{formatCount(m.lists, locale)}</td>
-                    <td className="px-2 py-2 text-right tabular-nums">{formatCount(m.site, locale)}</td>
-                    <td className="px-2 py-2 text-right tabular-nums text-vtk-body">{formatCount(m.siteNecessary, locale)}</td>
-                    <td className="px-2 py-2 text-right tabular-nums text-vtk-body">{formatCount(m.siteVoluntary, locale)}</td>
-                    <td className="px-2 py-2 text-right font-semibold tabular-nums">{formatCount(m.total, locale)}</td>
-                    <td className="px-2 py-2 text-right">{delta(m)}</td>
-                    <td className="px-4 py-2">
-                      <DistributionBar member={m} max={maxTotal} average={expectedOf(m)} nl={nl} />
-                    </td>
-                  </tr>
-                ))}
-                {rows.length === 0 && (
-                  <tr>
-                    <td colSpan={9} className="px-4 py-6 text-center text-sm text-vtk-muted">
-                      {nl ? "Niemand past bij deze filter." : "Nobody matches this filter."}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-              <tfoot className="border-t border-vtk-blue/10 text-xs text-vtk-muted">
-                <tr>
-                  <th scope="row" className="px-4 py-2 text-left font-semibold">
-                    {nl ? "Gemiddelde" : "Average"}
-                  </th>
-                  <td />
-                  <td className="px-2 py-2 text-right tabular-nums">{formatCount(averages.lists, locale)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{formatCount(averages.site, locale)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{formatCount(averages.siteNecessary, locale)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{formatCount(averages.siteVoluntary, locale)}</td>
-                  <td className="px-2 py-2 text-right tabular-nums">{formatCount(averages.total, locale)}</td>
-                  <td colSpan={2} />
-                </tr>
-                <tr>
-                  <th scope="row" className="px-4 pb-3 text-left font-semibold">
-                    {nl ? "Totaal" : "Total"}
-                  </th>
-                  <td />
-                  <td className="px-2 pb-3 text-right tabular-nums">{formatCount(sum((m) => m.lists), locale)}</td>
-                  <td className="px-2 pb-3 text-right tabular-nums">{formatCount(sum((m) => m.site), locale)}</td>
-                  <td className="px-2 pb-3 text-right tabular-nums">{formatCount(sum((m) => m.siteNecessary), locale)}</td>
-                  <td className="px-2 pb-3 text-right tabular-nums">{formatCount(sum((m) => m.siteVoluntary), locale)}</td>
-                  <td className="px-2 pb-3 text-right tabular-nums">{formatCount(sum((m) => m.total), locale)}</td>
-                  <td colSpan={2} />
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-          {members.some((m) => m.skippedLists.length > 0) && (
-            <p className="text-xs text-vtk-muted">
-              {nl
-                ? "* Overgeslagen op een lijst (bv. logistiek op 24UL): vergeleken met het gemiddelde zonder die lijst."
-                : "* Skipped on a list (e.g. logistics at 24UL): compared with the average without that list."}
-            </p>
-          )}
-        </>
-      ) : (
+      {view !== "perList" ? (
         <div className="relative overflow-x-auto rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated">
-          <table className="w-full text-sm">
-            <thead className="border-b border-vtk-blue/10 text-left text-xs text-vtk-muted">
+          <table className="vtk-psl-table w-full min-w-[680px]">
+            <thead>
               <tr>
-                <th className="sticky left-0 z-10 bg-vtk-surface-elevated px-4 py-2.5">{sortButton("name", nl ? "Naam" : "Name", "left")}</th>
-                {lists.map((list) => (
-                  <th key={list.id} className="px-2 py-2.5 text-right! font-semibold" title={list.name}>
-                    <span className="block max-w-28 truncate">{list.name}</span>
-                    {list.expectedPerMember !== null && (
-                      <span className="block font-normal">
-                        {nl ? "richtlijn " : "target "}
-                        {formatCount(list.expectedPerMember, locale)}
-                      </span>
-                    )}
-                  </th>
-                ))}
-                <th className="px-4 py-2.5 text-right!">{sortButton("lists", nl ? "Totaal" : "Total")}</th>
+                <th>{nl ? "Naam" : "Name"}</th>
+                <th>{nl ? "Telefoon" : "Phone"}</th>
+                <th className="vtk-psl-num">{nl ? "Lijsten" : "Lists"}</th>
+                <th className="vtk-psl-num" title={nl ? "Noodzakelijk · vrije wil" : "Necessary · voluntary"}>
+                  {nl ? "/shift nood · vrij" : "/shift nec. · vol."}
+                </th>
+                <th className="vtk-psl-num">{nl ? "Alles" : "All"}</th>
+                <th className="vtk-psl-num">{nl ? "Verschil" : "Difference"}</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map((m) => (
-                <tr key={m.userId} className="border-b border-vtk-blue/5 last:border-0">
-                  <td className="sticky left-0 z-10 bg-vtk-surface-elevated px-4 py-2">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedId(m.userId)}
-                      className="whitespace-nowrap text-left font-medium text-vtk-ink hover:underline"
-                    >
-                      {m.name}
-                    </button>
+              {below.length > 0 && (
+                <tr className="vtk-psl-group">
+                  <td colSpan={6}>
+                    {nl ? "Onder het gemiddelde" : "Below average"} · {below.length}
                   </td>
+                </tr>
+              )}
+              {below.map(row)}
+              {rest.length > 0 && (
+                <tr className="vtk-psl-group">
+                  <td colSpan={6}>
+                    {nl ? "Rond of boven het gemiddelde" : "Around or above average"} · {rest.length}
+                  </td>
+                </tr>
+              )}
+              {rest.map(row)}
+              {sorted.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="py-6 text-center text-sm text-vtk-muted">
+                    {nl ? `Niemand past bij "${query.trim()}".` : `Nobody matches "${query.trim()}".`}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="relative overflow-x-auto rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated">
+          <table className="vtk-psl-table w-full">
+            <thead>
+              <tr>
+                <th className="sticky left-0 z-10 bg-[var(--paper-2)]">{nl ? "Naam" : "Name"}</th>
+                {lists.map((list) => (
+                  <th key={list.id} className="vtk-psl-num" title={list.name}>
+                    <span className="block max-w-28 truncate">{list.name}</span>
+                    <span className="block font-medium normal-case tracking-normal">
+                      {list.expectedPerMember !== null
+                        ? `${nl ? "richtlijn" : "target"} ${formatCount(list.expectedPerMember, locale)}`
+                        : `${nl ? "gem." : "avg."} ${formatCount(list.average, locale)}`}
+                    </span>
+                  </th>
+                ))}
+                <th className="vtk-psl-num">{nl ? "Totaal" : "Total"}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((m) => (
+                <tr key={m.userId} className="cursor-pointer" onClick={() => setSelectedId(m.userId)}>
+                  <td className="sticky left-0 z-10 bg-vtk-surface-elevated whitespace-nowrap font-semibold">{m.name}</td>
                   {lists.map((list) => {
                     if (m.skippedLists.includes(list.id)) {
                       return (
-                        <td
-                          key={list.id}
-                          className="px-2 py-2 text-right text-xs text-vtk-muted"
-                          title={nl ? "Overgeslagen op deze lijst" : "Skipped on this list"}
-                        >
+                        <td key={list.id} className="text-right text-xs text-vtk-muted">
                           {nl ? "overgeslagen" : "skipped"}
                         </td>
                       );
@@ -494,45 +325,31 @@ export function MemberTable({
                     return (
                       <td
                         key={list.id}
-                        className={`px-2 py-2 text-right tabular-nums ${
-                          value === 0 ? "text-vtk-muted" : short ? "text-vtk-danger" : ""
-                        }`}
-                        title={
-                          short
-                            ? nl
-                              ? `${formatCount(list.expectedPerMember! - value, locale)} onder de richtlijn`
-                              : `${formatCount(list.expectedPerMember! - value, locale)} below the target`
-                            : undefined
-                        }
+                        className={`text-right tabular-nums ${value === 0 ? "text-vtk-muted" : ""} ${short ? "font-semibold text-vtk-danger" : ""}`}
                       >
                         {formatCount(value, locale)}
                         {short && <span className="sr-only">{nl ? " (onder de richtlijn)" : " (below target)"}</span>}
                       </td>
                     );
                   })}
-                  <td className="px-4 py-2 text-right font-semibold tabular-nums">{formatCount(m.lists, locale)}</td>
+                  <td className="text-right font-semibold tabular-nums">{formatCount(m.lists, locale)}</td>
                 </tr>
               ))}
             </tbody>
-            <tfoot className="border-t border-vtk-blue/10 text-xs text-vtk-muted">
-              <tr>
-                <th scope="row" className="sticky left-0 bg-vtk-surface-elevated px-4 py-2 text-left font-semibold">
-                  {nl ? "Gemiddelde" : "Average"}
-                </th>
-                {lists.map((list) => (
-                  <td key={list.id} className="px-2 py-2 text-right tabular-nums">
-                    {formatCount(list.average, locale)}
-                  </td>
-                ))}
-                <td className="px-4 py-2 text-right tabular-nums">{formatCount(averages.lists, locale)}</td>
-              </tr>
-            </tfoot>
           </table>
         </div>
       )}
 
+      {anySkipped && view !== "perList" && (
+        <p className="text-xs text-vtk-muted">
+          {nl
+            ? "* Overgeslagen op een lijst (bv. logistiek op 24UL): vergeleken met het gemiddelde zonder die lijst."
+            : "* Skipped on a list (e.g. logistics at 24UL): compared with the average without that list."}
+        </p>
+      )}
+
       {selected && (
-        <MemberDetail
+        <MemberDrawer
           locale={locale}
           member={selected}
           averages={averages}
@@ -544,7 +361,7 @@ export function MemberTable({
   );
 }
 
-function MemberDetail({
+function MemberDrawer({
   locale,
   member,
   averages,
@@ -558,142 +375,193 @@ function MemberDetail({
   onClose: () => void;
 }) {
   const nl = locale === "nl";
-  const listName = (id: string) => lists.find((l) => l.id === id)?.name ?? "";
-  const listIds = [...new Set(member.entries.map((e) => e.listId))];
-  const missing = lists.filter((l) => !(member.perList[l.id] > 0) && !member.skippedLists.includes(l.id));
+  const showToast = useToast();
+  const closeRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    closeRef.current?.focus();
+    function onKey(event: KeyboardEvent) {
+      if (event.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const shownLists = lists.filter(
+    (list) => (member.perList[list.id] ?? 0) > 0 || member.skippedLists.includes(list.id) || member.entries.some((e) => e.listId === list.id),
+  );
+  const missing = lists.filter((list) => !shownLists.includes(list));
+  const heading = "mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-vtk-muted";
 
   return (
-    <Modal title={member.name} onClose={onClose} size="lg">
-      <div className="space-y-5 text-sm">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-vtk-body">
-          <span>{member.posts.join(", ")}</span>
-          {member.phone ? (
-            <a href={`tel:${member.phone.replace(/\s/g, "")}`} className="font-medium tabular-nums text-vtk-ink hover:underline">
-              {member.phone}
-              {member.phoneFromList && <span className="ml-1 text-xs font-normal text-vtk-muted">{nl ? "(uit een shiftenlijst)" : "(from a shift list)"}</span>}
-            </a>
-          ) : (
-            <span className="text-vtk-muted">
-              {nl ? "Geen nummer op het profiel of in een shiftenlijst." : "No number on the profile or in a shift list."}
-            </span>
-          )}
+    <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true" aria-label={member.name}>
+      <div className="absolute inset-0 bg-vtk-ink/30" onClick={onClose} />
+      <div className="absolute inset-y-0 right-0 flex w-[460px] max-w-full flex-col overflow-y-auto bg-vtk-surface-elevated p-6 shadow-[-20px_0_40px_-20px_rgba(10,15,31,0.35)]">
+        <div className="flex justify-end">
+          <button
+            ref={closeRef}
+            type="button"
+            onClick={onClose}
+            aria-label={nl ? "Sluiten" : "Close"}
+            className="grid size-8 place-items-center rounded-full border border-vtk-navy/20 text-vtk-ink hover:bg-vtk-blue-soft/60"
+          >
+            <X size={16} aria-hidden />
+          </button>
         </div>
-
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {[
-            { label: nl ? "Shiftenlijsten" : "Shift lists", value: member.lists, avg: averages.lists },
-            { label: nl ? "Noodzakelijk op /shift" : "Necessary on /shift", value: member.siteNecessary, avg: averages.siteNecessary },
-            { label: nl ? "Vrije wil op /shift" : "Voluntary on /shift", value: member.siteVoluntary, avg: averages.siteVoluntary },
-            { label: nl ? "Alles" : "Everything", value: member.total, avg: averages.total },
-          ].map((item) => (
-            <div key={item.label} className="rounded-xl border border-vtk-blue/10 px-3 py-2">
-              <dt className="text-xs text-vtk-muted">{item.label}</dt>
-              <dd className="text-lg font-semibold tabular-nums">
-                {formatCount(item.value, locale)}
-                <span className="ml-1.5 text-xs font-normal text-vtk-muted">
-                  {nl ? "gem. " : "avg. "}
-                  {formatCount(item.avg, locale)}
-                </span>
-              </dd>
+        <div className="space-y-5">
+          <div className="flex items-center gap-3">
+            <div className="grid size-11 place-items-center rounded-full bg-[var(--paper-2)] text-sm font-bold text-vtk-navy">
+              {initials(member.name)}
             </div>
-          ))}
-        </dl>
+            <div>
+              <div className="text-lg font-bold tracking-tight">{member.name}</div>
+              <div className="text-xs text-vtk-muted">{member.posts.join(", ")}</div>
+            </div>
+          </div>
 
-        <section className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-vtk-muted">
-            {nl ? "Op de shiftenlijsten" : "On the shift lists"}
-          </h3>
-          {listIds.length === 0 && (
-            <p className="text-vtk-muted">{nl ? "Staat op geen enkele bevestigde shiftenlijst." : "Not on any confirmed shift list."}</p>
-          )}
-          {listIds.map((listId) => {
-            const list = lists.find((l) => l.id === listId);
-            const entries = member.entries.filter((e) => e.listId === listId);
-            const skipped = member.skippedLists.includes(listId);
-            const count = member.perList[listId] ?? 0;
-            return (
-              <div key={listId} className="rounded-xl border border-vtk-blue/10">
-                <div className="flex items-baseline justify-between gap-3 border-b border-vtk-blue/5 px-3 py-2">
-                  <span className="font-medium">
-                    {listName(listId)}
-                    {skipped && (
-                      <span className="ml-2 text-xs font-normal text-vtk-muted">
-                        {nl ? "overgeslagen: telt niet mee" : "skipped: does not count"}
-                      </span>
-                    )}
-                  </span>
-                  <span className="tabular-nums">
-                    <strong>{formatCount(count, locale)}</strong>
-                    {list?.expectedPerMember !== null && list?.expectedPerMember !== undefined && (
-                      <span className={`ml-1 text-xs ${count < list.expectedPerMember ? "text-vtk-danger" : "text-vtk-muted"}`}>
-                        / {formatCount(list.expectedPerMember, locale)}
-                      </span>
-                    )}
-                  </span>
-                </div>
-                <ul className={`divide-y divide-vtk-blue/5 ${skipped ? "opacity-60" : ""}`}>
-                  {entries.map((entry, i) => (
-                    <li key={i} className="grid grid-cols-[7rem_7rem_1fr_auto] gap-2 px-3 py-1.5 text-xs text-vtk-body max-sm:grid-cols-2">
-                      <span>{shortDate(entry.date, locale) || entry.sheet}</span>
-                      <span className="tabular-nums">{entry.slot ?? ""}</span>
-                      <span className="truncate" title={entry.role ?? ""}>
-                        {entry.role ?? ""}
-                        {entry.label !== member.name && <span className="text-vtk-muted"> · {entry.label}</span>}
-                      </span>
-                      <span className="text-right tabular-nums">{entry.weight !== 1 ? formatCount(entry.weight, locale) : ""}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            );
-          })}
-          {missing.length > 0 && listIds.length > 0 && (
-            <p className="text-xs text-vtk-muted">
-              {nl ? "Niet op: " : "Not on: "}
-              {missing.map((l) => l.name).join(", ")}
+          {member.phone ? (
+            <div className="flex items-center justify-between gap-2 rounded-xl bg-[var(--paper)] py-2 pl-3 pr-2">
+              <a href={`tel:${member.phone.replace(/\s/g, "")}`} className="text-base font-bold tabular-nums">
+                {member.phone}
+              </a>
+              <span className="flex items-center gap-2">
+                {member.phoneFromList && <span className="text-xs text-vtk-muted">{nl ? "uit een shiftenlijst" : "from a shift list"}</span>}
+                <IconButton
+                  label={nl ? "Nummer kopiëren" : "Copy number"}
+                  onClick={async () => {
+                    const ok = await copyText(member.phone ?? "");
+                    showToast(
+                      ok
+                        ? { message: nl ? "Nummer gekopieerd." : "Number copied.", variant: "success" }
+                        : { message: nl ? "Kopiëren lukte niet." : "Copy failed.", variant: "error", duration: 0 },
+                    );
+                  }}
+                >
+                  <CopyIcon />
+                </IconButton>
+              </span>
+            </div>
+          ) : (
+            <p className="text-sm text-vtk-muted">
+              {nl ? "Geen nummer op het profiel of in een shiftenlijst." : "No number on the profile or in a shift list."}
             </p>
           )}
-        </section>
 
-        <section className="space-y-2">
-          <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-vtk-muted">{nl ? "Op /shift" : "On /shift"}</h3>
-          {member.siteShifts.length === 0 ? (
-            <p className="text-vtk-muted">{nl ? "Geen shiften op /shift dit werkingsjaar." : "No shifts on /shift this working year."}</p>
-          ) : (
-            <ul className="divide-y divide-vtk-blue/5 rounded-xl border border-vtk-blue/10">
-              {member.siteShifts.map((shift) => (
-                <li key={shift.shiftId} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2">
-                  <div>
-                    <div className="font-medium">{shift.name}</div>
-                    <div className="text-xs text-vtk-muted">
-                      {shiftMoment(shift.startTime, locale)}
-                      {shift.post ? ` · ${shift.post}` : ""}
-                    </div>
-                  </div>
-                  <NecessityToggle shiftId={shift.shiftId} userIds={[member.userId]} necessary={shift.necessary} locale={locale} />
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+          <dl className="grid grid-cols-3 gap-3">
+            <div>
+              <dt className="text-xs text-vtk-muted">{nl ? "Shiftenlijsten" : "Shift lists"}</dt>
+              <dd className="text-xl font-semibold tabular-nums">{formatCount(member.lists, locale)}</dd>
+              <dd className="text-xs text-vtk-muted">
+                {nl ? "gem. " : "avg. "}
+                {formatCount(member.expectedLists, locale)}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-vtk-muted">{nl ? "Op /shift" : "On /shift"}</dt>
+              <dd className="text-xl font-semibold tabular-nums">{member.site}</dd>
+              <dd className="text-xs text-vtk-muted">
+                {member.siteNecessary} {nl ? "noodzakelijk" : "necessary"}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs text-vtk-muted">{nl ? "Verschil" : "Difference"}</dt>
+              <dd className="pt-1">
+                <DiffPill value={member.total - member.expectedTotal} locale={locale} />
+              </dd>
+              <dd className="text-xs text-vtk-muted">{nl ? "met alles samen" : "everything counted"}</dd>
+            </div>
+          </dl>
 
-        {member.weekly.length > 0 && (
-          <section className="space-y-2">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-vtk-muted">
-              {nl ? "Praesidiumshiften" : "Praesidium shifts"}
-            </h3>
-            <ul className="divide-y divide-vtk-blue/5 rounded-xl border border-vtk-blue/10">
-              {member.weekly.map((entry, i) => (
-                <li key={i} className="grid grid-cols-[7rem_1fr_auto] gap-2 px-3 py-1.5 text-xs text-vtk-body">
-                  <span>{shortDate(entry.date, locale)}</span>
-                  <span>{entry.role}</span>
-                  <span className="tabular-nums">{entry.slot ?? ""}</span>
-                </li>
-              ))}
-            </ul>
+          <section>
+            <h3 className={heading}>{nl ? "Per lijst" : "Per list"}</h3>
+            {shownLists.length === 0 && (
+              <p className="text-sm text-vtk-muted">{nl ? "Staat op geen enkele bevestigde lijst." : "Not on any confirmed list."}</p>
+            )}
+            {shownLists.map((list) => {
+              const skipped = member.skippedLists.includes(list.id);
+              const count = member.perList[list.id] ?? 0;
+              const entries = member.entries.filter((e) => e.listId === list.id);
+              const short = list.expectedPerMember !== null && count < list.expectedPerMember;
+              return (
+                <details key={list.id} className="group border-t border-[var(--rule-soft)] py-2">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm">
+                    <span>
+                      <span className="font-semibold">{list.name}</span>
+                      {skipped && (
+                        <span className="ml-2 rounded-full bg-[var(--paper-2)] px-2 py-0.5 text-[11px] font-semibold text-vtk-body">
+                          {nl ? "overgeslagen" : "skipped"}
+                        </span>
+                      )}
+                    </span>
+                    <span className="tabular-nums">
+                      {skipped ? (
+                        <span className="text-vtk-muted">{nl ? "telt niet" : "does not count"}</span>
+                      ) : (
+                        <>
+                          <strong>{formatCount(count, locale)}</strong>
+                          {list.expectedPerMember !== null && (
+                            <span className={`ml-1 text-xs ${short ? "text-vtk-danger" : "text-vtk-muted"}`}>
+                              / {formatCount(list.expectedPerMember, locale)}
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </span>
+                  </summary>
+                  <ul className={`mt-2 space-y-1 text-xs text-vtk-body ${skipped ? "opacity-60" : ""}`}>
+                    {entries.map((entry, i) => (
+                      <li key={i} className="grid grid-cols-[5.5rem_6.5rem_1fr] gap-2">
+                        <span>{shortDate(entry.date, locale) || entry.sheet}</span>
+                        <span className="tabular-nums">{entry.slot ?? ""}</span>
+                        <span className="truncate" title={entry.role ?? ""}>
+                          {entry.role ?? ""}
+                          {entry.label !== member.name && <span className="text-vtk-muted"> · {entry.label}</span>}
+                          {entry.weight !== 1 && <span className="text-vtk-muted"> · {formatCount(entry.weight, locale)}</span>}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              );
+            })}
+            {missing.length > 0 && (
+              <p className="border-t border-[var(--rule-soft)] pt-2 text-xs text-vtk-muted">
+                {nl ? "Niet op: " : "Not on: "}
+                {missing.map((l) => l.name).join(", ")}
+              </p>
+            )}
           </section>
-        )}
+
+          <section>
+            <h3 className={heading}>{nl ? "Op /shift" : "On /shift"}</h3>
+            {member.siteShifts.length === 0 ? (
+              <p className="text-sm text-vtk-muted">{nl ? "Geen shiften op /shift dit werkingsjaar." : "No shifts on /shift this working year."}</p>
+            ) : (
+              <ul>
+                {member.siteShifts.map((shift) => (
+                  <li key={shift.shiftId} className="flex items-center justify-between gap-2 border-t border-[var(--rule-soft)] py-2 text-sm">
+                    <span>
+                      {shift.name}{" "}
+                      <span className="text-xs text-vtk-muted">
+                        {shiftMoment(shift.startTime, locale)}
+                        {shift.post ? ` · ${shift.post}` : ""}
+                      </span>
+                    </span>
+                    <NecessityToggle shiftId={shift.shiftId} userIds={[member.userId]} necessary={shift.necessary} locale={locale} compact />
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <p className="text-xs text-vtk-muted">
+            {nl
+              ? `Praesidiumshiften: ${formatCount(member.weeklyPast, locale)} gedaan, ${formatCount(member.weeklyUpcoming, locale)} ingepland.`
+              : `Praesidium shifts: ${formatCount(member.weeklyPast, locale)} done, ${formatCount(member.weeklyUpcoming, locale)} planned.`}
+            {averages.weekly > 0 && (nl ? ` Gemiddeld ${formatCount(averages.weekly, locale)}.` : ` Average ${formatCount(averages.weekly, locale)}.`)}
+          </p>
+        </div>
       </div>
-    </Modal>
+    </div>
   );
 }

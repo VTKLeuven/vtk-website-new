@@ -2810,3 +2810,164 @@ a.vtk-shortcut-tile:hover {
     padding-left: 14px;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Shiftenoverzicht praesidium (/admin/shiftenoverzicht): het "rustige register".
+
+   Eén regel per praesidiumlid, gesplitst in "onder" en "rond of boven" het
+   gemiddelde, met het verschil als pil. De gewone beheertabel geeft elke cel
+   12px opvulling en zet hem bovenaan; voor tachtig mensen is dat te hoog, dus
+   deze tabel is een klasse zwaarder en compacter. Zie docs/design-decisions.md,
+   "Shiftenoverzicht praesidium".
+   --------------------------------------------------------------------------- */
+
+.vtk-admin-main .vtk-psl-table thead th {
+  padding: 10px 12px;
+}
+
+.vtk-admin-main .vtk-psl-table thead th.vtk-psl-num {
+  text-align: right;
+}
+
+.vtk-admin-main .vtk-psl-table tbody td {
+  padding: 8px 12px;
+  vertical-align: middle;
+  border-top: 1px solid var(--rule-soft);
+}
+
+.vtk-admin-main .vtk-psl-table tbody tr {
+  border-bottom: 0;
+}
+
+.vtk-admin-main .vtk-psl-table tbody tr.vtk-psl-group,
+.vtk-admin-main .vtk-psl-table tbody tr.vtk-psl-group:hover {
+  background: var(--paper);
+}
+
+.vtk-admin-main .vtk-psl-table tbody tr.vtk-psl-group td {
+  padding: 7px 12px;
+  border-top: 1px solid var(--line);
+  color: var(--body);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.vtk-admin-main .vtk-psl-table tbody tr[data-selected='true'] {
+  background: color-mix(in srgb, var(--yellow) 12%, var(--surface));
+}
+
+/* Het verschil met het gemiddelde: rood eronder, groen erboven, grijs rond. */
+.vtk-psl-diff {
+  display: inline-block;
+  min-width: 46px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 650;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  background: var(--paper-2);
+  color: var(--muted);
+}
+
+.vtk-psl-diff[data-tone='down'] {
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+}
+
+.vtk-psl-diff[data-tone='up'] {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+/* Een schakelaar in de vorm van de site: zwart aan, grijs uit. Het echte
+   vakje blijft een checkbox, zodat het formulier en een screenreader het
+   gewoon kennen. */
+.vtk-psl-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--body);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.vtk-psl-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+
+.vtk-psl-switch-track {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  flex: none;
+  border-radius: 999px;
+  background: var(--line-2);
+  transition: background 120ms ease;
+}
+
+.vtk-psl-switch-track::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--surface);
+  transition: transform 120ms ease;
+}
+
+.vtk-psl-switch input:checked + .vtk-psl-switch-track {
+  background: var(--ink);
+}
+
+.vtk-psl-switch input:checked + .vtk-psl-switch-track::after {
+  transform: translateX(12px);
+}
+
+.vtk-psl-switch input:focus-visible + .vtk-psl-switch-track {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* Tabbladen binnen één lijst: een lijn onder de actieve, geen pillen (die
+   zijn voor de twee hoofdtabbladen bovenaan de pagina). */
+.vtk-psl-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-psl-tabs a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: -1px;
+  padding: 9px 14px;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.vtk-psl-tabs a:hover {
+  color: var(--ink);
+}
+
+.vtk-psl-tabs a[aria-current='page'] {
+  border-bottom-color: var(--ink);
+  color: var(--ink);
+  font-weight: 600;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vtk-psl-switch-track,
+  .vtk-psl-switch-track::after {
+    transition: none;
+  }
+}

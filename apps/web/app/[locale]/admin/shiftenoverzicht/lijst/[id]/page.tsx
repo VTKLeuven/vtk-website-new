@@ -1,9 +1,7 @@
 import { notFound } from "next/navigation";
-import type { ReactNode } from "react";
 import type { Locale } from "@vtk/i18n";
 import { prisma } from "@vtk/db";
 import Link from "@/components/ui/Link";
-import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
@@ -20,7 +18,8 @@ import {
 } from "@/lib/praesidiumShifts/stats";
 import { deletePraesidiumShiftListAction } from "@/app/actions/praesidiumShifts";
 import { overviewErrorMessages } from "../../messages";
-import { NamesForm, type NameRowData } from "./NamesForm";
+import { NamesPanel, type NameRowData } from "./NamesForm";
+import { SkipPanel } from "./SkipPanel";
 import { ListSettingsForm } from "./ListSettingsForm";
 import { ListResult, type ListResultMember } from "./ListResult";
 import { ConfirmListForm, ReplaceFileForm } from "./ListFileActions";
@@ -30,24 +29,18 @@ function shortDay(date: Date | null, locale: Locale): string {
   return date.toLocaleDateString(locale === "nl" ? "nl-BE" : "en-GB", { weekday: "short", day: "numeric", month: "numeric", timeZone: "UTC" });
 }
 
-function Section({ title, aside, children }: { title: string; aside?: ReactNode; children: ReactNode }) {
-  return (
-    <section className="space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-3">
-        <h2 className="text-lg font-semibold">{title}</h2>
-        {aside}
-      </div>
-      {children}
-    </section>
-  );
-}
+type Tab = "namen" | "telt" | "stand" | "overslaan" | "bestand";
+const TABS: Tab[] = ["namen", "telt", "stand", "overslaan", "bestand"];
 
 export default async function PraesidiumShiftListPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ locale: string; id: string }>;
+  searchParams: Promise<{ tab?: string }>;
 }) {
   const { locale: localeParam, id } = await params;
+  const { tab: tabParam } = await searchParams;
   if (!hasLocale(localeParam)) notFound();
   const locale: Locale = localeParam;
   const nl = locale === "nl";
@@ -144,37 +137,20 @@ export default async function PraesidiumShiftListPage({
     list.expectedPerMember !== null ? countedMembers.filter((m) => m.count >= (list.expectedPerMember ?? 0)).length : null;
   const excludedCount = entries.filter((e) => e.excluded).length;
 
-  const settings = (
-    <ListSettingsForm
-      locale={locale}
-      detectedOpen={detectedOpen}
-      errorMessages={messages}
-      list={{
-        id: list.id,
-        kind: list.kind,
-        name: list.name,
-        eventDate: list.eventDate ? list.eventDate.toISOString().slice(0, 10) : null,
-        expectedPerMember: list.expectedPerMember,
-        countMode: list.countMode,
-        hoursPerShift: list.hoursPerShift,
-        openSlots: list.openSlots,
-        sheets: stats.sheets,
-        colors: stats.colors,
-      }}
-    />
-  );
-
-  const namesForm = (
-    <NamesForm
-      locale={locale}
-      listId={list.id}
-      draft={draft}
-      rows={nameRows}
-      roster={roster.map((m) => ({ userId: m.userId, name: m.name, posts: m.posts }))}
-      hiddenNames={hiddenNames}
-      errorMessages={messages}
-    />
-  );
+  const tab: Tab = TABS.includes(tabParam as Tab)
+    ? (tabParam as Tab)
+    : draft || unresolved > 0
+      ? "namen"
+      : "stand";
+  const tabUrl = (t: Tab) => `${base}/admin/shiftenoverzicht/lijst/${list.id}?tab=${t}`;
+  const countedSheets = stats.sheets.filter((s) => s.counted);
+  const tabLabels: Record<Tab, string> = {
+    namen: nl ? "Namen" : "Names",
+    telt: nl ? "Wat telt" : "What counts",
+    stand: nl ? "Stand" : "Standings",
+    overslaan: nl ? "Overslaan" : "Skip",
+    bestand: nl ? "Bestand" : "File",
+  };
 
   const facts: { label: string; value: string; hint?: string }[] = [
     { label: nl ? "Meetellende shiften" : "Counted shifts", value: formatCount(summary.counted, locale) },
@@ -184,16 +160,6 @@ export default async function PraesidiumShiftListPage({
       value: formatCount(summary.others, locale),
       hint: nl ? "werkgroepen, andere kringen" : "werkgroepen, other associations",
     },
-    { label: nl ? "Zonder keuze" : "Without a choice", value: formatCount(summary.unresolvedShifts, locale) },
-    ...(summary.skipped > 0 || skippedUsers.size > 0
-      ? [
-          {
-            label: nl ? "Overgeslagen" : "Skipped",
-            value: formatCount(summary.skipped, locale),
-            hint: nl ? `${skippedUsers.size} ${skippedUsers.size === 1 ? "lid" : "leden"}` : `${skippedUsers.size} members`,
-          },
-        ]
-      : []),
     { label: nl ? "Gemiddeld per lid" : "Average per member", value: formatCount(average, locale) },
   ];
   if (list.kind === "EVENT") {
@@ -203,160 +169,205 @@ export default async function PraesidiumShiftListPage({
     });
     facts.push({ label: nl ? "Nog open voor VTK" : "Still open for VTK", value: openSlots !== null ? String(openSlots) : "?" });
   }
+  if (summary.unresolvedShifts > 0) {
+    facts.push({ label: nl ? "Zonder keuze" : "Without a choice", value: formatCount(summary.unresolvedShifts, locale) });
+  }
+  if (summary.skipped > 0) {
+    facts.push({
+      label: nl ? "Overgeslagen" : "Skipped",
+      value: formatCount(summary.skipped, locale),
+      hint: nl ? `${skippedUsers.size} ${skippedUsers.size === 1 ? "lid" : "leden"}` : `${skippedUsers.size} members`,
+    });
+  }
 
-  const result = (
-    <Section title={nl ? "Resultaat" : "Result"}>
-      <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-[18px] border border-vtk-blue/10 bg-vtk-blue/10 sm:grid-cols-4 lg:grid-cols-4">
-        {facts.map((fact) => (
-          <div key={fact.label} className="bg-vtk-surface-elevated px-3 py-2.5">
-            <dt className="text-xs text-vtk-muted">{fact.label}</dt>
-            <dd className="text-lg font-semibold tabular-nums">{fact.value}</dd>
-            {fact.hint && <dd className="text-[11px] text-vtk-muted">{fact.hint}</dd>}
-          </div>
-        ))}
-      </dl>
-      {excludedCount > 0 && (
-        <p className="text-xs text-vtk-muted">
-          {nl
-            ? `${excludedCount} ${excludedCount === 1 ? "vakje telt" : "vakjes tellen"} niet mee omdat de lijst er zelf "telt niet mee" naast zet.`
-            : `${excludedCount} cells do not count because the list itself marks them "does not count".`}
-        </p>
-      )}
-      {roster.length > 0 ? (
-        <ListResult
-          locale={locale}
-          listId={list.id}
-          members={resultMembers}
-          expected={list.expectedPerMember}
-          average={average}
-          posts={posts.map((p) => ({ id: p.id, name: nl ? p.nameNl : p.nameEn, members: p._count.memberships }))}
-          errorMessages={messages}
-        />
-      ) : (
-        <p className="text-sm text-vtk-muted">
-          {nl
-            ? `Er staat in ${formatWorkingYear(list.year)} niemand in een praesidiumpost, dus er is niemand om te tellen.`
-            : `Nobody holds a praesidium post in ${formatWorkingYear(list.year)}, so there is nobody to count.`}
-        </p>
-      )}
-    </Section>
-  );
-
-  const fileBlock = (
-    <ReplaceFileForm locale={locale} listId={list.id} fileName={list.fileName} errorMessages={messages} />
-  );
+  const statusChip = draft
+    ? { text: nl ? "Concept" : "Draft", tone: "bg-[var(--low-bg)] text-[var(--low-ink)]" }
+    : unresolved > 0
+      ? { text: nl ? `${unresolved} ${unresolved === 1 ? "naam" : "namen"} open` : `${unresolved} open`, tone: "bg-[var(--low-bg)] text-[var(--low-ink)]" }
+      : { text: nl ? "Bevestigd" : "Confirmed", tone: "bg-[var(--paper-2)] text-vtk-body" };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <div className="space-y-2">
         <Link href={tabHref} className="text-sm text-vtk-muted hover:text-vtk-ink">
-          {"← "}
+          {"\u2190 "}
           {list.kind === "WEEKLY" ? (nl ? "Praesidiumshiften" : "Praesidium shifts") : nl ? "Shiftenlijsten" : "Shift lists"}
         </Link>
-        <h1 className="text-2xl font-semibold">{list.name}</h1>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-[28px] font-bold tracking-tight">{list.name}</h1>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusChip.tone}`}>{statusChip.text}</span>
+          </div>
+          {draft ? (
+            <div className="flex flex-wrap items-center gap-3">
+              {unresolved > 0 && (
+                <span className="text-xs text-vtk-muted">
+                  {nl ? `nog ${unresolved} ${unresolved === 1 ? "naam" : "namen"}` : `${unresolved} names left`}
+                </span>
+              )}
+              <ConfirmListForm locale={locale} listId={list.id} unresolved={unresolved} errorMessages={messages} />
+            </div>
+          ) : (
+            <Link
+              href={tabUrl("bestand")}
+              className="rounded-full border border-vtk-navy/20 px-4 py-2 text-sm font-semibold text-vtk-ink hover:bg-vtk-blue-soft/60"
+            >
+              {nl ? "Nieuwe versie opladen" : "Upload a new version"}
+            </Link>
+          )}
+        </div>
         <p className="text-sm text-vtk-muted">
           {[
-            list.kind === "WEEKLY" ? (nl ? "Rooster praesidiumshiften" : "Praesidium shift schedule") : nl ? "Shiftenlijst" : "Shift list",
             list.eventDate
               ? list.eventDate.toLocaleDateString(nl ? "nl-BE" : "en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" })
               : null,
+            nl
+              ? `${formatCount(summary.counted, locale)} shiften gelezen op ${countedSheets.length} ${countedSheets.length === 1 ? "tabblad" : "tabbladen"}`
+              : `${formatCount(summary.counted, "en")} shifts read on ${countedSheets.length} tabs`,
+            list.expectedPerMember !== null
+              ? nl
+                ? `richtlijn ${formatCount(list.expectedPerMember, locale)} per lid`
+                : `target ${formatCount(list.expectedPerMember, "en")} per member`
+              : null,
             `${nl ? "werkingsjaar" : "working year"} ${formatWorkingYear(list.year)}`,
-            list.fileName,
-            list.uploadedBy ? `${nl ? "opgeladen door" : "uploaded by"} ${list.uploadedBy.name}` : null,
           ]
             .filter(Boolean)
-            .join(" · ")}
+            .join(" \u00b7 ")}
         </p>
+        {draft && (
+          <p className="text-sm text-vtk-body">
+            {nl
+              ? "Deze lijst telt pas mee nadat je ze bevestigt. Kijk na wie elke naam is en wat er meetelt."
+              : "This list only counts after you confirm it. Check who every name is and what counts."}
+          </p>
+        )}
       </div>
 
-      {draft && (
-        <div className="space-y-3 rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated p-5 shadow-[inset_3px_0_0_var(--color-vtk-yellow)]">
-          <p className="text-sm text-vtk-body">
-            <strong className="font-semibold text-vtk-ink">{nl ? "Nog niet bevestigd." : "Not confirmed yet."}</strong>{" "}
-            {nl
-              ? "Deze lijst telt pas mee in het overzicht nadat je ze bevestigt. Kijk eerst na welke tabbladen en kleuren meetellen, en wie elke naam is."
-              : "This list only counts in the overview after you confirm it. First check which tabs and colours count, and who every name is."}
-            {unresolved > 0 &&
-              (nl
-                ? ` ${unresolved} ${unresolved === 1 ? "naam wacht" : "namen wachten"} op een keuze.`
-                : ` ${unresolved} names wait for a choice.`)}
-          </p>
-          <ConfirmListForm locale={locale} listId={list.id} unresolved={unresolved} errorMessages={messages} />
+      <nav className="vtk-psl-tabs" aria-label={nl ? "Onderdelen van de lijst" : "List sections"}>
+        {TABS.map((t) => (
+          <Link key={t} href={tabUrl(t)} aria-current={t === tab ? "page" : undefined}>
+            {tabLabels[t]}
+            {t === "namen" && unresolved > 0 && (
+              <span className="rounded-full bg-[var(--low-bg)] px-1.5 text-[11px] font-semibold text-[var(--low-ink)]">{unresolved}</span>
+            )}
+            {t === "overslaan" && skippedUsers.size > 0 && (
+              <span className="rounded-full bg-[var(--paper-2)] px-1.5 text-[11px] font-semibold text-vtk-body">{skippedUsers.size}</span>
+            )}
+          </Link>
+        ))}
+      </nav>
+
+      {tab === "namen" && (
+        <NamesPanel
+          locale={locale}
+          listId={list.id}
+          rows={nameRows}
+          roster={roster.map((m) => ({ userId: m.userId, name: m.name, posts: m.posts }))}
+          hiddenNames={hiddenNames}
+          errorMessages={messages}
+        />
+      )}
+
+      {tab === "telt" && (
+        <section className="rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated p-5">
+          <ListSettingsForm
+            locale={locale}
+            detectedOpen={detectedOpen}
+            errorMessages={messages}
+            list={{
+              id: list.id,
+              kind: list.kind,
+              name: list.name,
+              eventDate: list.eventDate ? list.eventDate.toISOString().slice(0, 10) : null,
+              expectedPerMember: list.expectedPerMember,
+              countMode: list.countMode,
+              hoursPerShift: list.hoursPerShift,
+              openSlots: list.openSlots,
+              sheets: stats.sheets,
+              colors: stats.colors,
+            }}
+          />
+        </section>
+      )}
+
+      {tab === "stand" && (
+        <div className="space-y-3">
+          <dl className="grid grid-cols-2 gap-px overflow-hidden rounded-[18px] border border-vtk-blue/10 bg-vtk-blue/10 sm:grid-cols-3 lg:grid-cols-4">
+            {facts.map((fact) => (
+              <div key={fact.label} className="bg-vtk-surface-elevated px-4 py-3">
+                <dt className="text-xs text-vtk-muted">{fact.label}</dt>
+                <dd className="text-xl font-semibold tabular-nums">{fact.value}</dd>
+                {fact.hint && <dd className="text-[11px] text-vtk-muted">{fact.hint}</dd>}
+              </div>
+            ))}
+          </dl>
+          {excludedCount > 0 && (
+            <p className="text-xs text-vtk-muted">
+              {nl
+                ? `${excludedCount} ${excludedCount === 1 ? "vakje telt" : "vakjes tellen"} niet mee omdat de lijst er zelf "telt niet mee" naast zet.`
+                : `${excludedCount} cells do not count because the list itself marks them "does not count".`}
+            </p>
+          )}
+          {roster.length > 0 ? (
+            <ListResult
+              locale={locale}
+              members={resultMembers}
+              expected={list.expectedPerMember}
+              average={average}
+              skipHref={tabUrl("overslaan")}
+            />
+          ) : (
+            <p className="text-sm text-vtk-muted">
+              {nl
+                ? `Er staat in ${formatWorkingYear(list.year)} niemand in een praesidiumpost, dus er is niemand om te tellen.`
+                : `Nobody holds a praesidium post in ${formatWorkingYear(list.year)}, so there is nobody to count.`}
+            </p>
+          )}
         </div>
       )}
 
-      {draft ? (
-        <>
-          <Section title={nl ? "Wat telt er" : "What counts"}>{settings}</Section>
-          <Section title={nl ? "Namen" : "Names"}>{namesForm}</Section>
-          {result}
-          <Section title={nl ? "Bestand" : "File"}>{fileBlock}</Section>
-        </>
-      ) : (
-        <>
-          {result}
-          <Section title={nl ? "Namen" : "Names"}>{namesForm}</Section>
-          <AdminDisclosure
-            summary={
-              <span>
-                <span className="block font-semibold text-vtk-ink">{nl ? "Wat telt er" : "What counts"}</span>
-                <span className="block text-sm text-vtk-muted">
-                  {[
-                    `${stats.sheets.filter((s) => s.counted).length}/${stats.sheets.filter((s) => s.kind === "SHIFTS" || s.kind === "SCHEDULE").length} ${nl ? "tabbladen" : "tabs"}`,
-                    list.kind === "EVENT" && stats.colors.length > 1
-                      ? `${stats.colors.filter((c) => c.counted).length}/${stats.colors.length} ${nl ? "kleuren" : "colours"}`
-                      : null,
-                    list.kind === "EVENT"
-                      ? list.countMode === "BY_DURATION"
-                        ? nl
-                          ? `naar duur, ${formatCount(list.hoursPerShift, locale)} uur per shift`
-                          : `by duration, ${formatCount(list.hoursPerShift, locale)} hours per shift`
-                        : nl
-                          ? "elke naam is één shift"
-                          : "every name is one shift"
-                      : null,
-                    list.expectedPerMember !== null
-                      ? `${nl ? "richtlijn" : "target"} ${formatCount(list.expectedPerMember, locale)}`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" · ")}
-                </span>
-              </span>
-            }
-          >
-            {settings}
-          </AdminDisclosure>
-          <AdminDisclosure
-            summary={
-              <span>
-                <span className="block font-semibold text-vtk-ink">{nl ? "Nieuwe versie opladen" : "Upload a new version"}</span>
-                <span className="block text-sm text-vtk-muted">{list.fileName}</span>
-              </span>
-            }
-          >
-            {fileBlock}
-          </AdminDisclosure>
-        </>
+      {tab === "overslaan" && (
+        <SkipPanel
+          locale={locale}
+          listId={list.id}
+          members={resultMembers}
+          posts={posts.map((p) => ({ id: p.id, name: nl ? p.nameNl : p.nameEn, members: p._count.memberships }))}
+          errorMessages={messages}
+        />
       )}
 
-      <div className="border-t border-vtk-blue/10 pt-5">
-        <DeleteButton
-          action={deletePraesidiumShiftListAction}
-          fields={{ listId: list.id, locale }}
-          title={nl ? `${list.name} verwijderen?` : `Delete ${list.name}?`}
-          description={
-            nl
-              ? `De lijst en haar ${entries.length} ingelezen vakjes verdwijnen uit het overzicht; wie erop stond, verliest die shiften in de telling. De bijnamen die je hier onthield, blijven bestaan, net als de shiften op /shift en de andere lijsten.`
-              : `The list and its ${entries.length} cells disappear from the overview; whoever was on it loses those shifts in the count. Nicknames you remembered here stay, as do the shifts on /shift and the other lists.`
-          }
-          confirmLabel={nl ? "Verwijderen" : "Delete"}
-          cancelLabel={nl ? "Annuleren" : "Cancel"}
-          errorMessages={messages}
-        >
-          {nl ? "Lijst verwijderen" : "Delete list"}
-        </DeleteButton>
-      </div>
+      {tab === "bestand" && (
+        <div className="space-y-4">
+          <section className="rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated p-5">
+            <ReplaceFileForm locale={locale} listId={list.id} fileName={list.fileName} errorMessages={messages} />
+          </section>
+          <section className="flex flex-wrap items-center justify-between gap-3 rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated p-5">
+            <p className="text-sm text-vtk-muted">
+              {[
+                list.uploadedBy ? `${nl ? "Opgeladen door" : "Uploaded by"} ${list.uploadedBy.name}` : null,
+                list.createdAt.toLocaleDateString(nl ? "nl-BE" : "en-GB", { day: "numeric", month: "long", year: "numeric" }),
+              ]
+                .filter(Boolean)
+                .join(", ")}
+            </p>
+            <DeleteButton
+              action={deletePraesidiumShiftListAction}
+              fields={{ listId: list.id, locale }}
+              title={nl ? `${list.name} verwijderen?` : `Delete ${list.name}?`}
+              description={
+                nl
+                  ? `De lijst en haar ${entries.length} ingelezen vakjes verdwijnen uit het overzicht; wie erop stond, verliest die shiften in de telling. De bijnamen die je hier onthield, blijven bestaan, net als de shiften op /shift en de andere lijsten.`
+                  : `The list and its ${entries.length} cells disappear from the overview; whoever was on it loses those shifts in the count. Nicknames you remembered here stay, as do the shifts on /shift and the other lists.`
+              }
+              confirmLabel={nl ? "Verwijderen" : "Delete"}
+              cancelLabel={nl ? "Annuleren" : "Cancel"}
+              errorMessages={messages}
+            >
+              {nl ? "Lijst verwijderen" : "Delete list"}
+            </DeleteButton>
+          </section>
+        </div>
+      )}
     </div>
   );
 }

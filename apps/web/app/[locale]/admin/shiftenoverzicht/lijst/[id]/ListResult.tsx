@@ -4,8 +4,8 @@ import { useState } from "react";
 import { CheckIcon, CopyIcon } from "@/components/ui/icons";
 import { IconButton } from "@/components/ui/IconButton";
 import { useToast } from "@/components/ui/toast";
+import Link from "@/components/ui/Link";
 import { formatCount } from "@/lib/praesidiumShifts/stats";
-import { SkipPostForm, SkipToggle } from "./SkipControls";
 
 export type ListResultMember = {
   userId: string;
@@ -26,21 +26,17 @@ export type ListResultMember = {
  */
 export function ListResult({
   locale,
-  listId,
   members: allMembers,
   expected,
   average,
-  posts,
-  errorMessages,
+  skipHref,
 }: {
   locale: "nl" | "en";
-  listId: string;
   members: ListResultMember[];
   expected: number | null;
   average: number;
-  /** Posten van dit werkingsjaar, om in één keer over te slaan. */
-  posts: { id: string; name: string; members: number }[];
-  errorMessages: Record<string, string>;
+  /** Het tabblad "Overslaan" van deze lijst. */
+  skipHref: string;
 }) {
   const members = allMembers.filter((m) => !m.skipped);
   const skippedMembers = allMembers.filter((m) => m.skipped);
@@ -83,8 +79,14 @@ export function ListResult({
               ? `Enkel wie onder het gemiddelde van ${formatCount(average, locale)} zit (${below.length})`
               : `Only who is below the average of ${formatCount(average, locale)} (${below.length})`}
         </label>
-        <div className="flex flex-wrap items-center gap-2">
-          <SkipPostForm locale={locale} listId={listId} posts={posts} errorMessages={errorMessages} />
+        <div className="flex flex-wrap items-center gap-3">
+          {skippedMembers.length > 0 && (
+            <Link href={skipHref} className="text-xs text-vtk-muted underline decoration-vtk-navy/25 underline-offset-4 hover:text-vtk-ink">
+              {nl
+                ? `${skippedMembers.length} overgeslagen${skippedMembers[0]?.skipReason ? ` (${[...new Set(skippedMembers.map((m) => m.skipReason).filter(Boolean))].join(", ")})` : ""}`
+                : `${skippedMembers.length} skipped`}
+            </Link>
+          )}
         <IconButton
           label={
             withPhone.length
@@ -103,57 +105,52 @@ export function ListResult({
         </div>
       </div>
       <div className="relative overflow-x-auto rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated">
-        <table className="w-full min-w-[620px] text-sm">
-          <thead className="border-b border-vtk-blue/10 text-left text-xs font-semibold text-vtk-muted">
+        <table className="vtk-psl-table w-full min-w-[640px]">
+          <thead>
             <tr>
-              <th className="px-4 py-2.5">{nl ? "Naam" : "Name"}</th>
-              <th className="px-2 py-2.5">{nl ? "Telefoon" : "Phone"}</th>
-              <th className="px-2 py-2.5 text-right!">{nl ? "Shiften" : "Shifts"}</th>
-              <th className="px-2 py-2.5 text-right!">{expected !== null ? (nl ? "t.o.v. richtlijn" : "vs target") : nl ? "t.o.v. gem." : "vs avg."}</th>
-              <th className="px-2 py-2.5">{nl ? "Wanneer" : "When"}</th>
-              <th className="px-4 py-2.5">
-                <span className="sr-only">{nl ? "Acties" : "Actions"}</span>
-              </th>
+              <th>{nl ? "Naam" : "Name"}</th>
+              <th>{nl ? "Telefoon" : "Phone"}</th>
+              <th className="vtk-psl-num">{nl ? "Shiften" : "Shifts"}</th>
+              <th className="vtk-psl-num">{expected !== null ? (nl ? "t.o.v. richtlijn" : "vs target") : nl ? "t.o.v. gem." : "vs avg."}</th>
+              <th>{nl ? "Wanneer" : "When"}</th>
             </tr>
           </thead>
           <tbody>
             {rows.map((m) => {
-              const diff = m.count - target;
+              const diff = Math.round((m.count - target) * 10) / 10;
+              const tone = diff <= -1 ? "down" : diff >= 1 || (expected !== null && diff >= 0) ? "up" : "even";
               return (
-                <tr key={m.userId} className="border-b border-vtk-blue/5 last:border-0 align-top">
-                  <td className="px-4 py-2">
-                    <div className="font-medium">{m.name}</div>
-                    <div className="text-xs text-vtk-muted">{m.posts.join(", ")}</div>
+                <tr key={m.userId}>
+                  <td>
+                    <span className="font-semibold text-vtk-ink">{m.name}</span>{" "}
+                    <span className="text-xs text-vtk-muted">{m.posts.join(", ")}</span>
                   </td>
-                  <td className="whitespace-nowrap px-2 py-2">
+                  <td className="whitespace-nowrap text-vtk-muted tabular-nums">
                     {m.phone ? (
-                      <a href={`tel:${m.phone.replace(/\s/g, "")}`} className="tabular-nums hover:underline">
+                      <a href={`tel:${m.phone.replace(/\s/g, "")}`} className="hover:underline">
                         {m.phone}
                       </a>
                     ) : (
-                      <span className="text-xs text-vtk-muted">{nl ? "geen nummer" : "no number"}</span>
+                      <span className="text-xs">{nl ? "geen nummer" : "no number"}</span>
                     )}
                   </td>
-                  <td className="px-2 py-2 text-right font-semibold tabular-nums">{formatCount(m.count, locale)}</td>
-                  <td
-                    className={`px-2 py-2 text-right tabular-nums ${
-                      diff <= -1 ? "text-vtk-danger" : diff >= 0 && expected !== null ? "text-[var(--ok-ink)]" : "text-vtk-muted"
-                    }`}
-                  >
-                    {Math.abs(diff) < 0.05
-                      ? "0"
-                      : `${diff > 0 ? "+" : "−"}${formatCount(Math.abs(Math.round(diff * 10) / 10), locale)}`}
+                  <td className="text-right font-semibold tabular-nums">{formatCount(m.count, locale)}</td>
+                  <td className="text-right">
+                    <span className="vtk-psl-diff" data-tone={tone}>
+                      {Math.abs(diff) < 0.05 ? "0" : `${diff > 0 ? "+" : "\u2212"}${formatCount(Math.abs(diff), locale)}`}
+                    </span>
                   </td>
-                  <td className="px-2 py-2 text-xs text-vtk-body">{m.slots.join(", ")}</td>
-                  <td className="px-4 py-2 text-right">
-                    <SkipToggle locale={locale} listId={listId} userId={m.userId} name={m.name} skipped={false} />
+                  <td className="max-w-[16rem] text-xs text-vtk-body">
+                    <span className="line-clamp-2" title={m.slots.join(", ")}>
+                      {m.slots.join(", ")}
+                    </span>
                   </td>
                 </tr>
               );
             })}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-6 text-center text-sm text-vtk-muted">
+                <td colSpan={5} className="py-6 text-center text-sm text-vtk-muted">
                   {nl ? "Iedereen haalt het." : "Everyone made it."}
                 </td>
               </tr>
@@ -161,34 +158,6 @@ export function ListResult({
           </tbody>
         </table>
       </div>
-      {skippedMembers.length > 0 && (
-        <section className="rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated">
-          <h3 className="px-4 pt-3 text-sm font-semibold">
-            {nl ? "Overgeslagen op deze lijst" : "Skipped on this list"}{" "}
-            <span className="font-normal text-vtk-muted">({skippedMembers.length})</span>
-          </h3>
-          <p className="px-4 pb-2 text-xs text-vtk-muted">
-            {nl
-              ? "Hun vakjes tellen niet, en ze staan niet in het gemiddelde, de richtlijn of de bellijst van deze lijst. In het overzicht worden ze vergeleken zonder deze lijst."
-              : "Their cells do not count, and they are left out of this list's average, target and call list. In the overview they are compared without this list."}
-          </p>
-          <ul>
-            {skippedMembers.map((m) => (
-              <li key={m.userId} className="flex flex-wrap items-center justify-between gap-3 border-t border-vtk-blue/5 px-4 py-2 text-sm">
-                <span>
-                  <span className="font-medium">{m.name}</span>
-                  <span className="ml-2 text-xs text-vtk-muted">
-                    {[m.skipReason, m.count > 0 ? (nl ? `${formatCount(m.count, locale)} shiften tellen niet` : `${formatCount(m.count, locale)} shifts not counted`) : null]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </span>
-                </span>
-                <SkipToggle locale={locale} listId={listId} userId={m.userId} name={m.name} skipped />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
     </div>
   );
 }

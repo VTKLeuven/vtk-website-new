@@ -97,7 +97,7 @@ export function SiteShiftTable({ locale, rows }: { locale: "nl" | "en"; rows: Si
       </div>
 
       <div className="relative overflow-x-auto rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated">
-        <table className="w-full min-w-[720px] text-sm">
+        <table className="vtk-psl-table w-full min-w-[720px] text-sm">
           <thead className="border-b border-vtk-blue/10 text-left text-xs font-semibold text-vtk-muted">
             <tr>
               <th className="px-4 py-2.5">{nl ? "Wanneer" : "When"}</th>

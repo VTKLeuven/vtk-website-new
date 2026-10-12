@@ -78,15 +78,15 @@ export function WeeklyTable({ locale, members, average }: { locale: "nl" | "en";
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="inline-flex rounded-full border border-vtk-blue/15 bg-white p-0.5" role="group" aria-label={nl ? "Toon" : "Show"}>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label={nl ? "Toon" : "Show"}>
           {filters.map((f) => (
             <button
               key={f.value}
               type="button"
               aria-pressed={filter === f.value}
               onClick={() => setFilter(f.value)}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
-                filter === f.value ? "bg-vtk-ink text-white" : "text-vtk-ink hover:bg-vtk-blue-soft/60"
+              className={`rounded-full border px-3.5 py-1.5 text-sm ${
+                filter === f.value ? "border-vtk-ink bg-vtk-ink text-white" : "border-vtk-navy/20 text-vtk-ink hover:bg-vtk-blue-soft/60"
               }`}
             >
               {f.label}
@@ -110,7 +110,7 @@ export function WeeklyTable({ locale, members, average }: { locale: "nl" | "en";
         </IconButton>
       </div>
       <div className="relative overflow-x-auto rounded-[18px] border border-vtk-blue/10 bg-vtk-surface-elevated">
-        <table className="w-full min-w-[680px] text-sm">
+        <table className="vtk-psl-table w-full min-w-[680px] text-sm">
           <thead className="border-b border-vtk-blue/10 text-left text-xs font-semibold text-vtk-muted">
             <tr>
               <th className="px-4 py-2.5">{nl ? "Naam" : "Name"}</th>
@@ -129,9 +129,9 @@ export function WeeklyTable({ locale, members, average }: { locale: "nl" | "en";
                 .join("\n");
               return (
                 <tr key={m.userId} className="border-b border-vtk-blue/5 last:border-0">
-                  <td className="px-4 py-2">
-                    <div className="font-medium">{m.name}</div>
-                    <div className="text-xs text-vtk-muted">{m.posts.join(", ")}</div>
+                  <td>
+                    <span className="font-semibold text-vtk-ink">{m.name}</span>{" "}
+                    <span className="text-xs text-vtk-muted">{m.posts.join(", ")}</span>
                   </td>
                   <td className="whitespace-nowrap px-2 py-2">
                     {m.phone ? (
