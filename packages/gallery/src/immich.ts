@@ -1,4 +1,5 @@
 import { immichConfig } from './config';
+import type { ImmichAsset, ImmichSearchResponse } from './types';
 
 /** Fout van de Immich-laag, met de HTTP-status die de route moet teruggeven. */
 export class GalleryError extends Error {
@@ -186,6 +187,52 @@ export async function downloadImmichOriginal(assetId: string): Promise<Response>
 export async function deleteImmichAssets(assetIds: string[], { force = true } = {}): Promise<unknown> {
   if (assetIds.length === 0) return null;
   return immichJson<unknown>('/assets', { method: 'DELETE', body: { ids: assetIds, force } });
+}
+
+/**
+ * Haalt assets terug uit de prullenmand van Immich. Ze staan daarna weer in de
+ * albums waar ze in zaten: Immich houdt dat lidmaatschap bij terwijl een asset
+ * in de prullenmand ligt.
+ */
+export async function restoreImmichAssets(assetIds: string[]): Promise<void> {
+  if (assetIds.length === 0) return;
+  await immichJson<unknown>('/trash/restore/assets', { method: 'POST', body: { ids: assetIds } });
+}
+
+/**
+ * Alle assets van één album, pagina per pagina.
+ *
+ * Via `/search/metadata` en niet via `GET /albums/<id>`, omdat dat laatste in
+ * recente Immich-versies de assets niet meer meestuurt. Wat in de prullenmand
+ * ligt, zit er niet bij.
+ */
+export async function listImmichAlbumAssets(albumId: string, { size = 1000 } = {}): Promise<ImmichAsset[]> {
+  const assets: ImmichAsset[] = [];
+  const seenPages = new Set<number>();
+  let page: number | null = 1;
+
+  while (page) {
+    if (seenPages.has(page)) {
+      throw new GalleryError(502, 'Immich album asset pagination loop detected.', 'immich_pagination_loop');
+    }
+    seenPages.add(page);
+
+    const result: ImmichSearchResponse = await immichJson<ImmichSearchResponse>('/search/metadata', {
+      method: 'POST',
+      body: { albumIds: [albumId], page, size },
+    });
+    assets.push(...(result?.assets?.items || []));
+
+    // Immich geeft `nextPage` terug als string ("2"), terwijl /search/metadata
+    // `page` als getal valideert en die string weigert met HTTP 400. Geef je
+    // ze ongewijzigd door, dan faalt elk album met meer dan `size` foto's op
+    // zijn tweede pagina. Dat viel lang niet op, want tot de import van het
+    // oude archief had geen enkel album er zoveel.
+    const next = Number(result?.assets?.nextPage);
+    page = Number.isInteger(next) && next > 0 ? next : null;
+  }
+
+  return assets;
 }
 
 export async function runImmichAssetJob(assetIds: string[], name: string): Promise<unknown> {

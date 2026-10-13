@@ -4,12 +4,15 @@ import { authErrorResponse, requireAnyPermission } from "@/lib/session";
 
 /**
  * De thumbnail van één foto, met de API-sleutel in plaats van via een gedeelde
- * link.
+ * link. Elke duimnagel in het mediabeheer loopt hierlangs.
  *
- * Nodig voor foto's die uit hun album gehaald zijn: de publieke foto-URL's
- * (`/share/photo/<sleutel>/...`) hangen aan de gedeelde link van een *album*, en
- * die hebben zulke foto's niet meer. Alle andere thumbnails in het beheer blijven
- * gewoon via de publieke proxy lopen; deze route is geen algemene fotoproxy.
+ * Het beheer toont ook wat de site niet heeft: een verborgen foto (uit het album
+ * gehaald), een album dat van de site staat (zonder gedeelde link) en de
+ * prullenmand. De publieke foto-URL's (`/share/photo/<sleutel>/...`) hangen aan
+ * de gedeelde link van een zichtbaar *album* en dekken dat dus niet.
+ *
+ * Achter `media.manage` of `photos.manageAlbums`, privé gecachet, en enkel de
+ * kleine thumbnail: dit is een beheerweergave, geen fotoproxy voor de site.
  */
 export const dynamic = "force-dynamic";
 

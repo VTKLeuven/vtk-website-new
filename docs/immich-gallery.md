@@ -51,33 +51,68 @@ Op `/media` verschijnt slechts één overzichtskaart met het totaal aantal foto'
 
 
 **In de praktijk hoef je dit niet met de hand in Immich te zetten.** In
-`/admin/media` maak je een album met tabs in één keer aan (een tabnaam en een
-fotoselectie per tab), of hang je later een tab aan een bestaand album; het
-beheerscherm per album (`/admin/media/albums/<slug>`) doet de rest. De uploader
-schrijft variant 1 hierboven.
+`/admin/media` maak je een album aan en hang je er later tabs aan ("Tab
+toevoegen" in het album zelf); het beheer schrijft variant 1 hierboven. Wie foto's
+beheert, hoort nooit in Immich te moeten: zie "Het mediabeheer" hieronder.
 
 **Let op de tabnaam van het hoofdalbum.** Draagt het hoofdalbum zelf geen
 `[tab: ...]`, dan heet zijn tab op de site letterlijk "Algemeen"
-(`resolveTabTitle` in `packages/gallery/src/grouping.ts`). Het beheerscherm zegt
-dat met zoveel woorden en laat de naam invullen.
+(`resolveTabTitle` in `packages/gallery/src/grouping.ts`). Het formulier voor
+een nieuwe tab vraagt daarom meteen ook een naam voor de foto's die er al in staan.
+
+## Het mediabeheer
+
+`/admin/media` heeft vier tabbladen (Foto's, Magazines, Aftermovies,
+Verwijderverzoeken). Foto's is een lijst van alle albums links en het open album
+rechts; zie `docs/design-decisions.md`, "Mediabeheer".
+
+**Het beheer leest Immich rechtstreeks, niet de momentopname.** De momentopname
+bevat enkel zichtbare albums, met duimnagels via de publieke gedeelde link, en
+loopt tot een kwartier achter. `listAdminAlbums` (in `packages/gallery`) doet één
+`GET /albums`, neemt de verborgen albums mee en groepeert met dezelfde
+`groupAlbums` als de site. De slugs worden in dezelfde volgorde toegekend als in
+de momentopname (eerst de zichtbare, nieuwste bovenaan, dan de verborgen), zodat
+`[parent: <slug>]` van een nieuwe tab naar hetzelfde album wijst als op de site.
+De foto's van één album komen uit `listImmichAlbumAssets`, de duimnagels allemaal
+uit `/api/admin/immich-gallery/assets/<assetId>/thumbnail` (met de API-sleutel,
+achter de mediarechten). Een album in het beheer heeft als adres het Immich-id
+van zijn hoofdalbum, niet de slug: die verandert mee met de titel, en een
+verborgen album heeft er geen.
 
 ### Een album van de site halen
 
 `[gallery]` wisselen voor **`[gallery-uit]`** haalt het album van de mediapagina
 zonder het uit Immich te gooien. De merker weghalen zou het album onvindbaar
-maken in het beheer; met `[gallery-uit]` staat het onderaan `/admin/media` onder
-"Niet op de site" en kan je het daar terugzetten. Voor de fakbargalerij is dat
-`[fakbar-uit]`. Er is geen botsing met de gewone merker: `"[gallery-uit]"`
-bevat `"[gallery]"` niet.
+maken in het beheer; met `[gallery-uit]` blijft het in de lijst staan, gedimd, en
+zet de schakelaar het terug. Dat gebeurt op **elk deel** van het album: enkel het
+hoofdalbum omzetten liet de tabs als losse albums op de site staan. Voor de
+fakbargalerij is dat `[fakbar-uit]`. Er is geen botsing met de gewone merker:
+`"[gallery-uit]"` bevat `"[gallery]"` niet. Een nieuw album kan meteen verborgen
+beginnen ("Eerst nakijken"); het krijgt dan van bij het aanmaken de uit-merker.
 
-### Foto's uit een album halen
+### Een foto verbergen
 
-Een foto uit een album halen (`DELETE /albums/{id}/assets`) laat ze in Immich
-staan, maar dan heeft ze geen publieke URL meer: die hangt aan de gedeelde link
-van een *album*. De rij in `GalleryDetachedPhoto` houdt bij waar ze vandaan kwam,
-en het beheer toont haar duimnagel via
-`/api/admin/immich-gallery/assets/<assetId>/thumbnail`, met de API-sleutel. Die
-route is afgeschermd en is bewust geen algemene fotoproxy.
+Verbergen haalt de foto uit haar album (`DELETE /albums/{id}/assets`). Ze blijft
+in Immich, maar heeft geen publieke URL meer: die hangt aan de gedeelde link van
+een *album*. De rij in `GalleryDetachedPhoto` houdt bij waar ze vandaan kwam;
+daarmee toont het beheer haar gedimd in haar eigen album en zet "Tonen" haar terug.
+
+### De prullenmand
+
+Verwijderen in het beheer is nooit meteen definitief, en terugzetten gebeurt in
+het beheer zelf, niet in Immich.
+
+- **Een foto** gaat naar de prullenmand van Immich (`DELETE /assets`,
+  `force: false`) en krijgt een rij in `GalleryTrashedPhoto`. Terugzetten is
+  `POST /trash/restore/assets`; Immich legt ze dan zelf terug in haar album.
+  Ook "Foto verwijderen" bij een verwijderverzoek schrijft zo'n rij.
+- **Een album** gaat niet naar Immich: elk deel krijgt de uit-merker en een rij in
+  `GalleryTrashedAlbum` haalt het uit de lijst. Terugzetten zet de merkers terug
+  (behalve als het album al verborgen was).
+- **Na 30 dagen** ruimt `purgeExpiredGalleryTrash` op, lui bij het openen van
+  het beheer (`after()` in de layout van Foto's): een album gaat dan echt weg,
+  zijn foto's naar de prullenmand van Immich. Die leegt zich op zijn eigen termijn.
+  Staat die korter dan 30 dagen, dan zegt "Terugzetten" dat de foto al weg is.
 
 ## Environment
 

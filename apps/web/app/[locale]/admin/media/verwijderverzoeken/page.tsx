@@ -1,4 +1,3 @@
-import Link from "@/components/ui/Link";
 import { notFound } from "next/navigation";
 import { prisma } from "@vtk/db";
 import { takedownReasonLabel } from "@vtk/gallery";
@@ -56,8 +55,8 @@ export default async function AdminTakedowns({
     delete: nl ? "Foto verwijderen" : "Delete photo",
     deleteTitle: nl ? "Deze foto verwijderen?" : "Delete this photo?",
     deleteDescription: nl
-      ? "{photo} gaat naar de prullenmand van Immich en verdwijnt meteen uit het album {album}. De rest van het album blijft staan. Immich ruimt de prullenmand later zelf op."
-      : "{photo} moves to Immich's trash and disappears from the album {album} straight away. The rest of the album stays. Immich empties its trash later on.",
+      ? "{photo} gaat naar de prullenmand en verdwijnt meteen uit het album {album}. De rest van het album blijft staan. 30 dagen lang kan je ze onder Foto's, Prullenmand, terugzetten."
+      : "{photo} moves to the trash and disappears from the album {album} straight away. The rest of the album stays. For 30 days you can put it back under Photos, Trash.",
     photoDeleted: nl ? "De foto is uit de galerij gehaald." : "The photo has been taken out of the gallery.",
     confirm: nl ? "Verwijderen" : "Delete",
     cancel: nl ? "Annuleren" : "Cancel",
@@ -88,25 +87,30 @@ export default async function AdminTakedowns({
       ? "Dit verzoek bestaat niet meer; herlaad de pagina."
       : "This request no longer exists; reload the page.",
     immichUnreachable: nl
-      ? "Immich is niet bereikbaar; de foto is niet verwijderd."
-      : "Immich is unreachable; the photo was not deleted.",
+      ? "De fotobibliotheek is niet bereikbaar; de foto is niet verwijderd."
+      : "The photo library is unreachable; the photo was not deleted.",
   };
 
   return (
-    <div className="vtk-admin-page">
-      <header className="vtk-admin-page-head">
-        <h1>{nl ? "Verwijderverzoeken" : "Takedown requests"}</h1>
-        <p>
+    // In het paneel en de lege toestand van de huid van het mediabeheer
+    // (vtk-ticket-admin.css), zoals de andere tabbladen; de rijen zelf houden
+    // hun eigen opmaak uit vtk-immich-gallery.css.
+    <section className="ticket-admin-section">
+      <div className="ticket-admin-section-head">
+        <div>
+          <h2>{nl ? "Verwijderverzoeken" : "Takedown requests"}</h2>
+          <p className="ticket-admin-help">
           {nl
-            ? "Mensen die vroegen om een foto uit de galerij te halen. Verwijderen zet de foto in de prullenmand van Immich; ze verdwijnt meteen van de site."
-            : "People who asked us to take a photo out of the gallery. Deleting moves the photo to Immich's trash; it disappears from the site straight away."}
-        </p>
-      </header>
+            ? "Mensen die vroegen om een foto uit de galerij te halen. Verwijderen zet de foto in de prullenmand van Foto's: ze is meteen van de site weg en blijft daar 30 dagen terug te zetten."
+            : "People who asked us to take a photo out of the gallery. Deleting moves the photo to the trash under Photos: it leaves the site straight away and can be put back there for 30 days."}
+          </p>
+        </div>
+      </div>
 
       {open.length === 0 ? (
-        <div className="vtk-admin-empty">
-          <h2>{nl ? "Geen openstaande verzoeken" : "No open requests"}</h2>
-          <p>
+        <div className="ticket-admin-empty-state">
+          <p className="ticket-admin-empty-title">{nl ? "Geen openstaande verzoeken" : "No open requests"}</p>
+          <p className="ticket-admin-empty-copy">
             {nl
               ? "Er staat niets te behandelen. Nieuwe verzoeken komen hier binnen en gaan ook per mail naar communicatie@vtk.be."
               : "Nothing to handle. New requests arrive here and are also emailed to communicatie@vtk.be."}
@@ -173,9 +177,8 @@ export default async function AdminTakedowns({
       <p className="vtk-takedown-footnote">
         {nl
           ? "Verzoeken worden na een jaar geanonimiseerd: de afhandeling blijft bewaard, de gegevens van de melder niet."
-          : "Requests are anonymised after a year: the handling is kept, the reporter's details are not."}{" "}
-        <Link href={`${base}/admin/media`}>{nl ? "Naar Media" : "Go to Media"}</Link>
+          : "Requests are anonymised after a year: the handling is kept, the reporter's details are not."}
       </p>
-    </div>
+    </section>
   );
 }

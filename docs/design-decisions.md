@@ -11004,6 +11004,44 @@ de zijbalk helemaal weg achter één knop.
   `AdminNav`, dus ook in de admin van vtk.be. Hij doet niets terwijl je typt
   (daar is Ctrl+B vet) en niets onder 860px, waar er geen rail is.
 
+## Mediabeheer: twee panelen, en nooit Immich
+
+Oktober 2026. `/admin/media` was één lange pagina: bovenaan de leescijfers
+(die zonder `UMAMI_SHARE_ID` enkel "nog niet ingesteld" toonden), dan de
+magazines, de promovideo's, een schakelaar voor de fakbargalerij, een uploader
+met drie modi en tot slot 144 albums als rijen tekst. Elk album had daarnaast een
+eigen pagina met zeven blokken onder elkaar. Wie een foto wilde terugzetten of een
+album wilde nakijken, moest in Immich zijn.
+
+- **Vier tabbladen**, met de code van die van Tickets (`.ticket-admin-tabs`,
+  echte links per tabblad): Foto's, Magazines, Aftermovies en
+  Verwijderverzoeken, dat laatste met het aantal open verzoeken in het geel.
+- **Foto's is twee panelen.** Links alle albums, per werkingsjaar, met een
+  zoekveld en een filter op zichtbaar of verborgen; rechts het open album. Drie
+  richtingen zijn als mockup naast elkaar gelegd: albumtegels met een eigen
+  scherm per album, twee panelen, en "uploaden eerst" met een tabel. De twee
+  panelen wonnen: wisselen van album zonder te navigeren, en de lijst blijft staan
+  (ze zit in de layout van de route-groep `(fotos)`, dus zoekterm en scroll ook).
+- **Zichtbaar is één schakelaar, op album en op foto.** Een verborgen foto blijft
+  gedimd in het beheer staan in plaats van te verdwijnen naar een aparte lijst
+  onderaan; zo zie je meteen wat er van de site staat, en zet je ze in één klik
+  terug.
+- **Verwijderen gaat naar een prullenmand in het beheer zelf**, 30 dagen lang
+  terug te zetten. Voordien kon dat enkel in Immich. Een album in de prullenmand
+  is enkel verborgen en uit de lijst; pas na 30 dagen gaat het echt weg.
+- **Een nieuw album staat standaard meteen op de site**, met "Eerst nakijken" als
+  keuze. Andersom zou een vergeten schakelaar een album onzichtbaar laten zonder
+  dat iemand het merkt.
+- **De leescijfers staan onderaan Magazines**, niet meer bovenaan het hele beheer:
+  je komt naar Media om iets op te laden, niet om cijfers te lezen. Ze bleven
+  ongewijzigd, en zijn het eerste wat weg kan als niemand ze mist.
+- **Tabs maak je in het album zelf.** De uploader met drie modi (één album, een
+  album met tabs, een tab aan een bestaand album) is weg; "Nieuw album" vraagt
+  enkel een titel en de foto's.
+- **Het woord Immich staat nergens in het beheer.** Foutmeldingen spreken van "de
+  fotobibliotheek"; de merkers (`[gallery]`, `[tab:]`) blijven een detail van de
+  code. Hoe dat technisch werkt, staat in `docs/immich-gallery.md`.
+
 ## Shiftenoverzicht praesidium
 
 Oktober 2026. Naast de shiften op /shift vult het praesidium shiftenlijsten in

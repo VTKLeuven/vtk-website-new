@@ -773,6 +773,8 @@ model User {
   fakbarEvenings        FakbarEvening[]        @relation("FakbarHoofdtapper")
   photoTakedownsHandled PhotoTakedownRequest[] @relation("PhotoTakedownHandler")
   galleryPhotosDetached GalleryDetachedPhoto[] @relation("GalleryPhotoDetacher")
+  galleryPhotosTrashed  GalleryTrashedPhoto[]  @relation("GalleryPhotoTrasher")
+  galleryAlbumsTrashed  GalleryTrashedAlbum[]  @relation("GalleryAlbumTrasher")
 
   websiteFeedback        WebsiteFeedback[] @relation("WebsiteFeedbackAuthor")
   websiteFeedbackHandled WebsiteFeedback[] @relation("WebsiteFeedbackHandler")
@@ -8299,6 +8301,60 @@ model GalleryDetachedPhoto {
   detachedBy User? @relation("GalleryPhotoDetacher", fields: [detachedById], references: [id], onDelete: SetNull)
 
   @@index([gallery, albumId])
+}
+
+/// Een foto die vanuit het mediabeheer naar de prullenmand ging.
+///
+/// De foto zelf ligt in de prullenmand van Immich; deze rij is wat het beheer
+/// nodig heeft om ze te tonen en terug te zetten zonder dat iemand in Immich
+/// moet. Na 30 dagen ruimt het beheer de rij op (`purgeExpiredGalleryTrash`);
+/// Immich leegt zijn eigen prullenmand op zijn eigen termijn.
+model GalleryTrashedPhoto {
+  id      String               @id @default(cuid())
+  gallery PhotoTakedownGallery
+
+  assetId String @unique
+
+  /// Het Immich-album (het album zelf of een tab) waar ze in zat. Titel en
+  /// tabnaam zijn momentopnames, net als bij `GalleryDetachedPhoto`.
+  albumId    String
+  albumTitle String
+  tabName    String?
+  filename   String?
+
+  trashedById String?
+  trashedAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  trashedBy User? @relation("GalleryPhotoTrasher", fields: [trashedById], references: [id], onDelete: SetNull)
+
+  @@index([gallery, trashedAt])
+}
+
+/// Een album dat in de prullenmand van het mediabeheer ligt.
+///
+/// Het album blijft in Immich bestaan, met de uit-merker op elk deel zodat het
+/// van de site is; terugzetten is dus de merkers terugzetten. Pas na 30 dagen
+/// gaan de albums echt weg en de foto's naar de prullenmand van Immich.
+model GalleryTrashedAlbum {
+  id      String               @id @default(cuid())
+  gallery PhotoTakedownGallery
+
+  /// Het hoofdalbum in Immich.
+  albumId String   @unique
+  /// Alle Immich-albums van dit album: het hoofdalbum en zijn tabs.
+  partIds String[]
+
+  title      String
+  photoCount Int
+  /// Stond het album al van de site? Dan blijft het na terugzetten verborgen.
+  wasHidden  Boolean
+
+  trashedById String?
+  trashedAt   DateTime @default(now()) @db.Timestamptz(3)
+
+  trashedBy User? @relation("GalleryAlbumTrasher", fields: [trashedById], references: [id], onDelete: SetNull)
+
+  @@index([gallery, trashedAt])
 }
 
 /// Waarover de feedback gaat. Vier categorieën plus een restcategorie: meer

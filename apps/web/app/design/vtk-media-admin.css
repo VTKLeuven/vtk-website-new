@@ -1,0 +1,1125 @@
+/*
+ * Mediabeheer (/admin/media).
+ *
+ * De kop, de tabbladen, knoppen, velden en lege toestanden komen uit
+ * `vtk-ticket-admin.css`, net als bij de formulieren; daarom staat
+ * `.ticket-admin` op de wortel. Hier staat enkel wat eigen is aan media: de
+ * twee panelen van Foto's, het fotoraster en de prullenmand.
+ *
+ * Geen container query op een voorouder van de selectiebalk of het
+ * uploadvenster: `container-type` brengt layout containment mee, en dan hangt
+ * een `position: fixed` aan die container in plaats van aan het scherm.
+ */
+
+.media-admin .num {
+  font-variant-numeric: tabular-nums;
+}
+
+.media-admin-lead {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* Het aantal open verwijderverzoeken in het tabblad: geel, want het vraagt werk. */
+.media-admin-tab-count {
+  display: inline-grid;
+  min-width: 19px;
+  height: 19px;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--yellow);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* De periodeknop van de leescijfers op Magazines. `.ticket-admin a` zet elke
+   link op `color: inherit`; de actieve knop is donker en had dan donkere tekst. */
+.ticket-admin a.media-stats-period[aria-current="true"] {
+  color: var(--paper);
+}
+
+/* ------------------------------------------------------------------------
+   Twee panelen
+   ------------------------------------------------------------------------ */
+
+.media-library {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.media-library-main {
+  min-width: 0;
+}
+
+.media-library-list {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-height: 380px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  overflow: hidden;
+}
+
+/* Twee kolommen zodra er plaats is. Op een laptop met de zijbalk open is de
+   inhoud van de admin 900px breed; 272 voor de lijst laat 600 voor het album. */
+@media (min-width: 1100px) {
+  .media-library {
+    grid-template-columns: 272px minmax(0, 1fr);
+  }
+
+  /* De lijst scrolt in haar eigen kolom en blijft staan terwijl je door een
+     album van vijfhonderd foto's scrolt. Onder de sitekop, die ook plakt. */
+  .media-library-list {
+    position: sticky;
+    top: 88px;
+    max-height: calc(100 * var(--vtk-dvh, 1dvh) - 104px);
+  }
+}
+
+.media-library-list-head {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.media-library-list-head .ticket-admin-button {
+  justify-content: center;
+}
+
+.media-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.media-chip {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--body);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.media-chip:hover {
+  border-color: color-mix(in oklab, var(--ink) 35%, transparent);
+}
+
+.media-chip[aria-pressed="true"] {
+  border-color: var(--navy);
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+.media-chip .num {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.media-chip:focus-visible,
+.media-album-row:focus-visible,
+.media-library-trash:focus-visible,
+.media-photo-hit:focus-visible,
+.media-switch:focus-visible {
+  outline: 2px solid var(--accent-2, #edbd22);
+  outline-offset: 2px;
+}
+
+.media-library-albums {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 2px 6px 8px;
+}
+
+.media-library-year h3 {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 10px 8px 6px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.media-library-year ul {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.media-album-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border-radius: 12px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.media-album-row:hover {
+  background: color-mix(in oklab, var(--paper-2) 55%, var(--surface));
+}
+
+.media-album-row[aria-current="page"] {
+  background: var(--paper-2);
+}
+
+.media-album-row img,
+.media-album-row-blank {
+  width: 40px;
+  height: 40px;
+  border-radius: 9px;
+  object-fit: cover;
+  background: var(--paper-2);
+}
+
+.media-album-row-blank {
+  background: repeating-linear-gradient(135deg, var(--paper-2) 0 6px, var(--paper) 6px 12px);
+}
+
+.media-album-row[data-hidden="true"] img {
+  opacity: 0.45;
+  filter: grayscale(0.6);
+}
+
+.media-album-row-text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.media-album-row-title {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-album-row[data-hidden="true"] .media-album-row-title {
+  color: var(--muted);
+}
+
+.media-album-row-meta {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.media-album-row-flag {
+  color: var(--muted);
+}
+
+.media-library-note {
+  margin: 0;
+  padding: 14px 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.media-library-trash {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 11px 16px;
+  border-top: 1px solid var(--line);
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.media-library-trash .num {
+  margin-left: auto;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.media-library-trash:hover,
+.media-library-trash[aria-current="page"] {
+  background: var(--paper-2);
+  color: var(--ink);
+}
+
+/* ------------------------------------------------------------------------
+   Uploaden
+   ------------------------------------------------------------------------ */
+
+.media-dropzone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 14px 18px;
+  border: 1.5px dashed color-mix(in oklab, var(--navy) 30%, transparent);
+  border-radius: 16px;
+  background: color-mix(in oklab, var(--paper-2) 35%, var(--surface));
+  color: var(--body);
+  font-size: 13.5px;
+  cursor: pointer;
+}
+
+.media-dropzone:hover,
+.media-dropzone[data-dragging="true"],
+.media-dropzone:focus-within {
+  border-color: var(--navy);
+  background: var(--surface);
+}
+
+.media-dropzone svg {
+  flex: none;
+  color: var(--navy);
+}
+
+.media-dropzone u {
+  color: var(--ink);
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.media-dropzone.is-large {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 44px 24px;
+  border-radius: 22px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.media-dropzone.is-large b {
+  color: var(--ink);
+  font-size: 17px;
+  letter-spacing: -0.01em;
+}
+
+.media-dropzone.is-large span:not(.ticket-admin-button) {
+  max-width: 46ch;
+  color: var(--muted);
+}
+
+.media-dropzone.is-large .ticket-admin-button {
+  margin-top: 6px;
+}
+
+.media-progress {
+  display: block;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--paper-2);
+  overflow: hidden;
+}
+
+.media-progress i {
+  display: block;
+  height: 100%;
+  background: var(--navy);
+  transition: width 0.2s ease;
+}
+
+.media-upload-tray {
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 41;
+  display: grid;
+  gap: 10px;
+  width: min(320px, calc(100vw - 40px));
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 18px 40px -18px rgba(10, 15, 31, 0.45);
+}
+
+.media-upload-tray-title {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.media-upload-tray-title span {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.media-upload-job {
+  display: grid;
+  gap: 5px;
+}
+
+.media-upload-job-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  overflow: hidden;
+  font-size: 12.5px;
+}
+
+.media-upload-job-label .num {
+  flex: none;
+  color: var(--muted);
+}
+
+.media-empty {
+  margin-bottom: 16px;
+}
+
+.media-disclosure-state {
+  margin-left: 6px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+/* ------------------------------------------------------------------------
+   Schakelaar en venster
+   ------------------------------------------------------------------------ */
+
+.media-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.media-switch-row.is-card {
+  margin: 0 0 14px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.media-switch-row b {
+  display: block;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.media-switch-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.media-switch {
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #c6cdda;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.media-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(10, 15, 31, 0.3);
+  transition: transform 0.15s ease;
+}
+
+.media-switch[aria-checked="true"] {
+  background: var(--ok-ink, #15803d);
+}
+
+.media-switch[aria-checked="true"]::after {
+  transform: translateX(16px);
+}
+
+.media-switch:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.media-dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(10, 15, 31, 0.42);
+}
+
+.media-dialog {
+  display: grid;
+  gap: 14px;
+  width: min(540px, 100%);
+  max-height: calc(100 * var(--vtk-dvh, 1dvh) - 32px);
+  overflow-y: auto;
+  padding: 22px;
+  border-radius: 22px;
+  background: var(--surface);
+  box-shadow: 0 30px 80px -30px rgba(10, 15, 31, 0.6);
+}
+
+.media-dialog-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.media-dialog-head h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.media-gallery-choice {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  font-size: 13.5px;
+}
+
+.media-gallery-choice legend {
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+
+.media-gallery-choice label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.media-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* ------------------------------------------------------------------------
+   Het album
+   ------------------------------------------------------------------------ */
+
+.media-album {
+  position: relative;
+  min-width: 0;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.media-album-head {
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 14px;
+}
+
+.media-album-cover {
+  width: 112px;
+  aspect-ratio: 4 / 3;
+  border-radius: 12px;
+  object-fit: cover;
+  background: var(--paper-2);
+}
+
+.media-album-cover.is-blank {
+  background: repeating-linear-gradient(135deg, var(--paper-2) 0 8px, var(--paper) 8px 16px);
+}
+
+.media-album-head-main {
+  min-width: 0;
+}
+
+.media-album-details {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+  align-items: start;
+}
+
+.media-album-details > :not(button):not([type="hidden"]) {
+  grid-column: 1;
+}
+
+.media-album-details > button,
+.media-album-details > div:last-child {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.media-album-title,
+.media-album-description {
+  width: 100%;
+  min-width: 0;
+  margin-left: -9px;
+  padding: 3px 8px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+}
+
+.media-album-title {
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.media-album-description {
+  color: var(--body);
+  font-size: 13.5px;
+}
+
+.media-album-title:hover,
+.media-album-description:hover {
+  border-color: var(--line-2);
+}
+
+.media-album-title:focus,
+.media-album-description:focus {
+  border-color: var(--navy);
+  background: var(--surface);
+  outline: none;
+}
+
+.media-album-title-hint {
+  display: none;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.media-album-details:focus-within .media-album-title-hint {
+  display: block;
+}
+
+.media-album-meta {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.media-album-meta a {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--ink);
+  text-underline-offset: 3px;
+}
+
+/* Op een telefoon kreeg de titel naast een cover van 112px en de knop Opslaan
+   nog een paar letters; daar een kleinere cover en de knop onder de velden. */
+@media (max-width: 600px) {
+  .media-album {
+    padding: 14px;
+  }
+
+  .media-album-head {
+    grid-template-columns: 64px minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  .media-album-cover {
+    width: 64px;
+  }
+
+  .media-album-details {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .media-album-details > div:last-child {
+    grid-column: 1;
+    grid-row: auto;
+  }
+}
+
+.media-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 12px;
+}
+
+.media-tabs-label {
+  margin-right: 4px;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.media-tabs-none {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+/* Twee velden naast elkaar, bovenaan uitgelijnd (de tweede draagt een uitleg
+   eronder), en de knop van SaveForm op een eigen rij eronder. */
+.media-tab-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 14px;
+  align-items: start;
+  margin: 0 0 14px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: inset 3px 0 0 var(--yellow);
+}
+
+.media-tab-form > div:last-child {
+  grid-column: 1 / -1;
+}
+
+.media-tab-form small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.media-tab-manage {
+  margin-bottom: 12px;
+}
+
+.media-tab-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.media-tab-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.media-tab-rename {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.media-tab-rename input:not([type="hidden"]) {
+  width: 200px;
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--surface);
+  font: inherit;
+}
+
+.media-tab-list-note,
+.media-tab-list-foot {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.media-tab-list-foot {
+  margin: 10px 0 0;
+}
+
+.media-album-upload {
+  display: grid;
+  gap: 5px;
+  margin-top: 10px;
+  font-size: 12.5px;
+}
+
+.media-grid-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 16px 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.media-grid-bar-grow {
+  flex: 1;
+}
+
+.media-grid-empty {
+  min-height: 120px;
+}
+
+/* ------------------------------------------------------------------------
+   Het fotoraster
+   ------------------------------------------------------------------------ */
+
+.media-photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.media-photo {
+  position: relative;
+  aspect-ratio: 1;
+  min-width: 0;
+}
+
+.media-photo-hit {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: var(--paper-2);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.media-photo-hit img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.media-photo[data-hidden="true"] .media-photo-hit img {
+  opacity: 0.42;
+  filter: grayscale(0.7);
+}
+
+.media-photo[data-selected="true"] .media-photo-hit {
+  box-shadow: 0 0 0 3px var(--yellow), 0 0 0 5px var(--navy);
+}
+
+.media-photo-check {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.92);
+  border-radius: 999px;
+  background: rgba(10, 15, 31, 0.28);
+  color: transparent;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.media-photo:hover .media-photo-check,
+.media-photo:focus-within .media-photo-check,
+.media-photo-grid[data-selecting="true"] .media-photo-check,
+.media-photo[data-selected="true"] .media-photo-check {
+  opacity: 1;
+}
+
+.media-photo[data-selected="true"] .media-photo-check {
+  border-color: var(--yellow);
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.media-photo-actions {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: flex;
+  gap: 4px;
+  opacity: 0;
+}
+
+.media-photo:hover .media-photo-actions,
+.media-photo:focus-within .media-photo-actions {
+  opacity: 1;
+}
+
+/* Zonder hover (een telefoon) zijn acties die pas bij hoveren verschijnen niet
+   te vinden. */
+@media (hover: none) {
+  .media-photo-actions {
+    opacity: 1;
+  }
+}
+
+.media-photo-actions .media-photo-action {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink);
+}
+
+.media-photo-actions .media-photo-action:hover {
+  background: var(--yellow);
+}
+
+.media-photo-badge {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  font-size: 10.5px;
+  font-weight: 700;
+  pointer-events: none;
+}
+
+.media-photo-badge.is-cover {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+.media-photo-badge.is-hidden,
+.media-photo-badge.is-days {
+  background: var(--navy);
+  color: var(--paper);
+}
+
+.media-photo-video {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  display: grid;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  border-radius: 999px;
+  background: rgba(10, 15, 31, 0.7);
+  color: #fff;
+  pointer-events: none;
+}
+
+.media-more {
+  display: flex;
+  margin: 14px auto 0;
+}
+
+.media-danger {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 32px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.media-danger p {
+  flex: 1 1 280px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.media-danger b {
+  display: block;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+/* De acties op een selectie: één balk onderaan het scherm, zodat ze er staan
+   waar je ook in een album van vijfhonderd foto's gescrold bent. */
+.media-selection-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  z-index: 40;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100vw - 32px);
+  padding: 8px 8px 8px 16px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: var(--paper);
+  box-shadow: 0 18px 40px -16px rgba(10, 15, 31, 0.55);
+  transform: translateX(-50%);
+}
+
+.media-selection-bar b {
+  margin-right: 6px;
+  font-size: 13px;
+}
+
+.media-selection-bar button,
+.media-selection-bar select {
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--paper);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.media-selection-bar select option {
+  color: var(--ink);
+}
+
+.media-selection-bar button:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.media-selection-bar .is-danger {
+  border-color: #fff;
+  background: #fff;
+  color: var(--danger-ink, #b91c1c);
+}
+
+.media-selection-bar .is-danger:hover {
+  background: var(--danger-bg, #fef2f2);
+}
+
+.media-selection-bar :disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.media-drop-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  border: 2px dashed var(--navy);
+  border-radius: 18px;
+  background: color-mix(in oklab, var(--surface) 88%, transparent);
+  color: var(--ink);
+  font-size: 15px;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------------
+   Prullenmand
+   ------------------------------------------------------------------------ */
+
+.media-trash {
+  display: grid;
+  gap: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.media-trash-head h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.media-trash-head p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13.5px;
+}
+
+.media-trash-section h3 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.media-trash-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.media-trash-section-head h3 {
+  margin: 0;
+}
+
+.media-trash-albums {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.media-trash-albums li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+}
+
+.media-trash-albums b {
+  display: block;
+  font-size: 14px;
+}
+
+.media-trash-albums small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .media-switch,
+  .media-switch::after,
+  .media-progress i {
+    transition: none;
+  }
+}

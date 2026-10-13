@@ -183,7 +183,7 @@ export async function setMagazineCoverAction(formData: FormData): Promise<SaveSt
     target: `${target.titleNl} ${target.issueNl}`,
     summary: "kaft gemaakt van bladzijde 1",
   });
-  revalidatePath("/admin/media");
+  revalidatePath("/[locale]/admin/media", "layout");
   revalidatePath("/media");
   revalidatePath("/en/media");
   return saveOk();
@@ -203,7 +203,7 @@ export async function deleteMagazineAction(formData: FormData): Promise<void> {
     target: removed ? `${removed.titleNl} ${removed.issueNl}` : id,
     summary: "publicatie van de mediapagina gehaald",
   });
-  revalidatePath("/admin/media");
+  revalidatePath("/[locale]/admin/media", "layout");
 }
 
 export async function savePromoVideosAction(
@@ -263,7 +263,7 @@ export async function savePromoVideosAction(
   revalidatePath("/");
   revalidatePath("/media");
   revalidatePath("/en/media");
-  revalidatePath("/admin/media");
+  revalidatePath("/[locale]/admin/media", "layout");
   return saveOk();
 }
 
@@ -298,11 +298,14 @@ export async function createImmichAlbumAction(
   if (!title) return { ok: false, error: "missing_title" };
   const target = await readGalleryTarget(formData);
   if (!target) return { ok: false, error: "fakbar_upload_disabled" };
+  // "Eerst nakijken": het album krijgt meteen de uit-merker en staat pas op de
+  // site wanneer iemand het in het beheer aanzet. Standaard staat het er meteen.
+  const hidden = formData.get("visible") === "false";
   try {
     const album =
       target === "fakbar"
-        ? await fakbarGallery.createAlbum({ title, description })
-        : await createImmichGalleryAlbum({ title, description });
+        ? await fakbarGallery.createAlbum({ title, description, hidden })
+        : await createImmichGalleryAlbum({ title, description, hidden });
 
     // Het hoofdalbum draagt zelf ook een tabnaam. Zonder die merker heet zijn
     // eigen tab op de site "Algemeen" (zie grouping.ts), en er was geen enkel
@@ -327,6 +330,9 @@ export async function createImmichAlbumAction(
           ? "fotoalbum aangemaakt in Immich voor de fakbargalerij"
           : "fotoalbum aangemaakt in Immich",
     });
+    // Het nieuwe album hoort meteen in de lijst links van het beheer, ook nog
+    // zonder foto's.
+    revalidatePath("/[locale]/admin/media", "layout");
     return { ok: true, albumId: album.id };
   } catch (error) {
     console.error("Immich album creation failed", error);
@@ -404,6 +410,8 @@ export async function finalizeImmichAlbumAction(formData?: FormData): Promise<vo
   await refreshImmichGallerySnapshot();
   revalidatePath("/media");
   revalidatePath("/en/media");
+  // Het beheer ook: de albumlijst links toont het aantal foto's en de cover.
+  revalidatePath("/[locale]/admin/media", "layout");
 }
 
 /**
@@ -426,8 +434,7 @@ export async function setFakbarUploadEnabledAction(
       ? "uploaden naar de fakbargalerij aangezet"
       : "uploaden naar de fakbargalerij uitgezet",
   });
-  revalidatePath("/admin/media");
-  revalidatePath("/en/admin/media");
+  revalidatePath("/[locale]/admin/media", "layout");
   // De web-variant van saveOk draagt geen eigen melding; het formulier zegt
   // zelf wat de nieuwe stand is.
   return saveOk();

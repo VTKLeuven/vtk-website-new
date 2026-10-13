@@ -70,10 +70,12 @@ export async function MagazineStats({
               href={`?stats=${option.value}`}
               scroll={false}
               aria-current={option.value === period ? "true" : undefined}
+              // `media-stats-period`: de huid van het mediabeheer (vtk-ticket-admin.css)
+              // zet elke link op `color: inherit`, en dat won van `text-white`.
               className={
                 option.value === period
-                  ? "rounded-full bg-vtk-ink px-3 py-1 text-xs font-medium text-white"
-                  : "rounded-full border border-vtk-blue/15 px-3 py-1 text-xs font-medium text-vtk-ink hover:bg-vtk-blue-soft/60"
+                  ? "media-stats-period rounded-full bg-vtk-ink px-3 py-1 text-xs font-medium text-white"
+                  : "media-stats-period rounded-full border border-vtk-blue/15 px-3 py-1 text-xs font-medium text-vtk-ink hover:bg-vtk-blue-soft/60"
               }
             >
               {nl ? option.nl : option.en}

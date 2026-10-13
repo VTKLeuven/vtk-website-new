@@ -3,6 +3,7 @@ import {
   GalleryError,
   addImmichAssetsToAlbum,
   immichJson,
+  listImmichAlbumAssets,
   type ImmichBulkIdResult,
 } from './immich';
 import {
@@ -21,9 +22,8 @@ import type {
   DownloadTarget,
   GalleryAlbum,
   GalleryAlbumSummary,
+  AdminAlbum,
   ImmichAlbumSummary,
-  ImmichAsset,
-  ImmichSearchResponse,
   ImmichSharedLink,
   ManageableAlbum,
 } from './types';
@@ -53,7 +53,13 @@ export type GalleryClient = {
   /** Albums die de merker van meer dan één galerij dragen; zie config.ts. */
   listAmbiguousAlbums: () => Promise<AmbiguousAlbum[]>;
   refreshSnapshot: () => Promise<void>;
-  createAlbum: (input: { title: string; description?: string }) => Promise<{ id: string }>;
+  /**
+   * De albums voor het mediabeheer: zichtbaar en verborgen samen, gegroepeerd
+   * zoals op de site. Loopt niet via de momentopname; zie `AdminAlbum`.
+   */
+  listAdminAlbums: () => Promise<AdminAlbum[]>;
+  /** `hidden`: meteen met de uit-merker, dus niet op de site tot iemand het aanzet. */
+  createAlbum: (input: { title: string; description?: string; hidden?: boolean }) => Promise<{ id: string }>;
   addAssets: (albumId: string, assetIds: string[]) => Promise<ImmichBulkIdResult[]>;
 };
 
@@ -77,40 +83,11 @@ export function createGalleryClient({
   let cache: { snapshot: Snapshot; expiresAt: number } | null = null;
   let inflight: Promise<Snapshot> | null = null;
 
-  async function listAlbumAssets(albumId: string, { size = 1000 } = {}): Promise<ImmichAsset[]> {
-    const assets: ImmichAsset[] = [];
-    const seenPages = new Set<number>();
-    let page: number | null = 1;
-
-    while (page) {
-      if (seenPages.has(page)) {
-        throw new GalleryError(502, 'Immich album asset pagination loop detected.', 'immich_pagination_loop');
-      }
-      seenPages.add(page);
-
-      const result: ImmichSearchResponse = await immichJson<ImmichSearchResponse>('/search/metadata', {
-        method: 'POST',
-        body: { albumIds: [albumId], page, size },
-      });
-      assets.push(...(result?.assets?.items || []));
-
-      // Immich geeft `nextPage` terug als string ("2"), terwijl /search/metadata
-      // `page` als getal valideert en die string weigert met HTTP 400. Geef je
-      // ze ongewijzigd door, dan faalt elk album met meer dan `size` foto's op
-      // zijn tweede pagina. Dat viel lang niet op, want tot de import van het
-      // oude archief had geen enkel album er zoveel.
-      const next = Number(result?.assets?.nextPage);
-      page = Number.isInteger(next) && next > 0 ? next : null;
-    }
-
-    return assets;
-  }
-
   async function getFullAlbum(albumId: string): Promise<ImmichAlbumSummary> {
     const album = await immichJson<ImmichAlbumSummary>(`/albums/${encodeURIComponent(albumId)}`);
     const assetCount = Number(album?.assetCount || 0);
     if (Array.isArray(album?.assets) || assetCount === 0) return album;
-    return { ...album, assets: await listAlbumAssets(albumId) };
+    return { ...album, assets: await listImmichAlbumAssets(albumId) };
   }
 
   function findAlbumSharedLink(links: ImmichSharedLink[], albumId: string) {
@@ -464,13 +441,101 @@ export function createGalleryClient({
     },
 
     /**
+     * Eén `GET /albums`, net als `listManageableAlbums`, maar gegroepeerd met
+     * dezelfde `groupAlbums` als de site: een album met tabs is één rij.
+     *
+     * De slugs worden toegekend zoals de momentopname dat doet: de zichtbare
+     * albums eerst, nieuwste bovenaan, en pas daarna de verborgen. Zo wijst
+     * `[parent: <slug>]` van een nieuwe tab naar hetzelfde album als op de site,
+     * ook bij twee albums met dezelfde titel (`schuimfuif`, `schuimfuif-2`).
+     */
+    async listAdminAlbums() {
+      const ownMarker = galleryMarker(id);
+      const offMarker = hiddenMarker(id);
+      if (!ownMarker) return [];
+
+      const summaries = await immichJson<ImmichAlbumSummary[]>('/albums');
+      const visible: ImmichAlbumSummary[] = [];
+      const hidden: ImmichAlbumSummary[] = [];
+      for (const album of summaries || []) {
+        const description = String(album.description || '');
+        const own = description.includes(ownMarker);
+        const off = !own && description.includes(offMarker);
+        if (!own && !off) continue;
+        // Dubbelzinnig (twee galerijmerkers): hoort nergens, zie `listAmbiguousAlbums`.
+        if (foreignMarkers(id).some((marker) => description.includes(marker))) continue;
+        (own ? visible : hidden).push(album);
+      }
+      const newestFirst = (left: ImmichAlbumSummary, right: ImmichAlbumSummary) =>
+        dateValue(right.startDate) - dateValue(left.startDate);
+      visible.sort(newestFirst);
+      hidden.sort(newestFirst);
+
+      const hiddenIds = new Set(hidden.map((album) => album.id));
+      const allocateSlug = createSlugAllocator();
+      const markers = [ownMarker, offMarker, ...foreignMarkers(id)];
+      const own = new Map<string, { cover: string | null; hasTab: boolean }>();
+
+      const entries: MappedAlbumEntry[] = [...visible, ...hidden].map((album) => {
+        const title = album.albumName || 'Naamloos album';
+        const parsed = parseAlbumMarkers(album.description, album.albumName || '');
+        const date = album.startDate || album.endDate || null;
+        const year = date ? new Date(date).getUTCFullYear() : null;
+        own.set(album.id, { cover: album.albumThumbnailAssetId || null, hasTab: Boolean(parsed.tab) });
+        return {
+          album: {
+            id: album.id,
+            slug: allocateSlug(title),
+            title,
+            description: stripMarkers(album.description || '', markers),
+            date,
+            year: Number.isFinite(year) ? year : null,
+            photoCount: Number(album.assetCount || 0),
+            coverPhoto: null,
+            photos: [],
+            shareUrl: '',
+            updatedAt: album.updatedAt || null,
+          },
+          markers: parsed,
+          rawTitle: album.albumName || '',
+          rawDescription: album.description || '',
+        };
+      });
+
+      return groupAlbums(entries)
+        .map((album): AdminAlbum => {
+          const tabs = album.subAlbums && album.subAlbums.length > 1 ? album.subAlbums : null;
+          return {
+            id: album.id,
+            slug: album.slug,
+            title: album.title,
+            description: album.description,
+            date: album.date,
+            photoCount: album.photoCount,
+            hidden: hiddenIds.has(album.id),
+            coverAssetId: own.get(album.id)?.cover ?? null,
+            parts: tabs
+              ? tabs.map((tab) => ({
+                  id: tab.id,
+                  name: tab.title,
+                  photoCount: tab.photoCount,
+                  hidden: hiddenIds.has(tab.id),
+                }))
+              : [{ id: album.id, name: album.title, photoCount: album.photoCount, hidden: hiddenIds.has(album.id) }],
+            hasOwnTabName: own.get(album.id)?.hasTab ?? false,
+          };
+        })
+        .sort((left, right) => dateValue(right.date) - dateValue(left.date));
+    },
+
+    /**
      * Maakt een album met de merker van **deze** galerij. Daardoor kan een
      * upload vanuit de fakbar-app niet per ongeluk op vtk.be belanden: de
      * merker komt van de client, niet van het formulier.
      */
-    async createAlbum({ title, description }) {
+    async createAlbum({ title, description, hidden = false }) {
       const publicDescription = (description || '').trim();
-      const marker = galleryMarker(id);
+      const marker = hidden ? hiddenMarker(id) : galleryMarker(id);
       const fullDescription = publicDescription ? `${publicDescription}\n\n${marker}` : marker;
 
       const album = await immichJson<{ id: string }>('/albums', {

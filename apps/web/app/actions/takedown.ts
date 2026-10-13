@@ -139,7 +139,7 @@ export async function submitTakedownAction(
     Sentry.captureMessage("Verwijderverzoek: meldingsmail versturen mislukt", "warning");
   }
 
-  revalidatePath("/[locale]/admin/media/verwijderverzoeken", "page");
+  revalidatePath("/[locale]/admin/media", "layout");
   return saveOk();
 }
 
@@ -164,6 +164,14 @@ export async function deleteTakedownPhotoAction(
   const request = await prisma.photoTakedownRequest.findUnique({ where: { id } });
   if (!request || request.gallery !== "MAIN") return saveError("REQUEST_MISSING");
 
+  // In welk Immich-album (of welke tab) de foto zat, zodat ze in de prullenmand
+  // van het mediabeheer terug te zetten is. Opzoeken vóór het verwijderen: daarna
+  // staat ze niet meer in de momentopname.
+  const album = await getImmichGalleryAlbum(request.albumSlug).catch(() => null);
+  const part =
+    album?.subAlbums?.find((sub) => sub.photos.some((photo) => photo.id === request.assetId)) ??
+    (album?.photos.some((photo) => photo.id === request.assetId) ? album : null);
+
   try {
     await deleteImmichAssets([request.assetId], { force: false });
   } catch (error) {
@@ -177,12 +185,27 @@ export async function deleteTakedownPhotoAction(
     where: { id },
     data: { status: "DELETED", handledById: session.user.id, handledAt: new Date() },
   });
+  if (part) {
+    await prisma.galleryTrashedPhoto.upsert({
+      where: { assetId: request.assetId },
+      create: {
+        gallery: "MAIN",
+        assetId: request.assetId,
+        albumId: part.id,
+        albumTitle: request.albumTitle,
+        tabName: album?.subAlbums && album.subAlbums.length > 1 ? part.title : null,
+        filename: request.photoFilename,
+        trashedById: session.user.id,
+      },
+      update: {},
+    });
+  }
 
   // Zonder dit blijft de foto tot een minuut in de momentopname staan en lijkt
   // het alsof er niets gebeurde.
   await refreshImmichGallerySnapshot().catch(() => null);
 
-  revalidatePath("/[locale]/admin/media/verwijderverzoeken", "page");
+  revalidatePath("/[locale]/admin/media", "layout");
   revalidatePath("/[locale]/media/[albumSlug]", "page");
   return saveOk();
 }
@@ -218,7 +241,7 @@ export async function keepTakedownPhotoAction(
     },
   });
 
-  revalidatePath("/[locale]/admin/media/verwijderverzoeken", "page");
+  revalidatePath("/[locale]/admin/media", "layout");
   return saveOk();
 }
 
@@ -241,6 +264,6 @@ export async function reopenTakedownAction(
     data: { status: "NEW", handlingNote: null, handledById: null, handledAt: null },
   });
 
-  revalidatePath("/[locale]/admin/media/verwijderverzoeken", "page");
+  revalidatePath("/[locale]/admin/media", "layout");
   return saveOk();
 }

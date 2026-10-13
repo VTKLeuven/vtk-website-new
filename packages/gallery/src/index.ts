@@ -1,4 +1,6 @@
 export type {
+  AdminAlbum,
+  AdminAlbumPart,
   AmbiguousAlbum,
   DownloadTarget,
   GalleryAlbum,
@@ -42,7 +44,9 @@ export {
   getImmichAssetThumbnail,
   immichJson,
   immichRequest,
+  listImmichAlbumAssets,
   removeImmichAssetsFromAlbum,
+  restoreImmichAssets,
   runImmichAssetJob,
   succeededAssetIds,
   setImmichAlbumCover,

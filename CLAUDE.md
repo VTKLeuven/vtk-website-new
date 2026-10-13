@@ -637,6 +637,13 @@ the design language into the application instead of copying mockup content.
     `apps/logistiek/lib/admin-nav-cookie.ts`); bouw daar geen eigen inklapknop
     of zwevende "Tabs"-knop meer naast. De sneltoets `[` of Ctrl/Cmd+B zit in
     `AdminNav` zelf.
+  - **Het mediabeheer (`/admin/media`) stuurt niemand naar Immich.** Tabbladen
+    zoals bij Tickets, en Foto's in twee panelen (albumlijst links in de layout
+    van de route-groep `(fotos)`, het album rechts). Verbergen en verwijderen
+    gebeuren daar, met een prullenmand van 30 dagen; zet in die schermen geen
+    "Open Immich"-link of het woord Immich. Het beheer leest Immich rechtstreeks
+    (`listAdminAlbums`), niet de momentopname van de site. Zie
+    `docs/immich-gallery.md` en `docs/design-decisions.md`.
   - Below 860px the left column collapses into one button naming the tab you are
     on, which opens the full grouped list as a panel underneath
     (`AdminNav` + `vtk-admin.css`). Do not reintroduce the horizontal scroller

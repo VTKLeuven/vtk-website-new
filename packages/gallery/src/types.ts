@@ -75,6 +75,41 @@ export type ManageableAlbum = {
   tab?: string;
 };
 
+/** Eén Immich-album binnen een album uit het beheer: het album zelf of een tab. */
+export type AdminAlbumPart = {
+  id: string;
+  /** De naam van de tab zoals de site ze toont; de albumtitel als er geen tabs zijn. */
+  name: string;
+  photoCount: number;
+  hidden: boolean;
+};
+
+/**
+ * Een album zoals de lijst in het mediabeheer het toont: gegroepeerd zoals op de
+ * site (een album met zijn tabs is één rij), maar met de verborgen albums erbij
+ * en zonder foto's, gedeelde links of momentopname.
+ */
+export type AdminAlbum = {
+  /** Het hoofdalbum in Immich. */
+  id: string;
+  /** Het adres op de site (`/media/<slug>`), zoals de momentopname het toekent. */
+  slug: string;
+  title: string;
+  /** De beschrijving zonder merkers. */
+  description: string;
+  /** De vroegste datum van de foto's, uit Immich. */
+  date: string | null;
+  photoCount: number;
+  /** Staat het album van de site af (`[gallery-uit]` op het hoofdalbum)? */
+  hidden: boolean;
+  /** De cover zoals Immich ze bijhoudt, om een duimnagel te tonen zonder gedeelde link. */
+  coverAssetId: string | null;
+  /** Eén deel wanneer het album geen tabs heeft; anders het hoofdalbum eerst. */
+  parts: AdminAlbumPart[];
+  /** Draagt het hoofdalbum een eigen `[tab:]`? Zonder heet zijn tab "Algemeen". */
+  hasOwnTabName: boolean;
+};
+
 export type ImmichAsset = {
   id: string;
   type?: string | null;

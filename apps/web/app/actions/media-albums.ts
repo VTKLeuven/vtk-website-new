@@ -2,16 +2,20 @@
 
 /**
  * Het beheer van een bestaand fotoalbum: titel, beschrijving, cover, tabs,
- * zichtbaarheid en de foto's zelf.
+ * zichtbaarheid, de foto's zelf en de prullenmand.
  *
  * Het aanmaken en uploaden staat in `media.ts`, samen met de magazines en de
- * promovideo's; dit bestand gaat enkel over wijzigen achteraf.
+ * aftermovies; dit bestand gaat enkel over wijzigen achteraf.
  *
  * **Alles leeft in Immich**, ook de structuur: een tab is een eigen Immich-album
  * met `[parent: <slug>]` en `[tab: <naam>]` in zijn beschrijving (zie
  * `packages/gallery/src/grouping.ts`). Wijzigen betekent hier dus bijna altijd:
  * de beschrijving herschrijven met `setMarker`, zonder de `[gallery]`-merker
  * kwijt te spelen, want zonder die merker verdwijnt het album van de site.
+ *
+ * Een album wordt aangewezen met het Immich-id van zijn hoofdalbum, niet met de
+ * slug van de site: een verborgen album staat niet in de momentopname en heeft
+ * dus geen slug, en een slug verandert mee met de titel.
  */
 
 import { revalidatePath } from "next/cache";
@@ -22,22 +26,22 @@ import { logAudit } from "@/lib/audit";
 import {
   addImmichAssetsToAlbum,
   createImmichGalleryAlbum,
-  deleteImmichAlbum,
   deleteImmichAssets,
   galleryAlbumMarker,
   galleryHiddenAlbumMarker,
-  getImmichGalleryAlbum,
   getManageableGalleryAlbum,
+  listAdminGalleryAlbums,
   refreshImmichGallerySnapshot,
   removeImmichAssetsFromAlbum,
+  restoreImmichAssets,
   setImmichAlbumCover,
   succeededAssetIds,
   setMarker,
   swapMarker,
   updateImmichAlbum,
-  type GalleryAlbum,
-  type GallerySubAlbum,
+  type AdminAlbum,
 } from "@/lib/immich-gallery";
+import { trashCutoff } from "@/lib/media-admin-shared";
 
 /**
  * Wie een album mag beheren.
@@ -61,43 +65,45 @@ function readIds(formData: FormData, name = "assetIds"): string[] {
 
 /**
  * Na elke wijziging: de momentopname opnieuw opbouwen (anders blijft de
- * wijziging tot een kwartier onzichtbaar) en de pagina's die eruit lezen
- * hertekenen, de beheerpagina's inbegrepen.
+ * wijziging tot een kwartier onzichtbaar op de site) en zowel de site als het
+ * hele beheer hertekenen, de albumlijst links inbegrepen.
  */
 async function refreshGallery(): Promise<void> {
   await refreshImmichGallerySnapshot().catch(() => null);
   revalidatePath("/media");
   revalidatePath("/en/media");
   revalidatePath("/[locale]/media/[albumSlug]", "page");
-  revalidatePath("/[locale]/admin/media", "page");
-  revalidatePath("/[locale]/admin/media/albums/[slug]", "page");
+  revalidatePath("/[locale]/admin/media", "layout");
 }
 
-/** Het album van de momentopname, of `null` wanneer de slug niet (meer) bestaat. */
-async function loadAlbum(slug: string): Promise<GalleryAlbum | null> {
-  if (!slug) return null;
-  return getImmichGalleryAlbum(slug).catch(() => null);
+/** Het album met al zijn delen, op het id van het hoofdalbum. */
+async function loadAlbum(albumId: string): Promise<AdminAlbum | null> {
+  if (!albumId) return null;
+  const albums = await listAdminGalleryAlbums().catch(() => null);
+  return albums?.find((album) => album.id === albumId) ?? null;
 }
 
-/**
- * De albums waaruit dit album bestaat: het album zelf wanneer er geen tabs zijn,
- * anders één per tab. `GallerySubAlbum.id` is het Immich-album-id.
- */
-function albumParts(album: GalleryAlbum): Array<{ id: string; title: string }> {
-  if (album.subAlbums && album.subAlbums.length > 1) {
-    return album.subAlbums.map((sub) => ({ id: sub.id, title: sub.title }));
+function partOf(album: AdminAlbum, partId: string) {
+  return album.parts.find((part) => part.id === partId) ?? null;
+}
+
+/** De tabnaam om in een rij te bewaren, of `null` wanneer het album geen tabs heeft. */
+function tabNameOf(album: AdminAlbum, partId: string): string | null {
+  return album.parts.length > 1 ? partOf(album, partId)?.name ?? null : null;
+}
+
+/** Zet de galerijmerker op elk deel van het album aan of uit. */
+async function setPartsVisible(partIds: string[], visible: boolean): Promise<void> {
+  const marker = galleryAlbumMarker();
+  const hidden = galleryHiddenAlbumMarker();
+  for (const id of partIds) {
+    const current = await getManageableGalleryAlbum(id);
+    if (!current) continue;
+    const next = visible
+      ? swapMarker(current.description, hidden, marker)
+      : swapMarker(current.description, marker, hidden);
+    if (next !== current.description) await updateImmichAlbum(id, { description: next });
   }
-  return [{ id: album.id, title: album.title }];
-}
-
-function findPart(album: GalleryAlbum, albumId: string): GallerySubAlbum | null {
-  return album.subAlbums?.find((sub) => sub.id === albumId) ?? null;
-}
-
-/** De ruwe beschrijving uit Immich; de momentopname heeft de merkers er al uit. */
-async function rawDescription(albumId: string): Promise<string> {
-  const row = await getManageableGalleryAlbum(albumId);
-  return row?.description ?? "";
 }
 
 // -----------------------------------------------------------------------------
@@ -143,9 +149,9 @@ export async function saveAlbumDetailsAction(
 }
 
 /**
- * Van de site halen en terugzetten: `[gallery]` wisselt met `[gallery-uit]`.
- * De merker weghalen zou het album onvindbaar maken in het beheer, en dan kan je
- * het er nooit meer op zetten.
+ * Op de site zetten en eraf halen: `[gallery]` wisselt met `[gallery-uit]`, op
+ * **elk** deel van het album. Enkel het hoofdalbum omzetten liet de tabs als
+ * losse albums op de site staan, want hun `[parent:]` wees dan naar niets.
  */
 export async function setAlbumVisibilityAction(
   _prev: SaveState,
@@ -155,19 +161,11 @@ export async function setAlbumVisibilityAction(
 
   const albumId = readField(formData, "albumId", 100);
   const visible = formData.get("visible") === "true";
-  if (!albumId) return saveError("INVALID_INPUT");
-
-  const current = await getManageableGalleryAlbum(albumId);
-  if (!current) return saveError("ALBUM_MISSING");
-
-  const marker = galleryAlbumMarker();
-  const hidden = galleryHiddenAlbumMarker();
-  const next = visible
-    ? swapMarker(current.description, hidden, marker)
-    : swapMarker(current.description, marker, hidden);
+  const album = await loadAlbum(albumId);
+  if (!album) return saveError("ALBUM_MISSING");
 
   try {
-    await updateImmichAlbum(albumId, { description: next });
+    await setPartsVisible(album.parts.map((part) => part.id), visible);
   } catch (error) {
     console.error("Immich album visibility update failed", error);
     return saveError("IMMICH_UNREACHABLE");
@@ -176,9 +174,9 @@ export async function setAlbumVisibilityAction(
   await logAudit({
     action: "update",
     entity: "photoAlbum",
-    entityId: albumId,
-    target: current.title,
-    summary: visible ? "fotoalbum terug op de site gezet" : "fotoalbum van de site gehaald",
+    entityId: album.id,
+    target: album.title,
+    summary: visible ? "fotoalbum op de site gezet" : "fotoalbum van de site gehaald",
   });
   await refreshGallery();
   return saveOk();
@@ -197,6 +195,10 @@ export async function setAlbumCoverAction(
   try {
     await setImmichAlbumCover(albumId, assetId);
   } catch (error) {
+    // Immich aanvaardt als cover enkel een foto uit dat album zelf, en de cover
+    // hangt aan het hoofdalbum: een foto uit een andere tab kan dat niet zijn.
+    const status = (error as { status?: number })?.status;
+    if (status === 400) return saveError("COVER_OTHER_TAB");
     console.error("Immich album cover update failed", error);
     return saveError("IMMICH_UNREACHABLE");
   }
@@ -213,56 +215,81 @@ export async function setAlbumCoverAction(
 }
 
 /**
- * Het hele album weg, tabs inbegrepen.
+ * Het album naar de prullenmand van het beheer.
  *
- * **Een Immich-album verwijderen wist de foto's niet**: ze blijven in de
- * bibliotheek staan en in elk ander album waar ze in zitten. Wie ze ook weg wil,
- * vinkt dat apart aan; die gaan dan naar de prullenmand van Immich, niet
- * definitief weg.
+ * Er wordt nog niets verwijderd: elk deel krijgt de uit-merker, zodat het meteen
+ * van de site is, en een rij in `GalleryTrashedAlbum` haalt het uit de lijst.
+ * Terugzetten is die twee dingen ongedaan maken. Pas na 30 dagen gaat het echt
+ * weg (`purgeExpiredGalleryTrash`).
  */
-export async function deleteAlbumAction(
+export async function trashAlbumAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
+  const session = await requireAnyPermission([...ALBUM_PERMISSIONS]);
 
-  const slug = readField(formData, "slug", 200);
-  const alsoTrashPhotos = formData.get("alsoTrashPhotos") === "true";
-  const album = await loadAlbum(slug);
-
-  // Een album dat van de site gehaald is, zit niet in de momentopname; dan is
-  // de slug het Immich-album-id en gaat het per definitie om één album.
-  const fallback = album ? null : await getManageableGalleryAlbum(slug).catch(() => null);
-  if (!album && !fallback) return saveError("ALBUM_MISSING");
-
-  const parts = album ? albumParts(album) : [{ id: fallback!.id, title: fallback!.title }];
-  const assetIds = album ? album.photos.map((photo) => photo.id) : [];
-  const albumTitle = album?.title ?? fallback!.title;
+  const album = await loadAlbum(readField(formData, "albumId", 100));
+  if (!album) return saveError("ALBUM_MISSING");
+  const partIds = album.parts.map((part) => part.id);
 
   try {
-    if (alsoTrashPhotos && assetIds.length > 0) {
-      await deleteImmichAssets(assetIds, { force: false });
-    }
-    for (const part of parts) {
-      await deleteImmichAlbum(part.id);
-    }
+    await setPartsVisible(partIds, false);
   } catch (error) {
-    console.error("Immich album delete failed", error);
+    console.error("Immich album trash failed", error);
     return saveError("IMMICH_UNREACHABLE");
   }
 
-  await prisma.galleryDetachedPhoto.deleteMany({
-    where: { gallery: "MAIN", albumId: { in: parts.map((part) => part.id) } },
+  await prisma.galleryTrashedAlbum.upsert({
+    where: { albumId: album.id },
+    create: {
+      gallery: "MAIN",
+      albumId: album.id,
+      partIds,
+      title: album.title,
+      photoCount: album.photoCount,
+      wasHidden: album.hidden,
+      trashedById: session.user.id,
+    },
+    update: { partIds, title: album.title, photoCount: album.photoCount, trashedAt: new Date() },
   });
 
   await logAudit({
     action: "delete",
     entity: "photoAlbum",
-    entityId: parts[0].id,
-    target: albumTitle,
-    summary: alsoTrashPhotos
-      ? `fotoalbum verwijderd, met ${assetIds.length} foto('s) naar de prullenmand`
-      : "fotoalbum verwijderd; de foto's blijven in Immich staan",
+    entityId: album.id,
+    target: album.title,
+    summary: "fotoalbum naar de prullenmand van het mediabeheer",
+  });
+  await refreshGallery();
+  return saveOk();
+}
+
+export async function restoreAlbumAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requireAnyPermission([...ALBUM_PERMISSIONS]);
+
+  const albumId = readField(formData, "albumId", 100);
+  const row = await prisma.galleryTrashedAlbum.findUnique({ where: { albumId } });
+  if (!row || row.gallery !== "MAIN") return saveError("TRASH_MISSING");
+  if (row.trashedAt < trashCutoff(new Date())) return saveError("TRASH_EXPIRED");
+
+  try {
+    // Stond het al van de site voor het weggegooid werd, dan blijft het dat.
+    if (!row.wasHidden) await setPartsVisible(row.partIds, true);
+  } catch (error) {
+    console.error("Immich album restore failed", error);
+    return saveError("IMMICH_UNREACHABLE");
+  }
+
+  await prisma.galleryTrashedAlbum.delete({ where: { id: row.id } });
+  await logAudit({
+    action: "update",
+    entity: "photoAlbum",
+    entityId: row.albumId,
+    target: row.title,
+    summary: "fotoalbum uit de prullenmand teruggezet",
   });
   await refreshGallery();
   return saveOk();
@@ -274,7 +301,8 @@ export async function deleteAlbumAction(
 
 /**
  * Een tab bijmaken: een nieuw Immich-album dat via `[parent:]` aan dit album
- * hangt. De foto's komen er daarna in via de gewone upload-actie.
+ * hangt. De foto's komen er daarna in via de gewone upload-actie. Staat het
+ * album van de site, dan de nieuwe tab ook.
  */
 export async function addAlbumTabAction(
   _prev: SaveState,
@@ -282,13 +310,12 @@ export async function addAlbumTabAction(
 ): Promise<SaveState> {
   await requireAnyPermission([...ALBUM_PERMISSIONS]);
 
-  const slug = readField(formData, "slug", 200);
   const name = readField(formData, "tabName", 50);
   if (!name) return saveError("TAB_NAME_REQUIRED");
 
-  const album = await loadAlbum(slug);
+  const album = await loadAlbum(readField(formData, "albumId", 100));
   if (!album) return saveError("ALBUM_MISSING");
-  if (album.subAlbums?.some((sub) => sub.title.toLowerCase() === name.toLowerCase())) {
+  if (album.parts.some((part) => part.name.toLowerCase() === name.toLowerCase())) {
     return saveError("TAB_EXISTS");
   }
 
@@ -300,10 +327,11 @@ export async function addAlbumTabAction(
     await createImmichGalleryAlbum({
       title: `${album.title}: ${name}`,
       description: `[parent: ${album.slug}] [tab: ${name}]`,
+      hidden: album.hidden,
     });
 
-    if (parentTabName) {
-      const raw = await rawDescription(album.id);
+    if (parentTabName && !album.hasOwnTabName) {
+      const raw = (await getManageableGalleryAlbum(album.id))?.description ?? "";
       await updateImmichAlbum(album.id, { description: setMarker(raw, "tab", parentTabName) });
     }
   } catch (error) {
@@ -328,13 +356,14 @@ export async function renameAlbumTabAction(
 ): Promise<SaveState> {
   await requireAnyPermission([...ALBUM_PERMISSIONS]);
 
-  const albumId = readField(formData, "albumId", 100);
+  const partId = readField(formData, "partId", 100);
   const name = readField(formData, "tabName", 50);
-  if (!albumId || !name) return saveError("TAB_NAME_REQUIRED");
+  if (!partId || !name) return saveError("TAB_NAME_REQUIRED");
 
   try {
-    const raw = await rawDescription(albumId);
-    await updateImmichAlbum(albumId, { description: setMarker(raw, "tab", name) });
+    const raw = (await getManageableGalleryAlbum(partId))?.description;
+    if (raw === undefined) return saveError("ALBUM_MISSING");
+    await updateImmichAlbum(partId, { description: setMarker(raw, "tab", name) });
   } catch (error) {
     console.error("Immich tab rename failed", error);
     return saveError("IMMICH_UNREACHABLE");
@@ -343,7 +372,7 @@ export async function renameAlbumTabAction(
   await logAudit({
     action: "update",
     entity: "photoAlbum",
-    entityId: albumId,
+    entityId: partId,
     target: name,
     summary: "tab van een fotoalbum hernoemd",
   });
@@ -353,23 +382,23 @@ export async function renameAlbumTabAction(
 
 /**
  * Een tab opheffen: `[parent:]` en `[tab:]` weg, waardoor dat album een
- * zelfstandig album op de mediapagina wordt. De foto's blijven waar ze zijn.
+ * zelfstandig album wordt. De foto's blijven waar ze zijn.
  */
 export async function detachAlbumTabAction(formData: FormData): Promise<void> {
   await requireAnyPermission([...ALBUM_PERMISSIONS]);
 
-  const albumId = readField(formData, "albumId", 100);
-  if (!albumId) return;
+  const partId = readField(formData, "partId", 100);
+  if (!partId) return;
 
-  const raw = await rawDescription(albumId);
+  const raw = (await getManageableGalleryAlbum(partId))?.description ?? "";
   const next = setMarker(setMarker(raw, "parent", null), "tab", null);
-  await updateImmichAlbum(albumId, { description: next });
+  await updateImmichAlbum(partId, { description: next });
 
   await logAudit({
     action: "update",
     entity: "photoAlbum",
-    entityId: albumId,
-    target: albumId,
+    entityId: partId,
+    target: partId,
     summary: "tab losgekoppeld; het album staat nu op zichzelf",
   });
   await refreshGallery();
@@ -391,19 +420,17 @@ export async function movePhotosToTabAction(
 ): Promise<SaveState> {
   await requireAnyPermission([...ALBUM_PERMISSIONS]);
 
-  const slug = readField(formData, "slug", 200);
-  const fromId = readField(formData, "fromAlbumId", 100);
-  const toId = readField(formData, "toAlbumId", 100);
+  const fromId = readField(formData, "fromPartId", 100);
+  const toId = readField(formData, "toPartId", 100);
   const assetIds = readIds(formData);
   if (!fromId || !toId || assetIds.length === 0) return saveError("INVALID_INPUT");
   if (fromId === toId) return saveError("SAME_TAB");
 
-  const album = await loadAlbum(slug);
+  const album = await loadAlbum(readField(formData, "albumId", 100));
   if (!album) return saveError("ALBUM_MISSING");
   // Verplaatsen mag enkel binnen dit album; anders is dit een manier om foto's
   // naar willekeurige Immich-albums te schuiven.
-  const parts = new Set(albumParts(album).map((part) => part.id));
-  if (!parts.has(fromId) || !parts.has(toId)) return saveError("INVALID_INPUT");
+  if (!partOf(album, fromId) || !partOf(album, toId)) return saveError("INVALID_INPUT");
 
   // Immich antwoordt met HTTP 200 en een resultaat per foto, dus enkel de
   // foto's die écht in de nieuwe tab staan mogen uit de oude gehaald worden.
@@ -428,68 +455,60 @@ export async function movePhotosToTabAction(
     return saveError("MOVE_HALF_DONE");
   }
 
-  if (moved.length < assetIds.length) {
-    await refreshGallery();
-    return saveError(
-      "MOVE_PARTIAL",
-      `${moved.length} van de ${assetIds.length} foto's zijn verplaatst; de rest bleef staan.`,
-    );
-  }
-
   await logAudit({
     action: "update",
     entity: "photoAlbum",
     entityId: album.id,
     target: album.title,
-    summary: `${assetIds.length} foto('s) naar een andere tab verplaatst`,
+    summary: `${moved.length} foto('s) naar een andere tab verplaatst`,
   });
   await refreshGallery();
+  if (moved.length < assetIds.length) {
+    return saveError(
+      "MOVE_PARTIAL",
+      `${moved.length} van de ${assetIds.length} foto's zijn verplaatst; de rest bleef staan.`,
+    );
+  }
   return saveOk();
 }
 
 /**
- * Foto's uit het album halen. Ze blijven in Immich staan; de rij in
- * `GalleryDetachedPhoto` is het enige spoor waarmee we ze nog terugvinden.
+ * Foto's verbergen: ze gaan uit het album en dus van de site, maar blijven in
+ * het beheer staan (gedimd) zodat je ze terug kan tonen. De rij in
+ * `GalleryDetachedPhoto` is wat het beheer nodig heeft om ze terug te vinden.
  */
-export async function detachPhotosAction(
+export async function hidePhotosAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
   const session = await requireAnyPermission([...ALBUM_PERMISSIONS]);
 
-  const slug = readField(formData, "slug", 200);
-  const fromId = readField(formData, "fromAlbumId", 100);
+  const partId = readField(formData, "partId", 100);
   const assetIds = readIds(formData);
-  if (!fromId || assetIds.length === 0) return saveError("INVALID_INPUT");
+  if (!partId || assetIds.length === 0) return saveError("INVALID_INPUT");
 
-  const album = await loadAlbum(slug);
+  const album = await loadAlbum(readField(formData, "albumId", 100));
   if (!album) return saveError("ALBUM_MISSING");
-  const parts = albumParts(album);
-  const part = parts.find((item) => item.id === fromId);
-  if (!part) return saveError("INVALID_INPUT");
-
-  const sub = findPart(album, fromId);
-  const photos = (sub?.photos ?? album.photos).filter((photo) => assetIds.includes(photo.id));
+  if (!partOf(album, partId)) return saveError("INVALID_INPUT");
 
   // Enkel wat Immich echt uit het album haalde: een rij schrijven voor een foto
   // die er nog in staat, zet ze in twee lijsten tegelijk.
-  let detached: string[] = [];
+  let hidden: string[] = [];
   try {
-    detached = succeededAssetIds(await removeImmichAssetsFromAlbum(fromId, assetIds));
+    hidden = succeededAssetIds(await removeImmichAssetsFromAlbum(partId, assetIds));
   } catch (error) {
-    console.error("Immich detach failed", error);
+    console.error("Immich hide failed", error);
     return saveError("IMMICH_UNREACHABLE");
   }
-  if (detached.length === 0) return saveError("DETACH_FAILED");
+  if (hidden.length === 0) return saveError("HIDE_FAILED");
 
   await prisma.galleryDetachedPhoto.createMany({
-    data: detached.map((assetId) => ({
+    data: hidden.map((assetId) => ({
       gallery: "MAIN" as const,
       assetId,
-      albumId: fromId,
+      albumId: partId,
       albumTitle: album.title,
-      tabName: parts.length > 1 ? part.title : null,
-      filename: photos.find((photo) => photo.id === assetId)?.filename ?? null,
+      tabName: tabNameOf(album, partId),
       detachedById: session.user.id,
     })),
     skipDuplicates: true,
@@ -500,64 +519,20 @@ export async function detachPhotosAction(
     entity: "photoAlbum",
     entityId: album.id,
     target: album.title,
-    summary: `${detached.length} foto('s) uit het album gehaald; ze blijven in Immich staan`,
+    summary: `${hidden.length} foto('s) verborgen op de site`,
   });
   await refreshGallery();
-  if (detached.length < assetIds.length) {
+  if (hidden.length < assetIds.length) {
     return saveError(
-      "DETACH_PARTIAL",
-      `${detached.length} van de ${assetIds.length} foto's zijn uit het album gehaald; de rest bleef staan.`,
+      "HIDE_PARTIAL",
+      `${hidden.length} van de ${assetIds.length} foto's zijn verborgen; de rest staat nog op de site.`,
     );
   }
   return saveOk();
 }
 
-export async function restorePhotoAction(
-  _prev: SaveState,
-  formData: FormData,
-): Promise<SaveState> {
-  await requireAnyPermission([...ALBUM_PERMISSIONS]);
-
-  const assetId = readField(formData, "assetId", 100);
-  const targetId = readField(formData, "toAlbumId", 100);
-  if (!assetId) return saveError("INVALID_INPUT");
-
-  const row = await prisma.galleryDetachedPhoto.findUnique({ where: { assetId } });
-  if (!row) return saveError("PHOTO_MISSING");
-
-  // Zonder expliciete keuze gaat ze terug naar waar ze vandaan kwam.
-  const destination = targetId || row.albumId;
-
-  try {
-    const restored = succeededAssetIds(await addImmichAssetsToAlbum(destination, [assetId]));
-    // De rij is het enige spoor naar deze foto; ze pas weggooien wanneer de
-    // foto echt terug in het album zit.
-    if (restored.length === 0) return saveError("RESTORE_FAILED");
-  } catch (error) {
-    console.error("Immich restore failed", error);
-    return saveError("IMMICH_UNREACHABLE");
-  }
-
-  await prisma.galleryDetachedPhoto.delete({ where: { assetId } }).catch(() => null);
-
-  await logAudit({
-    action: "update",
-    entity: "photoAlbum",
-    entityId: destination,
-    target: row.albumTitle,
-    summary: "foto teruggezet in het album",
-  });
-  await refreshGallery();
-  return saveOk();
-}
-
-/**
- * Naar de prullenmand van Immich (`force: false`), niet definitief: de foto is
- * meteen van de site weg en Immich ruimt zelf op, maar een tikfout in het beheer
- * is dan geen onherstelbaar verlies. Dezelfde keuze als bij de
- * verwijderverzoeken.
- */
-export async function trashPhotosAction(
+/** Verborgen foto's weer tonen: terug in het album waar ze uit kwamen. */
+export async function showPhotosAction(
   _prev: SaveState,
   formData: FormData,
 ): Promise<SaveState> {
@@ -565,6 +540,62 @@ export async function trashPhotosAction(
 
   const assetIds = readIds(formData);
   if (assetIds.length === 0) return saveError("INVALID_INPUT");
+
+  const rows = await prisma.galleryDetachedPhoto.findMany({
+    where: { gallery: "MAIN", assetId: { in: assetIds } },
+  });
+  if (rows.length === 0) return saveError("PHOTO_MISSING");
+
+  const shown: string[] = [];
+  try {
+    for (const albumId of new Set(rows.map((row) => row.albumId))) {
+      const ids = rows.filter((row) => row.albumId === albumId).map((row) => row.assetId);
+      shown.push(...succeededAssetIds(await addImmichAssetsToAlbum(albumId, ids)));
+    }
+  } catch (error) {
+    console.error("Immich show failed", error);
+    return saveError("IMMICH_UNREACHABLE");
+  }
+  // De rij is het enige spoor naar deze foto; ze pas weggooien wanneer de foto
+  // echt terug in het album zit.
+  if (shown.length === 0) return saveError("SHOW_FAILED");
+  await prisma.galleryDetachedPhoto.deleteMany({ where: { assetId: { in: shown } } });
+
+  await logAudit({
+    action: "update",
+    entity: "photoAlbum",
+    entityId: rows[0].albumId,
+    target: rows[0].albumTitle,
+    summary: `${shown.length} foto('s) weer op de site gezet`,
+  });
+  await refreshGallery();
+  return saveOk();
+}
+
+/**
+ * Naar de prullenmand van Immich (`force: false`), niet definitief: de foto is
+ * meteen van de site weg, en de rij in `GalleryTrashedPhoto` laat het beheer
+ * haar 30 dagen tonen en terugzetten zonder dat iemand in Immich moet.
+ */
+export async function trashPhotosAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  const session = await requireAnyPermission([...ALBUM_PERMISSIONS]);
+
+  const partId = readField(formData, "partId", 100);
+  const assetIds = readIds(formData);
+  if (assetIds.length === 0) return saveError("INVALID_INPUT");
+
+  const album = await loadAlbum(readField(formData, "albumId", 100));
+  if (!album) return saveError("ALBUM_MISSING");
+  // Een verborgen foto zit in geen album meer; waar ze vandaan kwam, staat in
+  // haar rij. Die gaat mee naar de prullenmand, zodat terugzetten ze daar weer
+  // in legt.
+  const detached = await prisma.galleryDetachedPhoto.findMany({
+    where: { gallery: "MAIN", assetId: { in: assetIds } },
+  });
+  const origin = new Map(detached.map((row) => [row.assetId, row.albumId]));
 
   try {
     await deleteImmichAssets(assetIds, { force: false });
@@ -577,13 +608,77 @@ export async function trashPhotosAction(
     }
   }
 
-  await prisma.galleryDetachedPhoto.deleteMany({ where: { assetId: { in: assetIds } } });
+  await prisma.$transaction([
+    prisma.galleryTrashedPhoto.createMany({
+      data: assetIds.map((assetId) => {
+        const from = origin.get(assetId) ?? partId;
+        return {
+          gallery: "MAIN" as const,
+          assetId,
+          albumId: from,
+          albumTitle: album.title,
+          tabName: tabNameOf(album, from),
+          trashedById: session.user.id,
+        };
+      }),
+      skipDuplicates: true,
+    }),
+    prisma.galleryDetachedPhoto.deleteMany({ where: { assetId: { in: assetIds } } }),
+  ]);
 
   await logAudit({
     action: "delete",
     entity: "photoAlbum",
-    target: `${assetIds.length} foto('s)`,
-    summary: "foto's naar de prullenmand van Immich",
+    entityId: album.id,
+    target: album.title,
+    summary: `${assetIds.length} foto('s) naar de prullenmand`,
+  });
+  await refreshGallery();
+  return saveOk();
+}
+
+/**
+ * Foto's uit de prullenmand terugzetten. Immich legt ze zelf terug in hun
+ * album; voor de zekerheid voegen we ze er nog eens aan toe (een foto die er
+ * al in zit, telt als gelukt).
+ */
+export async function restorePhotosAction(
+  _prev: SaveState,
+  formData: FormData,
+): Promise<SaveState> {
+  await requireAnyPermission([...ALBUM_PERMISSIONS]);
+
+  const assetIds = readIds(formData);
+  if (assetIds.length === 0) return saveError("INVALID_INPUT");
+
+  const rows = await prisma.galleryTrashedPhoto.findMany({
+    where: { gallery: "MAIN", assetId: { in: assetIds }, trashedAt: { gte: trashCutoff(new Date()) } },
+  });
+  if (rows.length === 0) return saveError("TRASH_MISSING");
+
+  try {
+    await restoreImmichAssets(rows.map((row) => row.assetId));
+  } catch (error) {
+    // Immich ruimt zijn prullenmand op zijn eigen termijn op; staat die korter
+    // dan 30 dagen, dan is de foto daar al weg.
+    const status = (error as { status?: number })?.status;
+    if (status === 400 || status === 404) return saveError("TRASH_EXPIRED");
+    console.error("Immich restore failed", error);
+    return saveError("IMMICH_UNREACHABLE");
+  }
+
+  for (const albumId of new Set(rows.map((row) => row.albumId))) {
+    const ids = rows.filter((row) => row.albumId === albumId).map((row) => row.assetId);
+    await addImmichAssetsToAlbum(albumId, ids).catch(() => null);
+  }
+  await prisma.galleryTrashedPhoto.deleteMany({ where: { assetId: { in: rows.map((row) => row.assetId) } } });
+
+  await logAudit({
+    action: "update",
+    entity: "photoAlbum",
+    entityId: rows[0].albumId,
+    target: rows[0].albumTitle,
+    summary: `${rows.length} foto('s) uit de prullenmand teruggezet`,
   });
   await refreshGallery();
   return saveOk();

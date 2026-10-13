@@ -23,6 +23,8 @@ const gallery = createGalleryClient({
 });
 
 export type {
+  AdminAlbum,
+  AdminAlbumPart,
   AmbiguousAlbum,
   GalleryAlbum,
   GalleryAlbumSummary,
@@ -39,7 +41,9 @@ export {
   downloadImmichOriginal,
   getImmichAssetThumbnail,
   immichWebUrl,
+  listImmichAlbumAssets,
   removeImmichAssetsFromAlbum,
+  restoreImmichAssets,
   runImmichAssetJob,
   setImmichAlbumCover,
   setMarker,
@@ -62,5 +66,6 @@ export const addImmichAssetsToAlbum = gallery.addAssets;
 export const listAmbiguousGalleryAlbums = gallery.listAmbiguousAlbums;
 export const listManageableGalleryAlbums = gallery.listManageableAlbums;
 export const getManageableGalleryAlbum = gallery.getManageableAlbum;
+export const listAdminGalleryAlbums = gallery.listAdminAlbums;
 export const galleryAlbumMarker = gallery.marker;
 export const galleryHiddenAlbumMarker = gallery.hiddenMarker;
