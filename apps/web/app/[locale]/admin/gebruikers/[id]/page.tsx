@@ -4,6 +4,13 @@ import { hasLocale } from '@/lib/locale';
 import { requirePermission } from '@/lib/session';
 import { getDictionary, type Locale } from '@vtk/i18n';
 import { nameParts } from '@vtk/auth';
+import { publicUrl } from '@/lib/storage';
+import { AvatarCropField } from '@/components/profile/AvatarCropField';
+import {
+  removeUserAvatarAction,
+  updateUserAvatarAction,
+} from '@/app/actions/users-groups';
+import { userAvatarErrorMessages } from '../messages';
 import { Button, Card, Input, Label, Select } from '@vtk/ui';
 import { DeleteButton, DeleteIconButton } from '@/components/ui/DeleteIconButton';
 import { SaveForm } from '@/components/ui/SaveForm';
@@ -147,6 +154,46 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
             </p>
           ) : null}
         </SaveForm>
+      </Card>
+
+      <Card className="p-5 space-y-4">
+        <h2 className="font-semibold">{locale === 'nl' ? 'Profielfoto' : 'Profile photo'}</h2>
+        <p className="max-w-2xl text-sm leading-6 text-[#5c667f]">
+          {locale === 'nl'
+            ? 'Vervang de foto van dit lid, bvb wanneer een ongepaste foto werd gebruikt. De nieuwe foto wordt vierkatisch bijgesneden en opgeslagen; de oude wordt verwijderd.'
+            : 'Replace this member\'s photo, e.g. when an inappropriate one was used. The new photo is cropped to a square and stored; the old one is removed.'}
+        </p>
+        <SaveForm
+          action={updateUserAvatarAction}
+          className="grid grid-cols-1 gap-3 md:grid-cols-[auto_1fr]"
+          submitLabel={locale === 'nl' ? 'Nieuwe foto opslaan' : 'Save new photo'}
+          savingLabel={locale === 'nl' ? 'Opslaan...' : 'Saving...'}
+          savedMessage={locale === 'nl' ? 'Profielfoto bijgewerkt' : 'Profile photo updated'}
+          errorMessages={userAvatarErrorMessages(locale)}
+          fallbackErrorMessage={dict.common.saveError}
+        >
+          <input type="hidden" name="id" value={user.id} />
+          <AvatarCropField locale={locale} currentAvatar={publicUrl(user.avatarKey)} />
+        </SaveForm>
+        {user.avatarKey ? (
+          <DeleteButton
+            action={removeUserAvatarAction}
+            fields={{ id: user.id }}
+            title={locale === 'nl' ? 'Profielfoto verwijderen?' : 'Remove profile photo?'}
+            description={
+              locale === 'nl'
+                ? `De profielfoto van ${user.name} wordt verwijderd. Dit kan niet ongedaan gemaakt worden.`
+                : `The profile photo of ${user.name} will be removed. This cannot be undone.`
+            }
+            confirmLabel={locale === 'nl' ? 'Verwijderen' : 'Remove'}
+            cancelLabel={locale === 'nl' ? 'Annuleren' : 'Cancel'}
+            successMessage={locale === 'nl' ? 'Profielfoto verwijderd' : 'Profile photo removed'}
+            errorMessages={userAvatarErrorMessages(locale)}
+            errorFallback={dict.common.saveError}
+          >
+            {locale === 'nl' ? 'Foto verwijderen' : 'Remove photo'}
+          </DeleteButton>
+        ) : null}
       </Card>
 
       <Card className="p-5 space-y-4">

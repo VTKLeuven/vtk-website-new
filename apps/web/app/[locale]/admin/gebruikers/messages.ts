@@ -26,3 +26,29 @@ export function userErrorMessages(locale: Locale): Record<string, string> {
       : "Not deleted: only a superadmin can delete a superadmin account.",
   };
 }
+
+/** Meldingen voor het wijzigen of verwijderen van een profielfoto in de admin. */
+export function userAvatarErrorMessages(locale: Locale): Record<string, string> {
+  const nl = locale === "nl";
+  return {
+    ...saveErrorMessages(locale),
+    ACCOUNT_NOT_FOUND: nl
+      ? "Niet opgeslagen: dit account bestaat niet meer."
+      : "Not saved: this account no longer exists.",
+    AVATAR_REQUIRED: nl
+      ? "Niet opgeslagen: kies eerst een foto."
+      : "Not saved: choose a photo first.",
+    AVATAR_TOO_LARGE: nl
+      ? "Niet opgeslagen: de foto is groter dan 8 MB."
+      : "Not saved: the photo is larger than 8 MB.",
+    AVATAR_FAILED: nl
+      ? "Niet opgeslagen: de foto kon niet worden verwerkt. Probeer een ander bestand."
+      : "Not saved: the photo could not be processed. Try a different file.",
+    STORAGE_UNAVAILABLE: nl
+      ? "Niet verwijderd: de objectopslag antwoordt niet, dus de foto kon niet worden verwijderd. Kijk de S3-instellingen na bij Admin → IT en probeer opnieuw."
+      : "Not removed: object storage is not responding, so the photo could not be removed. Check the S3 settings under Admin → IT and try again.",
+    FORBIDDEN: nl
+      ? "Niet opgeslagen: enkel een superadmin kan de foto van een superadmin wijzigen."
+      : "Not saved: only a superadmin can change a superadmin's photo.",
+  };
+}

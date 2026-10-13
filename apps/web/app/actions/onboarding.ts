@@ -4,10 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { after } from "next/server";
 import { z } from "zod";
-import sharp from "sharp";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@vtk/db";
-import { newStorageKey, putObject, deleteObject } from "@vtk/storage";
+import { deleteObject } from "@vtk/storage";
+import { storeAvatar } from "@/lib/avatar";
 import { requireSession } from "@/lib/session";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { currentStudyYear } from "@/lib/workingYear";
@@ -204,28 +204,6 @@ const profileSchema = z
   })
   .superRefine(validateStudy)
   .and(addressSchema);
-
-const MAX_AVATAR_BYTES = 8 * 1024 * 1024; // 8 MiB before re-encode
-
-/**
- * Store an uploaded avatar: re-encode to a square-ish JPEG, upload to S3 and
- * return the new storage key. Returns `null` when no (valid) file was sent.
- */
-async function storeAvatar(file: File | null): Promise<string | null> {
-  if (!file || file.size === 0) return null;
-  if (file.size > MAX_AVATAR_BYTES) throw new Error("AVATAR_TOO_LARGE");
-
-  const input = Buffer.from(await file.arrayBuffer());
-  const body = await sharp(input)
-    .rotate()
-    .resize(512, 512, { fit: "cover" })
-    .jpeg({ quality: 86, mozjpeg: true })
-    .toBuffer();
-
-  const key = newStorageKey("avatars", "avatar.jpg");
-  await putObject(key, body, "image/jpeg");
-  return key;
-}
 
 /** Fouten die het lid zelf kan oplossen; `ProfileForm` vertaalt ze naar een toast. */
 export type ProfileErrorCode =
