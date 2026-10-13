@@ -74,15 +74,6 @@ export function TripInspector({
   }, []);
 
   /**
-   * Het kaartje naast zijn blok leggen.
-   *
-   * Rechts ernaast wanneer dat past, anders links; past geen van beide (een blok
-   * op zondag op een smalle laptop), dan tegen de rechterrand. Verticaal begint
-   * het bij de bovenkant van het blok, maar het schuift omhoog zodra het onderaan
-   * uit beeld zou lopen, en het krijgt een maximumhoogte zodat het binnen het
-   * scherm blijft in plaats van eronder door te lopen.
-   */
-  /**
    * De gemeten hoogte van het kaartje. In een ref en niet in de berekening zelf,
    * en dat is met opzet: `place()` las eerst `offsetHeight` en zette daarmee de
    * positie, terwijl die positie de hoogte weer kon veranderen (een scrollbalk
@@ -92,6 +83,15 @@ export function TripInspector({
    */
   const height = useRef(0);
 
+  /**
+   * Het kaartje naast zijn blok leggen.
+   *
+   * Rechts ernaast wanneer dat past, anders links; past geen van beide (een blok
+   * op zondag op een smalle laptop), dan tegen de rechterrand. Verticaal begint
+   * het bij de bovenkant van het blok, maar het schuift omhoog zodra het onderaan
+   * uit beeld zou lopen, en het krijgt een maximumhoogte zodat het binnen het
+   * scherm blijft in plaats van eronder door te lopen.
+   */
   const place = useCallback(() => {
     const node = panel.current;
     if (!node) return;

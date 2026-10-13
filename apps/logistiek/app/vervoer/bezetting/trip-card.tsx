@@ -38,7 +38,6 @@ export type BezettingTrip = {
    * blok. Het evenement staat eronder als eigen regel.
    */
   title: string;
-  /** Bij welk evenement de rit hoort, of `null`. */
   eventName: string | null;
   /** De post of werkgroep die de rit aanvroeg; bij een externe zijn naam. */
   requester: string;

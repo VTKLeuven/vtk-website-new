@@ -36,24 +36,20 @@ export function parseCalendarView(value: string | undefined): CalendarView {
 }
 
 export type CalendarRange = {
-  /** De dagen die getekend worden, in volgorde. */
   days: Date[];
   /** Eerste dag, en de dag ná de laatste: het venster voor de query. */
   from: Date;
   to: Date;
 };
 
-/** Dagen tellen vanaf een date-only datum. */
 function addDays(day: Date, count: number): Date {
   return new Date(day.getTime() + count * DAY_MS);
 }
 
-/** De eerste van de maand waarin deze dag valt. */
 function startOfMonth(day: Date): Date {
   return new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth(), 1));
 }
 
-/** De eerste van de volgende maand. */
 function startOfNextMonth(day: Date): Date {
   return new Date(Date.UTC(day.getUTCFullYear(), day.getUTCMonth() + 1, 1));
 }

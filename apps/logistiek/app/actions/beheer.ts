@@ -275,7 +275,6 @@ async function writeUnits(
   return true;
 }
 
-/** JSON-array van id's uit een hidden input, ontdubbeld. */
 function parseIdList(raw: FormDataEntryValue | null): string[] {
   const text = String(raw ?? '').trim();
   if (!text) return [];
@@ -444,7 +443,6 @@ async function writeAlternatives(
   });
 }
 
-/** Snelle voorraadbijstelling per item, zonder het hele item te bewerken. */
 export async function setItemQuantityAction(itemId: string, quantity: number): Promise<ActionResult> {
   await requireManage();
   if (!Number.isInteger(quantity) || quantity < 0) return { ok: false, error: 'Ongeldig aantal.' };
@@ -1197,7 +1195,6 @@ export async function markDepositReturnedAction(reservationId: string): Promise<
 //    je iets rechtgezet hebt.
 // ---------------------------------------------------------------------------
 
-/** Betalingen die een wijziging blokkeren: lopend of geslaagd. */
 const BLOCKING_PAYMENT_STATUSES = ['CREATED', 'PENDING', 'SUCCEEDED'];
 
 export async function reopenReservationAction(reservationId: string): Promise<ActionResult> {
@@ -1424,12 +1421,6 @@ export async function undoDepositReturnedAction(reservationId: string): Promise<
   return { ok: true, message: 'De waarborg staat weer open.' };
 }
 
-/**
- * Team-bewerking van een aanvraag. Mag REQUESTED en APPROVED bewerken (elke post
- * kiezen). Bij APPROVED loopt de save in dezelfde Serializable-transactie als het
- * goedkeuren en wordt de voorraad opnieuw gecheckt, zodat een APPROVED aanvraag
- * altijd door voorraad gedekt blijft.
- */
 /**
  * Team-bewerking van een flesserke-aanvraag.
  *
@@ -1672,6 +1663,12 @@ export async function shiftReservationDatesAction(
   return saveOk();
 }
 
+/**
+ * Team-bewerking van een aanvraag. Mag REQUESTED en APPROVED bewerken (elke post
+ * kiezen). Bij APPROVED loopt de save in dezelfde Serializable-transactie als het
+ * goedkeuren en wordt de voorraad opnieuw gecheckt, zodat een APPROVED aanvraag
+ * altijd door voorraad gedekt blijft.
+ */
 export async function adminEditReservationAction(
   reservationId: string,
   input: ReservationFormInput
@@ -3170,7 +3167,6 @@ async function createDriverRow(
   return null;
 }
 
-/** Chauffeur toevoegen aan de pool, gekozen uit de leden van vtk.be. */
 export async function addDriverAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const session = await requireManage();
 
@@ -3207,7 +3203,6 @@ export async function addDriverFromGroupAction(userId: string): Promise<ActionRe
   return { ok: true };
 }
 
-/** Notitie bij een chauffeur bewerken. */
 export async function saveDriverNoteAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   await requireManage();
 
@@ -3447,7 +3442,6 @@ export async function saveVehicleAction(_prev: SaveState, formData: FormData): P
   if (id) {
     await prisma.uitleenVehicle.update({ where: { id }, data });
   } else {
-    // Nieuwe voertuigen: code afgeleid van de naam, uniek gemaakt.
     const base = nameNl.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'voertuig';
     let code = base;
     for (let i = 2; await prisma.uitleenVehicle.findUnique({ where: { code } }); i += 1) {
@@ -3748,12 +3742,6 @@ export async function deleteFlesserkeBatchAction(batchId: string): Promise<Actio
   return { ok: true, message: 'Lading verwijderd.' };
 }
 
-/**
- * Snelle voorraadbijstelling (wekelijkse upkeep) zonder het hele item te openen.
- *
- * Werkt enkel wanneer er één lading is; liggen er meerdere, dan is niet te weten
- * van welke er twee bij of af moeten, en zou de app die keuze verzinnen.
- */
 export async function setFlesserkeItemActiveAction(itemId: string, active: boolean): Promise<ActionResult> {
   await requireManage();
   await prisma.uitleenFlesserkeItem.update({ where: { id: itemId }, data: { active } });

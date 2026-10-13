@@ -81,7 +81,6 @@ export default async function StatistiekenPage({
     return search ? `/beheer/statistieken?${search}` : '/beheer/statistieken';
   };
 
-  /** Een pil aan- of uitzetten in een lijst met id's. */
   const toggleHref = (key: 'voertuig' | 'post', ids: string[], id: string) => {
     const next = ids.includes(id) ? ids.filter((entry) => entry !== id) : [...ids, id];
     return hrefWith({ [key]: next.join(',') || null });

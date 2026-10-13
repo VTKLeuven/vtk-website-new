@@ -119,7 +119,6 @@ export function AvailabilityPaint({
   note: string;
   previousHref: string;
   nextHref: string;
-  /** Terug naar waar dit scherm vandaan komt. */
   backHref: string;
 }) {
   const showToast = useToast();

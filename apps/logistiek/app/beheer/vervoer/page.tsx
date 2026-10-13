@@ -384,11 +384,9 @@ export default async function BeheerVervoerPage({
 
   const headerClass = 'py-2 pr-3 font-medium';
 
-  /** Kaartjes- en tabelweergave van een lijst afgesloten ritten (Historiek). */
   function HistoryList({ bookings: list }: { bookings: AdminTransportBooking[] }) {
     return (
       <>
-        {/* Kaartjesweergave: zichtbaar op mobile, verborgen op md+ */}
         <ul className="mt-4 grid gap-3 md:hidden">
           {list.map((booking) => (
             <li
@@ -421,7 +419,6 @@ export default async function BeheerVervoerPage({
           ))}
         </ul>
 
-        {/* Tabelweergave: verborgen op mobile, zichtbaar op md+ */}
         <div className="relative mt-4 hidden overflow-x-auto md:block">
           <table className="w-full min-w-[860px] border-collapse text-sm">
             <thead>
@@ -677,7 +674,6 @@ export default async function BeheerVervoerPage({
           <p className="mt-3 text-sm text-vtk-muted">Geen goedgekeurde ritten.</p>
         ) : (
           <>
-            {/* Kaartjesweergave: zichtbaar op mobile, verborgen op md+ */}
             <ul className="mt-4 grid gap-3 md:hidden">
               {approved.map((booking) => {
                 const paid = paidOf(booking);
@@ -729,7 +725,6 @@ export default async function BeheerVervoerPage({
               })}
             </ul>
 
-            {/* Tabelweergave: verborgen op mobile, zichtbaar op md+ */}
             <div className="relative mt-4 hidden overflow-x-auto md:block">
               <table className="w-full min-w-[860px] border-collapse text-sm">
                 <thead>

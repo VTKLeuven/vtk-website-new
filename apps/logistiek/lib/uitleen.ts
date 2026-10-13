@@ -1073,11 +1073,6 @@ export function isLastMinute(
 }
 
 /**
- * De staat van een exemplaar, zoals het team ze noteert. Interne informatie: ze
- * staat in het beheer en op de detailpagina enkel voor `logistiek.manage`, want
- * ze zegt iets over onderhoud en niet over wat je kan aanvragen.
- */
-/**
  * Dagdelen, in de volgorde van de dag. Enkel voor de mensen: de
  * voorraadberekening blijft op hele dagen rekenen (zie docs/design-decisions.md),
  * dus dit label staat naast de datum en niet in een query.
@@ -1144,6 +1139,11 @@ export function tripWindowFor(
   return { startAt: `${day}T${hours.from}`, endAt: `${day}T${hours.to}` };
 }
 
+/**
+ * De staat van een exemplaar, zoals het team ze noteert. Interne informatie: ze
+ * staat in het beheer en op de detailpagina enkel voor `logistiek.manage`, want
+ * ze zegt iets over onderhoud en niet over wat je kan aanvragen.
+ */
 export const ITEM_CONDITION_LABELS: Record<string, string> = {
   WERKT: 'Werkt',
   TESTEN: 'Nog testen',

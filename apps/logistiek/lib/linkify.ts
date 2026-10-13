@@ -45,7 +45,6 @@ export function linkify(text: string): TextChunk[] {
   return chunks;
 }
 
-/** Bevat deze tekst minstens één adres? */
 export function hasLink(text: string): boolean {
   return linkify(text).some((chunk) => chunk.kind === 'link');
 }

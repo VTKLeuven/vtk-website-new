@@ -145,7 +145,6 @@ function ItemFields({
   );
 }
 
-/** De ladingen van één item, elk met een eigen aantal en vervaldatum. */
 function BatchEditor({ item }: { item: AdminFlesserkeItem }) {
   return (
     <div className="grid gap-3">
@@ -391,7 +390,6 @@ export function FlesserkeManager({
         </details>
       </div>
 
-      {/* Zoeken + filteren op categorie. */}
       <div className="flex flex-wrap items-center gap-3">
         <input
           type="search"
@@ -418,7 +416,6 @@ export function FlesserkeManager({
       <section>
         <h3 className="text-lg font-semibold tracking-tight text-vtk-ink">Voorraad ({shown.length})</h3>
 
-        {/* Kaartjesweergave: zichtbaar op mobile, verborgen op md+ */}
         <ul className="mt-4 grid gap-3 md:hidden">
           {shown.map((item) => {
             const available = item.quantity - item.reserved;
@@ -510,7 +507,6 @@ export function FlesserkeManager({
           })}
         </ul>
 
-        {/* Tabelweergave: verborgen op mobile, zichtbaar op md+ */}
         <div className="mt-4 hidden overflow-x-auto md:block">
           <table className="w-full min-w-[720px] border-collapse text-sm">
             <thead>

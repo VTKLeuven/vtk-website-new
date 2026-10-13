@@ -114,7 +114,6 @@ export function MobileCalendar({
   selectedId?: string | null;
   onSelect?: (blockId: string) => void;
   onSelectEvent?: (eventId: string) => void;
-  /** Volledig scherm verlaten. */
   onClose: () => void;
   /**
    * Een rit toevoegen op de dag die je bekijkt. Slepen om een moment te kiezen
@@ -195,7 +194,6 @@ export function MobileCalendar({
     [blocks, parsedDays]
   );
 
-  /** De evenementen die deze dag raken. */
   const dayEvents = useMemo(() => {
     if (!events || !day) return [];
     const from = startOfBrusselsDay(day);

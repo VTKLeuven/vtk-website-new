@@ -255,8 +255,6 @@ export function TimeGrid({
     [blocks, dayStartHour, parsedDays]
   );
 
-  // Dezelfde dagknip als de ritten, zodat een venster van 22:00 tot 02:00 ook op
-  // twee dagen staat en niet op één met een negatieve hoogte.
   /**
    * Het ontwerp op zijn plek, per dag. Via dezelfde `placeForDay` als de ritten,
    * zodat een selectie over middernacht ook op twee dagen klopt in plaats van
@@ -277,6 +275,8 @@ export function TimeGrid({
     [dayStartHour, draft, parsedDays]
   );
 
+  // Dezelfde dagknip als de ritten, zodat een venster van 22:00 tot 02:00 ook op
+  // twee dagen staat en niet op één met een negatieve hoogte.
   const bandsPerDay = useMemo(
     () => parsedDays.map((day) => (bands ? placeForDay(bands, day, dayStartHour * 60) : [])),
     [bands, dayStartHour, parsedDays]

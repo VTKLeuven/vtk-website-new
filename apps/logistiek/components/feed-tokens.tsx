@@ -38,7 +38,6 @@ export function FeedTokens({
   tokens: FeedTokenRow[];
   /** Mag deze persoon de volledige planning abonneren? Vraagt `logistiek.manage`. */
   canTeam: boolean;
-  /** Staat deze persoon in de chauffeurslijst? */
   canDriver: boolean;
 }) {
   const showToast = useToast();

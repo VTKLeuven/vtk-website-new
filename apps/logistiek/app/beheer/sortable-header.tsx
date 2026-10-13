@@ -32,7 +32,6 @@ export function useSort<K extends string>(initialKey: K) {
   return { key, dir, toggle };
 }
 
-/** Eén sorteerbare kolomkop in een tabel. */
 export function SortHeader<K extends string>({
   label,
   sortKey,

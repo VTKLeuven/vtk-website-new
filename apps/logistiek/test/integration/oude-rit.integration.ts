@@ -227,7 +227,6 @@ describe.sequential('een rit van voor de nieuwe velden', () => {
     // De regels die bij een oude rit niet bestaan, staan er niet.
     expect(oud).not.toContain('Lading:');
     expect(oud).not.toContain('Bijrijders:');
-    // Wat er wel is, staat er wel.
     expect(oud).toContain('Waarvoor: Cantusmateriaal ophalen');
     expect(oud).toContain('Chauffeur: Jonas Chauffeur');
     expect(oud).toContain('Aanvrager bellen: 0470 11 22 33');

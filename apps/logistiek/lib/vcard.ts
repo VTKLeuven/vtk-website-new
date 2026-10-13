@@ -96,10 +96,8 @@ export function parseVcards(text: string): VcardContact[] {
   return out;
 }
 
-/** Waarom een nummer niet door de normalisatie kwam. */
 export type PhoneProblem = 'leeg' | 'geen-belgisch-nummer' | 'dubbele-nul';
 
-/** Wat er van een nummer te maken viel. */
 export type PhoneResult = { ok: true; phone: string } | { ok: false; reason: PhoneProblem };
 
 /**
@@ -176,7 +174,6 @@ export type MatchResult<T extends Person> = {
   matched: Match<T>[];
   /** Meer dan één persoon met deze naam: daar kiezen we niet voor het team. */
   ambiguous: Array<{ contact: VcardContact; candidates: T[] }>;
-  /** Geen persoon met deze naam. */
   unmatched: VcardContact[];
   /** Wel een persoon, maar het nummer was niet te lezen. */
   badPhone: Array<{ contact: VcardContact; person: T; reason: PhoneProblem }>;

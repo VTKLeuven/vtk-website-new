@@ -134,7 +134,6 @@ export function CollectEnGoInbox({
           <p className="mt-3 text-sm text-vtk-muted">Er staat nog geen Collect&Go-mail klaar.</p>
         ) : null}
 
-        {/* Kaartjes op mobile, tabel vanaf md. */}
         <ul className="mt-4 grid gap-3 md:hidden">
           {shown.map((order) => (
             <li key={order.id} className="rounded-[14px] border border-vtk-navy/10 bg-vtk-surface p-4">

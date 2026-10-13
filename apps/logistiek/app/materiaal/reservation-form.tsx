@@ -124,12 +124,6 @@ export function ReservationForm({
   const [eventLink, setEventLink] = useState({ eventId: '', createEvent: false });
 
   /**
-   * Een gekozen evenement vult de naam in plaats van dat je ze opnieuw typt: ze
-   * staat dan twee keer in het formulier en gaat scheef zodra er één van de twee
-   * aangepast wordt. Loskoppelen geeft het veld weer vrij, met de naam die er
-   * stond als vertrekpunt.
-   */
-  /**
    * Rekent de uitleendienst deze aanvrager iets aan? Enkel een externe (R4).
    *
    * Het formulier leidt het aanvragertype af uit de gekozen groep, net zoals de
@@ -138,7 +132,13 @@ export function ReservationForm({
    */
   const charged = chargesRequester(event.requesterType);
 
-  const linkedEvent = events?.find((entry) => entry.id === eventLink.eventId) ?? null;
+  /**
+   * Een gekozen evenement vult de naam in plaats van dat je ze opnieuw typt: ze
+   * staat dan twee keer in het formulier en gaat scheef zodra er één van de twee
+   * aangepast wordt. Loskoppelen geeft het veld weer vrij, met de naam die er
+   * stond als vertrekpunt.
+   */
+  const linkedEvent =events?.find((entry) => entry.id === eventLink.eventId) ?? null;
   function chooseEvent(next: { eventId: string; createEvent: boolean }) {
     setEventLink(next);
     const picked = events?.find((entry) => entry.id === next.eventId);
@@ -285,7 +285,6 @@ export function ReservationForm({
   const items = useMemo(() => catalog.flatMap((category) => category.items), [catalog]);
   const itemsById = useMemo(() => new Map(items.map((item) => [item.id, item])), [items]);
 
-  // Gefilterde weergave: op categorie en op een vrije zoekterm (naam/omschrijving).
   const shownCatalog = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return catalog
@@ -422,7 +421,6 @@ export function ReservationForm({
         type: event.requesterType ?? 'INTERN',
         itemCount: totals.count,
       });
-      // Ingediend: het concept is geen concept meer.
       draft.clear();
     });
   }

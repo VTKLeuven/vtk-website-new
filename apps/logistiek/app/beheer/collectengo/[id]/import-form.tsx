@@ -104,7 +104,6 @@ function itemLabel(item: ItemView): string {
   return [item.brand, item.name, content ? `(${content})` : ''].filter(Boolean).join(' ');
 }
 
-/** Een lijn die de aandacht van het team vraagt voor ze geïmporteerd wordt. */
 function needsAttention(line: LineView, suggestion: MatchSuggestion | null): boolean {
   return suggestion === null || suggestion.confidence === 'FUZZY' || line.unit === 'WEIGHT' || line.note !== null;
 }

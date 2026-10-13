@@ -398,7 +398,6 @@ function ItemTable({
 }) {
   return (
     <>
-      {/* Kaartjesweergave: zichtbaar op mobile, verborgen op md+ */}
       <ul className="grid gap-3 md:hidden">
         {items.map((item) => {
           const editing = editingId === item.id;
@@ -509,7 +508,6 @@ function ItemTable({
         })}
       </ul>
 
-      {/* Tabelweergave: verborgen op mobile, zichtbaar op md+ */}
       <div className="hidden overflow-x-auto md:block">
         <table className="w-full min-w-[760px] border-collapse text-sm">
           <thead>
@@ -865,7 +863,6 @@ export function InventoryManager({
         ) : null}
       </section>
 
-      {/* Zoeken + filteren op categorie. */}
       {items.length > 0 ? (
         <div className="flex flex-wrap items-center gap-3">
           <input

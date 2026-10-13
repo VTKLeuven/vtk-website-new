@@ -128,10 +128,6 @@ function DriverColorPicker({ entry }: { entry: DriverPoolEntry }) {
         Kleur in de planning
       </p>
 
-      {/* Ingeklapt is dit één knop met de kleur die deze chauffeur nu heeft.
-          Vierentwintig bolletjes bij elke chauffeur maakten van een lijst van
-          tien mensen een muur van tweehonderdveertig stippen, en je kijkt naar
-          hoogstens één ervan. */}
       <button
         type="button"
         disabled={pending}
@@ -362,11 +358,6 @@ function DriverRow({ entry }: { entry: DriverPoolEntry }) {
   );
 }
 
-/**
- * De volledige chauffeurslijst: eerst wie via de post Logistiek chauffeur is,
- * daarna wie het team zelf toevoegde. Beide groepen staan in dezelfde lijst,
- * want dit is precies de keuzelijst die je bij een rit te zien krijgt.
- */
 type DriverSortKey = 'name' | 'trips' | 'van';
 
 const DRIVER_SORTS = [
@@ -395,6 +386,11 @@ function sortDrivers(
   });
 }
 
+/**
+ * De volledige chauffeurslijst: eerst wie via de post Logistiek chauffeur is,
+ * daarna wie het team zelf toevoegde. Beide groepen staan in dezelfde lijst,
+ * want dit is precies de keuzelijst die je bij een rit te zien krijgt.
+ */
 export function DriverList({ drivers }: { drivers: DriverPoolEntry[] }) {
   // Sorteren binnen de twee groepen (T10). De groepen zelf blijven gescheiden:
   // wie via de post chauffeur is, beheer je op vtk.be en wie je zelf toevoegde

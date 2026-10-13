@@ -16,7 +16,6 @@ import type { LogistiekLocale } from '@/lib/i18n-shared';
  * op het rooster, en dan hoort er ook geen vulkleur in de legende.
  */
 
-/** Eén voorbeeldblok met zijn uitleg ernaast. */
 function Sample({
   className,
   style,

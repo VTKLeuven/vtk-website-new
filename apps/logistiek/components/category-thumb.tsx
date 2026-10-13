@@ -135,7 +135,6 @@ const PATHS: Record<IconKey, ReactNode> = {
   ),
 };
 
-/** Vult de foto-plek van een item met het categorie-icoon op een paper-2 vlak. */
 export function CategoryThumb({
   categoryName,
   className,

@@ -42,7 +42,6 @@ const IMPORT_ERRORS = {
   NOT_FOUND: 'Een van deze leden bestaat niet meer op vtk.be. Laad het bestand opnieuw in.',
 };
 
-/** Wat er nu staat, met waar het vandaan komt. */
 function currentLabel(driver: DriverPoolEntry): string {
   if (!driver.phone) return 'nog geen nummer';
   if (driver.phoneSource === 'PROFILE') return `${driver.phone}, van zijn profiel`;
@@ -59,7 +58,6 @@ function Group({ title, children }: { title: string; children: React.ReactNode }
   );
 }
 
-/** Eén regel om aan of uit te vinken. */
 function PickRow({
   driver,
   phone,

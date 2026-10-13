@@ -648,7 +648,6 @@ async function summaryFor(
   return kind === 'transport' ? transportSummary(id) : reservationSummary(id);
 }
 
-/** Eén bundel versturen naar de adressen van deze soort. */
 async function deliverDigest(
   kind: NotifyKind,
   to: string[],

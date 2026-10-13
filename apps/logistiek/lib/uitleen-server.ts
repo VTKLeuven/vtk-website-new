@@ -148,7 +148,6 @@ export type FlesserkeCatalogItem = {
 
 export type FlesserkeCatalogCategory = { id: string | null; name: string; items: FlesserkeCatalogItem[] };
 
-/** Actieve flesserke-catalogus, gegroepeerd per categorie. */
 export async function getFlesserkeCatalog(): Promise<FlesserkeCatalogCategory[]> {
   const [categories, items] = await Promise.all([
     prisma.uitleenFlesserkeCategory.findMany({
@@ -511,7 +510,6 @@ export async function myReservations(userId: string, groupIds: string[] = []) {
   });
 }
 
-/** Zoals `myReservations`: eigen ritten plus die van je posten. */
 /**
  * Welke aanvragen en ritten iemand anders gewijzigd heeft sinds de aanvrager ze
  * laatst bekeek (R5).
@@ -550,6 +548,7 @@ export async function unseenChanges(
   return changed;
 }
 
+/** Zoals `myReservations`: eigen ritten plus die van je posten. */
 export async function myVanBookings(userId: string, groupIds: string[] = []) {
   return prisma.uitleenTransportBooking.findMany({
     where:
@@ -1069,14 +1068,6 @@ export async function adminVanBookings() {
 export type AdminTransportBooking = Awaited<ReturnType<typeof adminVanBookings>>[number];
 
 /**
- * Ritten die een venster raken, voor het weekoverzicht. Een rit telt mee zodra
- * ze het venster overlapt en niet enkel wanneer ze erin start: een rit van
- * vrijdag tot maandag hoort in beide weken te staan.
- *
- * `REQUESTED` komt mee, want het weekraster dient net om te zien waar een
- * nieuwe aanvraag nog past; het beheer toont ze in een lichtere stijl.
- */
-/**
  * Statussen die op een bezettingsoverzicht horen: wat het voertuig bezet houdt.
  * Afgewezen en geannuleerd vallen weg, want die ritten gaan niet door.
  */
@@ -1194,6 +1185,14 @@ function allowedStatuses(
   return wanted;
 }
 
+/**
+ * Ritten die een venster raken, voor het weekoverzicht. Een rit telt mee zodra
+ * ze het venster overlapt en niet enkel wanneer ze erin start: een rit van
+ * vrijdag tot maandag hoort in beide weken te staan.
+ *
+ * `REQUESTED` komt mee, want het weekraster dient net om te zien waar een
+ * nieuwe aanvraag nog past; het beheer toont ze in een lichtere stijl.
+ */
 const transportWindowWhere = (
   from: Date,
   to: Date,
@@ -1270,7 +1269,6 @@ export async function transportRange(from: Date, to: Date, filters?: TransportFi
       // `assignTripGroupAction`). Allebei, want allebei maken ze een rit "van
       // jouw post" (F4.1, F4.15).
       groupId: true,
-      // De post die deze rit zelf mag invullen (zie `assignTripGroupAction`).
       assignedGroupId: true,
       assignedGroup: { select: { nameNl: true } },
       vehicle: { select: { nameNl: true } },
@@ -1290,11 +1288,6 @@ export type TransportBooking = Awaited<ReturnType<typeof transportRange>>[number
  * `transportRange`: een projectie achteraf laat vroeg of laat een veld door
  * wanneer iemand hierboven een relatie toevoegt. Voor het publieke overzicht
  * (zie docs/logistiek-feedback-plan.md, V13).
- */
-/**
- * Hetzelfde weekvenster, maar geanonimiseerd: enkel voertuig, dag en
- * tijdvenster. Een eigen projectie en geen filter over de beheerquery, want dat
- * laatste lekt vroeg of laat een veld mee.
  */
 export async function transportWeekPublic(from: Date, to: Date, filters?: TransportFilters) {
   return prisma.uitleenTransportBooking.findMany({
@@ -1508,7 +1501,6 @@ export async function availabilityInRange(from: Date, to: Date) {
   });
 }
 
-/** De vensters van één chauffeur, vanaf vandaag: wat hij zelf beheert. */
 /**
  * De algemene nota van één chauffeur voor één week (F4.5).
  *
@@ -1546,6 +1538,7 @@ export async function availabilityNotesInRange(from: Date, to: Date) {
   });
 }
 
+/** De vensters van één chauffeur, vanaf vandaag: wat hij zelf beheert. */
 export async function availabilityForDriver(userId: string, now = new Date()) {
   // Vensters die al voorbij zijn, blijven in de databank staan (ze zeggen
   // achteraf wie er die dag kon), maar horen niet in de lijst waar je dingen
@@ -2010,21 +2003,10 @@ export async function driverStatus(
   return { isDriver: driver, upcomingTrips };
 }
 
-/** Toont de app "Mijn ritten" voor dit lid? */
 export function showsMyTrips(status: { isDriver: boolean; upcomingTrips: number }): boolean {
   return status.isDriver || status.upcomingTrips > 0;
 }
 
-/**
- * De verantwoordelijken van een post of werkgroep dit werkingsjaar.
- *
- * Voor de mail die vertrekt zodra Logistiek een autorit aan die post doorgeeft:
- * zij zijn het die er iemand op zetten. Enkel `LEAD`, en enkel dit werkingsjaar,
- * dus de lijst loopt vanzelf mee met de 15-juli-wissel.
- *
- * Staat er niemand als verantwoordelijke, dan komt er een lege lijst terug en
- * vertrekt er geen mail; de actie zegt dat, in plaats van stil niets te doen.
- */
 /**
  * Het eigen mailadres van een post of werkgroep (`sport@vtk.be`), of `null`.
  *
@@ -2049,6 +2031,16 @@ export async function groupMailAddress(groupId: string): Promise<string | null> 
   return lists.find((list) => list._count.sources === 1)?.email ?? null;
 }
 
+/**
+ * De verantwoordelijken van een post of werkgroep dit werkingsjaar.
+ *
+ * Voor de mail die vertrekt zodra Logistiek een autorit aan die post doorgeeft:
+ * zij zijn het die er iemand op zetten. Enkel `LEAD`, en enkel dit werkingsjaar,
+ * dus de lijst loopt vanzelf mee met de 15-juli-wissel.
+ *
+ * Staat er niemand als verantwoordelijke, dan komt er een lege lijst terug en
+ * vertrekt er geen mail; de actie zegt dat, in plaats van stil niets te doen.
+ */
 export async function groupLeads(groupId: string) {
   const memberships = await prisma.groupMembership.findMany({
     where: { groupId, year: currentWorkingYear(), role: 'LEAD' },

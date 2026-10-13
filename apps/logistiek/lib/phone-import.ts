@@ -39,7 +39,6 @@ export type PhonePlan<T extends PhoneHolder> = {
   same: Array<Match<T>>;
 };
 
-/** De koppelingen verdelen over de drie gevallen. */
 export function planPhoneImport<T extends PhoneHolder>(matches: ReadonlyArray<Match<T>>): PhonePlan<T> {
   const plan: PhonePlan<T> = { fresh: [], different: [], same: [] };
   for (const match of matches) {

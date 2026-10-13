@@ -78,7 +78,6 @@ export type BoardNote = {
   text: string;
 };
 
-/** Eén venster als balkje op de strook. */
 type Bar = {
   id: string;
   driverId: string;
@@ -125,7 +124,6 @@ export function AvailabilityBoard({
   const [kinds, setKinds] = useState<AvailabilityKind[]>([]);
   /** Zoomniveau: 1 (100%) tot 5 (500%). */
   const [zoom, setZoom] = useState(1);
-  /** Geselecteerde balk voor detailweergave (vooral op mobiel). */
   const [selectedBar, setSelectedBar] = useState<Bar | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -177,9 +175,6 @@ export function AvailabilityBoard({
     []
   );
 
-  /**
-   * Desktop wheel / trackpad pinch zoom.
-   */
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -197,9 +192,6 @@ export function AvailabilityBoard({
     return () => el.removeEventListener('wheel', onWheel);
   }, [setZoomAnchored]);
 
-  /**
-   * Touch pinch-to-zoom voor mobiel.
-   */
   const handleTouchStart = (e: React.TouchEvent) => {
     if (e.touches.length === 2) {
       const t1 = e.touches[0];
@@ -269,9 +261,6 @@ export function AvailabilityBoard({
     return map;
   }, [kinds, range, windows]);
 
-  /**
-   * Hoeveel uur iemand van elke soort opgaf binnen dit venster.
-   */
   const hoursPerDriver = useMemo(() => {
     const map = new Map<string, Record<AvailabilityKind, number>>();
     for (const [driverId, bars] of perDriver) {
@@ -326,10 +315,6 @@ export function AvailabilityBoard({
       .sort((a, b) => a.weekStart.localeCompare(b.weekStart) || a.name.localeCompare(b.name));
   }, [drivers, notes, only]);
 
-  /**
-   * Dynamische tijdsverdeling (ticks) afhankelijk van het zoomniveau en het
-   * aantal dagen.
-   */
   const { ticks, tickStepHours } = useMemo(() => {
     const dayCount = parsedDays.length;
     let step = 6;
@@ -393,7 +378,6 @@ export function AvailabilityBoard({
         </p>
       </div>
 
-      {/* Legende */}
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
         {AVAILABILITY_KINDS.map((kind) => (
           <span key={kind} className="inline-flex items-center gap-1.5 text-[11px] text-vtk-muted">
@@ -408,7 +392,6 @@ export function AvailabilityBoard({
         ))}
       </div>
 
-      {/* Werkbalk: Soort filter + Zoom controls */}
       <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-y border-vtk-navy/10 py-2.5">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-vtk-muted">
@@ -452,7 +435,6 @@ export function AvailabilityBoard({
           })}
         </div>
 
-        {/* Zoombediening (desktop & mobiel) */}
         <div className="flex items-center gap-2">
           <span className="text-[11px] text-vtk-muted hidden lg:inline">
             Ctrl + scroll of knijp om in te zoomen
@@ -512,7 +494,6 @@ export function AvailabilityBoard({
         </div>
       </div>
 
-      {/* Chauffeur filter chips */}
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         <button
           type="button"
@@ -557,7 +538,6 @@ export function AvailabilityBoard({
         })}
       </div>
 
-      {/* Detail inspectiekaartje bij klik of tik op een balk */}
       {selectedBar && (
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-[12px] border border-vtk-navy/15 bg-vtk-paper/80 p-3 text-xs shadow-sm">
           <div className="flex flex-wrap items-center gap-2">
@@ -600,7 +580,6 @@ export function AvailabilityBoard({
         </div>
       )}
 
-      {/* Tijdrooster met zoom en sticky chauffeursnamen */}
       <div
         className="mt-3 min-w-0 overflow-x-auto select-none rounded-[12px] border border-vtk-navy/10 bg-vtk-surface"
         ref={containerRef}
@@ -612,7 +591,6 @@ export function AvailabilityBoard({
           className="relative min-w-[32rem] p-3 transition-all duration-75"
           style={{ width: `${Math.max(100, zoom * 100)}%` }}
         >
-          {/* Dagkop met uurschaal */}
           <div className="flex items-end gap-2 pb-2 border-b border-vtk-navy/10">
             <div className="w-28 sm:w-36 shrink-0 sticky left-0 z-20 bg-vtk-surface pr-2 border-r border-vtk-navy/10">
               <span className="text-[11px] font-semibold text-vtk-muted uppercase tracking-wider">
@@ -635,7 +613,6 @@ export function AvailabilityBoard({
                 ))}
               </div>
 
-              {/* Uurlabels afhankelijk van zoom */}
               <div className="relative mt-1 h-3.5">
                 {ticks.map((tick) =>
                   tick.label ? (
@@ -652,7 +629,6 @@ export function AvailabilityBoard({
             </div>
           </div>
 
-          {/* Chauffeur rijen */}
           <ul className="grid gap-1.5 mt-2">
             {rows.withWindows.map((driver) => {
               const totals = hoursPerDriver.get(driver.id);
@@ -668,7 +644,6 @@ export function AvailabilityBoard({
 
               return (
                 <li key={driver.id} className="flex items-center gap-2 group">
-                  {/* Sticky Chauffeursnaam links */}
                   <div className="w-28 sm:w-36 shrink-0 sticky left-0 z-20 bg-vtk-surface pr-2 border-r border-vtk-navy/10 py-0.5">
                     <span className="block truncate text-xs font-semibold text-vtk-ink">
                       {driver.name}
@@ -680,9 +655,7 @@ export function AvailabilityBoard({
                     ) : null}
                   </div>
 
-                  {/* Balken op de tijdslijn */}
                   <div className="relative h-8 flex-1 overflow-hidden rounded-[8px] bg-vtk-paper/70">
-                    {/* Ticks */}
                     {ticks.map((tick) =>
                       tick.left === 0 ? null : (
                         <span
@@ -700,7 +673,6 @@ export function AvailabilityBoard({
                       )
                     )}
 
-                    {/* Beschikbaarheidsbalken */}
                     {(perDriver.get(driver.id) ?? []).map((bar) => {
                       const isSelected = selectedBar?.id === bar.id;
                       const showLabel = bar.width * zoom >= 3.5;

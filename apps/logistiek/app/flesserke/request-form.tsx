@@ -34,7 +34,6 @@ export type FlesserkeInitial = {
   quantities: Record<string, number>;
 };
 
-/** Flesserke-aanvraagformulier (interne werking). Aparte flow van het materiaal. */
 export function FlesserkeForm({
   catalog,
   groups,
@@ -136,7 +135,6 @@ export function FlesserkeForm({
       .sort((a, b) => (a.item?.name ?? '').localeCompare(b.item?.name ?? '', 'nl'));
   }, [catalog, quantities]);
 
-  // Gefilterde weergave: op categorie en op een vrije zoekterm (naam/merk).
   const shownCatalog = useMemo(() => {
     const needle = search.trim().toLowerCase();
     return catalog

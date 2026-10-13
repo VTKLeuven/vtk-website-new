@@ -214,7 +214,6 @@ export async function createReservationAction(input: ReservationFormInput): Prom
   return { ok: true, message: 'Aanvraag ingediend. Je vindt de status bij Mijn aanvragen.' };
 }
 
-/** Een lid mag zijn eigen materiaalaanvraag bewerken zolang ze nog niet beslist is. */
 export async function editReservationAction(
   reservationId: string,
   input: ReservationFormInput

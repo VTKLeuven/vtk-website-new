@@ -44,7 +44,6 @@ export function DeliveryPanel({
 }: {
   reservationId: string;
   deliveryNote: string | null;
-  /** Ritten die al aan deze aanvraag hangen. */
   trips: Trip[];
   vehicles: VehicleOption[];
   initial: {

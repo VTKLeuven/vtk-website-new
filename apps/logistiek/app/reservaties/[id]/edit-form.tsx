@@ -8,10 +8,6 @@ import type { RequesterOption } from '@/app/materiaal/event-fields';
 import { ReservationForm, type ReservationFormInitial } from '@/app/materiaal/reservation-form';
 import type { CatalogCategory } from '@/lib/uitleen-server';
 
-/**
- * Lid-bewerking van een nog niet besliste materiaalaanvraag. Toont een knop die
- * het gedeelde aanvraagformulier opent, voorgevuld met de huidige waarden.
- */
 export function ReservationEditor({
   reservationId,
   catalog,

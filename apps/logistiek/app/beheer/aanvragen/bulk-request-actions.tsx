@@ -99,7 +99,6 @@ export function RowSelectCheckbox({ id, label }: { id: string; label: string }) 
   );
 }
 
-/** Vinkje in de sectiekop dat alle zichtbare rijen tegelijk (de)selecteert. */
 export function SelectAllCheckbox({ ids }: { ids: string[] }) {
   const { selected, setMany } = useSelection();
   const allSelected = ids.length > 0 && ids.every((id) => selected.has(id));

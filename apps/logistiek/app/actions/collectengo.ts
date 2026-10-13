@@ -196,7 +196,6 @@ export async function importCollectEnGoOrderAction(_prev: SaveState, formData: F
   );
 }
 
-/** Terzijde schuiven: de bestelling blijft staan, maar wacht niet meer. */
 /**
  * Een bestelling aan een evenement hangen, of ervan losmaken (B1/E5).
  *
@@ -231,6 +230,7 @@ export async function linkCollectEnGoOrderToEventAction(
   return { ok: true, message: eventId ? 'Gekoppeld aan het evenement.' : 'Losgekoppeld.' };
 }
 
+/** Terzijde schuiven: de bestelling blijft staan, maar wacht niet meer. */
 export async function ignoreCollectEnGoOrderAction(orderId: string): Promise<ActionResult> {
   await requireManage();
   const order = await prisma.collectEnGoOrder.findUnique({ where: { id: orderId }, select: { status: true } });

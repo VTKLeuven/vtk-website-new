@@ -80,7 +80,6 @@ export default async function ReservatieDetailPage({
     isOwner &&
     !paid &&
     (reservation.status === 'REQUESTED' || reservation.status === 'APPROVED');
-  // Een aanvraag is materiaal- of flesserke-type; de juiste editor volgt daaruit.
   const isFlesserke = reservation.flesserkeLines.length > 0 && reservation.lines.length === 0;
 
   const requesterLabel =
