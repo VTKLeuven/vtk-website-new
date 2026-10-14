@@ -172,9 +172,9 @@ export const FRONTPAGE_MODULES: FrontpageModule[] = [
     labelNl: "24 urenloop",
     labelEn: "24-hour run",
     descriptionNl:
-      "Aftelklok over de volle breedte met een cijferrij eronder. Geen agenda; tijdens de loop telt alleen de loop.",
+      "Aftelklok over de volle breedte met een cijferrij eronder. Het start- en aankomstuur en de live tussenstand komen uit Beheer → 24 urenloop.",
     descriptionEn:
-      "A full-width countdown with a row of figures under it. No agenda; during the run only the run matters.",
+      "A full-width countdown with a row of figures under it. Start and finish times and live race standings come from Admin → 24-hour run.",
     fields: {
       photo: {
         type: "image",
@@ -183,20 +183,6 @@ export const FRONTPAGE_MODULES: FrontpageModule[] = [
         helpNl: "Een sfeerbeeld van de piste werkt beter dan een logo.",
         helpEn: "A photo of the track works better than a logo.",
         fallbackUrl: "/frontpage/urenloop.jpg",
-      },
-      startsAt: {
-        type: "datetime",
-        labelNl: "Startschot",
-        labelEn: "Start",
-        helpNl: "Waar de klok naartoe telt. Daarna telt ze af naar het einde.",
-        helpEn: "What the clock counts down to. After that it counts to the finish.",
-      },
-      endsAt: {
-        type: "datetime",
-        labelNl: "Aankomst",
-        labelEn: "Finish",
-        helpNl: "24 uur later, tenzij het dit jaar anders loopt.",
-        helpEn: "24 hours later, unless this year runs differently.",
       },
       editionNl: {
         type: "text",

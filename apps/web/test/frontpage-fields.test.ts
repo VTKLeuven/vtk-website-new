@@ -18,15 +18,17 @@ const FIELD_PREFIX = 'field.';
 const FORM_CONTROLS = ['layout', 'startsAt', 'endsAt', 'active'];
 
 describe('frontpage field names', () => {
-  it('houdt de velden van een frontpage los van de formulierknoppen', () => {
-    // Precies het geval dat ooit misging: de urenloop heeft een eigen startsAt.
+  it('houdt de velden van een frontpage los van de formulierknoppen en haalt urenloop-tijden uit /admin/24urenloop', () => {
     const urenloop = getFrontpageModule('urenloop');
     expect(urenloop).not.toBeNull();
-    expect(Object.keys(urenloop!.fields)).toContain('startsAt');
+    // Startschot en aankomst van de 24 urenloop staan op één plek (/admin/24urenloop),
+    // niet dubbel op de frontpage.
+    expect(Object.keys(urenloop!.fields)).not.toContain('startsAt');
+    expect(Object.keys(urenloop!.fields)).not.toContain('endsAt');
 
     const form = new FormData();
     form.set('startsAt', '2026-11-01T09:00'); // het venster van de frontpage
-    form.set(`${FIELD_PREFIX}startsAt`, '2026-10-21T20:00'); // het startschot
+    form.set(`${FIELD_PREFIX}startsAt`, '2026-10-21T20:00');
 
     expect(form.get('startsAt')).toBe('2026-11-01T09:00');
     expect(form.get(`${FIELD_PREFIX}startsAt`)).toBe('2026-10-21T20:00');

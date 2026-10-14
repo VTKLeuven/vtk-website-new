@@ -22,7 +22,7 @@ export function newDeviceToken(): { raw: string; hash: string } {
 }
 
 export type DeviceCheck =
-  | { ok: true; email: string }
+  | { ok: true; email: string; deviceId: string; label: string; canPublishStats: boolean }
   | { ok: false; reason: "UNKNOWN" | "REVOKED" | "NOT_ALLOWED" };
 
 /**
@@ -54,7 +54,13 @@ export async function checkDeviceToken(
     where: { id: device.id },
     data: { lastUsedAt: new Date(), appVersion: appVersion ?? device.appVersion },
   });
-  return { ok: true, email: device.email };
+  return {
+    ok: true,
+    email: device.email,
+    deviceId: device.id,
+    label: device.label,
+    canPublishStats: allowed.canPublishStats,
+  };
 }
 
 /** Leest `Authorization: Bearer <token>`; null wanneer de header ontbreekt of anders is. */

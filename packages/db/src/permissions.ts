@@ -161,6 +161,9 @@ export const PERMISSIONS = [
   // Piano (reservaties voor het lokaal in het kasteel)
   { code: "piano.manage", labelNl: "Piano beheren (uren, sluitingsdagen, reservaties)", labelEn: "Manage the piano (hours, closures, reservations)", category: "piano" },
 
+  // 24 urenloop (start- en aankomstuur en tot wanneer de eindstand op de site blijft)
+  { code: "urenloop.manage", labelNl: "24 urenloop beheren (start, aankomst en resultaten)", labelEn: "Manage the 24-hour run (start, finish and results)", category: "general" },
+
   // Logistiek (uitleendienst op logistiek.vtk.be)
   { code: "logistiek.manage", labelNl: "Uitleendienst beheren (inventaris, aanvragen, camionette)", labelEn: "Manage equipment rental (inventory, requests, van)", category: "logistiek" },
   // Bijrijders van elke rit aanpassen, zonder de rest van het beheer: wie de

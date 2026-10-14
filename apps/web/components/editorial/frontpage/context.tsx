@@ -4,6 +4,7 @@ import type { FieldValues } from "@/lib/frontpage/fields";
 import type { HeroWeekMoment, HeroWeekPlacement } from "@/lib/calendar/heroWeek";
 import type { ResolvedSlogans } from "@/lib/slogans";
 import type { ShiftRosterEntry } from "@/lib/shift";
+import type { StoredUrenloopStats, UrenloopConfig } from "@/lib/urenloop/stats";
 
 /**
  * What every front page component receives.
@@ -129,6 +130,14 @@ export type FrontpageProps = {
    * Enkel de standaardpagina roteert; een campagne heeft haar eigen titel.
    */
   slogans: ResolvedSlogans;
+  /**
+   * De geplande uren en de laatst ontvangen tussenstand van de 24 urenloop.
+   * Enkel opgehaald wanneer de `urenloop`-frontpage op het scherm staat.
+   */
+  urenloop?: {
+    config: UrenloopConfig;
+    stats: StoredUrenloopStats | null;
+  };
 };
 
 /**

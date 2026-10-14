@@ -29,10 +29,11 @@ export async function addDownloadEmailAction(
   if (!parsed.success) return saveError("INVALID_EMAIL");
   const email = parsed.data;
   const note = String(formData.get("note") ?? "").trim() || null;
+  const canPublishStats = formData.get("canPublishStats") === "on";
 
   try {
     await prisma.urenloopDownloadEmail.create({
-      data: { email, note, addedById: session.user.id },
+      data: { email, note, canPublishStats, addedById: session.user.id },
     });
   } catch (error) {
     // Al op de lijst is geen serverfout maar een invoerfout; zie CLAUDE.md.
@@ -46,11 +47,37 @@ export async function addDownloadEmailAction(
     action: "grant",
     entity: "urenloopDownload",
     target: email,
-    summary: note ? `toegevoegd (${note})` : "toegevoegd",
+    summary: [note ? `toegevoegd (${note})` : "toegevoegd", canPublishStats ? "mag stats publiceren" : null]
+      .filter(Boolean)
+      .join(", "),
   });
   revalidatePath("/admin/it/24ul-app");
   revalidatePath("/en/admin/it/24ul-app");
   return saveOk();
+}
+
+export async function setDownloadEmailPublishStatsAction(formData: FormData): Promise<void> {
+  await requirePermission("urenloopApp.manage");
+
+  const id = String(formData.get("id") ?? "");
+  if (!id) return;
+  const canPublishStats = formData.get("canPublishStats") === "1";
+
+  const updated = await prisma.urenloopDownloadEmail.update({
+    where: { id },
+    data: { canPublishStats },
+  });
+
+  await logAudit({
+    action: canPublishStats ? "grant" : "revoke",
+    entity: "urenloopDownload",
+    target: updated.email,
+    summary: canPublishStats
+      ? "mag live tussenstand naar vtk.be sturen"
+      : "mag geen live tussenstand meer naar vtk.be sturen",
+  });
+  revalidatePath("/admin/it/24ul-app");
+  revalidatePath("/en/admin/it/24ul-app");
 }
 
 export async function removeDownloadEmailAction(formData: FormData): Promise<void> {

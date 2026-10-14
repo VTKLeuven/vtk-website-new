@@ -6937,14 +6937,18 @@ model FormOutboxMessage {
 /// toegang hangt aan een e-mailadres en niet aan een `User`. Beheerd in
 /// Admin -> IT -> 24UL App Download.
 model UrenloopDownloadEmail {
-  id        String   @id @default(cuid())
+  id              String   @id @default(cuid())
   /// Altijd in kleine letters bewaard; het adres is de sleutel waarop de
   /// codeaanvraag matcht en "Jan@..." en "jan@..." zijn dezelfde inbox.
-  email     String   @unique
+  email           String   @unique
   /// Vrije notitie, bv. de kring waar het adres bij hoort.
-  note      String?
-  addedById String?
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  note            String?
+  /// Of gekoppelde computers van dit adres de live tussenstand van de 24
+  /// urenloop naar vtk.be mogen sturen. Standaard uit: een bevriende kring mag
+  /// de app downloaden en updaten, maar niet onze publieke cijfers overschrijven.
+  canPublishStats Boolean  @default(false)
+  addedById       String?
+  createdAt       DateTime @default(now()) @db.Timestamptz(3)
 
   addedBy User? @relation("UrenloopDownloadEmailAddedBy", fields: [addedById], references: [id], onDelete: SetNull)
 

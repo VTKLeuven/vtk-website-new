@@ -73,6 +73,7 @@ export const AUDIT_ENTITIES = {
   news: { nl: "Nieuws", en: "News", group: "home" },
   home: { nl: "Homepagina", en: "Homepage", group: "home" },
   frontpage: { nl: "Frontpage", en: "Front page", group: "home" },
+  urenloop: { nl: "24 urenloop", en: "24-hour run", group: "home" },
   linkPage: { nl: "Linktree", en: "Linktree", group: "home" },
   partner: { nl: "Partner", en: "Partner", group: "home" },
   shortLink: { nl: "Verkorte link", en: "Short link", group: "shortlinks" },

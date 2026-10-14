@@ -1,7 +1,8 @@
 [
   {
     "slug": "24-urenloop",
-    "visibleInHeader": false,
+    "headerTabCode": "EVENTS",
+    "visibleInHeader": true,
     "titleNl": "24 urenloop",
     "titleEn": "24 Hour Run",
     "needsYearlyEdit": true,

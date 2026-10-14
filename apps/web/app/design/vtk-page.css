@@ -631,3 +631,189 @@
   border-radius: 4px 0 0 4px;
   transform-origin: 50% 0;
 }
+
+/* ---------------------------------------------------------------------------
+   [[24urenloop]]-blok in een contentpagina
+   --------------------------------------------------------------------------- */
+
+.vtk-urenloop {
+  margin: clamp(28px, 4vw, 44px) 0;
+  padding: clamp(22px, 3.2vw, 32px);
+  border-radius: 20px;
+  background: var(--navy);
+  color: var(--paper);
+}
+
+.vtk-urenloop-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.vtk-urenloop-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--yellow);
+}
+
+.vtk-urenloop-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--yellow);
+  box-shadow: 0 0 0 3px rgba(255, 209, 0, 0.22);
+}
+
+.vtk-urenloop-dot.is-final {
+  box-shadow: none;
+}
+
+.vtk-urenloop-stamp {
+  font-size: 12.5px;
+  color: var(--on-dark-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-urenloop-clock {
+  margin-top: 20px;
+}
+
+.vtk-urenloop .fp-countdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(18px, 3.5vw, 36px);
+}
+
+.vtk-urenloop .fp-count {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.vtk-urenloop .fp-count .n {
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--paper);
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-urenloop .fp-count .l {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--on-dark-muted);
+}
+
+.vtk-urenloop .fp-countdown-passed {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--yellow);
+}
+
+.vtk-urenloop-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px clamp(28px, 5vw, 56px);
+  padding: 20px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.vtk-urenloop-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.vtk-urenloop-stat-n {
+  font-size: clamp(28px, 4vw, 40px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  color: var(--paper);
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-urenloop-stat-l {
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--on-dark-muted);
+}
+
+.vtk-urenloop-stat-clock .fp-countdown {
+  gap: 14px;
+}
+
+.vtk-urenloop-boards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 22px 32px;
+  margin-top: 20px;
+}
+
+@media (max-width: 640px) {
+  .vtk-urenloop-boards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.vtk-urenloop-board h3 {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--on-dark-muted);
+}
+
+.vtk-urenloop-board ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vtk-urenloop-board li {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14.5px;
+  line-height: 1.35;
+}
+
+.vtk-urenloop-rank {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--yellow);
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-urenloop-name {
+  color: var(--paper);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vtk-urenloop-val {
+  color: var(--on-dark-muted);
+  font-size: 13.5px;
+  font-variant-numeric: tabular-nums;
+}
+

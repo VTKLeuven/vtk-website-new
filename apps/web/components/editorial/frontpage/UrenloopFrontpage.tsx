@@ -1,7 +1,75 @@
 import { countdownParts } from "@/lib/countdown";
 import { pickField } from "@/lib/frontpage/fields";
+import {
+  resolvePublicUrenloopState,
+  type UrenloopStatsPayload,
+} from "@/lib/urenloop/stats";
 import { Cta, ctaFrom, type FrontpageProps } from "./context";
 import { Countdown } from "./Countdown";
+
+function formatKm(km: number, nl: boolean): string {
+  const fixed = km.toFixed(1);
+  return nl ? fixed.replace(".", ",") : fixed;
+}
+
+function liveFiguresFrom(
+  stats: UrenloopStatsPayload,
+  nl: boolean,
+): Array<{ value: string; label: string }> {
+  const kmText = `${formatKm(stats.totals.km, nl)} km`;
+  const totalLabel = stats.frozenAt
+    ? nl
+      ? `Ronden (${kmText} · bevroren)`
+      : `Laps (${kmText} · frozen)`
+    : nl
+      ? `Ronden (${kmText})`
+      : `Laps (${kmText})`;
+
+  const figures: Array<{ value: string; label: string }> = [
+    {
+      value: String(stats.totals.laps),
+      label: totalLabel,
+    },
+  ];
+
+  const topGroup = stats.groups[0];
+  const topLaps = stats.mostLaps[0];
+  const topFastest = stats.fastestLap[0];
+
+  if (topGroup) {
+    figures.push({
+      value: topGroup.name,
+      label: nl
+        ? `Beste groep · ${topGroup.laps} ${topGroup.laps === 1 ? "ronde" : "ronden"}`
+        : `Leading group · ${topGroup.laps} ${topGroup.laps === 1 ? "lap" : "laps"}`,
+    });
+  } else if (topLaps) {
+    figures.push({
+      value: String(topLaps.laps),
+      label: nl
+        ? `Meeste ronden · ${topLaps.name}`
+        : `Most laps · ${topLaps.name}`,
+    });
+  }
+
+  if (topFastest) {
+    figures.push({
+      value: topFastest.time,
+      label: nl
+        ? `Snelste ronde · ${topFastest.name}`
+        : `Fastest lap · ${topFastest.name}`,
+    });
+  } else if (topGroup && topLaps) {
+    figures.push({
+      value: String(topLaps.laps),
+      label: nl
+        ? `Meeste ronden · ${topLaps.name}`
+        : `Most laps · ${topLaps.name}`,
+    });
+  }
+
+  return figures;
+}
 
 /**
  * The 24-urenloop front page.
@@ -10,39 +78,81 @@ import { Countdown } from "./Countdown";
  * clock is the page. It sits centred and full width, with a row of figures under
  * it, because during the run the only question anyone has is how long is left.
  *
- * The clock has three states and switches by itself, so nobody has to edit the
- * site at two in the morning:
- *  - before the start it counts down to the start,
- *  - between start and finish it counts down to the finish under a "we are
- *    running" heading,
- *  - after the finish it says so and drops to the figures alone.
+ * Start and finish times come from `/admin/24urenloop` (with a fallback to
+ * legacy field values). Before the first lap is counted, the three editorial
+ * figures (`stat1`–`stat3`) are shown; once the timing laptop at the track
+ * pushes standings, those three slots switch to live race numbers (total laps +
+ * km, leading group, and fastest lap).
  */
-export function UrenloopFrontpage({ values, locale, base, now }: FrontpageProps) {
+export function UrenloopFrontpage({
+  values,
+  locale,
+  base,
+  now,
+  urenloop,
+}: FrontpageProps) {
   const nl = locale === "nl";
 
-  const startsAt = values.startsAt ? new Date(values.startsAt) : null;
-  const endsAt = values.endsAt ? new Date(values.endsAt) : null;
-  const started = startsAt ? now >= startsAt : false;
-  const finished = endsAt ? now >= endsAt : false;
+  const config = urenloop?.config ?? {
+    startsAt: values.startsAt ?? null,
+    endsAt: values.endsAt ?? null,
+    showResultsUntil: null,
+  };
+  const publicState = resolvePublicUrenloopState(
+    config,
+    urenloop?.stats ?? null,
+    now,
+  );
+
+  const startsAt = config.startsAt
+    ? new Date(config.startsAt)
+    : values.startsAt
+      ? new Date(values.startsAt)
+      : null;
+  const endsAt =
+    publicState && (publicState.phase === "live" || publicState.phase === "final")
+      ? publicState.endsAt
+      : config.endsAt
+        ? new Date(config.endsAt)
+        : values.endsAt
+          ? new Date(values.endsAt)
+          : null;
+
+  const hasLiveOrFinalStats =
+    publicState?.phase === "live" || publicState?.phase === "final";
+  const started = hasLiveOrFinalStats || (startsAt ? now >= startsAt : false);
+  const finished =
+    publicState?.phase === "final" || (endsAt ? now >= endsAt : false);
   const target = !started ? startsAt : finished ? null : endsAt;
 
   const edition = pickField(values, "edition", locale);
-  const title = pickField(values, "title", locale) ?? (nl ? "24 urenloop" : "24-hour run");
+  const title =
+    pickField(values, "title", locale) ?? (nl ? "24 urenloop" : "24-hour run");
 
-  const primary = ctaFrom(pickField(values, "primaryLabel", locale), values.primaryUrl, base);
-  const secondary = ctaFrom(pickField(values, "secondaryLabel", locale), values.secondaryUrl, base);
+  const primary = ctaFrom(
+    pickField(values, "primaryLabel", locale),
+    values.primaryUrl,
+    base,
+  );
+  const secondary = ctaFrom(
+    pickField(values, "secondaryLabel", locale),
+    values.secondaryUrl,
+    base,
+  );
 
   const hook = pickField(values, "hook", locale);
 
-  // Free value/label pairs rather than fixed teams/laps/runners: the real page
-  // leans on figures that change per edition (530 m lap, a 1:23 Speedyteam
-  // time, the number of hours), and fixed slots would only fit one of them.
-  const figures = [1, 2, 3]
+  const staticFigures = [1, 2, 3]
     .map((i) => ({
       value: values[`stat${i}Value`],
       label: pickField(values, `stat${i}Label`, locale),
     }))
-    .filter((f) => f.value);
+    .filter((f): f is { value: string; label: string | undefined } => Boolean(f.value));
+
+  const figures =
+    publicState && (publicState.phase === "live" || publicState.phase === "final")
+      ? liveFiguresFrom(publicState.stats, nl)
+      : staticFigures;
 
   const heading = !started
     ? nl

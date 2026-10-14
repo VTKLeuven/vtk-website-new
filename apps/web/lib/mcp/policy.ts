@@ -113,6 +113,7 @@ export const MCP_PERMISSION_POLICY = {
   // houdt ze zelf bij.
   "pal.manage": { reads: [], creates: [], blocked: ["read or decide PAL+ requests, plan sessions, mark attendance or change tutor rewards"] },
   "piano.manage": { reads: ["piano"], creates: ["app_create:piano_window"], blocked: ["create closures, reserve or cancel slots"] },
+  "urenloop.manage": { reads: [], creates: [], blocked: ["change 24-hour run dates or overwrite live race stats"] },
   "logistiek.manage": { reads: ["logistiek"], creates: ["app_create:uitleen_category", "app_create:uitleen_item", "app_create:uitleen_event"], blocked: ["reserve stock, approve requests, move money or plan transport"] },
   "logistiek.helpers": { reads: [], creates: [], blocked: ["add or remove trip passengers"] },
   "door.open": { reads: [], creates: [], blocked: ["open doors"] },
