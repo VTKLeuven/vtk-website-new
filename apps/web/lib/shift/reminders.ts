@@ -358,6 +358,7 @@ export async function processDueShiftReminders(now: Date = new Date()): Promise<
           from: FROM,
           subject: mail.subject,
           text: mail.text,
+          html: mail.html,
           messageId: `<shift-reminder-${lead.key}-${candidate.shiftId}-${candidate.userId}@vtk.be>`,
         },
         { source: 'shifts' },

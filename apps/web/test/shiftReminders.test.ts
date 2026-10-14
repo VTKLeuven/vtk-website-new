@@ -8,6 +8,15 @@ import {
   windowFor,
 } from '@/lib/shift/reminders';
 
+const sendMail = vi.hoisted(() => vi.fn<typeof import('@/lib/email').sendMail>(async () => true));
+
+vi.mock('@/lib/email', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@/lib/email')>()),
+  sendMail,
+}));
+vi.mock('@/lib/app-api/notifications', () => ({ sendShiftReminderPush: vi.fn(async () => {}) }));
+vi.mock('@/lib/shift/voucherEligibility', () => ({ praesidiumYears: vi.fn(async () => new Map()) }));
+
 vi.mock('@vtk/db', () => ({
   prisma: {
     shiftParticipant: {
@@ -85,6 +94,32 @@ describe('zonder mailserver', () => {
     await expect(processDueShiftReminders(now)).rejects.toThrow(
       'de database mag hier niet aangesproken worden',
     );
+  });
+});
+
+describe('de mail die vertrekt', () => {
+  it('gaat opgemaakt de deur uit, niet enkel als tekst', async () => {
+    // De opgemaakte versie bestond al en de voorvertoning op /admin/it/flows
+    // toonde ze, maar de verzender gaf enkel `text` mee: in de inbox kwam een
+    // kale tekstmail aan. Daarom hier de echte verzendweg en niet de template.
+    const { prisma } = await import('@vtk/db');
+    const user = {
+      name: 'Jonas',
+      locale: 'NL' as const,
+      email: 'jonas@student.kuleuven.be',
+      personalEmail: null,
+      emailPreference: 'UNIVERSITY' as const,
+    };
+    vi.mocked(prisma.shiftParticipant.findMany)
+      .mockResolvedValueOnce([{ shiftId: 's1', userId: 'u1', shift, user }] as never)
+      .mockResolvedValueOnce([]);
+    vi.mocked(prisma.shiftParticipant.updateMany).mockResolvedValue({ count: 1 });
+
+    await expect(processDueShiftReminders(now)).resolves.toEqual({ sent: 1, failed: 0 });
+
+    const mail = shiftReminderMail('dayBefore', user, shift);
+    expect(sendMail).toHaveBeenCalledTimes(1);
+    expect(sendMail.mock.calls[0][0]).toMatchObject({ subject: mail.subject, text: mail.text, html: mail.html });
   });
 });
 
