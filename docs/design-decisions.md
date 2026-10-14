@@ -11130,6 +11130,23 @@ recht `shift.praesidium` (de rol `admin`, dus Groep 5 en IT, heeft het vanzelf).
   de som van het gemiddelde per lijst: zolang niemand overgeslagen wordt, is dat
   precies het gemiddelde van ieders totaal, en met overgeslagen mensen blijft
   het vergelijkbaar.
+- **Iemand voor een deel laten meetellen** (oktober 2026). Overslaan was alles
+  of niets, terwijl logistiek op 24UL soms maar een deel van de dag als
+  logistiek werkt. Op het tabblad Overslaan staat daarom een percentage voor
+  een post of een persoon: 0% is overslaan zoals hierboven, 50% betekent dat
+  die lijst voor die persoon half weegt. Van de drie lezingen die op tafel
+  lagen, koos de vice die waarin **de shiften én wat van iemand verwacht wordt
+  samen krimpen**: wie op 50% zes shiften doet waar het gemiddelde zes is,
+  telt er drie tegen een verwachting van drie. Zijn verschil op die lijst
+  halveert dus, en wie er nul deed, staat er -3 in plaats van -6. Het voordeel
+  is dat 0% precies overslaan is, zodat er één knop is in plaats van twee
+  regels die naast elkaar bestaan. Verworpen: enkel de verwachting halveren
+  (dan telt elke shift van logistiek volledig en moet ze maar de helft doen)
+  en enkel de shiften halveren tegen het volle gemiddelde (dan is 0% strenger
+  dan overslaan). In het gemiddelde van de lijst is iemand op 50% een halve
+  persoon met zijn shiften zoals ze op de lijst staan, zodat de verschillen
+  van iedereen samen nog altijd op nul uitkomen. Wie bestond als
+  "overgeslagen", staat in de database op 0% en is niet veranderd.
 - **"Geen praesidium" of "geen naam"** (oktober 2026). In een vakje staat niet
   altijd een persoon: "Cultuur", "Onthaal", "Iedereen", "Preasidium",
   "Karchauffeur" zijn een post, een taak of een opmerking. Die wachtten als

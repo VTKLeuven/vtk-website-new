@@ -24,6 +24,7 @@ import {
   formatCount,
   nameIndex,
   summarizeList,
+  weightedAverage,
   type SlotStat,
 } from "@/lib/praesidiumShifts/stats";
 import { deletePraesidiumShiftListAction } from "@/app/actions/praesidiumShifts";
@@ -88,7 +89,7 @@ export default async function PraesidiumShiftListPage({
     prisma.praesidiumShiftContact.findMany({ where: { listId: id }, select: { nameKey: true, kring: true } }),
     loadRoster(list.year, locale),
     loadAliasMap(),
-    prisma.praesidiumShiftExemption.findMany({ where: { listId: id }, select: { userId: true, reason: true } }),
+    prisma.praesidiumShiftExemption.findMany({ where: { listId: id }, select: { userId: true, weight: true, reason: true } }),
     prisma.group.findMany({
       where: { type: "PRAESIDIUM", memberships: { some: { year: list.year } } },
       orderBy: { orderInPraesidium: "asc" },
@@ -98,11 +99,12 @@ export default async function PraesidiumShiftListPage({
   ]);
   const entries = attachOverrides(rawEntries, cells);
   const skipReason = new Map(skips.map((s) => [s.userId, s.reason]));
-  const skippedUsers = new Set(skipReason.keys());
+  // Hoeveel deze lijst per lid weegt: 0 is overgeslagen, wie er niet in staat telt voor 1.
+  const weights = new Map(skips.map((s) => [s.userId, s.weight]));
   const phones = await listPhones(roster.filter((m) => !m.phone).map((m) => m.userId));
 
   const stats = toStatsList(list);
-  const summary = summarizeList(stats, entries, names, skippedUsers);
+  const summary = summarizeList(stats, entries, names, weights);
   const allCounts = summarizeList(stats, entries, names).perUser;
   const messages = overviewErrorMessages(locale);
   const draft = list.status === "DRAFT";
@@ -149,13 +151,14 @@ export default async function PraesidiumShiftListPage({
     slots: entries
       .filter((e) => entryCounts(stats, e) && entryUser(index, e) === member.userId)
       .map((e) => where(e)),
-    skipped: skippedUsers.has(member.userId),
+    weight: weights.get(member.userId) ?? 1,
     skipReason: skipReason.get(member.userId) ?? null,
   }));
-  const countedMembers = resultMembers.filter((m) => !m.skipped);
-  const average = countedMembers.length
-    ? countedMembers.reduce((s, m) => s + m.count, 0) / countedMembers.length
-    : 0;
+  const countedMembers = resultMembers.filter((m) => m.weight > 0);
+  // Wie voor 50% meetelt, is in het gemiddelde een halve persoon.
+  const average = weightedAverage(countedMembers.map((m) => ({ value: m.count, weight: m.weight })));
+  const skippedCount = resultMembers.filter((m) => m.weight === 0).length;
+  const partialCount = countedMembers.filter((m) => m.weight < 1).length;
   const detectedOpen = detectedOpenSlots(stats, (list.slots ?? []) as SlotStat[]);
   const openSlots = list.openSlots ?? detectedOpen;
   const metTarget =
@@ -201,9 +204,14 @@ export default async function PraesidiumShiftListPage({
   }
   if (summary.skipped > 0) {
     facts.push({
-      label: nl ? "Overgeslagen" : "Skipped",
+      label: partialCount > 0 ? (nl ? "Niet meegeteld" : "Not counted") : nl ? "Overgeslagen" : "Skipped",
       value: formatCount(summary.skipped, locale),
-      hint: nl ? `${skippedUsers.size} ${skippedUsers.size === 1 ? "lid" : "leden"}` : `${skippedUsers.size} members`,
+      hint: [
+        skippedCount > 0 ? (nl ? `${skippedCount} ${skippedCount === 1 ? "lid" : "leden"} overgeslagen` : `${skippedCount} skipped`) : null,
+        partialCount > 0 ? (nl ? `${partialCount} voor een deel` : `${partialCount} partly`) : null,
+      ]
+        .filter(Boolean)
+        .join(", "),
     });
   }
 
@@ -277,8 +285,8 @@ export default async function PraesidiumShiftListPage({
             {t === "namen" && unresolved > 0 && (
               <span className="rounded-full bg-[var(--low-bg)] px-1.5 text-[11px] font-semibold text-[var(--low-ink)]">{unresolved}</span>
             )}
-            {t === "overslaan" && skippedUsers.size > 0 && (
-              <span className="rounded-full bg-[var(--paper-2)] px-1.5 text-[11px] font-semibold text-vtk-body">{skippedUsers.size}</span>
+            {t === "overslaan" && weights.size > 0 && (
+              <span className="rounded-full bg-[var(--paper-2)] px-1.5 text-[11px] font-semibold text-vtk-body">{weights.size}</span>
             )}
           </Link>
         ))}

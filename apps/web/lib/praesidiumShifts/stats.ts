@@ -185,11 +185,35 @@ export function reanchorOverrides<T extends CellRef>(overrides: T[], entries: Ce
   return { kept, lost };
 }
 
-/** Iemand die op één lijst overgeslagen wordt (logistiek die als logistiek werkt). */
-export type StatsExemption = { listId: string; userId: string };
+/**
+ * Iemand die op één lijst niet of voor een deel meetelt (logistiek die als
+ * logistiek werkt). `weight` 0 is overgeslagen, 0.5 telt voor de helft.
+ */
+export type StatsExemption = { listId: string; userId: string; weight: number };
 
 function pairKey(listId: string, userId: string): string {
   return `${listId}\u0000${userId}`;
+}
+
+/** Het gewicht per lid op één lijst, voor `summarizeList`. Wie er niet in staat, telt voor 1. */
+export function listWeights(exemptions: StatsExemption[], listId: string): Map<string, number> {
+  return new Map(exemptions.filter((e) => e.listId === listId).map((e) => [e.userId, e.weight]));
+}
+
+/**
+ * Het gemiddelde op een lijst als iemand er voor een deel meetelt: wie voor
+ * 50% telt, is in het gemiddelde een halve persoon. Zonder uitzonderingen is
+ * dat gewoon het gemiddelde; wie overgeslagen wordt (0), valt eruit.
+ */
+export function weightedAverage(values: { value: number; weight: number }[]): number {
+  const weights = values.reduce((sum, v) => sum + v.weight, 0);
+  if (weights <= 0) return 0;
+  return values.reduce((sum, v) => sum + v.value * v.weight, 0) / weights;
+}
+
+/** "50%": een gewicht zoals de vice het intikt. */
+export function formatWeight(weight: number, locale: "nl" | "en" = "nl"): string {
+  return `${formatCount(weight * 100, locale)}%`;
 }
 
 export type ListSummary = {
@@ -201,12 +225,15 @@ export type ListSummary = {
   others: number;
   /** Vakjes met een post, taak of opmerking in plaats van een naam: tellen nergens mee. */
   notNames: number;
-  /** Door een praesidiumlid dat op deze lijst overgeslagen wordt. */
+  /**
+   * Wat niet meetelt omdat een praesidiumlid hier overgeslagen wordt of maar
+   * voor een deel meetelt: alles van wie voor 0% telt, de helft van wie voor 50%.
+   */
   skipped: number;
   /** Namen die nog op een keuze wachten, en hoeveel shiften daaraan hangen. */
   unresolvedNames: number;
   unresolvedShifts: number;
-  /** Per praesidiumlid dat meetelt. */
+  /** Per praesidiumlid dat meetelt, al vermenigvuldigd met zijn gewicht. */
   perUser: Map<string, number>;
 };
 
@@ -214,8 +241,8 @@ export function summarizeList(
   list: StatsList,
   entries: StatsEntry[],
   names: StatsName[],
-  /** Wie op deze lijst overgeslagen wordt. */
-  skippedUsers: ReadonlySet<string> = new Set(),
+  /** Wie op deze lijst niet (0) of voor een deel meetelt; wie er niet in staat, telt voor 1. */
+  userWeights: ReadonlyMap<string, number> = new Map(),
 ): ListSummary {
   const index = nameIndex(names);
   const perUser = new Map<string, number>();
@@ -239,11 +266,11 @@ export function summarizeList(
     }
     counted += weight;
     const userId = entryUser(index, entry);
-    if (userId && skippedUsers.has(userId)) {
-      skipped += weight;
-    } else if (userId) {
-      praesidium += weight;
-      perUser.set(userId, (perUser.get(userId) ?? 0) + weight);
+    if (userId) {
+      const share = userWeights.get(userId) ?? 1;
+      praesidium += weight * share;
+      skipped += weight * (1 - share);
+      if (share > 0) perUser.set(userId, (perUser.get(userId) ?? 0) + weight * share);
     } else if (!name || name.status === "UNRESOLVED" || (name.status === "MATCHED" && !name.userId)) {
       unresolved.add(entry.nameKey);
       unresolvedShifts += weight;
@@ -261,9 +288,9 @@ export function average(values: number[]): number {
 
 export type MemberTotals = {
   userId: string;
-  /** Som over de shiftenlijsten van evenementen. */
+  /** Som over de shiftenlijsten van evenementen, elk vermenigvuldigd met hoeveel ze voor dit lid weegt. */
   lists: number;
-  /** Per lijst (evenementen en roosters). */
+  /** Per lijst (evenementen en roosters), al vermenigvuldigd met het gewicht. */
   perList: Map<string, number>;
   siteNecessary: number;
   siteVoluntary: number;
@@ -273,12 +300,16 @@ export type MemberTotals = {
   /** Wekelijkse praesidiumshiften: al voorbij en nog te komen. */
   weeklyPast: number;
   weeklyUpcoming: number;
-  /** Lijsten waarop dit lid overgeslagen wordt. */
-  skippedLists: string[];
   /**
-   * Wat het gemiddelde lid deed op de lijsten waar dit lid meetelt. Zonder
-   * overgeslagen lijsten is dat gewoon het gemiddelde; wie op 24UL als
-   * logistiek werkte, wordt vergeleken zonder 24UL.
+   * Lijsten waarop dit lid niet (0) of voor een deel meetelt, met hun gewicht.
+   * Een lijst die er niet in staat, telt volledig.
+   */
+  listWeights: Map<string, number>;
+  /**
+   * Wat het gemiddelde lid deed op de lijsten, elk vermenigvuldigd met hoeveel
+   * ze voor dit lid weegt. Zonder uitzonderingen is dat gewoon het gemiddelde;
+   * wie op 24UL als logistiek werkte, wordt vergeleken zonder 24UL, en wie er
+   * voor 50% meetelt, met de helft van het gemiddelde van 24UL.
    */
   expectedLists: number;
   expectedTotal: number;
@@ -286,9 +317,13 @@ export type MemberTotals = {
 };
 
 export type ListAverage = {
-  /** Gemiddelde over wie op deze lijst meetelt. */
+  /**
+   * Gemiddelde over wie op deze lijst meetelt, per volledig lid: wie voor 50%
+   * meetelt, is erin een halve persoon met zijn shiften zoals ze op de lijst
+   * staan.
+   */
   average: number;
-  /** Hoeveel praesidiumleden op deze lijst meetellen. */
+  /** Hoeveel praesidiumleden op deze lijst meetellen (ook wie voor een deel). */
   participants: number;
 };
 
@@ -315,7 +350,10 @@ export type Standings = {
  * De stand per praesidiumlid. Iedereen uit `memberIds` krijgt een rij, ook wie
  * nergens op staat: een nul is precies wat de vice zoekt. Wie op een lijst
  * overgeslagen wordt, krijgt daar niets en telt daar niet mee in het
- * gemiddelde.
+ * gemiddelde. Wie er voor een deel meetelt (een gewicht tussen 0 en 1), krijgt
+ * dat deel van zijn shiften en wordt vergeleken met dat deel van het
+ * gemiddelde: zijn verschil op die lijst krimpt mee. Een gewicht van 0 is dus
+ * precies overslaan.
  */
 export function standings(input: {
   memberIds: string[];
@@ -339,7 +377,7 @@ export function standings(input: {
       total: 0,
       weeklyPast: 0,
       weeklyUpcoming: 0,
-      skippedLists: [],
+      listWeights: new Map(),
       expectedLists: 0,
       expectedTotal: 0,
       expectedWeekly: 0,
@@ -348,13 +386,14 @@ export function standings(input: {
   const index = nameIndex(input.names);
   const lists = new Map<string, StatsList>();
   for (const list of [...input.eventLists, ...input.weeklyLists]) lists.set(list.id, list);
-  const skipped = new Set<string>();
-  for (const { listId, userId } of input.exemptions ?? []) {
+  const weights = new Map<string, number>();
+  for (const { listId, userId, weight } of input.exemptions ?? []) {
     const row = rows.get(userId);
-    if (!row || !lists.has(listId)) continue;
-    skipped.add(pairKey(listId, userId));
-    row.skippedLists.push(listId);
+    if (!row || !lists.has(listId) || weight >= 1) continue;
+    weights.set(pairKey(listId, userId), weight);
+    row.listWeights.set(listId, weight);
   }
+  const weightOf = (listId: string, userId: string) => weights.get(pairKey(listId, userId)) ?? 1;
   const today = new Date(Date.UTC(input.now.getUTCFullYear(), input.now.getUTCMonth(), input.now.getUTCDate()));
 
   for (const entry of input.entries) {
@@ -362,8 +401,10 @@ export function standings(input: {
     if (!list || !entryCounts(list, entry)) continue;
     const userId = entryUser(index, entry);
     const row = userId ? rows.get(userId) : undefined;
-    if (!row || skipped.has(pairKey(list.id, row.userId))) continue;
-    const weight = entryWeight(list, entry);
+    if (!row) continue;
+    const share = weightOf(list.id, row.userId);
+    if (share <= 0) continue;
+    const weight = entryWeight(list, entry) * share;
     row.perList.set(list.id, (row.perList.get(list.id) ?? 0) + weight);
     if (list.kind === "EVENT") {
       row.lists += weight;
@@ -383,16 +424,24 @@ export function standings(input: {
 
   const listAverages = new Map<string, ListAverage>();
   for (const list of lists.values()) {
-    const counted = [...rows.values()].filter((row) => !skipped.has(pairKey(list.id, row.userId)));
+    const counted = [...rows.values()]
+      .map((row) => ({ row, weight: weightOf(list.id, row.userId) }))
+      .filter(({ weight }) => weight > 0);
     listAverages.set(list.id, {
-      average: average(counted.map((row) => row.perList.get(list.id) ?? 0)),
+      // `perList` is al vermenigvuldigd met het gewicht; gedeeld erdoor geeft
+      // de shiften zoals ze op de lijst staan.
+      average: weightedAverage(
+        counted.map(({ row, weight }) => ({ value: (row.perList.get(list.id) ?? 0) / weight, weight })),
+      ),
       participants: counted.length,
     });
   }
+  // Zonder `userId`: wat een volledig lid verwacht wordt. Met: elke lijst
+  // vermenigvuldigd met hoeveel ze voor dat lid weegt.
   const sumOf = (kind: ListKind, userId?: string) =>
     [...lists.values()]
-      .filter((list) => list.kind === kind && (!userId || !skipped.has(pairKey(list.id, userId))))
-      .reduce((sum, list) => sum + (listAverages.get(list.id)?.average ?? 0), 0);
+      .filter((list) => list.kind === kind)
+      .reduce((sum, list) => sum + (listAverages.get(list.id)?.average ?? 0) * (userId ? weightOf(list.id, userId) : 1), 0);
 
   const all = [...rows.values()];
   const siteAverage = average(all.map((row) => row.siteNecessary + row.siteVoluntary));

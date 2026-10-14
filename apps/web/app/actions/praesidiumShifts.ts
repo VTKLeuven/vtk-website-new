@@ -378,10 +378,29 @@ export async function setPraesidiumShiftNecessityAction(formData: FormData): Pro
 }
 
 // ---------------------------------------------------------------------------
-// Iemand overslaan op een lijst
+// Iemand overslaan of voor een deel laten meetellen op een lijst
 // ---------------------------------------------------------------------------
 
-/** Eén of meer praesidiumleden op een lijst overslaan of weer laten meetellen. */
+/**
+ * Hoeveel een lijst voor iemand weegt, uit een percentage zoals de vice het
+ * intikt ("50", "50%", "33,5"). 0 is overslaan, 100 is weer volledig (`null`:
+ * de uitzondering verdwijnt). `"invalid"` buiten 0 tot 100.
+ */
+function readWeight(formData: FormData): number | null | "invalid" {
+  const raw = String(formData.get("percent") ?? "").trim().replace(/%$/, "").trim().replace(",", ".");
+  const percent = Number(raw);
+  if (!raw || !Number.isFinite(percent) || percent < 0 || percent > 100) return "invalid";
+  const rounded = Math.round(percent);
+  return rounded >= 100 ? null : rounded / 100;
+}
+
+function weightSummary(weight: number | null): string {
+  if (weight === null) return "telt weer volledig mee";
+  if (weight === 0) return "overgeslagen";
+  return `telt voor ${Math.round(weight * 100)}%`;
+}
+
+/** Eén of meer praesidiumleden op een lijst overslaan, voor een deel laten meetellen, of weer volledig. */
 export async function setPraesidiumShiftSkipAction(formData: FormData): Promise<SaveState> {
   const session = await requirePermission("shift.praesidium");
   const list = await listOrNull(String(formData.get("listId") ?? ""));
@@ -391,23 +410,25 @@ export async function setPraesidiumShiftSkipAction(formData: FormData): Promise<
     .map((id) => id.trim())
     .filter(Boolean);
   if (userIds.length === 0) return saveError("INVALID_INPUT");
-  const skip = formData.get("skip") === "1";
+  const weight = readWeight(formData);
+  if (weight === "invalid") return saveError("INVALID_PERCENT");
   const reason = String(formData.get("reason") ?? "").trim().slice(0, 80) || null;
-  const count = await setExemption({ listId: list.id, year: list.year, userIds, skip, reason, actorId: session.user.id });
+  const count = await setExemption({ listId: list.id, year: list.year, userIds, weight, reason, actorId: session.user.id });
   await logAudit({
     action: "update",
     entity: "praesidiumShiftList",
     entityId: list.id,
     target: list.name,
-    summary: `${count} ${skip ? "overgeslagen" : "telt weer mee"}${reason ? ` (${reason})` : ""}`,
+    summary: `${count} ${weightSummary(weight)}${reason ? ` (${reason})` : ""}`,
   });
   revalidateOverview();
   return saveOk();
 }
 
 /**
- * Iedereen van een post op een lijst overslaan ("Logistiek" op 24UL). De
- * postnaam wordt de reden, zodat de lijst toont waarom.
+ * Iedereen van een post op een lijst overslaan of voor een deel laten
+ * meetellen ("Logistiek" op 24UL). De postnaam wordt de reden, zodat de lijst
+ * toont waarom.
  */
 export async function skipPraesidiumShiftPostAction(_prev: SaveState, formData: FormData): Promise<SaveState> {
   const session = await requirePermission("shift.praesidium");
@@ -415,6 +436,8 @@ export async function skipPraesidiumShiftPostAction(_prev: SaveState, formData: 
   if (!list) return saveError("LIST_NOT_FOUND");
   const groupId = String(formData.get("groupId") ?? "");
   if (!groupId) return saveError("GROUP_REQUIRED");
+  const weight = readWeight(formData);
+  if (weight === "invalid") return saveError("INVALID_PERCENT");
   const group = await prisma.group.findFirst({
     where: { id: groupId, type: "PRAESIDIUM" },
     select: { nameNl: true, nameEn: true, memberships: { where: { year: list.year }, select: { userId: true } } },
@@ -426,7 +449,7 @@ export async function skipPraesidiumShiftPostAction(_prev: SaveState, formData: 
     listId: list.id,
     year: list.year,
     userIds: group.memberships.map((m) => m.userId),
-    skip: true,
+    weight,
     reason,
     actorId: session.user.id,
   });
@@ -435,16 +458,31 @@ export async function skipPraesidiumShiftPostAction(_prev: SaveState, formData: 
     entity: "praesidiumShiftList",
     entityId: list.id,
     target: list.name,
-    summary: `${reason} overgeslagen (${count})`,
+    summary: `${reason} ${weightSummary(weight)} (${count})`,
   });
   revalidateOverview();
+  const percent = weight === null ? null : Math.round(weight * 100);
   if (count === 0) {
-    return saveOk(nl ? `Niemand bijgekomen: wie van ${reason} in het praesidium zit, werd al overgeslagen.` : `Nobody added: everyone from ${reason} was already skipped.`);
+    return saveOk(
+      nl
+        ? `Niets gewijzigd: wie van ${reason} in het praesidium zit, ${percent === null ? "telde al volledig mee" : percent === 0 ? "werd al overgeslagen" : `telde al voor ${percent}%`}.`
+        : `Nothing changed: everyone from ${reason} ${percent === null ? "already counted in full" : percent === 0 ? "was already skipped" : `already counted for ${percent}%`}.`,
+    );
   }
+  const members = nl ? `${count} ${count === 1 ? "lid" : "leden"} van ${reason}` : `${count} members of ${reason}`;
+  const one = count === 1;
   return saveOk(
     nl
-      ? `${count} ${count === 1 ? "lid" : "leden"} van ${reason} ${count === 1 ? "wordt" : "worden"} overgeslagen op ${list.name}.`
-      : `${count} members of ${reason} are skipped on ${list.name}.`,
+      ? percent === null
+        ? `${members} ${one ? "telt" : "tellen"} weer volledig mee op ${list.name}.`
+        : percent === 0
+          ? `${members} ${one ? "wordt" : "worden"} overgeslagen op ${list.name}.`
+          : `${members} ${one ? "telt" : "tellen"} voor ${percent}% op ${list.name}.`
+      : percent === null
+        ? `${members} count in full on ${list.name} again.`
+        : percent === 0
+          ? `${members} are skipped on ${list.name}.`
+          : `${members} count for ${percent}% on ${list.name}.`,
   );
 }
 

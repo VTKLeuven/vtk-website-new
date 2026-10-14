@@ -5,7 +5,7 @@ import { Search, X } from "lucide-react";
 import { CheckIcon, CopyIcon } from "@/components/ui/icons";
 import { IconButton } from "@/components/ui/IconButton";
 import { useToast } from "@/components/ui/toast";
-import { formatCount } from "@/lib/praesidiumShifts/stats";
+import { formatCount, formatWeight } from "@/lib/praesidiumShifts/stats";
 import type { OverviewListRow, OverviewMember } from "@/lib/praesidiumShifts/overview";
 import type { Averages } from "@/lib/praesidiumShifts/stats";
 import { NecessityToggle } from "./NecessityToggle";
@@ -57,6 +57,11 @@ function shiftMoment(iso: string, locale: "nl" | "en"): string {
   });
 }
 
+/** Hoeveel een lijst weegt voor dit lid: 0 is overgeslagen, 1 volledig. */
+function weightOn(member: OverviewMember, listId: string): number {
+  return member.listWeights[listId] ?? 1;
+}
+
 async function copyText(text: string): Promise<boolean> {
   try {
     await navigator.clipboard.writeText(text);
@@ -95,8 +100,8 @@ export function MemberTable({
   const basisLists = view !== "total";
   const valueOf = (m: OverviewMember) => (basisLists ? m.lists : m.total);
   // Waarmee iemand vergeleken wordt: het gemiddelde zonder de lijsten waarop
-  // hij overgeslagen wordt. Zonder overgeslagen lijsten is dat gewoon het
-  // gemiddelde.
+  // hij overgeslagen wordt, en met het deel van de lijsten waarop hij voor een
+  // deel meetelt. Zonder zo'n lijst is dat gewoon het gemiddelde.
   const expectedOf = (m: OverviewMember) => (basisLists ? m.expectedLists : m.expectedTotal);
   const diffOf = (m: OverviewMember) => valueOf(m) - expectedOf(m);
 
@@ -110,7 +115,9 @@ export function MemberTable({
   const rest = sorted.filter((m) => diffOf(m) > BELOW);
   const selected = members.find((m) => m.userId === selectedId) ?? null;
   const belowWithPhone = below.filter((m) => m.phone);
-  const anySkipped = members.some((m) => m.skippedLists.length > 0);
+  // Enkel de shiftenlijsten: een rooster weegt niet mee in deze tabel.
+  const weightedLists = (m: OverviewMember) => lists.filter((l) => weightOn(m, l.id) < 1);
+  const anyWeighted = members.some((m) => weightedLists(m).length > 0);
 
   async function copyBelow() {
     const ok = await copyText(belowWithPhone.map((m) => `${m.name}: ${m.phone}`).join("\n"));
@@ -132,13 +139,23 @@ export function MemberTable({
     });
   }
 
-  const skippedNote = (m: OverviewMember) => {
-    const names = m.skippedLists.map((id) => lists.find((l) => l.id === id)?.name).filter(Boolean);
-    return names.length
-      ? nl
-        ? `Overgeslagen op ${names.join(", ")}: vergeleken met ${formatCount(expectedOf(m), locale)} in plaats van het gemiddelde`
-        : `Skipped on ${names.join(", ")}: compared with ${formatCount(expectedOf(m), locale)} instead of the average`
-      : undefined;
+  const weightedNote = (m: OverviewMember) => {
+    const weighted = weightedLists(m);
+    if (weighted.length === 0) return undefined;
+    const skipped = weighted.filter((l) => weightOn(m, l.id) === 0).map((l) => l.name);
+    const partial = weighted
+      .filter((l) => weightOn(m, l.id) > 0)
+      .map((l) => (nl ? `voor ${formatWeight(weightOn(m, l.id), locale)} op ${l.name}` : `for ${formatWeight(weightOn(m, l.id), locale)} on ${l.name}`));
+    const where = [
+      skipped.length ? (nl ? `overgeslagen op ${skipped.join(", ")}` : `skipped on ${skipped.join(", ")}`) : null,
+      partial.length ? (nl ? `telt ${partial.join(", ")}` : `counts ${partial.join(", ")}`) : null,
+    ]
+      .filter(Boolean)
+      .join("; ");
+    const sentence = where.charAt(0).toUpperCase() + where.slice(1);
+    return nl
+      ? `${sentence}: vergeleken met ${formatCount(expectedOf(m), locale)} in plaats van het gemiddelde`
+      : `${sentence}: compared with ${formatCount(expectedOf(m), locale)} instead of the average`;
   };
 
   const row = (m: OverviewMember) => (
@@ -162,8 +179,8 @@ export function MemberTable({
       </td>
       <td className="text-right tabular-nums">
         {formatCount(m.lists, locale)}
-        {m.skippedLists.length > 0 && (
-          <sup className="text-vtk-muted" title={skippedNote(m)}>
+        {weightedLists(m).length > 0 && (
+          <sup className="text-vtk-muted" title={weightedNote(m)}>
             *
           </sup>
         )}
@@ -173,7 +190,7 @@ export function MemberTable({
       </td>
       <td className="text-right font-semibold tabular-nums">{formatCount(m.total, locale)}</td>
       <td className="text-right">
-        <DiffPill value={diffOf(m)} locale={locale} title={skippedNote(m)} />
+        <DiffPill value={diffOf(m)} locale={locale} title={weightedNote(m)} />
       </td>
     </tr>
   );
@@ -316,21 +333,29 @@ export function MemberTable({
                 <tr key={m.userId} className="cursor-pointer" onClick={() => setSelectedId(m.userId)}>
                   <td className="sticky left-0 z-10 bg-vtk-surface-elevated whitespace-nowrap font-semibold">{m.name}</td>
                   {lists.map((list) => {
-                    if (m.skippedLists.includes(list.id)) {
+                    const weight = weightOn(m, list.id);
+                    if (weight === 0) {
                       return (
                         <td key={list.id} className="text-right text-xs text-vtk-muted">
                           {nl ? "overgeslagen" : "skipped"}
                         </td>
                       );
                     }
+                    // Wat telt, dus al met het gewicht vermenigvuldigd; de
+                    // richtlijn krimpt mee.
                     const value = m.perList[list.id] ?? 0;
-                    const short = list.expectedPerMember !== null && value < list.expectedPerMember;
+                    const short = list.expectedPerMember !== null && value < list.expectedPerMember * weight;
                     return (
                       <td
                         key={list.id}
                         className={`text-right tabular-nums ${value === 0 ? "text-vtk-muted" : ""} ${short ? "font-semibold text-vtk-danger" : ""}`}
                       >
                         {formatCount(value, locale)}
+                        {weight < 1 && (
+                          <span className="ml-1 text-[11px] font-normal text-vtk-muted" title={nl ? `Telt voor ${formatWeight(weight, locale)} op deze lijst` : `Counts for ${formatWeight(weight, locale)} on this list`}>
+                            {formatWeight(weight, locale)}
+                          </span>
+                        )}
                         {short && <span className="sr-only">{nl ? " (onder de richtlijn)" : " (below target)"}</span>}
                       </td>
                     );
@@ -343,11 +368,11 @@ export function MemberTable({
         </div>
       )}
 
-      {anySkipped && view !== "perList" && (
+      {anyWeighted && view !== "perList" && (
         <p className="text-xs text-vtk-muted">
           {nl
-            ? "* Overgeslagen op een lijst (bv. logistiek op 24UL): vergeleken met het gemiddelde zonder die lijst."
-            : "* Skipped on a list (e.g. logistics at 24UL): compared with the average without that list."}
+            ? "* Overgeslagen of voor een deel meegeteld op een lijst (bv. logistiek op 24UL): die lijst weegt voor die persoon minder, in de shiften en in het gemiddelde waarmee ze vergeleken wordt. Overgeslagen is 0%."
+            : "* Skipped or partly counted on a list (e.g. logistics at 24UL): that list weighs less for that person, in their shifts and in the average they are compared with. Skipped is 0%."}
         </p>
       )}
 
@@ -398,7 +423,7 @@ function MemberDrawer({
   }, [onClose]);
 
   const shownLists = lists.filter(
-    (list) => (member.perList[list.id] ?? 0) > 0 || member.skippedLists.includes(list.id) || member.entries.some((e) => e.listId === list.id),
+    (list) => (member.perList[list.id] ?? 0) > 0 || list.id in member.listWeights || member.entries.some((e) => e.listId === list.id),
   );
   const missing = lists.filter((list) => !shownLists.includes(list));
   const heading = "mb-1 text-[11px] font-bold uppercase tracking-[0.08em] text-vtk-muted";
@@ -490,30 +515,41 @@ function MemberDrawer({
               <p className="text-sm text-vtk-muted">{nl ? "Staat op geen enkele bevestigde lijst." : "Not on any confirmed list."}</p>
             )}
             {shownLists.map((list) => {
-              const skipped = member.skippedLists.includes(list.id);
+              const weight = weightOn(member, list.id);
+              const skipped = weight === 0;
               const count = member.perList[list.id] ?? 0;
               const entries = member.entries.filter((e) => e.listId === list.id);
-              const short = list.expectedPerMember !== null && count < list.expectedPerMember;
+              const target = list.expectedPerMember !== null ? list.expectedPerMember * weight : null;
+              const short = target !== null && count < target;
               return (
                 <details key={list.id} className="group border-t border-[var(--rule-soft)] py-2">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm">
                     <span>
                       <span className="font-semibold">{list.name}</span>
-                      {skipped && (
+                      {weight < 1 && (
                         <span className="ml-2 rounded-full bg-[var(--paper-2)] px-2 py-0.5 text-[11px] font-semibold text-vtk-body">
-                          {nl ? "overgeslagen" : "skipped"}
+                          {skipped ? (nl ? "overgeslagen" : "skipped") : nl ? `telt voor ${formatWeight(weight, locale)}` : `counts for ${formatWeight(weight, locale)}`}
                         </span>
                       )}
                     </span>
-                    <span className="tabular-nums">
+                    <span
+                      className="tabular-nums"
+                      title={
+                        weight < 1 && !skipped
+                          ? nl
+                            ? `${formatCount(count / weight, locale)} op de lijst, telt voor ${formatWeight(weight, locale)}`
+                            : `${formatCount(count / weight, locale)} on the list, counts for ${formatWeight(weight, locale)}`
+                          : undefined
+                      }
+                    >
                       {skipped ? (
                         <span className="text-vtk-muted">{nl ? "telt niet" : "does not count"}</span>
                       ) : (
                         <>
                           <strong>{formatCount(count, locale)}</strong>
-                          {list.expectedPerMember !== null && (
+                          {target !== null && (
                             <span className={`ml-1 text-xs ${short ? "text-vtk-danger" : "text-vtk-muted"}`}>
-                              / {formatCount(list.expectedPerMember, locale)}
+                              / {formatCount(target, locale)}
                             </span>
                           )}
                         </>

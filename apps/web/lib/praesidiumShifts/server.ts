@@ -572,7 +572,7 @@ export async function loadYearLists(year: number, kind?: ListKind) {
     }),
     prisma.praesidiumShiftExemption.findMany({
       where: { listId: { in: ids } },
-      select: { listId: true, userId: true, reason: true },
+      select: { listId: true, userId: true, weight: true, reason: true },
     }),
     loadCellOverrides(ids),
   ]);
@@ -633,31 +633,46 @@ export async function setCellOverride(input: {
 }
 
 /**
- * Iemand op één lijst overslaan, of weer laten meetellen. Enkel wie in het
- * werkingsjaar van de lijst in het praesidium zit; een ander id wordt stil
- * genegeerd (de keuzelijst biedt het niet aan).
+ * Iemand op één lijst overslaan (`weight` 0), voor een deel laten meetellen
+ * (0.5 is de helft), of met `null` weer volledig laten meetellen. Enkel wie in
+ * het werkingsjaar van de lijst in het praesidium zit; een ander id wordt stil
+ * genegeerd (de keuzelijst biedt het niet aan). Geeft terug bij hoeveel mensen
+ * er iets veranderde.
  */
 export async function setExemption(input: {
   listId: string;
   year: number;
   userIds: string[];
-  skip: boolean;
+  weight: number | null;
   reason: string | null;
   actorId: string;
 }): Promise<number> {
-  if (!input.skip) {
+  if (input.weight === null) {
     const { count } = await prisma.praesidiumShiftExemption.deleteMany({
       where: { listId: input.listId, userId: { in: input.userIds } },
     });
     return count;
   }
+  const weight = input.weight;
   const roster = new Set((await loadRoster(input.year)).map((m) => m.userId));
-  const userIds = input.userIds.filter((id) => roster.has(id));
-  const { count } = await prisma.praesidiumShiftExemption.createMany({
-    data: userIds.map((userId) => ({ listId: input.listId, userId, reason: input.reason, createdById: input.actorId })),
-    skipDuplicates: true,
+  const existing = await prisma.praesidiumShiftExemption.findMany({
+    where: { listId: input.listId, userId: { in: input.userIds } },
+    select: { userId: true, weight: true },
   });
-  return count;
+  const current = new Map(existing.map((e) => [e.userId, e.weight]));
+  const userIds = input.userIds.filter((id) => roster.has(id) && current.get(id) !== weight);
+  // Een reden overschrijft enkel als er een is: wie als deel van Logistiek
+  // overgeslagen werd en daarna voor de helft telt, blijft "Logistiek".
+  await prisma.$transaction(
+    userIds.map((userId) =>
+      prisma.praesidiumShiftExemption.upsert({
+        where: { listId_userId: { listId: input.listId, userId } },
+        create: { listId: input.listId, userId, weight, reason: input.reason, createdById: input.actorId },
+        update: { weight, ...(input.reason ? { reason: input.reason } : {}) },
+      }),
+    ),
+  );
+  return userIds.length;
 }
 
 /** Een nummer uit het overzicht van een lijst, voor wie er op zijn profiel geen heeft. */

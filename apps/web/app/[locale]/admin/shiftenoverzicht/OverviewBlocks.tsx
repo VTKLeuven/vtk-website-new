@@ -166,6 +166,7 @@ export function ListCards({
                     ? `${list.metTarget} van ${list.participants} halen de richtlijn`
                     : `${list.metTarget} of ${list.participants} reach the target`}
                   {list.skipped > 0 && (nl ? ` · ${list.skipped} overgeslagen` : ` · ${list.skipped} skipped`)}
+                  {list.partial > 0 && (nl ? ` · ${list.partial} voor een deel` : ` · ${list.partial} partly`)}
                 </span>
               )}
             </span>

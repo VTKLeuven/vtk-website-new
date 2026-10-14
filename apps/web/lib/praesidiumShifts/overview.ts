@@ -15,10 +15,12 @@ import {
   entryOnCountedPart,
   entryUser,
   entryWeight,
+  listWeights,
   nameIndex,
   nameUser,
   standings,
   summarizeList,
+  weightedAverage,
   type Averages,
   type SlotStat,
   type StatsName,
@@ -46,8 +48,12 @@ export type OverviewListRow = {
   average: number;
   /** Hoeveel praesidiumleden de richtlijn haalden (van wie meetelt). */
   metTarget: number | null;
-  /** Hoeveel praesidiumleden op deze lijst overgeslagen worden, en hoeveel er meetellen. */
+  /**
+   * Hoeveel praesidiumleden op deze lijst overgeslagen worden, hoeveel er voor
+   * een deel meetellen, en hoeveel er meetellen (ook wie voor een deel).
+   */
   skipped: number;
+  partial: number;
   participants: number;
 };
 
@@ -97,9 +103,12 @@ export type OverviewMember = {
   total: number;
   weeklyPast: number;
   weeklyUpcoming: number;
-  /** Lijsten waarop dit lid overgeslagen wordt. */
-  skippedLists: string[];
-  /** Waarmee dit lid vergeleken wordt: het gemiddelde zonder de overgeslagen lijsten. */
+  /** Lijsten waarop dit lid niet (0) of voor een deel meetelt, met hun gewicht. */
+  listWeights: Record<string, number>;
+  /**
+   * Waarmee dit lid vergeleken wordt: het gemiddelde zonder de overgeslagen
+   * lijsten, en met het deel van de lijsten waarop het voor een deel meetelt.
+   */
   expectedLists: number;
   expectedTotal: number;
   expectedWeekly: number;
@@ -150,7 +159,7 @@ export async function buildOverview(year: number, locale: "nl" | "en", now = new
     exemptions,
     now,
   });
-  const skippedPairs = new Set(exemptions.map((e) => `${e.listId}\u0000${e.userId}`));
+  const skippedPairs = new Set(exemptions.filter((e) => e.weight === 0).map((e) => `${e.listId}\u0000${e.userId}`));
 
   // Per lid de vakjes en shiften, voor het detailvenster. Een vakje dat met de
   // hand geregeld is, staat ook bij wie de naam volgens de lijst is: zo ziet de
@@ -234,7 +243,7 @@ export async function buildOverview(year: number, locale: "nl" | "en", now = new
       total: total.total,
       weeklyPast: total.weeklyPast,
       weeklyUpcoming: total.weeklyUpcoming,
-      skippedLists: total.skippedLists,
+      listWeights: Object.fromEntries(total.listWeights),
       expectedLists: total.expectedLists,
       expectedTotal: total.expectedTotal,
       expectedWeekly: total.expectedWeekly,
@@ -246,11 +255,16 @@ export async function buildOverview(year: number, locale: "nl" | "en", now = new
 
   const listRow = (list: (typeof lists)[number]): OverviewListRow => {
     const stats = byId.get(list.id)!;
-    const skippedHere = new Set(exemptions.filter((e) => e.listId === list.id).map((e) => e.userId));
-    const summary = summarizeList(stats, entries, statsNames, skippedHere);
-    const counted = roster.filter((m) => !skippedHere.has(m.userId));
-    const perMember = counted.map((m) => summary.perUser.get(m.userId) ?? 0);
-    const average = listAverages.get(list.id)?.average ?? (perMember.length ? perMember.reduce((s, v) => s + v, 0) / perMember.length : 0);
+    const weights = listWeights(exemptions, list.id);
+    const weightOf = (userId: string) => weights.get(userId) ?? 1;
+    const summary = summarizeList(stats, entries, statsNames, weights);
+    const counted = roster.filter((m) => weightOf(m.userId) > 0);
+    // Zoals op de lijst staat: wie voor 50% meetelt, haalt de richtlijn met
+    // dezelfde shiften als een ander, enkel zijn verschil weegt minder.
+    const perMember = counted.map((m) => (summary.perUser.get(m.userId) ?? 0) / weightOf(m.userId));
+    const average =
+      listAverages.get(list.id)?.average ??
+      weightedAverage(counted.map((m, i) => ({ value: perMember[i], weight: weightOf(m.userId) })));
     return {
       id: list.id,
       kind: list.kind,
@@ -263,7 +277,8 @@ export async function buildOverview(year: number, locale: "nl" | "en", now = new
       others: summary.others,
       unresolvedNames: summary.unresolvedNames,
       unresolvedShifts: summary.unresolvedShifts,
-      skipped: skippedHere.size,
+      skipped: roster.filter((m) => weightOf(m.userId) === 0).length,
+      partial: counted.filter((m) => weightOf(m.userId) < 1).length,
       participants: counted.length,
       openSlots: list.openSlots ?? detectedOpenSlots(stats, (list.slots ?? []) as SlotStat[]),
       average,

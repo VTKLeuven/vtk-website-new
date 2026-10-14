@@ -3656,17 +3656,21 @@ model PraesidiumShiftContact {
   @@index([userId])
 }
 
-/// Iemand die op één lijst wordt overgeslagen, ook al staat hij erop:
-/// logistiek die op 24UL als logistiek werkt, krijgt daar geen praesidiumshiften
-/// voor. Zijn vakjes op die lijst tellen niet, en hij telt ook niet mee in het
-/// gemiddelde, de richtlijn en de bellijst van die lijst: wie de hele dag als
-/// logistiek werkt, kan geen praesidiumshiften doen en hoort dus niet als
-/// "ondergemiddeld" opgebeld te worden.
+/// Iemand die op één lijst niet of maar voor een deel meetelt, ook al staat hij
+/// erop: logistiek die op 24UL als logistiek werkt, krijgt daar geen (of minder)
+/// praesidiumshiften voor. Overgeslagen (`weight` 0): zijn vakjes op die lijst
+/// tellen niet, en hij telt ook niet mee in het gemiddelde, de richtlijn en de
+/// bellijst van die lijst. Voor een deel (`weight` 0.5): de lijst weegt voor hem
+/// half, in zijn shiften en in wat van hem verwacht wordt. Geen rij = telt
+/// volledig mee.
 model PraesidiumShiftExemption {
   listId String
   list   PraesidiumShiftList @relation(fields: [listId], references: [id], onDelete: Cascade)
   userId String
   user   User                @relation("PraesidiumShiftExemptionUser", fields: [userId], references: [id], onDelete: Cascade)
+  /// Hoeveel deze lijst voor dit lid weegt, van 0 (overgeslagen) tot net onder
+  /// 1. Zie `standings` in apps/web/lib/praesidiumShifts/stats.ts.
+  weight Float   @default(0)
   /// Waarom, kort ("Logistiek"). Leeg = geen reden opgegeven.
   reason String?
 

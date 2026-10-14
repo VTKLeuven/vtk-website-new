@@ -375,7 +375,7 @@ describe("tellen", () => {
       { listId: "l2", nameKey: "bram", status: "MATCHED" as const, userId: "u-bram" },
     ];
 
-    const summary = summarizeList(perName, rows, linked, new Set(["u-logi"]));
+    const summary = summarizeList(perName, rows, linked, new Map([["u-logi", 0]]));
     expect(summary).toMatchObject({ praesidium: 6, skipped: 6, counted: 12 });
     expect(summary.perUser.has("u-logi")).toBe(false);
 
@@ -386,7 +386,7 @@ describe("tellen", () => {
       entries: rows,
       names: linked,
       siteShifts: [],
-      exemptions: [{ listId: "l1", userId: "u-logi" }],
+      exemptions: [{ listId: "l1", userId: "u-logi", weight: 0 }],
       now: new Date("2026-10-11T12:00:00Z"),
     });
     // 24UL: enkel Bram en Lea tellen mee, gemiddeld 3. De cantus: iedereen, gemiddeld 1.
@@ -394,8 +394,48 @@ describe("tellen", () => {
     expect(result.listAverages.get("l2")?.average).toBe(1);
     expect(result.averages.lists).toBe(4);
     const logi = result.rows.find((r) => r.userId === "u-logi")!;
-    expect(logi).toMatchObject({ lists: 1, skippedLists: ["l1"], expectedLists: 1 });
+    expect(logi).toMatchObject({ lists: 1, listWeights: new Map([["l1", 0]]), expectedLists: 1 });
     expect(result.rows.find((r) => r.userId === "u-lea")).toMatchObject({ lists: 2, expectedLists: 4 });
+  });
+
+  it("laat iemand voor een deel meetellen: zijn shiften en wat van hem verwacht wordt, krimpen mee", () => {
+    const perName: StatsList = { ...list, countMode: "PER_NAME", sheets: [{ name: "Di", kind: "SHIFTS", names: 0, date: null, counted: true }], colors: [] };
+    const cell = (nameKey: string) => ({ listId: "l1", nameKey, sheet: "Di", color: null, hours: 2, excluded: false });
+    const rows = [
+      ...Array.from({ length: 6 }, () => cell("logi")),
+      ...Array.from({ length: 8 }, () => cell("bram")),
+      ...Array.from({ length: 4 }, () => cell("lea")),
+    ];
+    const linked = [
+      { listId: "l1", nameKey: "logi", status: "MATCHED" as const, userId: "u-logi" },
+      { listId: "l1", nameKey: "bram", status: "MATCHED" as const, userId: "u-bram" },
+      { listId: "l1", nameKey: "lea", status: "MATCHED" as const, userId: "u-lea" },
+    ];
+
+    // Logistiek telt voor de helft: van zijn zes shiften tellen er drie.
+    const summary = summarizeList(perName, rows, linked, new Map([["u-logi", 0.5]]));
+    expect(summary).toMatchObject({ counted: 18, praesidium: 15, skipped: 3 });
+    expect(summary.perUser.get("u-logi")).toBe(3);
+
+    const result = standings({
+      memberIds: ["u-logi", "u-bram", "u-lea"],
+      eventLists: [perName],
+      weeklyLists: [],
+      entries: rows,
+      names: linked,
+      siteShifts: [],
+      exemptions: [{ listId: "l1", userId: "u-logi", weight: 0.5 }],
+      now: new Date("2026-10-11T12:00:00Z"),
+    });
+    // In het gemiddelde is hij een halve persoon met zijn zes: (8 + 4 + 6 / 2) / 2,5 = 6.
+    expect(result.listAverages.get("l1")).toEqual({ average: 6, participants: 3 });
+    expect(result.averages.lists).toBe(6);
+    // Hij deed precies het gemiddelde, dus 3 tegen de helft van 6: geen verschil.
+    expect(result.rows.find((r) => r.userId === "u-logi")).toMatchObject({ lists: 3, expectedLists: 3 });
+    expect(result.rows.find((r) => r.userId === "u-bram")).toMatchObject({ lists: 8, expectedLists: 6 });
+    expect(result.rows.find((r) => r.userId === "u-lea")).toMatchObject({ lists: 4, expectedLists: 6 });
+    // De verschillen tellen samen nog altijd op tot nul.
+    expect(result.rows.reduce((sum, r) => sum + r.lists - r.expectedLists, 0)).toBe(0);
   });
 
   it("vergelijkt zonder overgeslagen lijsten precies met het gewone gemiddelde", () => {
