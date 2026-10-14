@@ -225,7 +225,7 @@ table whose rows expand into per-category editors, with create/import in modals.
 | --- | --- | --- |
 | `/admin/roles` (`RolesTable`) | `roles.manage` | Row = role + effective holder count. Expands to: direct holders, posts that grant it (edit needs `groups.manage`), permissions. |
 | `/admin/groepen` (`PostsTable`) | `groups.manage` | Per working-year tabs. Row = post + member count. Expands to: members, roles this post grants (DEFAULT/LEADER), post settings (incl. `active`). Posts are deactivated, never hard-deleted. Filtered to `Group.type = PRAESIDIUM`. |
-| `/admin/werkgroepen` (`WerkgroepenTable`) | `werkgroepen.manage` **or** werkgroep member | Werkgroepen = `Group` with `type = WERKGROEP`. Managers see all and manage members/roles/settings like posts; a plain member sees only their own werkgroep(s) and may edit just the info text + website (`saveWerkgroepInfoAction`, scoped to their own membership). Public page: `/werkgroepen`. |
+| `/admin/werkgroepen` (`WerkgroepenTable`) | `werkgroepen.manage` **or** werkgroep member | Werkgroepen = `Group` with `type = WERKGROEP`. Managers see all and manage members/roles/settings like posts; a plain member sees only their own werkgroep(s) and may edit just the info text + website (`saveWerkgroepInfoAction`, scoped to their own membership). With `werkgroepen.manageOwnMembers` (see "Werkgroepleden door de G3/G4") a member also adds and removes the plain members of this working year. Public page: `/werkgroepen`. |
 | `/admin/gebruikers` | `users.view` (edit needs `users.edit`) | **Server-driven** table (URL `?q&sort&dir&page`, `count` + `findMany` with `take`/`skip`, no memberships join), built to scale to tens of thousands of users. Editing opens `/admin/gebruikers/[id]`. |
 | `/admin/leden` | `leden.manage` | Wie dit **academiejaar** lid is van de kring (`Membership`, cutover 14 september), niet te verwarren met `/admin/gebruikers` (elk account) of `/admin/groepen` (posten per werkingsjaar). Ledenaantal + omzet bovenaan, jaartabs, instellingen (prijs, welke wegen openstaan), iemand handmatig lid maken, en een xlsx-export (`/api/admin/leden/export`). Los van `users.view`: die tab toont elk account, deze toont persoonsgegevens mét betaalstatus. |
 | `/admin/pocs` (`PocsTable`) | `pocs.manage` | Row = POC + representative count. Expands to representatives (added via the `/api/users/search` typeahead) and POC settings. |
@@ -446,6 +446,39 @@ rol (bv. "Werkgroep terugbetalen") met `expenses.reimbursePost`, en hang die in
 niet aan elk lid. Wie geen praesidiumlid is, kan met dit recht ook zelf
 indienen; anders staat hij met een bonnetje in de hand voor een gesloten
 formulier. Zoals elke rol reset dit op 15 juli met het lidmaatschap.
+
+## Werkgroepleden door de G3/G4
+
+`werkgroepen.manageOwnMembers` laat de verantwoordelijke van een werkgroep zelf
+leden toevoegen en verwijderen op `/admin/werkgroepen`. Het is bewust smaller
+dan `werkgroepen.manage`, dat voor elke werkgroep geldt en via
+`setWerkgroepRoleAction` elke rol aan een werkgroep laat hangen, ook `admin`.
+Geef de G3/G4 dus nooit `werkgroepen.manage`.
+
+Wat het recht toelaat (`lib/werkgroepMembers.ts`, de grenzen in
+`addMembershipAction` / `removeMembershipAction`):
+
+- **Enkel de werkgroep die het verleent.** De rol moet aan díe werkgroep hangen
+  en je lidmaatschap moet die grant halen (DEFAULT voor elk lid, LEADER enkel
+  voor de verantwoordelijke). Wie G3 is van Chemix en gewoon lid van Revue,
+  beheert enkel Chemix, ook al staat het recht in zijn sessie. Dat is strenger
+  dan het "permission + membership"-patroon hierboven, omdat het hier gaat over
+  wie de rollen van de werkgroep krijgt. Een directe toekenning telt niet.
+- **Enkel gewone leden.** Iemand verantwoordelijke maken, een verantwoordelijke
+  terugzetten naar lid of verwijderen blijft `werkgroepen.manage`. Een G3 die een
+  bestaande G3 als lid toevoegt, krijgt een rode toast (`MEMBERSHIP_LEAD_LOCKED`)
+  in plaats van een stille degradatie.
+- **Enkel het huidige werkingsjaar.** De ploeg van volgend jaar zet IT klaar.
+
+**Opzetten:** vink in `/admin/roles` `werkgroepen.manageOwnMembers` aan bij de rol
+die als **verantwoordelijke** (LEADER-grant) aan de werkgroepen hangt (in
+productie `werkgroepen-g3-g4`), plus `users.search`: zonder dat laatste geeft het
+zoekveld een 403, en het formulier zegt dan welk recht ontbreekt.
+
+**Bonnetjes van werkgroepleden** hebben geen eigen recht nodig: `expenses.submit`
+is precies "indienen en enkel je eigen rekeningen zien", en de postkeuze bij het
+indienen bevat de werkgroepen al. Vink het aan bij de rol die als DEFAULT aan elke
+werkgroep hangt (in productie `werkgroepen`).
 
 ## Boekhoudcodes
 

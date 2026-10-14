@@ -40,6 +40,11 @@ export const PERMISSIONS = [
   { code: "users.bulkImport", labelNl: "Bulk gebruikers importeren", labelEn: "Bulk import users", category: "users" },
   { code: "groups.manage", labelNl: "Posten en hun rollen beheren", labelEn: "Manage posts and their roles", category: "users" },
   { code: "werkgroepen.manage", labelNl: "Werkgroepen en hun rollen beheren", labelEn: "Manage werkgroepen and their roles", category: "users" },
+  // Bewust niet `werkgroepen.manage` voor de G3/G4: dat geldt voor élke
+  // werkgroep en laat je elke rol aan je werkgroep hangen, ook `admin`. Dit
+  // recht telt enkel in de werkgroep die het je verleent, enkel voor gewone
+  // leden en enkel in het huidige werkingsjaar (lib/werkgroepMembers.ts).
+  { code: "werkgroepen.manageOwnMembers", labelNl: "Leden van de eigen werkgroep toevoegen en verwijderen", labelEn: "Add and remove members of own werkgroep", category: "users" },
   { code: "roles.manage", labelNl: "Rollen beheren en toewijzen", labelEn: "Manage and assign roles", category: "users" },
   // Wie doet wat (/admin/wie-doet-wat): de taakverdeling binnen de posten.
   // Lezen staat los van bewerken omdat het register er is om iemand te vinden,

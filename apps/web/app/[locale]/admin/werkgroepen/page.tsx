@@ -6,7 +6,8 @@ import { requireSession } from "@/lib/session";
 import { hasPermission } from "@vtk/auth";
 import type { Locale } from "@vtk/i18n";
 import { publicUrl } from "@/lib/storage";
-import { formatWorkingYear, parseWorkingYear, workingYearTabs } from "@/lib/workingYear";
+import { currentWorkingYear, formatWorkingYear, parseWorkingYear, workingYearTabs } from "@/lib/workingYear";
+import { werkgroepenWithOwnMemberRights } from "@/lib/werkgroepMembers";
 import { werkgroepErrorMessages } from "./messages";
 import { WerkgroepenTable, type WerkgroepRow, type RoleOption } from "./WerkgroepenTable";
 
@@ -26,12 +27,16 @@ export default async function AdminWerkgroepen({
 
   // Toegang: beheerders (werkgroepen.manage/superadmin) zien alle werkgroepen en
   // beheren leden/rollen; een gewoon lid ziet enkel de werkgroep(en) waar het lid
-  // van is en mag daar enkel de infotekst + website aanpassen.
+  // van is en mag daar enkel de infotekst + website aanpassen. De G3/G4 met
+  // werkgroepen.manageOwnMembers beheert daarbovenop de gewone leden van dit
+  // werkingsjaar.
   const session = await requireSession();
   const canManage = hasPermission(session, "werkgroepen.manage");
   const myGroupIds = new Set(session.groups.map((g) => g.id));
 
   const year = parseWorkingYear(jaar);
+  const ownMemberGroupIds =
+    canManage || year !== currentWorkingYear() ? new Set<string>() : await werkgroepenWithOwnMemberRights(session);
 
   const [groups, roles, distinctYears] = await Promise.all([
     prisma.group.findMany({
@@ -104,6 +109,7 @@ export default async function AdminWerkgroepen({
       memberCount: members.length,
       members,
       roleGrants,
+      memberEdit: canManage ? "full" : ownMemberGroupIds.has(group.id) ? "own" : "none",
       searchText,
     };
   });
@@ -125,9 +131,13 @@ export default async function AdminWerkgroepen({
             ? nl
               ? "Werkgroepen werken zoals posten: ze verlenen rollen aan hun leden. Lidmaatschappen gelden per werkingsjaar en resetten op 15 juli. Elke werkgroep verschijnt op /werkgroepen met haar eigen infotekst en website."
               : "Werkgroepen work like posts: they grant roles to their members. Memberships apply per working year and reset on 15 July. Each werkgroep appears on /werkgroepen with its own info text and website."
-            : nl
-              ? "Hier pas je de infotekst en website van je eigen werkgroep aan. Die verschijnen op de publieke /werkgroepen-pagina."
-              : "Here you edit the info text and website of your own werkgroep. They appear on the public /werkgroepen page."}
+            : ownMemberGroupIds.size > 0
+              ? nl
+                ? "Hier pas je de infotekst en website van je eigen werkgroep aan en beheer je de leden van dit werkingsjaar. De tekst en website verschijnen op de publieke /werkgroepen-pagina."
+                : "Here you edit the info text and website of your own werkgroep and manage its members for this working year. The text and website appear on the public /werkgroepen page."
+              : nl
+                ? "Hier pas je de infotekst en website van je eigen werkgroep aan. Die verschijnen op de publieke /werkgroepen-pagina."
+                : "Here you edit the info text and website of your own werkgroep. They appear on the public /werkgroepen page."}
         </p>
       </div>
 

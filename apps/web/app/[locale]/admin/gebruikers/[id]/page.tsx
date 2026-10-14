@@ -16,7 +16,7 @@ import { DeleteButton, DeleteIconButton } from '@/components/ui/DeleteIconButton
 import { SaveForm } from '@/components/ui/SaveForm';
 import { userErrorMessages } from '../messages';
 import {
-  addMembershipAction,
+  addMembershipFormAction,
   deleteUserAction,
   removeMembershipAction,
   saveUserAction,
@@ -276,7 +276,7 @@ export default async function EditUserPage({ params }: { params: Promise<{ local
             </li>
           )}
         </ul>
-        <form action={addMembershipAction} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
+        <form action={addMembershipFormAction} className="grid grid-cols-1 md:grid-cols-6 gap-3 items-end">
           <input type="hidden" name="userId" value={user.id} />
           <div className="md:col-span-2">
             <Label>Group</Label>

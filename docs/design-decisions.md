@@ -2230,6 +2230,15 @@ terug (`apps/web/lib/brevo/unsubscribe.ts`).
   admin-tab toont een gewoon lid enkel zijn eigen werkgroep(en) en enkel het
   infotekst-formulier; `saveWerkgroepInfoAction` checkt het lidmaatschap
   server-side. Beheerders (met het recht of superadmin) zien en beheren alles.
+- **De G3/G4 beheert zijn gewone leden zelf, de verantwoordelijken niet.**
+  Met `werkgroepen.manageOwnMembers` voegt de verantwoordelijke van een
+  werkgroep leden toe en verwijdert hij ze, enkel voor het huidige werkingsjaar
+  en enkel gewone leden. Een andere G3/G4 aanduiden, terugzetten of verwijderen
+  blijft bij IT: de verantwoordelijke krijgt extra rechten via de LEADER-grant
+  (deur, tickets, rekeningen), en die horen niet door een collega uitgedeeld te
+  worden. De ploeg van volgend jaar zet IT ook klaar; een G3 die op 14 juli de
+  ploeg van na 15 juli invult, zou rechten uitdelen voor een jaar waarin hij zelf
+  misschien geen G3 meer is. Zie `docs/permissions.md`.
 - **Footer** linkt naar zowel `/praesidium` als `/werkgroepen`.
 
 ### Wie doet wat (taakverdeling binnen een post)

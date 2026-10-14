@@ -54,6 +54,12 @@ export type WerkgroepRow = {
   memberCount: number;
   members: Member[];
   roleGrants: GrantedRole[];
+  /**
+   * Wat deze gebruiker met de ledenlijst van het getoonde jaar mag: alles
+   * (`werkgroepen.manage`), enkel gewone leden (`own`, de G3/G4 met
+   * `werkgroepen.manageOwnMembers`, enkel in het huidige werkingsjaar) of niets.
+   */
+  memberEdit: "full" | "own" | "none";
   /** Voorbereide, lowercased zoekstring (naam, code, rollen, leden). */
   searchText: string;
 };
@@ -423,13 +429,20 @@ function WerkgroepDetail({
       <Panel
         title={nl ? `Leden (${yearLabel})` : `Members (${yearLabel})`}
         count={werkgroep.members.length}
-        canEdit={canManage}
+        canEdit={werkgroep.memberEdit !== "none"}
         editLabel={nl ? "Bewerken" : "Edit"}
         doneLabel={nl ? "Klaar" : "Done"}
       >
         {(editing) =>
           editing ? (
             <div className="space-y-2">
+              {werkgroep.memberEdit === "own" && (
+                <p className="text-xs text-[#5c667f]">
+                  {nl
+                    ? `Je kan gewone leden toevoegen en verwijderen. Een ${werkgroep.leadLabel} aanduiden of verwijderen vraag je aan IT.`
+                    : `You can add and remove members. Ask IT to appoint or remove a ${werkgroep.leadLabel}.`}
+                </p>
+              )}
               {werkgroep.members.length > 0 ? (
                 <ul className="divide-y divide-vtk-blue/10">
                   {werkgroep.members.map((m) => (
@@ -442,21 +455,29 @@ function WerkgroepDetail({
                           {m.title ? ` · ${m.title}` : ""}
                         </div>
                       </div>
-                      <RemoveMemberButton
-                        membershipId={m.membershipId}
-                        userId={m.userId}
-                        memberName={m.name}
-                        groupName={werkgroep.name}
-                        yearLabel={yearLabel}
-                        locale={locale}
-                      />
+                      {(werkgroep.memberEdit === "full" || m.role === "MEMBER") && (
+                        <RemoveMemberButton
+                          membershipId={m.membershipId}
+                          userId={m.userId}
+                          memberName={m.name}
+                          groupName={werkgroep.name}
+                          yearLabel={yearLabel}
+                          locale={locale}
+                        />
+                      )}
                     </li>
                   ))}
                 </ul>
               ) : (
                 <p className="text-sm text-[#5c667f]">{nl ? "Nog geen leden voor dit jaar." : "No members for this year yet."}</p>
               )}
-              <AddMemberForm groupId={werkgroep.id} year={year} locale={locale} leadLabel={werkgroep.leadLabel} />
+              <AddMemberForm
+                groupId={werkgroep.id}
+                year={year}
+                locale={locale}
+                leadLabel={werkgroep.leadLabel}
+                allowLead={werkgroep.memberEdit === "full"}
+              />
             </div>
           ) : werkgroep.members.length > 0 ? (
             <ul className="flex flex-wrap gap-2">

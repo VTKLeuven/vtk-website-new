@@ -15,6 +15,7 @@ import { currentWorkingYear } from "@/lib/workingYear";
 import { deleteObject } from "@vtk/storage";
 import { storeAvatar, MAX_AVATAR_BYTES } from "@/lib/avatar";
 import { LEAD_LABEL_MAX } from "@/lib/werkgroepen";
+import { canManageOwnWerkgroepMembers } from "@/lib/werkgroepMembers";
 import { eraseUserData, StorageUnavailableError } from "@/lib/privacy/account";
 import { describeChanges, logAudit } from "@/lib/audit";
 import { pushMailGroupsForGroup } from "@/lib/google/sync";
@@ -454,15 +455,22 @@ const membershipSchema = z.object({
 // af van het soort groep: een praesidiumpost vraagt groups.manage, een werkgroep
 // vraagt werkgroepen.manage. Zo kan werkgroepbeheer los gedelegeerd worden.
 // Superadmin altijd (via hasPermission).
-async function requireMembershipManager(groupId: string) {
+//
+// "own" is de smalle variant voor de G3/G4 van een werkgroep
+// (werkgroepen.manageOwnMembers): enkel gewone leden, enkel in het huidige
+// werkingsjaar. De beller dwingt die twee grenzen af.
+async function requireMembershipManager(groupId: string): Promise<"full" | "own"> {
   const session = await requireSession();
-  if (hasPermission(session, "users.edit")) return session;
+  if (hasPermission(session, "users.edit")) return "full";
   const group = groupId
     ? await prisma.group.findUnique({ where: { id: groupId }, select: { type: true } })
     : null;
   const needed = group?.type === "WERKGROEP" ? "werkgroepen.manage" : "groups.manage";
-  if (!hasPermission(session, needed)) throw new Error("FORBIDDEN");
-  return session;
+  if (hasPermission(session, needed)) return "full";
+  if (group?.type === "WERKGROEP" && (await canManageOwnWerkgroepMembers(session, groupId))) {
+    return "own";
+  }
+  throw new Error("FORBIDDEN");
 }
 
 /** Revalideert alle plekken waar een lidmaatschap zichtbaar is (post of werkgroep). */
@@ -485,9 +493,9 @@ function pushGroupAddresses(groupId: string, year: number): void {
   after(() => pushMailGroupsForGroup(groupId));
 }
 
-export async function addMembershipAction(formData: FormData): Promise<void> {
+export async function addMembershipAction(formData: FormData): Promise<SaveState> {
   const groupId = String(formData.get("groupId") ?? "");
-  await requireMembershipManager(groupId);
+  const manager = await requireMembershipManager(groupId);
   const rawYear = String(formData.get("year") ?? "").trim();
   const parsed = membershipSchema.parse({
     userId: formData.get("userId"),
@@ -498,6 +506,17 @@ export async function addMembershipAction(formData: FormData): Promise<void> {
     // Leeg jaar valt terug op het huidige werkingsjaar.
     year: rawYear || currentWorkingYear(),
   });
+  if (manager === "own") {
+    if (parsed.year !== currentWorkingYear()) return saveError("MEMBERSHIP_YEAR_LOCKED");
+    if (parsed.role === "LEAD") return saveError("MEMBERSHIP_LEAD_LOCKED");
+    // De upsert hieronder zou een bestaande verantwoordelijke stil terugzetten
+    // naar lid; dat is evengoed iemand anders verantwoordelijke maken.
+    const existing = await prisma.groupMembership.findUnique({
+      where: { userId_groupId_year: { userId: parsed.userId, groupId, year: parsed.year } },
+      select: { role: true },
+    });
+    if (existing?.role === "LEAD") return saveError("MEMBERSHIP_LEAD_LOCKED");
+  }
   await prisma.groupMembership.upsert({
     where: {
       userId_groupId_year: {
@@ -524,6 +543,17 @@ export async function addMembershipAction(formData: FormData): Promise<void> {
   });
   revalidateMembershipSurfaces(parsed.userId);
   pushGroupAddresses(parsed.groupId, parsed.year);
+  return saveOk();
+}
+
+/**
+ * Voor het kale formulier op de gebruikersfiche, dat geen toast heeft. Wie daar
+ * staat, heeft volledig beheer en krijgt dus geen invoerfout terug; komt er toch
+ * een, dan hoort ze in de error boundary en niet stil te verdwijnen.
+ */
+export async function addMembershipFormAction(formData: FormData): Promise<void> {
+  const result = await addMembershipAction(formData);
+  if (result.status === "error") throw new Error(result.code);
 }
 
 export async function removeMembershipAction(formData: FormData): Promise<void> {
@@ -535,12 +565,21 @@ export async function removeMembershipAction(formData: FormData): Promise<void> 
       select: {
         groupId: true,
         year: true,
+        role: true,
         user: { select: { name: true } },
         group: { select: { nameNl: true } },
       },
     });
     if (membership) {
-      await requireMembershipManager(membership.groupId);
+      const manager = await requireMembershipManager(membership.groupId);
+      // Het scherm toont de G3/G4 geen verwijderknop bij een verantwoordelijke of
+      // in een ander jaar, dus dit is geen invoerfout maar een geknutseld verzoek.
+      if (
+        manager === "own" &&
+        (membership.role === "LEAD" || membership.year !== currentWorkingYear())
+      ) {
+        throw new Error("FORBIDDEN");
+      }
       await prisma.groupMembership.delete({ where: { id } });
       await logAudit({
         action: "delete",
