@@ -323,6 +323,17 @@ export function startOfWeek(date: Date = new Date()): Date {
 }
 
 /**
+ * De week die "Wanneer kan ik rijden" opent zonder `?week=`. Tot en met
+ * donderdag is dat deze week; vanaf vrijdag (Belgische dag) de volgende, want
+ * dan geven de karchauffeurs hun beschikbaarheid voor die week door.
+ */
+export function availabilityDefaultWeek(now: Date = new Date()): Date {
+  const monday = startOfWeek(now);
+  const weekday = (todayDateOnly(now).getUTCDay() + 6) % 7; // maandag = 0
+  return weekday >= 4 ? new Date(monday.getTime() + 7 * 24 * 60 * 60 * 1000) : monday;
+}
+
+/**
  * ISO-weeknummer (maandag als eerste dag, week 1 bevat 4 januari). Voor de titel
  * van het weekoverzicht: "week 38" zegt Logistiek meer dan een datumbereik.
  */

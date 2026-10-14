@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  availabilityDefaultWeek,
   billedHours,
   EXTERN_REQUESTER,
   OTHER_REQUESTER,
@@ -227,6 +228,36 @@ describe('startOfWeek', () => {
   it('uses the Brussels day, so late Sunday evening stays in that week', () => {
     // 23:30 UTC op zondag is maandag 01:30 in Brussel (zomertijd).
     expect(startOfWeek(new Date('2026-09-20T23:30:00Z')).toISOString()).toBe(
+      '2026-09-21T00:00:00.000Z'
+    );
+  });
+});
+
+describe('availabilityDefaultWeek', () => {
+  it('opens this week up to and including Thursday', () => {
+    // 2026-09-17 is een donderdag.
+    expect(availabilityDefaultWeek(new Date('2026-09-17T20:00:00Z')).toISOString()).toBe(
+      '2026-09-14T00:00:00.000Z'
+    );
+  });
+
+  it('opens next week from Friday onwards', () => {
+    for (const moment of ['2026-09-18T08:00:00Z', '2026-09-19T12:00:00Z', '2026-09-20T20:00:00Z']) {
+      expect(availabilityDefaultWeek(new Date(moment)).toISOString()).toBe(
+        '2026-09-21T00:00:00.000Z'
+      );
+    }
+  });
+
+  it('switches on the Brussels day, not the UTC day', () => {
+    // 22:30 UTC op donderdag is vrijdag 00:30 in Brussel (zomertijd).
+    expect(availabilityDefaultWeek(new Date('2026-09-17T22:30:00Z')).toISOString()).toBe(
+      '2026-09-21T00:00:00.000Z'
+    );
+  });
+
+  it('goes back to this week on Monday', () => {
+    expect(availabilityDefaultWeek(new Date('2026-09-21T08:00:00Z')).toISOString()).toBe(
       '2026-09-21T00:00:00.000Z'
     );
   });

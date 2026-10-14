@@ -3968,6 +3968,15 @@ vakje dat je penseel al droeg, dan wis je.
   liever een rij van twintig pixels dan een scherm dat lekt. Klap je de nacht
   open, dan worden de rijen kleiner in plaats van dat er iets buiten valt.
 
+### Vanaf vrijdag opent de beschikbaarheid op de volgende week
+
+De karchauffeurs geven hun beschikbaarheid op het einde van de week door voor de
+week erna. Wie `/ritten/beschikbaarheid` opent zonder `?week=`, krijgt daarom van
+maandag tot en met donderdag deze week en vanaf vrijdag de volgende
+(`availabilityDefaultWeek` in `lib/uitleen.ts`). De dag telt in Belgische tijd,
+zoals bij `startOfWeek`. Wie toch nog iets aan de lopende week wil aanpassen,
+klikt één keer op "Vorige".
+
 ### De knop naar de beschikbaarheid staat in de donkere paginakop
 
 Op "Mijn ritten" stond ze als paneeltje tussen de ritten, en zo leest ze als een

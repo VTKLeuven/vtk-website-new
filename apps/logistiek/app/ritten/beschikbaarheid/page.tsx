@@ -5,6 +5,7 @@ import { ToastProvider } from '@/components/ui/toast';
 import { getLocale } from '@/lib/i18n';
 import { getSession } from '@/lib/session';
 import {
+  availabilityDefaultWeek,
   formatDateRange,
   isoWeekNumber,
   parseDateOnly,
@@ -40,7 +41,8 @@ export default async function BeschikbaarheidPage({
   if (!session) return <LoginGate variant="trips" returnTo="/ritten/beschikbaarheid" />;
   const en = locale === 'en';
 
-  const monday = startOfWeek((week && parseDateOnly(week)) || new Date());
+  const requested = week ? parseDateOnly(week) : null;
+  const monday = requested ? startOfWeek(requested) : availabilityDefaultWeek();
 
   const [driver, vanDriver, windows, note] = await Promise.all([
     isDriver(session.user.id),
