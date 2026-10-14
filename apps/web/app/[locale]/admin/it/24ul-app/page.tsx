@@ -3,7 +3,11 @@ import { Card } from "@vtk/ui";
 import { prisma } from "@vtk/db";
 import { hasLocale } from "@/lib/locale";
 import { requirePermission } from "@/lib/session";
-import { removeDownloadEmailAction, revokeDeviceAction } from "@/app/actions/urenloop-app";
+import {
+  removeDownloadEmailAction,
+  revokeDeviceAction,
+  setDownloadEmailPublishStatsAction,
+} from "@/app/actions/urenloop-app";
 import { DeleteIconButton } from "@/components/ui/DeleteIconButton";
 import { readReleaseManifest, formatBytes } from "@/lib/urenloopApp/release";
 import { AddDownloadEmailForm } from "./AddDownloadEmailForm";
@@ -104,7 +108,9 @@ export default async function AdminUrenloopApp({
           <h2 className="text-lg font-semibold">Allowed addresses</h2>
           <p className="mt-1 text-sm text-zinc-500">
             Removing an address takes effect immediately: any code already mailed to it stops
-            working, and a download session opened with it is refused on the next click.
+            working, and a download session opened with it is refused on the next click. Only
+            addresses with <span className="font-medium text-zinc-700">Publish stats</span> enabled
+            may push live 24urenloop standings to vtk.be.
           </p>
         </div>
         <Card className="p-5">
@@ -119,6 +125,7 @@ export default async function AdminUrenloopApp({
                   <tr className="border-b border-vtk-blue/10 text-left text-xs uppercase text-zinc-500">
                     <th className="py-2 pr-4 font-medium">Address</th>
                     <th className="py-2 pr-4 font-medium">Note</th>
+                    <th className="py-2 pr-4 font-medium">Publish stats</th>
                     <th className="py-2 pr-4 font-medium">Added</th>
                     <th className="py-2 pr-4 font-medium">By</th>
                     <th className="py-2" />
@@ -129,6 +136,26 @@ export default async function AdminUrenloopApp({
                     <tr key={entry.id} className="border-b border-vtk-blue/5">
                       <td className="py-2 pr-4 font-medium">{entry.email}</td>
                       <td className="py-2 pr-4 text-zinc-500">{entry.note ?? ""}</td>
+                      <td className="py-2 pr-4">
+                        <form action={setDownloadEmailPublishStatsAction}>
+                          <input type="hidden" name="id" value={entry.id} />
+                          <input
+                            type="hidden"
+                            name="canPublishStats"
+                            value={entry.canPublishStats ? "0" : "1"}
+                          />
+                          <button
+                            type="submit"
+                            className={`rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                              entry.canPublishStats
+                                ? "bg-vtk-yellow/50 text-vtk-ink hover:bg-vtk-yellow/70"
+                                : "border border-zinc-200 text-zinc-500 hover:border-zinc-300 hover:text-zinc-700"
+                            }`}
+                          >
+                            {entry.canPublishStats ? "Enabled" : "Off"}
+                          </button>
+                        </form>
+                      </td>
                       <td className="py-2 pr-4 text-zinc-500">{dateFmt.format(entry.createdAt)}</td>
                       <td className="py-2 pr-4 text-zinc-500">{entry.addedBy?.name ?? ""}</td>
                       <td className="py-2 text-right">

@@ -54,6 +54,7 @@ import { resolveFrontpage } from "@/lib/frontpage/resolve";
 import { frontpagePhoto } from "@/lib/frontpage/registry";
 import { Frontpage } from "@/components/editorial/frontpage";
 import type { FrontpageShift } from "@/components/editorial/frontpage/context";
+import { getCachedUrenloopData } from "@/lib/urenloop/server";
 import { currentWorkingYear } from "@/lib/workingYear";
 import { AftermovieGrid, type AftermovieGridItem } from "./AftermovieGrid";
 import {
@@ -190,12 +191,17 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
 
   // Een voorverkoop staat enkel in het nieuws van wie erin mag, en hangt dus aan
   // de sessie; daarom los van het gedeelde nieuws. Zie `getPresaleNews`.
-  const presaleNews = news.enabled
-    ? await getPresaleNews(locale, session, now).catch((error) => {
-        console.error("Voorverkoop in het nieuws lezen mislukt", error);
-        return [];
-      })
-    : [];
+  const [presaleNews, urenloopData] = await Promise.all([
+    news.enabled
+      ? getPresaleNews(locale, session, now).catch((error) => {
+          console.error("Voorverkoop in het nieuws lezen mislukt", error);
+          return [];
+        })
+      : [],
+    frontpage.module.id === "urenloop"
+      ? getCachedUrenloopData().catch(() => undefined)
+      : undefined,
+  ]);
   const newsEntries = presaleNews.length > 0 ? [...news.entries, ...presaleNews] : news.entries;
 
   // Aftermovies: `media.aftermovies` is dezelfde instelling als op /media, te
@@ -525,6 +531,7 @@ export async function HomeEditorial({ locale }: { locale: Locale }) {
           openShifts={openShifts}
           partners={partners}
           slogans={slogans}
+          urenloop={urenloopData}
         />
 
         <section className="quick">

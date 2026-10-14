@@ -145,6 +145,7 @@ export function getAdminNav(): NavEntry[] {
         anyPerm: ['shift.edit', 'shift.editAll', 'shift.reward', 'shift.ranking', 'shift.templates', 'shift.manual'],
       }),
       item('piano', '/piano', { perm: 'piano.manage' }),
+      item('urenloop', '/24urenloop', { perm: 'urenloop.manage' }),
     ]),
     // Eén evenement is één ding voor wie het organiseert: je plant het in en je
     // verkoopt er tickets voor.

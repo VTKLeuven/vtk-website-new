@@ -32,6 +32,14 @@ import {
 } from "@/lib/pageWerking";
 import { currentWorkingYear, formatWorkingYear } from "@/lib/workingYear";
 import { FORM_ANCHOR, splitOnFormMarker, stripFormMarker } from "@/lib/pageForm";
+import {
+  hasUrenloopMarker,
+  resolvePublicUrenloopState,
+  splitOnUrenloopMarker,
+  stripUrenloopMarker,
+} from "@/lib/urenloop/stats";
+import { getCachedUrenloopData } from "@/lib/urenloop/server";
+import { UrenloopPageBlock } from "@/components/site/UrenloopPageBlock";
 import { outlineFromMarkdown, outlineFromTiptap, type OutlineItem } from "@/lib/pageOutline";
 import { revealWords } from "@/lib/revealWords";
 import { getDictionary, pick, type Locale } from "@vtk/i18n";
@@ -129,6 +137,18 @@ export async function PageView({
       : null;
 
   const content = contentFor(page, locale);
+  const now = new Date();
+  const isUrenloopPage = page.slug === "24urenloop" || page.slug === "24-urenloop";
+  const hasMarker = content.kind === "markdown" && hasUrenloopMarker(content.markdown);
+  const urenloopData =
+    isUrenloopPage || hasMarker ? await getCachedUrenloopData().catch(() => null) : null;
+  const urenloopState = urenloopData
+    ? resolvePublicUrenloopState(urenloopData.config, urenloopData.stats, now)
+    : null;
+  const urenloopBlock = urenloopState ? (
+    <UrenloopPageBlock state={urenloopState} locale={locale} now={now} />
+  ) : null;
+
   // De markering bepaalt waar het paneel komt; staat ze er niet, dan komt het
   // onderaan. Zonder gekoppeld formulier verdwijnt ze gewoon uit de tekst.
   const split =
@@ -138,17 +158,19 @@ export async function PageView({
         : { before: stripFormMarker(content.markdown), after: null }
       : { before: "", after: null };
 
+  const urenloopInBefore = hasUrenloopMarker(split.before);
+
   const headings: OutlineItem[] =
     content.kind === "markdown"
       ? [
-          ...outlineFromMarkdown(split.before),
-          ...(split.after !== null ? outlineFromMarkdown(split.after) : []),
+          ...outlineFromMarkdown(stripUrenloopMarker(split.before)),
+          ...(split.after !== null ? outlineFromMarkdown(stripUrenloopMarker(split.after)) : []),
         ]
       : outlineFromTiptap(content.doc);
   // Het formulier staat in de rail op de plaats waar het in de tekst staat.
   const formIndex =
     content.kind === "markdown" && split.after !== null
-      ? outlineFromMarkdown(split.before).length
+      ? outlineFromMarkdown(stripUrenloopMarker(split.before)).length
       : headings.length;
 
   // Eén kopje is geen inhoudsopgave maar een herhaling van de titel; vanaf twee
@@ -272,16 +294,21 @@ export async function PageView({
             de tekst in een eigen scrollcontainer, waar een `view()`-tijdlijn een
             kopje halverwege zijn animatie kan laten staan. */}
         <div className="vtk-page-content vtk-motion">
+          {!hasMarker ? urenloopBlock : null}
           {content.kind === "markdown" ? (
             <>
-              <article className="prose-vtk">
-                <Markdown locale={locale} reveal>{split.before}</Markdown>
-              </article>
+              <MarkdownSegment
+                markdown={split.before}
+                locale={locale}
+                urenloopBlock={hasMarker && urenloopInBefore ? urenloopBlock : null}
+              />
               {split.after !== null ? panel : null}
               {split.after ? (
-                <article className="prose-vtk">
-                  <Markdown locale={locale} reveal>{split.after}</Markdown>
-                </article>
+                <MarkdownSegment
+                  markdown={split.after}
+                  locale={locale}
+                  urenloopBlock={hasMarker && !urenloopInBefore ? urenloopBlock : null}
+                />
               ) : null}
             </>
           ) : (
@@ -591,3 +618,58 @@ function EventCard({
     </Link>
   );
 }
+
+function MarkdownSegment({
+  markdown,
+  locale,
+  urenloopBlock,
+}: {
+  markdown: string;
+  locale: Locale;
+  urenloopBlock: React.ReactNode;
+}) {
+  if (!urenloopBlock) {
+    const cleaned = stripUrenloopMarker(markdown);
+    if (!cleaned) return null;
+    return (
+      <article className="prose-vtk">
+        <Markdown locale={locale} reveal>
+          {cleaned}
+        </Markdown>
+      </article>
+    );
+  }
+
+  const split = splitOnUrenloopMarker(markdown);
+  if (split.after === null) {
+    if (!markdown) return null;
+    return (
+      <article className="prose-vtk">
+        <Markdown locale={locale} reveal>
+          {markdown}
+        </Markdown>
+      </article>
+    );
+  }
+
+  return (
+    <>
+      {split.before ? (
+        <article className="prose-vtk">
+          <Markdown locale={locale} reveal>
+            {split.before}
+          </Markdown>
+        </article>
+      ) : null}
+      {urenloopBlock}
+      {split.after ? (
+        <article className="prose-vtk">
+          <Markdown locale={locale} reveal>
+            {split.after}
+          </Markdown>
+        </article>
+      ) : null}
+    </>
+  );
+}
+

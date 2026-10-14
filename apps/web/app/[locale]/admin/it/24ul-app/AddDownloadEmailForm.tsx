@@ -33,6 +33,14 @@ export function AddDownloadEmailForm() {
         <Label htmlFor="urenloop-note">Note (optional)</Label>
         <Input id="urenloop-note" name="note" autoComplete="off" placeholder="Which association" />
       </div>
+      <label className="flex items-center gap-2 pb-2 text-sm text-zinc-700">
+        <input
+          type="checkbox"
+          name="canPublishStats"
+          className="h-4 w-4 rounded border-zinc-300 text-vtk-blue focus:ring-vtk-blue"
+        />
+        <span>May publish live stats to vtk.be</span>
+      </label>
     </SaveForm>
   );
 }

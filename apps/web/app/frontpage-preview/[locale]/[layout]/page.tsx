@@ -25,6 +25,7 @@ import { ToastProvider } from "@/components/ui/toast";
 import { Frontpage } from "@/components/editorial/frontpage";
 import type { FrontpageShift } from "@/components/editorial/frontpage/context";
 import { ROSTER_PARTICIPANT_SELECT, toRoster } from "@/lib/shift/roster";
+import { readUrenloopData } from "@/lib/urenloop/server";
 
 // Outside `app/[locale]/` on purpose, so the site header, the footer and the
 // admin navigation stay out of the frame; only the root layout wraps this. That
@@ -69,7 +70,7 @@ export default async function FrontpagePreview({
   // Dezelfde lezing als de homepage, tot en met het venster dat een dag
   // terugkijkt: een voorbeeld dat andere evenementen toont dan de echte pagina,
   // is geen voorbeeld. Zie lib/frontpage/events.ts.
-  const [row, calendarEvents, partners, sloganSetting] = await Promise.all([
+  const [row, calendarEvents, partners, sloganSetting, urenloopData] = await Promise.all([
     prisma.frontpage.findUnique({ where: { layout } }),
     viewerAudienceFilter().then((audiences) =>
       prisma.calendarEvent.findMany({
@@ -89,6 +90,7 @@ export default async function FrontpagePreview({
       take: 12,
     }),
     prisma.setting.findUnique({ where: { key: "home.slogans" } }),
+    layoutModule.id === "urenloop" ? readUrenloopData() : Promise.resolve(undefined),
   ]);
 
   const eventIds = calendarEvents.map((event) => event.id);
@@ -163,6 +165,7 @@ export default async function FrontpagePreview({
             openShifts={openShifts}
             partners={partners}
             slogans={slogans}
+            urenloop={urenloopData}
           />
         </div>
       </ToastProvider>
