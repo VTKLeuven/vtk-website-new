@@ -64,26 +64,49 @@ describe("urenloopStatsPayloadSchema", () => {
 });
 
 describe("shouldAcceptUrenloopStats", () => {
-  const now = new Date("2026-10-20T21:00:00.000Z");
+  const nowDuringRace = new Date("2026-10-20T21:00:00.000Z");
 
-  it("rejects payloads when no edition is configured or eventStart is outside the edition window", () => {
+  it("accepts pre-race test pushes before startsAt so /admin/24urenloop can test the connection", () => {
     expect(
       shouldAcceptUrenloopStats({
-        incoming: samplePayload(),
+        incoming: samplePayload({ eventStart: "2026-10-20T14:00:00.000Z" }),
+        incomingDeviceId: "dev-1",
+        existing: null,
+        config: sampleConfig,
+        now: new Date("2026-10-20T14:05:00.000Z"),
+      }),
+    ).toEqual({ accept: true });
+
+    expect(
+      shouldAcceptUrenloopStats({
+        incoming: samplePayload({ eventStart: "2026-10-14T15:00:00.000Z" }),
         incomingDeviceId: "dev-1",
         existing: null,
         config: { startsAt: null, endsAt: null, showResultsUntil: null },
-        now,
+        now: new Date("2026-10-14T15:05:00.000Z"),
       }),
-    ).toEqual({ accept: false, reason: "OUTSIDE_EDITION_WINDOW" });
+    ).toEqual({ accept: true });
+  });
 
+  it("rejects payloads with eventStart outside the edition window once startsAt has passed", () => {
     expect(
       shouldAcceptUrenloopStats({
         incoming: samplePayload({ eventStart: "2025-10-20T18:00:00.000Z" }),
         incomingDeviceId: "dev-1",
         existing: null,
         config: sampleConfig,
-        now,
+        now: nowDuringRace,
+      }),
+    ).toEqual({ accept: false, reason: "OUTSIDE_EDITION_WINDOW" });
+
+    // An afternoon test run (> 30 min before startsAt) is also rejected during the race
+    expect(
+      shouldAcceptUrenloopStats({
+        incoming: samplePayload({ eventStart: "2026-10-20T14:00:00.000Z" }),
+        incomingDeviceId: "dev-1",
+        existing: null,
+        config: sampleConfig,
+        now: nowDuringRace,
       }),
     ).toEqual({ accept: false, reason: "OUTSIDE_EDITION_WINDOW" });
   });
@@ -102,7 +125,7 @@ describe("shouldAcceptUrenloopStats", () => {
       incomingDeviceId: "dev-backup",
       existing,
       config: sampleConfig,
-      now,
+      now: nowDuringRace,
     });
     expect(decision).toEqual({ accept: false, reason: "STALE_BACKUP_DEVICE" });
   });
@@ -121,7 +144,7 @@ describe("shouldAcceptUrenloopStats", () => {
       incomingDeviceId: "dev-primary",
       existing,
       config: sampleConfig,
-      now,
+      now: nowDuringRace,
     });
     expect(decision).toEqual({ accept: true });
   });
@@ -153,13 +176,30 @@ describe("shouldAcceptUrenloopStats", () => {
 });
 
 describe("resolvePublicUrenloopState", () => {
-  it("returns countdown before any stats arrive, live during the race, and null after showResultsUntil", () => {
-    const preRace = resolvePublicUrenloopState(
+  it("stays on countdown before startsAt even when test stats are stored, and ignores afternoon test runs after startsAt", () => {
+    const afternoonTestStored: StoredUrenloopStats = {
+      payload: samplePayload({ eventStart: "2026-10-20T14:00:00.000Z" }),
+      receivedAt: "2026-10-20T14:05:00.000Z",
+      deviceId: "dev-1",
+      deviceLabel: "PISTE-1",
+      deviceEmail: "sport@vtk.be",
+    };
+
+    // Before startsAt: public site stays on countdown even if test stats were pushed
+    const beforeStartGun = resolvePublicUrenloopState(
       sampleConfig,
-      null,
-      new Date("2026-10-19T12:00:00.000Z"),
+      afternoonTestStored,
+      new Date("2026-10-20T15:00:00.000Z"),
     );
-    expect(preRace?.phase).toBe("countdown");
+    expect(beforeStartGun?.phase).toBe("countdown");
+
+    // After startsAt: afternoon test run (eventStart 4h before startsAt) is still ignored on public site
+    const afterStartGunWithOnlyTestRun = resolvePublicUrenloopState(
+      sampleConfig,
+      afternoonTestStored,
+      new Date("2026-10-20T18:05:00.000Z"),
+    );
+    expect(afterStartGunWithOnlyTestRun?.phase).toBe("countdown");
 
     const stored: StoredUrenloopStats = {
       payload: samplePayload(),
@@ -197,3 +237,4 @@ describe("resolvePublicUrenloopState", () => {
     expect(expired).toBeNull();
   });
 });
+

@@ -131,26 +131,18 @@ export function parseStoredUrenloopStats(raw: unknown): StoredUrenloopStats | nu
   };
 }
 
-const PRE_START_TOLERANCE_MS = 24 * 3_600_000;
+const PRE_START_TOLERANCE_MS = 30 * 60_000;
 const DEFAULT_RESULTS_WINDOW_MS = 7 * 24 * 3_600_000;
 export const STALE_STATS_MS = 15 * 60_000;
 
-/**
- * Hoort een `eventStart` bij de geconfigureerde editie?
- *
- * Het eerste rondje kan op de wedstrijddag net voor of na het geplande
- * startschot vallen, maar een laptop die een week eerder of later openstaat
- * mag de site niet overschrijven.
- */
-export function isWithinConfiguredEdition(
-  eventStartIso: string,
-  config: UrenloopConfig,
-  now = new Date(),
-): boolean {
-  if (!config.startsAt) return false;
+function resolveEditionBounds(config: UrenloopConfig): {
+  startsAtMs: number;
+  endsAtMs: number;
+  untilMs: number;
+} | null {
+  if (!config.startsAt) return null;
   const startsAtMs = Date.parse(config.startsAt);
-  const eventStartMs = Date.parse(eventStartIso);
-  if (Number.isNaN(startsAtMs) || Number.isNaN(eventStartMs)) return false;
+  if (Number.isNaN(startsAtMs)) return null;
 
   const endsAtMs = config.endsAt
     ? Date.parse(config.endsAt)
@@ -158,10 +150,31 @@ export function isWithinConfiguredEdition(
   const untilMs = config.showResultsUntil
     ? Date.parse(config.showResultsUntil)
     : endsAtMs + DEFAULT_RESULTS_WINDOW_MS;
+  if (Number.isNaN(endsAtMs) || Number.isNaN(untilMs)) return null;
 
-  if (now.getTime() > untilMs) return false;
-  if (eventStartMs < startsAtMs - PRE_START_TOLERANCE_MS) return false;
-  if (eventStartMs > endsAtMs + PRE_START_TOLERANCE_MS) return false;
+  return { startsAtMs, endsAtMs, untilMs };
+}
+
+/**
+ * Hoort een `eventStart` bij de geconfigureerde editie?
+ *
+ * Het eerste rondje van de echte wedstrijd valt rond het geplande startschot
+ * (we laten 30 minuten speling toe voor een iets vroeger startschot), maar een
+ * testrondje in de namiddag of een laptop van een vorige editie hoort niet bij
+ * de publieke wedstrijd.
+ */
+export function isWithinConfiguredEdition(
+  eventStartIso: string,
+  config: UrenloopConfig,
+  now = new Date(),
+): boolean {
+  const bounds = resolveEditionBounds(config);
+  const eventStartMs = Date.parse(eventStartIso);
+  if (!bounds || Number.isNaN(eventStartMs)) return false;
+
+  if (now.getTime() > bounds.untilMs) return false;
+  if (eventStartMs < bounds.startsAtMs - PRE_START_TOLERANCE_MS) return false;
+  if (eventStartMs > bounds.endsAtMs + PRE_START_TOLERANCE_MS) return false;
   return true;
 }
 
@@ -179,14 +192,21 @@ export type StatsAcceptance =
 /**
  * Beslist of een binnengekomen tussenstand de huidige mag vervangen.
  *
- * Binnen dezelfde race (`eventStart` gelijk) weigeren we een pakket van een
- * *andere* computer wanneer diens laatste ronde ouder is dan wat we al hebben,
- * of wanneer de race al op `final` staat. Een tweede laptop die na een wissel
- * (S8) nog met een oudere backup openstaat, kan de site zo niet terugzetten.
- *
- * Komt het pakket van *dezelfde* computer, dan mag het aantal ronden of
- * `lastLapAt` wel zakken: dat is een correctie door de jury op de actieve
- * timinglaptop (`/change` of `/status`).
+ * - **Tijdens de publieke weergaveperiode** (`startsAt <= now <= showResultsUntil`):
+ *   alleen een run waarvan `eventStart` binnen de geconfigureerde editie valt
+ *   wordt aanvaard (`OUTSIDE_EDITION_WINDOW` anders). Zo kan een laptop met een
+ *   oude of test-database tijdens de loop of de eindstandperiode de site nooit
+ *   overschrijven.
+ * - **Vóór het startschot** (of wanneer er nog geen startuur ingesteld is):
+ *   test-pushes vanaf een gekoppelde laptop worden wél opgeslagen zodat Sport en
+ *   IT op `/admin/24urenloop` ("Live tussenstand van de piste") kunnen zien dat
+ *   de verbinding werkt, terwijl de publieke site op de aftelklok blijft staan.
+ * - Binnen dezelfde race (`eventStart` gelijk) weigeren we een pakket van een
+ *   *andere* computer wanneer diens laatste ronde ouder is dan wat we al hebben,
+ *   of wanneer de race al op `final` staat.
+ * - Komt het pakket van *dezelfde* computer, dan mag het aantal ronden of
+ *   `lastLapAt` wel zakken: dat is een correctie door de jury op de actieve
+ *   timinglaptop (`/change` of `/status`).
  */
 export function shouldAcceptUrenloopStats(args: {
   incoming: UrenloopStatsPayload;
@@ -196,15 +216,29 @@ export function shouldAcceptUrenloopStats(args: {
   now?: Date;
 }): StatsAcceptance {
   const { incoming, incomingDeviceId, existing, config, now = new Date() } = args;
+  const bounds = resolveEditionBounds(config);
+  const inActiveEditionWindow =
+    bounds !== null &&
+    now.getTime() >= bounds.startsAtMs &&
+    now.getTime() <= bounds.untilMs;
 
-  if (!isWithinConfiguredEdition(incoming.eventStart, config, now)) {
+  if (inActiveEditionWindow && !isWithinConfiguredEdition(incoming.eventStart, config, now)) {
     return { accept: false, reason: "OUTSIDE_EDITION_WINDOW" };
   }
 
   if (!existing) return { accept: true };
 
-  // Als de bestaande cijfers nog van een oude editie waren, wint de nieuwe altijd.
-  if (!isWithinConfiguredEdition(existing.payload.eventStart, config, now)) {
+  // Als de bestaande cijfers van een testloop buiten de editie waren en de nieuwe
+  // wél binnen de editie valt, wint de echte editie altijd.
+  if (
+    isWithinConfiguredEdition(incoming.eventStart, config, now) &&
+    !isWithinConfiguredEdition(existing.payload.eventStart, config, now)
+  ) {
+    return { accept: true };
+  }
+
+  // Zelfde laptop mag ook vóór de race een nieuwe testrun starten of wissen/corrigeren.
+  if (incomingDeviceId && incomingDeviceId === existing.deviceId) {
     return { accept: true };
   }
 
@@ -215,11 +249,6 @@ export function shouldAcceptUrenloopStats(args: {
     return { accept: false, reason: "OLDER_EDITION" };
   }
   if (incomingRunMs > existingRunMs) {
-    return { accept: true };
-  }
-
-  // Zelfde editie (`eventStart` gelijk): dezelfde laptop mag corrigeren.
-  if (incomingDeviceId && incomingDeviceId === existing.deviceId) {
     return { accept: true };
   }
 
@@ -255,6 +284,10 @@ export type PublicUrenloopState =
  * Wat de publieke site (`UrenloopFrontpage` en `[[24urenloop]]`) op dit moment
  * moet tonen, of `null` wanneer er geen editie gepland is of `showResultsUntil`
  * voorbij is.
+ *
+ * Zolang het ingestelde startschot (`startsAt`) nog niet geweest is, toont de
+ * publieke site **altijd** de aftelklok — ook als er in `/admin/24urenloop` al
+ * een test-tussenstand binnengekomen is.
  */
 export function resolvePublicUrenloopState(
   config: UrenloopConfig,
@@ -272,6 +305,14 @@ export function resolvePublicUrenloopState(
       : new Date(startsAt.getTime() + 24 * 3_600_000 + DEFAULT_RESULTS_WINDOW_MS);
 
   if (now > until) return null;
+
+  if (now < startsAt) {
+    return {
+      phase: "countdown",
+      startsAt,
+      endsAt,
+    };
+  }
 
   const validStored =
     stored && isWithinConfiguredEdition(stored.payload.eventStart, config, now)
@@ -302,3 +343,4 @@ export function resolvePublicUrenloopState(
     endsAt,
   };
 }
+
