@@ -88,21 +88,10 @@ describe("shouldAcceptUrenloopStats", () => {
     ).toEqual({ accept: true });
   });
 
-  it("rejects payloads with eventStart outside the edition window once startsAt has passed", () => {
+  it("rejects payloads from a previous year's edition once startsAt has passed", () => {
     expect(
       shouldAcceptUrenloopStats({
         incoming: samplePayload({ eventStart: "2025-10-20T18:00:00.000Z" }),
-        incomingDeviceId: "dev-1",
-        existing: null,
-        config: sampleConfig,
-        now: nowDuringRace,
-      }),
-    ).toEqual({ accept: false, reason: "OUTSIDE_EDITION_WINDOW" });
-
-    // An afternoon test run (> 30 min before startsAt) is also rejected during the race
-    expect(
-      shouldAcceptUrenloopStats({
-        incoming: samplePayload({ eventStart: "2026-10-20T14:00:00.000Z" }),
         incomingDeviceId: "dev-1",
         existing: null,
         config: sampleConfig,
@@ -176,31 +165,7 @@ describe("shouldAcceptUrenloopStats", () => {
 });
 
 describe("resolvePublicUrenloopState", () => {
-  it("stays on countdown before startsAt even when test stats are stored, and ignores afternoon test runs after startsAt", () => {
-    const afternoonTestStored: StoredUrenloopStats = {
-      payload: samplePayload({ eventStart: "2026-10-20T14:00:00.000Z" }),
-      receivedAt: "2026-10-20T14:05:00.000Z",
-      deviceId: "dev-1",
-      deviceLabel: "PISTE-1",
-      deviceEmail: "sport@vtk.be",
-    };
-
-    // Before startsAt: public site stays on countdown even if test stats were pushed
-    const beforeStartGun = resolvePublicUrenloopState(
-      sampleConfig,
-      afternoonTestStored,
-      new Date("2026-10-20T15:00:00.000Z"),
-    );
-    expect(beforeStartGun?.phase).toBe("countdown");
-
-    // After startsAt: afternoon test run (eventStart 4h before startsAt) is still ignored on public site
-    const afterStartGunWithOnlyTestRun = resolvePublicUrenloopState(
-      sampleConfig,
-      afternoonTestStored,
-      new Date("2026-10-20T18:05:00.000Z"),
-    );
-    expect(afterStartGunWithOnlyTestRun?.phase).toBe("countdown");
-
+  it("stays on countdown before startsAt even when stats are stored, and shows the app's live standings once startsAt has passed", () => {
     const stored: StoredUrenloopStats = {
       payload: samplePayload(),
       receivedAt: "2026-10-20T20:00:00.000Z",
@@ -209,6 +174,15 @@ describe("resolvePublicUrenloopState", () => {
       deviceEmail: "sport@vtk.be",
     };
 
+    // Before startsAt: public site stays on countdown even if stats were pushed
+    const beforeStartGun = resolvePublicUrenloopState(
+      sampleConfig,
+      stored,
+      new Date("2026-10-20T15:00:00.000Z"),
+    );
+    expect(beforeStartGun?.phase).toBe("countdown");
+
+    // Once startsAt has passed: public site shows the live standings from the app
     const freshLive = resolvePublicUrenloopState(
       sampleConfig,
       stored,

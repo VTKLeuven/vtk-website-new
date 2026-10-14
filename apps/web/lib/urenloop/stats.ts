@@ -131,7 +131,7 @@ export function parseStoredUrenloopStats(raw: unknown): StoredUrenloopStats | nu
   };
 }
 
-const PRE_START_TOLERANCE_MS = 30 * 60_000;
+const PRE_START_TOLERANCE_MS = 30 * 24 * 3_600_000;
 const DEFAULT_RESULTS_WINDOW_MS = 7 * 24 * 3_600_000;
 export const STALE_STATS_MS = 15 * 60_000;
 
@@ -158,10 +158,9 @@ function resolveEditionBounds(config: UrenloopConfig): {
 /**
  * Hoort een `eventStart` bij de geconfigureerde editie?
  *
- * Het eerste rondje van de echte wedstrijd valt rond het geplande startschot
- * (we laten 30 minuten speling toe voor een iets vroeger startschot), maar een
- * testrondje in de namiddag of een laptop van een vorige editie hoort niet bij
- * de publieke wedstrijd.
+ * We laten een ruime marge vóór `startsAt` toe zodat een eerder gestarte of
+ * test-database tijdens de editie altijd werkt, maar cijfers van een vorig
+ * academiejaar nooit opnieuw opduiken wanneer je het volgende jaar instelt.
  */
 export function isWithinConfiguredEdition(
   eventStartIso: string,
