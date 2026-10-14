@@ -47,8 +47,8 @@ export default async function AdminUrenloopPage({
         </h1>
         <p className="mt-1 text-sm text-zinc-500">
           {nl
-            ? "Eén plek voor het startschot, de aankomst en hoe lang de eindstand na de race op de site blijft staan. Zowel de 24 urenloop-frontpage als de pagina /events/24-urenloop (of waar [[24urenloop]] in de tekst staat) lezen deze uren."
-            : "One place for the start gun, the finish, and how long final standings stay on the site after the race. Both the 24-hour run front page and /events/24-urenloop (or wherever [[24urenloop]] is placed in the text) read these times."}
+            ? "Eén plek voor het startschot, de aankomst en hoe lang de eindstand na de race op de site blijft staan. Zowel de 24 urenloop-frontpage als het blok [[24urenloop]] op een inhoudspagina lezen deze uren."
+            : "One place for the start gun, the finish, and how long final standings stay on the site after the race. Both the 24-hour run front page and the [[24urenloop]] block on a content page read these times."}
         </p>
       </div>
 

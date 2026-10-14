@@ -138,10 +138,8 @@ export async function PageView({
 
   const content = contentFor(page, locale);
   const now = new Date();
-  const isUrenloopPage = page.slug === "24urenloop" || page.slug === "24-urenloop";
   const hasMarker = content.kind === "markdown" && hasUrenloopMarker(content.markdown);
-  const urenloopData =
-    isUrenloopPage || hasMarker ? await getCachedUrenloopData().catch(() => null) : null;
+  const urenloopData = hasMarker ? await getCachedUrenloopData().catch(() => null) : null;
   const urenloopState = urenloopData
     ? resolvePublicUrenloopState(urenloopData.config, urenloopData.stats, now)
     : null;
@@ -294,20 +292,19 @@ export async function PageView({
             de tekst in een eigen scrollcontainer, waar een `view()`-tijdlijn een
             kopje halverwege zijn animatie kan laten staan. */}
         <div className="vtk-page-content vtk-motion">
-          {!hasMarker ? urenloopBlock : null}
           {content.kind === "markdown" ? (
             <>
               <MarkdownSegment
                 markdown={split.before}
                 locale={locale}
-                urenloopBlock={hasMarker && urenloopInBefore ? urenloopBlock : null}
+                urenloopBlock={urenloopInBefore ? urenloopBlock : null}
               />
               {split.after !== null ? panel : null}
               {split.after ? (
                 <MarkdownSegment
                   markdown={split.after}
                   locale={locale}
-                  urenloopBlock={hasMarker && !urenloopInBefore ? urenloopBlock : null}
+                  urenloopBlock={!urenloopInBefore ? urenloopBlock : null}
                 />
               ) : null}
             </>
