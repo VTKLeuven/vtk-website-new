@@ -2971,3 +2971,60 @@ a.vtk-shortcut-tile:hover {
     transition: none;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Kassa's (/admin/kassas)
+   Smal scherm: elke kassa een blok, met de kolomkop als label per waarde. In
+   een horizontale scroller verdwenen net de status en het resultaat, en dat
+   zijn de twee dingen waarvoor Beheer de lijst opent.
+   --------------------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .vtk-kassa-table thead {
+    display: none;
+  }
+
+  .vtk-kassa-table,
+  .vtk-kassa-table tbody,
+  .vtk-kassa-table tfoot,
+  .vtk-kassa-table tr,
+  .vtk-kassa-table td {
+    display: block;
+    width: 100% !important;
+  }
+
+  .vtk-kassa-table tbody tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    padding: 8px 0;
+  }
+
+  .vtk-kassa-table tbody td[data-wide] {
+    grid-column: 1 / -1;
+  }
+
+  .vtk-admin-main .vtk-kassa-table td {
+    padding: 6px 16px;
+    text-align: left;
+  }
+
+  .vtk-kassa-table tbody td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .vtk-kassa-table tfoot tr {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .vtk-kassa-table tfoot td {
+    width: auto !important;
+  }
+}

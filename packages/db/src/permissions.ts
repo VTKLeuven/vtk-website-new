@@ -225,6 +225,13 @@ export const PERMISSIONS = [
   { code: "expenses.reimbursePost", labelNl: "Rekeningen van de eigen post of werkgroep op terugbetaald zetten", labelEn: "Mark own post's or werkgroep's expenses as reimbursed", category: "expenses" },
   { code: "expenses.manage", labelNl: "Alle rekeningen beheren (terugbetalen, inboeken, doorsturen)", labelEn: "Manage all expenses (reimburse, book, forward)", category: "expenses" },
 
+  // Kassa's (/admin/kassas): een post vraagt een kassa met wisselgeld aan voor
+  // een activiteit, Beheer aanvaardt, maakt, geeft mee en telt na. Aanvragen zit
+  // in de basisrol `praesidium`, net als een rekening indienen; beheren in de
+  // rol `admin` (IT en Groep 5). Zie docs/design-decisions.md ("Kassa's").
+  { code: "cashRegisters.request", labelNl: "Een kassa aanvragen", labelEn: "Request a cash register", category: "cashRegisters" },
+  { code: "cashRegisters.manage", labelNl: "Kassa's beheren (aanvaarden, status zetten, tellen)", labelEn: "Manage cash registers (accept, set status, count)", category: "cashRegisters" },
+
   // Boekhoudcodes: de lijst waaruit een ticketverkoop en het lidmaatschap hun
   // code kiezen. Kiezen mag iedereen die een event maakt; de lijst zelf
   // aanpassen is het werk van de penning. Zie docs/ticketing.md.

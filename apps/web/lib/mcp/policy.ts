@@ -142,6 +142,11 @@ export const MCP_PERMISSION_POLICY = {
   "expenses.managePost": { reads: [], creates: [], blocked: ["read or edit expenses"] },
   "expenses.reimbursePost": { reads: [], creates: [], blocked: ["read expenses or mark reimbursements"] },
   "expenses.manage": { reads: [], creates: [], blocked: ["read or edit expenses, mark reimbursements or forward to the accountant"] },
+  // Een kassa is geld dat iemand fysiek meekrijgt en terugbrengt; aanvaarden
+  // stuurt een mail en de telling is de basis van het kasboek. Niets ervan gaat
+  // door dit endpoint, ook niet lezend.
+  "cashRegisters.request": { reads: [], creates: [], blocked: ["request a cash register"] },
+  "cashRegisters.manage": { reads: [], creates: [], blocked: ["read, accept, count or delete cash registers"] },
   // De codelijst stuurt wat er in de betaalinfo van elke verkoop staat; een
   // agent hoort die niet aan te passen, en er is geen create-kind.
   "accounting.manage": { reads: [], creates: [], blocked: ["create, edit or delete accounting codes"] },

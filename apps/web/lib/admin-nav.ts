@@ -99,6 +99,9 @@ export function getAdminNav(): NavEntry[] {
     item('expenses', '/rekeningen', {
       anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.reimbursePost', 'expenses.manage'],
     }),
+    // Naast Rekeningen: een post vraagt hier een kassa met wisselgeld aan, en
+    // Beheer maakt, telt en boekt ze. Allebei geld dat langs Beheer passeert.
+    item('cashRegisters', '/kassas', { anyPerm: ['cashRegisters.request', 'cashRegisters.manage'] }),
     // Naast Rekeningen: allebei het werk van de penning. De codes zelf kiest
     // wie een ticketverkoop maakt, in het eventformulier; hier wordt enkel de
     // lijst beheerd.

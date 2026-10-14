@@ -23,6 +23,7 @@ export const EMAIL_LOG_RETENTION_DAYS = 30;
 export const EMAIL_SOURCES = {
   account: { nl: "Accounts", en: "Accounts" },
   calendar: { nl: "Kalender", en: "Calendar" },
+  cashRegisters: { nl: "Kassa's", en: "Cash registers" },
   contact: { nl: "Contactformulier", en: "Contact form" },
   expenses: { nl: "Rekeningen", en: "Expenses" },
   forms: { nl: "Formulieren", en: "Forms" },

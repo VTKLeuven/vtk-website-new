@@ -848,6 +848,8 @@ model User {
   expensesSubmitted Expense[] @relation("ExpenseSubmittedBy")
   expensesPaid      Expense[] @relation("ExpensePaidBy")
   expensesBooked    Expense[] @relation("ExpenseBookedBy")
+  cashRegistersRequested CashRegister[] @relation("CashRegisterRequestedBy")
+  cashRegistersAccepted  CashRegister[] @relation("CashRegisterAcceptedBy")
   expenseViews      ExpenseView[]
 
   createdLesbezoeken             Lesbezoek[]              @relation("LesbezoekCreatedBy")
@@ -922,6 +924,7 @@ model Group {
   uitleenEventsGroup       UitleenEvent[]
   mailGroupSources         MailGroupSource[]
   expenses                 Expense[]
+  cashRegisters            CashRegister[]
   /// De vaste taken van deze post (/admin/wie-doet-wat).
   tasks                    GroupTask[]                @relation("GroupTaskOwner")
   /// Taken van een andere post die het aanspreekpunt voor deze post zijn
@@ -2348,6 +2351,8 @@ model TicketEvent {
   scanLogs       TicketScanLog[]
   auditLogs      TicketAuditLog[]
   outboxMessages TicketOutboxMessage[]
+  /// Kassa's die de online verkoop van dit event meetellen in hun resultaat.
+  cashRegisters  CashRegisterTicketEvent[]
 
   @@index([calendarEventId])
   @@index([ownerGroupId])
@@ -8001,6 +8006,134 @@ model ExpenseView {
 
   @@id([userId, expenseId])
   @@index([expenseId])
+}
+
+// -----------------------------------------------------------------------------
+// Kassa's: een post vraagt een kassa aan voor een activiteit, Beheer maakt ze,
+// geeft ze mee en telt ze na. Vervangt het rekenblad "Overzichtdocument Kassa's".
+// Zie docs/design-decisions.md ("Kassa's").
+// -----------------------------------------------------------------------------
+
+/// Waar een kassa staat. `REQUESTED` is de aanvraag; vanaf `TO_MAKE` is ze
+/// aanvaard. De rest is de statuskolom van het rekenblad van Beheer, in
+/// dezelfde volgorde: te maken, gemaakt, meegegeven, teruggebracht, geteld,
+/// doorgegeven, kasboek.
+enum CashRegisterStatus {
+  REQUESTED
+  TO_MAKE
+  MADE
+  HANDED_OUT
+  RETURNED
+  COUNTED
+  PASSED_ON
+  BOOKED
+}
+
+enum CashRegisterPaymentMethod {
+  BANCONTACT
+  PAYCONIQ
+}
+
+/// Eén kassa voor één activiteit op één dag.
+model CashRegister {
+  id String @id @default(cuid())
+
+  status CashRegisterStatus @default(REQUESTED)
+
+  /// Werkingsjaar van de activiteit, afgeleid uit `date` met de 15-juli-grens.
+  /// Opgeslagen om dezelfde reden als bij `Expense`: een afgesloten jaar mag
+  /// geen kassa verliezen omdat iemand achteraf de datum rechtzet.
+  workingYear Int
+  /// De dag van de activiteit, niet van het aanvragen.
+  date        DateTime @db.Date
+  activity    String
+
+  /// `SetNull`: een post die verdwijnt, mag de telling niet meenemen.
+  groupId         String?
+  /// Naam van de post bij het aanvragen, zoals bij `Expense.postLabel`.
+  postLabel       String
+  /// Wie die dag voor de kassa instaat. Vrije tekst, want dat is niet altijd
+  /// wie de aanvraag invulde.
+  responsibleName String
+
+  requestedById String?
+
+  wantsBancontact Boolean @default(false)
+  wantsPayconiq   Boolean @default(false)
+  /// Wat de aanvrager er nog bij wil zeggen. NULL = niets.
+  comment         String?
+
+  /// Stuks per coupure, met als sleutel de waarde in centen ("5" tot "10000").
+  /// De aanvrager vult dit in als het wisselgeld dat hij wil; Beheer past het
+  /// aan naar wat er echt in de kassa gaat.
+  startCounts Json
+  /// Hetzelfde na het evenement. NULL = nog niet geteld, wat iets anders is
+  /// dan een lege kassa.
+  endCounts   Json?
+
+  /// Ontvangen bonnen. NULL = nog niet geteld.
+  shiftVouchers           Int?
+  elixirVouchers          Int?
+  /// Wat één bon waard is, vastgeklikt bij het aanvragen uit de instellingen.
+  /// Een latere wijziging van die waarde herrekent geen oude kassa.
+  shiftVoucherValueCents  Int
+  elixirVoucherValueCents Int
+
+  /// Opmerking van Beheer bij het tellen. Enkel voor wie kassa's beheert.
+  note String?
+
+  acceptedAt         DateTime? @db.Timestamptz(3)
+  acceptedById       String?
+  /// Wanneer de mail met de aanvaarding vertrok. NULL bij een aanvaarding
+  /// zonder mail (geen mailserver, of de aanvrager heeft geen account meer).
+  acceptedMailSentAt DateTime? @db.Timestamptz(3)
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  group        Group?                    @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  requestedBy  User?                     @relation("CashRegisterRequestedBy", fields: [requestedById], references: [id], onDelete: SetNull)
+  acceptedBy   User?                     @relation("CashRegisterAcceptedBy", fields: [acceptedById], references: [id], onDelete: SetNull)
+  payments     CashRegisterPayment[]
+  ticketEvents CashRegisterTicketEvent[]
+
+  @@index([workingYear])
+  @@index([groupId])
+  @@index([requestedById])
+  @@index([date])
+  @@index([status])
+}
+
+/// Eén Bancontact-bakje of Payconiq-rekening bij een kassa, met wat erop
+/// binnenkwam. Een kassa kan er meerdere hebben.
+model CashRegisterPayment {
+  id          String                    @id @default(cuid())
+  registerId  String
+  method      CashRegisterPaymentMethod
+  /// De naam zoals ze in de instellingen stond toen ze gekozen werd. Een
+  /// momentopname: een bakje hernoemen verandert geen getelde kassa.
+  terminal    String
+  /// NULL tot het bedrag van de terminal afgelezen is.
+  amountCents Int?
+  sortOrder   Int                       @default(0)
+
+  register CashRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
+
+  @@index([registerId])
+}
+
+/// Een ticketverkoop waarvan de online inkomsten bij deze kassa meetellen. Het
+/// bedrag wordt niet opgeslagen maar telkens berekend, zodat een latere
+/// terugbetaling meteen in het resultaat staat.
+model CashRegisterTicketEvent {
+  registerId    String
+  ticketEventId String
+
+  register    CashRegister @relation(fields: [registerId], references: [id], onDelete: Cascade)
+  ticketEvent TicketEvent  @relation(fields: [ticketEventId], references: [id], onDelete: Cascade)
+
+  @@id([registerId, ticketEventId])
+  @@index([ticketEventId])
 }
 
 // -----------------------------------------------------------------------------

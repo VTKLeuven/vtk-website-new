@@ -8316,6 +8316,73 @@ Supabase-verbruik met een waarschuwing bij 80% van 1 GB, want daarboven werd het
 hele project geblokkeerd. De objectopslag van de site heeft dat quotum niet, dus
 het cijfer staat er nog als informatie en niet meer als alarm.
 
+## Kassa's (de opvolger van het rekenblad "Overzichtdocument Kassa's")
+
+Een post die voor een activiteit een kassa met wisselgeld nodig had, mailde
+Beheer, en Beheer hield alles bij in een rekenblad: per kassa een blok van elf
+rijen (één per coupure), met begin- en eindkassa, bonnen, Bancontact, Payconiq en
+de ticketverkoop. Dat staat nu op `/admin/kassas` (`lib/kassas`, `app/actions/kassas.ts`).
+
+**Aanvragen is een recht van elk praesidiumlid, beheren dat van Beheer.**
+`cashRegisters.request` zit in de rol `praesidium`, `cashRegisters.manage` in de
+rol `admin` (IT en Groep 5), dezelfde verdeling als bij de rekeningen. De
+migratie kent ze ook op een draaiende omgeving toe, want de seed draait niet mee.
+Een post ziet de kassa's die ze zelf of een postgenoot aanvroeg, niet die van
+andere posten.
+
+**De post past aan tot Beheer aanvaardt, daarna niet meer.** Beheer maakt de
+kassa met het wisselgeld dat er op dat moment staat; een stille wijziging achteraf
+zou een kassa met het verkeerde wisselgeld opleveren. Wie nog iets wil, mailt
+Beheer, en dat zegt het scherm ook. Intrekken kan om dezelfde reden enkel zolang
+de aanvraag nog niet aanvaard is.
+
+**Aanvaarden is één knop die ook mailt.** De status gaat van "aangevraagd" naar
+"te maken" en de aanvrager krijgt een mail dat hij zelf een ophaalmoment afspreekt:
+persoonlijk met een van de financieel beheerders, of via het adres van Beheer
+(standaard `beheer@vtk.be`, in te stellen). Er is geen vast ophaalmoment, dus de
+mail belooft er ook geen. Daarom kan de statuskeuze niet van "aangevraagd" naar
+verder springen: dan vertrok er geen mail. Lukt de mail niet, dan gaat de
+aanvaarding toch door en zegt de melding dat, zodat Beheer het zelf laat weten.
+
+**De statussen zijn die van het rekenblad, met de hand gezet.** Te maken,
+gemaakt, meegegeven, teruggebracht, geteld, doorgegeven, kasboek. Anders dan bij
+de rekeningen is de status hier wel een kolom: het zijn handelingen in de echte
+wereld (een kassa meegeven) die nergens anders een spoor nalaten. Beheer zet ze
+in het overzicht per rij, zoals de keuzelijst in het blad.
+
+**Een niet getelde kassa is geen lege kassa.** In het blad telde een lege
+eindkassa als nul, waardoor een kassa die nog niet terug was op een verlies van de
+hele beginkassa stond (Studentenwelkom: -1950). Hier is `endCounts` NULL tot er
+geteld is, en telt het kassaresultaat dan niet mee; vul je één coupure in, dan
+geldt de rest als nul stuks. Hetzelfde voor een Bancontact-bedrag: leeg is "nog
+niet afgelezen", 0 is "het toestel deed niets".
+
+**"n.v.t." is geen bakje.** De keuzelijsten van het blad hadden "n.v.t." naast
+Evenementen, Cudi, Theo en Fak. Hier krijgt een kassa zonder Bancontact of
+Payconiq gewoon geen regel, en een kassa kan er meerdere hebben (Studentenwelkom
+had drie Bancontact-bakjes). De namen staan in de instellingen en zijn daar te
+hernoemen, toe te voegen en te schrappen; een kassa houdt de naam die het bakje
+had toen het gekozen werd, zodat hernoemen geen getelde kassa verandert.
+
+**Bonnen tellen mee aan € 1,20, en die waarde wordt vastgeklikt.** Het finaal
+resultaat van het blad telde een kolom voor de waarde van de bonnen mee, en het
+tabblad CUDITHEOFAK rekende die aan € 1,20 per bon. Die waarde staat nu in de
+instellingen (per soort, 0 = enkel tellen) en wordt bij het aanvragen op de kassa
+gezet, zodat een nieuwe waarde volgend jaar geen afgesloten kassa herrekent.
+
+**De ticketverkoop wordt gekoppeld, niet overgetikt.** Een kassa kan aan een of
+meer ticketverkopen hangen; hun netto online verkoop (uitgegeven tickets min wat
+effectief teruggestort is, dezelfde regel als de ticketstatistieken) telt mee in
+het finaal resultaat. Het bedrag wordt telkens opnieuw berekend en niet
+opgeslagen: een terugbetaling na de telling staat zo meteen in het resultaat.
+Het resultaat staat enkel bij Beheer; een post ziet in haar eigen lijst de status
+en de startkassa, want niet elk postlid mag de omzet van een ticketverkoop zien.
+
+**Cudi, Theokot en Fakbar zijn samen te bekijken.** Ze hebben een kassa die het
+hele semester meegaat, en het blad had er een eigen tabblad voor. In het
+overzicht is dat één keuze in de postfilter, naast elke post apart. Het gaat op
+de code van de post (`PERMANENT_POST_CODES`), net als `EXPENSE_POST_SPLITS`.
+
 ## Admin-navigatie: domeinen, losse modules en vastgepinde tabs
 
 De zijbalk van `/admin` telde tweeëntwintig rijen voor wie alles mag zien (IT en

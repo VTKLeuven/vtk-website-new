@@ -278,6 +278,10 @@ async function main() {
     // voorschiet; beheren (terugbetalen, inboeken, doorsturen) blijft bij de rol
     // admin, dus bij IT en Groep 5.
     "expenses.submit",
+    // Een kassa aanvragen voor een activiteit van de eigen post. Zelfde
+    // redenering als een rekening: elke post staat ooit achter een kassa, en
+    // aanvaarden en tellen blijft bij de rol admin (IT en Groep 5).
+    "cashRegisters.request",
     // Je e-mailhandtekening genereren. De generator draagt het VTK-schild en een
     // functietitel en stond vroeger voor elk ingelogd lid open; sinds deze
     // permissie hangt hij aan een rol, zodat het beheer hem per post kan

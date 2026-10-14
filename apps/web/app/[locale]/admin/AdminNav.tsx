@@ -469,6 +469,16 @@ const icons: Record<string, ReactNode> = {
       <path d="M9 12.2h3.6" />
     </Svg>
   ),
+  // cashRegisters: een kassalade met munten en een briefje erin
+  cashRegisters: (
+    <Svg>
+      <rect x="2" y="7" width="20" height="13" rx="2" />
+      <path d="M2 12h20" />
+      <circle cx="7" cy="16" r="1.5" />
+      <circle cx="12" cy="16" r="1.5" />
+      <path d="M6 7V4h12v3" />
+    </Svg>
+  ),
   // accountingCodes: grootboek met een kolom codes naast de regels
   accountingCodes: (
     <Svg>
