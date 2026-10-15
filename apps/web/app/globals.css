@@ -88,7 +88,17 @@ body {
   font-family: var(--font-vtk-sans), ui-sans-serif, system-ui, sans-serif;
 }
 
-/* Gedeelde opmaak voor content uit de Markdown-renderer. */
+/* Gedeelde opmaak voor content uit de Markdown-renderer. Een woord of link
+   zonder spaties (een Google Slides-link, een e-mailadres) breekt af in plaats
+   van de kolom breder te duwen dan het scherm: zo'n link maakte de eventpagina
+   op een telefoon horizontaal scrollbaar. `anywhere` op een link telt ook mee
+   in de minimale breedte van een grid- of flexkolom, `break-word` niet. */
+.prose-vtk {
+  overflow-wrap: break-word;
+}
+.prose-vtk a {
+  overflow-wrap: anywhere;
+}
 .prose-vtk h1 {
   @apply text-3xl font-semibold mt-6 mb-3 text-vtk-ink tracking-tight;
 }

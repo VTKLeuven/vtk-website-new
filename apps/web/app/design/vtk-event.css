@@ -321,9 +321,12 @@
 }
 
 @media (max-width: 960px) {
+  /* `minmax(0, 1fr)` en geen `1fr`: met `.vtk-event-main` op `display:
+     contents` geldt zijn `min-width: 0` niet meer, en een kolom van `1fr`
+     groeit dan mee met het breedste onbreekbare stuk in de omschrijving. */
   .vtk-event-head,
   .vtk-event-layout {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   /* Op een smal scherm: de foto, dan het paneel (wat je moet weten en doen),
