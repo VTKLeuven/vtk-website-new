@@ -94,6 +94,7 @@ export function HeroWeek({
   signedIn,
   dim,
   nextEventsLimit,
+  maxDays,
 }: {
   events: FrontpageEvent[];
   now: Date;
@@ -104,9 +105,12 @@ export function HeroWeek({
   dim: number;
   /** Maximum aantal rijen in de rustige-weeklijst; in te stellen in de admin. */
   nextEventsLimit: number;
+  /** Optioneel maximum aantal dagen (bijv. 4 op de 24 urenloop-hero). */
+  maxDays?: number;
 }) {
   const nl = locale === "nl";
-  const { mode, days } = selectHeroWeek(events, now, { nextLimit: nextEventsLimit });
+  const { mode, days: selectedDays } = selectHeroWeek(events, now, { nextLimit: nextEventsLimit });
+  const days = maxDays ? selectedDays.slice(0, maxDays) : selectedDays;
   const todayKey = new Intl.DateTimeFormat("en-CA", {
     timeZone: HERO_WEEK_TIME_ZONE,
     year: "numeric",

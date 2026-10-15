@@ -16,46 +16,204 @@
 --------------------------------------------------------------------------- */
 
 /* ---------------------------------------------------------------------------
-   24 urenloop: the clock is the page.
+   24 urenloop: open middle photo (VTK stand & baton exchange) + bottom strip.
 
-   One column, centred, no agenda. During the run the only question anyone has is
-   how long is left, so the countdown is the largest thing on the screen and
-   everything else arranges itself around it.
+   Top-left carries the headline and CTA; the middle stays open so the stand
+   with Obelix and the baton exchange on the track remain visible; a borderless
+   strip at the bottom carries the countdown and live race figures.
 --------------------------------------------------------------------------- */
-.vtk-design .fp-urenloop {
-  grid-template-columns: minmax(0, 1fr);
-  justify-items: center;
-  text-align: center;
+.vtk-design .home-dark-zone:has(.fp-urenloop) .home-hero-photo {
+  object-position: center 38%;
 }
 
-.vtk-design .fp-urenloop .eyebrow {
-  justify-content: center;
+.vtk-design .home-dark-zone:has(.fp-urenloop)::before {
+  background:
+    linear-gradient(
+      to bottom,
+      rgba(10, 15, 31, 0.62) 0,
+      rgba(10, 15, 31, 0.08) 38%,
+      rgba(10, 15, 31, 0.22) 65%,
+      rgba(8, 13, 28, 0.88) 100%
+    ),
+    linear-gradient(
+      95deg,
+      rgba(9, 12, 24, 0.82) 0%,
+      rgba(9, 12, 24, 0.18) 50%,
+      rgba(9, 12, 24, 0.08) 100%
+    );
+}
+
+.vtk-design .fp-urenloop {
+  grid-template-columns: minmax(0, 1fr);
+  padding-top: clamp(52px, 6vw, 70px);
+}
+
+.vtk-design .fp-urenloop:has(.hero-week) {
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 396px);
+  gap: clamp(32px, 4vw, 52px);
+}
+
+@media (min-width: 981px) {
+  .vtk-design .fp-urenloop {
+    padding-top: calc(var(--vtk-header-height) + clamp(52px, 6vw, 70px));
+  }
+}
+
+.vtk-design .fp-urenloop .hero-week-wash {
+  inset: -24px -40px -32px -36px;
+  border-radius: 44px;
+  filter: blur(28px);
+}
+
+.vtk-design .fp-urenloop .hero-week-head {
+  margin-bottom: 10px;
+}
+
+.vtk-design .fp-urenloop .hero-week-head h3 {
+  font-size: 13.5px;
+}
+
+.vtk-design .fp-urenloop .hero-week-head .range,
+.vtk-design .fp-urenloop .hero-week-head .all {
+  font-size: 11.5px;
+}
+
+.vtk-design .fp-urenloop .hero-week-days {
+  column-gap: 12px;
+}
+
+.vtk-design .fp-urenloop .hero-week-day {
+  padding: 8px 0;
+}
+
+.vtk-design .fp-urenloop .hero-week-day.empty {
+  padding: 5px 0;
+}
+
+.vtk-design .fp-urenloop .hero-week-label .num,
+.vtk-design .fp-urenloop .hero-week-day.today .hero-week-label .num {
+  min-width: 22px;
+  font-size: 16.5px;
+}
+
+.vtk-design .fp-urenloop .hero-week-day.empty .num {
+  font-size: 14.5px;
+}
+
+.vtk-design .fp-urenloop .hero-week-label .dow {
+  font-size: 11.5px;
+}
+
+.vtk-design .fp-urenloop .hero-week-evs {
+  gap: 8px;
+}
+
+.vtk-design .fp-urenloop .hero-week-ev {
+  gap: 8px;
+}
+
+.vtk-design .fp-urenloop .hero-week-ev .title {
+  font-size: 13.5px;
+  line-height: 1.3;
+}
+
+.vtk-design .fp-urenloop .hero-week-ev .body small,
+.vtk-design .fp-urenloop .hero-week-ev .time,
+.vtk-design .fp-urenloop .hero-week-none,
+.vtk-design .fp-urenloop .hero-week-more {
+  font-size: 11.5px;
+}
+
+.vtk-design .fp-urenloop-main {
+  gap: clamp(108px, 12.5vw, 148px);
+}
+
+.vtk-design .fp-urenloop-copy {
+  max-width: 540px;
 }
 
 .vtk-design .fp-urenloop h1 {
-  font-size: clamp(52px, 9vw, 104px);
-  line-height: 0.92;
-  text-transform: uppercase;
-  letter-spacing: -0.04em;
+  margin: 0;
 }
 
 .vtk-design .fp-urenloop .hero-cta {
-  justify-content: center;
+  margin-top: 20px;
 }
 
-.vtk-design .fp-clock {
-  margin-top: clamp(26px, 4vw, 40px);
+.vtk-design .fp-urenloop-strip {
+  position: relative;
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 24px;
+  align-items: end;
+  padding-top: 22px;
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.18),
+    rgba(255, 255, 255, 0.03) 78%,
+    transparent
+  );
+  background-size: 100% 1px;
+  background-repeat: no-repeat;
+  background-position: top left;
+}
+
+.vtk-design .fp-urenloop-strip:has(.fp-urenloop-figures) {
+  grid-template-columns: auto 1fr;
+  gap: 48px;
 }
 
 .vtk-design .fp-clock-head {
   color: var(--on-dark-muted);
-  font-size: 12px;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
+  font-size: 13px;
+  margin-bottom: 8px;
 }
 
-/* The big variant: no card around it, the figures stand on the photo. A glass
-   panel here would shrink the one element the page exists for. */
+.vtk-design .fp-clock-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--yellow);
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+/* Inline countdown for the bottom strip: plain tabular figures on the photo,
+   without glass tiles around the hours. */
+.vtk-design .fp-countdown-inline {
+  display: flex;
+  align-items: baseline;
+  gap: clamp(18px, 3vw, 34px);
+  flex-wrap: wrap;
+  border: 0;
+  padding: 0;
+}
+
+.vtk-design .fp-countdown-inline .fp-count {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.vtk-design .fp-countdown-inline .n {
+  color: var(--paper);
+  font-size: clamp(38px, 4.8vw, 58px);
+  font-weight: 600;
+  line-height: 0.95;
+  letter-spacing: -0.04em;
+  font-variant-numeric: tabular-nums;
+  text-shadow: 0 2px 30px rgba(10, 15, 31, 0.45);
+}
+
+.vtk-design .fp-countdown-inline .l {
+  color: var(--on-dark-muted);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* The big variant (kept for [[24urenloop]] content blocks): no card around it. */
 .vtk-design .fp-countdown-big {
   margin-top: 14px;
   display: flex;
@@ -72,8 +230,6 @@
   gap: 2px;
 }
 
-/* Tabular figures: without them the whole row shifts every minute, because a
-   "1" is narrower than an "8". */
 .vtk-design .fp-countdown-big .n {
   color: var(--paper);
   font-size: clamp(56px, 11vw, 132px);
@@ -100,37 +256,41 @@
   font-weight: 600;
 }
 
-/* The figures row sits on a hairline rather than in boxes: three bordered tiles
-   would compete with the clock right above them. */
-.vtk-design .fp-figures {
-  margin-top: clamp(28px, 4vw, 44px);
-  padding-top: 22px;
-  border-top: 1px solid rgba(255, 255, 255, 0.18);
+.vtk-design .fp-urenloop-figures {
   display: flex;
-  justify-content: center;
-  gap: clamp(28px, 6vw, 76px);
   flex-wrap: wrap;
+  gap: clamp(28px, 4.5vw, 56px);
 }
 
-.vtk-design .fp-figure {
+.vtk-design .fp-urenloop-figure {
   display: flex;
   flex-direction: column;
-  gap: 4px;
 }
 
-.vtk-design .fp-figure .n {
-  color: var(--paper);
+.vtk-design .fp-urenloop-figure .n {
   font-size: clamp(24px, 3vw, 34px);
   font-weight: 600;
-  letter-spacing: -0.02em;
+  color: var(--yellow);
   font-variant-numeric: tabular-nums;
+  line-height: 1;
 }
 
-.vtk-design .fp-figure .l {
+.vtk-design .fp-urenloop-figure .l {
+  font-size: 13px;
   color: var(--on-dark-muted);
-  font-size: 11px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  margin-top: 4px;
+}
+
+@media (max-width: 980px) {
+  .vtk-design .fp-urenloop-main {
+    gap: 48px;
+  }
+
+  .vtk-design .fp-urenloop-strip,
+  .vtk-design .fp-urenloop-strip:has(.fp-urenloop-figures) {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
 }
 
 /* ---------------------------------------------------------------------------

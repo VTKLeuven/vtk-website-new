@@ -1,15 +1,55 @@
+import { HERO_WEEK_MIN_FOR_WINDOW } from "@/lib/calendar/heroWeek";
 import { countdownParts } from "@/lib/countdown";
 import { pickField } from "@/lib/frontpage/fields";
+import { HOME_AGENDA_DIM_DEFAULT } from "@/lib/frontpage/registry";
 import {
   resolvePublicUrenloopState,
   type UrenloopStatsPayload,
 } from "@/lib/urenloop/stats";
 import { Cta, ctaFrom, type FrontpageProps } from "./context";
 import { Countdown } from "./Countdown";
+import { HeroWeek } from "./HeroWeek";
 
 function formatKm(km: number, nl: boolean): string {
   const fixed = km.toFixed(1);
   return nl ? fixed.replace(".", ",") : fixed;
+}
+
+function formatClockMoment(date: Date, nl: boolean): string {
+  try {
+    const dayPart = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+      timeZone: "Europe/Brussels",
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+    })
+      .format(date)
+      .replace(/\./g, "");
+    const timePart = new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+      timeZone: "Europe/Brussels",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(date);
+    return nl ? `${dayPart} om ${timePart}` : `${dayPart} at ${timePart}`;
+  } catch {
+    return "";
+  }
+}
+
+function formatShortTime(iso: string, nl: boolean): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  try {
+    return new Intl.DateTimeFormat(nl ? "nl-BE" : "en-GB", {
+      timeZone: "Europe/Brussels",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d);
+  } catch {
+    return "";
+  }
 }
 
 function liveFiguresFrom(
@@ -17,13 +57,7 @@ function liveFiguresFrom(
   nl: boolean,
 ): Array<{ value: string; label: string }> {
   const kmText = `${formatKm(stats.totals.km, nl)} km`;
-  const totalLabel = stats.frozenAt
-    ? nl
-      ? `Ronden (${kmText} · bevroren)`
-      : `Laps (${kmText} · frozen)`
-    : nl
-      ? `Ronden (${kmText})`
-      : `Laps (${kmText})`;
+  const totalLabel = nl ? `Ronden (${kmText})` : `Laps (${kmText})`;
 
   const figures: Array<{ value: string; label: string }> = [
     {
@@ -74,21 +108,18 @@ function liveFiguresFrom(
 /**
  * The 24-urenloop front page.
  *
- * Nothing here mirrors the default: no two-column split, no agenda card. The
- * clock is the page. It sits centred and full width, with a row of figures under
- * it, because during the run the only question anyone has is how long is left.
- *
- * Start and finish times come from `/admin/24urenloop` (with a fallback to
- * legacy field values). Before the first lap is counted, the three editorial
- * figures (`stat1`–`stat3`) are shown; once the timing laptop at the track
- * pushes standings, those three slots switch to live race numbers (total laps +
- * km, leading group, and fastest lap).
+ * Keeps the middle of the photo open so the VTK stand and baton exchange stay
+ * in full view, with the headline and CTA top-left, the week calendar top-right
+ * before the start, and a borderless strip at the bottom carrying the countdown
+ * and live race figures.
  */
 export function UrenloopFrontpage({
   values,
   locale,
   base,
   now,
+  weekEvents,
+  signedIn,
   urenloop,
 }: FrontpageProps) {
   const nl = locale === "nl";
@@ -123,24 +154,27 @@ export function UrenloopFrontpage({
   const started = hasLiveOrFinalStats || (startsAt ? now >= startsAt : false);
   const finished =
     publicState?.phase === "final" || (endsAt ? now >= endsAt : false);
-  const target = !started ? startsAt : finished ? null : endsAt;
+  const target = !started ? startsAt : endsAt;
 
-  const edition = pickField(values, "edition", locale);
   const title =
-    pickField(values, "title", locale) ?? (nl ? "24 urenloop" : "24-hour run");
+    pickField(values, "title", locale) ?? (nl ? "24 urenloop," : "24-hour run,");
+  const accent =
+    pickField(values, "accent", locale) ??
+    pickField(values, "hook", locale) ??
+    "the night is ours.";
+  const subtitle = pickField(values, "subtitle", locale);
 
-  const primary = ctaFrom(
-    pickField(values, "primaryLabel", locale),
-    values.primaryUrl,
-    base,
-  );
+  const primaryLabel =
+    pickField(values, "primaryLabel", locale) ??
+    (nl ? "Kom supporteren" : "Come cheer us on");
+  const primaryUrl = values.primaryUrl ?? "/24-urenloop";
+  const primary = ctaFrom(primaryLabel, primaryUrl, base);
+
   const secondary = ctaFrom(
     pickField(values, "secondaryLabel", locale),
     values.secondaryUrl,
     base,
   );
-
-  const hook = pickField(values, "hook", locale);
 
   const staticFigures = [1, 2, 3]
     .map((i) => ({
@@ -156,64 +190,107 @@ export function UrenloopFrontpage({
 
   const heading = !started
     ? nl
-      ? "Het startschot valt over"
-      : "The start gun goes off in"
+      ? "Start binnen"
+      : "Starts in"
     : finished
       ? nl
-        ? "De 24 uur zijn om."
-        : "The 24 hours are over."
+        ? "Afgelopen"
+        : "Finished"
       : nl
         ? "We lopen nog"
-        : "Still running for";
+        : "Still running";
+
+  let stamp = "";
+  if (!started && startsAt) {
+    stamp = formatClockMoment(startsAt, nl);
+  } else if (finished && endsAt) {
+    stamp = formatClockMoment(endsAt, nl);
+  } else if (publicState && (publicState.phase === "live" || publicState.phase === "final")) {
+    const t = formatShortTime(
+      publicState.stats.frozenAt ?? publicState.stats.generatedAt,
+      nl,
+    );
+    if (t) {
+      stamp = publicState.stats.frozenAt
+        ? nl
+          ? `stand om ${t}`
+          : `standings at ${t}`
+        : nl
+          ? `bijgewerkt om ${t}`
+          : `updated at ${t}`;
+    }
+  }
 
   return (
     <section className="home-hero fp-urenloop">
-      <div>
-        {edition ? (
-          <div className="eyebrow">
-            <span className="dot" />
-            {edition}
-          </div>
-        ) : null}
-        <h1>{title}</h1>
-
-        <div className="fp-clock">
-          <div className="fp-clock-head">{heading}</div>
-          {target ? (
-            <Countdown
-              targetIso={target.toISOString()}
-              initial={countdownParts(target, now)}
-              labels={{
-                days: nl ? "dagen" : "days",
-                hours: nl ? "uren" : "hours",
-                minutes: nl ? "min" : "min",
-                passed: nl ? "Het is zover." : "It is happening.",
-              }}
-              variant="big"
-            />
+      <div className="fp-urenloop-main">
+        <div className="fp-urenloop-copy">
+          <h1>
+            {title}
+            {accent ? (
+              <>
+                <br />
+                <span className="serif">{accent}</span>
+              </>
+            ) : null}
+          </h1>
+          {subtitle ? <p className="hero-sub">{subtitle}</p> : null}
+          {primary || secondary ? (
+            <div className="hero-cta">
+              <Cta cta={primary} className="btn btn-primary arrow" />
+              <Cta cta={secondary} className="btn btn-ghost" />
+            </div>
           ) : null}
         </div>
 
-        {hook ? <p className="fp-hook">{hook}</p> : null}
-
-        {figures.length > 0 ? (
-          <div className="fp-figures">
-            {figures.map((f, i) => (
-              <div className="fp-figure" key={i}>
-                <span className="n">{f.value}</span>
-                {f.label ? <span className="l">{f.label}</span> : null}
-              </div>
-            ))}
+        <div className="fp-urenloop-strip">
+          <div className="fp-clock">
+            <div className="fp-clock-head">
+              <span className="fp-clock-dot" aria-hidden="true" />
+              {heading}
+              {stamp ? ` (${stamp})` : ""}
+            </div>
+            {target ? (
+              <Countdown
+                targetIso={target.toISOString()}
+                initial={countdownParts(target, now)}
+                labels={{
+                  days: nl ? "dagen" : "days",
+                  hours: nl ? "uren" : "hours",
+                  minutes: nl ? "min" : "min",
+                  passed: "00",
+                }}
+                variant="inline"
+                zeroWhenPassed
+              />
+            ) : null}
           </div>
-        ) : null}
 
-        {primary || secondary ? (
-          <div className="hero-cta">
-            <Cta cta={primary} className="btn btn-primary arrow" />
-            <Cta cta={secondary} className="btn btn-ghost" />
-          </div>
-        ) : null}
+          {figures.length > 0 ? (
+            <div className="fp-urenloop-figures">
+              {figures.map((f, i) => (
+                <div className="fp-urenloop-figure" key={i}>
+                  <span className="n">{f.value}</span>
+                  {f.label ? <span className="l">{f.label}</span> : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+        </div>
       </div>
+
+      {!started ? (
+        <HeroWeek
+          events={weekEvents}
+          now={now}
+          locale={locale}
+          base={base}
+          signedIn={signedIn}
+          dim={HOME_AGENDA_DIM_DEFAULT}
+          nextEventsLimit={HERO_WEEK_MIN_FOR_WINDOW}
+          maxDays={4}
+        />
+      ) : null}
     </section>
   );
 }
