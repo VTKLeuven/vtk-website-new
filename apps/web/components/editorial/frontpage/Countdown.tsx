@@ -19,12 +19,15 @@ export function Countdown({
   initial,
   labels,
   variant = "panel",
+  zeroWhenPassed = false,
 }: {
   targetIso: string;
   initial: CountdownParts;
   labels: { days: string; hours: string; minutes: string; passed: string };
-  /** "panel" sits in a dark-glass card; "big" is the page's centrepiece. */
-  variant?: "panel" | "big";
+  /** "panel" sits in a dark-glass card; "big" is the page's centrepiece; "inline" sits on a bottom strip. */
+  variant?: "panel" | "big" | "inline";
+  /** Keep 00/00/00 on screen after the target moment instead of swapping to a text message. */
+  zeroWhenPassed?: boolean;
 }) {
   const [parts, setParts] = useState<CountdownParts>(initial);
 
@@ -36,17 +39,28 @@ export function Countdown({
     return () => clearInterval(id);
   }, [targetIso]);
 
-  if (parts.passed) {
+  if (parts.passed && !zeroWhenPassed) {
     return <div className="fp-countdown-passed">{labels.passed}</div>;
   }
 
+  const displayDays = parts.passed ? 0 : parts.days;
+  const displayHours = parts.passed ? 0 : parts.hours;
+  const displayMinutes = parts.passed ? 0 : parts.minutes;
+
+  const variantClass =
+    variant === "big"
+      ? " fp-countdown-big"
+      : variant === "inline"
+        ? " fp-countdown-inline"
+        : "";
+
   return (
-    <div className={`fp-countdown${variant === "big" ? " fp-countdown-big" : ""}`}>
+    <div className={`fp-countdown${variantClass}`}>
       {(
         [
-          [parts.days, labels.days],
-          [parts.hours, labels.hours],
-          [parts.minutes, labels.minutes],
+          [displayDays, labels.days],
+          [displayHours, labels.hours],
+          [displayMinutes, labels.minutes],
         ] as const
       ).map(([value, label]) => (
         <div className="fp-count" key={label}>
