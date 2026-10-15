@@ -55,6 +55,7 @@
 
 @media (min-width: 981px) {
   .vtk-design .fp-urenloop {
+    min-height: 100svh;
     padding-top: calc(var(--vtk-header-height) + clamp(52px, 6vw, 70px));
   }
 }
