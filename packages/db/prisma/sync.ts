@@ -12,7 +12,8 @@
  * de code de bron van waarheid is:
  *   - `Permission`: de registry is canoniek en niet GUI-bewerkbaar.
  *   - de rechten van de systeemrol `admin`: die bundelt per definitie alles, dus
- *     een nieuwe permissie moet er meteen aan hangen.
+ *     een nieuwe permissie moet er meteen aan hangen. Behalve wat in
+ *     `ADMIN_EXCLUDED_PERMISSIONS` staat: dat is bewust voor één post.
  *   - `Building` en `Room`: de gebouwen en lokalen van de KU Leuven komen uit
  *     `fixtures/gebouwen.json`, geschreven door `scripts/scrape-kulag.ts`. Ze
  *     zijn niet GUI-beheerd, en zonder deze sync maakt een deploy wel de
@@ -33,7 +34,7 @@ import { fileURLToPath } from "node:url";
 
 import { PrismaClient } from "@prisma/client";
 import { GROUP_SEEDS, WERKGROEP_SEEDS, HEADER_TABS } from "../src/groups";
-import { PERMISSIONS } from "../src/permissions";
+import { ADMIN_EXCLUDED_PERMISSIONS, PERMISSIONS } from "../src/permissions";
 
 const prisma = new PrismaClient();
 
@@ -119,7 +120,10 @@ async function syncAdminRolePermissions() {
   }
 
   const held = new Set(adminRole.permissions.map((rp) => rp.permissionId));
-  const all = await prisma.permission.findMany();
+  // Op de uitzonderingen na: die horen bij één post en krijgen een eigen rol.
+  const all = await prisma.permission.findMany({
+    where: { code: { notIn: [...ADMIN_EXCLUDED_PERMISSIONS] } },
+  });
   const missing = all.filter((p) => !held.has(p.id));
 
   for (const perm of missing) {

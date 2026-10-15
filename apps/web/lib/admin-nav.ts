@@ -96,16 +96,24 @@ export function getAdminNav(): NavEntry[] {
     }),
     item('grocomeet', '/grocomeet', { perm: 'grocomeet.manage' }),
     ...(logistics ? [item('logistics', logistics)] : []),
-    item('expenses', '/rekeningen', {
-      anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.reimbursePost', 'expenses.manage'],
-    }),
-    // Naast Rekeningen: een post vraagt hier een kassa met wisselgeld aan, en
-    // Beheer maakt, telt en boekt ze. Allebei geld dat langs Beheer passeert.
-    item('cashRegisters', '/kassas', { anyPerm: ['cashRegisters.request', 'cashRegisters.manage'] }),
-    // Naast Rekeningen: allebei het werk van de penning. De codes zelf kiest
-    // wie een ticketverkoop maakt, in het eventformulier; hier wordt enkel de
-    // lijst beheerd.
-    item('accountingCodes', '/boekhoudcodes', { perm: 'accounting.manage' }),
+    // Beheer: alles wat met het geld van de kring te maken heeft, onder één
+    // groep in plaats van vier losse tabs. Wie maar één ervan mag zien (een
+    // praesidiumlid dat enkel een rekening indient), krijgt dat ene item
+    // vanzelf terug als losse tab (zie de layout).
+    group('beheer', [
+      item('expenses', '/rekeningen', {
+        anyPerm: ['expenses.submit', 'expenses.managePost', 'expenses.reimbursePost', 'expenses.manage'],
+      }),
+      // Een post vraagt hier een kassa met wisselgeld aan, en Beheer maakt,
+      // telt en boekt ze.
+      item('cashRegisters', '/kassas', { anyPerm: ['cashRegisters.request', 'cashRegisters.manage'] }),
+      // Het werk van de penning. De codes zelf kiest wie een ticketverkoop
+      // maakt, in het eventformulier; hier wordt enkel de lijst beheerd.
+      item('accountingCodes', '/boekhoudcodes', { perm: 'accounting.manage' }),
+      // De budgetten en resultaten die langs het Bestuursorgaan passeerden.
+      // Enkel Groep 5 (de rol admin draagt dit recht niet).
+      item('bestuursorgaan', '/bestuursorgaan', { perm: 'bestuursorgaan.manage' }),
+    ]),
     // Theokot doet twee dingen die weinig met elkaar te maken hebben: broodjes
     // verkopen en de zaal verhuren. Later komt de uitleendienst erbij. Daarom
     // een groep en geen los item; wie maar één van de twee mag zien, krijgt dat

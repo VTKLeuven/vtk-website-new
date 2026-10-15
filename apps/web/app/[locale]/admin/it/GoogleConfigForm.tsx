@@ -80,6 +80,22 @@ export function GoogleConfigForm({ status }: { status: GoogleStatus }) {
               nobody is moved, which also means nothing stops them from sending.
             </p>
           </div>
+          <div className="sm:col-span-2">
+            <Label>Drive account (Bestuursorgaan scan)</Label>
+            <Input
+              name="driveSubject"
+              type="email"
+              defaultValue={status.driveSubject ?? ""}
+              placeholder="bo-scan@vtk.be"
+            />
+            <p className="mt-1 text-xs text-zinc-500">
+              The account the site impersonates to read the BO folder on the shared drive
+              Praesidium (/admin/bestuursorgaan). It must be a member of that drive and be able to
+              open the werkgroep folders the BO folders link to; an admin role alone does not give
+              access to files on a shared drive. Needs <code>drive.readonly</code> in the
+              delegation as well (<code>DRIVE_SCOPES</code>). Leave empty and the scan stays off.
+            </p>
+          </div>
           <div>
             <Label>OAuth client ID (self-service linking)</Label>
             <Input

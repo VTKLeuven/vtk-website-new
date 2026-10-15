@@ -3181,3 +3181,1164 @@ a.vtk-shortcut-tile:hover {
     width: auto !important;
   }
 }
+
+/* ---------------------------------------------------------------------------
+   Bestuursorgaan (/admin/bestuursorgaan): de verkenner. Drie panelen naast
+   elkaar zoals een mailprogramma: links posten, BO's of wat open staat, in het
+   midden de activiteiten, rechts alles over één activiteit. In de kolom van
+   900 px is dat 200 + 270 + de rest; wordt de kolom smaller dan 760 px, dan
+   staat er één paneel tegelijk en geeft `data-pane` aan welk (een
+   containerquery, want de inhoudskolom en niet het scherm beslist). Zie
+   docs/design-decisions.md ("Bestuursorgaan: de verkenner").
+   --------------------------------------------------------------------------- */
+
+.vtk-bo-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 22px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.vtk-bo-strip > div {
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.vtk-bo-strip dt {
+  color: var(--body);
+  font-size: 12.5px;
+}
+
+.vtk-bo-strip dd {
+  margin: 0;
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-bo-explorer-wrap {
+  container: bo-explorer / inline-size;
+}
+
+.vtk-bo-explorer {
+  display: grid;
+  grid-template-columns: 200px 270px minmax(0, 1fr);
+  min-height: 560px;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.vtk-bo-pane {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  border-right: 1px solid var(--line);
+}
+
+.vtk-bo-pane:last-child {
+  border-right: 0;
+}
+
+.vtk-bo-pane-head {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.vtk-bo-ptabs {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--paper-2);
+}
+
+.vtk-bo-ptabs button {
+  flex: 1;
+  padding: 5px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.vtk-bo-ptabs button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 2px rgba(10, 15, 31, 0.1);
+}
+
+.vtk-bo-item {
+  display: grid;
+  gap: 4px;
+  width: 100%;
+  padding: 9px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--rule-soft);
+  background: none;
+  color: var(--ink);
+  font-size: 12.5px;
+  text-align: left;
+}
+
+.vtk-bo-item:hover {
+  background: var(--paper);
+}
+
+.vtk-bo-item[aria-current='true'] {
+  background: color-mix(in srgb, var(--chart-1) 9%, var(--surface));
+  box-shadow: inset 3px 0 0 var(--chart-1);
+}
+
+.vtk-bo-item-r1,
+.vtk-bo-item-r2 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 8px;
+}
+
+.vtk-bo-item-r1 b {
+  min-width: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.vtk-bo-item-r2 {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.vtk-bo-prog {
+  position: relative;
+  display: inline-block;
+  width: 80px;
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--paper-2);
+}
+
+.vtk-bo-prog > span {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 999px;
+  background: var(--chart-1);
+}
+
+.vtk-bo-section {
+  padding: 8px 12px 4px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+/* Stand van een activiteit: grijs voor wat komt, amber voor wat ontbreekt. */
+.vtk-bo-pill {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 2px 9px;
+  background: var(--paper-2);
+  color: var(--body);
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.vtk-bo-pill[data-tone='low'] {
+  background: var(--low-bg);
+  color: var(--low-ink);
+}
+
+.vtk-bo-pill[data-tone='ok'] {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+.vtk-bo-pill[data-tone='next'] {
+  background: var(--yellow);
+  color: var(--ink);
+}
+
+/* De afwijking: groen beter dan gepland, rood slechter. Zelfde vorm als de pil
+   van het shiftenoverzicht. */
+.vtk-bo-dev {
+  display: inline-block;
+  min-width: 58px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--paper-2);
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.vtk-bo-dev[data-tone='up'] {
+  background: var(--ok-bg);
+  color: var(--ok-ink);
+}
+
+.vtk-bo-dev[data-tone='down'] {
+  background: var(--danger-bg);
+  color: var(--danger-ink);
+}
+
+.vtk-bo-detail {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  padding: 16px 18px;
+  container: bo-detail / inline-size;
+  /* Onder de vaste kop van de site, niet erachter. */
+  scroll-margin-top: 96px;
+}
+
+.vtk-bo-kicker {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-bo-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  text-align: left;
+  text-decoration: underline;
+  text-decoration-color: var(--line-2);
+  text-underline-offset: 3px;
+}
+
+.vtk-bo-link:hover {
+  text-decoration-color: var(--ink);
+}
+
+.vtk-bo-chip {
+  padding: 4px 10px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12.5px;
+}
+
+.vtk-bo-chip:hover {
+  background: var(--paper);
+}
+
+.vtk-bo-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.vtk-bo-tiles > div {
+  display: grid;
+  align-content: start;
+  gap: 1px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.vtk-bo-tiles .l {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vtk-bo-tiles .v {
+  color: var(--ink);
+  font-size: 14.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-bo-tiles .n {
+  color: var(--body);
+  font-size: 11.5px;
+}
+
+.vtk-bo-facts {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 6px 12px;
+  margin: 0;
+  font-size: 13px;
+}
+
+.vtk-bo-facts dt {
+  color: var(--muted);
+}
+
+.vtk-bo-facts dd {
+  margin: 0;
+}
+
+.vtk-bo-note {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 12px;
+  background: var(--paper);
+  box-shadow: inset 3px 0 0 var(--yellow);
+  font-size: 12.5px;
+}
+
+.vtk-admin-main .vtk-bo-note {
+  color: var(--body) !important;
+}
+
+.vtk-bo-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  border-bottom: 1px solid var(--line);
+}
+
+.vtk-bo-tabs button {
+  margin-bottom: -1px;
+  padding: 8px 12px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: none;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vtk-bo-tabs button[aria-pressed='true'] {
+  border-bottom-color: var(--yellow);
+  color: var(--ink);
+}
+
+/* Bedragen per post: budget en resultaat als twee dunne balken, de bedragen
+   ernaast. In een smal detail schuift de balk onder het label. */
+.vtk-bo-lines {
+  display: grid;
+  gap: 6px;
+  container: bo-lines / inline-size;
+}
+
+.vtk-bo-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--body);
+  font-size: 12px;
+}
+
+.vtk-bo-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 5px;
+  border-radius: 3px;
+  vertical-align: -1px;
+}
+
+.vtk-bo-legend i[data-series='budget'],
+.vtk-bo-line .bars span[data-series='budget'] {
+  background: var(--chart-1);
+}
+
+.vtk-bo-legend i[data-series='result'],
+.vtk-bo-line .bars span[data-series='result'] {
+  background: var(--chart-3);
+}
+
+.vtk-bo-line {
+  display: grid;
+  grid-template-columns: minmax(110px, 170px) minmax(0, 1fr) 92px 92px 78px;
+  gap: 10px;
+  align-items: center;
+  font-size: 12.5px;
+}
+
+.vtk-bo-line .num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.vtk-bo-line-label {
+  overflow-wrap: anywhere;
+}
+
+.vtk-bo-lines-section {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-bo-line .bars {
+  display: grid;
+  gap: 3px;
+}
+
+.vtk-bo-line .bars span {
+  display: block;
+  height: 7px;
+  min-width: 2px;
+  border-radius: 0 4px 4px 0;
+}
+
+.vtk-bo-line.head {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.vtk-bo-line.total {
+  padding-top: 6px;
+  border-top: 1px solid var(--line);
+  font-weight: 600;
+}
+
+.vtk-bo-line.muted {
+  color: var(--muted);
+}
+
+@container bo-lines (max-width: 560px) {
+  .vtk-bo-line {
+    grid-template-columns: minmax(0, 1fr) 82px 82px 70px;
+    row-gap: 3px;
+  }
+
+  .vtk-bo-line > .bars {
+    grid-column: 1 / -1;
+    order: 9;
+  }
+
+  .vtk-bo-line.head > :nth-child(2),
+  .vtk-bo-line.total > :nth-child(2),
+  .vtk-bo-line.muted > :nth-child(2) {
+    display: none;
+  }
+}
+
+.vtk-bo-steps {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vtk-bo-steps li {
+  display: grid;
+  grid-template-columns: 64px 14px minmax(0, 1fr);
+  gap: 10px;
+  padding-bottom: 14px;
+  position: relative;
+  font-size: 12.5px;
+}
+
+.vtk-bo-steps .d {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.vtk-bo-steps .m {
+  position: relative;
+  margin-top: 3px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid var(--chart-1);
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.vtk-bo-steps li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 16px;
+  bottom: 0;
+  left: 79px;
+  width: 2px;
+  background: var(--line-2);
+}
+
+.vtk-bo-steps li[data-kind='result'] .m {
+  border-color: var(--chart-3);
+  background: var(--chart-3);
+}
+
+.vtk-bo-steps li[data-kind='event'] .m {
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+  border-color: var(--ink);
+  border-radius: 2px;
+  background: var(--ink);
+  transform: rotate(45deg);
+}
+
+.vtk-bo-steps li[data-kind='open'] .m {
+  border-color: var(--chart-2);
+  border-style: dashed;
+}
+
+.vtk-bo-files {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vtk-bo-file {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 12.5px;
+}
+
+.vtk-bo-back {
+  display: none;
+  justify-self: start;
+  padding: 4px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+@container bo-detail (max-width: 520px) {
+  .vtk-bo-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@container bo-explorer (max-width: 760px) {
+  .vtk-bo-explorer {
+    grid-template-columns: minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .vtk-bo-explorer .vtk-bo-pane {
+    display: none;
+    border-right: 0;
+  }
+
+  .vtk-bo-explorer[data-pane='0'] .vtk-bo-pane:nth-child(1),
+  .vtk-bo-explorer[data-pane='1'] .vtk-bo-pane:nth-child(2),
+  .vtk-bo-explorer[data-pane='2'] .vtk-bo-pane:nth-child(3) {
+    display: grid;
+  }
+
+  .vtk-bo-back {
+    display: inline-flex;
+  }
+}
+
+/* De schakelaar Verkenner / Lijst (en Lijst / Grafiek in de lijst). */
+.vtk-bo-views {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line-2);
+  border-radius: 999px;
+  background: var(--surface);
+}
+
+.vtk-bo-views button {
+  padding: 5px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: var(--body);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.vtk-bo-views button[aria-pressed='true'] {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.vtk-bo-legend i[data-series='open'],
+.vtk-bo-l-stack span[data-series='open'] {
+  background: var(--chart-2);
+}
+
+.vtk-bo-legend i[data-series='upcoming'],
+.vtk-bo-l-stack span[data-series='upcoming'] {
+  background: var(--chart-context);
+}
+
+.vtk-bo-l-stack span[data-series='result'] {
+  background: var(--chart-3);
+}
+
+/* ---------------------------------------------------------------------------
+   Bestuursorgaan: de lijstweergave (`BoList.tsx`), zoals Odoo een lijst met
+   een controlepaneel (kruimelpad, zoeken, filters, groeperen) en achter elke
+   rij een formulier met slimme knoppen, een statusbalk en een logboek.
+   --------------------------------------------------------------------------- */
+
+.vtk-bo-l {
+  container: bo-list / inline-size;
+}
+
+.vtk-bo-l-cp {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.vtk-bo-l-crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 600;
+}
+
+.vtk-bo-l-crumbs button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--chart-1);
+  font: inherit;
+}
+
+.vtk-bo-l-crumbs button:hover {
+  text-decoration: underline;
+}
+
+.vtk-bo-l-crumbs .sep {
+  color: var(--chart-context);
+  font-weight: 400;
+}
+
+.vtk-bo-l-pager {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.vtk-bo-l-pager button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--line-2);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.vtk-bo-l-pager button:disabled {
+  opacity: 0.4;
+}
+
+.vtk-bo-l-searchrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.vtk-bo-l-search {
+  display: flex;
+  flex: 1 1 340px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 4px 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+/* Zwaarder dan de algemene invoerregel van de admin, die het veld een vulling
+   en een rand geeft: hier staat het in een vak dat dat al heeft. */
+.vtk-admin-main .vtk-bo-l-search input[type='search'] {
+  flex: 1 1 140px;
+  min-width: 100px;
+  padding: 3px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 13px;
+}
+
+.vtk-bo-l-facet {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px 3px 8px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--chart-1) 12%, var(--surface));
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.vtk-bo-l-facet .k {
+  color: var(--chart-1);
+}
+
+.vtk-bo-l-facet button {
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+
+.vtk-bo-l-tools {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.vtk-bo-l-dd {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 11px;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.vtk-bo-l-dd[aria-expanded='true'] {
+  border-color: var(--ink);
+}
+
+.vtk-bo-l-menu {
+  position: absolute;
+  top: 40px;
+  left: 0;
+  z-index: 5;
+  display: grid;
+  gap: 2px;
+  min-width: 240px;
+  padding: 8px;
+  border: 1px solid var(--line-2);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: 0 18px 40px -20px rgba(10, 15, 31, 0.45);
+}
+
+.vtk-bo-l-menu .hd {
+  margin: 0;
+  padding: 6px 10px 2px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.vtk-bo-l-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+}
+
+.vtk-bo-l-menu button:hover {
+  background: var(--paper);
+}
+
+.vtk-bo-l-menu .chk {
+  width: 14px;
+  color: var(--chart-1);
+  font-weight: 700;
+}
+
+.vtk-bo-l-wrap {
+  position: relative;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.vtk-bo-l-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.vtk-bo-l-table th {
+  padding: 9px 12px;
+  background: var(--paper-2);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.vtk-bo-l-table td {
+  padding: 8px 12px;
+  border-top: 1px solid var(--rule-soft);
+  vertical-align: middle;
+}
+
+.vtk-bo-l-table .num {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.vtk-bo-l-row {
+  cursor: pointer;
+}
+
+.vtk-bo-l-row:hover td {
+  background: #f7f9fc;
+}
+
+.vtk-bo-l-title {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-weight: 600;
+  text-align: left;
+}
+
+.vtk-bo-l-grp {
+  cursor: pointer;
+}
+
+.vtk-bo-l-grp td {
+  padding: 7px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--body);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.vtk-bo-l-gl {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.vtk-bo-l-car {
+  width: 18px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}
+
+.vtk-bo-l-car span {
+  display: inline-block;
+  transition: transform 0.15s;
+}
+
+.vtk-bo-l-car span[data-open='true'] {
+  transform: rotate(90deg);
+}
+
+.vtk-bo-l-table tfoot td {
+  border-top: 1px solid var(--line-2);
+  background: var(--paper);
+  font-weight: 700;
+}
+
+.vtk-bo-l-graph {
+  display: grid;
+  gap: 8px;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+}
+
+.vtk-bo-l-gr {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) 90px;
+  gap: 10px;
+  align-items: center;
+  font-size: 12.5px;
+}
+
+.vtk-bo-l-stack {
+  display: flex;
+  gap: 2px;
+  height: 14px;
+}
+
+.vtk-bo-l-stack span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+}
+
+.vtk-bo-l-status {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--line-2);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.vtk-bo-l-status span {
+  padding: 6px 14px;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.vtk-bo-l-status span + span {
+  border-left: 1px solid var(--line);
+}
+
+.vtk-bo-l-status span[data-state='done'] {
+  color: var(--ok-ink);
+}
+
+.vtk-bo-l-status span[data-state='current'] {
+  background: var(--ink);
+  color: var(--surface);
+}
+
+.vtk-bo-l-status span[data-state='late'] {
+  background: var(--low-bg);
+  color: var(--low-ink);
+}
+
+.vtk-bo-l-smart {
+  display: flex;
+  flex-wrap: wrap;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+.vtk-bo-l-smart > * {
+  display: grid;
+  flex: 1 1 110px;
+  gap: 1px;
+  padding: 10px 14px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  text-align: left;
+}
+
+.vtk-bo-l-smart > *:last-child {
+  border-right: 0;
+}
+
+.vtk-bo-l-smart button:hover {
+  background: var(--paper);
+}
+
+.vtk-bo-l-smart .v {
+  color: var(--ink);
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.vtk-bo-l-smart .l {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.vtk-bo-l-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: 20px;
+  align-items: start;
+}
+
+.vtk-bo-l-sheet {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 22px 26px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface);
+  container: bo-detail / inline-size;
+}
+
+.vtk-bo-l-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 36px;
+}
+
+.vtk-bo-l-field {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--rule-soft);
+  font-size: 13px;
+}
+
+.vtk-bo-l-field > span:first-child {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.vtk-bo-l-log {
+  display: grid;
+  gap: 12px;
+}
+
+.vtk-bo-l-msg {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 9px;
+  font-size: 12.5px;
+}
+
+.vtk-bo-l-msg .a {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--navy);
+  color: var(--surface);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.vtk-bo-l-msg .t {
+  display: block;
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+/* Smal: het logboek onder het formulier, de velden onder elkaar, en elke rij
+   van een tabel een blok met een label per waarde. */
+@container bo-list (max-width: 700px) {
+  .vtk-bo-l-split,
+  .vtk-bo-l-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .vtk-bo-l-sheet {
+    padding: 16px;
+  }
+
+  .vtk-bo-l-gr {
+    grid-template-columns: 110px minmax(0, 1fr) 70px;
+  }
+
+  .vtk-bo-l-table thead {
+    display: none;
+  }
+
+  .vtk-bo-l-table tbody tr.vtk-bo-l-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 12px;
+    padding: 10px 12px;
+    border-top: 1px solid var(--rule-soft);
+  }
+
+  .vtk-bo-l-table tbody tr.vtk-bo-l-row td {
+    display: block;
+    padding: 0;
+    border: 0;
+    text-align: left;
+  }
+
+  .vtk-bo-l-table tbody tr.vtk-bo-l-row td:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .vtk-bo-l-table td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    color: var(--muted);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  .vtk-bo-l-table tr.vtk-bo-l-grp,
+  .vtk-bo-l-table tfoot tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 12px;
+    padding: 8px 12px;
+    border-top: 1px solid var(--line);
+    background: var(--paper);
+  }
+
+  .vtk-bo-l-table tr.vtk-bo-l-grp td,
+  .vtk-bo-l-table tfoot td {
+    display: inline-block;
+    padding: 0;
+    border: 0;
+    background: none;
+  }
+
+  .vtk-bo-l-table tr.vtk-bo-l-grp td[data-label]::before {
+    display: inline;
+    margin-right: 4px;
+  }
+}

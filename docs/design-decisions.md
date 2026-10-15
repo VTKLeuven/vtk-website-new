@@ -8437,9 +8437,16 @@ samen de homepagina beschrijven ook naast elkaar te zetten.
 belangrijkste uitzondering op "alles in een domein". Theokot, Piano, Fakscanner
 en Grocomeet in een groep "Diensten" stoppen betekent dat net de mensen die er
 het meest inzitten er elke keer naar moeten zoeken; de winst van een kortere
-lijst gaat dan naar de mensen die die tab toch nooit openen. Rekeningen,
-Wachtwoorden en Logistiek staan om dezelfde reden los: die gebruikt iedereen
-rechtstreeks. Gevolg: zeven domeinen plus zeven losse modules, veertien rijen.
+lijst gaat dan naar de mensen die die tab toch nooit openen. Wachtwoorden en
+Logistiek staan om dezelfde reden los: die gebruikt iedereen rechtstreeks.
+
+**Beheer is een groep (oktober 2026)**: Rekeningen, Kassa's, Boekhoudcodes en
+Bestuursorgaan, alles wat met het geld van de kring te maken heeft. Rekeningen
+stond eerst los om de reden hierboven, maar wie enkel een rekening indient, ziet
+in die groep maar één item en krijgt het dus vanzelf als losse tab terug; voor
+hem verandert er niets. Wie er meer van ziet (Groep 5, Beheer, de penning), vond
+vier losse tabs naast elkaar onoverzichtelijk. De naam is die van de post die
+het doet, dus geen vage verzamelnaam zoals "Werking".
 
 **Een groep met een vage naam is erger dan geen groep.** Er stond even een groep
 "Werking" met Rekeningen, Wachtwoorden en Logistiek erin. Die is geschrapt: je
@@ -11301,3 +11308,102 @@ recht `shift.praesidium` (de rol `admin`, dus Groep 5 en IT, heeft het vanzelf).
   vorm als de boekhoudcodekiezer): met tachtig praesidiumleden is de keuzelijst
   van de browser niet te doen. De waarschijnlijke kandidaten ("Jarne" bij twee
   Jarnes) staan als knopjes onder het veld.
+
+## Bestuursorgaan
+
+Elke week passeren op het Bestuursorgaan (BO) de budgetten en resultaten van de
+posten, als rekenbladen in de map Bestuursorgaan op de gedeelde drive
+Praesidium. `/admin/bestuursorgaan` (`lib/bo`) leest die map en toont per post
+welke budgetten er al passeerden, of er al een resultaat is, en de bedragen.
+Hoe het werkt staat in `docs/bestuursorgaan.md`; dit zijn de keuzes erachter.
+
+- **Enkel Groep 5, en bewust niet de rol admin** (oktober 2026). De cijfers van
+  elke post zijn het werk van het dagelijks bestuur. Admin dragen IT en Groep 5
+  samen, en dat IT de koppeling opzet, is geen reden om de budgetten van elke
+  post te zien. Daarom een eigen rol `bestuursorgaan` aan Groep 5, en een lijst
+  `ADMIN_EXCLUDED_PERMISSIONS` die de seed en de sync bij elke start volgen; een
+  superadmin ziet het, zoals alles, wel. Een eigen rol laat het beheer het later
+  ook los toekennen, aan een penning buiten Groep 5, zonder admin mee te geven.
+- **Drive blijft de bron; de site schrijft er niets in.** De posten werken al
+  met die mappen en die naamgeving, en het BO leest ze daar. Een tweede plek om
+  een budget in te dienen, zou betekenen dat een deel in Drive staat en een deel
+  op de site. Wat in Drive fout staat (een naam zonder soort, een map die niet
+  gedeeld is), meldt het scherm bij "Na te kijken"; rechtzetten doe je in Drive.
+  Enkel twee beslissingen bewaart de site zelf, omdat ze nergens in Drive
+  passen: welke post een naam als "Vice" is, en bij welk budget een resultaat
+  hoort waarvan de naam op niets lijkt.
+- **De naam wint van de map.** Een bestand `26-27_Budget_Statix_Ontbijt` in een
+  map Resultaten is een budget; het scherm noemt wel waar het stond. De naam
+  typt iemand bewust, in welke map iets belandt is een sleepbeweging. Zegt de
+  naam het niet (`26-27_Development_ECC`), dan beslist de map.
+- **Niemand moet een bestand hernoemen om in het overzicht te staan.** De
+  herkenning aanvaardt wat in de map van 26-27 voorkwam: kleine letters, een
+  dubbelpunt, de post vóór het soort, `Acti` voor Activiteiten. Een strikte
+  regel had een derde van de bestanden gemist, en dan klopt het overzicht net
+  voor de posten die het minst op de afspraak letten.
+- **Een register, geen momentopname.** Verdwijnt een map of een bestand uit
+  Drive, dan blijft het staan met "niet meer in Drive": wat langs het BO
+  passeerde, is gebeurd, ook als iemand de map later opruimt.
+- **Een resultaat is open zodra de activiteit voorbij is, niet zodra het budget
+  passeerde.** De datum komt uit het blok Info van het budget. Een budget voor
+  de 24 urenloop in april staat in oktober dus als "Op 22 apr" en niet als
+  achterstand; zonder datum telt het wel als open, want dan weet niemand of het
+  al had moeten binnenkomen.
+- **Het lopende werkingsjaar en het vorige.** De resultaten van vorig jaar
+  komen nog binnen in de eerste BO's van het nieuwe, en hun budgetten staan in
+  de map van vorig jaar. De jaarmap zoekt de site zelf ("2026 - 2027 ..."), zodat
+  de 15-juli-wissel geen handwerk vraagt.
+- **Het scherm is een verkenner**, zie hieronder. De eerste versie was het
+  rustige register van het shiftenoverzicht (één tabel met een kopregel per
+  post); dat toonde wat er was, maar je kon niet verder klikken dan het rekenblad
+  in Drive, en er stond geen percentage en niets per BO.
+
+## Bestuursorgaan: de verkenner
+
+Op een bord met het register en vijf richtingen (een lijst met formulieren zoals
+Odoo, een cockpit met kerncijfers en grafieken, een pijplijn met kaarten, een
+matrix van posten tegen BO's, en een verkenner met drie panelen) koos Groep 5 de
+verkenner. De vraag was "een beetje als Odoo, dat je echt kan doorklikken", en
+"des te meer info, des te beter". Bord:
+https://claude.ai/artifact/VpxcbRLcNKHuuaxpYKnejB
+
+- **Drie panelen, zoals een mailprogramma**: links Posten, BO's of Open, in het
+  midden de activiteiten van wat links gekozen is, rechts alles over één
+  activiteit. Je verliest nooit waar je zat, en springt met één klik van de ene
+  post naar de andere. Zonder gekozen activiteit toont het rechterpaneel de
+  cijfers van de post of de BO, zodat het nooit leeg staat.
+- **Het percentage per post telt enkel wat voorbij is.** "7/9 · 78%" betekent:
+  van de negen activiteiten die al plaatsvonden (of geen datum hebben), hebben
+  er zeven een resultaat. Een budget voor april drukt het percentage in oktober
+  niet.
+- **Open is een eigen tab, ingedeeld naar hoe lang het al duurt**: minder dan
+  twee weken, twee tot vier, een tot twee maanden, langer, en zonder datum. Een
+  achterstand van drie dagen is geen probleem, een van drie maanden wel; een
+  lijst zonder die indeling maakt ze even zwaar.
+- **Per activiteit de posten uit het rekenblad** (Zaal, Drank, Inkom), budget en
+  resultaat naast elkaar, met het verschil per post. Een afwijking van € 200 zegt
+  weinig zonder te zien of ze uit de drank of uit de zaal komt.
+- **De keuze staat in de URL** (`?post=`, `?bo=`, `?activiteit=`), maar een klik
+  gaat niet langs de server: het hele jaar komt bij het laden mee, en de
+  verkenner zet enkel de URL (`history.pushState`). Zo is een link naar één
+  activiteit te delen, werkt de terugknop, en voelt doorklikken als bladeren.
+- **In de kolom van 900 px**, zonder uitzondering zoals de uitleendienst: 200 +
+  270 + de rest past, en het bord toonde dat de volle breedte niets toevoegde
+  wat de keuze veranderde. Wordt de kolom smaller dan 760 px, dan staat er één
+  paneel tegelijk met een terugknop; dat beslist een containerquery op de
+  verkenner, niet de breedte van het scherm.
+- **De lijst staat er als tweede weergave naast** (richting A van het bord,
+  `BoList.tsx`): zoals Odoo een lijst die je groepeert op post, BO, stand of
+  maand, met per groep het aantal, het percentage en de sommen, en achter elke
+  rij een formulier met slimme knoppen, een statusbalk, tabbladen en een
+  logboek. Groep 5 wilde allebei: de verkenner om rond te kijken, de lijst om
+  over het hele jaar heen te tellen en te vergelijken. Beide lezen dezelfde
+  URL (`?post=`, `?bo=`, `?activiteit=`), dus een gedeelde link komt in elke
+  weergave op dezelfde plek uit, en wat ze tonen over één activiteit
+  (bedragen, tijdlijn, bestanden) komt uit dezelfde componenten
+  (`BoParts.tsx`).
+- **Welke weergave iemand verkiest, wordt per account onthouden**
+  (`UserViewPreference`), niet per browser zoals de ingeklapte zijbalk: die
+  hangt af van de schermgrootte, dit van hoe iemand werkt. Wie nog niets koos,
+  krijgt de verkenner. Wisselen meldt zich niet met een toast: de weergave
+  wisselt zichtbaar, en enkel een mislukte bewaring krijgt een melding.

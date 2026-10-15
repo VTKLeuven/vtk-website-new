@@ -28,6 +28,7 @@ const CATEGORY_LABELS: Record<string, { nl: string; en: string }> = {
   expenses: { nl: "Rekeningen", en: "Expenses" },
   cashRegisters: { nl: "Kassa's", en: "Cash registers" },
   accounting: { nl: "Boekhouding", en: "Accounting" },
+  bestuursorgaan: { nl: "Bestuursorgaan", en: "Board meeting" },
   google: { nl: "Google Workspace", en: "Google Workspace" },
   modules: { nl: "Moduletoegang", en: "Module access" },
   external: { nl: "Externe apps", en: "External apps" },

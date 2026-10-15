@@ -761,6 +761,8 @@ model User {
 
   appPushDevices          AppPushDevice[]             @relation("AppPushDeviceUser")
   appNotificationPrefs    AppNotificationPreference[] @relation("AppNotificationPrefUser")
+  /// De weergave die iemand koos op een beheerscherm met meer dan één weergave.
+  viewPreferences         UserViewPreference[]
   calendarInterests       CalendarEventInterest[]     @relation("CalendarInterestUser")
   calendarCategoryFollows CalendarCategoryFollow[]    @relation("CalendarFollowUser")
   shiftRewardRedemptions  ShiftRewardRedemption[]     @relation("ShiftRewardRedemptionUser")
@@ -930,6 +932,9 @@ model Group {
   /// Taken van een andere post die het aanspreekpunt voor deze post zijn
   /// ("IT-contact voor Theokot").
   tasksFor                 GroupTask[]                @relation("GroupTaskFor")
+  /// Hoe deze post in de bestandsnamen van het Bestuursorgaan heet wanneer de
+  /// site dat niet zelf herkent ("Vice" voor Groep 5).
+  boPostAliases            BoPostAlias[]
 }
 
 model GroupMembership {
@@ -3250,6 +3255,24 @@ model UserDashboardTilePref {
 // lib/admin-nav.ts en niet op het pad: een tab die later verhuist houdt zo zijn
 // pin. Een pin op een tab die de gebruiker niet (meer) mag zien, rendert
 // gewoon niet; de rij mag blijven staan tot hij het recht terugkrijgt.
+/// Welke weergave iemand koos op een beheerscherm met meer dan één weergave
+/// (/admin/bestuursorgaan: de verkenner of de lijst). Per account en niet per
+/// browser, anders dan de ingeklapte zijbalk (`lib/adminNavCookie.ts`): die
+/// hangt af van de schermgrootte, dit van hoe iemand werkt.
+model UserViewPreference {
+  userId    String
+  /// Het scherm, bv. "bestuursorgaan".
+  screen    String
+  /// De gekozen weergave, bv. "verkenner" of "lijst". Wat geldig is, beslist
+  /// het scherm zelf; een onbekende waarde valt terug op zijn standaard.
+  view      String
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, screen])
+}
+
 model UserAdminNavPin {
   userId String
   key    String
@@ -8665,4 +8688,138 @@ model Room {
 
   @@index([buildingId])
   @@index([code])
+}
+
+// -----------------------------------------------------------------------------
+// Bestuursorgaan (BO): welke budgetten en resultaten er per post langs de
+// wekelijkse vergadering passeerden. De bron is de gedeelde drive Praesidium;
+// de site leest ze enkel en schrijft er nooit iets in terug. Zie
+// docs/design-decisions.md ("Bestuursorgaan") en docs/google-workspace.md.
+// -----------------------------------------------------------------------------
+
+/// Wat voor vergadering een map in de BO-map is.
+enum BoMeetingKind {
+  /// Een gewone BO ("BO 5 - 20/09").
+  MEETING
+  /// De begrotings-BO ("BO 4 - Begrotings BO - 11/09").
+  BUDGET_MEETING
+  /// "Schriftelijke goedkeuring": goedgekeurd zonder vergadering.
+  WRITTEN
+}
+
+/// Budget of resultaat.
+enum BoDocumentKind {
+  BUDGET
+  RESULT
+}
+
+/// Eén map in de BO-map van een werkingsjaar.
+model BoMeeting {
+  id            String        @id @default(cuid())
+  /// Het werkingsjaar van de jaarmap waarin ze staat, niet afgeleid uit de
+  /// datum: "BO 0" valt eind juni, nog voor het werkingsjaar begint, en hoort
+  /// toch bij de nieuwe ploeg.
+  workingYear   Int
+  driveFolderId String        @unique
+  /// De mapnaam zoals ze in Drive staat.
+  name          String
+  kind          BoMeetingKind
+  /// "BO 5" -> 5. Null bij schriftelijke goedkeuring.
+  number        Int?
+  /// Uit de mapnaam ("20/09"). Het jaar staat er niet in en volgt uit wanneer
+  /// de map aangemaakt werd.
+  date          DateTime?     @db.Date
+  webUrl        String
+  /// Gezet wanneer de scan de map niet meer vond. De rij blijft staan: wat er
+  /// al langs het BO passeerde, verdwijnt niet uit het overzicht omdat iemand
+  /// een map verplaatst.
+  missingSince  DateTime?     @db.Timestamptz(3)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(3)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(3)
+
+  documents BoDocument[]
+
+  @@index([workingYear])
+}
+
+/// Eén budget of resultaat zoals het in een BO-map stond, of via een
+/// snelkoppeling vanuit die map bereikbaar was. Hetzelfde bestand in twee BO's
+/// is twee rijen: een budget dat uitgesteld werd, passeerde twee keer.
+model BoDocument {
+  id              String          @id @default(cuid())
+  meetingId       String
+  /// Het bestand zelf: bij een snelkoppeling het doel, niet de koppeling.
+  driveFileId     String
+  /// De naam van het bestand. Post, activiteit en soort worden er pas bij het
+  /// tonen uit afgeleid (`lib/bo/names.ts`), zodat een betere herkenning ook
+  /// de rijen van vorige weken meteen juist zet.
+  name            String
+  mimeType        String
+  webUrl          String
+  /// In welke map het stond: Budgetten of Resultaten. Null daarbuiten. Zegt de
+  /// naam iets anders, dan wint de naam.
+  folderKind      BoDocumentKind?
+  driveModifiedAt DateTime        @db.Timestamptz(3)
+
+  /// Uit het blok "Overzicht" van het rekenblad (`lib/bo/figures.ts`). Null
+  /// wanneer het blad niet te lezen was; `figuresError` zegt dan waarom.
+  sheetPost          String?
+  sheetTitle         String?
+  eventDate          DateTime? @db.Date
+  budgetIncomeCents  Int?
+  budgetExpenseCents Int?
+  budgetTotalCents   Int?
+  resultIncomeCents  Int?
+  resultExpenseCents Int?
+  resultTotalCents   Int?
+  /// De regel "Begroting": wat de begroting van het jaar voor deze activiteit
+  /// voorzag.
+  allocationCents    Int?
+  /// Het deel dat VTK draagt wanneer een activiteit met een andere kring
+  /// gedeeld wordt (de ECC met Industria: 50). Null = alles voor VTK.
+  vtkSharePercent    Int?
+  /// Elke inkomsten- en kostenpost uit het blok Overzicht ("Zaal", "Drank"),
+  /// met haar budget en, in een resultaat, haar resultaat. De vorm is `BoLine[]`
+  /// uit `lib/bo/figures.ts`.
+  lines              Json?
+  /// "Locatie" uit het blok Info, zonder de tekst die het sjabloon laat staan.
+  location           String?
+  figuresError       String?
+  /// De `driveModifiedAt` waarvoor de bedragen gelezen werden. Gelijk aan de
+  /// huidige: het bestand hoeft niet opnieuw gedownload te worden.
+  figuresReadFor     DateTime? @db.Timestamptz(3)
+
+  /// Een resultaat dat Groep 5 met de hand bij een budget zette, omdat de
+  /// namen te ver uiteenlopen om vanzelf te koppelen.
+  pairedBudgetId String?
+
+  firstSeenAt  DateTime  @default(now()) @db.Timestamptz(3)
+  lastSeenAt   DateTime  @db.Timestamptz(3)
+  /// Zoals bij `BoMeeting`: niet meer gevonden, maar niet vergeten.
+  missingSince DateTime? @db.Timestamptz(3)
+
+  meeting       BoMeeting    @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  pairedBudget  BoDocument?  @relation("BoDocumentPairing", fields: [pairedBudgetId], references: [id], onDelete: SetNull)
+  pairedResults BoDocument[] @relation("BoDocumentPairing")
+
+  @@unique([meetingId, driveFileId])
+  @@index([driveFileId])
+  @@index([pairedBudgetId])
+}
+
+/// Hoe een post in de bestandsnamen heet wanneer de site dat niet zelf
+/// herkent: "Vice" en "Secretaris" zijn Groep 5. Eén keer gekoppeld, geldt het
+/// voor elk bestand met die schrijfwijze, ook de volgende.
+model BoPostAlias {
+  /// De schrijfwijze, genormaliseerd met `normalizeKey`.
+  key       String   @id
+  /// De eerste schrijfwijze zoals ze in een bestandsnaam stond, om te tonen.
+  label     String
+  groupId   String
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+  updatedAt DateTime @updatedAt @db.Timestamptz(3)
+
+  group Group @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId])
 }

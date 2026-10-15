@@ -1,7 +1,9 @@
 import { inflateRawSync } from "node:zlib";
 
 /*
- * Een kleine xlsx-lezer, enkel voor de shiftenlijsten van het praesidium.
+ * Een kleine xlsx-lezer, voor de shiftenlijsten van het praesidium. Ook de
+ * budgetten en resultaten van het Bestuursorgaan lopen erdoor
+ * (`lib/bo/figures.ts`); die hebben enkel de waarden nodig.
  *
  * Bestaat omdat de shiftenlijst zelf in de opmaak zit: welke kring een vakje
  * moet vullen, staat in de achtergrondkleur, en een shift van twee uur is een

@@ -380,6 +380,7 @@ const googleSchema = z.object({
   oauthClientSecret: z.string().trim().max(200).optional(),
   fullOrgUnit: z.string().trim().max(200).optional(),
   restrictedOrgUnit: z.string().trim().max(200).optional(),
+  driveSubject: z.string().trim().email().optional(),
   linkGateEnabled: z.string().optional(),
 });
 
@@ -405,6 +406,7 @@ export async function saveGoogleConfigAction(
     oauthClientSecret: ((formData.get("oauthClientSecret") as string) ?? "").trim() || undefined,
     fullOrgUnit: ((formData.get("fullOrgUnit") as string) ?? "").trim() || undefined,
     restrictedOrgUnit: ((formData.get("restrictedOrgUnit") as string) ?? "").trim() || undefined,
+    driveSubject: ((formData.get("driveSubject") as string) ?? "").trim().toLowerCase() || undefined,
     linkGateEnabled: (formData.get("linkGateEnabled") as string) ?? undefined,
   });
   if (!parsed.success) return saveError("INVALID_INPUT");
@@ -442,6 +444,7 @@ export async function saveGoogleConfigAction(
     oauthClientSecretEnc,
     fullOrgUnit: p.fullOrgUnit,
     restrictedOrgUnit: p.restrictedOrgUnit,
+    driveSubject: p.driveSubject,
     // Een uitgevinkte checkbox stuurt niets mee. Standaard dus uit, en dat is
     // de bedoeling: de koppeling opzetten mag nooit vanzelf een melding op het
     // scherm van elk praesidiumlid zetten.
@@ -465,5 +468,6 @@ export async function saveGoogleConfigAction(
   forgetGoogleGateState();
   revalidatePath("/admin/it");
   revalidatePath("/admin/groepsadressen");
+  revalidatePath("/admin/bestuursorgaan");
   return saveOk();
 }

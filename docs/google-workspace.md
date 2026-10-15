@@ -88,7 +88,9 @@ Maak (of kies) een Google Cloud-project en zet daar twee API's aan:
 - **Groups Settings API** (wie mag posten naar een groep)
 
 Wil je later de Gmail-instellingen laten werken (afzenderadres en doorsturen bij
-kiesploegaccounts), zet dan ook de **Gmail API** aan.
+kiesploegaccounts), zet dan ook de **Gmail API** aan. Voor het overzicht van het
+Bestuursorgaan (`/admin/bestuursorgaan`) is ook de **Google Drive API** nodig;
+zie "Het Drive-account voor het Bestuursorgaan" hieronder.
 
 ### 2. Service-account met domain-wide delegation
 
@@ -110,11 +112,13 @@ kiesploegaccounts), zet dan ook de **Gmail API** aan.
    https://www.googleapis.com/auth/admin.directory.user.alias,
    https://www.googleapis.com/auth/apps.groups.settings,
    https://www.googleapis.com/auth/gmail.settings.basic,
-   https://www.googleapis.com/auth/gmail.settings.sharing
+   https://www.googleapis.com/auth/gmail.settings.sharing,
+   https://www.googleapis.com/auth/drive.readonly
    ```
 
-   Ze staan ook in `apps/web/lib/google/client.ts` (`GOOGLE_SCOPES` en
-   `GMAIL_SCOPES`); dat is de bron van waarheid als er ooit één bijkomt.
+   Ze staan ook in `apps/web/lib/google/client.ts` (`GOOGLE_SCOPES`,
+   `GMAIL_SCOPES` en `DRIVE_SCOPES`); dat is de bron van waarheid als er ooit één
+   bijkomt.
 
    **Ontbreekt er één, dan faalt élke aanroep** met `unauthorized_client`. Dat
    leest als een kapotte sleutel maar is de delegatie. Voeg je later een scope
@@ -258,6 +262,36 @@ Wat overblijft lost zichzelf op: nieuwe accounts worden door de site aangemaakt
 Begin met één adres en kijk in Google na wat er gebeurde voor je de rest
 aanmaakt.
 
+### Het Drive-account voor het Bestuursorgaan
+
+`/admin/bestuursorgaan` leest de map Bestuursorgaan op de gedeelde drive
+Praesidium (zie `docs/bestuursorgaan.md`). Dat gebeurt met dezelfde sleutel, maar
+**als een ander account** dan de beheerder van stap 3: een beheerdersrol geeft
+geen toegang tot de bestanden van een gedeelde drive waar je geen lid van bent.
+
+1. Zet de **Google Drive API** aan in het Cloud-project en voeg
+   `https://www.googleapis.com/auth/drive.readonly` toe aan de delegatie van
+   stap 2. Ontbreekt hij, dan faalt enkel de BO-scan; de groepssync loopt door.
+2. Kies het account dat de site impersoneert, bij voorkeur een eigen account
+   zoals `bo-scan@vtk.be` in plaats van een persoon: wie het praesidium verlaat,
+   verliest zijn toegang, en dan valt de scan stil. Het moet **lid zijn van de
+   gedeelde drive Praesidium** (lezer volstaat) en de mappen kunnen openen
+   waarnaar de snelkoppelingen in de BO-map wijzen: de rekenbladen van de posten
+   en de mappen van de werkgroepen. Voeg het als lezer toe aan de gedeelde
+   drive, en deel de mappen van de werkgroepen ermee. Zet het niet als los adres
+   in `praesidium@vtk.be`: dan krijgt het ook elke mail aan het praesidium.
+3. Vul het in bij `/admin/it`, veld **Drive account (Bestuursorgaan scan)**.
+4. Groep 5 vult in `/admin/bestuursorgaan` bij Instellingen de link naar de
+   gedeelde drive in en klikt **Nu lezen**. Daarna leest de worker de map om het
+   halfuur.
+
+`drive.readonly` is breed: met domain-wide delegation kan de sleutel daarmee de
+bestanden van elk account in het domein lezen. Dat is waarom het account in het
+superadminscherm staat en niet in het scherm van Groep 5, en waarom de scan enkel
+leest wat onder de ingestelde map hangt. De sleutel kon via
+`admin.directory.user` al wachtwoorden zetten, dus wie hem heeft, kon dit al;
+wie de scope liever niet geeft, laat het veld leeg en de rest werkt gewoon.
+
 ### `praesidium@vtk.be` en de gedeelde drives
 
 Gebruik als bron **"Elke praesidiumpost"** in plaats van vijftien losse rijen.
@@ -364,9 +398,10 @@ bestaan; enkel de accountstaat wordt niet meer uit die ploeg afgeleid.
 
 ## Bewust niet gebouwd
 
-- **Geen Drive-koppeling.** Een gedeelde drive kan een groep als lid hebben, en
-  die beheren we al. De Drive-scope is breed en zou enkel een handeling
-  automatiseren die je per drive één keer doet.
+- **Geen beheer van gedeelde drives.** Een gedeelde drive kan een groep als lid
+  hebben, en die beheren we al; wie er lid van is, automatiseren we dus niet.
+  De Drive-scope wordt enkel gebruikt om de map van het Bestuursorgaan te
+  lezen (`docs/bestuursorgaan.md`), en nooit om te schrijven.
 - **Geen accounts afsluiten of verwijderen.** Wat er gebeurt met de mailbox en
   de Drive-bestanden van iemand die de kring verlaat, is een kringkeuze die nog
   niet gemaakt is. Tot dan degradeert en suspendeert de sync niemand.

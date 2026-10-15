@@ -148,6 +148,9 @@ export const MCP_PERMISSION_POLICY = {
   // door dit endpoint, ook niet lezend.
   "cashRegisters.request": { reads: [], creates: [], blocked: ["request a cash register"] },
   "cashRegisters.manage": { reads: [], creates: [], blocked: ["read, accept, count or delete cash registers"] },
+  // De budgetten en resultaten van elke post zijn voor Groep 5, en het IT-recht
+  // admin draagt dit bewust niet; een agent leest ze dus ook niet.
+  "bestuursorgaan.manage": { reads: [], creates: [], blocked: ["read budgets and results, scan the board folder or link posts"] },
   // De codelijst stuurt wat er in de betaalinfo van elke verkoop staat; een
   // agent hoort die niet aan te passen, en er is geen create-kind.
   "accounting.manage": { reads: [], creates: [], blocked: ["create, edit or delete accounting codes"] },

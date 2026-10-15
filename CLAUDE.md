@@ -150,6 +150,26 @@ nieuwsbrieven naar studenten; dit zijn de ontvangende adressen van de kring
 zelf, met de posten van het werkingsjaar als bron. Geen gedeelde regels, enkel
 een gedeeld sync-stramien.
 
+# Bestuursorgaan
+
+`docs/bestuursorgaan.md` is de referentie voor `/admin/bestuursorgaan`: welke
+budgetten en resultaten per post langs het BO passeerden, gelezen uit de
+gedeelde drive Praesidium (`apps/web/lib/bo`). Lees het voor je aan de scan, de
+herkenning van bestandsnamen of het uitlezen van de rekenbladen komt.
+
+- **De site leest enkel.** Niets in `lib/bo` schrijft, hernoemt of verplaatst
+  iets in Drive; wat daar fout staat, meldt het scherm bij "Na te kijken".
+- **Het recht is enkel voor Groep 5, ook niet voor de rol admin.** Een recht
+  dat admin niet mag krijgen, staat in `ADMIN_EXCLUDED_PERMISSIONS`; de seed én
+  `prisma/sync.ts` (die bij elke start draait) volgen die lijst.
+- **De Drive-scope heeft een eigen tokenaanvraag** (`DRIVE_SCOPES`), net als
+  Gmail. In `GOOGLE_SCOPES` zou een ontbrekende delegatie de groepssync stilleggen.
+- **Twee weergaven, één URL**: de verkenner (`BoExplorer.tsx`) en de lijst
+  zoals Odoo (`BoList.tsx`), met wat ze delen in `BoParts.tsx`. Beide lezen
+  `?post=`, `?bo=` en `?activiteit=`, en een klik gaat niet langs de server: het
+  hele jaar komt mee bij het laden. Wie welke verkiest, staat per account in
+  `UserViewPreference`. Zie `docs/design-decisions.md`.
+
 # MCP-server voor agents
 
 `docs/mcp.md` is de referentie voor het MCP-endpoint op `/api/mcp`, waarmee een

@@ -2,7 +2,7 @@ import { hash } from "@node-rs/argon2";
 import { PrismaClient } from "@prisma/client";
 import { GROUP_SEEDS, WERKGROEP_SEEDS, HEADER_TABS } from "../src/groups";
 import { SHIFTEN_PAGE, UITLEENDIENST_PAGE } from "../src/infoPages";
-import { PERMISSIONS } from "../src/permissions";
+import { ADMIN_EXCLUDED_PERMISSIONS, PERMISSIONS } from "../src/permissions";
 import { BUILTIN_SHIFT_TEMPLATES } from "../src/shiftTemplates";
 import { BUILTIN_TICKET_EVENT_TEMPLATES } from "../src/ticketEventTemplates";
 import { loadFixtures } from "../src/fixtures";
@@ -182,7 +182,11 @@ async function main() {
       descriptionEn: "Full access to administration.",
     },
   });
-  const allPermsForAdmin = await prisma.permission.findMany();
+  // "Alle rechten" op de uitzonderingen na (zie ADMIN_EXCLUDED_PERMISSIONS):
+  // die krijgt Groep 5 via een eigen rol verderop.
+  const allPermsForAdmin = await prisma.permission.findMany({
+    where: { code: { notIn: [...ADMIN_EXCLUDED_PERMISSIONS] } },
+  });
   for (const perm of allPermsForAdmin) {
     await prisma.rolePermission.upsert({
       where: { roleId_permissionId: { roleId: adminRole.id, permissionId: perm.id } },
@@ -194,13 +198,15 @@ async function main() {
   console.log("Seeding roles and post role grants...");
   // Posten kennen rechten niet meer direct toe: ze verlenen ROLLEN aan hun leden
   // (GroupRole, kind DEFAULT = elk lid). De geseede rolset:
-  //   - admin (alle rechten, systeemrol)                 -> IT + Groep 5
+  //   - admin (alle rechten behalve bestuursorgaan.*,     -> IT + Groep 5
+  //       systeemrol)
   //   - praesidium (calendar.create + photos.upload +    -> elke post
   //       tickets.create + forms.create + users.search +
   //       shift.rewardRedeem + expenses.submit +
   //       signature.generate)
   //   - werkgroep, medewerker                            -> beschikbaar, nog niet toegekend
   //   - theokot (theokot.manage + theokot.pickup)        -> Theokot
+  //   - bestuursorgaan (bestuursorgaan.manage)           -> Groep 5
   //   - één rol per post, met de postnaam                -> die post zelf
   //       (Communicatie krijgt meteen media.manage)
   // Alles als DEFAULT, zodat elk lid van de post de rol krijgt. Rechten voor de
@@ -405,6 +411,20 @@ async function main() {
   );
   await setRolePermissions(palPlusRole.id, ["pal.manage"]);
   await grantRoleToGroup("ONDERWIJS", palPlusRole.id, "DEFAULT");
+
+  // bestuursorgaan: de budgetten en resultaten per post, enkel voor Groep 5.
+  // Een eigen rol omdat de rol admin dit recht bewust níét draagt (zie
+  // ADMIN_EXCLUDED_PERMISSIONS in src/permissions.ts).
+  const bestuursorgaanRole = await upsertRole(
+    "bestuursorgaan",
+    "Bestuursorgaan",
+    "Board meeting",
+    10,
+    "Opvolgen welke budgetten en resultaten per post langs het Bestuursorgaan passeerden, met de bedragen uit de rekenbladen.",
+    "Follow up which budgets and results each post took to the board meeting, with the amounts from the spreadsheets.",
+  );
+  await setRolePermissions(bestuursorgaanRole.id, ["bestuursorgaan.manage"]);
+  await grantRoleToGroup("GROEP5", bestuursorgaanRole.id, "DEFAULT");
 
   // logistiek: de uitleendienst op logistiek.vtk.be beheren.
   const logistiekRole = await upsertRole(

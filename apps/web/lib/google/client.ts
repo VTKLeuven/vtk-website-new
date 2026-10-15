@@ -24,6 +24,7 @@ import type { GoogleConfig } from "./config";
 const TOKEN_URL = "https://oauth2.googleapis.com/token";
 const DIRECTORY = "https://admin.googleapis.com/admin/directory/v1";
 const GROUPS_SETTINGS = "https://www.googleapis.com/groups/v1/groups";
+const DRIVE = "https://www.googleapis.com/drive/v3";
 
 /**
  * Hoe lang één aanroep naar Google mag duren. Zonder grens wacht `fetch` tot vijf
@@ -56,6 +57,18 @@ export const GMAIL_SCOPES = [
   "https://www.googleapis.com/auth/gmail.settings.basic",
   "https://www.googleapis.com/auth/gmail.settings.sharing",
 ].join(" ");
+
+/**
+ * Scope voor het lezen van de BO-map (`lib/bo/scan.ts`): mappen, namen en de
+ * inhoud van de budgetten en resultaten.
+ *
+ * Ook dit is een aparte tokenaanvraag, als het account uit `driveSubject` en
+ * niet als de beheerder: een beheerdersrol geeft geen toegang tot de bestanden
+ * van een gedeelde drive waar je geen lid van bent. Staat de scope niet in de
+ * delegatie, dan faalt enkel de BO-scan, niet de groepssync; zet hem dus nooit
+ * in `GOOGLE_SCOPES`, anders ligt alles stil tot iemand de delegatie aanpast.
+ */
+export const DRIVE_SCOPES = "https://www.googleapis.com/auth/drive.readonly";
 
 export class GoogleError extends Error {
   constructor(
@@ -149,32 +162,43 @@ function forgetToken(cfg: GoogleConfig, subject: string, scope: string): void {
 /** Als welke gebruiker en met welke scopes een aanroep loopt. */
 type As = { subject?: string; scope?: string };
 
+/** Een aanroep met token, en bij een 401 één keer opnieuw met een vers token. */
+async function authorizedFetch(
+  cfg: GoogleConfig,
+  method: string,
+  url: string,
+  body: unknown,
+  as: As,
+): Promise<Response> {
+  const subject = as.subject ?? cfg.subject;
+  const scope = as.scope ?? GOOGLE_SCOPES;
+  const send = async () =>
+    fetch(url, {
+      method,
+      signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
+      headers: {
+        authorization: `Bearer ${await accessToken(cfg, subject, scope)}`,
+        ...(body === undefined ? {} : { "content-type": "application/json" }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      cache: "no-store",
+    });
+
+  const res = await send();
+  if (res.status !== 401) return res;
+  // Token ingetrokken of verlopen: één keer opnieuw, dan pas opgeven.
+  forgetToken(cfg, subject, scope);
+  return send();
+}
+
 async function request<T>(
   cfg: GoogleConfig,
   method: string,
   url: string,
   body?: unknown,
   as: As = {},
-  retry = true,
 ): Promise<T | null> {
-  const subject = as.subject ?? cfg.subject;
-  const scope = as.scope ?? GOOGLE_SCOPES;
-  const res = await fetch(url, {
-    method,
-    signal: AbortSignal.timeout(GOOGLE_TIMEOUT_MS),
-    headers: {
-      authorization: `Bearer ${await accessToken(cfg, subject, scope)}`,
-      ...(body === undefined ? {} : { "content-type": "application/json" }),
-    },
-    body: body === undefined ? undefined : JSON.stringify(body),
-    cache: "no-store",
-  });
-
-  if (res.status === 401 && retry) {
-    // Token ingetrokken of verlopen: één keer opnieuw, dan pas opgeven.
-    forgetToken(cfg, subject, scope);
-    return request<T>(cfg, method, url, body, as, false);
-  }
+  const res = await authorizedFetch(cfg, method, url, body, as);
 
   // Een onbestaande groep of een lid dat er al niet meer in zit is geen storing.
   if (res.status === 404) return null;
@@ -552,4 +576,107 @@ export async function disableForwarding(cfg: GoogleConfig, email: string): Promi
     { enabled: false },
     asUser(email),
   );
+}
+
+// -----------------------------------------------------------------------------
+// Drive (lezen van de BO-map)
+// -----------------------------------------------------------------------------
+
+export const DRIVE_FOLDER_MIME = "application/vnd.google-apps.folder";
+export const DRIVE_SHORTCUT_MIME = "application/vnd.google-apps.shortcut";
+export const DRIVE_SHEET_MIME = "application/vnd.google-apps.spreadsheet";
+export const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
+export type DriveFile = {
+  id: string;
+  name: string;
+  mimeType: string;
+  createdTime?: string;
+  modifiedTime?: string;
+  webViewLink?: string;
+  /** In bytes, als string; ontbreekt bij Google-documenten en mappen. */
+  size?: string;
+  shortcutDetails?: { targetId: string; targetMimeType?: string };
+};
+
+const DRIVE_FILE_FIELDS = "id,name,mimeType,createdTime,modifiedTime,webViewLink,size,shortcutDetails";
+
+/** Een Drive-id komt in een zoekvraag terecht; laat er enkel id-tekens door. */
+function assertDriveId(id: string): string {
+  if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new GoogleError(`Ongeldige Drive-id: ${id}`, 0, null);
+  return id;
+}
+
+/**
+ * De inhoud van een map, mappen en snelkoppelingen inbegrepen, zonder wat in de
+ * prullenbak zit. Werkt ook voor de wortel van een gedeelde drive: de id van de
+ * drive is de id van die map.
+ */
+export async function listDriveChildren(
+  cfg: GoogleConfig,
+  subject: string,
+  folderId: string,
+): Promise<DriveFile[]> {
+  const out: DriveFile[] = [];
+  let pageToken: string | undefined;
+  do {
+    const params = new URLSearchParams({
+      q: `'${assertDriveId(folderId)}' in parents and trashed = false`,
+      fields: `nextPageToken, files(${DRIVE_FILE_FIELDS})`,
+      pageSize: "1000",
+      corpora: "allDrives",
+      includeItemsFromAllDrives: "true",
+      supportsAllDrives: "true",
+    });
+    if (pageToken) params.set("pageToken", pageToken);
+    const page = await request<{ files?: DriveFile[]; nextPageToken?: string }>(
+      cfg,
+      "GET",
+      `${DRIVE}/files?${params.toString()}`,
+      undefined,
+      { subject, scope: DRIVE_SCOPES },
+    );
+    out.push(...(page?.files ?? []));
+    pageToken = page?.nextPageToken;
+  } while (pageToken);
+  return out;
+}
+
+/** `null` wanneer het bestand niet bestaat of het account er niet bij kan. */
+export async function getDriveFile(
+  cfg: GoogleConfig,
+  subject: string,
+  fileId: string,
+): Promise<DriveFile | null> {
+  const params = new URLSearchParams({ fields: DRIVE_FILE_FIELDS, supportsAllDrives: "true" });
+  return request<DriveFile>(
+    cfg,
+    "GET",
+    `${DRIVE}/files/${assertDriveId(fileId)}?${params.toString()}`,
+    undefined,
+    { subject, scope: DRIVE_SCOPES },
+  );
+}
+
+/**
+ * Een rekenblad als xlsx: een Google Sheet wordt geëxporteerd, een opgeladen
+ * xlsx gewoon gedownload. Zo leest één lezer (`lib/praesidiumShifts/xlsx.ts`)
+ * beide, met de laatst berekende waarde van elke formule.
+ */
+export async function downloadSpreadsheet(
+  cfg: GoogleConfig,
+  subject: string,
+  file: { id: string; mimeType: string },
+): Promise<Buffer> {
+  const id = assertDriveId(file.id);
+  const url =
+    file.mimeType === DRIVE_SHEET_MIME
+      ? `${DRIVE}/files/${id}/export?${new URLSearchParams({ mimeType: XLSX_MIME }).toString()}`
+      : `${DRIVE}/files/${id}?${new URLSearchParams({ alt: "media", supportsAllDrives: "true" }).toString()}`;
+  const res = await authorizedFetch(cfg, "GET", url, undefined, { subject, scope: DRIVE_SCOPES });
+  if (!res.ok) {
+    const parsed = (await res.json().catch(() => null)) as { error?: { message?: string } } | null;
+    throw new GoogleError(parsed?.error?.message ?? `${res.status} ${res.statusText}`, res.status, parsed);
+  }
+  return Buffer.from(await res.arrayBuffer());
 }

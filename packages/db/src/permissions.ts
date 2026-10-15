@@ -240,6 +240,13 @@ export const PERMISSIONS = [
   // aanpassen is het werk van de penning. Zie docs/ticketing.md.
   { code: "accounting.manage", labelNl: "Boekhoudcodes beheren", labelEn: "Manage accounting codes", category: "accounting" },
 
+  // Bestuursorgaan (/admin/bestuursorgaan): welke budgetten en resultaten er
+  // per post langs het BO passeerden, gelezen uit de gedeelde drive. Enkel voor
+  // Groep 5, en bewust níét in de rol admin: IT zet de koppeling op, maar de
+  // cijfers van elke post zijn het werk van het dagelijks bestuur. Zie
+  // docs/design-decisions.md ("Bestuursorgaan").
+  { code: "bestuursorgaan.manage", labelNl: "Budgetten en resultaten van het Bestuursorgaan opvolgen", labelEn: "Follow up budgets and results of the board meeting", category: "bestuursorgaan" },
+
   // Adminlogboek (wie deed wat in de admin)
   { code: "audit.view", labelNl: "Adminlogboek bekijken", labelEn: "View the admin audit log", category: "it" },
   { code: "urenloopApp.manage", labelNl: "24UL-app: downloadlijst beheren", labelEn: "24UL app: manage the download list", category: "it" },
@@ -251,3 +258,15 @@ export const PERMISSIONS = [
 ] as const;
 
 export type PermissionCode = (typeof PERMISSIONS)[number]["code"];
+
+/**
+ * Rechten die de systeemrol `admin` bewust níét krijgt, ook al "bundelt ze
+ * alles". De seed en de sync bij elke start (`prisma/sync.ts`) slaan ze over.
+ *
+ * Admin dragen IT en Groep 5 samen. Wat enkel voor één van beide is, hoort hier
+ * en krijgt een eigen rol: de budgetten en resultaten van het Bestuursorgaan
+ * zijn het werk van Groep 5, en dat IT de koppeling opzette, geeft IT geen
+ * reden om de cijfers van elke post te zien. Een superadmin ziet ze wel; dat is
+ * de harde uitzondering op alles.
+ */
+export const ADMIN_EXCLUDED_PERMISSIONS: readonly PermissionCode[] = ["bestuursorgaan.manage"];

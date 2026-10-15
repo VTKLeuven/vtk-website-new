@@ -52,6 +52,13 @@ export type StoredGoogle = {
    * de sync verplaatst niemand.
    */
   restrictedOrgUnit?: string;
+  /**
+   * Het account waarmee de site de BO-map leest (`lib/bo/scan.ts`). Los van
+   * `subject`: een beheerder ziet de bestanden van een gedeelde drive enkel als
+   * hij er lid van is, en de BO-map hangt via snelkoppelingen ook aan mappen
+   * van werkgroepen. Leeg = de BO-scan staat uit.
+   */
+  driveSubject?: string;
 };
 
 export type GoogleConfig = {
@@ -65,6 +72,8 @@ export type GoogleConfig = {
   fullOrgUnit: string;
   /** `null` = geen beperkte OU ingesteld; de sync verplaatst dan niemand. */
   restrictedOrgUnit: string | null;
+  /** `null` = de BO-scan staat uit. */
+  driveSubject: string | null;
 };
 
 export type GoogleStatus = {
@@ -81,6 +90,7 @@ export type GoogleStatus = {
   linkGateEnabled: boolean;
   fullOrgUnit: string | null;
   restrictedOrgUnit: string | null;
+  driveSubject: string | null;
 };
 
 /**
@@ -142,6 +152,7 @@ export async function getGoogleConfig(): Promise<GoogleConfig | null> {
     oauth,
     fullOrgUnit: stored.fullOrgUnit?.trim() || "/",
     restrictedOrgUnit: stored.restrictedOrgUnit?.trim() || null,
+    driveSubject: stored.driveSubject?.trim().toLowerCase() || null,
   };
 }
 
@@ -168,6 +179,7 @@ export async function getGoogleStatus(): Promise<GoogleStatus> {
     linkGateEnabled: Boolean(stored?.linkGateEnabled),
     fullOrgUnit: stored?.fullOrgUnit ?? null,
     restrictedOrgUnit: stored?.restrictedOrgUnit ?? null,
+    driveSubject: stored?.driveSubject ?? null,
   };
 }
 

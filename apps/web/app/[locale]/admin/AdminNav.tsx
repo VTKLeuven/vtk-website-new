@@ -489,6 +489,21 @@ const icons: Record<string, ReactNode> = {
       <path d="M11 16h3" />
     </Svg>
   ),
+  // beheer: een portefeuille (rekeningen, kassa's, boekhoudcodes, het BO)
+  beheer: (
+    <Svg>
+      <path d="M3 7.5A2.5 2.5 0 0 1 5.5 5H18v4" />
+      <path d="M3 7.5v10A1.5 1.5 0 0 0 4.5 19h15a1.5 1.5 0 0 0 1.5-1.5v-7A1.5 1.5 0 0 0 19.5 9h-14A2.5 2.5 0 0 1 3 7.5Z" />
+      <circle cx="16.5" cy="14" r="1.3" />
+    </Svg>
+  ),
+  // bestuursorgaan: een map met een vinkje (budget passeerde, resultaat binnen)
+  bestuursorgaan: (
+    <Svg>
+      <path d="M3 6.5A1.5 1.5 0 0 1 4.5 5H9l2 2h8.5A1.5 1.5 0 0 1 21 8.5v10a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 18.5Z" />
+      <path d="m9 13.5 2 2 4-4" />
+    </Svg>
+  ),
   // shift: shiften -> klok
   shift: (
     <Svg>
