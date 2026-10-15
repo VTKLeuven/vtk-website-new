@@ -2974,28 +2974,124 @@ a.vtk-shortcut-tile:hover {
 
 /* ---------------------------------------------------------------------------
    Kassa's (/admin/kassas)
-   De status als gekleurde chip, op het label en op de keuzelijst. De keuzelijst
-   is een admin-select, en die krijgt hierboven een achtergrond met
-   `!important`; deze regel is even zwaar en staat later, dus hij wint. De
-   opties zelf blijven wit, anders kleurt een browser de hele lijst mee.
+   De status als gekleurde chip: op het label, op de keuzelijst en op elke optie
+   in die lijst (`StatusSelect`), zoals de chips in het rekenblad van Beheer.
    --------------------------------------------------------------------------- */
 .vtk-kassa-status[data-status] {
   background: var(--kassa-status-bg);
   color: var(--kassa-status-ink);
 }
 
-.vtk-admin-main select.vtk-kassa-status[data-status] {
-  border-color: transparent !important;
-  border-radius: 999px !important;
-  background-color: var(--kassa-status-bg) !important;
-  color: var(--kassa-status-ink) !important;
-  font-weight: 600;
+.vtk-kassa-status-select {
+  display: inline-flex;
 }
 
-.vtk-kassa-status option {
+.vtk-kassa-status-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 10px 0 12px;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.vtk-kassa-status-trigger:hover:not(:disabled),
+.vtk-kassa-status-select[data-open] .vtk-kassa-status-trigger {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--kassa-status-ink) 35%, transparent);
+}
+
+.vtk-kassa-status-trigger:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+.vtk-kassa-status-trigger:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.vtk-kassa-status-trigger svg {
+  flex: none;
+  transition: transform 150ms ease;
+}
+
+.vtk-kassa-status-select[data-open] .vtk-kassa-status-trigger svg {
+  transform: rotate(180deg);
+}
+
+/* Alle labels in één cel, enkel het gekozen zichtbaar: de chip is zo breed als
+   het langste label. `visibility: hidden` haalt de rest ook uit de
+   toegankelijkheidsboom. */
+.vtk-kassa-status-value {
+  display: grid;
+  text-align: left;
+}
+
+.vtk-kassa-status-value > span {
+  grid-area: 1 / 1;
+  visibility: hidden;
+}
+
+.vtk-kassa-status-value > span[data-current] {
+  visibility: visible;
+}
+
+/* De lijst is een popover in de top layer; `StatusSelect` zet `top` en `left`.
+   De browserstijl van `[popover]` centreert ze met `inset: 0; margin: auto` en
+   geeft ze een rand en een systeemkleur; dat zetten we hier recht. */
+.vtk-kassa-status-menu {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  max-height: calc(100 * var(--vtk-dvh, 1dvh) - 16px);
+  overflow-y: auto;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
   background: var(--surface);
   color: var(--ink);
-  font-weight: 400;
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--ink) 14%, transparent);
+}
+
+.vtk-kassa-status-menu > button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px 10px 4px 4px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.vtk-kassa-status-menu > button:is(:hover, [data-highlighted]) {
+  background: var(--paper-2);
+}
+
+.vtk-kassa-status-menu > button svg {
+  flex: none;
+}
+
+.vtk-kassa-status-chip {
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
 }
 
 .vtk-kassa-status[data-status='aangevraagd'] {
