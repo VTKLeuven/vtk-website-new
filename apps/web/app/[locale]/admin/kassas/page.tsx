@@ -295,16 +295,16 @@ export default async function KassaOverzicht({
                     >
                       <td data-label={nl ? "Datum" : "Date"} className="whitespace-nowrap px-4 py-3 tabular-nums text-vtk-body">
                         {row.dateLabel}
+                        {row.timeLabel && <span className="block text-xs text-vtk-muted">{row.timeLabel}</span>}
                       </td>
                       <td data-wide className="px-4 py-3">
                         <Link href={href} className="font-medium text-vtk-ink hover:underline">
                           {row.activity}
                         </Link>
-                        <span className="block text-xs text-vtk-muted">
-                          {row.responsibleName}
-                          {row.wantsBancontact ? " · Bancontact" : ""}
-                          {row.wantsPayconiq ? " · Payconiq" : ""}
-                        </span>
+                        <span className="block text-xs text-vtk-muted">{row.responsibleName}</span>
+                        {row.devices.length > 0 && (
+                          <span className="block text-xs text-vtk-muted">{row.devices.join(", ")}</span>
+                        )}
                       </td>
                       <td data-label={nl ? "Post" : "Post"} className="px-4 py-3 text-vtk-body">
                         {row.postLabel}

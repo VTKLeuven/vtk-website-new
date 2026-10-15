@@ -11,6 +11,10 @@ export function kassaErrorMessages(locale: Locale): Record<string, string> {
     return {
       ...shared,
       BAD_DATE: "Niet opgeslagen: die datum bestaat niet.",
+      MISSING_TIME: "Niet opgeslagen: vul het begin- en einduur van de activiteit in.",
+      BAD_TIME: "Niet opgeslagen: begin- en einduur moeten een uur zijn, en mogen niet gelijk zijn.",
+      MISSING_TERMINAL:
+        "Niet aanvaard: kies een Bancontact-bakje of Payconiq-rekening voor wat de post vroeg. Heeft ze er toch geen nodig, vink het dan uit in de aanvraag.",
       MISSING_FIELD: "Niet opgeslagen: vul de activiteit en de verantwoordelijke in.",
       BAD_POST: "Niet opgeslagen: kies een post.",
       BAD_COUNT: "Niet opgeslagen: een aantal stuks of bonnen moet een geheel getal vanaf 0 zijn.",
@@ -28,6 +32,10 @@ export function kassaErrorMessages(locale: Locale): Record<string, string> {
   return {
     ...shared,
     BAD_DATE: "Not saved: that date does not exist.",
+    MISSING_TIME: "Not saved: fill in the start and end time of the activity.",
+    BAD_TIME: "Not saved: start and end must be a time of day, and cannot be the same.",
+    MISSING_TERMINAL:
+      "Not accepted: choose a Bancontact terminal or Payconiq account for what the post asked for. If they do not need one after all, untick it in the request.",
     MISSING_FIELD: "Not saved: fill in the activity and the person responsible.",
     BAD_POST: "Not saved: choose a post.",
     BAD_COUNT: "Not saved: a number of pieces or vouchers must be a whole number from 0.",

@@ -48,8 +48,11 @@ export default async function KassaAanvragen({ params }: { params: Promise<{ loc
           action={requestCashRegisterAction}
           posts={posts.map((post) => ({ id: post.id, name: post.name }))}
           redirectAfter={`${base}/admin/kassas/mijn`}
+          floatMode="pick"
           values={{
             date: "",
+            startTime: "",
+            endTime: "",
             activity: "",
             groupId: firstOwn,
             responsibleName: access.session.user.name,

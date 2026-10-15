@@ -8050,6 +8050,14 @@ model CashRegister {
   workingYear Int
   /// De dag van de activiteit, niet van het aanvragen.
   date        DateTime @db.Date
+  /// Begin en einde van de activiteit, van de Brusselse klok omgezet naar een
+  /// tijdstip; staat het einduur vroeger op de klok dan het begin, dan valt het
+  /// de dag erna. Bepaalt wanneer een Bancontact-bakje of Payconiq-rekening
+  /// bezet is. NULL bij een kassa van voor oktober 2026: toen werd er niet naar
+  /// gevraagd, en die uren zijn niet te kennen. Zo'n kassa houdt haar toestellen
+  /// de hele dag bezet (`registerInterval`).
+  startsAt    DateTime? @db.Timestamptz(3)
+  endsAt      DateTime? @db.Timestamptz(3)
   activity    String
 
   /// `SetNull`: een post die verdwijnt, mag de telling niet meenemen.

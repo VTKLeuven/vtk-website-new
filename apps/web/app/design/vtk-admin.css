@@ -2974,7 +2974,64 @@ a.vtk-shortcut-tile:hover {
 
 /* ---------------------------------------------------------------------------
    Kassa's (/admin/kassas)
-   Smal scherm: elke kassa een blok, met de kolomkop als label per waarde. In
+   De status als gekleurde chip, op het label en op de keuzelijst. De keuzelijst
+   is een admin-select, en die krijgt hierboven een achtergrond met
+   `!important`; deze regel is even zwaar en staat later, dus hij wint. De
+   opties zelf blijven wit, anders kleurt een browser de hele lijst mee.
+   --------------------------------------------------------------------------- */
+.vtk-kassa-status[data-status] {
+  background: var(--kassa-status-bg);
+  color: var(--kassa-status-ink);
+}
+
+.vtk-admin-main select.vtk-kassa-status[data-status] {
+  border-color: transparent !important;
+  border-radius: 999px !important;
+  background-color: var(--kassa-status-bg) !important;
+  color: var(--kassa-status-ink) !important;
+  font-weight: 600;
+}
+
+.vtk-kassa-status option {
+  background: var(--surface);
+  color: var(--ink);
+  font-weight: 400;
+}
+
+.vtk-kassa-status[data-status='aangevraagd'] {
+  --kassa-status-bg: var(--yellow);
+  --kassa-status-ink: var(--ink);
+}
+.vtk-kassa-status[data-status='te-maken'] {
+  --kassa-status-bg: var(--kassa-to-make-bg);
+  --kassa-status-ink: var(--kassa-to-make-ink);
+}
+.vtk-kassa-status[data-status='gemaakt'] {
+  --kassa-status-bg: var(--kassa-made-bg);
+  --kassa-status-ink: var(--kassa-made-ink);
+}
+.vtk-kassa-status[data-status='meegegeven'] {
+  --kassa-status-bg: var(--kassa-handed-out-bg);
+  --kassa-status-ink: var(--kassa-handed-out-ink);
+}
+.vtk-kassa-status[data-status='teruggebracht'] {
+  --kassa-status-bg: var(--kassa-returned-bg);
+  --kassa-status-ink: var(--kassa-returned-ink);
+}
+.vtk-kassa-status[data-status='geteld'] {
+  --kassa-status-bg: var(--kassa-counted-bg);
+  --kassa-status-ink: var(--kassa-counted-ink);
+}
+.vtk-kassa-status[data-status='doorgegeven'] {
+  --kassa-status-bg: var(--kassa-passed-on-bg);
+  --kassa-status-ink: var(--kassa-passed-on-ink);
+}
+.vtk-kassa-status[data-status='kasboek'] {
+  --kassa-status-bg: var(--kassa-booked-bg);
+  --kassa-status-ink: var(--kassa-booked-ink);
+}
+
+/* Smal scherm: elke kassa een blok, met de kolomkop als label per waarde. In
    een horizontale scroller verdwenen net de status en het resultaat, en dat
    zijn de twee dingen waarvoor Beheer de lijst opent.
    --------------------------------------------------------------------------- */

@@ -6,7 +6,7 @@ import { LinkedRow } from "@/components/ui/LinkedRow";
 import { hasLocale } from "@/lib/locale";
 import { formatEuro } from "@/lib/rekeningen/expenses";
 import { cashRegisterAccess } from "@/lib/kassas/server";
-import { statusLabel } from "@/lib/kassas/kassa";
+import { STATUS_SLUGS, statusLabel } from "@/lib/kassas/kassa";
 import { KassaNav } from "../KassaNav";
 import { listInclude, toListRows } from "../rows";
 
@@ -99,6 +99,7 @@ export default async function MijnKassas({ params }: { params: Promise<{ locale:
                     >
                       <td data-label={nl ? "Datum" : "Date"} className="whitespace-nowrap px-4 py-3 tabular-nums text-vtk-body">
                         {row.dateLabel}
+                        {row.timeLabel && <span className="block text-xs text-vtk-muted">{row.timeLabel}</span>}
                       </td>
                       <td data-wide className="px-4 py-3">
                         <Link href={href} className="font-medium text-vtk-ink hover:underline">
@@ -111,11 +112,8 @@ export default async function MijnKassas({ params }: { params: Promise<{ locale:
                       </td>
                       <td data-label="Status" className="px-4 py-3">
                         <span
-                          className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                            row.status === "REQUESTED"
-                              ? "bg-vtk-yellow text-vtk-on-yellow"
-                              : "bg-vtk-blue-soft text-vtk-body"
-                          }`}
+                          data-status={STATUS_SLUGS[row.status]}
+                          className="vtk-kassa-status inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
                         >
                           {statusLabel(row.status, nl)}
                         </span>

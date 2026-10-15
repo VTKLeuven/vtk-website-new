@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { useToast } from "@/components/ui/toast";
 import type { SaveState } from "@/lib/saveState";
-import { SETTABLE_STATUSES, statusLabel, type CashRegisterStatus } from "@/lib/kassas/kassa";
+import { SETTABLE_STATUSES, STATUS_SLUGS, statusLabel, type CashRegisterStatus } from "@/lib/kassas/kassa";
 
 /**
  * De status als keuzelijst, zoals de kolom in het rekenblad: een kassa gaat
@@ -13,7 +13,8 @@ import { SETTABLE_STATUSES, statusLabel, type CashRegisterStatus } from "@/lib/k
  * lukte, en bij een fout springt de lijst terug.
  *
  * Enkel na de aanvaarding: van "aangevraagd" naar verder gaat via aanvaarden,
- * want dan vertrekt de mail.
+ * want dan vertrekt de mail. De kleur per status is die van het rekenblad
+ * (`.vtk-kassa-status`), zodat Beheer de kolom nog op kleur leest.
  */
 export function StatusSelect({
   id,
@@ -69,7 +70,8 @@ export function StatusSelect({
         value={value}
         disabled={pending}
         onChange={(event) => onChange(event.target.value as Exclude<CashRegisterStatus, "REQUESTED">)}
-        className="h-8 rounded-full border border-vtk-blue/15 bg-white px-3 text-sm text-vtk-ink focus:border-vtk-ink focus:outline-none disabled:opacity-60"
+        data-status={STATUS_SLUGS[value]}
+        className="vtk-kassa-status h-8 rounded-full border px-3 text-sm focus:outline-none disabled:opacity-60"
       >
         {SETTABLE_STATUSES.map((option) => (
           <option key={option} value={option}>

@@ -894,11 +894,16 @@ function cashRegisterAcceptedPreview(): MailPreview {
     name: "Wannes",
     activity: "Voorbeeldcantus",
     date: new Date("2026-10-08T00:00:00.000Z"),
+    // 20:00 tot 01:00 Brusselse tijd (zomeruur), over middernacht.
+    startsAt: new Date("2026-10-08T18:00:00.000Z"),
+    endsAt: new Date("2026-10-08T23:00:00.000Z"),
     postLabel: "Onthaal",
     responsibleName: "Wannes Voorbeeld",
-    startCounts: { "50": 20, "100": 25, "200": 25, "500": 5 },
+    startCounts: { "50": 40, "100": 25, "200": 25, "500": 5 },
     wantsBancontact: true,
     wantsPayconiq: false,
+    bancontactTerminals: ["Evenementen"],
+    payconiqAccounts: [],
     contactEmail: "beheer@vtk.be",
     url: "https://vtk.be/admin/kassas/voorbeeld",
   });
@@ -906,7 +911,7 @@ function cashRegisterAcceptedPreview(): MailPreview {
     id: "cash-register-accepted",
     title: "Je kassa is aanvaard",
     when: "Zodra iemand met kassabeheer in /admin/kassas op \"Aanvaarden en mailen\" klikt.",
-    to: "Wie de kassa aanvroeg, op zijn voorkeursadres",
+    to: "Wie de kassa aanvroeg, op het @vtk.be-adres (zonder dat op het voorkeursadres)",
     source: "cashRegisters",
     file: "lib/kassas/mail.ts",
     subject: mail.subject,
@@ -914,7 +919,8 @@ function cashRegisterAcceptedPreview(): MailPreview {
     html: mail.html,
     notes: [
       "Het reply-to staat op het adres van Beheer uit de kassa-instellingen, dus een antwoord komt bij hen terecht.",
-      "De mail toont de startkassa zoals ze op het moment van aanvaarden staat: past Beheer het wisselgeld vooraf aan, dan staat dat erin.",
+      "De mail toont de startkassa en de toestellen zoals Beheer ze in het aanvaardformulier zette: het standaardwisselgeld voor wat de post aanduidde, met de aantallen die Beheer nog bijstelde.",
+      "Een kassa van voor oktober 2026 heeft geen uren; dan valt de regel \"Uur\" weg.",
       "Heeft de aanvrager geen account meer, dan vertrekt er niets en zegt de melding in het beheer dat.",
     ],
   };

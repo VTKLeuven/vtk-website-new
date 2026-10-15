@@ -3,13 +3,19 @@ import "server-only";
 import { prisma } from "@vtk/db";
 import type { SessionPayload } from "@vtk/auth";
 import { getCurrentSession, requireSession } from "@/lib/session";
+import { preferredEmail } from "@/lib/brevo/contacts";
+import { formatSpentOn } from "@/lib/rekeningen/expenses";
 import {
   computeResult,
   DEFAULT_CASH_REGISTER_CONFIG,
+  intervalsOverlap,
   normaliseCounts,
   parseCashRegisterConfig,
+  registerInterval,
+  timeRangeShort,
   type CashRegisterConfig,
   type CashRegisterResult,
+  type Interval,
   type PaymentMethod,
 } from "@/lib/kassas/kassa";
 
@@ -86,6 +92,101 @@ export function canView(access: CashRegisterAccess, register: Owned): boolean {
 export function canEditRequest(access: CashRegisterAccess, register: Owned): boolean {
   if (access.canManage) return true;
   return register.status === "REQUESTED" && canView(access, register);
+}
+
+/**
+ * Waar de mail over een kassa heen gaat: het `@vtk.be`-adres, en enkel zonder
+ * dat het voorkeursadres. Een kassa vraag je aan als lid van een post, en dat is
+ * werk van de kring; de mailvoorkeur in het profiel kiest tussen het
+ * universiteits- en het persoonlijke adres, en is er voor wat de site aan
+ * iedereen stuurt.
+ */
+export function cashRegisterMailTo(
+  user: Parameters<typeof preferredEmail>[0] & { googleEmail: string | null },
+): string {
+  return user.googleEmail ?? preferredEmail(user);
+}
+
+// -----------------------------------------------------------------------------
+// Bezette toestellen
+// -----------------------------------------------------------------------------
+
+export type TerminalChoice = { method: PaymentMethod; terminal: string };
+
+export type TerminalUse = TerminalChoice & {
+  activity: string;
+  postLabel: string;
+  date: Date;
+  startsAt: Date | null;
+  endsAt: Date | null;
+};
+
+/**
+ * De Bancontact-bakjes en Payconiq-rekeningen die een andere kassa gebruikt
+ * terwijl deze loopt. Een toestel staat op een kassa als betaalregel, met of
+ * zonder bedrag: Beheer kiest het bij het aanvaarden, en vanaf dan is het weg.
+ *
+ * De databank zoekt ruim op datum (een activiteit kan over middernacht lopen);
+ * of de uren elkaar echt raken, rekent `intervalsOverlap`.
+ */
+export async function terminalsInUse(registerId: string, interval: Interval): Promise<TerminalUse[]> {
+  const DAY = 86_400_000;
+  const rows = await prisma.cashRegisterPayment.findMany({
+    where: {
+      registerId: { not: registerId },
+      register: {
+        date: {
+          gte: new Date(interval.start.getTime() - 2 * DAY),
+          lte: new Date(interval.end.getTime() + DAY),
+        },
+      },
+    },
+    select: {
+      method: true,
+      terminal: true,
+      register: { select: { activity: true, postLabel: true, date: true, startsAt: true, endsAt: true } },
+    },
+  });
+  return rows
+    .filter((row) => intervalsOverlap(interval, registerInterval(row.register)))
+    .map((row) => ({ method: row.method, terminal: row.terminal, ...row.register }));
+}
+
+/** Hetzelfde toestel? Op soort en naam, zoals het op de kassa staat. */
+export function sameTerminal(a: TerminalChoice, b: TerminalChoice): boolean {
+  return a.method === b.method && a.terminal === b.terminal;
+}
+
+/**
+ * Het eerste gekozen toestel dat al op een andere kassa staat, als zinsdeel voor
+ * de toast ("het Bancontact-bakje Evenementen is dan al uitgeleend aan ...");
+ * `null` wanneer alles vrij is. Het noemt de andere kassa, zodat Beheer weet
+ * waar het toestel dan is.
+ */
+export async function terminalConflict(
+  registerId: string,
+  interval: Interval,
+  chosen: TerminalChoice[],
+): Promise<string | null> {
+  if (chosen.length === 0) return null;
+  const inUse = await terminalsInUse(registerId, interval);
+  for (const choice of chosen) {
+    const other = inUse.find((use) => sameTerminal(use, choice));
+    if (other) return `${terminalLabel(choice)} is dan al uitgeleend aan ${terminalUseLabel(other)}`;
+  }
+  return null;
+}
+
+export function terminalLabel(choice: TerminalChoice): string {
+  return choice.method === "BANCONTACT"
+    ? `het Bancontact-bakje ${choice.terminal}`
+    : `de Payconiq-rekening ${choice.terminal}`;
+}
+
+/** "Croque bar (Cultuur), 19/10/2026 20:00-23:00". */
+export function terminalUseLabel(use: TerminalUse): string {
+  const hours = timeRangeShort(use.startsAt, use.endsAt);
+  return `${use.activity} (${use.postLabel}), ${formatSpentOn(use.date)}${hours ? ` ${hours}` : ", de hele dag"}`;
 }
 
 // -----------------------------------------------------------------------------

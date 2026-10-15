@@ -7,6 +7,15 @@
  * `server.ts`, de mail in `mail.ts`.
  */
 
+import {
+  brusselsMinutesOfDay,
+  brusselsWallClock,
+  brusselsYMD,
+  shiftYMD,
+  ymdKey,
+  type YMD,
+} from "@/lib/brussels";
+
 // -----------------------------------------------------------------------------
 // Coupures
 // -----------------------------------------------------------------------------
@@ -61,6 +70,134 @@ export function countsLines(counts: Counts): Array<{ denomination: Denomination;
   return DENOMINATIONS.filter((denomination) => piecesOf(counts, denomination) > 0).map(
     (denomination) => ({ denomination, pieces: piecesOf(counts, denomination) }),
   );
+}
+
+// -----------------------------------------------------------------------------
+// Standaard wisselgeld
+// -----------------------------------------------------------------------------
+
+/**
+ * Wat een post kan aanvragen, en hoeveel stuks Beheer daarvoor meegeeft: een
+ * volle rol munten, of een vast aantal briefjes. Een post duidt enkel aan wat ze
+ * nodig heeft; het aantal is de keuze van Beheer, die het bij het aanvaarden nog
+ * bijstelt. 5 cent, € 50 en € 100 vraag je niet aan: wie dat toch nodig denkt
+ * te hebben, zet het in de opmerking.
+ */
+export const STANDARD_FLOAT: ReadonlyArray<{ denomination: Denomination; pieces: number }> = [
+  { denomination: 10, pieces: 40 },
+  { denomination: 20, pieces: 40 },
+  { denomination: 50, pieces: 40 },
+  { denomination: 100, pieces: 25 },
+  { denomination: 200, pieces: 25 },
+  { denomination: 500, pieces: 5 },
+  { denomination: 1000, pieces: 3 },
+  { denomination: 2000, pieces: 1 },
+];
+
+export function standardPieces(denomination: Denomination): number | null {
+  return STANDARD_FLOAT.find((row) => row.denomination === denomination)?.pieces ?? null;
+}
+
+/** Een aangeduide coupure uit een formulier ("100"), of null als je ze niet kan aanvragen. */
+export function parsePick(raw: unknown): Denomination | null {
+  const value = Number(raw);
+  return STANDARD_FLOAT.find((row) => row.denomination === value)?.denomination ?? null;
+}
+
+/**
+ * De startkassa na een aanvraag met aangeduide coupures. Een nieuw aangeduide
+ * coupure krijgt het standaardaantal; een die er al in zat, houdt haar aantal,
+ * want dat kan Beheer al bijgesteld hebben. Wat een post niet kan aanduiden
+ * (5 cent, € 50, € 100) blijft staan zoals Beheer het zette.
+ */
+export function startCountsFromPicks(picks: Denomination[], current: Counts): Counts {
+  const counts: Counts = {};
+  for (const denomination of DENOMINATIONS) {
+    const standard = standardPieces(denomination);
+    const pieces = piecesOf(current, denomination);
+    if (standard === null) {
+      if (pieces > 0) counts[`${denomination}`] = pieces;
+    } else if (picks.includes(denomination)) {
+      counts[`${denomination}`] = pieces > 0 ? pieces : standard;
+    }
+  }
+  return counts;
+}
+
+// -----------------------------------------------------------------------------
+// Uren
+// -----------------------------------------------------------------------------
+
+export type Interval = { start: Date; end: Date };
+
+const TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+/**
+ * Begin en einde van een activiteit uit de datum en twee uren op de Brusselse
+ * klok. Een einduur dat vroeger op de klok staat dan het begin, valt de dag
+ * erna: 22:00 tot 03:00 is een nacht, geen activiteit die achteruit loopt.
+ *
+ * `null` bij een uur dat niet bestaat of twee gelijke uren.
+ */
+export function activityInterval(date: Date, startTime: string, endTime: string): Interval | null {
+  if (!TIME_PATTERN.test(startTime) || !TIME_PATTERN.test(endTime) || startTime === endTime) return null;
+  const day = calendarDay(date);
+  const endDay = endTime < startTime ? shiftYMD(day, 1) : day;
+  return {
+    start: brusselsWallClock(day.year, day.month, day.day, startTime),
+    end: brusselsWallClock(endDay.year, endDay.month, endDay.day, endTime),
+  };
+}
+
+/** `date` is een `@db.Date`: middernacht UTC van de kalenderdag. */
+function calendarDay(date: Date): YMD {
+  return { year: date.getUTCFullYear(), month: date.getUTCMonth() + 1, day: date.getUTCDate() };
+}
+
+/**
+ * Wanneer een kassa en haar toestellen in gebruik zijn. Een kassa van voor de
+ * uren gevraagd werden, heeft er geen; die houdt de hele dag bezet, want welk
+ * deel van de dag het was, is niet te kennen.
+ */
+export function registerInterval(register: {
+  date: Date;
+  startsAt: Date | null;
+  endsAt: Date | null;
+}): Interval {
+  if (register.startsAt && register.endsAt) return { start: register.startsAt, end: register.endsAt };
+  const day = calendarDay(register.date);
+  const next = shiftYMD(day, 1);
+  return {
+    start: brusselsWallClock(day.year, day.month, day.day, "00:00"),
+    end: brusselsWallClock(next.year, next.month, next.day, "00:00"),
+  };
+}
+
+/** Raakt de ene de andere? Aansluitend (20:00 tot 22:00 en 22:00 tot 01:00) is geen overlap. */
+export function intervalsOverlap(a: Interval, b: Interval): boolean {
+  return a.start < b.end && b.start < a.end;
+}
+
+/** "20:00" op de Brusselse klok, voor een uurveld; leeg bij `null`. */
+export function timeInputValue(at: Date | null): string {
+  if (!at) return "";
+  const minutes = brusselsMinutesOfDay(at);
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+/** "20:00 tot 23:00", en "22:00 tot 03:00 (de dag erna)" over middernacht. */
+export function timeRangeLabel(startsAt: Date | null, endsAt: Date | null, nl: boolean): string | null {
+  if (!startsAt || !endsAt) return null;
+  const nextDay = ymdKey(brusselsYMD(startsAt)) !== ymdKey(brusselsYMD(endsAt));
+  return `${timeInputValue(startsAt)} ${nl ? "tot" : "to"} ${timeInputValue(endsAt)}${
+    nextDay ? (nl ? " (de dag erna)" : " (the next day)") : ""
+  }`;
+}
+
+/** "20:00-23:00" voor een smalle kolom. */
+export function timeRangeShort(startsAt: Date | null, endsAt: Date | null): string | null {
+  if (!startsAt || !endsAt) return null;
+  return `${timeInputValue(startsAt)}-${timeInputValue(endsAt)}`;
 }
 
 // -----------------------------------------------------------------------------

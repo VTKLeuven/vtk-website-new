@@ -8336,19 +8336,54 @@ zou een kassa met het verkeerde wisselgeld opleveren. Wie nog iets wil, mailt
 Beheer, en dat zegt het scherm ook. Intrekken kan om dezelfde reden enkel zolang
 de aanvraag nog niet aanvaard is.
 
-**Aanvaarden is één knop die ook mailt.** De status gaat van "aangevraagd" naar
+**Een post duidt het wisselgeld aan, Beheer kiest het aantal.** Een post weet
+zelden of ze 30 of 40 munten van 20 cent nodig heeft, wel dat ze er nodig heeft.
+De aanvraag heeft dus geen aantallen maar een knop per munt en briefje, en wie
+aanduidt, krijgt het standaardaantal (`STANDARD_FLOAT`): een volle rol van 40 voor
+10, 20 en 50 cent, een rol van 25 voor € 1 en € 2, en vijf briefjes van € 5,
+drie van € 10 en één van € 20. 5 cent, € 50 en € 100 vraag je niet aan; wie dat
+toch nodig denkt te hebben, zet het in de opmerking. Opgeslagen wordt wel het
+aantal, zodat het systeem weet dat er telkens een volle rol meeging. Beheer ziet
+bij het aanvaarden het raster met die aantallen al ingevuld en past enkel aan wat
+er anders meegaat. Past een post daarna de aanvraag nog aan, dan houdt een
+coupure die al aangeduid stond haar aantal: dat kan Beheer al bijgesteld hebben.
+
+**Aanvaarden is één formulier dat ook mailt.** Beheer stelt er de startkassa bij,
+kiest het Bancontact-bakje en de Payconiq-rekening voor wat de post vroeg, en
+aanvaardt. De status gaat van "aangevraagd" naar
 "te maken" en de aanvrager krijgt een mail dat hij zelf een ophaalmoment afspreekt:
 persoonlijk met een van de financieel beheerders, of via het adres van Beheer
 (standaard `beheer@vtk.be`, in te stellen). Er is geen vast ophaalmoment, dus de
 mail belooft er ook geen. Daarom kan de statuskeuze niet van "aangevraagd" naar
 verder springen: dan vertrok er geen mail. Lukt de mail niet, dan gaat de
 aanvaarding toch door en zegt de melding dat, zodat Beheer het zelf laat weten.
+De mail noemt de uren, de startkassa en het gekozen bakje en de rekening, zodat
+de post weet wat ze komt ophalen.
+
+**De mail gaat naar het `@vtk.be`-adres.** Een kassa vraag je aan als lid van een
+post, en dat is werk van de kring. De mailvoorkeur in het profiel kiest tussen het
+universiteits- en het persoonlijke adres en is er voor wat de site aan iedereen
+stuurt; enkel wie geen `@vtk.be`-account heeft, krijgt de mail daar
+(`cashRegisterMailTo`). Dit kwam van Beheer: de mail van een eigen aanvraag
+kwam op het persoonlijke adres toe.
+
+**Een toestel ligt nooit op twee plaatsen tegelijk.** Daarom vraagt de aanvraag
+een begin- en einduur; een einduur dat vroeger op de klok staat dan het begin,
+valt de dag erna (22:00 tot 03:00). Een bakje of rekening is bezet zodra Beheer
+het op een kassa zet, van het begin tot het einde van die activiteit; aansluitend
+(tot 22:00 en vanaf 22:00) mag. Het aanvaardformulier grijst een bezet toestel uit
+met de naam van de andere activiteit, en elke plek die een toestel op een kassa
+zet (aanvaarden, de telling, andere uren in de aanvraag) weigert een dubbele
+uitlening. Een kassa van voor de uren gevraagd werden, heeft er geen en houdt haar
+toestellen de hele dag bezet: welk deel van de dag het was, is niet te kennen, en
+een fail-safe die bij twijfel doorlaat, is er geen.
 
 **De statussen zijn die van het rekenblad, met de hand gezet.** Te maken,
 gemaakt, meegegeven, teruggebracht, geteld, doorgegeven, kasboek. Anders dan bij
 de rekeningen is de status hier wel een kolom: het zijn handelingen in de echte
 wereld (een kassa meegeven) die nergens anders een spoor nalaten. Beheer zet ze
-in het overzicht per rij, zoals de keuzelijst in het blad.
+in het overzicht per rij, zoals de keuzelijst in het blad, en in dezelfde kleuren
+als daar (`--kassa-*` in `vtk-base.css`), want Beheer las die kolom op kleur.
 
 **Een niet getelde kassa is geen lege kassa.** In het blad telde een lege
 eindkassa als nul, waardoor een kassa die nog niet terug was op een verlies van de

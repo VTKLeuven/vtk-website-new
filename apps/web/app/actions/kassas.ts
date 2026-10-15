@@ -6,26 +6,33 @@ import { prisma } from "@vtk/db";
 import { Prisma } from "@prisma/client";
 import { deliverWebsiteMail } from "@/lib/email";
 import { describeChanges, logAudit } from "@/lib/audit";
-import { preferredEmail } from "@/lib/brevo/contacts";
 import { siteBaseUrl } from "@/lib/calendar/feeds";
 import { saveError, saveOk, type SaveState } from "@/lib/saveState";
 import { parseDateInput, workingYearOf } from "@/lib/rekeningen/expenses";
 import {
   canEditRequest,
   CASH_REGISTER_CONFIG_KEY,
+  cashRegisterMailTo,
   getCashRegisterConfig,
   requireCashRegisterAccess,
+  terminalConflict,
   type CashRegisterAccess,
+  type TerminalChoice,
 } from "@/lib/kassas/server";
 import {
+  activityInterval,
   cleanTerminalNames,
   DENOMINATIONS,
   isCashRegisterStatus,
   normaliseCounts,
   parseAmountInput,
   parseCountInput,
+  parsePick,
+  registerInterval,
+  startCountsFromPicks,
   statusLabel,
   type Counts,
+  type Denomination,
   type PaymentMethod,
 } from "@/lib/kassas/kassa";
 import { cashRegisterAcceptedMail } from "@/lib/kassas/mail";
@@ -75,6 +82,8 @@ function readCounts(formData: FormData, prefix: string): Counts | null | "BAD_CO
 
 type RequestFields = {
   date: Date;
+  startsAt: Date;
+  endsAt: Date;
   workingYear: number;
   activity: string;
   groupId: string;
@@ -93,10 +102,15 @@ type RequestFields = {
 async function readRequest(
   formData: FormData,
   access: CashRegisterAccess,
-  current?: { groupId: string | null },
+  current?: { groupId: string | null; startCounts: unknown },
 ): Promise<RequestFields | { error: string }> {
   const date = parseDateInput(text(formData, "date", 10));
   if (!date) return { error: "BAD_DATE" };
+  const startTime = text(formData, "startTime", 5);
+  const endTime = text(formData, "endTime", 5);
+  if (!startTime || !endTime) return { error: "MISSING_TIME" };
+  const interval = activityInterval(date, startTime, endTime);
+  if (!interval) return { error: "BAD_TIME" };
 
   const activity = text(formData, "activity", 120);
   const responsibleName = text(formData, "responsibleName", 120);
@@ -115,11 +129,31 @@ async function readRequest(
     group && (access.postIds.includes(group.id) || current?.groupId === group.id);
   if (!group || (!group.active && !allowedInactive)) return { error: "BAD_POST" };
 
-  const startCounts = readCounts(formData, "start_");
-  if (startCounts === "BAD_COUNT") return { error: "BAD_COUNT" };
+  // De startkassa. Een post duidt aan wat ze nodig heeft (`pick`) en krijgt het
+  // standaardaantal; enkel Beheer telt ze per coupure (`count`). Bij `keep`
+  // staat ze elders op het scherm, in het aanvaardformulier, en blijft ze hier
+  // zoals ze was.
+  const currentCounts = normaliseCounts(current?.startCounts);
+  const mode = text(formData, "startMode", 10);
+  let startCounts: Counts;
+  if (mode === "keep" && current) {
+    startCounts = currentCounts;
+  } else if (mode === "count" && access.canManage) {
+    const counts = readCounts(formData, "start_");
+    if (counts === "BAD_COUNT") return { error: "BAD_COUNT" };
+    startCounts = counts ?? {};
+  } else {
+    const picks = formData
+      .getAll("startPick")
+      .map(parsePick)
+      .filter((denomination): denomination is Denomination => denomination !== null);
+    startCounts = startCountsFromPicks(picks, currentCounts);
+  }
 
   return {
     date,
+    startsAt: interval.start,
+    endsAt: interval.end,
     workingYear: workingYearOf(date),
     activity,
     groupId: group.id,
@@ -128,7 +162,7 @@ async function readRequest(
     wantsBancontact: formData.get("wantsBancontact") === "on",
     wantsPayconiq: formData.get("wantsPayconiq") === "on",
     comment: text(formData, "comment", 2000) || null,
-    startCounts: startCounts ?? {},
+    startCounts,
   };
 }
 
@@ -166,6 +200,8 @@ export async function requestCashRegisterAction(
 
 const REQUEST_LABELS: Record<string, string> = {
   date: "datum",
+  startsAt: "uren",
+  endsAt: "uren",
   activity: "activiteit",
   groupId: "post",
   responsibleName: "verantwoordelijke",
@@ -181,7 +217,10 @@ export async function updateCashRegisterRequestAction(
 ): Promise<SaveState> {
   const access = await requireCashRegisterAccess();
   const id = text(formData, "id", 60);
-  const register = await prisma.cashRegister.findUnique({ where: { id } });
+  const register = await prisma.cashRegister.findUnique({
+    where: { id },
+    include: { payments: { select: { method: true, terminal: true } } },
+  });
   if (!register) return saveError("NOT_FOUND");
   if (!canEditRequest(access, register)) {
     return saveError(register.status === "REQUESTED" ? "FORBIDDEN" : "LOCKED");
@@ -189,6 +228,11 @@ export async function updateCashRegisterRequestAction(
 
   const fields = await readRequest(formData, access, register);
   if ("error" in fields) return saveError(fields.error);
+
+  // Andere uren of een andere dag mogen een gekozen toestel niet stil dubbel
+  // uitlenen.
+  const conflict = await terminalConflict(id, { start: fields.startsAt, end: fields.endsAt }, register.payments);
+  if (conflict) return saveError("TERMINAL_BUSY", `Niet opgeslagen: ${conflict}.`);
 
   // Voor de post voorwaardelijk op de status: aanvaardt Beheer net terwijl de
   // post opslaat, dan gaat de wijziging niet stil over de aanvaarde kassa heen.
@@ -252,9 +296,16 @@ async function requireManager(): Promise<CashRegisterAccess | null> {
 }
 
 /**
- * Aanvaarden zet de kassa op "te maken" en mailt de aanvrager dat hij zelf een
- * ophaalmoment afspreekt. De aanvaarding gaat altijd door; lukt de mail niet,
- * dan zegt de toast dat, zodat Beheer het de aanvrager zelf laat weten.
+ * Aanvaarden: Beheer stelt de startkassa bij, kiest het Bancontact-bakje en de
+ * Payconiq-rekening voor wat de post vroeg, en de aanvrager krijgt een mail om
+ * zelf een ophaalmoment af te spreken. Alles in één formulier, want zo beslist
+ * Beheer het ook: wat er in de kassa gaat en wat er mee gaat, op het moment dat
+ * ze de aanvraag bekijken.
+ *
+ * Een toestel dat op dat moment al op een andere kassa staat, kan niet: dan
+ * zou hetzelfde bakje op twee plaatsen tegelijk moeten liggen. De aanvaarding
+ * gaat altijd door; lukt de mail niet, dan zegt de toast dat, zodat Beheer het
+ * de aanvrager zelf laat weten.
  */
 export async function acceptCashRegisterAction(
   _prev: SaveState,
@@ -263,21 +314,59 @@ export async function acceptCashRegisterAction(
   const access = await requireManager();
   if (!access) return saveError("FORBIDDEN");
   const id = text(formData, "id", 60);
+  const current = await prisma.cashRegister.findUnique({
+    where: { id },
+    select: { status: true, date: true, startsAt: true, endsAt: true, wantsBancontact: true, wantsPayconiq: true },
+  });
+  if (!current) return saveError("NOT_FOUND");
+  if (current.status !== "REQUESTED") return saveError("ALREADY_ACCEPTED");
+
+  // `null` = elk veld leeg: dan blijft de startkassa zoals de post ze vroeg.
+  const startCounts = readCounts(formData, "start_");
+  if (startCounts === "BAD_COUNT") return saveError("BAD_COUNT");
+
+  const config = await getCashRegisterConfig();
+  const devices: Array<{ method: PaymentMethod; wanted: boolean; field: string; names: string[] }> = [
+    { method: "BANCONTACT", wanted: current.wantsBancontact, field: "bancontactTerminal", names: config.bancontactTerminals },
+    { method: "PAYCONIQ", wanted: current.wantsPayconiq, field: "payconiqAccount", names: config.payconiqAccounts },
+  ];
+  const chosen: TerminalChoice[] = [];
+  for (const device of devices) {
+    if (!device.wanted) continue;
+    const terminal = text(formData, device.field, 60);
+    if (!terminal) return saveError("MISSING_TERMINAL");
+    if (!device.names.includes(terminal)) return saveError("BAD_TERMINAL");
+    chosen.push({ method: device.method, terminal });
+  }
+  const conflict = await terminalConflict(id, registerInterval(current), chosen);
+  if (conflict) return saveError("TERMINAL_BUSY", `Niet aanvaard: ${conflict}.`);
 
   // Voorwaardelijk op de status: twee beheerders die tegelijk klikken, sturen
-  // samen één mail.
-  const accepted = await prisma.cashRegister.updateMany({
-    where: { id, status: "REQUESTED" },
-    data: { status: "TO_MAKE", acceptedAt: new Date(), acceptedById: access.session.user.id },
+  // samen één mail en zetten de toestellen er één keer op.
+  const accepted = await prisma.$transaction(async (tx) => {
+    const updated = await tx.cashRegister.updateMany({
+      where: { id, status: "REQUESTED" },
+      data: {
+        status: "TO_MAKE",
+        acceptedAt: new Date(),
+        acceptedById: access.session.user.id,
+        ...(startCounts ? { startCounts } : {}),
+      },
+    });
+    if (updated.count === 0) return false;
+    // Een toestel is een betaalregel zonder bedrag tot er geteld wordt; zo staat
+    // het meteen klaar in de telling.
+    await tx.cashRegisterPayment.createMany({
+      data: chosen.map((choice, index) => ({ ...choice, registerId: id, amountCents: null, sortOrder: index })),
+    });
+    return true;
   });
-  if (accepted.count === 0) {
-    const exists = await prisma.cashRegister.count({ where: { id } });
-    return saveError(exists ? "ALREADY_ACCEPTED" : "NOT_FOUND");
-  }
+  if (!accepted) return saveError("ALREADY_ACCEPTED");
 
   const register = await prisma.cashRegister.findUniqueOrThrow({
     where: { id },
     include: {
+      payments: { orderBy: { sortOrder: "asc" }, select: { method: true, terminal: true } },
       requestedBy: {
         select: {
           name: true,
@@ -285,34 +374,40 @@ export async function acceptCashRegisterAction(
           email: true,
           personalEmail: true,
           emailPreference: true,
+          googleEmail: true,
           locale: true,
         },
       },
     },
   });
   const target = `${register.activity} (${register.postLabel})`;
+  const namesOf = (method: PaymentMethod) =>
+    register.payments.filter((payment) => payment.method === method).map((payment) => payment.terminal);
 
   let detail: string;
   const requester = register.requestedBy;
   if (!requester) {
     detail = "Aanvaard. De aanvrager heeft geen account meer, dus er vertrok geen mail.";
   } else {
-    const config = await getCashRegisterConfig();
     const locale = requester.locale === "EN" ? "en" : "nl";
     const mail = cashRegisterAcceptedMail({
       locale,
       name: requester.firstName?.trim() || requester.name,
       activity: register.activity,
       date: register.date,
+      startsAt: register.startsAt,
+      endsAt: register.endsAt,
       postLabel: register.postLabel,
       responsibleName: register.responsibleName,
       startCounts: normaliseCounts(register.startCounts),
       wantsBancontact: register.wantsBancontact,
       wantsPayconiq: register.wantsPayconiq,
+      bancontactTerminals: namesOf("BANCONTACT"),
+      payconiqAccounts: namesOf("PAYCONIQ"),
       contactEmail: config.contactEmail,
       url: `${siteBaseUrl()}${locale === "en" ? "/en" : ""}/admin/kassas/${register.id}`,
     });
-    const to = preferredEmail(requester);
+    const to = cashRegisterMailTo(requester);
     const result = await deliverWebsiteMail(
       { to, subject: mail.subject, text: mail.text, html: mail.html, replyTo: config.contactEmail },
       { source: "cashRegisters" },
@@ -332,7 +427,9 @@ export async function acceptCashRegisterAction(
     entity: "cashRegister",
     entityId: id,
     target,
-    summary: "aanvaard",
+    summary: chosen.length
+      ? `aanvaard, met ${chosen.map((choice) => `${choice.method === "BANCONTACT" ? "Bancontact" : "Payconiq"} ${choice.terminal}`).join(" en ")}`
+      : "aanvaard",
   });
   revalidateCashRegisters(id);
   return saveOk(detail);
@@ -422,6 +519,9 @@ export async function saveCashRegisterCountAction(
     if (amountCents === undefined) return saveError("BAD_AMOUNT");
     payments.push({ method, terminal, amountCents, sortOrder: payments.length });
   }
+  // Ook een bakje dat pas bij het tellen bijkomt, kan niet al elders liggen.
+  const conflict = await terminalConflict(id, registerInterval(register), payments);
+  if (conflict) return saveError("TERMINAL_BUSY", `Niet opgeslagen: ${conflict}.`);
 
   const requestedTickets = [...new Set(texts(formData, "ticketEventId").filter(Boolean))];
   const ticketEvents = requestedTickets.length

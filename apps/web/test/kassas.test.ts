@@ -16,9 +16,23 @@ import {
   STATUS_SLUGS,
   CASH_REGISTER_STATUSES,
   DEFAULT_CASH_REGISTER_CONFIG,
+  activityInterval,
+  intervalsOverlap,
+  parsePick,
+  registerInterval,
+  startCountsFromPicks,
+  timeInputValue,
+  timeRangeLabel,
   type Counts,
 } from "@/lib/kassas/kassa";
-import { accessFor, canEditRequest, canView, visibilityWhere } from "@/lib/kassas/server";
+import {
+  accessFor,
+  canEditRequest,
+  canView,
+  cashRegisterMailTo,
+  sameTerminal,
+  visibilityWhere,
+} from "@/lib/kassas/server";
 import { cashRegisterAcceptedMail } from "@/lib/kassas/mail";
 
 const noVouchers = { shiftVouchers: null, elixirVouchers: null, shiftVoucherValueCents: 120, elixirVoucherValueCents: 120 };
@@ -126,6 +140,87 @@ describe("kassa's: invoer", () => {
   });
 });
 
+describe("kassa's: standaardwisselgeld", () => {
+  it("geeft per aangeduide coupure een volle rol of het vaste aantal briefjes", () => {
+    expect(startCountsFromPicks([10, 20, 50, 100, 200, 500, 1000, 2000], {})).toEqual({
+      "10": 40,
+      "20": 40,
+      "50": 40,
+      "100": 25,
+      "200": 25,
+      "500": 5,
+      "1000": 3,
+      "2000": 1,
+    });
+    // Het voorbeeld van Beheer: € 1, € 2, € 5, € 10 en € 20 is samen € 150.
+    expect(countsTotalCents(startCountsFromPicks([100, 200, 500, 1000, 2000], {}))).toBe(15_000);
+  });
+
+  it("laat 5 cent, € 50 en € 100 niet aanduiden", () => {
+    expect(parsePick("5")).toBeNull();
+    expect(parsePick("5000")).toBeNull();
+    expect(parsePick("10000")).toBeNull();
+    expect(parsePick("100")).toBe(100);
+    expect(parsePick("abc")).toBeNull();
+  });
+
+  it("houdt een aantal dat Beheer al bijstelde, en wat een post niet kan aanduiden", () => {
+    const current: Counts = { "100": 30, "200": 25, "5000": 2 };
+    // € 2 uitgevinkt, € 5 erbij: € 1 houdt zijn 30, € 50 blijft staan.
+    expect(startCountsFromPicks([100, 500], current)).toEqual({ "100": 30, "500": 5, "5000": 2 });
+  });
+});
+
+describe("kassa's: uren en toestellen", () => {
+  const day = new Date("2026-10-19T00:00:00.000Z");
+
+  it("zet de Brusselse klok om, ook over middernacht en de wintertijd", () => {
+    const evening = activityInterval(day, "20:00", "23:00");
+    expect(evening?.start.toISOString()).toBe("2026-10-19T18:00:00.000Z");
+    expect(evening?.end.toISOString()).toBe("2026-10-19T21:00:00.000Z");
+    const night = activityInterval(day, "22:00", "03:00");
+    expect(night?.end.toISOString()).toBe("2026-10-20T01:00:00.000Z");
+    // 24 oktober 2026 op 25 oktober: de klok gaat een uur terug.
+    const shift = activityInterval(new Date("2026-10-24T00:00:00.000Z"), "22:00", "04:00");
+    expect(shift?.start.toISOString()).toBe("2026-10-24T20:00:00.000Z");
+    expect(shift?.end.toISOString()).toBe("2026-10-25T03:00:00.000Z");
+  });
+
+  it("weigert gelijke of onbestaande uren", () => {
+    expect(activityInterval(day, "20:00", "20:00")).toBeNull();
+    expect(activityInterval(day, "25:00", "02:00")).toBeNull();
+    expect(activityInterval(day, "8:00", "12:00")).toBeNull();
+  });
+
+  it("toont de uren op de Brusselse klok", () => {
+    const night = activityInterval(day, "22:00", "03:00")!;
+    expect(timeInputValue(night.start)).toBe("22:00");
+    expect(timeRangeLabel(night.start, night.end, true)).toBe("22:00 tot 03:00 (de dag erna)");
+    expect(timeRangeLabel(null, null, true)).toBeNull();
+  });
+
+  it("ziet overlap, maar niet wanneer de ene stopt waar de andere begint", () => {
+    const croque = activityInterval(day, "18:00", "22:00")!;
+    expect(intervalsOverlap(croque, activityInterval(day, "21:00", "23:00")!)).toBe(true);
+    expect(intervalsOverlap(croque, activityInterval(day, "22:00", "02:00")!)).toBe(false);
+  });
+
+  it("houdt een kassa zonder uren de hele dag bezet", () => {
+    const old = registerInterval({ date: day, startsAt: null, endsAt: null });
+    expect(old.start.toISOString()).toBe("2026-10-18T22:00:00.000Z");
+    expect(old.end.toISOString()).toBe("2026-10-19T22:00:00.000Z");
+    expect(intervalsOverlap(old, activityInterval(day, "23:00", "02:00")!)).toBe(true);
+    expect(intervalsOverlap(old, activityInterval(new Date("2026-10-20T00:00:00.000Z"), "10:00", "12:00")!)).toBe(
+      false,
+    );
+  });
+
+  it("vergelijkt een toestel op soort en naam", () => {
+    expect(sameTerminal({ method: "BANCONTACT", terminal: "Theo" }, { method: "BANCONTACT", terminal: "Theo" })).toBe(true);
+    expect(sameTerminal({ method: "BANCONTACT", terminal: "Theo" }, { method: "PAYCONIQ", terminal: "Theo" })).toBe(false);
+  });
+});
+
 describe("kassa's: instellingen", () => {
   it("valt terug op de standaard zonder instelling", () => {
     expect(parseCashRegisterConfig(undefined)).toEqual(DEFAULT_CASH_REGISTER_CONFIG);
@@ -176,17 +271,33 @@ describe("kassa's: toegang", () => {
   });
 });
 
+describe("kassa's: adres van de mail", () => {
+  const user = { email: "r0123@kuleuven.be", personalEmail: "wannes@example.com", emailPreference: "PERSONAL" as const };
+
+  it("mailt naar het @vtk.be-adres, ook bij een persoonlijke voorkeur", () => {
+    expect(cashRegisterMailTo({ ...user, googleEmail: "wannes.voorbeeld@vtk.be" })).toBe("wannes.voorbeeld@vtk.be");
+  });
+
+  it("valt zonder @vtk.be-adres terug op het voorkeursadres", () => {
+    expect(cashRegisterMailTo({ ...user, googleEmail: null })).toBe("wannes@example.com");
+  });
+});
+
 describe("kassa's: mail bij aanvaarden", () => {
   const mail = cashRegisterAcceptedMail({
     locale: "nl",
     name: "Wannes",
     activity: "Cantus <b>&</b> co",
     date: new Date("2026-10-08T00:00:00.000Z"),
+    startsAt: new Date("2026-10-08T20:00:00.000Z"),
+    endsAt: new Date("2026-10-09T01:00:00.000Z"),
     postLabel: "Onthaal",
     responsibleName: "Wannes Voorbeeld",
     startCounts: { "50": 20, "200": 25 },
     wantsBancontact: true,
-    wantsPayconiq: false,
+    wantsPayconiq: true,
+    bancontactTerminals: ["Evenementen"],
+    payconiqAccounts: [],
     contactEmail: "beheer@vtk.be",
     url: "https://vtk.be/admin/kassas/voorbeeld",
   });
@@ -199,6 +310,13 @@ describe("kassa's: mail bij aanvaarden", () => {
     expect(mail.text).toContain("€ 60,00");
     expect(mail.text).toContain("25 × € 2");
     expect(mail.text).toContain("donderdag 8 oktober 2026");
+  });
+
+  it("noemt de uren en het gekozen toestel", () => {
+    expect(mail.text).toContain("Uur: 22:00 tot 03:00 (de dag erna)");
+    expect(mail.text).toContain("Bancontact: Evenementen");
+    // Gevraagd, maar (nog) geen rekening gekozen: dan enkel "Ja".
+    expect(mail.text).toContain("Payconiq: Ja");
   });
 
   it("ontsnapt wat de post intikte in de html", () => {

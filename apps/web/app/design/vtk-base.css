@@ -42,6 +42,24 @@
   --danger-ink: #b42318;
   /* Rand rond een veld of kaart met een fout. */
   --danger-line: #f3c4bf;
+  /* De status van een kassa (/admin/kassas), in de kleuren van de keuzelijst
+     in het rekenblad van Beheer: daar lazen ze een kolom op kleur, en dat moet
+     hier blijven kunnen. Lichte vlakken met donkere tekst, zoals de chips van
+     Google Sheets. */
+  --kassa-to-make-bg: #ffcfc9;
+  --kassa-to-make-ink: #b10202;
+  --kassa-made-bg: #ffc8aa;
+  --kassa-made-ink: #753800;
+  --kassa-handed-out-bg: #ffe5a0;
+  --kassa-handed-out-ink: #473821;
+  --kassa-returned-bg: #bfe1f6;
+  --kassa-returned-ink: #0a53a8;
+  --kassa-counted-bg: #e6cff2;
+  --kassa-counted-ink: #5a3286;
+  --kassa-passed-on-bg: #e8eaed;
+  --kassa-passed-on-ink: #3d3d3d;
+  --kassa-booked-bg: #d4edbc;
+  --kassa-booked-ink: #11734b;
   --ink-2: var(--body);
   --rule: var(--line);
   --rule-soft: rgba(14, 26, 54, 0.07);

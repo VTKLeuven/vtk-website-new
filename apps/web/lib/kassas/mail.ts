@@ -10,7 +10,13 @@ import {
   mailNoticeBox,
   mailParagraph,
 } from "@/lib/mailDesign";
-import { countsLines, countsTotalCents, denominationLabel, type Counts } from "@/lib/kassas/kassa";
+import {
+  countsLines,
+  countsTotalCents,
+  denominationLabel,
+  timeRangeLabel,
+  type Counts,
+} from "@/lib/kassas/kassa";
 
 /**
  * De mail die vertrekt wanneer Beheer een kassa aanvaardt, als pure functie:
@@ -27,11 +33,17 @@ export type CashRegisterAcceptedMailInput = {
   activity: string;
   /** De datum van de activiteit (`@db.Date`, dus middernacht UTC). */
   date: Date;
+  /** Begin en einde; `null` bij een kassa van voor er naar de uren gevraagd werd. */
+  startsAt: Date | null;
+  endsAt: Date | null;
   postLabel: string;
   responsibleName: string;
   startCounts: Counts;
   wantsBancontact: boolean;
   wantsPayconiq: boolean;
+  /** De bakjes en rekeningen die Beheer bij het aanvaarden koos. */
+  bancontactTerminals: string[];
+  payconiqAccounts: string[];
   /** Het adres van Beheer; staat in de tekst en is het reply-to. */
   contactEmail: string;
   /** Volledige link naar de aanvraag in het beheer. */
@@ -51,8 +63,11 @@ export function cashRegisterAcceptedMail(input: CashRegisterAcceptedMailInput): 
     month: "long",
     year: "numeric",
   }).format(input.date);
+  const hours = timeRangeLabel(input.startsAt, input.endsAt, nl);
   const yes = nl ? "Ja" : "Yes";
   const no = nl ? "Nee" : "No";
+  // De naam van het toestel, zodat de post weet wat ze komt ophalen.
+  const device = (wanted: boolean, names: string[]) => (wanted ? names.join(", ") || yes : no);
 
   const startTotal = countsTotalCents(input.startCounts);
   const startLines = countsLines(input.startCounts).map(
@@ -83,11 +98,12 @@ export function cashRegisterAcceptedMail(input: CashRegisterAcceptedMailInput): 
   const facts = [
     { label: nl ? "Activiteit" : "Activity", value: input.activity },
     { label: nl ? "Datum" : "Date", value: date },
+    ...(hours ? [{ label: nl ? "Uur" : "Time", value: hours }] : []),
     { label: nl ? "Post" : "Post", value: input.postLabel },
     { label: nl ? "Verantwoordelijke" : "Responsible", value: input.responsibleName },
     { label: nl ? "Startkassa" : "Starting float", value: startValue },
-    { label: "Bancontact", value: input.wantsBancontact ? yes : no },
-    { label: "Payconiq", value: input.wantsPayconiq ? yes : no },
+    { label: "Bancontact", value: device(input.wantsBancontact, input.bancontactTerminals) },
+    { label: "Payconiq", value: device(input.wantsPayconiq, input.payconiqAccounts) },
   ];
   const buttonLabel = nl ? "Bekijk je aanvraag" : "View your request";
   const footer = nl

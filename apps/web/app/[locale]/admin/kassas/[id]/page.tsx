@@ -4,15 +4,16 @@ import { prisma } from "@vtk/db";
 import { pick, type Locale } from "@vtk/i18n";
 import { AdminDisclosure } from "@/components/admin/AdminDisclosure";
 import { DeleteButton } from "@/components/ui/DeleteIconButton";
-import { SaveForm } from "@/components/ui/SaveForm";
 import { hasLocale } from "@/lib/locale";
-import { preferredEmail } from "@/lib/brevo/contacts";
 import { formatEuro, formatSubmittedOn, toDateInputValue } from "@/lib/rekeningen/expenses";
 import {
   canEditRequest,
   canView,
   cashRegisterAccess,
+  cashRegisterMailTo,
   getCashRegisterConfig,
+  sameTerminal,
+  terminalsInUse,
   ticketIncomeByEvent,
 } from "@/lib/kassas/server";
 import {
@@ -20,7 +21,13 @@ import {
   countsTotalCents,
   denominationLabel,
   normaliseCounts,
+  registerInterval,
+  STATUS_SLUGS,
   statusLabel,
+  timeInputValue,
+  timeRangeLabel,
+  timeRangeShort,
+  type PaymentMethod,
 } from "@/lib/kassas/kassa";
 import {
   acceptCashRegisterAction,
@@ -29,6 +36,7 @@ import {
   setCashRegisterStatusAction,
   updateCashRegisterRequestAction,
 } from "@/app/actions/kassas";
+import { AcceptForm, type DeviceOption } from "../AcceptForm";
 import { CountForm, type TicketOption } from "../CountForm";
 import { RequestForm } from "../RequestForm";
 import { StatusSelect } from "../StatusSelect";
@@ -47,7 +55,7 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
     where: { id },
     include: {
       requestedBy: {
-        select: { name: true, email: true, personalEmail: true, emailPreference: true },
+        select: { name: true, email: true, personalEmail: true, emailPreference: true, googleEmail: true },
       },
       acceptedBy: { select: { name: true } },
       payments: { orderBy: { sortOrder: "asc" } },
@@ -72,10 +80,19 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
     year: "numeric",
   }).format(register.date);
   const listHref = `${base}/admin/kassas${manage ? "" : "/mijn"}`;
-  const requesterEmail = register.requestedBy ? preferredEmail(register.requestedBy) : null;
+  const requesterEmail = register.requestedBy ? cashRegisterMailTo(register.requestedBy) : null;
+  const hours = timeRangeLabel(register.startsAt, register.endsAt, nl);
+  // "Bancontact (Evenementen)": het toestel dat Beheer koos, zodra het gekozen is.
+  const deviceLabel = (method: PaymentMethod, label: string) => {
+    const names = register.payments.filter((payment) => payment.method === method).map((payment) => payment.terminal);
+    return names.length ? `${label} (${names.join(", ")})` : label;
+  };
 
   const facts: Array<{ label: string; value: string }> = [
     { label: nl ? "Datum" : "Date", value: longDate },
+    // Een kassa van voor er naar de uren gevraagd werd, heeft er geen; dan
+    // valt de regel weg in plaats van "niet ingevuld" te tonen.
+    ...(hours ? [{ label: nl ? "Uur" : "Time", value: hours }] : []),
     { label: nl ? "Post" : "Post", value: register.postLabel },
     { label: nl ? "Verantwoordelijke" : "Person responsible", value: register.responsibleName },
     {
@@ -85,7 +102,10 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
     {
       label: nl ? "Kaartbetalingen" : "Card payments",
       value:
-        [register.wantsBancontact ? "Bancontact" : "", register.wantsPayconiq ? "Payconiq" : ""]
+        [
+          register.wantsBancontact ? deviceLabel("BANCONTACT", "Bancontact") : "",
+          register.wantsPayconiq ? deviceLabel("PAYCONIQ", "Payconiq") : "",
+        ]
           .filter(Boolean)
           .join(nl ? " en " : " and ") || (nl ? "geen" : "none"),
     },
@@ -128,9 +148,13 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
       locale={locale}
       action={updateCashRegisterRequestAction}
       posts={(await postChoices(access, locale, register.groupId)).map((post) => ({ id: post.id, name: post.name }))}
+      // Bij Beheer staat de startkassa voor het aanvaarden in het aanvaardformulier.
+      floatMode={manage ? (requested ? "keep" : "count") : "pick"}
       values={{
         id: register.id,
         date: toDateInputValue(register.date),
+        startTime: timeInputValue(register.startsAt),
+        endTime: timeInputValue(register.endsAt),
         activity: register.activity,
         groupId: register.groupId ?? "",
         responsibleName: register.responsibleName,
@@ -158,15 +182,15 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-2xl font-semibold">{register.activity}</h1>
           <span
-            className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-              requested ? "bg-vtk-yellow text-vtk-on-yellow" : "bg-vtk-blue-soft text-vtk-body"
-            }`}
+            data-status={STATUS_SLUGS[register.status]}
+            className="vtk-kassa-status inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold"
           >
             {statusLabel(register.status, nl)}
           </span>
         </div>
         <p className="text-sm text-vtk-muted">
-          {longDate} · {register.postLabel}
+          {longDate}
+          {hours ? `, ${hours}` : ""} · {register.postLabel}
         </p>
       </header>
 
@@ -189,29 +213,24 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
               ? `De kassa gaat naar "te maken", en ${register.requestedBy?.name ?? "de aanvrager"} krijgt een mail om een ophaalmoment af te spreken met de financieel beheerders of via ${config.contactEmail}.`
               : `The register moves to "to make", and ${register.requestedBy?.name ?? "the requester"} gets an email to arrange a pick-up time with the financial managers or via ${config.contactEmail}.`}
           </p>
-          <SaveForm
+          <AcceptForm
+            locale={locale}
+            base={base}
             action={acceptCashRegisterAction}
-            submitLabel={nl ? "Aanvaarden en mailen" : "Accept and email"}
-            savingLabel={nl ? "Bezig met aanvaarden..." : "Accepting..."}
-            savedMessage={nl ? "Aanvaard." : "Accepted."}
-            errorMessages={errorMessages}
-            fallbackErrorMessage={nl ? "Aanvaarden mislukt." : "Could not accept."}
-            confirmSubmit={{
-              title: nl ? "Aanvaarden en mailen?" : "Accept and send the email?",
-              description: requesterEmail
+            id={register.id}
+            startCounts={startCounts}
+            {...(await deviceOptionsFor(register, config, nl))}
+            confirmDescription={
+              requesterEmail
                 ? nl
-                  ? `Er vertrekt meteen een mail naar ${requesterEmail}. Pas de aanvraag hieronder eerst aan als het wisselgeld niet klopt: de mail toont wat er nu staat.`
-                  : `An email goes to ${requesterEmail} right away. Adjust the request below first if the change is wrong: the email shows what is there now.`
+                  ? `Er vertrekt meteen een mail naar ${requesterEmail}, met de startkassa en de toestellen zoals ze hier staan.`
+                  : `An email goes to ${requesterEmail} right away, with the starting float and the devices as they are here.`
                 : nl
                   ? "De aanvrager heeft geen account meer, dus er vertrekt geen mail. Laat het de post zelf weten."
-                  : "The requester no longer has an account, so no email goes out. Let the post know yourself.",
-              confirmLabel: nl ? "Aanvaarden" : "Accept",
-              cancelLabel: nl ? "Annuleren" : "Cancel",
-            }}
-            className="mt-4"
-          >
-            <input type="hidden" name="id" value={register.id} />
-          </SaveForm>
+                  : "The requester no longer has an account, so no email goes out. Let the post know yourself."
+            }
+            errorMessages={errorMessages}
+          />
         </section>
       )}
 
@@ -242,21 +261,21 @@ export default async function KassaDetail({ params }: { params: Promise<{ locale
 
       {requestForm &&
         (manage ? (
-          // Bij Beheer is de aanvraag na het aanvaarden een detail; de telling is
-          // dan het werk. Openklappen kan nog altijd om het wisselgeld bij te
-          // stellen.
-          // De sleutel hangt aan de aanvraagstand: na het aanvaarden klapt de
-          // aanvraag zo vanzelf dicht en staat de telling open.
+          // Bij Beheer is de aanvraag een detail: voor het aanvaarden staat het
+          // werk (wisselgeld en toestellen) in het aanvaardformulier, daarna in
+          // de telling. Openklappen kan om iets recht te zetten.
           <AdminDisclosure
-            key={requested ? "aanvraag" : "aanvaard"}
-            defaultOpen={requested}
             summary={
               <span>
                 <span className="block font-semibold text-vtk-ink">{nl ? "Aanvraag aanpassen" : "Edit the request"}</span>
                 <span className="block text-xs text-vtk-muted">
-                  {nl
-                    ? "Datum, post, verantwoordelijke, kaartbetalingen en startkassa"
-                    : "Date, post, person responsible, card payments and starting float"}
+                  {requested
+                    ? nl
+                      ? "Datum, uren, post, verantwoordelijke en kaartbetalingen"
+                      : "Date, times, post, person responsible and card payments"
+                    : nl
+                      ? "Datum, uren, post, verantwoordelijke, kaartbetalingen en startkassa"
+                      : "Date, times, post, person responsible, card payments and starting float"}
                 </span>
               </span>
             }
@@ -376,4 +395,32 @@ async function ticketOptionsFor(
       samePost: event.ownerGroupId === register.groupId,
       incomeCents: income.get(event.id) ?? 0,
     }));
+}
+
+/**
+ * De bakjes en rekeningen uit de instellingen voor het aanvaardformulier, met
+ * bij elk de activiteit waar het op dat moment al ligt. `null` voor wat de post
+ * niet vroeg.
+ */
+async function deviceOptionsFor(
+  register: { id: string; date: Date; startsAt: Date | null; endsAt: Date | null; wantsBancontact: boolean; wantsPayconiq: boolean },
+  config: { bancontactTerminals: string[]; payconiqAccounts: string[] },
+  nl: boolean,
+): Promise<{ bancontact: DeviceOption[] | null; payconiq: DeviceOption[] | null }> {
+  if (!register.wantsBancontact && !register.wantsPayconiq) return { bancontact: null, payconiq: null };
+  const inUse = await terminalsInUse(register.id, registerInterval(register));
+  const options = (method: PaymentMethod, names: string[]): DeviceOption[] =>
+    names.map((name) => {
+      const use = inUse.find((candidate) => sameTerminal(candidate, { method, terminal: name }));
+      return {
+        name,
+        busyWith: use
+          ? `${use.activity}, ${timeRangeShort(use.startsAt, use.endsAt) ?? (nl ? "de hele dag" : "all day")}`
+          : null,
+      };
+    });
+  return {
+    bancontact: register.wantsBancontact ? options("BANCONTACT", config.bancontactTerminals) : null,
+    payconiq: register.wantsPayconiq ? options("PAYCONIQ", config.payconiqAccounts) : null,
+  };
 }
